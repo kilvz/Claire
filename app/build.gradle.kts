@@ -16,15 +16,21 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.wangzan101.mika"
+        // Claire installs alongside Mika (Kilv 2026-11-23): its own
+        // applicationId, so both can live on one phone. The Kotlin
+        // source package stays com.wangzan101.mika (class names only;
+        // install identity is the applicationId). Provider authorities
+        // use ${applicationId} and runtime code reads
+        // context.packageName, so they follow automatically.
+        applicationId = "com.kilv.claire"
         minSdk = 29
         targetSdk = 35
-        versionCode = 52
-        // Claire 1.0.0 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
+        versionCode = 53
+        // Claire 1.1.0 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
         // Versioning (same scheme as Kai-custom): a.b.c; minor fix bumps c
-        // (1.0.1), feature / major fix bumps b (1.1.0), rebase onto a new
+        // (1.1.1), feature / major fix bumps b (1.2.0), rebase onto a new
         // upstream bumps a (2.0.0, b/c reset). versionCode increments each release.
-        versionName = "1.0.0"
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
