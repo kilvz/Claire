@@ -38,7 +38,7 @@ object Releases {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * 发布里除了全架构的 `Mika-v<版本>.apk`,还可能有只带某个架构原生库的包,名字以 `-<后缀>.apk` 结尾。
+     * 发布里除了全架构的 `Claire-v<版本>.apk`,还可能有只带某个架构原生库的包,名字以 `-<后缀>.apk` 结尾。
      * 键是 Android 的 ABI 名,值是附件名后缀。
      */
     private val ABI_APK_SUFFIX = mapOf("arm64-v8a" to "arm64")
@@ -69,7 +69,7 @@ object Releases {
 
     /**
      * 从发布页兜底查到的版本:只有 tag,更新说明为空(说明只在 API 里)。
-     * [assets] 为 null 表示附件页无法读取，此时按 Mika 的固定命名推测全架构包地址。
+     * [assets] 为 null 表示附件页无法读取，此时按 Claire 的固定命名推测全架构包地址。
      * 已读取附件页时，只提供列表里与设备兼容的包。
      */
     internal fun fromPage(tag: String, assets: List<ReleaseAsset>?, deviceAbis: List<String>, releasesUrl: String): ReleaseInfo {
@@ -82,7 +82,7 @@ object Releases {
             notes = "",
             date = null,
             pageUrl = "$base/tag/$tag",
-            apkUrl = apk?.url ?: if (assets == null) "$base/download/$tag/Mika-$tag.apk" else null,
+            apkUrl = apk?.url ?: if (assets == null) "$base/download/$tag/Claire-$tag.apk" else null,
             apkSize = apk?.size,
             apkDigest = apk?.digest,
             apkListKnown = assets != null,

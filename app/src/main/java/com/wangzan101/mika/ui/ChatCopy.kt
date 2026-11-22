@@ -18,7 +18,7 @@ object ChatCopy {
     }
 
     val EMPTY_PROMPT get() = tr(R.string.chat_empty_prompt)
-    /** 空对话里的一句价值主张:说明 Mika 能干嘛。 */
+    /** 空对话里的一句价值主张:说明 Claire 能干嘛。 */
     val EMPTY_VALUE get() = tr(R.string.chat_empty_value)
 
     /** 内置示例的类型,只决定首页卡片上的图标和色调。 */
@@ -54,7 +54,7 @@ object ChatCopy {
     )
 
     /** 对话页顶栏的标题:固定是 App 名;副标题说此刻在做什么。 */
-    const val APP_TITLE = "Mika"
+    const val APP_TITLE = "Claire"
 
     /** 对话的名字:第一句话(只取第一行,附件那几行不算;只发了屏幕时是「你此刻的屏幕」);空对话为空。侧栏里用它称呼对话。 */
     fun title(exchanges: List<Exchange>): String =

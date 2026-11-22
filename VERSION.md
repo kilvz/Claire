@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 1.1.0 (versionCode 53)
+- **Claire version:** 1.2.0 (versionCode 54)
 - **Base version:** upstream Mika 0.1.50 (commit `9c7aabd8`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -22,6 +22,11 @@ recorded base version.
 - 1.0.0: first release (OrcaRouter, English by default).
 - 1.1.0: own applicationId `com.kilv.claire` + app label Claire, so
   it installs alongside Mika instead of conflicting with it.
+- 1.2.0: full Claire identity — the app calls itself Claire
+  everywhere (settings, captions, prompts, phone-call greetings),
+  the in-app updater checks `kilvz/Claire` releases, the author
+  points at Kilv (`@KilZT`, his WeChat QR), and its own folders are
+  `Pictures/Claire`, `Download/Claire`, `Music/Claire`.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the debug APK on GitHub

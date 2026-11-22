@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="web_logout_partial">Bazı oturumlar kalabilir; her şeyi temizlemek için \“Tümünden çık\”ı kullanın.</string>
-    <string name="web_challenged_note">Mika bu sitede yakın zamanda bir CAPTCHA veya erişim engeliyle karşılaştı. Olmaya devam ederse bu sitenin verilerini (çerezler ve web depolama) temizleyip tekrar oturum açın.</string>
-    <string name="web_data_note">Web sitesi oturum verileri yalnızca Mika\'nın bu telefondaki özel klasöründe, ek şifreleme olmadan saklanır — sistem tarayıcısıyla aynı koruma.</string>
+    <string name="web_challenged_note">Claire bu sitede yakın zamanda bir CAPTCHA veya erişim engeliyle karşılaştı. Olmaya devam ederse bu sitenin verilerini (çerezler ve web depolama) temizleyip tekrar oturum açın.</string>
+    <string name="web_data_note">Web sitesi oturum verileri yalnızca Claire\'nın bu telefondaki özel klasöründe, ek şifreleme olmadan saklanır — sistem tarayıcısıyla aynı koruma.</string>
     <string name="web_none">Henüz ziyaret edilen site yok</string>
-    <string name="web_none_sub">Siteler, Mika üzerlerinde çalıştıktan sonra veya siz burada oturum açtıktan sonra burada görünür</string>
-    <string name="web_signed_in_by_you">Mika içinde oturum açıldı</string>
+    <string name="web_none_sub">Siteler, Claire üzerlerinde çalıştıktan sonra veya siz burada oturum açtıktan sonra burada görünür</string>
+    <string name="web_signed_in_by_you">Claire içinde oturum açıldı</string>
     <string name="web_challenged">Bir denetim veya engelle karşılaştı</string>
     <string name="web_last_visit">Son ziyaret %1$s</string>
     <string name="web_manage">Yönet</string>
     <string name="web_logout_all_title">Tümünden çık ve web verilerini temizle</string>
-    <string name="web_you_signed_in">Bu sitede Mika içinde oturum açtınız.</string>
-    <string name="web_mika_visited">Mika bu siteyi ziyaret etti.</string>
+    <string name="web_you_signed_in">Bu sitede Claire içinde oturum açtınız.</string>
+    <string name="web_mika_visited">Claire bu siteyi ziyaret etti.</string>
     <string name="web_open_login">Oturum açmayı aç</string>
     <string name="web_cleared">%1$s için çerezler ve web depolama temizlendi; yeniden oturum açmanız gerekecek. Bazı veriler kalabilir; her şeyi temizlemek için \“Tümünden çık\”ı kullanın.</string>
     <string name="web_signed_out">%1$s oturumundan çıkıldı. %2$s</string>
     <string name="web_clear_site">Bu sitenin verilerini temizle</string>
     <string name="web_sign_out_site">Bu siteden çık</string>
     <string name="web_logout_all_q">Tümünden çıkılsın ve web verileri temizlensin mi?</string>
-    <string name="web_logout_all_body">Yerleşik tarayıcıdaki her siteden çıkar ve Mika\'da saklanan web verilerini temizler. Mika, bu siteleri kullandığında yeniden oturum açması gerekecek.</string>
+    <string name="web_logout_all_body">Yerleşik tarayıcıdaki her siteden çıkar ve Claire\'da saklanan web verilerini temizler. Claire, bu siteleri kullandığında yeniden oturum açması gerekecek.</string>
     <string name="web_logged_out_all">Tümünden çıkıldı ve web verileri temizlendi.</string>
     <string name="web_logout_all">Tümünden çık</string>
     <string name="date_pattern_md_compact">d MMM</string>
-    <string name="web_takeover_login">Mika\'nın tarayıcısında oturum açın, sonra \“Tamam\”a dokunun</string>
-    <string name="web_takeover_waiting">Mika sizi bekliyor: %1$s</string>
+    <string name="web_takeover_login">Claire\'nın tarayıcısında oturum açın, sonra \“Tamam\”a dokunun</string>
+    <string name="web_takeover_waiting">Claire sizi bekliyor: %1$s</string>
     <string name="web_reason_security">Güvenlik kontrolü</string>
     <!-- 任务结束后留在后台运行的那一页 -->
     <string name="kept_notif_title">Web sayfası arka planda çalışıyor</string>
@@ -39,7 +39,7 @@
     <string name="kept_reason_crashed">sayfa çöktü</string>
     <string name="kept_reason_user">siz kapattınız</string>
     <string name="kept_reason_replaced">başka bir sayfa tutuldu</string>
-    <string name="kept_reason_app_exit">Mika kapandı</string>
+    <string name="kept_reason_app_exit">Claire kapandı</string>
     <string name="kept_chat_sub">Arka planda 1 web sayfası çalışıyor</string>
     <string name="kept_capsule">Arka plan sayfası çalışıyor</string>
     <string name="kept_card_title">Arka plan sayfası</string>

@@ -25,7 +25,7 @@
     <string name="voice_mic_unavailable">Mikrofon kullanılamıyor. Başka bir uygulama onu kullanıyor olabilir</string>
     <string name="voice_hold_to_talk">Konuşmak için basılı tutun</string>
     <string name="voice_mic_blocked_title">Mikrofon hâlâ kullanılamıyor</string>
-    <string name="voice_mic_blocked_body">Kayda zaten izin verildi, ancak Mika hâlâ kaydedemiyor. Hızlı Ayarlar\'daki mikrofon erişim anahtarının açık olduğunu (Android 12 ve üstü) ve Mika\'nın mikrofonunun sistemin izin yöneticisinde kapatılmadığını kontrol edin. Başka bir uygulama da mikrofonu kullanıyor olabilir.</string>
+    <string name="voice_mic_blocked_body">Kayda zaten izin verildi, ancak Claire hâlâ kaydedemiyor. Hızlı Ayarlar\'daki mikrofon erişim anahtarının açık olduğunu (Android 12 ve üstü) ve Claire\'nın mikrofonunun sistemin izin yöneticisinde kapatılmadığını kontrol edin. Başka bir uygulama da mikrofonu kullanıyor olabilir.</string>
     <string name="voice_provider_failed">Metne dönüştürülemedi: %1$s</string>
     <string name="voice_unavailable_title">Ses girişi hazır değil</string>
     <string name="voice_unavailable_no_engine">Bu telefonda yerleşik konuşma tanıma yok ve hiçbir konuşmadan yazıya modeli seçilmedi. Ayarlar › Modeller › Konuşmadan yazıya\'da bir sağlayıcının konuşma modelini seçin, çalışacaktır.</string>
@@ -33,18 +33,18 @@
     <string name="voice_unavailable_system_silent">Telefonun yerleşik konuşma tanıması yanıt vermedi, bu yüzden hiçbir kelime gelmedi. Ayarlar › Modeller › Konuşmadan yazıya\'da bir sağlayıcının konuşma modelini seçin, çalışacaktır.</string>
     <string name="voice_unavailable_system_failed">Telefonun yerleşik konuşma tanıması başlatılamadı. Tekrar deneyin ya da Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tanıma yöntemi seçin.</string>
     <string name="voice_service_permission_title">Telefonun konuşma tanıması henüz kaydedemiyor</string>
-    <string name="voice_service_permission_body">\“%1$s\” bu telefonda konuşma tanımayı yapan uygulamadır ve ses kaydetmesine izin verilmedi, bu yüzden sizi duyamıyor. Mika\'nın kendi mikrofon izni sorunsuz. Onun izin sayfasını açıp mikrofonu açın, sonra dönüp tekrar konuşmak için basılı tutun. Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tanıma yöntemi de seçebilirsiniz.</string>
+    <string name="voice_service_permission_body">\“%1$s\” bu telefonda konuşma tanımayı yapan uygulamadır ve ses kaydetmesine izin verilmedi, bu yüzden sizi duyamıyor. Claire\'nın kendi mikrofon izni sorunsuz. Onun izin sayfasını açıp mikrofonu açın, sonra dönüp tekrar konuşmak için basılı tutun. Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tanıma yöntemi de seçebilirsiniz.</string>
     <string name="voice_service_settings_failed">\“%1$s\” için ayarlar sayfası açılamadı. Sistemin uygulama listesinde bulun ve mikrofonu açın.</string>
     <string name="voice_unavailable_provider_gone">Seçilen konuşma modelinin sağlayıcısı kaldırıldı. Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tane seçin.</string>
     <string name="voice_unavailable_off">Konuşmadan yazıya kapalı. Ayarlar › Modeller › Konuşmadan yazıya\'da bir tane seçin.</string>
     <string name="voice_go_pick">Bir tane seç</string>
-    <string name="voice_permission_title">Mika\'nın mikrofona ihtiyacı var</string>
-    <string name="voice_permission_body">Konuşmak için basılı tutarken sizi duymak için Mika\'nın ses kaydetmesi gerekir. Daha önce reddedildi, bu yüzden telefon bir daha sormayacak. Sistem ayarlarındaki Mika izin sayfasında mikrofonu açın.</string>
+    <string name="voice_permission_title">Claire\'nın mikrofona ihtiyacı var</string>
+    <string name="voice_permission_body">Konuşmak için basılı tutarken sizi duymak için Claire\'nın ses kaydetmesi gerekir. Daha önce reddedildi, bu yüzden telefon bir daha sormayacak. Sistem ayarlarındaki Claire izin sayfasında mikrofonu açın.</string>
     <string name="voice_permission_open">Ayarları aç</string>
     <!-- Floating capsule: long press to talk -->
     <string name="capsule_voice_talk">Konuş</string>
     <string name="capsule_voice_send">Gönder</string>
-    <string name="capsule_voice_answer_title">Mika\'yı yanıtlama</string>
+    <string name="capsule_voice_answer_title">Claire\'yı yanıtlama</string>
     <string name="capsule_voice_continue_title">\“%1$s\” devam ediyor</string>
     <string name="capsule_voice_cancel">İptal</string>
     <string name="capsule_voice_edit">Düzenle</string>
@@ -58,8 +58,8 @@
     <string name="capsule_voice_steered">Göreve söylendi: %1$s</string>
     <string name="capsule_voice_answered">Yanıtlandı: %1$s</string>
     <string name="capsule_voice_sent">Gönderildi: %1$s</string>
-    <string name="capsule_voice_need_mic">Mika\'da mikrofona izin vermek için dokunun</string>
+    <string name="capsule_voice_need_mic">Claire\'da mikrofona izin vermek için dokunun</string>
     <string name="capsule_voice_not_ready">Ses girişi hazır değil · dokunun</string>
     <string name="capsule_voice_service_need_mic">Konuşma tanıma henüz kaydedemiyor · dokunun</string>
-    <string name="capsule_voice_open">Mika\'yı aç</string>
+    <string name="capsule_voice_open">Claire\'yı aç</string>
 </resources>

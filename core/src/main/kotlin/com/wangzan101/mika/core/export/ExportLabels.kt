@@ -32,7 +32,7 @@ data class ExportLabels(
     companion object {
         /** 测试和没有本地化时的英文兜底。 */
         val English = ExportLabels(
-            user = "User", mika = "Mika", steer = "Message during the task", answer = "Answer",
+            user = "User", mika = "Claire", steer = "Message during the task", answer = "Answer",
             toolSteps = "Tool steps", attachments = "Attachments", screens = "Screenshots", files = "Files",
             quote = "Quoted", page = "From page", exportedAt = "Exported", model = "Model", unknown = "Unknown",
             warnings = "Warnings", truncated = "truncated, original length %d", missingAsset = "Missing: %s", tooLarge = "Too large: %s", runRecordMissing = "Run record no longer available",

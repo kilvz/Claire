@@ -17,7 +17,7 @@
     <string name="calls_summary_pending">Beklemede</string>
     <string name="calls_summary_done">Tamamlandı</string>
     <string name="calls_summary_unknown">Bilinmiyor</string>
-    <string name="a11y_service_description">Bu sistem izni, Mika\'nın herhangi bir ekrandakini okumasını ve işlemesini sağlar. Mika bunu yalnızca kendi sanal ekranında, verdiğiniz görevleri yapmak için kullanır; ana ekranınızda yalnızca orada bir görev verdiğinizde işlem yapar.</string>
+    <string name="a11y_service_description">Bu sistem izni, Claire\'nın herhangi bir ekrandakini okumasını ve işlemesini sağlar. Claire bunu yalnızca kendi sanal ekranında, verdiğiniz görevleri yapmak için kullanır; ana ekranınızda yalnızca orada bir görev verdiğinizde işlem yapar.</string>
     <string name="channel_attention">Size ihtiyaç duyuyor</string>
     <string name="takeover_title">Size ihtiyaç duyuyor</string>
     <string name="takeover_title_reason">Size ihtiyaç duyuyor: %1$s</string>
@@ -29,15 +29,15 @@
     <string name="takeover_handed_over_hint">Uygulama artık ana ekranınızda. İşiniz bitince \'Tamam\'a dokunun; her şeyi zaten kendiniz yaptıysanız \'Kendim yaptım\'a dokunun.</string>
     <string name="takeover_web_busy">Ayarlar\'da bir web sitesi oturumu açık. Önce orada \'Tamam\'a dokunun, ardından \'Ben halledeceğim\'e dokunun.</string>
     <string name="takeover_move_to_main_failed">Uygulama ana ekrana taşınamadı. Tekrar denemek için \'Ben halledeceğim\'e dokunun.</string>
-    <string name="takeover_move_back_failed">Uygulama Mika\'nın ekranına geri taşınamadı. Tekrar deneyin.</string>
+    <string name="takeover_move_back_failed">Uygulama Claire\'nın ekranına geri taşınamadı. Tekrar deneyin.</string>
     <string name="action_take_over">Ben halledeceğim</string>
     <string name="action_hand_back">Tamam</string>
     <string name="action_finished_myself">Kendim yaptım</string>
     <string name="action_skip">Atla</string>
     <string name="action_cancel_task">Görevi iptal et</string>
     <string name="input_title">Yanıtınız gerekiyor</string>
-    <string name="no_answer_note">%1$d dakika içinde yanıt gelmezse Mika yanıtsız devam eder.</string>
-    <string name="input_too_late">Çok geç: %1$d dakika sonra Mika yanıtsız devam etti.</string>
+    <string name="no_answer_note">%1$d dakika içinde yanıt gelmezse Claire yanıtsız devam eder.</string>
+    <string name="input_too_late">Çok geç: %1$d dakika sonra Claire yanıtsız devam etti.</string>
     <string name="action_approve">Onayla</string>
     <string name="action_decline">Reddet</string>
     <string name="confirmation_locked_hint">Alıcıyı ve içeriği görmek için kilidi açın</string>
@@ -145,7 +145,7 @@
     <string name="terminal_close_confirm">Kapat</string>
     <string name="terminal_retry">Tekrar aç</string>
     <string name="terminal_stop">Durdur</string>
-    <string name="terminal_task_running">Mika da bu çalışma alanında çalışıyor; iki taraftan gelen değişiklikler birbirini etkileyebilir.</string>
+    <string name="terminal_task_running">Claire da bu çalışma alanında çalışıyor; iki taraftan gelen değişiklikler birbirini etkileyebilir.</string>
     <string name="terminal_copy_all">Tümünü kopyala</string>
     <string name="terminal_copied">Kopyalandı</string>
     <string name="personal_replay_title">Telefon ekranı</string>

@@ -21,7 +21,7 @@
     <string name="about_group">تماس با سازنده</string>
     <string name="about_group_sub">WeChat</string>
     <string name="about_group_sheet_title">تماس با سازنده</string>
-    <string name="about_group_sheet_sub">دربارهٔ نحوهٔ استفاده گفتگو کنید یا ایده بدهید. هنگام افزودن در WeChat، در درخواست خود به Mika اشاره کنید</string>
+    <string name="about_group_sheet_sub">دربارهٔ نحوهٔ استفاده گفتگو کنید یا ایده بدهید. هنگام افزودن در WeChat، در درخواست خود به Claire اشاره کنید</string>
     <string name="about_group_hint">برای ذخیره طولانی فشار دهید · یا در WeChat اسکن کنید</string>
     <string name="about_save_qr">ذخیرهٔ کد QR</string>
     <string name="about_qr_saved">کد QR در گالری ذخیره شد</string>
@@ -34,7 +34,7 @@
     <string name="about_guide_sub">شروع به کار؛ افزودن دانش برنامه‌ها حتی بدون برنامه‌نویسی</string>
     <string name="about_data_note">آنچه برای میکا می‌فرستید، از جمله پیام‌ها، محتوای صفحه و عکس‌های صفحه، فقط به ارائه‌دهندهٔ مدلی که تنظیم کرده‌اید ارسال می‌شود. میکا سرور اختصاصی ندارد و داده‌ای از شما جمع‌آوری نمی‌کند؛ بررسی به‌روزرسانی با GitHub یا آینه‌های فعال‌شدهٔ شما ارتباط برقرار می‌کند.</string>
     <string name="about_license_link">مجوز Apache-2.0</string>
-    <string name="about_author">ساختهٔ Wang Zan · © 2026</string>
+    <string name="about_author">ساختهٔ Kilv · © 2026</string>
     <string name="about_license_title">مجوز Apache-2.0</string>
     <string name="about_update_download">دانلود از GitHub</string>
     <string name="about_update_download_in_app">دانلود به‌روزرسانی</string>

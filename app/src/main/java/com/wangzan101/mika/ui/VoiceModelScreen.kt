@@ -175,7 +175,7 @@ internal fun VoiceModelContent(store: ProviderStore, settings: VoiceSettings, on
                         player.play(
                             tts,
                             TtsRequest(
-                                "你好，我是 Mika。这是一段声音测试。",
+                                "你好，我是 Claire。这是一段声音测试。",
                                 choice.voice.ifBlank { null },
                                 choice.speed,
                                 "wav",

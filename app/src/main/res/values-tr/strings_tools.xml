@@ -68,8 +68,8 @@
     <string name="tool_tap">Dokun</string>
     <string name="tool_type">Metin yaz</string>
     <string name="tool_clear">Alanı temizle</string>
-    <string name="tool_mika_status">Mika\'nın durumuna bak</string>
-    <string name="tool_mika_open_screen">Bir Mika sayfası aç</string>
+    <string name="tool_mika_status">Claire\'nın durumuna bak</string>
+    <string name="tool_mika_open_screen">Bir Claire sayfası aç</string>
     <string name="tool_mika_open_file">Bir dosya aç</string>
     <string name="tool_mika_notify">Bir bildirim gönder</string>
     <string name="tool_mika_copy">Metni kopyala</string>

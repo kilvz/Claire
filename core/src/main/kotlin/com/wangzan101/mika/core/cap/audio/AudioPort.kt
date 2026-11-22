@@ -20,7 +20,7 @@ interface AudioPort {
     /** 把合成结果写进工作区 `/workspace/out/audio/`，返回最终路径；写入经工作区 gate。 */
     suspend fun store(response: TtsResponse, nameHint: String?, text: String): StoredAudio
 
-    /** 把工作区里的音频存进 `Music/Mika`（MediaStore.Audio）。 */
+    /** 把工作区里的音频存进 `Music/Claire`（MediaStore.Audio）。 */
     suspend fun saveToMusic(path: String, name: String?): SavedAudio
 
     /** 合成并在本机播放一段话（不落工作区、不发送）；失败时抛同样的错误。 */

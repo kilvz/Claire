@@ -133,7 +133,7 @@ fun toolDispatcher(
     userScreens: UserScreenSource? = null,
     /** 用户的个人技能;和 [skills]、[utterances] 都给了才提供 skill_save(用户要求时写下或改一份个人技能)。 */
     personalSkills: PersonalSkills? = null,
-    /** 改 Mika 自己设置的白名单入口;为空时不提供 settings_list、settings_set(见 [SelfConfig])。 */
+    /** 改 Claire 自己设置的白名单入口;为空时不提供 settings_list、settings_set(见 [SelfConfig])。 */
     selfConfig: com.wangzan101.mika.core.settings.SelfConfig? = null,
     /** 存下的运行记录;给了、而这个对话之前有记过运行的轮次时提供 history_read(查之前几轮读到的东西)。 */
     runRecords: RunRecords? = null,
@@ -155,13 +155,13 @@ fun toolDispatcher(
     imageAskBeforeSave: Boolean = true,
     /** 每个任务最多生成几张;超过后工具拒绝,不去花服务商的钱。 */
     imageMaxPerTask: Int = 8,
-    /** 以 root 跑命令(已 root 的手机上用户打开了「允许 Mika 执行 root 命令」才给);为空时 root 工具不登记。 */
+    /** 以 root 跑命令(已 root 的手机上用户打开了「允许 Claire 执行 root 命令」才给);为空时 root 工具不登记。 */
     root: RootPort? = null,
     /** 用户配置并启用的通用网页搜索;为空时保持原有浏览器搜索路径。 */
     webSearch: com.wangzan101.mika.core.search.WebSearch? = null,
-    /** 读 Mika 自己的状态;只对手机上、有用户的 UI 主任务给。 */
+    /** 读 Claire 自己的状态;只对手机上、有用户的 UI 主任务给。 */
     self: com.wangzan101.mika.core.self.SelfPort? = null,
-    /** 操作 Mika 自己的界面/文件/通知/剪贴板;用户打开「允许 Mika 操作自己的界面」时才给。 */
+    /** 操作 Claire 自己的界面/文件/通知/剪贴板;用户打开「允许 Claire 操作自己的界面」时才给。 */
     selfOperate: com.wangzan101.mika.core.self.SelfPort? = null,
     phoneCalls: com.wangzan101.mika.core.calls.PhoneCallPort? = null,
     smsLogin: com.wangzan101.mika.core.cap.phone.sms.SmsLoginPort? = null,
@@ -298,12 +298,12 @@ fun legacyNames(): LegacyNames =
 /** 读运行记录用的工具声明:改名前记下的旧名也认成现在的工具(动作、能力相同),旧的记录和新的评分一样。 */
 fun recordedTools(): ToolIndex = legacyNames().let { legacy -> ToolIndex(allTools()) { legacy.resolve(it) } }
 
-/** Mika 所有可能提供的工具,按发给模型的顺序。 */
+/** Claire 所有可能提供的工具,按发给模型的顺序。 */
 internal fun allTools(): List<AgentTool> =
     GeneralGroup.tools + PhoneCapability.tools() + WebGroup.tools + SandboxGroup.tools + com.wangzan101.mika.core.cap.audio.AudioGroup.tools + com.wangzan101.mika.core.cap.transcribe.TranscribeGroup.tools + com.wangzan101.mika.core.cap.image.ImageGroup.tools + RootGroup.tools + com.wangzan101.mika.core.calls.callAgentTools + helperFileTools + com.wangzan101.mika.core.wechat.wechatOwnerAgentTools
 
-/** Mika 所有可能提供的工具的声明。 */
+/** Claire 所有可能提供的工具的声明。 */
 fun knownTools(): ToolIndex = ToolIndex(allTools())
 
-/** Mika 所有可能提供的工具名(技能文档里提到的工具名据此校验)。 */
+/** Claire 所有可能提供的工具名(技能文档里提到的工具名据此校验)。 */
 fun knownToolNames(): Set<String> = knownTools().names + DO_STEPS_TOOL

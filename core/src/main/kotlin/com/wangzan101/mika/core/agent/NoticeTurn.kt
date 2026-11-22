@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.agent
 import com.wangzan101.mika.core.observation.Untrusted
 
 /**
- * Mika 自己写进对话的一轮「通知提醒」(主动能力):用户点开提醒时,Mika 把挑出来的几条通知列成一条消息。
+ * Claire 自己写进对话的一轮「通知提醒」(主动能力):用户点开提醒时,Claire 把挑出来的几条通知列成一条消息。
  * 这一轮没有用户的话([Turn.userText] 是空的);[Turn.outcome] 里的标题、正文是别的 App、别人写的,理由是模型看着那些字写的:
  * 都是第三方文字,任何时候都不是用户的话,也不是指令。
  *

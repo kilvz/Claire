@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">Sin SIM preferida</string>
     <string name="calls_task_back_to_edit">Volver a editar</string>
     <string name="calls_task_confirm_dial">Confirmar y llamar</string>
-    <string name="calls_task_confirm_note">Mika usa este encargo para esta llamada. Se usa la SIM elegida y pueden aplicarse cargos del operador y de voz en tiempo real.</string>
+    <string name="calls_task_confirm_note">Claire usa este encargo para esta llamada. Se usa la SIM elegida y pueden aplicarse cargos del operador y de voz en tiempo real.</string>
     <string name="calls_task_constraints">Qué no se puede prometer</string>
     <string name="calls_task_context">Contexto adicional</string>
     <string name="calls_task_filled">Añadido</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">Contactos</string>
     <string name="calls_manual_tab">Entrada manual</string>
     <string name="calls_contacts_search">Buscar por nombre o número</string>
-    <string name="calls_contacts_permission">Permite que Mika lea tus contactos para seleccionar sus números. También puedes escribirlos manualmente.</string>
+    <string name="calls_contacts_permission">Permite que Claire lea tus contactos para seleccionar sus números. También puedes escribirlos manualmente.</string>
     <string name="calls_contacts_empty">No hay contactos con un número de teléfono válido.</string>
     <string name="calls_contacts_failed">No se pudieron cargar los contactos.</string>
 </resources>

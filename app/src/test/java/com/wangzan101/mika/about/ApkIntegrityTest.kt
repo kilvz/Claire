@@ -10,27 +10,27 @@ class ApkIntegrityTest {
     @get:Rule val temp = TemporaryFolder()
 
     @Test fun acceptsOfficialApk() {
-        ApkIntegrity.requireOfficialUrl("https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk")
+        ApkIntegrity.requireOfficialUrl("https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk")
     }
 
     @Test fun rejectsUntrustedDownloads() {
         for (url in listOf(
-            "http://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com.evil.test/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/other/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/wangzan101/Mika/releases/download/../../other.apk",
-            "https://github.com/wangzan101/Mika/releases/download/%2e%2e/%2E%2e/%2e%2e/%2e%2e/other/x.apk",
-            "https://objects.githubusercontent.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.zip",
-            "https://github.com/wangzan101/Mika/releases/tag/v0.2.0",
-            "https://user:pass@github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com:8443/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
+            "http://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com.evil.test/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com/other/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com/kilvz/Claire/releases/download/../../other.apk",
+            "https://github.com/kilvz/Claire/releases/download/%2e%2e/%2E%2e/%2e%2e/%2e%2e/other/x.apk",
+            "https://objects.githubusercontent.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.zip",
+            "https://github.com/kilvz/Claire/releases/tag/v0.2.0",
+            "https://user:pass@github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com:8443/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
         )) rejects { ApkIntegrity.requireOfficialUrl(url) }
     }
 
     /** 下载地址只信 GitHub 官方,或「镜像前缀 + 官方地址」这个精确形式;别的主机、路径和参数都不行。 */
     @Test fun acceptsOnlyOfficialOrConfiguredMirrorUrls() {
-        val official = "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk"
+        val official = "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk"
         val mirrors = listOf(UpdateMirror("m", "GhFast", "https://ghfast.top/"))
         ApkIntegrity.requireTrustedDownloadUrl(official, official, mirrors)
         ApkIntegrity.requireTrustedDownloadUrl("https://ghfast.top/$official", official, mirrors)
@@ -40,8 +40,8 @@ class ApkIntegrityTest {
             "https://evil.test/$official" to mirrors,
             "https://ghfast.top/$official?x=1" to mirrors,
             "https://user:pass@ghfast.top/$official" to mirrors,
-            "https://ghfast.top/https://github.com/wangzan101/Mika/releases/download/v0.2.0/other.apk" to mirrors,
-            "https://ghfast.top/https://github.com/wangzan101/Mika/releases/tag/v0.2.0" to mirrors,
+            "https://ghfast.top/https://github.com/kilvz/Claire/releases/download/v0.2.0/other.apk" to mirrors,
+            "https://ghfast.top/https://github.com/kilvz/Claire/releases/tag/v0.2.0" to mirrors,
         )) {
             rejects { ApkIntegrity.requireTrustedDownloadUrl(url, official, allowed) }
         }

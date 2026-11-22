@@ -33,7 +33,7 @@
     <string name="workflow_delete_template">Bu görev şablonu silinsin mi?</string>
     <string name="workflow_step_number">Adım %1$d</string>
     <string name="workflow_step_name">Adım adı</string>
-    <string name="workflow_instruction">Mika ne yapsın?</string>
+    <string name="workflow_instruction">Claire ne yapsın?</string>
     <string name="workflow_move_up">Yukarı taşı</string>
     <string name="workflow_move_down">Aşağı taşı</string>
     <string name="workflow_add_step">Adım ekle</string>

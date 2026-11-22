@@ -202,7 +202,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
 
     /** 模型配置与 Key;建出的模型都套上计量,记到 [usage]。 */
     override val providers: ProviderStore by lazy {
-        ProviderStore.create(this, usage, "Mika/${BuildConfig.VERSION_NAME}", usage::providerTokensToday,
+        ProviderStore.create(this, usage, "Claire/${BuildConfig.VERSION_NAME}", usage::providerTokensToday,
             proactiveUsage = usage::proactiveTokensToday, proactiveLimit = { FeatureFlags.get(this).proactiveDailyTokenBudget() },
             proactiveCalls = usage::proactiveCallsToday).also { store ->
             voiceSettings.reconcileTtsChoice(store)
@@ -371,10 +371,10 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     /** 长期个人主会话与其独立任务，由进程持有。 */
     val personal by lazy { com.wangzan101.mika.personal.PersonalRuntime(this) }
 
-    /** Mika 自己的界面此刻看不看得见。 */
+    /** Claire 自己的界面此刻看不看得见。 */
     val foreground = AppForeground()
 
-    /** 自身操作的进程内 UI 请求(开 Mika 的页/文件);任务服务发,MainActivity 处理。 */
+    /** 自身操作的进程内 UI 请求(开 Claire 的页/文件);任务服务发,MainActivity 处理。 */
     val selfUi = com.wangzan101.mika.self.SelfUi()
 
     /** 更新镜像:用户可增删改排序;检查更新和下载都按它走,官方 GitHub 始终兜底。 */
@@ -397,7 +397,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     /** 浮在别的 App 上的悬浮胶囊。 */
     val capsule: CapsuleController by lazy { CapsuleController(this, taskState, foreground, resources.takeoverQueue) }
 
-    /** Mika 自己的朗读播放器:全进程一个,聊天里的「朗读」和设置页的测试共用。 */
+    /** Claire 自己的朗读播放器:全进程一个,聊天里的「朗读」和设置页的测试共用。 */
     val voicePlayer by lazy { com.wangzan101.mika.voice.VoicePlayer(this) }
     override val voiceSettings by lazy {
         com.wangzan101.mika.settings.VoiceSettings(getSharedPreferences(FeatureFlags.PREFS, MODE_PRIVATE))
@@ -570,19 +570,19 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         registerActivityLifecycleCallbacks(foreground)
         val flags = FeatureFlags.get(this)
         // 用户点了「完全退出」:进程可能被无障碍服务重新拉起。胶囊照样接线(开关按退出算关着,见 CapsuleController),
-        // 但运行环境准备和没结束的运行的善后先不做,免得刚退出就冒出一条通知;用户下次打开 Mika 时补上(见 [resumeAfterQuit])。
+        // 但运行环境准备和没结束的运行的善后先不做,免得刚退出就冒出一条通知;用户下次打开 Claire 时补上(见 [resumeAfterQuit])。
         val quit = flags.quitRequested()
-        // 设置 › 网络代理:Mika 自己的连接从第一个请求起就按它走;SOCKS 代理的账号密码经全进程的认证器给
+        // 设置 › 网络代理:Claire 自己的连接从第一个请求起就按它走;SOCKS 代理的账号密码经全进程的认证器给
         com.wangzan101.mika.settings.NetProxyStore.get(this)
         com.wangzan101.mika.core.net.NetProxy.shared.installSocksAuth()
         // 内置浏览器:设了代理才给 WebView 设上(读设置要解密,放到后台;没设代理不为此加载 WebView)
         scope.launch(Dispatchers.IO) { runCatching { com.wangzan101.mika.cap.web.WebProxy.apply(this@MikaApp) } }
         capsule.start()
-        // 内置助手的真实现,并开始看着助手(Mika 进程起来后,还活着的助手会自己交接 Binder)
+        // 内置助手的真实现,并开始看着助手(Claire 进程起来后,还活着的助手会自己交接 Binder)
         phone.shellManager.start()
         // 连接一可用就补上默认打开的几项能力
         phone.recovery.start()
-        // 告诉内置助手:Mika 被杀后要不要把它拉起来(胶囊一直显示或有任务在跑时才要;退出期间都不要)
+        // 告诉内置助手:Claire 被杀后要不要把它拉起来(胶囊一直显示或有任务在跑时才要;退出期间都不要)
         com.wangzan101.mika.cap.phone.setup.RestoreWishSync(
             phone.hub, flags.capsuleModeChanges(), taskState.busy, phone.recoverySettings.consent,
             phone.recovery.accessibility, flags.quitChanges(),
@@ -613,7 +613,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         scope.launch { runCatching { WebFiles.clearStale(this@MikaApp, SandboxDirs(this@MikaApp).gate) } }
         // 更新已经装上后,关于页下好的安装包
         scope.launch(Dispatchers.IO) { runCatching { apkUpdater.dropInstalled() } }
-        // 运行环境没准备好(首次启动、Mika 升级后)就在后台准备,不联网、对用户不可见
+        // 运行环境没准备好(首次启动、Claire 升级后)就在后台准备,不联网、对用户不可见
         if (!quit) RuntimePreparer.ensure(this)
         // 沙箱就绪(启动时已就绪,或刚装好)就把技能目录核对一次:App 更新带来的脚本马上能用
         scope.launch {
@@ -642,7 +642,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         }
     }
 
-    /** 用户重新打开 Mika:补上退出时略过的启动工作(见 [com.wangzan101.mika.quit.MikaQuit])。 */
+    /** 用户重新打开 Claire:补上退出时略过的启动工作(见 [com.wangzan101.mika.quit.MikaQuit])。 */
     fun resumeAfterQuit() {
         runRecovery.recover()
         RuntimePreparer.ensure(this)

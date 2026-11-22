@@ -19,7 +19,7 @@ import java.io.File
 
 /**
  * 音频能力的手机实现:模型调用直接用 [model];合成结果经工作区文件闸门写进 `out/audio/`;
- * 存音乐库走 [AudioExporter](MediaStore Music/Mika,不需要存储权限)。
+ * 存音乐库走 [AudioExporter](MediaStore Music/Claire,不需要存储权限)。
  */
 class AndroidAudioPort(
     private val context: Context,

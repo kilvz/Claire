@@ -207,11 +207,11 @@ data class Exchange(
     val usedMemory: List<String> = emptyList(),
     /** 结果卡片下的技能提示(学会了 / 最近不灵先停用了)。 */
     val skillNotes: List<SkillNote> = emptyList(),
-    /** 这一轮导出到「下载/Mika」的文件,显示成文件卡片。 */
+    /** 这一轮导出到「下载/Claire」的文件,显示成文件卡片。 */
     val files: List<SharedFile> = emptyList(),
-    /** 这一轮 Mika 生成并留在工作区里的音频,显示成音频卡片。 */
+    /** 这一轮 Claire 生成并留在工作区里的音频,显示成音频卡片。 */
     val audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
-    /** 这一轮 Mika 生成并留在工作区里的图,显示成照片格子。 */
+    /** 这一轮 Claire 生成并留在工作区里的图,显示成照片格子。 */
     val photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
     /** 这次打开 App 后开始跟的时刻(毫秒);不知道时为 0。 */
     val startedAt: Long = 0L,
@@ -235,7 +235,7 @@ data class Exchange(
 )
 
 /**
- * 有运行记录可看的那次运行。通知提醒那一轮([NoticeTurn])是 Mika 直接写进对话的,没跑过任务,它的编号只是用来认它的:
+ * 有运行记录可看的那次运行。通知提醒那一轮([NoticeTurn])是 Claire 直接写进对话的,没跑过任务,它的编号只是用来认它的:
  * 界面上「查看过程」、来源、重新开始都按这个给,那一轮就都没有(不然点进去只会说「记录已过期」)。
  * 认轮次、和存下的那份对上([ChatViewModel] 里按 [Exchange.runId])照旧用原来的编号。
  */
@@ -2632,7 +2632,7 @@ class ToolLabels(private val tools: ToolIndex, private val legacy: LegacyNames =
             "查看设置" to R.string.tool_list_settings,
             "改设置" to R.string.tool_set_setting,
             "查看自身状态" to R.string.tool_mika_status,
-            "打开 Mika 的页面" to R.string.tool_mika_open_screen,
+            "打开 Claire 的页面" to R.string.tool_mika_open_screen,
             "打开文件" to R.string.tool_mika_open_file,
             "发通知" to R.string.tool_mika_notify,
             "复制文字" to R.string.tool_mika_copy,

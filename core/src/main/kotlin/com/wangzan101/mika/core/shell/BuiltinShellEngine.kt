@@ -92,7 +92,7 @@ object BuiltinShellFailures {
 
 /**
  * 内置助手的状态与看门狗。[helper] 有值就是助手的 Binder 在手(Running);
- * 没有时:Mika 自己起得来(用户打开了「用 root 启动」且能用,或配过对)就先等 [graceMs](还活着的助手会在 Mika 进程起来后自己交接),
+ * 没有时:Claire 自己起得来(用户打开了「用 root 启动」且能用,或配过对)就先等 [graceMs](还活着的助手会在 Claire 进程起来后自己交接),
  * 再起一个:先经 su(见 [BuiltinShellPlatform.rootStart]),不行或没打开再经 adbd;失败按 [backoff] 重试。
  * su 拒绝或不回话时记下来,不再自己去问,等用户点重试。
  * 要起助手时无线调试关着,有 [autoOn] 就先替用户打开(条件和停下的规矩见 [WirelessDebuggingAutoOn])。
@@ -143,7 +143,7 @@ class BuiltinShellEngine(
 
     override val rootStart: Boolean get() = platform.rootStart() == RootStart.Ready
 
-    /** Mika 自己起得来助手:按当前通道看 Shizuku、su 或已配对的无线调试。 */
+    /** Claire 自己起得来助手:按当前通道看 Shizuku、su 或已配对的无线调试。 */
     private fun selfStart(): Boolean = when (platform.transport()) {
         ShellTransport.Shizuku -> platform.shizukuState().ready
         ShellTransport.WirelessDebugging -> rootStart || platform.paired()
@@ -159,7 +159,7 @@ class BuiltinShellEngine(
     }
 
     /**
-     * Mika 自己起不来、手里也没有助手时的状态:Shizuku 模式下报 Shizuku 缺哪一步;
+     * Claire 自己起不来、手里也没有助手时的状态:Shizuku 模式下报 Shizuku 缺哪一步;
      * 自动模式下若未配对且已装 Shizuku 也如实提示;否则看 root、电脑启动或未配对。
      */
     private fun idleStatus(): BuiltinShellStatus = when (platform.transport()) {
@@ -227,7 +227,7 @@ class BuiltinShellEngine(
 
     /**
      * 「用 root 启动」的开关或 su 的答复变了(用户在设置、引导页里打开、关掉、重新授权):助手不在就按新的情况从头再试;
-     * Mika 自己起不来了就照实改状态。
+     * Claire 自己起不来了就照实改状态。
      */
     fun rootChanged() {
         if (platform.transport() == ShellTransport.Shizuku) return
@@ -275,7 +275,7 @@ class BuiltinShellEngine(
 
     /**
      * 无线调试开关变了:刚打开就从头再试。关掉时只改状态,不马上替用户打开(用户可能是亲手关的),等要用助手时再说。
-     * Mika 自己正在写这个开关时不跟着动:系统可能马上拨回去,由写的那一边判断。
+     * Claire 自己正在写这个开关时不跟着动:系统可能马上拨回去,由写的那一边判断。
      */
     fun wirelessDebuggingChanged() {
         // 经 su 或纯 Shizuku 起助手不看无线调试

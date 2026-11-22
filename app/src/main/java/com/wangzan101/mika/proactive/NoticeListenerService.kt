@@ -5,7 +5,7 @@ import android.service.notification.StatusBarNotification
 import com.wangzan101.mika.MikaApp
 
 /**
- * 主动能力的通知监听。组件默认是停用的,功能打开时才由 [ProactiveRuntime] 启用(系统「通知使用权」列表里才有 Mika)。
+ * 主动能力的通知监听。组件默认是停用的,功能打开时才由 [ProactiveRuntime] 启用(系统「通知使用权」列表里才有 Claire)。
  * 这里只把系统回调转给 [ProactiveRuntime],连上之前什么都不做。
  */
 class NoticeListenerService : NotificationListenerService() {

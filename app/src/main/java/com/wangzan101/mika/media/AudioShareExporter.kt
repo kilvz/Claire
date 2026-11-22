@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
 /**
- * 分享前把工作区里的音频复制到「下载/Mika/share」:MediaStore 的 content URI 可以被对方 App 读取,
+ * 分享前把工作区里的音频复制到「下载/Claire/share」:MediaStore 的 content URI 可以被对方 App 读取,
  * 不需要 FileProvider 或存储权限。复制出来的是独立的一份,任务结束、工作区被清理后对方仍能读。
  */
 class AudioShareExporter(private val context: Context) {
@@ -72,6 +72,6 @@ class AudioShareExporter(private val context: Context) {
     }
 
     private companion object {
-        const val DIRECTORY = "Download/Mika/share"
+        const val DIRECTORY = "Download/Claire/share"
     }
 }

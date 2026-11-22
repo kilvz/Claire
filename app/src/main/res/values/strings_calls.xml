@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">Place a call</string>
     <string name="calls_rules">Answering rules</string>
     <string name="calls_setup_credentials">Configure realtime voice credentials.</string>
-    <string name="calls_setup_shell">Connect the built-in Mika assistant first.</string>
+    <string name="calls_setup_shell">Connect the built-in Claire assistant first.</string>
     <string name="calls_sim_clear_preferred">Clear preferred SIM</string>
     <string name="calls_sim_preferred">Preferred SIM: %1$s</string>
     <string name="calls_sim_save_preferred">Use this SIM by default</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">AI connected. You can take over anytime.</string>
     <string name="calls_only_types">Only selected call types</string>
     <string name="calls_pick_types">Select at least one call type</string>
-    <string name="calls_type_note">Mika uses Accessibility to match the phone app’s label and number to the ringing call. Unrecognized calls are left for you.</string>
+    <string name="calls_type_note">Claire uses Accessibility to match the phone app’s label and number to the ringing call. Unrecognized calls are left for you.</string>
     <string name="calls_type_accessibility">Open Accessibility settings</string>
     <string name="calls_type_takeout">Food delivery</string>
     <string name="calls_type_parcel">Parcels</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">Businesses and customer service</string>
     <string name="calls_type_transport">Taxis and ride services</string>
     <string name="calls_only_strangers">Only numbers outside contacts</string>
-    <string name="calls_strangers_note">Allow Mika to read contacts. AI answers only when the number can be checked and is not saved. Hidden numbers and failed lookups are left for you.</string>
+    <string name="calls_strangers_note">Allow Claire to read contacts. AI answers only when the number can be checked and is not saved. Hidden numbers and failed lookups are left for you.</string>
 </resources>

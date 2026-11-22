@@ -377,7 +377,7 @@ fun archivedAgo(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): Str
     else trPlural(R.plurals.drawer_archived_days_ago, days, days)
 }
 
-/** 侧栏顶上 Mika 名字下面那行状态,和它是不是好的(绿点)还是要处理(橙点)。 */
+/** 侧栏顶上 Claire 名字下面那行状态,和它是不是好的(绿点)还是要处理(橙点)。 */
 fun readiness(check: Prerequisites.Check): Pair<String, Boolean> = when {
     !check.canStartTask -> tr(R.string.chat_cannot_start) to false
     !check.phoneReady -> tr(R.string.drawer_phone_not_ready) to false
@@ -414,7 +414,7 @@ fun ChatDrawer(
     onSettings: () -> Unit,
     onOpen: (DrawerConversation) -> Unit,
     onAbout: () -> Unit = {},
-    /** 有新版本:「关于 Mika」带小红点。 */
+    /** 有新版本:「关于 Claire」带小红点。 */
     aboutDot: Boolean = false,
     /** 长按一条存过的对话:在它原地弹出操作菜单(置顶、改名、删除);带上那一行在窗口里的位置和大小。 */
     onActions: (DrawerConversation, Rect) -> Unit = { _, _ -> },
@@ -476,7 +476,7 @@ fun ChatDrawer(
         ) {
             MikaLogo(36.dp, corner = 10.dp)
             Column(Modifier.weight(1f)) {
-                Text("Mika", style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink)
+                Text("Claire", style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Box(Modifier.size(6.dp).background(if (ok) c.ok else c.warnSolid, CircleShape))
                     Text(state, style = MikaType.Hint, fontWeight = FontWeight.Medium, color = c.ink3)
@@ -649,7 +649,7 @@ fun ChatDrawer(
         if (selecting) {
             SelectBar(selectedCount, allSelected, onSelectAll, archivedView, onArchiveSelected, onUnarchiveSelected, onDeleteSelected)
         } else {
-            // 设置固定在侧栏最底下靠左;有新版时右边才出现「更新」带红点,点它进「关于 Mika」
+            // 设置固定在侧栏最底下靠左;有新版时右边才出现「更新」带红点,点它进「关于 Claire」
             Row(
                 Modifier.fillMaxWidth().drawBehind { drawLine(c.hair, Offset(0f, 0f), Offset(size.width, 0f), 0.5.dp.toPx()) }
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("drawer-footer"),
@@ -1275,7 +1275,7 @@ fun ChatWithDrawer(
     onScreens: () -> Unit = {},
     onSettings: () -> Unit,
     onAbout: () -> Unit = {},
-    /** 有新版本:侧栏「关于 Mika」带小红点。 */
+    /** 有新版本:侧栏「关于 Claire」带小红点。 */
     updateAvailable: Boolean = false,
     /** 从侧栏进去的页面刚退回来:当场打开侧栏,回到进去之前的样子。 */
     reopen: Boolean = false,

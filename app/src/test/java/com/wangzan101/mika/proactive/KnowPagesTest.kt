@@ -12,7 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 「Mika 知道了什么」分级页面的纯逻辑:索引上列哪些,某一页指的东西还在不在。 */
+/** 「Claire 知道了什么」分级页面的纯逻辑:索引上列哪些,某一页指的东西还在不在。 */
 class KnowPagesTest {
     private val today = 20_000L
     private val week = DigestPool.weekOf(today)

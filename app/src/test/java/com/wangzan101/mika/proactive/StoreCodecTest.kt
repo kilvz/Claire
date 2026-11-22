@@ -64,7 +64,7 @@ class StoreCodecTest {
         }
     }
 
-    // 解开了(认证过了)却读不懂:这是 Mika 自己写的,多半是别的版本的写法——照常抛出,文件不动
+    // 解开了(认证过了)却读不懂:这是 Claire 自己写的,多半是别的版本的写法——照常抛出,文件不动
     @Test fun contentThatDecryptsButCannotBeReadIsKept() {
         for ((name, load) in stores) for (text in listOf("{broken", """{"topics":"not a list","days":7,"entries":3,"contacts":1,"notes":2}""")) {
             tmp.root.listFiles()?.forEach { it.deleteRecursively() }

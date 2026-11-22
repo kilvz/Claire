@@ -24,7 +24,7 @@ import java.util.Collections
 import java.util.UUID
 
 /**
- * 桥的真机用例:沙箱里的 `mika` 命令经抽象套接字回调 Mika。用装好的沙箱(python3 与 mika 客户端都是安装时放的);
+ * 桥的真机用例:沙箱里的 `mika` 命令经抽象套接字回调 Claire。用装好的沙箱(python3 与 mika 客户端都是安装时放的);
  * 没装好就跳过。
  */
 @RunWith(AndroidJUnit4::class)
@@ -43,7 +43,7 @@ class BridgeDeviceTest {
             Files.exists(File(SandboxDirs(context).rootfs, "usr/bin/python3").toPath(), LinkOption.NOFOLLOW_LINKS))
     }
 
-    // 导出到「下载/Mika」的测试文件删掉,不留在用户的下载目录里
+    // 导出到「下载/Claire」的测试文件删掉,不留在用户的下载目录里
     @After fun deleteExported() {
         for (f in shared) runCatching { context.contentResolver.delete(Uri.parse(f.uri), null, null) }
         SandboxDirs(context).workspace(WorkspaceKey.Conversation("bridge-ws")).deleteRecursively()
@@ -59,11 +59,11 @@ class BridgeDeviceTest {
         // 名字带随机串,下载目录里不会撞名;工作区外的文件先被路径规则拒掉
         val name = "mika-bridge-test-${UUID.randomUUID().toString().take(8)}.txt"
         val r = sh("echo hi > $name; mika share $name; echo rc=$?; mika share /etc/passwd; echo rc=$?")
-        assertTrue(r.output, r.output.contains("\"savedAs\":\"Download/Mika/$name\""))
+        assertTrue(r.output, r.output.contains("\"savedAs\":\"Download/Claire/$name\""))
         assertTrue(r.output, r.output.contains("rc=0"))
         assertTrue(r.output, r.output.contains("path_outside_workspace"))
         assertEquals(r.output, 1, Regex("rc=1").findAll(r.output).count())
-        assertEquals(listOf("Download/Mika/$name"), shared.map { it.savedAs })
+        assertEquals(listOf("Download/Claire/$name"), shared.map { it.savedAs })
     }
 
     @Test fun bridgeWorksWithNetOff() {

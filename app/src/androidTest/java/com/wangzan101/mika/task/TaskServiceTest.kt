@@ -46,7 +46,7 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * 真机测试:用脚本模型驱动 TaskService,在虚拟屏上打开系统设置,检验常亮、静音、被挪走暂停与锁屏等待。
- * 需要内置助手在运行、Mika 无障碍服务已开启。
+ * 需要内置助手在运行、Claire 无障碍服务已开启。
  */
 @RunWith(AndroidJUnit4::class)
 class TaskServiceTest {
@@ -126,7 +126,7 @@ class TaskServiceTest {
         pollUntil(10_000) { DeviceTaskState.state.value.takeIf(predicate) } ?: error("state never matched: ${DeviceTaskState.state.value}")
 
     private fun mikaScreenLock(): String? =
-        sh("dumpsys power").lines().map { it.trim() }.firstOrNull { "'Mika:task'" in it }
+        sh("dumpsys power").lines().map { it.trim() }.firstOrNull { "'Claire:task'" in it }
 
     /**
      * 产品路径上回答不另请核查(任务以 reviewFinalAnswer = false 运行):模型给的回答原样交出,结局是办成、未经核查;
@@ -255,7 +255,7 @@ class TaskServiceTest {
     fun keepsScreenOnDuringTask() {
         startWithSettingsOpen()
         val line = mikaScreenLock()
-        assertNotNull("Mika holds no screen wake lock while running", line)
+        assertNotNull("Claire holds no screen wake lock while running", line)
         // 有的系统在类型前加锁对象编号(mLock:<id>),只认类型字样
         // 只保持亮屏、允许系统调暗,不锁在全亮
         assertTrue(line!!, "SCREEN_DIM_WAKE_LOCK" in line)
@@ -278,7 +278,7 @@ class TaskServiceTest {
         start("测试任务")
         val held = pollUntil(5_000) { mikaScreenLock() }
         opening.countDown()
-        assertNotNull("Mika holds no screen wake lock while preparing", held)
+        assertNotNull("Claire holds no screen wake lock while preparing", held)
         assertEquals(1, model.awaitCall().number)
         finishAndAwait()
     }

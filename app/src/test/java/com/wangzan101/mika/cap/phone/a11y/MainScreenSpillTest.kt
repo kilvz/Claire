@@ -49,7 +49,7 @@ class MainScreenSpillTest {
     }
 
     @Test fun taskMovedFromAnotherDisplayIsATakeoverNotASpill() {
-        // 接管(本任务或别的任务)是把任务从 Mika 的屏挪到主屏
+        // 接管(本任务或别的任务)是把任务从 Claire 的屏挪到主屏
         assertTrue(decide(arrival(from = 5)).isEmpty())
     }
 
@@ -84,7 +84,7 @@ class MainScreenSpillTest {
         val opened = arrival(at = since + 900)
         // 桌面和通知栏入口不发控件点击时，先有回桌面的主屏导航也足以证明是用户入口
         assertTrue(decide(desktop, opened).isEmpty())
-        // Mika 自己的主屏页面不是桌面，不能把 Agent 的真实外溢当成用户操作
+        // Claire 自己的主屏页面不是桌面，不能把 Agent 的真实外溢当成用户操作
         val mika = arrival(task = 2, pkg = "com.wangzan101.mika", at = since + 200, from = MainScreenSpill.MAIN)
         assertEquals(listOf(PullBack(opened)), decide(mika, opened))
     }

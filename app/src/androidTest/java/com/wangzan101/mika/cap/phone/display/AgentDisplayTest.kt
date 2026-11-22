@@ -278,14 +278,14 @@ class AgentDisplayTest {
     @Test
     fun coldStartDoesNotKillAppWithTaskOnAnotherScreen() {
         val d = newDisplay()
-        // 用另一块虚拟屏代表「Mika 屏以外的任务」,不碰用户的主屏
+        // 用另一块虚拟屏代表「Claire 屏以外的任务」,不碰用户的主屏
         val other = AgentDisplay(shell, 720, 1600, 320, InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(android.hardware.display.DisplayManager::class.java))
         try {
             assertEquals(ShellService.START_OK, shell.startApp(other.displayId, SETTINGS))
             assertNotNull(pollUntil(5_000) { shell.topTaskId(other.displayId).takeIf { it != -1 } })
             val pid = pollUntil(3_000) { shellCommand("pidof $SETTINGS").trim().takeIf { it.isNotEmpty() } }
             assertNotNull(pid)
-            // 另一块屏也是 Mika 的屏(代表另一个任务):直接拒绝、不强停,返回「被别的任务占用」
+            // 另一块屏也是 Claire 的屏(代表另一个任务):直接拒绝、不强停,返回「被别的任务占用」
             assertEquals(ShellService.START_IN_USE_BY_OTHER, shell.restartApp(d.displayId, SETTINGS))
             assertEquals("settings process was killed", pid, shellCommand("pidof $SETTINGS").trim())
         } finally {

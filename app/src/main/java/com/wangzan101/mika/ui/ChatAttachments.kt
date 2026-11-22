@@ -362,7 +362,7 @@ private fun SentPhotos(photos: List<AttachmentMessage.Item>, conversationId: Str
 }
 
 /**
- * Mika 生成的照片:和用户附件一样的格子(1 张一大张,2 张并排,3 张起三列),点开在 App 的查看页看。
+ * Claire 生成的照片:和用户附件一样的格子(1 张一大张,2 张并排,3 张起三列),点开在 App 的查看页看。
  * 路径来自工具结果,不解析回答文字;conversationId 为 null(旧记录没有对话)时不解码。
  */
 @Composable

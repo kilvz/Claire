@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">Buat panggilan</string>
     <string name="calls_rules">Aturan menjawab</string>
     <string name="calls_setup_credentials">Konfigurasikan kredensial suara real-time layanan suara yang dipilih.</string>
-    <string name="calls_setup_shell">Hubungkan asisten bawaan Mika terlebih dahulu.</string>
+    <string name="calls_setup_shell">Hubungkan asisten bawaan Claire terlebih dahulu.</string>
     <string name="calls_sim_clear_preferred">Hapus SIM pilihan</string>
     <string name="calls_sim_preferred">SIM pilihan: %1$s</string>
     <string name="calls_sim_save_preferred">Gunakan SIM ini sebagai default</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">AI terhubung. Anda dapat berbicara sendiri kapan saja.</string>
     <string name="calls_only_types">Hanya jenis panggilan yang dipilih</string>
     <string name="calls_pick_types">Pilih minimal satu jenis panggilan</string>
-    <string name="calls_type_note">Mika menggunakan Aksesibilitas untuk mencocokkan label dan nomor di aplikasi telepon dengan panggilan masuk. Jika tidak dapat dipastikan, Anda bisa menjawabnya sendiri.</string>
+    <string name="calls_type_note">Claire menggunakan Aksesibilitas untuk mencocokkan label dan nomor di aplikasi telepon dengan panggilan masuk. Jika tidak dapat dipastikan, Anda bisa menjawabnya sendiri.</string>
     <string name="calls_type_accessibility">Buka setelan aksesibilitas</string>
     <string name="calls_type_takeout">Pesan antar makanan</string>
     <string name="calls_type_parcel">Pengiriman paket</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">Perusahaan dan layanan pelanggan</string>
     <string name="calls_type_transport">Taksi dan transportasi daring</string>
     <string name="calls_only_strangers">Hanya nomor di luar kontak</string>
-    <string name="calls_strangers_note">Izinkan Mika membaca kontak. AI hanya menjawab jika nomor dipastikan belum tersimpan. Nomor tersembunyi atau yang gagal diperiksa dapat Anda jawab sendiri.</string>
+    <string name="calls_strangers_note">Izinkan Claire membaca kontak. AI hanya menjawab jika nomor dipastikan belum tersimpan. Nomor tersembunyi atau yang gagal diperiksa dapat Anda jawab sendiri.</string>
 </resources>

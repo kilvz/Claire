@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">Tanpa SIM pilihan</string>
     <string name="calls_task_back_to_edit">Kembali mengedit</string>
     <string name="calls_task_confirm_dial">Konfirmasi dan telepon</string>
-    <string name="calls_task_confirm_note">Mika memakai tugas ini hanya untuk panggilan ini. SIM pilihan digunakan dan biaya operator serta suara real-time dapat berlaku.</string>
+    <string name="calls_task_confirm_note">Claire memakai tugas ini hanya untuk panggilan ini. SIM pilihan digunakan dan biaya operator serta suara real-time dapat berlaku.</string>
     <string name="calls_task_constraints">Apa yang tidak boleh dijanjikan</string>
     <string name="calls_task_context">Konteks tambahan</string>
     <string name="calls_task_filled">Terisi</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">Kontak</string>
     <string name="calls_manual_tab">Input manual</string>
     <string name="calls_contacts_search">Cari nama atau nomor</string>
-    <string name="calls_contacts_permission">Izinkan Mika membaca kontak untuk memilih nomornya. Anda juga dapat memasukkan nomor secara manual.</string>
+    <string name="calls_contacts_permission">Izinkan Claire membaca kontak untuk memilih nomornya. Anda juga dapat memasukkan nomor secara manual.</string>
     <string name="calls_contacts_empty">Tidak ada kontak dengan nomor telepon yang dapat dipilih.</string>
     <string name="calls_contacts_failed">Gagal memuat kontak.</string>
 </resources>

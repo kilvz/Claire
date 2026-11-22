@@ -22,7 +22,7 @@ import java.io.IOException
 import java.nio.file.Files
 import javax.net.SocketFactory
 
-/** 设了网络代理时更新包由 Mika 自己经代理下:请求确实发给代理,下完整才留下文件,出错不留半截。 */
+/** 设了网络代理时更新包由 Claire 自己经代理下:请求确实发给代理,下完整才留下文件,出错不留半截。 */
 class ProxiedApkDownloadTest {
     private lateinit var proxy: MockWebServer
     private val dir: File = Files.createTempDirectory("apk").toFile()

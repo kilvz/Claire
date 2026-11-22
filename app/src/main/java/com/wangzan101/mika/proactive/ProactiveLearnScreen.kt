@@ -76,7 +76,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 「Mika 知道了什么」里的各级页面。最上面是索引(栈是空的):每天、每周、每月各一行,话题、联系人、清除各一个入口。
+ * 「Claire 知道了什么」里的各级页面。最上面是索引(栈是空的):每天、每周、每月各一行,话题、联系人、清除各一个入口。
  * 往下:某一天([Day])、某一周或某个月([Span])的句子;再往下是一句的依据([DayLine]、[SpanLine])和一句分段归纳
  * 那段时间的通知原文([Note])。
  *
@@ -168,7 +168,7 @@ private class KnowUi(
 }
 
 /**
- * 主动能力 ›「Mika 知道了什么」:归纳出的内容,和它们的删除。分几级([KnowPage]):先是一页索引,点进去才列句子,
+ * 主动能力 ›「Claire 知道了什么」:归纳出的内容,和它们的删除。分几级([KnowPage]):先是一页索引,点进去才列句子,
  * 再点一句看它是照着什么写的。设置都在上一页([ProactiveScreen]);这里不看开关也照样显示存着的东西(关着时东西还留着),
  * 只有「归纳到现在」那几行要开着、模型确认过才给。
  * 句子、概述、话题名、名字、通知原文都来自别处(模型照着通知写的、通知里的),一律当普通文字显示。
@@ -299,7 +299,7 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
         )
     }
     editRelation?.let { c ->
-        // 关系由用户设:列出几种关系和「不确定」;「交回给 Mika 判断」是清掉用户设的
+        // 关系由用户设:列出几种关系和「不确定」;「交回给 Claire 判断」是清掉用户设的
         MikaDialog(
             onDismissRequest = { editRelation = null },
             title = { Text(stringResource(R.string.proactive_learn_relation_title, c.name)) },

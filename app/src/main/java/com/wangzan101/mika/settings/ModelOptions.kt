@@ -30,7 +30,7 @@ data class ModelOption(
 object ModelOptions {
     /**
      * 把列出的模型和预设能力合并。可当主模型的排前面,其余保持服务商给的顺序。
-     * 只写了 Mika 不会说的接口协议的模型(见 [ListedModel.usable])对话调用必然失败,默认不列;
+     * 只写了 Claire 不会说的接口协议的模型(见 [ListedModel.usable])对话调用必然失败,默认不列;
      * [includeUnsupported] 为真时也列(服务商详情、声音模型要看完整目录)。
      */
     fun merge(listed: List<ListedModel>, base: Capabilities, includeUnsupported: Boolean = false): List<ModelOption> =

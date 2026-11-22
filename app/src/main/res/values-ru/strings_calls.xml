@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">Позвонить</string>
     <string name="calls_rules">Правила автоответа</string>
     <string name="calls_setup_credentials">Настройте данные доступа к выбранному голосовому сервису.</string>
-    <string name="calls_setup_shell">Сначала подключите встроенный помощник Mika.</string>
+    <string name="calls_setup_shell">Сначала подключите встроенный помощник Claire.</string>
     <string name="calls_sim_clear_preferred">Сбросить выбор SIM</string>
     <string name="calls_sim_preferred">Предпочитаемая SIM: %1$s</string>
     <string name="calls_sim_save_preferred">Использовать эту SIM по умолчанию</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">ИИ подключён. Вы можете перехватить звонок в любой момент.</string>
     <string name="calls_only_types">Только выбранные типы звонков</string>
     <string name="calls_pick_types">Выберите хотя бы один тип звонков</string>
-    <string name="calls_type_note">Mika использует специальные возможности для сверки метки и номера в приложении телефона с входящим вызовом. Если их не удалось подтвердить, вы можете ответить сами.</string>
+    <string name="calls_type_note">Claire использует специальные возможности для сверки метки и номера в приложении телефона с входящим вызовом. Если их не удалось подтвердить, вы можете ответить сами.</string>
     <string name="calls_type_accessibility">Открыть специальные возможности</string>
     <string name="calls_type_takeout">Доставка еды</string>
     <string name="calls_type_parcel">Доставка посылок</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">Компании и поддержка клиентов</string>
     <string name="calls_type_transport">Такси и перевозки</string>
     <string name="calls_only_strangers">Только номера вне контактов</string>
-    <string name="calls_strangers_note">Разрешите Mika читать контакты. ИИ ответит, только если проверит номер и не найдёт его в контактах. На звонки со скрытых номеров и при сбое проверки вы отвечаете сами.</string>
+    <string name="calls_strangers_note">Разрешите Claire читать контакты. ИИ ответит, только если проверит номер и не найдёт его в контактах. На звонки со скрытых номеров и при сбое проверки вы отвечаете сами.</string>
 </resources>

@@ -26,8 +26,8 @@ import kotlinx.serialization.json.putJsonArray
  * 自身工具:读自身状态、打开自己的页面/文件、发通知、写剪贴板。
  *
  * 这些工具不动屏幕(offScreen),不经过手机/网页那套屏幕关卡;它们的授权是用户设置里的
- * 「允许 Mika 操作自己的界面」,敏感动作还要在 execute 里用 [com.wangzan101.mika.core.tool.AskPort] 当次问用户。
- * 手机工具仍然不能碰 Mika 自己的包(见 ConfirmDecision.ownApp),这里不是绕过它,而是另一条正门。
+ * 「允许 Claire 操作自己的界面」,敏感动作还要在 execute 里用 [com.wangzan101.mika.core.tool.AskPort] 当次问用户。
+ * 手机工具仍然不能碰 Claire 自己的包(见 ConfirmDecision.ownApp),这里不是绕过它,而是另一条正门。
  */
 internal interface SelfTool : AgentTool {
     override val offScreen: Boolean get() = true
@@ -56,16 +56,16 @@ internal object MikaStatus : SelfTool {
     }
 }
 
-/** 打开 Mika 自己的一页;只改用户眼前的页面,不改任何设置。 */
+/** 打开 Claire 自己的一页;只改用户眼前的页面,不改任何设置。 */
 internal object MikaOpenScreen : SelfTool {
     override val verb = Verb.SelfOpenScreen
-    override val label = "打开 Mika 的页面"
+    override val label = "打开 Claire 的页面"
     override val risk = Risk.Write
     override val def = ToolDef(
         "mika_open_screen",
         Prompts.tool("mika_open_screen"),
         mapOf(
-            "screen" to str("Which Mika screen to open.", SelfScreen.entries.map { it.wire }),
+            "screen" to str("Which Claire screen to open.", SelfScreen.entries.map { it.wire }),
             "note" to str("Optional short reason shown to the user, in the user's language."),
         ),
         listOf("screen"),
@@ -119,7 +119,7 @@ internal object MikaNotify : SelfTool {
         mapOf(
             "title" to str("Short notification title, in the user's language."),
             "body" to str("What happened, in one or two sentences, in the user's language."),
-            "screen" to str("Optional Mika screen to open from the notification.", SelfScreen.entries.map { it.wire }),
+            "screen" to str("Optional Claire screen to open from the notification.", SelfScreen.entries.map { it.wire }),
         ),
         listOf("title", "body"),
     )
@@ -293,7 +293,7 @@ internal object MikaUserPage : SelfTool {
     }
 }
 
-/** 打开「给 Mika 登录」页,让用户自己登录。 */
+/** 打开「给 Claire 登录」页,让用户自己登录。 */
 internal object MikaLoginSite : SelfTool {
     override val verb = Verb.SelfLogin
     override val label = "请你登录网站"

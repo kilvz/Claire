@@ -25,9 +25,9 @@ Requirements:
   - Opening a browser, tapping the address bar, typing, tapping search → write as "Open <link>" or "Search on <site>"; the specific link/keywords come from the request; the demonstration did not save them.
   - Tapping an input field, typing, submitting → combine into one step, "Enter <content> and submit".
 - Keep what really determines the outcome: entries, specific buttons, options, criteria, and when to stop. Do not write waiting on the same screen, repeated scrolling, or meaningless back-navigation.
-- What you are given is a collapsed route; the human actions omitted from the demonstration, marked "已按 Mika 的直达能力省掉" ("already omitted thanks to Mika's direct capabilities"), are only there to help understanding; do not write them back into the skill.
+- What you are given is a collapsed route; the human actions omitted from the demonstration, marked "已按 Claire 的直达能力省掉" ("already omitted thanks to Claire's direct capabilities"), are only there to help understanding; do not write them back into the skill.
 - Label every fact with its source: observed, stated by you, or inferred. Content not in the summary may only be written as inference, and sparingly.
 - Entries not reached this time must not be written as if they do not exist.
-- Do not write passwords, verification codes, or card numbers, and do not claim Mika has already successfully test-run it.
+- Do not write passwords, verification codes, or card numbers, and do not claim Claire has already successfully test-run it.
 - "When to Stop and Hand Over to the User" must state: when the current screen shows no entry or precondition, stop applying the skill and switch to normal viewing and asking. Leave paying, sending, and ordering to the user.
 - Do not wrap tool names in backticks.

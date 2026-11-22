@@ -124,7 +124,7 @@ class PromptSurfaceTest {
         PromptSurface.check("persona/layer", com.wangzan101.mika.core.prompt.PersonaPrompt.layer("测试人格", "先给结论,再展开;少用感叹号。")!!)
     }
 
-    /** 改了称呼之后模型多看到、看到不一样的那几段:身份那一段、「Mika 是 App 的名字」的说明、人格层的固定头。 */
+    /** 改了称呼之后模型多看到、看到不一样的那几段:身份那一段、「Claire 是 App 的名字」的说明、人格层的固定头。 */
     @Test fun personaRenamed() {
         val identity = SystemPrompt.identity("辉夜").substringBefore("\n\nPrinciples:")
         val layer = com.wangzan101.mika.core.prompt.PersonaPrompt.layer("测试人格", "先给结论。", assistant = "辉夜")!!.substringBefore("\n\nWhat the persona may change")

@@ -72,7 +72,7 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** 已 root 的手机上「用 root 启动手机助手」「允许 Mika 执行 root 命令」两个开关;变了就让看门狗按新的情况再试。 */
+    /** 已 root 的手机上「用 root 启动手机助手」「允许 Claire 执行 root 命令」两个开关;变了就让看门狗按新的情况再试。 */
     val root = RootControl(app, scope) { engine.rootChanged() }
 
     /** Shizuku 官方 API 通道:检查安装/运行/授权并绑定 UserService。 */
@@ -306,7 +306,7 @@ class BuiltinShellManager(context: Context, private val hub: HelperHub, private 
         override suspend fun launchHelper() {
             launchStage("preparing")
             val tls = AndroidAdb.tls(AndroidAdb.identity(app))
-            // 助手每次交接前都核对 Mika 的签名
+            // 助手每次交接前都核对 Claire 的签名
             val command = HelperHandoff.command(app.applicationInfo.sourceDir, app.packageName, Process.myUid(), ownCertPin(app))
             launchStage("adb_connecting")
             val connection = connect(tls)

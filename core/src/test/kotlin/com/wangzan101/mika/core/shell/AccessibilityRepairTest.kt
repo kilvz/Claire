@@ -100,7 +100,7 @@ class AccessibilityRepairTest {
 
     @Test
     fun turnsItBackOnWhenRemovedFromTheSystemList() = runTest {
-        // 强行停止时系统会把 Mika 从无障碍列表里拿掉:一样自动打开
+        // 强行停止时系统会把 Claire 从无障碍列表里拿掉:一样自动打开
         val rig = Rig(initial = off).also { it.start(this) }
         advanceTimeBy(60_000)
         assertEquals(1, rig.restarts.size)
@@ -212,7 +212,7 @@ class AccessibilityRepairTest {
         assertEquals(RepairPhase.Repairing, rig.repair.phase.value)
         advanceTimeBy(10_000)
         assertEquals(RepairPhase.Idle, rig.repair.phase.value)
-        // 被拿掉了也要修;只有在 Mika 里关掉了替我打开才一直是 Idle
+        // 被拿掉了也要修;只有在 Claire 里关掉了替我打开才一直是 Idle
         assertEquals(RepairPhase.Pending, Rig(initial = off).also { it.start(this) }.repair.phase.value)
         val declined = RecoveryConsent(declined = setOf(RecoveryCapability.Accessibility))
         assertEquals(RepairPhase.Idle, Rig(initial = off, consent = declined).also { it.start(this) }.repair.phase.value)

@@ -4,7 +4,7 @@
     <string name="plugins_install">Eklenti yükle</string>
     <string name="plugins_installing">Yükleniyor…</string>
     <string name="plugins_empty">Henüz eklenti yok</string>
-    <string name="plugins_empty_sub">Mika\'nın okuyabileceği beceriler eklemek için bir eklenti zip\'i yükleyin. Bir eklenti, uygulama ayarlarını değiştiremez veya diğer verilerinizi okuyamaz.</string>
+    <string name="plugins_empty_sub">Claire\'nın okuyabileceği beceriler eklemek için bir eklenti zip\'i yükleyin. Bir eklenti, uygulama ayarlarını değiştiremez veya diğer verilerinizi okuyamaz.</string>
     <string name="plugins_enabled">Etkin</string>
     <string name="plugins_disabled">Devre dışı</string>
     <string name="plugins_skills">Beceriler</string>
@@ -16,7 +16,7 @@
     <string name="plugins_uninstall_body">Bu eklenti ve becerileri kaldırılsın mı? Konuşmalar ve anılar etkilenmez.</string>
     <string name="plugins_install_failed">Yükleme başarısız: %1$s</string>
     <string name="plugins_unsupported_in_version">Bu sürüm yalnızca beceri içeren eklentileri destekler.</string>
-    <string name="plugins_error_too_new">Bu eklenti daha yeni bir Mika sürümü gerektirir.</string>
+    <string name="plugins_error_too_new">Bu eklenti daha yeni bir Claire sürümü gerektirir.</string>
     <string name="plugins_error_unsafe">Paket güvenli olmayan bir yol içeriyor ve reddedildi.</string>
     <string name="plugins_error_too_large">Paket çok büyük.</string>
     <string name="plugins_error_missing_manifest">Paketin kökünde manifest.json yok.</string>

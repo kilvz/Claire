@@ -82,7 +82,7 @@
     <string name="main_fallback_clear">Yedek yok</string>
     <string name="main_fallback_failed">Yedek model ayarlanamadı</string>
     <string name="main_fallback_is_main">Bu şu anki ana model, bu yüzden kendi yedeği de olamaz</string>
-    <string name="role_vision_hint">İsteğe bağlı: olmadan Mika ekranı metin olarak okur.</string>
+    <string name="role_vision_hint">İsteğe bağlı: olmadan Claire ekranı metin olarak okur.</string>
     <string name="role_light_hint">Ucuz ve hızlı olması en iyisidir.</string>
     <string name="models_delete_title">\“%1$s\” silinsin mi?</string>
     <string name="models_delete_body">"API anahtarı da silinecek. "</string>
@@ -108,9 +108,9 @@
 
     <!-- 用 ChatGPT 登录 -->
     <string name="chatgpt_use_plan_title">ChatGPT planınızı kullanın</string>
-    <string name="chatgpt_use_plan_body">Bu uygulamadaki uygun yapay zeka isteklerini, kullanımınız ChatGPT planınıza veya kredi bakiyenize dahil olacak şekilde tamamlayın. ChatGPT Plus ve Pro ile çalışır. Mika\'nın kendisi ücretsizdir; Mika tarafından hiçbir ücret alınmaz.</string>
+    <string name="chatgpt_use_plan_body">Bu uygulamadaki uygun yapay zeka isteklerini, kullanımınız ChatGPT planınıza veya kredi bakiyenize dahil olacak şekilde tamamlayın. ChatGPT Plus ve Pro ile çalışır. Claire\'nın kendisi ücretsizdir; Claire tarafından hiçbir ücret alınmaz.</string>
     <string name="chatgpt_continue">ChatGPT ile devam et</string>
-    <string name="chatgpt_waiting">Tarayıcınızda oturumu bitirin, sonra Mika\'ya dönün.</string>
+    <string name="chatgpt_waiting">Tarayıcınızda oturumu bitirin, sonra Claire\'ya dönün.</string>
     <string name="chatgpt_welcome_title">ChatGPT planınızı kullanıyorsunuz</string>
     <string name="chatgpt_welcome_body">Bu uygulamadaki uygun kullanım ChatGPT planınızı kullanır. Kullanımı ChatGPT ayarlarınızda yönetin.</string>
     <string name="chatgpt_got_it">Anladım</string>
@@ -121,30 +121,30 @@
     <string name="chatgpt_manage_usage">Kullanımı yönet</string>
     <string name="chatgpt_plan_note">ChatGPT planı kullanılıyor. Plus\'ta 5 saatlik sınır, planınızı kullanan diğer uygulamalarla paylaşılır; Pro\'da 5 saatlik sınır yoktur.</string>
     <string name="chatgpt_signed_out_note">Bu telefonda oturum kapatıldı. Planınızı tekrar kullanmak için ChatGPT ile devam edin; model seçimleriniz korunur.</string>
-    <string name="chatgpt_revoke_unconfirmed">Bu telefonda oturum kapatıldı, ancak ChatGPT bunu doğrulamadı. Mika\'yı ChatGPT ayarlarınızdan da bağlantısını kesebilirsiniz.</string>
+    <string name="chatgpt_revoke_unconfirmed">Bu telefonda oturum kapatıldı, ancak ChatGPT bunu doğrulamadı. Claire\'yı ChatGPT ayarlarınızdan da bağlantısını kesebilirsiniz.</string>
     <string name="chatgpt_fail_denied">Oturum iptal edildi. Sayfa gerekli iznin olmadığını söylediyse: planınızı kullanmak için ChatGPT Plus veya Pro gerekir. Ücretsiz bir hesapla bunun yerine başka bir sağlayıcının API anahtarını ekleyin.</string>
     <string name="chatgpt_fail_mismatch">Oturum yanıtı bu denemeyle eşleşmedi. Lütfen tekrar deneyin.</string>
-    <string name="chatgpt_fail_no_client">ChatGPT, Mika\'yı kaydetmeyi bitirmedi. Lütfen tekrar deneyin.</string>
+    <string name="chatgpt_fail_no_client">ChatGPT, Claire\'yı kaydetmeyi bitirmedi. Lütfen tekrar deneyin.</string>
     <string name="chatgpt_fail_timed_out">Oturum zaman aşımına uğradı. Lütfen tekrar deneyin.</string>
     <string name="chatgpt_fail_exchange">ChatGPT bu oturumu reddetti (hata: %1$s). Lütfen tekrar deneyin.</string>
     <string name="chatgpt_fail_code_expired">Oturum kodu süresi doldu veya zaten kullanıldı. Lütfen tekrar oturum açın.</string>
     <string name="chatgpt_fail_region">OpenAI, ağınızın bulunduğu bölgeyi desteklemiyor. Başka bir ağ deneyin.</string>
     <string name="chatgpt_fail_blocked">OpenAI\'nın koruması isteği engelledi. Başka bir ağ deneyin veya daha sonra tekrar deneyin.</string>
     <string name="chatgpt_fail_id_token">ChatGPT hesabınız doğrulanamadı. Lütfen tekrar deneyin.</string>
-    <string name="chatgpt_fail_no_plan">Mika\'nın ChatGPT planınızı kullanmasına izin verilmedi. Tekrar oturum açın ve plan kullanımına izin verin (Plus veya Pro gerekir).</string>
+    <string name="chatgpt_fail_no_plan">Claire\'nın ChatGPT planınızı kullanmasına izin verilmedi. Tekrar oturum açın ve plan kullanımına izin verin (Plus veya Pro gerekir).</string>
     <string name="chatgpt_fail_network">ChatGPT\'ye ulaşılamadı. Ağınızı kontrol edip tekrar deneyin.</string>
-    <string name="chatgpt_page_title">Mika</string>
-    <string name="chatgpt_page_done">Oturum açıldı. Mika\'ya dönün.</string>
+    <string name="chatgpt_page_title">Claire</string>
+    <string name="chatgpt_page_done">Oturum açıldı. Claire\'ya dönün.</string>
     <string name="chatgpt_signin_notif_title">ChatGPT\'de oturum açılıyor</string>
     <string name="chatgpt_signin_notif_body">Tarayıcıda ChatGPT\'de oturum açmanız bekleniyor</string>
-    <string name="chatgpt_page_back">Mika\'ya dön</string>
+    <string name="chatgpt_page_back">Claire\'ya dön</string>
     <string name="chatgpt_no_browser">Oturum açmak için tarayıcı bulunamadı.</string>
     <string name="models_unverified">Test edilmedi; görevler başarısız olabilir</string>
     <string name="models_unverified_note">Kullanımdaki modeller (%1$s) henüz testi geçmedi. Bir modeli kontrol etmek için o modelin test düğmesine dokunun.</string>
     <string name="models_retest">Tekrar test et</string>
     <string name="models_retest_model">%1$s modelini test et</string>
     <string name="models_retest_confirm_title">Model test edilsin mi?</string>
-    <string name="models_retest_confirm_body">Mika, %2$s sağlayıcısındaki %1$s modeline bir araç çağırma testi isteği gönderecek.</string>
+    <string name="models_retest_confirm_body">Claire, %2$s sağlayıcısındaki %1$s modeline bir araç çağırma testi isteği gönderecek.</string>
 
     <string name="account_signin_copied">Kopyalandı</string>
     <string name="account_signin_notif_title">Hesabınızda oturum açılıyor</string>
@@ -169,8 +169,8 @@
     <string name="signin_use_key">Bunun yerine bir API anahtarı kullanın</string>
     <string name="signin_stored_note">Oturum bilgileri yalnızca bu telefonda şifrelenmiş saklanır ve asla günlüklere yazılmaz.</string>
     <string name="signin_xai_title">xAI ile oturum aç</string>
-    <string name="signin_xai_body">Ayrı bir API kredisi satın almadan SuperGrok veya X Premium+ aboneliğinizle Mika\'da Grok\'u kullanın. İstekler doğrudan xAI\'ya gider.</string>
-    <string name="signin_xai_risk">Bu oturum, xAI\'nın resmi komut satırı aracının genel oturum girişini ödünç alır; xAI bunu Mika için kurmadı. xAI bu kullanımı kısıtlayabilir ve bazı abonelik kademeleri oturum açtıktan sonra yine de arama yapamayabilir (403 görürsünüz). Böyle olursa bunun yerine bir xAI API anahtarı kullanın.</string>
+    <string name="signin_xai_body">Ayrı bir API kredisi satın almadan SuperGrok veya X Premium+ aboneliğinizle Claire\'da Grok\'u kullanın. İstekler doğrudan xAI\'ya gider.</string>
+    <string name="signin_xai_risk">Bu oturum, xAI\'nın resmi komut satırı aracının genel oturum girişini ödünç alır; xAI bunu Claire için kurmadı. xAI bu kullanımı kısıtlayabilir ve bazı abonelik kademeleri oturum açtıktan sonra yine de arama yapamayabilir (403 görürsünüz). Böyle olursa bunun yerine bir xAI API anahtarı kullanın.</string>
     <string name="signin_xai_starting">xAI onay sayfası açılıyor…</string>
     <string name="signin_xai_code_title">Tarayıcınızda onaylayın</string>
     <string name="signin_xai_code_body">xAI onay sayfası açık. Oradaki kodun aşağıdakiyle eşleştiğini kontrol edin, sonra onaylayın.</string>
@@ -179,15 +179,15 @@
     <string name="signin_xai_code_waiting">Tarayıcıda onaylamanız bekleniyor…</string>
     <string name="signin_xai_403_note">Çağrılar 403 ile başarısız olursa, abonelik kademeniz bu API\'yi kullanamaz. Bunun yerine bir xAI API anahtarı kullanın.</string>
     <string name="signin_openrouter_title">OpenRouter ile oturum aç</string>
-    <string name="signin_openrouter_body">OpenRouter\'ın yetkilendirme sayfasını açar. Onayladığınızda OpenRouter, Mika\'ya size ait bir anahtar verir; kullanım OpenRouter bakiyenizden düşer ve yüzlerce model bir anda hazır olur.</string>
+    <string name="signin_openrouter_body">OpenRouter\'ın yetkilendirme sayfasını açar. Onayladığınızda OpenRouter, Claire\'ya size ait bir anahtar verir; kullanım OpenRouter bakiyenizden düşer ve yüzlerce model bir anda hazır olur.</string>
     <string name="signin_openrouter_note">Bu, üçüncü taraf uygulamalar için OpenRouter\'ın resmi oturum açmasıdır. Anahtar bu telefonda şifrelenmiş saklanır; artık istemiyorsanız OpenRouter\'ın Anahtarlar sayfasından silin.</string>
     <string name="signin_openrouter_authorize">OpenRouter\'da yetkilendir</string>
-    <string name="signin_openrouter_waiting">Tarayıcıda onaylayın, sonra Mika\'ya dönün.</string>
+    <string name="signin_openrouter_waiting">Tarayıcıda onaylayın, sonra Claire\'ya dönün.</string>
     <string name="signin_openrouter_manage">OpenRouter\'ın Anahtarlar sayfasını aç</string>
-    <string name="signin_openrouter_signed_in_note">Kullanım OpenRouter bakiyenizden düşer. Anahtar bu telefonda şifrelenmiş saklanır; kullanmayı bırakmak için OpenRouter\'ın Anahtarlar sayfasında \“Mika\” adlı anahtarı silin.</string>
+    <string name="signin_openrouter_signed_in_note">Kullanım OpenRouter bakiyenizden düşer. Anahtar bu telefonda şifrelenmiş saklanır; kullanmayı bırakmak için OpenRouter\'ın Anahtarlar sayfasında \“Claire\” adlı anahtarı silin.</string>
     <string name="signin_openrouter_signed_out_note">Anahtar bu telefondan silindi. OpenRouter\'da hâlâ var; Anahtarlar sayfasından silin. Model seçimleri korunur.</string>
     <string name="signin_set_main">Ana model olarak ayarla</string>
-    <string name="signin_set_main_note">Mika işleri halletmek için onu kullanır</string>
+    <string name="signin_set_main_note">Claire işleri halletmek için onu kullanır</string>
     <string name="signin_sign_out_note">Yalnızca bu telefondaki oturumu temizler</string>
     <string name="signin_busy">Başka bir oturum açma sürüyor. Önce onu bitirin veya iptal edin.</string>
     <string name="signin_openrouter_name">%1$s (oturum açıldı)</string>
@@ -217,8 +217,8 @@
     <string name="models_daily_token_budget_sub">Bu sağlayıcı için tüm modelleri ve amaçları yerel takvim gününde sayar. Yalnızca bildirilen giriş ve çıkış tokenları sayılır. Sınıra gelindiğinde sonraki istek engellenir; uçuştaki istekler sınırı aşabilir. Yerel tarih değişince sıfırlanır.</string>
     <string name="models_daily_token_budget_save_failed">Bütçe kaydedilemedi. Önceki ayar hâlâ etkin.</string>
     <string name="role_voice">Ses modeli</string>
-    <string name="role_voice_what">Mika\'nın konuşmasını ve yanıtları sesli okumasını sağlar</string>
-    <string name="voice_enable">Mika\'nın konuşmasına izin ver</string>
+    <string name="role_voice_what">Claire\'nın konuşmasını ve yanıtları sesli okumasını sağlar</string>
+    <string name="voice_enable">Claire\'nın konuşmasına izin ver</string>
     <string name="voice_enable_note">Otomatik okuma açık değilse, konuşma yalnızca Sesli oku\'ya dokunduğunuzda yapılır</string>
     <string name="voice_provider">Sağlayıcı</string>
     <string name="voice_no_providers">Önce “Model” bölümünden bir sağlayıcı ekleyin.</string>
@@ -233,7 +233,7 @@
     <string name="voice_streaming">Akışlı oynatma</string>
     <string name="voice_streaming_note">Uyumlu bir sağlayıcı ve 1× oynatma hızı gerekir.</string>
     <string name="voice_auto_read">Her yanıtı sesli oku</string>
-    <string name="voice_speak_tool">Mika\'nın kendi kendine konuşmasına izin ver</string>
+    <string name="voice_speak_tool">Claire\'nın kendi kendine konuşmasına izin ver</string>
     <string name="voice_max_chars">En uzun okuma (karakter)</string>
     <string name="voice_test">Bir test cümlesi söyle</string>
     <string name="voice_testing">Test cümlesi yapılıyor…</string>
@@ -245,7 +245,7 @@
     <string name="voice_loading">Ses hazırlanıyor…</string>
     <string name="voice_play_failed">Ses çalınamadı: %1$s</string>
     <string name="voice_save_enabled">Sesin müzik kitaplığına kaydedilmesine izin ver</string>
-    <string name="voice_save_note">Varsayılan olarak kapalı. Kaydetme Music/Mika\'ya yazar</string>
+    <string name="voice_save_note">Varsayılan olarak kapalı. Kaydetme Music/Claire\'ya yazar</string>
     <string name="voice_ask_before_save">Her ses kaydından önce sor</string>
     <string name="tool_audio_generate">Konuşma üret</string>
     <string name="tool_audio_save">Sesi kaydet</string>
@@ -253,10 +253,10 @@
     <string name="tool_audio_transcribe">Sesi yazıya dök</string>
     <string name="image_ask_before_generate">Ask before each picture</string>
     <string name="image_ask_before_save">Ask before each save</string>
-    <string name="image_enable">Allow Mika to make pictures</string>
+    <string name="image_enable">Allow Claire to make pictures</string>
     <string name="image_enable_note">Off by default. No image tools are offered while this is off</string>
     <string name="image_footer">Pictures are written to the conversation workspace. Saving to the gallery needs the switch above; sending them on is still done in the target app.</string>
-    <string name="image_hint">Mika can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
+    <string name="image_hint">Claire can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
     <string name="image_limits">Limits and saving</string>
     <string name="image_max_per_task">Pictures per task</string>
     <string name="image_model_name">Model</string>
@@ -266,14 +266,14 @@
     <string name="image_protocol_openai">OpenAI Images</string>
     <string name="image_provider">Service</string>
     <string name="image_save_enabled">Allow saving to the gallery</string>
-    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Mika</string>
+    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Claire</string>
     <string name="image_supports_edit">Can edit from a reference picture</string>
     <string name="image_test">Make a test picture</string>
     <string name="image_test_failed">The test failed: %1$s</string>
     <string name="image_test_ok">The service returned a picture.</string>
     <string name="image_testing">Making a test picture…</string>
     <string name="role_image">Image model</string>
-    <string name="role_image_what">Makes pictures Mika can use</string>
+    <string name="role_image_what">Makes pictures Claire can use</string>
     <string name="tool_image_edit">Edit image</string>
     <string name="tool_image_generate">Generate image</string>
     <string name="tool_image_save">Save image</string>
@@ -315,5 +315,5 @@
     <string name="models_group_used_by">Used as %1$s</string>
     <string name="models_group_vision_needs_eyes">A vision group needs at least one model that can see images.</string>
     <string name="models_groups">Model groups</string>
-    <string name="model_not_chat_capable">Mika bu modeli sohbet için kullanamaz. Aşağıda yine de yalnızca ses olarak işaretleyebilirsiniz.</string>
+    <string name="model_not_chat_capable">Claire bu modeli sohbet için kullanamaz. Aşağıda yine de yalnızca ses olarak işaretleyebilirsiniz.</string>
 </resources>

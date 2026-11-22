@@ -19,7 +19,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * A whole-data backup of Mika: a plain ZIP file, no password.
+ * A whole-data backup of Claire: a plain ZIP file, no password.
  *
  * Why this exists: secrets are AES-GCM encrypted with AndroidKeyStore keys, and uninstall
  * invalidates those keys, so raw files cannot be carried to a differently signed install.

@@ -52,7 +52,7 @@ internal object StopRules {
         val treeBlind = v.evidence["treeBlind"] == JsonPrimitive(true)
         val why = when (v.code) {
             "repeating_action" -> "同一个操作反复执行仍没有效果"
-            "no_progress" -> if (treeBlind) "读不到这个界面的控件,点击和滑动画面也没有反应,该应用可能不响应 Mika 的自动化操作"
+            "no_progress" -> if (treeBlind) "读不到这个界面的控件,点击和滑动画面也没有反应,该应用可能不响应 Claire 的自动化操作"
                 else "操作多次后画面一直没有变化"
             "read_loop" -> "页面没有变化,反复读也读不出要找的内容"
             "too_many_failures" -> "操作连续失败"
@@ -87,7 +87,7 @@ internal fun userReason(e: ModelError): String = when (e) {
     is ModelError.ModelNotAvailable ->
         "模型「${e.model.ifEmpty { "当前模型" }}」这个账号没开通或没权限用。去设置 › 模型换一个模型，或到服务商后台开通。"
     is ModelError.ToolsUnsupported ->
-        "模型「${e.model.ifEmpty { "当前模型" }}」不支持调用工具,Mika 干活要靠工具。去设置 › 模型换一个会调用工具的模型。"
+        "模型「${e.model.ifEmpty { "当前模型" }}」不支持调用工具,Claire 干活要靠工具。去设置 › 模型换一个会调用工具的模型。"
     is ModelError.ContextTooLong -> "对话内容超出了模型的上下文长度,请换用上下文更长的模型,或把任务拆小一些。"
     is ModelError.ContentRefused -> "模型拒绝处理该内容,请调整任务描述或换一个模型。"
     is ModelError.ReasoningEffortRejected ->

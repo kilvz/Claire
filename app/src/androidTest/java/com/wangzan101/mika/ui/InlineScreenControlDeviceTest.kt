@@ -138,9 +138,9 @@ class InlineScreenControlDeviceTest {
             it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { node -> node.isEditable }
         }
         assertNotNull("search field must receive focus", DeviceSupport.pollUntil(5_000) { searchField() })
-        assertTrue(runBlocking { run.screenText(frame.width, frame.height, "Mika") })
+        assertTrue(runBlocking { run.screenText(frame.width, frame.height, "Claire") })
         assertNotNull("typed text must appear in the focused search field", DeviceSupport.pollUntil(5_000) {
-            searchField()?.takeIf { it.text?.toString() == "Mika" }
+            searchField()?.takeIf { it.text?.toString() == "Claire" }
         })
         assertTrue(runBlocking { run.screenBack(frame.width, frame.height) })
         compose.onNodeWithTag("screen-control-toggle").performClick()

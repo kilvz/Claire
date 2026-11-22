@@ -16,7 +16,7 @@ class UserWordsTest {
 
     private fun words(text: String) = UserWords.typed(text, tools) to UserWords.said(text, tools)
 
-    // 引了 Mika 的回答:引的那段两样都不算;附件行也不算,只带了附件、没打字时都为空
+    // 引了 Claire 的回答:引的那段两样都不算;附件行也不算,只带了附件、没打字时都为空
     @Test fun aQuotedReplyIsNotTheUserWords() {
         assertEquals("照这个改" to "照这个改", words(AttachmentLines.compose(QuoteMessage.compose(mika, "照这个改"), pdf)))
         assertEquals("" to "", words(AttachmentLines.compose(QuoteMessage.compose(mika, ""), pdf)))

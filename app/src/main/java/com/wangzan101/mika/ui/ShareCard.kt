@@ -56,7 +56,7 @@ import java.io.File
 data class ShareRequest(val goal: String, val answer: String)
 
 /**
- * 分享卡片(样式 1 · 白卡):顶部 Mika logo + 名字,中间「问 + 答」,底部项目地址。
+ * 分享卡片(样式 1 · 白卡):顶部 Claire logo + 名字,中间「问 + 答」,底部项目地址。
  * 固定宽度、高度随内容撑开,白底、浅色,不随界面深浅色变化;正文用 Markdown 渲染、不截断。
  */
 @Composable
@@ -68,7 +68,7 @@ fun ShareCardContent(goal: String, answer: String, logo: ImageBitmap, modifier: 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(logo, null, Modifier.size(40.dp).clip(MikaShapes.Chip), contentScale = ContentScale.Crop)
             Spacer(Modifier.width(10.dp))
-            Text("Mika", style = MikaType.Title.copy(fontWeight = FontWeight.Bold), color = ink)
+            Text("Claire", style = MikaType.Title.copy(fontWeight = FontWeight.Bold), color = ink)
         }
         Spacer(Modifier.height(20.dp))
         Text(stringResource(R.string.share_card_question), style = MikaType.Hint.copy(fontWeight = FontWeight.SemiBold), color = LightColors.accent)

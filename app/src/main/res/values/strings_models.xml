@@ -83,7 +83,7 @@
     <string name="main_fallback_clear">No fallback</string>
     <string name="main_fallback_failed">Could not set the fallback model</string>
     <string name="main_fallback_is_main">This is the current main model, so it cannot also be its fallback</string>
-    <string name="role_vision_hint">Optional: without it Mika reads the screen as text.</string>
+    <string name="role_vision_hint">Optional: without it Claire reads the screen as text.</string>
     <string name="role_light_hint">Cheap and fast is best.</string>
     <string name="models_delete_title">Delete “%1$s”?</string>
     <string name="models_delete_body">"Its API key will be deleted too. "</string>
@@ -113,9 +113,9 @@
 
     <!-- 用 ChatGPT 登录 -->
     <string name="chatgpt_use_plan_title">Use your ChatGPT plan</string>
-    <string name="chatgpt_use_plan_body">Complete eligible AI requests in this app with usage included in your ChatGPT plan or credits balance. Works with ChatGPT Plus and Pro. Mika itself is free; nothing is charged by Mika.</string>
+    <string name="chatgpt_use_plan_body">Complete eligible AI requests in this app with usage included in your ChatGPT plan or credits balance. Works with ChatGPT Plus and Pro. Claire itself is free; nothing is charged by Claire.</string>
     <string name="chatgpt_continue">Continue with ChatGPT</string>
-    <string name="chatgpt_waiting">Finish signing in in your browser, then come back to Mika.</string>
+    <string name="chatgpt_waiting">Finish signing in in your browser, then come back to Claire.</string>
     <string name="chatgpt_welcome_title">You’re using your ChatGPT plan</string>
     <string name="chatgpt_welcome_body">Eligible usage in this app uses your ChatGPT plan. Manage usage in your ChatGPT settings.</string>
     <string name="chatgpt_got_it">Got it</string>
@@ -126,30 +126,30 @@
     <string name="chatgpt_manage_usage">Manage usage</string>
     <string name="chatgpt_plan_note">Using ChatGPT plan. On Plus, the 5-hour limit is shared with other apps that use your plan; Pro has no 5-hour limit.</string>
     <string name="chatgpt_signed_out_note">Signed out on this phone. Continue with ChatGPT to use your plan again; your model choices are kept.</string>
-    <string name="chatgpt_revoke_unconfirmed">Signed out on this phone, but ChatGPT didn’t confirm it. You can also disconnect Mika in your ChatGPT settings.</string>
+    <string name="chatgpt_revoke_unconfirmed">Signed out on this phone, but ChatGPT didn’t confirm it. You can also disconnect Claire in your ChatGPT settings.</string>
     <string name="chatgpt_fail_denied">Sign-in was cancelled. If the page said the required permission isn’t available: using your plan needs ChatGPT Plus or Pro. With a free account, add another provider’s API key instead.</string>
     <string name="chatgpt_fail_mismatch">The sign-in reply didn’t match this attempt. Please try again.</string>
-    <string name="chatgpt_fail_no_client">ChatGPT didn’t finish registering Mika. Please try again.</string>
+    <string name="chatgpt_fail_no_client">ChatGPT didn’t finish registering Claire. Please try again.</string>
     <string name="chatgpt_fail_timed_out">Sign-in timed out. Please try again.</string>
     <string name="chatgpt_fail_exchange">ChatGPT rejected this sign-in (error: %1$s). Please try again.</string>
     <string name="chatgpt_fail_code_expired">The sign-in code expired or was already used. Please sign in again.</string>
     <string name="chatgpt_fail_region">OpenAI doesn’t support the region your network is in. Try another network.</string>
     <string name="chatgpt_fail_blocked">OpenAI’s protection blocked the request. Try another network or try again later.</string>
     <string name="chatgpt_fail_id_token">Couldn’t verify your ChatGPT account. Please try again.</string>
-    <string name="chatgpt_fail_no_plan">Mika wasn’t allowed to use your ChatGPT plan. Sign in again and allow plan usage (needs Plus or Pro).</string>
+    <string name="chatgpt_fail_no_plan">Claire wasn’t allowed to use your ChatGPT plan. Sign in again and allow plan usage (needs Plus or Pro).</string>
     <string name="chatgpt_fail_network">Couldn’t reach ChatGPT. Check your network and try again.</string>
-    <string name="chatgpt_page_title">Mika</string>
-    <string name="chatgpt_page_done">Signed in. Return to Mika.</string>
+    <string name="chatgpt_page_title">Claire</string>
+    <string name="chatgpt_page_done">Signed in. Return to Claire.</string>
     <string name="chatgpt_signin_notif_title">Signing in to ChatGPT</string>
     <string name="chatgpt_signin_notif_body">Waiting for you to sign in to ChatGPT in the browser</string>
-    <string name="chatgpt_page_back">Return to Mika</string>
+    <string name="chatgpt_page_back">Return to Claire</string>
     <string name="chatgpt_no_browser">No browser found to sign in with.</string>
     <string name="models_unverified">Not tested; tasks may fail</string>
     <string name="models_unverified_note">The models in use (%1$s) have yet to pass a test. To check one, tap its test button.</string>
     <string name="models_retest">Test again</string>
     <string name="models_retest_model">Test %1$s</string>
     <string name="models_retest_confirm_title">Test model?</string>
-    <string name="models_retest_confirm_body">Mika will send one tool-calling test request to model %1$s at %2$s.</string>
+    <string name="models_retest_confirm_body">Claire will send one tool-calling test request to model %1$s at %2$s.</string>
 
     <string name="account_signin_copied">Copied</string>
     <string name="account_signin_notif_title">Signing in to your account</string>
@@ -174,8 +174,8 @@
     <string name="signin_use_key">Use an API key instead</string>
     <string name="signin_stored_note">Sign-in details are stored encrypted on this phone only and are never written to logs.</string>
     <string name="signin_xai_title">Sign in with xAI</string>
-    <string name="signin_xai_body">Use Grok in Mika with your SuperGrok or X Premium+ subscription, with no separate API credit to buy. Requests go straight to xAI.</string>
-    <string name="signin_xai_risk">This sign-in borrows the public sign-in entry of xAI\'s official command-line tool; xAI did not set it up for Mika. xAI may restrict this use, and some subscription tiers still can\'t make calls after signing in (you\'ll see 403). If that happens, use an xAI API key instead.</string>
+    <string name="signin_xai_body">Use Grok in Claire with your SuperGrok or X Premium+ subscription, with no separate API credit to buy. Requests go straight to xAI.</string>
+    <string name="signin_xai_risk">This sign-in borrows the public sign-in entry of xAI\'s official command-line tool; xAI did not set it up for Claire. xAI may restrict this use, and some subscription tiers still can\'t make calls after signing in (you\'ll see 403). If that happens, use an xAI API key instead.</string>
     <string name="signin_xai_starting">Opening the xAI confirmation page…</string>
     <string name="signin_xai_code_title">Confirm in your browser</string>
     <string name="signin_xai_code_body">The xAI confirmation page is open. Check that the code there matches the one below, then approve.</string>
@@ -184,15 +184,15 @@
     <string name="signin_xai_code_waiting">Waiting for you to confirm in the browser…</string>
     <string name="signin_xai_403_note">If calls fail with 403, your subscription tier can\'t use this API. Use an xAI API key instead.</string>
     <string name="signin_openrouter_title">Sign in with OpenRouter</string>
-    <string name="signin_openrouter_body">Opens OpenRouter\'s authorization page. Once you approve, OpenRouter gives Mika a key of your own; usage comes out of your OpenRouter balance, and hundreds of models are ready at once.</string>
+    <string name="signin_openrouter_body">Opens OpenRouter\'s authorization page. Once you approve, OpenRouter gives Claire a key of your own; usage comes out of your OpenRouter balance, and hundreds of models are ready at once.</string>
     <string name="signin_openrouter_note">This is OpenRouter\'s official sign-in for third-party apps. The key is stored encrypted on this phone; if you no longer want it, delete it on OpenRouter\'s Keys page.</string>
     <string name="signin_openrouter_authorize">Authorize on OpenRouter</string>
-    <string name="signin_openrouter_waiting">Approve in the browser, then come back to Mika.</string>
+    <string name="signin_openrouter_waiting">Approve in the browser, then come back to Claire.</string>
     <string name="signin_openrouter_manage">Open OpenRouter\'s Keys page</string>
-    <string name="signin_openrouter_signed_in_note">Usage comes out of your OpenRouter balance. The key is stored encrypted on this phone; to stop using it, delete the key named \"Mika\" on OpenRouter\'s Keys page.</string>
+    <string name="signin_openrouter_signed_in_note">Usage comes out of your OpenRouter balance. The key is stored encrypted on this phone; to stop using it, delete the key named \"Claire\" on OpenRouter\'s Keys page.</string>
     <string name="signin_openrouter_signed_out_note">The key was deleted from this phone. It still exists on OpenRouter; delete it on the Keys page. Model choices are kept.</string>
     <string name="signin_set_main">Set as main model</string>
-    <string name="signin_set_main_note">Mika uses it to get things done</string>
+    <string name="signin_set_main_note">Claire uses it to get things done</string>
     <string name="signin_sign_out_note">Only clears the sign-in on this phone</string>
     <string name="signin_busy">Another sign-in is in progress. Finish or cancel it first.</string>
     <string name="signin_openrouter_name">%1$s (signed in)</string>
@@ -222,8 +222,8 @@
     <string name="models_daily_token_budget_sub">Counts all models and purposes for this provider in the local calendar day. Only reported input and output tokens count. At the limit, the next request is blocked; in-flight requests may exceed it. Resets when the local date changes.</string>
     <string name="models_daily_token_budget_save_failed">The budget could not be saved. The previous setting is still active.</string>
     <string name="role_voice">Voice model</string>
-    <string name="role_voice_what">Lets Mika speak and read answers aloud</string>
-    <string name="voice_enable">Allow Mika to speak</string>
+    <string name="role_voice_what">Lets Claire speak and read answers aloud</string>
+    <string name="voice_enable">Allow Claire to speak</string>
     <string name="voice_enable_note">Speech is only made when you tap Read aloud, unless auto-read is on</string>
     <string name="voice_provider">Provider</string>
     <string name="voice_no_providers">Add a provider under “Model” first.</string>
@@ -238,7 +238,7 @@
     <string name="voice_streaming">Stream playback</string>
     <string name="voice_streaming_note">Requires a compatible provider and 1× speed.</string>
     <string name="voice_auto_read">Read every answer aloud</string>
-    <string name="voice_speak_tool">Let Mika speak on its own</string>
+    <string name="voice_speak_tool">Let Claire speak on its own</string>
     <string name="voice_max_chars">Longest read (characters)</string>
     <string name="voice_test">Say a test line</string>
     <string name="voice_testing">Making a test line…</string>
@@ -250,16 +250,16 @@
     <string name="voice_loading">Preparing the voice…</string>
     <string name="voice_play_failed">Could not play the voice: %1$s</string>
     <string name="voice_save_enabled">Allow saving audio to the music library</string>
-    <string name="voice_save_note">Off by default. Saving writes to Music/Mika</string>
+    <string name="voice_save_note">Off by default. Saving writes to Music/Claire</string>
     <string name="voice_ask_before_save">Ask before each audio save</string>
     <string name="tool_audio_generate">Generate speech</string>
     <string name="tool_audio_save">Save audio</string>
     <string name="tool_share_audio">Share audio to app</string>
     <string name="tool_audio_transcribe">Transcribe audio</string>
     <string name="role_image">Image model</string>
-    <string name="role_image_what">Makes pictures Mika can use</string>
-    <string name="image_hint">Mika can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
-    <string name="image_enable">Allow Mika to make pictures</string>
+    <string name="role_image_what">Makes pictures Claire can use</string>
+    <string name="image_hint">Claire can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
+    <string name="image_enable">Allow Claire to make pictures</string>
     <string name="image_enable_note">Off by default. No image tools are offered while this is off</string>
     <string name="image_provider">Service</string>
     <string name="image_no_providers">Add a model service first (images use the same service and key).</string>
@@ -271,7 +271,7 @@
     <string name="image_limits">Limits and saving</string>
     <string name="image_max_per_task">Pictures per task</string>
     <string name="image_save_enabled">Allow saving to the gallery</string>
-    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Mika</string>
+    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Claire</string>
     <string name="image_ask_before_save">Ask before each save</string>
     <string name="image_ask_before_generate">Ask before each picture</string>
     <string name="image_test">Make a test picture</string>
@@ -322,5 +322,5 @@
     <string name="models_group_delete_body">Roles using it will go back to unset, none, or the main model.</string>
     <string name="models_group_used_by">Used as %1$s</string>
     <string name="models_group_member_context">Context</string>
-    <string name="model_not_chat_capable">Mika can’t use this model for chat. You can still mark it as speech-only below.</string>
+    <string name="model_not_chat_capable">Claire can’t use this model for chat. You can still mark it as speech-only below.</string>
 </resources>

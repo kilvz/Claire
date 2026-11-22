@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">Fazer uma chamada</string>
     <string name="calls_rules">Regras de atendimento</string>
     <string name="calls_setup_credentials">Configure as credenciais de voz em tempo real da plataforma de voz selecionada.</string>
-    <string name="calls_setup_shell">Conecte primeiro o assistente integrado do Mika.</string>
+    <string name="calls_setup_shell">Conecte primeiro o assistente integrado do Claire.</string>
     <string name="calls_sim_clear_preferred">Limpar SIM preferido</string>
     <string name="calls_sim_preferred">SIM preferido: %1$s</string>
     <string name="calls_sim_save_preferred">Usar este SIM por padrão</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">IA ligada. Pode falar pessoalmente a qualquer momento.</string>
     <string name="calls_only_types">Apenas tipos de chamada selecionados</string>
     <string name="calls_pick_types">Selecione pelo menos um tipo de chamada</string>
-    <string name="calls_type_note">O Mika usa a acessibilidade para comparar a etiqueta e o número da aplicação de telefone com a chamada recebida. Se não conseguir confirmar, pode atender pessoalmente.</string>
+    <string name="calls_type_note">O Claire usa a acessibilidade para comparar a etiqueta e o número da aplicação de telefone com a chamada recebida. Se não conseguir confirmar, pode atender pessoalmente.</string>
     <string name="calls_type_accessibility">Abrir definições de acessibilidade</string>
     <string name="calls_type_takeout">Entrega de refeições</string>
     <string name="calls_type_parcel">Encomendas</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">Empresas e apoio ao cliente</string>
     <string name="calls_type_transport">Táxis e transporte por aplicação</string>
     <string name="calls_only_strangers">Apenas números fora dos contatos</string>
-    <string name="calls_strangers_note">Permita que o Mika leia seus contatos. A IA só atende se confirmar que o número não está salvo. Números ocultos ou que não puderem ser verificados ficam para você atender.</string>
+    <string name="calls_strangers_note">Permita que o Claire leia seus contatos. A IA só atende se confirmar que o número não está salvo. Números ocultos ou que não puderem ser verificados ficam para você atender.</string>
 </resources>

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="notif_channel_prepare">Arka plan kurulumu</string>
-    <string name="notif_preparing">Mika hazırlanıyor</string>
-    <string name="notif_result_title">Mika görev sonucu</string>
+    <string name="notif_preparing">Claire hazırlanıyor</string>
+    <string name="notif_result_title">Claire görev sonucu</string>
     <string name="parallel_second_display_failed">İkinci bir sanal ekran oluşturulamadı, bu yüzden şimdilik aynı anda yalnızca bir görev çalışıyor</string>
     <string name="parallel_needs_14">Aynı anda birkaç görev çalıştırmak Android 14 veya üstü gerektirir</string>
     <string name="parallel_low_ram">Bu telefonda az bellek var, bu yüzden aynı anda bir görev çalışıyor</string>
     <string name="skill_suspended">Bu beceri son zamanlarda çalışmıyor, bu yüzden duraklatıldı: %1$s</string>
     <string name="skill_verified">Beceri işe yaradı, artık normal kullanımda: %1$s</string>
-    <string name="skill_learned">Mika bir beceri öğrendi: %1$s</string>
-    <string name="skill_app_draft">Mika, %1$s hakkında incelemeniz için birkaç olgu not etti</string>
-    <string name="skill_app_revised">Mika, %1$s hakkındaki notlarını incelemeniz için düzeltti</string>
+    <string name="skill_learned">Claire bir beceri öğrendi: %1$s</string>
+    <string name="skill_app_draft">Claire, %1$s hakkında incelemeniz için birkaç olgu not etti</string>
+    <string name="skill_app_revised">Claire, %1$s hakkındaki notlarını incelemeniz için düzeltti</string>
     <string name="recovered_result">Kurtarılan görev sonucu</string>
     <string name="recover_delivery_failed">Son görev bitti, ancak sonuç bildirimi başarısız oldu. Sohbeti kontrol edin.</string>
     <string name="recover_maybe_delivered">Son sonuç zaten teslim edilmiş olabilir. İki kez yapmamak için önce sohbeti kontrol edin.</string>
@@ -21,7 +21,7 @@
     <string name="gate_finish_app">\“%1$s\” ekranda size ihtiyaç duyuyor. Bitince Devam et\'e dokunun</string>
     <string name="gate_finish_unknown">Yeni açılan uygulama ekranda size ihtiyaç duyuyor. Bitince Devam et\'e dokunun</string>
     <string name="gate_moved_away">Bu uygulamayı siz açtınız. Bitince Devam et\'e dokunun</string>
-    <string name="gate_move_back_failed">Uygulama Mika\'nın ekranına geri taşınamadı. Yeniden denemek için Devam et\'e dokunun</string>
+    <string name="gate_move_back_failed">Uygulama Claire\'nın ekranına geri taşınamadı. Yeniden denemek için Devam et\'e dokunun</string>
     <string name="gate_shell_down">Telefon kontrolü bağlantısı koptu. Yeniden bağlanınca Devam et\'e dokunun (veya Ayarlar\'da düzeltin)</string>
     <plurals name="queue_ahead">
         <item quantity="other">Sırada: %1$d görev önde</item>
@@ -30,19 +30,19 @@
     <string name="fail_model_untested">Ana model henüz %1$s üzerinde bir testi geçmedi. Ayarlar › Modeller › %1$s\'e gidin ve kontrol etmek için \“Tekrar test et\”e dokunun.</string>
     <string name="fail_no_web">Bu cihazda web kullanılamıyor, bu yüzden koşul denetimi çalışamaz</string>
     <string name="task_waiting_display">Sırada: diğer görev bitince başlar</string>
-    <string name="task_no_phone_helper">Telefon kontrolü hazır değil. Mika\'da \“Telefon kontrolünü kur\”u tamamlayın. Web ve dosya görevleri etkilenmez.</string>
-    <string name="task_no_a11y">Mika\'nın erişilebilirlik hizmeti kapalı. Sistem ayarlarında Erişilebilirlik altında Mika\'yı açın.</string>
-    <string name="task_a11y_not_running">Mika\'nın erişilebilirlik hizmeti etkin, ancak Android onu bağlamadı. Sistem ayarlarında Erişilebilirlik altında Mika\'yı kapatıp yeniden açın. Android engelliyorsa, önce Mika\'nın uygulama bilgisinde kısıtlı ayarlara izin verin.</string>
+    <string name="task_no_phone_helper">Telefon kontrolü hazır değil. Claire\'da \“Telefon kontrolünü kur\”u tamamlayın. Web ve dosya görevleri etkilenmez.</string>
+    <string name="task_no_a11y">Claire\'nın erişilebilirlik hizmeti kapalı. Sistem ayarlarında Erişilebilirlik altında Claire\'yı açın.</string>
+    <string name="task_a11y_not_running">Claire\'nın erişilebilirlik hizmeti etkin, ancak Android onu bağlamadı. Sistem ayarlarında Erişilebilirlik altında Claire\'yı kapatıp yeniden açın. Android engelliyorsa, önce Claire\'nın uygulama bilgisinde kısıtlı ayarlara izin verin.</string>
     <string name="task_error">Görev hatası: %1$s</string>
-    <string name="task_app_blocked">\“%1$s\” devre dışı, bu yüzden Mika onu okuyamıyor veya çalıştıramıyor. Ayarlar › Uygulama erişimi\'nde izin verin ve tekrar deneyin.</string>
+    <string name="task_app_blocked">\“%1$s\” devre dışı, bu yüzden Claire onu okuyamıyor veya çalıştıramıyor. Ayarlar › Uygulama erişimi\'nde izin verin ve tekrar deneyin.</string>
     <string name="task_app_this_app">Bu uygulama</string>
     <string name="task_app_access_unavailable">Uygulama erişim ayarları okunamıyor. Ayarlar › Uygulama erişimi\'nde sıfırlayın ve tekrar deneyin.</string>
-    <string name="task_app_protected">Bu ekranı kendiniz halletmeniz gerekiyor; Mika onu otomatikleştiremez.</string>
+    <string name="task_app_protected">Bu ekranı kendiniz halletmeniz gerekiyor; Claire onu otomatikleştiremez.</string>
     <string name="task_app_unverified">Hangi uygulamanın önde olduğu doğrulanamadı, bu yüzden daha fazla işlem yapılmadı. Tekrar deneyin ya da önce hedef uygulamayı açın.</string>
     <string name="task_condition_interrupted">Koşul denetimi kesildi</string>
     <string name="task_check_unfinished">Zamanlanmış denetim bitmedi: %1$s</string>
     <string name="task_may_make_sound">Bu uygulama ses çıkarabilir</string>
-    <string name="task_notif_title">Mika: %1$s</string>
+    <string name="task_notif_title">Claire: %1$s</string>
     <plurals name="task_active">
         <item quantity="other">%1$d görev çalışıyor</item>
     </plurals>
@@ -63,8 +63,8 @@
     <string name="task_not_done">Görev bitmedi</string>
     <string name="task_stopped">Görev durduruldu</string>
     <string name="task_stopped_body">Bu görevi siz durdurdunuz</string>
-    <string name="gate_user_on_page">Sayfayı siz kullanıyorsunuz, bu yüzden Mika durakladı</string>
-    <string name="task_no_phone_helper_usb">Telefon yardımcısı durdu (genellikle telefon yeniden başladığında). Mika\'yı açın ve USB başlatma komutunu tekrar çalıştırın; \“Telefon kontrolünü kur\”da kopyalayabilirsiniz. Web ve dosya görevleri etkilenmez.</string>
+    <string name="gate_user_on_page">Sayfayı siz kullanıyorsunuz, bu yüzden Claire durakladı</string>
+    <string name="task_no_phone_helper_usb">Telefon yardımcısı durdu (genellikle telefon yeniden başladığında). Claire\'yı açın ve USB başlatma komutunu tekrar çalıştırın; \“Telefon kontrolünü kur\”da kopyalayabilirsiniz. Web ve dosya görevleri etkilenmez.</string>
     <string name="drawer_screens">Arka plan ekranları</string>
     <string name="screens_title">Arka plan ekranları</string>
     <string name="screens_empty">Şu an çalışan görev yok.</string>
@@ -90,5 +90,5 @@
     <string name="chip_done">Bitti: %1$d</string>
     <string name="chip_route_step">Adım %1$d/%2$d</string>
     <string name="chip_count">%1$d/%2$d</string>
-    <string name="task_no_phone_helper_shizuku">Telefon kontrolü hazır değil. Shizuku\'yu başlatın ve Mika\'ya izin verin (veya Ayarlar\'daki Telefon kontrolünü kontrol edin). Web ve dosya görevleri etkilenmez.</string>
+    <string name="task_no_phone_helper_shizuku">Telefon kontrolü hazır değil. Shizuku\'yu başlatın ve Claire\'ya izin verin (veya Ayarlar\'daki Telefon kontrolünü kontrol edin). Web ve dosya görevleri etkilenmez.</string>
 </resources>

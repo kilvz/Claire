@@ -13,9 +13,9 @@ import com.wangzan101.mika.core.prompt.Prompts
  */
 object SystemPrompt {
     /**
-     * [assistant] 是助理的自称(人格里的「称呼」),默认 Mika;进提示词前在这里由 [PersonaPrompt.nickname] 清洗。
-     * 不是 Mika 时身份句用它,并紧跟一段说明:Mika 是所在 App 的名字,后文和工具说明里的 Mika 指这个 App 和它自己。
-     * 是 Mika 时和没有这个参数之前逐字节一样。
+     * [assistant] 是助理的自称(人格里的「称呼」),默认 Claire;进提示词前在这里由 [PersonaPrompt.nickname] 清洗。
+     * 不是 Claire 时身份句用它,并紧跟一段说明:Claire 是所在 App 的名字,后文和工具说明里的 Claire 指这个 App 和它自己。
+     * 是 Claire 时和没有这个参数之前逐字节一样。
      */
     fun identity(assistant: String = PersonaPrompt.DEFAULT_NICKNAME): String {
         // 称呼落在围栏之外,这里自己再清洗一遍,不指望调用方洗过

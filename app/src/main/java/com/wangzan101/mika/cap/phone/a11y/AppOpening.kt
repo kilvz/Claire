@@ -22,7 +22,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
 
     /**
      * 打开装在另一份用户 [userId] 里的那份(调用方先按 [appCopies] 核对过):内置助手启动前再按同一规则核一次那份用户能不能用,
-     * 不能用为 copy_not_found;占用、冷启动都只看这一份。[userId] 就是 Mika 自己的用户时等于 [openApp]。
+     * 不能用为 copy_not_found;占用、冷启动都只看这一份。[userId] 就是 Claire 自己的用户时等于 [openApp]。
      */
     suspend fun openAppCopy(packageName: String, userId: Int, cold: Boolean): ActionResult =
         open(packageName, userId.takeIf { it != AndroidScreen.myUser }, cold)
@@ -39,7 +39,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
         }
     }
 
-    /** 这个包([user] 那份)此刻开在 Mika 的另一块屏上(别的任务手里)。 */
+    /** 这个包([user] 那份)此刻开在 Claire 的另一块屏上(别的任务手里)。 */
     internal fun onOtherDisplay(packageName: String, user: Int?): Boolean {
         val other = runCatching { if (user == null) screen.shell.displayOfPackage(packageName) else screen.shell.displayOfPackageInUser(packageName, user) }.getOrDefault(-1)
         return other >= 0 && other != screen.display.current?.displayId
@@ -164,9 +164,9 @@ internal class AppOpening(private val screen: AndroidScreen) {
     }
 
     /**
-     * 在 Mika 的屏上打开 Mika 的兼容性自检页([intent] 指明组件;只给兼容性自检用)。那一页只对 shell 这一级的调用方开放,
-     * 交给内置助手以 shell 身份直接启动到这块屏(助手只认这一个组件);shell 启动不受后台启动页面的限制,Mika 在不在前台都一样。
-     * 之后和 [openApp] 一样等它到 Mika 屏的最上面;第一次用时建屏。
+     * 在 Claire 的屏上打开 Claire 的兼容性自检页([intent] 指明组件;只给兼容性自检用)。那一页只对 shell 这一级的调用方开放,
+     * 交给内置助手以 shell 身份直接启动到这块屏(助手只认这一个组件);shell 启动不受后台启动页面的限制,Claire 在不在前台都一样。
+     * 之后和 [openApp] 一样等它到 Claire 屏的最上面;第一次用时建屏。
      */
     suspend fun openOwnPage(intent: Intent): ActionResult = withContext(Dispatchers.IO) {
         val before = if (screen.hasDisplay) screen.topWindowPackage().takeIf { it != screen.chooserPackage } else null
@@ -181,7 +181,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
     }
 
     /**
-     * 启动发出之后:等 [packageName] 到 Mika 屏的最上面,或系统先问打开哪一个([before] 是启动前最上面的窗口所在的包)。
+     * 启动发出之后:等 [packageName] 到 Claire 屏的最上面,或系统先问打开哪一个([before] 是启动前最上面的窗口所在的包)。
      * [sharing]:这次是分享(App 有几个收分享的页面时系统问用哪一个,选项里不一定有 App 名):最上面换成了系统包的窗口也算在问。
      */
     internal suspend fun awaitOpened(
@@ -199,7 +199,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
             val now = screen.foregroundTaskPackage() ?: ScreenReader.topPackage(screen.windows())
             if (now == before && screen.treeHash() == beforeTree) screen.frameGuardSince = null
         }
-        // 打开了:Mika 屏上最上面的任务是它(问不到任务时退回看无障碍读到的最上面的窗口);指定了哪一份时还得是那份用户的任务
+        // 打开了:Claire 屏上最上面的任务是它(问不到任务时退回看无障碍读到的最上面的窗口);指定了哪一份时还得是那份用户的任务
         fun launched(): Boolean = (screen.foregroundTaskPackage()?.let { it == packageName } ?: (ScreenReader.topPackage(screen.windows()) == packageName)) &&
             (user == null || screen.userOf(runCatching { screen.shell.topTaskId(screen.displayId) }.getOrDefault(-1)).let { it < 0 || it == user })
         fun picker(): String? = if (sharing) screen.systemPickerOf(packageName, before) else null
@@ -249,7 +249,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
     }
 
     /**
-     * 要的是另一份用户 [user] 里的那份,系统却在 Mika 屏上问打开哪一个(选项可能名字一模一样,看不出哪个是哪份):
+     * 要的是另一份用户 [user] 里的那份,系统却在 Claire 屏上问打开哪一个(选项可能名字一模一样,看不出哪个是哪份):
      * 逐个点选项,等开出来,读最上面任务所属的用户;是要的那份就算打开。不是就按一次返回让它退到后台(那可能是用户手上那份的任务,
      * 不结束它),再打开一次、点下一个。都试过还不是,照实失败 copy_not_opened,说开出来的是哪一份;不把错的那份当成功。
      */
@@ -300,7 +300,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
         return ActionResult.Failed(AndroidScreen.COPY_NOT_OPENED, "$what Requested: the copy in user $user.")
     }
 
-    /** 系统在 Mika 屏上问打开哪一个时,那几个选项的中心点(屏上像素,先后同选项);不是在问为 null。认法同 [chooserOf]。 */
+    /** 系统在 Claire 屏上问打开哪一个时,那几个选项的中心点(屏上像素,先后同选项);不是在问为 null。认法同 [chooserOf]。 */
     internal fun chooserTargets(packageName: String, before: String?): List<Pair<Int, Int>>? {
         val w = ScreenReader.contentWindows(screen.windows()).firstOrNull { it.root != null } ?: return null
         val pkg = w.root?.packageName?.toString() ?: return null

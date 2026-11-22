@@ -227,14 +227,14 @@ class BrowserScriptDeviceTest {
             s = await mika.snapshot();
             await mika.tap(find(s, '加一').ref);
             s = await mika.snapshot();
-            const typed = await mika.type(find(s, '名字'), 'Mika');
+            const typed = await mika.type(find(s, '名字'), 'Claire');
             mika.log('typed', typed.verification);
             return await mika.text('#status');
         """.trimIndent())
         assertEquals(r.toString(), "true", r.s("ok"))
         assertEquals("\"clicks=2\"", r.result())
         assertEquals("2", page("window.clicks"))
-        assertEquals("\"Mika\"", page("document.getElementById('name').value"))
+        assertEquals("\"Claire\"", page("document.getElementById('name').value"))
         assertEquals(listOf("snapshot", "tap", "snapshot", "tap", "snapshot", "type", "text"), r["actions"]!!.jsonArray.map { it.jsonObject.s("op") })
         assertTrue(r["logs"]!!.jsonArray[0].jsonPrimitive.content.startsWith("typed"))
         val recorded = events.filterIsInstance<RunEvent.ToolResult>().filter { it.source == "script" }

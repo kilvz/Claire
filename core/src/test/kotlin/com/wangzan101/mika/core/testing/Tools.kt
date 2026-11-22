@@ -7,7 +7,7 @@ import com.wangzan101.mika.core.cap.web.WEB
 import com.wangzan101.mika.core.tool.ToolIndex
 import com.wangzan101.mika.core.tool.Verb
 
-/** 测试用:Mika 全部工具的声明。 */
+/** 测试用:Claire 全部工具的声明。 */
 internal val TOOLS: ToolIndex get() = knownTools()
 
 /** 测试用:读运行记录的工具声明(改名前的旧名也认得)。 */

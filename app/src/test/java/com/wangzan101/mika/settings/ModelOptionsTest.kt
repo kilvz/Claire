@@ -251,7 +251,7 @@ class ModelOptionsTest {
         assertTrue(ModelOptions.mayHaveNonTtsModels(p.copy(ttsModels = emptySet())))
     }
 
-    /** 只写了 Mika 不会说的协议的模型:对话用途的选择器不列(调用必然失败),服务商详情和声音模型照样列出。 */
+    /** 只写了 Claire 不会说的协议的模型:对话用途的选择器不列(调用必然失败),服务商详情和声音模型照样列出。 */
     @Test fun unusableModelsAreHiddenFromRolePickersButShownInTheFullCatalog() {
         val p = Provider("p", "Local", ProviderConfig.Kind.OpenAiCompat, "https://local.test/v1", models = listOf(
             ListedModel("chat-model"),

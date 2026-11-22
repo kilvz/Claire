@@ -17,7 +17,7 @@ class MemoryContextTest {
         assertTrue(block.usedIds.all { id -> pinned.any { it.id == id } })
     }
 
-    // 交给任务的那段标题说的是「用户告诉你的」:Mika 自己归纳出来的那几条逐条标明不是用户说的
+    // 交给任务的那段标题说的是「用户告诉你的」:Claire 自己归纳出来的那几条逐条标明不是用户说的
     @Test fun inferredMemoriesAreMarkedAsNotTheUsersWords() {
         val said = mem("用户点外卖不要香菜")
         val own = mem("用户常在张江路一带活动").let { it.copy(source = it.source.copy(type = MemoryContext.INFERRED)) }

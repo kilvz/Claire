@@ -76,7 +76,7 @@
     <string name="role_vision_what">スクリーンショットを見る</string>
     <string name="role_light_what">確認やメモなどの小さな仕事</string>
     <string name="role_main_hint">タスクを確実にこなせるよう、ツール呼び出しに対応したモデルを選んでください。</string>
-    <string name="role_vision_hint">省略もできます。ない場合、Mika は画面をテキストで読み取ります。</string>
+    <string name="role_vision_hint">省略もできます。ない場合、Claire は画面をテキストで読み取ります。</string>
     <string name="role_light_hint">安くて速いモデルが最適です。</string>
     <string name="models_delete_title">「%1$s」を削除しますか？</string>
     <string name="models_delete_body">"API キーも削除されます。"</string>
@@ -102,9 +102,9 @@
 
     <!-- 用 ChatGPT 登录 -->
     <string name="chatgpt_use_plan_title">ChatGPT のプランを使う</string>
-    <string name="chatgpt_use_plan_body">このアプリの対象となる AI リクエストを、ChatGPT のプランまたはクレジット残高に含まれる利用枠で処理します。ChatGPT Plus と Pro で使えます。Mika 自体は無料で、Mika から料金は一切かかりません。</string>
+    <string name="chatgpt_use_plan_body">このアプリの対象となる AI リクエストを、ChatGPT のプランまたはクレジット残高に含まれる利用枠で処理します。ChatGPT Plus と Pro で使えます。Claire 自体は無料で、Claire から料金は一切かかりません。</string>
     <string name="chatgpt_continue">ChatGPT で続ける</string>
-    <string name="chatgpt_waiting">ブラウザでログインを済ませてから、Mika に戻ってください。</string>
+    <string name="chatgpt_waiting">ブラウザでログインを済ませてから、Claire に戻ってください。</string>
     <string name="chatgpt_welcome_title">ChatGPT のプランを使っています</string>
     <string name="chatgpt_welcome_body">このアプリの対象となる利用は、ChatGPT のプランが使われます。利用状況は ChatGPT の設定で管理できます。</string>
     <string name="chatgpt_got_it">OK</string>
@@ -115,30 +115,30 @@
     <string name="chatgpt_manage_usage">利用状況を管理</string>
     <string name="chatgpt_plan_note">ChatGPT のプランを使用中です。Plus では、5 時間の上限は、同じプランを使う他のアプリと共有されます。Pro には 5 時間の上限はありません。</string>
     <string name="chatgpt_signed_out_note">このスマホではログアウトしています。プランをもう一度使うには、ChatGPT で続けてください。モデルの選択は残ります。</string>
-    <string name="chatgpt_revoke_unconfirmed">このスマホではログアウトしましたが、ChatGPT 側では確認できませんでした。ChatGPT の設定で Mika の接続を解除することもできます。</string>
+    <string name="chatgpt_revoke_unconfirmed">このスマホではログアウトしましたが、ChatGPT 側では確認できませんでした。ChatGPT の設定で Claire の接続を解除することもできます。</string>
     <string name="chatgpt_fail_denied">ログインがキャンセルされました。必要な権限が使えないとページに表示された場合: プランを使うには ChatGPT Plus または Pro が必要です。無料アカウントの場合は、代わりに他のプロバイダーの API キーを追加してください。</string>
     <string name="chatgpt_fail_mismatch">ログインの応答が、今回の操作と一致しませんでした。もう一度お試しください。</string>
-    <string name="chatgpt_fail_no_client">ChatGPT が Mika の登録を完了しませんでした。もう一度お試しください。</string>
+    <string name="chatgpt_fail_no_client">ChatGPT が Claire の登録を完了しませんでした。もう一度お試しください。</string>
     <string name="chatgpt_fail_timed_out">ログインがタイムアウトしました。もう一度お試しください。</string>
     <string name="chatgpt_fail_exchange">ChatGPT がこのログインを拒否しました(エラー: %1$s)。もう一度お試しください。</string>
     <string name="chatgpt_fail_code_expired">ログインコードの期限が切れたか、すでに使用されています。もう一度ログインしてください。</string>
     <string name="chatgpt_fail_region">お使いのネットワークがある地域は、OpenAI が対応していません。別のネットワークをお試しください。</string>
     <string name="chatgpt_fail_blocked">OpenAI の保護機能によりリクエストがブロックされました。別のネットワークを試すか、しばらくしてからもう一度お試しください。</string>
     <string name="chatgpt_fail_id_token">ChatGPT アカウントを確認できませんでした。もう一度お試しください。</string>
-    <string name="chatgpt_fail_no_plan">Mika に ChatGPT のプランの利用が許可されませんでした。もう一度ログインして、プランの利用を許可してください(Plus または Pro が必要です)。</string>
+    <string name="chatgpt_fail_no_plan">Claire に ChatGPT のプランの利用が許可されませんでした。もう一度ログインして、プランの利用を許可してください(Plus または Pro が必要です)。</string>
     <string name="chatgpt_fail_network">ChatGPT に接続できませんでした。ネットワークを確認して、もう一度お試しください。</string>
-    <string name="chatgpt_page_title">Mika</string>
-    <string name="chatgpt_page_done">ログインしました。Mika に戻ってください。</string>
+    <string name="chatgpt_page_title">Claire</string>
+    <string name="chatgpt_page_done">ログインしました。Claire に戻ってください。</string>
     <string name="chatgpt_signin_notif_title">ChatGPT にログイン中</string>
     <string name="chatgpt_signin_notif_body">ブラウザでの ChatGPT へのログインを待っています</string>
-    <string name="chatgpt_page_back">Mika に戻る</string>
+    <string name="chatgpt_page_back">Claire に戻る</string>
     <string name="chatgpt_no_browser">ログインに使えるブラウザが見つかりません。</string>
     <string name="models_unverified">未テスト。タスクが失敗することがあります</string>
     <string name="models_unverified_note">使用中でテストを通過していないモデルがあります（%1$s）。確認するには、対象モデルのテストボタンをタップしてください。</string>
     <string name="models_retest">もう一度テスト</string>
     <string name="models_retest_model">%1$s をテスト</string>
     <string name="models_retest_confirm_title">モデルをテストしますか？</string>
-    <string name="models_retest_confirm_body">Mika がプロバイダー %2$s のモデル %1$s にツール呼び出しのテストリクエストを 1 回送信します。</string>
+    <string name="models_retest_confirm_body">Claire がプロバイダー %2$s のモデル %1$s にツール呼び出しのテストリクエストを 1 回送信します。</string>
 
     <string name="account_signin_copied">コピーしました</string>
     <string name="account_signin_notif_title">アカウントにログイン中</string>
@@ -163,8 +163,8 @@
     <string name="signin_use_key">代わりに API キーを使う</string>
     <string name="signin_stored_note">ログイン情報は、このスマホの中だけに暗号化して保存され、ログには書き込まれません。</string>
     <string name="signin_xai_title">xAI でログイン</string>
-    <string name="signin_xai_body">SuperGrok または X Premium+ のサブスクリプションで、Mika から Grok を使えます。API クレジットを別に購入する必要はありません。リクエストは xAI に直接送られます。</string>
-    <string name="signin_xai_risk">このログインは、xAI 公式のコマンドラインツールの公開ログイン入口を借りたもので、xAI が Mika のために用意したものではありません。xAI がこの使い方を制限する可能性があり、サブスクリプションのプランによっては、ログイン後も呼び出せない場合があります(403 が表示されます)。その場合は、代わりに xAI の API キーを使ってください。</string>
+    <string name="signin_xai_body">SuperGrok または X Premium+ のサブスクリプションで、Claire から Grok を使えます。API クレジットを別に購入する必要はありません。リクエストは xAI に直接送られます。</string>
+    <string name="signin_xai_risk">このログインは、xAI 公式のコマンドラインツールの公開ログイン入口を借りたもので、xAI が Claire のために用意したものではありません。xAI がこの使い方を制限する可能性があり、サブスクリプションのプランによっては、ログイン後も呼び出せない場合があります(403 が表示されます)。その場合は、代わりに xAI の API キーを使ってください。</string>
     <string name="signin_xai_starting">xAI の確認ページを開いています…</string>
     <string name="signin_xai_code_title">ブラウザで確認</string>
     <string name="signin_xai_code_body">xAI の確認ページが開いています。そこに表示されているコードが下のコードと一致するか確認してから、承認してください。</string>
@@ -173,15 +173,15 @@
     <string name="signin_xai_code_waiting">ブラウザでの確認を待っています…</string>
     <string name="signin_xai_403_note">呼び出しが 403 で失敗する場合、お使いのサブスクリプションのプランではこの API を使えません。代わりに xAI の API キーを使ってください。</string>
     <string name="signin_openrouter_title">OpenRouter でログイン</string>
-    <string name="signin_openrouter_body">OpenRouter の認可ページを開きます。承認すると、OpenRouter があなた専用のキーを Mika に渡します。利用料金は OpenRouter の残高から差し引かれ、数百のモデルをすぐに使えます。</string>
+    <string name="signin_openrouter_body">OpenRouter の認可ページを開きます。承認すると、OpenRouter があなた専用のキーを Claire に渡します。利用料金は OpenRouter の残高から差し引かれ、数百のモデルをすぐに使えます。</string>
     <string name="signin_openrouter_note">これは、サードパーティのアプリ向けの OpenRouter 公式のログインです。キーはこのスマホに暗号化して保存されます。不要になったら、OpenRouter の Keys ページで削除してください。</string>
     <string name="signin_openrouter_authorize">OpenRouter で認可する</string>
-    <string name="signin_openrouter_waiting">ブラウザで承認してから、Mika に戻ってください。</string>
+    <string name="signin_openrouter_waiting">ブラウザで承認してから、Claire に戻ってください。</string>
     <string name="signin_openrouter_manage">OpenRouter の Keys ページを開く</string>
-    <string name="signin_openrouter_signed_in_note">利用料金は OpenRouter の残高から差し引かれます。キーはこのスマホに暗号化して保存されます。使うのをやめるには、OpenRouter の Keys ページで「Mika」という名前のキーを削除してください。</string>
+    <string name="signin_openrouter_signed_in_note">利用料金は OpenRouter の残高から差し引かれます。キーはこのスマホに暗号化して保存されます。使うのをやめるには、OpenRouter の Keys ページで「Claire」という名前のキーを削除してください。</string>
     <string name="signin_openrouter_signed_out_note">このスマホからキーを削除しました。OpenRouter 側にはまだ残っているので、Keys ページで削除してください。モデルの選択は残ります。</string>
     <string name="signin_set_main">メインモデルに設定</string>
-    <string name="signin_set_main_note">Mika がタスクをこなすのに使います</string>
+    <string name="signin_set_main_note">Claire がタスクをこなすのに使います</string>
     <string name="signin_sign_out_note">このスマホのログイン情報だけを消去します</string>
     <string name="signin_busy">別のログインが進行中です。先に完了するか、キャンセルしてください。</string>
     <string name="signin_openrouter_name">%1$s(ログイン済み)</string>
@@ -217,8 +217,8 @@
     <string name="main_fallback_failed">Could not set the fallback model</string>
     <string name="main_fallback_is_main">This is the current main model, so it cannot also be its fallback</string>
     <string name="role_voice">音声モデル</string>
-    <string name="role_voice_what">Lets Mika speak and read answers aloud</string>
-    <string name="voice_enable">Allow Mika to speak</string>
+    <string name="role_voice_what">Lets Claire speak and read answers aloud</string>
+    <string name="voice_enable">Allow Claire to speak</string>
     <string name="voice_enable_note">Speech is only made when you tap Read aloud, unless auto-read is on</string>
     <string name="voice_provider">プロバイダー</string>
     <string name="voice_no_providers">まず「モデル」でプロバイダーを追加してください。</string>
@@ -233,7 +233,7 @@
     <string name="voice_streaming">ストリーミング再生</string>
     <string name="voice_streaming_note">対応サービスと 1.0 倍速が必要です。</string>
     <string name="voice_auto_read">Read every answer aloud</string>
-    <string name="voice_speak_tool">Let Mika speak on its own</string>
+    <string name="voice_speak_tool">Let Claire speak on its own</string>
     <string name="voice_max_chars">Longest read (characters)</string>
     <string name="voice_test">Say a test line</string>
     <string name="voice_testing">Making a test line…</string>
@@ -245,16 +245,16 @@
     <string name="voice_loading">Preparing the voice…</string>
     <string name="voice_play_failed">Could not play the voice: %1$s</string>
     <string name="voice_save_enabled">Allow saving audio to the music library</string>
-    <string name="voice_save_note">Off by default. Saving writes to Music/Mika</string>
+    <string name="voice_save_note">Off by default. Saving writes to Music/Claire</string>
     <string name="voice_ask_before_save">Ask before each audio save</string>
     <string name="tool_audio_generate">Generate speech</string>
     <string name="tool_audio_save">Save audio</string>
     <string name="tool_share_audio">Share audio to app</string>
     <string name="tool_audio_transcribe">Transcribe audio</string>
     <string name="role_image">Image model</string>
-    <string name="role_image_what">Makes pictures Mika can use</string>
-    <string name="image_hint">Mika can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
-    <string name="image_enable">Allow Mika to make pictures</string>
+    <string name="role_image_what">Makes pictures Claire can use</string>
+    <string name="image_hint">Claire can make pictures with your own image model. The pictures stay in this conversation’s workspace and show up in the chat.</string>
+    <string name="image_enable">Allow Claire to make pictures</string>
     <string name="image_enable_note">Off by default. No image tools are offered while this is off</string>
     <string name="image_provider">Service</string>
     <string name="image_no_providers">Add a model service first (images use the same service and key).</string>
@@ -266,7 +266,7 @@
     <string name="image_limits">Limits and saving</string>
     <string name="image_max_per_task">Pictures per task</string>
     <string name="image_save_enabled">Allow saving to the gallery</string>
-    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Mika</string>
+    <string name="image_save_enabled_note">Off by default. Saving writes to Pictures/Claire</string>
     <string name="image_ask_before_save">Ask before each save</string>
     <string name="image_ask_before_generate">Ask before each picture</string>
     <string name="image_test">Make a test picture</string>
@@ -318,5 +318,5 @@
     <string name="models_group_delete_body">このグループを使っている役割は、未設定・なし・メインモデルに戻ります。</string>
     <string name="models_group_used_by">%1$s として使用</string>
     <string name="models_group_member_context">コンテキスト</string>
-    <string name="model_not_chat_capable">このモデルは Mika のチャットには使えません。下で「音声専用」にすることはできます。</string>
+    <string name="model_not_chat_capable">このモデルは Claire のチャットには使えません。下で「音声専用」にすることはできます。</string>
 </resources>

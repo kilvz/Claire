@@ -58,7 +58,7 @@ class TeachDraftTest {
 
     @Test fun requestCarriesTheFoldedHumanSteps() {
         val req = TeachDraft.request(session(), route())
-        assertTrue(req.contains("已按 Mika 的直达能力省掉"))
+        assertTrue(req.contains("已按 Claire 的直达能力省掉"))
         assertTrue(req.contains("点了「小红书」"))
         assertTrue(req.contains("输入的文字没有保存"))
     }

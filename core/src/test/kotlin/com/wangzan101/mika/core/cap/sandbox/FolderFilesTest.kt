@@ -18,8 +18,8 @@ class FolderFilesTest {
         var expected: String? = null
         var writes = 0
         override fun list(path: String?) = FolderPage(listOf(
-            FolderEntry("/folders/test", "Mika", true, true, displayLocation = "/storage/emulated/0/Download/Mika"),
-            FolderEntry("/folders/other", "Mika", true, false),
+            FolderEntry("/folders/test", "Claire", true, true, displayLocation = "/storage/emulated/0/Download/Claire"),
+            FolderEntry("/folders/other", "Claire", true, false),
         ))
         override fun read(path: String) = bytes
         override fun write(path: String, content: ByteArray, expectedHash: String?, append: Boolean): ByteArray {
@@ -36,7 +36,7 @@ class FolderFilesTest {
         val result = dispatcher().execute(call("list_folder_files", buildJsonObject {}), ActionPass()).content
         val (local, other) = result.getValue("entries").jsonArray.map { it.jsonObject }
         assertEquals(local["name"], other["name"])
-        assertEquals(JsonPrimitive("/storage/emulated/0/Download/Mika"), local["displayLocation"])
+        assertEquals(JsonPrimitive("/storage/emulated/0/Download/Claire"), local["displayLocation"])
         assertEquals(JsonPrimitive("/folders/test"), local["path"])
         assertNull(other["displayLocation"])
         assertEquals(JsonPrimitive("/folders/other"), other["path"])

@@ -20,7 +20,7 @@
     <string name="backup_replace">すべて置き換え</string>
     <string name="backup_imported_title">バックアップを復元しました</string>
     <string name="backup_imported_body">%1$d ファイルを復元しました。</string>
-    <string name="backup_after_import_body">復元データを使うには Mika を閉じて開き直してください。その後ワイヤレスデバッグを再ペアリングし、Android 設定でアクセシビリティサービスを再度有効化し、バックアップ ZIP を削除してください。</string>
-    <string name="backup_close_app">Mika を閉じる</string>
+    <string name="backup_after_import_body">復元データを使うには Claire を閉じて開き直してください。その後ワイヤレスデバッグを再ペアリングし、Android 設定でアクセシビリティサービスを再度有効化し、バックアップ ZIP を削除してください。</string>
+    <string name="backup_close_app">Claire を閉じる</string>
     <string name="backup_restart_note">何かをアンインストールする前に先に書き出してください：このインストールだけがデータを復号できます。</string>
 </resources>

@@ -20,7 +20,7 @@
     <string name="backup_replace">جایگزینی همه</string>
     <string name="backup_imported_title">نسخه پشتیبان بازیابی شد</string>
     <string name="backup_imported_body">%1$d فایل بازیابی شد.</string>
-    <string name="backup_after_import_body">برای استفاده از داده‌های بازیابی‌شده، Mika را ببندید و دوباره باز کنید. سپس اشکال‌زدایی بی‌سیم را دوباره جفت‌سازی کنید، سرویس دسترس‌پذیری را در تنظیمات Android دوباره روشن کنید و فایل ZIP نسخه پشتیبان را حذف کنید.</string>
-    <string name="backup_close_app">بستن Mika</string>
+    <string name="backup_after_import_body">برای استفاده از داده‌های بازیابی‌شده، Claire را ببندید و دوباره باز کنید. سپس اشکال‌زدایی بی‌سیم را دوباره جفت‌سازی کنید، سرویس دسترس‌پذیری را در تنظیمات Android دوباره روشن کنید و فایل ZIP نسخه پشتیبان را حذف کنید.</string>
+    <string name="backup_close_app">بستن Claire</string>
     <string name="backup_restart_note">پیش از حذف هر چیزی، ابتدا صادر کنید: تنها این نصب می‌تواند داده‌های شما را رمزگشایی کند.</string>
 </resources>

@@ -22,7 +22,7 @@ val DEFAULT_PERSONA_CONF: String = """
     # prefix=先给结论,再给理由。不确定的事直接说不确定,不要绕。
     #
     # 例:去掉某句固定话术
-    # replace=You are Mika, the user's personal assistant on their phone.=>You are Mika.
+    # replace=You are Claire, the user's personal assistant on their phone.=>You are Claire.
     #
     # 例:追加一条规矩
     # suffix=回答尽量控制在三句话内,除非用户要细节。

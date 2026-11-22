@@ -21,7 +21,7 @@
     <string name="backup_replace">Replace all</string>
     <string name="backup_imported_title">Backup restored</string>
     <string name="backup_imported_body">Restored %1$d files.</string>
-    <string name="backup_after_import_body">Close Mika and open it again to use the restored data. Then re-pair wireless debugging, turn the accessibility service back on in Android Settings, and delete the backup ZIP file.</string>
-    <string name="backup_close_app">Close Mika</string>
+    <string name="backup_after_import_body">Close Claire and open it again to use the restored data. Then re-pair wireless debugging, turn the accessibility service back on in Android Settings, and delete the backup ZIP file.</string>
+    <string name="backup_close_app">Close Claire</string>
     <string name="backup_restart_note">Export first, before you uninstall anything: only this install can decrypt your data.</string>
 </resources>

@@ -20,7 +20,7 @@
     <string name="backup_replace">全部取代</string>
     <string name="backup_imported_title">備份已還原</string>
     <string name="backup_imported_body">已還原 %1$d 個檔案。</string>
-    <string name="backup_after_import_body">關閉 Mika 再重新開啟，以使用還原的資料。然後重新配對無線偵錯、在 Android 設定裡重新開啟無障礙服務，並刪除備份 ZIP 檔案。</string>
-    <string name="backup_close_app">關閉 Mika</string>
+    <string name="backup_after_import_body">關閉 Claire 再重新開啟，以使用還原的資料。然後重新配對無線偵錯、在 Android 設定裡重新開啟無障礙服務，並刪除備份 ZIP 檔案。</string>
+    <string name="backup_close_app">關閉 Claire</string>
     <string name="backup_restart_note">解除安裝任何東西之前請先匯出：只有目前這份安裝才能解密你的資料。</string>
 </resources>

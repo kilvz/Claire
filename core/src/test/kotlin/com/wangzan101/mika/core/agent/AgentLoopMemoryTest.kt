@@ -80,7 +80,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf(ids), events.filterIsInstance<RunEvent.MemoryUsed>().map { it.ids })
     }
 
-    // 用户让记住一件事,意图判断却会把这句话当成讨论:写记忆只动 Mika 自己的记忆,不经过那个判断,照常执行、存得下来
+    // 用户让记住一件事,意图判断却会把这句话当成讨论:写记忆只动 Claire 自己的记忆,不经过那个判断,照常执行、存得下来
     @Test fun savingAMemoryIsNotStrippedAsDiscussion() {
         val s = store()
         val said = UserUtterances()
@@ -181,7 +181,7 @@ class AgentLoopMemoryTest {
         assertEquals(before, s.items.value.size)
     }
 
-    // 开着「让 Mika 自己归纳着记」、用户又让它记:一口气十条归纳的都存上,任务正常结束
+    // 开着「让 Claire 自己归纳着记」、用户又让它记:一口气十条归纳的都存上,任务正常结束
     @Test fun aBatchOfOwnConclusionsIsSavedWhenAllowed() {
         val s = memStore(inferenceAllowed = { true })
         val calls = (1..10).map { i ->
@@ -198,7 +198,7 @@ class AgentLoopMemoryTest {
         assertTrue(s.items.value.all { it.source.type == com.wangzan101.mika.core.memory.MemoryContext.INFERRED })
     }
 
-    // 查到一条 Mika 自己归纳的记忆,接着照常回答:这条进了证据账本(工具查到的事实),任务正常结束
+    // 查到一条 Claire 自己归纳的记忆,接着照常回答:这条进了证据账本(工具查到的事实),任务正常结束
     @Test fun aRunThatFindsAnInferredMemoryFinishesNormally() {
         val s = memStore()
         s.add(MemoryKind.fact, "用户常点张江路那家外卖", listOf("外卖"),
@@ -323,7 +323,7 @@ class AgentLoopMemoryTest {
         return said.all
     }
 
-    // 引了 Mika 的回答:引的那段是 Mika 说的,记忆的引文不认,只收用户打的字
+    // 引了 Claire 的回答:引的那段是 Claire 说的,记忆的引文不认,只收用户打的字
     @Test fun quotedReplyIsNotTheUserWords() {
         val s = store()
         val said = UserUtterances()
@@ -365,7 +365,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("总结一下"), said.all)
     }
 
-    // 插话引了 Mika 的回答:只收插话里打的字
+    // 插话引了 Claire 的回答:只收插话里打的字
     @Test fun quotedSteerAddsOnlyTheTypedWords() = runBlocking {
         val s = store()
         val said = UserUtterances()
@@ -375,7 +375,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("帮我下单", "换成这个"), said.all)
     }
 
-    // 回答追问时引了 Mika 的回答:也只收打的字
+    // 回答追问时引了 Claire 的回答:也只收打的字
     @Test fun quotedAnswerAddsOnlyTheTypedWords() = runBlocking {
         val s = store()
         val said = UserUtterances()
@@ -470,7 +470,7 @@ class AgentLoopMemoryTest {
     }
 
     private companion object {
-        /** 用户引的 Mika 之前的一句回答。 */
+        /** 用户引的 Claire 之前的一句回答。 */
         const val MIKA_ADDRESS = "你常用的收货地址是幸福路 8 号"
     }
 

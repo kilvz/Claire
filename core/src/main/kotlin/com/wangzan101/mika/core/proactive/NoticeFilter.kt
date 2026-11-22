@@ -5,7 +5,7 @@ enum class NoticeDecision {
     Keep,
     /** 不在用户勾选的 App 里。 */
     NotWhitelisted,
-    /** Mika 自己(各种安装包)的通知,勾了也不收。 */
+    /** Claire 自己(各种安装包)的通知,勾了也不收。 */
     SelfPackage,
     /** 在「应用访问」里被禁用的 App。 */
     AppBlocked,
@@ -34,7 +34,7 @@ object NoticeFilter {
     /** 不收的类别(值与 android.app.Notification.CATEGORY_* 相同)。 */
     val DROPPED_CATEGORIES = setOf("progress", "transport", "service", "call", "alarm", "navigation", "stopwatch")
 
-    /** Mika 自己的包:正式版、.dev、.dev.test 等等都算。 */
+    /** Claire 自己的包:正式版、.dev、.dev.test 等等都算。 */
     fun isSelf(packageName: String): Boolean = packageName.startsWith(SELF_PREFIX)
 
     /** 只看包名的那一关;[blocked] 是「应用访问」里禁用的包名。 */

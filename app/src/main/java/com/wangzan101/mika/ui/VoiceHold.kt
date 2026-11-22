@@ -156,7 +156,7 @@ internal sealed interface VoiceSheet {
     /** 已经允许录音,识别服务仍说没有权限或录音出错:说明系统的麦克风总开关和权限管理,或被别的应用占用。 */
     data object MicBlocked : VoiceSheet
     data class Unavailable(val why: SpeechEngineSpec.Why) : VoiceSheet
-    /** 缺录音权限的是识别服务(另一个应用),不是 Mika:说明这一点,「去设置」打开的是它的设置页。 */
+    /** 缺录音权限的是识别服务(另一个应用),不是 Claire:说明这一点,「去设置」打开的是它的设置页。 */
     data class ServicePermission(val service: com.wangzan101.mika.voice.SpeechServiceTarget) : VoiceSheet
 }
 
@@ -403,7 +403,7 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
                     is SpeechFailure.Unavailable -> vh.sheet = VoiceSheet.Unavailable(why.why)
                     // 录音权限还没给:照旧弹系统框或「去设置」。已经给了仍报没有权限,或识别服务报录音出错:
                     // 另弹说明(系统的麦克风总开关、权限管理)。麦克风起不来的其他情况照旧提示可能被占用
-                    // 查得出来是识别服务自己没有录音权限:说明是它,带用户去它的设置页(去 Mika 的权限页是指错了地方)
+                    // 查得出来是识别服务自己没有录音权限:说明是它,带用户去它的设置页(去 Claire 的权限页是指错了地方)
                     is SpeechFailure.ServiceNoPermission -> vh.sheet = VoiceSheet.ServicePermission(why.service)
                     SpeechFailure.NoPermission -> if (vh.ensureMic()) vh.sheet = VoiceSheet.MicBlocked
                     SpeechFailure.AudioError -> vh.sheet = VoiceSheet.MicBlocked
@@ -726,7 +726,7 @@ internal fun Modifier.voiceDim(on: Boolean, reduceMotion: Boolean): Modifier {
     }
 }
 
-/** 「还不能语音输入」(「去选」到设置里选转文字)和录音权限的说明(「去设置」到系统里 Mika 的权限页)。 */
+/** 「还不能语音输入」(「去选」到设置里选转文字)和录音权限的说明(「去设置」到系统里 Claire 的权限页)。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
@@ -749,7 +749,7 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
             title = stringResource(R.string.voice_service_permission_title)
             body = stringResource(R.string.voice_service_permission_body, service.label)
             action = stringResource(R.string.voice_permission_open)
-            // Mika 不能替别的应用申请权限,只能带用户到它的设置页。回来之后不自己重新录音:下次按住时再试。
+            // Claire 不能替别的应用申请权限,只能带用户到它的设置页。回来之后不自己重新录音:下次按住时再试。
             // 这一页打不开时(有的系统不让看某些应用的详情)告诉用户到哪里找
             go = {
                 try {

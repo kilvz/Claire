@@ -40,15 +40,15 @@ internal class ToolConfig(
     val userScreens: com.wangzan101.mika.core.userscreen.UserScreenSource? = null,
     /** 用户的个人技能;给了(且有技能目录、用户本次说的话)才提供 skill_save。 */
     val personalSkills: com.wangzan101.mika.core.skills.PersonalSkills? = null,
-    /** 改 Mika 自己设置的白名单入口;为空(用户没允许)时不提供 settings_list、settings_set。 */
+    /** 改 Claire 自己设置的白名单入口;为空(用户没允许)时不提供 settings_list、settings_set。 */
     val selfConfig: com.wangzan101.mika.core.settings.SelfConfig? = null,
     /** 存下的运行记录;给了、而这个对话之前有记过运行的轮次时提供 history_read。 */
     val runRecords: com.wangzan101.mika.core.record.RunRecords? = null,
     /** 用户配置并启用的网页搜索;为空时不提供 web_search。 */
     val webSearch: com.wangzan101.mika.core.search.WebSearch? = null,
-    /** 读 Mika 自己的状态;只对手机上、有用户的 UI 主任务给。 */
+    /** 读 Claire 自己的状态;只对手机上、有用户的 UI 主任务给。 */
     val self: com.wangzan101.mika.core.self.SelfPort? = null,
-    /** 操作 Mika 自己的界面/文件/通知/剪贴板;用户打开「允许 Mika 操作自己的界面」时才给。 */
+    /** 操作 Claire 自己的界面/文件/通知/剪贴板;用户打开「允许 Claire 操作自己的界面」时才给。 */
     val selfOperate: com.wangzan101.mika.core.self.SelfPort? = null,
     /** Save a captured PNG in this task's workspace; screen tools do not depend on the sandbox capability. */
     val saveScreenshot: (suspend (String, ByteArray) -> String)? = null,

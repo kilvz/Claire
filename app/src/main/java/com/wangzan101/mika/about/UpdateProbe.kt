@@ -97,7 +97,7 @@ internal object UpdateProbe {
         timeoutMs: Long = 12_000L,
     ): ReleaseInfo? = withTimeoutOrNull(timeoutMs) {
         try {
-            fetch(client, prefix, apiUrl, releasesUrl, emptyList(), "Mika")
+            fetch(client, prefix, apiUrl, releasesUrl, emptyList(), "Claire")
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

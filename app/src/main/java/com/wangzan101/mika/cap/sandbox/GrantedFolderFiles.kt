@@ -253,7 +253,7 @@ class GrantedFolderFiles(private val context: Context) : FolderFiles {
         val bytes = if (append && old != null) old + content else content
         checkText(bytes)
         if (existing == null && !parent.writable) fail("folder_access_denied", "This folder cannot create files.")
-        // Resolve the live grant again immediately before mutation. Revocation and Mika writes share this lock.
+        // Resolve the live grant again immediately before mutation. Revocation and Claire writes share this lock.
         resolveGrant(path, write = true)
         val uri = existing?.let { document(tree, it.id) } ?: Docs.createDocument(resolver,
             document(tree, parent.id), if (name.endsWith(".md", true)) "text/markdown" else "text/plain", name)
@@ -307,7 +307,7 @@ class GrantedFolderFiles(private val context: Context) : FolderFiles {
     private fun resolveGrant(path: String, write: Boolean = false): Pair<Uri, List<String>> {
         val parts = FolderFiles.parts(path)
         val permission = permissions().firstOrNull { rootPath(it.uri) == "/folders/${parts.first()}" }
-            ?: fail("folder_access_denied", "Folder access was removed. Ask the user to choose the folder again in Mika settings.")
+            ?: fail("folder_access_denied", "Folder access was removed. Ask the user to choose the folder again in Claire settings.")
         if (!permission.isReadPermission || (write && !permission.isWritePermission))
             fail("folder_access_denied", "The folder is not authorized for this operation.")
         return permission.uri to parts.drop(1)

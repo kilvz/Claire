@@ -68,7 +68,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * 兼容性自检的安卓实现。手机这几项走任务用的同一套:进程里共用的那条助手连接([PhoneServices.sharedShell])、
  * [AgentDisplay] 建屏、[AndroidScreen] 打开页面、读屏、点按、打字、滚动、返回;网页走内置浏览器的 [WebScreen];
- * 沙箱走 [AndroidSandbox]。只碰 Mika 自己的自检页和系统设置(只打开、不点),不改设置、不联网。
+ * 沙箱走 [AndroidSandbox]。只碰 Claire 自己的自检页和系统设置(只打开、不点),不改设置、不联网。
  * 报告里的事实只写状态和数字,不写别的 App 的包名、账号和用户的内容。
  * [status] 是界面那边此刻的系统状态(无障碍、通知、内置助手)。
  */
@@ -152,7 +152,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
                 if (displayId == Display.DEFAULT_DISPLAY && armed.get() && !lockedAndOff()) invalidated.set(true)
             }
         }
-        val lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Mika:ScreenOffSelfCheck")
+        val lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Claire:ScreenOffSelfCheck")
         fun valid() = !invalidated.get() && !taskBusy() && lockedAndOff()
         val waitStage = R.string.selfcheck_screen_off_lock
         val finalStage = R.string.selfcheck_screen_off_start
@@ -407,7 +407,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val s = screen ?: AndroidScreen(a11y, sh, LazyAgentDisplay(d.width, d.height) { d }.also { it.get() }).also { screen = it }
         val own = s.openOwnPage(SelfCheckTargetActivity.intent(app))
         if (own !is ActionResult.Ok || topPackage(sh, d.displayId) != app.packageName) {
-            return CheckOutcome.fail("Mika's test page did not open on Mika's display (${reason(own)})", Advice.LaunchFailed)
+            return CheckOutcome.fail("Claire's test page did not open on Claire's display (${reason(own)})", Advice.LaunchFailed)
         }
         sampleMain(sh, "test page")
         // 先关掉自检页再开系统设置:之后从头开一页,不靠把旧的那一页翻回前面
@@ -423,7 +423,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
                 s.back()
                 when {
                     onMain -> SETTINGS_ON_MAIN
-                    !onMika -> "Settings did not come to the front of Mika's display"
+                    !onMika -> "Settings did not come to the front of Claire's display"
                     else -> null
                 }
             }
@@ -431,10 +431,10 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         // 后面几项在自检页上做:重新打开一次,从头来
         val again = s.openOwnPage(SelfCheckTargetActivity.intent(app))
         if (again !is ActionResult.Ok || !poll { withContext(Dispatchers.IO) { isTestPageOnTop(sh, d.displayId) } }) {
-            return CheckOutcome.fail("Mika's test page did not reopen after Settings (${reason(again)})", Advice.LaunchFailed)
+            return CheckOutcome.fail("Claire's test page did not reopen after Settings (${reason(again)})", Advice.LaunchFailed)
         }
         return when (settingsNote) {
-            null -> CheckOutcome.pass("Mika's test page and Settings opened on Mika's display")
+            null -> CheckOutcome.pass("Claire's test page and Settings opened on Claire's display")
             SETTINGS_ON_MAIN -> CheckOutcome.fail("test page ok; $settingsNote", Advice.OpenedOnMainScreen)
             SETTINGS_IN_USE -> CheckOutcome.partial("test page ok; $settingsNote", Advice.SettingsInUse)
             else -> CheckOutcome.partial("test page ok; $settingsNote", Advice.LaunchFailed)
@@ -448,7 +448,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
         val d = display ?: return CheckOutcome.fail("no display", Advice.DisplayFailed)
         s.waitStable(SETTLE_MS)
-        // 页面刚开出来时树可能还没齐:只认 Mika 自己窗口里的控件,最多等一会儿。
+        // 页面刚开出来时树可能还没齐:只认 Claire 自己窗口里的控件,最多等一会儿。
         // 系统覆盖窗口不属于新任务;完整系统应用则会成为最上层任务,不能一并容忍。
         suspend fun inspect(source: ScreenSnapshot) = readSelfCheckWindow(
             source, app.packageName, withContext(Dispatchers.IO) { topPackage(sh, d.displayId) }, EXPECTED, ::systemPackage,
@@ -462,13 +462,13 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
         val result = inspected
         if (!result.ready) {
-            val wrongApp = if (result.wrongAppOnTop) "; another app is above Mika" else ""
+            val wrongApp = if (result.wrongAppOnTop) "; another app is above Claire" else ""
             return CheckOutcome.fail(
                 "missing ${result.missing.joinToString().ifEmpty { "none" }}; ${seen(result.content ?: snap)}$wrongApp",
                 Advice.ReadFailed,
             )
         }
-        val content = result.content ?: return CheckOutcome.fail("Mika's window is not readable", Advice.ReadFailed)
+        val content = result.content ?: return CheckOutcome.fail("Claire's window is not readable", Advice.ReadFailed)
         val frame = awaitFrame(d) ?: return CheckOutcome.fail("tree ok; no screenshot from the display", Advice.BlankFrames)
         val blank = try {
             val grid = FrameMath.lumaGrid(frame.width, frame.height, frame::getPixel)
@@ -477,7 +477,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             frame.recycle()
         }
         if (blank) return CheckOutcome.fail("tree ok; screenshot is blank or black", Advice.BlankFrames)
-        return CheckOutcome.pass("${content.elements.size} Mika-window elements, all expected found; screenshot not blank")
+        return CheckOutcome.pass("${content.elements.size} Claire-window elements, all expected found; screenshot not blank")
     }
 
     // ---------- 7 动作 ----------
@@ -489,7 +489,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val ok = mutableListOf<String>()
         val bad = mutableListOf<String>()
         fun mark(name: String, passed: Boolean) { if (passed) ok += name else bad += name }
-        // 系统覆盖窗口存在时也只对 Mika 的控件做动作;编号仍属于原始快照,可直接交给动作端口。
+        // 系统覆盖窗口存在时也只对 Claire 的控件做动作;编号仍属于原始快照,可直接交给动作端口。
         fun own(source: ScreenSnapshot) = ownContent(source) ?: source.copy(elements = emptyList(), windows = emptyList())
 
         // 点按:计数加一
@@ -516,7 +516,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             mark("scroll", poll { own(s.peek()).rows().let { it.isNotEmpty() && it.first() != rowsBefore.first() } })
         } else mark("scroll", false)
 
-        // 返回:自检页离开 Mika 屏的最上面。刚打完字输入法多半还弹着,那几下是收起输入法(安卓本来如此),不算在次数里
+        // 返回:自检页离开 Claire 屏的最上面。刚打完字输入法多半还弹着,那几下是收起输入法(安卓本来如此),不算在次数里
         val gone = BackPresses.until(
             tries = BACK_TRIES,
             maxPresses = BACK_MAX_PRESSES,
@@ -549,7 +549,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val s = screen ?: return CheckOutcome.fail("no screen", Advice.LaunchFailed)
         val d = display ?: return CheckOutcome.fail("no display", Advice.DisplayFailed)
         if (s.openOwnPage(SelfCheckTargetActivity.intent(app)) !is ActionResult.Ok) {
-            return CheckOutcome.fail("Mika's test page did not reopen", Advice.LaunchFailed)
+            return CheckOutcome.fail("Claire's test page did not reopen", Advice.LaunchFailed)
         }
         val start = SystemClock.uptimeMillis()
         var lastChange = start
@@ -583,7 +583,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
         val before = mainBefore ?: return CheckOutcome.fail("main screen was not readable at the start", Advice.Error)
         sampleMain(sh, "end")
-        val who = if (withContext(Dispatchers.IO) { runCatching { sh.packageOfTask(before) }.getOrNull() } == app.packageName) "Mika" else "another app"
+        val who = if (withContext(Dispatchers.IO) { runCatching { sh.packageOfTask(before) }.getOrNull() } == app.packageName) "Claire" else "another app"
         return if (mainChanged.isEmpty()) CheckOutcome.pass("top task unchanged ($who stayed on top)")
         else CheckOutcome.fail("top task changed during: ${mainChanged.joinToString()}", Advice.MainScreenChanged)
     }
@@ -772,7 +772,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val n = snap.elements.size
         val first = snap.elements.take(SEEN_ELEMENTS)
         return when {
-            pkg == app.packageName -> "saw Mika, $n elements: " + first.joinToString { (it.resourceId ?: it.name).take(SEEN_CHARS) }
+            pkg == app.packageName -> "saw Claire, $n elements: " + first.joinToString { (it.resourceId ?: it.name).take(SEEN_CHARS) }
             pkg == null -> "saw no readable window, $n elements"
             systemPackage(pkg) -> "saw $pkg, $n elements: " + first.joinToString { (it.resourceId ?: it.role).take(SEEN_CHARS) }
             else -> "saw another app, $n elements"
@@ -834,7 +834,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         const val LIST = "selfcheck_list"
         const val TITLE = "selfcheck_title"
         val EXPECTED = listOf(TITLE, COUNT, BUTTON, INPUT, TICK, LIST)
-        const val ASCII = "Mika 123"
+        const val ASCII = "Claire 123"
         const val CHINESE = "你好米卡"
         const val SENTINEL = 987_654_321
         /** 读屏一项等自检页出现最多这么久。 */
@@ -860,7 +860,7 @@ internal data class SelfCheckWindowRead(
 }
 
 /**
- * 把合并读屏结果收窄到 Mika 自己的应用窗口,再检查控件。只有 Mika 仍是最上层任务时,
+ * 把合并读屏结果收窄到 Claire 自己的应用窗口,再检查控件。只有 Claire 仍是最上层任务时,
  * 系统应用的覆盖窗口才不影响自检;完整系统应用有自己的顶层任务,仍算切走。
  */
 internal fun readSelfCheckWindow(

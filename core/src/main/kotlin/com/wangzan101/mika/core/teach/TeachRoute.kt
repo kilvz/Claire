@@ -12,7 +12,7 @@ data class TeachRoute(
     val folded: List<String>,
 ) {
     /**
-     * 把「人的操作」整理成「Mika 的做法」的确定性第一步:
+     * 把「人的操作」整理成「Claire 的做法」的确定性第一步:
      * 回桌面、找图标、点开 App 这些只是为了让人进到 App 里,技能里写成「启动/改用/回到 <App>」。
      *
      * 识别不到桌面时([launcherPackages] 为空)整段原样保留,不误删任何步骤。

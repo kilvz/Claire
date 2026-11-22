@@ -76,7 +76,7 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 private enum class AboutSheet { Update, Changelog, Feedback, Group, Diagnostics }
 
 /**
- * 关于 Mika:顶上图标、名字、一句话介绍、版本(Beta 标记、构建编号);下面是检查更新与更新记录、
+ * 关于 Claire:顶上图标、名字、一句话介绍、版本(Beta 标记、构建编号);下面是检查更新与更新记录、
  * 反馈问题、开源仓库与使用说明;一段数据说明;最底下许可证与作者。
  * 外部链接都交给 [onOpenUrl](系统浏览器);手动检查的结果到了([UpdateState.manualRounds] 变了)才提示。
  * [diagnostics] 写出诊断信息(反馈面板里「复制诊断信息」点开预览时在后台线程调)。
@@ -225,7 +225,7 @@ private fun Hero(versionName: String, build: String, beta: Boolean) {
             painterResource(R.drawable.mika_launcher_art), contentDescription = null,
             Modifier.size(72.dp).clip(RoundedCornerShape(MikaRadius.Bubble)),
         )
-        Text("Mika", Modifier.padding(top = 12.dp), style = MikaType.Title, fontWeight = FontWeight.Bold, color = c.ink)
+        Text("Claire", Modifier.padding(top = 12.dp), style = MikaType.Title, fontWeight = FontWeight.Bold, color = c.ink)
         Text(AboutCopy.TAGLINE, Modifier.padding(top = 4.dp), style = MikaType.Caption, color = c.ink2, textAlign = TextAlign.Center)
         Row(Modifier.padding(top = 10.dp).testTag("about-version"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(AboutCopy.version(versionName), style = MikaType.Hint, color = c.ink3)

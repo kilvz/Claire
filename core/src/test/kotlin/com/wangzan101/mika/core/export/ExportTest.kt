@@ -91,7 +91,7 @@ class ExportTest {
             val text = File(root, "document.md").readText()
             assertTrue(text.contains("# 标题"))
             assertTrue(text.contains("## User"))
-            assertTrue(text.contains("## Mika"))
+            assertTrue(text.contains("## Claire"))
             assertTrue(text.contains("![screen-s1.jpg](assets/screen-s1.jpg)"))
             assertTrue(text.contains("[a.txt](assets/a.txt)"))
             assertTrue(text.contains("### Tool steps"))

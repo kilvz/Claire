@@ -53,7 +53,7 @@ class ModelSetupViewModelTest {
     private fun store() = ProviderStore(
         tmp.root, AesGcmKeyCipher { key },
         newId = { "id${++ids}" },
-        userAgent = "Mika/1.2.3",
+        userAgent = "Claire/1.2.3",
         modelFactory = { cfg, _, _, setup -> built += cfg.model to setup; Fake(cfg.capabilities) { reply() } },
         modelLister = { kind, url, apiKey, headers ->
             listBoom?.let { throw it }
@@ -407,7 +407,7 @@ class ModelSetupViewModelTest {
         assertEquals(setOf("vendor/opaque-marked"), saved.ttsModels)
     }
 
-    /** 目录里有、但 Mika 调不了的模型(只写了别的接口):设成看图/轻量前必须试调用,不通就不设。 */
+    /** 目录里有、但 Claire 调不了的模型(只写了别的接口):设成看图/轻量前必须试调用,不通就不设。 */
     @Test fun listedModelMikaCannotCallIsProbedBeforeBecomingVisionOrLight() = runTest {
         val store = store()
         val p = store.connect(
@@ -457,7 +457,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.canNext)
     }
 
-    /** 手填的是列表写明 Mika 调不了的模型:不试它,改试推荐的对话模型。 */
+    /** 手填的是列表写明 Claire 调不了的模型:不试它,改试推荐的对话模型。 */
     @Test fun onboardingSkipsATypedModelMikaCannotCallAndProbesAChatModel() = runTest {
         val model = ListedModel("vendor/opaque-speech", unsupportedApis = listOf("/v1/audio/speech"))
         listing[localSpeechUrl] = ModelListResult.Ok(listOf(model, ListedModel("vendor/chat")))

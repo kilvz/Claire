@@ -6,7 +6,7 @@
     <string name="sms_login_limits">Yapılandırılmış yerel uygulamalar için otomatik oturum: tam uygulama imzası, gönderici, hizmet ve hesap eşleşmesi. Oturum başına onay yok. Eksik kimlik, izin veya doğrulanmış başarı manuel kalır. Doğrulamadan sonra yerel metin gözlemi devam eder; bu çalıştırma sırasında görüntüler yerel kalır.</string>
     <string name="sms_login_permission">Android SMS izni</string>
     <string name="sms_login_error">İzin veya kayıt başarısız oldu. Manuel oturumu koruyun; Android uygulama izinlerini kontrol edin.</string>
-    <string name="sms_login_disclosure">Otomatik SMS oturumunu yalnızca burada yapılandırdığınız hesaplar ve imzalı uygulamalar için etkinleştirin. Mika, tekrar sormadan isteyebilir, doldurabilir ve gönderebilir, sonra hesabı yerel olarak doğrular. Ödeme, kurtarma veya kayıt yok. SMS ve kodlar asla kaydedilmez veya modele gönderilmez. İptal etmek için bir profili devre dışı bırakın veya silin.</string>
+    <string name="sms_login_disclosure">Otomatik SMS oturumunu yalnızca burada yapılandırdığınız hesaplar ve imzalı uygulamalar için etkinleştirin. Claire, tekrar sormadan isteyebilir, doldurabilir ve gönderebilir, sonra hesabı yerel olarak doğrular. Ödeme, kurtarma veya kayıt yok. SMS ve kodlar asla kaydedilmez veya modele gönderilmez. İptal etmek için bir profili devre dışı bırakın veya silin.</string>
     <string name="sms_login_sender">Tam SMS gönderici</string>
     <string name="sms_login_signature">Köşeli parantez içindeki hizmet adı</string>
     <string name="sms_login_account">Eşleşen hesap haneleri (4–11)</string>

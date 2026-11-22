@@ -38,7 +38,7 @@ sealed interface SpeechFailure {
      */
     data object AudioError : SpeechFailure
     /**
-     * 识别服务说没有权限,而且查得出来是它自己(另一个应用)没有录音权限,不是 Mika 没有(见 [SpeechServiceMic])。
+     * 识别服务说没有权限,而且查得出来是它自己(另一个应用)没有录音权限,不是 Claire 没有(见 [SpeechServiceMic])。
      * 界面据此说明,并带用户去那个应用的设置页。
      */
     data class ServiceNoPermission(val service: SpeechServiceTarget) : SpeechFailure

@@ -162,7 +162,7 @@ class UpdateChecker(
             launch(Dispatchers.IO) {
                 val found = withTimeoutOrNull(PROBE_TIMEOUT_MS) {
                     try {
-                        UpdateProbe.fetch(client, source, releaseApi, releasesUrl, deviceAbis, "Mika/$currentVersion")
+                        UpdateProbe.fetch(client, source, releaseApi, releasesUrl, deviceAbis, "Claire/$currentVersion")
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: Exception) {

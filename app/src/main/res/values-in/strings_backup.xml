@@ -20,7 +20,7 @@
     <string name="backup_replace">Ganti semua</string>
     <string name="backup_imported_title">Cadangan dipulihkan</string>
     <string name="backup_imported_body">%1$d file dipulihkan.</string>
-    <string name="backup_after_import_body">Tutup Mika lalu buka lagi untuk menggunakan data yang dipulihkan. Setelah itu, pasangkan ulang wireless debugging, aktifkan kembali layanan aksesibilitas di Setelan Android, dan hapus file ZIP cadangan.</string>
-    <string name="backup_close_app">Tutup Mika</string>
+    <string name="backup_after_import_body">Tutup Claire lalu buka lagi untuk menggunakan data yang dipulihkan. Setelah itu, pasangkan ulang wireless debugging, aktifkan kembali layanan aksesibilitas di Setelan Android, dan hapus file ZIP cadangan.</string>
+    <string name="backup_close_app">Tutup Claire</string>
     <string name="backup_restart_note">Ekspor dulu sebelum menghapus apa pun: hanya instalasi ini yang dapat mendekripsi data Anda.</string>
 </resources>

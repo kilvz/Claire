@@ -16,7 +16,7 @@ enum class SourceTier(val wire: String) {
 
 /**
  * 激进程度:一个总开关,一次调一组门槛。[Conservative] 什么都不带进任务。
- * 不管哪一档,Mika 都不会不等用户点就自己开口,也不会替用户回复。
+ * 不管哪一档,Claire 都不会不等用户点就自己开口,也不会替用户回复。
  *
  * - [topicDays]:一个话题至少在几个不同的日子里出现过才算已确立。
  * - [surfaceCap]:每个 App 每天最多提醒几个不同的会话。

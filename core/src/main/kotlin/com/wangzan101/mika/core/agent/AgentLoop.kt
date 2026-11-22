@@ -107,7 +107,7 @@ private fun cleanReplyParts(parts: List<Part>, text: String): List<Part> {
 }
 
 /**
- * 写、改 Mika 自己的记忆不先问「是讨论还是要操作」。那个判断管的是要不要去读、去动 App 和网站;这两个工具只动 Mika 自己的记忆,
+ * 写、改 Claire 自己的记忆不先问「是讨论还是要操作」。那个判断管的是要不要去读、去动 App 和网站;这两个工具只动 Claire 自己的记忆,
  * 各有校验(引文必须出自用户这一轮的话,改删还要话里明说了要改、要删,见 MemoryTools),改动在结果卡上可以撤销。
  * 交给它判的话,「总结一下写进记忆」「把那几条改得简洁一点」这样的话在真机上都被判成了讨论:调用被丢掉、改成不带工具重问,
  * 模型只好把调用写成文字,任务以「工具调用没被识别」结束。
@@ -149,7 +149,7 @@ class AgentLoop(
     private val approvals: ApprovalSettings = ApprovalSettings.ASK,
     /** 等用户回答确认的时限,到时按不同意;为 null 时一直等(测试)。 */
     confirmTimeoutMs: Long? = null,
-    /** Mika 自己的包名:作用在它上面的写操作不做。 */
+    /** Claire 自己的包名:作用在它上面的写操作不做。 */
     private val selfPackage: String? = null,
     /** 追问(ask_user 与开工前的歧义问题)等用户回答的时限;计时走协程调度器的时钟,测试里用虚拟时间。 */
     inputTimeoutMs: Long = DEFAULT_INPUT_TIMEOUT_MS,
@@ -868,7 +868,7 @@ class AgentLoop(
                         track.after(tools.verb(first.name), ok = false, guard = false, changed = null, recovery = false, app = null)
                         return null
                     }
-                    // 模型单步只会被守卫叫停、被确认关卡拦下或因作用在 Mika 自己身上不做;别的拒绝说明执行入口和这里对不上
+                    // 模型单步只会被守卫叫停、被确认关卡拦下或因作用在 Claire 自己身上不做;别的拒绝说明执行入口和这里对不上
                     check(action.hit != null || action.code == Refusals.OWN_APP) { "unexpected refusal ${action.code} for ${first.name}" }
                     // 被确认关卡拦下:不计入失败熔断,交给模型走确认流程
                     track.after(tools.verb(first.name), ok = false, guard = action.before.isNotEmpty(), changed = null, recovery = false, app = null)

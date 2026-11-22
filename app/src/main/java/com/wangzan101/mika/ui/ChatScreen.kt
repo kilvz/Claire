@@ -211,7 +211,7 @@ fun ChatScreen(
     voice: VoiceSource? = null,
     /** 「还不能语音输入」里的「去选」。 */
     openSpeechModel: () -> Unit = {},
-    /** 输入框里还没发出的字，交给「教 Mika」预填，不会自己开始。 */
+    /** 输入框里还没发出的字，交给「教 Claire」预填，不会自己开始。 */
     onOpenTeach: (String) -> Unit = {},
     /** 首页推荐任务。不传时用本机保存的那一份;测试传入单独的存储,避免改到用户的数据。 */
     recommendations: RecommendedTaskStore? = null,
@@ -1153,7 +1153,7 @@ private fun SteerStepPill(text: String) {
 }
 
 /**
- * Mika 的一段回答:长按弹出复制 / 引用 / 选择文字(见 [MessageArea]),复制、引用的是去掉 Markdown 符号的纯文字;
+ * Claire 的一段回答:长按弹出复制 / 引用 / 选择文字(见 [MessageArea]),复制、引用的是去掉 Markdown 符号的纯文字;
  * [modifier] 是回答的底,抬起的那张是同样的字放在白卡上。选择文字时选区的把手在单独的弹出窗口里,拖把手不会带出侧栏。
  */
 @Composable
@@ -1169,7 +1169,7 @@ private fun AnswerArea(key: String, answer: String, modifier: Modifier, content:
     ) { content() }
 }
 
-/** Mika 回答的底:很淡的灰,左下尾角。 */
+/** Claire 回答的底:很淡的灰,左下尾角。 */
 @Composable
 private fun Modifier.answerSurface(): Modifier =
     background(MikaTheme.colors.answer, MikaShapes.AnswerBubble).padding(horizontal = 14.dp, vertical = 12.dp)
@@ -1223,7 +1223,7 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
     }
 }
 
-/** 回答/干活头部那行:「Mika · 0:42 · 1.2 万 Token」;[elapsed]/[tokens] 为 null 时略去对应段。 */
+/** 回答/干活头部那行:「Claire · 0:42 · 1.2 万 Token」;[elapsed]/[tokens] 为 null 时略去对应段。 */
 @Composable
 private fun TurnMeta(elapsed: Long?, tokens: Long?) {
     val c = MikaTheme.colors
@@ -1710,7 +1710,7 @@ private fun ReplyIcon(icon: ImageVector, label: String, tint: Color = MikaTheme.
 
 /** 复制回答正文的纯文字到剪贴板。 */
 private fun copyAnswer(context: Context, answer: String) {
-    val clip = ClipData.newPlainText("Mika", MarkdownModel.toPlainText(answer))
+    val clip = ClipData.newPlainText("Claire", MarkdownModel.toPlainText(answer))
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
     Toast.makeText(context, R.string.chat_copied, Toast.LENGTH_SHORT).show()
 }
@@ -1759,7 +1759,7 @@ private fun TextLink(text: String, onClick: () -> Unit) {
     Text(text, Modifier.clip(MikaShapes.Pill).clickable(onClick = onClick).padding(4.dp), style = MikaType.Caption, color = MikaTheme.colors.ink3)
 }
 
-/** 导出到「下载/Mika」的文件:小卡片,名字、大小和存放处;点了能看的在 App 里打开([FileViewer]),其余交给系统里能打开它的 App。 */
+/** 导出到「下载/Claire」的文件:小卡片,名字、大小和存放处;点了能看的在 App 里打开([FileViewer]),其余交给系统里能打开它的 App。 */
 @Composable
 private fun FileCards(files: List<SharedFile>) {
     val context = LocalContext.current

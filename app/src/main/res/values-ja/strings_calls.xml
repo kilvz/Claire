@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">電話をかける</string>
     <string name="calls_rules">応答ルール</string>
     <string name="calls_setup_credentials">選択した音声サービスのリアルタイム音声認証情報を設定してください。</string>
-    <string name="calls_setup_shell">先に Mika の内蔵アシスタントに接続してください。</string>
+    <string name="calls_setup_shell">先に Claire の内蔵アシスタントに接続してください。</string>
     <string name="calls_sim_clear_preferred">優先 SIM を解除</string>
     <string name="calls_sim_preferred">優先 SIM：%1$s</string>
     <string name="calls_sim_save_preferred">この SIM を優先する</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">AI が接続しました。いつでも自分で引き継げます。</string>
     <string name="calls_only_types">選択した種類の着信のみ</string>
     <string name="calls_pick_types">着信の種類を1つ以上選択してください</string>
-    <string name="calls_type_note">Mika はユーザー補助で電話アプリのラベルと番号を着信に照合します。確認できない着信はご自身で応答できます。</string>
+    <string name="calls_type_note">Claire はユーザー補助で電話アプリのラベルと番号を着信に照合します。確認できない着信はご自身で応答できます。</string>
     <string name="calls_type_accessibility">ユーザー補助設定を開く</string>
     <string name="calls_type_takeout">フードデリバリー</string>
     <string name="calls_type_parcel">宅配便</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">企業・カスタマーサービス</string>
     <string name="calls_type_transport">タクシー・配車</string>
     <string name="calls_only_strangers">連絡先にない番号のみ</string>
-    <string name="calls_strangers_note">Mika に連絡先の読み取りを許可してください。番号が未登録だと確認できた場合のみ AI が応答します。非通知や照合できない着信にはご自身で応答してください。</string>
+    <string name="calls_strangers_note">Claire に連絡先の読み取りを許可してください。番号が未登録だと確認できた場合のみ AI が応答します。非通知や照合できない着信にはご自身で応答してください。</string>
 </resources>

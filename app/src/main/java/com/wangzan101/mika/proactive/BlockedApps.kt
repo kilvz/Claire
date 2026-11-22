@@ -28,7 +28,7 @@ internal object BlockedApps {
         gate.known && NoticeFilter.decide(r, allowed, gate.blocked) == NoticeDecision.Keep
 
     /**
-     * 这个 App 现在能不能归纳:勾选了、不是「不从它归纳」、没在「应用访问」里禁用、不是 Mika 自己。
+     * 这个 App 现在能不能归纳:勾选了、不是「不从它归纳」、没在「应用访问」里禁用、不是 Claire 自己。
      * 「应用访问」读不出来不在这里管([blocked] 那时是空的):归纳那边拿这个去清待归纳的事件,读不出来时只该停着,不该清。
      */
     fun learnEligible(pkg: String, allowed: Set<String>, optOut: Set<String>, blocked: Set<String>): Boolean =

@@ -34,9 +34,9 @@ class HelperRestoreTest {
     @Test
     fun accessibilityOnlyWhenWantedAndOn() {
         assertTrue(RestoreWish.of(true, false, accessibilityWanted = true, accessibilityOn = true).accessibility)
-        // 用户在 Mika 里关掉了替我打开无障碍
+        // 用户在 Claire 里关掉了替我打开无障碍
         assertFalse(RestoreWish.of(true, false, accessibilityWanted = false, accessibilityOn = true).accessibility)
-        // 用户趁 Mika 活着在系统设置里关掉了
+        // 用户趁 Claire 活着在系统设置里关掉了
         assertFalse(RestoreWish.of(true, false, accessibilityWanted = true, accessibilityOn = false).accessibility)
     }
 

@@ -98,13 +98,13 @@ class SettingsScreenTest {
             "模型已配置 · 手机操作可用",
             "模型、服务商与 Token 用量",
             "实时语音 · 运营商电话",
-            "在微信里给 Mika 安排任务",
+            "在微信里给 Claire 安排任务",
             "读取所选 App 的通知",
             "自主模式、操作节奏、步数上限与声音",
             "用别的 App 时，在屏幕上看任务进展",
-            "选择 Mika 和你说话的方式",
+            "选择 Claire 和你说话的方式",
             "什么时候弹出、去系统里改",
-            "把个人助手设为 Mika 首屏",
+            "把个人助手设为 Claire 首屏",
             "记忆、技能、操作路线与网站登录",
             "把全部数据导出成一个 ZIP 文件，或从 ZIP 恢复",
             "太久没有新消息的对话自动收进归档",
@@ -125,7 +125,7 @@ class SettingsScreenTest {
         val opened = mutableListOf<String>()
         home(opened = opened)
         // 「主动能力」在「微信」和「任务运行」之间
-        for (t in listOf("模型", "手机操作", "微信", "主动能力", "任务运行", "悬浮胶囊", "语言与外观", "通知", "记忆与数据", "应用访问", "高级与其他", "关于 Mika")) {
+        for (t in listOf("模型", "手机操作", "微信", "主动能力", "任务运行", "悬浮胶囊", "语言与外观", "通知", "记忆与数据", "应用访问", "高级与其他", "关于 Claire")) {
             scrollTo(t)
             compose.onNodeWithText(t).performClick()
         }
@@ -152,8 +152,8 @@ class SettingsScreenTest {
             compose.onNodeWithText(t).performClick()
         }
         compose.onNodeWithText("开发者选项").performScrollTo().performClick()
-        scrollTo("完全退出 Mika")
-        compose.onNodeWithText("完全退出 Mika").performClick()
+        scrollTo("完全退出 Claire")
+        compose.onNodeWithText("完全退出 Claire").performClick()
         assertEquals(listOf("proxy", "sandbox", "computer", "mcp", "recovery", "dev", "quit"), opened)
     }
 
@@ -641,7 +641,7 @@ class SettingsScreenTest {
     @Test
     fun notificationsOmitsRedundantSubtitles() {
         compose.setContent { NotificationsScreen(ready, onFix = {}, onBack = {}) }
-        compose.onAllNodesWithText("允许 Mika 发通知").assertCountEquals(0)
+        compose.onAllNodesWithText("允许 Claire 发通知").assertCountEquals(0)
         compose.onAllNodesWithText("静默显示在通知栏", substring = true).assertCountEquals(0)
         compose.onNodeWithText("需要你接管、确认、回答时").assertIsDisplayed()
     }

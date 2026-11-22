@@ -23,7 +23,7 @@ data class Persona(
     val prompt: String,
     /** 界面上选的选项;旧文件里没有这一项时全是默认值。 */
     val style: PersonaStyle = PersonaStyle.DEFAULT,
-    /** 称呼:助理的自称;空着就是默认的 Mika。进提示词前由 [PersonaPrompt.nickname] 清洗。 */
+    /** 称呼:助理的自称;空着就是默认的 Claire。进提示词前由 [PersonaPrompt.nickname] 清洗。 */
     val nickname: String = "",
     /** 每次保存 +1;v1 只保留最新正文,旧修订不保留。 */
     val revision: Int = 1,
@@ -33,7 +33,7 @@ data class Persona(
     val builtin: Boolean = false,
 )
 
-/** 这一套的自称:清洗过的称呼,没填就是 Mika。 */
+/** 这一套的自称:清洗过的称呼,没填就是 Claire。 */
 val Persona.assistant: String get() = PersonaPrompt.nickname(nickname)
 
 /** 这一套实际上什么都不改:选项全默认、没有指令、称呼也是默认的。 */
@@ -72,7 +72,7 @@ class PersonaStore(private val dir: File) {
     /** 设置里选的在用的那一套的 id;没有选、或选的那一套被删了为 null。 */
     val activeId: StateFlow<String?> = _activeId.asStateFlow()
 
-    /** 在用的那一套;没有为 null(Mika 按平常的方式说话)。 */
+    /** 在用的那一套;没有为 null(Claire 按平常的方式说话)。 */
     fun active(): Persona? = get(_activeId.value)
 
     /** 选用一套([id] 必须在列表里),或传 null 回到没有在用的。写进去了返回 true。 */
@@ -114,7 +114,7 @@ class PersonaStore(private val dir: File) {
         created
     }
 
-    /** 新建一套全默认的并设为在用:用户新建就是为了马上去调,全默认的一套不会让 Mika 变样。 */
+    /** 新建一套全默认的并设为在用:用户新建就是为了马上去调,全默认的一套不会让 Claire 变样。 */
     @Synchronized fun create(name: String): Result<Persona> = runCatching {
         val now = System.currentTimeMillis()
         val persona = Persona(name = name.trim(), prompt = "", createdAt = now, updatedAt = now)

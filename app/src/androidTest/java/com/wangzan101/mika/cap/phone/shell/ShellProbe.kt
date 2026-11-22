@@ -20,7 +20,7 @@ data class ProbeEvent(
     val keyCode: Int,
 )
 
-/** 在 Mika 进程里收 [ShellProbeActivity] 的广播。用完 close。 */
+/** 在 Claire 进程里收 [ShellProbeActivity] 的广播。用完 close。 */
 class ShellProbe(private val context: Context) : AutoCloseable {
     private val events = CopyOnWriteArrayList<ProbeEvent>()
     private val receiver = object : BroadcastReceiver() {

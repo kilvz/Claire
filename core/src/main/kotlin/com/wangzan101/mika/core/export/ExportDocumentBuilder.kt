@@ -113,7 +113,7 @@ class ExportDocumentBuilder(
             )
         }
 
-        val finalTitle = redact(title.trim().ifEmpty { turns.firstOrNull()?.userText?.take(80) ?: "Mika" }, content)
+        val finalTitle = redact(title.trim().ifEmpty { turns.firstOrNull()?.userText?.take(80) ?: "Claire" }, content)
         return ExportDocument(
             meta = ExportMeta(
                 conversationId = conversationId,

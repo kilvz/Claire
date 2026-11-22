@@ -13,7 +13,7 @@ import com.wangzan101.mika.core.agent.TokenEstimate
 object PersonaPrompt {
     const val MAX_NAME = 40
     /** 助理默认的自称。 */
-    const val DEFAULT_NICKNAME = "Mika"
+    const val DEFAULT_NICKNAME = "Claire"
     /** 称呼最多这么多个字(按码点)。 */
     const val MAX_NICKNAME = 16
     const val MAX_PROMPT_CHARS = 4_000

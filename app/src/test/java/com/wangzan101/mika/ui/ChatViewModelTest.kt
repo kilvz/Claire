@@ -160,7 +160,7 @@ class ChatViewModelTest {
         runCurrent()
     }
 
-    // 通知提醒那一轮(Mika 直接写进对话的,没跑过任务):没有用户气泡,也没有运行记录可看;同一天点开两次就有两轮,各是各的
+    // 通知提醒那一轮(Claire 直接写进对话的,没跑过任务):没有用户气泡,也没有运行记录可看;同一天点开两次就有两轮,各是各的
     @Test fun noticeTurnsHaveNoUserBubbleAndNoRunToOpen() = runTest {
         val store = ConversationStore(tmp.newFolder())
         store.append("talk", Turn("", "我从通知里挑出 1 条", "succeeded", runId = "notice:n1"))
@@ -1987,7 +1987,7 @@ class ChatViewModelTest {
         val vm = ChatViewModel(backgroundScope, state, stage, actions, store, sharedFiles = files).also { runCurrent() }
         vm.send("导出表格", ok)
         emit(TaskState.Running(1, "整理"))
-        val f = com.wangzan101.mika.chat.SharedFile("表.xlsx", 5000, "Download/Mika/表.xlsx", "content://media/1")
+        val f = com.wangzan101.mika.chat.SharedFile("表.xlsx", 5000, "Download/Claire/表.xlsx", "content://media/1")
         files.value = listOf(f)
         runCurrent()
         assertEquals(listOf(f), vm.ui.value.exchanges.last().files)
@@ -2306,7 +2306,7 @@ class ChatViewModelTest {
 
     @Test fun suspendedSkillRestoreAndView() = runTest {
         val vm = vmWithHistory()
-        val learned = com.wangzan101.mika.core.skills.SkillNote("Mika 学会了一项技能:发微信", draftId = "d1")
+        val learned = com.wangzan101.mika.core.skills.SkillNote("Claire 学会了一项技能:发微信", draftId = "d1")
         val suspended = com.wangzan101.mika.core.skills.SkillNote("这项技能最近不灵,先停用了", suspended = "wechat-msg")
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", skillNotes = listOf(learned, suspended)))
         runCurrent()
@@ -2358,12 +2358,12 @@ class ChatViewModelTest {
         active.value = listOf("a", "b")
         vm.switchTo("a")
         show("a", TaskState.Running(1, "整理"))
-        val mine = com.wangzan101.mika.chat.SharedFile("a.csv", 1, "Download/Mika/a.csv", "content://media/1")
+        val mine = com.wangzan101.mika.chat.SharedFile("a.csv", 1, "Download/Claire/a.csv", "content://media/1")
         files.value = listOf(mine)
         runCurrent()
         assertEquals(listOf(mine), vm.ui.value.exchanges.last().files)
         show("b", TaskState.Running(1, "查快递"))
-        files.value = listOf(com.wangzan101.mika.chat.SharedFile("b.csv", 1, "Download/Mika/b.csv", "content://media/2"))
+        files.value = listOf(com.wangzan101.mika.chat.SharedFile("b.csv", 1, "Download/Claire/b.csv", "content://media/2"))
         runCurrent()
         assertEquals(listOf(mine), vm.ui.value.exchanges.last().files)
     }
@@ -2464,7 +2464,7 @@ class ChatViewModelTest {
     // 那一问一答的原话、步骤(包括切走期间的)、文件都要在,不能另起一条空原话的
     @Test fun switchingBackRestoresTheRunningExchange() = runTest {
         val runStates = mapOf("a" to MutableStateFlow<TaskState>(TaskState.Running(0, "")), "b" to MutableStateFlow<TaskState>(TaskState.Running(0, "")))
-        val fileA = com.wangzan101.mika.chat.SharedFile("a.csv", 1, "Download/Mika/a.csv", "content://media/1")
+        val fileA = com.wangzan101.mika.chat.SharedFile("a.csv", 1, "Download/Claire/a.csv", "content://media/1")
         val runFiles = mapOf("a" to listOf(fileA), "b" to emptyList())
         val goals = mapOf("a" to "第一个任务", "b" to "第二个任务")
         val files = MutableStateFlow<List<com.wangzan101.mika.chat.SharedFile>>(emptyList())
@@ -2874,7 +2874,7 @@ class ChatViewModelTest {
         // 点开一步、运行过程页用的是同一份说法
         assertEquals("不是你亲口说的,没有写入", ChatCopy.effectLabel("quote_not_from_user"))
         assertEquals("没成功", ChatCopy.effectLabel("memory_full"))
-        // 开着「让 Mika 自己归纳着记」、但这句话没让它记
+        // 开着「让 Claire 自己归纳着记」、但这句话没让它记
         assertEquals("这句话没让它记,没有写入", ChatCopy.effectLabel("inference_not_requested"))
     }
 
@@ -3237,7 +3237,7 @@ class ChatViewModelTest {
         assertEquals(listOf("胶囊里说的"), vm.ui.value.exchanges.map { it.goal })
     }
 
-    // 别处在新对话里开始的任务:侧栏列在进行中;打开它(回到 Mika)就看到那句话和在跑的状态
+    // 别处在新对话里开始的任务:侧栏列在进行中;打开它(回到 Claire)就看到那句话和在跑的状态
     @Test fun runInNewConversationElsewhereOpensWithMessage() = runTest {
         for (parallel in listOf(false, true)) {
             val store = ConversationStore(tmp.newFolder())

@@ -60,7 +60,7 @@ class RemoteTaskRecoveryDeviceTest {
     @Test fun versionOneReceiptsUpgradeWithoutLosingResultsOrSingleUseFileRequests() {
         val name = "receipts-migration-" + UUID.randomUUID()
         val now = System.currentTimeMillis()
-        val item = com.wangzan101.mika.chat.SharedFile("result.csv", 3, "Downloads/Mika", "content://exports/7")
+        val item = com.wangzan101.mika.chat.SharedFile("result.csv", 3, "Downloads/Claire", "content://exports/7")
         val task = RemoteTask("files", "mcp-files", "original goal", now, null)
         try {
             app.openOrCreateDatabase(name, 0, null).use { db ->

@@ -43,7 +43,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 侧栏的「浏览器」入口;起始页的几段(搜索、常用网站、整理、最近打开),网页的顶栏和工具栏、「更多」面板、「给 Mika 登录」横幅。 */
+/** 侧栏的「浏览器」入口;起始页的几段(搜索、常用网站、整理、最近打开),网页的顶栏和工具栏、「更多」面板、「给 Claire 登录」横幅。 */
 @RunWith(AndroidJUnit4::class)
 class BrowserScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

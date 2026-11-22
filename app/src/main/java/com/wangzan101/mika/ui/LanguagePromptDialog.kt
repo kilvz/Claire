@@ -79,7 +79,7 @@ internal fun filterLanguages(query: String): List<AppLanguage> {
 }
 
 /**
- * Prompt shown once on update or next launch to allow users to pick Mika's reasoning and UI language.
+ * Prompt shown once on update or next launch to allow users to pick Claire's reasoning and UI language.
  * Dynamically scales its content height to the device screen height instead of using hardcoded dimensions.
  */
 @Composable

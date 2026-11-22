@@ -50,7 +50,7 @@ class ImageToolsTest {
         override suspend fun saveToGallery(path: String, name: String?): SavedImage {
             savedPath = path
             savedName = name
-            return SavedImage("Pictures/Mika/test.png", "content://mika/test", 4)
+            return SavedImage("Pictures/Claire/test.png", "content://mika/test", 4)
         }
     }
 
@@ -108,7 +108,7 @@ class ImageToolsTest {
         val d = dispatcher(port, save = true, ask = false)
         val r = d.execute(call("image_save", """{"path":"/workspace/out/images/a.png","name":"cat.png"}"""), ActionPass()).content
         assertEquals("true", r.s("ok"))
-        assertEquals("Pictures/Mika/test.png", r.s("savedAs"))
+        assertEquals("Pictures/Claire/test.png", r.s("savedAs"))
         assertEquals("/workspace/out/images/a.png", port.savedPath)
         assertEquals("cat.png", port.savedName)
     }

@@ -16,13 +16,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * 提醒对话:用户点开提醒时,Mika 把挑出来的几条通知写成自己的一条消息放进去(消息怎么写见
+ * 提醒对话:用户点开提醒时,Claire 把挑出来的几条通知写成自己的一条消息放进去(消息怎么写见
  * [com.wangzan101.mika.core.proactive.NoticeTalk];那一轮怎么认、怎么对待见 [NoticeTurn])。
  *
  * - 一天一个:当天再点开,接着写在同一个对话里;过了一天、或那个对话被用户删了,就新开一个。
  *   「今天是哪一个」记在 [ProactivePrefs.hintTalk] 里(只有对话 id 和日子)。
  * - 写完把它设成「用户此刻所在的对话」:悬浮窗的卡片接着它,用户在卡片里回一句,任务就在这个对话里跑;
- *   回到 Mika 里看到的也是同一个对话,可以接着说。
+ *   回到 Claire 里看到的也是同一个对话,可以接着说。
  * - 通知的标题和正文到这一刻才落盘(对话文件,和别的对话一样不加密):没点开的提醒不写。
  */
 class NoticeTalks(
@@ -62,7 +62,7 @@ class NoticeTalks(
         prefs.hintTalk?.takeIf { (id, day) -> day == dayOf(nowMs) && store.turns(id).isNotEmpty() }?.first
 
     /**
-     * 把 [message] 写成提醒对话里 Mika 的一轮(没有用户的话),并把这个对话设为当前对话;[title] 只在新开对话时用。
+     * 把 [message] 写成提醒对话里 Claire 的一轮(没有用户的话),并把这个对话设为当前对话;[title] 只在新开对话时用。
      * 返回对话 id。写不进去照常抛出,由调用方决定(那几条提醒因此不算看过)。
      */
     @Synchronized fun post(message: String, title: String, nowMs: Long): String {

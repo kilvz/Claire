@@ -8,9 +8,9 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * 模型看和操作 Mika 自己的唯一入口(App 实现,核心只认这些数据)。
+ * 模型看和操作 Claire 自己的唯一入口(App 实现,核心只认这些数据)。
  *
- * 手机那一套工具不能碰 Mika 自己的包(见 [com.wangzan101.mika.core.action.ConfirmDecision] 的 ownApp):
+ * 手机那一套工具不能碰 Claire 自己的包(见 [com.wangzan101.mika.core.action.ConfirmDecision] 的 ownApp):
  * 不自己给自己点同意、不自己改设置。这个端口是正门,只做几件明确的事:
  * 读自身状态、打开自己的页面/文件、发通知、写剪贴板。每件都在用户开关和当次同意之下。
  */
@@ -18,7 +18,7 @@ interface SelfPort {
     /** 此刻的自身状态。只含组件与计数,不含 Key/Token/其他对话内容/浏览历史。 */
     suspend fun status(): SelfStatus
 
-    /** 打开 Mika 自己的一页。前台进导航栈,后台发通知。 */
+    /** 打开 Claire 自己的一页。前台进导航栈,后台发通知。 */
     suspend fun openScreen(screen: SelfScreen, note: String? = null): SelfResult
 
     /** 用 App 内查看器打开本任务工作区里的文件([path] 形如 /workspace/…)。 */
@@ -46,7 +46,7 @@ interface SelfPort {
     /** 站点登记表:登录状态与最近的验证码/风控记录。 */
     suspend fun sites(): List<SelfSite> = emptyList()
 
-    /** 打开「给 Mika 登录」页,让用户自己登录 [host]。 */
+    /** 打开「给 Claire 登录」页,让用户自己登录 [host]。 */
     suspend fun loginSite(host: String): SelfResult = SelfResult(ok = false, reason = "not_supported")
 
     /** 用户说登录好了:核对一次并记下登录状态。 */
@@ -83,7 +83,7 @@ data class SelfFavorite(val host: String, val loggedIn: Boolean)
 /** 一次同意的文案与两个选项(已按 App 语言写好)。 */
 data class SelfConsent(val prompt: String, val allow: String, val deny: String)
 
-/** Mika 自己的顶层页面;只给这些,不给权限/root/开发者等高级子页。 */
+/** Claire 自己的顶层页面;只给这些,不给权限/root/开发者等高级子页。 */
 enum class SelfScreen(val wire: String) {
     Chat("chat"),
     Settings("settings"),

@@ -38,9 +38,9 @@ class SystemPromptLanguageTest {
 
     @Test
     fun testWithLanguageAppendsToPrompt() {
-        val base = "You are Mika."
+        val base = "You are Claire."
         val withEn = SystemPrompt.withLanguage(base, "en")
-        assertTrue(withEn.startsWith("You are Mika."))
+        assertTrue(withEn.startsWith("You are Claire."))
         assertTrue(withEn.contains("Communication & Reasoning Language"))
     }
 }

@@ -515,7 +515,7 @@ fun DuringWorkScreen(
             onPick = { onTokenBudget(it); editingTokenBudget = false },
             onDismiss = { editingTokenBudget = false },
         )
-        // 允许 Mika 改自己的设置:默认关,打开后任务里才有 settings_list、settings_set
+        // 允许 Claire 改自己的设置:默认关,打开后任务里才有 settings_list、settings_set
         GroupCard {
             ListRow(
                 MikaIcons.Spark, stringResource(R.string.settings_self_config),
@@ -526,7 +526,7 @@ fun DuringWorkScreen(
                 MikaSwitch(selfConfig, onSelfConfig, Modifier.testTag("work-self-config"))
             }
         }
-        // 允许 Mika 操作自己的界面:默认关;打开后任务里才有 mika_open_screen/open_file/notify/copy
+        // 允许 Claire 操作自己的界面:默认关;打开后任务里才有 mika_open_screen/open_file/notify/copy
         GroupCard {
             ListRow(
                 MikaIcons.Screens, stringResource(R.string.settings_self_operate),

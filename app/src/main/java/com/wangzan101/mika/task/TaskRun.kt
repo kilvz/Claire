@@ -644,7 +644,7 @@ class TaskRun(
         withContext(Dispatchers.IO + NonCancellable) {
             // 前面哪步抛错,屏和网页显示也照放(按建的反序)
             try {
-                // 先定 Mika 屏上 App 的去留(留下的挪到主屏后面、正在出声的关掉)并释放屏,再还原静音:留下的不会突然出声
+                // 先定 Claire 屏上 App 的去留(留下的挪到主屏后面、正在出声的关掉)并释放屏,再还原静音:留下的不会突然出声
                 val apps = phone?.takeIf { !shellDied }?.let { p ->
                     p.display.current?.let { d -> AppsAfterTaskEnd.finish(p.shell, d.displayId, c.afterTask) }
                 }
@@ -1055,7 +1055,7 @@ class TaskRun(
             val persona = if (conditionCheck || !FeatureFlags.get(service).persona() ||
                 env.modelFactory !== TaskEnvironment.defaultModelFactory) null
             else (service.application as MikaApp).personas.active()
-            // 称呼是助理的自称(默认 Mika):身份句和人格层的固定头都用它。
+            // 称呼是助理的自称(默认 Claire):身份句和人格层的固定头都用它。
             val assistant = PersonaPrompt.nickname(persona?.nickname)
             // 人格拼在身份、准则、通用规则之后;子任务和主任务用同一份。
             // 选项全默认、正文也为空时没有可拼的层。
@@ -1127,7 +1127,7 @@ class TaskRun(
                 ownerAlive = { job?.isActive == true },
             ).also { children = it } else null
             // 自身端口:只给手机上、有用户的 UI 主任务;子任务、条件检查、定时、渠道、MCP 都没有。
-            // 状态只读工具一直给;操作类工具等用户打开「允许 Mika 操作自己的界面」。
+            // 状态只读工具一直给;操作类工具等用户打开「允许 Claire 操作自己的界面」。
             val selfPort = if (provenance.origin == RunOrigin.Ui && !conditionCheck) {
                 (service.application as? MikaApp)?.let { app -> com.wangzan101.mika.self.AndroidSelfPort(app, conversationId, key) }
             } else null
@@ -1150,7 +1150,7 @@ class TaskRun(
                 phoneCalls = (service.application as MikaApp).callPort.takeIf {
                     !conditionCheck && (service.application as MikaApp).calls.settings.state.value.enabled
                 },
-                // 设置里允许 Mika 改自己时,才把 settings_list、settings_set 发给模型
+                // 设置里允许 Claire 改自己时,才把 settings_list、settings_set 发给模型
                 selfConfig = if (FeatureFlags.get(service).selfConfig()) {
                     com.wangzan101.mika.settings.SelfConfigImpl(FeatureFlags.get(service))
                 } else null,
@@ -1214,10 +1214,10 @@ class TaskRun(
                 mcpServers = mcpEndpoints(),
                 // 仅用户明确配置并启用时提供通用搜索;否则继续用浏览器搜索。
                 webSearch = com.wangzan101.mika.settings.WebSearchSettings.get(service).service(),
-                // 已 root 的手机上用户打开了「允许 Mika 执行 root 命令」才登记 root 工具(子任务、条件检查不给)
+                // 已 root 的手机上用户打开了「允许 Claire 执行 root 命令」才登记 root 工具(子任务、条件检查不给)
                 root = phoneServices.shellManager.root.takeIf { !conditionCheck && it.commandsAllowed() }
                     ?.let { r -> RootCommands(RootShell::su, r::commandsAllowed) { a -> if (a == null) r.suGone() else r.commandsDenied(a) } },
-                // 看/操作 Mika 自己;开关关着时只给只读状态
+                // 看/操作 Claire 自己;开关关着时只给只读状态
                 self = selfPort,
                 selfOperate = selfPort?.takeIf { FeatureFlags.get(service).selfOperate() },
                 pluginTools = pluginTools, pluginScriptRunner = pluginRunner,
@@ -1269,7 +1269,7 @@ class TaskRun(
                     if (taskGate.pass({ phoneScreen.acquired && dispatcher?.surface != WEB }, w))
                         throw com.wangzan101.mika.core.gate.ScreenRecoveryRequired()
                 }, knowledge = knowledge, screenMaps = memoryRuntime.screenMaps(), sink = sink, trace = trace, installedApps = { apps },
-                // 选渠道用的事实:装了哪些 App、在 Mika 里登录过哪些网站、有没有内置浏览器
+                // 选渠道用的事实:装了哪些 App、在 Claire 里登录过哪些网站、有没有内置浏览器
                 channelFacts = {
                     val registry = WebSites.registry(service)
                     ChannelFacts(

@@ -20,7 +20,7 @@
     <string name="backup_replace">Tümünü değiştir</string>
     <string name="backup_imported_title">Yedek geri yüklendi</string>
     <string name="backup_imported_body">%1$d dosya geri yüklendi.</string>
-    <string name="backup_after_import_body">Geri yüklenen verileri kullanmak için Mika\'yı kapatıp yeniden açın. Ardından kablosuz hata ayıklamayı yeniden eşleştirin, Android Ayarları\'nda erişilebilirlik hizmetini yeniden açın ve yedek ZIP dosyasını silin.</string>
-    <string name="backup_close_app">Mika\'yı kapat</string>
+    <string name="backup_after_import_body">Geri yüklenen verileri kullanmak için Claire\'yı kapatıp yeniden açın. Ardından kablosuz hata ayıklamayı yeniden eşleştirin, Android Ayarları\'nda erişilebilirlik hizmetini yeniden açın ve yedek ZIP dosyasını silin.</string>
+    <string name="backup_close_app">Claire\'yı kapat</string>
     <string name="backup_restart_note">Herhangi bir şeyi kaldırmadan önce dışa aktarın: verilerinizin şifresini yalnızca bu kurulum çözebilir.</string>
 </resources>

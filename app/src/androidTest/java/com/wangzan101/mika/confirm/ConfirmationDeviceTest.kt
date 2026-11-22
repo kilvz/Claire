@@ -33,7 +33,7 @@ import com.wangzan101.mika.task.TaskEnvironment
 /**
  * 真机测试:脚本模型在虚拟屏的设置里申报一次花钱的操作(只是申报,从不真的去做;只有花钱要同意,申报都带金额),
  * 检查高优先级通知的标题、正文和「同意」「不同意」按钮,以及不同意、同意、评测自动拒绝三条路。
- * 需要内置助手在运行、Mika 无障碍服务已开启。
+ * 需要内置助手在运行、Claire 无障碍服务已开启。
  */
 @RunWith(AndroidJUnit4::class)
 class ConfirmationDeviceTest {

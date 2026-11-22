@@ -270,13 +270,13 @@ class PaymentOnlyAskTest {
     }
 
     @Test fun mikaNeverOperatesItself() = runTest {
-        // 屏上是 Mika 自己:不点
+        // 屏上是 Claire 自己:不点
         val s = Chat(app = "com.mika")
         val m = FakeModel(OBSERVE, tap("@e6"), GIVE_UP)
         loop(m, s, self = "com.mika").run("t")
         assertTrue(s.taps.isEmpty())
         assertEquals("own_app", m.result(2).s("error"))
-        // 从别的 App 打开 Mika、打开它的应用详情:不做
+        // 从别的 App 打开 Claire、打开它的应用详情:不做
         s.app = "com.chat"
         val m2 = FakeModel(OBSERVE, tools(call("phone_launch_app", """{"package":"com.mika"}""")), tools(call("phone_open_link", """{"uri":"package:com.mika"}""")), GIVE_UP)
         loop(m2, s, self = "com.mika").run("t")

@@ -26,7 +26,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Mika 此刻的朗读状态。 */
+/** Claire 此刻的朗读状态。 */
 sealed interface VoicePlayback {
     data object Idle : VoicePlayback
     data object Loading : VoicePlayback

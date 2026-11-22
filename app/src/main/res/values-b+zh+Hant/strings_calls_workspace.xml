@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">不指定預設 SIM</string>
     <string name="calls_task_back_to_edit">返回修改</string>
     <string name="calls_task_confirm_dial">確認並撥打</string>
-    <string name="calls_task_confirm_note">Mika 只為這通電話使用任務單。確認後使用所選 SIM 撥號，可能產生電信業者和即時語音費用。</string>
+    <string name="calls_task_confirm_note">Claire 只為這通電話使用任務單。確認後使用所選 SIM 撥號，可能產生電信業者和即時語音費用。</string>
     <string name="calls_task_constraints">不能承諾什麼</string>
     <string name="calls_task_context">補充情況</string>
     <string name="calls_task_filled">已填寫</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">通訊錄</string>
     <string name="calls_manual_tab">手動輸入</string>
     <string name="calls_contacts_search">搜尋姓名或號碼</string>
-    <string name="calls_contacts_permission">允許 Mika 讀取通訊錄，即可勾選聯絡人號碼。你也可以直接手動輸入。</string>
+    <string name="calls_contacts_permission">允許 Claire 讀取通訊錄，即可勾選聯絡人號碼。你也可以直接手動輸入。</string>
     <string name="calls_contacts_empty">通訊錄中沒有可選的電話號碼。</string>
     <string name="calls_contacts_failed">無法讀取通訊錄。</string>
 </resources>

@@ -105,7 +105,7 @@ fun teachGoalAccepted(goal: String): Boolean {
 
 object TeachTrace {
     /**
-     * 不在采集中、不是主屏、是 Mika 自己的界面、或没有包名：原样返回，不新增步骤。
+     * 不在采集中、不是主屏、是 Claire 自己的界面、或没有包名：原样返回，不新增步骤。
      */
     fun reduce(session: TeachSession, event: TeachObservation, ownPackage: String): TeachSession {
         if (!session.phase.collects()) return session
@@ -273,12 +273,12 @@ fun teachLine(step: TeachStep): String {
 object TeachSkill {
     const val SOURCE = "demonstrated"
     const val PREFIX = "teach:"
-    const val NOT_TRIAL_RUN = "Mika 还没有试跑成功。"
+    const val NOT_TRIAL_RUN = "Claire 还没有试跑成功。"
     const val NOT_ABSENT = "这次示范没走到的入口，不能据此认为那个入口不存在。"
     const val STOP_IF_UNMATCHED = "当前界面看不出上面写的入口或前置条件时，停止套用这份技能，改用平常的查看和询问。"
     /** 模型读到试用中的示范技能时加在正文前。 */
     const val USE_NOTE =
-        "[Demonstrated, not trial-run. Mika has not successfully replayed this. " +
+        "[Demonstrated, not trial-run. Claire has not successfully replayed this. " +
             "Apply it only when the current screen matches the entrance and preconditions written below. " +
             "If they do not match, stop using this skill and explore or ask. " +
             "An entrance that was not used in the demonstration is not evidence that it does not exist.]"
@@ -323,9 +323,9 @@ object TeachDraft {
         route.apps.forEach { app ->
             appendLine("App: ${app.label}(${app.packageName})${if (app.browser) "，是这台手机的默认浏览器" else ""}")
         }
-        if (route.folded.isNotEmpty()) appendLine("已按 Mika 的直达能力省掉:${route.folded.joinToString("；")}")
+        if (route.folded.isNotEmpty()) appendLine("已按 Claire 的直达能力省掉:${route.folded.joinToString("；")}")
         appendLine("整理规则:")
-        appendLine("- 回桌面、找图标、点开 App 只是人在做:Mika 直接打开 App,不要写桌面和图标。")
+        appendLine("- 回桌面、找图标、点开 App 只是人在做:Claire 直接打开 App,不要写桌面和图标。")
         appendLine("- 打开浏览器、点地址栏、输入、点搜索:写成「直接打开 <链接>」或「在 <站点> 搜索」;链接和关键词由使用时的请求提供,示范里没有保存。")
         appendLine("- 点输入框、输入、提交:合成一步「输入 <内容> 并提交」。")
         appendLine("- 只写真正决定结果的入口、具体按钮、选项、判据和停手条件;等待、重复滚动、无意义返回不写。")
@@ -343,7 +343,7 @@ object TeachDraft {
             appendLine("## 入口")
             appendLine("适用：${plain(session.goal)}")
             val first = route.apps.firstOrNull()
-            if (first != null) appendLine("Mika 直接打开 ${first.label}（${first.packageName}）。只把这次真正出现过的界面当前置条件。")
+            if (first != null) appendLine("Claire 直接打开 ${first.label}（${first.packageName}）。只把这次真正出现过的界面当前置条件。")
             else appendLine("这次没有留下可用的 App 入口。只把这次真正出现过的界面当前置条件。")
             explained.forEach { appendLine("[你说明的] $it") }
             appendLine("来源只分三种：观察到的、你说明的、以及标明为推测的。这份由本机按示范路线整理，没有另作推测。")

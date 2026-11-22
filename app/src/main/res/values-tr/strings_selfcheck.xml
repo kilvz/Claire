@@ -44,17 +44,17 @@
     <string name="selfcheck_advice_too_old">Bu sistem Android 12\'den eski, bu yüzden telefon kontrolü kullanılamıyor. Sohbet, web ve korumalı alan yine de çalışır.</string>
     <string name="selfcheck_advice_no_wireless">Bu sistemde Kablosuz hata ayıklama yok. Bunun yerine telefon kontrolünü USB üzerinden bir bilgisayardan başlatabilirsiniz.</string>
     <string name="selfcheck_advice_phone_unavailable">Bu ortam telefonunuzdaki uygulamaları çalıştıramaz (Geliştirici seçenekleri veya Kablosuz hata ayıklama yok); sohbet, web, dosyalar ve hesaplamalar her zamanki gibi çalışır.</string>
-    <string name="selfcheck_advice_a11y_off">Erişilebilirlik kapalı. Ayarlar › Telefon kontrolü\'nde Mika\'nın erişilebilirliğini açın.</string>
-    <string name="selfcheck_advice_a11y_restart">Erişilebilirlik açık ama çalışmıyor. Sistem ayarlarında Mika\'nın erişilebilirliğini kapatıp yeniden açın.</string>
+    <string name="selfcheck_advice_a11y_off">Erişilebilirlik kapalı. Ayarlar › Telefon kontrolü\'nde Claire\'nın erişilebilirliğini açın.</string>
+    <string name="selfcheck_advice_a11y_restart">Erişilebilirlik açık ama çalışmıyor. Sistem ayarlarında Claire\'nın erişilebilirliğini kapatıp yeniden açın.</string>
     <string name="selfcheck_advice_notifications">Bildirimler engellendi, bu yüzden görev ilerlemesi veya \“size ihtiyaç duyuyor\” uyarılarını göremezsiniz.</string>
-    <string name="selfcheck_advice_battery">Pil kullanımı kısıtlı, bu yüzden Mika arka planda durdurulabilir. Bunu Kurtarma ve onarım\'da kaldırabilirsiniz.</string>
+    <string name="selfcheck_advice_battery">Pil kullanımı kısıtlı, bu yüzden Claire arka planda durdurulabilir. Bunu Kurtarma ve onarım\'da kaldırabilirsiniz.</string>
     <string name="selfcheck_advice_setup">Yerleşik yardımcı çalışmıyor. Ayarlar › Telefon kontrolü\'nde kurulumu tamamlayın, sonra bunu tekrar çalıştırın.</string>
-    <string name="selfcheck_advice_display">Mika\'nın sanal ekranı oluşturulamadı. Yardımcıyı yeniden bağlayıp tekrar deneyin; yine olmazsa lütfen bildirin.</string>
-    <string name="selfcheck_advice_focus">Mika\'nın sanal ekranının kendi odağı yok, bu yüzden Mika çalışırken ekranınız odağı kısa süre kaybedebilir. Her şey yine de çalışır.</string>
-    <string name="selfcheck_advice_launch">Mika\'nın sanal ekranında bir sayfa açılmadı. Lütfen bildirin.</string>
-    <string name="selfcheck_advice_on_main">Sistem Ayarları, Mika\'nın sanal ekranı yerine sizin ekranınızda açıldı. Lütfen bildirin.</string>
+    <string name="selfcheck_advice_display">Claire\'nın sanal ekranı oluşturulamadı. Yardımcıyı yeniden bağlayıp tekrar deneyin; yine olmazsa lütfen bildirin.</string>
+    <string name="selfcheck_advice_focus">Claire\'nın sanal ekranının kendi odağı yok, bu yüzden Claire çalışırken ekranınız odağı kısa süre kaybedebilir. Her şey yine de çalışır.</string>
+    <string name="selfcheck_advice_launch">Claire\'nın sanal ekranında bir sayfa açılmadı. Lütfen bildirin.</string>
+    <string name="selfcheck_advice_on_main">Sistem Ayarları, Claire\'nın sanal ekranı yerine sizin ekranınızda açıldı. Lütfen bildirin.</string>
     <string name="selfcheck_advice_settings_in_use">Sistem Ayarları sizin ekranınızda açık, bu yüzden bu adım onu açmadı. Kapatıp bunu tekrar çalıştırın.</string>
-    <string name="selfcheck_advice_read">Sayfanın kontrolleri okunamadı. Mika\'nın erişilebilirliğini kapatıp yeniden açın, sonra bunu tekrar çalıştırın.</string>
+    <string name="selfcheck_advice_read">Sayfanın kontrolleri okunamadı. Claire\'nın erişilebilirliğini kapatıp yeniden açın, sonra bunu tekrar çalıştırın.</string>
     <string name="selfcheck_advice_blank">Sanal ekranın görüntüsü tamamen siyah veya boş. Lütfen bildirin.</string>
     <string name="selfcheck_advice_action">Bazı eylemler etki etmedi (rapora bakın). Lütfen bildirin.</string>
     <string name="selfcheck_advice_frames">Sanal ekran bir süre sonra güncellenmeyi durduruyor, bu yüzden görevler takılabilir. Lütfen bildirin.</string>
@@ -69,8 +69,8 @@
     <string name="selfcheck_advice_out_of_time">Öz denetimin süresi bu denetimden önce doldu.</string>
     <string name="selfcheck_advice_cancelled">İptal edildi.</string>
 
-    <string name="selfcheck_target_title">Mika öz denetim sayfası</string>
-    <string name="selfcheck_target_note">Bu Mika\'nın kendi test sayfası. Uyumluluk öz denetimi burada dokunur ve yazar; diğer uygulamalarınıza dokunmaz.</string>
+    <string name="selfcheck_target_title">Claire öz denetim sayfası</string>
+    <string name="selfcheck_target_note">Bu Claire\'nın kendi test sayfası. Uyumluluk öz denetimi burada dokunur ve yazar; diğer uygulamalarınıza dokunmaz.</string>
     <string name="selfcheck_target_taps">Dokunma: %1$d</string>
     <string name="selfcheck_target_button">Bana dokun</string>
     <string name="selfcheck_target_input">Buraya yaz</string>

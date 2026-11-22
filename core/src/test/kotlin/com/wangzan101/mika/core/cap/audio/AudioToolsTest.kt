@@ -43,7 +43,7 @@ class AudioToolsTest {
         override suspend fun saveToMusic(path: String, name: String?): SavedAudio {
             savedPath = path
             savedName = name
-            return SavedAudio("Music/Mika/line.wav", "content://mika/audio", 4)
+            return SavedAudio("Music/Claire/line.wav", "content://mika/audio", 4)
         }
     }
 
@@ -104,7 +104,7 @@ class AudioToolsTest {
         val d = dispatcher(port, save = true, ask = false)
         val r = d.execute(call("audio_save", """{"path":"/workspace/out/audio/line.wav","name":"line.wav"}"""), ActionPass()).content
         assertEquals("true", r.s("ok"))
-        assertEquals("Music/Mika/line.wav", r.s("savedAs"))
+        assertEquals("Music/Claire/line.wav", r.s("savedAs"))
         assertEquals("/workspace/out/audio/line.wav", port.savedPath)
         assertEquals("line.wav", port.savedName)
     }

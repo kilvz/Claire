@@ -26,7 +26,7 @@ interface ImagePort {
     /** 把一张图写进工作区 `/workspace/out/images/`，返回最终路径和字节数；写入经工作区 gate，不覆盖、不跟随链接。 */
     suspend fun store(image: GeneratedImage, nameHint: String?, prompt: String): StoredImage
 
-    /** 把工作区里的一张图存进相册 `Pictures/Mika`，返回相册路径和 content URI。 */
+    /** 把工作区里的一张图存进相册 `Pictures/Claire`，返回相册路径和 content URI。 */
     suspend fun saveToGallery(path: String, name: String?): SavedImage
 }
 

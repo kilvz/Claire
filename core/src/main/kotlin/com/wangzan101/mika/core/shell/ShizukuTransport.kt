@@ -19,7 +19,7 @@ enum class ShellTransport {
     }
 }
 
-/** 平台上看到的 Shizuku 状态:有没有装、服务跑没跑、有没有给 Mika 授权。 */
+/** 平台上看到的 Shizuku 状态:有没有装、服务跑没跑、有没有给 Claire 授权。 */
 data class ShizukuPlatformState(
     val installed: Boolean = false,
     val running: Boolean = false,

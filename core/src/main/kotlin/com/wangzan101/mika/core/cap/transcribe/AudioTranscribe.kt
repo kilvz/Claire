@@ -72,7 +72,7 @@ internal object AudioTranscribe : AgentTool {
 private fun failure(e: Throwable): ToolExecution = when (e) {
     is TranscribeError.Unsupported -> fail("transcribe_unsupported", e.message ?: "No file transcription model is configured.")
     is TranscribeError.TooLarge -> fail("transcribe_too_large", "The audio is larger than 25 MB; split it into parts first.")
-    is TranscribeError.BadAudio -> fail("transcribe_bad_audio", e.message ?: "The file is not an audio file Mika can read.")
+    is TranscribeError.BadAudio -> fail("transcribe_bad_audio", e.message ?: "The file is not an audio file Claire can read.")
     is ModelError.Auth -> fail("transcribe_auth_failed", "The transcription service rejected the API key. Check Settings › Speech to text.", recoverable = false)
     is ModelError.QuotaExceeded -> fail("transcribe_quota_exceeded", "The transcription service's quota is used up. Tell the user; do not retry.", recoverable = false)
     is ModelError.RateLimited -> fail("transcribe_rate_limited", "The transcription service is rate limiting. Wait a little, then try once more.")

@@ -14,7 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import com.wangzan101.mika.a11y.MikaAccessibilityService
 
-/** 真机测试共用:shell 连接、无障碍服务、虚拟屏上的 AndroidScreen。需要内置助手在运行(已配对、无线调试开着)且 Mika 无障碍服务已开启。 */
+/** 真机测试共用:shell 连接、无障碍服务、虚拟屏上的 AndroidScreen。需要内置助手在运行(已配对、无线调试开着)且 Claire 无障碍服务已开启。 */
 object DeviceSupport {
     const val SETTINGS = "com.android.settings"
     const val TEST_PACKAGE = "com.wangzan101.mika.test"
@@ -38,8 +38,8 @@ object DeviceSupport {
     fun awaitShell(c: ShellBinding, timeoutMs: Long = 30_000): IMikaShell = runBlocking {
         withTimeoutOrNull(timeoutMs) { c.shell.filterNotNull().first { it.asBinder().pingBinder() } }
     } ?: error(
-        "Mika's phone helper is not running (status=${phone.shellControl.status.value}): " +
-            "pair it once in Mika (设置手机操作) with Wireless debugging on, keep Wireless debugging on, then rerun",
+        "Claire's phone helper is not running (status=${phone.shellControl.status.value}): " +
+            "pair it once in Claire (设置手机操作) with Wireless debugging on, keep Wireless debugging on, then rerun",
     )
 
     /** 服务掉线(前面的测试结束了本进程的绑定等)时先促使系统重绑,再等它连上。 */
@@ -47,7 +47,7 @@ object DeviceSupport {
         if (ScreenAccessibility.instance.value == null) rebindAccessibility()
         return runBlocking {
             withTimeoutOrNull(10_000) { ScreenAccessibility.instance.filterNotNull().first() }
-        } ?: error("Mika accessibility service is not enabled")
+        } ?: error("Claire accessibility service is not enabled")
     }
 
     class Agent(val display: AgentDisplay, val screen: AndroidScreen) {
@@ -85,7 +85,7 @@ object DeviceSupport {
     }
 
     fun sh(cmd: String): String {
-        // 不压制其他无障碍服务,否则 Mika 的服务会在测试期间被暂停
+        // 不压制其他无障碍服务,否则 Claire 的服务会在测试期间被暂停
         val ua = InstrumentationRegistry.getInstrumentation()
             .getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
         val pfd = ua.executeShellCommand(cmd)

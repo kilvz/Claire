@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * 启动器 mikarun 的真机用例:退出码、超时、断网、清场(脱离父进程的后代、Mika 被杀)。
+ * 启动器 mikarun 的真机用例:退出码、超时、断网、清场(脱离父进程的后代、Claire 被杀)。
  * 根文件系统与 SandboxSmokeTest 共用。
  */
 @RunWith(AndroidJUnit4::class)

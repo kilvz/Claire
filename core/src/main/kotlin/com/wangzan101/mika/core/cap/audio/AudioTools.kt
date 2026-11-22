@@ -154,7 +154,7 @@ private fun failure(e: Throwable): ToolExecution = when (e) {
     else -> fail("audio_failed", e.message?.take(300) ?: "Speech generation failed.")
 }
 
-/** 让 Mika 在本机主动说一句;默认不提供,用户在声音设置里打开后才给。 */
+/** 让 Claire 在本机主动说一句;默认不提供,用户在声音设置里打开后才给。 */
 internal object Speak : AgentTool {
     override val capability: String get() = AUDIO
     override val verb = Verb.Speak

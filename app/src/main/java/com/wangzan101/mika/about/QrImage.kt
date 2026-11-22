@@ -9,10 +9,10 @@ import com.wangzan101.mika.R
 /** 作者的微信二维码(随 App 打包,换码只换 res/drawable-nodpi/wechat_qr.jpg)。 */
 object QrImage {
     val RES = R.drawable.wechat_qr
-    private const val FILE_NAME = "Mika-author-wechat.jpg"
+    private const val FILE_NAME = "Claire-author-wechat.jpg"
 
     /**
-     * 存进相册的 Pictures/Mika。经 MediaStore 写自己新建的图片不要存储权限(安卓 10 起如此,Mika 最低支持安卓 11)。
+     * 存进相册的 Pictures/Claire。经 MediaStore 写自己新建的图片不要存储权限(安卓 10 起如此,Claire 最低支持安卓 11)。
      * 写完前标成待定,别的 App 看不到半张图;失败时删掉那一条。
      */
     fun saveToPictures(context: Context): Boolean {
@@ -20,7 +20,7 @@ object QrImage {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, FILE_NAME)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Mika")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Claire")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         val uri = runCatching { resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) }.getOrNull() ?: return false

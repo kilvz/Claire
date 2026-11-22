@@ -181,7 +181,7 @@ object DiagnosticsCollector {
             silent = settings.systemSilent.value,
             remembered = settings.systemService,
             services = SystemSpeech.services(app).map { svc ->
-                // 它所在的应用自己有没有录音权限:识别服务说没有权限时,缺的常常是这一个,不是 Mika 的
+                // 它所在的应用自己有没有录音权限:识别服务说没有权限时,缺的常常是这一个,不是 Claire 的
                 val mic = when (com.wangzan101.mika.voice.SpeechServiceMic.state(app, svc.component.substringBefore('/'))) {
                     com.wangzan101.mika.voice.ServiceMic.Granted -> "granted"
                     com.wangzan101.mika.voice.ServiceMic.Missing -> "NOT granted"

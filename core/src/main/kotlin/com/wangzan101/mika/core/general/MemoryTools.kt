@@ -71,14 +71,14 @@ internal object MemorySearch : AgentTool {
             put("memories", JsonArray(found.map { (m, _) ->
                 buildJsonObject {
                     put("id", m.id); put("kind", m.kind.name); put("content", m.content)
-                    // Mika 自己归纳出来的:不是用户说的,标出来
+                    // Claire 自己归纳出来的:不是用户说的,标出来
                     if (m.source.type == MemoryContext.INFERRED) put("inferred", true)
                 }
             }))
         }
     }
 
-    /** 记忆里的是用户以前说的:作为用户给的事实交给核查。Mika 自己归纳出来的那几条不是用户说的,另作一条工具查到的事实。 */
+    /** 记忆里的是用户以前说的:作为用户给的事实交给核查。Claire 自己归纳出来的那几条不是用户说的,另作一条工具查到的事实。 */
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog): List<Observation> {
         if (r.content["ok"] != JsonPrimitive(true)) return emptyList()
         val (own, said) = (r.content["memories"] as? JsonArray).orEmpty().partition { (it as? JsonObject)?.get("inferred") == JsonPrimitive(true) }
@@ -88,13 +88,13 @@ internal object MemorySearch : AgentTool {
             said.takeIf { it.isNotEmpty() }?.let { Observation(ObsKind.UserSaid, lines(it, "记忆检索「${o.argStr("query")}」:\n"), source = "memory") },
             // 归纳的那几条是工具查到的东西,不是用户给的事实:进账本,写明出处
             own.takeIf { it.isNotEmpty() }?.let {
-                Observation(ObsKind.Fact, lines(it, "记忆检索「${o.argStr("query")}」查到的、Mika 以前自己归纳的(不是用户说的):\n"), source = "memory")
+                Observation(ObsKind.Fact, lines(it, "记忆检索「${o.argStr("query")}」查到的、Claire 以前自己归纳的(不是用户说的):\n"), source = "memory")
             },
         )
     }
 }
 
-/** 只改 Mika 自己的记忆,不动屏幕和外部世界。 */
+/** 只改 Claire 自己的记忆,不动屏幕和外部世界。 */
 internal object MemorySave : AgentTool {
     override val verb = Verb.MemorySave
     override val label = "写入记忆"
@@ -123,7 +123,7 @@ internal object MemorySave : AgentTool {
         if (!utterances.containsMemoryQuote(quote)) return refused(ctx, a, "quote_not_from_user", Feedback["memory.quote_not_from_user"])
         val store = ctx.config.memory!!
         // 引文对上了,内容里的具体值(地址、号码、名字)也得是用户说过的,不能从屏幕上补。
-        // 用户打开了「让 Mika 自己归纳着记」、这一轮又亲口让它记的时候不拒:照存,但来源记成 Mika 归纳的,不冒充用户说的
+        // 用户打开了「让 Claire 自己归纳着记」、这一轮又亲口让它记的时候不拒:照存,但来源记成 Claire 归纳的,不冒充用户说的
         val inferred = (listOf(content) + keywords).any { utterances.unsupportedMemorySpecifics(it, quote).isNotEmpty() }
         if (inferred) {
             if (!store.inferenceAllowed()) return refused(ctx, a, "content_not_from_user", Feedback["memory.content_not_from_user"])
@@ -159,7 +159,7 @@ internal object MemorySave : AgentTool {
     /**
      * 这半句让它记:记住、记下、写入记忆、存起来、保存、别忘了、remember、save、add … to memory。只认中文和英文的动词说法
      * (改删记忆的 [MemoryEdit] 也只认这两种),光提到「记忆」「memory」这个词不算,别的语言一律按没让它记处理——
-     * 认错了就是把用户没同意的东西存进去,宁可不认。只在收「Mika 自己归纳的」时用:用户原话照旧不需要这些字眼。
+     * 认错了就是把用户没同意的东西存进去,宁可不认。只在收「Claire 自己归纳的」时用:用户原话照旧不需要这些字眼。
      */
     private val SAVE_REQUEST = Regex(
         "[记記](?:住|下|一下|一[条條]|一[笔筆]|[几幾][条條]|到|[进進]|入|[着著]|好|上|吧|[录錄](?:一下|下|到|[进進]|在))|" +
@@ -245,7 +245,7 @@ internal object MemoryEdit : AgentTool {
             // 新内容里有靠原来那条才站得住的具体值(用户这一轮没说)
             carried = texts.any { utterances.unsupportedSpecifics(it, quote).isNotEmpty() }
         }
-        // Mika 自己归纳的那条改写之后还是它归纳的:里面的具体值仍然不是用户说的。用户这一轮把内容都亲口说了的,才改记成用户说的
+        // Claire 自己归纳的那条改写之后还是它归纳的:里面的具体值仍然不是用户说的。用户这一轮把内容都亲口说了的,才改记成用户说的
         val type = if (carried && before?.source?.type == MemoryContext.INFERRED) MemoryContext.INFERRED else "user_said"
         val changed: Result<Change> = when (op) {
             "update" -> store.update(id, content!!, keywords,

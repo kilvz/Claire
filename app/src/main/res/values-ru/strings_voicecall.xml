@@ -19,7 +19,7 @@
     <string name="voicecall_ended_notification">Завершён из уведомления</string>
     <string name="voicecall_ended_incoming">Поступил телефонный звонок — вызов завершён</string>
     <string name="voicecall_ended_limit">10 минут истекли — вызов завершён</string>
-    <string name="voicecall_ended_background">Вернитесь в Mika, чтобы продолжить</string>
+    <string name="voicecall_ended_background">Вернитесь в Claire, чтобы продолжить</string>
     <string name="voicecall_error_auth">Учётные данные голосового сервиса отклонены — проверьте настройки</string>
     <string name="voicecall_error_timeout">Время подключения истекло — попробуйте ещё раз</string>
     <string name="voicecall_error_disconnected">Соединение прервано</string>
@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">Громкая связь</string>
     <string name="voicecall_mic_needed_title">Голосовому чату нужен микрофон</string>
     <string name="voicecall_mic_needed_body">Чтобы слышать вас — и позволить перебивать — нужна запись. Вызов начнётся только после разрешения.</string>
-    <string name="voicecall_mic_denied_body">Разрешение было отклонено, поэтому телефон больше не спросит. Включите микрофон на странице разрешений Mika в настройках системы.</string>
+    <string name="voicecall_mic_denied_body">Разрешение было отклонено, поэтому телефон больше не спросит. Включите микрофон на странице разрешений Claire в настройках системы.</string>
     <string name="voicecall_mic_allow">Разрешить микрофон</string>
     <string name="voicecall_setup_title">Сначала настройте голосовой сервис</string>
     <string name="voicecall_setup_body">Голосовой чат работает через сервис реального времени (та же настройка, что и у ИИ-звонков). Добавьте учётные данные, чтобы начать.</string>

@@ -92,8 +92,8 @@ internal fun ReportExportMenu(runId: String, report: TaskReport?) {
             val uri = withContext(Dispatchers.IO) {
                 try {
                     val dir = File(context.cacheDir, "report-share").apply { mkdirs() }
-                    var file = File(dir, "Mika-$runId.${format.extension}")
-                    if (file.exists()) file = File(dir, "Mika-$runId-${System.currentTimeMillis()}.${format.extension}")
+                    var file = File(dir, "Claire-$runId.${format.extension}")
+                    if (file.exists()) file = File(dir, "Claire-$runId-${System.currentTimeMillis()}.${format.extension}")
                     file.outputStream().use { TaskReportExport.write(r, format, it) }
                     FileProvider.getUriForFile(context, "${context.packageName}.reportfiles", file)
                 } catch (e: CancellationException) { throw e }
@@ -138,7 +138,7 @@ internal fun ReportExportMenu(runId: String, report: TaskReport?) {
                 DropdownMenuItem(text = { Text(label) }, onClick = {
                     open = false
                     val format = TaskReportExport.Format.entries[index]
-                    val name = "Mika-${runId}.${format.extension}"
+                    val name = "Claire-${runId}.${format.extension}"
                     when (index) { 0 -> md.launch(name); 1 -> word.launch(name); else -> txt.launch(name) }
                 })
             }

@@ -106,7 +106,7 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
         // 存了不止一套时说清楚这一页改的是哪一套
         if (active != null && personas.size > 1) FooterNote(stringResource(R.string.persona_editing, active.name))
 
-        // 称呼:Mika 的自称,空着就是 Mika;只接受名字里该有的字符,别的当场提示,不悄悄删
+        // 称呼:Claire 的自称,空着就是 Claire;只接受名字里该有的字符,别的当场提示,不悄悄删
         GroupCard {
             InputRow(
                 stringResource(R.string.persona_nickname), nickname, { nickname = it.replace('\n', ' ') },
@@ -294,7 +294,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
                 if (!full) SheetAction(stringResource(R.string.persona_copy)) {
                     done(store.duplicate(p.id) { name -> copyName.replace(NAME_SLOT, name) })
                 } else null,
-                // 删除先确认:删掉在用的那一套,Mika 就回到默认的说话方式
+                // 删除先确认:删掉在用的那一套,Claire 就回到默认的说话方式
                 SheetAction(stringResource(R.string.confirm_delete), destructive = true) { deleting = p },
             ),
             onDismiss = { acting = null },

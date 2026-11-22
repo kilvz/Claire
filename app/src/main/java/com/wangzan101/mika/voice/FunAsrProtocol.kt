@@ -65,7 +65,7 @@ internal class FunAsrProtocol(private val language: AsrLanguage = AsrLanguage.Au
 
     companion object {
         /** 自建服务怎么部署(Fun-ASR-Nano 的实时服务、Qwen3-ASR + vLLM)写在这份文档里;设置页的「部署说明」打开它。 */
-        const val DEPLOY_GUIDE = "https://github.com/wangzan101/Mika/blob/main/docs/dev/live-asr.md"
+        const val DEPLOY_GUIDE = "https://github.com/kilvz/Claire/blob/main/docs/dev/live-asr.md"
 
         /** 服务端默认端口。 */
         const val DEFAULT_PORT = 10095

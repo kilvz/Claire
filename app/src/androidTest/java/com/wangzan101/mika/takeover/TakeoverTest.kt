@@ -38,7 +38,7 @@ import com.wangzan101.mika.task.TaskEnvironment
 /**
  * 真机测试:脚本模型在虚拟屏的设置子页面上请求接管;「我来处理」把设置挪到主屏并恢复声音,
  * 「处理好了」挪回虚拟屏、重新静音,Agent 下一轮先 observe。
- * 会短暂占用主屏(专用测试机),结束时把设置从主屏关掉。需要内置助手在运行、Mika 无障碍服务已开启。
+ * 会短暂占用主屏(专用测试机),结束时把设置从主屏关掉。需要内置助手在运行、Claire 无障碍服务已开启。
  */
 @RunWith(AndroidJUnit4::class)
 class TakeoverTest {

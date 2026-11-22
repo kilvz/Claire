@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="persona_title">Kişilik</string>
-    <string name="persona_sub">Mika\'nın sizinle nasıl konuşacağını seçin</string>
+    <string name="persona_sub">Claire\'nın sizinle nasıl konuşacağını seçin</string>
     <string name="persona_default">Varsayılan</string>
-    <string name="persona_default_sub">Mika\'nın her zamanki sesi</string>
+    <string name="persona_default_sub">Claire\'nın her zamanki sesi</string>
     <string name="persona_empty">Henüz kişilik yok</string>
-    <string name="persona_empty_sub">Bir kişilik, Mika\'nın ne yapabileceğini değil nasıl konuştuğunu değiştirir.</string>
+    <string name="persona_empty_sub">Bir kişilik, Claire\'nın ne yapabileceğini değil nasıl konuştuğunu değiştirir.</string>
     <string name="persona_new">Yeni kişilik</string>
     <string name="persona_name">Ad</string>
     <string name="persona_prompt">Talimatlar</string>
     <string name="persona_prompt_hint">Ton, uzunluk, ifade, biçimlendirme…</string>
     <string name="persona_counter">%1$d karakter · yaklaşık %2$d token</string>
     <string name="persona_preview">Tam istemi önizle</string>
-    <string name="persona_preview_note">Gri kurallar sabittir. Bir kişilik tonu ve ifadeyi değiştirebilir; asla güvenliği, izinleri veya Mika\'nın raporladıklarını değiştiremez.</string>
+    <string name="persona_preview_note">Gri kurallar sabittir. Bir kişilik tonu ve ifadeyi değiştirebilir; asla güvenliği, izinleri veya Claire\'nın raporladıklarını değiştiremez.</string>
     <string name="persona_manage">Kişilikleri yönet</string>
     <string name="persona_delete_title">\“%1$s\” silinsin mi?</string>
-    <string name="persona_delete_body">Bu işlem geri alınamaz. Kullanımdaysa Mika her zamanki konuşma tarzına döner.</string>
+    <string name="persona_delete_body">Bu işlem geri alınamaz. Kullanımdaysa Claire her zamanki konuşma tarzına döner.</string>
     <string name="persona_copy">Çoğalt</string>
     <string name="persona_name_required">Bir ad girin.</string>
     <string name="persona_name_too_long">Ad çok uzun.</string>
@@ -55,6 +55,6 @@
     <string name="persona_discard_body">Değişiklikler henüz kaydedilmedi.</string>
     <string name="persona_keep_editing">Düzenlemeye devam et</string>
     <string name="persona_nickname">Takma ad</string>
-    <string name="persona_nickname_about">Mika’nın kendinden söz ederken kullandığı ad. Boş bırakırsanız Mika olur. Uygulamanın adı değişmez.</string>
+    <string name="persona_nickname_about">Claire’nın kendinden söz ederken kullandığı ad. Boş bırakırsanız Claire olur. Uygulamanın adı değişmez.</string>
     <string name="persona_nickname_invalid">En fazla %1$d karakter: yalnızca harf, rakam ve boşluk.</string>
 </resources>

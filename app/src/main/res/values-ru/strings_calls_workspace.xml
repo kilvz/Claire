@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">Без предпочитаемой SIM</string>
     <string name="calls_task_back_to_edit">Вернуться к редактированию</string>
     <string name="calls_task_confirm_dial">Подтвердить и позвонить</string>
-    <string name="calls_task_confirm_note">Mika использует задание только для этого звонка. Вызов с выбранной SIM может повлечь плату оператора и голосового сервиса.</string>
+    <string name="calls_task_confirm_note">Claire использует задание только для этого звонка. Вызов с выбранной SIM может повлечь плату оператора и голосового сервиса.</string>
     <string name="calls_task_constraints">Чего нельзя обещать</string>
     <string name="calls_task_context">Дополнительные сведения</string>
     <string name="calls_task_filled">Заполнено</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">Контакты</string>
     <string name="calls_manual_tab">Ввести вручную</string>
     <string name="calls_contacts_search">Поиск по имени или номеру</string>
-    <string name="calls_contacts_permission">Разрешите Mika читать контакты, чтобы выбрать их номера. Номера также можно ввести вручную.</string>
+    <string name="calls_contacts_permission">Разрешите Claire читать контакты, чтобы выбрать их номера. Номера также можно ввести вручную.</string>
     <string name="calls_contacts_empty">Нет контактов с подходящим номером телефона.</string>
     <string name="calls_contacts_failed">Не удалось загрузить контакты.</string>
 </resources>

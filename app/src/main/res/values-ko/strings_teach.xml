@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="teach_title">Mika에게 가르치기</string>
-    <string name="teach_menu">Mika에게 가르치기</string>
+    <string name="teach_title">Claire에게 가르치기</string>
+    <string name="teach_menu">Claire에게 가르치기</string>
     <string name="teach_goal_label">목표</string>
-    <string name="teach_goal_hint">Mika가 기억할 내용을 한 문장으로 적으세요.</string>
+    <string name="teach_goal_hint">Claire가 기억할 내용을 한 문장으로 적으세요.</string>
     <string name="teach_disclosure">시범 시작을 누른 뒤에야 단계가 이 기기에만 저장됩니다. 모델이 설정되어 있으면 기술 초안을 만들 때 목표와 단계의 요약이 그 모델로 전송됩니다. 비밀번호, 인증 코드, 결제 내용은 빠집니다. 모델이 없으면 기기에서만 정리하고 업로드하지 않습니다. 수락하기 전에는 쓰이지 않으며 시험 실행에 성공한 것이 아닙니다.</string>
     <string name="teach_continue">계속</string>
-    <string name="teach_ready_body">Mika는 보기만 하고 기기를 조작하지 않습니다. 일시 중지, 끝내기, 버리기를 할 수 있습니다. 시범 시작 전에는 기록하지 않습니다.</string>
+    <string name="teach_ready_body">Claire는 보기만 하고 기기를 조작하지 않습니다. 일시 중지, 끝내기, 버리기를 할 수 있습니다. 시범 시작 전에는 기록하지 않습니다.</string>
     <string name="teach_start">시범 시작</string>
     <string name="teach_learning">학습 중</string>
     <string name="teach_paused">일시 중지됨</string>
@@ -25,11 +25,11 @@
     <string name="teach_blocked_task">학습 중이라 이 작업은 시작하지 않았습니다.</string>
     <string name="teach_channel">가르치기</string>
     <string name="teach_sensitive_note">민감한 입력은 저장하지 않았습니다.</string>
-    <string name="teach_notification">Mika가 기기를 조작하고 있지 않습니다.</string>
+    <string name="teach_notification">Claire가 기기를 조작하고 있지 않습니다.</string>
     <string name="teach_no_visible">학습 중 막대를 띄울 수 없어 기록을 시작하지 않았습니다. 알림 권한은 필요 없습니다. 접근성 오버레이가 보여야 하고, 거기에서 일시 중지하거나 끝낼 수 있어야 합니다.</string>
     <string name="teach_watch_lost">학습 중 막대가 사라져 시범을 멈췄습니다. 더 이상 기록하지 않습니다.</string>
-    <string name="teach_shelf_expand">Mika에게 가르치기 펼치기</string>
-    <string name="teach_shelf_collapse">Mika에게 가르치기 접기</string>
+    <string name="teach_shelf_expand">Claire에게 가르치기 펼치기</string>
+    <string name="teach_shelf_collapse">Claire에게 가르치기 접기</string>
     <string name="teach_summarizing">스킬로 정리하는 중…</string>
     <string name="teach_accept">이 스킬 받기</string>
     <string name="teach_retry">다시 정리하기</string>
@@ -37,7 +37,7 @@
     <string name="teach_intro_body">처음부터 끝까지 한 번만 해 보세요. 옆에서 보고 있다가 끝나면 자동으로 스킬로 정리해 둘게요. 다음에는 한마디면 됩니다.</string>
     <string name="teach_disclosure_short">이 휴대폰에서 일어나는 동작만 봅니다. 비밀번호, 인증번호, 결제 내용은 기록하지 않습니다.</string>
     <string name="teach_summary_ready">정리했어요</string>
-    <string name="teach_summary_head">Mika가 직접 하는 방식으로 정리한 것이며, 조작을 그대로 재생한 것이 아닙니다.</string>
+    <string name="teach_summary_head">Claire가 직접 하는 방식으로 정리한 것이며, 조작을 그대로 재생한 것이 아닙니다.</string>
     <string name="teach_folded_n">손으로만 하던 단계 %1$d개를 줄였어요</string>
     <string name="teach_basic_note">이번에는 모델이 연결되지 않아 기기 규칙으로 정리했어요. 모델을 설정하면 더 자세히 이해할 수 있습니다.</string>
     <string name="teach_accepted_title">배웠어요</string>

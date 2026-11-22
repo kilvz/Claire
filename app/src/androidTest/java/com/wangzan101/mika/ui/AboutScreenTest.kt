@@ -38,8 +38,8 @@ class AboutScreenTest {
     @get:Rule val compose = createComposeRule()
 
     private val r020 = ReleaseInfo(
-        "0.2.0", "Mika 0.2.0", "### 新增\n- 附件面板", "2026-11-05",
-        "https://github.com/wangzan101/Mika/releases/tag/v0.2.0", "https://github.com/x/mika-0.2.0.apk",
+        "0.2.0", "Claire 0.2.0", "### 新增\n- 附件面板", "2026-11-05",
+        "https://github.com/kilvz/Claire/releases/tag/v0.2.0", "https://github.com/x/mika-0.2.0.apk",
     )
 
     private class Calls {
@@ -49,7 +49,7 @@ class AboutScreenTest {
         var licenses = 0
     }
 
-    private val sampleDiagnostics = "Mika 诊断信息 / Mika diagnostics\n\n[App]\nversion: 0.1.0 (build abc1234)\n"
+    private val sampleDiagnostics = "Claire 诊断信息 / Claire diagnostics\n\n[App]\nversion: 0.1.0 (build abc1234)\n"
 
     private fun about(update: UpdateState = UpdateState()): Calls {
         val calls = Calls()
@@ -74,7 +74,7 @@ class AboutScreenTest {
     @Test
     fun showsHeroRowsNoteAndFooter() {
         about()
-        compose.onNodeWithText("Mika").assertIsDisplayed()
+        compose.onNodeWithText("Claire").assertIsDisplayed()
         compose.onNodeWithText(AboutCopy.TAGLINE).assertIsDisplayed()
         compose.onNodeWithText("版本 0.1.0").assertIsDisplayed()
         compose.onNodeWithText("Beta").assertIsDisplayed()
@@ -255,7 +255,7 @@ class AboutScreenTest {
         assertEquals(listOf(MikaLinks.RELEASES), calls.urls)
     }
 
-    /** 侧栏最底下一行:设置靠左;有新版时右边才出现「更新」带红点(红点在最右边),点它进「关于 Mika」。 */
+    /** 侧栏最底下一行:设置靠左;有新版时右边才出现「更新」带红点(红点在最右边),点它进「关于 Claire」。 */
     @Test
     fun drawerFooterShowsUpdateOnlyWhenAvailable() {
         val calls = mutableListOf<String>()
@@ -302,7 +302,7 @@ class AboutScreenTest {
         compose.onAllNodesWithTag("update-dot", useUnmergedTree = true).assertCountEquals(0)
     }
 
-    /** 设置首页「关于 Mika」一行:有新版写「x 可更新」带红点。 */
+    /** 设置首页「关于 Claire」一行:有新版写「x 可更新」带红点。 */
     @Test
     fun settingsAboutRowShowsUpdate() {
         compose.setContent {

@@ -19,8 +19,8 @@
     <string name="relay_unpair">Ağ geçidi eşleştirmesini kaldır</string>
     <string name="relay_unpair_body">Bu telefonun ağ geçidiyle bağlantısını kesin. İnternet bağlantısı gerekir. Telefon erişim belirteci değişmeden kalır.</string>
     <string name="relay_failed">Tamamlanamadı. Ağ geçidi adresini, internet bağlantısını ve eşleştirme kodunu kontrol edin. Eşleştirmeyi kaldırma başarısız olduysa erişim kapalıdır; yeniden deneyin veya telefona erişimi ağ geçidinde iptal edin.</string>
-    <string name="relay_notif_body">Uzak erişim etkin. Ağ geçidi bağlantısını kontrol etmek için Mika\'yı açın.</string>
-    <string name="relay_incompatible">Mika\'yı ve ağ geçidini eşleşen sürümlere güncelleyin</string>
+    <string name="relay_notif_body">Uzak erişim etkin. Ağ geçidi bağlantısını kontrol etmek için Claire\'yı açın.</string>
+    <string name="relay_incompatible">Claire\'yı ve ağ geçidini eşleşen sürümlere güncelleyin</string>
     <string name="relay_copy_gateway">Ağ geçidi adresini kopyala</string>
     <string name="relay_cli_help">Erişim belirtecini bilgisayarınızda bir dosyaya kaydedin, sonra yukarıdaki bağlantı komutunu çalıştırın.</string>
     <string name="relay_intro">Ağ geçidi, normalde Wi-Fi / LAN üzerinden gönderilen CLI ve MCP isteklerini uzak erişim için telefonunuza iletir. Eşleştirmeden önce kendi genel sunucunuza dağıtın.</string>

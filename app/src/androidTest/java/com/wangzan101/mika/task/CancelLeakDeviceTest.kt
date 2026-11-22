@@ -18,8 +18,8 @@ import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 真机测试:任务刚开始建虚拟屏或网页显示就被取消,反复 20 次,收尾后系统里不留 Mika 的显示。
- * 取消的时机错开,落在建屏前后的不同位置。需要内置助手在运行、Mika 无障碍服务已开启。
+ * 真机测试:任务刚开始建虚拟屏或网页显示就被取消,反复 20 次,收尾后系统里不留 Claire 的显示。
+ * 取消的时机错开,落在建屏前后的不同位置。需要内置助手在运行、Claire 无障碍服务已开启。
  */
 @RunWith(AndroidJUnit4::class)
 class CancelLeakDeviceTest {
@@ -61,8 +61,8 @@ class CancelLeakDeviceTest {
             assertNotNull("round $i did not end", pollUntil(15_000) { DeviceTaskState.busy.value.takeIf { !it } })
         }
         val displays = sh("dumpsys display")
-        assertFalse("Mika agent display left behind", "mika-agent" in displays)
-        assertFalse("Mika web display left behind", "mika-web" in displays)
+        assertFalse("Claire agent display left behind", "mika-agent" in displays)
+        assertFalse("Claire web display left behind", "mika-web" in displays)
     }
 
     private companion object {

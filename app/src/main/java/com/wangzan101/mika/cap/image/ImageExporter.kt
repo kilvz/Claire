@@ -14,7 +14,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
-/** 把一张图片存到手机的「相册/Mika」(MediaStore,不需要存储权限)。 */
+/** 把一张图片存到手机的「相册/Claire」(MediaStore,不需要存储权限)。 */
 class ImageExporter(private val context: Context) {
     /** [name] 是想要的文件名;系统重名时自动加序号。返回相册里的实际名字和 content URI。 */
     suspend fun save(bytes: ByteArray, mime: String, name: String): SavedImage = withContext(Dispatchers.IO) {
@@ -49,7 +49,7 @@ class ImageExporter(private val context: Context) {
         SavedImage("$DIRECTORY/$actual", uri.toString(), bytes.size.toLong())
     }
 
-    /** 删掉本 App 在「相册/Mika」里留下的、没写完的条目(写到一半进程被杀会留下 IS_PENDING 的空壳)。启动时调用。 */
+    /** 删掉本 App 在「相册/Claire」里留下的、没写完的条目(写到一半进程被杀会留下 IS_PENDING 的空壳)。启动时调用。 */
     fun cleanPending() {
         val resolver = context.contentResolver
         val args = Bundle().apply {
@@ -77,6 +77,6 @@ class ImageExporter(private val context: Context) {
     }
 
     private companion object {
-        const val DIRECTORY = "Pictures/Mika"
+        const val DIRECTORY = "Pictures/Claire"
     }
 }

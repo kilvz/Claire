@@ -54,7 +54,7 @@ class UpdateCheckerTest {
     )
 
     private fun release(tag: String, notes: String = "- 新东西") =
-        MockResponse().setBody("""{"tag_name":"$tag","name":"Mika $tag","body":"$notes","html_url":"https://github.com/wangzan101/Mika/releases/tag/$tag","assets":[]}""")
+        MockResponse().setBody("""{"tag_name":"$tag","name":"Claire $tag","body":"$notes","html_url":"https://github.com/kilvz/Claire/releases/tag/$tag","assets":[]}""")
 
     @Test
     fun newerReleaseFromGitHubShowsUpdate() = runTest {
@@ -69,7 +69,7 @@ class UpdateCheckerTest {
         assertEquals(listOf("/api"), hits)
         val req = server.takeRequest()
         assertEquals("application/vnd.github+json", req.getHeader("Accept"))
-        assertTrue(req.getHeader("User-Agent")!!.startsWith("Mika/"))
+        assertTrue(req.getHeader("User-Agent")!!.startsWith("Claire/"))
     }
 
     @Test
@@ -227,7 +227,7 @@ class UpdateCheckerTest {
     @Test
     fun sameVersionPreservesNotesAndOnlyReusesIntegrityForSameApk() = runTest {
         fun metadata(url: String, notes: String, integrity: String) = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","body":"$notes","assets":[{"name":"Mika.apk","browser_download_url":"$url"$integrity}]}"""
+            """{"tag_name":"v0.2.0","body":"$notes","assets":[{"name":"Claire.apk","browser_download_url":"$url"$integrity}]}"""
         )
         val c = checker()
         github = metadata("https://example.com/a.apk", "release notes", ",\"size\":123,\"digest\":\"sha256:abc\"")
@@ -252,11 +252,11 @@ class UpdateCheckerTest {
     fun moreCompleteAttachmentReplacesDifferentUrl() = runTest {
         val c = checker()
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"https://example.com/a.apk","size":456}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"https://example.com/a.apk","size":456}]}"""
         )
         c.check(manual = true)
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"https://example.com/b.apk","size":123,"digest":"sha256:other"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"https://example.com/b.apk","size":123,"digest":"sha256:other"}]}"""
         )
         c.check(manual = true)
         assertEquals("https://example.com/b.apk", c.state.value.latest?.apkUrl)
@@ -269,7 +269,7 @@ class UpdateCheckerTest {
         val mirror = UpdateMirror("m", "Mirror", server.url("/mirror/").toString())
         var officialAvailable = false
         var fallbackAvailable = true
-        val architectureUrl = "https://example.com/Mika-v0.2.0-arm64.apk"
+        val architectureUrl = "https://example.com/Claire-v0.2.0-arm64.apk"
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path.orEmpty()
@@ -280,7 +280,7 @@ class UpdateCheckerTest {
                     path.contains("/mirror/") && path.endsWith("/releases/expanded_assets/v0.2.0") ->
                         MockResponse().setBody("")
                     path == "/api" && officialAvailable -> MockResponse().setBody(
-                        """{"tag_name":"v0.2.0","body":"notes","assets":[{"name":"Mika-v0.2.0-arm64.apk","browser_download_url":"$architectureUrl","size":123,"digest":"sha256:abc"}]}"""
+                        """{"tag_name":"v0.2.0","body":"notes","assets":[{"name":"Claire-v0.2.0-arm64.apk","browser_download_url":"$architectureUrl","size":123,"digest":"sha256:abc"}]}"""
                     )
                     else -> MockResponse().setResponseCode(500)
                 }
@@ -289,7 +289,7 @@ class UpdateCheckerTest {
         val settings = MirrorSettings(enabled = true, mirrors = listOf(mirror))
         val c = checker(mirrors = settings, abis = listOf("arm64-v8a"))
         c.check(manual = true)
-        assertTrue(c.state.value.latest!!.apkUrl!!.endsWith("/Mika-v0.2.0.apk"))
+        assertTrue(c.state.value.latest!!.apkUrl!!.endsWith("/Claire-v0.2.0.apk"))
 
         officialAvailable = true
         fallbackAvailable = false
@@ -321,7 +321,7 @@ class UpdateCheckerTest {
                     path.endsWith("/releases/latest") ->
                         MockResponse().setResponseCode(302).setHeader("Location", "/releases/tag/v0.2.0")
                     assetsAvailable -> MockResponse().setBody(
-                        """<ul><li><a href="/releases/download/v0.2.0/Mika-v0.2.0-arm64.apk">arm64</a></li></ul>""",
+                        """<ul><li><a href="/releases/download/v0.2.0/Claire-v0.2.0-arm64.apk">arm64</a></li></ul>""",
                     )
                     else -> MockResponse().setResponseCode(404)
                 }
@@ -346,20 +346,20 @@ class UpdateCheckerTest {
     fun switchingToArchitectureDoesNotReuseUniversalIntegrity() = runTest {
         val c = checker(abis = listOf("arm64-v8a"))
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika-v0.2.0.apk","browser_download_url":"https://example.com/Mika-v0.2.0.apk","size":456,"digest":"sha256:universal"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire-v0.2.0.apk","browser_download_url":"https://example.com/Claire-v0.2.0.apk","size":456,"digest":"sha256:universal"}]}"""
         )
         c.check(manual = true)
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika-v0.2.0-arm64.apk","browser_download_url":"https://example.com/Mika-v0.2.0-arm64.apk"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire-v0.2.0-arm64.apk","browser_download_url":"https://example.com/Claire-v0.2.0-arm64.apk"}]}"""
         )
         c.check(manual = true)
-        assertEquals("https://example.com/Mika-v0.2.0.apk", c.state.value.latest?.apkUrl)
+        assertEquals("https://example.com/Claire-v0.2.0.apk", c.state.value.latest?.apkUrl)
         assertEquals("sha256:universal", c.state.value.latest?.apkDigest)
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika-v0.2.0-arm64.apk","browser_download_url":"https://example.com/Mika-v0.2.0-arm64.apk","size":123,"digest":"sha256:arm64"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire-v0.2.0-arm64.apk","browser_download_url":"https://example.com/Claire-v0.2.0-arm64.apk","size":123,"digest":"sha256:arm64"}]}"""
         )
         c.check(manual = true)
-        assertEquals("https://example.com/Mika-v0.2.0-arm64.apk", c.state.value.latest?.apkUrl)
+        assertEquals("https://example.com/Claire-v0.2.0-arm64.apk", c.state.value.latest?.apkUrl)
         assertEquals(123L, c.state.value.latest?.apkSize)
         assertEquals("sha256:arm64", c.state.value.latest?.apkDigest)
     }
@@ -408,7 +408,7 @@ class UpdateCheckerTest {
         val mirror = UpdateMirror("m", "Mirror", server.url("/mirror/").toString())
         val settings = MirrorSettings(enabled = true, mirrors = listOf(mirror))
         fun metadata(digest: String) = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"https://example.com/Mika.apk","size":123,"digest":"sha256:$digest"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"https://example.com/Claire.apk","size":123,"digest":"sha256:$digest"}]}"""
         )
         var officialAvailable = true
         var slowOfficial = true
@@ -486,7 +486,7 @@ class UpdateCheckerTest {
                 val isMirror = request.path.orEmpty().contains("/mirror/")
                 val digest = if (isMirror) ",\"digest\":\"sha256:mirror\"" else ""
                 val response = MockResponse().setBody(
-                    """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"https://example.com/Mika.apk"$digest}]}"""
+                    """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"https://example.com/Claire.apk"$digest}]}"""
                 )
                 return if (!isMirror) response.setBodyDelay(250, java.util.concurrent.TimeUnit.MILLISECONDS) else response
             }
@@ -501,9 +501,9 @@ class UpdateCheckerTest {
 
     @Test
     fun legacyRecordHasUnknownAuthorityUntilOfficialRefresh() = runTest {
-        val url = "https://example.com/Mika.apk"
+        val url = "https://example.com/Claire.apk"
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"$url","digest":"sha256:legacy"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"$url","digest":"sha256:legacy"}]}"""
         )
         checker().check(manual = true)
         val file = tmp.root.resolve("update.json")
@@ -511,7 +511,7 @@ class UpdateCheckerTest {
         file.writeText(kotlinx.serialization.json.JsonObject(record - "latestOfficial").toString())
 
         github = MockResponse().setBody(
-            """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"$url"}]}"""
+            """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"$url"}]}"""
         )
         val migrated = checker()
         migrated.load()
@@ -524,7 +524,7 @@ class UpdateCheckerTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse =
                 if (request.path.orEmpty().contains("/mirror/")) MockResponse().setBody(
-                    """{"tag_name":"v0.2.0","assets":[{"name":"Mika.apk","browser_download_url":"$url","digest":"sha256:mirror"}]}"""
+                    """{"tag_name":"v0.2.0","assets":[{"name":"Claire.apk","browser_download_url":"$url","digest":"sha256:mirror"}]}"""
                 ) else MockResponse().setResponseCode(500)
         }
         val restarted = checker(mirrors = MirrorSettings(enabled = true, mirrors = listOf(mirror)))
@@ -543,7 +543,7 @@ class UpdateCheckerTest {
         }
         val c = checker(mirrors = MirrorSettings(enabled = true, mirrors = listOf(mirror)))
         c.check(manual = true)
-        assertEquals("Mika v0.2.0", c.state.value.latest?.name)
+        assertEquals("Claire v0.2.0", c.state.value.latest?.name)
     }
 
     /** 关掉镜像时一个镜像请求都不发。 */

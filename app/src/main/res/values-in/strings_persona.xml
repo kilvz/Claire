@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="persona_title">Persona</string>
-    <string name="persona_sub">Pilih cara Mika berbicara dengan Anda</string>
+    <string name="persona_sub">Pilih cara Claire berbicara dengan Anda</string>
     <string name="persona_default">Default</string>
-    <string name="persona_default_sub">Suara biasa Mika</string>
+    <string name="persona_default_sub">Suara biasa Claire</string>
     <string name="persona_empty">Belum ada persona</string>
-    <string name="persona_empty_sub">Persona mengubah cara Mika berbicara, bukan apa yang boleh dilakukan Mika.</string>
+    <string name="persona_empty_sub">Persona mengubah cara Claire berbicara, bukan apa yang boleh dilakukan Claire.</string>
     <string name="persona_new">Persona baru</string>
     <string name="persona_name">Nama</string>
     <string name="persona_prompt">Instruksi</string>
     <string name="persona_prompt_hint">Nada, panjang, susunan kata, format…</string>
     <string name="persona_counter">%1$d karakter · sekitar %2$d token</string>
     <string name="persona_preview">Pratinjau prompt lengkap</string>
-    <string name="persona_preview_note">Aturan abu-abu bersifat tetap. Persona dapat mengubah nada dan susunan kata, tetapi tidak keselamatan, izin, atau apa yang dilaporkan Mika.</string>
+    <string name="persona_preview_note">Aturan abu-abu bersifat tetap. Persona dapat mengubah nada dan susunan kata, tetapi tidak keselamatan, izin, atau apa yang dilaporkan Claire.</string>
     <string name="persona_manage">Kelola persona</string>
     <string name="persona_delete_title">Hapus “%1$s”?</string>
-    <string name="persona_delete_body">Tindakan ini tidak dapat dibatalkan. Jika sedang digunakan, Mika kembali ke cara bicaranya yang biasa.</string>
+    <string name="persona_delete_body">Tindakan ini tidak dapat dibatalkan. Jika sedang digunakan, Claire kembali ke cara bicaranya yang biasa.</string>
     <string name="persona_copy">Duplikat</string>
     <string name="persona_name_required">Masukkan nama.</string>
     <string name="persona_name_too_long">Nama terlalu panjang.</string>
@@ -55,6 +55,6 @@
     <string name="persona_discard_body">Perubahan belum disimpan.</string>
     <string name="persona_keep_editing">Lanjutkan mengedit</string>
     <string name="persona_nickname">Panggilan</string>
-    <string name="persona_nickname_about">Nama yang dipakai Mika untuk menyebut dirinya. Kosongkan untuk Mika. Nama aplikasi tidak berubah.</string>
+    <string name="persona_nickname_about">Nama yang dipakai Claire untuk menyebut dirinya. Kosongkan untuk Claire. Nama aplikasi tidak berubah.</string>
     <string name="persona_nickname_invalid">Maksimal %1$d karakter: hanya huruf, angka, dan spasi.</string>
 </resources>

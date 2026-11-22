@@ -48,7 +48,7 @@ class EvalProbes(private val sh: (String) -> String, private val loggedIn: File)
 
     /**
      * `installed:<包名>`、`app:<能力>`、`signedIn:<包名或网站>`(旧写法 `login:<包名>`、`site:<主机名>`)。
-     * 登录态:网站只认站点登记表里「用户在 Mika 里登录过」的(在设置「网站登录」里登录过);App 只认人工标记([loggedIn]),
+     * 登录态:网站只认站点登记表里「用户在 Claire 里登录过」的(在设置「网站登录」里登录过);App 只认人工标记([loggedIn]),
      * 评测器不替用户判断 App 的登录态(没有对所有 App 都可靠的探法)。没登录的题跳过,原因写「未登录」。
      */
     fun requirementMet(req: String): Pair<Boolean, String> {

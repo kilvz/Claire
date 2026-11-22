@@ -8,7 +8,7 @@
     <string name="chat_greeting_evening">عصر بخیر</string>
     <string name="chat_greeting_night">هنوز بیدارید؟</string>
     <string name="chat_empty_prompt">میکا چه کاری انجام دهد؟</string>
-    <string name="chat_example_follow">ایکس را باز کن، وانگ زان (@wangzan101) را جست‌وجو کن و حساب او را دنبال کن.</string>
+    <string name="chat_example_follow">ایکس را باز کن، Kilv (@KilZT) را جست‌وجو کن و حساب او را دنبال کن.</string>
     <string name="chat_example_group_summary">واتساپ را باز کن و پیام‌های خوانده‌نشدهٔ امروز را خلاصه کن؛ مواردی را که به پاسخ من نیاز دارند مشخص کن.</string>
     <string name="chat_example_alarms">برای فردا صبح در ساعت‌های ۹:۴۰، ۹:۵۰ و ۱۰:۰۰ زنگ هشدار تنظیم کن.</string>
     <string name="chat_example_replace_title">پیش‌نویس فعلی جایگزین شود؟</string>
@@ -197,7 +197,7 @@
     <string name="chat_copy">کپی</string>
     <string name="share_card_question">پرسش</string>
     <string name="share_card_answer">پاسخ</string>
-    <string name="share_card_made_by">توسط Mika انجام شد</string>
+    <string name="share_card_made_by">توسط Claire انجام شد</string>
     <string name="chat_quote">نقل‌قول</string>
     <string name="chat_select_text">انتخاب متن</string>
     <string name="chat_copied">کپی شد</string>
@@ -239,7 +239,7 @@
     <string name="chat_placeholder_queue">کار بعدی را بنویسید…</string>
     <string name="voice_placeholder_queue">کار بعدی را بگویید…</string>
     <string name="steer_received_paused">متوجه شدم؛ هنگام ادامهٔ کار اعمال می‌شود</string>
-    <string name="chat_example_github_star">نشانی https://github.com/wangzan101/mika را باز کن و به پروژه ستاره بده.</string>
+    <string name="chat_example_github_star">نشانی https://github.com/kilvz/Claire را باز کن و به پروژه ستاره بده.</string>
     <string name="drawer_search_clear">پاک کردن جست‌وجو</string>
     <string name="drawer_search_empty">هیچ گفتگویی با «%1$s» مطابقت ندارد</string>
     <string name="drawer_search_empty_hint">در عنوان‌ها و متن گفتگوها جست‌وجو می‌کند</string>
@@ -317,11 +317,11 @@
     <string name="plus_sub_device">پوشه‌های این گوشی را بگرد</string>
     <string name="plus_clipboard">تخته‌شمار</string>
     <string name="plus_sub_clipboard">آنچه تازه کپی کردی را بچسبان</string>
-    <string name="plus_sub_teach">یک بار نشان بده تا Mika یاد بگیرد</string>
+    <string name="plus_sub_teach">یک بار نشان بده تا Claire یاد بگیرد</string>
     <string name="plus_sub_skills">یک مهارت برای این نوبت انتخاب کن</string>
     <string name="plus_sub_tasks">کار ذخیره‌شده را در کادر ورودی پر کن</string>
     <string name="plus_sub_browser">مرورگر داخلی</string>
-    <string name="plus_skills_empty">هنوز مهارت شخصی نداری. مهارت‌هایی که Mika از کارهای انجام‌شده یاد می‌گیرد اینجا نمایش داده می‌شوند.</string>
+    <string name="plus_skills_empty">هنوز مهارت شخصی نداری. مهارت‌هایی که Claire از کارهای انجام‌شده یاد می‌گیرد اینجا نمایش داده می‌شوند.</string>
     <string name="plus_clipboard_empty">متنی برای چسباندن از تخته‌شمار نیست</string>
     <string name="plus_skill_directive">از مهارت «%1$s» استفاده کن: </string>
 </resources>

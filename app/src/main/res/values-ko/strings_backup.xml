@@ -20,7 +20,7 @@
     <string name="backup_replace">모두 교체</string>
     <string name="backup_imported_title">백업이 복원되었습니다</string>
     <string name="backup_imported_body">파일 %1$d개를 복원했습니다.</string>
-    <string name="backup_after_import_body">복원된 데이터를 사용하려면 Mika를 닫았다가 다시 여세요. 그런 다음 무선 디버깅을 다시 페어링하고, Android 설정에서 접근성 서비스를 다시 켜고, 백업 ZIP 파일을 삭제하세요.</string>
-    <string name="backup_close_app">Mika 닫기</string>
+    <string name="backup_after_import_body">복원된 데이터를 사용하려면 Claire를 닫았다가 다시 여세요. 그런 다음 무선 디버깅을 다시 페어링하고, Android 설정에서 접근성 서비스를 다시 켜고, 백업 ZIP 파일을 삭제하세요.</string>
+    <string name="backup_close_app">Claire 닫기</string>
     <string name="backup_restart_note">무언가를 제거하기 전에 먼저 내보내세요. 이 설치본만 데이터를 복호화할 수 있습니다.</string>
 </resources>

@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">Tercih edilen SIM yok</string>
     <string name="calls_task_back_to_edit">Düzenlemeye dön</string>
     <string name="calls_task_confirm_dial">Onayla ve ara</string>
-    <string name="calls_task_confirm_note">Mika bu arama için bu özeti kullanır. Arama, seçilen SIM\'i kullanır ve operatör ile gerçek zamanlı ses ücretleri doğurabilir.</string>
+    <string name="calls_task_confirm_note">Claire bu arama için bu özeti kullanır. Arama, seçilen SIM\'i kullanır ve operatör ile gerçek zamanlı ses ücretleri doğurabilir.</string>
     <string name="calls_task_constraints">Neyin vaat edilmemesi gerektiği</string>
     <string name="calls_task_context">Ek bağlam</string>
     <string name="calls_task_filled">Eklendi</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">Kişiler</string>
     <string name="calls_manual_tab">Elle giriş</string>
     <string name="calls_contacts_search">Ada veya numaraya göre ara</string>
-    <string name="calls_contacts_permission">Numaraları seçmek için Mika’nın kişilerinizi okumasına izin verin. Numaraları elle de girebilirsiniz.</string>
+    <string name="calls_contacts_permission">Numaraları seçmek için Claire’nın kişilerinizi okumasına izin verin. Numaraları elle de girebilirsiniz.</string>
     <string name="calls_contacts_empty">Seçilebilecek telefon numarası olan kişi yok.</string>
     <string name="calls_contacts_failed">Kişiler yüklenemedi.</string>
 </resources>

@@ -2,7 +2,7 @@
 <resources>
     <string name="language_title">زبان</string>
     <string name="language_prompt_title">زبان</string>
-    <string name="language_prompt_hint">زبانی را که Mika برای فکر کردن، توضیح مراحل و پاسخ‌ها استفاده می‌کند انتخاب کنید.</string>
+    <string name="language_prompt_hint">زبانی را که Claire برای فکر کردن، توضیح مراحل و پاسخ‌ها استفاده می‌کند انتخاب کنید.</string>
     <string name="language_search_hint">جستجوی زبان</string>
     <string name="language_prompt_confirm">تأیید</string>
     <string name="language_prompt_dismiss">فعلاً نه</string>

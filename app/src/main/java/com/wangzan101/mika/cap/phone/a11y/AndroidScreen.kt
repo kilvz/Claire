@@ -101,17 +101,17 @@ class AndroidScreen(
     internal val a11y: ScreenAccessibility,
     internal val shell: IMikaShell,
     internal val display: LazyAgentDisplay,
-    /** 剪贴板暂时换成 Mika 的文字时为 true,还原后为 false;任务服务据此记下,进程意外结束后下次启动还原。 */
+    /** 剪贴板暂时换成 Claire 的文字时为 true,还原后为 false;任务服务据此记下,进程意外结束后下次启动还原。 */
     internal val clipHeld: (Boolean) -> Unit = {},
     /** 剪贴板是全局的:几个任务同时跑时粘贴兜底共用一把锁。 */
     internal val clipLock: Lock = ReentrantLock(),
-    /** 并行任务时为 true:打开 App 前先查它是不是正在 Mika 的另一块屏上给别的任务用。 */
+    /** 并行任务时为 true:打开 App 前先查它是不是正在 Claire 的另一块屏上给别的任务用。 */
     internal val checkOtherTasks: Boolean = false,
     /** 并行任务时替本任务占下这个包;别的任务已占着(且还在用)时返回 false。 */
     internal val reserve: (String) -> Boolean = { true },
     /** 同 [reserve],占的是装在另一份用户(用户编号)里的那份:和本来那份分开占,两个任务能各用一份。 */
     internal val reserveCopy: (String, Int) -> Boolean = { _, _ -> true },
-    /** 换剪贴板成功后交出用户原来的文字和 Mika 放进去的文字,供加密留底(进程被杀后据此还原)。 */
+    /** 换剪贴板成功后交出用户原来的文字和 Claire 放进去的文字,供加密留底(进程被杀后据此还原)。 */
     internal val clipSaved: (original: String, ours: String) -> Unit = { _, _ -> },
     /** App 此刻在用户手上(接管中):这时主屏上开出什么都是用户的事,不去挪。 */
     internal val handedOver: () -> Boolean = { false },
@@ -361,8 +361,8 @@ class AndroidScreen(
     // ---------- 系统动作 ----------
 
     /**
-     * 经安卓标准 intent 做系统动作(见 [SystemIntents])。先在 Mika 这边查谁接(能力检测,不用建屏):没有就 not_supported;
-     * 有几个时按 [SystemIntents.choose] 直接指定一个。再交给内置助手启动到 Mika 的屏(第一次用时建屏),动作前后照常盯着主屏。
+     * 经安卓标准 intent 做系统动作(见 [SystemIntents])。先在 Claire 这边查谁接(能力检测,不用建屏):没有就 not_supported;
+     * 有几个时按 [SystemIntents.choose] 直接指定一个。再交给内置助手启动到 Claire 的屏(第一次用时建屏),动作前后照常盯着主屏。
      * 闹钟、计时器本该悄悄设好:之后读系统的下一个闹钟核对;App 却开了界面时照实报。闹钟列表、新日程要等那个 App 到最上面。
      */
     override suspend fun systemAction(action: SystemAction): SystemActionResult = withContext(Dispatchers.IO) {
@@ -390,7 +390,7 @@ class AndroidScreen(
         val beforeTree = treeHash()
         val startedAt = System.nanoTime()
         val w = spill.armSpillWatch()
-        // 接手的页面要求的权限(设闹钟)shell 可能没有:备一个以 Mika 身份启动的
+        // 接手的页面要求的权限(设闹钟)shell 可能没有:备一个以 Claire 身份启动的
         val asMika = PendingIntent.getActivity(a11y, SYSTEM_ACTION_REQUEST, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         // 悄悄设好的(闹钟、计时器)不开界面,不去静它:时钟到点要响
         if (!action.silent) beforeOpen(pkg, null)
@@ -490,7 +490,7 @@ class AndroidScreen(
 
     internal val systemPackages = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
-    /** 系统自带的包;Mika 自己看不到的包(安卓 11 起的包可见性)问内置助手。 */
+    /** 系统自带的包;Claire 自己看不到的包(安卓 11 起的包可见性)问内置助手。 */
     internal fun isSystemPackage(pkg: String): Boolean = pkg in systemPickers || systemPackages.getOrPut(pkg) {
         val flags = runCatching { a11y.packageManager.getApplicationInfo(pkg, 0).flags }.getOrNull()
         if (flags != null) flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
@@ -576,8 +576,8 @@ class AndroidScreen(
 
     /**
      * 系统在用户主屏上问打开哪一个、等用户选的那一次:[taskId] 问的那个窗口的任务,[packageName] 它的包,[app] 问的是哪个 App,
-     * [topBefore] 它出来前主屏最上面的任务,[agentTop] 那时 Mika 屏上最上面的任务,[since] 它出来的时刻。
-     * 选择框从不挪:挪了屏它要按新屏重建,有的重建时自己关掉;Mika 也不替别的 App 重新打开它(打开的一方得是原来那个 App)。
+     * [topBefore] 它出来前主屏最上面的任务,[agentTop] 那时 Claire 屏上最上面的任务,[since] 它出来的时刻。
+     * 选择框从不挪:挪了屏它要按新屏重建,有的重建时自己关掉;Claire 也不替别的 App 重新打开它(打开的一方得是原来那个 App)。
      */
     class UserPick(val taskId: Int, val packageName: String, val app: String?, val topBefore: Int, val agentTop: Int, val since: Long)
 
@@ -594,13 +594,13 @@ class AndroidScreen(
     val userPick: StateFlow<UserPick?> get() = spill.userPick
 
     /**
-     * 任务在下一个改动屏幕的动作前调:等用户在主屏上选完(选之前一直盯着主屏)。选完后,开到主屏上的普通页面挪回 Mika 的屏
+     * 任务在下一个改动屏幕的动作前调:等用户在主屏上选完(选之前一直盯着主屏)。选完后,开到主屏上的普通页面挪回 Claire 的屏
      * (只挪,打开它的仍是原来那个 App);要用户亲手处理的(要输密码、窗口读不到,像付款、指纹)留在主屏,返回 [PickResult.NeedsUser];
-     * 开在了 Mika 屏上的一并算进来;用户把问题关了就照实说。没在等时为 null。
+     * 开在了 Claire 屏上的一并算进来;用户把问题关了就照实说。没在等时为 null。
      */
     suspend fun awaitUserPick(): PickResult? = spill.awaitUserPick()
 
-    /** 用户处理完([PickResult.NeedsUser])点了继续:它还在主屏上就挪回 Mika 的屏接着做,已经关了就照实说。 */
+    /** 用户处理完([PickResult.NeedsUser])点了继续:它还在主屏上就挪回 Claire 的屏接着做,已经关了就照实说。 */
     suspend fun afterUserStep(r: PickResult.NeedsUser) = spill.afterUserStep(r)
 
     /** 等界面稳定后比对指纹(规则见 [ChangeWait]);确认变了立即返回 true。 */
@@ -680,7 +680,7 @@ class AndroidScreen(
     @Volatile internal var requestedUser: Int? = null
 
     /**
-     * 目标 App 装了两份(列出过另一份、要的就是另一份,或打开的就是另一份)时,此刻 Mika 屏上是哪一份:(inProfile, 所属用户)。
+     * 目标 App 装了两份(列出过另一份、要的就是另一份,或打开的就是另一份)时,此刻 Claire 屏上是哪一份:(inProfile, 所属用户)。
      * 只装一份、最上面不是它或读不到为 null;只装一份的 App 不多问。
      */
     internal fun shownCopy(): Pair<String, Int>? {
@@ -1066,7 +1066,7 @@ class AndroidScreen(
         const val NO_FOCUS = "no_focus"
         const val EDITOR_NOT_VISIBLE = "editor_not_visible"
         const val PER_USER_RANGE = 100_000
-        /** Mika 所在的用户:本来那份 App 在这里。 */
+        /** Claire 所在的用户:本来那份 App 在这里。 */
         val myUser: Int get() = AppCopyReader.myUser
         const val COPY_NOT_FOUND = "copy_not_found"
         const val COPY_NOT_OPENED = "copy_not_opened"
@@ -1121,7 +1121,7 @@ class AndroidScreen(
             "but new text containing it appeared on the screen after typing (e.g. suggestions), so the app seems to have received it. Observe to check before submitting."
         const val HINT_SHARE_PICKER = "The system is asking which of the app's share screens to use (the screen lists them). " +
             "Tap the one the task needs (for a message, the one that sends to a contact or chat); do not share again."
-        const val HINT_COLD_IGNORED = "coldIgnored: app has a task outside Mika's screen, so it was not restarted (that would wipe the user's state there). It was opened as-is; navigate back to its start screen yourself if needed."
+        const val HINT_COLD_IGNORED = "coldIgnored: app has a task outside Claire's screen, so it was not restarted (that would wipe the user's state there). It was opened as-is; navigate back to its start screen yourself if needed."
         const val MAX_ANCESTORS = 8
 
         // 悬停、触摸探索、手势识别、无障碍焦点这些不是界面内容的变化
@@ -1133,7 +1133,7 @@ class AndroidScreen(
     }
 }
 
-/** 桌面上能打开的 App(包名, 显示名),不含 Mika 自己;只用包管理器,不要内置助手和无障碍。 */
+/** 桌面上能打开的 App(包名, 显示名),不含 Claire 自己;只用包管理器,不要内置助手和无障碍。 */
 fun launchableApps(pm: android.content.pm.PackageManager, ownPackage: String): List<Pair<String, String>> {
     val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
     return pm.queryIntentActivities(launcher, 0)

@@ -483,7 +483,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, launches())
     }
 
-    /** 没配对时电脑起的助手停了:不当作从没设置过,说它停了;Mika 自己不去起(起不来)。 */
+    /** 没配对时电脑起的助手停了:不当作从没设置过,说它停了;Claire 自己不去起(起不来)。 */
     @Test
     fun usbHelperStoppingSaysSoAndDoesNotLaunch() = runTest {
         val e = engine()

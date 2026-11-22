@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="card_approve_once">Yalnızca bu kez onayla</string>
-    <string name="card_see_process">Tüm süreç için Mika\'ya dön</string>
-    <string name="card_back_to_mika">Mika\'ya dön</string>
+    <string name="card_see_process">Tüm süreç için Claire\'ya dön</string>
+    <string name="card_back_to_mika">Claire\'ya dön</string>
     <string name="card_continue_last">Son sohbeti sürdür</string>
     <string name="card_screen">Arka plan ekranı, büyütmek için dokunun</string>
     <string name="card_screen_label">Arka plan</string>
     <string name="card_zoomed">Büyütülmüş arka plan ekranı, kapatmak için dokunun</string>
-    <string name="card_zoom_hint">Mika arka planda çalışıyor · kapatmak için dokunun</string>
+    <string name="card_zoom_hint">Claire arka planda çalışıyor · kapatmak için dokunun</string>
     <string name="card_continuing">\“%1$s\” sürdürülüyor</string>
     <string name="card_queued_ahead">Önce diğer devri bitirin, sonra bu</string>
-    <string name="card_hint_answer">Mika\'yı yanıtla…</string>
+    <string name="card_hint_answer">Claire\'yı yanıtla…</string>
     <string name="card_hint_continue">Konuşmaya devam…</string>
     <plurals name="capsule_behind">
         <item quantity="other">Bundan sonra %1$d daha sizi bekliyor</item>
@@ -23,11 +23,11 @@
     <string name="capsule_stopped">Durduruldu</string>
     <string name="capsule_stop">Bunu yapmayı bırak</string>
     <string name="capsule_expand">Bu görevi genişlet</string>
-    <string name="capsule_talk">Mika\'yla konuş</string>
+    <string name="capsule_talk">Claire\'yla konuş</string>
     <string name="capsule_swap_side">Diğer tarafa taşı</string>
     <string name="capsule_desc_needs">%1$s, halletmek için dokunun</string>
-    <string name="capsule_desc_running">Mika çalışıyor: %1$s, ayrıntılar için dokunun</string>
-    <string name="capsule_desc_other">Mika: %1$s, ayrıntılar için dokunun</string>
+    <string name="capsule_desc_running">Claire çalışıyor: %1$s, ayrıntılar için dokunun</string>
+    <string name="capsule_desc_other">Claire: %1$s, ayrıntılar için dokunun</string>
     <string name="capsule_then_tap_right">Bitince sağ tarafa dokunun</string>
     <string name="capsule_need_of_total">%1$d size ihtiyaç duyuyor · toplam %2$d</string>
     <string name="capsule_of_total">%1$s · toplam %2$d</string>
@@ -36,7 +36,7 @@
     <string name="capsule_needs_you">Size ihtiyaç duyuyor: %1$s</string>
     <string name="capsule_handle_it">bir bak</string>
     <string name="capsule_needs_ok">Onayınızı gerektiriyor: %1$s</string>
-    <string name="capsule_asks">Mika soruyor: %1$s</string>
+    <string name="capsule_asks">Claire soruyor: %1$s</string>
     <string name="capsule_hold_why">Beklemede: %1$s</string>
     <string name="capsule_you_handle">Sıra sizde</string>
     <string name="capsule_thinking">Sonraki adımı düşünüyor</string>

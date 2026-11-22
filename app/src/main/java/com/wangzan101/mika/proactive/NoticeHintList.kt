@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * 「值得提醒」的入口:胶囊上的条数从这里取;点胶囊上的数字、或主动能力页那一行,就把那几条写成对话里 Mika 的一条消息([openTalk])。
+ * 「值得提醒」的入口:胶囊上的条数从这里取;点胶囊上的数字、或主动能力页那一行,就把那几条写成对话里 Claire 的一条消息([openTalk])。
  * 不调模型、不触发通知自带的点击或回复;写进对话之后的事(用户回一句、任务开始)和别的对话一样。
  */
 object NoticeHintList {
@@ -50,8 +50,8 @@ object NoticeHintList {
 }
 
 /**
- * 主动能力页上的那一行(胶囊显示不了提醒时的入口:开关不是「一直显示」、或人在 Mika 里):「值得提醒 (N)」,
- * 下面两个数是看过的和没看就处理了的条数;点开是同一个提醒对话,在 Mika 里打开。
+ * 主动能力页上的那一行(胶囊显示不了提醒时的入口:开关不是「一直显示」、或人在 Claire 里):「值得提醒 (N)」,
+ * 下面两个数是看过的和没看就处理了的条数;点开是同一个提醒对话,在 Claire 里打开。
  */
 @Composable
 internal fun NoticeHintEntry(state: NoticeHints.State) {

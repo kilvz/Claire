@@ -8,7 +8,7 @@
     <string name="usage_title">Token kullanımı</string>
     <string name="usage_none">Henüz yok</string>
     <string name="usage_empty_title">Bu dönemde kullanım yok</string>
-    <string name="usage_empty_body">Mika\'dan bir şey yapmasını isteyin, kullanılan tokenlar buraya kaydedilir.</string>
+    <string name="usage_empty_body">Claire\'dan bir şey yapmasını isteyin, kullanılan tokenlar buraya kaydedilir.</string>
     <string name="usage_note">Rakamlar sağlayıcılarınızın bildirdiği gibidir ve yalnızca bu telefonda kalır.</string>
     <string name="usage_total">Toplam</string>
     <string name="usage_trend">Eğilim</string>

@@ -32,7 +32,7 @@
     <string name="model_test_save">آزمون و ذخیره</string>
     <string name="model_testing">در حال آزمون…</string>
     <string name="model_test_note">میکا فهرست مدل‌های این ارائه‌دهنده را می‌گیرد و از یکی از آن‌ها می‌خواهد ابزار آزمایشی را فراخوانی کند؛ اگر هر دو موفق باشند، آن را ذخیره می‌کند.</string>
-    <string name="model_test_catalog_note">Mika فهرست مدل‌های ارائه‌دهنده را دریافت و ذخیره می‌کند. اگر هنوز مدل اصلی ندارید، از مدل پیشنهادی می‌خواهد یک بار یک ابزار آزمایشی را فراخوانی کند و فقط در صورت موفقیت آن را مدل اصلی می‌کند.</string>
+    <string name="model_test_catalog_note">Claire فهرست مدل‌های ارائه‌دهنده را دریافت و ذخیره می‌کند. اگر هنوز مدل اصلی ندارید، از مدل پیشنهادی می‌خواهد یک بار یک ابزار آزمایشی را فراخوانی کند و فقط در صورت موفقیت آن را مدل اصلی می‌کند.</string>
     <string name="next">بعدی</string>
     <string name="model_failed">اتصال ناموفق بود: %1$s</string>
     <string name="cap_vision">بینایی</string>
@@ -101,6 +101,6 @@
     <string name="model_fallback_backup_badge">پشتیبان شماره %1$d</string>
     <string name="model_fallback_add_first">افزودن مدل پشتیبان</string>
     <string name="model_fallback_add_another">افزودن مدل پشتیبان دیگر (%1$d/%2$d)</string>
-    <string name="model_fallback_footer_note">اگر %1$s به محدودیت نرخ یا سهمیه برخورد کند، Mika به‌طور خودکار به مدل‌های بعدی زنجیره سوئیچ می‌کند تا کارها بدون وقفه به پایان برسند.</string>
+    <string name="model_fallback_footer_note">اگر %1$s به محدودیت نرخ یا سهمیه برخورد کند، Claire به‌طور خودکار به مدل‌های بعدی زنجیره سوئیچ می‌کند تا کارها بدون وقفه به پایان برسند.</string>
     <string name="model_fallback_collapse_hint">زنجیره فعال · برای بستن ضربه بزنید</string>
 </resources>

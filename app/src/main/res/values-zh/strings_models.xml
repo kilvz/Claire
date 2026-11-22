@@ -108,11 +108,11 @@
 
     <!-- 用 ChatGPT 登录 -->
     <string name="chatgpt_use_plan_title">用你的 ChatGPT 套餐</string>
-    <string name="chatgpt_use_plan_body">用你 ChatGPT 套餐里包含的用量（或额度余额）完成 Mika 里符合条件的 AI 请求。ChatGPT Plus 和 Pro 可用。Mika 本身免费，不另外收费。</string>
+    <string name="chatgpt_use_plan_body">用你 ChatGPT 套餐里包含的用量（或额度余额）完成 Claire 里符合条件的 AI 请求。ChatGPT Plus 和 Pro 可用。Claire 本身免费，不另外收费。</string>
     <string name="chatgpt_continue">使用 ChatGPT 继续</string>
-    <string name="chatgpt_waiting">请在浏览器里完成登录，再回到 Mika。</string>
+    <string name="chatgpt_waiting">请在浏览器里完成登录，再回到 Claire。</string>
     <string name="chatgpt_welcome_title">正在使用你的 ChatGPT 套餐</string>
-    <string name="chatgpt_welcome_body">Mika 里符合条件的用量会使用你的 ChatGPT 套餐。可以在 ChatGPT 设置里管理用量。</string>
+    <string name="chatgpt_welcome_body">Claire 里符合条件的用量会使用你的 ChatGPT 套餐。可以在 ChatGPT 设置里管理用量。</string>
     <string name="chatgpt_got_it">知道了</string>
     <string name="chatgpt_account">账号</string>
     <string name="chatgpt_signed_in">已登录</string>
@@ -121,30 +121,30 @@
     <string name="chatgpt_manage_usage">管理用量</string>
     <string name="chatgpt_plan_note">使用 ChatGPT 套餐额度。Plus 每 5 小时的额度和其他用你套餐的 App 共用；Pro 没有 5 小时的限制。</string>
     <string name="chatgpt_signed_out_note">这台手机上已退出登录。点「使用 ChatGPT 继续」就能接着用套餐；选好的模型都还在。</string>
-    <string name="chatgpt_revoke_unconfirmed">这台手机上已退出登录，但 ChatGPT 那边没有确认。也可以在 ChatGPT 设置里断开 Mika。</string>
+    <string name="chatgpt_revoke_unconfirmed">这台手机上已退出登录，但 ChatGPT 那边没有确认。也可以在 ChatGPT 设置里断开 Claire。</string>
     <string name="chatgpt_fail_denied">已取消登录。如果授权页提示「所需权限不可用」：用套餐额度需要 ChatGPT Plus 或 Pro，免费账号可以改用其他服务商的 API Key。</string>
     <string name="chatgpt_fail_mismatch">登录回来的信息和这次对不上，请再试一次。</string>
-    <string name="chatgpt_fail_no_client">ChatGPT 没有完成对 Mika 的注册，请再试一次。</string>
+    <string name="chatgpt_fail_no_client">ChatGPT 没有完成对 Claire 的注册，请再试一次。</string>
     <string name="chatgpt_fail_timed_out">登录超时了，请再试一次。</string>
     <string name="chatgpt_fail_exchange">ChatGPT 拒绝了这次登录（错误：%1$s），请再试一次。</string>
     <string name="chatgpt_fail_code_expired">登录码过期或已用过，请再登录一次。</string>
     <string name="chatgpt_fail_region">当前网络所在的地区不被 OpenAI 支持，换个网络再试。</string>
     <string name="chatgpt_fail_blocked">请求被 OpenAI 的防护拦下了，换个网络或稍后再试。</string>
     <string name="chatgpt_fail_id_token">核对不了你的 ChatGPT 账号，请再试一次。</string>
-    <string name="chatgpt_fail_no_plan">没有允许 Mika 使用你的 ChatGPT 套餐。请重新登录并允许使用套餐额度（需要 Plus 或 Pro）。</string>
+    <string name="chatgpt_fail_no_plan">没有允许 Claire 使用你的 ChatGPT 套餐。请重新登录并允许使用套餐额度（需要 Plus 或 Pro）。</string>
     <string name="chatgpt_fail_network">连不上 ChatGPT，请检查网络后再试。</string>
-    <string name="chatgpt_page_title">Mika</string>
-    <string name="chatgpt_page_done">登录成功，回到 Mika。</string>
+    <string name="chatgpt_page_title">Claire</string>
+    <string name="chatgpt_page_done">登录成功，回到 Claire。</string>
     <string name="chatgpt_signin_notif_title">正在登录 ChatGPT</string>
     <string name="chatgpt_signin_notif_body">正在等你在浏览器里登录 ChatGPT</string>
-    <string name="chatgpt_page_back">回到 Mika</string>
+    <string name="chatgpt_page_back">回到 Claire</string>
     <string name="chatgpt_no_browser">没有找到可以用来登录的浏览器。</string>
     <string name="models_unverified">没测试通过，任务可能会失败</string>
     <string name="models_unverified_note">正在使用的 %1$s 尚未通过测试。点击对应模型的测试按钮可单独验证。</string>
     <string name="models_retest">重新测试</string>
     <string name="models_retest_model">测试 %1$s</string>
     <string name="models_retest_confirm_title">测试模型？</string>
-    <string name="models_retest_confirm_body">Mika 将向服务商 %2$s 的模型 %1$s 发送一次工具调用测试请求。</string>
+    <string name="models_retest_confirm_body">Claire 将向服务商 %2$s 的模型 %1$s 发送一次工具调用测试请求。</string>
 
     <!-- 账号登录：xAI / Grok（设备码）。 -->
     <string name="account_signin_copied">已复制</string>
@@ -170,8 +170,8 @@
     <string name="signin_use_key">改用 API Key</string>
     <string name="signin_stored_note">登录信息只加密存在这台手机上，不会写进日志。</string>
     <string name="signin_xai_title">用 xAI 账号登录</string>
-    <string name="signin_xai_body">用你的 SuperGrok 或 X Premium+ 订阅在 Mika 里用 Grok，不用另外买 API 额度。请求直接发给 xAI。</string>
-    <string name="signin_xai_risk">这项登录借用 xAI 官方命令行工具的公开登录入口，不是 xAI 专门给 Mika 开的。xAI 可能限制这种用法；有的订阅档位登录成功后仍不能调用（会提示 403），那时请改用 xAI 的 API Key。</string>
+    <string name="signin_xai_body">用你的 SuperGrok 或 X Premium+ 订阅在 Claire 里用 Grok，不用另外买 API 额度。请求直接发给 xAI。</string>
+    <string name="signin_xai_risk">这项登录借用 xAI 官方命令行工具的公开登录入口，不是 xAI 专门给 Claire 开的。xAI 可能限制这种用法；有的订阅档位登录成功后仍不能调用（会提示 403），那时请改用 xAI 的 API Key。</string>
     <string name="signin_xai_starting">正在打开 xAI 的确认页…</string>
     <string name="signin_xai_code_title">在浏览器里确认</string>
     <string name="signin_xai_code_body">已打开 xAI 的确认页。核对页面上的码和下面一样，然后点同意。</string>
@@ -180,15 +180,15 @@
     <string name="signin_xai_code_waiting">等你在浏览器里确认…</string>
     <string name="signin_xai_403_note">如果调用时提示 403：说明你的订阅档位不能用这个接口，可以改用 xAI 的 API Key。</string>
     <string name="signin_openrouter_title">用 OpenRouter 账号登录</string>
-    <string name="signin_openrouter_body">会打开 OpenRouter 的授权页。你同意后，OpenRouter 给 Mika 一把属于你的 Key，用量从你的 OpenRouter 余额里扣，一次就能用上几百个模型。</string>
+    <string name="signin_openrouter_body">会打开 OpenRouter 的授权页。你同意后，OpenRouter 给 Claire 一把属于你的 Key，用量从你的 OpenRouter 余额里扣，一次就能用上几百个模型。</string>
     <string name="signin_openrouter_note">这是 OpenRouter 官方给第三方应用的登录方式。Key 加密存在这台手机上；不想用了，可以在 OpenRouter 的 Keys 页面删掉它。</string>
     <string name="signin_openrouter_authorize">去 OpenRouter 授权</string>
-    <string name="signin_openrouter_waiting">请在浏览器里同意授权，再回到 Mika。</string>
+    <string name="signin_openrouter_waiting">请在浏览器里同意授权，再回到 Claire。</string>
     <string name="signin_openrouter_manage">打开 OpenRouter 的 Keys 页面</string>
-    <string name="signin_openrouter_signed_in_note">用量从你的 OpenRouter 余额里扣。Key 加密存在这台手机上；不想用了，可以在 OpenRouter 的 Keys 页面删掉名为「Mika」的那把。</string>
+    <string name="signin_openrouter_signed_in_note">用量从你的 OpenRouter 余额里扣。Key 加密存在这台手机上；不想用了，可以在 OpenRouter 的 Keys 页面删掉名为「Claire」的那把。</string>
     <string name="signin_openrouter_signed_out_note">这台手机上的 Key 已删掉。OpenRouter 那边的这把 Key 还在，可以在 Keys 页面删掉。选好的模型都还在。</string>
     <string name="signin_set_main">设为主模型</string>
-    <string name="signin_set_main_note">Mika 办事时用它</string>
+    <string name="signin_set_main_note">Claire 办事时用它</string>
     <string name="signin_sign_out_note">只清这台手机上的登录信息</string>
     <string name="signin_busy">另一个登录还没结束，先完成或取消它。</string>
     <string name="signin_openrouter_name">%1$s（账号登录）</string>
@@ -218,8 +218,8 @@
     <string name="models_daily_token_budget_sub">按本地日历日统计这家所有模型和用途的已报告输入与输出 Token。达到预算后不再发起下一次请求；在途请求可能超量，未报告用量按 0 计。本地日期变更后自动恢复。</string>
     <string name="models_daily_token_budget_save_failed">预算保存失败，原设置未变。</string>
     <string name="role_voice">声音模型</string>
-    <string name="role_voice_what">让 Mika 说话、朗读回答</string>
-    <string name="voice_enable">允许 Mika 说话</string>
+    <string name="role_voice_what">让 Claire 说话、朗读回答</string>
+    <string name="voice_enable">允许 Claire 说话</string>
     <string name="voice_enable_note">只有点「朗读」时才会合成；自动朗读另开</string>
     <string name="voice_provider">服务商</string>
     <string name="voice_no_providers">请先在「模型」中添加服务商。</string>
@@ -234,7 +234,7 @@
     <string name="voice_streaming">流式播放</string>
     <string name="voice_streaming_note">需要服务商支持流式音频，语速为 1.0。</string>
     <string name="voice_auto_read">每条回答自动朗读</string>
-    <string name="voice_speak_tool">允许 Mika 主动说话</string>
+    <string name="voice_speak_tool">允许 Claire 主动说话</string>
     <string name="voice_max_chars">单次最长字数</string>
     <string name="voice_test">说一句测试</string>
     <string name="voice_testing">正在合成测试语音…</string>
@@ -246,16 +246,16 @@
     <string name="voice_loading">正在准备声音…</string>
     <string name="voice_play_failed">播放失败：%1$s</string>
     <string name="voice_save_enabled">允许把音频存进音乐库</string>
-    <string name="voice_save_note">默认关闭。保存写入 Music/Mika</string>
+    <string name="voice_save_note">默认关闭。保存写入 Music/Claire</string>
     <string name="voice_ask_before_save">每次保存音频前先问我</string>
     <string name="tool_audio_generate">生成语音</string>
     <string name="tool_audio_save">保存音频</string>
     <string name="tool_share_audio">分享音频到 App</string>
     <string name="tool_audio_transcribe">转写音频</string>
     <string name="role_image">图片模型</string>
-    <string name="role_image_what">让 Mika 生成能用的图片</string>
-    <string name="image_hint">Mika 可以用你自己的图片模型生成图片。图片留在当前对话的工作区里，并显示在聊天中。</string>
-    <string name="image_enable">允许 Mika 生成图片</string>
+    <string name="role_image_what">让 Claire 生成能用的图片</string>
+    <string name="image_hint">Claire 可以用你自己的图片模型生成图片。图片留在当前对话的工作区里，并显示在聊天中。</string>
+    <string name="image_enable">允许 Claire 生成图片</string>
     <string name="image_enable_note">默认关闭。关闭时不向模型提供任何图片工具</string>
     <string name="image_provider">服务商</string>
     <string name="image_no_providers">先添加一个模型服务商（图片和对话共用服务商与 Key）。</string>
@@ -267,7 +267,7 @@
     <string name="image_limits">上限与保存</string>
     <string name="image_max_per_task">每个任务最多几张</string>
     <string name="image_save_enabled">允许保存到相册</string>
-    <string name="image_save_enabled_note">默认关闭。保存写入 Pictures/Mika</string>
+    <string name="image_save_enabled_note">默认关闭。保存写入 Pictures/Claire</string>
     <string name="image_ask_before_save">每次保存前先问我</string>
     <string name="image_ask_before_generate">每次生成前先问我</string>
     <string name="image_test">生成一张测试图</string>
@@ -319,5 +319,5 @@
     <string name="models_group_delete_body">用这个组的用途会退回没选、不用或用主模型。</string>
     <string name="models_group_used_by">用作 %1$s</string>
     <string name="models_group_member_context">上下文</string>
-    <string name="model_not_chat_capable">Mika 不能用这个模型对话；仍可在下方把它标为仅用于朗读。</string>
+    <string name="model_not_chat_capable">Claire 不能用这个模型对话；仍可在下方把它标为仅用于朗读。</string>
 </resources>

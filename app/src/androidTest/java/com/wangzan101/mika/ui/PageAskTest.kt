@@ -32,8 +32,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 浏览器页上「问 Mika」那一块的几种样子:平时的输入条 → 干活中的半屏面板(光边、步骤、停止)→ 你在页面上动手后收成小卡片、
- * 顶上一条「继续」;Mika 问你时面板自己打开。不跑任务,直接给状态。
+ * 浏览器页上「问 Claire」那一块的几种样子:平时的输入条 → 干活中的半屏面板(光边、步骤、停止)→ 你在页面上动手后收成小卡片、
+ * 顶上一条「继续」;Claire 问你时面板自己打开。不跑任务,直接给状态。
  */
 @RunWith(AndroidJUnit4::class)
 class PageAskTest {
@@ -67,7 +67,7 @@ class PageAskTest {
         compose.onNodeWithTag("page-ask-bar").assertIsDisplayed()
         compose.onNodeWithText(PageAskCopy.HINT).assertIsDisplayed()
 
-        // 用户问了:面板打开,Mika 在干活,四周亮光边,输入框右边是停止键
+        // 用户问了:面板打开,Claire 在干活,四周亮光边,输入框右边是停止键
         compose.runOnIdle {
             chat.show("conv-1", card(TaskState.Running(2, "", reason = "正在点「加入购物车」")), thread)
             chat.open = true

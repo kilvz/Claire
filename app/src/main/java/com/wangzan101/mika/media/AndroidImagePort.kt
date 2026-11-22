@@ -25,7 +25,7 @@ import java.io.File
 
 /**
  * 图片能力的手机实现:模型调用直接用 [model];产物经工作区文件闸门写进 `out/images/`;
- * 存相册走 [ImageExporter](MediaStore Pictures/Mika,不需要存储权限)。
+ * 存相册走 [ImageExporter](MediaStore Pictures/Claire,不需要存储权限)。
  * [onGenerated]/[onSaved] 把结果交给任务,聊天里据此出现照片格子与「已存入相册」卡片。
  */
 class AndroidImagePort(

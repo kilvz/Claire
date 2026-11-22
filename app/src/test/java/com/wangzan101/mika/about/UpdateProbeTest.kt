@@ -54,7 +54,7 @@ class UpdateProbeTest {
     private fun assetsPage(vararg apks: Pair<String, String?>) = buildString {
         append("<ul>")
         for ((name, sha) in apks) {
-            append("<li><a href=\"/wangzan101/Mika/releases/download/v0.3.0/$name\">$name</a>")
+            append("<li><a href=\"/kilvz/Claire/releases/download/v0.3.0/$name\">$name</a>")
             sha?.let { append("<span>sha256:$it</span>") }
             append("</li>")
         }
@@ -64,15 +64,15 @@ class UpdateProbeTest {
     @Test fun readsReleaseFromGitHubApi() = runTest {
         server.dispatcher = dispatcher {
             MockResponse().setBody(
-                """{"tag_name":"v0.3.0","name":"Mika 0.3.0","body":"- 新东西","published_at":"2026-11-01T00:00:00Z",
-                   "html_url":"https://github.com/wangzan101/Mika/releases/tag/v0.3.0",
-                   "assets":[{"name":"Mika-v0.3.0.apk","browser_download_url":"https://github.com/wangzan101/Mika/releases/download/v0.3.0/Mika-v0.3.0.apk","size":123,"digest":"$digest"}]}""",
+                """{"tag_name":"v0.3.0","name":"Claire 0.3.0","body":"- 新东西","published_at":"2026-11-01T00:00:00Z",
+                   "html_url":"https://github.com/kilvz/Claire/releases/tag/v0.3.0",
+                   "assets":[{"name":"Claire-v0.3.0.apk","browser_download_url":"https://github.com/kilvz/Claire/releases/download/v0.3.0/Claire-v0.3.0.apk","size":123,"digest":"$digest"}]}""",
             )
         }
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Claire/test")
         assertNotNull(found)
         assertEquals("0.3.0", found!!.version)
-        assertEquals("https://github.com/wangzan101/Mika/releases/download/v0.3.0/Mika-v0.3.0.apk", found.apkUrl)
+        assertEquals("https://github.com/kilvz/Claire/releases/download/v0.3.0/Claire-v0.3.0.apk", found.apkUrl)
         assertEquals(123L, found.apkSize)
         assertEquals(digest, found.apkDigest)
     }
@@ -80,7 +80,7 @@ class UpdateProbeTest {
     @Test fun rejectsOversizedMetadataWithoutAContentLength() = runTest {
         val metadata = """{"tag_name":"v0.3.0","assets":[]}"""
         server.enqueue(MockResponse().setChunkedBody(metadata.padEnd(2 * 1024 * 1024 + 1), 8192))
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test")
         assertNull(found)
         assertEquals(1, server.requestCount)
     }
@@ -94,15 +94,15 @@ class UpdateProbeTest {
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test"))
+        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test"))
         server.dispatcher = dispatcher { path ->
             when {
                 path.endsWith("/api") -> MockResponse().setResponseCode(403)
                 path.endsWith("/latest") -> MockResponse().setBody(releasePage)
-                else -> MockResponse().setBody(assetsPage("Mika-v0.3.0.apk" to null).padEnd(2 * 1024 * 1024 + 1))
+                else -> MockResponse().setBody(assetsPage("Claire-v0.3.0.apk" to null).padEnd(2 * 1024 * 1024 + 1))
             }
         }
-        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test"))
+        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test"))
     }
 
     /** 镜像不代理 API(403)时退到发布页:302 的 Location 里取 tag,再从附件页取文件名和摘要。 */
@@ -112,20 +112,20 @@ class UpdateProbeTest {
                 path.endsWith("/api") -> MockResponse().setResponseCode(403)
                 path.endsWith("/releases/latest") ->
                     MockResponse().setResponseCode(302)
-                        .setHeader("Location", "https://github.com/wangzan101/Mika/releases/tag/v0.3.0")
+                        .setHeader("Location", "https://github.com/kilvz/Claire/releases/tag/v0.3.0")
                 path.endsWith("/expanded_assets/v0.3.0") ->
                     MockResponse().setBody(assetsPage(
-                        "Mika-v0.3.0-arm64.apk" to "b".repeat(64),
-                        "Mika-v0.3.0.apk" to "a".repeat(64),
+                        "Claire-v0.3.0-arm64.apk" to "b".repeat(64),
+                        "Claire-v0.3.0.apk" to "a".repeat(64),
                     ))
                 else -> MockResponse().setResponseCode(404)
             }
         }
         // 镜像设置下 API 的 403 只说明它不代理 API,还要继续试发布页。
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, listOf("arm64-v8a"), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, listOf("arm64-v8a"), "Claire/test")
         assertNotNull(found)
         assertEquals("0.3.0", found!!.version)
-        assertEquals(releases.trimEnd('/') + "/download/v0.3.0/Mika-v0.3.0-arm64.apk", found.apkUrl)
+        assertEquals(releases.trimEnd('/') + "/download/v0.3.0/Claire-v0.3.0-arm64.apk", found.apkUrl)
         assertEquals("sha256:" + "b".repeat(64), found.apkDigest)
         assertTrue(found.pageUrl.endsWith("/tag/v0.3.0"))
     }
@@ -136,13 +136,13 @@ class UpdateProbeTest {
             when {
                 path.endsWith("/api") -> MockResponse().setResponseCode(403)
                 path.endsWith("/releases/latest") -> MockResponse().setBody(
-                    "<html><a href=\"/wangzan101/Mika/releases/tag/v0.4.0\">latest</a></html>",
+                    "<html><a href=\"/kilvz/Claire/releases/tag/v0.4.0\">latest</a></html>",
                 )
-                path.endsWith("/expanded_assets/v0.4.0") -> MockResponse().setBody(assetsPage("Mika-v0.4.0.apk" to "c".repeat(64)))
+                path.endsWith("/expanded_assets/v0.4.0") -> MockResponse().setBody(assetsPage("Claire-v0.4.0.apk" to "c".repeat(64)))
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test")
         assertEquals("0.4.0", found?.version)
         assertEquals("sha256:" + "c".repeat(64), found?.apkDigest)
     }
@@ -153,18 +153,18 @@ class UpdateProbeTest {
             when {
                 path.endsWith("/api") -> MockResponse().setResponseCode(403)
                 path.endsWith("/releases/latest") ->
-                    MockResponse().setResponseCode(302).setHeader("Location", "https://github.com/wangzan101/Mika/releases/tag/v0.5.0")
+                    MockResponse().setResponseCode(302).setHeader("Location", "https://github.com/kilvz/Claire/releases/tag/v0.5.0")
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test")
         assertEquals("0.5.0", found?.version)
-        assertEquals(releases.trimEnd('/') + "/download/v0.5.0/Mika-v0.5.0.apk", found?.apkUrl)
+        assertEquals(releases.trimEnd('/') + "/download/v0.5.0/Claire-v0.5.0.apk", found?.apkUrl)
         assertNull(found?.apkDigest)
     }
 
     @Test fun publishedAssetsWithoutACompatibleApkOnlyOfferTheReleasePage() = runTest {
-        for (assets in listOf(assetsPage("Mika-v0.3.0-arm64.apk" to null), assetsPage())) {
+        for (assets in listOf(assetsPage("Claire-v0.3.0-arm64.apk" to null), assetsPage())) {
             server.dispatcher = dispatcher { path ->
                 when {
                     path.endsWith("/api") -> MockResponse().setResponseCode(403)
@@ -173,7 +173,7 @@ class UpdateProbeTest {
                     else -> MockResponse().setBody(assets)
                 }
             }
-            val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, listOf("x86_64"), "Mika/test")
+            val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, listOf("x86_64"), "Claire/test")
             assertEquals("0.3.0", found?.version)
             assertEquals("$releases/tag/v0.3.0", found?.pageUrl)
             assertNull(found?.apkUrl)
@@ -187,7 +187,7 @@ class UpdateProbeTest {
             requests++
             MockResponse().setResponseCode(500)
         }
-        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Mika/test"))
+        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Claire/test"))
         assertEquals(1, requests)
     }
 
@@ -197,12 +197,12 @@ class UpdateProbeTest {
             when {
                 path.endsWith("/api") -> MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.DISCONNECT_AT_START)
                 path.endsWith("/releases/latest") ->
-                    MockResponse().setResponseCode(302).setHeader("Location", "https://github.com/wangzan101/Mika/releases/tag/v0.6.0")
-                path.endsWith("/expanded_assets/v0.6.0") -> MockResponse().setBody(assetsPage("Mika-v0.6.0.apk" to null))
+                    MockResponse().setResponseCode(302).setHeader("Location", "https://github.com/kilvz/Claire/releases/tag/v0.6.0")
+                path.endsWith("/expanded_assets/v0.6.0") -> MockResponse().setBody(assetsPage("Claire-v0.6.0.apk" to null))
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Mika/test")
+        val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), "", api, releases, emptyList(), "Claire/test")
         assertEquals("0.6.0", found?.version)
         assertNull(found?.apkDigest)
     }
@@ -217,7 +217,7 @@ class UpdateProbeTest {
         server.enqueue(MockResponse().setBody("""{"tag_name":"v0.3.0","assets":[]}""")
             .setBodyDelay(3, TimeUnit.SECONDS))
         val job = launch(Dispatchers.IO) {
-            UpdateProbe.fetch(client, "", api, releases, emptyList(), "Mika/test")
+            UpdateProbe.fetch(client, "", api, releases, emptyList(), "Claire/test")
         }
         assertTrue(withContext(Dispatchers.IO) { headersReceived.await(2, TimeUnit.SECONDS) })
         delay(200) // 响应头已到,响应体仍在等待,让读取进入阻塞状态。
@@ -246,6 +246,6 @@ class UpdateProbeTest {
 
     @Test fun allSourcesFailingMeansNoResult() = runTest {
         server.dispatcher = dispatcher { MockResponse().setResponseCode(500) }
-        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Mika/test"))
+        assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test"))
     }
 }

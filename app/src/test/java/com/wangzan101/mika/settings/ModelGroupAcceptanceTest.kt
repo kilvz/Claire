@@ -37,7 +37,7 @@ class ModelGroupAcceptanceTest {
     private val seen = mutableListOf<Pair<UsageSource, Usage?>>()
     private val calls = mutableMapOf<String, Int>()
 
-    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }, userAgent = "Mika/test") { cfg, _, _, _ ->
+    private fun store() = ProviderStore(tmp.root, AesGcmKeyCipher { key }, usage = { src, u -> seen += src to u }, userAgent = "Claire/test") { cfg, _, _, _ ->
         ScriptedModel(cfg.model, cfg.capabilities) {
             val n = (calls[cfg.model] ?: 0) + 1
             calls[cfg.model] = n

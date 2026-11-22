@@ -115,22 +115,22 @@ class ProjectDrawerUiTest {
         show(vm, drawerOpen = true)
 
         compose.onNodeWithTag("drawer-new-project").performClick()
-        compose.onNodeWithTag("project-name-field").performTextReplacement("Mika 研发")
+        compose.onNodeWithTag("project-name-field").performTextReplacement("Claire 研发")
         compose.onNodeWithTag("confirm-create-project").performClick()
         compose.waitForIdle()
 
         val created = projects.projects.value.single()
-        assertEquals("Mika 研发", created.name)
+        assertEquals("Claire 研发", created.name)
         assertEquals(created.id, vm.ui.value.projectId)
-        compose.onNode(hasText("Mika 研发") and hasAnyAncestor(hasTestTag("chat-project-pill"))).assertIsDisplayed()
+        compose.onNode(hasText("Claire 研发") and hasAnyAncestor(hasTestTag("chat-project-pill"))).assertIsDisplayed()
 
         compose.onNodeWithContentDescription("菜单").performClick()
-        compose.onNode(hasTestTag("project-header") and hasText("Mika 研发")).assertExists()
+        compose.onNode(hasTestTag("project-header") and hasText("Claire 研发")).assertExists()
         compose.onNode(hasTestTag("project-new-chat") and hasAnyAncestor(hasTestTag("drawer"))).performClick()
         compose.waitForIdle()
 
         assertEquals(created.id, vm.ui.value.projectId)
-        compose.onNode(hasText("Mika 研发") and hasAnyAncestor(hasTestTag("chat-project-pill"))).assertIsDisplayed()
+        compose.onNode(hasText("Claire 研发") and hasAnyAncestor(hasTestTag("chat-project-pill"))).assertIsDisplayed()
     }
 
     @Test fun collapseRenameAndDeleteProjectRemoveMembersOnly() {

@@ -69,7 +69,7 @@ class ToolRiskTest {
         override val capabilities = TtsCapabilities(maxChars = 100, formats = setOf("wav"))
         override suspend fun synthesize(request: TtsRequest) = TtsResponse(ByteArray(0), "audio/wav")
         override suspend fun store(response: TtsResponse, nameHint: String?, text: String) = StoredAudio("/workspace/out/audio/x.wav", 0, "audio/wav")
-        override suspend fun saveToMusic(path: String, name: String?) = SavedAudio("Music/Mika/x.wav", "content://x", 0)
+        override suspend fun saveToMusic(path: String, name: String?) = SavedAudio("Music/Claire/x.wav", "content://x", 0)
         override suspend fun speak(request: TtsRequest) {}
     }
 
@@ -79,7 +79,7 @@ class ToolRiskTest {
         override suspend fun generate(request: ImageRequest) = ImageResponse(emptyList())
         override suspend fun readReference(path: String) = ImageReference(ByteArray(0), "image/png")
         override suspend fun store(image: GeneratedImage, nameHint: String?, prompt: String) = StoredImage("/workspace/out/images/x.png", 0, 0, 0)
-        override suspend fun saveToGallery(path: String, name: String?) = SavedImage("Pictures/Mika/x.png", "content://x", 0)
+        override suspend fun saveToGallery(path: String, name: String?) = SavedImage("Pictures/Claire/x.png", "content://x", 0)
     }
 
     @Test fun readCallsRefuseWhatTheOldListsRefused() = runTest {

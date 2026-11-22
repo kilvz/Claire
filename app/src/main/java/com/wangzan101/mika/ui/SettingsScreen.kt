@@ -98,7 +98,7 @@ fun SettingsScreen(
     /** 任务运行里的「自主模式」:当前值和换它的办法。 */
     autonomous: Boolean = false,
     onAutonomous: (Boolean) -> Unit = {},
-    /** 查到的新版本号;有它时「关于 Mika」一行写「x 可更新」带红点。 */
+    /** 查到的新版本号;有它时「关于 Claire」一行写「x 可更新」带红点。 */
     updateVersion: String? = null,
     onOpenAbout: () -> Unit = {},
     /** 外部 MCP server 设置(outbound);为空时不显示入口。 */
@@ -516,7 +516,7 @@ fun SettingsContent(
                 RowValue(languageLabel(language))
                 RowChevron()
             }
-            // 人格和语言、外观是一类:定 Mika 怎么表现的全局取值。行尾是现在在用的,主界面上没有别的地方显示它
+            // 人格和语言、外观是一类:定 Claire 怎么表现的全局取值。行尾是现在在用的,主界面上没有别的地方显示它
             onOpenPersonas?.let { open ->
                 val personas = (LocalContext.current.applicationContext as? com.wangzan101.mika.MikaApp)?.personas
                 ListRow(MikaIcons.Chats, stringResource(R.string.persona_title), onClick = open) {
@@ -677,7 +677,7 @@ fun AdvancedSettingsContent(
             }
         }
 
-        // 完全退出:和无障碍服务不同,它只是让 Mika 安静下来;下次打开 App 就回来
+        // 完全退出:和无障碍服务不同,它只是让 Claire 安静下来;下次打开 App 就回来
         GroupCard {
             ListRow(
                 MikaIcons.Power, stringResource(R.string.quit_title), stringResource(R.string.quit_row_sub),

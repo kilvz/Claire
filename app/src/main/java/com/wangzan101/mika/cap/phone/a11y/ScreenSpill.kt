@@ -28,12 +28,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 「App 被开到用户主屏上」的整块处理:动作前后盯梢主屏冒出来的任务,把开到主屏上的 App 挪回 Mika 的屏,
+ * 「App 被开到用户主屏上」的整块处理:动作前后盯梢主屏冒出来的任务,把开到主屏上的 App 挪回 Claire 的屏,
  * 或等用户在主屏上选完/亲手处理完。共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
  */
 internal class ScreenSpill(private val screen: AndroidScreen) {
 
-    /** 一次动作的盯梢:[since] 开始的时刻,[topBefore] 那时主屏最上面的任务,[agentTopBefore] 那时 Mika 屏上最上面的任务,
+    /** 一次动作的盯梢:[since] 开始的时刻,[topBefore] 那时主屏最上面的任务,[agentTopBefore] 那时 Claire 屏上最上面的任务,
      * [userActiveBefore] 动作开始前用户刚在主屏上动过手。 */
     internal class Watch(val since: Long, val topBefore: Int, val agentTopBefore: Int, val userActiveBefore: Boolean)
 
@@ -46,7 +46,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     /** 已经判过的记录到哪个时刻:同一条不判两次。 */
     @Volatile internal var consumed = 0L
 
-    /** 从用户主屏挪回 Mika 屏上的任务,和从它们里面打开的:它们在最上面算目标 App 打开的,不算被切走。 */
+    /** 从用户主屏挪回 Claire 屏上的任务,和从它们里面打开的:它们在最上面算目标 App 打开的,不算被切走。 */
     internal val adopted: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     internal val _userPick = MutableStateFlow<AndroidScreen.UserPick?>(null)
@@ -71,7 +71,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         runCatching { screen.a11y.packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName } }.getOrDefault(emptyList()).toSet()
     }
 
-    /** 不算开到主屏上的:Mika 自己、桌面 App。 */
+    /** 不算开到主屏上的:Claire 自己、桌面 App。 */
     internal val notSpills: Set<String> by lazy { homeApps + screen.a11y.packageName }
 
     /** 动作之前:请内置助手盯着主屏,记下此刻两块屏最上面的任务;没有屏、接管中或助手不支持时为 null(不盯)。 */
@@ -87,7 +87,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return Watch(since, top, agentTop, userActiveBefore).also { watch = it }
     }
 
-    /** 盯梢期间记下用户在主屏上的点按(Mika 自己的浮层不算);到期自己停。 */
+    /** 盯梢期间记下用户在主屏上的点按(Claire 自己的浮层不算);到期自己停。 */
     internal fun watchUserTaps(until: Long) {
         tapWatchUntil = maxOf(tapWatchUntil, until)
         if (tapWatch?.isActive == true) return
@@ -96,7 +96,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
                 screen.a11y.eventsFor(Display.DEFAULT_DISPLAY).collect { e ->
                     val systemTouch = e.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START
                     if (MainScreenSpill.isUserTap(e.eventType) &&
-                        // Mika 浮层自己的控件点击不是用户打开了别的 App;系统触摸事件没有这种包名歧义
+                        // Claire 浮层自己的控件点击不是用户打开了别的 App;系统触摸事件没有这种包名歧义
                         (systemTouch || e.packageName?.toString() != screen.a11y.packageName)
                     ) {
                         // 系统触摸事件带有真实发生时刻;通知栏、桌面等不发控件点击事件的入口也不能漏掉
@@ -116,7 +116,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 动作之后:问内置助手这次动作开始后主屏冒出来的任务,按 [MainScreenSpill] 判;开到主屏上的挪回 Mika 的屏,
+     * 动作之后:问内置助手这次动作开始后主屏冒出来的任务,按 [MainScreenSpill] 判;开到主屏上的挪回 Claire 的屏,
      * 开在用户正用着的 App 里的只报不动。没有为 null。
      */
     internal suspend fun takeSpill(w: Watch?): Spill? {
@@ -131,7 +131,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
             // 开到用户主屏上的不在应用访问边界看的那块屏上:被禁用的不挪、不读
             screen.appAccess.current().denial(pkg)?.let { throw it }
             last = when (v) {
-                // 系统问打开哪一个的先按选择框处理;要用户亲手处理的弹窗(登录验证、账号确认一类)留在主屏,不挪到 Mika 的屏上
+                // 系统问打开哪一个的先按选择框处理;要用户亲手处理的弹窗(登录验证、账号确认一类)留在主屏,不挪到 Claire 的屏上
                 is MainScreenSpill.PullBack -> leaveForUser(a, pkg, w) ?: leavePopup(a, pkg) ?: pullBack(a, pkg) ?: last
                 is MainScreenSpill.InUse -> Spill(OpenedElsewhere(pkg, screen.appLabel(pkg), pulledBack = false, inProfile = inProfileOf(pkg, a.userId)), null)
             }
@@ -155,7 +155,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     /**
      * 冒到主屏上的是要用户亲手处理的弹窗(登录验证、账号确认、付款确认一类):不挪,留在用户屏上。
      * 判据:系统账号登录服务(登记了账号认证器、没有桌面图标的包)的页面,顶层窗口不是整屏(对话框、底部弹层),窗口里有密码框,或页面本身不进最近任务(excludeFromRecents)。
-     * 这类窗口挪到 Mika 的屏上就从用户眼前消失,用户也就没法在主屏上点确认。不是为 null。
+     * 这类窗口挪到 Claire 的屏上就从用户眼前消失,用户也就没法在主屏上点确认。不是为 null。
      * noHistory 不算:很多 App 的开屏页带着它,算进来就把普通 App 当成了弹窗。
      */
     internal suspend fun leavePopup(a: MainScreenSpill.Arrival, pkg: String): Spill? =
@@ -190,14 +190,14 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     /**
      * 这个包是不是系统的账号登录服务:登记了账号认证器(AccountManager.authenticatorTypes,平台数据),自己又没有桌面图标
      * (没有 LAUNCHER 入口)。这种包没有自己的首页,冒到主屏上的只会是加账号、登录、验证、验证码一类页面,本身就是用户的事,
-     * 整屏、没有密码框也不能挪到 Mika 的屏上。有桌面图标的认证器包(同步联系人的聊天 App、邮箱 App 等)不算,
+     * 整屏、没有密码框也不能挪到 Claire 的屏上。有桌面图标的认证器包(同步联系人的聊天 App、邮箱 App 等)不算,
      * 它们的会话、分享、写信页照常挪回。认证器表每次现读:新装的认证器也认得出,这一步只在有页面冒到主屏时才走。
      */
     internal fun isAuthenticatorUi(pkg: String): Boolean {
         val authenticators = runCatching { AccountManager.get(screen.a11y).authenticatorTypes.mapNotNull { it.packageName }.toSet() }
             .getOrDefault(emptySet())
         if (pkg !in authenticators) return false
-        // 有桌面图标的包对 Mika 一定看得见(清单里查了 LAUNCHER);查不到才算没有
+        // 有桌面图标的包对 Claire 一定看得见(清单里查了 LAUNCHER);查不到才算没有
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
         val hasLauncher = runCatching { screen.a11y.packageManager.queryIntentActivities(launcher, 0).isNotEmpty() }.getOrDefault(true)
         return MainScreenSpill.authenticatorUi(pkg, authenticators, hasLauncher)
@@ -226,7 +226,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return Spill(OpenedElsewhere(pkg, app, pulledBack = false, picker = true), choice)
     }
 
-    /** 把开到主屏上的任务挪到 Mika 的屏(只挪,不替它重新打开),等它到最上面;挪不动为 null。 */
+    /** 把开到主屏上的任务挪到 Claire 的屏(只挪,不替它重新打开),等它到最上面;挪不动为 null。 */
     internal suspend fun pullBack(a: MainScreenSpill.Arrival, pkg: String, byUser: Boolean = false): Spill? {
         if (!runCatching { screen.shell.moveTask(a.taskId, screen.displayId) }.getOrDefault(false)) {
             Log.w(AndroidScreen.TAG, "could not move task ${a.taskId} ($pkg) from the main screen")
@@ -257,9 +257,9 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 任务在下一个改动屏幕的动作前调:等用户在主屏上选完(选之前一直盯着主屏)。选完后,开到主屏上的普通页面挪回 Mika 的屏
+     * 任务在下一个改动屏幕的动作前调:等用户在主屏上选完(选之前一直盯着主屏)。选完后,开到主屏上的普通页面挪回 Claire 的屏
      * (只挪,打开它的仍是原来那个 App);要用户亲手处理的(要输密码、窗口读不到,像付款、指纹)留在主屏,返回 [AndroidScreen.PickResult.NeedsUser];
-     * 开在了 Mika 屏上的一并算进来;用户把问题关了就照实说。没在等时为 null。
+     * 开在了 Claire 屏上的一并算进来;用户把问题关了就照实说。没在等时为 null。
      */
     suspend fun awaitUserPick(): AndroidScreen.PickResult? = withContext(Dispatchers.IO) {
         val p = _userPick.value ?: return@withContext null
@@ -283,7 +283,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
                     pendingReport = pullBack(opened, pkg)
                     return@withContext AndroidScreen.PickResult.Settled
                 }
-                // 选中的 App 开在了 Mika 的屏上(从那边打开的)
+                // 选中的 App 开在了 Claire 的屏上(从那边打开的)
                 val top = runCatching { screen.shell.topTaskId(screen.displayId) }.getOrDefault(-1)
                 if (top >= 0 && top != p.agentTop && top !in adopted) {
                     adopted += top
@@ -303,7 +303,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         }
     }
 
-    /** 用户处理完([AndroidScreen.PickResult.NeedsUser])点了继续:它还在主屏上就挪回 Mika 的屏接着做,已经关了就照实说。 */
+    /** 用户处理完([AndroidScreen.PickResult.NeedsUser])点了继续:它还在主屏上就挪回 Claire 的屏接着做,已经关了就照实说。 */
     suspend fun afterUserStep(r: AndroidScreen.PickResult.NeedsUser) = withContext(Dispatchers.IO) {
         val still = runCatching { screen.shell.displayOfTask(r.taskId) }.getOrDefault(-1) == Display.DEFAULT_DISPLAY
         val moved = if (still) pullBack(MainScreenSpill.Arrival(r.taskId, r.packageName, r.userId, 0, Display.DEFAULT_DISPLAY, false, true, Display.DEFAULT_DISPLAY), r.packageName, byUser = true) else null
@@ -334,7 +334,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 动作之前 Mika 屏上最上面的是挪回来的任务(或从它里面打开的),动作之后最上面换成了另一个任务:
+     * 动作之前 Claire 屏上最上面的是挪回来的任务(或从它里面打开的),动作之后最上面换成了另一个任务:
      * 这个也是那条路上打开的,一并算进来。装了两份的 App 报开的是哪一份。
      */
     internal suspend fun adoptFromAdopted(w: Watch?): String? {
@@ -346,7 +346,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return inProfileOf(pkg, runCatching { screen.shell.userOfTask(top) }.getOrDefault(-1))
     }
 
-    /** 装了两份的 App 开的是哪一份:和 Mika 同一个用户的是本来那份;只装了一份或看不出为 null。 */
+    /** 装了两份的 App 开的是哪一份:和 Claire 同一个用户的是本来那份;只装了一份或看不出为 null。 */
     internal suspend fun inProfileOf(pkg: String, userId: Int): String? {
         if (userId < 0 || pkg !in screen.otherProfiles()) return null
         return if (userId == AndroidScreen.myUser) OpenedElsewhere.MAIN_PROFILE else OpenedElsewhere.OTHER_PROFILE
@@ -378,10 +378,10 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return when {
             o.closed -> "The user closed the system's question on their screen without picking, so nothing was opened. Decide what to do next; do not simply repeat the action."
             o.byUser && !o.pulledBack -> "$name needed the user; they handled it on their own screen and tapped continue, and it has closed. Observe before acting."
-            o.byUser -> "$name needed the user; they handled it on their own screen and tapped continue. It is now in front on Mika's screen. Observe before acting."
+            o.byUser -> "$name needed the user; they handled it on their own screen and tapped continue. It is now in front on Claire's screen. Observe before acting."
             o.needsUser && o.onUserScreen -> "It was $name: a popup on the user's screen that needs them (a sign-in, verification or confirmation step). " +
                 "It was left there on purpose; do not repeat the action. Call hand_to_user so they can finish it, then observe before acting."
-            o.pulledBack -> "It was $name, now in front on Mika's screen.$copy Observe before acting."
+            o.pulledBack -> "It was $name, now in front on Claire's screen.$copy Observe before acting."
             else -> "It was $name, which the user is using on their own screen, so it was left there. " +
                 "Do not repeat the previous action: call hand_to_user with reason other so the user can do that step there, or wait and try again later."
         }

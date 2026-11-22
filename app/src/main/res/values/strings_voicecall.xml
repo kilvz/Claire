@@ -19,7 +19,7 @@
     <string name="voicecall_ended_notification">Ended from the notification</string>
     <string name="voicecall_ended_incoming">A phone call came in — call ended</string>
     <string name="voicecall_ended_limit">10 minutes are up — call ended</string>
-    <string name="voicecall_ended_background">Return to Mika to continue</string>
+    <string name="voicecall_ended_background">Return to Claire to continue</string>
     <string name="voicecall_error_auth">The voice credentials were rejected — check the setup</string>
     <string name="voicecall_error_timeout">Connection timed out — try again</string>
     <string name="voicecall_error_disconnected">The connection dropped</string>
@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">Speaker</string>
     <string name="voicecall_mic_needed_title">Voice chat needs the microphone</string>
     <string name="voicecall_mic_needed_body">Hearing you — and letting you barge in — takes recording. The call starts only after you allow it.</string>
-    <string name="voicecall_mic_denied_body">It was denied before, so the phone won\'t ask again. Turn on the microphone on Mika\'s permission page in system settings.</string>
+    <string name="voicecall_mic_denied_body">It was denied before, so the phone won\'t ask again. Turn on the microphone on Claire\'s permission page in system settings.</string>
     <string name="voicecall_mic_allow">Allow microphone</string>
     <string name="voicecall_setup_title">Set up realtime voice first</string>
     <string name="voicecall_setup_body">Voice chat runs on the realtime voice service (the same setup as AI calls). Add credentials to start.</string>

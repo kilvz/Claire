@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">免持</string>
     <string name="voicecall_mic_needed_title">語音通話要用麥克風</string>
     <string name="voicecall_mic_needed_body">聽到你說話、你隨時打斷，都要錄音。允許之後通話才開始。</string>
-    <string name="voicecall_mic_denied_body">之前沒有允許，手機不會再問了：到系統設定裡 Mika 的權限頁，打開「麥克風」就能用。</string>
+    <string name="voicecall_mic_denied_body">之前沒有允許，手機不會再問了：到系統設定裡 Claire 的權限頁，打開「麥克風」就能用。</string>
     <string name="voicecall_mic_allow">允許麥克風</string>
     <string name="voicecall_setup_title">先設定即時語音</string>
     <string name="voicecall_setup_body">語音通話走即時語音服務（和 AI 電話同一份設定），配上憑據就能用。</string>

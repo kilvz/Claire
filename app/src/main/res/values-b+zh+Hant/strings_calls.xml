@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">撥打電話</string>
     <string name="calls_rules">自動接聽規則</string>
     <string name="calls_setup_credentials">請設定所選語音服務的憑據。</string>
-    <string name="calls_setup_shell">請先連線 Mika 內建助理。</string>
+    <string name="calls_setup_shell">請先連線 Claire 內建助理。</string>
     <string name="calls_sim_clear_preferred">取消預設 SIM</string>
     <string name="calls_sim_preferred">預設撥號 SIM：%1$s</string>
     <string name="calls_sim_save_preferred">設為預設撥號 SIM</string>
@@ -146,8 +146,8 @@
     <string name="calls_notification_connected">AI 已接通，可隨時手動接管</string>
     <string name="calls_only_types">僅接聽所選類型</string>
     <string name="calls_pick_types">請至少選擇一種來電類型</string>
-    <string name="calls_type_note">Mika 透過無障礙服務讀取系統電話顯示的標籤與號碼。無法確認類型或號碼時，由你本人接聽。</string>
-    <string name="calls_type_accessibility">開啟 Mika 無障礙服務</string>
+    <string name="calls_type_note">Claire 透過無障礙服務讀取系統電話顯示的標籤與號碼。無法確認類型或號碼時，由你本人接聽。</string>
+    <string name="calls_type_accessibility">開啟 Claire 無障礙服務</string>
     <string name="calls_type_takeout">外送餐點</string>
     <string name="calls_type_parcel">快遞包裹</string>
     <string name="calls_type_delivery">配送或物流（未細分）</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">企業與客服</string>
     <string name="calls_type_transport">計程車與叫車服務</string>
     <string name="calls_only_strangers">僅接聽陌生號碼</string>
-    <string name="calls_strangers_note">請允許 Mika 讀取通訊錄。只有確認號碼未儲存時，AI 才會接聽。隱藏號碼或無法查詢時，由你本人接聽。</string>
+    <string name="calls_strangers_note">請允許 Claire 讀取通訊錄。只有確認號碼未儲存時，AI 才會接聽。隱藏號碼或無法查詢時，由你本人接聽。</string>
 </resources>

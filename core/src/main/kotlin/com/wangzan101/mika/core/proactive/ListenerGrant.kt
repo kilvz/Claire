@@ -6,7 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 「由 Mika 助手授权」的结果。界面只按类别给一句话,不显示命令的原始输出。 */
+/** 「由 Claire 助手授权」的结果。界面只按类别给一句话,不显示命令的原始输出。 */
 sealed interface GrantResult {
     data object Granted : GrantResult
     /** 助手和已配对的连接都用不上(命令根本没跑起来)。 */
@@ -18,7 +18,7 @@ sealed interface GrantResult {
 }
 
 /**
- * 以 shell 身份给 Mika 的通知监听开「通知使用权」:只在用户点按钮并确认后跑一次,不在后台自动跑。
+ * 以 shell 身份给 Claire 的通知监听开「通知使用权」:只在用户点按钮并确认后跑一次,不在后台自动跑。
  * 纯逻辑:跑命令、等系统那边生效都经参数传入,便于用假的测。
  */
 object ListenerGrant {

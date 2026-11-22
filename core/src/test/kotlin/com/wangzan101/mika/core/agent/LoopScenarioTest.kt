@@ -403,7 +403,7 @@ class LoopScenarioTest {
         assertTrue(hint, "latest message: \"$quoted\"" in hint)
     }
 
-    // 引了 Mika 之前的一段英文回答、再打一句短中文:按整句算会判成换了语言;引的那段不算用户的话,语言提示引打的字,中文回答不退回
+    // 引了 Claire 之前的一段英文回答、再打一句短中文:按整句算会判成换了语言;引的那段不算用户的话,语言提示引打的字,中文回答不退回
     @Test fun quotedReplyFollowsTheUserWords() = runTest {
         val goal = QuoteMessage.compose(QuoteMessage.Quote(QuoteMessage.From.Mika, ENGLISH_REPLY), "那哪个更值")
         assertNotNull(ReplyLanguage.mismatch(goal, HEADPHONES_ANSWER))

@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">免提</string>
     <string name="voicecall_mic_needed_title">语音通话要用麦克风</string>
     <string name="voicecall_mic_needed_body">听到你说话、你随时打断，都要录音。允许之后通话才开始。</string>
-    <string name="voicecall_mic_denied_body">之前没有允许，手机不会再问了：到系统设置里 Mika 的权限页，打开「麦克风」就能用。</string>
+    <string name="voicecall_mic_denied_body">之前没有允许，手机不会再问了：到系统设置里 Claire 的权限页，打开「麦克风」就能用。</string>
     <string name="voicecall_mic_allow">允许麦克风</string>
     <string name="voicecall_setup_title">先配置实时语音</string>
     <string name="voicecall_setup_body">语音通话走实时语音服务（和 AI 电话同一份配置），配上凭据就能用。</string>

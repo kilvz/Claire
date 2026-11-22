@@ -229,7 +229,7 @@ object UpdateMirrors {
     const val NAME_MAX = 40
 
     /**
-     * 预设:2026-11-15 实测能下载 Mika 发布附件的服务。地址只保留协议、主机和路径,末尾补斜杠;
+     * 预设:2026-11-15 实测能下载 Claire 发布附件的服务。地址只保留协议、主机和路径,末尾补斜杠;
      * 完整下载地址是 `prefix + https://github.com/...`。前两个还能用于检查更新(一个走 API,一个走发布页)。
      */
     val PRESETS = listOf(

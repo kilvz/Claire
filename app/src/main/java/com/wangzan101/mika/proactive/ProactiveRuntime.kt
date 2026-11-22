@@ -73,7 +73,7 @@ class ProactiveRuntime(
     private val access: () -> AppGate,
     /** 「应用访问」变了就发一次(收集时先给现在的):禁用之后,已经收下的一并去掉;读不出来、又读得出来时重新看一遍。 */
     private val accessChanges: Flow<AppGate>,
-    /** 「由 Mika 助手授权」用的 shell 命令通道;只在用户点了按钮时才取,功能关着时不碰手机能力。 */
+    /** 「由 Claire 助手授权」用的 shell 命令通道;只在用户点了按钮时才取,功能关着时不碰手机能力。 */
     private val shellRunner: () -> ShellCommandRunner,
     /** 判定要用的模型、用量和「有任务在跑」;判定关着时不碰。 */
     private val triageHooks: TriageHooks,
@@ -193,7 +193,7 @@ class ProactiveRuntime(
 
     /**
      * 「完全退出」时调:停下看守并请系统解绑,开关和白名单都不动。之后系统为别的服务把进程拉起来、
-     * 又把监听绑上时,[onConnected] 看到没在看守会再解绑;用户重新打开 Mika 时由 [start] 恢复。
+     * 又把监听绑上时,[onConnected] 看到没在看守会再解绑;用户重新打开 Claire 时由 [start] 恢复。
      */
     fun pause() {
         scope.launch {
@@ -233,7 +233,7 @@ class ProactiveRuntime(
     }
 
     /**
-     * 系统设置里有没有给 Mika 通知使用权。问通知服务本身,不读 `enabled_notification_listeners` 那个设置项:
+     * 系统设置里有没有给 Claire 通知使用权。问通知服务本身,不读 `enabled_notification_listeners` 那个设置项:
      * 真机上使用权被收回后那个设置项里还留着旧值。
      */
     fun authorized(): Boolean = runCatching {
@@ -243,7 +243,7 @@ class ProactiveRuntime(
     private val granting = Mutex()
 
     /**
-     * 用户在主动能力页点「由 Mika 助手授权」并确认后调:经内置助手(或已配对的连接)以 shell 身份给监听开通知使用权。
+     * 用户在主动能力页点「由 Claire 助手授权」并确认后调:经内置助手(或已配对的连接)以 shell 身份给监听开通知使用权。
      * 只由用户操作触发,不在后台自动调;用户离开页面也跑完(授权生效了要重绑)。同一时间只跑一次(后来的排队,轮到时已授权就直接算成功)。
      * 生效后照解锁的路子请系统重绑,不用离开页面。日志里只记结果类别和截短的命令输出,没有通知内容。
      */
@@ -559,7 +559,7 @@ class ProactiveRuntime(
         }
     }
 
-    /** 包名这一关在读通知内容之前:不在白名单里(或是 Mika 自己、或被应用访问禁用)的连内容都不读。 */
+    /** 包名这一关在读通知内容之前:不在白名单里(或是 Claire 自己、或被应用访问禁用)的连内容都不读。 */
     private fun gatedRecord(sbn: StatusBarNotification): NoticeRecord? {
         val pkg = sbn.packageName ?: return null
         if (!BlockedApps.readable(pkg, allowed.current(), access())) return null
@@ -592,7 +592,7 @@ class ProactiveRuntime(
     }
 
     /**
-     * 清单里监听组件默认是停用的(没用过这个功能的人,系统「通知使用权」列表里没有 Mika);第一次打开功能时启用,
+     * 清单里监听组件默认是停用的(没用过这个功能的人,系统「通知使用权」列表里没有 Claire);第一次打开功能时启用,
      * 之后不再停用(停用会让系统收回使用权,见 [setEnabled])。
      */
     private fun enableComponent() {
@@ -604,7 +604,7 @@ class ProactiveRuntime(
         }.onFailure { Log.w(TAG, "cannot enable the notification listener", it) }
     }
 
-    // ---- 值得提醒(见 [NoticeHints]):只在内存里,胶囊上只给条数;点开时才写成对话里 Mika 的一条消息(见 [NoticeTalks]) ----
+    // ---- 值得提醒(见 [NoticeHints]):只在内存里,胶囊上只给条数;点开时才写成对话里 Claire 的一条消息(见 [NoticeTalks]) ----
 
     private val hintBoard = NoticeHints()
     /** 判为值得提醒、还在收件箱里的几条,和还没看过的条数。 */
@@ -613,7 +613,7 @@ class ProactiveRuntime(
     private val talks = NoticeTalks(com.wangzan101.mika.chat.ConversationStore.shared(app), prefs)
 
     /**
-     * 用户点开了提醒(悬浮窗上的数字,或主动能力页那一行):把还没看的几条写成 Mika 的一条消息,放进今天的提醒对话,
+     * 用户点开了提醒(悬浮窗上的数字,或主动能力页那一行):把还没看的几条写成 Claire 的一条消息,放进今天的提醒对话,
      * 设为当前对话,这几条记为看过(见 [NoticeTalks.open])。返回那个对话的 id;没有可开的、写不进去为 null。不调模型。
      */
     suspend fun openHintTalk(): String? {

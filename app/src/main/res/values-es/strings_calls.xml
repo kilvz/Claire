@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">Hacer una llamada</string>
     <string name="calls_rules">Reglas de respuesta</string>
     <string name="calls_setup_credentials">Configura las credenciales del servicio de voz.</string>
-    <string name="calls_setup_shell">Conecte primero el asistente integrado de Mika.</string>
+    <string name="calls_setup_shell">Conecte primero el asistente integrado de Claire.</string>
     <string name="calls_sim_clear_preferred">Borrar SIM preferida</string>
     <string name="calls_sim_preferred">SIM preferida: %1$s</string>
     <string name="calls_sim_save_preferred">Usar esta SIM por defecto</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">IA conectada. Puedes hablar personalmente en cualquier momento.</string>
     <string name="calls_only_types">Solo tipos de llamada seleccionados</string>
     <string name="calls_pick_types">Selecciona al menos un tipo de llamada</string>
-    <string name="calls_type_note">Mika usa Accesibilidad para cotejar la etiqueta y el número de la aplicación de teléfono con la llamada entrante. Si no puede identificarlos, podrás contestar tú.</string>
+    <string name="calls_type_note">Claire usa Accesibilidad para cotejar la etiqueta y el número de la aplicación de teléfono con la llamada entrante. Si no puede identificarlos, podrás contestar tú.</string>
     <string name="calls_type_accessibility">Abrir los ajustes de accesibilidad</string>
     <string name="calls_type_takeout">Comida a domicilio</string>
     <string name="calls_type_parcel">Paquetería</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">Empresas y atención al cliente</string>
     <string name="calls_type_transport">Taxis y transporte con conductor</string>
     <string name="calls_only_strangers">Solo números no guardados</string>
-    <string name="calls_strangers_note">Permite que Mika lea tus contactos. La IA solo contesta si confirma que el número no está guardado. Si está oculto o falla la consulta, podrás contestar tú.</string>
+    <string name="calls_strangers_note">Permite que Claire lea tus contactos. La IA solo contesta si confirma que el número no está guardado. Si está oculto o falla la consulta, podrás contestar tú.</string>
 </resources>

@@ -7,7 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** 词标「Mika」统一用这个字重:比标题轻一档,顶栏、侧栏、回答头看起来是同一个名字。 */
+/** 词标「Claire」统一用这个字重:比标题轻一档,顶栏、侧栏、回答头看起来是同一个名字。 */
 val WordmarkWeight = FontWeight.Medium
 
 /** 字号与字重。只定大小、字重、行高,颜色由用的地方给。 */
@@ -86,7 +86,7 @@ object MikaShapes {
     val SheetTop = RoundedCornerShape(topStart = MikaRadius.Bubble, topEnd = MikaRadius.Bubble)
     /** 用户消息气泡:右下角是尾角。 */
     val UserBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail, MikaRadius.Bubble)
-    /** Mika 的回答:左下角是尾角,和用户气泡对称。 */
+    /** Claire 的回答:左下角是尾角,和用户气泡对称。 */
     val AnswerBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail)
     val Button = RoundedCornerShape(MikaRadius.Button)
     val Tile = RoundedCornerShape(MikaRadius.Tile)

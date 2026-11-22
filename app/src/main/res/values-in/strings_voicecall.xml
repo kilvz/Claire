@@ -19,7 +19,7 @@
     <string name="voicecall_ended_notification">Diakhiri dari notifikasi</string>
     <string name="voicecall_ended_incoming">Ada panggilan telepon masuk — panggilan berakhir</string>
     <string name="voicecall_ended_limit">10 menit telah habis — panggilan berakhir</string>
-    <string name="voicecall_ended_background">Kembali ke Mika untuk melanjutkan</string>
+    <string name="voicecall_ended_background">Kembali ke Claire untuk melanjutkan</string>
     <string name="voicecall_error_auth">Kredensial suara ditolak — periksa pengaturan</string>
     <string name="voicecall_error_timeout">Koneksi kedaluwarsa — coba lagi</string>
     <string name="voicecall_error_disconnected">Koneksi terputus</string>
@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">Speaker</string>
     <string name="voicecall_mic_needed_title">Obrolan suara memerlukan mikrofon</string>
     <string name="voicecall_mic_needed_body">Mendengarmu — dan membiarkanmu menyela — butuh merekam. Panggilan baru dimulai setelah kamu mengizinkan.</string>
-    <string name="voicecall_mic_denied_body">Sebelumnya ditolak, jadi ponsel tidak akan bertanya lagi. Aktifkan mikrofon di halaman izin Mika di pengaturan sistem.</string>
+    <string name="voicecall_mic_denied_body">Sebelumnya ditolak, jadi ponsel tidak akan bertanya lagi. Aktifkan mikrofon di halaman izin Claire di pengaturan sistem.</string>
     <string name="voicecall_mic_allow">Izinkan mikrofon</string>
     <string name="voicecall_setup_title">Siapkan suara waktu-nyata dulu</string>
     <string name="voicecall_setup_body">Obrolan suara memakai layanan suara waktu-nyata (pengaturan yang sama dengan panggilan AI). Tambahkan kredensial untuk mulai.</string>

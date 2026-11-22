@@ -6,8 +6,8 @@
     <string name="metrics_other">Diğer (beklemeler, yeniden denemeler)</string>
     <string name="metrics_title">Çalıştırma istatistikleri</string>
     <string name="metrics_sub">Son çalıştırmaların süresi, model gidiş-dönüşleri ve tokenları</string>
-    <string name="metrics_empty">Henüz çalıştırma istatistiği yok. Mika\'dan bir şey yapmasını isteyin, buraya kaydedilir.</string>
-    <string name="metrics_note">Yalnızca bu telefondaki son %1$d çalıştırma sayılır. Süre, Mika çalışmaya başladığında başlar; ilk geri bildirim, ne yaptığını ilk gördüğünüz andır.</string>
+    <string name="metrics_empty">Henüz çalıştırma istatistiği yok. Claire\'dan bir şey yapmasını isteyin, buraya kaydedilir.</string>
+    <string name="metrics_note">Yalnızca bu telefondaki son %1$d çalıştırma sayılır. Süre, Claire çalışmaya başladığında başlar; ilk geri bildirim, ne yaptığını ilk gördüğünüz andır.</string>
     <string name="metrics_copy">JSON kopyala</string>
     <string name="metrics_share">JSON paylaş</string>
     <string name="metrics_last_10">Son 10</string>

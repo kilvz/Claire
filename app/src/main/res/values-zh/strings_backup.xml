@@ -20,7 +20,7 @@
     <string name="backup_replace">全部替换</string>
     <string name="backup_imported_title">备份已恢复</string>
     <string name="backup_imported_body">已恢复 %1$d 个文件。</string>
-    <string name="backup_after_import_body">关闭 Mika 再重新打开，以使用恢复的数据。然后重新配对无线调试、在 Android 设置里重新打开无障碍服务，并删除备份 ZIP 文件。</string>
-    <string name="backup_close_app">关闭 Mika</string>
+    <string name="backup_after_import_body">关闭 Claire 再重新打开，以使用恢复的数据。然后重新配对无线调试、在 Android 设置里重新打开无障碍服务，并删除备份 ZIP 文件。</string>
+    <string name="backup_close_app">关闭 Claire</string>
     <string name="backup_restart_note">卸载任何东西之前请先导出：只有当前这份安装才能解密你的数据。</string>
 </resources>

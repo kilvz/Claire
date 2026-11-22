@@ -16,17 +16,17 @@
     <string name="dev_parallel_sub">Farklı sohbetlerden gelen görevlerin her biri bir sanal ekran alır ve birlikte çalışır</string>
     <string name="dev_compaction">Uzun görevler için yapılandırılmış özetler</string>
     <string name="dev_compaction_sub">Birçok adımın sıkıştırılması gerektiğinde hedefi, olguları, ilerlemeyi ve sonraki adımı not eder</string>
-    <string name="dev_group">Mika nasıl çalışır</string>
+    <string name="dev_group">Claire nasıl çalışır</string>
     <string name="dev_autonomy">Otonom mod</string>
-    <string name="dev_autonomy_sub">Açıkken Mika ödeme öncesi bile sormaz ve bitirir; kapalıyken yalnızca ödeme öncesi sorar</string>
-    <string name="dev_note">Bu anahtarlar Mika\'nın nasıl ve ne kadar hızlı çalıştığını etkiler. Genellikle varsayılanlarda bırakın.</string>
+    <string name="dev_autonomy_sub">Açıkken Claire ödeme öncesi bile sormaz ve bitirir; kapalıyken yalnızca ödeme öncesi sorar</string>
+    <string name="dev_note">Bu anahtarlar Claire\'nın nasıl ve ne kadar hızlı çalıştığını etkiler. Genellikle varsayılanlarda bırakın.</string>
     <string name="dev_grounding">Görüntü konumlandırma doğrulandı</string>
-    <string name="dev_grounding_sub">Görüntü modeli %1$s, şeyleri doğru konumlandırmak için test edildikten sonra bir kez açın; kapalıyken işaretlediği konumlar, Mika dokunmadan önce başka kanıt gerektirir.</string>
+    <string name="dev_grounding_sub">Görüntü modeli %1$s, şeyleri doğru konumlandırmak için test edildikten sonra bir kez açın; kapalıyken işaretlediği konumlar, Claire dokunmadan önce başka kanıt gerektirir.</string>
     <string name="dev_speed">Hız</string>
     <string name="dev_experiments">Deneyler</string>
     <string name="dev_run_log">Çalıştırma kayıtları</string>
     <string name="dev_screen_tables">Yeni ekran öğelerini sıkıştır</string>
     <string name="dev_screen_tables_sub">Bir ekran ilk okunduğunda tekrarlanan alanları tablo sütunu olarak gönderir. Öğe referansları ve tam ağaç korunur.</string>
     <string name="dev_device_files">Cihaz dosyalarını içe aktar</string>
-    <string name="dev_device_files_sub">Mika\'nın paylaşılan cihaz depolamasından çalışma alanına dosya kopyalamasına izin verin. Değişiklikler yeni görevlere uygulanır.</string>
+    <string name="dev_device_files_sub">Claire\'nın paylaşılan cihaz depolamasından çalışma alanına dosya kopyalamasına izin verin. Değişiklikler yeni görevlere uygulanır.</string>
 </resources>

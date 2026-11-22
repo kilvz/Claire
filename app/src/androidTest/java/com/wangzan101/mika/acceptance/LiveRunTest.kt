@@ -75,10 +75,10 @@ import com.wangzan101.mika.core.cap.phone.OperatingPace
  *
  * - 在浏览器页上问:`-e liveUrl <网址> -e liveGoal <问题> -e liveRun <记录目录名> [-e liveTimeoutSec 600] [-e liveDesktop true]
  *   [-e liveNew true] [-e liveTouchAtStep N -e liveResumeAfterSec S] [-e liveOnTakeover cancel|handback]`,运行 [runPageAsk]。
- *   经由真实界面:侧栏进浏览器,打开网址(liveDesktop 时换成电脑版),等页面加载完,在网页底下「问问 Mika」里写问题、点发送
+ *   经由真实界面:侧栏进浏览器,打开网址(liveDesktop 时换成电脑版),等页面加载完,在网页底下「问问 Claire」里写问题、点发送
  *   (liveNew 时先点「新对话」),这一页借给那个任务。liveTouchAtStep:到第 N 步时经窗口在网页上用手指往上划一下
  *   (和真人一样经 PageFrame,不点到链接),记下有没有暂停、横幅和小卡片出没出来,等 S 秒(缺省 5)后点横幅上的「继续」,记下恢复。
- *   不给 liveTouchAtStep 时,任务里因「你在操作」而暂停算失败(Mika 自己的点按、滚动不该让任务暂停),记录照写。
+ *   不给 liveTouchAtStep 时,任务里因「你在操作」而暂停算失败(Claire 自己的点按、滚动不该让任务暂停),记录照写。
  *   result.txt 在 runGoal 那些之外还有:borrowed(页面借给了任务)、firstToolCalls、urlsOpened(web_navigate 打开过的网址)、
  *   reopenedSameUrl(又打开了这一页,不该有)、userTabUrlAtEnd、pausedByTouch、resumed、pauses(各种暂停的次数)、userPauses、
  *   conversationId、pageOrigin、listedAsWeb(侧栏里这条对话带「网页」小标签)。每一步、暂停、恢复、结束、侧栏各截一张主屏(step-NN.png 等)。
@@ -506,7 +506,7 @@ class LiveRunTest {
                 "conversationId=$conversationId\npageOrigin=${origin?.let { "${it.host} ${it.url} ${it.title}" }}\nlistedAsWeb=$listedAsWeb\n" +
                 "answer=$answer\n",
         )
-        // Mika 自己的点按、滚动不该让任务以为用户在操作
+        // Claire 自己的点按、滚动不该让任务以为用户在操作
         if (touchAt <= 0) check(userPauses == 0) { "the run paused as if the user touched the page ($userPauses times) though nobody did" }
         else check(pausedByTouch && resumed) { "touch at step $touchAt: paused=$pausedByTouch resumed=$resumed" }
     }
@@ -551,7 +551,7 @@ class LiveRunTest {
         appendLine("routes=${(context.applicationContext as MikaApp).routes.count()}")
     }
 
-    /** Mika 当前通知的标题、正文和按钮(从 dumpsys notification 里摘)。 */
+    /** Claire 当前通知的标题、正文和按钮(从 dumpsys notification 里摘)。 */
     private fun mikaNotifications(): String = sh("dumpsys notification --noredact")
         .split("NotificationRecord(").drop(1).filter { "pkg=com.wangzan101.mika " in it }
         .joinToString(" || ") { rec ->

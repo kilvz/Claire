@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="trigger_reminder">Mika hatırlatması</string>
+    <string name="trigger_reminder">Claire hatırlatması</string>
     <string name="trigger_not_started_body">Bir zamanlanmış görev başlayamadı. Zamanlanmış görevler sayfasından kontrol edin ve tekrar çalıştırın.</string>
     <string name="trigger_start_failed">Başlatılamadı</string>
     <string name="trigger_not_started">Zamanlanmış görev başlamadı</string>
-    <string name="trigger_interrupted_body">Bir zamanlanmış görev kesildi ve sonucu doğrulanamıyor. Önce gerçekte ne olduğunu kontrol edin; Mika onu otomatik tekrarlamaz.</string>
+    <string name="trigger_interrupted_body">Bir zamanlanmış görev kesildi ve sonucu doğrulanamıyor. Önce gerçekte ne olduğunu kontrol edin; Claire onu otomatik tekrarlamaz.</string>
     <string name="trigger_unconfirmed">Zamanlanmış görev sonucunun kontrol edilmesi gerekiyor</string>
     <string name="trigger_unlock_failed">Zamanlanmış görev telefonu uyandıramadı veya kilidini açamadı. Bir sonraki çalıştırmadan önce kilidi açın ya da Ayarlar › Bilgisayara bağlan altında \“Uzaktan uyandırma ve kilit açmaya izin ver\”i ve kayıtlı ekran kilidi kimliğini kontrol edin.</string>
     <string name="trigger_alarm_title">Zamanlanmış görevler \“Alarmlar ve hatırlatıcılar\” iznine ihtiyaç duyar</string>
@@ -13,7 +13,7 @@
     <string name="plans_alarm_body">Bu izin olmadan zamanlanmış görevler geç ya da hiç çalışmayabilir. Yalnızca bir kez açmanız gerekir.</string>
     <string name="plans_running_n">Etkin %1$d</string>
     <string name="plans_stopped_n">Kapalı %1$d</string>
-    <string name="plans_empty">Henüz zamanlanmış görev yok\nBir tane oluşturmak için +\'ya dokunun ya da bir sohbette Mika\'ya ne zaman hatırlatacağını veya sizin için ne yapacağını söyleyin.</string>
+    <string name="plans_empty">Henüz zamanlanmış görev yok\nBir tane oluşturmak için +\'ya dokunun ya da bir sohbette Claire\'ya ne zaman hatırlatacağını veya sizin için ne yapacağını söyleyin.</string>
     <string name="plans_none_running">Etkin zamanlanmış görev yok</string>
     <string name="plans_none_stopped">Kapatılmış zamanlanmış görev yok</string>
     <string name="plans_footer">Kendiniz bir görev oluşturmak için +\'yı kullanın ya da bir sohbette \“her gün 8\'de…\” veya \“fiyat düşünce bana söyle\” deyin; sonuçlar o sohbete döner. Zamanlı çalıştırmalar pil tasarrufundan etkilenebilir; kapatmak veya silmek yalnızca gelecekteki çalıştırmaları etkiler.</string>
@@ -28,7 +28,7 @@
     <string name="plans_add">Yeni zamanlanmış görev</string>
     <string name="plans_task_mode">Bir görev çalıştır</string>
     <string name="plans_reminder_mode">Yalnızca hatırlatma</string>
-    <string name="plans_content_task">Mika ne yapsın?</string>
+    <string name="plans_content_task">Claire ne yapsın?</string>
     <string name="plans_content_reminder">Hatırlatma metni</string>
     <string name="plans_repeat_interval">Aralık</string>
     <string name="plans_repeat_weekly">Haftalık</string>
@@ -42,7 +42,7 @@
     <string name="plans_notify_change">Değişince</string>
     <string name="plans_notify_each">Her seferinde</string>
     <string name="plans_cooldown_minutes">Çalıştırmalar arası minimum dakika (isteğe bağlı)</string>
-    <string name="plans_when_idle">Yalnızca Mika boştayken çalıştır</string>
+    <string name="plans_when_idle">Yalnızca Claire boştayken çalıştır</string>
     <string name="plans_enabled">Etkin</string>
     <string name="plans_error_content">Bir görev veya hatırlatma girin</string>
     <string name="plans_error_content_long">En fazla 4.000 karakter ya da hatırlatma için 2.000 kullanın</string>

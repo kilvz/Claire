@@ -139,7 +139,7 @@ class UpdateMirrorStoreTest {
     }
 
     @Test fun candidatesKeepUserOrderAndAlwaysEndWithOfficial() {
-        val official = "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk"
+        val official = "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk"
         val mirrors = listOf(
             UpdateMirror("1", "One", "https://one.example.test/"),
             UpdateMirror("2", "Two", "https://two.example.test/"),

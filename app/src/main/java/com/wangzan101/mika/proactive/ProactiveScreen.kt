@@ -67,7 +67,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * 设置 › 主动能力。只放要用户做决定的:
- * 状态卡(总开关、一句现在的状态、要处理时给一个按钮)→「Mika 知道了什么」的入口
+ * 状态卡(总开关、一句现在的状态、要处理时给一个按钮)→「Claire 知道了什么」的入口
  * → 设置(激进程度、敏感类推断、当日消息归纳、每日上限)→ 读哪些 App(每个 App 不读 / 低 / 中 / 高;列表可能很长,放在设置后面)
  * → 诊断(默认折起:监听状态、计数、失败重试、最近的通知)→ 页尾说明
  * (发什么、存什么、留多久)。归纳出的内容和它们的删除在下一页([ProactiveLearnScreen])。
@@ -124,7 +124,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
     var confirmSensitiveOn by remember { mutableStateOf(false) }
     var confirmSensitiveOff by remember { mutableStateOf(false) }
     var diagOpen by rememberSaveable { mutableStateOf(false) }
-    // 「由 Mika 助手授权」:要用助手或已配对的连接(和恢复开关看的是同一个条件);跑的过程中按钮不能再点
+    // 「由 Claire 助手授权」:要用助手或已配对的连接(和恢复开关看的是同一个条件);跑的过程中按钮不能再点
     val phone = remember { PhoneServices.of(context) }
     val shellStatus by phone.shellControl.status.collectAsState()
     val helperShell by phone.hub.shell.collectAsState()
@@ -143,7 +143,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
         onPauseOrDispose {}
     }
     LaunchedEffect(Unit) {
-        // Mika 自己的各个安装包(正式版、.dev 等)不给选
+        // Claire 自己的各个安装包(正式版、.dev 等)不给选
         apps = withContext(Dispatchers.IO) {
             runCatching { launchableApps(app.packageManager, app.packageName) }.getOrDefault(emptyList())
                 .filterNot { NoticeFilter.isSelf(it.first) }
@@ -162,7 +162,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
     val budgetOut = enabled && ProactiveBudget.exhausted(tokens, calls, limit) != null
     val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(context) }
     val dateFormat = remember { android.text.format.DateFormat.getMediumDateFormat(context) }
-    // 「Mika 知道了什么」是本页下面的一页;放在所有 remember 之后,回来时本页的状态还在
+    // 「Claire 知道了什么」是本页下面的一页;放在所有 remember 之后,回来时本页的状态还在
     var knownOpen by rememberSaveable { mutableStateOf(false) }
     if (knownOpen) return ProactiveLearnScreen(onBack = { knownOpen = false })
     val gate = TriageGate.of(true, consent, target)

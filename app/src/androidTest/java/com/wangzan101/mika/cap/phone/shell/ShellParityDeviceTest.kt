@@ -36,7 +36,7 @@ import com.wangzan101.mika.shell.IMikaShell
  * 外壳 20 项能力的对照验收(destroy 在 [ShellDestroyParityDeviceTest])。
  * shell 由 [DeviceSupport.shell] 提供,哪个后端在用就测哪个,两个后端跑同一套断言。
  * 断言尽量看外壳以外的证据:DisplayManager、探针页自己报的屏和任务、appops 命令、测试进程直接读剪贴板。
- * 需要外壳已连上;用户的主屏不被打扰(只在 Mika 自己建的屏上开页面)。
+ * 需要外壳已连上;用户的主屏不被打扰(只在 Claire 自己建的屏上开页面)。
  */
 @RunWith(AndroidJUnit4::class)
 class ShellParityDeviceTest {
@@ -460,7 +460,7 @@ class ShellParityDeviceTest {
         ParityClip.put(context, null)
         assertEquals(ShellService.CLIP_SET, shell.setClipText("parity-ours"))
         shell.restoreClip()
-        assertNull("Mika's text leaked", ParityClip.text(context))
+        assertNull("Claire's text leaked", ParityClip.text(context))
     }
 
     @Test
@@ -506,7 +506,7 @@ class ShellParityDeviceTest {
         ParityClip.put(context, null)
         assertEquals(ShellService.CLIP_SET, shell.setClipText("parity-ours"))
         shell.restoreClipText("", "parity-ours")
-        assertNull("Mika's text leaked", ParityClip.text(context))
+        assertNull("Claire's text leaked", ParityClip.text(context))
     }
 
     @Test

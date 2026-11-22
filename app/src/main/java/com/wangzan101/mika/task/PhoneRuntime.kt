@@ -151,7 +151,7 @@ internal class PhoneRuntime(
     }
 
     /**
-     * 这次任务的静音规则(见 [AppMuter]):Mika 自己不静;没有桌面入口的系统包不静(系统界面、选择框一类);
+     * 这次任务的静音规则(见 [AppMuter]):Claire 自己不静;没有桌面入口的系统包不静(系统界面、选择框一类);
      * 用户在主屏上看得见的不静;没静成的记下,任务进度上提示可能出声。
      */
     fun appMuter(shell: IMikaShell, audio: AudioMute): AppMuter {
@@ -268,7 +268,7 @@ internal class PhoneRuntime(
 
     private companion object {
         const val TAG = "MikaTask"
-        /** Mika 屏上的前台 App 两次重读之间至少隔这么久。 */
+        /** Claire 屏上的前台 App 两次重读之间至少隔这么久。 */
         const val FOREGROUND_GAP_MS = 300L
     }
 }

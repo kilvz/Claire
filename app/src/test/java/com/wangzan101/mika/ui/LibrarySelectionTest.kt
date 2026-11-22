@@ -16,7 +16,7 @@ class LibrarySelectionTest {
     }
 
     @Test fun outputKeyUsesUriWhenPresentAndSourceWhenMissing() {
-        val file = SharedFile("x.pdf", 3, "Download/Mika/x.pdf", "")
+        val file = SharedFile("x.pdf", 3, "Download/Claire/x.pdf", "")
         val first = FileSource("a", 0, "run", 1L)
         val second = FileSource("a", 1, "run", 2L)
         assertNotEquals(LibrarySelection.outputKey(file, first), LibrarySelection.outputKey(file, second))

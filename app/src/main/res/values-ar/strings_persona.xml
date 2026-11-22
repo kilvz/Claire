@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="persona_title">الشخصية</string>
-    <string name="persona_sub">اختر طريقة تحدث Mika معك</string>
+    <string name="persona_sub">اختر طريقة تحدث Claire معك</string>
     <string name="persona_default">الافتراضية</string>
-    <string name="persona_default_sub">نبرة Mika المعتادة</string>
+    <string name="persona_default_sub">نبرة Claire المعتادة</string>
     <string name="persona_empty">لا توجد شخصيات بعد</string>
-    <string name="persona_empty_sub">الشخصية تغيّر طريقة تحدث Mika فقط، لا ما يمكنه فعله.</string>
+    <string name="persona_empty_sub">الشخصية تغيّر طريقة تحدث Claire فقط، لا ما يمكنه فعله.</string>
     <string name="persona_new">شخصية جديدة</string>
     <string name="persona_name">الاسم</string>
     <string name="persona_prompt">التعليمات</string>
     <string name="persona_prompt_hint">النبرة، الطول، الصياغة، التنسيق…</string>
     <string name="persona_counter">%1$d حرفًا · نحو %2$d رمزًا</string>
     <string name="persona_preview">معاينة المطالبة الكاملة</string>
-    <string name="persona_preview_note">القواعد الرمادية ثابتة. يمكن للشخصية تغيير النبرة والصياغة، لكن ليس الأمان أو الأذونات أو ما يبلغ عنه Mika.</string>
+    <string name="persona_preview_note">القواعد الرمادية ثابتة. يمكن للشخصية تغيير النبرة والصياغة، لكن ليس الأمان أو الأذونات أو ما يبلغ عنه Claire.</string>
     <string name="persona_manage">إدارة الشخصيات</string>
     <string name="persona_delete_title">حذف «%1$s»؟</string>
-    <string name="persona_delete_body">لا يمكن التراجع عن هذا. إذا كانت قيد الاستخدام فسيعود Mika إلى طريقته المعتادة في الكلام.</string>
+    <string name="persona_delete_body">لا يمكن التراجع عن هذا. إذا كانت قيد الاستخدام فسيعود Claire إلى طريقته المعتادة في الكلام.</string>
     <string name="persona_copy">تكرار</string>
     <string name="persona_name_required">أدخل اسمًا.</string>
     <string name="persona_name_too_long">الاسم طويل جدًا.</string>
@@ -55,6 +55,6 @@
     <string name="persona_discard_body">لم تُحفظ التغييرات بعد.</string>
     <string name="persona_keep_editing">متابعة التعديل</string>
     <string name="persona_nickname">اللقب</string>
-    <string name="persona_nickname_about">الاسم الذي يستخدمه Mika للإشارة إلى نفسه. اتركه فارغًا ليبقى Mika. اسم التطبيق لا يتغير.</string>
+    <string name="persona_nickname_about">الاسم الذي يستخدمه Claire للإشارة إلى نفسه. اتركه فارغًا ليبقى Claire. اسم التطبيق لا يتغير.</string>
     <string name="persona_nickname_invalid">حتى %1$d حرفًا: حروف وأرقام ومسافات فقط.</string>
 </resources>

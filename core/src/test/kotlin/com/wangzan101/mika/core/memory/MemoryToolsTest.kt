@@ -353,7 +353,7 @@ class MemoryToolsTest {
         assertEquals("true", d.run("memory_edit", args).s("ok"))
     }
 
-    // Mika 自己归纳的那条改写之后还是它归纳的;用户这一轮把内容亲口说了的,才改记成用户说的
+    // Claire 自己归纳的那条改写之后还是它归纳的;用户这一轮把内容亲口说了的,才改记成用户说的
     @Test fun rewordingMikasOwnConclusionKeepsItMarkedAsSuch() {
         val store = memStore(inferenceAllowed = { true })
         val item = store.add(MemoryKind.fact, "用户常在张江路100号附近点外卖", listOf("外卖"),
@@ -390,7 +390,7 @@ class MemoryToolsTest {
         assertFalse(missing.containsKey("counts_as_failure"))
     }
 
-    // ---- 「让 Mika 自己归纳着记」:开着、用户这一轮又亲口让它记时,带着用户没说过的具体值的内容照存,来源标成 Mika 归纳的 ----
+    // ---- 「让 Claire 自己归纳着记」:开着、用户这一轮又亲口让它记时,带着用户没说过的具体值的内容照存,来源标成 Claire 归纳的 ----
 
     private val askedToSum = "根据今天的消息看看我是个什么样的人,然后写入一些你觉得合适的东西到记忆里"
 

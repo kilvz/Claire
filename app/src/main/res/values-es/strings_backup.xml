@@ -20,7 +20,7 @@
     <string name="backup_replace">Reemplazar todo</string>
     <string name="backup_imported_title">Copia de seguridad restaurada</string>
     <string name="backup_imported_body">Se restauraron %1$d archivos.</string>
-    <string name="backup_after_import_body">Cierra Mika y ábrelo de nuevo para usar los datos restaurados. Luego vuelve a emparejar la depuración inalámbrica, reactiva el servicio de accesibilidad en los ajustes de Android y elimina el archivo ZIP de copia de seguridad.</string>
-    <string name="backup_close_app">Cerrar Mika</string>
+    <string name="backup_after_import_body">Cierra Claire y ábrelo de nuevo para usar los datos restaurados. Luego vuelve a emparejar la depuración inalámbrica, reactiva el servicio de accesibilidad en los ajustes de Android y elimina el archivo ZIP de copia de seguridad.</string>
+    <string name="backup_close_app">Cerrar Claire</string>
     <string name="backup_restart_note">Exporta primero, antes de desinstalar cualquier cosa: solo esta instalación puede descifrar tus datos.</string>
 </resources>

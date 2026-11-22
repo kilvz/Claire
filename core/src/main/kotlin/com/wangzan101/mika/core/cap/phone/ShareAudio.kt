@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 把一个工作区音频分享给一个 App(ACTION_SEND + EXTRA_STREAM),在 Mika 的屏上打开它的分享页:
+ * 把一个工作区音频分享给一个 App(ACTION_SEND + EXTRA_STREAM),在 Claire 的屏上打开它的分享页:
  * 只打开,不发出;收件人和「发送」由模型在那一页上用屏幕工具完成,发送仍走现有的确认关卡。
  */
 internal object ShareAudio : PhoneTool {

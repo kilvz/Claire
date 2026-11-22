@@ -123,7 +123,7 @@ object MemoryContext {
         val message = sections.joinToString("\n\n") { (header, list) ->
             header + "\n" + list.withIndex().joinToString("\n") { (i, m) ->
                 "${i + 1}. ${if (m.kind == MemoryKind.procedure) rewrite(m.content) else m.content}" +
-                    // Mika 自己归纳出来的那几条不是用户说的:这一段的标题说的是「用户告诉你的」,逐条标出来
+                    // Claire 自己归纳出来的那几条不是用户说的:这一段的标题说的是「用户告诉你的」,逐条标出来
                     if (m.source.type == INFERRED) INFERRED_MARK else ""
             }
         }

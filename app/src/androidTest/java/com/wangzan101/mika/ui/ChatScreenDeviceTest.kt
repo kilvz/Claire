@@ -69,7 +69,7 @@ import com.wangzan101.mika.task.TaskEnvironment
 /**
  * 真机走一遍对话页:脚本模型在虚拟屏上打开设置,检查步骤、小窗(收起、展开、拖动、需要你时自动展开)和结果卡片,
  * 每个阶段截一张图到 App 的外部文件目录 shots/(由开发机 adb pull 出来人工查看)。
- * 需要内置助手在运行、Mika 无障碍服务已开启。
+ * 需要内置助手在运行、Claire 无障碍服务已开启。
  */
 @RunWith(AndroidJUnit4::class)
 class ChatScreenDeviceTest {
@@ -124,7 +124,7 @@ class ChatScreenDeviceTest {
         compose.waitForIdle()
         Thread.sleep(400)
         compose.waitForIdle()
-        // 默认的 UiAutomation 会压制其他无障碍服务,Mika 的服务会被断开
+        // 默认的 UiAutomation 会压制其他无障碍服务,Claire 的服务会被断开
         val bmp = InstrumentationRegistry.getInstrumentation()
             .getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).takeScreenshot()
         File(context.getExternalFilesDir(null), "shots/$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -221,7 +221,7 @@ class ChatScreenDeviceTest {
         assertTrue(vm.ui.value.pip.visible)
         shot("03-running-collapsed")
 
-        compose.onNodeWithContentDescription("Mika 的虚拟屏").performClick()
+        compose.onNodeWithContentDescription("Claire 的虚拟屏").performClick()
         compose.waitForIdle()
         assertTrue(vm.ui.value.pip.expanded)
         shot("04-running-expanded")
@@ -230,12 +230,12 @@ class ChatScreenDeviceTest {
 
         // 小窗平时在右下角(输入栏上方):往左上甩,应吸到左上角
         val d = context.resources.displayMetrics.density
-        val pip = compose.onNodeWithContentDescription("Mika 的虚拟屏").fetchSemanticsNode().boundsInWindow
+        val pip = compose.onNodeWithContentDescription("Claire 的虚拟屏").fetchSemanticsNode().boundsInWindow
         val x = pip.center.x
         val y = pip.center.y
         sh("input swipe ${x.toInt()} ${y.toInt()} ${(x - 250 * d).toInt()} ${(y - 300 * d).toInt()} 120")
         compose.waitForIdle()
-        val moved = compose.onNodeWithContentDescription("Mika 的虚拟屏").fetchSemanticsNode().boundsInWindow
+        val moved = compose.onNodeWithContentDescription("Claire 的虚拟屏").fetchSemanticsNode().boundsInWindow
         assertTrue("pip did not move up-left: $pip -> $moved", moved.center.x < x && moved.center.y < y)
         shot("05-dragged")
 

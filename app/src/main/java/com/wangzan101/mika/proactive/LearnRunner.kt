@@ -647,7 +647,7 @@ internal class LearnRunner(
         }
     }
 
-    /** 用户设关系;null 是交回给 Mika 判断。 */
+    /** 用户设关系;null 是交回给 Claire 判断。 */
     fun setContactRelation(id: String, relation: ContactRelation?) {
         loadedContacts()?.let { if (it.setRelation(id, relation)) saveContacts(it) }
     }
@@ -999,7 +999,7 @@ internal class LearnRunner(
 
     /**
      * 要拿归纳去用(给任务、挑该做哪一份)之前:过了留存期的先去掉,有去掉的就存。
-     * 到期不靠定时器(息屏不干活),谁来读谁先清——不然不开「Mika 知道了什么」那一页,过期的归纳照样会被带进任务。
+     * 到期不靠定时器(息屏不干活),谁来读谁先清——不然不开「Claire 知道了什么」那一页,过期的归纳照样会被带进任务。
      */
     private fun freshDigest(): DigestPool? = loadedDigest()?.also { if (it.expire(dayOf(clock()))) saveDigest(it) }
 

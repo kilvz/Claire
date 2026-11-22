@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <!-- 按住说话时录音，转成文字；用户浏览器里的网页要麦克风时也用它。 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- 用户浏览器里的网页要摄像头（Mika 自己拍照走系统相机，不用这个权限）；网页请求时先弹框问用户。 -->
+    <!-- 用户浏览器里的网页要摄像头（Claire 自己拍照走系统相机，不用这个权限）；网页请求时先弹框问用户。 -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- 用户浏览器里的网页要定位；网页请求时先弹框问用户。 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -54,7 +54,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <!-- 对话页附件可以拍照(走系统相机),声明用到相机、但不是必需:没有相机的设备照常安装。
-         有的系统按 APK 特征给应用分类,不声明时 Mika 可能被当成游戏、限制刷新率;这条声明要留着 -->
+         有的系统按 APK 特征给应用分类,不声明时 Claire 可能被当成游戏、限制刷新率;这条声明要留着 -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -138,7 +138,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 覆盖磁贴长按的系统默认应用详情页，直接回到 Mika。 -->
+            <!-- 覆盖磁贴长按的系统默认应用详情页，直接回到 Claire。 -->
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -199,7 +199,7 @@
             android:taskAffinity=""
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- 兼容性自检在 Mika 虚拟屏上操作的测试页。对外开放只为让内置助手(shell)按组件名把它开到 Mika 的屏上:
+        <!-- 兼容性自检在 Claire 虚拟屏上操作的测试页。对外开放只为让内置助手(shell)按组件名把它开到 Claire 的屏上:
              调用方必须持有 INTERACT_ACROSS_USERS_FULL,shell 有,普通 App 没有;没有 intent-filter。单独一个任务,不进最近任务 -->
         <activity
             android:name=".selfcheck.SelfCheckTargetActivity"
@@ -366,7 +366,7 @@
                 android:resource="@xml/report_files" />
         </provider>
 
-        <!-- 走网络代理时 Mika 自己下的更新安装包:只读交给系统安装器,不对外导出,安装时临时授权 -->
+        <!-- 走网络代理时 Claire 自己下的更新安装包:只读交给系统安装器,不对外导出,安装时临时授权 -->
         <provider
             android:name=".about.UpdateFilesProvider"
             android:authorities="${applicationId}.updatefiles"

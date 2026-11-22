@@ -15,7 +15,7 @@ class SelfCheckTextTest {
     @Test
     fun extraOrOddWhitespaceStillMatches() {
         assertTrue(SelfCheckText.same("  Tap  me\n", "Tap me"))
-        assertTrue(SelfCheckText.same("Mika  self-check\tpage", "Mika self-check page"))
+        assertTrue(SelfCheckText.same("Claire  self-check\tpage", "Claire self-check page"))
     }
 
     @Test
@@ -32,7 +32,7 @@ class SelfCheckTextTest {
 
     @Test
     fun containsIgnoresCaseAndWhitespace() {
-        assertTrue(SelfCheckText.contains("MIKA 123", "Mika 123"))
+        assertTrue(SelfCheckText.contains("CLAIRE 123", "Claire 123"))
         assertTrue(SelfCheckText.contains("text  CLICKED 1 here", "Clicked 1"))
         assertFalse(SelfCheckText.contains("Clicked 0", "Clicked 1"))
     }

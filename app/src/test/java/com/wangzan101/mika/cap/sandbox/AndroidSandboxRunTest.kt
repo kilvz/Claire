@@ -78,7 +78,7 @@ class AndroidSandboxRunTest {
 
     @Test fun preparerNeedsWork() {
         assertTrue(RuntimePreparer.needsWork(SandboxStatus.NotInstalled, null, "v2", skipBroken = false))
-        assertTrue(RuntimePreparer.needsWork(SandboxStatus.Ready(false), "v1", "v2", skipBroken = false)) // Mika 升级了
+        assertTrue(RuntimePreparer.needsWork(SandboxStatus.Ready(false), "v1", "v2", skipBroken = false)) // Claire 升级了
         assertFalse(RuntimePreparer.needsWork(SandboxStatus.Ready(true), "v2", "v2", skipBroken = false))
         assertTrue(RuntimePreparer.needsWork(SandboxStatus.Broken("x"), "v2", "v2", skipBroken = false))
         assertFalse(RuntimePreparer.needsWork(SandboxStatus.Broken("x"), "v2", "v2", skipBroken = true))
@@ -98,12 +98,12 @@ class AndroidSandboxRunTest {
         var fail: Exception? = null
         val sb = AndroidSandbox(dirs, { SandboxStatus.Ready(false) }, { emptyList() }, exporter = { g, n ->
             // 交给导出的是过了关口的句柄:内容从它读
-            calls += String(g.read(0, 100)) to n; fail?.let { throw it }; com.wangzan101.mika.chat.SharedFile(n, g.size, "Download/Mika/$n", "content://x")
+            calls += String(g.read(0, 100)) to n; fail?.let { throw it }; com.wangzan101.mika.chat.SharedFile(n, g.size, "Download/Claire/$n", "content://x")
         })
         val f = sb.hostPath("c1", "out/a.txt", forWrite = true)!!.apply { parentFile?.mkdirs(); writeText("a") }
-        assertEquals("Download/Mika/a.txt", sb.share(f, "a.txt"))
+        assertEquals("Download/Claire/a.txt", sb.share(f, "a.txt"))
         assertEquals("a" to "a.txt", calls.single())
-        // 工作区里的硬链接(可能链着 Mika 的私有文件)不导出
+        // 工作区里的硬链接(可能链着 Claire 的私有文件)不导出
         val private = File(tmp, "s2/private.db").apply { writeText("secret") }
         val linked = File(f.parentFile, "linked.db")
         Files.createLink(linked.toPath(), private.toPath())

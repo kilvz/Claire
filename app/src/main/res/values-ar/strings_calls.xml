@@ -91,7 +91,7 @@
     <string name="calls_outgoing_title">إجراء مكالمة</string>
     <string name="calls_rules">قواعد الرد</string>
     <string name="calls_setup_credentials">اضبط بيانات اعتماد الصوت الفوري من خدمة الصوت المحددة.</string>
-    <string name="calls_setup_shell">اتصل بمساعد Mika المدمج أولًا.</string>
+    <string name="calls_setup_shell">اتصل بمساعد Claire المدمج أولًا.</string>
     <string name="calls_sim_clear_preferred">مسح بطاقة SIM المفضلة</string>
     <string name="calls_sim_preferred">بطاقة SIM المفضلة: %1$s</string>
     <string name="calls_sim_save_preferred">استخدام بطاقة SIM هذه افتراضيًا</string>
@@ -146,7 +146,7 @@
     <string name="calls_notification_connected">تم اتصال الذكاء الاصطناعي. يمكنك تولي المكالمة بنفسك في أي وقت.</string>
     <string name="calls_only_types">أنواع المكالمات المحددة فقط</string>
     <string name="calls_pick_types">اختر نوع مكالمة واحدًا على الأقل</string>
-    <string name="calls_type_note">يستخدم Mika تسهيلات الاستخدام لمطابقة التصنيف والرقم في تطبيق الهاتف مع المكالمة الواردة. إذا تعذرت المطابقة يمكنك الرد بنفسك.</string>
+    <string name="calls_type_note">يستخدم Claire تسهيلات الاستخدام لمطابقة التصنيف والرقم في تطبيق الهاتف مع المكالمة الواردة. إذا تعذرت المطابقة يمكنك الرد بنفسك.</string>
     <string name="calls_type_accessibility">فتح إعدادات تسهيلات الاستخدام</string>
     <string name="calls_type_takeout">توصيل الطعام</string>
     <string name="calls_type_parcel">توصيل الطرود</string>
@@ -160,5 +160,5 @@
     <string name="calls_type_business">شركات وخدمة العملاء</string>
     <string name="calls_type_transport">سيارات الأجرة وخدمات النقل</string>
     <string name="calls_only_strangers">الأرقام غير المحفوظة فقط</string>
-    <string name="calls_strangers_note">اسمح لتطبيق Mika بقراءة جهات الاتصال. يرد الذكاء الاصطناعي فقط إذا تأكد أن الرقم غير محفوظ. تتولى أنت الرد إذا كان الرقم مخفيًا أو تعذر التحقق منه.</string>
+    <string name="calls_strangers_note">اسمح لتطبيق Claire بقراءة جهات الاتصال. يرد الذكاء الاصطناعي فقط إذا تأكد أن الرقم غير محفوظ. تتولى أنت الرد إذا كان الرقم مخفيًا أو تعذر التحقق منه.</string>
 </resources>

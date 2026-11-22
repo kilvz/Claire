@@ -242,7 +242,7 @@ class FeatureFlags(private val prefs: SharedPreferences) {
     }
 
     /**
-     * 允许 Mika 改自己的设置(见 core 的 SelfConfig):模型与 Key、删数据不在允许之列。
+     * 允许 Claire 改自己的设置(见 core 的 SelfConfig):模型与 Key、删数据不在允许之列。
      * 默认关;开着的时候任务里才有 settings_list、settings_set 这两件工具。
      */
     fun selfConfig(): Boolean = prefs.getBoolean(SELF_CONFIG, false)
@@ -252,7 +252,7 @@ class FeatureFlags(private val prefs: SharedPreferences) {
     }
 
     /**
-     * 允许 Mika 操作自己的界面(见 core 的 SelfPort):打开 Mika 的页、把工作区文件用 App 内查看器打开、
+     * 允许 Claire 操作自己的界面(见 core 的 SelfPort):打开 Claire 的页、把工作区文件用 App 内查看器打开、
      * 发通知、写剪贴板。默认关;模型改不了这个开关。
      */
     fun selfOperate(): Boolean = prefs.getBoolean(SELF_OPERATE, false)
@@ -396,7 +396,7 @@ class FeatureFlags(private val prefs: SharedPreferences) {
     }.distinctUntilChanged()
 
     /**
-     * 用户点了「完全退出」,要到下次打开 Mika 的界面为止([com.wangzan101.mika.quit.MikaQuit])。
+     * 用户点了「完全退出」,要到下次打开 Claire 的界面为止([com.wangzan101.mika.quit.MikaQuit])。
      * 在这期间进程可能被无障碍服务重新拉起:胶囊不画、后台服务不补起、自动恢复也不做,直到用户自己打开 App。
      */
     fun quitRequested(): Boolean = prefs.getBoolean(QUIT_REQUESTED, false)

@@ -19,7 +19,7 @@
     <string name="voicecall_ended_notification">أُنهيت من الإشعار</string>
     <string name="voicecall_ended_incoming">ورد اتصال هاتفي — انتهت المكالمة</string>
     <string name="voicecall_ended_limit">انتهت الدقائق العشر — انتهت المكالمة</string>
-    <string name="voicecall_ended_background">عد إلى Mika للمتابعة</string>
+    <string name="voicecall_ended_background">عد إلى Claire للمتابعة</string>
     <string name="voicecall_error_auth">بيانات الاعتماد الصوتية مرفوضة — راجع الإعدادات</string>
     <string name="voicecall_error_timeout">انتهت مهلة الاتصال — حاول مجددًا</string>
     <string name="voicecall_error_disconnected">انقطع الاتصال</string>
@@ -34,7 +34,7 @@
     <string name="voicecall_speaker">مكبر الصوت</string>
     <string name="voicecall_mic_needed_title">الدردشة الصوتية تحتاج إلى الميكروفون</string>
     <string name="voicecall_mic_needed_body">سماعك — والسماح لك بالمقاطعة — يتطلب التسجيل. تبدأ المكالمة بعد السماح فقط.</string>
-    <string name="voicecall_mic_denied_body">رُفض الإذن سابقًا، لذا لن يسأل الهاتف مجددًا. فعّل الميكروفون في صفحة أذونات Mika من إعدادات النظام.</string>
+    <string name="voicecall_mic_denied_body">رُفض الإذن سابقًا، لذا لن يسأل الهاتف مجددًا. فعّل الميكروفون في صفحة أذونات Claire من إعدادات النظام.</string>
     <string name="voicecall_mic_allow">السماح بالميكروفون</string>
     <string name="voicecall_setup_title">جهّز الصوت الفوري أولًا</string>
     <string name="voicecall_setup_body">الدردشة الصوتية تعمل عبر خدمة الصوت الفوري (نفس إعداد مكالمات الذكاء الاصطناعي). أضف بيانات الاعتماد للبدء.</string>

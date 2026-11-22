@@ -7,7 +7,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.provider.Settings
 
-/** 一个识别服务所在的应用有没有录音权限。它和 Mika 是两个应用,各有各的权限。 */
+/** 一个识别服务所在的应用有没有录音权限。它和 Claire 是两个应用,各有各的权限。 */
 enum class ServiceMic {
     /** 申请了,也给了。 */
     Granted,
@@ -23,10 +23,10 @@ enum class ServiceMic {
 data class SpeechServiceTarget(val packageName: String, val label: String)
 
 /**
- * 识别服务说「没有权限」时,分清缺权限的是谁。Mika 的录音权限给了,识别服务(另一个应用)自己的没给,它照样录不了音——
- * 这时让用户去 Mika 的权限页是指错了地方。
+ * 识别服务说「没有权限」时,分清缺权限的是谁。Claire 的录音权限给了,识别服务(另一个应用)自己的没给,它照样录不了音——
+ * 这时让用户去 Claire 的权限页是指错了地方。
  *
- * 只在三样都确定时才说是识别服务缺权限:Mika 自己有录音权限;这次用的是哪个服务认得出来;那个应用申请了录音权限却没拿到。
+ * 只在三样都确定时才说是识别服务缺权限:Claire 自己有录音权限;这次用的是哪个服务认得出来;那个应用申请了录音权限却没拿到。
  * 有一样不确定就不下这个结论,照原来的说法。只查询,不替别的应用申请或授予权限。
  */
 object SpeechServiceMic {

@@ -26,7 +26,7 @@ class ProviderStoreGroupTest {
     @get:Rule val tmp = TemporaryFolder()
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
 
-    private fun store(dir: java.io.File = tmp.root) = ProviderStore(dir, AesGcmKeyCipher { key }, userAgent = "Mika/1.2.3") { cfg, _, _, _ ->
+    private fun store(dir: java.io.File = tmp.root) = ProviderStore(dir, AesGcmKeyCipher { key }, userAgent = "Claire/1.2.3") { cfg, _, _, _ ->
         FakeModel(cfg.model, cfg.capabilities)
     }
 
