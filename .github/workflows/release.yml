@@ -53,7 +53,7 @@ jobs:
 
             Claire is a fork of [Mika](https://github.com/wangzan101/Mika) by Wang Zan, kept under the same Apache-2.0 license. What makes it Claire: English by default (first run and the agent's own instructions), OrcaRouter built in as a model provider, and its own versioning — this release is based on upstream Mika 0.1.50, see [VERSION.md](https://github.com/kilvz/Claire/blob/main/VERSION.md).
 
-            Install the APK below (Android 11+, debug-signed, package `com.wangzan101.mika`; it installs over Mika and earlier Claire builds). Then in Settings › Model, pick OrcaRouter and paste a key from [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) — the free model orcarouter/free costs nothing to try, or orcarouter/auto picks the model per prompt — or pick any other provider, or sign in with a ChatGPT, xAI or OpenRouter account.
+            Install the APK below (Android 11+, debug-signed, package `com.kilv.claire`; it installs alongside Mika, and over earlier `com.kilv.claire` builds). Then in Settings › Model, pick OrcaRouter and paste a key from [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) — the free model orcarouter/free costs nothing to try, or orcarouter/auto picks the model per prompt — or pick any other provider, or sign in with a ChatGPT, xAI or OpenRouter account.
 
             Verify the download against SHA256SUMS.txt.
           files: |
