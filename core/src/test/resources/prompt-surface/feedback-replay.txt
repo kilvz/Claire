@@ -27,6 +27,6 @@ Current screen (read result; its refs can be used directly):
 ### stopped for confirmation
 1 of 2 steps were run automatically, following a way that worked before:
 1. phone_launch_app com.notes
-Step 2 is 「phone_tap 「提交订单」」, which needs the user's confirmation, so it was not run. Continue from the current screen or page, and handle the confirmation the normal way.
+Step 2 is "phone_tap 「提交订单」", which needs the user's confirmation, so it was not run. Continue from the current screen or page, and handle the confirmation the normal way.
 
 Current screen (read result; its refs can be used directly):

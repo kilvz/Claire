@@ -112,7 +112,7 @@ class AgentLoopUserScreenTest {
         loop(model, "那我怎么回", prior = prior).run("那我怎么回", prior)
         val first = model.requests.first().withoutRuntime().first().plainText()
         assertTrue(first.startsWith(Conversation.HEADER))
-        assertTrue(first.contains("(Screen s1 the user sent earlier: 聊天, Oct 28 04:02; the screen begins with 「周六那个聚会你还去吗 应该去吧,怎么了」) 看看这个"))
+        assertTrue(first.contains("(Screen s1 the user sent earlier: 聊天, Oct 28 04:02; the screen begins with \"周六那个聚会你还去吗 应该去吧,怎么了\") 看看这个"))
         assertFalse(first.contains("[[screen:"))
         // 之前几轮里有屏幕:能按编号回看
         assertTrue(model.offeredTools.first().contains("view_user_screen"))

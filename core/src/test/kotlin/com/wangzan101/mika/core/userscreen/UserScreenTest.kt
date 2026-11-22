@@ -42,7 +42,7 @@ class UserScreenTest {
 
     @Test fun earlierLine() {
         val s = UserScreen("s1", at, "com.example.pay", "支付", lines = listOf(ScreenLine("支付成功", 500, 200), ScreenLine("¥38.50", 500, 260)))
-        assertEquals("(Screen s1 the user sent earlier: 支付, Oct 28 04:02; the screen begins with 「支付成功 ¥38.50」)", UserScreenPrompt.earlier("s1", s, zone))
+        assertEquals("(Screen s1 the user sent earlier: 支付, Oct 28 04:02; the screen begins with \"支付成功 ¥38.50\")", UserScreenPrompt.earlier("s1", s, zone))
         assertTrue(UserScreenPrompt.earlier("s1", s.copy(lines = emptyList()), zone).contains("no text was read"))
         assertTrue(UserScreenPrompt.earlier("s1", s.copy(blocked = true), zone).contains("does not allow screenshots"))
         val long = s.copy(lines = listOf(ScreenLine("字".repeat(100), 0, 0)))

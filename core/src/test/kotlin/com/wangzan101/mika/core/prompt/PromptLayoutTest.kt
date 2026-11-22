@@ -70,10 +70,15 @@ class PromptLayoutTest {
         assertEquals(setOf("README.md"), root.listFiles().orEmpty().filter { it.isFile }.map { it.name }.toSet())
     }
 
-    /** 写出来给用户看的东西(技能、App 知识、记忆)要跟着用户的语言:这几份角色说明是中文,得明说,否则模型照着写中文。 */
+    /** 写出来给用户看的东西(技能、App 知识、记忆)要跟着用户的语言:这几份角色说明得明说,否则模型照着写英文。 */
     @Test fun learnedTextFollowsTheUsersLanguage() {
-        listOf("skill_draft", "teach_skill", "app_knowledge", "memory_extract").forEach {
-            assertTrue("$it 没有写明用用户的语言", Prompts.role(it).contains("所用的语言写"))
+        mapOf(
+            "skill_draft" to "in the language of the \"goal\"",
+            "teach_skill" to "in the language of the \"goal\"",
+            "app_knowledge" to "in the language of the \"goal\"",
+            "memory_extract" to "in the language the user spoke in",
+        ).forEach { (role, phrase) ->
+            assertTrue("$role 没有写明用用户的语言", Prompts.role(role).contains(phrase))
         }
     }
 

@@ -312,7 +312,7 @@ class VerifierTest {
         Verifier(m, null).verify("付款", CRITERIA, "付好了\n依据: 屏", e)
         val body = (m.requests.single().single().parts.single() as Part.Text).text
         assertTrue(body, "hand_to_user(payment) 接管被跳过" in body)
-        assertTrue(Verifier.PROMPT, "takeovers" in Verifier.PROMPT && "没有处理" in Verifier.PROMPT)
+        assertTrue(Verifier.PROMPT, "takeovers" in Verifier.PROMPT && "no one handled it" in Verifier.PROMPT)
     }
 
     @Test fun screenshotSentWithModelImageEncoding() = runTest {
