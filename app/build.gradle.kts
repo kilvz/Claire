@@ -25,12 +25,12 @@ android {
         applicationId = "com.kilv.claire"
         minSdk = 29
         targetSdk = 35
-        versionCode = 54
-        // Claire 1.2.0 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
+        versionCode = 55
+        // Claire 1.2.1 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
         // Versioning (same scheme as Kai-custom): a.b.c; minor fix bumps c
         // (1.2.1), feature / major fix bumps b (1.3.0), rebase onto a new
         // upstream bumps a (2.0.0, b/c reset). versionCode increments each release.
-        versionName = "1.2.0"
+        versionName = "1.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false
@@ -65,7 +65,34 @@ android {
     // 评测任务集(仓库根目录 eval/tasks)打进测试包的 assets,真机评测跑器从那里读题
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("eval/tasks"))
 
+    // Permanent release signing (Kilv 2026-11-23): 1.2.0 failed to install
+    // over 1.1.0 because both were debug-signed and GitHub runners generate
+    // a FRESH debug key on every run, so the signatures never matched. The
+    // release key lives in GitHub Actions secrets (see
+    // .github/workflows/release.yml) with a local backup under
+    // ~/workspace/keystores/; it never enters the repo. Without the env
+    // vars (local builds) this config stays empty and the release build
+    // type keeps its default (debug) signing.
+    signingConfigs {
+        create("release") {
+            val keystoreFile = System.getenv("KEYSTORE_FILE")
+            if (keystoreFile != null) {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        // The published APK is the release build, signed with the
+        // permanent key above when the CI secrets are present.
+        getByName("release") {
+            if (System.getenv("KEYSTORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         // 真机验收时并排安装,保留发行版和用户数据;默认构建标识不变。
         if (providers.gradleProperty("devInstall").isPresent) getByName("debug") {
             applicationIdSuffix = ".dev"
