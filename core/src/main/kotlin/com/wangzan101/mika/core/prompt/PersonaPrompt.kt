@@ -28,8 +28,9 @@ object PersonaPrompt {
     /** 改变显示方向的控制符:ALM、LRM、RLM、嵌入/覆盖(U+202A–202E)、隔离(U+2066–2069)。 */
     private val BIDI = Regex("[\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]")
 
-    /** 选项的固定句子:键 → 原文(`prompts/persona/style.md`,格式同 feedback 文件)。 */
-    private val styleText: Map<String, String> by lazy { Feedback.parse(Prompts.read("persona/style.md")).toMap() }
+    /** 选项的固定句子:键 → 原文(`prompts/persona/style.md`,格式同 feedback 文件)。每次现算,不缓存——提示词语言换了,下次取就跟着换。 */
+    private val styleText: Map<String, String>
+        get() = Feedback.parse(Prompts.read("persona/style.md")).toMap()
 
     /**
      * 拼好的那一层。选项的句子在前(每条一行,前面加「- 」),用户写的正文在后,中间空一行;

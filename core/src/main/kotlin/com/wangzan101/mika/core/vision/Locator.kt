@@ -75,7 +75,7 @@ private val PROMPTS: Pair<String, String> by lazy {
     val (locate, confirm) = Prompts.role("locate").split("<!-- confirm -->")
     locate.trim() to confirm.trim()
 }
-private val DESCRIBE_PROMPT: String by lazy { Prompts.role("describe") }
+private val DESCRIBE_PROMPT: String get() = Prompts.role("describe")
 
 /**
  * 在屏上找一个元素:有原文且控件树和画面同步时先在控件树里找唯一的精确匹配,

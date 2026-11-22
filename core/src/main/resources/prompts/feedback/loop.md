@@ -1,4 +1,4 @@
-<!-- 主循环给模型的提醒、说明与参考资料的来源标签。每条以「## 键」开头,下面是原文;{{名字}} 由代码填。 -->
+<!-- Reminders, explanations and source labels the main loop gives the model. Each entry starts with a line "## key", followed by the original text; {{name}} is filled in by code. -->
 
 ## empty_reply
 Your reply was empty. Continue the task with your tools, or reply with your final answer to the user in text.
@@ -35,7 +35,7 @@ Before this goes to the user: {{what}}, and nothing has been done with it since.
 the user approved this action: {{action}}
 
 ## followup_answered
-the user answered your question 「{{prompt}}」
+the user answered your question "{{prompt}}"
 
 ## answer_or_failure
 If the result the task asks for needs a feature, menu, setting, page, item or value that is not there, call end_not_done listing what you checked. Only a yes/no question about whether something exists is answered by its absence: if the app's own search gave a definitive none, reply that it does not exist, quoting the text it showed.
@@ -140,7 +140,7 @@ Step {{step}} expected {{expected}}, actually read {{seen}}{{error}} (this step 
 {{note}}
 
 ## replay.stopped
-Step {{step}} is 「{{action}}」, which needs the user's confirmation, so it was not run. Continue from the current screen or page, and handle the confirmation the normal way.
+Step {{step}} is "{{action}}", which needs the user's confirmation, so it was not run. Continue from the current screen or page, and handle the confirmation the normal way.
 
 ## confirmation_unavailable
 request_confirmation is not available.
@@ -198,7 +198,7 @@ The user tried to send you the screen they are looking at ({{app}}, {{time}}), b
 The user sent a screen they were looking at ({{id}}), but that screenshot is no longer available.
 
 ## user_screen.earlier
-(Screen {{id}} the user sent earlier: {{app}}, {{time}}; the screen begins with 「{{gist}}」)
+(Screen {{id}} the user sent earlier: {{app}}, {{time}}; the screen begins with "{{gist}}")
 
 ## user_screen.earlier_blank
 (Screen {{id}} the user sent earlier: {{app}}, {{time}}; no text was read on it)
@@ -220,7 +220,7 @@ No text was read on the screen.
 You cannot see this image. To learn anything beyond the text (icons, pictures, colours, layout), ask the vision model with view_user_screen and your question.
 
 ## user_screen.no_words
-The user sent only this screen, without words. Work out from the screen what they most likely want. If it only needs an answer, reading, looking something up or searching (nothing gets written or changed anywhere), just do it. If it would write or change something (save an entry in another app, send, post, book, pay, delete, change a setting…), first ask once with ask_user, in one line, what you plan to do, with short options such as 「Log it」/「No thanks」, and go ahead only if they agree. If you do not know which app they use for that kind of job, ask in the same question, and remember their choice if you can save memories.
+The user sent only this screen, without words. Work out from the screen what they most likely want. If it only needs an answer, reading, looking something up or searching (nothing gets written or changed anywhere), just do it. If it would write or change something (save an entry in another app, send, post, book, pay, delete, change a setting…), first ask once with ask_user, in one line, what you plan to do, with short options such as "Log it"/"No thanks", and go ahead only if they agree. If you do not know which app they use for that kind of job, ask in the same question, and remember their choice if you can save memories.
 
 ## user_screen.blocked_reply
 The page did not allow screenshots, so you cannot see it. Say so in one line and ask the user to switch to another page and send again, or to just tell you what to do.

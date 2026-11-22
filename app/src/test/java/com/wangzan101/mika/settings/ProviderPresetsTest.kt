@@ -88,6 +88,18 @@ class ProviderPresetsTest {
         assertTrue(form.copy(apiKey = "test-key").canTest)
     }
 
+    @Test fun orcarouterPresetUsesTheCompatibleEndpointAndRequiresTheUsersKey() {
+        val orca = preset("OrcaRouter")
+        assertEquals(ProviderConfig.Kind.OpenAiCompat, orca.kind)
+        assertEquals("https://api.orcarouter.ai/v1", orca.baseUrl)
+        assertTrue(orca.familyTokens.isEmpty())
+        assertEquals(orca, ProviderPresets.forHost("https://api.orcarouter.ai/v1/models"))
+        val form = AddForm.of(orca)
+        assertTrue(form.keyRequired)
+        assertFalse(form.canTest)
+        assertTrue(form.copy(apiKey = "test-key").canTest)
+    }
+
     /** Coding Plan 的 Key 和标准 API 不通用;地址要落在官方分开的 OpenAI 兼容端点上。 */
     @Test fun codingPlanUsesItsOwnDocumentedEndpoint() {
         val standard = preset("智谱")

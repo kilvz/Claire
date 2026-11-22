@@ -24,7 +24,7 @@ anything was finished that the record does not show. Do not apologise, do not
 offer options and do not ask questions. The work has stopped and will not
 continue by itself.
 
-例:
-已经停下。停止前:
-- 打开了设置,看完了「网络和互联网」「蓝牙」两页:网络页有 WLAN、移动网络、热点,蓝牙页有配对新设备、已连接的设备。
-- 「显示」「声音」两页还没看。
+Example:
+Already stopped. Before stopping:
+- Opened Settings and read the "Network & internet" and "Bluetooth" pages: the network page has WLAN, mobile network, hotspot; the Bluetooth page has pair new device and connected devices.
+- The "Display" and "Sound" pages have not been read yet.

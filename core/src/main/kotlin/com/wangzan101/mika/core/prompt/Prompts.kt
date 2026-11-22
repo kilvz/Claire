@@ -11,11 +11,37 @@ import java.util.concurrent.ConcurrentHashMap
 object Prompts {
     private val cache = ConcurrentHashMap<String, String>()
 
+    /**
+     * 当前提示词语言(BCP 47 标签,如 "en" / "zh-Hans"),由 App 按用户选的语言设置;
+     * null 表示默认(英文)。改了就清缓存,下次读按新语言取。
+     * 中文时先读 prompts/zh/<path>,没有中文版就回落到 prompts/<path>(英文);
+     * 别的语言直接读 prompts/<path>(英文)。
+     */
+    @Volatile
+    var languageTag: String? = null
+        set(value) {
+            if (field != value) {
+                field = value
+                cache.clear()
+            }
+        }
+
     /** 资源原文(去掉首尾空白)。 */
-    fun read(path: String): String = cache.getOrPut(path) {
-        checkNotNull(Prompts::class.java.getResourceAsStream("/prompts/$path")) { "missing prompts/$path" }
-            .bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
+    fun read(path: String): String {
+        val chinese = languageTag?.trim()?.lowercase()?.startsWith("zh") == true
+        val key = if (chinese) "zh|$path" else path
+        return cache.getOrPut(key) {
+            if (chinese) {
+                load("zh/$path") ?: checkNotNull(load(path)) { "missing prompts/$path" }
+            } else {
+                checkNotNull(load(path)) { "missing prompts/$path" }
+            }
+        }
     }
+
+    private fun load(path: String): String? =
+        Prompts::class.java.getResourceAsStream("/prompts/$path")
+            ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }?.trim()
 
     fun system(name: String): String = read("system/$name.md")
 

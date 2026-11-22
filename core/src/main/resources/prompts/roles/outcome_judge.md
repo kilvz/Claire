@@ -22,6 +22,6 @@ Reply with one line of JSON and nothing else:
 reason: one short sentence, in the user's language, naming what is missing;
 empty for done.
 
-例:「告诉我这个视频的标题」,回复「视频不存在,拿不到标题」是 not_possible;
-「有没有叫小王的联系人」,回复「没有,通讯录搜索显示无结果」是 done;
-「前三条热搜的发布者」,回复只给了两条是 partial。
+Example: for 「告诉我这个视频的标题」, a reply of 「视频不存在,拿不到标题」 is not_possible;
+for 「有没有叫小王的联系人」, a reply of 「没有,通讯录搜索显示无结果」 is done;
+for 「前三条热搜的发布者」, a reply giving only two is partial.

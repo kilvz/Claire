@@ -220,7 +220,7 @@ internal object ViewImage : SandboxTool {
         return ToolExecution(JsonObject(read.content + ("seen" to JsonPrimitive(seen))))
     }
 
-    private val ROLE: String by lazy { Prompts.role("view_image") }
+    private val ROLE: String get() = Prompts.role("view_image")
 }
 
 internal object ListFolderFiles : SandboxTool {

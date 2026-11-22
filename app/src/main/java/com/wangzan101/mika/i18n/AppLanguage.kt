@@ -9,6 +9,7 @@ import android.content.res.Resources
 import android.icu.util.ULocale
 import android.os.Build
 import android.os.LocaleList
+import com.wangzan101.mika.core.prompt.Prompts
 import java.util.Locale
 
 /**
@@ -112,14 +113,16 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
             if (systemManaged) {
                 context.getSystemService(LocaleManager::class.java).applicationLocales =
                     language.tag?.let(LocaleList::forLanguageTags) ?: LocaleList.getEmptyLocaleList()
-                return
+            } else {
+                context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_TAG, language.tag).commit()
+                legacyTag = language.tag
+                legacyLoaded = true
+                cached = null
+                applyDefaultLocale(context)
+                context.activity()?.recreate()
             }
-            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_TAG, language.tag).commit()
-            legacyTag = language.tag
-            legacyLoaded = true
-            cached = null
-            applyDefaultLocale(context)
-            context.activity()?.recreate()
+            // 提示词语言跟着换:跟随系统时按系统语言定,英文默认;下个任务起按新语言取提示词。
+            Prompts.languageTag = resolved(context).tag
         }
 
         /** App 启动时调:安卓 12 及以前选了语言时,把进程的默认 Locale(日期、数字的格式)也换成它。 */

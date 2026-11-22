@@ -116,7 +116,7 @@ class RouteMatcher(
             return n
         }
 
-        val PROMPT: String by lazy { Prompts.role("route_match") }
+        val PROMPT: String get() = Prompts.role("route_match")
 
         internal fun parse(text: String, list: List<Route>, goal: String): RouteChoice? {
             val start = text.indexOf('{'); val end = text.lastIndexOf('}')

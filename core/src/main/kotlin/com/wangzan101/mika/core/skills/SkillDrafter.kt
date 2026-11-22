@@ -303,6 +303,6 @@ class SkillDrafter(private val model: ChatModel) {
         /** 文中的技能脚本路径,如 `scripts/extract_pdf.py` 或 `skills/documents/scripts/extract_pdf.py`。 */
         private val SCRIPT_PATH = Regex("[A-Za-z0-9_./-]*scripts/[A-Za-z0-9_./-]+\\.(?:py|mjs|js|sh)(?![A-Za-z0-9_])")
 
-        val PROMPT: String by lazy { Prompts.role("skill_draft") }
+        val PROMPT: String get() = Prompts.role("skill_draft")
     }
 }

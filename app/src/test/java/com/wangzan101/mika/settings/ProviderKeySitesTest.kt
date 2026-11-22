@@ -13,6 +13,7 @@ class ProviderKeySitesTest {
         assertEquals("https://aistudio.google.com/app/apikey", ProviderKeySites.forBaseUrl("https://generativelanguage.googleapis.com"))
         assertEquals("https://console.anthropic.com/settings/keys", ProviderKeySites.forBaseUrl("https://api.anthropic.com"))
         assertEquals("https://console.groq.com/keys", ProviderKeySites.forBaseUrl("https://api.groq.com/openai/v1"))
+        assertEquals("https://www.orcarouter.ai/console/token", ProviderKeySites.forBaseUrl("https://api.orcarouter.ai/v1"))
     }
 
     @Test

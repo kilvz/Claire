@@ -860,7 +860,7 @@ private fun MikaRoot(
     var showLanguagePrompt by rememberSaveable { mutableStateOf(!AppLanguage.hasPrompted(context)) }
     if (showLanguagePrompt && onboarding == null) {
         LanguagePromptDialog(
-            initial = AppLanguage.current(context),
+            initial = AppLanguage.English,
             onConfirm = { lang ->
                 showLanguagePrompt = false
                 AppLanguage.markPrompted(context)
@@ -869,6 +869,7 @@ private fun MikaRoot(
             onDismiss = {
                 showLanguagePrompt = false
                 AppLanguage.markPrompted(context)
+                AppLanguage.set(context, AppLanguage.English)
             },
         )
     }

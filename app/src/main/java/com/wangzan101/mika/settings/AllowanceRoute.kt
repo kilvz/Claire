@@ -32,6 +32,7 @@ internal data class AllowanceRoute(
                 "Kimi" -> AllowanceRoute(AllowanceSource.Kimi, "https://platform.kimi.com/console/account")
                 "硅基流动" -> AllowanceRoute(AllowanceSource.SiliconFlow, "https://cloud.siliconflow.cn/expensebill")
                 "OpenRouter" -> AllowanceRoute(AllowanceSource.OpenRouter, "https://openrouter.ai/settings/credits")
+                "OrcaRouter" -> AllowanceRoute(dashboard = "https://www.orcarouter.ai/console")
                 "OpenDesign Go" -> AllowanceRoute(dashboard = "https://open-design.ai/cloud/dashboard")
                 "通义千问" -> AllowanceRoute(dashboard = "https://bailian.console.aliyun.com/")
                 "智谱" -> AllowanceRoute(dashboard = "https://bigmodel.cn/finance/overview")

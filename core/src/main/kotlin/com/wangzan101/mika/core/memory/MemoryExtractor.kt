@@ -103,7 +103,7 @@ class MemoryExtractor(private val model: ChatModel) {
         private val FORGET = Regex("忘|别记|删|不用记|forget", RegexOption.IGNORE_CASE)
         private val ONE_OFF = Regex("这次|这一次|今天先|this time", RegexOption.IGNORE_CASE)
 
-        val PROMPT: String by lazy { Prompts.role("memory_extract") }
+        val PROMPT: String get() = Prompts.role("memory_extract")
 
         /** 与这次说的话相关的已有记忆(待批准的也给,免得重复提出同一条做法)。 */
         fun related(utterances: List<String>, items: List<MemoryItem>): List<MemoryItem> =

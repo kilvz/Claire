@@ -9,11 +9,13 @@ object Feedback {
     val FILES = listOf("tools", "loop")
     private val HEADING = Regex("^## ([a-z0-9_.]+)$")
 
-    private val entries: Map<String, String> by lazy {
-        val out = LinkedHashMap<String, String>()
-        for (f in FILES) parse(Prompts.read("feedback/$f.md")).forEach { (k, v) -> check(out.put(k, v) == null) { "duplicate feedback key $k" } }
-        out
-    }
+    /** 反馈条目(键 → 原文):每次现算,不缓存——提示词语言换了,下次取就跟着换。 */
+    private val entries: Map<String, String>
+        get() {
+            val out = LinkedHashMap<String, String>()
+            for (f in FILES) parse(Prompts.read("feedback/$f.md")).forEach { (k, v) -> check(out.put(k, v) == null) { "duplicate feedback key $k" } }
+            return out
+        }
 
     /** 一个反馈文件里的各条(键 → 原文),按出现顺序;第一条之前的说明不算。 */
     fun parse(text: String): List<Pair<String, String>> {

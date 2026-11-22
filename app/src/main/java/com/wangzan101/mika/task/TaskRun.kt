@@ -52,6 +52,7 @@ import com.wangzan101.mika.core.agent.TaskStages
 import com.wangzan101.mika.core.agent.AgentLoop
 import com.wangzan101.mika.core.agent.SystemPrompt
 import com.wangzan101.mika.core.prompt.PersonaPrompt
+import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.record.Redactor
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.ModelRouter
@@ -1060,6 +1061,8 @@ class TaskRun(
             // 选项全默认、正文也为空时没有可拼的层。
             val personaLayer = persona?.let { PersonaPrompt.layer(it.name, it.prompt, it.style, assistant) }
             val appLang = AppLanguage.current(service)
+            // 角色/子任务提示词按用户选的语言取(跟随系统时按系统语言定,英文默认);改语言后下个任务就生效。
+            Prompts.languageTag = AppLanguage.resolved(service).tag
             val promptWithPersona = SystemPrompt.withPersona(SystemPrompt.identity(assistant), personaLayer)
             val basePrompt = SystemPrompt.withLanguage(promptWithPersona, appLang.tag)
             // 这一轮用了人格:拼出了人格层,或者只改了称呼;两样都没有就不记

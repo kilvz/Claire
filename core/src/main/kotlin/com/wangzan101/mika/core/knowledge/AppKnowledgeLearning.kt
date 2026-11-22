@@ -152,8 +152,8 @@ class AppKnowledgeDrafter(private val model: ChatModel) {
         /** 模型说「没有值得补的」时只回这个词。 */
         const val NOTHING = "NONE"
 
-        val PROMPT: String by lazy { Prompts.role("app_knowledge") }
-        private val INPUT: String by lazy { Prompts.role("app_knowledge_input") }
+        val PROMPT: String get() = Prompts.role("app_knowledge")
+        private val INPUT: String get() = Prompts.role("app_knowledge_input")
 
         private val TOOL_MENTION = Regex("`([a-z][a-z0-9_]*)`")
         /**

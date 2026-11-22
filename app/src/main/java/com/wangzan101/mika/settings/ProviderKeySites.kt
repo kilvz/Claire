@@ -19,6 +19,7 @@ object ProviderKeySites {
         "tokenhub.tencentmaas.com" to "https://console.cloud.tencent.com/hunyuan/api-key",
         "qianfan.baidubce.com" to "https://console.bce.baidu.com/qianfan/ais/console/apiKey",
         "openrouter.ai" to "https://openrouter.ai/settings/keys",
+        "api.orcarouter.ai" to "https://www.orcarouter.ai/console/token",
         "api.anthropic.com" to "https://console.anthropic.com/settings/keys",
         "generativelanguage.googleapis.com" to "https://aistudio.google.com/app/apikey",
         "api.openai.com" to "https://platform.openai.com/api-keys",

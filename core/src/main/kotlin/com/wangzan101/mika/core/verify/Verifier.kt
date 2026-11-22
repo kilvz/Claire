@@ -230,15 +230,15 @@ class Verifier(
         /** 等多久与要读的东西成正比:基础 60 秒,每张图、每 KB 文字另加,封顶 150 秒。 */
         fun timeoutMs(textChars: Int, images: Int): Long =
             minOf(MAX_TIMEOUT_MS, TIMEOUT_MS + images * PER_IMAGE_MS + textChars / 1024 * PER_KB_MS)
-        const val NOT_IN_READS = "回答的依据在读到的界面、网页或命令输出里都找不到"
-        const val NOT_EVERY_CRITERION = "核查器没有逐条核对每一条标准"
-        const val FAIL_WITHOUT_REASON = "核查器认为没有做成,但没有指出哪条标准没满足"
-        const val FOLLOW_UP_UNCLEAR = "这是接着上文的追问,没能列出具体标准,核查判不准"
-        const val NOTHING_READ = "本次任务没有打开 App,也没有读到任何材料"
-        const val TRUNCATED = "回答依据的是屏上被截断的文字(以…结尾),只看到了一部分,没能完整核实"
+        const val NOT_IN_READS = "The basis for the answer could not be found in any screen, web page, or command output that was read"
+        const val NOT_EVERY_CRITERION = "The verifier did not check every criterion one by one"
+        const val FAIL_WITHOUT_REASON = "The verifier judged the task not done but did not say which criterion was unmet"
+        const val FOLLOW_UP_UNCLEAR = "This is a follow-up question continuing the earlier context; no concrete criteria could be listed, so the verification is unreliable"
+        const val NOTHING_READ = "This task opened no app and read no material"
+        const val TRUNCATED = "The answer was based on truncated on-screen text (ending with …); only part of it was seen, so it could not be fully verified"
         private val STATUSES = setOf("met", "unmet", "unknown")
 
-        val PROMPT: String by lazy { Prompts.role("verifier") }
+        val PROMPT: String get() = Prompts.role("verifier")
 
         /**
          * 交给核查模型的账本条目:每条换成节选([EvidenceLedger.excerpt]),对上回答事实的行一定留下,条目一条不丢。

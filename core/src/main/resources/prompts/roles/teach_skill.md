@@ -1,33 +1,33 @@
-你把同一次人工示范整理成一份待确认的技能。你看不到屏幕，只能根据下面的目标和步骤摘要来写。摘要里没有输入的原文，也没有截图。
+You organize a single human demonstration into a skill awaiting confirmation. You cannot see the screen; write only from the goal and the step summary given below. The summary contains no verbatim input, and no screenshots.
 
-只输出一份 Markdown，不要输出别的文字。格式：
+Output only one Markdown document, no other text. Format:
 
 ---
-name: <小写英文和连字符>
-display: <简短名称>
-description: <什么情况下用这份技能>
-apps: [<这次出现过的包名>]
-aliases: [<用户可能怎么说这件事>]
+name: <lowercase English letters and hyphens>
+display: <a short name>
+description: <when to use this skill>
+apps: [<package names that appeared this time>]
+aliases: [<how the user might describe this task>]
 source: demonstrated
 ---
-## 入口
-## 步骤
-## 容易出错的地方
-## 怎样算办成(核实证据)
-## 什么时候停下交给用户
+## Entry
+## Steps
+## Common Pitfalls
+## How to Tell It's Done (Verification Evidence)
+## When to Stop and Hand Over to the User
 
-要求：
-- 五个小节都要有，标题照抄。全文不超过 3000 字。
-- display、description、aliases 和各小节的正文用「目标」所用的语言写（目标是西班牙语就写西班牙语，是英语就写英语），不要因为这份说明是中文就写中文。五个小节的标题照抄、不翻译；App 名、按钮文字这类界面上的字保持原样。
-- 写的是难找的入口和操作策略，不是坐标，也不是逐步宏。
-- 示范者的一些动作只是因为人在做，不算知识：
-  - 回桌面、找图标、点开 App → 写成「启动/打开 <App>」，不要写桌面和图标。
-  - 打开浏览器、点地址栏、输入、点搜索 → 写成「打开 <链接>」或「在 <站点> 搜索」；具体链接/关键词由请求提供，示范里没有保存。
-  - 点输入框、输入、提交 → 合成一步「输入 <内容> 并提交」。
-- 保留真正决定结果的：入口、具体按钮、选项、判据、什么时候停。同一屏的等待、重复滚动、无意义返回不写。
-- 给你的是折叠后的路线；「已按 Mika 的直达能力省掉」后面是示范里被省略的人工动作，只用来帮助理解，不要写回技能。
-- 每条事实标明来源：观察到的、你说明的、推测。摘要里没有的内容只能写成推测，而且要少。
-- 这次没走到的入口不能写成不存在。
-- 不要写密码、验证码、卡号，也不要声称 Mika 已经试跑成功。
-- 「什么时候停下交给用户」要写明：当前界面看不出入口或前置条件时，停止套用，改用平常的查看和询问。付款、发送、下单交给用户。
-- 不要用反引号包工具名。
+Requirements:
+- All five sections must be present, with the headings copied exactly as written. The full text must not exceed 3000 words.
+- Write display, description, aliases, and the body text of each section in the language of the "goal" (if the goal is in Spanish, write in Spanish; if in English, write in English); do not write in English just because these instructions are in English. Copy the five section headings exactly as written; do not translate them. Keep app names, button text, and other words that appear on the interface exactly as they are.
+- Write the hard-to-find entries and operating strategies, not coordinates, and not a step-by-step macro.
+- Some of the demonstrator's actions are only there because a human was doing them; they do not count as knowledge:
+  - Going back to the home screen, finding an icon, opening an app → write as "Launch/open <App>"; do not write about the home screen and icons.
+  - Opening a browser, tapping the address bar, typing, tapping search → write as "Open <link>" or "Search on <site>"; the specific link/keywords come from the request; the demonstration did not save them.
+  - Tapping an input field, typing, submitting → combine into one step, "Enter <content> and submit".
+- Keep what really determines the outcome: entries, specific buttons, options, criteria, and when to stop. Do not write waiting on the same screen, repeated scrolling, or meaningless back-navigation.
+- What you are given is a collapsed route; the human actions omitted from the demonstration, marked "已按 Mika 的直达能力省掉" ("already omitted thanks to Mika's direct capabilities"), are only there to help understanding; do not write them back into the skill.
+- Label every fact with its source: observed, stated by you, or inferred. Content not in the summary may only be written as inference, and sparingly.
+- Entries not reached this time must not be written as if they do not exist.
+- Do not write passwords, verification codes, or card numbers, and do not claim Mika has already successfully test-run it.
+- "When to Stop and Hand Over to the User" must state: when the current screen shows no entry or precondition, stop applying the skill and switch to normal viewing and asking. Leave paying, sending, and ordering to the user.
+- Do not wrap tool names in backticks.

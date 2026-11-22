@@ -5,6 +5,7 @@ import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.ResourceTexts
 import com.wangzan101.mika.i18n.UiText
 import com.wangzan101.mika.i18n.AppLanguage
+import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.ui.ChatCopy
 import android.app.Application
@@ -561,6 +562,8 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         }
         // 界面以外的文字(通知、服务、悬浮胶囊)按 App 语言取
         AppLanguage.applyDefaultLocale(this)
+        // 提示词语言:启动时按用户选的语言(跟随系统时按系统语言)定,英文默认
+        Prompts.languageTag = AppLanguage.resolved(this).tag
         UiText.source = ResourceTexts { AppLanguage.resources(this) }
         teach = TeachRuntime(this, taskState)
         teach.recover()

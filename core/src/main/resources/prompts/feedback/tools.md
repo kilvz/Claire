@@ -1,4 +1,4 @@
-<!-- 工具结果里给模型的提示与错误说明。每条以「## 键」开头,下面是原文;{{名字}} 由代码填。failure.<码> 是按错误码给的说明。 -->
+<!-- Prompts and error explanations in tool results for the model. Each entry starts with a line "## key", followed by the original text; {{name}} is filled in by code. "failure.<code>" is the explanation given per error code. -->
 
 ## tap_unchanged
 Screen text and focus unchanged after this action. If you expected a visible change, observe before deciding what to do next; do not repeat the action blindly (it may already have taken effect).
@@ -364,7 +364,7 @@ Check whether the order is already paid. If the task includes payment, complete 
 quote is not something the user said in this task. Save a skill only when the user asked for it; quote their exact words.
 
 ## skill.sensitive
-Nothing was saved: the skill contains a password, code, card or ID number, key or similar. Remove it and use a placeholder like <参数>.
+Nothing was saved: the skill contains a password, code, card or ID number, key or similar. Remove it and use a placeholder like <parameter>.
 
 ## skill.invalid_name
 Nothing was saved: name in the front matter must be lowercase letters, digits and hyphens, like order-coffee.
@@ -617,13 +617,13 @@ unknown argument for {{tool}}; allowed: {{allowed}}.
 This is Mika's own screen (or opens Mika itself), and Mika does not operate itself: nothing was done. Try another way, or ask the user to handle it.
 
 ## described.ambiguous
-{{count}} elements match 「{{text}}」, so nothing was done: {{candidates}}. Use one of these refs with snapshotId {{snapshot}}, or describe it more exactly (full text, or add role).
+{{count}} elements match "{{text}}", so nothing was done: {{candidates}}. Use one of these refs with snapshotId {{snapshot}}, or describe it more exactly (full text, or add role).
 
 ## described.none
-No element on the screen right now matches 「{{text}}」{{role}}, so nothing was done. Call {{observe}} to see what is there, then use a ref or the exact text shown.
+No element on the screen right now matches "{{text}}"{{role}}, so nothing was done. Call {{observe}} to see what is there, then use a ref or the exact text shown.
 
 ## described.not_seen
-No input field in the element list matches 「{{text}}」, and looking for it by sight did not find it either ({{reason}}), so nothing was typed. {{next}}
+No input field in the element list matches "{{text}}", and looking for it by sight did not find it either ({{reason}}), so nothing was typed. {{next}}
 
 ## described.not_seen.retry
 Describe the box differently (where it is, what is next to it), or give its point as x+y (from a visibleText line or phone_find_visually).

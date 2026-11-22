@@ -43,7 +43,7 @@ internal object ViewUserScreen : AgentTool {
             "question" to str("What you want to know about it, 1-300 characters. Needed when you cannot see images: the vision model answers it from the screenshot."),
         ), listOf("id"))
 
-    private val ROLE: String by lazy { Prompts.role("user_screen") }
+    private val ROLE: String get() = Prompts.role("user_screen")
 
     override fun available(ctx: ToolContext): Boolean {
         if (ctx.config.userScreens == null) return false
