@@ -8,11 +8,13 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * docs/readme/ 下的几份译文跟得上仓库首页的英文 README.md:
+ * Claire 只发英文 README.md,没有译文:上游 Mika 的译文是对旧版 README 的翻译,
+ * Claire 1.0.0 把 README 完全重写后它们已过期,随这次重写一并删除。
+ * 以后如果有人重新翻译,按下面的机制把文件加回 [TRANSLATIONS] 即可:
  *  - 每份译文开头有 `<!-- translated-from: README.md @ <指纹> -->`,指纹是翻译时 README.md 的 [fingerprint];
  *    README.md 改了而译文没跟着改,这里失败并列出哪几份过期了;
  *  - 译文和 README.md 的 `## ` 小节一样多,用到的本地图片一样(各自按所在目录解析成仓库里的路径再比);网上的徽章图各语言自己写,不比。
- * 生成段落只在 README.md 和简体中文 [ReadmeSections.README_ZH] 里,由 [ReadmeSectionsTest] 守着;其他译文不能有。
+ * 生成段落只在 README.md 里,由 [ReadmeSectionsTest] 守着;译文里不能有。
  */
 class ReadmeTranslationsTest {
     private val root = File("..").canonicalFile
@@ -45,8 +47,8 @@ class ReadmeTranslationsTest {
     }
 
     @Test fun translationsHaveNoGeneratedBlocks() {
-        val bad = (TRANSLATIONS - ReadmeSections.README_ZH).filter { "<!-- generated:" in File(root, it).readText() }
-        assertTrue("生成段落只放在 README.md、${ReadmeSections.README_ZH},其他译文里换成指向它们的一句话:$bad", bad.isEmpty())
+        val bad = TRANSLATIONS.filter { "<!-- generated:" in File(root, it).readText() }
+        assertTrue("生成段落只放在 README.md 里,译文里换成指向它的一句话:$bad", bad.isEmpty())
     }
 
     @Test fun fingerprintIgnoresGeneratedBlocksAndLineEndings() {
@@ -58,9 +60,8 @@ class ReadmeTranslationsTest {
     }
 
     companion object {
-        /** 译文都在 docs/ 下,core/build.gradle.kts 里测试的 docsDir 输入已经盖住;放到别处要另加输入。 */
-        val TRANSLATIONS = listOf(ReadmeSections.README_ZH) +
-            listOf("zh-Hant", "ja", "ko", "es").map { "docs/readme/README.$it.md" }
+        /** Claire 只发英文 README,没有译文(见文件头注释);以后重新翻译时把文件加回这里。译文都在 docs/ 下,core/build.gradle.kts 里测试的 docsDir 输入已经盖住;放到别处要另加输入。 */
+        val TRANSLATIONS = emptyList<String>()
         private val MARKER = Regex("""<!-- translated-from: README\.md @ ([0-9a-f]+) -->""")
         private val GENERATED = Regex("""<!-- generated:([\w-]+):start -->.*?<!-- generated:\1:end -->""", RegexOption.DOT_MATCHES_ALL)
 

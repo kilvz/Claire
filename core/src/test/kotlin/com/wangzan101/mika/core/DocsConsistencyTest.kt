@@ -18,9 +18,11 @@ import java.io.File
  *    不带 / 的,只有代码类扩展名(kt、py、xml 等)才查,json、md、txt 这类常是运行时产物;
  *    查的时候:根目录下直接存在,或「模块/包路径/文件」的简写(`app/task/X.kt`),或中间用 ... 省略(`core/.../X.kt`),或短文件名在仓库任意位置;
  *  - 类名:大驼峰且至少两个大写字母(`Mika` 这样的单词不当类名);在 core、app 的源码(含测试)里有 class/object/interface/typealias
- *    声明或同名文件;源码里从本仓库以外的包导入过的(安卓、JDK、库的类)不归本仓库管;
+ *    声明、顶层函数声明,或同名文件;源码里从本仓库以外的包导入过的(安卓、JDK、库的类)不归本仓库管;
+ *    源码里作为字符串字面量出现的展示名(如服务商名 `DeepSeek`)也不是类,见 [displayNames];
  *  - 工具名:只查「第一段是现有工具名的第一段」的 snake_case(`max_seconds` 这样的参数名不查),对照 [knownToolNames],
- *    那是工具注册处的名单,不是金样快照。
+ *    那是工具注册处的名单,不是金样快照;Android 字符串资源名(`R.string.*`,如 `settings_all_ready_detail`)
+ *    长得像工具名但不是工具,见 [stringResourceNames],不查。
  */
 class DocsConsistencyTest {
     private val root = File("..").canonicalFile
@@ -122,10 +124,28 @@ class DocsConsistencyTest {
     }
 
     private fun classExists(name: String): Boolean =
-        name in sourceNames || Regex("""\b(class|object|interface|typealias)\s+$name\b""").containsMatchIn(sourceText)
+        name in sourceNames || Regex("""\b(class|object|interface|typealias|fun)\s+$name\b""").containsMatchIn(sourceText)
 
     private fun importedFromOutside(name: String): Boolean =
         Regex("""(?m)^import\s+(?!com\.wangzan101\.mika\.)[\w.]+\.$name\b""").containsMatchIn(sourceText)
+
+    /**
+     * 在源码里作为字符串字面量出现的展示名,不是类:服务商/品牌名(如设置页上显示的 `DeepSeek`)
+     * 只出现在界面文字里,文档提到它是在断言这段文字存在,不是在引用一个类。
+     */
+    private val displayNames = setOf("DeepSeek")
+
+    /**
+     * Android 字符串资源名(`R.string.*`):`settings_all_ready_detail`、`phone_repair_sub` 这类
+     * 以下划线连接的资源名,第一段常和工具名前缀撞上(`settings`、`phone`),但它们不是模型工具。
+     * 对照 app/src/main/res 下各 values 目录的 strings*.xml 里声明的 name。
+     */
+    private val stringResourceNames: Set<String> by lazy {
+        File(root, "app/src/main/res").walkTopDown()
+            .filter { it.isFile && it.extension == "xml" && it.name.startsWith("strings") }
+            .flatMap { Regex("""name="([^"]+)"""").findAll(it.readText()).map { m -> m.groupValues[1] } }
+            .toSet()
+    }
 
     private fun problems(doc: File): List<String> {
         val rel = doc.relativeTo(root).invariantSeparatorsPath
@@ -133,9 +153,9 @@ class DocsConsistencyTest {
             if (notIdentifier.containsMatchIn(s)) return@mapNotNull null
             when {
                 isPath(s) -> if (pathExists(s)) null else "$rel: 路径 `$s` 在仓库里找不到"
-                tool.matches(s) -> if (s in remoteApiNames || s in nonToolNames || s in sessionToolNames || s.substringBefore('_') !in toolPrefixes || s in toolNames) null else "$rel: 工具名 `$s` 不在现有工具里"
+                tool.matches(s) -> if (s in remoteApiNames || s in nonToolNames || s in sessionToolNames || s in stringResourceNames || s.substringBefore('_') !in toolPrefixes || s in toolNames) null else "$rel: 工具名 `$s` 不在现有工具里"
                 classLike.matches(s) && s.count { it.isUpperCase() } >= 2 && s.any { it.isLowerCase() } ->
-                    if (classExists(s) || importedFromOutside(s)) null else "$rel: 类名 `$s` 在 core/app 的源码里找不到"
+                    if (classExists(s) || importedFromOutside(s) || s in displayNames) null else "$rel: 类名 `$s` 在 core/app 的源码里找不到"
                 else -> null
             }
         }

@@ -4,11 +4,10 @@ import com.wangzan101.mika.core.knowledge.IndexEntry
 import com.wangzan101.mika.core.knowledge.KnowledgeIndex
 import java.io.File
 
-/**
- * README 里会变的清单(内置知识、服务商预设)从源头生成,夹在 `<!-- generated:<名>:start -->` 和 `<!-- generated:<名>:end -->` 之间。
- * 英文 README.md(仓库首页)和简体中文 docs/readme/README.zh-CN.md 用同一份源头,各出一种语言;英文版里知识的显示名照原样写(不另起译名)。
- * `./gradlew updateReadme` 改写这两份 README;core 的 `ReadmeSectionsTest` 守着它们和生成结果一致。其他译文不带生成段落。
- *
+/** README 里会变的清单(内置知识、服务商预设)从源头生成,夹在 `<!-- generated:<名>:start -->` 和 `<!-- generated:<名>:end -->` 之间。
+ * 英文 README.md(仓库首页)用这份源头;`./gradlew updateReadme` 改写它;core 的 `ReadmeSectionsTest` 守着它和生成结果一致。
+ * 中文版的生成函数(`knowledge`、`providers`、`sections(english = false)`)是上游留下的机制,Claire 不发中文 README,所以
+ * `updateReadme` 只写英文版;以后如果恢复译文,再把 `README_ZH` 加回下面的 main 入口。 */
  * 知识清单用构建索引的同一个 [KnowledgeIndex.build],顺序就是索引的顺序。服务商预设在 app 的 `ProviderPresets.kt` 里,
  * core 加载不了安卓模块的类,这里按「`ProviderPreset("名字", ProviderConfig.Kind.<类型>, "地址"`」逐条读源码;
  * app 的 `ReadmePresetsTest` 拿真对象 `ProviderPresets.all` 对照,读法跟不上源码时那边失败。
@@ -104,11 +103,11 @@ object ReadmeSections {
             text.substring(0, s + start(name).length) + "\n" + body + "\n" + text.substring(e)
         }
 
-    /** `updateReadme` 的入口:`<仓库根目录>`。 */
+    /** `updateReadme` 的入口:`<仓库根目录>`。只写英文 README.md;中文 README 不再随 Claire 发行。 */
     @JvmStatic
     fun main(args: Array<String>) {
         val root = File(args[0])
-        listOf(README to true, README_ZH to false).forEach { (name, english) ->
+        listOf(README to true).forEach { (name, english) ->
             val file = File(root, name)
             val before = file.readText()
             val after = render(before, sections(root, english))

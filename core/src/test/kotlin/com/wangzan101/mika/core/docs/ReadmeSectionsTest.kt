@@ -16,12 +16,6 @@ class ReadmeSectionsTest {
         assertEquals("README.md 里生成的段落过期了,运行 ./gradlew updateReadme", expected, readme)
     }
 
-    @Test fun chineseReadmeMatchesGenerated() {
-        val readme = File(root, ReadmeSections.README_ZH).readText()
-        val expected = ReadmeSections.render(readme, ReadmeSections.sections(root, english = false))
-        assertEquals("${ReadmeSections.README_ZH} 里生成的段落过期了,运行 ./gradlew updateReadme", expected, readme)
-    }
-
     @Test fun renderReplacesOnlyBetweenMarkers() {
         val text = "前\n${ReadmeSections.start("x")}\n旧\n${ReadmeSections.end("x")}\n后\n"
         assertEquals(
