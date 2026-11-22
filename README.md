@@ -10,8 +10,6 @@ Claire is a fork of [Mika](https://github.com/wangzan101/Mika) by [Wang Zan](htt
 
 It works on a hidden background screen, so you can keep using your phone.
 
-<a href="https://github.com/kilvz/Claire"><img src="docs/media/star-banner-v2.png" alt="Like Claire? Give it a star — click Star in the top-right corner" width="620" /></a>
-
 <br/>
 
 <a href="https://github.com/kilvz/Claire/releases/latest"><img src="https://img.shields.io/badge/Download%20APK-Android%2011%2B-2ea043?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a> <a href="https://github.com/kilvz/Claire"><img src="https://img.shields.io/github/stars/kilvz/Claire?style=for-the-badge&logo=github&label=Star&color=FFD700&logoColor=white" alt="Star this repo" /></a>
@@ -176,25 +174,6 @@ More answers are in the [FAQ](docs/faq.en.md).
 - **Follow the author**: X [@wangzan101](https://x.com/wangzan101)
 - **Report a problem**: [open an issue](https://github.com/kilvz/Claire/issues/new/choose); About › Send feedback in the app can attach diagnostics
 - **Contribute**: add usage knowledge for an app or website (plain text, no code needed), or contribute code; see the [contributing guide](.github/CONTRIBUTING.md)
-
-<p align="center">⭐ If Claire saves you time, give it a star — it helps more people find it.</p>
-
-## Star History
-
-<a href="https://star-history.com/#kilvz/Claire&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date&theme=dark&v=20261110-2017" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date&v=20261110-2017" width="600" />
-  </picture>
-</a>
-
-## Contributors
-
-Thanks to everyone who has helped build Claire:
-
-<a href="https://github.com/kilvz/Claire/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kilvz/Claire&max=100&columns=12" alt="Contributors" />
-</a>
 
 ## License
 
