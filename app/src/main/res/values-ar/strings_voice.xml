@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">الإدخال الصوتي غير جاهز · انقر</string>
     <string name="capsule_voice_service_need_mic">التعرّف على الكلام لا يستطيع التسجيل بعد · انقر</string>
     <string name="capsule_voice_open">فتح Claire</string>
+    <string name="voice_unavailable_sherpa_missing">تحويل الكلام إلى نص مضبوط على نموذج Sherpa-ONNX يعمل على الجهاز، لكنه لم يُنزَّل بعد. نزّله من «الإعدادات › الطرازات › نماذج الصوت» أو اختر طريقة تعرّف أخرى.</string>
+    <string name="voice_unavailable_sherpa_failed">تعذّر تشغيل محرّك Sherpa-ONNX على الجهاز. أعد المحاولة أو اختر طريقة تعرّف أخرى من «الإعدادات › الطرازات › تحويل الكلام إلى نص».</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · على الجهاز</string>
 </resources>

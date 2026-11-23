@@ -148,6 +148,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.xz)
+    // Sherpa-ONNX model downloads are .tar.bz2 archives unpacked in-app.
+    implementation(libs.commons.compress)
     implementation(libs.commonmark)
     implementation(libs.commonmark.ext.gfm.tables)
     implementation(libs.commonmark.ext.gfm.strikethrough)
@@ -158,6 +160,8 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    // On-device streaming speech recognition (sherpa-onnx); see voice/SherpaOnnx.kt.
+    implementation(libs.sherpa.onnx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

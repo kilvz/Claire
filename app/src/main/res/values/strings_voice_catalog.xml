@@ -51,6 +51,15 @@
     <string name="voice_catalog_protocol_stt_doubao_streaming">Doubao streaming</string>
     <string name="voice_catalog_protocol_stt_funasr_streaming">FunASR streaming</string>
     <string name="voice_catalog_protocol_stt_bailian_streaming">Bailian streaming</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (on-device)</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX English (on-device)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multilingual (download)</string>
+    <string name="voice_catalog_sherpa_download">Download (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">Downloading… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">Model downloaded</string>
+    <string name="voice_catalog_sherpa_download_failed">Download failed: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">Retry download</string>
+    <string name="voice_catalog_sherpa_needs_download">The model has to be downloaded first.</string>
     <string name="voice_catalog_protocol_tts_android_system">Android system</string>
     <string name="voice_catalog_system_stt_name">Android system speech recognition</string>
     <string name="voice_catalog_system_tts_name">Android system speech synthesis</string>

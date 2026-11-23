@@ -42,6 +42,8 @@ import com.wangzan101.mika.core.model.TtsRequest
 import com.wangzan101.mika.voice.VoicePlayer
 import com.wangzan101.mika.voice.model.RealtimeBinding
 import com.wangzan101.mika.voice.model.RealtimeProtocol
+import com.wangzan101.mika.voice.model.SherpaModelStore
+import com.wangzan101.mika.voice.model.SherpaOnnxModels
 import com.wangzan101.mika.voice.model.SttBinding
 import com.wangzan101.mika.voice.model.SttProtocol
 import com.wangzan101.mika.voice.model.SttSelectionController
@@ -81,12 +83,14 @@ import com.wangzan101.mika.settings.ui.models.edit
  * 服务商、账号、每个能力各自的协议与接口在此声明;语音输入、朗读和通话设置页只负责选择与使用偏好。
  */
 
-/** Resource id for a built-in system model's localized name, or null for user-defined models. */
+/** Resource id for a built-in model's localized name, or null for user-defined models. */
 internal fun systemModelDisplayNameRes(model: VoiceModel): Int? = when {
     model.serviceId == SttSelectionController.SYSTEM_STT_MODEL.serviceId &&
         model.id == SttSelectionController.SYSTEM_STT_MODEL.id -> R.string.voice_catalog_system_stt_name
     model.serviceId == TtsSelectionController.SYSTEM_TTS_MODEL.serviceId &&
         model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id -> R.string.voice_catalog_system_tts_name
+    model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id == SherpaOnnxModels.EN20M_ID -> R.string.voice_catalog_sherpa_en_name
+    model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id == SherpaOnnxModels.MULTILINGUAL_ID -> R.string.voice_catalog_sherpa_multi_name
     else -> null
 }
 
@@ -248,7 +252,8 @@ private fun ServiceGroup(
             ModelRow(
                 model = model,
                 first = index == 0,
-                system = system && (model.id == SttSelectionController.SYSTEM_STT_MODEL.id || model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id),
+                system = (system && (model.id == SttSelectionController.SYSTEM_STT_MODEL.id || model.id == TtsSelectionController.SYSTEM_TTS_MODEL.id)) ||
+                    model.serviceId == SherpaOnnxModels.SERVICE_ID,
                 snapshot = snapshot,
                 onEdit = { onEdit(model) },
                 onDelete = { onDelete(model) },
@@ -338,6 +343,71 @@ private fun ModelRow(
             stringResource(if (allVerified) R.string.voice_catalog_verified else R.string.voice_catalog_unverified),
             if (allVerified) PillTone.Ok else PillTone.Warn,
             Modifier.testTag("voice-status-${model.id}"),
+        )
+        if (model.serviceId == SherpaOnnxModels.SERVICE_ID && model.id in SherpaOnnxModels.DOWNLOADS) {
+            SherpaDownloadControl(model)
+        }
+    }
+}
+
+/**
+ * Download control for the optional on-device models that don't ship in the APK.
+ * The bundled English model has no entry in [SherpaOnnxModels.DOWNLOADS] and no
+ * row here; a downloaded model stays available offline for good.
+ */
+@Composable
+private fun SherpaDownloadControl(model: VoiceModel) {
+    val spec = SherpaOnnxModels.DOWNLOADS[model.id] ?: return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val states by SherpaModelStore.states.collectAsState()
+    val state = states[model.id]
+        ?: if (SherpaModelStore.ready(context, model.id)) SherpaModelStore.State.Ready else SherpaModelStore.State.Absent
+    Spacer(Modifier.height(8.dp))
+    when (state) {
+        SherpaModelStore.State.Ready -> StatusPill(
+            stringResource(R.string.voice_catalog_sherpa_downloaded),
+            PillTone.Ok,
+            Modifier.testTag("sherpa-ready-${model.id}"),
+        )
+        is SherpaModelStore.State.Downloading -> StatusPill(
+            stringResource(R.string.voice_catalog_sherpa_downloading, (state.fraction * 100).toInt()),
+            PillTone.Warn,
+            Modifier.testTag("sherpa-downloading-${model.id}"),
+        )
+        is SherpaModelStore.State.Failed -> Column {
+            StatusPill(stringResource(R.string.voice_catalog_sherpa_download_failed, state.message), PillTone.Warn)
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        try {
+                            SherpaModelStore.download(context, model.id)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            // The store already recorded the failure in its state.
+                        }
+                    }
+                },
+            ) { Text(stringResource(R.string.voice_catalog_sherpa_retry)) }
+        }
+        SherpaModelStore.State.Absent -> MikaButton(
+            stringResource(
+                R.string.voice_catalog_sherpa_download,
+                "~${spec.approximateBytes / (1024 * 1024)} MB",
+            ),
+            onClick = {
+                scope.launch {
+                    try {
+                        SherpaModelStore.download(context, model.id)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // The store already recorded the failure in its state.
+                    }
+                }
+            },
+            modifier = Modifier.testTag("sherpa-download-${model.id}"),
         )
     }
 }
@@ -721,6 +791,7 @@ private fun sttProtocolLabel(protocol: SttProtocol): String = vendorProtocolName
         SttProtocol.DoubaoStreaming -> R.string.voice_catalog_protocol_stt_doubao_streaming
         SttProtocol.FunAsrStreaming -> R.string.voice_catalog_protocol_stt_funasr_streaming
         SttProtocol.BailianStreaming -> R.string.voice_catalog_protocol_stt_bailian_streaming
+        SttProtocol.SherpaStreaming -> R.string.voice_catalog_protocol_stt_sherpa_streaming
         else -> R.string.voice_catalog_protocol_stt_audio_transcriptions
     },
 )

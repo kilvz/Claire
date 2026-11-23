@@ -63,4 +63,7 @@
     <string name="capsule_voice_not_ready">Input suara belum siap · ketuk</string>
     <string name="capsule_voice_service_need_mic">Pengenalan ucapan belum bisa merekam · ketuk</string>
     <string name="capsule_voice_open">Buka Claire</string>
+    <string name="voice_unavailable_sherpa_missing">Ubah suara menjadi teks memakai model Sherpa-ONNX di perangkat yang belum diunduh. Unduh dulu di «Setelan › Model › Model suara», atau pilih metode pengenalan lain.</string>
+    <string name="voice_unavailable_sherpa_failed">Mesin Sherpa-ONNX di perangkat tidak dapat dimulai. Coba lagi, atau pilih metode pengenalan lain di «Setelan › Model › Suara ke teks».</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · di perangkat</string>
 </resources>

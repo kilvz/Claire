@@ -72,6 +72,7 @@ private fun VoiceModel.supports(capability: VoiceCapability) = capability in cap
 internal fun VoiceModel.traits(capability: VoiceCapability): List<VoiceTrait> = when (capability) {
     VoiceCapability.STT -> when (stt?.protocol) {
         SttProtocol.AndroidSystem -> listOf(VoiceTrait.Live, VoiceTrait.Free)
+        SttProtocol.SherpaStreaming -> listOf(VoiceTrait.Live, VoiceTrait.Free)
         SttProtocol.DoubaoStreaming, SttProtocol.FunAsrStreaming, SttProtocol.BailianStreaming -> listOf(VoiceTrait.Live)
         SttProtocol.AudioTranscriptions, SttProtocol.ChatInputAudio, SttProtocol.GeminiInline,
         SttProtocol.ElevenLabsUpload, SttProtocol.DeepgramUpload, SttProtocol.AzureShortAudio,

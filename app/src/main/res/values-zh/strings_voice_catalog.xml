@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">火山双工</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI 实时</string>
     <string name="voice_catalog_tts_sample">你好，这是一次语音测试。</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX（本机）</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX 英语（本机）</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多语言（需下载）</string>
+    <string name="voice_catalog_sherpa_download">下载（%1$s）</string>
+    <string name="voice_catalog_sherpa_downloading">正在下载… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">模型已下载</string>
+    <string name="voice_catalog_sherpa_download_failed">下载失败：%1$s</string>
+    <string name="voice_catalog_sherpa_retry">重新下载</string>
+    <string name="voice_catalog_sherpa_needs_download">需要先下载这个模型。</string>
 </resources>

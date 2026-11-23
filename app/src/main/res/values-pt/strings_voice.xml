@@ -63,4 +63,7 @@
     <string name="capsule_voice_not_ready">A entrada por voz não está pronta · toque</string>
     <string name="capsule_voice_service_need_mic">O reconhecimento de fala ainda não pode gravar · toque</string>
     <string name="capsule_voice_open">Abrir o Claire</string>
+    <string name="voice_unavailable_sherpa_missing">A conversão de fala em texto usa um modelo Sherpa-ONNX no dispositivo que ainda não foi baixado. Baixe-o em «Configurações › Modelos › Modelos de voz» ou escolha outro método de reconhecimento.</string>
+    <string name="voice_unavailable_sherpa_failed">O motor Sherpa-ONNX no dispositivo não conseguiu iniciar. Tente novamente ou escolha outro método de reconhecimento em «Configurações › Modelos › Fala para texto».</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · no dispositivo</string>
 </resources>

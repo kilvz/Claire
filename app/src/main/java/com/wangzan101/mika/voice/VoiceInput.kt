@@ -158,6 +158,8 @@ class VoiceInput(
             is SpeechEngineSpec.Unavailable -> FailedSession(SpeechFailure.Unavailable(spec.why))
             // Vendor recognition exists only in the catalog path; the legacy path never resolves to it.
             is SpeechEngineSpec.Vendor -> FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SystemGone))
+            // Likewise on-device sherpa models are catalog-only; never reached from the legacy path.
+            is SpeechEngineSpec.Sherpa -> FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SherpaFailed))
         }
     }
 }

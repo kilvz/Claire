@@ -64,4 +64,7 @@
     <string name="capsule_voice_not_ready">還不能語音輸入 · 點這裡</string>
     <string name="capsule_voice_service_need_mic">語音辨識還不能錄音 · 點這裡</string>
     <string name="capsule_voice_open">打開 Claire</string>
+    <string name="voice_unavailable_sherpa_missing">語音轉文字選的是在本機執行的 Sherpa-ONNX 模型，這個模型還沒下載。到「設定 › 模型 › 語音模型」下載，或換一種識別方式。</string>
+    <string name="voice_unavailable_sherpa_failed">本機的 Sherpa-ONNX 引擎沒能啟動。再試一次，或到「設定 › 模型 › 語音轉文字」換一種識別方式。</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · 本機</string>
 </resources>

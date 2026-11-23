@@ -64,4 +64,7 @@
     <string name="capsule_voice_not_ready">还不能语音输入 · 点这里</string>
     <string name="capsule_voice_service_need_mic">语音识别还不能录音 · 点这里</string>
     <string name="capsule_voice_open">打开 Claire</string>
+    <string name="voice_unavailable_sherpa_missing">语音转文字选的是在本机运行的 Sherpa-ONNX 模型，这个模型还没下载。到「设置 › 模型 › 语音模型」下载，或换一种识别方式。</string>
+    <string name="voice_unavailable_sherpa_failed">本机的 Sherpa-ONNX 引擎没能启动。再试一次，或到「设置 › 模型 › 语音转文字」换一种识别方式。</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · 本机</string>
 </resources>

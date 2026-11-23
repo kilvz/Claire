@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc دوطرفه</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI بلادرنگ</string>
     <string name="voice_catalog_tts_sample">سلام، این یک آزمایش صوتی است.</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (روی دستگاه)</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX انگلیسی (روی دستگاه)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX چندزبانه (دانلود)</string>
+    <string name="voice_catalog_sherpa_download">دانلود (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">در حال دانلود… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">مدل دانلود شد</string>
+    <string name="voice_catalog_sherpa_download_failed">دانلود ناموفق: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">دانلود دوباره</string>
+    <string name="voice_catalog_sherpa_needs_download">ابتدا باید مدل دانلود شود.</string>
 </resources>

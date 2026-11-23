@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc 双方向</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI リアルタイム</string>
     <string name="voice_catalog_tts_sample">こんにちは、これは音声テストです。</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX（端末内）</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX 英語（端末内）</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多言語（ダウンロード）</string>
+    <string name="voice_catalog_sherpa_download">ダウンロード（%1$s）</string>
+    <string name="voice_catalog_sherpa_downloading">ダウンロード中… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">モデルをダウンロードしました</string>
+    <string name="voice_catalog_sherpa_download_failed">ダウンロードに失敗しました：%1$s</string>
+    <string name="voice_catalog_sherpa_retry">再ダウンロード</string>
+    <string name="voice_catalog_sherpa_needs_download">先にモデルをダウンロードしてください。</string>
 </resources>

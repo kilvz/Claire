@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">Голосовой ввод не готов · нажмите</string>
     <string name="capsule_voice_service_need_mic">Распознавание речи пока не может записывать · нажмите</string>
     <string name="capsule_voice_open">Открыть Claire</string>
+    <string name="voice_unavailable_sherpa_missing">Распознавание речи настроено на модель Sherpa-ONNX, работающую на устройстве, но она ещё не загружена. Загрузите её в «Настройки › Модели › Модели речи» или выберите другой способ распознавания.</string>
+    <string name="voice_unavailable_sherpa_failed">Не удалось запустить движок Sherpa-ONNX на устройстве. Повторите попытку или выберите другой способ распознавания в «Настройки › Модели › Речь в текст».</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · на устройстве</string>
 </resources>

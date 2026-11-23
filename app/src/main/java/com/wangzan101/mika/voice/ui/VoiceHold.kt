@@ -231,6 +231,7 @@ internal object VoiceCopy {
         is SpeechEngineSpec.System -> tr(if (spec.onDevice) R.string.voice_engine_phone_offline else R.string.voice_engine_phone)
         is SpeechEngineSpec.Provider -> spec.model
         is SpeechEngineSpec.Vendor -> spec.model
+        is SpeechEngineSpec.Sherpa -> tr(R.string.voice_engine_sherpa)
         is SpeechEngineSpec.Unavailable -> ""
     }
 
@@ -257,6 +258,8 @@ internal object VoiceCopy {
         SpeechEngineSpec.Why.SystemFailed -> tr(R.string.voice_unavailable_system_failed)
         SpeechEngineSpec.Why.ProviderGone -> tr(R.string.voice_unavailable_provider_gone)
         SpeechEngineSpec.Why.Off -> tr(R.string.voice_unavailable_off)
+        SpeechEngineSpec.Why.SherpaModelMissing -> tr(R.string.voice_unavailable_sherpa_missing)
+        SpeechEngineSpec.Why.SherpaFailed -> tr(R.string.voice_unavailable_sherpa_failed)
     }
 
     /** 最后十秒的倒数;还早时为 null。 */

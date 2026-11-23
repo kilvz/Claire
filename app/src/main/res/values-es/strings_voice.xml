@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">La entrada de voz no está lista · toca</string>
     <string name="capsule_voice_service_need_mic">El reconocimiento de voz aún no puede grabar · toca</string>
     <string name="capsule_voice_open">Abrir Claire</string>
+    <string name="voice_unavailable_sherpa_missing">El paso de voz a texto usa un modelo Sherpa-ONNX en el dispositivo que aún no se ha descargado. Descárgalo en «Ajustes › Modelos › Modelos de voz» o elige otro método de reconocimiento.</string>
+    <string name="voice_unavailable_sherpa_failed">El motor Sherpa-ONNX en el dispositivo no pudo iniciarse. Inténtalo de nuevo o elige otro método de reconocimiento en «Ajustes › Modelos › Voz a texto».</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · en el dispositivo</string>
 </resources>
