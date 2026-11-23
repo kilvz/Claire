@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 1.3.2 (versionCode 58)
+- **Claire version:** 1.3.3 (versionCode 59)
 - **Base version:** upstream Mika 0.1.50 (commit `9c7aabd8`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -45,6 +45,10 @@ recorded base version.
   (refreshed every 4 s, stops when the task ends), and the "Got it —
   your task is registered." notice is sent only for the very first
   task after the bot is set up, not for later tasks.
+- 1.3.3: Telegram gets its own paper-plane icon (`MikaIcons.Telegram`,
+  drawn in the same hand-drawn stroke style) on the Settings home row
+  and the Telegram settings header — it no longer shares the two-bubble
+  `Chats` icon with WeChat.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

@@ -171,7 +171,7 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
 
     PageScaffold(stringResource(R.string.telegram_title), onBack) {
         val status = telegramStateCopy(state, configured)
-        StateCard(MikaIcons.Chats, status.first, status.second, status.third, Modifier.testTag("telegram-status"))
+        StateCard(MikaIcons.Telegram, status.first, status.second, status.third, Modifier.testTag("telegram-status"))
 
         GroupLabel(stringResource(R.string.telegram_how))
         GroupCard {

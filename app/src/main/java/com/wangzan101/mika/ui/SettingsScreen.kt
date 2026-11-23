@@ -508,7 +508,7 @@ fun SettingsContent(
                 WechatEntryStatus(wechatState, wechatBound)
                 RowChevron()
             }
-            ListRow(MikaIcons.Chats, stringResource(R.string.telegram_title), onClick = onOpenTelegram) {
+            ListRow(MikaIcons.Telegram, stringResource(R.string.telegram_title), onClick = onOpenTelegram) {
                 TelegramEntryStatus(telegramState, telegramConfigured)
                 RowChevron()
             }
