@@ -45,7 +45,8 @@ class AntigravityModelTest {
         val req = server.takeRequest()
         assertEquals("/v1internal:generateContent", req.path)
         assertEquals("Bearer tok", req.getHeader("Authorization"))
-        val body = sentBody()
+        // The request is already consumed above; a second takeRequest() would block forever.
+        val body = Json.parseToJsonElement(req.body.readUtf8()).jsonObject
         assertEquals("gemini-4-neon", body.str("model"))
         assertEquals("proj-123", body.str("project"))
         val inner = body.obj("request")
