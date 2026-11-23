@@ -12,16 +12,13 @@ internal enum class InferenceProtocol(val provider: String, val instruction: Str
     Chat("openai_compatible", null, "messages"),
     Responses("openai_compatible", "instructions", "input"),
     Anthropic("anthropic", "system", "messages"),
-    Gemini("gcp.gemini", "systemInstruction", "contents"),
-    /** Google Cloud Code Assist (Antigravity): Gemini-shaped replies wrapped in a "response" envelope. */
-    CloudCodeAssist("gcp.cloudcode", "systemInstruction", "contents");
+    Gemini("gcp.gemini", "systemInstruction", "contents");
 
     fun usageIn(packet: JsonObject): ReportedTokens? {
         val envelope = when (this) {
             Responses -> (packet["response"] as? JsonObject)?.get("usage") ?: packet["usage"]
             Anthropic -> (packet["message"] as? JsonObject)?.get("usage") ?: packet["usage"]
             Gemini -> packet["usageMetadata"]
-            CloudCodeAssist -> (packet["response"] as? JsonObject)?.get("usageMetadata") ?: packet["usageMetadata"]
             Chat -> packet["usage"]
         }
         val u = envelope as? JsonObject ?: return null
@@ -40,7 +37,7 @@ internal enum class InferenceProtocol(val provider: String, val instruction: Str
                 val cache = n("cache_read_input_tokens")
                 ReportedTokens(n("input_tokens")?.plus((cache ?: 0) + (n("cache_creation_input_tokens") ?: 0)), n("output_tokens"), cache)
             }
-            Gemini, CloudCodeAssist -> {
+            Gemini -> {
                 val text = n("candidatesTokenCount")
                 val thoughts = n("thoughtsTokenCount")
                 ReportedTokens(n("promptTokenCount"), if (text == null && thoughts == null) null else (text ?: 0) + (thoughts ?: 0),

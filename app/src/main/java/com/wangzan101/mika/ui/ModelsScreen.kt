@@ -428,9 +428,6 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
         if (p.kind == ProviderConfig.Kind.ChatGpt) {
             GroupLabel(ModelsCopy.CONNECTION)
             ChatGptConnection(ui, state, actions)
-        } else if (p.kind == ProviderConfig.Kind.Antigravity) {
-            GroupLabel(ModelsCopy.CONNECTION)
-            AntigravityConnection(ui, state, actions)
         } else if (p.kind == ProviderConfig.Kind.Xai || p.signIn == ProviderStore.OPENROUTER_SIGN_IN) {
             GroupLabel(ModelsCopy.CONNECTION)
             AccountConnection(ui, p, state, actions)
@@ -1242,21 +1239,18 @@ object ModelsCopy {
         SignInKind.ChatGpt -> tr(R.string.signin_row_chatgpt)
         SignInKind.Xai -> tr(R.string.signin_row_xai)
         SignInKind.OpenRouter -> tr(R.string.signin_row_openrouter)
-        SignInKind.Antigravity -> tr(R.string.antigravity_row)
     }
 
     fun signInTitle(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_TITLE
         SignInKind.Xai -> tr(R.string.signin_xai_title)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_title)
-        SignInKind.Antigravity -> ANTIGRAVITY_TITLE
     }
 
     fun signInBody(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_BODY
         SignInKind.Xai -> tr(R.string.signin_xai_body)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_body)
-        SignInKind.Antigravity -> ANTIGRAVITY_BODY
     }
 
     /** 登录前要先说清的风险(黄底);没有为 null。 */
@@ -1267,55 +1261,30 @@ object ModelsCopy {
         SignInKind.ChatGpt -> null
         SignInKind.Xai -> tr(R.string.signin_stored_note)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_note)
-        SignInKind.Antigravity -> ANTIGRAVITY_NOTE
     }
 
     fun signInStart(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_CONTINUE
         SignInKind.Xai -> tr(R.string.signin_continue)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_authorize)
-        SignInKind.Antigravity -> ANTIGRAVITY_CONTINUE
     }
 
     fun signInWaiting(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_WAITING
         SignInKind.Xai -> tr(R.string.signin_xai_starting)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_waiting)
-        SignInKind.Antigravity -> ANTIGRAVITY_WAITING
     }
 
     fun accountManage(kind: SignInKind) = when (kind) {
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_manage)
-        SignInKind.Antigravity -> ANTIGRAVITY_MANAGE_CLIENT
         else -> tr(R.string.account_manage_xai)
     }
 
     /** 账号登录详情下面的说明:在用什么、退出后怎样。 */
     fun accountNote(kind: SignInKind, signedIn: Boolean) = when (kind) {
         SignInKind.OpenRouter -> tr(if (signedIn) R.string.signin_openrouter_signed_in_note else R.string.signin_openrouter_signed_out_note)
-        SignInKind.Antigravity -> if (signedIn) ANTIGRAVITY_PLAN_NOTE else ANTIGRAVITY_SIGNED_OUT_NOTE
         else -> tr(if (signedIn) R.string.account_signed_in_note_xai else R.string.account_signed_out_note)
     }
-
-    // ---------- Antigravity(用 Google 账号登录) ----------
-
-    val ANTIGRAVITY_TITLE: String get() = tr(R.string.antigravity_signin_title)
-    val ANTIGRAVITY_BODY: String get() = tr(R.string.antigravity_signin_body)
-    val ANTIGRAVITY_NOTE: String get() = tr(R.string.antigravity_signin_note)
-    val ANTIGRAVITY_CLIENT_ID: String get() = tr(R.string.antigravity_client_id)
-    val ANTIGRAVITY_CLIENT_ID_HINT: String get() = tr(R.string.antigravity_client_id_hint)
-    val ANTIGRAVITY_CLIENT_SECRET: String get() = tr(R.string.antigravity_client_secret)
-    val ANTIGRAVITY_CLIENT_SECRET_HINT: String get() = tr(R.string.antigravity_client_secret_hint)
-    val ANTIGRAVITY_CLIENT_MISSING: String get() = tr(R.string.antigravity_client_missing)
-    val ANTIGRAVITY_CONTINUE: String get() = tr(R.string.antigravity_signin_start)
-    val ANTIGRAVITY_WAITING: String get() = tr(R.string.antigravity_signin_waiting)
-    val ANTIGRAVITY_ACCOUNT: String get() = tr(R.string.antigravity_account)
-    val ANTIGRAVITY_SIGN_OUT: String get() = tr(R.string.antigravity_sign_out)
-    val ANTIGRAVITY_MANAGE_CLIENT: String get() = tr(R.string.antigravity_manage_client)
-    val ANTIGRAVITY_PLAN_NOTE: String get() = tr(R.string.antigravity_signed_in_note)
-    val ANTIGRAVITY_SIGNED_OUT_NOTE: String get() = tr(R.string.antigravity_signed_out_note)
-    val ANTIGRAVITY_REVOKE_UNCONFIRMED: String get() = tr(R.string.antigravity_revoke_unconfirmed)
-    val ANTIGRAVITY_SAVE_SIGN_IN: String get() = tr(R.string.antigravity_save_client)
 
     fun accountFailure(e: AccountSignInException): String = when (e.reason) {
         AccountSignInFailure.Denied -> tr(R.string.account_fail_denied)
@@ -1473,7 +1442,6 @@ object ModelsCopy {
         ProviderConfig.Kind.OpenAiResponses -> "OpenAI Responses"
         ProviderConfig.Kind.ChatGpt -> "ChatGPT"
         ProviderConfig.Kind.Xai -> "xAI Responses"
-        ProviderConfig.Kind.Antigravity -> "Antigravity"
     }
 
     fun shortUrl(url: String) = url.removePrefix("https://").removePrefix("http://")

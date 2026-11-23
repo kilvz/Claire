@@ -53,7 +53,6 @@ At the top of "Add provider" is the group "Sign in with an account · no key nee
 - **ChatGPT** (Plus or Pro, uses your plan's usage): tap "Continue with ChatGPT" and sign in in the browser.
 - **xAI / Grok** (SuperGrok or X Premium+ subscription): the browser opens xAI's confirmation page; check that it shows the same short code as your phone, then approve. This sign-in borrows the public sign-in entry of xAI's official command-line tool; xAI did not set it up for Mika and may restrict this use. Some subscription tiers still can't make calls after signing in (403); use an xAI API key in that case.
 - **OpenRouter**: OpenRouter's official authorization for third-party apps. Once you approve, OpenRouter gives Mika a key of your own (named "Mika"), paid from your OpenRouter balance; to stop, delete it on OpenRouter's Keys page.
-- **Antigravity** (Google Cloud Code Assist, uses your Google account's Antigravity quota): paste your own OAuth client id and client secret first (Desktop-app OAuth client in your Google Cloud project, or the client from your own Antigravity install — Claire ships none), then tap "Sign in with Google" and sign in in the browser. The client must be one Google accepts for Cloud Code Assist; if it refuses a self-registered client, the sign-in shows the server's error.
 
 Signing out only clears the sign-in on this phone.
 

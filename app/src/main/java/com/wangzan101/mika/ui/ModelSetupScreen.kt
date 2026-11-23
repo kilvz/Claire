@@ -7,7 +7,6 @@ import android.net.Uri
 import android.widget.Toast
 import com.wangzan101.mika.R
 import com.wangzan101.mika.core.chatgpt.ChatGptAuth
-import com.wangzan101.mika.core.oauth.AntigravityAuth
 import com.wangzan101.mika.core.oauth.OpenRouterAuth
 import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.voice.SystemSpeech
@@ -168,10 +167,6 @@ fun ModelSetupScreen(
     LaunchedEffect(ui.chatGptAccount?.signedIn, ui.chatGptSignIn) {
         if (signInSheet == SignInKind.ChatGpt && ui.chatGptAccount?.signedIn == true && ui.chatGptSignIn == ListState.Idle) signInSheet = null
     }
-    // Antigravity 登录成功同样留在这一页,面板收起
-    LaunchedEffect(ui.antigravityAccount?.signedIn, ui.antigravitySignIn) {
-        if (signInSheet == SignInKind.Antigravity && ui.antigravityAccount?.signedIn == true && ui.antigravitySignIn == ListState.Idle) signInSheet = null
-    }
 
     val provider = openProvider?.let { id -> ui.providers.firstOrNull { it.id == id } }
     val role = picking
@@ -244,28 +239,13 @@ fun ModelSetupScreen(
                     setTts = { model, enabled -> vm.setTtsModel(p.id, model, enabled) },
                     showAll = { allModels = true },
                     retestModel = { model -> vm.retestModel(p.id, model) },
-                    // ChatGPT 照旧直接去浏览器登录;Antigravity 有客户端就直接登录、没有先打开填客户端的面板;
-                    // xAI、OpenRouter 先打开说明面板
-                    signIn = {
-                        when {
-                            accountKind != null -> signInSheet = accountKind
-                            p.kind == ProviderConfig.Kind.Antigravity && ui.antigravityClientId.isBlank() -> signInSheet = SignInKind.Antigravity
-                            p.kind == ProviderConfig.Kind.Antigravity -> vm.signInWithAntigravity()
-                            else -> vm.signInWithChatGpt()
-                        }
-                    },
-                    signOut = {
-                        when {
-                            accountKind != null -> vm.signOutAccount(p.id)
-                            p.kind == ProviderConfig.Kind.Antigravity -> vm.signOutAntigravity(p.id)
-                            else -> vm.signOutChatGpt(p.id)
-                        }
-                    },
+                    // ChatGPT 照旧直接去浏览器登录;xAI、OpenRouter 先打开说明面板
+                    signIn = { if (accountKind != null) signInSheet = accountKind else vm.signInWithChatGpt() },
+                    signOut = { if (accountKind != null) vm.signOutAccount(p.id) else vm.signOutChatGpt(p.id) },
                     manageUsage = {
-                        openInBrowser(context, when {
-                            p.kind == ProviderConfig.Kind.Antigravity -> AntigravityAuth.CREDENTIALS_URL
-                            accountKind == SignInKind.Xai -> ModelsCopy.ACCOUNT_MANAGE_URL
-                            accountKind == SignInKind.OpenRouter -> OpenRouterAuth.KEYS_PAGE
+                        openInBrowser(context, when (accountKind) {
+                            SignInKind.Xai -> ModelsCopy.ACCOUNT_MANAGE_URL
+                            SignInKind.OpenRouter -> OpenRouterAuth.KEYS_PAGE
                             else -> ChatGptAuth.USAGE_URL
                         })
                     },
@@ -374,21 +354,8 @@ fun ModelSetupScreen(
         SignInSheet(
             ui, kind,
             SignInSheetActions(
-                start = { k ->
-                    when {
-                        k.account != null -> vm.signInWithAccount(k.account)
-                        k == SignInKind.Antigravity -> vm.signInWithAntigravity()
-                        else -> vm.signInWithChatGpt()
-                    }
-                },
-                cancel = { k ->
-                    when {
-                        k.account != null -> vm.cancelAccountSignIn()
-                        k == SignInKind.Antigravity -> vm.cancelAntigravitySignIn()
-                        else -> vm.cancelChatGptSignIn()
-                    }
-                },
-                startAntigravity = { id, secret -> vm.signInWithAntigravity(id, secret) },
+                start = { k -> k.account?.let(vm::signInWithAccount) ?: vm.signInWithChatGpt() },
+                cancel = { k -> if (k.account != null) vm.cancelAccountSignIn() else vm.cancelChatGptSignIn() },
                 useApiKey = { k ->
                     signInSheet = null
                     vm.openForm()
@@ -398,7 +365,6 @@ fun ModelSetupScreen(
                     signInSheet = null
                     // 失败的原因看过了;还在登录的不打断
                     if (!ui.accountSignIn.running) vm.dismissAccountFailure()
-                    if (ui.antigravitySignIn != ListState.Running) vm.dismissAntigravityFailure()
                 },
             ),
         )
@@ -1414,7 +1380,6 @@ object ModelSetupCopy {
             ProviderConfig.Kind.Anthropic -> R.string.model_example_anthropic
             ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> R.string.model_example_openai
             ProviderConfig.Kind.Xai -> R.string.model_example_grok
-            ProviderConfig.Kind.Antigravity -> R.string.antigravity_model_example
             ProviderConfig.Kind.OpenAiCompat -> R.string.model_example_compat
         },
     )

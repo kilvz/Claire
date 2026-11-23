@@ -70,10 +70,8 @@ class ProviderPresetsTest {
     /** 预置的思考档位只来自官方文档:DeepSeek 的 reasoning_effort 可能值是 none/low/high/max(none 关思考),别名不预置。 */
     @Test fun reasoningLevelsAreCuratedAndOfficialOnly() {
         assertEquals(listOf("none", "low", "high", "max"), preset("DeepSeek").reasoningLevels)
-        // Antigravity 的 Cloud Code Assist API 按档位收 effort:low/medium/high。
-        assertEquals(listOf("low", "medium", "high"), preset("Antigravity").reasoningLevels)
         // 没核实的店家一律不预置,界面上照旧不出档位(见 ReasoningOptions)
-        ProviderPresets.all.filter { it.label != "DeepSeek" && it.label != "Antigravity" }.forEach { p ->
+        ProviderPresets.all.filter { it.label != "DeepSeek" }.forEach { p ->
             assertEquals(p.label, emptyList<String>(), p.reasoningLevels)
         }
     }

@@ -15,15 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,7 +34,6 @@ import com.wangzan101.mika.settings.ProviderConfig
 import com.wangzan101.mika.settings.ProviderStore
 import com.wangzan101.mika.ui.components.ButtonKind
 import com.wangzan101.mika.ui.components.ButtonSize
-import com.wangzan101.mika.ui.components.FooterNote
 import com.wangzan101.mika.ui.components.GroupCard
 import com.wangzan101.mika.ui.components.GroupLabel
 import com.wangzan101.mika.ui.components.ListRow
@@ -53,16 +46,15 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 
-/** 「添加模型」里「用账号登录」那一组。ChatGPT 和 Antigravity 的登录各另有一套,xAI、OpenRouter 对应 [AccountProvider]。 */
+/** 「添加模型」里「用账号登录」那一组的三家。ChatGPT 的登录另有一套,xAI、OpenRouter 对应 [AccountProvider]。 */
 enum class SignInKind(val account: AccountProvider?, val label: String, val tag: String) {
     ChatGpt(null, "ChatGPT", "chatgpt"),
     Xai(AccountProvider.Xai, "xAI / Grok", "xai"),
-    OpenRouter(AccountProvider.OpenRouter, "OpenRouter", "openrouter"),
-    Antigravity(null, "Antigravity", "antigravity");
+    OpenRouter(AccountProvider.OpenRouter, "OpenRouter", "openrouter");
 
-    /** 「改用 API Key」时选的预设;ChatGPT、Antigravity 没有这一项。 */
+    /** 「改用 API Key」时选的预设;ChatGPT 没有这一项。 */
     val keyPreset: String? get() = when (this) {
-        ChatGpt, Antigravity -> null
+        ChatGpt -> null
         Xai -> "xAI"
         OpenRouter -> "OpenRouter"
     }
@@ -79,11 +71,6 @@ internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean
         chatGptSignIn == ListState.Running,
         (chatGptSignIn as? ListState.Failed)?.message,
     )
-    SignInKind.Antigravity -> Triple(
-        providers.firstOrNull { it.kind == ProviderConfig.Kind.Antigravity }?.id?.takeIf { antigravityAccount?.signedIn == true },
-        antigravitySignIn == ListState.Running,
-        (antigravitySignIn as? ListState.Failed)?.message,
-    )
     else -> {
         val signedIn = if (kind == SignInKind.Xai) xaiAccount?.signedIn == true else openRouterAccount?.signedIn == true
         val id = providers.firstOrNull {
@@ -96,7 +83,7 @@ internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean
 }
 
 /**
- * 「用账号登录 · 不用填 Key」:ChatGPT、xAI / Grok、OpenRouter、Antigravity 各一行。已登录的写「已登录」,点进服务商详情;
+ * 「用账号登录 · 不用填 Key」:ChatGPT、xAI / Grok、OpenRouter 各一行。已登录的写「已登录」,点进服务商详情;
  * 没登录的点开说明面板([onOpen]),在面板里才开始登录。正在登录的写「登录中…」,点开看进度。
  */
 @Composable
@@ -127,8 +114,6 @@ class SignInSheetActions(
     val cancel: (SignInKind) -> Unit = {},
     val useApiKey: (SignInKind) -> Unit = {},
     val dismiss: () -> Unit = {},
-    /** Antigravity:先存下这对 OAuth 客户端,再开始登录(存和登录同一次写盘后读,不怕写晚了)。 */
-    val startAntigravity: (String, String) -> Unit = { _, _ -> },
 )
 
 /**
@@ -157,97 +142,10 @@ internal fun SignInSheetBody(ui: ModelSetupUi, kind: SignInKind, actions: SignIn
     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp).testTag("signin-sheet-${kind.tag}")) {
         when {
             code != null -> DeviceCodeBody(ui.accountSignIn, code) { actions.cancel(kind) }
-            kind == SignInKind.Antigravity -> AntigravitySheetBody(ui, actions)
             // 同一时刻只有一次登录:别家正在登录时这里不能开始
-            else -> IntroBody(kind, running, failure, busy = !running && (ui.chatGptSignIn == ListState.Running || ui.antigravitySignIn == ListState.Running || ui.accountSignIn.running), actions)
+            else -> IntroBody(kind, running, failure, busy = !running && (ui.chatGptSignIn == ListState.Running || ui.accountSignIn.running), actions)
         }
     }
-}
-
-/**
- * Antigravity 的登录面板:先填用户自己的 Google OAuth 客户端(Client ID、Client Secret,存在本机、加密保存),
- * 再点「Sign in with Google」去浏览器登录。Client ID 为空时不能开始,面板里写明去哪找。
- * 登录中写「在浏览器里完成」,可以取消;失败在面板里说原因,可以再试。
- */
-@Composable
-private fun AntigravitySheetBody(ui: ModelSetupUi, actions: SignInSheetActions) {
-    val c = MikaTheme.colors
-    val (_, running, failure) = ui.signInState(SignInKind.Antigravity)
-    var clientId by rememberSaveable { mutableStateOf(ui.antigravityClientId) }
-    var clientSecret by rememberSaveable { mutableStateOf(ui.antigravityClientSecret) }
-    val ready = clientId.isNotBlank() && clientSecret.isNotBlank()
-    Text(ModelsCopy.ANTIGRAVITY_TITLE, Modifier.fillMaxWidth(), style = MikaType.Title, color = c.ink, textAlign = TextAlign.Center)
-    Text(ModelsCopy.ANTIGRAVITY_BODY, Modifier.padding(top = 10.dp), style = MikaType.Caption, color = c.ink2)
-    Note(ModelsCopy.ANTIGRAVITY_NOTE, c.fill, c.ink2)
-    OutlinedTextField(
-        clientId, { clientId = it },
-        Modifier.fillMaxWidth().padding(top = 12.dp).testTag("antigravity-client-id"),
-        label = { Text(ModelsCopy.ANTIGRAVITY_CLIENT_ID) },
-        placeholder = { Text(ModelsCopy.ANTIGRAVITY_CLIENT_ID_HINT) },
-        singleLine = true, enabled = !running,
-    )
-    OutlinedTextField(
-        clientSecret, { clientSecret = it },
-        Modifier.fillMaxWidth().padding(top = 8.dp).testTag("antigravity-client-secret"),
-        label = { Text(ModelsCopy.ANTIGRAVITY_CLIENT_SECRET) },
-        placeholder = { Text(ModelsCopy.ANTIGRAVITY_CLIENT_SECRET_HINT) },
-        singleLine = true, enabled = !running,
-        visualTransformation = PasswordVisualTransformation(),
-    )
-    if (!ready) Note(ModelsCopy.ANTIGRAVITY_CLIENT_MISSING, c.warnSoft, c.warn, Modifier.testTag("antigravity-client-missing"))
-    MikaButton(
-        ModelsCopy.ANTIGRAVITY_SAVE_SIGN_IN, { actions.startAntigravity(clientId.trim(), clientSecret.trim()) },
-        Modifier.fillMaxWidth().padding(top = 16.dp).testTag("signin-start"), enabled = !running && ready,
-    )
-    if (running) {
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(ModelsCopy.ANTIGRAVITY_WAITING, Modifier.weight(1f), style = MikaType.Caption, color = c.ink2)
-            Text(
-                ModelSetupCopy.CANCEL,
-                Modifier.clickable { actions.cancel(SignInKind.Antigravity) }.padding(start = 12.dp, top = 4.dp, bottom = 4.dp).testTag("signin-cancel"),
-                style = MikaType.Caption, color = c.accent,
-            )
-        }
-    }
-    failure?.let {
-        Text(it, Modifier.padding(top = 10.dp).testTag("signin-failed"), style = MikaType.Caption, color = c.bad)
-    }
-}
-
-/**
- * Antigravity 的连接:账号(邮箱)、退出登录或再登录、管理 OAuth 客户端(打开 Google Cloud 的凭据页)。
- * 退出登录只清这台手机上的令牌,服务商、模型和用途都留着;OAuth 客户端也留着,再登录不用重填。
- * 还没填客户端时写明去哪找,点「Sign in with Google」先打开填客户端的面板。
- */
-@Composable
-internal fun AntigravityConnection(ui: ModelSetupUi, state: ListState?, actions: ProviderDetailActions) {
-    val c = MikaTheme.colors
-    val account = ui.antigravityAccount
-    val signedIn = account?.signedIn == true
-    GroupCard {
-        ListRow(null, ModelsCopy.STATUS, first = true) {
-            when {
-                !signedIn -> RowValue(ModelsCopy.CHATGPT_SIGNED_OUT, ValueTone.Warn)
-                state == ListState.Running -> RowValue(ModelsCopy.LISTING)
-                state is ListState.Failed -> RowValue(ModelsCopy.LIST_FAILED, ValueTone.Bad)
-                else -> RowValue(ModelsCopy.CHATGPT_SIGNED_IN, ValueTone.Ok)
-            }
-        }
-        account?.email?.takeIf { it.isNotEmpty() }?.let { email -> ListRow(null, ModelsCopy.ANTIGRAVITY_ACCOUNT) { RowValue(email) } }
-        ListRow(null, ModelsCopy.ANTIGRAVITY_MANAGE_CLIENT, titleColor = c.accent, onClick = actions.manageUsage) { RowChevron() }
-        if (signedIn) {
-            ListRow(null, ModelsCopy.ANTIGRAVITY_SIGN_OUT, titleColor = c.bad, onClick = actions.signOut)
-        } else {
-            ListRow(
-                null, if (ui.antigravitySignIn == ListState.Running) ModelsCopy.ANTIGRAVITY_WAITING else ModelsCopy.ANTIGRAVITY_CONTINUE,
-                titleColor = c.accent, onClick = actions.signIn,
-            )
-        }
-    }
-    if (ui.antigravityClientId.isBlank()) FooterNote(ModelsCopy.ANTIGRAVITY_CLIENT_MISSING, color = c.warn)
-    FooterNote(if (signedIn) ModelsCopy.ANTIGRAVITY_PLAN_NOTE else ModelsCopy.ANTIGRAVITY_SIGNED_OUT_NOTE)
-    if (ui.antigravityRevokeUnconfirmed) FooterNote(ModelsCopy.ANTIGRAVITY_REVOKE_UNCONFIRMED, color = c.warn)
-    (ui.antigravitySignIn as? ListState.Failed)?.let { FooterNote(it.message, color = c.bad) }
 }
 
 @Composable

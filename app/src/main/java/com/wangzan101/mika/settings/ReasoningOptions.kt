@@ -29,8 +29,7 @@ data class ReasoningOptions(val levels: List<String>, val fromProvider: Boolean)
                     ReasoningOptions(manualLevels, fromProvider = false)
                 // 预设里这家官方文档写明了几档就给几档;对不上预设的 OpenAI 兼容地址(第三方网关)
                 // 也照给通用档位并标「来源不是服务商」,让入口能渲染、由用户显式承担风险;默认仍是「默认」不发字段。
-                // Antigravity 的档位同样写在预设里(Cloud Code 的模型名后接档位后缀)。
-                ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.Antigravity ->
+                ProviderConfig.Kind.OpenAiCompat ->
                     ProviderPresets.forBaseUrl(config.baseUrl)?.reasoningLevels
                         ?.takeIf { it.isNotEmpty() }?.let { ReasoningOptions(it, fromProvider = false) }
                         ?: ReasoningOptions(manualLevels, fromProvider = false)
