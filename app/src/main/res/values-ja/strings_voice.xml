@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">音声入力の準備ができていません · タップ</string>
     <string name="capsule_voice_service_need_mic">音声認識がまだ録音できません · タップ</string>
     <string name="capsule_voice_open">Claire を開く</string>
+    <string name="voice_unavailable_sherpa_missing">音声入力は端末内で動く Sherpa-ONNX モデルに設定されていますが、まだダウンロードされていません。「設定 › モデル › 音声モデル」でダウンロードするか、別の認識方法を選んでください。</string>
+    <string name="voice_unavailable_sherpa_failed">端末内の Sherpa-ONNX エンジンを起動できませんでした。もう一度試すか、「設定 › モデル › 音声入力」で別の認識方法を選んでください。</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · 端末内</string>
 </resources>

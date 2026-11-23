@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc duplex</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI em tempo real</string>
     <string name="voice_catalog_tts_sample">Olá, este é um teste de voz.</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (no dispositivo)</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX inglês (no dispositivo)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multilíngue (baixar)</string>
+    <string name="voice_catalog_sherpa_download">Baixar (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">Baixando… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">Modelo baixado</string>
+    <string name="voice_catalog_sherpa_download_failed">Falha no download: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">Baixar novamente</string>
+    <string name="voice_catalog_sherpa_needs_download">O modelo precisa ser baixado primeiro.</string>
 </resources>

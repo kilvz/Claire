@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc duplex</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI realtime</string>
     <string name="voice_catalog_tts_sample">Halo, ini uji coba suara.</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (di perangkat)</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX Inggris (di perangkat)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multibahasa (unduh)</string>
+    <string name="voice_catalog_sherpa_download">Unduh (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">Mengunduh… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">Model terunduh</string>
+    <string name="voice_catalog_sherpa_download_failed">Unduhan gagal: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">Coba unduh lagi</string>
+    <string name="voice_catalog_sherpa_needs_download">Model harus diunduh terlebih dahulu.</string>
 </resources>

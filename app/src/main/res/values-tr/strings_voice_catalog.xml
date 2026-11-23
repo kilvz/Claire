@@ -59,4 +59,13 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc çift yönlü</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI gerçek zamanlı</string>
     <string name="voice_catalog_tts_sample">Merhaba, bu bir ses testidir.</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (cihazda)</string>
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX İngilizce (cihazda)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX çok dilli (indir)</string>
+    <string name="voice_catalog_sherpa_download">İndir (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">İndiriliyor… %1$d%%</string>
+    <string name="voice_catalog_sherpa_downloaded">Model indirildi</string>
+    <string name="voice_catalog_sherpa_download_failed">İndirme başarısız: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">Yeniden indir</string>
+    <string name="voice_catalog_sherpa_needs_download">Önce modelin indirilmesi gerekiyor.</string>
 </resources>

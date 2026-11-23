@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">Ses girişi hazır değil · dokunun</string>
     <string name="capsule_voice_service_need_mic">Konuşma tanıma henüz kaydedemiyor · dokunun</string>
     <string name="capsule_voice_open">Claire\'yı aç</string>
+    <string name="voice_unavailable_sherpa_missing">Sesten metne, cihazda çalışan ve henüz indirilmemiş bir Sherpa-ONNX modeli kullanıyor. «Ayarlar › Modeller › Ses modelleri» bölümünden indirin veya başka bir tanıma yöntemi seçin.</string>
+    <string name="voice_unavailable_sherpa_failed">Cihazdaki Sherpa-ONNX motoru başlatılamadı. Tekrar deneyin veya «Ayarlar › Modeller › Sesten metne» bölümünden başka bir tanıma yöntemi seçin.</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · cihazda</string>
 </resources>

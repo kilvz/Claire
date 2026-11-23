@@ -65,4 +65,7 @@
     <string name="capsule_voice_not_ready">ورودی صوتی آماده نیست · بزنید</string>
     <string name="capsule_voice_service_need_mic">تشخیص گفتار هنوز نمی‌تواند ضبط کند · بزنید</string>
     <string name="capsule_voice_open">باز کردن میکا</string>
+    <string name="voice_unavailable_sherpa_missing">تبدیل گفتار به متن روی مدل Sherpa-ONNX که روی دستگاه اجرا می‌شود تنظیم شده، اما هنوز دانلود نشده است. آن را از «تنظیمات › مدل‌ها › مدل‌های صدا» دانلود کنید یا روش تشخیص دیگری انتخاب کنید.</string>
+    <string name="voice_unavailable_sherpa_failed">موتور Sherpa-ONNX روی دستگاه اجرا نشد. دوباره امتحان کنید یا از «تنظیمات › مدل‌ها › گفتار به متن» روش دیگری انتخاب کنید.</string>
+    <string name="voice_engine_sherpa">Sherpa-ONNX · روی دستگاه</string>
 </resources>
