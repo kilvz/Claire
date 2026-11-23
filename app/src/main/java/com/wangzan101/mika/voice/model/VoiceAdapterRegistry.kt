@@ -10,6 +10,7 @@ import com.wangzan101.mika.voice.model.adapters.OpenAiRealtimeAdapter
 import com.wangzan101.mika.voice.model.adapters.OpenAiSpeechTtsAdapter
 import com.wangzan101.mika.voice.model.adapters.ProviderSttAdapter
 import com.wangzan101.mika.voice.model.adapters.RealtimeAdapter
+import com.wangzan101.mika.voice.model.adapters.SherpaSttAdapter
 import com.wangzan101.mika.voice.model.adapters.SttAdapter
 import com.wangzan101.mika.voice.model.adapters.TtsAdapter
 import com.wangzan101.mika.voice.model.adapters.VendorSttAdapter
@@ -25,6 +26,7 @@ class VoiceAdapterRegistry(
         DoubaoSttAdapter(),
         FunAsrSttAdapter(),
         BailianSttAdapter(),
+        SherpaSttAdapter(),
     ) + VendorSttAdapter.PROTOCOLS.map(::VendorSttAdapter),
     ttsAdapters: List<TtsAdapter> = listOf(
         OpenAiSpeechTtsAdapter(),

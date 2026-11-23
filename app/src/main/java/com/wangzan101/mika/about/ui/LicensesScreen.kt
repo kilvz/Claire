@@ -64,6 +64,7 @@ object Licenses {
         Entry("Protocol Buffers", "BSD-3-Clause", "详细 Trace 的 Protobuf 编码。 https://protobuf.dev/"),
         Entry("OkHttp", "Apache-2.0", "版本 4.12.0,用于访问模型接口。https://square.github.io/okhttp/"),
         Entry("Okio", "Apache-2.0", "版本 3.6.0,OkHttp 的依赖。https://github.com/square/okio/"),
+        Entry("sherpa-onnx", "Apache-2.0", "本机离线语音识别（sherpa-onnx v2.0.1,含 onnxruntime）。随安装包带的英语模型（streaming zipformer en-20M）和设置里另行下载的模型均由 k2-fsa 项目以 Apache-2.0 发布。https://github.com/k2-fsa/sherpa-onnx"),
         Entry("AndroidX(含 Jetpack Compose)", "Apache-2.0", "Compose 1.7.6、Material3 1.3.1、Activity 1.9.3、Lifecycle 2.8.3、Core 1.13.1、WebKit 1.12.1 等界面与系统组件库。https://developer.android.com/jetpack/androidx"),
         Entry("Guava ListenableFuture(由 AndroidX 库引入)", "Apache-2.0", "listenablefuture 1.0。https://github.com/google/guava"),
         Entry("scrcpy", "Apache-2.0", "以 shell 身份取得系统上下文的做法仿照 scrcpy,相关源文件头部保留出处。"),

@@ -60,6 +60,19 @@ class VoiceModelEnvironment(
             } else if (existingTts.tts != TtsSelectionController.SYSTEM_TTS_MODEL.tts) {
                 catalog.upsertModel(existingTts.copy(tts = TtsSelectionController.SYSTEM_TTS_MODEL.tts))
             }
+            // On-device Sherpa-ONNX models (bundled English + optional downloads).
+            if (catalog.state.value.services.none { it.id == SherpaOnnxModels.SERVICE_ID }) {
+                catalog.upsertService(SherpaOnnxModels.SERVICE)
+            }
+            SherpaOnnxModels.BUILTIN.forEach { seed ->
+                val currentModel = catalog.state.value.models.firstOrNull {
+                    it.serviceId == seed.serviceId && it.id == seed.id
+                }
+                when {
+                    currentModel == null -> catalog.upsertModel(seed)
+                    currentModel.stt != seed.stt -> catalog.upsertModel(currentModel.copy(stt = seed.stt))
+                }
+            }
             TtsSelectionController(this).ensureDefault()
         }
     }

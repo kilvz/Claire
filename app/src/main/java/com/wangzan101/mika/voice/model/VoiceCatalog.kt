@@ -45,6 +45,8 @@ enum class SttProtocol {
     DoubaoStreaming,
     FunAsrStreaming,
     BailianStreaming,
+    /** On-device streaming recognition with sherpa-onnx: no network, no account, models shipped or downloaded. */
+    SherpaStreaming,
     /** ElevenLabs speech-to-text: multipart upload, one utterance per request. */
     ElevenLabsUpload,
     /** Deepgram pre-recorded listen: raw WAV body. */

@@ -18,6 +18,8 @@ import com.wangzan101.mika.voice.LiveAsrTransport
 import com.wangzan101.mika.voice.LiveSpeech
 import com.wangzan101.mika.voice.PcmRecorder
 import com.wangzan101.mika.voice.ProviderSpeech
+import com.wangzan101.mika.voice.SherpaOnnx
+import com.wangzan101.mika.voice.SherpaSpeechSession
 import com.wangzan101.mika.voice.SpeechEngineSpec
 import com.wangzan101.mika.voice.SpeechEvent
 import com.wangzan101.mika.voice.SpeechFailure
@@ -32,6 +34,7 @@ import com.wangzan101.mika.voice.Transcriber
 import com.wangzan101.mika.voice.model.ChatInputAudioData
 import com.wangzan101.mika.voice.model.ResolvedAccount
 import com.wangzan101.mika.voice.model.ResolvedVoiceModel
+import com.wangzan101.mika.voice.model.SherpaOnnxModels
 import com.wangzan101.mika.voice.model.SttBinding
 import com.wangzan101.mika.voice.model.SttProtocol
 import com.wangzan101.mika.voice.model.VoiceCapability
@@ -213,6 +216,34 @@ class BailianSttAdapter(
     }
 }
 
+/**
+ * On-device streaming recognition (sherpa-onnx). Nothing leaves the phone and no
+ * account is involved; the only failure modes before listening are a missing
+ * model (the catalog page can download it) and a broken local engine.
+ */
+class SherpaSttAdapter(
+    private val sessionFactory: SttSessionFactory = defaultSherpaSession,
+) : SttAdapter {
+    override val protocol = SttProtocol.SherpaStreaming
+
+    override fun spec(model: ResolvedVoiceModel): SpeechEngineSpec {
+        model.sttBinding(protocol)
+        return SpeechEngineSpec.Sherpa(model.model.id)
+    }
+
+    override fun start(context: Context, model: ResolvedVoiceModel, language: String?, hooks: SttHooks): SpeechSession {
+        spec(model)
+        // Call audio is injected from outside; the local engine is the microphone path only.
+        if (hooks.recorder != null) {
+            return FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SherpaFailed))
+        }
+        if (!SherpaOnnxModels.available(context, model.model.id)) {
+            return FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SherpaModelMissing))
+        }
+        return categorizedSession { sessionFactory(context, model, languageTag(context, language), hooks) }
+    }
+}
+
 private val defaultSystemSession: SttSessionFactory = { context, _, tag, hooks ->
     val capability = hooks.systemCapability ?: SystemSpeech.capability(context)
     SystemSpeechSession(
@@ -273,6 +304,14 @@ private val defaultBailianSession: SttSessionFactory = { _, model, tag, hooks ->
     )
 }
 
+private val defaultSherpaSession: SttSessionFactory = { context, model, _, hooks ->
+    val recognizer = SherpaOnnx.recognizer(context, SherpaOnnxModels.files(context, model.model.id))
+    SherpaSpeechSession(
+        hooks.recorder ?: PcmRecorder(streaming = true, unbounded = true),
+        recognizer,
+    )
+}
+
 internal fun languageTag(context: Context, language: String?): String =
     language ?: SystemSpeech.speechTag(AppLanguage.current(context))
 
@@ -297,6 +336,7 @@ private inline fun <reified T : SpeechEngineSpec> ResolvedVoiceModel.speechSpec(
         SttProtocol.DoubaoStreaming -> DoubaoSttAdapter()
         SttProtocol.FunAsrStreaming -> FunAsrSttAdapter()
         SttProtocol.BailianStreaming -> BailianSttAdapter()
+        SttProtocol.SherpaStreaming -> SherpaSttAdapter()
         else -> VendorSttAdapter(model.stt!!.protocol)
     }
     return adapter.spec(this) as T

@@ -28,6 +28,7 @@ import com.wangzan101.mika.voice.model.adapters.VendorSttAdapter
 import com.wangzan101.mika.voice.model.adapters.DoubaoSttAdapter
 import com.wangzan101.mika.voice.model.adapters.FunAsrSttAdapter
 import com.wangzan101.mika.voice.model.adapters.ProviderSttAdapter
+import com.wangzan101.mika.voice.model.adapters.SherpaSttAdapter
 import com.wangzan101.mika.voice.model.adapters.SttSessionFactory
 import com.wangzan101.mika.voice.model.voiceTestEnvironment
 import com.wangzan101.mika.voice.model.voiceTestProvider
@@ -146,6 +147,7 @@ class VoiceInputUnifiedTest {
                 DoubaoSttAdapter(factory),
                 FunAsrSttAdapter(factory),
                 BailianSttAdapter(factory),
+                SherpaSttAdapter(factory),
             ) + VendorSttAdapter.PROTOCOLS.map { VendorSttAdapter(it, factory) },
         )
         val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
@@ -154,6 +156,7 @@ class VoiceInputUnifiedTest {
         catalog.upsertService(VoiceService("funasr", "Fun-ASR", VoiceAccount.None))
         catalog.upsertService(VoiceService("bailian", "Bailian", VoiceAccount.VoiceOwned("bailian")))
         catalog.upsertService(VoiceService("vendor", "Vendor", VoiceAccount.VoiceOwned("vendor")))
+        catalog.upsertService(VoiceService("sherpa-onnx", "Sherpa-ONNX", VoiceAccount.None))
         val models = listOf(
             VoiceModel("provider:p1", "batch", "Batch", stt = SttBinding(SttProtocol.AudioTranscriptions)),
             VoiceModel("provider:p1", "chat", "Chat", stt = SttBinding(SttProtocol.ChatInputAudio)),
@@ -161,6 +164,7 @@ class VoiceInputUnifiedTest {
             VoiceModel("doubao", "doubao", "Doubao", stt = SttBinding(SttProtocol.DoubaoStreaming, resourceId = DoubaoProtocol.DURATION)),
             VoiceModel("funasr", "funasr", "Fun-ASR", stt = SttBinding(SttProtocol.FunAsrStreaming, endpoint = "ws://localhost:10095", language = "yue")),
             VoiceModel("bailian", "bailian", "Bailian", stt = SttBinding(SttProtocol.BailianStreaming, region = "Beijing", language = "yue")),
+            VoiceModel("sherpa-onnx", "en-20m", "Sherpa-ONNX English", stt = SttBinding(SttProtocol.SherpaStreaming)),
         ) + VendorSttAdapter.PROTOCOLS.map { VoiceModel("vendor", it.name, it.name, stt = SttBinding(it, region = "eastasia")) }
         models.forEach(catalog::upsertModel)
         val refs = models.map { VoiceModelRef(it.serviceId, it.id, VoiceCapability.STT) } + SttSelectionController.SYSTEM_STT_REF
