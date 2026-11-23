@@ -62,6 +62,11 @@ recorded base version.
   preset, Telegram channel (typing indicator, first-only "Got it",
   paper-plane icon), permanent-keystore signing. No release tag yet —
   2.0.0 is merged to main; the release is a later call.
+- 2.0.1: the "Voice input isn't ready" sheet now explains what the
+  built-in speech recognition does and offers to install it — a button
+  opens Speech Services by Google on the Play Store, so phones that
+  ship without a recognizer can get one instead of only being told to
+  pick a cloud provider.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

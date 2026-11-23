@@ -30,6 +30,9 @@
     <string name="voice_unavailable_title">Voice input isn’t ready</string>
     <string name="voice_unavailable_no_engine">This phone has no built-in speech recognition, and no speech-to-text model has been picked. Pick a provider’s speech model in Settings › Models › Speech to text and it will work.</string>
     <string name="voice_unavailable_system_gone">Speech to text is set to the phone’s built-in recognition, but this phone doesn’t have it now. Pick another one in Settings › Models › Speech to text.</string>
+    <string name="voice_unavailable_built_in_missing">The built-in option turns your voice into text, so you can talk to Claire instead of typing. This phone has no speech recognition service installed, so it can’t work. Install “Speech Services by Google” to get one — the Google app alone doesn’t include it. Or pick a provider’s speech model in Settings › Models › Speech to text.</string>
+    <string name="voice_get_speech_service">Get the speech service</string>
+    <string name="voice_speech_service_store_failed">Couldn’t open the Play Store page for “Speech Services by Google”. Find it in the Play Store and install it.</string>
     <string name="voice_unavailable_system_silent">The phone’s built-in speech recognition didn’t respond, so no words came through. Pick a provider’s speech model in Settings › Models › Speech to text and it will work.</string>
     <string name="voice_unavailable_system_failed">The phone’s built-in speech recognition couldn’t start. Try again, or choose another recognition method in Settings › Models › Speech to text.</string>
     <string name="voice_service_permission_title">The phone’s speech recognition can’t record yet</string>

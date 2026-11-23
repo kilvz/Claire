@@ -742,10 +742,38 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
     val body: String
     val action: String
     val go: () -> Unit
+    // Built-in recognizer missing: offer to install it — the Play Store page
+    // for "Speech Services by Google". The Google app alone is not the recognizer.
+    var install: (() -> Unit)? = null
     when (sheet) {
         is VoiceSheet.Unavailable -> {
             title = stringResource(R.string.voice_unavailable_title)
-            body = VoiceCopy.unavailable(sheet.why)
+            // NoSystemNoModel / SystemGone mean the phone has no recognition
+            // service at all; the other cases are a broken or busy service.
+            if (sheet.why == SpeechEngineSpec.Why.NoSystemNoModel || sheet.why == SpeechEngineSpec.Why.SystemGone) {
+                body = stringResource(R.string.voice_unavailable_built_in_missing)
+                install = {
+                    // market:// first, web fallback; a phone without a Play
+                    // Store must never crash — toast instead.
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.tts"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    } catch (_: RuntimeException) {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.tts"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        } catch (_: RuntimeException) {
+                            vh.toast = tr(R.string.voice_speech_service_store_failed)
+                        }
+                    }
+                }
+            } else {
+                body = VoiceCopy.unavailable(sheet.why)
+            }
             action = stringResource(R.string.voice_go_pick)
             go = onPickSpeech
         }
@@ -789,7 +817,10 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 18.dp).testTag("voice-sheet")) {
             Text(title, style = MikaType.Title, color = c.ink)
             Text(body, Modifier.padding(top = 8.dp), style = SheetBody, color = c.ink2)
-            Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            install?.let { openStore ->
+                MikaButton(stringResource(R.string.voice_get_speech_service), { vh.sheet = null; openStore() }, Modifier.fillMaxWidth().padding(top = 18.dp), size = ButtonSize.Medium)
+            }
+            Row(Modifier.fillMaxWidth().padding(top = if (install != null) 10.dp else 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MikaButton(stringResource(R.string.ok_got_it), { vh.sheet = null }, Modifier.weight(1f), kind = ButtonKind.Tonal, size = ButtonSize.Medium)
                 MikaButton(action, { vh.sheet = null; go() }, Modifier.weight(1f), size = ButtonSize.Medium)
             }

@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.0.0: a full rebase onto upstream Mika 0.1.51 — all 198 upstream commits since v0.1.50 are in, including in-app voice calls, the MCP service catalog, WeChat result push, new model providers, and a cleaner codebase layout. Claire's own features (OrcaRouter, Telegram bot with typing indicator, permanent-keystore signing) are unchanged.
+            New in 2.0.1: the 'Voice input isn't ready' sheet now explains what the built-in speech recognition does and offers to install it — a button opens Speech Services by Google on the Play Store, so phones that ship without a recognizer can get one instead of only being told to pick a cloud provider.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

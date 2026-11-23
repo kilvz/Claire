@@ -30,6 +30,9 @@
     <string name="voice_unavailable_title">La entrada de voz no está lista</string>
     <string name="voice_unavailable_no_engine">Este teléfono no tiene reconocimiento de voz integrado y no se ha elegido ningún modelo de voz a texto. Elige el modelo de voz de un proveedor en Ajustes › Modelos › Voz a texto y funcionará.</string>
     <string name="voice_unavailable_system_gone">Voz a texto está configurado con el reconocimiento integrado del teléfono, pero este teléfono ya no lo tiene. Elige otro en Ajustes › Modelos › Voz a texto.</string>
+    <string name="voice_unavailable_built_in_missing">La opción integrada convierte tu voz en texto, así puedes hablarle a Claire en lugar de escribir. Pero este teléfono no tiene ningún servicio de reconocimiento de voz instalado, así que no puede funcionar. Instala «Speech Services by Google» para tener uno: la app de Google por sí sola no lo incluye. O elige un modelo de voz de un proveedor en Ajustes › Modelos › Voz a texto.</string>
+    <string name="voice_get_speech_service">Obtener el servicio de voz</string>
+    <string name="voice_speech_service_store_failed">No se pudo abrir la página de Play Store de «Speech Services by Google». Búscala en Play Store e instálala.</string>
     <string name="voice_unavailable_system_silent">El reconocimiento de voz integrado del teléfono no respondió, así que no llegó ninguna palabra. Elige el modelo de voz de un proveedor en Ajustes › Modelos › Voz a texto y funcionará.</string>
     <string name="voice_unavailable_system_failed">No se pudo iniciar el reconocimiento de voz integrado del teléfono. Inténtalo de nuevo o elige otro método de reconocimiento en Ajustes › Modelos › Voz a texto.</string>
     <string name="voice_service_permission_title">El reconocimiento de voz del teléfono aún no puede grabar</string>
