@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 1.2.1 (versionCode 55)
+- **Claire version:** 1.3.0 (versionCode 56)
 - **Base version:** upstream Mika 0.1.50 (commit `9c7aabd8`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -34,6 +34,11 @@ recorded base version.
   generate a fresh debug key per run, so the signatures never
   matched. From 1.2.1 on, releases install over earlier
   `com.kilv.claire` builds; 1.1.0 still needs one manual uninstall.
+- 1.3.0: Antigravity provider — sign in with a Google account (your
+  own OAuth client id/secret from a Google Cloud project or your own
+  Antigravity install) and use its quota; Telegram bot channel in
+  Settings, directly below WeChat (bot token + chat id, send/receive
+  via the Bot API).
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

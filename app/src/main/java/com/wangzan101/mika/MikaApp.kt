@@ -131,6 +131,13 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 com.wangzan101.mika.settings.KeystoreKeyCipher("mika-wechat-account")))
     }
 
+    /** Telegram 渠道：机器人令牌、监听和渠道适配器整个进程一份；任务仍由 TaskService 执行。 */
+    val telegram by lazy {
+        com.wangzan101.mika.telegram.TelegramRuntime(this,
+            com.wangzan101.mika.telegram.TelegramStore(java.io.File(filesDir, "telegram"),
+                com.wangzan101.mika.settings.KeystoreKeyCipher("mika-telegram-token")))
+    }
+
     /** 本机授权的主屏唤醒/解锁；电脑连接和无人值守定时任务共用同一条确定性流程。 */
     val deviceAccess by lazy { com.wangzan101.mika.device.AndroidDeviceAccess(this) { phone.hub.shell.value } }
 
@@ -251,7 +258,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         }
         val local = localChannel(scheduled = false)
         val labels = com.wangzan101.mika.ui.ToolLabels(com.wangzan101.mika.core.assembly.knownTools())
-        RunRecovery(runStore, outbox, { id -> if (id == LocalChannel.ID) local else wechat.channelFor(id) }, object : TriggerOutcomes {
+        RunRecovery(runStore, outbox, { id -> if (id == LocalChannel.ID) local else wechat.channelFor(id) ?: telegram.channelFor(id) }, object : TriggerOutcomes {
             override fun interrupted(key: String, reason: String) = TriggerRuntime.interrupted(app, key, reason)
             override fun delivered(key: String) = TriggerRuntime.delivered(app, key)
             override fun actionFailed(key: String, reason: String) = TriggerRuntime.actionFailed(app, key, reason)
@@ -593,6 +600,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         if (!quit) runRecovery.recover().let { if (it.isNotEmpty()) Log.w("MikaTask", "${it.size} runs interrupted by process restart") }
         // 用户已绑定并打开微信渠道时恢复监听；完全退出期间由各运行入口统一拒绝补起
         wechat.ensureRunning()
+        telegram.ensureRunning()
         if (flags.proactive()) proactive.start(paused = quit)
         // 先对一下设备时区;退出期间不排闹钟,重新打开时再补排
         if (!quit) scope.launch(Dispatchers.IO) { runCatching { TriggerRuntime.syncTimeZone(this@MikaApp); TriggerRuntime.rearm(this@MikaApp) } }
@@ -649,6 +657,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         autoArchiveNow()
         mcp.ensureRunning()
         wechat.ensureRunning()
+        telegram.ensureRunning()
         if (FeatureFlags.get(this).proactive()) proactive.start(paused = false)
         scope.launch(Dispatchers.IO) {
             runCatching {

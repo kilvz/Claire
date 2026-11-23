@@ -37,8 +37,11 @@ object ReadmeSections {
     private fun kindName(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI 兼容"; "OpenAiResponses" -> "OpenAI Responses"; else -> kind }
     private fun kindNameEn(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI-compatible"; "OpenAiResponses" -> "OpenAI Responses"; else -> kind }
 
-    /** 「自定义」能选的接口类型:预设里出现过的;Responses 排最后,和界面上的次序(`ProviderConfig.Kind.withApiKey`)一致。 */
-    private fun customKinds(presets: List<Preset>) = presets.map { it.kind }.distinct().sortedBy { it == "OpenAiResponses" }
+    /** 「自定义」能选的接口类型:预设里出现过的、带 API Key 的那几类;Responses 排最后,和界面上的次序(`ProviderConfig.Kind.withApiKey`)一致。
+     * 账号登录的预设(Antigravity)不算:自定义没有它的登录流程,接不了。 */
+    private fun customKinds(presets: List<Preset>) = presets.map { it.kind }.distinct()
+        .filter { it in setOf("OpenAiCompat", "Anthropic", "Gemini", "OpenAiResponses") }
+        .sortedBy { it == "OpenAiResponses" }
 
     /** 「a、b、c」的英文写法:a, b or c。 */
     private fun orList(items: List<String>) =

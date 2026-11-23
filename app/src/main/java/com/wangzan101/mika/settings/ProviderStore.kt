@@ -17,9 +17,17 @@ import com.wangzan101.mika.core.chatgpt.ChatGptSession
 import com.wangzan101.mika.core.chatgpt.ChatGptTokens
 import com.wangzan101.mika.core.oauth.AccountSession
 import com.wangzan101.mika.core.oauth.AccountTokens
+import com.wangzan101.mika.core.oauth.AntigravityAuth
+import com.wangzan101.mika.core.oauth.AntigravityDiscovery
+import com.wangzan101.mika.core.oauth.AntigravitySession
+import com.wangzan101.mika.core.oauth.AntigravityTokens
 import com.wangzan101.mika.core.oauth.OauthTokenResult
 import com.wangzan101.mika.core.oauth.OpenRouterAuth
 import com.wangzan101.mika.core.oauth.XaiAuth
+import com.wangzan101.mika.core.model.AntigravityModel
+import com.wangzan101.mika.core.model.AntigravityModel.Companion.DEFAULT_BASE_URL as ANTIGRAVITY_BASE_URL
+import com.wangzan101.mika.core.model.antigravityFallbackModels
+import com.wangzan101.mika.core.model.antigravityListedModels
 import com.wangzan101.mika.core.model.AnthropicModel
 import com.wangzan101.mika.core.model.ApiKeyText
 import com.wangzan101.mika.core.model.KeyPoolManager
@@ -120,14 +128,16 @@ data class ProviderConfig(
      * 接口类型。[OpenAiResponses] 用在模型列表给某个模型写明 Responses 协议时、预设「OpenAI」,以及添加自定义服务商时选了它;
      * [ChatGpt] 是用 ChatGPT 账号登录、用套餐额度调用的那一家:凭据是登录(见 [ChatGptSession]),不是 API Key。
      * [Xai] 同样是账号登录(设备码),凭据是登录不是 API Key,调用 xAI 自己的 Responses 接口。
+     * [Antigravity] 是用 Google 账号登录、调 Google Cloud Code Assist 的那一家:凭据是登录
+     * (见 [AntigravitySession]),不是 API Key;用的 OAuth 客户端是用户自己填的。
      */
     enum class Kind {
-        OpenAiCompat, Anthropic, Gemini, OpenAiResponses, ChatGpt, Xai;
+        OpenAiCompat, Anthropic, Gemini, OpenAiResponses, ChatGpt, Xai, Antigravity;
 
         /**
          * 这个接口类型发请求走哪种协议。用它筛掉接口写明了不支持的模型,见 [com.wangzan101.mika.ui.ModelSetupViewModel]
-         * 的试调用。账号登录的两家(ChatGpt、Xai)都走 Responses;这两家不走那张表单的试调用(登录时已经核对过),
-         * 所以这里只求写对,不影响筛谁。
+         * 的试调用。账号登录的三家(ChatGpt、Xai、Antigravity)中,前两家走 Responses,Antigravity 走 Cloud Code;
+         * 这几家不走那张表单的试调用(登录时已经核对过),所以这里只求写对,不影响筛谁。
          */
         val protocol: ModelProtocol
             get() = when (this) {
@@ -135,6 +145,7 @@ data class ProviderConfig(
                 Anthropic -> ModelProtocol.Messages
                 Gemini -> ModelProtocol.GenerateContent
                 OpenAiResponses, ChatGpt, Xai -> ModelProtocol.Responses
+                Antigravity -> ModelProtocol.CloudCodeAssist
             }
 
         companion object {
@@ -143,6 +154,7 @@ data class ProviderConfig(
                 ModelProtocol.ChatCompletions -> OpenAiCompat
                 ModelProtocol.Messages -> Anthropic
                 ModelProtocol.GenerateContent -> Gemini
+                ModelProtocol.CloudCodeAssist -> Antigravity
                 ModelProtocol.Responses -> OpenAiResponses
             }
 
@@ -207,7 +219,7 @@ data class Provider(
      * [verifiedModels] 里。账号登录的那几家模型名是固定的,不算。服务商页对这样在用的模型给「重新测试」。
      */
     fun untested(model: String): Boolean =
-        kind != ProviderConfig.Kind.ChatGpt && kind != ProviderConfig.Kind.Xai && models?.isEmpty() == true && model !in verifiedModels
+        kind != ProviderConfig.Kind.ChatGpt && kind != ProviderConfig.Kind.Xai && kind != ProviderConfig.Kind.Antigravity && models?.isEmpty() == true && model !in verifiedModels
 }
 
 /** OkHttp 把超时换算为 Int 毫秒，秒数必须在换算后仍能存下。 */
@@ -418,6 +430,8 @@ class ProviderStore(
     val xaiAuth: XaiAuth = defaultXaiAuth,
     /** OpenRouter 账号授权(换 Key)。 */
     val openRouterAuth: OpenRouterAuth = defaultOpenRouterAuth,
+    /** 「用 Google 账号登录 Antigravity」的授权服务(换令牌、刷新、注销、读邮箱)。 */
+    val antigravityAuth: AntigravityAuth = defaultAntigravityAuth,
     /** 主动能力今天已报告的 Token(各服务商合计)、它的每日预算、今天已发出的请求数;每次请求前实时读。 */
     private val proactiveUsage: () -> Long = { 0L },
     private val proactiveLimit: () -> Long = { ProactiveBudget.DEFAULT_DAILY_LIMIT },
@@ -431,11 +445,14 @@ class ProviderStore(
     private val modelFactory: (ProviderConfig, String?, ModelEndpoint?, ClientSetup) -> ChatModel = modelFactory ?: ::buildModel
     /** 每个 ChatGPT 服务商一份:同一时刻只有一个在换令牌。 */
     private val chatGptTokens = mutableMapOf<String, ChatGptTokens>()
+    /** 每个 Antigravity 服务商一份,和 ChatGPT 一样同一时刻只有一个在换令牌。 */
+    private val antigravityTokens = mutableMapOf<String, AntigravityTokens>()
     /** 每个订阅账号一份,和 ChatGPT 一样同一时刻只有一个在换令牌。 */
     private val accountTokens = mutableMapOf<String, AccountTokens>()
     private val configFile = File(dir, CONFIG_FILE)
     private val keyFile = File(dir, KEY_FILE)
     private val chatGptHostFile = File(dir, CHATGPT_HOST_FILE)
+    private val antigravityClientFile = File(dir, ANTIGRAVITY_CLIENT_FILE)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _providers = MutableStateFlow<List<Provider>>(emptyList())
@@ -1369,12 +1386,16 @@ class ProviderStore(
 
     /** 重新列一个已连接服务商的模型:用存着的 Key;订阅登录用访问令牌(快过期先换新的)。 */
     suspend fun listModels(p: Provider): ModelListResult {
-        if (p.kind != ProviderConfig.Kind.ChatGpt && p.kind != ProviderConfig.Kind.Xai) {
+        if (p.kind != ProviderConfig.Kind.ChatGpt && p.kind != ProviderConfig.Kind.Xai && p.kind != ProviderConfig.Kind.Antigravity) {
             val key = activeApiKey(p.id) ?: providerKey(p.id)?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() }
             return listModels(p.kind, p.baseUrl, key, p.sessionHeader)
         }
         val token = try {
-            if (p.kind == ProviderConfig.Kind.ChatGpt) tokensFor(p.id).get(fresh = false) else accountTokensFor(p.id).get(fresh = false)
+            when (p.kind) {
+                ProviderConfig.Kind.ChatGpt -> tokensFor(p.id).get(fresh = false)
+                ProviderConfig.Kind.Antigravity -> antigravityTokensFor(p.id).get(fresh = false)
+                else -> accountTokensFor(p.id).get(fresh = false)
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: ModelError.SignInExpired) {
@@ -1441,6 +1462,88 @@ class ProviderStore(
         chatGptTokens.getOrPut(providerId) {
             ChatGptTokens(chatGptAuth, { chatGptSession(providerId) }, { saveChatGptSession(providerId, it) })
         }
+    }
+
+    // ---------- Antigravity 登录 ----------
+
+    /** Antigravity 服务商的登录(和 API Key 存在同一处、同样加密);没有或解不开为 null。 */
+    fun antigravitySession(providerId: String): AntigravitySession? = AntigravitySession.fromJson(providerKey(providerId))
+
+    /** 已连接的 Antigravity 服务商(只有一家)。 */
+    fun antigravityProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.Antigravity }
+
+    /** 登录成功:存下登录和列出的模型;已有 Antigravity 服务商就更新那一家。 */
+    @Synchronized
+    fun connectAntigravity(session: AntigravitySession, models: List<ListedModel>): Provider =
+        connect(ANTIGRAVITY_NAME, ProviderConfig.Kind.Antigravity, AntigravityAuth.API_BASE, session.toJson(), models,
+            signIn = ANTIGRAVITY_SIGN_IN)
+
+    /**
+     * 退出登录:先在服务端注销刷新令牌(确认不了也照样清),再清掉本机的令牌;OAuth 客户端和账号留着,
+     * 再登录时沿用。返回服务端是否确认了注销。服务商和它的模型、用途都不动。
+     */
+    suspend fun signOutAntigravity(providerId: String): Boolean {
+        val s = antigravitySession(providerId) ?: return true
+        val revoked = s.refreshToken.isEmpty() || antigravityAuth.revoke(s.refreshToken)
+        saveAntigravitySession(providerId, s.signedOut())
+        return revoked
+    }
+
+    /**
+     * 用户填的 OAuth 客户端(Client ID、Client Secret)。登录前就得有:存在单独的小文件里,整份和 API Key
+     * 一样加密,不是密钥的明文。登录成功后这对值也写进登录里([AntigravitySession]);退出登录后留着,
+     * 再登录不用重填。删掉 Antigravity 服务商时不删(下次登录接着用)。
+     */
+    @Synchronized
+    fun antigravityClient(): Pair<String, String> {
+        if (!antigravityClientFile.isFile) return "" to ""
+        val plain = runCatching { String(cipher.decrypt(decode(antigravityClientFile.readText().trim()))) }.getOrNull()
+            ?: return "" to ""
+        val saved = runCatching { json.parseToJsonElement(plain).jsonObject }.getOrNull() ?: return "" to ""
+        val id = (saved["clientId"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull.orEmpty()
+        val secret = (saved["clientSecret"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull.orEmpty()
+        return id to secret
+    }
+
+    /** 记下用户填的 OAuth 客户端(见 [antigravityClient]);空串表示清掉。 */
+    @Synchronized
+    fun saveAntigravityClient(clientId: String, clientSecret: String) {
+        val text = buildJsonObject { put("clientId", clientId); put("clientSecret", clientSecret) }.toString()
+        writeAtomically(antigravityClientFile, encode(cipher.encrypt(text.toByteArray())))
+    }
+
+    /**
+     * 记下 loadCodeAssist 发现的 GCP 项目和档位(见 [AntigravitySession.projectId]):下次调用直接用,
+     * 不用每次都发现一次。登录换了账号时项目也会跟着换(登录成功后旧值先清掉,见登录流程)。
+     */
+    @Synchronized
+    fun rememberAntigravityProject(providerId: String, projectId: String, tier: String) {
+        val s = antigravitySession(providerId) ?: return
+        if (s.projectId == projectId && s.tier == tier) return
+        saveAntigravitySession(providerId, s.withProject(projectId, tier))
+    }
+
+    @Synchronized
+    private fun saveAntigravitySession(providerId: String, session: AntigravitySession) {
+        if (provider(providerId) != null) setKey(providerId, session.toJson())
+    }
+
+    private fun antigravityTokensFor(providerId: String): AntigravityTokens = synchronized(antigravityTokens) {
+        antigravityTokens.getOrPut(providerId) {
+            AntigravityTokens(antigravityAuth, { antigravitySession(providerId) }, { saveAntigravitySession(providerId, it) })
+        }
+    }
+
+    /**
+     * 这次调用要用的 GCP 项目:登录里记着的直接用;还没有就调 loadCodeAssist 发现一次、记下再用。
+     * 发现失败抛错(调用方按失败处理,不猜项目)。
+     */
+    suspend fun antigravityProject(providerId: String): String {
+        antigravitySession(providerId)?.projectId?.takeIf { it.isNotBlank() }?.let { return it }
+        val info = AntigravityDiscovery(ProviderStore.modelHttp, ANTIGRAVITY_BASE_URL, antigravityTokensFor(providerId), emptyMap())
+            .loadCodeAssist()
+        rememberAntigravityProject(providerId, info.projectId, info.tier)
+        return info.projectId
     }
 
     // ---------- xAI 账号登录 ----------
@@ -1545,7 +1648,7 @@ class ProviderStore(
     private fun buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?, setup: ClientSetup): ChatModel {
         val (kind, adapterBase) = adapterFor(cfg, endpoint)
         // 订阅登录用服务商当前的地址(登录时可能换过),配置里存的是添加时的
-        val baseUrl = if (cfg.kind == ProviderConfig.Kind.Xai) {
+        val baseUrl = if (cfg.kind == ProviderConfig.Kind.Xai || cfg.kind == ProviderConfig.Kind.Antigravity) {
             provider(cfg.providerId)?.baseUrl?.takeIf { it.isNotBlank() } ?: adapterBase
         } else adapterBase
         val defaultHttp = http
@@ -1583,6 +1686,10 @@ class ProviderStore(
             ProviderConfig.Kind.ChatGpt ->
                 ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true, headers = setup.headers,
                     reasoningEffort = setup.reasoningEffort, serviceTier = setup.serviceTier)
+            ProviderConfig.Kind.Antigravity ->
+                AntigravityModel(baseUrl, antigravityTokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, setup.headers,
+                    setup.maxOutputTokens, reasoningEffort = setup.reasoningEffort,
+                    project = { antigravityProject(cfg.providerId) })
             ProviderConfig.Kind.Xai ->
                 ResponsesModel(baseUrl, accountTokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, headers = setup.headers,
                     reasoningEffort = setup.reasoningEffort, accountLogin = XAI_ACCOUNT)
@@ -2011,6 +2118,8 @@ class ProviderStore(
         private const val CONFIG_FILE = "providers.json"
         private const val KEY_FILE = "provider-keys.json"
         private const val CHATGPT_HOST_FILE = "chatgpt-host.json"
+        /** 用户填的 Antigravity OAuth 客户端(Client ID、Client Secret),整份加密(见 [antigravityClient])。 */
+        private const val ANTIGRAVITY_CLIENT_FILE = "antigravity-client.json"
 
         /** 各家预设沿用的旧上下文默认值;预设改了默认后,存着这个值的配置由 [repairStaleContextDefaults] 跟上去。 */
         private const val LEGACY_DEFAULT_CONTEXT_TOKENS = 64_000
@@ -2035,6 +2144,12 @@ class ProviderStore(
         private val defaultChatGptAuth by lazy { ChatGptAuth(shortHttp) }
         private val defaultOpenRouterAuth by lazy { OpenRouterAuth(shortHttp) }
         private val defaultXaiAuth by lazy { XaiAuth(shortHttp) }
+        private val defaultAntigravityAuth by lazy { AntigravityAuth(shortHttp) }
+
+        /** Antigravity 服务商的名字(品牌名,不随界面语言变)。 */
+        const val ANTIGRAVITY_NAME = "Antigravity"
+        /** 用 Google 账号登录的 Antigravity 服务商:[Provider.signIn] 标成这个,详情里是账号登录的样子,不是填 Key。 */
+        const val ANTIGRAVITY_SIGN_IN = "antigravity"
 
         /** ChatGPT 服务商的名字(品牌名,不随界面语言变)。 */
         const val CHATGPT_NAME = "ChatGPT"
@@ -2058,6 +2173,8 @@ class ProviderStore(
 
         /**
          * 列模型的接口:OpenAI 兼容、Responses、ChatGPT 和 xAI 都是 `GET {base}/models`(Bearer;订阅登录的 [apiKey] 是访问令牌)。
+         * Antigravity 是 Cloud Code 的 `fetchAvailableModels`(要先用 `loadCodeAssist` 拿到 GCP 项目);
+         * 发现失败、或还没登录([apiKey] 为空)时给写死的五个模型,用户照样能选、试调用时再报真正的错。
          * [headers] 每个请求都带(见 [ClientHeaders])。
          */
         suspend fun listAvailable(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, headers: Map<String, String>): ModelListResult =
@@ -2066,14 +2183,30 @@ class ProviderStore(
                     catalog.openAiCompat(baseUrl, apiKey, headers)
                 ProviderConfig.Kind.Anthropic -> catalog.anthropic(baseUrl, apiKey.orEmpty(), headers)
                 ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty(), headers)
+                ProviderConfig.Kind.Antigravity -> antigravityModels(baseUrl, apiKey, headers)
             }
+
+        /** Antigravity 的模型列表:发现得到的照实给,发现不了给写死的五个(见 [antigravityFallbackModels])。 */
+        private suspend fun antigravityModels(baseUrl: String, apiKey: String?, headers: Map<String, String>): ModelListResult {
+            if (apiKey.isNullOrBlank()) return ModelListResult.Ok(antigravityFallbackModels())
+            return try {
+                val discovery = AntigravityDiscovery(shortHttp, baseUrl, BearerToken.fixed(apiKey), headers)
+                val project = discovery.loadCodeAssist().projectId
+                val ids = discovery.fetchAvailableModels(project)
+                ModelListResult.Ok(if (ids.isEmpty()) antigravityFallbackModels() else antigravityListedModels(ids))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ModelListResult.Ok(antigravityFallbackModels())
+            }
+        }
 
         /**
          * 调用这个模型用哪种适配器、交给它什么 Base URL。建模型([buildModel])和给思考档位([ReasoningOptions])都按它。
-         * 订阅登录(xAI)固定走这一家的接口,不跟模型列表里写的别的协议走,免得把订阅转去另一个接口。
+         * 订阅登录(xAI、Antigravity)固定走这一家的接口,不跟模型列表里写的别的协议走,免得把订阅转去另一个接口。
          */
         internal fun adapterFor(cfg: ProviderConfig, endpoint: ModelEndpoint?): Pair<ProviderConfig.Kind, String> =
-            if (endpoint == null || cfg.kind == ProviderConfig.Kind.Xai) cfg.kind to cfg.baseUrl
+            if (endpoint == null || cfg.kind == ProviderConfig.Kind.Xai || cfg.kind == ProviderConfig.Kind.Antigravity) cfg.kind to cfg.baseUrl
             else ProviderConfig.Kind.of(endpoint.protocol) to endpoint.adapterBaseUrl
 
         /** 产品里的那份(App 建):配置在 files/settings 下,Key 用 Android 密钥库加密,用量记到 [usage]。 */

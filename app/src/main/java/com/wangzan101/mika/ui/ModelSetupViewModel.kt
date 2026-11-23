@@ -29,8 +29,10 @@ import com.wangzan101.mika.settings.RoleChoice
 import com.wangzan101.mika.settings.RoleChoices
 import com.wangzan101.mika.settings.ChatGptSignIns
 import com.wangzan101.mika.settings.AccountOutcome
+import com.wangzan101.mika.settings.AntigravityAccount
 import com.wangzan101.mika.settings.DevicePrompt
 import com.wangzan101.mika.settings.SignInTarget
+import com.wangzan101.mika.settings.antigravityFailure
 import com.wangzan101.mika.settings.VoiceChoice
 import com.wangzan101.mika.settings.VoiceSettings
 import com.wangzan101.mika.voice.SpeechChoice
@@ -41,6 +43,10 @@ import com.wangzan101.mika.core.chatgpt.ChatGptAuth
 import com.wangzan101.mika.core.chatgpt.SignInException
 import com.wangzan101.mika.core.chatgpt.SignInFailure
 import com.wangzan101.mika.core.chatgpt.signInWithChatGpt
+import com.wangzan101.mika.core.oauth.AntigravityAuth
+import com.wangzan101.mika.core.oauth.AntigravitySignInException
+import com.wangzan101.mika.core.oauth.AntigravitySignInFailure
+import com.wangzan101.mika.core.oauth.signInWithAntigravity
 import com.wangzan101.mika.core.oauth.AccountSignInException
 import com.wangzan101.mika.core.oauth.AccountSignInFailure
 import com.wangzan101.mika.core.oauth.DeviceChallenge
@@ -242,6 +248,15 @@ data class ModelSetupUi(
     val chatGptWelcome: Boolean = false,
     /** 退出登录时 ChatGPT 那边没确认注销(本机令牌已清)。 */
     val chatGptRevokeUnconfirmed: Boolean = false,
+    /** Antigravity 服务商的账号;没有这家时为 null。 */
+    val antigravityAccount: AntigravityAccount? = null,
+    /** 用 Google 账号登录 Antigravity 的进度。 */
+    val antigravitySignIn: ListState = ListState.Idle,
+    /** 退出登录时 Google 那边没确认注销(本机令牌已清)。 */
+    val antigravityRevokeUnconfirmed: Boolean = false,
+    /** 用户填的 Antigravity OAuth 客户端(面板里回填;Secret 照原样回填,框里是密码样式)。 */
+    val antigravityClientId: String = "",
+    val antigravityClientSecret: String = "",
     /** 已连接的 Grok 订阅;没有这家时为 null。 */
     val xaiAccount: SubscriptionAccount? = null,
     /** 用 OpenRouter 账号授权连上的那一家;没有时为 null。 */
@@ -325,9 +340,10 @@ data class ModelSetupUi(
      */
     fun untested(p: Provider): Boolean = p.savedUntested
 
-    /** 用账号登录的这一家已经退出了登录(ChatGPT、xAI 的令牌清了,OpenRouter 的 Key 删了)。 */
+    /** 用账号登录的这一家已经退出了登录(ChatGPT、Antigravity、xAI 的令牌清了,OpenRouter 的 Key 删了)。 */
     fun signedOut(p: Provider): Boolean = when {
         p.kind == ProviderConfig.Kind.ChatGpt -> chatGptAccount?.signedIn != true
+        p.kind == ProviderConfig.Kind.Antigravity -> antigravityAccount?.signedIn != true
         p.kind == ProviderConfig.Kind.Xai -> xaiAccount?.signedIn != true
         p.signIn != null -> p.id !in keyed
         else -> false
@@ -401,6 +417,9 @@ class ModelSetupViewModel(
                         running && target == SignInTarget.ChatGpt && it.chatGptSignIn == ListState.Idle ->
                             it.copy(chatGptSignIn = ListState.Running)
                         !running && it.chatGptSignIn == ListState.Running -> snapshot(it.copy(chatGptSignIn = ListState.Idle))
+                        running && target == SignInTarget.Antigravity && it.antigravitySignIn == ListState.Idle ->
+                            it.copy(antigravitySignIn = ListState.Running)
+                        !running && it.antigravitySignIn == ListState.Running -> snapshot(it.copy(antigravitySignIn = ListState.Idle))
                         running && AccountProvider.of(target) != null -> it.copy(
                             accountSignIn = it.accountSignIn.copy(
                                 provider = AccountProvider.of(target),
@@ -445,6 +464,7 @@ class ModelSetupViewModel(
 
     private fun snapshot(ui: ModelSetupUi): ModelSetupUi {
         val providers = store.providers.value
+        val (agClientId, agClientSecret) = store.antigravityClient()
         return ui.copy(
             providers = providers, configs = store.configs.value, roles = store.roles.value, groups = store.groups.value,
             keyed = providers.filter { store.hasKey(it.id) }.map { it.id }.toSet(),
@@ -452,6 +472,11 @@ class ModelSetupViewModel(
             chatGptAccount = store.chatGptProvider()?.let { p ->
                 store.chatGptSession(p.id).let { ChatGptAccount(it?.email.orEmpty(), it?.signedIn == true) }
             },
+            antigravityAccount = store.antigravityProvider()?.let { p ->
+                store.antigravitySession(p.id).let { AntigravityAccount(it?.email.orEmpty(), it?.signedIn == true) }
+            },
+            antigravityClientId = agClientId,
+            antigravityClientSecret = agClientSecret,
             xaiAccount = store.xaiProvider()?.let { p ->
                 store.accountSession(p.id).let { SubscriptionAccount(it?.label.orEmpty(), it?.signedIn == true) }
             },
@@ -823,6 +848,87 @@ class ModelSetupViewModel(
     }
 
     fun dismissChatGptWelcome() = _state.update { it.copy(chatGptWelcome = false) }
+
+    // ---------- 用 Google 账号登录 Antigravity ----------
+
+    /**
+     * 打开浏览器登录 Google,回调后换令牌、读邮箱、列出模型,存成(或更新)Antigravity 服务商,回到 Claire。
+     * 还没有主模型时选它的一个模型为主模型。失败说原因(并记下给诊断信息)。
+     * [clientId]/[clientSecret] 是面板里刚填的(先存下再登录);不传时用以前存下的那对。
+     * 没填过就直接说去哪找,不打开浏览器。跑在 [signIns] 里:用户在浏览器里登录时 Claire 在后台,不能跟着界面走。
+     */
+    fun signInWithAntigravity(clientId: String? = null, clientSecret: String? = null) {
+        val browser = browser ?: return
+        if (_state.value.antigravitySignIn == ListState.Running || signIns.running.value) return
+        val provided = if (clientId != null && clientSecret != null) clientId.trim() to clientSecret.trim() else null
+        val (id, secret) = provided ?: store.antigravityClient()
+        if (id.isBlank() || secret.isBlank()) {
+            _state.update { it.copy(antigravitySignIn = ListState.Failed(antigravityFailure(AntigravitySignInFailure.NoClient))) }
+            return
+        }
+        _state.update { it.copy(antigravitySignIn = ListState.Running, antigravityRevokeUnconfirmed = false) }
+        signIns.start(
+            target = SignInTarget.Antigravity,
+            noticeTitle = tr(R.string.antigravity_signin_notif_title),
+            noticeBody = tr(R.string.antigravity_signin_notif_body),
+        ) {
+            val listProblem = try {
+                withContext(io) {
+                    if (provided != null) store.saveAntigravityClient(id, secret)
+                    val existing = store.antigravityProvider()
+                    val session = signInWithAntigravity(
+                        store.antigravityAuth, id, secret, existing?.let { store.antigravitySession(it.id) },
+                        openBrowser = browser::open,
+                        page = { e -> browser.page(e?.let { antigravityFailure(it.reason, it.code) }) },
+                    )
+                    val listed = store.listModels(ProviderConfig.Kind.Antigravity, AntigravityAuth.API_BASE, session.accessToken)
+                    val p = store.connectAntigravity(session, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty())
+                    if (!store.roles.value.hasMain) {
+                        val options = ModelOptions.ofProvider(p, store.list())
+                        (ModelOptions.defaultMain(options) ?: options.firstOrNull()?.id)?.let { m -> use(ModelRole.Main, p, m, options) }
+                    }
+                    (listed as? ModelListResult.Failed)?.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val failure = e as? AntigravitySignInException
+                    ?: AntigravitySignInException(AntigravitySignInFailure.Network, e.message.orEmpty(), e)
+                signIns.recordAccountFailure("Antigravity", failure.reason.name, failure.code)
+                browser.returnToApp()
+                _state.update { it.copy(antigravitySignIn = ListState.Failed(antigravityFailure(failure.reason, failure.code))) }
+                return@start
+            }
+            browser.returnToApp()
+            val pid = store.antigravityProvider()?.id
+            _state.update {
+                snapshot(it.copy(
+                    antigravitySignIn = ListState.Idle, formOpen = false,
+                    listing = if (listProblem != null && pid != null) it.listing + (pid to ListState.Failed(listProblem)) else it.listing - pid.orEmpty(),
+                ))
+            }
+        }
+    }
+
+    /** 放弃正在进行的登录(本机回调随之关掉)。 */
+    fun cancelAntigravitySignIn() {
+        signIns.cancel()
+        _state.update { it.copy(antigravitySignIn = ListState.Idle) }
+    }
+
+    /** 面板关掉时清掉看过的失败原因;还在登录的不打断。 */
+    fun dismissAntigravityFailure() {
+        if (_state.value.antigravitySignIn == ListState.Running) return
+        _state.update { it.copy(antigravitySignIn = ListState.Idle) }
+    }
+
+    /** 退出 Antigravity 登录:服务端注销、本机清令牌;服务商和用途不动,再登录就能接着用。 */
+    fun signOutAntigravity(providerId: String) {
+        scope.launch {
+            val revoked = withContext(io) { store.signOutAntigravity(providerId) }
+            _state.update { snapshot(it.copy(antigravityRevokeUnconfirmed = !revoked, listing = it.listing - providerId)) }
+        }
+    }
 
     /**
      * 用账号登录 xAI 或 OpenRouter:xAI 在浏览器里打开核对过的验证页、界面留下短码,等用户确认;
@@ -1275,6 +1381,7 @@ class ModelSetupViewModel(
     /** 退出了登录的列不了模型,等再登录。 */
     private fun listable(p: Provider) = if (p.signIn != null) store.hasKey(p.id) else when (p.kind) {
         ProviderConfig.Kind.ChatGpt -> store.chatGptSession(p.id)?.signedIn == true
+        ProviderConfig.Kind.Antigravity -> store.antigravitySession(p.id)?.signedIn == true
         ProviderConfig.Kind.Xai -> store.accountSession(p.id)?.signedIn == true
         else -> true
     }
@@ -1338,9 +1445,10 @@ class ModelSetupViewModel(
     fun removeProvider(providerId: String) {
         scope.launch {
             withContext(io) {
-                // ChatGPT 的先在服务端注销登录,再删
+                // ChatGPT、Antigravity 的先在服务端注销登录,再删
                 when (store.provider(providerId)?.kind) {
                     ProviderConfig.Kind.ChatGpt -> store.signOutChatGpt(providerId)
+                    ProviderConfig.Kind.Antigravity -> store.signOutAntigravity(providerId)
                     ProviderConfig.Kind.Xai -> store.signOutAccount(providerId)
                     else -> Unit
                 }

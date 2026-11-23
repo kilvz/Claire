@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Antigravity (Google Cloud Code Assist) sign-in strings. English only; other locales fall back to these. -->
+<resources>
+    <string name="antigravity_signin_title">Sign in to Antigravity with Google</string>
+    <string name="antigravity_signin_body">Claire will use your Google account to call Antigravity models through Google Cloud Code Assist. Sign in in your browser; your Google password is never typed into Claire.</string>
+    <string name="antigravity_signin_note">Claire needs your own Google OAuth client. In Google Cloud Console, create OAuth client credentials of the Desktop app type (or reuse the client from your own Antigravity install) and paste the Client ID and Client Secret below. They are stored encrypted on this phone and only ever sent to Google.</string>
+    <string name="antigravity_client_id">Client ID</string>
+    <string name="antigravity_client_id_hint">Your Google OAuth Client ID</string>
+    <string name="antigravity_client_secret">Client Secret</string>
+    <string name="antigravity_client_secret_hint">Your Google OAuth Client Secret</string>
+    <string name="antigravity_client_missing">Enter your Google OAuth Client ID and Client Secret first. Create them in Google Cloud Console (OAuth client, Desktop app type), or reuse the client from your own Antigravity install.</string>
+    <string name="antigravity_signin_start">Sign in with Google</string>
+    <string name="antigravity_signin_waiting">Finish signing in in your browser, then come back to Claire.</string>
+    <string name="antigravity_sign_out">Sign out</string>
+    <string name="antigravity_account">Account</string>
+    <string name="antigravity_manage_client">Manage OAuth client</string>
+    <string name="antigravity_signed_in_note">Signed in with your Google account. Usage is billed to the Google Cloud project Antigravity found for this account. Sign out only clears the tokens on this phone.</string>
+    <string name="antigravity_signed_out_note">Signed out on this phone. Sign in with Google again to use Antigravity models; your model choices are kept.</string>
+    <string name="antigravity_revoke_unconfirmed">Signed out on this phone, but Google didn’t confirm it. You can also disconnect Claire in your Google account settings.</string>
+    <string name="antigravity_row">Uses your Google account</string>
+    <string name="antigravity_save_client">Save and sign in with Google</string>
+    <string name="antigravity_signin_notif_title">Signing in to Antigravity</string>
+    <string name="antigravity_signin_notif_body">Waiting for you to sign in to Google in the browser</string>
+    <string name="antigravity_fail_denied">Sign-in was cancelled. Please try again.</string>
+    <string name="antigravity_fail_mismatch">The sign-in reply didn’t match this attempt. Please try again.</string>
+    <string name="antigravity_fail_no_client">Enter your Google OAuth Client ID and Client Secret first.</string>
+    <string name="antigravity_fail_timed_out">Sign-in timed out. Please try again.</string>
+    <string name="antigravity_fail_exchange">Google rejected this sign-in (error: %1$s). If it says the client is not recognised, check the Client ID and Client Secret, and that the OAuth client allows the redirect to this phone.</string>
+    <string name="antigravity_fail_code_expired">The sign-in code expired or was already used. Please sign in again.</string>
+    <string name="antigravity_fail_blocked">Google’s protection blocked the request. Try another network or try again later.</string>
+    <string name="antigravity_fail_network">Couldn’t reach Google. Check your network and try again.</string>
+    <string name="antigravity_model_example">gemini-4-neon</string>
+</resources>

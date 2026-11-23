@@ -56,6 +56,8 @@ enum class ModelProtocol(val wire: String) {
     Messages("messages"),
     /** Gemini generateContent,由 [GeminiModel] 调用。 */
     GenerateContent("generate-content"),
+    /** Google Cloud Code Assist (Antigravity) generateContent,由 [AntigravityModel] 调用。 */
+    CloudCodeAssist("cloud-code-assist"),
     /** OpenAI Responses,由 [ResponsesModel] 调用。排在最后:同一个模型也写了前几种的,照旧用前几种。 */
     Responses("responses");
 
@@ -96,7 +98,7 @@ data class ModelEndpoint(val protocol: ModelProtocol, val baseUrl: String, val r
         get() {
             val url = baseUrl.trim().trimEnd('/')
             return when (protocol) {
-                ModelProtocol.ChatCompletions, ModelProtocol.Responses -> url
+                ModelProtocol.ChatCompletions, ModelProtocol.Responses, ModelProtocol.CloudCodeAssist -> url
                 ModelProtocol.Messages -> url.removeSuffix("/v1")
                 ModelProtocol.GenerateContent -> url.removeSuffix("/v1beta")
             }

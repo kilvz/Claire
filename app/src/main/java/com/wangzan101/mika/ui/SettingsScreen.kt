@@ -67,6 +67,7 @@ import com.wangzan101.mika.ui.components.TileTone
 import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.i18n.AppLanguage
+import com.wangzan101.mika.telegram.TelegramConnectionState
 import com.wangzan101.mika.wechat.WechatConnectionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,7 +76,7 @@ import kotlinx.coroutines.withContext
 private const val SHIZUKU_SETUP_GUIDE_URL = "https://shizuku.rikka.app/guide/setup/"
 
 /** 设置里能进入的子页面;[Home] 是设置首页,[Advanced] 集中放置连接、维护和工程能力。 */
-private enum class SettingsPage { Home, Advanced, AppAccess, SmsLogin, PhoneOps, Calls, Wechat, DuringWork, AppPace, Capsule, Language, Notifications, Recommendations, Checklists, Workflows, Sandbox, Plugins, EnvVars, Recovery, SelfCheck, ComputerAccess, McpServers, Root, Developer, DeviceDirectories, RunStats, Proactive, Backup }
+private enum class SettingsPage { Home, Advanced, AppAccess, SmsLogin, PhoneOps, Calls, Wechat, Telegram, DuringWork, AppPace, Capsule, Language, Notifications, Recommendations, Checklists, Workflows, Sandbox, Plugins, EnvVars, Recovery, SelfCheck, ComputerAccess, McpServers, Root, Developer, DeviceDirectories, RunStats, Proactive, Backup }
 
 /**
  * 设置页:总状态卡 + 常用 / 我的数据 / 其他。高级与其他只增加一层,各子页返回来时的页面。
@@ -143,6 +144,8 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { root.refresh() }
     val wechat = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).wechat }
     val wechatState by wechat.state.collectAsState()
+    val telegram = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).telegram }
+    val telegramState by telegram.state.collectAsState()
     val flags = remember { FeatureFlags.get(context) }
     var personalStart by remember { mutableStateOf(flags.personalStart()) }
     var parallelMax by remember { mutableIntStateOf(flags.parallelMax()) }
@@ -232,6 +235,8 @@ fun SettingsScreen(
             onOpenCalls = { page = SettingsPage.Calls },
             wechatState = wechatState, wechatBound = wechat.store.account() != null,
             onOpenWechat = { page = SettingsPage.Wechat },
+            telegramState = telegramState, telegramConfigured = telegram.store.configured(),
+            onOpenTelegram = { page = SettingsPage.Telegram },
             onOpenProactive = { page = SettingsPage.Proactive },
             onOpenAppAccess = { page = SettingsPage.AppAccess },
             onOpenSmsLogin = { page = SettingsPage.SmsLogin },
@@ -271,6 +276,7 @@ fun SettingsScreen(
         SettingsPage.AppAccess -> AppAccessScreen(onBack = toHome)
         SettingsPage.SmsLogin -> SmsLoginSettingsScreen(onBack = toHome)
         SettingsPage.Wechat -> WechatSettingsScreen(wechat, onBack = toHome)
+        SettingsPage.Telegram -> TelegramSettingsScreen(telegram, onBack = toHome)
         SettingsPage.PhoneOps -> PhoneOpsScreen(
             status, androidRelease, onProblem,
             onRepair = { onFix(Fix.RepairPhoneHelper) }, onUnpair = { onFix(Fix.UnpairPhoneHelper) }, onBack = toHome,
@@ -443,6 +449,9 @@ fun SettingsContent(
     wechatState: WechatConnectionState = WechatConnectionState.NeedsBinding,
     wechatBound: Boolean = false,
     onOpenWechat: () -> Unit = {},
+    telegramState: TelegramConnectionState = TelegramConnectionState.NeedsSetup,
+    telegramConfigured: Boolean = false,
+    onOpenTelegram: () -> Unit = {},
     /** 「主动能力」的入口,在「微信」和「任务运行」之间。 */
     onOpenProactive: () -> Unit = {},
     onOpenAppAccess: () -> Unit = {},
@@ -497,6 +506,10 @@ fun SettingsContent(
             ListRow(MikaIcons.Phone, stringResource(R.string.calls_title), onClick = onOpenCalls) { RowChevron() }
             ListRow(MikaIcons.Chats, stringResource(R.string.wechat_title), onClick = onOpenWechat) {
                 WechatEntryStatus(wechatState, wechatBound)
+                RowChevron()
+            }
+            ListRow(MikaIcons.Chats, stringResource(R.string.telegram_title), onClick = onOpenTelegram) {
+                TelegramEntryStatus(telegramState, telegramConfigured)
                 RowChevron()
             }
             ListRow(MikaIcons.Ripple, stringResource(R.string.proactive_title), onClick = onOpenProactive) { RowChevron() }
