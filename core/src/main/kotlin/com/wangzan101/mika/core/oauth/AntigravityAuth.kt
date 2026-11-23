@@ -161,18 +161,20 @@ class AntigravityAuth(
      * The account's email, for display only. Returns null when userinfo cannot be read;
      * sign-in does not fail over it.
      */
-    suspend fun fetchEmail(accessToken: String): String? = try {
-        val raw = HttpSupport.execute(
-            http,
-            Request.Builder().url(userinfoUrl).header("Authorization", "Bearer $accessToken").get().build(),
-        )
-        if (raw.status != 200) return null
-        val root = runCatching { json.parseToJsonElement(raw.body) as? JsonObject }.getOrNull() ?: return null
-        (root["email"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull?.takeIf { it.isNotBlank() }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
+    suspend fun fetchEmail(accessToken: String): String? {
+        return try {
+            val raw = HttpSupport.execute(
+                http,
+                Request.Builder().url(userinfoUrl).header("Authorization", "Bearer $accessToken").get().build(),
+            )
+            if (raw.status != 200) return null
+            val root = runCatching { json.parseToJsonElement(raw.body) as? JsonObject }.getOrNull() ?: return null
+            (root["email"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull?.takeIf { it.isNotBlank() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private suspend fun token(form: FormBody): TokenResult {
