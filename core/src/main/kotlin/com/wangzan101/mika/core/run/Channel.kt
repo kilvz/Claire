@@ -57,6 +57,12 @@ interface Channel {
     suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome
     /** Best-effort "typing..." while a task runs; channels without one ignore the call. */
     suspend fun typing(peer: ChannelPeer) {}
+    /**
+     * Whether an accepted task from this peer gets the "task registered"
+     * notice. Defaults to true; Telegram allows it only for the first task
+     * after setup, later tasks get no notice.
+     */
+    fun shouldAcknowledge(peer: ChannelPeer): Boolean = true
 }
 
 /** 配对不等于主人；只有已绑定的 peer 才能给 Run 发消息。 */

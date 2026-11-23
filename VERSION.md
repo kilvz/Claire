@@ -42,7 +42,9 @@ recorded base version.
 - 1.3.1: removed the Antigravity provider (Google sign-in) again;
   the Telegram bot channel stays.
 - 1.3.2: the Telegram bot shows "typing..." while a channel task runs
-  (refreshed every 4 s, stops when the task ends).
+  (refreshed every 4 s, stops when the task ends), and the "Got it —
+  your task is registered." notice is sent only for the very first
+  task after the bot is set up, not for later tasks.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

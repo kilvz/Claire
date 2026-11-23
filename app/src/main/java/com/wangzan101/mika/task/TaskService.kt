@@ -214,12 +214,17 @@ class TaskService : Service() {
     /**
      * 每个新登记的任务只确认一次，不转发运行阶段。立即进入可靠送达账本并占住发送顺序，
      * 网络发送在后台进行；重复消息不会建任务，因此也不会再确认。
+     * Telegram 只在设置后第一次确认（见 TelegramChannel.shouldAcknowledge），
+     * 之后的任务没有确认，只有输入提示和最终回答；别的渠道每次都确认。
      */
     private fun acceptChannel(run: TaskRun) {
         val peer = run.channelPeer ?: return
+        val channel = channelFor(peer)
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            outbox.deliver(channelFor(peer), peer,
-                Delivery.Notice("accepted:${run.key}", peer.threadId, tr(R.string.channel_task_accepted)))
+            if (channel.shouldAcknowledge(peer)) {
+                outbox.deliver(channel, peer,
+                    Delivery.Notice("accepted:${run.key}", peer.threadId, tr(R.string.channel_task_accepted)))
+            }
         }
         startChannelTyping(run)
     }

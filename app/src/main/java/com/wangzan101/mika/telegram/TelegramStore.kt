@@ -27,6 +27,13 @@ private data class TelegramState(
     val pending: List<PendingTelegramMessage> = emptyList(),
     /** Keep the most recent acknowledgements so a replayed update is never registered twice. */
     val acknowledgedMessages: List<String> = emptyList(),
+    /**
+     * The "task registered" notice is sent only for the very first channel
+     * task after setup; a fresh state (new setup, reconfiguration, removal)
+     * starts with it pending again. Missing in state.json files written
+     * before 1.3.2, so those also ack once more, then never again.
+     */
+    val firstTaskAckPending: Boolean = true,
 )
 
 /**
@@ -52,6 +59,21 @@ class TelegramStore(
 
     /** A bot is usable once a token and a target chat id are both saved. */
     @Synchronized fun configured() = token != null && state.chatId.isNotBlank()
+
+    /**
+     * The one-time "task registered" notice: true only for the first channel
+     * task after setup, then consumed (persisted) so later tasks get no
+     * notice. A reconfiguration ([saveBot] with a different token or chat
+     * id, [setChatId]) or a removal ([clear]) replaces the state, so the
+     * next setup acks once again; re-saving the same setup does not reset it.
+     */
+    @Synchronized fun consumeFirstTaskAck(): Boolean {
+        if (!state.firstTaskAckPending) return false
+        val next = state.copy(firstTaskAckPending = false)
+        saveState(next)
+        state = next
+        return true
+    }
 
     /**
      * Save the bot credentials. A changed token or chat id invalidates the

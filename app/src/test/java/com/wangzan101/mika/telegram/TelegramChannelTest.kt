@@ -11,6 +11,8 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -133,6 +135,47 @@ class TelegramChannelTest {
             channel.typing(peer)
 
             assertEquals(0, server.requestCount)
+        }
+    }
+
+    @Test fun shouldAcknowledgeOnlyTheFirstTask() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+            val channel = TelegramChannel(store, api(server), log = {})
+            val peer = store.peer("123")
+
+            assertTrue(channel.shouldAcknowledge(peer))
+            assertFalse(channel.shouldAcknowledge(peer))
+            assertFalse(channel.shouldAcknowledge(peer))
+        }
+    }
+
+    @Test fun shouldAcknowledgeDoesNotConsumeForAStrangerPeer() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+            val channel = TelegramChannel(store, api(server), log = {})
+            val peer = store.peer("123")
+
+            assertFalse(channel.shouldAcknowledge(ChannelPeer(TelegramChannel.ID, "999", "other-thread")))
+            assertTrue(channel.shouldAcknowledge(peer))
+            assertFalse(channel.shouldAcknowledge(peer))
+        }
+    }
+
+    @Test fun wechatStillAcknowledgesEveryTask() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = WechatStore(tmp.newFolder(), cipher)
+            store.saveAccount(WechatAccount("token", server.url("/").toString(), "bot", "owner"))
+            store.setEnabled(true)
+            val channel = WechatChannel(store, WechatApi(OkHttpClient(), "0.1.35"), log = {})
+            val peer = store.peer("owner")
+
+            assertTrue(channel.shouldAcknowledge(peer))
+            assertTrue(channel.shouldAcknowledge(peer))
+            assertTrue(channel.shouldAcknowledge(peer))
         }
     }
 }

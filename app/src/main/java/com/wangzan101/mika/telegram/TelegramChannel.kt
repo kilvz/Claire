@@ -60,6 +60,17 @@ class TelegramChannel(
         }
     }
 
+    /**
+     * The "task registered" notice is sent only for the very first task
+     * after setup; later tasks get no notice (the typing indicator shows
+     * instead). A peer that is no longer accepted does not consume the
+     * one-time notice.
+     */
+    override fun shouldAcknowledge(peer: ChannelPeer): Boolean {
+        if (peer.channelId != id || !isAlive(peer)) return false
+        return store.consumeFirstTaskAck()
+    }
+
     override suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome {
         if (peer.channelId != id || !isAlive(peer)) return SendOutcome.Failed
         if (delivery is Delivery.Image) return SendOutcome.Failed
