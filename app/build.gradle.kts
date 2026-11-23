@@ -25,12 +25,12 @@ android {
         applicationId = "com.kilv.claire"
         minSdk = 29
         targetSdk = 35
-        versionCode = 57
-        // Claire 1.3.1 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
+        versionCode = 58
+        // Claire 1.3.2 — base: upstream Mika 0.1.50 (commit 9c7aabd8).
         // Versioning (same scheme as Kai-custom): a.b.c; minor fix bumps c
-        // (1.2.1, 1.3.1), feature / major fix bumps b (1.3.0), rebase onto a new
+        // (1.2.1, 1.3.1, 1.3.2), feature / major fix bumps b (1.3.0), rebase onto a new
         // upstream bumps a (2.0.0, b/c reset). versionCode increments each release.
-        versionName = "1.3.1"
+        versionName = "1.3.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // 关于页版本号后的 Beta 标记;出正式版时改成 false

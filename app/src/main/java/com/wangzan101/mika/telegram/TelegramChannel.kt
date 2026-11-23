@@ -38,6 +38,28 @@ class TelegramChannel(
 
     override fun acknowledge(messageId: String) = store.acknowledge(messageId)
 
+    /**
+     * Best-effort "typing...": same guards as [send] (owner peer only,
+     * re-checked right before the API call), and a failure here must never
+     * fail the task — it is swallowed.
+     */
+    override suspend fun typing(peer: ChannelPeer) {
+        if (peer.channelId != id || !isAlive(peer)) return
+        val token = store.token() ?: return
+        withContext(Dispatchers.IO) {
+            try {
+                // Re-check between queueing and the real API call: a pause or
+                // reconfiguration in between must not show typing for the old setup.
+                if (!store.accepts(peer)) return@withContext
+                api.sendChatAction(token, peer.peerId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best-effort only.
+            }
+        }
+    }
+
     override suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome {
         if (peer.channelId != id || !isAlive(peer)) return SendOutcome.Failed
         if (delivery is Delivery.Image) return SendOutcome.Failed

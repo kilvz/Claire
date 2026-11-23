@@ -33,6 +33,19 @@ private data class SendMessageResponse(
 )
 
 @Serializable
+private data class SendChatActionRequest(
+    @SerialName("chat_id") val chatId: String,
+    val action: String,
+)
+
+@Serializable
+private data class SendChatActionResponse(
+    val ok: Boolean = false,
+    val description: String? = null,
+    val result: Boolean = false,
+)
+
+@Serializable
 private data class SentMessage(@SerialName("message_id") val messageId: Long = 0)
 
 @Serializable
@@ -67,7 +80,7 @@ private data class GetUpdatesResponse(
  * The bot token travels in the request path, as the Bot API requires; it is
  * never logged and never written to any file. Only outcomes are logged.
  */
-class TelegramApi(private val http: OkHttpClient) {
+class TelegramApi(private val http: OkHttpClient, private val baseUrl: String = BASE_URL) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val jsonBody = "application/json; charset=utf-8".toMediaType()
 
@@ -75,7 +88,7 @@ class TelegramApi(private val http: OkHttpClient) {
     suspend fun sendMessage(token: String, chatId: String, text: String): Long {
         val payload = json.encodeToString(SendMessageRequest.serializer(), SendMessageRequest(chatId, text))
             .toRequestBody(jsonBody)
-        val request = Request.Builder().url("$BASE_URL/bot$token/sendMessage").post(payload).build()
+        val request = Request.Builder().url("$baseUrl/bot$token/sendMessage").post(payload).build()
         val response = executeCancellable(request, SendMessageResponse.serializer())
         if (!response.ok || response.result == null) {
             throw TelegramApiException(response.description ?: "Telegram sendMessage failed")
@@ -83,9 +96,24 @@ class TelegramApi(private val http: OkHttpClient) {
         return response.result.messageId
     }
 
+    /**
+     * Shows a chat action (e.g. "typing") for about 5 seconds; call again
+     * to keep it visible. Throws on any failure; callers that only want a
+     * best-effort indicator must swallow the failure.
+     */
+    suspend fun sendChatAction(token: String, chatId: String, action: String = "typing") {
+        val payload = json.encodeToString(SendChatActionRequest.serializer(), SendChatActionRequest(chatId, action))
+            .toRequestBody(jsonBody)
+        val request = Request.Builder().url("$baseUrl/bot$token/sendChatAction").post(payload).build()
+        val response = executeCancellable(request, SendChatActionResponse.serializer())
+        if (!response.ok) {
+            throw TelegramApiException(response.description ?: "Telegram sendChatAction failed")
+        }
+    }
+
     /** Long-polls for updates after [offset]; returns updates in order. Throws on any failure. */
     suspend fun getUpdates(token: String, offset: Long, timeoutSeconds: Int = LONG_POLL_SECONDS): List<TelegramUpdate> {
-        val url = "$BASE_URL/bot$token/getUpdates".toHttpUrl().newBuilder()
+        val url = "$baseUrl/bot$token/getUpdates".toHttpUrl().newBuilder()
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("timeout", timeoutSeconds.toString())
             .build()

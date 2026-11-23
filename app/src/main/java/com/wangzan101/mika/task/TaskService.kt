@@ -58,8 +58,11 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.plus
@@ -99,6 +102,9 @@ private const val QUIET_GROUP = "com.wangzan101.mika.quiet"
  * 前台服务类型用 specialUse:dataSync 在安卓 15 有每日 6 小时上限且语义不符;
  * specialUse 没有运行时限制,只需在清单里写明子类型。
  */
+/** Telegram shows "typing..." for about 5 seconds; refresh this often while a channel task runs. */
+private const val TYPING_INTERVAL_MS = 4_000L
+
 class TaskService : Service() {
     internal val taskState: TaskCenterState get() = (application as com.wangzan101.mika.MikaApp).taskState
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -215,6 +221,39 @@ class TaskService : Service() {
             outbox.deliver(channelFor(peer), peer,
                 Delivery.Notice("accepted:${run.key}", peer.threadId, tr(R.string.channel_task_accepted)))
         }
+        startChannelTyping(run)
+    }
+
+    /**
+     * "typing..." while a channel task runs. One loop per run at most (a
+     * second accept for the same run replaces the old loop); the loop ends
+     * the moment the run leaves the center, and [onRunEnded] cancels it
+     * outright. Typing is best-effort — a failure is swallowed inside
+     * [Channel.typing] and can never fail, delay or duplicate the task.
+     */
+    private val typingJobs = mutableMapOf<String, Job>()
+    private val typingLock = Any()
+
+    private fun startChannelTyping(run: TaskRun) {
+        val peer = run.channelPeer ?: return
+        val job = scope.launch {
+            while (center.runs().any { it.key == run.key }) {
+                runCatching { channelFor(peer).typing(peer) }
+                    .onFailure { if (it is CancellationException) throw it }
+                delay(TYPING_INTERVAL_MS)
+            }
+        }
+        synchronized(typingLock) {
+            typingJobs[run.key]?.cancel()
+            typingJobs[run.key] = job
+        }
+        job.invokeOnCompletion {
+            synchronized(typingLock) { if (typingJobs[run.key] === job) typingJobs.remove(run.key) }
+        }
+    }
+
+    private fun stopChannelTyping(runKey: String) {
+        synchronized(typingLock) { typingJobs.remove(runKey) }?.cancel()
     }
 
     internal fun interaction(threadId: String, source: ChannelPeer? = null): ChannelInteraction {
@@ -802,6 +841,7 @@ class TaskService : Service() {
 
     /** 任务收尾之后:都结束了就退出前台;还有别的任务就把前台交给它们,并放出排队的任务。 */
     private fun onRunEnded(run: TaskRun, store: ConversationStore) {
+        stopChannelTyping(run.key)
         val wasShown = taskState.shownRun === run
         val started = center.onEnded(run)
         // 收尾时替接班的拿着的屏幕锁交给第一个放出来的;没有放出来的(排着的被取消、同一对话还有任务在跑)就放开

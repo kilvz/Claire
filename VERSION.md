@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 1.3.1 (versionCode 57)
+- **Claire version:** 1.3.2 (versionCode 58)
 - **Base version:** upstream Mika 0.1.50 (commit `9c7aabd8`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -41,6 +41,8 @@ recorded base version.
   via the Bot API).
 - 1.3.1: removed the Antigravity provider (Google sign-in) again;
   the Telegram bot channel stays.
+- 1.3.2: the Telegram bot shows "typing..." while a channel task runs
+  (refreshed every 4 s, stops when the task ends).
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

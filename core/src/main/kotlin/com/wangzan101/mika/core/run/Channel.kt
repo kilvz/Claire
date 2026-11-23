@@ -55,6 +55,8 @@ interface Channel {
     /** 入站消息已持久化为任务后确认；没有待处理账本的渠道无需实现。 */
     fun acknowledge(messageId: String) = Unit
     suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome
+    /** Best-effort "typing..." while a task runs; channels without one ignore the call. */
+    suspend fun typing(peer: ChannelPeer) {}
 }
 
 /** 配对不等于主人；只有已绑定的 peer 才能给 Run 发消息。 */
