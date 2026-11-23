@@ -76,7 +76,6 @@ class SharedDraftImporter(private val context: Context, private val store: Share
             if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
                 return SingleOutcome.Failed(AttachmentFailure(Attachments.safeName(fallbackLabel), AttachmentFailureReason.IO_ERROR))
             }
-            // 外部分享不应该借 Claire 自己的私有 provider 指定另一个内部文件;所有收到的内容都从外部 provider 新复制。
             // Android 跨用户 URI 的 authority 可以是「用户编号@提供方」。
             val authority = uri.authority.orEmpty().substringAfterLast('@')
             if (authority.isBlank() || authority == context.packageName || authority.startsWith("${context.packageName}.")) {

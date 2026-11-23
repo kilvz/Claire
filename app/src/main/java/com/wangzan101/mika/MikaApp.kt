@@ -1,6 +1,5 @@
 package com.wangzan101.mika
 
-import com.wangzan101.mika.core.prompt.Prompts
 import android.app.Application
 import android.net.Uri
 import android.util.Log
@@ -36,6 +35,7 @@ import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import com.wangzan101.mika.core.run.Outbox
 import com.wangzan101.mika.core.run.RunStore
 import com.wangzan101.mika.core.model.usage.UsageLedger
+import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.workspace.SandboxTree
 import com.wangzan101.mika.i18n.AppLanguage
 import com.wangzan101.mika.i18n.ResourceTexts
