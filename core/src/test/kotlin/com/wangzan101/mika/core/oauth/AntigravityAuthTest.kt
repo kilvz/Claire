@@ -65,7 +65,7 @@ class AntigravityAuthTest {
         server.enqueue(ok("""{"access_token":"at","refresh_token":"rt","expires_in":3600,"scope":"openid email"}"""))
         val attempt = auth.newAttempt("http://127.0.0.1:9/auth/callback")
         val r = auth.exchange("cid-123", "csecret", "code-1", attempt)
-        val tokens = (r as? TokenResult.Ok)?.tokens ?: fail("expected tokens")
+        val tokens = (r as? TokenResult.Ok)?.tokens ?: error("expected tokens")
         assertEquals("at", tokens.accessToken)
         assertEquals("rt", tokens.refreshToken)
         val req = server.takeRequest()
@@ -79,7 +79,7 @@ class AntigravityAuthTest {
     @Test fun refreshKeepsOldTokenWhenNoneReturned() = runTest {
         server.enqueue(ok("""{"access_token":"at2","expires_in":3600}"""))
         val r = auth.refresh("cid-123", "csecret", "rt")
-        val tokens = (r as? TokenResult.Ok)?.tokens ?: fail("expected tokens")
+        val tokens = (r as? TokenResult.Ok)?.tokens ?: error("expected tokens")
         assertEquals("at2", tokens.accessToken)
         assertNull(tokens.refreshToken)
     }
@@ -88,7 +88,7 @@ class AntigravityAuthTest {
         server.enqueue(MockResponse().setResponseCode(400)
             .setBody("""{"error":"invalid_grant","error_description":"bad code"}"""))
         val r = auth.exchange("cid-123", "csecret", "code-1", auth.newAttempt("http://127.0.0.1:9/auth/callback"))
-        val rejected = r as? TokenResult.Rejected ?: fail("expected rejection")
+        val rejected = r as? TokenResult.Rejected ?: error("expected rejection")
         assertEquals("invalid_grant", rejected.code)
         assertTrue(rejected.terminal)
     }
