@@ -69,7 +69,6 @@ import com.wangzan101.mika.ui.components.StatusPill
 import com.wangzan101.mika.ui.components.TileTone
 import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
-import com.wangzan101.mika.i18n.AppLanguage
 import com.wangzan101.mika.ui.TelegramEntryStatus
 import com.wangzan101.mika.ui.TelegramSettingsScreen
 import com.wangzan101.mika.telegram.TelegramConnectionState
