@@ -18,7 +18,7 @@ import com.wangzan101.mika.core.chatgpt.ChatGptTokens
 import com.wangzan101.mika.core.oauth.AccountSession
 import com.wangzan101.mika.core.oauth.AccountTokens
 import com.wangzan101.mika.core.oauth.AntigravityAuth
-import com.wangzan101.mika.core.oauth.AntigravityDiscovery
+import com.wangzan101.mika.core.model.AntigravityDiscovery
 import com.wangzan101.mika.core.oauth.AntigravitySession
 import com.wangzan101.mika.core.oauth.AntigravityTokens
 import com.wangzan101.mika.core.oauth.OauthTokenResult
