@@ -1,8 +1,8 @@
 package com.wangzan101.mika.telegram
 
 import com.wangzan101.mika.core.run.ChannelPeer
-import com.wangzan101.mika.core.wechat.WechatAccount
-import com.wangzan101.mika.core.wechat.WechatApi
+import com.wangzan101.mika.core.cap.wechat.WechatAccount
+import com.wangzan101.mika.core.cap.wechat.WechatApi
 import com.wangzan101.mika.settings.KeyCipher
 import com.wangzan101.mika.wechat.WechatChannel
 import com.wangzan101.mika.wechat.WechatStore

@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 1.3.3 (versionCode 59)
-- **Base version:** upstream Mika 0.1.50 (commit `9c7aabd8`)
+- **Claire version:** 2.0.0 (versionCode 60)
+- **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -49,6 +49,19 @@ recorded base version.
   drawn in the same hand-drawn stroke style) on the Settings home row
   and the Telegram settings header — it no longer shares the two-bubble
   `Chats` icon with WeChat.
+- 2.0.0: rebase onto upstream Mika 0.1.51 — all 198 upstream commits
+  since v0.1.50 ported (main `a85b8a7b`, 23 Nov 2026), cherry-picked in
+  order: in-app voice calls (live subtitles, 13 voice vendors), MCP
+  guided catalog (74 services, one-click auth), WeChat result push +
+  intent gate, teach/learning, new providers (Cloudflare Workers AI,
+  OpenDesign Go, OpenAI Fast/Ultrafast, model groups with failover),
+  sandbox limit/timeout fixes, multi-file share to draft, and the
+  23 Nov file splits + directory restructures (ui files into feature
+  `ui/` packages, core packages regrouped, repo root layered).
+  Claire's own work survives untouched: full rebrand, OrcaRouter
+  preset, Telegram channel (typing indicator, first-only "Got it",
+  paper-plane icon), permanent-keystore signing. No release tag yet —
+  2.0.0 is merged to main; the release is a later call.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

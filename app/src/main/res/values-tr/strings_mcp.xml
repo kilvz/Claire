@@ -43,7 +43,7 @@
     <string name="mcp_cli_install">1. Bilgisayarınızı kurun</string>
     <string name="mcp_cli_install_sub">Kurulum kılavuzunu bilgisayarınızdaki yapay zekaya gönderin ya da bilgisayarda kendiniz izleyin.</string>
     <string name="mcp_copy_install">Kurulum kılavuzunu kopyala</string>
-    <string name="mcp_cli_install_prompt">Mika CLI\'yı veya bu ajan için Skill\'i kurmak üzere https://github.com/wangzan101/Mika/blob/main/docs/agent-quickstart.en.md adresini izleyin. Telefonda seçilen bağlantı yöntemini kullanın: USB, yetkili ADB kullanır; Wi-Fi/özel VPN, HTTP adresini ve özel bir belirteç dosyasını kullanır. Bağlantıyı doğrulamak için connect\'i çalıştırın. Yalnızca Skill varsa, paketindeki betiği kullanın. Sohbette telefon görevleri göndermeyin veya belirteçleri yazdırmayın.</string>
+    <string name="mcp_cli_install_prompt">Claire CLI\'yı veya bu ajan için Skill\'i kurmak üzere https://github.com/wangzan101/Claire/blob/main/docs/agent-quickstart.en.md adresini izleyin. Telefonda seçilen bağlantı yöntemini kullanın: USB, yetkili ADB kullanır; Wi-Fi/özel VPN, HTTP adresini ve özel bir belirteç dosyasını kullanır. Bağlantıyı doğrulamak için connect\'i çalıştırın. Yalnızca Skill varsa, paketindeki betiği kullanın. Sohbette telefon görevleri göndermeyin veya belirteçleri yazdırmayın.</string>
     <string name="mcp_cli_connect">2. Telefonu bağlayın</string>
     <string name="mcp_cli_connect_sub">USB veya eşleştirilmiş kablosuz hata ayıklama üzerinden bilgisayarınızda çalıştırın. connect, bağlantıyı doğrular. Yalnızca Skill varsa, ajandan paketindeki istemciyi çalıştırmasını isteyin.</string>
     <string name="mcp_copy_command">Komutu kopyala</string>
@@ -56,7 +56,7 @@
     <string name="mcp_usb_client">3. MCP istemcinizi yapılandırın</string>
     <string name="mcp_usb_client_sub">Başlatma komutu, bilgisayarda adresi ve belirteci yazdırır. Bunları istemcinize ekleyin ve yukarıdaki istek saatinin güncellendiğini kontrol edin.</string>
     <string name="mcp_copy_instructions">Kurulum talimatlarını kopyala</string>
-    <string name="mcp_usb_client_instructions">Bu bilgisayarda http://127.0.0.1:%1$d/mcp adresinde bir Streamable HTTP MCP sunucusu ekleyin. Authorization başlığını, Mika başlatma komutunun yazdırdığı belirtecin ardından Bearer olarak ayarlayın. Belirteci sohbette yazdırmayın. Araç listesine bağlanın veya yenileyin ve telefondaki istek saatinin güncellendiğini kontrol edin. Kılavuz: https://github.com/wangzan101/Mika/blob/main/docs/mcp.en.md</string>
+    <string name="mcp_usb_client_instructions">Bu bilgisayarda http://127.0.0.1:%1$d/mcp adresinde bir Streamable HTTP MCP sunucusu ekleyin. Authorization başlığını, Claire başlatma komutunun yazdırdığı belirtecin ardından Bearer olarak ayarlayın. Belirteci sohbette yazdırmayın. Araç listesine bağlanın veya yenileyin ve telefondaki istek saatinin güncellendiğini kontrol edin. Kılavuz: https://github.com/wangzan101/Claire/blob/main/docs/mcp.en.md</string>
     <string name="mcp_network_enable">Bu ağ bağlantısına izin ver</string>
     <string name="mcp_network_enable_action">Ağ erişimini etkinleştir</string>
     <string name="mcp_network_address_step">1. Erişilebilir bir adres seçin</string>

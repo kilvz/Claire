@@ -1,7 +1,7 @@
 package com.wangzan101.mika.core.docs
 
-import com.wangzan101.mika.core.knowledge.IndexEntry
-import com.wangzan101.mika.core.knowledge.KnowledgeIndex
+import com.wangzan101.mika.core.learn.knowledge.IndexEntry
+import com.wangzan101.mika.core.learn.knowledge.KnowledgeIndex
 import java.io.File
 
 /** README 里会变的清单(内置知识、服务商预设)从源头生成,夹在 `<!-- generated:<名>:start -->` 和 `<!-- generated:<名>:end -->` 之间。
