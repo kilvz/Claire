@@ -99,6 +99,7 @@ class AntigravityAuth(
     private val authUrl: String = AUTH_URL,
     private val tokenUrl: String = TOKEN_URL,
     private val userinfoUrl: String = USERINFO_URL,
+    private val revokeUrl: String = REVOKE_URL,
     private val now: () -> Long = System::currentTimeMillis,
     private val random: SecureRandom = SecureRandom(),
 ) {
@@ -150,7 +151,7 @@ class AntigravityAuth(
     /** Revoke the refresh token; true when the server confirms (HTTP 200; an already-dead token is also 200). */
     suspend fun revoke(refreshToken: String): Boolean = try {
         val form = FormBody.Builder().add("token", refreshToken).build()
-        HttpSupport.execute(http, Request.Builder().url(REVOKE_URL).post(form).build()).status == 200
+        HttpSupport.execute(http, Request.Builder().url(revokeUrl).post(form).build()).status == 200
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

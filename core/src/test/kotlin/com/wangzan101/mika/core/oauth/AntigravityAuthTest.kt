@@ -25,6 +25,7 @@ class AntigravityAuthTest {
             authUrl = server.url("/auth").toString(),
             tokenUrl = server.url("/token").toString(),
             userinfoUrl = server.url("/userinfo").toString(),
+            revokeUrl = server.url("/revoke").toString(),
         )
     }
     @After fun tearDown() { server.shutdown() }

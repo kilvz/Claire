@@ -85,6 +85,7 @@ class AntigravityModelTest {
     @Test fun finishReasonStopSuffixAndToolResultRoundTrip() = runTest {
         server.enqueue(ok(resp("""[{"text":"x"}]""", finish = "FINISH_REASON_STOP")))
         assertEquals(StopReason.EndTurn, model().complete("s", user, emptyList()).stopReason)
+        server.takeRequest() // drain the first request; the next sentBody() reads the history request
         server.enqueue(ok(resp("""[]""")))
         val history = listOf(
             Message(Role.User, listOf(Part.Text("go")), Author.Mika),
