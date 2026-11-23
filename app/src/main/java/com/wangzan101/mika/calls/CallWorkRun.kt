@@ -30,7 +30,7 @@ import com.wangzan101.mika.calls.CallRuntime.Companion.PHONE_DTMF_PROMPT
 import com.wangzan101.mika.calls.CallRuntime.Companion.FAREWELL_ENDING
 import com.wangzan101.mika.calls.CallRuntime.Companion.TOKEN
 
-// 电话运行时:一次 AI 通话的执行、唤醒锁与取消
+// Call runtime: execution of a single AI call, wake locks, and cancellation
 internal fun CallRuntime.startWork(attempt: Work) {
     check(work == null)
     work = attempt

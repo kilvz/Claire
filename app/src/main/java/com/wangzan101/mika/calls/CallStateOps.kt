@@ -22,7 +22,7 @@ import com.wangzan101.mika.calls.CallRuntime.Tracked
 import com.wangzan101.mika.calls.CallRuntime.Work
 import com.wangzan101.mika.calls.CallRuntime.Companion.TOKEN
 
-// 电话运行时:状态发布、前置条件与通话判定
+// Call runtime: state publishing, preconditions, and call checks
 internal fun CallRuntime.publish() {
     dtmf.invalidate()
     val config = settings.state.value

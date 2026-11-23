@@ -21,8 +21,8 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.ACTIVITY_TYPE_
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.resolveTargetUid
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.sameCopy
 
-// 助手服务:任务栈查询、挪屏、留在后台与收尾关闭
-/** 该包在主屏有可见任务,或者就是主屏最上面的任务。[userId] 不为空时只看那份用户里的(见 [sameCopy])。 */
+// Assistant service: task stack queries, moving between displays, keeping in the background, and closing out
+/** The package has a visible task on the main screen, or is itself the top task on the main screen. When [userId] is not null, only tasks in that user are considered (see [sameCopy]). */
 internal fun ShellService.inUseOnMainScreen(packageName: String, userId: Int? = null): Boolean {
     val visibleField = runCatching { TASK_INFO.getField("isVisible") }.getOrNull()
     return tasksOn(Display.DEFAULT_DISPLAY).withIndex().any { (index, task) ->
@@ -31,8 +31,8 @@ internal fun ShellService.inUseOnMainScreen(packageName: String, userId: Int? = 
 }
 
 /**
- * IActivityTaskManager.getTasks:按最近使用排序,shell 持有 REAL_GET_TASKS,能看到所有 App 的任务。
- * API 33+ 有带 displayId 的重载,优先用它;更早的版本取全部再按 TaskInfo.displayId 过滤。
+ * IActivityTaskManager.getTasks: sorted by recency of use; the shell holds REAL_GET_TASKS, so it can see the tasks of every app.
+ * API 33+ has an overload that takes a displayId, which is preferred; earlier versions fetch everything and then filter by TaskInfo.displayId.
  */
 internal fun ShellService.tasksOn(displayId: Int): List<Any> {
     val methods = taskManager.javaClass.methods.filter { it.name == "getTasks" }
@@ -46,7 +46,7 @@ internal fun ShellService.tasksOn(displayId: Int): List<Any> {
     return tasks.filterNotNull().filter { displayField.getInt(it) == displayId }
 }
 
-/** 所有屏上的任务:带屏号的重载传 INVALID_DISPLAY 即不按屏过滤。 */
+/** Tasks on all displays: passing INVALID_DISPLAY to the overload that takes a display id means no filtering by display. */
 internal fun ShellService.allTasks(): List<Any> {
     val methods = taskManager.javaClass.methods.filter { it.name == "getTasks" }
     val withDisplay = methods.firstOrNull { it.parameterTypes.size == 4 }
@@ -66,7 +66,7 @@ internal fun ShellService.task(taskId: Int): Any? {
 internal fun ShellService.sortAndMove(displayId: Int, keep: Array<String>?, close: Array<String>?): Sorting {
     val closed = ArrayList<String>()
     val notes = LinkedHashSet<String>()
-    // 已挪到主屏后面的;中途出错也照记,下次打开接得上
+    // Tasks already moved behind the main screen; they are recorded even if an error occurs midway, so the next launch can pick up where this left off
     val moved = ArrayList<AppsAfterTask.Fate>()
     val hidden = HashSet<Int>()
     try {
@@ -91,7 +91,7 @@ internal fun ShellService.sortAndMove(displayId: Int, keep: Array<String>?, clos
                 }
             }
         }
-        // 挪过去之后又出声的(没标过 keep):挪回这块屏,随屏关掉;挪不回就直接关
+        // Tasks that started playing audio after being moved (not marked keep): move them back to this display and close them with it; if they cannot be moved back, close them directly
         val playingNow = if (moved.isEmpty()) null else playingUids()
         val nowLoud = moved.map { f -> AppsAfterTask.recheck(f, task(f.task.id)?.let { playingIn(it, playingNow) }) }.filter { !it.keep }
         for (f in nowLoud) {
@@ -107,15 +107,15 @@ internal fun ShellService.sortAndMove(displayId: Int, keep: Array<String>?, clos
 }
 
 /**
- * [finishDisplay] 的最后一段,在锁里:按 [SettleBehind.closeOut] 再定一次。等到超时还看得见的挪回这块屏随屏关掉
- * (和挪过去又出声的同一条路,不留在用户眼前),记成没留下([AppsAfterTask.Why.StillInFront]);已不在主屏的不再记;
- * 记下留下的,释放屏。没能等(读不了任务列表,[settled] 为 null)时照留,结果里写明没核对上。
+ * The last stage of [finishDisplay], inside the lock: decide again according to [SettleBehind.closeOut]. Tasks still visible when the timeout expires are moved back to this display and closed with it
+ * (the same path as tasks that started playing audio after being moved; they are not left in front of the user) and recorded as not kept ([AppsAfterTask.Why.StillInFront]); tasks no longer on the main screen are not recorded;
+ * the ones that are kept are recorded and the display is released. If it could not wait (the task list cannot be read, [settled] is null), they are kept anyway and the result states that they were not verified.
  */
 internal fun ShellService.closeOut(displayId: Int, sorting: Sorting, settled: SettleBehind.Plan.Done?): Bundle {
     val (moved, closed, notes) = Triple(sorting.moved, sorting.closed, sorting.notes)
     if (settled == null) notes += AppsAfterTask.NOTE_SETTLE_UNKNOWN
     else try {
-        // 等的时候不占锁:回到锁里再看一次,别的任务这会儿把它拿走了、或已经落定的,都不动
+        // Do not hold the lock while waiting: look again after returning to the lock; a task that another task took over in the meantime, or that has already settled, is left untouched
         val ids = moved.mapTo(LinkedHashSet()) { it.task.id }
         val final = SettleBehind.closeOut(ids, settled.fallback, seenOnMain(ids))
         for (f in moved.filter { it.task.id in final.fallback }) {
@@ -130,7 +130,7 @@ internal fun ShellService.closeOut(displayId: Int, sorting: Sorting, settled: Se
         Log.e(TAG, "finishDisplay: cannot recheck the main screen", t)
         notes += "error ${t.javaClass.simpleName}"
     }
-    // 取消隐藏没做成的:留在主屏但最近任务里看不见,下次打开同一份时 resumeKept 挪回来补上取消隐藏
+    // Failed unhides: the task stays on the main screen but is invisible in recents; the next time the same app is opened, resumeKept moves it back and completes the unhide
     val hidden = moved.count { it.task.id in sorting.hidden }
     if (hidden > 0) notes += "$hidden ${AppsAfterTask.NOTE_LEFT_HIDDEN}"
     synchronized(kept) { moved.forEach { kept[it.task.id] = it.key } }
@@ -142,12 +142,12 @@ internal fun ShellService.closeOut(displayId: Int, sorting: Sorting, settled: Se
     }
 }
 
-/** 不留的任务挪回 Claire 的屏 [displayId],随屏关掉;挪不回就直接关。 */
+/** Move tasks that are not kept back to Claire's display [displayId] and close them with it; if they cannot be moved back, close them directly. */
 internal fun ShellService.sendBackToClose(taskId: Int, displayId: Int) {
     if (!moveRoot(taskId, displayId)) removeTask(taskId)
 }
 
-/** 任务的一行给 [AppsAfterTask.decide]:键、是不是普通 App 的页面、是不是 Claire 自己的、此刻出不出声。 */
+/** One task row for [AppsAfterTask.decide]: its key, whether it is a standard app page, whether it belongs to Claire itself, and whether it is playing audio right now. */
 internal fun ShellService.afterTaskRow(t: Any, playing: Map<Int, Set<String>>?): AppsAfterTask.Task {
     val user = runCatching { TASK_INFO.getField("userId").getInt(t) }.getOrDefault(myUser)
     val pkgs = packagesOf(t).distinct()
@@ -162,7 +162,7 @@ internal fun ShellService.afterTaskRow(t: Any, playing: Map<Int, Set<String>>?):
     )
 }
 
-/** 这个任务的 App(同一份用户里的)此刻在出声;读不到为 null。 */
+/** Whether the app of this task (in the same user) is playing audio right now; null if it cannot be read. */
 internal fun ShellService.playingIn(task: Any, playing: Map<Int, Set<String>>?): Boolean? {
     playing ?: return null
     val user = runCatching { TASK_INFO.getField("userId").getInt(task) }.getOrNull()
@@ -171,9 +171,9 @@ internal fun ShellService.playingIn(task: Any, playing: Map<Int, Set<String>>?):
 }
 
 /**
- * 此刻正在播放的 uid → 这个 uid 的包。先问音频服务(AudioManager.getActivePlaybackConfigurations,
- * 带 MODIFY_AUDIO_ROUTING 时才给出 uid);拿到的 uid 被隐去时改读 `dumpsys audio`。只认播放器状态为 started 的
- * (被 Claire 静音的照样算在播:静音只是没声,还原就响)。都读不到为 null。
+ * uids playing right now → packages of that uid. First ask the audio service (AudioManager.getActivePlaybackConfigurations,
+ * which only reports uids when MODIFY_AUDIO_ROUTING is held); when the returned uids are redacted, read `dumpsys audio` instead. Only entries whose player state is started count
+ * (apps muted by Claire still count as playing: muting only silences them, and they sound again once restored). Null if neither can be read.
  */
 internal fun ShellService.playingUids(): Map<Int, Set<String>>? {
     val uids = runCatching {
@@ -192,8 +192,8 @@ internal fun ShellService.playingUids(): Map<Int, Set<String>>? {
 }
 
 /**
- * 把 Claire 屏上的任务 [row] 挪到主屏最后面。移动成功后 reorder/取消隐藏没做成也不删任务:还看得见的交给 [settleBehind] 等过渡、
- * 再排到后面;一直藏着的返回 [Behind.HIDDEN],结果里写明,下次 [resumeKept] 挪回来时取消隐藏。
+ * Move task [row] from Claire's display to the back of the main screen. Once the move succeeds, the task is not deleted even if reorder/unhide fails: tasks still visible are handed to [settleBehind] to wait for the transition
+ * and then ordered to the back again; tasks that stay hidden return [Behind.HIDDEN], which is stated in the result, and the unhide is completed the next time [resumeKept] moves them back.
  */
 internal fun ShellService.keepBehind(row: Any): Behind {
     val id = TASK_INFO.getField("taskId").getInt(row)
@@ -203,19 +203,19 @@ internal fun ShellService.keepBehind(row: Any): Behind {
         transact { wct -> wctCall(wct, "setHidden", token, false) }
         return Behind.UNSUPPORTED
     }
-    // 隐藏着 reorder 再取消隐藏,否则系统不挪它;两步放在同一个事务里。
+    // Reorder while hidden and then unhide; otherwise the system does not move it. Both steps go in the same transaction.
     val placed = transact { wct ->
         wctCall(wct, "reorder", token, false)
         wctCall(wct, "setHidden", token, false)
     }
     if (placed) return Behind.OK
-    // 别把它留在隐藏状态;取消隐藏后在上面的,交给 settleBehind 再排到后面。
+    // Do not leave it hidden; if it ends up on top after the unhide, hand it to settleBehind to order it back again.
     if (transact { wct -> wctCall(wct, "setHidden", token, false) }) return Behind.OK
     Log.w(TAG, "task $id is still hidden on the main screen; resumeKept will unhide it")
     return Behind.HIDDEN
 }
 
-/** [ids] 里此刻还在主屏上的任务,和它们看不看得见;读不到 isVisible 时按「是不是主屏最上面的任务」看(那里的任务按最近使用排,只作退路)。 */
+/** Tasks among [ids] that are currently on the main screen, and whether they are visible; when isVisible cannot be read, fall back to "is it the top task on the main screen" (tasks there are sorted by recency of use, so this is only a fallback). */
 internal fun ShellService.seenOnMain(ids: Set<Int>): List<SettleBehind.Seen> {
     if (ids.isEmpty()) return emptyList()
     val idField = TASK_INFO.getField("taskId")
@@ -227,8 +227,8 @@ internal fun ShellService.seenOnMain(ids: Set<Int>): List<SettleBehind.Seen> {
 }
 
 /**
- * 等挪到主屏的任务 [moved] 退到用户看不见的地方,规则见 [SettleBehind]。不在 [launchLock] 里调:要等最多 [SettleBehind.TIMEOUT_MS]。
- * 读不了任务列表时返回 null(调用方照留,结果里写明没核对上)。
+ * Wait for the tasks [moved] to the main screen to settle where the user cannot see them; the rules are in [SettleBehind]. Not called inside [launchLock]: it waits up to [SettleBehind.TIMEOUT_MS].
+ * Returns null when the task list cannot be read (the caller keeps them anyway and states in the result that they were not verified).
  */
 internal fun ShellService.settleBehind(moved: Set<Int>): SettleBehind.Plan.Done? = try {
     val start = SystemClock.uptimeMillis()
@@ -258,7 +258,7 @@ internal fun ShellService.settleBehind(moved: Set<Int>): SettleBehind.Plan.Done?
     null
 }
 
-/** 把主屏上的这些任务再排到最后面(过渡还没完的不算失败,下一轮再看)。 */
+/** Order these tasks on the main screen to the back again (tasks whose transition has not finished are not treated as failures; they are checked again in the next round). */
 internal fun ShellService.sendToBack(ids: Set<Int>) {
     val idField = TASK_INFO.getField("taskId")
     for (row in tasksOn(Display.DEFAULT_DISPLAY)) {
@@ -270,10 +270,10 @@ internal fun ShellService.sendToBack(ids: Set<Int>) {
     }
 }
 
-/** IActivityTaskManager.moveRootTaskToDisplay;接口不在时退回 `am display move-stack`(同一个调用)。 */
+/** IActivityTaskManager.moveRootTaskToDisplay; falls back to `am display move-stack` (the same call) when the interface is unavailable. */
 internal fun ShellService.moveRoot(taskId: Int, displayId: Int): Boolean = moveTask(taskId, displayId)
 
-/** IActivityTaskManager.removeTask(关掉任务,和最近任务里划掉一样);不行退回 `am stack remove`。 */
+/** IActivityTaskManager.removeTask (closes the task, the same as swiping it away in recents); falls back to `am stack remove` if that fails. */
 internal fun ShellService.removeTask(taskId: Int): Boolean = try {
     taskManager.javaClass.getMethod("removeTask", Int::class.java).invoke(taskManager, taskId) as Boolean
 } catch (t: Throwable) {
@@ -281,7 +281,7 @@ internal fun ShellService.removeTask(taskId: Int): Boolean = try {
     exec("am", "stack", "remove", "$taskId") == 0
 }
 
-/** 建一个 WindowContainerTransaction,经 IWindowOrganizerController.applyTransaction 交给系统;哪一步不行返回 false。 */
+/** Build a WindowContainerTransaction and hand it to the system through IWindowOrganizerController.applyTransaction; returns false if any step fails. */
 @SuppressLint("PrivateApi")
 internal fun ShellService.transact(build: (Any) -> Unit): Boolean = try {
     val wct = WCT.getConstructor().newInstance()
@@ -299,7 +299,7 @@ internal fun ShellService.wctCall(wct: Any, method: String, token: Any, flag: Bo
     WCT.getMethod(method, Class.forName("android.window.WindowContainerToken"), Boolean::class.javaPrimitiveType).invoke(wct, token, flag)
 }
 
-/** 主屏上(没在用户眼前)的、上次任务留下的这份 App 的任务。 */
+/** Tasks of this app on the main screen (not in front of the user) that were kept by the previous task. */
 internal fun ShellService.keptOnMain(packageName: String, userId: Int): List<Any> {
     val ids = synchronized(kept) { kept.keys.toSet() }
     if (ids.isEmpty()) return emptyList()
@@ -307,7 +307,7 @@ internal fun ShellService.keptOnMain(packageName: String, userId: Int): List<Any
     val displayField = TASK_INFO.getField("displayId")
     val visibleField = runCatching { TASK_INFO.getField("isVisible") }.getOrNull()
     val all = allTasks()
-    // 已经不在的任务不再记着
+    // Stop remembering tasks that no longer exist
     synchronized(kept) { kept.keys.retainAll(all.map { idField.getInt(it) }.toSet()) }
     return all.filter { t ->
         idField.getInt(t) in ids && displayField.getInt(t) == Display.DEFAULT_DISPLAY && isCopy(t, packageName, userId) &&
@@ -315,12 +315,12 @@ internal fun ShellService.keptOnMain(packageName: String, userId: Int): List<Any
     }
 }
 
-/** 把留在主屏后面的那个任务挪回 Claire 的屏;没有、或挪不了返回 false(调用方照常启动)。 */
+/** Move the task kept behind the main screen back to Claire's display; returns false if there is none or it cannot be moved (the caller launches as usual). */
 internal fun ShellService.resumeKept(displayId: Int, packageName: String, userId: Int): Boolean {
     val row = runCatching { keptOnMain(packageName, userId).firstOrNull() }.getOrNull() ?: return false
     val id = TASK_INFO.getField("taskId").getInt(row)
     if (!moveRoot(id, displayId)) return false
-    // 收尾时没来得及取消隐藏的,挪回来补一次。
+    // If there was no time to unhide during close-out, do it once more after moving it back.
     val token = runCatching { TASK_INFO.getField("token").get(row) }.getOrNull()
     if (token != null && !transact { wct -> wctCall(wct, "setHidden", token, false) }) {
         Log.w(TAG, "task $id is still hidden after moving it back to display $displayId")
@@ -329,7 +329,7 @@ internal fun ShellService.resumeKept(displayId: Int, packageName: String, userId
     return true
 }
 
-/** 冷启动前关掉上次任务留在主屏后面的那份(Claire 自己留下的,不是用户的状态)。 */
+/** Before a cold start, close the copy left behind on the main screen by the previous task (left there by Claire itself, not by the user). */
 internal fun ShellService.dropKept(packageName: String, userId: Int) {
     keptOnMain(packageName, userId).forEach { t ->
         val id = TASK_INFO.getField("taskId").getInt(t)
@@ -337,7 +337,7 @@ internal fun ShellService.dropKept(packageName: String, userId: Int) {
     }
 }
 
-/** 所有屏上的任务,换成 [MainScreenLog.Task];页面种类读不到时当作普通 App 的页面。 */
+/** Tasks on all displays, converted to [MainScreenLog.Task]; when the page type cannot be read, treat it as a standard app page. */
 internal fun ShellService.taskRows(): List<MainScreenLog.Task> {
     val id = TASK_INFO.getField("taskId")
     val display = TASK_INFO.getField("displayId")
@@ -356,7 +356,7 @@ internal fun ShellService.taskRows(): List<MainScreenLog.Task> {
     }
 }
 
-/** 虚拟屏顶部任务的 uid(定向注入的目标);解析不到返回 null(退回非定向注入)。 */
+/** uid of the top task on the virtual display (the target of directed injection); returns null if it cannot be resolved (falls back to undirected injection). */
 internal fun ShellService.topTaskUid(displayId: Int): Int? = try {
     val task = tasksOn(displayId).firstOrNull() ?: return null
     val top = TASK_INFO.getField("topActivity").get(task) as? ComponentName

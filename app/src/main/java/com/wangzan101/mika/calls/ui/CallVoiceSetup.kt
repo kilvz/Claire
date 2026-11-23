@@ -67,7 +67,7 @@ import com.wangzan101.mika.voice.ui.tryChoice
 import com.wangzan101.mika.voice.ui.voiceOptions
 
 /**
- * 「电话用的听和说」: phone calls follow the voice settings by default, or get their own call mode and models
+ * "Listening and speaking for calls": phone calls follow the voice settings by default, or get their own call mode and models
  * (an 8 kHz phone recognizer, a calmer voice). Device recognition only hears the microphone, so it is never offered
  * for listening on a call.
  */
@@ -258,7 +258,7 @@ internal fun callVoiceSummary(runtime: CallRuntime): String {
 }
 
 /**
- * 「手机通话音频」: how call audio reaches Claire on this phone, and the user's confirmation that both directions work.
+ * "Phone call audio": how call audio reaches Claire on this phone, and the user's confirmation that both directions work.
  * Auto-answer stays blocked until that confirmation, for the route in use.
  */
 @Composable

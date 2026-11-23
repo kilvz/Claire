@@ -13,11 +13,11 @@ source: learned
 learned_from: <run ID>
 updates: <the name of an existing skill; if this is a new kind of task, remove this line>
 ---
-## 入口
-## 步骤
-## 容易出错的地方
-## 怎样算办成(核实证据)
-## 什么时候停下交给用户
+## Entry
+## Steps
+## Common pitfalls
+## How success is verified (evidence)
+## When to stop and hand off
 
 Requirements:
 - All five sections must be present, with the headings copied exactly as written. The full text must not exceed 3000 words.

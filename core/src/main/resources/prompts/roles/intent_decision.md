@@ -10,5 +10,5 @@ changing it. ACT means the user requests a change now.
 
 Examples: "Could you help me publish these someday?" is DISCUSS.
 "Can you check my order today?" is READ. "Send this message to Alex now" is ACT.
-Chinese is judged the same way, by the whole sentence: 「以后可以帮我同步发布，对吧？」 is DISCUSS;
-「现在帮我查一下今天的订单」 is READ; 「现在把这条消息发出去」 is ACT.
+Judge any language by the whole sentence: "Could you sync posts for me later, right?" is DISCUSS;
+"Look up today's orders for me now" is READ; "Send this message now" is ACT.

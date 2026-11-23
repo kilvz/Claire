@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.browser.ui.findActivity
 import com.wangzan101.mika.settings.ui.models.refresh
 
-/** 对话页附件的说法。 */
+/** Wording for attachments on the chat screen. */
 object AttachCopy {
     val ADD: String get() = tr(R.string.attach_add)
     val CAMERA: String get() = tr(R.string.attach_camera)
@@ -102,11 +102,11 @@ object AttachCopy {
     fun overLimit(n: Int) = tr(R.string.attach_over_limit, AttachTray.LIMIT, n)
 }
 
-// ---------- ＋ 里要系统界面的活 ----------
+// ---------- Things in ＋ that need system UI ----------
 
 /**
- * 「＋」面板里要系统界面或照片的那几件活:相机、相册、文件、照片权限(第一次打开时问一次)和最近的照片。
- * 挑完、拍完的结果交给 [onPicked];最近的照片点一下交给 [onToggle],满了(返回 false)时 [onFull]。
+ * The tasks in the "＋" panel that need system UI or photos: camera, album, files, photo permission (asked once the first time it is opened), and recent photos.
+ * Results from picking or taking photos go to [onPicked]; tapping a recent photo goes to [onToggle], and when the limit is reached (returns false) to [onFull].
  */
 internal class AttachLaunchers(
     val camera: () -> Unit,
@@ -136,7 +136,7 @@ internal fun rememberAttachLaunchers(
         access = RecentPhotos.access(context)
         refresh++
     }
-    // 回到 App 时(可能刚在系统设置里改过照片权限、刚拍了照)重新看一眼;面板刚打开那一次上面已经在读
+    // On returning to the app (the photo permission may just have been changed in system settings, or a photo just taken), take another look; the first time the panel opens, the read above already happened
     var resumedOnce by remember { mutableStateOf(false) }
     LifecycleResumeEffect(Unit) {
         val now = RecentPhotos.access(context)
@@ -156,7 +156,7 @@ internal fun rememberAttachLaunchers(
         cameraUri = null
         if (ok) onPicked(listOf(uri)) else AttachFiles.discardCamera(context, Uri.parse(uri))
     }
-    // 声明了 CAMERA 权限后,系统相机要求应用先拿到授权;没授权时 ACTION_IMAGE_CAPTURE 会抛 SecurityException
+    // Once the CAMERA permission is declared, the system camera requires the app to be granted it first; without the grant, ACTION_IMAGE_CAPTURE throws a SecurityException
     fun startCamera() {
         val uri = AttachFiles.newCameraUri(context)
         cameraUri = uri.toString()
@@ -197,7 +197,7 @@ internal fun rememberAttachLaunchers(
             val blocked = access == PhotoAccess.None && RecentPhotos.asked(context) && activity != null &&
                 RecentPhotos.permissions().none { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
             RecentPhotos.markAsked(context)
-            // 用户选过「不再询问」:系统不会再弹窗,只能去 App 信息里开
+            // The user chose "don't ask again": the system will not show a dialog anymore, so the only way is to enable it in the app info screen
             if (blocked) context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
             else permissions.launch(RecentPhotos.permissions())
         },
@@ -205,7 +205,7 @@ internal fun rememberAttachLaunchers(
     )
 }
 
-/** 最近的一张照片:方块缩略图;选中时蓝框、淡蓝罩、右上角蓝底序号,没选时右上角一个空心圈。 */
+/** One recent photo: a square thumbnail; when selected it has a blue border, a light blue overlay and a numbered blue badge in the top-right corner; when unselected, an empty circle in the top-right corner. */
 @Composable
 internal fun RecentCell(photo: PendingAttachment, order: Int?, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -228,9 +228,9 @@ internal fun RecentCell(photo: PendingAttachment, order: Int?, onClick: () -> Un
     }
 }
 
-// ---------- 待发 ----------
+// ---------- Pending ----------
 
-/** 输入框上方一排待发的附件:照片是方块缩略图,文件是小卡片(类型、名字、大小),点一下预览或打开,右上角 × 去掉。 */
+/** A row of pending attachments above the input box: photos are square thumbnails, files are small cards (type, name, size); tap to preview or open, tap × in the top-right corner to remove. */
 @Composable
 internal fun PendingTray(
     items: List<PendingAttachment>,
@@ -300,11 +300,11 @@ internal fun PendingTray(
     }
 }
 
-// ---------- 发出去的 ----------
+// ---------- Sent ----------
 
 /**
- * 用户消息里带的附件:照片排成格子(见 [PhotoGrid];1 张保持比例,2 张并排,3 张起三列),文件是卡片(类型、名字、大小);
- * 点照片或卡片交给 [onOpen](在 App 里的查看页打开)。最宽 [maxWidth]。
+ * Attachments carried by a user message: photos are laid out in a grid (see [PhotoGrid]; one keeps its aspect ratio, two sit side by side, three or more use three columns), files are cards (type, name, size);
+ * tapping a photo or card goes to [onOpen] (opens in the in-app viewer). At most [maxWidth] wide.
  */
 @Composable
 internal fun SentAttachments(parsed: AttachmentMessage.Parsed, conversationId: String?, maxWidth: Dp, onOpen: (AttachmentMessage.Item) -> Unit) {
@@ -314,7 +314,7 @@ internal fun SentAttachments(parsed: AttachmentMessage.Parsed, conversationId: S
     }
 }
 
-/** 回答里模型产出的 `/workspace/...` 引用:照片排格子、文件画卡片,和回答一起左对齐。 */
+/** `/workspace/...` references produced by the model in an answer: photos are laid out in a grid and files drawn as cards, left-aligned together with the answer. */
 @Composable
 internal fun OutputRefs(answer: String, conversationId: String?, onOpen: (AttachmentMessage.Item) -> Unit) {
     val parsed = remember(answer) { outputRefsParsed(answer) }
@@ -364,8 +364,8 @@ private fun SentPhotos(photos: List<AttachmentMessage.Item>, conversationId: Str
 }
 
 /**
- * Claire 生成的照片:和用户附件一样的格子(1 张一大张,2 张并排,3 张起三列),点开在 App 的查看页看。
- * 路径来自工具结果,不解析回答文字;conversationId 为 null(旧记录没有对话)时不解码。
+ * Photos generated by Claire: the same grid as user attachments (one large photo, two side by side, three or more in three columns); tap to view in the in-app viewer.
+ * Paths come from tool results and are not parsed out of the answer text; nothing is decoded when conversationId is null (old records have no conversation).
  */
 @Composable
 internal fun GeneratedPhotos(photos: List<GeneratedPhoto>, conversationId: String?, maxWidth: Dp) {
@@ -417,7 +417,7 @@ private fun SentFileCard(f: AttachmentMessage.Item, maxWidth: Dp, onClick: () ->
     }
 }
 
-/** 文件类型角标:按扩展名配色,上面写扩展名。 */
+/** File type badge: colored by extension, with the extension written on it. */
 @Composable
 private fun TypeBadge(name: String, modifier: Modifier, small: Boolean) {
     val shape = RoundedCornerShape(if (small) MikaRadius.Micro else MikaRadius.Tile)
@@ -434,7 +434,7 @@ private fun badgeColor(kind: FileBadge.Kind, c: MikaColors): Color = when (kind)
     FileBadge.Kind.Archive, FileBadge.Kind.Other -> NeutralBadge
 }
 
-/** 缩略图解到这么大(像素):面板格子、待发的小方块、单张大图。 */
+/** Thumbnails decode at these sizes (pixels): panel cell, pending small square, single large image. */
 private const val RECENT_PX = 256
 private const val TRAY_PX = 180
 private const val SINGLE_PX = 640

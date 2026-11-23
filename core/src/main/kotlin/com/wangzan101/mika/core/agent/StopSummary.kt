@@ -39,18 +39,9 @@ class StopSummary(
         val input = facts(goal, events, draft, label, appLabel, language)
         val messages = listOf(Message(Role.User, listOf(Part.Text(input)), Author.User))
         val rolePrompt = Prompts.role("stop_summary")
-        val phrase = StopPhrases.forLanguage(language)
-        val basePrompt = if (phrase.isChinese) {
-            rolePrompt
-        } else {
-            rolePrompt.replace(
-                "例:\n已经停下。停止前:\n- 打开了设置,看完了「网络和互联网」「蓝牙」两页:网络页有 WLAN、移动网络、热点,蓝牙页有配对新设备、已连接的设备。\n- 「显示」「声音」两页还没看。",
-                phrase.example,
-            )
-        }
         val systemPrompt = SystemPrompt.languageDirective(language)?.let {
-            "$it\n\n$basePrompt"
-        } ?: basePrompt
+            "$it\n\n$rolePrompt"
+        } ?: rolePrompt
         val written = withTimeoutOrNull(timeoutMs) {
             for (candidate in listOfNotNull(writer, fallback?.takeUnless { it === writer })) {
                 val text = try {
@@ -90,7 +81,6 @@ class StopSummary(
             label: (String) -> String = { it }, appLabel: (String) -> String = { it },
             language: String? = null,
         ): String {
-            val isZh = language == null || language.startsWith("zh", ignoreCase = true)
             val notes = notes(events)
             val lines = mutableListOf<String>()
             val said = mutableSetOf<Int>()
@@ -98,34 +88,29 @@ class StopSummary(
             for (a in events.filterIsInstance<RunEvent.Activity>()) {
                 val where = a.target?.let { where(it, appLabel) }
                 val what = listOfNotNull(label(a.label), where, a.title?.takeIf(String::isNotBlank)).joinToString(" · ")
-                val tags = if (isZh) {
-                    listOfNotNull("对外发出".takeIf { a.outward && !a.failed }, "没成功".takeIf { a.failed })
-                } else {
-                    listOfNotNull("sent externally".takeIf { a.outward && !a.failed }, "failed".takeIf { a.failed })
-                }
-                val line = if (isZh) {
-                    "第 ${a.step} 步 $what" + if (tags.isEmpty()) "" else "(${tags.joinToString("、")})"
-                } else {
-                    "Step ${a.step} $what" + if (tags.isEmpty()) "" else " (${tags.joinToString(", ")})"
-                }
+                val tags = listOfNotNull(
+                    "sent externally".takeIf { a.outward && !a.failed },
+                    "failed".takeIf { a.failed },
+                )
+                val line = "Step ${a.step} $what" + if (tags.isEmpty()) "" else " (${tags.joinToString(", ")})"
                 // 连着读同一处只记一行
                 if (a.kind == "observe" && line == lastObserve) continue
                 lastObserve = if (a.kind == "observe") line else null
                 val note = notes[a.step]?.takeIf { said.add(a.step) }
-                lines += if (note == null) line else if (isZh) "$line —— 用意:$note" else "$line — Intent: $note"
+                lines += if (note == null) line else "$line — Intent: $note"
             }
             val shown = if (lines.size <= MAX_LINES) lines
-                else lines.take(20) + "…(中间省略 ${lines.size - MAX_LINES} 件)…" + lines.takeLast(MAX_LINES - 20)
+                else lines.take(20) + "…(${lines.size - MAX_LINES} more actions omitted)…" + lines.takeLast(MAX_LINES - 20)
             val reads = events.filterIsInstance<RunEvent.Observed>().filter { it.kind == ObsKind.Read.wire && it.text.isNotBlank() }
                 .takeLast(MAX_READS).map { it.text.clip(READ_CHARS) }
             val checkpoint = events.filterIsInstance<RunEvent.Criteria>().lastOrNull { it.criteria.isNotEmpty() || it.progress != null }
-            val emptyActions = if (isZh) "(还没做任何操作)" else "(No actions taken yet)"
+            val emptyActions = "(No actions taken yet)"
             return buildString {
                 append("<request>\n").append(untag(goal)).append("\n</request>\n\n")
                 append("<actions>\n").append(untag(shown.joinToString("\n").ifEmpty { emptyActions })).append("\n</actions>")
                 checkpoint?.let { c ->
                     if (c.criteria.isNotEmpty()) append("\n\n<acceptance>\n").append(untag(c.criteria.joinToString("\n"))).append("\n</acceptance>")
-                    progress(c, isZh)?.let { p -> append("\n\n<progress>\n").append(untag(p)).append("\n</progress>") }
+                    progress(c, false)?.let { p -> append("\n\n<progress>\n").append(untag(p)).append("\n</progress>") }
                 }
                 if (reads.isNotEmpty()) append("\n\n<last_read>\n").append(untag(reads.joinToString("\n----\n"))).append("\n</last_read>")
                 draft?.trim()?.takeIf(String::isNotEmpty)?.let { append("\n\n<draft>\n").append(untag(it.clip(DRAFT_CHARS))).append("\n</draft>") }

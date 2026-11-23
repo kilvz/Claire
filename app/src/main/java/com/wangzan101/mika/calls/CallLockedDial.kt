@@ -13,7 +13,7 @@ import com.wangzan101.mika.calls.CallRuntime.CallProblem
 import com.wangzan101.mika.calls.CallRuntime.PendingLockedDial
 import com.wangzan101.mika.calls.CallRuntime.Work
 
-// 电话运行时:锁屏时排队拨出
+// Call runtime: queue the outgoing dial while the screen is locked
 /** Takes effect only after the owner confirms this specific task while the app is visible. */
 suspend fun CallRuntime.queueLockedDial(number: String, simId: String? = null, task: CallTaskBrief): CallActionResult = onMain {
     if (!interactiveForeground() || !userUnlocked()) return@onMain fail("请解锁手机并在电话页面确认本次拨号")

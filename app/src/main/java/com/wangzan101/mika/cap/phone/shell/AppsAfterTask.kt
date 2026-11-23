@@ -1,36 +1,41 @@
 package com.wangzan101.mika.cap.phone.shell
 
 /**
- * 任务结束时 Claire 屏上的 App 怎么办(外壳一侧的规则,不碰系统接口,单元测试直接测)。
+ * What happens to the apps on Claire's screen when a task ends (rules on the sibling side; they do not
+ * touch system APIs, so unit tests target them directly).
  *
- * 默认留下:挪到主屏、排在最后面,用户在最近任务里看得到它停在 Claire 做完的那一页,下次 Claire 打开它也接着这一页。
- * 此刻正在出声(播放音视频)的默认关掉,免得任务结束、静音还原时突然响起来。模型按用户的话标过的([keep] / [close])
- * 优先于默认。Claire 自己的页面、不是普通 App 页面的(桌面、最近任务一类)一律随屏关掉。
+ * Kept by default: moved to the main screen and placed at the very back, so the user sees it in Recents
+ * still sitting on the page Claire finished on, and the next time Claire opens it, it resumes from that
+ * page. Anything currently making sound (playing audio/video) is closed by default, so it does not
+ * suddenly start playing when the task ends and the mute is restored. What the model marked per the
+ * user's words ([keep] / [close]) takes precedence over the default. Claire's own pages and anything
+ * that is not a normal app page (launcher, Recents and the like) are always closed with the display.
  */
 object AppsAfterTask {
-    /** 一个任务的去留为什么这样定;[wire] 写进结果和运行记录。 */
+    /** Why a task was kept or closed this way; [wire] is written into the result and the run record. */
     enum class Why(val wire: String) {
-        /** 模型标过。 */
+        /** The model marked it. */
         Marked("marked"),
-        /** 此刻正在出声。 */
+        /** Currently making sound. */
         Playing("playing"),
-        /** 读不到在不在出声,而它正被 Claire 静着:还原静音时可能突然响,按出声算。 */
+        /** Whether it is making sound cannot be read, and Claire is muting it: it may suddenly play when the mute is restored, so it counts as playing. */
         PlaybackUnknown("playback_unknown"),
-        /** 默认:留下。 */
+        /** Default: keep it. */
         Default("default"),
-        /** Claire 自己的页面。 */
+        /** Claire's own page. */
         Own("mika"),
-        /** 不是普通 App 的页面。 */
+        /** Not a normal app page. */
         NotApp("not_app"),
-        /** 这台系统挪不了任务,照旧随屏关掉。 */
+        /** This system cannot move tasks, so it is closed with the display as before. */
         MoveUnsupported("move_not_supported"),
-        /** 挪到主屏后等到超时还看得见:不能留在用户眼前,挪回 Claire 的屏随屏关掉。 */
+        /** Still visible after moving to the main screen until the timeout: it cannot stay in front of the user, so it is moved back to Claire's display and closed with it. */
         StillInFront("still_in_front"),
     }
 
     /**
-     * 屏上的一个任务:[keys] 是它的页面所属的包换成的键(见 [keyOf]),[playing] 读不到时为 null,
-     * [muted] 是它此刻正被 Claire 静着(收尾时会还原)。
+     * A task on the display: [keys] are the keys built from the packages its pages belong to (see
+     * [keyOf]), [playing] is null when it cannot be read, and [muted] means Claire is muting it right now
+     * (it is restored when wrapping up).
      */
     data class Task(val id: Int, val keys: List<String>, val standard: Boolean, val own: Boolean, val playing: Boolean?, val muted: Boolean = false)
 
@@ -38,11 +43,11 @@ object AppsAfterTask {
         val key: String get() = task.keys.firstOrNull().orEmpty()
     }
 
-    /** 键:本来那份(Claire 所在的用户)就是包名,另一份是 包名@用户,和静音记录同一种写法([AppAudioKey])。 */
+    /** Key: the original copy (in Claire's user) is just the package name, another copy is package@user, the same notation as the mute ledger ([AppAudioKey]). */
     fun keyOf(packageName: String, userId: Int, myUser: Int): String =
         AppAudioKey.of(packageName, userId.takeIf { it != myUser && it >= 0 })
 
-    /** 模型标的键换成同一种写法:写成 Claire 所在用户的另一份等于本来那份;不合格式的丢掉。 */
+    /** Converts the model's keys to the same notation: a copy written for Claire's own user equals the original, and malformed keys are dropped. */
     fun normalize(keys: Array<String>?, myUser: Int): Set<String> = keys.orEmpty().mapNotNull { k ->
         AppAudioKey.parse(k)?.let { (pkg, user) -> AppAudioKey.of(pkg, user?.takeIf { it != myUser }) }
     }.toSet()
@@ -54,21 +59,24 @@ object AppsAfterTask {
             t.keys.any { it in close } -> Fate(t, false, Why.Marked)
             t.keys.any { it in keep } -> Fate(t, true, Why.Marked)
             t.playing == true -> Fate(t, false, Why.Playing)
-            // 读不到在不在出声:没被静着的留下(它要出声早就有声了,收尾不改变什么);静着的按出声算,免得还原时突然响
+            // Playback state unreadable: keep it if it is not muted (if it were going to make sound it already would, and wrapping up changes nothing); if it is muted, count it as playing so it does not suddenly sound when the mute is restored
             t.playing == null && t.muted -> Fate(t, false, Why.PlaybackUnknown)
             else -> Fate(t, true, Why.Default)
         }
     }
 
     /**
-     * 挪过去之后再看一眼:没标过 keep、这会儿开始出声的,改成关掉(静音一还原就会响)。标过 keep 的照留。
+     * A second look after the move: anything not marked keep that has started making sound by now is
+     * closed instead (it would sound as soon as the mute is restored). Items marked keep stay.
      */
     fun recheck(fate: Fate, playingNow: Boolean?): Fate =
         if (fate.keep && fate.why != Why.Marked && playingNow == true) fate.copy(keep = false, why = Why.Playing) else fate
 
     /**
-     * `dumpsys audio` 里正在播放的那些 uid:每个播放器一行 `AudioPlaybackConfiguration piid:.. u/pid:<uid>/<pid> state:started ..`。
-     * 认不出是音频服务的输出(没有播放记录那一段)时为 null,调用方按「读不到」处理。
+     * The uids currently playing according to `dumpsys audio`: one line per player,
+     * `AudioPlaybackConfiguration piid:.. u/pid:<uid>/<pid> state:started ..`.
+     * Null when the output is not recognizable as the audio service's (the playback-record section is
+     * missing); the caller then treats it as "unreadable".
      */
     fun playingUids(dumpsys: String): Set<Int>? {
         if (!dumpsys.contains(PLAYBACK_SECTION)) return null
@@ -80,12 +88,13 @@ object AppsAfterTask {
             .toSet()
     }
 
-    /** 结果里关掉的那一项:键:原因。 */
+    /** A closed entry in the result: key:reason. */
     fun closedEntry(f: Fate): String = "${f.key}:${f.why.wire}"
 
     /**
-     * 诊断信息里的一行:只数个数,不列包名(诊断信息不写装了什么、开过什么)。
-     * 如「kept 1, closed 1 (playing 1)」「closed 2 (move not supported)」「none」。
+     * One line for the diagnostics: counts only, never package names (diagnostics do not record what is
+     * installed or what was opened).
+     * e.g. "kept 1, closed 1 (playing 1)", "closed 2 (move not supported)", "none".
      */
     fun diagnosticsLine(kept: Int, closed: List<String>, note: String?): String {
         if (kept == 0 && closed.isEmpty()) return note?.let { "none ($it)" } ?: "none"
@@ -98,19 +107,19 @@ object AppsAfterTask {
         return parts.joinToString(", ") + (note?.let { "; $it" } ?: "")
     }
 
-    // finishDisplay 的 Bundle
+    // Bundle of finishDisplay
     const val KEY_KEPT = "kept"
     const val KEY_CLOSED = "closed"
     const val KEY_NOTE = "note"
 
-    /** 挪不了时写进 note 的话。 */
+    /** Text written into note when the task cannot be moved. */
     const val NOTE_MOVE_UNSUPPORTED = "move not supported"
     const val NOTE_PLAYBACK_UNKNOWN = "playback unknown"
-    /** 有任务挪过去以后一直看得见,没留下。 */
+    /** A task stayed visible after being moved over, so it was not kept. */
     const val NOTE_STILL_IN_FRONT = "still visible on main, closed"
-    /** 前面带个数:挪过去了却没能取消隐藏,最近任务里看不见,下次打开同一份时挪回来补上。 */
+    /** Preceded by a count: moved over but unhiding failed, so it is invisible in Recents and is moved back to make up for it the next time the same copy is opened. */
     const val NOTE_LEFT_HIDDEN = "left hidden on main"
-    /** 读不了主屏的任务列表,没核对上留下的是不是已退到后面。 */
+    /** The main screen's task list could not be read, so it was not verified that the kept tasks had settled to the back. */
     const val NOTE_SETTLE_UNKNOWN = "behind check unavailable"
 
     // AudioPlaybackConfiguration.PLAYER_STATE_STARTED

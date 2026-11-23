@@ -290,10 +290,10 @@ class CallRuntime(internal val app: MikaApp) {
         }
     }
 
-    /** 迁移后语音目录的快照:通话设置页从中列出能做实时通话的模型、标出当前选中的那个。 */
+    /** Snapshot of the voice catalog after migration: the call settings screen lists the models that can make realtime calls from it and marks the currently selected one. */
     internal val realtimeCatalog: StateFlow<VoiceCatalogSnapshot> get() = realtimeController.catalog.state
 
-    /** 电话是否跟随应用里「语音通话」的选择。 */
+    /** Whether phone calls follow the "voice call" selection in the app. */
     internal val callVoiceFollows: Boolean get() = realtimeController.callFollows
 
     suspend fun refresh(): CallActionResult = onMain {

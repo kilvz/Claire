@@ -65,13 +65,13 @@ fun CallSettingsScreen(runtime: CallRuntime, onInstructions: (() -> Unit)? = nul
             handledFocusRequest = focusRequest
         }
     }
-    // 这里的子页都不是导航路由,系统返回键要先关子页,不能直接退出整个电话页
+    // The sub-pages here are not navigation routes, so the system back key must close the sub-page first and must not exit the whole call screen directly.
     BackHandler(enabled = voiceProfilesOpen || instructionsOpen) {
         voiceProfilesOpen = false
         instructionsOpen = false
     }
     when {
-        // 迁移后旧的配置页不再用:在这里从语音目录里选通话用的实时模型,新增/编辑去目录
+        // After migration the old configuration page is no longer used: pick the realtime model for calls from the voice catalog here; add/edit in the catalog.
         voiceProfilesOpen && runtime.realtimeMigrated -> CallVoiceScreen(
             runtime, onBack = { voiceProfilesOpen = false }, onOpenServices = onOpenVoiceCatalog,
         )
@@ -404,7 +404,7 @@ private enum class CallWorkspaceTab(val label: Int) {
 
 @Composable
 private fun CallWorkspaceTabs(selected: CallWorkspaceTab, onSelect: (CallWorkspaceTab) -> Unit) {
-    // 页面底有背景图片时标签栏透出它,不留一条纯色
+    // When the page has a background image at the bottom, the tab bar shows it through instead of leaving a solid-colored strip.
     val tabBg = if (LocalSkinBackdrop.current != null) Color.Transparent else MikaTheme.colors.bg
     TabRow(selectedTabIndex = selected.ordinal, containerColor = tabBg, contentColor = MikaTheme.colors.accent) {
         CallWorkspaceTab.entries.forEach { tab ->
@@ -617,7 +617,7 @@ internal fun CallReceivePage(
                 enabled = controlsEnabled && (config.autoAnswer || canTurnOn),
             )
         }
-        // 开着或暂停中才有暂停/恢复;按钮直接放在开关下面,不再藏进折叠行
+        // Pause/resume is available only when enabled or paused; the buttons sit directly below the switch and are no longer hidden in a collapsible row.
         if (config.autoAnswer || paused) {
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -728,7 +728,7 @@ private fun CallPreferencesPage(
         }
     }
 
-    // 不再有「启用」大开关:做完准备清单就是启用,不想用了在这里停用
+    // There is no longer a big "enable" switch: completing the setup checklist enables it; to stop using it, disable it here.
     if (config.enabled) {
         Spacer(Modifier.height(16.dp))
         GroupCard {

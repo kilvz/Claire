@@ -12,7 +12,7 @@ import com.wangzan101.mika.files.ui.LibraryFileHandle
 import com.wangzan101.mika.files.ui.LibraryMergeResult
 import com.wangzan101.mika.files.ui.LibraryStaged
 
-/** 输入框上方的附件:相机相册文件、设备文件、文件库。 */
+/** Attachments above the input box: camera, album, and file picker; device files; file library. */
 internal class ChatAttachmentOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val drafts = session.drafts
@@ -30,7 +30,7 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
     private val describeAttachments = vm.describeAttachments
     private val sharedDrafts = vm.sharedDrafts
 
-    /** 从相机、相册、文件选择器拿到的文件:没有任务在跑、沙箱就绪时才收;读出名字和大小后挂在输入框上方,随下一句话发出去。 */
+    /** Files obtained from the camera, album, or file picker: accepted only when no task is running and the sandbox is ready; after reading the name and size they are attached above the input box and sent with the next message. */
     fun attach(uris: List<String>, conversationId: String? = _ui.value.conversationId) {
         if (uris.isEmpty() || conversationId != _ui.value.conversationId || !session.canAttach(_ui.value)) return
         val id = session.draftConversation()
@@ -92,10 +92,10 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
         job.invokeOnCompletion { deviceImports.remove(conversationId, job) }
     }
 
-    /** 为当前新会话分配草稿编号；调用方在主线程调用。 */
+    /** Allocates a draft ID for the current new conversation; the caller invokes this on the main thread. */
     fun libraryTargetConversation(): String = session.draftConversation()
 
-    /** 目标草稿此刻能不能收文件库的文件；不能时返回 null。调用方在主线程调用。 */
+    /** Whether the target draft can accept file library files right now; returns null when it cannot. The caller invokes this on the main thread. */
     private fun libraryDraft(conversationId: String): ComposerDraft? {
         if (conversationId.isBlank() || conversationId in _deleted.value || conversationId in deleting || !sandboxReady.value)
             return null
@@ -107,8 +107,8 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
     }
 
     /**
-     * 批量加入前的规划:按传入顺序去掉目标草稿里已有的来源,再截到剩余槽位。
-     * 不复制文件；合并时会按当时的目标状态再校验一次。调用方在主线程调用。
+     * Planning before a batch add: drop sources already present in the target draft, in the order passed in, then truncate to the remaining slots.
+     * No files are copied; the merge validates again against the target state at that time. The caller invokes this on the main thread.
      */
     fun planLibraryAttachments(conversationId: String, sources: List<LibraryFileHandle>): LibraryAddPlan? {
         val draft = libraryDraft(conversationId) ?: return null
@@ -132,8 +132,8 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
     }
 
     /**
-     * 把已经复制好的一批文件合并到目标草稿；只更新一次草稿。
-     * 收下的副本登记在 [libraryCopies] 里，没收下的当场释放。调用方在主线程调用。
+     * Merges a batch of already-copied files into the target draft; the draft is updated only once.
+     * Accepted copies are registered in [libraryCopies], and those not accepted are released on the spot. The caller invokes this on the main thread.
      */
     fun addLibraryAttachments(conversationId: String, items: List<LibraryStaged>, overLimit: Int = 0): LibraryMergeResult {
         val draft = libraryDraft(conversationId)
@@ -175,7 +175,7 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
         return LibraryMergeResult(added, duplicates, full, unavailable = false)
     }
 
-    /** 合并文件库副本到指定会话的草稿，不切换会话或覆盖已有内容。调用方在主线程调用。 */
+    /** Merges a file library copy into the draft of the given conversation without switching conversations or overwriting existing content. The caller invokes this on the main thread. */
     fun addLibraryAttachment(conversationId: String, item: PendingAttachment, source: LibraryFileHandle? = null,
                              release: () -> Unit = {}): LibraryAttachmentResult {
         val draft = libraryDraft(conversationId) ?: return LibraryAttachmentResult.Unavailable
@@ -196,7 +196,7 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
         return LibraryAttachmentResult.Added
     }
 
-    /** 面板里最近的照片点一下:选上或取消;已经满了返回 false。 */
+    /** Tapping a recent photo in the panel: select or deselect it; returns false when the tray is already full. */
     fun toggleAttachment(item: PendingAttachment): Boolean {
         val ui = _ui.value
         if (!session.canAttach(ui)) return true

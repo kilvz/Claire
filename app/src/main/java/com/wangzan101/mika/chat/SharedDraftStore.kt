@@ -12,10 +12,10 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** 系统分享附件的私有副本;[fileName] 只由本 App 生成,不保留外部路径。 */
+/** Private copy of a system-shared attachment; [fileName] is generated only by this app and retains no external path. */
 data class SharedDraftAttachment(val fileName: String, val name: String, val size: Long, val photo: Boolean = true)
 
-/** 一个对话里尚未发送的分享内容。只保存草稿,不包含任何执行状态。 */
+/** Shared content that has not been sent yet in a conversation. Only the draft is stored; it contains no execution state. */
 data class SharedDraft(
     val conversationId: String,
     val text: String,
@@ -24,13 +24,13 @@ data class SharedDraft(
     constructor(conversationId: String, text: String, attachment: SharedDraftAttachment?) :
         this(conversationId, text, listOfNotNull(attachment))
 
-    /** 兼容单附件读取;没有附件时为 null。 */
+    /** Compatible single-attachment read; null when there are no attachments. */
     val attachment: SharedDraftAttachment? get() = attachments.firstOrNull()
 }
 
 /**
- * 系统分享草稿按对话保存的落盘点。对话编号由对话页决定;这里只负责让草稿跨进程存下来。
- * 元数据先写临时文件再改名;附件在写入元数据前已完整复制,外部 URI 授权之后失效也能继续编辑和发送。
+ * Persistence point for system-shared drafts, stored per conversation. The conversation ID is decided by the conversation screen; this class is only responsible for making drafts survive across processes.
+ * Metadata is written to a temporary file first and then renamed; attachments are fully copied before the metadata is written, so editing and sending can continue even after the external URI grant expires.
  */
 class SharedDraftStore(private val dir: File) {
     private val metadata: File get() = File(dir, METADATA)
@@ -49,7 +49,7 @@ class SharedDraftStore(private val dir: File) {
     @Synchronized
     fun readPending(): SharedDraft? = readState().second
 
-    /** 保存待用户确认替换的后台分享草稿;进程在确认弹窗期间被回收重建时可恢复。 */
+    /** Saves a background-shared draft awaiting user confirmation to replace; it can be recovered if the process is reclaimed and rebuilt while the confirmation dialog is showing. */
     @Synchronized
     fun savePending(draft: SharedDraft): Boolean {
         if (!valid(draft)) return false
@@ -64,14 +64,14 @@ class SharedDraftStore(private val dir: File) {
         write(oldDrafts, null, oldDrafts, oldPending)
     }
 
-    /** 导入工作区期间保留文件副本，即使同会话收到新分享。 */
+    /** Keeps the file copy while importing into the workspace, even if the same conversation receives a new share. */
     @Synchronized
     fun setImporting(fileName: String?, active: Boolean) {
         if (fileName.isNullOrEmpty()) return
         setImporting(listOf(fileName), active)
     }
 
-    /** 导入工作区期间保留多个文件副本，即使同会话收到新分享。 */
+    /** Keeps multiple file copies while importing into the workspace, even if the same conversation receives a new share. */
     @Synchronized
     fun setImporting(fileNames: Collection<String>, active: Boolean) {
         for (fileName in fileNames) {
@@ -90,7 +90,7 @@ class SharedDraftStore(private val dir: File) {
         }
     }
 
-    /** 保存前要求所有附件已经是本目录里的完整普通文件;失败时不改旧草稿。 */
+    /** All attachments must already be complete regular files in this directory before saving; on failure the old draft is left unchanged. */
     @Synchronized
     fun save(draft: SharedDraft): Boolean {
         if (!valid(draft)) return false
@@ -102,7 +102,7 @@ class SharedDraftStore(private val dir: File) {
         return write(next, nextPending, old, oldPending)
     }
 
-    /** 发送或删除只清理所属对话,其他会话的分享附件继续可用。 */
+    /** Sending or deleting only cleans up the owning conversation; shared attachments of other conversations remain usable. */
     @Synchronized
     fun clear(conversationId: String) {
         val (old, oldPending) = readState()
@@ -112,7 +112,7 @@ class SharedDraftStore(private val dir: File) {
         write(next, nextPending, old, oldPending)
     }
 
-    /** 移除某个附件([fileName] 非空)或该对话的全部共享附件([fileName] 为空)。 */
+    /** Removes one attachment ([fileName] non-null) or all shared attachments of the conversation ([fileName] null). */
     @Synchronized
     fun removeAttachment(conversationId: String, fileName: String? = null) {
         val old = readState().first.firstOrNull { it.conversationId == conversationId } ?: return
@@ -122,13 +122,13 @@ class SharedDraftStore(private val dir: File) {
         if (remaining.isEmpty() && old.text.isBlank()) clear(conversationId) else save(old.copy(attachments = remaining))
     }
 
-    /** 尚未绑到对话的副本取消时删除;已经保存成功的同一文件不能删。 */
+    /** Deletes a copy when the attachment that has not been bound to a conversation yet is cancelled; the same file must not be deleted once it has been saved successfully. */
     @Synchronized
     fun discard(attachment: SharedDraftAttachment?) {
         attachment?.let { discardFile(it.fileName) }
     }
 
-    /** 批量清理尚未绑到对话的附件副本;已保存或导入中的文件不动。 */
+    /** Cleans up attachment copies not yet bound to a conversation in bulk; saved files and files currently being imported are left untouched. */
     @Synchronized
     fun discard(attachments: Collection<SharedDraftAttachment>) {
         attachments.forEach { discardFile(it.fileName) }
@@ -143,7 +143,7 @@ class SharedDraftStore(private val dir: File) {
         attachmentFile(fileName)?.delete()
     }
 
-    /** 清掉复制中断的临时文件、没来得及绑到对话的副本和损坏的元数据。 */
+    /** Clears temporary files left by interrupted copies, copies that were never bound to a conversation, and corrupted metadata. */
     @Synchronized
     fun cleanup() {
         val (drafts, pending) = readState()
@@ -237,7 +237,7 @@ class SharedDraftStore(private val dir: File) {
                     decodeAttachment(fields, requirePhoto = true) ?: return null
                 }
             }
-            // 兼容旧版单附件格式(attachment)及更早的单图片格式(image,无 photo 标记)。
+            // Compatible with the old single-attachment format (attachment) and the even older single-image format (image, no photo flag).
             "attachment" in o || "image" in o -> {
                 val encoded = o["attachment"] ?: o["image"]
                 val fields = encoded as? JsonObject ?: return null
@@ -254,7 +254,7 @@ class SharedDraftStore(private val dir: File) {
 
     private fun readState(): Pair<List<SharedDraft>, SharedDraft?> = runCatching {
         val root = Json.parseToJsonElement(metadata.readText()) as? JsonObject ?: return emptyList<SharedDraft>() to null
-        // 兼容原来只有一份分享草稿的文件。
+        // Compatible with the original file that held only a single shared draft.
         val entries = (root["drafts"] as? JsonArray)?.toList() ?: listOf(root)
         val drafts = entries.mapNotNull { (it as? JsonObject)?.let(::decodeDraft) }
         val pending = (root["pending"] as? JsonObject)?.let(::decodeDraft)

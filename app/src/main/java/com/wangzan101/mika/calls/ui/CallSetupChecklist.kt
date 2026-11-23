@@ -127,7 +127,7 @@ internal fun CallChecklistPage(
                     CallSetupStep.Audio -> stringResource(R.string.calls_step_audio_sub)
                     CallSetupStep.Standby -> stringResource(R.string.calls_step_standby_sub)
                 }
-                // 每一步自己的「去做」:权限缺哪个开哪个;都给了还没启用就走准备流程
+                // Each step has its own "do it": open whichever permission is missing; if all are granted but it is not enabled yet, run the setup flow.
                 val action: (() -> Unit)? = when (step) {
                     CallSetupStep.Voice -> onVoice
                     CallSetupStep.Phone -> when {

@@ -11,14 +11,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 沙箱在宿主上的目录:`files/sandbox/` 下的根文件系统、工作区、技能、/proc 替身;PRoot 的临时目录在缓存里;
- * 可执行文件只在 [nativeDir](安卓 10 起数据目录里的文件不能 execve)。
+ * The sandbox's directories on the host: the root filesystem, workspaces, skills, and /proc stand-ins under `files/sandbox/`; PRoot's temporary directory is in the cache;
+ * executables live only in [nativeDir] (since Android 10, files in the data directory cannot be execve'd).
  */
 class SandboxDirs internal constructor(
     val root: File, val tmp: File, val nativeDir: File,
-    /** 宿主侧读写这些目录(沙箱碰得到)都过它;手机上是 [AndroidFdSys.gate],JVM 测试传按路径的那份。 */
+    /** Host-side reads and writes of these directories (which the sandbox can reach) all go through it; on the phone it is [AndroidFdSys.gate], while JVM tests pass the path-based one. */
     val gate: WorkspaceFileGate,
-    /** 往这棵树里写都先拿它的许可;手机上是进程里那一份([SandboxOwner]),测试自己给一份。不设默认:私有的一份锁不住别人。 */
+    /** Every write into this tree acquires its permission first; on the phone it is the per-process instance ([SandboxOwner]), while tests supply their own. No default: a private instance cannot lock out others. */
     val tree: SandboxTree,
 ) {
     constructor(context: Context) : this(
@@ -30,30 +30,30 @@ class SandboxDirs internal constructor(
     val work: File get() = File(root, "work")
     val skills: File get() = File(root, "skills")
     val procStandIns: File get() = File(root, "proc")
-    /** 各工作区共享、沙箱可写的 MCP 包缓存(装好的 npm/pypi 包,非用户数据)。 */
+    /** MCP package cache shared by all workspaces and writable by the sandbox (installed npm/pypi packages, not user data). */
     val mcpCache: File get() = File(root, "mcp-cache")
 
-    /** 一个工作区对应一个目录:项目为 `p-<ID>`,对话为 `c-<ID>` 或 `h-<哈希>`(与 `p-` 永不撞名)。 */
+    /** One workspace maps to one directory: projects are `p-<ID>`, conversations are `c-<ID>` or `h-<hash>` (never colliding with `p-`). */
     fun workspace(key: WorkspaceKey): File = File(work, dirName(key))
 
     fun lib(name: String): File = File(nativeDir, name)
 
     /**
-     * 删、换沙箱里的命令写得到的整棵目录(工作区、运行环境)都经这里:拿着 [tree] 的独占许可在 IO 线程里做,
-     * 等在跑的命令和别的写入都结束才开始,做完之前新的命令、导入也等着,免得一边删一边有人往里写。
-     * 代价:删一个大目录要多久,所有对话的沙箱命令就要等多久。等许可时情况可能变了(比如对话又有了任务),
-     * 要看的条件在 [block] 里拿到许可后再查。
+     * Deleting or replacing an entire directory tree that commands in the sandbox can write to (workspaces, runtimes) goes through here: done on an IO thread holding [tree]'s exclusive permission,
+     * starting only after running commands and other writes have finished, and new commands and imports wait until it is done, so nobody writes into a tree while it is being deleted.
+     * Cost: however long deleting a large directory takes, sandbox commands in all conversations wait that long. Conditions may change while waiting for the permission (e.g. a conversation gains tasks again),
+     * so conditions to check should be re-checked inside [block] after the permission is acquired.
      */
     suspend fun <T> exclusiveWrite(block: suspend () -> T): T = tree.exclusive { withContext(Dispatchers.IO) { block() } }
 
-    /** 删掉 [key] 对应的整个工作区(按句柄删、不跟进链接,见 [exclusiveWrite])。 */
+    /** Deletes the entire workspace for [key] (deleting by handle, not following links; see [exclusiveWrite]). */
     suspend fun deleteWorkspace(key: WorkspaceKey) = deleteWorkDir(workspace(key).name)
 
     /**
-     * 删掉 `work/` 下名为 [dirName] 的工作区。本来就没有(没往里写过东西)时直接返回,不拿独占许可:
-     * 拿独占许可要收回所有租约([SandboxTree.lease]),别的对话开着的终端、在跑的 stdio MCP server 都会被停掉,而这里什么也不用删。
-     * 这一查在许可之外:已经拿到共享许可、还没建出目录的写入(命令、导入附件、存屏幕)不再等它做完,
-     * 它建出的工作区会留下来,在设置的「已用空间」里列成「已删除的对话」,可以清掉。
+     * Deletes the workspace named [dirName] under `work/`. Returns immediately if it does not exist (nothing was ever written there), without taking the exclusive permission:
+     * taking the exclusive permission revokes all leases ([SandboxTree.lease]), stopping terminals open in other conversations and running stdio MCP servers, yet there is nothing to delete here.
+     * This check happens outside the permission: a write that already holds a shared permission but has not created the directory yet (commands, attachment imports, saving screens) no longer waits for it to finish,
+     * so the workspace it creates stays behind, listed as "Deleted conversations" under "Used space" in settings, and can be cleaned up.
      */
     suspend fun deleteWorkDir(dirName: String) {
         if (withContext(Dispatchers.IO) { !Files.exists(File(work, dirName).toPath(), LinkOption.NOFOLLOW_LINKS) }) return
@@ -61,8 +61,8 @@ class SandboxDirs internal constructor(
     }
 
     /**
-     * 绑定前把要绑的目录都建好:源目录不存在时 PRoot 会往标准错误写一句警告,
-     * 而标准错误并进了命令输出,模型会看到。技能目录还没同步时就是空目录。
+     * Create every directory to be bound before binding: if a source directory does not exist, PRoot writes a warning to stderr,
+     * and stderr is merged into the command output, so the model would see it. The skills directory is just an empty directory until it is synced.
      */
     fun ensureBindSources(workspace: File) {
         for (d in listOf(workspace, skills, tmp, mcpCache)) d.mkdirs()

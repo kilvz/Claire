@@ -18,21 +18,21 @@ import java.io.File
 import java.io.InputStream
 import java.util.UUID
 
-/** 批量导入系统分享文件的结果:成功复制的草稿与单项失败原因。 */
+/** Result of batch-importing files shared by the system: the successfully copied draft and the per-item failure reasons. */
 data class SharedDraftImportResult(
     val draft: SharedDraft,
     val failures: List<AttachmentFailure> = emptyList(),
 )
 
-/** 把系统分享的文件复制到私有草稿目录，不依赖之后仍有效的 URI 授权。 */
+/** Copies files shared by the system into the private draft directory, without relying on a URI grant that is still valid later. */
 class SharedDraftImporter(private val context: Context, private val store: SharedDraftStore) {
     suspend fun attachment(text: String, uri: Uri, declaredType: String?): SharedDraft? =
         attachments(text, listOf(uri), declaredType)?.draft
 
     /**
-     * 复制一个或多个外部内容 URI 到私有草稿目录。
-     * - 至少有一个文件复制成功时返回草稿与单项失败列表;全部失败返回 null。
-     * - 中途取消时删除已复制的全部私有副本,不留下孤儿文件。
+     * Copies one or more external content URIs into the private draft directory.
+     * - Returns the draft and the per-item failure list when at least one file was copied successfully; returns null when all fail.
+     * - On cancellation midway, deletes all private copies already made, leaving no orphaned files.
      */
     suspend fun attachments(text: String, uris: List<Uri>, declaredType: String?): SharedDraftImportResult? {
         if (text.length > SharedDraftStore.MAX_TEXT_CHARS || uris.isEmpty()) return null
@@ -55,7 +55,7 @@ class SharedDraftImporter(private val context: Context, private val store: Share
                 SharedDraftImportResult(SharedDraft("", text, succeeded), failures)
             }
         } catch (e: CancellationException) {
-            // withContext 在复制刚完成、结果尚未交给界面的那一刻也可能被取消;这些副本还没绑到草稿,不能留下。
+            // withContext may also be cancelled at the very moment the copy has just finished and the result has not yet been handed to the UI; these copies are not bound to a draft yet, so they must not be left behind.
             copiedFiles.forEach { it.delete() }
             throw e
         } catch (e: Exception) {
@@ -76,7 +76,7 @@ class SharedDraftImporter(private val context: Context, private val store: Share
             if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
                 return SingleOutcome.Failed(AttachmentFailure(Attachments.safeName(fallbackLabel), AttachmentFailureReason.IO_ERROR))
             }
-            // Android 跨用户 URI 的 authority 可以是「用户编号@提供方」。
+            // For Android cross-user URIs, the authority can be "user id@provider".
             val authority = uri.authority.orEmpty().substringAfterLast('@')
             if (authority.isBlank() || authority == context.packageName || authority.startsWith("${context.packageName}.")) {
                 return SingleOutcome.Failed(AttachmentFailure(Attachments.safeName(fallbackLabel), AttachmentFailureReason.IO_ERROR))
@@ -163,7 +163,7 @@ class SharedDraftImporter(private val context: Context, private val store: Share
 
 internal class SharedDraftCopyException(val reason: AttachmentFailureReason, message: String) : IllegalStateException(message)
 
-/** 有界复制:每个块都检查取消和空间;失败或取消时不留下半份临时文件。 */
+/** Bounded copy: cancellation and free space are checked for every chunk; a failure or cancellation leaves no partial temporary file behind. */
 internal object SharedDraftCopy {
     suspend fun copy(
         input: InputStream,

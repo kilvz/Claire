@@ -591,10 +591,9 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
             runCatching { com.wangzan101.mika.task.AndroidDeviceFiles.cleanupStaging(SandboxDirs(this@MikaApp)) }
                 .onFailure { Log.w("MikaImport", "Could not clean device import staging", it) }
         }
-        // 界面以外的文字(通知、服务、悬浮胶囊)按 App 语言取
+        // Outside-the-UI text (notifications, services, floating capsule) follows the app language.
         AppLanguage.applyDefaultLocale(this)
-        // 提示词语言:启动时按用户选的语言(跟随系统时按系统语言)定,英文默认
-        Prompts.languageTag = AppLanguage.resolved(this).tag
+        // Prompts sent to the model are always English, whatever the UI language.
         UiText.source = ResourceTexts { AppLanguage.resources(this) }
         teach = TeachRuntime(this, taskState)
         teach.recover()

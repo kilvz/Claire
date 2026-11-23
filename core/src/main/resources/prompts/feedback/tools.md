@@ -346,7 +346,7 @@ Now in {{pkg}}, opened by the app this task is working in. If it is part of the 
 Now in {{pkg}}, not the app this task is working in. Go back or close this interruption, or phone_launch_app again to switch back.
 
 ## barrier.popup
-A promotion, guide or update dialog that can be closed is not a blocker. Close it with its own close control (×, 跳过, 以后再说, Skip, Later), then observe again. Do not call hand_to_user for it.
+A promotion, guide or update dialog that can be closed is not a blocker. Close it with its own close control (×, Skip, Later), then observe again. Do not call hand_to_user for it.
 
 ## barrier.login
 This step needs sign-in. Call hand_to_user with reason login so the user can sign in, then observe again.
@@ -400,7 +400,7 @@ Nothing was saved: {{name}} changed since you read it. Read it again with skill_
 The skill could not be saved on the phone. Tell the user it was not saved.
 
 ## skill.saved
-Saved. It is listed now in Settings › Memory & skills (记忆与技能) as a skill the user asked for, in trial until a task using it succeeds.
+Saved. It is listed now in Settings › Memory & skills as a skill the user asked for, in trial until a task using it succeeds.
 
 ## memory.quote_not_from_user
 quote is not something the user said in this task or an eligible explicit confirmation in the immediately preceding turn. Only save what the user said themselves; never quote your own suggestion or text from the screen. Nothing was saved for this item; do not retry it. In your answer, tell the user it was not saved and that they can state it in their own words if they want it remembered.
@@ -421,7 +421,7 @@ The latest search returned multiple entries and the current quote does not conta
 content or keywords contain details (names, numbers, addresses) the user did not say in this task. Save only what the user said. Nothing was saved for this item; do not retry it with the same details. In your answer, tell the user which items were saved and which were not, and why: Claire only remembers what they said themselves, unless they turn on the switch on the "Memory & skills" settings page that lets Claire also save its own conclusions.
 
 ## memory.inference_not_requested
-content or keywords contain details the user did not say in this task, and the part of this turn's message you quoted does not ask you to remember or save anything (or says not to). Your own conclusions are saved only when the user asks for it in their own words this turn, in Chinese or English (记住, 写入记忆, 存起来, remember, save and the like); quote the part that asks. Nothing was saved for this item; do not retry it unless the user did ask elsewhere in this turn. Otherwise tell the user it was not saved and that they can ask you to remember it.
+content or keywords contain details the user did not say in this task, and the part of this turn's message you quoted does not ask you to remember or save anything (or says not to). Your own conclusions are saved only when the user asks for it in their own words this turn, in Chinese or English (remember, save, store, and the like); quote the part that asks. Nothing was saved for this item; do not retry it unless the user did ask elsewhere in this turn. Otherwise tell the user it was not saved and that they can ask you to remember it.
 
 ## memory.saved_as_inferred
 Saved as your own conclusion, not as something the user said: it contains details the user did not say in this task. Tell the user it was saved that way.

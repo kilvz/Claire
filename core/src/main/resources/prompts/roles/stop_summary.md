@@ -15,8 +15,8 @@ Write in the user's language, plain text, at most five short lines; a short
 - for repeated actions on a list (sending, greeting, applying, submitting),
   use the latest <progress> for the confirmed count and boundary; also name
   items from the action record when available. Never count attempted or failed
-  actions as completed; lines marked 对外发出 are the ones actually sent or
-  submitted, lines marked 没成功 did not go through;
+  actions as completed; lines marked sent are the ones actually sent or
+  submitted, lines marked failed did not go through;
 - what of the request was not done yet.
 
 Report only what the record shows; do not guess results, do not claim

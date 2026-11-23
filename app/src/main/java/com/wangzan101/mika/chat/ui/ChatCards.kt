@@ -75,16 +75,16 @@ fun takeoverReasonLabel(reason: String): Int? = when (reason) {
     else -> null
 }
 
-/** 一问一答此刻的状态:要你做的事是一张白卡([NeedCard]),结果直接排在背景上。 */
+/** The current state of one question-and-answer exchange: what it needs from you is a white card ([NeedCard]), while results are laid out directly on the background. */
 @Composable
 internal fun StatusCard(
     status: ExchangeStatus, stage: Takeover.Stage, vm: ChatViewModel, runId: String?,
     elapsedMs: Long?, tokens: Long?,
     loadSource: suspend (String) -> EvidenceSource?, openSource: (String?, String?) -> Unit,
     openRun: (String) -> Unit,
-    /** 回答的长按菜单认这一条用的(见 [MessageArea])。 */
+    /** Used by the answer's long-press menu to identify this item (see [MessageArea]). */
     key: String,
-    /** 回答里的 /workspace 引用卡片点开要走这个对话的工作区。 */
+    /** Opening a /workspace reference card in the answer must go through this conversation's workspace. */
     conversationId: String?,
     recover: (Boolean) -> Unit = {},
     goal: String, openReport: (String) -> Unit, openPlayback: (String) -> Unit,
@@ -101,7 +101,7 @@ internal fun StatusCard(
             val title = if (label != null) stringResource(R.string.takeover_title_reason, stringResource(label)) else stringResource(R.string.takeover_title)
             val handedOver = stage == Takeover.Stage.HandedOver
             val text = if (handedOver) stringResource(R.string.takeover_handed_over_hint) else status.message
-            // 付款的商品、金额、地址单独成行:这张卡片就是付款前的确认
+            // The payment item, amount and address each go on their own line: this card is the confirmation before payment
             val body = listOfNotNull(text, StatusCopy.paymentLines(status.item, status.amount, status.address)).joinToString("\n")
             NeedCard(title, body, footer = { TextLink(stringResource(R.string.action_cancel_task), vm::cancel) }) {
                 if (handedOver) {
@@ -125,7 +125,7 @@ internal fun StatusCard(
                 if (options.isEmpty()) CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
             }
         }
-        // 只有花钱的操作要你同意,每次只同意这一次
+        // Only operations that spend money require your consent, and each approval covers only this one time
         is ExchangeStatus.NeedsConfirmation -> NeedCard(status.title, status.body + "\n" + ConfirmationCopy.NOTE) {
             CardButton(stringResource(R.string.chat_refuse), onClick = { vm.decline(status.key) })
             CardButton(stringResource(R.string.chat_allow_once), primary = true, onClick = { vm.approve(status.key) })
@@ -134,11 +134,11 @@ internal fun StatusCard(
             CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
             if (status.resumable) CardButton(stringResource(R.string.chat_continue), primary = true, onClick = vm::resume)
         }
-        // 排队等开始:轮到时自动开始,点继续不能插队,只给取消
+        // Queued waiting to start: it starts automatically when its turn comes, and tapping continue cannot jump the queue, so only cancel is offered
         is ExchangeStatus.Queued -> NeedCard(stringResource(R.string.chat_queued), status.why) {
             CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
         }
-        // 长按整块回答弹菜单;复制、引用的只是回答的字,不带上面的提示和下面的来源
+        // Long-pressing the whole answer block opens the menu; copying and quoting take only the answer text, without the hint above and the sources below
         is ExchangeStatus.Done -> Box(Modifier.padding(bottom = 12.dp)) {
             AnswerArea(key, status.answer, Modifier.fillMaxWidth().answerSurface()) {
                 Column {
@@ -169,7 +169,7 @@ internal fun StatusCard(
             RecoveryActions(runId, recover)
             ReplyActions(runId, null, goal, vm, {}, openRun, loadSource, openSource, null, openReport, openPlayback)
         }
-        // 停止后补上的交代当作这一轮的回答,排在「已停止」下面;还在写时一行小字
+        // The wrap-up added after stopping is treated as this turn's answer and is placed below "Stopped"; while it is still being written, a single line of small text is shown
         is ExchangeStatus.Cancelled -> Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
             Text(stringResource(R.string.chat_stopped), Modifier.padding(start = 2.dp), style = MikaType.Body, color = MikaTheme.colors.ink2)
             if (status.summarizing) Text(
@@ -194,7 +194,7 @@ internal fun StatusCard(
     }
 }
 
-/** 操作区里的「朗读/停止」图标;没有配置声音模型时不显示。 */
+/** The "read aloud/stop" icon in the action area; hidden when no voice model is configured. */
 @Composable
 private fun ReadAloudIcon(answer: String, vm: ChatViewModel) {
     val ready by vm.canSpeak.collectAsState()
@@ -220,7 +220,7 @@ private fun ReadAloudIcon(answer: String, vm: ChatViewModel) {
     }
 }
 
-/** 这一轮生成的音频:名字/稿子开头、时长、播放/停止;点整张卡播放,再点停止。 */
+/** Audio generated in this turn: name/start of the script, duration, play/stop; tapping the whole card plays it, tapping again stops. */
 @Composable
 internal fun GeneratedAudioCards(audios: List<com.wangzan101.mika.core.chat.GeneratedAudio>, vm: ChatViewModel) {
     val playback by vm.voice.collectAsState()
@@ -260,7 +260,7 @@ private fun secondsLabel(ms: Long): String {
     return "%d:%02d".format(total / 60, total % 60)
 }
 
-/** 终态后旧现场已经释放:两个按钮都开新运行,区别只是是否沿用摘要里的已确认进度。 */
+/** After a terminal state the old run context has already been released: both buttons start a new run, and the only difference is whether the confirmed progress from the summary is carried over. */
 @Composable
 private fun RecoveryActions(runId: String?, recover: (Boolean) -> Unit) {
     if (runId == null) return
@@ -270,7 +270,7 @@ private fun RecoveryActions(runId: String?, recover: (Boolean) -> Unit) {
     }
 }
 
-/** 回答正文下方的操作区:一条淡分隔线 + 一排纯图标按钮(朗读/复制/分享 | 查看过程/来源/任务报告/操作回放)。 */
+/** Action area below the answer body: a faint divider + a row of icon-only buttons (read aloud/copy/share | view process/sources/task report/action playback). */
 @Composable
 private fun ReplyActions(
     runId: String?,

@@ -51,13 +51,14 @@ internal fun SkillReadingView(markdown: String) {
             Spacer(Modifier.fillMaxWidth().height(1.dp).background(c.hair))
             for ((title, contents) in remember(blocks) { readingSections(blocks) }) {
                 val label = title?.text?.text.orEmpty()
-                val caution = label.startsWith("容易出错的地方")
+                // New skills use English section headings; skills stored earlier use the Chinese ones.
+                val caution = label.startsWith("容易出错的地方") || label.startsWith("Common pitfalls")
                 val icon = when {
-                    label.startsWith("入口") -> MikaIcons.Pin
-                    label.startsWith("步骤") -> MikaIcons.Route
+                    label.startsWith("入口") || label.startsWith("Entry") -> MikaIcons.Pin
+                    label.startsWith("步骤") || label.startsWith("Steps") -> MikaIcons.Route
                     caution -> MikaIcons.Info
-                    label.startsWith("怎样算办成") -> MikaIcons.Check
-                    label.startsWith("什么时候停下交给用户") -> MikaIcons.Hand
+                    label.startsWith("怎样算办成") || label.startsWith("How success is verified") -> MikaIcons.Check
+                    label.startsWith("什么时候停下交给用户") || label.startsWith("When to stop and hand off") -> MikaIcons.Hand
                     else -> null
                 }
                 val panel = if (caution) Modifier.background(c.warnSoft, MikaShapes.Tile).padding(12.dp) else Modifier

@@ -51,19 +51,19 @@ internal object CallPolicy {
     const val DEFAULT_SECONDS = 600
     const val MIN_SECONDS = 15
     const val MAX_SECONDS = 600
-    /** 到上限前多久注入道别(毫秒):道别句不长,这点提前量够说完播完。 */
+    /** How long before the limit to inject the farewell (milliseconds): the farewell line is short, so this lead time is enough to say it and finish playing. */
     const val CLOSING_LEAD_MS = 15_000L
-    /** 到时上限时替 AI 说的话;尾句要能被 [CallFarewellPolicy.isAssistantClosing] 认下,走自然挂断。 */
+    /** The line spoken on behalf of the AI when the time limit is reached; the closing sentence must be recognized by [CallFarewellPolicy.isAssistantClosing] so that a natural hang-up is used. */
     const val CLOSING_LINE = "时间差不多了，那我们先这样吧"
 
-    /** 到时上限挂断未被确认时的重试次数。 */
+    /** Number of retries when the time-limit hang-up is not confirmed. */
     const val HANGUP_ATTEMPTS = 3
 
-    /** 0 = 不限时长;正数按 [MIN_SECONDS]..[MAX_SECONDS] 收拢。 */
+    /** 0 = no time limit; positive values are clamped to [MIN_SECONDS]..[MAX_SECONDS]. */
     fun clampCallSeconds(seconds: Int): Int =
         if (seconds <= 0) 0 else seconds.coerceIn(MIN_SECONDS, MAX_SECONDS)
 
-    /** 到点前注入道别的延迟;不限时长( null )或剩余时间连道别都不够时不安排。 */
+    /** Delay for injecting the farewell before the deadline; no farewell is scheduled when the duration is unlimited (null) or the remaining time is not even enough for the farewell. */
     fun closingDelayMs(remainingMs: Long?): Long? =
         remainingMs?.takeIf { it > CLOSING_LEAD_MS }?.minus(CLOSING_LEAD_MS)
 
