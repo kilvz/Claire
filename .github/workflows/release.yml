@@ -65,16 +65,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Claire ${{ github.ref_name }}
+          # The release body says ONLY what changed in this version.
+          # Update the "New in ..." line below for every release; never
+          # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            Claire ${{ github.ref_name }} — an AI assistant on your phone, in English from the first tap.
-
-            Claire is a fork of [Mika](https://github.com/wangzan101/Mika) by Wang Zan, kept under the same Apache-2.0 license. What makes it Claire: English by default (first run and the agent's own instructions), OrcaRouter built in as a model provider, and its own versioning — this release is based on upstream Mika 0.1.51, see [VERSION.md](https://github.com/kilvz/Claire/blob/main/VERSION.md).
-
-            Install the APK below (Android 11+, release-signed with Claire's permanent key, package `com.kilv.claire`; it installs alongside Mika, and over earlier `com.kilv.claire` builds from 1.2.1 onward — if you still have 1.1.0 installed, uninstall it once first, its debug signature can never match the release key). Then in Settings › Model, pick OrcaRouter and paste a key from [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) — the free model orcarouter/free costs nothing to try, or orcarouter/auto picks the model per prompt — or pick any other provider, or sign in with a ChatGPT, xAI or OpenRouter account.
-
             New in 2.0.0: a full rebase onto upstream Mika 0.1.51 — all 198 upstream commits since v0.1.50 are in, including in-app voice calls, the MCP service catalog, WeChat result push, new model providers, and a cleaner codebase layout. Claire's own features (OrcaRouter, Telegram bot with typing indicator, permanent-keystore signing) are unchanged.
-
-            Verify the download against SHA256SUMS.txt.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
