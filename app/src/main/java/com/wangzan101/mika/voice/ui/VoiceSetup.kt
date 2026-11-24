@@ -214,7 +214,7 @@ internal fun VoicePickerSheet(voices: List<String>, onPick: (String) -> Unit, on
     }
     val actions = voices.map { voice -> SheetAction(VoiceVoices.label(model, voice)) { onPick(voice) } } +
         SheetAction(stringResource(R.string.voice_enter_voice_id), MikaIcons.Edit) { typing = true }
-    // 选「手动输入」时面板会顺手关掉,这里拦下,让输入框接着出来
+    // Picking "enter manually" closes the sheet as a side effect; this intercepts that so the input dialog can appear
     ActionSheet(stringResource(R.string.voice_voice), actions) { if (!typing) onDismiss() }
 }
 
@@ -246,7 +246,7 @@ internal fun voiceServiceCount(snapshot: VoiceCatalogSnapshot, providers: List<P
 }
 
 /**
- * The single 「语音」 group on the models page: three uses, each saying who does it now, plus the accounts row.
+ * The single "Voice" group on the models page: three uses, each saying who does it now, plus the accounts row.
  * A use that cannot work yet says so and leads to its page instead of being greyed out.
  */
 @Composable
@@ -294,7 +294,7 @@ internal fun VoiceHubSection(
 }
 
 /**
- * 「语音通话」: the realtime model in-app voice calls use, which AI phone calls follow unless they pick their own.
+ * "Voice calls": the realtime model in-app voice calls use, which AI phone calls follow unless they pick their own.
  * The voice comes from the model's own list.
  */
 @Composable
@@ -324,7 +324,7 @@ fun RealtimeVoiceScreen(store: ProviderStore, onBack: () -> Unit, onOpenCalls: (
                 choices, selected, stringResource(R.string.voice_try_realtime), viewModel,
                 onPick = { choice -> voiceModels.realtime.select(viewModel.ensureInCatalog(choice)) },
                 onTest = { choice -> viewModel.tryChoice(choice, "") },
-                // 应用内语音通话只接得住可打断的双向协议;只能打电话的模型留在列表里说明,选它去 AI 接打电话那页
+                // In-app voice calls can only take interruptible bidirectional protocols; phone-call-only models stay in the list as an explanation, and picking one goes to the AI phone calls page
                 pickable = { VoiceTrait.PhoneOnly !in it.traits },
             )
         }

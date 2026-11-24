@@ -26,7 +26,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Claire 此刻的朗读状态。 */
+/** Claire's current read-aloud state. */
 sealed interface VoicePlayback {
     data object Idle : VoicePlayback
     data object Loading : VoicePlayback
@@ -35,9 +35,9 @@ sealed interface VoicePlayback {
 }
 
 /**
- * 本机朗读。流式 PCM 数据到达后送入 AudioTrack，已合成的音频写缓存文件交给 MediaPlayer。
- * 同一时间只播一条,新的替换旧的:每次开播领一个代次,prepare 在路上的回调、旧播放器上的回调一律不落地。
- * 申请系统音频焦点(语音内容、短暂独占),来电或别的 App 出声时暂停/降低,播放结束、出错或被停下来时释放。
+ * On-device playback. Streaming PCM data is fed to AudioTrack as it arrives, and synthesized audio written to a cache file goes to MediaPlayer.
+ * Only one item plays at a time and the new one replaces the old: every playback takes a generation, and callbacks still in flight from prepare or from an old player are never applied.
+ * Requests system audio focus (speech content, transient exclusive); pauses/lowers when a call comes in or another app makes sound, and releases on completion, error or stop.
  */
 class VoicePlayer(private val context: Context) {
     private val _state = MutableStateFlow<VoicePlayback>(VoicePlayback.Idle)
@@ -55,12 +55,12 @@ class VoicePlayer(private val context: Context) {
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
 
-    /** 播一段合成好的音频;格式从 [mime] 猜扩展名,MediaPlayer 按文件内容解码。 */
+    /** Plays a piece of synthesized audio; the extension is guessed from [mime] and MediaPlayer decodes by file content. */
     suspend fun play(bytes: ByteArray, mime: String) = loadAndPlay { ticket ->
         prepareFile(ticket, bytes, mime)
     }
 
-    /** 在服务支持时边合成边播，其他服务或语速继续使用完整音频响应。 */
+    /** Streams while synthesizing when the service supports it; other services or speech rates keep using the full audio response. */
     suspend fun play(
         model: TtsModel,
         request: TtsRequest,
@@ -68,7 +68,7 @@ class VoicePlayer(private val context: Context) {
         onStarted: () -> Unit = {},
     ) = playRequests(model, listOf(request), streaming, onStarted)
 
-    /** 按顺序朗读同一条回答的各段。 */
+    /** Reads the segments of one reply in order. */
     internal suspend fun playRequests(
         model: TtsModel,
         requests: List<TtsRequest>,
@@ -82,7 +82,7 @@ class VoicePlayer(private val context: Context) {
         } else {
             null
         }
-        // 回退后逐段合成，等当前文件播完再取下一段。
+        // After a fallback, synthesize segment by segment, taking the next one once the current file finishes playing.
         for (index in (fallback?.index ?: 0)..requests.lastIndex) {
             val audio = if (fallback?.index == index) fallback.response else model.synthesize(requests[index])
             _state.value = VoicePlayback.Loading
@@ -95,7 +95,7 @@ class VoicePlayer(private val context: Context) {
 
     private suspend fun loadAndPlay(block: suspend (Long) -> Unit) = withContext(Dispatchers.Main.immediate) {
         stop()
-        // 先领代次再挂起:合成/写文件期间来了新请求,本次代次即作废,后续回调一律不落地
+        // Take the generation before suspending: if a new request arrives while synthesizing/writing the file, this generation is invalidated and later callbacks are never applied
         val ticket = tickets.begin()
         val job = currentCoroutineContext().job
         pendingPlayback = job
@@ -178,7 +178,7 @@ class VoicePlayer(private val context: Context) {
                 }
             }
         }.catch { error ->
-            // 播完已经收到的 PCM，再报告后续合成失败。
+            // Play the PCM already received, then report the later synthesis failure.
             if (error is CancellationException || error !is Exception) throw error
             emit(StreamEvent.Failed(error))
         }.buffer(PCM_LOOKAHEAD_CHUNKS)
@@ -186,7 +186,7 @@ class VoicePlayer(private val context: Context) {
     private suspend fun drainPcm(nextState: VoicePlayback = VoicePlayback.Idle) {
         val audio = pcmTrack ?: return
         audio.drain()
-        // 只收 PCM 资源:流式会话可能还在继续(格式变化/回退到整段),代次不能作废
+        // Release only the PCM resources: the streaming session may still continue (format change / fallback to the whole clip), so the generation must not be invalidated
         pcmTrack = null
         runCatching { audio.close() }
         focus?.let { runCatching { audioManager.abandonAudioFocusRequest(it) } }
@@ -199,7 +199,7 @@ class VoicePlayer(private val context: Context) {
         val audio = pcmTrack ?: PcmAudioTrack(attributes, chunk.sampleRate, chunk.channels).also { track ->
             pcmTrack = track
             check(requestFocus { change ->
-                // 代次作废或换了新轨道后,旧轨道上的焦点回调一律忽略
+                // Once the generation is invalidated or a new track is used, audio focus callbacks on the old track are ignored
                 if (pcmTrack === track && tickets.owns(ticket)) {
                     when (change) {
                         AudioManager.AUDIOFOCUS_LOSS -> stop()
@@ -241,7 +241,7 @@ class VoicePlayer(private val context: Context) {
                 dir.mkdirs()
                 f.writeBytes(bytes)
             }
-            // 写文件期间来了新请求:本次代次作废,不建播放器、不碰状态(文件由 finally 清掉)
+            // A new request arrived while writing the file: this generation is invalidated, no player is created and the state is untouched (the file is cleaned up by finally)
             if (!tickets.owns(ticket)) return
             file = f
             val mp = MediaPlayer().apply {
@@ -269,15 +269,15 @@ class VoicePlayer(private val context: Context) {
             if (tickets.owns(ticket)) release(VoicePlayback.Idle)
             throw e
         } catch (e: Exception) {
-            // 代次已作废的旧请求出错时静默收尾,不盖掉新请求的状态
+            // When an old request whose generation was invalidated fails, finish silently without overwriting the new request's state
             if (tickets.owns(ticket)) finishSegment(VoicePlayback.Error(e.message ?: "cannot play audio"))
         } finally {
-            // 没落地的临时文件(被新请求顶替、中途取消)不留盘上
+            // Temporary files that never landed (superseded by a new request, cancelled midway) are not left on disk
             if (file !== f) f.delete()
         }
     }
 
-    /** 停下来并释放。 */
+    /** Stop and release. */
     fun stop() = finish(VoicePlayback.Idle)
 
     fun fail(message: String) = finish(VoicePlayback.Error(message))
@@ -286,7 +286,7 @@ class VoicePlayer(private val context: Context) {
         val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setAudioAttributes(attributes)
             .setOnAudioFocusChangeListener { change ->
-                // 焦点回调挂在旧播放器上时,代次和实例都对不上,直接忽略
+                // When the focus callback belongs to an old player, neither generation nor instance matches, so it is ignored
                 if (!tickets.owns(ticket) || player !== mp) return@setOnAudioFocusChangeListener
                 when (change) {
                     AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> if (mp.isPlaying) mp.pause()
@@ -319,7 +319,7 @@ class VoicePlayer(private val context: Context) {
     }
 
     private fun release(state: VoicePlayback) {
-        // 作废当前代次:prepare 在路上的回调、旧播放器上的回调此后一律丢弃
+        // Invalidate the current generation: callbacks still in flight from prepare and callbacks on the old player are dropped from now on
         tickets.invalidate()
         val oldPlayer = player
         player = null
@@ -343,7 +343,7 @@ class VoicePlayer(private val context: Context) {
     }
 
     private companion object {
-        // 每块最多 8 KiB，44.1 kHz 单声道大约可预读 2.2 秒。
+        // At most 8 KiB per chunk, roughly 2.2 seconds of lookahead at 44.1 kHz mono.
         const val PCM_LOOKAHEAD_CHUNKS = 24
         const val SEGMENT_PAUSE_MS = 90
     }

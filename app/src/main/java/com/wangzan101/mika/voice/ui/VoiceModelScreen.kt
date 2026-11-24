@@ -49,8 +49,8 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.settings.ui.models.Page
 
 /**
- * 设置 › 模型 › 声音模型:选服务商、模型、接口、音色、语速;打开朗读/自动朗读/主动说话。
- * 不在 [com.wangzan101.mika.core.model.ModelRole] 里;和语音转写、图片模型一样独立。
+ * Settings › Models › Voice model: pick the provider, model, protocol, voice and speed; turn on read-aloud / auto read-aloud / speaking up.
+ * Not part of [com.wangzan101.mika.core.model.ModelRole]; it stands on its own like speech transcription and image models.
  */
 @Composable
 fun VoiceModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: (() -> Unit)? = null) {
@@ -201,7 +201,7 @@ internal fun VoiceModelContent(store: ProviderStore, settings: VoiceSettings, on
     }
 }
 
-/** 迁移后只选择目录里声明了 TTS 的模型;音色、语速、流式等使用偏好仍由 [VoiceSettings] 保存。 */
+/** After migration only catalog models that declare TTS are picked; usage preferences such as voice, speed and streaming are still stored by [VoiceSettings]. */
 @Composable
 private fun MigratedVoiceModelContent(
     voiceModels: VoiceModelEnvironment,

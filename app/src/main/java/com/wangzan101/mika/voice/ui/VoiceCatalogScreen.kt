@@ -79,8 +79,8 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.settings.ui.models.edit
 
 /**
- * 设置 › 模型 › 语音模型:统一管理语音转文字、文字转语音和实时通话的模型。
- * 服务商、账号、每个能力各自的协议与接口在此声明;语音输入、朗读和通话设置页只负责选择与使用偏好。
+ * Settings › Models › Voice models: manages speech-to-text, text-to-speech and realtime call models in one place.
+ * Providers, accounts and each capability's protocol and endpoint are declared here; the voice input, read-aloud and call setup pages only handle selection and usage preferences.
  */
 
 /** Resource id for a built-in model's localized name, or null for user-defined models. */
@@ -680,8 +680,8 @@ private fun ProtocolBlock(
 }
 
 /*
- * 表单只露出协议和接口地址。编辑时协议没换,就在原绑定上只改地址,表单之外的参数
- * (计费方案、地域、工作空间、识别语言、音色)原样保留;换了协议,旧协议的参数不再适用,从头建。
+ * The form only exposes the protocol and the endpoint URL. When editing without changing the protocol, only the endpoint is changed on the original binding, and parameters outside the form
+ * (billing plan, region, workspace, recognition language, voice) are preserved as they are; when the protocol changes the old protocol's parameters no longer apply and the binding is built from scratch.
  */
 internal fun editedSttBinding(saved: SttBinding?, protocol: SttProtocol, endpoint: String): SttBinding =
     if (saved?.protocol == protocol) saved.copy(endpoint = endpoint) else SttBinding(protocol, endpoint = endpoint)

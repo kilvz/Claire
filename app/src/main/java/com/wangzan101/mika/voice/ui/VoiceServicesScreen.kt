@@ -78,7 +78,7 @@ import com.wangzan101.mika.settings.ui.models.use
 private enum class PresetKind { Compatible, SelfHosted }
 
 /**
- * 「语音服务」: every account voice draws on. Built-in vendors ask for their own fields once and bring all their
+ * "Voice services": every account voice draws on. Built-in vendors ask for their own fields once and bring all their
  * listen, speak and realtime models; the OpenAI-compatible form, self-hosted recognition and the full catalog
  * form stay under Advanced.
  */
@@ -106,13 +106,13 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     fun apply(plan: VoicePresetPlan) {
         val manager = VoiceAccountManager(voiceModels.catalog, requireNotNull(voiceModels.credentialStore))
         saved = VoicePresets.apply(manager, voiceModels.catalog, plan).map(::encodeRef)
-        // 新 key 下的模型列表可能不同,回到详情页时重新拉
+        // The model list may differ under a new key, so it is fetched again when returning to the detail page
         listedThisRun.remove(plan.service.id)
     }
     BackHandler(enabled = vendorForm != null || detail != null || preset != null || results != null) { back() }
     when {
         results != null -> PresetResult(snapshot, results, viewModel, voiceModels, onDone = {
-            // 存完回到这家服务商的详情,看它带来的全部模型
+            // After saving, return to this vendor's detail page to see all the models it brings
             detail = results.firstOrNull()?.serviceId ?: detail
             saved = null; preset = null; vendorForm = null
         })
@@ -132,7 +132,7 @@ fun VoiceServicesScreen(store: ProviderStore, onBack: () -> Unit, onOpenCustom: 
     }
 }
 
-// 列表要能存进 rememberSaveable,引用编码成一行字
+// The list must be storable in rememberSaveable, so a reference is encoded into one string
 private fun encodeRef(ref: VoiceModelRef) = listOf(ref.serviceId, ref.modelId, ref.capability.name).joinToString("\u0001")
 private fun decodeRef(text: String): VoiceModelRef? = text.split("\u0001").takeIf { it.size == 3 }?.let { (s, m, c) ->
     runCatching { VoiceModelRef(s, m, VoiceCapability.valueOf(c)) }.getOrNull()
@@ -235,7 +235,7 @@ private sealed interface ListUi {
 
 /**
  * One connected service: its key and model list, then every model it brings grouped by what it does. Models the
- * vendor's list did not describe sit folded under 「其他模型」 in both the listen and speak groups; any model id can
+ * vendor's list did not describe sit folded under "Other models" in both the listen and speak groups; any model id can
  * be typed in. A fetched or typed-in model opens its connection test once chosen, so a model the protocol does not
  * fit shows its error right away.
  */
@@ -362,7 +362,7 @@ private fun VendorModelRow(
                     VoiceCapability.TTS -> voiceModels.tts.select(ref)
                     VoiceCapability.REALTIME -> voiceModels.realtime.select(ref)
                 }
-                // 列表拉来的、手填的模型协议是借来的,选上就去测一次
+                // Models from the list and manually entered ones carry a borrowed protocol, so test once as soon as one is picked
                 if (model.origin != VoiceModelOrigin.Builtin) onTest(ref)
             },
             kind = ButtonKind.Tonal, size = ButtonSize.Small,

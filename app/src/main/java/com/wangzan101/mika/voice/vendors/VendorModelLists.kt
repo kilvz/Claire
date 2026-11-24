@@ -110,7 +110,7 @@ internal object VendorModelLists {
     fun gemini(root: JsonElement): List<ListedModel> = entries(root).mapNotNull { model ->
         val id = model.first("name")?.removePrefix("models/") ?: return@mapNotNull null
         val methods = model["supportedGenerationMethods"].strings()
-        // 只能 embed / predict 的模型走不了 generateContent,这是服务商自己说的,不是猜
+        // Models that can only embed / predict cannot do generateContent; the vendor states this itself, it is not a guess
         if (methods.isNotEmpty() && "generateContent" !in methods) return@mapNotNull null
         val n = id.lowercase()
         val caps = when {
@@ -176,7 +176,7 @@ internal object VendorModelLists {
 
     fun elevenLabsModels(root: JsonElement): List<ListedModel> = entries(root).mapNotNull { m ->
         val id = m.first("model_id") ?: return@mapNotNull null
-        // 服务商标了不能合成的(只做变声等)不放进说话列表
+        // Models the vendor marks as unable to synthesize (voice changing only, etc.) are left out of the speak list
         if (m["can_do_text_to_speech"].bool() == false) return@mapNotNull null
         ListedModel(id, m.first("name") ?: id, TTS)
     }
@@ -250,7 +250,7 @@ internal object VendorModelLists {
             if (stated.any { "asr" in it || "speech-recognition" in it }) add(VoiceCapability.STT)
             if (stated.any { "tts" in it || "text-to-speech" in it }) add(VoiceCapability.TTS)
         }
-        // 服务商标了能力、却没有任何语音能力的(文本、图像模型)不进语音列表
+        // Models that state capabilities but have no voice capability (text, image models) do not go into the voice list
         if (stated.isNotEmpty() && caps.isEmpty()) return@mapNotNull null
         ListedModel(id, m.first("name", "display_name") ?: id, caps)
     }
@@ -273,7 +273,7 @@ internal object VendorModelLists {
             val id = v.first("ShortName") ?: return@mapNotNull null
             Triple(id, v.first("Locale").orEmpty(), listOfNotNull(v.first("LocalName", "DisplayName"), v.first("Locale")).joinToString(" · "))
         }
-        // 手机语言的音色排前面,其余按地区
+        // Voices in the phone's language come first, the rest ordered by region
         val lang = locale.language.lowercase()
         return rows.sortedWith(compareBy({ !it.second.lowercase().startsWith("$lang-") }, { it.second }))
             .map { it.first to it.third.ifEmpty { it.first } }

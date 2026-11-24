@@ -77,31 +77,31 @@ import com.wangzan101.mika.settings.ui.models.pickSpeech
 import com.wangzan101.mika.settings.ui.models.pickSpeechModel
 import com.wangzan101.mika.settings.ui.models.pickSttModel
 
-/** 选择页上的动作。 */
+/** Actions on the picker page. */
 class SpeechPickActions(
-    /** 「手机自带」或「不用」:当场生效并返回。 */
+    /** "Phone built-in" or "Off": takes effect immediately and returns. */
     val pick: (SpeechChoice) -> Unit = {},
-    /** 迁移后的目录模型:只保存引用,不联网。 */
+    /** A catalog model after migration: only the reference is saved, no network access. */
     val pickRef: (VoiceModelRef) -> Unit = {},
-    /** (服务商 id, 模型名):先试转,通了才选上并返回;列表里点的和手填的都走这里。 */
+    /** (provider id, model name): tests transcription first and only selects it and returns if that works; both list picks and manual entries go through here. */
     val pickModel: (String, String) -> Unit = { _, _ -> },
-    /** 进豆包流式识别的设置页。 */
+    /** Opens the Doubao streaming recognition setup page. */
     val openDoubao: () -> Unit = {},
-    /** (API Key, App ID, Access Token, 计费方式):加密存下凭据并选用;不联网。 */
+    /** (API Key, App ID, Access Token, billing mode): stores the credentials encrypted and selects it; no network access. */
     val saveDoubao: (String, String, String, String) -> Unit = { _, _, _, _ -> },
-    /** 沿用已存的凭据,换成这种计费方式并选用。 */
+    /** Reuses the stored credentials, switches to this billing mode and selects it. */
     val useDoubao: (String) -> Unit = {},
     val clearDoubao: () -> Unit = {},
-    /** 进自建 Fun-ASR、百炼的设置页。 */
-    /** 进「千问实时语音识别」的设置页(自建、百炼北京、百炼新加坡三个分页)。 */
+    /** Opens the setup page for self-hosted Fun-ASR / Bailian. */
+    /** Opens the "Qwen live speech recognition" setup page (three tabs: self-hosted, Bailian Beijing, Bailian Singapore). */
     val openFunAsr: () -> Unit = {},
-    /** 沿用上次那种(自建的地址,或百炼某个地域的模型),当场选用。 */
+    /** Reuses the previous kind (the self-hosted address, or a Bailian model in some region) and selects it right away. */
     val useFunAsr: () -> Unit = {},
 )
 
 /**
- * 设置 › 模型 › 语音转文字:自己带一个模型状态,可以从别处(例如输入框的「还不能语音输入」)直接进入。
- * 选好(手机自带、不用、试转通过的服务商模型)后回到进来的那一页。
+ * Settings › Models › Speech to text: carries its own model state and can be entered directly from elsewhere (e.g. the composer's "voice input not available yet").
+ * Once chosen (phone built-in, off, or a provider model whose test transcription passed), it returns to the page it was entered from.
  */
 @Composable
 fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: (() -> Unit)? = null) {
@@ -110,9 +110,9 @@ fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: 
     val settings = (context.applicationContext as? MikaApp)?.speech
     val voiceModels = remember { VoiceModelEnvironment.get(context) }
     var doubaoConfigured by remember { mutableStateOf(settings?.hasDoubaoCredentials == true) }
-    // 豆包的设置页叠在这一页上面;返回键先关它
+    // The Doubao setup page is stacked on top of this page; the back key closes it first
     var doubaoOpen by remember { mutableStateOf(false) }
-    // 「千问实时语音识别」三个分页的已存内容;存、删之后重读
+    // Stored content of the three "Qwen live speech recognition" tabs; reread after saving or deleting
     fun funAsrSaved() = settings?.let { s ->
         FunAsrSaved(
             s.funAsrUrl, BailianRegion.entries.filter(s::hasBailianKey).toSet(),
@@ -124,7 +124,7 @@ fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: 
     var funAsrLast by remember { mutableStateOf(settings?.lastLive) }
     var funAsrOpen by remember { mutableStateOf(false) }
     var liveProbe by remember { mutableStateOf(LiveProbeUi()) }
-    // 先连一次走一遍开场和收尾,通了才存;失败留在设置页上说原因
+    // Connect once and run through the opening and closing; only store if it works, and stay on the setup page showing the reason on failure
     fun probeThen(protocol: com.wangzan101.mika.voice.LiveAsrProtocol, url: String, headers: Map<String, String>, save: () -> Unit) {
         if (liveProbe.testing) return
         liveProbe = LiveProbeUi(testing = true)
@@ -159,7 +159,7 @@ fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: 
         pickRef = { vm.pickSttModel(it) },
         pickModel = { pid, model -> vm.pickSpeechModel(pid, model, onPicked = onBack) },
         openDoubao = { doubaoOpen = true },
-        // 存好后回到语音转文字页,看得到它已选上
+        // After saving, return to the speech-to-text page where it can be seen as selected
         saveDoubao = { key, appId, token, resource ->
             checkNotNull(settings).saveDoubao(DoubaoCredentials(key, appId, token), resource)
             doubaoConfigured = true
@@ -174,7 +174,7 @@ fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: 
             doubaoOpen = false
         },
         openFunAsr = { liveProbe = LiveProbeUi(); funAsrOpen = true },
-        // 沿用上次那种(自建或百炼的某个地域);用不了时进设置页
+        // Reuse the previous kind (self-hosted, or a Bailian region); open the setup page when it cannot be used
         useFunAsr = {
             when (val last = settings?.lastLive) {
                 is SpeechChoice.FunAsr -> { settings.saveFunAsr(last.url, last.language); vm.pickSpeech(settings.choice.value) }
@@ -219,7 +219,7 @@ fun SpeechModelScreen(store: ProviderStore, onBack: () -> Unit, onOpenServices: 
     }
 }
 
-/** 迁移后只选择目录里的模型;系统健康说明保留,模型选择本身不发送请求。 */
+/** After migration only catalog models are picked; the system health note is kept, and picking a model itself sends no request. */
 @Composable
 private fun MigratedSpeechModelContent(
     ui: ModelSetupUi, actions: SpeechPickActions, onBack: () -> Unit, onOpenServices: (() -> Unit)?,
@@ -275,7 +275,7 @@ private fun MigratedSpeechModelContent(
     }
 }
 
-/** 不带状态的选择页,便于测试:顶上一段说明,「手机自带」「不用」,下面按服务商分组单选。 */
+/** A stateless picker page for tests: a note at the top, "phone built-in" and "off", then radio rows grouped by provider. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SpeechModelContent(
@@ -285,8 +285,8 @@ fun SpeechModelContent(
     val c = MikaTheme.colors
     val system = ui.systemSpeech
     val choice = ui.speech
-    // 没选过时有手机自带就是在用它,所以「没选过」也把它标成选中
-    // 记成不响应时不标选中;行仍可点,重新选它就清掉记号再试
+    // With no choice made, the phone's built-in is in use, so "no choice" still marks it as selected
+    // When it was recorded as unresponsive it is not marked selected; the row stays tappable, and picking it again clears the mark and retries
     val systemSelected = system.usable && (choice == SpeechChoice.System || choice == SpeechChoice.Auto)
     Page(tr(R.string.role_speech), onBack) {
         Text(
@@ -322,7 +322,7 @@ fun SpeechModelContent(
             val p = g.provider
             val testing = ui.speechTesting == p.id
             GroupLabel(ModelsCopy.providerName(p))
-            // 手填选上的模型不在列表里,也补一行标成选中,让人看得出现在用的是哪个
+            // A manually entered model that is in use is not in the list, so a row is added and marked selected to show which one is in use
             val picked = (choice as? SpeechChoice.Provider)
                 ?.takeIf { it.providerId == p.id }?.model
             val rows = if (picked != null && picked !in g.models) g.models + picked else g.models
@@ -334,14 +334,14 @@ fun SpeechModelContent(
                         trailing = { CapabilityTag(tr(R.string.speech_tag_speech)) },
                     )
                 }
-                // 列表里没有的(列表不全、或这家不给列表)手填
+                // Models missing from the list (incomplete list, or the vendor gives none) can be typed in
                 Box(Modifier.testTag("speech-manual-${p.name}")) {
                     ManualModel(p, if (testing) ListState.Running else null, first = rows.isEmpty()) { actions.pickModel(p.id, it) }
                 }
             }
             when {
                 probe[p.id] != null -> {
-                    // 列表长时原因落在屏幕外,点了像没反应:出来时滚到看得见
+                    // With a long list the reason falls off screen and tapping looks like nothing happened: scroll it into view when it appears
                     val why = probe.getValue(p.id)
                     val into = remember { BringIntoViewRequester() }
                     LaunchedEffect(why) { into.bringIntoView() }
@@ -355,9 +355,9 @@ fun SpeechModelContent(
 }
 
 /**
- * 「边说边转的语音服务」一组:豆包和「千问实时语音识别」(自建服务、百炼北京、百炼新加坡三选一,在它的设置页里分页)各一行。
- * 没设置过时点行进设置页;设置过以后点圆圈就用它(Fun-ASR 沿用上次那种),右边「设置」进去改或删掉。
- * 凭据和聊天服务商分开存,不列模型、不试转。
+ * The "live speech services" group: one row each for Doubao and "Qwen live speech recognition" (self-hosted, Bailian Beijing or Bailian Singapore, tabbed inside its setup page).
+ * When not configured, tapping the row opens the setup page; once configured, tapping the circle uses it (Fun-ASR reuses the previous kind), and "Settings" on the right opens it for editing or removal.
+ * Credentials are stored separately from chat providers, models are not listed and no test transcription is run.
  */
 @Composable
 private fun LiveRows(choice: SpeechChoice, doubao: Boolean, funAsr: Boolean, actions: SpeechPickActions) {
@@ -388,8 +388,8 @@ private fun planName(resource: String): Int =
     if (resource == DoubaoProtocol.CONCURRENT) R.string.speech_doubao_concurrent else R.string.speech_doubao_duration
 
 /**
- * 豆包流式识别的设置页:填凭据(新版控制台的 API Key,或旧版的 App ID + Access Token)、选计费方式。
- * 保存不联网;已存的凭据不回填,输入框也不进可恢复的状态。只改计费方式、不重填凭据时沿用已存的凭据。
+ * The Doubao streaming recognition setup page: enter credentials (the new console's API Key, or the legacy App ID + Access Token) and pick a billing mode.
+ * Saving does no network access; stored credentials are not filled back in and the input fields do not enter a recoverable state. Changing only the billing mode without re-entering credentials reuses the stored ones.
  */
 @Composable
 fun DoubaoSetupPage(choice: SpeechChoice, configured: Boolean, actions: SpeechPickActions, onBack: () -> Unit) {

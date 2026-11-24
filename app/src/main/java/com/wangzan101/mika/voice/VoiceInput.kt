@@ -18,15 +18,15 @@ import com.wangzan101.mika.voice.model.VoiceModelError
 import com.wangzan101.mika.voice.model.adapters.SttHooks
 import kotlinx.coroutines.CancellationException
 
-/** 界面(输入栏、悬浮胶囊)拿语音会话的地方;App 里是 [VoiceInput],界面测试换成假的。 */
+/** Where the UI (input bar, floating capsule) gets a voice session; in the app it is [VoiceInput], and UI tests substitute a fake. */
 interface VoiceSource {
     fun spec(): SpeechEngineSpec
     fun start(language: String? = null): SpeechSession
 }
 
 /**
- * 语音输入的入口:对话页输入框和悬浮胶囊只经这里拿会话。
- * 迁移前沿用旧选择;迁移后由同一目录解析显式模型,不再按服务商或模型名选择实现。
+ * The voice input entry point: the conversation input box and the floating capsule get sessions only through here.
+ * Before migration the old choice is used; after migration the same catalog resolves the explicit model, and the implementation is no longer chosen by provider or model name.
  */
 class VoiceInput(
     context: Context,
@@ -41,7 +41,7 @@ class VoiceInput(
 ) : VoiceSource {
     private val context = context.applicationContext
 
-    /** 界面先问一下能不能用、用的是哪个(卡片顶上那个小标签)。 */
+    /** The UI asks first whether it can be used and which one is used (the small label at the top of the card). */
     override fun spec(): SpeechEngineSpec {
         if (!voiceModels.stt.migrated) return legacySpec()
         return try {
@@ -70,8 +70,8 @@ class VoiceInput(
     }
 
     /**
-     * 开一次会话,按下时调(要在主线程)。[language] 是识别语言(BCP-47);null 跟 App 界面语言。
-     * 没有录音权限、引擎用不了时,给出只发一个 Failed 的会话,界面按同一套处理。
+     * Start a session, called on press (must be on the main thread). [language] is the recognition language (BCP-47); null follows the app UI language.
+     * Without the recording permission or when the engine is unavailable, a session that emits only a single Failed is returned, and the UI handles it the same way.
      */
     override fun start(language: String?): SpeechSession =
         if (voiceModels.stt.migrated) startMigrated(language) else startLegacy(language)

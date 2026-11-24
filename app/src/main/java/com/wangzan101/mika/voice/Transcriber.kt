@@ -22,9 +22,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Base64
 
 /**
- * 用服务商的模型把一段录音转成文字,接口形态见 [TranscribeMethod]。
- * 报错和对话模型走同一套映射([ModelHttp]),界面可以直接复用现有的说法。
- * [headers] 是每个请求都带的头(客户端标识等,见 ClientHeaders),Key 的头由这里按接口类型加。
+ * Turns a recording into text with a provider's model; the interface shapes are in [TranscribeMethod].
+ * Errors go through the same mapping as chat models ([ModelHttp]), so the UI can reuse the existing wording.
+ * [headers] are headers sent on every request (client identification, etc., see ClientHeaders); the key header is added here per interface type.
  */
 class Transcriber(
     private val http: OkHttpClient,
@@ -33,8 +33,8 @@ class Transcriber(
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * 转一段音频;失败抛 [ModelError](和对话模型同一套)。返回的文字可能是空串(没听到话)。
-     * [mime]/[filename] 给服务商看文件类型;默认按录音的 WAV,文件转写传原文件的类型。
+     * Transcribes a piece of audio; throws [ModelError] on failure (the same set as chat models). The returned text may be an empty string (no speech heard).
+     * [mime]/[filename] tell the provider the file type; by default the WAV of a recording, while file transcription passes the original file's type.
      */
     suspend fun transcribe(
         p: Provider, key: String?, model: String, method: TranscribeMethod, wav: ByteArray, language: String?,
@@ -65,7 +65,7 @@ class Transcriber(
                                     put("type", "input_audio")
                                     putJsonObject("input_audio") { put("data", data); put("format", format) }
                                 })
-                                // 专做转写的模型不收文字块;通用模型没有这句指令会当成聊天回话
+                                // Transcription-only models do not accept text blocks; a general model without this instruction treats it as a chat reply
                                 if (method != TranscribeMethod.ChatInputAudioOnly) {
                                     add(buildJsonObject { put("type", "text"); put("text", INSTRUCTION) })
                                 }
@@ -88,7 +88,7 @@ class Transcriber(
                         })
                     })
                 }
-                // 和对话适配器一样:库存的地址不带 /v1beta,这里补上
+                // Same as the chat adapter: the stored URL has no /v1beta, so add it here
                 builder("$base/v1beta/models/$model:generateContent", key, gemini).post(payload.toString().toRequestBody(JSON)).build()
             }
         }
@@ -116,7 +116,7 @@ class Transcriber(
                 val msg = ((root["choices"] as? JsonArray)?.firstOrNull() as? JsonObject)?.get("message") as? JsonObject
                 when (val c = msg?.get("content")) {
                     is JsonPrimitive -> c.contentOrNull
-                    // 内容是分块数组的:把文字块拼起来
+                    // The content is an array of blocks: join the text blocks together
                     is JsonArray -> c.mapNotNull { (it as? JsonObject)?.str("text") }.joinToString("")
                     else -> null
                 }
@@ -124,7 +124,7 @@ class Transcriber(
             TranscribeMethod.GeminiInline -> {
                 val cand = (root["candidates"] as? JsonArray)?.firstOrNull() as? JsonObject
                 val parts = (cand?.get("content") as? JsonObject)?.get("parts") as? JsonArray
-                // 没有任何文字块(比如静音时只回结束原因)按空串;连候选都没有才算格式不对
+                // No text blocks at all (e.g. only a finish reason when silent) means empty string; only a missing candidate counts as a malformed response
                 if (cand == null) null else parts.orEmpty().mapNotNull { (it as? JsonObject)?.str("text") }.joinToString("")
             }
         }
@@ -135,7 +135,7 @@ class Transcriber(
 
     private fun base64(b: ByteArray): String = Base64.getEncoder().encodeToString(b)
 
-    /** OpenAI 的 input_audio 只认几种格式名;认不出按 wav。 */
+    /** OpenAI's input_audio only recognizes a few format names; anything unrecognized is treated as wav. */
     private fun formatOf(mime: String): String = when (mime.substringAfter('/', "").substringBefore(';').lowercase()) {
         "mpeg", "mp3" -> "mp3"
         "mp4", "m4a", "x-m4a" -> "m4a"
@@ -147,10 +147,10 @@ class Transcriber(
     companion object {
         private val JSON = "application/json".toMediaType()
 
-        /** 发给模型的指令:只要原话,不要解释(模型面向英文)。 */
+        /** The instruction sent to the model: only the verbatim words, no explanation (the model faces English). */
         private const val INSTRUCTION = "Transcribe this recording word for word. Output only the transcript text."
 
-        /** 这家能不能做语音转文字:有 Key 的 OpenAI 兼容、Responses、Gemini 可以;Anthropic 和账号登录的不行。 */
+        /** Whether this provider can do speech-to-text: OpenAI-compatible with a key, Responses and Gemini can; Anthropic and account sign-in cannot. */
         fun supports(p: Provider): Boolean = when (p.kind) {
             ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.Gemini -> p.signIn == null
             else -> false

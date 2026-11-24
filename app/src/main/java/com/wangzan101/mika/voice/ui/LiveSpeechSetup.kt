@@ -44,12 +44,12 @@ import com.wangzan101.mika.settings.ui.models.ModelIdStyle
 import com.wangzan101.mika.settings.ui.models.Page
 import com.wangzan101.mika.settings.ui.models.listed
 
-/** 设置页试连的状态:[testing] 时按钮转圈不可点,[error] 是没通的原因。 */
+/** Probe state of the setup page: while [testing] the button spins and cannot be pressed, [error] is the reason it did not connect. */
 data class LiveProbeUi(val testing: Boolean = false, val error: String? = null)
 
 /**
- * 「边说边转的语音服务」里的一行:没设置过时点它进设置页;设置过以后点圆圈就用它,右边「设置」进去改。
- * 豆包、自建 Fun-ASR、百炼都长这样。
+ * One row under "live speech services": when not configured, tapping it opens the setup page; once configured, tapping the circle uses it and "Settings" on the right opens it for editing.
+ * Doubao, self-hosted Fun-ASR and Bailian all look like this.
  */
 @Composable
 internal fun LiveServiceRow(
@@ -78,12 +78,12 @@ internal fun LiveServiceRow(
     )
 }
 
-/** 「千问实时语音识别」设置页上的三个分页:自建服务,百炼北京,百炼新加坡。 */
+/** The three tabs on the "Qwen live speech recognition" setup page: self-hosted service, Bailian Beijing, Bailian Singapore. */
 enum class FunAsrTab { Local, Beijing, Singapore;
     val region: BailianRegion? get() = when (this) { Local -> null; Beijing -> BailianRegion.Beijing; Singapore -> BailianRegion.Singapore }
 
     companion object {
-        /** 打开时先停在正在用(或上次用)的那种。 */
+        /** When opened, start on the kind currently in use (or last used). */
         fun of(choice: SpeechChoice?): FunAsrTab = when (choice) {
             is SpeechChoice.Bailian -> if (choice.region == BailianRegion.Singapore) Singapore else Beijing
             else -> Local
@@ -91,14 +91,14 @@ enum class FunAsrTab { Local, Beijing, Singapore;
     }
 }
 
-/** 分页标签和行上的说法:「自建」「百炼·北京」「百炼·新加坡」。 */
+/** Tab labels and row wording: "Self-hosted", "Bailian · Beijing", "Bailian · Singapore". */
 internal fun funAsrTabName(tab: FunAsrTab): String = when (tab) {
     FunAsrTab.Local -> tr(R.string.speech_funasr_tab_local)
     FunAsrTab.Beijing -> tr(R.string.speech_bailian_tab, tr(R.string.speech_bailian_beijing))
     FunAsrTab.Singapore -> tr(R.string.speech_bailian_tab, tr(R.string.speech_bailian_singapore))
 }
 
-/** 设置页每个分页的已存内容:自建服务的地址,各地域有没有存 Key、上次的模型和业务空间 ID。 */
+/** What is stored per tab of the setup page: the self-hosted service address, and per region whether a key is stored, the last model and the workspace ID. */
 data class FunAsrSaved(
     val url: String? = null,
     val keys: Set<BailianRegion> = emptySet(),
@@ -108,10 +108,10 @@ data class FunAsrSaved(
     val languages: Map<BailianRegion, AsrLanguage> = emptyMap(),
 )
 
-/** 百炼分页「连接并使用」交上来的:Key 为空表示沿用已存的;[workspace] 已规范,空串用通用接入点。 */
+/** What the Bailian tab's "Connect and use" submits: an empty key means keep the stored one; [workspace] is already normalized, and an empty string uses the generic endpoint. */
 data class BailianInput(val key: String, val model: String, val region: BailianRegion, val workspace: String, val language: AsrLanguage = AsrLanguage.Auto)
 
-/** 识别语言的说法。 */
+/** The wording for a recognition language. */
 internal fun asrLanguageName(language: AsrLanguage): String = tr(
     when (language) {
         AsrLanguage.Auto -> R.string.speech_asr_language_auto
@@ -123,7 +123,7 @@ internal fun asrLanguageName(language: AsrLanguage): String = tr(
     },
 )
 
-/** 「识别语言」一组:一排可选的胶囊,默认自动。 */
+/** The "Recognition language" group: a row of selectable chips, automatic by default. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun LanguagePicker(selected: AsrLanguage, onSelect: (AsrLanguage) -> Unit) {
@@ -138,9 +138,9 @@ private fun LanguagePicker(selected: AsrLanguage, onSelect: (AsrLanguage) -> Uni
 }
 
 /**
- * 「千问实时语音识别」的设置页:顶上三个分页并排——自建、百炼·北京、百炼·新加坡,各管各的设置。
- * 自建:填服务地址(只写「主机:端口」时按 ws、默认端口补全)。百炼:API Key(各地域一份,已存的不回填,留空沿用)和模型。
- * 「连接并使用」先连一次走一遍开场(不送音频),通了才存下并选用。
+ * The "Qwen live speech recognition" setup page: three tabs side by side at the top — self-hosted, Bailian · Beijing, Bailian · Singapore — each with its own settings.
+ * Self-hosted: enter the service address (when only "host:port" is given, it is completed with ws and the default port). Bailian: API Key (one per region, stored ones are not filled back in, leave empty to keep) and model.
+ * "Connect and use" connects once and runs through the opening (without sending audio); only if that succeeds is it stored and selected.
  */
 @Composable
 fun FunAsrSetupPage(
@@ -160,7 +160,7 @@ fun FunAsrSetupPage(
         )
         when (val region = tab.region) {
             null -> LocalFunAsr(saved.url, saved.localLanguage, probe, onSaveLocal)
-            // 换地域时整块重建,输入框不把一个地域的字带到另一个
+            // The whole block is rebuilt when the region changes, so an input field does not carry text from one region into another
             else -> androidx.compose.runtime.key(region) {
                 BailianFunAsr(
                     region, region in saved.keys, saved.models[region] ?: BailianProtocol.DEFAULT_MODEL, saved.workspaces[region].orEmpty(),
@@ -179,7 +179,7 @@ private fun LocalFunAsr(savedUrl: String?, savedLanguage: AsrLanguage, probe: Li
     var language by remember { mutableStateOf(savedLanguage) }
     val url = FunAsrProtocol.normalize(address)
     Text(tr(R.string.speech_funasr_setup_hint), Modifier.padding(top = 4.dp, bottom = 4.dp), style = MikaType.Body, color = c.ink2)
-    // 两种模型各怎么部署写在仓库文档里;没有能打开网页的应用时 openUri 会抛错,这时什么都不做
+    // How to deploy each of the two models is documented in the repository; openUri throws when no app can open web pages, in which case nothing is done
     val uri = LocalUriHandler.current
     Text(
         tr(R.string.speech_funasr_deploy_guide),

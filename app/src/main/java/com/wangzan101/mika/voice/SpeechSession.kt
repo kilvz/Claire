@@ -6,20 +6,20 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
- * 一次按住说话的会话,两种引擎(手机自带识别、服务商转写)对界面长一个样:
- * 界面只收 [events]、在松开时调 [release]、在取消时调 [cancel],不用管背后是哪种引擎。
+ * A single push-to-talk session: both engines (the phone's built-in recognition and provider transcription) look the same to the UI:
+ * the UI only receives [events], calls [release] on release and [cancel] on cancel, with no need to care which engine is behind it.
  */
 sealed interface SpeechEvent {
-    /** 0..1,画波形。 */
+    /** 0..1, for drawing the waveform. */
     data class Level(val value: Float) : SpeechEvent
 
-    /** 到此刻听到的全文:[tail] 是末尾还可能变的几个字,其余是 [stable]。 */
+    /** Everything heard so far: [tail] is the trailing few characters that may still change, the rest is [stable]. */
     data class Partial(val stable: String, val tail: String) : SpeechEvent
 
-    /** 服务商:松开后在转。 */
+    /** Provider: converting after release. */
     data object Converting : SpeechEvent
 
-    /** 最终文字;空串 = 没听清。 */
+    /** Final text; empty string = nothing was heard clearly. */
     data class Final(val text: String) : SpeechEvent
 
     data class Failed(val why: SpeechFailure) : SpeechEvent
@@ -29,16 +29,16 @@ sealed interface SpeechFailure {
     data object NoPermission : SpeechFailure
     data object Busy : SpeechFailure
     data object Network : SpeechFailure
-    /** 本机录音器起不来(服务商转写用的录音):可能被别的应用占着;识别服务初始化失败另行说明。 */
+    /** The local recorder cannot start (the recording used for provider transcription): it may be held by another app; a recognition service init failure is explained separately. */
     data object MicUnavailable : SpeechFailure
     /**
-     * 识别服务报录音出错(ERROR_AUDIO):录音权限给了也可能录不到,例如系统的麦克风使用总开关关着,
-     * 或系统权限管理里单独关掉了麦克风。界面据此说明该去哪里看。
+     * The recognition service reports an audio error (ERROR_AUDIO): even with the recording permission granted nothing may be captured, e.g. when the system-wide microphone toggle is off,
+     * or the microphone is switched off separately in the system permission manager. The UI explains where to look based on this.
      */
     data object AudioError : SpeechFailure
     /**
-     * 识别服务说没有权限,而且查得出来是它自己(另一个应用)没有录音权限,不是 Claire 没有(见 [SpeechServiceMic])。
-     * 界面据此说明,并带用户去那个应用的设置页。
+     * The recognition service says it has no permission, and it can be determined that it is itself (another app) that lacks the recording permission, not Claire (see [SpeechServiceMic]).
+     * The UI explains this and takes the user to that app's settings page.
      */
     data class ServiceNoPermission(val service: SpeechServiceTarget) : SpeechFailure
     data class Provider(val error: Exception) : SpeechFailure
@@ -46,28 +46,28 @@ sealed interface SpeechFailure {
 }
 
 interface SpeechSession {
-    /** 只给一个收集者;每个事件只送一次,[SpeechEvent.Final]/[SpeechEvent.Failed] 之后或 [cancel] 之后流就结束。 */
+    /** Only one collector; each event is delivered once, and the flow ends after [SpeechEvent.Final]/[SpeechEvent.Failed] or after [cancel]. */
     val events: Flow<SpeechEvent>
 
-    /** 能边说边出字(系统、原生流式 ASR 为 true,整段文件转写为 false)。 */
+    /** Produces text while speaking (true for the system and native streaming ASR, false for whole-file transcription). */
     val live: Boolean
 
     /**
-     * 按住多久都行:边说边传、不攒整段录音的流式识别,不受按住说话的 60 秒封顶,也不倒数。
-     * 默认 false(手机自带识别、整段转写和其余引擎照旧封顶)。
+     * Hold for as long as you like: streaming recognition that sends while speaking and does not buffer the whole recording, not subject to the 60-second push-to-talk cap and with no countdown.
+     * Defaults to false (the phone's built-in recognition, whole-segment transcription and the other engines are capped as before).
      */
     val unlimited: Boolean get() = false
 
-    /** 松开:收尾并给 Final。 */
+    /** Release: wrap up and emit Final. */
     fun release()
 
-    /** 丢掉;幂等。 */
+    /** Drop it; idempotent. */
     fun cancel()
 }
 
 /**
- * 会话的事件出口:无界缓冲,界面晚一点开始收也不丢;结束事件发出后关上。
- * 取消时连同还没被收走的一起丢掉——用户已经不要这次了,迟到的结果不该再冒出来。
+ * Event outlet of a session: unbounded buffer, so nothing is lost if the UI starts collecting a little later; closed after the terminal event is sent.
+ * On cancel, everything not yet collected is dropped too — the user no longer wants this attempt, and a late result must not surface.
  */
 internal class SessionEvents {
     private val channel = Channel<SpeechEvent>(Channel.UNLIMITED)
@@ -86,7 +86,7 @@ internal class SessionEvents {
         if (!finished && !cancelled) channel.trySend(e)
     }
 
-    /** 发最后一个事件并关上;已经结束或取消了就什么都不做。返回这次是不是真的发了。 */
+    /** Send the last event and close; does nothing if already finished or cancelled. Returns whether this call actually sent it. */
     @Synchronized
     fun finish(e: SpeechEvent): Boolean {
         if (finished || cancelled) return false
@@ -96,7 +96,7 @@ internal class SessionEvents {
         return true
     }
 
-    /** 返回这次是不是第一次取消。 */
+    /** Returns whether this was the first cancel. */
     @Synchronized
     fun cancel(): Boolean {
         if (cancelled) return false
@@ -106,7 +106,7 @@ internal class SessionEvents {
     }
 }
 
-/** 一开始就用不了的会话(没权限、引擎不可用):只发一个 Failed。 */
+/** A session unusable from the start (no permission, engine unavailable): emits only a single Failed. */
 internal class FailedSession(why: SpeechFailure) : SpeechSession {
     private val out = SessionEvents().also { it.finish(SpeechEvent.Failed(why)) }
     override val events: Flow<SpeechEvent> = out.flow

@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
 import com.wangzan101.mika.ui.QrCodeImage
 import com.wangzan101.mika.ui.encodeQr
 
-/** 设置首页的状态胶囊；未绑定不影响页面的「一切就绪」检查。 */
+/** The status pill on the settings home page; being unbound does not affect the page's "all set" check. */
 @Composable
 internal fun WechatEntryStatus(state: WechatConnectionState, bound: Boolean) {
     val (text, tone) = when (state) {
@@ -67,7 +67,7 @@ internal fun WechatEntryStatus(state: WechatConnectionState, bound: Boolean) {
     StatusPill(stringResource(text), tone)
 }
 
-/** 设置 › 微信：绑定只负责扫码，消息监听和任务执行仍由同一个运行时负责。 */
+/** Settings › WeChat: binding only handles the QR scan; message listening and task execution are still handled by the same runtime. */
 @Composable
 fun WechatSettingsScreen(runtime: WechatRuntime, onBack: () -> Unit) {
     val state by runtime.state.collectAsState()
@@ -103,7 +103,7 @@ fun WechatSettingsScreen(runtime: WechatRuntime, onBack: () -> Unit) {
         }
     }
 
-    // 服务端确认和本地取消可能同时发生；最终以已经持久化的账号为准。
+    // Server confirmation and a local cancel may happen at the same time; the persisted account is what finally counts.
     LaunchedEffect(state) { bound = runtime.store.account() != null }
 
     fun cancelLogin() {

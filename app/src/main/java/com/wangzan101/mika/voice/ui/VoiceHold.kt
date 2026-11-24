@@ -118,35 +118,35 @@ import com.wangzan101.mika.chat.ui.Spinner
 import com.wangzan101.mika.settings.ui.models.edit
 
 /**
- * 对话输入栏的按住说话:输入框上的手势([holdToTalk])、按住时整条变蓝的输入栏([VoiceBarCover])、
- * 输入栏上方的「在听」卡片和「上滑 发送/取消」提示、没听清之类的轻提示([VoiceFloat])、
- * 「还不能语音输入」和录音权限的说明([VoiceSheetHost])。状态都在 [HoldToTalk] 里,这里只管画和接线。
+ * Push-to-talk on the conversation composer: the gesture on the input field ([holdToTalk]), the input bar that turns blue while holding ([VoiceBarCover]),
+ * the "listening" card above the input bar and the "slide up to send/cancel" hint, light toasts such as "didn't catch that" ([VoiceFloat]),
+ * and the explanations for "voice input not available yet" and the recording permission ([VoiceSheetHost]). All state lives in [HoldToTalk]; this file only draws and wires things up.
  */
 
-/** 按住约这么久(毫秒)才开始听;不到就是点一下打字。 */
+/** Listen only after holding about this long (milliseconds); anything shorter is a tap for typing. */
 private const val HOLD_MS = 300L
 
-/** 从手指按下算,不到这么久(毫秒)松开就当误触、没听清。 */
+/** Measured from the moment the finger goes down, releasing sooner than this (milliseconds) counts as an accidental touch, nothing heard. */
 private const val MIN_TOTAL_MS = 500L
 
-/** 一次最多听这么久;最后 [COUNTDOWN_MS] 卡片右下角倒数。 */
+/** The most one recording listens; during the last [COUNTDOWN_MS] the card counts down in its bottom-right corner. */
 private const val MAX_MS = 60_000L
 private const val COUNTDOWN_MS = 10_000L
 
-/** 「在听」卡片还没排好版时:手指往上滑过这么多就是「松开取消」。 */
+/** While the "listening" card is not laid out yet: sliding the finger up this far means "release to cancel". */
 private val CancelLift = 80.dp
 
-/** 手指要往上滑过这么多,停在「在听」卡片里才是「松开 发送」;拇指稍微一动不会就直接发出去。 */
+/** The finger must slide up this far and stay inside the "listening" card for "release to send"; a slight thumb movement does not send right away. */
 private val SendLift = 32.dp
 
-/** 松开时手指落在哪:取消、直接发送,或都不是(字填进输入框)。 */
+/** Where the finger lands on release: cancel, send directly, or neither (the text fills the input box). */
 internal enum class VoiceAim { Fill, Send, Cancel }
 
 /**
- * 按着说话时手指的落点。[finger] 和 [card](「在听」卡片)都是根布局坐标,[upPx] 是从按下处往上移了多少。
- * 卡片还没排好版(空的)时照旧只看上滑距离:过了 [cancelLiftPx] 是取消。
- * 排好版后:手指在卡片上沿以上是取消(「上滑 发送/取消」的小胶囊就在那里);在卡片里、且上滑过 [sendLiftPx] 是直接发送;
- * 其余(还在输入栏上、或卡片和输入栏之间)是填进输入框。只看纵向,卡片本来就差不多和屏幕一样宽。
+ * Where the finger is during push-to-talk. [finger] and [card] (the "listening" card) are in root-layout coordinates, and [upPx] is how far it has moved up from the press point.
+ * While the card is not laid out yet (empty), only the upward distance counts as before: past [cancelLiftPx] means cancel.
+ * Once laid out: a finger above the card's top edge is cancel (the "slide up to send/cancel" pill sits there); inside the card and moved up past [sendLiftPx] sends directly;
+ * everything else (still on the input bar, or between the card and the input bar) fills the input box. Only the vertical axis matters, since the card is about as wide as the screen anyway.
  */
 internal fun voiceAim(finger: Offset, card: Rect, upPx: Float, cancelLiftPx: Float, sendLiftPx: Float): VoiceAim = when {
     card.isEmpty -> if (upPx > cancelLiftPx) VoiceAim.Cancel else VoiceAim.Fill
@@ -155,19 +155,19 @@ internal fun voiceAim(finger: Offset, card: Rect, upPx: Float, cancelLiftPx: Flo
     else -> VoiceAim.Fill
 }
 
-/** 底部弹层:哪种说明。 */
+/** Bottom sheet: which explanation it shows. */
 internal sealed interface VoiceSheet {
     data object Permission : VoiceSheet
-    /** 已经允许录音,识别服务仍说没有权限或录音出错:说明系统的麦克风总开关和权限管理,或被别的应用占用。 */
+    /** Recording is already allowed but the recognition service still reports no permission or an audio error: explain the system-wide microphone toggle and permission management, or that another app holds it. */
     data object MicBlocked : VoiceSheet
     data class Unavailable(val why: SpeechEngineSpec.Why) : VoiceSheet
-    /** 缺录音权限的是识别服务(另一个应用),不是 Claire:说明这一点,「去设置」打开的是它的设置页。 */
+    /** It is the recognition service (another app) that lacks the recording permission, not Claire: explain this, and "Open settings" opens its settings page. */
     data class ServicePermission(val service: com.wangzan101.mika.voice.SpeechServiceTarget) : VoiceSheet
 }
 
 /**
- * 按着时听到的字:定下的深色、还在变的浅色。放不下 [maxLines] 行时按 [VoiceCopy.fitHeard] 去掉前面说完的整句,
- * 最新的字一直看得见。输入框和悬浮胶囊共用。
+ * Text heard while holding: settled text in a darker color, still-changing text lighter. When it does not fit [maxLines] lines, [VoiceCopy.fitHeard] drops finished sentences from the front,
+ * so the latest text stays visible. Shared by the input box and the floating capsule.
  */
 @Composable
 internal fun HeardText(stable: String, tail: String, style: androidx.compose.ui.text.TextStyle, maxLines: Int, modifier: Modifier = Modifier) {
@@ -193,15 +193,15 @@ internal fun HeardText(stable: String, tail: String, style: androidx.compose.ui.
     }
 }
 
-/** 按住说话时界面上要的文字;不碰界面,单测直接测。 */
+/** The strings the UI needs during push-to-talk; touches no UI, so unit tests can test it directly. */
 internal object VoiceCopy {
-    /** 一句说完的地方:这些标点之后断开。 */
+    /** Where a sentence ends: break after these punctuation marks. */
     private val sentenceEnd = setOf('。', '！', '？', '；', '!', '?', ';', '.', '…', '\n')
 
     /**
-     * 按着时听到的字太多、卡片里放不下时:从前面去掉已经说完的整句([stable] 里句号、问号等之后断开),前面加「…」,
-     * 留下最近的几句和还在说的 [tail];只剩还在说的那句也放不下时,留它的末尾。[fits] 量一段字(定下的、还在变的)放不放得下。
-     * 只改显示,交出去的文字不变。
+     * When too much text is heard while holding to fit in the card: drop finished sentences from the front (breaking after periods, question marks, etc. in [stable]) and prefix "…",
+     * keeping the last few sentences plus the [tail] still being spoken; if even just that sentence does not fit, keep its end. [fits] measures whether a piece of text (settled plus still-changing) fits.
+     * Only the display changes; the text handed out stays the same.
      */
     fun fitHeard(stable: String, tail: String, fits: (String, String) -> Boolean): Pair<String, String> {
         if (fits(stable, tail)) return stable to tail
@@ -211,7 +211,7 @@ internal object VoiceCopy {
             if (fits(rest, tail)) return rest to tail
         }
         if (fits(ELLIPSIS, tail)) return ELLIPSIS to tail
-        // 还在说的那句自己就放不下:找能放下的最长末尾
+        // The sentence still being spoken alone does not fit: find the longest end that does
         var lo = 0
         var hi = tail.length
         while (lo < hi) {
@@ -223,7 +223,7 @@ internal object VoiceCopy {
 
     private const val ELLIPSIS = "…"
 
-    /** 卡片顶上的小标签:用的是哪个转文字。 */
+    /** The small label at the top of the card: which transcriber is in use. */
     fun engine(spec: SpeechEngineSpec): String = when (spec) {
         is SpeechEngineSpec.Doubao -> tr(R.string.speech_doubao_model)
         is SpeechEngineSpec.FunAsr -> tr(R.string.speech_funasr_model)
@@ -235,12 +235,12 @@ internal object VoiceCopy {
         is SpeechEngineSpec.Unavailable -> ""
     }
 
-    /** 失败时输入栏上方那一句;权限、引擎用不了平时走说明弹层,这里只给一句标题兜底。 */
+    /** The line above the input bar on failure; permission and unavailable-engine cases normally go through the explanation sheet, so this is only a title fallback. */
     fun failure(why: SpeechFailure): String = when (why) {
         SpeechFailure.Busy -> tr(R.string.voice_busy)
         SpeechFailure.Network -> tr(R.string.voice_network)
         SpeechFailure.MicUnavailable, SpeechFailure.AudioError -> tr(R.string.voice_mic_unavailable)
-        // 服务商的错沿用模型出错时的说法(额度、Key、找不到模型……)
+        // Provider errors reuse the wording used for model errors (quota, key, model not found, …)
         is SpeechFailure.Provider -> tr(R.string.voice_provider_failed, why.error.message.orEmpty())
         SpeechFailure.NoPermission -> tr(R.string.voice_permission_title)
         is SpeechFailure.ServiceNoPermission -> tr(R.string.voice_service_permission_title)
@@ -262,7 +262,7 @@ internal object VoiceCopy {
         SpeechEngineSpec.Why.SherpaFailed -> tr(R.string.voice_unavailable_sherpa_failed)
     }
 
-    /** 最后十秒的倒数;还早时为 null。 */
+    /** The countdown for the last ten seconds; null while there is still time. */
     fun countdown(elapsedMs: Long): String? {
         val left = MAX_MS - elapsedMs
         if (left > COUNTDOWN_MS) return null
@@ -270,7 +270,7 @@ internal object VoiceCopy {
     }
 }
 
-/** 录音权限被拒过的记号:系统不再弹框时(拒过、也不该再解释)改弹说明,按钮直达 App 的权限页。 */
+/** The mark that the recording permission was denied: when the system no longer shows a dialog (denied before, and it should not explain again), show the explanation instead, with a button straight to the app's permission page. */
 private object MicPermission {
     private const val PREFS = "voice_input"
     private const val DENIED = "mic_denied"
@@ -282,24 +282,24 @@ private object MicPermission {
 }
 
 /**
- * 输入栏一次按住说话的界面状态:手指是不是还按着([holding])、卡片上的引擎标签、弹层和轻提示。
- * 开会话、转事件、收尾都交给 [hold]。
+ * UI state of one push-to-talk on the input bar: whether the finger is still down ([holding]), the engine label on the card, the sheet and the toast.
+ * Starting the session, converting events and wrapping up are all delegated to [hold].
  */
 @Stable
 internal class VoiceHold(private val voice: VoiceSource, private val scope: CoroutineScope) {
-    // 「太短」按手指按下算不到半秒:开始听时已经按了 HOLD_MS,状态机只再数剩下的
+    // "Too short" means under half a second from the finger going down: HOLD_MS was already held when listening starts, so the state machine only counts the rest
     val hold = HoldToTalk(clock = SystemClock::elapsedRealtime, maxMs = MAX_MS, minMs = MIN_TOTAL_MS - HOLD_MS)
 
-    /** 引擎现在不可用(识别服务没响应/没配服务商)。手势照常进语音流程(begin 弹说明页),这只决定点话筒是提示还是直接弹说明。 */
+    /** The engine is currently unavailable (recognition service not responding / no provider configured). Gestures still enter the voice flow (begin shows the explanation sheet); this only decides whether tapping the mic shows a toast or the explanation directly. */
     internal val engineUsable: Boolean get() = voice.spec() !is SpeechEngineSpec.Unavailable
 
-    /** 点话筒时引擎不可用:弹「还不能语音输入」说明页(原因 + 去选引擎的路),功能不可用也不装死。 */
+    /** The engine is unavailable when the mic is tapped: show the "voice input not available yet" explanation (reason + a way to pick an engine), so an unavailable feature never plays dead. */
     fun explainUnavailable() {
         toast = null
         (voice.spec() as? SpeechEngineSpec.Unavailable)?.let { sheet = VoiceSheet.Unavailable(it.why) }
     }
 
-    /** 长按开始以后手指还没离开。 */
+    /** The finger has not left since the long press started. */
     var holding by mutableStateOf(false)
         private set
     var engine by mutableStateOf("")
@@ -307,22 +307,22 @@ internal class VoiceHold(private val voice: VoiceSource, private val scope: Coro
     var sheet by mutableStateOf<VoiceSheet?>(null)
     var toast by mutableStateOf<String?>(null)
 
-    /** 有录音权限时返回 true;没有时去要(或弹说明)并返回 false,这一次不开始。由界面装上(要 Activity)。 */
+    /** Returns true when the recording permission is granted; otherwise asks for it (or shows the explanation) and returns false, so this attempt does not start. Installed by the UI (needs an Activity). */
     internal var ensureMic: () -> Boolean = { true }
     internal var haptic: () -> Unit = {}
     private var collector: Job? = null
 
     /**
-     * 「在听」卡片在根布局里的位置,卡片排好版后报上来。松开后卡片还在(在等字)时照样留着:
-     * 这时再按住,卡片没动、不会再报一次。
+     * The "listening" card's position in the root layout, reported once the card is laid out. It is kept as is when the card is still there after release (waiting for text):
+     * pressing again then does not move the card, so it is not reported again.
      */
     internal var cardAt = Rect.Zero
-    /** 调用方能直接发出时才有「松开 发送」;不能时手指在卡片里也只是填进输入框。 */
+    /** "Release to send" exists only when the caller can send directly; otherwise a finger inside the card still just fills the input box. */
     internal var canSend = false
 
     /**
-     * 长按到时:先看能不能用、有没有权限,都行才开始听。
-     * 上一段松开后还在转(服务商卡住、或自带识别在收尾)也可以重新按:上一段不要了,由 [HoldToTalk.press] 取消。
+     * When the long press fires: first check availability and permission, and only start listening if both are fine.
+     * Pressing again is also allowed while the previous segment is still converting after release (a stuck provider, or built-in recognition wrapping up): the previous segment is abandoned and [HoldToTalk.press] cancels it.
      */
     fun begin() {
         if (holding) return
@@ -343,21 +343,21 @@ internal class VoiceHold(private val voice: VoiceSource, private val scope: Coro
         collector = scope.launch { session.events.collect { hold.onEvent(it) } }
     }
 
-    /** 手指移到了根布局里的 [finger],比按下处往上 [upPx]:算出落点告诉状态机。 */
+    /** The finger moved to [finger] in the root layout, [upPx] above the press point: compute the target and tell the state machine. */
     fun move(finger: Offset, upPx: Float, cancelLiftPx: Float, sendLiftPx: Float) {
         if (!holding) return
         val aim = voiceAim(finger, cardAt, upPx, cancelLiftPx, sendLiftPx)
         hold.aim(cancel = aim == VoiceAim.Cancel, send = aim == VoiceAim.Send && canSend)
     }
 
-    /** 手指离开:交给状态机(取消、直接发送、太短、收尾)。 */
+    /** The finger left: hand it to the state machine (cancel, send directly, too short, wrap up). */
     fun end() {
         if (!holding) return
         holding = false
         hold.release()
     }
 
-    /** 手势被打断、离开页面、转屏、App 到后台:这一段不要了。 */
+    /** The gesture was interrupted, the page left, the screen rotated or the app went to the background: this segment is dropped. */
     fun abort() {
         holding = false
         hold.dispose()
@@ -369,8 +369,8 @@ internal class VoiceHold(private val voice: VoiceSource, private val scope: Coro
 private val IdleState = MutableStateFlow<HoldToTalk.State>(HoldToTalk.State.Idle)
 
 /**
- * 输入栏要的那一份 [VoiceHold];没有 [voice] 或用户在设置里选了「不用」时为 null(输入框只能打字)。
- * 说完的字交给 [onText];松开在「松开 发送」上时交给 [onSend],直接发出。没有 [onSend] 时没有「松开 发送」。
+ * The [VoiceHold] the input bar needs; null when there is no [voice] or the user picked "off" in settings (the input box can only type).
+ * The spoken text goes to [onText]; releasing on "release to send" goes to [onSend] and sends directly. Without [onSend] there is no "release to send".
  */
 @Composable
 internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, onSend: ((String) -> Unit)? = null): VoiceHold? {
@@ -390,7 +390,7 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
     vh.ensureMic = {
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) true
         else {
-            // 第一次按住才要权限;拒过且系统不再弹框时,改成说明 + 去系统设置
+            // The permission is requested only on the first hold; if it was denied and the system no longer shows a dialog, switch to the explanation + a trip to the system settings
             val activity = context.findActivity()
             val blocked = MicPermission.denied(context) && activity != null &&
                 !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO)
@@ -409,9 +409,9 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
                 when (val why = s.why) {
                     null -> vh.toast = VoiceCopy.NO_MATCH
                     is SpeechFailure.Unavailable -> vh.sheet = VoiceSheet.Unavailable(why.why)
-                    // 录音权限还没给:照旧弹系统框或「去设置」。已经给了仍报没有权限,或识别服务报录音出错:
-                    // 另弹说明(系统的麦克风总开关、权限管理)。麦克风起不来的其他情况照旧提示可能被占用
-                    // 查得出来是识别服务自己没有录音权限:说明是它,带用户去它的设置页(去 Claire 的权限页是指错了地方)
+                    // The recording permission is not granted yet: show the system dialog or "open settings" as before. It was granted but no permission is still reported, or the recognition service reports an audio error:
+                    // show the separate explanation (system-wide microphone toggle, permission management). Other cases where the mic cannot start still show the "may be in use" toast
+                    // It can be determined that the recognition service itself lacks the recording permission: say it is that app and take the user to its settings page (Claire's permission page would point to the wrong place)
                     is SpeechFailure.ServiceNoPermission -> vh.sheet = VoiceSheet.ServicePermission(why.service)
                     SpeechFailure.NoPermission -> if (vh.ensureMic()) vh.sheet = VoiceSheet.MicBlocked
                     SpeechFailure.AudioError -> vh.sheet = VoiceSheet.MicBlocked
@@ -422,7 +422,7 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
             else -> Unit
         }
     }
-    // 按着时由界面推着走:计时、到 60 秒收尾(录音到点自己停,不收尾字就丢了)
+    // While holding, the UI drives it: timing, and wrapping up at 60 seconds (the recording stops on its own at the limit, so without wrapping up the text would be lost)
     val listening = state is HoldToTalk.State.Listening
     LaunchedEffect(listening) {
         while (listening) {
@@ -435,31 +435,31 @@ internal fun rememberVoiceHold(voice: VoiceSource?, onText: (String) -> Unit, on
         delay(if (t == VoiceCopy.NO_MATCH) 2_000 else 3_500)
         vh.toast = null
     }
-    // 离开页面、转屏、App 到后台:丢掉正在说的这一段
+    // Leaving the page, rotating the screen or the app going to the background: drop the segment being spoken
     LifecycleStartEffect(vh) { onStopOrDispose { vh.abort() } }
     return vh
 }
 
-/** [vh] 此刻的状态;没有 [vh] 时一直是平时。 */
+/** The current state of [vh]; always idle when there is no [vh]. */
 @Composable
 internal fun voiceState(vh: VoiceHold?): HoldToTalk.State = (vh?.hold?.state ?: IdleState).collectAsState().value
 
 /**
- * 盖在没聚焦的输入框上的手势:点一下照旧打字([onTap] 聚焦弹键盘),按住约 0.3 秒开始听,
- * 按着往上滑进「在听」卡片是直接发送、滑过卡片上沿是取消(见 [voiceAim]),松开交给状态机。
+ * The gesture over the unfocused input field: a tap still types ([onTap] focuses and opens the keyboard), holding about 0.3 seconds starts listening,
+ * sliding up into the "listening" card while holding sends directly, and sliding past the card's top edge cancels (see [voiceAim]); on release it goes to the state machine.
  */
 @Composable
 internal fun Modifier.holdToTalk(vh: VoiceHold, onTap: () -> Unit): Modifier {
     val density = LocalDensity.current
     val cancelLift = with(density) { CancelLift.toPx() }
     val sendLift = with(density) { SendLift.toPx() }
-    // 手势这块在根布局里的位置:手指的坐标是相对它的,卡片的是根布局的
+    // Position of this gesture area in the root layout: finger coordinates are relative to it, while the card's are in the root layout
     val origin = remember { arrayOf(Offset.Zero) }
     return onGloballyPositioned { origin[0] = it.positionInRoot() }.pointerInput(vh, cancelLift, sendLift) {
         awaitEachGesture {
             val down = awaitFirstDown()
             down.consume()
-            // true:点一下;false:手指动了或没了,不算我们的;null:按满了开始听——引擎不可用也由 begin 弹说明页,功能入口不消失
+            // true: a tap; false: the finger moved or lifted, not ours; null: the hold completed and listening starts — begin shows the explanation even when the engine is unavailable, so the feature entry never disappears
             val tapped = withTimeoutOrNull<Boolean>(HOLD_MS) {
                 var result: Boolean? = null
                 while (result == null) {
@@ -480,8 +480,8 @@ internal fun Modifier.holdToTalk(vh: VoiceHold, onTap: () -> Unit): Modifier {
             }
             vh.begin()
             if (!vh.holding) {
-                // 没起听:说明页/权限框已经弹出来了。按住了就留着说明页——这是用户发现语音入口、被带去设置的路;
-                // 不足半秒松手照旧回退点按:收掉说明页、当点按处理,不吃手势
+                // Listening did not start: the explanation sheet or permission dialog is already showing. Keep the sheet while the finger stays down — that is how users discover the voice entry and get taken to settings;
+                // releasing within half a second falls back to a tap as before: close the sheet, treat it as a tap and swallow the gesture
                 while (true) {
                     val ch = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
                     if (!ch.pressed) {
@@ -500,7 +500,7 @@ internal fun Modifier.holdToTalk(vh: VoiceHold, onTap: () -> Unit): Modifier {
                         ch?.consume()
                         ended = true
                         vh.end()
-                        // 按得太短(多半是想来点按的):状态机已当没听清取消,这里补当点按——开键盘/出提示,不吃手势
+                        // Held too briefly (most likely a tap was intended): the state machine already cancelled it as nothing heard, so make it a tap here — open the keyboard / show the prompt, and swallow the gesture
                         if (ch != null && ch.uptimeMillis - down.uptimeMillis < MIN_TOTAL_MS) onTap()
                         break
                     }
@@ -514,7 +514,7 @@ internal fun Modifier.holdToTalk(vh: VoiceHold, onTap: () -> Unit): Modifier {
     }
 }
 
-/** 按着时整条输入栏变蓝(上滑到取消时变红、滑进卡片要直接发送时变绿),中间波形和「松开 填入」;盖在玻璃输入栏上。 */
+/** The whole input bar turns blue while holding (red when sliding up to cancel, green when inside the card to send directly), with the waveform and "release to fill" in the middle; it covers the glass input bar. */
 @Composable
 internal fun VoiceBarCover(vh: VoiceHold, state: HoldToTalk.State, reduceMotion: Boolean, modifier: Modifier = Modifier) {
     val s = state as? HoldToTalk.State.Listening
@@ -536,7 +536,7 @@ internal fun VoiceBarCover(vh: VoiceHold, state: HoldToTalk.State, reduceMotion:
     }
 }
 
-/** 波形:14 根细条,高低跟着音量走;关了动画时只跟音量,不自己摆。输入栏和悬浮胶囊的说话面板共用。 */
+/** The waveform: 14 thin bars whose heights follow the volume; with animations off they only follow the volume and do not swing on their own. Shared by the input bar and the floating capsule's speaking panel. */
 @Composable
 internal fun VoiceWave(level: Float, flat: Boolean, reduceMotion: Boolean, color: Color) {
     val loud by animateFloatAsState(if (flat) 0f else level.coerceIn(0f, 1f), if (reduceMotion) snap() else tween(120), label = "wave-level")
@@ -556,15 +556,15 @@ internal fun VoiceWave(level: Float, flat: Boolean, reduceMotion: Boolean, color
 private const val WAVE_BARS = 14
 
 /**
- * 输入栏上方浮起的那一层,不占布局(放在输入栏前面、高度算 0、往上画):
- * 按着时的「上滑 发送/取消」提示、「在听」卡片,以及没听清之类的轻提示。
- * [title] 是卡片顶上那句(平时「在听」,任务在跑时「插话给『…』」)。
+ * The layer floating above the input bar, taking no layout space (placed before the input bar, zero height, drawn upward):
+ * the "slide up to send/cancel" hint while holding, the "listening" card, and light toasts such as "didn't catch that".
+ * [title] is the line at the top of the card ("listening" normally, "interject to '…'" while a task is running).
  */
 @Composable
 internal fun VoiceFloat(vh: VoiceHold, state: HoldToTalk.State, title: String, backdrop: GlassBackdrop?, reduceMotion: Boolean) {
     val gap = with(LocalDensity.current) { 12.dp.roundToPx() }
     val listening = state as? HoldToTalk.State.Listening
-    // 卡片收起的动画里还要画最后那一刻的内容
+    // The last moment's content still has to be drawn during the card's collapse animation
     val last = remember { arrayOfNulls<HoldToTalk.State.Listening>(1) }
     if (listening != null) last[0] = listening
     Box(
@@ -592,7 +592,7 @@ internal fun VoiceFloat(vh: VoiceHold, state: HoldToTalk.State, title: String, b
     }
 }
 
-/** 「上滑 发送/取消」的小胶囊:往上滑进卡片是发送、再滑过卡片到这里是取消;滑到这里变红写「松开 取消」。 */
+/** The "slide up to send/cancel" pill: sliding up into the card sends, sliding on past the card to here cancels; on reaching it, it turns red and reads "release to cancel". */
 @Composable
 private fun CancelHint(armed: Boolean, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -610,9 +610,9 @@ private fun CancelHint(armed: Boolean, modifier: Modifier = Modifier) {
 }
 
 /**
- * 「在听」卡片:顶上一个红点(在录)、说给谁、用的哪个转文字、用时;中间实时的字(末尾还可能变的几个字浅一些);
- * 底下说松开以后会怎样,最后十秒倒数。上滑到取消时字划掉、边框变红;滑进卡片要直接发送时边框变绿。
- * 排好版后把自己在根布局里的位置交给 [onPlaced](手指落在卡片里就是直接发送)。
+ * The "listening" card: a red dot at the top (recording), who it is being said to, which transcriber is used, and the elapsed time; in the middle the live text (the trailing characters that may still change are lighter);
+ * below, what happens after release, plus a countdown in the last ten seconds. When sliding up to cancel the text is struck through and the border turns red; when inside the card to send directly the border turns green.
+ * Once laid out it reports its position in the root layout to [onPlaced] (a finger inside the card sends directly).
  */
 @Composable
 private fun ListenCard(
@@ -660,7 +660,7 @@ private fun ListenCard(
     }
 }
 
-/** 卡片顶上那个点:在录时蓝色一圈一圈往外;要取消时变红、要直接发送时变绿,都不动。 */
+/** The dot at the top of the card: blue rings pulse outward while recording; red when cancelling and green when sending directly, both motionless. */
 @Composable
 private fun RecDot(s: HoldToTalk.State.Listening) {
     val c = MikaTheme.colors
@@ -679,7 +679,7 @@ private fun RecDot(s: HoldToTalk.State.Listening) {
     )
 }
 
-/** 落点的颜色:取消红、直接发送绿,其余 [idle]。输入栏、卡片边框和卡片上的点共用,和取消一个样式。 */
+/** The color of the target: red for cancel, green for direct send, otherwise [idle]. Shared by the input bar, the card border and the dot on the card, using the same style as cancel. */
 @Composable
 private fun aimTone(s: HoldToTalk.State.Listening, idle: Color): Color {
     val c = MikaTheme.colors
@@ -690,7 +690,7 @@ private fun aimTone(s: HoldToTalk.State.Listening, idle: Color): Color {
     }
 }
 
-/** 输入栏上方的一句轻提示(没听清、识别服务忙……),一会儿自己消失。 */
+/** A short toast above the input bar (didn't catch that, recognition service busy, …) that disappears on its own after a moment. */
 @Composable
 private fun VoiceToast(text: String) {
     val c = MikaTheme.colors
@@ -701,7 +701,7 @@ private fun VoiceToast(text: String) {
     )
 }
 
-/** 服务商松开后在转:输入框里转圈加「转文字…」。 */
+/** The provider is converting after release: a spinner in the input box plus "transcribing…". */
 @Composable
 internal fun VoiceConverting(modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -711,7 +711,7 @@ internal fun VoiceConverting(modifier: Modifier = Modifier) {
     }
 }
 
-/** 能按住说话时的灰字：左对齐,和光标位置一致(这行第一身份是文本框)。 */
+/** The grey text shown when push-to-talk is available: left-aligned, matching the cursor position (this line's primary identity is a text box). */
 @Composable
 internal fun VoicePlaceholder(mode: ComposerMode, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -720,7 +720,7 @@ internal fun VoicePlaceholder(mode: ComposerMode, modifier: Modifier = Modifier)
     }
 }
 
-/** 按着说话时对话内容虚化变淡,注意力在卡片上;安卓 12 以下只变淡。 */
+/** Blurs and fades the conversation while holding to talk, keeping attention on the card; below Android 12 it only fades. */
 @Composable
 internal fun Modifier.voiceDim(on: Boolean, reduceMotion: Boolean): Modifier {
     val p by animateFloatAsState(if (on) 1f else 0f, if (reduceMotion) snap() else tween(250), label = "voice-dim")
@@ -734,7 +734,7 @@ internal fun Modifier.voiceDim(on: Boolean, reduceMotion: Boolean): Modifier {
     }
 }
 
-/** 「还不能语音输入」(「去选」到设置里选转文字)和录音权限的说明(「去设置」到系统里 Claire 的权限页)。 */
+/** The "voice input not available yet" explanation ("choose" leads to the transcriber picker in settings) and the recording permission explanation ("open settings" leads to Claire's permission page in the system). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
@@ -785,8 +785,8 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
             title = stringResource(R.string.voice_service_permission_title)
             body = stringResource(R.string.voice_service_permission_body, service.label)
             action = stringResource(R.string.voice_permission_open)
-            // Claire 不能替别的应用申请权限,只能带用户到它的设置页。回来之后不自己重新录音:下次按住时再试。
-            // 这一页打不开时(有的系统不让看某些应用的详情)告诉用户到哪里找
+            // Claire cannot request permissions for another app, only take the user to its settings page. It does not start recording again on return: the next hold tries again.
+            // When this page cannot be opened (some systems forbid viewing certain apps' details), tell the user where to look
             go = {
                 try {
                     context.startActivity(

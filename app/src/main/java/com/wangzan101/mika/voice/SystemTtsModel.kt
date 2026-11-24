@@ -14,9 +14,9 @@ import java.io.File
 import java.util.Locale
 
 /**
- * 用系统 [TextToSpeech] 合成完整 WAV 的非流式声音模型。每次合成新建一个引擎、初始化后合成到临时文件、
- * 等 [SystemTtsEngine.setOnUtteranceProgressListener] 的完成回调再读出字节,完成、出错或取消都一定 stop/shutdown。
- * 交回 [TtsResponse] 后由现有 [VoicePlayer] 播放,不另开播放路径或后台服务。
+ * A non-streaming voice model that synthesizes a complete WAV with the system [TextToSpeech]. Every synthesis creates a new engine, initializes it, synthesizes into a temporary file,
+ * waits for the completion callback of [SystemTtsEngine.setOnUtteranceProgressListener] and then reads the bytes; completion, error and cancellation always stop/shutdown.
+ * After the [TtsResponse] is returned, the existing [VoicePlayer] plays it; no separate playback path or background service is opened.
  */
 class SystemTtsModel(
     private val context: Context,

@@ -88,7 +88,7 @@ internal fun VoiceModel.traits(capability: VoiceCapability): List<VoiceTrait> = 
         else -> listOf(VoiceTrait.WholeRead)
     }
     VoiceCapability.REALTIME -> when (realtime?.protocol) {
-        // 应用内语音通话目前只接双向实时协议,其余的只能用于 AI 接打电话
+        // In-app voice calls currently only support bidirectional realtime protocols; the rest can only be used for AI phone calls
         RealtimeProtocol.VolcDuplex -> listOf(VoiceTrait.Interruptible)
         RealtimeProtocol.OpenAiRealtime -> listOf(VoiceTrait.Interruptible, VoiceTrait.PhoneOnly)
         null -> emptyList()

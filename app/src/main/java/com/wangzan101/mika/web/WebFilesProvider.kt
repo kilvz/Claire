@@ -6,8 +6,8 @@ import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
 
 /**
- * 把工作区文件交给网页文件选择框用的 content:// 地址。只读:不许写、不许删、不许插入;
- * 只覆盖沙箱的 work/ 目录(见 res/xml/web_files.xml),不对外导出。
+ * Provides content:// URIs for workspace files to the web page's file chooser. Read-only: no writing, deleting or inserting;
+ * covers only the sandbox work/ directory (see res/xml/web_files.xml) and is not exported.
  */
 class WebFilesProvider : FileProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {

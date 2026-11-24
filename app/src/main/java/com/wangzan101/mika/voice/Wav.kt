@@ -3,7 +3,7 @@ package com.wangzan101.mika.voice
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** 把 16 位单声道 PCM 包成标准 WAV(44 字节头 + 小端数据),给服务商的转文字接口上传用。 */
+/** Wraps 16-bit mono PCM into a standard WAV (44-byte header + little-endian data) for uploading to provider transcription APIs. */
 object Wav {
     const val RATE = 16_000
     private const val HEADER = 44
@@ -15,19 +15,19 @@ object Wav {
         buf.putInt(36 + dataSize)
         buf.put("WAVE".toByteArray(Charsets.US_ASCII))
         buf.put("fmt ".toByteArray(Charsets.US_ASCII))
-        buf.putInt(16)              // fmt 块长度
+        buf.putInt(16)              // fmt chunk size
         buf.putShort(1)             // PCM
-        buf.putShort(1)             // 单声道
+        buf.putShort(1)             // mono
         buf.putInt(rate)
-        buf.putInt(rate * 2)        // 每秒字节数 = 采样率 × 声道 × 2 字节
-        buf.putShort(2)             // 块对齐
-        buf.putShort(16)            // 位深
+        buf.putInt(rate * 2)        // bytes per second = sample rate × channels × 2 bytes
+        buf.putShort(2)             // block alignment
+        buf.putShort(16)            // bit depth
         buf.put("data".toByteArray(Charsets.US_ASCII))
         buf.putInt(dataSize)
         for (s in pcm16) buf.putShort(s)
         return buf.array()
     }
 
-    /** 一段全零的静音 WAV,用来试探某个模型能不能转文字(不需要真录音)。 */
+    /** A block of all-zero silence as WAV, used to probe whether a model can transcribe at all (no real recording needed). */
     fun silence(ms: Int, rate: Int = RATE): ByteArray = encode(ShortArray(rate * ms / 1000), rate)
 }
