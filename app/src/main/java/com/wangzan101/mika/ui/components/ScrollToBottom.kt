@@ -31,7 +31,7 @@ import com.wangzan101.mika.ui.theme.MikaSize
 import com.wangzan101.mika.ui.theme.MikaTheme
 
 /**
- * 列表上滑脱离末尾后浮出的圆形磨砂玻璃「回到底部」按钮。
+ * A round frosted-glass "back to bottom" button that floats out once the list is scrolled away from the end.
  */
 @Composable
 fun ScrollToBottomButton(
@@ -75,8 +75,8 @@ private const val APPROACH_RATE = 8.5f
 private const val RAMP_SECONDS = 0.07f
 
 /**
- * 连续平滑滚回列表真正的末尾：
- * 不经过「先停在最后一项顶部、再二次补滚到底部」的分段跳转，全程在同一帧循环里平滑加速并减速落到底部边缘。
+ * Continuously and smoothly scroll back to the real end of the list:
+ * without the two-stage jump of "first stop at the top of the last item, then scroll a second time to the bottom"; the whole run accelerates and decelerates smoothly within the same per-frame loop and comes to rest at the bottom edge.
  */
 internal suspend fun scrollListToBottom(listState: LazyListState, density: Density, reduceMotion: Boolean) {
     val initialLayout = listState.layoutInfo
@@ -87,7 +87,7 @@ internal suspend fun scrollListToBottom(listState: LazyListState, density: Densi
         return
     }
     val lastVisibleIndex = initialLayout.visibleItemsInfo.lastOrNull()?.index ?: 0
-    // 只有距离特别远（超过 25 条）时先一次性跳到近处，避免超长历史滚好几秒；正常翻看全程连续滑动。
+    // Only when the distance is especially large (more than 25 items) jump close in one go first, so a very long history doesn't take several seconds to scroll; normal browsing slides continuously the whole way.
     if (initialEnd - lastVisibleIndex > PRE_JUMP_ITEM_GAP) {
         listState.scrollToItem((initialEnd - PRE_JUMP_KEEP_ITEMS).coerceAtLeast(0))
     }

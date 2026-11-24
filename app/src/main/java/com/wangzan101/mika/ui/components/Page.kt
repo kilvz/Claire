@@ -21,8 +21,8 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaSpace
 
 /**
- * 子页面的骨架:页面底 + 带返回的顶栏 + 一列可滚动的内容(左右留 [MikaSpace.Page],避开导航栏)。
- * 内容里直接放 [GroupLabel] / [GroupCard] / [FooterNote]。
+ * Skeleton for a sub-page: page background + top bar with back + a scrolling column of content ([MikaSpace.Page] on the left and right, avoiding the navigation bar).
+ * Put [GroupLabel] / [GroupCard] / [FooterNote] directly in the content.
  */
 @Composable
 fun PageScaffold(

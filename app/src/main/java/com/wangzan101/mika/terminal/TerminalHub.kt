@@ -22,9 +22,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * 用户终端:进程里一份,按沙箱工作区([WorkspaceKey])管理会话(同项目对话共用同一个项目终端)。
- * 终端不属于任何任务,不经过模型,也不写运行记录;同一工作区只开一个,全局最多 [MAX_SESSIONS] 个。
- * 对话或项目删除、树锁收回、用户关闭都会结束对应会话。
+ * User terminals: one instance per process, managing sessions by sandbox workspace ([WorkspaceKey]) (conversations in the same project share the same project terminal).
+ * A terminal belongs to no task, never goes through the model, and writes no run records; only one is opened per workspace, at most [MAX_SESSIONS] in total.
+ * Deleting a conversation or project, revoking the tree lock, or the user closing it all end the corresponding session.
  */
 class TerminalHub internal constructor(
     private val conversations: ConversationStore,
@@ -80,14 +80,14 @@ class TerminalHub internal constructor(
 
     fun sessionForWorkspace(key: WorkspaceKey): TerminalSession? = _sessions.value[key.wire]
 
-    /** 打开或附着这个对话所属工作区的终端;运行环境没准备好时先等它(最多两分钟)。 */
+    /** Open or attach the terminal of the workspace this conversation belongs to; if the runtime isn't ready yet, wait for it first (up to two minutes). */
     suspend fun open(conversationId: String, title: String?, cols: Int = 80, rows: Int = 24): TerminalSession {
         val key = resolveWorkspace(conversationId)
         val displayTitle = if (key is WorkspaceKey.Project) projects?.get(key.id)?.name ?: title else title
         return openWorkspace(key, displayTitle, cols, rows)
     }
 
-    /** 打开或附着指定工作区 [key] 的终端;运行环境没准备好时先等它(最多两分钟)。 */
+    /** Open or attach the terminal of the given workspace [key]; if the runtime isn't ready yet, wait for it first (up to two minutes). */
     suspend fun openWorkspace(key: WorkspaceKey, title: String?, cols: Int = 80, rows: Int = 24): TerminalSession {
         val sessionKey = key.wire
         _sessions.value[sessionKey]?.let {
@@ -99,7 +99,7 @@ class TerminalHub internal constructor(
                 if (it.phase.value == TerminalSession.Phase.Running) return@withLock it
                 closeWorkspace(key)
             }
-            // 退出、被收回、被关掉的会话不再占名额。
+            // Sessions that exited, were revoked or were closed no longer take up a slot.
             _sessions.update { map -> map.filterValues { it.phase.value == TerminalSession.Phase.Running } }
             if (_sessions.value.size >= MAX_SESSIONS) {
                 throw SandboxError("terminal_limit", "Close another terminal first.", recoverable = true)

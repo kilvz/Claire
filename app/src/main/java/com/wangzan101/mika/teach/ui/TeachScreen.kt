@@ -47,7 +47,7 @@ import com.wangzan101.mika.chat.ui.draft
 import com.wangzan101.mika.skills.ui.SkillReadingView
 import com.wangzan101.mika.skills.ui.skillPreviewBody
 
-/** 总结页要显示的东西，和 runtime 分开，便于单独预览与测试。 */
+/** What the summary page needs to show, kept separate from the runtime so it can be previewed and tested on its own. */
 internal data class TeachSummaryView(
     val display: String,
     val description: String,
@@ -79,7 +79,7 @@ fun TeachScreen(runtime: TeachRuntime, onBack: () -> Unit) {
             } else {
                 Summarizing(failed = true, notice = ui.notice, onRetry = runtime::retry, onDiscard = runtime::discard)
             }
-            // 收下以后带着新目标再进来:问的是新目标,不该停在上一份的「已学会」
+            // Re-entering with a new goal after accepting: the question is about the new goal, so it shouldn't stay on the previous session's "learned" page
             TeachPhase.Saved -> if (showDone(session, ui.hint)) TeachDonePage(
                 name = ui.acceptedName ?: metaValue(draft, "display") ?: session.goal,
                 description = metaValue(draft, "description").orEmpty(),
@@ -90,7 +90,7 @@ fun TeachScreen(runtime: TeachRuntime, onBack: () -> Unit) {
     }
 }
 
-/** 已经收下、且没有带着新目标进来时，才停在「已学会」页。 */
+/** Only stay on the "learned" page when it has been accepted and no new goal was passed in. */
 internal fun showDone(session: TeachSession?, hint: String?): Boolean =
     session?.phase == TeachPhase.Saved && (hint.isNullOrBlank() || hint == session.goal)
 

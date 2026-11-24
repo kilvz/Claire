@@ -1,6 +1,6 @@
 package com.wangzan101.mika.ui
 
-/** 全部使用窗口内容区域内的 dp；不依赖设备型号、屏幕方向或 Android Rect，方便验证边界。 */
+/** Everything uses dp within the window content area; no dependency on device model, screen orientation or Android Rect, which makes boundaries easy to verify. */
 internal data class PaneBounds(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
     val height get() = bottom - top
@@ -18,10 +18,10 @@ internal data class AdaptiveLayout(
 }
 
 /**
- * 640dp 起常驻 280dp 侧栏，840dp 起侧栏加宽到 304dp。竖折屏按真实铰链分栏。
- * 至少给列表 280dp、聊天 360dp，兼顾展开后仍不足 840dp 的折叠屏。
- * 横向折痕、多个铰链或任意一栏太窄时，选择最大的完整区域；同面积优先左侧/上侧。
- * 非分隔、无遮挡的平展折痕由调用方过滤，不应浪费可用空间。
+ * From 640dp there is a permanent 280dp side pane, and from 840dp the side pane widens to 304dp. Vertical foldables are split at the real hinge.
+ * Give the list at least 280dp and the chat 360dp, also covering foldables that are still under 840dp once unfolded.
+ * With a horizontal crease, multiple hinges, or any pane too narrow, pick the largest complete region; on equal area prefer the left/top one.
+ * Flat creases that are neither separating nor occluding are filtered out by the caller and should not waste usable space.
  */
 internal fun adaptiveLayout(width: Float, height: Float, folds: List<FoldObstacle>, navigation: Boolean): AdaptiveLayout {
     val full = PaneBounds(0f, 0f, width.coerceAtLeast(0f), height.coerceAtLeast(0f))

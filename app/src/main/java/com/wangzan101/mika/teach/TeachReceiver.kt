@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.wangzan101.mika.MikaApp
 
-/** 通知上的暂停、继续、结束、放弃。 */
+/** Pause, resume, end and discard from the notification. */
 class TeachReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext as? MikaApp ?: return

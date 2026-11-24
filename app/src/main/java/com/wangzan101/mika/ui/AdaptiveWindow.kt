@@ -39,7 +39,7 @@ import com.wangzan101.mika.browser.ui.findActivity
 
 internal val LocalAdaptiveLayout = staticCompositionLocalOf { AdaptiveLayout(PaneBounds(0f, 0f, 0f, 0f)) }
 
-/** 跟随窗口和姿态变化；按生命周期收集，后台时取消监听。系统栏和铰链都是窗口坐标。 */
+/** Follows window and posture changes; collected per lifecycle, with listening cancelled in the background. System bars and hinges are both in window coordinates. */
 @Composable
 internal fun AdaptiveWindow(navigation: Boolean = false, content: @Composable () -> Unit) {
     val activity = LocalContext.current.findActivity()
@@ -76,7 +76,7 @@ internal fun AdaptiveWindow(navigation: Boolean = false, content: @Composable ()
         val pane = layout.content
         val right = (width / scale - pane.right).coerceAtLeast(0f).dp
         val bottom = (height / scale - pane.bottom).coerceAtLeast(0f).dp
-        // 单栏没有折痕时，继续由原页面自行处理系统栏与键盘。
+        // With a single pane and no crease, let the original page keep handling system bars and the keyboard.
         val protection = if (layout.hasNavigation || pane != PaneBounds(0f, 0f, width / scale, height / scale)) {
             Modifier.background(MikaTheme.colors.bg).windowInsetsPadding(bars)
                 .absolutePadding(left = pane.left.dp, top = pane.top.dp, right = right, bottom = bottom)

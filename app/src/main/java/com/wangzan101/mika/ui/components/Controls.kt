@@ -56,11 +56,11 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import androidx.compose.runtime.getValue
 
-// ---------- 开关 ----------
+// ---------- Switch ----------
 
 /**
- * 开关:44×26,打开时强调蓝。动画 200ms 减速,系统关了动画时直接到位。
- * [onCheckedChange] 为空时只显示(整行可点时用)。
+ * Switch: 44×26, accent blue when on. The animation is 200ms with deceleration; with system animations off it jumps straight into place.
+ * When [onCheckedChange] is null it is display-only (used when the whole row is clickable).
  */
 @Composable
 fun MikaSwitch(
@@ -96,11 +96,11 @@ fun MikaSwitch(
     )
 }
 
-// ---------- 胶囊 ----------
+// ---------- Pills ----------
 
 enum class PillTone { Ok, Warn, Neutral, Accent }
 
-/** 状态胶囊:可用、需要你、已停用;强调色的标明「在用」(例如模型在给哪个用途干活)。 */
+/** Status pill: available, needs you, disabled; the accent tone marks "in use" (e.g. which purpose a model is serving). */
 @Composable
 fun StatusPill(text: String, tone: PillTone = PillTone.Neutral, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -118,19 +118,19 @@ fun StatusPill(text: String, tone: PillTone = PillTone.Neutral, modifier: Modifi
 
 private val PillText = MikaType.Hint.copy(fontWeight = FontWeight.SemiBold)
 
-// ---------- 按钮 ----------
+// ---------- Buttons ----------
 
-/** 主按钮(强调蓝实底)、浅色次按钮(白底蓝字)、浅填充按钮、文字按钮。 */
+/** Primary button (solid accent blue), light secondary button (white background, blue text), light filled button, text button. */
 enum class ButtonKind { Primary, Secondary, Tonal, Text }
 
-/** 大:页面底部 52;中:卡片里并排 42;小:行内 32 的胶囊。 */
+/** Large: 52 at the bottom of a page; medium: 42 side by side in a card; small: 32 pill inline. */
 enum class ButtonSize(val height: Dp, val shape: RoundedCornerShape, val text: TextStyle, val padding: Dp) {
     Large(MikaSize.Button, MikaShapes.Button, MikaType.BodyStrong, 20.dp),
     Medium(42.dp, MikaShapes.Chip, MikaType.Body.copy(fontWeight = FontWeight.SemiBold), 14.dp),
     Small(32.dp, MikaShapes.Card, MikaType.Caption.copy(fontWeight = FontWeight.SemiBold), 14.dp),
 }
 
-/** 按钮。宽度由 [modifier] 定(铺满、按权重分或包住文字)。 */
+/** A button. The width is set by [modifier] (fill, weighted, or wrapped around the text). */
 @Composable
 fun MikaButton(
     text: String,
@@ -162,9 +162,9 @@ fun MikaButton(
     }
 }
 
-// ---------- 分段控件 ----------
+// ---------- Segmented control ----------
 
-/** 分段控件:浅填充底,选中的一段是白色浮起。[tags] 是各段的测试标签。 */
+/** Segmented control: light filled background, the selected segment is white and raised. [tags] are the test tags for each segment. */
 @Composable
 fun SegmentedControl(
     options: List<String>,
@@ -207,11 +207,11 @@ fun DirectionalIcon(icon: ImageVector, contentDescription: String?, modifier: Mo
     Icon(icon, contentDescription, modifier.graphicsLayer { if (mirror) scaleX = -1f }, tint = tint)
 }
 
-// ---------- 顶栏 ----------
+// ---------- Top bar ----------
 
 /**
- * 顶栏上的圆形图标按钮,40dp。[glass] 为真时是浮在内容上的白色玻璃圆。
- * [badge] 为真时右上角一个强调色小圆点(有别的事在进行);[enabled] 为假时变淡、不可点。
+ * Round icon button for the top bar, 40dp. When [glass] is true it is a white glass circle floating over the content.
+ * When [badge] is true, a small accent dot in the top-end corner (something else is in progress); when [enabled] is false it dims and can't be tapped.
  */
 @Composable
 fun BarIconButton(
@@ -241,8 +241,8 @@ fun BarIconButton(
 }
 
 /**
- * 顶栏:56 高,左右各一个图标按钮位,标题居中,可带一行副标题。
- * 底色默认是页面底色,内容在它下面滚动时不透字。
+ * Top bar: 56 tall, one icon button slot on each side, centered title, optionally with a line of subtitle.
+ * The background defaults to the page background, so text doesn't show through when content scrolls beneath it.
  */
 @Composable
 fun TopBar(
@@ -250,7 +250,7 @@ fun TopBar(
     left: ImageVector? = null,
     onLeft: () -> Unit = {},
     leftLabel: String = "",
-    /** 左边按钮上的小圆点,见 [BarIconButton]。 */
+    /** The small dot on the left button; see [BarIconButton]. */
     leftBadge: Boolean = false,
     right: (@Composable RowScope.() -> Unit)? = null,
     subtitle: String? = null,
@@ -282,9 +282,9 @@ fun TopBar(
     }
 }
 
-// ---------- 选择胶囊 ----------
+// ---------- Select chips ----------
 
-/** 可选的胶囊(服务商、接口类型):34 高,白卡底;选中时深色实底、反色字。[small] 是行内的小号。 */
+/** Selectable pill (provider, API type): 34 tall, white card background; when selected it is a solid dark fill with inverted text. [small] is the inline small variant. */
 @Composable
 fun SelectChip(
     text: String,
@@ -327,11 +327,11 @@ private val SmallChipShape = MikaShapes.Tile
 private val ChipText = MikaType.Body.copy(fontWeight = FontWeight.Medium)
 private val SmallChipText = MikaType.Hint.copy(fontWeight = FontWeight.Medium)
 
-// ---------- 小标签 ----------
+// ---------- Small tags ----------
 
 enum class TagTone { Neutral, Accent }
 
-/** 能力小标签(工具调用、看图、64K):11 / 600,圆角 7。 */
+/** Small capability tag (tool calling, image input, 64K): 11 / 600, corner radius 7. */
 @Composable
 fun CapabilityTag(text: String, tone: TagTone = TagTone.Neutral) {
     val c = MikaTheme.colors
@@ -342,9 +342,9 @@ fun CapabilityTag(text: String, tone: TagTone = TagTone.Neutral) {
 private val TagShape = MikaShapes.Tile
 private val TagText = MikaType.Micro.copy(fontWeight = FontWeight.SemiBold)
 
-// ---------- 分页点 ----------
+// ---------- Pagination dots ----------
 
-/** 上手流程底部的分页点:当前一步是 18 宽的强调色短条,其余是 6 的灰点。 */
+/** Pagination dots at the bottom of the onboarding flow: the current step is an 18-wide accent bar, the rest are 6-wide grey dots. */
 @Composable
 fun ProgressDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors

@@ -21,9 +21,9 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import kotlinx.coroutines.delay
 
 /**
- * 给竖向的懒加载列表画一条细滚动条:贴在右边,长短反映看得见的部分占整个列表的多少,位置反映滚到哪。
- * 列表放得下时不画;滚动时和内容刚变化时出现,停下来一会儿后淡出。画在内容上面,不占布局。
- * 总长按已显示那几项的平均高度估算,各项高度差得不大时足够准。
+ * Draws a thin scrollbar for a vertical lazy list: pinned to the right edge, its length reflects how much of the whole list is visible and its position reflects where you have scrolled.
+ * Nothing is drawn when the list fits; it appears while scrolling and right after the content changes, then fades out after a moment at rest. It is drawn on top of the content and takes no layout space.
+ * The total length is estimated from the average height of the items shown so far, which is accurate enough when item heights don't vary much.
  */
 @Composable
 fun Modifier.lazyListScrollbar(

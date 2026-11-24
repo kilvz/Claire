@@ -30,8 +30,8 @@ import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 
 /**
- * App 内统一弹窗：保留调用方的内容、动作和测试标识，只统一容器、正文层级与操作区。
- * 操作仍由调用方提供；这里只给它们一致的浅色底、圆角和排布，不把确认逻辑收进组件。
+ * The app's unified dialog: it keeps the caller's content, actions and test tags, and only unifies the container, body hierarchy and action area.
+ * Actions are still supplied by the caller; this only gives them a consistent light background, corner radius and arrangement, without pulling confirm logic into the component.
  */
 @Composable
 fun MikaDialog(
@@ -89,7 +89,7 @@ private fun DialogAction(modifier: Modifier, background: Color, content: @Compos
     ) { content() }
 }
 
-/** 通知型弹窗的正文和回答使用同一套 Markdown 排版，不把原始标记直接交给用户。 */
+/** The body and answer of a notice dialog use the same Markdown layout, so raw markup is never handed straight to the user. */
 @Composable
 fun MikaNoticeDialog(
     message: String,

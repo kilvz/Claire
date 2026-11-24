@@ -14,7 +14,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
-/** 环形缓冲:保留最近 [cap] 字节,UI 重新附着时从这里重建画面。 */
+/** Ring buffer: keeps the most recent [cap] bytes; the UI rebuilds the screen from it when re-attaching. */
 class TerminalRingBuffer(private val cap: Int) {
     private val buf = ByteArray(cap)
     private var start = 0
@@ -53,19 +53,19 @@ class TerminalRingBuffer(private val cap: Int) {
         return out
     }
 
-    /** 被丢掉的最旧字节数;0 表示从会话开始的内容都还在。 */
+    /** Number of oldest bytes dropped; 0 means everything since the session started is still there. */
     @Synchronized
     fun droppedBytes(): Long = dropped
 }
 
 /**
- * 一个用户终端的会话:shell 进程、输出缓冲、输入和历史。
- * 输出同时进环形缓冲(给重新附着的界面)和 [output](给正在看的界面)。
+ * A user terminal session: shell process, output buffer, input and history.
+ * Output goes into the ring buffer (for a re-attaching UI) and to [output] (for the UI currently watching) at the same time.
  */
 class TerminalSession internal constructor(
     val conversationId: String,
     val title: String?,
-    /** 会话启动时冻结的联网状态;中途改设置只影响新会话。 */
+    /** Network state frozen when the session starts; changing the setting midway only affects new sessions. */
     val network: Boolean,
     private val shell: SandboxShell,
     scope: CoroutineScope,
@@ -79,19 +79,19 @@ class TerminalSession internal constructor(
     val exitCode: StateFlow<Int?> = _exitCode.asStateFlow()
 
     private val ring = TerminalRingBuffer(1 shl 20)
-    // 界面一时跟不上时读输出的这一侧等着,不丢块:丢掉的块会让屏上缺一段,还可能切断转义序列或半个 UTF-8 字。
-    // 等着的时候输出管道写满,沙箱那头停下来,输入和改窗口大小也要等界面赶上才处理。没有界面在看时 emit 不等,只进环形缓冲
+    // When the UI falls behind for a moment, the reading side waits instead of dropping chunks: a dropped chunk leaves a gap on screen and may also cut an escape sequence or half a UTF-8 character.
+    // While it waits, the output pipe fills up and the sandbox side stalls, so input and resizes are only handled once the UI catches up. With no UI watching, emit doesn't wait and only goes into the ring buffer
     private val _output = MutableSharedFlow<ByteArray>(extraBufferCapacity = 64)
     val output: kotlinx.coroutines.flow.SharedFlow<ByteArray> = _output
 
-    /** 本次会话里用户输入过的行;只在内存里,不写盘。 */
+    /** Lines the user has entered in this session; memory only, never written to disk. */
     val history = ArrayDeque<String>()
 
-    /** PTY 自己回显,界面不要再把输入画一遍。 */
+    /** The PTY echoes by itself, so the UI must not draw the input again. */
     val echoInput = false
 
     private val shellClosed = AtomicBoolean()
-    /** 见 [writeBytes];在 [lifecycle] 之前建好,它收尾时要关掉这个线程。 */
+    /** See [writeBytes]; created before [lifecycle], which has to shut this thread down when it wraps up. */
     private val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "mika-terminal-write").apply { isDaemon = true } }
     private val lifecycle = scope.launch {
         try {
@@ -144,20 +144,22 @@ class TerminalSession internal constructor(
     }
 
     /**
-     * 写进 shell 的字交给这个会话自己的线程按先后写,调用方不等:界面落后时沙箱那头不读输入,输入管道会写满,
-     * 在主线程上直接写就把主线程卡住,而收输出的也是主线程,两边互相等。写不进去(会话已关)的丢掉。
+     * Text written to the shell is handed to this session's own thread and written in order; the caller doesn't wait: when the
+     * UI falls behind, the sandbox side doesn't read input and the input pipe fills up, so writing directly on the main thread
+     * would block it, and since the main thread also collects output, the two sides would wait on each other. Writes that fail
+     * (session already closed) are dropped.
      */
     fun writeBytes(bytes: ByteArray) {
         runCatching { writer.execute { runCatching { shell.input.write(bytes); shell.input.flush() } } }
     }
 
-    /** 界面大小变了(转屏、字体变化、分屏);mikarun 会把新的行列数写进 pty。 */
+    /** The UI size changed (rotation, font change, split screen); mikarun writes the new column and row counts into the pty. */
     fun resize(cols: Int, rows: Int) {
         if (cols !in 1..1000 || rows !in 1..1000) return
         runCatching { shell.resize(cols, rows) }
     }
 
-    /** 从会话开始到现在的输出(最旧的超出缓冲的部分已经丢掉)。 */
+    /** Output from the start of the session until now (the oldest part beyond the buffer has already been dropped). */
     fun snapshot(): ByteArray = ring.snapshot()
 
     fun droppedBytes(): Long = ring.droppedBytes()

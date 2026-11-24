@@ -45,20 +45,20 @@ enum class TeachNotice { Busy, NoAccessibility, NeedGoal, SecretGoal, DraftFaile
 data class TeachUi(
     val session: TeachSession? = null,
     val notice: TeachNotice? = null,
-    /** 输入框里还没发出的字，只作预填，不会自己开始。 */
+    /** Text typed in the input box but not sent yet; used only as prefill and never starts on its own. */
     val hint: String? = null,
-    /** 整理好、等着用户收下的技能。 */
+    /** The skill that has been assembled and is waiting for the user to accept it. */
     val draft: PersonalSkill? = null,
-    /** 被折叠掉、没有写进技能的人工步骤，只用于总结页说明。 */
+    /** Manual steps that were folded away and not written into the skill; used only to explain things on the summary page. */
     val folded: List<String> = emptyList(),
-    /** 这次没有配置模型，技能由本机规则整理。 */
+    /** No model was configured this time, so the skill was assembled by on-device rules. */
     val basic: Boolean = false,
     val acceptedName: String? = null,
 )
 
 /**
- * 示范会话。只有 [TeachPhase.Recording] 会收下事件。
- * 进程起来时若上次停在采集或暂停，改成已停下，不继续采。
+ * A teaching session. Only [TeachPhase.Recording] accepts events.
+ * If the process starts while the previous session was capturing or paused, it is marked stopped and capture does not resume.
  */
 class TeachRuntime(
     private val app: Context,
@@ -69,7 +69,7 @@ class TeachRuntime(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
     private var session: TeachSession? = null
-    /** 正在整理的那一次;用户丢弃或开始新的示范时作废,晚到的结果不许再写。 */
+    /** The run currently being assembled; it is invalidated when the user discards it or starts a new demo, and late results must not be written. */
     private var work: Job? = null
     private var draft: PersonalSkill? = null
     private var folded: List<String> = emptyList()
@@ -145,7 +145,7 @@ class TeachRuntime(
             files.save(session!!)
             publish(null)
         }
-        // 提示只作预填:这次的目标已经开始了,别再拿它去猜下一次的入口
+        // The hint is only prefill: this goal has already started, so don't use it to guess the entry point for the next one
         _ui.value = _ui.value.copy(hint = null)
         TeachNotifier.tryShow(app, TeachPhase.Recording)
         (app.applicationContext as? MikaApp)?.capsule?.yieldToTeaching()
@@ -179,7 +179,7 @@ class TeachRuntime(
         return null
     }
 
-    /** 做完了：立刻进入整理，不需要用户再点生成。 */
+    /** Done: go straight into assembly; the user doesn't need to tap generate again. */
     fun end() {
         chip.hide()
         val snapshot = synchronized(lock) {
@@ -195,7 +195,7 @@ class TeachRuntime(
         launchWork(snapshot)
     }
 
-    /** 整理失败或没看到操作后，再整理一次。 */
+    /** Assemble again after assembly failed or no actions were seen. */
     fun retry() {
         val snapshot = synchronized(lock) {
             val cur = session ?: return
@@ -209,7 +209,7 @@ class TeachRuntime(
         launchWork(snapshot)
     }
 
-    /** 用户看过总结后收下：这时技能才启用（试用）。 */
+    /** The user accepts after reviewing the summary: only now is the skill enabled (for trial). */
     fun accept(): TeachNotice? {
         val cur = synchronized(lock) { session } ?: return null
         val id = cur.draftId ?: return fail(TeachNotice.DraftFailed)
@@ -243,7 +243,7 @@ class TeachRuntime(
         if (rejected != null) skills().reject(rejected)
     }
 
-    /** 草稿被拒绝、删除或收下：轨迹不再需要。 */
+    /** The draft was rejected, deleted or accepted: the trace is no longer needed. */
     fun forget(skill: PersonalSkill) {
         val traceId = synchronized(lock) { session?.id ?: files.load()?.id } ?: return
         if (!TeachSkill.retiresTrace(skill, traceId)) return
@@ -287,13 +287,13 @@ class TeachRuntime(
         if (outcome == TeachSummary.Outcome.Failed) failDraft(snapshot, TeachNotice.DraftFailed)
     }
 
-    /** 现在还是不是这一次示范：用户已经丢弃、或已经开始了新的一次，晚到的整理结果就不能再写。 */
+    /** Whether this is still the same demo session: if the user has already discarded it or started a new one, late assembly results must not be written. */
     private fun isCurrent(snapshot: TeachSession): Boolean = synchronized(lock) {
         val cur = session
         cur?.id == snapshot.id && cur.phase == TeachPhase.Drafting
     }
 
-    /** 草稿上次已经写完、会话没来得及落盘：只补记会话，不再写一遍。 */
+    /** The draft was already written last time but the session didn't reach disk: just record the session, don't write it again. */
     private fun adoptDraft(snapshot: TeachSession, route: TeachRoute, draftId: String, result: TeachDraft.Result) {
         synchronized(lock) {
             val cur = session ?: return
@@ -303,8 +303,9 @@ class TeachRuntime(
     }
 
     /**
-     * 写进待确认，并把草稿编号记进会话。检查和写盘在同一把锁里，丢弃那边也拿这把锁：
-     * 两边谁也插不进中间，用户丢弃以后不会再冒出一份没人认领的草稿。
+     * Write into pending and record the draft id in the session. The check and the write to disk happen under the same lock,
+     * and the discard side takes that lock too: neither can slip in between, so no unclaimed draft can appear after the
+     * user discards.
      */
     private fun commitDraft(snapshot: TeachSession, route: TeachRoute, draftId: String, result: TeachDraft.Result): Boolean =
         synchronized(lock) {
@@ -329,7 +330,7 @@ class TeachRuntime(
         publish(null)
     }
 
-    /** 整理一次。上一次还没跑完（用户又点了重整理）就作废，结果只认最后一次。 */
+    /** Assemble once. If the previous run hasn't finished (the user tapped assemble again) it is invalidated; only the last result counts. */
     private fun launchWork(snapshot: TeachSession) {
         work?.cancel()
         work = scope.launch {
@@ -343,7 +344,7 @@ class TeachRuntime(
         }
     }
 
-    /** 草稿已经存过、会话没来得及落盘：按轨迹编号找回，不重复生成。 */
+    /** The draft was already stored but the session didn't reach disk: find it again by trace id instead of regenerating. */
     private suspend fun restoreDraft(snapshot: TeachSession) {
         val found = try {
             withContext(Dispatchers.IO) {
@@ -384,7 +385,7 @@ class TeachRuntime(
             val cur = session
             if (cur?.id != snapshot.id || cur.phase != TeachPhase.Drafting) return
             session = cur.copy(phase = TeachPhase.Reviewing, updatedAt = System.currentTimeMillis())
-            // 写盘失败也要把「没能写成草稿、可以重来」的页面给出来,不能再抛回去把进程带走
+            // Even if saving to disk fails, still show the "no draft could be written, you can start over" page; don't throw again and take the process down with it
             runCatching { files.save(session!!) }
             publish(notice)
         }
@@ -416,7 +417,7 @@ class TeachRuntime(
 
     private fun interrupt() = loseWatch()
 
-    /** 浮层或无障碍没了：停止采集，并留下原因。不再记录。 */
+    /** The overlay or accessibility is gone: stop capturing and leave the reason. Nothing is recorded anymore. */
     private fun loseWatch() {
         chip.hide()
         val stopped = synchronized(lock) {

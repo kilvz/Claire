@@ -11,7 +11,7 @@ import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.learn.teach.TeachPhase
 
-/** 采集或暂停时的常驻通知。没有这条通知就不算在看；进程没了不会自己再采。 */
+/** The ongoing notification while capturing or paused. Without this notification it doesn't count as watching; once the process is gone it won't capture again by itself. */
 object TeachNotifier {
     const val PAUSE = "com.wangzan101.mika.teach.PAUSE"
     const val RESUME = "com.wangzan101.mika.teach.RESUME"
@@ -20,7 +20,7 @@ object TeachNotifier {
     private const val CHANNEL = "teach"
     private const val ID = 7
 
-    /** 通知只是附加提示。失败（例如没有通知权限）不影响采集；采集靠 [TeachChip]。 */
+    /** The notification is only an extra hint. Failure (e.g. no notification permission) doesn't affect capture; capture relies on [TeachChip]. */
     fun tryShow(context: Context, phase: TeachPhase) {
         runCatching { show(context, phase) }
     }

@@ -11,7 +11,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import com.wangzan101.mika.R
 
-/** Claire 的标志:圆角方块里的图标画。圆角默认按边长的 0.28(36dp 约 10,76dp 约 22)。 */
+/** The Claire logo: an icon drawing inside a rounded square. The corner radius defaults to 0.28 of the side length (about 10 at 36dp, about 22 at 76dp). */
 @Composable
 fun MikaLogo(size: Dp, modifier: Modifier = Modifier, corner: Dp = size * 0.28f) {
     Image(

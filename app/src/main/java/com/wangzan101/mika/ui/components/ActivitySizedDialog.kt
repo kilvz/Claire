@@ -38,7 +38,7 @@ internal fun ActivitySizedDialog(
     val windowManager = context.getSystemService(WindowManager::class.java)
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    // WindowMetrics 是安卓 11 起才有的;更早的系统用真实显示尺寸,系统栏留白取自 Compose 的兼容实现。
+    // WindowMetrics only exists since Android 11; older systems use the real display size, and the system bar insets come from Compose's compatibility implementation.
     val bounds: Rect
     val system: Insets
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

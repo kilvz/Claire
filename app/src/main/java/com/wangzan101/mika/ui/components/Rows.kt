@@ -52,13 +52,13 @@ import com.wangzan101.mika.ui.theme.MikaSize
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 分组小标题:13 / 500,辅助文字色。 */
+/** Group heading: 13 / 500, secondary text color. */
 @Composable
 fun GroupLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier.padding(top = 8.dp, bottom = 8.dp), style = MikaType.Label, color = MikaTheme.colors.ink3)
 }
 
-/** 分组下面的说明,和卡片里的文字对齐。 */
+/** The note under a group, aligned with the text inside the cards. */
 @Composable
 fun FooterNote(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     Text(
@@ -67,7 +67,7 @@ fun FooterNote(text: String, modifier: Modifier = Modifier, color: Color = Color
     )
 }
 
-/** 一行摘要 + 可展开的「详情」:默认只显示 [summary],点「详情」展开 [detail] 全文。间距由调用方用 [modifier] 给。 */
+/** One line of summary + an expandable "details": by default only [summary] is shown; tapping "details" expands the full [detail]. Spacing is provided by the caller via [modifier]. */
 @Composable
 fun DetailNote(summary: String, detail: String, modifier: Modifier = Modifier) {
     var open by rememberSaveable { mutableStateOf(false) }
@@ -95,7 +95,7 @@ fun DetailNote(summary: String, detail: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** 图标块的底色和图形色。默认中性;只有状态才上色。 */
+/** Background and glyph colors of the icon tile. Neutral by default; only status gets color. */
 enum class TileTone {
     Neutral, Accent, Ok, Warn, Bad;
 
@@ -109,8 +109,8 @@ enum class TileTone {
 }
 
 /**
- * 行左边的图标块:30dp、圆角 9,里面图形 18dp。
- * [brandTile] 非空时是自着色的品牌标:底色用它(两种模式一致),图形保留自身颜色。
+ * Icon tile to the left of a row: 30dp, corner radius 9, with an 18dp glyph inside.
+ * When [brandTile] is non-null it is a self-colored brand mark: its color is used as the background (the same in both modes) and the glyph keeps its own colors.
  */
 @Composable
 fun IconTile(icon: ImageVector, tone: TileTone = TileTone.Neutral, brandTile: Color? = null) {
@@ -120,7 +120,7 @@ fun IconTile(icon: ImageVector, tone: TileTone = TileTone.Neutral, brandTile: Co
     }
 }
 
-/** 行与行之间的分隔线,从 [start] 画到右边;分组首行([first])不画。 */
+/** Divider between rows, drawn from [start] to the right edge; the first row of a group ([first]) gets none. */
 private fun Modifier.topHairline(first: Boolean, start: Dp, color: Color): Modifier =
     if (first) this
     else drawBehind {
@@ -128,14 +128,14 @@ private fun Modifier.topHairline(first: Boolean, start: Dp, color: Color): Modif
         drawLine(color, Offset(start.toPx(), y), Offset(size.width, y), strokeWidth = 0.5.dp.toPx())
     }
 
-/** 有图标块时文字从这里开始:左边距 16 + 图标块 30 + 间距 14。 */
+/** Where text starts when there is an icon tile: left padding 16 + icon tile 30 + gap 14. */
 private val TextStartWithIcon = 60.dp
 private val TextStartPlain = 16.dp
 
 /**
- * 列表行:左边图标块可选,中间标题和说明,右边是 [trailing](值、胶囊、开关、箭头)。
- * [detail] 是说明下面再一行的小字(如「上次结果」),颜色由 [detailColor] 定。
- * [first] 为分组首行时不画上分隔线;[onClick] 为空时整行不可点。
+ * A list row: optional icon tile on the left, title and description in the middle, [trailing] on the right (value, pill, switch, chevron).
+ * [detail] is a small line of text under the description (such as "last result"), colored by [detailColor].
+ * With [first] the top divider is not drawn for the first row of a group; when [onClick] is null the whole row is not clickable.
  */
 @Composable
 fun ListRow(
@@ -174,7 +174,7 @@ fun ListRow(
 
 enum class ValueTone { Plain, Ok, Warn, Bad, Link }
 
-/** 行尾的值。 */
+/** The value at the end of a row. */
 @Composable
 fun RowValue(text: String, tone: ValueTone = ValueTone.Plain) {
     val c = MikaTheme.colors
@@ -192,13 +192,13 @@ fun RowValue(text: String, tone: ValueTone = ValueTone.Plain) {
     )
 }
 
-/** 行尾的小箭头:点进去还有一页。 */
+/** The small chevron at the end of a row: tapping leads to another page. */
 @Composable
 fun RowChevron() {
     DirectionalIcon(MikaIcons.Chevron, null, Modifier.size(MikaSize.SmallIcon), tint = MikaTheme.colors.ink3)
 }
 
-/** 单选行:左边圆圈,选中时实心强调色。分隔线从文字处开始。 */
+/** Radio row: a circle on the left, solid accent color when selected. The divider starts at the text. */
 @Composable
 fun RadioRow(
     title: String,
@@ -208,7 +208,7 @@ fun RadioRow(
     first: Boolean = false,
     enabled: Boolean = true,
     titleStyle: TextStyle = MikaType.Body,
-    /** 标题下面的附加内容(例如能力小标签)。 */
+    /** Extra content under the title (e.g. small capability tags). */
     below: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
@@ -246,9 +246,9 @@ private fun RadioMark(selected: Boolean, enabled: Boolean = true) {
 }
 
 /**
- * 卡片里的输入行:左边固定宽的标题,右边单行输入框(空时显示 [placeholder])。
- * [secret] 为真时按密码显示;[trailing] 放在输入框右边(例如「显示」)。
- * [onClear] 非空且输入框里有字时,在文字右边放一个清空按钮(和搜索框的叉同一套)。
+ * Input row inside a card: fixed-width label on the left, a single-line field on the right (shows [placeholder] when empty).
+ * When [secret] is true it is displayed as a password; [trailing] goes to the right of the field (e.g. "show").
+ * When [onClear] is non-null and the field has text, a clear button is placed to the right of the text (the same set as the search field's X).
  */
 @Composable
 fun InputRow(
@@ -290,7 +290,7 @@ fun InputRow(
     }
 }
 
-/** 输入框末尾的叉:点一下清空。和搜索框的清空按钮同一套大小和颜色,只在有内容时由调用方放出来。 */
+/** The X at the end of a field: tap to clear. Same size and colors as the search field's clear button; the caller only shows it when there is content. */
 @Composable
 fun FieldClearButton(description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
@@ -302,7 +302,7 @@ fun FieldClearButton(description: String, onClick: () -> Unit, modifier: Modifie
     }
 }
 
-/** 卡片里自己排版的块之间的分隔线,从 [start] 画到右边。 */
+/** Divider between self-arranged blocks inside a card, drawn from [start] to the right edge. */
 @Composable
 fun Hairline(start: Dp = TextStartWithIcon) {
     Box(Modifier.fillMaxWidth().padding(start = start).height(0.5.dp).background(MikaTheme.colors.hair))

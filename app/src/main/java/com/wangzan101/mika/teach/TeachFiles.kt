@@ -8,7 +8,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** 一份示范轨迹，只留合并后的步骤。放弃、拒绝、删除或收下后整个目录删掉。 */
+/** A demo trace that keeps only the merged steps. The whole directory is deleted after discard, reject, delete, or accept. */
 class TeachFiles(dir: File) {
     private val root = File(dir, "teach")
     private val file = File(root, "session.json")

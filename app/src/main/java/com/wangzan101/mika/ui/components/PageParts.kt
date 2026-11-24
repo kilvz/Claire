@@ -37,8 +37,8 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /**
- * 二级页的骨架:页面底 + 顶栏(左上角返回)+ 下面可滚动的内容(左右各 16)。
- * 内容很长、要懒加载的页面不用它,自己在 [TopBar] 下面放 LazyColumn。
+ * Skeleton for a second-level page: page background + top bar (back in the top-start corner) + scrolling content below (16 on each side).
+ * Pages whose content is very long or needs lazy loading don't use this; they place a LazyColumn under [TopBar] themselves.
  */
 @Composable
 fun SubPage(
@@ -60,7 +60,7 @@ fun SubPage(
     }
 }
 
-/** 行下面的一排操作按钮(小号胶囊),和行的文字对齐。 */
+/** A row of action buttons under a row (small pills), aligned with the row's text. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RowActions(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
@@ -71,7 +71,7 @@ fun RowActions(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     ) { content() }
 }
 
-/** 搜索框:浅填充底、圆角 14、高 40,左边放大镜。给了 [onSubmit] 时键盘上是「前往」,按下交给它。 */
+/** Search field: light filled background, corner radius 14, height 40, magnifier on the left. When [onSubmit] is given, the keyboard shows "Go" and pressing it hands off to it. */
 @Composable
 fun SearchField(
     value: String,
@@ -99,7 +99,7 @@ fun SearchField(
     }
 }
 
-/** 空状态:一两句居中的说明。 */
+/** Empty state: one or two centered sentences. */
 @Composable
 fun EmptyNote(text: String, modifier: Modifier = Modifier) {
     Text(
