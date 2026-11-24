@@ -59,8 +59,8 @@ import kotlinx.coroutines.withContext
 import com.wangzan101.mika.memory.ui.Link
 
 /**
- * 设置 › 关于 › 更新镜像:总开关、可拖动排序的镜像列表、增删改和「测试」。
- * GitHub 官方固定排在最后,不在此列表里,也不能删。检查更新和下载都按这里的顺序尝试。
+ * Settings › About › Update mirrors: the master switch, a drag-to-reorder mirror list, add/edit/delete and "Test".
+ * Official GitHub is always last, is not in this list and cannot be deleted. Update checks and downloads try sources in this order.
  */
 @Composable
 fun UpdateMirrorsScreen(store: UpdateMirrorStore, onBack: () -> Unit) {
@@ -107,7 +107,7 @@ fun UpdateMirrorsScreen(store: UpdateMirrorStore, onBack: () -> Unit) {
                 stringResource(R.string.about_mirror_download_detail),
                 first = true,
             ) {
-                // 列表读不出来时不能改开关,不显示一个点了没反应的控件。
+                // The switch cannot be changed when the list cannot be read, so don't show a control that does nothing when tapped.
                 if (!unreadable) {
                     MikaSwitch(enabled, { on ->
                         scope.launch {
@@ -301,7 +301,7 @@ private fun MirrorDialog(store: UpdateMirrorStore, initial: UpdateMirror?, onDis
     )
 }
 
-/** 行尾的删除。单独可点,不会连着打开编辑。 */
+/** Delete at the end of a row. Separately tappable so it does not also open the editor. */
 @Composable
 private fun DeleteMirrorButton(onClick: () -> Unit) {
     val label = stringResource(R.string.about_mirrors_delete)

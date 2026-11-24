@@ -26,12 +26,13 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-/** 手动检查更新这一次的结果;自动检查不改它(失败时不打扰)。 */
+/** Result of this manual update check; automatic checks do not touch it (a failure stays quiet). */
 enum class CheckStatus { Idle, Checking, Done, Failed }
 
 /**
- * 检查更新的状态。[latest] 是最近一次查到的版本(更新记录用),[update] 是比当前新的那个(有它才有红点)。
- * [manualRounds] 每完成一次手动检查加一,页面据此给出「已是最新」「连不上」之类的提示。
+ * Update check state. [latest] is the most recently found version (used for update history), [update] is the one newer than the
+ * current version (only that shows a badge).
+ * [manualRounds] increases by one for every completed manual check, which is how the screen shows messages like "already up to date" or "cannot connect".
  */
 data class UpdateState(
     val latest: ReleaseInfo? = null,
@@ -43,8 +44,9 @@ data class UpdateState(
 }
 
 /**
- * 每次打开 App 都自动查一次,只挡住连着来的:离上次自动检查不到 [MIN_GAP_MS](来回切几下、旋转屏幕)不再查。
- * 上次时间比现在还晚(改过系统时间)也算到期。
+ * Checks once every time the app opens, only suppressing back-to-back ones: if less than [MIN_GAP_MS] has passed since the last
+ * automatic check (switching back and forth a few times, rotating the screen) it does not check again.
+ * A last-attempt time later than now (the system clock was changed) also counts as due.
  */
 object UpdateSchedule {
     const val MIN_GAP_MS = 2 * 60 * 1000L
@@ -53,10 +55,13 @@ object UpdateSchedule {
 }
 
 /**
- * 检查更新,没有自己的服务器:直连 GitHub 发布页接口,开了镜像时也按用户的顺序问镜像;
- * 连不上、限流、读不懂都算这次没查到。镜像不支持 API 时退到发布页取 tag 和附件信息。
- * 查到的版本和上次自动检查的时间存在 [file],App 重开后红点还在;装了新版后当前版本不再落后,红点自然消失。
- * 这里只检查版本；用户主动下载、安装由 [ApkUpdater] 处理。
+ * Checks for updates with no server of its own: it talks to the GitHub releases API directly, and when mirrors are enabled it also
+ * asks the mirrors in the user's order;
+ * being unable to connect, rate limiting and unparseable responses all count as "not found this time". When a mirror does not support
+ * the API it falls back to the release page for the tag and asset information.
+ * The found version and the time of the last automatic check are stored in [file], so the badge is still there after the app is
+ * reopened; once a newer version is installed the current version is no longer behind and the badge disappears by itself.
+ * This only checks versions; user-initiated download and install are handled by [ApkUpdater].
  */
 class UpdateChecker(
     private val file: File,
@@ -64,11 +69,11 @@ class UpdateChecker(
     private val client: OkHttpClient = defaultClient(),
     private val releaseApi: String = MikaLinks.LATEST_RELEASE_API,
     private val releasesUrl: String = MikaLinks.RELEASES,
-    /** 当前的镜像设置;每次检查取一次,用户在检查途中改了顺序也不影响这一次。 */
+    /** Current mirror settings; read once per check, so changing the order mid-check does not affect that check. */
     private val mirrorSettings: () -> MirrorSettings = { MirrorSettings.OFF },
     private val now: () -> Long = System::currentTimeMillis,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    /** 本机支持的 ABI(Build.SUPPORTED_ABIS),用来挑发布里合适的 APK;为空时取全架构包。 */
+    /** ABIs this device supports (Build.SUPPORTED_ABIS), used to pick the right APK from a release; when empty the all-architecture package is taken. */
     private val deviceAbis: List<String> = emptyList(),
 ) {
     private val _state = MutableStateFlow(UpdateState())
@@ -77,23 +82,24 @@ class UpdateChecker(
     private val mutex = Mutex()
     private var lastAttempt: Long? = null
     private var loaded = false
-    // 记录当前结果的来源，跨重启也不能把镜像摘要当作官方摘要。
+    // Record the source of the current result; even across restarts a mirror digest must not be treated as an official digest.
     private var latestOfficial = false
 
-    /** 每次打开 App 时调:到期就在后台查一次,失败不吭声。 */
+    /** Called every time the app opens: checks once in the background when due, silently on failure. */
     fun autoCheckInBackground() = scope.launch { autoCheck() }
 
-    /** 用户点了「检查更新」。 */
+    /** The user tapped "Check for updates". */
     fun checkInBackground() {
         scope.launch { check(manual = true) }
     }
 
-    /** 读出存着的结果(只读一次),红点不用等联网。 */
+    /** Reads the stored result (once only) so the badge does not have to wait for the network. */
     suspend fun load() = mutex.withLock { loadLocked() }
 
     /**
-     * 到期就查一次,返回这次有没有真的去查。开查前先记下这次的时间:同时进来的第二次(查还没完)看到的是刚记的时间,
-     * 不会再查一遍。
+     * Checks once when due and returns whether a check actually ran. The time is recorded before checking starts: a second call
+     * arriving at the same time (while the check is still running) sees the time just recorded,
+     * and does not check again.
      */
     suspend fun autoCheck(): Boolean {
         val due = mutex.withLock {
@@ -144,14 +150,14 @@ class UpdateChecker(
                 }
                 completeManual(if (foundAny) CheckStatus.Done else CheckStatus.Failed)
             } finally {
-                // 取消检查也要清除手动等待状态，避免界面一直转圈。
+                // Cancelling the check must also clear the manual waiting state, so the screen does not spin forever.
                 completeManual(if (foundAny) CheckStatus.Done else CheckStatus.Failed)
                 save()
             }
         }
     }
 
-    /** 各来源并行查询，结果按到达顺序交给同一个协程处理。 */
+    /** Queries all sources in parallel; results are handed to the same coroutine in arrival order. */
     private suspend fun fetchLatest(settings: MirrorSettings, onResult: (ReleaseInfo, Boolean) -> Unit) = coroutineScope {
         val sources = buildList {
             add("")
@@ -178,7 +184,7 @@ class UpdateChecker(
         }
     }
 
-    /** 同版本补全缺失信息；校验数据只属于其对应的 APK 地址。 */
+    /** Fills in missing information for the same version; verification data only belongs to its own APK URL. */
     private fun mergeRelease(previous: ReleaseInfo, candidate: ReleaseInfo, previousOfficial: Boolean, candidateOfficial: Boolean): ReleaseInfo {
         val clearsGuess = candidate.apkListKnown && candidate.apkUrl == null &&
             !previous.apkListKnown && previous.apkSize == null && previous.apkDigest == null
@@ -206,7 +212,7 @@ class UpdateChecker(
         val trustedOther = !candidateOfficial || previousOfficial || other === candidate
         return candidate.copy(
             name = candidate.name.takeUnless { it.isBlank() || it == candidate.version } ?: previous.name,
-            // 官方结果优先:镜像代理 API 时可能给出缓存或错误的说明,由官方覆盖。
+            // Official results take priority: when a mirror proxies the API it may return cached or wrong notes, which the official one overrides.
             notes = if (candidateOfficial && !previousOfficial) {
                 candidate.notes.ifBlank { previous.notes }
             } else {
@@ -230,7 +236,7 @@ class UpdateChecker(
         lastAttempt = (o["lastAttempt"] as? JsonPrimitive)?.longOrNull
         latestOfficial = (o["latestOfficial"] as? JsonPrimitive)?.content == "true"
         val latest = (o["latest"] as? JsonObject)?.let(Releases::fromJson)?.let {
-            // 旧记录没有来源，不能将其校验数据视作可信的官方数据。
+            // Old records have no source, so their verification data cannot be treated as trusted official data.
             if (o["latestOfficial"] == null) it.copy(apkSize = null, apkDigest = null) else it
         }
         _state.update { it.withLatest(latest) }
@@ -256,10 +262,10 @@ class UpdateChecker(
     }
 
     companion object {
-        /** 一个来源最多花这么久(镜像可能要走「API → 发布页 → 附件页」三次请求);各路并行,不会叠加。 */
+        /** A single source may take at most this long (a mirror may have to go "API → release page → assets page", three requests); the paths run in parallel, so the times do not add up. */
         private const val PROBE_TIMEOUT_MS = 12_000L
 
-        /** 有的网络连 GitHub 时快时慢:超时放短,失败就换备用来源。走设置 › 网络代理和更新镜像。 */
+        /** Some networks are fast or slow when reaching GitHub: keep the timeout short and switch to a fallback source on failure. See Settings › Network proxy and update mirrors. */
         fun defaultClient(): OkHttpClient = NetProxy.shared.client(OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)

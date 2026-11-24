@@ -6,7 +6,7 @@ import com.wangzan101.mika.about.CheckStatus
 import com.wangzan101.mika.about.MikaLinks
 import com.wangzan101.mika.about.UpdateState
 
-/** 关于页的文字,以及「检查更新」一行、设置首页「关于 Claire」一行、侧栏入口上的提示怎么显示。 */
+/** The About screen's text, plus how the "Check for updates" row, the "About Claire" row on the settings home and the hint on the drawer entry are displayed. */
 object AboutCopy {
     val TITLE: String get() = tr(R.string.settings_about)
     val TAGLINE: String get() = tr(R.string.about_tagline)
@@ -72,11 +72,11 @@ object AboutCopy {
     fun available(version: String): String = tr(R.string.about_available, version)
     fun updateTitle(version: String): String = tr(R.string.about_update_title, version)
 
-    /** 「当前 0.1.0 Beta · 2026-11-05 发布」;不知道发布日期时只写当前版本。 */
+    /** "Current 0.1.0 Beta · released 2026-11-05"; when the release date is unknown only the current version is written. */
     fun updateSub(current: String, beta: Boolean, date: String?): String =
         tr(R.string.about_current, current + if (beta) " $BETA" else "") + (date?.let { tr(R.string.about_released_on, it) } ?: "")
 
-    /** 「检查更新」一行右边:正在查转圈,有新版写版本号带红点,查过一次写结果;从没查过什么都不写。 */
+    /** Right side of the "Check for updates" row: a spinner while checking, the version number with a dot when there is a new release, the result once a check has run; nothing at all if it has never run. */
     data class CheckValue(val text: String?, val dot: Boolean = false, val spinner: Boolean = false, val highlight: Boolean = false)
 
     fun checkValue(s: UpdateState): CheckValue = when {
@@ -87,11 +87,11 @@ object AboutCopy {
         else -> CheckValue(null)
     }
 
-    /** 设置首页「关于 Claire」一行右边:有新版写「x 可更新」带红点,不然写当前版本号。 */
+    /** Right side of the "About Claire" row on the settings home: "x available" with a dot when there is a new release, otherwise the current version number. */
     fun settingsValue(updateVersion: String?, versionName: String): CheckValue =
         if (updateVersion != null) CheckValue(available(updateVersion), dot = true, highlight = true)
         else CheckValue(versionName.takeIf { it.isNotEmpty() })
 
-    /** 侧栏「关于 Claire」上的红点。 */
+    /** The dot on "About Claire" in the drawer. */
     fun drawerDot(s: UpdateState): Boolean = s.hasUpdate
 }

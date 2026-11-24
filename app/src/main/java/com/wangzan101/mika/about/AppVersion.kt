@@ -1,9 +1,11 @@
 package com.wangzan101.mika.about
 
 /**
- * 版本号比较,按「主.次.修订[-预发布][+构建]」的习惯:开头的 v 去掉,数字段逐个比(缺的当 0),
- * 数字一样时正式版比带预发布后缀的新,两个都带后缀时按点分的各段比(数字按大小,文字按字典序,数字段排在文字段前)。
- * 构建后缀(+ 之后)不参与比较。
+ * Version comparison following the "major.minor.patch[-prerelease][+build]" convention: a leading v is stripped, the numeric
+ * segments are compared one by one (missing ones count as 0),
+ * when the numbers are equal a final release is newer than one with a prerelease suffix, and when both have suffixes the
+ * dot-separated segments are compared (numbers numerically, text lexicographically, numeric segments before text segments).
+ * The build suffix (after +) takes no part in the comparison.
  */
 object AppVersion {
     fun normalize(v: String): String = v.trim().removePrefix("v").removePrefix("V").trim()
@@ -23,7 +25,7 @@ object AppVersion {
         }
     }
 
-    /** [candidate] 比 [current] 新。 */
+    /** [candidate] is newer than [current]. */
     fun isNewer(candidate: String, current: String): Boolean = compare(candidate, current) > 0
 
     private fun split(v: String): Pair<List<Int>, String?> {

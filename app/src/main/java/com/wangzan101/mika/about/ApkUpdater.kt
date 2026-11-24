@@ -26,14 +26,16 @@ data class ApkDownloadState(
 }
 
 /**
- * 手动直连下载交给系统;保存任务编号,进程重启后仍能查询、取消或安装。方法在 IO 线程调用。
- * 文件放在本应用的外部专属目录(别的 App 读写不到),同一时间只留一个;换版本、删除、装好后都清掉。
- * 自动下载和经代理的手动下载由 Claire 在进程里执行,以便绑定 Wi-Fi 或使用应用代理([ProxiedApkDownload])。
+ * Manual direct downloads are handed to the system; the task id is saved so it can still be queried, cancelled or installed after a
+ * process restart. Methods are called on the IO thread.
+ * Files live in this app's external files directory (no other app can read or write them), only one at a time; switching version,
+ * cancelling, and after install they are all cleaned up.
+ * Automatic downloads and proxied manual downloads run inside Claire's process so they can bind to Wi-Fi or use the app proxy ([ProxiedApkDownload]).
  */
 class ApkUpdater(
     private val context: Context,
     private val net: NetProxy = NetProxy.shared,
-    /** 当前的镜像设置;下载开始时取一次,下载途中改开关或顺序不影响这一次。 */
+    /** Current mirror settings; read once when a download starts, so changing the switch or order mid-download does not affect this one. */
     private val mirrorSettings: () -> MirrorSettings = { MirrorSettings.OFF },
 ) {
     private val manager = context.getSystemService(DownloadManager::class.java)
@@ -41,14 +43,14 @@ class ApkUpdater(
     private val directory: File get() = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         ?: error("external files unavailable"), "updates")
     private val file: File? get() = prefs.getString("file", null)?.let { File(directory, it) }
-    /** 这一份由 Claire 自己下载。 */
+    /** This download is performed by Claire itself. */
     private val viaApp: Boolean get() = prefs.getBoolean("viaApp", false)
 
     @Synchronized
     fun state(release: ReleaseInfo): ApkDownloadState =
         if (prefs.getString("url", null) != release.apkUrl) ApkDownloadState() else recorded()
 
-    /** 记下的那个下载任务现在的状态;系统里查不到这个任务算失败。 */
+    /** Current status of the recorded download task; a task the system cannot find counts as failed. */
     private fun recorded(): ApkDownloadState {
         if (viaApp) return file?.let(proxied::state) ?: ApkDownloadState(DownloadPhase.Failed)
         val id = prefs.getLong("id", -1)
@@ -68,7 +70,7 @@ class ApkUpdater(
     }
 
     @Synchronized
-    /** 自动下载传入当前 Wi-Fi，手动下载沿用系统默认网络。 */
+    /** Automatic downloads pass the current Wi-Fi; manual downloads use the system default network. */
     fun download(release: ReleaseInfo, wifi: Network? = null) {
         val official = requireNotNull(release.apkUrl)
         ApkIntegrity.requireOfficialUrl(official)
@@ -76,18 +78,21 @@ class ApkUpdater(
         val sources = UpdateMirrors.candidates(official, settings)
         sources.forEach { ApkIntegrity.requireTrustedDownloadUrl(it, official, settings.mirrors) }
         val proxy = net.proxyFor(Uri.parse(official).host.orEmpty())
-        // 下载的「身份」始终是官方地址:镜像开关或顺序变了,已经下好的同一份包不用重下。
-        // 「暂停」不算在途:系统下载器有时会卡在暂停不自动恢复,再点下载就取消重下,给用户一个手动续上的口子。
+        // A download's "identity" is always the official URL: if the mirror switch or order changes, an already
+        // downloaded copy of the same package need not be fetched again.
+        // "Paused" does not count as in flight: the system downloader sometimes gets stuck paused and does not resume
+        // by itself, so pressing download again cancels and restarts, giving the user a way to continue manually.
         if (prefs.getString("url", null) == official && state(release).phase in
             listOf(DownloadPhase.Downloading, DownloadPhase.Ready)) return
         cancel()
         val folder = directory
         check(folder.mkdirs() || folder.isDirectory)
-        // 进程被杀、记录丢了时留下的旧文件也一并清掉,目录里只留这一次的。
+        // Also remove old files left behind when the process was killed or the record lost, so only this attempt's file remains.
         folder.listFiles()?.forEach { it.delete() }
-        // remove 的后台清理可能晚于下一次下载,不能复用旧任务的文件名。
+        // remove's background cleanup may finish after the next download starts, so the old task's file name cannot be reused.
         val target = File(folder, "update-${UUID.randomUUID()}.apk")
-        // 镜像可能不止一个,要在一次任务里逐个换;系统下载器做不到,所以开了镜像就由 Claire 自己下。
+        // There may be more than one mirror to try within a single task; the system downloader cannot do that, so with
+        // mirrors enabled Claire downloads it herself.
         if (wifi != null || proxy != null || sources.size > 1) {
             check(prefs.edit().putBoolean("viaApp", true).putString("url", official).putString("file", target.name).commit()) { "could not save download" }
             proxied.start(sources, target, wifi) {
@@ -99,7 +104,8 @@ class ApkUpdater(
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("Claire ${release.version}")
             .setMimeType("application/vnd.android.package-archive")
-            // 只在下载中显示通知:完成后的通知一点就会绕过下面的校验直接打开安装包,所以不留。
+            // Show the notification only while downloading: tapping the completed notification would bypass the
+            // verification below and open the package directly, so it is not kept.
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationUri(Uri.fromFile(target))
         val id = manager.enqueue(request)
@@ -119,7 +125,7 @@ class ApkUpdater(
         check(prefs.edit().clear().commit())
     }
 
-    /** 已经装上(或装了更新的版本)后,下好的安装包没用了:启动时清掉。下载中、暂停、失败的留给关于页处理。 */
+    /** Once installed (or a newer version is installed) the downloaded package is useless: clear it at startup. In-progress, paused and failed downloads are left to the About screen. */
     @Synchronized
     fun dropInstalled() {
         val target = file ?: return
@@ -130,8 +136,8 @@ class ApkUpdater(
     }
 
     /**
-     * 只接受本应用、更高版本、同一签名的完整附件;没通过就删掉文件并抛 [ApkRejected]。
-     * 系统安装器之后还会再验签名并要求用户确认。
+     * Accepts only a complete asset from this app, of a higher version, with the same signature; on failure the file is deleted and [ApkRejected] is thrown.
+     * The system installer verifies the signature again afterwards and asks the user to confirm.
      */
     @Synchronized
     fun installIntent(release: ReleaseInfo): Intent {
@@ -168,12 +174,12 @@ class ApkUpdater(
     @Suppress("DEPRECATION")
     private fun installedInfo(flags: Int): PackageInfo = context.packageManager.getPackageInfo(context.packageName, flags)
 
-    /** 当前签名证书;个别系统读安装包时不给 signingInfo,退回旧字段 signatures。 */
+    /** Current signing certificates; on a few systems reading an APK does not provide signingInfo, so fall back to the legacy signatures field. */
     @Suppress("DEPRECATION")
     private fun PackageInfo.signers(): Set<String> =
         (signingInfo?.apkContentsSigners ?: signatures).orEmpty().map { ApkIntegrity.sha256(it.toByteArray()) }.toSet()
 
-    /** 轮换过签名的包带着历史证书;多个签名者时没有历史。 */
+    /** Packages that rotated their signing key carry a certificate history; there is none with multiple signers. */
     private fun PackageInfo.signerHistory(): Set<String> {
         val info = signingInfo ?: return emptySet()
         if (info.hasMultipleSigners()) return emptySet()
@@ -181,7 +187,7 @@ class ApkUpdater(
     }
 
     private companion object {
-        /** 进程内只下载一份更新。 */
+        /** Only one update download at a time per process. */
         val proxied by lazy {
             ProxiedApkDownload(NetProxy.shared.client(OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS)))
         }

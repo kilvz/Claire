@@ -75,14 +75,15 @@ import com.wangzan101.mika.memory.ui.Link
 import com.wangzan101.mika.ui.DiagnosticsSheet
 import com.wangzan101.mika.ui.MarkdownText
 
-/** 关于页上点开的底部面板。 */
+/** Bottom sheets opened from the About screen. */
 private enum class AboutSheet { Update, Changelog, Feedback, Group, Diagnostics }
 
 /**
- * 关于 Claire:顶上图标、名字、一句话介绍、版本(Beta 标记、构建编号);下面是检查更新与更新记录、
- * 反馈问题、开源仓库与使用说明;一段数据说明;最底下许可证与作者。
- * 外部链接都交给 [onOpenUrl](系统浏览器);手动检查的结果到了([UpdateState.manualRounds] 变了)才提示。
- * [diagnostics] 写出诊断信息(反馈面板里「复制诊断信息」点开预览时在后台线程调)。
+ * About Claire: icon, name, one-line introduction and version (Beta badge, build number) at the top; below that check for updates and
+ * update history, feedback, the open-source repository and the guide; a data statement; and the license and author at the very bottom.
+ * External links all go through [onOpenUrl] (system browser); a manual check's result is announced only when it arrives
+ * ([UpdateState.manualRounds] changed).
+ * [diagnostics] renders the diagnostics text (called on a background thread when "Copy diagnostics" is opened as a preview in the feedback sheet).
  */
 @Composable
 fun AboutScreen(
@@ -107,7 +108,8 @@ fun AboutScreen(
     val c = MikaTheme.colors
     val context = LocalContext.current
     var sheet by rememberSaveable { mutableStateOf<AboutSheet?>(null) }
-    // 点了「检查更新」后等这一轮结果:有新版直接弹出说明,没有就提示一句
+    // After "Check for updates" is tapped, wait for this round's result: show the notes right away when there is a new
+    // version, otherwise show a short toast
     var waitingRound by remember { mutableIntStateOf(-1) }
     LaunchedEffect(update.manualRounds) {
         if (waitingRound >= 0 && update.manualRounds > waitingRound) {
@@ -243,7 +245,7 @@ private fun Hero(versionName: String, build: String, beta: Boolean) {
     }
 }
 
-/** 行尾的值:转圈、红点加文字,或一段普通的值。 */
+/** Value at the end of a row: a spinner, a dot plus text, or a plain value. */
 @Composable
 internal fun TrailingValue(v: AboutCopy.CheckValue) {
     if (v.spinner) {
@@ -254,7 +256,7 @@ internal fun TrailingValue(v: AboutCopy.CheckValue) {
     v.text?.let { RowValue(it, if (v.highlight) ValueTone.Link else ValueTone.Plain) }
 }
 
-/** 有新版本时的小红点。 */
+/** The small red dot shown when a new version is available. */
 @Composable
 internal fun UpdateDot(modifier: Modifier = Modifier) {
     Box(modifier.size(8.dp).background(MikaTheme.colors.bad, CircleShape).testTag("update-dot"))
@@ -265,7 +267,7 @@ private fun ExternalMark() {
     Icon(MikaIcons.External, null, Modifier.size(15.dp), tint = MikaTheme.colors.ink3)
 }
 
-// ---------- 底部面板 ----------
+// ---------- Bottom sheets ----------
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -277,7 +279,7 @@ private fun AboutSheetFrame(title: String, sub: String?, tag: String, onDismiss:
         containerColor = c.surface,
         shape = MikaShapes.SheetTop,
     ) {
-        // 面板内容太高(矮屏、大字号)时整体能滚,底下的按钮总够得着
+        // When the sheet content is too tall (short screen, large font) the whole thing scrolls so the buttons at the bottom stay reachable
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()
                 .padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(tag),
@@ -289,7 +291,7 @@ private fun AboutSheetFrame(title: String, sub: String?, tag: String, onDismiss:
     }
 }
 
-/** 更新说明(Markdown),浅底、太长时在框里滚。 */
+/** Release notes (Markdown) on a light background, scrolling inside a box when too long. */
 @Composable
 private fun NotesBox(notes: String) {
     val c = MikaTheme.colors
@@ -350,7 +352,7 @@ private fun FeedbackOption(icon: ImageVector, title: String, sub: String, first:
 }
 
 /**
- * 联系作者面板:作者的微信二维码,长按或按钮存进相册。二维码最高占屏幕约三分之一,常见手机上不用滚就能看到按钮。
+ * Contact-the-author sheet: the author's WeChat QR code, saved to the gallery by long press or the button. The QR code takes up at most about a third of the screen, so on common phones the button is visible without scrolling.
  */
 @Composable
 internal fun GroupSheet(onSave: () -> Unit, onDismiss: () -> Unit) {

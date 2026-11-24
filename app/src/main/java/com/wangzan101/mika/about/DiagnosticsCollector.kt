@@ -35,7 +35,7 @@ import com.wangzan101.mika.task.TaskService
 import com.wangzan101.mika.voice.SpeechChoice
 import com.wangzan101.mika.voice.SystemSpeech
 
-/** 引导页的输入:由系统状态加上引导页自己记的几项(用户确认过的、跳过的、回头重做的)组成。引导页和诊断信息共用这一份。 */
+/** Setup screen input: built from the system status plus the few things the setup screen records itself (what the user confirmed, skipped or went back to redo). The setup screen and diagnostics share this one. */
 fun SystemStatus.setupInputs(
     discovery: PairingDiscovery,
     repair: Boolean,
@@ -56,8 +56,10 @@ fun SystemStatus.setupInputs(
 )
 
 /**
- * 从 App 里各处现成的状态收一份 [DiagnosticsSnapshot]:系统状态、内置助手、自动恢复、模型配置、运行记录、检查更新。
- * 要读盘(运行记录),在后台线程调。[setup] 是引导页此刻的输入;不在引导页时按系统状态现建一份(没有用户确认过的步骤)。
+ * Gathers a [DiagnosticsSnapshot] from the state already available across the app: system status, built-in helper, automatic recovery,
+ * model configuration, run history, update check.
+ * It reads from disk (run history), so call it on a background thread. [setup] is the setup screen's current input; when not on the setup
+ * screen, one is built from the system status (with no user-confirmed steps).
  */
 object DiagnosticsCollector {
     private const val RECENT_RUNS = 3
@@ -109,7 +111,7 @@ object DiagnosticsCollector {
         )
     }
 
-    /** 内置助手连着时问它每份别的用户的判定,再数能打开的另一份有几个(只数,不列包名);问不到为 null。 */
+    /** When the built-in helper is connected, ask it for its verdict on each other user, then count how many of them can be opened (count only, no package names); null when unavailable. */
     private fun appCopies(app: MikaApp, phone: PhoneServices): String? = runCatching {
         val shell = phone.hub.shell.value ?: return null
         val summary = shell.appCopyUsers()?.getString(ShellService.KEY_COPY_SUMMARY) ?: return null
@@ -137,7 +139,7 @@ object DiagnosticsCollector {
     private fun channel(context: Context, id: String): Int? =
         runCatching { context.getSystemService(NotificationManager::class.java).getNotificationChannel(id)?.importance }.getOrNull()
 
-    /** 只看状况,不为了诊断去读钥匙。 */
+    /** Status only; do not read keys for diagnostics. */
     private fun adbKey(context: Context): String? = runCatching {
         val src = AndroidAdb.identities(context)
         src.state.name + (src.problem?.let { " ($it)" } ?: "")
@@ -164,7 +166,7 @@ object DiagnosticsCollector {
         )
     }
 
-    /** 语音转文字:选择、手机自带识别的能力和记号、手机上登记的识别服务(组件名、开不开放、要的权限)。 */
+    /** Speech-to-text: the choice, the phone's built-in recognition capability and marker, the recognition services registered on the phone (component name, whether exported, required permissions). */
     private fun speech(app: MikaApp): DiagnosticsSnapshot.Speech? = runCatching {
         val settings = app.speech
         val cap = SystemSpeech.capability(app, settings.systemSilent.value)
@@ -184,7 +186,8 @@ object DiagnosticsCollector {
             silent = settings.systemSilent.value,
             remembered = settings.systemService,
             services = SystemSpeech.services(app).map { svc ->
-                // 它所在的应用自己有没有录音权限:识别服务说没有权限时,缺的常常是这一个,不是 Claire 的
+                // Whether the app it belongs to has the record-permission itself: when a recognition service reports
+                // missing permission, this is often the missing one, not Claire's
                 val mic = when (com.wangzan101.mika.voice.SpeechServiceMic.state(app, svc.component.substringBefore('/'))) {
                     com.wangzan101.mika.voice.ServiceMic.Granted -> "granted"
                     com.wangzan101.mika.voice.ServiceMic.Missing -> "NOT granted"
@@ -197,7 +200,7 @@ object DiagnosticsCollector {
         )
     }.getOrNull()
 
-    /** 最近几次运行:结局和步数取小结,模型取概要;目标、回答、失败原话都不取。 */
+    /** Recent runs: outcome and step count come from the summary, the model from the overview; goal, answer and the failure's exact wording are never taken. */
     private fun runs(app: MikaApp): List<DiagnosticsSnapshot.Run> = runCatching {
         val store = RunStore(app)
         val models = store.list().take(RECENT_RUNS * 2).associate { it.id to it.model }

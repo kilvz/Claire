@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.wangzan101.mika.ui.components.GlassBackdrop
 import com.wangzan101.mika.ui.theme.MikaTheme
 
-/** 由调样台导出的参数。网页像素在安卓布局里按 dp 使用。 */
+/** Parameters exported from the tuning bench. Web pixels are used as dp in the Android layout. */
 internal enum class UpdateGlassMaterial(
     val width: Int,
     val height: Int,
@@ -134,7 +134,7 @@ private fun refractedEffect(
         RenderEffect.createBlurEffect(blur, blur, android.graphics.Shader.TileMode.CLAMP)).asComposeRenderEffect()
 }
 
-// 采样本地聊天绘制层。圆角边缘向内折射，RGB 取不同偏移；中心只做轻微放大。
+// Samples the local chat drawing layer. Rounded corners refract inward, RGB takes different offsets; the center is only slightly magnified.
 private const val GLASS_SHADER = """
     uniform shader image;
     uniform float2 extent;

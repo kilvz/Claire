@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 
-/** 自动下载复用更新任务；进程存活时离开前台仍继续，回来再看结果。 */
+/** Automatic download reuses the update task; while the process lives it keeps going in the background after leaving the foreground, and the result is visible on return. */
 internal class AutomaticUpdates(context: Context, private val updater: ApkUpdater) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private val prefs = context.getSharedPreferences("automatic-updates", Context.MODE_PRIVATE)

@@ -25,9 +25,9 @@ import javax.net.SocketFactory
 import kotlin.coroutines.coroutineContext
 
 /**
- * 应用内更新下载,用于绑定 Wi-Fi 的自动下载以及使用应用代理的手动下载。
- * 先写到 `<目标>.part`,下完整了再改名成目标文件,所以「目标文件在」就是下好了。
- * 进程里只有一份(同一时间只下一个);进程被杀后没下完的算失败,用户重试即可。
+ * In-app update download, used for automatic downloads bound to Wi-Fi and for manual downloads going through the app proxy.
+ * It writes to `<target>.part` first and renames to the target file only once complete, so "the target file exists" means it is done.
+ * There is only one per process (one download at a time); if the process is killed, an unfinished download counts as failed and the user can retry.
  */
 class ProxiedApkDownload(
     private val http: OkHttpClient,
@@ -40,8 +40,9 @@ class ProxiedApkDownload(
     @Volatile private var total = -1L
 
     /**
-     * 按 [sources] 的顺序下载,前一个失败就换下一个;每个来源下完都先过 [verify](大小、摘要),
-     * 不通过也当这个来源失败。全部失败时进程里不留目标文件,状态回到 Failed,用户可重试。
+     * Downloads the [sources] in order, moving to the next one when one fails; every source must pass [verify] (size, digest) after
+     * download, and failing that also counts as a failure of that source. If all fail, no target file is left in the process, the
+     * state returns to Failed and the user can retry.
      */
     @Synchronized
     fun start(
@@ -55,7 +56,7 @@ class ProxiedApkDownload(
         target = file
         bytes = 0
         total = -1
-        // 使用 Wi-Fi 自己的 DNS 和 socket，断开后连接失败，不会切到移动数据继续下载。
+        // Use Wi-Fi's own DNS and sockets: once it disconnects, connections fail instead of falling back to mobile data and continuing the download.
         val client = wifi?.let { network ->
             wifiBoundClient(http, network.socketFactory, object : Dns {
                 override fun lookup(hostname: String): List<InetAddress> = network.getAllByName(hostname).toList()
@@ -86,7 +87,7 @@ class ProxiedApkDownload(
                     file.delete()
                     throw e
                 } catch (_: Exception) {
-                    // 取消导致的连接异常不能触发下一个来源。
+                    // A connection exception caused by cancellation must not trigger the next source.
                     file.delete()
                     coroutineContext.ensureActive()
                 }
@@ -96,7 +97,7 @@ class ProxiedApkDownload(
         download.start()
     }
 
-    /** [file] 这一份的状态:正在下、下好了,或失败(没在下、也没有完整的文件)。 */
+    /** State of this [file]: downloading, downloaded, or failed (not downloading and no complete file). */
     @Synchronized
     fun state(file: File): ApkDownloadState = when {
         job?.isActive == true && target == file -> ApkDownloadState(DownloadPhase.Downloading, bytes, total)
@@ -107,7 +108,7 @@ class ProxiedApkDownload(
     @Synchronized
     fun cancel() {
         job?.cancel()
-        // 连带掐断连接,不等读完这一块
+        // Cut the connection as well instead of waiting for this chunk to finish reading
         call?.cancel()
         job = null
         call = null
@@ -117,7 +118,7 @@ class ProxiedApkDownload(
     companion object {
         private const val PART = ".part"
 
-        /** 每次路由（包括重定向）都按目标选代理，禁止绕过 Wi-Fi socket factory 的 SOCKS。 */
+        /** Chooses the proxy per target on every route (including redirects), forbidding SOCKS that would bypass the Wi-Fi socket factory. */
         internal fun wifiBoundClient(http: OkHttpClient, sockets: SocketFactory, dns: Dns): OkHttpClient {
             val delegate = http.proxySelector
             val selector = object : ProxySelector() {
@@ -138,7 +139,7 @@ class ProxiedApkDownload(
                 .connectionPool(ConnectionPool()).build()
         }
 
-        /** 把 [url] 下到 [file]:边下边报进度(已下、总共,不知道总共为 -1);不是 2xx、或没下完整就抛错,不留目标文件。 */
+        /** Downloads [url] into [file]: reporting progress along the way (downloaded, total; -1 when the total is unknown); throws if the response is not 2xx or the download is incomplete, and leaves no target file. */
         suspend fun fetch(http: OkHttpClient, url: String, file: File, onCall: (Call) -> Unit = {}, progress: (Long, Long) -> Unit) {
             val part = File(file.path + PART)
             try {

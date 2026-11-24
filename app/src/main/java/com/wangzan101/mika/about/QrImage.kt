@@ -6,14 +6,15 @@ import android.os.Environment
 import android.provider.MediaStore
 import com.wangzan101.mika.R
 
-/** 作者的微信二维码(随 App 打包,换码只换 res/drawable-nodpi/wechat_qr.jpg)。 */
+/** The author's WeChat QR code (bundled with the app; replacing the code only means replacing res/drawable-nodpi/wechat_qr.jpg). */
 object QrImage {
     val RES = R.drawable.wechat_qr
     private const val FILE_NAME = "Claire-author-wechat.jpg"
 
     /**
-     * 存进相册的 Pictures/Claire。经 MediaStore 写自己新建的图片不要存储权限(安卓 10 起如此,Claire 最低支持安卓 11)。
-     * 写完前标成待定,别的 App 看不到半张图;失败时删掉那一条。
+     * Saved into the gallery's Pictures/Claire. Writing a newly created image through MediaStore needs no storage permission (true
+     * since Android 10, and Claire supports Android 11 as its minimum).
+     * It stays pending until fully written, so other apps never see half an image; the row is deleted on failure.
      */
     fun saveToPictures(context: Context): Boolean {
         val resolver = context.contentResolver

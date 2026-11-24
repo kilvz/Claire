@@ -4,21 +4,22 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.io.File
 import java.security.MessageDigest
 
-/** 更新包没通过校验时为什么拒绝;界面按这个给出不同的说明。 */
+/** Why an update package was rejected during verification; the UI gives a different explanation for each. */
 class ApkRejected(val reason: Reason) : Exception(reason.name) {
     enum class Reason {
-        /** 大小、SHA-256 对不上,或者根本读不出安装包。 */
+        /** Size or SHA-256 does not match, or the package cannot be read at all. */
         Corrupt,
-        /** 不是 Claire,或者版本不比已装的新。 */
+        /** Not Claire, or not newer than the installed version. */
         NotNewer,
-        /** 签名证书和已装的 Claire 不同。 */
+        /** The signing certificate differs from the installed Claire. */
         Signer,
     }
 }
 
 /**
- * 下载地址只接受官方仓库的 HTTPS 发布附件。之后的跳转(到 GitHub 的附件存储)由系统下载服务处理、我们管不到,
- * 所以下载完的文件一律再验:大小与 SHA-256(发布元数据给了才验)、包名、版本号、签名证书。
+ * Download URLs are accepted only for HTTPS release assets from the official repository. Later redirects (to GitHub's asset storage) are
+ * handled by the system download service and are out of our reach, so every downloaded file is verified again: size and SHA-256 (only when
+ * the release metadata provides them), package name, version number and signing certificate.
  */
 internal object ApkIntegrity {
     private val official = "${MikaLinks.RELEASES}/download/".toHttpUrl()
@@ -32,8 +33,9 @@ internal object ApkIntegrity {
     }
 
     /**
-     * 下载地址只能是官方发布附件,或「内置/用户添加的镜像前缀 + 官方附件地址」。
-     * 镜像本身仍由用户信任;下载完照样校验大小、摘要和签名,地址放宽不会让别的包装进来。
+     * The download URL may only be an official release asset, or "built-in/user-added mirror prefix + official asset URL".
+     * Mirrors are still trusted by the user; size, digest and signature are verified after download as usual, so relaxing the
+     * URL does not let another package in.
      */
     fun requireTrustedDownloadUrl(url: String, officialUrl: String, mirrors: List<UpdateMirror>) {
         if (url == officialUrl) {
@@ -47,7 +49,7 @@ internal object ApkIntegrity {
         require(parsed.encodedPath.endsWith(".apk", ignoreCase = true))
     }
 
-    /** 给了摘要就必须是 sha256 且对得上;别的写法也算对不上,不放过。 */
+    /** When a digest is given it must be sha256 and must match; any other form also counts as a mismatch, no exceptions. */
     fun verify(file: File, size: Long?, digest: String?) {
         corruptUnless(file.isFile && file.length() > 0)
         if (size != null) corruptUnless(file.length() == size)
@@ -62,8 +64,9 @@ internal object ApkIntegrity {
     }
 
     /**
-     * 新包的签名证书(各证书 SHA-256)要和已装的一致;新包轮换过签名时,已装的证书要在它的签名历史里。
-     * 系统安装器也会拦,这里提前拦下是为了给出说得清的提示。
+     * The new package's signing certificates (SHA-256 of each certificate) must match the installed ones; when the new package has
+     * rotated its signing key, the installed certificate must appear in its signing history.
+     * The system installer checks this too; we block it early to give a clearer message.
      */
     fun requireSameSigner(installed: Set<String>, archive: Set<String>, archiveHistory: Set<String>) {
         if (installed.isEmpty() || archive.isEmpty()) throw ApkRejected(ApkRejected.Reason.Signer)
