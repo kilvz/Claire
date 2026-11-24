@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.0.1: the 'Voice input isn't ready' sheet now explains what the built-in speech recognition does and offers to install it — a button opens Speech Services by Google on the Play Store, so phones that ship without a recognizer can get one instead of only being told to pick a cloud provider.
+            New in 2.1.0: English-first throughout — every LLM prompt, tool description, call script, skill, built-in knowledge note, plugin manifest and doc is now English, so the assistant no longer drifts into Chinese when you write in English. Chinese and the other UI languages remain available as translations when you choose them.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

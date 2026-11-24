@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.0.0 (versionCode 60)
+- **Claire version:** 2.1.0 (versionCode 62)
 - **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -67,6 +67,12 @@ recorded base version.
   opens Speech Services by Google on the Play Store, so phones that
   ship without a recognizer can get one instead of only being told to
   pick a cloud provider.
+- 2.1.0: English-first throughout. Every LLM prompt, tool description,
+  call script, skill, built-in knowledge note, plugin manifest and doc
+  is English, so the assistant no longer drifts into Chinese when the
+  user writes in English. Chinese and the other UI languages remain as
+  translations for users who choose them; Chinese-specific matching
+  data and test fixtures are unchanged.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub
