@@ -228,14 +228,14 @@ fun ProactiveScreen(onBack: () -> Unit) {
         // ---- Settings ----
         GroupLabel(stringResource(R.string.settings_title))
         GroupCard {
-            // Aggressiveness: one choice adjusts a whole set of thresholds (how many days a topic counts, how many reminders per day, whether digested content is carried into tasks)
-            ListRow(null, stringResource(R.string.proactive_learn_level), stringResource(levelDesc(level)), first = true, onClick = { pickLevel = true }) {
+            // Aggressiveness: one slider moves a group of thresholds together (how many days a topic stays relevant, reminders per day, whether derived items enter tasks)
+            ListRow(null, stringResource(R.string.proactive_learn_level), note = stringResource(levelDesc(level)), first = true, onClick = { pickLevel = true }) {
                 RowValue(stringResource(levelName(level)))
             }
             // Sensitive-category inference: off by default; confirm before turning it on, and ask whether to delete the stored sensitive topics when turning it off
             val toggleSensitive: (Boolean) -> Unit = { on -> if (on) confirmSensitiveOn = true else confirmSensitiveOff = true }
             ListRow(
-                null, stringResource(R.string.proactive_learn_sensitive), stringResource(R.string.proactive_learn_sensitive_sub),
+                null, stringResource(R.string.proactive_learn_sensitive), note = stringResource(R.string.proactive_learn_sensitive_sub),
                 onClick = { toggleSensitive(!sensitiveOn) },
             ) {
                 MikaSwitch(sensitiveOn, toggleSensitive, Modifier.testTag("proactive-learn-sensitive"))
@@ -376,13 +376,13 @@ fun ProactiveScreen(onBack: () -> Unit) {
                     RadioRow(
                         stringResource(R.string.proactive_app_off), selected = current == null,
                         onClick = { unsaved = !runtime.setAppReading(pkg, null) || runtime.allowed.dirty; pickApp = null },
-                        subtitle = stringResource(R.string.proactive_app_off_sub), first = true,
+                        note = stringResource(R.string.proactive_app_off_sub), first = true,
                     )
                     SourceTier.entries.forEach { t ->
                         RadioRow(
                             stringResource(tierName(t)), selected = t == current,
                             onClick = { unsaved = !runtime.setAppReading(pkg, t) || runtime.allowed.dirty; pickApp = null },
-                            subtitle = stringResource(tierDesc(t)),
+                            note = stringResource(tierDesc(t)),
                         )
                     }
                 }
@@ -400,7 +400,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
                         RadioRow(
                             stringResource(levelName(l)), selected = l == level,
                             onClick = { runtime.setLearnLevel(l); pickLevel = false },
-                            subtitle = stringResource(levelDesc(l)), first = l == LearnLevel.entries.first(),
+                            note = stringResource(levelDesc(l)), first = l == LearnLevel.entries.first(),
                         )
                     }
                     Text(stringResource(R.string.proactive_learn_level_note), Modifier.padding(top = 10.dp))

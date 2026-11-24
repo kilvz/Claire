@@ -17,5 +17,9 @@ class BootRestoreReceiver : BootRestoreHandler() {
         if (intent.action == Intent.ACTION_TIMEZONE_CHANGED) TriggerRuntime.syncTimeZone(context)
         // On boot, if a LAN-style computer connection was open, start listening again (USB does not survive a reboot: the boot ID changes, so it is already treated as off here, and the previous connection info is cleared too)
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) (context.applicationContext as com.wangzan101.mika.MikaApp).mcp.ensureRunning()
+        // AI calls were set up before: bring the call runtime back up, and once the built-in assistant reconnects it redoes the step that was lost after boot
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED &&
+            com.wangzan101.mika.calls.CallTelecomAccess(context.applicationContext).preparedOnEarlierBoot()
+        ) (context.applicationContext as com.wangzan101.mika.MikaApp).calls
     }
 }

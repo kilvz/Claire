@@ -49,6 +49,20 @@ internal object ChatReduce {
             }
         }
 
+    /**
+     * The card for the action a running task needs from you right now (takeover, allow once, something to do first), the same kind as in a chat question;
+     * null for other states (including queued and auto-continue after unlock). The main chat's question card uses it, and its buttons act directly on that one task.
+     */
+    internal fun needStatus(s: TaskState, appLabel: (String) -> String): ExchangeStatus? = when (s) {
+        is TaskState.WaitingTakeover -> ExchangeStatus.NeedsTakeover(s.reason, s.message, s.item, s.amount, s.address)
+        is TaskState.WaitingConfirmation -> ExchangeStatus.NeedsConfirmation(
+            ConfirmationCopy.title(s.request), ConfirmationCopy.detail(s.request, appLabel(s.request.app)),
+            ConfirmationNotifier.requestKey(s),
+        )
+        is TaskState.Held -> if (s.reason == TaskGate.LOCKED || s.reason.queued) null else ExchangeStatus.Paused(s.reason.why, s.reason.resumable)
+        else -> null
+    }
+
     internal fun state(ex: Exchange, s: TaskState, appLabel: (String) -> String): Exchange = when (s) {
         TaskState.Idle -> ex
         is TaskState.Running -> {

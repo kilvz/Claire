@@ -113,7 +113,7 @@ fun Modifier.floatShadow(colors: MikaColors, shape: Shape): Modifier =
 
 /** A card whose content is clipped inside the rounded corners (so a row's press effect doesn't spill out). */
 @Composable
-fun MikaCard(modifier: Modifier = Modifier, shape: Shape = MikaShapes.Card, content: @Composable ColumnScope.() -> Unit) {
+fun MikaCard(modifier: Modifier = Modifier, shape: Shape = if (LocalPlainList.current) PlainCardShape else MikaShapes.Card, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth().cardSurface(MikaTheme.colors, shape).clip(shape), content = content)
 }
 
@@ -123,7 +123,60 @@ fun MikaCard(modifier: Modifier = Modifier, shape: Shape = MikaShapes.Card, cont
  */
 @Composable
 fun GroupCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    MikaCard(modifier.padding(bottom = 12.dp), content = content)
+    if (!LocalPlainList.current) {
+        MikaCard(modifier.padding(bottom = 12.dp), content = content)
+        return
+    }
+    // Plain list: the row's note ([ListRow] / [RadioRow] note) does not go inside the row; it moves below the card as a footnote
+    val notes = remember { CardNotes() }
+    Column(modifier.padding(bottom = 12.dp)) {
+        CompositionLocalProvider(LocalCardNotes provides notes) { MikaCard(content = content) }
+        val text = notes.footnote()
+        if (text != null) {
+            Text(text, Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                style = MikaType.Hint, color = MikaTheme.colors.ink3)
+        }
+    }
+}
+
+/** Notes submitted by the rows in a card. */
+class CardNotes {
+    internal class Note(val title: String, val text: String, val selected: Boolean?)
+    internal val items = androidx.compose.runtime.mutableStateMapOf<Any, Note>()
+    /** Icons for the rows (null when a row has no icon). */
+    internal val icons = androidx.compose.runtime.mutableStateMapOf<Any, Any?>()
+
+    /** When the same icon appears three or more times in one group, or some rows have icons and others do not, the whole group drops icons: icons appear only when they help tell rows apart. */
+    internal val hideIcons: Boolean
+        get() {
+            val all = icons.values.toList()
+            if (all.size < 2) return false
+            val shown = all.filterNotNull()
+            return shown.isNotEmpty() && (shown.size < all.size || shown.groupingBy { it }.eachCount().values.any { it >= 3 })
+        }
+
+    /** A radio group states only the selected item; with one item it says it directly; with several it lists "title: note" line by line. */
+    internal fun footnote(): String? {
+        val all = items.values.toList()
+        if (all.isEmpty()) return null
+        all.firstOrNull { it.selected == true }?.let { return it.text }
+        if (all.any { it.selected != null }) return null
+        if (all.size == 1) return all[0].text
+        return all.joinToString("\n") { "${it.title}:${it.text}" }
+    }
+}
+
+val LocalCardNotes = androidx.compose.runtime.staticCompositionLocalOf<CardNotes?> { null }
+
+/** Hand this row's note to its card; returns false when not inside a plain-list card, in which case the row displays it itself. */
+@Composable
+internal fun rememberCardNote(title: String, note: String?, selected: Boolean? = null): Boolean {
+    val sink = LocalCardNotes.current ?: return false
+    if (note.isNullOrEmpty()) return true
+    val key = remember { Any() }
+    androidx.compose.runtime.DisposableEffect(sink, key) { onDispose { sink.items.remove(key) } }
+    androidx.compose.runtime.SideEffect { sink.items[key] = CardNotes.Note(title, note, selected) }
+    return true
 }
 
 /** Status card: round icon on the left, title and description on the right. Used for the overall status at the top of a page. */
@@ -144,7 +197,11 @@ fun StateCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val (bg, fg) = tone.colors(c)
-            Box(Modifier.size(36.dp).background(bg, CircleShape), contentAlignment = Alignment.Center) {
+            if (LocalPlainList.current) {
+                // Plain list: no round background; normal states use the body color, and only things that need you are colored
+                val tint = if (tone == TileTone.Neutral || tone == TileTone.Ok) c.ink else fg
+                Icon(icon, null, Modifier.size(22.dp), tint = tint)
+            } else Box(Modifier.size(36.dp).background(bg, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(icon, null, Modifier.size(20.dp), tint = fg)
             }
             Column(Modifier.weight(1f)) {
@@ -256,4 +313,32 @@ fun GlassSurface(
             content = content,
         )
     }
+}
+
+/** Plain-list style is on: groups are large rounded pure white cards, icons have no backing block, and status capsules are written in grey. */
+val LocalPlainList = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Corner radius of group cards in the plain list. */
+val PlainCardShape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
+
+/** List pages such as settings and AI calls: switch to the plain-list palette and style. */
+@Composable
+fun PlainListTheme(content: @Composable () -> Unit) {
+    val base = MikaTheme.colors
+    val colors = androidx.compose.runtime.remember(base) { base.forPlainList() }
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.wangzan101.mika.ui.theme.LocalMikaColors provides colors,
+        LocalPlainList provides true,
+        content = content,
+    )
+}
+
+/** Submit this row's icon and get back the icon it should actually draw (null when its group decided to drop icons). */
+@Composable
+internal fun rememberCardIcon(icon: androidx.compose.ui.graphics.vector.ImageVector?): androidx.compose.ui.graphics.vector.ImageVector? {
+    val sink = LocalCardNotes.current ?: return icon
+    val key = remember { Any() }
+    androidx.compose.runtime.DisposableEffect(sink, key) { onDispose { sink.icons.remove(key) } }
+    androidx.compose.runtime.SideEffect { sink.icons[key] = icon }
+    return if (sink.hideIcons) null else icon
 }

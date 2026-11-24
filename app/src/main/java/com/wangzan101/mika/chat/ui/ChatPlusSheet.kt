@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -45,6 +46,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.Icon
+import androidx.compose.ui.platform.testTag
 import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.R
 import com.wangzan101.mika.core.learn.knowledge.FrontMatter
@@ -53,10 +57,10 @@ import com.wangzan101.mika.settings.RecommendedTask
 import com.wangzan101.mika.ui.components.ButtonKind
 import com.wangzan101.mika.ui.components.ButtonSize
 import com.wangzan101.mika.ui.components.DirectionalIcon
-import com.wangzan101.mika.ui.components.IconTile
 import com.wangzan101.mika.ui.components.MikaButton
 import com.wangzan101.mika.ui.components.MikaCard
 import com.wangzan101.mika.ui.components.RowChevron
+import com.wangzan101.mika.ui.components.PlainListTheme
 import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
@@ -83,9 +87,9 @@ internal fun readClipboardText(context: Context): String? {
 }
 
 /**
- * Feature panel opened by "+": rises from the bottom and takes half the screen first; drag (or scroll) up to 82%, and close it by dragging down, tapping the scrim or pressing back.
- * The content is a series of cards, with one action per row: the upper card puts things into this turn, the lower one has Claire do something or go elsewhere.
- * Albums, skills and frequent tasks open a second-level page inside the panel; camera, files and checklists are handed straight to the system or the chat page.
+ * The "+" feature panel: rises from the bottom and takes half the screen first; drag (or scroll) up to 82% to expand, or drag down, tap the scrim or press back to close.
+ * Three layers: the top row of four buttons and recent photos puts something into this message; the two large cards in the middle (Teach Claire, Skills) decide how this turn runs;
+ * and the "Frequently used" row at the bottom opens common phrases, saved lists and flows. The album, skills and frequently used pages are second-level pages inside the panel.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,12 +105,10 @@ internal fun ChatPlusSheet(
     onTeach: (() -> Unit)?,
     onChecklists: () -> Unit,
     onWorkflows: () -> Unit,
-    onBrowser: () -> Unit,
     tasks: List<RecommendedTask>,
     onPickTask: (RecommendedTask) -> Unit,
     onPickSkill: (PlusSkill) -> Unit,
 ) {
-    val c = MikaTheme.colors
     val context = LocalContext.current
     val attach = rememberAttachLaunchers(onPicked, onToggle, onFull, onDeviceFiles)
     var view by remember { mutableStateOf(PlusView.Main) }
@@ -117,6 +119,9 @@ internal fun ChatPlusSheet(
         }
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // The same plain-list palette as settings: white blocks on a light grey background, no outlines
+    PlainListTheme {
+    val c = MikaTheme.colors
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -132,27 +137,54 @@ internal fun ChatPlusSheet(
                 when (view) {
                     PlusView.Main -> Column(
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = PlusInset, vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        // First block: put something into this message. The four buttons and recent photos share one white card
                         MikaCard {
-                            PlusRow(MikaIcons.PhotoCamera, AttachCopy.CAMERA, null, first = true, onClick = attach.camera)
-                            PlusRow(MikaIcons.Photo, AttachCopy.ALBUM, stringResource(R.string.plus_sub_album), onClick = { view = PlusView.Photos }, trailing = { RowChevron() })
-                            PlusRow(MikaIcons.Paperclip, AttachCopy.FILES, stringResource(R.string.plus_sub_files), onClick = attach.files, trailing = { RowChevron() })
-                            attach.deviceFiles?.let { open ->
-                                PlusRow(MikaIcons.Folder, stringResource(R.string.device_browser_title), stringResource(R.string.plus_sub_device), onClick = open, trailing = { RowChevron() })
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp)) {
+                                QuickButton(MikaIcons.PhotoCamera, AttachCopy.CAMERA, "plus-camera", attach.camera)
+                                QuickButton(MikaIcons.Photo, AttachCopy.ALBUM, "plus-album") { view = PlusView.Photos }
+                                QuickButton(MikaIcons.Paperclip, AttachCopy.FILES, "plus-files", attach.files)
+                                QuickButton(MikaIcons.Copy, stringResource(R.string.plus_clipboard), "plus-clipboard", onPaste)
                             }
-                            PlusRow(MikaIcons.Copy, stringResource(R.string.plus_clipboard), stringResource(R.string.plus_sub_clipboard), onClick = onPaste)
+                            val recent = attach.recent.orEmpty()
+                            if (attach.access != PhotoAccess.None && recent.isNotEmpty()) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    recent.take(4).forEach { p ->
+                                        Box(Modifier.weight(1f)) { RecentCell(p, AttachTray.order(selected, p.uri)) { attach.toggle(p) } }
+                                    }
+                                    Box(
+                                        Modifier.weight(1f).aspectRatio(1f).clip(MikaShapes.Tile).background(c.fill)
+                                            .clickable(role = Role.Button) { view = PlusView.Photos },
+                                        contentAlignment = Alignment.Center,
+                                    ) { Text(AttachCopy.ALL, style = MikaType.Caption, color = c.ink2) }
+                                }
+                            }
                         }
+                        Spacer(Modifier.height(12.dp))
+                        // Second block: how this turn runs, and saved items to reuse. A list like the settings page
                         MikaCard {
+                            var first = true
                             onTeach?.let { teach ->
-                                PlusRow(MikaIcons.Hand, stringResource(R.string.teach_menu), stringResource(R.string.plus_sub_teach), first = true, onClick = teach)
+                                PlusRow(MikaIcons.Hand, stringResource(R.string.teach_menu), stringResource(R.string.plus_sub_teach), first = true, onClick = teach, tag = "plus-teach")
+                                first = false
                             }
-                            PlusRow(MikaIcons.Book, stringResource(R.string.memory_skills), stringResource(R.string.plus_sub_skills), first = onTeach == null, onClick = { view = PlusView.Skills }, trailing = { RowChevron() })
-                            PlusRow(MikaIcons.ListChecks, stringResource(R.string.checklists_title), null, onClick = onChecklists)
-                            PlusRow(MikaIcons.Route, stringResource(R.string.workflows_title), null, onClick = onWorkflows)
-                            PlusRow(MikaIcons.Star, stringResource(R.string.recommendations_title), stringResource(R.string.plus_sub_tasks), onClick = { view = PlusView.Tasks }, trailing = { RowChevron() })
-                            PlusRow(MikaIcons.Globe, stringResource(R.string.drawer_browser), stringResource(R.string.plus_sub_browser), onClick = onBrowser, trailing = { RowChevron() })
+                            PlusRow(MikaIcons.Book, stringResource(R.string.memory_skills), null, first = first, onClick = { view = PlusView.Skills }, tag = "plus-skills", trailing = { RowChevron() })
+                            PlusRow(
+                                MikaIcons.Star, stringResource(R.string.plus_reuse), null,
+                                onClick = { view = PlusView.Tasks }, tag = "plus-reuse",
+                                trailing = {
+                                    Text(stringResource(R.string.plus_reuse_hint), style = MikaType.Caption, color = c.ink3)
+                                    RowChevron()
+                                },
+                            )
+                            attach.deviceFiles?.let { open ->
+                                PlusRow(MikaIcons.Folder, stringResource(R.string.device_browser_title), null, onClick = open, trailing = { RowChevron() })
+                            }
                         }
+                        Spacer(Modifier.height(16.dp))
                     }
                     PlusView.Photos -> PlusPhotosPage(
                         access = attach.access,
@@ -168,15 +200,18 @@ internal fun ChatPlusSheet(
                         onPick = onPickSkill,
                         onBack = { view = PlusView.Main },
                     )
-                    PlusView.Tasks -> PlusTasksPage(
+                    PlusView.Tasks -> PlusReusePage(
                         tasks = tasks,
                         onPick = onPickTask,
+                        onChecklists = onChecklists,
+                        onWorkflows = onWorkflows,
                         onBack = { view = PlusView.Main },
                     )
                 }
             }
         }
     }
+}
 }
 
 /** Top handle: a 36×5 short bar; the drag and tap semantics come from the Material sheet shell. */
@@ -198,21 +233,22 @@ private fun PlusRow(
     subtitle: String?,
     first: Boolean = false,
     onClick: () -> Unit,
+    tag: String? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val c = MikaTheme.colors
     Row(
-        Modifier.fillMaxWidth()
+        Modifier.fillMaxWidth().heightIn(min = 54.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier)
             .then(if (first) Modifier else Modifier.drawBehind {
-                val x = 58.dp.toPx()
+                val x = 50.dp.toPx()
                 drawLine(c.hair, Offset(x, 0f), Offset(size.width, 0f), strokeWidth = 0.5.dp.toPx())
             })
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(start = 16.dp, end = 14.dp, top = 7.dp, bottom = 7.dp),
+            .padding(start = 16.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconTile(icon)
+        Icon(icon, null, Modifier.size(22.dp), tint = c.ink2)
         Column(Modifier.weight(1f)) {
             Text(title, style = MikaType.Body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrEmpty()) {
@@ -324,16 +360,28 @@ private fun PlusSkillsPage(skills: List<PlusSkill>?, onPick: (PlusSkill) -> Unit
     }
 }
 
-/** Frequent tasks second-level page: tapping one fills its wording into the input field (without sending). */
+/** The "Frequently used" second-level page: saved lists and flows above, common phrases below (tapping one fills the input without sending). */
 @Composable
-private fun PlusTasksPage(tasks: List<RecommendedTask>, onPick: (RecommendedTask) -> Unit, onBack: () -> Unit) {
+private fun PlusReusePage(
+    tasks: List<RecommendedTask>,
+    onPick: (RecommendedTask) -> Unit,
+    onChecklists: () -> Unit,
+    onWorkflows: () -> Unit,
+    onBack: () -> Unit,
+) {
     val c = MikaTheme.colors
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = PlusInset)) {
-        SheetHead(title = stringResource(R.string.recommendations_title), onBack = onBack)
+        SheetHead(title = stringResource(R.string.plus_reuse), onBack = onBack)
+        MikaCard {
+            PlusRow(MikaIcons.ListChecks, stringResource(R.string.checklists_title), null, first = true, onClick = onChecklists, trailing = { RowChevron() })
+            PlusRow(MikaIcons.Route, stringResource(R.string.workflows_title), null, onClick = onWorkflows, trailing = { RowChevron() })
+        }
+        Spacer(Modifier.height(16.dp))
+        PlusLabel(stringResource(R.string.plus_reuse_phrases))
         if (tasks.isEmpty()) {
             Text(
                 stringResource(R.string.recommendations_empty),
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 style = MikaType.Caption, color = c.ink3,
             )
         } else {
@@ -347,7 +395,26 @@ private fun PlusTasksPage(tasks: List<RecommendedTask>, onPick: (RecommendedTask
     }
 }
 
-/** Installed personal skills; suspended ones are not listed (they are no longer in use); the display name and description come from the SKILL.md header. */
+@Composable
+private fun PlusLabel(text: String) {
+    Text(text, Modifier.padding(start = 16.dp, bottom = 6.dp), style = MikaType.Caption, color = MikaTheme.colors.ink3)
+}
+
+/** A button in the first row: an icon with a line of text below, the whole block tappable. */
+@Composable
+private fun RowScope.QuickButton(icon: ImageVector, label: String, tag: String, onClick: () -> Unit) {
+    val c = MikaTheme.colors
+    Column(
+        Modifier.weight(1f).clip(MikaShapes.Tile).clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp).testTag(tag),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(icon, null, Modifier.size(26.dp), tint = c.ink)
+        Text(label, style = MikaType.Caption, color = c.ink2, maxLines = 1)
+    }
+}
+
+/** Accepted personal skills; disabled ones are not listed (they are no longer in use), and the display name and description come from the SKILL.md header. */
 private fun loadSkills(context: Context): List<PlusSkill> {
     val files = (context.applicationContext as? MikaApp)?.memory?.skills() ?: return emptyList()
     return files.list()

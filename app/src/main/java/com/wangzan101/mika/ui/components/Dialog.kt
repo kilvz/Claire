@@ -64,11 +64,12 @@ fun MikaDialog(
             }
         },
         confirmButton = {
+            // The action area does not use the accent color: both buttons share a light grey background, confirm is bold in body color, cancel uses the secondary color; caller-provided colors (such as red for delete) are kept
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (dismissButton != null) {
-                    DialogAction(Modifier.weight(1f), c.fill) { dismissButton() }
+                    DialogAction(Modifier.weight(1f), c.fill, c.ink2, androidx.compose.ui.text.font.FontWeight.Normal) { dismissButton() }
                 }
-                DialogAction(Modifier.weight(1f), c.accentSoft) { confirmButton() }
+                DialogAction(Modifier.weight(1f), c.fill, c.ink, androidx.compose.ui.text.font.FontWeight.SemiBold) { confirmButton() }
             }
         },
         shape = MikaShapes.Sheet,
@@ -81,12 +82,23 @@ fun MikaDialog(
 }
 
 @Composable
-private fun DialogAction(modifier: Modifier, background: Color, content: @Composable () -> Unit) {
+private fun DialogAction(
+    modifier: Modifier, background: Color, ink: Color,
+    weight: androidx.compose.ui.text.font.FontWeight, content: @Composable () -> Unit,
+) {
     val shape = MikaShapes.Button
+    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
+    // The whole block is the button: pass the block's size as the minimum size to the button inside so it fills the block, and tapping anywhere counts
     Box(
         modifier.heightIn(min = 44.dp).background(background, shape).clip(shape),
         contentAlignment = Alignment.Center,
-    ) { content() }
+        propagateMinConstraints = true,
+    ) {
+        // TextButton uses primary as its text color; here it is replaced with a neutral color
+        androidx.compose.material3.MaterialTheme(colorScheme = scheme.copy(primary = ink)) {
+            CompositionLocalProvider(LocalTextStyle provides MikaType.Body.copy(fontWeight = weight)) { content() }
+        }
+    }
 }
 
 /** The body and answer of a notice dialog use the same Markdown layout, so raw markup is never handed straight to the user. */

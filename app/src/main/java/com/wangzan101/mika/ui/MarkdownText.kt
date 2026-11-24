@@ -42,6 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -94,10 +97,37 @@ internal class FindHighlight(
 
 internal val LocalFindHighlight = compositionLocalOf<FindHighlight?> { null }
 
+/**
+ * Markdown layout flavor for one place in the UI; when not supplied, it uses the shared default.
+ * The chat page's answers use it: dark grey body, pure black bold, headings not enlarged, muted list bullets, and quotes as a light background block instead of a vertical line.
+ */
+@Immutable
+data class MarkdownLook(
+    /** Distance between paragraphs (dp). */
+    val gap: Int = 8,
+    /** Headings are about the same size as body text and differ only by bold weight. */
+    val flatHeadings: Boolean = false,
+    /** Body color: when given, replaces the primary text color supplied by the caller. */
+    val bodyInk: Color = Color.Unspecified,
+    /** Color of bold text. */
+    val strongInk: Color = Color.Unspecified,
+    /** Color of list bullets and numbers. */
+    val markerInk: Color = Color.Unspecified,
+    /** Background of quotes; when given, draws a light background block instead of a left vertical line. */
+    val quoteFill: Color = Color.Unspecified,
+    /** Background of inline code. */
+    val codeFill: Color = Color.Unspecified,
+)
+
+val LocalMarkdownLook = staticCompositionLocalOf { MarkdownLook() }
+
 @Composable
 fun MarkdownText(markdown: String, style: TextStyle, modifier: Modifier = Modifier, streaming: Boolean = false, reportStyle: Boolean = false) {
+    val look = LocalMarkdownLook.current
+    val colors = MikaTheme.colors
+    val body = if (look.bodyInk.isSpecified && style.color == colors.ink) style.copy(color = look.bodyInk) else style
     MarkdownDocument(markdown, streaming, reportStyle) { blocks ->
-        MarkdownBlocks(blocks, style, modifier, gap = if (reportStyle) 16 else 8)
+        MarkdownBlocks(blocks, body, modifier, gap = if (reportStyle) 16 else look.gap)
     }
 }
 
@@ -105,7 +135,13 @@ fun MarkdownText(markdown: String, style: TextStyle, modifier: Modifier = Modifi
 internal fun MarkdownDocument(markdown: String, streaming: Boolean = false, reportStyle: Boolean = false, content: @Composable (List<MdBlock>) -> Unit) {
     // Streaming fragments update frequently, so parse them in the background; the previous frame is kept until the new fragment is ready, avoiding main-thread jank and text flashing empty.
     val colors = MikaTheme.colors
-    val styles = remember(colors, reportStyle) { MarkdownModel.Styles.of(colors, if (reportStyle) FontWeight.Bold else FontWeight.SemiBold) }
+    val look = LocalMarkdownLook.current
+    val styles = remember(colors, reportStyle, look) {
+        MarkdownModel.Styles.of(
+            colors, if (reportStyle) FontWeight.Bold else FontWeight.SemiBold,
+            strongColor = look.strongInk, codeFill = look.codeFill.takeOrElse { colors.fill },
+        )
+    }
     val blocks = if (streaming) {
         val parsed by produceState<List<MdBlock>>(emptyList(), markdown, styles) {
             value = withContext(Dispatchers.Default) { MarkdownModel.parseStreaming(markdown, styles) }
@@ -116,6 +152,8 @@ internal fun MarkdownDocument(markdown: String, streaming: Boolean = false, repo
     val uriHandler = remember(context) {
         object : UriHandler {
             override fun openUri(uri: String) {
+                // Web links open in the built-in browser
+                if ((uri.startsWith("https://", true) || uri.startsWith("http://", true)) && InAppLinks.open?.invoke(uri) == true) return
                 try {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 } catch (e: ActivityNotFoundException) {
@@ -237,6 +275,7 @@ private fun JustifiedText(text: AnnotatedString, style: TextStyle, modifier: Mod
 @Composable
 private fun Block(b: MdBlock, style: TextStyle, depth: Int) {
     val find = LocalFindHighlight.current
+    val look = LocalMarkdownLook.current
     when (b) {
         is MdBlock.Para -> {
             val text = remember(b.text, find) { b.text.withFind(find) }
@@ -244,27 +283,35 @@ private fun Block(b: MdBlock, style: TextStyle, depth: Int) {
         }
         is MdBlock.Heading -> Text(
             remember(b.text, find) { b.text.withFind(find) },
-            Modifier.padding(top = if (LocalReportStyle.current) 12.dp else 2.dp),
+            Modifier.padding(top = if (LocalReportStyle.current) 12.dp else if (look.flatHeadings) 4.dp else 2.dp),
             style = style.copy(
-                fontSize = when (b.level) { 1 -> 19.sp; 2 -> 17.5.sp; 3 -> 16.sp; else -> style.fontSize },
-                lineHeight = when (b.level) { 1 -> 25.sp; 2 -> 23.sp; else -> style.lineHeight },
+                color = look.strongInk.takeOrElse { style.color },
+                fontSize = if (look.flatHeadings) (style.fontSize.value + if (b.level <= 2) 1f else 0.5f).sp
+                    else when (b.level) { 1 -> 19.sp; 2 -> 17.5.sp; 3 -> 16.sp; else -> style.fontSize },
+                lineHeight = if (look.flatHeadings) style.lineHeight
+                    else when (b.level) { 1 -> 25.sp; 2 -> 23.sp; else -> style.lineHeight },
                 fontWeight = if (LocalReportStyle.current) FontWeight.Bold else FontWeight.SemiBold,
                 // Headings stay left-aligned: justification would stretch headings of two or more lines to full width, and a heading shouldn't be stretched out
                 textAlign = TextAlign.Start,
             ),
         )
         is MdBlock.Code -> CodeBlock(b, style)
-        is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
+        is MdBlock.Quote -> if (look.quoteFill.isSpecified) {
+            MarkdownBlocks(
+                b.blocks, style.copy(color = MikaTheme.colors.ink2),
+                Modifier.fillMaxWidth().background(look.quoteFill, MikaShapes.Button).padding(horizontal = 11.dp, vertical = 7.dp), depth + 1, look.gap,
+            )
+        } else Row(Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(3.dp).fillMaxHeight().background(MikaTheme.colors.hair, MikaShapes.Micro))
             MarkdownBlocks(b.blocks, style.copy(color = MikaTheme.colors.ink2), Modifier.padding(start = 10.dp), depth + 1)
         }
-        is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(if (b.tight) 3.dp else 8.dp)) {
+        is MdBlock.ListBlock -> Column(verticalArrangement = Arrangement.spacedBy(if (b.tight) (if (look.flatHeadings) 4.dp else 3.dp) else look.gap.dp)) {
             b.items.forEachIndexed { i, item ->
                 val reportItem = LocalReportStyle.current && depth == 0
                 Row(Modifier.then(if (reportItem) Modifier.fillMaxWidth().clip(MikaShapes.Button)
                     .background(MikaTheme.colors.bg).padding(14.dp) else Modifier)) {
                     val marker = if (b.start != null) "${b.start + i}." else if (depth % 2 == 0) "•" else "◦"
-                    Text(marker, Modifier.widthIn(min = 18.dp).padding(end = 6.dp), style = style.copy(color = if (reportItem) MikaTheme.colors.accent else MikaTheme.colors.ink2))
+                    Text(marker, Modifier.widthIn(min = 18.dp).padding(end = 6.dp), style = style.copy(color = if (reportItem) MikaTheme.colors.accent else look.markerInk.takeOrElse { MikaTheme.colors.ink2 }))
                     MarkdownBlocks(item, style, depth = depth + 1, gap = if (b.tight) 3 else 8)
                 }
             }

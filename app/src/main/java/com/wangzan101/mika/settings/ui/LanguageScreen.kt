@@ -86,7 +86,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
             ThemeMode.entries.forEachIndexed { idx, m ->
                 RadioRow(
                     appearanceLabel(m), selected = m == themeMode, first = idx == 0,
-                    subtitle = if (m == ThemeMode.System) stringResource(R.string.appearance_system_detail) else null,
+                    note = if (m == ThemeMode.System) stringResource(R.string.appearance_system_detail) else null,
                     onClick = {
                         // Colors change immediately with the setting, without rebuilding, so the page and scroll position are preserved
                         if (m != themeMode) flags.setThemeMode(m)

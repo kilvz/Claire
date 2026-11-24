@@ -56,16 +56,6 @@ class SidebarDestinationsDeviceTest {
     @Test fun sidebarPagesStayBesideNavigationAndBackRestoresChatDraft() {
         compose.runOnUiThread { (context.applicationContext as MikaApp).chat.newConversation() }
         compose.onNodeWithTag("composer-field").performTextReplacement("保留这段折叠屏草稿")
-        open(R.string.drawer_personal)
-        compose.onNodeWithTag("personal-screen").assertIsDisplayed()
-        open(R.string.drawer_plans)
-        compose.onNodeWithTag("composer-field").assertDoesNotExist()
-        compose.onNodeWithTag("plans-segment-running").assertIsDisplayed()
-        open(R.string.memory_and_skills)
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("segment-Skills")).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("segment-Skills").assertIsDisplayed().performClick()
         open(R.string.drawer_browser)
         compose.onNodeWithTag("browser-search").assertIsDisplayed()
         // After rotating to a narrow window only the feature page is shown; returning to a wide window restores the sidebar and still leaves you in the browser.
@@ -80,8 +70,8 @@ class SidebarDestinationsDeviceTest {
         instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.onNodeWithTag("composer-field").assertTextEquals("保留这段折叠屏草稿")
         compose.onNodeWithTag("permanent-navigation").assertIsDisplayed()
-        // Tapping new chat on a feature page must also return to the chat on the right, not just change the hidden ViewModel.
-        open(R.string.drawer_plans)
+        // Tapping new chat on a feature page must return to the chat on the right, not just change a hidden ViewModel.
+        open(R.string.drawer_browser)
         open(R.string.chat_new)
         compose.onNodeWithTag("composer-field").assertIsDisplayed()
     }

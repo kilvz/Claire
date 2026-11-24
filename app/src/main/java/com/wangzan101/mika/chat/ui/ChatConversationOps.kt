@@ -134,8 +134,10 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         }
     }
 
-    /** Switch to a conversation; does not switch while a task is running. */
-    fun openConversation(id: String) {
+    /** Switch to a conversation; do not switch while a task is running. */
+    fun openConversation(requested: String) {
+        // The child conversation Claire uses for a task is not shown to the user (notifications, the small window and old links may point to it): open the chat it belongs to instead
+        val id = store.deskParent(requested) ?: requested
         if (_ui.value.conversationId == id) return
         session.refreshParallel()
         if (session.parallel()) return switchTo(id)

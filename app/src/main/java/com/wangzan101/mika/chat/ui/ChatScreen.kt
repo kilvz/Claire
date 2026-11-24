@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -440,6 +441,8 @@ fun ChatScreen(
                     exchange(
                         i, ex, ui.conversationId, ui.takeoverStage, vm, reduceMotion, backgroundNote, openRun, kept,
                         highlightKey = highlightKey,
+                        joinedAbove = replyJoinsAbove(ui.exchanges, i, calls),
+                        joinedBelow = replyJoinsAbove(ui.exchanges, i + 1, calls),
                         recover = { resume ->
                             val label = if (resume) R.string.chat_resume_request else R.string.chat_restart_request
                             vm.send(context.getString(label, ex.goal), check)
@@ -449,7 +452,7 @@ fun ChatScreen(
                     if (setupRow == i) item("ps$i") { PhoneSetupLine(openPhoneSetup) }
                 }
                 callMarkRows(calls.tail, highlightKey, reduceMotion)
-                deskNeedRows(ui.deskTasks, highlightKey, reduceMotion, vm::answerDeskTask, vm::openConversation, vm::cancelDeskTask)
+                deskNeedRows(ui.deskTasks, highlightKey, reduceMotion, vm::answerDeskTask, vm::cancelDeskTask, vm)
                 if (setupRow == -1) item("phone-setup") { PhoneSetupLine(openPhoneSetup) }
                 ui.blocked?.let { problems ->
                     item("blocked") {
@@ -465,44 +468,48 @@ fun ChatScreen(
             }
         }
 
-        Column(Modifier.behindMenu(menuOpen) { lift.value }.onSizeChanged { topHeight = it.height }) {
-            // The three floating glass pieces: menu / title / new, each a small block of frosted glass instead of one full bar
+        // The status bar and area behind the top bar fade from the page background to transparent: content scrolling up does not overlap the clock or battery
+        val topFade = MikaTheme.colors.bg.let { bg -> remember(bg) { Brush.verticalGradient(0f to bg, 0.4f to bg, 1f to bg.copy(alpha = 0f)) } }
+        Column(Modifier.behindMenu(menuOpen) { lift.value }.background(topFade).onSizeChanged { topHeight = it.height }) {
+            // Three floating glass blocks: left group (menu, new chat) / title / right group (call, more), not a full-width bar
             Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)) {
-                Row(
+                // The title is centered across the whole row instead of being squeezed by both sides
+                Box(
                     Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    if (!adaptive.hasNavigation || screenDocked) GlassSurface(modifier = Modifier.size(MikaSize.IconButton), backdrop = backdrop, shape = CircleShape) {
-                        Box(
-                            Modifier.fillMaxSize().clip(CircleShape)
-                                .clickable(onClickLabel = stringResource(R.string.chat_menu), onClick = onOpenDrawer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            DirectionalIcon(MikaIcons.Menu, stringResource(R.string.chat_menu), Modifier.size(MikaSize.Icon), tint = c.ink)
-                            // Other conversations still have tasks running (in parallel mode): a small dot at the top right, and they can be switched to from "Running" in the drawer
-                            if (others.isNotEmpty()) {
-                                Box(
-                                    Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 7.dp).size(8.dp)
-                                        .background(c.bg, CircleShape).padding(1.dp).background(c.accent, CircleShape),
-                                )
+                    // One glass block on each side, shared by the icons in the group: menu + new chat on the left, call + more on the right
+                    GlassSurface(backdrop = backdrop, modifier = Modifier.align(Alignment.CenterStart), shape = TopBarShape) {
+                        Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // Another conversation still has a task running (in parallel): a small dot at the top right of the menu, and the sidebar's "In progress" lets you switch to it
+                            if (!adaptive.hasNavigation || screenDocked) {
+                                TopBarIcon(MikaIcons.Menu, stringResource(R.string.chat_menu), "chat-menu", badge = others.isNotEmpty(), onClick = onOpenDrawer)
                             }
+                            TopBarIcon(MikaIcons.New, stringResource(R.string.chat_new), "chat-new", enabled = vm.canSwitch()) { vm.newConversation() }
                         }
                     }
-                    GlassSurface(backdrop = backdrop) {
-                        Row(Modifier.clickable(role = Role.Button, onClickLabel = stringResource(R.string.chat_usage_title)) { showUsage = true }
-                            .testTag("chat-usage-title").padding(horizontal = 14.dp, vertical = 8.dp),
+                    GlassSurface(backdrop = backdrop, modifier = Modifier.align(Alignment.Center), shape = TopBarShape) {
+                        Row(Modifier.clip(TopBarShape).clickable(role = Role.Button, onClickLabel = stringResource(R.string.chat_usage_title)) { showUsage = true }
+                            .testTag("chat-usage-title").height(MikaSize.IconButton + 4.dp).padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(ChatCopy.APP_TITLE, style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink, maxLines = 1)
                         }
                     }
-                    ChatMoreMenu(
-                        backdrop, canSwitch = vm.canSwitch(),
-                        onNew = { vm.newConversation() },
-                        onRecords = { showRecords = true },
-                        onTasks = { showTasks = true },
-                        onCallSettings = openCallSettings,
-                    )
+                    GlassSurface(backdrop = backdrop, modifier = Modifier.align(Alignment.CenterEnd), shape = TopBarShape) {
+                        Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // Voice calling concerns the whole conversation, so its entry is in the top bar rather than squeezed into the input bar
+                            if (onVoiceCall != null) {
+                                TopBarIcon(MikaIcons.Handset, stringResource(R.string.voicecall_menu), "chat-call", onClick = onVoiceCall)
+                            }
+                            ChatMoreMenu(
+                                backdrop, canSwitch = vm.canSwitch(),
+                                onNew = { vm.newConversation() },
+                                onRecords = { showRecords = true },
+                                onTasks = { showTasks = true },
+                                onCallSettings = openCallSettings,
+                                bare = true,
+                            )
+                        }
+                    }
                 }
                 if (currentProject != null) {
                     Row(
@@ -567,7 +574,6 @@ fun ChatScreen(
                 vm.send(text, check)
             },
             onPickSpeech = openSpeechModel,
-            onVoiceCall = onVoiceCall,
             steerTarget = null,
             onVoiceHolding = { voiceHolding = it },
             editRequest = editRequest,
@@ -637,7 +643,6 @@ fun ChatScreen(
                 }) else null,
                 onChecklists = { showPlus = false; showChecklists = true },
                 onWorkflows = { showPlus = false; showWorkflows = true },
-                onBrowser = { showPlus = false; onOpenBrowser() },
                 tasks = recommendedTasks,
                 onPickTask = { showPlus = false; pickTask(it) },
                 onPickSkill = { skill ->
@@ -685,12 +690,12 @@ fun ChatScreen(
             },
             onReopen = { if (deskPip != null) deskPipClosed = deskPipClosed - deskPip.taskId else vm.reopenPip() },
             onToggleSound = { if (deskPip != null) vm.togglePipSoundIn(deskPip.taskId) else vm.togglePipSound() },
-            // Tapping the small window while it needs you: collapse it and scroll to the card that needs you. A front desk job scrolls to its question card;
-            // a task's own card is in the last question-and-answer, after which only file cards and the "go to settings" row can follow
+            // Tapping the small window when something needs you: collapse and scroll to the card that needs you. For a running task, scroll to its question card (or open its process record if there is none);
+            // a card for your own task is in the last question and answer, which can only be followed by file cards and the go-to-settings row
             onAttention = {
                 if (deskPip != null) {
                     deskPipExpanded = null
-                    if (!jumpToNeed(deskPip.taskId)) vm.openConversation(deskPip.taskId)
+                    if (!jumpToNeed(deskPip.taskId)) openDeskTask(deskPip.taskId)
                 } else {
                     vm.attendPip()
                     val count = listState.layoutInfo.totalItemsCount

@@ -76,6 +76,8 @@ fun ChatDrawer(
     onPlans: () -> Unit = {},
     onMemory: () -> Unit = {},
     onBrowser: () -> Unit = {},
+    onTeach: () -> Unit = {},
+    onCalls: () -> Unit = {},
     onScreens: () -> Unit = {},
     onSettings: () -> Unit,
     onOpen: (DrawerConversation) -> Unit,
@@ -134,47 +136,27 @@ fun ChatDrawer(
             .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars))
             .testTag("drawer"),
     ) {
-        val (state, ok) = readiness(check)
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MikaLogo(36.dp, corner = 10.dp)
-            Column(Modifier.weight(1f)) {
-                Text("Claire", style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Box(Modifier.size(6.dp).background(if (ok) c.ok else c.warnSolid, CircleShape))
-                    Text(state, style = MikaType.Hint, fontWeight = FontWeight.Medium, color = c.ink3)
-                }
-            }
-            // Selection is entered from the long-press menu; once in, this becomes "Cancel", and the back key exits as well
+            MikaLogo(32.dp, corner = 9.dp)
+            Text("Claire", Modifier.weight(1f), style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink)
+            // New chat sits to the right of the title; it collapses during search, multi-select and archive
+            if (!searchActive && !selecting && !archivedView) NewConversationButton(canSwitch, onNew)
+            // Multi-select is entered from the long-press menu; once inside, this becomes "Cancel", and back also exits
             if (selecting) HeaderAction(stringResource(R.string.cancel), "drawer-select-cancel", c.ink2, onExitSelect)
         }
-        if (!searchActive && !selecting && !archivedView && permanent) {
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                onShowScreen?.let { NavEntry(MikaIcons.Screens, stringResource(R.string.screens_preview), onClick = it) }
-                NavEntry(MikaIcons.Message, stringResource(R.string.drawer_personal), onClick = onPersonal)
-                NavEntry(MikaIcons.Clock, stringResource(R.string.drawer_plans), onClick = onPlans)
-                NavEntry(MikaIcons.Heart, stringResource(R.string.memory_and_skills), onClick = onMemory)
-                NavEntry(MikaIcons.Globe, stringResource(R.string.drawer_browser), onClick = onBrowser)
+        if (!searchActive && !selecting && !archivedView) {
+            // The three main abilities stay at the top; everything else is in settings
+            DrawerShortcuts(onBrowser, onTeach, onCalls, Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+            if (permanent) onShowScreen?.let {
+                Column(Modifier.padding(horizontal = 12.dp)) { NavEntry(MikaIcons.Screens, stringResource(R.string.screens_preview), onClick = it) }
             }
         }
-        // The search field and new conversation share a row: the field takes the width and a neutral round plus sits on the right (only when not searching); the plus stays even when there is nothing to search
-        val showNew = !searchActive && !selecting && !archivedView
         if (canSearch && !selecting && !archivedView) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                DrawerSearchField(query, onQueryChange, Modifier.weight(1f))
-                if (showNew) NewConversationButton(canSwitch, onNew)
-            }
-        } else if (showNew) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-                NewConversationButton(canSwitch, onNew)
-            }
+            DrawerSearchField(query, onQueryChange, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp))
         }
         // While searching, the row below the field filters by archive state; the archive view has no search, so naturally no such row either
         if (searchActive) SearchArchiveFilterRow(searchFilter, onSearchFilterChange)
@@ -317,12 +299,24 @@ fun ChatDrawer(
         } else {
             // Settings is pinned at the bottom-left of the drawer; only when a new version exists does "Update" with a red dot appear on the right, tapping it opens "About Claire"
             Row(
-                Modifier.fillMaxWidth().drawBehind { drawLine(c.hair, Offset(0f, 0f), Offset(size.width, 0f), 0.5.dp.toPx()) }
+                Modifier.fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("drawer-footer"),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                NavEntry(MikaIcons.Gear, stringResource(R.string.settings_title), Modifier, onClick = onSettings)
+                SettingsEntry(onSettings)
+                // On the right: "Update" when there is a new version, otherwise the current status
                 if (aboutDot) NavEntry(MikaIcons.Refresh, stringResource(R.string.drawer_update), Modifier, dot = true, onClick = onAbout)
+                else {
+                    val (state, ok) = readiness(check)
+                    Row(
+                        Modifier.height(46.dp).padding(horizontal = 12.dp).testTag("drawer-status"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Box(Modifier.size(6.dp).background(if (ok) c.ok else c.warnSolid, CircleShape))
+                        Text(state, style = MikaType.Hint, color = if (ok) c.ink3 else c.warn)
+                    }
+                }
             }
         }
     }

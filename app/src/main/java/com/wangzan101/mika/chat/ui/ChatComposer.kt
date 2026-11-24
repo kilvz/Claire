@@ -118,9 +118,8 @@ internal fun Composer(
     onVoiceSend: ((String) -> Unit)? = null,
     /** The "choose" action in "voice input not available yet": pick speech-to-text in settings. */
     onPickSpeech: () -> Unit = {},
-    /** Handset button: open a voice call; not shown when null. */
-    onVoiceCall: (() -> Unit)? = null,
-    /** Who the message goes to while a task is running: the card's top reads "Steer to '…'". */
+    /** The handset button: enters a voice call; hidden when null. */
+    /** Who words spoken while a task runs are given to: the top of the card says "Speak to '…'". */
     steerTarget: String? = null,
     /** True while holding to talk: the conversation content blurs along with it. */
     onVoiceHolding: (Boolean) -> Unit = {},
@@ -268,19 +267,7 @@ internal fun Composer(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        // Handset: start a voice call (coexists with hold-to-talk)
-                        if (onVoiceCall != null) {
-                            val callLabel = stringResource(R.string.voicecall_menu)
-                            Box(
-                                Modifier.size(MikaSize.IconButton).clip(CircleShape)
-                                    .clickable(onClickLabel = callLabel, onClick = onVoiceCall)
-                                    .testTag("composer-call"),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(MikaIcons.Handset, callLabel, Modifier.size(MikaSize.Icon), tint = c.ink)
-                            }
-                        }
-                        // Mic always present: listening only while held, a tap hints to hold (or opens the explanation sheet directly when the engine is unavailable); once the keyboard is up, long-pressing the field stays with the system's text selection
+                        // The microphone is always present: listening only while held, and a tap explains holding (or opens the explanation page when the engine is unavailable); after the keyboard appears, long-pressing the input is left to the system for text selection
                         if (vh != null) {
                             val hint = stringResource(R.string.voice_hold_to_talk)
                             Box(
