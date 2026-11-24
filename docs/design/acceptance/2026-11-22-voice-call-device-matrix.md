@@ -8,15 +8,16 @@ Preconditions: real-time voice credentials configured in Settings (the same ones
 
 ## 1. Connecting and the basic chain
 
-- [ ] The handset button next to the microphone in the input bar opens the call page; the capsule menu "Voice chat" opens it too
-- [ ] Connecting: the orb is in mesh form → switches to a "Connected" green dot and the timer starts running
-- [ ] The first session plays a greeting, and **plays it only once** (not replayed within the same call)
-- [ ] The local two-tone "ding-dong" prompt sounds before the greeting
-- [ ] Speaking produces a waveform response (the orb takes on a wavy form)
-- [ ] While the assistant speaks, the orb rises and falls with its voice
-- [ ] Hanging up: the red hang-up button → falls to "Ended", the timer stops at the final duration, the bottom input/hands-free/hang-up controls disappear, leaving only collapse at the top left
-- [ ] Tap collapse → the page exits, the notification bar still holds a call notification (with hang-up), and the call continues
-- [ ] Hang up from the notification bar → the call ends, and the page is dismissed too if it is open
+- [ ] 输入栏话筒旁的听筒按钮能进通话页;胶囊菜单「语音聊天」也能进
+- [ ] 接通过程:球是网形态 → 转「已连接」绿点,计时开始走
+- [ ] 首次会话听到问候语,且**只播一次**(同一通内不再重播)
+- [ ] 本地「叮咚」两音提示音在问候语之前响
+- [ ] 说话有波形反应(球变波浪形态)
+- [ ] 助手说话时球随其声音起伏
+- [ ] 挂断:红色挂断钮 → 落「已结束」,计时停在最终时长,底部输入/免提/挂断消失,只剩左上收起
+- [ ] 点收起或按返回 → 回到上一页,通知栏仍有一条通话通知(带挂断),通话继续;每一页顶上有绿条「通话中 · 回到通话」+ 计时,点了回通话页
+- [ ] 收起后再返回,不会又弹回通话页
+- [ ] 通知栏挂断 → 通话结束,页面若开着也收掉
 
 ## 2. Audio routing matrix (every item must be tried)
 
@@ -36,25 +37,29 @@ Preconditions: real-time voice credentials configured in Settings (the same ones
 
 ## 4. Interruptions and abnormal cases
 
-- [ ] Incoming call (MODE_IN_CALL/RINGTONE) → the call ends with "Incoming call" and explains why
-- [ ] Another app grabs audio focus (e.g. plays a video) → degrade or end as designed, with no double-track overlap
-- [ ] Network lost → falls to "Connection interrupted", retrying in place reconnects and attempt increments
-- [ ] 10-minute cap → wraps up when the time is up and shows the reason, without automatic retry
-- [ ] Screen locked: the call continues (foreground service keeps it alive); **locking the screen does not pop the call page up by itself**
-- [ ] System mute / microphone taken by another app → shows wording such as "No microphone input", not a silent hang
-- [ ] Backgrounding and coming back: page state, timer and status line are all still there
-- [ ] Rotation: the call **does not drop** (MainActivity already declares configChanges), and the page layout is normal
-- [ ] System dark/light switching, font scaling, split screen: the main interface redraws immediately and correctly (a whole-app behavior change; confirm in passing)
+- [ ] 来电(MODE_IN_CALL/RINGTONE)→ 通话以「来电」结束并说明
+- [ ] 其他 App 抢音频焦点(如放视频)→ 按设计降级或结束,不出现双声道叠音
+- [ ] 断网 → 落「连接中断」,就地重试能重新接通且 attempt 增加
+- [ ] 静默挂断(设 2 分钟)→ 一直不说话:第 90 秒左右 Mika 问一句还在不在;接着不理,第 2 分钟挂断并显示「2 分钟没有动静，通话已结束」,不自动重试;中途说一句、打字或任务有进展都重新计时
+- [ ] 锁屏:通话继续(前台服务保活);**锁屏不会自己弹出通话页**
+- [ ] 系统静音/被别的 App 占用麦克风 → 报「麦克风无输入」类文案,不是静默卡住
+- [ ] 退到后台再回来:页面状态、计时、状态行都还在
+- [ ] 转屏:通话**不掉线**(MainActivity 已声明 configChanges),页面布局正常
+- [ ] 系统深色/浅色切换、字体缩放、分屏:主界面即时重绘正常(全 App 行为变更,顺带确认)
 
 ## 5. The full voice task-execution chain
 
-- [ ] Say "wake me up at eight tomorrow morning" → the status line scrolls progress → the alarm really gets set → the assistant repeats the result
-- [ ] During the task the status line has at most 12 lines and scrolling stays legible
-- [ ] **The status line contains no private details**: no coordinates, calendar titles, contact names or specific text content
-- [ ] The task needs user confirmation/takeover (e.g. needs a password, needs a person to act) → prompts "go look at the task page", without pretending it is done
-- [ ] Interrupting mid-task → tasks that were started but not finished are cancelled (operations already in effect are not claimed to be undone)
-- [ ] Panel text input box: typing and sending goes the same way as speaking
-- [ ] After the call ends, both sides' text **appears in the conversation that started the call** (question/answer/time), and is written only once
+- [ ] 说「明天早上八点叫我起床」→ 状态行滚动进度 → 闹钟真被订上 → 助手复述结果
+- [ ] 办事期间状态行最多 12 行,滚动不糊
+- [ ] **状态行不含隐私细节**:不出现坐标、日程标题、联系人姓名、具体文本内容
+- [ ] 任务需要用户确认/接管(如要密码、要人操作)→ 提示「去任务页看」,不假装已办完
+- [ ] 办事中打断 → 已启动未完成的任务被取消(已生效的操作不声称撤销)
+- [ ] 面板文字输入框:打字发出去与说话同一条路
+- [ ] 通话里每说完一轮,聊天页就多一轮(问/答/时间),挂断后不重复写
+- [ ] 聊天页里这一段前后有「语音通话 · 时刻」「通话结束 · 时长」两行浅色小字;一句没说就挂的只有一行「语音通话 · 时长 · 没有说话」
+- [ ] 再打开通话页是空白的,只显示这一通;顶部「上次通话 · 时刻 ›」点了回到聊天里那一段
+- [ ] 通话页右上角 ⋯ →「通话记录」列出这个对话的每一通;点一条回到聊天里那一通开头并亮一下;⋯ →「通话设置」进通话方式
+- [ ] 通话页点任务卡进任务时间线,返回回到通话页
 
 ## 6. Guarding against wrong execution (safety gates; all of these must not take effect)
 

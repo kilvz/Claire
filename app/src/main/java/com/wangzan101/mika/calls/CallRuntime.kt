@@ -16,6 +16,7 @@ import com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility
 import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.R
 import com.wangzan101.mika.calls.instructions.CallInstructionStore
+import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.shell.IMikaShell
 import com.wangzan101.mika.voice.cascade.CallUse
 import com.wangzan101.mika.voice.cascade.CascadeEngine
@@ -446,6 +447,10 @@ class CallRuntime(internal val app: MikaApp) {
         val expectedCallId: String? = null,
         val task: CallTaskBrief? = null,
         val lockedDialTicket: LockedDialGate.Ticket? = null,
+        /** The backend task this call belongs to (present only when the task placed the call); the phone front desk puts its state into the context. */
+        val ownerTask: StateFlow<TaskState>? = null,
+        /** The conversation the owner can see (questions are written here and can be answered here); null for calls with no owning task, where the only way to answer is the notification. */
+        val ownerConversationId: String? = null,
     ) {
         val id = UUID.randomUUID().toString()
         val result = CompletableDeferred<CallActionResult>()

@@ -10,7 +10,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaType
-import com.wangzan101.mika.ui.theme.WordmarkWeight
 
 /** How long the jump target row stays highlighted (milliseconds). */
 internal const val JUMP_HIGHLIGHT_MS = 1_800L
@@ -27,7 +26,6 @@ internal val BubbleText = MikaType.Body
 /** Answer: body font size, justified (Chinese paragraphs then have even line ends, except for the last line). */
 internal val AnswerText = MikaType.Body.copy(textAlign = TextAlign.Justify)
 internal val NowText = MikaType.Value
-internal val TurnNameText = MikaType.Label.copy(fontWeight = WordmarkWeight)
 internal val ClockText = MikaType.Hint.copy(fontFeatureSettings = "tnum")
 internal val StepText = MikaType.Caption
 internal val StepCurrentText = MikaType.Caption.copy(fontWeight = FontWeight.Medium)

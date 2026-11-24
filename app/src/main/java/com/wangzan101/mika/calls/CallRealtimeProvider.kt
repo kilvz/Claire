@@ -13,6 +13,25 @@ interface CallRealtimeSession : AutoCloseable {
     fun sendGreeting(text: String): Boolean
     fun setMuted(muted: Boolean): Boolean
     fun sendToolResult(callId: String, result: JsonObject): Boolean = false
+    /**
+     * A message arrived from a backend task: speak it after the current sentence finishes and when the user is not
+     * speaking, without interrupting; returns false when it cannot be spoken now (the caller takes another route).
+     * An accepted message is always [ended] exactly once at the end: true when fully spoken; false when interrupted or
+     * the call ended before it got a turn.
+     */
+    fun sendNotice(text: String, ended: (spoken: Boolean) -> Unit = {}): Boolean = false
+    /**
+     * A cue handed to the model (not something the other party said, and not read verbatim): the model reads it and
+     * continues in its own words. Queuing and the [ended] contract are the same as [sendNotice].
+     * Returns false when the protocol has no text input that keeps the model replying; the caller takes another route.
+     */
+    fun sendCue(text: String, ended: (spoken: Boolean) -> Unit = {}): Boolean = false
+
+    /** A cue used purely as background for the model: added to the context without making it speak; returns false when the protocol has no such input. */
+    fun sendContext(text: String): Boolean = false
+
+    /** Text the user typed, treated as one utterance and answered; returns false when unsupported. */
+    fun sendUserText(text: String): Boolean = false
     override fun close()
 }
 

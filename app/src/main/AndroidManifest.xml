@@ -288,6 +288,8 @@
         </service>
 
         <receiver android:name=".calls.CallNotificationAction" android:exported="false" />
+        <!-- Ask the owner from within an AI call: the landing point for replying directly in the notification; not exported (the PendingIntent names this component) -->
+        <receiver android:name=".calls.OwnerReplyReceiver" android:exported="false" />
 
         <!-- In-app voice calls: keep the process and background microphone alive during a call; the notification has a hang-up action and does not open the call page when the screen is locked. -->
         <service

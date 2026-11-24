@@ -1,9 +1,12 @@
 package com.wangzan101.mika.voicecall
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Execution safety gate: each of the 5 rules has positive and negative cases; also covers cross-turn replay, a second offer in the same turn after consumption, and the echo window's ring-buffer boundaries. */
+/** Execution safety gate: each of the 5 rules has positive and negative cases, plus cross-turn replay, multiple offers in one turn, echo judged on the whole sentence, and the ring-buffer boundary of the echo window. */
 class VoiceCallRequestTest {
 
     // Rule ①: no transcript for the current turn → Reject
@@ -13,7 +16,7 @@ class VoiceCallRequestTest {
         assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "打开微信"))
     }
 
-    // Rule ⑤ positive case: match → Accept (the original transcript, not the normalized result)
+    // Rule ⑤ positive case: a match → Accept (the user's whole original sentence, not the normalized result)
     @Test
     fun matchingUtteranceAcceptsWithOriginalTranscript() {
         val gate = VoiceCallRequest(RingBuffer(10))
@@ -40,7 +43,17 @@ class VoiceCallRequestTest {
         assertEquals(VoiceCallDecision.Accept("帮我打开微信好吗"), gate.offer("c1", "打开微信"))
     }
 
-    // Rule ③ negative case: the utterance is longer than the current turn's transcript — the model added words the user did not say → Reject, and the transcript is not consumed
+    // Rule ⑤: even when the model excerpts only a fragment it cannot change the user's meaning — negations are not dropped, and the backend always gets the whole sentence
+    @Test
+    fun aFragmentCannotDropANegation() {
+        val gate = VoiceCallRequest(RingBuffer(10))
+        gate.onUserTranscript("千万别帮我给他转账")
+        assertEquals(VoiceCallDecision.Accept("千万别帮我给他转账"), gate.offer("c1", "帮我给他转账"))
+        assertEquals("千万别帮我给他转账", gate.said("千万别帮我给他转账"))
+        assertNull(gate.said("帮我给他转账"))
+    }
+
+    // Rule ③ negative case: the utterance is longer than this turn's transcript — the model added words the user never said → Reject, and the transcript is not consumed
     @Test
     fun utteranceLongerThanTranscriptRejectsAndKeepsTranscript() {
         val gate = VoiceCallRequest(RingBuffer(10))
@@ -80,12 +93,26 @@ class VoiceCallRequestTest {
         assertEquals(VoiceCallDecision.Accept("打开支付宝"), gate.offer("c2", "打开支付宝"))
     }
 
-    // Rule ⑤ negative case: the transcript is consumed only once — offering again in the same turn with a new callId after an Accept → Reject
+    // Rule ⑤: one sentence can do several things — the turn's transcript is not consumed on accept, and each call carries its own excerpt of the original words
     @Test
-    fun secondOfferSameTurnAfterAcceptRejects() {
+    fun oneUtteranceAuthorizesSeveralCalls() {
+        val gate = VoiceCallRequest(RingBuffer(10))
+        gate.onUserTranscript("帮我订晚饭,再叫个车")
+        // Every item carries the whole sentence (the user's original words); which part each item does is described by the front desk's title and note
+        assertEquals(VoiceCallDecision.Accept("帮我订晚饭,再叫个车"), gate.offer("c1", "帮我订晚饭"))
+        assertEquals(VoiceCallDecision.Accept("帮我订晚饭,再叫个车"), gate.offer("c2", "再叫个车"))
+        assertEquals("帮我订晚饭,再叫个车", gate.said("帮我订晚饭,再叫个车"))
+        // Words the user never said are still rejected in the same turn
+        assertEquals(VoiceCallDecision.Reject, gate.offer("c3", "顺便转账"))
+    }
+
+    // Rule ⑤: when the user speaks in the next turn, the previous turn's transcript expires
+    @Test
+    fun nextUserTurnExpiresTheTranscript() {
         val gate = VoiceCallRequest(RingBuffer(10))
         gate.onUserTranscript("打开微信")
         assertEquals(VoiceCallDecision.Accept("打开微信"), gate.offer("c1", "打开微信"))
+        gate.onUserTurnStart()
         assertEquals(VoiceCallDecision.Reject, gate.offer("c2", "打开微信"))
     }
 
@@ -110,14 +137,36 @@ class VoiceCallRequestTest {
         assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "马上帮你打开微信"))
     }
 
-    // Rule ④ negative case (reverse direction): the echo window content is a substring of the utterance → also Reject
+    // Rule ④ positive case: the echo covers only a small part of this sentence → not echo (the user went on to say something else)
     @Test
-    fun echoWindowInsideUtteranceRejects() {
+    fun echoCoveringOnlyPartOfTheTurnDoesNotBlock() {
         val window = RingBuffer<String>(10)
         val gate = VoiceCallRequest(window)
         window.append("你好")
         gate.onUserTranscript("你好世界")
-        assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "你好世界"))
+        assertEquals(VoiceCallDecision.Accept("你好世界"), gate.offer("c1", "你好世界"))
+    }
+
+    // Rule ④ positive case: the question just spoken contains options and the user answers with one → not echo
+    @Test
+    fun answeringWithAnOptionFromTheSpokenQuestionPasses() {
+        val window = RingBuffer<String>(ECHO_WINDOW_CAPACITY_CHARS)
+        val gate = VoiceCallRequest(window)
+        window.append("订日料那件,在问你:七点还是八点?")
+        gate.onUserTranscript("七点吧")
+        assertEquals(VoiceCallDecision.Accept("七点吧"), gate.offer("c1", "七点"))
+        gate.onUserTranscript("七点")
+        assertEquals(VoiceCallDecision.Accept("七点"), gate.offer("c2", "七点"))
+    }
+
+    // Rule ④ negative case: almost the whole sentence was just spoken (playback fed back as a user transcript) → Reject, even if only a fragment is excerpted
+    @Test
+    fun aTurnMostlyMadeOfEchoRejectsEvenForAFragment() {
+        val window = RingBuffer<String>(ECHO_WINDOW_CAPACITY_CHARS)
+        val gate = VoiceCallRequest(window)
+        window.append("好的,马上帮你打开微信")
+        gate.onUserTranscript("马上帮你打开微信吧")
+        assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "打开微信"))
     }
 
     // Rule ④ positive case: the echo window holds unrelated content, and the utterance matches the transcript without being inside the window → Accept
@@ -136,8 +185,8 @@ class VoiceCallRequestTest {
         val window = RingBuffer<String>(ECHO_WINDOW_CAPACITY_CHARS)
         val gate = VoiceCallRequest(window)
         window.append("甲".repeat(ECHO_WINDOW_CAPACITY_CHARS))
-        gate.onUserTranscript("甲甲")
-        assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "甲甲"))
+        gate.onUserTranscript("甲甲甲甲")
+        assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "甲甲甲甲"))
     }
 
     // Echo window 500-character ring-buffer boundary: beyond the capacity the oldest entry is dropped one by one; dropped content no longer counts as echo, retained content still does
@@ -146,12 +195,12 @@ class VoiceCallRequestTest {
         val window = RingBuffer<String>(ECHO_WINDOW_CAPACITY_CHARS)
         val gate = VoiceCallRequest(window)
         window.append("甲".repeat(ECHO_WINDOW_CAPACITY_CHARS))
-        window.append("乙")
-        assertEquals(listOf("乙"), window.snapshot())
-        gate.onUserTranscript("甲甲")
-        assertEquals(VoiceCallDecision.Accept("甲甲"), gate.offer("c1", "甲甲"))
-        gate.onUserTranscript("乙乙")
-        assertEquals(VoiceCallDecision.Reject, gate.offer("c2", "乙乙"))
+        window.append("乙乙乙乙")
+        assertEquals(listOf("乙乙乙乙"), window.snapshot())
+        gate.onUserTranscript("甲甲甲甲")
+        assertEquals(VoiceCallDecision.Accept("甲甲甲甲"), gate.offer("c1", "甲甲甲甲"))
+        gate.onUserTranscript("乙乙乙乙")
+        assertEquals(VoiceCallDecision.Reject, gate.offer("c2", "乙乙乙乙"))
     }
 
     // Echo window ring-buffer boundary: a single entry larger than the capacity keeps only its most recent tail
@@ -163,8 +212,8 @@ class VoiceCallRequestTest {
         assertEquals(listOf("丁".repeat(ECHO_WINDOW_CAPACITY_CHARS)), window.snapshot())
         gate.onUserTranscript("丙丙")
         assertEquals(VoiceCallDecision.Accept("丙丙"), gate.offer("c1", "丙丙"))
-        gate.onUserTranscript("丁丁")
-        assertEquals(VoiceCallDecision.Reject, gate.offer("c2", "丁丁"))
+        gate.onUserTranscript("丁丁丁丁")
+        assertEquals(VoiceCallDecision.Reject, gate.offer("c2", "丁丁丁丁"))
     }
 
     // Hardening: an utterance that normalizes to empty (punctuation only) is rejected rather than executed — the empty string is a substring of any string, so it must not be let through
@@ -173,5 +222,19 @@ class VoiceCallRequestTest {
         val gate = VoiceCallRequest(RingBuffer(10))
         gate.onUserTranscript("……")
         assertEquals(VoiceCallDecision.Reject, gate.offer("c1", "……"))
+    }
+
+    // Cancellation only takes the most recently accepted sentence: once the user says another, the earlier one can no longer stop a task
+    @Test
+    fun cancelOnlyTakesTheLatestAcceptedWords() {
+        val gate = VoiceCallRequest(RingBuffer(10))
+        gate.onUserTranscript("别订了")
+        assertEquals(VoiceCallDecision.Accept("别订了"), gate.offer("c1", "别订了"))
+        assertEquals("别订了", gate.saidNow("别订了"))
+        gate.onUserTurnStart()
+        gate.onUserTranscript("明天天气怎么样")
+        assertEquals(VoiceCallDecision.Accept("明天天气怎么样"), gate.offer("c2", "天气"))
+        assertEquals("别订了", gate.said("别订了"))
+        assertNull(gate.saidNow("别订了"))
     }
 }

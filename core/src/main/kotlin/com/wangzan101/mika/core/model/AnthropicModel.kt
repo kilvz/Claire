@@ -168,18 +168,23 @@ class AnthropicModel(
     private fun buildMessages(messages: List<Message>): JsonArray {
         // (role, blocks): merge adjacent same-role entries first, then emit
         val merged = mutableListOf<Pair<String, MutableList<JsonObject>>>()
-        for (m in messages) {
-            if (m.role == Role.System) continue
+        // Cache through the last block of the last user message; if the next step starts the same, it comes from cache. Assistant messages may end with a thinking block, so they are not marked.
+        // Trailing uncached messages that change every time do not count: the mark goes before them, and their blocks still merge in after the mark.
+        val stable = messages.size - messages.takeLastWhile { it.uncached }.size
+        var mark: Pair<Int, Int>? = null
+        messages.forEachIndexed { index, m ->
+            if (m.role == Role.System) return@forEachIndexed
             val role = if (m.role == Role.Assistant) "assistant" else "user"
             val blocks = if (role == "assistant") assistantBlocks(m) else userBlocks(m)
-            if (blocks.isEmpty()) continue
+            if (blocks.isEmpty()) return@forEachIndexed
             if (merged.lastOrNull()?.first == role) merged.last().second += blocks else merged += role to blocks.toMutableList()
+            if (role == "user" && index < stable) mark = merged.lastIndex to merged.last().second.lastIndex
         }
-        // Cache the conversation up to the last user message, so the next step can start from cache when its beginning is identical; assistant messages may end with a thinking block, so they are not marked
-        val lastUser = merged.indexOfLast { it.first == "user" }
         return buildJsonArray {
             merged.forEachIndexed { i, (role, blocks) ->
-                val content = if (i == lastUser) blocks.dropLast(1) + JsonObject(blocks.last() + ("cache_control" to ephemeral)) else blocks
+                val content = mark?.takeIf { it.first == i }?.let { (_, at) ->
+                    blocks.mapIndexed { j, b -> if (j == at) JsonObject(b + ("cache_control" to ephemeral)) else b }
+                } ?: blocks
                 add(buildJsonObject { put("role", role); put("content", JsonArray(content)) })
             }
         }

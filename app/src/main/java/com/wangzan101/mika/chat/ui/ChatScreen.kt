@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.ui.components.DirectionalIcon
 import com.wangzan101.mika.ui.components.GlassSurface
+import com.wangzan101.mika.voicecall.ui.CallRecordsSheet
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
@@ -38,6 +39,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -59,6 +60,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.R
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
+import com.wangzan101.mika.core.frontdesk.DeskTaskView
 import com.wangzan101.mika.chat.ChecklistSource
 import com.wangzan101.mika.chat.SavedChecklistStore
 import com.wangzan101.mika.settings.FeatureFlags
@@ -112,7 +115,9 @@ fun ChatScreen(
     webOpen: StateFlow<Boolean>,
     /** Entry point for operating directly in the small window (taps/swipes/back injected into the virtual screen); null while the screen is not set up or the task has ended. */
     pipInput: StateFlow<com.wangzan101.mika.cap.phone.display.PipInput?> = MutableStateFlow(null),
-    /** The small window's target app sound has been restored by the user: the sound button reads "Mute", otherwise "Restore sound". */
+    /** Conversations whose task currently has a virtual screen (or an open web page): the small window follows it when a dispatched job has a picture. */
+    screens: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+    /** Whether the user has restored the sound of the small window's target app: the sound button then reads "Mute", otherwise "Restore sound". */
     pipSoundOn: StateFlow<Boolean> = MutableStateFlow(false),
     /** The user enabled "allow me to operate directly in the small window" in settings. */
     pipOperateEnabled: Boolean = false,
@@ -127,10 +132,7 @@ fun ChatScreen(
     /** A task needs the phone but phone operation is not ready: put a "go to settings" row under that question-answer (attached at the end when it cannot be matched to a specific turn). */
     phoneSetupNeed: com.wangzan101.mika.cap.phone.setup.PhoneSetupPrompt.Need? = null,
     openPhoneSetup: () -> Unit = {},
-    /** Fetches where the evidence came from, based on the run record (the "sources" pill and the screenshots shown when expanded); the caller moves disk work onto a background thread. */
-    loadSource: suspend (runId: String) -> EvidenceSource? = { null },
-    openSource: (runId: String?, legacyText: String?) -> Unit = { _, _ -> },
-    /** Hold-to-talk in the input bar starts its session here; when null, only typing is available. */
+    /** Holding to talk in the input bar opens a session from here; when null only typing is possible. */
     voice: VoiceSource? = null,
     /** The "choose" in "voice input is not available yet". */
     openSpeechModel: () -> Unit = {},
@@ -140,12 +142,14 @@ fun ChatScreen(
     recommendations: RecommendedTaskStore? = null,
     checklists: SavedChecklistStore? = null,
     workflows: com.wangzan101.mika.workflow.WorkflowRuntime? = null,
-    openReport: (String) -> Unit = {},
-    openPlayback: (String) -> Unit = {},
     /** "Manage personas" in the persona picker: opens the personas page in settings. */
     onOpenPersonas: () -> Unit = {},
     /** The earpiece button in the input bar: enters a voice call; hidden when null (normally always present; when unavailable it leads to a gating page instead). */
     onVoiceCall: (() -> Unit)? = null,
+    /** "View details" for a job dispatched by the front desk: opens the process of this run, or its conversation when the run cannot be found (the phase decides which run counts). */
+    openDeskRun: (taskId: String, phase: com.wangzan101.mika.core.frontdesk.DeskTaskPhase) -> Unit = { _, _ -> },
+    /** "Call settings" in the ⋯ menu at the top right. */
+    openCallSettings: () -> Unit = {},
 ) {
     val checklistStore = checklists ?: (LocalContext.current.applicationContext as? MikaApp)?.savedChecklists
     val workflowRuntime = workflows ?: (LocalContext.current.applicationContext as? MikaApp)?.workflows
@@ -169,6 +173,8 @@ fun ChatScreen(
         DeviceFileBrowser(vm, id) { deviceBrowserConversation = null }
     }
     val pendingJump by vm.jump.collectAsState()
+    val callLog by remember(ui.conversationId) { vm.calls(ui.conversationId) }.collectAsState(emptyList())
+    val calls = remember(ui.exchanges, callLog) { callMarks(ui.exchanges, callLog) }
     val others by vm.otherRunning.collectAsState()
     val keptAny by vm.keptPage.collectAsState()
     // Only consider the page kept by this conversation
@@ -188,7 +194,24 @@ fun ChatScreen(
     }
     val frame = live ?: lastFrame.takeIf { ui.pip.visible && ui.pip.mode == PipMode.Done }
     val webContent = if (ui.pip.mode == PipMode.Done) lastFrameWasWeb else webLive
-    // Registers Android state saving for the text; normally the in-process ViewModel manages the full conversation draft.
+    // When a conversation with a front desk attached has no task of its own running, the small window follows what the front desk dispatched: among the jobs that are running or need you and have a picture, needing you wins, then the most recently updated;
+    // have the service show it and the picture follows. Expanded and closed are remembered per page, separately per job; when more than one is running, the small window shows which one.
+    val screenTasks by screens.collectAsState()
+    val deskPip = if (ui.pip.visible) null else ui.deskTasks
+        .filter { (it.state == DeskTaskPhase.Running || it.state == DeskTaskPhase.NeedsYou) && it.taskId in screenTasks }
+        .sortedWith(compareBy<DeskTaskView> { if (it.state == DeskTaskPhase.NeedsYou) 0 else 1 }.thenByDescending { it.updatedAt })
+        .firstOrNull()
+    LaunchedEffect(deskPip?.taskId) { deskPip?.let { vm.showDeskScreen(it.taskId) } }
+    var deskPipExpanded by remember(ui.conversationId) { mutableStateOf<String?>(null) }
+    var deskPipClosed by remember(ui.conversationId) { mutableStateOf(emptySet<String>()) }
+    val pip = deskPip?.let {
+        PipUi(
+            visible = true, mode = if (it.state == DeskTaskPhase.NeedsYou) PipMode.NeedsYou else PipMode.Running,
+            expanded = deskPipExpanded == it.taskId && it.taskId !in deskPipClosed, closed = it.taskId in deskPipClosed,
+        )
+    } ?: ui.pip
+    val pipLabel = deskPip?.title?.takeIf { trayOrder(ui.deskTasks).size > 1 }
+    // Register Android state saving for the text; normally the in-process ViewModel manages the full conversation draft.
     rememberSaveable(vm, saver = androidx.compose.runtime.saveable.listSaver(
         save = { model: ChatViewModel -> model.saveDraftTexts() },
         restore = { saved -> vm.also { it.restoreDraftTexts(saved) } },
@@ -197,6 +220,8 @@ fun ChatScreen(
     // A recommended task can be filled straight into an empty input field; when there is already content, confirm first so a stray tap cannot replace the draft.
     var pendingExample by rememberSaveable(ui.conversationId) { mutableStateOf<String?>(null) }
     var showUsage by rememberSaveable(ui.conversationId) { mutableStateOf(false) }
+    var showRecords by rememberSaveable(ui.conversationId) { mutableStateOf(false) }
+    var showTasks by rememberSaveable(ui.conversationId) { mutableStateOf(false) }
     var showChecklists by remember(ui.conversationId) { mutableStateOf(false) }
     var checklistIncoming by remember(ui.conversationId) { mutableStateOf<ChecklistSource?>(null) }
     var pendingChecklistDraft by remember(ui.conversationId) { mutableStateOf<String?>(null) }
@@ -234,7 +259,14 @@ fun ChatScreen(
         if (jumpHighlight == active) jumpHighlight = null
     }
 
-    // Only keep following when it was following the latest message to begin with. This state is saved across pages along with the list position.
+    var cardFlash by remember { mutableStateOf<CardFlash?>(null) }
+    LaunchedEffect(cardFlash) {
+        val active = cardFlash ?: return@LaunchedEffect
+        delay(JUMP_HIGHLIGHT_MS)
+        if (cardFlash == active) cardFlash = null
+    }
+
+    // Keep following only if we were already following the latest message. This state is saved across page switches together with the list position.
     var followingTail by rememberSaveable { mutableStateOf(true) }
     var scrollingToBottom by remember(ui.conversationId) { mutableStateOf(false) }
     var scrollToBottomJob by remember(ui.conversationId) { mutableStateOf<Job?>(null) }
@@ -253,19 +285,39 @@ fun ChatScreen(
     // The target row is computed directly from the current UI state: layoutInfo still holds the previous frame's measurement results, so reading it right after sending would scroll to the old end.
     val last = ui.exchanges.lastOrNull()
     val setupRow = phoneSetupRow(phoneSetupNeed, ui.conversationId, ui.exchanges)
-    val rowCount = chatItemCount(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null)
+    // Jobs dispatched by the front desk that are waiting on you right now: one question card at the end of the conversation each
+    val needs = ui.deskTasks.filter { it.need != null }.map { it.taskId }
+    val rowCount = chatItemCount(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null, calls, needs)
     val canScrollForward by remember { derivedStateOf { listState.canScrollForward } }
     val showScrollToBottom = ui.exchanges.isNotEmpty() && !followingTail && canScrollForward
-    val scrollMarker = "${ui.conversationId}:${ui.exchanges.size}:${last?.steps?.size}:${last?.steers?.size}:${last?.status?.hashCode()}:${ui.blocked?.hashCode()}"
+    val scrollMarker = "${ui.conversationId}:${ui.exchanges.size}:${last?.steps?.size}:${last?.steers?.size}:${last?.status?.hashCode()}:${ui.blocked?.hashCode()}" +
+        ":${callLog.size}:${callLog.lastOrNull()?.endMs}"
     val jump = pendingJump?.takeIf { it.conversationId == ui.conversationId }
-    // Highlight of the target row: computed only while the target still belongs to the current conversation.
-    val highlightKey = jumpHighlight
+    // Highlight of the target row: only counted while the target is still the current conversation.
+    val highlightKey = cardFlash?.takeIf { it.conversationId == ui.conversationId }?.key ?: jumpHighlight
         ?.takeIf { it.conversationId == ui.conversationId }
         ?.let { chatTargetKey(ui.exchanges, it.target) }
+    val openDeskTask: (String) -> Unit = { id ->
+        val view = ui.deskTasks.firstOrNull { it.taskId == id }
+        openDeskRun(id, view?.state ?: DeskTaskPhase.Done)
+    }
+    // Scroll to the question card of a dispatched task and flash it briefly; returns false when it is not waiting on you right now (no question card)
+    val jumpToNeed: (String) -> Boolean = { taskId ->
+        val key = needCardKey(taskId)
+        val index = chatItemKeys(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null, calls, needs).indexOf(key)
+        if (index < 0) false
+        else {
+            scrollToBottomJob?.cancel()
+            followingTail = false
+            scope.launch { if (reduceMotion) listState.scrollToItem(index) else listState.animateScrollToItem(index) }
+            cardFlash = CardFlash(ui.conversationId, key, System.nanoTime())
+            true
+        }
+    }
     LaunchedEffect(scrollMarker, jump) {
         // Coming from search or the file library: scroll to the target message first and do not follow the end meanwhile; if the target is gone, fall back to the original logic.
         if (jump != null) {
-            val keys = chatItemKeys(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null)
+            val keys = chatItemKeys(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null, calls, needs)
             val index = chatTargetKey(ui.exchanges, jump.target)?.let(keys::indexOf) ?: -1
             if (index >= 0) {
                 previousScrollMarker = scrollMarker
@@ -317,9 +369,6 @@ fun ChatScreen(
         if (grown > 0 && followingTail && !listState.isScrollInProgress) listState.scrollBy(grown.toFloat())
     }
 
-    // Run summaries of the finished turns: the end-of-turn row shows that turn's tokens
-    val endedRuns = ui.exchanges.filter { !it.status.isActive() }.mapNotNull { it.recordedRun }
-    val runMetrics = rememberRunMetrics(endedRuns)
     val context = LocalContext.current
 
     val c = MikaTheme.colors
@@ -365,8 +414,8 @@ fun ChatScreen(
     }
     val menuHost = remember(selecting) { MessageMenuHost(selecting) { menu = it } }
     val menuOpen = menu != null
-    /** Empty conversation: only the greeting and recommendation cards, without the message list's side padding, so the cards line up with the input bar themselves. */
-    val emptyConversation = ui.exchanges.isEmpty() && ui.blocked == null
+    /** Empty conversation: only the greeting and recommendation cards, without the message list's side padding, so the cards align with the input bar themselves. */
+    val emptyConversation = ui.exchanges.isEmpty() && ui.blocked == null && calls.isEmpty()
     PageBackground {
         CompositionLocalProvider(LocalMessageMenu provides menuHost) {
             LazyColumn(
@@ -385,19 +434,22 @@ fun ChatScreen(
                     }
                 }
                 ui.exchanges.forEachIndexed { i, ex ->
+                    callMarkRows(calls.before(i), highlightKey, reduceMotion)
+                    timeMarkAt(ui.exchanges, i, calls)?.let { at -> item(timeMarkKey(i)) { TimeMarkLine(at, timeMarkKey(i)) } }
                     val backgroundNote = i == ui.exchanges.lastIndex && ui.operatingPhone && !screenDocked
                     exchange(
-                        i, ex, ui.conversationId, ui.takeoverStage, vm, reduceMotion, backgroundNote, runMetrics, openRun, loadSource, openSource, kept,
+                        i, ex, ui.conversationId, ui.takeoverStage, vm, reduceMotion, backgroundNote, openRun, kept,
                         highlightKey = highlightKey,
                         recover = { resume ->
                             val label = if (resume) R.string.chat_resume_request else R.string.chat_restart_request
                             vm.send(context.getString(label, ex.goal), check)
                         },
-                        openReport = openReport, openPlayback = openPlayback,
                     )
                     // "Go to settings" follows the turn where the phone was found not ready; when it cannot be matched to a turn it stays at the end as before (below)
                     if (setupRow == i) item("ps$i") { PhoneSetupLine(openPhoneSetup) }
                 }
+                callMarkRows(calls.tail, highlightKey, reduceMotion)
+                deskNeedRows(ui.deskTasks, highlightKey, reduceMotion, vm::answerDeskTask, vm::openConversation, vm::cancelDeskTask)
                 if (setupRow == -1) item("phone-setup") { PhoneSetupLine(openPhoneSetup) }
                 ui.blocked?.let { problems ->
                     item("blocked") {
@@ -444,16 +496,13 @@ fun ChatScreen(
                             Text(ChatCopy.APP_TITLE, style = MikaType.Title.copy(fontWeight = WordmarkWeight), color = c.ink, maxLines = 1)
                         }
                     }
-                    GlassSurface(modifier = Modifier.size(MikaSize.IconButton), backdrop = backdrop, shape = CircleShape) {
-                        Box(
-                            Modifier.fillMaxSize().clip(CircleShape)
-                                .clickable(enabled = vm.canSwitch(), onClickLabel = stringResource(R.string.chat_new), onClick = { vm.newConversation() })
-                                .alpha(if (vm.canSwitch()) 1f else 0.35f),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(MikaIcons.New, stringResource(R.string.chat_new), Modifier.size(MikaSize.Icon), tint = c.ink)
-                        }
-                    }
+                    ChatMoreMenu(
+                        backdrop, canSwitch = vm.canSwitch(),
+                        onNew = { vm.newConversation() },
+                        onRecords = { showRecords = true },
+                        onTasks = { showTasks = true },
+                        onCallSettings = openCallSettings,
+                    )
                 }
                 if (currentProject != null) {
                     Row(
@@ -486,9 +535,6 @@ fun ChatScreen(
             onSend = { vm.send(input, check) },
             onStop = vm::cancel,
             queued = ui.queued,
-            onGuideQueued = { id ->
-                if (!vm.guideQueued(id, check)) Toast.makeText(context, context.getString(R.string.follow_up_already_started), Toast.LENGTH_SHORT).show()
-            },
             onQueueActions = { queueActions = it },
             onCancelQueued = { id ->
                 if (!vm.cancelQueued(id)) Toast.makeText(context, context.getString(R.string.follow_up_already_started), Toast.LENGTH_SHORT).show()
@@ -500,7 +546,8 @@ fun ChatScreen(
                 keyboardController?.hide()
                 showPlus = true
             }) else null,
-            attachBlocked = ui.attachEnabled && !ui.importing && ui.composer != ComposerMode.Idle && ui.followUpMode == FollowUpMode.Steer,
+            // With a front desk attached, attachments can be added at any time; without one, attachments follow a task that starts directly, and cannot be added while this conversation is running its own task (see [ChatSession.canAttach])
+            attachBlocked = ui.attachEnabled && !ui.importing && vm.deskFor(ui.conversationId) == null && ui.composer != ComposerMode.Idle,
             attachments = ui.attachments,
             importing = ui.importing,
             rejected = ui.rejectedAttachments,
@@ -524,9 +571,12 @@ fun ChatScreen(
             steerTarget = null,
             onVoiceHolding = { voiceHolding = it },
             editRequest = editRequest,
+            deskTasks = ui.deskTasks,
+            onStopTask = vm::cancelDeskTask,
+            onTaskDetail = openDeskTask,
         )
 
-        val pipOccupiesCorner = !screenDocked && ui.pip.visible && ui.pip.mode != PipMode.Done
+        val pipOccupiesCorner = !screenDocked && pip.visible && pip.mode != PipMode.Done
         val composerBottomDp = with(density) { composerHeight.toDp() }
         ScrollToBottomButton(
             visible = showScrollToBottom,
@@ -600,9 +650,21 @@ fun ChatScreen(
         }
 
         if (showUsage) ConversationUsageSheet(ui.conversationId) { showUsage = false }
+    if (showRecords) {
+        CallRecordsSheet(
+            callLog, current = callLog.lastOrNull { it.endMs == null }?.id.orEmpty(),
+            onPick = { call -> showRecords = false; ui.conversationId?.let { vm.openConversationAt(it, ChatTarget.Call(call)) } },
+            onDismiss = { showRecords = false },
+        )
+    }
+    if (showTasks) {
+        val items = remember(ui.exchanges, ui.deskTasks) { deskTaskItems(ui.exchanges, ui.deskTasks) }
+        val titles by produceState(emptyMap<String, String>(), items) { value = vm.deskTaskTitles(items.map { it.taskId }) }
+        DeskTasksSheet(items, titles, onPick = { showTasks = false; openDeskTask(it.taskId) }, onDismiss = { showTasks = false })
+    }
 
         if (!screenDocked) AgentPip(
-            pip = ui.pip,
+            pip = pip,
             frame = frame,
             webContent = webContent,
             pipInput = pipInputLive,
@@ -611,23 +673,33 @@ fun ChatScreen(
             reduceMotion = reduceMotion,
             topInset = topHeight.toFloat(),
             bottomInset = composerHeight.toFloat(),
-            onExpand = vm::expandPip,
-            onCollapse = vm::collapsePip,
-            // Closing the small window: only the small button in the bottom-right remains until this task ends; show a hint about where it can still be seen
+            onExpand = { if (deskPip != null) deskPipExpanded = deskPip.taskId else vm.expandPip() },
+            onCollapse = { if (deskPip != null) deskPipExpanded = null else vm.collapsePip() },
+            // Close the small window: only the small button in the bottom-right remains until this task ends; a toast says where it can still be viewed
             onClose = {
-                vm.closePip()
+                if (deskPip != null) {
+                    deskPipClosed = deskPipClosed + deskPip.taskId
+                    deskPipExpanded = null
+                } else vm.closePip()
                 Toast.makeText(context, context.getString(R.string.pip_closed_hint), Toast.LENGTH_SHORT).show()
             },
-            onReopen = vm::reopenPip,
-            onToggleSound = vm::togglePipSound,
-            // Tapping the small window when it needs you: collapse it and scroll to the card that needs you (it is in the last question-answer, and only file cards and the "go to settings" row can follow it)
+            onReopen = { if (deskPip != null) deskPipClosed = deskPipClosed - deskPip.taskId else vm.reopenPip() },
+            onToggleSound = { if (deskPip != null) vm.togglePipSoundIn(deskPip.taskId) else vm.togglePipSound() },
+            // Tapping the small window while it needs you: collapse it and scroll to the card that needs you. A front desk job scrolls to its question card;
+            // a task's own card is in the last question-and-answer, after which only file cards and the "go to settings" row can follow
             onAttention = {
-                vm.attendPip()
-                val count = listState.layoutInfo.totalItemsCount
-                val after = (if (last?.files?.isNotEmpty() == true) 1 else 0) + (if (setupRow == ui.exchanges.lastIndex || setupRow == -1) 1 else 0)
-                val card = count - 1 - after
-                if (card >= 0) scope.launch { if (reduceMotion) listState.scrollToItem(card) else listState.animateScrollToItem(card) }
+                if (deskPip != null) {
+                    deskPipExpanded = null
+                    if (!jumpToNeed(deskPip.taskId)) vm.openConversation(deskPip.taskId)
+                } else {
+                    vm.attendPip()
+                    val count = listState.layoutInfo.totalItemsCount
+                    val after = (if (last?.files?.isNotEmpty() == true) 1 else 0) + (if (setupRow == ui.exchanges.lastIndex || setupRow == -1) 1 else 0)
+                    val card = count - 1 - after
+                    if (card >= 0) scope.launch { if (reduceMotion) listState.scrollToItem(card) else listState.animateScrollToItem(card) }
+                }
             },
+            label = pipLabel,
         )
 
         queueActions?.let { item ->
@@ -831,3 +903,6 @@ private fun LazyListState.nearTail(thresholdPx: Int): Boolean {
 }
 
 // ---------- Empty conversation ----------
+
+/** Brief highlight after jumping to a task card: which conversation, which row; [at] makes tapping the same card again restart the timer. */
+private data class CardFlash(val conversationId: String?, val key: String, val at: Long)

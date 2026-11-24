@@ -1,6 +1,9 @@
 package com.wangzan101.mika.core
 
 import com.wangzan101.mika.core.assembly.knownToolNames
+import com.wangzan101.mika.core.frontdesk.DeskToolSet
+import com.wangzan101.mika.core.frontdesk.DeskTools
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -66,10 +69,11 @@ class DocsConsistencyTest {
     private val nonToolNames = setOf("copy_not_found", "copy_not_opened", "task_progress", "image_item")
 
     /**
-     * Tools registered for the model in live voice sessions (defined in the app's call protocol layer, not in core's tool table):
-     * when the docs mention them, let them pass as "really existing".
+     * Tools the front desk (chat, calls) registers for the model: defined in [DeskTools], not in the Agent's tool table; when the docs mention them, treat them as really existing.
+     * Also add `mika_request` from the earlier call design draft: it has since been replaced by these tools once the front desk shipped; the draft records the plan of that time, so leave it unchanged.
      */
-    private val sessionToolNames = setOf("mika_request")
+    private val sessionToolNames: Set<String> =
+        DeskToolSet.entries.flatMap(DeskTools::specs).map { it["name"]!!.jsonPrimitive.content }.toSet() + "mika_request"
     private val classLike = Regex("""[A-Z][A-Za-z0-9]*""")
 
     private val toolNames: Set<String> by lazy { knownToolNames() }
@@ -197,6 +201,8 @@ class DocsConsistencyTest {
         assertTrue("no docs found", docs().size >= 5)
         assertTrue(toolNames.contains("knowledge_read"))
         assertTrue(classExists("ToolDef"))
+        // Front-desk tools (registered for both chat and calls) count as existing when mentioned in the docs
+        assertTrue(sessionToolNames.containsAll(listOf("dispatch_task", "add_to_task", "answer_task", "cancel_task", "ask_owner")))
         assertTrue(spans(docs().joinToString("\n") { it.readText() }).size > 50)
     }
 

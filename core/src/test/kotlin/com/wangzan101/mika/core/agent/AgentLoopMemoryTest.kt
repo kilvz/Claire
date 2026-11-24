@@ -486,7 +486,18 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("帮我点个外卖"), plain.requests.first().withoutRuntime().map { it.text() })
     }
 
-    // When the task carries the "obtained from notifications" block, the "confirmed in the previous turn" exception stays off: the previous turn's suggestion may have been based on that block
+    // The front desk's supplementary note enters the task context but is not the user's words: the record of the user's own words holds only the task's own words
+    @Test fun deskNoteNeverEntersUserUtterances() {
+        val model = FakeModel(finishReply)
+        val said = UserUtterances()
+        runBlocking { AgentLoop(model, toolDispatcher(FakeScreen(), utterances = said), "B", deskNote = "前台整理:用户要靠窗的座位").run("帮我订明早的票") }
+        val first = model.requests.first().withoutRuntime()
+        assertEquals(listOf(ContextKind.DeskNote, null), first.map { ContextBuilder.kindOf(it) })
+        assertEquals(listOf("帮我订明早的票"), said.all)
+        assertTrue(said.all.none { "靠窗" in it })
+    }
+
+    // When the task carries the "from notifications" block, the "confirmed in the previous turn" exception stays off: the previous suggestion may well have followed that block
     @Test fun previousConfirmationIsNotUsedWhenObservedContextIsCarried() {
         val prior = listOf(
             Turn("给我起个中文名", "我建议叫我「知微」，你觉得怎么样?", "succeeded"),

@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.model
 
 import com.wangzan101.mika.core.screen.observation.ReadTag
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 sealed interface Part {
@@ -42,11 +43,18 @@ enum class Role { System, User, Assistant, Tool }
 enum class Author { User, Mika }
 
 /**
- * [author] must be given explicitly (there is no default): places added later that put in user words or photos will not be trimmed away as Claire's notes.
- * Used only inside Claire (to preserve the user's words when compacting), never sent to the provider.
+ * [author] is required (no default): if a newly added place puts in the user's words or photos, they will not be trimmed as a note from Claire.
+ * Used only inside Claire (to keep the user's words during compaction), never sent to providers.
+ * [uncached]: this message changes on every request (such as the freshly prepared background note) and may only go at the end; adapters put the moving cache mark
+ * on the last block before these trailing messages so the next request still hits cache. Effective for this request only, never persisted.
  */
 @Serializable
-data class Message(val role: Role, val parts: List<Part>, val author: Author)
+data class Message(
+    val role: Role,
+    val parts: List<Part>,
+    val author: Author,
+    @Transient val uncached: Boolean = false,
+)
 
 data class ToolSpec(val name: String, val description: String, val parametersJsonSchema: String)
 

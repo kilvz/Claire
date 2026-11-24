@@ -6,7 +6,6 @@ import com.wangzan101.mika.chat.DeleteBatch
 import com.wangzan101.mika.chat.SharedDraft
 import com.wangzan101.mika.chat.SharedDraftAttachment
 import com.wangzan101.mika.memory.RunNotes
-import com.wangzan101.mika.task.SteerNote
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -160,8 +159,11 @@ internal class ChatSession(private val vm: ChatViewModel) {
         return ex.copy(memoryNotes = n.memoryNotes, usedMemory = n.usedMemory, skillNotes = n.skillNotes)
     }
 
-    fun canAttach(ui: ChatUi) = ui.attachEnabled && !ui.importing &&
-        (ui.composer == ComposerMode.Idle || ui.followUpMode == FollowUpMode.Queue)
+    /**
+     * Whether attachments can be added: with a front desk attached, always (a message with an attachment is dispatched as a new task, whether or not a task is running);
+     * without a front desk (tests only) the attachment starts a new task directly and can only be added when this conversation has no task running.
+     */
+    fun canAttach(ui: ChatUi) = ui.attachEnabled && !ui.importing && (vm.deskFor(ui.conversationId) != null || ui.composer == ComposerMode.Idle)
 
     /**
      * When the small window is shown: the screen must have been opened (the other fields are still computed and are
@@ -175,10 +177,7 @@ internal class ChatSession(private val vm: ChatViewModel) {
         else -> p.copy(closed = false)
     }
 
-    /** Steers added while the task with the original wording has not been handed to the service yet. */
-    val held = mutableListOf<SteerNote>()
-
-    /** Turns saved for this conversation, together with each turn's exported files and the current memory and skill notes. */
+    /** The turns stored for this conversation, together with the files each turn exported and the current memory and skill notes. */
     fun saved(conversationId: String): List<Exchange> =
         runCatching { store.records(conversationId) }.getOrDefault(emptyList()).map { (t, files) -> withSummarizing(withNotes(fromTurn(t).copy(files = files), runNotes.value)) }
 

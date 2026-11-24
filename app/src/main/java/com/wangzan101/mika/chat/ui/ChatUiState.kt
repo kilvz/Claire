@@ -148,6 +148,19 @@ data class Exchange(
     /** The actions actually performed in each step (by step number): the title is a summary, and expanding a step shows these details. */
     val stepActions: Map<Int, List<StepAction>> = emptyMap(),
     val goals: GoalChecklist? = null,
+    /**
+     * The front desk's reply for this turn (when chat goes through the front desk): non-null means this row is a front desk question-and-answer, drawn as a front desk bubble with no task card;
+     * an empty string means it is still thinking (three dots). When it finished but the front desk said nothing (only dispatched tasks), no empty bubble is drawn.
+     */
+    val deskReply: String? = null,
+    /** The ids of tasks dispatched in this turn (or referenced by a report), in order; each one gets a task card below this question-and-answer. */
+    val deskTasks: List<String> = emptyList(),
+    /** A small tag when the front desk adds a note to an existing task, replies to it, or cancels it this turn (shown only for this opening, not persisted). */
+    val deskTool: String? = null,
+    /** Which voice call this turn was spoken in ([com.wangzan101.mika.core.agent.Turn.callId]); null for typed chat. */
+    val callId: String? = null,
+    /** When this turn was stored; null while not yet stored (still in progress). Silent calls are placed in the conversation by it. */
+    val atMs: Long? = null,
 )
 
 /**
@@ -156,7 +169,20 @@ data class Exchange(
  * are all gated on this, so that turn has none of them (otherwise tapping through would only say "the record has expired").
  * Identifying a turn and matching it against the saved copy (by [Exchange.runId] in [ChatViewModel]) still uses the original id.
  */
-val Exchange.recordedRun: String? get() = runId?.takeUnless { it.startsWith(NoticeTurn.RUN_PREFIX) }
+val Exchange.recordedRun: String? get() = runId?.takeUnless { it.startsWith(NoticeTurn.RUN_PREFIX) || it.startsWith(DeskChatOps.RUN_PREFIX) }
+
+/**
+ * Tasks newly dispatched in this turn. The first item of a front desk report row (which has no user words) is the one being reported on ([deskRef]) and does not count as new;
+ * anything else the front desk dispatched along with a report rows after it and counts as new. "Work in this conversation" lists them.
+ */
+val Exchange.deskCards: List<String> get() = if (goal.isEmpty()) deskTasks.drop(1) else deskTasks
+
+/** Which task the front desk report row is reporting on; null when it is not a report. */
+val Exchange.deskRef: String? get() = if (goal.isEmpty()) deskTasks.firstOrNull() else null
+
+/** Whether this front desk row draws text: it does while thinking (three dots), when it said something, or when it failed; when it finished without a word (only dispatched tasks) no empty bubble is drawn. */
+internal fun deskReplyShown(ex: Exchange): Boolean =
+    ex.deskReply != null && (ex.status == ExchangeStatus.Working || ex.deskReply.isNotBlank() || ex.status is ExchangeStatus.Failed)
 
 /** The single line of progress while running: what it is waiting for when waiting on you; only a neutral status while a model request is in flight; otherwise this step's wording, or the latest thing done when there is none. */
 fun liveLine(ex: Exchange): String? {
@@ -220,13 +246,13 @@ data class PipUi(
 enum class ComposerMode {
     /** No task; sending starts a new task. */
     Idle,
-    /** A task is running: what you send goes to this task, and stopping is a separate button. */
+    /** A task opened directly in this conversation is running (from an attachment, or in an older conversation): show a stop button when nothing is typed; typed text still goes to the front desk. */
     Busy,
     /** The agent is waiting for an answer; sending is the answer. */
     Answer,
 }
 
-/** When sending a follow-up while a task is running, who gets it: the current task (carried with its next step), or the next task of this conversation. */
+/** When a follow-up is sent from the floating capsule while a task is running, who receives it: the current task (carried on the next step), or this conversation's next task (chat goes through the front desk and no longer uses it). */
 enum class FollowUpMode { Steer, Queue }
 
 data class ChatUi(
@@ -238,10 +264,10 @@ data class ChatUi(
     val blocked: List<Problem>? = null,
     val pip: PipUi = PipUi(),
     val composer: ComposerMode = ComposerMode.Idle,
-    /** Who gets follow-ups sent while a task is running; the main conversation queues them by default, and tapping the arrow on the right of a message switches to steering. */
-    val followUpMode: FollowUpMode = FollowUpMode.Queue,
-    /** The next items explicitly queued for this conversation that have not started yet (in order); removed from here once started or cancelled. */
+    /** The next item explicitly queued for this conversation that has not started (in order); removed here once it starts or is cancelled. */
     val queued: List<QueuedFollowUp> = emptyList(),
+    /** Tasks this conversation's front desk has dispatched and their stages (in dispatch order); running ones show in the "In progress" row above the input bar, and each maps to a card in the conversation. */
+    val deskTasks: List<com.wangzan101.mika.core.frontdesk.DeskTaskView> = emptyList(),
     val takeoverStage: Takeover.Stage = Takeover.Stage.None,
     /** The attachment button next to the input field exists only once the sandbox is ready. */
     val attachEnabled: Boolean = false,
@@ -269,7 +295,6 @@ internal data class ComposerDraft(
     val input: String = "",
     val attachments: List<PendingAttachment> = emptyList(),
     val quote: QuoteMessage.Quote? = null,
-    val followUpMode: FollowUpMode = FollowUpMode.Queue,
     val sharedDraft: SharedDraft? = null,
     val importing: Boolean = false,
     val rejected: List<AttachmentFailure> = emptyList(),
@@ -278,11 +303,11 @@ internal data class ComposerDraft(
 ) {
     val hasContent: Boolean get() = input.isNotEmpty() || attachments.isNotEmpty() || quote != null || importing || rejected.isNotEmpty()
     fun applyTo(ui: ChatUi) = ui.copy(input = input, attachments = attachments, quote = quote,
-        followUpMode = followUpMode, sharedDraft = sharedDraft, importing = importing,
+        sharedDraft = sharedDraft, importing = importing,
         rejectedAttachments = rejected, overLimit = overLimit, projectId = projectId ?: ui.projectId)
 }
 
-internal fun ChatUi.draft() = ComposerDraft(input, attachments, quote, followUpMode, sharedDraft,
+internal fun ChatUi.draft() = ComposerDraft(input, attachments, quote, sharedDraft,
     importing, rejectedAttachments, overLimit, projectId)
 
 /**
@@ -306,8 +331,8 @@ internal fun ChatUi.rebuildForConversation(
     pip = PipUi(),
     composer = ComposerMode.Idle,
     input = input,
-    followUpMode = FollowUpMode.Queue,
     queued = emptyList(),
+    deskTasks = emptyList(),
     takeoverStage = takeoverStage,
     attachments = attachments,
     importing = false,

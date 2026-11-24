@@ -13,6 +13,9 @@ sealed interface ChatTarget {
 
     /** The result card of this turn. */
     data class Status(val turnIndex: Int) : ChatTarget
+
+    /** The start row of a voice call (jumped to from "Call history" on the call page). */
+    data class Call(val callId: String) : ChatTarget
 }
 
 /** A one-shot jump request. serial makes two consecutive jumps to the same place count as a new request. */

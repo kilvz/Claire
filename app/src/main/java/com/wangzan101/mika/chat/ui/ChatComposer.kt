@@ -74,8 +74,9 @@ import com.wangzan101.mika.voice.ui.rememberVoiceHold
 import com.wangzan101.mika.voice.ui.voiceState
 
 /**
- * Glass pill composer: "+" on the left, send on the right (grey when there is no content); while a task is running there is an extra stop, and follow-up messages queue above the composer.
- * "+" opens the feature panel ([onPlus], a sheet rising from the bottom on the conversation page). Pending attachments sit in a row above the composer ([PendingTray]).
+ * Glass capsule input bar: a "+" on the left, send on the right (grey when empty); while a task is running a stop button is added, and follow-up messages queue above the input bar.
+ * Chat goes through the front desk: whatever the front desk is working on shows as one row above the input bar ([DeskTray]), and the input bar does not get busier because of background tasks.
+ * "+" opens the feature panel ([onPlus]; on the conversation page it is a list rising from the bottom). Pending attachments sit in a row above the input bar ([PendingTray]).
  */
 @Composable
 internal fun Composer(
@@ -88,7 +89,6 @@ internal fun Composer(
     onStop: () -> Unit,
     /** The next item explicitly queued for this conversation that has not started yet. */
     queued: List<com.wangzan101.mika.task.QueuedFollowUp> = emptyList(),
-    onGuideQueued: (String) -> Unit = {},
     onQueueActions: (com.wangzan101.mika.task.QueuedFollowUp) -> Unit = {},
     onCancelQueued: (String) -> Unit = {},
     onEditQueued: (String) -> Unit = {},
@@ -126,6 +126,12 @@ internal fun Composer(
     onVoiceHolding: (Boolean) -> Unit = {},
     sendFromIme: Boolean = false,
     draftKey: String? = null,
+    /** Tasks this conversation's front desk has dispatched: if any are running, a progress row appears above the input bar. */
+    deskTasks: List<com.wangzan101.mika.core.frontdesk.DeskTaskView> = emptyList(),
+    /** The "Stop" button for one item in the progress row. */
+    onStopTask: (String) -> Unit = {},
+    /** The "View details" button for one item in the progress row. */
+    onTaskDetail: (String) -> Unit = {},
 ) {
     val c = MikaTheme.colors
     var fieldFocused by remember { mutableStateOf(false) }
@@ -173,8 +179,9 @@ internal fun Composer(
             .padding(start = ComposerInset, end = ComposerInset, top = 10.dp, bottom = 6.dp),
     ) {
         Column(Modifier.fillMaxWidth()) {
+            DeskTray(deskTasks, reduceMotion, backdrop, onStopTask, onTaskDetail)
             FollowUpTray(
-                queued, active = mode != ComposerMode.Idle, canGuide = mode == ComposerMode.Busy, onGuide = onGuideQueued,
+                queued, active = mode != ComposerMode.Idle,
                 onEdit = onEditQueued, onCancel = onCancelQueued, onStartNow = onStartQueued, onActions = onQueueActions,
             )
             quote?.let { QuoteChip(it, onRemoveQuote, Modifier.padding(bottom = 6.dp)) }

@@ -28,6 +28,7 @@ import com.wangzan101.mika.cap.phone.a11y.DeviceSupport.sh
 import com.wangzan101.mika.core.agent.AttachedPage
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.cap.phone.OperatingPace
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.Message
 import com.wangzan101.mika.core.model.ModelReply
@@ -35,6 +36,7 @@ import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.Part
 import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.memory.MemoryRuntime
+import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.ProviderConfig
 import com.wangzan101.mika.settings.ProviderPresets
 import com.wangzan101.mika.settings.ProviderStore
@@ -44,6 +46,7 @@ import com.wangzan101.mika.settings.choose
 import com.wangzan101.mika.settings.configFor
 import com.wangzan101.mika.settings.save
 import com.wangzan101.mika.task.TaskEnvironment
+import com.wangzan101.mika.task.TaskRun
 import com.wangzan101.mika.task.TaskService
 import com.wangzan101.mika.task.testTasks
 import com.wangzan101.mika.ui.MainActivity
@@ -101,11 +104,15 @@ import org.junit.runner.RunWith
  *   (this conversation carries the "web page" small tag in the drawer). One main-screen screenshot is taken at every step,
  *   pause, resume, end and drawer (step-NN.png etc.).
  *
- * Records are written to the app's external files directory acceptance/<liveRun>/: log.txt (what the model said at each
- * step, the tool calls and a summary of their results), result.txt (model, goal, outcome, steps, elapsed time, final
- * answer), the virtual display's frame at every step and main-screen screenshots;
- * when `-e liveSettleSec N` is passed, wait up to N seconds for the outcome decision and the learning to finish, and what
- * was learned is written into learned.txt.
+ * - Multi-turn chat through the desk: `-e deskScript "<step>||<step>…" -e deskRun <record dir> [-e deskWaitSec 300] [-e deskParallelMax N] [-e deskNew false]`,
+ *   runs [runDesk]. Steps: `say:<sentence>` (sent through the input box, waits for the desk's turn to finish), `wait:running|queued|needsyou|idle|report|tasks=N`
+ *   (wait for the task board/report to reach that state), `sleep:<seconds>`, `home` (go to the home screen; later reports use the fallback), `notifications` (record Claire's notifications at this moment).
+ *   deskParallelMax changes the parallel limit only for this run and restores it at the end. In result.txt each sentence gets a turnN line (ms to first character/first task/finish, dispatched task, tool chips, reply),
+ *   each report spoken by the desk gets a reportN line, followed by the final task board, backend tools called, and notifications.
+ *
+ * Records are written to the app's external files dir acceptance/<liveRun>/: log.txt (what the model said at each step, tool calls and result summaries),
+ * result.txt (model, goal, result, step count, duration, final answer), per-step virtual-screen frames and home-screen screenshots;
+ * when `-e liveSettleSec N` is passed, wait up to N seconds for outcome judgement and learning to finish, with learned items written to learned.txt.
  */
 @RunWith(AndroidJUnit4::class)
 class LiveRunTest {
@@ -185,6 +192,7 @@ class LiveRunTest {
         val learningJob = memory.scope.coroutineContext[Job]!!
         val resident = learningJob.children.count { it.isActive }
 
+        val before = DeviceTaskState.runs.value.toSet()
         compose.typeAndSend(goal!!)
         // Put the keyboard away as soon as it is sent: only then does the background-display thumbnail under the chat page show, just like a real person who puts the keyboard away after sending
         compose.runOnUiThread {
@@ -199,6 +207,18 @@ class LiveRunTest {
             "send did not go out: composer=${chat.ui.value.composer} exchanges=${chat.ui.value.exchanges.size} task=${DeviceTaskState.state.value}"
         }
         val t0 = System.currentTimeMillis()
+        // Chat goes through the desk: this sentence first reaches the desk, which dispatches it as a background task (running in its own sub-conversation); follow the dispatched task;
+        // when the desk only replies without dispatching, the desk's reply is this turn's answer
+        val dispatched: Any? = DeviceSupport.pollUntil(timeoutMs) {
+            compose.mainClock.advanceTimeBy(250)
+            DeviceTaskState.runs.value.firstOrNull { it !in before }
+                ?: chat.ui.value.exchanges.lastOrNull { it.goal == goal.trim() }
+                    ?.takeIf { it.status != com.wangzan101.mika.chat.ui.ExchangeStatus.Working && it.deskTasks.isEmpty() }
+                    ?.let { it.deskReply.orEmpty() }
+        }
+        val task = dispatched as? TaskRun
+        val deskOnly = dispatched as? String
+        note("desk dispatched=${task?.key} child=${task?.conversationId} deskOnlyReply=${deskOnly?.take(300)}")
 
         var lastStep = -1
         var takeovers = 0
@@ -206,8 +226,8 @@ class LiveRunTest {
         var pausesHandled = 0
         var end: TaskState? = null
         var last: TaskState? = null
-        while (System.currentTimeMillis() - t0 < timeoutMs) {
-            val s = DeviceTaskState.state.value
+        while (task != null && System.currentTimeMillis() - t0 < timeoutMs) {
+            val s = task.state.value
             if (s != last) {
                 note("state $s")
                 last = s
@@ -225,16 +245,16 @@ class LiveRunTest {
             if (cancelAt > 0 && !cancelled && s is TaskState.Running && s.step >= cancelAt) {
                 cancelled = true
                 note("stopping at step ${s.step}")
-                compose.runOnUiThread { (context.applicationContext as MikaApp).chat.cancel() }
+                TaskService.cancel(context, task.key)
             }
             if (s is TaskState.Held && s.reason.resumable && pausesHandled == 0) {
                 pausesHandled++
                 Thread.sleep(3000)
                 val shell = DeviceSupport.shell()
-                note("paused; still paused after 3s: ${DeviceTaskState.state.value}; main top task=${shell.topTaskId(0)} pkg=${shell.packageOfTask(shell.topTaskId(0))}")
+                note("paused; still paused after 3s: ${task.state.value}; main top task=${shell.topTaskId(0)} pkg=${shell.packageOfTask(shell.topTaskId(0))}")
                 note("notifications: " + mikaNotifications())
                 mainShot(dir, "paused-main")
-                TaskService.resume(context)
+                TaskService.resume(context, task.key)
                 note("resume requested")
             }
             if (s is TaskState.WaitingTakeover && takeovers == 0) {
@@ -243,11 +263,11 @@ class LiveRunTest {
                 frame(dir, "takeover-agent")
                 mainShot(dir, "takeover-main")
                 note("takeover requested; action=$onTakeover")
-                if (onTakeover == "handback") TaskService.handBack(context) else TaskService.cancel(context)
+                if (onTakeover == "handback") TaskService.handBack(context, runKey = task.key) else TaskService.cancel(context, task.key)
             }
             if (s is TaskState.Succeeded || s is TaskState.Failed || s == TaskState.Cancelled) {
                 end = s
-                note("chat status at end: ${chat.ui.value.exchanges.lastOrNull()?.status}")
+                note("desk board at end: ${chat.ui.value.deskTasks.joinToString { "${it.taskId} ${it.state}" }}")
                 break
             }
             // The UI test clock only advances when the test pushes it: push it forward while waiting so the chat page's step, timer and thumbnail keep refreshing as usual (needed when recording a demo)
@@ -255,16 +275,17 @@ class LiveRunTest {
             Thread.sleep(250)
         }
         val wall = (System.currentTimeMillis() - t0) / 1000.0
-        if (end == null) {
+        if (end == null && task != null) {
             note("timeout, cancelling")
-            TaskService.cancel(context)
+            TaskService.cancel(context, task.key)
         }
         Thread.sleep(1500)
         compose.waitForIdle()
         mainShot(dir, "end-main")
-        // The wrap-up after the stop: wait for it to appear on the chat page as this round's answer
+        // Handoff after stopping: the task runs in the sub-conversation dispatched by the desk; wait for it to be recorded there as that turn's answer
+        val app = context.applicationContext as MikaApp
         val summary = if (end == TaskState.Cancelled) DeviceSupport.pollUntil(30_000) {
-            chat.ui.value.exchanges.lastOrNull()?.status?.let { it as? com.wangzan101.mika.chat.ui.ExchangeStatus.Cancelled }?.summary
+            app.conversations.turns(task!!.conversationId).lastOrNull()?.let(com.wangzan101.mika.core.agent.Conversation::stopSummary)
         }.also {
             note("stop summary: $it")
             compose.waitForIdle()
@@ -274,12 +295,12 @@ class LiveRunTest {
             is TaskState.Succeeded -> "succeeded"
             is TaskState.Failed -> "failed"
             TaskState.Cancelled -> if (takeovers > 0) "takeover(cancelled)" else "cancelled"
-            else -> "timeout"
+            else -> if (deskOnly != null) "desk_reply" else "timeout"
         }
         val answer = when (end) {
             is TaskState.Succeeded -> end.answer
             is TaskState.Failed -> end.reason
-            else -> ""
+            else -> deskOnly.orEmpty()
         }
         // liveSettleSec: wait for the outcome decision and the learning after handover to finish, and write what was learned into learned.txt
         val settleMs = (args.getString("liveSettleSec")?.toLong() ?: 0) * 1000
@@ -298,9 +319,117 @@ class LiveRunTest {
     }
 
     /**
-     * Whether the page left in the background after the task ended is still running: read the page's media playback
-     * progress and a counter-only timer twice, [seconds] seconds apart (put into the page only for this acceptance run, so
-     * the page's own things are left alone), and save a picture of what it shows. Returns the lines written into result.txt.
+     * Multi-turn acceptance for the chat page through the desk: follow [deskScript] step by step, typing into the input box and tapping send through the real UI, watching each desk turn read-only
+     * ([DeskWatch]): how long until the first character, first task, and finish; what was dispatched; the tool chips at the top; every task-board change.
+     * Take a home-screen screenshot at each step, and write the turns and task board to result.txt at the end.
+     */
+    @Test
+    fun runDesk() {
+        val script = args.getString("deskScript")
+        assumeTrue(script != null)
+        val run = args.getString("deskRun") ?: "desk"
+        val waitMs = (args.getString("deskWaitSec")?.toLong() ?: 300) * 1000
+        testTasks.evalHooks.operatingPace = OperatingPace.parse(args.getString("livePace")) ?: OperatingPace.FAST
+        val dir = File(context.getExternalFilesDir(null), "acceptance/$run").apply { deleteRecursively(); mkdirs() }
+        val log = File(dir, "log.txt")
+        fun note(s: String) = log.appendText("[${System.currentTimeMillis()}] $s\n")
+        DeviceSupport.shell()
+        DeviceSupport.service()
+        val app = context.applicationContext as MikaApp
+        val chat = app.chat
+        val flags = FeatureFlags.get(context)
+        val parallelBefore = flags.parallelMax()
+        // The parallel limit is changed only for this acceptance run (Claire's own setting) and restored at the end
+        args.getString("deskParallelMax")?.toInt()?.let { flags.setParallelMax(it) }
+        val recorder = Recorder(::note)
+        testTasks.modelFactory = { ctx, s -> TaskEnvironment.defaultModelFactory(ctx, s)?.let { recorder.wrap(it) } }
+        if (args.getString("deskNew") != "false") compose.runOnUiThread { chat.newConversation() }
+        compose.waitForIdle()
+        note("parallelMax=${flags.parallelMax()} (was $parallelBefore) limit=${app.taskState.parallelLimit.value} script=$script")
+        val watch = DeskWatch(chat.ui, ::note, System::currentTimeMillis).apply { start() }
+        val sent = mutableListOf<Pair<String, Long>>()
+        val results = StringBuilder()
+        fun board() = chat.ui.value.deskTasks
+        fun waitUntil(what: String, cond: () -> Boolean): Boolean {
+            val ok = DeviceSupport.pollUntil(waitMs) {
+                compose.mainClock.advanceTimeBy(250)
+                true.takeIf { cond() }
+            } != null
+            note("wait $what: ${if (ok) "ok" else "TIMEOUT"} board=${board().joinToString { "${it.taskId} ${it.state}${it.position?.let { p -> "#$p" } ?: ""}" }}")
+            return ok
+        }
+        val ended = setOf(DeskTaskPhase.Done, DeskTaskPhase.Failed, DeskTaskPhase.Cancelled)
+        try {
+            script!!.split("||").map { it.trim() }.filter { it.isNotEmpty() }.forEachIndexed { i, step ->
+                val (kind, value) = step.substringBefore(':') to step.substringAfter(':', "")
+                note("step $i: $step")
+                val ok = when (kind) {
+                    "say" -> {
+                        val seen = watch.turns().map { it.runId }.toSet()
+                        val at = System.currentTimeMillis()
+                        compose.typeAndSend(value)
+                        compose.runOnUiThread {
+                            val w = compose.activity.window
+                            compose.activity.currentFocus?.clearFocus()
+                            WindowCompat.getInsetsController(w, w.decorView).hide(WindowInsetsCompat.Type.ime())
+                        }
+                        chat.ui.value.blocked?.let { error("blocked by prerequisites: $it") }
+                        sent += value.trim() to at
+                        // Move on only after this desk turn finishes (finishes speaking or only dispatches a task)
+                        waitUntil("reply to \"$value\"") { watch.turnFor(value.trim(), seen)?.doneAt != null }
+                    }
+                    "wait" -> when {
+                        value == "running" -> waitUntil(value) { board().any { it.state == DeskTaskPhase.Running } }
+                        value == "needsyou" -> waitUntil(value) { board().any { it.state == DeskTaskPhase.NeedsYou } }
+                        value == "queued" -> waitUntil(value) { board().any { it.state == DeskTaskPhase.Queued } }
+                        value == "idle" -> waitUntil(value) {
+                            board().isNotEmpty() && board().all { it.state in ended } && watch.turns().none { it.doneAt == null }
+                        }
+                        value.startsWith("tasks=") -> value.removePrefix("tasks=").toInt().let { n -> waitUntil(value) { board().size >= n } }
+                        value == "report" -> watch.turns().count { it.isReport }.let { n -> waitUntil(value) { watch.turns().count { it.isReport && it.doneAt != null } > n } }
+                        else -> error("unknown wait $value")
+                    }
+                    "sleep" -> { Thread.sleep(value.toLong() * 1000); true }
+                    // Page goes to the background: later reports should use the fallback (write back to the conversation, send a notification); reopening starts from the home-screen entry
+                    "home" -> { sh("input keyevent KEYCODE_HOME"); Thread.sleep(1500); true }
+                    "notifications" -> { note("notifications: " + mikaNotifications()); true }
+                    else -> error("unknown step $step")
+                }
+                compose.mainClock.advanceTimeBy(500)
+                runCatching { compose.waitForIdle() }
+                mainShot(dir, "step-%02d".format(i))
+                results.append("step$i=$step ok=$ok\n")
+            }
+        } finally {
+            watch.stop()
+            flags.setParallelMax(parallelBefore)
+            val turns = watch.turns()
+            sent.forEachIndexed { i, (text, at) ->
+                val turn = turns.firstOrNull { it.goal == text && it.seenAt >= at }
+                results.append("turn$i.text=$text\nturn$i.${turn?.describe(at) ?: "missing"}\n")
+            }
+            turns.filter { it.isReport }.forEachIndexed { i, t -> results.append("report$i.${t.describe()}\n") }
+            results.append("board=" + board().joinToString(" ; ") { "${it.taskId} ${it.state}${it.position?.let { p -> "#$p" } ?: ""} ${it.title}" } + "\n")
+            results.append("conversationId=${chat.ui.value.conversationId}\n")
+            // Saved turns: reports while the page is away are written back to the conversation by the fallback (status = desk_report), visible here
+            chat.ui.value.conversationId?.let { id ->
+                app.conversations.turns(id).forEachIndexed { i, t ->
+                    results.append("saved$i=${t.status} user=${t.userText.take(40)} said=${t.outcome.replace('\n', ' ').take(160)}\n")
+                }
+            }
+            results.append("backendSteps=${recorder.calls} backendTools=${recorder.toolCalls.map { it.first }.distinct().joinToString(",")}\n")
+            results.append("notifications=${mikaNotifications()}\n")
+            File(dir, "result.txt").writeText(results.toString())
+            // Stop anything still running so nothing is left on the phone
+            board().filter { it.state !in ended }.forEach { v ->
+                DeviceTaskState.runs.value.firstOrNull { it.conversationId == v.taskId }?.let { TaskService.cancel(context, it.key) }
+            }
+        }
+    }
+
+    /**
+     * Whether the page left in the background after the task ends is still running: every [seconds] seconds, read the page's media playback progress and a count-only timer twice (added to the page just for this acceptance run,
+     * without touching the page's own content), and save a frame of what it displays. Returns the lines written to result.txt.
      */
     private fun keptPageCheck(seconds: Long, dir: File, note: (String) -> Unit): String {
         val keeper = (context.applicationContext as MikaApp).pageKeeper

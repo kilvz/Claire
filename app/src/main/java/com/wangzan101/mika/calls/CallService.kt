@@ -38,6 +38,22 @@ internal class CallNotifications(private val context: Context) {
             notificationManager.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
     }.getOrDefault(false)
 
+    /**
+     * Channel used to ask the owner during a call: the other party is waiting on the line, so it must pop up (high importance).
+     * Returns false when the user has turned off this channel or all notifications; callers then only write to the conversation and remind the user there to turn them back on.
+     */
+    fun ownerAskReady(): Boolean = runCatching {
+        val notificationManager = manager ?: return false
+        notificationManager.createNotificationChannel(
+            NotificationChannel(OWNER_ASK_CHANNEL, context.getString(R.string.calls_owner_ask_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                setShowBadge(true)
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            },
+        )
+        notificationManager.areNotificationsEnabled() &&
+            notificationManager.getNotificationChannel(OWNER_ASK_CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+    }.getOrDefault(false)
+
     fun show(callId: String, message: String, ringing: Boolean): Boolean = runCatching {
         if (!ready()) return false
         val takeOverIntent = Intent(context, CallNotificationAction::class.java)
@@ -137,6 +153,7 @@ internal class CallNotifications(private val context: Context) {
         const val LOCKED_DIAL_SCHEME = "mika-locked-dial"
         const val CHANNEL = "mika_ai_calls"
         const val COMPLETED_CHANNEL = "mika_ai_call_completed"
+        const val OWNER_ASK_CHANNEL = "mika_ai_call_owner_ask"
         private const val ID = 90_117
         private fun completedId(callId: String) = 91_000 + (callId.hashCode() and 0x7fffffff) % 8_000
     }

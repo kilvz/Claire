@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -29,7 +30,8 @@ sealed interface VoiceCallState {
     data object Connecting : VoiceCallState
     data object MicCheck : VoiceCallState
     data class Active(val startedAt: Long) : VoiceCallState
-    data class Ended(val reason: EndReason) : VoiceCallState
+    /** [idleMinutes] is meaningful only for [EndReason.Idle]: how many minutes of quiet before hanging up. */
+    data class Ended(val reason: EndReason, val idleMinutes: Int = 0) : VoiceCallState
     data class Failed(val error: VoiceCallError, val attempt: Int) : VoiceCallState
 }
 
@@ -39,7 +41,16 @@ sealed interface VoiceCallState {
  */
 enum class VoiceCallTurn { Listening, Thinking, Speaking }
 
-enum class EndReason { Hangup, Notification, IncomingCall, TimeLimit, Background }
+/** [Idle]: there has been no new activity for a good while during the call (nobody spoke, nothing was typed, no task progressed), so it hangs up automatically after the configured duration. */
+enum class EndReason { Hangup, Notification, IncomingCall, Idle, Background;
+
+    /** The wire value recorded in the call record ([com.wangzan101.mika.chat.ConversationCall.endReason]). */
+    val wire: String get() = when (this) {
+        Idle -> com.wangzan101.mika.chat.ConversationCall.END_IDLE
+        Hangup -> com.wangzan101.mika.chat.ConversationCall.END_HANGUP
+        else -> name.lowercase()
+    }
+}
 
 enum class VoiceCallError { Auth, ConnectTimeout, Disconnected, RateLimited, Provider, MicSilent, AudioFocus, Playback, Busy }
 
@@ -48,9 +59,10 @@ enum class VoiceCallError { Auth, ConnectTimeout, Disconnected, RateLimited, Pro
  * mic check (VOICE_COMMUNICATION init failure falls back to MIC in the orchestration layer) → start playback → local two-tone prompt tone →
  * cloud greeting (played only once per session) → Active.
  *
- * After Active, three paths run in parallel: event consumption (downstream audio goes into the 20-second-capped [CallPlaybackQueue]; barge-in invalidates the generation + hardware flush;
- * mika_request first registers the current turn's transcript then passes the safety gate), upstream capture (20ms frames with absolute deadline pacing), and the 10-minute limit.
- * Wind-down is idempotent: hangup/end/failure all go through the same finally that releases focus, capture, playback and the real-time session; external cancellation does not count as failure.
+ * After Active, three paths run in parallel: event consumption (downstream audio into the 20-second-capped [CallPlaybackQueue]; barge-in invalidates the generation + hardware flush;
+ * front desk tool calls that carry user words first register the current-turn transcript and then pass the safety gate), upstream capture (20ms frame pacing against absolute deadlines), and idle hangup (no overall duration cap, see [idleMs]).
+ * User barge-in only interrupts what the assistant is saying, never background tasks.
+ * Shutdown is idempotent: hangup/end/failure all go through finally to release focus, capture, playback and the realtime session; external cancellation does not count as a failure.
  *
  * The safety gate ([requestGate]) is created once per session and not reset across retries: it must withstand reconnection replays for its callIds.
  */
@@ -62,13 +74,22 @@ class VoiceCallSession(
     private val greeting: String,
     private val echoWindow: RingBuffer<String> = RingBuffer(ECHO_WINDOW_CAPACITY_CHARS),
     private val requestGate: VoiceCallRequest = VoiceCallRequest(echoWindow),
-    private val onVoiceRequest: (callId: String, text: String) -> Unit = { _, _ -> },
-    private val onBargeIn: () -> Unit = {},
+    /** Front desk tools called by the model (those with words have passed the safety gate and the words are swapped for the passed current-turn transcript); the assembly side replies with the same callId after executing. */
+    private val onDeskCall: (callId: String, name: String, args: JsonObject) -> Unit = { _, _, _ -> },
+    /** When the conversation cannot take typed text (realtime sessions take no text), hand it to the assembly side to dispatch directly, with the result shown locally. */
+    private val onTypedText: (text: String) -> Unit = {},
     private val onUserTranscript: (text: String, isFinal: Boolean) -> Unit = { _, _ -> },
     private val onAssistantTranscript: (text: String, isFinal: Boolean) -> Unit = { _, _ -> },
     /** The assistant's text so far in this turn (accumulated segment by segment), for the call page to display live; settling still goes through [onAssistantTranscript]. */
     private val onAssistantDraft: (text: String) -> Unit = {},
-    private val timeLimitMs: Long = MAX_CALL_DURATION_MS,
+    /**
+     * How long without new activity during a call before hanging up; null means no automatic hangup. New activity: you speak (even mid-utterance), typing, Claire speaking, and task progress ([onActivity]).
+     * [IDLE_WARNING_MS] before the deadline it first asks whether you are still there: when the conversation can keep replying, the model paraphrases [idleCue]; when it cannot, [idleLine] is read out as-is;
+     * the reminder itself does not count as new activity.
+     */
+    private val idleMs: Long? = DEFAULT_IDLE_MS,
+    private val idleCue: String = "",
+    private val idleLine: String = "",
     private val resumedTimeoutMs: Long = RESUMED_TIMEOUT_MS,
     private val micCheckTimeoutMs: Long = MIC_CHECK_TIMEOUT_MS,
     private val clockNanos: () -> Long = System::nanoTime,
@@ -90,6 +111,12 @@ class VoiceCallSession(
     /** The time (clockNanos) of the most recent cloud audio actually written to the playback track; after playback has been idle for a while the turn returns to listening. */
     @Volatile private var lastSpokeNanos = 0L
 
+    /** Time (clockNanos) of the most recent new activity; the quiet timer counts from here. */
+    @Volatile private var lastActivityNanos = 0L
+
+    /** "Are you still there" has been asked and no new sign of you or a task has arrived: while this is set, Claire's own speech does not restart the timer (that is just the reminder being read). */
+    @Volatile private var idleWarned = false
+
     private val lock = Any()
     private var runJob: Job? = null
     private var terminal = false
@@ -101,6 +128,15 @@ class VoiceCallSession(
     }
 
     fun hangup() = end(EndReason.Hangup)
+
+    /** New activity from outside the call (a dispatched task progressed): the quiet timer restarts. */
+    fun onActivity() = markActivity(fromMika = false)
+
+    private fun markActivity(fromMika: Boolean) {
+        if (fromMika && idleWarned) return
+        if (!fromMika) idleWarned = false
+        lastActivityNanos = clockNanos()
+    }
 
     fun setMuted(muted: Boolean) {
         _muted.value = muted
@@ -115,21 +151,25 @@ class VoiceCallSession(
         _turn.compareAndSet(VoiceCallTurn.Thinking, VoiceCallTurn.Listening)
     }
 
-    private var typedCount = 0
+    /** The conversation connected right now; null when not connected. */
+    @Volatile private var live: CallRealtimeSession? = null
 
     /**
-     * Text input from the call panel: typing takes the same path as speaking — it is registered into the transcript (question), and dispatched straight to the voice request handler
-     * with a synthesized callId ([TYPED_CALL_PREFIX]+sequence number). Typing is the user's own speech, so it does not pass the safety gate (the gate guards against model forgery); the assembly side handles
-     * results for synthesized callIds locally (into the transcript/panel), since the protocol layer has no callId registered for them. Accepted only in the Active state, blank input ignored.
+     * Text input on the call panel: typing follows the same path as speaking -- it is registered into the transcript (as a question) and as the current-turn transcript (so the model's later tool calls still pass the gate).
+     * When the conversation can take text (standard mode) it is handed over as a message for it to answer; when it cannot (realtime mode) the text is recorded as the user's own words
+     * and handed to [onTypedText] to dispatch directly. Accepted only in the Active state; blank input is ignored.
      */
     fun sendUserText(text: String) {
         val clean = text.trim()
         if (clean.isEmpty()) return
         if (_state.value !is VoiceCallState.Active) return
-        val callId = TYPED_CALL_PREFIX + (++typedCount)
+        markActivity(fromMika = false)
         onUserTranscript(clean, true)
         _turn.value = VoiceCallTurn.Thinking
-        onVoiceRequest(callId, clean)
+        requestGate.onUserTranscript(clean)
+        if (live?.sendUserText(clean) == true) return
+        requestGate.acceptTyped(clean)
+        onTypedText(clean)
     }
 
     /**
@@ -139,11 +179,11 @@ class VoiceCallSession(
     fun end(reason: EndReason) {
         val job = synchronized(lock) {
             if (terminal) {
-                if (_state.value is VoiceCallState.Failed) _state.value = VoiceCallState.Ended(reason)
+                if (_state.value is VoiceCallState.Failed) _state.value = endedFor(reason)
                 return
             }
             terminal = true
-            _state.value = VoiceCallState.Ended(reason)
+            _state.value = endedFor(reason)
             runJob
         }
         job?.cancel()
@@ -218,6 +258,7 @@ class VoiceCallSession(
             playTone()
             greetOnce(realtime)
             _state.value = VoiceCallState.Active(nowMillis())
+            live = realtime
             runActive(realtime)
         } catch (cancelled: CancellationException) {
             throw cancelled // External cancellation is not a failure; the terminal state is decided by the canceller
@@ -230,6 +271,7 @@ class VoiceCallSession(
             fail(VoiceCallError.Provider, attempt)
         } finally {
             audio.onFocusLost = null
+            live = null
             runCatching { realtime?.close() }
             audio.stopCapture()
             audio.stopPlayback()
@@ -298,11 +340,8 @@ class VoiceCallSession(
                 launch { writeLoop(queue) }
                 launch { pumpMic(realtime) }
                 launch { watchSpeaking() }
-                launch {
-                    delay(timeLimitMs)
-                    end(EndReason.TimeLimit)
-                }
-                // A system call (incoming/outgoing) displaces our call: poll the audio mode during the call and wrap up as "incoming call" when one comes in
+                idleMs?.let { limit -> launch { watchIdle(realtime, limit) } }
+                // A system call (incoming or outgoing) takes over ours: poll the audio mode during the call and end as an "incoming call" if one comes in
                 launch {
                     while (true) {
                         delay(PHONE_CALL_POLL_MS)
@@ -316,6 +355,26 @@ class VoiceCallSession(
             }
         } finally {
             queue.close()
+        }
+    }
+
+    /** Idle hangup: ask once before [IDLE_WARNING_MS] is up, then hang up at the deadline if nothing happens; a warning window shorter than a minute is halved. */
+    private suspend fun watchIdle(realtime: CallRealtimeSession, limit: Long) {
+        val warnAfter = (limit - IDLE_WARNING_MS).coerceAtLeast(limit / 2)
+        idleWarned = false
+        lastActivityNanos = clockNanos()
+        while (true) {
+            delay(IDLE_POLL_MS)
+            val quietMs = (clockNanos() - lastActivityNanos) / 1_000_000L
+            if (quietMs >= limit) {
+                end(EndReason.Idle)
+                return
+            }
+            if (quietMs >= warnAfter && !idleWarned) {
+                idleWarned = true
+                if (idleCue.isNotBlank() && realtime.sendCue(idleCue)) continue
+                if (idleLine.isNotBlank() && realtime.sendNotice(idleLine)) echoWindow.append(idleLine)
+            }
         }
     }
 
@@ -333,17 +392,22 @@ class VoiceCallSession(
         }
         realtime.events.collect { event ->
             when (event) {
-                is VolcRealtimeEvent.Audio ->
+                is VolcRealtimeEvent.Audio -> {
+                    markActivity(fromMika = true)
                     if (queue.offer(event.pcm) == null) throw VoiceCallFailure(VoiceCallError.Playback)
+                }
                 VolcRealtimeEvent.UserSpeaking, VolcRealtimeEvent.AssistantInterrupted -> {
+                    if (event == VolcRealtimeEvent.UserSpeaking) markActivity(fromMika = false)
+                    // The user spoke again: calls authorized by the previous utterance end here
+                    if (event == VolcRealtimeEvent.UserSpeaking) requestGate.onUserTurnStart()
                     queue.invalidate()
                     audio.interruptPlayback()
                     _speakerLevel.value = 0f
                     flushAssistantText(final = false)
                     listen()
-                    onBargeIn()
                 }
                 is VolcRealtimeEvent.UserTranscript -> {
+                    markActivity(fromMika = false)
                     onUserTranscript(event.text, event.isFinal)
                     if (event.isFinal && event.isCurrentTurn) _turn.value = VoiceCallTurn.Thinking
                     // Register the current turn's final+complete transcript first, so a later function_call is eligible to pass the gate
@@ -352,6 +416,7 @@ class VoiceCallSession(
                     }
                 }
                 is VolcRealtimeEvent.AssistantTranscript -> {
+                    markActivity(fromMika = true)
                     val room = MAX_ASSISTANT_TURN_CHARS - assistantText.length
                     if (room > 0) {
                         assistantText.append(event.delta.take(room))
@@ -369,15 +434,21 @@ class VoiceCallSession(
         throw VolcRealtimeException(VolcRealtimeException.Kind.NETWORK)
     }
 
+    /**
+     * Front desk tools carrying words first pass the safety gate; the passed words are verified to fall within the current-turn transcript and swapped for the whole utterance before being handed onward;
+     * tools without words are handed onward as-is and rejected by the front desk executor (all four tools require words).
+     */
     private fun handleFunctionCall(realtime: CallRealtimeSession, event: VolcRealtimeEvent.FunctionCall) {
-        if (event.name != VolcRealtimeProtocol.MIKA_REQUEST_FUNCTION) return
-        val utterance = (event.arguments["utterance"] as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
+        if (event.name !in VolcRealtimeProtocol.deskToolNames) return
+        val words = event.arguments["words"] ?: return onDeskCall(event.callId, event.name, event.arguments)
+        val utterance = (words as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
         when (val decision = requestGate.offer(event.callId, utterance)) {
-            is VoiceCallDecision.Accept -> onVoiceRequest(event.callId, decision.text)
+            is VoiceCallDecision.Accept ->
+                onDeskCall(event.callId, event.name, JsonObject(event.arguments + ("words" to JsonPrimitive(decision.text))))
             VoiceCallDecision.Reject -> realtime.sendToolResult(event.callId, buildJsonObject {
                 put("status", "rejected")
-                put("reason", "utterance_not_verified")
-                put("next", "Do not act on this request. Only if the user says it again as a new utterance, call mika_request once more with it; the retry must use the new call_id.")
+                put("reason", "words_not_verified")
+                put("next", "Do not act on this. Only if the user says it again as a new utterance, call the tool once more with their words; the retry must use the new call_id.")
             })
         }
     }
@@ -422,6 +493,7 @@ class VoiceCallSession(
                     audio.writePlayback(pcm, block.byteCount)
                     _speakerLevel.value = levelOf(pcm, block.byteCount)
                     lastSpokeNanos = clockNanos()
+                    markActivity(fromMika = true)
                     _turn.value = VoiceCallTurn.Speaking
                 }
             } catch (cancelled: CancellationException) {
@@ -464,11 +536,19 @@ class VoiceCallSession(
         return (sqrt(sum / samples) / LEVEL_FULL_SCALE).coerceIn(0.0, 1.0).toFloat()
     }
 
+    private fun endedFor(reason: EndReason) = VoiceCallState.Ended(
+        reason,
+        idleMinutes = if (reason == EndReason.Idle) idleMs?.let { ((it + 30_000L) / 60_000L).toInt().coerceAtLeast(1) } ?: 0 else 0,
+    )
+
     private class VoiceCallFailure(val error: VoiceCallError) : Exception()
 
     companion object {
-        const val TYPED_CALL_PREFIX = "typed-"
-        const val MAX_CALL_DURATION_MS = 10 * 60_000L
+        /** Default: hang up after 5 minutes of quiet. */
+        const val DEFAULT_IDLE_MS = 5 * 60_000L
+        /** How long before hanging up to first ask whether you are still there. */
+        const val IDLE_WARNING_MS = 30_000L
+        const val IDLE_POLL_MS = 1_000L
         const val RESUMED_TIMEOUT_MS = 3_000L
         const val MIC_CHECK_TIMEOUT_MS = 3_000L
         /** Interval for checking the system audio mode during a call: wrap up as soon as an incoming/outgoing call takes over the call audio. */

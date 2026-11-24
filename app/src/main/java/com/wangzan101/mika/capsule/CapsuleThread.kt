@@ -3,6 +3,7 @@ package com.wangzan101.mika.capsule
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.core.agent.Conversation
+import com.wangzan101.mika.core.agent.DeskTurn
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.record.RunEvent
@@ -81,14 +82,15 @@ object CapsuleThreads {
     fun pastItems(index: Int, t: PastTurn, summarizing: Set<String> = emptySet()): List<ThreadItem> {
         val turn = t.turn
         val base = turn.runId?.let { "r$it" } ?: "p$index"
-        val kind = when (turn.status) {
-            "succeeded", "unverified" -> CapsuleKind.Done
-            "cancelled" -> CapsuleKind.Cancelled
+        // What the front desk replied and its reports are all normal replies (the report turn has no user words, so no user bubble is drawn below)
+        val kind = when {
+            Conversation.replied(turn) -> CapsuleKind.Done
+            turn.status == "cancelled" -> CapsuleKind.Cancelled
             else -> CapsuleKind.Failed
         }
         val answer = when (kind) {
             CapsuleKind.Done -> answerParts(turn.outcome).first
-            CapsuleKind.Failed -> turn.outcome
+            CapsuleKind.Failed -> DeskTurn.failure(turn) ?: turn.outcome
             else -> Conversation.stopSummary(turn).orEmpty()
         }
         // The original utterance first, then interjections; replies that finished before an interjection and the reply it interrupted are placed before it (same as the conversation screen)

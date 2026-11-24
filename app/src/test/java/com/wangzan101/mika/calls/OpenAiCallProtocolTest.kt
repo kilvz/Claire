@@ -81,6 +81,22 @@ class OpenAiCallProtocolTest {
                 assertTrue(session.setMuted(false))
                 assertTrue(session.sendGreeting("hello"))
                 assertEquals("response.create", messages.receive()["type"]!!.jsonPrimitive.content)
+                // A cue for the model: add one system text item and then ask it to reply, not "read aloud"
+                assertTrue(session.sendCue("[提示] 主人回复：七点"))
+                val cue = messages.receive()
+                assertEquals("conversation.item.create", cue["type"]!!.jsonPrimitive.content)
+                val cueItem = cue["item"]!!.jsonObject
+                assertEquals("message", cueItem["type"]!!.jsonPrimitive.content)
+                assertEquals("system", cueItem["role"]!!.jsonPrimitive.content)
+                val cueContent = cueItem["content"]!!.jsonArray.single().jsonObject
+                assertEquals("input_text", cueContent["type"]!!.jsonPrimitive.content)
+                assertEquals("[提示] 主人回复：七点", cueContent["text"]!!.jsonPrimitive.content)
+                val respond = messages.receive()
+                assertEquals("response.create", respond["type"]!!.jsonPrimitive.content)
+                assertFalse(respond.toString().contains("verbatim"))
+                // Background only: add one system text item without asking it to speak (the next item is audio)
+                assertTrue(session.sendContext("[提示] 任务已完成"))
+                assertEquals("system", messages.receive()["item"]!!.jsonObject["role"]!!.jsonPrimitive.content)
                 assertTrue(session.sendPcm16(ByteArray(640)))
                 assertEquals(960, Base64.getDecoder().decode(messages.receive()["audio"]!!.jsonPrimitive.content).size)
                 peer.send("""{"type":"input_audio_buffer.speech_started","item_id":"u"}""")

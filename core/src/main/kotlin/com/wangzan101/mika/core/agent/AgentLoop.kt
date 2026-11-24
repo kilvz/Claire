@@ -176,7 +176,9 @@ class AgentLoop(
     internal val autonomous: Boolean = false,
     /** The block the proactive capability accumulated from notifications that qualifies for carrying into this task (see [com.wangzan101.mika.core.proactive.ObservedContext]); null when there is none. */
     internal val observed: String? = null,
-    /** The interactive UI enables a visible text stream; evaluations and background calls keep the original request format. */
+    /** Extra context the front desk attaches when dispatching (background and tidying); it enters the context as a note from Claire, not as the user's words ([utterances]). Null when absent. */
+    internal val deskNote: String? = null,
+    /** The interactive UI turns on the visible text stream; evaluation and background calls keep the original request format. */
     internal val streamReplies: Boolean = false,
     /** Screens the user sent in this conversation (see [UserScreenTurns]); when absent, the line carrying the screen is given to the model as-is. */
     internal val userScreens: UserScreenSource? = null,

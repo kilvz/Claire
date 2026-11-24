@@ -25,7 +25,8 @@ internal object CallSummaryGenerator {
         val otherParty = if (direction == CallDirection.OUTGOING) "callee" else "caller"
         val input = transcript.asSequence().mapNotNull { line ->
             // Device submission status is metadata, never a statement by either party.
-            if (line.role == "system") return@mapNotNull null
+            // An owner reply that could not be relayed is not something said on the call either
+            if (line.role == "system" || line.role == CallTranscriptLine.OWNER_UNRELAYED) return@mapNotNull null
             val text = line.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
             "${if (line.role == "assistant") "Claire" else otherParty}: $text"
         }.joinToString("\n").takeLast(MAX_INPUT_CHARS)

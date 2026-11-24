@@ -44,6 +44,8 @@ enum class ContextKind(val wire: String, val layer: ContextLayer, val trust: Tru
     Memory("memory", ContextLayer.Task, Trust.UserMemory, pinned = true),
     /** The block obtained from notifications (see [com.wangzan101.mika.core.proactive.ObservedContext]): stored separately from the user's memory, each with its own trust description. */
     Observed("observed", ContextLayer.Task, Trust.Observed, pinned = true),
+    /** Background and tidying written by the front desk when dispatching (a front-desk note): a note from Claire to the model, not the user's words; kept during compaction. */
+    DeskNote("desk_note", ContextLayer.Task, Trust.Claire, pinned = true),
     AppKnowledge("app_knowledge", ContextLayer.Knowledge, Trust.Reference, pinned = true),
     SiteKnowledge("site_knowledge", ContextLayer.Knowledge, Trust.Reference, pinned = true),
     /** The screen map of an app (page structure, see [com.wangzan101.mika.core.screenmap]); reference material like APP.md, kept when folding. */
@@ -109,6 +111,8 @@ class ContextBuilder(
         memory: String? = null,
         /** The block the proactive capability accumulated from notifications that is qualified to be carried into the task (already length-limited); not carried when there is none. */
         observed: String? = null,
+        /** Extra context attached when the front desk dispatches; not the user's words, wrapped in Claire's note shell. Omitted when absent. */
+        deskNote: String? = null,
         channel: String? = null,
         knowledge: List<KnowledgeEntry> = emptyList(),
         knowledgeNote: String = "",
@@ -123,14 +127,16 @@ class ContextBuilder(
         // No clip: this block is already length-limited itself (ObservedContext.MAX_TOKENS), and it consists of pairs of untrusted markers, so truncating in the middle would lose the closing marker.
         // Task-layer items are never dropped, so the whole block goes in; the cost is that when there is a lot of memory and many earlier turns, the app knowledge after it gets at most 600 tokens less allowance
         observed?.let { pieces += Piece(ContextKind.Observed, "notifications", body = it) }
+        // The front-desk note and the task's original words together are what to do this time; the task layer goes in whole, unclipped
+        deskNote?.let { pieces += Piece(ContextKind.DeskNote, "front desk", body = it) }
         channel?.let { pieces += Piece(ContextKind.Channel, "installed apps and websites", body = it) }
         val fresh = knowledge.filter { it.body != null && injected.size < budget.maxKnowledge && injected.add(it.name to it.surface) }
         fresh.forEach { pieces += knowledgePiece(it, knowledgeNote, withLinks) }
         skillsIndex?.let { pieces += Piece(ContextKind.SkillsIndex, "knowledge and skills index", body = it) }
 
         val kept = fit(pieces)
-        // The task's own words were said by the user, so they do not go into an envelope; they are placed after earlier turns and memory, and before the remaining context
-        val at = kept.indexOfFirst { it.kind != ContextKind.PriorTurns && it.kind != ContextKind.Memory && it.kind != ContextKind.Observed }
+        // The task's original words are the user's, so no shell; placed after earlier turns, memory, notices and the front-desk note, before the rest of the context
+        val at = kept.indexOfFirst { it.kind !in BEFORE_TASK }
             .let { if (it < 0) kept.size else it }
         val messages = kept.map { it.message() }.toMutableList()
         messages.add(at, Message(Role.User, listOf(Part.Text(task)) + taskImages, Author.User))
@@ -252,7 +258,8 @@ class ContextBuilder(
         private const val OPEN = "<context kind=\""
         private const val CLOSE = "</context>"
         private val PRIORITY = listOf(ContextLayer.Task, ContextLayer.Knowledge, ContextLayer.Skills)
-        private val RANK = listOf(ContextKind.Memory, ContextKind.PriorTurns, ContextKind.Observed,
+        private val BEFORE_TASK = setOf(ContextKind.PriorTurns, ContextKind.Memory, ContextKind.Observed, ContextKind.DeskNote)
+        private val RANK = listOf(ContextKind.Memory, ContextKind.PriorTurns, ContextKind.Observed, ContextKind.DeskNote,
             ContextKind.AppKnowledge, ContextKind.SiteKnowledge, ContextKind.SkillsIndex)
         private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
         private const val EXCERPT_CHARS = 60

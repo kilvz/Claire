@@ -113,9 +113,12 @@ class OpenAiCompatModel(
             reasoningEffort?.let { put("reasoning_effort", it) }
             // Thinking is replayed only in requests that carry tools (it must follow along step by step across tool calls); side calls without tools do not need it
             val replayReasoning = tools.isNotEmpty()
+            // Trailing uncached messages that change every time do not take part: the moving cache mark lands before them
+            val stable = messages.size - messages.takeLastWhile { it.uncached }.size
             val wire = listOf(buildJsonObject { put("role", "system"); put("content", system) }) +
-                messages.flatMap { serialize(it, replayReasoning) }
-            put("messages", JsonArray(if (capabilities.promptCaching == PromptCaching.Explicit) withCacheMarks(wire) else wire))
+                messages.take(stable).flatMap { serialize(it, replayReasoning) }
+            val tail = messages.drop(stable).flatMap { serialize(it, replayReasoning) }
+            put("messages", JsonArray((if (capabilities.promptCaching == PromptCaching.Explicit) withCacheMarks(wire) else wire) + tail))
             if (tools.isNotEmpty()) putJsonArray("tools") { tools.forEach { add(toolJson(it)) } }
             if (stream) {
                 put("stream", true)

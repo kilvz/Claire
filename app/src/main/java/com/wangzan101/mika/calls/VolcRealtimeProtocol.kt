@@ -1,5 +1,9 @@
 package com.wangzan101.mika.calls
 
+import com.wangzan101.mika.core.frontdesk.DeskPersona
+import com.wangzan101.mika.core.frontdesk.DeskPrompt
+import com.wangzan101.mika.core.frontdesk.DeskToolSet
+import com.wangzan101.mika.core.frontdesk.DeskTools
 import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -15,16 +19,17 @@ data class VolcRealtimeConfig(
     val model: String = MODEL,
     /** Tools are enabled only for an owned carrier call, never a briefing or connection test. */
     val enablePhoneDtmf: Boolean = false,
-    /** In-app voice requests: every complete utterance is handed to the task system via mika_request. */
+    /** In-app voice call: the model runs the front desk with the front desk's user tools (dispatch, supplement, answer, cancel); [systemPrompt] only carries the task board at opening. */
     val agentTools: Boolean = false,
     val protocol: CallVoiceProtocol = CallVoiceProtocol.VOLC_DUPLEX,
+    /** With [agentTools], the persona used for the front desk note (nickname and persona layer), the same one as in chat. */
+    val deskPersona: DeskPersona = DeskPersona(),
 ) {
     init {
         require(systemPrompt.length <= MAX_PROMPT_CHARS) { "Realtime system prompt is too long" }
         require(speaker.isNotBlank() && speaker.length <= 128) { "Invalid realtime speaker" }
         require(model.isNotBlank() && model.length <= 128 && model.all { it.code in 33..126 }) { "Invalid realtime model" }
-        // The OpenAI realtime path has no mika_request registration or dispatch; fail fast
-        // instead of silently dropping every voice request.
+        // The realtime protocol that can add system text items does not register front desk tools: fail fast instead of silently dropping every request
         require(!(agentTools && protocol == CallVoiceProtocol.OPENAI_REALTIME)) {
             "agentTools requires the VOLC_DUPLEX realtime protocol"
         }
@@ -55,17 +60,12 @@ internal object VolcRealtimeProtocol {
     const val SESSION_UPDATED = "session.updated"
     const val FUNCTION_CALL = "response.function_call_arguments.done"
     const val DTMF_FUNCTION = "send_dtmf"
-    const val MIKA_REQUEST_FUNCTION = "mika_request"
     const val MAX_DTMF_DIGITS = 32
     const val MAX_UTTERANCE_CHARS = 4_096
 
-    /** Session instructions section appended whenever agentTools is on (same placement as CallRuntime.PHONE_DTMF_PROMPT). */
-    const val AGENT_TOOLS_PROMPT = "\nFor every complete utterance from the user, call mika_request exactly once, passing that utterance verbatim and in full as utterance; stay silent the rest of the time and do not answer on your own. After a tool result comes back, restate the result to the user once, without adding anything or calling the tool again."
     const val MAX_FUNCTION_CALLS = 128
     const val MAX_FUNCTION_BATCH = 8
     const val MAX_FUNCTION_ARGUMENT_CHARS = 256
-    /** mika_request carries a full utterance (≤ [MAX_UTTERANCE_CHARS]) plus JSON envelope overhead. */
-    const val MAX_AGENT_FUNCTION_ARGUMENT_CHARS = MAX_UTTERANCE_CHARS + 128
     const val MAX_TOOL_RESULT_CHARS = 2048
     const val SESSION_CLOSED = "session.closed"
     const val INPUT_AUDIO_COMMITTED = "input_audio_buffer.committed"
@@ -84,7 +84,12 @@ internal object VolcRealtimeProtocol {
     fun create(eventId: String, config: VolcRealtimeConfig): String = message("session.create", eventId) {
         putJsonObject("session") {
             put("model", config.model)
-            val instructions = if (config.agentTools) config.systemPrompt + AGENT_TOOLS_PROMPT else config.systemPrompt
+            // Front desk note first, then the opening task board (if any) appended after it.
+            val instructions = if (config.agentTools) {
+                listOf(DeskPrompt.user(spoken = true, persona = config.deskPersona), config.systemPrompt).filter { it.isNotBlank() }.joinToString("\n\n")
+            } else {
+                config.systemPrompt
+            }
             if (instructions.isNotBlank()) put("instructions", instructions)
             putJsonObject("audio") {
                 putJsonObject("input") {
@@ -112,8 +117,8 @@ internal object VolcRealtimeProtocol {
     fun enableTools(eventId: String, config: VolcRealtimeConfig): String = message("session.update", eventId) {
         putJsonObject("session") {
             put("tools", JsonArray(mutableListOf<kotlinx.serialization.json.JsonElement>().apply {
-                if (config.enablePhoneDtmf) addAll(phoneTools())
-                if (config.agentTools) add(mikaRequestTool())
+                if (config.enablePhoneDtmf) addAll(phoneCallTools())
+                if (config.agentTools) addAll(DeskTools.specs(DeskToolSet.User))
             }))
         }
     }
@@ -138,25 +143,8 @@ internal object VolcRealtimeProtocol {
         }
     }))
 
-    /** Every complete user utterance goes to the task system exactly once; the model never answers it itself. */
-    fun mikaRequestTool(): JsonObject = buildJsonObject {
-        put("type", "function")
-        put("name", MIKA_REQUEST_FUNCTION)
-        put("description", "Hand the user's complete spoken request to the task system for execution. Pass the utterance verbatim; never answer or act on it yourself.")
-        putJsonObject("parameters") {
-            put("type", "object")
-            putJsonObject("properties") {
-                putJsonObject("utterance") {
-                    put("type", "string")
-                    put("minLength", 1)
-                    put("maxLength", MAX_UTTERANCE_CHARS)
-                    put("description", "The user's complete utterance, verbatim.")
-                }
-            }
-            put("required", JsonArray(listOf(JsonPrimitive("utterance"))))
-            put("additionalProperties", false)
-        }
-    }
+    /** The full tool set for carrier calls: keypad + phone front desk (asking the owner only). */
+    fun phoneCallTools() = JsonArray(phoneTools() + DeskTools.specs(DeskToolSet.Phone))
 
     fun toolResults(eventId: String, results: List<Pair<String, JsonObject>>): String =
         message("conversation.item.create", eventId) {
@@ -178,14 +166,34 @@ internal object VolcRealtimeProtocol {
             digits.all { it in '0'..'9' || it == '*' || it == '#' }
     }
 
-    fun validAgentArguments(arguments: JsonObject): Boolean {
-        val utterance = arguments.string("utterance") ?: return false
-        return arguments.keys == setOf("utterance") && utterance.length in 1..MAX_UTTERANCE_CHARS
+    /** Front desk user tool names; in-app voice calls accept only these (plus keypad). */
+    val deskToolNames: Set<String> = DeskTools.specs(DeskToolSet.User).map { it.string("name")!! }.toSet()
+
+    /** Phone front desk tool names (asking the owner only); carrier calls accept only this (plus keypad). */
+    val phoneDeskToolNames: Set<String> = DeskTools.specs(DeskToolSet.Phone).map { it.string("name")!! }.toSet()
+
+    /** Front desk tool arguments: only fields listed in the spec, all values strings, every required field present and non-blank. Length limits are enforced at execution (the original words are not truncated; the rest is). */
+    fun validDeskArguments(name: String, arguments: JsonObject): Boolean {
+        val parameters = (DeskTools.specs(DeskToolSet.User) + DeskTools.specs(DeskToolSet.Phone)).firstOrNull { it.string("name") == name }
+            ?.get("parameters") as? JsonObject ?: return false
+        val properties = (parameters["properties"] as? JsonObject)?.keys ?: return false
+        val required = (parameters["required"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+        return properties.containsAll(arguments.keys) && arguments.values.all { it is JsonPrimitive && it.isString } &&
+            required.all { !arguments.string(it).isNullOrBlank() }
     }
 
-    /** Argument envelopes are tool-sized: a DTMF batch is tiny, an utterance can fill the cap. */
-    fun maxArgumentCharsFor(name: String?): Int =
-        if (name == MIKA_REQUEST_FUNCTION) MAX_AGENT_FUNCTION_ARGUMENT_CHARS else MAX_FUNCTION_ARGUMENT_CHARS
+    /**
+     * Argument envelopes are tool-sized: a DTMF batch is tiny; tools carrying the user's words get a full utterance
+     * plus the other fields (title, note), all possibly sent as `\uXXXX` escapes. The words alone are checked
+     * against [MAX_UTTERANCE_CHARS] after parsing, so a near-limit utterance is never lost to the envelope.
+     */
+    fun maxArgumentCharsFor(name: String?): Int = when (name) {
+        DeskTools.DISPATCH, DeskTools.ADD, DeskTools.ANSWER, DeskTools.CANCEL, DeskTools.ASK_OWNER -> MAX_WORDS_ARGUMENT_CHARS
+        else -> MAX_FUNCTION_ARGUMENT_CHARS
+    }
+
+    /** One escaped character takes at most six (`\uXXXX`); the rest covers keys, quotes and separators. */
+    private const val MAX_WORDS_ARGUMENT_CHARS = (MAX_UTTERANCE_CHARS + 2 * MAX_FUNCTION_ARGUMENT_CHARS) * 6 + MAX_FUNCTION_ARGUMENT_CHARS
 
     fun greeting(eventId: String, text: String): String = message("speech_text_buffer.commit", eventId) {
         put("text", text)

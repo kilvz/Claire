@@ -30,7 +30,9 @@ import com.wangzan101.mika.chat.ProjectDeleter
 import com.wangzan101.mika.chat.ProjectStore
 import com.wangzan101.mika.chat.SharedDraftStore
 import com.wangzan101.mika.chat.WorkspaceResolver
+import com.wangzan101.mika.frontdesk.DeskRegistry
 import com.wangzan101.mika.task.ConfirmationNotifier
+import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import com.wangzan101.mika.core.run.Outbox
 import com.wangzan101.mika.core.run.RunStore
@@ -49,6 +51,7 @@ import com.wangzan101.mika.settings.ApprovalControl
 import com.wangzan101.mika.settings.ApprovalStore
 import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.ProviderStore
+import com.wangzan101.mika.settings.modelFor
 import com.wangzan101.mika.settings.proactiveTarget
 import com.wangzan101.mika.settings.proactiveTargeted
 import com.wangzan101.mika.settings.ttsModel
@@ -293,6 +296,23 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
     /** Conversation records: one per process, shared by the task service, the chat UI and the result card's buttons. */
     val conversations: ConversationStore by lazy { ConversationStore(this) }
 
+    /**
+     * Unanswered questions from a call: the question is written into its conversation, the owner answers in the
+     * conversation or from the notification, and the first answer wins.
+     * Writing to the conversation goes on a dedicated IO line so questions and answers land in order.
+     */
+    val ownerQuestions: com.wangzan101.mika.calls.OwnerQuestions by lazy {
+        val io = kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
+        com.wangzan101.mika.calls.OwnerQuestions(
+            write = { id, turn -> scope.launch(io) { runCatching { conversations.append(id, turn) } } },
+            askedLine = { question, notified ->
+                tr(R.string.calls_owner_ask_line, question) + if (notified) "" else "\n" + tr(R.string.calls_owner_ask_notify_off)
+            },
+            answeredLine = { tr(R.string.calls_owner_ask_answered) },
+            withdrawnLine = { tr(R.string.calls_owner_ask_withdrawn) },
+        )
+    }
+
     /** Project definitions: one per process. */
     val projects: ProjectStore by lazy { ProjectStore(this) }
 
@@ -326,7 +346,20 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         )
     }
 
-    /** Deletes a conversation (long-press in the sidebar): stops its current task and deletes the workspace (conversations in the same project keep the shared workspace), keeping scheduled tasks. */
+    private val deskRegistry = lazy { DeskRegistry(this) }
+
+    /** One resident front desk per conversation: chat page, voice call and other entry points get the same front desk, its tool executor and background from here. */
+    val desks: DeskRegistry by deskRegistry
+
+    /**
+     * Asked by the task service: when run runKey ends with end, is a front desk following this run and about to speak
+     * the ending (see [DeskRegistry.reportsEnding]); if so the task no longer posts its own "task complete". Does not
+     * create a front desk just to answer when none has been created yet.
+     */
+    val deskReportsEnding: (runKey: String, end: TaskState) -> Boolean =
+        { runKey, end -> deskRegistry.isInitialized() && desks.reportsEnding(runKey, end) }
+
+    /** Delete a conversation (long-press in the sidebar): stop its current task and delete the workspace (conversations in the same project keep the shared workspace), keeping scheduled jobs. */
     val conversationDeleter: ConversationDeleter by lazy {
         val app = this
         ConversationDeleter(
@@ -511,6 +544,8 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 override fun togglePipSoundIn(conversationId: String) { taskState.run(conversationId)?.togglePipSound() }
             },
             conversations,
+            // While a call is waiting for the owner's reply, the next sentence in this conversation is that reply
+            ownerAnswer = { id, text -> ownerQuestions.answerIn(id, text) },
             followUps = followUpQueue.changes,
             serviceBusy = taskState.busy,
             appLabel = { ConfirmationNotifier.appLabel(app, it) },
@@ -587,6 +622,37 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                 projectDeleter.delete(pid)
             },
             workspaceResolver = workspaceResolver,
+            // Chat goes through the front desk: shares this conversation's front desk and ledger with calls; null when no thinking model is configured, and sending will guide the user to settings
+            desk = com.wangzan101.mika.chat.ui.DeskChatDeps(
+                desk = { id -> desks.desk(id) },
+                executor = { id, words -> desks.executor(id, words) },
+                brain = { id ->
+                    com.wangzan101.mika.frontdesk.deskModel(app)?.let { model ->
+                        com.wangzan101.mika.core.frontdesk.LlmBrain(
+                            model,
+                            com.wangzan101.mika.core.frontdesk.DeskPrompt.user(
+                                spoken = false, persona = com.wangzan101.mika.frontdesk.deskPersona(app),
+                            ),
+                            com.wangzan101.mika.core.frontdesk.DeskTools.specs(com.wangzan101.mika.core.frontdesk.DeskToolSet.User)
+                                .map(com.wangzan101.mika.core.frontdesk.LlmBrain::toolSpec),
+                            background = desks.background(id),
+                            log = { Log.w("MikaDesk", it) },
+                        )
+                    }
+                },
+                // New conversations taken by the front desk do not get a title from the task side, so generate one here from the first sentence; light model first, main model as fallback, usage recorded on this conversation
+                title = { id, first ->
+                    kotlinx.coroutines.withContext(conversations.meter(id)) {
+                        com.wangzan101.mika.chat.ConversationTitler.ensure(conversations, id, first) {
+                            val session = com.wangzan101.mika.core.model.ModelSession.of(id)
+                            listOfNotNull(
+                                providers.modelFor(com.wangzan101.mika.core.model.ModelRole.Light, session),
+                                providers.modelFor(com.wangzan101.mika.core.model.ModelRole.Main, session),
+                            )
+                        }
+                    }
+                },
+            ),
         )
     }
 

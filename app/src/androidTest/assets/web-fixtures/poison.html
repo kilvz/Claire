@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8"><title>poison</title>
 <script>
-  // 页面先把常用的全局入口改坏;文档开始注入的页面脚本应不受影响
+  // The page sabotages common global entry points first; the page script injected at document start should be unaffected
   Object.defineProperty = function (o) { return o; };
   Object.getOwnPropertyDescriptor = function () { return undefined; };
   Reflect.apply = function () { return 'poisoned'; };

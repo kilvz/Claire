@@ -144,6 +144,23 @@ class ChatScreenDeviceTest {
         return line.contains("$short ") || line.contains("${context.packageName}/${cls.name} ")
     }
 
+    /**
+     * Open a child conversation created by a front-desk dispatch and switch to it: now that chat goes through the front desk,
+     * text typed in a top-level conversation first goes to the front desk (a real model) which then dispatches work; what is
+     * tested here is how a task itself is drawn on the conversation page (steps, small window, result, usage, parallelism), so
+     * typing in the child conversation hands text straight to the task and the scripted model answers. The child marker is
+     * written through a different store: its front-desk conversation was never saved, so the child is still listed as usual
+     * (the same as when the front-desk conversation was not saved after a restart).
+     */
+    private fun openTaskConversation(): String {
+        val id = ConversationStore.shared(context).newConversation()
+        ConversationStore(context).setDeskParent(id, "desk-test-parent-$id")
+        compose.runOnUiThread { vm.openConversation(id) }
+        compose.waitUntil(5_000) { vm.ui.value.conversationId == id }
+        compose.waitForIdle()
+        return id
+    }
+
     private fun awaitState(predicate: (TaskState) -> Boolean): TaskState =
         pollUntil(15_000) { DeviceTaskState.state.value.takeIf(predicate) } ?: error("state never matched: ${DeviceTaskState.state.value}")
 
@@ -164,7 +181,9 @@ class ChatScreenDeviceTest {
         }
         fun close() = compose.onNodeWithTag("close-conversation-usage").performClick()
         // The user's configured start page can be Personal or onboarding. Open this chat via its normal entry point.
+        // What is measured is the task's usage: send from the child conversation the front desk dispatched, where text goes straight to the task (see openTaskConversation)
         val id = ConversationStore.shared(context).newConversation()
+        ConversationStore(context).setDeskParent(id, "desk-test-parent-$id")
         compose.runOnUiThread {
             val intent = android.content.Intent(compose.activity.intent).putExtra(MainActivity.EXTRA_OPEN_CONVERSATION, id)
             InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(compose.activity, intent)
@@ -199,6 +218,7 @@ class ChatScreenDeviceTest {
     fun runsTaskWithStepsPipAndResult() {
         shot("01-idle")
 
+        openTaskConversation()
         compose.typeAndSend("打开设置看看电池")
         if (vm.ui.value.blocked != null) {
             // This phone has no model configured etc.: screenshot the blocking notice too, then bypass the check and run with the scripted model
@@ -354,16 +374,13 @@ class ChatScreenDeviceTest {
         val firstStarted = AtomicBoolean(false)
         testTasks.modelFactory = { _, _ -> if (firstStarted.get()) models[1] else models[0] }
         try {
+            val first = openTaskConversation()
             compose.runOnUiThread { assertTrue(vm.send("第一个任务", anyway)) }
             assertEquals(1, models[0].awaitCall().number)
             firstStarted.set(true)
-            val first = vm.ui.value.conversationId
-            compose.runOnUiThread {
-                vm.newConversation()
-                assertTrue(vm.send("第二个任务", anyway))
-            }
+            val second = openTaskConversation()
+            compose.runOnUiThread { assertTrue(vm.send("第二个任务", anyway)) }
             assertEquals(1, models[1].awaitCall().number)
-            val second = vm.ui.value.conversationId
             assertTrue(first != second)
 
             compose.onNodeWithContentDescription("菜单").performClick()

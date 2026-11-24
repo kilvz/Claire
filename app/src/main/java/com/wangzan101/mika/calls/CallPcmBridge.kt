@@ -1,6 +1,7 @@
 package com.wangzan101.mika.calls
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -37,6 +38,8 @@ internal class CallPcmBridge(
         commitFarewell: () -> Boolean = { false },
         sendDtmf: suspend (String) -> CallDtmfResult = { CallDtmfResult.rejected("unavailable", it.length) },
         onStage: (CallVoiceStage) -> Unit = {},
+        /** Tools other than keypad dialing go to the phone front desk ([PhoneDesk.execute]); without a front desk everything is unsupported. */
+        desk: (suspend (String, JsonObject) -> JsonObject)? = null,
     ): Unit = coroutineScope {
         var stage = CallVoiceStage.Listening
         val playbackQueue = CallPlaybackQueue()
@@ -168,6 +171,17 @@ internal class CallPcmBridge(
                                 // A function request invalidates any pending natural-hangup candidate.
                                 cancelFarewellWaiter()
                                 farewell.cancelCandidate()
+                                if (callToolRoute(event.name) == CallToolRoute.Desk) {
+                                    // Front desk tools return immediately (asking the owner does not wait for a reply), so they also run alongside without blocking audio
+                                    launch {
+                                        val result = try {
+                                            desk?.invoke(event.name, event.arguments) ?: buildJsonObject { put("status", "unsupported") }
+                                        } catch (cancelled: CancellationException) { throw cancelled }
+                                        catch (_: Exception) { buildJsonObject { put("status", "failed") } }
+                                        if (!session.sendToolResult(event.callId, result)) throw CallMediaFailure("The phone front desk result could not be sent back; control returned to the system")
+                                    }
+                                    return@collect
+                                }
                                 val digits = event.arguments["digits"]?.jsonPrimitive?.content.orEmpty()
                                 fun reply(result: CallDtmfResult) {
                                     if (!session.sendToolResult(event.callId, buildJsonObject {
@@ -178,7 +192,7 @@ internal class CallPcmBridge(
                                         put("next", "Wait for the next phone prompt; never retry uncertain or partial input automatically.")
                                     })) throw CallMediaFailure("The keypress result could not be returned; control was handed back to the system")
                                 }
-                                if (event.name != "send_dtmf" || digits.isEmpty() || digits.length > 32 ||
+                                if (digits.isEmpty() || digits.length > 32 ||
                                     digits.any { it !in "0123456789*#" }) {
                                     reply(CallDtmfResult.rejected("invalid_digits"))
                                 } else if (toolJob?.isActive == true) {
@@ -223,6 +237,12 @@ internal class CallPcmBridge(
         }
     }
 }
+
+/** Who receives tools the model calls during a call: keypad dialing is handled by the bridge itself; everything else (asking the owner, invented or non-call names) goes to the phone front desk. */
+internal enum class CallToolRoute { Dtmf, Desk }
+
+internal fun callToolRoute(name: String): CallToolRoute =
+    if (name == VolcRealtimeProtocol.DTMF_FUNCTION) CallToolRoute.Dtmf else CallToolRoute.Desk
 
 /** No suspension between checking for cancellation and committing on the call dispatcher. */
 internal suspend fun commitDrainedFarewell(commit: () -> Boolean): Boolean {

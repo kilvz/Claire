@@ -1,11 +1,25 @@
 package com.wangzan101.mika.voicecall.ui
 
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
 import android.text.format.DateFormat
 import android.view.View
 import android.view.ViewParent
 import android.view.Window
 import android.view.WindowManager
 import androidx.compose.animation.animateContentSize
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.delay
+import com.wangzan101.mika.capsule.sameFrame
+import com.wangzan101.mika.capsule.previewFrames
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -88,30 +103,43 @@ import com.wangzan101.mika.voicecall.VoiceCallFeedItem
 import com.wangzan101.mika.voicecall.VoiceCallState
 import com.wangzan101.mika.voicecall.VoiceCallTurn
 import com.wangzan101.mika.voicecall.voiceCallStatusText
+import com.wangzan101.mika.chat.ConversationCall
+import com.wangzan101.mika.chat.ui.callTime
 import kotlin.math.abs
 import kotlin.math.sin
 
 /**
- * The voice call page: a call is just a conversation. A full-screen Dialog (neither the back key nor tapping outside dismisses it), following the app's light/dark theme and accent color.
+ * Voice call page: holds only this call (the whole conversation is on the chat page, where each line said during the call is also listed). One page in the page stack, following the app's light/dark theme and accent color.
  *
- * Top bar: collapse ⌄ + a small dotted ball (shape follows the state) + "In a call with Claire" and a status phrase (listening to you / thinking / Claire speaking /
- * working on it / muted; terminal states show the end or error text). In the middle is the conversation feed: what you said and what Claire said become bubbles in real time (half-spoken ones are translucent),
- * tasks are step cards, errors are cards with "retry", and while nobody has spoken yet a big ball sits in the center. The bottom console: level bars + mute / type /
- * hang up (with a timer) / speakerphone; after the call ends the console is replaced by "back to chat".
+ * Top bar: collapse ⌄ + a small dotted sphere (shape follows the state) + "In call with Claire" and one status line (listening to you / thinking / Claire speaking /
+ * working on it / muted; in a terminal state it is the end or error text). The middle is the conversation feed: what you and Claire say becomes live bubbles (translucent while mid-utterance),
+ * jobs are step cards, errors are cards with "Retry", and a big sphere sits centered until anyone speaks. The bottom console: a sound-wave bar + mute / type /
+ * hang up (with timer) / speakerphone; after the call it becomes "Back to chat". Call history and call settings are entered from the ⋯ at the top right of the chat page.
  *
  * The page only reads the various state flows inside [VoiceCallHolder] and does not depend on the foreground service being present (see [VoiceCallController]).
  */
 @Composable
-fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
-    CallDialog {
+fun VoiceCallPage(
+    call: VoiceCallHolder,
+    onCollapse: () -> Unit,
+    onOpenTask: (VoiceCallFeedItem.Task) -> Unit = {},
+    /** This conversation's call records, including this call. */
+    calls: List<ConversationCall> = emptyList(),
+    /** A call history entry was tapped (or "Last call" at the top of the page): jump to the start of that call in chat. */
+    onOpenRecord: (callId: String) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val last = calls.lastOrNull { it.id != call.callId }
+    Box(Modifier.fillMaxSize()) {
         val session = call.session
         val state by session.state.collectAsState()
         val turn by session.turn.collectAsState()
         val muted by session.muted.collectAsState()
         val micLevel by session.micLevel.collectAsState()
         val speakerLevel by session.speakerLevel.collectAsState()
-        val busy by call.route.busy.collectAsState()
+        val busy by call.busy.collectAsState()
         val items by call.feed.items.collectAsState()
+        val screens by call.screens.collectAsState()
         val device by call.audioRoute.route.collectAsState()
         val clock = rememberCallClock(state)
         val startedAt = rememberStartedAt(state)
@@ -142,6 +170,7 @@ fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
                 else -> c.ink3
             },
         ) {
+            WatchedScreen(call, items, screens)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 CallFeed(
                     items = items,
@@ -149,6 +178,10 @@ fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
                     failedText = (state as? VoiceCallState.Failed)?.let { voiceCallStatusText(it) },
                     endedText = (state as? VoiceCallState.Ended)?.let { stringResource(R.string.voicecall_ended_after, voiceCallStatusText(it), clock) },
                     onRetry = session::retry,
+                    screens = screens,
+                    onOpenTask = onOpenTask,
+                    onWatch = { call.watching = it },
+                    lastCall = last?.let { stringResource(R.string.voicecall_last_call, callTime(context, it.startMs)) to { onOpenRecord(it.id) } },
                 )
                 // Nobody has spoken yet: put a big ball in the center so the page is not empty
                 if (items.isEmpty() && state !is VoiceCallState.Failed && state !is VoiceCallState.Ended) {
@@ -315,6 +348,11 @@ private fun CallFeed(
     failedText: String?,
     endedText: String?,
     onRetry: () -> Unit,
+    screens: Set<String> = emptySet(),
+    onOpenTask: (VoiceCallFeedItem.Task) -> Unit = {},
+    onWatch: (String) -> Unit = {},
+    /** The text of the small "Last call · 9:20 ›" line at the top of the page and what tapping it does; null when this conversation has had no other calls. */
+    lastCall: Pair<String, () -> Unit>? = null,
 ) {
     val list = rememberLazyListState()
     val lastText = (items.lastOrNull() as? VoiceCallFeedItem.Said)?.text
@@ -331,18 +369,34 @@ private fun CallFeed(
             contentPadding = PaddingValues(horizontal = MikaSpace.Page, vertical = MikaSpace.S12),
             verticalArrangement = Arrangement.spacedBy(MikaSpace.S8),
         ) {
+            // Only this call: from the "Connected" row down; earlier ones are on the chat page and in "Call history"
+            if (lastCall != null) item("last-call") { LastCallLink(lastCall.first, lastCall.second) }
             if (startedAt != null) item("connected") {
                 SystemPill(stringResource(R.string.voicecall_connected_at, DateFormat.getTimeFormat(context).format(startedAt)))
             }
             items(items, key = { it.id }) { item ->
                 when (item) {
                     is VoiceCallFeedItem.Said -> SaidBubble(item, bubbleMax)
-                    is VoiceCallFeedItem.Task -> TaskCard(item)
+                    is VoiceCallFeedItem.Task -> TaskCard(item, hasScreen = item.running && item.taskId in screens, onOpen = { onOpenTask(item) }, onWatch = { onWatch(item.taskId) })
                 }
             }
             if (failedText != null) item("failed") { FailedCard(failedText, onRetry) }
             if (endedText != null) item("ended") { SystemPill(endedText) }
         }
+    }
+}
+
+/** A row of small, light text at the top of the page: "Last call · 9:20 ›"; tapping jumps to that stretch in chat. */
+@Composable
+private fun LastCallLink(text: String, onClick: () -> Unit) {
+    val c = MikaTheme.colors
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text(
+            "$text ›",
+            Modifier.clip(MikaShapes.Chip).clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 4.dp).testTag("voicecall-last-call"),
+            style = MikaType.Hint, color = c.accent,
+        )
     }
 }
 
@@ -364,7 +418,7 @@ private fun SaidBubble(item: VoiceCallFeedItem.Said, max: androidx.compose.ui.un
     val mine = item.speaker == VoiceCallFeedItem.Speaker.User
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         val shape = if (mine) MikaShapes.UserBubble else MikaShapes.AnswerBubble
-        val base = Modifier.widthIn(max = max).alpha(if (item.partial) 0.6f else 1f).animateContentSize()
+        val base = Modifier.widthIn(max = max).alpha(if (item.partial) PARTIAL_ALPHA else 1f).animateContentSize()
         if (mine) {
             // What you said/typed is shown as-is
             Text(
@@ -383,21 +437,70 @@ private fun SaidBubble(item: VoiceCallFeedItem.Said, max: androidx.compose.ui.un
     }
 }
 
-/** Task step card: earlier steps are all checked; the last step spins while running and gets a check when done. */
+/**
+ * One task dispatched by the front desk: its title and current phase, with earlier steps checked; the last step spins while running and gets a check when done.
+ * Only the newest [VISIBLE_STEPS] steps are shown when there are more, and earlier ones can be scrolled up inside the card; new progress scrolls back to the bottom automatically.
+ * Tapping opens this task's "run details" (the call shrinks to a ball and keeps going); while it is running and has a picture, a "View screen" is added, and tapping it shows the picture on the call page.
+ */
 @Composable
-private fun TaskCard(item: VoiceCallFeedItem.Task) {
+private fun TaskCard(item: VoiceCallFeedItem.Task, hasScreen: Boolean, onOpen: () -> Unit, onWatch: () -> Unit) {
     val c = MikaTheme.colors
     Column(
-        Modifier.fillMaxWidth().background(c.surface, MikaShapes.Card).border(1.dp, c.hair, MikaShapes.Card)
+        Modifier.fillMaxWidth().clip(MikaShapes.Card)
+            .background(c.surface, MikaShapes.Card).border(1.dp, c.hair, MikaShapes.Card)
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.voicecall_task_open), onClick = onOpen)
             .padding(horizontal = 14.dp, vertical = 12.dp).animateContentSize().testTag("voicecall-task"),
     ) {
-        Text(
-            stringResource(if (item.running) R.string.voicecall_task_running else R.string.voicecall_task_done),
-            style = MikaType.Label, color = c.ink2,
-        )
-        item.steps.forEachIndexed { index, step ->
-            val running = item.running && index == item.steps.lastIndex
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    item.title, style = MikaType.Label, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    stringResource(phaseText(item.phase)), style = MikaType.Label, color = c.ink2,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            if (hasScreen) {
+                Row(
+                    Modifier.padding(start = 8.dp).clip(MikaShapes.Chip).background(c.accent.copy(alpha = 0.12f), MikaShapes.Chip)
+                        .clickable(role = Role.Button, onClick = onWatch)
+                        .padding(horizontal = 8.dp, vertical = 3.dp).testTag("voicecall-task-screen"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(MikaIcons.Screens, null, Modifier.size(13.dp), tint = c.accent)
+                    Text(stringResource(R.string.voicecall_task_screen), Modifier.padding(start = 4.dp), style = MikaType.Hint, color = c.accent)
+                }
+            }
+            Icon(MikaIcons.Chevron, null, Modifier.padding(start = 6.dp).size(14.dp), tint = c.ink3)
+        }
+        TaskSteps(item)
+    }
+}
+
+/** Steps inside the card: with more than [VISIBLE_STEPS] the window is only as tall as the newest few, scrollable inside; new progress scrolls to the bottom. */
+@Composable
+private fun TaskSteps(item: VoiceCallFeedItem.Task) {
+    val c = MikaTheme.colors
+    val steps = item.steps
+    if (steps.isEmpty()) return
+    val scroll = rememberScrollState()
+    val heights = remember(item.taskId) { mutableStateMapOf<Int, Int>() }
+    val density = LocalDensity.current
+    val windowed = steps.size > VISIBLE_STEPS
+    val window = if (windowed) {
+        val tail = (steps.size - VISIBLE_STEPS until steps.size).map { heights[it] }
+        if (tail.all { it != null }) with(density) { tail.sumOf { it ?: 0 }.toDp() } else null
+    } else null
+    LaunchedEffect(steps.size, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    Column(
+        (if (windowed) Modifier.then(if (window != null) Modifier.height(window) else Modifier.heightIn(max = STEPS_WINDOW_FALLBACK)).verticalScroll(scroll) else Modifier)
+            .fillMaxWidth().testTag("voicecall-task-steps"),
+    ) {
+        steps.forEachIndexed { index, step ->
+            val running = item.running && index == steps.lastIndex
+            Row(Modifier.onSizeChanged { heights[index] = it.height }.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
                     if (running) {
                         CircularProgressIndicator(Modifier.size(14.dp), color = c.accent, strokeWidth = 2.dp)
@@ -667,3 +770,82 @@ fun VoiceCallGate(
         }
     }
 }
+
+/** The few phase words on a task card. */
+private fun phaseText(phase: DeskTaskPhase): Int = when (phase) {
+    DeskTaskPhase.Running, DeskTaskPhase.Queued -> R.string.voicecall_task_running
+    DeskTaskPhase.NeedsYou -> R.string.voicecall_see_task_page
+    DeskTaskPhase.Done -> R.string.voicecall_task_done
+    DeskTaskPhase.Failed -> R.string.voicecall_task_failed
+    DeskTaskPhase.Cancelled -> R.string.voicecall_task_cancelled
+}
+
+/** Content that existed before the call opened (and mid-utterance text) is drawn fainter, separating it from what was said in this call. */
+private const val PARTIAL_ALPHA = 0.6f
+
+/** How many steps a task card normally shows. */
+private const val VISIBLE_STEPS = 2
+
+/** Until the height of the newest few steps is measured, the step window starts at this height. */
+private val STEPS_WINDOW_FALLBACK = 64.dp
+
+/** The watched task lost its picture (finished, screen released); the panel stays on the last frame this long before collapsing. */
+private const val SCREEN_LINGER_MS = 2_000L
+
+/**
+ * The virtual screen panel above the call page: it appears only after the user taps "View screen" on a task card and is view-only;
+ * its title is that task and × closes it. When that task loses its picture, it stays on the last frame for [SCREEN_LINGER_MS] and then collapses by itself.
+ */
+@Composable
+private fun WatchedScreen(call: VoiceCallHolder, items: List<VoiceCallFeedItem>, screens: Set<String>) {
+    val watching = call.watching ?: return
+    val source = remember(watching) { call.frames(watching) }
+    val live = watching in screens && source != null
+    LaunchedEffect(watching, live) {
+        if (!live) {
+            if (source != null) delay(SCREEN_LINGER_MS)
+            if (call.watching == watching) call.watching = null
+        }
+    }
+    if (source == null) return
+    val c = MikaTheme.colors
+    val title = items.filterIsInstance<VoiceCallFeedItem.Task>().firstOrNull { it.taskId == watching }?.title.orEmpty()
+    val frames = remember(source) { source.filterNotNull().previewFrames(same = ::sameFrame) }
+    val frame by frames.collectAsState(initial = null)
+    Column(
+        Modifier.fillMaxWidth().padding(start = MikaSpace.Page, end = MikaSpace.Page, top = MikaSpace.S8)
+            .clip(MikaShapes.Card).background(c.surface, MikaShapes.Card).border(1.dp, c.hair, MikaShapes.Card)
+            .testTag("voicecall-screen-panel"),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(MikaIcons.Screens, null, Modifier.size(14.dp), tint = c.accent)
+            Text(
+                title, Modifier.weight(1f).padding(start = 6.dp), style = MikaType.Label, color = c.ink,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Box(
+                Modifier.size(MikaSize.IconButton).clip(CircleShape)
+                    .clickable(onClickLabel = stringResource(R.string.voicecall_screen_close)) { call.watching = null }
+                    .testTag("voicecall-screen-close"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(MikaIcons.Close, stringResource(R.string.voicecall_screen_close), Modifier.size(16.dp), tint = c.ink2)
+            }
+        }
+        Box(
+            Modifier.fillMaxWidth().height(SCREEN_PANEL_HEIGHT).padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                .clip(MikaShapes.Tile).background(c.fill),
+            contentAlignment = Alignment.Center,
+        ) {
+            val bmp = frame
+            if (bmp == null) {
+                CircularProgressIndicator(Modifier.size(20.dp), color = c.accent, strokeWidth = 2.dp)
+            } else {
+                Image(bmp.asImageBitmap(), title, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            }
+        }
+    }
+}
+
+/** The height of the picture in the virtual screen panel on the call page. */
+private val SCREEN_PANEL_HEIGHT = 260.dp

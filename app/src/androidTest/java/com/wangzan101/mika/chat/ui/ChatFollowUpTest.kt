@@ -24,22 +24,20 @@ class ChatFollowUpTest {
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun trayShowsMessagesAndGuidesTheSelectedOne() {
-        val actions = mutableListOf<String>()
+    // Now that chat goes through the front desk, additions are relayed by the front desk and queued messages no longer show a "guide" arrow
+    @Test fun trayShowsMessagesWithoutAGuideArrow() {
         compose.setContent {
             MikaTheme {
                 FollowUpTray(
                     listOf(QueuedFollowUp("a", "c", "下一件"), QueuedFollowUp("b", "c", "再下一件")),
-                    active = true, onGuide = { actions += "guide:$it" },
-                    onEdit = {}, onCancel = {}, onStartNow = {},
+                    active = true, onEdit = {}, onCancel = {}, onStartNow = {},
                 )
             }
         }
         compose.onNodeWithText("下一件").assertIsDisplayed()
         compose.onNodeWithText("再下一件").assertIsDisplayed()
         compose.onNodeWithTag("follow-up-tray").assertIsDisplayed()
-        compose.onAllNodesWithTag("follow-up-steer")[0].performClick()
-        compose.runOnIdle { assertEquals(listOf("guide:a"), actions) }
+        assertEquals(0, compose.onAllNodesWithTag("follow-up-steer").fetchSemanticsNodes().size)
     }
 
     @Test fun longPressingAMessageOpensItsActions() {

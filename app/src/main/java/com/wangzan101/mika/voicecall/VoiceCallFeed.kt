@@ -1,27 +1,46 @@
 package com.wangzan101.mika.voicecall
 
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
+import com.wangzan101.mika.core.frontdesk.DeskTaskView
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** One entry in the call page's conversation feed: a sentence (you/Claire, the half-spoken one is partial), or a task step card. */
+/**
+ * One item in the call page's conversation feed: a line of speech (you or Claire; partial when mid-utterance), or a job step card.
+ * The call page only holds this call; the whole conversation lives on the chat page, and earlier calls are in "Call history".
+ */
 sealed interface VoiceCallFeedItem {
     val id: Long
 
-    data class Said(override val id: Long, val speaker: Speaker, val text: String, val partial: Boolean) : VoiceCallFeedItem
+    data class Said(
+        override val id: Long,
+        val speaker: Speaker,
+        val text: String,
+        val partial: Boolean,
+    ) : VoiceCallFeedItem
 
-    /** One task run: steps are ordered by appearance, the last one is the current step; when [running] is false it has finished (success is judged by the last step's wording). */
-    data class Task(override val id: Long, val steps: List<String>, val running: Boolean) : VoiceCallFeedItem
+    /** One task dispatched by the front desk: steps in the order they appeared, the last being the current one; [phase] is the task's current phase. */
+    data class Task(
+        override val id: Long,
+        val taskId: String,
+        val title: String,
+        val steps: List<String>,
+        val phase: DeskTaskPhase,
+    ) : VoiceCallFeedItem {
+        /** Not finished yet (running, queued, or needing you). */
+        val running: Boolean get() = phase == DeskTaskPhase.Running || phase == DeskTaskPhase.Queued || phase == DeskTaskPhase.NeedsYou
+    }
 
     enum class Speaker { User, Mika }
 }
 
 /**
- * The call page's conversation feed: lays out the session transcript (including half-spoken parts) and the route's task status in one column, for the page to draw bubbles directly.
- * Display only, no storage (writing back to the chat is [VoiceCallTranscript]'s job). The callbacks may come from different threads, so it locks internally.
+ * The call page's conversation feed: lays out the conversation transcript (including mid-utterance text) and the tasks dispatched by the front desk in one column for the page to draw bubbles directly.
+ * Display only; it writes nothing (writing back to chat is [VoiceCallTranscript]'s job). Callbacks may come from different threads, so it locks internally.
  *
- * - What you said: partial segments replace the same entry, final settles it.
- * - What Claire said: drafts replace the same entry piece by piece, final (or the non-final one when interrupted) settles it.
- * - Tasks: a card is opened when the route becomes busy, then each new status line adds a step, and the card is closed when busy drops.
+ * - What you said: a partial segment replaces the same line, a final one settles it.
+ * - What Claire said: a draft replaces the same line segment by segment, and the final (or non-final when interrupted) settles it.
+ * - Jobs: one card per task dispatched by the front desk, see [onTasks].
  */
 class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
     private val _items = MutableStateFlow<List<VoiceCallFeedItem>>(emptyList())
@@ -29,8 +48,9 @@ class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
 
     private val lock = Any()
     private var nextId = 0L
-    private var openTaskId: Long? = null
-    private var taskBaseline: List<String> = emptyList()
+    /** Task ids already finished when the task board was first received (dispatched earlier, so no card); null before it has been received. */
+    private var ignored: Set<String>? = null
+    private fun steps(view: DeskTaskView) = (view.recent + listOfNotNull(view.line)).distinct()
 
     fun onUser(text: String, isFinal: Boolean) = said(VoiceCallFeedItem.Speaker.User, text, partial = !isFinal)
 
@@ -40,33 +60,31 @@ class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
     @Suppress("UNUSED_PARAMETER")
     fun onAssistant(text: String, isFinal: Boolean) = said(VoiceCallFeedItem.Speaker.Mika, text, partial = false)
 
-    /** The route's task status: [busy] whether a task is running, [lines] the route's scrolling status lines (newest last). */
-    fun onTask(busy: Boolean, lines: List<String>) = synchronized(lock) {
-        val open = openTaskId
-        if (open == null) {
-            if (!busy) return@synchronized
-            // The status lines at card-opening time are left over from the previous task and do not count as this run's steps
-            taskBaseline = lines
-            val id = nextId++
-            openTaskId = id
-            publish(_items.value + VoiceCallFeedItem.Task(id, emptyList(), running = true))
-            return@synchronized
+    /**
+     * This conversation's task board for the call: one card per task (by task id), appended to the end of the feed when it first appears,
+     * then each new progress line adds a step and the phase follows. Anything already finished when first received is an older task and gets no card.
+     */
+    fun onTasks(views: List<DeskTaskView>) {
+        synchronized(lock) {
+            val baseline = ignored ?: views.filter { it.state in ENDED }.map { it.taskId }.toSet().also { ignored = it }
+            var current = _items.value
+            // Cards already shown in this call keep updating; ones with no card that are already finished are older and get none
+            for (view in views.filter { it.taskId !in baseline || hasCard(current, it.taskId) }) current = withTask(current, view)
+            if (current !== _items.value) publish(current)
         }
-        var current = _items.value
-        val latest = lines.lastOrNull()
-        if (lines != taskBaseline && latest != null) {
-            taskBaseline = lines
-            current = current.map { item ->
-                if (item is VoiceCallFeedItem.Task && item.id == open && item.steps.lastOrNull() != latest) {
-                    item.copy(steps = item.steps + latest)
-                } else item
-            }
-        }
-        if (!busy) {
-            openTaskId = null
-            current = current.map { if (it is VoiceCallFeedItem.Task && it.id == open) it.copy(running = false) else it }
-        }
-        publish(current)
+    }
+
+    private fun hasCard(current: List<VoiceCallFeedItem>, taskId: String) =
+        current.any { it is VoiceCallFeedItem.Task && it.taskId == taskId }
+
+    private fun withTask(current: List<VoiceCallFeedItem>, view: DeskTaskView): List<VoiceCallFeedItem> {
+        val seen = steps(view)
+        val index = current.indexOfFirst { it is VoiceCallFeedItem.Task && it.taskId == view.taskId }
+        if (index < 0) return current + VoiceCallFeedItem.Task(nextId++, view.taskId, view.title, seen, view.state)
+        val card = current[index] as VoiceCallFeedItem.Task
+        val steps = card.steps + seen.filter { it !in card.steps }
+        if (steps == card.steps && view.state == card.phase) return current
+        return current.toMutableList().also { it[index] = card.copy(steps = steps, phase = view.state) }
     }
 
     private fun said(speaker: VoiceCallFeedItem.Speaker, text: String, partial: Boolean) {
@@ -86,11 +104,14 @@ class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
         }
     }
 
+    /** Beyond [maxItems] items only the newest are kept (every one is fully on the chat page). */
     private fun publish(items: List<VoiceCallFeedItem>) {
         _items.value = if (items.size > maxItems) items.takeLast(maxItems) else items
     }
 
     companion object {
         const val MAX_ITEMS = 80
+
+        private val ENDED = setOf(DeskTaskPhase.Done, DeskTaskPhase.Failed, DeskTaskPhase.Cancelled)
     }
 }

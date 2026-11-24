@@ -2,6 +2,7 @@ package com.wangzan101.mika.capsule
 
 import org.junit.Rule
 import com.wangzan101.mika.i18n.ChineseTexts
+import com.wangzan101.mika.core.agent.DeskTurn
 import com.wangzan101.mika.core.agent.FailKind
 import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.agent.Turn
@@ -64,7 +65,24 @@ class CapsuleThreadTest {
         assertEquals(listOf("你:算一下", "注:没办成", "答:模型没回", "你:写首诗", "你:短一点", "注:已停止"), texts(CapsuleThreads.build(past, 10, emptyList())))
     }
 
-    // For a stopped turn, the wrap-up follows the "stopped" line; while the wrap-up is still being written it reads "tidying up what was done…"
+    // A stopped turn: the line below "Stopped" is the handoff; while the handoff is still being written it shows "Organizing what was done…"
+    @Test fun deskRepliesAndReportsReadAsRepliesNotFailures() {
+        // Desk replies and desk reports are normal replies; the report turn has no user message, so no user bubble is drawn; a turn that only dispatched a task without replying leaves no empty answer
+        val past = listOf(
+            PastTurn(turn("帮我查下天气", "好,我让后台去查", status = DeskTurn.STATUS, runId = "desk:1")),
+            PastTurn(turn("", "天气查好了:晴", status = DeskTurn.REPORT_STATUS, runId = "desk:2")),
+            PastTurn(turn("再订个闹钟", "", status = DeskTurn.STATUS, runId = "desk:3")),
+        )
+        val t = CapsuleThreads.build(past, 10, emptyList())
+        assertEquals(listOf("你:帮我查下天气", "答:好,我让后台去查", "答:天气查好了:晴", "你:再订个闹钟"), texts(t))
+        assertTrue(t.items.none { it is ThreadItem.Note })
+    }
+
+    @Test fun deskTurnThatCouldNotReplyShowsItsReason() {
+        val failed = Turn("看看这个文件", "", DeskTurn.STATUS, note = "文件没准备好", runId = "desk:1")
+        assertEquals(listOf("你:看看这个文件", "注:没办成", "答:文件没准备好"), texts(CapsuleThreads.build(listOf(PastTurn(failed)), 10, emptyList())))
+    }
+
     @Test fun stoppedTurnShowsItsSummaryUnderTheNote() {
         val past = listOf(
             PastTurn(turn("看设置", "停止前看完了网络、蓝牙;显示、声音还没看。", status = "cancelled", runId = "r1"), places = listOf("设置")),

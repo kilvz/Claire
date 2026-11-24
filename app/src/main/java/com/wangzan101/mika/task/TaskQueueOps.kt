@@ -1,5 +1,6 @@
 package com.wangzan101.mika.task
 
+import com.wangzan101.mika.MikaApp
 import com.wangzan101.mika.i18n.tr
 import android.app.ActivityManager
 import android.os.Build
@@ -28,11 +29,25 @@ internal fun TaskService.localDeliveryChannel(scheduled: Boolean) = LocalChannel
         center.byConversation(delivery.threadId)?.let(::refreshNotifications)
         SendOutcome.Delivered
     } else {
-        val resultId = if (delivery is Delivery.Result && center.byConversation(delivery.threadId)?.parallel == false) ID_RESULT
-            else nextResultId()
-        notifyDelivery(this, delivery, resultId, scheduled)
+        val run = center.byConversation(delivery.threadId)
+        val resultId = if (delivery is Delivery.Result && run?.parallel == false) ID_RESULT else nextResultId()
+        val own = delivery !is Delivery.Result ||
+            ownResultNotice(delivery, run?.key, run?.state?.value ?: TaskState.Idle, (application as MikaApp).deskReportsEnding)
+        notifyDelivery(this, delivery, resultId, scheduled, ownResult = own)
     }
 }
+
+/**
+ * Whether a task sends its own "Task complete" notification when it finishes: when run [runKey] wraps up with [end] and a front desk is currently following it and will speak that outcome
+ * ([deskReportsEnding]), nothing is sent and the front desk's line is the only voice; ones redelivered after the process died ([Delivery.Result.restored]) and
+ * ones whose run cannot be found send their own as in every other case.
+ */
+internal fun ownResultNotice(
+    delivery: Delivery.Result,
+    runKey: String?,
+    end: TaskState,
+    deskReportsEnding: (runKey: String, end: TaskState) -> Boolean,
+): Boolean = delivery.restored || runKey == null || !deskReportsEnding(runKey, end)
 
 internal fun TaskService.limit(): ParallelLimit {
     if (!parallel) return ParallelLimit(1, null)

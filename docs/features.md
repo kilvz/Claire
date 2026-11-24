@@ -91,6 +91,19 @@ Any app installed on your phone works, with no per-app integration: Mika looks a
 
 - Remembers facts, preferences and ways of doing things that you state explicitly (ways of doing things need your approval). You can view, edit and delete them. It only learns from what you yourself say, and never stores passwords, verification codes, card numbers and the like. Memory is stored encrypted on the phone.
 
+## Front desk: talk while work runs, interrupt or stop anytime
+
+- In the conversation page and on voice calls, Claire's front desk is what answers first: it replies in a sentence or two, and hands anything that needs hands-on work (opening an app, looking something up online, operating the phone, sending a message) to the background, attached as a task card under this turn; while a task is being done you can keep chatting about something else.
+- While a task is running, just say it: to add to or correct the request, the front desk passes it to that task; ask “how far has it got” and the front desk answers from what the task card actually says, without inventing progress; when a task asks you something, one reply is passed on; say to drop it and that task stops. What goes to the background is the whole sentence you said, which the front desk does not rewrite; unless it heard you speak, it never dispatches work, answers or stops a task on your behalf.
+- One sentence can dispatch several things at once; ones over the parallel limit queue, and start automatically as the earlier ones finish.
+- When you leave the conversation page, a task starting, needing your attention and its result are written back into that conversation, with progress kept to the latest line only; finishing or failing sends a notification.
+- Which model the front desk uses is chosen as the lightweight model or the main model under “Think” in Settings › Models › Voice › Call mode, and both chat and calls follow it; with no lightweight model configured it uses the main model.
+- Typing in a task's own conversation is speaking to that task directly: Claire reads it before its next step.
+- Every step in the chat can be opened to see exactly what it tapped or typed and how that turned out.
+- “View process” works while the task is still running; new steps keep arriving as it goes.
+- Long-press a message sent during a task that the model has not handled yet to withdraw it or take it back for editing; editing keeps its quote, and is not offered when the composer already has a draft; a message that carries a screen or text selected on a web page cannot be edited.
+- When you press stop, Claire adds a short wrap-up: what it did, what it saw, how many times it sent something, and what is left. Say “continue” next time and it knows where to pick up.
+
 ## Faster and steadier on familiar apps and websites
 
 Even without any instructions, Mika can get things done by looking at the screen. For some apps and websites there is extra usage knowledge (where things are, common ways to do things, what to watch out for), which Mika looks up automatically when it needs it, so it takes fewer wrong turns. For example, in a chat app it already knows how to find a contact and scroll through chat history; on a job site it knows how to filter jobs and greet recruiters. There are also general how-to skills for a few kinds of tasks.

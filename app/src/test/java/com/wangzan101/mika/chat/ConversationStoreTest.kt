@@ -27,6 +27,55 @@ import java.io.IOException
 class ConversationStoreTest {
     @get:Rule val tmp = TemporaryFolder()
 
+    // Background task ids dispatched by the front desk are stored with that round and read back unchanged; older records without this field read as empty
+    @Test fun turnTasksRoundTrip() {
+        val dir = tmp.newFolder()
+        val store = ConversationStore(dir)
+        val turn = Turn("帮我订票", "好的,在办", "succeeded", atMs = 1, deskTasks = listOf("c1", "c2"))
+        store.append("p", turn)
+        assertEquals(listOf(turn), ConversationStore(dir).turns("p"))
+        File(dir, "old.json").writeText("""[{"userText":"问题","outcome":"结果","status":"succeeded"}]""")
+        assertEquals(emptyList<String>(), ConversationStore(dir).turns("old").single().deskTasks)
+        // No task ids means the field is not written
+        store.append("plain", Turn("问题", "结果", "succeeded"))
+        assertFalse("deskTasks" in File(dir, "plain.json").readText())
+    }
+
+    // A child conversation opened by front-desk dispatch remembers its front-desk conversation and does not appear in the conversation list; deleting the child deletes this link too
+    @Test fun deskChildrenHiddenFromList() {
+        val dir = tmp.newFolder()
+        val store = ConversationStore(dir)
+        store.append("p", Turn("帮我订票", "在办", "succeeded"))
+        store.append("c1", Turn("订明早的票", "订好了", "succeeded"))
+        assertNull(store.deskParent("c1"))
+        store.setDeskParent("c1", "p")
+        assertEquals("p", store.deskParent("c1"))
+        assertEquals("p", ConversationStore(dir).deskParent("c1"))
+        assertEquals(listOf("p"), ConversationStore(dir).list(includeArchived = true).map { it.id })
+        assertNull(store.deskParent("p"))
+        store.delete("c1")
+        assertFalse(File(dir, "c1.desk_parent").exists())
+    }
+
+    // A child conversation is hidden only while its parent exists: once the parent is deleted (or cannot be found after a restart), the child returns to the list instead of being lost forever
+    @Test fun deskChildShownOnceParentIsGone() {
+        val dir = tmp.newFolder()
+        val store = ConversationStore(dir)
+        store.append("c1", Turn("订明早的票", "订好了", "succeeded"))
+        // The parent's round is not stored yet, but work was just dispatched in this process: still hidden
+        store.setDeskParent("c1", "p")
+        assertEquals(emptyList<String>(), store.list().map { it.id })
+        store.append("p", Turn("帮我订票", "在办", "desk"))
+        assertEquals(listOf("p"), ConversationStore(dir).list().map { it.id })
+        store.delete("p")
+        assertEquals(listOf("c1"), store.list().map { it.id })
+        assertEquals(listOf("c1"), ConversationStore(dir).list().map { it.id })
+        // After a restart the parent was never stored: the child is listed too
+        store.append("c2", Turn("查天气", "晴", "succeeded"))
+        store.setDeskParent("c2", "never-saved")
+        assertTrue("c2" in ConversationStore(dir).list().map { it.id })
+    }
+
     @Test fun failedFileDeletionKeepsHistoryAndAllowsRetry() {
         val dir = tmp.newFolder()
         val store = ConversationStore(dir)
@@ -782,5 +831,29 @@ class ConversationStoreTest {
         assertTrue(store.setProject(branched, null))
         assertNull(store.projectId(branched))
         assertFalse(File(dir, "$branched.project").exists())
+    }
+
+    // Rounds said in a call record which call they belong to; call records replace by id, sort by connect time, survive a reopen, and are deleted with the conversation
+    @Test fun callRecordsRoundTrip() {
+        val dir = tmp.newFolder()
+        val store = ConversationStore(dir)
+        val turn = Turn("几点了", "九点", "desk", atMs = 300, callId = "a")
+        store.append("p", turn)
+        assertEquals("a", ConversationStore(dir).turns("p").single().callId)
+        store.append("plain", Turn("问题", "结果", "succeeded"))
+        assertFalse("callId" in File(dir, "plain.json").readText())
+
+        store.recordCall("p", ConversationCall("b", 500))
+        store.recordCall("p", ConversationCall("a", 200))
+        store.recordCall("p", ConversationCall("a", 200, 400, ConversationCall.END_IDLE, spoke = true))
+        val calls = ConversationStore(dir).calls("p")
+        assertEquals(listOf("a", "b"), calls.map { it.id })
+        assertEquals(400L, calls.first().endMs)
+        assertEquals(ConversationCall.END_IDLE, calls.first().endReason)
+        assertEquals(emptyList<ConversationCall>(), store.calls("plain"))
+
+        store.delete("p")
+        assertEquals(emptyList<ConversationCall>(), ConversationStore(dir).calls("p"))
+        assertFalse(dir.listFiles().orEmpty().any { it.name.endsWith(".calls") })
     }
 }

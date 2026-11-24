@@ -21,8 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import com.wangzan101.mika.ui.theme.MikaTheme
 
-/** Pages in the app. Chat is the root page; everything else is entered from it (or from Settings), and leaving returns to the page you came in from. */
-enum class Route { Chat, Personal, Settings, Memory, Plans, Browser, Files, Run, Source, PhoneSetup, Models, Usage, SpeechModel, VoiceModel, ImageModel, Welcome, ModelSetup, About, License, UpdateMirrors, Screens, Teach, Calls, Report, Playback, Persona, VoiceCatalog, RealtimeVoice, VoiceServices, CallMode }
+/** Pages in the app. The conversation is the root page; everything else is entered from it (or from settings), and back returns to the page it was entered from. */
+enum class Route { Chat, Personal, Settings, Memory, Plans, Browser, Files, Run, Source, PhoneSetup, Models, Usage, SpeechModel, VoiceModel, ImageModel, Welcome, ModelSetup, About, License, UpdateMirrors, Screens, Teach, Calls, Report, Playback, Persona, VoiceCatalog, RealtimeVoice, VoiceServices, CallMode, VoiceCall }
 
 /**
  * Page stack: the bottom is always the Chat page. [push] goes to a page, [back] returns to the previous page (returns false when already on the Chat page, leaving exit to the system).
@@ -67,6 +67,19 @@ class NavStack(initial: List<Route> = listOf(Route.Chat), fromDrawer: Boolean = 
             reopenDrawer = true
         }
         return true
+    }
+
+    /** Bring [route] to the top: if it is already in the stack, pop back to it (closing the pages above); otherwise push it. */
+    fun bringToTop(route: Route) {
+        if (route == Route.Chat) return reset()
+        val at = stack.indexOf(route)
+        stack = if (at < 0) stack + route else stack.take(at + 1)
+    }
+
+    /** [route] leaves the page stack: if it is on top this pops one page, and if it is below the top it is pulled out; it does nothing when not in the stack. */
+    fun leave(route: Route) {
+        if (route == Route.Chat || route !in stack) return
+        if (current == route) back() else stack = stack - route
     }
 
     fun drawerReopened() {

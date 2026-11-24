@@ -63,10 +63,9 @@ import com.wangzan101.mika.settings.ui.models.refresh
 import com.wangzan101.mika.ui.ToolLabels
 
 /**
- * State of the chat screen. The step list comes from things actually done (activities in the run events); the progress
- * line is the model's wording for this step, and only the status is shown while waiting for the model. While a task is
- * running, what is sent from the input field is queued first, and the user then decides whether to steer the current task instead.
- * There is a single instance per process, so a running task's steps are still there when the screen is closed and reopened.
+ * State of the chat UI. The step list comes from what actually ran in the run events (the activity); the progress line is what the model said in this step,
+ * and while waiting for the model only the status is shown. Text sent from the input bar goes to this conversation's front desk (see [DeskChatOps]), and tasks it dispatches run in their own child conversations.
+ * There is one instance for the whole process, so when the UI is closed and reopened the steps of a running task are still there.
  */
 class ChatViewModel(
     internal val scope: CoroutineScope,
@@ -136,7 +135,9 @@ class ChatViewModel(
     internal val activities: StateFlow<List<RunEvent.Activity>> = MutableStateFlow(emptyList()),
     /** Steers the shown task has received, and where they went. */
     internal val steers: StateFlow<List<SteerNote>> = MutableStateFlow(emptyList()),
-    /** The process-wide queue; only items of the current conversation that the service has not claimed yet are taken here. */
+    /** While a call is waiting for the owner to reply, the next message sent in this conversation goes to the call (returns true, without starting a task or interjecting); returns false when not waiting. */
+    internal val ownerAnswer: (conversationId: String, text: String) -> Boolean = { _, _ -> false },
+    /** The process-wide queue; here only items for the current conversation that the service has not taken yet. */
     private val followUps: StateFlow<List<QueuedFollowUp>> = MutableStateFlow(emptyList()),
     /** The runs (run ids) whose write-up is still being written after a stop; that turn shows "organizing what was done…" below it. */
     internal val summarizing: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
@@ -178,6 +179,8 @@ class ChatViewModel(
     internal val projectDeletionImpact: (String) -> ProjectDeleteImpact = { ProjectDeleteImpact(0, 0, 0) },
     internal val removeProject: suspend (String) -> Unit = {},
     internal val workspaceResolver: WorkspaceResolver? = null,
+    /** Chat goes through the front desk: typed text goes to this conversation's front desk and dispatched tasks hang as cards; when absent (tests only) tasks are started directly as before. */
+    desk: DeskChatDeps? = null,
 ) {
     internal val session = ChatSession(this)
     internal val live = ChatLiveFollow(this, session)
@@ -187,6 +190,10 @@ class ChatViewModel(
     internal val drafting = ChatDraftOps(this, session)
     internal val sending = ChatSendOps(this, session)
     internal val noting = ChatNoteOps(this, session)
+    internal val desking: ChatDesk? = desk?.let { ChatDesk(this, session, it) }
+
+    /** The front desk attached to this conversation; null when none is attached or this is a child-task conversation dispatched by the front desk (talk to the task directly as before, see [ChatDesk.handles]). */
+    internal fun deskFor(conversationId: String?): ChatDesk? = desking?.takeIf { it.handles(conversationId) }
     private var autoReadKey by session::autoReadKey
     private val _ui = session._ui
     private val _jump = session._jump
@@ -301,6 +308,7 @@ class ChatViewModel(
             drafts.update { it + (draft.conversationId to ComposerDraft(input = draft.text,
                 attachments = session.sharedAttachments(draft), sharedDraft = draft)) }
         }
+        desking?.start()
         val current = store.currentChat() as? CurrentChat.Open
         val pending = sharedDrafts?.readPending()?.takeIf { current != null && it.conversationId == current.id }
         if (current != null && (current.id in drafts.value || pending != null)) {
@@ -332,6 +340,13 @@ class ChatViewModel(
     fun openWorkflowConversation(conversationId: String) = chats.openWorkflowConversation(conversationId)
     fun openPersonalTask(conversationId: String) = chats.openPersonalTask(conversationId)
     fun openConversationAt(id: String, target: ChatTarget) = chats.openConversationAt(id, target)
+
+    /** The voice call records of this conversation (used by the chat page to draw call start/end lines); empty when there is no conversation. */
+    fun calls(conversationId: String?): kotlinx.coroutines.flow.Flow<List<com.wangzan101.mika.chat.ConversationCall>> =
+        conversationId?.let(store::observeCalls) ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    /** The title each dispatched job's conversation has generated (used by "Work in this conversation"); jobs without one are absent. */
+    suspend fun deskTaskTitles(ids: List<String>): Map<String, String> =
+        kotlinx.coroutines.withContext(io) { ids.mapNotNull { id -> store.title(id)?.let { id to it } }.toMap() }
     fun consumeJump(jump: ChatJump) = chats.consumeJump(jump)
     fun createProject(name: String): Result<Project>? = chats.createProject(name)
     fun renameProject(projectId: String, name: String): Result<Project>? = chats.renameProject(projectId, name)
@@ -362,6 +377,9 @@ class ChatViewModel(
     fun attach(uris: List<String>, conversationId: String? = _ui.value.conversationId) = attaching.attach(uris, conversationId)
     internal fun importDeviceAttachments(conversationId: String, paths: List<String>, copy: suspend (String, String) -> com.wangzan101.mika.core.workspace.DeviceFileImport) = attaching.importDeviceAttachments(conversationId, paths, copy)
     fun libraryTargetConversation(): String = attaching.libraryTargetConversation()
+
+    /** The current conversation's id; for a still-blank new conversation, reserves the next one (the chat page stays on it), for entry points such as calls that need to land in the current conversation. */
+    fun claimConversation(): String = session.draftConversation()
     fun planLibraryAttachments(conversationId: String, sources: List<LibraryFileHandle>): LibraryAddPlan? = attaching.planLibraryAttachments(conversationId, sources)
     fun addLibraryAttachments(conversationId: String, items: List<LibraryStaged>, overLimit: Int = 0): LibraryMergeResult = attaching.addLibraryAttachments(conversationId, items, overLimit)
     fun addLibraryAttachment(conversationId: String, item: PendingAttachment, source: LibraryFileHandle? = null, release: () -> Unit = {}): LibraryAttachmentResult = attaching.addLibraryAttachment(conversationId, item, source, release)
@@ -387,10 +405,8 @@ class ChatViewModel(
     fun quote(from: QuoteMessage.From, text: String) = sending.quote(from, text)
     fun clearQuote() = sending.clearQuote()
     fun send(text: String, check: Prerequisites.Check): Boolean = sending.send(text, check)
-    fun setFollowUpMode(mode: FollowUpMode) = sending.setFollowUpMode(mode)
     fun startQueued() = sending.startQueued()
     fun cancelQueued(id: String): Boolean = sending.cancelQueued(id)
-    fun guideQueued(id: String, check: Prerequisites.Check): Boolean = sending.guideQueued(id, check)
     fun editQueued(id: String): String? = sending.editQueued(id)
     fun withdrawSteer(messageId: String): Boolean = sending.withdrawSteer(messageId)
     fun editSteer(messageId: String): String? = sending.editSteer(messageId)
@@ -410,6 +426,22 @@ class ChatViewModel(
     fun closePip() = sending.closePip()
     fun reopenPip() = sending.reopenPip()
     fun togglePipSound() = sending.togglePipSound()
+
+    /** Have the service show the task [taskId] dispatched by the front desk (its conversation id is the task id): the picture-in-picture window follows it while the on-screen conversation stays the same. */
+    fun showDeskScreen(taskId: String) = actions.show(taskId)
+
+    /** The sound toggle in the picture-in-picture window of that dispatched task. */
+    fun togglePipSoundIn(taskId: String) = actions.togglePipSoundIn(taskId)
+
+    // ChatDesk
+    /** Whether the chat page is on screen: when it is, background reports are delivered by the front desk on the page; when not, they go to the fallback (written back to the conversation and sent as a notification). */
+    fun pageShown(shown: Boolean) { desking?.pageShown(shown) }
+
+    /** A dispatched task is asking a question and the user tapped [words] on the question card. */
+    fun answerDeskTask(taskId: String, words: String) { desking?.answer(taskId, words) }
+
+    /** Stop one dispatched task. */
+    fun cancelDeskTask(taskId: String) { desking?.cancel(taskId) }
 
     // ChatNoteOps
     fun noteText(note: MemoryNote): String = noting.noteText(note)

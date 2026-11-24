@@ -1,12 +1,16 @@
 package com.wangzan101.mika.voicecall
 
 import com.wangzan101.mika.R
+import com.wangzan101.mika.core.frontdesk.DESK_RESULT_MAX_CHARS
+import com.wangzan101.mika.core.frontdesk.DeskReport
+import com.wangzan101.mika.frontdesk.DeskNotifier
 import com.wangzan101.mika.i18n.tr
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Copy mapping for the call page: each error kind and each end reason has its own separate wording; the
- * Ended(Background) produced when RESUMED times out is rendered here as "please return to the foreground". Results of typed requests (synthesized callId,
- * no function_call on the model side) come back locally: the route's model-instruction text is swapped for the local wording, and the task's own answer/reason is passed through as-is.
+ * Copy mapping for the call page: every error kind and every end reason has its own separate wording; the Ended(Background) that a RESUMED timeout produces
+ * is rendered here as "Please come back to the foreground". Front desk reports and the results of a directly dispatched typed message also become local wording here.
  */
 
 fun voiceCallErrorText(error: VoiceCallError): String = tr(
@@ -23,32 +27,40 @@ fun voiceCallErrorText(error: VoiceCallError): String = tr(
     },
 )
 
-fun voiceCallEndText(reason: EndReason): String = tr(
-    when (reason) {
-        EndReason.Hangup -> R.string.voicecall_ended_hangup
-        EndReason.Notification -> R.string.voicecall_ended_notification
-        EndReason.IncomingCall -> R.string.voicecall_ended_incoming
-        EndReason.TimeLimit -> R.string.voicecall_ended_limit
-        EndReason.Background -> R.string.voicecall_ended_background
-    },
-)
+/** [idleMinutes] is the configured idle-hangup duration in minutes and is only used for [EndReason.Idle]. */
+fun voiceCallEndText(reason: EndReason, idleMinutes: Int = 0): String = when (reason) {
+    EndReason.Hangup -> tr(R.string.voicecall_ended_hangup)
+    EndReason.Notification -> tr(R.string.voicecall_ended_notification)
+    EndReason.IncomingCall -> tr(R.string.voicecall_ended_incoming)
+    EndReason.Idle -> tr(R.string.voicecall_ended_idle, idleMinutes)
+    EndReason.Background -> tr(R.string.voicecall_ended_background)
+}
+
+/**
+ * The cue given to the model before an idle hangup (not UI text shown to the user): when the conversation can keep replying, the model paraphrases it in the call's language;
+ * when it cannot, [R.string.voicecall_idle_line] is read out as-is.
+ */
+const val VOICECALL_IDLE_CUE =
+    "The call has been quiet for a while. In one short sentence, ask whether the user is still there " +
+        "and say you will hang up soon if you hear nothing. Do not call any tool."
+
 
 /** The line next to the status dot at the top: in progress it is a status word, in a terminal state it is the end/error text. */
 fun voiceCallStatusText(state: VoiceCallState): String = when (state) {
     VoiceCallState.Connecting -> tr(R.string.voicecall_status_connecting)
     VoiceCallState.MicCheck -> tr(R.string.voicecall_status_mic_check)
     is VoiceCallState.Active -> tr(R.string.voicecall_status_active)
-    is VoiceCallState.Ended -> voiceCallEndText(state.reason)
+    is VoiceCallState.Ended -> voiceCallEndText(state.reason, state.idleMinutes)
     is VoiceCallState.Failed -> voiceCallErrorText(state.error)
 }
 
-/** Result text of a typed request: the route constants are English instructions meant for the model, so they are swapped for local wording here; the rest (the task's answer/reason) is kept as-is. */
-fun typedResultText(text: String): String = when (text) {
-    VoiceCallRoute.RESULT_BUSY -> tr(R.string.voicecall_task_running)
-    VoiceCallRoute.RESULT_START_FAILURE -> tr(R.string.voicecall_task_failed)
-    VoiceCallRoute.RESULT_NEEDS_USER -> tr(R.string.voicecall_see_task_page)
-    VoiceCallRoute.RESULT_CANCELLED -> tr(R.string.voicecall_task_cancelled)
-    VoiceCallRoute.RESULT_DONE_FALLBACK -> tr(R.string.voicecall_task_done)
-    VoiceCallRoute.RESULT_FAILED_FALLBACK -> tr(R.string.voicecall_task_failed)
-    else -> text
-}
+/** What the front desk report says during a call: "That job of yours is done: ..."; the body is capped at [DESK_RESULT_MAX_CHARS] characters. */
+fun deskReportSpeech(report: DeskReport): String =
+    tr(R.string.voicecall_desk_report, report.title, DeskNotifier.line(report.event).take(DESK_RESULT_MAX_CHARS))
+
+/** The result of a directly dispatched typed message comes back locally: on dispatch say "Working on it" (later progress is reported by the front desk as usual), on failure say "That did not work". */
+fun typedDeskResult(result: JsonObject): String =
+    when ((result["status"] as? JsonPrimitive)?.content) {
+        "started", "queued", "already_dispatched" -> tr(R.string.voicecall_task_running)
+        else -> tr(R.string.voicecall_task_failed)
+    }

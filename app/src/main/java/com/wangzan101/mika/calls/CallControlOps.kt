@@ -8,7 +8,13 @@ import com.wangzan101.mika.calls.CallRuntime.Work
 import com.wangzan101.mika.calls.CallRuntime.Companion.CALL_CHANGED
 
 // Call runtime: dialing, answering, keypad, hang-up and takeover
-suspend fun CallRuntime.dial(number: String, simId: String? = null, task: CallTaskBrief? = null): CallActionResult = onMain {
+/** [ownerConversationId]: the conversation containing the task that placed this call; the task is claimed here and the in-call front desk reads its state. */
+suspend fun CallRuntime.dial(
+    number: String,
+    simId: String? = null,
+    task: CallTaskBrief? = null,
+    ownerConversationId: String? = null,
+): CallActionResult = onMain {
     val taskSnapshot = try {
         task?.validatedSnapshot()
     } catch (e: IllegalArgumentException) {
@@ -35,7 +41,11 @@ suspend fun CallRuntime.dial(number: String, simId: String? = null, task: CallTa
             else -> "Select a valid SIM, or explicitly choose the system default SIM"
         })
     val sim = sims.single { it.info.id == picked.id }
-    val attempt = Work(CallDirection.OUTGOING, config, requestedNumber = normalized, sim = sim, task = taskSnapshot)
+    val ownerTask = ownerConversationId?.let { app.taskState.run(it)?.state }
+    // Tasks dispatched by the front desk run in a hidden child conversation; the owner sees its front desk conversation
+    val ownerConversation = ownerConversationId?.let { app.conversations.deskParent(it) ?: it }
+    val attempt = Work(CallDirection.OUTGOING, config, requestedNumber = normalized, sim = sim, task = taskSnapshot,
+        ownerTask = ownerTask, ownerConversationId = ownerConversation)
     startWork(attempt)
     awaitResult(attempt)
 }

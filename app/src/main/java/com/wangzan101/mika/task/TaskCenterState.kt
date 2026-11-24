@@ -6,9 +6,16 @@ import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.run.record.RunEvent
 import com.wangzan101.mika.core.remote.RemoteSteer
 import com.wangzan101.mika.takeover.Takeover
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Messages the user injects into the same conversation while a task is running: [Pending] just sent and not yet delivered to the task, [Received] the task's inbox has accepted it (it will be handled on the next step),
@@ -120,3 +127,13 @@ class TaskCenterState {
     val _pipSoundOn = MutableStateFlow(false)
     val pipSoundOn: StateFlow<Boolean> = _pipSoundOn.asStateFlow()
 }
+
+/** The conversations whose task currently has a virtual screen (or an open web page); not followed when nobody is watching. The call page's task cards use it to show "View screen". */
+@OptIn(ExperimentalCoroutinesApi::class)
+fun TaskCenterState.screenConversations(scope: CoroutineScope): StateFlow<Set<String>> =
+    runs.flatMapLatest { list ->
+        if (list.isEmpty()) flowOf(emptySet())
+        else combine(list.map { run ->
+            combine(run.displayId, run.webOpen) { display, web -> run.conversationId.takeIf { display >= 0 || web } }
+        }) { ids -> ids.filterNotNull().toSet() }
+    }.stateIn(scope, SharingStarted.WhileSubscribed(5_000), emptySet())

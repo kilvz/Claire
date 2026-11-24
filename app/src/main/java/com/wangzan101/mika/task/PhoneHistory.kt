@@ -2,6 +2,8 @@ package com.wangzan101.mika.task
 
 import com.wangzan101.mika.chat.ConversationStore
 import com.wangzan101.mika.chat.ConversationSummary
+import com.wangzan101.mika.core.agent.Conversation
+import com.wangzan101.mika.core.agent.DeskTurn
 import com.wangzan101.mika.core.agent.NoticeTurn
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.record.Redactor
@@ -78,12 +80,14 @@ class PhoneHistory(
         val answer = if (NoticeTurn.isNotice(turn)) "" else turn.outcome
         put("goal", turn.userText.take(TEXT_LIMIT)); put("answer", answer.take(TEXT_LIMIT))
         put("text_truncated", turn.userText.length > TEXT_LIMIT || answer.length > TEXT_LIMIT)
-        put("status", when (turn.status) {
-            "succeeded", "unverified" -> "done"
-            "cancelled" -> "cancelled"
+        // Front desk replies and reports both count as completed replies; when the front desk could not produce its line, the reason is recorded in note
+        put("status", when {
+            Conversation.replied(turn) -> "done"
+            turn.status == "cancelled" -> "cancelled"
             else -> "failed"
         })
-        if (turn.status == "failed") put("reason", turn.outcome.take(TEXT_LIMIT))
+        val failure = DeskTurn.failure(turn) ?: turn.outcome.takeIf { turn.status == "failed" }
+        failure?.let { put("reason", it.take(TEXT_LIMIT)) }
         turn.verified?.let { put("verified", it) }
         turn.note?.let { put("verification_note", it.take(TEXT_LIMIT)) }
         turn.result?.let { put("result", it) }

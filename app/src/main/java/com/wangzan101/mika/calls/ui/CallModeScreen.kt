@@ -4,6 +4,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Slider
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.KeyboardType
+import com.wangzan101.mika.ui.components.MikaDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -61,6 +68,12 @@ internal fun callModeLine(snapshot: VoiceCatalogSnapshot, engine: CallEngine): S
     )
 }
 
+/** The hint for the "thinking" row: when the light model is selected, explain that the main model is used if no light model is configured ([deskModel] falls back that way); no hint when the main model is selected. */
+internal fun thinkFallbackHint(think: ThinkModel): Int? = when (think) {
+    ThinkModel.Light -> R.string.call_mode_think_light_note
+    ThinkModel.Main -> null
+}
+
 internal fun silenceSeconds(ms: Int): String = String.format(Locale.getDefault(), "%.1f", ms / 1000f)
 
 /**
@@ -106,7 +119,8 @@ fun CallModeScreen(onBack: () -> Unit, onOpenStt: () -> Unit, onOpenTts: () -> U
                 ) { RowChevron() }
                 ListRow(
                     MikaIcons.Spark, stringResource(R.string.call_mode_think),
-                    if (s.think == ThinkModel.Light) stringResource(R.string.call_mode_think_light_note) else null,
+                    stringResource(R.string.call_mode_think_note),
+                    detail = thinkFallbackHint(s.think)?.let { stringResource(it) },
                 ) {}
                 SegmentedControl(
                     listOf(stringResource(R.string.call_mode_think_light), stringResource(R.string.call_mode_think_main)),
@@ -155,5 +169,83 @@ fun CallModeScreen(onBack: () -> Unit, onOpenStt: () -> Unit, onOpenTts: () -> U
             }
             FooterNote(stringResource(R.string.call_mode_realtime_note), Modifier.padding(top = 6.dp))
         }
+        IdleHangup(s.idleMinutes) { catalog.setCallStyle(idleMinutes = it) }
     }
+}
+
+/** Which row is selected under "auto hang-up": a preset number of minutes, custom, or never. */
+internal sealed interface IdleChoice {
+    data class Preset(val minutes: Int) : IdleChoice
+    data class Custom(val minutes: Int) : IdleChoice
+    data object Never : IdleChoice
+}
+
+internal fun idleChoiceOf(minutes: Int): IdleChoice = when {
+    minutes <= VoiceSelections.NEVER_IDLE -> IdleChoice.Never
+    minutes in VoiceSelections.IDLE_PRESETS -> IdleChoice.Preset(minutes)
+    else -> IdleChoice.Custom(minutes)
+}
+
+/** Whether the text in the custom duration field can be saved: an integer from 1 to 120 minutes. */
+internal fun customIdleMinutes(text: String): Int? =
+    text.trim().toIntOrNull()?.takeIf { it in VoiceSelections.MIN_IDLE_MINUTES..VoiceSelections.MAX_IDLE_MINUTES }
+
+/** How long a call can go without new content before hanging up (used by both standard and realtime calls; AI calls are not governed by it). */
+@Composable
+private fun IdleHangup(minutes: Int, onChange: (Int) -> Unit) {
+    val choice = idleChoiceOf(minutes)
+    var editing by rememberSaveable { mutableStateOf(false) }
+    GroupLabel(stringResource(R.string.call_mode_idle))
+    GroupCard {
+        VoiceSelections.IDLE_PRESETS.forEachIndexed { i, preset ->
+            RadioRow(
+                stringResource(R.string.call_mode_idle_minutes, preset), choice == IdleChoice.Preset(preset),
+                onClick = { onChange(preset) }, first = i == 0, modifier = Modifier.testTag("call-idle-$preset"),
+            )
+        }
+        RadioRow(
+            stringResource(R.string.call_mode_idle_custom), choice is IdleChoice.Custom,
+            onClick = { editing = true },
+            subtitle = (choice as? IdleChoice.Custom)?.let { stringResource(R.string.call_mode_idle_custom_sub, it.minutes) },
+            modifier = Modifier.testTag("call-idle-custom"),
+        ) { RowChevron() }
+        RadioRow(
+            stringResource(R.string.call_mode_idle_never), choice == IdleChoice.Never,
+            onClick = { onChange(VoiceSelections.NEVER_IDLE) }, modifier = Modifier.testTag("call-idle-never"),
+        )
+    }
+    FooterNote(stringResource(R.string.call_mode_idle_note), Modifier.padding(top = 6.dp))
+    if (editing) {
+        CustomIdleDialog(
+            initial = (choice as? IdleChoice.Custom)?.minutes ?: (choice as? IdleChoice.Preset)?.minutes ?: VoiceSelections.DEFAULT_IDLE_MINUTES,
+            onDismiss = { editing = false },
+            onSave = { onChange(it); editing = false },
+        )
+    }
+}
+
+@Composable
+private fun CustomIdleDialog(initial: Int, onDismiss: () -> Unit, onSave: (Int) -> Unit) {
+    var text by rememberSaveable { mutableStateOf(initial.toString()) }
+    val value = customIdleMinutes(text)
+    MikaDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.call_mode_idle_dialog_title)) },
+        text = {
+            OutlinedTextField(
+                text, { text = it.filter(Char::isDigit).take(3) },
+                modifier = Modifier.fillMaxWidth().testTag("call-idle-custom-input"),
+                singleLine = true,
+                supportingText = { Text(stringResource(R.string.call_mode_idle_dialog_hint)) },
+                isError = text.isNotEmpty() && value == null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { value?.let(onSave) }, enabled = value != null, modifier = Modifier.testTag("call-idle-custom-save")) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }

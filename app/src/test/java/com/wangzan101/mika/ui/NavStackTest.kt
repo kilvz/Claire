@@ -75,4 +75,22 @@ class NavStackTest {
         nav.back()
         assertFalse(nav.reopenDrawer)
     }
+
+    // Call page: tapping call again during a call brings it back to the top (pages stacked above it are dismissed); when the call ends it is removed from the stack, even if pages sit below it
+    @Test fun callPageComesBackAndLeaves() {
+        val nav = NavStack()
+        nav.bringToTop(Route.VoiceCall)
+        assertEquals(listOf(Route.Chat, Route.VoiceCall), nav.stack)
+        nav.push(Route.Run)
+        nav.bringToTop(Route.VoiceCall)
+        assertEquals(listOf(Route.Chat, Route.VoiceCall), nav.stack)
+        nav.leave(Route.VoiceCall)
+        assertEquals(listOf(Route.Chat), nav.stack)
+        nav.push(Route.VoiceCall)
+        nav.push(Route.CallMode)
+        nav.leave(Route.VoiceCall)
+        assertEquals(listOf(Route.Chat, Route.CallMode), nav.stack)
+        nav.leave(Route.VoiceCall)
+        assertEquals(listOf(Route.Chat, Route.CallMode), nav.stack)
+    }
 }

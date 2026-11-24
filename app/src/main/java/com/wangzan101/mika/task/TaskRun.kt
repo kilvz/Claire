@@ -212,6 +212,8 @@ class TaskRun(
     internal var triggerThreadId: String? = null
     internal var mcpExternalId: String? = null
     internal var workflowAttemptId: String? = null
+    /** Supplementary note attached when the front desk dispatches work; in the task context it is Claire's note, not the user's own words. Null when absent. */
+    internal var brief: String? = null
     internal var channelPeer: ChannelPeer? = null
     internal var channelMessageId: String? = null
     /** When the main loop produced the outcome; the time until the result is actually sent is used to locate channel round-trip delay. */

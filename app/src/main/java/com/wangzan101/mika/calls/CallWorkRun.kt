@@ -93,7 +93,9 @@ internal suspend fun CallRuntime.runWork(w: Work) {
         val helper = shell ?: throw CallProblem("Claire's built-in helper is not connected")
         val migrated = realtimeController.migrated
         val standard = standardCalls
-        val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone) else if (migrated) {
+        // Standard call: the owning task's state is appended as a trailing note each turn for the phone front desk, keeping the system prompt byte-for-byte unchanged
+        val ownerBackground = w.ownerTask?.let(PhoneDesk::background)
+        val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone, background = ownerBackground) else if (migrated) {
             try {
                 realtimeController.callProvider()
             } catch (e: VoiceModelError) {
@@ -126,7 +128,13 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 .getOrElse { throw CallProblem("Could not read the call instructions; the AI did not operate the phone") }
         }
         validateTarget(w)
-        val systemPrompt = CallPolicy.prompt(w.config.systemPrompt, w.direction, ownerRules, task = w.task) + PHONE_DTMF_PROMPT
+        // Existing call prompt first, phone front desk note after; realtime calls put the owning task's state at opening into the prompt, then push updates when it changes
+        val systemPrompt = PhoneDesk.systemPrompt(
+            CallPolicy.prompt(w.config.systemPrompt, w.direction, ownerRules, task = w.task) + PHONE_DTMF_PROMPT,
+            task = w.task.takeIf { w.direction == CallDirection.OUTGOING },
+            openingOwnerTask = if (standard) null else PhoneDesk.renderOwnerTask(w.ownerTask?.value),
+            canCue = PhoneDesk.canCue(standard, profile.protocol),
+        )
         try {
             provider.validate(profile, systemPrompt, enablePhoneDtmf = true)
         } catch (_: IllegalArgumentException) {
@@ -222,7 +230,7 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 publish()
             },
         )
-        runAudio(w, helper, session)
+        runAudio(w, helper, session, pushOwnerTask = !standard, canCue = PhoneDesk.canCue(standard, profile.protocol))
     } catch (e: CancellationException) {
         // Coroutine cancellation may carry a secondary descriptor-close exception.
         if (BuildConfig.DEBUG) e.suppressed.take(MAX_MEDIA_DIAGNOSTICS).forEach { debugMediaException(w, it) }

@@ -9,8 +9,6 @@ import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.settings.Prerequisites
 import com.wangzan101.mika.task.SteerNote
 import com.wangzan101.mika.task.SteerState
-import com.wangzan101.mika.task.QueuedFollowUp
-import com.wangzan101.mika.task.QueuedSource
 import com.wangzan101.mika.task.unconsumed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -20,7 +18,7 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.chat.ui.ChatReduce.state
 import com.wangzan101.mika.chat.ui.ChatReduce.withAttachments
 
-/** Sending: starting tasks, steering, queueing, quoting, plus task buttons such as stop and takeover, and picture-in-picture. */
+/** Sending: delegates to the front desk, answers, starts tasks with attachments, quotes, plus task buttons such as the queue row, stop, and takeover, and picture-in-picture. */
 internal class ChatSendOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val libraryImports = session.libraryImports
@@ -31,7 +29,6 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     private var pendingStart by session::pendingStart
     private var screenSeen by session::screenSeen
     private var pipClosed by session::pipClosed
-    private val held = session.held
     private val scope = vm.scope
     private val actions = vm.actions
     private val store = vm.store
@@ -57,7 +54,12 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
 
     fun clearQuote() = _ui.update { it.copy(quote = null) }
 
-    /** Sends what is in the input field; when there is a quote it is written before the text (see [QuoteMessage]) and cleared after sending. Returns false when nothing was sent (conditions not met, or a task is running). */
+    /**
+     * Send the words in the input bar; when there is a quote, it is written before the words (see [QuoteMessage]) and cleared after sending. Returns false when nothing was sent (a condition was not met).
+     * Routing in order: to the call when it is waiting for the owner's reply; as an answer when a task is waiting for one; as a new task the front desk follows when there are attachments (bypassing the front desk model);
+     * everything else goes to this conversation's front desk (it can still be sent while the front desk is replying, without becoming "task running"). Nothing is sent while teaching the user.
+     * A child-task conversation dispatched by the front desk does not go through the front desk (see [ChatDesk.handles]): with a task running the words are interjected into it, when idle a new one starts, and with attachments they open along with the new task.
+     */
     fun send(text: String, check: Prerequisites.Check): Boolean {
         if (teaching()) {
             onTeachingBlocked()
@@ -66,58 +68,97 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         session.refreshParallel()
         val ui = _ui.value
         if (ui.importing) return false
-        val queuedAttachments = ui.composer != ComposerMode.Idle && ui.followUpMode == FollowUpMode.Queue
-        val sendingAttachments = ui.attachments.isNotEmpty() && (ui.composer == ComposerMode.Idle || queuedAttachments)
-        val sent = sendQuoted(text.trim(), ui, check)
-        if (sent && !sendingAttachments) {
-            val shared = ui.sharedDraft
-            if (shared != null) {
-                if (shared.attachments.isEmpty()) {
-                    vm.drafting.discardSharedDraft(shared)
-                } else {
-                    val textCleared = shared.copy(text = "")
-                    sharedDrafts?.save(textCleared)
-                    _ui.update { if (it.sharedDraft == shared) it.copy(sharedDraft = textCleared) else it }
-                }
-            }
-            _ui.update {
-                it.copy(input = if (it.input == text) "" else it.input, quote = null)
-            }
-        }
-        return sent
+        val routed = route(text.trim(), ui, check)
+        if (routed == Routed.Sent) clearSent(ui, text)
+        return routed != Routed.NotSent
     }
 
-    private fun sendQuoted(words: String, ui: ChatUi, check: Prerequisites.Check): Boolean {
-        // Attachments can go with a new task or with the next item explicitly queued; copy them into the workspace first, then persist the paths together with the wording.
-        val queuedAttachments = ui.composer != ComposerMode.Idle && ui.followUpMode == FollowUpMode.Queue
-        if ((ui.composer == ComposerMode.Idle || queuedAttachments) && ui.attachments.isNotEmpty()) {
-            return sendWithAttachments(QuoteMessage.compose(ui.quote, words), ui.attachments, check)
-        }
-        // With only a quote and no text, do not send
-        if (words.isEmpty()) return false
+    private enum class Routed { NotSent, Sent, Importing }
+
+    private fun route(words: String, ui: ChatUi, check: Prerequisites.Check): Routed {
         val goal = QuoteMessage.compose(ui.quote, words)
-        when (ui.composer) {
-            ComposerMode.Answer -> {
-                act({ actions.answer(goal) }) { actions.answerIn(it, goal) }
-                return true
-            }
-            ComposerMode.Busy -> return if (_ui.value.followUpMode == FollowUpMode.Queue) enqueue(goal, check) else steer(goal, check)
-            ComposerMode.Idle -> Unit
+        val desk = vm.deskFor(ui.conversationId)
+        // A call is waiting for the owner's reply: these words are the reply, so hand them to the call (it records them into this conversation); with attachments they still go to the call first and the attachments stay in the input bar
+        if (words.isNotEmpty() && ui.conversationId?.let { vm.ownerAnswer(it, goal) } == true) return Routed.Sent
+        // A task is waiting for an answer: these words are the answer
+        if (words.isNotEmpty() && ui.composer == ComposerMode.Answer) {
+            act({ actions.answer(goal) }) { actions.answerIn(it, goal) }
+            return Routed.Sent
         }
+        // With attachments: copy them into this conversation's workspace first, then dispatch a new task the front desk follows (the files are copied into the child conversation along with it), whether or not a task is running;
+        // without a front desk they start directly with the new task as before, and are not sent while a task is running
+        if (ui.attachments.isNotEmpty()) {
+            if (desk == null && ui.composer != ComposerMode.Idle) return Routed.NotSent
+            return if (sendWithAttachments(goal, ui.attachments, check)) Routed.Importing else Routed.NotSent
+        }
+        // A quote with no words is not sent
+        if (words.isEmpty()) return Routed.NotSent
         if (!check.canStartTask) {
             _ui.update { it.copy(blocked = check.blockers) }
-            return false
+            return Routed.NotSent
         }
-        begin(goal, ui.conversationId ?: store.newConversation())
-        return true
+        val id = ui.conversationId ?: store.newConversation()
+        if (desk != null) {
+            claim(id)
+            return if (desk.line(id).send(goal)) Routed.Sent else Routed.NotSent
+        }
+        // No front desk: with a task running the words are interjected into it (without opening another), when idle a new task starts as before
+        if (ui.composer == ComposerMode.Busy) return if (steer(id, goal)) Routed.Sent else Routed.NotSent
+        if (ui.composer != ComposerMode.Idle) return Routed.NotSent
+        begin(goal, id)
+        return Routed.Sent
     }
 
     /**
-     * Starts a new task with attachments: first copy the attachments into the conversation workspace's inbox/ (meanwhile
-     * the area above the input field shows that they are being added); once all have been copied, write each attachment as
-     * a line "Attachment: <path> (<size>)" after the text and start the task.
-     * If some attachments were not accepted, the draft is kept and the failures are listed, for the user to retry or remove before sending again.
-     * If the conversation is switched or another task starts during the copy, nothing is sent (the copied files stay in the original conversation's workspace).
+     * Interject words into the task running in this conversation: hang them under the current question-and-answer (shown first as "pending delivery") and hand them to the service.
+     * Nothing is sent while the task is still waiting for the previous one to yield the service (it has not really started); the words stay in the input bar.
+     */
+    private fun steer(id: String, text: String): Boolean {
+        if (liveIndex !in _ui.value.exchanges.indices || pendingStart?.isActive == true) return false
+        val note = SteerNote(java.util.UUID.randomUUID().toString(), text, SteerState.Pending)
+        _ui.update { ui ->
+            if (liveIndex !in ui.exchanges.indices) return@update ui
+            val exchanges = ui.exchanges.toMutableList()
+            exchanges[liveIndex] = exchanges[liveIndex].let { it.copy(steers = it.steers + note) }
+            ui.copy(exchanges = exchanges)
+        }
+        actions.steer(id, note.id, text)
+        return true
+    }
+
+    /** Sent: clear this message and the quote from the input bar; a system-shared draft with no attachments is dropped entirely, while one with attachments only has its text cleared. */
+    private fun clearSent(ui: ChatUi, text: String) {
+        val shared = ui.sharedDraft
+        if (shared != null) {
+            if (shared.attachments.isEmpty()) {
+                vm.drafting.discardSharedDraft(shared)
+            } else {
+                val textCleared = shared.copy(text = "")
+                sharedDrafts?.save(textCleared)
+                _ui.update { if (it.sharedDraft == shared) it.copy(sharedDraft = textCleared) else it }
+            }
+        }
+        _ui.update {
+            it.copy(input = if (it.input == text) "" else it.input, quote = null)
+        }
+    }
+
+    /** The id for this conversation is settled: bind the project chosen when the draft was attached and tell the floating capsule it is in this conversation now (a new conversation only gets an id at this point). */
+    private fun claim(id: String) {
+        val boundProject = (_ui.value.projectId ?: store.projectId(id))?.takeIf { projectStore == null || projectStore.get(it) != null }
+        if (boundProject != null && store.projectId(id) != boundProject) {
+            runCatching { store.setProject(id, boundProject) }
+        }
+        workspaceResolver?.setDraftProject(id, null)
+        session.markCurrent(CurrentChat.Open(id))
+    }
+
+    /**
+     * Sending with attachments: copy the attachments into the conversation workspace's inbox/ first (the input bar shows they are being added meanwhile),
+     * and once all copies succeed, write each attachment as a line "Attachment: <path> (<size>)" after the words and hand it to the front desk to dispatch as a new task
+     * (see [DeskChatOps.sendFiles]); without a front desk, start the task in this conversation as before.
+     * If some attachments were not accepted, keep the draft and list the failures so the user can retry or remove them before sending again.
+     * If the conversation changes or another task starts during the copy, nothing is sent (the copied files stay in the original conversation's workspace).
      */
     private fun sendWithAttachments(text: String, items: List<PendingAttachment>, check: Prerequisites.Check): Boolean {
         if (!check.canStartTask) {
@@ -180,10 +221,15 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
             val currentAttachments = now.attachments
             val draftReplaced = sharedDraftSerial != serialBefore
             val keepNewerAttachments = draftReplaced || currentAttachments != submitted.attachments
-            val accepted = when {
-                now.composer == ComposerMode.Idle -> { begin(goal, id, clearDraftAttachments = !keepNewerAttachments); true }
-                now.composer != ComposerMode.Idle && now.followUpMode == FollowUpMode.Queue -> enqueue(goal, check)
-                else -> false
+            val desk = vm.deskFor(id)
+            // With a front desk, whether a task is running does not matter; without one, as before: if another task started during the copy nothing is sent, keeping the draft and attachments
+            val accepted = desk != null || now.composer == ComposerMode.Idle
+            if (accepted && desk != null) {
+                if (!keepNewerAttachments) vm.drafting.discardSharedDraft()
+                claim(id)
+                desk.line(id).sendFiles(text, goal, r.added, deskTitle(text, items))
+            } else if (accepted) {
+                begin(goal, id, clearDraftAttachments = !keepNewerAttachments)
             }
             if (accepted) {
                 if (!draftReplaced) vm.drafting.discardSharedDraft()
@@ -192,7 +238,6 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
                         input = if (!draftReplaced && it.input == submitted.input) "" else it.input,
                         quote = if (!draftReplaced && it.quote == submitted.quote) null else it.quote,
                         attachments = if (keepNewerAttachments) currentAttachments else emptyList(),
-                        followUpMode = if (keepNewerAttachments && currentAttachments.isNotEmpty() && it.composer != ComposerMode.Idle) FollowUpMode.Queue else it.followUpMode,
                     )
                 }
                 session.releaseUnusedLibraryCopies()
@@ -201,20 +246,18 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         return true
     }
 
-    /** Starts a new task [goal] in conversation [id]: adds a question-answer to the UI and hands it to the service (with parallelism off and the service still busy, it is queued behind its cleanup). */
+    /** The title on the task card for an attachment send: the user's words (without the quote); when only files were sent, the file names. */
+    private fun deskTitle(text: String, items: List<PendingAttachment>): String =
+        QuoteMessage.words(text).trim().ifBlank { items.joinToString("、") { it.name } }
+
+    /** Start a new task [goal] in conversation [id]: add a question-and-answer to the UI and hand it to the service (queued behind the current one when parallelism is off and the service is busy). */
     private fun begin(goal: String, id: String, clearDraftAttachments: Boolean = true) {
         lingerJob?.cancel()
         // Once the task has really started, the draft attachments are already in the workspace, so the private staging copies can be cleared.
         if (clearDraftAttachments) vm.drafting.discardSharedDraft()
-        val boundProject = (_ui.value.projectId ?: store.projectId(id))?.takeIf { projectStore == null || projectStore.get(it) != null }
-        if (boundProject != null && store.projectId(id) != boundProject) {
-            runCatching { store.setProject(id, boundProject) }
-        }
-        workspaceResolver?.setDraftProject(id, null)
-        // This conversation's id is settled: the pill continues from it afterwards (a newly opened conversation only gets an id at this point)
-        session.markCurrent(CurrentChat.Open(id))
-        // When the previous task wraps up it removes its screen before reporting completion, so what is read here is the state just before the new task starts;
-        // in parallel mode that is another conversation's task's screen, and the new task has no screen yet
+        claim(id)
+        // When the previous task wrapped up it cleared the screen before reporting the end, so what is read here is the state before the new task started;
+        // in parallel mode that is another conversation's task screen, and the new task has no screen yet
         // A new message must not inherit the previous run's screen; once this run's screen is really created, screenOpen opens the small window.
         screenSeen = false
         pipClosed = false
@@ -228,8 +271,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
                 attachments = nextAttachments,
                 pip = session.gated(PipUi(visible = true)),
                 composer = ComposerMode.Busy,
-                followUpMode = FollowUpMode.Queue,
-                // If this sentence was optimistically listed on the queue bar and has now started, it must no longer show as a row
+                // If this message was already shown optimistically on the queue row and has now started, it must not be shown again as a row
                 queued = it.queued.filterNot { q -> q.text == goal },
             )
         }
@@ -246,63 +288,14 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
                 serviceBusy.first { !it }
                 pendingStart = null
                 actions.start(goal, id)
-                // Steers made during the wait: start the task for the original wording first, then hand them over
-                held.toList().also { held.clear() }.forEach { n -> actions.steer(id, n.id, n.text) }
-                // Queued items are persisted long before; the service takes them out in FIFO order when the original task wraps up, so do not rewrite or jump ahead of it here
+                // Queued items were persisted long ago; the service takes the original-words task out in FIFO order when it wraps up, so do not rewrite or jump the queue here
             }
         } else {
             actions.start(goal, id)
         }
     }
 
-    /**
-     * What is sent while a task is running: attached below the question-answer being followed and handed to this task;
-     * where it went is reported back by the service ([steers]). It may become the next item, so it goes through the same
-     * check as starting a new task. While the task has not been handed to the service ([pendingStart]) it is held first and sent after the start.
-     */
-    private fun steer(text: String, check: Prerequisites.Check): Boolean {
-        val id = _ui.value.conversationId ?: return false
-        if (liveIndex !in _ui.value.exchanges.indices) return false
-        if (!check.canStartTask) {
-            _ui.update { it.copy(blocked = check.blockers) }
-            return false
-        }
-        val note = SteerNote(java.util.UUID.randomUUID().toString(), text, SteerState.Pending)
-        _ui.update { ui ->
-            val exchanges = ui.exchanges.toMutableList()
-            exchanges[liveIndex] = exchanges[liveIndex].let { it.copy(steers = it.steers + note) }
-            ui.copy(exchanges = exchanges)
-        }
-        if (pendingStart?.isActive == true) held += note else actions.steer(id, note.id, text)
-        return true
-    }
-
-    /** Switches the default destination for follow-ups sent while a task is running; it only affects the next send and does not change messages already sent. */
-    fun setFollowUpMode(mode: FollowUpMode) {
-        if (_ui.value.importing) return
-        if (mode == FollowUpMode.Steer) {
-            _ui.value.sharedDraft?.takeIf { it.attachments.isNotEmpty() }?.let(vm.attaching::clearSharedAttachments)
-        }
-        _ui.update {
-            if (it.followUpMode == mode) it else it.copy(followUpMode = mode,
-                attachments = if (mode == FollowUpMode.Steer) emptyList() else it.attachments)
-        }
-        session.releaseUnusedLibraryCopies()
-    }
-
-    /** While a task is running, write this sentence into the conversation's persistent FIFO first; returns false when writing fails, and the input field keeps the text. */
-    private fun enqueue(text: String, check: Prerequisites.Check): Boolean {
-        val id = _ui.value.conversationId ?: return false
-        if (!check.canStartTask) {
-            _ui.update { it.copy(blocked = check.blockers) }
-            return false
-        }
-        val item = QueuedFollowUp(java.util.UUID.randomUUID().toString(), id, text, clock(), QueuedSource.Explicit)
-        // While the original wording is still waiting for another task to wrap up, only persist it; the next item must not start ahead of it.
-        return actions.enqueueFollowUp(id, item.id, text, startIfIdle = pendingStart?.isActive != true)
-    }
-
-    /** When no task is running, start the first queued item (the "start now" on the queue bar). */
+    /** When no task is running, start the first queued item ("start now" on the queue row). */
     fun startQueued() {
         val id = _ui.value.conversationId ?: return
         actions.drainFollowUps(id)
@@ -314,20 +307,6 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         if (!actions.cancelFollowUp(conversationId, id)) return false
         _ui.update { it.copy(queued = it.queued.filterNot { q -> q.id == id }) }
         return true
-    }
-
-    /** Turns a queued item that has not started into a steer for the current task; when it loses the race, the queue entry is kept or restored. */
-    fun guideQueued(id: String, check: Prerequisites.Check): Boolean {
-        val ui = _ui.value
-        if (ui.composer != ComposerMode.Busy) return false
-        val item = ui.queued.firstOrNull { it.id == id } ?: return false
-        if (!check.canStartTask) {
-            _ui.update { it.copy(blocked = check.blockers) }
-            return false
-        }
-        if (!cancelQueued(id)) return false
-        if (steer(item.text, check)) return true
-        return enqueue(item.text, check)
     }
 
     /**
@@ -350,7 +329,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         val id = ui.conversationId ?: return false
         val note = ui.exchanges.getOrNull(liveIndex)?.steers?.firstOrNull { it.id == messageId } ?: return false
         if (!note.state.unconsumed || note.remote) return false
-        if (!held.removeAll { it.id == messageId } && !actions.withdrawSteer(id, messageId)) return false
+        if (!actions.withdrawSteer(id, messageId)) return false
         _ui.update { now -> now.copy(exchanges = now.exchanges.map { ex ->
             ex.copy(steers = ex.steers.map { if (it.id == messageId) it.copy(state = SteerState.Withdrawn) else it })
         }) }
@@ -389,7 +368,6 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         // The task has not been handed to the service yet: discard this start; what is wrapping up in the service is the previous task, so leave it alone
         pending.cancel()
         pendingStart = null
-        held.clear()
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
             if (liveIndex in exchanges.indices) exchanges[liveIndex] = exchanges[liveIndex].copy(status = ExchangeStatus.Cancelled())
@@ -459,11 +437,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         val live = _ui.value.exchanges.getOrNull(liveIndex)
         pendingStart = null
         pending.cancel()
-        if (id == null || live == null) {
-            held.clear()
-            return
-        }
+        if (id == null || live == null) return
         actions.start(live.goal, id)
-        held.toList().also { held.clear() }.forEach { n -> actions.steer(id, n.id, n.text) }
     }
 }

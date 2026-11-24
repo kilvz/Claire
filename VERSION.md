@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.1.3 (versionCode 65)
-- **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
+- **Claire version:** 2.2.0 (versionCode 66)
+- **Base version:** upstream Mika 0.1.51 (commit `7f7a93155`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -100,6 +100,17 @@ recorded base version.
   models load in the background, so the listening card appears at once
   instead of the voice button freezing while a large model loads, and
   speech from that moment is kept.
+- 2.2.0: ported upstream Mika through commit `7f7a93155` (24 Nov 2026).
+  The new front desk answers in a sentence or two while background tasks
+  do the work: in chat and voice calls it dispatches tasks, takes
+  additions and corrections, answers their questions, reports progress
+  from the task board, and stops them — always with the user's whole
+  original sentence. Voice calls now live in the conversation timeline
+  with call records, tasks can be branched or re-asked from any finished
+  turn, phone calls can ask the owner a question with a reply
+  notification, and there is a new file library. Existing English copy,
+  the international default provider, and the Google speech fix are
+  kept.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

@@ -17,6 +17,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -80,9 +85,13 @@ import com.wangzan101.mika.ui.theme.animationsOff
 import com.wangzan101.mika.ui.theme.appearanceDark
 import com.wangzan101.mika.ui.theme.systemBarsFor
 import com.wangzan101.mika.voicecall.ui.VoiceCallDeps
+import com.wangzan101.mika.task.screenConversations
+import com.wangzan101.mika.voicecall.ui.VoiceCallBar
 import com.wangzan101.mika.voicecall.ui.VoiceCallHost
+import com.wangzan101.mika.voicecall.ui.VoiceCallScreen
+import com.wangzan101.mika.voicecall.ui.liveCall
+import com.wangzan101.mika.voicecall.ui.rememberVoiceCallController
 import com.wangzan101.mika.voicecall.VoiceCallService
-import com.wangzan101.mika.voicecall.VoiceCallTaskLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -106,7 +115,6 @@ import com.wangzan101.mika.chat.ui.ShareContent
 import com.wangzan101.mika.chat.ui.SourceScreen
 import com.wangzan101.mika.chat.ui.SourceViewModel
 import com.wangzan101.mika.chat.ui.draft
-import com.wangzan101.mika.chat.ui.evidenceSource
 import com.wangzan101.mika.chat.ui.isShareIntent
 import com.wangzan101.mika.chat.ui.readShare
 import com.wangzan101.mika.chat.ui.shareCanRead
@@ -492,6 +500,7 @@ private fun MikaRoot(
         }
     }
     var runId by rememberSaveable { mutableStateOf<String?>(null) }
+    // "Run details" was opened from the call page: on back, call this to bring the call page back; null when opened from elsewhere
     var reportRunId by rememberSaveable { mutableStateOf<String?>(null) }
     var playbackScreenshotId by rememberSaveable { mutableStateOf<Int?>(null) }
     var sourceRunId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -516,19 +525,38 @@ private fun MikaRoot(
             profile = { app.calls.activeVoiceProfile() },
             credentials = { app.calls.voiceProfiles.credentials(it) },
             foregroundResumed = voiceCallResumed,
-            launcher = VoiceCallTaskLauncher { goal ->
-                ConversationStore.shared(context).newConversation().also { id ->
-                    TaskService.start(context, goal, id)
-                }
-            },
-            runState = { app.taskState.run(it)?.state },
-            cancelTask = { id -> app.taskState.run(id)?.key?.let { TaskService.cancel(context, it) } },
+            desks = app.desks,
             conversationId = { app.chat.ui.value.conversationId },
-            appendTurn = { id, turn -> ConversationStore.shared(context).append(id, turn) },
+            newConversation = { app.chat.claimConversation() },
+            deskParent = { ConversationStore.shared(context).deskParent(it) },
+            turns = { ConversationStore.shared(context).turns(it) },
+            // Save as you go during the call, invoked from the app-level scope: file IO is dispatched to IO
+            appendTurn = { id, turn -> withContext(Dispatchers.IO) { ConversationStore.shared(context).append(id, turn) } },
+            recordCall = { id, call -> withContext(Dispatchers.IO) { ConversationStore.shared(context).recordCall(id, call) } },
             attachService = { VoiceCallService.attach(context, it) },
+            persona = { com.wangzan101.mika.frontdesk.deskPersona(app) },
+            openConversation = { id ->
+                app.chat.openConversation(id)
+                nav.reset()
+            },
+            // Run details sits on top of the call page, so back returns to the call page
+            openRun = { id ->
+                runId = id
+                nav.push(Route.Run)
+            },
+            calls = { ConversationStore.shared(context).observeCalls(it) },
+            // Tap an entry in call history: jump to the start of that call in chat (the call keeps going, with the "In call" bar at the top)
+            openCallRecord = { id, callId ->
+                app.chat.openConversationAt(id, com.wangzan101.mika.chat.ui.ChatTarget.Call(callId))
+                nav.reset()
+            },
+            liveRun = { id -> app.taskState.runs.value.firstOrNull { it.conversationId == id }?.runId?.value },
+            screens = app.taskState.screenConversations(app.appScope),
+            frames = { id -> app.taskState.runs.value.firstOrNull { it.conversationId == id }?.frames },
         )
     }
-    // Newly found version: the red dots on the drawer, settings home and about page all read it
+    val voiceCall = rememberVoiceCallController(voiceCallDeps)
+    // A newer version was found: the sidebar, the settings home, and the about page all show a dot based on it
     val updateState by app.updates.state.collectAsState()
     val autoUpdate by app.automaticUpdates.enabled.collectAsState()
     val readyUpdate by app.automaticUpdates.ready.collectAsState()
@@ -635,6 +663,12 @@ private fun MikaRoot(
     // The chat page keeps its list position and input content when it leaves the composition tree, and restores them exactly after returning from sub-pages such as settings.
     val screenStates = rememberSaveableStateHolder()
     val sidebarPage = nav.current in setOf(Route.Chat, Route.Personal, Route.Plans, Route.Memory, Route.Browser)
+    // When the call page is not on top, an "In call · Back to call" bar at the top; the page underneath starts below it
+    val liveCall = voiceCall.liveCall()
+    val callBar = liveCall != null && nav.current != Route.VoiceCall
+    Column(Modifier.fillMaxSize()) {
+    if (callBar && liveCall != null) VoiceCallBar(liveCall) { nav.bringToTop(Route.VoiceCall) }
+    Box(Modifier.weight(1f).fillMaxWidth().then(if (callBar) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
     AdaptiveWindow(navigation = sidebarPage) {
         val page: @Composable (() -> Unit) -> Unit = { openDrawer ->
     // Global page switches get the slide-in push transition; inside a page always use route rather than nav.current, because the old page is still rendering during the transition and reading live state would make it change on the spot
@@ -665,6 +699,11 @@ private fun MikaRoot(
                 app.chat.refresh()
                 onStopOrDispose {}
             }
+            // While the chat page is visible, front desk reports are spoken in the conversation; on leaving or going to the background they go back to the fallback (notifications)
+            LifecycleStartEffect(route) {
+                app.chat.pageShown(route == Route.Chat)
+                onStopOrDispose { app.chat.pageShown(false) }
+            }
             Box(Modifier.fillMaxSize()) {
                     val readyRelease = readyUpdate?.takeIf { autoUpdate && it.apkUrl == updateState.update?.apkUrl }
                     val updateBackdrop = if (readyRelease != null) rememberGlassBackdrop() else null
@@ -683,6 +722,7 @@ private fun MikaRoot(
                             frames = app.taskState.frames,
                             webOpen = app.tasks.webScreenOpen,
                             pipInput = app.taskState.pipInput,
+                            screens = remember(app) { app.taskState.screenConversations(app.appScope) },
                             pipSoundOn = app.taskState.pipSoundOn,
                             pipOperateEnabled = FeatureFlags.get(context).pipOperate(),
                             reduceMotion = MikaTheme.reduceMotion,
@@ -690,18 +730,8 @@ private fun MikaRoot(
                             openSettings = { nav.push(Route.Settings) },
                             onOpenBrowser = { nav.push(Route.Browser) },
                             openRun = { runId = it; nav.push(Route.Run) },
-                            openReport = { reportRunId = it; nav.push(Route.Report) },
-                            openPlayback = { reportRunId = it; playbackScreenshotId = null; nav.push(Route.Playback) },
                             phoneSetupNeed = (if (status.builtinShell != BuiltinShellStatus.Running) phoneSetupNeed else null),
                             openPhoneSetup = { onFix(Fix.OpenPhoneSetup) },
-                            loadSource = { id ->
-                                withContext(Dispatchers.IO) { evidenceSource(RunStore(context).events(id)) { ConfirmationNotifier.appLabel(context, it) } }
-                            },
-                            openSource = { id, legacy ->
-                                sourceRunId = id
-                                sourceLegacyText = legacy
-                                nav.push(Route.Source)
-                            },
                             voice = app.voice,
                             openSpeechModel = { nav.push(Route.SpeechModel) },
                             onOpenTeach = { hint ->
@@ -710,6 +740,16 @@ private fun MikaRoot(
                             },
                             // The entry point is permanent: when credentials aren't configured or the protocol is incompatible it opens the gated page (explanation + go configure) instead of silently disappearing
                             onVoiceCall = { localVoiceCall++ },
+                            openDeskRun = { id, phase ->
+                                voiceCallScope.launch {
+                                    val live = app.taskState.runs.value.firstOrNull { it.conversationId == id }?.runId?.value
+                                    val run = withContext(Dispatchers.IO) {
+                                        com.wangzan101.mika.voicecall.VoiceCallTaskLink.runFor(phase, live) { ConversationStore.shared(context).turns(id) }
+                                    }
+                                    if (run == null) app.chat.openConversation(id) else { runId = run; nav.push(Route.Run) }
+                                }
+                            },
+                            openCallSettings = { nav.push(Route.CallMode) },
                         )
                     }
                     var installUpdate by remember { mutableStateOf<ReleaseInfo?>(null) }
@@ -749,6 +789,7 @@ private fun MikaRoot(
         }
         Route.Models -> ModelsScreen(store, onBack = back, onOpenSpeech = { nav.push(Route.SpeechModel) }, onOpenVoice = { nav.push(Route.VoiceModel) }, onOpenImage = { nav.push(Route.ImageModel) }, onOpenUsage = { nav.push(Route.Usage) }, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) }, onOpenCallMode = { nav.push(Route.CallMode) })
         Route.VoiceModel -> VoiceModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) })
+        Route.VoiceCall -> VoiceCallScreen(voiceCall, onGone = { nav.leave(Route.VoiceCall) })
         Route.CallMode -> CallModeScreen(onBack = back, onOpenStt = { nav.push(Route.SpeechModel) }, onOpenTts = { nav.push(Route.VoiceModel) }, onOpenRealtime = { nav.push(Route.RealtimeVoice) })
         Route.RealtimeVoice -> RealtimeVoiceScreen(store, onBack = back, onOpenCalls = { nav.push(Route.Calls) }, onOpenServices = { nav.push(Route.VoiceServices) })
         Route.VoiceServices -> VoiceServicesScreen(store, onBack = back, onOpenCustom = { nav.push(Route.VoiceCatalog) })
@@ -918,10 +959,12 @@ private fun MikaRoot(
             )
         } else page({})
     }
+    }
+    }
 
-    // The call page is layered over the whole navigation tree: a full-screen Dialog, so the host survives after it's dismissed and a service-kept call can light up again at any time
-    VoiceCallHost(voiceCallDeps, voiceCallSignal + localVoiceCall, onGoConfigure = { gate ->
-        // A standard call is missing the listen-and-speak models, so go to "call mode"; a realtime call is missing credentials, so go to the voice settings on the phone page
+    // The call host lives outside navigation: the call page is one page in the page stack, and leaving it lets the call keep going (the service keeps it alive), ready to return to anytime
+    VoiceCallHost(voiceCall, voiceCallSignal + localVoiceCall, showPage = { nav.bringToTop(Route.VoiceCall) }, hidePage = { nav.leave(Route.VoiceCall) }, onGoConfigure = { gate ->
+        // A standard call is missing its listen and speak models, so go to "Call mode"; a realtime call is missing credentials, so go to the voice settings on the calls page
         nav.push(if (gate == com.wangzan101.mika.voicecall.ui.VoiceCallGateStage.NeedListenSpeak) Route.CallMode else Route.Calls)
     })
 

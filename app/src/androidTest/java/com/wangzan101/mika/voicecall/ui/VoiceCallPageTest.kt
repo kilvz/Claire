@@ -1,5 +1,6 @@
 package com.wangzan101.mika.voicecall.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
@@ -27,11 +28,23 @@ import com.wangzan101.mika.voicecall.VoiceCallAudio
 import com.wangzan101.mika.voicecall.VoiceCallAudioRoute
 import com.wangzan101.mika.voicecall.VoiceCallError
 import com.wangzan101.mika.voicecall.VoiceCallFeed
-import com.wangzan101.mika.voicecall.VoiceCallRoute
 import com.wangzan101.mika.voicecall.VoiceCallSession
 import com.wangzan101.mika.voicecall.VoiceCallState
-import com.wangzan101.mika.voicecall.VoiceCallTaskLauncher
 import com.wangzan101.mika.voicecall.VoiceCallTranscript
+import com.wangzan101.mika.voicecall.ECHO_WINDOW_CAPACITY_CHARS
+import com.wangzan101.mika.voicecall.RingBuffer
+import com.wangzan101.mika.voicecall.VoiceCallRequest
+import com.wangzan101.mika.voicecall.VoiceDeskBridge
+import com.wangzan101.mika.voicecall.typedDeskResult
+import com.wangzan101.mika.core.frontdesk.DeskLedger
+import com.wangzan101.mika.core.frontdesk.DeskReport
+import com.wangzan101.mika.core.frontdesk.DeskSink
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
+import com.wangzan101.mika.core.frontdesk.DeskTaskPort
+import com.wangzan101.mika.core.frontdesk.DeskToolExecutor
+import com.wangzan101.mika.core.frontdesk.DispatchOutcome
+import com.wangzan101.mika.core.frontdesk.FrontDesk
+import com.wangzan101.mika.core.frontdesk.ReportPolicy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +55,9 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -59,7 +74,7 @@ import org.junit.runner.RunWith
  * Chain: connect → listen (waveform) → playback animation → barge-in → hang up → retry → time limit; permission denied → go to settings; missing credentials → go to configuration.
  */
 @RunWith(AndroidJUnit4::class)
-class VoiceCallOverlayTest {
+class VoiceCallPageTest {
 
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
 
@@ -116,62 +131,110 @@ class VoiceCallOverlayTest {
         override fun close() {}
     }
 
-    /** One fake call: a real session wired to the fake device; [connect] decides whether connecting succeeds (it may run multiple times, which pairs with retry). The conversation feed is fed exactly as in the production wiring. */
+    /** Fake background: the Nth dispatch opens tN, whose state comes from the same-named flow in [flows]; records cancellations. */
+    private class FakePort(private val flows: Map<String, MutableStateFlow<TaskState>>) : DeskTaskPort {
+        private var count = 0
+        val cancelled = mutableListOf<String>()
+        @Synchronized
+        override fun dispatch(words: String, note: String, parentConversation: String): DispatchOutcome =
+            DispatchOutcome.Started("t${++count}")
+        override fun state(taskId: String): StateFlow<TaskState>? = flows[taskId]
+        override fun queuePosition(taskId: String): Int? = null
+        override fun steer(taskId: String, words: String) = true
+        override fun answer(taskId: String, words: String) = true
+        override fun cancel(taskId: String): Boolean { cancelled += taskId; return true }
+    }
+
+    /**
+     * A fake call: a real session over fake devices; [connect] decides whether connecting succeeds (repeatable, for retries).
+     * The front desk, bridge and conversation feed are wired as in production (with the background replaced by [FakePort]).
+     * The session starts connecting as soon as it is built, before the test's variables are assigned: [connect] receives this
+     * call as its receiver and connects through its own [rt] rather than an outer variable.
+     */
     private inner class Call(
-        val route: VoiceCallRoute,
-        connect: suspend (Int) -> CallRealtimeSession,
-        timeLimitMs: Long = 600_000L,
+        flows: Map<String, MutableStateFlow<TaskState>> = emptyMap(),
+        connect: suspend Call.(Int) -> CallRealtimeSession,
+        idleMs: Long? = 600_000L,
     ) {
         val audio = FakeAudio()
         val rt = FakeRealtime()
         val feed = VoiceCallFeed()
+        val port = FakePort(flows)
         val transcript = VoiceCallTranscript(
             conversationId = { null },
             appendTurn = { _, _ -> },
         )
-        val session = VoiceCallSession(
-            scope = scope,
-            audio = audio,
-            foregroundResumed = MutableStateFlow(true),
-            connect = connect,
-            greeting = "你好",
-            onVoiceRequest = { callId, text -> scope.launch { route.execute(callId, text) } },
-            onBargeIn = route::onBargeIn,
-            onUserTranscript = { text, isFinal ->
-                feed.onUser(text, isFinal)
-                if (isFinal) transcript.onUser(text)
-            },
-            onAssistantTranscript = { text, isFinal ->
-                feed.onAssistant(text, isFinal)
-                if (isFinal) transcript.onAssistant(text)
-            },
-            onAssistantDraft = feed::onAssistantDraft,
-            timeLimitMs = timeLimitMs,
-        )
+        private val ledger = DeskLedger()
+        val desk = FrontDesk("conv-1", scope, port, ledger, ReportPolicy(System::currentTimeMillis), object : DeskSink {
+            override suspend fun record(conversationId: String, report: DeskReport) {}
+        })
+        private val echoWindow = RingBuffer<String>(ECHO_WINDOW_CAPACITY_CHARS)
+        private val gate = VoiceCallRequest(echoWindow)
+        private val executor = DeskToolExecutor(port, ledger, gate, System::currentTimeMillis, "conv-1") {
+            desk.track(it.taskId, it.title)
+        }
+        private val bridge = VoiceDeskBridge(desk, executor, { rt }, { it.title }, echoWindow::append)
+        val busy = desk.active.map { views -> views.any { it.state == DeskTaskPhase.Running || it.state == DeskTaskPhase.Queued } }
+            .stateIn(scope, SharingStarted.Eagerly, false)
+        lateinit var session: VoiceCallSession
 
         init {
-            scope.launch { combine(route.busy, route.lines, ::Pair).collect { (busy, lines) -> feed.onTask(busy, lines) } }
+            session = VoiceCallSession(
+                scope = scope,
+                audio = audio,
+                foregroundResumed = MutableStateFlow(true),
+                connect = { attempt -> connect(attempt) },
+                greeting = "你好",
+                echoWindow = echoWindow,
+                requestGate = gate,
+                onDeskCall = { callId, name, args -> scope.launch { bridge.onFunctionCall(callId, name, args) } },
+                onTypedText = { text ->
+                    scope.launch {
+                        typedDeskResult(bridge.dispatchTyped(text)).let {
+                            transcript.onAssistant(it)
+                            feed.onAssistant(it, isFinal = true)
+                        }
+                        session.onLocalReply()
+                    }
+                },
+                onUserTranscript = { text, isFinal ->
+                    feed.onUser(text, isFinal)
+                    if (isFinal) transcript.onUser(text)
+                },
+                onAssistantTranscript = { text, isFinal ->
+                    feed.onAssistant(text, isFinal)
+                    if (isFinal) transcript.onAssistant(text)
+                },
+                onAssistantDraft = feed::onAssistantDraft,
+                idleMs = idleMs,
+            )
+            bridge.attach()
+            scope.launch { desk.active.collect(feed::onTasks) }
         }
     }
 
-    private fun fakeRoute(
-        flows: Map<String, MutableStateFlow<TaskState>> = emptyMap(),
-        cancelled: MutableList<String> = mutableListOf(),
-    ) = VoiceCallRoute(
-        launcher = VoiceCallTaskLauncher { "conv-1" },
-        runState = { flows[it] },
-        sendResult = { _, _ -> },
-        cancelTask = { id ->
-            cancelled += id
-            flows[id]?.value = TaskState.Cancelled
-        },
-    )
+    /**
+     * Draw with animation off: with the dot-matrix ball animating, every frame requests the next one, so UI tests never
+     * reach idle (ComposeNotIdle); with it off the ball is drawn statically by shape and level, and the shape testTag stays the same.
+     */
+    @androidx.compose.runtime.Composable
+    private fun StillTheme(content: @androidx.compose.runtime.Composable () -> Unit) = MikaTheme(reduceMotion = true, content = content)
 
-    private fun show(call: Call, onCollapse: () -> Unit = {}) {
+    private fun show(
+        call: Call,
+        onCollapse: () -> Unit = {},
+        screens: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
+        frames: (String) -> StateFlow<android.graphics.Bitmap?>? = { null },
+        onOpenTask: (String) -> Unit = {},
+        calls: List<com.wangzan101.mika.chat.ConversationCall> = emptyList(),
+        onOpenRecord: (String) -> Unit = {},
+    ) {
         val audioRoute = VoiceCallAudioRoute(InstrumentationRegistry.getInstrumentation().targetContext)
-        val holder = VoiceCallHolder(call.session, call.route, audioRoute, call.transcript, call.feed)
+        val holder = VoiceCallHolder(call.session, call.busy, audioRoute, call.transcript, call.feed, screens, frames)
         compose.setContent {
-            MikaTheme { VoiceCallOverlay(holder, onCollapse) }
+            StillTheme {
+                VoiceCallPage(holder, onCollapse, { onOpenTask(it.taskId) }, calls, onOpenRecord)
+            }
         }
     }
 
@@ -187,7 +250,7 @@ class VoiceCallOverlayTest {
         assertTrue(pred())
     }
 
-    /** Waits for a text node to appear (the conversation feed is updated asynchronously through route→feed, so asserting directly can miss it). */
+    /** Wait for a text node to appear (the conversation feed updates asynchronously through the front desk → feed, so asserting directly can miss it). */
     private fun awaitText(text: String, timeoutMs: Long = 5_000) {
         compose.waitUntil(timeoutMs) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
@@ -224,7 +287,7 @@ class VoiceCallOverlayTest {
 
     @Test fun connectingShowsStatusAndWebBallThenActiveShowsClockAndGlobe() {
         val gate = kotlinx.coroutines.CompletableDeferred<CallRealtimeSession>()
-        val call = Call(fakeRoute(), connect = { gate.await() })
+        val call = Call(connect = { gate.await() })
         show(call)
         // Connecting: status word + Web-shaped ball; the timer has not started yet
         compose.onNodeWithText("正在连接…").assertIsDisplayed()
@@ -234,14 +297,14 @@ class VoiceCallOverlayTest {
         gate.complete(call.rt)
         reachActive(call)
         compose.onNodeWithText("在听你说").assertIsDisplayed()
-        compose.onNodeWithTag("voicecall-clock").assertTextEquals("0:00")
+        // The timer lives in the hang-up button and is merged into the button semantics, so search the unmerged tree
+        compose.onNodeWithTag("voicecall-clock", useUnmergedTree = true).assertTextEquals("0:00")
         awaitBall("Globe")
         call.session.end(EndReason.Hangup)
     }
 
     @Test fun micLevelSwitchesBallToWave() {
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = { call.rt })
+        val call = Call(connect = { rt })
         show(call)
         reachActive(call)
         awaitBall("Globe")
@@ -252,8 +315,7 @@ class VoiceCallOverlayTest {
     }
 
     @Test fun cloudAudioDrivesSpeakerLevelAndWave() {
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = { call.rt })
+        val call = Call(connect = { rt })
         show(call)
         reachActive(call)
         awaitBall("Globe")
@@ -264,13 +326,12 @@ class VoiceCallOverlayTest {
     }
 
     @Test fun workingTaskShowsTaskCardAndStatusLines() {
-        val flow = MutableStateFlow<TaskState>(TaskState.Running(1, "正在打开设置"))
-        val route = fakeRoute(mapOf("conv-1" to flow))
-        lateinit var call: Call
-        call = Call(route, connect = { call.rt })
+        // The progress on the task card is the line the task shows the user (narration), not the step note
+        val flow = MutableStateFlow<TaskState>(TaskState.Running(1, "open_app", narration = "正在打开设置"))
+        val call = Call(mapOf("t1" to flow), connect = { rt })
         show(call)
         reachActive(call)
-        // Typing to get things done: tap the keyboard to expand the input row, and after sending, the route claims it and the step card appears
+        // Typing to work: tap the keyboard to expand the input row, sending dispatches straight away and the task card appears
         compose.onNodeWithTag("voicecall-keyboard").performClick()
         compose.onNodeWithTag("voicecall-input").performTextInput("帮我开深色模式")
         compose.onNodeWithTag("voicecall-send").performClick()
@@ -282,29 +343,60 @@ class VoiceCallOverlayTest {
         call.session.end(EndReason.Hangup)
     }
 
-    @Test fun bargeInInterruptsPlaybackAndCancelsTheRunningTask() {
-        val flow = MutableStateFlow<TaskState>(TaskState.Running(1, "正在打开设置"))
-        val cancelled = mutableListOf<String>()
-        val route = fakeRoute(mapOf("conv-1" to flow), cancelled)
-        lateinit var call: Call
-        call = Call(route, connect = { call.rt })
+    @Test fun tappingATaskCardOpensItAndViewScreenShowsTheScreenOnTheCallPage() {
+        val flow = MutableStateFlow<TaskState>(TaskState.Running(1, "open_app", narration = "正在打开设置"))
+        val call = Call(mapOf("t1" to flow), connect = { rt })
+        val screens = MutableStateFlow<Set<String>>(emptySet())
+        val frame = MutableStateFlow<android.graphics.Bitmap?>(android.graphics.Bitmap.createBitmap(90, 160, android.graphics.Bitmap.Config.ARGB_8888))
+        val opened = mutableListOf<String>()
+        show(call, screens = screens, frames = { frame }, onOpenTask = { opened += it })
+        reachActive(call)
+        compose.onNodeWithTag("voicecall-keyboard").performClick()
+        compose.onNodeWithTag("voicecall-input").performTextInput("帮我开深色模式")
+        compose.onNodeWithTag("voicecall-send").performClick()
+        awaitText("正在打开设置")
+        // No screen yet: no "view screen"; once the screen exists it appears
+        compose.onAllNodesWithTag("voicecall-task-screen").assertCountEquals(0)
+        val taskId = call.feed.items.value.filterIsInstance<com.wangzan101.mika.voicecall.VoiceCallFeedItem.Task>().single().taskId
+        screens.value = setOf(taskId)
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("voicecall-task-screen").fetchSemanticsNodes().isNotEmpty() }
+        // Tap "view screen": the picture appears on the call page without leaving the call; × closes it
+        compose.onNodeWithTag("voicecall-task-screen").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("voicecall-screen-panel").fetchSemanticsNodes().isNotEmpty() }
+        assertTrue(opened.isEmpty())
+        compose.onNodeWithTag("voicecall-screen-close").performClick()
+        compose.onAllNodesWithTag("voicecall-screen-panel").assertCountEquals(0)
+        // Tap the card: hand off to the host to open that task
+        compose.onNodeWithTag("voicecall-task").performClick()
+        assertEquals(listOf(taskId), opened)
+        // Once finished, "view screen" no longer appears
+        flow.value = TaskState.Succeeded("开好了")
+        awaitText("已完成")
+        compose.onAllNodesWithTag("voicecall-task-screen").assertCountEquals(0)
+        call.session.end(EndReason.Hangup)
+    }
+
+    @Test fun bargeInInterruptsPlaybackButNeverCancelsTheRunningTask() {
+        // The progress on the task card is the line the task shows the user (narration), not the step note
+        val flow = MutableStateFlow<TaskState>(TaskState.Running(1, "open_app", narration = "正在打开设置"))
+        val call = Call(mapOf("t1" to flow), connect = { rt })
         show(call)
         reachActive(call)
         compose.onNodeWithTag("voicecall-keyboard").performClick()
         compose.onNodeWithTag("voicecall-input").performTextInput("帮我开深色模式")
         compose.onNodeWithTag("voicecall-send").performClick()
         awaitText("正在打开设置")
-        // The user starts speaking to barge in: playback stops at once and tasks that were started but not finished are cancelled
+        // The user interrupts by speaking: only playback stops; the background task keeps running
         call.rt.emit(VolcRealtimeEvent.UserSpeaking)
-        awaitValue { cancelled == listOf("conv-1") }
-        assertEquals(1, call.audio.interruptCount)
-        awaitText("已取消")
+        awaitValue { call.audio.interruptCount == 1 }
+        assertTrue(call.port.cancelled.isEmpty())
+        assertTrue(flow.value is TaskState.Running)
+        compose.onAllNodesWithText("正在打开设置").fetchSemanticsNodes().isNotEmpty().let(::assertTrue)
         call.session.end(EndReason.Hangup)
     }
 
     @Test fun hangupShowsEndedCopy() {
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = { call.rt })
+        val call = Call(connect = { rt })
         show(call)
         reachActive(call)
         compose.onNodeWithTag("voicecall-hangup").performClick()
@@ -315,9 +407,8 @@ class VoiceCallOverlayTest {
 
     @Test fun failureShowsErrorCopyAndRetryRerunsTheFlow() {
         val attempts = AtomicInteger(0)
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = {
-            if (attempts.incrementAndGet() == 1) throw VolcRealtimeException(VolcRealtimeException.Kind.TIMEOUT) else call.rt
+        val call = Call(connect = {
+            if (attempts.incrementAndGet() == 1) throw VolcRealtimeException(VolcRealtimeException.Kind.TIMEOUT) else rt
         })
         show(call)
         // First failure: error copy (one in the top-bar status and one in the error card) + retry in place
@@ -329,19 +420,17 @@ class VoiceCallOverlayTest {
         call.session.end(EndReason.Hangup)
     }
 
-    @Test fun timeLimitEndsTheCallWithItsOwnCopy() {
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = { call.rt }, timeLimitMs = 300L)
+    @Test fun aQuietCallEndsWithItsOwnCopy() {
+        val call = Call(connect = { rt }, idleMs = 300L)
         show(call)
         reachActive(call)
-        awaitState(call.session) { it == VoiceCallState.Ended(EndReason.TimeLimit) }
-        compose.onNodeWithText("聊满 10 分钟，通话结束").assertIsDisplayed()
+        awaitState(call.session) { it == VoiceCallState.Ended(EndReason.Idle, idleMinutes = 1) }
+        compose.onNodeWithText("1 分钟没有动静，通话已结束", substring = true).assertIsDisplayed()
     }
 
     @Test fun collapseInvokesCallback() {
         val collapses = AtomicInteger(0)
-        lateinit var call: Call
-        call = Call(fakeRoute(), connect = { call.rt })
+        val call = Call(connect = { rt })
         show(call, onCollapse = { collapses.incrementAndGet() })
         reachActive(call)
         compose.onNodeWithTag("voicecall-collapse").performClick()
@@ -349,14 +438,27 @@ class VoiceCallOverlayTest {
         call.session.end(EndReason.Hangup)
     }
 
-    // ---------- permission / credential gates ----------
+    @Test fun theLastCallLinkJumpsToItAndThePageHasNoMenu() {
+        val picked = mutableListOf<String>()
+        val earlier = com.wangzan101.mika.chat.ConversationCall("old", 1_000L, 61_000L, spoke = true)
+        val call = Call(connect = { rt })
+        show(call, calls = listOf(earlier), onOpenRecord = { picked += it })
+        reachActive(call)
+        compose.onNodeWithTag("voicecall-last-call").performClick()
+        assertEquals(listOf("old"), picked)
+        // Call records and call settings are entered from ⋯ at the top right of the chat page; the call page no longer has ⋯
+        compose.onNodeWithTag("voicecall-more").assertDoesNotExist()
+        call.session.end(EndReason.Hangup)
+    }
+
+    // ---------- permission / credential gate ----------
 
     @Test fun permissionGateRequestsThenPointsToSettings() {
         val requests = AtomicInteger(0)
         val settings = AtomicInteger(0)
         var stage by mutableStateOf(VoiceCallGateStage.NeedPermission)
         compose.setContent {
-            MikaTheme {
+            StillTheme {
                 VoiceCallGate(
                     stage,
                     onRequestPermission = { requests.incrementAndGet() },
@@ -378,7 +480,7 @@ class VoiceCallOverlayTest {
     @Test fun credentialsGatePointsToSetup() {
         val setups = AtomicInteger(0)
         compose.setContent {
-            MikaTheme {
+            StillTheme {
                 VoiceCallGate(
                     VoiceCallGateStage.NeedCredentials,
                     onRequestPermission = {},
@@ -396,7 +498,7 @@ class VoiceCallOverlayTest {
     @Test fun unsupportedProtocolGateExplainsAndPointsToSetup() {
         val setups = AtomicInteger(0)
         compose.setContent {
-            MikaTheme {
+            StillTheme {
                 VoiceCallGate(
                     VoiceCallGateStage.UnsupportedProtocol,
                     onRequestPermission = {},

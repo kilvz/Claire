@@ -25,9 +25,19 @@ internal fun chatItemKeys(
     kept: KeptPage?,
     phoneSetupRow: Int?,
     hasBlocked: Boolean,
+    calls: CallMarks = CallMarks.None,
+    needs: List<String> = emptyList(),
 ): List<String> = buildList {
-    if (exchanges.isEmpty() && !hasBlocked) add("empty")
+    if (exchanges.isEmpty() && !hasBlocked && calls.isEmpty()) add("empty")
     exchanges.forEachIndexed { index, ex ->
+        calls.before(index).forEach { add(it.key) }
+        if (timeMarkAt(exchanges, index, calls) != null) add(timeMarkKey(index))
+        // A front desk row: the user bubble and the front desk's words (still occupying a row when there are none)
+        if (ex.deskReply != null) {
+            if (ex.goal.isNotEmpty()) add("u$index")
+            add("r$index")
+            return@forEachIndexed
+        }
         if (ex.goal.isNotEmpty()) add("u$index")
         val active = ex.status.isActive()
         val answering = ex.status == ExchangeStatus.Working && !ex.draft.isNullOrBlank()
@@ -44,6 +54,8 @@ internal fun chatItemKeys(
         if (ex.runId != null && (ex.memoryNotes.isNotEmpty() || ex.skillNotes.isNotEmpty())) add("m$index")
         if (phoneSetupRow == index) add("ps$index")
     }
+    calls.tail.forEach { add(it.key) }
+    needs.forEach { add(needCardKey(it)) }
     if (phoneSetupRow == -1 && exchanges.isNotEmpty()) add("phone-setup")
     if (hasBlocked) add("blocked")
 }
@@ -57,10 +69,36 @@ internal fun chatItemCount(
     kept: KeptPage?,
     phoneSetupRow: Int?,
     hasBlocked: Boolean,
-): Int = chatItemKeys(exchanges, kept, phoneSetupRow, hasBlocked).size
+    calls: CallMarks = CallMarks.None,
+    needs: List<String> = emptyList(),
+): Int = chatItemKeys(exchanges, kept, phoneSetupRow, hasBlocked, calls, needs).size
+
+/** The row key of the question card at the end of the conversation when task [taskId] dispatched by the front desk needs you. */
+internal fun needCardKey(taskId: String) = "need-$taskId"
+
+/** Two consecutive turns this far apart get a time row between them. */
+internal const val TIME_MARK_GAP_MS = 5 * 60_000L
+
+/** The key of the time row above turn [index]. */
+internal fun timeMarkKey(index: Int) = "t$index"
+
+/** The time of this turn: restored turns use the stored time, ones started now use the start time; null when neither exists. */
+internal val Exchange.timeMs: Long? get() = atMs ?: startedAt.takeIf { it > 0L }
+
+/**
+ * The time of the row above turn [index]: the first turn draws it when it has a time, later turns only once at least [TIME_MARK_GAP_MS] has passed since the last turn with a time;
+ * null when this turn is directly preceded by a call row (which carries its own time) or when the turn has no time.
+ */
+internal fun timeMarkAt(exchanges: List<Exchange>, index: Int, calls: CallMarks): Long? {
+    if (calls.before(index).isNotEmpty()) return null
+    val at = exchanges.getOrNull(index)?.timeMs ?: return null
+    val previous = (index - 1 downTo 0).firstNotNullOfOrNull { exchanges[it].timeMs }
+    return at.takeIf { previous == null || at - previous > TIME_MARK_GAP_MS }
+}
 
 /** Key of the target message in [chatItemKeys]; returns null when the turn or message is gone. */
 internal fun chatTargetKey(exchanges: List<Exchange>, target: ChatTarget): String? {
+    if (target is ChatTarget.Call) return callStartKey(target.callId)
     val turn = target.turnIndex
     val ex = exchanges.getOrNull(turn) ?: return null
     return when (target) {
@@ -73,6 +111,7 @@ internal fun chatTargetKey(exchanges: List<Exchange>, target: ChatTarget): Strin
         is ChatTarget.Reply -> turnStartKey(turn, ex)
         is ChatTarget.Files -> if (ex.files.isNotEmpty()) "f$turn" else turnStartKey(turn, ex)
         is ChatTarget.Status -> "r$turn"
+        is ChatTarget.Call -> callStartKey(target.callId)
     }
 }
 
@@ -90,4 +129,5 @@ private val ChatTarget.turnIndex: Int
         is ChatTarget.Reply -> this.turnIndex
         is ChatTarget.Files -> this.turnIndex
         is ChatTarget.Status -> this.turnIndex
+        is ChatTarget.Call -> -1
     }

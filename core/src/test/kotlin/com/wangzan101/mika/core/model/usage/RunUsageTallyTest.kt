@@ -13,7 +13,7 @@ class RunUsageTallyTest {
         assertEquals(5L, tally.totalTokens())
         try {
             tally.checkBudget()
-            fail("达到上限后必须拒绝下一次请求")
+            fail("must reject the next request once the limit is reached")
         } catch (e: ModelError.TaskBudgetExceeded) {
             assertEquals(5L, e.limit)
             assertEquals(5L, e.used)

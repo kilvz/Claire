@@ -3,6 +3,8 @@ package com.wangzan101.mika.voicecall
 import com.wangzan101.mika.voicecall.VoiceCallFeedItem.Said
 import com.wangzan101.mika.voicecall.VoiceCallFeedItem.Speaker
 import com.wangzan101.mika.voicecall.VoiceCallFeedItem.Task
+import com.wangzan101.mika.core.frontdesk.DeskTaskPhase
+import com.wangzan101.mika.core.frontdesk.DeskTaskView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,23 +44,42 @@ class VoiceCallFeedTest {
         assertTrue(feed.items.value.isEmpty())
     }
 
-    @Test fun `a task card collects new status lines and closes when the route is idle`() {
+    private fun view(id: String, phase: DeskTaskPhase, line: String?, recent: List<String> = emptyList()) =
+        DeskTaskView(id, "标题$id", phase, line, null, recent)
+
+    @Test fun `each desk task gets one card that collects its progress`() {
         val feed = VoiceCallFeed()
-        val old = listOf("上次办完了")
-        feed.onTask(busy = false, lines = old)
-        assertTrue("no card when not running a task", feed.items.value.isEmpty())
-        feed.onTask(busy = true, lines = old)
-        var task = feed.items.value.single() as Task
-        assertTrue(task.running)
-        assertTrue("lines left over from the previous run do not count as this run's steps", task.steps.isEmpty())
-        feed.onTask(busy = true, lines = old + "打开天气")
-        feed.onTask(busy = true, lines = old + "打开天气" + "读取预报")
-        feed.onTask(busy = false, lines = old + "打开天气" + "读取预报" + "已办完")
-        task = feed.items.value.single() as Task
-        assertEquals(listOf("打开天气", "读取预报", "已办完"), task.steps)
-        assertFalse(task.running)
-        feed.onTask(busy = true, lines = old + "打开天气" + "读取预报" + "已办完")
-        assertEquals("the next task opens a new card", 2, feed.items.value.filterIsInstance<Task>().size)
+        // Tasks already finished when the call opens were dispatched earlier, so they get no card; ones still running get a card as usual.
+        feed.onTasks(listOf(view("old", DeskTaskPhase.Done, "上次办完了"), view("t0", DeskTaskPhase.Running, "打开日历")))
+        assertEquals(listOf("t0"), feed.items.value.filterIsInstance<Task>().map { it.taskId })
+        feed.onTasks(
+            listOf(
+                view("old", DeskTaskPhase.Done, "上次办完了"),
+                view("t0", DeskTaskPhase.Running, "读日程", listOf("打开日历", "读日程")),
+                view("t1", DeskTaskPhase.Queued, null),
+            ),
+        )
+        var cards = feed.items.value.filterIsInstance<Task>()
+        assertEquals(listOf("t0", "t1"), cards.map { it.taskId })
+        assertEquals(listOf("打开日历", "读日程"), cards[0].steps)
+        assertTrue(cards[1].running)
+        feed.onTasks(listOf(view("t0", DeskTaskPhase.Done, "办完了", listOf("打开日历", "读日程")), view("t1", DeskTaskPhase.Running, "打开天气")))
+        cards = feed.items.value.filterIsInstance<Task>()
+        assertEquals(listOf("打开日历", "读日程", "办完了"), cards[0].steps)
+        assertFalse(cards[0].running)
+        assertEquals("标题t0", cards[0].title)
+        assertEquals(listOf("打开天气"), cards[1].steps)
+        assertEquals("the same task does not open a second card", 2, cards.size)
+    }
+
+    @Test fun `a new call starts empty and a task that ended before it gets no card`() {
+        val feed = VoiceCallFeed()
+        assertTrue(feed.items.value.isEmpty())
+        // Tasks already finished on the board when the call opens were dispatched earlier: no card; only tasks dispatched afterwards get one
+        feed.onTasks(listOf(view("old", DeskTaskPhase.Done, "订好了")))
+        assertTrue(feed.items.value.isEmpty())
+        feed.onTasks(listOf(view("old", DeskTaskPhase.Done, "订好了"), view("t1", DeskTaskPhase.Running, "打开天气")))
+        assertEquals(listOf("t1"), feed.items.value.filterIsInstance<Task>().map { it.taskId })
     }
 
     @Test fun `the feed keeps only the latest items`() {

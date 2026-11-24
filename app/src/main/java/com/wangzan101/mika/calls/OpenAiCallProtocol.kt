@@ -23,7 +23,7 @@ internal object OpenAiCallProtocol {
                 }
                 putJsonObject("output") { put("format", format); put("voice", config.speaker) }
             }
-            if (config.enablePhoneDtmf) put("tools", VolcRealtimeProtocol.phoneTools())
+            if (config.enablePhoneDtmf) put("tools", VolcRealtimeProtocol.phoneCallTools())
         }
     }.toString()
 
@@ -47,6 +47,22 @@ internal object OpenAiCallProtocol {
             put("tool_choice", "none")
         }
     }.toString()
+
+    /** A note to the model: enters the conversation as a system text item (not something the other party said); send [respond] to have the model continue speaking. */
+    fun systemNote(text: String) = buildJsonObject {
+        put("type", "conversation.item.create")
+        putJsonObject("item") {
+            put("type", "message")
+            put("role", "system")
+            put("content", JsonArray(listOf(buildJsonObject {
+                put("type", "input_text")
+                put("text", text)
+            })))
+        }
+    }.toString()
+
+    /** Ask the model to reply in the current context (without instructions, not reading a script). */
+    fun respond() = """{"type":"response.create"}"""
 
     fun toolResult(id: String, result: JsonObject) = buildJsonObject {
         put("type", "conversation.item.create")

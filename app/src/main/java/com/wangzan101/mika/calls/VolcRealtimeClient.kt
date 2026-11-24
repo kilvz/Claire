@@ -249,6 +249,56 @@ class VolcRealtimeSession internal constructor(
         return send(if (openAi) OpenAiCallProtocol.greeting(text) else VolcRealtimeProtocol.greeting(nextId(), text))
     }
 
+    /**
+     * A front desk report: the sentence assembled by code is read out verbatim (same path as the greeting), with queueing handled by the server.
+     * It only counts as fully spoken once the reply that starts after it is handed off finishes playing; before that, the user speaking, the reply being cancelled, or the call dropping all count as not spoken.
+     */
+    @Synchronized override fun sendNotice(text: String, ended: (spoken: Boolean) -> Unit): Boolean {
+        if (phase != Phase.ACTIVE || text.isBlank() || text.length > VolcRealtimeProtocol.MAX_TOOL_RESULT_CHARS) return false
+        val sent = send(if (openAi) OpenAiCallProtocol.greeting(text) else VolcRealtimeProtocol.greeting(nextId(), text))
+        if (sent) notices.addLast(PendingNotice(ended))
+        return sent
+    }
+
+    /**
+     * A cue to the model, passed on in its own words: realtime protocols that can add system text items add one and then
+     * ask the model to reply; whether it was fully spoken is tracked the same way as reports.
+     * The duplex conversation protocol only accepts verbatim `speech_text_buffer` text and has no text input that keeps
+     * the model replying, so this returns false (the phone front desk then makes the model ask again to fetch the answer,
+     * see [PhoneDesk.canCue]).
+     */
+    @Synchronized override fun sendCue(text: String, ended: (spoken: Boolean) -> Unit): Boolean {
+        if (!openAi || phase != Phase.ACTIVE || text.isBlank() || text.length > VolcRealtimeProtocol.MAX_TOOL_RESULT_CHARS) return false
+        if (!send(OpenAiCallProtocol.systemNote(text)) || !send(OpenAiCallProtocol.respond())) return false
+        notices.addLast(PendingNotice(ended))
+        return true
+    }
+
+    /** A background-only cue: realtime protocols that can add system text items add one without asking the model to speak; the duplex conversation protocol has no such input and returns false. */
+    @Synchronized override fun sendContext(text: String): Boolean {
+        if (!openAi || phase != Phase.ACTIVE || text.isBlank() || text.length > VolcRealtimeProtocol.MAX_TOOL_RESULT_CHARS) return false
+        return send(OpenAiCallProtocol.systemNote(text))
+    }
+
+    /** A report handed off but not yet fully spoken; [playing] means a new reply has started after it was handed off, and this report counts as spoken once that reply finishes. */
+    private class PendingNotice(val ended: (Boolean) -> Unit, var playing: Boolean = false)
+    private val notices = ArrayDeque<PendingNotice>()
+
+    /** A new reply started playing: the report at the front that has not started yet is the one. */
+    private fun noticeAudioStarted() {
+        notices.firstOrNull { !it.playing }?.playing = true
+    }
+
+    /** A reply finished playing: the report currently playing is fully spoken. */
+    private fun noticeAudioDone() {
+        if (notices.firstOrNull()?.playing == true) notices.removeFirst().ended(true)
+    }
+
+    /** The user spoke, the reply was cancelled, or the call dropped: all handed-off reports count as not spoken. */
+    private fun cutNotices() {
+        while (notices.isNotEmpty()) notices.removeFirst().ended(false)
+    }
+
     @Synchronized override fun setMuted(muted: Boolean): Boolean {
         if (phase != Phase.ACTIVE) return false
         if (this.muted == muted) return true
@@ -457,6 +507,7 @@ class VolcRealtimeSession internal constructor(
                 if (!audioActive || (responseId != null && responseId != audioId)) {
                     audioId = responseId
                     audioActive = true
+                    noticeAudioStarted()
                     publish(VolcRealtimeEvent.AssistantAudioStarted)
                 }
             }
@@ -467,6 +518,7 @@ class VolcRealtimeSession internal constructor(
                 acceptResponseIdentity(responseId)
                 if (!audioActive) {
                     audioActive = true
+                    noticeAudioStarted()
                     publish(VolcRealtimeEvent.AssistantAudioStarted)
                 }
                 if (responseId != null) {
@@ -483,6 +535,7 @@ class VolcRealtimeSession internal constructor(
             VolcRealtimeProtocol.AUDIO_DONE -> if (!isRetiredResponse(responseId) && audioActive && (responseId == null || responseId == audioId || audioId == null)) {
                 audioActive = false
                 audioId = null
+                noticeAudioDone()
                 publish(VolcRealtimeEvent.AssistantAudioEnded)
             }
             VolcRealtimeProtocol.CANCELED -> {
@@ -552,8 +605,10 @@ class VolcRealtimeSession internal constructor(
                 stale -> "stale_response"
                 name == VolcRealtimeProtocol.DTMF_FUNCTION && config.enablePhoneDtmf ->
                     if (arguments == null || !VolcRealtimeProtocol.validDtmfArguments(arguments)) "invalid_arguments" else null
-                name == VolcRealtimeProtocol.MIKA_REQUEST_FUNCTION && config.agentTools ->
-                    if (arguments == null || !VolcRealtimeProtocol.validAgentArguments(arguments)) "invalid_arguments" else null
+                name in VolcRealtimeProtocol.phoneDeskToolNames && config.enablePhoneDtmf ->
+                    if (arguments == null || !VolcRealtimeProtocol.validDeskArguments(name!!, arguments)) "invalid_arguments" else null
+                name in VolcRealtimeProtocol.deskToolNames && config.agentTools ->
+                    if (arguments == null || !VolcRealtimeProtocol.validDeskArguments(name!!, arguments)) "invalid_arguments" else null
                 else -> "unsupported_tool"
             }
             if (error != null) {
@@ -628,6 +683,7 @@ class VolcRealtimeSession internal constructor(
     }
 
     private fun interruptAudio() {
+        cutNotices()
         // Text can arrive before synthesis starts. Retire that observed identity too.
         retireResponse(lastResponseId)
         lastResponseId = null
@@ -685,6 +741,7 @@ class VolcRealtimeSession internal constructor(
         if (phase == Phase.ENDED) return
         phase = Phase.ENDED
         closeWatchdog?.cancel()
+        cutNotices()
         val connection = socket
         socket = null
         if (cancelSocket) connection?.cancel()

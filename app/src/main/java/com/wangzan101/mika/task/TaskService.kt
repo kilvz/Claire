@@ -171,7 +171,7 @@ class TaskService : Service() {
         val run = if (intent?.hasExtra(EXTRA_RUN) == true) intent.getStringExtra(EXTRA_RUN)?.let(center::byKey) else taskState.shownRun
         when (intent?.action) {
             ACTION_START -> begin(intent.getStringExtra(EXTRA_GOAL).orEmpty(), intent.getStringExtra(EXTRA_CONVERSATION),
-                messageId = intent.getStringExtra(EXTRA_MESSAGE_ID))
+                messageId = intent.getStringExtra(EXTRA_MESSAGE_ID), brief = intent.getStringExtra(EXTRA_BRIEF))
             ACTION_ENQUEUE_FOLLOWUP -> {
                 val thread = intent.getStringExtra(EXTRA_CONVERSATION)
                 val text = intent.getStringExtra(EXTRA_GOAL).orEmpty()
@@ -318,12 +318,15 @@ class TaskService : Service() {
         /** The next ID for result notifications when parallel (reused cyclically). */
         internal fun nextResultId() = ID_RESULT_FIRST + resultCount.getAndIncrement() % RESULT_IDS
 
-        /** Posts results and notices as notifications (shared by the service and by recovery at app start); [resultId] is the ID of the result notification. */
-        internal fun notifyDelivery(context: Context, delivery: Delivery, resultId: Int, scheduled: Boolean = false): SendOutcome {
+        /**
+         * Send results and prompts as notifications (shared by the service and by app-start recovery); [resultId] is the result notification's id.
+         * When [ownResult] is false the result is not notified: the front desk is following this run and reports it (see [ownResultNotice]).
+         */
+        internal fun notifyDelivery(context: Context, delivery: Delivery, resultId: Int, scheduled: Boolean = false, ownResult: Boolean = true): SendOutcome {
             val nm = context.getSystemService(NotificationManager::class.java)
             when (delivery) {
-                // When Claire is in the foreground (the user is looking at the chat page) no task-completion notification is posted and the result is shown in-app only; the notification is kept only after switching to another app (#731)
-                is Delivery.Result -> if (!MainActivity.foreground) nm.notify(resultId, Notification.Builder(context, CHANNEL_RESULT)
+                // While Claire is in the foreground (the user is looking at the chat page) do not pop a task-complete notification; show the result in-app only and keep the notification for when the user switches to another app (#731).
+                is Delivery.Result -> if (!MainActivity.foreground && ownResult) nm.notify(resultId, Notification.Builder(context, CHANNEL_RESULT)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(delivery.title)
                     .setContentText(delivery.text)
@@ -373,6 +376,7 @@ class TaskService : Service() {
         internal const val FAILURE_STREAK_NOTICE = 3
         internal const val EXTRA_GOAL = "goal"
         internal const val EXTRA_MESSAGE_ID = "message_id"
+        internal const val EXTRA_BRIEF = "brief"
         internal const val EXTRA_SOURCE = "source"
         internal const val EXTRA_CONVERSATION = "conversation"
         internal const val EXTRA_TRIGGER_KEY = "trigger_key"
@@ -435,15 +439,22 @@ class TaskService : Service() {
                 .putExtra(EXTRA_WORKFLOW_ATTEMPT, attemptId))
         }
 
-        /** Starts a task; queues when another conversation is busy. When messageId is non-null it is handled as a steer. */
-        fun start(context: Context, goal: String, conversationId: String? = null, messageId: String? = null) {
+        /**
+         * Start a task; queue it when another conversation is busy. A non-empty messageId is handled as an interjection.
+         * [goal] is the user's own words; [brief] is the supplementary note attached when the front desk dispatches work, which enters the task context as Claire's note rather than the user's words.
+         */
+        fun start(context: Context, goal: String, conversationId: String? = null, messageId: String? = null, brief: String? = null) {
             if (FeatureFlags.get(context).quitRequested()) return
             context.startForegroundService(
-                Intent(context, TaskService::class.java).setAction(ACTION_START).putExtra(EXTRA_GOAL, goal)
-                    .apply { if (conversationId != null) putExtra(EXTRA_CONVERSATION, conversationId) }
-                    .apply { if (messageId != null) putExtra(EXTRA_MESSAGE_ID, messageId) },
+                Intent(context, TaskService::class.java).setAction(ACTION_START)
+                    .apply { startExtras(goal, conversationId, messageId, brief).forEach { (k, v) -> putExtra(k, v) } },
             )
         }
+
+        /** The fields carried by the request [start] sends; absent ones are omitted. */
+        internal fun startExtras(goal: String, conversationId: String?, messageId: String?, brief: String?): List<Pair<String, String>> =
+            listOfNotNull(EXTRA_GOAL to goal, conversationId?.let { EXTRA_CONVERSATION to it },
+                messageId?.let { EXTRA_MESSAGE_ID to it }, brief?.let { EXTRA_BRIEF to it })
 
         /**
          * The user explicitly chose "queue": first write the user's words into the persistent ledger on the caller side, then let the service claim it.

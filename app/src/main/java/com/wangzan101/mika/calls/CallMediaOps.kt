@@ -40,7 +40,9 @@ internal suspend fun CallRuntime.probeAudio(): Boolean {
     return ready
 }
 
-internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: CallRealtimeSession) {
+/** [pushOwnerTask]: in realtime calls, push a cue when the owning task's state changes (standard calls carry it in each turn's trailing note, so no push needed); [canCue]: see [PhoneDesk.canCue]. */
+internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: CallRealtimeSession, pushOwnerTask: Boolean = false,
+                                         canCue: Boolean = true) {
     val greeting = CallPolicy.spokenGreeting(w.config.greeting, hasTask = w.task != null)
     val notification = app.getString(
         if (greeting.isBlank()) R.string.calls_notification_connected_waiting else R.string.calls_notification_connected,
@@ -106,100 +108,118 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
     val remaining = w.config.maxCallSeconds.takeIf { it > 0 }
         ?.let { (it * 1_000L - (SystemClock.elapsedRealtime() - w.activeElapsed)).coerceAtLeast(1) }
     w.mediaStage = MediaStage.PCM_BRIDGE
-    withTimeoutOrNull(remaining ?: Long.MAX_VALUE) {
-        coroutineScope {
-            // Let the AI say a goodbye line before the deadline (both providers play it literally); when the goodbye leads to a natural hang-up, this wraps up early
-            val closingJob = CallPolicy.closingDelayMs(remaining)?.let { closingAt ->
-                launch {
-                    delay(closingAt)
-                    if (work === w && w.stopReason.value == null && w.aiActive &&
-                        !target.suppressed && sameActiveMuteTarget(w, target)) {
-                        runCatching { session.sendGreeting(CallPolicy.CLOSING_LINE) }
+    // Phone front desk: can only ask the owner; the owner's replies and task state are given to the model only as cues to relay in its own words, never read verbatim to the other party;
+    // replies not yet handed to the model when the call ends are recorded in the call history (callbacks may come from another thread, so write back on the main thread)
+    val desk = PhoneDesk(
+        ownerTask = { w.ownerTask },
+        ask = OwnerAskNotifier(app, app.ownerQuestions, w.ownerConversationId),
+        cue = { text, ended -> session.sendCue(text, ended) },
+        unrelayed = { reply -> scope.launch { appendTranscript(w.transcript, CallTranscriptLine.OWNER_UNRELAYED, reply) } },
+        context = { text -> session.sendContext(text) },
+        canCue = canCue,
+    )
+    try {
+        withTimeoutOrNull(remaining ?: Long.MAX_VALUE) {
+            coroutineScope {
+                val ownerTaskPush = if (pushOwnerTask) launch { desk.pushOwnerTaskChanges() } else null
+                // Let the AI say a goodbye shortly before the limit (both providers play it verbatim); if the goodbye leads to a natural hang-up, wrap up early here
+                val closingJob = CallPolicy.closingDelayMs(remaining)?.let { closingAt ->
+                    launch {
+                        delay(closingAt)
+                        if (work === w && w.stopReason.value == null && w.aiActive &&
+                            !target.suppressed && sameActiveMuteTarget(w, target)) {
+                            runCatching { session.sendGreeting(CallPolicy.CLOSING_LINE) }
+                        }
                     }
                 }
-            }
-            val watchdog = launch {
-                var lastBytes = -1L
-                var stalled = 0
-                while (true) {
-                    delay(if (w.aiActive) 1_500 else 350)
-                    // The lock expires naturally (especially when no time limit takes a budget at the maximum tier); reacquire it on expiry, it must not be released while the call is still live
-                    if (w.wakeLock?.isHeld == false) acquireCallWakeLock(w)
-                    val stats = withContext(Dispatchers.IO) {
-                        runCatching { helper.callAudioStats(w.audioOwner) }.getOrNull()
-                    }
-                    if (stats?.getBoolean("active") != true) {
-                        throw CallMediaFailure(shellAudioStopDiagnostic(stats?.getString("reason"))
-                            ?: "The device stopped two-way audio; the system is handling the call")
-                    }
-                    val bytes = stats.getLong("downBytes")
-                    if (!w.aiActive) {
-                        if (callAudioHasStarted(greeting, bytes, stats.getLong("upBytes"))) {
-                            if (!notifications.show(w.id, notification, ringing = false)) {
-                                throw CallProblem("Call notifications are unavailable; control was handed back to the system")
-                            }
-                            w.aiActive = true
-                            detail = notification
-                            if (w.direction == CallDirection.INCOMING) {
-                                w.result.complete(ok(if (greeting.isBlank()) "Android answered; the AI is waiting for the other party to speak"
-                                    else "Android answered; the two-way audio bridge is now streaming"))
-                            }
-                            publish()
-                        } else if (SystemClock.elapsedRealtime() - w.activeElapsed >= 7_000) {
-                            throw CallMediaFailure("Two-way audio was not established in time; the system is handling the call")
+                val watchdog = launch {
+                    var lastBytes = -1L
+                    var stalled = 0
+                    while (true) {
+                        delay(if (w.aiActive) 1_500 else 350)
+                        // Locks expire naturally (especially the budget taken for a length tier when the duration is unlimited), so re-acquire on expiry; it must not be released while the call is still going
+                        if (w.wakeLock?.isHeld == false) acquireCallWakeLock(w)
+                        val stats = withContext(Dispatchers.IO) {
+                            runCatching { helper.callAudioStats(w.audioOwner) }.getOrNull()
                         }
-                    } else {
-                        stalled = if (lastBytes == bytes) stalled + 1 else 0
-                        if (stalled >= 2) throw CallMediaFailure("Carrier audio input made no progress; the system is handling the call")
+                        if (stats?.getBoolean("active") != true) {
+                            throw CallMediaFailure(shellAudioStopDiagnostic(stats?.getString("reason"))
+                                ?: "The device stopped two-way audio; the call is handled by the system")
+                        }
+                        val bytes = stats.getLong("downBytes")
+                        if (!w.aiActive) {
+                            if (callAudioHasStarted(greeting, bytes, stats.getLong("upBytes"))) {
+                                if (!notifications.show(w.id, notification, ringing = false)) {
+                                    throw CallProblem("The call notification is unavailable; control returned to the system")
+                                }
+                                w.aiActive = true
+                                detail = notification
+                                if (w.direction == CallDirection.INCOMING) {
+                                    w.result.complete(ok(if (greeting.isBlank()) "Android answered; the AI is waiting for the other party to speak"
+                                        else "Android answered; the two-way audio bridge is now transferring"))
+                                }
+                                publish()
+                            } else if (SystemClock.elapsedRealtime() - w.activeElapsed >= 7_000) {
+                                throw CallMediaFailure("Two-way audio was not established in time; the call is handled by the system")
+                            }
+                        } else {
+                            stalled = if (lastBytes == bytes) stalled + 1 else 0
+                            if (stalled >= 2) throw CallMediaFailure("Carrier audio input made no progress; the call is handled by the system")
+                        }
+                        lastBytes = bytes
                     }
-                    lastBytes = bytes
                 }
-            }
-            try {
-                channel.run(
-                    session, greeting, counters = w.mediaCounters,
-                    onTranscript = { role, text -> appendTranscript(w.transcript, role, text) },
-                    onStage = { stage ->
-                        if (work === w && w.voiceStage != stage) {
-                            w.voiceStage = stage
-                            publish()
-                        }
-                    },
-                    sendDtmf = { digits -> onMain { sendCallDtmf(target, digits, owner = w) } },
-                    onFinalTranscript = { role, text ->
-                        if (work === w && w.stopReason.value == null && target.phase == CallPhase.ACTIVE &&
-                            liveCalls().singleOrNull() === target && liveTranscriptCallId == target.id &&
-                            appendTranscript(liveTranscript, role, text)) {
-                            publish()
-                        }
-                    },
-                    playedOutputFrames = {
-                        withContext(Dispatchers.IO) {
-                            val stats = helper.callAudioStats(w.audioOwner)
-                            if (stats?.getBoolean("upPlaybackHeadFresh") == true && stats.getBoolean("upPlaybackRouteReady")) {
-                                (stats.getLong("upPlaybackHeadFrames") - stats.getLong("upPlaybackPrimeFrames"))
-                                    .coerceIn(0L, stats.getLong("upPlaybackEpochDataBytes") / 2L)
-                            } else 0L
-                        }
-                    },
-                    awaitFarewellDrain = { fence ->
-                        if (!sameActiveMuteTarget(w, target) || target.suppressed || work !== w) false
-                        else awaitFarewellPlayback(helper, w, fence)
-                    },
-                    commitFarewell = {
-                        // No suspension: speech can still cancel the waiter up to this point.
-                        if (target.suppressed || w.stopReason.value != null || shell !== helper ||
-                            !settings.state.value.enabled || !sameActiveMuteTarget(w, target) ||
-                            !mute.isConfirmed(target.service.telecomMuted, microphoneMuted())) false
-                        else if (runCatching { target.call.disconnect() }.isSuccess) w.stopReason.record(FAREWELL_ENDING)
-                        else false
-                    },
-                )
-            } finally {
-                watchdog.cancel()
-                closingJob?.cancel()
+                try {
+                    channel.run(
+                        session, greeting, counters = w.mediaCounters,
+                        onTranscript = { role, text -> appendTranscript(w.transcript, role, text) },
+                        onStage = { stage ->
+                            if (work === w && w.voiceStage != stage) {
+                                w.voiceStage = stage
+                                publish()
+                            }
+                        },
+                        sendDtmf = { digits -> onMain { sendCallDtmf(target, digits, owner = w) } },
+                        desk = desk::execute,
+                        onFinalTranscript = { role, text ->
+                            if (work === w && w.stopReason.value == null && target.phase == CallPhase.ACTIVE &&
+                                liveCalls().singleOrNull() === target && liveTranscriptCallId == target.id &&
+                                appendTranscript(liveTranscript, role, text)) {
+                                publish()
+                            }
+                        },
+                        playedOutputFrames = {
+                            withContext(Dispatchers.IO) {
+                                val stats = helper.callAudioStats(w.audioOwner)
+                                if (stats?.getBoolean("upPlaybackHeadFresh") == true && stats.getBoolean("upPlaybackRouteReady")) {
+                                    (stats.getLong("upPlaybackHeadFrames") - stats.getLong("upPlaybackPrimeFrames"))
+                                        .coerceIn(0L, stats.getLong("upPlaybackEpochDataBytes") / 2L)
+                                } else 0L
+                            }
+                        },
+                        awaitFarewellDrain = { fence ->
+                            if (!sameActiveMuteTarget(w, target) || target.suppressed || work !== w) false
+                            else awaitFarewellPlayback(helper, w, fence)
+                        },
+                        commitFarewell = {
+                            // No suspension: speech can still cancel the waiter up to this point.
+                            if (target.suppressed || w.stopReason.value != null || shell !== helper ||
+                                !settings.state.value.enabled || !sameActiveMuteTarget(w, target) ||
+                                !mute.isConfirmed(target.service.telecomMuted, microphoneMuted())) false
+                            else if (runCatching { target.call.disconnect() }.isSuccess) w.stopReason.record(FAREWELL_ENDING)
+                            else false
+                        },
+                    )
+                } finally {
+                    watchdog.cancel()
+                    closingJob?.cancel()
+                    ownerTaskPush?.cancel()
+                }
             }
         }
+    } finally {
+        // Call ended: withdraw pending questions and notifications; late replies are no longer relayed
+        desk.close()
     }
     // A natural ending already issued the owner-bound disconnect with media still running.
     if (w.stopReason.value == FAREWELL_ENDING) return

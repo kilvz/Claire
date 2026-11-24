@@ -3,7 +3,6 @@ package com.wangzan101.mika.chat.ui
 import com.wangzan101.mika.core.agent.GoalChecklist
 import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.core.agent.AttachedPage
-import com.wangzan101.mika.core.run.record.RunMetrics
 import com.wangzan101.mika.ui.components.DirectionalIcon
 import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -87,7 +86,7 @@ import com.wangzan101.mika.ui.MarkdownText
 
 /** Brief highlight on the jump target row: a full-width tinted background that fades out after about 1.8 seconds. */
 @Composable
-private fun JumpHighlight(active: Boolean, reduceMotion: Boolean, content: @Composable () -> Unit) {
+internal fun JumpHighlight(active: Boolean, reduceMotion: Boolean, content: @Composable () -> Unit) {
     val c = MikaTheme.colors
     val alpha by animateFloatAsState(if (active) 1f else 0f, if (reduceMotion) snap() else tween(260), label = "jump-highlight")
     Box(
@@ -98,15 +97,18 @@ private fun JumpHighlight(active: Boolean, reduceMotion: Boolean, content: @Comp
 
 internal fun LazyListScope.exchange(
     index: Int, ex: Exchange, conversationId: String?, stage: Takeover.Stage, vm: ChatViewModel, reduceMotion: Boolean, backgroundNote: Boolean,
-    runMetrics: Map<String, RunMetrics>,
-    openRun: (String) -> Unit, loadSource: suspend (String) -> EvidenceSource?, openSource: (String?, String?) -> Unit,
+    openRun: (String) -> Unit,
     kept: KeptPage? = null,
     /** Key of the row to highlight when jumping in from search or the file library. */
     highlightKey: String? = null,
     /** The two new-run entries after a terminal state: true continues from where the summary broke off, false restarts from the original goal. */
     recover: (Boolean) -> Unit = {},
-    openReport: (String) -> Unit = {}, openPlayback: (String) -> Unit = {},
 ) {
+    // A front desk turn: the user's words and the front desk's reply; it does not go through the task steps and status cards
+    if (ex.deskReply != null) {
+        deskExchange(index, ex, conversationId, reduceMotion, highlightKey)
+        return
+    }
     if (ex.goal.isNotEmpty()) item("u$index") {
         JumpHighlight(highlightKey == "u$index", reduceMotion) { UserBubble(ex.goal, conversationId, key = "u$index") }
     }
@@ -131,9 +133,7 @@ internal fun LazyListScope.exchange(
     ex.draft?.takeIf(String::isNotBlank)?.let { draft -> item("d$index") { DraftText(draft, ex.waitingForModel) } }
     item("r$index") {
         JumpHighlight(highlightKey == "r$index", reduceMotion) {
-            StatusCard(ex.status, stage, vm, ex.recordedRun, ex.elapsedMs, ex.recordedRun?.let { runMetrics[it]?.tokens }, loadSource, openSource, openRun, "r$index",
-                conversationId = conversationId,
-                recover = recover, goal = ex.goal, openReport = openReport, openPlayback = openPlayback)
+            StatusCard(ex.status, stage, vm, ex.recordedRun, "r$index", conversationId = conversationId, recover = recover)
         }
     }
     // The page left running in the background after this turn: a green row while it is still open (and can be closed), and a reason once it is closed
@@ -240,7 +240,7 @@ private val ChatThumbWidth = 110.dp
 private fun DraftText(text: String, generating: Boolean) {
     MarkdownText(
         text, AnswerText.copy(color = MikaTheme.colors.ink),
-        Modifier.fillMaxWidth().padding(bottom = 12.dp).answerSurface(), streaming = generating,
+        Modifier.padding(bottom = ReplyGap).answerSurface(), streaming = generating,
     )
 }
 
@@ -286,7 +286,10 @@ internal fun AnswerArea(key: String, answer: String, modifier: Modifier, content
     ) { content() }
 }
 
-/** Background of Claire's answer: a very pale gray, with the tail corner at the bottom left. */
+/** The spacing between several replies under the same message. */
+internal val ReplyGap = 8.dp
+
+/** The background of a Claire answer: a very faint grey with the bottom-left tail. Short ones hug the text width, long ones fill the width; front desk replies, reports, and legacy answers all use it. */
 @Composable
 internal fun Modifier.answerSurface(): Modifier =
     background(MikaTheme.colors.answer, MikaShapes.AnswerBubble).padding(horizontal = 14.dp, vertical = 12.dp)
@@ -304,7 +307,6 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
     val paused = ChatCopy.paused(ex.status)
     val elapsed = rememberElapsed(ex.startedAt)
     Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
-        TurnMeta(elapsed, tokens = null)
         Row(
             Modifier.fillMaxWidth().heightIn(min = 24.dp),
             verticalAlignment = Alignment.Top,
@@ -315,6 +317,7 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
                 ChatCopy.progressLine(ex), Modifier.weight(1f), style = NowText, color = c.ink,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
+            if (elapsed != null) Text(ChatCopy.clock(elapsed), style = ClockText, color = c.ink3)
         }
         ex.goals?.let { GoalChecklistRow(it, ex.runId) }
         if (ex.steps.isNotEmpty() || steers.isNotEmpty()) StepLine(ex.steps, ex.stepActions, steers, live = true, paused = paused)
@@ -337,28 +340,6 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
                 Icon(MikaIcons.Eye, null, Modifier.size(15.dp), tint = c.ink3)
                 Text(ChatCopy.BACKGROUND_NOTE, style = NoteText, color = c.ink3)
             }
-        }
-    }
-}
-
-/** The header row of an answer or running work: "Claire · 0:42 · 1.2 wan Token"; the corresponding segment is omitted when [elapsed]/[tokens] is null. */
-@Composable
-internal fun TurnMeta(elapsed: Long?, tokens: Long?) {
-    val c = MikaTheme.colors
-    // Put some distance from the body/progress below: the body line height pushes the first line to the top edge of its line box, so without a gap it would stick to this row
-    Row(
-        Modifier.padding(bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Text(ChatCopy.APP_TITLE, style = TurnNameText, color = c.ink)
-        if (elapsed != null) {
-            Text("·", style = ClockText, color = c.ink3)
-            Text(ChatCopy.clock(elapsed), style = ClockText, color = c.ink3)
-        }
-        if (tokens != null && tokens > 0) {
-            Text("·", style = ClockText, color = c.ink3)
-            Text(ChatTokensCopy.amount(tokens), style = ClockText, color = c.ink3)
         }
     }
 }

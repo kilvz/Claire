@@ -30,13 +30,14 @@ internal class ChatAttachmentOps(private val vm: ChatViewModel, private val sess
     private val describeAttachments = vm.describeAttachments
     private val sharedDrafts = vm.sharedDrafts
 
-    /** Files obtained from the camera, album, or file picker: accepted only when no task is running and the sandbox is ready; after reading the name and size they are attached above the input box and sent with the next message. */
+    /** A file from the camera, gallery, or file picker: accepted only when attachments are allowed (see [ChatSession.canAttach]) and the sandbox is ready; once its name and size are read it sits above the input bar and goes out with the next message. */
     fun attach(uris: List<String>, conversationId: String? = _ui.value.conversationId) {
         if (uris.isEmpty() || conversationId != _ui.value.conversationId || !session.canAttach(_ui.value)) return
         val id = session.draftConversation()
         val sharedBefore = _ui.value.sharedDraft
         val serialBefore = sharedDraftSerial
-        val wasIdle = _ui.value.composer == ComposerMode.Idle
+        // With no front desk (no front desk attached, or a subtask conversation) the attachment starts a new task directly: if the conversation starts a task while the file is being read it is not accepted; with a front desk it is accepted whether or not a task is running
+        val wasIdle = vm.deskFor(id) == null && _ui.value.composer == ComposerMode.Idle
         scope.launch {
             val items = try { describeAttachments(uris) } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
             if (wasIdle && _ui.value.composer != ComposerMode.Idle) return@launch

@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.onStart
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -169,12 +172,15 @@ class ConversationStore(
         val unsaved = pending.asSequence()
             .filter { firstMessage(file(it.id)) == null }
             .filter { includeArchived || archivedAt(it.id) == null }
+            .filterNot { hiddenDeskChild(it.id) }
         val saved = dir.listFiles { f -> f.isFile && f.name.endsWith(".json") }.orEmpty()
             .map { it to it.lastModified() }
             .sortedWith(compareByDescending<Pair<File, Long>> { it.second }.thenBy { it.first.name })
             .asSequence().mapNotNull { (f, updatedAt) ->
                 val first = firstMessage(f) ?: return@mapNotNull null
                 val id = f.nameWithoutExtension
+                // Child conversations dispatched by the front desk are viewed under the front desk conversation and not listed separately (if the front desk conversation is gone, list them separately; see hiddenDeskChild)
+                if (hiddenDeskChild(id)) return@mapNotNull null
                 val archivedAt = archivedAt(id)
                 if (!includeArchived && archivedAt != null) return@mapNotNull null
                 ConversationSummary(id, title(id) ?: first, updatedAt, pinnedAt(id), pageOrigin(id), branchOrigin(id), archivedAt, restoredAt(id), projectId(id))
@@ -231,7 +237,7 @@ class ConversationStore(
         val metadata = setOf(titleFile(conversationId).name, pinFile(conversationId).name,
             pageFile(conversationId).name, branchFile(conversationId).name, archiveFile(conversationId).name,
             restoreFile(conversationId).name, personaFile(conversationId).name, personaFile(conversationId).name + ".tmp",
-            projectFile(conversationId).name, projectFile(conversationId).name + ".tmp")
+            projectFile(conversationId).name, projectFile(conversationId).name + ".tmp", deskParentFile(conversationId).name)
         val files = dir.listFiles { f -> f.name == main || f.name.startsWith("$main.") || f.name in metadata }
             ?: if (Files.notExists(dir.toPath())) emptyArray() else throw IOException("Cannot list conversation files")
         // Leave the history in place if any of its companion files cannot be removed.
@@ -457,6 +463,33 @@ class ConversationStore(
         return ok
     }
 
+    /** Which front desk conversation the child conversation [id] dispatched by the front desk belongs to; null when it is not a child conversation or cannot be read. Stored in `<id>.desk_parent`. */
+    @Synchronized
+    fun deskParent(id: String): String? =
+        runCatching { deskParentFile(id).takeIf { it.isFile }?.readText()?.trim() }.getOrNull()?.let(::safe)?.takeIf(String::isNotEmpty)
+
+    /** Front desk conversations that have dispatched work in this process: their first turn may not be saved yet, but child conversations are still hidden under them. */
+    private val liveDeskParents = mutableSetOf<String>()
+
+    /** Record that child conversation [child] was dispatched by front desk conversation [parent]; afterwards [child] stays out of the conversation list while the front desk conversation still exists. Deleted conversations are left alone. */
+    @Synchronized
+    fun setDeskParent(child: String, parent: String) {
+        if (safe(child) in deleted || safe(parent).isEmpty()) return
+        dir.mkdirs()
+        liveDeskParents += safe(parent)
+        if (runCatching { deskParentFile(child).writeText(safe(parent)) }.isSuccess) _changes.tryEmit(child)
+    }
+
+    /**
+     * A child conversation is hidden only while its front desk conversation still exists (viewed under that front desk conversation): if the front desk
+     * conversation is deleted, or never got saved after a restart, the child conversation returns to the list instead of being lost forever.
+     */
+    private fun hiddenDeskChild(id: String): Boolean {
+        val parent = deskParent(id) ?: return false
+        if (parent in deleted) return false
+        return file(parent).isFile || parent in liveDeskParents
+    }
+
     /**
      * The project this conversation belongs to; null when absent, unreadable, or the id is invalid. Kept in `<id>.project`.
      * If the sidecar file unexpectedly remains after the project was deleted, the caller verifies it through [WorkspaceResolver] before use.
@@ -575,6 +608,35 @@ class ConversationStore(
     @Synchronized
     fun turns(conversationId: String): List<Turn> = records(conversationId).map { it.first }
 
+    private fun callsFile(id: String) = File(dir, "${file(id).name}.calls")
+    private val callsJson = Json { ignoreUnknownKeys = true }
+
+    /** The voice calls in this conversation ([ConversationCall]), in connect order; empty if none were made or they cannot be parsed. */
+    fun calls(conversationId: String): List<ConversationCall> = runCatching {
+        val f = callsFile(conversationId).takeIf { it.isFile } ?: return@runCatching emptyList()
+        callsJson.decodeFromString(ListSerializer(ConversationCall.serializer()), f.readText())
+    }.getOrDefault(emptyList())
+
+    /** Record (or update the one with the same id) a call; deleted together with the conversation file. Emits [changes] once written. */
+    @Synchronized
+    fun recordCall(conversationId: String, call: ConversationCall) {
+        if (safe(conversationId) in deleted) return
+        val next = calls(conversationId).upsert(call)
+        dir.mkdirs()
+        val dest = callsFile(conversationId)
+        val tmp = File(dir, "${dest.name}.tmp")
+        val ok = runCatching {
+            tmp.writeText(callsJson.encodeToString(ListSerializer(ConversationCall.serializer()), next))
+            Files.move(tmp.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        }.isSuccess
+        if (ok) _changes.tryEmit(conversationId)
+    }
+
+    /** The call records of this conversation, re-read whenever one is written. */
+    fun observeCalls(conversationId: String): Flow<List<ConversationCall>> =
+        changes.filter { it == conversationId }.map { calls(conversationId) }
+            .onStart { emit(calls(conversationId)) }.distinctUntilChanged().flowOn(Dispatchers.IO)
+
     /** Whether this conversation has stored content (a conversation file exists); false for an empty id or when unreadable. */
     @Synchronized
     fun exists(conversationId: String): Boolean = file(conversationId).isFile
@@ -637,6 +699,8 @@ class ConversationStore(
                 verified = field("verified")?.toBooleanStrictOrNull(),
                 remoteTaskId = field("remoteTaskId"),
                 outcomeSystemType = field("outcomeSystemType"),
+                deskTasks = (o["deskTasks"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList(),
+                callId = field("callId"),
             )
             turn to (o["files"] as? JsonArray).orEmpty().mapNotNull(::fileOf)
         }
@@ -726,6 +790,8 @@ class ConversationStore(
                 if (it.interruptedReplies.any(String::isNotEmpty)) put("interruptedReplies", JsonArray(it.interruptedReplies.map(::JsonPrimitive)))
                 if (it.finishedReplies.any(String::isNotEmpty)) put("finishedReplies", JsonArray(it.finishedReplies.map(::JsonPrimitive)))
                 if (it.groups.isNotEmpty()) put("groups", JsonArray(it.groups.map(::JsonPrimitive)))
+                if (it.deskTasks.isNotEmpty()) put("deskTasks", JsonArray(it.deskTasks.map(::JsonPrimitive)))
+                it.callId?.let { c -> put("callId", c) }
                 it.keptPage?.let { h -> put("keptPage", h) }; it.keptPageClosed?.let { r -> put("keptPageClosed", r) }
                 it.atMs?.let { t -> put("atMs", t) }
                 if (it.audios.isNotEmpty()) put("audios", JsonArray(it.audios.map { a ->
@@ -787,6 +853,7 @@ class ConversationStore(
     private fun restoreFile(id: String) = File(dir, "${safe(id)}.restored")
     private fun personaFile(id: String) = File(dir, "${safe(id)}.persona")
     private fun projectFile(id: String) = File(dir, "${safe(id)}.project")
+    private fun deskParentFile(id: String) = File(dir, "${safe(id)}.desk_parent")
 
     /** Which conversation the user is in right now, see [CurrentChat]; not `.json`, so not in [list]. */
     private fun currentFile() = File(dir, "current")
