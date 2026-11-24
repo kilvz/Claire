@@ -50,7 +50,7 @@ import kotlin.math.max
 internal const val CHAT_DRAWER_OPEN_FRACTION = 0.4f
 private const val MIN_FLING_FRACTION = 0.15f
 
-/** Material 抽屉没有可配置的距离阈值;保留同样的锚点拖动,以展开行程的 40% 为分界。 */
+/** The Material drawer offers no configurable distance threshold; the same anchored drag is kept, with 40% of the reveal travel as the dividing point. */
 @Stable
 internal class ChatDrawerState(initial: DrawerValue, density: Density) {
     var density by mutableStateOf(density)
@@ -59,8 +59,8 @@ internal class ChatDrawerState(initial: DrawerValue, density: Density) {
     val drag: AnchoredDraggableState<DrawerValue> = AnchoredDraggableState(
         initialValue = initial,
         positionalThreshold = { distance ->
-            // Foundation 会在拖动中途更新 currentValue。反向距离须用 60%,
-            // 才能始终以绝对展开位置 40% 分界,避免 45% 展开、55% 反而回弹。
+            // Foundation updates currentValue mid-drag. The reverse distance must use 60%
+            // so the dividing point always stays at 40% of the absolute reveal position, avoiding 45% closing and 55% springing back.
             distance * if (isCurrentAnchorOpen()) 1f - CHAT_DRAWER_OPEN_FRACTION else CHAT_DRAWER_OPEN_FRACTION
         },
         velocityThreshold = { with(this.density) { 400.dp.toPx() } },
@@ -73,8 +73,8 @@ internal class ChatDrawerState(initial: DrawerValue, density: Density) {
     val isOpen get() = drag.settledValue == DrawerValue.Open
     private var gestureStartOffset = 0f
 
-    // 拖动仍使用同一份锚点状态和互斥锁,抓住正在播放的动画时可以原地接手。
-    // 松手不走 animateToWithDecay:当前 Foundation 对零点终点的惯性判定会直接结束首帧。
+    // Dragging still uses the same anchored state and mutual exclusion, so a running animation can be taken over in place.
+    // Release does not use animateToWithDecay: the current Foundation inertia check for a zero endpoint finishes on the very first frame.
     val touch = object : DraggableState {
         override suspend fun drag(dragPriority: MutatePriority, block: suspend DragScope.() -> Unit) {
             this@ChatDrawerState.drag.anchoredDrag(dragPriority) { anchors ->
@@ -103,7 +103,7 @@ internal class ChatDrawerState(initial: DrawerValue, density: Density) {
             reveal >= widthPx * CHAT_DRAWER_OPEN_FRACTION -> DrawerValue.Open
             else -> DrawerValue.Closed
         }
-        // Tween 不把甩动速度带成冲刺,剩余路程始终有可见的减速过程。
+        // A tween does not carry the fling velocity into a sprint, so the remaining distance always has a visible deceleration.
         drag.animateTo(target)
     }
 
@@ -128,7 +128,7 @@ internal fun rememberChatDrawerState(initial: DrawerValue = DrawerValue.Closed):
     return state
 }
 
-/** 侧栏在下、聊天卡片在上;手势、RTL、返回可访问性和点击收起共用同一份位置。 */
+/** The drawer beneath and the chat card above; gestures, RTL, back accessibility and tap-to-collapse all share the same position. */
 @Composable
 internal fun ChatNavigationDrawer(
     drawerContent: @Composable () -> Unit,

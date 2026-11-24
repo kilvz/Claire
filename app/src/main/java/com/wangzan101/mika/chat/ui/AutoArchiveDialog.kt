@@ -14,7 +14,7 @@ import com.wangzan101.mika.chat.AutoArchive
 import com.wangzan101.mika.ui.components.MikaDialog
 import com.wangzan101.mika.ui.components.RadioRow
 
-/** 自动归档的天数:关闭,或几天没新消息就收进归档。选中即生效,归档后在归档视图里可以恢复。 */
+/** Auto-archive period in days: off, or archive after this many days without new messages. Picking takes effect immediately, and an archived conversation can be restored from the archive view. */
 @Composable
 internal fun AutoArchiveDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
     MikaDialog(

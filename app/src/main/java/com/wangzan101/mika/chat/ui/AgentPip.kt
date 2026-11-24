@@ -83,11 +83,11 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.components.floatShadow
 import androidx.compose.ui.unit.Dp
 
-/** 小窗宽度:收起 / 展开。高度按画面(没有画面时按主屏)的长宽比算,整屏完整显示、不裁底部。 */
+/** Small-window width: collapsed / expanded. The height follows the aspect ratio of the frame (of the main screen when there is no frame yet), so the whole screen is shown without cropping the bottom. */
 private val CollapsedWidth = 96.dp
 private val ExpandedWidth = 220.dp
 
-/** 主屏的高宽比(按真实像素,含系统栏):虚拟屏按主屏尺寸建,还没有画面时小窗先按它定大小。 */
+/** Height/width ratio of the main screen in real pixels, including system bars: the virtual screen is created at the main screen's size, and until a frame exists the small window sizes itself by it. */
 private fun mainScreenAspect(context: Context): Float {
     val m = DisplayMetrics()
     context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.getRealMetrics(m)
@@ -98,26 +98,26 @@ private const val DEFAULT_ASPECT = 2.2f
 private val Ease = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 
 /**
- * 悬浮画中画:盖在对话上,只显示 Agent 虚拟屏的实时画面,只看不点;上面不放文字和按钮,要你做的事都在对话卡片里。
- * 状态只靠边框光:干活中细绿边,需要你时橙色呼吸光晕(接管开始时由 [ChatViewModel] 自动展开)。
- * 平时停在右下角、输入栏上方,不挡顶栏和最新的消息。
- * 拖动 1:1 跟手;松手按速度投射落点吸到最近的角(临界阻尼弹簧,见 [PipPhysics]);
- * 点一下展开,点 × 或外面收起;需要你时点一下交给 [onAttention](收起并滚到那张卡片)。
- * 展开时左上角「关掉小画面」([onClose]):这个任务结束前只剩右下角一个小按钮([PipUi.closed]),
- * 点它再打开([onReopen]);要你处理时小按钮变橙色、呼吸,点它同样交给 [onAttention]。
- * [reduceMotion] 时(系统关了动画)不做弹簧、缩放和呼吸,直接到位。
- * [topInset]/[bottomInset] 是顶栏和输入框占的像素高度,小窗不会停在它们下面。
+ * Floating picture-in-picture: overlays the conversation and only shows the live frame of the Agent's virtual screen; view only, no tapping. It carries no text or buttons of its own — everything you need to do lives in the conversation cards.
+ * State is conveyed only by the border glow: a thin green edge while working, an orange breathing halo when it needs you (expanded automatically at the start of a takeover, by [ChatViewModel]).
+ * At rest it sits in the bottom-right corner above the composer, clear of the top bar and the latest messages.
+ * Dragging follows the finger 1:1; on release the landing point is projected by velocity and snapped to the nearest corner (critically damped spring, see [PipPhysics]);
+ * a tap expands it, tapping × or outside collapses it; when it needs you, a tap hands over to [onAttention] (collapse and scroll to that card).
+ * While expanded, the top-left "turn off the small picture" ([onClose]): until this task ends only a small button in the bottom-right corner remains ([PipUi.closed]),
+ * tapping it opens the picture again ([onReopen]); when you are needed the small button turns orange and breathes, and tapping it likewise hands over to [onAttention].
+ * With [reduceMotion] (system animations off) there is no spring, scaling or breathing — it snaps into place.
+ * [topInset]/[bottomInset] are the pixel heights occupied by the top bar and the composer; the small window never comes to rest beneath them.
  */
 @Composable
 fun AgentPip(
     pip: PipUi,
     frame: Bitmap?,
     webContent: Boolean,
-    /** 小窗直接操作的口子(点/滑/返回注入到虚拟屏);屏没建好或任务结束时为 null。 */
+    /** Hook for operating directly inside the small window (taps/swipes/back injected into the virtual screen); null while the screen is not ready or once the task has ended. */
     pipInput: PipInput? = null,
-    /** 目标 App 的声音被用户恢复过:按钮显示「静音」,再按一次静回去;否则「恢复声音」。 */
+    /** The target app's sound was restored by the user: the button shows "Mute" and pressing it again mutes it; otherwise it shows "Unmute". */
     soundOn: Boolean = false,
-    /** 用户在设置里开了「允许我在小窗里直接操作」。 */
+    /** The user enabled "let me operate directly in the small window" in settings. */
     operateEnabled: Boolean = false,
     reduceMotion: Boolean,
     topInset: Float,
@@ -131,7 +131,7 @@ fun AgentPip(
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val fade = if (reduceMotion) tween<Float>(150) else tween(300)
-        // 关掉了:只留右下角的小按钮(任务做完那几秒不留)
+        // Closed: only the small button in the bottom-right corner remains (not kept during the few seconds after the task finishes)
         AnimatedVisibility(
             pip.visible && pip.closed && pip.mode != PipMode.Done, Modifier.align(Alignment.BottomEnd),
             enter = fadeIn(fade), exit = fadeOut(fade),
@@ -155,8 +155,8 @@ fun AgentPip(
 }
 
 /**
- * 小画面关掉后剩下的小按钮:平时写「显示画面」,点了再打开;要你处理时橙色呼吸、写「等你处理」,
- * 点了滚到要你处理的那张卡片(小画面关着也不漏掉要你做的事)。
+ * The small button left once the small picture is closed: normally it reads "Show picture" and opens it again on tap; when you are needed it breathes orange and reads "Waiting for you",
+ * and tapping it scrolls to the card that needs you (nothing that needs you is missed even while the small picture is closed).
  */
 @Composable
 private fun ClosedPip(needsYou: Boolean, reduceMotion: Boolean, modifier: Modifier, onReopen: () -> Unit, onAttention: () -> Unit) {
@@ -207,8 +207,8 @@ private fun PipWindow(
     var expandedScale by rememberSaveable { mutableStateOf(1f) }
     var pinching by remember { mutableStateOf(false) }
     val sizeSpec = if (reduceMotion || pinching) snap() else tween<androidx.compose.ui.unit.Dp>(350, easing = Ease)
-    // 大小跟着画面的长宽比走:手机游戏和桌面网页都可能横向,按固定的宽度定高度,
-    // 画面整张放得下;放不下时按比例整体缩小
+    // The size follows the frame's aspect ratio: phone games and desktop web pages can both be landscape, so the height is derived from a fixed width,
+    // and the whole frame fits; when it does not fit, everything shrinks proportionally
     val context = LocalContext.current
     val screenAspect = remember { mainScreenAspect(context) }
     val landscapeFrame = frame != null && frame.width > frame.height
@@ -230,8 +230,8 @@ private fun PipWindow(
     val h by animateDpAsState(target.second, sizeSpec, label = "pipH")
     val wPx = with(density) { w.toPx() }
     val hPx = with(density) { h.toPx() }
-    // 收起的小窗让开顶栏和输入栏(别挡住打字和顶栏的按钮);展开时整块背景已经压暗、它们本来也点不到,
-    // 小窗改放到整屏、只让开系统栏,不再挤在中间一小块里挪。展开收起途中按同一个时长插值,跟着大小一起挪,不跳。
+    // The collapsed small window keeps clear of the top bar and the composer (so it never blocks typing or the top bar's buttons); when expanded the whole backdrop is already dimmed and they are unreachable anyway,
+    // so the window moves to the full screen and only avoids the system bars, instead of shifting around inside a small central area. During expand/collapse the same duration interpolates it, so it moves along with the size without jumping.
     val collapsedShare by animateFloatAsState(
         if (pip.expanded) 0f else 1f,
         if (reduceMotion) snap() else tween<Float>(350, easing = Ease),
@@ -253,12 +253,12 @@ private fun PipWindow(
     val attend by rememberUpdatedState(onAttention)
 
     var corner by rememberSaveable { mutableStateOf(Corner.BottomEnd) }
-    // 拖动或弹簧途中的位置;为空表示贴在 corner 上(展开收起时跟着大小一起贴角)
+    // Position during dragging or springing; null means it is attached to the corner (and stays attached while expanding/collapsing)
     var free by remember { mutableStateOf<Offset?>(null) }
     val scope = rememberCoroutineScope()
     var settle by remember { mutableStateOf<Job?>(null) }
 
-    /** 从 [start] 以速度 (vx, vy) 弹到角 [c];关了动画时直接到位。 */
+    /** Spring from [start] to corner [c] with velocity (vx, vy); snaps into place immediately when animations are off. */
     fun springTo(c: Corner, start: Offset, vx: Float, vy: Float) {
         settle?.cancel()
         corner = c
@@ -290,7 +290,7 @@ private fun PipWindow(
         springTo(PipPhysics.snapCorner(start.x, start.y, vx, vy, currentBounds), start, vx, vy)
     }
 
-    // 完成时如果停在下方两个角,先挪到同侧上方,免得盖住刚出来的结果卡片
+    // On completion, if it rests in either bottom corner, move it to the top corner on the same side first so it does not cover the result card that just appeared
     LaunchedEffect(pip.mode) {
         if (pip.mode != PipMode.Done) return@LaunchedEffect
         val up = when (corner) {
@@ -305,7 +305,7 @@ private fun PipWindow(
     val outer = RoundedCornerShape(if (pip.expanded) MikaRadius.Sheet else MikaRadius.Card)
     val inner = RoundedCornerShape(if (pip.expanded) MikaRadius.Bubble else MikaRadius.Chip)
     val insetDp = if (pip.expanded) 4.dp else 3.dp
-    // 直接操作:开了开关、小窗展开、有画面、口子还活着时才把点/滑注入到虚拟屏
+    // Direct operation: inject taps/swipes into the virtual screen only when the setting is on, the window is expanded, a frame exists and the hook is still alive
     val operate = operateEnabled && pip.expanded && frame != null && pipInput != null
     val operateInput = pipInput.takeIf { operate }
     val breath = if (pip.mode == PipMode.NeedsYou && !reduceMotion) {
@@ -316,7 +316,7 @@ private fun PipWindow(
 
     Box(Modifier.offset { IntOffset(pos.x.roundToInt(), pos.y.roundToInt()) }) {
         if (pip.mode == PipMode.NeedsYou) {
-            // 橙色光晕:比窗口大一圈,模糊后透出边缘(安卓 12 以下不模糊,只是一圈淡橙色)
+            // Orange halo: one ring larger than the window, blurred so it bleeds past the edge (no blur below Android 12, just a pale orange ring)
             Box(
                 Modifier.offset((-5).dp, (-5).dp).size(w + 10.dp, h + 10.dp).alpha(breath)
                     .blur(10.dp).background(MikaTheme.colors.warnSolid.copy(alpha = 0.55f), outer),
@@ -330,8 +330,8 @@ private fun PipWindow(
                 .border(0.5.dp, MikaTheme.colors.glassEdge, outer)
                 .then(if (operate) Modifier else Modifier.pointerInput(Unit) {
                     val tracker = VelocityTracker()
-                    // 自己数位移而不用 detectDragGestures:越过触摸阈值时把阈值内的那段也补上,
-                    // 窗口始终保持按下时的抓取位置,真正 1:1 跟手
+                    // Accumulate displacement manually instead of using detectDragGestures: when the touch slop is crossed, the movement within the slop is added too,
+                    // so the window always keeps the grab offset from the moment of the press — truly 1:1 with the finger
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val origin = free ?: currentBounds.position(corner).let { (x, y) -> Offset(x, y) }
@@ -380,7 +380,7 @@ private fun PipWindow(
                 .then(if (operate) Modifier else Modifier.pointerInput(Unit) { detectTapGestures { if (needsYou) attend() else if (!expanded) expand() } })
                 .padding(insetDp),
         ) {
-            // 画面按长宽比塞满整个内框;直接操作时把点/滑按内框归一化坐标换算成虚拟屏坐标注入
+            // The frame fills the whole inner box by aspect ratio; in direct-operation mode taps/swipes are normalized to the inner box and converted into virtual-screen coordinates before injection
             Box(
                 Modifier.fillMaxSize().clip(inner).background(MikaTheme.colors.surface),
                 contentAlignment = Alignment.Center,
@@ -407,7 +407,7 @@ private fun PipWindow(
                     }
                     PipSizeButton("↺", stringResource(R.string.pip_size_reset), "pip-size-reset") { expandedScale = 1f }
                 }
-                // 左上角:返回(直接操作时)、声音开关(恢复/再静,方向跟着任务里的真实音频记录)、关掉小画面;不伪造与真实音频无关的开关状态
+                // Top-left: back (in direct-operation mode), sound toggle (restore/mute again, its direction following the real audio record of the task), close the small picture; never fake a toggle state unrelated to the real audio
                 Row(Modifier.align(Alignment.TopStart).padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (operateInput != null) {
                         PipButton(
@@ -438,7 +438,7 @@ private fun PipWindow(
                 ) { Icon(MikaIcons.Close, stringResource(R.string.collapse), Modifier.size(12.dp), tint = MikaTheme.colors.ink) }
             }
         }
-        // 边框光画在玻璃框外沿
+        // The border glow is drawn along the outer edge of the glass frame
         val glow = when (pip.mode) {
             PipMode.Running -> MikaTheme.colors.ok to 2.dp
             PipMode.NeedsYou -> MikaTheme.colors.warnSolid.copy(alpha = breath) to 2.dp
@@ -459,7 +459,7 @@ private fun PipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
     ) { Icon(icon, label, Modifier.size(13.dp), tint = MikaTheme.colors.ink) }
 }
 
-/** 画面按长宽比塞进 innerW×innerH 后的尺寸(不裁、不拉伸),没画面或尺寸异常时退回整框。 */
+/** Size of the frame after fitting it into innerW×innerH by aspect ratio (no cropping, no stretching); falls back to the whole box when there is no frame or the dimensions are invalid. */
 private fun fittedSize(frameW: Int, frameH: Int, innerW: Dp, innerH: Dp): Pair<Dp, Dp> {
     if (frameW <= 0 || frameH <= 0) return innerW to innerH
     val a = frameW.toFloat() / frameH
@@ -467,7 +467,7 @@ private fun fittedSize(frameW: Int, frameH: Int, innerW: Dp, innerH: Dp): Pair<D
     return w to w / a
 }
 
-/** 直接操作时小窗画面的触摸:按下没动就点一下,动了就按走过的点滑一笔;坐标按这个框归一化到 0..1。 */
+/** Touch handling on the small window's frame in direct-operation mode: a press that does not move becomes a tap, movement becomes a swipe along the traversed points; coordinates are normalized to 0..1 within this box. */
 private fun operateInputModifier(input: PipInput, scope: CoroutineScope): Modifier = Modifier.pointerInput(input) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)

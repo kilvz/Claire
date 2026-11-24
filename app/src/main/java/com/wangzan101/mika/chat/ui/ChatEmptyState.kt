@@ -40,8 +40,8 @@ import com.wangzan101.mika.ui.theme.MikaType
 import java.time.LocalTime
 
 /**
- * 空对话:问候 + 一句价值主张 + 推荐任务卡片。点一条把完整提示词填进输入框,改好了再发;
- * 一条都没有时不显示。放不下一屏时可以滚动。
+ * Empty conversation: greeting + a value statement + recommended task cards. Tapping one fills the full prompt into the composer, to be edited before sending;
+ * hidden when there are none. Scrolls when it does not fit on one screen.
  */
 @Composable
 internal fun EmptyState(conversation: String?, tasks: List<RecommendedTask>, modifier: Modifier = Modifier, onPick: (RecommendedTask) -> Unit) {
@@ -61,7 +61,7 @@ internal fun EmptyState(conversation: String?, tasks: List<RecommendedTask>, mod
     }
 }
 
-/** 推荐任务卡片:左边类型图标,右边标题和提示词首行。整张可点,点它把完整提示词填进输入框。 */
+/** Recommended task card: the kind icon on the left, the title and the prompt's first line on the right. The whole card is tappable and fills the full prompt into the composer. */
 @Composable
 private fun TaskCard(task: RecommendedTask, onPick: (RecommendedTask) -> Unit) {
     val c = MikaTheme.colors
@@ -93,7 +93,7 @@ private fun TaskCard(task: RecommendedTask, onPick: (RecommendedTask) -> Unit) {
     }
 }
 
-/** 推荐任务的类型 → 图标和颜色;自己加的任务没有类型,用星光配中性色。 */
+/** Recommended task kind → icon and color; tasks added by the user have no kind and get the sparkle with a neutral color. */
 private data class TaskLook(val icon: ImageVector, val tint: Color)
 
 private fun taskLook(kind: ChatCopy.ExampleKind?, c: MikaColors): TaskLook = when (kind) {
@@ -105,4 +105,4 @@ private fun taskLook(kind: ChatCopy.ExampleKind?, c: MikaColors): TaskLook = whe
     null -> TaskLook(MikaIcons.Spark, c.ink2)
 }
 
-// ---------- 一问一答 ----------
+// ---------- Question and answer ----------

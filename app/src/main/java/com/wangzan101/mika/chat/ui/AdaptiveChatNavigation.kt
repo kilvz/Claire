@@ -42,7 +42,7 @@ import com.wangzan101.mika.ui.AdaptiveLayout
 import com.wangzan101.mika.ui.SplitHandleWidth
 import com.wangzan101.mika.ui.splitNavigationWidth
 
-/** 两个槽位在抽屉和双栏间移动，不重新创建聊天和列表的 remember/rememberSaveable 状态。 */
+/** The two slots move between the drawer and the two-pane layout without recreating the remember/rememberSaveable state of the chat and of the list. */
 @Composable
 internal fun AdaptiveChatNavigation(
     layout: AdaptiveLayout,

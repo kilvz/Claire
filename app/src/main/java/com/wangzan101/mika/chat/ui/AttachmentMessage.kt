@@ -8,18 +8,18 @@ import com.wangzan101.mika.ui.viewer.ViewerKind
 import com.wangzan101.mika.ui.viewer.ViewerKinds
 
 /**
- * 用户的话里带的附件(消息末尾每个附件一行,写法见 [AttachmentLines]):对话页据此把附件画成照片格子和文件卡片,
- * 路径那几行不给用户看。
+ * Attachments carried by the user's message (one line per attachment at the end of the message, format in [AttachmentLines]): the conversation page uses this to draw them as photo tiles and file cards,
+ * and the path lines are never shown to the user.
  */
 object AttachmentMessage {
-    /** 一个附件:工作区里的路径和写在消息里的大小(「2 KB」)。 */
+    /** One attachment: its path in the workspace and the size written in the message ("2 KB"). */
     data class Item(val path: String, val size: String) {
         val name: String get() = path.substringAfterLast('/')
-        /** 按扩展名认照片;照片排成格子,其余是文件卡片。 */
+        /** Recognizes photos by extension; photos are laid out as tiles, everything else as file cards. */
         val photo: Boolean get() = isPhoto(name)
     }
 
-    /** 拆开的一句话:[photos]、[files] 按出现先后,[words] 是附件行以外的话(去掉首尾空白)。 */
+    /** A parsed message: [photos] and [files] in order of appearance, [words] is the text outside the attachment lines (trimmed). */
     data class Parsed(val photos: List<Item>, val files: List<Item>, val words: String) {
         val hasAttachments: Boolean get() = photos.isNotEmpty() || files.isNotEmpty()
     }
@@ -30,13 +30,13 @@ object AttachmentMessage {
         return Parsed(items.filter { it.photo }, items.filterNot { it.photo }, p.words)
     }
 
-    /** 去掉附件行后的话;只发了附件时是一句称呼([label])。标题、侧栏用它。 */
+    /** The text with attachment lines removed; when only attachments were sent it is a label ([label]). Used for the title and in the drawer. */
     fun plain(text: String): String {
         val p = parse(text)
         return if (!p.hasAttachments) text else p.words.ifEmpty { label(p) }
     }
 
-    /** 只发了附件时怎么称呼:「照片」「3 张照片」「合同.pdf」「合同.pdf 等 2 个文件」「照片和文件」。 */
+    /** How to refer to a message that contains only attachments: "Photo", "3 photos", "contract.pdf", "contract.pdf and 2 more files", "Photos and files". */
     fun label(p: Parsed): String = when {
         p.photos.isNotEmpty() && p.files.isNotEmpty() -> tr(R.string.attach_photos_and_files)
         p.photos.size == 1 -> tr(R.string.attach_photo)
@@ -49,7 +49,7 @@ object AttachmentMessage {
     fun isPhoto(name: String): Boolean = ViewerKinds.of(null, name) == ViewerKind.Image
 }
 
-/** 照片格子怎么排:1 张一大张(保持比例),2 张并排,3 张起三列、多了换行。 */
+/** Photo tile layout: one is shown large (aspect ratio preserved), two sit side by side, three or more use three columns and wrap onto more rows. */
 object PhotoGrid {
     fun columns(count: Int): Int = when {
         count <= 1 -> 1
@@ -60,7 +60,7 @@ object PhotoGrid {
     fun rows(count: Int): Int = if (count <= 0) 0 else (count + columns(count) - 1) / columns(count)
 }
 
-/** 文件卡片上的类型角标:扩展名(最多 4 个字母)和颜色分组。 */
+/** Type badge on a file card: the extension (at most 4 letters) and the color group. */
 object FileBadge {
     enum class Kind { Pdf, Sheet, Doc, Slides, Archive, Other }
 
@@ -78,11 +78,11 @@ object FileBadge {
     private fun ext(name: String): String = name.substringAfterLast('.', "").lowercase().filter { it.isLetterOrDigit() }
 }
 
-/** 输入框上方待发的附件:最多 [LIMIT] 个(照片和文件一起算),同一个地址只算一次。 */
+/** Attachments waiting above the composer: at most [LIMIT] (photos and files together), and each URI counts only once. */
 object AttachTray {
     const val LIMIT = 9
 
-    /** 加进来:已有的跳过,超过上限的不收;返回新的列表和没收下的个数。 */
+    /** Add: skip ones already present, reject ones beyond the limit; returns the new list and the number rejected. */
     fun add(current: List<PendingAttachment>, items: List<PendingAttachment>): Pair<List<PendingAttachment>, Int> {
         val out = current.toMutableList()
         var dropped = 0
@@ -93,7 +93,7 @@ object AttachTray {
         return out to dropped
     }
 
-    /** 点一下:选着的去掉,没选的加上(满了不加,[Toggle.full] 为真)。 */
+    /** Tap: remove it if selected, add it if not (nothing is added when full, and [Toggle.full] is true). */
     fun toggle(current: List<PendingAttachment>, item: PendingAttachment): Toggle =
         if (current.any { it.uri == item.uri }) Toggle(current.filterNot { it.uri == item.uri }, full = false)
         else if (current.size >= LIMIT) Toggle(current, full = true)
@@ -101,11 +101,11 @@ object AttachTray {
 
     data class Toggle(val items: List<PendingAttachment>, val full: Boolean)
 
-    /** 照片在待发里是第几张(从 1 起,只数照片);没选为 null。照片格子右上角的序号。 */
+    /** Which photo this is among the pending ones (1-based, counting photos only); null when not selected. Shown in the top-right corner of the photo tile. */
     fun order(current: List<PendingAttachment>, uri: String): Int? =
         current.filter { it.photo }.indexOfFirst { it.uri == uri }.takeIf { it >= 0 }?.plus(1)
 
-    /** 有字或有附件、没在复制时能发。 */
+    /** Can send when there is text or an attachment and no import is in progress. */
     fun canSend(text: String, items: List<PendingAttachment>, importing: Boolean): Boolean =
         (text.isNotBlank() || items.isNotEmpty()) && !importing
 }

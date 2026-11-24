@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import com.wangzan101.mika.core.agent.AttachedPage
 import com.wangzan101.mika.core.screen.user.UserScreenMessage
 
-/** 从某一轮分支、从某一句重新问。 */
+/** Branch from a turn, and ask again from a single message. */
 internal class ChatBranchOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val deleted get() = vm.deleted
@@ -28,35 +28,35 @@ internal class ChatBranchOps(private val vm: ChatViewModel, private val session:
     private val branchTitle = vm.branchTitle
     private val io = vm.io
 
-    /** 屏上这个对话此刻分不了支:还没存过、有任务在跑或排队、已删或正在删、输入框正忙。 */
+    /** This conversation on screen cannot be branched right now: not saved yet, a task is running or queued, it was deleted or is being deleted, or the composer is busy. */
     private fun branchBlocked(): Boolean {
         val id = _ui.value.conversationId ?: return true
         return id in activeConversations.value || id in deleted.value || id in deleting || session.busy()
     }
 
-    /** 长按的消息 [key] 能「从这里分支」时返回轮次;菜单据此显示,[branchFrom] 用的是同一个判断。 */
+    /** Returns the turn when the long-pressed message [key] can "Branch from here"; the menu shows on this basis and [branchFrom] uses the same check. */
     fun branchTurn(key: String): Int? = branchableTurn(_ui.value.exchanges, key, branchBlocked())
 
-    /** 长按的消息 [key] 能「从这里重新问」时返回轮次;菜单据此显示,[branchBefore] 用的是同一个判断。 */
+    /** Returns the turn when the long-pressed message [key] can "Ask again from here"; the menu shows on this basis and [branchBefore] uses the same check. */
     fun retryTurn(key: String): Int? = retryableTurn(_ui.value.exchanges, key, branchBlocked())
 
-    /** 清掉上次分支复制工作区的提示。 */
+    /** Clears the notice about the workspace copy from the last branch. */
     fun clearBranchCopy() {
         _branchCopy.value = null
     }
 
     /**
-     * 从当前对话的第 [throughTurn] 轮(0 起,含这一轮)分支:复制轮次和标题/网页来源,再复制工作区 inbox/,成功后切到新对话。
-     * 返回新对话编号;[canBranchAt] 不成立(有任务在跑或排队、正在删、输入框正忙、轮次越界、这一轮还没结束)或复制失败时为 null。
-     * 工作区复制的结果(超过上限等)放在 [branchCopy] 里,不当作失败。
+     * Branch from turn [throughTurn] (0-based, inclusive) of the current conversation: copy the turns and the title/page source, then copy the workspace inbox/, and switch to the new conversation on success.
+     * Returns the new conversation id; null when [canBranchAt] does not hold (a task is running or queued, deletion is in progress, the composer is busy, the turn is out of range, or this turn has not finished) or the copy fails.
+     * The result of the workspace copy (over the limit, etc.) is stored in [branchCopy] and is not treated as a failure.
      */
     suspend fun branchFrom(throughTurn: Int): String? =
         branchInto(throughTurn, afterTurn = true, allowed = ::canBranchAt)
 
     /**
-     * 从当前对话的第 [turn] 条用户消息「重新问」:复制这一轮之前的轮次,返回新对话编号和要预填的文字,不自动发送。
-     * 原消息的附件/屏幕不会带进输入框,用 [BranchRetry.needsReattach] 告诉界面提示重新添加。
-     * [canRetryAt] 不成立(同 [branchFrom],另加这一轮用户的话是空的)或复制失败时为 null。
+     * "Ask again" from the user message in turn [turn] of the current conversation: copy the turns before it and return the new conversation id and the text to prefill, without sending automatically.
+     * The original message's attachments/screen are not carried into the composer; [BranchRetry.needsReattach] tells the UI to prompt for re-adding them.
+     * Returns null when [canRetryAt] does not hold (same as [branchFrom], plus this turn's user message being empty) or the copy fails.
      */
     suspend fun branchBefore(turn: Int): BranchRetry? {
         val exchanges = _ui.value.exchanges
@@ -86,8 +86,8 @@ internal class ChatBranchOps(private val vm: ChatViewModel, private val session:
     }
 
     /**
-     * [branchFrom] 和 [branchBefore] 共用:[allowed] 成立时新建对话,复制到第 [turn] 轮([afterTurn] 时含这一轮,否则只到它之前)、
-     * 标题加后缀、写分支来源,再复制工作区 inbox/,然后切到新对话。返回新对话编号;不允许或复制失败为 null,不切走。
+     * Shared by [branchFrom] and [branchBefore]: when [allowed] holds, create a new conversation, copy up to turn [turn] (inclusive when [afterTurn], otherwise only up to before it),
+     * add the suffix to the title, record the branch origin, copy the workspace inbox/, then switch to the new conversation. Returns the new conversation id; null when not allowed or the copy fails, and it does not switch.
      */
     private suspend fun branchInto(
         turn: Int, afterTurn: Boolean, allowed: (List<Exchange>, Int, Boolean) -> Boolean,

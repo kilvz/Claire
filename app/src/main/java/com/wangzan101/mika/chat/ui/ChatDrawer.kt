@@ -53,22 +53,22 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.WordmarkWeight
 
 /**
- * 侧栏:从起始边随聊天卡片一起滑出。顶部是标志和状态;导航入口;中间是进行中(段标题右边进「后台屏」页)和最近的对话;最底下设置和关于并排。
- * 打开和关上由外面的抽屉管,这里只摆内容,点了什么交给回调。
+ * Drawer: slides out from the start edge together with the chat card. The top holds the wordmark and status; then the navigation entries; the middle holds the running section (the section header's right side opens the "background screens" page) and recent conversations; the very bottom has settings and about side by side.
+ * Opening and closing are managed by the drawer outside; this only lays out content and hands taps to callbacks.
  */
 @Composable
 fun ChatDrawer(
     check: Prerequisites.Check,
     sections: DrawerSections,
     canSwitch: Boolean,
-    /** 搜索框里的字;非空时侧栏进入搜索结果,入口区让位给结果。 */
+    /** Text in the search field; when non-blank the drawer switches to search results and the entry area gives way to them. */
     query: String = "",
     onQueryChange: (String) -> Unit = {},
-    /** 当前查询的结果;还没搜完时 [DrawerSearch.searching] 为真。 */
+    /** Results for the current query; [DrawerSearch.searching] is true while the search is still running. */
     search: DrawerSearch? = null,
-    /** 有对话可搜时才显示搜索框。 */
+    /** The search field is shown only when there are conversations to search. */
     canSearch: Boolean = false,
-    /** 搜索结果的归档筛选:全部 / 只看未归档 / 只看已归档。 */
+    /** Archive filter for search results: all / only unarchived / only archived. */
     searchFilter: SearchArchiveFilter = SearchArchiveFilter.All,
     onSearchFilterChange: (SearchArchiveFilter) -> Unit = {},
     onNew: () -> Unit,
@@ -80,31 +80,31 @@ fun ChatDrawer(
     onSettings: () -> Unit,
     onOpen: (DrawerConversation) -> Unit,
     onAbout: () -> Unit = {},
-    /** 有新版本:「关于 Claire」带小红点。 */
+    /** A new version is available: "About Claire" gets a small red dot. */
     aboutDot: Boolean = false,
-    /** 长按一条存过的对话:在它原地弹出操作菜单(置顶、改名、删除);带上那一行在窗口里的位置和大小。 */
+    /** Long-press on a saved conversation: pop up the action menu (pin, rename, delete) in place; carries that row's position and size in the window. */
     onActions: (DrawerConversation, Rect) -> Unit = { _, _ -> },
-    /** 多选模式:每行左边出现勾选框,点一行是勾选;底部换成「已选 N 条 / 全选 / 删除」。 */
+    /** Selection mode: a checkbox appears on the left of each row and tapping a row toggles it; the bottom becomes "N selected / Select all / Delete". */
     selecting: Boolean = false,
     selected: Set<String> = emptySet(),
     onExitSelect: () -> Unit = {},
     onToggleSelect: (DrawerConversation) -> Unit = {},
     onSelectAll: () -> Unit = {},
     onDeleteSelected: () -> Unit = {},
-    /** 归档视图里多选后「取消归档」;普通侧栏里用不到。 */
+    /** "Unarchive" after multi-selecting in the archive view; unused in the normal drawer. */
     onUnarchiveSelected: () -> Unit = {},
-    /** 普通侧栏里多选后「归档」;归档视图里用不到。 */
+    /** "Archive" after multi-selecting in the normal drawer; unused in the archive view. */
     onArchiveSelected: () -> Unit = {},
-    /** 批量删除的进度和结果;在底部显示,删完过几秒由外面清掉。 */
+    /** Progress and results of a batch delete; shown at the bottom and cleared from outside a few seconds after it finishes. */
     deleteBatch: DeleteBatch? = null,
-    /** 批量归档的结果;在底部显示,过几秒由外面清掉。 */
+    /** Result of a batch archive; shown at the bottom and cleared from outside a few seconds later. */
     archiveBatch: ArchiveBatch? = null,
-    /** 刚归档的那一条;底部显示「撤销」,过几秒由外面清掉。 */
+    /** The item just archived; the bottom shows "Undo" and it is cleared from outside a few seconds later. */
     archiveUndo: ArchiveUndo? = null,
     onUndoArchive: () -> Unit = {},
-    /** 归档视图里列出的对话;按归档时间倒序。 */
+    /** Conversations listed in the archive view; newest archived first. */
     archived: List<DrawerConversation> = emptyList(),
-    /** 正在看归档视图:列表换成归档对话,搜索框和导航入口收起。 */
+    /** The archive view is showing: the list becomes archived conversations and the search field and navigation entries are collapsed. */
     archivedView: Boolean = false,
     onOpenArchive: () -> Unit = {},
     onExitArchive: () -> Unit = {},
@@ -120,13 +120,13 @@ fun ChatDrawer(
     onShowScreen: (() -> Unit)? = null,
 ) {
     val c = MikaTheme.colors
-    // 能勾的就是此刻列在侧栏里、已经存过的对话(还没存过的当前草稿没有编号,删不了);归档视图里是归档的那些
+    // Only conversations currently listed in the drawer and already saved can be checked (a current draft not saved yet has no id and cannot be deleted); in the archive view it is the archived ones
     val selectableIds = remember(sections, archived, archivedView) {
         drawerSelectableIds(sections, archived, archivedView)
     }
     val selectedCount = selected.count { it in selectableIds }
     val allSelected = selectableIds.isNotEmpty() && selectedCount == selectableIds.size
-    // 搜索时把几个入口收起来，把高度让给结果;清空后原样回来。搜索框在入口上面，位置不跳
+    // While searching, the entries collapse to give their height to the results, and return as they were once cleared. The search field sits above the entries, so nothing jumps
     val searchActive = canSearch && !selecting && !archivedView && query.isNotBlank()
     Column(
         modifier.fillMaxHeight().then(if (permanent) Modifier else Modifier.widthIn(max = DrawerWidth)).fillMaxWidth()
@@ -148,7 +148,7 @@ fun ChatDrawer(
                     Text(state, style = MikaType.Hint, fontWeight = FontWeight.Medium, color = c.ink3)
                 }
             }
-            // 多选从长按菜单进;进去以后这里换成「取消」,返回键同样能退出
+            // Selection is entered from the long-press menu; once in, this becomes "Cancel", and the back key exits as well
             if (selecting) HeaderAction(stringResource(R.string.cancel), "drawer-select-cancel", c.ink2, onExitSelect)
         }
         if (!searchActive && !selecting && !archivedView && permanent) {
@@ -160,7 +160,7 @@ fun ChatDrawer(
                 NavEntry(MikaIcons.Globe, stringResource(R.string.drawer_browser), onClick = onBrowser)
             }
         }
-        // 搜索框和新对话并成一行:搜索框占满,右边一个中性圆加号(没在搜时才有);没有可搜的对话时也留那个加号
+        // The search field and new conversation share a row: the field takes the width and a neutral round plus sits on the right (only when not searching); the plus stays even when there is nothing to search
         val showNew = !searchActive && !selecting && !archivedView
         if (canSearch && !selecting && !archivedView) {
             Row(
@@ -176,9 +176,9 @@ fun ChatDrawer(
                 NewConversationButton(canSwitch, onNew)
             }
         }
-        // 搜索时搜索框下面按归档状态筛;归档视图里没有搜索,自然也没有这一行
+        // While searching, the row below the field filters by archive state; the archive view has no search, so naturally no such row either
         if (searchActive) SearchArchiveFilterRow(searchFilter, onSearchFilterChange)
-        // 侧栏关着时列表只剩末尾那一项;打开时对话插在它前面,列表会按原来那一项停在最底下。最上面一项变了就回到顶上
+        // While the drawer is closed the list holds only the trailing item; when it opens, conversations are inserted before it and the list would stay pinned at the bottom on that former item. When the topmost item changes, scroll back to the top
         val list = rememberLazyListState()
         val first = when {
             archivedView -> "h-archive"
@@ -191,7 +191,7 @@ fun ChatDrawer(
         }
         LaunchedEffect(first) { list.requestScrollToItem(0) }
         val terms = remember(query) { ConversationSearch.termsOf(query) }
-        // 归档视图按本周 / 本月 / 更早分组;分组也跟着列表走
+        // The archive view groups by this week / this month / earlier; groups live in the same list
         val archiveGrouping = remember(archived) { archiveGroups(archived, System.currentTimeMillis()) }
         LazyColumn(Modifier.fillMaxWidth().weight(1f).lazyListScrollbar(list), state = list) {
             if (searchActive) {
@@ -204,10 +204,10 @@ fun ChatDrawer(
                         )
                     }
                 }
-                // 扫正文期间一直提示;标题命中已经列出来时也提示,表示结果还会补全
+                // The hint stays while bodies are being scanned; it also shows when title hits are already listed, indicating results will be filled in further
                 if (search?.searching != false) item("searching") { SearchHint(stringResource(R.string.drawer_searching)) }
                 items(search?.hits.orEmpty(), key = { "s-${it.id}" }) {
-                    // 「只看已归档」时每一行都是归档的,不用再标;其余筛选用归档小图标把收起来的对话标出来
+                    // With "only archived" every row is archived so no mark is needed; other filters mark collapsed conversations with the small archive icon
                     ConversationEntry(it, onOpen, onActions, terms, showArchivedMark = searchFilter != SearchArchiveFilter.Archived, showProjectMark = true)
                 }
                 if (search != null && !search.searching && search.hits.isEmpty()) {
@@ -230,7 +230,7 @@ fun ChatDrawer(
                 }
             } else {
                 if (sections.running.isNotEmpty()) {
-                    // 「进行中」这一段的右边进「后台屏」页:看每个在跑的任务正在用哪个 App、实时画面
+                    // The right side of the "running" section opens the "background screens" page: see which app each running task is using and its live frame
                     item("h-running") { RunningLabel(onScreens) }
                     items(sections.running, key = { "r-${it.id}" }) {
                         ConversationEntry(it, onOpen, onActions, selecting = selecting, selected = it.id in selected, onToggleSelect = onToggleSelect, showProjectMark = true)
@@ -271,7 +271,7 @@ fun ChatDrawer(
                         }
                     }
                 }
-                // 换不了对话时的说明放在第一段存着的对话(置顶或最近)上面
+                // The note explaining why switching is impossible sits above the first section of saved conversations (pinned or recent)
                 val busyNote: LazyListScope.() -> Unit = {
                     if (!canSwitch) {
                         item("busy") {
@@ -308,14 +308,14 @@ fun ChatDrawer(
             }
             item("end") { Box(Modifier.height(12.dp)) }
         }
-        // 批量删除的进度 / 结果在底部停留几秒
+        // Batch delete progress / results linger at the bottom for a few seconds
         deleteBatch?.let { DeleteStatusBar(it) }
         archiveBatch?.let { ArchiveStatusBar(it) }
         if (!selecting) archiveUndo?.let { ArchiveUndoBar(it, onUndoArchive) }
         if (selecting) {
             SelectBar(selectedCount, allSelected, onSelectAll, archivedView, onArchiveSelected, onUnarchiveSelected, onDeleteSelected)
         } else {
-            // 设置固定在侧栏最底下靠左;有新版时右边才出现「更新」带红点,点它进「关于 Claire」
+            // Settings is pinned at the bottom-left of the drawer; only when a new version exists does "Update" with a red dot appear on the right, tapping it opens "About Claire"
             Row(
                 Modifier.fillMaxWidth().drawBehind { drawLine(c.hair, Offset(0f, 0f), Offset(size.width, 0f), 0.5.dp.toPx()) }
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("drawer-footer"),

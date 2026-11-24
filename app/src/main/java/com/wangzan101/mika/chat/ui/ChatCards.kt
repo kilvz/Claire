@@ -319,7 +319,7 @@ private fun ReplyActions(
     }
 }
 
-/** 操作区里的一枚纯图标按钮:30dp 触达区、17dp 图标,[label] 只作无障碍描述。 */
+/** An icon-only button in the action row: 30dp touch target, 17dp icon, [label] used only as the accessibility description. */
 @Composable
 private fun ReplyIcon(icon: ImageVector, label: String, tint: Color = MikaTheme.colors.ink2, onClick: () -> Unit) {
     Box(
@@ -330,7 +330,7 @@ private fun ReplyIcon(icon: ImageVector, label: String, tint: Color = MikaTheme.
     }
 }
 
-/** 复制回答正文的纯文字到剪贴板。 */
+/** Copies the plain text of the answer body to the clipboard. */
 private fun copyAnswer(context: Context, answer: String) {
     val clip = ClipData.newPlainText("Claire", MarkdownModel.toPlainText(answer))
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
@@ -338,8 +338,8 @@ private fun copyAnswer(context: Context, answer: String) {
 }
 
 /**
- * 「需要你」卡片(要你处理、提问、确认、暂停、锁屏、被拦下):白卡,标题前一个橙色圆点,下面说明;
- * [options] 是一列可点的答案;按钮并排,次要的在左(浅色)、主要的在右(蓝色);[footer] 在最下面。
+ * The "needs you" card (needs your attention, question, confirmation, pause, lock screen, blocked): a white card with an orange dot before the title and the explanation below;
+ * [options] is a column of tappable answers; buttons sit side by side, secondary on the left (light) and primary on the right (blue); [footer] at the very bottom.
  */
 @Composable
 internal fun NeedCard(
@@ -381,7 +381,7 @@ internal fun TextLink(text: String, onClick: () -> Unit) {
     Text(text, Modifier.clip(MikaShapes.Pill).clickable(onClick = onClick).padding(4.dp), style = MikaType.Caption, color = MikaTheme.colors.ink3)
 }
 
-/** 导出到「下载/Claire」的文件:小卡片,名字、大小和存放处;点了能看的在 App 里打开([FileViewer]),其余交给系统里能打开它的 App。 */
+/** A file exported to "Downloads/Claire": a small card with name, size and location; tapping opens it in the app when viewable ([FileViewer]), otherwise it is handed to a system app that can open it. */
 @Composable
 internal fun FileCards(files: List<SharedFile>) {
     val context = LocalContext.current
@@ -413,4 +413,4 @@ internal fun FileCards(files: List<SharedFile>) {
 
 private fun openShared(context: Context, f: SharedFile) = FileViewer.open(context, Uri.parse(f.uri), f.name)
 
-// ---------- 输入栏 ----------
+// ---------- Composer ----------

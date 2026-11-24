@@ -18,7 +18,7 @@ import com.wangzan101.mika.chat.ui.ChatReduce.rows
 import com.wangzan101.mika.chat.ui.ChatReduce.state
 import com.wangzan101.mika.settings.ui.models.refresh
 
-/** 跟着屏上这个对话的任务:状态、步骤、文件、插话的去向,切走时停到一边,切回来接上。 */
+/** Follows the task of the conversation on screen: state, steps, files and where steers went; parked aside when switching away and reattached when switching back. */
 internal class ChatLiveFollow(private val vm: ChatViewModel, private val session: ChatSession) {
     private var autoReadKey by session::autoReadKey
     private val _ui = session._ui
@@ -61,7 +61,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         vm.speak(status.answer)
     }
 
-    /** 把屏上这个对话正在跟的那一问一答停到一边(换到别的对话之前调用)。 */
+    /** Parks the question-and-answer pair being followed for the conversation on screen (called before switching to another conversation). */
     fun parkLive() {
         val ui = _ui.value
         val id = ui.conversationId ?: return
@@ -102,8 +102,8 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
     }
 
     /**
-     * 插话的去向按编号改到它所在的那一问一答上(任务收尾后它可能已经不是在跟的那条)。
-     * 别处(悬浮胶囊)插给正在跟的任务的话,这里还没有的,挂到正在跟的那一问一答下面。
+     * Steer destinations are updated by id on the question-and-answer pair they belong to (after a task wraps up that may no longer be the one being followed).
+     * Text steered into the followed task from elsewhere (the floating pill) that is not here yet is attached under the pair being followed.
      */
     fun onSteers(list: List<SteerNote>) {
         val byId = list.associateBy { it.id }
@@ -155,11 +155,11 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
     }
 
     /**
-     * 只收屏上这个对话的任务的状态;界面刚起来还没有对话时接上正在跑的那个(连同那个对话存下的轮次)。
-     * 服务换去显示别的对话的任务(别处刚开始了一个)时,这里正在跟的任务还在跑就让服务显示回来,不让它停在半路。
+     * Accepts the state only of the conversation on screen's task; when the UI has just started with no conversation yet, attaches the running one (along with the turns saved for that conversation).
+     * When the service switches to showing another conversation's task (one just started elsewhere), the followed task here is switched back to if it is still running, so it does not stall halfway.
      */
     fun onShown(conversationId: String, s: TaskState) {
-        // 删掉的对话的任务正在停下:不接到屏上
+        // A deleted conversation's task is stopping: do not attach it to the screen
         if (conversationId in _deleted.value) return
         val current = _ui.value.conversationId
         when {
@@ -183,14 +183,14 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
     }
 
     /**
-     * 接上屏上这个对话正在跑的任务(不论从哪里开始的:这里、悬浮胶囊、定时任务)。没在跟时先摆好那一问一答
-     * (切走时停着的 [p],或按任务的原话新起一条),再让服务显示它,并按服务此刻对外的各项补齐。
+     * Attaches to the running task of the conversation on screen (no matter where it started: here, the floating pill, a scheduled job). When not following yet, first set up the question-and-answer pair
+     * (the parked [p] from switching away, or a new one from the task's original message), then make the service display it, and fill in from the service's current outward values.
      */
     fun follow(conversationId: String, p: Parked? = null) {
         val fresh = liveIndex < 0
         if (fresh) {
-            // 先把这个对话的那一问一答摆好,再让服务显示它:服务一换显示,状态可能当场就送进来(onShown),
-            // 那时这一问一答必须已经在,不然会另起一条没有原话的
+            // Set up this conversation's question-and-answer pair first, then make the service display it: as soon as the service switches, the state may arrive right away (onShown),
+            // and by then this pair must already exist, otherwise a new one without the original message would be created
             val live = p?.exchange ?: Exchange(runGoal(conversationId).orEmpty(), emptyList(), ExchangeStatus.Working, live = true, startedAt = clock())
             screenSeen = p?.screenSeen ?: false
             pipClosed = p?.pipClosed ?: false
@@ -207,9 +207,9 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         }
         actions.show(conversationId)
         val shown = shownTask.value?.takeIf { it.first == conversationId } ?: return
-        // 正在跟的那一问一答不拿服务里已收尾的状态去结束它(那可能是上一个任务的)
+        // Do not end the followed pair with a finished state from the service (it may belong to the previous task)
         if (!fresh && !shown.second.active()) return
-        // 服务对外的这几项此刻都是这个任务的了:按它们补齐(状态流只在变化时送,切过来不一定再送一次)
+        // These outward values of the service now all belong to this task: fill in from them (state flows only emit on change, and switching over may not re-emit)
         if (!screenSeen && screenOpen.value) screenSeen = true
         _ui.update { it.copy(takeoverStage = takeoverStage.value) }
         onSharedFiles(sharedFiles.value)
@@ -221,8 +221,8 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
     }
 
     /**
-     * 对话页重新看得见时(回到前台、从别的页面回来):别处存进屏上这个对话的轮次补上;
-     * 这个对话有任务在跑(从悬浮胶囊、定时任务开始的)而这里没在跟,或服务显示的换成了别的任务,就接上它。
+     * When the conversation page becomes visible again (back to the foreground, returning from another page): turns saved into the conversation on screen from elsewhere are filled in;
+     * if that conversation has a running task (started from the floating pill or a scheduled job) that is not being followed here, or the service switched to showing another task, attach to it.
      */
     fun refresh() {
         session.refreshParallel()
@@ -230,13 +230,13 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         syncSaved(id)
         if (id !in activeConversations.value) { actions.drainFollowUps(id); return }
         if (pendingStart?.isActive == true) return
-        // 开关关着、这里没在跟任务时换对话要等任务结束:那时屏上这个对话的任务就是服务里唯一在跑的
+        // With the setting off and no task followed here, switching conversations waits for the task to end: then the conversation on screen's task is the only one running in the service
         follow(id, if (session.parallel()) unpark(id) else null)
     }
 
     /**
-     * 存储里这个对话变了(别处跑完存进一轮、改了某一轮):屏上按存下的那份重排。这里跟过的那几轮按运行编号认
-     * (没有编号的按原话),用这里的那份(带步骤和用时),不重复;还没存进去的接在后面;正在跟的那一问一答留在最后。
+     * The stored version of this conversation changed (a turn was saved from elsewhere, or one was edited): re-lay out the screen from the stored copy. Turns that were followed here are matched by run id
+     * (by original message when there is no id), the copy from here (with steps and elapsed time) is used instead of duplicating them; turns not saved yet are appended; the followed pair stays last.
      */
     fun syncSaved(conversationId: String) {
         val stored = session.saved(conversationId)
@@ -244,14 +244,14 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
             if (ui.conversationId != conversationId) return@update ui
             val live = ui.exchanges.getOrNull(liveIndex)
             val tracked = ui.exchanges.filterIndexed { i, ex -> ex.live && i != liveIndex }.toMutableList()
-            // 从最近的往前配:同一句原话说过好几次时,配上的是最近那次
+            // Match from the most recent backwards: when the same message was said several times, the most recent one is matched
             val merged = stored.asReversed().map { s ->
                 val mine = tracked.lastOrNull { if (s.runId != null) it.runId == s.runId else it.runId == null && it.goal == s.goal }
                     ?: return@map s
                 tracked.remove(mine)
-                // 停止后补上的交代记在存下的那份里
+                // The explanation added after a stop is recorded in the stored copy
                 val m = if (mine.status is ExchangeStatus.Cancelled && s.status is ExchangeStatus.Cancelled && s.status.summary != null) mine.copy(status = s.status) else mine
-                // 留页的记录(留下的站点、后来关掉的原因)也只在存下的那份里
+                // The kept-page record (the site kept, the reason it was later closed) also exists only in the stored copy
                 val k = if (s.keptPage != null) m.copy(keptPage = s.keptPage, keptPageClosed = s.keptPageClosed) else m
                 if (k.goal.isEmpty()) k.copy(goal = s.goal) else k
             }.asReversed()
@@ -264,13 +264,13 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
 
     fun onState(s: TaskState) {
         if (liveIndex < 0) {
-            // 任务不是从这里开始的(比如界面重建前就在跑):接着显示,只是没有用户那句话
+            // The task did not start here (e.g. it was already running before the UI was recreated): keep showing it, just without the user's message
             if (!s.active()) return
             screenSeen = screenOpen.value
             pipClosed = false
             _ui.update {
                 liveIndex = it.exchanges.size
-                // 原话、文件按对话取:这条状态属于屏上这个对话的任务
+                // The original message and files are taken by conversation: this state belongs to the conversation on screen's task
                 val goal = it.conversationId?.let(runGoal).orEmpty()
                 val files = if (session.ownTask()) sharedFiles.value else emptyList()
                 val audios = if (session.ownTask()) generatedAudios.value else emptyList()
@@ -289,11 +289,11 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
             val old = ui.exchanges[liveIndex]
             val ex = reduce(withGoal(old, ui.conversationId), s, appLabel, toolLabels::label).let {
                 if (it.status.active() || !old.status.active()) {
-                    // 跑的时候就挂上这个对话的任务的编号,「运行过程」当场可用;结束那一下仍走下面那一支
+                    // Attach this conversation's task id while running so run details are available right away; the finishing moment still takes the branch below
                     val live = if (it.status.active() && it.runId == null) ui.conversationId?.let(liveRunId) else null
                     if (live != null) it.copy(runId = live) else it
                 }
-                // 收尾时还没交到任务手里的插话:服务把它当成这个对话的下一件事
+                // A steer not yet handed to the task at wrap-up: the service treats it as the conversation's next item
                 else session.withSummarizing(session.withNotes(it.copy(runId = endedRunFor(ui.conversationId), elapsedMs = elapsedOf(old),
                     steers = it.steers.map { n -> if (n.state.unconsumed) n.copy(state = SteerState.Next) else n }), runNotes.value))
             }
@@ -311,7 +311,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         _ui.value.exchanges.getOrNull(liveIndex)?.let(::maybeAutoRead)
         if (!s.active() && s != TaskState.Idle) {
             liveIndex = -1
-            // 这一轮可能已先一步存进对话、补到了屏上:按运行编号并成一条
+            // This turn may already have been saved into the conversation and added to the screen: merge it by run id
             _ui.value.conversationId?.let(::syncSaved)
             if (s is TaskState.Succeeded) {
                 lingerJob = scope.launch {
@@ -322,7 +322,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
         }
     }
 
-    /** 正在跟的那一问一答还没有原话(接上别处开始的任务时它还没登记):按屏上这个对话的任务补上。 */
+    /** The followed pair has no original message yet (it was not registered when attaching to a task started elsewhere): fill it in from the conversation on screen's task. */
     fun fillGoal() = _ui.update { ui ->
         val ex = ui.exchanges.getOrNull(liveIndex) ?: return@update ui
         val filled = withGoal(ex, ui.conversationId)
@@ -337,7 +337,7 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
     private fun elapsedOf(ex: Exchange): Long? = ex.startedAt.takeIf { it > 0 }?.let { (clock() - it).coerceAtLeast(0) }
 
     private fun endedRunFor(conversationId: String?): String? {
-        // 没有对话编号(接上界面重建前就在跑的任务)时只能用显示中的那个
+        // With no conversation id (attaching to a task that was already running before the UI was recreated), only the currently shown one can be used
         val byConversation = endedRunIds ?: return endedRunId.value
         return if (conversationId == null) endedRunId.value else byConversation.value[conversationId]
     }
@@ -349,8 +349,8 @@ internal class ChatLiveFollow(private val vm: ChatViewModel, private val session
             is ExchangeStatus.Failed, is ExchangeStatus.Cancelled -> PipUi()
             else -> {
                 val needs = st.needsUser()
-                // 只有接管刚开始时自动展开(提问、暂停要让输入框和卡片按钮留在眼前);接管结束时收起;
-                // 同一次接管里用户收起后不再弹开
+                // Expand automatically only when a takeover just started (a question or pause must keep the composer and card buttons in view); collapse when the takeover ends;
+                // do not pop open again within the same takeover after the user collapsed it
                 val takeover = st is ExchangeStatus.NeedsTakeover
                 val wasTakeover = before is ExchangeStatus.NeedsTakeover
                 val expanded = when {

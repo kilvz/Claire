@@ -74,8 +74,8 @@ import com.wangzan101.mika.voice.ui.rememberVoiceHold
 import com.wangzan101.mika.voice.ui.voiceState
 
 /**
- * 玻璃胶囊输入栏:左边「＋」,右边发送(没内容时灰);任务在跑时多一个停止,补充消息先排在输入栏上方。
- * 「＋」打开功能面板([onPlus],对话页里是从底部升起的列表)。待发的附件在输入栏上方一排([PendingTray])。
+ * Glass pill composer: "+" on the left, send on the right (grey when there is no content); while a task is running there is an extra stop, and follow-up messages queue above the composer.
+ * "+" opens the feature panel ([onPlus], a sheet rising from the bottom on the conversation page). Pending attachments sit in a row above the composer ([PendingTray]).
  */
 @Composable
 internal fun Composer(
@@ -86,16 +86,16 @@ internal fun Composer(
     hasHistory: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    /** 这个对话明确排队、还没开始的下一件。 */
+    /** The next item explicitly queued for this conversation that has not started yet. */
     queued: List<com.wangzan101.mika.task.QueuedFollowUp> = emptyList(),
     onGuideQueued: (String) -> Unit = {},
     onQueueActions: (com.wangzan101.mika.task.QueuedFollowUp) -> Unit = {},
     onCancelQueued: (String) -> Unit = {},
     onEditQueued: (String) -> Unit = {},
     onStartQueued: () -> Unit = {},
-    /** 沙箱就绪时就有「＋」;点开是功能面板。 */
+    /** "+" exists once the sandbox is ready; tapping it opens the feature panel. */
     onPlus: (() -> Unit)? = null,
-    /** 附件已启用但此刻不能加:「＋」还在,点了只给提示。 */
+    /** Attachments are enabled but cannot be added right now: "+" is still there, tapping it only shows a hint. */
     attachBlocked: Boolean = false,
     attachments: List<PendingAttachment> = emptyList(),
     importing: Boolean = false,
@@ -103,37 +103,37 @@ internal fun Composer(
     overLimit: Int = 0,
     onRemove: (String) -> Unit = {},
     onDismissRejected: () -> Unit = {},
-    /** 要随下一句话发出去的引用;有时输入框上方一张小条,× 去掉。 */
+    /** The quote to send along with the next message; when present, a small chip above the field, removed with ×. */
     quote: QuoteMessage.Quote? = null,
     onRemoveQuote: () -> Unit = {},
     editRequest: Int = 0,
-    /** 输入栏后面那层内容的画面;为 null 时输入栏不做模糊、用不透明底。 */
+    /** A snapshot of the content behind the composer; when null the composer is not blurred and uses an opaque background. */
     backdrop: GlassBackdrop? = null,
     reduceMotion: Boolean = false,
-    /** 按住说话从这里开会话;null 时输入框只能打字。 */
+    /** Hold-to-talk opens its session from here; when null the field can only be typed in. */
     voice: VoiceSource? = null,
-    /** 说完的字;调用方把它接在已有的字后面,不自动发送。 */
+    /** Text produced by speaking; the caller appends it to the existing text and does not send automatically. */
     onVoiceText: (String) -> Unit = {},
-    /** 松开在「在听」卡片里(「松开 发送」)说完的字:调用方接上已有的字直接发出。没给时没有「松开 发送」。 */
+    /** Text finished in the "listening" card ("release to send"): the caller appends it to the existing text and sends immediately. When absent there is no "release to send". */
     onVoiceSend: ((String) -> Unit)? = null,
-    /** 「还不能语音输入」里的「去选」:到设置里选转文字。 */
+    /** The "choose" action in "voice input not available yet": pick speech-to-text in settings. */
     onPickSpeech: () -> Unit = {},
-    /** 听筒按钮:进语音通话;为 null 时不显示。 */
+    /** Handset button: open a voice call; not shown when null. */
     onVoiceCall: (() -> Unit)? = null,
-    /** 任务在跑时说的话交给谁:卡片顶上写「插话给『…』」。 */
+    /** Who the message goes to while a task is running: the card's top reads "Steer to '…'". */
     steerTarget: String? = null,
-    /** 按着说话时为 true:对话内容跟着虚化。 */
+    /** True while holding to talk: the conversation content blurs along with it. */
     onVoiceHolding: (Boolean) -> Unit = {},
     sendFromIme: Boolean = false,
     draftKey: String? = null,
 ) {
     val c = MikaTheme.colors
     var fieldFocused by remember { mutableStateOf(false) }
-    // 底部从页面底色淡出到透明,输入栏是浮在上面的玻璃
+    // The bottom fades from the page background to transparent, and the composer is glass floating above it
     val fade = remember(c) { Brush.verticalGradient(0f to c.bg.copy(alpha = 0f), 0.25f to c.bg, 1f to c.bg) }
     val busy = mode == ComposerMode.Busy
     val context = LocalContext.current
-    // 附件功能开着就保留「＋」;此刻不能加时只提示,不展开面板
+    // Keep "+" while attachments are enabled; when they cannot be added right now it only shows a hint and does not open the panel
     val showAttach = onPlus != null || attachBlocked
     val density = LocalDensity.current
     val focus = LocalFocusManager.current
@@ -141,7 +141,7 @@ internal fun Composer(
     val field = remember { FocusRequester() }
     val ime = WindowInsets.ime
     val nav = WindowInsets.navigationBars
-    // 「松开 发送」和发送键一样直接发出
+    // "Release to send" sends directly, just like the send button
     val vh = androidx.compose.runtime.key(draftKey) { rememberVoiceHold(voice, onVoiceText, onVoiceSend?.let { send -> { text -> send(text) } }) }
     val vState = voiceState(vh)
     val voiceHolding = vh?.holding == true
@@ -152,9 +152,9 @@ internal fun Composer(
             keyboard?.show()
         }
     }
-    // 输入框聚焦时长按留给系统的选字、粘贴(悬浮、分体、实体键盘也一样);没聚焦时输入框上盖一层按住说话的手势
+    // While the field is focused, long-press stays with the system's text selection and paste (also for floating, split and hardware keyboards); when unfocused a hold-to-talk gesture layer covers the field
     val voiceGesture = vh != null && (!fieldFocused || voiceHolding)
-    // 键盘从弹着到收起(返回键、键盘自己的收起键):输入框跟着失焦,又能按住说话。只看键盘的变化,实体键盘(从不弹出)不受影响
+    // Keyboard going from shown to hidden (back key, the keyboard's own hide key): the field loses focus too, so hold-to-talk works again. Only keyboard changes are observed; a hardware keyboard (which never shows) is unaffected
     LaunchedEffect(ime, density, vh != null) {
         if (vh == null) return@LaunchedEffect
         var wasUp = false
@@ -163,7 +163,7 @@ internal fun Composer(
             wasUp = up
         }
     }
-    // 输入框外面的字一变(说完填进来、点了示例),光标放到末尾,接着说或接着打都在后面
+    // When the text from outside changes (speech filled in, an example tapped), put the cursor at the end so continuing by voice or typing appends
     var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
     val shownValue = if (fieldValue.text == text) fieldValue else TextFieldValue(text, TextRange(text.length))
     Box(
@@ -183,7 +183,7 @@ internal fun Composer(
                 Column(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (importing) Text(AttachCopy.IMPORTING, style = MikaType.Caption, color = c.ink3)
                     if (rejected.isNotEmpty() || overLimit > 0) {
-                        // 超限提示写当前档位,不再硬编码 200 MiB
+                        // The over-limit hint states the current limit instead of hardcoding 200 MiB
                         val ctx = LocalContext.current
                         val attachmentLimitLabel = remember(ctx) {
                             trPlural(R.plurals.settings_attachment_file_limit_mb_n, com.wangzan101.mika.settings.FeatureFlags.get(ctx).attachmentMaxMb())
@@ -212,12 +212,12 @@ internal fun Composer(
                 VoiceFloat(vh, vState, title, backdrop, reduceMotion)
             }
             Box(Modifier.fillMaxWidth()) {
-            // 实底卡片:半透明玻璃在两行身后衬的底不一致会显出两个色,输入栏不走高斯模糊
+            // Solid card: translucent glass over two rows would be backed by different colors and show two tones, so the composer does not use a Gaussian blur
             GlassBar(Modifier.fillMaxWidth().keepsKeyboard()) {
                 val canSend = AttachTray.canSend(text, attachments, importing)
-                // 两行:第一行纯输入,第二行按钮;字再多按钮排布也不动
+                // Two rows: the first is pure input, the second holds the buttons; the button layout does not move no matter how much text there is
                 Column(Modifier.weight(1f)) {
-                    // start 14dp:文字左缘对齐＋图标可视左缘(40dp 按钮内 20dp 图标居中,字形自身再内缩约 4dp)
+                    // start 14dp: the text's left edge aligns with the visible left edge of the + icon (a 20dp icon centered in a 40dp button, with the glyph itself inset about 4dp more)
                     Box(Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 4.dp)) {
                         val converting = vState is HoldToTalk.State.Converting
                         if (text.isEmpty() && !converting) {
@@ -238,7 +238,7 @@ internal fun Composer(
                                 if (AttachTray.canSend(text, attachments, importing)) onSend()
                             }) else KeyboardActions.Default,
                         )
-                        // 服务商松开后在转:输入框里转圈,转好的字填进来
+                        // The provider is transcribing after release: a spinner inside the field, and the transcribed text is filled in
                         if (converting) VoiceConverting(Modifier.align(Alignment.CenterStart))
                         if (voiceGesture && vh != null) {
                             Box(Modifier.matchParentSize().holdToTalk(vh) { field.requestFocus(); keyboard?.show() })
@@ -261,7 +261,7 @@ internal fun Composer(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        // 听筒:进语音通话(与按住说话共存)
+                        // Handset: start a voice call (coexists with hold-to-talk)
                         if (onVoiceCall != null) {
                             val callLabel = stringResource(R.string.voicecall_menu)
                             Box(
@@ -273,7 +273,7 @@ internal fun Composer(
                                 Icon(MikaIcons.Handset, callLabel, Modifier.size(MikaSize.Icon), tint = c.ink)
                             }
                         }
-                        // 话筒常驻:按住才听,点一下提示按住(引擎不可用则直接弹说明页);键盘出来以后长按输入框留给系统选字
+                        // Mic always present: listening only while held, a tap hints to hold (or opens the explanation sheet directly when the engine is unavailable); once the keyboard is up, long-pressing the field stays with the system's text selection
                         if (vh != null) {
                             val hint = stringResource(R.string.voice_hold_to_talk)
                             Box(
@@ -283,7 +283,7 @@ internal fun Composer(
                                 Icon(MikaIcons.Mic, hint, Modifier.size(MikaSize.Icon), tint = c.ink)
                             }
                         }
-                        // 任务在跑时没字就停止;写了字停止让位给发送,发出去的话交给当前任务
+                        // While a task is running, stop is shown when there is no text; once text is written stop yields to send, and what is sent goes to the current task
                         if (busy && !canSend) {
                             Box(
                                 Modifier.size(MikaSize.IconButton).clip(CircleShape)
@@ -294,7 +294,7 @@ internal fun Composer(
                             }
                         }
                         if (!busy || canSend) {
-                            // 可发时黑底白箭头(主操作);空输入灰底灰箭头——发送是主行动,空态也有圆底和＋/话筒拉开层级,但灰箭头表明还不可用。全用 token,深色主题自动反转
+                            // When sendable, a white arrow on black (the primary action); with empty input, a grey arrow on grey — sending is the primary action, so the empty state keeps a round background and separates levels from +/mic, while the grey arrow shows it is not available yet. All tokens, so dark theme inverts automatically
                             Box(
                                 Modifier.size(MikaSize.IconButton)
                                     .clip(CircleShape)

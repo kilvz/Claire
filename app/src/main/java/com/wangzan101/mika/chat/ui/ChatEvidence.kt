@@ -8,19 +8,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /**
- * 结果卡片上的回答和依据文字,只从这里取。新的回答不带依据段(来源由代码从证据账本里找,见 [evidenceSource]);
- * 旧的运行记录、对话文件里模型自己写在末尾的「依据:」段照旧拆出来。[evidence] 给了就直接用。
+ * The answer and evidence text on result cards comes only from here. New answers carry no evidence section (code finds the source from the evidence ledger, see [evidenceSource]);
+ * in old run records and conversation files the model's own trailing "Evidence:" section is still split out as before. When [evidence] is given it is used directly.
  */
 fun answerParts(answer: String, evidence: String? = null): Pair<String, String?> =
     evidence?.trim()?.takeIf { it.isNotEmpty() }?.let { answer.trim() to it } ?: splitEvidence(answer)
 
 /**
- * 回答的来源:所在的 App 或网站([place],不知道时为 null)、相关的画面编号,和逐条的说明([items],「第 3 步 · 12306 · 车次查询」)。
- * 从运行记录里取:有代码记下的来源(sources 事件)就用它;旧记录用最后存下画面的那一步。
+ * Source of the answer: the app or website it is in ([place], null when unknown), the related screenshot ids, and a per-item description ([items], "step 3 · 12306 · train search").
+ * Taken from the run record: when there is a source recorded by code (a sources event) it is used; old records use the step where screenshots were last saved.
  */
 data class EvidenceSource(val place: String?, val screenshots: List<Int>, val items: List<String> = emptyList())
 
-/** 见 [EvidenceSource];[appLabel] 把包名换成 App 名,网站和网址显示域名。 */
+/** See [EvidenceSource]; [appLabel] turns package names into app names, and websites and URLs show their domain. */
 fun evidenceSource(events: List<RunEvent>, appLabel: (String) -> String = { it }): EvidenceSource {
     events.filterIsInstance<RunEvent.Sources>().lastOrNull()?.items?.takeIf { it.isNotEmpty() }?.let { list ->
         fun where(p: String?) = p?.let { placeLabel(it, appLabel) }
@@ -34,10 +34,10 @@ fun evidenceSource(events: List<RunEvent>, appLabel: (String) -> String = { it }
     return EvidenceSource(place, final.map { it.mediaId }.distinct())
 }
 
-/** 运行记录里网页那一屏的「地方」写成「网站 <域名>」。 */
+/** In run records the "place" of the web screen is written as "website <domain>". */
 internal const val SITE_PREFIX = "网站 "
 
-/** 来源里的地方:「网站 域名」和网址显示域名,包名换成 App 名,别的(命令、文件)原样。 */
+/** The place in a source: "website domain" and URLs show their domain, package names become app names, and anything else (commands, files) stays as is. */
 private fun placeLabel(place: String, appLabel: (String) -> String): String = when {
     place.startsWith(SITE_PREFIX) -> place.removePrefix(SITE_PREFIX)
     place.startsWith("http://") || place.startsWith("https://") -> runCatching { java.net.URI(place).host }.getOrNull() ?: place
@@ -45,15 +45,15 @@ private fun placeLabel(place: String, appLabel: (String) -> String): String = wh
     else -> place
 }
 
-/** 「来源」那一行:「来源 · 12306 · 2 张截图」;没有地方、没有截图时省掉那一段。 */
+/** The "source" line: "Source · 12306 · 2 screenshots"; a part is omitted when there is no place or no screenshot. */
 fun sourceLabel(source: EvidenceSource?): String = listOfNotNull(
     tr(R.string.source_label), source?.place, source?.screenshots?.size?.takeIf { it > 0 }?.let { trPlural(R.plurals.screenshots, it) },
 ).joinToString(" · ")
 
 /**
- * 把答案拆成「结论」和「依据」。旧的运行记录、对话文件里,回答的最后一行以「依据:」开头;
- * 模型不一定照做,所以也认「证据 / 来源」和句末接着写的情况,之后的都算依据。
- * 认不出来时整段都是结论,回答下面不放「来源」。
+ * Splits an answer into "conclusion" and "evidence". In old run records and conversation files the answer's last section starts with "Evidence:";
+ * the model does not always comply, so "proof / source" written after the end of a sentence is recognized too, and everything after it counts as evidence.
+ * When nothing is recognized the whole text is the conclusion and no "source" is shown under the answer.
  */
 fun splitEvidence(answer: String): Pair<String, String?> {
     val m = EVIDENCE.find(answer) ?: return answer.trim() to null
@@ -63,5 +63,5 @@ fun splitEvidence(answer: String): Pair<String, String?> {
     return main to evidence
 }
 
-// 段首或句末标点之后,可带 markdown 的 **、#、- 等前缀
+// At a paragraph start or after end-of-sentence punctuation, optionally preceded by markdown prefixes such as **, #, -
 private val EVIDENCE = Regex("""(^|\n|[。.!！?？]\s*)[\s*#>\-]*\**(?:依据|证据|来源)\**\s*[:：]\**""")

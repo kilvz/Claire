@@ -42,9 +42,9 @@ import java.util.UUID
 import com.wangzan101.mika.settings.ui.models.edit
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 对话页附件要读的东西:选中文件的名字大小、相机落点、点开已发出的附件。读盘的都在后台线程。 */
+/** What the conversation page's attachments need to read: name and size of picked files, the camera target, and opening already-sent attachments. All disk reads happen on a background thread. */
 object AttachFiles {
-    /** 选中文件(内容 URI 字符串)的名字和大小;读不到名字时用地址最后一段,读不到大小为 0。 */
+    /** Name and size of the picked files (content URI strings); when the name cannot be read the last path segment is used, and an unreadable size becomes 0. */
     suspend fun describe(context: Context, uris: List<String>): List<PendingAttachment> = withContext(Dispatchers.IO) {
         uris.map { s ->
             val uri = Uri.parse(s)
@@ -62,7 +62,7 @@ object AttachFiles {
         }
     }
 
-    /** 相机拍的照片写到哪儿:缓存里 camera/ 下的新文件(一天前的旧照片顺手删掉),交给系统相机的地址。 */
+    /** Where a camera photo goes: a new file under camera/ in the cache (photos older than a day are removed along the way), as the URI handed to the system camera. */
     fun newCameraUri(context: Context): Uri {
         val dir = File(context.cacheDir, "attach/camera").apply { mkdirs() }
         val stale = System.currentTimeMillis() - 24 * 3600_000L
@@ -74,17 +74,17 @@ object AttachFiles {
         return FileProvider.getUriForFile(context, AttachFilesProvider.authority(context.packageName), f)
     }
 
-    /** 拍照没成(取消了):把空文件删掉。 */
+    /** The photo was not taken (cancelled): delete the empty file. */
     fun discardCamera(context: Context, uri: Uri) {
         val name = uri.lastPathSegment ?: return
         File(context.cacheDir, "attach/camera/$name").takeIf { it.name == name }?.delete()
     }
 
-    /** 工作区里的路径(`/workspace/inbox/…`)换成相对工作区的路径;不在工作区里为 null。 */
+    /** Turns a workspace path (`/workspace/inbox/…`) into a workspace-relative path; null when it is not inside the workspace. */
     fun relative(path: String): String? =
         path.removePrefix(SandboxPaths.WORKSPACE + "/").takeIf { it != path && it.isNotEmpty() }
 
-    /** 把待查看的流写进缓存里的 viewing/(先清掉上一次的),返回可供 [FileViewer] 授权打开的内容地址。 */
+    /** Writes the stream to be viewed into viewing/ in the cache (clearing the previous one first) and returns a content URI that [FileViewer] can be granted to open. */
     private suspend fun copyToViewing(context: Context, name: String, copyTo: (File) -> Unit): Uri? {
         val safe = Attachments.safeName(name)
         val file = withContext(Dispatchers.IO) {
@@ -103,8 +103,8 @@ object AttachFiles {
     }
 
     /**
-     * 点开已发出的附件:从对话工作区(经文件闸门)复制一份到缓存里的 viewing/(先清掉上一次的),
-     * 交给 App 里的查看页;看不了的类型交给系统里能打开它的 App。读不到时返回 false。
+     * Open an already-sent attachment: copy it from the conversation workspace (through the file gate) into viewing/ in the cache (clearing the previous one first),
+     * then hand it to the in-app viewer; types the viewer cannot show go to a system app that can open them. Returns false when it cannot be read.
      */
     suspend fun openSent(context: Context, conversationId: String, path: String): Boolean {
         val rel = relative(path) ?: return false
@@ -120,8 +120,8 @@ object AttachFiles {
     }
 
     /**
-     * 点开待发出的本地附件:App 自己的文件地址确认可读后直接打开,其余内容地址先复制到缓存 viewing/ 再交给 [FileViewer]
-     * (系统文件选择器授予的临时权限不能再经 Intent 转发给查看页或第三方应用)。读不到或打不开时返回 false。
+     * Open a pending local attachment: for the app's own file URIs, open directly once readability is confirmed; other content URIs are first copied into the cache's viewing/ and then handed to [FileViewer]
+     * (temporary grants from the system file picker cannot be forwarded to the viewer page or a third-party app via an Intent again). Returns false when it cannot be read or opened.
      */
     suspend fun openPending(context: Context, uri: String, name: String): Boolean {
         val parsed = runCatching { Uri.parse(uri) }.getOrNull()?.takeIf { !it.scheme.isNullOrBlank() } ?: return false
@@ -151,15 +151,15 @@ object AttachFiles {
     }
 }
 
-/** 照片能不能直接读:全部、只给了部分(安卓 14 起)、没给。 */
+/** Whether photos can be read directly: all, only a partial selection given (Android 14+), or none. */
 enum class PhotoAccess { Full, Partial, None }
 
-/** 附件面板里「最近的照片」:权限和媒体库里的照片。 */
+/** "Recent photos" in the attachment panel: permissions and photos from the media library. */
 object RecentPhotos {
     private const val PREFS = "attach"
     private const val ASKED = "photos_asked"
 
-    /** 要申请的权限:安卓 14 起连同「部分照片」一起要,13 要读照片,12 及以前要读外部存储。 */
+    /** Permissions to request: Android 14+ asks for "selected photos" as well, 13 asks to read photos, and 12 and below ask to read external storage. */
     fun permissions(): Array<String> = when {
         Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
         Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
@@ -176,12 +176,12 @@ object RecentPhotos {
         }
     }
 
-    /** 第一次打开面板时问一次;之后只在用户点「允许访问照片」时再问。 */
+    /** Asked once when the panel is opened for the first time; afterwards only when the user taps "Allow access to photos". */
     fun asked(context: Context): Boolean = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(ASKED, false)
 
     fun markAsked(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(ASKED, true).apply()
 
-    /** 最近加进媒体库的照片,新的在前;读不到(没权限)为空。 */
+    /** Photos most recently added to the media library, newest first; empty when they cannot be read (no permission). */
     suspend fun query(context: Context, limit: Int = 120): List<PendingAttachment> = withContext(Dispatchers.IO) {
         val base = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val args = Bundle().apply {
@@ -203,24 +203,24 @@ object RecentPhotos {
     }
 }
 
-/** 附件里的一张图:还没发出的(内容地址)或已发出的(对话工作区里的路径)。 */
+/** One image in an attachment: either not yet sent (content URI) or already sent (path inside the conversation workspace). */
 sealed interface AttachImage {
     data class Picked(val uri: String) : AttachImage
     data class Sent(val conversationId: String, val path: String) : AttachImage
 }
 
-/** 按要的边长(像素)读一张缩小的图;读不到为 null。界面测试换成假的。 */
+/** Loads a downscaled image with the requested edge length in pixels; null when it cannot be read. UI tests substitute a fake. */
 fun interface AttachImages {
     suspend fun load(image: AttachImage, px: Int): ImageBitmap?
 
-    /** 已经解过的直接给(列表来回滑时不闪占位);没有为 null。 */
+    /** Returns an already-decoded image directly (so scrolling back and forth does not flash a placeholder); null when there is none. */
     fun cached(image: AttachImage, px: Int): ImageBitmap? = null
 }
 
-/** 给了就用它读附件的图(测试);没给时读手机上的。 */
+/** When provided, it is used to load attachment images (tests); otherwise images are read from the device. */
 val LocalAttachImages = staticCompositionLocalOf<AttachImages?> { null }
 
-/** 手机上的附件图:缩小着解(不解整张),在后台线程,解过的按字节数记着。 */
+/** Attachment images on the device: decoded downscaled (never the full image), on a background thread, with decoded results cached by byte size. */
 private class StoredAttachImages(private val context: Context) : AttachImages {
     override fun cached(image: AttachImage, px: Int): ImageBitmap? = cache.get("$image@$px")
 
@@ -245,7 +245,7 @@ private class StoredAttachImages(private val context: Context) : AttachImages {
     }
 
     companion object {
-        /** 一张图超过这么大就不解了(只显示占位)。 */
+        /** An image larger than this is not decoded at all (only the placeholder is shown). */
         const val MAX_BYTES = 40L shl 20
         val cache = object : LruCache<String, ImageBitmap>(24 shl 20) {
             override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
@@ -253,7 +253,7 @@ private class StoredAttachImages(private val context: Context) : AttachImages {
     }
 }
 
-/** 解成短边不小于 [px] 的缩小图(按 2 的倍数缩),照片的方向按 EXIF 摆正。 */
+/** Decodes into a downscaled image whose short edge is at least [px] (subsampling by powers of 2), with the photo orientation corrected from EXIF. */
 private fun decodeSmall(bytes: ByteArray, px: Int): ImageBitmap =
     ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { d, info, _ ->
         val short = minOf(info.size.width, info.size.height)
@@ -262,7 +262,7 @@ private fun decodeSmall(bytes: ByteArray, px: Int): ImageBitmap =
         d.setTargetSampleSize(sample)
     }.asImageBitmap()
 
-/** 读一张附件图(在后台);还没读到、读不到时为 null。 */
+/** Loads an attachment image (in the background); null while it has not loaded yet or when it cannot be read. */
 @Composable
 fun rememberAttachImage(image: AttachImage, px: Int): ImageBitmap? {
     val context = LocalContext.current

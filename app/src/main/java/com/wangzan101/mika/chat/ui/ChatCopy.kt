@@ -6,9 +6,9 @@ import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.i18n.trPlural
 
-/** 对话页上按状态算出来的文字;不碰界面,单测直接测。 */
+/** Texts the conversation page derives from state; it touches no UI and is unit-tested directly. */
 object ChatCopy {
-    /** 空对话的问候,按时段。 */
+    /** Greeting for an empty conversation, by time of day. */
     fun greeting(hour: Int): String = when (hour) {
         in 5..10 -> tr(R.string.chat_greeting_morning)
         in 11..12 -> tr(R.string.chat_greeting_noon)
@@ -18,16 +18,16 @@ object ChatCopy {
     }
 
     val EMPTY_PROMPT get() = tr(R.string.chat_empty_prompt)
-    /** 空对话里的一句价值主张:说明 Claire 能干嘛。 */
+    /** A value statement for the empty conversation: explains what Claire can do. */
     val EMPTY_VALUE get() = tr(R.string.chat_empty_value)
 
-    /** 内置示例的类型,只决定首页卡片上的图标和色调。 */
+    /** The kind of a built-in example; it only decides the icon and tint of the card on the home screen. */
     enum class ExampleKind { Web, Follow, GroupChat, Alarm, Schedule }
     data class Example(val kind: ExampleKind, val title: String, val prompt: String)
 
     /**
-     * 内置推荐任务的原文。只在本机还没有保存过推荐任务时用来初始化一次;
-     * 标题和提示词都用这一句,之后用户在设置里改,不会因为换语言或升级被加回来。
+     * The text of the built-in recommended tasks. Used to initialize once only when no recommended task has been saved on this device yet;
+     * both the title and the prompt come from this entry, and after the user edits them in settings they are not added back by a language change or an upgrade.
      */
     val examples get() = listOf(
         Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star)),
@@ -40,36 +40,36 @@ object ChatCopy {
     fun recommendationSeeds(): List<Pair<String, String>> = examples.map { it.title to it.prompt }
 
     /**
-     * 一条推荐任务属于哪种类型:提示词和内置示例一字不差就是内置的那条(标题改过也认得出);
-     * 自己加的任务没有类型,返回 null,界面上用通用图标。
+     * Which kind a recommended task belongs to: when the prompt matches a built-in example exactly it is that built-in one (recognized even if the title was edited);
+     * tasks added by the user have no kind, so null is returned and the UI uses a generic icon.
      */
     fun kindOf(prompt: String): ExampleKind? = examples.firstOrNull { it.prompt == prompt }?.kind
 
     /**
-     * 曾经内置、现在已经去掉的示例。升级时把用户还没动过的那一条从推荐列表里清掉;
-     * 标题或提示词改过的留着——那已经是用户自己的任务了。
+     * Examples that used to be built in and have since been removed. On upgrade, the entry the user has not touched is cleared from the recommended list;
+     * one whose title or prompt was edited is kept — it is the user's own task by now.
      */
     fun retiredRecommendationSeeds(): List<Pair<String, String>> = listOf(
         tr(R.string.chat_example_pdf_title) to tr(R.string.chat_example_pdf),
     )
 
-    /** 对话页顶栏的标题:固定是 App 名;副标题说此刻在做什么。 */
+    /** Title of the conversation page's top bar: always the app name; the subtitle says what is happening right now. */
     const val APP_TITLE = "Claire"
 
-    /** 对话的名字:第一句话(只取第一行,附件那几行不算;只发了屏幕时是「你此刻的屏幕」);空对话为空。侧栏里用它称呼对话。 */
+    /** Name of the conversation: its first message (first line only, attachment lines excluded; when only the screen was sent it is "your current screen"); empty for an empty conversation. Used in the drawer to refer to the conversation. */
     fun title(exchanges: List<Exchange>): String =
         exchanges.firstOrNull { it.goal.isNotBlank() }?.goal?.let(::plainTitle).orEmpty()
 
     /**
-     * 一句用户的话当标题怎么写:去掉网页说明([AttachedPage])、引用([QuoteMessage])、附件那几行(只发了附件时是「照片」「合同.pdf」之类)和屏幕那一行(只发了屏幕时是「你此刻的屏幕」),
-     * 只取第一行。
+     * How a user message is turned into a title: strip the page note ([AttachedPage]), quotes ([QuoteMessage]), the attachment lines (when only attachments were sent it becomes something like "Photo" or "contract.pdf") and the screen line (when only the screen was sent it is "your current screen"),
+     * then keep the first line only.
      */
     fun plainTitle(text: String): String =
         ScreenCopy.plain(AttachmentMessage.plain(QuoteMessage.words(AttachedPage.words(text)))).lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
 
     /**
-     * 分支的标题:源标题(或第一句话)后面加本地化后缀,总长不超过 [max] 字。
-     * 截的是源标题,后缀留着;按码点截,不会把 emoji 截成半个。
+     * Title of a branch: the source title (or first message) followed by the localized suffix, no longer than [max] characters in total.
+     * The source title is what gets truncated and the suffix is kept; truncation is by code point, so an emoji is never cut in half.
      */
     fun branchTitle(base: String, suffix: String, max: Int = 24): String {
         val room = (max - suffix.length).coerceAtLeast(0)
@@ -84,10 +84,10 @@ object ChatCopy {
 
     enum class Tone { Accent, Warn, Ok }
 
-    /** 顶栏副标题:这个对话留着一页在后台运行(没有任务在跑时)。 */
+    /** Top bar subtitle: this conversation keeps a page running in the background (when no task is running). */
     val KEPT_PAGE: String get() = tr(R.string.kept_chat_sub)
 
-    /** 顶栏副标题:正在做什么(强调色)或等你(橙色);没有任务在跑时为 null。[place] 是正在操作的 App 或网站。 */
+    /** Top bar subtitle: what it is doing (accent color) or waiting for you (orange); null when no task is running. [place] is the app or website being operated. */
     fun subtitle(ex: Exchange?, place: String?): Pair<String, Tone>? = when (ex?.status) {
         null -> null
         ExchangeStatus.Working -> (if (place.isNullOrBlank()) tr(R.string.chat_working) else tr(R.string.chat_working_on, place)) to Tone.Accent
@@ -98,16 +98,16 @@ object ChatCopy {
         else -> null
     }
 
-    /** 进度那一行:在跑时是此刻的进展,停下来等你时是「已暂停」。 */
+    /** The progress line: the current progress while running, and "Paused" when it has stopped to wait for you. */
     fun progressLine(ex: Exchange): String =
         if (paused(ex.status)) tr(R.string.chat_paused) else liveLine(ex) ?: tr(R.string.chat_working)
 
-    /** 任务停下来等你(要你处理、回答、同意、解锁、点继续)。 */
+    /** The task has stopped and waits for you (needs you to act, answer, approve, unlock or tap continue). */
     fun paused(status: ExchangeStatus): Boolean =
         status is ExchangeStatus.NeedsTakeover || status is ExchangeStatus.NeedsInput ||
             status is ExchangeStatus.NeedsConfirmation || status is ExchangeStatus.Paused || status == ExchangeStatus.WaitingUnlock
 
-    /** 进度行右边的用时:「0:24」「12:05」「1:02:03」。 */
+    /** Elapsed time on the right of the progress line: "0:24", "12:05", "1:02:03". */
     fun clock(ms: Long): String {
         val s = (ms / 1000).coerceAtLeast(0)
         val h = s / 3600
@@ -116,17 +116,17 @@ object ChatCopy {
         return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
     }
 
-    /** 在跑时步骤只列最近这几步,前面的收成一行「前面还有 n 步」,点开看全部。 */
+    /** While running, only the most recent steps are listed; earlier ones collapse into a single line "n earlier steps" that expands to show all. */
     const val VISIBLE_STEPS = 5
 
     fun earlierSteps(n: Int) = trPlural(R.plurals.chat_earlier_steps, n)
 
-    /** 在后台操作手机时步骤下面那行小字。 */
+    /** The small line below the steps while operating the phone in the background. */
     val BACKGROUND_NOTE get() = tr(R.string.chat_background_note)
 
     /**
-     * 一个动作的结果(记录里的 effect 代号 → 给人看的一句话)。错误码只对开发有意义,
-     * 给人看的一律说「没成功」;按规矩没收的那几种除外([declinedLabel])。运行过程页用的是同一份说法。
+     * The outcome of one action (the effect code in the record → a sentence for people to read). Error codes only mean something to developers,
+     * so users are always told "didn't succeed", except for the cases that are declined as intended ([declinedLabel]). The run details page uses the same wording.
      */
     fun effectLabel(effect: String?): String = when (effect) {
         "changed", "done", "place_changed" -> tr(R.string.result_effective)
@@ -138,8 +138,8 @@ object ChatCopy {
     }
 
     /**
-     * 写记忆、存技能、改资料时按规矩没收(不是用户亲口说的、敏感、没明确要改删):这不是出了故障,
-     * 写「没成功」会让人以为坏了。说清没收和原因;别的错误码返回 null。
+     * Writes to memory, skill saves and profile edits can be declined by policy (not said by the user themselves, sensitive, no explicit request to change or delete): this is not a malfunction,
+     * and saying "didn't succeed" would make it look broken. State the declination and the reason; null for other error codes.
      */
     fun declinedLabel(code: String?): String? = when (code) {
         "quote_not_from_user", "content_not_from_user" -> tr(R.string.step_declined_not_said)
@@ -149,7 +149,7 @@ object ChatCopy {
         else -> null
     }
 
-    /** 点开一步后每件事一行:做了什么 · 对什么 · 结果(结果为空时不写)。 */
+    /** One line per action after expanding a step: what was done · on what · the outcome (omitted when the outcome is empty). */
     fun actionLine(a: StepAction): String =
         listOfNotNull(a.label, a.target?.takeIf(String::isNotBlank), effectLabel(a.effect).takeIf(String::isNotBlank)).joinToString(" · ")
 
@@ -159,7 +159,7 @@ object ChatCopy {
         ComposerMode.Idle -> if (hasHistory) tr(R.string.chat_placeholder_more) else EMPTY_PROMPT
     }
 
-    /** 能按住说话时的居中灰字:告诉人能按住说、点一下打字;任务在跑时说的就是补充消息。 */
+    /** The centered grey text when hold-to-talk is available: tells the user they can hold to speak or tap to type; while a task is running, what is said becomes a follow-up message. */
     fun voicePlaceholder(mode: ComposerMode): String = when (mode) {
         ComposerMode.Busy -> tr(R.string.voice_placeholder_busy)
         ComposerMode.Answer -> tr(R.string.voice_placeholder_answer)

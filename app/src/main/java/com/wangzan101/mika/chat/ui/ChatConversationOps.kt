@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.wangzan101.mika.settings.ui.models.refresh
 
-/** 对话与项目:打开、切换、新建、跳转、删除、归档、改名、置顶。 */
+/** Conversations and projects: open, switch, create, jump, delete, archive, rename, pin. */
 internal class ChatConversationOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val _jump = session._jump
@@ -41,8 +41,8 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
     private val workspaceResolver = vm.workspaceResolver
 
     /**
-     * 切到某个对话(并行时任务在跑也能切):载入它的历史;它有任务在跑就让服务显示那个任务,并接上它此刻的状态。
-     * 开关关着时同 [openConversation]。
+     * Switch to a conversation (possible even while a task runs when parallel mode is on): load its history; when it has a running task, make the service display that task and attach to its current state.
+     * When the setting is off, behaves like [openConversation].
      */
     fun switchTo(conversationId: String) {
         session.refreshParallel()
@@ -54,14 +54,14 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         if (conversationId != _ui.value.conversationId) vm.live.parkLive()
         val past = session.saved(conversationId)
         liveIndex = -1
-        // 没有任务的对话不带别的任务的接管进度;输入内容只恢复目标对话自己的草稿。
+        // A conversation without a task does not carry another task's takeover progress; the input restores only the target conversation's own draft.
         _ui.update { session.restoreDraft(it.rebuildForConversation(conversationId = conversationId, exchanges = past, projectId = session.projectFor(conversationId))) }
         session.markCurrent(CurrentChat.Open(conversationId))
         if (conversationId !in activeConversations.value) { vm.live.unpark(conversationId); actions.drainFollowUps(conversationId); return }
         vm.live.follow(conversationId, vm.live.unpark(conversationId))
     }
 
-    /** 打开个人助手或工作流拥有的对话:只切换展示,不启动另一项工作,并保留用户草稿。 */
+    /** Open a conversation owned by the personal assistant or a workflow: switch the display only, do not start another job, and keep the user's draft. */
     fun openWorkflowConversation(conversationId: String) {
         if (conversationId == _ui.value.conversationId) { vm.live.refresh(); return }
         session.refreshParallel()
@@ -82,28 +82,28 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
     }
 
     /**
-     * 打开某个对话并跳到指定消息。已经在这个对话里时只设跳转,不重新载入;
-     * 任务进行中且没开并行时打不开,跳转也不会留下,调用方可以用 [ChatUi.conversationId] 判断是否成功。
+     * Open a conversation and jump to a given message. When already in this conversation, only the jump is set and nothing is reloaded;
+     * when a task is running and parallel mode is off it cannot be opened and the jump is not kept either, so callers can check [ChatUi.conversationId] to see whether it succeeded.
      */
     fun openConversationAt(id: String, target: ChatTarget) {
         if (_ui.value.conversationId != id) openConversation(id)
         if (_ui.value.conversationId == id) _jump.value = ChatJump(id, target, ++jumpSerial)
     }
 
-    /** 聊天页滚到目标后清掉请求;期间又来了新请求时不要误清。 */
+    /** The chat page clears the request once it has scrolled to the target; a newer request that arrived meanwhile must not be cleared by mistake. */
     fun consumeJump(jump: ChatJump) {
         _jump.update { if (it == jump) null else it }
     }
 
-    /** 创建新项目。 */
+    /** Create a new project. */
     fun createProject(name: String): Result<Project>? = projectStore?.create(name)
 
-    /** 重命名项目。 */
+    /** Rename a project. */
     fun renameProject(projectId: String, name: String): Result<Project>? = projectStore?.rename(projectId, name)
 
     fun projectDeleteImpact(projectId: String): ProjectDeleteImpact = projectDeletionImpact(projectId)
 
-    /** 删除项目及其全部成员对话和共享工作区 `p-<projectId>`。 */
+    /** Delete a project together with all its member conversations and its shared workspace `p-<projectId>`. */
     fun deleteProject(projectId: String) {
         val members = store.list(includeArchived = true).filter { it.projectId == projectId }.map { it.id }
         val draftMembers = drafts.value.filterValues { it.projectId == projectId }.keys
@@ -135,7 +135,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         }
     }
 
-    /** 切到某个对话;任务在跑时不切。 */
+    /** Switch to a conversation; does not switch while a task is running. */
     fun openConversation(id: String) {
         if (_ui.value.conversationId == id) return
         session.refreshParallel()
@@ -149,7 +149,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
             session.restoreDraft(it.rebuildForConversation(conversationId = id, exchanges = past, takeoverStage = it.takeoverStage, projectId = session.projectFor(id)))
         }
         session.markCurrent(CurrentChat.Open(id))
-        // 这个对话的任务是别处开始的(悬浮胶囊、定时任务):打开就接上它
+        // This conversation's task was started elsewhere (floating pill, scheduled job): attach to it on open
         if (id in activeConversations.value) vm.live.follow(id) else {
             vm.live.unpark(id)
             actions.drainFollowUps(id)
@@ -162,14 +162,14 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         if (session.parallel()) {
             vm.drafting.cancelPendingSharedDraft()
             session.keepDraft()
-            // 别的任务可能还在跑:先给新对话编号,它的状态就不会被当成这个对话的
+            // Another task may still be running: give the new conversation an id first so its state is not taken for this conversation's
             lingerJob?.cancel()
             vm.live.parkLive()
             liveIndex = -1
             val fresh = store.newConversation()
             workspaceResolver?.setDraftProject(fresh, validProject)
             _ui.update { it.rebuildForConversation(conversationId = fresh, projectId = validProject) }
-            // 还没说过话:胶囊上是一张新对话卡片(编号等说出来再定,见 begin)
+            // Nothing has been said yet: the pill shows a new-conversation card (the id is assigned once something is said, see begin)
             session.markCurrent(CurrentChat.Fresh)
             return
         }
@@ -181,15 +181,15 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         session.markCurrent(CurrentChat.Fresh)
     }
 
-    /** 屏上这个对话此刻有没有任务在跑或排队。 */
+    /** Whether the conversation on screen has a running or queued task right now. */
     fun currentRunning(): Boolean = _ui.value.conversationId?.let { it in activeConversations.value } == true
 
-    /** 删掉 [id] 会连带什么:侧栏的确认弹窗据此写明会停掉任务、删掉定时任务。 */
+    /** What deleting [id] entails: the drawer's confirmation dialog uses this to state that tasks are stopped and scheduled jobs deleted. */
     fun deleteImpact(id: String): DeleteImpact = deletionImpact(id)
 
     /**
-     * 删掉对话 [id](用户在侧栏确认过):当场从侧栏拿掉;是屏上这个对话就换成一个新的空对话。
-     * 停任务、删定时任务、删文件在后台做(见 `ConversationDeleter`)。
+     * Delete conversation [id] (confirmed by the user in the drawer): remove it from the drawer immediately; if it is the conversation on screen, replace it with a new empty conversation.
+     * Stopping tasks, deleting scheduled jobs and deleting files happen in the background (see `ConversationDeleter`).
      */
     fun deleteConversation(id: String) {
         deleteConversations(listOf(id), report = false)
@@ -200,8 +200,8 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
     }
 
     /**
-     * 用户在侧栏多选后一次删掉 [ids]:当场把它们从侧栏拿掉,再逐条在后台删。
-     * 删的时候 [deleteBatch] 里写着一共几条、删完几条、失败几条,侧栏据此显示进度和结果。
+     * Delete [ids] all at once after the user multi-selects them in the drawer: remove them from the drawer immediately, then delete them one by one in the background.
+     * During deletion [deleteBatch] records the total count, the number deleted and the number failed, which the drawer uses to show progress and results.
      */
     fun deleteConversations(ids: Collection<String>) {
         deleteConversations(ids, report = true)
@@ -221,7 +221,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         scope.launch {
             var done = 0
             var failed = 0
-            // 一条删不掉(存储读写失败等)不挡住后面的;最后照实说几条失败
+            // One that cannot be deleted (storage read/write failure, etc.) does not block the rest; the number of failures is reported truthfully at the end
             targets.forEach { id ->
                 try {
                     deviceImports[id]?.join()
@@ -242,22 +242,22 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         }
     }
 
-    /** 用户在侧栏给对话 [id] 改名:换成 [title](去掉两头空白;空的不改)。之后起好的标题不会再盖掉它。 */
+    /** The user renames conversation [id] in the drawer: set it to [title] (trimmed; empty leaves it unchanged). Later generated titles will no longer overwrite it. */
     fun renameConversation(id: String, title: String) {
         if (id in _deleted.value) return
         runCatching { store.rename(id, title) }
     }
 
-    /** 侧栏里置顶或取消置顶对话 [id]。 */
+    /** Pin or unpin conversation [id] in the drawer. */
     fun setPinned(id: String, pinned: Boolean) {
         if (id in _deleted.value) return
         runCatching { store.setPinned(id, pinned, clock()) }
     }
 
     /**
-     * 侧栏里归档对话 [id]:从列表收起,内容、工作区、定时任务都不动。
-     * 归档的是屏上这个对话时,先确认现在能换对话,再换成一个新的空对话(草稿留着,取消归档后接着用)。
-     * 跑着或排着任务的对话不归档,返回 false。
+     * Archive conversation [id] in the drawer: collapsed from the list, while its content, workspace and scheduled jobs are untouched.
+     * When the one archived is the conversation on screen, first make sure switching is possible now, then switch to a new empty conversation (the draft is kept and can be used again after unarchiving).
+     * A conversation that is running or has a queued task is not archived and false is returned.
      */
     fun archiveConversation(id: String): Boolean {
         if (id in _deleted.value || id in deleting) return false
@@ -268,29 +268,29 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
             if (session.busy()) return false
         }
         val ok = runCatching { store.setArchived(id, true, clock()) }.getOrDefault(false)
-        // 先归档再换:换到新对话时侧栏重读,原来那个已经不在列表里了
+        // Archive before switching: the drawer re-reads when switching to the new conversation, so the old one is already gone from the list
         if (ok && current) newConversation()
         return ok
     }
 
-    /** 侧栏里取消归档对话 [id];它回到原来的位置(置顶的还回置顶)。 */
+    /** Unarchive conversation [id] in the drawer; it returns to its previous place (a pinned one returns to the pinned section). */
     fun unarchiveConversation(id: String) {
         if (id in _deleted.value) return
         runCatching { store.setArchived(id, false) }
     }
 
-    /** 归档视图里多选恢复:一条条取消归档;已经删掉的跳过。 */
+    /** Multi-select restore in the archive view: unarchive one by one; already-deleted ones are skipped. */
     fun unarchiveConversations(ids: Collection<String>) {
         ids.filter { it !in _deleted.value }.forEach { runCatching { store.setArchived(it, false) } }
     }
 
     /**
-     * 普通侧栏里多选后一次归档 [ids]:未保存首轮的草稿、在跑的、删掉的、当前正在看的跳过
-     * (当前对话归档要换新对话,批量里不悄悄换)。返回实际归档了几个。
+     * Archive [ids] all at once after multi-selecting in the normal drawer: drafts whose first turn is unsaved, running ones, deleted ones and the one currently being viewed are skipped
+     * (archiving the current conversation requires switching to a new one, which is not done silently in a batch). Returns how many were actually archived.
      */
     fun archiveConversations(ids: Collection<String>): Int {
         val current = _ui.value.conversationId
-        // 与侧栏判断已保存对话的依据一致,不能只看 ID:未发送的草稿也有 ID。
+        // Matches the drawer's criterion for saved conversations; an ID alone is not enough: unsent drafts also have IDs.
         val savedIds = store.list(includeArchived = true).mapTo(mutableSetOf()) { it.id }
         return ids.count { id ->
             id in savedIds && id != current && id !in _deleted.value && id !in deleting && id !in activeConversations.value &&
@@ -298,7 +298,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         }
     }
 
-    /** 屏上的对话被删了:不再跟它的任务(还没交给服务的开始直接作废),换成新的空对话。 */
+    /** The conversation on screen was deleted: stop following its task (a start not yet handed to the service is simply discarded) and switch to a new empty conversation. */
     private fun startOver(id: String) {
         draftStateChanged = true
         vm.drafting.cancelPendingSharedDraft()
@@ -313,7 +313,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         pipClosed = false
         val fresh = if (session.parallel()) store.newConversation() else null
         _ui.update { it.rebuildForConversation(conversationId = fresh) }
-        // 屏上换成了一个新的空对话:胶囊不再接着删掉的那个
+        // The screen switched to a new empty conversation: the pill no longer continues the deleted one
         session.markCurrent(CurrentChat.Fresh)
     }
 }

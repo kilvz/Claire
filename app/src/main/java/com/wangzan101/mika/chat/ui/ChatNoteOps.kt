@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 任务结束后的记忆与技能提示:撤销、批准、恢复、删除。 */
+/** Memory and skill prompts after a task ends: undo, approve, restore, delete. */
 internal class ChatNoteOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val ui get() = vm.ui
@@ -14,10 +14,10 @@ internal class ChatNoteOps(private val vm: ChatViewModel, private val session: C
     private val learning = vm.learning
     private val memoryItems = vm.memoryItems
 
-    /** 提示这一行的文字,内容从此刻的记忆里取;那条已经删掉时写「一条已删除的记忆」。 */
+    /** The text of this prompt line, with content taken from the current memory; when that entry has been deleted it reads "a deleted memory". */
     fun noteText(note: MemoryNote): String = note.text(memoryItems.value.find { it.id == note.memoryId })
 
-    /** 撤销这条记忆改动;令牌已失效(重启过)时只把「撤销」去掉。 */
+    /** Undo this memory change; when the token is no longer valid (after a restart) only the "Undo" is removed. */
     fun undoNote(runId: String, note: MemoryNote) {
         val token = note.undoToken ?: return
         scope.launch {
@@ -26,7 +26,7 @@ internal class ChatNoteOps(private val vm: ChatViewModel, private val session: C
         }
     }
 
-    /** 做法:「好」批准。 */
+    /** The practice: "Yes" approves it. */
     fun approveNote(runId: String, note: MemoryNote) {
         val id = note.pendingId ?: return
         scope.launch {
@@ -35,7 +35,7 @@ internal class ChatNoteOps(private val vm: ChatViewModel, private val session: C
         }
     }
 
-    /** 做法:「不要」撤销这次新增;令牌没了就直接删掉那条。 */
+    /** The practice: "No" undoes this addition; when the token is gone the entry is deleted directly. */
     fun rejectNote(runId: String, note: MemoryNote) {
         scope.launch {
             val undone = note.undoToken?.let { learning?.undo(it) } ?: false
@@ -44,7 +44,7 @@ internal class ChatNoteOps(private val vm: ChatViewModel, private val session: C
         }
     }
 
-    /** 「用到 n 条记忆」点开时的内容;已删掉的不列。 */
+    /** The content shown when "n memories used" is expanded; deleted ones are not listed. */
     fun usedMemoryTexts(ids: List<String>): List<String> {
         val byId = memoryItems.value.associateBy { it.id }
         return ids.mapNotNull { byId[it]?.content }
