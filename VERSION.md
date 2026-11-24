@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.1.0 (versionCode 62)
+- **Claire version:** 2.1.1 (versionCode 63)
 - **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -73,6 +73,15 @@ recorded base version.
   user writes in English. Chinese and the other UI languages remain as
   translations for users who choose them; Chinese-specific matching
   data and test fixtures are unchanged.
+- 2.1.1: voice fixes. The on-device and streaming speech tests can be
+  stopped — while a live engine is listening the test button becomes
+  Stop, so "Say a sentence" finishes and verifies instead of running
+  forever with the button disabled. Sherpa models can be downloaded
+  directly from the speech selection page, a missing model explains
+  that it needs downloading, and an archive without all four model
+  files fails without leaving a partial model behind. Google speech
+  services use their current Play Store name, Speech Recognition &
+  Synthesis.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

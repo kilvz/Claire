@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.1.0: English-first throughout — every LLM prompt, tool description, call script, skill, built-in knowledge note, plugin manifest and doc is now English, so the assistant no longer drifts into Chinese when you write in English. Chinese and the other UI languages remain available as translations when you choose them.
+            New in 2.1.1: the on-device and streaming speech tests can be stopped — while an engine is listening the test button becomes Stop, so "Say a sentence" finishes and verifies instead of running forever. Sherpa models can be downloaded right from the speech selection page, a missing model now says it needs downloading, and a broken archive fails cleanly without leaving a partial model. Google speech services also use their current Play Store name, Speech Recognition & Synthesis.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
