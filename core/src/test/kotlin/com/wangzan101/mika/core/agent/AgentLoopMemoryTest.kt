@@ -215,7 +215,7 @@ class AgentLoopMemoryTest {
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Succeeded)
         val seen = events.filterIsInstance<RunEvent.Observed>().single { "张江路" in it.text }
         assertEquals("fact", seen.kind)
-        assertTrue("the user did not say this" in seen.text)
+        assertTrue("not said by the user" in seen.text)
         // In the tool result the model sees, this entry carries the mark; the block injected at the start is marked too
         assertTrue(events.filterIsInstance<RunEvent.ToolResult>().single { it.tool == "memory_search" }.resultJson.contains("\"inferred\":true"))
         assertTrue(model.requests.first().joinToString("\n") { it.plainText() }.contains("the user did not say this"))

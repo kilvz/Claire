@@ -23,11 +23,11 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6
-      - name: Regenerate loop snapshots
-        run: ./gradlew :core:test --tests '*LoopScenarioTest' -PupdateSnapshots --stacktrace
+      - name: Regenerate snapshots
+        run: ./gradlew :core:test --tests '*LoopScenarioTest' --tests '*PromptSurfaceTest' -PupdateSnapshots --stacktrace
       - name: Commit updated snapshots
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add core/src/test/resources/loop-snapshots
-          git diff --cached --quiet && echo "No snapshot changes." || (git commit -m "Regenerate loop snapshots" && git push)
+          git add core/src/test/resources/loop-snapshots core/src/test/resources/prompt-surface
+          git diff --cached --quiet && echo "No snapshot changes." || (git commit -m "Regenerate loop and prompt snapshots" && git push)

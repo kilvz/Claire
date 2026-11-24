@@ -481,7 +481,7 @@ class ToolDispatcherWebTest {
         assertFalse("网页正文" in t.evidence().freshText)
         t.go()
         val ev = t.evidence()
-        assertTrue(ev.freshText, ev.freshText.startsWith("当前网页:https://shop.example.com/cart"))
+        assertTrue(ev.freshText, ev.freshText.startsWith("Current page: https://shop.example.com/cart"))
         assertTrue(ev.freshText, ev.freshText.endsWith("Page text (beginning):\n正文"))
         assertEquals(listOf("readPage 3000 0 noscroll"), web.calls.filter { it.startsWith("readPage") })
     }
@@ -511,8 +511,8 @@ class ToolDispatcherWebTest {
         t.execute(call("web_observe"))
         t.execute(call("web_read_page"))
         val ev = t.evidence()
-        assertTrue(ev.freshText, ev.freshText.lines().contains("网页标题:只有标题的页"))
-        assertTrue(ev.read(ObsKind.Read, ObsKind.Reply).toString(), ev.read(ObsKind.Read, ObsKind.Reply).any { it.lines().contains("网页标题:只有标题的页") })
+        assertTrue(ev.freshText, ev.freshText.lines().contains("Page title: 只有标题的页"))
+        assertTrue(ev.read(ObsKind.Read, ObsKind.Reply).toString(), ev.read(ObsKind.Read, ObsKind.Reply).any { it.lines().contains("Page title: 只有标题的页") })
         val seen = ev.sources(ev.ledger.all).joinToString("\n")
         assertTrue(seen, "查看说明" in seen && "https://shop.example.com/help" in seen)
         assertTrue(seen, "商品主图" in seen)
@@ -522,7 +522,7 @@ class ToolDispatcherWebTest {
         val web = FakeWebPort().apply { title = "Example Domain" }
         val t = d(web = web)
         t.go()
-        assertTrue(t.evidence().freshText.lines().contains("网页标题:Example Domain"))
+        assertTrue(t.evidence().freshText.lines().contains("Page title: Example Domain"))
     }
 
     @Test fun uploadGoesThroughIrreversibleCheck() = runTest {

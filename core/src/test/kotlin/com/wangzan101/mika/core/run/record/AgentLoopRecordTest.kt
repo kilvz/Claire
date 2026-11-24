@@ -222,7 +222,7 @@ class AgentLoopRecordTest {
         assertEquals(1, texts[0].step)
         assertEquals(1, texts[0].id)
         assertEquals(Place.app("com.x"), texts[0].place)
-        assertEquals(listOf("当前 App:com.x") + els.map { it.name }, texts[0].text.lines())
+        assertEquals(listOf("Current app: com.x") + els.map { it.name }, texts[0].text.lines())
     }
 
     @Test fun actionReturnedScreenIsRecorded() {
@@ -234,7 +234,7 @@ class AgentLoopRecordTest {
             val m = FakeModel(reply(call("phone_tap", """{"x":1,"y":1}""")), com.wangzan101.mika.core.testing.answerReply("明天晴 25 度"))
             val sink = run(m, screen, vision = vision, inline = inline)
             val texts = sink.events.filterIsInstance<RunEvent.Observed>()
-            assertEquals("inline=$inline vision=$vision", listOf("当前 App:com.x", "明天晴 25 度"), texts.single().text.lines())
+            assertEquals("inline=$inline vision=$vision", listOf("Current app: com.x", "明天晴 25 度"), texts.single().text.lines())
             // The evaluation's evidence rules can find an answer that appears only in the screen an action brought back
             assertTrue(com.wangzan101.mika.core.eval.Checks.grounded("明天晴 25 度", com.wangzan101.mika.core.eval.RunFacts.evidence(sink.events, TOOLS, "", "明天晴 25 度"), 1))
         }

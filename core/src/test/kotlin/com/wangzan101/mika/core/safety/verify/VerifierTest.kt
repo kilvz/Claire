@@ -163,7 +163,7 @@ class VerifierTest {
     @Test fun appHeaderIsNotEvidence() = runTest {
         val v = Verifier(FakeModel(text(PASS)), null).verify(
             "查包名", CRITERIA, "包名 com.android.settings\n依据: 「com.android.settings」",
-            evidence(fresh = "当前 App:com.android.settings\n电池"),
+            evidence(fresh = "Current app: com.android.settings\n电池"),
         )
         assertEquals(Verdict.CannotVerify, v.verdict)
     }

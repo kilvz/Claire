@@ -67,12 +67,12 @@ class AgentLoopScreenMapTest {
         val maps = msgs.screenMaps()
         assertEquals(1, maps.size)
         val map = maps.single()
-        assertTrue(map.contains("屏（2）"))
+        assertTrue(map.contains("Screens (2):"))
         assertTrue(map.contains("首页"))
         assertTrue(map.contains("我的"))
         assertTrue(map.contains("搜索"))
         assertTrue(map.contains("结果"))
-        assertTrue(map.contains("现在在「")) // current screen recognized → location included
+        assertTrue(map.contains("Currently on the \"")) // current screen recognized → location included
     }
 
     @Test fun noScreenMapWhenNoGraph() {

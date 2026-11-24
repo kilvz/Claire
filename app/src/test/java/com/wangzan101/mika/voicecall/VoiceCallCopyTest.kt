@@ -46,7 +46,7 @@ class VoiceCallCopyTest {
     }
 
     @Test
-    fun `typed request results come back locally: routed model instruction text becomes local wording`() {
+    fun `typed request results come back locally - routed model instruction text becomes local wording`() {
         assertEquals("正在处理", typedResultText(VoiceCallRoute.RESULT_BUSY))
         assertEquals("没办成", typedResultText(VoiceCallRoute.RESULT_START_FAILURE))
         assertEquals("需要你在任务页处理，去任务页看看", typedResultText(VoiceCallRoute.RESULT_NEEDS_USER))
