@@ -25,7 +25,7 @@ import com.wangzan101.mika.core.screen.uistate.lastSnapshot
 
 private fun timeoutProp() = int("Time limit, 1000-$READ_SCRIPT_MAX_TIMEOUT_MS ms (default $READ_SCRIPT_DEFAULT_TIMEOUT_MS).", 1000, READ_SCRIPT_MAX_TIMEOUT_MS)
 
-/** 读脚本(读数据脚本、站点命令)跑在端口上;结果来自网页,交给模型时套不可信标记,也作为观察交给核查。 */
+/** Read scripts (data-reading scripts, site commands) run on the port; the result comes from a web page, so it is wrapped in the untrusted marker when handed to the model and also given to the checks as an observation. */
 private suspend fun readScript(ctx: ToolContext, code: String, args: JsonObject?, timeoutMs: Int, what: String): ToolExecution {
     val r = try {
         ctx.web!!.evaluate(code, timeoutMs.toLong(), args)
@@ -47,7 +47,7 @@ private suspend fun readScript(ctx: ToolContext, code: String, args: JsonObject?
     }
 }
 
-/** 读数据脚本:在当前页面的读取世界里只读地跑(真实 DOM、同源 GET);要动页面走动作工具。 */
+/** Data-reading script: runs read-only in the current page's read world (real DOM, same-origin GET); to change the page, use the action tools. */
 internal object EvaluateJs : WebTool {
     override val verb = Verb.EvaluateJs
     override val label = "读取网页数据"
@@ -69,8 +69,8 @@ internal object EvaluateJs : WebTool {
 }
 
 /**
- * 站点命令:当前站点知识里声明的 `scripts/<name>.js`,在读取世界里只读地跑,参数按声明校验。
- * 只有内置知识里有站点命令时才提供;只认当前页面所属站点的命令。
+ * Site command: a `scripts/<name>.js` declared in the current site knowledge, run read-only in the read world, with the arguments validated against the declaration.
+ * Only offered when the built-in knowledge has site commands; only commands of the site the current page belongs to are accepted.
  */
 internal object RunSiteCommand : WebTool {
     override val verb = Verb.SiteCommand
@@ -107,7 +107,7 @@ internal object RunSiteCommand : WebTool {
         return readScript(ctx, command.body, args, timeout, "站点命令 ${command.site}/${command.decl.name} 的结果")
     }
 
-    /** 当前标签的网址:按标签列表,读不到时用最近一次读屏的。 */
+    /** The current tab's URL: taken from the tab list, falling back to the most recent screen read when it cannot be read. */
     private suspend fun currentUrl(ctx: ToolContext): String? {
         val tabs = try { ctx.web!!.tabs() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
         return tabs.firstOrNull { it.current }?.url?.takeIf { it.isNotBlank() } ?: ctx.lastSnapshot?.web?.url

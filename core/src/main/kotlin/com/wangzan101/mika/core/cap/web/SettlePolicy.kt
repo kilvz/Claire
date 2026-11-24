@@ -3,10 +3,10 @@ package com.wangzan101.mika.core.cap.web
 import kotlinx.coroutines.delay
 
 /**
- * 网页动作之后等多久。等页面安静和以前一样([domQuiet] 带旧上限 [domCapMs],页面一直在变就等满这个上限,不报);
- * 网络是另一个条件:只有本次动作发出的请求还在途时([networkBusy])才往后等,自动作开始合计至多 [netCapMs],
- * 请求结束后在剩余时间里再看一眼页面安静。网络本来就空闲时,和没有网络记录时等得一样久。
- * 返回网络是否在上限内静下来(没等网络时为 true)。
+ * How long to wait after a web action. Waiting for the page to go quiet works as before ([domQuiet] with the old cap [domCapMs]; if the page keeps changing, that whole cap is waited out without any report);
+ * the network is a separate condition: the wait is extended only while requests sent by this action are still in flight ([networkBusy]), for at most [netCapMs] in total from the start of the action,
+ * and after the requests finish, the page's quietness is looked at once more within the remaining time. When the network was idle to begin with, the wait is as long as when there is no network record.
+ * Returns whether the network went quiet within the cap (true when there was no network wait).
  */
 object SettlePolicy {
     suspend fun settle(
@@ -30,9 +30,9 @@ object SettlePolicy {
     }
 
     /**
-     * 读页之前等正文稳定(不只是页面安静:懒加载、分批渲染时 DOM 可能一会儿静一会儿动)。
-     * 每隔 [intervalMs] 取一次正文的(长度, 摘要),连续 [stableIntervals] 次都和上一次一样算稳定;
-     * 还一个字都没有时要连续 [emptyIntervals] 次(页面多半还在加载)。到 [capMs] 还不稳定返回 false;取不到样本也返回 false。
+     * Wait for the body text to settle before reading a page (not merely for the page to go quiet: with lazy loading and progressive rendering the DOM may be quiet for a while and busy again).
+     * The body's (length, digest) is sampled every [intervalMs], and it counts as stable once [stableIntervals] consecutive samples equal the previous one;
+     * while there is not a single character yet, [emptyIntervals] consecutive samples are required (the page is most likely still loading). Returns false when it is still unstable at [capMs]; also false when no sample can be taken.
      */
     suspend fun contentStable(
         clock: () -> Long,

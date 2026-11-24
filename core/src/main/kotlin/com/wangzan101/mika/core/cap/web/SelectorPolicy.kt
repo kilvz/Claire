@@ -1,24 +1,24 @@
 package com.wangzan101.mika.core.cap.web
 
 /**
- * 交给页面的 CSS 选择器不许按 value 属性选元素:`input[value^="h"]` 一位一位试,猜得出密码框、隐藏字段的值。
- * 只看字面会漏,所以先照 CSS 读选择器的规矩还原成浏览器看到的样子再找:去掉注释,解开转义(`v\61 lue` 就是 value),
- * 引号里的整段拿掉(属性名不写在引号里,引号里的注释记号、`[value` 也不算数);属性名前可以带命名空间(`*|value`、`|value`)。
- * 还原时宁可多认:转义出来的方括号(类名 `.\5b value`)也算作按 value 选。
- * 带 `url(` 的一律算作按 value 选:url( 后面不带引号时到 `)` 为止是一个记号,里面的注释记号、引号既不开始注释也不开始字符串,
- * 上面的还原对不上;`:is()` 只丢掉写错的那一项,后面的 `[value` 照样生效。选择器里本来也用不到它。
- * web_script 的 mika.query 在 Kotlin 里查([selectsByValue]);只读脚本的查找方法在页面里调,用同一套规矩的 JS 版([JS])。
+ * A CSS selector handed to the page may not select elements by the value attribute: trying `input[value^="h"]` one character at a time can guess the value of a password field or a hidden field.
+ * Checking only the literal text misses cases, so the selector is first restored the way the CSS rules read it into what the browser sees, and is searched after that: comments are removed, escapes are resolved (`v\61 lue` is value),
+ * whole quoted sections are dropped (attribute names are not written inside quotes, and a comment marker or `[value` inside quotes does not count either); an attribute name may carry a namespace prefix (`*|value`, `|value`).
+ * When restoring, it is better to over-detect: a bracket produced by an escape (the class name `.\5b value`) also counts as selecting by value.
+ * Anything containing `url(` always counts as selecting by value: after url( without quotes everything up to `)` is a single token, and inside it comment markers and quotes start neither a comment nor a string,
+ * so the restoration above does not match; `:is()` drops only the malformed item, and a later `[value` still takes effect. Selectors have no real use for it anyway.
+ * web_script's mika.query checks in Kotlin ([selectsByValue]); the lookup methods of read scripts are called in the page and use the JS version of the same rules ([JS]).
  */
 object SelectorPolicy {
     fun selectsByValue(selector: String): Boolean = plain(selector).let { URL_FUNCTION.containsMatchIn(it) || BY_VALUE.containsMatchIn(it) }
 
-    /** `[`、可有可无的命名空间、value,后面不再接名字里的字。只认 CSS 的空白(空格、制表、换行),和 JS 版一致。 */
+    /** `[`, an optional namespace prefix, then value, with no further name character after it. Only CSS whitespace counts (space, tab, newline), matching the JS version. */
     private val BY_VALUE = Regex("""\[[ \t\n]*(?:[^ \t\n\[\]|]*[ \t\n]*\|[ \t\n]*)?value(?![\w\x{80}-\x{10FFFF}-])""", RegexOption.IGNORE_CASE)
 
-    /** 还原后出现 `url(`(名字可以是转义拼出来的):CSS 在这里开始一个 url 记号。 */
+    /** `url(` appears after restoration (the name may be spelled out with escapes): CSS starts a url token here. */
     private val URL_FUNCTION = Regex("""url\(""", RegexOption.IGNORE_CASE)
 
-    /** 按 CSS 的读法还原:换行先统一成 \n;注释换成一个空格;引号里的整段换成 `""`;转义换成它代表的字。 */
+    /** Restore it the way CSS reads it: newlines are normalized to \n first; a comment becomes one space; a whole quoted section becomes `""`; an escape becomes the character it stands for. */
     internal fun plain(selector: String): String {
         val s = selector.replace("\r\n", "\n").replace('\r', '\n').replace('\u000C', '\n')
         val out = StringBuilder()
@@ -33,7 +33,7 @@ object SelectorPolicy {
                 }
                 c == '"' || c == '\'' -> {
                     i++
-                    // 引号里:反斜杠加换行是续行,别的转义照常吃掉;没转义的换行让这段字到此为止(浏览器也这样)
+                    // Inside quotes: a backslash plus newline continues the line, other escapes are consumed as usual; an unescaped newline ends the section there (the browser behaves the same way)
                     while (i < s.length && s[i] != c && s[i] != '\n') {
                         i = when {
                             s[i] != '\\' -> i + 1
@@ -55,7 +55,7 @@ object SelectorPolicy {
         return out.toString()
     }
 
-    /** [i] 处是反斜杠:返回转义出的字和下一个位置。1–6 位十六进制(紧跟的一个空白算在转义里),否则就是下一个字本身。 */
+    /** There is a backslash at [i]: returns the escaped character and the next position. 1-6 hex digits (one immediately following whitespace counts as part of the escape), otherwise the next character itself. */
     private fun escape(s: String, i: Int): Pair<String, Int> {
         if (i + 1 >= s.length) return "\uFFFD" to s.length
         var j = i + 1
@@ -71,7 +71,7 @@ object SelectorPolicy {
 
     private fun Char.isHex() = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
-    /** JS 版:在页面里定义 `selectsByValue(选择器字符串)`,和上面一行一行对应。 */
+    /** The JS version: defines `selectsByValue(selectorString)` in the page, matching the code above line by line. */
     val JS: String = """
   const selectsByValue = (() => {
     const HEX = /^[0-9a-fA-F]${'$'}/;

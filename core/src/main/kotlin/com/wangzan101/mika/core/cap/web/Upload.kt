@@ -22,10 +22,10 @@ import com.wangzan101.mika.core.workspace.WorkspacePathCheck
 import com.wangzan101.mika.core.screen.uistate.action
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 页面脚本给文件选择控件(input type=file)的角色。 */
+/** The role the page script gives to a file picker control (input type=file). */
 private const val FILE_ROLE = "file"
 
-/** 把工作区里的文件交给页面上的文件控件;要点文件控件,和点击一样判不可逆。 */
+/** Hand files from the workspace to a file control on the page; the file control has to be clicked, so it is judged irreversible like a click. */
 internal object Upload : WebTool {
     override val verb = Verb.Upload
     override val label = "上传文件"
@@ -51,7 +51,7 @@ internal object Upload : WebTool {
         if (target != null && target.role != FILE_ROLE) {
             throw ArgError("ref", "${ref.first} is a ${target.role}, not a file control; pass the ref of the file input (role $FILE_ROLE)")
         }
-        // 没接工作区检查时一律当越界:宁可传不了,不能把工作区外的文件交给页面
+        // Without a workspace check wired in, everything counts as outside: better not to upload at all than to hand files from outside the workspace to the page
         val pathCheck = ctx.workspacePath ?: { WorkspacePathCheck.Outside }
         for (p in paths) {
             val check = if (!workspaceShaped(p)) WorkspacePathCheck.Outside else pathCheck(p)
@@ -65,7 +65,7 @@ internal object Upload : WebTool {
         return ctx.action(ctx.web!!.upload(ref.first, ref.second, paths))
     }
 
-    /** /workspace/ 下、没有 . 和 .. 段、没有连续斜杠的路径;其余交给 app 侧规范化后再判。 */
+    /** A path under /workspace/ with no . or .. segments and no consecutive slashes; anything else is left to the app side to normalize and judge. */
     private fun workspaceShaped(p: String): Boolean {
         if (!p.startsWith(WORKSPACE_PREFIX) || "//" in p) return false
         return p.removePrefix(WORKSPACE_PREFIX).split('/').none { it == "." || it == ".." || it.isEmpty() }

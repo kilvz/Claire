@@ -15,12 +15,12 @@ import kotlin.math.roundToInt
 import com.wangzan101.mika.core.screen.uistate.WebInfo
 
 /**
- * 页面脚本输出 → ScreenSnapshot。输入形如
- * `{"els":[{"r":"button","n":"搜索","x":120,"y":40,"w":80,"h":32,"id":"go","c":1,"e":0,"s":0}],"vw":412,"vh":915,"dpr":2.625,"trunc":false,"mut":17}`,
- * 坐标为 CSS 像素。center 换成 WebView 像素(优先按 viewportW / vw 换算,其次 dpr),夹在视口内;bounds 按视口归一到 0–999,和手机同一坐标系。
- * 另有可选标记:`ph`=name 是输入框的提示语(placeholder)而不是已填内容,`f`=有输入焦点;文件选择控件的 `r` 为 "file"。
- * ref 按数组位置编号:坏掉的条目也占一个号,和页面脚本里的编号表对得上。
- * 坏输入给空列表,不抛异常:读屏失败不该让整个回合崩掉。
+ * Page script output → ScreenSnapshot. The input looks like
+ * `{"els":[{"r":"button","n":"Search","x":120,"y":40,"w":80,"h":32,"id":"go","c":1,"e":0,"s":0}],"vw":412,"vh":915,"dpr":2.625,"trunc":false,"mut":17}`,
+ * coordinates in CSS pixels. center is converted to WebView pixels (first by viewportW / vw, otherwise by dpr) and clamped into the viewport; bounds are normalized by the viewport to 0–999, the same coordinate system as on the phone.
+ * There are also optional flags: `ph`=name is the input's placeholder rather than its entered content, `f`=it holds input focus; a file picker's `r` is "file".
+ * refs are numbered by array position: a broken entry still takes up a number, so they line up with the numbering table in the page script.
+ * Broken input yields an empty list and throws no exception: a failed screen read should not crash the whole turn.
  */
 object PageTree {
     fun parse(json: String, viewportW: Int, viewportH: Int, snapshotId: String, info: WebInfo): ScreenSnapshot {
@@ -67,7 +67,7 @@ object PageTree {
         )
     }
 
-    /** 页面给的数可能是巨大值或无穷:先夹住再取整,别让取整溢出、中心点算到天边。 */
+    /** Numbers from the page may be huge or infinite: clamp first, then round, so rounding does not overflow and the center does not end up far off the map. */
     private fun px(css: Double?, scale: Double): Int = ((css ?: 0.0) * scale).coerceIn(-PX_LIMIT, PX_LIMIT).roundToInt()
 
     private const val PX_LIMIT = 1e6
@@ -78,7 +78,7 @@ object PageTree {
 
     private fun JsonObject.str(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-    /** 0/1 与 true/false 都认。 */
+    /** Both 0/1 and true/false are accepted. */
     private fun JsonObject?.flag(key: String): Boolean {
         val p = this?.get(key) as? JsonPrimitive ?: return false
         return p.booleanOrNull ?: ((p.intOrNull ?: 0) != 0)

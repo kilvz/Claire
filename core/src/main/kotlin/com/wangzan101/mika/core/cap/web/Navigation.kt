@@ -30,7 +30,7 @@ import com.wangzan101.mika.core.screen.uistate.session
 import com.wangzan101.mika.core.screen.uistate.DwellStop
 import com.wangzan101.mika.core.screen.uistate.dwellStopped
 
-/** 打开网页。跳 App 的链接(含应用商店的网页链接)不在内置浏览器里打开。 */
+/** Open a web page. Links that hand off to an app (including web links to app stores) are not opened in the built-in browser. */
 internal object Navigate : WebTool {
     override val verb = Verb.Navigate
     override val label = "打开网页"
@@ -50,14 +50,14 @@ internal object Navigate : WebTool {
         val newTab = a.bool("newTab", false)
         WebUrlPolicy.external(url)?.let { return externalLink(it.url, it.packageName) }
         WebUrlPolicy.checkNavigable(url)?.let { throw ArgError("url", it) }
-        // 同一个网站上一页还没看够:先补足停留(停留里可以轻轻滚几下眼前这一页);这个网站本任务里的页到了上限就不打开
+        // The previous page on this site has not been viewed long enough yet: top up the dwell first (during the dwell the current page may be scrolled lightly); if this site has already reached its page limit for this task, it is not opened
         try { ctx.dwell?.before(url, ctx.web) } catch (e: DwellStop) { return dwellStopped(e) }
         val r = try { ctx.web!!.navigate(url, newTab) } catch (e: WebTabCrashed) { return failCode("tab_crashed") } catch (e: WebTabHandedOver) { return failCode("handed_over") } catch (e: WebDialogOpen) { return failCode(DIALOG_OPEN) }
         r.externalLink?.let { return externalLink(it.url, it.packageName) }
-        // 换了页面:上一张读屏的编号不再能换算坐标
+        // The page changed: the previous screen read's indices can no longer be converted to coordinates
         ctx.session.lastSnapshot = null
         if (r.loaded) ctx.dwell?.seen(r.tab.url)
-        // 网址是个文件:打开变成了下载,照实说下载的状态,不当成打开了网页
+        // The URL is a file: opening it turned into a download; report the download status truthfully instead of treating it as an opened page
         r.download?.let { d ->
             return ok {
                 put("loaded", false); put("tabId", r.tab.tabId)
@@ -68,7 +68,7 @@ internal object Navigate : WebTool {
                 put("hint", Feedback.format("navigate_became_download", "file" to JsonPrimitive(d.file).toString(), "status" to d.status))
             }
         }
-        // 主文档没打开:把浏览器的错误码交给模型,不报成功
+        // The main document did not open: hand the browser's error code to the model instead of reporting success
         r.netError?.let { e ->
             return ToolExecution(buildJsonObject {
                 put("ok", false); put("error", "navigation_failed"); put("netError", e); put("url", r.upgradedFrom ?: url)
@@ -102,14 +102,14 @@ internal object Navigate : WebTool {
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) = listOfNotNull(pageFact(name, r))
 }
 
-/** 打开的网页的网址、标题、HTTP 状态也是可引用的事实。 */
+/** The opened page's URL, title and HTTP status are also quotable facts. */
 internal fun pageFact(name: String, r: ToolExecution): Observation? {
     if (r.content["ok"] != JsonPrimitive(true)) return null
     fun res(k: String) = (r.content[k] as? JsonPrimitive)?.contentOrNull
     return webFact("$name:网址 ${res("url")},网页标题「${res("title").orEmpty()}」" + (res("httpStatus")?.let { ",HTTP 状态 $it" } ?: ""))
 }
 
-/** 网页给出的一条事实(网址、标题、标签)。 */
+/** One fact supplied by a web page (URL, title, tab). */
 internal fun webFact(text: String) = Observation(ObsKind.Fact, text, source = WEB)
 
 internal object Tabs : WebTool {
@@ -141,7 +141,7 @@ internal object Tabs : WebTool {
                 if (id == null) throw ArgError("tabId", "required for switch")
                 val t = try { w.switchTab(id) } catch (e: WebTabHandedOver) { return failCode("handed_over") }
                     ?: return fail("tab_not_found", Feedback.format("tab_not_found", "id" to id))
-                // 换了标签:上一张读屏不是这个页面了
+                // Switched tabs: the previous screen read no longer belongs to this page
                 ctx.session.lastSnapshot = null
                 ok { put("tabId", t.tabId); put("title", t.title); put("url", t.url) }
             }
@@ -182,7 +182,7 @@ internal object SiteMode : WebTool {
         val r = try { ctx.web!!.setSiteMode(mode == "mobile") } catch (e: WebTabCrashed) { return failCode("tab_crashed") } catch (e: WebTabHandedOver) { return failCode("handed_over") }
             catch (e: UnsupportedOperationException) { return failCode("site_mode_unavailable") }
             ?: return failCode("no_tab_open")
-        // 重新加载了:上一张读屏的编号都不算数
+        // Reloaded: none of the previous screen read's indices are valid any more
         ctx.session.lastSnapshot = null
         return ok { put("site", r.host); put("mode", if (r.mobile) "mobile" else "desktop"); put("reloaded", r.reloaded) }
     }

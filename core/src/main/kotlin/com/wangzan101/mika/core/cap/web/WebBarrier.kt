@@ -10,27 +10,27 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 
 /**
- * 网页上采集到的事实:[base] 同手机(可见文字、密码框、黑帧…),另加主文档 HTTP 状态、
- * 页面里框架的地址(只算跨源的)、当前页面主机名。
+ * Facts gathered on a web page: [base] is the same as on the phone (visible text, password fields, black frames…), plus the main document's HTTP status,
+ * the URLs of frames in the page (cross-origin ones only) and the current page's host name.
  */
 data class WebFacts(val base: ScreenFacts, val httpStatus: Int?, val frameUrls: List<String>, val host: String?)
 
-/** 网页障碍判定:先看网页独有的迹象,再落到和手机同一套 [ScreenDiagnosis.classify]。 */
+/** Web barrier verdict: web-specific signals are checked first, then it falls back to the same [ScreenDiagnosis.classify] used on the phone. */
 object WebBarrier {
     private val RISK_STATUS = setOf(403, 429, 503)
     private val RISK_WORDS = listOf("访问受限", "频繁", "异常", "blocked", "too many requests")
 
-    /** 人机验证服务的框架主机(按域名后缀认)。 */
+    /** Frame hosts of human-verification services (recognized by domain suffix). */
     private val CAPTCHA_HOSTS = listOf(
         "recaptcha.net", "hcaptcha.com", "challenges.cloudflare.com", "geetest.com", "arkoselabs.com", "funcaptcha.com",
     )
-    /** 主机名本身不专门做验证、靠路径区分的(主机, 路径前缀)。 */
+    /** Hosts that do not do verification themselves but distinguish it by path (host, path prefix). */
     private val CAPTCHA_PATHS = listOf("google.com" to "/recaptcha", "gstatic.com" to "/recaptcha")
     private val CAPTCHA_HOST_WORDS = listOf("captcha")
 
     /**
-     * 风控拦截页(网站觉得这次访问不像人、环境不对)上的说法,单独出现就算(比对时去掉空白、不分大小写)。
-     * 只在页面字不多时认:正文很长的页面(讲这类问题的文章)不算。
+     * Wording found on risk-control interception pages (the site thinks this visit does not look human or the environment is off); appearing on its own is enough (whitespace is removed and case ignored when comparing).
+     * It is only recognized when the page has little text: pages with long body text (articles discussing this kind of issue) do not count.
      */
     private val INTERSTITIAL_WORDS = listOf(
         "访问异常", "异常访问", "访问行为异常", "访问存在异常", "环境异常", "环境存在异常", "存在安全风险", "当前访问存在风险",
@@ -38,28 +38,28 @@ object WebBarrier {
         "unusualtraffic", "unusualactivity", "suspiciousactivity", "automatedqueries", "automatedrequests", "checkingyourbrowser",
         "accesstemporarilyrestricted", "requestwasblocked", "requesthasbeenblocked",
     )
-    /** 只是标题(「安全提示」「安全检查」)的,还要同页有异常、验证、频繁一类的字。 */
+    /** For a title alone (a security notice, a security check), the same page must also contain words such as unusual, verify or frequent. */
     private val INTERSTITIAL_TITLES = listOf("安全提示", "安全检查", "安全警告", "securitycheck", "securitynotice", "securityverification")
     private val INTERSTITIAL_CUES = listOf("异常", "验证", "频繁", "风险", "unusual", "verify", "suspicious", "robot", "automated")
-    /** 算「页面字不多」的上限:可见文字合计字数(去掉空白)、条数。 */
+    /** The caps for "the page has little text": total characters of visible text (whitespace removed), and the number of text items. */
     private const val INTERSTITIAL_MAX_CHARS = 800
     private const val INTERSTITIAL_MAX_TEXTS = 40
 
-    /** 接口响应里表示被风控拦下的说法:和 [INTERSTITIAL_WORDS] 同一类,另加接口常用的写法。 */
+    /** Wording in API responses that says the request was stopped by risk control: the same kind as [INTERSTITIAL_WORDS], plus the spellings APIs commonly use. */
     private val API_RISK_WORDS = INTERSTITIAL_WORDS + listOf(
         "环境存在风险", "账号存在风险", "请求异常", "访问受限", "abnormal", "riskcontrol", "toomanyrequests", "ratelimit",
     )
-    /** 只看响应顶层报信息的这几个字段(小写比)。 */
+    /** Only these top-level message fields of the response are looked at (compared in lowercase). */
     private val API_MESSAGE_KEYS = setOf("message", "msg", "errmsg", "errormsg", "error_msg", "errormessage", "error", "tip", "tips", "toast", "reason")
     private const val API_MESSAGE_MAX = 200
 
-    /** 比对时去掉空白:「请下载 App 继续」和「请下载App继续」一样认。 */
+    /** Whitespace is removed when comparing: "please download the App to continue" is recognized the same with or without spaces. */
     private val UNSUPPORTED_WORDS = listOf(
         "请在浏览器中打开", "当前浏览器不支持", "不支持此浏览器", "请下载app继续", "browserisnotsupported", "browsernotsupported",
     )
 
     fun classify(f: WebFacts): ScreenCheck {
-        // 手机同一套规则已经判出要人处理(密码框、验证码字样、付款),以它为准
+        // When the phone's own rules already decided a human is needed (password field, captcha wording, payment), that verdict stands
         val base = ScreenDiagnosis.classify(f.base)
         if (base.state == ScreenState.NEEDS_HUMAN) return base
         val text = f.base.texts.joinToString("\n").lowercase()
@@ -83,7 +83,7 @@ object WebBarrier {
         return base
     }
 
-    /** 字不多的页面上风控拦截页的说法;不是为 null。 */
+    /** Risk-control interception wording on a page with little text; null when there is none. */
     private fun interstitial(texts: List<String>, compact: String): String? {
         if (texts.size > INTERSTITIAL_MAX_TEXTS || compact.length > INTERSTITIAL_MAX_CHARS) return null
         INTERSTITIAL_WORDS.firstOrNull { it in compact }?.let { return it }
@@ -92,8 +92,8 @@ object WebBarrier {
     }
 
     /**
-     * 页面自己收到的接口响应 [body] 是不是在说被风控拦下了:JSON 对象顶层报信息的字段(message、msg、error…)里有那类说法。
-     * 返回那段说法(截短);不是 JSON、没有这类字段或没说到为 null。
+     * Whether an API response the page itself received, [body], says it was stopped by risk control: one of the JSON object's top-level message fields (message, msg, error…) carries that kind of wording.
+     * Returns that wording (truncated); null when it is not JSON, has no such field, or does not say so.
      */
     fun apiRisk(body: String?): String? {
         val text = body?.trim()?.takeIf { it.startsWith("{") } ?: return null
@@ -108,7 +108,7 @@ object WebBarrier {
         return null
     }
 
-    /** 跨源(主机名和页面不同)且指向人机验证服务的框架。 */
+    /** A frame that is cross-origin (its host differs from the page's) and points at a human-verification service. */
     private fun captchaFrame(url: String, pageHost: String?): Boolean {
         val h = WebUrlPolicy.host(url) ?: return false
         if (pageHost != null && h == pageHost.lowercase().removePrefix("www.")) return false

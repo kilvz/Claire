@@ -17,7 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * 留下的那一页为什么关了;[wire] 记进对话。到时间、内存不够被系统收回、渲染进程崩了、用户关的、留了另一页、Claire 退出了。
+ * Why the page that was kept open got closed; [wire] is recorded in the conversation. Timed out, reclaimed by the system for lack of memory, renderer process crashed, closed by the user, another page kept instead, Claire quit.
  */
 enum class KeptPageClose(val wire: String) {
     Expired("expired"), Memory("memory"), Crashed("crashed"), User("user"), Replaced("replaced"), AppExit("app_exit");
@@ -27,12 +27,12 @@ enum class KeptPageClose(val wire: String) {
     }
 }
 
-/** 任务结束后留下的那一页至多留几个小时(到时自动关)。 */
+/** A page left open after the task ends stays for at most this many hours (closed automatically when it expires). */
 const val KEEP_OPEN_HOURS = 2
 
 /**
- * 任务结束时默认关掉这个任务的全部网页;要页面在回答之后接着运行(接着播放、挂着、等它自己走完)时,用它把当前这一页留下。
- * 只是记下「结束时留下」,此刻什么也不动;全局只留一页,留新的会关掉旧的;撤销用 keep=false。
+ * When the task ends, all web pages of the task are closed by default; when a page must keep running after the answer (keep playing, stay idle, finish on its own), use this to leave the current page open.
+ * This only records "leave open at the end" and touches nothing right now; only one page is kept globally, and keeping a new one closes the old one; undo with keep=false.
  */
 internal object KeepOpen : WebTool {
     override val verb = Verb.KeepOpen

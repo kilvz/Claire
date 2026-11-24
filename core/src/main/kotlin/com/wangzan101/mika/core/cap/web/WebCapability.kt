@@ -26,10 +26,10 @@ private const val EVIDENCE_PAGE_CHARS = 3000
 private val HOST_RE = Regex("^[a-z0-9-]+(\\.[a-z0-9-]+)+$")
 
 /**
- * 内置浏览器:网页那一套屏幕工具,再加打开网页、读页、页面脚本、下载上传;接了网页端口([port])才提供工具。
- * [workspacePath] 是上传时的工作区路径检查(规范化、符号链接解析由 app 侧做)。
- * [pacing] 是一页一页看的节奏(见 [PagePacing]):换页的动作之前补足这一页的停留;[sitePace] 按主机名给出站点知识对浏览快慢的说法;
- * [idle] 给了时停留里轻轻滚几下页面(见 [IdleScroll])。
+ * The built-in browser: the web version of the screen tools, plus opening pages, reading pages, page scripts, downloads and uploads; the tools are offered only when a web port is attached ([port]).
+ * [workspacePath] is the workspace path check used for uploads (normalization and symlink resolution are done by the app side).
+ * [pacing] is the rhythm of looking page by page (see [PagePacing]): it tops up this page's dwell before actions that change the page; [sitePace] gives, per host name, what site knowledge says about how fast a site may be browsed;
+ * when [idle] is given, the page is scrolled lightly a few times during the dwell (see [IdleScroll]).
  */
 internal class WebCapability(
     val port: WebPort?,
@@ -48,10 +48,10 @@ internal class WebCapability(
 
     override fun tools(): List<AgentTool> = WebGroup.tools
 
-    /** 这次的话是从浏览器页上对着一页问的(带着 [AttachedPage] 的说明):那一页已经是当前标签,开局就展开网页一组。 */
+    /** The message this time was asked on a browser page about one page (it carries the [AttachedPage] note): that page is already the current tab, so the web group is expanded from the start. */
     override fun preload(task: String): Boolean = port != null && AttachedPage.has(task)
 
-    /** 页面说明里的标题、网址和选中的字来自网页,去掉后剩下用户打的字。 */
+    /** The title, URL and selected text in the page note come from the web page; what is left after removing them is what the user typed. */
     override fun userWords(text: String): String = AttachedPage.words(text)
 
     override val family = WEB_FAMILY
@@ -61,7 +61,7 @@ internal class WebCapability(
             mode = { siteMode(p) })
     }
 
-    /** 网页那一组收着时不给。 */
+    /** Not supplied while the web group is collapsed. */
     override fun sections(env: PromptEnv): List<String> =
         if (env.isOpen(id) && WebGroup.tools.any { it.name in env.offered }) listOf(env.gate(Prompts.capability(WEB))) else emptyList()
 
@@ -72,21 +72,21 @@ internal class WebCapability(
         dwell.afterIdle = { ctx.sessions[id]?.reprobe() }
     }
 
-    /** 用户答过话:同一网站的页数上限重新算(用户答应了接着看)。 */
+    /** The user has answered: the page cap for the same site is recomputed (the user agreed to keep looking). */
     override fun onUserAnswered(ctx: ToolContext) = dwell.userAnswered()
 
-    /** 网页上的对外动作:做的这一次不受页数上限拦;做成之后这个网站的页数上限不再算(成批联系、投递做到网站自己的上限为止)。 */
+    /** An outward action on the web: this one is not blocked by the page cap; once it succeeds, the page cap no longer applies to this site (bulk outreach and submissions go on up to the site's own limits). */
     override fun onOutwardStart(ctx: ToolContext, site: String) = dwell.outwardStart(site)
 
     override fun onOutwardEnd(ctx: ToolContext, site: String, done: Boolean) = dwell.outwardEnd(site, done)
 
-    /** 再看一眼:此刻这一页的界面状态,另附整页正文的开头(界面状态只有视口里的元素)。 */
+    /** Another look: the current interface state of this page, with the beginning of the whole-page body text attached (the interface state only holds elements inside the viewport). */
     override suspend fun freshLook(ctx: ToolContext, withImage: Boolean): Look? {
         val p = port ?: return null
         return ctx.sessions[id]?.freshLook(withImage) { pageStart(p)?.let { webRead(it, null) } }
     }
 
-    /** 确认申报的 app 在网页上是站点主机名(国际化域名按 ASCII 形式),和网页读屏的 packageName 一致。 */
+    /** Confirms that the declared app on the web surface is a site host name (an internationalized domain in ASCII form), matching the packageName of the web screen read. */
     private fun declaredHost(app: String): String {
         val host = app.takeIf { it.isNotEmpty() && it.none { c -> c in "/:?#@\\ " } }?.let { UrlHost.of("https://$it") }
         if (host == null || !HOST_RE.matches(host))
@@ -94,21 +94,21 @@ internal class WebCapability(
         return host
     }
 
-    /** 整页正文的开头。 */
+    /** The beginning of the whole-page body text. */
     private suspend fun pageStart(p: WebPort): String? {
         val text = try { p.readPage(EVIDENCE_PAGE_CHARS, 0, scrollLazy = false).text } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
         return text?.takeIf { it.isNotBlank() }?.let { "网页正文(开头):\n$it" }
     }
 
-    /** 当前标签此刻用的版本(mobile / desktop);读不到为 null。 */
+    /** The version the current tab is using right now (mobile / desktop); null when it cannot be read. */
     private suspend fun siteMode(p: WebPort): String? = try { p.siteMode() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
 
     /**
-     * 网页那一套屏幕工具读屏与动作经它:返回键是页面的后退;读屏的包名换成站点主机名
-     * (确认关卡按它核对「申报的是不是眼前这个」)。读屏时把地址交给 [dwell] 认新的一页;
-     * 可能换页的动作(点击、后退、按键、往下滚、滑动)之前先补足这一页的停留,打字、清空、往上滚不等。
-     * 按编号点、后退、按键、往下滚不按屏幕坐标做,停留里可以轻轻滚几下页面;按坐标点、滑动的停留里不滚(坐标会对不上)。
-     * 这个网站本任务里的页到了上限时,除往下滚之外的这些动作都不做,报 page_limit。
+     * The web version of the screen tools' snapshots and actions goes through this: the back key is the page's own back; the snapshot's package name is replaced by the site host name
+     * (the confirmation gate checks by it whether what was declared is what is in front of us). On a snapshot the URL is handed to [dwell] so it can recognize a new page;
+     * before actions that may change the page (click, back, key press, scroll down, swipe) this page's dwell is topped up first, while typing, clearing and scrolling up do not wait.
+     * Tapping by ref, going back, pressing keys and scrolling down are not done by screen coordinates, so the page may be scrolled lightly during the dwell; tapping by coordinates and swiping do not scroll during the dwell (the coordinates would no longer match).
+     * When pages from this site have reached the task's cap, all these actions except scrolling down are not performed, and page_limit is reported.
      */
     private class WebScreen(private val port: WebPort, private val dwell: PageDwell) : ScreenPort by port {
         override suspend fun back(): ActionResult = paced(idle = true) { port.historyBack() }
@@ -124,13 +124,13 @@ internal class WebCapability(
 
         override suspend fun scroll(ref: String?, snapshotId: String?, down: Boolean): ActionResult {
             if (!down) return port.scroll(ref, snapshotId, false)
-            // 往下滚是读这一页余下的内容:到了页数上限也照滚;停留中用户插了话就不滚
+            // Scrolling down means reading the rest of this page: it happens even at the page cap; if the user interjects during the dwell, it does not happen
             try { dwell.before(port = port, gate = false) } catch (e: DwellStop) { return ActionResult.Failed(e.code, e.detail) }
             val mark = dwell.scrollMark(port)
             return port.scroll(ref, snapshotId, true).also { dwell.afterScroll(port, mark) }
         }
 
-        /** 先补足停留(到了页数上限、停留中用户插了话就不做,报 page_limit 或 skipped_for_new_message),再做 [action]。 */
+        /** Top up the dwell first (skipped at the page cap or when the user interjects during it, reporting page_limit or skipped_for_new_message), then perform [action]. */
         private suspend fun paced(idle: Boolean, action: suspend () -> ActionResult): ActionResult {
             try {
                 dwell.before(port = port.takeIf { idle })
@@ -151,10 +151,10 @@ internal class WebCapability(
     }
 }
 
-/** 本任务的网页端口;没有网页为 null。 */
+/** This task's web port; null when there is no web capability. */
 internal val ToolContext.web: WebPort? get() = this[WebCapability.KEY]?.port
 
-/** 本任务的一页一页的停留;没有网页能力为 null。 */
+/** This task's page-by-page dwell; null when there is no web capability. */
 internal val ToolContext.dwell: PageDwell? get() = this[WebCapability.KEY]?.dwell
 
 internal val ToolContext.workspacePath: ((String) -> WorkspacePathCheck)? get() = this[WebCapability.KEY]?.workspacePath
