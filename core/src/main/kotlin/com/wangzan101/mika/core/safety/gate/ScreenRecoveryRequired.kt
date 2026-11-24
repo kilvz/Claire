@@ -1,4 +1,4 @@
 package com.wangzan101.mika.core.safety.gate
 
-/** 等待期间发生过锁屏周期:准备好的写屏动作按旧屏幕排的,先重读现在的屏幕再决定怎么做。 */
+/** A screen-lock cycle happened during the wait: prepared write actions were planned against the old screen, so re-read the current screen before deciding what to do. */
 class ScreenRecoveryRequired : Exception()

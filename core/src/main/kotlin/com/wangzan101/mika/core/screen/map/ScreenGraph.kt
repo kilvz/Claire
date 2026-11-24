@@ -4,15 +4,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * 一张 App 的屏图：节点 = 结构页，边 = 点击导航。由运行记录确定性重建，`nodes` 键是屏 id。
+ * The screen map of one app: nodes = structural pages, edges = click navigation. Rebuilt deterministically from the run log;
+ * keys of `nodes` are screen ids.
  */
 @Serializable
 data class ScreenGraph(val app: String, val nodes: Map<String, ScreenNode>) {
     fun nodes(): List<ScreenNode> = nodes.values.toList()
 
     /**
-     * 从 [from] 屏到 [to] 屏的最短导航序列（BFS，只走换屏的 NAVIGATED 边）。不可达返回 null。
-     * 已在 [to] 返回空序列。design D6：相对导航，没完整走过的目标也能拼段。
+     * Shortest navigation sequence from screen [from] to screen [to] (BFS, only following NAVIGATED edges that change screens).
+     * Returns null when unreachable.
+     * Returns an empty sequence when already at [to]. design D6: relative navigation, so segments can be stitched together even
+     * for a target never fully traversed.
      */
     fun path(from: String, to: String): List<Transition>? {
         if (from == to) return emptyList()
@@ -25,8 +28,8 @@ data class ScreenGraph(val app: String, val nodes: Map<String, ScreenNode>) {
             val cur = queue.removeFirst()
             val node = nodes[cur.node] ?: continue
             for (t in node.transitions.values) {
-                val next = t.to ?: continue // LEFT_APP 没到本图哪屏
-                if (next == cur.node) continue // state_changed / none 的边停在原地
+                val next = t.to ?: continue // LEFT_APP does not reach any screen in this map
+                if (next == cur.node) continue // state_changed / none edges stay in place
                 val path = cur.path + t
                 if (next == to) return path
                 if (visited.add(next)) queue.addLast(Step(next, path))
@@ -36,8 +39,9 @@ data class ScreenGraph(val app: String, val nodes: Map<String, ScreenNode>) {
     }
 
     /**
-     * 把 [fragment] 按屏 id 并入:同 id 的 anchors/levels/visits/transitions 计数累加、status provisional→confirmed;
-     * 新 id 追加(保留它的 status)。不同 App 的片段不并(返回原图,防归错 App)。
+     * Merge [fragment] in by screen id: for the same id the anchors/levels/visits/transitions counts are summed and status goes
+     * provisional→confirmed; new ids are appended (keeping their status). Fragments of a different app are not merged (the
+     * original graph is returned, to avoid attributing screens to the wrong app).
      */
     fun mergedWith(fragment: ScreenGraph): ScreenGraph {
         if (fragment.app != app) return this
@@ -49,7 +53,7 @@ data class ScreenGraph(val app: String, val nodes: Map<String, ScreenNode>) {
     }
 
     companion object {
-        /** 两条路的公共前缀长度（按转移边 key 逐条比）。供回放接图裁掉已走过的公共部分（design D6）。 */
+        /** Length of the common prefix of two paths (compared edge by edge by transition key). Used when stitching maps during replay to cut the already-traversed common part (design D6). */
         fun commonPrefix(a: List<Transition>, b: List<Transition>): Int {
             var i = 0
             while (i < a.size && i < b.size && a[i].key() == b[i].key()) i++

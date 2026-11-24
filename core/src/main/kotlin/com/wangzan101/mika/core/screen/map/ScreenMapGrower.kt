@@ -1,8 +1,9 @@
 package com.wangzan101.mika.core.screen.map
 
 /**
- * 收尾长图:把本次运行长出的屏/边片段([ScreenMapBuilder.apply] 的产物)按屏 id 并进已存图。
- * 每 App 读旧图 → [ScreenGraph.mergedWith] 合并 → 写回;读写失败往上抛,由调用方 guarded(design D4:失败不影响任务)。
+ * Grow the map at the end: merge the screen/edge fragments grown in this run (the output of [ScreenMapBuilder.apply]) into the
+ * stored map by screen id. For each app: load the old map → merge with [ScreenGraph.mergedWith] → write back; read/write
+ * failures are thrown upward and guarded by the caller (design D4: a failure does not affect the task).
  */
 object ScreenMapGrower {
     fun grow(store: ScreenMapStore, fragments: Map<String, ScreenGraph>) {

@@ -6,18 +6,27 @@ import com.wangzan101.mika.core.screen.observation.Observation
 import com.wangzan101.mika.core.run.record.Redactor
 
 /**
- * 一次任务里助手实际读到的全部材料(证据账本):读屏、读网页、命令输出与读到的文件、工具结果里的事实。
- * 运行时的核查器和评测的核对用的是同一套账本和同一个挑选规则([forAnswer]),两边不会各看各的。
+ * All the material the assistant actually read during a task (the evidence ledger): screen reads, web page reads, command
+ * output and files read, and facts from tool results.
+ * The runtime verifier and the evaluation checker use the same ledger and the same selection rule ([forAnswer]), so the two
+ * never look at different things.
  *
- * - 进账前脱敏([Redactor.evidence]),每条按来源截短;同样的原文只留最近一次(来处跟着更新)。
- *   接管之后读到的输入框里不是助手打的字(用户在接管时填的)不记;命令输出里原样出现在命令本身里的行(回显)不记。
- * - 总量有上限([capChars]):超了从最早的丢起。这是内存上的安全上限,正常任务碰不到。
- * - 交给核对的条目([forAnswer]):含有回答里某条事实的每一条(一条也不丢)、这些条目和回答提到的每个 App 或网址最近的那一条
- *   (后来读到的可能和回答矛盾)、最近读到的 [RECENT] 条。按读到的先后排。代码的核对看这些条目的全文;
- *   核查模型只看它们的节选([excerpt]:对上事实的行和前后几行,总字数有上限),带着来处(第几步、哪种来源、哪个 App 或网址、网页标题)。
- *   挑选只决定给看哪些,核对规则([Grounding])不变:没读到过的东西,账本里没有,挑多少都证不了。
- * - 助手打进输入框的字不给回答作证:那个输入框里的字、输入框还有焦点时以这些字开头的联想行,挑选时去掉;
- *   结果里恰好和搜索词一样的标题照样留着。不知道哪些是输入框的(旧记录)按整行等于打进去的字去掉。
+ * - Redacted before entry ([Redactor.evidence]) and clipped per source; identical text keeps only the latest copy (its origin
+ *   is updated along with it). After a takeover, input-field text that the assistant did not type (text the user filled in
+ *   during the takeover) is not recorded; lines of command output that appear verbatim in the command itself (echo) are not
+ *   recorded.
+ * - Total size is capped ([capChars]): past it the earliest entries are dropped. This is a memory safety cap that normal
+ *   tasks never reach.
+ * - Entries handed to verification ([forAnswer]): every one containing a fact from the answer (none is dropped), the latest
+ *   entry for each app or URL mentioned by those entries and by the answer (what was read later may contradict the answer),
+ *   and the latest [RECENT] read. Ordered by when they were read. The code check looks at their full text; the verifier model
+ *   only sees excerpts of them ([excerpt]: the lines matching facts plus a few around them, with a total length cap),
+ *   together with their origin (which step, which kind of source, which app or URL, page title).
+ *   Selection only decides what is shown; the verification rules ([Grounding]) stay the same: what was never read is not in
+ *   the ledger, and no amount of selection can prove it.
+ * - Text the assistant typed into an input field does not support the answer: that field's text, and suggestion lines
+ *   starting with it while the field still has focus, are removed during selection; a result title that happens to equal the
+ *   search term is still kept. When the input fields are unknown (older records), whole lines equal to typed text are removed.
  */
 class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
     private val entries = ArrayDeque<Observation>()
@@ -30,27 +39,31 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
     val isEmpty: Boolean get() = entries.isEmpty()
 
     /**
-     * 记一条观察;脱敏、截短后为空的不记,返回记下的那一条(填好编号、第几步、时刻;[step]、[atMs] 是此刻的)。
-     * 观察里的 [Observation.inputs] 是那一次输入框里的字;[Observation.authored] 是助手自己写的东西(跑的命令):原样出现在里面的行是回显,不记。
+     * Record one observation; one that is blank after redaction and clipping is not recorded. Returns the recorded entry
+     * (with id, step and timestamp filled in; [step] and [atMs] are the current ones).
+     * The observation's [Observation.inputs] are the input-field text at that time; [Observation.authored] is what the
+     * assistant itself wrote (commands it ran): lines appearing verbatim inside it are echoes and are not recorded.
      */
     fun add(o: Observation, step: Int = o.step, atMs: Long = o.atMs): Observation? {
         val ins = o.inputs?.names?.map(::norm)?.filter { it.isNotEmpty() }
         var lines = Redactor.evidence(o.text).lines()
-        // 接管时用户自己填的字(输入框里不是助手打的)不留
+        // Text the user filled in during the takeover (not typed by the assistant) is not kept
         if (afterTakeover && ins != null) lines = lines.filterNot { l -> norm(l).let { n -> n in ins && typed.none { it in n } } }
         o.authored?.let(::norm)?.takeIf { it.isNotEmpty() }?.let { a -> lines = lines.filterNot { l -> norm(l).let { it.isNotEmpty() && it in a } } }
         val t = clip(o.kind, lines.joinToString("\n"))
         if (t.isBlank()) return null
         val place = o.place?.let { it.copy(name = Redactor.evidence(it.name)) }
-        // 回显已经去掉了,记下的这条不再带着助手自己写的东西
+        // Echoes are already removed, so the recorded entry no longer carries what the assistant wrote itself
         return insert(o.copy(text = t, place = place, step = step, atMs = atMs, id = ++seq, authored = null,
             inputs = ins?.let { InputHints(it, o.inputs.focused?.let(::norm)?.takeIf { f -> f.isNotEmpty() }) },
             title = o.title?.let(Redactor::evidence)?.takeIf { it.isNotBlank() }))
     }
 
     /**
-     * 照原样放回一条运行时已经记下的观察(运行记录里的 observed,已脱敏、截短、去掉回显,编号也是那时的):
-     * 不再过滤,只照进账时一样去掉同样的旧一条、守住总量上限。离线重建账本用,和运行时的账本一样。
+     * Put an observation already recorded at runtime back exactly as it is (the observed entry in the run log, already
+     * redacted, clipped, echo-stripped, with its original id): no further filtering, only the same removal of an identical
+     * older entry as on normal entry, and the total size cap. Used to rebuild the ledger offline, identical to the runtime
+     * one.
      */
     fun restore(o: Observation): Observation {
         seq = maxOf(seq, o.id)
@@ -65,25 +78,25 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
         return stored
     }
 
-    /** 这段原文(按进账时一样脱敏、截短后)已经在账本里。 */
+    /** This text (redacted and clipped the same way as on entry) is already in the ledger. */
     fun has(kind: ObsKind, text: String): Boolean = clip(kind, Redactor.evidence(text)).let { t -> entries.any { it.text == t } }
 
-    /** 助手用 type_text 打进去的字;只记不是密码框的。 */
+    /** Text the assistant typed with type_text; only non-password fields are recorded. */
     fun noteTyped(text: String) {
         norm(text).takeIf { it.isNotEmpty() }?.let { typed += it }
     }
 
-    /** 交给用户接管过:之后读屏里输入框中不是助手打的字不再进账。 */
+    /** The user was handed control: input-field text read afterwards that the assistant did not type no longer enters the ledger. */
     fun noteTakeover() {
         afterTakeover = true
     }
 
-    /** 同一份账本的副本(运行时把账本交给核查器时用,之后的读屏不影响这份)。 */
+    /** A copy of the same ledger (used when the runtime hands the ledger to the verifier; later screen reads do not affect this copy). */
     fun copy(): EvidenceLedger = EvidenceLedger(capChars).also { c ->
         c.entries.addAll(entries); c.typed.addAll(typed); c.total = total; c.seq = seq; c.afterTakeover = afterTakeover
     }
 
-    /** 交给核对的条目:见类说明。每条已去掉输入框回显;去掉后没字的不选。 */
+    /** Entries handed to verification: see the class doc. Each has input-field echoes removed; one with no text left is not selected. */
     fun forAnswer(goal: String, answer: String): List<Observation> {
         val cands = entries.mapNotNull(::withoutEcho)
         val holds = cands.indices.filter { i -> Grounding.check(goal, answer, listOf(cands[i].text)).let { it.claims.size > it.unmatched.size } }
@@ -94,13 +107,13 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
         return (holds + latest + recent).distinct().sorted().map { cands[it] }
     }
 
-    /** 最近进账的那一条的编号(还没进账为 0);和 [readSince] 一起判断某个时刻之后有没有重新读过。 */
+    /** The id of the latest recorded entry (0 before anything is recorded); used with [readSince] to tell whether anything was read after a point in time. */
     val lastId: Int get() = seq
 
-    /** 编号 [id] 之后读到过东西(读屏、网页、命令输出与文件;工具报告的事实不算读)。 */
+    /** Something was read after id [id] (screen reads, web pages, command output and files; facts reported by tools do not count as reads). */
     fun readSince(id: Int): Boolean = entries.any { it.id > id && it.kind != ObsKind.Fact }
 
-    /** 回答里的事实在其中对得上的条目(已去掉输入框回显,按读到的先后);回答里没有可核对的事实时为空。回答的来源由它来找。 */
+    /** The entries whose facts match the answer (input-field echoes removed, in read order); empty when the answer has no checkable fact. Answer sources are found from these. */
     fun supporting(goal: String, answer: String): List<Observation> =
         entries.mapNotNull(::withoutEcho).filter { e -> Grounding.check(goal, answer, listOf(e.text)).let { it.claims.size > it.unmatched.size } }
 
@@ -109,9 +122,9 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
         val lines = e.text.lines()
         val ins = e.inputs?.names
         val kept = if (ins == null) lines.filterNot { norm(it) in typed } else {
-            // 装着打进去的字的输入框,每个去掉一行(同样字的结果标题照样留着)
+            // One line is removed for each input field holding typed text (a result title with the same text is still kept)
             val left = ins.filter { n -> typed.any { it in n } }.groupingBy { it }.eachCount().toMutableMap()
-            // 还有焦点的输入框里是打进去的字:以这些字开头、更长的行是联想
+            // A focused input field holds typed text: longer lines starting with it are suggestions
             val suggesting = e.inputs?.focused?.let { f -> typed.filter { it in f } }.orEmpty()
             lines.filterNot { l ->
                 val n = norm(l)
@@ -123,21 +136,21 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
     }
 
     companion object {
-        /** 账本总字数的安全上限。 */
+        /** Safety cap on the ledger's total character count. */
         const val STORE_CHARS = 400_000
-        /** 交给核查模型的节选总字数的目标上限(含有回答事实的条目一条不丢,放不下时每条再缩短)。 */
+        /** Target cap on the total character count of excerpts handed to the verifier model (no entry containing an answer fact is dropped; when it does not fit, each is shortened further). */
         const val EXCERPT_CHARS = 6_000
-        /** 节选时对上事实的行前后各留几行(放不下时逐步减到 0)。 */
+        /** How many lines to keep before and after each matching line in an excerpt (reduced step by step to 0 when it does not fit). */
         const val EXCERPT_CONTEXT = 2
-        /** 没有对上事实的条目(某处最近的一次、最近读的)只给开头这么多字。 */
+        /** Entries with no matched fact (the latest at a place, the latest read) only get this many characters from the start. */
         const val HEAD_CHARS = 600
-        /** 放不下时每条节选至少留这么多字。 */
+        /** Minimum characters to keep per excerpt when it does not fit. */
         const val MIN_EXCERPT = 300
-        /** 交给核对的最近几条。 */
+        /** How many of the latest entries are handed to verification. */
         const val RECENT = 1
-        /** 读屏、网页、别的 AI 的回答每条至多这么多字。 */
+        /** Maximum characters per entry for screen reads, web pages and other AIs' replies. */
         const val READ_CHARS = 6_000
-        /** 命令输出、文件内容、工具事实每条至多这么多字(按头尾截短)。 */
+        /** Maximum characters per entry for command output, file content and tool facts (clipped from both ends). */
         const val OUTPUT_CHARS = 4_000
 
         private val WS = Regex("\\s+")
@@ -145,14 +158,16 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
         private val PLACE_SPLIT = Regex("[^\\p{L}\\p{N}]+")
         private val PLACE_NOISE = setOf("com", "cn", "net", "org", "www", "http", "https", "android", "app", "html", "m")
 
-        /** App 或网址里能在题目、回答里提到的词(包名、域名的各段,太短太常见的不算)。 */
+        /** Words from an app name or URL that can be mentioned in the goal or answer (package-name and domain segments; too short or too common ones do not count). */
         private fun placeNames(where: String): List<String> =
             where.lowercase().split(PLACE_SPLIT).filter { it.length >= 3 && it !in PLACE_NOISE }
 
         /**
-         * 给核查模型看的节选:[text] 里 [hits] 这几行和前后各 [context] 行,省掉的地方写一行「[省略 N 行]」;没有对上的行时
-         * (或 [withHead])另给开头 [HEAD_CHARS] 字。
-         * [cap] 是这一条至多多少字(按行截,截掉的同样标出)。
+         * The excerpt shown to the verifier model: lines [hits] of [text] plus [context] lines before and after each, with a
+         * "[N lines omitted]" line where text is skipped; when nothing matched (or with [withHead]) the first [HEAD_CHARS]
+         * characters are given as well.
+         * [cap] is the maximum character count for this entry (clipping happens on line boundaries and clipped text is marked
+         * the same way).
          */
         fun excerpt(text: String, hits: Set<Int>, context: Int, cap: Int = Int.MAX_VALUE, withHead: Boolean = false): String {
             val ls = text.lines()

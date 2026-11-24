@@ -4,12 +4,12 @@ import com.wangzan101.mika.core.tool.Verb
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
-/** 读屏、看图、诊断屏幕一类:守卫按工具计重复,不按参数。 */
+/** Screen reads, image views, screen diagnosis and the like: the guard counts repeats per tool, not per argument. */
 internal val DIAGNOSTIC_VERBS = setOf(Verb.Observe, Verb.ListElements, Verb.Screenshot, Verb.Describe, Verb.Diagnose, Verb.ViewPastScreens)
-/** 只读不动的看页面一类:页面没变时反复用它们读,由 [OperationGuards.read] 管。 */
+/** Read-only page-viewing tools: repeatedly reading with them while the page is unchanged is handled by [OperationGuards.read]. */
 internal val PAGE_READ_VERBS = DIAGNOSTIC_VERBS + setOf(Verb.ReadPage, Verb.EvaluateJs, Verb.SiteCommand)
 
-/** 工具结果的指纹(不含每次都换的读屏编号)。 */
+/** Fingerprint of a tool result (without the screen-read id that changes every time). */
 internal fun resultFingerprint(content: JsonObject): Long {
     val text = JsonObject(content - "snapshotId" - "guard" - "advice").toString()
     var h = -0x340d631b7bdddcdbL
@@ -17,10 +17,10 @@ internal fun resultFingerprint(content: JsonObject): Long {
     return h
 }
 
-/** 画面指纹:元素列表文本的 64 位 FNV-1a。纯文本模型没有截图,也能判断「画面没变」。 */
+/** Screen fingerprint: a 64-bit FNV-1a of the element-list text. A text-only model without screenshots can still tell that the screen did not change. */
 internal fun elementsHash(elements: JsonArray?): Long? {
     elements ?: return null
-    // 不含编号:稳定编号开着时同一屏里重复的同名元素每次读都换新编号,不该被当成换了一屏
+    // Excludes refs: with stable ids enabled, repeated same-name elements on the same screen get new refs on every read, which should not count as a screen change
     val text = JsonArray(elements.map { e -> (e as? JsonObject)?.let { JsonObject(it - "ref") } ?: e }).toString()
     var h = -0x340d631b7bdddcdbL
     for (b in text.toByteArray(Charsets.UTF_8)) {

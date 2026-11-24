@@ -1,60 +1,73 @@
 package com.wangzan101.mika.core.safety.verify
 
 /**
- * 代码兜底:核查器判 pass 之后,用一条与模型无关的规则再对一遍文字证据。代码只核它核得准的——字面上有没有,
- * 不判断一个值是不是属于回答说的那个东西(那是核查模型的事,见 verifier 提示词)。回答正文(「依据:」之前)里:
- * - 引号里的原文(「…」『…』“…”"…"‘…’,题目里本来就有的除外)要在某一处材料里找到;
- *   引号里用一个字母代替回答自己写过的数(「今日 +N」指正文里的「今日 +2,271」),是在说回答自己的写法,不是屏上的字;
- * - 带单位、货币、百分号或数量级(万/亿/千)的数,小数,三位以上的整数,夹在字母里的编号,要按整个词在某处材料里找到;
- * - 日期和时刻(10月23日、2026-10-23、14:05)同样要找到。
- * 「依据:」里只核引文:每段引文都要在某一处材料里找到(引文里的 … 把它分成几段,各段都要在同一处);
- * 依据里其余的字(来源、网址、读取时间、叙述里的计数)不是要核对的事实,对上了可以帮着定位,对不上也不否决。
- * 两位以内、不带单位的整数无论在哪都不要求。题目里的数和原文视为已知。
- * 另外两种来源也算已知,各自只证它证得了的:题目或证据里写了「明天」「周二」,按运行时钟换算出的那一天;
- * 回答里写明的算式(a 运算符 b = c,a、b 都在证据里对上)的结果,和明说是约数(约、≈)的取整。
- * 比对前两边统一写法:全角半角(NFKC)、零宽字符、引用编号与脚注、千分位、万/亿折算、标点与空白;两边都按行比,
- * 回答的一行不和下一行拼起来(行首的列表编号按行去掉),材料不拼成一整串;「当前 App:」这一行不算屏上文字。
- * 引用编号的边界用显式的前后断言,不用 \b:Java 的 \b 把汉字当作单词字符,「@e46显示」里的 46 会被当成回答里的数。
+ * Code backstop: after the verifier judges pass, re-check the textual evidence with a model-independent rule. The code only
+ * checks what it can check accurately — whether something appears literally — and does not judge whether a value belongs to
+ * the thing the answer names (that is the verifier model's job, see the verifier prompt). In the answer body (before the
+ * "basis:" section):
+ * - Quoted text (「…」『…』“…”"…"‘…’, except text already present in the goal) must be found somewhere in the material;
+ *   a letter inside quotes standing for a number the answer itself wrote ("today +N" meaning "today +2,271" in the body) is
+ *   describing the answer's own wording, not on-screen text;
+ * - Numbers with a unit, currency, percent sign or magnitude word (ten-thousand / hundred-million / thousand), decimals,
+ *   integers of three or more digits, and ids embedded in letters must be found as whole words somewhere in the material;
+ * - Dates and times (October 23, 2026-10-23, 14:05) must likewise be found.
+ * In the "basis:" section only quotations are checked: every quotation must be found somewhere in the material (a … inside
+ * it splits it into pieces, and every piece must be in the same place); the rest of the basis (source, URL, read time,
+ * counts in the narrative) is not a fact to verify — matching it can help locate, but not matching it does not veto.
+ * Integers of up to two digits without a unit are never required anywhere. Numbers and quoted text from the goal are taken as
+ * known.
+ * Two other sources also count as known, each proving only what it can: the day computed from the runtime clock when the goal
+ * or the evidence says "tomorrow" or "Tuesday"; and the result of an arithmetic expression written in the answer (a operator
+ * b = c, with a and b both matched in the evidence), plus rounding explicitly marked as approximate (about, ≈).
+ * Before comparing, both sides are normalized: full-width/half-width (NFKC), zero-width characters, citation markers and
+ * footnotes, thousands separators, ten-thousand/hundred-million scaling, punctuation and whitespace; both sides are compared
+ * line by line, so one answer line is not joined with the next (leading list numbers are stripped per line) and the material
+ * is not joined into one long string; the "current app:" line does not count as on-screen text.
+ * Citation boundaries use explicit lookarounds rather than \b: Java's \b treats Chinese characters as word characters, so the
+ * 46 in "@e46" followed directly by Chinese text would be taken as a number in the answer.
  */
 internal object Grounding {
     private val QUOTED = Regex("「([^」]*)」|『([^』]*)』|“([^”]*)”|\"([^\"]*)\"|‘([^’]*)’")
     private val EVIDENCE = Regex("依据\\**\\s*[:：]")
     /**
-     * 数后面的亿/万/千是数量级(中间只能隔空白,App 常排成「1561 万热度」;隔了标点就不是);
-     * 「千米」「千克」「千瓦」里的千是单位的一部分,不是数量级。行首、引文开头的序号(「5 千与千寻」)先按 [ORDINAL] 去掉。
+     * A magnitude word after a number (hundred-million / ten-thousand / thousand) is a magnitude (only whitespace may come
+     * between — apps often lay it out as "1561" plus the magnitude word; with punctuation in between it is not one); the
+     * thousand in kilometer / kilogram / kilowatt is part of the unit, not a magnitude. Ordinals at the start of a line or of
+     * a quotation ("5" then a title) are stripped by [ORDINAL] first.
      */
     private val NUMBER = Regex("(?<!\\d)(?<!\\d[.,])\\d+(?:[.,]\\d+)*(?!\\d)([ \\t]*(?:[亿万]|千(?![米克瓦卡帕焦])))?")
     private val THOUSANDS = Regex("^\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?$")
     private val DIGITS = Regex("\\d+")
-    /** 紧跟在数后面、说明它是个量的字(序号后面不会是它们):单位、数量级、量词。 */
+    /** Characters right after a number that show it is a quantity (they never follow an ordinal): units, magnitudes, classifiers. */
     private const val UNIT_WORDS = "公里|千米|米|厘米|毫米|公斤|千克|斤|克|吨|元|块|角|小时|分钟|秒|岁|度|分|人|次|个|条|件|万|亿|千[米克瓦卡帕焦]|[A-Za-z%℃°]"
 
-    /** 序号不是要核对的数:第N条/步/名…、前N个/条…、Top N、No.N、#N、行首的列表编号(1. 2、 3))。「第2026届」是值,不算。 */
+    /** Ordinals are not numbers to verify: the Nth item/step/rank…, the first N items…, Top N, No.N, #N, list numbers at the start of a line (1. 2、 3)). "the 2026th edition" is a value, not an ordinal. */
     private val ORDINAL = Regex(
         "第[ \\t]*\\d+[ \\t]*(?=[条个集页项张篇步名位行章节轮次题])|前[ \\t]*\\d+[ \\t]*(?=[个条名位项篇张])|(?i:top)[ \\t]*\\d+|(?i:no)\\.[ \\t]*\\d+|#\\d+" +
             "|(?m)^[ \\t]*\\d+[ \\t]*[.、)）](?!\\d)" +
-            // 行首或引文开头的序号后面隔个空格就是名字(「5 千与千寻…」):不是值
+            // An ordinal at the start of a line or quotation followed by a space is a name ("5" then a title): not a value
             "|(?m)(?:^|(?<=[「『“\"‘]))[ \\t]*\\d{1,3}[ \\t]*[.、](?!\\d)|(?m)(?:^|(?<=[「『“\"‘]))[ \\t]*\\d{1,3}[ \\t]+(?=\\p{L})(?!$UNIT_WORDS)",
     )
-    /** 日期和时刻;用 . 分隔的只认年.月.日三段,免得把 1561.5 当成日期。 */
+    /** Dates and times; the dot-separated form only accepts three parts (year.month.day), so that 1561.5 is not mistaken for a date. */
     private val DATE = Regex(
         "(?<!\\d)(?:\\d{4}\\s*[-/年]\\s*\\d{1,2}(?:\\s*[-/月]\\s*\\d{1,2}\\s*[日号]?)?|\\d{4}\\.\\d{1,2}\\.\\d{1,2}" +
             "|\\d{1,2}\\s*月\\s*\\d{1,2}\\s*[日号]?|\\d{1,2}\\s*:\\s*\\d{2}(?:\\s*:\\s*\\d{2})?)(?!\\d)",
     )
-    /** 紧跟在数后面、说明它是个量值的单位(计数用的量词「条」「个」不算:那是回答自己数出来的)。 */
+    /** Units right after a number that show it is a quantity value (counting classifiers such as "items" or "pcs" do not count: those were counted by the answer itself). */
     private val UNIT_AFTER = Regex(
         "^\\s*(?:%|‰|元|块|角|美元|欧元|日元|港元|英镑|℃|°|度|公里|千米|米|厘米|毫米|公斤|千克|斤|克|吨|小时|分钟|秒|毫秒|岁|英寸|寸|折|星" +
             "|(?:km|cm|mm|kg|mAh|GB|MB|KB|TB|Hz|ms|[kKwWmgGM])(?![A-Za-z]))",
     )
     private val CURRENCY_BEFORE = Regex("[¥$€£]\\s*$")
     private val ZERO_WIDTH = Regex("[\\u200B\\u200C\\u200D\\uFEFF\\u2060]")
-    /** 回答里的强调与代码标记(**粗**、__粗__、~~删~~、`码`)只是排版,不是内容;单个 * 可能是乘号,不动。 */
+    /** Emphasis and code markers in the answer (**bold**, __bold__, ~~strike~~, `code`) are only formatting, not content; a single * may be a multiplication sign and is left alone. */
     private val MARKUP = Regex("\\*\\*|__|~~|`")
     private val FRAGMENT_BREAK = Regex("[^\\p{L}]+")
     private val PIECE_BREAK = Regex("[^\\p{L}\\p{N}]+")
     /**
-     * 不同模型引用的写法:元素编号(@e16、@v2,可能套在括号里)、方括号脚注([1]、[^2]、【3】)。
-     * 不是回答的内容,比对前去掉。边界用前后断言:后面紧跟汉字(@e46显示)也要认出来。
+     * Citation forms used by different models: element refs (@e16, @v2, possibly wrapped in brackets) and bracketed
+     * footnotes ([1], [^2], 【3】). They are not answer content and are stripped before comparing. Boundaries use
+     * lookarounds: a ref immediately followed by Chinese characters must still be recognized.
      */
     private val REF_CITATION = Regex(
         "[(\\[【]\\s*@[ev]\\d+(?:\\s*[,、]\\s*@[ev]\\d+)*\\s*[)\\]】]|(?<![A-Za-z0-9_])@[ev]\\d+(?!\\d)",
@@ -62,13 +75,13 @@ internal object Grounding {
     private val FOOTNOTE = Regex("\\[\\^?\\d{1,3}]|【\\d{1,3}】")
     private val MAGNITUDE = mapOf("亿" to 8, "万" to 4, "千" to 3)
     const val APP_HEADER = "当前 App:"
-    /** 依据里的文字片段太短会碰巧和任何屏幕都对得上(「屏上」「设置」),不算。 */
+    /** Text fragments in the basis that are too short would coincidentally match any screen ("on screen", "settings"), so they do not count. */
     private const val MIN_FRAGMENT = 4
-    /** 屏上的一行出现在依据里时,这一行至少要有几个字。 */
+    /** For an on-screen line to count as appearing in the basis, the line needs at least this many characters. */
     private const val MIN_LINE_IN_BASIS = 2
 
     private data class Num(val value: String, val magnitude: String) {
-        /** 带单位折算后的值(5.3万 与 53000 相同);算不出为 null。 */
+        /** The value after applying the magnitude (5.3 ten-thousand equals 53000); null when it cannot be computed. */
         val scaled: String? = value.toBigDecimalOrNull()?.let { v ->
             (MAGNITUDE[magnitude]?.let { v.movePointRight(it) } ?: v).stripTrailingZeros().toPlainString()
         }
@@ -76,34 +89,38 @@ internal object Grounding {
             (scaled != null && scaled == screen.scaled)
     }
 
-    /** [Token]:夹在英文字母里的编号(G7541、a3f899c),整个按一个词比,不按数比。[Quote] 含依据里的引文。 */
+    /** [Token]: an id embedded in English letters (G7541, a3f899c), compared as a whole word rather than as a number. [Quote] covers quotations in the basis. */
     enum class Kind { Quote, Number, Date, Token }
 
-    /** 回答里的一条具体事实。数和日期是能写成文字的值;不带数字的引文才可能只在画面上(如单选框选中的状态)。 */
+    /** One concrete fact in the answer. Numbers and dates are values that can be written as text; only quotations without digits can exist only on screen (such as a radio button's selected state). */
     data class Claim(val kind: Kind, val text: String) {
         val visualOnly: Boolean get() = kind == Kind.Quote && text.none(Char::isDigit)
     }
 
     /**
-     * 兜底的结果。[unmatched] 是在哪个证据来源里都找不到的事实;[anchored] 表示至少有一条事实或依据里的一处对上了。
-     * [found]:对得上 true,对不上 false,回答里没有可核对的东西(或只有数对上、没有引文或依据定位)null。
-     * [items] 是回答里有据可查的条目数(评测的 answer_grounded 用,见 [check])。
+     * The backstop result. [unmatched] are the facts found in no evidence source; [anchored] means at least one fact or one
+     * place in the basis matched.
+     * [found]: true when it matches, false when it does not, null when the answer has nothing checkable (or only numbers
+     * matched with no quotation or basis location).
+     * [items] is the number of verifiable items in the answer (used by the evaluation's answer_grounded, see [check]).
      */
     class Result(
         val found: Boolean?, val claims: List<Claim>, val unmatched: List<Claim>, val anchored: Boolean, val located: Boolean = false, val items: Int = 0,
     )
 
-    /** NFKC 之后 … 已是 ...。 */
+    /** After NFKC, … is already ... . */
     private const val CUT = "..."
-    /** 回答里紧挨着 ... 的那段字(至少几个字才拿去比)。 */
+    /** The text right before ... in the answer (compared once it has at least a few characters). */
     private val BEFORE_CUT = Regex("([^\\n.「」『』“”\"]{2,20})\\.\\.\\.")
 
     private fun isCut(line: String) = line.trimEnd().endsWith(CUT)
 
     /**
-     * 回答是不是建立在被截断的文字上:回答里紧挨着 ... 的那段字、引号里的原文(去掉首尾的 ...),在屏上只出现在被截断的行里,
-     * 而且一直连到截断处。截断的文字只是值的一部分,不能当完整的值核实。
-     * 只看屏上的字是否被截断:回答自己用 ... 省略引文的后半句,而屏上那一行是完整的,不算截断。
+     * Whether the answer is built on truncated text: the text right before ... in the answer, or the quoted text (with a
+     * leading or trailing ... removed), appears on screen only in truncated lines and runs all the way to the truncation
+     * point. Truncated text is only part of a value and cannot be verified as the whole value.
+     * Only on-screen truncation counts: if the answer itself uses ... to omit the rest of a quotation while that on-screen
+     * line is complete, it does not count as truncated.
      */
     fun builtOnTruncated(answer: String, screens: List<String>): Boolean {
         val a = canon(answer)
@@ -114,7 +131,7 @@ internal object Grounding {
             val hits = raw.filter { p in norm(it) }
             return hits.isNotEmpty() && hits.all { l -> isCut(l) && norm(l.trimEnd().removeSuffix(CUT)).endsWith(p) }
         }
-        // 引文以 ... 开头(屏上那一行前半截被截掉):这段字只出现在以 ... 开头的行里
+        // The quotation starts with ... (the beginning of that on-screen line was cut off): this text only appears in lines starting with ...
         fun onlyOnHeadCutLines(piece: String): Boolean {
             val p = norm(piece)
             if (p.length < 2) return false
@@ -125,7 +142,7 @@ internal object Grounding {
         if (quoted.any { q -> q.endsWith(CUT) && onlyOnCutLines(q.removeSuffix(CUT)) }) return true
         if (quoted.any { q -> q.startsWith(CUT) && onlyOnHeadCutLines(q.removePrefix(CUT).removeSuffix(CUT)) }) return true
         if (quoted.any(::onlyOnCutLines)) return true
-        // 紧挨着 ... 的字前面可能连着回答自己的话(「要求 Kotlin + Jetpack...」):取在屏上出现过的最长的那段尾巴来比
+        // The text right before ... may be preceded by the answer's own words ("requires Kotlin + Jetpack..."): take the longest tail that appears on screen for comparison
         return BEFORE_CUT.findAll(a).any { m ->
             val cap = m.groupValues[1]
             val tail = cap.indices.map { cap.substring(it) }.firstOrNull { t -> norm(t).length >= 2 && raw.any { norm(t) in norm(it) } }
@@ -133,16 +150,16 @@ internal object Grounding {
         }
     }
 
-    /** 去掉引用编号与脚注(不是回答的内容)。 */
+    /** Strip citation markers and footnotes (they are not answer content). */
     fun stripRefs(s: String): String = s.replace(REF_CITATION, " ").replace(FOOTNOTE, " ")
 
-    /** 两边比对前统一写法:全角半角(NFKC)、零宽字符、排版标记、引用编号与脚注。 */
+    /** Normalize both sides before comparing: full-width/half-width (NFKC), zero-width characters, formatting markers, citation markers and footnotes. */
     private fun canon(s: String): String =
         stripRefs(java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKC).replace(ZERO_WIDTH, "").replace(MARKUP, ""))
 
     private fun norm(s: String) = s.filter { it.isLetterOrDigit() }
 
-    // 空引号(JSON 里的 ""、「」)没有可核对的原文:跳过,不能让整个任务因此异常中断
+    // Empty quotes ("" in JSON, 「」) have no text to verify: skip them, and never let the whole task crash over it
     private fun quotes(s: String) = QUOTED.findAll(s).mapNotNull { m -> m.groupValues.drop(1).firstOrNull { it.isNotEmpty() } }.toList()
 
     private fun num(m: MatchResult): Num {
@@ -153,8 +170,9 @@ internal object Grounding {
     private fun numbers(s: String): List<Num> = NUMBER.findAll(s).map(::num).toList()
 
     /**
-     * [s] 里算作事实的数:带数量级、单位或货币符号的,小数,三位以上的整数。
-     * 两位以内不带单位的整数是计数、序号、排名,不算。
+     * Numbers in [s] that count as facts: ones with a magnitude, unit or currency symbol, decimals, and integers of three or
+     * more digits.
+     * Integers of up to two digits without a unit are counts, ordinals or rankings and do not count.
      */
     private fun valueNumbers(s: String, known: Set<String>): List<Num> = NUMBER.findAll(s).mapNotNull { m ->
         val n = num(m)
@@ -172,9 +190,10 @@ internal object Grounding {
     private fun Char.isAsciiAlnum() = isAsciiLetter() || this in '0'..'9'
 
     /**
-     * 屏上 [s] 里 [start] 到 [end](不含)这个数是不是完整的一个词:前一个字不能是英文字母或数字;后面紧跟英文字母时,
-     * 只能是一串字母就结束(单位,如 128GB),不能再接数字。哈希、网址里的编号、a3f899c 这类 id 里的数字不算屏上的数。
-     * 数里面的小数点、千分位不影响。
+     * Whether the number in on-screen [s] from [start] to [end] (exclusive) is a complete word: the preceding character must
+     * not be an English letter or digit; when English letters follow, they may only be a run of letters ending there (a unit,
+     * such as 128GB) and no digits may follow. Digits inside hashes, ids in URLs, or ids like a3f899c do not count as
+     * on-screen numbers. Decimal points and thousands separators inside the number do not matter.
      */
     private fun wholeToken(s: String, start: Int, end: Int): Boolean {
         if (s.getOrNull(start - 1)?.isAsciiAlnum() == true) return false
@@ -184,7 +203,8 @@ internal object Grounding {
     }
 
     /**
-     * [text] 里哪几行(按 [text] 的行号)对上了回答里的事实:给核查模型看节选时,这些行一定留下([EvidenceLedger.excerpt])。不是核对规则。
+     * Which lines of [text] (by [text]'s line numbers) match facts in the answer: when showing excerpts to the verifier
+     * model, these lines are always kept ([EvidenceLedger.excerpt]). Not a verification rule.
      */
     fun hitLines(goal: String, answer: String, text: String, today: java.time.LocalDate? = null): Set<Int> {
         val r = check(goal, answer, listOf(text), today)
@@ -208,13 +228,13 @@ internal object Grounding {
         }.toSet()
     }
 
-    /** 屏上一行里完整的数(见 [wholeToken])。 */
+    /** The complete numbers in one on-screen line (see [wholeToken]). */
     private fun screenNumbers(s: String): List<Num> = NUMBER.findAll(s).mapNotNull { m ->
         val n = num(m)
         n.takeIf { wholeToken(s, m.range.first, m.range.first + m.value.length - m.groupValues[1].length) }
     }.toList()
 
-    /** 屏上一行里完整的数字串(对日期用)。 */
+    /** The complete digit strings in one on-screen line (used for dates). */
     private fun screenComponents(s: String) = DIGITS.findAll(s).filter { wholeToken(s, it.range.first, it.range.last + 1) }
         .map { it.value.trimStart('0').ifEmpty { "0" } }.toList()
 
@@ -222,12 +242,13 @@ internal object Grounding {
 
     private val ALNUM_RUN = Regex("[A-Za-z0-9]+")
 
-    /** 一行里的英文字母数字串(比编号用,不分大小写)。 */
+    /** Alphanumeric runs in a line (used to compare ids, case-insensitive). */
     private fun alnumRuns(s: String) = ALNUM_RUN.findAll(s).map { it.value.lowercase() }.toSet()
 
     /**
-     * [s] 里夹在英文字母里的编号(数不是完整的词,见 [wholeToken]),和把它们换成等长空白后的文字:
-     * 编号整个当一个值核对,里面的数字不再当数。
+     * The ids in [s] embedded in English letters (numbers that are not complete words, see [wholeToken]), and the text with
+     * them replaced by blanks of the same length: each id is verified as one whole value and the digits inside it no longer
+     * count as numbers.
      */
     private fun idTokens(s: String): Pair<List<String>, String> {
         val ids = NUMBER.findAll(s).filterNot { m -> wholeToken(s, m.range.first, m.range.first + m.value.length - m.groupValues[1].length) }
@@ -246,22 +267,22 @@ internal object Grounding {
     private fun lines(screens: List<String>) = screens.flatMap { canon(it).lines() }
         .filter { it.isNotBlank() && !it.startsWith(APP_HEADER) }.map { Line(norm(it), screenNumbers(it), screenComponents(it), alnumRuns(it)) }
 
-    /** 引文(可能跨几行)里至少有一行能在屏上的某一行里找到。 */
+    /** At least one line of the quotation (which may span several lines) can be found in one of the on-screen lines. */
     fun quoteInReads(quote: String, screens: List<String>): Boolean {
         val ls = lines(screens)
         return canon(quote).lines().map(::norm).filter { it.length >= 2 }.any { q -> ls.any { q in it.text } }
     }
 
-    /** 对得上返回 true,对不上返回 false;回答里没有可核对的东西时返回 null。 */
+    /** true when it matches, false when it does not; null when the answer has nothing checkable. */
     fun found(goal: String, answer: String, screens: List<String>): Boolean? = check(goal, answer, screens).found
 
-    /** 相对的日子:今天、明天、后天、昨天,周X / 星期X。 */
+    /** Relative days: today, tomorrow, the day after tomorrow, yesterday, and weekday names (zhou-X / xingqi-X). */
     private val RELATIVE_DAY = Regex("今天|今日|明天|明日|后天|昨天|昨日|(?:周|星期|礼拜)([一二三四五六日天])")
     private val WEEKDAY_CHARS = "一二三四五六日"
-    /** 周X 换算成具体日期时看的范围:昨天到一周后。 */
+    /** The range scanned when converting a weekday name to a concrete date: from yesterday to a week ahead. */
     private const val WEEK_AHEAD = 7L
 
-    /** [word] 按 [today] 换算出的日期(周X 在昨天到一周后之间可能有两个)。 */
+    /** The dates [word] resolves to relative to [today] (a weekday name can have two between yesterday and a week ahead). */
     private fun resolve(word: MatchResult, today: java.time.LocalDate): List<java.time.LocalDate> = when (word.value) {
         "今天", "今日" -> listOf(today)
         "明天", "明日" -> listOf(today.plusDays(1))
@@ -274,7 +295,7 @@ internal object Grounding {
         }
     }
 
-    /** 日期写法里的年、月、日;只有年月、或是时刻时为 null。 */
+    /** The year, month and day in a date form; null for a year-month only form or for a time. */
     private fun dateParts(d: String): Triple<Int?, Int, Int>? {
         if (':' in d) return null
         val c = DIGITS.findAll(d).map { it.value.toInt() }.toList()
@@ -286,9 +307,10 @@ internal object Grounding {
     }
 
     /**
-     * 运行时钟能作证的日期:题目或证据里的某一行写了「明天」「周二」这类说法,按 [today] 换算出的那一天,
-     * 回答正文(引文和「依据:」以外)写成具体日期时由时钟作证。只出现在回答里的相对说法什么也不证;时刻、引文里的日期、
-     * 依据里的日期(回答说是从页面读到的)都不由时钟作证。
+     * Dates the runtime clock can vouch for: when the goal or one of the evidence lines says "tomorrow" or "Tuesday", the day
+     * it resolves to from [today] vouches for that date when the answer body (outside quotations and the "basis:" section)
+     * writes it out concretely. A relative expression appearing only in the answer proves nothing; times of day, dates inside
+     * quotations, and dates in the basis (which the answer claims were read from the page) are not vouched for by the clock.
      */
     private fun clockDates(body: String, basis: String, said: List<String>, today: java.time.LocalDate?): Set<String> {
         today ?: return emptySet()
@@ -305,21 +327,22 @@ internal object Grounding {
     }
 
     private const val NUM_TOKEN = "(\\d+(?:,\\d{3})*(?:\\.\\d+)?)"
-    /** 一个操作数:可带货币符号、紧跟的单位(字母、℃、°、%),和括号里写的出处(「399(商品页)」)。 */
+    /** One operand: an optional currency symbol, an immediately following unit (letter, ℃, °, %), and a source noted in parentheses ("399 (product page)"). */
     private const val OPERAND = "([¥$€£]?)\\s*$NUM_TOKEN\\s*([\\p{L}℃°%]{0,4})\\s*(?:[(（][^()（）\\n]{1,20}[)）])?\\s*"
     /**
-     * 回答里写明的一步运算:a 运算符 b = c(或 ≈ c,= 约 c);运算符是 + - − × * ÷ /。c 后面带 % 时,÷ 和 / 的结果按百分数比。
+     * A one-step calculation written out in the answer: a operator b = c (or ≈ c, = about c); the operators are + - − × * ÷ /.
+     * When c carries a trailing %, the results of ÷ and / are compared as percentages.
      */
     private val EXPRESSION = Regex(
         OPERAND + "([+\\-−×*÷/])\\s*" + OPERAND + "(=|≈)\\s*(约|≈)?\\s*([¥$€£]?)\\s*$NUM_TOKEN(\\s*%)?\\s*([\\p{L}℃°]{0,4})",
     )
 
-    /** 一个标准单位:量纲和换算到基本单位的倍数。 */
+    /** A standard unit: its dimension and the factor for converting to the base unit. */
     private class Unit(val dimension: String, val factor: java.math.BigDecimal)
 
     /**
-     * 标准单位的同义写法和换算(封闭的一张表,不做别的猜测):公里/千米/km,米/m,元/块/¥/RMB/人民币,克/g,千克/公斤/kg,
-     * 小时/h,分钟/min,%/百分之。最长的写法先认。
+     * Synonyms and conversions for standard units (a closed table, with no other guessing): kilometer/km, meter/m,
+     * yuan/quai/¥/RMB/renminbi, gram/g, kilogram/kg, hour/h, minute/min, %/percent. The longest spelling is recognized first.
      */
     private val UNITS: List<Pair<String, Unit>> = listOf(
         "公里" to Unit("length", java.math.BigDecimal(1000)), "千米" to Unit("length", java.math.BigDecimal(1000)), "km" to Unit("length", java.math.BigDecimal(1000)),
@@ -333,19 +356,21 @@ internal object Grounding {
         "百分之" to Unit("percent", java.math.BigDecimal.ONE), "%" to Unit("percent", java.math.BigDecimal.ONE),
     ).sortedByDescending { it.first.length }
 
-    /** 货币符号和数后面的字里认出的标准单位;认不出为 null(按没写单位算)。 */
+    /** The standard unit recognized from the currency symbol and the characters after the number; null when none is recognized (treated as no unit written). */
     private fun unitOf(before: String, after: String): Unit? =
         UNITS.firstOrNull { (k, _) -> before == k }?.second ?: UNITS.firstOrNull { (k, _) -> after.startsWith(k, ignoreCase = k.all { it.isAsciiLetter() }) && !after.drop(k.length).take(1).any { it.isAsciiLetter() } }?.second
 
-    /** 算式里操作数的单位:表里有的按标准单位;写了表里没有的(美元符号、英里……)各算一种量纲,只和自己同类。 */
+    /** The unit of an operand in a calculation: units in the table use the standard unit; anything not in the table (dollar sign, mile, …) becomes its own dimension and only matches itself. */
     private fun operandUnit(before: String, after: String): Unit? =
         unitOf(before, after) ?: (before + after.trim()).takeIf { it.isNotBlank() }?.let { Unit("other:" + it.lowercase(), java.math.BigDecimal.ONE) }
-    /** 紧挨在数前面、明说是约数的记号。 */
+    /** A marker right before a number that explicitly says it is approximate. */
     private val APPROX_BEFORE = Regex("(?:约|≈)\\s*[¥$€£]?\\s*$")
 
     /**
-     * [x] 是 [d] 取整的结果:不是约数时只认按 [x] 写出的最后一位取整(整数要相等,小数按小数位);
-     * 明说是约数(约、≈)时末尾的 0 也算精度(900 取到百位),且相对误差不超过 [MAX_ROUND_ERROR]。
+     * [x] is a rounded form of [d]: when it is not marked approximate, only rounding at the last place written in [x] is
+     * accepted (integers must be equal, decimals are judged at their decimal place); when it is explicitly approximate
+     * (about, ≈), trailing zeros count as precision too (900 rounds to the hundreds) and the relative error must not exceed
+     * [MAX_ROUND_ERROR].
      */
     private fun roundsTo(x: java.math.BigDecimal, d: java.math.BigDecimal, approx: Boolean): Boolean {
         val diff = (x - d).abs()
@@ -367,8 +392,9 @@ internal object Grounding {
     private fun plainValue(s: String) = s.replace(",", "").toBigDecimalOrNull()
 
     /**
-     * 回答里写明了算式、两个操作数都在证据里对上的结果(「6363−5464=899」):返回结果的写法(和回答里的数的写法一致)。
-     * [grounded] 判断一个数在证据里对得上(不含题目里的数)。
+     * Results of calculations written out in the answer whose two operands both match the evidence ("6363−5464=899"):
+     * returns the written form of the result (the same way the number is written in the answer).
+     * [grounded] tells whether a number matches the evidence (excluding numbers from the goal).
      */
     private fun computed(body: String, grounded: (String) -> Boolean): Set<String> = body.lines().flatMap { EXPRESSION.findAll(it).toList() }.mapNotNull { m ->
         val g = m.groupValues
@@ -381,7 +407,7 @@ internal object Grounding {
         var b = plainValue(bRaw) ?: return@mapNotNull null
         var c = plainValue(cRaw) ?: return@mapNotNull null
         val mc = java.math.MathContext.DECIMAL64
-        // 加减要同一个量纲:写了单位的按标准单位换算(公里和千米是一回事,公里和米差 1000 倍);量纲不同的算式不算数
+        // Addition and subtraction need the same dimension: written units are converted by the standard table (kilometer and km are the same, kilometer and meter differ by a factor of 1000); a calculation mixing dimensions does not count
         if (op in setOf("+", "-", "−")) {
             val ua = operandUnit(aCur, aUnit)
             val ub = operandUnit(bCur, bUnit)
@@ -405,11 +431,13 @@ internal object Grounding {
         cRaw.replace(",", "").takeIf { roundsTo(c, result, approx) }
     }.toSet()
 
-    /** 引文里代替数的一个字母(「今日 +N」的 N)。 */
+    /** A single letter in a quotation standing in for a number (the N in "today +N"). */
     private val PLACEHOLDER = Regex("(?<![A-Za-z])[A-Za-z](?![A-Za-z])")
 
     /**
-     * 引文 [q] 是在说回答自己的写法:里面有代替数的字母,把字母换成数后,正好是回答正文(引号以外)里写过的一段(「今日 +N」对「今日 +2,271」)。
+     * The quotation [q] is describing the answer's own wording: it contains a letter standing in for a number, and with the
+     * letter replaced by a number it is exactly a passage written in the answer body (outside quotes) ("today +N" matching
+     * "today +2,271").
      */
     private fun template(q: String, plain: String): Boolean {
         if (!PLACEHOLDER.containsMatchIn(q)) return false
@@ -420,11 +448,11 @@ internal object Grounding {
     }
 
     private val EMPHASIS = Regex("\\*\\*|__|`")
-    /** 行首的列表记号(1. 2、 3) ① - * •)。 */
+    /** List markers at the start of a line (1. 2、 3) ① - * •). */
     private val LIST_MARK = Regex("^[ \\t]*(?:\\(?\\d{1,3}[.、)）:：]|（\\d{1,3}）|[①-⑳]|[-*•·])[ \\t]*")
-    /** 列表里「标签:值」的值。 */
+    /** The value in a "label: value" list entry. */
     private val LABEL_VALUE = Regex("^[^:：]{1,12}[:：]\\s*(.+)$")
-    /** 一个条目至少要有几个字(单字、标点哪屏都有,不能拿来凑数)。 */
+    /** Minimum characters per item (single characters and punctuation are on every screen and must not be used to pad the count). */
     private const val MIN_ITEM = 2
 
     fun check(goal: String, answer: String, screens: List<String>, today: java.time.LocalDate? = null): Result {
@@ -433,7 +461,7 @@ internal object Grounding {
         val ls = entries.flatten()
         val g = canon(goal)
         val goalNums = numbers(g).map { it.value }.toSet()
-        // 题目里的数按值比(1000.0 和 1000 是同一个数)
+        // Numbers from the goal are compared by value (1000.0 and 1000 are the same number)
         val goalValues = numbers(g).mapNotNull { it.scaled }.toSet()
         val goalText = norm(g)
         val at = EVIDENCE.find(a)
@@ -441,16 +469,16 @@ internal object Grounding {
         val body = at?.let { a.substring(0, it.range.first) } ?: a
 
         fun numOnScreen(n: Num) = ls.any { l -> l.nums.any(n::matches) }
-        /** [q] 在 [where] 这些行里:整段在某一行,或按标点空白分开的每段各在某一行(其中的数按整个数比)。 */
+        /** [q] is in these [where] lines: either the whole text in one line, or every piece split on punctuation and whitespace in some line (numbers in it are compared as whole numbers). */
         fun textIn(q: String, where: List<Line>): Boolean {
             val t = norm(q)
             if (t.isEmpty() || where.any { t in it.text }) return true
             val pieces = q.split(PIECE_BREAK).map(::norm).filter(String::isNotEmpty)
-            // 行首的序号(「5 千与千寻」)、夹在字母里的数字(AQ3A)不是数,不拿去比
+            // A leading ordinal ("5" then a title) and digits embedded in letters (AQ3A) are not numbers and are not compared
             return pieces.size > 1 && pieces.all { p -> where.any { p in it.text } } &&
                 screenNumbers(ORDINAL.replace(q.trim(), " ")).all { n -> where.any { l -> l.nums.any(n::matches) } }
         }
-        /** 引文在某一处材料里:被 ... 分开的几段各自对得上,而且在同一处。 */
+        /** The quotation is somewhere in the material: the pieces split by ... each match, and all in the same place. */
         fun quoteFound(q: String): Boolean {
             val parts = q.split(CUT).filter { norm(it).isNotEmpty() }.ifEmpty { listOf(q) }
             return entries.any { e -> parts.all { textIn(it, e) } }
@@ -461,7 +489,7 @@ internal object Grounding {
             return variants.any { v -> ls.any { l -> l.digits.windowed(v.size).any { it == v } } }
         }
 
-        // 一行一行地取值:回答的一行不和下一行拼起来,行首的列表编号按行去掉
+        // Collect values line by line: one answer line is not joined with the next, and leading list numbers are stripped per line
         fun values(line: String): List<Claim> {
             val dates = DATE.findAll(line).map { it.value }.filter { d -> components(d).any { it !in goalNums } }.toList()
             val (ids, plain) = idTokens(ORDINAL.replace(DATE.replace(line, " "), " "))
@@ -475,7 +503,7 @@ internal object Grounding {
         val lineClaims = bodyLines.map(::values)
         val claims = (bodyQuotes.map { Claim(Kind.Quote, it) } + lineClaims.flatten() + basisQuotes.map { Claim(Kind.Quote, it) }).distinct()
 
-        // 证据里写了「明天」「周二」的地方:题目、证据里的每一行
+        // Places where the evidence says "tomorrow" or "Tuesday": the goal and every evidence line
         val byClock = clockDates(body, basis, listOf(g) + ls.map { it.text }, today)
         fun matched(c: Claim) = when (c.kind) {
             Kind.Quote -> quoteFound(c.text)
@@ -483,11 +511,11 @@ internal object Grounding {
             Kind.Date -> dateOnScreen(c.text) || c.text in byClock
             Kind.Token -> ls.any { c.text.lowercase() in it.tokens }
         }
-        // 证据里对得上的数(题目里的数不算:题目给的数算出来的结果仍要在屏上读到)
+        // Numbers that match the evidence (numbers from the goal do not count: a result computed from the goal's numbers must still be read on screen)
         fun grounded(n: Num) = (n.scaled == null || n.scaled !in goalValues) && numOnScreen(n)
         fun groundedRaw(raw: String) = numbers(raw).firstOrNull()?.let(::grounded) == true
         val known = a.lines().flatMap { numbers(ORDINAL.replace(DATE.replace(it, " "), " ")) }.filter(::grounded).mapNotNull { it.scaled?.toBigDecimalOrNull() }
-        // 写明算式的结果,和明说是约数(约、≈)、按写出的精度取整后等于某个对得上的数的数
+        // Results of written-out calculations, and numbers explicitly marked approximate (about, ≈) that equal a matched number after rounding at the written precision
         val derivedNums = computed(body, ::groundedRaw) + body.lines().flatMap { line ->
             NUMBER.findAll(line).mapNotNull { m ->
                 val n = num(m)
@@ -498,7 +526,7 @@ internal object Grounding {
         }
         val unmatched = claims.filterNot { matched(it) || (it.kind == Kind.Number && it.text in derivedNums) }
 
-        // 依据里引文以外的字只帮着定位(对上一处即可),对不上不否决
+        // Non-quotation text in the basis only helps locate (one match is enough); a mismatch does not veto
         val basisNorm = norm(basis)
         val fragments = QUOTED.replace(basis, " ").split(FRAGMENT_BREAK).map(::norm).filter { it.length >= MIN_FRAGMENT }
         val located = (basisQuotes.isNotEmpty() && basisQuotes.all(::quoteFound)) || fragments.any { f -> ls.any { f in it.text } } ||
@@ -508,12 +536,12 @@ internal object Grounding {
         val found = when {
             unmatched.isNotEmpty() -> false
             quoteMatched || located -> true
-            // 没有引文、依据也没定位到:只有数对上,数可能碰巧在屏上,单靠它们不算对上
+            // No quotation and the basis did not locate: only numbers matched, and numbers can coincide on screen, so on their own they do not count
             else -> null
         }
 
-        // 有据可查的条目:回答里有对上的事实的行(内容相同的行只算一次),和不带值的列表条目里整段在某一行里的;
-        // 取它和对上的不同事实数里大的那个
+        // Verifiable items: answer lines containing matched facts (identical lines counted once), and value-less list items
+        // whose whole text appears in some line; take the larger of that count and the number of distinct matched facts
         val okClaims = claims.filter { it !in unmatched }.toSet()
         val rows = mutableSetOf<String>()
         val bare = mutableSetOf<String>()

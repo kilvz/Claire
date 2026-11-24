@@ -3,13 +3,16 @@ package com.wangzan101.mika.core.screen.map
 import com.wangzan101.mika.core.run.record.RunEvent
 
 /**
- * merge gate 自检（design D7）：两道必须为 0 的关卡，作为 `screen-map` 的自检/测试用，不是运行指标。
- * 拦「合错」这一向（两个不同的页被当成一个、或屏归错了 App）；「拆」的方向不设门槛（D9）。
+ * merge gate self-check (design D7): two gates that must be zero, for `screen-map` self-checks/tests, not runtime metrics.
+ * They block the "merged wrong" direction (two different pages treated as one, or a screen attributed to the wrong app); the
+ * "split" direction has no threshold (D9).
  */
 object ScreenMapMergeGate {
     /**
-     * 两个标了不同语义名、却被 [ScreenRecognizer.identify] 认成同一屏的屏 → 合错的嫌疑。
-     * 返回 (被认错的屏 id, 被认成了谁) 的对；[labeled] 缺名（空/不标）时不判（本版屏不标名，天然为空）。
+     * Screens labeled with different semantic names that [ScreenRecognizer.identify] nonetheless recognizes as the same screen
+     * → suspected wrong merge.
+     * Returns pairs of (the misrecognized screen id, what it was recognized as); when [labeled] has no name (empty/not labeled)
+     * it is not judged (this version does not label screens, so it is naturally empty).
      */
     fun wrongMerge(nodes: List<ScreenNode>, labeled: Map<String, String>): List<Pair<String, String>> {
         val out = mutableListOf<Pair<String, String>>()
@@ -24,8 +27,10 @@ object ScreenMapMergeGate {
     }
 
     /**
-     * 事件里的屏被记到了错的 App 下：同一屏签名出现在两个不同的非空包名下（且两个包名都已有图）。
-     * 归 system / unknown（包名为 null）或没图的包名不算（D7「允许，只是不记」）。返回这些被归错 App 的屏签名。
+     * A screen in the events was recorded under the wrong app: the same screen signature appears under two different non-empty
+     * package names (and both packages already have a map).
+     * Attribution to system / unknown (null package name) or to a package with no map does not count (D7 "allowed, just not
+     * recorded"). Returns the screen signatures attributed to the wrong app.
      */
     fun wrongOwner(events: List<RunEvent>, graphs: Map<String, ScreenGraph>): List<String> {
         val owners = mutableMapOf<String, MutableSet<String>>()

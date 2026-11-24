@@ -4,12 +4,13 @@ import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** 一次动作把图带去了哪：换了屏 / 同屏变了状态 / 没变 / 跳去别的 App / 未知。 */
+/** Where one action took the map: changed screens / same screen with a state change / unchanged / jumped to another app / unknown. */
 enum class TransitionEffect { NAVIGATED, STATE_CHANGED, NONE, LEFT_APP, UNKNOWN }
 
 /**
- * 一条点击导航边：在某屏点 [action]（目标元素 [target]）→ 到 [to] 屏。
- * [count] 走通几次，[offTrack] 点完没到预期几次。同一条边靠 [key] 去重。
+ * One click navigation edge: tapping [action] on some screen (target element [target]) → arriving at screen [to].
+ * [count] is how many times it worked through, [offTrack] how many times it did not reach the expected screen. The same edge is
+ * deduplicated by [key].
  */
 @Serializable
 data class Transition(
@@ -20,13 +21,14 @@ data class Transition(
     val count: Int = 0,
     val offTrack: Int = 0,
 ) {
-    /** 去重键：同一 (动作, 目标, 效果, 到哪屏) 是一条边，次数/跑偏另计。 */
+    /** Dedup key: the same (action, target, effect, destination screen) is one edge; counts and off-tracks are tracked separately. */
     fun key(): String = "$action\u0000${target ?: ""}\u0000${effect.name}\u0000${to ?: ""}"
 }
 
 /**
- * 一个结构页（屏）。身份靠骨架锚点 [anchors] 自描述；名字/层级字段本版留空，供以后标。
- * [transitions] 键是 [Transition.key]，值是这条边。
+ * One structural page (a screen). Its identity is described by its skeleton anchors [anchors]; the name/level fields are left
+ * empty in this version, for labeling later.
+ * Keys of [transitions] are [Transition.key] and values are the edge.
  */
 @Serializable
 data class ScreenNode(
@@ -40,7 +42,7 @@ data class ScreenNode(
     val status: String = "provisional",
 )
 
-/** 确定性屏 id：同一 (app, 骨架签名) 永远同一个 id，可整体重建逐字节相同。 */
+/** Deterministic screen id: the same (app, skeleton signature) always gives the same id, so a full rebuild is byte-identical. */
 object ScreenId {
     fun of(app: String, signature: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")
@@ -48,7 +50,7 @@ object ScreenId {
         return bytes.take(8).joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
-    /** 骨架锚点签名：稳定骨架文字去重后排序拼接。建图与自检共用同一口径。 */
+    /** Skeleton anchor signature: stable skeleton texts deduplicated, sorted and joined. Map building and self-checks share the same definition. */
     fun signature(texts: List<String>): String = texts.distinct().sorted().joinToString("\u0000")
 }
 

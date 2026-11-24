@@ -3,10 +3,11 @@ package com.wangzan101.mika.core.screen.map
 import com.wangzan101.mika.core.run.record.RunEvent
 
 /**
- * 从运行记录确定性重建屏图（design D4）。原料是 `RunEvent.ActionTarget` 的 before/after 骨架锚点：
- * 每个动作前、后各 visit / 建屏，动作加一条转移边。屏身份 = 首次骨架锚点签名（`ScreenId.of(app, 签名)`），
- * 同签名再见到 = 同一屏（计数累加、provisional→confirmed）；不同签名 = 新屏（宁可分开不可合错）。
- * 重放顺序固定 → 同一批 events 跑两遍逐字节相同。
+ * Rebuild the screen map deterministically from the run log (design D4). The input is the before/after skeleton anchors of
+ * `RunEvent.ActionTarget`: each action visits or creates a screen before and after, and adds one transition edge. Screen
+ * identity = the skeleton anchor signature seen first (`ScreenId.of(app, signature)`); seeing the same signature again = the
+ * same screen (counts accumulate, provisional→confirmed); a different signature = a new screen (better split than merged
+ * wrong). The replay order is fixed → running the same batch of events twice yields byte-identical output.
  */
 class ScreenMapBuilder {
     fun apply(runId: String, events: List<RunEvent>): Map<String, ScreenGraph> {

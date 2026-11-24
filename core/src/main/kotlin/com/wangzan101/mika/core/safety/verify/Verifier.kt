@@ -23,24 +23,28 @@ import com.wangzan101.mika.core.screen.vision.ImageOps
 import com.wangzan101.mika.core.screen.vision.ModelImage
 
 /**
- * 核查时对照的标准:[items] 是做成之后应当看得到的事实;[kind] 为 read / irreversible(做过发送、提交、下单、删除、付款一类收不回的事)。
- * [fallback] 表示没有另列标准,[items] 只是用户原话本身(任务路径上一向如此,不另花一次模型调用去列)。
+ * The criteria the verification is checked against: [items] are the facts that should be visible once the task is done;
+ * [kind] is read / irreversible (something that cannot be taken back was done, such as sending, submitting, ordering,
+ * deleting or paying).
+ * [fallback] means no separate criteria were listed and [items] is just the user's own words (always the case on the task
+ * path, which does not spend an extra model call to list them).
  */
 data class Criteria(val items: List<String>, val kind: String, val fallback: Boolean) {
     companion object {
-        /** 任务路径用的标准:用户原话本身。 */
+        /** The criteria used on the task path: the user's own words. */
         fun of(goal: String, irreversible: Boolean) = Criteria(listOf(goal), if (irreversible) "irreversible" else "read", fallback = true)
     }
 }
 
 enum class Verdict(val wire: String) { Pass("pass"), Fail("fail"), CannotVerify("cannot_verify") }
 
-/** 一条标准的核对结果;[status] 为 met / unmet / unknown,[quote] 是支持它的屏幕原文。 */
+/** The check result for one criterion; [status] is met / unmet / unknown, and [quote] is the on-screen text supporting it. */
 data class CriterionCheck(val criterion: String, val status: String, val quote: String?)
 
 /**
- * [groundedBy] 为 "image":文字证据里找不到的只有画面上的状态(不带数字的引文),由看过截图的核查器判 pass;
- * 运行记录里与按文字核实的 pass 区分开。[notFound] 是兜底在任何证据来源里都没找到的回答事实。
+ * [groundedBy] is "image": what could not be found in the textual evidence was only on-screen state (quotations without
+ * digits), and the verifier that saw the screenshot judged pass; in the run log this is kept distinct from a pass verified by
+ * text. [notFound] are the answer facts the backstop could not find in any evidence source.
  */
 data class Verification(
     val verdict: Verdict,
@@ -49,17 +53,19 @@ data class Verification(
     val groundedBy: String? = null,
     val notFound: List<String> = emptyList(),
 ) {
-    /** 没满足的标准;核查器判 fail 却没指出哪条时用它给的理由。 */
+    /** The unmet criteria; when the verifier judged fail without naming one, the reason it gave is used. */
     val unmet: List<String>
         get() = checks.filter { it.status == "unmet" }.map { it.criterion }.ifEmpty { if (verdict == Verdict.Fail) listOf(reason) else emptyList() }
 }
 
 /**
- * 交给核查器的证据。[fresh] 是回答之后由最近在用的那个能力重新看的一眼([com.wangzan101.mika.core.capability.Capability.freshLook]:
- * 界面状态、网页正文的开头……),[freshImage] 是同一时刻的画面(只在要附图时有);
- * [ledger] 是本次任务读到的全部观察(证据账本,见 [EvidenceLedger];核查时按回答挑出相关的条目),
- * [actions] 是精简的动作清单(「第3步 tap(搜索) 生效」)。
- * [protected] 表示此刻的页面受防截屏保护。[appOpened] 为 false 表示本次任务没有成功打开过 App。
+ * The evidence handed to the verifier. [fresh] is a fresh look taken after the answer by the most recently used capability
+ * ([com.wangzan101.mika.core.capability.Capability.freshLook]: interface state, the start of the web page body, …), and
+ * [freshImage] is the screen at that same moment (only when an image is to be attached);
+ * [ledger] is every observation read during this task (the evidence ledger, see [EvidenceLedger]; relevant entries are
+ * selected by the answer at verification time), and [actions] is a condensed action list ("step 3: tap(search) took effect").
+ * [protected] means the current page is protected against screenshots. [appOpened] false means this task never opened an app
+ * successfully.
  */
 class Evidence(
     val fresh: List<Observation>,
@@ -68,52 +74,61 @@ class Evidence(
     val actions: List<String>,
     val protected: Boolean,
     val appOpened: Boolean = true,
-    /** 每次接管的结局,不随动作清单滚出(跳过、超时说明用户没有处理)。 */
+    /** The outcome of each takeover, which does not scroll out with the action list (skipped or timed out means the user did not handle it). */
     val takeovers: List<String> = emptyList(),
-    /** 用户给的事实:记忆检索结果、本次任务里对提问的回答。 */
+    /** Facts the user gave: memory lookup results and answers to questions asked during this task. */
     val userFacts: List<String> = emptyList(),
-    /** 运行时钟:核查当下的时刻和时区。回答正文里紧挨着「明天」「周日」的日期按它换算核对(见 [Grounding.check])。 */
+    /** The runtime clock: the current moment and time zone at verification. Dates written right after "tomorrow" or "Sunday" in the answer body are converted and checked against it (see [Grounding.check]). */
     val nowMs: Long = System.currentTimeMillis(),
     val zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
 ) {
-    /** 运行时钟的日期。 */
+    /** The runtime clock's date. */
     val today: java.time.LocalDate get() = java.time.Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
 
-    /** 再看一眼读到的文字,一条观察一段。 */
+    /** The text read in the fresh look, one observation per paragraph. */
     val freshText: String get() = fresh.joinToString("\n") { it.text }
 
-    /** 没打开 App、也没读到任何界面、网页或命令输出:回答只能凭对话或常识,没有可对照的材料。 */
+    /** No app was opened and no interface, web page or command output was read: the answer can only rely on the conversation or common knowledge, with no material to compare against. */
     val nothingRead: Boolean get() = !appOpened && !protected && freshText.isBlank() && ledger.isEmpty && userFacts.isEmpty()
 
-    /** 账本里某几类观察的原文,按读到的先后(看账本记了什么用)。 */
+    /** The raw text of certain observation kinds in the ledger, in read order (for inspecting what the ledger recorded). */
     fun read(vararg kinds: ObsKind): List<String> = ledger.all.filter { it.kind in kinds }.map { it.text }
 
-    /** 能对照回答的全部文字,一次读的一处:再看的一眼、账本里挑出的条目 [chosen](全文)、用户给的每条事实。 */
+    /** All text the answer can be compared against, one read per source: the fresh look, the [chosen] ledger entries (full text), and each fact the user gave. */
     fun sources(chosen: List<Observation>): List<String> =
         (listOf(freshText) + chosen.map { it.text } + userFacts).filter { it.isNotBlank() }
 }
 
 /**
- * 最终回答交出前的独立核查(只在做过不可逆、对外的事,或字面核对有对不上的时候才请它,见 AnswerReview):一次新的模型调用,不带工具、不带干活模型的历史,只看目标、标准、回答和证据。
- * 有截图且配了视觉模型时用 [visionModel] 并附图,否则用 [textModel]。
- * 分工:代码兜底([Grounding])只核字面——模型判 pass 但回答里的具体事实(引文、带单位的数、编号、日期)在证据文字里找不到
- * → cannot_verify;附了截图、找不到的只是画面上的状态 → pass,记为看图核实。一个值是不是属于回答说的那个东西
- * (哪个页面、哪个商品、哪一行)由核查模型判:交给它的账本条目是节选([EvidenceLedger.excerpt]),带着来处。
- * 出错、回复解析不了 → cannot_verify;超时按证据多少放宽([timeoutMs]),超时后精简证据再问一次,还超时才 cannot_verify。
- * 什么也没读过的任务([Evidence.nothingRead])没有材料可对照,不做这条兜底,只告诉核查器没有读到任何材料,由它判断回答是否切题。
+ * Independent verification before the final answer is handed over (only requested when something irreversible and external
+ * was done, or the literal check found something unmatched, see AnswerReview): a fresh model call with no tools and none of
+ * the working model's history, looking only at the goal, the criteria, the answer and the evidence.
+ * When there is a screenshot and a vision model is configured, [visionModel] is used with the attached image, otherwise
+ * [textModel].
+ * Division of labor: the code backstop ([Grounding]) only checks the literal level — the model judged pass but a concrete fact
+ * in the answer (a quotation, a number with a unit, an id, a date) cannot be found in the evidence text → cannot_verify; when
+ * a screenshot was attached and only on-screen state could not be found → pass, recorded as verified by image. Whether a
+ * value belongs to the thing the answer names (which page, which product, which row) is judged by the verifier model: the
+ * ledger entries it receives are excerpts ([EvidenceLedger.excerpt]) with their origin.
+ * An error or an unparseable reply → cannot_verify; a timeout is relaxed according to how much evidence there is
+ * ([timeoutMs]), and after a timeout the evidence is trimmed and asked once more, only then cannot_verify.
+ * A task that read nothing ([Evidence.nothingRead]) has no material to compare against, so this backstop is skipped: the
+ * verifier is only told that no material was read, and it judges whether the answer is on point.
  */
 class Verifier(
     private val textModel: ChatModel,
     private val visionModel: ChatModel?,
-    /** 截图按 [ModelImage] 的统一编码发出;为空时原样发。 */
+    /** Screenshots are sent in [ModelImage]'s unified encoding; when this is null they are sent as they are. */
     private val ops: ImageOps? = null,
 ) {
-    /** 有视觉模型时才值得附画面。 */
+    /** Attaching the image is only worthwhile when a vision model exists. */
     val wantsImage: Boolean get() = visionModel != null
 
     /**
-     * [earlierGoals] 是本对话之前几轮用户说的话(只有用户原话,没有干活模型的任何东西),追问时用来理解指代。
-     * 目标、回答、读屏、动作清单都是不可信的材料,编成一个 JSON 对象发出,里面的换行伪造不出新的段落。
+     * [earlierGoals] are what the user said in earlier turns of this conversation (only the user's own words, nothing from the
+     * working model), used to resolve references in follow-up questions.
+     * The goal, answer, screen reads and action list are all untrusted material and are assembled into one JSON object, so line
+     * breaks inside them cannot fake new sections.
      */
     suspend fun verify(goal: String, criteria: Criteria, answer: String, evidence: Evidence, earlierGoals: List<String> = emptyList()): Verification {
         val chosen = evidence.ledger.forAnswer(goal, answer)
@@ -124,7 +139,7 @@ class Verifier(
         val v = when (val first = ask(model, goal, criteria, answer, evidence, chosen, EvidenceLedger.EXCERPT_CHARS, earlierGoals, image)) {
             is Asked.Done -> first.v
             is Asked.Failed -> return cannot(first.reason)
-            // 证据多的长任务容易超时:精简后再问一次
+            // Long tasks with a lot of evidence tend to time out: trim it down and ask once more
             Asked.TimedOut -> when (val second = ask(model, goal, criteria, answer, trimmed(evidence), chosen, TRIM_EXCERPT_CHARS, earlierGoals, image)) {
                 is Asked.Done -> second.v
                 is Asked.Failed -> return cannot(second.reason)
@@ -133,12 +148,12 @@ class Verifier(
         }
         return when (v.verdict) {
             Verdict.Pass -> when {
-                // 没有逐条核对每一条标准的 pass 不算数
+                // A pass that did not check every criterion one by one does not count
                 v.checks.size < criteria.items.size -> v.copy(verdict = Verdict.CannotVerify, reason = NOT_EVERY_CRITERION)
                 evidence.nothingRead -> v
                 else -> backstop(v, goal, answer, reads, imageSent = image != null, evidence.today)
             }
-            // 接着上文的追问没列出标准,只能对照一句没头没尾的原话,判 fail 不可靠
+            // A follow-up continuing the earlier context listed no criteria, so it could only be compared against one out-of-context sentence; a fail judgment is unreliable
             Verdict.Fail -> if (criteria.fallback && earlierGoals.isNotEmpty()) v.copy(verdict = Verdict.CannotVerify, reason = FOLLOW_UP_UNCLEAR)
                 else if (v.reason.isBlank()) v.copy(reason = FAIL_WITHOUT_REASON) else v
             Verdict.CannotVerify -> v
@@ -162,7 +177,7 @@ class Verifier(
         var unparsed = false
         return try {
             withTimeoutOrNull(timeoutMs(body.length, if (image != null) 1 else 0)) {
-                // 回复走容错解析;读不出来时再问一次、只要 JSON;还不行才算解析不了
+                // Replies go through tolerant parsing; when nothing can be read, ask once more for JSON only; only then is it unparseable
                 ModelJson.completeParsed(model, PROMPT, listOf(Message(Role.User, parts, Author.Mika)), ::parse).also { unparsed = it == null }
             }?.let { Asked.Done(it) } ?: if (unparsed) Asked.Failed("核查器的回复无法解析") else Asked.TimedOut
         } catch (e: CancellationException) {
@@ -172,14 +187,14 @@ class Verifier(
         }
     }
 
-    /** 超时那次重问用的精简证据:此刻一屏和截图保留,动作只留最近的,每段截短;账本条目的节选另按更小的字数上限([TRIM_EXCERPT_CHARS])。 */
+    /** The trimmed evidence for the retry after a timeout: the current screen and screenshot are kept, only the latest actions remain, and each part is shortened; ledger excerpts use a smaller character cap ([TRIM_EXCERPT_CHARS]). */
     private fun trimmed(e: Evidence) = Evidence(
         trimmedFresh(e.fresh), e.freshImage, e.ledger,
         e.actions.takeLast(TRIM_ACTIONS), e.protected, e.appOpened, e.takeovers,
         e.userFacts.map { it.take(TRIM_CHARS) }, e.nowMs, e.zone,
     )
 
-    /** 再看的一眼合起来至多 [TRIM_FRESH_CHARS] 字(按先后截)。 */
+    /** The fresh look totals at most [TRIM_FRESH_CHARS] characters (clipped in order). */
     private fun trimmedFresh(fresh: List<Observation>): List<Observation> {
         var room = TRIM_FRESH_CHARS
         return fresh.mapNotNull { o ->
@@ -214,7 +229,7 @@ class Verifier(
     }
 
     companion object {
-        /** 核查不该把任务拖住:基础等待时间;证据多时按 [timeoutMs] 放宽,最多 [MAX_TIMEOUT_MS]。 */
+        /** Verification must not hold the task up: the base wait time; relaxed by [timeoutMs] when there is more evidence, up to [MAX_TIMEOUT_MS]. */
         const val TIMEOUT_MS = 60_000L
         const val MAX_TIMEOUT_MS = 150_000L
         private const val PER_IMAGE_MS = 20_000L
@@ -223,11 +238,11 @@ class Verifier(
         private const val TRIM_CHARS = 3_000
         private const val TRIM_ACTIONS = 10
         private const val TRIM_EXCERPT_CHARS = EvidenceLedger.EXCERPT_CHARS / 2
-        /** 再看的一眼长过这么多字时只给节选(开头和对上回答事实的行)。 */
+        /** When the fresh look is longer than this, only an excerpt is given (the start and the lines matching answer facts). */
         private const val FRESH_CHARS = 4_000
         const val IMAGE = "image"
 
-        /** 等多久与要读的东西成正比:基础 60 秒,每张图、每 KB 文字另加,封顶 150 秒。 */
+        /** The wait is proportional to how much is read: 60 seconds base, plus extra per image and per KB of text, capped at 150 seconds. */
         fun timeoutMs(textChars: Int, images: Int): Long =
             minOf(MAX_TIMEOUT_MS, TIMEOUT_MS + images * PER_IMAGE_MS + textChars / 1024 * PER_KB_MS)
         const val NOT_IN_READS = "The basis for the answer could not be found in any screen, web page, or command output that was read"
@@ -241,8 +256,10 @@ class Verifier(
         val PROMPT: String get() = Prompts.role("verifier")
 
         /**
-         * 交给核查模型的账本条目:每条换成节选([EvidenceLedger.excerpt]),对上回答事实的行一定留下,条目一条不丢。
-         * 先按前后各 [EvidenceLedger.EXCERPT_CONTEXT] 行取,总字数超过 [budget] 就减少前后的行数,还超就把每条截到平均的份额(至少 [EvidenceLedger.MIN_EXCERPT] 字)。
+         * The ledger entries handed to the verifier model: each becomes an excerpt ([EvidenceLedger.excerpt]), lines matching
+         * answer facts are always kept, and no entry is dropped. First [EvidenceLedger.EXCERPT_CONTEXT] lines on each side are
+         * taken; if the total exceeds [budget] the number of surrounding lines is reduced, and if it still exceeds, each entry
+         * is clipped to an equal share (at least [EvidenceLedger.MIN_EXCERPT] characters).
          */
         internal fun excerpts(goal: String, answer: String, chosen: List<Observation>, budget: Int, today: java.time.LocalDate? = null): List<Observation> {
             val hits = chosen.map { Grounding.hitLines(goal, answer, it.text, today) }
@@ -254,7 +271,7 @@ class Verifier(
             return chosen.mapIndexed { i, r -> r.copy(text = EvidenceLedger.excerpt(r.text, hits[i], 0, cap)) }
         }
 
-        /** 交给核查模型的再看一眼:不长时原样,长了给开头和对上回答事实的行。 */
+        /** The fresh look handed to the verifier model: unchanged when short, otherwise the start plus the lines matching answer facts. */
         private fun freshShown(goal: String, answer: String, e: Evidence): String {
             val t = e.freshText
             if (t.length <= FRESH_CHARS) return t
@@ -262,16 +279,20 @@ class Verifier(
         }
 
         /**
-         * 模型判 pass 之后的兜底(规则见 [Grounding.check]):只核字面,不判断值属于哪个东西。文字对不上时:附了截图、没对上的只有画面上的状态(不带数字的引文;
-         * 引文还要求回答别处已在文字里对上),看过图的 pass 算数,记为看图核实;数和日期能写成文字,对不上就否决。
-         * [today] 是运行时钟的日期(相对日期按它换算,见 [Grounding.check])。离线重算录下来的运行也用它。
+         * The backstop after the model judges pass (rules in [Grounding.check]): only checks the literal level and does not judge
+         * which thing a value belongs to. When the text does not match: if a screenshot was attached and what did not match was
+         * only on-screen state (quotations without digits; quotations also require that elsewhere in the answer they were matched
+         * in text), the pass that saw the image counts, recorded as verified by image; numbers and dates can be written as text,
+         * so a mismatch vetoes.
+         * [today] is the runtime clock's date (relative dates are resolved with it, see [Grounding.check]). Recomputing a recorded
+         * run offline uses it too.
          */
         internal fun backstop(v: Verification, goal: String, answer: String, screens: List<String>, imageSent: Boolean, today: java.time.LocalDate? = null): Verification {
             val g = Grounding.check(goal, answer, screens, today)
             val ok = when (g.found) {
                 true -> true
                 false -> false
-                // 回答里没有可核对的东西,或只有数对上、没有引文定位:至少要有一条 met 的引文真在屏上
+                // Nothing checkable in the answer, or only numbers matched with no quotation to locate: at least one met criterion's quotation must really be on screen
                 null -> v.checks.any { it.status == "met" && it.quote != null && Grounding.quoteInReads(it.quote, screens) }
             }
             val missing = g.unmatched.map { it.text }
@@ -281,13 +302,14 @@ class Verifier(
                     v.copy(groundedBy = IMAGE, notFound = missing)
                 else -> v.copy(verdict = Verdict.CannotVerify, reason = NOT_IN_READS, notFound = missing)
             }
-            // 依据是屏上被截断的文字(以 … 结尾):只看到了一部分,核实不了全貌
+            // The basis is truncated on-screen text (ending with …): only part of it was seen, so it cannot be fully verified
             return if (result.verdict == Verdict.Pass && Grounding.builtOnTruncated(answer, screens)) result.copy(verdict = Verdict.CannotVerify, reason = TRUNCATED) else result
         }
 
         /**
-         * 回复里第一个能读的 JSON 对象(见 [ModelJson]:容忍代码块、前后的话、键名写法);结论缺失或不认识时返回 null。
-         * 各条结论和总结论矛盾时按各条算。
+         * The first readable JSON object in the reply (see [ModelJson]: tolerates code fences, surrounding prose and key-name
+         * spellings); null when the verdict is missing or unrecognized.
+         * When the individual checks contradict the overall verdict, the individual checks win.
          */
         internal fun parse(text: String): Verification? {
             val obj = ModelJson.firstObject(text) ?: return null

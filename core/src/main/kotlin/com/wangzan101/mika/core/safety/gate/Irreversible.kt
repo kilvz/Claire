@@ -1,11 +1,13 @@
 package com.wangzan101.mika.core.safety.gate
 
-/** 不可逆操作的种类(确认卡片、判定结果、申报共用)。 */
+/** Kinds of irreversible operations (shared by confirmation cards, gate results and declarations). */
 @Suppress("EnumEntryName")
 enum class IrrevAction { send, pay, delete, order, submit, other }
 
 /**
- * 工具声明的「按什么判不可逆」:Tap 点击的元素或坐标;FileControl 点的文件控件(和点击一样判,但不会是看图得来的点);
- * Enter 打字后的回车;Key 按键;Swipe 横滑(滑动删除);Interact 网页上的组合键、拖动、下拉选择。
+ * What a tool declares as "what to judge irreversibility by": Tap the tapped element or coordinates; FileControl the tapped
+ * file control (judged like a tap, but never a point obtained from looking at an image); Enter the Enter key pressed after
+ * typing; Key a key press; Swipe a sideways swipe (swipe to delete); Interact key combos, drags and dropdown selects on a web
+ * page.
  */
 enum class GateTarget { Tap, FileControl, Enter, Key, Swipe, Interact }

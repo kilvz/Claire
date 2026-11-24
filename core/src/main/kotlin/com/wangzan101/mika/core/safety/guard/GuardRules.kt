@@ -1,70 +1,75 @@
 package com.wangzan101.mika.core.safety.guard
 
 /**
- * 操作守卫的判定规则。每条规则看的都是同一种事实:做了什么动作、作用在哪个目标(两者合成动作签名 [actionSignature]),
- * 动作的实际效果(effect),以及之后界面到了哪个状态;[OperationGuards] 按这些事实记计数,这里只把计数换成该给的级别。纯函数。
+ * Decision rules for the operation guards. Every rule looks at the same kinds of facts: which action was performed and which
+ * target it acted on (the two combine into the action signature [actionSignature]), the action's actual effect (effect), and
+ * which interface state it arrived at afterwards; [OperationGuards] keeps the counts from these facts and this object only
+ * turns counts into the level to report. Pure functions.
  *
- * 走进死胡同时先提醒(nudge):说清卡在哪,并给三条出路(换一条明显不同的路、问用户、把已有的交出来并说明缺什么)。
- * 每条阶梯的最后一级才叫停,它只是最后的安全网,门槛远在提醒之后;慢慢兜圈子的几条按本次任务的步数上限定(见 [lateStop]):
+ * When it runs into a dead end it first nudges: state clearly where it is stuck and give three ways out (take a clearly
+ * different route, ask the user, hand over what is already there and say what is missing). Only the last rung of each ladder
+ * stops the task, and it is just the final safety net, its threshold far past the nudges; the slowly-circling ones are bounded
+ * by this task's step budget (see [lateStop]):
  *
- * | 信号 | 提醒 | 叫停(安全网) |
+ * | Signal | Nudge | Stop (safety net) |
  * |---|---|---|
- * | 同一动作 + 同一目标重复(最近 [LOOP_WINDOW] 次里) | 3、6 | 12 |
- * | 同上,诊断类看界面的工具(按工具计) | 6、9 | 15 |
- * | 动作没有效果(effect 为 no_effect,或动过之后界面不变),连续 | 3、6、9 | 12 |
- * | 页面没变时又读了一遍、没读出新内容 | 5、8 | 12 |
- * | 连续失败(第 4 次起附出路) | 2、4 | 8 |
- * | 不可恢复的失败 | 1 | 3 |
- * | 回到同一状态(兜圈时不重复,由兜圈那条说) | 3、6 | 步数上限的 1/4(至少 10) |
- * | 在两三个状态之间兜圈(整圈数) | 3、4 | 步数上限的 1/5(至少 6) |
- * | 连续 N 个动作没到过任何新状态 | 8、16 | 步数上限的 1/2(至少 24) |
+ * | Same action + same target repeated (within the latest [LOOP_WINDOW] actions) | 3, 6 | 12 |
+ * | Same as above, for diagnostic interface-viewing tools (counted per tool) | 6, 9 | 15 |
+ * | Action had no effect (effect is no_effect, or the interface did not change after acting), consecutive | 3, 6, 9 | 12 |
+ * | Read again while the page was unchanged, with no new content | 5, 8 | 12 |
+ * | Consecutive failures (ways out added from the 4th on) | 2, 4 | 8 |
+ * | Unrecoverable failure | 1 | 3 |
+ * | Return to the same state (not repeated during a cycle, which the cycle row covers) | 3, 6 | 1/4 of the step budget (at least 10) |
+ * | Circling among two or three states (whole rounds) | 3, 4 | 1/5 of the step budget (at least 6) |
+ * | N consecutive actions that reached no new state | 8, 16 | 1/2 of the step budget (at least 24) |
  *
- * 不知道步数上限时按 [DEFAULT_BUDGET] 算。
+ * When the step budget is unknown, [DEFAULT_BUDGET] is used.
  */
 internal object GuardRules {
-    /** 计数到了阶梯的哪一级:[threshold] 是这一级的门槛。 */
+    /** Which rung of the ladder the count has reached: [threshold] is this rung's threshold. */
     data class Rung(val threshold: Int, val severity: Severity)
 
-    /** 重复动作看最近多少次动作。 */
+    /** Repeated actions are counted over the latest this many actions. */
     const val LOOP_WINDOW = 16
 
-    /** 不知道任务的步数上限时按这么多步算。 */
+    /** Used when the task's step budget is unknown. */
     const val DEFAULT_BUDGET = 60
 
-    /** 重复动作的阶梯:提醒、再提醒、叫停。诊断类看界面本来就常重复,门槛更高。 */
+    /** Ladder for repeated actions: nudge, nudge again, stop. Diagnostic interface-viewing tools repeat a lot by nature, so their thresholds are higher. */
     fun repeatLadder(diagnostic: Boolean): List<Int> = if (diagnostic) listOf(6, 9, 15) else listOf(3, 6, 12)
 
-    /** 动作没有效果的阶梯。 */
+    /** Ladder for actions with no effect. */
     val NO_EFFECT_LADDER = listOf(3, 6, 9, 12)
 
-    /** 页面没变时重读的阶梯。 */
+    /** Ladder for re-reads while the page is unchanged. */
     val REREAD_LADDER = listOf(5, 8, 12)
 
-    /** 连续失败的阶梯;不可恢复的失败另按 [UNRECOVERABLE_LADDER]。 */
+    /** Ladder for consecutive failures; unrecoverable failures use [UNRECOVERABLE_LADDER] instead. */
     val FAILURE_LADDER = listOf(2, 4, 8)
     val UNRECOVERABLE_LADDER = listOf(1, 3)
 
-    /** 连续失败到这一次起,提醒里附上出路。 */
+    /** From this consecutive failure on, the nudge includes ways out. */
     const val FAILURE_WAYS_OUT = 4
 
-    /** 兜圈最多看几个状态一圈。 */
+    /** At most this many states per cycle are considered. */
     const val MAX_CYCLE = 3
 
-    /** 回到同一状态的阶梯([budget] 是任务的步数上限)。 */
+    /** Ladder for returning to the same state ([budget] is the task's step budget). */
     fun sameStateLadder(budget: Int?) = listOf(3, 6, lateStop(budget, 4, 10))
 
-    /** 兜圈的阶梯(整圈数)。 */
+    /** Ladder for cycles (whole rounds). */
     fun cycleLadder(budget: Int?) = listOf(3, 4, lateStop(budget, 5, 6))
 
-    /** 连续没到过新状态的动作数的阶梯。 */
+    /** Ladder for the number of consecutive actions that reached no new state. */
     fun noNewStateLadder(budget: Int?) = listOf(8, 16, lateStop(budget, 2, 24))
 
-    /** 安全网的门槛:步数上限的 1/[divisor],至少 [floor](要远在提醒之后)。 */
+    /** Safety-net threshold: 1/[divisor] of the step budget, at least [floor] (it has to be far past the nudges). */
     fun lateStop(budget: Int?, divisor: Int, floor: Int): Int = maxOf(floor, (budget ?: DEFAULT_BUDGET) / divisor)
 
     /**
-     * 计数 [count] 在阶梯 [ladder](升序,最后一级叫停)上到了哪一级。还没到第一级,或这一级([warnedAt] 是已提醒到的门槛)已提醒过为 null;
-     * 到最高一级且 [canStop] 时叫停,否则提醒。
+     * Which rung of the ascending [ladder] (the last rung is the stop) the count [count] has reached. null when the first rung
+     * is not reached yet, or when this rung has already been notified ([warnedAt] is the threshold already notified); at the
+     * top rung with [canStop] it is a stop, otherwise a nudge.
      */
     fun climb(count: Int, ladder: List<Int>, warnedAt: Int, canStop: Boolean): Rung? {
         val threshold = ladder.lastOrNull { count >= it } ?: return null
@@ -72,14 +77,15 @@ internal object GuardRules {
         return Rung(threshold, if (threshold == ladder.last() && canStop) Severity.Stop else Severity.Warn)
     }
 
-    /** 末尾在 [period] 个不同状态之间兜圈:[length] 是合这一圈的末尾长度,[rounds] 是走了几整圈。 */
+    /** The tail circles among [period] distinct states: [length] is the matching tail length and [rounds] is how many whole rounds were walked. */
     data class Cycle(val period: Int, val length: Int) {
         val rounds: Int get() = length / period
     }
 
     /**
-     * 先后到过的各状态(相邻的不同)末尾是不是在 2–[MAX_CYCLE] 个状态之间兜圈:A B A B 是 2 个一圈的 2 圈,
-     * A B C A B C 是 3 个一圈的 2 圈。没有至少重复一步的为 null;几种圈长都合时取走得最长的。
+     * Whether the tail of the states visited so far (adjacent duplicates removed) circles among 2–[MAX_CYCLE] states:
+     * A B A B is 2 rounds of a 2-state cycle, A B C A B C is 2 rounds of a 3-state cycle. null when nothing repeats for at
+     * least one step; when several cycle lengths fit, the longest one is taken.
      */
     fun cycle(trail: List<Long>): Cycle? {
         var best: Cycle? = null
@@ -94,7 +100,7 @@ internal object GuardRules {
         return best
     }
 
-    /** 连续失败 [consecutive] 次、其中不可恢复 [unrecoverable] 次时该给的级别;不到为 null。 */
+    /** The severity to report for [consecutive] consecutive failures, [unrecoverable] of them unrecoverable; null when none. */
     fun failures(consecutive: Int, unrecoverable: Int): Severity? = when {
         consecutive >= FAILURE_LADDER.last() || unrecoverable >= UNRECOVERABLE_LADDER.last() -> Severity.Stop
         consecutive >= FAILURE_LADDER.first() || unrecoverable >= UNRECOVERABLE_LADDER.first() -> Severity.Warn

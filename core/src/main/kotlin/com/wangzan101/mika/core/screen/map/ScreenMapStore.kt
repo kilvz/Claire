@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.screen.map
 
-/** 屏图的存取口。读写失败等于「没有图」，调用方只计数、不影响任务（design D8）。 */
+/** Storage port for screen maps. A read/write failure equals "no map"; the caller only counts it and the task is not affected (design D8). */
 interface ScreenMapStore {
     fun load(app: String): ScreenGraph?
     fun save(app: String, graph: ScreenGraph)

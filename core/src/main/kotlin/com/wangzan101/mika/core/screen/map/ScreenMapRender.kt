@@ -1,19 +1,21 @@
 package com.wangzan101.mika.core.screen.map
 
 /**
- * 把屏图渲染成给模型看的紧凑地图文字（design D8）。屏没有语义名（D3），名字就用骨架锚点自描述；
- * 图超长只截屏清单，不挤掉元素列表。
+ * Render the screen map as compact map text for the model (design D8). Screens have no semantic name (D3), so their name is
+ * the skeleton anchors describing themselves; when the map is too long only the screen list is truncated, never squeezing out
+ * the element lists.
  */
 object ScreenMapRender {
-    /** 你现在在哪个屏；认不出返回空串。 */
+    /** Which screen you are on now; an empty string when it cannot be recognized. */
     fun renderPosition(graph: ScreenGraph, currentId: String?): String {
         val node = currentId?.let { graph.nodes[it] } ?: return ""
         return "你现在在「${label(node)}」屏"
     }
 
     /**
-     * 进入某 App 时给模型的屏图：有图才给，读不到屏([skeletonTexts] 为 null)不给；
-     * 认得出当前屏就带「你在哪 + 从这怎么走」，认不出只给屏清单。
+     * The screen map given to the model when entering an app: only when a map exists, and not when the screen cannot be read
+     * ([skeletonTexts] is null); when the current screen is recognized it includes "where you are + how to get from here",
+     * otherwise only the screen list.
      */
     fun renderMapFor(graph: ScreenGraph?, skeletonTexts: Set<String>?): String? {
         if (graph == null || graph.nodes.isEmpty()) return null
@@ -23,8 +25,9 @@ object ScreenMapRender {
     }
 
     /**
-     * 屏清单 + 从当前屏出发的路。超 [maxScreens] 截屏清单、超 [maxChars] 截整段。
-     * 图空返回空串。
+     * The screen list plus the paths out of the current screen. Beyond [maxScreens] the screen list is truncated, and beyond
+     * [maxChars] the whole text is truncated.
+     * An empty map returns an empty string.
      */
     fun renderMap(graph: ScreenGraph, currentId: String?, maxScreens: Int = 12, maxChars: Int = 1200): String {
         if (graph.nodes.isEmpty()) return ""
