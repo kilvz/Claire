@@ -70,24 +70,24 @@ import com.wangzan101.mika.voice.ui.VoiceHubSection
 import com.wangzan101.mika.voice.ui.voiceState
 
 /**
- * 配置模型:用途(主模型、看图模型、轻量模型)和服务商两块。首次上手时 [onboarding] 为真
- * (服务商在前,底部有分页点和「下一步」);设置 › 模型([ModelsScreen])也是这一页,标题和引导语不同,没有底部按钮。
- * 选用途、服务商详情、服务商的全部模型是这一页里的子页面。上手时「下一步」选好主模型才可点,点了调 [onDone]。
+ * Model setup: two blocks, roles (main model, vision model, light model) and providers. During first-time onboarding [onboarding] is true
+ * (providers come first and the bottom has progress dots and "Next"); Settings › Models ([ModelsScreen]) is this same page with a different title and lead text and no bottom button.
+ * Role selection, provider details and a provider's all-models list are sub-pages of this page. During onboarding "Next" is only enabled once the main model is chosen, and tapping it calls [onDone].
  */
 @Composable
 fun ModelSetupScreen(
     store: ProviderStore, onboarding: Boolean, onBack: () -> Unit, onDone: () -> Unit,
-    /** 设置里点「语音转文字」卡片去选择页;上手流程不传,卡片就不出现。 */
+    /** In settings, the "Speech to text" card opens the picker; the onboarding flow does not pass it, so the card does not appear. */
     onOpenSpeech: (() -> Unit)? = null,
-    /** 设置里点「声音模型」卡片去设置页;上手流程不传,卡片就不出现。 */
+    /** In settings, the "Voice model" card opens its settings page; the onboarding flow does not pass it, so the card does not appear. */
     onOpenVoice: (() -> Unit)? = null,
-    /** 设置里点「图片模型」卡片去设置页;上手流程不传,卡片就不出现。 */
+    /** In settings, the "Image model" card opens its settings page; the onboarding flow does not pass it, so the card does not appear. */
     onOpenImage: (() -> Unit)? = null,
-    /** 设置里查看 Token 用量;上手流程不传。 */
+    /** In settings, view Token usage; the onboarding flow does not pass it. */
     onOpenUsage: (() -> Unit)? = null,
-    /** 设置里打开统一语音模型目录;上手流程不传。 */
+    /** In settings, open the unified voice model catalog; the onboarding flow does not pass it. */
     onOpenVoiceCatalog: (() -> Unit)? = null,
-    /** 设置里打开「语音通话」选择页;上手流程不传。 */
+    /** In settings, open the "Voice call" picker; the onboarding flow does not pass it. */
     onOpenCallMode: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -112,7 +112,7 @@ fun ModelSetupScreen(
     val voiceSettings = if (onOpenVoice != null) (context.applicationContext as? VoiceSettings.Owner)?.voiceSettings else null
     val voiceState = voiceSettings?.state?.collectAsState()?.value
     val voiceChoice = voiceState?.choice
-    // 子页里改了朗读/通话的选择,回到这页要马上看到,所以直接跟目录走,不等 vm 下次同步
+    // Read-aloud/call choices changed on a sub-page must be visible here immediately, so follow the catalog directly instead of waiting for the vm's next sync
     val liveVoiceCatalog = if (onOpenCallMode != null) {
         remember { com.wangzan101.mika.voice.model.VoiceModelEnvironment.get(context) }.catalog.state.collectAsState().value
     } else null
@@ -120,16 +120,16 @@ fun ModelSetupScreen(
     var pickingFallbackRole by rememberSaveable { mutableStateOf<ModelRole?>(null) }
     var pickingFallbackSlot by rememberSaveable { mutableStateOf<Int?>(null) }
     var groupsOpen by rememberSaveable { mutableStateOf(false) }
-    // "" 表示新建,null 表示不在编辑组
+    // "" means creating a new group, null means not editing a group
     var groupEditing by rememberSaveable { mutableStateOf<String?>(null) }
     var openProvider by rememberSaveable { mutableStateOf<String?>(null) }
     var allModels by rememberSaveable { mutableStateOf(false) }
     var openDecision by rememberSaveable { mutableStateOf(false) }
     var showProviders by rememberSaveable { mutableStateOf(false) }
-    // 账号登录的面板:在添加表单和服务商详情里都能打开,登录中关掉也不打断登录
+    // Account sign-in panel: it can be opened from both the add form and provider details, and closing it mid sign-in does not interrupt the sign-in
     var signInSheet by rememberSaveable { mutableStateOf<SignInKind?>(null) }
 
-    // 用账号登录成功:收起面板,打开这一家的详情(看账号和模型、设主模型)
+    // Account sign-in succeeded: close the panel and open this provider's details (see the account and models, set the main model)
     LaunchedEffect(ui.signedInProvider) {
         val id = ui.signedInProvider ?: return@LaunchedEffect
         signInSheet = null
@@ -140,7 +140,7 @@ fun ModelSetupScreen(
         }
         vm.signedInShown()
     }
-    // ChatGPT 登录成功照旧留在这一页(第一次会说明在用套餐额度),面板收起
+    // A successful ChatGPT sign-in stays on this page as before (the first time it explains that plan quota is used) and the panel closes
     LaunchedEffect(ui.chatGptAccount?.signedIn, ui.chatGptSignIn) {
         if (signInSheet == SignInKind.ChatGpt && ui.chatGptAccount?.signedIn == true && ui.chatGptSignIn == ListState.Idle) signInSheet = null
     }
@@ -153,7 +153,7 @@ fun ModelSetupScreen(
         testAndSave = vm::testAndSave,
         saveUntested = vm::saveWithoutTest,
         openForm = vm::openForm, closeForm = vm::closeForm,
-        // 从服务商页面进详情时留着 showProviders:返回落回服务商页面,不是模型页
+        // Keep showProviders when opening details from the providers page, so Back returns to the providers page and not the model page
         openProvider = {
             if (ui.formOpen) vm.closeForm()
             openProvider = it
@@ -170,7 +170,7 @@ fun ModelSetupScreen(
         openDecision = { openDecision = true }, openSignIn = { signInSheet = it },
         setReasoningEffort = vm::setReasoningEffort, setModelContext = vm::setModelContext,
     )
-    // 内部子页:标识稳定(换数据不重演动画)、带着层级(决定滑动方向)
+    // Internal sub-pages: stable identity (data changes do not replay the animation) and a depth level (which decides the slide direction)
     val origin: ModelSubPage = when {
         openDecision -> ModelSubPage.Decision
         groupEditing != null -> ModelSubPage.GroupEdit(groupEditing ?: "")
@@ -183,7 +183,7 @@ fun ModelSetupScreen(
         else -> ModelSubPage.Main
     }
     val subPage = if (ui.formOpen) ModelSubPage.AddProvider(origin.depth + 1) else origin
-    // 换页动画期间旧页还在渲染:服务商刚删掉时详情页也能从缓存里拿到数据画完退出
+    // The old page still renders during the page-change animation: when a provider was just deleted, the details page can still draw from cached data and then exit
     var heldProviders by remember { mutableStateOf(ui.providers) }
     if (ui.providers.isNotEmpty()) heldProviders = ui.providers
     NavSlide(subPage, depth = { it.depth }) { page ->
@@ -217,7 +217,7 @@ fun ModelSetupScreen(
                     showAll = { allModels = true },
                     retestModel = { model -> vm.retestModel(p.id, model) },
                     voiceUsage = vm::providerVoiceUsage,
-                    // ChatGPT 照旧直接去浏览器登录;xAI、OpenRouter 先打开说明面板
+                    // ChatGPT still signs in through the browser directly; xAI and OpenRouter open the explanation panel first
                     signIn = { if (accountKind != null) signInSheet = accountKind else vm.signInWithChatGpt() },
                     signOut = { if (accountKind != null) vm.signOutAccount(p.id) else vm.signOutChatGpt(p.id) },
                     manageUsage = {
@@ -262,7 +262,7 @@ fun ModelSetupScreen(
             BackHandler { showProviders = false }
             Page(ModelsCopy.PROVIDERS, onBack = { showProviders = false }) {
                 ProvidersSection(ui, actions)
-                // 各服务商的当前额度跟着服务商走,不放在 Token 用量页
+                // Each provider's current allowance travels with the provider and is not put on the Token usage page
                 UsageAllowanceCard(ui.providers, store, onOpenUrl = { openInBrowser(context, it) })
             }
         }
@@ -342,7 +342,7 @@ fun ModelSetupScreen(
                 },
                 dismiss = {
                     signInSheet = null
-                    // 失败的原因看过了;还在登录的不打断
+                    // The failure reason has been seen; a sign-in still in progress is not interrupted
                     if (!ui.accountSignIn.running) vm.dismissAccountFailure()
                 },
             ),
@@ -351,15 +351,15 @@ fun ModelSetupScreen(
 }
 
 /**
- * 模型页内部的子页:标识用稳定值(服务商 id、用途、槽位),数据变了不重演换页动画;
- * [depth] 决定滑动方向——主页 0,服务商列表和各选择页 1,详情 1(主页直进)或 2(从服务商列表进),全部模型再深一层。
+ * Sub-pages inside the model page: identity uses stable values (provider id, role, slot) so data changes do not replay the page-change animation;
+ * [depth] decides the slide direction — main page 0, provider list and the pickers 1, details 1 (entered directly from the main page) or 2 (entered from the provider list), and all models one level deeper.
  */
 private sealed class ModelSubPage(val depth: Int) {
     data object Main : ModelSubPage(0)
     data object Decision : ModelSubPage(1)
     data object Providers : ModelSubPage(1)
     data object Groups : ModelSubPage(1)
-    /** id 为空串表示新建组。 */
+    /** An empty id means creating a new group. */
     data class GroupEdit(val id: String) : ModelSubPage(2)
     data class AddProvider(val level: Int) : ModelSubPage(level)
     data class Detail(val id: String, val fromProviders: Boolean) : ModelSubPage(if (fromProviders) 2 else 1)
@@ -368,7 +368,7 @@ private sealed class ModelSubPage(val depth: Int) {
     data class RolePick(val role: ModelRole) : ModelSubPage(1)
 }
 
-/** 主页面上的全部动作。 */
+/** All actions available on the main page. */
 class ModelSetupActions(
     val selectPreset: (String) -> Unit = {},
     val setKind: (ProviderConfig.Kind) -> Unit = {},
@@ -376,11 +376,11 @@ class ModelSetupActions(
     val setAccountId: (String) -> Unit = {},
     val setApiKey: (String) -> Unit = {},
     val setModel: (String) -> Unit = {},
-    /** 「手动填写模型名」的开和收。 */
+    /** Turns "enter model name manually" on and off. */
     val setManual: (Boolean) -> Unit = {},
     val setName: (String) -> Unit = {},
     val testAndSave: () -> Unit = {},
-    /** 不测试,直接保存(见 [ModelSetupViewModel.saveWithoutTest])。 */
+    /** Save without testing (see [ModelSetupViewModel.saveWithoutTest]). */
     val saveUntested: () -> Unit = {},
     val openForm: () -> Unit = {},
     val closeForm: () -> Unit = {},
@@ -389,34 +389,34 @@ class ModelSetupActions(
     val pickFallback: (Int) -> Unit = {},
     val pickRoleFallback: (ModelRole, Int) -> Unit = { _, _ -> },
     val clearFallback: (ModelRole, Int) -> Unit = { _, _ -> },
-    /** 打开「服务商」页(已连接的服务商 + 添加表单)。 */
+    /** Open the "Providers" page (connected providers plus the add form). */
     val openProviders: () -> Unit = {},
-    /** 打开「语音转文字」的选择页;为 null 时不显示这张卡(上手流程)。 */
+    /** Open the "Speech to text" picker; when null this card is not shown (onboarding flow). */
     val openSpeech: (() -> Unit)? = null,
-    /** 打开「声音模型」设置页;为 null 时不显示这张卡(上手流程)。 */
+    /** Open the "Voice model" settings page; when null this card is not shown (onboarding flow). */
     val openVoice: (() -> Unit)? = null,
-    /** 打开「图片模型」设置页;为 null 时不显示这张卡(上手流程)。 */
+    /** Open the "Image model" settings page; when null this card is not shown (onboarding flow). */
     val openImage: (() -> Unit)? = null,
-    /** 打开 Token 用量;为 null 时不显示入口(上手流程)。 */
+    /** Open Token usage; when null the entry point is not shown (onboarding flow). */
     val openUsage: (() -> Unit)? = null,
-    /** 打开统一语音模型目录;为 null 时不显示入口(上手流程)。 */
+    /** Open the unified voice model catalog; when null the entry point is not shown (onboarding flow). */
     val openVoiceCatalog: (() -> Unit)? = null,
-    /** 打开「语音通话」选择页;为 null 时不显示(上手流程)。 */
+    /** Open the "Voice call" picker; when null it is not shown (onboarding flow). */
     val openCallMode: (() -> Unit)? = null,
     /** Independent opt-in decision service; the three model roles remain unchanged. */
     val openDecision: (() -> Unit)? = null,
     val next: () -> Unit = {},
-    /** 打开一家账号登录的说明面板。 */
+    /** Open the explanation panel for signing in to one account. */
     val openSignIn: (SignInKind) -> Unit = {},
-    /** 打开模型组管理页;上手流程不显示入口。 */
+    /** Open the model group management page; the onboarding flow does not show the entry point. */
     val openGroups: () -> Unit = {},
     val setReasoningEffort: (ModelRole, String?) -> Unit = { _, _ -> },
     val setModelContext: (String, ModelContextSettings) -> Boolean = { _, _ -> false },
 )
 
 /**
- * 不带状态的主页面,便于测试。改动当场生效(测试通过就存下服务商,用途选完就用),
- * 所以设置里进来只有返回;上手时底部留「下一步」,键盘弹出时藏起来,把地方让给表单。
+ * Stateless main page, for easy testing. Changes take effect immediately (a passed test saves the provider, and a role applies as soon as it is chosen),
+ * so when entered from settings the page only has Back; during onboarding "Next" sits at the bottom and hides when the keyboard appears to give the form more room.
  */
 @Composable
 fun ModelSetupContent(
@@ -425,7 +425,7 @@ fun ModelSetupContent(
     liveVoiceCatalog: VoiceCatalogSnapshot? = null, onBack: () -> Unit,
 ) {
     val c = MikaTheme.colors
-    // 表单收起(测试通过存好了,或取消)后页面上没有要打字的地方,顺手收起键盘
+    // Once the form is closed (saved after a passed test, or cancelled) nothing on the page needs typing, so dismiss the keyboard too
     val focus = LocalFocusManager.current
     LaunchedEffect(ui.showForm) { if (!ui.showForm) focus.clearFocus() }
     val onPick = actions.pickRole
@@ -442,10 +442,10 @@ fun ModelSetupContent(
                         style = MikaType.Body, color = c.ink2,
                     )
                 }
-                // 上手时先连服务商再选模型;设置里先看用途
+                // Onboarding connects providers before choosing models; settings shows roles first
                 if (onboarding) {
                     ProvidersSection(ui, actions)
-                    // 上手时不放「上下文与压缩」,设置里再调
+                    // "Context and compaction" is not offered during onboarding; adjust it in settings later
                     RolesSection(ui, onPick, actions.setReasoningEffort)
                     FooterNote(ModelSetupCopy.ONBOARDING_NOTE)
                 } else {
@@ -468,10 +468,10 @@ fun ModelSetupContent(
                             ListRow(MikaIcons.Chart, UsageCopy.TITLE, first = true, onClick = openUsage) { RowChevron() }
                         }
                     }
-                    // 存下服务商、推荐的模型没试通过时的说明和「选主模型」(上手时在服务商一组下面)
+                    // Note for when the provider was saved but the suggested model failed its test, plus "choose main model" (below the providers group during onboarding)
                     ProbeNote(ui, actions)
-                    // 迁移到语音目录后,三种用途和来源账号收成一组「语音」;迁移前仍是旧的分散入口
-                    // 设置页的 vm 不带语音控制器,迁移与否直接看目录本身
+                    // After migrating to the voice catalog, the three roles and source accounts are consolidated into one "Voice" group; before migration the old scattered entries remain
+                    // The settings page's vm carries no voice controller, so migration is read from the catalog itself
                     val voiceCatalog = liveVoiceCatalog?.takeIf { it.legacyMigrationComplete } ?: ui.sttCatalog
                     val hubOpen = voiceCatalog != null && actions.openSpeech != null && actions.openVoice != null &&
                         actions.openCallMode != null && actions.openVoiceCatalog != null
@@ -504,7 +504,7 @@ fun ModelSetupContent(
                 }
                 Spacer(Modifier.height(16.dp))
             }
-            // 看键盘实际占的高度;isImeVisible 在系统第一次报告前默认是 true,会把按钮误藏
+            // Measure the height the keyboard actually occupies; isImeVisible defaults to true before the system first reports, which would hide the button by mistake
             if (onboarding && WindowInsets.ime.getBottom(LocalDensity.current) == 0) {
                 Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)) {
                     ProgressDots(Onboarding.DOTS, Onboarding.dot(OnboardingStep.Model), Modifier.padding(bottom = 14.dp))
@@ -515,7 +515,7 @@ fun ModelSetupContent(
     }
 }
 
-/** 配置模型页(上手时)和添加服务商表单的文字(纯函数,便于测试)。用途的说法在 [ModelsCopy]。 */
+/** Text for the model setup page (onboarding) and the add-provider form, as pure functions for easy testing. Role wording lives in [ModelsCopy]. */
 object ModelSetupCopy {
     val TITLE: String get() = tr(R.string.model_setup_title)
     val LEAD: String get() = tr(R.string.model_setup_lead)
@@ -528,7 +528,7 @@ object ModelSetupCopy {
     const val API_KEY = "API Key"
     val KEY_HINT: String get() = tr(R.string.model_key_hint)
     val KEY_OPTIONAL: String get() = tr(R.string.model_key_optional)
-    /** 填 Key 的大输入框:可以一次贴多把,逗号或换行分开,自动轮换。 */
+    /** The large Key input: several keys can be pasted at once, separated by commas or newlines, and they rotate automatically. */
     val KEY_POOL_HINT: String get() = tr(R.string.model_key_pool_hint)
     val KEY_INVISIBLE_REMOVED: String get() = tr(R.string.model_key_invisible_removed)
     val KEY_ILLEGAL: String get() = tr(R.string.model_key_illegal_chars)
@@ -545,7 +545,7 @@ object ModelSetupCopy {
     val SAVE_UNTESTED_BODY: String get() = tr(R.string.model_save_untested_body)
     val SAVE_UNTESTED_CONFIRM: String get() = tr(R.string.model_save_untested_confirm)
 
-    /** 手填模型名时举的例子,按接口类型(各家模型名的样子不同)。 */
+    /** Example given when entering a model name manually, per protocol kind (each provider formats model names differently). */
     fun modelExample(kind: ProviderConfig.Kind): String = tr(
         when (kind) {
             ProviderConfig.Kind.Gemini -> R.string.model_example_gemini
@@ -556,7 +556,7 @@ object ModelSetupCopy {
         },
     )
 
-    /** 自定义地址是某家官方地址时的建议;接口类型和那家对不上时补一句。 */
+/** Suggestion when the custom URL is some provider's official URL; adds a sentence when the protocol does not match that provider. */
     fun presetSuggestion(f: AddForm): String {
         val preset = f.suggestedPreset ?: return ""
         val match = tr(R.string.model_preset_match, preset.label)
@@ -569,7 +569,7 @@ object ModelSetupCopy {
 
     fun failed(reason: String) = tr(R.string.model_failed, reason)
 
-    /** 模型的能力标签:(文字, 是否强调色)。接口没给、用户也没说、按预设推断的标「未确认」。只作参考,不拦选择。 */
+    /** Model capability tags: (text, whether to use the accent color). Tagged "unconfirmed" when the API did not report it, the user did not say, and it was inferred from the preset. For reference only; it never blocks a choice. */
     fun tags(o: ModelOption, forVision: Boolean = false): List<Pair<String, Boolean>> = buildList {
         val caps = o.capabilities
         val visionKnown = o.visionKnown || o.visionByUser != null

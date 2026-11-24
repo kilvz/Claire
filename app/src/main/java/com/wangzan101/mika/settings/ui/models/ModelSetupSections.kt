@@ -34,7 +34,7 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 服务商:每家一行(写明在给哪些用途干活),加「添加服务商」;没有服务商或点了添加时,表单就摊在这里。 */
+/** Providers: one row per provider (stating which roles it serves) plus "Add provider"; when there are none or add was tapped, the form is laid out right here. */
 @Composable
 internal fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
     val c = MikaTheme.colors
@@ -42,7 +42,7 @@ internal fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
         GroupCard {
             ui.providers.forEachIndexed { i, p ->
                 val line = if (ui.signedOut(p)) ModelsCopy.CHATGPT_SIGNED_OUT else ModelsCopy.providerLine(p, ui.listing[p.id], ui.rolesOf(p))
-                // 有用着却没试通过的模型、或跳过测试存下且已经在用:这一行就提醒「没测试通过」
+                // There is a model in use that failed its test, or the provider was saved skipping the test and is already in use: this row then warns "not verified"
                 val warning = ModelsCopy.UNVERIFIED.takeIf {
                     ui.unverified(p).isNotEmpty() || (ui.untested(p) && ui.rolesOf(p).isNotEmpty())
                 }
@@ -61,16 +61,16 @@ internal fun ProvidersSection(ui: ModelSetupUi, actions: ModelSetupActions) {
     FooterNote(ModelsCopy.KEY_NOTE)
 }
 
-/** 存下服务商时的说明;推荐的模型没试通过、还没有主模型时,给「选主模型」(选的时候先试调用)。 */
+/** Note shown when a provider is saved; if the suggested model failed its test and there is no main model yet, it offers "choose main model" (which test-calls on selection). */
 @Composable
 internal fun ProbeNote(ui: ModelSetupUi, actions: ModelSetupActions) {
     val c = MikaTheme.colors
-    // 首次上手:服务商一存下,摊开的表单就收起了,推荐的模型还在试调用,这里接着说一声
+    // First-time onboarding: the expanded form collapses as soon as the provider is saved while the suggested model is still being test-called, so say so here
     if (ui.form.test == ListState.Running && !ui.formOpen && ui.providers.isNotEmpty()) {
         FooterNote(ModelSetupCopy.TESTING, Modifier.testTag("setup-probe-running"))
     }
     ui.probeNote?.let { FooterNote(it, Modifier.testTag("setup-probe-note"), color = c.warn) }
-    // 刚存下的那家一个模型都没试通过:直接去选主模型(选的时候先试调用)
+    // None of the just-saved provider's models passed its test: go straight to choosing the main model (which test-calls on selection)
     if (ui.pickToProbe != null && !ui.roles.hasMain) {
         Text(
             ModelSetupCopy.PICK_MAIN,
@@ -80,7 +80,7 @@ internal fun ProbeNote(ui: ModelSetupUi, actions: ModelSetupActions) {
     }
 }
 
-/** 对话和声音模型共用一组用途卡。 */
+/** Chat and voice models share one group of role cards. */
 @Composable
 internal fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReasoning: (ModelRole, String?) -> Unit,
     onContext: ((String, ModelContextSettings) -> Boolean)? = null,
@@ -117,7 +117,7 @@ internal fun RolesSection(ui: ModelSetupUi, onPick: (ModelRole) -> Unit, onReaso
     }
 }
 
-/** 语音转文字独立设置。 */
+/** Speech to text is configured separately. */
 @Composable
 internal fun SpeechSection(ui: ModelSetupUi, onSpeech: (() -> Unit)?) {
     if (onSpeech == null) return
@@ -129,7 +129,7 @@ internal fun SpeechSection(ui: ModelSetupUi, onSpeech: (() -> Unit)?) {
     }
 }
 
-/** 图片模型:生成/改图用的模型,和语音一样单独一行。 */
+/** Image model: the model used for generating/editing images, on its own row like voice. */
 @Composable
 internal fun ImageModelSection(ui: ModelSetupUi, onImage: (() -> Unit)?) {
     if (onImage == null) return
@@ -141,7 +141,7 @@ internal fun ImageModelSection(ui: ModelSetupUi, onImage: (() -> Unit)?) {
     }
 }
 
-/** 统一语音模型目录入口:能力与协议在此声明;语音输入、朗读和通话页只负责选择与使用偏好。 */
+/** Entry to the unified voice model catalog: capabilities and protocols are declared here; the speech input, read-aloud and call pages only handle selection and usage preferences. */
 @Composable
 internal fun VoiceCatalogSection(onOpenVoiceCatalog: (() -> Unit)?) {
     if (onOpenVoiceCatalog == null) return

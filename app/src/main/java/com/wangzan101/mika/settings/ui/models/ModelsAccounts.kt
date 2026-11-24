@@ -17,8 +17,8 @@ import com.wangzan101.mika.ui.components.ValueTone
 import com.wangzan101.mika.ui.theme.MikaTheme
 
 /**
- * ChatGPT 的连接:账号(邮箱)、退出登录或再登录、管理用量(打开 ChatGPT 的用量页)。
- * 退出登录只清这台手机上的令牌,服务商、模型和用途都留着。
+ * ChatGPT connection: account (email), sign out or sign in again, and manage usage (opens ChatGPT's usage page).
+ * Signing out only clears the token on this phone; providers, models and roles are kept.
  */
 @Composable
 internal fun ChatGptConnection(ui: ModelSetupUi, state: ListState?, actions: ProviderDetailActions) {
@@ -51,8 +51,8 @@ internal fun ChatGptConnection(ui: ModelSetupUi, state: ListState?, actions: Pro
 }
 
 /**
- * 用 xAI 或 OpenRouter 账号登录的连接:账号、状态、设为主模型、打开对方的账号页(OpenRouter 是 Keys 页面)、退出或再登录。
- * 退出只清这台手机上的登录信息(xAI 的令牌、OpenRouter 换来的 Key),服务商、模型和用途都留着。
+ * Connection that signs in with an xAI or OpenRouter account: account, status, set as main model, open that provider's account page (the Keys page for OpenRouter), and sign out or sign in again.
+ * Signing out only clears the sign-in data on this phone (the xAI token, the Key exchanged for OpenRouter); providers, models and roles are kept.
  */
 @Composable
 internal fun AccountConnection(ui: ModelSetupUi, p: Provider, state: ListState?, actions: ProviderDetailActions) {
@@ -73,10 +73,10 @@ internal fun AccountConnection(ui: ModelSetupUi, p: Provider, state: ListState?,
         }
     }
     GroupCard {
-        // 主模型已经在这家就不放这一行
+        // Skip this row when the main model already comes from this provider
         val isMain = ui.configFor(ModelRole.Main)?.providerId == p.id
         if (signedIn && !isMain && ui.options(p).isNotEmpty()) {
-            // 设主模型先试调用一次(见 ModelSetupViewModel.useAsMain)
+            // Setting the main model first runs one test call (see ModelSetupViewModel.useAsMain)
             val pick = ui.manualPick[p.id]
             ListRow(
                 null, ModelsCopy.SET_MAIN, if (pick == ListState.Running) ModelSetupCopy.TESTING else ModelsCopy.SET_MAIN_NOTE,

@@ -27,23 +27,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * 配置模型的状态与动作。添加服务商时「测试并保存」列出模型就存下这家;还没有主模型时再让推荐的一个试调用,通了才当主模型。
- * 改了服务商、地址或 Key,进行中的测试作废。用途:从所有已连接服务商记住的模型里选;主模型要先试调用通过
- * (试通过过的不再试),看图、轻量、备援选中即生效;看图还可以「用主模型」「不用」,轻量可以「用主模型」。
- * 首次上手和设置 › 模型共用。
+ * State and actions for model setup. When adding a provider, "Test and save" stores it once models can be listed; if there is no main model yet, the suggested one is test-called and only becomes the main model when it passes.
+ * Changing the provider, URL or Key invalidates a test in progress. Roles are chosen from the models remembered across all connected providers; the main model must pass a test call first
+ * (ones that already passed are not tested again), while vision, light and fallbacks apply on selection; vision can also be "use main model"/"off", light can be "use main model".
+ * Shared by first-time onboarding and Settings › Models.
  */
 class ModelSetupViewModel(
     internal val store: ProviderStore,
     internal val scope: CoroutineScope,
     internal val io: CoroutineDispatcher = Dispatchers.IO,
     internal val browser: SignInBrowser? = null,
-    /** 登录跑在哪:界面给的是 App 那一份(退到后台、界面重建都不断,期间开前台服务);测试里就用 [scope]。 */
+    /** Where sign-in runs: the UI passes the app-wide one (unaffected by going to the background or a UI rebuild, running a foreground service meanwhile); tests just use [scope]. */
     internal val signIns: ChatGptSignIns = ChatGptSignIns(scope),
-    /** 语音转文字的选择;测试和上手流程不传,卡片就不出现。 */
+    /** The speech-to-text choice; tests and the onboarding flow do not pass it, so the card does not appear. */
     internal val speech: SpeechSettings? = null,
     internal val systemSpeech: () -> SystemCapability = { SystemCapability(available = false, onDevice = false) },
     internal val stt: SttSelectionController? = null,
-    /** 统一语音目录的账号管理:删除服务商时一并清掉依赖它的语音模型;测试和上手流程可不传。 */
+    /** Account management for the unified voice catalog: deleting a provider also clears the voice models that depend on it; tests and the onboarding flow may omit it. */
     internal val voiceAccounts: com.wangzan101.mika.voice.model.VoiceAccountManager? = null,
 ) {
     internal val _state = MutableStateFlow(snapshot(ModelSetupUi(AddForm.of(ProviderPresets.all.first()))))
@@ -51,18 +51,18 @@ class ModelSetupViewModel(
 
     internal val _speechProbe = MutableStateFlow<Map<String, String>>(emptyMap())
 
-    /** 服务商 id -> 选它的语音模型时试转没通过的原因(用现有的说法);选通了或重新选时清掉。 */
+    /** Provider id -> reason the test transcription failed when selecting its voice model (using the existing wording); cleared when a selection passes or is made again. */
     val speechProbe: StateFlow<Map<String, String>> = _speechProbe.asStateFlow()
 
     internal var testJob: Job? = null
     internal val refreshJobs = mutableMapOf<String, Job>()
 
     init {
-        // 别处(开发者选项等)改了存储时跟着更新
+        // Follow the store when it is changed elsewhere (developer options, etc.)
         scope.launch { merge(store.providers, store.configs, store.roles, store.groups).collect { sync() } }
         speech?.let { s -> scope.launch { s.choice.collect { sync() } } }
         stt?.let { controller -> scope.launch { controller.catalog.state.collect { sync() } } }
-        // 登录在别处结束(通知上取消了)或界面重建前就开始了:跟着它的进度
+        // Sign-in ended elsewhere (cancelled from the notification) or started before a UI rebuild: follow its progress
         scope.launch {
             signIns.running.collect { running ->
                 val prompt = signIns.devicePrompt
@@ -87,7 +87,7 @@ class ModelSetupViewModel(
                 }
             }
         }
-        // 设备码的短码可能在界面重建之后才来
+        // The device code short code may arrive after a UI rebuild
         scope.launch {
             signIns.device.collect { prompt ->
                 if (prompt == null) return@collect
@@ -100,7 +100,7 @@ class ModelSetupViewModel(
                 }
             }
         }
-        // 账号登录的结果交给现在这个界面(登录可能是重建前的那个界面开始的)
+        // Hand the account sign-in result to the current UI (the sign-in may have been started by the UI before a rebuild)
         scope.launch {
             signIns.outcome.collect { o ->
                 if (o == null) return@collect
@@ -135,10 +135,10 @@ class ModelSetupViewModel(
 
     internal fun sync() = _state.update(::snapshot)
 
-    // ---------- 添加服务商 ----------
+    // ---------- Add provider ----------
 
     /**
-     * 试调用的结论:通过、[model] 没调用工具、失败([message] 是给人看的原因)。
+     * Outcome of a test call: passed, [model] did not call a tool, or failed ([message] is the user-facing reason).
      */
     internal sealed interface ProbeOutcome {
         data object Passed : ProbeOutcome
@@ -147,10 +147,10 @@ class ModelSetupViewModel(
     }
 
     companion object {
-        /** 用户指定模型的试调用最多等多久。 */
+        /** How long a test call for a user-specified model may take at most. */
         const val PROBE_TIMEOUT_MS = 20_000L
 
-        /** 自定义服务商的名字最多几个字(服务商列表一行放得下)。 */
+        /** Maximum length of a custom provider name (so it fits on one line in the provider list). */
         const val MAX_NAME = 32
     }
 }

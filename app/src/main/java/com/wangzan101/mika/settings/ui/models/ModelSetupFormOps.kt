@@ -32,7 +32,7 @@ import com.wangzan101.mika.settings.ui.models.ModelSetupViewModel.ProbeOutcome
 import com.wangzan101.mika.settings.ui.models.ModelSetupViewModel.Companion.PROBE_TIMEOUT_MS
 import com.wangzan101.mika.settings.ui.models.ModelSetupViewModel.Companion.MAX_NAME
 
-// 模型设置:添加服务商表单、测试保存与模型探测
+// Model setup: add-provider form, test-and-save, and model probing
 fun ModelSetupViewModel.openForm() = _state.update { it.copy(formOpen = true) }
 
 fun ModelSetupViewModel.closeForm() {
@@ -47,7 +47,7 @@ fun ModelSetupViewModel.selectPreset(label: String) {
     edit { AddForm.of(p).copy(apiKey = form.apiKey, keyNotice = form.keyNotice) }
 }
 
-// 换了接口类型或地址,上次「没列出模型」就不作数了,要重新列
+// After changing the protocol or URL, a previous "no models listed" no longer applies and the list must be fetched again
 fun ModelSetupViewModel.setKind(kind: ProviderConfig.Kind) = edit { it.copy(kind = kind, noList = false) }
 
 fun ModelSetupViewModel.setBaseUrl(url: String) = edit { it.copy(baseUrl = url, noList = false) }
@@ -67,7 +67,7 @@ fun ModelSetupViewModel.setAccountId(input: String) {
     setBaseUrl(newUrl)
 }
 
-/** 粘贴或逐字改 Key:去掉零宽;换行和其它放不进请求头的字符原样留下并立刻标出来。 */
+/** Pasting or typing a Key: strip zero-width characters; keep line breaks and other characters that cannot go into a request header as-is and flag them immediately. */
 fun ModelSetupViewModel.setApiKey(key: String) {
     val accepted = ApiKeyText.accept(key)
     edit { it.copy(apiKey = accepted.text, keyNotice = accepted.notice) }
@@ -75,26 +75,26 @@ fun ModelSetupViewModel.setApiKey(key: String) {
 
 fun ModelSetupViewModel.setModel(model: String) = edit { it.copy(model = model) }
 
-/** 「手动填写模型名」:打开时显示模型名一栏;收起时清掉填的(没列出模型时那一栏一直在)。 */
+/** "Enter model name manually": shows the model name field when on; clears what was entered when turned off (when no models were listed the field always stays). */
 fun ModelSetupViewModel.setManual(on: Boolean) = edit { it.copy(manual = on, model = if (on || it.noList) it.model else "") }
 
-// 按字符(码点)截,不把 emoji 截成半个
+// Truncate by character (code point) so emoji are never cut in half
 fun ModelSetupViewModel.setName(name: String) = edit {
     val n = name.codePointCount(0, name.length)
     it.copy(name = if (n <= MAX_NAME) name else name.substring(0, name.offsetByCodePoints(0, MAX_NAME)))
 }
 
-/** 连接信息变了:进行中的测试和上次的失败原因作废。 */
+/** Connection details changed: invalidate the running test and the previous failure reason. */
 internal fun ModelSetupViewModel.edit(change: (AddForm) -> AddForm) {
     testJob?.cancel()
     _state.update { it.copy(form = change(it.form).copy(test = ListState.Idle)) }
 }
 
 /**
- * 测试并保存:列得出模型就存下这家服务商和列表(列不出时请用户手填,或 [saveWithoutTest] 先存下)。
- * 已经有主模型时只列模型、不发对话请求。还没有主模型时(首次上手、第一家)挑一个候选:手填了模型名的用它,
- * 否则按 [ModelOptions.defaultMain],再不行用第一个对话模型(标为 TTS 的不算);让它调用一次工具(见 [verifyMain]),
- * 通了当主模型;没通过服务商照样存下、不定主模型,说明原因并给「选主模型」的入口([ModelSetupUi.pickToProbe])。
+ * Test and save: if models can be listed, store this provider and its list (when it cannot, ask the user to enter a model manually, or use [saveWithoutTest] to save it anyway).
+ * When a main model already exists, only list the models and send no chat request. When there is no main model yet (first run, first provider), pick a candidate: use the manually entered model name if there is one,
+ * otherwise follow [ModelOptions.defaultMain], and failing that use the first chat model (ones marked TTS excluded); make it call a tool once (see [verifyMain]) and
+ * use it as the main model if that passes; if it fails, the provider is still saved without a main model, the reason is explained, and an entry point for "choose main model" is offered ([ModelSetupUi.pickToProbe]).
  */
 fun ModelSetupViewModel.testAndSave() {
     val f = _state.value.form
@@ -135,7 +135,7 @@ fun ModelSetupViewModel.testAndSave() {
         var note: String? = null
         if (!store.roles.value.hasMain) {
             val options = ModelOptions.ofProvider(saved, store.list())
-            // 手填的是列表里写明 Claire 调不了的(不在 options 里)就不试它
+            // If the manually entered model is one the list says Claire cannot use (not in options), do not test it
             val candidate = typed.takeIf { t -> t.isNotBlank() && (models.none { it.id == t } || options.any { it.id == t }) }
                 ?: ModelOptions.defaultMain(options, f.familyTokens) ?: options.firstOrNull()?.id
             if (candidate != null) {
@@ -157,13 +157,13 @@ fun ModelSetupViewModel.testAndSave() {
 }
 
 /**
- * 不测试,直接保存:只按填的接口类型、地址和 Key 存下这家服务商,不列模型、不试调用(见 [AddForm.canSaveUntested])。
- * 存下的这家带着 [Provider.savedUntested]，服务商页提供刷新目录的入口。
+ * Save without testing: store this provider using only the entered protocol, URL and Key, without listing models or making a test call (see [AddForm.canSaveUntested]).
+ * The stored provider carries [Provider.savedUntested], and the provider page offers an entry point to refresh the catalog.
  *
- * 手填了模型名([AddForm.typedModel])时,只把它记为手填——列表里没有它、或这家列不出模型,刷新列表也不会丢。
+ * When a model name was entered manually ([AddForm.typedModel]), it is only recorded as manually typed — so it is not lost when the list is refreshed, even if the list does not contain it or this provider cannot list models at all.
  *
- * 列表参数给的是空列表(「列过但一个也没有」)而不是 null:这样「没列出模型」这件事和 [Provider.savedUntested]
- * 一起把两种情形分清楚了——真的没有列表,还是这次没去列。
+ * The list argument is an empty list ("listed, but none found") rather than null: together with [Provider.savedUntested] this distinguishes
+ * the two cases — there really is no list, or this time no listing was attempted.
  */
 fun ModelSetupViewModel.saveWithoutTest() {
     val f = _state.value.form
@@ -196,8 +196,8 @@ fun ModelSetupViewModel.saveWithoutTest() {
 }
 
 /**
- * 拿去放进请求头的 Key:再收一次(零宽去掉),首尾空白去掉。换行算放不进头。
- * 还含有放不进头的字符时为 null,调用方不能发请求、也不能保存。
+ * The Key to put into the request header: sanitized once more (zero-width removed) and trimmed. A line break counts as not header-safe.
+ * Returns null while characters that cannot go into a header remain; the caller must then neither send requests nor save.
  */
 internal fun ModelSetupViewModel.headerKey(raw: String): String? {
     val accepted = ApiKeyText.accept(raw)
@@ -208,12 +208,12 @@ internal fun ModelSetupViewModel.headerKey(raw: String): String? {
     return if (parsed.isNotEmpty() && parsed.all { ApiKeyText.isHeaderLegal(it) }) key else null
 }
 
-/** 表单上的 Key 放不进请求头:标红,停在表单上,不发请求。 */
+/** The Key on the form cannot go into a request header: flag it in red, stay on the form and send no request. */
 internal fun ModelSetupViewModel.rejectKey() {
     _state.update { it.copy(form = it.form.copy(keyNotice = ApiKeyText.Notice.IllegalCharacters, test = ListState.Idle)) }
 }
 
-/** 列模型。头值仍让 OkHttp 抛时收成失败结果,不让异常逃出协程把进程打掉。消息里不带头的原文。 */
+/** Lists models. If a header value still makes OkHttp throw, this is turned into a failed result so the exception cannot escape the coroutine and crash the process. Messages never include the raw header. */
 internal suspend fun ModelSetupViewModel.listSafely(block: suspend () -> ModelListResult): ModelListResult = try {
     withContext(io) { block() }
 } catch (e: CancellationException) {
@@ -230,16 +230,16 @@ internal fun ModelSetupViewModel.listFailure(e: Exception): ModelListResult.Fail
 internal fun ModelSetupViewModel.listMessage(r: ModelListResult.Failed): String =
     if (r.reason == ListFailure.IllegalKey) tr(R.string.model_key_illegal_chars) else r.message
 
-/** 列模型以外的失败给人看的一句。头值不合法时不把异常原文(可能含 Key)露出去。 */
+/** A user-facing line for failures other than listing. When a header value is illegal, the raw exception text (which may contain the Key) is not exposed. */
 internal fun ModelSetupViewModel.listFailureText(e: Exception): String = when (e) {
     is ModelError.IllegalHeader, is IllegalArgumentException -> tr(R.string.model_key_illegal_chars)
     else -> e.message.orEmpty()
 }
 
 /**
- * 让 [model] 调用一次工具,和真实任务走同一条建模型的路(请求头、会话号都一样):Key 不对、少了服务商要的请求头、
- * 模型名不对、模型不会调用工具,这里就露出来,不等到第一个任务。超过 [PROBE_TIMEOUT_MS] 没回算失败,服务端的报错原样带上;
- * 找不到模型时说明是哪个，以及 [exampleKind] 这一类接口的模型名示例。
+ * Make [model] call a tool once, going through the same model-construction path as a real task (same request headers and session id): a wrong Key, a missing header the provider requires,
+ * a wrong model name, or a model that cannot call tools shows up here instead of at the first task. No reply within [PROBE_TIMEOUT_MS] counts as a failure and carries the server error as-is;
+ * when the model is not found, it says which one it was and gives a model name example for interfaces of kind [exampleKind].
  */
 internal suspend fun ModelSetupViewModel.probeModel(
     kind: ProviderConfig.Kind, baseUrl: String, key: String?, sessionHeader: String?,
@@ -267,7 +267,7 @@ internal suspend fun ModelSetupViewModel.probeModel(
             is ModelError.ModelNotFound -> ProbeOutcome.Failed(
                 tr(R.string.model_probe_not_found, model, ModelSetupCopy.modelExample(exampleKind)),
             )
-            // 代理那一段的问题:说是代理,不说成模型或服务商不行
+            // A problem in the proxy leg: say it is the proxy, not that the model or provider is unusable
             is ModelError.Proxy -> ProbeOutcome.Failed(tr(R.string.model_probe_failed, model, proxyReason(e)))
             is ModelError.IllegalHeader -> ProbeOutcome.Failed(tr(R.string.model_key_illegal_chars))
             else -> ProbeOutcome.Failed(tr(R.string.model_probe_failed, model, e.message.orEmpty()))
@@ -276,7 +276,7 @@ internal suspend fun ModelSetupViewModel.probeModel(
 }
 
 /**
- * 已连上的服务商里试调用 [model]:用存着的 Key、请求头,能力按已有的配置或预设。
+ * Test-call [model] on an already connected provider: using the stored Key and request headers, with capabilities from the existing config or the preset.
  */
 internal suspend fun ModelSetupViewModel.probeSaved(p: Provider, model: String): ProbeOutcome {
     val stored = store.provider(p.id)
@@ -292,12 +292,12 @@ internal suspend fun ModelSetupViewModel.probeSaved(p: Provider, model: String):
 }
 
 /**
- * 设主模型前的把关:让 [model] 调用一次工具,只回话、不调用工具也算没通过(主模型要会调用工具)。
- * [Provider.verifiedModels] 只说明回复过,不作为跳过的依据;已经是主模型不再测。
- * 通过时记为核实过。返回没通过的原因,通过为 null。
+ * Gate before setting the main model: make [model] call a tool once; replying without calling a tool also counts as a failure (the main model must be able to call tools).
+ * [Provider.verifiedModels] only says it has replied and is not a reason to skip; a model that is already the main model is not tested again.
+ * On success it is marked as verified. Returns the failure reason, or null when it passed.
  */
 internal suspend fun ModelSetupViewModel.verifyMain(p: Provider, model: String): String? {
-    // verifiedModels 只说明回复过(转写、无工具回复也算),不能证明会调用工具;只有已经是主模型的不再测
+    // verifiedModels only says it has replied (transcription and tool-less replies count too) and does not prove it can call tools; only a model that already is the main model is skipped
     if (store.isMainModel(p.id, model)) return null
     return when (val outcome = probeSaved(p, model)) {
         ProbeOutcome.Passed -> {
@@ -310,8 +310,8 @@ internal suspend fun ModelSetupViewModel.verifyMain(p: Provider, model: String):
 }
 
 /**
- * 选择页里手填的模型名,看图、轻量和备援也先试调用这一个(主模型走 [verifyMain]):手填错了这里就露出来,不等到任务失败。
- * 只回话、不调用工具也算没通过,看图例外(看图不靠工具)。通过(含只回话的看图)时记为核实过。返回没通过的原因,通过为 null。
+ * For a manually entered model name from the picker, vision, light and fallback also test-call it first (the main model goes through [verifyMain]): a typo shows up here instead of at a failed task.
+ * Replying without calling a tool also counts as a failure, except for vision (vision does not rely on tools). On success (including a reply-only vision test) it is marked as verified. Returns the failure reason, or null when it passed.
  */
 internal suspend fun ModelSetupViewModel.verifyTyped(p: Provider, model: String, role: ModelRole): String? =
     when (val outcome = probeSaved(p, model)) {

@@ -56,7 +56,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-/** 组成员列表要跟着编辑页一起扛过进程重建:每项压成一行,恢复时还原。 */
+/** The group member list must survive process death along with the edit page: each entry is packed into one line and restored on recovery. */
 private val GroupMembersSaver = listSaver<List<GroupMember>, String>(
     save = { members ->
         members.map { m ->
@@ -81,7 +81,7 @@ private val GroupMembersSaver = listSaver<List<GroupMember>, String>(
     },
 )
 
-/** 模型组列表:名称、成员数、用于哪些用途。点一行编辑。 */
+/** Model group list: name, member count and which roles it serves. Tap a row to edit. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelGroupsScreen(
@@ -117,8 +117,8 @@ fun ModelGroupsScreen(
 }
 
 /**
- * 组编辑页。[groupId] 为 null 是新建。保存失败(成员配置没了、主模型组不满足全员支持工具)时留在页上说明;
- * 删除是另一个确认按钮,删完返回列表。
+ * Group edit page. A null [groupId] means creating a new group. When saving fails (a member config is gone, or a main-model group does not have tool support for every member) the page stays and explains why;
+ * deletion is a separate confirmation button, and the list is shown again after deleting.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,13 +147,13 @@ fun ModelGroupEditorScreen(
         strategy = GroupStrategy.of(strategy),
         members = members.mapIndexed { i, m -> m.copy(priority = i) },
         sticky = sticky,
-        // 编辑页还没有这两项的控件;保存时保留已存的值,不要静默重置
+        // This page has no controls for these two yet; keep the stored values when saving instead of silently resetting them
         raceReadOnly = existing?.raceReadOnly ?: false,
         limits = existing?.limits ?: GroupLimits(),
     )
     val validMain = group.usableFor(com.wangzan101.mika.core.model.ModelRole.Main) { id -> ui.configOf(id)?.capabilities }
     val validVision = group.usableFor(com.wangzan101.mika.core.model.ModelRole.Vision) { id -> ui.configOf(id)?.capabilities }
-    // 已经用做主模型的组不能失去工具支持;看图/轻量组不受这条限制
+    // A group already used as the main model must not lose tool support; vision/light groups are exempt from this rule
     val usedForMain = existing != null && ui.roles.resolveGroup(com.wangzan101.mika.core.model.ModelRole.Main) == existing.id
     val canSave = name.isNotBlank() && members.isNotEmpty() && !saving && (!usedForMain || validMain)
 
@@ -161,7 +161,7 @@ fun ModelGroupEditorScreen(
         InputRow(ModelsCopy.GROUP_NAME, name, { name = it; error = null }, ModelsCopy.GROUP_NAME_HINT, first = true)
         GroupLabel(ModelsCopy.GROUP_STRATEGY, Modifier.padding(top = 8.dp))
         GroupCard {
-            // 费用档位还没有编辑界面,v1 先不露出 cost-first;文件和核心已经能读
+            // There is no editing UI for cost tiers yet, so v1 does not expose cost-first; files and core can already read it
             GroupStrategy.entries.filter { it != GroupStrategy.CostFirst }.forEachIndexed { i, s ->
                 RadioRow(ModelsCopy.strategyTitle(s), selected = strategy == s.wire, onClick = { strategy = s.wire }, first = i == 0, subtitle = ModelsCopy.strategyNote(s))
             }
@@ -266,7 +266,7 @@ private fun List<GroupMember>.swapped(i: Int, j: Int): List<GroupMember> {
     return toMutableList().also { it[i] = this[j]; it[j] = this[i] }
 }
 
-/** 添加成员:列出所有服务商的模型,已经在组里的不再列。 */
+/** Add member: lists the models of every provider, skipping those already in the group. */
 @Composable
 private fun AddMemberDialog(
     ui: ModelSetupUi, existing: List<GroupMember>, onDismiss: () -> Unit, onAdd: (String, String) -> Unit,

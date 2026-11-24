@@ -23,8 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.chat.ui.isActive
 
-// 模型设置:刷新列表、换 Key 与移除服务商
-/** 重新列一次这个服务商的模型并记下;失败时记下原因。 */
+// Model setup: refreshing lists, changing Keys and removing providers
+/** Lists this provider's models again and records them; records the reason on failure. */
 fun ModelSetupViewModel.refresh(providerId: String) {
     val p = store.provider(providerId) ?: return
     if (refreshJobs[providerId]?.isActive == true) return
@@ -41,12 +41,12 @@ fun ModelSetupViewModel.refresh(providerId: String) {
     }
 }
 
-/** 选择页、服务商页打开时:还没记住列表的服务商列一次。 */
+/** When the picker or provider page opens: list providers whose model list has not been remembered yet. */
 fun ModelSetupViewModel.ensureListed() {
     _state.value.providers.filter { it.models == null && _state.value.listing[it.id] == null && listable(it) }.forEach { refresh(it.id) }
 }
 
-/** 退出了登录的列不了模型,等再登录。 */
+/** Signed-out providers cannot list models; wait until they sign in again. */
 internal fun ModelSetupViewModel.listable(p: Provider) = if (p.signIn != null) store.hasKey(p.id) else when (p.kind) {
     ProviderConfig.Kind.ChatGpt -> store.chatGptSession(p.id)?.signedIn == true
     ProviderConfig.Kind.Xai -> store.accountSession(p.id)?.signedIn == true
@@ -54,7 +54,7 @@ internal fun ModelSetupViewModel.listable(p: Provider) = if (p.signIn != null) s
 }
 
 /**
- * 换 Key,然后用新 Key 重新列一次模型。零宽先去掉;换行和其它放不进请求头的字符不保存、不列模型。
+ * Change the Key, then list the models again with the new Key. Zero-width characters are stripped first; line breaks and other characters that cannot go into a request header mean nothing is saved and no models are listed.
  */
 fun ModelSetupViewModel.changeKey(providerId: String, apiKey: String) {
     val k = headerKey(apiKey) ?: return
@@ -108,21 +108,21 @@ fun ModelSetupViewModel.removeProviderKey(providerId: String, keyToRemove: Strin
     }
 }
 
-/** 删服务商前预览它名下的语音模型能力引用;删除面板靠它说清影响。 */
+/** Preview the voice-model capability references under this provider before deleting it; the delete panel uses it to spell out the impact. */
 fun ModelSetupViewModel.providerVoiceUsage(providerId: String): List<com.wangzan101.mika.voice.model.VoiceModelRef> =
     voiceAccounts?.providerVoiceUsage(providerId) ?: emptyList()
 
-/** 删掉服务商和它的 Key;用着它的用途退回默认,依赖它的语音模型一并清掉。 */
+/** Delete the provider and its Key; roles using it fall back to the default, and voice models depending on it are cleared as well. */
 fun ModelSetupViewModel.removeProvider(providerId: String) {
     scope.launch {
         withContext(io) {
-            // ChatGPT 的先在服务端注销登录,再删
+            // For ChatGPT, sign out on the server first, then delete
             when (store.provider(providerId)?.kind) {
                 ProviderConfig.Kind.ChatGpt -> store.signOutChatGpt(providerId)
                 ProviderConfig.Kind.Xai -> store.signOutAccount(providerId)
                 else -> Unit
             }
-            // OpenRouter 授权来的 Key 随服务商一起删;OpenRouter 那边的 Key 要用户自己到 Keys 页面删
+            // A Key obtained through OpenRouter authorization is deleted along with the provider; the Key on OpenRouter's side must be deleted by the user on the Keys page
             store.removeProvider(providerId)
             voiceAccounts?.deleteProviderWithVoiceUsage(providerId)
         }

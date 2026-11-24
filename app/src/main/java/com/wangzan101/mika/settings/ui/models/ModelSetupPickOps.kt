@@ -40,8 +40,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.settings.ui.models.ModelSetupViewModel.ProbeOutcome
 
-// 模型设置:选用途、备用、模型组、语音模型与各模型设置
-/** 把这家默认的那个模型(见 [ModelOptions.defaultMain])设为主模型:和 [pick] 一样先试调用,进度在 [ModelSetupUi.manualPick]。 */
+// Model setup: choosing roles, fallbacks, model groups, voice models and per-model settings
+/** Set this provider's default model (see [ModelOptions.defaultMain]) as the main model: test-called first like [pick], with progress in [ModelSetupUi.manualPick]. */
 fun ModelSetupViewModel.useAsMain(providerId: String) {
     val p = store.provider(providerId) ?: return
     val options = ModelOptions.ofProvider(p, store.list())
@@ -78,14 +78,14 @@ fun ModelSetupViewModel.setModelServiceTier(providerId: String, model: String, t
 }
 
 /**
- * 服务商详情「用作」里明确改选用途。
- * 主模型和 [pick] 一样先试调用;看图、轻量是手填的(列表里没有)时也先试调用(见 [verifyTyped])。没通过不改;
- * 进度和原因在 [ModelSetupUi.manualPick]。保存成功后调 [onDone]。
+ * Explicitly change the role from "Use as" in the provider details.
+ * The main model is test-called first like [pick]; vision and light are also test-called first when manually entered (not in the list) (see [verifyTyped]). Nothing changes on failure;
+ * progress and the reason are in [ModelSetupUi.manualPick]. [onDone] is called after a successful save.
  */
 fun ModelSetupViewModel.useFromProvider(role: ModelRole, providerId: String, model: String, onDone: () -> Unit = {}) {
     saveModelSelection(
         providerId, model, clearNote = role == ModelRole.Main,
-        // 主模型照样先试调用;看图、轻量只有手填的(列表里没有)才试,列表里的不试
+        // The main model is still test-called first; vision and light are only tested when manually entered (not in the list), listed ones are not
         verify = when {
             role == ModelRole.Main -> { p, name -> verifyMain(p, name) }
             else -> { p, name -> if (listed(p, name)) null else verifyTyped(p, name, role) }
@@ -99,15 +99,15 @@ fun ModelSetupViewModel.useFromProvider(role: ModelRole, providerId: String, mod
 }
 
 /**
- * 保存从列表里选的对话模型。主模型先试调用这一个模型(见 [verifyMain]),通过才换,
- * 没通过原来的主模型不动;看图、轻量不试调用。手填的走 [pickManual]。
+ * Save a chat model picked from the list. For the main model this model is test-called first (see [verifyMain]) and only swapped in when it passes;
+ * on failure the existing main model stays. Vision and light are not test-called. Manually entered ones go through [pickManual].
  */
 fun ModelSetupViewModel.pick(role: ModelRole, providerId: String, model: String, onPicked: () -> Unit = {}) =
     pickRole(role, providerId, model, onPicked, if (role == ModelRole.Main) { p, name -> verifyMain(p, name) } else null)
 
 /**
- * 选择页里手填的模型名:不论哪个用途都先试调用一次(见 [verifyTyped];主模型见 [verifyMain]),通了才用,
- * 列表里没有的记为手填;没通过说原因,原来的选择不动。
+ * A manually entered model name from the picker: it is test-called once for any role (see [verifyTyped]; [verifyMain] for the main model) and only used when it passes;
+ * names not in the list are recorded as manually typed; on failure the reason is shown and the previous selection stays.
  */
 fun ModelSetupViewModel.pickManual(role: ModelRole, providerId: String, model: String, onPicked: () -> Unit = {}) =
     pickRole(role, providerId, model, onPicked) { p, name ->
@@ -124,20 +124,20 @@ internal fun ModelSetupViewModel.pickRole(
     }
 }
 
-/** 保存从列表里选的备援模型,一般不试调用;主模型的备援例外见下。手填的走 [pickFallbackManual]。 */
+/** Save a fallback model picked from the list; it is generally not test-called, with the main-model exception below. Manually entered ones go through [pickFallbackManual]. */
 fun ModelSetupViewModel.pickFallback(role: ModelRole, slot: Int, providerId: String, model: String, onPicked: () -> Unit = {}) =
     saveFallback(role, slot, providerId, model, onPicked, verify = if (role != ModelRole.Main) null else { p, name ->
-        // 主模型的备援:跳过测试存下的那家、或列表里没有的(手填的),先试调用一次
+        // Fallback for the main model: test-call once when the provider was saved skipping the test, or the model is not in the list (manually entered)
         if (!p.savedUntested && listed(p, name)) null else verifyTyped(p, name, ModelRole.Main)
     })
 
 /**
- * [model] 在这家列出的模型目录里,且 Claire 用得上([ListedModel.usable]:目录写明只有别的接口的不算)。
- * 用不上的按手填处理,先试调用——目录里有、Claire 不会说的模型不能被静默设成看图/轻量/备援。
+ * [model] is in this provider's listed model catalog and Claire can use it ([ListedModel.usable]: entries the catalog marks as only serving other protocols do not count).
+ * Unusable ones are treated as manually entered and test-called first — a model that is in the catalog but that Claire will not use must not be silently set as vision/light/fallback.
  */
 internal fun ModelSetupViewModel.listed(p: Provider, model: String): Boolean = p.models.orEmpty().any { it.id == model && it.usable }
 
-/** 备援里手填的模型名:先试调用一次(见 [verifyTyped]),通了才设上;没通过这一位不动。 */
+/** A manually entered fallback model name: test-called once (see [verifyTyped]) and only set when it passes; on failure this slot stays unchanged. */
 fun ModelSetupViewModel.pickFallbackManual(role: ModelRole, slot: Int, providerId: String, model: String, onPicked: () -> Unit = {}) =
     saveFallback(role, slot, providerId, model, onPicked) { p, name -> verifyTyped(p, name, role) }
 
@@ -159,8 +159,8 @@ internal fun ModelSetupViewModel.saveFallback(
 }
 
 /**
- * 选择页、「用作」面板保存一个模型:有 [verify] 的先过它(设主模型的试调用),
- * 再 [save]。进度和原因记在 [ModelSetupUi.manualPick]。
+ * Saves a model from the picker or the "Use as" sheet: when [verify] is given it runs first (the test call when setting the main model),
+ * then [save]. Progress and the reason are recorded in [ModelSetupUi.manualPick].
  */
 internal fun ModelSetupViewModel.saveModelSelection(
     providerId: String, model: String, clearNote: Boolean, onPicked: () -> Unit,
@@ -201,7 +201,7 @@ internal fun ModelSetupViewModel.saveModelSelection(
     }
 }
 
-/** 撤掉指定角色的第 [slot] 位备援。 */
+/** Clears fallback slot [slot] of the given role. */
 fun ModelSetupViewModel.clearFallback(role: ModelRole, slot: Int) {
     scope.launch {
         withContext(io) { store.setFallback(role, slot, null) }
@@ -209,10 +209,10 @@ fun ModelSetupViewModel.clearFallback(role: ModelRole, slot: Int) {
     }
 }
 
-/** 撤掉第 [slot] 位主模型备援(项目 3)。 */
+/** Clears main-model fallback slot [slot] (item 3). */
 fun ModelSetupViewModel.clearFallback(slot: Int) = clearFallback(ModelRole.Main, slot)
 
-/** 看图、轻量的固定选项:「用主模型」或(只有看图)「不用」。 */
+/** Fixed choices for vision and light: "Use main model" or (vision only) "Off". */
 fun ModelSetupViewModel.choose(role: ModelRole, choice: RoleChoice) {
     scope.launch {
         withContext(io) { store.choose(role, choice) }
@@ -220,7 +220,7 @@ fun ModelSetupViewModel.choose(role: ModelRole, choice: RoleChoice) {
     }
 }
 
-/** 把某个用途切到一个模型组;组不可用时不做。 */
+/** Switch a role to a model group; does nothing when the group is unusable. */
 fun ModelSetupViewModel.chooseGroup(role: ModelRole, groupId: String) {
     scope.launch {
         withContext(io) { store.choose(role, RoleChoice.Group(groupId)) }
@@ -228,12 +228,12 @@ fun ModelSetupViewModel.chooseGroup(role: ModelRole, groupId: String) {
     }
 }
 
-/** 保存组(新建或替换同 id);成员配置不存在、或主模型组不满足全员支持工具时返回 false。 */
+/** Save a group (create, or replace the one with the same id); returns false when a member config is missing or a main-model group lacks tool support for every member. */
 suspend fun ModelSetupViewModel.saveGroup(group: ModelGroup): Boolean = withContext(io) { store.saveGroup(group) }
 
 suspend fun ModelSetupViewModel.deleteGroup(groupId: String) = withContext(io) { store.deleteGroup(groupId) }
 
-/** 组编辑时把一个「服务商 + 模型」加成成员:复用已有配置,没有就按当前能力建一条。 */
+/** Add a "provider + model" as a member while editing a group: reuse an existing config, otherwise create one with the current capabilities. */
 suspend fun ModelSetupViewModel.ensureConfig(providerId: String, model: String): String? = withContext(io) {
     val p = store.provider(providerId) ?: return@withContext null
     val caps = ModelOptions.ofProvider(p, store.list()).firstOrNull { it.id == model }?.capabilities
@@ -241,7 +241,7 @@ suspend fun ModelSetupViewModel.ensureConfig(providerId: String, model: String):
     store.ensureConfig(providerId, model, caps)
 }
 
-/** 选「手机自带」或「不用」,当场生效。 */
+/** Choose "built into the phone" or "off"; takes effect immediately. */
 fun ModelSetupViewModel.pickSpeech(choice: SpeechChoice) {
     if (choice is SpeechChoice.Provider) return
     if (stt?.migrated == true) {
@@ -259,7 +259,7 @@ fun ModelSetupViewModel.pickSpeech(choice: SpeechChoice) {
     sync()
 }
 
-/** 迁移后的目录选择只写模型引用,不试转、不探测协议。 */
+/** After migration, selecting from the catalog only writes a model reference: no test transcription and no protocol probing. */
 fun ModelSetupViewModel.pickSttModel(ref: VoiceModelRef, onPicked: () -> Unit = {}) {
     val controller = stt?.takeIf { it.migrated } ?: return
     controller.select(ref)
@@ -269,8 +269,8 @@ fun ModelSetupViewModel.pickSttModel(ref: VoiceModelRef, onPicked: () -> Unit = 
 }
 
 /**
- * 迁移后按目录引用直接选择;迁移前不再拿静音试转探测接口,直接按服务商类型落成显式选择(默认接口),
- * 然后调 [onPicked]。旧选择经迁移后仍带着显式 [TranscribeMethod],运行时不重新探测。
+ * After migration, select directly by catalog reference; before migration, no longer probe the interface with a silent test transcription but resolve to an explicit selection (default endpoint) by provider kind,
+ * then call [onPicked]. After migration the old selection still carries an explicit [TranscribeMethod], so nothing is re-probed at runtime.
  */
 fun ModelSetupViewModel.pickSpeechModel(providerId: String, model: String, onPicked: () -> Unit = {}) {
     val m = model.trim()
@@ -291,7 +291,7 @@ fun ModelSetupViewModel.pickSpeechModel(providerId: String, model: String, onPic
     }
     val settings = speech ?: return
     val p = store.provider(providerId) ?: return
-    // 迁移前没有目录可依,按服务商类型落成显式选择;默认接口,不再试转探测
+    // Before migration there is no catalog to rely on, so resolve to an explicit selection by provider kind; default endpoint, no more test-transcription probing
     val method = if (p.kind == ProviderConfig.Kind.Gemini) TranscribeMethod.GeminiInline else TranscribeMethod.AudioTranscriptions
     settings.set(SpeechChoice.Provider(p.id, m, method))
     sync()
@@ -302,13 +302,13 @@ internal fun ModelSetupViewModel.proxyReason(e: ModelError.Proxy): String = tr(
     if (e.failure == ProxyFailure.AuthFailed) R.string.net_proxy_auth_failed else R.string.net_proxy_unreachable,
 )
 
-/** 选择页打开时,上次试转的结果作废。 */
+/** When the picker opens, the previous test-transcription result is discarded. */
 fun ModelSetupViewModel.clearSpeechProbe() { _speechProbe.value = emptyMap() }
 
-/** 选择页、「用作」面板打开时清掉上次保存的结果;还在试调用的留着(结束时自己更新)。 */
+/** Clears the previous save result when the picker or "Use as" sheet opens; entries still being test-called are kept (they update themselves when done). */
 fun ModelSetupViewModel.clearManualPick() = _state.update { it.copy(manualPick = it.manualPick.filterValues { v -> v == ListState.Running }) }
 
-/** 只测试用户在服务商页确认的这一个模型。 */
+/** Tests only the single model the user confirmed on the provider page. */
 fun ModelSetupViewModel.retestModel(providerId: String, model: String) {
     val provider = store.provider(providerId) ?: return
     val key = providerId to model

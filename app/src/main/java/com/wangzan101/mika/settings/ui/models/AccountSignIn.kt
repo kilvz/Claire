@@ -47,13 +47,13 @@ import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.openInBrowser
 
-/** 「添加模型」里「用账号登录」那一组的三家。ChatGPT 的登录另有一套,xAI、OpenRouter 对应 [AccountProvider]。 */
+/** The three providers in the "Sign in with account" group of "Add model". ChatGPT has its own sign-in flow; xAI and OpenRouter map to [AccountProvider]. */
 enum class SignInKind(val account: AccountProvider?, val label: String, val tag: String) {
     ChatGpt(null, "ChatGPT", "chatgpt"),
     Xai(AccountProvider.Xai, "xAI / Grok", "xai"),
     OpenRouter(AccountProvider.OpenRouter, "OpenRouter", "openrouter");
 
-    /** 「改用 API Key」时选的预设;ChatGPT 没有这一项。 */
+    /** Preset selected for "Use API Key instead"; ChatGPT has no such option. */
     val keyPreset: String? get() = when (this) {
         ChatGpt -> null
         Xai -> "xAI"
@@ -65,7 +65,7 @@ enum class SignInKind(val account: AccountProvider?, val label: String, val tag:
     }
 }
 
-/** 这一家在账号登录里的样子:已登录的服务商 id(没有或已退出为 null)、正在登录、失败的原因。 */
+/** How this provider looks in account sign-in: the signed-in provider id (null if absent or signed out), whether sign-in is running, and the failure reason. */
 internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean, String?> = when (kind) {
     SignInKind.ChatGpt -> Triple(
         providers.firstOrNull { it.kind == ProviderConfig.Kind.ChatGpt }?.id?.takeIf { chatGptAccount?.signedIn == true },
@@ -84,8 +84,8 @@ internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean
 }
 
 /**
- * 「用账号登录 · 不用填 Key」:ChatGPT、xAI / Grok、OpenRouter 各一行。已登录的写「已登录」,点进服务商详情;
- * 没登录的点开说明面板([onOpen]),在面板里才开始登录。正在登录的写「登录中…」,点开看进度。
+ * "Sign in with account · no Key required": one row each for ChatGPT, xAI / Grok and OpenRouter. Signed-in ones show "Signed in" and open provider details when tapped;
+ * signed-out ones open the explanation panel ([onOpen]) and sign-in only starts from inside it. Rows with sign-in in progress show "Signing in…" and open to show progress.
  */
 @Composable
 internal fun AccountSignInGroup(ui: ModelSetupUi, onOpen: (SignInKind) -> Unit, openProvider: (String) -> Unit) {
@@ -109,7 +109,7 @@ internal fun AccountSignInGroup(ui: ModelSetupUi, onOpen: (SignInKind) -> Unit, 
     }
 }
 
-/** 登录面板的动作:开始、取消、改用 API Key(选好那家的预设、打开填 Key 的表单)、关掉。 */
+/** Actions of the sign-in panel: start, cancel, use API Key instead (select that provider's preset and open the Key form), and dismiss. */
 class SignInSheetActions(
     val start: (SignInKind) -> Unit = {},
     val cancel: (SignInKind) -> Unit = {},
@@ -118,8 +118,8 @@ class SignInSheetActions(
 )
 
 /**
- * 一家账号登录的面板。先说明会发生什么(和风险),点「继续登录」才开始;登录中:xAI 显示短码(复制并重新打开确认页)、
- * 别的写「在浏览器里完成」,都可以取消;失败在面板里说原因,可以再试。成功后由页面关掉面板、打开详情。
+ * Panel for signing in to one account. It first explains what will happen (and the risks); sign-in only starts after tapping "Continue sign-in". While signing in: xAI shows a short code (copy it and reopen the confirmation page),
+ * the others say "complete it in the browser", and all of them can be cancelled; failures show the reason in the panel and can be retried. On success the page closes the panel and opens the details.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +135,7 @@ internal fun SignInSheet(ui: ModelSetupUi, kind: SignInKind, actions: SignInShee
     }
 }
 
-/** 面板里的内容(不带面板本身,便于测试)。 */
+/** The content inside the panel (without the panel itself, for easier testing). */
 @Composable
 internal fun SignInSheetBody(ui: ModelSetupUi, kind: SignInKind, actions: SignInSheetActions) {
     val (_, running, failure) = ui.signInState(kind)
@@ -143,7 +143,7 @@ internal fun SignInSheetBody(ui: ModelSetupUi, kind: SignInKind, actions: SignIn
     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp).testTag("signin-sheet-${kind.tag}")) {
         when {
             code != null -> DeviceCodeBody(ui.accountSignIn, code) { actions.cancel(kind) }
-            // 同一时刻只有一次登录:别家正在登录时这里不能开始
+            // Only one sign-in at a time: this one can't start while another provider is signing in
             else -> IntroBody(kind, running, failure, busy = !running && (ui.chatGptSignIn == ListState.Running || ui.accountSignIn.running), actions)
         }
     }
@@ -182,7 +182,7 @@ private fun IntroBody(kind: SignInKind, running: Boolean, failure: String?, busy
     }
 }
 
-/** xAI 设备码:和浏览器确认页上一样的短码、有效期;复制并重新打开确认页;等待中可以取消。 */
+/** xAI device code: the same short code and expiry as on the browser confirmation page; copy it and reopen the confirmation page; can be cancelled while waiting. */
 @Composable
 private fun DeviceCodeBody(s: AccountSignInUi, code: String, cancel: () -> Unit) {
     val c = MikaTheme.colors

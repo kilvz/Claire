@@ -37,11 +37,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// 模型设置:ChatGPT 与账号登录、退出
+// Model setup: ChatGPT and account sign-in, and sign-out
 /**
- * 打开浏览器登录 ChatGPT,回调后换令牌、核对,列出模型,存成(或更新)ChatGPT 服务商,回到 Claire。
- * 还没有主模型时选它的一个模型为主模型。第一次注册成功后说明一次在用套餐额度。失败说原因(并记下给诊断信息)。
- * 跑在 [signIns] 里:用户在浏览器里登录时 Claire 在后台,不能跟着界面走。
+ * Opens the browser to sign in to ChatGPT; after the callback it exchanges the token, verifies it, lists models, saves (or updates) the ChatGPT provider and returns to Claire.
+ * When there is no main model yet, one of its models is chosen as the main model. After the first successful registration it explains once that plan quota is being used. Failures state the reason (and are recorded for diagnostics).
+ * Runs inside [signIns]: while the user signs in through the browser, Claire is in the background and cannot follow the UI.
  */
 fun ModelSetupViewModel.signInWithChatGpt() {
     val browser = browser ?: return
@@ -85,7 +85,7 @@ fun ModelSetupViewModel.signInWithChatGpt() {
     }
 }
 
-/** 放弃正在进行的登录(本机回调随之关掉)。 */
+/** Abandons the sign-in in progress (the local callback is closed along with it). */
 fun ModelSetupViewModel.cancelChatGptSignIn() {
     signIns.cancel()
     _state.update { it.copy(chatGptSignIn = ListState.Idle) }
@@ -94,10 +94,10 @@ fun ModelSetupViewModel.cancelChatGptSignIn() {
 fun ModelSetupViewModel.dismissChatGptWelcome() = _state.update { it.copy(chatGptWelcome = false) }
 
 /**
- * 用账号登录 xAI 或 OpenRouter:xAI 在浏览器里打开核对过的验证页、界面留下短码,等用户确认;
- * OpenRouter 打开授权页,同意后回到本机回调、换到一把属于用户的 Key。
- * 成功后列出模型、存下这一家,还没有主模型时选一个,再打开它的详情页([ModelSetupUi.signedInProvider])。
- * 失败只说类别和错误代码(并记下给诊断信息)。和 ChatGPT 一样跑在 [signIns] 里:用户在浏览器里时 Claire 在后台。
+ * Sign in to xAI or OpenRouter with an account: for xAI, a verified page opens in the browser and a short code stays in the UI until the user confirms;
+ * for OpenRouter, the authorization page opens and, once approved, control returns to the local callback and a Key belonging to the user is obtained.
+ * On success it lists the models, saves this provider, picks a main model if there is none yet, then opens its details page ([ModelSetupUi.signedInProvider]).
+ * Failures only state the category and error code (and are recorded for diagnostics). Like ChatGPT it runs inside [signIns]: Claire is in the background while the user is in the browser.
  */
 fun ModelSetupViewModel.signInWithAccount(provider: AccountProvider) {
     val browser = browser ?: return
@@ -137,7 +137,7 @@ fun ModelSetupViewModel.signInWithAccount(provider: AccountProvider) {
     if (!started) _state.update { it.copy(accountSignIn = AccountSignInUi()) }
 }
 
-/** xAI 设备码登录,列出模型,存成(或更新)那一家。 */
+/** xAI device-code sign-in: lists models and saves (or updates) that provider. */
 internal suspend fun ModelSetupViewModel.connectXai(browser: SignInBrowser): Pair<Provider, ModelListResult> {
     val session = store.xaiAuth.signIn(openBrowser = browser::open, onChallenge = ::publishDevice)
     val existing = store.xaiProvider()
@@ -145,7 +145,7 @@ internal suspend fun ModelSetupViewModel.connectXai(browser: SignInBrowser): Pai
     return store.connectAccount(session, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty()) to listed
 }
 
-/** OpenRouter 授权换 Key,列出模型,按 OpenRouter 预设存下(或更新)那一家。 */
+/** OpenRouter authorization exchanged for a Key: lists models and saves (or updates) that provider using the OpenRouter preset. */
 internal suspend fun ModelSetupViewModel.connectOpenRouter(browser: SignInBrowser): Pair<Provider, ModelListResult> {
     val key = signInWithOpenRouter(store.openRouterAuth, browser::open, page = { e -> browser.page(e?.let(ModelsCopy::accountFailure)) })
     val existing = store.openRouterAccount()
@@ -153,11 +153,11 @@ internal suspend fun ModelSetupViewModel.connectOpenRouter(browser: SignInBrowse
     return store.connectOpenRouter(key, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty()) to listed
 }
 
-/** 把短码留在界面上。打开浏览器由登录流程自己做,这里不再开一次。 */
+/** Leaves the short code on screen. The browser is opened by the sign-in flow itself, so it is not opened again here. */
 internal fun ModelSetupViewModel.publishDevice(c: DeviceChallenge) {
     val openUrl = c.verificationUriComplete ?: c.verificationUri
     val expiresAt = System.currentTimeMillis() + c.expiresInSec * 1000
-    // 界面经 signIns.device 接着显示(重建后的界面也收得到)
+    // The UI keeps showing it through signIns.device (a rebuilt UI receives it too)
     signIns.showDevice(DevicePrompt(c.userCode, openUrl, expiresAt))
 }
 
@@ -168,10 +168,10 @@ fun ModelSetupViewModel.cancelAccountSignIn() {
 
 fun ModelSetupViewModel.dismissAccountFailure() = _state.update { it.copy(accountSignIn = AccountSignInUi()) }
 
-/** 详情页打开过了。 */
+/** The details page has been opened. */
 fun ModelSetupViewModel.signedInShown() = _state.update { it.copy(signedInProvider = null) }
 
-/** 退出账号登录:xAI 清本机令牌,OpenRouter 删本机的 Key;服务商和用途留着,再登录接着用。 */
+/** Sign out of the account sign-in: xAI clears the local token and OpenRouter deletes the local Key; the provider and roles are kept so signing in again picks up where it left off. */
 fun ModelSetupViewModel.signOutAccount(providerId: String) {
     scope.launch {
         withContext(io) {
@@ -182,7 +182,7 @@ fun ModelSetupViewModel.signOutAccount(providerId: String) {
     }
 }
 
-/** 退出 ChatGPT 登录:服务端注销、本机清令牌;服务商和用途不动,再登录就能接着用。 */
+/** Sign out of ChatGPT: revoke on the server and clear the local token; the provider and roles stay, so signing in again picks up where it left off. */
 fun ModelSetupViewModel.signOutChatGpt(providerId: String) {
     scope.launch {
         val revoked = withContext(io) { store.signOutChatGpt(providerId) }

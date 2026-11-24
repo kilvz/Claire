@@ -25,7 +25,7 @@ import com.wangzan101.mika.voice.SpeechOptions
 import com.wangzan101.mika.voice.model.VoiceModelRef
 import com.wangzan101.mika.chat.ui.Exchange
 
-/** 模型页(用途、选择页、服务商详情、全部模型)的文字(纯函数,便于测试)。三个用途的说法全 App 只在这里。 */
+/** Text for the model pages (roles, picker, provider details, all models) as pure functions, for easy testing. The wording of the three roles lives only here in the whole app. */
 object ModelsCopy {
     val TITLE: String get() = tr(R.string.settings_model)
     val LEAD: String get() = tr(R.string.models_lead)
@@ -71,7 +71,7 @@ object ModelsCopy {
     val RETEST: String get() = tr(R.string.models_retest)
     val SEES_IMAGES: String get() = tr(R.string.models_sees_images)
 
-    // ---------- 模型组 ----------
+    // ---------- Model groups ----------
 
     val GROUPS: String get() = tr(R.string.models_groups)
     val NEW_GROUP: String get() = tr(R.string.models_group_new)
@@ -123,7 +123,7 @@ object ModelsCopy {
         GroupStrategy.CostFirst -> R.string.models_group_strategy_cost_note
     })
 
-    /** 「能看图」开关下的说明:用户说过的、用作看图的、列表写明的、没写未确认的。 */
+    /** Note under the "can see images" switch: user-declared, used for vision, stated by the listing, or not stated and thus unconfirmed. */
     fun seesNote(o: ModelOption, usedForVision: Boolean): String = tr(when {
         o.visionByUser != null -> R.string.models_sees_note_user
         usedForVision -> R.string.models_sees_note_vision
@@ -154,8 +154,8 @@ object ModelsCopy {
     val CHATGPT_REVOKE_UNCONFIRMED: String get() = tr(R.string.chatgpt_revoke_unconfirmed)
 
     /**
-     * 用 ChatGPT 登录没成的原因(界面和回调网页共用)。说得出具体原因的照说;只有服务端说了套餐、权限,
-     * 或授予的权限里没有套餐那一项时才提 Plus、Pro;别的被拒带上错误代码 [code](不是机密)。
+     * Reasons ChatGPT sign-in failed (shared by the UI and the callback page). Specific reasons are reported as such; Plus and Pro are only mentioned when the server reported a plan or scope issue,
+     * or when the granted scopes lack the plan entry; other rejections include the error code [code] (not a secret).
      */
     fun chatGptFailure(reason: SignInFailure, code: String? = null): String = when (reason) {
         SignInFailure.Denied -> tr(R.string.chatgpt_fail_denied)
@@ -171,7 +171,7 @@ object ModelsCopy {
         SignInFailure.Network -> tr(R.string.chatgpt_fail_network)
     }
 
-    // ---------- 用账号登录(xAI、OpenRouter;ChatGPT 的在上面) ----------
+    // ---------- Sign in with account (xAI, OpenRouter; ChatGPT is above) ----------
 
     val SIGN_IN_GROUP: String get() = tr(R.string.signin_group)
     val KEY_GROUP: String get() = tr(R.string.signin_key_group)
@@ -179,7 +179,7 @@ object ModelsCopy {
     val SIGN_IN_USE_KEY: String get() = tr(R.string.signin_use_key)
     val SIGN_IN_BUSY: String get() = tr(R.string.signin_busy)
 
-    /** 界面上服务商的名字:授权来的 OpenRouter 加一句来历,和用户自己填 Key 的那一家分得开。 */
+    /** Provider name shown in the UI: OpenRouter from authorization gets a note about its origin so it stays distinguishable from a provider added by the user with their own Key. */
     fun providerName(p: Provider): String {
         if (p.signIn == ProviderStore.OPENROUTER_SIGN_IN) return tr(R.string.signin_openrouter_name, p.name)
         if (p.name == "Cloudflare Workers AI" && p.baseUrl.contains("/accounts/")) {
@@ -199,12 +199,12 @@ object ModelsCopy {
     val SET_MAIN: String get() = tr(R.string.signin_set_main)
     val SET_MAIN_NOTE: String get() = tr(R.string.signin_set_main_note)
     val SIGN_OUT_NOTE: String get() = tr(R.string.signin_sign_out_note)
-    /** xAI 的账号页。 */
+    /** xAI account page. */
     const val ACCOUNT_MANAGE_URL = "https://accounts.x.ai"
 
     fun codeValid(minutes: Int) = tr(R.string.signin_xai_code_valid, minutes)
 
-    /** 「用账号登录」一组里每家下面那一行小字。 */
+    /** The small line under each provider in the "Sign in with account" group. */
     fun signInRowLine(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> tr(R.string.signin_row_chatgpt)
         SignInKind.Xai -> tr(R.string.signin_row_xai)
@@ -223,10 +223,10 @@ object ModelsCopy {
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_body)
     }
 
-    /** 登录前要先说清的风险(黄底);没有为 null。 */
+    /** Risk that must be explained before signing in (yellow background); null when there is none. */
     fun signInRisk(kind: SignInKind): String? = if (kind == SignInKind.Xai) tr(R.string.signin_xai_risk) else null
 
-    /** 登录前的补充说明(灰底);没有为 null。 */
+    /** Additional note before signing in (grey background); null when there is none. */
     fun signInInfo(kind: SignInKind): String? = when (kind) {
         SignInKind.ChatGpt -> null
         SignInKind.Xai -> tr(R.string.signin_stored_note)
@@ -250,7 +250,7 @@ object ModelsCopy {
         else -> tr(R.string.account_manage_xai)
     }
 
-    /** 账号登录详情下面的说明:在用什么、退出后怎样。 */
+    /** Note below the account sign-in details: what is being used and what happens after signing out. */
     fun accountNote(kind: SignInKind, signedIn: Boolean) = when (kind) {
         SignInKind.OpenRouter -> tr(if (signedIn) R.string.signin_openrouter_signed_in_note else R.string.signin_openrouter_signed_out_note)
         else -> tr(if (signedIn) R.string.account_signed_in_note_xai else R.string.account_signed_out_note)
@@ -266,10 +266,10 @@ object ModelsCopy {
         AccountSignInFailure.BadIssuer -> tr(R.string.account_fail_issuer)
     }
 
-    /** 用途卡上的一行:[title] 是模型名([isModel])、「用主模型」「不用」或「未设置」([unset]),[subtitle] 是补充说明。 */
+    /** A line on a role card: [title] is the model name ([isModel]), "Use main model", "Off" or "Not set" ([unset]); [subtitle] is the supporting note. */
     data class RoleLine(
         val title: String, val subtitle: String, val isModel: Boolean = false, val unset: Boolean = false,
-        /** 副标题用「可用」的绿色(语音转文字写「可离线」)。 */
+        /** Draw the subtitle in the "available" green (speech-to-text says "offline capable"). */
         val subtitleOk: Boolean = false,
     )
 
@@ -279,7 +279,7 @@ object ModelsCopy {
         ModelRole.Light -> tr(R.string.role_light)
     }
 
-    /** 这个用途做什么。 */
+    /** What this role does. */
     fun roleWhat(role: ModelRole) = when (role) {
         ModelRole.Main -> tr(R.string.role_main_what)
         ModelRole.Vision -> tr(R.string.role_vision_what)
@@ -288,14 +288,14 @@ object ModelsCopy {
 
     fun roleLabel(role: ModelRole) = roleName(role)
 
-    /** 选择页顶上的说明。 */
+    /** Note at the top of the picker page. */
     fun roleHint(role: ModelRole) = when (role) {
         ModelRole.Main -> tr(R.string.role_main_hint)
         ModelRole.Vision -> tr(R.string.role_vision_hint)
         ModelRole.Light -> tr(R.string.role_light_hint)
     }
 
-    /** 第四个用途「语音转文字」不在 [ModelRole] 里(它不是对话模型),卡片的名字、图标、右边两行在这里。 */
+    /** The fourth role, "speech to text", is not in [ModelRole] (it is not a chat model); its card name, icon and two right-hand lines live here. */
     val SPEECH_LABEL: String get() = "${tr(R.string.role_speech)} · ${tr(R.string.role_speech_what)}"
     val SPEECH_ICON: ImageVector get() = MikaIcons.Mic
 
@@ -305,7 +305,7 @@ object ModelsCopy {
         return RoleLine(s.title, s.sub.orEmpty(), isModel = !unset && (ui.speech is SpeechChoice.Provider || ui.speech is SpeechChoice.Doubao || ui.speech is SpeechChoice.FunAsr || ui.speech is SpeechChoice.Bailian), unset = unset, subtitleOk = s.subOk)
     }
 
-    /** 主模型备援(项目 3)的卡片图标、名字和右边两行:和用途卡同一套说法。 */
+    /** Card icon, name and two right-hand lines for the main-model fallback (item 3), using the same wording as the role cards. */
     val FALLBACK_ICON: ImageVector get() = MikaIcons.Refresh
     val FALLBACK_CLEAR: String get() = tr(R.string.main_fallback_clear)
 
@@ -321,7 +321,7 @@ object ModelsCopy {
 
     fun fallbackLine(ui: ModelSetupUi, slot: Int): RoleLine = fallbackLine(ui, ModelRole.Main, slot)
 
-    /** 声音模型卡片显示实际选中的合成模型和服务商。 */
+    /** The voice model card shows the synthesis model and provider actually selected. */
     val VOICE_ICON: ImageVector get() = MikaIcons.Sound
 
     fun voiceLine(providers: List<Provider>, choice: VoiceChoice?): RoleLine {
@@ -332,7 +332,7 @@ object ModelsCopy {
         return RoleLine(UNSET, tr(R.string.role_voice_what), unset = true)
     }
 
-    /** 图片模型的入口说明和图标。 */
+    /** Entry label and icon for the image model. */
     val IMAGE_LABEL: String get() = "${tr(R.string.role_image)} · ${tr(R.string.role_image_what)}"
     val IMAGE_ICON: ImageVector get() = MikaIcons.Photo
 
@@ -344,7 +344,7 @@ object ModelsCopy {
         ModelRole.Light -> MikaIcons.Leaf
     }
 
-    /** 用途卡上写什么:选了模型写模型名和服务商;「用主模型」写主模型是谁;「不用」写只靠文字读屏。 */
+    /** What a role card shows: with a model selected, the model name and provider; "Use main model" shows which model that is; "Off" says only text screen reading is available. */
     fun roleLine(ui: ModelSetupUi, role: ModelRole): RoleLine {
         fun modelLine(cfg: ProviderConfig) = RoleLine(cfg.model, ui.providerOf(cfg)?.let(::providerName) ?: cfg.name, isModel = true)
         val main = ui.configFor(ModelRole.Main)
@@ -372,7 +372,7 @@ object ModelsCopy {
 
     fun deleteTitle(name: String) = tr(R.string.models_delete_title, name)
 
-    /** 删除前说清会影响哪些用途、哪些语音模型。 */
+    /** Before deleting, spell out which roles and which voice models are affected. */
     fun deleteBody(roles: List<ModelRole>, voiceModels: List<VoiceModelRef> = emptyList()) =
         tr(R.string.models_delete_body) +
             if (roles.isEmpty()) tr(R.string.models_delete_unused) else tr(R.string.models_delete_used, roleNames(roles)) +
@@ -402,14 +402,14 @@ object ModelsCopy {
 
     fun shortUrl(url: String) = url.removePrefix("https://").removePrefix("http://")
 
-    /** 记住的模型数;还没列过时为空,服务不提供列表时说明。 */
+    /** Number of remembered models; null when never listed, and an explanation when the service offers no list. */
     fun modelCount(p: Provider): String? = when {
         p.models == null -> null
         p.models.isEmpty() -> tr(R.string.models_no_list)
         else -> trPlural(R.plurals.models_count, p.models.count { it.usable })
     }
 
-    /** 服务商一行的说明:已连接 · N 个模型 · 哪些用途在用;刷新失败时说明。 */
+    /** Note on a provider row: connected · N models · which roles use it; explains when refreshing failed. */
     fun providerLine(p: Provider, state: ListState?, roles: List<ModelRole>): String =
         if (state is ListState.Failed) LIST_FAILED
         else listOfNotNull(CONNECTED, modelCount(p), roles.takeIf { it.isNotEmpty() }?.let { tr(R.string.models_used_by, roleNames(it)) }).joinToString(" · ")

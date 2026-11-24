@@ -61,13 +61,13 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 设置 › 语言:跟随系统、简体中文、繁體中文、English;选了马上换,界面跟着重建。 */
+/** Settings › Language: follow system, Simplified Chinese, Traditional Chinese, English; switching applies immediately and the UI is rebuilt accordingly. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val flags = remember { FeatureFlags.get(context) }
-    // 跟着设置走:任务里改了外观,这页也对得上
+    // Follow the settings: if the appearance is changed elsewhere, this page stays in sync
     val themeMode by remember(flags) { flags.themeModeChanges() }.collectAsState(flags.themeMode())
     val themeAccent by remember(flags) { flags.themeAccentChanges() }.collectAsState(flags.themeAccent())
     val skin by remember(flags) { flags.skinChanges() }.collectAsState(flags.skin())
@@ -80,7 +80,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
     val focusManager = LocalFocusManager.current
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     PageScaffold(stringResource(R.string.appearance_title), onBack, modifier = Modifier.imePadding()) {
-        // 语言和外观放在同一页:都是「界面长什么样」
+        // Language and appearance share one page: both define "what the UI looks like"
         GroupLabel(stringResource(R.string.appearance_group))
         GroupCard {
             ThemeMode.entries.forEachIndexed { idx, m ->
@@ -88,7 +88,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
                     appearanceLabel(m), selected = m == themeMode, first = idx == 0,
                     subtitle = if (m == ThemeMode.System) stringResource(R.string.appearance_system_detail) else null,
                     onClick = {
-                        // 界面跟着设置当场换颜色,不重建,页面和滚动位置都不丢
+                        // Colors change immediately with the setting, without rebuilding, so the page and scroll position are preserved
                         if (m != themeMode) flags.setThemeMode(m)
                     },
                 )
@@ -97,7 +97,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
         GroupLabel(stringResource(R.string.accent_group))
         GroupCard {
             val dark = MikaTheme.colors.isDark
-            // 背景图片的颜色在当强调色时,这里选的暂时不用,行变灰
+            // When the background image's color serves as the accent, the selection here is unused for now and the row is greyed out
             val followingImage = skin.accentHue != null
             ThemeAccent.entries.forEachIndexed { idx, a ->
                 RadioRow(
@@ -105,7 +105,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
                     subtitle = if (a == ThemeAccent.Blue) stringResource(R.string.accent_default) else null,
                     onClick = { if (a != themeAccent) flags.setThemeAccent(a) },
                 ) {
-                    // 色块按此刻的深浅色画,和选上以后看到的一样
+                    // The swatch is drawn with the current light/dark tone, matching what you see after selecting it
                     Box(Modifier.size(18.dp).background(accentTone(a, dark).first, CircleShape))
                 }
             }
@@ -198,7 +198,7 @@ fun LanguageScreen(language: AppLanguage, onLanguage: (AppLanguage) -> Unit, onB
     }
 }
 
-/** 语言的名字:每种语言总用它自己的写法(日本語、Español…),「跟随系统」按当前语言写。 */
+/** Language names: each language is always written with its own native name and spelling (e.g. Español…); "Follow system" is written in the current language. */
 @Composable
 fun languageLabel(l: AppLanguage): String = stringResource(
     when (l) {
@@ -218,4 +218,4 @@ fun languageLabel(l: AppLanguage): String = stringResource(
     },
 )
 
-// ---------- 隐私与数据 ----------
+// ---------- Privacy and data ----------

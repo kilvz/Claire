@@ -66,33 +66,33 @@ class ProviderDetailActions(
     val removeKey: (String) -> Unit = {},
     val remove: () -> Unit = {},
     /**
-     * 把这家的一个模型用作某个用途(「用作」面板里点的),存好后调最后一个参数。主模型先试调用,
-     * 进度和原因在 [ModelSetupUi.manualPick]。
+     * Use one of this provider's models for a role (tapped in the "Use as" sheet); the last parameter is called after saving. The main model is test-called first,
+     * with progress and the reason in [ModelSetupUi.manualPick].
      */
     val use: (ModelRole, String, () -> Unit) -> Unit = { _, _, _ -> },
-    /** 清掉上次保存或试调用的结果(「用作」面板打开时)。 */
+    /** Clears the previous save or test-call result (when the "Use as" sheet opens). */
     val clearPick: () -> Unit = {},
-    /** 用户说这家的一个模型能不能看图(「用作」面板里的开关)。 */
+    /** Whether the user says one of this provider's models can see images (the switch in the "Use as" sheet). */
     val setVision: (String, Boolean) -> Unit = { _, _ -> },
     val setServiceTier: (String, OpenAiServiceTier?) -> Boolean = { _, _ -> false },
     val showAll: () -> Unit = {},
-    /** 测试用户确认的模型。 */
+    /** Test the model the user confirmed. */
     val retestModel: (String) -> Unit = {},
-    /** 这家服务商名下的语音模型能力引用;删除前预览哪些语音模型会一并删掉。 */
+    /** Voice-model capability references under this provider; previews which voice models would be deleted along with it. */
     val voiceUsage: (String) -> List<VoiceModelRef> = { emptyList() },
-    /** 用账号登录的服务商(ChatGPT、xAI、OpenRouter):再登录、退出登录、打开对方的用量或账号页。 */
+    /** Account-signed-in providers (ChatGPT, xAI, OpenRouter): sign in again, sign out, open that provider's usage or account page. */
     val signIn: () -> Unit = {},
     val signOut: () -> Unit = {},
     val manageUsage: () -> Unit = {},
-    /** 这家所有模型、用途合计的本地每日 Token 预算。 */
+    /** Local daily Token budget for this provider, summed over all models and roles. */
     val setDailyBudget: (Long?) -> Boolean = { false },
-    /** 把这家默认的模型设为主模型(账号登录的详情里那一行)。 */
+    /** Set this provider's default model as the main model (the row in account sign-in details). */
     val useAsMain: () -> Unit = {},
 )
 
 /**
- * 一个服务商:连接(状态、接口、地址、Key 可更换)、几个模型(在用的在前,最多 [MODEL_PREVIEW] 个,其余点「查看全部」)、删除。
- * 点一个模型从底部弹出「用作」。页面长度基本固定,模型再多也不会把删除挤到很远。
+ * One provider: connection (status, protocol, URL, replaceable Key), a few models (in-use ones first, at most [MODEL_PREVIEW], the rest behind "view all"), and deletion.
+ * Tapping a model opens the "Use as" sheet from the bottom. The page has a roughly fixed length, so even many models do not push deletion far away.
  */
 @Composable
 fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetailActions, onBack: () -> Unit) {
@@ -226,7 +226,7 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
             ManualModel(p, state = null, first = list.isEmpty()) { using = it }
         }
         if (list.isNotEmpty()) FooterNote(ModelsCopy.MODELS_NOTE)
-        // 跳过测试直接存下的:说清它还没测过,别说成「这家不提供模型列表」——那个说法对它不成立
+        // Saved skipping the test: say clearly that it has not been tested yet, not that "this provider offers no model list" — that would be wrong for it
         val untested = ui.untested(p)
         val unverified = ui.unverified(p)
         if (untested) {
@@ -245,7 +245,7 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
             (retest as? ListState.Failed)?.let { FooterNote(it.message, Modifier.testTag("provider-retest-failed"), color = c.bad) }
         }
         when {
-            // 跳过测试存下的那次没列过模型,不能拿它当「这家不提供列表」的证据
+            // No models were listed when this was saved skipping the test, so that must not count as evidence that "this provider offers no list"
             p.models?.isEmpty() == true && !untested -> FooterNote(ModelsCopy.NO_LIST_NOTE)
             p.models == null && list.isEmpty() && state != ListState.Running -> FooterNote(ModelsCopy.NOT_LISTED)
         }

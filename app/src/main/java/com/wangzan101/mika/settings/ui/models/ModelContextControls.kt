@@ -45,7 +45,7 @@ internal fun hasModelContextControl(ui: ModelSetupUi, role: ModelRole): Boolean 
 internal fun ModelContextControl(ui: ModelSetupUi, role: ModelRole,
     onSave: (String, ModelContextSettings) -> Boolean, modifier: Modifier = Modifier,
 ) {
-    // 具体模型和组都能设;组先给排在最前的成员,成员级设置在组编辑页
+    // Both a concrete model and a group can be configured; for a group the first member is used, and per-member settings live on the group edit page
     if (ui.roles[role] !is RoleChoice.Model && ui.roles[role] !is RoleChoice.Group) return
     val cfg = ui.configFor(role) ?: return
     val saved = ui.providerOf(cfg)?.contextSettings?.get(cfg.model) ?: ModelContextSettings()
@@ -57,7 +57,7 @@ internal fun ModelContextControl(ui: ModelSetupUi, role: ModelRole,
     }
 }
 
-/** 一个模型配置的上下文窗口/压缩触发点;用途页和组编辑页共用。[onSave] 返回 false 时留在对话框上说明。 */
+/** Context window / compaction trigger for one model config; shared by the role page and the group edit page. When [onSave] returns false the dialog stays open and shows the reason. */
 @Composable
 internal fun ModelContextDialog(
     cfg: ProviderConfig, saved: ModelContextSettings, tagPrefix: String,
@@ -120,7 +120,7 @@ internal fun ModelContextDialog(
     )
 }
 
-/** 模型的能力标签;[accent] 为假时一律中性色(列表行里强调色留给「在用」的胶囊)。 */
+/** Capability tags of a model; when [accent] is false everything uses the neutral color (in list rows the accent color is reserved for the "in use" pill). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun Tags(o: ModelOption, forVision: Boolean = false, accent: Boolean = true) {

@@ -37,8 +37,8 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import kotlinx.coroutines.launch
 
 /**
- * 设置 › 模型 › 图片模型:选服务商、模型、接口,打开总开关;保存到相册另有开关和每次询问。
- * 不在 [com.wangzan101.mika.core.model.ModelRole] 里:图片模型不参与对话、工具调用和上下文。
+ * Settings › Models › Image model: pick provider, model and protocol, and enable the master switch; saving to the album has its own switch and per-use prompt.
+ * Not part of [com.wangzan101.mika.core.model.ModelRole]: image models take no part in chat, tool calls or context.
  */
 @Composable
 fun ImageModelScreen(store: ProviderStore, onBack: () -> Unit) {

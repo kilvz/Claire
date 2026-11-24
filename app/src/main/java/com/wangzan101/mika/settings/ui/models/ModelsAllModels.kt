@@ -69,8 +69,8 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /**
- * 「<服务商> · 全部模型」:搜索框固定在顶栏下面,列表只在下面滚(模型多时按需排版);右上角刷新重新列一次。
- * 点模型同样弹出「用作」。
+ * "<Provider> · All models": the search box is pinned below the top bar and only the list below it scrolls (laid out on demand when there are many models); the refresh button in the top right lists them again.
+ * Tapping a model opens the same "Use as" sheet.
  */
 @Composable
 fun AllModelsContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetailActions, onBack: () -> Unit) {
@@ -113,14 +113,14 @@ fun AllModelsContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetailActio
     using?.let { model -> UseAsSheet(ui, p, model, actions, onDismiss = { using = null }) }
 }
 
-/** 一张卡拆成懒加载的行时,每行的圆角:首行上圆、末行下圆。 */
+/** Corner radii for each row when one card is split into lazily loaded rows: rounded top on the first row, rounded bottom on the last. */
 private fun rowShape(i: Int, n: Int): RoundedCornerShape {
     val r = MikaRadius.Card
     return RoundedCornerShape(topStart = if (i == 0) r else 0.dp, topEnd = if (i == 0) r else 0.dp,
         bottomStart = if (i == n - 1) r else 0.dp, bottomEnd = if (i == n - 1) r else 0.dp)
 }
 
-/** 模型一行:模型名(等宽)和标签,右边标着它在给哪些用途干活。 */
+/** One model row: the model name (monospace) and tags, with the roles it serves shown on the right. */
 @Composable
 internal fun ModelListRow(o: ModelOption, roles: List<ModelRole>, first: Boolean, onClick: () -> Unit) {
     Column {
@@ -140,8 +140,8 @@ internal fun ModelListRow(o: ModelOption, roles: List<ModelRole>, first: Boolean
 }
 
 /**
- * 点一个模型后从底部打开「用作」面板(手填的模型也行)。上面是对话用途,点了就用:主模型先试调用一次
- * (试通过过的不再试,见 [ModelSetupViewModel.useFromProvider]),进度和原因显示在下面,没通过不改。
+ * Opens the "Use as" sheet from the bottom after tapping a model (manually entered models work too). The chat roles are listed at the top and apply on tap: the main model runs one test call first
+ * (ones that already passed are not tested again, see [ModelSetupViewModel.useFromProvider]); progress and the reason are shown below, and nothing changes if the test fails.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +151,7 @@ internal fun UseAsSheet(ui: ModelSetupUi, p: Provider, model: String, actions: P
     val chatCapable = option != null
     val pick = ui.manualPick[p.id]
     val running = pick == ListState.Running
-    // 上次在别处保存、试调用的结果不带进来
+    // Don't carry over the test-call results saved elsewhere earlier
     LaunchedEffect(p.id, model) { actions.clearPick() }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = c.surface, shape = MikaShapes.SheetTop) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = 8.dp).testTag("use-as")) {
@@ -168,7 +168,7 @@ internal fun UseAsSheet(ui: ModelSetupUi, p: Provider, model: String, actions: P
                     )
                 }
             } else {
-                // 目录里写明只有别的接口的模型:对话用途不列(设了也办不了事)
+                // The catalog says this model only serves other protocols: chat roles are not listed (setting one would not work anyway)
                 FooterNote(tr(R.string.model_not_chat_capable), Modifier.testTag("use-as-not-chat-capable"))
             }
             when {

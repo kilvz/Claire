@@ -54,7 +54,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.openInBrowser
 
-/** 添加服务商:先是「用账号登录」一组(不用填 Key),再是填 Key 的:预设胶囊 → (自定义时)接口类型和地址 → API Key →「测试并保存」。 */
+/** Add provider: first the "sign in with account" group (no Key needed), then the Key-based flow: preset chips → (when custom) protocol and URL → API Key → "Test and save". */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, standalone: Boolean = false) {
@@ -70,7 +70,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
     }
     // Sign-in options (ChatGPT, xAI, OpenRouter)
     AccountSignInGroup(ui, actions.openSignIn, actions.openProvider)
-    // 填 Key 的一组:预设胶囊
+    // The Key-based group: preset chips
     GroupLabel(ModelsCopy.KEY_GROUP)
     FlowRow(
         Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -87,7 +87,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(ModelSetupCopy.KIND, Modifier.padding(end = 12.dp), style = MikaType.Body, color = c.ink)
-                // 四种接口一行放不下时折到下一行
+                // The four protocols wrap onto the next line when they do not fit on one
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     ProviderConfig.Kind.withApiKey.forEach { k -> SelectChip(ModelsCopy.kindLabel(k), f.kind == k, { actions.setKind(k) }, small = true) }
                 }
@@ -141,7 +141,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
             )
         }
         if (f.isCustom) {
-            // 可不填:提示里直接写出不填时用的名字(地址的主机名)
+            // Optional: the hint itself shows the name used when left empty (the host name of the URL)
             InputRow(
                 ModelSetupCopy.NAME, f.name, actions.setName,
                 if (f.urlProblem == null) f.defaultName else ModelSetupCopy.NAME_HINT,
@@ -228,7 +228,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
                     style = MikaType.Caption, color = c.ok,
                 )
             }
-            // 按地址认得出服务商时,给官方 Key 申请页的直达链接;认不出不显示
+            // When the provider can be recognized from the URL, link straight to the official Key page; hide it when it cannot
             ProviderKeySites.forBaseUrl(f.baseUrl)?.let { url ->
                 val context = LocalContext.current
                 Text(
@@ -246,7 +246,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
             )
         }
     }
-    // 列表里没有要的模型、或这家不提供列表时,随时可以自己填(没列出模型时那一栏已经在了)
+    // When the wanted model is not in the list, or this provider offers no list, it can always be entered manually (that field is already shown when no models were listed)
     if (!f.noList) {
         Text(
             if (f.manual) ModelSetupCopy.MANUAL_OFF else ModelSetupCopy.MANUAL_ON,
@@ -275,7 +275,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
             style = MikaType.Caption, color = c.bad,
         )
     }
-    // 试不成又想先存下的:做成按钮,不要藏成一行小字——它是个真实的动作,不是说明
+    // For saving without a successful test: make it a button instead of hiding it as a small line — it is a real action, not an explanation
     MikaButton(
         ModelSetupCopy.SAVE_UNTESTED, { confirmUntested = true },
         Modifier.fillMaxWidth().padding(top = 6.dp).testTag("setup-save-untested"),
@@ -299,8 +299,8 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
 }
 
 /**
- * API Key 这一栏下面的一句:零宽被去掉时用次要文字色,换行或其它放不进请求头的字符用错误色。
- * 和表单上其它 [FooterNote] 同一套字号。
+ * The line under the API Key field: secondary text color when zero-width characters were removed, error color for line breaks or other characters that cannot go into a request header.
+ * Uses the same type scale as the other [FooterNote]s on the form.
  */
 @Composable
 internal fun ApiKeyNoticeNote(notice: ApiKeyText.Notice, tag: String = "setup-key-notice") {
@@ -314,7 +314,7 @@ internal fun ApiKeyNoticeNote(notice: ApiKeyText.Notice, tag: String = "setup-ke
     }
 }
 
-/** 自定义填的是某家的官方地址:建议改用那家的预设(不拦着),接口类型对不上时一并说;点一下就换过去,Key 留着。 */
+/** The custom entry is some provider's official URL: suggest switching to that provider's preset (without blocking), mention it when the protocol does not match, and switch over on one tap while keeping the Key. */
 @Composable
 private fun PresetSuggestion(f: AddForm, label: String, onUse: () -> Unit) {
     val c = MikaTheme.colors

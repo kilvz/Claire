@@ -31,20 +31,20 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 class RolePickerActions(
-    /** (服务商 id, 模型名) */
+    /** (provider id, model name) */
     val pick: (String, String) -> Unit = { _, _ -> },
-    /** 手填的模型名(服务商 id, 模型名):先试调用,通了才选。 */
+    /** A manually entered model name (provider id, model name): test-called first, selected only when it passes. */
     val pickManual: (String, String) -> Unit = { _, _ -> },
-    /** 看图、轻量的固定选项(用主模型、不用)。 */
+    /** Fixed choices for vision and light (use main model, off). */
     val choose: (RoleChoice) -> Unit = {},
-    /** 选一个模型组。 */
+    /** Choose a model group. */
     val chooseGroup: (String) -> Unit = {},
-    /** 打开模型组管理页。 */
+    /** Open the model group management page. */
     val manageGroups: () -> Unit = {},
     val addProvider: () -> Unit = {},
 )
 
-/** 选择页顶上的固定选项:看图「用主模型」「不用」,轻量「用主模型」;主模型没有。 */
+/** Fixed choices at the top of the picker: vision offers "use main model" and "off", light offers "use main model"; the main model has none. */
 internal fun fixedChoices(role: ModelRole): List<RoleChoice> = when (role) {
     ModelRole.Main -> emptyList()
     ModelRole.Vision -> listOf(RoleChoice.SameAsMain, RoleChoice.Off)
@@ -52,8 +52,8 @@ internal fun fixedChoices(role: ModelRole): List<RoleChoice> = when (role) {
 }
 
 /**
- * 选择对话用途，按服务商分组展示可选模型。看图、轻量还提供固定选项。
- * 选主模型时先试调用(见 [ModelSetupViewModel.pick]),进度和原因显示在那一家下面。
+ * Pick the model for a chat role, showing selectable models grouped by provider. Vision and light also offer fixed choices.
+ * Choosing the main model test-calls first (see [ModelSetupViewModel.pick]), with progress and the reason shown under that provider.
  */
 @Composable
 fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActions, onBack: () -> Unit,
@@ -121,7 +121,7 @@ fun RolePickerContent(ui: ModelSetupUi, role: ModelRole, actions: RolePickerActi
     }
 }
 
-/** 按服务商分组的单选列表。 */
+/** Single-choice list grouped by provider. */
 @Composable
 internal fun ModelPickerRows(
     groups: List<Pair<Provider, List<ModelOption>>>,
@@ -165,7 +165,7 @@ internal fun ModelPickerRows(
         val state = listing[provider.id]
         when {
             manual is ListState.Failed -> FooterNote(manual.message, Modifier.testTag("manual-model-failed"), color = c.bad)
-            // 选主模型先试调用;手填那一行自己显示进度
+            // Choosing the main model test-calls first; the manual row shows its own progress
             manual == ListState.Running && shown.isNotEmpty() -> FooterNote(ModelSetupCopy.TESTING, Modifier.testTag("pick-probe-running"))
             state == ListState.Running -> FooterNote(ModelsCopy.LISTING)
             state is ListState.Failed -> FooterNote(ModelSetupCopy.failed(state.message), color = c.bad)
@@ -175,7 +175,7 @@ internal fun ModelPickerRows(
     if (q.isNotEmpty() && !anyShown) FooterNote(ModelsCopy.NO_MATCH)
 }
 
-/** 手填列表里找不到的模型名，由调用方处理提交;[state] 是进度(设主模型时先试调用)。 */
+/** Enter a model name that is not in the list; the caller handles submission. [state] is the progress (setting the main model test-calls first). */
 @Composable
 internal fun ManualModel(p: Provider, state: ListState?, first: Boolean, onUse: (String) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
@@ -193,7 +193,7 @@ internal fun ManualModel(p: Provider, state: ListState?, first: Boolean, onUse: 
 private const val FILTER_FROM = 8
 private const val PICK_AT_MOST = 80
 
-/** 服务商详情里最多放几个模型;其余进「全部模型」页。 */
+/** How many models the provider details show at most; the rest go to the "all models" page. */
 internal const val MODEL_PREVIEW = 3
 
-// ---------- 一个服务商 ----------
+// ---------- One provider ----------

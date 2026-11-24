@@ -21,7 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.wangzan101.mika.ui.MainActivity
 
-/** 第一次用 ChatGPT 登录成功后说明一次:Claire 里的用量走你的 ChatGPT 套餐。 */
+/** Shown once after the first successful ChatGPT sign-in: usage in Claire goes through your ChatGPT plan. */
 @Composable
 internal fun ChatGptWelcome(onDismiss: () -> Unit) {
     MikaDialog(
@@ -33,8 +33,8 @@ internal fun ChatGptWelcome(onDismiss: () -> Unit) {
 }
 
 /**
- * 登录要用的系统能力:授权页用系统浏览器打开;回调页(换完令牌之后才给出)写成功或失败的原因,再放一个回到 Claire 的链接(intent 链接,点了由浏览器打开 Claire);
- * 登录完(成功或失败)把 Claire 带回前台。安卓限制后台打开界面,带不回来时用户点回调页的链接或从最近任务回来。
+ * System capabilities the sign-in needs: the authorization page opens in the system browser; the callback page (only produced after the token exchange) states success or the failure reason and then offers a link back to Claire (an intent link that the browser uses to open Claire);
+ * after sign-in (success or failure) Claire is brought back to the foreground. Android restricts opening UI from the background, so when that is not possible the user taps the callback page link or returns from the recent tasks.
  */
 internal class AndroidSignInBrowser(private val context: Context) : SignInBrowser {
     override fun open(url: String) {
@@ -62,7 +62,7 @@ internal class AndroidSignInBrowser(private val context: Context) : SignInBrowse
     }
 }
 
-/** 回调后浏览器里那一页:一句话加一个回到 App 的按钮。文字转义后放进去。 */
+/** The page shown in the browser after the callback: one sentence plus a button that returns to the app. Text is escaped before being inserted. */
 internal object SignInPage {
     fun html(title: String, text: String, back: String, backUrl: String): String {
         fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
