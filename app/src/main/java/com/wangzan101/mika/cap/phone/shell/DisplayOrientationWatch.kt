@@ -9,9 +9,10 @@ import android.os.Parcel
 import android.util.Log
 
 /**
- * 只在有虚拟屏时监听任务方向、窗口大小变化;不读应用内容,不改变任务焦点。
- * 注册不上任务监听时退回每 [POLL_MS] 扫一次,只在 [active](还有 Claire 的屏)为真时扫;
- * 屏放完后由 [close] 停下,[active] 变假时轮询也自己停。
+ * Watches task orientation and window size changes only while a virtual display exists; it does not read app
+ * content and does not change task focus. When the task listener cannot be registered, it falls back to
+ * scanning every [POLL_MS], only while [active] (Claire's display still exists) is true; after the display is
+ * released it is stopped by [close], and polling also stops by itself when [active] turns false.
  */
 @SuppressLint("PrivateApi")
 internal class DisplayOrientationWatch(

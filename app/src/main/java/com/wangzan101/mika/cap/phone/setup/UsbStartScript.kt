@@ -13,24 +13,27 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 「用电脑启动」的脚本:电脑经 USB 调试跑 `adb shell sh <外部文件目录>/usb-start.sh`,起的是和无线调试同一个助手,
- * 交接也走同一个 [HelperHub.offer](同样核对 shell 身份、口令、签名)。
- * 助手不在时写带一次性口令的脚本;助手连着时换成不带口令的说明,磁盘上不留能用的口令。
- * 外部文件目录 App 自己写不用权限,shell 也读得到;别的 App 读不到。
+ * The "start from computer" script: the computer runs `adb shell sh <external files dir>/usb-start.sh` over USB
+ * debugging and starts the same helper as wireless debugging; the handoff also goes through the same
+ * [HelperHub.offer] (likewise verifying shell identity, passphrase and signature).
+ * When the helper is absent, write a script that carries a one-time passphrase; when the helper is connected,
+ * replace it with the instructions that carry no passphrase, so no usable passphrase is left on disk.
+ * The app can write the external files directory without permissions and the shell can read it; other apps
+ * cannot.
  */
 class UsbStartScript(context: Context, private val hub: HelperHub) {
     private val app = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var started = false
 
-    /** 脚本在手机上的位置;外部存储暂时不可用时为 null。 */
+    /** The script's location on the phone; null when external storage is temporarily unavailable. */
     private fun file(): File? = app.getExternalFilesDir(null)?.let { File(it, HelperHandoff.USB_SCRIPT) }
 
-    /** 电脑上要跑的那条命令(引导页显示、复制的就是它)。 */
+    /** The command to run on the computer (this is exactly what the onboarding screen displays and copies). */
     fun command(): String =
         HelperHandoff.usbCommand(file()?.absolutePath ?: "/storage/emulated/0/Android/data/${app.packageName}/files/${HelperHandoff.USB_SCRIPT}")
 
-    /** App 启动时调:跟着助手在不在、口令有没有被作废(解除配对)重写脚本。 */
+    /** Called when the app starts: rewrites the script according to whether the helper is present and whether the passphrase has been invalidated (unpaired). */
     @Synchronized
     fun start() {
         if (started) return
@@ -38,7 +41,7 @@ class UsbStartScript(context: Context, private val hub: HelperHub) {
         scope.launch { HelperHandoff.usbScriptWrites(hub.shell, hub.nonceResets).collect { write(connected = it) } }
     }
 
-    /** 有人要用助手却没有、打开引导页时调:再写一遍(口令还新就沿用,见 [HelperHub.usbNonce])。 */
+    /** Called when the onboarding screen is opened because the helper is needed but missing: writes it again (the passphrase is reused while still fresh, see [HelperHub.usbNonce]). */
     fun refresh() {
         scope.launch { write(connected = hub.shell.value != null) }
     }
@@ -54,7 +57,7 @@ class UsbStartScript(context: Context, private val hub: HelperHub) {
             Log.w(TAG, "cannot build ${f.name}", it)
             return
         }
-        // 先写临时文件再改名:电脑那边正在读时不会读到半截
+        // Write a temporary file first and rename it afterwards: the computer never reads a half-written file
         runCatching {
             val tmp = File(f.parentFile, f.name + ".tmp")
             tmp.writeText(text)
@@ -70,7 +73,7 @@ class UsbStartScript(context: Context, private val hub: HelperHub) {
     }
 }
 
-/** Claire 签名证书的指纹:助手每次交接前都拿它核对 Claire(两种启动方式共用),取自本 App 自己的安装信息。 */
+/** Pin of Claire's signing certificate: the helper checks Claire against it before every handoff (shared by both start methods); read from this app's own install information. */
 internal fun ownCertPin(context: Context): String {
     val signers = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
         .signingInfo?.apkContentsSigners?.map { it.toByteArray() }

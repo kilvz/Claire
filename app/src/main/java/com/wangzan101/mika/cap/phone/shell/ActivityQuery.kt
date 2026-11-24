@@ -1,17 +1,19 @@
 package com.wangzan101.mika.cap.phone.shell
 
 /**
- * 系统接口查不了哪些页面能接一个 Intent 时(有的系统在应用这一侧的查询里另读设置,外壳身份读不了就抛错),
- * 改问 `cmd package query-activities`:查询在系统服务里做,只认外壳身份。不依赖安卓类,单元测试直接调。
+ * When the system APIs cannot tell which activities can receive an Intent (on some systems the app-side query
+ * reads additional settings and throws if the shell identity cannot read them), ask
+ * `cmd package query-activities` instead: the query runs in the system service and only honors the shell
+ * identity. Does not depend on Android classes, so unit tests can call it directly.
  */
 internal object ActivityQuery {
-    /** 命令参数:[action]、可选 [type]、[uri]、[category],限定 [packageName] 时只查这个包;[user] 查哪份用户(默认当前用户)。 */
+    /** Command arguments: [action], optional [type], [uri], [category]; with [packageName] only that package is queried; [user] selects which user profile (current user by default). */
     fun args(action: String, type: String? = null, uri: String? = null, category: String? = null, packageName: String? = null, user: String = "current"): List<String> =
         listOf("cmd", "package", "query-activities", "--brief", "--user", user, "-a", action) +
             listOfNotNull(type?.let { "-t" }, type) + listOfNotNull(uri?.let { "-d" }, uri) +
             listOfNotNull(category?.let { "-c" }, category) + listOfNotNull(packageName?.let { "-p" }, packageName)
 
-    /** 从输出里取出每个页面的 (包名, 完整类名);以点开头的短类名补上包名。 */
+    /** Extracts each activity's (package name, fully qualified class name) from the output; short class names starting with a dot get the package name prepended. */
     fun parse(output: String): List<Pair<String, String>> = output.lineSequence().mapNotNull { line ->
         val m = COMPONENT.matchEntire(line.trim()) ?: return@mapNotNull null
         val (pkg, cls) = m.destructured

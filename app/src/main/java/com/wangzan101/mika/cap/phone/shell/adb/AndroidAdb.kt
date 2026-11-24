@@ -18,36 +18,36 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.net.ssl.SSLException
 
-/** Android 上的 adb 身份与 TLS:钥匙用 Keystore 里的 AES 密钥包装后放在 App 私有目录;导出密钥走平台 TLS。 */
+/** adb identity and TLS on Android: the key is wrapped with an AES key from the Keystore and kept in the app's private directory; keying material export goes through platform TLS. */
 object AndroidAdb {
     private const val KEYSTORE = "AndroidKeyStore"
     private const val WRAP_ALIAS = "mika_adb_key_wrap"
     private const val TAG = "MikaAdbKey"
 
-    // 设备端导出时不带 context;TLS 1.3 里空 context 与不带 context 的结果相同(RFC 8446 §7.5)
+    // Device-side export is done without a context; under TLS 1.3 an empty context gives the same result as no context (RFC 8446 §7.5)
     val exporter = KeyingMaterialExporter { socket, label, length ->
         SSLSockets.exportKeyingMaterial(socket, label, ByteArray(0), length) ?: throw SSLException("keying material export failed")
     }
 
     @Volatile private var source: AdbIdentitySource? = null
 
-    /** 本进程唯一的一份身份来源:配对和连接都从这里拿,拿到的是同一把钥匙。 */
+    /** The single identity source for this process: both pairing and connecting take it from here, so they get the same key. */
     fun identities(context: Context): AdbIdentitySource = source ?: synchronized(this) {
         source ?: AdbIdentitySource(keyStore(context), { "mika@${Build.MODEL}" }) { msg, e -> Log.w(TAG, msg, e) }.also { source = it }
     }
 
-    /** 连接用的身份;存着的钥匙读不出时抛 [com.wangzan101.mika.core.device.adb.AdbKeyUnreadableException]。 */
+    /** Identity used for connecting; throws [com.wangzan101.mika.core.device.adb.AdbKeyUnreadableException] when the stored key cannot be read. */
     fun identity(context: Context): AdbIdentity = identities(context).forConnect()
 
-    /** 配对用的身份:存着的钥匙读不出时换一把新的(见 [AdbIdentitySource.forPairing])。 */
+    /** Identity used for pairing: falls back to a new key when the stored key cannot be read (see [AdbIdentitySource.forPairing]). */
     fun pairingIdentity(context: Context): AdbIdentity = identities(context).forPairing()
 
     fun tls(identity: AdbIdentity) = AdbTls(identity, exporter)
 
-    /** 删除钥匙和本进程里的缓存(「解除配对」用);设备那边的授权记录要由用户在系统设置里撤销。 */
+    /** Deletes the key and this process's cache (used by "unpair"); the authorization record on the device has to be revoked by the user in system settings. */
     fun forget(context: Context) = identities(context).forget()
 
-    /** 钥匙文件 + 包装它的 Keystore 密钥:清掉时两样一起删。 */
+    /** The key file plus the Keystore key that wraps it: clearing removes both. */
     private fun keyStore(context: Context): AdbKeyStore {
         val file = WrappedKeyFile(File(context.applicationContext.noBackupFilesDir, "adb/adbkey.bin")) { wrappingKey() }
         return object : AdbKeyStore by file {

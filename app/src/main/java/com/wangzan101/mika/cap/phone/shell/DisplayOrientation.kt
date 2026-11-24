@@ -2,7 +2,7 @@ package com.wangzan101.mika.cap.phone.shell
 
 import android.content.pm.ActivityInfo
 
-/** 后台屏不抢主屏焦点时,系统可能把横屏 Activity 缩在竖屏顶部。按系统报告的应用窗口比例纠正屏方向。 */
+/** When a background display does not take focus from the main display, the system may shrink a landscape Activity into the top of a portrait screen. Correct the display orientation using the app window aspect ratio reported by the system. */
 internal object DisplayOrientation {
     fun rotation(
         bufferWidth: Int,

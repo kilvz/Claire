@@ -1,8 +1,9 @@
 package com.wangzan101.mika.cap.phone.shell
 
 /**
- * launch_app cold=true 时能不能结束进程。结束进程会连带清掉这个 App 在任何屏上的状态,
- * 所以只要它在 Claire 的屏以外还有任务(哪怕在后台),就不结束,改为普通启动。
+ * Whether the process may be killed when launch_app cold=true. Killing the process also wipes this app's
+ * state on every display, so as long as it still has tasks outside Claire's display (even in the background),
+ * it is not killed; a normal launch is used instead.
  */
 enum class ColdStart {
     RESTART, WARM, IN_USE;

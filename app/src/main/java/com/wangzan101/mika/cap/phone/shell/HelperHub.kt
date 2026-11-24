@@ -29,9 +29,10 @@ import java.io.IOException
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
- * Claire 进程里内置助手 Binder 的落点。助手经 [HandoffProvider] 交来 Binder,在这里核对后收下;
- * 由 [com.wangzan101.mika.cap.phone.PhoneServices] 建一份(助手只认一个进程里的一个落点),
- * [BuiltinShellConnection] 和看门狗都看它的 [shell]。
+ * The landing point for the built-in helper's Binder inside the Claire process. The helper hands its Binder over
+ * through [HandoffProvider], and it is verified and accepted here; a single instance is created by
+ * [com.wangzan101.mika.cap.phone.PhoneServices] (the helper recognizes only one landing point per process), and
+ * both [BuiltinShellConnection] and the watchdog observe its [shell].
  */
 class HelperHub internal constructor(
     context: Context,
@@ -41,19 +42,19 @@ class HelperHub internal constructor(
     private val app = context.applicationContext
 
     private val _shell = MutableStateFlow<IMikaShell?>(initialShell)
-    /** 现在手里的助手接口;助手进程死了就变回 null。 */
+    /** The helper interface currently in hand; reverts to null once the helper process dies. */
     val shell: StateFlow<IMikaShell?> = _shell.asStateFlow()
 
     private val _restores = MutableStateFlow<HelperRestoreReport?>(null)
-    /** 助手交接时报来的「Claire 被杀后由它拉起来」的记录(诊断信息用);没拉过为 null。 */
+    /** The record reported at handoff of "brought back after Claire was killed" (for diagnostics); null when it never brought Claire back. */
     val restores: StateFlow<HelperRestoreReport?> = _restores.asStateFlow()
 
     private val handoffDiagnostics = HandoffDiagnostics()
 
-    /** 本次启动尝试的交接拒绝;不含口令、Binder、包路径或具体 UID。 */
+    /** Handoff rejections from this launch attempt; carries no passphrase, Binder, package path or concrete UID. */
     val lastHandoffRejection: String? get() = handoffDiagnostics.lastRejection
 
-    /** 经助手代连本进程的 WebView 调试套接字;助手不在时抛 IOException,助手拒绝或连不上为 null。 */
+    /** Connects this process's WebView debugging socket through the helper; throws IOException when the helper is not running, and returns null when the helper refuses or the connection fails. */
     fun openDevtoolsSocket(endpoint: String): ParcelFileDescriptor? {
         val sh = shell.value ?: throw IOException("phone helper is not running")
         return sh.openDevtoolsSocket(endpoint)
@@ -99,32 +100,32 @@ class HelperHub internal constructor(
         } else response
     }
 
-    /** 以助手的 shell 权限列目录;字段及错误见 IMikaShell.listFiles。 */
+    /** Lists a directory with the helper's shell privileges; for the fields and errors see IMikaShell.listFiles. */
     fun listFiles(path: String, afterName: String?, limit: Int): Bundle = deviceFileCall { it.listFiles(path, afterName, limit) }
 
     fun searchFiles(path: String, name: String?, extension: String?, after: Long, before: Long, depth: Int, entries: Int, timeout: Int): Bundle =
         deviceFileCall { it.searchFiles(path, name, extension, after, before, depth, entries, timeout) }
 
-    /** 成功时调用方须关闭返回的 fd。 */
+    /** On success the caller must close the returned fd. */
     fun openFile(path: String): Bundle = deviceFileCall { it.openFile(path) }
 
-    /** 交给助手的本进程令牌:Claire 进程一死,助手就从它的死亡通知得知,撤掉 Claire 留下的改动。 */
+    /** The token for this process handed to the helper: as soon as the Claire process dies, the helper learns it from its death notification and reverts the changes Claire left behind. */
     private val token = Binder()
     private val nonces: HandoffNonces by lazy { HandoffNonces(PrefsNonceStore(app), SystemClock::elapsedRealtime, System::currentTimeMillis) }
 
-    /** 经 adbd 起新助手前调:这个一次性口令经 exec 流的标准输入交给助手。 */
+    /** Called before starting a new helper through adbd: this one-time passphrase is handed to the helper on the standard input of the exec stream. */
     fun issueLaunchNonce(): String {
         handoffDiagnostics.launchStarted()
         return nonces.issueLaunch()
     }
 
-    /** 写进「用电脑启动」脚本的一次性口令(见 [HandoffNonces.usbNonce]);交接走的是同一个 [offer]。 */
+    /** The one-time passphrase written into the "start from computer" script (see [HandoffNonces.usbNonce]); the handoff goes through the same [offer]. */
     fun usbNonce(): String = nonces.usbNonce()
 
-    /** 口令被整体作废的次数(见 [HandoffNonces.resets]):「用电脑启动」脚本跟着它重写。 */
+    /** How many times the passphrases have been invalidated as a whole (see [HandoffNonces.resets]): the "start from computer" script is rewritten in step with it. */
     val nonceResets: StateFlow<Int> get() = nonces.resets
 
-    /** 解除配对:口令全部作废(还活着的助手下次交接会被拒绝并退出),手里的接口也放掉。 */
+    /** Unpair: invalidates all passphrases (a helper still alive is rejected and exits on its next handoff) and also releases the interface in hand. */
     fun forget() {
         nonces.clear()
         handoffDiagnostics.clear()
@@ -135,8 +136,10 @@ class HelperHub internal constructor(
     }
 
     /**
-     * 助手来交接。只收 shell(uid 2000)、自报 uid/pid 与调用方一致、跑的是当前这份 APK、口令对的;
-     * 再调一次 Binder 确认它确实在来交接的这个进程里,最后才用掉口令并换发下一枚。
+     * The helper comes to hand off. Accepted only when it runs as shell (uid 2000), its self-reported uid/pid
+     * match the caller, it runs this very APK and the passphrase is correct; then the Binder is called once more
+     * to confirm it really lives in the process performing the handoff, and only then is the passphrase consumed
+     * and the next one issued.
      */
     @Synchronized
     fun offer(extras: Bundle?, callingUid: Int, callingPid: Int): Bundle {
@@ -151,7 +154,7 @@ class HelperHub internal constructor(
         )?.let { return reject(callingUid, it) }
         val gate = nonces
         val nonce = extras?.getString(HelperHandoff.KEY_NONCE)
-        // 口令不对就不碰对方给的 Binder
+        // If the passphrase is wrong, do not touch the Binder supplied by the other side
         if (!gate.matches(nonce)) return reject(callingUid, HelperHandoff.Reject.BadNonce)
         val shell = IMikaShell.Stub.asInterface(binder!!)
         val ids = runCatching { shell.identity() }.getOrNull()
@@ -164,7 +167,7 @@ class HelperHub internal constructor(
         } catch (e: Exception) {
             return reject(callingUid, HelperHandoff.Reject.NoBinder)
         }
-        // 换了新的助手:旧的随后会被新的结束,它的死亡通知因为不是当前这个而被忽略
+        // A new helper replaced the old one: the old one is terminated by the new one shortly after, and its death notification is ignored because it is not the current one
         handoffDiagnostics.clear()
         synchronized(deviceFilesLock) {
             directoryStore.clearSync()
@@ -253,7 +256,7 @@ class HelperHub internal constructor(
             prefs.getString("resume", null), prefs.getString("launch", null), prefs.getLong("launchAt", 0),
             prefs.getString("usb", null), prefs.getLong("usbAt", 0),
         )
-        // 同步写:助手拿到新口令后 Claire 可能马上被杀,新进程要认得它
+        // Write synchronously: Claire may be killed right after the helper receives the new passphrase, so the new process must recognize it
         override fun save(slots: NonceSlots) {
             prefs.edit().putString("resume", slots.resume).putString("launch", slots.launch).putLong("launchAt", slots.launchAt)
                 .putString("usb", slots.usb).putLong("usbAt", slots.usbAt).commit()
@@ -262,10 +265,14 @@ class HelperHub internal constructor(
 }
 
 /**
- * 内置助手交接 Binder 的入口。要对 shell 开放所以是 exported,清单里另要求 INTERACT_ACROSS_USERS_FULL
- * (shell 有,普通 App 没有),普通 App 连 provider 都拿不到;真正的把关在 [HelperHub.offer]。
- * 落点是 App 的那一份([PhoneServices.of]):App 对象在 provider 之前就构造好了,但交接调用可能早于或与 Application.onCreate 同时到达;
- * 安全靠 MikaApp.phone 与 [HelperHub] 里口令都是同步的 lazy(谁先到谁建、只建一次),[HelperHub.offer] 本身也加了锁,不依赖 onCreate 先跑完。
+ * The entry point for the built-in helper's handoff Binder. It is exported because the shell must be able to
+ * reach it, and the manifest additionally requires INTERACT_ACROSS_USERS_FULL (the shell has it, ordinary apps
+ * do not), so ordinary apps cannot even obtain the provider; the real gate is [HelperHub.offer].
+ * The landing point is the app's single instance ([PhoneServices.of]): the app object is constructed before the
+ * provider, but handoff calls may arrive before Application.onCreate or at the same time as it; safety relies on
+ * both MikaApp.phone and the passphrase in [HelperHub] being synchronous lazies (whoever arrives first creates
+ * it, and it is created only once), and [HelperHub.offer] itself is locked too, so it does not depend on
+ * onCreate having finished first.
  */
 open class HandoffProvider : ContentProvider() {
     override fun onCreate() = true

@@ -1,6 +1,6 @@
 package com.wangzan101.mika.cap.phone.shell
 
-/** 一批事件只排一次扫描;后来的事件不推迟已排好的扫描,连续事件也能及时处理。 */
+/** A burst of events schedules only one scan; later events do not postpone an already scheduled scan, so back-to-back events are still handled promptly. */
 internal class CoalescedScan(
     private val schedule: (Runnable) -> Unit,
     private val cancel: (Runnable) -> Unit,

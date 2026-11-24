@@ -14,21 +14,24 @@ import com.wangzan101.mika.core.device.CredentialKind
 import com.wangzan101.mika.core.device.DeviceCredential
 
 /**
- * 只由已认证的 Claire Binder 调用。主屏专用;凭据从不进命令行、剪贴板、截图或日志。
- * 凭据的每个按键都经 [injectTo] 只投给 SystemUI 拥有的焦点窗口:锁屏上方另有窗口(锁屏时显示的 App、来电、
- * 全屏通知)或已经解锁回到 App 时,系统拒绝注入,按键不会落到别处。[inject] 只用于不含秘密的亮屏键。
+ * Called only by the authenticated Claire Binder. For the main screen only; the credential never goes into a
+ * command line, the clipboard, a screenshot or a log.
+ * Every credential keystroke is sent through [injectTo] onto the focused window owned by SystemUI alone: when
+ * another window sits above the keyguard (an app shown over the lock screen, an incoming call, a full-screen
+ * notification), or when the device is already unlocked and back in an app, the system refuses the injection, so
+ * the keystrokes cannot land anywhere else. [inject] is used only for the wake key, which carries no secret.
  */
 internal class DeviceUnlockInput(private val context: Context, private val inject: (InputEvent) -> Boolean,
     private val injectTo: (InputEvent, Int) -> Boolean, private val command: (List<String>) -> Boolean) {
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
     private val power = context.getSystemService(PowerManager::class.java)
-    /** 锁屏界面属于 SystemUI;查不到它的 uid 时不输入凭据。 */
+    /** The keyguard UI belongs to SystemUI; when its uid cannot be resolved, no credential is entered. */
     private val systemUiUid: Int? by lazy { runCatching { context.packageManager.getPackageUid(SYSTEM_UI, 0) }.getOrNull() }
 
     @Suppress("DEPRECATION")
     fun wake(): Boolean {
-        // WakeLock + ACQUIRE_CAUSES_WAKEUP 是旧式但兼容的亮屏路;注入 KEYCODE_WAKEUP / input keyevent 224 在部分 ROM 上失效(#618)。
-        // 这里只负责「尽力唤醒」，是否真亮屏由 DeviceAccess 读系统状态判断。
+        // WakeLock + ACQUIRE_CAUSES_WAKEUP is the old but compatible way to wake the screen; injecting KEYCODE_WAKEUP / input keyevent 224 fails on some ROMs (#618).
+        // This only does a best-effort wake; whether the screen is really on is judged by DeviceAccess reading system state.
         val woken = runCatching {
             power.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "mika:wake").acquire(1_000)
         }.isSuccess
@@ -37,7 +40,7 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
 
     fun dismiss(): Boolean = command(listOf("wm", "dismiss-keyguard"))
 
-    /** 安全锁屏仍停在通知/指纹页时做一次通用的上滑。事件定向给 SystemUI,解锁中途完成也不会落进前台 App。 */
+    /** Performs a generic swipe up while a secure keyguard is still on the notification/fingerprint page. The events are directed to SystemUI, so even if the unlock completes mid-way they never land in the foreground app. */
     fun reveal(): Boolean {
         val target = systemUiUid ?: return false
         if (!power.isInteractive || !keyguard.isKeyguardLocked || !keyguard.isDeviceLocked) return false
@@ -72,7 +75,7 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
         }
     }
 
-    /** 对 SystemUI 做一次定向点击,用于点「用密码解锁」这类回退按钮;不含凭据。 */
+    /** A directed tap on SystemUI, used for fallback buttons such as "unlock with password"; carries no credential. */
     fun tap(x: Int, y: Int): Boolean {
         val target = systemUiUid ?: return false
         if (!power.isInteractive || !keyguard.isKeyguardLocked || !keyguard.isDeviceLocked) return false
@@ -104,8 +107,10 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
             if (!DeviceCredential.valid(type, chars)) return false
             val map = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD)
             val events = if (type == CredentialKind.Password) map.getEvents(chars) ?: return false else null
-            // 已由调用方确认 SystemUI 的凭据输入框。只按已有输入的长度回删残留半截,空框不删:
-            // 部分系统在空输入框上收到 DEL 会直接关掉密码页,盲发 16 次 DEL 会让后面的数字全部落空。
+            // The caller has already confirmed SystemUI's credential input field. Delete characters only according
+            // to the length of the existing input, never on an empty field: on some systems a DEL on an empty input
+            // field closes the password page outright, and blindly sending 16 DELs would make every following
+            // digit land nowhere.
             if (type == CredentialKind.Pin) {
                 repeat(clear.coerceIn(0, MAX_CLEAR)) { if (!key(KeyEvent.KEYCODE_DEL, send = ::toKeyguard)) return false }
             } else if (!key(KeyEvent.KEYCODE_A, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON, ::toKeyguard) ||
@@ -121,12 +126,14 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
                     if (SystemClock.uptimeMillis() > deadline || !keyguard.isKeyguardLocked || !power.isInteractive || !toKeyguard(event)) return false
                 }
             }
-            // 某些系统在最后一位自动提交。回车同样只投给 SystemUI:这期间已经解锁回到 App 时被系统拒绝,不会发进 App。
+            // Some systems auto-submit on the last digit. Enter is likewise sent only to SystemUI: if the device has
+            // already unlocked and returned to an app by then, the system refuses it, so it is not delivered to the app.
             SystemClock.sleep(200)
             return !keyguard.isKeyguardLocked || !keyguard.isDeviceLocked || key(KeyEvent.KEYCODE_ENTER, send = ::toKeyguard)
         } finally {
             bytes.fill(0); chars.fill('\u0000')
-            // 密码里的符号可能用到修饰键;发过按键才释放,同样只投给 SystemUI,不往前台 App 发任何事件。
+            // Symbols in a password may involve modifier keys; release them only if keystrokes were sent, again only
+            // to SystemUI, so no event is sent to the foreground app.
             if (sent && target != null) for (code in MODIFIERS) {
                 val now = SystemClock.uptimeMillis()
                 injectTo(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0,
