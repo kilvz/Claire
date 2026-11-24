@@ -13,23 +13,23 @@ import okhttp3.Response
 import java.io.IOException
 
 /**
- * 各家外部 JSON 接口(网页搜索、网页抓取)共用的那一段:发请求、把常见的 HTTP 状态换成给模型的失败、读 JSON。
- * 各家特殊的状态由 [call] 的 special 先认:可以是一种失败,也可以是结果(比如 Jina 零命中回的 422)。
- * [service] 只进给模型的说法("search service"、"fetch service")。
+ * The piece shared by the various external JSON APIs (web search, web fetch): sending the request, mapping common HTTP statuses to failures reported to the model, and reading JSON.
+ * Provider-specific statuses are recognized first by [call]'s special: it may be a failure or a result (for example the 422 that Jina returns on zero hits).
+ * [service] only feeds the wording shown to the model ("search service", "fetch service").
  */
 internal object JsonHttp {
     private const val MAX_RESPONSE_CHARS = 1_000_000
     private val JSON_TYPE = "application/json".toMediaType()
     private const val USER_AGENT = "Claire (+https://github.com/kilvz/Claire)"
 
-    /** 一次调用没成的原因;由调用方换成自己的失败类型。 */
+    /** Why a call failed; the caller converts it into its own failure type. */
     data class Failure(val code: String, val message: String, val retryAfterSeconds: Long? = null)
 
     fun json(body: JsonObject): RequestBody = body.toString().toRequestBody(JSON_TYPE)
 
     /**
-     * 返回 [T]:special 先认响应(返回结果就照它的),再按 HTTP 状态换成失败,否则读 JSON 交给 parse。
-     * 网络不通时也走 [failure]。
+     * Returns [T]: special gets first look at the response (if it returns a result, that result is used), then the HTTP status is mapped to a failure, otherwise the JSON is read and handed to parse.
+     * An unreachable network goes through [failure] as well.
      */
     suspend fun <T> call(
         client: OkHttpClient,
@@ -49,7 +49,7 @@ internal object JsonHttp {
                     val text = StringBuilder()
                     val buffer = CharArray(8192)
                     while (true) {
-                        // 多读一个字符判定超限，避免等待超大正文全部下载完成。
+                        // Read one extra character to detect the limit, avoiding a wait for an oversized body to download completely.
                         val count = reader.read(buffer, 0, minOf(buffer.size, MAX_RESPONSE_CHARS - text.length + 1))
                         if (count == -1) break
                         if (text.length + count > MAX_RESPONSE_CHARS) {
@@ -79,6 +79,6 @@ internal object JsonHttp {
         else -> Failure("service_unavailable", "The $service service returned HTTP ${response.code}.")
     }
 
-    /** 读一个字符串字段;没有、不是字符串、全是空白都按空串。 */
+    /** Reads a string field; absent, non-string and all-whitespace values all become the empty string. */
     fun text(o: JsonObject, name: String): String = (o[name] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
 }

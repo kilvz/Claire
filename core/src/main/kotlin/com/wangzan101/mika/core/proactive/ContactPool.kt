@@ -5,7 +5,7 @@ import kotlin.math.exp
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** 联系人是一个人,还是一个群(群里的成员不单独记)。 */
+/** Whether a contact is a person or a group (group members are not recorded separately). */
 @Serializable
 enum class ContactType(val wire: String) {
     @SerialName("person") Person("person"),
@@ -16,11 +16,11 @@ enum class ContactType(val wire: String) {
     }
 }
 
-/** 和用户的关系(固定的几种);群也用这几种(家人群、工作群、同学群)。 */
+/** The relationship to the user (a fixed set); groups use the same set (family group, work group, classmate group). */
 @Serializable
 enum class ContactRelation(val wire: String) {
     @SerialName("family") Family("family"),
-    /** 伴侣:算敏感类推断,只有「敏感类推断」开着时模型才能给。 */
+    /** Partner: counts as a sensitive-type inference; the model can only supply it while "sensitive inference" is enabled. */
     @SerialName("partner") Partner("partner"),
     @SerialName("friend") Friend("friend"),
     @SerialName("colleague") Colleague("colleague"),
@@ -34,11 +34,11 @@ enum class ContactRelation(val wire: String) {
 }
 
 /**
- * 攒出来的一个联系人(一个人或一个群)。[id] 是 [ContactIdentity] 算的,[name] 是通知标题里最近一个能用的显示名,
- * 都不来自模型;模型只投类型和关系的票。票按天记:[typeVotes]、[relationVotes] 是每种值在哪几天(本地日期的纪元日,升序)投过,
- * 同一天同一种值只算一票(一天里十条消息也是一票)。[days] 是在哪几天出现过。不存消息原文,也不存每天几条。
- * [topics] 是连着的话题 id:是我们按「这个会话的通知被归到了哪个话题」机械地连的,不是模型给的。
- * [userRelation] 是用户自己设的,一直压过票数。
+ * A contact accumulated over time (a person or a group). [id] is computed by [ContactIdentity], and [name] is the most recent usable display name from the notification titles;
+ * neither comes from the model; the model only casts votes for type and relationship. Votes are recorded per day: [typeVotes] and [relationVotes] hold the days on which each value was voted for (epoch days of the local date, ascending),
+ * and the same value on the same day counts as one vote (ten messages in one day still count as one). [days] are the days on which it appeared. Neither message text nor a per-day message count is stored.
+ * [topics] are the linked topic ids: we link them mechanically according to "which topic this conversation's notification was classified into", not something the model provides.
+ * [userRelation] is set by the user and always takes precedence over the vote counts.
  */
 @Serializable
 data class ObservedContact(
@@ -53,17 +53,17 @@ data class ObservedContact(
     val topics: List<String> = emptyList(),
     val userRelation: ContactRelation? = null,
 ) {
-    /** 敏感:有人投过「伴侣」,或用户自己设成了伴侣。 */
+    /** Sensitive: someone has voted "partner", or the user set it to partner. */
     val sensitive: Boolean get() = userRelation == ContactRelation.Partner || ContactRelation.Partner in relationVotes
 
-    /** 类型:票最多的(一样多时取最近投过的);还没有票时当个人。 */
+    /** Type: the one with the most votes (on a tie, the one voted for most recently); a person when there are no votes yet. */
     val type: ContactType
         get() = typeVotes.entries.maxWithOrNull(compareBy({ it.value.size }, { it.value.lastOrNull() ?: Long.MIN_VALUE }))?.key
             ?: ContactType.Person
 
     /**
-     * 显示的关系:用户设过的就用它;否则票最多的那种,只有它在至少 [LearnTuning.RELATION_MIN_DAYS] 个不同的日子里被投过、
-     * 并且超过全部关系票的一半(「不确定」的票也算在总数里)才显示,不然就是 [ContactRelation.Unknown]。
+     * The relationship shown: the one the user set, if any; otherwise the most-voted one, shown only when it was voted for on at least [LearnTuning.RELATION_MIN_DAYS] different days
+     * and holds more than half of all relationship votes ("unknown" votes count toward the total); otherwise [ContactRelation.Unknown].
      */
     val relation: ContactRelation
         get() {
@@ -73,16 +73,16 @@ data class ObservedContact(
             return if (top.value.size >= LearnTuning.RELATION_MIN_DAYS && top.value.size * 2 > total) top.key else ContactRelation.Unknown
         }
 
-    /** 显示的关系是不是用户设的(不是就是猜的)。 */
+    /** Whether the displayed relationship is one the user set (if not, it is a guess). */
     val userSet: Boolean get() = userRelation != null
 
-    /** 至少在 [LearnTuning.CONTACT_ESTABLISHED_DAYS] 个不同的日子里出现过才算已确立。 */
+    /** Counts as established only after appearing on at least [LearnTuning.CONTACT_ESTABLISHED_DAYS] different days. */
     val established: Boolean get() = days.size >= LearnTuning.CONTACT_ESTABLISHED_DAYS
 
-    /** 强度:出现过的不同日子数。 */
+    /** Strength: the number of distinct days it appeared on. */
     val strength: Double get() = days.size.toDouble()
 
-    /** 留存:和话题一样,exp(-Δt / S),S = [LearnTuning.STABILITY_DAYS] 天 × (1 + 强度)。 */
+    /** Retention: as with topics, exp(-Δt / S), where S = [LearnTuning.STABILITY_DAYS] days × (1 + strength). */
     fun retention(nowMs: Long): Double {
         val dtDays = (nowMs - lastSeenMs).coerceAtLeast(0L).toDouble() / LearnTuning.DAY_MS
         return exp(-dtDays / (LearnTuning.STABILITY_DAYS * (1 + strength)))
@@ -91,7 +91,7 @@ data class ObservedContact(
     fun score(nowMs: Long): Double = strength * retention(nowMs)
 }
 
-/** 联系人落盘的样子:别人的显示名、类型和关系的票、日子、连着的话题;[blocked] 是删掉后「不再记录」的身份 id(只有 id)。 */
+/** How contacts are persisted: others' display names, type and relationship votes, days, linked topics; [blocked] holds the identity ids of deleted contacts to "no longer record" (ids only). */
 @Serializable
 data class ContactPoolData(
     val version: Int = 1,
@@ -99,32 +99,32 @@ data class ContactPoolData(
     val blocked: List<String> = emptyList(),
 )
 
-/** 校验过的一条联系人归类:引用这一批里的几条通知([events] 是下标),说它们是谁发的(类型)、和用户什么关系。没有名字。 */
+/** One validated contact classification: it references several notifications from this batch ([events] are indices) and states who sent them (type) and what their relationship to the user is. No name. */
 data class ContactSignal(val events: List<Int>, val type: ContactType, val relation: ContactRelation)
 
-/** 联系人归类被丢掉的原因(给计数用,不含内容)。 */
+/** Why a contact classification was dropped (used for counting, carries no content). */
 enum class ContactDrop {
-    /** 多出 [LearnTuning.CONTACTS_MAX] 的。 */
+    /** Beyond [LearnTuning.CONTACTS_MAX]. */
     OverLimit,
-    /** 不是对象,或者 type 写的不认识 / 没有。 */
+    /** Not an object, or "type" is an unrecognized value or missing. */
     Malformed,
-    /** 引用的通知 id 里有不在这一批里的:整条不要(一条记一次)。 */
+    /** A referenced notification id is not in this batch: the whole entry is dropped (counted once per entry). */
     UnknownId,
-    /** 一个有效的通知 id 都没有。 */
+    /** There is not a single valid notification id. */
     NoIds,
-    /** 「归纳联系人与关系」关着(请求时或用上时)。 */
+    /** "Summarize contacts and relationships" is off (at request time or at application time). */
     Off,
-    /** 引用的通知算不出身份,或第一次见到时标题给不出能用的显示名。 */
+    /** No identity can be computed for the referenced notifications, or the title yielded no usable display name when first seen. */
     NoIdentity,
-    /** 用户删过这个联系人(「不再记录」)。 */
+    /** The user deleted this contact ("do not record again"). */
     Blocked,
 }
 
 /**
- * 联系人池:纯逻辑,不是线程安全的(在 ProactiveRuntime 那条串行协程上用)。
- * 谁是一个联系人由 [ContactIdentity] 定,模型只给类型和关系的票;关系一律当猜测,除非用户自己设了。
- * 类型(人还是群)在通知的写法说得清时([LearnEvent.group],见 [NoticeShapes])按写法算,模型的那一票只在说不清时用。
- * 不定时整理:用上归纳结果、或打开页面时整理一遍([maintain])。
+ * The contact pool: pure logic, not thread-safe (used on the single serial coroutine of ProactiveRuntime).
+ * Who counts as one contact is decided by [ContactIdentity], and the model only casts votes for type and relationship; a relationship is always a guess unless the user set it.
+ * The type (person or group) is derived from how the notification is written when that is unambiguous ([LearnEvent.group], see [NoticeShapes]); the model's vote is used only when it is not.
+ * There is no periodic maintenance: it is tidied once ([maintain]) when summarization results are applied or a page is opened.
  */
 class ContactPool(data: ContactPoolData = ContactPoolData()) {
     private val contacts = LinkedHashMap<String, ObservedContact>().apply { data.contacts.forEach { put(it.id, it) } }
@@ -141,12 +141,12 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     data class Applied(val accepted: Int, val dropped: Map<ContactDrop, Int>, val changed: Boolean)
 
     /**
-     * 把一批的联系人归类用到池上。[events] 是这批现在的样子(标题还在);身份按 [strategy] 算。
-     * 一条归类引用的通知落在几个身份上,每个身份都记一票。「敏感类推断」关着([allowSensitive] 为 false)时「伴侣」当不确定。
-     * [topicsByEvent] 是这一批里各条通知被归到的话题:属于某个联系人的通知,它的话题连到这个联系人上(机械的,不是模型给的)。
+     * Applies a batch of contact classifications to the pool. [events] is the batch in its current form (titles still present); identities are computed per [strategy].
+     * When one classification's referenced notifications land on several identities, each identity gets one vote. While "sensitive inference" is off ([allowSensitive] is false), "partner" counts as unknown.
+     * [topicsByEvent] maps each notification in this batch to the topics it was classified into: for a notification belonging to a contact, its topics are linked to that contact (mechanically, not supplied by the model).
      *
-     * 一次回复对一个联系人最多记一天、每种类型和关系最多投一票:几条归类落在同一个身份上时并在一起,记在它们引用的通知里
-     * 最新那条发出的那天。所以跨了午夜的一批不能凭一次判断就凑够显示关系要的两天。日子取通知发出的那天,不是判断的那天。
+     * One reply records at most one day per contact and casts at most one vote per type and relationship: several classifications landing on the same identity are merged and recorded on the day
+     * the newest of their referenced notifications was posted. So a batch spanning midnight cannot, from one judgement alone, reach the two days required for a displayed relationship. The day is the day the notification was posted, not the day of the judgement.
      */
     fun apply(
         events: List<LearnEvent>,
@@ -157,29 +157,29 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         allowSensitive: Boolean = false,
         strategy: ContactIdStrategy = LearnTuning.CONTACT_ID,
     ): Applied {
-        // 标题是发言人、不是会话名的(没有会话名的群聊)认不出是哪个会话:不记
+        // when the title is the speaker rather than the conversation name (group chats without a conversation name), the conversation cannot be identified: not recorded
         val ids = events.map { if (it.titleIsSpeaker) null else ContactIdentity.of(it.packageName, it.key, it.title, strategy) }
-        // 「不再记录」的名单里可能还是按以前的算法(带着通知键)记的 id:这条通知按以前的算法正好是它,就把现在的 id 也记进去。
-        // 不然换了算法,用户删掉的联系人就悄悄回来了
-        // 名单因此变长也算改动:要存上。不然进程一重启、通知键又换了,以前的 id 对不上,删掉的就回来了
+        // The "do not record again" list may still hold ids recorded under the previous algorithm (with the notification key): if this notification's id under that previous algorithm is exactly it, record the current id too.
+        // Otherwise, after a change of algorithm, contacts the user deleted would quietly come back
+        // The list growing as a result also counts as a change: it must be saved. Otherwise, once the process restarts and the notification key changes again, the previous id no longer matches and the deleted contacts come back
         var carried = false
         if (strategy != ContactIdStrategy.KeyAndTitle) events.forEachIndexed { i, e ->
             val now = ids[i]?.id ?: return@forEachIndexed
             if (now in blocked) return@forEachIndexed
-            // 现在的 id 上已经有联系人了(用户留着的那一条换过来的,或换了通知键之后新记的):不带。带了的话它既在名单里
-            // 又在列表里:留在页面上,却再也不会动,也没有任何说明。用户不要它可以再删一次,这回按会话名记,换了键也挡得住
+            // The current id already has a contact (either the one the user kept, carried over, or one recorded anew after the notification key changed): do not carry it over. Carrying it over would put it both on the list
+            // and among the contacts: it would stay on the page yet never move again, with no explanation. If the user does not want it, they can delete it once more; this time it is recorded by conversation name, which holds up even when the key changes
             if (now in contacts) return@forEachIndexed
             val before = ContactIdentity.of(e.packageName, e.key, e.title, ContactIdStrategy.KeyAndTitle)?.id
-            // 换成现在的 id,不是再添一个:旧的那个以后用不上了(现在的 id 换了通知键也挡得住),两个都留着的话,
-            // 一次删除占名单里两个位置,名单满着时换一个就挤掉一个别的、还没换过来的删除
+            // Replace it with the current id rather than adding another one: the old one will never be needed again (the current id holds up even when the notification key changes), and keeping both would mean
+            // that one deletion takes two slots on the list; when the list is full, each conversion evicts some other deletion that has not been converted yet
             if (before != null && before in blocked) { blocked.remove(before); block(now); carried = true }
         }
-        // 显示名用这批里这个会话最近一条能给的;没有的话沿用旧的;第一次见就给不出的不记
+        // the display name comes from the newest notification in this batch that can provide one for this conversation; if there is none, the old name is kept; one that yields none on first sight is not recorded
         fun nameOf(id: String): String? = events.indices.filter { ids[it]?.id == id }.sortedBy { events[it].postedAtMs }
             .mapNotNull { ids[it]?.name }.lastOrNull()
         val dropped = LinkedHashMap<ContactDrop, Int>()
         fun drop(d: ContactDrop) { dropped[d] = (dropped[d] ?: 0) + 1 }
-        // 这一次里每个身份被引用到的通知(下标),和被投过的类型、关系
+        // for each identity in this round, the referenced notifications (indices) and the types and relationships voted for
         class Cite {
             val cited = LinkedHashSet<Int>()
             val types = LinkedHashSet<ContactType>()
@@ -197,7 +197,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
                 if (id !in contacts && nameOf(id) == null) { drop(ContactDrop.NoIdentity); continue }
                 val c = cites.getOrPut(id) { Cite() }
                 c.cited += idx
-                // 是群还是人:通知的写法说得清的(引用到的几条都一样)按它算,不听模型的;说不清的才用模型给的
+                // group or person: when the notification's wording is unambiguous (all the referenced ones agree), go by it and ignore the model; only use the model's value when it is not
                 c.types += knownType(idx.map { events[it].group }) ?: s.type
                 c.relations += relation
                 used = true
@@ -221,7 +221,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
             )
             changed = true
         }
-        // 话题连到联系人上:这批里属于(现在池里有的)联系人的通知,它被归到的话题
+        // link topics to contacts: for notifications in this batch that belong to a contact (one now present in the pool), the topics they were classified into
         for ((i, topicIds) in topicsByEvent) {
             val id = ids.getOrNull(i)?.id ?: continue
             val c = contacts[id] ?: continue
@@ -232,8 +232,8 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     }
 
     /**
-     * 整理:去掉指着已不存在的话题的连接([liveTopics] 为 null 时不查:话题池没读出来);留存低于 [LearnTuning.FORGET_BELOW] 的丢掉(用户设过关系的不丢);
-     * 超过 [LearnTuning.CONTACT_CAP] 个时丢强度×留存最低的(同样不丢用户设过关系的)。有改动返回 true。
+     * Tidies up: removes links to topics that no longer exist (not checked when [liveTopics] is null: the topic pool could not be read); drops contacts whose retention is below [LearnTuning.FORGET_BELOW] (those with a user-set relationship are not dropped);
+     * when there are more than [LearnTuning.CONTACT_CAP], drops the ones with the lowest strength × retention (user-set relationships are likewise not dropped). Returns true when something changed.
      */
     fun maintain(nowMs: Long, liveTopics: Set<String>?): Boolean {
         var changed = liveTopics != null && forgetTopicsWhere { it !in liveTopics }
@@ -246,7 +246,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         return changed
     }
 
-    /** 话题 [from] 被用户并进了 [into]:连着它的改成连着那一个(留在原来的位置;两个都连着的只留一个)。有改动返回 true。 */
+    /** Topic [from] was merged into [into] by the user: links to it now point at the other one (kept in the original position; when both are linked, only one remains). Returns true when something changed. */
     fun remapTopic(from: String, into: String): Boolean {
         var changed = false
         for (c in contacts.values.toList()) {
@@ -257,7 +257,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         return changed
     }
 
-    /** 话题被删了:联系人上不再连着它。有改动返回 true。 */
+    /** A topic was deleted: contacts are no longer linked to it. Returns true when something changed. */
     fun forgetTopics(ids: Set<String>): Boolean = ids.isNotEmpty() && forgetTopicsWhere { it in ids }
 
     private fun forgetTopicsWhere(gone: (String) -> Boolean): Boolean {
@@ -270,7 +270,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         return changed
     }
 
-    /** 用户设关系;null 是交回去按票数猜。 */
+    /** The user sets a relationship; null hands it back to guessing from votes. */
     fun setRelation(id: String, relation: ContactRelation?): Boolean {
         val c = contacts[id] ?: return false
         if (c.userRelation == relation) return false
@@ -279,8 +279,8 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     }
 
     /**
-     * 用户删一个:同一个会话以后也不再记(只记 id)。删的是按以前的算法存下来的一条时(补做以前没存上的删除),
-     * 它按现在的算法该是哪个 id 也一并记进去——同名的那几条接下来会并成一条([adoptIdentities]),不能让它借着换算法回来。
+     * The user deletes one: the same conversation is no longer recorded afterwards either (only the id is kept). When the deleted entry was stored under the previous algorithm (making up for a deletion that was not saved before),
+     * the id it would have under the current algorithm is recorded as well — the identically named entries are about to merge into one ([adoptIdentities]), and it must not come back by way of the algorithm change.
      */
     fun delete(id: String, strategy: ContactIdStrategy = LearnTuning.CONTACT_ID): Boolean {
         val c = contacts.remove(id) ?: return false
@@ -290,10 +290,10 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     }
 
     /**
-     * 补做一次记着的删除([id] 是当时删掉的那个联系人):还在就照常删;不在了也把 [id] 记进「不再记录」。
-     * 不在是会有的:把以前的条目换成现在的身份([adoptIdentities])之后没存上,用户又删了换好的那一条、也没存上,
-     * 进程没了——下次读出来的还是换之前的文件,里面没有这个 id。只是跳过的话,接着再换一遍身份,删掉的就回来了。
-     * 有改动返回 true。
+     * Replays a recorded deletion ([id] is the contact deleted at the time): if it still exists it is deleted as usual; if not, [id] is still recorded on the "do not record again" list.
+     * It can legitimately be missing: entries were converted to the current identities ([adoptIdentities]) but not saved, the user then deleted the converted entry and that was not saved either,
+     * and the process died — the next read still gets the file from before the conversion, which lacks this id. If it were merely skipped, the next identity conversion would bring the deleted contact back.
+     * Returns true when something changed.
      */
     fun forget(id: String, strategy: ContactIdStrategy = LearnTuning.CONTACT_ID): Boolean {
         if (delete(id, strategy)) return true
@@ -309,11 +309,11 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     }
 
     /**
-     * 把按以前的算法(带着通知键)存下来的联系人换成现在的身份([strategy],只看会话名):同一个 App 里名字一样的并成一条。
-     * 以前同一个群每换一次通知键就多存一条,这里把它们合回去。算不出现在的身份的(名字是空的)原样留着,等它淡忘。
-     * 并的时候:出现过的日子、类型和关系的票取并集;名字、用户定的关系用最近出现过的那一条的,它没有定过就用另一条的;
-     * 连着的话题都留着(超出上限时留最近的)。现在的身份在「不再记录」里的,不留。
-     * 已经都是现在的身份时什么都不做。有改动返回 true。要在补做完记着的删除之后调(那些删除记的是以前的 id)。
+     * Converts contacts stored under the previous algorithm (with the notification key) to the current identities ([strategy], conversation name only): identically named ones in the same app merge into one.
+     * Previously, each change of notification key left another copy of the same group stored; here they are merged back. Ones whose current identity cannot be computed (empty name) are left as they are, to fade away.
+     * When merging: the days that appeared and the type and relationship votes are unioned; the name and the user-set relationship come from the entry seen most recently, falling back to the other entry when it has none;
+     * all linked topics are kept (when that exceeds the limit, the most recent ones are kept). If the current identity is on the "do not record again" list, it is not kept.
+     * When everything is already under the current identity, nothing happens. Returns true when something changed. Must be called after replaying the recorded deletions (those deletions record the previous ids).
      */
     fun adoptIdentities(strategy: ContactIdStrategy = LearnTuning.CONTACT_ID): Boolean {
         if (strategy != ContactIdStrategy.Title || contacts.keys.none(::fromAnOlderStrategy)) return false
@@ -329,25 +329,25 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         return true
     }
 
-    /** 重新允许删掉过的联系人(一次全部)。 */
+    /** Allows deleted contacts again (all of them at once). */
     fun allowAgain(): Boolean {
         if (blocked.isEmpty()) return false
         blocked.clear()
         return true
     }
 
-    /** 清空全部:是重来,不记进「不再记录」。 */
+    /** Clears everything: this is a fresh start, nothing goes on the "do not record again" list. */
     fun clear(): Boolean {
         if (contacts.isEmpty()) return false
         contacts.clear()
         return true
     }
 
-    /** 清掉某个 App 的:同样不记进「不再记录」。 */
+    /** Clears one app's contacts: likewise nothing goes on the "do not record again" list. */
     fun clearApp(packageName: String): Boolean = contacts.values.removeAll { it.packageName == packageName }
 
     /**
-     * 关掉「敏感类推断」并选了删除:去掉「伴侣」的票(用户自己设的不动,那不是推断)。有改动返回 true。
+     * "Sensitive inference" was turned off and deletion was chosen: removes the "partner" votes (a user-set value is left alone, since that is not an inference). Returns true when something changed.
      */
     fun deleteSensitive(): Boolean {
         var changed = false
@@ -360,7 +360,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
     }
 
     companion object {
-        /** 几条通知都说是群(或都说是私聊)时的类型;有说不清的、互相不一致的为 null。 */
+        /** The type when several notifications all say group (or all say one-to-one); null when some are unclear or they disagree with each other. */
         private fun knownType(groups: List<Boolean?>): ContactType? = when {
             groups.isEmpty() || groups.any { it == null } -> null
             groups.all { it == true } -> ContactType.Group
@@ -368,14 +368,14 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
             else -> null
         }
 
-        // 以前的算法(键加标题,发出去的版本里只用过这一种)给的 id:它的字母加一段十六进制的哈希。逐个字符比,不用正则
+        // the id produced by the previous algorithm (key plus title, the only one used in released versions): its letter plus a hex hash. Compared character by character, without a regex
         private fun fromAnOlderStrategy(id: String): Boolean {
             val prefix = ContactIdStrategy.KeyAndTitle.prefix
             return id.length == prefix.length + NoticeDedup.ID_HEX && id.startsWith(prefix) &&
                 id.drop(prefix.length).all { it in '0'..'9' || it in 'a'..'f' }
         }
 
-        /** 两条其实是同一个联系人:并成一条(规则见 [adoptIdentities])。id、App 用 [a] 的。 */
+        /** The two entries are actually the same contact: merge them into one (rules in [adoptIdentities]). The id and app are taken from [a]. */
         private fun merge(a: ObservedContact, b: ObservedContact): ObservedContact {
             val (older, newer) = if (b.lastSeenMs >= a.lastSeenMs) a to b else b to a
             fun <K> votes(x: Map<K, List<Long>>, y: Map<K, List<Long>>): Map<K, List<Long>> =
@@ -387,7 +387,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
                 typeVotes = votes(a.typeVotes, b.typeVotes),
                 relationVotes = votes(a.relationVotes, b.relationVotes),
                 days = addDays(a.days, b.days),
-                // 超出上限时留最近的:两边都连着的话题按较新那一条里的位置算(和平时刷新连接的规矩一样)
+                // when over the limit keep the most recent: topics linked by both sides take their position from the newer entry (the same rule as when refreshing links normally)
                 topics = (older.topics - newer.topics.toSet() + newer.topics).distinct().takeLast(LearnTuning.CONTACT_TOPICS),
                 userRelation = newer.userRelation ?: older.userRelation,
             )
@@ -396,7 +396,7 @@ class ContactPool(data: ContactPoolData = ContactPoolData()) {
         private fun addDays(old: List<Long>, days: List<Long>): List<Long> =
             (old + days).toSortedSet().toList().takeLast(LearnTuning.CONTACT_DAYS)
 
-        /** 一天一种值只算一票:票就是投过的日子。 */
+        /** One value on one day counts as one vote: the votes are simply the days voted for. */
         private fun <T> vote(votes: Map<T, List<Long>>, value: T, days: List<Long>): Map<T, List<Long>> {
             val out = LinkedHashMap(votes)
             out[value] = addDays(votes[value].orEmpty(), days)

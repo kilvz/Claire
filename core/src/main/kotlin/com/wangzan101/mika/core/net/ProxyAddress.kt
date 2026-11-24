@@ -6,12 +6,12 @@ import java.net.URI
 import java.net.URLDecoder
 
 /**
- * 一个网络代理地址,形如 `协议://[用户:密码@]主机:端口`:协议是 http、https、socks5、socks5h 之一,后面不带路径。
- * [toString] 不带账号密码,写进日志、显示在界面上都不会泄露。
+ * A network proxy address of the form `scheme://[user:password@]host:port`: the scheme is one of http, https, socks5, socks5h, with no path after it.
+ * [toString] omits the credentials, so writing it to logs or showing it in the UI leaks nothing.
  */
 class ProxyAddress private constructor(
     val scheme: String,
-    /** 主机名或 IP;IPv6 不带方括号。 */
+    /** Hostname or IP; IPv6 without brackets. */
     val host: String,
     val port: Int,
     val user: String,
@@ -21,14 +21,14 @@ class ProxyAddress private constructor(
     val hasCredentials: Boolean get() = user.isNotEmpty()
 
     /**
-     * Claire 自己的连接(调模型、下更新、内置浏览器)能不能走它。https 代理要先和代理本身握 TLS,
-     * 这些连接用的网络库不支持,只有容器里的命令(curl 等)用得上。
+     * Whether Claire's own connections (calling models, downloading updates, the built-in browser) can go through it. An https proxy requires a TLS handshake with the proxy itself first,
+     * which the network library these connections use does not support; only commands in the container (curl and the like) can use it.
      */
     val forApp: Boolean get() = scheme != "https"
 
     fun javaProxy(): Proxy = Proxy(if (socks) Proxy.Type.SOCKS else Proxy.Type.HTTP, InetSocketAddress.createUnresolved(host, port))
 
-    /** 给人看的写法:协议、主机、端口,不带账号密码。 */
+    /** The human-facing form: scheme, host, port, without credentials. */
     val display: String get() = "$scheme://${if (host.contains(':')) "[$host]" else host}:$port"
 
     override fun toString(): String = display
@@ -36,7 +36,7 @@ class ProxyAddress private constructor(
     companion object {
         val SCHEMES = setOf("http", "https", "socks5", "socks5h")
 
-        /** 解析代理地址;空串或写法不对为 null。 */
+        /** Parses a proxy address; null for an empty string or an invalid format. */
         fun parse(text: String): ProxyAddress? {
             val v = text.trim()
             if (v.isEmpty() || v.any { it.isWhitespace() }) return null
@@ -52,10 +52,10 @@ class ProxyAddress private constructor(
             return ProxyAddress(scheme, host, u.port, user, password)
         }
 
-        // URI 中的加号是字面字符,解码时保留它。
+        // A plus sign in a URI is a literal character, so keep it when decoding.
         private fun decodeCredential(value: String): String = URLDecoder.decode(value.replace("+", "%2B"), "UTF-8")
 
-        /** 空串(不用代理),或能解析的代理地址。 */
+        /** An empty string (no proxy), or a proxy address that parses. */
         fun valid(text: String): Boolean = text.isBlank() || parse(text) != null
     }
 }

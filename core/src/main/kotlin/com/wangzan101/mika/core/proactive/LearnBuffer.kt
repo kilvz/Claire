@@ -4,21 +4,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** 用户拿这条系统通知做了什么:是我们自己从系统看到的(监听的移除原因),不是通知里写的。 */
+/** What the user did with this system notification: something we observed from the system ourselves (the listener's removal reason), not something written in the notification. */
 enum class LearnOutcome {
-    /** 还在通知栏里,或被「全部清除」一并清掉(不说明什么)。 */
+    /** Still in the notification shade, or cleared along with "clear all" (this says nothing). */
     None,
-    /** 点开了。 */
+    /** Opened. */
     Opened,
-    /** 单独划掉了。 */
+    /** Dismissed on its own. */
     Dismissed,
 }
 
 /**
- * 留着待归纳的一条通知。[title]、[text] 是清洗过的通知文字(第三方写的,不可信),归纳完([state] 为 Done)就清空,
- * 只留下它被归到了哪些话题([topics]),好让之后才到的点开/划掉也能算到那些话题上。
- * [sig] 是这个键当时文字的指纹(SHA-256 的前 8 个字节;文字归纳完就清掉了,只能靠它比),同一个键同样的文字
- * 在 [LearnTuning.REPEAT_WINDOW_MS] 之内只记一次。
+ * One notification kept pending summarization. [title] and [text] are the cleaned notification text (written by third parties, not trustworthy) and are cleared once summarization is done ([state] is Done),
+ * leaving only the topics it was classified into ([topics]), so that an open/dismiss arriving later can still count toward those topics.
+ * [sig] is the fingerprint of this key's text at that time (the first 8 bytes of SHA-256; the text is cleared after summarization, so comparison can only rely on it); identical text under the same key
+ * is recorded only once within [LearnTuning.REPEAT_WINDOW_MS].
  */
 data class LearnEvent(
     val seq: Long,
@@ -31,47 +31,47 @@ data class LearnEvent(
     val state: State = State.Pending,
     val topics: Set<String> = emptySet(),
     val sig: Long = 0,
-    /** 这条通知来自群聊(true)还是私聊(false);看不出来为 null(见 [NoticeRecord.group])。是我们按通知的写法拆出来的,不是模型说的。 */
+    /** Whether this notification came from a group chat (true) or a one-to-one chat (false); null when it cannot be told (see [NoticeRecord.group]). This is derived by us from how the notification is written, not stated by the model. */
     val group: Boolean? = null,
-    /** 这段文字最近一次出现(原样重发也算)的时间:离它够久再出现才算新的一次(见 [LearnTuning.REPEAT_WINDOW_MS])。 */
+    /** When this text most recently appeared (being re-posted verbatim counts too): only an appearance after a long enough gap counts as a new occurrence (see [LearnTuning.REPEAT_WINDOW_MS]). */
     val seenAtMs: Long = postedAtMs,
-    /** [title] 是发言人、不是会话的名字(见 [NoticeRecord.titleIsSpeaker]):不拿它认联系人。 */
+    /** [title] is the speaker rather than the conversation name (see [NoticeRecord.titleIsSpeaker]): it is not used to identify contacts. */
     val titleIsSpeaker: Boolean = false,
 ) {
     enum class State { Pending, Sending, Done }
 }
 
 /**
- * 归纳用的事件缓冲:只在内存里(进程没了就没了,可以接受:归纳本来就是攒统计),和收件箱各管各的——
- * 收件箱里的记录被点开、划掉后,这里的事件还在。最多 [capacity] 条,满了先丢已归纳过的最旧的,再丢待归纳的最旧的(在发的不丢)。
- * 不是线程安全的:都在 ProactiveRuntime 那条串行协程上调;界面只读 [state]。
+ * The event buffer used for summarization: in memory only (it is lost with the process, which is acceptable: summarization is about accumulating statistics anyway), managed separately from the inbox —
+ * when records in the inbox are opened or dismissed, the events here remain. At most [capacity] entries; when full, the oldest already-summarized ones are dropped first, then the oldest pending ones (those being sent are never dropped).
+ * Not thread-safe: everything is called on the single serial coroutine of ProactiveRuntime; the UI only reads [state].
  */
 class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
-    /** 给界面的数:总共留着几条,其中几条待归纳。 */
+    /** The numbers for the UI: how many entries are kept in total, and how many of them are pending summarization. */
     data class Summary(val total: Int = 0, val pending: Int = 0)
 
     private val events = ArrayList<LearnEvent>()
-    /** 刚被认成状态显示、事件已经去掉的键(见 [forgetKey]):它被点开、划掉时不往回找。 */
+    /** Keys just recognized as status displays whose event has already been removed (see [forgetKey]): when such a key is opened or dismissed, no backward lookup is done. */
     private val withdrawn = HashSet<String>()
     private var seq = 0L
     private val mutable = MutableStateFlow(Summary())
     val state: StateFlow<Summary> = mutable.asStateFlow()
 
     /**
-     * 收件箱收下了一条(已清洗)。同一个键同样的标题和正文在 [LearnTuning.REPEAT_WINDOW_MS] 之内只记一次
-     * (隔得更久的是新的一次,比如第二天又发来的同一句话);都是空的不记。记下了返回 true。
+     * The inbox accepted one record (already cleaned). The same title and body under the same key are recorded only once within [LearnTuning.REPEAT_WINDOW_MS]
+     * (a longer gap makes it a new occurrence, e.g. the same sentence arriving again the next day); when both are empty nothing is recorded. Returns true when it was recorded.
      *
-     * [newMessages] 是这条通知的消息列表里这回才见到的几条(会话样式的通知;见 [NoticeDedup.admit]):有的话,
-     * 归纳用的那句话就是它们(由旧到新,放不下时留新的),不是通知的正文——正文常常是空的,或只有最后一句,
-     * 只看正文的话锁屏期间攒下的前几句就归纳不到了。判定和通知原文也是看消息列表的。
+     * [newMessages] are the messages seen for the first time this round in this notification's message list (for conversation-style notifications; see [NoticeDedup.admit]): when present,
+     * the sentence used for summarization is those messages (oldest to newest, keeping the newest when they do not fit), not the notification body — the body is often empty or holds only the last sentence,
+     * and going by the body alone would leave the earlier sentences accumulated while the screen was locked unsummarized. Detection and the notification text also look at the message list.
      */
     fun capture(record: NoticeRecord, newMessages: List<NoticeMessage> = emptyList()): Boolean {
         val title = NoticeFilter.clean(record.title, LearnTuning.TITLE_MAX)
         val text = NoticeFilter.clean(if (newMessages.isEmpty()) record.said else lines(newMessages), LearnTuning.TEXT_MAX)
         if (title.isEmpty() && text.isEmpty()) return false
         val sig = fingerprint(title + "\u0000" + text)
-        // 同样的文字:离它上一次出现不久的只是重发(一条没人管的通知被 App 反复重发,不能每半天算一次),记下「刚又出现过」就行;
-        // 安静了够久再出现的才是新的一次
+        // Same text: one appearing again soon after its last appearance is only a re-post (an unattended notification gets re-posted by the app over and over and must not count every half hour), so just record "it appeared again just now";
+        // only one appearing again after it has been quiet long enough is a new occurrence
         val i = events.indexOfLast { it.key == record.key && it.sig == sig }
         if (i >= 0 && kotlin.math.abs(record.postedAtMs - events[i].seenAtMs) < LearnTuning.REPEAT_WINDOW_MS) {
             events[i] = events[i].copy(seenAtMs = maxOf(events[i].seenAtMs, record.postedAtMs))
@@ -87,7 +87,7 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
         return true
     }
 
-    /** 几条消息并成一句(带着谁说的,由旧到新):最多 [LearnTuning.NEW_LINES_MAX] 条、总共不超过 [LearnTuning.TEXT_MAX] 个字,放不下时留新的。 */
+    /** Merges several messages into one text (with who said it, oldest to newest): at most [LearnTuning.NEW_LINES_MAX] messages and no more than [LearnTuning.TEXT_MAX] characters in total, keeping the newest when they do not fit. */
     private fun lines(messages: List<NoticeMessage>): String {
         val picked = ArrayList<String>()
         var chars = 0
@@ -104,11 +104,11 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
     }
 
     /**
-     * 系统说这条通知被点开/划掉了:记到这个键最新的那条事件上(用户点的是通知栏里现在那段文字),只记一次。
-     * 那条已经归纳过了的,返回它归到的话题(由调用方补到话题池上);否则返回空。
+     * The system says this notification was opened/dismissed: recorded on the newest event for this key (what the user tapped is the text currently in the notification shade), only once.
+     * If that one has already been summarized, returns the topics it was classified into (the caller adds them to the topic pool); otherwise returns empty.
      */
     fun outcome(key: String, outcome: LearnOutcome): Set<String> {
-        // 被处理掉的是一条状态显示:它的事件已经去掉了,往回找只会找到同一个键上更早的、不相干的通知,把这次点开/划掉算到那个话题头上
+        // the one handled was a status display: its event has already been removed, so searching backwards would only find an earlier, unrelated notification under the same key and attribute this open/dismiss to its topic
         if (withdrawn.remove(key)) return emptySet()
         if (outcome == LearnOutcome.None) return emptySet()
         val i = events.indexOfLast { it.key == key }
@@ -120,8 +120,8 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
     }
 
     /**
-     * 现在该发哪个 App:只看 [eligible] 认的 App 里待归纳的;攒够 [LearnTuning.DUE_COUNT] 条,或最旧的一条已过了
-     * [LearnTuning.DUE_AGE_MS],就算到期。几个都到期时先发最旧的那个。没有到期的为 null。
+     * Which app should be sent now: only pending entries from apps that [eligible] accepts are considered; an app is due once it has accumulated [LearnTuning.DUE_COUNT] entries
+     * or its oldest entry is older than [LearnTuning.DUE_AGE_MS]. When several are due, the one with the oldest entry goes first. Null when nothing is due.
      */
     fun due(nowMs: Long, eligible: (String) -> Boolean): String? = events
         .filter { it.state == LearnEvent.State.Pending && eligible(it.packageName) }
@@ -133,19 +133,19 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
     val pendingCount: Int get() = events.count { it.state == LearnEvent.State.Pending }
 
     /**
-     * 这个键其实是一条被反复重发的状态显示(见 [LiveUpdates]):它从 [sinceMs] 起收进来、还没发出去归纳的那几条去掉。
-     * 更早的、正在发的那一批不动(在发的由调用方先取消)。有去掉的返回 true。
-     * 这条通知之后被点开、划掉不算对哪个话题的反馈(见 [outcome]),直到这个键上又收下新的一条。
+     * This key is actually a status display that keeps being re-posted (see [LiveUpdates]): the entries captured from [sinceMs] onward that have not been sent for summarization yet are removed.
+     * Earlier ones and the batch currently being sent are left alone (the caller cancels the in-flight batch first). Returns true when anything was removed.
+     * An open/dismiss of this notification afterwards does not count as feedback for any topic (see [outcome]) until a new entry is captured under this key.
      */
     fun forgetKey(key: String, sinceMs: Long): Boolean {
         withdrawn += key
-        // 只去掉这一阵重发收进来的:很多 App 所有推送共用一个通知键,同一个键上更早的那条正常通知不能跟着丢
+        // only remove what was captured during this round of re-posts: many apps share one notification key across all pushes, so an earlier normal notification under the same key must not be lost with them
         val gone = events.removeAll { it.key == key && it.state == LearnEvent.State.Pending && it.postedAtMs >= sinceMs }
         if (gone) publish()
         return gone
     }
 
-    /** 开一批:这个 App 最旧的待归纳的最多 [LearnTuning.BATCH_MAX] 条,标成在发。 */
+    /** Starts a batch: up to [LearnTuning.BATCH_MAX] of this app's oldest pending entries are marked as being sent. */
     fun begin(packageName: String): List<LearnEvent> {
         check(events.none { it.state == LearnEvent.State.Sending }) { "a batch is already in flight" }
         val picked = events.filter { it.state == LearnEvent.State.Pending && it.packageName == packageName }
@@ -157,17 +157,17 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
         return sending()
     }
 
-    /** 在发的这批现在的样子(点开/划掉可能是发出之后才到的),按发出时的顺序。 */
+    /** The current state of the batch being sent (opens/dismisses may have arrived after it was sent out), in the order they were sent. */
     fun sending(): List<LearnEvent> = events.filter { it.state == LearnEvent.State.Sending }
         .sortedWith(compareBy({ it.postedAtMs }, { it.seq }))
 
-    /** 这批没发成(锁屏取消、预算用完、开关变了):照旧待归纳。 */
+    /** The batch was not sent (cancelled by screen lock, budget exhausted, the switch changed): the entries go back to pending summarization. */
     fun abort() {
         events.replaceAll { if (it.state == LearnEvent.State.Sending) it.copy(state = LearnEvent.State.Pending) else it }
         publish()
     }
 
-    /** 这批失败了(超时、模型出错、回复读不懂):丢掉,不重试。返回丢了几条。 */
+    /** The batch failed (timeout, model error, unreadable reply): drop it without retrying. Returns how many entries were dropped. */
     fun fail(): Int {
         val before = events.size
         events.removeAll { it.state == LearnEvent.State.Sending }
@@ -175,7 +175,7 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
         return before - events.size
     }
 
-    /** 这批归纳完了:按 seq 记下各条归到的话题,文字清掉。 */
+    /** The batch was summarized: the topics each entry was classified into are recorded by seq, and the text is cleared. */
     fun finish(topicsBySeq: Map<Long, Set<String>>) {
         events.replaceAll {
             if (it.state != LearnEvent.State.Sending) it
@@ -184,18 +184,18 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
         publish()
     }
 
-    /** 话题 [from] 被用户并进了 [into]:事件上指着它的改指那一个(之后才到的点开/划掉算到那一个上)。 */
+    /** Topic [from] was merged into [into] by the user: events pointing at it are pointed at the other one (a later open/dismiss counts toward that one). */
     fun remapTopic(from: String, into: String) {
         events.replaceAll { if (from in it.topics) it.copy(topics = it.topics - from + into) else it }
     }
 
-    /** 话题被删了:事件上不再指着它。 */
+    /** A topic was deleted: events no longer point at it. */
     fun forgetTopics(ids: Set<String>) {
         if (ids.isEmpty()) return
         events.replaceAll { if (it.topics.any(ids::contains)) it.copy(topics = it.topics - ids) else it }
     }
 
-    /** 不再收的 App(取消勾选、不从它归纳)的事件一并去掉;在发的那批不动(由调用方先取消)。 */
+    /** Events of apps no longer collected (unchecked, not summarized from) are removed too; the batch being sent is left alone (the caller cancels it first). */
     fun purge(keep: (String) -> Boolean) {
         if (events.removeAll { it.state != LearnEvent.State.Sending && !keep(it.packageName) }) publish()
     }
@@ -219,10 +219,10 @@ class LearnBuffer(private val capacity: Int = LearnTuning.BUFFER_CAP) {
     }
 
     private companion object {
-        /** 并成一句时两条消息之间的分隔(清洗会把换行并成空格,所以不用换行)。 */
+        /** The separator between two messages when merging into one text (cleaning collapses line breaks into spaces, so a line break is not used). */
         const val LINE_BREAK = " / "
 
-        /** 文字的指纹:SHA-256 的前 8 个字节(用 32 位的 hashCode 的话,「Aa」和「BB」这样不同的两句会撞上)。只在内存里用。 */
+        /** Text fingerprint: the first 8 bytes of SHA-256 (with a 32-bit hashCode, two different strings such as "Aa" and "BB" would collide). Used in memory only. */
         fun fingerprint(s: String): Long {
             val d = java.security.MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8))
             var out = 0L

@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** 正文在 OkHttp 回调线程内读完再交回，等待响应和读取正文期间都能取消。 */
+/** Reads the body to completion on the OkHttp callback thread before returning it; cancellation works while waiting for the response and while reading the body. */
 internal suspend fun <T> Call.awaitBody(timeoutSec: Int? = null, read: (Response) -> T): T =
     suspendCancellableCoroutine { continuation ->
         if (timeoutSec != null) timeout().timeout(timeoutSec.toLong(), TimeUnit.SECONDS)

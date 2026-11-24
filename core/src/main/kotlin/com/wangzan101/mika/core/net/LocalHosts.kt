@@ -3,12 +3,12 @@ package com.wangzan101.mika.core.net
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * 地址是不是在本机或局域网里。只看地址本身,不做域名解析。
- * - [isLocal](严格):本机(localhost、127.0.0.0/8、::1)、私有网段(10/8、172.16/12、192.168/16、IPv6 的 fc00::/7)、
- *   链路本地(169.254/16、fe80::/10)和 `.local` 名字。用来判断明文 http 安不安全这类事。
- * - [bypassesProxy](宽一些):走网络代理时照旧直连的地址——[isLocal] 之外,还有不带点的主机名(局域网里的机器名)、
- *   局域网常用的后缀(`.lan`、`.home.arpa`、`.internal`)和运营商级 NAT 的共享网段 100.64/10(组网工具常给设备分这段)。
- *   本机、局域网里跑的模型服务代理多半到不了,所以直连。
+ * Whether an address is on this machine or the local network. Only the address itself is examined; no DNS resolution is done.
+ * - [isLocal] (strict): this machine (localhost, 127.0.0.0/8, ::1), private ranges (10/8, 172.16/12, 192.168/16, IPv6 fc00::/7),
+ *   link-local (169.254/16, fe80::/10) and `.local` names. Used for decisions such as whether plain http is safe.
+ * - [bypassesProxy] (broader): addresses that still connect directly when a network proxy is in use — beyond [isLocal], it also covers hostnames without a dot (machine names on the local network),
+ *   suffixes common on local networks (`.lan`, `.home.arpa`, `.internal`) and the carrier-grade NAT shared range 100.64/10 (mesh tools often assign devices addresses from it).
+ *   Proxies usually cannot reach model services running on this machine or the local network, hence the direct connection.
  */
 object LocalHosts {
     fun isLocal(host: String): Boolean {
@@ -17,9 +17,9 @@ object LocalHosts {
         if (h == "localhost" || h.endsWith(".localhost") || h.endsWith(".local")) return true
         ipv4(h)?.let { (a, b) -> return privateIpv4(a, b) }
         if (':' in h) {
-            // ::1 的完整写法也是本机回环
+            // the fully expanded form of ::1 is loopback as well
             if (h == "::1" || h == "0:0:0:0:0:0:0:1") return true
-            // ::ffff:a.b.c.d 是 IPv4-mapped IPv6,按里面那段 IPv4 判断;本机模型服务常这样写
+            // ::ffff:a.b.c.d is IPv4-mapped IPv6, so it is judged by the IPv4 part inside; local model services are often written this way
             if (h.startsWith("::ffff:")) {
                 val (a, b) = ipv4(h.removePrefix("::ffff:")) ?: return false
                 return privateIpv4(a, b)
@@ -34,9 +34,9 @@ object LocalHosts {
         a == 127 || a == 10 || (a == 172 && b in 16..31) || (a == 192 && b == 168) || (a == 169 && b == 254)
 
     /**
-     * 是不是本机、局域网,或组网工具常用的 CGNAT 网段 100.64/10。
-     * Tailscale 这类 VPN 给设备分这段地址、流量已在网络层加密,明文 http 也安全;
-     * 所以「明文 http 可不可接受」这类判断把它当私有地址看。比 [isLocal] 多认这一段。
+     * Whether this is this machine, the local network, or the CGNAT range 100.64/10 commonly used by mesh tools.
+     * VPNs such as Tailscale assign devices addresses from this range and traffic is already encrypted at the network layer, so plain http is safe too;
+     * therefore checks such as "is plain http acceptable" treat it as a private address. It recognizes this one range beyond [isLocal].
      */
     fun isPrivateOrMesh(host: String): Boolean {
         if (isLocal(host)) return true
@@ -50,7 +50,7 @@ object LocalHosts {
         return false
     }
 
-    /** 走网络代理时这个主机照旧直连。 */
+    /** This host still connects directly when a network proxy is in use. */
     fun bypassesProxy(host: String): Boolean {
         if (isLocal(host)) return true
         val h = normalize(host)
@@ -61,7 +61,7 @@ object LocalHosts {
         return '.' !in h
     }
 
-    /** 明文 http、又不在本机或局域网的地址:Key 和对话会在网上不加密地传。认不出的地址不算。 */
+    /** A plain-http address that is not on this machine or the local network: keys and conversations travel over the network unencrypted. Addresses that cannot be recognized do not count. */
     fun unencryptedRemote(url: String): Boolean {
         val u = url.trim().toHttpUrlOrNull() ?: return false
         return !u.isHttps && !isLocal(u.host)
@@ -70,8 +70,8 @@ object LocalHosts {
     private val PROXY_SUFFIXES = listOf(".lan", ".home.arpa", ".internal")
 
     /**
-     * 浏览器的直连规则([bypassesProxy] 的同一套,写成浏览器内核认的格式);本机地址内核本来就直连,
-     * 不带点的主机名另由「简单主机名直连」管。
+     * Direct-connection rules for the browser (the same set as [bypassesProxy], written in the format the browser engine understands); the engine connects local addresses directly anyway,
+     * while dotless hostnames are handled separately by "connect simple hostnames directly".
      */
     val BYPASS_RULES: List<String> = listOf(
         "localhost", "*.localhost", "*.local", "*.lan", "*.home.arpa", "*.internal",
@@ -79,13 +79,13 @@ object LocalHosts {
         "fc00::/7", "fe80::/10",
     )
 
-    /** 给命令行工具的 no_proxy:逗号分隔的主机、后缀和网段(不认网段的工具也至少认得前三个)。 */
+    /** no_proxy for command-line tools: comma-separated hosts, suffixes and ranges (tools that do not understand ranges still recognize at least the first three). */
     const val NO_PROXY = "localhost,127.0.0.1,::1,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10," +
         "fc00::/7,fe80::/10,.localhost,.local,.lan,.home.arpa,.internal"
 
     private fun normalize(host: String) = host.trim().trimStart('[').trimEnd(']').trimEnd('.').lowercase()
 
-    /** 点分四段的 IPv4 的前两段;不是 IPv4 为 null。 */
+    /** The first two octets of a dotted-quad IPv4 address; null when it is not IPv4. */
     private fun ipv4(h: String): Pair<Int, Int>? {
         val parts = h.split('.')
         if (parts.size != 4) return null

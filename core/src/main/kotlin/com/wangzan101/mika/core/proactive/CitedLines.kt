@@ -6,22 +6,22 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 当日消息归纳各级共用的读法:模型的回复是一串句子,每句必须指向它依据的输入条目(这一次请求里的 id),指不上的不要;
- * 引用的 id 里有一个不是这次请求里的,也整句不要。
- * 只认回复结尾的那个 JSON 值([ReplyJson]):`{"<key>":[…]}` 或直接一个数组;别的写法、超长的读不出来。
- * 每句的文字按通知文字的办法清洗,网址和长串数字遮掉([LearnText.maskLinksAndLongNumbers]),截到 [maxLen];
- * 过不了敏感信息这一关([LearnText.sensitive]:密码、验证码、卡号之类,加上登录码这些别的叫法)的整句不要。
+ * The shared reading method used at all levels of daily-message summarization: the model's reply is a series of sentences, and each sentence must point to the input items it is based on (ids from this request); sentences that point to none are discarded;
+ * if any referenced id is not from this request, the whole sentence is discarded as well.
+ * Only the JSON value at the end of the reply ([ReplyJson]) is recognized: `{"<key>":[…]}` or a bare array; other forms, and overly long ones, cannot be read.
+ * The text of each sentence is cleaned the way notification text is, with URLs and long digit runs masked ([LearnText.maskLinksAndLongNumbers]), then truncated to [maxLen];
+ * sentences that fail the sensitive-information check ([LearnText.sensitive]: passwords, verification codes, card numbers and the like, plus alternative names such as login codes) are discarded entirely.
  */
 internal object CitedLines {
     /**
-     * [brief]:回复里和句子并排给的一句概述(只有 `{"<key>":[…],"brief":"…"}` 这种写法才有;当日、周、月归纳用)。
-     * 它不指向任何输入,所以只在它说的就是收下的这些句子时才留:一句都没收下、或有句子因为说不出依据、过不了敏感信息那一关
-     * 之类被丢掉了([NoteDrop.OverLimit] 不算——那只是写多了),概述里可能还带着被丢掉的内容,不要。没有、不合格为 null。
+     * [brief]: a one-line overview given alongside the sentences in the reply (present only in the `{"<key>":[…],"brief":"…"}` form; used for daily, weekly and monthly summaries).
+     * It points to no input, so it is kept only when it says exactly the sentences that were accepted: when none were accepted, or when sentences were dropped because they could not state a basis,
+     * failed the sensitive-information check, or the like ([NoteDrop.OverLimit] does not count — that is merely writing too much), the brief may still carry dropped content, so it is not kept. Null when absent or unsuitable.
      */
     class Parsed(val lines: List<NoteSignal>, val dropped: Map<NoteDrop, Int>, val brief: String? = null)
 
     /**
-     * [idPrefix] 加序号是输入条目的 id(`e1`…、`s1`…),一共 [count] 个;一次最多认 [maxItems] 句。读不出来为 null。
+     * [idPrefix] plus a sequence number is the id of an input item (`e1`…, `s1`…), [count] of them in total; at most [maxItems] sentences are recognized at a time. Null when it cannot be read.
      */
     fun parse(raw: String, key: String, idPrefix: String, count: Int, maxItems: Int, maxLen: Int): Parsed? {
         if (raw.length > ReplyJson.MAX_CHARS) return null
@@ -37,8 +37,8 @@ internal object CitedLines {
             }
             else -> return null
         }
-        // 给了东西、却没有一条是对象(比如 [1,2,3]):回复的结构就不对,读不出来——不能当成「一句都没写」收下
-        // (分段归纳那边,一句都没写的一批会把原文标成做过了)
+        // Something was given but not a single entry is an object (e.g. [1,2,3]): the reply's structure is wrong and cannot be read — it must not be accepted as "nothing was written"
+        // (in chunked summarization, a batch that wrote nothing marks the original text as done)
         if (items.isNotEmpty() && items.none { it is JsonObject }) return null
         val dropped = LinkedHashMap<NoteDrop, Int>()
         fun drop(d: NoteDrop) { dropped[d] = (dropped[d] ?: 0) + 1 }
@@ -48,7 +48,7 @@ internal object CitedLines {
             val o = e as? JsonObject ?: return@forEachIndexed drop(NoteDrop.Malformed)
             val ids = (o.field("ids") as? JsonArray).orEmpty()
                 .map { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content?.trim()?.let { id -> index(id, idPrefix, count) } }
-            // 引用了这次请求里没有的 id:这句有一部分说不出依据,整句不要(不是只把那个 id 划掉)
+            // quoted an id that is not in this request: part of this sentence cannot state a basis, so drop the whole sentence (not just that one id)
             if (ids.any { it == null }) return@forEachIndexed drop(NoteDrop.UnknownId)
             val valid = ids.filterNotNull().distinct()
             if (valid.isEmpty()) return@forEachIndexed drop(NoteDrop.NoIds)

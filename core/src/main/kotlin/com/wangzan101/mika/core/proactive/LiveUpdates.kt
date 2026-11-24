@@ -1,29 +1,29 @@
 package com.wangzan101.mika.core.proactive
 
 /**
- * 认出「状态显示」:同一条通知被 App 一遍遍重发,每次换几个字——导航的「300 米后右转」、配送还有几站、比分、倒计时。
- * 它们不是一件件的事,每换一次字就收一条的话,几分钟就是上百条没用的东西,判定、归纳和通知原文里全是它。
+ * Recognizes a "status display": the same notification re-posted by an app over and over, changing a few words each time — navigation's "turn right in 300 meters", how many stops a delivery is away, a score, a countdown.
+ * These are not separate events; capturing one entry per change would mean hundreds of useless entries within minutes, filling detection, summarization and the notification text.
  *
- * 常驻的、前台服务的、不可清除的、类别写着导航或进度的,[NoticeFilter] 已经不收了。这里管的是那些什么都没标的:
- * 真机上看到的一个地图 App 的导航播报就是一条普通的可清除通知,没有类别,不出声,每两三秒重发一次。
- * 能认它的只剩「重发得有多密」这一样,所以只看这个,不看是哪个 App、标题里写了什么:
- * - 不出声的通知([NoticeRecord.silent]):一分钟里重发到第 [SILENT_POSTS] 次;
- * - 会出声的通知:一分钟里重发到第 [LOUD_POSTS] 次(人发消息到不了这么密)。
- * 认出来之后这个键的都不收,一直到它安静了 [QUIET_MS]。
+ * Ongoing, foreground-service, non-dismissible notifications, and those whose category says navigation or progress, are already rejected by [NoticeFilter]. This deals with the unlabeled ones:
+ * the navigation announcements of a maps app seen on a real device were an ordinary dismissible notification, with no category, silent, re-posted every two or three seconds.
+ * The only thing left that can identify it is "how densely it is re-posted", so only that is used, not which app it is or what the title says:
+ * - silent notifications ([NoticeRecord.silent]): re-posted up to the [SILENT_POSTS]-th time within a minute;
+ * - audible notifications: re-posted up to the [LOUD_POSTS]-th time within a minute (people cannot send messages that densely).
+ * Once recognized, nothing under that key is captured until it has been quiet for [QUIET_MS].
  *
- * 聊天不算:一个会话的通知本来就是来一句更新一次。带会话样式的、类别是消息/邮件/社交的、已经按聊天的写法拆开了的
- * ([NoticeRecord.group] 不为空)都不看。没有这些标记、又没测过的聊天 App,要一个键上一分钟来 [LOUD_POSTS] 条才会被当成状态显示
- * (它的通知被用户设成了不出声时是 [SILENT_POSTS] 条)。
+ * Chat does not count: a conversation notification is updated once per incoming message by nature. Notifications with a conversation style, with a message/email/social category, or already split by the chat wording
+ * ([NoticeRecord.group] not null) are all ignored. A chat app without these markers that has not been tested has to reach [LOUD_POSTS] in a minute on one key before it is taken for a status display
+ * ([SILENT_POSTS] when the user has set its notifications to silent).
  *
- * 只在内存里,不落盘;按通知键认,最多记 [capacity] 个键。不是线程安全的:在 ProactiveRuntime 那条串行协程上用。
+ * In memory only, never persisted; keyed by notification key, recording at most [capacity] keys. Not thread-safe: used on the single serial coroutine of ProactiveRuntime.
  */
 class LiveUpdates(private val capacity: Int = 200) {
     enum class Verdict {
-        /** 照常收。 */
+        /** Capture as usual. */
         Normal,
-        /** 这一次重发让它被认成了状态显示:这一条不收,它前面刚收进来的那几条也该去掉。 */
+        /** This re-post made it be recognized as a status display: this entry is not captured, and the few captured just before it should be removed as well. */
         BecameLive,
-        /** 已经认成状态显示了:不收。 */
+        /** Already recognized as a status display: do not capture. */
         Live,
     }
 
@@ -33,12 +33,12 @@ class LiveUpdates(private val capacity: Int = 200) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Track>) = size > capacity
     }
 
-    /** [record] 是清洗、拆好的。同一次发出(发出时间一样)再看一遍不多算一次。 */
+    /** [record] is already cleaned and split. Looking at the same posting again (same posted time) does not count it twice. */
     fun observe(record: NoticeRecord): Verdict {
         if (conversation(record)) return Verdict.Normal
         val at = record.postedAtMs
         val t = tracks.getOrPut(record.key) { Track() }
-        // 钟被往回拨了很多:以前记的没法比,重来
+        // the clock was turned back a lot: earlier records cannot be compared, start over
         if (at < t.lastPostedAtMs - WINDOW_MS) { t.posts.clear(); t.liveUntilMs = Long.MIN_VALUE; t.lastPostedAtMs = Long.MIN_VALUE }
         val live = at <= t.liveUntilMs
         if (at != t.lastPostedAtMs) {
@@ -59,9 +59,9 @@ class LiveUpdates(private val capacity: Int = 200) {
     }
 
     /**
-     * 用户点开、划掉了这个键上的通知:这一条到此为止,同一个键的下一条从头数(原来被认成状态显示的,也重新认)。
-     * 不这样的话:很多 App 所有推送共用一个通知键,用户一条条处理掉的几条各不相干的通知,也会被数成「同一条在重发」。
-     * App 自己撤回再发的不算(那多半就是在重发),只有用户动的手才调这里。真的状态显示被划掉后接着重发的,数到第几次照样再认出来。
+     * The user opened or dismissed the notification under this key: this entry ends here, and the next one under the same key is counted from scratch (one previously taken for a status display is recognized again too).
+     * Otherwise: many apps share one notification key across all pushes, and several unrelated notifications the user handles one by one would be counted as "the same one being re-posted".
+     * Withdrawals and re-posts done by the app itself do not count (that is usually exactly the re-posting); only the user's own action calls this. If a real status display keeps being re-posted after being dismissed, it is still recognized once the count is reached again.
      */
     fun ended(key: String) {
         tracks.remove(key)
@@ -70,18 +70,18 @@ class LiveUpdates(private val capacity: Int = 200) {
     fun clear() = tracks.clear()
 
     companion object {
-        /** 数重发次数的窗口。 */
+        /** The window for counting re-posts. */
         const val WINDOW_MS = 60_000L
-        /** 不出声的通知:窗口里重发到第几次就算状态显示。 */
+        /** Silent notifications: the re-post count within the window at which it counts as a status display. */
         const val SILENT_POSTS = 4
-        /** 会出声的通知:窗口里重发到第几次才算。 */
+        /** Audible notifications: the re-post count within the window that is required. */
         const val LOUD_POSTS = 12
-        /** 认成状态显示之后,安静这么久才重新照常收。 */
+        /** After being recognized as a status display, it must be quiet this long before being captured as usual again. */
         const val QUIET_MS = 5 * 60_000L
 
         private val CONVERSATION_CATEGORIES = setOf("msg", "email", "social")
 
-        /** 这是一条会话的通知(来一句更新一次是它本来的样子)。 */
+        /** This is a conversation notification (updating once per message is its normal shape). */
         internal fun conversation(r: NoticeRecord): Boolean =
             r.conversation || r.messages.isNotEmpty() || r.group != null || r.category in CONVERSATION_CATEGORIES
     }

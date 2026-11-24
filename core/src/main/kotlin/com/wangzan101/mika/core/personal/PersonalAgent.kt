@@ -29,7 +29,7 @@ data class PersonalMessage(
     /** Stable runtime-owned display key; null (including legacy records) preserves text verbatim. */
     val systemType: String? = null,
 ) {
-    /** 旧版的模型可能把历史前缀照抄进回复，只清理这类机器格式。 */
+    /** Older models may copy historical prefixes into replies verbatim; only such machine-generated formats are cleaned up. */
     fun conversationText(): String = if (role == "assistant") stripReplyMetadata(text) else text
 }
 @Serializable

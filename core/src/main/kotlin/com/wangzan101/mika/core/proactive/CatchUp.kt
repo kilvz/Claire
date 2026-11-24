@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.proactive
 
 /**
- * 解锁后补收:通知栏里还在的通知,只取锁屏之后(且在打开功能之后)发出的。
- * 锁屏前发出的在解锁状态下已经实时收过;打开功能之前就在的积压一条都不收。
+ * Catch-up after unlock: of the notifications still sitting in the notification shade, only those posted after locking (and after the feature was turned on) are taken.
+ * Those posted before locking were already received in real time while unlocked; none of the backlog that existed before the feature was turned on is taken.
  */
 object CatchUp {
     fun select(active: List<NoticeRecord>, enabledAtMs: Long, lastLockedAtMs: Long): List<NoticeRecord> {

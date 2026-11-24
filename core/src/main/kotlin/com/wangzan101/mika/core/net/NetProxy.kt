@@ -21,23 +21,23 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.net.Authenticator as JavaAuthenticator
 import okhttp3.Authenticator as OkAuthenticator
 
-/** 走网络代理时出的错,和服务商那边的错分开说。 */
+/** An error that occurs when going through a network proxy, reported separately from errors on the provider side. */
 enum class ProxyFailure {
-    /** 连不上代理,或代理没有转发这个请求。 */
+    /** The proxy cannot be reached, or the proxy did not forward this request. */
     Unreachable,
-    /** 代理要账号密码,给的不对(或没给)。 */
+    /** The proxy asked for credentials and the ones supplied are wrong (or none were supplied). */
     AuthFailed,
 }
 
 /**
- * Claire 自己的网络连接(调模型、列模型、账号登录换令牌、下更新、内置浏览器下载)用的网络代理。
- * [source] 每次给出此刻存着的代理地址(空串不用);按原文缓存解析结果,改了设置后调 [changed]。
+ * The network proxy used by Claire's own network connections (calling models, listing models, exchanging account login for tokens, downloading updates, built-in browser downloads).
+ * [source] supplies the proxy address stored at that moment on each call (an empty string means none); parse results are cached by the raw text, and [changed] is called after the setting changes.
  *
- * - 经 [client] 建的 OkHttp 客户端每个请求都问 [selector]:本机、局域网地址([LocalHosts.bypassesProxy])直连,别的走代理;
- *   没设代理或代理不适用([ProxyAddress.forApp] 为假)时直连。流式回复照旧逐段读,不经过缓冲。
- * - HTTP 代理的账号密码在代理要求时(以及建隧道前)带上 `Proxy-Authorization`;同一请求带过还被拒就不再重试。
- * - SOCKS 代理的账号密码只能经全进程一个的 [java.net.Authenticator] 给:[installSocksAuth] 装上的那个
- *   只回答发给当前 SOCKS 代理(主机、端口都对上)的询问,别的一律不答。
+ * - Every request of an OkHttp client built through [client] asks [selector]: addresses on this machine or the local network ([LocalHosts.bypassesProxy]) connect directly, everything else goes through the proxy;
+ *   when no proxy is set or the proxy does not apply ([ProxyAddress.forApp] is false), the connection is direct. Streaming replies are still read chunk by chunk, without buffering.
+ * - HTTP proxy credentials are sent as `Proxy-Authorization` when the proxy asks for them (and before establishing a tunnel); if the same request already carried them and was still rejected, no further retry is made.
+ * - SOCKS proxy credentials can only be supplied through the single process-wide [java.net.Authenticator]: the one installed by [installSocksAuth]
+ *   answers only queries addressed to the current SOCKS proxy (host and port both matching), and answers nothing else.
  */
 class NetProxy(private val source: () -> String) {
     private class Parsed(val raw: String, val address: ProxyAddress?)
@@ -45,7 +45,7 @@ class NetProxy(private val source: () -> String) {
     @Volatile private var parsed: Parsed? = null
     private val pools = CopyOnWriteArrayList<WeakReference<okhttp3.ConnectionPool>>()
 
-    /** 此刻 Claire 自己的连接要走的代理;没设、写法不对或不适用时为 null。 */
+    /** The proxy Claire's own connections should use right now; null when none is set, the format is invalid, or it does not apply. */
     fun current(): ProxyAddress? {
         val raw = runCatching(source).getOrDefault("")
         parsed?.takeIf { it.raw == raw }?.let { return it.address }
@@ -54,7 +54,7 @@ class NetProxy(private val source: () -> String) {
         return address
     }
 
-    /** 连这个主机要走的代理;本机、局域网地址直连(为 null)。 */
+    /** The proxy to use when connecting to this host; addresses on this machine or the local network connect directly (null). */
     fun proxyFor(host: String): ProxyAddress? = current()?.takeUnless { LocalHosts.bypassesProxy(host) }
 
     val selector: ProxySelector = Selector()
@@ -62,7 +62,7 @@ class NetProxy(private val source: () -> String) {
     val authenticator: OkAuthenticator = OkAuthenticator { route, response -> authenticate(route, response) }
 
     private fun authenticate(route: Route?, response: Response): Request? {
-        // 带过账号密码还被拒:不再重试,交给调用方报「代理的账号或密码不对」
+        // credentials were already sent and still rejected: do not retry, let the caller report "the proxy username or password is wrong"
         if (response.request.header(PROXY_AUTHORIZATION) != null) return null
         val proxy = current() ?: return null
         if (proxy.socks || !proxy.hasCredentials) return null
@@ -70,18 +70,18 @@ class NetProxy(private val source: () -> String) {
         return response.request.newBuilder().header(PROXY_AUTHORIZATION, Credentials.basic(proxy.user, proxy.password)).build()
     }
 
-    /** 按 [builder] 建一个走这里代理设置的客户端;它的连接池会在设置改了时清掉空闲连接。 */
+    /** Builds a client with this proxy configuration from [builder]; its connection pool drops idle connections when the settings change. */
     fun client(builder: OkHttpClient.Builder = OkHttpClient.Builder()): OkHttpClient =
         builder.proxySelector(selector).proxyAuthenticator(authenticator).build().also { pools += WeakReference(it.connectionPool) }
 
-    /** 设置改了:重新解析,空闲的连接全部断开,下一个请求按新的设置连(正在进行的请求照旧走完)。 */
+    /** The settings changed: re-parse, evict all idle connections, and the next request connects with the new settings (requests already in flight still run to completion). */
     fun changed() {
         parsed = null
         pools.removeAll { it.get() == null }
         pools.forEach { it.get()?.evictAll() }
     }
 
-    /** SOCKS 代理的账号密码:只回答发给当前 SOCKS 代理的询问。 */
+    /** SOCKS proxy credentials: answers only queries addressed to the current SOCKS proxy. */
     val socksAuthenticator: JavaAuthenticator = object : JavaAuthenticator() {
         override fun getPasswordAuthentication(): PasswordAuthentication? =
             socksCredentials(requestingProtocol, requestingHost, requestingPort)
@@ -95,7 +95,7 @@ class NetProxy(private val source: () -> String) {
         return PasswordAuthentication(proxy.user, proxy.password.toCharArray())
     }
 
-    /** 装上 [socksAuthenticator](全进程一个);App 启动时调一次。 */
+    /** Installs [socksAuthenticator] (one per process); called once at app startup. */
     fun installSocksAuth() = JavaAuthenticator.setDefault(socksAuthenticator)
 
     private inner class Selector : ProxySelector() {
@@ -112,22 +112,22 @@ class NetProxy(private val source: () -> String) {
     companion object {
         private const val PROXY_AUTHORIZATION = "Proxy-Authorization"
 
-        /** 产品里的那一份:App 启动时把 [sharedSource] 接到存着的设置上。 */
+        /** The one used in the product: at app startup [sharedSource] is wired to the stored settings. */
         @Volatile var sharedSource: () -> String = { "" }
         val shared: NetProxy = NetProxy { sharedSource() }
 
-        /** 经 [client] 建的客户端对应的那一份;别的客户端为 null。 */
+        /** The instance matching clients built through [client]; null for other clients. */
         fun of(http: OkHttpClient): NetProxy? = (http.proxySelector as? Selector)?.owner
 
-        /** 这次失败是不是代理的问题:[http] 连 [url] 时走了代理,且错在连代理、过代理那一段。 */
+        /** Whether this failure is the proxy's fault: [http] went through a proxy when connecting to [url], and the error lies in the connect-through-proxy part. */
         fun failure(http: OkHttpClient, url: HttpUrl, e: IOException): ProxyFailure? {
             of(http)?.proxyFor(url.host) ?: return null
             return classify(e)
         }
 
         /**
-         * 走代理时网络错误的归类:代理拒了账号密码算 [ProxyFailure.AuthFailed];连不上代理(拒绝连接、找不到主机、连接超时)、
-         * 代理建隧道失败、SOCKS 握手出错算 [ProxyFailure.Unreachable];读回复时断了之类的不算代理的问题(为 null)。
+         * Classification of network errors while going through a proxy: the proxy rejecting the credentials counts as [ProxyFailure.AuthFailed]; an unreachable proxy (connection refused, host not found, connect timeout),
+         * a failed tunnel setup by the proxy, and SOCKS handshake errors count as [ProxyFailure.Unreachable]; a dropped connection while reading the reply and the like are not the proxy's problem (null).
          */
         fun classify(e: IOException): ProxyFailure? {
             val chain = generateSequence(e as Throwable) { it.cause }.take(6).toList()

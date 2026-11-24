@@ -1,153 +1,153 @@
 package com.wangzan101.mika.core.proactive
 
 /**
- * 「从通知里归纳」的所有可调的数,集中在这里。都是暂定的:先上真机看攒出来的东西像不像样,再改。
+ * All tunable numbers for "summarize from notifications", gathered here. They are provisional: first check on a real device whether what gets accumulated looks right, then adjust.
  */
 object LearnTuning {
-    // ---- 收集与发送 ----
-    /** 内存里最多留多少条事件(满了先丢已归纳过的最旧的)。 */
+    // ---- collection and sending ----
+    /** Maximum number of events kept in memory (when full, the oldest already-summarized ones are dropped first). */
     const val BUFFER_CAP = 200
-    /** 一批最多几条(只有一个 App,最旧的先发)。 */
+    /** Maximum entries per batch (a single app, oldest sent first). */
     const val BATCH_MAX = 12
-    /** 一个 App 攒到这么多条没归纳的,就该发了。 */
+    /** Once one app has accumulated this many unsummarized entries, it is due to be sent. */
     const val DUE_COUNT = 12
-    /** 或者它最旧的一条没归纳的已经过了这么久(只在有事发生时才看,不定时)。 */
+    /** Or its oldest unsummarized entry is already this old (only checked when something happens, never on a timer). */
     const val DUE_AGE_MS = 30 * 60_000L
-    /** 一次请求最多等多久。 */
+    /** Maximum time to wait for one request. */
     const val TIMEOUT_MS = 30_000L
     /**
-     * 一批没归纳成之后,停多久再发下一批:按连续失败的次数逐级拉长,之后都是最后一级(和判定用同一组时长)。
-     * 不定时:到点后也要等下一件事发生才看。
+     * How long to pause before sending the next batch after a batch failed to be summarized: it lengthens step by step with the number of consecutive failures, then stays at the last step (the same durations as detection uses).
+     * No timer: even once the time is up, it waits for the next event before checking.
      */
     val FAILURE_HOLD_MS: List<Long> = listOf(2 * 60_000L, 5 * 60_000L, 15 * 60_000L, 30 * 60_000L)
 
-    /** 连续第 [failures] 次(从 1 起)失败之后停多久。 */
+    /** How long to pause after the [failures]-th consecutive failure (counting from 1). */
     fun failureHoldMs(failures: Int): Long = FAILURE_HOLD_MS[(failures - 1).coerceIn(0, FAILURE_HOLD_MS.lastIndex)]
 
-    /** 发给模型的通知标题、正文各截到多长。 */
+    /** How long the notification title and body sent to the model are truncated to. */
     const val TITLE_MAX = 120
     const val TEXT_MAX = 200
     /**
-     * 同一条通知(同一个键)同样的文字,安静了这么久再出现就算新的一次。聊天 App 每来一句会把同一条通知原样重发一遍,
-     * 那不算新的;但第二天又发来的同一句话(每天的问候、固定的服务提醒)是新的一次,话题和联系人要靠它攒「出现了几天」。
-     * 半天:比一条通知被反复重发的间隔长得多,又比「每天一次」短。归纳的缓冲从最近一次出现算起(一直被重发的不算);
-     * 通知原文从上一次记下算起(没有地方记「最近一次出现」)。
+     * For the same notification (same key) with the same text, an appearance after this much quiet counts as a new occurrence. A chat app re-posts the same notification verbatim for every new message,
+     * and that does not count as new; but the same sentence arriving again the next day (a daily greeting, a fixed service reminder) is a new occurrence, and topics and contacts rely on it to accumulate "how many days it appeared".
+     * Half a day: far longer than the interval at which one notification gets re-posted, yet shorter than "once a day". The summarization buffer counts from the most recent appearance (one that keeps being re-posted does not count);
+     * the notification text counts from when it was last recorded (there is nowhere to record "most recent appearance").
      */
     const val REPEAT_WINDOW_MS = 12 * 3_600_000L
-    /** 一条通知的消息列表里,这回才见到的最多拿几条去归纳(新的优先)。 */
+    /** In one notification's message list, how many of the messages seen for the first time this round are taken for summarization at most (newest first). */
     const val NEW_LINES_MAX = 5
 
-    // ---- 回复校验 ----
-    /** 一次请求里给模型看的已有话题最多几个(按强度×留存从高到低)。 */
+    // ---- reply validation ----
+    /** Maximum number of existing topics shown to the model in one request (highest strength × retention first). */
     const val EXISTING_MAX = 30
-    /** 一次回复最多认几条。 */
+    /** Maximum number of entries recognized from one reply. */
     const val SIGNALS_MAX = 8
-    /** 话题名最长多少(UTF-16 单位)。 */
+    /** Maximum topic name length (UTF-16 units). */
     const val LABEL_MAX = 24
-    /** 话题名里不许有这么长的一串数字(订单号、电话、验证码之类)。 */
+    /** A topic name may not contain a digit run this long (order numbers, phone numbers, verification codes and the like). */
     const val DIGIT_RUN_MAX = 5
 
-    // ---- 话题池 ----
-    /** 每个 App 下最多记多少个不同的日子(只留最近的)。 */
+    // ---- topic pool ----
+    /** Maximum number of distinct days recorded per app (only the most recent are kept). */
     const val DAYS_PER_APP = 60
-    /** 一个话题最多记几个 App 的证据(多了丢最久没出现的那个 App)。 */
+    /** Maximum number of apps' evidence recorded per topic (when there are more, the app that has gone longest without appearing is dropped). */
     const val APPS_PER_TOPIC = 20
-    /** 用户点开过一次,强度加多少。 */
+    /** How much strength is added each time the user opens it. */
     const val OPENED_BONUS = 0.5
-    /** 用户划掉过一次,强度减多少(强度不低于 0)。 */
+    /** How much strength is subtracted each time the user dismisses it (strength never drops below 0). */
     const val DISMISSED_PENALTY = 0.25
-    /** 遗忘的时间尺度:S = 这么多天 × (1 + 强度);越常被印证的忘得越慢(艾宾浩斯 / MemoryBank 的想法)。 */
+    /** Forgetting time scale: S = this many days × (1 + strength); the more often something is reinforced, the more slowly it is forgotten (the Ebbinghaus / MemoryBank idea). */
     const val STABILITY_DAYS = 7.0
-    /** 留存 exp(-Δt / S) 低于这个数的,下次整理时丢掉。 */
+    /** Anything whose retention exp(-Δt / S) is below this is dropped at the next tidy-up. */
     const val FORGET_BELOW = 0.1
-    /** 话题池最多留多少个;多了先丢强度×留存最低的。 */
+    /** Maximum number of topics kept in the pool; when there are more, the ones with the lowest strength × retention are dropped first. */
     const val POOL_CAP = 300
-    /** 至少在几个不同的日子里出现过,才算「已确立」。 */
+    /** How many different days it must have appeared on at least before it counts as "established". */
     const val ESTABLISHED_DAYS = 2
 
-    // ---- 联系人与关系 ----
+    // ---- contacts and relationships ----
     /**
-     * 联系人身份怎么算(见 [ContactIdentity]):只看会话名。真机上核实过,通知键不是一个会话一个——有的聊天 App 的通知 id
-     * 是顺着往上加的,同一个群隔一会儿就换一个键;带着键算的话,同一个群每换一次键就多出一个联系人,谁也攒不够天数。
+     * How contact identity is computed (see [ContactIdentity]): the conversation name only. It was verified on real devices that the notification key is not one per conversation — some chat apps increment
+     * the notification id, so the same group gets a different key after a while; if the key were part of it, every key change would add another contact for the same group and none would ever accumulate enough days.
      */
     val CONTACT_ID = ContactIdStrategy.Title
-    /** 一次回复最多认几条联系人。 */
+    /** Maximum number of contacts recognized from one reply. */
     const val CONTACTS_MAX = 6
-    /** 显示名最长多少(UTF-16 单位)。 */
+    /** Maximum display name length (UTF-16 units). */
     const val CONTACT_NAME_MAX = 40
-    /** 每个联系人最多记多少个不同的日子(只留最近的;每种类型、每种关系的票也各按天记,同样只留这么多)。 */
+    /** Maximum number of distinct days recorded per contact (only the most recent are kept; type and relationship votes are also recorded per day and kept to the same count). */
     const val CONTACT_DAYS = 60
-    /** 每个联系人最多连着几个话题(多了丢最早连上的)。 */
+    /** Maximum number of topics linked to one contact (when there are more, the earliest linked are dropped). */
     const val CONTACT_TOPICS = 12
-    /** 至少在几个不同的日子里出现过,才算「已确立」的联系人。 */
+    /** How many different days it must have appeared on at least before a contact counts as "established". */
     const val CONTACT_ESTABLISHED_DAYS = 3
-    /** 显示猜出的关系,至少要有几个不同的日子投过它。 */
+    /** How many different days must have voted for a guessed relationship before it is displayed. */
     const val RELATION_MIN_DAYS = 2
-    /** 联系人最多留多少个;多了先丢强度×留存最低的(用户设过关系的不丢)。 */
+    /** Maximum number of contacts kept; when there are more, the ones with the lowest strength × retention are dropped first (those with a user-set relationship are not dropped). */
     const val CONTACT_CAP = 300
-    /** 删掉后「不再记录」的话题名最多记多少个(多了丢最早的)。 */
+    /** Maximum number of topic names recorded as "do not record again" after deletion (when there are more, the earliest are dropped). */
     const val TOPIC_BLOCKED_CAP = 500
-    /** 并掉的话题名最多记多少个(多了丢最早的;见 [TopicPool.merge])。 */
+    /** Maximum number of merged topic names recorded (when there are more, the earliest are dropped; see [TopicPool.merge]). */
     const val TOPIC_MERGED_CAP = 500
-    /** 「不再记录」的身份 id 最多记多少个(多了丢最早的)。 */
+    /** Maximum number of identity ids recorded as "do not record again" (when there are more, the earliest are dropped). */
     const val CONTACT_BLOCKED_CAP = 500
 
-    // ---- 当日消息归纳:第 1 级,分段归纳 ----
-    /** 一批最多几段通知原文(只有一个 App,最旧的先发)。比归纳话题的一批大:这里只要几句话。 */
+    // ---- daily-message summaries: level 1, chunk summaries ----
+    /** Maximum number of notification text entries per batch (a single app, oldest sent first). Larger than the batch for topic summarization: only a few sentences are needed here. */
     const val NOTES_BATCH_MAX = 20
-    /** 一个 App 攒到这么多段没归纳过的,就该发了。 */
+    /** Once one app has accumulated this many unsummarized entries, it is due to be sent. */
     const val NOTES_DUE_COUNT = 20
-    /** 或者它最旧的一段已经过了这么久(只在有事发生时才看,不定时)。 */
+    /** Or its oldest entry is already this old (only checked when something happens, never on a timer). */
     const val NOTES_DUE_AGE_MS = 2 * 3_600_000L
-    /** 一次回复最多认几句。 */
+    /** Maximum number of sentences recognized from one reply. */
     const val NOTES_MAX = 10
-    /** 一句最长多少(UTF-16 单位)。真机上 120 太短:一个群里的讨论只剩「在聊某某」,要留得下谁说了什么、结论是什么。 */
+    /** Maximum length of one sentence (UTF-16 units). On real devices 120 was too short: a group discussion came down to just "talking about so-and-so", and it must be long enough to keep who said what and what the conclusion was. */
     const val NOTE_MAX = 240
-    /** 一句里连着的数字超过这么多位就换成「…」(单号、卡号、电话;金额、日期短,留着)。 */
+    /** A digit run longer than this inside a sentence is replaced with "…" (tracking numbers, card numbers, phone numbers; amounts and dates are short and are kept). */
     const val NOTE_DIGIT_RUN_MAX = 6
-    /** 分段归纳留多少天(周归纳做完之前要用)。 */
+    /** How many days chunk summaries are kept (needed until the weekly summary is done). */
     const val NOTES_KEEP_DAYS = 8L
 
-    // ---- 当日消息归纳:第 2 级,当日归纳 ----
-    /** 一次请求最多放多少句分段归纳(多了只放最新的这么多)。 */
+    // ---- daily-message summaries: level 2, daily summaries ----
+    /** Maximum number of chunk-summary sentences put into one request (when there are more, only that many of the newest are used). */
     const val DAY_NOTES_MAX = 60
-    /** 当日归纳最多几句、每句最长多少。 */
+    /** Maximum number of sentences per daily summary and the maximum length of each. */
     const val DAY_LINES_MAX = 15
     const val DAY_LINE_MAX = 300
     /**
-     * 一份归纳(当日、周、月)的一句概述最长多少:主要是中日韩文字的按 [BRIEF_MAX_CJK] 个字,别的文字一个词占好几个字母,
-     * 放宽到 [BRIEF_MAX]。超了就截。
+     * Maximum length of a summary's (daily, weekly, monthly) one-line overview: [BRIEF_MAX_CJK] characters for mostly CJK text, while other scripts take several letters per word
+     * and are relaxed to [BRIEF_MAX]. Anything longer is truncated.
      */
     const val BRIEF_MAX_CJK = 50
     const val BRIEF_MAX = 120
-    /** 当日归纳留多少天(周、月归纳要用)。 */
+    /** How many days daily summaries are kept (needed for weekly and monthly summaries). */
     const val DAYS_KEEP = 35L
     /**
-     * 今天还没过完时,「到现在为止」的当日归纳什么时候自动做(用户不必去点):上一份之后新写下的句子至少
-     * [TODAY_AUTO_MIN_NOTES] 句,并且要么已经有 [TODAY_AUTO_READY_NOTES] 句、要么其中最早的一句等了
-     * [TODAY_AUTO_WAIT_MS];离上一份至少 [TODAY_AUTO_INTERVAL_MS](一天也就做三四次,不把预算花在反复重写上)。
-     * 和别的一样只在有事发生时看一眼,没有定时器。
+     * While today is not over yet, when an "up to now" daily summary is generated automatically (the user does not have to tap): at least [TODAY_AUTO_MIN_NOTES] sentences written
+     * since the previous one, and either [TODAY_AUTO_READY_NOTES] sentences already exist or the earliest of them has waited [TODAY_AUTO_WAIT_MS];
+     * and at least [TODAY_AUTO_INTERVAL_MS] since the previous one (that is three or four runs per day, so the budget is not spent rewriting over and over).
+     * Like everything else it only takes a look when something happens; there is no timer.
      */
     const val TODAY_AUTO_MIN_NOTES = 2
     const val TODAY_AUTO_READY_NOTES = 5
     const val TODAY_AUTO_WAIT_MS = 2 * 3_600_000L
     const val TODAY_AUTO_INTERVAL_MS = 4 * 3_600_000L
-    /** 同一天的当日归纳在一个进程里最多试几次(回复总读不懂时不一直试下去)。 */
+    /** Maximum number of attempts at the same day's daily summary within one process (so an unreadable reply is not retried forever). */
     const val DAY_TRIES_MAX = 3
 
-    // ---- 当日消息归纳:第 3 级(周)、第 4 级(月) ----
-    /** 一次请求里下一级的句子加起来最多多少字;超了各份轮流取,每份留住排在前面的。 */
+    // ---- daily-message summaries: level 3 (week), level 4 (month) ----
+    /** Maximum total characters of lower-level sentences in one request; when exceeded, entries take turns and each keeps the sentences at its front. */
     const val SPAN_INPUT_CHARS = 16_000
-    /** 周、月归纳最多几句、每句最长多少。 */
+    /** Maximum number of sentences per weekly or monthly summary and the maximum length of each. */
     const val SPAN_LINES_MAX = 20
     const val SPAN_LINE_MAX = 300
-    /** 周、月归纳的请求等多久:输入比别的批长得多,30 秒不够慢一点的模型读完。 */
+    /** How long a weekly or monthly summary request waits: the input is far longer than other batches, and 30 seconds is not enough for a slower model to read it. */
     const val SPAN_TIMEOUT_MS = 90_000L
-    /** 周归纳留多少天(26 周)。 */
+    /** How many days weekly summaries are kept (26 weeks). */
     const val WEEKS_KEEP_DAYS = 182L
-    /** 月归纳留多少天(两年)。 */
+    /** How many days monthly summaries are kept (two years). */
     const val MONTHS_KEEP_DAYS = 730L
-    /** 同一周(同一个月)的归纳在一个进程里最多试几次。 */
+    /** Maximum number of attempts at the same week's (month's) summary within one process. */
     const val SPAN_TRIES_MAX = 3
 
     const val DAY_MS = 86_400_000L
