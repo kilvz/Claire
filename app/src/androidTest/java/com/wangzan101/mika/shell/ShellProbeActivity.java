@@ -11,9 +11,9 @@ import android.view.MotionEvent;
 import android.view.View;
 
 /**
- * 外壳对照测试用的探针页:把自己所在的屏、任务、进程以及收到的点击和按键用广播告诉 Mika 进程里的测试。
- * 可以按启动入口(MAIN + INFO)或链接 mika-parity:// 打开。
- * 测试 APK 单独运行在自己的进程里、不带 Kotlin 标准库,所以这个页面用 Java 写。
+ * Probe page for shell parity testing: broadcasts its display, task, process and the touches and key events it receives to the test inside the Mika process.
+ * It can be opened through its launcher entry (MAIN + INFO) or through the mika-parity:// link.
+ * The test APK runs on its own in a separate process and does not bundle the Kotlin standard library, so this page is written in Java.
  */
 public class ShellProbeActivity extends Activity {
     public static final String BROADCAST = "com.wangzan101.mika.test.SHELL_PROBE";

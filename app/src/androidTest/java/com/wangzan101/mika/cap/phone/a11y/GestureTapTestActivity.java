@@ -6,7 +6,7 @@ import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-/** 浮层手势真机回归的整屏点按探针;只在测试包里,点按次数通过无障碍文字读出。 */
+/** Full-screen tap probe for on-device regression of overlay gestures; test APK only, and the tap count is read out through the accessibility text. */
 public class GestureTapTestActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {

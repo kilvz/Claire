@@ -7,16 +7,16 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 
 /**
- * 点一下按钮,交给另一个进程里的服务({@link SpillLaunchService})带 NEW_TASK 打开 {@link #EXTRA_TARGET} 那个 App 的启动页:
- * 和 App 经后台的进程(服务、SDK、跳转)打开另一个 App 一样,发起的进程在 Mika 的屏上没有页面,系统按默认放到主屏。
- * 用来重现「开到用户主屏上」。(同一进程里从应用上下文打开时,安卓按这个进程最上面页面所在的屏放,不会外溢。)
- * 测试 APK 的页面运行在测试包自己的进程里、不带 Kotlin 标准库,所以用 Java 写。
+ * Tapping the button hands off to a service in another process ({@link SpillLaunchService}), which opens the launch page of the app named by {@link #EXTRA_TARGET} with NEW_TASK:
+ * the same way an app opens another app through a background process (service, SDK, redirect); the initiating process has no page on Mika's display, so the system places it on the home screen by default.
+ * Used to reproduce "opens onto the user's home screen". (When opened from an application context in the same process, Android places it on the display of the topmost page of that process, so nothing spills over.)
+ * Pages in the test APK run in the test package's own process and do not bundle the Kotlin standard library, so they are written in Java.
  */
 public class SpillTestActivity extends Activity {
     public static final String EXTRA_TARGET = "target";
-    /** 给了时另加一个按钮:同样经后台服务打开这个对话框样式的页面。 */
+    /** When supplied, adds another button: opens this dialog-styled page through the background service as well. */
     public static final String EXTRA_DIALOG = "dialog";
-    /** 给了时另加一个按钮:经后台服务打开这个整屏的账号登录页(测试包是账号认证器)。 */
+    /** When supplied, adds another button: opens this full-screen account sign-in page through the background service (the test package is an account authenticator). */
     public static final String EXTRA_AUTH = "auth";
 
     @Override

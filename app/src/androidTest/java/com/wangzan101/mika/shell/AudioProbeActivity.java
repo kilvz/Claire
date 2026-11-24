@@ -6,8 +6,8 @@ import android.media.AudioTrack;
 import android.os.Bundle;
 
 /**
- * 正在出声的探针页:打开后一直循环播放一段无声的声音(播放器状态是「在播」,听不到),关掉时停下。
- * 其余同 {@link ShellProbeActivity}(把屏、任务报给测试)。任务结束时「正在出声的 App 默认关掉」用它来测。
+ * Probe page that is producing sound: after opening it loops a silent sound forever (the player state is "playing", but nothing is audible), and stops when closed.
+ * Everything else is the same as {@link ShellProbeActivity} (reports the display and task to the test). Used to test the "apps that are producing sound are closed by default when the task ends" behavior.
  */
 public class AudioProbeActivity extends ShellProbeActivity {
     private static final int RATE = 8000;
@@ -41,7 +41,7 @@ public class AudioProbeActivity extends ShellProbeActivity {
             try {
                 track.stop();
             } catch (IllegalStateException ignored) {
-                // 没开始播放就被关掉了
+                // Closed before playback started
             }
             track.release();
             track = null;

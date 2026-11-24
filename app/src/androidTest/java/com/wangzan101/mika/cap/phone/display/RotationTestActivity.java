@@ -12,7 +12,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 
-/** 用真实的 Activity 方向请求重现横屏游戏;不依赖任何第三方应用。 */
+/** Reproduces a landscape game using a real Activity orientation request; does not depend on any third-party app. */
 public class RotationTestActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);

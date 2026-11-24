@@ -8,8 +8,8 @@ import android.content.Context;
 import android.os.Bundle;
 
 /**
- * 测试用账号认证器:让测试包出现在系统的账号认证器表里,用来验证「账号认证器的登录页留在主屏」这条判据。
- * 本身不支持任何操作,只登记类型。
+ * Test account authenticator: makes the test package show up in the system's list of account authenticators, used to verify the criterion that "an account authenticator's sign-in page stays on the home screen".
+ * It supports no operations itself; it only registers the account type.
  */
 public class TestAuthenticator extends AbstractAccountAuthenticator {
     TestAuthenticator(Context context) {
