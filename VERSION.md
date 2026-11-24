@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.1.1 (versionCode 63)
+- **Claire version:** 2.1.2 (versionCode 64)
 - **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -82,6 +82,15 @@ recorded base version.
   files fails without leaving a partial model behind. Google speech
   services use their current Play Store name, Speech Recognition &
   Synthesis.
+- 2.1.2: the multilingual on-device speech model loads as the
+  zipformer2 export it is, so testing or using it no longer closes the
+  app. Downloads keep running after leaving the page and show an
+  unpacking step once the bytes arrive; the speech test waits for that
+  to finish instead of reporting the model as missing. While listening,
+  microphone updates no longer replace what was already heard, and a
+  finished test shows the transcript. When Google's speech app is
+  installed but Android offers no recognition service, the missing-voice
+  sheet opens its settings instead of a store page that says Installed.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

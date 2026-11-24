@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.1.1: the on-device and streaming speech tests can be stopped — while an engine is listening the test button becomes Stop, so "Say a sentence" finishes and verifies instead of running forever. Sherpa models can be downloaded right from the speech selection page, a missing model now says it needs downloading, and a broken archive fails cleanly without leaving a partial model. Google speech services also use their current Play Store name, Speech Recognition & Synthesis.
+            New in 2.1.2: the multilingual on-device speech model now loads as the zipformer2 export it is, so testing or using it no longer closes the app. A model download keeps running when you leave the page, and once the bytes arrive it shows an unpacking step instead of a progress bar that looks stuck at 100%; the speech test waits for that to finish instead of saying the model is missing. While a test is listening, microphone updates no longer replace the words already on screen, and a finished test shows what the recognizer heard. If Google's speech app is installed but Android offers no recognition service, the missing-voice sheet now opens that app's settings instead of a Play Store page that already says Installed.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
