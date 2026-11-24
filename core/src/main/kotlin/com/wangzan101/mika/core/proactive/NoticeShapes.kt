@@ -1,37 +1,37 @@
 package com.wangzan101.mika.core.proactive
 
 /**
- * 把一条聊天通知理成后面都认的样子:[NoticeRecord.title] 是会话的名字(人或群),[NoticeRecord.sender] 是群里说话的人,
- * [NoticeRecord.text] 只剩那句话,[NoticeRecord.group] 说这是不是群。未读条数不是内容,去掉。纯函数,在清洗
- * ([NoticeFilter.sanitize])之后、进收件箱之前做一次,后面的判定、提醒、归纳、联系人都用理好的。
+ * Shapes a chat notification into the form everything downstream understands: [NoticeRecord.title] is the conversation's name (a person or a group), [NoticeRecord.sender] is the person speaking in a group,
+ * [NoticeRecord.text] is just the sentence and [NoticeRecord.group] says whether it is a group. The unread count is not content and is stripped. Pure functions; run once after cleaning
+ * ([NoticeFilter.sanitize]) and before the inbox, and triage, hints, learning and contacts all work on the shaped record.
  *
- * 带会话样式的通知(任何 App):会话名、是不是群都听系统的([styled]),不看是哪家 App。
+ * For conversation-style notifications (any app): the conversation name and whether it is a group come from the system ([styled]), regardless of which app it is.
  *
- * 不用系统会话样式的,有几个聊天 App 把「哪个会话、谁说的、第几条」都挤在标题和正文里,这里按各家的写法拆开。
- * 只拆在真机上见过写法的那几家;别的 App 不猜——猜错了会把不是聊天的通知拆出一个「发言人」来。
+ * For apps that do not use the system conversation style, a few chat apps squeeze "which conversation, who said it, which message number" into the title and body, so they are split here according to each app's format.
+ * Only the apps whose format has actually been seen on a device are split; other apps are not guessed at — a wrong guess would split a "speaker" out of a notification that is not a chat.
  *
- * 各家的写法(只看结构,不看内容):
- * - QQ 群:真机上看到的,标题「群名(13条新消息)」,正文「某人: 那句话」。
- * - QQ 私聊:**没在真机上看到过**,按「标题是对方、正文没有『某人: 』」猜的。
- * - 微信私聊:真机上看到的,标题是对方,正文「[3条]某人: 那句话」,「某人」就是标题。
- * - 微信群:**没在真机上看到过**,按「标题是群名、正文里的『某人』不是标题」猜的。
- * 猜的两种要在真机上核实;核实前拆错的后果是那一条的说话人、群/私聊标错。
- * 带会话样式的通知、别的 App 的通知原样不动。App 改了写法、或遇到没见过的写法时,拆不出来就原样留着,不猜。
+ * Each app's format (structure only, not content):
+ * - QQ groups: seen on a device, title "group name (13 new messages)", body "someone: the sentence".
+ * - QQ private chats: **never seen on a device**, guessed as "the title is the other person and the body has no 'someone: '".
+ * - WeChat private chats: seen on a device, the title is the other person, the body is "[3 messages]someone: the sentence", where "someone" is the title.
+ * - WeChat groups: **never seen on a device**, guessed as "the title is the group name and the 'someone' in the body is not the title".
+ * The two guessed formats need verifying on a device; until then, a wrong split mislabels that entry's speaker and its group/private status.
+ * Conversation-style notifications and other apps' notifications are left untouched. If an app changes its format or an unseen format shows up, nothing is split and the record is left as is, with no guessing.
  *
- * 已知的误判:私聊里对方发来的话本身是「时间: 明天」这种样子(QQ 私聊正文没有前缀),会被当成群里一个叫「时间」的人说的。
- * 只影响这一条显示成谁说的,不影响它算在哪个会话上。
+ * Known misjudgement: in a private chat, a message that itself looks like "time: tomorrow" (QQ private-chat bodies have no prefix) is taken as said by someone called "time" in a group.
+ * This only affects who that one entry is displayed as being from, not which conversation it counts toward.
  */
 object NoticeShapes {
     private val QQ = setOf("com.tencent.mobileqq", "com.tencent.tim", "com.tencent.qqlite", "com.tencent.mobileqqi")
     private const val WECHAT = "com.tencent.mm"
 
-    /** 微信正文开头的「[3条]」。 */
+    /** The "[3 messages]" at the start of a WeChat body. */
     private val UNREAD_PREFIX = Regex("^\\[[0-9]+条\\]\\s*")
-    /** 「某人: 那句话」:名字不长、里面没有冒号。 */
+    /** "someone: the sentence": the name is short and contains no colon. */
     private val SAID = Regex("^([^:：]{1,40}): (.+)$")
 
     fun apply(r: NoticeRecord): NoticeRecord = when {
-        // 带会话样式的自己就分得清谁说了什么;会话的名字要换成系统给的那个
+        // conversation-style notifications already tell who said what; the conversation's name needs replacing with the one the system gave
         r.conversation || r.messages.isNotEmpty() -> styled(r)
         r.packageName in QQ -> chat(r, ContactIdentity.withoutUnreadCount(r.title), r.text, privateWithoutPrefix = true)
         r.packageName == WECHAT -> chat(r, r.title, UNREAD_PREFIX.replace(r.text, ""), privateWithoutPrefix = false)
@@ -39,27 +39,27 @@ object NoticeShapes {
     }
 
     /**
-     * 会话样式的群聊:系统把通知标题写成「会话名: 发言人」(发言人取最新一条消息的),会话名另放在一个字段里。
-     * 拿标题当会话名的话,同一个群里每个人说话都成了另一个「会话」。有会话名就用它当标题,标题里的发言人放到 [NoticeRecord.sender]
-     * (提醒、判定里的那一句带上是谁说的)。
+     * A conversation-style group chat: the system writes the notification title as "conversation name: speaker" (the speaker from the newest message), with the conversation name in a separate field.
+     * Taking the title as the conversation name would make every speaker in the same group a separate "conversation". When there is a conversation name it becomes the title, and the speaker from the title goes into [NoticeRecord.sender]
+     * (so the line used by hints and triage carries who said it).
      *
-     * 是不是群:系统说是就是;系统没说、有会话名的当群(老写法里会话名只给群聊设)。系统说不是、却有会话名的看不出来——
-     * 老的写法只设会话名、不另说是群,新的写法也可以给私聊起会话名——留给模型判断,不硬说是私聊。
+     * Whether it is a group: whatever the system says wins; when the system says nothing but there is a conversation name, it is treated as a group (older formats only set a conversation name for groups). When the system says it is not a group yet there is a conversation name, it cannot be told —
+     * older formats set only a conversation name without saying group, and newer formats may also name private chats — so that is left to the model rather than declaring it a private chat.
      *
-     * 没有会话名:私聊的标题本来就是对方,不动。群聊(系统说是群)的标题是最新一条的发言人,认不了会话,记上一笔。
+     * No conversation name: a private chat's title is already the other person, so it is left alone. For a group chat (the system says group), the title is the newest message's speaker and cannot identify the conversation, so a flag is recorded.
      */
     private fun styled(r: NoticeRecord): NoticeRecord {
         val name = r.conversationTitle?.trim().orEmpty()
         if (name.isEmpty()) return if (r.group == true) r.copy(titleIsSpeaker = true) else r
         val rest = r.title.trim().removePrefix(name).trimStart()
         val speaker = if (rest.startsWith(":") || rest.startsWith("：")) rest.drop(1).trim() else ""
-        // 发言人就是会话名的(以对方的名字当会话名的私聊)不另记,和 [chat] 里一样
+        // a speaker identical to the conversation name (a private chat using the other person's name as the conversation name) is not recorded separately, same as in [chat]
         return r.copy(title = name, sender = speaker.takeIf { it.isNotEmpty() && it != name }, group = if (r.group == false) null else true)
     }
 
     /**
-     * [title]、[text] 是去掉了未读条数的。正文是「某人: 那句话」时:某人就是标题的是私聊,不是的是群里的某人。
-     * 正文没有这个样子时:[privateWithoutPrefix] 的 App(QQ)当私聊;别的看不出来。
+     * [title] and [text] have the unread count removed. When the body is "someone: the sentence": if that someone is the title it is a private chat, otherwise it is someone in a group.
+     * When the body does not look like that: apps with [privateWithoutPrefix] (QQ) are treated as private chats; for others it cannot be told.
      */
     private fun chat(r: NoticeRecord, title: String, text: String, privateWithoutPrefix: Boolean): NoticeRecord {
         val m = if (title.isBlank()) null else SAID.matchEntire(text)

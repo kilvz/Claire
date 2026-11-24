@@ -18,18 +18,18 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface DayResult {
-    /** [lines] 里每句的 [NoteSignal.entries] 是它依据的分段归纳(这一次请求里的下标)。 */
-    /** [brief]:这一份的一句概述(见 [CitedLines.Parsed.brief]);没有为 null。 */
+    /** Each line in [lines] has [NoteSignal.entries] pointing at the segmented notes it was based on (indices within this request). */
+    /** [brief]: a one-sentence overview of this digest (see [CitedLines.Parsed.brief]); null when there is none. */
     data class Done(val lines: List<NoteSignal>, val dropped: Map<NoteDrop, Int>, val brief: String? = null) : DayResult
     data class Failed(val unreachable: Boolean = false) : DayResult
     data object BudgetExhausted : DayResult
 }
 
 /**
- * 当日消息归纳的第 2 级:把一天里各个 App 的分段归纳([DigestNote],第 1 级)合成当天的一份。
- * 这是多个 App 第一次放进同一个请求:放进去的只有第 1 级的句子(模型照着通知写的、已经校验和遮过的),没有通知原文。
- * 句子本身仍然是从别人写的字里来的,所以照样套 [Untrusted]、不带工具、只请求一次;每句输出必须指向它依据的那几句分段归纳,
- * 指不上的不要(读法见 [CitedLines])。App 的名字由调用方按包名从系统读([appLabel]),写在不可信那一块外面。
+ * Level 2 of the daily message digest: combines the per-app segmented notes ([DigestNote], level 1) of one day into a single digest for that day.
+ * This is the first time multiple apps go into the same request: only level-1 sentences are included (written by the model from notifications, already validated and redacted), never raw notification text.
+ * The sentences themselves still come from words other people wrote, so they are wrapped in [Untrusted] as usual, no tools are offered, and only one request is made; each output line must point at the segmented notes it was based on,
+ * and lines that cannot be traced are dropped (see [CitedLines] for how the reply is read). App names are read from the system by the caller using the package name ([appLabel]) and are written outside the untrusted block.
  */
 class NoticeDay(private val model: ChatModel, private val language: String, private val timeoutMs: Long = LearnTuning.TIMEOUT_MS) {
     suspend fun digest(notes: List<DigestNote>, zone: ZoneId, appLabel: (String) -> String): DayResult {
@@ -62,8 +62,8 @@ class NoticeDay(private val model: ChatModel, private val language: String, priv
         private fun untrusted(s: String): String = Untrusted.wrap(s.replace(TAG, "(untrusted"))
 
         /**
-         * 发给模型的输入:语言,然后按时间逐句列出。时间是我们自己的;会话名和句子在不可信那一块里;
-         * App 名在外面,是那个 App 自己起的名字,只收过一遍([NoticeFilter.appName])。
+         * Input sent to the model: the language, then the lines listed in time order. Times are our own; chat names and sentences sit inside the untrusted block;
+         * app names are outside, are the names the apps gave themselves, and have been cleaned once ([NoticeFilter.appName]).
          */
         fun buildInput(notes: List<DigestNote>, language: String, zone: ZoneId, appLabel: (String) -> String): String = buildString {
             appendLine("Language for the digest: $language")

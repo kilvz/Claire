@@ -20,40 +20,40 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** 回复里一条归纳被丢掉的原因(给计数用,不含内容)。 */
+/** Why a signal in the reply was dropped (for counting only, no content). */
 enum class LearnDrop {
-    /** 多出 [LearnTuning.SIGNALS_MAX] 的。 */
+    /** Beyond [LearnTuning.SIGNALS_MAX]. */
     OverLimit,
-    /** 不是对象,或者 topic 和 new 都有 / 都没有。 */
+    /** Not an object, or it has both topic and new, or neither. */
     Malformed,
-    /** 引用的通知 id 里有不在这一批里的:整条不要(一条记一次)。 */
+    /** A cited notification id is not in this batch: the whole item is dropped (counted once per item). */
     UnknownId,
-    /** 一个有效的通知 id 都没有。 */
+    /** No valid notification ids at all. */
     NoIds,
-    /** 引用的话题 id 不是这次给的。 */
+    /** The cited topic id is not one given this time. */
     UnknownTopic,
-    /** 新话题的种类不认识。 */
+    /** The new topic's kind is not recognised. */
     BadKind,
-    /** 新话题的名字是空的。 */
+    /** The new topic's label is empty. */
     BadLabel,
-    /** 名字里像有网址。 */
+    /** The label looks like it contains a URL. */
     UrlLike,
-    /** 名字里有一长串数字。 */
+    /** The label contains a long run of digits. */
     LongDigits,
-    /** 名字过不了敏感信息关卡。 */
+    /** The label fails the sensitive-information check. */
     Sensitive,
-    /** 「敏感类推断」关着,模型却给了标了敏感的新话题。 */
+    /** "Sensitive inference" is off, yet the model supplied a new topic marked sensitive. */
     SensitiveOff,
-    /** 校验过了,但用到话题池上时没收:引用的话题途中被删了,或用上时敏感类已关(由调用方记)。 */
+    /** It validated, but applying it to the topic pool did not take it: the cited topic was deleted in the meantime, or sensitive inference was off when applied (counted by the caller). */
     NotApplied,
-    /** 新起的话题是用户删掉过的名字(由调用方记)。 */
+    /** The newly created topic's name is one the user deleted before (counted by the caller). */
     Blocked,
 }
 
 sealed interface LearnResult {
     /**
-     * 读懂了;[signals] 是校验过的(可能是空的),[dropped] 是被丢掉的条数(按原因)。
-     * [contacts]、[contactDropped] 是同一份回复里的联系人归类(和话题分开算,一边坏了不连累另一边)。
+     * The reply was understood; [signals] are the validated ones (possibly empty) and [dropped] counts what was dropped (by reason).
+     * [contacts] and [contactDropped] are the contact classifications from the same reply (counted separately from topics, so one side breaking does not affect the other).
      */
     data class Learned(
         val signals: List<LearnSignal>,
@@ -62,42 +62,42 @@ sealed interface LearnResult {
         val contactDropped: Map<ContactDrop, Int> = emptyMap(),
     ) : LearnResult
     /**
-     * 没归纳成。[unreachable] 为 true:根本没连上模型(网络不通、代理不通),和这批的内容无关,这一批留着以后再发。
-     * 否则是模型回了错、超时或回复读不懂:这一批丢掉,不重试。两种都由调用方停一段再发下一批。
-     * [unreadable]:模型回了,但回复读不成结果(不是只给 JSON、结构不对);只是给调用方记日志用的。
+     * Nothing was learned. [unreachable] true means the model was never reached at all (no network, no proxy), unrelated to this batch's content, and the batch is kept to be sent later.
+     * Otherwise the model returned an error, timed out, or the reply could not be read: the batch is dropped and not retried. Either way the caller waits a while before sending the next batch.
+     * [unreadable]: the model replied but the reply could not be read into a result (it was not JSON only, or the structure was wrong); used by the caller for logging only.
      */
     data class Failed(val unreachable: Boolean = false, val unreadable: Boolean = false) : LearnResult
-    /** 主动能力今天的预算用完了,没发请求:这一批照旧待归纳。 */
+    /** The proactive budget for today is used up, so no request was sent: this batch stays pending. */
     data object BudgetExhausted : LearnResult
 }
 
-/** 给模型看的一个已有话题;[id] 是池里的 id(请求里换成 t1…t30)。 */
+/** An existing topic shown to the model; [id] is the pool id (replaced by t1…t30 in the request). */
 data class ExistingTopic(val id: String, val kind: TopicKind, val label: String)
 
 /**
- * 从同一个 App 的一批通知(最多 [LearnTuning.BATCH_MAX] 条)里归纳出用户的兴趣、关注、在买的东西之类的短话题。
- * App 推什么,是它的推荐模型对这个用户的判断:推广、推荐在这里是信号,不是噪音。纯逻辑,模型由调用方给。
+ * Learns short topics from a batch of notifications from the same app (at most [LearnTuning.BATCH_MAX]): the user's interests, things they follow, things they are shopping for and the like.
+ * What an app pushes is its recommendation model's judgement about this user: ads and recommendations are signal here, not noise. Pure logic, with the model supplied by the caller.
  *
- * 防注入,和 [NoticeTriage] 一样:
- * - 只请求一次,工具列表是空的,超时 [LearnTuning.TIMEOUT_MS];这里不重试(没连上模型的那批由调用方留着,见 [LearnResult.Failed])。
- * - 通知文字、以及已有话题的名字(那也是模型早先从不可信的文字里归纳的)都套在 [Untrusted] 里;
- *   用户的动作(点开、划掉)是我们自己看到的,写在不可信那一块外面。
- * - 回复严格校验([parse]):只认这一批的通知 id、这次给的话题 id、固定的几种种类;新话题名清洗、截短,
- *   不许像网址、不许有长串数字、要过 [SensitiveFilter];最多认 [LearnTuning.SIGNALS_MAX] 条。
- * - 模型只能引用或新起话题,不能改名、合并、删除;回复里也没有 App 这一项,证据算在哪个 App 名下由调用方定。
- * - 聊天 App(微信之类)也归纳(用户自己把来源档位调成「低」来排除):提示词只许从对话里取「在聊什么」,
- *   别人对用户的说法、要求、指令都不当用户的事实;也不许拿私人或群的名字当话题名。
- *   这两条机器查不出来(名字和普通名词分不开),只靠提示词;字面上能查的(网址、长串数字、敏感信息)才在 [checkLabel] 里挡。
- * - 联系人与关系也在同一次请求里([contactsAllowed]):模型只能给「这几条通知是一个人 / 一个群发的、和用户什么关系」,
- *   不给名字;谁是一个联系人、叫什么,由 [ContactIdentity] 从通知本身算。类型和关系只认固定的几种,最多 [LearnTuning.CONTACTS_MAX] 条。
- *   已有的联系人和早先的归类不放进请求:每次的票各自独立。
+ * Injection defence, same as [NoticeTriage]:
+ * - Only one request, an empty tool list, and a timeout of [LearnTuning.TIMEOUT_MS]; no retry here (a batch that never reached the model is kept by the caller, see [LearnResult.Failed]).
+ * - Notification text, and the names of existing topics (also learned earlier by the model from untrusted text), are wrapped in [Untrusted];
+ *   the user's actions (opened, dismissed) are what we saw ourselves and go outside the untrusted block.
+ * - The reply is strictly validated ([parse]): only this batch's notification ids, the topic ids given this time and a fixed set of kinds are accepted; new topic labels are cleaned and shortened,
+ *   must not look like URLs, must not contain long digit runs and must pass [SensitiveFilter]; at most [LearnTuning.SIGNALS_MAX] are accepted.
+ * - The model can only cite or create topics; it cannot rename, merge or delete, and the reply has no app field either — the caller decides which app the evidence is attributed to.
+ * - Chat apps (WeChat and the like) are learned from too (the user excludes them by setting the source tier to "low"): the prompt only allows taking "what is being talked about" from the conversation,
+ *   and what other people say to the user, ask for or instruct is never treated as fact about the user; private or group names must not be used as topic labels either.
+ *   Those two cannot be checked by machine (a name is indistinguishable from an ordinary noun) and rely on the prompt alone; only what is checkable literally (URLs, long digit runs, sensitive information) is blocked in [checkLabel].
+ * - Contacts and relationships come in the same request ([contactsAllowed]): the model may only say "these notifications came from one person / one group, and this is the relationship to the user",
+ *   never names; who counts as one contact and what they are called is derived from the notifications themselves by [ContactIdentity]. Kinds and relations are limited to a fixed set, at most [LearnTuning.CONTACTS_MAX] entries.
+ *   Existing contacts and earlier classifications are not put into the request: each round's vote stands on its own.
  */
 class NoticeLearn(
     private val model: ChatModel,
     private val language: String,
-    /** 「敏感类推断」开着:模型可以给健康、财务等话题,但新话题要标 sensitive。关着时标了的一律丢掉。 */
+    /** "Sensitive inference" is on: the model may produce health, finance and similar topics, but new topics must be marked sensitive. When off, anything marked is dropped. */
     private val sensitiveAllowed: Boolean = false,
-    /** 「归纳联系人与关系」开着:模型可以给联系人归类;关着时请求里说不要,回复里给了也丢掉。 */
+    /** "Learn contacts and relationships" is on: the model may classify contacts; when off the request says not to, and anything supplied in the reply is dropped. */
     private val contactsAllowed: Boolean = false,
     private val timeoutMs: Long = LearnTuning.TIMEOUT_MS,
 ) {
@@ -113,13 +113,13 @@ class NoticeLearn(
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             return LearnResult.BudgetExhausted
         } catch (e: CancellationException) {
-            // 只有调用方自己被取消(锁屏、关掉)才往外抛;模型内部的超时之类算失败
+            // only throw when the caller itself was cancelled (screen locked, feature turned off); timeouts and the like inside the model count as failure
             currentCoroutineContext().ensureActive()
             return LearnResult.Failed()
         } catch (e: Exception) {
-            // 调用方被取消时,取消也可能以别的异常冒出来(连接被打断之类):那不是这一批失败
+            // when the caller is cancelled, the cancellation can surface as another exception (connection interrupted, for instance): that is not a failure of this batch
             currentCoroutineContext().ensureActive()
-            // 连接没建起来(模型只在家里的网络上、出门了之类):请求没到模型那里,这批没有问题
+            // the connection was never established (the model is only reachable on the home network, and the user is out, for example): the request never reached the model, so this batch is fine
             return LearnResult.Failed(unreachable = e is ModelError.Network || e is ModelError.Proxy)
         }
         val text = reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text }
@@ -142,7 +142,7 @@ class NoticeLearn(
             LearnOutcome.None -> "none"
         }
 
-        /** 发给模型的输入:第一行是话题名用的语言,然后是包名、已有话题、各条通知;别处来的文字都在 untrusted 里。 */
+        /** Input sent to the model: the first line is the language for topic labels, then the package name, existing topics and the notifications; text from elsewhere all sits in untrusted. */
         fun buildInput(
             packageName: String,
             events: List<LearnEvent>,
@@ -153,7 +153,7 @@ class NoticeLearn(
         ): String = buildString {
             appendLine("Language for labels: $language")
             appendLine("App package: $packageName")
-            // 模式由我们写,在不可信的块外面
+            // the mode is written by us, outside the untrusted block
             appendLine("Sensitive topics: ${if (sensitiveAllowed) "allowed" else "not allowed"}")
             appendLine("Contacts: ${if (contactsAllowed) "on" else "off"}")
             appendLine()
@@ -170,7 +170,7 @@ class NoticeLearn(
             events.forEachIndexed { i, e ->
                 appendLine()
                 appendLine("[${eventId(i)}] user action: ${outcomeWire(e.outcome)}")
-                // 群聊还是私聊是我们按通知的写法拆出来的(看不出来就不写),写在不可信那一块外面
+                // group or private chat is split out by us from how the notification is written (omitted when it cannot be told), written outside the untrusted block
                 e.group?.let { appendLine("chat: ${if (it) "group" else "private"}") }
                 val title = NoticeFilter.clean(e.title, LearnTuning.TITLE_MAX)
                 val text = NoticeFilter.clean(e.text, LearnTuning.TEXT_MAX)
@@ -180,10 +180,10 @@ class NoticeLearn(
         }.trimEnd()
 
         /**
-         * 严格读回复:模型最后给的那个值(见 [itemsOf];模型可能先想一段再给)。
-         * 读不出来为 null(整批失败)。[eventCount] 是这一批有几条(n1…);[topicIds] 是这次给模型看的话题(t1… 依次对应的池里的 id)。
-         * 每一条按它带的字段分:有 `topic` / `new` 的是话题,有 `type` / `relation`(而没有前两样)的是联系人,不看它在哪个数组里;
-         * 两边的上限各算各的。联系人那部分坏了照样用话题,话题那部分坏了照样用联系人。
+         * Reads the reply strictly: the last value the model gave (see [itemsOf]; the model may think for a while first).
+         * Unreadable means null (the whole batch fails). [eventCount] is how many notifications this batch has (n1…); [topicIds] are the topics shown to the model this time (t1… mapping in order to pool ids).
+         * Each item is sorted by the fields it carries: ones with `topic` / `new` are topics, ones with `type` / `relation` (and neither of the first two) are contacts, regardless of which array they were in;
+         * each side's limit is counted separately. If the contact part is broken the topics are still used, and if the topic part is broken the contacts are still used.
          */
         fun parse(
             raw: String,
@@ -193,7 +193,7 @@ class NoticeLearn(
             contactsAllowed: Boolean = false,
         ): LearnResult.Learned? {
             val (signalItems, contactItems) = itemsOf(raw) ?: return null
-            // 给了东西、却没有一条是对象(比如 [1,2,3]):回复的结构就不对,整批读不出来——不能当成「什么都没归纳出来」收下
+            // something was given, yet not one item is an object (such as [1,2,3]): the reply's structure is wrong and the whole batch is unreadable — it must not be accepted as "nothing was learned"
             if ((signalItems.isNotEmpty() || contactItems.isNotEmpty()) && (signalItems + contactItems).none { it is JsonObject }) return null
             val dropped = LinkedHashMap<LearnDrop, Int>()
             fun drop(d: LearnDrop) { dropped[d] = (dropped[d] ?: 0) + 1 }
@@ -201,7 +201,7 @@ class NoticeLearn(
             signalItems.forEachIndexed { i, e ->
                 if (i >= LearnTuning.SIGNALS_MAX) return@forEachIndexed drop(LearnDrop.OverLimit)
                 val o = e as? JsonObject ?: return@forEachIndexed drop(LearnDrop.Malformed)
-                // 话题和联系人的字段都带的,哪边都不算
+                // ones carrying both the topic and the contact fields count for neither side
                 if (present(o, "type") || present(o, "relation")) return@forEachIndexed drop(LearnDrop.Malformed)
                 val valid = idsOf(o, eventCount) ?: return@forEachIndexed drop(LearnDrop.UnknownId)
                 if (valid.isEmpty()) return@forEachIndexed drop(LearnDrop.NoIds)
@@ -218,8 +218,8 @@ class NoticeLearn(
                     val n = new as? JsonObject ?: return@forEachIndexed drop(LearnDrop.Malformed)
                     val kind = TopicKind.ofWire((n.field("kind") as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.lowercase())
                         ?: return@forEachIndexed drop(LearnDrop.BadKind)
-                    // 标记写得不认识的整条不要:不能把一个看不懂的「敏感」标记当成没标收下。
-                    // 该写在 new 里面;写在外面那一层(和 ids 并排)的也认,哪一处标了都算标了
+                    // an unrecognisable mark means dropping the whole item: an incomprehensible "sensitive" mark must not be accepted as unmarked.
+                    // it belongs inside new; the outer level (next to ids) is accepted too, and a mark in either place counts as marked
                     val inner = flag(n.field("sensitive")) ?: return@forEachIndexed drop(LearnDrop.Malformed)
                     val outer = flag(o.field("sensitive")) ?: return@forEachIndexed drop(LearnDrop.Malformed)
                     val sensitive = inner || outer
@@ -235,7 +235,7 @@ class NoticeLearn(
             return LearnResult.Learned(out, dropped, contacts, contactDropped)
         }
 
-        /** 联系人那部分:只认这一批的通知 id、固定的类型(不认识的整条丢)和关系(不认识的当不确定);名字一概不读。 */
+        /** The contact part: only this batch's notification ids, a fixed set of types (unknown means the whole item is dropped) and relations (unknown becomes unsure); names are never read at all. */
         private fun parseContacts(
             items: List<JsonElement>,
             eventCount: Int,
@@ -256,7 +256,7 @@ class NoticeLearn(
                 if (valid.isEmpty()) return@forEachIndexed drop(ContactDrop.NoIds)
                 val type = ContactType.ofWire(wireOf(o, "type")) ?: return@forEachIndexed drop(ContactDrop.Malformed)
                 var relation = ContactRelation.ofWire(wireOf(o, "relation")) ?: ContactRelation.Unknown
-                // 「敏感类推断」关着时,「伴侣」当不确定
+                // with "sensitive inference" off, "partner" becomes unsure
                 if (relation == ContactRelation.Partner && !sensitiveAllowed) relation = ContactRelation.Unknown
                 out += ContactSignal(valid, type, relation)
             }
@@ -267,8 +267,8 @@ class NoticeLearn(
             (o.field(name) as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.lowercase()
 
         /**
-         * 这一条引用的、这一批里有的通知下标(去重)。里面有一个不是字符串、或不是这一批里的 id,整条不要(返回 null):
-         * 依据有一处对不上,这条结论就不能信——不是只把对不上的那个 id 丢掉、结论照收。分段归纳的句子也是整句不要的。
+         * The indices of the notifications this item cites that are in this batch (deduplicated). If any of them is not a string, or not an id from this batch, the whole item is dropped (null is returned):
+         * when one piece of evidence does not line up, the conclusion cannot be trusted — the mismatched id is not simply dropped while the conclusion is accepted. Segmented note lines are dropped whole the same way.
          */
         private fun idsOf(o: JsonObject, eventCount: Int): List<Int>? {
             val indices = (o.field("ids") as? JsonArray).orEmpty()
@@ -283,8 +283,8 @@ class NoticeLearn(
         }
 
         /**
-         * 新话题名:按通知文字的办法清洗;像网址、有一长串数字、过不了敏感信息关卡的不要(这几项对没截短的整段查,
-         * 截短藏不住);再截到 [LearnTuning.LABEL_MAX];空的不要。
+         * A new topic label: cleaned the same way as notification text; ones that look like URLs, contain a long digit run or fail the sensitive-information check are rejected (these are checked against the untruncated full text,
+         * so truncation cannot hide them); then cut to [LearnTuning.LABEL_MAX]; empty ones are rejected.
          */
         fun checkLabel(raw: String): LabelCheck {
             val full = NoticeFilter.clean(raw, 1_000)
@@ -292,7 +292,7 @@ class NoticeLearn(
             val normalized = LearnText.nfkc(full)
             if (LearnText.urlLike(normalized)) return LabelCheck.Bad(LearnDrop.UrlLike)
             if (LearnText.longDigits(normalized)) return LabelCheck.Bad(LearnDrop.LongDigits)
-            if (LearnText.sensitive(full)) return LabelCheck.Bad(LearnDrop.Sensitive) // 主程序那一关,加上登录码这些别的叫法
+            if (LearnText.sensitive(full)) return LabelCheck.Bad(LearnDrop.Sensitive) // the main app's check, plus other names for things like login codes
             val label = NoticeFilter.cap(full, LearnTuning.LABEL_MAX).trim()
             return if (label.isEmpty()) LabelCheck.Bad(LearnDrop.BadLabel) else LabelCheck.Ok(label)
         }
@@ -300,16 +300,16 @@ class NoticeLearn(
         private fun eventIndex(id: String, count: Int): Int? {
             if (!id.startsWith("n")) return null
             val n = id.substring(1).toIntOrNull() ?: return null
-            // 只认 n1…nN 的标准写法(n01 不算)
+            // only the canonical n1…nN form is accepted (n01 does not count)
             return (n - 1).takeIf { it in 0 until count && eventId(it) == id }
         }
 
         private fun present(o: JsonObject, name: String): Boolean = o.field(name).let { it != null && it !is JsonNull }
 
         /**
-         * 「敏感」标记:没写、写 null 是没标;JSON 的 true / false 照认,写成字符串的 "true" / "false" 也认(有的模型这样写,
-         * 意思是清楚的)。别的写法(别的字符串、数字、数组、对象)认不出来,返回 null。
-         * 往严的一边靠:写成字符串的 "true" 要是当成没标,「敏感类推断」关着也会收下、还存成不敏感的。
+         * The "sensitive" mark: absent or null means unmarked; JSON true / false are taken as is, and "true" / "false" written as strings are accepted too (some models write it that way,
+         * and the meaning is clear). Other forms (other strings, numbers, arrays, objects) are unrecognisable and return null.
+         * Err on the strict side: if a string "true" were treated as unmarked, it would be accepted even with "sensitive inference" off and stored as not sensitive.
          */
         private fun flag(e: JsonElement?): Boolean? = when {
             e == null || e is JsonNull -> false
@@ -321,20 +321,20 @@ class NoticeLearn(
             else -> null
         }
 
-        /** 带 `topic` 或 `new` 的是话题。 */
+        /** Items with `topic` or `new` are topics. */
         private fun signalShaped(o: JsonObject) = present(o, "topic") || present(o, "new")
 
-        /** 带 `type` 或 `relation`、又不带 `topic` / `new` 的是联系人。 */
+        /** Items with `type` or `relation` and without `topic` / `new` are contacts. */
         private fun contactShaped(o: JsonObject) = !signalShaped(o) && (present(o, "type") || present(o, "relation"))
 
         /**
-         * 回复里的条目,分成话题和联系人两堆。只认模型最后给的那个值([ReplyJson.ending]):
-         * - 以对象结尾:它得带 `signals` 和 / 或 `contacts` 数组(两样都不是数组就读不出来)。
-         * - 以数组结尾:同一个模型有时会省掉外面那层,直接给 `[{…},{…}]`;里面的按字段分堆。
-         * - 回复不以 JSON 结尾的读不出来(整批失败):这时要是退回去找「最后一个带 `signals` 的对象」,模型把通知里写着的
-         *   一段 JSON 复述出来、后面再跟一句话时,复述的那段就会被当成结论。提示词要求的本来就是只给 JSON。
-         * 超过 [ReplyJson.MAX_CHARS] 的不读。几种写法下都按字段分堆(见 [signalShaped]、[contactShaped]);
-         * 两样都不像的留在原来那堆里,由校验记成坏的。读不出来为 null。
+         * The items in the reply, split into a topic pile and a contact pile. Only the last value the model gave counts ([ReplyJson.ending]):
+         * - ending with an object: it must carry a `signals` and/or `contacts` array (unreadable if neither is an array).
+         * - ending with an array: the same model sometimes omits the outer layer and gives `[{…},{…}]` directly; the items inside are split by field.
+         * - a reply not ending in JSON is unreadable (the whole batch fails): if we fell back to looking for "the last object with `signals`", then when the model
+         *   repeats a chunk of JSON written in the notification and follows it with a sentence, the repeated chunk would be taken as the conclusion. The prompt asks for JSON only anyway.
+         * Anything over [ReplyJson.MAX_CHARS] is not read. Splitting by field (see [signalShaped], [contactShaped]) applies in every form;
+         * items that look like neither stay in the pile they came from and are counted as bad by validation. Unreadable means null.
          */
         private fun itemsOf(raw: String): Pair<List<JsonElement>, List<JsonElement>>? {
             if (raw.length > ReplyJson.MAX_CHARS) return null

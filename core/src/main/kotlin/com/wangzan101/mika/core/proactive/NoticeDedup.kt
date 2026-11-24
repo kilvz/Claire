@@ -12,54 +12,54 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 
 /**
- * 去重:每个通知键记下见过的发出时间和见过的最新一条消息的时间,按最近使用留 [capacity] 个键。
- * 普通通知按(键, 发出时间)判断;会话样式的通知只有比上次见过的更新的消息才算新。
- * 只记时间,不记通知内容;键也不原样记:键里带着发通知的 App 自定的 tag(可能含会话标识),
- * 内存里和 [encode] 写出去的都只是键的 SHA-256 取前 [ID_HEX] 位十六进制([idOf]),落盘的东西倒推不出原来的键。
+ * Deduplication: for each notification key it records the post time it has seen and the time of the newest message seen, keeping [capacity] keys in least-recently-used order.
+ * Plain notifications are judged by (key, post time); for conversation-style notifications only messages newer than the last seen ones count as new.
+ * Only times are stored, never notification content; keys are not stored verbatim either: a key carries the tag the posting app chose (which may contain a conversation identifier),
+ * so both in memory and in what [encode] writes out only the first [ID_HEX] hex digits of the key's SHA-256 ([idOf]) are kept, and the persisted data cannot be reversed into the original key.
  *
- * 消息的时间是发通知的 App 填的,不能全信([trusted]):只看时间的话,填到将来的被原样记成水位,之后真的新消息永远比它「旧」;
- * 都填 0、几条挤在同一毫秒的,后面的也永远不算新。所以信不过的时间不进水位,而且有上回的内容可比时就比内容:
- * 这回的消息里有没有上回没见过的。每条消息的指纹只在内存里(不落盘:落盘的那份说好了只有时间),
- * 所以进程重启后头一回没得比,只能看时间——那一回时间又信不过的,算见过。
+ * Message times are filled in by the posting app and cannot be fully trusted ([trusted]): looking at time alone, a time set in the future would be recorded verbatim as the watermark, so genuinely new messages afterwards would always be "older" than it;
+ * when every message is 0 or several fall in the same millisecond, the later ones never count as new either. So untrusted times never enter the watermark, and when there is previous content to compare against, content is compared:
+ * whether this round's messages contain any not seen last time. Each message's fingerprint lives only in memory (nothing persisted: the persisted copy is agreed to hold only times),
+ * so after a process restart there is nothing to compare against the first time and only times can be used — and on that round, messages whose times are untrusted count as seen.
  */
 class NoticeDedup(private val capacity: Int = DEFAULT_CAPACITY) {
-    /** [sigs] 是上次见到的那几条消息各自的指纹(只在内存里,读回来的没有)。 */
+    /** [sigs] holds the fingerprints of the messages seen last time (memory only; nothing loaded from storage has them). */
     private data class Seen(val postedAtMs: Long, val lastMessageAtMs: Long, val sigs: Set<Long>? = null)
 
-    /** 收下的一条通知里这回才见到的消息(由旧到新);不是会话样式的为空。 */
+    /** The messages newly seen this round in a notification that was accepted (oldest first); empty for non-conversation-style notifications. */
     class Admitted(val newMessages: List<NoticeMessage>)
 
     private val seen = object : LinkedHashMap<String, Seen>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Seen>) = size > capacity
     }
 
-    /** [record] 有没有新内容;有就记下,返回 true。 */
+    /** Whether [record] has new content; if so, record it and return true. */
     fun accept(record: NoticeRecord): Boolean = admit(record) != null
 
-    /** [record] 有新内容就记下,并说出里面哪几条消息是这回才见到的;没有新内容为 null。 */
+    /** If [record] has new content, record it and report which of its messages were newly seen this round; null when there is no new content. */
     @Synchronized fun admit(record: NoticeRecord): Admitted? {
         val id = idOf(record.key)
         val before = seen[id]
         if (!record.conversation || record.messages.isEmpty()) {
             val fresh = before == null || record.postedAtMs != before.postedAtMs
-            // 上回消息的指纹留着:这一回只是没带消息(或都是空的),下回带了还要有得比
+            // keep the previous message fingerprints: this round simply carried no messages (or all were blank), and the next round that does carry them still needs something to compare against
             if (fresh) seen[id] = Seen(record.postedAtMs, before?.lastMessageAtMs ?: Long.MIN_VALUE, before?.sigs)
             return if (fresh) Admitted(emptyList()) else null
         }
-        // 记着的水位比这条通知的发出时间还晚:不可能是真的,当没有
+        // the recorded watermark is later than this notification's post time: that cannot be real, so treat it as absent
         val mark = before?.lastMessageAtMs?.takeIf { trusted(it, record.postedAtMs) || it < 1 } ?: Long.MIN_VALUE
         val sigs = record.messages.map(::fingerprint)
         val known = before?.sigs
         val new = when {
             before == null -> record.messages
-            // 有上回的内容可比:这回的消息里上回没见过的(App 只是把最旧的几条挤出列表、时间填得不对,都不会算错)
+            // there is previous content to compare against: this round's messages that were not seen last time (an app merely dropping the oldest entries from the list or filling in wrong times will not cause a wrong call)
             known != null -> record.messages.filterIndexed { i, _ -> sigs[i] !in known }
-            // 重启后头一回:只能看时间,而且只认信得过的时间
+            // first round after a restart: only times are available, and only trusted times count
             else -> record.messages.filter { trusted(it.atMs, record.postedAtMs) && it.atMs > mark }
         }
         val newest = record.messages.filter { trusted(it.atMs, record.postedAtMs) }.maxOfOrNull { it.atMs }
         val fresh = before == null || new.isNotEmpty()
-        // 不算新的也把这回的内容记下:下回才有得比
+        // even when nothing is new, still record this round's content: the next round needs something to compare against
         seen[id] = Seen(if (fresh) record.postedAtMs else before!!.postedAtMs, maxOf(newest ?: Long.MIN_VALUE, mark), sigs.toSet())
         return if (fresh) Admitted(new) else null
     }
@@ -68,7 +68,7 @@ class NoticeDedup(private val capacity: Int = DEFAULT_CAPACITY) {
 
     @Synchronized fun size(): Int = seen.size
 
-    /** `{"v":2,"seen":[[键的 id, 发出时间, 最新消息时间], …]}`,由旧到新。 */
+    /** `{"v":2,"seen":[[key id, post time, newest message time], …]}`, oldest first. */
     @Synchronized fun encode(): String = JsonObject(mapOf(
         "v" to JsonPrimitive(FORMAT),
         "seen" to JsonArray(seen.map { (id, v) ->
@@ -78,12 +78,12 @@ class NoticeDedup(private val capacity: Int = DEFAULT_CAPACITY) {
 
     companion object {
         const val DEFAULT_CAPACITY = 500
-        /** 存下来的格式版本;不是这个版本的读到就当空的。 */
+        /** Version of the stored format; data in any other version is treated as empty when read. */
         const val FORMAT = 2
         const val ID_HEX = 16
         private const val HEX = "0123456789abcdef"
 
-        /** 通知键的 id:UTF-8 的 SHA-256 取前 [ID_HEX] 位小写十六进制。手写十六进制,不用安卓 34 才有的 HexFormat。 */
+        /** Id of a notification key: the first [ID_HEX] lowercase hex digits of the SHA-256 of its UTF-8 bytes. Hex is written out by hand rather than using HexFormat, which only exists on Android 34. */
         fun idOf(key: String): String {
             val digest = MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
             return buildString(ID_HEX) {
@@ -96,17 +96,17 @@ class NoticeDedup(private val capacity: Int = DEFAULT_CAPACITY) {
 
         private fun isId(s: String) = s.length == ID_HEX && s.all { it in HEX }
 
-        /** 消息的时间可以比通知的发出时间晚这么多:发消息的服务器的钟比手机快一点是常事。 */
+        /** How much later than the notification's post time a message time may be: it is common for the messaging server's clock to run slightly ahead of the phone's. */
         const val CLOCK_SKEW_MS = 2 * 60_000L
 
         /**
-         * 消息自己带的时间([atMs],发通知的 App 填的)信不信得过:得在 1 和系统记下的发出时间([postedAtMs])之间,
-         * 晚一点点([CLOCK_SKEW_MS])也算。没填的、填 0 的、比通知发出晚得多的(填错、故意填到将来)都信不过。
-         * 通知日志给条目定时间也用这一条。
+         * Whether the time a message carries ([atMs], filled in by the posting app) can be trusted: it must lie between 1 and the post time recorded by the system ([postedAtMs]),
+         * with a tiny bit later ([CLOCK_SKEW_MS]) also allowed. Missing times, 0, and times far later than the post (mistakes, or deliberately set in the future) are not trusted.
+         * The notification journal uses the same rule when timing its entries.
          */
         fun trusted(atMs: Long, postedAtMs: Long): Boolean = atMs in 1..postedAtMs + CLOCK_SKEW_MS
 
-        /** 一条消息的指纹(谁说的、说了什么、几点):SHA-256 的前 8 个字节。只用来在内存里比「上回见没见过」。 */
+        /** Fingerprint of a message (who said it, what was said, at what time): the first 8 bytes of its SHA-256. Used only in memory to compare "was this seen last time". */
         private fun fingerprint(m: NoticeMessage): Long {
             val d = MessageDigest.getInstance("SHA-256").digest((m.sender.orEmpty() + "\u0000" + m.text + "\u0000" + m.atMs).toByteArray(Charsets.UTF_8))
             var out = 0L
@@ -114,7 +114,7 @@ class NoticeDedup(private val capacity: Int = DEFAULT_CAPACITY) {
             return out
         }
 
-        /** 读回 [encode] 的结果;读不懂的(损坏、别的格式版本、id 不像 id)当空的。 */
+        /** Reads back the result of [encode]; anything unreadable (corrupt, another format version, ids that do not look like ids) is treated as empty. */
         fun decode(text: String?, capacity: Int = DEFAULT_CAPACITY): NoticeDedup {
             val d = NoticeDedup(capacity)
             if (text.isNullOrBlank()) return d

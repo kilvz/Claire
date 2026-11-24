@@ -6,15 +6,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** 同一条通知(同一个键)先后显示过的一段文字;[atMs] 是那次的发出时间。 */
+/** One piece of text the same notification (same key) has shown over time; [atMs] is the post time of that round. */
 data class NoticeLine(val title: String, val text: String, val atMs: Long)
 
 /**
- * 收件箱:只在内存里,最多 [capacity] 条,满了丢最旧的;同一个通知键的更新只留最新一条(挪到最新的位置)。
- * 有些 App(比如微信)每来一句就把同一条通知重发一遍、只换正文,不带会话样式的消息列表:
- * 这种通知另按键记下先后见过的不同文字(由旧到新,最多 [historyLimit] 段,和上一段一样的不记),免得前面的话被盖掉。
- * 带消息列表的通知自己就带着前面的消息,不另记。
- * 另记当天的两个计数:收到(过了白名单的)和筛后(过了筛选和去重、进了收件箱的);换了一天从零算。
+ * The inbox: memory only, at most [capacity] entries, dropping the oldest when full; an update to the same notification key keeps only the newest entry (moved to the newest position).
+ * Some apps (WeChat, for instance) repost the same notification for every new message, changing only the body, without a conversation-style message list:
+ * for such notifications the different texts seen over time are also recorded per key (oldest to newest, at most [historyLimit] pieces, skipping ones identical to the previous piece), so earlier words are not overwritten.
+ * Notifications that carry a message list already bring the earlier messages, so nothing extra is recorded for them.
+ * Two counters for the day are also kept: received (those that passed the whitelist) and kept (those that passed filtering and dedup and entered the inbox); they restart at zero on a new day.
  */
 class NoticeInbox(
     private val capacity: Int = DEFAULT_CAPACITY,
@@ -23,8 +23,8 @@ class NoticeInbox(
     private val historyLimit: Int = HISTORY_LIMIT,
 ) {
     /**
-     * [records] 由旧到新,每条是这个键的最新状态;[day] 是计数所在那天(本地日期的纪元日)。
-     * [history] 按键给出没有消息列表的通知先后见过的文字(由旧到新,最后一段就是记录现在的文字)。
+     * [records] runs oldest to newest, each entry being the latest state for its key; [day] is the day the counters belong to (epoch day of the local date).
+     * [history] gives, per key, the texts seen over time for notifications without a message list (oldest to newest; the last piece is the record's current text).
      */
     data class Snapshot(
         val records: List<NoticeRecord>,
@@ -42,14 +42,14 @@ class NoticeInbox(
     private val mutable = MutableStateFlow(Snapshot(emptyList(), day, 0, 0))
     val state: StateFlow<Snapshot> = mutable.asStateFlow()
 
-    /** 一条过了白名单的通知到了(不管后面留不留)。 */
+    /** A notification that passed the whitelist arrived (regardless of whether it is kept later). */
     @Synchronized fun noteReceived() {
         rollDay()
         received++
         publish()
     }
 
-    /** 放进一条已筛过、去过重的记录。 */
+    /** Puts in a record that has been filtered and deduplicated. */
     @Synchronized fun add(record: NoticeRecord) {
         rollDay()
         kept++
@@ -61,15 +61,15 @@ class NoticeInbox(
         publish()
     }
 
-    /** 用户已经看过(点开或划掉)的通知。 */
+    /** A notification the user has already seen (opened or swiped away). */
     @Synchronized fun remove(key: String) {
         history.remove(key)
         if (records.remove(key) != null) publish()
     }
 
     /**
-     * 和通知栏对一遍:[active] 是通知栏里现在有的全部通知的键,不在里面的记录去掉(锁屏期间被用户处理了、被 App 撤回了、
-     * 超时了——那一阵监听是解绑的,没收到移除的回调)。返回去掉了几条。只能拿一次读成了的通知栏来对:读不出来不是「空的」。
+     * Reconciles against the notification shade: [active] holds the keys of all notifications currently in the shade, and records not in it are dropped (handled by the user while locked, revoked by the app,
+     * or timed out — the listener was unbound during that stretch and no removal callback arrived). Returns how many were dropped. Only a shade that was read successfully may be used for this: failing to read is not "empty".
      */
     @Synchronized fun retainKeys(active: Set<String>): Int {
         val gone = records.keys.filter { it !in active }
@@ -79,7 +79,7 @@ class NoticeInbox(
         return gone.size
     }
 
-    /** 某个 App 不再勾选时,它的记录一并去掉。 */
+    /** When an app is no longer selected, its records are dropped along with it. */
     @Synchronized fun removePackages(keep: (String) -> Boolean) {
         if (records.values.removeAll { !keep(it.packageName) }) {
             dropOrphanHistory()
@@ -99,7 +99,7 @@ class NoticeInbox(
         return mutable.value
     }
 
-    /** 带消息列表的不另记(并丢掉以前记的);和上一段文字一样的不记;只留最近 [historyLimit] 段。 */
+    /** Notifications with a message list get nothing extra recorded (and earlier records are dropped); text identical to the previous piece is skipped; only the most recent [historyLimit] pieces are kept. */
     private fun remember(record: NoticeRecord) {
         if (record.messages.isNotEmpty()) {
             history.remove(record.key)
@@ -107,12 +107,12 @@ class NoticeInbox(
         }
         val before = history[record.key].orEmpty()
         val last = before.lastOrNull()
-        // 群里的每一段带上是谁说的(见 [NoticeRecord.said])
+        // each piece from a group carries who said it (see [NoticeRecord.said])
         if (last != null && last.title == record.title && last.text == record.said) return
         history[record.key] = (before + NoticeLine(record.title, record.said, record.postedAtMs)).takeLast(historyLimit)
     }
 
-    /** 记录没了(满了被挤掉、按包名去掉)的键,它的文字记录也不留。 */
+    /** Keys whose record is gone (pushed out when full, or removed by package) keep no text history either. */
     private fun dropOrphanHistory() {
         history.keys.retainAll(records.keys)
     }

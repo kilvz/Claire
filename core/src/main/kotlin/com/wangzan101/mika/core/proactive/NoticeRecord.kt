@@ -1,11 +1,11 @@
 package com.wangzan101.mika.core.proactive
 
 /**
- * 一条通知的本机记录。所有文字都来自发通知的 App(任何人都能给用户发消息),只当数据看:
- * 不解析链接、不当指令、不渲染格式。进 [NoticeInbox] 之前先经 [NoticeFilter.sanitize] 清洗。
+ * The local record of one notification. All text comes from the app that posted it (anyone can send the user messages) and is treated as data only:
+ * links are not resolved, it is never taken as instructions, and formatting is not rendered. It is cleaned through [NoticeFilter.sanitize] before entering [NoticeInbox].
  *
- * [key] 是系统给的通知键(里面带着 App 自定的 tag,可能含任意字符);[postedAtMs] 是系统记下的发出时间,
- * 不是 App 自己填的显示时间。后面几项是筛选要用的通知特征。
+ * [key] is the notification key the system assigned (it carries the tag the app chose and may contain any characters); [postedAtMs] is the post time recorded by the system,
+ * not a display time filled in by the app. The fields after that are the notification traits used for filtering.
  */
 data class NoticeRecord(
     val key: String,
@@ -14,7 +14,7 @@ data class NoticeRecord(
     val title: String,
     val text: String,
     val messages: List<NoticeMessage> = emptyList(),
-    /** 带会话样式(MessagingStyle)的通知。 */
+    /** A notification with a conversation style (MessagingStyle). */
     val conversation: Boolean = false,
     val ongoing: Boolean = false,
     val groupSummary: Boolean = false,
@@ -22,29 +22,29 @@ data class NoticeRecord(
     val clearable: Boolean = true,
     val category: String? = null,
     /**
-     * 这句话是谁说的:只在通知自己把「谁」写在正文里、又和会话的名字不是同一个时才有(群里的某个人)。
-     * 由 [NoticeShapes] 按 App 的写法拆出来;拆不出来、私聊、不是聊天的通知都是 null。带会话样式的通知:有会话名时是系统写在标题里的
-     * 那个发言人(最新一条收到的消息的),各条消息的发送人看 [messages]。
+     * Who said this: present only when the notification itself writes "who" in the body and it differs from the conversation's name (someone in a group).
+     * Split out by [NoticeShapes] according to how the app writes it; null when it cannot be split out, for private chats and for notifications that are not chats. For conversation-style notifications: when there is a conversation name,
+     * this is the speaker the system put in the title (that of the most recently received message); the sender of each individual message is in [messages].
      */
     val sender: String? = null,
-    /** 这是群聊(true)还是和一个人的私聊(false);看不出来、不是聊天的为 null。同样由 [NoticeShapes] 定。 */
+    /** Whether this is a group chat (true) or a private chat with one person (false); null when it cannot be told or it is not a chat. Also decided by [NoticeShapes]. */
     val group: Boolean? = null,
     /**
-     * 带会话样式的通知里系统另给的会话名(群名)。有它的时候,系统把 [title] 写成「会话名: 发言人」——发言人每条消息都在变,
-     * 不能拿来认会话。[NoticeShapes] 拿它换掉 [title];没有会话样式、私聊的为 null。
+     * The conversation name (group name) the system separately supplies for conversation-style notifications. When present, the system writes [title] as "conversation name: speaker" — the speaker changes with every message
+     * and cannot be used to identify the conversation. [NoticeShapes] replaces [title] with this; null when there is no conversation style or for private chats.
      */
     val conversationTitle: String? = null,
     /**
-     * 带会话样式的群聊,系统却没给会话名:这时系统把 [title] 写成最新一条消息的发言人,不是会话的名字。
-     * 拿它认会话的话,群里每个人各成一个「会话」,还会和同名的私聊混成一个;所以这种通知不记联系人(见 [ContactPool.apply])。
+     * A conversation-style group chat where the system supplied no conversation name: the system then writes [title] as the speaker of the newest message, not the conversation's name.
+     * Identifying conversations that way would make each person in the group a separate "conversation" and would merge them with a private chat of the same name; so contacts are not learned from such notifications (see [ContactPool.apply]).
      */
     val titleIsSpeaker: Boolean = false,
-    /** 系统说这条通知不出声、不弹出来(重要程度在「默认」以下);不知道时当会出声。见 [LiveUpdates]。 */
+    /** The system says this notification makes no sound and does not pop up (importance below "default"); when unknown it is treated as audible. See [LiveUpdates]. */
     val silent: Boolean = false,
 ) {
-    /** 给人和模型看的那一句:群里的带上是谁说的(「张三: 明天见」),别的就是正文。 */
+    /** The one line shown to people and models: for groups it carries who said it ("Zhang San: see you tomorrow"), otherwise it is just the body. */
     val said: String get() = if (sender.isNullOrBlank()) text else "$sender: $text"
 }
 
-/** 会话样式里的一条消息;[sender] 可能没有(自己发的或 App 没给)。 */
+/** One message in a conversation style; [sender] may be absent (sent by the user, or not supplied by the app). */
 data class NoticeMessage(val sender: String?, val text: String, val atMs: Long)

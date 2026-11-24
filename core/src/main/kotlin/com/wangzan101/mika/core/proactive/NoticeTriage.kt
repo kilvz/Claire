@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-/** 模型给一条通知的判定。 */
+/** The model's verdict for a notification. */
 enum class TriageDecision(val wire: String) {
     Ignore("ignore"), Remember("remember"), Surface("surface");
 
@@ -27,49 +27,49 @@ enum class TriageDecision(val wire: String) {
     }
 }
 
-/** 内置的说明(界面按语言给字),代替模型写的理由。 */
+/** Built-in explanations (the UI supplies the words per language), used in place of a reason written by the model. */
 enum class TriageNote {
-    /** 回复里没有这条,或给的判定不认识:按忽略算。 */
+    /** The reply had no entry for it, or the verdict given was unrecognised: treated as ignore. */
     NoVerdict,
-    /** 这个 App 今天值得提醒的条数到了上限,按忽略记。 */
+    /** This app has hit today's limit on surfaced hints, so it is recorded as ignore. */
     SurfaceCapped,
 }
 
 /**
- * 一条判定。[reason] 是模型写的(由通知内容引出,当不可信的普通文字:已清洗、截短,只按纯文字显示);
- * [note] 不为 null 时界面显示内置说明,不显示 [reason]。
+ * One verdict. [reason] is written by the model (drawn from the notification content and treated as untrusted plain text: cleaned, shortened, displayed as plain text only);
+ * when [note] is not null the UI shows the built-in explanation instead of [reason].
  */
 data class TriageVerdict(val decision: TriageDecision, val reason: String = "", val note: TriageNote? = null)
 
-/** 一条要判定的通知:记录本身,和同一个键先后显示过的文字(见 [NoticeInbox.Snapshot.history],最后一段就是现在的文字)。 */
+/** A notification to judge: the record itself, plus the texts the same key has shown over time (see [NoticeInbox.Snapshot.history]; the last piece is the current text). */
 data class TriageItem(val record: NoticeRecord, val history: List<NoticeLine> = emptyList())
 
 sealed interface TriageResult {
-    /** 按通知键给出的判定;这一批里的每条都有。 */
+    /** The verdicts by notification key; every item in this batch has one. */
     data class Judged(val verdicts: Map<String, TriageVerdict>) : TriageResult
     /**
-     * 模型出错、超时或回复读不懂:这一批都算判定失败,不自动重试。[unreachable]:根本没连上模型(网络不通、代理不通);
-     * [unanswered]:连上了,但等到这里的超时也没有回应(模型忙、很慢;连不上的会更早以连接错误报出来,算 [unreachable]);
-     * [unreadable]:模型回了,但回复读不成判定(不是只给 JSON、结构不对)。这几样是给调用方记日志、定退避用的。
+     * The model errored, timed out, or the reply could not be read: the whole batch counts as a failed judgement and is not retried automatically. [unreachable]: the model was never reached (no network, no proxy);
+     * [unanswered]: the connection was made, but no reply arrived before the timeout here (the model is busy or very slow; unreachable cases surface earlier as connection errors and count as [unreachable]);
+     * [unreadable]: the model replied, but the reply could not be read into verdicts (it was not JSON only, or the structure was wrong). These are used by the caller for logging and for choosing a backoff.
      */
     data class Failed(val unreachable: Boolean = false, val unreadable: Boolean = false, val unanswered: Boolean = false) : TriageResult
-    /** 主动能力今天的预算用完了,没发请求:这一批照旧待判定。 */
+    /** The proactive budget for today is used up, so no request was sent: this batch stays pending. */
     data object BudgetExhausted : TriageResult
 }
 
 /**
- * 给同一个 App 的一批通知(最多 [MAX_BATCH] 条)请一次模型判定:忽略、记下、值得提醒。纯逻辑,模型由调用方给。
+ * Asks the model once to judge a batch of notifications from the same app (at most [MAX_BATCH]): ignore, remember, worth surfacing. Pure logic, with the model supplied by the caller.
  *
- * 防注入:
- * - 只请求一次,工具列表是空的;不重试(读不懂就是失败,免得坏掉的配置把每天的请求次数耗光)。
- * - 通知来的文字一律按字段套在 [Untrusted] 里(结束标记转义掉,大小写、空格变体先挡掉),系统提示词说明那是数据、不是指令,
- *   并且一条不能改变另一条的判定。
- * - 回复严格校验([parse]):不认识的 id 丢掉,重复的 id 只认第一个,不认识的判定按忽略,缺的 id 按忽略并给内置说明,
- *   只认回复结尾的 `{"items":[…]}` 或条目数组(话里引用的通知原文不算),读不出来就整批失败。
- * - 每批只有一个 App 的通知(调用方按 App 分批,这里也检查)。已知的局限:同一个 App 里(比如微信里不同的人)的几条
- *   还是在同一个请求里,一条消息仍可能影响另一条的判定;这一阶段的后果只是一个标签。
+ * Injection defence:
+ * - One request only, an empty tool list; no retry (an unreadable reply is a failure, so a broken configuration does not burn through the daily request budget).
+ * - All text from notifications is wrapped field by field in [Untrusted] (closing markers escaped, case and whitespace variants blocked beforehand), the system prompt states that it is data, not instructions,
+ *   and that one notification cannot change another's verdict.
+ * - The reply is strictly validated ([parse]): unknown ids are dropped, duplicate ids keep only the first, unknown verdicts become ignore, missing ids become ignore with a built-in explanation,
+ *   and only the trailing `{"items":[…]}` or an array of items is accepted (notification originals quoted in prose do not count); if it cannot be read, the whole batch fails.
+ * - Each batch holds one app's notifications only (the caller batches by app, and this is checked here too). Known limitation: a few notifications from the same app (different people in WeChat, say)
+ *   are still in one request, so one message can still influence another's verdict; at this stage the consequence is only a label.
  *
- * [language] 是理由用的语言(界面语言的英文名),写在输入第一行。
+ * [language] is the language for the reasons (the English name of the UI language), written on the first line of the input.
  */
 class NoticeTriage(
     private val model: ChatModel,
@@ -88,13 +88,13 @@ class NoticeTriage(
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             return TriageResult.BudgetExhausted
         } catch (e: CancellationException) {
-            // 只有调用方自己被取消(锁屏、关掉)才往外抛;模型内部的超时之类算失败
+            // only throw when the caller itself was cancelled (screen locked, feature turned off); timeouts and the like inside the model count as failure
             currentCoroutineContext().ensureActive()
             return TriageResult.Failed()
         } catch (e: Exception) {
-            // 调用方被取消时,取消也可能以别的异常冒出来(连接被打断之类):那不是这一批失败
+            // when the caller is cancelled, the cancellation can surface as another exception (connection interrupted, for instance): that is not a failure of this batch
             currentCoroutineContext().ensureActive()
-            // 连接层的错(模型适配层会包成 Network / Proxy;没包的 IOException 也一样)都是没连上
+            // connection-layer errors (the model adapter wraps them as Network / Proxy; a bare IOException counts the same) all mean the model was never reached
             return TriageResult.Failed(unreachable = e is ModelError.Network || e is ModelError.Proxy || e is java.io.IOException)
         }
         val text = reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text }
@@ -112,15 +112,15 @@ class NoticeTriage(
         const val LINE_MAX = 200
         const val REASON_MAX = 120
 
-        /** 一批里第 [index] 条(从 0 起)的 id:n1…n8。只在这一个请求里有意义,不是通知键。 */
+        /** The id of the [index]th item in a batch (0-based): n1…n8. Meaningful only within this one request, and not a notification key. */
         fun idOf(index: Int): String = "n${index + 1}"
 
-        // 结束标记的各种写法(大小写、空格)先改掉,再由 Untrusted 转义标准写法;开头标记也改掉,免得看着像新的一段
+        // the various spellings of the closing marker (case, whitespace) are rewritten first, then Untrusted escapes the canonical form; opening markers are rewritten too, so they do not look like a new block
         private val TAG = Regex("<\\s*/?\\s*untrusted", RegexOption.IGNORE_CASE)
 
         private fun untrusted(s: String): String = Untrusted.wrap(s.replace(TAG, "(untrusted"))
 
-        /** 发给模型的输入:第一行是理由用的语言,然后是包名,再逐条列出,通知来的文字都在 untrusted 里。 */
+        /** Input sent to the model: the first line is the language for reasons, then the package name, then each notification listed; all text from notifications is inside untrusted. */
         fun buildInput(items: List<TriageItem>, language: String): String = buildString {
             appendLine("Language for reasons: $language")
             appendLine("App package: ${items.first().record.packageName}")
@@ -129,14 +129,14 @@ class NoticeTriage(
                 val r = item.record
                 appendLine()
                 appendLine("[${idOf(i)}]")
-                // 群聊还是私聊是我们按通知的写法拆出来的(看不出来就不写),写在不可信那一块外面
+                // group or private chat is split out by us from how the notification is written (omitted when it cannot be told), written outside the untrusted block
                 r.group?.let { appendLine("chat: ${if (it) "group" else "private"}") }
                 val title = NoticeFilter.clean(r.title, TITLE_MAX)
-                // 群里的带上是谁说的(见 [NoticeRecord.said])
+                // for groups it carries who said it (see [NoticeRecord.said])
                 val text = NoticeFilter.clean(r.said, TEXT_MAX)
                 if (title.isNotEmpty()) appendLine("title: ${untrusted(title)}")
                 if (text.isNotEmpty()) appendLine("text: ${untrusted(text)}")
-                // 同一条通知重发前显示过的话(最后一段就是现在的,不重复)
+                // texts shown by the same notification before it was reposted (the last piece is the current one and is not repeated)
                 val earlier = item.history.dropLast(1).takeLast(LINES_MAX)
                     .map { line -> NoticeFilter.clean(listOf(line.title, line.text).filter { it.isNotBlank() }.joinToString(": "), LINE_MAX) }
                     .filter { it.isNotEmpty() }
@@ -149,15 +149,15 @@ class NoticeTriage(
         }.trimEnd()
 
         /**
-         * 严格读回复:模型最后给的那个值(见 [itemsOf]:本地模型可能先想一段再给;想的时候复述的通知里可能就有一个
-         * 像答案的对象,结论在最后)。读不出来为 null(整批失败)。
-         * 返回 [ids] 里每个 id 的判定:不认识的 id 丢掉;重复的只认第一个;判定不认识的按忽略、不带模型的理由;缺的按忽略。
-         * 理由按通知文字的办法清洗,截到 [REASON_MAX]。
+         * Reads the reply strictly: the last value the model gave (see [itemsOf]: a local model may think for a while first, and while thinking it may restate a notification containing
+         * an object that looks like an answer; the conclusion is last). Unreadable means null (the whole batch fails).
+         * Returns a verdict for each id in [ids]: unknown ids are dropped; duplicates keep only the first; unrecognised verdicts become ignore without the model's reason; missing ones become ignore.
+         * Reasons are cleaned the same way as notification text and cut to [REASON_MAX].
          */
         fun parse(raw: String, ids: List<String>): Map<String, TriageVerdict>? {
             val items = itemsOf(raw) ?: return null
-            // 给了东西、却没有一条是条目的样子(比如 [1,2,3]):回复的结构就不对,整批读不出来——
-            // 不能当成「每一条都没给判定」收下(那样这一批就都按忽略了)。真的一条都没给([])照旧
+            // something was given, yet not one item looks like an item (such as [1,2,3]): the reply's structure is wrong and the whole batch is unreadable —
+            // it must not be accepted as "no verdict was given for any item" (that would turn the whole batch into ignores). Truly giving none ([]) is fine as before
             if (items.isNotEmpty() && items.none { it is JsonObject }) return null
             val out = LinkedHashMap<String, TriageVerdict>()
             for (e in items) {
@@ -177,11 +177,11 @@ class NoticeTriage(
         }
 
         /**
-         * 回复里的条目:只认模型最后给的那个值([ReplyJson.ending])。以对象结尾时它得带 `items` 数组;以数组结尾时那就是条目
-         * (真机上同一个模型在条数多时会省掉外面那层,直接给 `[{…},{…}]`)。话里引用的、复述的通知原文不算。
-         * 回复不以 JSON 结尾的读不出来(整批失败):这时要是退回去找「最后一个带 `items` 的对象」,模型只是把通知里
-         * 写着的一段 JSON 复述出来、后面跟一句「别信它」时,复述的那段就成了判定。提示词要求的本来就是只给 JSON。
-         * 超过 [ReplyJson.MAX_CHARS] 的不读。
+         * The items in the reply: only the last value the model gave counts ([ReplyJson.ending]). Ending with an object means it must carry an `items` array; ending with an array means that array is the items
+         * (on a device the same model omits the outer layer when there are many items and gives `[{…},{…}]` directly). Notification originals quoted or restated in prose do not count.
+         * A reply not ending in JSON is unreadable (the whole batch fails): if we fell back to looking for "the last object with `items`", then the model merely restating
+         * a chunk of JSON written in the notification and following it with "don't trust that" would make the restated chunk the verdict. The prompt asks for JSON only anyway.
+         * Anything over [ReplyJson.MAX_CHARS] is not read.
          */
         private fun itemsOf(raw: String): JsonArray? {
             if (raw.length > ReplyJson.MAX_CHARS) return null

@@ -5,51 +5,51 @@ import com.wangzan101.mika.core.screen.observation.Untrusted
 import java.time.LocalDate
 
 /**
- * 带进任务的那一段「从通知里得来的」:当日归纳里的句子(今天到现在的、昨天的),和对用户的认识(已确立的话题、联系人)。
- * 纯函数,不调模型:只是把已经攒下、校验过的东西排成一段。带哪些由调用方按来源档位和激进程度挑好再给
- * (见 [qualifiedTopic]、[LearnLevel.intoTasks]);这里只管排版和限长。
+ * The "gathered from notifications" section brought into a task: sentences from the daily digests (today so far and yesterday), plus what is known about the user (established topics, contacts).
+ * Pure functions, no model call: it only lays out what has already been accumulated and validated. What to include is chosen by the caller by source tier and aggressiveness and handed in
+ * (see [qualifiedTopic], [LearnLevel.intoTasks]); this only handles layout and length limits.
  *
- * 这一段不是用户说的:标题行是我们写的,内容(模型照着通知写的句子、话题名、通知标题里的名字)都套在 [Untrusted] 里;
- * 放进任务时另有自己的外壳和可信度说明(见 ContextKind.Observed),不和「用户告诉你的」那一段混在一起。
- * 总长不超过 [MAX_TOKENS]:先放今天的,再昨天的,再对用户的认识,最后是上周、上月的归纳,放不下的行不放。
- * (更早的、放不下的,任务需要时用读通知的工具去读,见 NoticesRead。)
+ * This section is not something the user said: the heading lines are ours, while the content (sentences the model wrote from notifications, topic labels, names from notification titles) is wrapped in [Untrusted];
+ * when placed into a task it gets its own wrapper and trust note (see ContextKind.Observed) and is not mixed with the "the user told you this" section.
+ * Total length stays within [MAX_TOKENS]: today first, then yesterday, then what is known about the user, and last week's and last month's digests; lines that do not fit are left out.
+ * (Older ones and ones that did not fit are read with the read-notifications tool when a task needs them, see NoticesRead.)
  */
 object ObservedContext {
     /**
-     * 任务开工时带了这一段,就在运行记录里记一条这个名字的状态(只记长度,不记内容)。
-     * 任务结束后据此不自动从用户这次说的话里提取记忆:那些话多半是在回应这一段里别人写的事。
+     * When a task starts with this section, a run-state entry with this name is recorded (length only, no content).
+     * After the task ends that is used to skip automatic memory extraction from what the user said this time: those words are mostly responses to things other people wrote in this section.
      */
     const val RUN_STATE = "notice_context"
 
-    /** 整段最多多少 token(按 [TokenEstimate]):它每个任务都带着,不能挤掉用户自己的记忆和参考资料。 */
+    /** The most tokens the whole section may take (per [TokenEstimate]): it rides along with every task, so it must not crowd out the user's own memories and reference material. */
     const val MAX_TOKENS = 600
 
     private val TAG = Regex("<\\s*/?\\s*untrusted", RegexOption.IGNORE_CASE)
 
     /**
-     * 刚过完的那一周(那个月)的归纳:[start] 到 [end] 是它管的日子(纪元日,两头都算),[lines] 是要带的句子。
-     * [leftOut]:做那一份时放不下、没看到的句子有几句(见 [DayDigest.leftOut])。
+     * The digest of the just-finished week (month): [start] to [end] are the days it covers (epoch days, both inclusive), and [lines] are the sentences to include.
+     * [leftOut]: how many sentences did not fit and were not seen when that digest was made (see [DayDigest.leftOut]).
      */
     class Earlier(val start: Long, val end: Long, val lines: List<String>, val leftOut: Int = 0)
 
-    /** 一个联系人怎么写:名字、是人还是群、关系(用户设的,还是猜的)。 */
+    /** How one contact is written: name, whether a person or a group, and the relation (set by the user, or guessed). */
     class Person(val name: String, val group: Boolean, val relation: ContactRelation, val userSet: Boolean)
 
-    /** 一节:标题、各行(要紧的在前)、在整段里占的份额(百分数)。 */
+    /** One section: title, lines (most important first) and its share of the whole section (a percentage). */
     private class Section(val title: String, val lines: List<String>, val share: Int)
 
     /**
-     * [today]、[yesterday] 是那两天当日归纳里要带的句子(没有就给空的);[topics] 按强弱排好,[people] 同样。
-     * [todayAsOf] 是今天那一份做到几点(「到现在为止」的那份是用户点了才做的,之后来的不在里面;写出来免得模型当成最新的)。
-     * [lastWeek]、[lastMonth] 是刚过完的那一周、那个月的归纳里要带的句子(完整的那份;没有就不给)。
-     * [todayLeftOut]、[yesterdayLeftOut]:那一天的当日归纳做的时候有几句放不下、没看到——标题里说出来,免得模型当成那一天的全部。
-     * 都是空的返回 null(这次不带这一段)。
+     * [today] and [yesterday] are the sentences to include from those days' daily digests (pass empty when there are none); [topics] are sorted by strength, as are [people].
+     * [todayAsOf] is how far today's digest goes ("up to now" digests are made only when the user asks, so later ones are not in it; it is stated so the model does not take it as the latest).
+     * [lastWeek] and [lastMonth] are the sentences to include from the digests of the just-finished week and month (the complete ones; pass nothing when there are none).
+     * [todayLeftOut] and [yesterdayLeftOut]: how many sentences did not fit and were not seen when that day's digest was made — stated in the heading so the model does not take it as the whole day.
+     * Returns null when all of them are empty (no section this time).
      *
-     * 整段不超过 [MAX_TOKENS]。今天、昨天、对用户的认识这三节各有份额(开头那句说明之外的部分按 45 / 25 / 30 分),
-     * 先在自己那一份里放;放不下的那一行跳过、接着试后面的(后面的可能短)。上周、上月没有份额,排在最后、有余量才带。
-     * 三节放完还有余量(有的节没有、或用不完):先让还一行都没有的节各放一行,再按节的先后把跳过的补进去。
-     * 不按「哪一节有一行放不下,后面的节全不放」来:那样昨天的句子一多,对用户的认识、上周、上月就都没了,
-     * 第一行太长时甚至整段都不带。
+     * The whole section stays within [MAX_TOKENS]. Today, yesterday and what is known about the user each have a share (the part beyond the opening explanation is split 45 / 25 / 30),
+     * and lines are placed within their own share first; a line that does not fit is skipped and the following ones are tried (later ones may be shorter). Last week and last month have no share, come last, and are only included when there is room left.
+     * If room remains after the three sections (some sections are absent, or do not use up their share): each section that still has no lines is allowed one line, then skipped lines are added back in section order.
+     * It does not work as "if one line in a section does not fit, no later section gets anything": that way a verbose yesterday would wipe out what is known about the user, last week and last month,
+     * and a too-long first line could leave the whole section out.
      */
     fun render(
         today: List<String>, yesterday: List<String>, topics: List<ObservedTopic>, people: List<Person>, todayAsOf: String? = null,
@@ -76,7 +76,7 @@ object ObservedContext {
             }, "; ")
         }
         if (about.isNotEmpty()) sections += Section("Noticed about the user over several days:", about, 30)
-        // 日期是我们自己写的:句子里已经按要求写成了日期,标题再说清是哪一段
+        // dates are our own: the sentences already write dates as required, and the heading makes clear which span it is
         fun earlier(name: String, e: Earlier?) = e?.takeIf { it.lines.isNotEmpty() }?.let {
             val dates = "${DAY.format(LocalDate.ofEpochDay(it.start))} to ${DAY.format(LocalDate.ofEpochDay(it.end))}"
             sections += Section(title(name, dates, partial(it.leftOut)), it.lines.map { l -> "- ${line(l)}" }, 0)
@@ -87,7 +87,7 @@ object ObservedContext {
 
         val kept = sections.map { java.util.TreeSet<Int>() }
         fun block(i: Int, lines: Collection<Int>) = sections[i].title + "\n" + Untrusted.wrap(lines.joinToString("\n") { sections[i].lines[it] })
-        // token 的估算不是各行相加那么简单,所以每次都按拼好的整段算
+        // token estimates are not simply additive per line, so every time the whole assembled section is measured
         fun whole(extra: Pair<Int, Int>? = null) = buildString {
             append(HEADER)
             for (i in sections.indices) {
@@ -95,7 +95,7 @@ object ObservedContext {
                 if (lines.isNotEmpty()) append("\n\n").append(block(i, lines.sorted()))
             }
         }
-        // 第一轮:有份额的节在自己那一份里放(份额从开头那句说明之外的部分里分)
+        // first round: sections with a share place lines within their own share (shares are taken from the part beyond the opening explanation)
         val room = MAX_TOKENS - TokenEstimate.of(HEADER)
         for (i in sections.indices) {
             val budget = room * sections[i].share / 100
@@ -103,11 +103,11 @@ object ObservedContext {
                 if (TokenEstimate.of(block(i, kept[i] + n)) <= budget && TokenEstimate.of(whole(i to n)) <= MAX_TOKENS) kept[i] += n
             }
         }
-        // 第二轮:余量先给还一行都没有的节各放一行(上周、上月,或第一行就超了自己份额的节)……
+        // second round: remaining room first gives each section with no lines yet one line (last week, last month, or a section whose very first line exceeded its share)…
         for (i in sections.indices) {
             if (kept[i].isEmpty()) sections[i].lines.indices.firstOrNull { TokenEstimate.of(whole(i to it)) <= MAX_TOKENS }?.let { kept[i] += it }
         }
-        // ……再按节的先后补给跳过的行
+        // …then skipped lines are added back in section order
         for (i in sections.indices) {
             for (n in sections[i].lines.indices) {
                 if (n !in kept[i] && TokenEstimate.of(whole(i to n)) <= MAX_TOKENS) kept[i] += n
@@ -116,7 +116,7 @@ object ObservedContext {
         return if (kept.all { it.isEmpty() }) null else whole()
     }
 
-    /** 把几项并成一行,整行不超过 [JOINED_CHARS]:排在前面的(更要紧的)先放,放不下的不要。至少放一项。 */
+    /** Joins several items into one line no longer than [JOINED_CHARS]: earlier (more important) ones go first and ones that do not fit are left out. At least one item is always placed. */
     private fun joined(items: List<String>, separator: String): String {
         val out = StringBuilder()
         for (item in items) {
@@ -128,8 +128,8 @@ object ObservedContext {
     }
 
     /**
-     * 这个话题够不够格带进任务:只数 [qualifies] 认的那些 App(来源档位够高的)印证过它的日子,
-     * 满 [LearnLevel.topicDays] 个不同的日子才算。来源档位低的 App 再怎么印证也不算数。
+     * Whether this topic qualifies to be brought into a task: only the days on which apps accepted by [qualifies] (those with a high enough source tier) corroborated it are counted,
+     * and it takes [LearnLevel.topicDays] distinct days. Apps with a low source tier do not count no matter how often they corroborate it.
      */
     fun qualifiedTopic(t: ObservedTopic, level: LearnLevel, qualifies: (String) -> Boolean): Boolean =
         t.evidence.filterKeys(qualifies).values.flatten().toSet().size >= level.topicDays
@@ -141,11 +141,11 @@ object ObservedContext {
     private val DAY = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 
     /**
-     * 一行最多这么多字,和存着的归纳句子的上限一样([LearnTuning.DAY_LINE_MAX]):存着的句子不会在这里被截成半句
-     * (半句话可能读成另一个意思),放不下就整行跳过。
+     * The most characters one line may have, the same as the stored digest sentences' limit ([LearnTuning.DAY_LINE_MAX]): stored sentences are never cut in half here
+     * (half a sentence can read as something else); if it does not fit, the whole line is skipped.
      */
     private const val LINE_CHARS = LearnTuning.DAY_LINE_MAX
-    /** 并成一行的话题名、联系人,整行最多这么多字。 */
+    /** The most characters a joined line of topic labels or contacts may have. */
     private const val JOINED_CHARS = 240
 
     private fun line(s: String): String = NoticeFilter.clean(s, LINE_CHARS).replace(TAG, "(untrusted")

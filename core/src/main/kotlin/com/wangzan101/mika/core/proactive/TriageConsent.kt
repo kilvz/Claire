@@ -2,32 +2,32 @@ package com.wangzan101.mika.core.proactive
 
 import com.wangzan101.mika.core.model.ChatModel
 
-/** 判定实际会用的服务商和模型(轻量模型,没有用主模型);[providerName] 只给界面说是哪一家。 */
+/** The provider and model triage will actually use (a lightweight model, not the main one); [providerName] is only for the UI to say which provider it is. */
 data class TriageTarget(val providerId: String, val providerName: String, val model: String)
 
 /**
- * 后台的模型请求是哪一种。回复有多长差得很远:判定、归纳话题回的是几条短的标记;分段、当日、周、月归纳回的是
- * 十几句、每句上百字的话([long])。建模型时据此定回复上限,不能一个上限管所有的。
+ * Which kind of background model request this is. Reply lengths vary widely: triage and topic learning return a few short markers, while segmented, daily, weekly and monthly digests return
+ * a dozen or so sentences of a hundred-plus characters each ([long]). This decides the reply length limit when building the model; one limit cannot serve them all.
  */
 enum class ProactiveCall(val long: Boolean) {
     Triage(false), Learn(false), Notes(true), Day(true), Span(true),
 }
 
-/** 建好的模型和它用的服务商、模型:两样出自同一次读配置,发请求前就对着这个 [target] 查同意。 */
+/** A built model together with the provider and model it uses: both come from the same config read, and consent is checked against this [target] before a request is sent. */
 class TargetedModel(val target: TriageTarget, val model: ChatModel)
 
-/** 用户同意把通知文字发给哪一家的哪个模型。只记服务商 id 和模型名,不含任何通知内容。 */
+/** Which provider's which model the user agreed to send notification text to. Only the provider id and model name are recorded; no notification content is included. */
 data class TriageConsent(val providerId: String, val model: String) {
-    /** 实际要用的 [target] 是不是同意过的那个;没有模型时不算。 */
+    /** Whether the [target] actually used is the one agreed to; does not count when there is no model. */
     fun covers(target: TriageTarget?): Boolean = target != null && target.providerId == providerId && target.model == model
 
     companion object {
         fun of(target: TriageTarget) = TriageConsent(target.providerId, target.model)
 
         /**
-         * 总开关一动,同意跟着怎么变。关掉(或这个版本上用不了)就清掉:再打开要重新确认,不沿用上一次的。
-         * 打开时用户在确认框里点了同意的([confirmed] 是确认框里写着的那一家、那个模型)记下它;
-         * 打开时没有可确认的(还没配模型)保持 [current]——之后配好了,在页面上确认。
+         * How consent changes when the master switch changes. Turning it off (or the feature being unavailable in this version) clears it: turning it back on requires confirming again, and the previous choice is not reused.
+         * When turning on and the user agreed in the confirmation dialog, that is recorded ([confirmed] is the provider and model shown in the dialog);
+         * when turning on with nothing to confirm (no model configured yet) [current] is kept — once a model is configured, it is confirmed on the page.
          */
         fun afterSwitch(on: Boolean, confirmed: TriageTarget?, current: TriageConsent?): TriageConsent? = when {
             !on -> null
@@ -37,12 +37,12 @@ data class TriageConsent(val providerId: String, val model: String) {
     }
 }
 
-/** 后台的模型请求(判定和归纳)现在能不能发。 */
+/** Whether background model requests (triage and learning) can be sent right now. */
 enum class TriageGate {
     Off,
-    /** 开着,但没配模型。 */
+    /** On, but no model configured. */
     NoModel,
-    /** 开着,但实际要用的服务商或模型和同意过的不一样:停下,等用户重新确认。 */
+    /** On, but the provider or model actually used differs from the one agreed to: hold off until the user confirms again. */
     NeedsConsent,
     Ready;
 

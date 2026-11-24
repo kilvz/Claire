@@ -7,29 +7,29 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 读主动能力(判定、归纳)的模型回复:只认回复最后的那个 JSON 值,那才是模型的结论。
- * 前面的(想的过程、复述的通知)里就算有像答案的对象,也不算:通知是第三方写的,复述出来的「答案」可能是注入。
- * 纯函数;只认标准 JSON:没加引号的只能是数字、true、false、null(kotlinx 读树时不查这个,这里另查),
- * 一段以 `[n1, n2]` 结尾的话不算数组。
+ * Reads model replies for the proactive features (triage, learning): only the trailing JSON value of the reply counts, since that is the model's conclusion.
+ * Anything earlier (the thinking process, restated notifications) does not count even if it contains an answer-shaped object: notifications are written by third parties, and a restated "answer" could be an injection.
+ * Pure functions; only standard JSON is accepted: unquoted values may only be numbers, true, false or null (kotlinx does not check this when reading the tree, so it is checked separately here),
+ * and a sentence ending in `[n1, n2]` does not count as an array.
  */
 internal object ReplyJson {
-    /** 回复超过这么长就不读(整批失败)。 */
+    /** Replies longer than this are not read (the whole batch fails). */
     const val MAX_CHARS = 32_000
-    /** 找结尾那个值时最多试这么多个起点,再多就算读不出来。 */
+    /** The most starting points tried when looking for the trailing value; beyond that it counts as unreadable. */
     const val MAX_STARTS = 200
 
     private val strict = Json
 
     sealed interface Ending {
-        /** 回复以这个 JSON 对象或数组结尾(最外层的那个)。 */
+        /** The reply ends with this JSON object or array (the outermost one). */
         data class Value(val element: JsonElement) : Ending
-        /** 回复不以 JSON 值结尾(最后一个字不是 `}` / `]`,或结尾那段读不成一个值)。 */
+        /** The reply does not end with a JSON value (the last character is not `}` / `]`, or the trailing chunk does not read as a value). */
         data object None : Ending
-        /** 起点太多,没试完:当读不出来。 */
+        /** Too many starting points, not all tried: treated as unreadable. */
         data object GaveUp : Ending
     }
 
-    /** 去掉首尾空白,开头一行代码块标记(``` 或 ```json)和结尾的 ```,再去一次空白。两头各自看(先想一段再给代码块时开头没有标记)。 */
+    /** Trims whitespace, then strips an opening code-fence line (``` or ```json) and a trailing ```, then trims again. The two ends are considered separately (when it thinks first and then gives a code block, there is no opening fence). */
     fun normalise(raw: String): String {
         var s = raw.trim()
         if (s.startsWith(FENCE)) {
@@ -43,8 +43,8 @@ internal object ReplyJson {
     }
 
     /**
-     * [text](已 [normalise])结尾的那个 JSON 值:以 `}` 结尾时找正好在最后结束的最外层对象,以 `]` 结尾时找最外层数组。
-     * 从左往右试每个 `{` / `[`,第一个「从它到结尾正好是一个这种值」的就是;最多试 [MAX_STARTS] 个。
+     * The JSON value at the end of [text] (already [normalise]d): when it ends with `}` find the outermost object that ends exactly at the end, and when it ends with `]` find the outermost array.
+     * Each `{` / `[` is tried from left to right, and the first one that "runs from there to the end as exactly such a value" is it; at most [MAX_STARTS] are tried.
      */
     fun ending(text: String): Ending {
         val open = when (text.lastOrNull()) {
@@ -67,7 +67,7 @@ internal object ReplyJson {
 
     private val NUMBER = Regex("-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 
-    /** 没加引号的值都是数字、true、false、null。不递归(嵌套很深也不会爆栈)。 */
+    /** Every unquoted value is a number, true, false or null. Not recursive (so very deep nesting cannot blow the stack). */
     private fun standard(root: JsonElement): Boolean {
         val stack = ArrayDeque<JsonElement>()
         stack.addLast(root)

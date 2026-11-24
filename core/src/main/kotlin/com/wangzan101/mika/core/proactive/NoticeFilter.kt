@@ -1,29 +1,29 @@
 package com.wangzan101.mika.core.proactive
 
-/** [NoticeFilter.decide] 的结论:留下,或者为什么丢掉。 */
+/** The conclusion of [NoticeFilter.decide]: keep, or why it was dropped. */
 enum class NoticeDecision {
     Keep,
-    /** 不在用户勾选的 App 里。 */
+    /** Not among the apps the user selected. */
     NotWhitelisted,
-    /** Claire 自己(各种安装包)的通知,勾了也不收。 */
+    /** A notification from Claire itself (any of its install packages): not accepted even when selected. */
     SelfPackage,
-    /** 在「应用访问」里被禁用的 App。 */
+    /** An app disabled under "app access". */
     AppBlocked,
     Ongoing,
     GroupSummary,
     ForegroundService,
     NotClearable,
-    /** 进度、播放控制、后台服务、来电、闹钟、导航、秒表这类类别。 */
+    /** Categories such as progress, playback control, background service, incoming call, alarm, navigation and stopwatch. */
     Category,
-    /** 标题和正文都是空的。 */
+    /** Both title and text are blank. */
     Blank,
     /** Authentication secrets must never reach the inbox, journal or models. */
     AuthenticationSecret,
 }
 
 /**
- * 通知筛选:纯函数,先看包名(白名单 → 自己 → 应用访问禁用),再看通知特征,最后看有没有内容。
- * 包名这一关([decidePackage])在读通知内容之前就做:不在白名单里的通知连内容都不读。
+ * Notification filtering: pure functions. The package name is checked first (whitelist → self → disabled under app access), then the notification's traits, and finally whether it has any content.
+ * The package-name gate ([decidePackage]) runs before the notification content is read at all: notifications outside the whitelist never have their content read.
  */
 object NoticeFilter {
     const val SELF_PREFIX = "com.wangzan101.mika"
@@ -31,13 +31,13 @@ object NoticeFilter {
     const val TEXT_MAX = 2_000
     const val MESSAGES_MAX = 20
 
-    /** 不收的类别(值与 android.app.Notification.CATEGORY_* 相同)。 */
+    /** Categories that are not accepted (values match android.app.Notification.CATEGORY_*). */
     val DROPPED_CATEGORIES = setOf("progress", "transport", "service", "call", "alarm", "navigation", "stopwatch")
 
-    /** Claire 自己的包:正式版、.dev、.dev.test 等等都算。 */
+    /** Claire's own packages: the release build, .dev, .dev.test and so on all count. */
     fun isSelf(packageName: String): Boolean = packageName.startsWith(SELF_PREFIX)
 
-    /** 只看包名的那一关;[blocked] 是「应用访问」里禁用的包名。 */
+    /** The gate that looks at the package name only; [blocked] holds the package names disabled under app access. */
     fun decidePackage(packageName: String, whitelist: Set<String>, blocked: Set<String>): NoticeDecision = when {
         packageName !in whitelist -> NoticeDecision.NotWhitelisted
         isSelf(packageName) -> NoticeDecision.SelfPackage
@@ -45,7 +45,7 @@ object NoticeFilter {
         else -> NoticeDecision.Keep
     }
 
-    /** 整条的结论。[record] 应已经过 [sanitize],只有控制字符的标题也算空。 */
+    /** The conclusion for a whole record. [record] should already have gone through [sanitize]; a title made only of control characters counts as blank. */
     fun decide(record: NoticeRecord, whitelist: Set<String>, blocked: Set<String>): NoticeDecision {
         val byPackage = decidePackage(record.packageName, whitelist, blocked)
         if (byPackage != NoticeDecision.Keep) return byPackage
@@ -61,7 +61,7 @@ object NoticeFilter {
         }
     }
 
-    /** 清洗:去掉控制字符、双向文字控制符和看不见的格式字符,空白并成一个空格,按长度截断;消息只留最近 [MESSAGES_MAX] 条。 */
+    /** Cleaning: strips control characters, bidirectional text controls and invisible formatting characters, collapses whitespace to a single space and truncates by length; only the most recent [MESSAGES_MAX] messages are kept. */
     fun sanitize(record: NoticeRecord): NoticeRecord = record.copy(
         title = clean(record.title, TITLE_MAX),
         conversationTitle = record.conversationTitle?.let { clean(it, TITLE_MAX) }?.ifBlank { null },
@@ -73,11 +73,11 @@ object NoticeFilter {
     )
 
     private val BIDI = Regex("[\\u202A-\\u202E\\u2066-\\u2069\\u200E\\u200F\\u061C]")
-    // 看不见的格式字符:软连字符、蒙古文元音分隔符、词连接符到不可见运算符。夹在结束标记里会让它看着不像标记;
-    // 和双向控制符一起在合并空白之前去掉(U+180E 在有的平台上还算空格)。U+200C / U+200D 不去:emoji 和一些文字里要用
+    // Invisible formatting characters: soft hyphen, Mongolian vowel separator, word joiner through invisible operator. Embedded in the closing marker they would make it look unlike a marker;
+    // they are stripped along with the bidirectional controls before whitespace is collapsed (U+180E still counts as a space on some platforms). U+200C / U+200D are kept: emoji and some scripts need them
     private val INVISIBLE = Regex("[\\u00AD\\u180E\\u2060-\\u2064]")
-    // 不用 (?U):安卓自带的正则引擎(ICU)不认这个开关,一加载就抛异常;这里把 Unicode 的空白类字符直接列出来,
-    // 电脑上的 JVM 和安卓上结果一样。\p{Z} 是各种空格与行、段分隔符,另加零宽空格和 BOM。
+    // No (?U): the regex engine bundled with Android (ICU) does not know that flag and throws as soon as it is loaded; so the Unicode whitespace characters are listed explicitly here,
+    // which gives the same result on a desktop JVM and on Android. \p{Z} covers the various spaces and the line/paragraph separators, plus zero-width space and the BOM.
     private val SPACES = Regex("[\\s\\p{Z}\\u200B\\uFEFF]+")
 
     internal fun clean(s: String, max: Int): String {
@@ -87,22 +87,22 @@ object NoticeFilter {
     }
 
     /**
-     * App 的显示名,给模型看之前收一收。名字是装的那个 App 自己在安装包里写的(第三方的字),我们却把它写在不可信标记外面、
-     * 当成自己的标签用:清洗、截到 [APP_NAME_MAX] 个字,并去掉能搭出标记、结构的符号(尖括号、方括号、花括号、引号、反引号、
-     * 冒号、逗号、分号)。这只是让它搭不出我们输入里的格式,不是把它变成可信的——名字里的词照样在。
+     * An app's display name, tightened up before the model sees it. The name is written by the installed app itself in its package (third-party text), yet we put it outside the untrusted markers
+     * and use it as our own label: so clean it, cut it to [APP_NAME_MAX] characters, and remove the symbols that could build markers or structure (angle brackets, square brackets, curly braces, quotes, backticks,
+     * colons, commas, semicolons). This only stops it from building anything that looks like formatting in our input; it does not make it trustworthy — the words in the name are still there.
      */
     fun appName(raw: String): String =
         clean(buildString(raw.length) { for (ch in raw) append(if (ch in APP_NAME_MARKUP) ' ' else ch) }, APP_NAME_MAX)
 
-    /** 同上;收完是空的(名字全是符号)就用 [packageName] 顶上,不留一个空着的标签。 */
+    /** Same as above; if the result is empty (the name was all symbols), [packageName] stands in so there is never an empty label. */
     fun appName(raw: String, packageName: String): String = appName(raw).ifEmpty { packageName }
 
     const val APP_NAME_MAX = 40
-    // 逐个字符比,不用正则:这个类每来一条通知都要加载,安卓自带的正则引擎对写法比电脑上的 JVM 挑剔(见下面 SPACES 的注释),
-    // 一个在电脑上没问题的写法到手机上可能一加载就抛异常
+    // Compared character by character instead of with a regex: this class is loaded for every incoming notification, and the regex engine bundled with Android is pickier about patterns than a desktop JVM (see the SPACES comment below),
+    // so a pattern that works fine on a computer may throw as soon as it is loaded on a phone
     private const val APP_NAME_MARKUP = "<>[]{}\"'`:：,，;；"
 
-    /** 截到 [max] 个 UTF-16 单位以内,不把代理对切成两半。 */
+    /** Truncates to at most [max] UTF-16 units without splitting a surrogate pair. */
     internal fun cap(s: String, max: Int): String {
         if (s.length <= max) return s
         val end = if (Character.isHighSurrogate(s[max - 1])) max - 1 else max

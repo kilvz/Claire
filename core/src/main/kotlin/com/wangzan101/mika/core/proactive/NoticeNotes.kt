@@ -17,38 +17,38 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 校验过的一句分段归纳:[entries] 是它依据的那几段通知(这一批里的下标,至少一个),[text] 是清洗、遮过的那句话。 */
+/** A validated segmented note line: [entries] are the notifications it was based on (indices within this batch, at least one), and [text] is the cleaned, redacted sentence. */
 data class NoteSignal(val entries: List<Int>, val text: String)
 
-/** 一句被丢掉的原因(只计数,不含内容)。 */
+/** Why a line was dropped (counting only, no content). */
 enum class NoteDrop {
-    /** 多出 [LearnTuning.NOTES_MAX] 的。 */
+    /** Beyond [LearnTuning.NOTES_MAX]. */
     OverLimit,
-    /** 不是对象,或没有文字。 */
+    /** Not an object, or it has no text. */
     Malformed,
-    /** 引用的通知 id 不在这一批里(这句里有一个就记一次)。 */
+    /** A cited notification id is not in this batch (counted once per line that has one). */
     UnknownId,
-    /** 一个有效的通知 id 都没有:说不出依据的不要。 */
+    /** No valid notification ids at all: anything that cannot show its evidence is rejected. */
     NoIds,
-    /** 过不了敏感信息关卡(密码、验证码、卡号之类)。 */
+    /** Fails the sensitive-information check (passwords, verification codes, card numbers and the like). */
     Sensitive,
 }
 
 sealed interface NotesResult {
     data class Noted(val notes: List<NoteSignal>, val dropped: Map<NoteDrop, Int>) : NotesResult
-    /** [unreachable]:根本没连上模型,这一批留着;否则这一批算做过(不再发)。和 [LearnResult.Failed] 一个意思。 */
+    /** [unreachable]: the model was never reached and the batch is kept; otherwise the batch counts as done (never sent again). Same meaning as [LearnResult.Failed]. */
     data class Failed(val unreachable: Boolean = false) : NotesResult
     data object BudgetExhausted : NotesResult
 }
 
 /**
- * 当日消息归纳的第 1 级:同一个 App 的一批通知原文(最多 [LearnTuning.NOTES_BATCH_MAX] 段)→ 几句「发生了什么」。
- * 每句必须指向它依据的那几段通知(这一批里的 id),指不上的不要:上面几级(当日、周)只在这些句子上做,
- * 有依据才能回头核对。只新增句子,不改写以前的(多次改写同一段摘要会把错越传越远)。纯逻辑,模型由调用方给。
+ * Level 1 of the daily message digest: a batch of raw notifications from the same app (at most [LearnTuning.NOTES_BATCH_MAX] pieces) → a few sentences of "what happened".
+ * Each sentence must point at the notifications it was based on (ids within this batch), and sentences that cannot are dropped: the levels above (day, week) work only on these sentences,
+ * and evidence makes them checkable later. Only new sentences are added; earlier ones are never rewritten (rewriting the same summary repeatedly spreads errors further). Pure logic, with the model supplied by the caller.
  *
- * 防注入和 [NoticeLearn] 一样:只请求一次、工具列表是空的、有超时;通知文字都在 [Untrusted] 里;一批只有一个 App;
- * 回复只认结尾的那个 JSON 值([ReplyJson]),严格校验。句子里的网址、长串数字(单号、卡号、电话)遮掉,
- * 过不了 [SensitiveFilter] 的整句不要。
+ * Injection defence is the same as [NoticeLearn]: one request only, an empty tool list, a timeout; notification text sits in [Untrusted]; one batch is one app;
+ * only the trailing JSON value of the reply is read ([ReplyJson]) and it is strictly validated. URLs and long digit runs (tracking numbers, card numbers, phone numbers) inside sentences are redacted,
+ * and whole sentences that fail [SensitiveFilter] are dropped.
  */
 class NoticeNotes(private val model: ChatModel, private val language: String, private val timeoutMs: Long = LearnTuning.TIMEOUT_MS) {
     suspend fun note(packageName: String, entries: List<NoticeEntry>, zone: ZoneId): NotesResult {
@@ -81,7 +81,7 @@ class NoticeNotes(private val model: ChatModel, private val language: String, pr
 
         private fun untrusted(s: String): String = Untrusted.wrap(s.replace(TAG, "(untrusted"))
 
-        /** 发给模型的输入:语言、包名,然后逐段列出(几点、群聊还是私聊是我们自己的,在不可信那一块外面)。 */
+        /** Input sent to the model: the language, the package name, then each piece listed (the time and whether it is a group or private chat are our own and go outside the untrusted block). */
         fun buildInput(packageName: String, entries: List<NoticeEntry>, language: String, zone: ZoneId): String = buildString {
             appendLine("Language for notes: $language")
             appendLine("App package: $packageName")
@@ -99,8 +99,8 @@ class NoticeNotes(private val model: ChatModel, private val language: String, pr
         }.trimEnd()
 
         /**
-         * 严格读回复:结尾的那个 JSON 值得是 `{"notes":[…]}` 或直接一个数组;别的写法、超长的读不出来(null,整批算失败)。
-         * 每句:要有至少一个这一批里的通知 id、要有文字;文字清洗、遮掉网址和长串数字、截到 [LearnTuning.NOTE_MAX]。
+         * Reads the reply strictly: the trailing JSON value must be `{"notes":[…]}` or a plain array; other forms or an over-long reply are unreadable (null, and the batch counts as failed).
+         * Each line must have at least one notification id from this batch and must have text; the text is cleaned, URLs and long digit runs are redacted, and it is cut to [LearnTuning.NOTE_MAX].
          */
         fun parse(raw: String, entryCount: Int): NotesResult.Noted? =
             CitedLines.parse(raw, "notes", "e", entryCount, LearnTuning.NOTES_MAX, LearnTuning.NOTE_MAX)?.let { NotesResult.Noted(it.lines, it.dropped) }

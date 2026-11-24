@@ -3,11 +3,11 @@ package com.wangzan101.mika.core.proactive
 import kotlinx.serialization.Serializable
 
 /**
- * 收到过的一段通知文字。[title] 是会话的名字(人或群,或「到账通知」这类),[sender] 是群里说话的人(没有就是 null),
- * [text] 是那句话。文字都是别的 App、别人写的。
+ * A piece of notification text that was received. [title] is the name of the conversation (a person or group, or things like "payment received"), [sender] is the person speaking in a group (null if none),
+ * and [text] is the sentence itself. All of this text was written by other apps and other people.
  *
- * [keyId] 是通知键的哈希([NoticeDedup.idOf],倒推不出原来的键),[sig] 是这一段内容的指纹,[styled] 说它来自带会话样式的通知:
- * 这三样只用来认「这条通知的这段话记过没有」,存下来之后重启也认得。
+ * [keyId] is a hash of the notification key ([NoticeDedup.idOf], which cannot be reversed into the original key), [sig] is a fingerprint of this piece's content, and [styled] says it came from a conversation-style notification:
+ * these three are only used to recognise "has this piece of this notification been recorded already", and they make that recognisable after a restart once persisted.
  */
 @Serializable
 data class NoticeEntry(
@@ -19,32 +19,32 @@ data class NoticeEntry(
     val keyId: String = "",
     val sig: Int = 0,
     val styled: Boolean = false,
-    /** 这一段已经做过分段归纳(第 1 级,见 [NoticeNotes]);归纳没成的也算做过,不再发。 */
+    /** This piece has been through segmented note-taking (level 1, see [NoticeNotes]); attempts that failed also count as done and are not sent again. */
     val noted: Boolean = false,
-    /** 群聊(true)、私聊(false),看不出来为 null(见 [NoticeRecord.group])。 */
+    /** Group chat (true), private chat (false), or null when it cannot be told (see [NoticeRecord.group]). */
     val group: Boolean? = null,
 )
 
 /**
- * 通知日志存下来的样子:[sinceMs] 是这一份从什么时候开始记的,[entries] 由旧到新;
- * [cutMs] 是因为条数满了被挤掉的里面最晚的一段的时间(没挤掉过为 0)。
+ * The persisted shape of the notification journal: [sinceMs] is when this copy started recording, [entries] runs oldest to newest;
+ * [cutMs] is the time of the latest piece among those pushed out because the count was full (0 if nothing was ever pushed out).
  */
 @Serializable
 data class NoticeJournalData(val version: Int = 1, val sinceMs: Long, val entries: List<NoticeEntry> = emptyList(), val cutMs: Long = 0)
 
 /**
- * 通知日志(当日消息归纳的第 0 级):收进来的每一段通知文字按时间记下(已经过了白名单、筛选、去重、清洗、拆分)。
- * 和 [NoticeInbox] 不同,用户点开、划掉通知之后这里的还在——「今天都收到了什么」读的是它。
+ * The notification journal (level 0 of the daily message digest): every piece of notification text that comes in is recorded by time (after whitelisting, filtering, dedup, cleaning and splitting).
+ * Unlike [NoticeInbox], entries survive the user opening or swiping away the notification — "what did I receive today" reads from here.
  *
- * 纯逻辑,不是线程安全的(在 ProactiveRuntime 那条串行协程上用)。存不存盘、什么时候存由调用方定([data] 给出要存的样子,
- * 构造时给回来就接着上次的)。锁屏期间不读通知(解锁后只补得回还留在通知栏里的),所以 [sinceMs] 记着这一份是从什么时候开始记的,
- * 读的人要把「从几点起、可能不全」说清楚。
+ * Pure logic and not thread-safe (it runs on the single serial coroutine in ProactiveRuntime). Whether and when to persist is up to the caller ([data] gives the shape to store,
+ * and passing it back to the constructor continues from last time). Notifications are not read while locked (after unlocking only those still in the shade can be caught up), so [sinceMs] records when this copy started recording,
+ * and whoever reads it must make clear "from what time, and possibly incomplete".
  *
- * 只留最近 [keepMs] 的([expire];没有新通知来也要有人调),最多 [capacity] 条,满了丢最旧的。
+ * Only the most recent [keepMs] are kept ([expire]; something must call it even when no new notifications arrive), at most [capacity] entries, dropping the oldest when full.
  *
- * 同一条通知里同样的内容只记一次:带会话样式的通知每次重发都带着前面几条消息,按(谁说的、文字、时间)认;
- * 别的通知(微信、QQ 每来一句把同一条通知重发一遍)按会话名、说话人、正文认,和这条通知上一次的一样就不记。
- * 认的依据([NoticeEntry.keyId]、[NoticeEntry.sig])跟着条目存着,重启之后同一条通知原样重发也不会再记一遍。
+ * The same content in the same notification is recorded only once: conversation-style notifications carry the previous few messages on every repost and are recognised by (who said it, text, time);
+ * other notifications (WeChat and QQ repost the same notification for every new message) are recognised by chat name, speaker and body, and nothing is recorded when it matches the previous round of that notification.
+ * The identity used ([NoticeEntry.keyId], [NoticeEntry.sig]) is stored with the entry, so after a restart an identical repost of the same notification is not recorded again.
  */
 class NoticeJournal(
     data: NoticeJournalData? = null,
@@ -54,19 +54,19 @@ class NoticeJournal(
 ) {
     private val entries = ArrayDeque<NoticeEntry>()
 
-    /** 这一份从什么时候开始记(第一次建出来、或上次 [clear] 的时间)。 */
+    /** When this copy started recording (when it was first created, or the time of the last [clear]). */
     var sinceMs: Long = data?.sinceMs ?: clock()
         private set
 
-    /** 条数满了被挤掉的里面最晚的一段的时间;没挤掉过为 0。 */
+    /** The time of the latest piece among those pushed out when the count was full; 0 if nothing was ever pushed out. */
     private var cutMs: Long = data?.cutMs ?: 0L
 
-    /** 从什么时候起这一份是全的:开始记的时间,条数满了挤掉过旧的就是被挤掉的那些之后。 */
+    /** From when this copy is complete: the time it started recording, or, if old entries were pushed out when full, the point after those pushed out. */
     val completeSinceMs: Long get() = maxOf(sinceMs, cutMs)
 
     /**
-     * 读进来的那份里有没有过了保留期的(建出来时已经从内存里去掉)。有的话文件里还留着它们:
-     * 读的人要马上存一次,不然之后 [expire] 再也不会说「有改动」,过期的原文就一直躺在文件里。
+     * Whether the data read in contained entries past the retention period (already removed from memory when this was created). If so, they are still in the file:
+     * the caller must persist right away, otherwise [expire] will never report "something changed" again and the expired original text sits in the file forever.
      */
     val expiredOnLoad: Boolean
 
@@ -81,7 +81,7 @@ class NoticeJournal(
 
     fun data(): NoticeJournalData = NoticeJournalData(sinceMs = sinceMs, entries = entries.toList(), cutMs = cutMs)
 
-    /** 记下一条已清洗、拆好的记录里新的内容。返回新记了几段。 */
+    /** Records the new content of a record that has been cleaned and split. Returns how many pieces were newly recorded. */
     fun add(record: NoticeRecord): Int {
         val keyId = NoticeDedup.idOf(record.key)
         var added = 0
@@ -90,11 +90,11 @@ class NoticeJournal(
             for (m in record.messages) {
                 if (m.text.isBlank()) continue
                 val sig = listOf(m.sender, m.text, m.atMs).hashCode()
-                // 指纹只有 32 位,不同的两句会撞上:撞上了再比一遍原文(日志里留着原文),真一样才算记过
+                // the fingerprint is only 32 bits, so different sentences can collide: on a collision the original text is compared again (the journal keeps the original), and only a true match counts as already recorded
                 if (seen.any { it.sig == sig && it.sender == m.sender && it.text == m.text }) continue
                 entries += NoticeEntry(
-                    // 消息自己带的时间是发通知的 App 填的:没有就用通知的发出时间,比通知还晚的(填错、故意填到将来)也按通知的算,
-                    // 不然它过不了期,还会被算到将来的某一天里
+                    // the time a message carries is filled in by the posting app: if absent use the notification's post time, and times later than the post (mistakes, or deliberately set in the future) also use the post time,
+                    // otherwise it would never expire and would be counted into some future day
                     record.packageName, m.atMs.takeIf { NoticeDedup.trusted(it, record.postedAtMs) }?.coerceAtMost(record.postedAtMs) ?: record.postedAtMs, record.title, m.sender, m.text,
                     keyId = keyId, sig = sig, styled = true, group = record.group,
                 )
@@ -104,8 +104,8 @@ class NoticeJournal(
         } else if (record.title.isNotBlank() || record.text.isNotBlank()) {
             val sig = listOf(record.title, record.sender, record.text).hashCode()
             val last = entries.lastOrNull { !it.styled && it.keyId == keyId }
-            // 和这条通知上一次的一样就不记(每来一句把同一条通知原样重发一遍的 App)。「一样」要原文真一样(指纹只有 32 位),
-            // 而且隔得不久:隔了半天以上的是新的一次(第二天又发来的同一句话),要记,不然那一天的归纳里就没有它
+            // identical to the previous round of this notification means nothing is recorded (apps that repost the same notification verbatim for every new message). "Identical" requires the original text to really match (the fingerprint is only 32 bits),
+            // and requires it to be recent: more than half a day apart is a new occurrence (the same sentence sent again the next day) and must be recorded, or it would be missing from that day's digest
             val repeat = last != null && last.sig == sig && last.title == record.title && last.sender == record.sender &&
                 last.text == record.text && record.postedAtMs - last.atMs < LearnTuning.REPEAT_WINDOW_MS
             if (!repeat) {
@@ -122,26 +122,26 @@ class NoticeJournal(
         return added
     }
 
-    /** [fromMs](含)到 [toMs](不含)之间的,由旧到新。 */
+    /** Entries between [fromMs] (inclusive) and [toMs] (exclusive), oldest to newest. */
     fun between(fromMs: Long, toMs: Long): List<NoticeEntry> = entries.filter { it.atMs in fromMs until toMs }.sortedBy { it.atMs }
 
     /**
-     * 一句分段归纳([DigestNote])是照着哪些通知写的:它只记了 App、会话名和起止时间,没有记是哪几段——所以给的是
-     * 这个 App 在 [fromMs] 到 [toMs](都含)之间的通知;[title] 不为 null 时只要这个会话的(按存句子时同样的办法从标题算出
-     * 会话名来比,见 [ContactIdentity.displayName])。可能比当时依据的多几段(同一段时间里没被引用的)。由旧到新。
+     * Which notifications a segmented note ([DigestNote]) was written from: it only recorded the app, the chat name and the start and end times, not which pieces — so what is returned is
+     * this app's notifications between [fromMs] and [toMs] (both inclusive); when [title] is not null only that conversation's are returned (comparing chat names derived from titles the same way as when the sentence was stored,
+     * see [ContactIdentity.displayName]). It may include a few more pieces than were actually used (ones not cited within that span). Oldest to newest.
      */
     fun around(packageName: String, title: String?, fromMs: Long, toMs: Long): List<NoticeEntry> = entries
         .filter { it.packageName == packageName && it.atMs in fromMs..toMs && (title == null || ContactIdentity.displayName(it.title) == title) }
         .sortedBy { it.atMs }
 
-    // ---- 分段归纳(第 1 级)要用的:哪些还没归纳过 ----
+    // ---- For segmented notes (level 1): which pieces have not been noted yet ----
 
-    /** 还没归纳过的有几段。 */
+    /** How many pieces have not been noted yet. */
     val pendingCount: Int get() = entries.count { !it.noted }
 
     /**
-     * 现在该归纳哪个 App:只看 [eligible] 认的 App 里还没归纳过的;攒够 [dueCount] 段,或最旧的一段已过了 [dueAgeMs],就算到期。
-     * 几个都到期时先做最旧的那个。没有到期的为 null。不计时:由调用方在有事发生时来问。
+     * Which app should be noted now: only apps accepted by [eligible] that have unnoted pieces are considered; an app is due once it has accumulated [dueCount] pieces, or its oldest piece is older than [dueAgeMs].
+     * When several are due, the one with the oldest piece goes first. Null when nothing is due. No timers: the caller asks whenever something happens.
      */
     fun due(nowMs: Long, eligible: (String) -> Boolean, dueCount: Int, dueAgeMs: Long): String? = entries
         .filter { !it.noted && eligible(it.packageName) }
@@ -150,15 +150,15 @@ class NoticeJournal(
         .minByOrNull { (_, list) -> list.minOf { it.atMs } }
         ?.key
 
-    /** [fromMs](含)到 [toMs](不含)之间还有没有没归纳过的([eligible] 认的 App 里):有的话这段时间的当日归纳先等等。 */
+    /** Whether there are unnoted pieces between [fromMs] (inclusive) and [toMs] (exclusive) among apps accepted by [eligible]: if so, the daily digest for that span should wait. */
     fun hasPending(fromMs: Long, toMs: Long, eligible: (String) -> Boolean): Boolean =
         entries.any { !it.noted && it.atMs in fromMs until toMs && eligible(it.packageName) }
 
-    /** 这个 App 还没归纳过的,由旧到新,最多 [limit] 段。 */
+    /** This app's unnoted pieces, oldest to newest, at most [limit]. */
     fun pending(packageName: String, limit: Int): List<NoticeEntry> =
         entries.filter { !it.noted && it.packageName == packageName }.sortedBy { it.atMs }.take(limit)
 
-    /** [done] 这几段做过分段归纳了(成没成都算)。有改动返回 true。 */
+    /** The [done] pieces have been through segmented note-taking (whether or not it succeeded). Returns true if anything changed. */
     fun markNoted(done: List<NoticeEntry>): Boolean {
         if (done.isEmpty()) return false
         val ids = done.mapTo(HashSet()) { identity(it) }
@@ -175,26 +175,26 @@ class NoticeJournal(
 
     private fun identity(e: NoticeEntry) = listOf(e.packageName, e.keyId, e.sig, e.atMs, e.styled)
 
-    /** 过了保留期的去掉。有去掉的返回 true。不只在来新通知时调:没有新通知,到期的也得删。 */
+    /** Drops entries past the retention period. Returns true if anything was dropped. Not only called when a new notification arrives: entries must also be dropped when nothing new comes in. */
     fun expire(): Boolean = removeBefore(clock() - keepMs)
 
-    /** [beforeMs] 之前的去掉(过了保留期的、已经归纳完的那一天)。有去掉的返回 true。 */
+    /** Drops everything before [beforeMs] (entries past retention, or a day that has already been fully noted). Returns true if anything was dropped. */
     fun removeBefore(beforeMs: Long): Boolean = entries.removeAll { it.atMs < beforeMs }
 
-    /** 某个 App 不再归纳(取消勾选、被禁用、不从它归纳、清掉它的)时,它的记录一并去掉。有去掉的返回 true。 */
+    /** When an app is no longer noted (deselected, disabled, not noted from, or its data cleared), its entries are dropped too. Returns true if anything was dropped. */
     fun removePackages(keep: (String) -> Boolean): Boolean = entries.removeAll { !keep(it.packageName) }
 
     /**
-     * 这个键([keyId] 是通知键的哈希)其实是一条被反复重发的状态显示(见 [LiveUpdates]):它从 [sinceMs] 起记下、还没做分段归纳的那几段去掉。
-     * 更早的(同一个键上以前的正常通知)和已经归纳过的不动(句子已经写出来了,原文留着给它作依据)。有去掉的返回 true。
+     * This key ([keyId] is the hash of the notification key) turned out to be a repeatedly reposted status display (see [LiveUpdates]): drop the pieces recorded since [sinceMs] that have not been noted yet.
+     * Earlier ones (previous normal notifications on the same key) and ones already noted stay put (the sentences have already been written and keep the original text as their evidence). Returns true if anything was dropped.
      */
     fun removeKey(keyId: String, sinceMs: Long, untilMs: Long = Long.MAX_VALUE): Boolean =
         entries.removeAll { it.keyId == keyId && !it.noted && it.atMs in sinceMs..untilMs }
 
-    /** 现在留着哪些 App 的通知原文(只有包名,不带内容)。 */
+    /** Which apps' notification originals are currently held (package names only, no content). */
     fun packages(): Set<String> = entries.mapTo(LinkedHashSet()) { it.packageName }
 
-    /** 全部清掉,从现在重新开始记。 */
+    /** Clears everything and starts recording again from now. */
     fun clear() {
         entries.clear()
         sinceMs = clock()
@@ -203,7 +203,7 @@ class NoticeJournal(
 
     companion object {
         const val CAPACITY = 2_000
-        /** 原文留多久:今天和昨天。 */
+        /** How long originals are kept: today and yesterday. */
         const val KEEP_MS = 48 * 3_600_000L
     }
 }
