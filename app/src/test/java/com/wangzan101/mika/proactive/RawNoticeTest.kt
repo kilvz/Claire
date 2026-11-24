@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** StatusBarNotification 之后那一半(纯映射);读系统对象的那一半要在真机上验。 */
+/** The half that comes after StatusBarNotification (pure mapping); the half that reads system objects has to be verified on a real device. */
 class RawNoticeTest {
     private val raw = RawNotice("k", "com.tencent.mm", 42, "张三", null, "一行", emptyList(), false, 0, false, true, null)
 
@@ -32,7 +32,7 @@ class RawNoticeTest {
         assertFalse(plain.groupSummary || plain.foregroundService || plain.ongoing)
     }
 
-    // 会话名、是不是群:只有带会话样式的才往下传
+    // Conversation name and whether it is a group: only propagated for notifications that carry the conversation style
     @Test fun conversationNameAndGroupOnlyComeFromMessagingStyle() {
         val styled = raw.copy(messagingStyle = true, title = "爬山群: 张三", conversationTitle = "爬山群", groupConversation = true).toRecord()
         assertEquals("爬山群", styled.conversationTitle)
@@ -42,7 +42,7 @@ class RawNoticeTest {
         assertEquals(null, plain.group)
     }
 
-    // 重要程度在「默认」以下的是不出声的;拿不到重要程度时当会出声
+    // Importance below "default" means silent; when the importance is unavailable it is treated as audible
     @Test fun lowImportanceMeansSilent() {
         assertFalse(raw.toRecord().silent)
         assertTrue(raw.copy(importance = 2).toRecord().silent)

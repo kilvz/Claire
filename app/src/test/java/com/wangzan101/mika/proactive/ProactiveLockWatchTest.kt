@@ -32,7 +32,7 @@ class ProactiveLockWatchTest {
         }
     }
 
-    // 熄屏时没有轮询,过多久都不读
+    // No polling while the screen is off, and nothing is read no matter how long passes
     @Test fun noPollWhileScreenOff() = runTest {
         val w = watch()
         w.start()
@@ -42,14 +42,14 @@ class ProactiveLockWatchTest {
         advanceTimeBy(3_600_000); runCurrent()
         assertEquals(before, reads)
         assertNull(w.pollJob)
-        // 熄屏时锁屏界面不在(刚熄、还没上锁)也一样
+        // Same when the keyguard is not up while the screen is off (just turned off, not yet locked)
         keyguardLocked = false
         w.refresh()
         assertTrue(w.locked.value)
         assertNull(w.pollJob)
     }
 
-    // 亮着但锁屏界面还在:轮询,直到读到解锁就停;之后不再读
+    // Screen on but the keyguard still up: poll until an unlock is read, then stop; no reads afterwards
     @Test fun pollStopsOnUnlock() = runTest {
         val w = watch()
         w.start()
@@ -58,7 +58,7 @@ class ProactiveLockWatchTest {
         assertNotNull(w.pollJob)
         ticks(3)
         assertTrue(w.locked.value)
-        keyguardLocked = false // 锁屏界面退下,没有广播
+        keyguardLocked = false // the keyguard goes away, with no broadcast
         ticks(1)
         assertFalse(w.locked.value)
         assertNull(w.pollJob)
@@ -67,19 +67,19 @@ class ProactiveLockWatchTest {
         assertEquals(after, reads)
     }
 
-    // 轮询中熄屏:下一次读到熄屏就停
+    // Screen goes off while polling: stop at the next read that sees the screen off
     @Test fun pollStopsWhenScreenGoesOff() = runTest {
         val w = watch()
         interactive = true
         w.start()
         assertNotNull(w.pollJob)
-        interactive = false // 广播还没到,轮询自己读到
+        interactive = false // the broadcast has not arrived yet; polling reads it itself
         ticks(1)
         assertNull(w.pollJob)
         val after = reads
         ticks(20)
         assertEquals(after, reads)
-        // 广播先到也一样立刻停
+        // Same immediate stop when the broadcast arrives first
         interactive = true
         w.refresh()
         assertNotNull(w.pollJob)
@@ -91,7 +91,7 @@ class ProactiveLockWatchTest {
         assertEquals(now, reads)
     }
 
-    // 停止看守就停轮询;停着时广播来了也不开
+    // Stopping the watch stops polling; while stopped, an incoming broadcast does not start it again
     @Test fun stopCancelsAndKeepsPollOff() = runTest {
         val w = watch()
         interactive = true
@@ -106,7 +106,7 @@ class ProactiveLockWatchTest {
         assertEquals(after, reads)
     }
 
-    // 解锁 → 再锁 → 亮屏:轮询重新开起来
+    // Unlock -> lock again -> screen on: polling starts up again
     @Test fun pollRestartsOnTheNextLockedScreenOn() = runTest {
         val w = watch()
         interactive = true

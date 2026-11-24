@@ -110,7 +110,7 @@ class RunStoreTest {
         assertEquals(sum.startedAtMs + 5_000, sum.endedAtMs)
     }
 
-    // 跑起来过的运行关上时记一份小结;交出回答后判的结局补进去;记录清掉了小结还在
+    // A run that actually started records a summary when it closes; an outcome judged after the answer was handed out is added later; the summary survives the record being pruned
     @Test fun closingWritesMetricsThatOutliveTheRecord() {
         val s = store(keep = 1)
         val h = s.open("查天气")
@@ -145,7 +145,7 @@ class RunStoreTest {
         }
         val left = s.list().map { it.id }
         assertEquals(30, left.size)
-        assertEquals(ids.drop(5).reversed(), left) // 新的在前
+        assertEquals(ids.drop(5).reversed(), left) // newest first
         ids.take(5).forEach { assertFalse(tmp.root.resolve("files/runs/$it").exists()) }
     }
 
@@ -193,7 +193,7 @@ class RunStoreTest {
         val h = s.open("g")
         val t0 = System.nanoTime()
         h.media(1, byteArrayOf(1))
-        assertTrue(entered.await(5, TimeUnit.SECONDS)) // 写线程卡在第 1 张上
+        assertTrue(entered.await(5, TimeUnit.SECONDS)) // the writer thread is stuck on frame 1
         for (id in 2..20) h.media(id, byteArrayOf(id.toByte()))
         repeat(50) { h.event(RunEvent.State(clock, "x", "$it")) }
         val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)
@@ -201,7 +201,7 @@ class RunStoreTest {
         release.countDown()
         h.close()
         val saved = (1..20).filter { s.screen(h.runId, it) != null }
-        // 卡住的那张 + 积压里最新的几张
+        // The stuck frame plus the newest few from the backlog
         assertEquals(listOf(1) + (21 - RunHandle.MAX_PENDING_FRAMES..20).toList(), saved)
         assertEquals(50, s.events(h.runId).size)
     }

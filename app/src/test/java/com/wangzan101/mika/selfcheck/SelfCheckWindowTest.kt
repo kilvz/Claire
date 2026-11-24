@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 自检读屏按窗口归属认控件,不把合并节点和最上层窗口的包名混为一谈。 */
+/** Self-check screen reading attributes controls by window and does not conflate merged nodes with the package name of the topmost window. */
 class SelfCheckWindowTest {
     @Test
     fun systemWindowAboveCompleteMikaContentIsReady() {

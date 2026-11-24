@@ -37,8 +37,8 @@ class TopicPoolFileTest {
         }
     }
 
-    // 有并掉的话题名的文件写成第 2 版:只认第 1 版的代码读它会把这些名字丢掉,所以让它认不得、不去碰;
-    // 没有的时候和第 1 版写出来的一样,还写 1
+    // A file with merged topic names is written as version 2: code that only knows version 1 would drop those names when reading it, so it is made unreadable to such code, which then leaves it alone;
+    // without merged names it is written exactly like version 1, and still says 1
     @Test fun aFileWithMergedNamesIsVersionTwo() {
         fun version() = kotlinx.serialization.json.Json.parseToJsonElement(AesGcmKeyCipher { key }.decrypt(bin.readBytes()).toString(Charsets.UTF_8))
             .let { (it as kotlinx.serialization.json.JsonObject)["version"].toString() }
@@ -47,9 +47,9 @@ class TopicPoolFileTest {
         val merged = data.copy(merged = mapOf("0123456789abcdef" to "k1"))
         file().save(merged)
         assertEquals("2", version())
-        // (最外层的版本号也读进了数据类里那一项;话题池不看它)
+        // (the outermost version number is also read into that field of the data class; the topic pool ignores it)
         assertEquals(merged.copy(version = 2), file().load())
-        // 并进去的话题没了、别名跟着没了之后,又是第 1 版
+        // Once the merged topics are gone and the aliases go with them, it is version 1 again
         file().save(data)
         assertEquals("1", version())
     }
@@ -61,7 +61,7 @@ class TopicPoolFileTest {
         assertFalse(bin.exists())
         val aside = File(tmp.root, "proactive").listFiles { f -> f.name.startsWith("topics.bin.broken-") }.orEmpty()
         assertEquals(1, aside.size)
-        // 之后照常存取
+        // Saving and loading work as usual afterwards
         file().save(data)
         assertEquals(data, file().load())
         bin.writeBytes(byteArrayOf(1, 2, 3))
@@ -69,7 +69,7 @@ class TopicPoolFileTest {
         assertTrue(File(tmp.root, "proactive").listFiles { f -> f.name.startsWith("topics.bin.broken-") }!!.size == 2)
     }
 
-    // 早先的文件里还有一个序号(后来 id 改成随机的,不再有):照常读出来,旧的 id 原样留着
+    // Older files also carried a sequence number (ids later became random, so it is gone): they load as usual, with the old ids kept as they are
     @Test fun oldFileWithASequenceNumberStillLoads() {
         val old = """{"version":1,"seq":7,"topics":[{"id":"k7","kind":"interest","label":"Hiking","firstSeenMs":3,"lastSeenMs":4}]}"""
         bin.parentFile!!.mkdirs()
@@ -77,7 +77,7 @@ class TopicPoolFileTest {
         assertEquals(TopicPoolData(topics = listOf(ObservedTopic("k7", TopicKind.Interest, "Hiking", 3L, 4L))), file().load())
     }
 
-    // 用户删了东西时:另存的旧文件删掉,现在的那份不动
+    // When the user deletes something: the set-aside old files are deleted, the current one is untouched
     @Test fun dropBrokenRemovesOnlyTheSetAsideCopies() {
         file().save(data)
         bin.writeBytes(byteArrayOf(1, 2, 3))
@@ -88,11 +88,11 @@ class TopicPoolFileTest {
         file().dropBroken()
         assertEquals(listOf("topics.bin"), dir.list()!!.toList())
         assertEquals(data, file().load())
-        // 没有可删的也不出错
+        // No error when there is nothing to delete
         file().dropBroken()
     }
 
-    // 「清空全部」:文件、临时文件、另存的旧文件都删掉;目录还没有时也不出错
+    // "Clear all": the file, the temp file and any set-aside old files are all deleted; no error when the directory does not exist yet
     @Test fun wipeRemovesEverything() {
         file().wipe()
         file().save(data)

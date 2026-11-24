@@ -37,16 +37,16 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TriageRunnerTest {
-    /** 每次调用都等测试放行([release]),或直接按 [reply] 回。 */
+    /** Each call waits for the test to release it ([release]), or replies straight from [reply]. */
     private class Fake(var reply: () -> String = { "" }) : ChatModel {
         override val capabilities = Capabilities(toolCalls = false, vision = false, contextTokens = 8_000, reasoning = false)
         val calls = mutableListOf<List<Message>>()
         val tools = mutableListOf<List<ToolSpec>>()
         var gate: CompletableDeferred<Unit>? = null
         var cancelled = 0
-        /** 设了就每次调用都抛它(连不上模型之类)。 */
+        /** When set, every call throws it (model unreachable and so on). */
         var error: Exception? = null
-        /** 设了就在下一次调用里不理取消:等它放行后抛「预算用完」(只用一次)。 */
+        /** When set, the next call ignores cancellation: once released it throws "budget exhausted" (used only once). */
         var late: CompletableDeferred<Unit>? = null
         override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
             calls += messages
@@ -77,7 +77,7 @@ class TriageRunnerTest {
         var on = true
         var consent: TriageConsent? = TriageConsent.of(target)
         var effective: TriageTarget? = target
-        /** 建模型那一次读到的目标(null 时同 [effective]):模拟两次读配置之间被改了。 */
+        /** The target read at model-build time (same as [effective] when null): simulates the configuration changing between the two reads. */
         var built: TriageTarget? = null
         val model = Fake()
         var tokens = 0L
@@ -85,9 +85,9 @@ class TriageRunnerTest {
         var limit = ProactiveBudget.DEFAULT_DAILY_LIMIT
         var models = 0
         var modelError: Exception? = null
-        /** 读「现在配的是哪个模型」这一步出错(配置一时读不出来)。 */
+        /** The step that reads "which model is configured now" fails (the configuration cannot be read temporarily). */
         var targetError: Exception? = null
-        /** 读锁屏状态这一步出错。 */
+        /** The step that reads the lock state fails. */
         var lockReadFails = false
         val runner = TriageRunner(
             inbox,
@@ -110,7 +110,7 @@ class TriageRunnerTest {
         private var watching: kotlinx.coroutines.Job? = null
         private val scope0 = scope
 
-        /** 停下看守再开始(开关关了又开、回到前台)。 */
+        /** Stop the watch and start it again (the switch was turned off and back on, app back in the foreground). */
         fun restart() {
             watching?.cancel()
             scope0.runCurrent()
@@ -151,7 +151,7 @@ class TriageRunnerTest {
         assertEquals(TriageDecision.Remember, (marks.getValue("a") as TriageMark.Done).verdict.decision)
         assertEquals(TriageStatus.Idle, e.runner.state.value.status)
         assertFalse(e.runner.timerActive)
-        // 没新东西就不再发
+        // Nothing new means nothing more is sent
         wait(3_600_000)
         assertEquals(1, e.model.calls.size)
     }
@@ -167,7 +167,7 @@ class TriageRunnerTest {
         wait(24 * 3_600_000L)
         assertTrue(e.model.calls.isEmpty())
         assertEquals(0, e.models)
-        // 解锁后才发(早已过了凑批的时间,马上发)
+        // Only sent after unlocking (the batching window passed long ago, so it sends right away)
         e.locked.value = false
         runCurrent()
         assertEquals(1, e.model.calls.size)
@@ -202,7 +202,7 @@ class TriageRunnerTest {
         assertEquals("照旧待判定,不算失败", 1, s.counts.pending)
         assertEquals(0, s.counts.failed)
         assertNull(s.marks["a"])
-        // 解锁后再发一次
+        // Send once more after unlocking
         e.model.gate = null
         e.model.reply = { ok("n1") }
         e.locked.value = false
@@ -211,7 +211,7 @@ class TriageRunnerTest {
         assertEquals(1, e.runner.state.value.counts.judged)
     }
 
-    // 锁屏取消了请求,模型却不理取消、晚些时候才回来;这期间解锁后新的一批已经在发:晚回来的那次什么都不能动
+    // The lock cancelled the request, but the model ignores cancellation and only returns later; meanwhile, after unlocking, a new batch is already being sent: the late return must not touch anything
     @Test fun staleRequestReturningLateDoesNotTouchTheNewerBatch() = runTest {
         val e = Env(this)
         e.model.reply = { ok("n1") }
@@ -228,7 +228,7 @@ class TriageRunnerTest {
         runCurrent()
         assertEquals(2, e.model.calls.size)
         assertTrue(e.runner.requestActive)
-        // 第一次请求这时才回来(按「预算用完」)
+        // The first request only comes back now (reported as "budget exhausted")
         late.complete(Unit)
         runCurrent()
         assertTrue("新的一批还在发", e.runner.requestActive)
@@ -301,14 +301,14 @@ class TriageRunnerTest {
         wait(TriagePlanner.WINDOW_MS * 3)
         assertEquals(TriageStatus.NeedsConsent, e.runner.state.value.status)
         assertEquals(0, e.models)
-        // 重新确认后才发
+        // Only sent after the consent is confirmed again
         e.consent = TriageConsent.of(e.effective!!)
         e.runner.poke()
         runCurrent()
         assertEquals(1, e.model.calls.size)
     }
 
-    // 门口查同意时是同意过的模型,建模型时配置已被改成别的:不发,照旧待判定,等用户重新确认
+    // The consent gate saw the consented model, but by the time the model was built the configuration had been switched to another one: nothing is sent, the items stay pending and wait for the user to confirm again
     @Test fun targetChangedBetweenTheGateAndTheBuildSendsNothing() = runTest {
         val e = Env(this)
         e.model.reply = { ok("n1") }
@@ -321,7 +321,7 @@ class TriageRunnerTest {
         assertEquals(TriageStatus.NeedsConsent, e.runner.state.value.status)
         assertEquals(1, e.runner.state.value.counts.pending)
         assertTrue(e.runner.state.value.marks.isEmpty())
-        // 配置回到同意过的那个:照常发
+        // The configuration is back to the consented one: it sends as usual
         e.built = null
         e.runner.poke()
         runCurrent()
@@ -377,7 +377,7 @@ class TriageRunnerTest {
         assertEquals(3, e.runner.state.value.counts.judged)
     }
 
-    // 建模型出错(比如解不开 Key):这一批算失败,看守不被带垮,之后的照常处理
+    // Building the model fails (e.g. the key cannot be decrypted): this batch counts as failed, the watch is not dragged down with it, and later batches are handled as usual
     @Test fun modelConstructionErrorFailsTheBatchAndKeepsRunning() = runTest {
         val e = Env(this)
         e.modelError = IllegalStateException("key")
@@ -407,7 +407,7 @@ class TriageRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.judged)
         val judgedAt = currentTime
-        // 聊天接着说:同一个键每 20 秒重发一次,冷却(2 分钟)期间一个请求都不发
+        // The chat keeps going: the same key is reposted every 20 seconds, and no request is sent during the cooldown (2 minutes)
         e.post("a", at = 50)
         runCurrent()
         assertEquals(1, e.runner.state.value.counts.cooling)
@@ -419,7 +419,7 @@ class TriageRunnerTest {
         wait(judgedAt + 120_000 - currentTime - 1)
         assertEquals(1, e.model.calls.size)
         assertNull("正在显示的是旧结果", e.runner.state.value.marks["a"]?.takeIf { it.postedAtMs == 70L })
-        // 到点后照常凑批,一次请求带上攒下的
+        // When it ends, batching resumes as usual and one request carries the accumulated items
         wait(1 + TriagePlanner.WINDOW_MS)
         assertEquals(2, e.model.calls.size)
         assertEquals(0, e.runner.state.value.counts.cooling)
@@ -431,7 +431,7 @@ class TriageRunnerTest {
     @Test fun chattyAppCostsAFewRequestsNotOneEveryTwentySeconds() = runTest {
         val e = Env(this)
         e.model.reply = { ok("n1") }
-        // 十分钟里每 5 秒一句;第一批发出去后让请求拖 3 秒,期间正好来一句
+        // One message every 5 seconds for ten minutes; after the first batch is sent the request is held for 3 seconds, and a message arrives exactly during that window
         var at = 1L
         e.post("a", at = at)
         wait(TriagePlanner.WINDOW_MS - 1)
@@ -449,7 +449,7 @@ class TriageRunnerTest {
             e.post("a", at = ++at)
             wait(5_000)
         }
-        // 判定 0s+20s;冷却 2 分钟+凑批 20 秒、5 分钟+20 秒,第三次在 ~8 分钟时,之后冷却 15 分钟
+        // Triage at 0 s + 20 s; cooldown 2 min + 20 s batching, then 5 min + 20 s, the third one at ~8 min, followed by a 15-minute cooldown
         assertEquals(3, e.model.calls.size)
     }
 
@@ -478,7 +478,7 @@ class TriageRunnerTest {
         wait(TriagePlanner.WINDOW_MS)
         assertEquals(1, e.model.calls.size)
         val failedAt = currentTime
-        // 模型坏着,聊天每 20 秒一句:停着的 2 分钟里一个请求都不发
+        // The model is broken and the chat posts every 20 seconds: no request is sent during the 2-minute hold
         var at = 1L
         while (currentTime < failedAt + 120_000 - 20_000) {
             e.post("a", at = ++at)
@@ -488,11 +488,11 @@ class TriageRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals("停着的算失败", 1, e.runner.state.value.counts.failed)
         assertEquals(0, e.runner.state.value.counts.pending)
-        // 到点后凑批,只发一次
+        // After the hold, batch the items and send only once
         wait(1 + TriagePlanner.WINDOW_MS)
         assertEquals(2, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.failed)
-        // 再失败:没有新内容,不再自动发
+        // It fails again: with nothing new, nothing is sent automatically any more
         wait(3_600_000)
         assertEquals(2, e.model.calls.size)
     }
@@ -544,7 +544,7 @@ class TriageRunnerTest {
         assertEquals("到判定那份(整份还剩两成)就停", 1, e.model.calls.size)
         assertEquals(TriageStatus.TokensUsedUp, e.runner.state.value.status)
         assertFalse(e.runner.timerActive)
-        // 用户调高上限:接着判
+        // The user raises the limit: triage carries on
         e.limit = 2 * ProactiveBudget.DEFAULT_DAILY_LIMIT
         e.runner.budgetChanged()
         runCurrent()
@@ -565,8 +565,8 @@ class TriageRunnerTest {
         assertEquals(1, e.model.calls.size)
     }
 
-    // 看一遍时读配置出了一次错:在发的请求不动(它已经算过钱,取消了回头还得再发一遍),只是这一回不发新的;
-    // 配置读得出来之后照常
+    // A configuration read fails during one check: the in-flight request is left alone (its cost has already been counted, and cancelling it would only mean sending it again later), only no new one is sent this time;
+    // once the configuration can be read again, everything proceeds as usual
     @Test fun aFailedConfigurationReadLeavesTheRequestInFlightAlone() = runTest {
         val e = Env(this)
         e.model.gate = CompletableDeferred()
@@ -587,12 +587,12 @@ class TriageRunnerTest {
         e.model.gate = null
         runCurrent()
         wait(TriagePlanner.WINDOW_MS)
-        // 原来那一个没有重发;出错期间来的那条随后照常判
+        // The original one was not resent; the item that arrived during the failure is triaged as usual afterwards
         assertEquals(listOf("com.chat", "com.other"), e.model.packages())
         assertEquals(0, e.runner.state.value.counts.failed)
     }
 
-    // 锁屏状态读不出来的时候不能留着请求:锁屏不发是硬规矩,不知道锁没锁就当锁了
+    // A request must not be left running when the lock state cannot be read: not sending while locked is a hard rule, so an unknown lock state is treated as locked
     @Test fun aFailedLockReadStopsTheRequest() = runTest {
         val e = Env(this)
         e.model.gate = CompletableDeferred()
@@ -606,8 +606,8 @@ class TriageRunnerTest {
         assertEquals(1, e.model.cancelled)
     }
 
-    // 连不上模型时整个停一阵:只按会话各自冷却的话,每来一个新会话都会再连一次,来得多时就是不停地重连。
-    // 那一批不算失败,照旧待判定;连续连不上停得越久;连上了照常判
+    // When the model is unreachable, triage pauses as a whole: with only per-conversation cooldowns, every new conversation would trigger another connection attempt, and with many of them that means reconnecting non-stop.
+    // That batch does not count as failed and stays pending; consecutive failures pause for longer; once reachable again, triage proceeds as usual
     @Test fun anUnreachableModelPausesTriageAsAWhole() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Network()
@@ -616,12 +616,12 @@ class TriageRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(0, e.runner.state.value.counts.failed)
         assertEquals(1, e.runner.state.value.counts.pending)
-        // 又来了四个新会话(别的 App 的也一样):都不再连
+        // Four more conversations arrive (including from other apps): no further connection attempts
         e.post("b", at = 2); e.post("c", at = 3); e.post("d", pkg = "com.other", at = 4); e.post("e", pkg = "com.mail", at = 5)
         wait(TriagePlanner.WINDOW_MS)
         assertEquals(1, e.model.calls.size)
         assertEquals(TriageStatus.Unreachable, e.runner.state.value.status)
-        // 停着的时候锁屏:到点再看的那个计时取消(息屏不留计时),解锁后接着停
+        // Locking while paused: the timer that would re-check when the pause ends is cancelled (no timers are left while the screen is off), and the pause continues after unlocking
         assertTrue(e.runner.timerActive)
         e.locked.value = true
         runCurrent()
@@ -630,12 +630,12 @@ class TriageRunnerTest {
         runCurrent()
         assertEquals(TriageStatus.Unreachable, e.runner.state.value.status)
         assertEquals(1, e.model.calls.size)
-        // 停够第一级:再连一次,还是连不上,这回停第二级那么久
+        // The first backoff level elapses: one more attempt, still unreachable, so this time it pauses for the second level
         wait(TriagePlanner.BACKOFF_MS[0])
         assertEquals(2, e.model.calls.size)
         wait(TriagePlanner.BACKOFF_MS[0])
         assertEquals(2, e.model.calls.size)
-        // 网络好了:到点接着判,一条都没丢、没有记成失败
+        // The network is back: triage resumes when due, nothing was lost and nothing was recorded as failed
         e.model.error = null
         e.model.reply = { ok("n1", "n2", "n3") }
         wait(TriagePlanner.BACKOFF_MS[1])
@@ -645,7 +645,7 @@ class TriageRunnerTest {
         assertEquals(5, e.runner.state.value.counts.judged)
     }
 
-    // 别的失败(模型回了错、回复读不懂)照旧只记在那一批上,不让整个停下
+    // Other failures (the model returned an error, or the reply cannot be parsed) are still recorded only against that batch and do not pause everything
     @Test fun otherFailuresDoNotPauseTriageAsAWhole() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Server(500)
@@ -660,7 +660,7 @@ class TriageRunnerTest {
         assertEquals(1, e.runner.state.value.counts.judged)
     }
 
-    // 连不上而停着的时候用户点了「再试一次」:马上再连
+    // When the user taps "try again" while paused for unreachability: it reconnects immediately
     @Test fun retryingByHandEndsTheUnreachablePause() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Network()
@@ -676,8 +676,8 @@ class TriageRunnerTest {
         assertEquals(1, e.runner.state.value.counts.judged)
     }
 
-    // 连上了却等到超时也没回应(模型忙、很慢):也让整个停一阵,不接着一条条地问。
-    // 超时的那一批记成失败(可能是这一批本身的问题,不自动重发),页面上「再试一次」点得到
+    // Connected but no response before the timeout (the model is busy or very slow): this too pauses everything instead of asking item by item.
+    // The timed-out batch is recorded as failed (the problem may lie with that batch itself, so it is not resent automatically), and "try again" stays available on the page
     @Test fun aTimeoutAlsoPausesTriageAsAWhole() = runTest {
         val e = Env(this)
         e.model.gate = CompletableDeferred()
@@ -698,10 +698,10 @@ class TriageRunnerTest {
         assertEquals(1, e.runner.state.value.counts.judged)
     }
 
-    // 「换没换模型」按服务商 id 和模型名认:两次读配置给的不是同一个对象、显示名改了,都不算换,照样停着
+    // Whether "the model changed" is judged by provider id and model name: two configuration reads returning different objects, or a changed display name, do not count as a change, and the pause holds
     @Test fun theUnreachablePauseHoldsWhileTheSameModelIsConfigured() = runTest {
         val e = Env(this)
-        // 建模型那一次读到的是另一个对象,显示名也不一样
+        // The read at model-build time returned a different object, and the display name differs too
         e.built = TriageTarget(target.providerId, "Renamed", target.model)
         e.model.error = ModelError.Network()
         e.post("a")
@@ -714,14 +714,14 @@ class TriageRunnerTest {
         assertEquals(TriageStatus.Unreachable, e.runner.state.value.status)
     }
 
-    // 因为连不上而停着,不该比原因活得久:换了服务商或模型、重新开始看守,都马上再试
+    // A pause caused by unreachability must not outlive its cause: changing the provider or model, or restarting the watch, retries immediately
     @Test fun theUnreachablePauseEndsWhenTheModelChangesOrTheWatchRestarts() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Network()
         e.post("a")
         wait(TriagePlanner.WINDOW_MS)
         assertEquals(TriageStatus.Unreachable, e.runner.state.value.status)
-        // 换了模型(同意也跟着换)
+        // The model is changed (the consent switches along with it)
         val other = TriageTarget("p2", "Other", "m2")
         e.effective = other
         e.consent = TriageConsent.of(other)
@@ -733,7 +733,7 @@ class TriageRunnerTest {
         assertEquals(2, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.judged)
 
-        // 重新开始看守
+        // Restart the watch
         val again = Env(this)
         again.model.error = ModelError.Network()
         again.post("a")

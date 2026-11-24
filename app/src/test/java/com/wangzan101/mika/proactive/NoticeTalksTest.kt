@@ -51,7 +51,7 @@ class NoticeTalksTest {
         assertEquals("succeeded", turn.status)
         assertEquals("notice:id1", turn.runId)
         assertTrue(NoticeTurn.isNotice(turn))
-        // 设成了当前对话(悬浮窗的卡片接着它),侧栏里有、有标题
+        // Set as the current conversation (the floating window's card continues in it): it shows up in the sidebar and has a title
         assertEquals(CurrentChat.Open(id), store.currentChat())
         assertEquals("Notifications · Oct 4", store.list().single { it.id == id }.title)
         assertEquals(id, t.today(t0))
@@ -67,7 +67,7 @@ class NoticeTalksTest {
         assertEquals(listOf(true, false, true), store.turns(id).map(NoticeTurn::isNotice))
         assertEquals("title", store.title(id))
         assertEquals(CurrentChat.Open(id), store.currentChat())
-        // 换一个进程(同一份记录)也接得上
+        // A different process (same records) picks it up just the same
         assertEquals(id, talks().today(t0 + 4 * 3_600_000L))
     }
 
@@ -84,7 +84,7 @@ class NoticeTalksTest {
         assertNotEquals(second, third)
     }
 
-    // 分支带着提醒那一轮的,新对话照样认得出(保护跟着走);从提醒之前分出去的不带
+    // A branch that carries the notice turn is still recognized in the new conversation (the protection follows along); one branched off before the notice does not
     @Test fun branchingKeepsTheNoticeTurn() {
         store.append("x", Turn("你好", "你好!", "succeeded", runId = "r0"))
         val prefs = ProactivePrefs(raw)
@@ -96,7 +96,7 @@ class NoticeTalksTest {
         assertTrue(NoticeTurn.tainted(store.turns("with")))
         assertTrue(store.branchBefore(id, "without", beforeTurn = 1))
         assertFalse(NoticeTurn.tainted(store.turns("without")))
-        // 重新读(换一个进程)也还认得
+        // Still recognized after re-reading (a different process)
         assertTrue(NoticeTurn.tainted(ConversationStore(tmp.root.resolve("c")).turns(id)))
     }
 
@@ -112,14 +112,14 @@ class NoticeTalksTest {
         val id = t.open(h, t0, ::draft)!!
         assertEquals(listOf("b,a"), store.turns(id).map { it.outcome })
         assertEquals(0, h.state.value.unseen)
-        // 没有新的:什么都不写,回到同一个对话
+        // Nothing new: write nothing and return to the same conversation
         assertEquals(id, t.open(h, t0 + 1, ::draft))
         assertEquals(1, store.turns(id).size)
-        // 一个都没有、今天也没开过:null
+        // No hints at all and nothing opened today either: null
         assertNull(talks().open(NoticeHints(), t0 + day, ::draft))
     }
 
-    // 连点两下、两个入口同时点:同样几条只写一遍
+    // Double taps, or two entry points tapped at once: the same hints are written only once
     @Test fun overlappingOpensWriteTheSameHintsOnce() = runTest {
         val io = StandardTestDispatcher(testScheduler)
         val t = talks(io)
@@ -133,7 +133,7 @@ class NoticeTalksTest {
         assertEquals(2, h.state.value.seenTotal)
     }
 
-    // 写的过程中新来的提醒没给用户看过:不算看过,下次点开再写
+    // Hints that arrive during the write were never shown to the user: they do not count as seen and are written on the next open
     @Test fun hintsArrivingDuringTheWriteStayUnseen() = runTest {
         val t = talks()
         val a = rec("a", 1); val b = rec("b", 2)
@@ -148,7 +148,7 @@ class NoticeTalksTest {
         assertEquals(listOf("a", "b"), store.turns(id).map { it.outcome })
     }
 
-    // 写不进去:抛出来,那几条不算看过
+    // The write fails: the error propagates and those hints do not count as seen
     @Test fun aFailedWriteLeavesTheHintsUnseen() = runTest {
         val h = board(rec("a", 1))
         try {
@@ -158,7 +158,7 @@ class NoticeTalksTest {
         assertEquals(1, h.state.value.unseen)
     }
 
-    // 一条消息最多列 6 条:第 7 条没写进对话,就不能算看过——它留着,提醒的数字还在,再点一次接着列出来
+    // A message lists at most 6 items: the 7th one did not make it into the conversation, so it cannot count as seen — it stays, the reminder count still reflects it, and the next open lists it
     @Test fun hintsThatDidNotFitInTheMessageStayUnseen() = runTest {
         val store = ConversationStore(tmp.newFolder("conversations-fit"))
         val talks = NoticeTalks(store, ProactivePrefs(FeatureFlagsCapsuleTest.MemoryPrefs()), { ZoneOffset.UTC }, io = Dispatchers.Unconfined)
@@ -167,7 +167,7 @@ class NoticeTalksTest {
             h.sync(records, records.associate { it.key to TriageMark.Done(it.postedAtMs, TriageVerdict(TriageDecision.Surface, "why")) }, true)
         }
         val copy = NoticeTalk.Copy({ "showing $it" }, { "reason $it" }, { "and $it more" }, "reply if needed")
-        // 和 ProactiveRuntime.openHintTalk 一样的写法
+        // Built the same way as ProactiveRuntime.openHintTalk
         val draft: (List<NoticeHint>) -> NoticeTalks.Draft? = { fresh ->
             NoticeTalk.compose(fresh.map { NoticeTalk.Item("chat", "09:00", it.title, it.text, it.reason) }, copy)
                 ?.let { NoticeTalks.Draft(it.text, "notices", it.shown) }
@@ -179,7 +179,7 @@ class NoticeTalksTest {
         for (i in 2..7) assertTrue("$i", "unique-private-text-$i" in first)
         assertTrue("and 1 more" in first)
         assertEquals(1, board.state.value.unseen)
-        // 再点一次:剩下的那一条列出来,这回都看过了
+        // Open once more: the remaining one is listed, and this time everything has been seen
         assertEquals(conversation, talks.open(board, 1_700_000_000_000, draft))
         val second = store.turns(conversation).last().outcome
         assertTrue("unique-private-text-1" in second)

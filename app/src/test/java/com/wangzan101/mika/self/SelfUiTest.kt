@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 进程内自身请求:只留最新一条,处理完只清同一条。 */
+/** In-process self requests: only the latest one is kept, and completing it clears only that same one. */
 class SelfUiTest {
     @Test fun latestRequestWins() {
         val ui = SelfUi()

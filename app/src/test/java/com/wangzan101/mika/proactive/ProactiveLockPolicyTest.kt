@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProactiveLockPolicyTest {
-    // 下面三个:照着返回的动作做,给了补收就当通知栏读成了(运行时读成之后会说一声 caughtUp)。读不成的情况另有测试
+    // The three below: follow the returned actions, and treat a catch-up as a successful read of the notification shade (the runtime calls `caughtUp` after a successful read). The read-failure cases have their own tests
     private fun ProactiveLockPolicy.startOk(locked: Boolean, connected: Boolean) = start(locked, connected).also { if (Action.CatchUp in it) caughtUp() }
     private fun ProactiveLockPolicy.unlockedOk(connected: Boolean) = unlocked(connected).also { if (Action.CatchUp in it) caughtUp() }
     private fun ProactiveLockPolicy.connectedOk(locked: Boolean, nowMs: Long) = connected(locked, nowMs).also { if (Action.CatchUp in it) caughtUp() }
@@ -17,7 +17,7 @@ class ProactiveLockPolicyTest {
         val p = ProactiveLockPolicy(100)
         assertEquals(emptyList<Action>(), p.startOk(locked = true, connected = false))
         assertEquals(100L, p.lockedAtMs)
-        // 同一段锁着里再看到锁着,不改锁屏时间
+        // Seeing locked again inside the same locked stretch does not change the lock time
         assertEquals(emptyList<Action>(), p.locked(500, connected = false))
         assertEquals(100L, p.lockedAtMs)
         assertEquals(listOf(Action.Rebind), p.unlockedOk(connected = false))
@@ -37,9 +37,9 @@ class ProactiveLockPolicyTest {
         p.startOk(locked = false, connected = true)
         p.locked(1_000, connected = true)
         assertEquals(listOf(Action.Rebind), p.unlockedOk(connected = false))
-        assertEquals(emptyList<Action>(), p.unlockedOk(connected = false)) // 已经解锁,不重复
+        assertEquals(emptyList<Action>(), p.unlockedOk(connected = false)) // already unlocked, no repeat
         p.locked(2_000, connected = true)
-        // 解绑没成功、一直连着:不会再有「连上」,直接补收
+        // The unbind failed and the listener stayed connected: there will be no further "connected", so catch up directly
         assertEquals(listOf(Action.CatchUp), p.unlockedOk(connected = true))
     }
 
@@ -53,38 +53,38 @@ class ProactiveLockPolicyTest {
     @Test fun postIgnoredBeforeTheLockBroadcastMovesTheLockTimeBack() {
         val p = ProactiveLockPolicy(0)
         p.startOk(locked = false, connected = true)
-        // 服务先读到锁着,略过了 900 发出的通知;广播在 1000 才到
+        // The service saw locked first and skipped the notification posted at 900; the broadcast only arrives at 1000
         assertEquals(listOf(Action.PersistLockedAt(899), Action.Unbind), p.ignoredWhileLocked(900, connected = true))
         assertEquals(emptyList<Action>(), p.locked(1_000, connected = false))
         assertEquals(899L, p.lockedAtMs)
-        // 更早的一条再往前挪,更晚的不动
+        // An earlier one moves the time further back, a later one leaves it alone
         assertEquals(listOf(Action.PersistLockedAt(799)), p.ignoredWhileLocked(800, connected = false))
         assertEquals(emptyList<Action>(), p.ignoredWhileLocked(950, connected = false))
         assertEquals(799L, p.lockedAtMs)
     }
 
-    // ---- 欠着的补收:锁屏时间留在最早那段还没补收的锁着的开头 ----
+    // ---- Owed catch-up: the lock time stays at the start of the earliest locked stretch not yet caught up ----
 
-    // 锁(解绑)→ 通知 N 发出 → 解锁(请重绑)→ 连上之前又锁了 → 锁着时连上(只解绑)→ 解锁、连上:补收要盖住 N
+    // Lock (unbind) -> notification N posted -> unlock (request rebind) -> locked again before connecting -> connected while locked (unbind only) -> unlock and connect: the catch-up must cover N
     @Test fun relockBeforeTheListenerConnectsKeepsTheEarlierLockTime() {
         val p = ProactiveLockPolicy(0)
         assertEquals(listOf(Action.CatchUp), p.startOk(locked = false, connected = true))
         assertEquals(listOf(Action.PersistLockedAt(1_000), Action.Unbind), p.locked(1_000, connected = true))
         val postedN = 2_000L
         assertEquals(listOf(Action.Rebind), p.unlockedOk(connected = false))
-        // 还没连上就又锁了:不往后挪,也不存
+        // Locked again before connecting: do not move the time later and do not persist it
         assertEquals(emptyList<Action>(), p.locked(3_000, connected = false))
         assertEquals(listOf(Action.Unbind), p.connectedOk(locked = true, nowMs = 3_500))
         assertEquals(1_000L, p.lockedAtMs)
         assertEquals(listOf(Action.Rebind), p.unlockedOk(connected = false))
         assertEquals(listOf(Action.CatchUp), p.connectedOk(locked = false, nowMs = 4_000))
         assertTrue("补收从 N 之前算起", p.lockedAtMs < postedN)
-        // 补收过了:下一次锁屏照常记新的锁屏时间
+        // Catch-up done: the next lock records a fresh lock time as usual
         assertEquals(listOf(Action.PersistLockedAt(5_000), Action.Unbind), p.locked(5_000, connected = true))
         assertEquals(5_000L, p.lockedAtMs)
     }
 
-    // 进程起来时没锁,第一次连上之前锁了:沿用存着的锁屏时间,直到真的补收过
+    // Unlocked when the process started, then locked before the first connect: keep the stored lock time until a catch-up has actually happened
     @Test fun lockBeforeTheFirstConnectAfterStartKeepsTheStoredLockTime() {
         val p = ProactiveLockPolicy(100)
         assertEquals(listOf(Action.Rebind), p.startOk(locked = false, connected = false))
@@ -110,7 +110,7 @@ class ProactiveLockPolicyTest {
         assertEquals(1_000L, p.lockedAtMs)
     }
 
-    // 普通的一锁一解:每次补收过后,下一次锁屏都存新的时间
+    // The ordinary lock/unlock pair: after each catch-up, the next lock persists its own time
     @Test fun eachLockAfterACatchUpPersistsItsOwnTime() {
         val p = ProactiveLockPolicy(0)
         p.startOk(locked = false, connected = true)
@@ -120,13 +120,13 @@ class ProactiveLockPolicyTest {
             assertEquals(listOf(Action.CatchUp), p.connectedOk(locked = false, nowMs = t + 100))
             assertEquals(t, p.lockedAtMs)
         }
-        // 解绑没成功、一直连着时解锁就补收,同样算补收过
+        // When the unbind failed and the listener stayed connected, unlocking catches up and likewise counts as caught up
         p.locked(4_000, connected = true)
         assertEquals(listOf(Action.CatchUp), p.unlockedOk(connected = true))
         assertEquals(listOf(Action.PersistLockedAt(5_000)), p.locked(5_000, connected = false))
     }
 
-    // 欠着补收时,略过的通知只能把锁屏时间往前挪
+    // While a catch-up is owed, a skipped notification can only move the lock time earlier
     @Test fun ignoredWhileOwedOnlyMovesTheTimeEarlier() {
         val p = ProactiveLockPolicy(1_000)
         p.startOk(locked = false, connected = false)
@@ -139,30 +139,30 @@ class ProactiveLockPolicyTest {
         assertEquals(799L, p.lockedAtMs)
     }
 
-    // 补收时通知栏读不出来(监听刚断开、系统抛异常):这一次等于没补,还欠着。
-    // 下一次锁屏不能把锁屏时间往后挪——还在通知栏里的那批是在它之前发出的,往后挪就再也补不回来
+    // The notification shade cannot be read during the catch-up (the listener just disconnected, or the system threw): this attempt does not count and the catch-up is still owed.
+    // The next lock must not move the lock time later — the batch still in the shade was posted before it, and moving the time later would make it impossible to catch up
     @Test fun aCatchUpThatCouldNotReadTheShadeIsStillOwed() {
         val p = ProactiveLockPolicy(100_000)
         p.start(locked = true, connected = false)
         assertEquals(listOf(Action.Rebind), p.unlocked(connected = false))
-        // 连上了,给出补收——但读通知栏失败,没有人说 caughtUp
+        // Connected and offered a catch-up — but reading the shade fails, so nobody calls `caughtUp`
         assertEquals(listOf(Action.CatchUp), p.connected(locked = false, nowMs = 160_000))
         assertTrue(p.catchUpOwed)
-        // 又锁了:锁屏时间留在原来那一段的开头,不存新的
+        // Locked again: the lock time stays at the start of the earlier stretch, nothing new is persisted
         assertEquals(listOf(Action.Unbind), p.locked(nowMs = 200_000, connected = true))
         assertEquals(100_000L, p.lockedAtMs)
-        // 再解锁、连上:这回读成了,150 秒时发出的那条在「锁屏之后」的范围里
+        // Unlock and connect again: this time the read succeeds, so the one posted at 150 s falls inside the "after the lock" range
         p.unlocked(connected = false)
         assertEquals(listOf(Action.CatchUp), p.connected(locked = false, nowMs = 260_000))
         val earlier = com.wangzan101.mika.core.proactive.NoticeRecord("k", "com.chat", 150_000, "t", "x")
         assertEquals(listOf(earlier), com.wangzan101.mika.core.proactive.CatchUp.select(listOf(earlier), enabledAtMs = 0, lastLockedAtMs = p.lockedAtMs - 5_000))
         p.caughtUp()
         assertEquals(false, p.catchUpOwed)
-        // 还上之后,下一次锁屏才记自己的时间
+        // Only after the catch-up is settled does the next lock record its own time
         assertEquals(listOf(Action.PersistLockedAt(300_000), Action.Unbind), p.locked(nowMs = 300_000, connected = true))
     }
 
-    // 还欠着的时候有机会就再试:没锁、监听连着才试;锁着的等解锁,没连上的等连上,还上了的不试
+    // While still owed, retry whenever possible: only when unlocked and the listener is connected; if locked wait for the unlock, if not connected wait for the connect, and once settled do not retry
     @Test fun anOwedCatchUpIsRetriedWhenPossible() {
         val p = ProactiveLockPolicy(0)
         p.start(locked = false, connected = true)
@@ -172,7 +172,7 @@ class ProactiveLockPolicyTest {
         assertEquals(emptyList<Action>(), p.retry(locked = false, connected = false))
         p.caughtUp()
         assertEquals(emptyList<Action>(), p.retry(locked = false, connected = true))
-        // 锁着的那一段里不试
+        // No retry within the locked stretch
         p.locked(1_000, connected = true)
         assertEquals(emptyList<Action>(), p.retry(locked = false, connected = true))
     }

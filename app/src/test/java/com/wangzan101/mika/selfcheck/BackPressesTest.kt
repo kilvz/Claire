@@ -6,9 +6,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 自检按返回:输入法弹着时按的那几下是收起输入法,不算在次数里;总下数有上限。 */
+/** Self-check back presses: while the IME is up, those presses only dismiss the IME and do not count towards the tries; the total number of presses is capped. */
 class BackPressesTest {
-    /** 一块屏:输入法要按 [imePresses] 下才收起(先清没上屏的字、再收起),之后再按 [pageLeavesAfter] 下页面离开。 */
+    /** One screen: the IME takes [imePresses] presses to dismiss (first clearing the text that has not been committed, then dismissing), after which [pageLeavesAfter] presses make the page leave. */
     private class Screen(var imePresses: Int, val pageLeavesAfter: Int = 1) {
         var presses = 0
         private var pageBacks = 0
@@ -24,7 +24,7 @@ class BackPressesTest {
     }
 
     @Test fun keyboardThatTakesTwoPressesNoLongerFailsTheCheck() {
-        // 原来两下都被输入法吃掉就判失败
+        // Previously, both presses being swallowed by the IME made the check fail
         val screen = Screen(imePresses = 2)
         assertTrue(run(screen))
         assertEquals(3, screen.presses)

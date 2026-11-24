@@ -30,10 +30,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 判定和归纳共用一个请求位:主动能力的后台请求一次只发一个,两边都轮得到。 */
+/** Triage and distillation share one request slot: proactive background requests go out one at a time, and both sides get their turn. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RequestSlotTest {
-    /** 两边各一个模型,在途数记在一起;每次调用都等测试放行。 */
+    /** One model per side, with the in-flight count recorded in one place; every call waits for the test to release it. */
     private class Gauge {
         var inFlight = 0
         var most = 0
@@ -95,7 +95,7 @@ class RequestSlotTest {
 
         var watches: List<kotlinx.coroutines.Job> = emptyList()
 
-        /** 开始看守(和 ProactiveRuntime 一样,两边在同一个作业下)。 */
+        /** Start watching (as in ProactiveRuntime, both sides under the same job). */
         fun start() {
             watches = listOf(
                 scope.backgroundScope.launch { triage.watch(locked) { locked.value } },
@@ -104,7 +104,7 @@ class RequestSlotTest {
             scope.runCurrent()
         }
 
-        /** 停止看守(关掉功能、完全退出)。 */
+        /** Stop watching (feature switched off, app fully exited). */
         fun stop() {
             watches.forEach { it.cancel() }
             scope.runCurrent()
@@ -118,12 +118,12 @@ class RequestSlotTest {
         fun record(key: String = "k${++n}") = NoticeRecord(key, "com.chat", scope.testScheduler.currentTime + n, "title $key", "text $key")
     }
 
-    // 两边同时到点:一次只发一个(不是各发各的、同时两个请求),判定先发,发完归纳接着发,两边都轮得到
+    // Both sides come due at the same time: only one is sent at a time (not one each, i.e. two requests at once); triage goes first and distillation follows when it finishes, so both get their turn
     @Test fun onlyOneBackgroundRequestAtATimeAndBothGetATurn() = runTest {
         val e = Env(this)
-        // 归纳先攒够一批(还没到判定的那一条)
+        // Distillation has already accumulated a full batch (the triage one is not due yet)
         val batch = (1..LearnTuning.DUE_COUNT).map { e.record() }
-        // 同一刻:归纳攒够了,判定也有一条到点
+        // Same instant: distillation has a full batch and triage also has one due
         e.inbox.add(batch.first())
         batch.forEach(e.learn::capture)
         runCurrent()
@@ -131,7 +131,7 @@ class RequestSlotTest {
         assertEquals(listOf("triage"), e.gauge.order)
         assertTrue(e.triage.requestActive)
         assertFalse(e.learn.requestActive)
-        // 判定发完:归纳接着发
+        // Triage has finished sending: distillation sends next
         e.judge.finish()
         runCurrent()
         assertEquals(listOf("triage", "learn"), e.gauge.order)
@@ -144,7 +144,7 @@ class RequestSlotTest {
         assertEquals(1, e.triage.state.value.counts.judged)
     }
 
-    // 归纳在发的时候判定到点:等着,不抢;归纳发完,判定先发,归纳的下一批排在后面
+    // Triage comes due while distillation is sending: it waits and does not cut in; when distillation finishes, triage goes first and the next distillation batch queues behind it
     @Test fun triageWaitsForLearningAndThenGoesFirst() = runTest {
         val e = Env(this)
         repeat(2 * LearnTuning.DUE_COUNT) { e.learn.capture(e.record()) }
@@ -166,7 +166,7 @@ class RequestSlotTest {
         assertEquals(1, e.gauge.most)
     }
 
-    // 在发的被取消(锁屏):位子放开;解锁后照常,一次还是只发一个
+    // The in-flight request is cancelled (screen locked): the slot is released; after unlocking everything runs as usual, still one at a time
     @Test fun aCancelledRequestFreesTheSlot() = runTest {
         val e = Env(this)
         val batch = (1..LearnTuning.DUE_COUNT).map { e.record() }
@@ -190,7 +190,7 @@ class RequestSlotTest {
         assertEquals(0, e.learn.state.value.pending)
     }
 
-    // 对照:各用各的位子时,两边会同时各发一个——共用一个位子防的就是这个
+    // Control case: with separate slots both sides send one at the same time — a shared slot is exactly what prevents this
     @Test fun withoutASharedSlotBothWouldSendAtOnce() = runTest {
         val e = Env(this, shared = false)
         val batch = (1..LearnTuning.DUE_COUNT).map { e.record() }
@@ -200,7 +200,7 @@ class RequestSlotTest {
         assertEquals(2, e.gauge.most)
     }
 
-    // 位子空着时两边同时到点:谁先看到谁先发(这里是归纳先攒够),另一边等它发完——一次还是只有一个
+    // Both sides come due while the slot is free: whoever looks first sends first (here distillation accumulated first), and the other waits for it to finish — still only one at a time
     @Test fun atATieWhoeverLooksFirstSendsFirst() = runTest {
         val e = Env(this)
         val batch = (1..LearnTuning.DUE_COUNT).map { e.record() }
@@ -217,7 +217,7 @@ class RequestSlotTest {
         assertEquals(1, e.gauge.most)
     }
 
-    // 看守停下(关掉功能、完全退出)时判定在发、归纳等着:两边都收住,不趁机多发一个;再开始看守,两边照常各轮一次
+    // When the watch stops (feature off, app fully exited) with triage sending and distillation waiting: both are reined in and no extra request is slipped in; starting the watch again, each side takes its turn as usual
     @Test fun stoppingAndRestartingTheWatchKeepsOneAtATime() = runTest {
         val e = Env(this)
         val batch = (1..LearnTuning.DUE_COUNT).map { e.record() }
@@ -233,7 +233,7 @@ class RequestSlotTest {
         assertEquals(LearnTuning.DUE_COUNT, e.learn.state.value.pending)
         e.start()
         assertEquals(1, e.gauge.inFlight)
-        // 两边都发完:各轮到一次,没有同时在发的
+        // Both sides have finished sending: each got one turn, and nothing was ever in flight at the same time
         repeat(4) {
             e.judge.gates.lastOrNull()?.complete(Unit)
             e.distil.gates.lastOrNull()?.complete(Unit)

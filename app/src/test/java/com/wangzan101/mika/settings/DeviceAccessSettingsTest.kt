@@ -58,7 +58,7 @@ class DeviceAccessSettingsTest {
         assertFalse(s.enabled)
         s.setEnabled(true)
         assertTrue(s.localEnabled)
-        // 两个开关独立持久化:重载后各自保持,谁也不带动谁
+        // The two switches persist independently: after a reload each keeps its own value, and neither drags the other along
         val reloaded = settings()
         assertTrue(reloaded.enabled)
         assertTrue(reloaded.localEnabled)
@@ -66,7 +66,7 @@ class DeviceAccessSettingsTest {
         assertFalse(settings().localEnabled)
         assertTrue(settings().enabled)
         settings().setLocalEnabled(true)
-        // blocked 占位互不通:远程占位不挡本机占位,本机占位也只放一次且随重启存活
+        // The blocked latches are independent: the remote latch does not block the local one, and the local latch admits only once and survives a restart
         val latching = settings()
         latching.credential()!!.use { assertTrue(latching.beginAttempt(it)) }
         assertTrue(latching.attemptBlocked)

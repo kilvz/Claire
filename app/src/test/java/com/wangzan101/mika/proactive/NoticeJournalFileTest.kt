@@ -38,7 +38,7 @@ class NoticeJournalFileTest {
         }
     }
 
-    // 解不开、内容坏了的文件直接删掉,不改名另存:原文不留一份看不见、删不掉的副本
+    // A file that cannot be decrypted or whose contents are corrupt is deleted outright, not renamed and set aside: no invisible, undeletable copy of the plaintext is left behind
     @Test fun brokenFileIsDeletedNotSetAside() {
         file().save(data)
         val other = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
@@ -47,12 +47,12 @@ class NoticeJournalFileTest {
         bin.writeBytes(byteArrayOf(1, 2, 3))
         assertNull(file().load())
         assertEquals(emptyList<String>(), dir.list()!!.toList())
-        // 之后照常存取
+        // Saving and loading work as usual afterwards
         file().save(data)
         assertEquals(data, file().load())
     }
 
-    // 密钥库一时不可用不是坏文件:照常抛出,文件不动
+    // A momentarily unavailable keystore does not make the file corrupt: the error is thrown as usual and the file is untouched
     @Test fun keystoreTroubleLeavesTheFileAlone() {
         file().save(data)
         val busy = object : KeyCipher {

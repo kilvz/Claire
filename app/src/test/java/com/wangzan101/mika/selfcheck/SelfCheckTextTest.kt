@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 自检认页面文字:读屏给的大小写、空白和页面上写的不一样时照样认得出,别的文字不认错。 */
+/** Self-check recognizing page text: it still matches when the case and whitespace reported by the screen reader differ from what is written on the page, and it does not mistake other text for it. */
 class SelfCheckTextTest {
     @Test
     fun buttonTextReadBackInCapitalsStillMatches() {
@@ -56,7 +56,7 @@ class SelfCheckTextTest {
 
     @Test
     fun numberedTextMatchesArabicIndicDigits() {
-        // 阿拉伯语等语言里 %d 会被渲染成阿拉伯-印度数字,读屏报回的也是它。
+        // In Arabic and similar languages %d is rendered as Arabic-Indic digits, and that is what the screen reader reports back.
         val taps = SelfCheckText.Numbered("النقرات: ٩٨٧٦٥٤٣٢١", "987654321")
         assertTrue(taps.matches("النقرات: ٠"))
         assertTrue(taps.matches("النقرات: ١٢"))

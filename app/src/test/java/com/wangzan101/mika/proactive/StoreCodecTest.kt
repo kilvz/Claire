@@ -13,7 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** 四份加密存盘读不出来时:拿得出证据是坏了的才删(或另存),别的出错文件一概不动(见 [StoreCodec])。 */
+/** When one of the four encrypted stores cannot be read: only proven corruption is deleted (or set aside); every other kind of read error leaves the file untouched (see [StoreCodec]). */
 class StoreCodecTest {
     @get:Rule val tmp = TemporaryFolder()
     private val dir get() = File(tmp.root, "proactive")
@@ -27,7 +27,7 @@ class StoreCodecTest {
         override fun decrypt(data: ByteArray) = data
     }
 
-    /** 四份存盘:文件名,和拿一个 cipher 去读它。 */
+    /** The four stores: the file name, plus a way to read that file with a given cipher. */
     private val stores: List<Pair<String, (KeyCipher) -> Any?>> = listOf(
         DigestFile.FILE to { c -> DigestFile(tmp.root, c).load() },
         NoticeJournalFile.FILE to { c -> NoticeJournalFile(tmp.root, c).load() },
@@ -38,7 +38,7 @@ class StoreCodecTest {
     private fun seed(name: String, text: String = "encrypted bytes that are perfectly fine") =
         File(dir, name).apply { parentFile.mkdirs(); writeText(text) }
 
-    // 取钥、解密这一步出的错,除了「认证没过」「短得不成密文」,都不说明密文坏了:照常抛出,文件原样留着
+    // Errors from obtaining the key or decrypting — apart from "authentication failed" and "too short to be ciphertext" — do not prove the ciphertext is corrupt: they propagate as usual and the file is left as it was
     @Test fun troubleWhileDecryptingLeavesEveryStoreAlone() {
         val troubles: List<() -> Exception> = listOf(
             { IOException("transient keystore load failure") },
@@ -64,7 +64,7 @@ class StoreCodecTest {
         }
     }
 
-    // 解开了(认证过了)却读不懂:这是 Claire 自己写的,多半是别的版本的写法——照常抛出,文件不动
+    // Decrypted (authenticated) but unreadable: this was written by Claire itself, most likely in some other version's format — it propagates as usual and the file is untouched
     @Test fun contentThatDecryptsButCannotBeReadIsKept() {
         for ((name, load) in stores) for (text in listOf("{broken", """{"topics":"not a list","days":7,"entries":3,"contacts":1,"notes":2}""")) {
             tmp.root.listFiles()?.forEach { it.deleteRecursively() }
@@ -78,7 +78,7 @@ class StoreCodecTest {
         }
     }
 
-    // 拿得出证据的才算坏:认证没过、短得不成密文。原文和归纳直接删,话题和联系人另存一份、从空开始
+    // Only proven corruption counts: authentication failed, or too short to be ciphertext. Notice text and digest are deleted outright; topics and contacts are set aside as a copy and start empty
     @Test fun provenCorruptionIsHandledPerStore() {
         val proofs: List<Pair<String, KeyCipher>> = listOf(
             "tag" to Failing { javax.crypto.AEADBadTagException("mac check failed") },
@@ -101,7 +101,7 @@ class StoreCodecTest {
         }
     }
 
-    // 通知原文只该留两天:一直读不了、文件又已两天没写过(里面全是过期的)就删掉;还新着的不动
+    // Raw notice text should only be kept for two days: if it stays unreadable and the file has not been written for two days (everything inside is expired), it is deleted; a still-fresh one is left alone
     @Test fun anUnreadableJournalDoesNotOutliveItsRetention() {
         var now = 1_800_000_000_000L
         val f = seed(NoticeJournalFile.FILE)
@@ -117,7 +117,7 @@ class StoreCodecTest {
         now += 1
         load()
         assertFalse(f.exists())
-        // 归纳留得久,读不了多久都不删
+        // The digest is retained longer, so it is never deleted however long it stays unreadable
         val d = seed(DigestFile.FILE)
         d.setLastModified(1L)
         try {
@@ -127,7 +127,7 @@ class StoreCodecTest {
         assertTrue(d.exists())
     }
 
-    // ---- 版本号 ----
+    // ---- Version number ----
 
     private val plainJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val topics = com.wangzan101.mika.core.proactive.TopicPoolData(
@@ -139,7 +139,7 @@ class StoreCodecTest {
     private val digest = com.wangzan101.mika.core.proactive.DigestData(
         days = listOf(com.wangzan101.mika.core.proactive.DayDigest(20_000, 1L, listOf(com.wangzan101.mika.core.proactive.DigestLine("一句", apps = listOf("com.chat"))))))
 
-    /** 每份存盘:文件名、加版本检查之前的写法写出来的内容(没有 version)、存一遍、读一遍。 */
+    /** Per store: the file name, contents written in the format used before the version check (no `version`), a save, and a load. */
     private class Case(val name: String, val old: String, val save: () -> Unit, val load: () -> Any?, val data: Any, val known: Int = 1)
     private fun cases() = listOf(
         Case(TopicPoolFile.FILE, plainJson.encodeToString(com.wangzan101.mika.core.proactive.TopicPoolData.serializer(), topics),
@@ -153,7 +153,7 @@ class StoreCodecTest {
     )
     private fun root(name: String) = kotlinx.serialization.json.Json.parseToJsonElement(File(dir, name).readText()) as kotlinx.serialization.json.JsonObject
 
-    // 手机上现有的文件是加版本检查之前存的,里面没有 version:四份都照常读得出来,内容一样
+    // The files already on the phone were written before the version check and have no `version` inside: all four still load as usual, with identical contents
     @Test fun filesWrittenBeforeTheVersionCheckStillLoad() {
         for (c in cases()) {
             tmp.root.listFiles()?.forEach { it.deleteRecursively() }
@@ -164,7 +164,7 @@ class StoreCodecTest {
         }
     }
 
-    // 存的时候最外层总写着版本号(数据类里的默认值序列化时会被省掉,不能靠它);存了再读内容一样
+    // Saving always writes the version at the outermost level (defaults in the data classes are omitted during serialization, so they cannot be relied on); saving and then loading yields the same contents
     @Test fun everyStoreWritesItsVersion() {
         for (c in cases()) {
             tmp.root.listFiles()?.forEach { it.deleteRecursively() }
@@ -174,9 +174,9 @@ class StoreCodecTest {
         }
     }
 
-    // 更新的版本写的文件:读的这一层不认得它的写法,不读进来、不改、不另存、不删——哪怕按现在的写法照样读得进来
-    // (读进来再存一遍会按旧写法重写,新版本加的东西就没了)。
-    // 用户自己要删的照删:「清空全部」、清掉某个 App 时读不出来的通知原文、关掉开关时的原文,以及原文两天没写过的那条规矩
+    // A file written by a newer version: this reading layer does not understand its format, so it is not read in, not modified, not set aside and not deleted — even if the current format would still parse it
+    // (reading it in and saving it again would rewrite it in the old format, and whatever the new version added would be lost).
+    // Deletions the user asks for still happen: "clear all", unreadable raw notice text when a given app is cleared, the raw text when the switch is turned off, and the rule that raw text not written for two days goes away
     @Test fun aNewerVersionIsRefusedAndLeftUntouched() {
         for (c in cases()) {
             tmp.root.listFiles()?.forEach { it.deleteRecursively() }
@@ -197,7 +197,7 @@ class StoreCodecTest {
         }
     }
 
-    // 版本号写得不成样子的当读不懂(文件不动);不比现在新的照常读
+    // A malformed version number is treated as unreadable (the file stays put); anything not newer than the current version loads as usual
     @Test fun oddVersionValues() {
         val c = cases().first()
         val body = (kotlinx.serialization.json.Json.parseToJsonElement(c.old) as kotlinx.serialization.json.JsonObject)

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ProactiveRuntimeGateTest {
-    // 读通知的工具:主动能力、「当日消息归纳」都开着,激进程度不是最保守的一档,才给任务
+    // Tools that read notifications: granted to tasks only when the proactive capability and the "daily message digest" are both on, and the aggressiveness level is not the most conservative one
     @Test fun tasksReadNoticesOnlyWhenEverySwitchIsOnAndTheLevelAllowsIt() {
         for (proactive in listOf(true, false)) for (digest in listOf(true, false)) for (level in LearnLevel.entries) {
             val expected = proactive && digest && level != LearnLevel.Conservative

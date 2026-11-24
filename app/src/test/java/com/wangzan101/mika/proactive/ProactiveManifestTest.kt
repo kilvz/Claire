@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.w3c.dom.Element
 
-/** 通知监听的清单写法:默认停用(没开功能时系统「通知使用权」里没有 Claire),只滤常驻通知。 */
+/** How the notification listener is declared in the manifest: disabled by default (with the feature off, Claire is absent from the system's "notification access" settings), and it only filters ongoing notifications. */
 class ProactiveManifestTest {
     private val ns = "http://schemas.android.com/apk/res/android"
 
