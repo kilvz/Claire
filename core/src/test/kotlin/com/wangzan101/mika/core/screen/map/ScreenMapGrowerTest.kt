@@ -5,7 +5,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 内存里的屏图仓库,记录写入,可配置 save 抛错。 */
+/** In-memory screen map store that records writes, with save failure configurable. */
 private class MemStore(private val graphs: MutableMap<String, ScreenGraph> = mutableMapOf()) : ScreenMapStore {
     var failSave = false
     override fun load(app: String) = graphs[app]

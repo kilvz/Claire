@@ -42,8 +42,8 @@ class ScreenMapRenderTest {
         }
         val g = ScreenGraph("x", nodes)
         val s = ScreenMapRender.renderMap(g, "s1", maxScreens = 12)
-        assertTrue(s.contains("屏（15）")) // 总数仍报 15
-        assertFalse(s.contains("页15")) // 但清单截到 12，第 15 个不在
+        assertTrue(s.contains("屏（15）")) // The total still reports 15
+        assertFalse(s.contains("页15")) // But the list is cut to 12, so the 15th is not there
     }
 
     @Test fun renderMapEmptyGraphIsEmpty() {

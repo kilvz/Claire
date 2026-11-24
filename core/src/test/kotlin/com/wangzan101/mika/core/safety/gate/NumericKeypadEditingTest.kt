@@ -86,7 +86,7 @@ class NumericKeypadEditingTest {
         val screen = pricePad().let { it.copy(elements = it.elements.filterNot { e -> e.ref == "@stock" }) }
         val hit = tap(screen, "@done")
         assertNotNull(hit)
-        // 卖家价格页的「预估服务费/到手价」只是页面内容,不是应付金额,不按付款判;但仍按不可逆动作拦。
+        // The estimated service fee and the estimated proceeds on a seller's price page are just page content, not an amount due, so they are not judged as pay; the action is still blocked as irreversible.
         assertFalse(ClassifiedRisk.assess(Verb.Tap, hit) { screen }.payment)
     }
 

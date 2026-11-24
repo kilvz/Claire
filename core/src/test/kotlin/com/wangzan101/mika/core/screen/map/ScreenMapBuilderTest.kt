@@ -27,7 +27,7 @@ class ScreenMapBuilderTest {
         val g1 = builder.apply("run1", events)
         val g2 = builder.apply("run1", events)
 
-        // 一张图、两屏
+        // One graph, two screens
         assertEquals(setOf(app), g1.keys)
         val graph = g1.getValue(app)
         assertEquals(2, graph.nodes.size)
@@ -35,14 +35,14 @@ class ScreenMapBuilderTest {
         val screenA = graph.nodes.values.first { it.anchors.containsKey("主页") }
         val screenB = graph.nodes.values.first { it.anchors.containsKey("关于本机") }
 
-        // 屏 id 确定：不同结构不同 id
+        // Screen ids are deterministic: different structure, different id
         assertTrue(screenA.id != screenB.id)
         assertEquals(2, screenA.visits)
         assertEquals(2, screenB.visits)
         assertEquals("confirmed", screenA.status)
         assertEquals("confirmed", screenB.status)
 
-        // 转移边：A 点「设置」→ B（NAVIGATED）；B 返回 → A
+        // Transition edges: tapping "Settings" on A → B (NAVIGATED); back on B → A
         val aTrans = screenA.transitions.values.single()
         assertEquals("phone_tap", aTrans.action)
         assertEquals("设置", aTrans.target)
@@ -56,7 +56,7 @@ class ScreenMapBuilderTest {
         assertEquals(TransitionEffect.NAVIGATED, bTrans.effect)
         assertEquals(screenA.id, bTrans.to)
 
-        // 确定性：同批 events 跑两遍，序列化后逐字节相同
+        // Determinism: the same batch of events run twice serializes byte-for-byte identically
         val enc = Json { prettyPrint = false }
         val s1 = enc.encodeToString(g1.mapValues { it.value.nodes })
         val s2 = enc.encodeToString(g2.mapValues { it.value.nodes })
@@ -79,13 +79,13 @@ class ScreenMapBuilderTest {
         val homeNode = graph.nodes.values.first { it.anchors.containsKey("主页") }
         val detailNode = graph.nodes.values.first { it.anchors.containsKey("详情") }
 
-        // 换屏导航
+        // Navigating to another screen
         assertEquals(TransitionEffect.NAVIGATED, homeNode.transitions.values.single().effect)
         assertEquals(detailNode.id, homeNode.transitions.values.single().to)
-        // 跳到别的 App → LEFT_APP，to 为空
+        // Jumping to another app → LEFT_APP, with to empty
         assertEquals(TransitionEffect.LEFT_APP, detailNode.transitions.values.single().effect)
         assertEquals(null, detailNode.transitions.values.single().to)
-        // 别的 App 单独一张图
+        // Another app gets its own graph
         assertNotNull(graphs[other])
     }
 

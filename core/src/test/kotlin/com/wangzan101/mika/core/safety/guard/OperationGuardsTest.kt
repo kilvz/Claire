@@ -17,7 +17,7 @@ class OperationGuardsTest {
     private fun obj(s: String) = Json.parseToJsonElement(s).jsonObject
 
     @Test fun coordinateBucketing() {
-        // 坐标按 50 取整、忽略 reason 和键顺序、滑动只记方向。
+        // Coordinates are bucketed to 50, reason and key order are ignored, and a swipe only records its direction.
         assertEquals(
             actionSignature("phone_tap", obj("""{"x":101,"y":149,"reason":"one"}""")),
             actionSignature("phone_tap", obj("""{"reason":"two","y":145,"x":105}""")),
@@ -62,7 +62,7 @@ class OperationGuardsTest {
         val perAction = (1..3).map { g.noteAction(); g.effect("no_effect") + g.frame("f$it", 42L) }
         assertEquals(3, g.unchangedFrames)
         assertEquals("no_progress", perAction.last().single().code)
-        // 小的局部变化也是进展，应清零
+        // A small local change is progress too and must reset the count
         g.noteAction(); g.effect("small_change"); assertEquals(0, g.unchangedFrames)
         g.noteAction(); g.effect("done"); assertEquals(0, g.unchangedFrames)
     }
@@ -94,8 +94,8 @@ class OperationGuardsTest {
         assertNull(ordinary.evidence["treeBlind"])
         assertNull(unrelated.stop)
 
-        // 同一轮无效果里已有两次空树点击,紧接的滚动也没效果时可以在第三次停下;
-        // 单独滚动到底仍只走普通阶梯,不会被当成注入不响应。
+        // With two tree-blind taps already in the same no-effect run, a scroll with no effect right after may stop on the third;
+        // a bare scroll to the bottom still follows the ordinary ladder and is not taken as the app ignoring injected input.
         val mixed = OperationGuards()
         assertTrue(mixed.effect("no_effect", treeBlind = true).isEmpty())
         assertEquals(Severity.Warn, mixed.effect("no_effect", treeBlind = true).single().severity)
@@ -114,7 +114,7 @@ class OperationGuardsTest {
     @Test fun threeStateLoopIsCaught() {
         val g = OperationGuards()
         g.frame("s0", 1L)
-        // 1→2→3 转满三圈(trail 攒到 9)时提醒兜圈;周期循环全程没有 same_state(由 cycle 通道单独说)
+        // Circling 1→2→3 for three full laps (the trail reaches 9) nudges; a periodic loop never produces same_state (the cycle channel reports it separately)
         val seq = listOf(2L, 3L, 1L, 2L, 3L, 1L, 2L, 3L)
         val verdicts = seq.mapIndexed { i, h -> g.noteAction(); g.frame("s${i + 1}", h) }
         assertTrue(verdicts.dropLast(1).flatten().none { it.code == "state_cycle" || it.code == "same_state" })
@@ -163,7 +163,7 @@ class OperationGuardsTest {
     @Test fun cycleStopFollowsTheStepBudget() {
         val g = OperationGuards(stepBudget = 30)
         g.frame("s0", 1L)
-        // budget 30 → 梯 [3, 4, max(6, 30/5)=6]:第 5 帧(rounds 3)、第 7 帧(rounds 4)提醒,第 11 帧(rounds 6)叫停
+        // budget 30 → ladder [3, 4, max(6, 30/5)=6]: warns on frame 5 (rounds 3) and frame 7 (rounds 4), stops on frame 11 (rounds 6)
         var stopAt = 0
         val warnAt = mutableListOf<Int>()
         for (i in 1..11) {
@@ -180,7 +180,7 @@ class OperationGuardsTest {
     @Test fun returningToTheSameScreenWithoutAnythingNewNudgesAtThree() {
         val g = OperationGuards()
         g.frame("s0", 1L)
-        // 每次经不同的新页面回到同一屏(不规则回访,不构成周期):第二次到 1 不提醒,第三次提醒
+        // Each time it returns to the same screen through a different new page (irregular revisits, not a cycle): the second arrival at 1 does not nudge, the third does
         val out1 = listOf(2L, 3L, 4L, 1L).mapIndexed { i, h -> g.noteAction(); g.frame("a$i", h) }.flatten()
         assertTrue(out1.toString(), out1.none { it.code == "same_state" || it.code == "state_cycle" })
         val out2 = listOf(5L, 6L, 7L).mapIndexed { i, h -> g.noteAction(); g.frame("b$i", h) }.flatten()
@@ -200,7 +200,7 @@ class OperationGuardsTest {
             .withIndex().filter { (_, l) -> l.any { it.code == "no_new_state" } }.map { it.index + 1 }
         assertEquals(listOf(8, 16, 30), v)
         assertNull(g.stop)
-        // 步数上限高的任务,安全网跟着往后
+        // With a high step budget the safety net moves further out
         val big = OperationGuards(stepBudget = 100)
         big.frame("s0", 1L); big.noteAction(); big.frame("s1", 2L)
         repeat(49) { i -> big.noteAction(); big.effect("small_change"); big.frame("y$i", 2L) }
@@ -215,7 +215,7 @@ class OperationGuardsTest {
         repeat(2) { g.noteAction(); g.frame("a$it", 1L) }
         g.noteAction(); assertTrue(g.frame("b", 2L).isEmpty())
         assertEquals(0, g.unchangedFrames)
-        // 同一 id 重复上报不计。
+        // Re-reporting the same id does not count.
         g.noteAction(); g.frame("b", 2L)
         assertEquals(0, g.unchangedFrames)
     }
@@ -252,11 +252,11 @@ class OperationGuardsTest {
         assertEquals(List(6) { Severity.Warn } + Severity.Stop, counts.map { it.single().severity })
         assertEquals("too_many_failures", counts.last().single().code)
         assertEquals(8, counts.last().single().evidence["consecutive"]!!.jsonPrimitive.int)
-        // 第 4 次起提醒里附出路
+        // From the fourth failure on, the nudge includes a way out
         assertFalse(counts[0].single().nudge!!.contains("ask the user"))
         assertTrue(counts[2].single().nudge!!.contains("ask the user"))
 
-        // 成功或 counts_as_failure=false 清零。
+        // A success, or counts_as_failure=false, resets the count.
         val g2 = OperationGuards()
         g2.result("phone_tap", fail)
         g2.result("phone_tap", obj("""{"ok":true}"""))
@@ -278,7 +278,7 @@ class OperationGuardsTest {
         assertEquals("""{"code":"repeating_action","severity":"warn","evidence":{}}""", v.toJson().toString())
     }
 
-    // 页面没变、换着工具和参数反复读:读不出新东西,5、8 次提醒,12 次停;读到新内容、画面变了都从头算
+    // The page stays the same and it keeps reading with varying tools and arguments: nothing new comes back, so it nudges at 5 and 8 and stops at 12; new content or a changed screen starts the count over
     @Test fun rereadingAnUnchangedPageWarnsThenStops() {
         val g = OperationGuards()
         assertTrue(g.firstSeen(1L))
@@ -294,9 +294,9 @@ class OperationGuardsTest {
         val g = OperationGuards()
         g.firstSeen(1L)
         repeat(4) { assertTrue(g.read("phone_observe", g.firstSeen(1L)).isEmpty()) }
-        // 读整页换了起点:新内容,不算重读
+        // Reading the whole page with a different starting point: new content, not a re-read
         repeat(10) { assertTrue(g.read("web_read_page", g.firstSeen(100L + it)).isEmpty()) }
-        // 画面变了:之前读到的不再作数
+        // The screen changed: what was read before no longer counts
         g.frame("f0", 5L); g.noteAction(); g.frame("f1", 6L)
         assertTrue(g.firstSeen(1L))
         repeat(4) { assertTrue(g.read("phone_observe", g.firstSeen(1L)).isEmpty()) }

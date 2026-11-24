@@ -11,13 +11,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 录下来的运行里,每次核查(verifier 事件)和它核的那次最终回答配对(新记录是不带调用的回复,旧记录是 finish 调用,
- * 见 [RunFacts.isFinalAnswer]),不依赖两者的先后:平常的一步先核查、核完才记回复,最后一轮先记回复再核查。
+ * In recorded runs, each verification (verifier event) is paired with the final answer it checked (a reply with no tool call in new records, a finish call in old ones,
+ * see [RunFacts.isFinalAnswer]), independent of their order: an ordinary step verifies first and records the reply afterwards, while the last round records the reply first and verifies after.
  *
- * - 事件带 step:配同一步的回答。
- * - 旧记录没有 step:它之后的第一条模型回复是还没配过的回答,就是它(先核查后记回复);否则配它之前最近的、还没配过的回答。
+ * - An event with a step: pairs with the answer of the same step.
+ * - An old record without a step: the first model reply after it that is not yet paired is its answer (verify first, record the reply after); otherwise it pairs with the nearest earlier answer not yet paired.
  *
- * 返回 (verifier 下标, 回答下标);配不上的核查不在里面。
+ * Returns (verifier index, answer index); verifications that cannot be paired are not included.
  */
 internal object RecordedVerifications {
     fun pairs(events: List<RunEvent>): List<Pair<Int, Int>> {
@@ -38,7 +38,7 @@ internal object RecordedVerifications {
         return out
     }
 
-    /** 核查 [v] 当时能用的材料:它之前的事件,去掉被核的那次 finish 自己的回复和结果(回答不能拿来证明自己)。 */
+    /** The material available to verification [v] at the time: the events before it, minus the checked finish's own reply and result (an answer cannot be used to prove itself). */
     fun before(events: List<RunEvent>, v: Int, f: Int): List<RunEvent> {
         val step = (events[f] as RunEvent.ModelReply).step
         return events.subList(0, v).filterIndexed { i, e ->
@@ -46,7 +46,7 @@ internal object RecordedVerifications {
         }
     }
 
-    /** 核查当时能对照的文字:之前的全部读屏文字和工具结果里的全部字符串(见 [before])。 */
+    /** The text that could be compared against at verification time: all earlier screen-read text and every string in the tool results (see [before]). */
     fun sources(events: List<RunEvent>, v: Int, f: Int): List<String> = before(events, v, f).mapNotNull { b ->
         when (b) {
             is RunEvent.Observed -> b.text.takeIf { b.kind == "read" }
@@ -56,8 +56,8 @@ internal object RecordedVerifications {
     }.filter { it.isNotBlank() }
 
     /**
-     * 按证据账本重建运行时核查器拿到的材料:finish 后重读的一屏没有记下来,用最后一次读屏代替;
-     * 加上账本([RunFacts.ledger])按回答挑出的条目——和运行时的 [Verifier] 用同一个挑法。
+     * Rebuilds the material the runtime verifier got, from the evidence ledger: the fresh screen reread after finish was not recorded, so the last screen read stands in for it;
+     * plus the entries the ledger ([RunFacts.ledger]) selects for the answer — the same selection the runtime [Verifier] uses.
      */
     fun ledgerSources(events: List<RunEvent>, v: Int, f: Int, goal: String, answer: String): List<String> {
         val seen = before(events, v, f)
@@ -65,7 +65,7 @@ internal object RecordedVerifications {
         return listOfNotNull(fresh) + RunFacts.ledger(seen, RECORDED_TOOLS).forAnswer(goal, answer).map { it.text }
     }
 
-    /** 被核的那次回答:回答是任务的结局时取 task_ended 里的全文(回复里记的可能截短了)。 */
+    /** The answer that was checked: when it ended the task, take the full text from task_ended (the reply may have been recorded truncated). */
     fun answer(events: List<RunEvent>, f: Int): String? {
         val r = events[f] as RunEvent.ModelReply
         val last = events.indexOfLast(RunFacts::isFinalAnswer) == f

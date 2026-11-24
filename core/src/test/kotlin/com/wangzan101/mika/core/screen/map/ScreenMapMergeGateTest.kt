@@ -21,7 +21,7 @@ class ScreenMapMergeGateTest {
         val b = ScreenNode(id = "B", app = "x", anchors = mapOf("首页" to 1, "设置" to 1))
         val pairs = ScreenMapMergeGate.wrongMerge(listOf(a, b), mapOf("A" to "甲", "B" to "乙"))
         assertTrue(pairs.isNotEmpty())
-        // B 被认成了 A
+        // B was taken for A
         assertEquals("A", pairs.first().second)
     }
 
@@ -56,7 +56,7 @@ class ScreenMapMergeGateTest {
     }
 
     @Test fun wrongOwnerAllowsNullPackageAndNoGraph() {
-        // 归 system/unknown(null 包名)允许;没图的包名也不判
+        // Ownership as system/unknown (null package) is allowed; a package with no graph is not judged either
         val events = listOf(
             at(null, listOf("首页"), "com.a", listOf("设置")),
             at("com.noGraph", listOf("首页"), "com.noGraph", listOf("设置")),

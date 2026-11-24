@@ -7,13 +7,13 @@ import java.io.File
 import java.time.ZoneId
 
 /**
- * 离线重算:用现在的 [Grounding] 重新核对录下来的运行(不调模型)。没设目录时跳过。
+ * Offline rescoring: rechecks recorded runs with the current [Grounding] (no model calls). Skipped when no directory is set.
  *
  *   MIKA_RESCORE_DIR=/path/to/runs ./gradlew :core:test --tests '*RescoreRecordedRuns*' --rerun
  *
- * 递归找目录下所有 events.jsonl;每次核查(verifier 事件)按 [RecordedVerifications] 配上它核的那次 finish(不论先后)取回答,
- * 证据用核查之前的全部读屏文字和工具结果里的全部字符串(不含那次 finish 自己的),相对日期按那次核查的时刻换算(时区取
- * MIKA_RESCORE_ZONE,没设用本机的)。结果写到 <目录>/rescore.tsv:运行、当时的结论与理由、现在的兜底结论、找不到的事实。
+ * Recursively finds every events.jsonl under the directory; for each verification (verifier event) it takes the answer from the finish it checked, paired by [RecordedVerifications] (whatever their order);
+ * the evidence is all screen-read text and every string in the tool results before the verification (excluding the checked finish's own), and relative dates are resolved from the clock at that verification (the time zone comes from
+ * MIKA_RESCORE_ZONE, or the local one when unset). Results go to <dir>/rescore.tsv: the run, the verdict and reason at the time, the current fallback verdict, and the facts not found.
  */
 class RescoreRecordedRuns {
     @Test fun rescore() {
