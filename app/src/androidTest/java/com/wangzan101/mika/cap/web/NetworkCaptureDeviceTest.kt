@@ -40,15 +40,15 @@ import kotlin.coroutines.resume
 import com.wangzan101.mika.cap.phone.PhoneServices
 
 /**
- * 真机测试:网页标签经 DevTools 记网络、动作后等网络空闲、取 fetch 的 JSON 正文、web_wait_for 的各种条件。
- * 页面和接口都由测试经 WebViewAssetLoader 的路径处理器给出(https 的本地假域名,不走真网络,也不受明文 HTTP 限制);
- * DevTools 会话由测试自己连本进程的调试套接字建好,交给 [devtools.provider]。
+ * Device test: a web tab records network traffic over DevTools, waits for the network to go idle after an action, takes the JSON body of a fetch, and covers the various web_wait_for conditions.
+ * The page and the endpoints are all served by the test through WebViewAssetLoader path handlers (a local fake https domain: no real network and no plaintext HTTP restriction);
+ * the test establishes the DevTools session itself over this process's debugging socket and hands it to [devtools.provider].
  */
 @RunWith(AndroidJUnit4::class)
 class NetworkCaptureDeviceTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val ctx = instr.targetContext
-    /** 本测试自己的一份:换会话来源、连法都不影响别的测试。 */
+    /** This test's own copy: changing the session source or the connection method does not affect other tests. */
     private val devtools = WebDevtools(PhoneServices.of(InstrumentationRegistry.getInstrumentation().targetContext).hub::openDevtoolsSocket)
     private lateinit var host: WebHost
     private lateinit var tab: WebTab
@@ -91,7 +91,7 @@ class NetworkCaptureDeviceTest {
         val r = screen.tapRef(load.ref, s.snapshotId)
         assertTrue("$r", r is ActionResult.Ok)
         assertEquals(true, (r as ActionResult.Ok).settled)
-        // 自动等待等到了接口返回、页面写完
+        // The automatic wait covered the API response and the page write
         assertEquals("\"n=42\"", js("document.getElementById('out').textContent"))
 
         val list = screen.captures("data.json", null, sinceLastAction = true)
@@ -136,9 +136,9 @@ class NetworkCaptureDeviceTest {
         assertTrue(runCatching { screen.captures(null, null, false) }.exceptionOrNull() is com.wangzan101.mika.core.cap.web.DevtoolsUnavailable)
     }
 
-    // ---------- 连接 ----------
+    // ---------- connection ----------
 
-    /** 本进程调试套接字上找到这个标签的页面:先在页面里写个记号,再逐个目标读回来对。 */
+    /** Find this tab's page on this process's debugging socket: first write a marker into the page, then read it back from each target to compare. */
     private suspend fun connect(): CdpSession {
         val mark = UUID.randomUUID().toString()
         js("window.__netTestMark='$mark'")

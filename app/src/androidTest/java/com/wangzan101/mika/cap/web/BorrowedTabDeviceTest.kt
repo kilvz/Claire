@@ -24,10 +24,10 @@ import org.junit.runner.RunWith
 import kotlin.coroutines.resume
 
 /**
- * 真机测试:借来的标签(用户在浏览器页上看着的那一个)当任务的当前标签用。不经任务,直接拿标签池和网页端口:
- * 「用户的标签」挂在另一块网页显示上(代替浏览器页的界面),借进任务的池,网页工具在它上面读、点;
- * 借来的不挂到任务的显示上、不算上限、打开网址另开新标签;还回去和任务结束都不销毁它;用户关页面时任务收下它接着用。
- * 不需要内置助手,不碰主屏。
+ * Device test: a borrowed tab (the one the user is looking at on the browser page) is used as the task's current tab. Without going through tasks, it uses the tab pool and the web port directly:
+ * the "user's tab" is attached to a separate web display (standing in for the browser page's UI), borrowed into the task's pool, and the web tools read and tap on it;
+ * a borrowed tab is not attached to the task's display, does not count toward the cap, and opening a URL spawns a new tab; handing it back and the task ending both leave it undestroyed; when the user closes the page the task adopts it and keeps using it.
+ * No built-in assistant is needed, and the main screen is not touched.
  */
 @RunWith(AndroidJUnit4::class)
 class BorrowedTabDeviceTest {
@@ -51,7 +51,7 @@ class BorrowedTabDeviceTest {
             host = WebHost(ctx, bounds.width(), bounds.height(), dpi)
             userHost = WebHost(ctx, bounds.width(), bounds.height(), dpi)
             pool = WebTabPool(ctx, host, perTask = 2, budget = TabBudget(), assetLoaders = loaders)
-            // 用户的标签:不归池管,挂在自己的那块显示上(浏览器页的界面在真机上是 Activity 的窗口)
+            // The user's tab: not managed by the pool, attached to its own display (on a real device the browser page's UI is the Activity's window)
             userTab = WebTab(ctx, "browser1", "user-browser", loaders)
             userTab.devtools.setHandOperated(userTab)
             userHost.attach(userTab, desktop = false)
@@ -87,7 +87,7 @@ class BorrowedTabDeviceTest {
         main {
             assertSame(userTab, pool.current(task))
             assertTrue(pool.isExternal(userTab.id))
-            // 不挂到任务的网页显示上,不算上限
+            // Not attached to the task's web display, so it does not count toward the cap
             assertSame(userHost, (userTab.view.parent as android.view.View).tag)
             assertEquals(0, pool.tabCount())
         }
@@ -98,9 +98,9 @@ class BorrowedTabDeviceTest {
         assertTrue("$r", r is ActionResult.Ok)
         assertEquals("1", js(userTab, "window.clicks"))
         assertEquals("true", js(userTab, "window.lastTrusted"))
-        // 截图画的是这个视图本身
+        // The screenshot draws this view itself
         assertNotNull(s.screenshotPng())
-        // 打开网址不换走用户的这一页:另开新标签
+        // Navigating does not take the user's page away: a new tab is opened
         val nav = s.navigate(fixture("elements.html"), newTab = false)
         assertTrue(nav.newTab)
         main {
@@ -108,7 +108,7 @@ class BorrowedTabDeviceTest {
             assertTrue(userTab.view.url!!.endsWith("inputs.html"))
             assertEquals(1, pool.tabCount())
         }
-        // 切回来照样能用;任务结束时还回去,不销毁
+        // Switching back works as usual; when the task ends it is handed back, not destroyed
         main { assertSame(userTab, pool.switchTo(task, userTab.id)) }
         main { pool.closeAll(task) }
         main {
@@ -121,9 +121,9 @@ class BorrowedTabDeviceTest {
     @Test
     fun detachReturnsAndAdoptKeepsThePage() = runBlocking<Unit> {
         main { assertTrue(pool.attachExternal(task, userTab)) }
-        // 借进来两次只是切过去
+        // Borrowing it a second time just switches to it
         main { assertTrue(pool.attachExternal(task, userTab)) }
-        // 别的任务借不走同一个
+        // Another task cannot borrow the same tab
         main { assertFalse(pool.attachExternal("other", userTab)) }
         main {
             assertTrue(pool.detachExternal(userTab.id))
@@ -131,7 +131,7 @@ class BorrowedTabDeviceTest {
             assertFalse(userTab.destroyed)
             assertFalse(pool.detachExternal(userTab.id))
         }
-        // 用户关掉页面:任务收下它当普通标签,挂到任务的显示上,页面状态还在
+        // The user closes the page: the task adopts it as a normal tab, attached to the task's display, and the page state is preserved
         js(userTab, "document.getElementById('counter').click()")
         main { assertTrue(pool.attachExternal(task, userTab)) }
         main {
@@ -144,7 +144,7 @@ class BorrowedTabDeviceTest {
             assertEquals(1, pool.tabCount())
         }
         assertEquals("1", js(userTab, "window.clicks"))
-        // 收下的随任务结束一起关
+        // Adopted tabs are closed together with the task
         main { pool.closeAll(task) }
         main { assertTrue(userTab.destroyed) }
     }

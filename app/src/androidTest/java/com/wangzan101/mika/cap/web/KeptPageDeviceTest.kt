@@ -22,10 +22,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * 真机测试:任务结束后留下一页接着运行。一套不挂在任务上的网页([WebStack],和任务里一样建),打开本地的计时页,
- * 用 web_keep_open 那条路标下它,再「结束任务」([WebStack.close]):那一页不随任务关,交到进程里那一份 [PageKeeper],
- * 页面里的计时器和画面帧接着涨;没标的一页照常关;留新的一页顶掉旧的;最后经 [PageKeeper] 关掉。
- * 秒数可用 `-e keptRunSec N` 调(默认 5)。
+ * Device test: one page keeps running after the task ends. A web stack not attached to a task ([WebStack], built the same way as inside a task) opens the local ticker page,
+ * marks it through the web_keep_open path, then "ends the task" ([WebStack.close]): that page is not closed with the task but handed to the process-wide [PageKeeper],
+ * and the page's timer and animation frames keep climbing; an unmarked page closes as usual; keeping a new page replaces the old one; finally it is closed through [PageKeeper].
+ * The number of seconds can be set with `-e keptRunSec N` (default 5).
  */
 @RunWith(AndroidJUnit4::class)
 class KeptPageDeviceTest {
@@ -64,7 +64,7 @@ class KeptPageDeviceTest {
 
     private fun open(s: WebStack) = runBlocking { s.screen.navigate(TICKER, newTab = false) }.also { assertTrue("ticker loaded", it.loaded) }
 
-    /** 页面里此刻的计数(计时器, 画面帧)。 */
+    /** The counters inside the page right now (timer, animation frames). */
     private fun counts(tab: WebTab): Pair<Long, Long> {
         val latch = CountDownLatch(1)
         var raw = ""
@@ -74,7 +74,7 @@ class KeptPageDeviceTest {
         return a.toLong() to b.toLong()
     }
 
-    /** 任务结束(和 TaskRun 收尾一样在主线程上关)。 */
+    /** The task ends (closed on the main thread, just as TaskRun does when wrapping up). */
     private fun endTask(s: WebStack) {
         instr.runOnMainSync { s.close() }
         stacks -= s
@@ -91,7 +91,7 @@ class KeptPageDeviceTest {
         assertNull("nothing kept before", r.replaces)
         endTask(s)
 
-        // 任务的池关了,这一页没关:交到了 PageKeeper,还挂在它那块显示上
+        // The task's pool is closed but this page is not: it was handed to PageKeeper and is still attached to its display
         assertFalse("kept tab not destroyed at task end", tab.destroyed)
         assertTrue(tab === keeper.keptTab())
         val page = keeper.page.value!!
@@ -100,16 +100,16 @@ class KeptPageDeviceTest {
         assertEquals("appassets.androidplatform.net" to null, keeper.recordFor("run-keep-1"))
         assertNotNull("still on its display", tab.view.parent)
 
-        // 页面接着跑:计时器、画面帧都在涨
+        // The page keeps running: timer and animation frames both advance
         val before = counts(tab)
         Thread.sleep(seconds * 1_000)
         val after = counts(tab)
         assertTrue("timer advanced ${before.first} -> ${after.first}", after.first - before.first >= seconds * 5)
         assertTrue("frames advanced ${before.second} -> ${after.second}", after.second > before.second)
-        // 画中画同一来源的画面也有
+        // Picture-in-picture frames from the same origin are available too
         assertNotNull("live frame", runBlocking { keeper.frames().let { f -> kotlinx.coroutines.withTimeoutOrNull(5_000) { f.first { it != null } } } })
 
-        // 经 PageKeeper 关掉:标签销毁,记下原因
+        // Close it through PageKeeper: the tab is destroyed and the reason is recorded
         instr.runOnMainSync { assertTrue(keeper.close(KeptPageClose.User)) }
         assertTrue(tab.destroyed)
         assertNull(keeper.page.value)
@@ -147,7 +147,7 @@ class KeptPageDeviceTest {
         endTask(a)
         val b = stack("second")
         open(b)
-        // 已经留着一页:结果里说清会顶掉它
+        // A page is already kept: the result states that it will be replaced
         assertEquals("appassets.androidplatform.net", runBlocking { b.screen.keepOpen(true, "y") }!!.replaces)
         endTask(b)
         assertTrue("old kept page closed", first.destroyed)

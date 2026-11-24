@@ -43,7 +43,7 @@ class CapsuleContentTest {
         show(CapsuleView.Shown(CapsuleKind.Running, "在搜牙膏", count = 1, runKey = "a", conversationId = "c"))
         compose.onNodeWithContentDescription("Claire 在干活：在搜牙膏，点开看详情").assertIsDisplayed()
         compose.onNodeWithTag("capsule-ring", useUnmergedTree = true).assertIsDisplayed()
-        // 一颗上不写那句话
+        // That sentence is not drawn on a single ball
         compose.onNodeWithText("在搜牙膏").assertDoesNotExist()
         compose.onNodeWithTag("capsule-ball").performClick()
         assertEquals(listOf("open"), clicks)
@@ -54,24 +54,24 @@ class CapsuleContentTest {
         compose.setContent {
             MikaTheme(dark = false, reduceMotion = true) { CapsuleContent(view, {}, {}, {}) }
         }
-        // 好几件:角上写件数
+        // Several items: the count is written in the corner
         compose.onNodeWithTag("capsule-count", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("3", useUnmergedTree = true).assertIsDisplayed()
-        // 等条件:灰圈,没有件数
+        // Waiting for a condition: grey ring, no count
         view = CapsuleView.Shown(CapsuleKind.Held, "先等等：排队中", count = 1)
         compose.onNodeWithTag("capsule-ring", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("capsule-count", useUnmergedTree = true).assertDoesNotExist()
-        // 看过的要你处理:还是一颗,橙圈
+        // Already seen but needs you: still a single ball, orange ring
         view = CapsuleView.Shown(CapsuleKind.NeedConfirm, "要你同意：发送", count = 1, needCount = 1)
         compose.onNodeWithContentDescription("要你同意：发送，点开处理").assertIsDisplayed()
         compose.onNodeWithTag("capsule-ring", useUnmergedTree = true).assertIsDisplayed()
-        // 办好了、没办成、已停止:角标,没有圈
+        // Succeeded, failed, cancelled: badge, no ring
         for (kind in listOf(CapsuleKind.Done, CapsuleKind.Failed, CapsuleKind.Cancelled)) {
             view = CapsuleView.Shown(kind, "结果")
             compose.onNodeWithTag("capsule-badge", useUnmergedTree = true).assertIsDisplayed()
             compose.onNodeWithTag("capsule-ring", useUnmergedTree = true).assertDoesNotExist()
         }
-        // 空闲:只有图标
+        // Idle: icon only
         view = CapsuleView.Shown(CapsuleKind.Idle, "")
         compose.onNodeWithContentDescription(CapsuleCopy.IDLE).assertIsDisplayed()
         compose.onNodeWithTag("capsule-badge", useUnmergedTree = true).assertDoesNotExist()
@@ -100,7 +100,7 @@ class CapsuleContentTest {
         assertEquals(listOf("open"), clicks)
     }
 
-    /** 展开、缩回:同一块底换宽度,缩回后是一颗那么宽。 */
+    /** Expand, shrink back: the same background changes width; after shrinking back it is as wide as one ball. */
     @Test fun pillShrinksBackToBall() {
         var view by mutableStateOf(CapsuleView.Shown(CapsuleKind.Done, "办好了 · 点开看结果", pill = true))
         compose.setContent {
@@ -124,7 +124,7 @@ class CapsuleContentTest {
         assertEquals(listOf("stop", "back"), clicks)
     }
 
-    /** 同一段([CapsuleView.Shown.widthEpoch] 不变)里换成短句,胶囊不变窄;换了一段才重新定宽。 */
+    /** Within the same epoch (unchanged [CapsuleView.Shown.widthEpoch]), switching to a shorter sentence does not narrow the capsule; only a new epoch measures the width again. */
     @Test fun widthOnlyGrowsWithinEpoch() {
         var view by mutableStateOf(CapsuleView.Shown(CapsuleKind.NeedAnswer, "Claire 问你：要三家店里哪一家的", pill = true, widthEpoch = 1))
         compose.setContent {
@@ -139,7 +139,7 @@ class CapsuleContentTest {
         assertTrue("new epoch should re-fit: $narrow vs $wide", narrow < wide)
     }
 
-    /** 一颗淡下去时外圈和角标照样在;读屏时能「移到屏幕另一边」。 */
+    /** While a ball fades out, the ring and badge are still there; with a screen reader it offers "move to the other side of the screen". */
     @Test fun fadedBallKeepsMarksAndOffersSwapSide() {
         var swapped = 0
         compose.setContent {
@@ -157,7 +157,7 @@ class CapsuleContentTest {
         assertEquals(1, swapped)
     }
 
-    /** 读屏时多一个「说话」代替长按;长按说话中胶囊亮蓝边。 */
+    /** With a screen reader there is an extra "talk" action in place of long-press; while holding to talk, the capsule shows a blue outline. */
     @Test fun talkActionAndHoldingRing() {
         var talked = 0
         compose.setContent {

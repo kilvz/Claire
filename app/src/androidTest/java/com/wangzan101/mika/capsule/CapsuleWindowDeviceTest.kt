@@ -20,7 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.math.abs
 
-/** 真实的两个浮层窗口:收起后无障碍节点消失还不够,系统画布上也不能留下半张卡片。 */
+/** The real pair of overlay windows: it is not enough for the accessibility nodes to disappear after collapsing — no half a card may remain on the system canvas either. */
 @RunWith(AndroidJUnit4::class)
 class CapsuleWindowDeviceTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -36,12 +36,12 @@ class CapsuleWindowDeviceTest {
         try {
             flags.setQuitRequested(false)
             flags.setCapsuleMode(CapsuleMode.Always)
-            instrumentation.runOnMainSync { app.capsule.resume() } // 胶囊控制器只在主线程上动窗口
+            instrumentation.runOnMainSync { app.capsule.resume() } // The capsule controller only moves windows on the main thread
             DeviceSupport.startTestActivity(Display.DEFAULT_DISPLAY, GestureTapTestActivity::class.java)
             assertNotNull("test page did not open", pollUntil(5_000) { findText(service, "taps:0") })
-            Thread.sleep(300) // 等页面进入动画结束,再记录用于判断残帧的静态基准
+            Thread.sleep(300) // Wait for the page's enter animation to finish, then record the static baseline used to detect residual frames
             assertNotNull("idle capsule did not appear", pollUntil(15_000) { find(service, CapsuleCopy.IDLE) })
-            Thread.sleep(3_500) // 等胶囊入场动效(约 272ms)结束并走完空闲淡出(CapsuleFade.IDLE_MS=3s,alpha 1→0.4);否则基准是全不透明,而关卡片耗时>3s 时胶囊已淡出,会被误判成残帧
+            Thread.sleep(3_500) // Wait for the capsule's entrance animation (about 272ms) to finish and for the idle fade to complete (CapsuleFade.IDLE_MS=3s, alpha 1→0.4); otherwise the baseline is fully opaque while the capsule has already faded by the time the card takes >3s to close, which would be mistaken for residual frames
             val baseline = screenshot()
 
             assertTrue("idle capsule was not clickable", click(service, CapsuleCopy.IDLE))
@@ -64,12 +64,12 @@ class CapsuleWindowDeviceTest {
             find(service, CardCopy.COLLAPSE)?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             flags.setCapsuleMode(oldMode)
             flags.setQuitRequested(oldQuit)
-            instrumentation.runOnMainSync { app.capsule.resume() } // 胶囊控制器只在主线程上动窗口
+            instrumentation.runOnMainSync { app.capsule.resume() } // The capsule controller only moves windows on the main thread
             instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         }
     }
 
-    /** 展开后的卡片要落到完整几何:整张在屏内、水平居中、高度到位,不停在半开的缩放上(#323 第 1 点)。 */
+    /** The expanded card must settle on the full geometry: entirely on screen, horizontally centered, at the right height, never stuck in a half-open scale (#323 point 1). */
     @Test fun openedCardReachesFullCenteredGeometry() {
         val service = DeviceSupport.service()
         val oldMode = flags.capsuleMode()
@@ -77,14 +77,14 @@ class CapsuleWindowDeviceTest {
         try {
             flags.setQuitRequested(false)
             flags.setCapsuleMode(CapsuleMode.Always)
-            instrumentation.runOnMainSync { app.capsule.resume() } // 胶囊控制器只在主线程上动窗口
+            instrumentation.runOnMainSync { app.capsule.resume() } // The capsule controller only moves windows on the main thread
             DeviceSupport.startTestActivity(Display.DEFAULT_DISPLAY, GestureTapTestActivity::class.java)
             assertNotNull("test page did not open", pollUntil(5_000) { findText(service, "taps:0") })
             assertNotNull("idle capsule did not appear", pollUntil(15_000) { find(service, CapsuleCopy.IDLE) })
             assertTrue("idle capsule was not clickable", click(service, CapsuleCopy.IDLE))
             assertNotNull("card did not open", pollUntil(5_000) { find(service, CardCopy.COLLAPSE) })
 
-            // 参照 = 测试页窗口(铺满主屏可用区);卡片窗口 = 里面有收起按钮(×)的那个浮层窗口
+            // Reference = the test page window (filling the main screen's usable area); card window = the overlay window that contains the collapse button (×)
             val screen = windowBounds(service) { it.text?.toString() == "taps:0" } ?: error("test page window not found")
             val card = pollUntil(5_000) { windowBounds(service) { it.contentDescription?.toString() == CardCopy.COLLAPSE } }
                 ?: error("card window not found")
@@ -99,12 +99,12 @@ class CapsuleWindowDeviceTest {
             find(service, CardCopy.COLLAPSE)?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             flags.setCapsuleMode(oldMode)
             flags.setQuitRequested(oldQuit)
-            instrumentation.runOnMainSync { app.capsule.resume() } // 胶囊控制器只在主线程上动窗口
+            instrumentation.runOnMainSync { app.capsule.resume() } // The capsule controller only moves windows on the main thread
             instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         }
     }
 
-    /** 第一个有节点满足 [match] 的窗口的屏幕边界;没有为 null。浮层窗口不经 uiautomator,只有自己服务看得见。 */
+    /** Screen bounds of the first window that has a node satisfying [match]; null if none. Overlay windows do not go through uiautomator, only our own service can see them. */
     private fun windowBounds(service: ScreenAccessibility, match: (AccessibilityNodeInfo) -> Boolean): android.graphics.Rect? {
         for (window in service.windowsOn(Display.DEFAULT_DISPLAY)) {
             val root = window.root ?: continue
@@ -123,7 +123,7 @@ class CapsuleWindowDeviceTest {
         return null
     }
 
-    /** 自己服务的浮层也在窗口列表里;只找用户看得见的节点,不可见窗口里的旧 Compose 树不算。 */
+    /** Our own service's overlays are in the window list too; only nodes visible to the user are considered, stale Compose trees in invisible windows do not count. */
     private fun find(service: ScreenAccessibility, description: String): AccessibilityNodeInfo? {
         for (window in service.windowsOn(Display.DEFAULT_DISPLAY)) {
             val root = window.root ?: continue
@@ -153,7 +153,7 @@ class CapsuleWindowDeviceTest {
     private fun click(service: ScreenAccessibility, description: String): Boolean =
         find(service, description)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
 
-    /** 页面中段的像素;避开状态栏、顶部胶囊和底部导航条。 */
+    /** Pixels from the middle band of the page; avoids the status bar, the top capsule and the bottom navigation bar. */
     private fun screenshot(): IntArray {
         val bitmap = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES).takeScreenshot()
         try {

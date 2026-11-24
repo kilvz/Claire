@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * 沙箱原生程序真机冒烟:启动器自检、PRoot 下跑 busybox 与 shell 管道。
- * 决定「nativeLibraryDir 里的 PRoot + 载入器」方案在真机上能否成立。根文件系统用随 APK 自带的那份。
+ * On-device smoke test for the sandbox native programs: launcher self-test, running busybox and shell pipelines under PRoot.
+ * Decides whether the "PRoot + loader in nativeLibraryDir" approach holds up on a real device. The root filesystem is the one bundled with the APK.
  */
 @RunWith(AndroidJUnit4::class)
 class SandboxSmokeTest {
@@ -57,7 +57,7 @@ class SandboxSmokeTest {
             put("TMPDIR", "/tmp")
         }
         val p = pb.start()
-        // 另起线程读输出,否则命令卡住时 readText 会一直阻塞,超时判断就失效了
+        // Read the output on a separate thread; otherwise readText blocks forever when the command hangs and the timeout check stops working
         var out = ""
         val reader = thread { out = p.inputStream.bufferedReader().readText() }
         if (!p.waitFor(60, TimeUnit.SECONDS)) {
@@ -78,10 +78,10 @@ class SandboxSmokeTest {
 
         internal fun lib(name: String) = File(nativeLibDir, name).absolutePath
 
-        /** 自己解根文件系统的设备测试用这套目录,跟真正装好的沙箱(files/sandbox)分开:测试不删也不改它。 */
+        /** Device tests that unpack their own root filesystem use this set of directories, kept separate from the real installed sandbox (files/sandbox): the tests neither delete nor modify it. */
         internal val testDirs get() = SandboxDirs(File(context.filesDir, "sandbox-test"), File(context.cacheDir, "proot-tmp-test"), File(nativeLibDir), AndroidFdSys.gate, SandboxOwner.of(context).sandboxTree)
 
-        /** 准备 [testDirs]:解好根文件系统,建好要绑定的目录(技能目录缺了 PRoot 会往输出里写警告)。 */
+        /** Prepare [testDirs]: unpack the root filesystem and create the directories to be bound (if the skills directory is missing, PRoot writes a warning to the output). */
         internal fun prepareTestSandbox(): SandboxDirs = testDirs.also {
             it.skills.mkdirs()
             it.tmp.mkdirs()
@@ -97,7 +97,7 @@ class SandboxSmokeTest {
             ensureRootfs(rootfs)
         }
 
-        /** 把随 APK 自带的运行环境解到 [dest](不联网);同一版本已解好的不重做。[dest] 不能是装好的沙箱。 */
+        /** Unpack the runtime bundled with the APK into [dest] (no network); if the same version is already unpacked, do not redo it. [dest] must not be the installed sandbox. */
         internal fun ensureRootfs(dest: File) {
             check(dest.canonicalPath != SandboxDirs(context).rootfs.canonicalPath) { "tests must not unpack over the installed sandbox" }
             val marker = File(dest, ".smoke-ready")

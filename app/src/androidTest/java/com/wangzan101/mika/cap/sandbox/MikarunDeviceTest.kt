@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * 启动器 mikarun 的真机用例:退出码、超时、断网、清场(脱离父进程的后代、Claire 被杀)。
- * 根文件系统与 SandboxSmokeTest 共用。
+ * On-device tests for the mikarun launcher: exit code, timeout, network off, cleanup (descendants detached from the parent process, Claire being killed).
+ * Shares the root filesystem with SandboxSmokeTest.
  */
 @RunWith(AndroidJUnit4::class)
 class MikarunDeviceTest {
@@ -51,7 +51,7 @@ class MikarunDeviceTest {
     fun parentDeathKillsWholeTree() {
         val marker = "1002"
         val inner = (launcher("--timeout", "600") + proot("/bin/sleep", marker)).joinToString(" ") { shQuote(it) }
-        // 「假父进程」:先报自己的 PID,再在后台起启动器并等它
+        // The "fake parent process": first reports its own PID, then starts the launcher in the background and waits for it
         val p = start(listOf("/system/bin/sh", "-c", "echo \$\$; $inner & wait"))
         try {
             val fakeParent = p.inputStream.bufferedReader().readLine().trim().toInt()
@@ -82,7 +82,7 @@ class MikarunDeviceTest {
                 val args = cmdline(it)
                 args.firstOrNull()?.endsWith("libmikarun.so") == true && script in args
             }
-            // 启动器来不及清场:靠 PRoot 的 PDEATHSIG 与 PTRACE_O_EXITKILL 带走全部沙箱进程
+            // The launcher has no time to clean up: rely on PRoot's PDEATHSIG and PTRACE_O_EXITKILL to take down every sandbox process
             Os.kill(launcherPid, OsConstants.SIGKILL)
             assertEquals("leftover sleep processes", emptyList<Int>(), awaitGone(marker, 3_000))
         } finally {
@@ -99,8 +99,8 @@ class MikarunDeviceTest {
 
     @Test
     fun netOffAllowsUnixSocket() {
-        // busybox 的 nc 不支持 AF_UNIX;改用 syslogd(在 /dev/log 上 bind)与 logger(connect)互通。
-        // /dev/log 绑到缓存目录里的一个文件,syslogd 会把它换成套接字。
+        // busybox's nc does not support AF_UNIX; use syslogd (binds on /dev/log) and logger (connects) to talk to each other instead.
+        // /dev/log is bound to a file in the cache directory, which syslogd replaces with a socket.
         val devLog = File(SandboxSmokeTest.prootTmp.parentFile, "mikarun-test-devlog").apply { delete(); writeText("") }
         val script = "syslogd -n -O /tmp/mikarun-unix.log & sleep 1; logger -t mikaprobe hello-unix; sleep 1; " +
             "kill \$!; cat /tmp/mikarun-unix.log; rm -f /tmp/mikarun-unix.log"
@@ -113,10 +113,10 @@ class MikarunDeviceTest {
 
     @Test
     fun netOnAllowsTcp() {
-        // 有的网络让 TCP 连上却不回应答:先在沙箱外挑一个真能拿到 HTTP 回复的地址,再让沙箱里连同一个
+        // Some networks let TCP connect but never answer: first pick, outside the sandbox, an address that really gets an HTTP reply, then have the sandbox connect to that same one
         val host = HTTP_PROBES.firstOrNull(::hostAnswersHttp)
         assumeTrue("no probe host answers HTTP on this network", host != null)
-        // busybox nc 读到标准输入结束就退出,不等回应:发完请求后让输入再开 3 秒,慢一点的服务器也来得及回
+        // busybox nc exits as soon as stdin ends and does not wait for the reply: keep stdin open 3 more seconds after sending the request, so slower servers still have time to answer
         val script = "(printf 'HEAD / HTTP/1.0\\r\\n\\r\\n'; sleep 3) | nc -w 3 $host 80"
         val r = run(launcher("--timeout", "20", "--net", "on") + proot("/bin/sh", "-c", script))
         assertTrue(r.output, r.output.contains("HTTP/"))
@@ -183,7 +183,7 @@ class MikarunDeviceTest {
         return Result(p.exitValue(), out, elapsedMs)
     }
 
-    /** 本 App 身份能看到的、命令行参数里有一项恰好等于 marker 的进程。 */
+    /** Processes visible under this app's identity whose command line has an argument exactly equal to marker. */
     private fun findProcesses(marker: String): List<Int> =
         File("/proc").listFiles().orEmpty().mapNotNull { dir ->
             dir.name.toIntOrNull()?.takeIf { cmdline(it).contains(marker) }
@@ -202,7 +202,7 @@ class MikarunDeviceTest {
         }
     }
 
-    /** 沙箱外直接发一个 HEAD,拿到「HTTP/」开头的回复才算这个地址可用。 */
+    /** Send a HEAD request directly from outside the sandbox; only an address whose reply starts with "HTTP/" counts as usable. */
     private fun hostAnswersHttp(host: String): Boolean = runCatching {
         Socket().use { socket ->
             socket.connect(InetSocketAddress(host, 80), 3_000)
@@ -216,7 +216,7 @@ class MikarunDeviceTest {
 
     companion object {
         private const val TAG = "MikarunDeviceTest"
-        /** 按 IP 直连(沙箱里不依赖 DNS)的公共 HTTP 端点,各地网络通的不一样,挑第一个答得上的。 */
+        /** Public HTTP endpoints reached by direct IP (no DNS dependency inside the sandbox); different networks can reach different ones, so the first that answers is picked. */
         private val HTTP_PROBES = listOf("1.1.1.1", "223.5.5.5", "1.0.0.1")
 
         @BeforeClass

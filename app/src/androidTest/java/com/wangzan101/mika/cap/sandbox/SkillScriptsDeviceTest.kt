@@ -26,8 +26,8 @@ import com.wangzan101.mika.core.device.access.AppAccessPolicy
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
 /**
- * 随 App 打包的可运行脚本在真沙箱里经 run_bundled_script 跑一遍(和模型用的是同一条路)。
- * 需要沙箱已装好;没装就跳过。
+ * Every runnable script bundled with the app is run once through run_bundled_script in a real sandbox (the same path the model uses).
+ * Requires the sandbox to be installed; skipped if it is not.
  */
 @RunWith(AndroidJUnit4::class)
 class SkillScriptsDeviceTest {
@@ -35,7 +35,7 @@ class SkillScriptsDeviceTest {
     private val ws = "skill-scripts-device-test"
     private val sb = AndroidSandbox(context, SandboxState.get(context))
 
-    /** run_bundled_script 不碰屏幕;任何屏幕调用都算测试写错了。appAccess 是只读的访问控制配置,不算碰屏幕。 */
+    /** run_bundled_script does not touch the screen; any screen call means the test is wrong. appAccess is a read-only access-control configuration, so it does not count as touching the screen. */
     private val noScreen = Proxy.newProxyInstance(ScreenPort::class.java.classLoader, arrayOf(ScreenPort::class.java)) { _, m, _ ->
         when (m.name) {
             "getAppAccess" -> AppAccessPolicy.ALLOW
@@ -62,7 +62,7 @@ class SkillScriptsDeviceTest {
         assertEquals(r.toString(), "0", r.s("exitCode"))
     }
 
-    /** 两页、每页一行文字的最小 PDF(Helvetica,无压缩),由测试当场生成。 */
+    /** Minimal two-page PDF with one line of text per page (Helvetica, uncompressed), generated on the spot by the test. */
     private fun samplePdf(vararg pages: String): ByteArray {
         val objs = mutableListOf<String>()
         val kids = pages.indices.joinToString(" ") { "${3 + it * 2} 0 R" }

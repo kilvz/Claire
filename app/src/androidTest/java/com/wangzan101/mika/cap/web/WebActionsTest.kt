@@ -26,7 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.coroutines.resume
 
-/** 真机测试:网页上的点击、打字、清空、滚动、后退都走真实输入,并诚实回读。不需要内置助手,不碰主屏。 */
+/** Device test: tapping, typing, clearing, scrolling and going back on a web page all use real input and are honestly read back. No built-in assistant needed, and the main screen is not touched. */
 @RunWith(AndroidJUnit4::class)
 class WebActionsTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
@@ -140,7 +140,7 @@ class WebActionsTest {
         val st = status()
         assertFalse(st, st.contains("inputs=0 "))
         assertTrue(st, st.endsWith("text=你好 Claire\""))
-        // 再打一次是替换,不是接在后面
+        // Typing again replaces the text rather than appending to it
         val s2 = screen.snapshot()
         assertEquals(Verification.MATCH, (screen.typeText(s2.ref("#editor"), s2.snapshotId, "第二次") as ActionResult.Ok).verification)
         assertTrue(status().endsWith("text=第二次\""))
@@ -263,7 +263,7 @@ class WebActionsTest {
         assertEquals(fixture("inputs.html"), s.web!!.url)
         assertEquals("inputs", s.web!!.title)
         assertEquals("t1", s.web!!.tabId)
-        // 端口自己为核实读的屏不登记编号,模型手里的编号仍可用
+        // The screen the port reads for its own verification gets no snapshot id, and the snapshot id the model holds still works
         screen.peek()
         assertTrue(screen.tapRef(s.ref("#noop"), s.snapshotId) is ActionResult.Ok)
     }
