@@ -25,7 +25,7 @@
     <string name="web_takeover_login">Sign in in Claire’s browser, then tap “Done”</string>
     <string name="web_takeover_waiting">Claire is waiting for you: %1$s</string>
     <string name="web_reason_security">Security check</string>
-    <!-- 任务结束后留在后台运行的那一页 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">Web page running in the background</string>
     <string name="kept_row_detail">%1$s · closes in %2$s</string>
     <string name="kept_close">Close page</string>

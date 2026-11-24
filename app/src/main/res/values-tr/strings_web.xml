@@ -25,7 +25,7 @@
     <string name="web_takeover_login">Claire\'nın tarayıcısında oturum açın, sonra \“Tamam\”a dokunun</string>
     <string name="web_takeover_waiting">Claire sizi bekliyor: %1$s</string>
     <string name="web_reason_security">Güvenlik kontrolü</string>
-    <!-- 任务结束后留在后台运行的那一页 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">Web sayfası arka planda çalışıyor</string>
     <string name="kept_row_detail">%1$s · %2$s içinde kapanır</string>
     <string name="kept_close">Sayfayı kapat</string>

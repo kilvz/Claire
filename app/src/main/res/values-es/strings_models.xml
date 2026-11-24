@@ -111,7 +111,7 @@
     </plurals>
     <string name="models_used_by">usado como %1$s</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">Usa tu plan de ChatGPT</string>
     <string name="chatgpt_use_plan_body">Completa las solicitudes de IA admisibles de esta app con el uso incluido en tu plan de ChatGPT o en tu saldo de créditos. Funciona con ChatGPT Plus y Pro. Claire es gratis; Claire no cobra nada.</string>
     <string name="chatgpt_continue">Continuar con ChatGPT</string>

@@ -116,7 +116,7 @@
     </plurals>
     <string name="models_used_by">используется как: %1$s</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">Использовать ваш тариф ChatGPT</string>
     <string name="chatgpt_use_plan_body">Подходящие запросы к ИИ в этом приложении будут выполняться за счёт лимитов вашего тарифа ChatGPT или баланса кредитов. Работает с ChatGPT Plus и Pro. Сама Claire бесплатна; она ничего не списывает.</string>
     <string name="chatgpt_continue">Продолжить через ChatGPT</string>

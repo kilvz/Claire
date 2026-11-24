@@ -107,7 +107,7 @@
     </plurals>
     <string name="models_used_by">%1$s在用</string>
 
-    <!-- 用 ChatGPT 登入 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">用你的 ChatGPT 方案</string>
     <string name="chatgpt_use_plan_body">用你 ChatGPT 方案裡包含的用量（或額度餘額）完成 Claire 裡符合條件的 AI 請求。ChatGPT Plus 和 Pro 可用。Claire 本身免費，不另外收費。</string>
     <string name="chatgpt_continue">使用 ChatGPT 繼續</string>
@@ -193,7 +193,7 @@
     <string name="signin_busy">另一個登入還沒結束，先完成或取消它。</string>
     <string name="signin_openrouter_name">%1$s（帳號登入）</string>
 
-    <!-- 設定 › 模型：語音轉文字這個用途和它的選擇頁 -->
+    <!-- Settings › Model: the speech-to-text purpose and its picker page -->
     <string name="role_speech">語音轉文字</string>
     <string name="role_speech_what">按住說話時用</string>
     <string name="speech_hint">線上服務使用你的服務商額度。</string>

@@ -126,7 +126,7 @@
     </plurals>
     <string name="models_used_by">يُستخدم بصفته %1$s</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">استخدم خطة ChatGPT الخاصة بك</string>
     <string name="chatgpt_use_plan_body">أنجز طلبات الذكاء الاصطناعي المؤهلة في هذا التطبيق باستخدام الاستهلاك المشمول في خطة ChatGPT أو رصيدك. يعمل مع ChatGPT Plus وPro. تطبيق Claire مجاني؛ ولا تفرض Claire أي رسوم.</string>
     <string name="chatgpt_continue">المتابعة باستخدام ChatGPT</string>

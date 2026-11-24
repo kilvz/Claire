@@ -25,7 +25,7 @@
     <string name="web_takeover_login">在 Claire 的瀏覽器裡登入,登好後點「完成」</string>
     <string name="web_takeover_waiting">Claire 在等你:%1$s</string>
     <string name="web_reason_security">安全驗證</string>
-    <!-- 任務結束後留在背景執行的那一頁 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">背景網頁在執行</string>
     <string name="kept_row_detail">%1$s · %2$s後自動關</string>
     <string name="kept_close">關閉網頁</string>

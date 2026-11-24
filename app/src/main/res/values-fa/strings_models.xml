@@ -106,7 +106,7 @@
     </plurals>
     <string name="models_used_by">استفاده به‌عنوان %1$s</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">استفاده از اشتراک ChatGPT</string>
     <string name="chatgpt_use_plan_body">درخواست‌های واجد شرایط این برنامه با سهمیهٔ اشتراک ChatGPT یا موجودی اعتبار شما انجام می‌شوند. با ChatGPT Plus و Pro کار می‌کند. خود میکا رایگان است و هزینه‌ای دریافت نمی‌کند.</string>
     <string name="chatgpt_continue">ادامه با ChatGPT</string>

@@ -107,7 +107,7 @@
     </plurals>
     <string name="models_used_by">%1$s在用</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">用你的 ChatGPT 套餐</string>
     <string name="chatgpt_use_plan_body">用你 ChatGPT 套餐里包含的用量（或额度余额）完成 Claire 里符合条件的 AI 请求。ChatGPT Plus 和 Pro 可用。Claire 本身免费，不另外收费。</string>
     <string name="chatgpt_continue">使用 ChatGPT 继续</string>
@@ -147,7 +147,7 @@
     <string name="models_retest_confirm_title">测试模型？</string>
     <string name="models_retest_confirm_body">Claire 将向服务商 %2$s 的模型 %1$s 发送一次工具调用测试请求。</string>
 
-    <!-- 账号登录：xAI / Grok（设备码）。 -->
+    <!-- Account sign-in: xAI / Grok (device code). -->
     <string name="account_signin_copied">已复制</string>
     <string name="account_signin_notif_title">正在登录账号</string>
     <string name="account_signin_notif_body">正在等你在浏览器里完成登录</string>
@@ -194,7 +194,7 @@
     <string name="signin_busy">另一个登录还没结束，先完成或取消它。</string>
     <string name="signin_openrouter_name">%1$s（账号登录）</string>
 
-    <!-- 设置 › 模型:语音转文字这个用途和它的选择页 -->
+    <!-- Settings › Model: the speech-to-text purpose and its picker page -->
     <string name="role_speech">语音转文字</string>
     <string name="role_speech_what">按住说话时用</string>
     <string name="speech_hint">在线服务使用你的服务商额度。</string>

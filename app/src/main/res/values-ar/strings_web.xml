@@ -25,7 +25,7 @@
     <string name="web_takeover_login">سجّل الدخول في متصفح Claire، ثم انقر على «تم»</string>
     <string name="web_takeover_waiting">Claire بانتظارك: %1$s</string>
     <string name="web_reason_security">فحص أمني</string>
-    <!-- 任务结束后留在后台运行的那一页 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">صفحة ويب تعمل في الخلفية</string>
     <string name="kept_row_detail">%1$s · تُغلق خلال %2$s</string>
     <string name="kept_close">إغلاق الصفحة</string>

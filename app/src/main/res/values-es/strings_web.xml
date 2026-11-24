@@ -25,7 +25,7 @@
     <string name="web_takeover_login">Inicia sesión en el navegador de Claire y luego toca “Listo”</string>
     <string name="web_takeover_waiting">Claire te está esperando: %1$s</string>
     <string name="web_reason_security">Verificación de seguridad</string>
-    <!-- 任务结束后留在后台运行的那一页 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">Página web en ejecución en segundo plano</string>
     <string name="kept_row_detail">%1$s · se cierra en %2$s</string>
     <string name="kept_close">Cerrar página</string>

@@ -25,7 +25,7 @@
     <string name="web_takeover_login">Войдите в браузере Claire и нажмите «Готово»</string>
     <string name="web_takeover_waiting">Claire ждёт вас: %1$s</string>
     <string name="web_reason_security">Проверка безопасности</string>
-    <!-- 任务结束后留在后台运行的那一页 -->
+    <!-- The page that keeps running in the background after a task ends -->
     <string name="kept_notif_title">Веб-страница работает в фоне</string>
     <string name="kept_row_detail">%1$s · закроется через %2$s</string>
     <string name="kept_close">Закрыть страницу</string>

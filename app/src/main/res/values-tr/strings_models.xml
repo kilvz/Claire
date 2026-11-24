@@ -107,7 +107,7 @@
     </plurals>
     <string name="models_used_by">%1$s olarak kullanılıyor</string>
 
-    <!-- 用 ChatGPT 登录 -->
+    <!-- Sign in with ChatGPT -->
     <string name="chatgpt_use_plan_title">ChatGPT planınızı kullanın</string>
     <string name="chatgpt_use_plan_body">Bu uygulamadaki uygun yapay zeka isteklerini, kullanımınız ChatGPT planınıza veya kredi bakiyenize dahil olacak şekilde tamamlayın. ChatGPT Plus ve Pro ile çalışır. Claire\'nın kendisi ücretsizdir; Claire tarafından hiçbir ücret alınmaz.</string>
     <string name="chatgpt_continue">ChatGPT ile devam et</string>
