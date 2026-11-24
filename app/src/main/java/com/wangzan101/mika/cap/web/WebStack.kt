@@ -18,8 +18,8 @@ import java.io.File
 import com.wangzan101.mika.core.workspace.SandboxTree
 
 /**
- * 一个任务的内置浏览器:自己的一块后台网页显示、一池标签、网页端口与隔离脚本引擎。
- * 每个任务一套(并行时各自的当前标签都挂在自己的显示上照常渲染)。在主线程上建和关。
+ * The built-in browser of one task: its own off-screen web display, its own tab pool, web ports, and an isolated script engine.
+ * One per task (when tasks run in parallel, each task's current tab is attached to its own display and renders as usual). Created and closed on the main thread.
  */
 class WebStack private constructor(
     private val context: Context,
@@ -27,19 +27,19 @@ class WebStack private constructor(
     val host: WebHost,
     val pool: WebTabPool,
     workspace: Workspace?,
-    /** 任务结束后留下一页时交给它;为 null 时不能留页(web_keep_open 报不可用)。 */
+    /** Receives the page left over after the task ends; when null no page can be kept (web_keep_open reports it as unavailable). */
     private val keeper: PageKeeper?,
 ) {
     /**
-     * 本对话的工作区:[dir] 是宿主目录(work/<对话>,不存在就建,不要求沙箱已安装);
-     * 下载写进去、上传从里面读,都经 [gate](打开一次、按句柄核实)。
+     * The workspace of this conversation: [dir] is the host directory (work/<conversation>, created if missing; the sandbox does not have to be installed).
+     * Downloads are written into it and uploads read from it, all through [gate] (opened once, verified by handle).
      */
     class Workspace(val dir: File, val gate: WorkspaceFileGate, val tree: SandboxTree)
 
-    // 下载在后台进行;任务结束一并取消,没下完的标 cancelled 并删掉半截文件
+    // Downloads run in the background; they are all cancelled when the task ends, and unfinished ones are marked cancelled and their partial files deleted
     private val transfers = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** 下载与上传;没有工作区时为空(两者都报不可用)。 */
+    /** Downloads and uploads; null when there is no workspace (both then report unavailable). */
     val files: WebFiles? = workspace?.let { w ->
         val downloads = WebDownloads(w.dir, w.gate, w.tree, NetProxy.shared.client(), cookies = { url -> WebTab.cookieManager().getCookie(url) }, scope = transfers)
         WebFiles(context, w.dir, downloads, w.gate, transfers)
@@ -47,22 +47,22 @@ class WebStack private constructor(
 
     val screen: WebScreen = WebScreen(pool, taskId, host, SystemClock::uptimeMillis, files, keptNow = keeper?.let { k -> { k.page.value } })
 
-    /** 留下的那一页记在谁名下(对话、运行记录、原话);任务结束时取。没给时不留页。 */
+    /** Records under whose name the kept page lives (conversation, run record, original words); read when the task ends. When unset, no page is kept. */
     @Volatile var keepOrigin: (() -> KeptOrigin)? = null
 
     init {
         files?.let { f -> pool.downloadHandler = { tab, url, ua, cd, mime -> onDownload(f, tab, url, ua, cd, mime) } }
     }
 
-    // 页面触发的下载:http(s) 直接取,blob: 让页面脚本读出来,data: 直接解;别的(如 intent:)不理。文件只保存,不打开。
-    // 三种都先问页面链接上给的名字(<a download>):下载监听只带响应头里的名字,blob:/data: 连响应头都没有
+    // Page-initiated downloads: http(s) is fetched directly, blob: is read out through page scripts, data: is decoded directly; anything else (e.g. intent:) is ignored. Files are only saved, never opened.
+    // All three first ask the page for the name on the link (<a download>): the download listener only carries the name from the response headers, and blob:/data: have no headers at all
     private fun onDownload(f: WebFiles, tab: WebTab, url: String, ua: String, cd: String?, mime: String?) {
         val d = f.downloads
         val pageName: suspend () -> String? = { screen.downloadName(tab, url) }
         when {
             url.startsWith("http://", true) || url.startsWith("https://", true) -> {
                 val referer = tab.view.url
-                // 自己因 TLS 连不上时改由页面用浏览器的网络栈去取:只给和当前页面同源的地址
+                // When our own TLS connection fails, let the page fetch it with the browser's network stack: only addresses same-origin with the current page are offered
                 val viaPage: (suspend (Long) -> Pair<ByteArray, String?>?)? = if (!sameOrigin(url, referer)) null else { max ->
                     (screen.readBlob(tab, url, max) as? PageScript.Blob.Ok)?.let { it.bytes to it.mime }
                 }
@@ -81,41 +81,41 @@ class WebStack private constructor(
         }
     }
 
-    /** 两个网址同源(协议、主机、端口都一样);有一个没有为 false。 */
+    /** Whether two URLs are same-origin (same scheme, host, and port); false if either is missing. */
     private fun sameOrigin(a: String, b: String?): Boolean {
         fun origin(u: String?) = u?.toHttpUrlOrNull()?.let { "${it.scheme}://${it.host}:${it.port}" }
         val x = origin(a) ?: return false
         return x == origin(b)
     }
 
-    /** 正交给用户的标签(接管中);没有为 null。 */
+    /** The tab currently handed to the user (during takeover); null if none. */
     @Volatile private var handedTab: WebTab? = null
 
-    /** 页面此刻在用户手上(接管中)。 */
+    /** The page is in the user's hands right now (during takeover). */
     val handedOver: Boolean get() = handedTab != null
 
-    /** 这个任务有没有当前标签(当前标签挂在网页显示上,看得见);只在后台临时标签里读过网页时没有。 */
+    /** Whether this task has a current tab (the current tab is attached to the web display and visible); false when the web was only read in a temporary background tab. */
     val hasVisibleTab: Boolean get() = pool.current(taskId) != null
 
-    /** 当前标签是借来的、用户看着的那一页(见 [borrow]):它不在网页显示上,画中画不放画面。 */
+    /** The current tab is the borrowed page the user is watching (see [borrow]): it is not on the web display, so picture-in-picture shows no frame. */
     val onBorrowedTab: Boolean get() = pool.current(taskId)?.let { pool.isExternal(it.id) } == true
 
-    // ---------- 借来的标签 ----------
+    // ---------- borrowed tabs ----------
 
     /**
-     * 借来用户在浏览器页上看着的标签 [tab],当成这个任务的当前标签(见 [WebTabPool.attachExternal]);生死仍归原来的主人。
-     * 借不进来(已关、崩了)返回 false。主线程。
+     * Borrows [tab], the tab the user is watching on the browser page, as this task's current tab (see [WebTabPool.attachExternal]); its life cycle still belongs to the original owner.
+     * Returns false when it cannot be borrowed (already closed, crashed). Main thread.
      */
     fun borrow(tab: WebTab): Boolean = pool.attachExternal(taskId, tab).also { if (it) Log.i(TAG, "task $taskId borrowed tab ${tab.id}") }
 
-    /** 还回借来的标签 [tab](任务结束、用户那边不再给了);不是借来的不动。主线程。 */
+    /** Returns the borrowed tab [tab] (the task ended, or the user's side no longer offers it); does nothing if it was not borrowed. Main thread. */
     fun giveBack(tab: WebTab) {
         if (pool.detachExternal(tab.id)) Log.i(TAG, "task $taskId returned tab ${tab.id}")
     }
 
     /**
-     * 借来的标签换成了 [next](用户的页面开了或关了弹出的窗口,看得见的成了另一个):原来那个还回去,新的借进来;
-     * 原来那个是当前标签时新的也是。主线程。
+     * The borrowed tab changed to [next] (the user's page opened or closed a popup window and another one is now visible): the old one is returned and the new one borrowed;
+     * if the old one was the current tab, the new one becomes current too. Main thread.
      */
     fun swapBorrowed(prev: WebTab, next: WebTab) {
         val wasCurrent = pool.current(taskId) === prev
@@ -124,9 +124,9 @@ class WebStack private constructor(
     }
 
     /**
-     * 用户关掉了借出页面所在的浏览器页,标签交给这个任务([adopt]):还回借的那一份,在池里收下同一个 WebView 当普通标签,
-     * 挂到网页显示上照常运行,页面状态(滚动、表单、单页应用的状态)不丢;任务结束时随别的标签一起关。收不下(已关、崩了)返回 false,
-     * 调用方自己销毁。主线程。
+     * The user closed the browser page hosting the lent page and the tab is handed to this task ([adopt]): the borrowed entry is returned, the same WebView is taken into the
+     * pool as an ordinary tab, attached to the web display and running as usual, so page state (scroll position, forms, single-page-app state) is not lost; it is closed with the
+     * other tabs when the task ends. Returns false when it cannot be taken in (already closed, crashed), in which case the caller destroys it itself. Main thread.
      */
     fun adopt(tab: WebTab): Boolean {
         val wasCurrent = pool.current(taskId) === tab
@@ -135,24 +135,24 @@ class WebStack private constructor(
     }
 
     /**
-     * 接管:把当前标签锁住,拿到主屏的接管界面里。没有当前标签、或界面打不开时返回 false。
-     * [actions] 把界面上的按钮交给任务(处理好了、我自己做完了、取消、先放着);[currentKey] 是任务此刻的等待编号。
+     * Takeover: locks the current tab and brings it into the takeover UI on the main screen. Returns false when there is no current tab or the UI cannot be opened.
+     * [actions] hands the UI buttons to the task (handed back, I finished it myself, cancel, leave it for now); [currentKey] is the task's current wait key.
      */
     fun showForTakeover(reason: String, message: String?, waitKey: Int, actions: (WebHandover.Action) -> Unit, currentKey: () -> Int?): Boolean {
         val tab = pool.current(taskId) ?: return false
         pool.lock(tab.id)
-        // 借来的标签本来就在用户眼前(浏览器页):不挪,锁住等用户在那里处理好了交回
+        // A borrowed tab is already in front of the user (on the browser page): do not move it, just lock it and wait for the user to hand it back once done there
         val shown = if (pool.isExternal(tab.id)) !tab.destroyed
             else WebHandover.show(context, tab, host, reason, message, waitKey, taskId, actions, currentKey)
         if (shown) handedTab = tab else pool.unlock(tab.id)
-        // 人机验证或访问拦截真把任务拦住了(要交给用户):把任务所在的网站记为碰到过拦截
+        // A CAPTCHA or access block genuinely stopped the task (it has to go to the user): record the task's site as having hit a block
         if (shown && reason in SiteRegistry.CHALLENGE_KINDS) {
             tab.view.url?.takeIf { it.startsWith("http") }?.let(WebUrlPolicy::host)?.let { WebSites.registry(context).challenged(it, reason) }
         }
         return shown
     }
 
-    /** 交回:结束接管界面、标签放回后台并解锁;[loggedIn] 时页面看得出已登录就把网站记为已登录。不在接管中为 null。 */
+    /** Hand back: closes the takeover UI, puts the tab back in the background and unlocks it; when [loggedIn] and the page looks signed in, the site is marked as signed in. Null when not in takeover. */
     fun returnFromTakeover(loggedIn: Boolean): HandoverActivity? {
         val tab = handedTab ?: return null
         handedTab = null
@@ -166,16 +166,16 @@ class WebStack private constructor(
         return r
     }
 
-    /** 借来的标签上用户摸了几下(接管交回时记进结果);由借出的一方给。 */
+    /** How many times the user touched the borrowed tab (recorded in the result when takeover hands back); supplied by the lending side. */
     @Volatile var borrowedTouches: ((WebTab) -> Int)? = null
 
     /**
-     * 任务结束:还在接管就先收回,再关掉这个任务的标签和显示。模型用 web_keep_open 标过一页时,那一页连同这块显示交给 [keeper]
-     * 留在后台接着运行(显示就不关了);交不出(那一页已关、崩了)时照常全关。
+     * Task end: take the takeover back first if still active, then close this task's tabs and display. When the model marked a page with web_keep_open, that page together with
+     * this display is handed to [keeper] to keep running in the background (so the display is not closed); if it cannot be handed off (the page was closed, crashed) everything is closed as usual.
      */
     fun close() {
         runCatching { returnFromTakeover(loggedIn = false) }.onFailure { Log.w(TAG, "takeover not returned cleanly", it) }
-        // 先从池里拿出要留的那一页,别的标签关掉时就不会把别的页挂到显示上顶掉它
+        // Take the page to keep out of the pool first, so closing other tabs cannot attach another page to the display and displace it
         val kept = runCatching { pool.closeKeeping(taskId, screen.keepMark?.tabId) }.onFailure { Log.w(TAG, "kept page not released", it) }.getOrNull()
         runCatching { pool.close() }
         val handed = kept != null && runCatching { handOff(kept) }.onFailure { Log.w(TAG, "kept page not handed off", it) }.getOrDefault(false)
@@ -185,7 +185,7 @@ class WebStack private constructor(
         transfers.cancel()
     }
 
-    /** 把留下的那一页交给 [keeper];收下了返回 true。 */
+    /** Hands the kept page to [keeper]; returns true when accepted. */
     private fun handOff(tab: WebTab): Boolean {
         val k = keeper ?: return false
         val origin = keepOrigin?.invoke() ?: return false
@@ -195,7 +195,7 @@ class WebStack private constructor(
     companion object {
         private const val TAG = "MikaWebStack"
 
-        /** 并行子任务各用一套后台浏览器，第一次导航或读网址时才建，子任务结束即关。 */
+        /** Each parallel subtask uses its own off-screen browser, created on the first navigation or URL read and closed as soon as the subtask ends. */
         internal fun childPort(
             context: Context, childId: String, widthPx: Int, heightPx: Int, densityDpi: Int,
             resources: ResourceScope, assetLoaders: List<WebViewAssetLoader> = emptyList(),
@@ -205,7 +205,7 @@ class WebStack private constructor(
             }.screen
         }
 
-        /** 建一套;系统 WebView 不可用等原因建不起来时抛出,调用方就只给手机界面。主线程调用。 */
+        /** Creates one; throws when it cannot be built (system WebView unavailable, etc.), in which case the caller only offers the phone UI. Call on the main thread. */
         fun create(
             context: Context, taskId: String, widthPx: Int, heightPx: Int, densityDpi: Int,
             assetLoaders: List<WebViewAssetLoader> = emptyList(),

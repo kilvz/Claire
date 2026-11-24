@@ -27,10 +27,10 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.web.WebTakeoverActivity
 
 /**
- * 网页接管界面:主屏全屏,顶部一条「Claire 在等你:<原因>」和按钮,下面是**同一个** WebView(从后台宿主挪过来)。
- * 任务接管:「处理好了」「我自己做完了」「取消任务」;系统返回键 = 先放着(任务仍在等待接管,通知还在)。
- * 设置页登录:只有「完成」,返回键直接关掉。
- * 接管结束([WebHandover.end])时界面自己关掉,视图放回后台宿主。
+ * Web takeover UI: full screen on the main display, with a "Claire is waiting for you: <reason>" bar and buttons at the top, and the **same** WebView below (moved over from the background host).
+ * Task takeover: "Hand back", "I finished it myself", "Cancel task"; the system back key = leave it for now (the task is still waiting for takeover and the notification remains).
+ * Settings-page login: only "Done", and the back key closes it directly.
+ * When the takeover ends ([WebHandover.end]) the UI closes itself and the view goes back to the background host.
  */
 open class WebTakeoverPage : Activity() {
     private var session: WebHandover.Session? = null
@@ -46,7 +46,7 @@ open class WebTakeoverPage : Activity() {
         }
     }
 
-    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    // On Android 12 and earlier, apply the language selected in the App; from 13 on the system applies it itself
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguage.wrap(newBase))
     }
@@ -67,13 +67,13 @@ open class WebTakeoverPage : Activity() {
             addView(header(s), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             addView(container, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         })
-        // 同一个 WebView:从后台宿主摘下,放进本界面
+        // The same WebView: detached from the background host and placed into this UI
         val view = s.tab.view
         (view.parent as? ViewGroup)?.removeView(view)
         container.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         view.requestFocus()
         ticker.post(recordPage)
-        // 接管在别处结束了(通知按钮、超时、取消):关掉本界面,视图由 WebHandover 放回
+        // The takeover ended elsewhere (notification button, timeout, cancel): close this UI; WebHandover puts the view back
         scope.launch {
             WebHandover.session.collect { now -> if (now !== s) leave() }
         }
@@ -123,7 +123,7 @@ open class WebTakeoverPage : Activity() {
         s.onAction(action)
     }
 
-    // 用户对页面的每一下触摸(按下)和按键都记一次;点顶部按钮不算
+    // Every touch (down) and key press the user makes on the page counts once; taps on the top bar do not
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val s = session
         if (s != null && ev.actionMasked == MotionEvent.ACTION_DOWN && ::container.isInitialized) {
@@ -139,7 +139,7 @@ open class WebTakeoverPage : Activity() {
         return super.dispatchKeyEvent(event)
     }
 
-    /** 系统返回键:任务接管 = 先放着;设置页登录 = 关掉。 */
+    /** System back key: task takeover = leave it for now; settings-page login = close. */
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val s = session ?: return super.onBackPressed()
@@ -162,9 +162,9 @@ open class WebTakeoverPage : Activity() {
     override fun onDestroy() {
         ticker.removeCallbacks(recordPage)
         scope.cancel()
-        // 视图不能随本界面一起销毁:先摘下,由 WebHandover 放回后台宿主
+        // The view must not be destroyed along with this UI: detach it first, and WebHandover puts it back into the background host
         if (::container.isInitialized) container.removeAllViews()
-        // 界面被划掉、而接管还没结束:任务接管按「先放着」处理,设置页登录直接结束
+        // The UI was swiped away while the takeover has not ended: task takeover is treated as "leave it for now", settings-page login ends outright
         session?.let { s ->
             if (WebHandover.session.value === s && isFinishing && !isChangingConfigurations) {
                 if (s.loginMode) WebHandover.end() else s.onAction(WebHandover.Action.PutAside)

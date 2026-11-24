@@ -16,8 +16,8 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
- * 项目分组:一组共用同一个沙箱工作区的对话。
- * v1 只保留核心标识、名字和时间戳;更多配置(默认人格、项目说明)以后按可选字段加进 JSON。
+ * Project grouping: a group of conversations sharing the same sandbox workspace.
+ * v1 keeps only the core identity, name and timestamps; more configuration (default persona, project instructions) will be added to the JSON later as optional fields.
  */
 @Serializable
 data class Project(
@@ -31,8 +31,8 @@ data class Project(
 private data class ProjectFile(val version: Int = 1, val projects: List<Project> = emptyList())
 
 /**
- * 项目列表:`files/projects/projects-v1.json`。原子写、带版本号,读不懂时把原文件另存成 `.bad-<时间>` 并当空列表。
- * 同一进程一份,由 [com.wangzan101.mika.MikaApp] 给出。
+ * The project list: `files/projects/projects-v1.json`. Atomic writes with a version number; when it cannot be parsed, the original file is saved as `.bad-<time>` and treated as an empty list.
+ * One per process, provided by [com.wangzan101.mika.MikaApp].
  */
 class ProjectStore(
     private val dir: File,
@@ -118,7 +118,7 @@ class ProjectStore(
                 .filter { isValidId(it.id) && it.name.isNotBlank() }
                 .distinctBy { it.id }
         }.getOrElse {
-            // 读不懂的旧文件留着,别被下一次保存直接盖掉
+            // Keep the unreadable old file so the next save does not simply overwrite it
             runCatching { file.renameTo(File(dir, "${file.name}.bad-${clock()}")) }
             emptyList()
         }

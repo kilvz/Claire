@@ -21,12 +21,12 @@ import java.io.Closeable
 import com.wangzan101.mika.core.cap.web.ExternalLink as Link
 import com.wangzan101.mika.cap.web.cdp.WebDevtools
 
-/** 标签池里发生的事:新开、关掉(原因)、崩溃、拦下的跳 App 链接、内存回收后切回时重新加载。 */
+/** Things that happen in the tab pool: a new tab, a close (with reason), a crash, a blocked app-jump link, and a reload when switching back after memory reclamation. */
 sealed interface PoolEvent {
     data class NewTab(val tabId: String, val taskId: String, val fromPopup: Boolean) : PoolEvent
     /**
-     * [reason]:closed 主动关、limit 超出上限关掉最久没用的、task_end 任务结束、popup_other_site 弹出窗口要去别的网站;
-     * 借来的标签([WebTabPool.attachExternal])还回去时是 returned,任务结束时留在后台([WebTabPool.release])是 kept(这两种标签本身没关)。
+     * [reason]: closed for a deliberate close, limit when the cap evicted the least recently used one, task_end when the task ended, popup_other_site when a popup wanted another site;
+     * returned when a borrowed tab ([WebTabPool.attachExternal]) is given back, and kept when it stays in the background after the task ends ([WebTabPool.release]) (in both cases the tab itself is not closed).
      */
     data class Closed(val tabId: String, val reason: String) : PoolEvent
     data class Crashed(val tabId: String) : PoolEvent
@@ -35,49 +35,49 @@ sealed interface PoolEvent {
 }
 
 /**
- * 网页标签池:每个任务至多 [perTask] 个标签;所有任务合起来至多 [budget] 的上限(跨任务共用一份);
- * 超出时关掉本任务最久没用的那个,本任务没有可关的才关别的任务里最久没用的。
- * 同一时间只有最近打开或切到的那个标签挂在 [host] 上绘制,其余在后台照常运行(页面看到的是后台标签)。
- * 页面弹出的新窗口只在用户点了(有手势)时才在池里开新标签,并且只能是同一网站;跳 App 的链接不跳,发 [PoolEvent.ExternalLink]。
- * 渲染进程崩溃:销毁该标签,发 [PoolEvent.Crashed],下一次打开网址开新标签。
- * 系统内存紧张时关掉后台标签只记下地址,切回时重新加载;页面加载完、任务结束、App 进入后台时把 Cookie 写盘,登录不丢。
- * 借来的标签([attachExternal],用户在浏览器页上看着的那一个):当成任务的当前标签用,但不归池管——不挂到 [host] 上(它在用户的界面里),
- * 不算上限、不被腾位置或内存回收关掉,池也不接它上面的事(下载、弹窗、登录探查由它原来的主人管);关它、任务结束时只是还回去([detachExternal]),不销毁。
+ * The web tab pool: at most [perTask] tabs per task, and at most the [budget] cap across all tasks (one shared across tasks);
+ * when exceeded, this task's least recently used tab is closed, and only when this task has none to close is the least recently used tab of another task closed.
+ * Only the most recently opened or switched-to tab is attached to [host] for drawing at any time; the rest keep running in the background (pages see a background tab).
+ * A new window opened by a page creates a new tab in the pool only when the user clicked (there is a gesture), and only for the same site; app-jump links are not followed and emit [PoolEvent.ExternalLink].
+ * Renderer crash: the tab is destroyed, [PoolEvent.Crashed] is emitted, and the next URL open creates a new tab.
+ * Under system memory pressure, background tabs are closed with only their URL recorded and reloaded when switched back; cookies are flushed to disk when a page finishes loading, when a task ends, and when the App goes to the background, so logins are not lost.
+ * Borrowed tabs ([attachExternal], the one the user is watching on the browser page): used as the task's current tab but not managed by the pool -- not attached to [host] (it lives in the user's UI),
+ * not counted against the cap, not evicted or closed by memory reclamation, and the pool does not take its events (downloads, popups, login probes are handled by its original owner); closing it or ending the task only gives it back ([detachExternal]), never destroying it.
  *
- * 会动到 WebView 的方法([open]、[switchTo]、[close]、[closeAll]、[list]、[onTrimMemory])都在主线程调用;
- * [current]、[isLive]、[crashedTab] 任意线程可调。
+ * Methods that touch WebViews ([open], [switchTo], [close], [closeAll], [list], [onTrimMemory]) are called on the main thread;
+ * [current], [isLive], [crashedTab] may be called from any thread.
  */
 class WebTabPool(
     private val context: Context,
     private val host: WebHost,
     private val perTask: Int = 4,
-    /** 各任务共用的标签总数上限;默认是进程里那一份。 */
+    /** The total tab cap shared by all tasks; defaults to the process-wide instance. */
     private val budget: TabBudget = WebOwner.of(context).tabBudget,
     private val assetLoaders: List<WebViewAssetLoader> = emptyList(),
     private val registry: SiteRegistry? = null,
-    /** 池里标签的 DevTools 会话入口;默认是进程里那一份。 */
+    /** DevTools session entry point for tabs in the pool; defaults to the process-wide instance. */
     private val devtools: WebDevtools = WebDevtools.of(context),
 ) : WebTab.Listener, Closeable, TabBudget.Member {
     /**
-     * [background]:读页用的临时后台标签,不当当前标签、不进标签列表、不算上限,读完即关(见 [openBackground])。
-     * [external]:借来的标签(见 [attachExternal]),不算上限,关的时候只还回去。
+     * [background]: a temporary background tab for page reads; not made current, not in the tab list, not counted against the cap, and closed as soon as the read is done (see [openBackground]).
+     * [external]: a borrowed tab (see [attachExternal]); not counted against the cap, and closing it only gives it back.
      */
     private class Entry(
         val id: String, val taskId: String, var tab: WebTab?, var url: String?, var title: String, var lastUsed: Long,
         val background: Boolean = false, val external: Boolean = false,
     ) {
-        /** 算进每任务和全局上限、可以被腾位置关掉的普通标签。 */
+        /** An ordinary tab counted toward the per-task and global caps that may be evicted to make room. */
         val counted: Boolean get() = !background && !external
     }
 
     private val entries = LinkedHashMap<String, Entry>()
     private val currentByTask = HashMap<String, String>()
     private val crashedByTask = HashMap<String, String>()
-    /** 正交给用户处理(接管中)的标签:任务不能操作它,池也不关它、不回收它。 */
+    /** Tabs currently handed to the user (during takeover): the task cannot operate them, and the pool neither closes nor reclaims them. */
     private val locked = HashSet<String>()
     private var counter = 0
     private val main = Handler(Looper.getMainLooper())
-    /** 各标签等着跑的登录状态探查(主线程动)。 */
+    /** Pending login-state probes per tab (touched on the main thread). */
     private val loginProbes = HashMap<String, Runnable>()
 
     private val _events = MutableSharedFlow<PoolEvent>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -95,7 +95,7 @@ class WebTabPool(
         budget.join(this)
     }
 
-    /** 在任务里开一个新标签并切过去;[url] 不为空时开始加载(不等加载完)。 */
+    /** Opens a new tab in the task and switches to it; when [url] is not null, starts loading it (without waiting for the load to finish). */
     fun open(taskId: String, url: String?): WebTab {
         checkMain()
         makeRoom(taskId, keep = null)
@@ -109,8 +109,8 @@ class WebTabPool(
     }
 
     /**
-     * 开一个临时后台标签给读页用:不切过去、不挂到宿主上(没人给它排版,按 [width]×[height] 量一次,页面才有视口),
-     * 不出现在 [list] 里,不算每任务和全局的标签上限(同时有几个由调用方限定),也不会被腾位置或内存回收关掉。用完调 [close]。
+     * Opens a temporary background tab for page reads: not switched to, not attached to the host (nothing lays it out, so it is measured once at [width]x[height] to give the page a viewport),
+     * not listed by [list], not counted toward the per-task and global caps (how many run at once is bounded by the caller), and never evicted or closed by memory reclamation. Call [close] when done.
      */
     fun openBackground(taskId: String, width: Int, height: Int): WebTab {
         checkMain()
@@ -128,9 +128,9 @@ class WebTabPool(
     fun current(taskId: String): WebTab? = currentByTask[taskId]?.let { entries[it]?.tab }
 
     /**
-     * 把一个不归池管的标签(用户在浏览器页上看着的那一个)借给任务 [taskId],当成它的当前标签:之后网页工具读它、在它上面操作,
-     * 和池里的标签一样。不挂到 [host] 上、不算上限、不接管它的监听;同一个标签已经借进来了就只切过去。
-     * 已关的、崩了的、编号和池里的标签撞了的借不进来,返回 false。主线程。
+     * Lends a tab not managed by the pool (the one the user is watching on the browser page) to task [taskId] as its current tab: web tools then read it and act on it
+     * like a pooled tab. It is not attached to [host], not counted against the cap, and its listener is not taken over; if the same tab is already borrowed, it is only made current.
+     * Closed tabs, crashed tabs, and tabs whose id collides with a pooled tab cannot be borrowed and return false. Main thread.
      */
     fun attachExternal(taskId: String, tab: WebTab): Boolean {
         checkMain()
@@ -149,8 +149,8 @@ class WebTabPool(
     }
 
     /**
-     * 还回借来的标签 [tabId]:从池里拿掉,不销毁、不动它的视图;是当前标签时换成本任务最近用过的另一个(没有就没有当前标签)。
-     * 不是借来的返回 false。主线程。
+     * Gives back the borrowed tab [tabId]: removes it from the pool without destroying it or touching its view; if it was the current tab, the task's most recently used other tab
+     * becomes current (with none, there is no current tab). Returns false if it was not borrowed. Main thread.
      */
     fun detachExternal(tabId: String): Boolean {
         checkMain()
@@ -160,9 +160,9 @@ class WebTabPool(
     }
 
     /**
-     * 收下一个原来不归池管的标签 [tab] 当任务 [taskId] 的普通标签(借出页面的浏览器页关掉了,页面交给任务接着用):
-     * 接它上面的事、算上限、可被腾位置,任务结束时随别的一起关。[current] 或任务还没有当前标签时切过去、挂到宿主上,否则在后台。
-     * 已关、崩了、编号已在池里的收不下,返回 false。主线程。
+     * Takes in a tab [tab] that was not managed by the pool as an ordinary tab of task [taskId] (the browser page hosting the lent page was closed and the page is handed to the task):
+     * its events are taken over, it counts against the cap, it may be evicted, and it is closed with the others when the task ends. It becomes current and is attached to the host when
+     * [current] is true or the task has no current tab; otherwise it stays in the background. Closed tabs, crashed tabs, and ids already in the pool cannot be taken in and return false. Main thread.
      */
     fun adopt(taskId: String, tab: WebTab, current: Boolean): Boolean {
         checkMain()
@@ -182,9 +182,9 @@ class WebTabPool(
     }
 
     /**
-     * 任务结束时把要留下的标签 [tabId] 交出去(见 [PageKeeper]):从池里拿掉,不销毁、不从宿主上摘下来,也不把别的标签挂上去
-     * (它是当前标签时这个任务就没有当前标签了);之后不再接它上面的事、不算上限、不随任务关。发 Closed(kept)。
-     * 借来的、临时后台的、被内存回收过的、崩了的、不存在的交不出,返回 null。主线程。
+     * At task end, hands out the tab [tabId] to be kept (see [PageKeeper]): removed from the pool without destroying it, detaching it from the host, or attaching another tab
+     * (if it was the current tab, this task no longer has one); afterwards its events are no longer taken, it does not count against the cap, and it is not closed with the task. Emits Closed(kept).
+     * Borrowed tabs, temporary background tabs, reclaimed tabs, crashed tabs, and unknown tabs cannot be handed out and return null. Main thread.
      */
     fun release(tabId: String): WebTab? {
         checkMain()
@@ -202,14 +202,14 @@ class WebTabPool(
         return tab
     }
 
-    /** [tabId] 是借来的标签(见 [attachExternal])。 */
+    /** Whether [tabId] is a borrowed tab (see [attachExternal]). */
     @Synchronized
     fun isExternal(tabId: String): Boolean = entries[tabId]?.external == true
 
     @Synchronized
     fun isLive(tabId: String): Boolean = entries[tabId]?.tab != null
 
-    /** 接管开始:锁住标签,直到 [unlock]。 */
+    /** Takeover starts: locks the tab until [unlock]. */
     @Synchronized
     fun lock(tabId: String) {
         locked += tabId
@@ -223,11 +223,11 @@ class WebTabPool(
     @Synchronized
     fun isLocked(tabId: String): Boolean = tabId in locked
 
-    /** 这个任务最近崩溃、且之后还没开过新标签的那个标签;没有为 null。 */
+    /** The tab of this task that crashed most recently and has not been replaced by a new tab since; null if none. */
     @Synchronized
     fun crashedTab(taskId: String): String? = crashedByTask[taskId]
 
-    /** 切到本任务的某个标签;不是本任务的、或不存在的为 null。被内存回收过的标签重新加载并发 [PoolEvent.Reloaded]。 */
+    /** Switches to one of this task's tabs; null for tabs of other tasks or nonexistent ones. A reclaimed tab is reloaded and [PoolEvent.Reloaded] is emitted. */
     fun switchTo(taskId: String, tabId: String): WebTab? {
         checkMain()
         val entry = synchronized(this) { entries[tabId]?.takeIf { it.taskId == taskId } } ?: return null
@@ -242,10 +242,10 @@ class WebTabPool(
         return tab
     }
 
-    /** 关掉一个标签(不论哪个任务的)。任务自己关标签用 close(taskId, tabId)。 */
+    /** Closes a tab (of any task). A task closing its own tab uses close(taskId, tabId). */
     fun close(tabId: String) = remove(tabId, PoolEvent.Closed(tabId, "closed"))
 
-    /** 任务关自己的标签;不是这个任务的、不存在的、或正交给用户处理的返回 false,不关。 */
+    /** A task closes its own tab; returns false and does not close it when the tab belongs to another task, does not exist, or is currently with the user. */
     fun close(taskId: String, tabId: String): Boolean {
         checkMain()
         if (synchronized(this) { entries[tabId]?.taskId != taskId || tabId in locked }) return false
@@ -253,20 +253,20 @@ class WebTabPool(
         return true
     }
 
-    /** 退出一个网站:过期它的 Cookie、清它的网页存储、从站点登记表里去掉(尽力而为,见 [WebLogin])。返回过期的 Cookie 个数。 */
+    /** Logs out of one site: expires its cookies, clears its web storage, and removes it from the site registry (best effort, see [WebLogin]). Returns the number of expired cookies. */
     fun clearSiteData(host: String): Int {
         checkMain()
         return WebLogin(WebTab.cookieManager(), WebTab.webStorage(), registry).logout(host)
     }
 
-    /** 全部退出并清除网页数据。开着的标签不关,但已经没有登录状态。 */
+    /** Logs out everywhere and clears web data. Open tabs are not closed, but they no longer have any login state. */
     fun clearAll() {
         checkMain()
         val views = synchronized(this) { entries.values.mapNotNull { it.tab?.view } }
         WebLogin(WebTab.cookieManager(), WebTab.webStorage(), registry).logoutAll(views, WebViewDatabase.getInstance(context))
     }
 
-    /** 任务结束:关掉它开的全部标签(借来的还回去),Cookie 写盘(登录状态不随标签关闭丢失)。 */
+    /** Task end: closes every tab it opened (borrowed ones are given back) and flushes cookies to disk (login state is not lost when the tabs close). */
     fun closeAll(taskId: String) {
         checkMain()
         val ids = synchronized(this) { entries.values.filter { it.taskId == taskId }.map { it.id } }
@@ -276,8 +276,8 @@ class WebTabPool(
     }
 
     /**
-     * 任务 [taskId] 结束、要留下 [keep] 那一页:先把它交出来([release]),再关掉这个任务别的标签([closeAll])。
-     * 交出来的标签由调用方接着管;[keep] 为 null 或交不出时为 null(照常全关)。主线程。
+     * Task [taskId] ends and the page [keep] is to be kept: it is handed out first ([release]), then the task's other tabs are closed ([closeAll]).
+     * The handed-out tab is managed by the caller from then on; null when [keep] is null or cannot be handed out (everything is closed as usual). Main thread.
      */
     fun closeKeeping(taskId: String, keep: String?): WebTab? {
         checkMain()
@@ -286,7 +286,7 @@ class WebTabPool(
         return tab
     }
 
-    /** 本任务的标签,按打开顺序。 */
+    /** This task's tabs, in opening order. */
     fun list(taskId: String): List<TabInfo> {
         checkMain()
         val (rows, cur) = synchronized(this) { entries.values.filter { it.taskId == taskId && !it.background } to currentByTask[taskId] }
@@ -297,8 +297,8 @@ class WebTabPool(
     }
 
     /**
-     * 内存紧张(RUNNING_LOW 及以上,或已在后台被要求释放)时关掉每个任务的非当前标签,只记地址;
-     * App 进入后台(UI_HIDDEN)时把 Cookie 写盘。
+     * Under memory pressure (RUNNING_LOW and above, or already in the background and asked to release), closes each task's non-current tabs keeping only their URLs;
+     * when the App goes to the background (UI_HIDDEN), flushes cookies to disk.
      */
     fun onTrimMemory(level: Int) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -323,7 +323,7 @@ class WebTabPool(
         }
     }
 
-    /** 关掉所有任务的标签,不再接收系统内存回调。 */
+    /** Closes all tasks' tabs and stops receiving system memory callbacks. */
     override fun close() {
         checkMain()
         val tasks = synchronized(this) { entries.values.map { it.taskId }.toSet() }
@@ -332,7 +332,7 @@ class WebTabPool(
         context.applicationContext.unregisterComponentCallbacks(memory)
     }
 
-    // ---------- 全局上限 ----------
+    // ---------- global cap ----------
 
     @Synchronized
     override fun tabCount(): Int = entries.values.count { it.counted }
@@ -343,7 +343,7 @@ class WebTabPool(
 
     override fun evictForBudget(tabId: String) = remove(tabId, PoolEvent.Closed(tabId, "limit"))
 
-    // ---------- 标签上的事 ----------
+    // ---------- events on tabs ----------
 
     override fun onPageFinished(tab: WebTab) {
         val url = tab.view.url
@@ -359,8 +359,9 @@ class WebTabPool(
     }
 
     /**
-     * 页面脚本多在加载完成后才画出账号区:等页面停下来再看登录状态,登记表跟着页面的真实状态走。
-     * 又加载了(跳转)就重新计时;只看任务正在用、挂在宿主上的标签;地址还在变或还在加载就再等,至多几次。主线程。
+     * Page scripts usually draw the account area only after loading finishes: wait for the page to settle, then look at the login state, so the registry follows the page's real state.
+     * If it loads again (redirect), restart the timer; only tabs the task is using and that are attached to the host are examined; if the URL is still changing or it is still loading,
+     * wait again, up to a few times. Main thread.
      */
     private fun scheduleLoginProbe(tab: WebTab, attempt: Int) {
         val r = registry ?: return
@@ -382,15 +383,15 @@ class WebTabPool(
     }
 
     override fun onCrashed(tab: WebTab) {
-        // 在回调之外销毁,别在 WebView 自己的回调栈里调 destroy
+        // Destroy outside the callback; never call destroy from inside the WebView's own callback stack
         main.post {
-            // 临时后台标签崩了不算任务的标签崩了:读页那边自己报
+            // A temporary background tab crashing does not count as the task's tab crashing: the page-read side reports it itself
             synchronized(this) { if (entries[tab.id]?.background != true) crashedByTask[tab.ownerTaskId] = tab.id }
             remove(tab.id, PoolEvent.Crashed(tab.id), force = true)
         }
     }
 
-    /** 页面触发的下载交给它(任务把它接到工作区);为空时忽略。主线程回调:(标签, 网址, UA, Content-Disposition, 类型)。 */
+    /** Page-triggered downloads go here (the task routes them into the workspace); ignored when null. Main-thread callback: (tab, URL, UA, Content-Disposition, MIME type). */
     var downloadHandler: ((WebTab, String, String, String?, String?) -> Unit)? = null
 
     override fun onDownload(tab: WebTab, url: String, userAgent: String, contentDisposition: String?, mime: String?) {
@@ -403,7 +404,7 @@ class WebTabPool(
     }
 
     override fun onCreateWindow(tab: WebTab, isUserGesture: Boolean, resultMsg: Message): Boolean {
-        // 不经用户操作的弹窗一律不开
+        // Never open a popup without a user action
         if (!isUserGesture) return false
         val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
         makeRoom(tab.ownerTaskId, keep = tab.id)
@@ -420,7 +421,7 @@ class WebTabPool(
         main.post { remove(tab.id, PoolEvent.Closed(tab.id, "popup_other_site")) }
     }
 
-    // ---------- 内部 ----------
+    // ---------- internals ----------
 
     private fun create(taskId: String): WebTab {
         val id = synchronized(this) { "t${++counter}" }
@@ -441,13 +442,13 @@ class WebTabPool(
             currentByTask[entry.taskId] = entry.id
             entry.lastUsed = budget.tick()
         }
-        // 借来的标签留在用户的界面里;宿主上原来挂着的那个照样留着(在后台照常运行)
+        // A borrowed tab stays in the user's UI; whatever was already attached to the host stays attached (and keeps running in the background as usual)
         if (!entry.external) entry.tab?.let { host.attach(it) }
     }
 
     /**
-     * 为本任务腾出一个位置:本任务满了关它最久没用的;所有任务合起来满了,先关本任务的,没有再关别处最久没用的。
-     * [keep] 和锁住(接管中)的不关,但照样算数。实在没有可关的就不关(宁可略超,也不动用户手上的页面)。
+     * Makes room for this task: when this task is full, close its least recently used tab; when all tasks together are full, close this task's first and, only if there is none,
+     * the least recently used one elsewhere. [keep] and locked (in takeover) tabs are not closed but still count. If there is truly nothing to close, nothing is closed (better to overshoot slightly than to touch a page in the user's hands).
      */
     private fun makeRoom(taskId: String, keep: String?) {
         while (true) {
@@ -464,7 +465,7 @@ class WebTabPool(
         }
     }
 
-    /** 关掉一个标签;接管中(锁住)的不关,除非 [force](渲染进程已经没了、还回借来的标签)。借来的只拿掉,不销毁。 */
+    /** Closes a tab; a locked one (in takeover) is not closed unless [force] (the renderer is already gone, a borrowed tab is being given back). A borrowed tab is only removed, never destroyed. */
     private fun remove(tabId: String, event: PoolEvent, force: Boolean = false) {
         checkMain()
         val (entry, next) = synchronized(this) {
@@ -486,7 +487,7 @@ class WebTabPool(
             it.destroy()
         }
         next?.let { n ->
-            // 下一个当前标签若被内存回收过,等任务切到它时再重新加载;借来的留在用户那里
+            // If the next current tab was reclaimed, it reloads when the task switches to it; a borrowed one stays with the user
             if (!n.external) n.tab?.let { host.attach(it) }
         }
         emit(event)

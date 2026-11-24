@@ -42,12 +42,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 一个网页标签:一个 WebView 加它的加载状态。默认打开桌面版网页,按站点可换回手机版(见 [WebDevtools])。
- * 必须在主线程创建;[assetLoaders] 只给本地夹具这类 App 自带的网页用(每个域名一个)。
- * 系统支持多配置时用名为 mika 的独立网页配置(Cookie、存储与系统里别的 WebView 分开)。
- * 页面的权限申请(定位、相机、麦克风、MIDI、受保护媒体)默认静默拒绝;用户自己看的标签由界面问用户。
- * 跳 App 的链接不跳;下载暂不接收。
- * 页面弹框(alert/confirm/prompt、离开页面确认)不弹系统对话框,记进 [dialogs] 等 Agent(或用户自己用的浏览器页)回话。
+ * One web tab: a WebView plus its load state. Desktop pages are opened by default, switchable back to mobile per site (see [WebDevtools]).
+ * Must be created on the main thread; [assetLoaders] serve only App-bundled pages such as local fixtures (one per domain).
+ * When the system supports multiple profiles, a separate web profile named mika is used (cookies and storage kept apart from other WebViews in the system).
+ * Page permission requests (geolocation, camera, microphone, MIDI, protected media) are silently denied by default; for tabs the user is watching, the UI asks the user.
+ * Links that jump to an app are not followed; downloads are not accepted yet.
+ * Page dialogs (alert/confirm/prompt, leave-page confirmation) are not shown as system dialogs; they are recorded in [dialogs] and wait for the Agent (or the browser page the user is using) to answer.
  */
 @SuppressLint("SetJavaScriptEnabled")
 class WebTab(
@@ -55,119 +55,119 @@ class WebTab(
     val id: String,
     ownerTaskId: String,
     private val assetLoaders: List<WebViewAssetLoader> = emptyList(),
-    /** 这个标签的 DevTools 会话入口;默认是进程里那一份。 */
+    /** DevTools session entry point for this tab; defaults to the process-wide instance. */
     val devtools: WebDevtools = WebDevtools.of(context),
 ) {
-    /** 标签池接收标签上发生的事。都在主线程回调。 */
+    /** The tab pool receives the events that happen on a tab. All callbacks are on the main thread. */
     interface Listener {
         fun onPageFinished(tab: WebTab) {}
         fun onCrashed(tab: WebTab) {}
         fun onExternalLink(tab: WebTab, link: ExternalLink) {}
-        /** 页面要开新窗口;返回 true 表示已接下(把新标签的 WebView 交给 [resultMsg])。 */
+        /** The page wants to open a new window; return true to accept it (hand the new tab's WebView to [resultMsg]). */
         fun onCreateWindow(tab: WebTab, isUserGesture: Boolean, resultMsg: Message): Boolean = false
-        /** 弹出的新标签第一次要去别的网站:标签池关掉它。 */
+        /** A new popup tab is about to go to a different site for the first time: the tab pool closes it. */
         fun onPopupRefused(tab: WebTab, url: String) {}
-        /** 页面要关掉自己这个窗口(window.close())。 */
+        /** The page wants to close its own window (window.close()). */
         fun onCloseWindow(tab: WebTab) {}
-        /** 页面触发了下载(只保存,不打开、不安装)。 */
+        /** The page triggered a download (save only; never open or install it). */
         fun onDownload(tab: WebTab, url: String, userAgent: String, contentDisposition: String?, mime: String?) {}
-        /** 页面地址、标题或加载进度变了(给看得见的标签刷新地址栏和进度条)。 */
+        /** The page URL, title or load progress changed (refresh the address bar and progress bar of visible tabs). */
         fun onPageChanged(tab: WebTab) {}
-        /** 页面弹了框,记在 [dialogs] 里等回话。 */
+        /** The page raised a dialog, recorded in [dialogs] awaiting a reply. */
         fun onDialog(tab: WebTab) {}
-        /** 收到了当前页面的网站图标。 */
+        /** The current page's favicon was received. */
         fun onIcon(tab: WebTab, icon: Bitmap) {}
-        /** 用户自己看的标签要选文件:由界面弹系统选择器,[callback] 收到选好的文件(取消为 null)。返回 true 表示接下。 */
+        /** A tab the user is watching needs a file chosen: the UI shows the system picker and [callback] receives the chosen files (null on cancel). Return true to accept. */
         fun onFileChooser(tab: WebTab, callback: ValueCallback<Array<Uri>>, params: WebChromeClient.FileChooserParams): Boolean = false
-        /** 用户自己看的标签要摄像头、麦克风等:由界面问用户,[request] 由界面同意或拒绝。返回 true 表示接下。 */
+        /** A tab the user is watching wants the camera, microphone, etc.: the UI asks the user, which grants or denies [request]. Return true to accept. */
         fun onPermissionRequest(tab: WebTab, request: PermissionRequest): Boolean = false
         fun onPermissionRequestCanceled(tab: WebTab, request: PermissionRequest) {}
-        /** 用户自己看的标签要定位:由界面问用户,[callback] 由界面回话。返回 true 表示接下。 */
+        /** A tab the user is watching wants geolocation: the UI asks the user and answers through [callback]. Return true to accept. */
         fun onGeolocationRequest(tab: WebTab, origin: String?, callback: GeolocationPermissions.Callback): Boolean = false
         fun onGeolocationPermissionsHidePrompt(tab: WebTab) {}
-        /** 网页要全屏播放视频:由界面把 [view] 盖到整屏上,并把回调留着,退出时交给调用方。返回 true 表示接下。 */
+        /** The page wants to play video full screen: the UI puts [view] over the whole screen and keeps the callback, handing it to the caller on exit. Return true to accept. */
         fun onFullscreen(tab: WebTab, view: View, callback: WebChromeClient.CustomViewCallback): Boolean = false
-        /** 网页要退出全屏。 */
+        /** The page wants to leave full screen. */
         fun onExitFullscreen(tab: WebTab) {}
     }
 
     /**
-     * web_upload 先放在这里的、要交给页面文件选择框的文件(工作区文件的 content:// 地址);
-     * 选择框弹出时取走一次。没有待交的文件时选择框直接取消。只在主线程读写。
+     * Files that web_upload placed here for the page's file chooser (content:// addresses of workspace files);
+     * they are taken once when the chooser opens. With no files waiting, the chooser is simply cancelled. Read and written on the main thread only.
      */
     var pendingUpload: List<Uri>? = null
 
-    /** 页面弹了选择框、却没有待交的文件(被取消)的次数。 */
+    /** How many times the page opened a file chooser with no files waiting (and it was cancelled). */
     var choosersRefused: Int = 0
         private set
 
-    /** 这个标签属于哪个任务(用户自己的浏览器页是它自己的编号);用户关掉借给任务的页面、任务收下它时改成那个任务。 */
+    /** Which task this tab belongs to (the user's own browser page uses its own id); when the user closes a page lent to a task and the task adopts it, this becomes that task. */
     var ownerTaskId: String = ownerTaskId
         internal set
 
     val view: WebView = WebView(context)
 
-    /** 这个标签上等回话的页面弹框。 */
+    /** Page dialogs waiting for a reply on this tab. */
     val dialogs = PageDialogs()
 
     var listener: Listener? = null
 
-    /** 由页面弹出时为打开它的页面地址。弹出的标签终生只能在这个网站里导航。 */
+    /** When opened by a page, the address of the page that opened it. A popup tab can only ever navigate within this site. */
     var popupOpener: String? = null
 
-    // 弹出的标签已经在同站页面上开始加载过:之后再要去别的网站只拦下那次导航,不再关标签
+    // The popup tab has already started loading a same-site page: later attempts to reach another site only cancel that navigation, without closing the tab
     private var popupCommitted = false
-    /** 当前主文档的代理认证重试额度(只在主线程上动)。 */
+    /** Proxy authentication retry budget for the current main document (touched on the main thread only). */
     private val proxyAuth = WebProxyAuth()
 
-    /** 主文档是否正在加载。只在主线程读写。 */
+    /** Whether the main document is loading. Read and written on the main thread only. */
     var loading: Boolean = false
         private set
 
-    /** 主文档的加载进度(0–100)。只在主线程读写。 */
+    /** Load progress of the main document (0–100). Read and written on the main thread only. */
     var progress: Int = 0
         private set
 
-    /** 最近一次 [load] 是否等到了加载完成(含出错页面);超时为 false。 */
+    /** Whether the last [load] waited until loading finished (error pages included); false on timeout. */
     var lastLoadFinished: Boolean = false
         private set
 
-    /** 最近一次主文档的 HTTP 错误状态(4xx/5xx);拿不到或没出错为 null。 */
+    /** HTTP error status of the most recent main document (4xx/5xx); null when unavailable or no error. */
     var httpErrorStatus: Int? = null
         private set
 
-    /** 最近一次主文档没打开时浏览器给的错误码(如 net::ERR_NAME_NOT_RESOLVED);打开了或没出错为 null。 */
+    /** The error code the browser reported when the most recent main document did not open (e.g. net::ERR_NAME_NOT_RESOLVED); null when it opened or there was no error. */
     var mainFrameError: String? = null
         private set
 
-    /** 最近一次 [load] 期间页面变成了下载(主文档是个文件)。 */
+    /** During the last [load] the page turned into a download (the main document was a file). */
     var loadBecameDownload: Boolean = false
         private set
 
-    /** 最近一次被拦下的跳 App 链接;[load] 开始时清空。 */
+    /** The most recently blocked app-jump link; cleared when [load] starts. */
     var lastExternalLink: ExternalLink? = null
         private set
 
-    /** [destroy] 之后为 true。 */
+    /** True after [destroy]. */
     @Volatile var destroyed: Boolean = false
         private set
 
-    /** 渲染进程崩溃或被系统回收后为 true,该标签不能再用,由上层重新打开。 */
+    /** True after the renderer crashed or was reclaimed by the system; the tab is unusable and must be reopened by the caller. */
     @Volatile var crashed: Boolean = false
         private set
 
-    /** 渲染进程不是自己崩的,是系统为腾内存收回的([crashed] 同时为 true)。 */
+    /** The renderer did not crash on its own but was reclaimed by the system to free memory ([crashed] is true at the same time). */
     @Volatile var reclaimed: Boolean = false
         private set
 
     private var pending: CompletableDeferred<Boolean>? = null
-    // 发起新加载后,要等到它自己的 onPageStarted 才认 onPageFinished,上一次导航迟到的完成回调不算数
+    // After starting a new load, onPageFinished only counts once its own onPageStarted has arrived; a late finish callback from the previous navigation does not count
     private var armed = false
     private var mainFrameFailed = false
     private var mainUrl: String? = null
 
     init {
-        // 配置要在 WebView 做任何别的事之前设定
+        // The profile must be set before the WebView does anything else
         if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             ProfileStore.getInstance().getOrCreateProfile(PROFILE)
             WebViewCompat.setProfile(view, PROFILE)
@@ -186,12 +186,12 @@ class WebTab(
             @Suppress("DEPRECATION")
             saveFormData = false
             setGeolocationEnabled(false)
-            // 新窗口经 onCreateWindow 交给标签池;脚本不能不经用户操作就自己开窗口
+            // New windows go to the tab pool through onCreateWindow; scripts cannot open windows on their own without a user action
             setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = false
         }
         devtools.prepare(this, context)
-        // 第三方 Cookie 关闭(裁定);后续确有站点需要再单独定
+        // Third-party cookies are off (by decision); revisit per site later if one genuinely needs them
         cookieManager().setAcceptThirdPartyCookies(view, false)
         view.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(v: WebView, request: WebResourceRequest): WebResourceResponse? =
@@ -200,7 +200,7 @@ class WebTab(
             override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
                 if (request.isForMainFrame && refusePopup(url)) return true
-                // 跳 App 的链接(intent:、自定义协议、应用商店)不跳;只有主文档的才告诉标签池(子框架里的静默拦下)
+                // App-jump links (intent:, custom schemes, app stores) are not followed; only main-frame ones are reported to the tab pool (sub-frame ones are blocked silently)
                 WebUrlPolicy.external(url)?.let { link ->
                     if (request.isForMainFrame) {
                         lastExternalLink = link
@@ -212,7 +212,7 @@ class WebTab(
             }
 
             override fun onPageStarted(v: WebView, url: String?, favicon: Bitmap?) {
-                // 弹出窗口的第一次导航不一定经过 shouldOverrideUrlLoading:这里再核对一次
+                // A popup's first navigation does not always go through shouldOverrideUrlLoading: check again here
                 if (url != null && refusePopup(url)) {
                     v.stopLoading()
                     return
@@ -232,7 +232,7 @@ class WebTab(
                 listener?.onPageChanged(this@WebTab)
             }
 
-            // 页面开始显示时再核对一次弹出窗口的网站(前两处都可能被绕过时的最后一道)
+            // Check the popup's site once more when the page starts showing (the last line of defence should either earlier check be bypassed)
             override fun onPageCommitVisible(v: WebView, url: String?) {
                 if (url != null && refusePopup(url)) v.stopLoading()
             }
@@ -258,8 +258,8 @@ class WebTab(
                 }
             }
 
-            // 网络代理要账号密码:只回答设置 › 网络代理 里那个 HTTP 代理,答过几次还在问(账号密码不对)就不再答;
-            // 网站自己的登录框不在这里填
+            // The network proxy asks for credentials: only answer for the HTTP proxy in Settings > Network proxy; once a few answers still leave it asking (wrong credentials), stop answering;
+            // the site's own login prompt is not filled in here
             override fun onReceivedHttpAuthRequest(v: WebView, handler: HttpAuthHandler, host: String?, realm: String?) {
                 val credentials = proxyAuth.credentialsFor(host)
                 if (credentials == null) {
@@ -269,7 +269,7 @@ class WebTab(
                 handler.proceed(credentials.first, credentials.second)
             }
 
-            // 证书有问题一律不继续
+            // Never continue when the certificate is bad
             override fun onReceivedSslError(v: WebView, handler: SslErrorHandler, error: SslError) {
                 handler.cancel()
                 if (error.url == mainUrl) {
@@ -278,7 +278,7 @@ class WebTab(
                 }
             }
 
-            // 返回 true 才不会连带整个 App 被杀;标签作废,由标签池销毁
+            // Returning true is required so the whole App is not killed along with it; the tab is dead and the tab pool destroys it
             override fun onRenderProcessGone(v: WebView, detail: RenderProcessGoneDetail): Boolean {
                 Log.w(TAG, "renderer gone for tab $id crashed=${detail.didCrash()}")
                 crashed = true
@@ -313,7 +313,7 @@ class WebTab(
                 if (icon != null) listener?.onIcon(this@WebTab, icon)
             }
 
-            // 页面弹框:记下就返回(返回 true 表示自己处理,系统不弹框),不占界面线程;回话前页面脚本停着
+            // Page dialogs: record and return (returning true means we handle it and the system shows nothing), without blocking the UI thread; page scripts stay frozen until answered
             override fun onJsAlert(v: WebView, url: String?, message: String?, result: JsResult): Boolean =
                 held(PageDialog.ALERT, message, null, result)
 
@@ -326,7 +326,7 @@ class WebTab(
             override fun onJsBeforeUnload(v: WebView, url: String?, message: String?, result: JsResult): Boolean =
                 held(PageDialog.BEFORE_UNLOAD, message, null, result)
 
-            // 用户可能看不见这个标签,不替用户点同意;用户自己看的标签由界面问
+            // The user may not see this tab, so do not agree on their behalf; for tabs the user is watching the UI asks
             override fun onPermissionRequest(request: PermissionRequest) {
                 if (listener?.onPermissionRequest(this@WebTab, request) == true) return
                 request.deny()
@@ -345,8 +345,8 @@ class WebTab(
                 listener?.onGeolocationPermissionsHidePrompt(this@WebTab)
             }
 
-            // 文件选择框:agent 先用 web_upload 事先放好的工作区文件(取走即清);用户自己看的标签交界面弹系统选择器
-            // 全屏视频:交给看得见的标签那一侧盖到整屏;没人接就立刻退出
+            // File chooser: the agent places workspace files in advance with web_upload (taken and cleared once used); for tabs the user is watching, the UI shows the system picker
+            // Full-screen video: hand it to the visible tab's side to cover the whole screen; exit immediately if nobody takes it
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 if (listener?.onFullscreen(this@WebTab, view, callback) == true) return
                 callback.onCustomViewHidden()
@@ -356,7 +356,7 @@ class WebTab(
                 listener?.onExitFullscreen(this@WebTab)
             }
 
-            // 文件选择框:只交 web_upload 事先放好的工作区文件,取走即清;没有就取消,不弹系统选择器
+            // File chooser: only hand over workspace files placed in advance by web_upload, cleared once taken; otherwise cancel without showing the system picker
             override fun onShowFileChooser(v: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
                 val files = pendingUpload
                 pendingUpload = null
@@ -371,13 +371,13 @@ class WebTab(
                 return true
             }
         }
-        // 下载暂不接收,由下载模块接手
-        // 下载交给标签池(落到工作区);文件不打开、不安装
+        // Downloads are not accepted here; the download module takes them over
+        // Downloads go to the tab pool (landing in the workspace); files are never opened or installed
         view.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
             val l = listener
             if (l == null) Log.i(TAG, "download ignored on tab $id: ${url.take(80)}")
             else l.onDownload(this, url, userAgent.orEmpty(), contentDisposition, mimetype)
-            // 正在等加载的那次导航变成了下载:页面不会再加载,不用等到超时
+            // The navigation being awaited turned into a download: the page will not load, so there is no need to wait for the timeout
             if (pending != null) {
                 loadBecameDownload = true
                 loading = false
@@ -386,7 +386,7 @@ class WebTab(
         }
     }
 
-    /** 记下页面弹框;回话在主线程交给浏览器(JsResult 只能回一次)。 */
+    /** Records a page dialog; the reply is passed to the browser on the main thread (a JsResult can only be answered once). */
     private fun held(kind: String, message: String?, defaultText: String?, result: JsResult): Boolean {
         val text = message.orEmpty().take(PageDialog.MAX_MESSAGE)
         dialogs.open(PageDialog(kind, text, defaultText?.take(PageDialog.MAX_MESSAGE)), object : DialogReply {
@@ -399,14 +399,14 @@ class WebTab(
         })
         Log.i(TAG, "page dialog $kind held on tab $id")
         listener?.onDialog(this)
-        // 加载中弹框:页面停在这里了,加载等待不再等到超时
+        // A dialog during loading: the page has stopped here, so the load wait no longer runs to the timeout
         if (pending != null) finish(true)
         return true
     }
 
     /**
-     * 弹出的标签要导航到和打开它的页面不同的网站(about:blank 除外):拦下。还没在同站页面上加载过时交标签池关掉它,
-     * 之后只拦这次导航。
+     * A popup tab wants to navigate to a different site than the page that opened it (other than about:blank): block it. If it has not yet loaded a same-site page,
+     * hand it to the tab pool to close; afterwards only that navigation is blocked.
      */
     private fun refusePopup(url: String): Boolean {
         val opener = popupOpener ?: return false
@@ -425,7 +425,7 @@ class WebTab(
         armed = false
     }
 
-    /** 打开网址并等主文档加载完;超时、主文档出错或 HTTP 4xx/5xx 返回 false。只接受 http/https 网址。 */
+    /** Opens a URL and waits for the main document to load; returns false on timeout, main-document error, or HTTP 4xx/5xx. Only http/https addresses are accepted. */
     suspend fun load(url: String, timeoutMs: Long = 20_000): Boolean = withContext(Dispatchers.Main) {
         if (crashed) return@withContext false
         WebUrlPolicy.checkNavigable(url)?.let {
@@ -433,7 +433,7 @@ class WebTab(
             lastLoadFinished = false
             return@withContext false
         }
-        // 第一次导航前把桌面版仿真设好(连不上时至多等一小会儿,照常打开)
+        // Set up desktop emulation before the first navigation (waits only a short while if it cannot connect, then opens as usual)
         devtools.beforeLoad(this@WebTab, url)
         if (crashed || destroyed) return@withContext false
         finish(false)
@@ -472,8 +472,8 @@ class WebTab(
         private const val PROFILE = "mika"
 
         /**
-         * 网页登录数据所在的 Cookie 库:支持多配置时是 mika 配置的,否则是默认的。主线程调用。
-         * 不支持多配置时它和本 App 进程里任何别的 WebView 共用:App 里不得再有别的 WebView 处理网站登录,否则登录态会混在一起。
+         * The cookie store holding web login data: the mika profile's when multiple profiles are supported, otherwise the default one. Call on the main thread.
+         * Without multi-profile support it is shared with every other WebView in this App process: no other WebView in the App may handle website logins, or login state would be mixed together.
          */
         fun cookieManager(): CookieManager =
             if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
@@ -482,7 +482,7 @@ class WebTab(
                 CookieManager.getInstance()
             }
 
-        /** 和 [cookieManager] 同一个配置的网页存储(localStorage、IndexedDB 等)。主线程调用。 */
+        /** Web storage (localStorage, IndexedDB, etc.) of the same profile as [cookieManager]. Call on the main thread. */
         fun webStorage(): WebStorage =
             if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
                 ProfileStore.getInstance().getOrCreateProfile(PROFILE).webStorage

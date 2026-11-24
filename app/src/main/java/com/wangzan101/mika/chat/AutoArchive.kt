@@ -1,20 +1,20 @@
 package com.wangzan101.mika.chat
 
 /**
- * 自动归档:太久没有新消息的对话收进归档(和手动归档一样,随时能在归档视图里恢复)。
- * 默认关闭,天数在 设置 › 我的数据 › 自动归档对话 里选。
+ * Auto-archive: conversations with no new messages for too long are moved into the archive (like manual archiving, they can be restored from the archive view at any time).
+ * Off by default; the number of days is chosen in Settings > My data > Auto-archive conversations.
  */
 object AutoArchive {
-    /** 可选的「多久没新消息就归档」天数;0 表示关闭。 */
+    /** The selectable "archive after this long without new messages" day counts; 0 means off. */
     val DAYS = listOf(0, 7, 30, 90, 180)
 
-    /** 多久没新消息算「太久」:从 [days] 天前这一刻算起。 */
+    /** How long without new messages counts as "too long": counted back from this moment [days] days ago. */
     fun cutoff(days: Int, now: Long): Long = now - days * DAY_MS
 
     /**
-     * 从 [all] 里挑出这次该归档的:还没归档、没置顶、最后改动早于 [cutoff],
-     * 而且最近没有手动取消归档(手动恢复的对话在 [cutoff] 之前恢复的才算又静下来了)。
-     * [keep] 里的不动(在跑的任务、用户此刻在看的对话)。
+     * Picks from [all] the ones to archive this round: not archived yet, not pinned, last changed before [cutoff],
+     * and not manually unarchived recently (a manually restored conversation only counts as quiet again if it was restored before [cutoff]).
+     * Entries in [keep] are left alone (running tasks, the conversation the user is viewing right now).
      */
     fun candidates(all: List<ConversationSummary>, cutoff: Long, keep: Set<String> = emptySet()): List<String> =
         all.asSequence()
@@ -26,8 +26,8 @@ object AutoArchive {
             .toList()
 
     /**
-     * 按设置跑一次,返回归档了几个。按消息时间判断；缺少时间的旧记录回退到文件时间;
-     * 之后再有新的一轮写进来,和手动归档一样会自动取消归档(见 [ConversationStore.append])。
+     * Runs once according to the settings and returns how many were archived. Judged by message time; old records lacking a time fall back to the file time;
+     * when a new turn is written afterwards, it is automatically unarchived just as with manual archiving (see [ConversationStore.append]).
      */
     fun run(
         store: ConversationStore,

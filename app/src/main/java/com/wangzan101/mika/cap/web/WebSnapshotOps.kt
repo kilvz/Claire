@@ -31,20 +31,20 @@ import com.wangzan101.mika.cap.web.WebScreen.Companion.UNZOOM_STEPS
 import com.wangzan101.mika.cap.web.WebScreen.Companion.UNZOOM_SETTLE_MS
 import com.wangzan101.mika.cap.web.WebScreen.Companion.PINCH_PROBE
 
-// 网页屏:读页快照、对话框快照、元素定位与视口缩放
+// Web screen: page snapshot reads, dialog snapshots, element locating, and viewport zoom
 internal fun WebScreen.ready(): Ready {
     val tab = currentTab() ?: return Ready.Fail(ActionResult.Failed(if (crashedTab() != null) TAB_CRASHED else NO_TAB))
     if (tab.crashed) return Ready.Fail(ActionResult.Failed(TAB_CRASHED))
-    // 用户正在接管界面里操作这个页面:Agent 不能同时动它
+    // The user is operating this page in the takeover UI: the Agent must not touch it at the same time
     if (pool?.isLocked(tab.id) == true) return Ready.Fail(ActionResult.Failed(HANDED_OVER))
-    // 页面弹框挂着时页面停着,点、打字都落不到页面上:先回话
+    // While a page dialog is pending the page is stalled, so clicks and typing never land on it: report the dialog first
     if (tab.dialogs.current != null) return Ready.Fail(ActionResult.Failed(DIALOG_OPEN))
     return Ready.Tab(tab)
 }
 
-/** [fuse] 为真且标签有 DevTools 会话时做元素融合;核实、障碍判定用的读屏不做,保持快。 */
+/** When [fuse] is true and the tab has a DevTools session, elements are fused in; the reads used for verification and obstruction checks skip this and stay fast. */
 internal suspend fun WebScreen.read(tab: WebTab, key: String?, id: String, fuse: Boolean = false): Snap {
-    // 弹框挂着时页面脚本停着,读页面只会等到超时:只报弹框
+    // While a dialog is pending the page scripts are stalled, so reading the page would only wait for the timeout: report just the dialog
     tab.dialogs.current?.let { d -> return dialogSnap(tab, id, d) }
     val s = script(tab)
     val urlBefore = url(tab)
@@ -67,7 +67,7 @@ internal suspend fun WebScreen.read(tab: WebTab, key: String?, id: String, fuse:
     return Snap(id, tab, key, snapshot, locators(snapshot.elements), scale, mut)
 }
 
-/** 元素融合;DevTools 超时、出错时为 null(记下原因),读屏照用页面脚本的结果。 */
+/** Element fusion; null on DevTools timeout or error (the reason is logged), and the read then uses the page-script result. */
 internal suspend fun WebScreen.fused(tab: WebTab, s: PageScript, session: CdpSession, key: String?, id: String, snapshot: ScreenSnapshot, scale: Double, mut: Long): Snap? {
     val outcome = try {
         ElementProbe(session).enrich(snapshot, s.refNodesExpression(key), scale)
@@ -82,7 +82,7 @@ internal suspend fun WebScreen.fused(tab: WebTab, s: PageScript, session: CdpSes
     }
     Log.d(TAG, "element fusion $id: ${outcome.stats}")
     val r = outcome.result
-    // 补信息期间页面又动了:如实标上
+    // The page moved again while enriching: report it truthfully
     val moved = s.mutationCount() != mut
     val out = snapshot.copy(
         elements = r.elements,
@@ -105,7 +105,7 @@ internal fun WebScreen.emptySnapshot(tab: WebTab?) = ScreenSnapshot(
     width = host.width, height = host.height, hasWindow = false,
 )
 
-// 上下文是遍历顺序里前面最近一个有名字的元素,防止别处的同名元素顶上来被误认
+// The context is the nearest preceding named element in traversal order, so a same-named element elsewhere cannot be mistaken for this one
 internal fun WebScreen.locators(elements: List<UiElement>): List<ElementLocator> {
     var last: String? = null
     return elements.map { e ->
@@ -115,12 +115,12 @@ internal fun WebScreen.locators(elements: List<UiElement>): List<ElementLocator>
     }
 }
 
-/** 当前标签是借来的(在用户的界面里,不在网页显示上)。 */
+/** The current tab is borrowed (it lives in the user's UI, not on the web display). */
 internal fun WebScreen.borrowed(tab: WebTab): Boolean = pool?.isExternal(tab.id) == true
 
 /**
- * 借来的标签此刻的样子:把视图本身画进一张图(和视图像素一一对应,点按坐标照用),不含盖在它上面的界面(对话面板)。
- * 视图还没排版时为 null。
+ * How the borrowed tab looks right now: the view itself is drawn into a bitmap (pixel-for-pixel with the view, so tap coordinates still apply),
+ * excluding the UI layered on top of it (the conversation panel). Null while the view has not been laid out yet.
  */
 internal suspend fun WebScreen.viewFrame(tab: WebTab): android.graphics.Bitmap? = withContext(Dispatchers.Main) {
     val v = tab.view
@@ -131,8 +131,9 @@ internal suspend fun WebScreen.viewFrame(tab: WebTab): android.graphics.Bitmap? 
 }
 
 /**
- * 用户在借来的标签上双指放大过:缩回整页再读屏。页面脚本按排版视口报坐标,放大后看得见的只是其中一块,
- * 不缩回编号的坐标就对不上屏幕。没放大时什么也不做;缩不回(页面禁止缩放等)就照样读。
+ * The user pinch-zoomed on the borrowed tab: zoom back out to the whole page before reading. Page scripts report coordinates in the layout
+ * viewport, and when zoomed in only a slice of it is visible, so the numbered coordinates would not line up with the screen without zooming out.
+ * Does nothing when not zoomed in; if zooming out fails (page forbids zoom, etc.) the read proceeds as usual.
  */
 internal suspend fun WebScreen.unzoom(tab: WebTab) {
     if (!pinched(tab)) return
@@ -143,7 +144,7 @@ internal suspend fun WebScreen.unzoom(tab: WebTab) {
     }
 }
 
-// 看得见的那块(视觉视口)比排版视口窄,或挪开了:用户放大过
+// The visible part (visual viewport) is narrower than the layout viewport, or has been panned away: the user zoomed in
 internal suspend fun WebScreen.pinched(tab: WebTab): Boolean {
     val raw = kotlinx.coroutines.withTimeoutOrNull(UNZOOM_SETTLE_MS * 4) {
         kotlinx.coroutines.suspendCancellableCoroutine<String?> { c ->

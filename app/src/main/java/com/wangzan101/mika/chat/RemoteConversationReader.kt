@@ -10,8 +10,8 @@ import com.wangzan101.mika.core.remote.RemoteTurn
 import com.wangzan101.mika.task.TaskRun
 
 /**
- * Web 控制台读的手机一侧:对话从 [ConversationStore] 现读,运行中的任务从任务中心现读,不另存一份。
- * 只读;发送、派工、回答仍走任务 API 的既有入口。
+ * The phone side read by the web console: conversations are read live from [ConversationStore] and running tasks live from the task center, with no separate copy stored.
+ * Read-only; sending, dispatching, and answering still go through the existing task API entry points.
  */
 class RemoteConversationReader(
     private val store: ConversationStore,

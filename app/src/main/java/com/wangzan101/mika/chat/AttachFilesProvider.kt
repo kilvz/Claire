@@ -6,10 +6,10 @@ import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
 
 /**
- * 对话页附件用的 content:// 地址(见 res/xml/attach_files.xml),不对外导出,只在用到时临时授权:
- * - camera/:系统相机拍的照片写到这里(拍照时授权相机 App 写这一个文件),发送时再复制进对话工作区;
- * - viewing/:点开已发出的照片、文件时从工作区复制出来的一份,交给 App 里的查看页(或用户选的别的 App)只读打开。
- * 工作区本身不开放。除 camera/ 外只读;不许删、不许插入。
+ * content:// addresses used for conversation page attachments (see res/xml/attach_files.xml); not exported, granted only temporarily when in use:
+ * - camera/: photos taken by the system camera are written here (the camera app is granted write access to this single file while shooting) and copied into the conversation workspace when sent;
+ * - viewing/: a copy made from the workspace when an already-sent photo or file is opened, handed to the App's viewer (or another app the user picks) to open read-only.
+ * The workspace itself is not exposed. Read-only except for camera/; deletion and insertion are not allowed.
  */
 class AttachFilesProvider : FileProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
@@ -24,7 +24,7 @@ class AttachFilesProvider : FileProvider() {
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = 0
 
     companion object {
-        /** 和 attach_files.xml 里的 name 一致:地址的第一段。 */
+        /** Matches the name in attach_files.xml: the first path segment of the address. */
         const val CAMERA = "camera"
 
         fun authority(packageName: String) = "$packageName.attachfiles"

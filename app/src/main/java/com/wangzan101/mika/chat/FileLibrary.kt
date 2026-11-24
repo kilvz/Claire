@@ -4,12 +4,12 @@ import com.wangzan101.mika.core.agent.AttachmentLines
 import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.core.agent.AttachedPage
 
-/** 已保存消息里的文件记录。只读对话，不检查文件是否仍可打开。 */
+/** File records from saved messages. Reads conversations only; does not check whether the files can still be opened. */
 class FileLibrary(private val conversations: ConversationStore) {
-    /** 每次重新读取；调用方可结合 ConversationStore.changes 在后台刷新。 */
+    /** Re-reads every time; callers can combine it with ConversationStore.changes to refresh in the background. */
     fun list(): List<LibraryFile> = snapshot().files
 
-    /** 返回已读出的文件，并标记目录或任一对话是否读取失败；可再次调用重试。 */
+    /** Returns the files that could be read, flagging whether the directory or any conversation failed to read; calling again retries. */
     fun snapshot(): FileLibrarySnapshot {
         val recordsSnapshot = conversations.allRecords()
         val result = mutableListOf<LibraryFile>()
@@ -36,7 +36,7 @@ class FileLibrary(private val conversations: ConversationStore) {
                 }
                 files.forEach { file ->
                     val occurrence = SharedFileSource(source, file)
-                    // 空 URI 无法证明是同一个文件；文件名、路径和摘要也不用于推断身份。
+                    // An empty URI cannot prove it is the same file; the file name, path and digest are not used to infer identity either.
                     val uri = file.uri.takeIf { it.isNotBlank() }
                     val index = uri?.let { outputsByUri[it] }
                     if (index == null) {
@@ -55,7 +55,7 @@ class FileLibrary(private val conversations: ConversationStore) {
 
 data class FileLibrarySnapshot(val files: List<LibraryFile>, val hasReadFailures: Boolean)
 
-/** turnIndex 和 steerIndex 从零开始；steerIndex 为 null 表示该轮的首条用户消息。 */
+/** turnIndex and steerIndex start at zero; steerIndex null means the turn's first user message. */
 data class FileSource(
     val conversationId: String,
     val turnIndex: Int,
@@ -68,13 +68,13 @@ data class InputFileSource(val source: FileSource, val sizeLabel: String)
 data class SharedFileSource(val source: FileSource, val file: SharedFile)
 
 sealed interface LibraryFile {
-    /** 同一对话的相同路径聚合；路径可能被覆盖，不表示各次内容相同。 */
+    /** Entries with the same path in the same conversation are merged; a path may be overwritten, so this does not mean the contents were the same each time. */
     data class Input(val path: String, val sources: List<InputFileSource>) : LibraryFile {
         val name: String get() = path.substringAfterLast('/')
         val latestAtMs: Long? get() = sources.mapNotNull { it.source.atMs }.maxOrNull()
     }
 
-    /** 相同非空 URI 的产物合并；每条来源保留当时记录的完整元数据。 */
+    /** Outputs with the same non-empty URI are merged; each source keeps the full metadata recorded at that time. */
     data class Output(val sources: List<SharedFileSource>) : LibraryFile {
         val latestAtMs: Long? get() = sources.mapNotNull { it.source.atMs }.maxOrNull()
     }

@@ -8,12 +8,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.CoroutineContext
 
-/** 删掉一个项目会连带什么:有多少条对话、多少个运行中或排队中的任务、以及绑在这些对话上的定时任务数(定时计划保留)。 */
+/** What deleting a project entails: how many conversations, how many running or queued tasks, and how many schedules are bound to those conversations (the schedules themselves are kept). */
 data class ProjectDeleteImpact(val conversations: Int, val runningTasks: Int, val schedules: Int)
 
 /**
- * 删掉一个项目:停掉项目内所有对话在跑或排队的任务并等它们收尾,删除项目内对话历史和项目定义,
- * 然后删除项目共享工作区(`p-<projectId>`)并清理对应导入记录。定时计划保留。
+ * Deletes a project: stops the running and queued tasks of all conversations in it and waits for them to wind down, deletes those conversations' history and the project definition,
+ * then deletes the project's shared workspace (`p-<projectId>`) and cleans up the corresponding import records. Schedules are kept.
  */
 class ProjectDeleter(
     private val projects: ProjectStore,
@@ -44,7 +44,7 @@ class ProjectDeleter(
             withTimeoutOrNull(stopWaitMs) { active.first { current -> current.none { it in memberSet } } }
         }
         val deletedIds = withContext(io) {
-            // 停完任务后重新收集一次成员(期间可能有新落盘的旁文件)，然后删记录与项目定义
+            // Collect the members once more after the tasks have stopped (new sidecar files may have been written meanwhile), then delete the records and the project definition
             val allMembers = (memberIds + memberConversationIds(projectId)).distinct()
             for (id in allMembers) {
                 forgetRemoteTasks(id)
@@ -58,9 +58,9 @@ class ProjectDeleter(
     }
 
     /**
-     * 项目里的对话:存下了首轮、旁文件指向这个项目的,加上任务在跑或排队、首轮还没存下的。
-     * 新对话发出首句时先写 `.project` 旁文件,首轮等任务收尾才写进对话文件,[ConversationStore.list] 里还没有它;
-     * 漏掉它,删项目时它的任务不停,收尾时又把对话写回来。
+     * The conversations in the project: those whose first turn is stored and whose sidecar file points to this project, plus those with a running or queued task whose first turn is not stored yet.
+     * A new conversation writes its `.project` sidecar file when the first message is sent, but the first turn is only written into the conversation file when the task winds down, so it is not yet in
+     * [ConversationStore.list]; missing it would mean its task is not stopped when the project is deleted, and winding down would write the conversation back.
      */
     fun memberConversationIds(projectId: String): List<String> =
         (conversations.list(includeArchived = true).filter { it.projectId == projectId }.map { it.id } +

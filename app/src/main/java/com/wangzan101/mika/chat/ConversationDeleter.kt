@@ -8,34 +8,34 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.CoroutineContext
 
-/** 删掉一个对话会连带什么:有没有在跑或排队的任务(会被停掉),绑在它上面的定时任务有几条(会保留)。 */
+/** What deleting a conversation entails: whether it has running or queued tasks (they will be stopped), and how many schedules are bound to it (they are kept). */
 data class DeleteImpact(val runningTask: Boolean, val schedules: Int)
 
-/** 一次批量删除的进度:一共 [total] 条,已经处理 [done] 条,其中 [failed] 条没删成。 */
+/** Progress of one batch delete: [total] in all, [done] already processed, of which [failed] could not be deleted. */
 data class DeleteBatch(val total: Int, val done: Int, val failed: Int) {
-    /** 全部处理完了(不论成没成)。 */
+    /** Everything has been processed (whether or not it succeeded). */
     val finished: Boolean get() = done >= total
 }
 
 /**
- * 删掉一个对话:停掉它在跑、排队的任务并等它收尾(收尾时存进的那一轮也在删的范围里),
- * 然后删对话记录，再清理它的工作区(附件、用户发来的屏幕、任务写的文件)。
- * 定时任务有自己的管理页,不随历史对话删除;下次触发会在原对话编号下重新留下结果。
- * 运行记录(运行统计用)是全局的,不删。
+ * Deletes a conversation: stops its running and queued tasks and waits for them to wind down (a turn saved while winding down is still within the delete's scope),
+ * then deletes the conversation record, then cleans up its workspace (attachments, screens the user sent, files written by tasks).
+ * Schedules have their own management page and are not deleted with the conversation history; the next trigger leaves its result under the original conversation id again.
+ * Run records (used for run statistics) are global and are not deleted.
  */
 class ConversationDeleter(
     private val store: ConversationStore,
-    /** 有任务在跑或排队的对话。 */
+    /** Conversations with a running or queued task. */
     private val active: StateFlow<List<String>>,
-    /** 停掉这个对话所有在跑、排队的任务。 */
+    /** Stops all running and queued tasks of this conversation. */
     private val cancelTasks: (conversationId: String) -> Unit,
-    /** 绑在这个对话上的定时任务的编号;只用于删除前提示,计划本身保留。 */
+    /** Ids of the schedules bound to this conversation; used only for the warning before deleting, the schedules themselves are kept. */
     private val schedulesOf: (conversationId: String) -> List<String>,
-    /** 删掉这个对话的工作区。 */
+    /** Deletes this conversation's workspace. */
     private val deleteWorkspace: suspend (conversationId: String) -> Unit,
-    /** 停任务后最多等它收尾这么久;过了照删。 */
+    /** After stopping the tasks, wait at most this long for them to wind down; past that, delete anyway. */
     private val stopWaitMs: Long = 15_000,
-    /** 读写定时任务和对话记录在哪儿做。 */
+    /** Where reading and writing schedules and conversation records happens. */
     private val io: CoroutineContext = Dispatchers.IO,
     private val forgetRemoteTasks: (String) -> Unit = {},
     private val isSharedWorkspace: (String) -> Boolean = { store.projectId(it) != null },

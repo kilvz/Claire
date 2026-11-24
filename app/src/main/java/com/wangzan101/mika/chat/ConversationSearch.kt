@@ -13,8 +13,8 @@ import kotlinx.coroutines.ensureActive
 import java.io.File
 
 /**
- * 一条命中。[inTitle] 表示标题里有词;片段取自正文,没有合适的正文片段时为 null。
- * [target] 是正文命中所在的聊天消息;只有标题命中时为 null。
+ * One hit. [inTitle] means a term is in the title; the snippet is taken from the body and is null when no suitable body snippet exists.
+ * [target] is the chat message where the body hit is; null when only the title matched.
  */
 data class ConversationHit(
     val id: String,
@@ -24,34 +24,34 @@ data class ConversationHit(
     val target: ChatTarget? = null,
 )
 
-/** 一次正文搜索的结果;[truncated] 为真表示还有更多命中没返回。 */
+/** Result of one body search; [truncated] true means more hits were not returned. */
 data class SearchResult(val hits: List<ConversationHit>, val truncated: Boolean = false)
 
 /**
- * 侧栏搜索:查对话标题和对话里看得见的文字(用户的话和插话按气泡上显示的取,见 [shown];助手的回答)。
+ * Sidebar search: searches conversation titles and the visible text inside conversations (the user's messages and steers are taken as shown on the bubbles, see [shown]; the assistant's replies).
  *
- * 正文按对话文件的修改时间缓存:文件没变就不再解析。读文件走 [turnsOf](就是 [ConversationStore] 的解析),
- * 不拿 store 的锁,后台任务收尾往对话里补写时不会被搜索挡住。
+ * Bodies are cached by the conversation file's modification time: an unchanged file is not parsed again. Files are read through [turnsOf] (the same parsing as [ConversationStore]),
+ * without taking the store's lock, so a background task writing into the conversation while winding down is not blocked by a search.
  */
 class ConversationSearch(
     private val fileOf: (String) -> File,
     private val turnsOf: (File) -> List<Turn>?,
 ) {
-    /** 缓存的一条正文。[updatedAt] 是 [ConversationSummary.updatedAt],变了就重读。 */
+    /** One cached body. [updatedAt] is [ConversationSummary.updatedAt]; when it changes the body is re-read. */
     private data class Entry(val updatedAt: Long, val body: Body)
 
-    /** 一段看得见的文字,以及它在聊天页里对应的消息。 */
+    /** One piece of visible text and the message it corresponds to on the chat page. */
     private data class Segment(val text: String, val target: ChatTarget)
 
-    /** 一个对话里看得见的文字,按出现顺序;片段从其中一段里取。 */
+    /** The visible text in one conversation, in order of appearance; the snippet is taken from one of the segments. */
     private data class Body(val segments: List<Segment>, val firstUser: String?)
 
     private val lock = Any()
     private val cache = HashMap<String, Entry>()
 
     /**
-     * 只查标题(纯内存),输入时立刻显示。所有词都在标题里才算命中;
-     * 有一个词只在正文里也先不显示,等 [search] 扫完正文再说。
+     * Title-only search (purely in memory), shown immediately while typing. A hit requires every term to be in the title;
+     * when a term is only in the body, the hit is not shown yet and waits for [search] to finish scanning bodies.
      */
     fun titleMatches(query: String, candidates: List<ConversationSummary>): List<ConversationHit> {
         val terms = termsOf(query)
@@ -67,7 +67,7 @@ class ConversationSearch(
         return ranked(hits, candidates).take(MAX_HITS)
     }
 
-    /** 查标题和正文。在 IO 线程调用;读完每个对话检查一次取消,输入变了就早点停。 */
+    /** Searches titles and bodies. Call on an IO thread; cancellation is checked after each conversation so a changed query stops early. */
     suspend fun search(query: String, candidates: List<ConversationSummary>): SearchResult {
         val terms = termsOf(query)
         if (terms.isEmpty()) return SearchResult(emptyList())
@@ -79,11 +79,11 @@ class ConversationSearch(
             val body = if (c.updatedAt == 0L) Body(emptyList(), null) else body(c)
             val inTitle = terms.map { c.title.contains(it, ignoreCase = true) }
             val inBody = terms.map { t -> body.segments.any { it.text.contains(t, ignoreCase = true) } }
-            // 每个词至少出现在标题或正文的一处
+            // Every term must appear in the title or the body at least once
             if (inTitle.indices.any { !inTitle[it] && !inBody[it] }) continue
             val titleAll = inTitle.all { it }
             val best = bestSegment(body.segments, terms)
-            // 标题就是第一句话(或只发了一个文件时就是文件名)、而且标题已经命中时,不再把同一句话当片段重复一遍
+            // When the title is the first message (or the file name when only a file was sent) and the title already matched, the same text is not repeated as the snippet
             val snippet = best?.takeIf { !(titleAll && (it.text == body.firstUser || it.text == c.title)) }?.let(::window)
             hits += ConversationHit(
                 c.id, inTitle = inTitle.any { it }, snippet = snippet,
@@ -96,7 +96,7 @@ class ConversationSearch(
         return SearchResult(sorted.take(MAX_HITS), truncated = sorted.size > MAX_HITS)
     }
 
-    /** 清空正文缓存;侧栏关掉时调用,免得一次搜索过后一直占着所有对话的正文。 */
+    /** Clears the body cache; called when the sidebar closes, so the bodies of all conversations are not held on to after a single search. */
     fun clear() {
         synchronized(lock) { cache.clear() }
     }
@@ -107,7 +107,7 @@ class ConversationSearch(
         val turns = runCatching { turnsOf(fileOf(c.id)) }.getOrNull().orEmpty()
         val segments = ArrayList<Segment>()
         turns.forEachIndexed { index, turn -> segments += visibleText(turn, index) }
-        // 只看第一轮:第一句只发了附件、屏幕时它打的字是空的,不拿后面一轮的话顶上
+        // Only look at the first turn: when the first message carried only attachments or a screen, its typed text is empty, and a later turn's words are not substituted for it
         val firstUser = turns.firstOrNull()?.let { shown(it.userText).first() }?.takeIf(String::isNotBlank)
         val body = Body(segments, firstUser)
         synchronized(lock) { cache[c.id] = Entry(c.updatedAt, body) }
@@ -115,8 +115,8 @@ class ConversationSearch(
     }
 
     /**
-     * 一轮里用户和助手看得见的字;同一轮里重复的只留一份。用户的话和插话按 [shown] 取;
-     * [Turn.result] 是判出的结局代码(done、partial…),对话页不显示,不拿来搜。
+     * The text the user and the assistant show in one turn; duplicates within the same turn are kept once. The user's message and steers are taken through [shown];
+     * [Turn.result] is the decided outcome code (done, partial...), which the chat page does not display, so it is not searched.
      */
     private fun visibleText(t: Turn, turnIndex: Int): List<Segment> = buildList {
         fun put(s: String?, target: ChatTarget) {
@@ -137,10 +137,10 @@ class ConversationSearch(
     }.distinctBy { it.text }
 
     /**
-     * 用户的一句话(开局的话、插话)在气泡上显示出来的字,拆法和气泡一样:网页显示网站和选中的字,引用显示引的那段,
-     * 文件卡片显示文件名(照片只显示图),屏幕显示截图。页面说明那几行、引用的头、附件行里的路径、屏幕那一行不显示,
-     * 不拿来搜(侧栏标题也是去掉这些再比的);文件大小卡片上有,也不拿来搜,免得搜「KB」命中每个带附件的对话。
-     * 第一项是用户这次打的字,可能是空串。
+     * The text a user message (the opening message, a steer) shows on its bubble, split the same way the bubble does: a page shows the site and the selected text, a quote shows the
+     * quoted passage, a file card shows the file name (a photo shows only the image), and a screen shows the screenshot. The page description lines, the quote header, the paths in
+     * attachment lines, and the screen line are not displayed and are not searched (the sidebar title is compared after removing them too); the file size appears on the card and is
+     * also not searched, so that searching "KB" does not hit every conversation with an attachment. The first item is what the user typed this time and may be an empty string.
      */
     private fun shown(text: String): List<String> {
         val paged = AttachedPage.parse(text)
@@ -152,7 +152,7 @@ class ConversationSearch(
         return listOf(words) + listOfNotNull(page?.let { WebUrlPolicy.host(it.url) ?: it.url }, page?.selection, quoted.quote?.text) + files
     }
 
-    /** 命中词最多的一段;一样多时取命中位置靠前的。 */
+    /** The segment with the most matching terms; on a tie, the one whose match comes first wins. */
     private data class Best(val text: String, val target: ChatTarget, val index: Int, val length: Int)
 
     private fun bestSegment(segments: List<Segment>, terms: List<String>): Best? {
@@ -180,7 +180,7 @@ class ConversationSearch(
         return best
     }
 
-    /** 命中处前后各留一段,换行压成空格;截断处加省略号。 */
+    /** Keeps a stretch before and after the match, squeezes newlines into spaces, and adds an ellipsis where truncated. */
     private fun window(best: Best): String {
         val text = best.text
         val start = (best.index - SNIPPET_BEFORE).coerceAtLeast(0)
@@ -191,14 +191,14 @@ class ConversationSearch(
         return head + piece + tail
     }
 
-    /** 别把 emoji 的代理对截成半个:起点落在低位代理上时往前挪一位。 */
+    /** Never cut an emoji surrogate pair in half: when the start lands on a low surrogate, move it back one place. */
     private fun safeStart(text: String, index: Int): Int {
         var i = index.coerceIn(0, text.length)
         if (i in 1 until text.length && Character.isLowSurrogate(text[i]) && Character.isHighSurrogate(text[i - 1])) i--
         return i
     }
 
-    /** 终点落在低位代理上时往后挪一位,把这一对留全。 */
+    /** When the end lands on a low surrogate, move it forward one place so the pair stays whole. */
     private fun safeEnd(text: String, index: Int): Int {
         var i = index.coerceIn(0, text.length)
         if (i in 1 until text.length && Character.isLowSurrogate(text[i]) && Character.isHighSurrogate(text[i - 1])) i++
@@ -213,7 +213,7 @@ class ConversationSearch(
 
     private fun prefix(title: String, term: String): Boolean = title.startsWith(term, ignoreCase = true)
 
-    /** 分高的在前;同分时置顶的在前,再按最近改过的排。 */
+    /** Higher scores first; on a tie, pinned conversations first, then the most recently changed. */
     private fun ranked(hits: List<ConversationHit>, candidates: List<ConversationSummary>): List<ConversationHit> {
         val byId = candidates.associateBy { it.id }
         return hits.sortedWith(
@@ -225,16 +225,16 @@ class ConversationSearch(
     }
 
     companion object {
-        /** 一次最多返回多少条;再多就只显示前这么多。 */
+        /** How many hits are returned at most; beyond that only the first ones are shown. */
         const val MAX_HITS = 100
 
         private const val MAX_TERMS = 8
         private const val SNIPPET_BEFORE = 24
         private const val SNIPPET_AFTER = 48
-        // Java 的 \s 只认 ASCII 空白,中文输入法的全角空格和粘贴来的 NBSP 也要算分隔
+        // Java's \s only recognizes ASCII whitespace, so the full-width space from Chinese IMEs and pasted NBSP must also count as separators
         private val SPACE = Regex("[\\s\\u3000\\u00A0]+")
 
-        /** 查询切成关键词:空白分隔,空的和重复的不算,最多 8 个。 */
+        /** Splits a query into terms: whitespace-separated, empty and duplicate ones dropped, at most 8. */
         fun termsOf(query: String): List<String> =
             query.trim().split(SPACE).filter(String::isNotEmpty).distinct().take(MAX_TERMS)
     }
