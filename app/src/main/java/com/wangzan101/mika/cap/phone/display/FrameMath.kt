@@ -3,8 +3,8 @@ package com.wangzan101.mika.cap.phone.display
 import kotlin.math.abs
 
 /**
- * 画面粗判,只用像素读取函数,不依赖安卓类(可在 JVM 上测)。
- * [pixel] 返回 (x, y) 处的 ARGB 颜色值。
+ * Coarse frame judgement that only needs a pixel-reader function and no Android classes (so it is testable on the JVM).
+ * [pixel] returns the ARGB color at (x, y).
  */
 object FrameMath {
     const val GRID_W = 12
@@ -16,7 +16,7 @@ object FrameMath {
     private const val BLACK_SAMPLES = 24
     private const val BLACK_LEVEL = 8
 
-    /** 把画面切成 [GRID_W]×[GRID_H] 格,每格取 4×4 个点的平均亮度。 */
+    /** Split the frame into a [GRID_W]×[GRID_H] grid and average the brightness of 4×4 points per cell. */
     fun lumaGrid(width: Int, height: Int, pixel: (Int, Int) -> Int): IntArray {
         val out = IntArray(GRID_W * GRID_H)
         val cw = width / GRID_W
@@ -32,19 +32,19 @@ object FrameMath {
         return out
     }
 
-    /** 有足够多的格子明显变亮或变暗才算画面变了,光标闪烁这类小变化不算。 */
+    /** The frame counts as changed only when enough cells get clearly brighter or darker; small changes such as a blinking cursor do not count. */
     fun differs(a: IntArray?, b: IntArray?): Boolean {
         if (a == null || b == null || a.size != b.size) return false
         return a.indices.count { abs(a[it] - b[it]) > CELL_DELTA } >= MIN_CELLS
     }
 
-    /** 至少 [PAGE_SHARE] 的格子变了:换了一整页(或整屏在动),不是头像动图、光标、进度圈这类局部变化。 */
+    /** At least [PAGE_SHARE] of the cells changed: a whole page turned (or the entire screen is moving), not a local change such as an avatar animation, cursor or progress spinner. */
     fun pageChanged(a: IntArray?, b: IntArray?): Boolean {
         if (a == null || b == null || a.size != b.size) return false
         return a.indices.count { abs(a[it] - b[it]) > CELL_DELTA } >= a.size * PAGE_SHARE
     }
 
-    /** 均匀取样的点里至少 99.5% 每个通道都 ≤ [BLACK_LEVEL] 才算全黑。 */
+    /** The frame counts as fully black only when at least 99.5% of the evenly sampled points have every channel ≤ [BLACK_LEVEL]. */
     fun isBlack(width: Int, height: Int, pixel: (Int, Int) -> Int): Boolean {
         if (width <= 1 || height <= 1) return false
         var dark = 0

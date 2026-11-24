@@ -1,17 +1,17 @@
 package com.wangzan101.mika.cap.phone.display
 
 /**
- * 对话里虚拟屏小窗的输入口:用户在预览画面上点 / 滑,换算成虚拟屏逻辑坐标注入。
- * [fx] / [fy] 是相对预览画面的 0..1 坐标(左上角 0,0、右下角 1,1),由实现按虚拟屏当前逻辑宽高换算。
- * 只在用户开了「允许我在小窗里直接操作」、且小窗已展开时才会被调用。
+ * Input entry point for the virtual display's mini window in the conversation: taps / swipes on the preview image are converted into virtual display logical coordinates and injected.
+ * [fx] / [fy] are 0..1 coordinates relative to the preview image (top-left 0,0, bottom-right 1,1); implementations convert them using the virtual display's current logical width and height.
+ * Only called when the user has enabled "allow me to operate directly in the mini window" and the mini window is expanded.
  */
 interface PipInput {
-    /** 在预览画面的 (fx, fy) 点一下。 */
+    /** Tap once at (fx, fy) on the preview image. */
     suspend fun tap(fx: Float, fy: Float)
 
-    /** 一根手指沿 [points](0..1 坐标)滑一笔,从按下到抬起约 [durationMs] 毫秒;至少两个点。 */
+    /** One finger swipes along [points] (0..1 coordinates), taking about [durationMs] milliseconds from press to lift; at least two points. */
     suspend fun swipe(points: List<Pair<Float, Float>>, durationMs: Long)
 
-    /** 在虚拟屏上按一次返回键。 */
+    /** Press the back button once on the virtual display. */
     suspend fun back()
 }

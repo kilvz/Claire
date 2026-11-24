@@ -8,16 +8,16 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * 手机上的 su:找它、问它、经它跑进程。只按能力判断(找得到 su 文件、跑出来的 uid),不认是哪种 root。
- * 所有方法都会阻塞(su 可能正弹着授权框等用户),只在 IO 线程上调。
+ * su on the phone: find it, query it, run processes through it. Judged purely by capability (the su file can be found, the uid that comes out), not by which kind of root it is.
+ * Every method blocks (su may be showing a permission dialog waiting for the user), so call them only on IO threads.
  */
 object RootShell {
-    /** su 的完整路径;找不到为 null。 */
+    /** Full path of su; null when it cannot be found. */
     fun su(): String? = SuProbe.find(System.getenv("PATH")) { runCatching { File(it).exists() }.getOrDefault(false) }
 
     /**
-     * 问 su 一次:以 [uid](0 是 root,2000 是 shell)跑 `id`,最多等 [timeoutMs](第一次会弹授权框,要给用户时间)。
-     * 找不到 su 为 null。
+     * Query su once: run `id` as [uid] (0 is root, 2000 is shell), waiting at most [timeoutMs] (the first time it shows a permission dialog, so the user needs time).
+     * Null when su cannot be found.
      */
     fun ask(uid: Int, timeoutMs: Long): SuAnswer? {
         val su = su() ?: return null
@@ -30,12 +30,12 @@ object RootShell {
         return SuProbe.answer(text, timedOut = !exited, expectUid = uid)
     }
 
-    /** 起一个 su 进程;标准错误并进标准输出(拒绝时 su 的说明在那里)。 */
+    /** Start an su process; stderr is merged into stdout (that is where su's explanation goes when it denies). */
     fun start(args: List<String>): Process = ProcessBuilder(args).redirectErrorStream(true).start()
 
     /**
-     * 读进程输出,直到读到一行 uid(返回它)、流结束(null:su 没跑命令就退出了)或到 [timeoutMs](抛 java.util.concurrent.TimeoutException)。
-     * 超时由调用方结束进程。
+     * Read the process output until a line yields a uid (it is returned), the stream ends (null: su exited without running the command), or [timeoutMs] elapses (throws java.util.concurrent.TimeoutException).
+     * On timeout the caller terminates the process.
      */
     fun readUid(p: Process, timeoutMs: Long): Int? {
         val f = onThread {
@@ -45,12 +45,12 @@ object RootShell {
         return f.get(timeoutMs, TimeUnit.MILLISECONDS)
     }
 
-    /** 在单独的线程上做阻塞的读(不占公共线程池)。 */
+    /** Do the blocking read on its own thread (does not occupy the shared thread pool). */
     fun <T> onThread(block: () -> T): CompletableFuture<T> = CompletableFuture<T>().also { f ->
         Thread({ runCatching(block).fold({ f.complete(it) }, { f.completeExceptionally(it) }) }, "mika-su").apply { isDaemon = true }.start()
     }
 
-    /** 在另一条线程上把 [stream] 读完(最多 [max] 字节,多的丢掉)。 */
+    /** Drain [stream] on another thread (at most [max] bytes, anything beyond that is dropped). */
     fun collect(stream: InputStream, max: Int = 16 * 1024): CompletableFuture<String> = onThread {
         val buf = java.io.ByteArrayOutputStream()
         val chunk = ByteArray(4096)

@@ -16,14 +16,14 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 手机已有 root 能力时的两项授权。检测 su 只看文件能力,不执行 su,也不识别 root 实现。
- * 手机助手在用户首次明确授权后自动优先经 su 以 shell 身份启动,没有可见开关;
- * root 命令是另一项独立开关,默认关闭。拒绝或不回应后只由用户的明确动作重新请求。
+ * The two authorizations available when the phone already has root capability. Detecting su only looks at file capability; it never executes su and does not identify the root implementation.
+ * After the user explicitly authorizes it the first time, the phone helper automatically prefers to be started through su under the shell identity, with no visible switch;
+ * root commands are a separate switch, off by default. After a denial or no reply, only an explicit user action requests it again.
  */
 class RootControl(context: Context, private val scope: CoroutineScope, private val changed: () -> Unit) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    /** [startRequested] 只记录用户是否点过助手授权;真正自动启动还要求 [startGrant] 为 [RootGrant.Granted]。 */
+    /** [startRequested] only records whether the user ever tapped the helper authorization; actually auto-starting also requires [startGrant] to be [RootGrant.Granted]. */
     data class State(
         val suPresent: Boolean = false,
         val startRequested: Boolean = false,
@@ -43,9 +43,9 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
     )
     val state: StateFlow<State> = _state.asStateFlow()
 
-    /** su 在不在:第一次用时当场看一眼(只是几个文件在不在),之后由 [refresh] 更新。 */
+    /** Whether su is present: checked on the spot the first time it is used (only whether a few files exist), updated by [refresh] afterwards. */
     @Volatile private var suFound: Boolean? = null
-    /** 每次新的授权动作作废旧请求;解除配对后,迟到的 su 答复也不能把自动启动重新打开。 */
+    /** Each new authorization action invalidates the old request; after unpairing, a late su answer must not turn auto-start back on either. */
     private val startRequest = AtomicInteger(0)
     private val commandsRequest = AtomicInteger(0)
 
@@ -54,7 +54,7 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
         _state.update { it.copy(suPresent = found) }
     }
 
-    /** 重新找一次 su(App 启动、打开设置页时)。这里只检测文件,绝不会请求 root 授权。 */
+    /** Look for su again (when the App starts or the settings page opens). This only detects files and never requests root authorization. */
     fun refresh() {
         scope.launch(Dispatchers.IO) {
             val before = suFound
@@ -65,17 +65,17 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
         }
     }
 
-    /** 看门狗看的:只有用户请求过并且 su 已确认过 shell 身份,Root 启动才是 Ready。 */
+    /** What the watchdog sees: root start is Ready only when the user has requested it and su has confirmed the shell identity. */
     fun rootStart(): RootStart = RootStart.of(_state.value.startRequested, suPresent(), answer(KEY_START_ANSWER))
 
-    /** 看门狗起助手时 su 的答复;null 是用户明确重试后忘掉上一次答复。 */
+    /** su's answer when the watchdog starts the helper; null forgets the previous answer after an explicit user retry. */
     fun setStartAnswer(a: SuAnswer?) {
         if (a == null) prefs.edit().remove(KEY_START_ANSWER).apply()
         else prefs.edit().putString(KEY_START_ANSWER, a.name).apply()
         _state.update { it.copy(startGrant = RootGrant.of(a)) }
     }
 
-    /** 经 su 起助手或执行命令时发现 su 没了。 */
+    /** su turned out to be gone while starting the helper through it or running commands. */
     fun suGone() {
         if (suFound == false) return
         suFound = false
@@ -83,8 +83,8 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
     }
 
     /**
-     * 用户点「自动启动手机助手」或失败后的重试:这是首次和再次请求 su 的唯一入口。
-     * 已授权或正在询问时重复点击不做事;拒绝、不回话、身份不对都留在设置里说明。
+     * The user tapped "auto-start the phone helper", or retries after a failure: this is the only entry point for the first and any later su request.
+     * Repeated taps do nothing while granted or already asking; denials, silence and a wrong identity are all explained in settings.
      */
     fun requestStart() {
         val current = _state.value
@@ -96,7 +96,7 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
             val a = withContext(Dispatchers.IO) { RootShell.ask(HelperHandoff.SHELL_UID, ASK_TIMEOUT_MS) }
             if (request != startRequest.get()) return@launch
             if (a == null) {
-                // su 在授权期间消失:不能一直停在 Pending,否则 su 恢复后也无法再次点授权
+                // su disappeared during authorization: do not stay in Pending forever, otherwise the authorization could not be tapped again even after su comes back
                 setStartAnswer(null)
                 suGone()
             } else setStartAnswer(a)
@@ -104,17 +104,17 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
         }
     }
 
-    /** 解除配对会停止手机操作:清掉自动启动请求,避免看门狗再把助手起回来。 */
+    /** Unpairing stops phone operation: clear the auto-start request so the watchdog does not start the helper again. */
     fun turnOffStart() {
         startRequest.incrementAndGet()
         prefs.edit().putBoolean(KEY_START, false).remove(KEY_START_ANSWER).apply()
         _state.update { it.copy(startRequested = false, startGrant = RootGrant.Unknown) }
     }
 
-    /** Agent 能用 root 工具:用户打开了、su 答应过、su 还在。 */
+    /** The Agent may use root tools: the user turned it on, su has agreed, and su is still present. */
     fun commandsAllowed(): Boolean = _state.value.commands && answer(KEY_COMMANDS_ANSWER) == SuAnswer.Granted && suPresent()
 
-    /** 打开或关掉「允许 Claire 执行 root 命令」。打开时以 root 问 su 一次,答应了才打开。 */
+    /** Turn "allow Claire to run root commands" on or off. Turning it on asks su once as root and turns on only if su agrees. */
     fun setCommands(on: Boolean) {
         if (!on) {
             commandsRequest.incrementAndGet()
@@ -135,7 +135,7 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
         }
     }
 
-    /** 执行 root 命令时 su 拒绝了:关掉这一项并记下(下次打开时再问)。 */
+    /** su denied while running a root command: turn this option off and record it (it is asked again the next time it is turned on). */
     fun commandsDenied(a: SuAnswer) {
         commandsRequest.incrementAndGet()
         prefs.edit().putBoolean(KEY_COMMANDS, false).putString(KEY_COMMANDS_ANSWER, a.name).apply()
@@ -150,7 +150,7 @@ class RootControl(context: Context, private val scope: CoroutineScope, private v
         const val KEY_START_ANSWER = "startAnswer"
         const val KEY_COMMANDS = "commands"
         const val KEY_COMMANDS_ANSWER = "commandsAnswer"
-        /** 用户明确请求授权时等待系统授权框,给看清并点一下的时间。 */
+        /** How long to wait for the system permission dialog when the user explicitly requests authorization, enough time to read it and tap once. */
         const val ASK_TIMEOUT_MS = 60_000L
     }
 }

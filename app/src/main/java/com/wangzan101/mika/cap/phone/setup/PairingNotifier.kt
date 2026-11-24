@@ -19,25 +19,25 @@ import com.wangzan101.mika.ui.MainActivity
 import com.wangzan101.mika.settings.ui.PhoneSetupCopy
 import com.wangzan101.mika.setup.PairingCodeReceiver
 
-/** 配对通知此刻该显示什么。 */
+/** What the pairing notification should show right now. */
 sealed interface PairingNotice {
     /**
-     * 带输入框的「输入配对码」;[error] 是上一次没成功的原因和怎么办,输入框照样留着。
-     * [quiet] 为真时只放进通知栏、不响不弹:还没找到配对窗口时先备好(见 [of])。
+     * "Enter the pairing code" with an input field; [error] is the reason the last attempt failed and what to do about it, and the input field stays.
+     * When [quiet] is true it is only placed in the notification shade, without sound or pop-up: prepared ahead of time while the pairing window has not been found yet (see [of]).
      */
     data class EnterCode(val port: Int?, val error: String? = null, val quiet: Boolean = false) : PairingNotice
     data object Working : PairingNotice
     data object Done : PairingNotice
-    /** 配对后没能连上:回 Claire 看怎么处理。 */
+    /** Paired but could not connect afterwards: go back to Claire to see what to do. */
     data class Problem(val title: String) : PairingNotice
 
     companion object {
         /**
-         * 只在用户正在配对的这段时间里用([PairingCoordinator] 开着时)。找到配对窗口才弹输入框;
-         * 还在找时先在通知栏里静静放一个(不带端口,配对时再找):系统可能在切到系统设置后冻结后台的 Claire,
-         * 等找到窗口再发就发不出去了,用户下拉通知栏要能找到它;
-         * 配对阶段的失败(码不对、过期、窗口关了)留在通知里重填;要重新配对的失败(配对失效)找到配对窗口后也给输入框,
-         * 和无障碍读码认的一样(PairingScreen.attempt),还在找时同样先静静备好;别的失败请用户回 Claire。
+         * Used only while the user is pairing ([PairingCoordinator] active). The input field pops up only once the pairing window is found;
+         * while still searching, one is placed quietly in the notification shade first (without a port, looked up again when pairing): the system may freeze a backgrounded Claire after switching to system settings,
+         * and a notification sent later, once the window is found, could no longer get out, so the user must be able to find it by pulling the shade down;
+         * failures during pairing (wrong code, expired, window closed) stay in the notification for re-entry; failures that need a new pairing (pairing expired) also get an input field once the pairing window is found,
+         * recognized the same way as when accessibility reads the code (PairingScreen.attempt), and are likewise prepared quietly while still searching; other failures ask the user to return to Claire.
          */
         fun of(status: BuiltinShellStatus, discovery: PairingDiscovery): PairingNotice? {
             val port = (discovery as? PairingDiscovery.Found)?.port
@@ -58,23 +58,23 @@ sealed interface PairingNotice {
             }
         }
 
-        /** 无障碍在读配对码时,填码通知晚这么久再弹,多半已经配上了,不打扰。 */
+        /** While accessibility is reading the pairing code, the code-entry notification pops up this much later, by which point pairing has usually succeeded, so it does not intrude. */
         const val AUTO_READ_GRACE_MS = 5_000L
-        /** 填码通知弹出后没人填,依次隔这么久再弹一次;最多 [MAX_REALERTS] 次,不刷屏。 */
+        /** If nobody enters a code after the notification pops up, pop it again after each of these delays; at most [MAX_REALERTS] times, so it does not spam. */
         val REALERT_MS = listOf(8_000L, 20_000L, 40_000L)
         val MAX_REALERTS = REALERT_MS.size
 
-        /** 发出 [notice] 前等多久。无障碍没开时找到配对窗口就弹,不等;静静备好的那个也不等(要赶在进程被冻结之前)。 */
+        /** How long to wait before posting [notice]. With accessibility off it pops up as soon as the pairing window is found, with no wait; the quiet one does not wait either (it must get out before the process is frozen). */
         fun delayBefore(notice: PairingNotice, autoRead: Boolean): Long =
             if (notice is EnterCode && autoRead && !notice.quiet) AUTO_READ_GRACE_MS else 0L
 
-        /** 已经再提醒过 [sent] 次,下一次隔多久;null 表示不再提醒。 */
+        /** After [sent] re-alerts, how long until the next one; null means no more re-alerts. */
         fun realertAfter(notice: PairingNotice, sent: Int): Long? = if (notice is EnterCode && !notice.quiet) REALERT_MS.getOrNull(sent) else null
 
         /**
-         * [PairingCoordinator] 跟着状态更新通知时的一次计算:这时该显示哪条,显示完是否不再跟。
-         * 填了码、配对还没开始([submitted])时一律是「正在配对」,也不在这时结束(助手原本就在运行也一样,配对开始后状态还会变);
-         * 「重新配对」时运行中的旧状态不算配好([PhoneSetupFlow.effectiveStatus]),助手在运行、又不在重新配对才结束。
+         * One evaluation when [PairingCoordinator] follows status updates with a notification: which notice to show now, and whether to stop following after showing it.
+         * While a code has been submitted but pairing has not started ([submitted]) it is always "pairing", and following does not end at this point either (the same when the helper was already running, since the status still changes once pairing starts);
+         * during "pair again" a stale running status does not count as paired ([PhoneSetupFlow.effectiveStatus]), and following ends only when the helper is running and not re-pairing.
          */
         fun follow(status: BuiltinShellStatus, discovery: PairingDiscovery, repairing: Boolean, submitted: Boolean): Pair<PairingNotice?, Boolean> =
             if (submitted) Working to false
@@ -82,10 +82,10 @@ sealed interface PairingNotice {
     }
 }
 
-/** 系统里已有的一个配对频道;[userSet] 是用户自己改过它的重要程度。 */
+/** An existing pairing channel in the system; [userSet] means the user changed its importance themselves. */
 data class ChannelSnapshot(val id: String, val importance: Int, val userSet: Boolean)
 
-/** 配对频道怎么处理:[Create] 新建 [id](高优先级);[Use] 用已有的 [id],[health] 是它现在的样子。 */
+/** What to do with the pairing channel: [Create] makes a new [id] (high importance); [Use] uses the existing [id], with [health] describing its current state. */
 sealed interface ChannelPlan {
     val id: String
     val health: PairingChannelHealth
@@ -98,13 +98,13 @@ sealed interface ChannelPlan {
 }
 
 /**
- * 配对频道的选择(纯函数,便于测试)。频道的重要程度建好后 App 改不了:
- * 旧版本建得不够高、用户也没动过,就换一个新 id 重建;用户自己调低或关掉的不改回去,交给引导页提示。
+ * Choosing the pairing channel (pure functions, easy to test). An app cannot change a channel's importance once it is created:
+ * if an older version created it too low and the user never touched it, recreate it under a new id; what the user lowered or turned off is not changed back, the guide page just points it out.
  */
 object PairingChannel {
-    /** 用过的频道 id,越往后越新;新装的直接用最后一个。 */
+    /** Channel ids used so far, later ones newer; a fresh install uses the last one directly. */
     val IDS = listOf("pairing_code", "pairing_alert")
-    /** 更早版本的频道,见到就删,免得设置里多一项。 */
+    /** Channels from earlier versions; delete them on sight so settings does not gain extra entries. */
     const val LEGACY = "pairing"
 
     fun plan(existing: List<ChannelSnapshot>): ChannelPlan {
@@ -122,24 +122,24 @@ object PairingChannel {
 }
 
 /**
- * 配对通知:高优先级、带声音和振动(勿扰时听系统的),在系统设置的配对窗口上方弹出来;
- * 输入框用 RemoteInput,用户不用离开配对窗口。输入的码交给 [PairingCodeInput]。
+ * The pairing notification: high importance, with sound and vibration (deferring to the system in Do Not Disturb), popping up above the pairing window in system settings;
+ * the input field uses RemoteInput so the user does not have to leave the pairing window. The entered code goes to [PairingCodeInput].
  */
 object PairingNotifier {
     const val KEY_CODE = "pairing_code"
     const val EXTRA_PORT = "pairing_port"
     private const val ID = 4401
     private const val DONE_TIMEOUT_MS = 8_000L
-    /** 填码通知最多留这么久(和找配对窗口的时长一样),App 被杀了也不会一直挂着。 */
+    /** The code-entry notification stays at most this long (the same as the pairing window search), so it does not linger even if the App is killed. */
     private const val INPUT_TIMEOUT_MS = 10 * 60_000L
     private const val TAG = "MikaPairing"
     /**
-     * 静静备好的填码通知单放一组、只让组摘要出声:组里没有摘要,它就不响不弹(minSdk 30 上的静音办法,
-     * 和 AndroidX 的 setSilent 在旧系统上的做法一样)。不另建低优先级频道:有的系统把低优先级通知折进「不重要的通知」,不好找。
+     * The quietly prepared code-entry notification is put in a group of its own with only the group summary allowed to alert: with no summary in the group it neither rings nor pops up (the mute trick at minSdk 30,
+     * the same approach AndroidX's setSilent takes on older systems). No separate low-importance channel is created: some systems fold low-importance notifications into "less important notifications", where they are hard to find.
      */
     private const val QUIET_GROUP = "pairing_quiet"
 
-    /** 确保有一个配对频道,返回要用的那个(引导页据此提示、打开它的设置页)。 */
+    /** Make sure a pairing channel exists and return the one to use (the guide page uses it to hint and to open its settings page). */
     fun ensureChannel(context: Context): ChannelPlan {
         val nm = context.getSystemService(NotificationManager::class.java)
         val existing = PairingChannel.IDS.mapNotNull { id ->
@@ -174,7 +174,7 @@ object PairingNotifier {
         when (notice) {
             is PairingNotice.EnterCode -> {
                 val input = RemoteInput.Builder(KEY_CODE).setLabel(PhoneSetupCopy.NOTIFY_INPUT_LABEL).setAllowFreeFormInput(true).build()
-                // RemoteInput 要往 Intent 里填结果,必须是可变的
+                // RemoteInput has to put its result into the Intent, so the Intent must be mutable
                 val reply = PendingIntent.getBroadcast(
                     context, 1,
                     Intent(context, PairingCodeReceiver::class.java).apply { notice.port?.let { putExtra(EXTRA_PORT, it) } },
@@ -184,14 +184,14 @@ object PairingNotifier {
                     .addRemoteInput(input)
                     .setAllowGeneratedReplies(false)
                     .setSemanticAction(Notification.Action.SEMANTIC_ACTION_REPLY)
-                // 锁着屏也能直接填,不先要求解锁
+                // Can be filled in even while the screen is locked, without asking for an unlock first
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.setAuthenticationRequired(false)
                 val text = notice.error ?: PhoneSetupCopy.NOTIFY_ENTER_TEXT
                 b.setContentTitle(PhoneSetupCopy.NOTIFY_ENTER_TITLE)
                     .setContentText(text)
                     .setStyle(Notification.BigTextStyle().bigText(text))
                     .setOngoing(true)
-                    // 每次发都要响铃、弹出,包括没人填时的再次提醒和填错后的提示
+                    // Every post must ring and pop up, including re-alerts when nobody enters a code and the hint after a wrong code
                     .setOnlyAlertOnce(false)
                     .setTimeoutAfter(INPUT_TIMEOUT_MS)
                     .addAction(action.build())
@@ -203,11 +203,11 @@ object PairingNotifier {
                 .setAutoCancel(true).setOnlyAlertOnce(true).setTimeoutAfter(DONE_TIMEOUT_MS)
             is PairingNotice.Problem -> b.setContentTitle(notice.title).setContentText(PhoneSetupCopy.NOTIFY_PROBLEM_TEXT).setAutoCancel(true)
         }
-        // 静静备好的那个:放进通知栏,不响不弹(高优先级频道上也是,minSdk 30 没有 setSilent)
+        // The quiet one: placed in the shade without ringing or popping up (even on a high-importance channel; minSdk 30 has no setSilent)
         if (notice is PairingNotice.EnterCode && notice.quiet) b.setOnlyAlertOnce(true).setGroup(QUIET_GROUP).setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
-        // 没允许通知时系统会丢掉它;引导页在配对这一步先请用户允许
+        // Without notification permission the system drops it; the guide page asks the user to allow it first at the pairing step
         runCatching { nm.notify(ID, b.build()) }.onFailure { Log.w(TAG, "pairing notification not posted", it) }
-        // 发出去了也可能不弹:总开关、频道的重要程度都记一句(厂商另外的「悬浮通知」开关读不到)
+        // It may be posted and still not pop up: log both the master switch and the channel importance (vendor-specific "floating notification" switches cannot be read)
         if (!nm.areNotificationsEnabled()) Log.w(TAG, "notifications are off for Claire; the pairing notice is dropped")
         else nm.getNotificationChannel(channel)?.let { if (it.importance < NotificationManager.IMPORTANCE_HIGH) Log.i(TAG, "pairing channel importance ${it.importance}; it won't pop up") }
     }

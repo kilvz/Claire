@@ -19,12 +19,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
 /**
- * 配对时借 Claire 的无障碍服务读出系统配对窗口上的配对码,读到就直接配对,用户不用去通知里填。
- * 只在 [PairingCoordinator] 开着的这段时间里跑,只看系统设置的窗口;读到的码不写日志。
- * 无障碍没开就什么也不做,配对照样走通知。
+ * During pairing, borrow Claire's accessibility service to read the pairing code off the system pairing window, and pair right away once it is read, so the user does not have to type it from the notification.
+ * It runs only while [PairingCoordinator] is active and looks only at system settings windows; a code that is read is never logged.
+ * With accessibility off it does nothing, and pairing still goes through the notification.
  */
 internal object PairingCodeReader {
-    /** 窗口内容常常分几次刷出来,等它稳一下再读。 */
+    /** Window content often appears in several updates, so wait for it to settle before reading. */
     private const val SETTLE_MS = 300L
     private const val MAX_NODES = 400
     private const val TAG = "MikaPairing"
@@ -52,7 +52,7 @@ internal object PairingCodeReader {
                     val portFound = control.pairingDiscovery.value is PairingDiscovery.Found
                     val status = PhoneSetupFlow.effectiveStatus(control.status.value, coordinator.repairing.value)
                     val readings = readings(service, settings)
-                    // 只在看到的和上次不同时记一句;码本身不记,只记有没有
+                    // Log a line only when what is seen differs from last time; the code itself is not logged, only whether one exists
                     val seen = "${readings.size} window(s), code ${readings.any { it.code != null }}, port ${readings.firstNotNullOfOrNull { it.port }}, port found $portFound, status $status"
                     if (seen != last) {
                         Log.i(TAG, "saw $seen")
@@ -68,7 +68,7 @@ internal object PairingCodeReader {
         }
     }
 
-    /** 每个系统设置窗口各读一次:配对码和端口要在同一个窗口里(配对窗口下面那页也有一个「IP:端口」)。 */
+    /** Read each system settings window once: the pairing code and the port must come from the same window (the page below the pairing window also shows an "IP:port"). */
     private fun readings(service: ScreenAccessibility, settings: String): List<PairingScreenReading> =
         service.windowsOn(Display.DEFAULT_DISPLAY).mapNotNull { w ->
             val root = runCatching { w.root }.getOrNull() ?: return@mapNotNull null

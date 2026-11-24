@@ -4,7 +4,7 @@ import kotlin.math.roundToInt
 
 internal data class PhoneViewport(val width: Int, val height: Int, val dpi: Int)
 
-/** 像素比例跟随可用画面区；小侧栏降低显示密度，让应用至少拥有 320dp 的布局宽度。 */
+/** Pixel scaling follows the available screen area; a small side panel lowers the display density so apps still get a layout width of at least 320dp. */
 internal fun phoneViewport(width: Int, height: Int, deviceDpi: Int): PhoneViewport {
     require(width > 0 && height > 0 && deviceDpi > 0)
     val scale = minOf(1f, 2048f / maxOf(width, height))

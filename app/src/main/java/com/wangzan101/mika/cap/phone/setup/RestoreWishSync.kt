@@ -22,9 +22,9 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 
 /**
- * 把「Claire 被杀后要不要拉起来」([RestoreWish])交给内置助手:胶囊模式、有没有任务在跑、「替我打开无障碍」、
- * 系统列表里有没有 Claire 的无障碍服务、用户是不是点了完全退出,任一变了、或换了助手,就经 [IMikaShell.setRestoreWish] 再交一次。
- * 助手读不到 Claire 的设置,Claire 死后只按最后交到的这一份行事。
+ * Hands "should Claire be started again after it is killed" ([RestoreWish]) to the built-in helper: whenever the capsule mode, whether a task is running, "turn on accessibility for me",
+ * whether Claire's accessibility service is in the system list, or whether the user chose a full quit changes, or the helper changes, hand it over again through [IMikaShell.setRestoreWish].
+ * The helper cannot read Claire's settings and, once Claire is dead, acts only on the copy handed over last.
  */
 class RestoreWishSync(
     private val hub: HelperHub,
@@ -32,7 +32,7 @@ class RestoreWishSync(
     private val taskRunning: Flow<Boolean>,
     private val consent: Flow<RecoveryConsent>,
     private val accessibility: Flow<A11yObservation>,
-    /** 用户点了「完全退出」:哪怕胶囊是「一直显示」、哪怕还有任务在跑,也不让助手把 Claire 拉起来。 */
+    /** The user chose "fully quit": even if the capsule is set to "always show" and a task is still running, the helper must not start Claire again. */
     private val quit: Flow<Boolean>,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -45,8 +45,8 @@ class RestoreWishSync(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun start() {
         var lastOn: Boolean? = null
-        // 列表里没了 Claire 的服务要过一会儿才交出去:进程被强行停止时系统会先拿掉它,不能让这一下把心愿改掉;
-        // 一直没有(用户在系统设置里关掉了)才不替他写回
+        // A Claire service disappearing from the list is only handed over after a while: when a process is force-stopped the system removes it first, and that must not change the wish;
+        // only when it stays absent (the user turned it off in system settings) do we stop writing it back on their behalf
         val accessibilityOn = accessibility.map { it.enabled }.distinctUntilChanged().mapLatest { on ->
             if (!on && lastOn == true) delay(OFF_SETTLE_MS)
             lastOn = on

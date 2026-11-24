@@ -7,8 +7,8 @@ import com.wangzan101.mika.cap.phone.PhoneServices
 import kotlinx.coroutines.launch
 
 /**
- * 开机广播。只有用户打开了「重启后自动恢复」、并且 Claire 还拿着修改系统设置的授权时才动手,
- * 其余情况什么都不做(判断在 [BuiltinShellRecovery.restoreAfterBoot])。
+ * Boot broadcast. It acts only when the user has enabled "restore automatically after reboot" and Claire still holds the authorization to modify system settings;
+ * in every other case it does nothing (the check lives in [BuiltinShellRecovery.restoreAfterBoot]).
  */
 open class BootRestoreHandler : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

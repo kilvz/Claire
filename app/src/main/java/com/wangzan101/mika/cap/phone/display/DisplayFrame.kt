@@ -6,8 +6,8 @@ import android.graphics.Paint
 import android.graphics.Rect
 
 /**
- * 系统把逻辑画面顺时针旋转到固定的物理缓冲;反向转回来,让预览、PNG 和 OCR 都用应用的逻辑坐标。
- * 直接画到目标尺寸,不为每张预览另建一张全尺寸的中间图;源矩形不含 ImageReader 的行填充。
+ * The system rotates the logical screen clockwise into a fixed physical buffer; we rotate it back so previews, PNGs and OCR all use the app's logical coordinates.
+ * Draw straight to the target size instead of building a full-size intermediate bitmap for each preview; the source rectangle excludes ImageReader row padding.
  */
 internal fun uprightDisplayFrame(
     buffer: Bitmap,

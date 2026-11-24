@@ -8,15 +8,15 @@ import android.os.Bundle
 import android.provider.Settings
 
 /**
- * 引导要看的系统开关,以及跳到对应设置页的 Intent。
- * 「USB 调试」「无线调试」没有公开的跳转入口:进开发者选项,并按原版设置的做法高亮那一行;不认这个参数的手机就停在开发者选项顶部。
+ * The system switches the guide checks, and the Intents that jump to the matching settings pages.
+ * "USB debugging" and "Wireless debugging" have no public entry point: open developer options and highlight that row the way the stock settings app does; phones that do not honor this argument stop at the top of developer options.
  */
 object DeveloperSettings {
-    /** 原版的全局设置项;未公开常量,按名字读。 */
+    /** The stock global settings key; the constant is not public, so it is read by name. */
     const val ADB_WIFI_ENABLED = "adb_wifi_enabled"
-    /** 原版开发者选项里「无线调试」一行的 key,用来高亮。 */
+    /** Key of the "Wireless debugging" row in the stock developer options, used for highlighting. */
     private const val WIRELESS_DEBUGGING_KEY = "toggle_adb_wireless"
-    /** 原版开发者选项里「USB 调试」一行的 key。 */
+    /** Key of the "USB debugging" row in the stock developer options. */
     private const val USB_DEBUGGING_KEY = "enable_adb"
     private const val EXTRA_FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
     private const val EXTRA_SHOW_FRAGMENT_ARGS = ":settings:show_fragment_args"
@@ -28,33 +28,33 @@ object DeveloperSettings {
     fun developerOptions(cr: ContentResolver): Boolean =
         Settings.Global.getInt(cr, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
 
-    /** 没写过这一项(从没开过)按关着算;读不准的手机由引导页的「我已经打开了」兜底。 */
+    /** A key that was never written (never turned on) counts as off; on phones where it cannot be read reliably, the guide page's "I already turned it on" is the fallback. */
     fun wirelessDebugging(cr: ContentResolver): Boolean = Settings.Global.getInt(cr, ADB_WIFI_ENABLED, 0) == 1
 
     /**
-     * 系统里没有无线调试这一项。原版(安卓 11 起)开机时总会把这项设置按当前状态写成 0 或 1,所以开着关着都读得到;
-     * 一直没有这一项,说明系统没带无线调试。读的时候出错(系统不让读)不下结论,按有算。
+     * Wireless debugging does not exist on this system. The stock system (Android 11 and later) always writes this setting as 0 or 1 according to its current state at boot, so both on and off are readable;
+     * if the key is never present, the system does not ship wireless debugging. An error while reading (the system forbids reading) draws no conclusion and counts as present.
      */
     fun wirelessDebuggingMissing(cr: ContentResolver): Boolean =
         runCatching { Settings.Global.getString(cr, ADB_WIFI_ENABLED) == null }.getOrDefault(false)
 
     /**
-     * 系统里打不开「开发者选项」页:跳过去的 Intent 没有页面接(有的运行环境不带安卓的系统设置)。
-     * 问不到(系统不让问)不下结论,按有算。
+     * The "Developer options" page cannot be opened on this system: no activity handles the jump Intent (some runtime environments do not ship Android's system settings).
+     * Being unable to ask (the system forbids the query) draws no conclusion and counts as present.
      */
     fun developerOptionsPageMissing(pm: PackageManager): Boolean =
         runCatching { pm.resolveActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS), 0) == null }.getOrDefault(false)
 
     /**
-     * 把无线调试开关写成打开(要有修改系统设置的授权)。写入被拒(抛异常或返回 false)返回 false;
-     * 写进去之后系统还可能马上拨回去(见 [com.wangzan101.mika.core.device.shell.WirelessDebuggingAutoOn]),由调用方再读。
+     * Write the wireless debugging switch to on (requires the permission to modify system settings). A rejected write (throwing or returning false) yields false;
+     * after the write the system may still flip it back right away (see [com.wangzan101.mika.core.device.shell.WirelessDebuggingAutoOn]), so the caller reads it again.
      */
     fun turnOnWirelessDebugging(cr: ContentResolver): Boolean =
         runCatching { Settings.Global.putInt(cr, ADB_WIFI_ENABLED, 1) }.getOrDefault(false)
 
     fun usbDebugging(cr: ContentResolver): Boolean = Settings.Global.getInt(cr, Settings.Global.ADB_ENABLED, 0) == 1
 
-    /** 「关于手机」,版本号在这里(有的手机在它下面的「软件信息」里)。 */
+    /** "About phone", where the build number lives (on some phones it is under "Software information" there). */
     fun aboutPhone(): List<Intent> = listOf(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS), Intent(Settings.ACTION_SETTINGS))
 
     fun developerOptionsPage(): List<Intent> = listOf(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS), Intent(Settings.ACTION_SETTINGS))

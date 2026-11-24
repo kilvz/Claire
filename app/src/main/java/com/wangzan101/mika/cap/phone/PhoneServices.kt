@@ -12,41 +12,41 @@ import com.wangzan101.mika.core.device.shell.BuiltinShellControl
 import com.wangzan101.mika.settings.RecoverySettings
 
 /**
- * 手机能力在 Claire 进程里的服务,由 App 建一份、经 [Owner] 给出:内置助手(交接落点、配对与看门狗、
- * 自动恢复与授权)、任务和启动恢复共用的那条 shell 连接、配对流程、「去设置」提示。
- * 助手进程(HelperMain、ShellService)跑在 shell 身份下,没有 App 对象,不经这里。
+ * Services for the phone capabilities inside the Claire process, created once by the App and handed out via [Owner]: the built-in helper (handoff endpoint, pairing and watchdog,
+ * automatic recovery and authorization), the one shell connection shared by tasks and boot restore, the pairing flow, and the "go to settings" prompt.
+ * The helper processes (HelperMain, ShellService) run under the shell identity and have no App object, so they do not go through here.
  */
 class PhoneServices(context: Context) {
     private val app = context.applicationContext
 
-    /** 助手交来 Binder 的落点:助手只认一个进程里的一个落点。 */
+    /** The endpoint where the helper hands over its Binder: the helper only knows one endpoint in one process. */
     val hub = HelperHub(app)
 
     /** Opt-in incoming SMS login and process-wide single-attempt admission. */
     val smsLogin by lazy { com.wangzan101.mika.cap.phone.sms.SmsLoginRuntime(app) }
 
-    /** 配对、经 adbd 起助手、看门狗。 */
+    /** Pairing, starting the helper through adbd, and the watchdog. */
     val shellManager = BuiltinShellManager(app, hub) { recoverySettings.consent.value }
 
-    /** 内置助手本身(状态、配对、重试、解除配对)。 */
+    /** The built-in helper itself (status, pairing, retry, unpair). */
     val shellControl: BuiltinShellControl get() = shellManager.engine
 
-    /** 自动恢复与授权开关的设置。 */
+    /** Settings for automatic recovery and the authorization switches. */
     val recoverySettings: RecoverySettings by lazy { RecoverySettings(RecoverySettings.prefs(app)) }
 
-    /** 自动恢复与那几项授权开关。 */
+    /** Automatic recovery plus those authorization switches. */
     val recovery: BuiltinShellRecovery by lazy { BuiltinShellRecovery(app, shellManager.commandRunner, recoverySettings, shellControl) }
 
-    /** 任务与启动恢复共用的那条 shell 连接。 */
+    /** The shell connection shared by tasks and boot restore. */
     val sharedShell = SharedShell { BuiltinShellConnection(hub) { shellManager.need() } }
 
-    /** 一次配对的全过程。 */
+    /** The whole process of one pairing. */
     val pairing: PairingCoordinator by lazy { PairingCoordinator(app, shellControl) }
 
-    /** 任务要用手机、助手却没在运行时的提示。 */
+    /** Shown when a task needs the phone but the helper is not running. */
     val setupPrompt = PhoneSetupPrompt(app)
 
-    /** 给出进程里那一份的 Application。 */
+    /** Hands out the single instance held by the process: the Application. */
     interface Owner {
         val phone: PhoneServices
     }

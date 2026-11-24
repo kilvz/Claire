@@ -4,8 +4,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 能往后推的时限:从最后一次 [extend] 起算 [lengthMs]。[PairingCoordinator] 用它定看着配对多久,
- * 用户每次回到配对这件事上(点「去无线调试」、从停在配对一步的引导页离开)都从那时重新算。
+ * A deadline that can be pushed back: it counts [lengthMs] from the last [extend]. [PairingCoordinator] uses it to decide how long to watch pairing;
+ * every time the user comes back to the pairing matter (tapping "go to wireless debugging", leaving the guide page that stopped at the pairing step) it is recounted from that moment.
  */
 internal class SlidingDeadline(private val lengthMs: Long, private val now: () -> Long) {
     @Volatile private var until = 0L
@@ -14,7 +14,7 @@ internal class SlidingDeadline(private val lengthMs: Long, private val now: () -
         until = now() + lengthMs
     }
 
-    /** 等 [job] 做完;等的时候时限可以被推后。做完为 true,时限先到为 false。 */
+    /** Wait for [job] to complete; while waiting, the deadline may be pushed back. True when it completes, false when the deadline arrives first. */
     suspend fun await(job: Job): Boolean {
         while (true) {
             val left = until - now()

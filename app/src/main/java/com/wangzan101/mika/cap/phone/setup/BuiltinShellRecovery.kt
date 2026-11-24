@@ -48,9 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 内置助手的自动恢复和那几项能力。跑 shell 命令用 [runner](经助手或已配对的连接;两样都没有时不给);
- * 能力与开机结果记在 [settings];[control] 是内置助手本身。由 [com.wangzan101.mika.cap.phone.PhoneServices] 建一份,
- * App 启动时由 [start] 开始看着连接。
+ * Automatic recovery and those capabilities of the built-in helper. Shell commands run through [runner] (via the helper or a paired connection; not provided when neither exists);
+ * capabilities and boot results are stored in [settings]; [control] is the built-in helper itself. Created once by [com.wangzan101.mika.cap.phone.PhoneServices];
+ * [start] begins watching the connection when the App starts.
  */
 class BuiltinShellRecovery(
     context: Context,
@@ -64,13 +64,13 @@ class BuiltinShellRecovery(
     private var started = false
 
     val permissions: RecoveryPermissions by lazy {
-        // 助手在运行(不论怎么起的)或配对过,命令就有路可走
+        // While the helper is running (however it was started) or has been paired, commands have a path to go through
         RecoveryPermissions({ runner.takeIf { control.status.value == BuiltinShellStatus.Running || control.paired } }, settings, app.packageName)
     }
 
     /**
-     * 无障碍服务没在运行时自动打开它;结果([AccessibilityRepair.last])给设置页说一句。
-     * App 自己有修改系统设置的授权(「重启后自动恢复」给的)就直接写,不必等助手;没有才经助手。
+     * Turn the accessibility service back on automatically when it is not running; the result ([AccessibilityRepair.last]) gives the settings page something to report.
+     * When the App itself holds the permission to modify system settings (granted by "restore automatically after reboot") it writes directly without waiting for the helper; only otherwise does it go through the helper.
      */
     val accessibilityRepair = AccessibilityRepair(
         restart = { gap -> if (canWriteSecure()) restartDirectly(gap) else permissions.restartAccessibility(gap) },
@@ -82,7 +82,7 @@ class BuiltinShellRecovery(
     private fun canWriteSecure() =
         app.checkSelfPermission(PermissionCommands.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
 
-    /** 和 [RecoveryPermissions.restartAccessibility] 同样的步骤,只是由 App 自己写系统设置:没有就加上,有却没绑定就去掉再加回。 */
+    /** The same steps as [RecoveryPermissions.restartAccessibility], except the App writes the system settings itself: add it if absent; if present but not bound, remove it and add it back. */
     private suspend fun restartDirectly(gapMs: Long): PermissionResult = withContext(Dispatchers.IO) {
         val cr = app.contentResolver
         val me = PermissionCommands.accessibilityService(app.packageName)
@@ -97,7 +97,7 @@ class BuiltinShellRecovery(
                 write(AccessibilityList.without(current, me))
                 withContext(NonCancellable) {
                     delay(gapMs)
-                    // 加回失败时把原来的列表(连同总开关)写回,不让 Claire 从列表里消失;这次仍按加回失败报
+                    // If adding back fails, write the original list (together with the master switch) back so Claire does not vanish from the list; this attempt is still reported as a failed add-back
                     try {
                         write(AccessibilityList.with(read(), me))
                     } catch (e: Exception) {
@@ -117,9 +117,9 @@ class BuiltinShellRecovery(
     }
 
     /**
-     * 助手每次变成运行中(刚配对完、掉线后重起、App 启动时本来就配过对、开机自动恢复连上),就把默认打开、
-     * 用户没关掉、还没生效的几项补上。这几条路最后都落到同一个状态,所以只在这里看,不在各处分别调。
-     * 同时看着无障碍服务:没在运行、又有办法写系统设置(App 自己有授权或助手在运行)时,自动打开它。
+     * Every time the helper becomes running (just paired, restarted after dropping, already paired when the App starts, reconnected by boot restore), apply the capabilities that are on by default,
+     * that the user has not turned off and that are not in effect yet. All those paths end in the same state, so it is handled only here rather than called separately from each place.
+     * The accessibility service is watched at the same time: when it is not running and there is a way to write system settings (the App has the permission or the helper is running), turn it on automatically.
      */
     @Synchronized
     fun start() {
@@ -128,7 +128,7 @@ class BuiltinShellRecovery(
         val active = FeatureFlags.get(app).quitChanges().map { !it }
         scope.launch { permissions.applyWhenRunning(control.status, active) }
         val service = accessibility
-        // 启动时看一眼:被强行停止后系统会把服务从列表里拿掉,或者在列表里却迟迟不绑定;记下来给诊断信息
+        // Look once at startup: after a force-stop the system removes the service from the list, or leaves it listed but never binds it; record that for diagnostics
         val initial = service.value
         val seen = settings.accessibilitySeen
         scope.launch {
@@ -142,8 +142,8 @@ class BuiltinShellRecovery(
     }
 
     /**
-     * 开机后用户解锁过没有([UserManager.isUserUnlocked]):没解锁时无障碍服务本来就绑不上,自动修复先不动;
-     * 收到 [Intent.ACTION_USER_UNLOCKED] 时重读一次,让自动修复再判断。整个进程一份。
+     * Whether the user has unlocked since boot ([UserManager.isUserUnlocked]): before unlocking the accessibility service cannot bind anyway, so automatic repair holds off;
+     * on [Intent.ACTION_USER_UNLOCKED] it is read once more so automatic repair can re-evaluate. One instance for the whole process.
      */
     private val userUnlocked: StateFlow<Boolean> by lazy {
         fun read() = runCatching { app.getSystemService(UserManager::class.java)?.isUserUnlocked }.getOrNull() != false
@@ -154,12 +154,12 @@ class BuiltinShellRecovery(
             val filter = IntentFilter(Intent.ACTION_USER_UNLOCKED)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
             else app.registerReceiver(receiver, filter)
-            trySend(read()) // 注册前后之间的变化
+            trySend(read()) // changes between registration and the first send
             awaitClose { runCatching { app.unregisterReceiver(receiver) } }
         }.stateIn(scope, SharingStarted.Eagerly, read())
     }
 
-    /** 系统列表里有没有 Claire(跟着系统设置的变化)和服务实例是否连着(跟着连上、断开)。整个进程一份。 */
+    /** Whether Claire is in the system list (following system settings changes) and whether the service instance is connected (following connects and disconnects). One instance for the whole process. */
     val accessibility: StateFlow<A11yObservation> by lazy { serviceObservations() }
 
     private fun serviceObservations(): StateFlow<A11yObservation> {
@@ -178,21 +178,21 @@ class BuiltinShellRecovery(
             .stateIn(scope, SharingStarted.Eagerly, A11yObservation(enabled(), ScreenAccessibility.instance.value != null))
     }
 
-    /** 解除配对:先趁连接还在收回授权,再删配对。 */
+    /** Unpair: revoke the authorizations while the connection is still there, then remove the pairing. */
     suspend fun unpair() {
         val a11yApplied = settings.consent.value.isApplied(RecoveryCapability.Accessibility)
         val result = permissions.revokeAll()
-        // 连接已经不在时,无障碍服务至少能自己关掉;电池白名单和修改系统设置的授权只能靠连接收回
+        // With the connection already gone, the accessibility service can at least disable itself; the battery allowlist and the modify-system-settings permission can only be revoked through the connection
         if (result != PermissionResult.Done && a11yApplied) {
             runCatching { ScreenAccessibility.instance.value?.disableSelf() }
         }
         control.unpair()
     }
 
-    /** 开机后按已生效的「重启后自动恢复」重新打开无线调试并重起助手;不需要动手时返回 null。 */
+    /** After boot, following the active "restore automatically after reboot", turn wireless debugging back on and restart the helper; returns null when nothing needs doing. */
     suspend fun restoreAfterBoot(): RestoreOutcome? {
-        // 没配对过(助手是电脑经 USB 起的):Claire 自己起不来助手,不去动无线调试;
-        // 用 root 启动、Shizuku 模式或 Shizuku 已就绪时,也不去动无线调试
+        // Never paired (the helper was started from a computer over USB): Claire cannot start the helper itself, so wireless debugging is left alone;
+        // with root start, Shizuku mode, or Shizuku already ready, wireless debugging is left alone too
         if (!control.paired || control.rootStart || control.shizukuStart || control.transport == ShellTransport.Shizuku) return null
         val holds = app.checkSelfPermission(PermissionCommands.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
         when (BootRestore.gate(Build.VERSION.SDK_INT, settings.consent.value, holds)) {
@@ -201,7 +201,7 @@ class BuiltinShellRecovery(
             BootRestore.Gate.Act -> Unit
         }
         val cr = app.contentResolver
-        // 能力检测:写入被拒(抛异常/返回 false)或写了读回来不是 1,都当这台手机不支持
+        // Capability check: a rejected write (throwing / returning false), or reading back something other than 1 after writing, both mean this phone does not support it
         val written = DeveloperSettings.turnOnWirelessDebugging(cr) && DeveloperSettings.wirelessDebugging(cr)
         if (!written) return RestoreOutcome.SettingUnavailable.also(settings::recordRestore)
 
@@ -210,7 +210,7 @@ class BuiltinShellRecovery(
                 inputs = {
                     RecoveryInputs(
                         paired = control.paired,
-                        // 不在信任的 Wi-Fi 上时系统会把开关拨回去:每轮重读,拨回去就停
+                        // Off a trusted Wi-Fi network the system flips the switch back: re-read every round and stop once it has been flipped back
                         wirelessDebugging = DeveloperSettings.wirelessDebugging(cr),
                         status = control.status.value,
                     )
@@ -223,7 +223,7 @@ class BuiltinShellRecovery(
     }
 
     private companion object {
-        /** 开机广播 goAsync 之后约有一分钟;留余量。 */
+        /** About a minute is available after goAsync in a boot broadcast; leave headroom. */
         const val BOOT_BUDGET_MS = 50_000L
     }
 }
