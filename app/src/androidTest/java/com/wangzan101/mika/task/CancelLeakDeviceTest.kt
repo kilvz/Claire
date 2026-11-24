@@ -18,8 +18,8 @@ import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 真机测试:任务刚开始建虚拟屏或网页显示就被取消,反复 20 次,收尾后系统里不留 Claire 的显示。
- * 取消的时机错开,落在建屏前后的不同位置。需要内置助手在运行、Claire 无障碍服务已开启。
+ * Device test: a task is cancelled right as it starts creating a virtual display or web display, repeated 20 times, and no Claire display is left in the system afterwards.
+ * The cancellation timings are staggered so they land at different points around display creation. Requires the built-in assistant to be running and Claire's accessibility service enabled.
  */
 @RunWith(AndroidJUnit4::class)
 class CancelLeakDeviceTest {
@@ -53,7 +53,7 @@ class CancelLeakDeviceTest {
             val model = models[i]
             TaskService.start(context, "测试任务 $i")
             assertEquals(1, model.awaitCall().number)
-            // 轮流建虚拟屏、网页显示
+            // Alternate between creating a virtual display and a web display
             if (i % 2 == 0) model.feed("phone_launch_app", """{"package":"$SETTINGS"}""")
             else model.feed("web_navigate", """{"url":"https://example.com/"}""")
             Thread.sleep((i / 2 % 5) * 40L)

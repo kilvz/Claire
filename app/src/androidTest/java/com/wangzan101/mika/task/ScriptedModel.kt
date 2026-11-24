@@ -15,7 +15,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
 
-/** 真机测试用的脚本模型:每次 complete 先报到(第几次、收到的历史),再等测试喂下一步工具调用。 */
+/** Scripted model for device tests: on every complete it reports in first (call number, history received), then waits for the test to feed the next tool call. */
 class ScriptedModel : ChatModel {
     class Call(val number: Int, val messages: List<Message>)
 
@@ -23,23 +23,23 @@ class ScriptedModel : ChatModel {
     private val calls = Channel<Call>(Channel.UNLIMITED)
     private val replies = Channel<List<Part>>(Channel.UNLIMITED)
     private val n = AtomicInteger()
-    /** 收到的完成前核查请求次数。 */
+    /** Number of pre-completion verification requests received. */
     val verifierRequests = AtomicInteger()
-    /** 停止后写交代的请求次数;回 [stopSummary](默认空白,交代按记录直接拼),不占脚本也不计次。 */
+    /** Number of requests to write the post-stop summary; answers with [stopSummary] (blank by default, since the summary is assembled straight from the record), which neither consumes scripted steps nor counts as a call. */
     val summaryRequests = AtomicInteger()
     @Volatile var stopSummary: String = ""
-    /** 核查的固定回答;默认通过。 */
+    /** Fixed answer for verification; passes by default. */
     @Volatile var verdict: String = PASS
     /**
-     * 从界面发起的任务在提议第一个工具调用时,会另问一次模型「用户是在讨论、要读还是要操作」;没配轻量模型时问的就是这个模型。
-     * 默认固定回答 ACT(测试脚本都是操作任务),不占脚本也不计次;要测别的判断时改成 READ / DISCUSS,
-     * 设为 null 时这一问和别的调用一样要测试来喂。
+     * When a task started from the UI proposes its first tool call, it asks the model once more whether the user is discussing, wants to read, or wants to act; with no light model configured, this model is the one asked.
+     * It answers ACT by default (the test scripts are all action tasks), which neither consumes scripted steps nor counts as a call; set it to READ / DISCUSS to test other judgments,
+     * and set it to null to have the test feed this call like any other.
      */
     @Volatile var intent: String? = "ACT"
 
     override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
         if (system == Prompts.role("task_stages")) return ModelReply(listOf(Part.Text("[]")), StopReason.EndTurn, null)
-        // 回答交出前的核查:固定回答,不占脚本也不计次
+        // Verification before the answer is handed over: fixed answer, neither consumes scripted steps nor counts as a call
         if (system == Verifier.PROMPT) {
             verifierRequests.incrementAndGet()
             return ModelReply(listOf(Part.Text(verdict)), StopReason.EndTurn, null)
@@ -48,7 +48,7 @@ class ScriptedModel : ChatModel {
             summaryRequests.incrementAndGet()
             return ModelReply(listOf(Part.Text(stopSummary)), StopReason.EndTurn, null)
         }
-        // 给新对话起标题:固定回答,不占脚本也不计次
+        // Generating a title for a new conversation: fixed answer, neither consumes scripted steps nor counts as a call
         if (system == TITLE_PROMPT) return ModelReply(listOf(Part.Text("测试对话")), StopReason.EndTurn, null)
         intent?.let { if (system == INTENT_PROMPT) return ModelReply(listOf(Part.Text(it)), StopReason.EndTurn, null) }
         calls.send(Call(n.incrementAndGet(), messages))
@@ -56,11 +56,11 @@ class ScriptedModel : ChatModel {
         return ModelReply(parts, if (parts.any { it is Part.ToolCall }) StopReason.ToolUse else StopReason.EndTurn, null)
     }
 
-    /** [say] 是模型在这一步顺带说的话(界面上显示在步骤下面)。 */
+    /** [say] is what the model says along with this step (shown under the step in the UI). */
     fun feed(name: String, args: String = "{}", say: String? = null) =
         replies.trySend(listOfNotNull(say?.let { Part.Text(it) }, Part.ToolCall("c${n.get()}", name, args)))
 
-    /** 不带调用的回复:交给用户的最终回答,任务就此结束(核对没对上时会被退回一次)。 */
+    /** A reply with no tool call: the final answer handed to the user, which ends the task (it is sent back once if the verification does not match). */
     fun answer(text: String) = replies.trySend(listOf(Part.Text(text)))
 
     companion object {

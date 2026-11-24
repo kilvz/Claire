@@ -154,7 +154,7 @@ class PlanEditorDialogTest {
         assertEquals(1, saved.size)
     }
 
-    /** 新增时刻不用打字:默认从最后一个时刻往后一小时,加完点叉还能删掉。 */
+    /** Adding a time needs no typing: it defaults to one hour after the last time, and once added it can still be removed with the cross. */
     @Test fun clockChipsAddAndRemoveTimesWithoutTyping() {
         val saved = mutableListOf<TriggerDefinition>()
         show(saved = saved)
@@ -227,7 +227,7 @@ class PlanEditorDialogTest {
         assertTrue(saved.isEmpty())
     }
 
-    /** 首次执行走日期 + 时间选择器:选中的 23:59 要写回编辑框。 */
+    /** The first run is chosen through the date + time pickers: the selected 23:59 must be written back into the field. */
     @Test fun dateAndTimePickersWriteTheFirstRunTime() {
         show(saved = mutableListOf())
         compose.onNodeWithTag("plan-editor-content").performTextInput("检查天气")

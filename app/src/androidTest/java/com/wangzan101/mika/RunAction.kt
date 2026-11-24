@@ -10,6 +10,6 @@ import com.wangzan101.mika.core.run.record.RunSink
 import com.wangzan101.mika.core.tool.ToolDispatcher
 import com.wangzan101.mika.core.tool.ToolExecution
 
-/** 设备测试里直接做一个工具调用:和产品一样经执行入口(不配确认关卡,不等锁屏)。 */
+/** Perform a tool call directly in a device test: it goes through the execution entry point like the product does (no confirmation gate configured, no wait for the lock screen). */
 suspend fun ToolDispatcher.runAction(call: Part.ToolCall): ToolExecution =
     ActionExecutor(this, OperationGuards(), null, gate = {}, recorder = ActionRecorder(RunSink.NONE)).run(call, Origin.Model(0)).execution()

@@ -59,7 +59,7 @@ import com.wangzan101.mika.ui.appString
 import com.wangzan101.mika.ui.awaitOne
 import com.wangzan101.mika.voice.ui.VoiceModelContent
 
-/** 欢迎页、配置模型一页(上手和设置共用)、选用途页、服务商详情、全部模型和「用作」面板(只用假数据,不联网)。 */
+/** Welcome page, the model setup page (shared by onboarding and settings), the role picker page, provider detail, all models, and the "use as" sheet (fake data only, no network). */
 @RunWith(AndroidJUnit4::class)
 class ModelSetupScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -101,22 +101,22 @@ class ModelSetupScreenTest {
     @Test fun firstVisitShowsFormAndNextIsDisabled() {
         show(ModelSetupUi(form))
         compose.onNodeWithTag("setup-next").assertIsNotEnabled()
-        // 上面多了「用账号登录」一组,按钮可能在屏幕外:先滚到再点
+        // An extra "sign in with account" group was added above, so the button may be off screen: scroll to it before clicking
         compose.onNodeWithTag("setup-test").performScrollTo().assertIsEnabled().performClick()
         compose.onNodeWithTag("preset-Kimi").performScrollTo().performClick()
         assertEquals(listOf("test", "preset Kimi"), calls)
     }
 
-    /** 「不测试,直接保存」先问一次:说清后果,取消了就什么都不做,确认了才存。 */
+    /** "Save without testing" asks once first: it spells out the consequences, does nothing on cancel, and saves only on confirm. */
     @Test fun saveWithoutTestAsksBeforeSaving() {
         show(ModelSetupUi(form))
         compose.onNodeWithTag("setup-save-untested").performScrollTo().performClick()
         compose.onNodeWithText(ModelSetupCopy.SAVE_UNTESTED_TITLE).assertIsDisplayed()
         compose.onNodeWithText(ModelSetupCopy.SAVE_UNTESTED_BODY).assertIsDisplayed()
-        // 取消:什么都没存
+        // Cancel: nothing is saved
         compose.onNodeWithText("取消").performClick()
         assertTrue(calls.isEmpty())
-        // 确认:存
+        // Confirm: save
         compose.onNodeWithTag("setup-save-untested").performScrollTo().performClick()
         compose.onNodeWithText(ModelSetupCopy.SAVE_UNTESTED_CONFIRM).performClick()
         assertEquals(listOf("save untested"), calls)
@@ -125,12 +125,12 @@ class ModelSetupScreenTest {
     @Test fun connectedProvidersAreListedAndNextEnables() {
         show(connected())
         compose.onNodeWithTag("context-main").assertDoesNotExist()
-        // 服务商一组不再有小标题(b8d40cd4),直接看每家一行
+        // The providers group no longer has a subheading (b8d40cd4), so just look at one row per provider
         compose.onNodeWithTag("provider-DeepSeek").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("已连接 · 2 个模型 · 主模型、轻量模型在用").performScrollTo().assertIsDisplayed()
-        // 轻量卡「用主模型」下面也写着主模型名,所以只在主模型卡里找
+        // The light card's "same as main" choice also shows the main model name, so look only inside the main model card
         compose.onNodeWithTag("role-main").performScrollTo().assertTextContains("deepseek-chat", substring = true)
-        // 表单收起,留一个入口
+        // The form is collapsed, leaving a single entry point
         compose.onNodeWithTag("setup-test").assertDoesNotExist()
         compose.onNodeWithText(ModelsCopy.ADD_PROVIDER).performScrollTo().performClick()
         compose.onNodeWithTag("provider-通义千问").performScrollTo().performClick()
@@ -143,7 +143,7 @@ class ModelSetupScreenTest {
         show(connected(RoleChoices(main = "c1", vision = RoleChoice.Off, light = RoleChoice.SameAsMain)), onboarding = false)
         compose.onNodeWithText(ModelsCopy.TITLE).assertIsDisplayed()
         compose.onNodeWithText(ModelsCopy.LEAD).assertDoesNotExist()
-        // 改动当场生效,左上角返回就行
+        // Changes take effect immediately; going back via the top-left button is enough
         compose.onNodeWithTag("setup-next").assertDoesNotExist()
         ModelRole.entries.forEach { compose.onNodeWithText(ModelsCopy.roleLabel(it)).assertIsDisplayed() }
         compose.onNodeWithText(ModelsCopy.OFF).assertIsDisplayed()
@@ -170,7 +170,7 @@ class ModelSetupScreenTest {
     }
 
     @Test fun liveMigratedCatalogShowsVoiceGroupWithoutViewModelCatalog() {
-        // 设置页的 vm 不带语音控制器(sttCatalog 为空),只靠页面收集的目录判断是否迁移
+        // The settings page's view model has no voice controller (sttCatalog is empty), so migration is decided only from the catalog the page collected
         val snapshot = com.wangzan101.mika.voice.model.VoiceCatalogSnapshot(
             services = listOf(com.wangzan101.mika.voice.model.SttSelectionController.SYSTEM_STT_SERVICE),
             models = listOf(com.wangzan101.mika.voice.model.SttSelectionController.SYSTEM_STT_MODEL),
@@ -242,7 +242,7 @@ class ModelSetupScreenTest {
     }
 
     @Test fun settingsPageOpensTokenUsageButOnboardingDoesNotShowIt() {
-        // 一个测试只能 setContent 一次:同一份内容切换上手 / 设置
+        // A test can only call setContent once: switch the same content between onboarding and settings
         var onboarding by mutableStateOf(false)
         compose.setContent { MikaTheme { ModelSetupContent(connected(), onboarding = onboarding, actions = actions, onBack = {}) } }
         compose.onNodeWithText(UsageCopy.TITLE).performScrollTo().performClick()
@@ -367,7 +367,7 @@ class ModelSetupScreenTest {
         compose.onNodeWithText(ModelsCopy.SAME_AS_MAIN).performClick()
         compose.onNodeWithText(ModelsCopy.OFF).performClick()
         compose.onNodeWithText("DeepSeek").assertIsDisplayed()
-        // 不按能力置灰
+        // No greying out based on capabilities
         compose.onNodeWithText("deepseek-coder").assertIsEnabled().performClick()
         compose.onNodeWithText("qwen-long").performScrollTo().performClick()
         assertEquals(listOf("${RoleChoice.SameAsMain}", "${RoleChoice.Off}", "p1 deepseek-coder", "p2 qwen-long"), picked)
@@ -392,7 +392,7 @@ class ModelSetupScreenTest {
         }
         compose.onNodeWithText("DeepSeek").assertIsDisplayed()
         compose.onNodeWithText("deepseek-chat").assertIsDisplayed()
-        // 不再按 ttsModels 隐藏模型或服务商
+        // Models and providers are no longer hidden based on ttsModels
         compose.onNodeWithText("speech-mixed").assertIsDisplayed()
         compose.onNodeWithText("Local Voice").assertIsDisplayed()
         compose.onNodeWithText("fishaudio/drama-3-int4").assertIsDisplayed()
@@ -410,7 +410,7 @@ class ModelSetupScreenTest {
         val ui = ModelSetupUi(form, providers = listOf(deepseek, many), configs = listOf(main), roles = RoleChoices(main = "c1"))
         compose.setContent { MikaTheme { RolePickerContent(ui, ModelRole.Main, RolePickerActions(), onBack = {}) } }
         compose.onNodeWithTag("model-filter").performTextInput("qwen-9")
-        // 筛选框里也有这几个字,只看不是输入框的那一行
+        // The filter field contains the same text, so only look at the row that is not a text input
         compose.onNode(hasText("qwen-9") and !hasSetTextAction()).assertIsDisplayed()
         compose.onNodeWithText("qwen-1").assertDoesNotExist()
         compose.onNodeWithText("DeepSeek").assertDoesNotExist()
@@ -428,9 +428,9 @@ class ModelSetupScreenTest {
             }
         }
         compose.onNodeWithText(ModelsCopy.CONNECTED).assertIsDisplayed()
-        // Key 在「API Key」卡里按条列出,默认遮住中间
+        // Keys are listed one by one in the "API Key" card, with the middle masked by default
         compose.onNodeWithText("sk-qwen-…6789").performScrollTo().assertIsDisplayed()
-        // 在用的排最前,只放 3 个;Key 卡和用量卡在上面,模型要先滚到
+        // In-use models come first and only 3 are shown; the key card and usage card are above, so scroll to the models first
         compose.onNodeWithTag("model-qwen-vl-max").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(ModelsCopy.roleName(ModelRole.Vision)).performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("model-qwen-max").performScrollTo().assertIsDisplayed()
@@ -438,7 +438,7 @@ class ModelSetupScreenTest {
         compose.onNodeWithTag("model-qwen-turbo").assertDoesNotExist()
         compose.onNodeWithText(ModelsCopy.viewAll(5)).performScrollTo().performClick()
         assertEquals(listOf("all"), got)
-        // 删除前说清会影响哪个用途
+        // Before deleting, spell out which role is affected
         compose.onNodeWithText(ModelsCopy.DELETE).performScrollTo().performClick()
         compose.awaitOne(ModelsCopy.deleteBody(listOf(ModelRole.Vision)), inDialog = true).assertIsDisplayed()
     }
@@ -544,7 +544,7 @@ class ModelSetupScreenTest {
         compose.onNodeWithContentDescription(ModelsCopy.REFRESH).assertIsNotEnabled()
     }
 
-    // ---------- 用账号登录 ----------
+    // ---------- Sign in with an account ----------
 
     private val grok = Provider("p3", "xAI / Grok", ProviderConfig.Kind.Xai, "https://api.x.ai/v1", listOf(ListedModel("grok-4"), ListedModel("grok-4-fast")))
 
@@ -559,7 +559,7 @@ class ModelSetupScreenTest {
     }
 
     @Test fun signedInAccountRowOpensTheProvider() {
-        // 已有服务商时「添加服务商」是单独的子页(见 ModelSetupScreen 的 ModelSubPage.AddProvider),照它的样子渲染
+        // When providers already exist, "add provider" is its own subpage (see ModelSubPage.AddProvider in ModelSetupScreen); render it the same way
         val ui = ModelSetupUi(form, formOpen = true, providers = listOf(grok), xaiAccount = SubscriptionAccount("me@example.com", signedIn = true))
         compose.setContent { MikaTheme { Page(ModelsCopy.ADD_PROVIDER, onBack = {}) { AddProviderForm(ui, actions, standalone = true) } } }
         compose.onNodeWithTag("signin-xai-signed-in", useUnmergedTree = true).assertExists()

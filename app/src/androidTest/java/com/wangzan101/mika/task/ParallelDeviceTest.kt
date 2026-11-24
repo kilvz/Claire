@@ -30,15 +30,15 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * 真机测试:开关 parallelTasks 打开时,两个对话的任务同时跑,各占一块虚拟屏。
- * 需要安卓 14+、内置助手在运行、Claire 无障碍服务已开启。脚本模型按开始顺序分给两个任务。
+ * Device test: with the parallelTasks flag on, two conversations' tasks run at the same time, each on its own virtual display.
+ * Requires Android 14+, the built-in assistant running and Claire's accessibility service enabled. The scripted models are assigned to the two tasks in start order.
  */
 @RunWith(AndroidJUnit4::class)
 class ParallelDeviceTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var shell: IMikaShell
     private val models = listOf(ScriptedModel(), ScriptedModel())
-    /** 按对话分脚本模型:起标题等也会向工厂要模型,按调用次数分会错位;同一对话(同一会话号)始终拿同一个。 */
+    /** Hand out scripted models per conversation: title generation and the like also ask the factory for a model, so splitting by call count would drift; the same conversation (same session id) always gets the same model. */
     private val bySession = java.util.concurrent.ConcurrentHashMap<String, ScriptedModel>()
     private lateinit var priorFlags: SpeedFlags
 
@@ -49,7 +49,7 @@ class ParallelDeviceTest {
         DeviceSupport.service()
         sh("pm grant ${context.packageName} android.permission.POST_NOTIFICATIONS")
         val flags = FeatureFlags.get(context)
-        // 杀进程测试的第二次运行:第一次被杀时没跑收尾,开关还开着;要还原成第一次开始前记下的,不是此刻的
+        // Second run of the kill-process test: the first run was killed before wrap-up, so the flag is still on; restore what was recorded before the first run started, not what is set now
         priorFlags = killRecord.takeIf { it.exists() }?.let { runCatching { SpeedFlags.parse(JSONObject(it.readText()).getString(FLAGS_KEY)) }.getOrNull() }
             ?: flags.speedFlags()
         flags.setSpeed(priorFlags.copy(parallelTasks = true))
@@ -75,7 +75,7 @@ class ParallelDeviceTest {
         context.packageManager.resolveActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS), 0)?.activityInfo?.packageName
             ?: error("no clock app handles ACTION_SHOW_ALARMS")
 
-    /** 开一个新对话的任务,等它的模型第一次被调到;返回对话编号。 */
+    /** Start a task in a new conversation and wait until its model is first called; returns the conversation id. */
     private fun startTask(goal: String, model: ScriptedModel): String {
         val before = DeviceTaskState.conversationId.value
         TaskService.start(context, goal)
@@ -93,7 +93,7 @@ class ParallelDeviceTest {
         return run.state.value.takeIf { it is TaskState.Succeeded || it is TaskState.Failed || it is TaskState.Cancelled }
     }
 
-    /** 两个任务同时跑在两块屏上,都能做完;期间用户的主屏不受影响。 */
+    /** Both tasks run at the same time on two displays and both can finish; meanwhile the user's main display is unaffected. */
     @Test
     fun twoTasksRunOnTwoDisplays() {
         val mainBefore = DeviceSupport.mainScreenState(shell)
@@ -112,7 +112,7 @@ class ParallelDeviceTest {
         assertNotEquals(displayA, displayB)
         assertTrue(shell.topTaskId(displayA) >= 0)
         assertTrue(shell.topTaskId(displayB) >= 0)
-        // 两块屏各自操作,主屏的焦点与最上面的任务都不变
+        // Each display is operated separately, and neither the main display's focus nor its top task changes
         a.feed("phone_back")
         b.feed("phone_back")
         assertEquals(3, a.awaitCall().number)
@@ -127,7 +127,7 @@ class ParallelDeviceTest {
         assertFalse("Claire display left behind", "mika-agent" in sh("dumpsys display"))
     }
 
-    /** 两个任务都要开设置:后开的那个拿到 app_in_use_by_other_task,不把设置从第一个任务手里抢走。 */
+    /** Both tasks want to open settings: the later one gets app_in_use_by_other_task and does not take settings away from the first task. */
     @Test
     fun sameAppSecondTaskGetsConflictError() {
         val (a, b) = models
@@ -149,12 +149,12 @@ class ParallelDeviceTest {
     }
 
     /**
-     * Review Focus 5:两个任务进行中 Claire 进程被杀,下次启动两个包的 PLAY_AUDIO 都恢复,Claire 的虚拟屏都不在了。
-     * 测试跑在 Claire 进程里,杀进程会连测试一起结束,所以分两次运行,中间由外面杀进程:
-     * 第一次布置好、在 files/parallel-kill-test.json 留下记录(两个包原来的 PLAY_AUDIO 和开始前的开关),然后等着;
-     * 看到记录出现后在开发机上跑 `adb shell am force-stop <Claire 包名>`(这次报崩溃)。
-     * 第二次(进程重新拉起,启动时做恢复)按记录检查,并把开关还原成记录里的(第一次被杀时没跑收尾)。
-     * 注意:force-stop 会把 Claire 从已开启的无障碍服务里去掉(系统行为),第二次运行前要重新开启。
+     * Review Focus 5: with two tasks in progress the Claire process is killed; on the next start PLAY_AUDIO is restored for both packages and none of Claire's virtual displays is left.
+     * The test runs inside the Claire process, and killing it would end the test as well, so it is split into two runs with the kill done from outside in between:
+     * the first run sets everything up and leaves a record in files/parallel-kill-test.json (both packages' original PLAY_AUDIO modes and the flags from before the start), then waits;
+     * once the record appears, run `adb shell am force-stop <Claire package name>` on the dev machine (that run reports a crash).
+     * The second run (the process is relaunched and recovery happens on startup) checks against the record and restores the flags from it (the first run was killed before wrap-up).
+     * Note: force-stop removes Claire from the enabled accessibility services (system behavior), so it must be enabled again before the second run.
      */
     private val killRecord get() = File(context.filesDir, "parallel-kill-test.json")
 
@@ -172,7 +172,7 @@ class ParallelDeviceTest {
                 }
                 assertFalse("Claire display left behind", "mika-agent" in sh("dumpsys display"))
             } finally {
-                // 收尾里也会还原;这里先还原,断言失败时开关也不留着开
+                // Wrap-up restores it too; restore it here first so the flag is not left on even if an assertion fails
                 FeatureFlags.get(context).setSpeed(priorFlags)
             }
             return
@@ -190,8 +190,8 @@ class ParallelDeviceTest {
         assertEquals("ignore", pollUntil(5_000) { shell.getAudioMode(SETTINGS)?.takeIf { it == "ignore" } })
         assertEquals("ignore", pollUntil(5_000) { shell.getAudioMode(clock)?.takeIf { it == "ignore" } })
         record.writeText(prior.toString())
-        // 进程内放到后台的自杀命令不会执行(随测试的 shell 会话一起结束),只能由外面结束:
-        // 看到记录文件出现后在开发机上跑 adb shell am force-stop <包名>。等不到就清掉记录、按失败收尾
+        // A self-kill command backgrounded inside the process would not run (it dies with the test's shell session), so it has to be killed from outside:
+        // after the record file appears, run adb shell am force-stop <package> on the dev machine. If that does not happen, clear the record and fail
         Thread.sleep(KILL_WAIT_MS)
         record.delete()
         error("Claire was not killed: run `adb shell am force-stop ${context.packageName}` after ${record.name} appears, then rerun this test")

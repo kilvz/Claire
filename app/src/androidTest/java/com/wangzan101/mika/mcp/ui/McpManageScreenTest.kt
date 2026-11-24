@@ -16,7 +16,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
-/** 服务管理与自定义页面的 UI 冒烟:页面渲染出关键动作,不依赖真实网络。 */
+/** UI smoke test for the server management and custom server screens: the pages render their key actions without relying on a real network. */
 @RunWith(AndroidJUnit4::class)
 class McpManageScreenTest {
     @get:Rule val compose = createComposeRule()

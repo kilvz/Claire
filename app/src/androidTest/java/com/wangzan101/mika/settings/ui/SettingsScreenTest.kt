@@ -68,7 +68,7 @@ class SettingsScreenTest {
         }
     }
 
-    /** 页面是一整列滚动内容:先把这一行滚进视口再断言或点击。 */
+    /** The page is one long scrolling column: scroll the row into the viewport before asserting or clicking. */
     private fun scrollTo(text: String) {
         compose.awaitOne(text).performScrollTo()
         compose.waitForIdle()
@@ -79,7 +79,7 @@ class SettingsScreenTest {
         home()
         compose.onNodeWithText("一切就绪").assertIsDisplayed()
         compose.onNodeWithText("常用").assertIsDisplayed()
-        // 首页只显示模型、手机操作、通知和版本等常用状态。
+        // The home page only shows commonly used status such as the model, phone operations, notifications and version.
         for (v in listOf("DeepSeek", "可用", "正常", "0.1.0")) {
             scrollTo(v)
             compose.onNodeWithText(v).assertIsDisplayed()
@@ -127,7 +127,7 @@ class SettingsScreenTest {
     fun homeRowsOpenTheirPages() {
         val opened = mutableListOf<String>()
         home(opened = opened)
-        // 「主动能力」在「微信」和「任务运行」之间
+        // "Proactive capabilities" sits between "WeChat" and "Task runs"
         for (t in listOf("模型", "手机操作", "微信", "主动能力", "任务运行", "悬浮胶囊", "语言与外观", "通知", "记忆与数据", "应用访问", "高级与其他", "关于 Claire")) {
             scrollTo(t)
             compose.onNodeWithText(t).performClick()
@@ -135,7 +135,7 @@ class SettingsScreenTest {
         assertEquals(listOf("models", "phone", "wechat", "proactive", "work", "capsule", "language", "notifications", "memory", "access", "advanced", "about"), opened)
     }
 
-    /** 高级与其他集中放连接、维护和工程入口,各行仍打开原来的子页。 */
+    /** Advanced & other gathers the connectivity, maintenance and engineering entry points; each row still opens its original subpage. */
     @Test
     fun advancedRowsOpenTheirPages() {
         val opened = mutableListOf<String>()
@@ -160,14 +160,14 @@ class SettingsScreenTest {
         assertEquals(listOf("proxy", "sandbox", "computer", "mcp", "recovery", "dev", "quit"), opened)
     }
 
-    /** 发布版的高级与其他里没有开发者选项。 */
+    /** The release build's advanced & other page has no developer options entry. */
     @Test
     fun developerRowHiddenInRelease() {
         compose.setContent { AdvancedSettingsContent(onBack = {}, showDeveloper = false) }
         compose.onAllNodesWithText("开发者选项").assertCountEquals(0)
     }
 
-    /** 有问题时状态卡变成提示,按钮把问题交给 onProblem。 */
+    /** When something is wrong the status card turns into a prompt, and its button hands the problem to onProblem. */
     @Test
     fun statusCardTurnsIntoFixPrompt() {
         val clicked = mutableListOf<Problem>()
@@ -208,7 +208,7 @@ class SettingsScreenTest {
         assertEquals(1, repaired)
     }
 
-    /** 通知页:总开关允许、一个频道被调低、进度被关时,各行显示状态,点各行交给 onFix。 */
+    /** Notifications page: with the master switch allowing notifications, one channel lowered and progress turned off, each row shows its state and tapping a row hands it to onFix. */
     @Test
     fun notificationsPageShowsChannelsAndOpensThem() {
         val fixes = mutableListOf<Fix>()
@@ -238,7 +238,7 @@ class SettingsScreenTest {
         assertEquals(listOf(Fix.OpenLiveTaskSettings), fixes)
     }
 
-    /** 总开关关着:给「去打开」,三个频道都显示已关闭。 */
+    /** Master switch off: "turn on" is offered and all three channels show as off. */
     @Test
     fun notificationsPageWhenAppOff() {
         val fixes = mutableListOf<Fix>()
@@ -258,7 +258,7 @@ class SettingsScreenTest {
         assertEquals(1, unpaired)
     }
 
-    /** 并行开关打开、但设备不支持时:这一行灰掉,写明原因,不给加减。 */
+    /** Parallel tasks on but the device unsupported: the row is greyed out, states the reason, and offers no plus/minus. */
     @Test
     fun parallelDisabledShowsReason() {
         compose.setContent {
@@ -303,7 +303,7 @@ class SettingsScreenTest {
         compose.onAllNodesWithText("同时进行的任务").assertCountEquals(0)
     }
 
-    /** 「干活时」两项默认开着,用户可以关:点了开关回调新值。 */
+    /** Both "while working" toggles are on by default and the user can turn them off: tapping reports the new value. */
     @Test
     fun duringWorkTogglesCanBeTurnedOff() {
         val changes = mutableListOf<String>()
@@ -319,7 +319,7 @@ class SettingsScreenTest {
         assertEquals(listOf("screen:false", "mute:false"), changes)
     }
 
-    /** 干活时 › 操作节奏:快、标准(默认)、像人三选一,点了回调新值。 */
+    /** While working › operating pace: one of fast, standard (default) or human-like; tapping reports the new value. */
     @Test
     fun operatingPaceIsOneChoiceOfThree() {
         val picked = mutableListOf<OperatingPace>()
@@ -334,7 +334,7 @@ class SettingsScreenTest {
         assertEquals(listOf(OperatingPace.HUMAN, OperatingPace.FAST), picked)
     }
 
-    /** 首页「悬浮胶囊」一行写着当前的选择。 */
+    /** The "floating capsule" row on the home page shows the current choice. */
     @Test
     fun capsuleRowShowsCurrentChoice() {
         compose.setContent {
@@ -343,7 +343,7 @@ class SettingsScreenTest {
         compose.awaitOne("一直显示").assertIsDisplayed()
     }
 
-    /** 悬浮胶囊子页三选一,选了回调新值;页脚说明用的是无障碍服务。 */
+    /** The floating capsule subpage offers three choices and reports the new one on selection; the footer notes that it uses the accessibility service. */
     @Test
     fun capsulePageOffersThreeChoices() {
         var mode by mutableStateOf(CapsuleMode.DuringTasks)
@@ -356,14 +356,14 @@ class SettingsScreenTest {
         compose.onNodeWithText("允许添加到快捷设置").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("几秒没碰后的显示程度", substring = true).assertDoesNotExist()
         compose.onNodeWithText("前台应用铺满屏幕", substring = true).assertDoesNotExist()
-        // 脚注在三个选项下面,矮屏或大字号时要滚一下才看得到
+        // The footnote sits below the three options, so it needs a scroll to be visible on short screens or with large fonts
         compose.onNodeWithText("无障碍服务", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("一直显示").performScrollTo().performClick()
         compose.onNodeWithText("关闭").performScrollTo().performClick()
         assertEquals(listOf(CapsuleMode.Always, CapsuleMode.Off), picked)
     }
 
-    /** 「全部清除」先问一句;确认后清空,条数变成 0、按钮消失;取消则不动。 */
+    /** "Clear all" asks first; confirming empties the list so the count becomes 0 and the button disappears; cancelling changes nothing. */
     @Test
     fun clearRoutesAsksThenEmpties() {
         var routes by mutableStateOf(3)
@@ -382,7 +382,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("全部清除").assertDoesNotExist()
     }
 
-    /** 开发者选项:八个开关分速度、实验两组,点一下打开对应那一项。 */
+    /** Developer options: eight switches split into the speed and experimental groups; tapping one turns on the corresponding item. */
     @Test
     fun developerOptionsHasTwoGroupsAndToggles() {
         val changed = mutableListOf<SpeedFlags>()
@@ -419,7 +419,7 @@ class SettingsScreenTest {
         assertEquals(listOf(true, false), toggled)
     }
 
-    /** 「自主模式」在任务运行最前面,默认关;点开关或整行都切换。 */
+    /** "Autonomous mode" comes first under task runs and is off by default; tapping the switch or the whole row toggles it. */
     @Test
     fun autonomousSwitchComesFirstAndToggles() {
         val toggled = mutableListOf<Boolean>()
@@ -439,7 +439,7 @@ class SettingsScreenTest {
         assertEquals(listOf(true, false), toggled)
     }
 
-    /** 「看图定位已验证」挪到开发者选项:有看图模型才出现,点了切换。 */
+    /** "Vision grounding verified" moved into developer options: it only appears when a vision model exists, and tapping it toggles. */
     @Test
     fun groundingSwitchShowsOnlyWithVisionModel() {
         val toggled = mutableListOf<Boolean>()
@@ -511,7 +511,7 @@ class SettingsScreenTest {
         assertTrue(c.network == listOf(true))
     }
 
-    /** 已用空间:每个对话的工作区一行;有任务在跑的写明不能清、点不动;清理先确认,确认后才回调。 */
+    /** Used space: one row per conversation workspace; a workspace with a running task says it cannot be cleared yet and is not clickable; clearing asks for confirmation first and only then reports the change. */
     @Test
     fun usageClearsAWorkspaceOnlyAfterConfirming() {
         val usage = com.wangzan101.mika.cap.sandbox.SandboxUsage(
@@ -605,7 +605,7 @@ class SettingsScreenTest {
         assertTrue(refreshes >= 1)
     }
 
-    /** 手机操作:术语副标题、修复连接的目录说明删掉,系统版本用版本号替代「满足」,危险后果说明保留。 */
+    /** Phone operations: the terminology subtitles and the table-of-contents copy for repairing the connection are gone, the system version shows the version number instead of "meets requirements", and the note on risky consequences stays. */
     @Test
     fun phoneOpsOmitsRedundantSubtitles() {
         compose.setContent { PhoneOpsScreen(ready, "14", onProblem = {}, onRepair = {}, onUnpair = {}, onBack = {}) }
@@ -615,7 +615,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("安卓 14").assertIsDisplayed()
     }
 
-    /** Shizuku 就绪时诊断读盘隐藏,未就绪时仍出现。 */
+    /** When Shizuku is ready the diagnostic read-out is hidden, and it still appears when Shizuku is not ready. */
     @Test
     fun phoneOpsShizukuReadyHidesDiagnostic() {
         var status by mutableStateOf(ready.copy(shizuku = ShizukuPlatformState(installed = true, running = true, permissionGranted = true)))
@@ -625,7 +625,7 @@ class SettingsScreenTest {
         compose.onAllNodesWithText("已安装", substring = true).assertCountEquals(1)
     }
 
-    /** 任务运行:直白开关与费用说明的副标题删掉;4 个上限值仍显示(移到行尾)。 */
+    /** Task runs: the plain-language toggle subtitles and the cost-note subtitle are removed; the 4 limit values still show (moved to the end of the row). */
     @Test
     fun duringWorkOmitsRedundantSubtitles() {
         compose.setContent {
@@ -635,12 +635,12 @@ class SettingsScreenTest {
         for (t in listOf("屏幕不熄灭", "不出声", "按人民币估算", "在小窗里点")) {
             compose.onAllNodesWithText(t, substring = true).assertCountEquals(0)
         }
-        // 4 个上限值仍显示:步数/定时/Token 是「不限制」,沙箱是「30 分钟」
+        // The 4 limit values still show: steps/schedule/Token are "unlimited", sandbox is "30 minutes"
         compose.onAllNodesWithText("不限制").assertCountEquals(3)
         compose.onNodeWithText("30 分钟").performScrollTo().assertIsDisplayed()
     }
 
-    /** 通知:总开关与免打扰的复述说明删掉,频道触发时机保留。 */
+    /** Notifications: the restated explanations for the master switch and do-not-disturb are removed, while the channel trigger timing stays. */
     @Test
     fun notificationsOmitsRedundantSubtitles() {
         compose.setContent { NotificationsScreen(ready, onFix = {}, onBack = {}) }
@@ -649,7 +649,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("需要你接管、确认、回答时").assertIsDisplayed()
     }
 
-    /** 悬浮胶囊:两条滑杆说明删掉,三模式差异说明保留。 */
+    /** Floating capsule: the descriptions of the two sliders are removed, while the note on how the three modes differ stays. */
     @Test
     fun capsuleOmitsSliderDetails() {
         compose.setContent { CapsuleScreen(CapsuleMode.DuringTasks, onMode = {}, onBack = {}) }
@@ -658,7 +658,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("有任务时显示").assertIsDisplayed()
     }
 
-    /** 高级:网页搜索的目录说明删掉(行尾值仍显示)。 */
+    /** Advanced: the web-search table-of-contents copy is removed (the trailing value still shows). */
     @Test
     fun advancedOmitsWebSearchSubtitle() {
         compose.setContent { AdvancedSettingsContent(onBack = {}, webSearch = WebSearchConfig(), onOpenWebSearch = {}) }

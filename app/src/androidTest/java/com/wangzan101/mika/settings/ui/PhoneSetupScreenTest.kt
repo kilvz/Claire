@@ -28,7 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 引导页和「高级」里的手机操作几行(只用假数据,不碰系统设置)。 */
+/** The guide screens and the phone-operation rows under "Advanced" (fake data only, no system settings touched). */
 @RunWith(AndroidJUnit4::class)
 class PhoneSetupScreenTest {
     @get:Rule val compose = createComposeRule()
@@ -55,7 +55,7 @@ class PhoneSetupScreenTest {
         )
     }
 
-    /** 连不上:「稍后再说」还在,能照着「无线调试」页面填端口;填错当场提示,不去连。 */
+    /** Cannot connect: "later" is still offered, and the port can be entered by following the "Wireless debugging" screen; a wrong value is flagged immediately instead of attempting a connection. */
     @Test
     fun failedConnectOffersLaterAndManualPort() {
         show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed)))
@@ -70,7 +70,7 @@ class PhoneSetupScreenTest {
         assertEquals(listOf("port 41235", "close"), calls)
     }
 
-    /** 这个环境没有开发者选项和无线调试:一开始就说明,不列步骤,「知道了」离开。 */
+    /** This environment has no developer options and no wireless debugging: state that up front, list no steps, and leave via "got it". */
     @Test
     fun unavailableEnvironmentExplainsUpFrontWithoutSteps() {
         show(SetupInputs(false, false, BuiltinShellStatus.NotPaired, wirelessMissing = true, developerSettingsMissing = true))
@@ -82,7 +82,7 @@ class PhoneSetupScreenTest {
         assertEquals(listOf("close"), calls)
     }
 
-    /** 正在连接:也能「稍后再说」;在本机找端口时照实说。 */
+    /** Connecting: "later" is still available; while searching for the port on the device, say so plainly. */
     @Test
     fun workingOffersLaterAndShowsPortSearch() {
         show(SetupInputs(true, true, BuiltinShellStatus.Connecting), scanning = true)
@@ -92,7 +92,7 @@ class PhoneSetupScreenTest {
         assertEquals(listOf("close"), calls)
     }
 
-    /** 失败在配对一步(码不对)时不给填连接端口,「稍后再说」照样在。 */
+    /** When the failure is at the pairing step (wrong code), no connect-port field is offered, but "later" is still there. */
     @Test
     fun pairingFailureHasLaterButNoConnectPort() {
         show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.WrongCode)))
@@ -100,10 +100,10 @@ class PhoneSetupScreenTest {
         compose.onNodeWithTag("setup-connect-port").assertDoesNotExist()
     }
 
-    /** 走到配对一步、无障碍跳过了:配对码只能填在通知里。 */
+    /** Reached the pairing step with accessibility skipped: the pairing code can only be entered from the notification. */
     private val pairingWithoutA11y = SetupInputs(true, true, BuiltinShellStatus.NotPaired, accessibility = false, accessibilitySkipped = true)
 
-    /** 「复制诊断信息」底部一直在;失败时出错的那一步里也有一个。 */
+    /** "Copy diagnostics" is always at the bottom; when something fails there is also one inside the failing step. */
     @Test
     fun diagnosticsButtonAtBottomAndInFailedStep() {
         show(SetupInputs(true, true, BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed)), diagnostics = true)
@@ -137,13 +137,13 @@ class PhoneSetupScreenTest {
         compose.onNodeWithTag("setup-app-info").performClick()
         compose.onNodeWithTag("setup-skip-a11y").performClick()
         assertEquals(listOf("step Accessibility", "appInfo", "skipA11y"), calls)
-        // 无障碍靠跳过往下走,不另给「已打开」
+        // With accessibility you move on by skipping, so no separate "turned on" button is offered
         compose.onNodeWithTag("setup-confirm").assertDoesNotExist()
     }
 
     @Test
     fun everySwitchStepHasAManualNext() {
-        // 什么都读成关着:第一步就能点「我已经打开了,下一步」
+        // Everything reads as off: even the first step offers "I've turned it on, next"
         show(SetupInputs(false, false, BuiltinShellStatus.NotPaired, usbDebugging = false, accessibility = false))
         compose.onNodeWithText(PhoneSetupCopy.TURNED_ON_NEXT).assertIsDisplayed()
         compose.onNodeWithTag("setup-confirm").performClick()
@@ -161,7 +161,7 @@ class PhoneSetupScreenTest {
     fun doneStepsCanBeTappedToRedo() {
         show(SetupInputs(true, true, BuiltinShellStatus.NotPaired))
         compose.onNodeWithTag("setup-step-UsbDebugging").performClick()
-        // 后面没做的不能点
+        // Steps that have not been done yet cannot be tapped
         compose.onNodeWithTag("setup-step-Connect").performClick()
         compose.onNodeWithText(PhoneSetupCopy.REVISIT_NOTE).performScrollTo().assertIsDisplayed()
         assertEquals(listOf("revisit UsbDebugging"), calls)
@@ -190,7 +190,7 @@ class PhoneSetupScreenTest {
         compose.onNodeWithTag("setup-pairing-guide").performScrollTo().assertIsDisplayed()
         PhoneSetupCopy.NOTIFY_GUIDE.forEach { compose.onNodeWithText(it).assertExists() }
         compose.onNodeWithTag("setup-pairing-hint").assertDoesNotExist()
-        // 通知好好的:主按钮还是去无线调试,也没有修通知的按钮
+        // Notifications are fine: the primary button still goes to wireless debugging, and there is no fix-notifications button
         compose.onNodeWithTag("setup-notify-fix").assertDoesNotExist()
         compose.onNodeWithTag("setup-action").performScrollTo().performClick()
         assertEquals(listOf("step PairingCode"), calls)
@@ -243,7 +243,7 @@ class PhoneSetupScreenTest {
         compose.onNodeWithTag("setup-manual").performClick()
         compose.onNodeWithTag("setup-code").performTextInput("123 456")
         compose.onNodeWithTag("setup-port").performTextInput("37001")
-        // 真机上键盘弹出来会把按钮挤到可见区下面,先滚过去再点
+        // On a real device the on-screen keyboard pushes the button below the visible area, so scroll to it before clicking
         compose.onNodeWithTag("setup-submit").performScrollTo().performClick()
         assertEquals(listOf("submit 123456 37001"), calls)
     }
@@ -268,7 +268,7 @@ class PhoneSetupScreenTest {
         assertEquals(listOf("close"), calls)
     }
 
-    /** 「改用电脑启动」平时不出现:无线调试一步只有一行「找不到无线调试?」,点了才在这一步里出现命令和复制。 */
+    /** "Start from a computer" normally does not appear: the wireless debugging step only has one "can't find wireless debugging?" row, and only after tapping it do the command and copy action show up in that step. */
     @Test
     fun usbCardAppearsOnlyWhenAskedOnTheWirelessStep() {
         val wirelessStep = SetupInputs(true, false, BuiltinShellStatus.NotPaired)
@@ -290,7 +290,7 @@ class PhoneSetupScreenTest {
         assertEquals(listOf("copy"), calls)
     }
 
-    /** 正常走到配对一步:没有「找不到无线调试?」,也没有卡片。 */
+    /** Reaching the pairing step normally: no "can't find wireless debugging?" row and no card. */
     @Test
     fun normalPairingStepHasNoUsbOption() {
         compose.setContent {

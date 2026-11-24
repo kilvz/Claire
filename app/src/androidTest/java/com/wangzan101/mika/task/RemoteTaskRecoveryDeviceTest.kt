@@ -142,7 +142,7 @@ class RemoteTaskRecoveryDeviceTest {
         } finally { app.deleteDatabase(db) }
     }
 
-    // 收尾的和删对话留下的占位按条数、按时间清;没收尾的不清,清掉的编号再来就当新请求
+    // Finished receipts and the placeholders left by deleted conversations are pruned by count and by age; unfinished ones are not pruned, and a pruned id that comes back counts as a new request
     @Test fun finishedReceiptsAndPlaceholdersArePrunedUnfinishedKept() {
         val db = "receipts-test-" + UUID.randomUUID()
         var now = 10 * RemoteTaskReceipts.KEEP_MS
@@ -155,7 +155,7 @@ class RemoteTaskRecoveryDeviceTest {
                 for (id in listOf("a", "b")) { store.insert(task(id), false); store.finish(id, TaskState.Cancelled, emptyList()) }
                 fun gone() = (runCatching { store.find("gone") }.exceptionOrNull() as? RemoteTaskError)?.code
                 assertNotNull(store.find("running")); assertEquals(RemoteTaskError.Code.GONE, gone())
-                // 第五条收件:最早的两条落在最近三条之外,收尾的占位被清,还没收尾的留着
+                // Fifth receipt: the two oldest fall outside the most recent three, so the finished placeholder is pruned while the unfinished one is kept
                 store.insert(task("c"), false)
                 assertNotNull(store.find("running"))
                 assertNull(gone()); assertNull(store.find("gone"))
@@ -164,7 +164,7 @@ class RemoteTaskRecoveryDeviceTest {
             }
             now += RemoteTaskReceipts.KEEP_MS + 1
             RemoteTaskReceipts(app, db, clock = { now }, keep = 3).use { store ->
-                // 重开:running 标成中断后和 a b c 一起过了保留时间,都清掉
+                // Reopen: running is marked interrupted and, like a b c, is past the retention time, so all are pruned
                 assertEquals(emptyList<RemoteTask>(), store.recent(10))
                 store.insert(task("a"), false)
                 assertTrue(store.claimStart("a"))

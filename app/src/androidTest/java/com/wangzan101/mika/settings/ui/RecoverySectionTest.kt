@@ -18,7 +18,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 设置 › 恢复与修复:几项默认显示打开,拨动直接执行,不弹确认框。 */
+/** Settings › Recovery & repair: several items show as on by default, and toggling them acts directly without a confirmation dialog. */
 @RunWith(AndroidJUnit4::class)
 class RecoverySectionTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -40,7 +40,7 @@ class RecoverySectionTest {
         compose.onAllNodesWithText("默认打开").assertCountEquals(0)
         compose.onNodeWithText(RecoveryCopy.NEED_SETUP).assertIsDisplayed()
 
-        // 说明默认收起,点开「了解这几项在做什么」后才显示。
+        // The explanations are collapsed by default and only appear after opening "learn what these items do".
         compose.onAllNodesWithText(RecoveryCopy.switch(RecoveryCapability.BatteryWhitelist).explain).assertCountEquals(0)
         compose.onNodeWithText(RecoveryCopy.LEARN).performClick()
         compose.onNodeWithText(RecoveryCopy.switch(RecoveryCapability.BatteryWhitelist).explain).assertExists()
