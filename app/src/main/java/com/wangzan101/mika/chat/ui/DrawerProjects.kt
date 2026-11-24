@@ -56,7 +56,7 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 侧栏「项目」段头与「新建项目」入口。 */
+/** Drawer "Projects" section header and the "New project" entry. */
 @Composable
 internal fun ProjectsHeader(enabled: Boolean, onNewProject: () -> Unit) {
     val c = MikaTheme.colors
@@ -75,7 +75,7 @@ internal fun ProjectsHeader(enabled: Boolean, onNewProject: () -> Unit) {
     }
 }
 
-/** 侧栏里一个项目的可折叠分组头:点按展开/收起，右侧加号新建项目内对话，长按打开项目操作菜单。 */
+/** Collapsible group header for a project in the drawer: tap to expand/collapse, the plus on the right creates a new chat inside the project, long-press opens the project actions menu. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ProjectGroupHeader(
@@ -124,7 +124,7 @@ internal fun ProjectGroupHeader(
     }
 }
 
-/** 新建 / 重命名项目的输入弹窗。 */
+/** Input dialog for creating / renaming a project. */
 @Composable
 internal fun ProjectNameDialog(
     title: String,
@@ -161,7 +161,7 @@ internal fun ProjectNameDialog(
     )
 }
 
-/** 删除项目的确认弹窗:写明会删除项目内全部对话与共享工作区文件。 */
+/** Confirmation dialog for deleting a project: states that all chats in the project and the shared workspace files will be deleted. */
 @Composable
 internal fun DeleteProjectDialog(
     project: Project,

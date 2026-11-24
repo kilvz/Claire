@@ -17,7 +17,7 @@ import com.wangzan101.mika.task.SteerState
 import kotlinx.coroutines.flow.map
 import com.wangzan101.mika.settings.ui.StatusCopy
 
-/** 把任务状态和运行事件折成聊天卡片上的一问一答(纯函数)。 */
+/** Folds task state and run events into a single question-answer on the chat card (pure functions). */
 internal object ChatReduce {
     internal fun TaskState.active() = when (this) {
         TaskState.Idle, is TaskState.Succeeded, is TaskState.Failed, TaskState.Cancelled -> false
@@ -38,10 +38,10 @@ internal object ChatReduce {
             it.copy(steps = rows(it, toolLabel, appLabel), stepActions = actionsOf(it.activities, appLabel, toolLabel))
         }
 
-    /** 按步号归好的动作明细:点开一步时列出来。 */
+    /** Action details grouped by step number: listed when a step is expanded. */
     internal fun actionsOf(activities: List<RunEvent.Activity>, appLabel: (String) -> String, toolLabel: (String) -> String) =
         activities.groupBy { it.step }.mapValues { (_, list) ->
-            // 用工具的界面说法(和运行过程页同一份),不把工具名露给用户;经 MCP 的调用说连接器名
+            // Use the tool's UI wording (the same as on the run progress page) instead of exposing raw tool names to the user; MCP calls name the connector
             list.map { a ->
                 val label = a.mcpConnector?.let(StatusCopy::calledMcp) ?: toolLabel(a.label)
                 StepAction(label, a.target?.let { where(it, appLabel) }, a.effect, a.failed)
@@ -52,9 +52,9 @@ internal object ChatReduce {
         TaskState.Idle -> ex
         is TaskState.Running -> {
             val goals = (s.progress as? RunProgress.Task)?.goals
-            // 正在调 MCP 先说哪个连接器,盖过模型写的话
+            // While calling MCP, name the connector first, taking precedence over what the model wrote
             val progress = s.mcpConnector?.let(StatusCopy::callingMcp) ?: s.progress?.takeIf { goals == null }?.let(StatusCopy::progress)
-            // 「在做什么」先用模型随调用写的话,没有再用调用里的用意
+            // For "what is it doing", prefer the wording the model wrote alongside the call, then fall back to the intent in the call
             val said = (s.narration ?: s.reason)?.takeIf(String::isNotBlank)
             val waiting = progress == null && s.tool == null && said == null
             ex.copy(
@@ -63,7 +63,7 @@ internal object ChatReduce {
                 notes = if (s.step > 0 && said != null) ex.notes + (s.step to said) else ex.notes,
             )
         }
-        // 等能力的前置条件:锁屏时自动继续;排队等开始;其余能点继续的才给继续
+        // Waiting on a capability precondition: resume automatically when the screen is locked; queue until start; otherwise offer resume only when it can be resumed
         is TaskState.Held -> ex.copy(
             status = when {
                 s.reason == TaskGate.LOCKED -> ExchangeStatus.WaitingUnlock
@@ -83,7 +83,7 @@ internal object ChatReduce {
                 ConfirmationNotifier.requestKey(s),
             ),
         )
-        // 回答原样显示(不再有模型写的依据段);来源由运行记录里代码记下的那份给出
+        // The answer is shown as-is (there is no longer a model-written evidence section); sources come from what the code recorded in the run log
         is TaskState.Succeeded -> ex.copy(status = ExchangeStatus.Done(s.answer.trim(), null, s.verified, s.note, s.unconfirmed, s.reviewed),
             waitingForModel = false, draft = null, line = "")
         is TaskState.Failed -> ex.copy(status = ExchangeStatus.Failed(s.reason), waitingForModel = false, draft = null, line = "")
@@ -91,11 +91,12 @@ internal object ChatReduce {
     }
 
     /**
-     * 步骤列表:每件实际做过的事一行。读取类只在知道读的是哪里时出现,连着读同一处合成一行(「看了微信的聊天列表」);
-     * 动作写「点击 · 微信」,那一步模型写了话就用它的话;没成功只说没成功,不显示错误码。
-     * 最后一行的状态跟着这一问一答:在跑、等你、结束。
+     * Step list: one row per thing actually done. Reads show up only when we know what was read, and consecutive reads of
+     * the same place merge into one row ("looked at WeChat's chat list"); actions read "tap · WeChat", and if the model
+     * wrote something for that step its wording is used; failures just say it failed, without showing error codes.
+     * The last row's state follows this question-answer: running, waiting for you, finished.
      */
-    /** 没办成的一步下面那行小字:按规矩没收的说原因,其余说「没成功」。 */
+    /** The small line under a step that did not go through: ones blocked by rules give the reason, the rest say "failed". */
     internal fun failedLabel(a: RunEvent.Activity) = ChatCopy.declinedLabel(a.effect) ?: tr(R.string.step_failed)
 
     internal fun rows(ex: Exchange, toolLabel: (String) -> String, appLabel: (String) -> String): List<StepRow> {
@@ -105,10 +106,10 @@ internal object ChatReduce {
             val where = a.target?.let { where(it, appLabel) }
             val mcp = a.mcpConnector?.let(StatusCopy::calledMcp)
             if (mcp != null) {
-                // 经 MCP 的调用单列一行说连接器;失败也看得出是哪个连接器
+                // MCP calls get a row of their own naming the connector, so a failure still shows which connector it was
                 out += StepRow(a.step, mcp, if (a.failed) failedLabel(a) else "", StepState.Ok)
             } else if (a.kind == "observe") {
-                // 读成功了却不知道读的是哪里:不列;没读成的照样列出来
+                // Read succeeded but we do not know what was read: omit it; failed reads are still listed
                 if (where == null && !a.failed) continue
                 val text = if (where == null) toolLabel(a.label)
                     else a.title?.takeIf(String::isNotBlank)?.let { tr(R.string.step_viewed_part, where, it) } ?: tr(R.string.step_viewed, where)
@@ -132,7 +133,7 @@ internal object ChatReduce {
         return out
     }
 
-    /** 活动对象给人看的说法:包名换成 App 名,「网站 域名」只留域名。 */
+    /** Human-readable form of an activity target: package names become app names, and "site domain" keeps only the domain. */
     internal fun where(target: String, appLabel: (String) -> String): String? = when {
         target.isBlank() -> null
         target.startsWith(SITE_PREFIX) -> target.removePrefix(SITE_PREFIX)
@@ -167,7 +168,7 @@ internal object ChatReduce {
             })
     }
 
-    /** 消息末尾每个附件一行:「附件:/workspace/inbox/<名字>(<大小>)」;[files] 是复制进工作区后的 (路径, 字节数)。 */
+    /** One line per attachment at the end of the message: "Attachment: /workspace/inbox/<name> (<size>)"; [files] is (path, bytes) after copying into the workspace. */
     internal fun withAttachments(text: String, files: List<Pair<String, Long>>): String =
         AttachmentLines.composeBytes(text, files)
 

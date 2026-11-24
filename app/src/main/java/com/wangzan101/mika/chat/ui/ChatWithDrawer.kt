@@ -76,8 +76,10 @@ import com.wangzan101.mika.browser.ui.findActivity
 import com.wangzan101.mika.ui.LocalAdaptiveLayout
 
 /**
- * 对话页和它的侧栏:左上角菜单从左边滑出侧栏,外面一层遮罩;点遮罩、往左滑、按返回都关上。
- * 对话列表在后台预热和刷新。进了别的页面再回来,按 [reopen] 当场恢复侧栏。[content] 拿到「打开侧栏」放到菜单按钮上。
+ * The chat page and its drawer: the menu at the top left slides the drawer out from the left over a scrim; tapping the
+ * scrim, swiping left or pressing back all close it.
+ * The conversation list is warmed up and refreshed in the background. After going to another page and coming back,
+ * [reopen] restores the drawer immediately. [content] receives "open drawer" to put on the menu button.
  */
 @Composable
 fun ChatWithDrawer(
@@ -85,11 +87,11 @@ fun ChatWithDrawer(
     check: Prerequisites.Check,
     reduceMotion: Boolean,
     conversations: () -> List<ConversationSummary>,
-    /** 存储里改过的对话(见 `ConversationStore.changes`);侧栏开着时别处存进来的对话也当场列出。 */
+    /** Conversations changed in storage (see `ConversationStore.changes`); while the drawer is open, conversations saved elsewhere are listed right away. */
     conversationChanges: Flow<String> = emptyFlow(),
-    /** 对话起好的标题;当前对话还没存进列表时(任务刚开始)也能叫出名字。 */
+    /** A title already given to a conversation; even while the current conversation is not saved into the list yet (a task just started) it can still be named. */
     conversationTitle: (String) -> String? = { null },
-    /** 侧栏搜索用的索引;没有时侧栏不显示搜索框。 */
+    /** Index used for drawer search; when absent, no search box is shown in the drawer. */
     search: ConversationSearch? = null,
     onPersonal: () -> Unit = {},
     onPlans: () -> Unit = {},
@@ -98,16 +100,16 @@ fun ChatWithDrawer(
     onScreens: () -> Unit = {},
     onSettings: () -> Unit,
     onAbout: () -> Unit = {},
-    /** 有新版本:侧栏「关于 Claire」带小红点。 */
+    /** A new version is available: "About Claire" in the drawer carries a small red dot. */
     updateAvailable: Boolean = false,
-    /** 从侧栏进去的页面刚退回来:当场打开侧栏,回到进去之前的样子。 */
+    /** A page entered from the drawer has just been exited: open the drawer immediately, back to how it was before entering. */
     reopen: Boolean = false,
     onReopened: () -> Unit = {},
     frames: StateFlow<Bitmap?>? = null,
     operationRun: (String) -> com.wangzan101.mika.task.TaskRun? = { null },
     chatActive: Boolean = true,
     onRegularChat: () -> Unit = {},
-    /** 外部跳回对话页时变化:若之前因返回键留在展开的侧栏,当场收起侧栏。 */
+    /** Changes when returning to the chat page from outside: if the drawer was left expanded because of the back key, collapse it immediately. */
     resetKey: Int = 0,
     content: @Composable (openDrawer: () -> Unit) -> Unit,
 ) {
@@ -118,7 +120,7 @@ fun ChatWithDrawer(
     var preferConversations by rememberSaveable(ui.conversationId, runId) { mutableStateOf(false) }
     val screenAvailable = chatActive && permanent && frames != null && ui.pip.visible
     val screenDocked = screenAvailable && !ui.pip.closed && !preferConversations
-    // 从侧栏页面返回时直接以展开状态创建,保留上游修复的首帧行为。
+    // When returning from a drawer page, create it directly in the expanded state, preserving the upstream fix's first-frame behavior.
     val drawer = rememberChatDrawerState(if (reopen && !permanent) DrawerValue.Open else DrawerValue.Closed)
     val backProgress = remember { Animatable(0f) }
     var drawerWidthPx by remember { mutableIntStateOf(0) }
@@ -137,12 +139,12 @@ fun ChatWithDrawer(
         }
         then()
     }
-    /** 去别的页面:先当场关上侧栏,回来时就是关着的。 */
+    /** Go to another page: close the drawer immediately first, so it is closed when you come back. */
     fun leave(go: () -> Unit) {
         scope.launch { drawer.snapTo(DrawerValue.Closed) }
         go()
     }
-    // 从手指刚拉动就准备列表,而不是过了半程才从空白跳成历史记录;完全收回才清理搜索等状态。
+    // Prepare the list as soon as the finger starts dragging, instead of jumping from blank to history halfway through; only clear search and other state once it is fully closed.
     val open by remember(drawer, permanent) {
         derivedStateOf {
             permanent || drawer.targetValue == DrawerValue.Open || drawer.isOpen ||
@@ -157,20 +159,20 @@ fun ChatWithDrawer(
             keyboard?.hide()
         }
     }
-    /** 搜索框里的字和已经拿到的结果;侧栏关掉就清空。 */
+    /** The text in the search box and the results obtained so far; cleared when the drawer closes. */
     var query by remember { mutableStateOf("") }
     var searchOutcome by remember { mutableStateOf<SearchOutcome?>(null) }
-    /** 搜索结果的归档筛选;侧栏关掉回到「全部」。 */
+    /** Archive filter for the search results; returns to "All" when the drawer closes. */
     var searchFilter by remember { mutableStateOf(SearchArchiveFilter.All) }
-    /** 多选模式:进去以后每行可勾选,底部换成批量删除的操作条;侧栏关上就退出。 */
+    /** Multi-select mode: once entered, every row can be checked and the bottom becomes a batch-delete action bar; it is exited when the drawer closes. */
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
-    /** 归档视图:列表换成收起来的对话;侧栏关上就退出。 */
+    /** Archive view: the list switches to the put-away conversations; it is exited when the drawer closes. */
     var archivedView by remember { mutableStateOf(false) }
-    /** 等用户确认的批量删除(对话编号)。 */
+    /** A batch delete awaiting the user's confirmation (conversation ids). */
     var confirmingMany by remember { mutableStateOf<List<String>?>(null) }
     val deleteBatch by vm.deleteBatch.collectAsState()
-    /** 批量归档的结果;在底部停留几秒。 */
+    /** Result of a batch archive; stays at the bottom for a few seconds. */
     var archiveBatch by remember { mutableStateOf<ArchiveBatch?>(null) }
     LaunchedEffect(archiveBatch) {
         if (archiveBatch != null) {
@@ -178,7 +180,7 @@ fun ChatWithDrawer(
             archiveBatch = null
         }
     }
-    /** 刚归档的那一条;底部给几秒钟的「撤销」。 */
+    /** The item just archived; offers "Undo" at the bottom for a few seconds. */
     var archiveUndo by remember { mutableStateOf<ArchiveUndo?>(null) }
     LaunchedEffect(archiveUndo) {
         if (archiveUndo != null) {
@@ -186,11 +188,11 @@ fun ChatWithDrawer(
             archiveUndo = null
         }
     }
-    /** 归档一条并给一次「撤销」;没归档成功(有任务在跑)就不提示。 */
+    /** Archives one item and offers an "Undo"; when archiving did not succeed (a task is running), no hint is shown. */
     fun archiveWithUndo(id: String, title: String) {
         if (vm.archiveConversation(id)) archiveUndo = ArchiveUndo(id, title)
     }
-    // 删除结果在底部停留几秒;下一批开始前不动它
+    // The delete result stays at the bottom for a few seconds; it is left alone until the next batch starts
     LaunchedEffect(deleteBatch) {
         val batch = deleteBatch ?: return@LaunchedEffect
         if (batch.finished) {
@@ -208,12 +210,12 @@ fun ChatWithDrawer(
             archivedView = false
             archiveBatch = null
             archiveUndo = null
-            // 正文索引只在侧栏开着时有用,关掉就放掉,长时间使用不会一直占着全部对话的正文
+            // The body-text index is only useful while the drawer is open, so release it once it closes; long use then does not keep every conversation's body text in memory
             search?.clear()
         }
     }
-    // 返回先退出多选/归档/搜索,再收起侧栏。关着时交回系统,不把返回当作打开菜单。
-    // 对话页里面板、画中画等自己的返回在内层,先于这里处理。
+    // Back first exits multi-select/archive/search, then collapses the drawer. When it is closed, back goes back to the
+    // system; back is never treated as opening the menu. Panels, picture-in-picture and other back handling inside the chat page are in inner layers and processed before this.
     val activity = LocalContext.current.findActivity()
     val context = LocalContext.current
     val nestedDrawerView = selecting || archivedView || query.isNotEmpty()
@@ -228,8 +230,8 @@ fun ChatWithDrawer(
             else -> close()
         }
     }
-    // 从右侧露出的聊天页贴边左划时,系统可能先接管返回。直接跟随返回进度,
-    // 而不是等手指松开才突然启动另一段收起动画;取消返回则平滑回到展开位置。
+    // When swiping left from the edge on a chat page revealed from the right, the system may take over back first. Follow
+    // the back progress directly instead of only starting another collapse animation once the finger is lifted; when back is cancelled, return smoothly to the expanded position.
     PredictiveBackHandler(enabled = !permanent && open && !nestedDrawerView) { progress ->
         try {
             progress.collect { backProgress.snapTo(it.progress) }
@@ -246,13 +248,13 @@ fun ChatWithDrawer(
     var revision by remember { mutableIntStateOf(0) }
     LaunchedEffect(conversationChanges) { conversationChanges.collect { revision++ } }
     val deleted by vm.deleted.collectAsState()
-    /** 长按了的那条和它在窗口里的位置;菜单开着(收起的动画放完才清掉)。 */
+    /** The long-pressed item and its position in the window; the menu is open (cleared only after the collapse animation finishes). */
     var acting by remember { mutableStateOf<Pair<DrawerConversation, Rect>?>(null) }
     var actingProject by remember { mutableStateOf<Pair<Project, Rect>?>(null) }
     var creatingProject by remember { mutableStateOf(false) }
     var renamingProject by remember { mutableStateOf<Project?>(null) }
     var confirmingProject by remember { mutableStateOf<Pair<Project, ProjectDeleteImpact>?>(null) }
-    /** 菜单出现的进度:0 是没有,1 是完全出来;关了动画时直接到位。 */
+    /** Progress of the menu appearing: 0 means absent, 1 fully out; with animations off it snaps straight into place. */
     val lift = remember { Animatable(0f) }
     LaunchedEffect(adaptive) {
         acting = null
@@ -264,7 +266,7 @@ fun ChatWithDrawer(
             if (reduceMotion) lift.snapTo(1f) else lift.animateTo(1f, tween(MENU_IN_MS, easing = MikaMotion.Decelerate))
         }
     }
-    /** 收起菜单:倒着放一遍出现的动画,放完再清掉;[then] 当场做(改名、删除的弹窗不用等菜单收完)。 */
+    /** Collapses the menu: plays the appearance animation backwards, then clears it; [then] runs immediately (the rename and delete dialogs do not wait for the menu to finish collapsing). */
     fun closeMenu(then: () -> Unit = {}) {
         then()
         scope.launch {
@@ -273,10 +275,10 @@ fun ChatWithDrawer(
             actingProject = null
         }
     }
-    /** 正在改名的那条。 */
+    /** The item being renamed. */
     var renaming by remember { mutableStateOf<DrawerConversation?>(null) }
     var exporting by remember { mutableStateOf<DrawerConversation?>(null) }
-    /** 要删的那条和删它会连带什么;确认弹窗开着。 */
+    /** The item to delete and what deleting it also affects; the confirmation dialog is open. */
     var confirming by remember { mutableStateOf<Pair<DrawerConversation, DeleteImpact>?>(null) }
     var lastReset by remember { mutableIntStateOf(resetKey) }
     LaunchedEffect(resetKey) {
@@ -306,11 +308,11 @@ fun ChatWithDrawer(
     val collapsedProjects by vm.collapsedProjects.collectAsState()
     val drawerColors = MikaTheme.colors
     BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().background(MikaTheme.colors.bg)) {
-        // 与参照一致占手机宽度的 85%;窄窗口也至少留 48dp 供点击/左滑收回。
+        // Match the reference at 85% of the phone width; in narrow windows at least 48dp is left for tapping / swiping left to close.
         val drawerWidth = minOf(DrawerWidth, maxWidth * 0.85f, (maxWidth - 48.dp).coerceAtLeast(0.dp))
         AdaptiveChatNavigation(
             layout = adaptive,
-            // 菜单开着时后面整屏(对话页和侧栏)模糊(安卓 12 起;更早的只变暗),无障碍也只读菜单
+            // While the menu is open the whole screen behind (chat page and drawer) is blurred (from Android 12 on; older versions only dim), and accessibility reads only the menu
             modifier = if (!menuOpen) Modifier else Modifier
                 .then(
                     if (GlassBlurSupported) Modifier.graphicsLayer {
@@ -320,14 +322,14 @@ fun ChatWithDrawer(
                 )
                 .clearAndSetSemantics {},
             drawerContent = {
-                // 提前在 IO 线程预热列表,之后保留最近快照;拖动开始的首帧不再同步遍历会话文件。
+                // Warm up the list on the IO thread ahead of time, then keep the latest snapshot; the first frame after dragging starts no longer walks the conversation files synchronously.
                 val readHistory by rememberUpdatedState(conversations)
                 val history by produceState(emptyList<ConversationSummary>(), open, revision) {
                     value = withContext(Dispatchers.IO) { readHistory() }
                 }
                 val drafts by vm.draftConversations.collectAsState()
                 val cached by produceState(emptyList<ConversationSummary>(), history, drafts, revision) {
-                    // 草稿元数据也在后台合并;输入草稿时只合并快照,不为每个字重新遍历会话目录。
+                    // Draft metadata is merged in the background too; while typing a draft only the snapshot is merged, without re-walking the conversation directory for every character.
                     value = withContext(Dispatchers.IO) { vm.withDrafts(history) }
                 }
                 val all = remember(open, cached) { if (open) cached else emptyList() }
@@ -344,8 +346,9 @@ fun ChatWithDrawer(
                     if (running) ChatCopy.subtitle(last, last?.let(vm::livePlace))?.first.orEmpty() else "",
                 )
                 val canSwitch = vm.canSwitch()
-                // 搜索候选:标题换成侧栏里显示的样子(去掉附件行、网页说明),和行上看到的一致;再按归档状态筛。
-                // 有没有可搜的对话看全部,不看当前筛选——筛到空的时候搜索框和筛选条还得留着,不然退不回来
+                // Search candidates: titles converted to what the drawer displays (attachment lines and page notes stripped),
+                // matching what the row shows; then filtered by archive state.
+                // Whether there is anything searchable looks at everything, not the current filter — when the filter yields nothing the search box and filter row must stay, otherwise there is no way back
                 val searchable = remember(all, deleted) { all.any { it.id !in deleted } }
                 val candidates = remember(all, deleted, searchFilter) { drawerSearchCandidates(all, deleted, searchFilter) }
                 val engine = search
@@ -355,12 +358,12 @@ fun ChatWithDrawer(
                         searchOutcome = null
                         return@LaunchedEffect
                     }
-                    // 这个筛选下没有可搜的对话:直接给空结果,别让界面一直停在「搜索中」
+                    // Under this filter there are no conversations to search: give an empty result directly instead of leaving the UI stuck on "searching"
                     if (candidates.isEmpty()) {
                         searchOutcome = SearchOutcome(q, emptyList(), searching = false)
                         return@LaunchedEffect
                     }
-                    // 标题命中不用等正文,先列出来;正文扫完再整体换掉
+                    // Title matches do not need to wait for the body text, so list them first; once the body scan finishes, replace the whole set
                     searchOutcome = SearchOutcome(q, engine.titleMatches(q, candidates), searching = true)
                     delay(180)
                     val result = withContext(Dispatchers.IO) { engine.search(q, candidates) }
@@ -387,11 +390,11 @@ fun ChatWithDrawer(
                         outcome.truncated,
                     )
                 }
-                // 删掉的对话当场不列,不等后台删完
+                // Deleted conversations are not listed right away; there is no waiting for the background delete to finish
                 val sections = remember(all, current, others, canSwitch, deleted, projects) {
                     drawerSections(all.filter { it.id !in deleted }, current, others.filter { it !in deleted }, vm::runningGoal, canSwitch, System.currentTimeMillis(), projects = projects)
                 }
-                // 归档视图里的行:按归档时间倒序,最近收起来的在前;副标题写清所属项目和归档了多久
+                // Rows in the archive view: newest archive time first, most recently put away at the top; the subtitle states the owning project and how long ago it was archived
                 val archivedRows = remember(all, current, canSwitch, deleted, runningIds, projectNames) {
                     val now = System.currentTimeMillis()
                     all.filter { it.id !in deleted && it.archivedAt != null }
@@ -405,12 +408,12 @@ fun ChatWithDrawer(
                             )
                         }
                 }
-                // 能勾的就是此刻列在侧栏里的对话;别处删了、列表变了,勾选里已经不存在的当场去掉。归档视图里换成归档的对话
+                // Only the conversations listed in the drawer right now can be checked; when the list changes or something is deleted elsewhere, selections that no longer exist are dropped immediately. In the archive view this becomes the archived conversations
                 val selectableIds = remember(sections, archivedRows, archivedView) {
                     drawerSelectableIds(sections, archivedRows, archivedView)
                 }
                 LaunchedEffect(selectableIds) { selected = selected intersect selectableIds }
-                // 普通侧栏和归档视图之间换,勾选不带过去
+                // Switching between the normal drawer and the archive view does not carry the selection over
                 LaunchedEffect(archivedView) {
                     selecting = false
                     selected = emptySet()
@@ -422,7 +425,7 @@ fun ChatWithDrawer(
                         val reveal = if (offset.isFinite()) (drawerWidthPx + offset).coerceIn(0f, drawerWidthPx.toFloat()) else 0f
                         IntOffset(-(reveal * backProgress.value).roundToInt(), 0)
                     },
-                    // 与外层共用背景,让聊天卡片上下角的外侧阴影完整显示。
+                    // Share the background with the outer layer so the shadow outside the chat card's top and bottom corners shows completely.
                     containerColor = Color.Transparent,
                     permanent = permanent,
                     onShowScreen = if (screenAvailable) ({ preferConversations = false; vm.expandPip() }) else null,
@@ -534,14 +537,15 @@ fun ChatWithDrawer(
                         reveal * (1f - backProgress.value)
                     },
                     onDismiss = { close() },
-                    // 对话页上从左往右划拉出侧栏(拖着跟手);能左右滚的内容(宽表格、代码块等)先自己滚。
-                    // 屏幕边缘保留给系统返回;侧栏开着时返回收起侧栏,关着时交回系统。
+                    // On the chat page, swiping right pulls out the drawer (tracking the finger); content that scrolls
+                    // sideways (wide tables, code blocks, etc.) scrolls itself first. The screen edge is reserved for the
+                    // system's back gesture; back collapses the drawer while it is open and goes back to the system while it is closed.
                     gesturesEnabled = !menuOpen,
                 ) { detail() }
             },
         ) {
-            // 使用抽屉同一份实时位移,聊天页宽度不变,和侧栏一起跟手平移;不能只在松手后播动画。
-            // offset 会自动镜像 RTL,和 Material 抽屉的起始边一致。
+            // Use the drawer's same live offset so the chat page keeps its width and translates with the drawer as the finger moves; it cannot only animate after the finger is lifted.
+            // offset is mirrored automatically for RTL, matching the Material drawer's starting edge.
             Box(
                 (if (permanent) Modifier else Modifier.offset {
                     val offset = drawer.currentOffset
@@ -551,12 +555,12 @@ fun ChatWithDrawer(
                     val offset = drawer.currentOffset
                     val progress = if (drawerWidthPx > 0 && offset.isFinite())
                         ((drawerWidthPx + offset) / drawerWidthPx).coerceIn(0f, 1f) * (1f - backProgress.value) else 0f
-                    // 现版 Kimi 的聊天页退成一张浮起的卡片:仅纵向略缩短,文字不被横向压窄。
+                    // The chat page recedes into a lifted card like current Kimi: it only shortens slightly vertically, so the text is not squeezed narrower horizontally.
                     scaleY = 1f - 0.04f * progress
                     shape = DrawerCardShape(progress)
                     clip = progress > 0f
                     shadowElevation = 16.dp.toPx() * progress
-                    // 参考图是柔和的四周阴影,减弱 Android 默认向下投射的重阴影。
+                    // The reference has a soft shadow all around, so tone down Android's default heavy downward shadow.
                     ambientShadowColor = drawerColors.floatShadow
                     spotShadowColor = drawerColors.floatShadow.copy(alpha = 0.18f)
                 }.background(MikaTheme.colors.bg).drawWithContent {
@@ -564,7 +568,7 @@ fun ChatWithDrawer(
                     val offset = drawer.currentOffset
                     val progress = if (drawerWidthPx > 0 && offset.isFinite())
                         ((drawerWidthPx + offset) / drawerWidthPx).coerceIn(0f, 1f) * (1f - backProgress.value) else 0f
-                    // 深色主题里阴影不明显,用主题的细描边保留卡片边界。
+                    // Shadows are barely visible on dark themes, so a thin stroke in the theme color preserves the card's boundary.
                     if (drawerColors.isDark && progress > 0f) drawRoundRect(
                         color = drawerColors.edge.copy(alpha = drawerColors.edge.alpha * progress),
                         cornerRadius = CornerRadius(32.dp.toPx() * progress, 32.dp.toPx() * progress / (1f - 0.04f * progress)),
@@ -580,7 +584,7 @@ fun ChatWithDrawer(
                         if (!permanent) scope.launch { if (reduceMotion) drawer.snapTo(DrawerValue.Open) else drawer.open() }
                     }
                 }
-                // 跟手淡化聊天内容,视觉焦点留在侧栏;绘制阶段读取位移,不让整页每帧重组。
+                // Fade the chat content as the finger moves, keeping visual focus on the drawer; the offset is read in the draw phase so the whole page does not recompose every frame.
                 if (!permanent) Box(Modifier.fillMaxSize().drawBehind {
                     val offset = drawer.currentOffset
                     val progress = if (drawerWidthPx > 0 && offset.isFinite())
@@ -679,7 +683,7 @@ fun ChatWithDrawer(
         )
     }
     confirmingMany?.let { ids ->
-        // 弹窗里要写几条任务会停、几条定时任务保留;打开时算一次就够
+        // The dialog must state how many tasks will be stopped and how many schedules are kept; computing it once when opened is enough
         val impacts = remember(ids) { ids.map(vm::deleteImpact) }
         DeleteManyConversationsDialog(
             count = ids.size,

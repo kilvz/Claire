@@ -33,7 +33,7 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 输入栏上方的补充消息:运行中可点箭头引导,没任务时可从第一件开始。 */
+/** Follow-up messages above the input bar: while running, the arrow guides one; when no task is running, you can start from the first item. */
 @Composable
 fun FollowUpTray(
     items: List<QueuedFollowUp>,

@@ -65,17 +65,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.ui.Route
 
-/** 技能列表里的一项:界面用 SKILL.md 头部写的显示名和说明。 */
+/** One entry in the skills list: the UI uses the display name and description written in the SKILL.md header. */
 internal data class PlusSkill(val name: String, val display: String, val description: String)
 
-/** 「＋」面板里正在看的那一页。 */
+/** The page currently being shown in the "+" panel. */
 private enum class PlusView { Main, Photos, Skills, Tasks }
 
-/** 弹窗顶部把手占的高度;整屏的 82% 里要把它扣掉。 */
+/** Height taken by the sheet's top handle; it must be subtracted from the 82% of the screen. */
 private val PlusHandleHeight = 22.dp
 private val PlusInset = 12.dp
 
-/** 剪贴板里的文字;没有、或者只有非文字内容时为 null。 */
+/** Text on the clipboard; null when there is none or it only holds non-text content. */
 internal fun readClipboardText(context: Context): String? {
     val clip = context.getSystemService(ClipboardManager::class.java)?.primaryClip ?: return null
     if (clip.itemCount == 0) return null
@@ -83,9 +83,9 @@ internal fun readClipboardText(context: Context): String? {
 }
 
 /**
- * 「＋」打开的功能面板:从底部升起,先占半屏;往上拖(或滚)到 82%,往下拖、点遮罩或返回关掉。
- * 内容是一张张卡片、每张卡片里每行一件事:上面那张往这一轮里放东西,下面那张是让 Claire 做事或去别处。
- * 相册、技能、常用任务在面板里翻到二级页;拍照、文件、清单这些直接交给系统或对话页。
+ * Feature panel opened by "+": rises from the bottom and takes half the screen first; drag (or scroll) up to 82%, and close it by dragging down, tapping the scrim or pressing back.
+ * The content is a series of cards, with one action per row: the upper card puts things into this turn, the lower one has Claire do something or go elsewhere.
+ * Albums, skills and frequent tasks open a second-level page inside the panel; camera, files and checklists are handed straight to the system or the chat page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,7 +97,7 @@ internal fun ChatPlusSheet(
     onFull: () -> Unit,
     onDeviceFiles: (() -> Unit)?,
     onPaste: () -> Unit,
-    /** 只有空着的时候才能开始示范;任务在跑时为 null,这一行不出现。 */
+    /** A demo can only be started when idle; null while a task is running, in which case this row is not shown. */
     onTeach: (() -> Unit)?,
     onChecklists: () -> Unit,
     onWorkflows: () -> Unit,
@@ -110,7 +110,7 @@ internal fun ChatPlusSheet(
     val context = LocalContext.current
     val attach = rememberAttachLaunchers(onPicked, onToggle, onFull, onDeviceFiles)
     var view by remember { mutableStateOf(PlusView.Main) }
-    // 技能要读盘;真到「技能」那一页才读,面板开合不额外读
+    // Skills require disk reads; read only when actually on the "Skills" page, so opening/closing the panel costs no extra reads
     val skills by produceState<List<PlusSkill>?>(null, view) {
         if (view == PlusView.Skills && value == null) {
             value = withContext(Dispatchers.IO) { loadSkills(context) }
@@ -126,7 +126,7 @@ internal fun ChatPlusSheet(
         scrimColor = Color.Black.copy(alpha = 0.28f),
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // 半屏→展开到整屏的 82%:把手加上内容正好这么高
+            // Half screen → expand to 82% of the screen: handle plus content is exactly this tall
             val body = (maxHeight * 0.82f - PlusHandleHeight).coerceAtLeast(0.dp)
             Column(Modifier.fillMaxWidth().height(body)) {
                 when (view) {
@@ -179,7 +179,7 @@ internal fun ChatPlusSheet(
     }
 }
 
-/** 顶部把手:一条 36×5 的短横线;拖动和点按的语义由 Material 的弹窗壳子给。 */
+/** Top handle: a 36×5 short bar; the drag and tap semantics come from the Material sheet shell. */
 @Composable
 private fun PlusHandle() {
     Box(Modifier.fillMaxWidth().height(PlusHandleHeight), contentAlignment = Alignment.Center) {
@@ -188,8 +188,8 @@ private fun PlusHandle() {
 }
 
 /**
- * 面板里的一行:图标块、标题、一句说明,右边可以带箭头或别的。
- * [first] 为卡片首行时不画上分隔线;分隔线从文字处开始。
+ * A row in the panel: icon tile, title, one line of description, and optionally an arrow or something else on the right.
+ * When [first] is the card's first row, no top divider is drawn; the divider starts at the text.
  */
 @Composable
 private fun PlusRow(
@@ -223,7 +223,7 @@ private fun PlusRow(
     }
 }
 
-/** 二级页顶上的一行:返回、标题,右边放链接。 */
+/** Top row of a second-level page: back, title, with links on the right. */
 @Composable
 private fun SheetHead(title: String, onBack: () -> Unit, trailing: (@Composable RowScope.() -> Unit)? = null) {
     val c = MikaTheme.colors
@@ -243,7 +243,7 @@ private fun SheetHead(title: String, onBack: () -> Unit, trailing: (@Composable 
     }
 }
 
-/** 二级页里的小链接(「全部照片」「更改范围」)。 */
+/** Small link on a second-level page ("All photos", "Change scope"). */
 @Composable
 private fun SheetLink(text: String, onClick: () -> Unit) {
     Text(
@@ -253,7 +253,7 @@ private fun SheetLink(text: String, onClick: () -> Unit) {
     )
 }
 
-/** 相册的二级页:四列最近的照片(点一下选上,右上角是序号;再点取消)。[onGrant] 是没给照片权限时。 */
+/** Album second-level page: four columns of recent photos (tap to select, the order number appears in the top-right corner; tap again to deselect). [onGrant] is used when photo permission has not been granted. */
 @Composable
 internal fun PlusPhotosPage(
     access: PhotoAccess,
@@ -301,7 +301,7 @@ internal fun PlusPhotosPage(
     }
 }
 
-/** 技能的二级页:点一个把「用这个技能」写进输入框,回对话页。 */
+/** Skills second-level page: tapping one writes "use this skill" into the input field and returns to the chat page. */
 @Composable
 private fun PlusSkillsPage(skills: List<PlusSkill>?, onPick: (PlusSkill) -> Unit, onBack: () -> Unit) {
     val c = MikaTheme.colors
@@ -324,7 +324,7 @@ private fun PlusSkillsPage(skills: List<PlusSkill>?, onPick: (PlusSkill) -> Unit
     }
 }
 
-/** 常用任务的二级页:点一条把它的说法填进输入框(不自动发)。 */
+/** Frequent tasks second-level page: tapping one fills its wording into the input field (without sending). */
 @Composable
 private fun PlusTasksPage(tasks: List<RecommendedTask>, onPick: (RecommendedTask) -> Unit, onBack: () -> Unit) {
     val c = MikaTheme.colors
@@ -347,7 +347,7 @@ private fun PlusTasksPage(tasks: List<RecommendedTask>, onPick: (RecommendedTask
     }
 }
 
-/** 已收下的个人技能;停用的不列(它已经不用了),显示名和说明取 SKILL.md 头部。 */
+/** Installed personal skills; suspended ones are not listed (they are no longer in use); the display name and description come from the SKILL.md header. */
 private fun loadSkills(context: Context): List<PlusSkill> {
     val files = (context.applicationContext as? MikaApp)?.memory?.skills() ?: return emptyList()
     return files.list()

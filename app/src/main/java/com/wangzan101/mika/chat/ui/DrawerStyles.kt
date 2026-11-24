@@ -22,7 +22,7 @@ internal const val MENU_IN_MS = 200
 internal const val MENU_OUT_MS = 140
 internal val DrawerWidth = 360.dp
 
-/** 卡片先纵向缩短,轮廓在屏幕上仍保持圆弧,不把上下角压成椭圆。 */
+/** The card shrinks vertically first while the outline stays circular on screen, so the top and bottom corners are not squashed into ellipses. */
 internal class DrawerCardShape(private val progress: Float) : Shape {
     override fun createOutline(size: androidx.compose.ui.geometry.Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val radius = with(density) { 32.dp.toPx() } * progress

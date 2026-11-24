@@ -63,9 +63,10 @@ import com.wangzan101.mika.settings.ui.models.refresh
 import com.wangzan101.mika.ui.ToolLabels
 
 /**
- * 聊天界面的状态。步骤列表来自运行事件里实际做过的事(活动);进展那一行是模型这一步的话,
- * 等待模型时仅显示状态。任务在跑时输入框发的话先排队,用户再决定是否改为当前任务的引导。
- * 整个进程只用一个实例,界面关掉再打开时正在跑的任务的步骤还在。
+ * State of the chat screen. The step list comes from things actually done (activities in the run events); the progress
+ * line is the model's wording for this step, and only the status is shown while waiting for the model. While a task is
+ * running, what is sent from the input field is queued first, and the user then decides whether to steer the current task instead.
+ * There is a single instance per process, so a running task's steps are still there when the screen is closed and reopened.
  */
 class ChatViewModel(
     internal val scope: CoroutineScope,
@@ -74,100 +75,105 @@ class ChatViewModel(
     internal val actions: TaskActions,
     internal val store: ConversationStore,
     /**
-     * 服务还有任务(这个对话上一个任务还在收尾,或别处开始的任务在跑);并行关着时新任务等它收完再交给服务,
-     * 免得这个对话的新一句被当成上一个任务的插话。等着时那条消息下面写「等前一个任务做完再开始」。
+     * The service still has a task (the previous task of this conversation is still wrapping up, or a task started
+     * elsewhere is running); with parallelism off, a new task waits for it to finish before being handed to the service,
+     * so a new sentence in this conversation is not taken as a steer for the previous task. While waiting, the message says
+     * "wait for the previous task to finish before starting" below it.
      */
     internal val serviceBusy: StateFlow<Boolean> = MutableStateFlow(false),
-    /** 包名换成 App 显示名(确认卡片用)。 */
+    /** Converts a package name to the app's display name (used by confirmation cards). */
     internal val appLabel: (String) -> String = { it },
     /**
-     * 当前任务有没有虚拟屏。屏到第一次打开 App 才建,没建过屏的任务(纯对话、不用手机就能答)不出画中画,
-     * 问答和确认都在聊天卡片里。
+     * Whether the current task has a virtual screen. The screen is created only when an app is first opened, so tasks that
+     * never created one (pure conversation, answerable without the phone) show no picture-in-picture, and their questions
+     * and confirmations stay in the chat card.
      */
     internal val screenOpen: StateFlow<Boolean> = MutableStateFlow(false),
     /**
-     * 刚结束的那个任务的运行记录编号,服务在报结束之前写好;收到结束状态时挂到那一问一答上,
-     * 卡片上就有「查看过程」。之后它再变也不改已结束的那条。
+     * Run record id of the task that just ended, written by the service before it reports completion; when the finished
+     * state arrives it is attached to that question-answer, so the card has "View process". Later changes to it do not touch
+     * the one already finished.
      */
     internal val endedRunId: StateFlow<String?> = MutableStateFlow(null),
     /**
-     * 对话里正在跑的那个任务的运行记录编号(任务一开头就有;还没分到时为 null)。按对话取,和 [endedRunIds] 一样
-     * 不看服务对外的「显示中的任务」:并行时那可能是别的对话的。在跑时挂上它,「运行过程」当场就能打开。
+     * Run record id of the task currently running in a conversation (there from the very start of the task; null until it
+     * is assigned). Looked up per conversation and, like [endedRunIds], ignoring the service's "shown task", which in
+     * parallel mode may belong to another conversation. Attached while running, so "run process" opens immediately.
      */
     internal val liveRunId: (conversationId: String) -> String? = { null },
-    /** 每个对话最近结束的任务的运行记录编号;给了就按卡片所在的对话取,不用上面那个(它只跟显示中的任务)。 */
+    /** Run record id of the most recently ended task per conversation; when provided it is looked up by the card's conversation instead of using the one above (which only follows the shown task). */
     internal val endedRunIds: StateFlow<Map<String, String?>>? = null,
-    /** 开关 parallelTasks:打开时不同对话的任务可以同时跑,界面只跟着屏上这个对话的任务。界面没在跟任务时重读。 */
+    /** The parallelTasks switch: when on, tasks in different conversations can run at the same time and the UI only follows the task of the conversation on screen. Re-read whenever the UI is not following a task. */
     internal val parallelFlag: () -> Boolean = { false },
-    /** 服务显示中的任务:(对话, 状态),两者一起写;并行时用它代替 [taskState],别的对话的状态不进来。 */
+    /** The service's shown task: (conversation, state), written together; in parallel mode it replaces [taskState], so other conversations' states do not come in. */
     internal val shownTask: StateFlow<Pair<String, TaskState>?> = MutableStateFlow(null),
-    /** 正在跑或排队的任务所在的对话。 */
+    /** Conversations that have a running or queued task. */
     internal val activeConversations: StateFlow<List<String>> = MutableStateFlow(emptyList()),
-    /** 该对话正在跑的任务的原话;切过去接着显示时用。 */
+    /** The original wording of the task running in that conversation; used to keep showing it after switching over. */
     internal val runGoal: (String) -> String? = { null },
-    /** 该对话正在跑的任务自己的状态(不论服务此刻显示的是谁);切走后靠它接着记那一问一答的步骤。 */
+    /** The running task's own state for that conversation (regardless of who the service is showing right now); after switching away it keeps that question-answer's steps updated. */
     internal val runState: (String) -> StateFlow<TaskState>? = { null },
-    /** 任务结束后补上的记忆与技能提示,按运行编号。 */
+    /** Memory and skill notes filled in after a task ends, keyed by run id. */
     internal val runNotes: StateFlow<Map<String, RunNotes>> = MutableStateFlow(emptyMap()),
     internal val learning: LearningActions? = null,
-    /** 此刻的记忆条目(从加密存储读出);提示的文字和「用到」的内容从这里现取,对话文件里不存内容。 */
+    /** Memory items as of now (read from encrypted storage); the note text and the "used" contents are fetched from here, and the conversation file stores no content. */
     internal val memoryItems: StateFlow<List<MemoryItem>> = MutableStateFlow(emptyList()),
-    /** 沙箱是否就绪。 */
+    /** Whether the sandbox is ready. */
     internal val sandboxReady: StateFlow<Boolean> = MutableStateFlow(false),
-    /** 当前任务导出的文件;任务开始时由服务清空。 */
+    /** Files exported by the current task; cleared by the service when a task starts. */
     internal val sharedFiles: StateFlow<List<SharedFile>> = MutableStateFlow(emptyList()),
-    /** 当前任务生成并留在工作区里的音频;任务开始时由服务清空。 */
+    /** Audio generated by the current task and left in the workspace; cleared by the service when a task starts. */
     internal val generatedAudios: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>> = MutableStateFlow(emptyList()),
-    /** 当前任务生成并留在工作区里的图;任务开始时由服务清空。 */
+    /** Images generated by the current task and left in the workspace; cleared by the service when a task starts. */
     internal val generatedPhotos: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>> = MutableStateFlow(emptyList()),
-    /** 把选中的文件(内容 URI 字符串)复制进对话工作区的 inbox/。 */
+    /** Copies the selected files (content URI strings) into the conversation workspace's inbox/. */
     internal val importAttachments: suspend (conversationId: String, uris: List<String>) -> ImportResult = { _, _ -> ImportResult(emptyList(), emptyList()) },
-    /** 读出选中文件(内容 URI 字符串)的名字、大小和是不是照片;读盘的活由调用方放到后台线程。 */
+    /** Reads the name, size and whether it is a photo for the selected files (content URI strings); the caller moves disk work onto a background thread. */
     internal val describeAttachments: suspend (uris: List<String>) -> List<PendingAttachment> = { uris -> uris.map { PendingAttachment(it, it.substringAfterLast('/'), 0L) } },
-    /** 步骤行里工具的说法。 */
+    /** The tool wording used in step rows. */
     internal val toolLabels: ToolLabels = ToolLabels(knownTools()),
-    /** 显示中的任务实际做过的事(运行事件里的活动)。 */
+    /** What the shown task has actually done (activities in the run events). */
     internal val activities: StateFlow<List<RunEvent.Activity>> = MutableStateFlow(emptyList()),
-    /** 显示中的任务收到的插话和去向。 */
+    /** Steers the shown task has received, and where they went. */
     internal val steers: StateFlow<List<SteerNote>> = MutableStateFlow(emptyList()),
-    /** 整个进程的排队队列;这里只取当前对话、还没被服务取走的项。 */
+    /** The process-wide queue; only items of the current conversation that the service has not claimed yet are taken here. */
     private val followUps: StateFlow<List<QueuedFollowUp>> = MutableStateFlow(emptyList()),
-    /** 停止之后正在写交代的那几次运行(运行编号);那一轮下面显示「正在整理已做的事…」。 */
+    /** The runs (run ids) whose write-up is still being written after a stop; that turn shows "organizing what was done…" below it. */
     internal val summarizing: StateFlow<Set<String>> = MutableStateFlow(emptySet()),
-    /** 算用时的时钟(毫秒)。 */
+    /** Clock used to compute elapsed time (milliseconds). */
     internal val clock: () -> Long = System::currentTimeMillis,
-    /** 删掉一个对话会连带什么(见 `ConversationDeleter.impact`)。 */
+    /** What deleting a conversation also affects (see `ConversationDeleter.impact`). */
     internal val deletionImpact: (String) -> DeleteImpact = { DeleteImpact(runningTask = false, schedules = 0) },
-    /** 删掉一个对话和属于它的一切(见 `ConversationDeleter.delete`)。 */
+    /** Deletes a conversation and everything belonging to it (see `ConversationDeleter.delete`). */
     internal val removeConversation: suspend (String) -> Unit = {},
-    /** 任务结束后留在后台运行的那一页(全局至多一页);对话页在它来自的那一轮下面显示一行,顶栏写「后台保持着 1 个网页」。 */
+    /** The page left running in the background after a task ends (at most one page globally); the chat page shows a row under the turn it came from, and the top bar says "1 web page kept in the background". */
     val keptPage: StateFlow<KeptPage?> = MutableStateFlow(null),
-    /** 关掉留着的那一页(用户点了那一行上的「关闭」)。 */
+    /** Closes the kept page (the user tapped "Close" on that row). */
     private val closeKept: () -> Unit = {},
-    /** 分支时复制源对话工作区的 inbox/(附件);没注入就只复制轮次。 */
+    /** Copies the source conversation workspace's inbox/ (attachments) when branching; when not injected, only turns are copied. */
     internal val branchWorkspace: BranchWorkspace? = null,
-    /** 分支标题:在源标题或第一句话后面加本地化后缀(太长时截断);默认原样。 */
+    /** Branch title: appends a localized suffix to the source title or first sentence (truncated when too long); unchanged by default. */
     internal val branchTitle: (String) -> String = { it },
-    /** 系统分享草稿的持久化;内部图片文件名变成本 App provider 的内容地址。 */
+    /** Persistence for system share drafts; internal image file names become content URIs of this app's provider. */
     internal val sharedDrafts: SharedDraftStore? = null,
     internal val sharedDraftUri: (SharedDraftAttachment) -> String = { it.fileName },
-    /** 读写对话记录、复制分支在哪儿做。 */
+    /** Where conversation records are read and written and where branches are copied. */
     internal val io: CoroutineContext = Dispatchers.IO,
-    /** 正在跟用户学习时不另开任务，也不把这句话记成已经开始。 */
+    /** While learning from the user, do not start a separate task, nor record this sentence as already started. */
     internal val teaching: () -> Boolean = { false },
     internal val onTeachingBlocked: () -> Unit = {},
-    /** 朗读一条回答;没配置声音模型时不做。 */
+    /** Reads an answer aloud; does nothing when no voice model is configured. */
     private val speakText: suspend (String) -> Unit = {},
     private val stopVoice: () -> Unit = {},
     private val voicePlayback: StateFlow<com.wangzan101.mika.voice.VoicePlayback> =
         MutableStateFlow(com.wangzan101.mika.voice.VoicePlayback.Idle),
     private val voiceReady: StateFlow<Boolean> = MutableStateFlow(false),
-    /** 每条完成的回答自动朗读;默认关。 */
+    /** Automatically read out every completed answer; off by default. */
     internal val autoRead: StateFlow<Boolean> = MutableStateFlow(false),
-    /** 播放工作区里的一段音频(对话编号, 路径);默认不做。 */
+    /** Plays an audio clip in the workspace (conversation id, path); does nothing by default. */
     private val playAudio: suspend (String, String) -> Unit = { _, _ -> },
     private val voiceFailed: (String) -> Unit = {},
-    /** 项目分组列表与删项目入口;为 null 时仅按普通对话显示。 */
+    /** Project group list and the delete-project entry; when null, everything is shown as ordinary conversations only. */
     internal val projectStore: ProjectStore? = null,
     internal val projectDeletionImpact: (String) -> ProjectDeleteImpact = { ProjectDeleteImpact(0, 0, 0) },
     internal val removeProject: suspend (String) -> Unit = {},
@@ -190,7 +196,7 @@ class ChatViewModel(
     private val _branchCopy = session._branchCopy
     private val _deleteBatch = session._deleteBatch
 
-    /** 项目分组列表;为空或不注入时不展示项目分组。 */
+    /** Project group list; when empty or not injected, project groups are not shown. */
     val projects: StateFlow<List<Project>> = projectStore?.projects ?: MutableStateFlow(emptyList())
     private val _collapsedProjects = MutableStateFlow<Set<String>>(emptySet())
     val collapsedProjects: StateFlow<Set<String>> = _collapsedProjects.asStateFlow()
@@ -199,13 +205,13 @@ class ChatViewModel(
         _collapsedProjects.update { if (projectId in it) it - projectId else it + projectId }
     }
 
-    /** 用户在对话页上关掉留在后台的那一页。 */
+    /** The user closes the page kept in the background from the chat page. */
     fun closeKeptPage() = closeKept()
 
-    /** 说话状态;回答下面的「朗读/停止」按它显示。 */
+    /** Speaking state; the "read aloud / stop" control under an answer is shown according to it. */
     val voice: StateFlow<com.wangzan101.mika.voice.VoicePlayback> get() = voicePlayback
 
-    /** 有没有可用的声音模型;没有时不显示朗读入口。 */
+    /** Whether a usable voice model is available; when not, no read-aloud entry is shown. */
     val canSpeak: StateFlow<Boolean> get() = voiceReady
 
     fun speak(text: String) {
@@ -222,7 +228,7 @@ class ChatViewModel(
 
     fun stopSpeaking() = stopVoice()
 
-    /** 播放这一轮生成的一段音频;没有对话编号时不做。 */
+    /** Plays an audio clip generated in this turn; does nothing when there is no conversation id. */
     fun playAudio(path: String) {
         val id = _ui.value.conversationId ?: return
         scope.launch { playAudio(id, path) }
@@ -231,7 +237,7 @@ class ChatViewModel(
     val ui: StateFlow<ChatUi> = _ui.asStateFlow()
     val jump: StateFlow<ChatJump?> = _jump.asStateFlow()
 
-    /** 尚未发送第一句话的草稿也能从侧栏找回来;已有历史的对话由侧栏沿用原标题。 */
+    /** Drafts that have not sent their first message can also be found again from the drawer; conversations with history keep their existing title in the drawer. */
     val draftConversations = combine(drafts, _ui) { saved, current ->
         val all = saved + listOfNotNull(current.conversationId?.let { it to current.draft() }).toMap()
         all.filterValues { it.hasContent }.map { (id, draft) ->
@@ -245,17 +251,17 @@ class ChatViewModel(
     val deleted: StateFlow<Set<String>> = _deleted.asStateFlow()
     val branchCopy: StateFlow<BranchCopyResult?> = _branchCopy.asStateFlow()
 
-    /** 屏上这个对话以外、有任务在跑或排队的对话(顶部「另 n 个任务进行中」)。 */
+    /** Conversations other than the one on screen that have a running or queued task (the "n other tasks in progress" at the top). */
     val otherRunning: StateFlow<List<String>> = combine(activeConversations, _ui.map { it.conversationId }.distinctUntilChanged()) { active, current ->
         active.filter { it != current }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     init {
-        // 开关关着时也按状态带的对话认:别的对话的任务(悬浮胶囊、定时任务开始的)不接到屏上这个对话里
+        // Even with the switch off, go by the conversation carried in the state: tasks of other conversations (started from the floating pill or by schedules) are not attached to the conversation on screen
         scope.launch { taskState.collect { s -> if (!session.parallel()) shownTask.value?.let { live.onShown(it.first, s) } ?: live.onState(s) } }
         scope.launch { shownTask.collect { t -> if (t != null && session.parallel()) live.onShown(t.first, t.second) } }
-        // 排队条:只显示当前对话、明确排队、还没被服务取走的项;fallback 由穿插话那行 SteerState.Next 表示。
-        // 和整个 ChatUi 组合(不只是 conversationId):换对话/重建 ChatUi 时即使编号没变,也要把队列补回去。
+        // Queue bar: show only items of the current conversation that are explicitly queued and not yet claimed by the service; the fallback is represented by the SteerState.Next line of an inserted message.
+        // Combined with the whole ChatUi (not just conversationId): when switching conversations or rebuilding ChatUi the queue must be restored even if the id did not change.
         scope.launch {
             combine(followUps, _ui) { list, ui ->
                 val id = ui.conversationId
@@ -264,20 +270,20 @@ class ChatViewModel(
                 }
             }.collect { queued -> _ui.update { if (it.queued == queued) it else it.copy(queued = queued) } }
         }
-        // 不论是谁存进屏上这个对话的(悬浮胶囊、定时任务、这里),都按存下的那份补上
+        // Whoever saved into the conversation on screen (floating pill, schedules, here), fill it in from what was saved
         scope.launch {
             store.changes.collect { id ->
                 if (id == _ui.value.conversationId) live.syncSaved(id)
-                // 删掉的对话又有人往里存了:重新列出来
+                // Someone saved into a deleted conversation again: list it again
                 if (id in _deleted.value && id !in deleting && store.turns(id).isNotEmpty()) _deleted.update { it - id }
             }
         }
-        // 并行时只收屏上这个对话的任务的接管进度
+        // In parallel mode, only accept takeover progress from the task of the conversation on screen
         scope.launch {
             takeoverStage.collect { s -> if (session.ownTask()) _ui.update { it.copy(takeoverStage = s) } }
         }
-        // 只认任务进行中新列出的标准:订阅时的旧值可能是上一个任务的
-        // 有没有屏和状态一样是每个任务各自的:并行时只收屏上这个对话的任务的
+        // Only accept criteria listed during the running task: the value at subscription time may belong to the previous task
+        // Whether there is a screen is per task, like the state: in parallel mode only accept it from the task of the conversation on screen
         scope.launch { screenOpen.collect { if (it && session.ownTask()) live.onScreenOpened() } }
         scope.launch { sandboxReady.collect { r -> _ui.update { it.copy(attachEnabled = r) } } }
         scope.launch { sharedFiles.collect { if (session.ownTask()) live.onSharedFiles(it) } }
@@ -287,10 +293,10 @@ class ChatViewModel(
         scope.launch { runNotes.collect { notes -> _ui.update { ui -> ui.copy(exchanges = ui.exchanges.map { session.withNotes(it, notes) }) } } }
         scope.launch { activities.collect { if (session.ownTask()) live.onActivities(it) } }
         scope.launch { steers.collect { if (session.ownTask()) live.onSteers(it) } }
-        // 任务登记进任务列表(原话可以取了)可能晚于它的第一个状态:那时接上的那一问一答补上原话
+        // A task being registered in the task list (so its original wording can be fetched) may come later than its first state: the question-answer attached at that time then gets its original wording filled in
         scope.launch { activeConversations.collect { live.fillGoal() } }
         scope.launch { summarizing.collect { set -> _ui.update { ui -> ui.copy(exchanges = ui.exchanges.map { session.withSummarizing(it, set) }) } } }
-        // 分享附件有私有副本,可以恢复;只把当前对话那份放到输入框,其余留在各自草稿里。
+        // Shared attachments have private copies and can be restored; only the current conversation's goes into the input field, the rest stay in their own drafts.
         sharedDrafts?.readAll()?.forEach { draft ->
             drafts.update { it + (draft.conversationId to ComposerDraft(input = draft.text,
                 attachments = session.sharedAttachments(draft), sharedDraft = draft)) }
@@ -305,14 +311,14 @@ class ChatViewModel(
 
     val deleteBatch: StateFlow<DeleteBatch?> = _deleteBatch.asStateFlow()
 
-    /** 正在操作的 App 或网站(最近一件有对象的事);顶栏副标题「正在操作 …」用。没有时为 null。 */
+    /** The app or site currently being operated (the most recent thing with a target); used by the top bar subtitle "operating …". Null when there is none. */
     fun livePlace(ex: Exchange): String? =
         ex.activities.lastOrNull { !it.target.isNullOrBlank() }?.target?.let { where(it, appLabel) }
 
-    /** 该对话正在跑的任务的原话;侧栏「进行中」里还没存进对话列表的那条用它当标题。 */
+    /** The original wording of that conversation's running task; used as the title for the "Running" entry in the drawer that is not yet saved into the conversation list. */
     fun runningGoal(conversationId: String): String? = runGoal(conversationId)
 
-    /** 能不能换到别的对话:并行时随时能换,否则要等这个对话的任务结束。 */
+    /** Whether other conversations can be switched to: at any time in parallel mode, otherwise only after this conversation's task ends. */
     fun canSwitch() = session.parallel() || !session.busy()
 
     // ChatSession

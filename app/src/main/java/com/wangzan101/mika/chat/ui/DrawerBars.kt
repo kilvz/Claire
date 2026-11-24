@@ -45,7 +45,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.about.ui.UpdateDot
 
-/** 侧栏顶上的小按钮:平时的「多选」和多选中的「取消」。 */
+/** Small button at the top of the drawer: "Select" normally, and "Cancel" while selecting. */
 @Composable
 internal fun HeaderAction(text: String, tag: String, color: Color, onClick: () -> Unit) {
     TextButton(onClick = onClick, modifier = Modifier.testTag(tag), contentPadding = PaddingValues(horizontal = 10.dp)) {
@@ -53,7 +53,7 @@ internal fun HeaderAction(text: String, tag: String, color: Color, onClick: () -
     }
 }
 
-/** 归档视图顶上的一行:返回普通侧栏,右边写着收起来了几条。 */
+/** Row at the top of the archive view: goes back to the normal drawer, with how many were put away written on the right. */
 @Composable
 internal fun ArchiveHeader(count: Int, onBack: () -> Unit) {
     val c = MikaTheme.colors
@@ -72,7 +72,7 @@ internal fun ArchiveHeader(count: Int, onBack: () -> Unit) {
     }
 }
 
-/** 归档视图里一条都没有。 */
+/** There is nothing at all in the archive view. */
 @Composable
 internal fun ArchiveEmpty() {
     Text(
@@ -82,7 +82,7 @@ internal fun ArchiveEmpty() {
     )
 }
 
-/** 侧栏底部的「已归档」入口:进去看收起来的对话。 */
+/** "Archived" entry at the bottom of the drawer: opens the conversations that were put away. */
 @Composable
 internal fun ArchiveEntry(count: Int, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -101,7 +101,7 @@ internal fun ArchiveEntry(count: Int, onClick: () -> Unit) {
     }
 }
 
-/** 多选时的底部操作条:已选几条、全选 / 取消全选、删除;普通侧栏多一个「归档」,归档视图里换成「取消归档」。 */
+/** Bottom action bar while multi-selecting: how many are selected, select all / deselect all, delete; the normal drawer also has "Archive", which becomes "Unarchive" in the archive view. */
 @Composable
 internal fun SelectBar(
     selectedCount: Int, allSelected: Boolean, onSelectAll: () -> Unit,
@@ -136,7 +136,7 @@ internal fun SelectBar(
     }
 }
 
-/** 批量归档的结果:归档了几个;有因为在跑任务或是当前对话没动的,照实说几个没归档。 */
+/** Result of a batch archive: how many were archived; if some were left alone because they are running a task or are the current conversation, it states exactly how many were not archived. */
 @Composable
 internal fun ArchiveStatusBar(batch: ArchiveBatch) {
     val c = MikaTheme.colors
@@ -157,7 +157,7 @@ internal fun ArchiveStatusBar(batch: ArchiveBatch) {
     }
 }
 
-/** 刚归档一条:底部写清收起了哪个对话,几秒内可以撤销。 */
+/** One conversation just archived: the bottom bar states which conversation was put away, and it can be undone within a few seconds. */
 @Composable
 internal fun ArchiveUndoBar(undo: ArchiveUndo, onUndo: () -> Unit) {
     val c = MikaTheme.colors
@@ -178,7 +178,7 @@ internal fun ArchiveUndoBar(undo: ArchiveUndo, onUndo: () -> Unit) {
     }
 }
 
-/** 批量删除的进度和结果:删的时候是「正在删除 N 个对话…」,删完写成功几条、失败几条。 */
+/** Progress and result of a batch delete: while deleting it reads "Deleting N conversations…", and when done it reports how many succeeded and how many failed. */
 @Composable
 internal fun DeleteStatusBar(batch: DeleteBatch) {
     val c = MikaTheme.colors
@@ -226,7 +226,7 @@ internal fun NavEntry(
     }
 }
 
-/** 侧栏搜索框右边的新对话按钮:中性圆底 + 深色加号,和顶栏 ✚ 一个样子。 */
+/** New conversation button to the right of the drawer search box: neutral round background + dark plus, matching the top bar's ✚. */
 @Composable
 internal fun NewConversationButton(enabled: Boolean, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -240,7 +240,7 @@ internal fun NewConversationButton(enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** 「进行中」的段标题,右边一个「后台屏 ›」进后台屏页(只有有任务在跑时才有这一段)。 */
+/** Section heading for "Running", with a "Background screens ›" link on the right that opens the background screens page (this section only exists while a task is running). */
 @Composable
 internal fun RunningLabel(onScreens: () -> Unit) {
     val c = MikaTheme.colors

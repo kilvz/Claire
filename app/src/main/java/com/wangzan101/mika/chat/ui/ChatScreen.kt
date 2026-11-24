@@ -98,9 +98,11 @@ import com.wangzan101.mika.voice.ui.voiceDim
 import com.wangzan101.mika.workflow.ui.WorkflowsScreen
 
 /**
- * 对话页:顶栏(左边打开侧栏、中间对话标题和此刻在做什么、右边新对话),对话在顶栏和玻璃输入栏之间滚动。
- * 进行中是一行状态加一条竖线步骤,不套卡片;要你处理时停在当前步,下面一张白卡;完成后过程收成一行,回答直接排在背景上。
- * Agent 的虚拟屏以悬浮小窗([AgentPip])盖在对话上,不占布局。
+ * The chat page: top bar (drawer on the left, conversation title and what it is doing right now in the middle, new
+ * conversation on the right), with the conversation scrolling between the top bar and the glass input bar.
+ * While running it is one status row plus a vertical-rail step list, without a card; when it needs you it stops at the
+ * current step with a white card below; once finished the process folds into a row and the answer sits directly on the background.
+ * The agent's virtual screen covers the conversation as a floating small window ([AgentPip]) without taking layout space.
  */
 @Composable
 fun ChatScreen(
@@ -108,41 +110,41 @@ fun ChatScreen(
     check: Prerequisites.Check,
     frames: StateFlow<Bitmap?>,
     webOpen: StateFlow<Boolean>,
-    /** 小窗直接操作的入口(点/滑/返回注入到虚拟屏);屏没建好或任务结束时为 null。 */
+    /** Entry point for operating directly in the small window (taps/swipes/back injected into the virtual screen); null while the screen is not set up or the task has ended. */
     pipInput: StateFlow<com.wangzan101.mika.cap.phone.display.PipInput?> = MutableStateFlow(null),
-    /** 小窗目标 App 的声音被用户恢复过:声音按钮显示「静音」,否则「恢复声音」。 */
+    /** The small window's target app sound has been restored by the user: the sound button reads "Mute", otherwise "Restore sound". */
     pipSoundOn: StateFlow<Boolean> = MutableStateFlow(false),
-    /** 用户在设置里开了「允许我在小窗里直接操作」。 */
+    /** The user enabled "allow me to operate directly in the small window" in settings. */
     pipOperateEnabled: Boolean = false,
     reduceMotion: Boolean,
-    /** 左上角菜单:打开侧栏。 */
+    /** Menu at the top left: opens the drawer. */
     onOpenDrawer: () -> Unit,
-    /** 被拦下的提示里的「去设置」。 */
+    /** The "go to settings" in the blocked hint. */
     openSettings: () -> Unit,
-    /** 「＋」面板里的「浏览器」:打开内置浏览器。 */
+    /** "Browser" in the "+" panel: opens the built-in browser. */
     onOpenBrowser: () -> Unit = {},
     openRun: (String) -> Unit = {},
-    /** 任务要用手机而手机操作没准备好:在那轮问答下面放一行去设置(配不上具体轮次时挂在最后)。 */
+    /** A task needs the phone but phone operation is not ready: put a "go to settings" row under that question-answer (attached at the end when it cannot be matched to a specific turn). */
     phoneSetupNeed: com.wangzan101.mika.cap.phone.setup.PhoneSetupPrompt.Need? = null,
     openPhoneSetup: () -> Unit = {},
-    /** 按运行记录取依据的来处(「来源」胶囊和点开后的截图);读盘的活由调用方放到后台线程。 */
+    /** Fetches where the evidence came from, based on the run record (the "sources" pill and the screenshots shown when expanded); the caller moves disk work onto a background thread. */
     loadSource: suspend (runId: String) -> EvidenceSource? = { null },
     openSource: (runId: String?, legacyText: String?) -> Unit = { _, _ -> },
-    /** 输入栏按住说话从这里开会话;null 时只能打字。 */
+    /** Hold-to-talk in the input bar starts its session here; when null, only typing is available. */
     voice: VoiceSource? = null,
-    /** 「还不能语音输入」里的「去选」。 */
+    /** The "choose" in "voice input is not available yet". */
     openSpeechModel: () -> Unit = {},
-    /** 输入框里还没发出的字，交给「教 Claire」预填，不会自己开始。 */
+    /** The unsent text in the input field, handed to "teach Claire" as a prefill; it does not start on its own. */
     onOpenTeach: (String) -> Unit = {},
-    /** 首页推荐任务。不传时用本机保存的那一份;测试传入单独的存储,避免改到用户的数据。 */
+    /** Recommended tasks for the home screen. When not passed, the locally saved set is used; tests pass a separate store so the user's data is not modified. */
     recommendations: RecommendedTaskStore? = null,
     checklists: SavedChecklistStore? = null,
     workflows: com.wangzan101.mika.workflow.WorkflowRuntime? = null,
     openReport: (String) -> Unit = {},
     openPlayback: (String) -> Unit = {},
-    /** 人格选择器里的「管理人格」:打开设置里的人格页。 */
+    /** "Manage personas" in the persona picker: opens the personas page in settings. */
     onOpenPersonas: () -> Unit = {},
-    /** 输入栏的听筒按钮:进语音通话;为 null 时不显示(正常常驻,不可用时进门禁页引导)。 */
+    /** The earpiece button in the input bar: enters a voice call; hidden when null (normally always present; when unavailable it leads to a gating page instead). */
     onVoiceCall: (() -> Unit)? = null,
 ) {
     val checklistStore = checklists ?: (LocalContext.current.applicationContext as? MikaApp)?.savedChecklists
@@ -169,12 +171,12 @@ fun ChatScreen(
     val pendingJump by vm.jump.collectAsState()
     val others by vm.otherRunning.collectAsState()
     val keptAny by vm.keptPage.collectAsState()
-    // 只管这个对话留下的那一页
+    // Only consider the page kept by this conversation
     val kept = keptAny?.takeIf { it.conversationId == ui.conversationId }
     val live by frames.collectAsState()
     val webLive by webOpen.collectAsState()
     val pipInputLive by pipInput.collectAsState()
-    // 任务一结束虚拟屏就释放了;完成时小窗还要停留几秒打勾,继续显示最后一帧
+    // The virtual screen is released as soon as the task ends; on completion the small window still lingers a few seconds to show a check, so keep showing the last frame
     var lastFrame by remember { mutableStateOf<Bitmap?>(null) }
     var lastFrameWasWeb by remember { mutableStateOf(false) }
     LaunchedEffect(live, webLive, ui.pip.mode) {
@@ -186,20 +188,20 @@ fun ChatScreen(
     }
     val frame = live ?: lastFrame.takeIf { ui.pip.visible && ui.pip.mode == PipMode.Done }
     val webContent = if (ui.pip.mode == PipMode.Done) lastFrameWasWeb else webLive
-    // 注册文字的 Android 状态保存;平时由进程内的 ViewModel 管理完整会话草稿。
+    // Registers Android state saving for the text; normally the in-process ViewModel manages the full conversation draft.
     rememberSaveable(vm, saver = androidx.compose.runtime.saveable.listSaver(
         save = { model: ChatViewModel -> model.saveDraftTexts() },
         restore = { saved -> vm.also { it.restoreDraftTexts(saved) } },
     )) { vm }
     val input = ui.input
-    // 推荐任务可以直接填进空输入框;已有内容时先确认,不能因误触把草稿换掉。
+    // A recommended task can be filled straight into an empty input field; when there is already content, confirm first so a stray tap cannot replace the draft.
     var pendingExample by rememberSaveable(ui.conversationId) { mutableStateOf<String?>(null) }
     var showUsage by rememberSaveable(ui.conversationId) { mutableStateOf(false) }
     var showChecklists by remember(ui.conversationId) { mutableStateOf(false) }
     var checklistIncoming by remember(ui.conversationId) { mutableStateOf<ChecklistSource?>(null) }
     var pendingChecklistDraft by remember(ui.conversationId) { mutableStateOf<String?>(null) }
     var showWorkflows by rememberSaveable { mutableStateOf(false) }
-    // 面板开着时选照片会把首页的草稿提升成对话(id 从 null 变成新值),所以不跟对话 id 绑;换对话时用户本来就会先关掉
+    // While the panel is open, picking a photo promotes the home-screen draft into a conversation (the id goes from null to a new value), so this is not keyed on the conversation id; switching conversations closes it first anyway
     var showPlus by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -224,7 +226,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // 从搜索或文件库跳过来时,短暂高亮目标行;新跳转带新 serial,会重新计时。
+    // When jumping in from search or the file library, briefly highlight the target row; a new jump carries a new serial, which restarts the timer.
     var jumpHighlight by remember { mutableStateOf<ChatJump?>(null) }
     LaunchedEffect(jumpHighlight) {
         val active = jumpHighlight ?: return@LaunchedEffect
@@ -232,7 +234,7 @@ fun ChatScreen(
         if (jumpHighlight == active) jumpHighlight = null
     }
 
-    // 只有原本跟着最新消息时才继续跟随。这个状态与列表位置一起跨页面保存。
+    // Only keep following when it was following the latest message to begin with. This state is saved across pages along with the list position.
     var followingTail by rememberSaveable { mutableStateOf(true) }
     var scrollingToBottom by remember(ui.conversationId) { mutableStateOf(false) }
     var scrollToBottomJob by remember(ui.conversationId) { mutableStateOf<Job?>(null) }
@@ -247,8 +249,8 @@ fun ChatScreen(
         }
     }
 
-    // 返回聊天时同一条内容不重新滚动；新进展仅在跟随末尾时滚动。
-    // 目标行直接由当前 UI 状态计算:layoutInfo 还是上一帧的测量结果,发送后立即读它会滚到旧的末尾。
+    // Returning to the chat does not scroll again for the same content; new progress scrolls only while following the end.
+    // The target row is computed directly from the current UI state: layoutInfo still holds the previous frame's measurement results, so reading it right after sending would scroll to the old end.
     val last = ui.exchanges.lastOrNull()
     val setupRow = phoneSetupRow(phoneSetupNeed, ui.conversationId, ui.exchanges)
     val rowCount = chatItemCount(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null)
@@ -256,12 +258,12 @@ fun ChatScreen(
     val showScrollToBottom = ui.exchanges.isNotEmpty() && !followingTail && canScrollForward
     val scrollMarker = "${ui.conversationId}:${ui.exchanges.size}:${last?.steps?.size}:${last?.steers?.size}:${last?.status?.hashCode()}:${ui.blocked?.hashCode()}"
     val jump = pendingJump?.takeIf { it.conversationId == ui.conversationId }
-    // 目标行的高亮:只在目标还是当前对话时算。
+    // Highlight of the target row: computed only while the target still belongs to the current conversation.
     val highlightKey = jumpHighlight
         ?.takeIf { it.conversationId == ui.conversationId }
         ?.let { chatTargetKey(ui.exchanges, it.target) }
     LaunchedEffect(scrollMarker, jump) {
-        // 从搜索或文件库过来:先滚到目标消息,期间不要跟末尾;目标不在了就退回原来的逻辑。
+        // Coming from search or the file library: scroll to the target message first and do not follow the end meanwhile; if the target is gone, fall back to the original logic.
         if (jump != null) {
             val keys = chatItemKeys(ui.exchanges, kept, setupRow, hasBlocked = ui.blocked != null)
             val index = chatTargetKey(ui.exchanges, jump.target)?.let(keys::indexOf) ?: -1
@@ -292,7 +294,7 @@ fun ChatScreen(
             else listState.animateScrollToItem(rowCount - 1)
         }
     }
-    // 流式文字增长时跟住底部；用户主动向上翻看过程时不拉回去。
+    // Stick to the bottom while streamed text grows; do not pull the user back when they have deliberately scrolled up to review the process.
     LaunchedEffect(last?.draft?.length) {
         if (last?.draft.isNullOrEmpty() || !followingTail || listState.isScrollInProgress) return@LaunchedEffect
         val layout = listState.layoutInfo
@@ -305,8 +307,9 @@ fun ChatScreen(
         listState.scrollToItem(end, offset)
     }
 
-    // 输入栏变高(多半是输入法弹起,也可能是附件、多行输入):原本跟着最新消息时,对话流一起往上顶同样的距离,
-    // 最后一条仍贴着输入栏;用户正往上翻看时不动。变矮时列表到底自己会收回来。
+    // The input bar grew taller (usually the IME appearing, possibly attachments or multi-line input): when it was following
+    // the latest message, the conversation is pushed up by the same distance so the last message still touches the input
+    // bar; nothing moves while the user is scrolling up to review. When it shrinks, the list settles back at the bottom on its own.
     var lastComposerHeight by remember { mutableIntStateOf(composerHeight) }
     LaunchedEffect(composerHeight) {
         val grown = composerHeight - lastComposerHeight
@@ -314,19 +317,19 @@ fun ChatScreen(
         if (grown > 0 && followingTail && !listState.isScrollInProgress) listState.scrollBy(grown.toFloat())
     }
 
-    // 已结束各轮的运行小结:每轮结束那一行写这一轮的 token
+    // Run summaries of the finished turns: the end-of-turn row shows that turn's tokens
     val endedRuns = ui.exchanges.filter { !it.status.isActive() }.mapNotNull { it.recordedRun }
     val runMetrics = rememberRunMetrics(endedRuns)
     val context = LocalContext.current
 
     val c = MikaTheme.colors
     val backdrop = rememberGlassBackdrop()
-    /** 长按了的那条消息;菜单开着(收起的动画放完才清掉)。 */
+    /** The long-pressed message; the menu is open (cleared only after the collapse animation finishes). */
     var menu by remember { mutableStateOf<MessageTarget?>(null) }
     var queueActions by remember(ui.conversationId) { mutableStateOf<com.wangzan101.mika.task.QueuedFollowUp?>(null) }
-    /** 选了「选择文字」的那条:它换回系统的长按选中;换对话时清掉。 */
+    /** The message whose "select text" was chosen: it switches to the system's long-press selection; cleared when switching conversations. */
     var selecting by remember(ui.conversationId) { mutableStateOf<String?>(null) }
-    /** 菜单出现的进度:0 是没有,1 是完全出来;关了动画时直接到位。 */
+    /** Progress of the menu appearing: 0 means absent, 1 fully out; with animations off it snaps straight into place. */
     val lift = remember { Animatable(0f) }
     val adaptive = LocalAdaptiveLayout.current
     val screenDocked = LocalOperationScreenDocked.current
@@ -352,7 +355,7 @@ fun ChatScreen(
             }
         }
     }
-    /** 收起菜单:倒着放一遍出现的动画,放完再清掉;[then] 当场做。 */
+    /** Collapses the menu: plays the appearance animation backwards, then clears it; [then] runs immediately. */
     fun closeMenu(then: () -> Unit = {}) {
         then()
         scope.launch {
@@ -362,7 +365,7 @@ fun ChatScreen(
     }
     val menuHost = remember(selecting) { MessageMenuHost(selecting) { menu = it } }
     val menuOpen = menu != null
-    /** 空对话:只有问候和推荐卡片,左右不套消息列表那圈留白,由卡片自己和输入栏对齐。 */
+    /** Empty conversation: only the greeting and recommendation cards, without the message list's side padding, so the cards line up with the input bar themselves. */
     val emptyConversation = ui.exchanges.isEmpty() && ui.blocked == null
     PageBackground {
         CompositionLocalProvider(LocalMessageMenu provides menuHost) {
@@ -392,7 +395,7 @@ fun ChatScreen(
                         },
                         openReport = openReport, openPlayback = openPlayback,
                     )
-                    // 「去设置」挂在发现手机没就绪的那一轮后面;配不上具体轮次时(下面)照旧挂在最后
+                    // "Go to settings" follows the turn where the phone was found not ready; when it cannot be matched to a turn it stays at the end as before (below)
                     if (setupRow == i) item("ps$i") { PhoneSetupLine(openPhoneSetup) }
                 }
                 if (setupRow == -1) item("phone-setup") { PhoneSetupLine(openPhoneSetup) }
@@ -411,7 +414,7 @@ fun ChatScreen(
         }
 
         Column(Modifier.behindMenu(menuOpen) { lift.value }.onSizeChanged { topHeight = it.height }) {
-            // 悬浮玻璃三件套:菜单 / 标题 / 新建,各自一小块磨砂玻璃,不铺一整条
+            // The three floating glass pieces: menu / title / new, each a small block of frosted glass instead of one full bar
             Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars)) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
@@ -425,7 +428,7 @@ fun ChatScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             DirectionalIcon(MikaIcons.Menu, stringResource(R.string.chat_menu), Modifier.size(MikaSize.Icon), tint = c.ink)
-                            // 别的对话里还有任务在跑(并行时):右上角一个小圆点,侧栏「进行中」里能切过去
+                            // Other conversations still have tasks running (in parallel mode): a small dot at the top right, and they can be switched to from "Running" in the drawer
                             if (others.isNotEmpty()) {
                                 Box(
                                     Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 7.dp).size(8.dp)
@@ -508,9 +511,9 @@ fun ChatScreen(
             quote = ui.quote,
             onRemoveQuote = vm::clearQuote,
             voice = voice,
-            // 说的话接在已有的字后面;任务在跑时先作为补充消息排队
+            // Spoken words are appended after the existing text; while a task is running they are first queued as a follow-up
             onVoiceText = { vm.input(HoldToTalk.join(vm.ui.value.input, it)) },
-            // 松开在「在听」卡片里:接上已有的字直接发出;发不出去(比如还在导入附件)就留在输入框里
+            // Releasing on the "listening" card: append to the existing text and send straight away; if it cannot be sent (e.g. attachments are still importing), it stays in the input field
             onVoiceSend = {
                 val text = HoldToTalk.join(vm.ui.value.input, it)
                 vm.input(text)
@@ -610,14 +613,14 @@ fun ChatScreen(
             bottomInset = composerHeight.toFloat(),
             onExpand = vm::expandPip,
             onCollapse = vm::collapsePip,
-            // 关掉小画面:这个任务结束前只剩右下角的小按钮;提示一句还能去哪看
+            // Closing the small window: only the small button in the bottom-right remains until this task ends; show a hint about where it can still be seen
             onClose = {
                 vm.closePip()
                 Toast.makeText(context, context.getString(R.string.pip_closed_hint), Toast.LENGTH_SHORT).show()
             },
             onReopen = vm::reopenPip,
             onToggleSound = vm::togglePipSound,
-            // 要你处理时点小窗:收起,滚到要你处理的那张卡片(在最后一问一答里,它后面只可能还有文件卡片和去设置那一行)
+            // Tapping the small window when it needs you: collapse it and scroll to the card that needs you (it is in the last question-answer, and only file cards and the "go to settings" row can follow it)
             onAttention = {
                 vm.attendPip()
                 val count = listState.layoutInfo.totalItemsCount
@@ -642,8 +645,8 @@ fun ChatScreen(
             )
         }
 
-        // 长按消息的菜单盖在最上面:复制纯文字;引用放到输入框上方;选择文字让那条换回系统的长按选中;
-        // 已经答完的一轮还能从这里分支
+        // The long-press message menu covers everything on top: copy the plain text; quote it above the input field; select
+        // text to switch that message back to the system's long-press selection; a turn already answered can also be branched from here
         menu?.let { m ->
             val pending = withdrawableSteer(ui.exchanges, m.key)
             val canEdit = input.isBlank() && ui.quote == null && ui.attachments.isEmpty() && !ui.importing
@@ -819,7 +822,7 @@ fun ChatScreen(
     }
 }
 
-/** 最后一项可能是一段很长的答复，仅仅看到它的开头不代表用户正在看末尾。 */
+/** The last item may be a very long answer, and merely seeing its beginning does not mean the user is looking at the end. */
 private fun LazyListState.nearTail(thresholdPx: Int): Boolean {
     val layout = layoutInfo
     val end = layout.totalItemsCount - 1
@@ -827,4 +830,4 @@ private fun LazyListState.nearTail(thresholdPx: Int): Boolean {
     return tail.offset + tail.size - layout.viewportEndOffset <= thresholdPx
 }
 
-// ---------- 空对话 ----------
+// ---------- Empty conversation ----------

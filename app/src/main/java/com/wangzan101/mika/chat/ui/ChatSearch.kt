@@ -47,17 +47,17 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 搜索时按归档状态筛选:[All] 全部(归档的带上标记)、[Active] 只看未归档、[Archived] 只看已归档。 */
+/** Filter by archive state when searching: [All] everything (archived ones carry the marker), [Active] only unarchived, [Archived] only archived. */
 enum class SearchArchiveFilter { All, Active, Archived }
 
-/** 侧栏搜索结果:标题和命中片段已经换成行要显示的样子;没搜完时 [searching] 为真。 */
+/** Drawer search results: the title and hit snippet are already in the form the row displays; [searching] is true while the search has not finished. */
 data class DrawerSearch(
     val hits: List<DrawerConversation>,
     val searching: Boolean,
     val truncated: Boolean = false,
 )
 
-/** 侧栏顶部的搜索框:38 高的浅底圆角条,聚焦时一圈强调色;键盘上是「搜索」。 */
+/** Search box at the top of the drawer: a 38-high rounded bar on a light background, with an accent ring while focused; the keyboard key reads "Search". */
 @Composable
 internal fun DrawerSearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -102,7 +102,7 @@ internal fun DrawerSearchField(query: String, onQueryChange: (String) -> Unit, m
     }
 }
 
-/** 搜索框下面按归档状态筛选的三段;只在有搜索词时显示。 */
+/** Three-segment archive-state filter below the search box; shown only when there is a search term. */
 @Composable
 internal fun SearchArchiveFilterRow(selected: SearchArchiveFilter, onSelect: (SearchArchiveFilter) -> Unit) {
     SegmentedControl(
@@ -118,7 +118,7 @@ internal fun SearchArchiveFilterRow(selected: SearchArchiveFilter, onSelect: (Se
     )
 }
 
-/** 搜索结果里的一行提示:搜索中、结果太多只显示前若干条。 */
+/** One-line hint in the search results: searching, or too many results so only the first few are shown. */
 @Composable
 internal fun SearchHint(text: String) {
     Text(
@@ -127,7 +127,7 @@ internal fun SearchHint(text: String) {
     )
 }
 
-/** 一个对话都没搜到:说清楚搜了哪儿,别让人以为是功能坏了。 */
+/** No conversation matched: say what was searched so people do not think the feature is broken. */
 @Composable
 internal fun SearchEmpty(query: String) {
     val c = MikaTheme.colors
@@ -148,7 +148,7 @@ internal fun SearchEmpty(query: String) {
     }
 }
 
-/** 把 [text] 里出现在 [terms] 中的部分标成强调色;没有命中时原样返回。 */
+/** Marks the parts of [text] that appear in [terms] with the accent color; returns it unchanged when nothing matches. */
 internal fun highlighted(text: String, terms: List<String>, color: Color): AnnotatedString {
     val ranges = matchRanges(text, terms)
     if (ranges.isEmpty()) return AnnotatedString(text)
@@ -158,7 +158,7 @@ internal fun highlighted(text: String, terms: List<String>, color: Color): Annot
     }
 }
 
-/** [terms] 在 [text] 里所有出现的位置(不区分大小写),重叠或相接的合并。 */
+/** Every position where [terms] occur in [text] (case-insensitive), with overlapping or adjacent ranges merged. */
 internal fun matchRanges(text: String, terms: List<String>): List<IntRange> {
     if (text.isEmpty() || terms.isEmpty()) return emptyList()
     val found = ArrayList<IntRange>()

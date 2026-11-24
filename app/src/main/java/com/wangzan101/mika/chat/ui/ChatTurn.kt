@@ -85,7 +85,7 @@ import com.wangzan101.mika.settings.ui.StatusCopy
 import com.wangzan101.mika.ui.MarkdownModel
 import com.wangzan101.mika.ui.MarkdownText
 
-/** 跳转目标行的短暂高亮:一条全宽淡色底,约 1.8 秒后渐隐。 */
+/** Brief highlight on the jump target row: a full-width tinted background that fades out after about 1.8 seconds. */
 @Composable
 private fun JumpHighlight(active: Boolean, reduceMotion: Boolean, content: @Composable () -> Unit) {
     val c = MikaTheme.colors
@@ -101,9 +101,9 @@ internal fun LazyListScope.exchange(
     runMetrics: Map<String, RunMetrics>,
     openRun: (String) -> Unit, loadSource: suspend (String) -> EvidenceSource?, openSource: (String?, String?) -> Unit,
     kept: KeptPage? = null,
-    /** 从搜索或文件库跳过来时要高亮的行 key。 */
+    /** Key of the row to highlight when jumping in from search or the file library. */
     highlightKey: String? = null,
-    /** 终态后的两个新运行入口:true 从摘要断点继续,false 按原目标重新开始。 */
+    /** The two new-run entries after a terminal state: true continues from where the summary broke off, false restarts from the original goal. */
     recover: (Boolean) -> Unit = {},
     openReport: (String) -> Unit = {}, openPlayback: (String) -> Unit = {},
 ) {
@@ -115,8 +115,9 @@ internal fun LazyListScope.exchange(
         ex.status is ExchangeStatus.NeedsInput || ex.status is ExchangeStatus.Queued
     val active = ex.status.isActive()
     val answering = ex.status == ExchangeStatus.Working && !ex.draft.isNullOrBlank()
-    // 插话:干活中作为右侧一步插进步骤里(见 [StepLine]);没在跑步骤(结束了、或在写总结)时收成紧跟
-    // 用户消息下面的一条弱化小字,和前面的主对话区分主从。撤回的插话不显示。
+    // Steers: while working they are inserted into the steps as a step on the right (see [StepLine]); when steps are not
+    // running (finished, or writing the summary) they collapse into a subdued small line right below the user message,
+    // setting the subordinate apart from the main conversation before it. Withdrawn steers are not shown.
     val steers = ex.steers.filterNot { it.state == SteerState.Withdrawn }
     if (active && !answering) {
         item("s$index") { WorkBlock(ex, steers.map { it.text }, reduceMotion, backgroundNote, openRun) }
@@ -135,7 +136,7 @@ internal fun LazyListScope.exchange(
                 recover = recover, goal = ex.goal, openReport = openReport, openPlayback = openPlayback)
         }
     }
-    // 这一轮结束后留在后台运行的那一页:还开着是绿色一行(能关),关了是一句原因
+    // The page left running in the background after this turn: a green row while it is still open (and can be closed), and a reason once it is closed
     keptPageRow(index, ex, kept, vm::closeKeptPage)
     if (ex.audios.isNotEmpty()) item("au$index") { GeneratedAudioCards(ex.audios, vm) }
     if (ex.photos.isNotEmpty()) item("p$index") {
@@ -148,8 +149,8 @@ internal fun LazyListScope.exchange(
 }
 
 /**
- * 插话分成两段:第一句还没交给模型的([SteerState.unconsumed])之前的,和它连同之后的。
- * 正在长出来的回答排在两段中间。
+ * Steers split into two parts: those before the first one not yet handed to the model ([SteerState.unconsumed]), and that
+ * one together with everything after it. The answer currently growing is placed between the two parts.
  */
 internal fun steersAroundDraft(steers: List<SteerNote>): Pair<List<SteerNote>, List<SteerNote>> {
     val visible = steers.filterNot { it.state == SteerState.Withdrawn }
@@ -158,8 +159,10 @@ internal fun steersAroundDraft(steers: List<SteerNote>): Pair<List<SteerNote>, L
 }
 
 /**
- * 长按的 [key] 是进行中那一问一答里、模型还没取走的手机插话时给出它,菜单据此提供撤回和编辑(编辑另看 [editableSteer])。
- * 电脑追加的([SteerNote.remote])不给:编辑会把只归当前任务的话变成手机插话、可能转成下一件事;撤不撤由电脑定。
+ * When the long-pressed [key] is a phone steer in the running question-answer that the model has not claimed yet, returns
+ * it, so the menu can offer withdraw and edit (edit is additionally gated by [editableSteer]).
+ * Ones appended from the computer ([SteerNote.remote]) are not returned: editing would turn words that belong only to this
+ * task into a phone steer and could move them to the next item; whether to withdraw is decided on the computer.
  */
 internal fun withdrawableSteer(exchanges: List<Exchange>, key: String): SteerNote? = exchanges.mapIndexedNotNull { i, ex ->
     if (ex.status.isActive()) ex.steers.firstOrNull { key == "m$i-${it.id}" && it.state.unconsumed && !it.remote } else null
@@ -169,11 +172,15 @@ internal fun ExchangeStatus.isActive() =
     this !is ExchangeStatus.Done && this !is ExchangeStatus.Failed && this !is ExchangeStatus.Cancelled
 
 /**
- * 用户的话:淡蓝底气泡(深字),圆角 20、右下尾角 6,最宽八成。[note] 是插话的去向。
- * 带着用户此刻的屏幕时上面是截图缩略图和「你此刻的屏幕 · App · 时刻」,附言在下面的气泡里(见 [UserMessage])。
- * 带着附件时上面是照片格子和文件卡片(见 [SentAttachments]),点开在 App 里的查看页看;写的话在下面另起一个气泡,路径那几行不显示。
- * 引用了前面的消息时最上面是引的那条(见 [SentQuote])。长按气泡弹出复制 / 引用 / 选择文字([key] 认是哪一条,见 [MessageArea])。
- * 在浏览器页上对着一页问的,最上面是「网页 · 网站」和选中的字(见 [SentPage]),页面说明那几行不显示。
+ * The user's words: a pale blue bubble (dark text), 20 corner radius with a 6 tail corner at the bottom right, at most 80%
+ * wide. [note] is where a steer went.
+ * When it carries the user's current screen, above it are the screenshot thumbnail and "your current screen · app · time",
+ * with the accompanying text in the bubble below (see [UserMessage]).
+ * When it carries attachments, above it are photo tiles and file cards (see [SentAttachments]), opened in the in-app viewer;
+ * the written text goes in a separate bubble below, and the path lines are not shown.
+ * When it quotes an earlier message, the quoted one comes first (see [SentQuote]). Long-pressing the bubble brings up copy /
+ * quote / select text ([key] identifies which message, see [MessageArea]).
+ * For one asking about a page in the browser, at the top are "web page · site" and the selected text (see [SentPage]), and the page-note lines are not shown.
  */
 @Composable
 internal fun UserBubble(text: String, conversationId: String?, note: String? = null, key: String = "") {
@@ -195,7 +202,7 @@ internal fun UserBubble(text: String, conversationId: String?, note: String? = n
             }
             if (attached.hasAttachments && attached.words.isNotEmpty()) Spacer(Modifier.size(6.dp))
             if ((!attached.hasAttachments || attached.words.isNotEmpty()) && (paged.page == null || quoted.words.isNotEmpty())) UserMessage(conversationId, attached.words.takeIf { attached.hasAttachments } ?: quoted.words, ChatThumbWidth) { words ->
-                // 用户气泡是淡蓝底 + 深字:选中的底色用稍浓一点的蓝,把手仍是强调色(画在气泡外面)
+                // The user bubble is pale blue with dark text: the selection background is a slightly stronger blue, and the handles stay in the accent color (drawn outside the bubble)
                 val colors = MikaTheme.colors
                 val bubble = colors.accent.copy(alpha = 0.14f)
                 CompositionLocalProvider(LocalTextSelectionColors provides TextSelectionColors(colors.accent, colors.accent.copy(alpha = 0.3f))) {
@@ -216,7 +223,7 @@ private fun UserBubbleText(words: String) {
     Text(words, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), style = BubbleText, color = MikaTheme.colors.ink)
 }
 
-/** 长按抬起的那条消息:[color] 底、带阴影;太长时(最高半屏)只露开头,下面裁掉。 */
+/** The message lifted by a long-press: [color] background with a shadow; when too long (at most half the screen) only the start is shown and the rest is clipped below. */
 @Composable
 private fun LiftedMessage(shape: Shape, color: Color, content: @Composable () -> Unit) {
     Box(
@@ -225,10 +232,10 @@ private fun LiftedMessage(shape: Shape, color: Color, content: @Composable () ->
     ) { content() }
 }
 
-/** 对话页里截图缩略图的宽。 */
+/** Width of the screenshot thumbnail on the chat page. */
 private val ChatThumbWidth = 110.dp
 
-/** 正在生成的回答:和完成后的回答一样放在淡灰底上。 */
+/** The answer being generated: on the same pale gray background as a finished answer. */
 @Composable
 private fun DraftText(text: String, generating: Boolean) {
     MarkdownText(
@@ -237,7 +244,7 @@ private fun DraftText(text: String, generating: Boolean) {
     )
 }
 
-/** 结束后插话收成的弱化小字:右对齐、比正文淡一点点,紧跟用户消息下面,和主回答区分主从。 */
+/** The subdued small line a steer collapses into after finishing: right-aligned and a touch lighter than the body text, right under the user message, setting the subordinate apart from the main answer. */
 @Composable
 private fun SteerSupplement(text: String) {
     Box(
@@ -248,7 +255,7 @@ private fun SteerSupplement(text: String) {
     }
 }
 
-/** 干活中插话作为「右侧插入的一步」:淡蓝胶囊、右对齐,和左边的模型步骤区分开。 */
+/** A steer while working, as a "step inserted on the right": a pale blue pill, right-aligned, set apart from the model's steps on the left. */
 @Composable
 private fun SteerStepPill(text: String) {
     val c = MikaTheme.colors
@@ -262,8 +269,9 @@ private fun SteerStepPill(text: String) {
 }
 
 /**
- * Claire 的一段回答:长按弹出复制 / 引用 / 选择文字(见 [MessageArea]),复制、引用的是去掉 Markdown 符号的纯文字;
- * [modifier] 是回答的底,抬起的那张是同样的字放在白卡上。选择文字时选区的把手在单独的弹出窗口里,拖把手不会带出侧栏。
+ * A piece of Claire's answer: long-pressing brings up copy / quote / select text (see [MessageArea]), and copy and quote use
+ * the plain text with Markdown symbols stripped. [modifier] is the answer's background, and the lifted card shows the same
+ * text on a white card. While selecting text the selection handles live in a separate popup window, so dragging them does not pull out the drawer.
  */
 @Composable
 internal fun AnswerArea(key: String, answer: String, modifier: Modifier, content: @Composable () -> Unit) {
@@ -278,16 +286,17 @@ internal fun AnswerArea(key: String, answer: String, modifier: Modifier, content
     ) { content() }
 }
 
-/** Claire 回答的底:很淡的灰,左下尾角。 */
+/** Background of Claire's answer: a very pale gray, with the tail corner at the bottom left. */
 @Composable
 internal fun Modifier.answerSurface(): Modifier =
     background(MikaTheme.colors.answer, MikaShapes.AnswerBubble).padding(horizontal = 14.dp, vertical = 12.dp)
 
-// ---------- 进度 ----------
+// ---------- Progress ----------
 
 /**
- * 进行中:一行状态(呼吸点 + 此刻的进展 + 用时),下面一条竖线步骤(做完的灰点、当前的蓝点;停下来等你时当前步是橙点)。
- * 在后台操作手机时最下面一行小字。
+ * In progress: one status row (breathing dot + current progress + elapsed time), below it a vertical-rail step list
+ * (gray dots for finished steps, a blue dot for the current one; when stopped waiting for you the current step is an orange dot).
+ * While operating the phone in the background there is one more small line at the bottom.
  */
 @Composable
 internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean, backgroundNote: Boolean, openRun: (String) -> Unit) {
@@ -309,7 +318,7 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
         }
         ex.goals?.let { GoalChecklistRow(it, ex.runId) }
         if (ex.steps.isNotEmpty() || steers.isNotEmpty()) StepLine(ex.steps, ex.stepActions, steers, live = true, paused = paused)
-        // 跑的时候就能进运行过程(页面按秒接着长);结束后收进「做了 N 步 · 查看过程」那一行
+        // The run process can be opened while it is still running (the page keeps growing by the second); after finishing it is folded into the "did N steps · view process" row
         ex.recordedRun?.let { id ->
             Row(
                 Modifier.padding(top = 2.dp).clip(MikaShapes.Pill).clickable(role = Role.Button) { openRun(id) }
@@ -332,11 +341,11 @@ internal fun WorkBlock(ex: Exchange, steers: List<String>, reduceMotion: Boolean
     }
 }
 
-/** 回答/干活头部那行:「Claire · 0:42 · 1.2 万 Token」;[elapsed]/[tokens] 为 null 时略去对应段。 */
+/** The header row of an answer or running work: "Claire · 0:42 · 1.2 wan Token"; the corresponding segment is omitted when [elapsed]/[tokens] is null. */
 @Composable
 internal fun TurnMeta(elapsed: Long?, tokens: Long?) {
     val c = MikaTheme.colors
-    // 和下面的正文/进展拉开距离:正文行高会把第一行顶到行框上沿,不留空就会贴住这一行
+    // Put some distance from the body/progress below: the body line height pushes the first line to the top edge of its line box, so without a gap it would stick to this row
     Row(
         Modifier.padding(bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -372,7 +381,7 @@ private fun GoalChecklistRow(goals: GoalChecklist, runId: String?) {
     }
 }
 
-/** 从 [startedAt] 起的用时,每秒更新;不知道开始时刻(为 0)时为 null。 */
+/** Elapsed time since [startedAt], updated every second; null when the start time is unknown (0). */
 @Composable
 private fun rememberElapsed(startedAt: Long): Long? {
     if (startedAt <= 0L) return null
@@ -388,16 +397,17 @@ private fun rememberElapsed(startedAt: Long): Long? {
 private enum class Dot { Done, Current, Paused, Dim }
 
 /**
- * 竖线步骤。[live] 时最后一步按任务此刻的状态标蓝点或橙点;在跑时只列最近 [ChatCopy.VISIBLE_STEPS] 步,
- * 前面的收成一行,点开看全部。
+ * The vertical-rail step list. With [live], the last step is marked with a blue or orange dot according to the task's
+ * current state; while running only the latest [ChatCopy.VISIBLE_STEPS] steps are listed, with the earlier ones folded into
+ * one row that expands to show them all.
  */
 @Composable
 private fun StepLine(steps: List<StepRow>, actions: Map<Int, List<StepAction>>, steers: List<String>, live: Boolean, paused: Boolean) {
     val c = MikaTheme.colors
     var all by rememberSaveable { mutableStateOf(!live) }
-    // 哪几步点开了:按这一屏里的序号记,列表变长也不乱
+    // Which steps are expanded: recorded by index within this screen so it stays consistent as the list grows
     val expanded = remember { mutableStateMapOf<Int, Boolean>() }
-    // 步数多到值得收起来(超过这一屏列出的最近几步)时,才给「展开/收起」的开关
+    // Only offer the expand/collapse toggle when there are enough steps to be worth folding (more than the recent steps listed on this screen)
     val collapsible = steps.size > ChatCopy.VISIBLE_STEPS
     val hidden = if (all) 0 else (steps.size - ChatCopy.VISIBLE_STEPS).coerceAtLeast(0)
     Column(
@@ -406,7 +416,7 @@ private fun StepLine(steps: List<StepRow>, actions: Map<Int, List<StepAction>>, 
             drawLine(c.hair, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
         },
     ) {
-        // 顶部开关:折叠时「前面还有 N 步」,展开时「收起」,点一下来回切
+        // Top toggle: "N earlier steps" while collapsed, "Collapse" while expanded; tapping switches back and forth
         if (collapsible) {
             val label = if (all) stringResource(R.string.collapse) else ChatCopy.earlierSteps(hidden)
             StepItem(label, "", Dot.Dim, current = false, link = true, onClick = { all = !all })
@@ -415,7 +425,7 @@ private fun StepLine(steps: List<StepRow>, actions: Map<Int, List<StepAction>>, 
         visible.forEachIndexed { i, row ->
             val key = hidden + i
             val isLast = key == steps.lastIndex
-            // 用户插话:右侧一步,插在完成的步骤和当前步之间
+            // The user's steer: a step on the right, inserted between the finished steps and the current step
             if (isLast) steers.forEach { SteerStepPill(it) }
             val dot = when {
                 live && isLast && paused -> Dot.Paused
@@ -428,13 +438,13 @@ private fun StepLine(steps: List<StepRow>, actions: Map<Int, List<StepAction>>, 
             StepItem(
                 row.text, row.subtitle, dot, current = dot == Dot.Current || dot == Dot.Paused,
                 actions = detail, open = open,
-                // 有具体动作才点得开:点开看这一步实际做了什么、对什么、结果如何
+                // Only expandable when there are concrete actions: expand to see what this step actually did, on what, and with what result
                 onClick = if (detail.isEmpty()) null else ({ expanded[key] = !open }),
             )
         }
-        // 还没有任何步骤时(刚把插话交给任务)只显示插话这一步
+        // When there are no steps at all yet (a steer was just handed to the task), show only the steer step
         if (visible.isEmpty()) steers.forEach { SteerStepPill(it) }
-        // 底部「收起」:展开后步数一多,滑到最下面不用再爬回去也能收
+        // "Collapse" at the bottom: once expanded with many steps, it can be collapsed at the end without scrolling back up
         if (all && collapsible) {
             StepItem(stringResource(R.string.collapse), "", Dot.Dim, current = false, link = true, onClick = { all = false })
         }
@@ -471,7 +481,7 @@ private fun StepItem(
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             if (subtitle.isNotEmpty()) Text(subtitle, style = MikaType.Hint, color = c.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            // 点开:这一步实际做的几件事,一件一行「做了什么 · 对什么 · 结果」,说法和运行过程页一样
+            // Expanded: the few things this step actually did, one per line as "what · on what · result", worded the same as on the run progress page
             if (open) actions.forEach { a ->
                 Text(
                     ChatCopy.actionLine(a), Modifier.padding(top = 2.dp),
@@ -479,7 +489,7 @@ private fun StepItem(
                 )
             }
         }
-        // 能点开的只有有动作的那些:右边一个小箭头,点开时朝下
+        // Only the ones with actions can be expanded: a small arrow on the right, pointing down when expanded
         if (actions.isNotEmpty()) DirectionalIcon(
             MikaIcons.Chevron, null,
             Modifier.padding(start = 6.dp).size(12.dp).graphicsLayer { rotationZ = if (open) if (rtl) -90f else 90f else 0f },
@@ -488,7 +498,7 @@ private fun StepItem(
     }
 }
 
-/** 步骤点:6dp 实心;当前步外面一圈 3dp 的淡色光环。 */
+/** Step dot: 6dp filled; the current step has a 3dp pale ring around it. */
 @Composable
 private fun StepDot(dot: Dot) {
     val c = MikaTheme.colors
@@ -498,7 +508,7 @@ private fun StepDot(dot: Dot) {
         Dot.Current -> c.accent to c.accentSoft
         Dot.Paused -> c.warnSolid to c.warnSoft
     }
-    // 底色先盖住竖线,点才是干净的
+    // The background covers the rail first so the dot stays clean
     val bg = c.bg
     Box(
         Modifier.size(12.dp).drawBehind {
@@ -512,7 +522,7 @@ private fun StepDot(dot: Dot) {
     )
 }
 
-/** 转圈:淡色圆环,顶上一段实色。[spinning] 为假(关了动画、停下来等你)时停在原处。 */
+/** Spinner: a pale ring with one solid segment at the top. When [spinning] is false (animations off, stopped waiting for you) it stays put. */
 @Composable
 internal fun Spinner(modifier: Modifier, spinning: Boolean, track: Color, head: Color) {
     val turn = if (!spinning) 0f else rememberInfiniteTransition(label = "spin").animateFloat(
@@ -529,7 +539,7 @@ internal fun Spinner(modifier: Modifier, spinning: Boolean, track: Color, head: 
     )
 }
 
-/** 干活那行「活着」的信号:一颗呼吸的小点(淡→实、微微放大);停下来等你时变橙、静止。 */
+/** The "alive" signal on the working row: a breathing dot (pale to solid, slightly scaling up); it turns orange and still when stopped waiting for you. */
 @Composable
 private fun BreathingDot(paused: Boolean, reduceMotion: Boolean) {
     val c = MikaTheme.colors

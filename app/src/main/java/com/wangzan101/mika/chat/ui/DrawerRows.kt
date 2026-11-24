@@ -64,9 +64,11 @@ import com.wangzan101.mika.browser.ui.PageAskCopy
 import com.wangzan101.mika.ui.Route
 
 /**
- * 一条对话:点开它;长按(带一下振动)在原地弹出它的操作菜单(置顶、改名、删除)。换不了对话时(任务进行中、没开并行)点不开,长按照样能用。
- * 还没存进对话列表的(没有编号)没东西可改,不响应长按。置顶了的标题前有个小图钉。
- * 多选模式([selecting])下点一行是勾选/取消,左边出现勾选框;没存过的草稿不参与。
+ * A conversation: tap to open it; long-press (with a short vibration) pops up its action menu in place (pin, rename,
+ * delete). When conversations cannot be switched (a task is running and parallelism is off) it cannot be tapped open, but
+ * long-press still works. Ones not yet saved into the conversation list (no id) have nothing to change and do not respond
+ * to long-press. A pinned one shows a small pin before the title.
+ * In multi-select mode ([selecting]) tapping a row checks/unchecks it and a checkbox appears on the left; drafts never saved do not take part.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -74,39 +76,39 @@ internal fun ConversationEntry(
     item: DrawerConversation,
     onOpen: (DrawerConversation) -> Unit,
     onActions: (DrawerConversation, Rect) -> Unit,
-    /** 搜索结果里高亮的关键词;普通列表为空。 */
+    /** Keywords highlighted in search results; empty in the normal list. */
     terms: List<String> = emptyList(),
     selecting: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: (DrawerConversation) -> Unit = {},
-    /** 标题前显不显示归档小图标;归档视图里每一行都是归档的,不用再标。 */
+    /** Whether to show the small archived icon before the title; every row in the archive view is archived, so it does not need marking again. */
     showArchivedMark: Boolean = true,
-    /** 非项目分组列表(进行中/搜索/归档)里把所属项目用小文件夹标出来。 */
+    /** In lists that are not grouped by project (running/search/archived), mark the owning project with a small folder. */
     showProjectMark: Boolean = false,
 ) {
     val c = MikaTheme.colors
     val deletable = item.id != null
     val selectable = selecting && deletable
     val haptic = LocalHapticFeedback.current
-    // 这一行在窗口里的位置和大小(不裁掉滚出列表的部分),菜单照它摆出抬起的那一行;只在回调里读,不引起重组
+    // This row's position and size within the window (not clipped to the part scrolled out of the list); the menu places the lifted row from it, and it is only read in the callback, so it does not cause recomposition
     val bounds = remember { mutableStateOf(Rect.Zero) }
     val row: @Composable () -> Unit = {
         Column(
             Modifier.padding(horizontal = 12.dp).fillMaxWidth()
                 .onGloballyPositioned { bounds.value = Rect(it.positionInWindow(), it.size.toSize()) }
-                // 侧滑时前景必须遮住归档底层，不能让按钮透过标题和时间。
+                // When swiping sideways, the foreground must cover the archive layer underneath, so the buttons cannot show through the title and time.
                 .background(c.bg, NavShape)
                 .then(if (item.current) Modifier.cardSurface(c, NavShape) else Modifier)
                 .clip(NavShape)
                 .then(
                     when {
                         selectable -> Modifier.toggleable(value = selected, role = Role.Checkbox, onValueChange = { onToggleSelect(item) })
-                        // 多选模式里没存过的草稿不响应,免得点一下退出侧栏
+                        // In multi-select mode, drafts never saved do not respond, so a tap does not dismiss the drawer
                         selecting -> Modifier
                         deletable -> Modifier.combinedClickable(
                             onClickLabel = null,
                             onLongClickLabel = stringResource(R.string.drawer_actions),
-                            // 和系统里长按一样振一下
+                            // Vibrate once, like a system long-press does
                             onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onActions(item, bounds.value) },
                             onClick = { if (item.enabled) onOpen(item) },
                         )
@@ -126,7 +128,7 @@ internal fun ConversationEntry(
     row()
 }
 
-/** 多选模式下每行左边的勾选框:没选是空心圆,选了是实心圆加一个白勾。 */
+/** The checkbox on the left of each row in multi-select mode: an empty circle when unselected, a filled circle with a white check when selected. */
 @Composable
 private fun SelectMark(selected: Boolean) {
     val c = MikaTheme.colors
@@ -141,7 +143,7 @@ private fun SelectMark(selected: Boolean) {
     }
 }
 
-/** 一条对话里面的东西:进行中的小圆点、图钉、标题、时间,有副标题时下面一行。侧栏里那一行和长按抬起的那一张都用它。 */
+/** The contents of a conversation row: the running dot, pin, title and time, plus a second line when there is a subtitle. Used by both the drawer row and the card lifted by a long-press. */
 @Composable
 internal fun ConversationRowContent(
     item: DrawerConversation,
@@ -196,7 +198,7 @@ internal fun ConversationRowContent(
     }
 }
 
-/** 给对话改名:输入框里是现在的标题(整段选中,直接打字就替换);空的存不了,两头空白去掉。 */
+/** Rename a conversation: the field holds the current title (fully selected, so typing replaces it); an empty one cannot be saved, and leading/trailing whitespace is trimmed. */
 @Composable
 internal fun RenameConversationDialog(title: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var value by remember(title) { mutableStateOf(TextFieldValue(title, TextRange(0, title.length))) }
@@ -226,8 +228,9 @@ internal fun RenameConversationDialog(title: String, onSave: (String) -> Unit, o
 }
 
 /**
- * 删对话前的确认:写明删的是哪个对话;有任务在跑会停掉,绑着定时任务则写明计划会保留。
- * 和别处删东西的确认一样:右边红字「删除」,左边「取消」。
+ * Confirmation before deleting a conversation: states which conversation is being deleted; a running task will be
+ * stopped, and if schedules are attached it states that the schedule will be kept.
+ * Like other delete confirmations: "Delete" in red on the right, "Cancel" on the left.
  */
 @Composable
 internal fun DeleteConversationDialog(title: String, impact: DeleteImpact, onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -250,8 +253,9 @@ internal fun DeleteConversationDialog(title: String, impact: DeleteImpact, onCon
 }
 
 /**
- * 批量删对话前的确认:写明将删除几个对话;其中有任务在跑的会停掉,绑着定时任务的写明计划会保留。
- * 和单条删除的确认一样:右边红字「删除」,左边「取消」。
+ * Confirmation before deleting conversations in bulk: states how many will be deleted; any running tasks among them will
+ * be stopped, and if schedules are attached it states that the schedule will be kept.
+ * Same as the single-delete confirmation: "Delete" in red on the right, "Cancel" on the left.
  */
 @Composable
 internal fun DeleteManyConversationsDialog(

@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.update
 import com.wangzan101.mika.chat.ui.ChatReduce.fromTurn
 import com.wangzan101.mika.files.ui.LibraryFileHandle
 
-/** 共用状态:屏上这个对话的界面状态、各对话草稿、在跟的任务、删除中的对话,以及各块都要用的草稿与对话小工具。 */
+/** Shared state: the UI state of the conversation on screen, per-conversation drafts, the task being followed, conversations being deleted, plus the draft and conversation helpers every part needs. */
 internal class ChatSession(private val vm: ChatViewModel) {
     private val store = vm.store
     private val parallelFlag = vm.parallelFlag
@@ -28,11 +28,11 @@ internal class ChatSession(private val vm: ChatViewModel) {
     private val projectStore = vm.projectStore
     private val workspaceResolver = vm.workspaceResolver
 
-    /** 已经自动朗读过的那条回答;同一条不重复读。 */
+    /** The answer already read aloud automatically; the same one is not read again. */
     var autoReadKey: String? = null
     val _ui = MutableStateFlow(ChatUi())
 
-    /** 从搜索或文件库过来的一次性跳转;聊天页滚到目标后清掉。 */
+    /** One-shot jump coming from search or the file library; cleared once the chat page has scrolled to the target. */
     val _jump = MutableStateFlow<ChatJump?>(null)
     var jumpSerial = 0L
     val drafts = MutableStateFlow<Map<String, ComposerDraft>>(emptyMap())
@@ -42,7 +42,7 @@ internal class ChatSession(private val vm: ChatViewModel) {
     val libraryImports = mutableMapOf<String, Int>()
     val deviceImports = mutableMapOf<String, kotlinx.coroutines.Job>()
 
-    /** 只回收本进程登记的副本；导入中或任何草稿引用中的 URI 继续保留。 */
+    /** Reclaims only copies registered by this process; URIs that are importing or referenced by any draft are kept. */
     fun releaseUnusedLibraryCopies() {
         val referenced = _ui.value.attachments.map { it.uri }.toSet() +
             drafts.value.values.flatMap { it.attachments.map(PendingAttachment::uri) } + libraryImports.keys
@@ -53,7 +53,7 @@ internal class ChatSession(private val vm: ChatViewModel) {
         }
     }
 
-    /** 每次有分享放进当前会话就加一;异步操作靠它分辨草稿是被新分享换掉了,还是用户只改了文字。 */
+    /** Incremented each time a share is placed into the current conversation; async operations use it to tell whether the draft was replaced by a new share or the user only edited the text. */
     var sharedDraftSerial = 0L
     var pendingSharedFailures: List<AttachmentFailure> = emptyList()
     var pendingSharedOverLimit: Int = 0
@@ -96,18 +96,18 @@ internal class ChatSession(private val vm: ChatViewModel) {
         }
     }
 
-    /** 删掉了(或正在删)的对话:侧栏当场不再列出,不等删完。 */
+    /** Conversations that were deleted (or are being deleted): the drawer stops listing them immediately instead of waiting for the delete to finish. */
     val _deleted = MutableStateFlow<Set<String>>(emptySet())
 
-    /** 还没删完的。 */
+    /** Those whose deletion has not finished yet. */
     val deleting = mutableSetOf<String>()
 
-    /** 最近一次分支复制工作区的结果(超过上限、目标已有 inbox 等);界面提示完调 [clearBranchCopy]。 */
+    /** Result of the most recent branch workspace copy (over the limit, target already has an inbox, etc.); call [clearBranchCopy] once the UI has shown the hint. */
     val _branchCopy = MutableStateFlow<BranchCopyResult?>(null)
     val parked = mutableMapOf<String, Parked>()
     val parkedJobs = mutableMapOf<String, Job>()
 
-    /** 开关在没有任务时重读,开始任务、换对话时也重读([refreshParallel]):这里在跟的任务中途改开关不改这一轮的行为。 */
+    /** The switch is re-read when there is no task, and also when a task starts or the conversation changes ([refreshParallel]): toggling it mid-task here does not change this turn's behavior. */
     var parallelOn = parallelFlag()
 
     fun parallel(): Boolean {
@@ -116,24 +116,26 @@ internal class ChatSession(private val vm: ChatViewModel) {
     }
 
     /**
-     * 开始任务、换对话时重读开关(这个界面没在跟任务时):设置里刚改的开关不用重建界面就生效,
-     * 和服务每次开始任务时重读一致。别的对话的任务照旧跑,它们在服务里按各自开始时的开关。
+     * Re-reads the switch when a task starts or the conversation changes (as long as this screen is not following a
+     * task): a switch just changed in settings takes effect without recreating the screen, matching the service, which
+     * re-reads it every time a task starts. Tasks in other conversations keep running as before, following in the service
+     * the switch each of them had when it started.
      */
     fun refreshParallel() {
         if (liveIndex < 0) parallelOn = parallelFlag()
     }
 
-    /** 正在跟踪的任务在 exchanges 里的位置;-1 表示没有。 */
+    /** Position of the task being followed within exchanges; -1 means none. */
     var liveIndex = -1
     var lingerJob: Job? = null
 
-    /** 排在服务收尾后面、还没交给服务的开始;在这期间点停止就直接作废它。 */
+    /** A start queued behind the service's cleanup that has not been handed to the service yet; tapping stop during this window discards it outright. */
     var pendingStart: Job? = null
 
-    /** 正在跟踪的任务开过屏;一旦开过,到任务结束(含完成后停留的那几秒)都显示画中画。 */
+    /** The task being followed opened the screen; once it has, picture-in-picture is shown until the task ends (including the few seconds it lingers after finishing). */
     var screenSeen = false
 
-    /** 用户把正在跟踪的这个任务的小画面关掉了(换任务时清掉,见 [PipUi.closed])。 */
+    /** The user closed the small window of the task being followed (cleared when switching tasks, see [PipUi.closed]). */
     var pipClosed = false
 
     fun attachmentUri(attachment: SharedDraftAttachment): String? =
@@ -143,14 +145,14 @@ internal class ChatSession(private val vm: ChatViewModel) {
         attachmentUri(attachment)?.let { PendingAttachment(it, attachment.name, attachment.size, attachment.photo) }
     }
 
-    /** 停止的那一轮:交代还在写时标上「正在整理」;写好了、写不成就去掉。 */
+    /** A turn that was stopped: marked "organizing" while the summary is still being written; cleared once it is written or has failed. */
     fun withSummarizing(ex: Exchange, set: Set<String> = summarizing.value): Exchange {
         val st = ex.status as? ExchangeStatus.Cancelled ?: return ex
         val on = st.summary == null && ex.runId != null && ex.runId in set
         return if (st.summarizing == on) ex else ex.copy(status = st.copy(summarizing = on))
     }
 
-    /** 服务对外的那几项(接管进度、有没有屏、导出的文件)此刻是不是屏上这个对话的任务的:并行时看显示中的是谁。 */
+    /** Whether the items the service exposes (takeover progress, whether there is a screen, exported files) currently belong to the task of the conversation on screen: in parallel mode this checks which one is being shown. */
     fun ownTask() = !parallel() || shownTask.value?.first == _ui.value.conversationId
 
     fun withNotes(ex: Exchange, notes: Map<String, RunNotes>): Exchange {
@@ -162,8 +164,10 @@ internal class ChatSession(private val vm: ChatViewModel) {
         (ui.composer == ComposerMode.Idle || ui.followUpMode == FollowUpMode.Queue)
 
     /**
-     * 小画面什么时候给:屏得开过(其余字段照算,开屏那一刻直接用)。用户关掉了这个任务的小画面时只留小按钮,
-     * 也不再自动展开(接管开始时同样不弹开,要你处理的事在对话卡片里,小按钮变橙色)。
+     * When the small window is shown: the screen must have been opened (the other fields are still computed and are
+     * used directly at the moment the screen opens). When the user has closed this task's small window, only the small
+     * button remains and the window no longer expands automatically (it also does not pop open when a takeover starts;
+     * whatever needs your attention is in the chat card, and the small button turns orange).
      */
     fun gated(p: PipUi) = when {
         !screenSeen -> p.copy(visible = false, expanded = false, closed = false)
@@ -171,33 +175,36 @@ internal class ChatSession(private val vm: ChatViewModel) {
         else -> p.copy(closed = false)
     }
 
-    /** 原话的任务还没交给服务时插的话。 */
+    /** Steers added while the task with the original wording has not been handed to the service yet. */
     val held = mutableListOf<SteerNote>()
 
-    /** 这个对话存下的轮次,连同各轮导出的文件和此刻的记忆与技能提示。 */
+    /** Turns saved for this conversation, together with each turn's exported files and the current memory and skill notes. */
     fun saved(conversationId: String): List<Exchange> =
         runCatching { store.records(conversationId) }.getOrDefault(emptyList()).map { (t, files) -> withSummarizing(withNotes(fromTurn(t).copy(files = files), runNotes.value)) }
 
-    /** 这个对话存下的项目 id;项目不存在时回落为 null。 */
+    /** Project id saved for this conversation; falls back to null when the project does not exist. */
     fun projectFor(conversationId: String?): String? =
         conversationId?.let { store.projectId(it) }?.takeIf { projectStore == null || projectStore.get(it) != null }
 
     /**
-     * 告诉悬浮胶囊用户此刻在哪个对话([CurrentChat]):胶囊的空闲卡片接着它,而不是按对话文件最后被谁写过猜一个。
-     * 写不进去不影响界面。
+     * Tells the floating pill which conversation the user is in right now ([CurrentChat]): the pill's idle card continues
+     * from that instead of guessing from whoever last wrote to the conversation files.
+     * Failing to write does not affect the UI.
      */
     fun markCurrent(current: CurrentChat) {
         runCatching { store.setCurrent(current) }
     }
 
-    /** 一次批量删除的进度和结果;侧栏在底部显示,提示完调 [clearDeleteBatch]。 */
+    /** Progress and result of one batch delete; the drawer shows it at the bottom, and [clearDeleteBatch] is called once the hint is shown. */
     val _deleteBatch = MutableStateFlow<DeleteBatch?>(null)
 
     fun busy() = _ui.value.composer != ComposerMode.Idle
 }
 
 /**
- * 并行时切走的、任务还在跑的对话:那一问一答(原话、标准、步骤、文件)和开没开过屏都留着,
- * 后台按它自己任务的状态接着更新步骤,切回来原样接上。任务结束时丢掉(那一轮由服务存进对话)。
+ * A conversation switched away from in parallel mode while its task is still running: its question-answer (original
+ * wording, criteria, steps, files) and whether the screen was opened are all kept, steps keep updating in the background
+ * from that task's own state, and switching back reconnects it as-is. Dropped when the task ends (the service saves that
+ * turn into the conversation).
  */
 internal class Parked(val exchange: Exchange, val screenSeen: Boolean, val pipClosed: Boolean = false)

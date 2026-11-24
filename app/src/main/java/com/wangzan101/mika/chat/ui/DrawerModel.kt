@@ -19,7 +19,7 @@ import java.time.format.TextStyle as DateTextStyle
 import java.time.temporal.TemporalAdjusters
 import com.wangzan101.mika.i18n.uiLocale
 
-/** 侧栏里的一条对话。[id] 为 null 是还没存进对话列表的当前对话。 */
+/** A conversation in the drawer. An [id] of null means the current conversation, which is not saved into the conversation list yet. */
 data class DrawerConversation(
     val id: String?,
     val title: String,
@@ -27,44 +27,44 @@ data class DrawerConversation(
     val running: Boolean,
     val current: Boolean,
     val enabled: Boolean,
-    /** 最后改动的时间(写在标题右边);还没存进对话列表的为空。 */
+    /** Time of the last change (shown to the right of the title); empty when not saved into the conversation list yet. */
     val time: String = "",
-    /** 置顶了:标题前一个小图钉,长按菜单里是「取消置顶」。 */
+    /** Pinned: a small pin before the title, and the long-press menu offers "Unpin". */
     val pinned: Boolean = false,
-    /** 在浏览器页上对着一页开始的对话:那个网站(主机名),标题后面一个「网页」小标签;不是为 null。 */
+    /** Conversation started against a page in the browser: that site (host name), with a small "web page" tag after the title; null otherwise. */
     val site: String? = null,
-    /** 从另一个对话分支出来的:标题前一个小分支图标。 */
+    /** Branched from another conversation: a small branch icon before the title. */
     val branch: Boolean = false,
-    /** 归档了:标题前一个小盒子图标,长按菜单里是「取消归档」。 */
+    /** Archived: a small box icon before the title, and the long-press menu offers "Unarchive". */
     val archived: Boolean = false,
-    /** 已经存进对话列表(有对话文件);还没说过话的草稿为 false,不能归档。 */
+    /** Already saved into the conversation list (has a conversation file); false for a draft that has never been spoken to, which cannot be archived. */
     val saved: Boolean = true,
-    /** 归档的时间;归档视图里按它分组、算「归档于几天前」。 */
+    /** Archive time; the archive view groups by it and computes "archived N days ago". */
     val archivedAt: Long? = null,
-    /** 搜索结果命中了正文:打开对话后跳到这条消息;只有标题命中时为 null。 */
+    /** The search hit matched the body text: jump to this message after opening the conversation; null when only the title matched. */
     val target: ChatTarget? = null,
-    /** 所属项目分组 id;未归属项目时为 null。 */
+    /** Id of the owning project group; null when not assigned to a project. */
     val projectId: String? = null,
-    /** 所属项目分组名称(用于在已归档、搜索和进行中列表里直接标明归属)。 */
+    /** Name of the owning project group (used to label the owner directly in the archived, search and running lists). */
     val projectName: String? = null,
 )
 
-/** 一次批量归档的结果:归档了几个、几个因为在跑任务或是当前对话没动。 */
+/** Result of one batch archive: how many were archived and how many were skipped because they are running a task or are the current conversation. */
 data class ArchiveBatch(val archived: Int, val skipped: Int)
 
-/** 刚归档的那一条:底部给几秒钟的「撤销」。 */
+/** The item just archived: offers "Undo" at the bottom for a few seconds. */
 data class ArchiveUndo(val id: String, val title: String)
 
-/** 归档视图里的时间段:本周归档的、本月早些时候的、更早的。 */
+/** Time periods in the archive view: archived this week, earlier this month, earlier. */
 enum class ArchivePeriod { ThisWeek, ThisMonth, Earlier }
 
-/** 归档视图里的一组。[rows] 保持传进来的顺序(按归档时间倒序)。 */
+/** A group in the archive view. [rows] keeps the incoming order (newest archive time first). */
 data class ArchiveGroup(val period: ArchivePeriod, val rows: List<DrawerConversation>)
 
-/** 侧栏里的一个项目分组及其成员对话。 */
+/** A project group in the drawer along with its member conversations. */
 data class DrawerProjectGroup(val project: Project, val rows: List<DrawerConversation>)
 
-/** 侧栏里的对话分段:进行中、项目分组、置顶、最近。 */
+/** Conversation sections in the drawer: running, project groups, pinned, recent. */
 data class DrawerSections(
     val running: List<DrawerConversation>,
     val recent: List<DrawerConversation>,
@@ -72,7 +72,7 @@ data class DrawerSections(
     val projects: List<DrawerProjectGroup> = emptyList(),
 )
 
-/** 多选能勾的对话:普通侧栏是此刻列出来的;归档视图里是收起来的那些。没有编号的行勾不了。 */
+/** Conversations selectable in multi-select: in the normal drawer the ones listed right now; in the archive view the archived ones. Rows without an id cannot be selected. */
 fun drawerSelectableIds(
     sections: DrawerSections,
     archived: List<DrawerConversation>,
@@ -81,7 +81,7 @@ fun drawerSelectableIds(
     if (archivedView) archived.mapNotNull { it.id }.toSet()
     else (sections.running + sections.pinned + sections.recent + sections.projects.flatMap { it.rows }).mapNotNull { it.id }.toSet()
 
-/** 搜索候选:删掉的当场不搜;再按归档状态筛,全部时归档的也搜(结果行带归档标记)。 */
+/** Search candidates: deleted ones are not searched at all; then filter by archive state, where "All" also searches archived ones (their result rows carry the archived marker). */
 internal fun drawerSearchCandidates(
     all: List<ConversationSummary>,
     deleted: Set<String>,
@@ -99,7 +99,7 @@ internal fun drawerSearchCandidates(
         .map { it.copy(title = ChatCopy.plainTitle(it.title)) }
         .toList()
 
-/** 搜索拿到的原始命中;显示前再按此刻的置顶、运行、时间换成侧栏里的行。 */
+/** Raw hits returned by the search; converted into drawer rows using the current pinned, running and time state before display. */
 internal data class SearchOutcome(
     val query: String,
     val hits: List<ConversationHit>,
@@ -107,14 +107,17 @@ internal data class SearchOutcome(
     val truncated: Boolean = false,
 )
 
-/** 当前对话在侧栏里的样子:有没有任务在跑、标题、副标题(在做什么)。 */
+/** How the current conversation looks in the drawer: whether a task is running, the title, and the subtitle (what it is doing). */
 data class CurrentConversation(val id: String?, val running: Boolean, val title: String, val subtitle: String)
 
 /**
- * 侧栏的三段:「进行中」是当前对话(有任务时)和别的有任务在跑的对话;「置顶」是其余置顶了的对话,最近置顶的在前;
- * 「最近」是剩下的对话,最近改过的在前。每个对话只出现在一段里:置顶的对话有任务在跑时列在进行中(带图钉),跑完回到置顶。
- * 归档的对话不进置顶和最近,但仍然在跑任务时列在进行中;当前正在看的那个即使归档了也留着,方便知道自己在哪。
- * [canSwitch] 为假(任务进行中、没开并行)时只有当前对话可点。
+ * The drawer's three sections: "Running" holds the current conversation (when it has a task) plus other conversations
+ * with tasks running; "Pinned" holds the remaining pinned conversations, most recently pinned first; "Recent" holds the
+ * rest, most recently modified first. Each conversation appears in only one section: a pinned conversation whose task is
+ * running is listed under Running (with its pin) and returns to Pinned when it finishes. Archived conversations stay out
+ * of Pinned and Recent but are still listed under Running while their task runs; the one currently being viewed is kept
+ * even if archived, so you can tell where you are. When [canSwitch] is false (a task is running and parallelism is off),
+ * only the current conversation is tappable.
  */
 fun drawerSections(
     all: List<ConversationSummary>,
@@ -147,7 +150,7 @@ fun drawerSections(
     val runningIds = running.mapNotNull { it.id }.toSet()
     fun entry(s: ConversationSummary): DrawerConversation =
         drawerEntry(s, current.id, canSwitch, running = s.id in runningIds, time = timeOf(s.id), projectName = s.projectId?.let(projectNames::get))
-    // 归档的对话不在主列表里;当前正在看的那个例外,不然打开归档对话后不知道自己在哪
+    // Archived conversations are not in the main list; the one currently being viewed is the exception, otherwise you would not know where you are after opening an archived conversation
     val rest = all.filter { it.id !in runningIds && (it.archivedAt == null || it.id == current.id) }
     val grouped = rest.filter { it.projectId != null && it.projectId in projectNames }.groupBy { it.projectId!! }
     val projectGroups = projects.map { project ->
@@ -162,7 +165,7 @@ fun drawerSections(
     return DrawerSections(running, recent, pinnedRows, projectGroups)
 }
 
-/** 一条对话在侧栏里的样子:侧栏列表和搜索结果共用，免得两处规则走岔。 */
+/** How a conversation looks in the drawer: shared by the drawer list and the search results so the rules in the two places cannot diverge. */
 internal fun drawerEntry(
     s: ConversationSummary,
     currentId: String?,
@@ -182,7 +185,7 @@ internal fun drawerEntry(
     )
 }
 
-/** 对话的时间:今天写时刻,昨天写「昨天」,一周内写星期几,今年写几月几日,更早带年份。 */
+/** Conversation time: the time of day for today, "Yesterday" for yesterday, the weekday within a week, month and day this year, and earlier ones include the year. */
 fun conversationTime(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): String {
     val t = Instant.ofEpochMilli(at).atZone(zone)
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -197,7 +200,7 @@ fun conversationTime(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault())
     }
 }
 
-/** 归档的时间落在哪一段:本周(周一起算)、本月早些时候、更早。 */
+/** Which period an archive time falls into: this week (starting Monday), earlier this month, or earlier. */
 fun archivePeriod(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): ArchivePeriod {
     val day = Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -209,7 +212,7 @@ fun archivePeriod(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): A
     }
 }
 
-/** 归档视图按时间段分组;没记归档时间的归到「更早」,不会漏掉。空组不出现。 */
+/** The archive view grouped by period; anything without a recorded archive time falls under "Earlier", so nothing is lost. Empty groups do not appear. */
 fun archiveGroups(
     rows: List<DrawerConversation>,
     now: Long,
@@ -222,7 +225,7 @@ fun archiveGroups(
         if (group.isEmpty()) null else ArchiveGroup(period, group)
     }
 
-/** 分组标题:本周 / 本月 / 更早。 */
+/** Group heading: This week / This month / Earlier. */
 fun archivePeriodLabel(period: ArchivePeriod): String = tr(
     when (period) {
         ArchivePeriod.ThisWeek -> R.string.drawer_archive_this_week
@@ -231,7 +234,7 @@ fun archivePeriodLabel(period: ArchivePeriod): String = tr(
     }
 )
 
-/** 「归档于 3 天前」;当天归档的说「今天归档」。 */
+/** "Archived 3 days ago"; items archived today show "Archived today". */
 fun archivedAgo(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): String {
     val day = Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
     val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -240,7 +243,7 @@ fun archivedAgo(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): Str
     else trPlural(R.plurals.drawer_archived_days_ago, days, days)
 }
 
-/** 侧栏顶上 Claire 名字下面那行状态,和它是不是好的(绿点)还是要处理(橙点)。 */
+/** The status line under Claire's name at the top of the drawer, and whether it is fine (green dot) or needs attention (orange dot). */
 fun readiness(check: Prerequisites.Check): Pair<String, Boolean> = when {
     !check.canStartTask -> tr(R.string.chat_cannot_start) to false
     !check.phoneReady -> tr(R.string.drawer_phone_not_ready) to false

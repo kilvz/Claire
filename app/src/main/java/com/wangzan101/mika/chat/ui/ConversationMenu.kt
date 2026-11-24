@@ -56,13 +56,15 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** 长按菜单摆在哪:抬起的那一行的顶边(可能为了放下菜单挪过)、菜单的顶边、菜单是不是在那一行上面。 */
+/** Where the long-press menu is placed: the top edge of the lifted row (possibly moved so the menu fits), the top edge of the menu, and whether the menu sits above that row. */
 internal data class MenuPlacement(val rowTop: Float, val menuTop: Float, val above: Boolean)
 
 /**
- * 长按菜单的位置。[top]、[bottom] 是能放东西的上下边(去掉状态栏、导航栏、键盘)。
- * 那一行先挪进这个范围;下面放得下菜单就放下面,不然上面放得下就放上面;两边都放不下(键盘占了大半屏)时把那一行往上挪,
- * 菜单接在它下面,还不够就让那一行顶到最上面。
+ * Placement of the long-press menu. [top] and [bottom] are the top and bottom edges things can be placed within
+ * (status bar, navigation bar and keyboard excluded).
+ * The row is first moved into that range; if the menu fits below it, it goes below, otherwise above if it fits there;
+ * when neither fits (the keyboard takes up most of the screen), the row is moved up and the menu follows right under it,
+ * and if that still is not enough the row is pushed to the very top.
  */
 internal fun placeMenu(rowTop: Float, rowHeight: Float, menuHeight: Float, gap: Float, top: Float, bottom: Float): MenuPlacement {
     val row = rowTop.coerceIn(top, max(top, bottom - rowHeight))
@@ -73,9 +75,10 @@ internal fun placeMenu(rowTop: Float, rowHeight: Float, menuHeight: Float, gap: 
 }
 
 /**
- * 侧栏里长按一条对话后的菜单(见 [LongPressMenu]):那一行抬起成一张白卡,菜单里是置顶 / 取消置顶、
- * 归档 / 取消归档、改名、红字删除。归档了的对话不在主列表里,没有置顶可谈;还没存过的草稿和正在跑任务的不能归档。
- * [bounds] 是那一行在窗口里的位置和大小。
+ * Menu shown after long-pressing a conversation in the drawer (see [LongPressMenu]): that row lifts into a white card,
+ * and the menu holds pin / unpin, archive / unarchive, rename, and delete in red. An archived conversation is not in the
+ * main list, so pinning does not apply to it; drafts never saved and conversations running a task cannot be archived.
+ * [bounds] is the row's position and size within the window.
  */
 @Composable
 internal fun ConversationMenu(
@@ -112,7 +115,7 @@ internal fun ConversationMenu(
     ) { LiftedRow(item) }
 }
 
-/** 长按侧栏项目分组头后的菜单:在项目里新对话、重命名、打开终端、删除项目。 */
+/** Menu shown after long-pressing a project group header in the drawer: new chat in the project, rename, open terminal, delete project. */
 @Composable
 internal fun ProjectMenu(
     project: Project,
@@ -150,15 +153,20 @@ internal fun ProjectMenu(
     }
 }
 
-/** 长按菜单里的一项:文字、右边的图标、测试标签、颜色(为 null 是正文色)。 */
+/** One entry in the long-press menu: text, icon on the right, test tag, and color (null means the body text color). */
 internal class MenuEntry(val text: String, val icon: ImageVector, val tag: String, val color: Color? = null, val onClick: () -> Unit)
 
 /**
- * 长按某样东西后原地弹出的菜单(侧栏里的对话、对话页里的消息共用):后面整屏变暗(安卓 12 起还模糊,由外面给后面的内容加,见 [MenuBlur]),
- * 那样东西原地「抬起」([lifted],自己画成白卡之类,略微放大),下面(放不下就上面)一张窄一点的白卡列出 [entries],文字在左、图标在右。
- * 点外面、按返回都收起。[progress] 是出现的进度(0 到 1),外面按关没关动画决定是动着过去还是直接到位;
- * 只在绘制、摆放时读,动画时不重组。[bounds] 是那样东西在窗口里的位置和大小:抬起的那张和它一样宽,高按自己的内容,
- * 最高半屏(很长的回答只抬起开头那一截,由 [lifted] 自己裁掉)。[alignEnd] 时菜单和它的右边对齐(用户自己的话靠右)。
+ * Menu that pops up in place after long-pressing something (shared by drawer conversations and chat page messages): the
+ * whole screen behind dims (and blurs from Android 12 on, applied to the content behind by the caller, see [MenuBlur]),
+ * that thing "lifts" in place ([lifted], drawn by itself as a white card or similar, slightly scaled up), and a narrower
+ * white card below it (above it when it does not fit) lists [entries], text on the left and icon on the right.
+ * Tapping outside or pressing back dismisses it. [progress] is the appearance progress (0 to 1); the caller decides from
+ * whether the closing animation is running whether to animate there or snap straight into place.
+ * It is only read while drawing and placing, so it does not recompose during the animation. [bounds] is that thing's
+ * position and size within the window: the lifted card is as wide as it, with its height from its own content, at most
+ * half the screen (a very long answer only lifts its opening section, which [lifted] crops itself). With [alignEnd] the
+ * menu aligns to its right edge (the user's own words sit on the right).
  */
 @Composable
 internal fun LongPressMenu(
@@ -175,7 +183,7 @@ internal fun LongPressMenu(
     val insets = WindowInsets.safeDrawing
     val view = LocalView.current
     val close = stringResource(R.string.collapse)
-    // 能模糊时后面已经糊了,暗一点就够;不能模糊时只靠变暗把后面压下去
+    // When blur is available the background is already blurred, so a light dim is enough; without blur, dimming alone has to push the background back
     val dim = c.floatShadow.copy(alpha = if (GlassBlurSupported) 0.16f else 0.32f)
     BackHandler(onBack = onDismiss)
     Layout(
@@ -205,7 +213,7 @@ internal fun LongPressMenu(
         val menuW = min(MenuWidth.roundToPx(), w).coerceAtLeast(0)
         val menu = measurables[1].measure(Constraints(minWidth = menuW, maxWidth = menuW, maxHeight = h))
         layout(w, h) {
-            // 那一行的位置是窗口坐标;这一层不一定从窗口左上角开始(没有铺到系统栏底下时)
+            // The row position is in window coordinates; this layer does not necessarily start at the window's top-left corner (when it does not extend under the system bars)
             val origin = coordinates?.positionInWindow() ?: Offset.Zero
             val top = max(0f, insets.getTop(this@Layout) - origin.y)
             val bottom = min(h.toFloat(), view.rootView.height - insets.getBottom(this@Layout) - origin.y)
@@ -227,7 +235,7 @@ internal fun LongPressMenu(
     }
 }
 
-/** 抬起的那一行:和侧栏里那一行一样的内容,换成白底圆角、带阴影。 */
+/** The lifted row: the same content as the row in the drawer, but on a rounded white background with a shadow. */
 @Composable
 private fun LiftedRow(item: DrawerConversation) {
     val c = MikaTheme.colors
@@ -272,7 +280,7 @@ private fun MenuDivider(color: Color) {
     Box(Modifier.fillMaxWidth().height(0.5.dp).background(color))
 }
 
-/** 菜单出现时后面那层内容模糊到多少(安卓 12 起)。 */
+/** How much the content behind is blurred while the menu appears (from Android 12 on). */
 internal val MenuBlur = 14.dp
 private val MenuWidth = 220.dp
 private val MenuGap = 8.dp

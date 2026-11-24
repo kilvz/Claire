@@ -21,9 +21,9 @@ import java.text.NumberFormat
 import java.util.Currency
 import com.wangzan101.mika.settings.ui.UsageCopy
 
-/** 对话页上的 token 用量:每轮结束那一行显示这一轮的用量。 */
+/** Token usage on the chat page: the row at the end of each turn shows that turn's usage. */
 object ChatTokensCopy {
-    /** 「1.2 万 Token」,写法和 Token 用量页同一个。 */
+    /** An amount such as "1.2 wan Token", worded exactly as on the Token usage page. */
     fun amount(n: Long): String = "${UsageCopy.tokens(n)} ${UsageCopy.UNIT}"
 
     fun cost(estimate: DeepSeekCost): String {
@@ -44,9 +44,10 @@ object ChatTokensCopy {
 }
 
 /**
- * 读这些轮的运行小结(运行记录关上时由写线程记,一轮刚结束时可能还没写好:没读全就隔一会儿再读缺的那几轮)。
- * 按运行编号取,不把整份小结都解析一遍;读盘在 IO 线程。
- * 换了轮次时先留着上次读到的,读完再换,每轮结束那一行不闪。
+ * Reads the run summaries for these turns (the writer thread records them when run recording is off; right after a turn
+ * ends they may not be written yet, so when the read is incomplete the missing turns are re-read after a short wait).
+ * Fetched by run id instead of parsing the whole summary file; disk reads happen on the IO thread.
+ * When the turns change, the values from the previous read are kept until the new read finishes, so the end-of-turn row does not flicker.
  */
 @Composable
 fun rememberRunMetrics(runIds: List<String>): Map<String, RunMetrics> {
@@ -59,7 +60,7 @@ fun rememberRunMetrics(runIds: List<String>): Map<String, RunMetrics> {
             found = emptyMap()
             return@LaunchedEffect
         }
-        // 上次读到的里面还要的先留着,只去读缺的
+        // Keep the entries from the previous read that are still wanted; only fetch the missing ones
         var read = found.filterKeys { it in wanted }
         for (wait in RETRY_MS) {
             val missing = wanted - read.keys
@@ -74,5 +75,5 @@ fun rememberRunMetrics(runIds: List<String>): Map<String, RunMetrics> {
     return found
 }
 
-/** 没读全时再读的间隔;读完这几次还缺的(旧到被清掉了)就按缺着算。 */
+/** Retry intervals when the read is incomplete; anything still missing after these attempts (too old and already pruned) is treated as missing. */
 private val RETRY_MS = listOf(300L, 1_000L, 2_000L, 4_000L, 0L)

@@ -12,28 +12,28 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.WordmarkWeight
 
-/** 跳转目标行高亮停留多久(毫秒)。 */
+/** How long the jump target row stays highlighted (milliseconds). */
 internal const val JUMP_HIGHLIGHT_MS = 1_800L
 
-/** 竖线的位置(从左边算起);步骤点、转圈的中心都在这条线上。 */
+/** Position of the vertical rail (measured from the left); the step dots and the spinner center all sit on this line. */
 internal val StepRail = 8.dp
 
-/** 输入栏外壳的左右留白;空态的推荐卡片也按它和输入框左右对齐。 */
+/** Horizontal inset of the composer shell; the empty-state suggestion cards use it too to line up with the text field. */
 internal val ComposerInset = 12.dp
 
 internal val FileTileShape = MikaShapes.Tile
 internal val EmptyLead = MikaType.Value
 internal val BubbleText = MikaType.Body
-/** 回答:正文字号,两端对齐(中文整段行尾整齐,最后一行除外)。 */
+/** Answer: body font size, justified (Chinese paragraphs then have even line ends, except for the last line). */
 internal val AnswerText = MikaType.Body.copy(textAlign = TextAlign.Justify)
 internal val NowText = MikaType.Value
 internal val TurnNameText = MikaType.Label.copy(fontWeight = WordmarkWeight)
 internal val ClockText = MikaType.Hint.copy(fontFeatureSettings = "tnum")
 internal val StepText = MikaType.Caption
 internal val StepCurrentText = MikaType.Caption.copy(fontWeight = FontWeight.Medium)
-/** 插话收成的小字:14sp,比正文淡一点点。 */
+/** The small text a steer collapses into: 14sp, a touch lighter than the body text. */
 internal val SupplementText = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal)
-/** 干活中插话的右侧胶囊:比用户气泡小一圈,右下尾角。 */
+/** Right-side pill for a steer while work is running: a size smaller than the user bubble, with the tail corner at the bottom right. */
 internal val SteerPillShape = RoundedCornerShape(14.dp, 14.dp, 5.dp, 14.dp)
 internal val NoteText = MikaType.Hint
 internal val DoneText = MikaType.Caption

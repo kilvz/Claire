@@ -24,25 +24,30 @@ import com.wangzan101.mika.core.screen.user.UserScreenMessage
 enum class StepState { Ok, Run, Wait, Dim }
 
 /**
- * 一步里的一个动作:做了什么([label],工具的界面说法,不是工具名)、对什么、结果如何(运行记录里的 effect)。
- * 点开这一步时逐条列出来——一行标题写的是汇总,想看它到底点了什么、打了什么字,看这里。
+ * One action within a step: what was done ([label], the tool's UI wording, not the tool name), on what, and how it went
+ * (the effect in the run log).
+ * Expanding the step lists them one by one — the row title is a summary; to see exactly what it tapped and what characters
+ * it typed, look here.
  */
 data class StepAction(val label: String, val target: String?, val effect: String?, val failed: Boolean)
 
 /**
- * 执行过程里的一行,来自实际做过的事(运行事件里的活动):[title] 是做了什么(读取类合并成「看了微信的聊天列表」),
- * [reason] 是模型给那一步写的用意(没写时为空),[subtitle] 是没成功时的说明,平时为空。
+ * A row in the execution process, sourced from things actually done (activities in the run events): [title] is what was
+ * done (reads merge into "looked at WeChat's chat list"), [reason] is the intent the model wrote for that step (empty when
+ * it wrote none), and [subtitle] explains a failure and is normally empty.
  */
 data class StepRow(val step: Int, val title: String, val subtitle: String, val state: StepState, val reason: String = "") {
-    /** 这一步在界面上的说法:模型自己的话,没有时用工具的说法。 */
+    /** What this step reads as in the UI: the model's own words, falling back to the tool's wording when there are none. */
     val text: String get() = if (shouldHideRawReason(reason)) title else reason.ifEmpty { title }
 
     companion object {
         /**
-         * 当界面语言为非中文环境（如当前语言为英文），而模型未遵循指令输出了包含中文字符的用意时，
-         * 避免在界面上展示突兀的生硬中文，回退为已本地化的动作标题（如 Tap · WeChat）。
-         * 「像中文」要求含汉字且不含假名:日语书面语几乎必混假名(助词/活用),只有假名能把日语从汉字里分出来,
-         * 否则日语界面下模型按语言指令写的日语用意会被整条隐藏。
+         * When the UI language is not Chinese (e.g. the current language is English) and the model ignored the instruction
+         * and produced an intent containing Chinese characters, fall back to the localized action title (e.g. Tap · WeChat)
+         * instead of showing jarring, blunt Chinese in the UI.
+         * "Looks Chinese" requires Han characters and no kana: written Japanese almost always mixes in kana (particles /
+         * inflections), and only kana can separate Japanese from Han characters; otherwise, under a Japanese UI, Japanese
+         * intents the model wrote per the language instruction would be hidden entirely.
          */
         internal fun shouldHideRawReason(reason: String, isChineseLocale: Boolean = uiLocale().language == "zh"): Boolean {
             if (reason.isEmpty()) return false
@@ -55,24 +60,28 @@ data class StepRow(val step: Int, val title: String, val subtitle: String, val s
 sealed interface ExchangeStatus {
     data object Working : ExchangeStatus
     data object WaitingUnlock : ExchangeStatus
-    /** 付款接管时 [item]/[amount]/[address] 单独列在卡片上。 */
+    /** During payment takeover [item]/[amount]/[address] are listed separately on the card. */
     data class NeedsTakeover(
         val reason: String, val message: String,
         val item: String? = null, val amount: String? = null, val address: String? = null,
     ) : ExchangeStatus
     data class NeedsInput(val prompt: String, val options: List<String>?) : ExchangeStatus
     /**
-     * 等用户同意一次要花钱的操作(只能同意这一次);[title]「要你同意:<动作>」,[body] 一行一个字段(App、对象、完整内容、金额)。
-     * [key] 是这次申报的编号,按钮带着它,点在旧卡片上不算数。
+     * Waiting for the user to approve a single money-spending operation (approval only applies to this one time);
+     * [title] reads "Needs your approval: <action>", and [body] has one field per line (app, target, full content, amount).
+     * [key] is the id of this declaration, carried by the button, so tapping an older card does not count.
      */
     data class NeedsConfirmation(val title: String, val body: String, val key: Int) : ExchangeStatus
-    /** 停下来等;[resumable] 时点「继续」接着做,否则条件满足后自动继续(卡片上不给「继续」)。 */
+    /** Stopped and waiting; when [resumable], tapping "Continue" carries on, otherwise it resumes automatically once the condition is met (the card offers no "Continue"). */
     data class Paused(val why: String, val resumable: Boolean = true) : ExchangeStatus
-    /** 还没开始,排在开始队列里;轮到时自动开始,只能取消。 */
+    /** Not started yet, sitting in the start queue; it starts automatically when its turn comes, and can only be cancelled. */
     data class Queued(val why: String) : ExchangeStatus
     /**
-     * [verified] 为 false 表示办完了但没能核实,[note] 是原因;这时不打绿勾。[unconfirmed] 是回答里核对后仍没找到出处的几处,
-     * 卡片上逐条列出。[reviewed] 为 false 是什么也没核对(聊天、回答里没有可核对的值):不打任何标。[evidence] 只有旧记录里模型自己写的「依据:」段才有;新的回答来源从运行记录里取(见 [evidenceSource])。
+     * [verified] false means it finished but could not be verified, with [note] as the reason; no green check is shown
+     * then. [unconfirmed] holds the passages in the answer that still had no source after checking, listed one by one on
+     * the card. [reviewed] false means nothing was checked at all (chats, or answers with no checkable values): no mark is
+     * shown. [evidence] only exists for old records that have a model-written "Evidence:" section; new answers take their
+     * sources from the run log (see [evidenceSource]).
      */
     data class Done(
         val answer: String, val evidence: String?, val verified: Boolean = true, val note: String? = null,
@@ -86,15 +95,17 @@ sealed interface ExchangeStatus {
     }
     data class Failed(val reason: String) : ExchangeStatus
     /**
-     * 用户停止了。[summary] 是停止后补上的交代(做过什么、哪些没做完),当作这一轮的回答;还没写好、没什么可交代时为 null。
-     * [summarizing] 时交代还在写(「正在整理已做的事…」)。
+     * The user stopped it. [summary] is the write-up added after stopping (what was done, what was left unfinished), used
+     * as this turn's answer; null while it is not written yet or there is nothing to report.
+     * While [summarizing], the write-up is still being written ("organizing what was done…").
      */
     data class Cancelled(val summary: String? = null, val summarizing: Boolean = false) : ExchangeStatus
 }
 
 /**
- * 一问一答:用户的一句话、执行过程、此刻的状态或结果。[live] 表示是这次打开 App 后跑的任务(带步骤)。
- * [runId] 是任务结束后可以查看的运行记录;在跑或没有记录时为 null。
+ * One question-answer: the user's sentence, the execution process, and the current state or result. [live] means it is a
+ * task run since this app launch (with steps).
+ * [runId] is the run record that can be viewed after the task ends; null while running or when there is no record.
  */
 data class Exchange(
     val goal: String,
@@ -102,51 +113,52 @@ data class Exchange(
     val status: ExchangeStatus,
     val live: Boolean,
     val runId: String? = null,
-    /** 模型请求在途时只显示状态，不把等待伪装成一次执行步骤。 */
+    /** While a model request is in flight, show only the status rather than dressing the wait up as an execution step. */
     val waitingForModel: Boolean = false,
-    /** 模型这次请求已经给出的可见文字；完成前可能成为进度说明或答复。 */
+    /** The visible text the model has already produced for this request; before completion it may become a progress note or the reply. */
     val draft: String? = null,
-    /** 结果卡片下的记忆提示(记住了 / 更新了 / 忘掉了 / 要我以后都这样做吗)。 */
+    /** Memory notes below the result card (remembered / updated / forgot / should I always do this from now on). */
     val memoryNotes: List<MemoryNote> = emptyList(),
-    /** 这次用到的记忆条目编号(代码记录的,不是模型自述)。 */
+    /** Ids of the memory entries used this time (recorded by code, not the model's own account). */
     val usedMemory: List<String> = emptyList(),
-    /** 结果卡片下的技能提示(学会了 / 最近不灵先停用了)。 */
+    /** Skill notes below the result card (learned / suspended for now because it stopped working recently). */
     val skillNotes: List<SkillNote> = emptyList(),
-    /** 这一轮导出到「下载/Claire」的文件,显示成文件卡片。 */
+    /** Files exported to "Downloads/Claire" in this turn, shown as file cards. */
     val files: List<SharedFile> = emptyList(),
-    /** 这一轮 Claire 生成并留在工作区里的音频,显示成音频卡片。 */
+    /** Audio Claire generated and left in the workspace this turn, shown as audio cards. */
     val audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
-    /** 这一轮 Claire 生成并留在工作区里的图,显示成照片格子。 */
+    /** Images Claire generated and left in the workspace this turn, shown as photo tiles. */
     val photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
-    /** 这次打开 App 后开始跟的时刻(毫秒);不知道时为 0。 */
+    /** When following started after this app launch (milliseconds); 0 when unknown. */
     val startedAt: Long = 0L,
-    /** 结束时算出的用时;没结束或不知道开始时刻时为 null。 */
+    /** Elapsed time computed at the end; null when not finished or when the start time is unknown. */
     val elapsedMs: Long? = null,
-    /** 到此刻实际做过的事(运行事件);[steps] 由它推出。 */
+    /** What was actually done so far (run events); [steps] is derived from it. */
     val activities: List<RunEvent.Activity> = emptyList(),
-    /** 模型给各步写的话(进度说明或调用用意),按步号。 */
+    /** Wording the model wrote for each step (progress note or call intent), keyed by step number. */
     val notes: Map<Int, String> = emptyMap(),
-    /** 此刻在做什么:模型这一步的话,或不经模型连做几步时的进度;没有时为空。 */
+    /** What it is doing right now: this step's wording from the model, or the progress while running several steps without the model; empty when there is none. */
     val line: String = "",
-    /** 任务进行中用户在这里插的话和它们的去向。 */
+    /** Things the user interjected here while the task was running, and where each of them went. */
     val steers: List<SteerNote> = emptyList(),
-    /** 这一轮结束后留在后台运行的那一页的站点(见 [Turn.keptPage]);没留为 null。 */
+    /** Site of the page left running in the background after this turn (see [Turn.keptPage]); null when none was kept. */
     val keptPage: String? = null,
-    /** 那一页后来关掉的原因([Turn.keptPageClosed]);还开着或不知道为 null。 */
+    /** Reason that page was closed later ([Turn.keptPageClosed]); null when it is still open or unknown. */
     val keptPageClosed: String? = null,
-    /** 每一步实际做的动作(按步号):标题是汇总,点开一步时看这里的明细。 */
+    /** The actions actually performed in each step (by step number): the title is a summary, and expanding a step shows these details. */
     val stepActions: Map<Int, List<StepAction>> = emptyMap(),
     val goals: GoalChecklist? = null,
 )
 
 /**
- * 有运行记录可看的那次运行。通知提醒那一轮([NoticeTurn])是 Claire 直接写进对话的,没跑过任务,它的编号只是用来认它的:
- * 界面上「查看过程」、来源、重新开始都按这个给,那一轮就都没有(不然点进去只会说「记录已过期」)。
- * 认轮次、和存下的那份对上([ChatViewModel] 里按 [Exchange.runId])照旧用原来的编号。
+ * The run that has a viewable run record. A notification reminder turn ([NoticeTurn]) is written straight into the
+ * conversation by Claire without running a task, and its id exists only to identify it: "view process", sources and restart
+ * are all gated on this, so that turn has none of them (otherwise tapping through would only say "the record has expired").
+ * Identifying a turn and matching it against the saved copy (by [Exchange.runId] in [ChatViewModel]) still uses the original id.
  */
 val Exchange.recordedRun: String? get() = runId?.takeUnless { it.startsWith(NoticeTurn.RUN_PREFIX) }
 
-/** 在跑时的一行进展:等你时说等什么;模型请求在途时只给中性状态;否则是这一步的话,没有就是最近做的事。 */
+/** The single line of progress while running: what it is waiting for when waiting on you; only a neutral status while a model request is in flight; otherwise this step's wording, or the latest thing done when there is none. */
 fun liveLine(ex: Exchange): String? {
     when (ex.status) {
         is ExchangeStatus.NeedsTakeover -> return tr(R.string.takeover_title)
@@ -159,7 +171,7 @@ fun liveLine(ex: Exchange): String? {
     return ex.line.ifEmpty { null } ?: ex.steps.lastOrNull()?.text
 }
 
-/** 插话下面那行小字;还没有去向时不写。[paused] 时任务正等着用户处理,说明这句要等继续后才生效。 */
+/** The small line under a steer; left out while it has no destination yet. With [paused], the task is waiting for the user, so it notes that this only takes effect after continuing. */
 fun steerLabel(state: SteerState, paused: Boolean = false): String? = when (state) {
     SteerState.Pending, SteerState.Withdrawn -> null
     SteerState.Received -> tr(if (paused) R.string.steer_received_paused else R.string.steer_received)
@@ -169,14 +181,17 @@ fun steerLabel(state: SteerState, paused: Boolean = false): String? = when (stat
 }
 
 /**
- * 插话能不能取回编辑。悬浮胶囊插的带着屏幕、浏览器页上选了字插的带着页面说明,取回来时输入框开头是
- * `[[screen:…]]` 那一行或几行页面说明原文,删掉就丢了屏幕和页面,改坏就认不出页面,这两种不给编辑。
+ * Whether a steer can be pulled back for editing. Ones inserted from the floating pill carry a screen, and ones inserted
+ * from selected text on a browser page carry page notes; pulling those back puts the `[[screen:…]]` line, or the original
+ * text of the page notes, at the start of the input field, so deleting them loses the screen and the page and mangling them
+ * makes the page unrecognizable. These two are not offered for editing.
  */
 internal fun editableSteer(text: String): Boolean = !UserScreenMessage.has(text) && AttachedPage.parse(text).page == null
 
 /**
- * 选好、等着随下一句话发出去的附件:内容地址([uri])、名字和大小;发送时才复制进对话工作区。
- * [photo] 的在输入框上方是缩略图,其余是文件小卡片。
+ * An attachment picked and waiting to be sent out with the next message: content URI ([uri]), name and size; it is copied
+ * into the conversation workspace only when sending.
+ * Those with [photo] appear above the input field as thumbnails, the rest as small file cards.
  */
 data class PendingAttachment(
     val uri: String,
@@ -190,9 +205,10 @@ data class PendingAttachment(
 enum class PipMode { Running, NeedsYou, Done }
 
 /**
- * 画中画只放画面:状态只靠边框光(绿色在干活、橙色呼吸要你处理),要你做的事在对话卡片里。
- * [closed]:用户把这个任务的小画面关掉了,只剩右下角一个小按钮(点它再打开;要你处理时它变橙色)。
- * 关掉只管这一个任务,下一个任务照常出小画面。
+ * Picture-in-picture carries only the screen: its state is conveyed purely by the border glow (green while working, an
+ * orange breath when it needs you), and whatever it needs you to do is in the chat card.
+ * [closed]: the user closed this task's small window, leaving only a small button in the bottom-right corner (tap it to
+ * reopen; it turns orange when it needs you). Closing only affects this one task; the next task shows its small window as usual.
  */
 data class PipUi(
     val visible: Boolean = false,
@@ -202,49 +218,49 @@ data class PipUi(
 )
 
 enum class ComposerMode {
-    /** 没有任务,发出去就是新任务。 */
+    /** No task; sending starts a new task. */
     Idle,
-    /** 任务在跑:发出去的话交给这个任务,停止是另一个按钮。 */
+    /** A task is running: what you send goes to this task, and stopping is a separate button. */
     Busy,
-    /** Agent 在等回答,发出去就是回答。 */
+    /** The agent is waiting for an answer; sending is the answer. */
     Answer,
 }
 
-/** 任务进行中发补充消息时,这句话交给谁:当前任务(下一步带上),还是这个对话的下一件任务。 */
+/** When sending a follow-up while a task is running, who gets it: the current task (carried with its next step), or the next task of this conversation. */
 enum class FollowUpMode { Steer, Queue }
 
 data class ChatUi(
     val conversationId: String? = null,
     val exchanges: List<Exchange> = emptyList(),
-    /** 所属项目分组 id;新对话还没发第一句话时只保存在草稿/界面状态,发送首条消息时写入旁文件。 */
+    /** Owning project group id; for a new conversation before the first message is sent it lives only in the draft/UI state, and is written to the sidecar file when the first message is sent. */
     val projectId: String? = null,
-    /** 上次发送被拦下时缺的条件;为空表示没被拦。 */
+    /** Conditions missing when the last send was blocked; empty means it was not blocked. */
     val blocked: List<Problem>? = null,
     val pip: PipUi = PipUi(),
     val composer: ComposerMode = ComposerMode.Idle,
-    /** 任务进行中补充消息交给谁;主对话默认排队,点消息右侧箭头后改为引导。 */
+    /** Who gets follow-ups sent while a task is running; the main conversation queues them by default, and tapping the arrow on the right of a message switches to steering. */
     val followUpMode: FollowUpMode = FollowUpMode.Queue,
-    /** 这个对话明确排队、还没开始的下一件(按先后);开始或取消后从这里拿掉。 */
+    /** The next items explicitly queued for this conversation that have not started yet (in order); removed from here once started or cancelled. */
     val queued: List<QueuedFollowUp> = emptyList(),
     val takeoverStage: Takeover.Stage = Takeover.Stage.None,
-    /** 沙箱就绪时输入框旁才有附件按钮。 */
+    /** The attachment button next to the input field exists only once the sandbox is ready. */
     val attachEnabled: Boolean = false,
     val input: String = "",
     val attachments: List<PendingAttachment> = emptyList(),
-    /** 正在把附件复制进工作区(发送时)。 */
+    /** Attachments are being copied into the workspace (at send time). */
     val importing: Boolean = false,
-    /** 没收下的附件(太大或读不了);为空不提示。 */
+    /** Attachments that were not accepted (too large or unreadable); empty means no hint is shown. */
     val rejectedAttachments: List<AttachmentFailure> = emptyList(),
-    /** 超过一次能带的个数([AttachTray.LIMIT])没加上的个数;为 0 不提示。 */
+    /** How many were not added because they exceeded the per-send count ([AttachTray.LIMIT]); 0 means no hint is shown. */
     val overLimit: Int = 0,
-    /** 系统分享刚预填到新对话的内容;只供输入框展示,不会触发任务。 */
+    /** Content just pre-filled into a new conversation by a system share; only shown in the input field and never starts a task. */
     val sharedDraft: SharedDraft? = null,
-    /** 当前会话已有草稿时,后台收到的系统分享先挂在这里,等用户确认替换或取消。 */
+    /** When the current conversation already has a draft, a system share received in the background parks here first, awaiting the user's confirmation to replace it or cancel. */
     val pendingSharedDraft: SharedDraft? = null,
-    /** 输入框上方要随下一句话发出去的引用(长按消息选「引用」);没有为 null。随会话草稿保留。 */
+    /** The quote above the input field to be sent with the next message (long-press a message and choose "Quote"); null when there is none. Kept with the conversation draft. */
     val quote: QuoteMessage.Quote? = null,
 ) {
-    /** 任务此刻正在后台的虚拟屏上操作(输入框上方那行提示):开过屏、在干活,不在等你或等解锁。 */
+    /** The task is currently operating on the background virtual screen (the hint above the input field): the screen was opened, it is working, and it is not waiting for you or for an unlock. */
     val operatingPhone: Boolean
         get() = pip.visible && pip.mode == PipMode.Running && exchanges.lastOrNull()?.status == ExchangeStatus.Working
 }
@@ -270,8 +286,9 @@ internal fun ChatUi.draft() = ComposerDraft(input, attachments, quote, followUpM
     importing, rejectedAttachments, overLimit, projectId)
 
 /**
- * 换对话时统一重建界面:任务和输入内容属于各自对话,附件按钮能力属于设备,不随对话重建丢掉。
- * 每条切换路径都从这里走,再恢复目标对话自己的草稿。系统分享可以显式填入它自己的文字和附件。
+ * Rebuilds the UI uniformly when switching conversations: tasks and input content belong to their own conversation, while
+ * attachment capability belongs to the device and is not dropped by rebuilding for a conversation.
+ * Every switch path goes through here, then restores the target conversation's own draft. A system share may explicitly fill in its own text and attachments.
  */
 internal fun ChatUi.rebuildForConversation(
     conversationId: String?,

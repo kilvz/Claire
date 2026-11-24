@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.chat.ui.ChatReduce.state
 import com.wangzan101.mika.chat.ui.ChatReduce.withAttachments
 
-/** 发出去:开任务、插话、排队、引用,停止、接管等任务按钮和画中画。 */
+/** Sending: starting tasks, steering, queueing, quoting, plus task buttons such as stop and takeover, and picture-in-picture. */
 internal class ChatSendOps(private val vm: ChatViewModel, private val session: ChatSession) {
     private val _ui = session._ui
     private val libraryImports = session.libraryImports
@@ -46,7 +46,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     private val projectStore = vm.projectStore
     private val workspaceResolver = vm.workspaceResolver
 
-    /** 长按消息选了「引用」:引的内容放到输入框上方,随下一句话发出去(新任务、插话、回答都带)。空的不引。 */
+    /** "Quote" chosen on a long-press: the quoted content goes above the input field and is sent with the next message (carried by new tasks, steers and answers alike). Nothing is quoted when empty. */
     fun quote(from: QuoteMessage.From, text: String) {
         val t = text.trim()
         if (t.isNotEmpty()) {
@@ -57,7 +57,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
 
     fun clearQuote() = _ui.update { it.copy(quote = null) }
 
-    /** 发送输入框里的话;有引用时引用写在话的前面(见 [QuoteMessage]),发出去后清掉。返回 false 表示没发出去(条件不满足,或任务在跑)。 */
+    /** Sends what is in the input field; when there is a quote it is written before the text (see [QuoteMessage]) and cleared after sending. Returns false when nothing was sent (conditions not met, or a task is running). */
     fun send(text: String, check: Prerequisites.Check): Boolean {
         if (teaching()) {
             onTeachingBlocked()
@@ -88,12 +88,12 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     }
 
     private fun sendQuoted(words: String, ui: ChatUi, check: Prerequisites.Check): Boolean {
-        // 附件可跟新任务或明确排队的下一件走;先复制进工作区,再把路径随原话一起持久化。
+        // Attachments can go with a new task or with the next item explicitly queued; copy them into the workspace first, then persist the paths together with the wording.
         val queuedAttachments = ui.composer != ComposerMode.Idle && ui.followUpMode == FollowUpMode.Queue
         if ((ui.composer == ComposerMode.Idle || queuedAttachments) && ui.attachments.isNotEmpty()) {
             return sendWithAttachments(QuoteMessage.compose(ui.quote, words), ui.attachments, check)
         }
-        // 只有引用、没写话时不发
+        // With only a quote and no text, do not send
         if (words.isEmpty()) return false
         val goal = QuoteMessage.compose(ui.quote, words)
         when (ui.composer) {
@@ -113,10 +113,11 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     }
 
     /**
-     * 带着附件开新任务:先把附件复制进对话工作区的 inbox/(期间输入框上方显示正在添加),
-     * 全部复制成功后,把每个附件写成一行「附件:<路径>(<大小>)」接在话后面开始任务。
-     * 有附件没收下时保留草稿并列出失败项,由用户重试或移除后再发送。
-     * 复制期间换了对话或开始了别的任务就不发了(复制进去的文件留在原对话的工作区里)。
+     * Starts a new task with attachments: first copy the attachments into the conversation workspace's inbox/ (meanwhile
+     * the area above the input field shows that they are being added); once all have been copied, write each attachment as
+     * a line "Attachment: <path> (<size>)" after the text and start the task.
+     * If some attachments were not accepted, the draft is kept and the failures are listed, for the user to retry or remove before sending again.
+     * If the conversation is switched or another task starts during the copy, nothing is sent (the copied files stay in the original conversation's workspace).
      */
     private fun sendWithAttachments(text: String, items: List<PendingAttachment>, check: Prerequisites.Check): Boolean {
         if (!check.canStartTask) {
@@ -200,21 +201,21 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         return true
     }
 
-    /** 在对话 [id] 里开始新任务 [goal]:界面上加一问一答,交给服务(并行关着、服务还忙时排在它收尾后面)。 */
+    /** Starts a new task [goal] in conversation [id]: adds a question-answer to the UI and hands it to the service (with parallelism off and the service still busy, it is queued behind its cleanup). */
     private fun begin(goal: String, id: String, clearDraftAttachments: Boolean = true) {
         lingerJob?.cancel()
-        // 真正开始任务后,草稿附件已在工作区,可以清掉私有暂存副本。
+        // Once the task has really started, the draft attachments are already in the workspace, so the private staging copies can be cleared.
         if (clearDraftAttachments) vm.drafting.discardSharedDraft()
         val boundProject = (_ui.value.projectId ?: store.projectId(id))?.takeIf { projectStore == null || projectStore.get(it) != null }
         if (boundProject != null && store.projectId(id) != boundProject) {
             runCatching { store.setProject(id, boundProject) }
         }
         workspaceResolver?.setDraftProject(id, null)
-        // 这个对话的编号定下来了:胶囊之后接着它(新开的对话到这一刻才有编号)
+        // This conversation's id is settled: the pill continues from it afterwards (a newly opened conversation only gets an id at this point)
         session.markCurrent(CurrentChat.Open(id))
-        // 上一个任务收尾时先撤屏再报结束,这里读到的就是新任务开始前的样子;
-        // 并行时那是别的对话的任务的屏,新任务还没有屏
-        // 新消息开始时不能继承上一次运行的屏；真正建好本次的屏后由 screenOpen 打开小窗。
+        // When the previous task wraps up it removes its screen before reporting completion, so what is read here is the state just before the new task starts;
+        // in parallel mode that is another conversation's task's screen, and the new task has no screen yet
+        // A new message must not inherit the previous run's screen; once this run's screen is really created, screenOpen opens the small window.
         screenSeen = false
         pipClosed = false
         _ui.update {
@@ -228,26 +229,26 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
                 pip = session.gated(PipUi(visible = true)),
                 composer = ComposerMode.Busy,
                 followUpMode = FollowUpMode.Queue,
-                // 这一句如果本来在排队条上乐观挂着、现在已经开始,就不能再显示一行
+                // If this sentence was optimistically listed on the queue bar and has now started, it must no longer show as a row
                 queued = it.queued.filterNot { q -> q.text == goal },
             )
         }
-        // 并行时服务忙着(别的对话的任务在跑)也直接交给它
+        // In parallel mode, hand it over directly even if the service is busy (another conversation's task is running)
         if (serviceBusy.value && !session.parallel()) {
-            // 等着的这段时间说清楚在等什么,不让它看着像卡住了;交给服务后由任务自己的状态接着写
+            // During the wait, spell out what it is waiting for so it does not look stuck; once handed to the service, the task's own state continues the line
             _ui.update { ui ->
                 val exchanges = ui.exchanges.toMutableList()
                 exchanges[liveIndex] = exchanges[liveIndex].copy(line = tr(R.string.chat_wait_previous_task))
                 ui.copy(exchanges = exchanges)
             }
-            // 交过去时别处(定时、电脑)可能刚好先开始了一个:服务把它排在那个后面,不丢
+            // By the time it is handed over, something elsewhere (a schedule, the computer) may have just started first: the service queues it behind that one, so it is not lost
             pendingStart = scope.launch {
                 serviceBusy.first { !it }
                 pendingStart = null
                 actions.start(goal, id)
-                // 等着期间插的话:原话的任务先开始,再交给它
+                // Steers made during the wait: start the task for the original wording first, then hand them over
                 held.toList().also { held.clear() }.forEach { n -> actions.steer(id, n.id, n.text) }
-                // 排队项早已持久化;原话任务收尾时服务按 FIFO 取出,不在这里重写或抢跑
+                // Queued items are persisted long before; the service takes them out in FIFO order when the original task wraps up, so do not rewrite or jump ahead of it here
             }
         } else {
             actions.start(goal, id)
@@ -255,8 +256,9 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     }
 
     /**
-     * 任务在跑时发的话:挂在正在跟的那一问一答下面,交给这个任务;它的去向由服务报回来([steers])。
-     * 它可能成为下一件事,所以和开新任务过同一道检查。任务还没交给服务([pendingStart])时先留着,开始之后再发。
+     * What is sent while a task is running: attached below the question-answer being followed and handed to this task;
+     * where it went is reported back by the service ([steers]). It may become the next item, so it goes through the same
+     * check as starting a new task. While the task has not been handed to the service ([pendingStart]) it is held first and sent after the start.
      */
     private fun steer(text: String, check: Prerequisites.Check): Boolean {
         val id = _ui.value.conversationId ?: return false
@@ -275,7 +277,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         return true
     }
 
-    /** 切换任务进行中补充消息的默认去向;只影响下次发送,不改已经发出的消息。 */
+    /** Switches the default destination for follow-ups sent while a task is running; it only affects the next send and does not change messages already sent. */
     fun setFollowUpMode(mode: FollowUpMode) {
         if (_ui.value.importing) return
         if (mode == FollowUpMode.Steer) {
@@ -288,7 +290,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         session.releaseUnusedLibraryCopies()
     }
 
-    /** 任务在跑时把这句话先写进这个对话的持久 FIFO;写失败返回 false,输入框保留原话。 */
+    /** While a task is running, write this sentence into the conversation's persistent FIFO first; returns false when writing fails, and the input field keeps the text. */
     private fun enqueue(text: String, check: Prerequisites.Check): Boolean {
         val id = _ui.value.conversationId ?: return false
         if (!check.canStartTask) {
@@ -296,17 +298,17 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
             return false
         }
         val item = QueuedFollowUp(java.util.UUID.randomUUID().toString(), id, text, clock(), QueuedSource.Explicit)
-        // 原话还在等别的任务收尾时也只落盘,不能让下一件抢在它前面开始。
+        // While the original wording is still waiting for another task to wrap up, only persist it; the next item must not start ahead of it.
         return actions.enqueueFollowUp(id, item.id, text, startIfIdle = pendingStart?.isActive != true)
     }
 
-    /** 当前没有任务在跑时,把排队的第一件开始(排队条上的「现在开始」)。 */
+    /** When no task is running, start the first queued item (the "start now" on the queue bar). */
     fun startQueued() {
         val id = _ui.value.conversationId ?: return
         actions.drainFollowUps(id)
     }
 
-    /** 取消一条还没开始的持久排队;已经轮到了返回 false。 */
+    /** Cancels one persistent queued item that has not started; returns false once its turn has come. */
     fun cancelQueued(id: String): Boolean {
         val conversationId = _ui.value.conversationId ?: return false
         if (!actions.cancelFollowUp(conversationId, id)) return false
@@ -314,7 +316,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         return true
     }
 
-    /** 把一条还没开始的排队改为当前任务的引导;竞争失败时保留或恢复排队。 */
+    /** Turns a queued item that has not started into a steer for the current task; when it loses the race, the queue entry is kept or restored. */
     fun guideQueued(id: String, check: Prerequisites.Check): Boolean {
         val ui = _ui.value
         if (ui.composer != ComposerMode.Busy) return false
@@ -329,7 +331,8 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     }
 
     /**
-     * 取回一条排队:先取消,成功才把文字放回输入框(引用照旧解析)。带屏幕/页面标记的只能取消,不能编辑。
+     * Pulls back a queued item: cancel it first, and only on success put the text back into the input field (the quote is
+     * parsed as usual). Ones carrying screen/page markers can only be cancelled, not edited.
      */
     fun editQueued(id: String): String? {
         val ui = _ui.value
@@ -366,7 +369,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
 
     fun dismissBlocked() = _ui.update { it.copy(blocked = null) }
 
-    /** 停止:任务连同还没交到它手里的插话一起作废(插话不再当成下一件事)。 */
+    /** Stop: discards the task together with any steers not yet handed to it (those steers are no longer treated as the next item). */
     fun cancel() {
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
@@ -377,20 +380,20 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
         }
         val pending = pendingStart
         if (pending == null || !pending.isActive) {
-            // 这个对话在服务里有任务(在跑或排着队)就只停它:不带编号的停止按服务显示中的任务算,
-            // 这条还排在别处开始的任务后面时,停掉的会是那个任务
+            // If this conversation has a task in the service (running or queued), stop only that one: a stop without an id
+            // applies to the service's shown task, and if this one is still queued behind a task started elsewhere, that task would be stopped instead
             val id = _ui.value.conversationId
             if (id != null && id in activeConversations.value) actions.cancelIn(id) else act({ actions.cancel() }) { actions.cancelIn(it) }
             return
         }
-        // 任务还没交给服务:作废这次开始;服务里正在收尾的是上一个任务,不去碰它
+        // The task has not been handed to the service yet: discard this start; what is wrapping up in the service is the previous task, so leave it alone
         pending.cancel()
         pendingStart = null
         held.clear()
         _ui.update { ui ->
             val exchanges = ui.exchanges.toMutableList()
             if (liveIndex in exchanges.indices) exchanges[liveIndex] = exchanges[liveIndex].copy(status = ExchangeStatus.Cancelled())
-            // 明确排队的下一件有独立持久生命周期,取消原话开始也不删它。
+            // The explicitly queued next item has its own persistent lifecycle; cancelling the start of the original wording does not delete it.
             ui.copy(exchanges = exchanges, pip = PipUi(), composer = ComposerMode.Idle)
         }
         liveIndex = -1
@@ -413,8 +416,9 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     fun decline(key: Int) = act({ actions.decline(key) }) { actions.declineIn(it, key) }
 
     /**
-     * 应用内的按钮:开关关着时作用于服务显示中的任务(M1);并行时带上按下那一刻屏上的对话,只作用于它的任务,
-     * 这个对话没有任务就不发。
+     * In-app buttons: with the switch off they act on the service's shown task (M1); in parallel mode they carry the
+     * conversation that was on screen at the moment of the press and act only on its task, and nothing is sent if that
+     * conversation has no task.
      */
     private inline fun act(serial: () -> Unit, scoped: (String) -> Unit) {
         if (!session.parallel()) return serial()
@@ -424,31 +428,31 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
 
     fun expandPip() = _ui.update { if (it.pip.visible) it.copy(pip = it.pip.copy(expanded = true)) else it }
 
-    /** 要你处理时点画中画:收起它,由界面滚到要你处理的那张卡片。 */
+    /** Tapping picture-in-picture when it needs you: collapse it and let the UI scroll to the card that needs you. */
     fun attendPip() = collapsePip()
 
     fun collapsePip() = _ui.update { it.copy(pip = it.pip.copy(expanded = false)) }
 
-    /** 用户关掉这个任务的小画面:只留右下角的小按钮,这个任务结束前不再自己浮出来。 */
+    /** The user closes this task's small window: only the small button in the bottom-right is left, and the window does not pop up on its own again until the task ends. */
     fun closePip() {
         if (liveIndex < 0) return
         pipClosed = true
         _ui.update { it.copy(pip = session.gated(it.pip)) }
     }
 
-    /** 点小按钮:把这个任务的小画面再打开。 */
+    /** Tapping the small button: reopens this task's small window. */
     fun reopenPip() {
         pipClosed = false
         _ui.update { it.copy(pip = session.gated(it.pip)) }
     }
 
-    /** 浮层的声音开关:只发真实音频动作,方向由任务里的真实记录定,不在界面伪造开关状态。 */
+    /** The overlay's sound toggle: it only sends a real audio action and the direction is determined by the real record in the task rather than faking the toggle state in the UI. */
     fun togglePipSound() {
         val id = _ui.value.conversationId ?: return
         actions.togglePipSoundIn(id)
     }
 
-    /** 分享切走前,把仍在等串行服务空闲的原任务交给服务排队;只取消界面里的等待协程,不取消任务。 */
+    /** Before a share switches away, hand the original task that is still waiting for the serial service to become free over to the service's queue; only the waiting coroutine in the UI is cancelled, not the task. */
     fun handOffPendingStart() {
         val pending = pendingStart?.takeIf { it.isActive } ?: return
         val id = _ui.value.conversationId
