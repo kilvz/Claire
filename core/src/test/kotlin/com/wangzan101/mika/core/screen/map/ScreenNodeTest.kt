@@ -8,11 +8,11 @@ class ScreenNodeTest {
     @Test fun screenIdIsDeterministicAndStable() {
         val a = ScreenId.of("com.example.app", "关于本机|设置")
         val b = ScreenId.of("com.example.app", "关于本机|设置")
-        assertEquals(a, b) // 同输入两次相同
+        assertEquals(a, b) // same input twice gives the same id
         assertEquals(16, a.length) // 16 hex
-        assertNotEquals(ScreenId.of("com.example.app", "关于本机|设置"), ScreenId.of("com.other.app", "关于本机|设置")) // 不同 app
-        assertNotEquals(ScreenId.of("com.example.app", "关于本机|设置"), ScreenId.of("com.example.app", "关于本机|设置|更多")) // 不同签名
-        assertEquals(a, ScreenId.of("com.example.app", "关于本机|设置")) // 稳定，不随时间变
+        assertNotEquals(ScreenId.of("com.example.app", "关于本机|设置"), ScreenId.of("com.other.app", "关于本机|设置")) // different app
+        assertNotEquals(ScreenId.of("com.example.app", "关于本机|设置"), ScreenId.of("com.example.app", "关于本机|设置|更多")) // different signature
+        assertEquals(a, ScreenId.of("com.example.app", "关于本机|设置")) // stable, does not change over time
     }
 
     @Test fun codecRoundTrips() {
@@ -32,8 +32,8 @@ class ScreenNodeTest {
     @Test fun transitionKeyUsesTupleNotCounters() {
         val a = Transition("click", "设置", TransitionEffect.NAVIGATED, "target", count = 1, offTrack = 0)
         val b = Transition("click", "设置", TransitionEffect.NAVIGATED, "target", count = 9, offTrack = 3)
-        assertEquals(a.key(), b.key()) // 同一 (动作, 目标, 效果, 到哪屏) 是一条边，次数/跑偏另计
+        assertEquals(a.key(), b.key()) // the same (action, target, effect, destination screen) tuple is one edge; the visit and off-track counts are tracked separately
         val c = Transition("click", "返回", TransitionEffect.NAVIGATED, "target", count = 1)
-        assertNotEquals(a.key(), c.key()) // 目标不同则不同边
+        assertNotEquals(a.key(), c.key()) // a different target gives a different edge
     }
 }

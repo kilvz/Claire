@@ -41,9 +41,9 @@ class ScreenDiagnosisTest {
         assertEquals("payment", ScreenDiagnosis.classify(facts(black = listOf(true, true), texts = listOf("确认支付"))).takeoverReason)
         assertEquals("captcha", ScreenDiagnosis.classify(facts(black = listOf(true, true), texts = listOf("安全验证"))).takeoverReason)
         assertEquals("login", ScreenDiagnosis.classify(facts(black = listOf(true, true), password = true)).takeoverReason)
-        // 没有窗口时的黑屏只是空白
+        // A black screen with no window is merely blank
         assertEquals(ScreenState.BLANK, ScreenDiagnosis.classify(facts(hasWindow = false, readable = 0, black = listOf(true, true))).state)
-        // 根节点不可读但系统仍有 App 窗口/前台任务时,同样不能退回「没有 App」或不断重试。
+        // When the root node is unreadable but the system still has an app window/foreground task, it likewise must not fall back to "no app" or keep retrying.
         val unreadable = ScreenFacts(null, false, 0, false, listOf(true, true), emptyList(), false,
             anyWindow = true, foregroundApp = "com.x")
         val unavailable = ScreenDiagnosis.classify(unreadable)
@@ -82,7 +82,7 @@ class ScreenDiagnosisTest {
         assertEquals("login", ScreenDiagnosis.classify(facts(password = true)).takeoverReason)
         assertEquals("login", ScreenDiagnosis.classify(facts(texts = listOf("手机号", "获取验证码"))).takeoverReason)
         assertTrue(ScreenDiagnosis.classify(facts(texts = listOf("Verify you are human"))).needsHuman)
-        // 普通设置页里的「密码」字样不算
+        // The word "password" on an ordinary settings page does not count
         assertFalse(ScreenDiagnosis.classify(facts(texts = listOf("密码与安全", "隐私"))).needsHuman)
     }
 }

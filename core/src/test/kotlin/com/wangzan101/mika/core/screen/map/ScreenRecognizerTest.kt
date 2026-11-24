@@ -19,7 +19,7 @@ class ScreenRecognizerTest {
     }
 
     @Test fun missingOneAnchorStillRecognizes() {
-        // 一页两种结构的「缺 banner」：少一个骨架锚点仍认对（覆盖率 < 1.0 容忍）
+        // The same page in two structural variants, "banner missing": one skeleton anchor short is still recognized (coverage < 1.0 tolerated)
         val n = node("a", "关于本机", "设置", "更多")
         val r = ScreenRecognizer.identify(setOf("关于本机", "设置"), listOf(n))
         assertNotNull(r)
@@ -29,14 +29,14 @@ class ScreenRecognizerTest {
     }
 
     @Test fun commonWordAcrossScreensDoesNotMergeThem() {
-        // 「确定」在两屏都出现：只看到这个通用字，稀有度把置信度压到阈值下，不认成任何一屏
+        // "OK" appears on both screens: seeing only this common word, rarity pushes confidence below the threshold, so no screen is recognized
         val a = node("a", "保存", "确定")
         val b = node("b", "取消", "确定")
         assertNull(ScreenRecognizer.identify(setOf("确定"), listOf(a, b)))
     }
 
     @Test fun rarityDisambiguatesWhenUniqueAnchorAlsoPresent() {
-        // 通用字 + 只属于 A 的「保存」→ 认 A，不认 B
+        // common word + "Save" that belongs only to A -> recognize A, not B
         val a = node("a", "保存", "确定")
         val b = node("b", "取消", "确定")
         val r = ScreenRecognizer.identify(setOf("确定", "保存"), listOf(a, b))
@@ -50,7 +50,7 @@ class ScreenRecognizerTest {
     }
 
     @Test fun onlyFuzzyAnchorsReturnsNull() {
-        // 两屏共享「确定」「返回」，只看到这些模糊字 → 低于阈值 → 不知道
+        // both screens share "OK" and "Back"; seeing only these fuzzy words -> below the threshold -> unknown
         val a = node("a", "确定", "返回", "关于本机")
         val b = node("b", "确定", "返回", "设置")
         assertNull(ScreenRecognizer.identify(setOf("确定", "返回"), listOf(a, b)))

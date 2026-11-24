@@ -11,11 +11,11 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 一次就读到空树时要再读一次(窗口刚切走、正在重绘、无障碍还没吐出节点都会让这一屏暂时是空的);
- * 两次都空才判不可用,免得瞬时读不到就把整屏判死、把模型赶去整页 OCR。
+ * A first read that comes back as an empty tree is retried once (a window that just switched away, an in-progress redraw, or accessibility not having emitted nodes yet can all leave the screen temporarily empty);
+ * only two empty reads mark it unusable, so a momentary miss does not condemn the whole screen and push the model into full-page OCR.
  */
 class BlankReadRetryTest {
-    /** [blankFirst] 为真:第一次读是空树,之后正常;[blankAlways] 为真:一直是空树;[unreadable] 非空:窗口读不到。 */
+    /** [blankFirst] true: the first read is an empty tree and later reads are normal; [blankAlways] true: always an empty tree; [unreadable] non-null: the window cannot be read. */
     private class FlickerScreen(private val blankFirst: Boolean, private val blankAlways: Boolean = false, private val unreadable: String? = null) : ScreenPort by FakeScreen() {
         var snapshots = 0
         override suspend fun snapshot(): ScreenSnapshot {
@@ -35,7 +35,7 @@ class BlankReadRetryTest {
         val s = FlickerScreen(blankFirst = true)
         val r = toolDispatcher(s).executeRead(Part.ToolCall("o", "phone_observe", "{}"))
         assertEquals(2, s.snapshots)
-        // 第二次读到的那一屏是按 ref 能办事的:不写 treeQuality,也不让模型改走 OCR
+        // The screen from the second read can be acted on by ref: treeQuality is not written and the model is not sent to OCR
         assertNull(r.content.s("treeQuality"))
         assertNull(r.content.s("imageReason"))
     }
@@ -53,7 +53,7 @@ class BlankReadRetryTest {
         assertEquals(1, s.snapshots)
     }
 
-    /** 窗口读不到是持续的(服务/权限层面),不是节点还没吐出来:不重试,一次就按原判据判不可用。 */
+    /** An unreadable window is persistent (service/permission level), not nodes that have not been emitted yet: no retry; one read is judged unusable by the usual criteria. */
     @Test fun unreadableWindowIsNotRetried() = runTest {
         val s = FlickerScreen(blankFirst = true, unreadable = "com.example.slow")
         val r = toolDispatcher(s).executeRead(Part.ToolCall("o", "phone_observe", "{}"))

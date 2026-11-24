@@ -5,8 +5,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 返回控件的识别：back 注入失效时,从一屏元素里认出「返回」控件做降级点击。
- * 只认名字精确/包含返回词的可点元素,或左上角无名字的图标型控件;认不到返回 null(不硬点)。
+ * Back-control detection: when injected back stops working, recognize a back control among one screen's elements for a fallback tap.
+ * Only clickable elements whose name exactly equals or contains a back word, or an unnamed icon control in the top-left corner; returns null when it cannot be found (no blind tapping).
  */
 class BackAffordanceTest {
     private fun el(

@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class HantTest {
-    // 两串逐字配对:长度不等会悄悄截断、整张表错位;一个繁体字只能对一个简体字
+    // The two strings pair up character by character: unequal lengths would silently truncate and misalign the whole table; each traditional character maps to exactly one simplified character
     @Test fun tableLinesUp() {
         assertEquals(Hant.TRADITIONAL.length, Hant.SIMPLIFIED.length)
         assertEquals(Hant.TRADITIONAL.length, Hant.TRADITIONAL.toSet().size)

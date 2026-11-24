@@ -5,7 +5,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.random.Random
 
-/** 停留时顺手滚几下的安排:够长才滚,下数、幅度、净移动都有界,时刻落在停留里。 */
+/** Schedule of incidental scrolls during a dwell: it only scrolls when the dwell is long enough, and the count, step size and net movement are all bounded, with timestamps falling inside the dwell. */
 class IdleScrollTest {
     private val l = IdleScroll.Limits()
 
@@ -27,12 +27,12 @@ class IdleScrollTest {
             assertTrue("$seed $plan", plan.sumOf { abs(it.fraction) } <= l.maxTotal + 1e-9)
             val net = plan.sumOf { it.fraction }
             assertTrue("$seed $plan", net >= -1e-9 && net <= l.maxNet + 1e-9)
-            // 第一下总往下;往回拨不超过之前往下滚的
+            // The first scroll is always downward; scrolling back never exceeds the earlier downward amount
             assertTrue("$seed $plan", plan.first().fraction > 0)
             var pos = 0.0
             plan.forEach { pos += it.fraction; assertTrue("$seed $plan", pos >= -1e-9) }
             plan.forEach { assertTrue("$seed $plan", abs(it.fraction) <= l.stepFraction.endInclusive + 1e-9) }
-            // 时刻在停留里,前后留出余地,两下之间隔得开
+            // Timestamps stay inside the dwell with margin on both sides, and consecutive scrolls are far enough apart
             plan.forEach { assertTrue("$seed $plan", it.atMs >= l.leadMs && it.atMs <= wait - l.tailMs) }
             plan.zipWithNext().forEach { (a, b) -> assertTrue("$seed $plan", b.atMs - a.atMs >= l.gapMs) }
             ups += plan.count { it.fraction < 0 }

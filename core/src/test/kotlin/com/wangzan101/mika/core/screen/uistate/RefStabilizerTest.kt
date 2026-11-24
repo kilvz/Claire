@@ -9,14 +9,14 @@ import org.junit.Test
 class RefStabilizerTest {
     private var port = 0
 
-    /** 端口每次读屏都从 @e1 重新编号、snapshotId 随机,和真端口一样。 */
+    /** The port renumbers from @e1 on every screen read and randomizes snapshotId, just like the real port. */
     private fun shot(vararg els: Triple<String, Int, Int>, pkg: String = "com.x", width: Int = 1000, height: Int = 2000, list: Boolean = false,
                      rid: (String) -> String? = { null }): ScreenSnapshot {
         port++
         val items = els.mapIndexed { i, (name, x, y) ->
             UiElement("@e${i + 1}", "button", name, x, y, listOf(0, 0, 10, 10), rid(name), true, false, false)
         }
-        // list:顶部以下是一个可滚动列表,顶部(y < 100 像素)的元素不在列表里
+        // list: everything below the top is one scrollable list; elements at the top (y < 100 px) are not in the list
         val pane = UiElement("@e${items.size + 1}", "list", "", width / 2, height / 2, listOf(0, 100, 999, 999), null, false, false, true)
         return ScreenSnapshot("port$port", pkg, if (list) items + pane else items, width, height)
     }
@@ -30,7 +30,7 @@ class RefStabilizerTest {
         val a = st.next(shot(el("搜索", 500, 100)))
         assertEquals("w1", a.snapshotId)
         assertTrue(st.resolve(a.ref("搜索"), "w1") is Resolved.Current)
-        // 别的前缀的同号编号不是这块屏的
+        // Same-numbered refs with another prefix do not belong to this screen
         assertEquals(Resolved.Stale(StaleCause.SnapshotUnknown), st.resolve(a.ref("搜索"), "p1"))
     }
 
@@ -41,7 +41,7 @@ class RefStabilizerTest {
         assertEquals("s1", a.snapshotId); assertEquals("s2", b.snapshotId)
         assertEquals(a.ref("搜索"), b.ref("搜索"))
         assertEquals(a.ref("返回"), b.ref("返回"))
-        // 模型编号映射到这一屏的端口编号
+        // Model refs map to this screen's port refs
         assertEquals("@e3", b.toPort[b.ref("搜索")])
         assertEquals("@e1", b.toPort[b.ref("返回")])
         assertEquals("@e3", b.ref("新的"))
@@ -50,7 +50,7 @@ class RefStabilizerTest {
     @Test fun movedWithin15PercentKeepsRef() {
         val st = RefStabilizer()
         val a = st.next(shot(el("确定", 500, 500)))
-        val b = st.next(shot(el("确定", 500, 640))) // 140 ≤ 屏宽 1000 的 15%
+        val b = st.next(shot(el("确定", 500, 640))) // 140 ≤ 15% of the 1000-wide screen
         assertEquals(a.ref("确定"), b.ref("确定"))
     }
 
@@ -71,13 +71,13 @@ class RefStabilizerTest {
     @Test fun duplicateKeysNeverKeepRefs() {
         val st = RefStabilizer()
         val a = st.next(shot(el("关注", 800, 300), el("关注", 800, 600), el("标题", 500, 50)))
-        // 滚动一行之后同一位置已经是另一行的「关注」
+        // After scrolling one row, the same position already holds another row's "Follow"
         val b = st.next(shot(el("关注", 800, 300), el("关注", 800, 600), el("标题", 500, 50)))
         val old = a.refs("关注").toSet()
         assertTrue(b.refs("关注").none { it in old })
         assertEquals(2, b.refs("关注").toSet().size)
         assertEquals(a.ref("标题"), b.ref("标题"))
-        // 一边唯一、另一边重复,也不沿用
+        // Unique on one side, duplicated on the other: not carried over either
         val c = st.next(shot(el("关注", 800, 300)))
         assertTrue(c.ref("关注") !in b.refs("关注"))
         val d = st.next(shot(el("关注", 800, 300), el("关注", 800, 600)))
@@ -99,7 +99,7 @@ class RefStabilizerTest {
         val c = st.next(shot(el("一", 100, 100), el("二", 200, 200), el("四", 300, 300), el("三", 300, 300)))
         assertTrue(b.elements.none { it.ref == "@e3" })
         assertNotEquals("@e3", c.ref("四"))
-        assertNotEquals("@e3", c.ref("三")) // 退役后重新出现也是新编号
+        assertNotEquals("@e3", c.ref("三")) // Reappearing after retirement still gets a new ref
         val all = c.elements.map { it.ref }
         assertEquals(all.size, all.toSet().size)
     }
@@ -133,7 +133,7 @@ class RefStabilizerTest {
         val st = RefStabilizer()
         st.next(shot(el("一", 100, 100)))
         val b = st.next(shot(el("一", 100, 100), el("二", 200, 200)))
-        // @e2 是第二屏才有的:配第一屏的 snapshotId 不成立
+        // @e2 exists only on the second screen: pairing it with the first screen's snapshotId does not hold
         assertEquals(Resolved.Stale(StaleCause.RefNotInSnapshot), st.resolve(b.ref("二"), "s1"))
         assertEquals(Resolved.Stale(StaleCause.SnapshotUnknown), st.resolve(b.ref("一"), "s9"))
         assertEquals(Resolved.Stale(StaleCause.SnapshotUnknown), st.resolve(b.ref("一"), "port2"))
@@ -146,18 +146,18 @@ class RefStabilizerTest {
         val retired = a.ref("旧")
         st.next(shot(el("一", 100, 100), el("二", 200, 200)))
         repeat(18) { st.next(shot(el("一", 100, 100), el("二", 200, 200))) }
-        // s1 是仍保留的最旧一屏:还能区分编号状态,正常旧编号也仍能翻译。
+        // s1 is the oldest snapshot still retained: ref states can still be distinguished, and normal old refs still translate.
         assertTrue(st.resolve(a.ref("二"), "s1") is Resolved.Current)
         assertEquals(Resolved.Stale(StaleCause.RefRetired), st.resolve(retired, "s1"))
         assertEquals(Resolved.Stale(StaleCause.RefRetired), st.resolve("@e99", "s1"))
         st.next(shot(el("一", 100, 100), el("二", 200, 200)))
-        // s1 被裁掉后无法知道当时有哪些编号:snapshot_unknown 优先于未知/退役编号。
+        // Once s1 is evicted, the refs of that time are unknowable: snapshot_unknown takes priority over unknown/retired refs.
         assertEquals(Resolved.Stale(StaleCause.SnapshotUnknown), st.resolve(retired, "s1"))
         assertEquals(Resolved.Stale(StaleCause.SnapshotUnknown), st.resolve("@e99", "s1"))
     }
 
     @Test fun singleSameNameNewRowGetsNewRef() {
-        // 列表里只有一个「关注」;滚动后另一行的「关注」挪到附近:前面的用户名换了,不是同一个
+        // The list holds only one "Follow"; after scrolling, another row's "Follow" moves nearby: the username before it changed, so it is not the same element
         val st = RefStabilizer()
         val a = st.next(shot(el("张三", 300, 500), el("关注", 800, 500)))
         val b = st.next(shot(el("李四", 300, 520), el("关注", 800, 520)))
@@ -169,7 +169,7 @@ class RefStabilizerTest {
         val a = st.next(shot(el("标题", 500, 50), el("搜索", 900, 50), el("关注", 800, 500), list = true))
         val b = st.next(shot(el("标题", 500, 50), el("搜索", 900, 50), el("关注", 800, 500), list = true))
         assertEquals(a.ref("关注"), b.ref("关注"))
-        // 上下文相同、挪了不到 15%,但在列表里:可能已经滚到另一行,不沿用
+        // Same context and moved less than 15%, but inside a list: it may have scrolled to another row, so it is not carried over
         val c = st.next(shot(el("标题", 500, 50), el("搜索", 900, 50), el("关注", 800, 600), list = true))
         assertNotEquals(b.ref("关注"), c.ref("关注"))
         assertEquals(b.ref("标题"), c.ref("标题"))
@@ -197,7 +197,7 @@ class RefStabilizerTest {
     }
 
     @Test fun shiftLimitUsesShortSide() {
-        // 横屏:宽 2000、高 1000,上限是 150 而不是 300
+        // Landscape: 2000 wide by 1000 tall, so the limit is 150 rather than 300
         val st = RefStabilizer()
         val a = st.next(shot(el("确定", 500, 300), width = 2000, height = 1000))
         val b = st.next(shot(el("确定", 500, 500), width = 2000, height = 1000))
@@ -205,7 +205,7 @@ class RefStabilizerTest {
     }
 
     @Test fun cumulativeShiftFromOldSnapshotIsStale() {
-        // 每屏挪 100(都在 150 以内,编号沿用),但从第一屏算起已挪了 300
+        // Moves 100 per screen (all within 150, so the ref is carried over), but it has moved 300 from the first screen
         val st = RefStabilizer()
         val a = st.next(shot(el("确定", 500, 500)))
         st.next(shot(el("确定", 500, 600)))

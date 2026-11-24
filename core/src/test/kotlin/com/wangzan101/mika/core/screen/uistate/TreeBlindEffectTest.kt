@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 树读不出点的那一处时,看不出变化照实说「看不出」,不说「多半没点上」;种类仍是 no_effect。 */
+/** When the tree cannot see the tapped spot, say honestly that no change is visible instead of "it probably did not land"; the kind is still no_effect. */
 class TreeBlindEffectTest {
     private val button = UiElement("@e1", "button", "设置", 500, 100, listOf(400, 50, 600, 150), null, true, false, false)
     private val before = ScreenSnapshot("s1", "com.example.chat", listOf(button), 1080, 2400)
@@ -18,7 +18,7 @@ class TreeBlindEffectTest {
         assertTrue(ActionEffect.treeBlind(Verb.Tap, TreeQuality.Unusable, before, null, offTree))
         assertTrue(ActionEffect.treeBlind(Verb.Tap, TreeQuality.Unusable, before, button, null))
         assertTrue(ActionEffect.treeBlind(Verb.PhoneGesture, TreeQuality.Unusable, before, null, null))
-        // 返回、滑动、按键看不出变化另有说法
+        // Back, swipe and key presses have their own wording when no change is visible
         assertFalse(ActionEffect.treeBlind(Verb.Back, TreeQuality.Unusable, before, null, null))
         assertFalse(ActionEffect.treeBlind(Verb.Swipe, TreeQuality.Unusable, before, null, offTree))
     }
