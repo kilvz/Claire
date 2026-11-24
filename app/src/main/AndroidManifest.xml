@@ -105,6 +105,8 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- The speech app is checked before offering to install it again; some builds expose only TTS to package queries -->
+        <package android:name="com.google.android.tts" />
         <!-- The onboarding page first checks whether the system developer options page can be opened: if not (some runtime environments lack Android system settings), it states up front that phone control is unavailable -->
         <intent>
             <action android:name="android.settings.APPLICATION_DEVELOPMENT_SETTINGS" />

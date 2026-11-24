@@ -22,6 +22,18 @@ data class RecognizerService(val component: String, val open: Boolean, val permi
 
 /** The phone's built-in recognition: capability detection, how error codes are classified, and the language used for recognition. */
 object SystemSpeech {
+    /** Google's speech app ("Speech Recognition & Synthesis", formerly "Speech Services by Google"); also the Play Store package. */
+    const val SPEECH_APP_PACKAGE = "com.google.android.tts"
+
+    /**
+     * Google's speech app when it is installed, null otherwise. Android can still offer no recognition service
+     * when the app is disabled, its recognition component is turned off, or the installed build only carries TTS;
+     * then telling the user to install it again is wrong, and the sheet opens the app's settings instead.
+     */
+    fun installedSpeechApp(context: Context): String? = SPEECH_APP_PACKAGE.takeIf {
+        runCatching { context.packageManager.getPackageInfo(it, 0) }.isSuccess
+    }
+
     /**
      * Starting with Android 11, querying RecognitionService must be declared in the manifest, otherwise this is always unavailable.
      * [silent] is the mark that the service was tried before and did not respond (see [SpeechSettings.systemSilent]): the system can only tell whether one exists, whether it answers has to be tried.

@@ -105,6 +105,8 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.voice.HoldToTalk
 import com.wangzan101.mika.voice.SpeechEngineSpec
 import com.wangzan101.mika.voice.SpeechFailure
+import com.wangzan101.mika.voice.SpeechServiceMic
+import com.wangzan101.mika.voice.SystemSpeech
 import com.wangzan101.mika.voice.VoiceSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -745,33 +747,51 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
     val body: String
     val action: String
     val go: () -> Unit
-    // Built-in recognizer missing: offer to install it — the Play Store page
-    // for "Speech Recognition & Synthesis" (formerly "Speech Services by Google").
-    // The Google app alone is not the recognizer.
-    var install: (() -> Unit)? = null
+    // Built-in recognizer missing: offer to install the Play Store app — or, when
+    // it is already installed but Android exposes no recognition service, open
+    // its settings instead of sending people to a page that says "Installed".
+    var fix: Pair<String, () -> Unit>? = null
     when (sheet) {
         is VoiceSheet.Unavailable -> {
             title = stringResource(R.string.voice_unavailable_title)
             // NoSystemNoModel / SystemGone mean the phone has no recognition
             // service at all; the other cases are a broken or busy service.
             if (sheet.why == SpeechEngineSpec.Why.NoSystemNoModel || sheet.why == SpeechEngineSpec.Why.SystemGone) {
-                body = stringResource(R.string.voice_unavailable_built_in_missing)
-                install = {
-                    // market:// first, web fallback; a phone without a Play
-                    // Store must never crash — toast instead.
-                    try {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.tts"))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    } catch (_: RuntimeException) {
+                val installed = SystemSpeech.installedSpeechApp(context)
+                if (installed != null) {
+                    // The app is on the phone but Android is not offering its recognition service
+                    // (disabled, its component is off, or this build only carries TTS). Never send
+                    // the user back to a Play Store page that already says "Installed".
+                    body = stringResource(R.string.voice_unavailable_system_gone)
+                    fix = stringResource(R.string.voice_permission_open) to {
                         try {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.tts"))
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", installed, null))
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         } catch (_: RuntimeException) {
-                            vh.toast = tr(R.string.voice_speech_service_store_failed)
+                            vh.toast = tr(R.string.voice_service_settings_failed, SpeechServiceMic.label(context, installed))
+                        }
+                    }
+                } else {
+                    body = stringResource(R.string.voice_unavailable_built_in_missing)
+                    fix = stringResource(R.string.voice_get_speech_service) to {
+                        // market:// first, web fallback; a phone without a Play
+                        // Store must never crash — toast instead.
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${SystemSpeech.SPEECH_APP_PACKAGE}"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        } catch (_: RuntimeException) {
+                            try {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${SystemSpeech.SPEECH_APP_PACKAGE}"))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            } catch (_: RuntimeException) {
+                                vh.toast = tr(R.string.voice_speech_service_store_failed)
+                            }
                         }
                     }
                 }
@@ -821,10 +841,10 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 18.dp).testTag("voice-sheet")) {
             Text(title, style = MikaType.Title, color = c.ink)
             Text(body, Modifier.padding(top = 8.dp), style = SheetBody, color = c.ink2)
-            install?.let { openStore ->
-                MikaButton(stringResource(R.string.voice_get_speech_service), { vh.sheet = null; openStore() }, Modifier.fillMaxWidth().padding(top = 18.dp), size = ButtonSize.Medium)
+            fix?.let { (label, open) ->
+                MikaButton(label, { vh.sheet = null; open() }, Modifier.fillMaxWidth().padding(top = 18.dp), size = ButtonSize.Medium)
             }
-            Row(Modifier.fillMaxWidth().padding(top = if (install != null) 10.dp else 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth().padding(top = if (fix != null) 10.dp else 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MikaButton(stringResource(R.string.ok_got_it), { vh.sheet = null }, Modifier.weight(1f), kind = ButtonKind.Tonal, size = ButtonSize.Medium)
                 MikaButton(action, { vh.sheet = null; go() }, Modifier.weight(1f), size = ButtonSize.Medium)
             }
