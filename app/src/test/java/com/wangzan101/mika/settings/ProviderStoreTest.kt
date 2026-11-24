@@ -108,13 +108,13 @@ class ProviderStoreTest {
         assertNull(setups.last().serviceTier)
     }
 
-    /** 存一条配置并让它当主模型(没人用的配置会被清掉)。 */
+    /** Save a config and make it the main model (configs nobody uses get pruned). */
     private fun ProviderStore.saveAsMain(c: ProviderConfig, apiKey: String?) {
         save(c, apiKey)
         assertTrue(choose(ModelRole.Main, RoleChoice.Model(c.id)))
     }
 
-    // ---------- 主模型备援链(项目 3) ----------
+    // ---------- Main model fallback chain (item 3) ----------
 
     @Test fun mainFallbackGapSlotAppendsAtEnd() {
         val s = store()
@@ -155,9 +155,9 @@ class ProviderStoreTest {
         assertEquals(emptyList<String>(), s.roles.value.mainFallbacks)
     }
 
-    // ---------- 密钥池接线:401/403 标耗尽、429 冷却 ----------
+    // ---------- Key pool wiring: 401/403 marks exhausted, 429 cools down ----------
 
-    /** 真接线(不换 buildModel):401 的坏 key 在池里被标耗尽,不再被轮询选中;好 key 接手完成请求。 */
+    /** Real wiring (without swapping buildModel): the bad key that got the 401 is marked exhausted in the pool and is no longer picked by rotation; the good key takes over and completes the request. */
     @Test fun authFailureMarksKeyExhaustedThroughWiredModel() = runTest {
         val server = MockWebServer().also { it.start() }
         try {
@@ -172,12 +172,12 @@ class ProviderStoreTest {
                 val m = s.modelForConfig(c.id)!!
                 val reply = m.complete("s", listOf(Message(Role.User, listOf(Part.Text("hi")), Author.Mika)), emptyList())
                 assertEquals("hi", reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text })
-                // 轮询位置跨注册保留(#757):先后两棒各用一把,不假设哪把先跑
+                // The rotation position survives re-registration (#757): the two consecutive turns each use one key, without assuming which one runs first
                 val first = server.takeRequest().getHeader("Authorization")
                 val second = server.takeRequest().getHeader("Authorization")
                 assertNotEquals(first, second)
                 assertEquals(setOf("Bearer sk-bad", "Bearer sk-good"), setOf(first, second))
-                // 401 的那把已标耗尽:池里只剩接手的那把可用,轮询不会再选回去
+                // The key that got the 401 is marked exhausted: only the key that took over is available in the pool, so rotation will not pick it again
                 assertEquals(2, KeyPoolManager.shared.keyCount(pid))
                 assertEquals(1, KeyPoolManager.shared.activeKeyCount(pid))
                 assertEquals(second?.removePrefix("Bearer "), KeyPoolManager.shared.getActiveKey(pid))
@@ -190,7 +190,7 @@ class ProviderStoreTest {
     }
 
     @Test fun mainFallbackRejectsSlotAtMax() {
-        // 位子只有 0..MAX-1(UI 也只显示这些):slot == MAX 要拒(MK-1 B-D3)。
+        // Slots are only 0..MAX-1 (the UI shows only these too): slot == MAX must be rejected (MK-1 B-D3).
         val s = store()
         s.save(cfg("a"), "sk-a")
         assertFalse(s.setMainFallback(MAX_MAIN_FALLBACKS, "a"))
@@ -198,8 +198,8 @@ class ProviderStoreTest {
     }
 
     @Test fun mainFallbackChainSkipsMainItself() {
-        // 旧设定若把主模型自己排进备援,组链时略过(MK-1 B-D2)。
-        // 顺序要注意:setMainFallback 会 prune 掉还没被引用的配置,所以先把 a 排上再存 b。
+        // If an old setting listed the main model itself among the fallbacks, it is skipped when the chain is built (MK-1 B-D2).
+        // Mind the order: setMainFallback prunes configs that are not referenced yet, so assign a first and then save b.
         val s = store()
         s.saveAsMain(cfg("a"), "sk-a")
         assertTrue(s.setMainFallback(0, "a"))
@@ -222,7 +222,7 @@ class ProviderStoreTest {
     }
 
     @Test fun isMainModelMatchesCurrentMain() {
-        // 手填备援时挡主模型自己,靠这个判断(MK-1 D1)。
+        // Used to block the main model itself when a fallback is typed by hand (MK-1 D1).
         val s = store()
         val p = connected(s)
         s.use(ModelRole.Main, p.id, "m1", none)
@@ -232,7 +232,7 @@ class ProviderStoreTest {
     }
 
     @Test fun choosingFallbackAsMainClearsItFromFallbacks() {
-        // 把备援改选为主模型:它不能同时留在备援链里(MK-1 D2)。
+        // Selecting a fallback as the main model: it must not stay in the fallback chain at the same time (MK-1 D2).
         val s = store()
         val p = connected(s)
         s.use(ModelRole.Main, p.id, "m1", none)
@@ -243,7 +243,7 @@ class ProviderStoreTest {
     }
 
     @Test fun storedMainDuplicateClearedOnReload() {
-        // 旧文件里主模型自己排在备援链里:重新载入时清掉,界面与实际链一致(MK-1 D2)。
+        // In an old file the main model itself was listed in the fallback chain: clear it on reload so the UI matches the actual chain (MK-1 D2).
         val s = store()
         s.saveAsMain(cfg("a"), "sk-a")
         assertTrue(s.setMainFallback(0, "a"))
@@ -254,7 +254,7 @@ class ProviderStoreTest {
     }
 
     @Test fun settingMainAsFallbackIsDroppedImmediately() {
-        // 任何路径把主模型写进备援位,存的当下就清掉,不等下次载入(审 T-1112-74a8f2 D2)。
+        // Whichever path writes the main model into a fallback slot, it is cleared at save time instead of waiting for the next load (review T-1112-74a8f2 D2).
         val s = store()
         s.saveAsMain(cfg("a"), "sk-a")
         assertTrue(s.setMainFallback(0, "a"))
@@ -262,7 +262,7 @@ class ProviderStoreTest {
     }
 
     @Test fun fallbackInheritsMainReasoningEffortWhenSupported() {
-        // 主模型设了思考强度、备援写明支持同一档:建备援时带上(MK-1 B-D1)。
+        // The main model has a reasoning effort set and the fallback declares support for the same level: carry it over when building the fallback (MK-1 B-D1).
         val s = store()
         val mainP = s.connect("MainP", ProviderConfig.Kind.OpenAiCompat, "https://mainp.test/v1", "k",
             listOf(ListedModel("m1", reasoningEfforts = listOf("low", "high"))))
@@ -278,7 +278,7 @@ class ProviderStoreTest {
     }
 
     @Test fun fallbackOmitsMainReasoningEffortWhenUnsupported() {
-        // 备援没写明支持主模型那个档位:不带,用它自己的默认,不能让请求因参数被拒(MK-1 B-D1)。
+        // The fallback does not declare support for the level the main model uses: omit it and use its own default, so the request is not rejected because of the parameter (MK-1 B-D1).
         val s = store()
         val mainP = s.connect("MainP", ProviderConfig.Kind.OpenAiCompat, "https://mainp.test/v1", "k",
             listOf(ListedModel("m1", reasoningEfforts = listOf("low", "high"))))
@@ -308,7 +308,7 @@ class ProviderStoreTest {
         existing.writeText(stored.replace(entryStart, "\"ttsModels\":[\"m1\"],$entryStart"))
 
         val reopened = store()
-        // 旧 ttsModels 字段仍作为遗留数据可读;不再按它过滤运行时的用途
+        // The old ttsModels field is still readable as legacy data; runtime roles are no longer filtered by it
         assertEquals(setOf("m1"), reopened.provider(provider.id)?.ttsModels)
         reopened.rememberModels(provider.id, listOf(ListedModel("m1"), ListedModel("m2")))
         assertEquals("m1", reopened.configFor(ModelRole.Main)?.model)
@@ -321,12 +321,12 @@ class ProviderStoreTest {
         val p = connected(s)
         val choice = VoiceChoice(p.id, " manual-tts ", TtsProtocol.OpenAiSpeech)
         val capabilities = TtsCapabilities()
-        // 不再要求模型标为 TTS;模型名去空格后直接建
+        // The model no longer has to be marked as TTS; the name is trimmed and the adapter is built directly
         assertEquals("manual-tts", s.ttsModel(choice, capabilities)?.name)
         assertEquals("m1", s.ttsModel(choice.copy(model = "m1"), capabilities)?.name)
     }
 
-    /** 地址读回来不合法(手改过的文件):不建朗读模型、不抛,试听和朗读按没选处理。 */
+    /** The address read back is invalid (hand-edited file): no read-aloud model is built and nothing throws; preview and read-aloud behave as if none were chosen. */
     @Test fun ttsAdapterIsNullForAnInvalidBaseUrl() {
         val s = store()
         val p = connected(s)
@@ -338,7 +338,7 @@ class ProviderStoreTest {
         assertNull(reopened.ttsModel(VoiceChoice(p.id, "tts-1", TtsProtocol.GeminiTts), TtsCapabilities()))
     }
 
-    /** 文件里已有的空手填名读入时丢掉。 */
+    /** Blank hand-typed names already in the file are dropped when it is read. */
     @Test fun blankTypedModelsAreDroppedOnRead() {
         val s = store()
         val p = connected(s)
@@ -366,7 +366,7 @@ class ProviderStoreTest {
         assertNull(store.providerKeyRevisions.value[first.id])
     }
 
-    // ---------- 用途的选择 ----------
+    // ---------- Role selection ----------
 
     @Test fun modelContextSurvivesPruningAndIsSharedOnlyWithinTheSameProviderAndModel() {
         val s = store()
@@ -396,8 +396,8 @@ class ProviderStoreTest {
     }
 
     @Test fun perModelReadTimeoutFlowsIntoTheClientSetupAndPersists() {
-        // #295:慢速本地推理服务(例如经隧道访问)一次生成可以超过全局默认的 120 秒读超时;
-        // 每模型配置的读超时随 ModelContextSettings 存取,并进到建模型用的 ClientSetup 里。
+        // #295: one generation from a slow local inference service (e.g. reached through a tunnel) can exceed the global default 120-second read timeout;
+        // the per-model configured read timeout is stored with ModelContextSettings and passed into the ClientSetup used to build the model.
         val s = store()
         val first = connected(s)
         s.use(ModelRole.Main, first.id, "m1", none)
@@ -416,7 +416,7 @@ class ProviderStoreTest {
     @Test fun configuredReadTimeoutAppliesToTheRealHttpClient() = runTest {
         MockWebServer().use { server ->
             server.start()
-            // 响应头故意晚于单模型的一秒读超时;若配置没进入 OkHttp,这里不会抛 Network。
+            // The response headers deliberately arrive later than the single model's one-second read timeout; if the setting never reached OkHttp, this would not throw Network.
             server.enqueue(MockResponse().setHeadersDelay(2, TimeUnit.SECONDS).setBody("{}"))
             val s = ProviderStore(tmp.root, AesGcmKeyCipher { key })
             val p = s.connect("Local", ProviderConfig.Kind.OpenAiCompat, server.url("/v1").toString(), "k", listOf(ListedModel("m")))
@@ -427,7 +427,7 @@ class ProviderStoreTest {
                 s.modelFor(ModelRole.Main)!!.complete("", emptyList(), emptyList())
                 fail("Expected the configured read timeout")
             } catch (_: ModelError.Network) {
-                // 真实适配器在读取响应头时超时,而不只是 ClientSetup 里保存了一个数字。
+                // The real adapter times out while reading the response headers, not just a number stored in ClientSetup.
             }
         }
     }
@@ -458,18 +458,18 @@ class ProviderStoreTest {
         assertNull(setups.last().readTimeoutSeconds)
     }
 
-    /** 预设改了默认上下文后,按旧默认存下的配置读入时跟上去;用户改过的和写了每模型窗口的不动(见 repairStaleContextDefaults)。 */
+    /** After a preset changes its default context, configs saved with the old default catch up when read back; values the user changed and explicit per-model windows are left alone (see repairStaleContextDefaults). */
     @Test fun stalePresetWindowIsRepairedOnLoadButUserValuesAreNot() {
         val s = store()
         val deepseek = s.connect("DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com", "k", listOf(ListedModel("deepseek-flash")))
         val other = connected(s)
         s.use(ModelRole.Main, deepseek.id, "deepseek-flash", none)
         s.use(ModelRole.Light, other.id, "m1", none)
-        // 用户给另一条配置单独写过窗口:不动
+        // The user wrote a window for another config separately: leave it alone
         assertTrue(s.setModelContext(s.configFor(ModelRole.Light)!!.id, ModelContextSettings(windowTokens = 32_000)))
         val reloaded = store()
         assertEquals(1_000_000, reloaded.configFor(ModelRole.Main)!!.capabilities.contextTokens)
-        // 预设默认没变的(示例地址不对应任何预设)和用户写过的都不动
+        // Entries whose preset default did not change (the example address matches no preset) and entries the user wrote are both left alone
         assertEquals(64_000, reloaded.configFor(ModelRole.Light)!!.capabilities.contextTokens)
     }
 
@@ -535,7 +535,7 @@ class ProviderStoreTest {
         val s = store()
         s.saveAsMain(cfg("a", vision = true), "sk-a")
         assertEquals("a", s.configFor(ModelRole.Light)?.id)
-        // 不再有「主模型能看图就兼任看图」的隐含规则
+        // The implicit rule "a main model that can see images also serves vision" is gone
         assertNull(s.configFor(ModelRole.Vision))
         val m = s.modelFor(ModelRole.Main)
         assertEquals("套上计量后能力照旧(临时:每 16 轮折一次)", cfg("a", vision = true).capabilities.copy(compactionEveryRounds = TEMP_COMPACTION_EVERY_ROUNDS), m?.capabilities)
@@ -554,7 +554,7 @@ class ProviderStoreTest {
         assertTrue(built.last().first.capabilities.vision)
         assertEquals("sk-a", built.last().second)
         assertTrue("用户说了主模型能看图,主模型自己办事也直接看截图", s.configFor(ModelRole.Main)!!.capabilities.vision)
-        // 重开仍在
+        // Still there after reopening
         assertEquals(RoleChoice.SameAsMain, store().roles.value.vision)
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.Off))
         assertFalse("换走了就回到存着的标记", s.configFor(ModelRole.Main)!!.capabilities.vision)
@@ -585,7 +585,7 @@ class ProviderStoreTest {
         val reopened = store()
         assertEquals(mapOf("m1" to true), reopened.provider(p.id)!!.visionOverrides)
         assertTrue("重开仍在", reopened.configFor(ModelRole.Main)!!.capabilities.vision)
-        // 用户也能关掉:看图用主模型时主模型也按用户说的不附图,看图这一路照旧
+        // The user can turn it off too: when vision uses the main model, the main model stops attaching images as the user said, while the vision path keeps working as before
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.SameAsMain))
         assertTrue(s.setModelVision(p.id, "m1", false))
         assertFalse(s.configFor(ModelRole.Main)!!.capabilities.vision)
@@ -637,7 +637,7 @@ class ProviderStoreTest {
         assertEquals("m1" to "m2", main.model to vision.model)
         assertTrue("选作主模型就记工具调用", main.capabilities.toolCalls)
         assertTrue("选作看图就算能看图", vision.capabilities.vision)
-        // 轻量不要求任何能力
+        // The light role requires no capabilities at all
         assertTrue(s.use(ModelRole.Light, p.id, "m2", none))
         assertEquals(vision.id, s.configFor(ModelRole.Light)?.id)
         assertFalse(s.use(ModelRole.Main, "missing", "m1", none))
@@ -668,7 +668,7 @@ class ProviderStoreTest {
         assertEquals("m1", built.single().first.model)
     }
 
-    // ---------- 没人用的配置删掉 ----------
+    // ---------- Configs nobody uses are deleted ----------
 
     @Test
     fun configsNoRoleUsesAreDeletedButTheProviderKeyStays() {
@@ -677,10 +677,10 @@ class ProviderStoreTest {
         s.use(ModelRole.Main, p.id, "m1", none)
         s.use(ModelRole.Light, p.id, "m2", none)
         assertEquals(listOf("m1", "m2"), s.list().map { it.model })
-        // 轻量改回用主模型:m2 没人用了
+        // Switch the light role back to the main model: nothing uses m2 anymore
         assertTrue(s.choose(ModelRole.Light, RoleChoice.SameAsMain))
         assertEquals(listOf("m1"), s.list().map { it.model })
-        // 换主模型:m1 没人用了
+        // Switch the main model: nothing uses m1 anymore
         s.use(ModelRole.Main, p.id, "m2", none)
         assertEquals(listOf("m2"), s.list().map { it.model })
         assertEquals("k", s.providerKey(p.id))
@@ -707,7 +707,7 @@ class ProviderStoreTest {
         assertEquals(2, s.list().size)
         val reopened = store()
         assertEquals(listOf("a"), reopened.list().map { it.id })
-        // 手改坏的文件:看图指向不存在的配置,退回不用
+        // Hand-broken file: vision points at a config that does not exist, so it falls back to Off
         val f = File(tmp.root, "providers.json")
         f.writeText(f.readText().replace("\"Vision\":{\"use\":\"none\"}", "\"Vision\":{\"use\":\"model\",\"config\":\"gone\"}"))
         assertEquals(RoleChoice.Off, store().roles.value.vision)
@@ -742,7 +742,7 @@ class ProviderStoreTest {
         assertNull(ProviderStore(tmp.root, AesGcmKeyCipher { otherKey }).apiKey("a"))
     }
 
-    /** 试调用通过的模型名随服务商存下;再连一次同一家时合并;旧文件没有这一项时为空。 */
+    /** Model names that passed the test call are stored with the provider; connecting the same provider again merges them; old files without this field read as empty. */
     @Test
     fun verifiedModelsPersist() {
         val s = store()
@@ -768,33 +768,33 @@ class ProviderStoreTest {
         assertEquals(listOf(p), reopened.providers.value)
         assertEquals(listed, reopened.providers.value.single().models)
         assertEquals("sk-d", reopened.providerKey(p.id))
-        // 同一家再连一次:更新 Key 和列表,不重复添加
+        // Connect the same provider again: update the key and the list without adding a duplicate entry
         val again = s.connect("DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com/", "sk-new", listOf(ListedModel("c")))
         assertEquals(p.id, again.id)
         assertEquals(1, s.providers.value.size)
         assertEquals("sk-new", s.providerKey(p.id))
         assertEquals(listOf("c"), store().providers.value.single().models!!.map { it.id })
-        // 没列过的是 null,列过但没有的是空列表
+        // Never listed is null; listed but empty is an empty list
         s.rememberModels(p.id, emptyList())
         assertEquals(emptyList<ListedModel>(), store().providers.value.single().models)
     }
 
-    // ---------- 跳过测试直接存下 ----------
+    // ---------- Saved directly without testing ----------
 
-    /** 跳过测试存下的那家带标记;重新读文件也在(旧版本的文件没有这一项,按测过算)。 */
+    /** A provider saved by skipping the test carries the flag, and it is still there after re-reading the file (files from older versions lack this field and count as tested). */
     @Test
     fun untestedProviderPersistsItsFlag() {
         val s = store()
         val p = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", emptyList(), untested = true)
         assertTrue(p.savedUntested)
         assertTrue("重新读入还在", store().provider(p.id)!!.savedUntested)
-        // 不是跳过测试存下的那些没有这个标记
+        // Providers that were not saved by skipping the test do not carry this flag
         val other = s.connect("Y", ProviderConfig.Kind.OpenAiCompat, "https://y.test/v1", "k", emptyList())
         assertFalse(other.savedUntested)
         assertFalse(store().provider(other.id)!!.savedUntested)
     }
 
-    /** 列过一次模型、或试通过一个模型,「没测过」就不再成立。 */
+    /** Once the model list has been fetched or a single model has passed the test call, "not tested" no longer holds. */
     @Test
     fun listingOrVerifyingClearsTheUntestedFlag() {
         val s = store()
@@ -809,7 +809,7 @@ class ProviderStoreTest {
         assertEquals(setOf("m1"), s.provider(verified.id)!!.verifiedModels)
     }
 
-    /** 主模型在它那家还没测试通过(没有列表、手填、没核实)时给出那一家;核实过、或这家有列表时不算。 */
+    /** Returns the main model's provider while that provider has not passed a test (no list, hand-typed, unverified); it does not count once the model is verified or the provider has a list. */
     @Test
     fun untestedMainProviderFollowsTheMainModel() {
         val s = store()
@@ -825,7 +825,7 @@ class ProviderStoreTest {
         assertNull("从列表里选的不算", s.untestedMainProvider())
     }
 
-    /** 跳过测试再存一次已经列过模型的那家:已有的列表留着,不要被空表盖掉,也仍然是「测过」。 */
+    /** Saving with the test skipped again for a provider whose models were already listed: the existing list is kept, not overwritten by an empty one, and it still counts as "tested". */
     @Test
     fun savingUntestedAgainKeepsAnExistingModelList() {
         val s = store()
@@ -847,7 +847,7 @@ class ProviderStoreTest {
         assertEquals(listOf("k2", "k2"), s.list().map { s.apiKey(it.id) })
         s.modelFor(ModelRole.Main)
         assertEquals("k2", built.last().second)
-        // Key 文件里只有一份(按服务商存)
+        // The key file holds only one copy (stored per provider)
         val keys = kotlinx.serialization.json.Json.parseToJsonElement(File(tmp.root, "provider-keys.json").readText())
         assertEquals(setOf(p.id), (keys as kotlinx.serialization.json.JsonObject).keys)
     }
@@ -867,7 +867,7 @@ class ProviderStoreTest {
         assertEquals(1, s.configs.value.size)
     }
 
-    // ---------- 删除服务商 ----------
+    // ---------- Removing a provider ----------
 
     @Test
     fun removeProviderDropsItsModelsAndKeyAndResetsItsRoles() {
@@ -882,7 +882,7 @@ class ProviderStoreTest {
         assertEquals(RoleChoices(main = "other", vision = RoleChoice.Off, light = RoleChoice.SameAsMain), s.roles.value)
         assertNull(s.providerKey(p.id))
         assertEquals(listOf("P other"), s.providers.value.map { it.name })
-        // 重开后数据一致
+        // Data is consistent after reopening
         val reopened = store()
         assertEquals(listOf("other"), reopened.list().map { it.id })
         assertEquals(s.roles.value, reopened.roles.value)
@@ -900,12 +900,12 @@ class ProviderStoreTest {
         s.removeProvider(a.id)
         assertNull(s.roles.value.main)
         assertEquals(b.id, s.configFor(ModelRole.Vision)?.providerId)
-        // 重开时不会把剩下的那条当成主模型(那是旧版本的规则)
+        // Reopening does not treat the remaining config as the main model (that was the rule in older versions)
         assertNull(store().roles.value.main)
         assertEquals(b.id, store().configFor(ModelRole.Vision)?.providerId)
     }
 
-    // ---------- 旧版本的文件 ----------
+    // ---------- Files from older versions ----------
 
     private fun enc(k: String): String = java.util.Base64.getEncoder().encodeToString(AesGcmKeyCipher { key }.encrypt(k.toByteArray()))
 
@@ -913,7 +913,7 @@ class ProviderStoreTest {
         """{"id":"$id","name":"$name","kind":"OpenAiCompat","baseUrl":"$url","model":"$model","toolCalls":true,"vision":$vision,""" +
             """"contextTokens":64000,"reasoning":false,"groundingVerified":false,"promptCaching":"implicit"}"""
 
-    /** 旧版本的文件:只有模型配置,Key 按配置 id 存,角色只记显式指定的。 */
+    /** Files from older versions: model configs only, keys stored by config id, and roles record only the explicit choices. */
     private fun writeLegacyFiles(roles: String = """{"Main":"c2","Vision":"c3"}""") {
         File(tmp.root, "providers.json").writeText(
             """{"providers":[""" +
@@ -933,24 +933,24 @@ class ProviderStoreTest {
         val ds = s.providers.value[0]
         val local = s.providers.value[1]
         assertNull("还没列过模型", ds.models)
-        // Key 归到服务商
+        // Keys move to the providers
         assertEquals("sk-ds", s.providerKey(ds.id))
         assertEquals("sk-local", s.providerKey(local.id))
-        // 显式指定的照旧;没人用的 c1 删掉
+        // Explicit choices stay as they were; c1 is deleted because nobody uses it
         assertEquals(RoleChoices(main = "c2", vision = RoleChoice.Model("c3"), light = RoleChoice.SameAsMain), s.roles.value)
         assertEquals(listOf("c2", "c3"), s.list().map { it.id })
         assertEquals(listOf(ds.id, local.id), s.list().map { it.providerId })
         assertEquals("deepseek-reasoner", s.configFor(ModelRole.Main)?.model)
         s.modelFor(ModelRole.Vision)
         assertEquals("c3" to "sk-local", built.last().first.id to built.last().second)
-        // 按配置 id 存的旧 Key 清掉了
+        // Old keys stored by config id are cleared
         val keys = kotlinx.serialization.json.Json.parseToJsonElement(File(tmp.root, "provider-keys.json").readText())
         assertEquals(setOf(ds.id, local.id), (keys as kotlinx.serialization.json.JsonObject).keys)
     }
 
     @Test
     fun legacyDefaultsAreWrittenOutAsTheyWorked() {
-        // 没指定主模型:那时用第一个配置;它不能看图,所以看图不用;轻量跟随主模型
+        // No main model specified: the first config was used back then; it cannot see images, so vision stays Off; light follows the main model
         writeLegacyFiles(roles = "{}")
         val s = store()
         assertEquals(RoleChoices(main = "c1", vision = RoleChoice.Off, light = RoleChoice.SameAsMain), s.roles.value)
@@ -997,7 +997,7 @@ class ProviderStoreTest {
     fun interruptedMigrationIsRedoneWithoutLosingKeys() {
         writeLegacyFiles()
         store()
-        // 模拟中途断掉:配置文件回到旧格式,Key 文件里新旧两份都在
+        // Simulate an interruption mid-way: the config file is back in the old format, and both the old and the new copies exist in the key file
         val migratedKeys = File(tmp.root, "provider-keys.json").readText()
         writeLegacyFiles()
         val legacyKeys = kotlinx.serialization.json.Json.parseToJsonElement(File(tmp.root, "provider-keys.json").readText())
@@ -1011,14 +1011,14 @@ class ProviderStoreTest {
         assertEquals(s.providers.value.map { it.id }.toSet(), (keys as kotlinx.serialization.json.JsonObject).keys)
     }
 
-    // ---------- 看图定位已验证 ----------
+    // ---------- Vision grounding verified ----------
 
     @Test
     fun groundingVerifiedFollowsTheVisionModelAndPersists() {
         val s = store()
         val p = connected(s)
         s.use(ModelRole.Main, p.id, "m1", none)
-        // 没有看图模型时不动
+        // Does nothing when there is no vision model
         s.setVisionGroundingVerified(true)
         assertFalse(s.list().single().capabilities.groundingVerified)
         s.use(ModelRole.Vision, p.id, "m2", none)
@@ -1026,7 +1026,7 @@ class ProviderStoreTest {
         assertTrue(s.configFor(ModelRole.Vision)!!.capabilities.groundingVerified)
         assertFalse(s.configFor(ModelRole.Main)!!.capabilities.groundingVerified)
         assertTrue(store().configFor(ModelRole.Vision)!!.capabilities.groundingVerified)
-        // 看图用主模型时改的是主模型那条
+        // When vision uses the main model, the main model's entry is the one changed
         s.choose(ModelRole.Vision, RoleChoice.SameAsMain)
         assertFalse(s.configFor(ModelRole.Vision)!!.capabilities.groundingVerified)
         s.setVisionGroundingVerified(true)
@@ -1049,7 +1049,7 @@ class ProviderStoreTest {
         assertEquals(RoleChoices(main = null, vision = RoleChoice.SameAsMain, light = RoleChoice.SameAsMain), r.keepOnly(emptySet()))
     }
 
-    // ---------- 按模型指定的接口 ----------
+    // ---------- Per-model endpoints ----------
 
     private val chat = ModelEndpoint(ModelProtocol.ChatCompletions, "https://x.test/openai/v1", "reasoning_content")
     private val messages = ModelEndpoint(ModelProtocol.Messages, "https://x.test/anthropic/v1")
@@ -1080,7 +1080,7 @@ class ProviderStoreTest {
         store().modelFor(ModelRole.Light)
         assertEquals(listOf(messages, null), endpoints)
         assertEquals(listOf("k", "k"), built.map { it.second })
-        // 重新列出、地址换了,下次建模型用新的
+        // Listed again with a changed address: the next model build uses the new one
         val moved = messages.copy(baseUrl = "https://y.test/anthropic/v1")
         s.rememberModels(p.id, listOf(ListedModel("b", endpoint = moved)))
         s.modelFor(ModelRole.Main)
@@ -1099,9 +1099,9 @@ class ProviderStoreTest {
         assertEquals(ProviderConfig.Kind.Anthropic to "https://api.anthropic.com", ProviderStore.adapterFor(anthropicConfig, null))
     }
 
-    // ---------- 请求头 ----------
+    // ---------- Request headers ----------
 
-    /** 声明了会话头的服务商:同一段对话建的模型带同一个会话号,换一段对话就换;User-Agent 每个都带。 */
+    /** Providers that declare a session header: models built within one conversation carry the same session id, and a different conversation gets a different one; every model carries the User-Agent. */
     @Test
     fun sessionHeaderIsStableWithinAConversationAndDiffersAcross() {
         val s = store()
@@ -1115,7 +1115,7 @@ class ProviderStoreTest {
         assertTrue(setups.all { it.headers["User-Agent"] == "Claire/1.2.3" })
     }
 
-    /** 列表把模型指到 Responses 的(同一服务商下只说这一种协议的模型):走真的 Responses 适配器,照样带客户端标识和会话号。 */
+    /** The listing routes the model to Responses (a model declaring only that protocol under the same provider): it goes through the real Responses adapter and still carries the client identifier and the session id. */
     @Test
     fun responsesRoutedModelCarriesTheSessionHeader() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
@@ -1148,7 +1148,7 @@ class ProviderStoreTest {
         assertEquals(mapOf("User-Agent" to "Claire/1.2.3"), setups.single().headers)
     }
 
-    /** 会话头随服务商存下;旧版本存下的(没有这一项)按地址对得上的预设补上,预设的地址就会带。 */
+    /** The session header is stored with the provider; providers saved by older versions (without this field) get it from the preset whose address matches, so preset addresses carry it. */
     @Test
     fun sessionHeaderPersistsAndIsFilledFromThePresetForOldFiles() {
         val goUrl = ProviderPresets.all.first { it.sessionHeader != null }
@@ -1163,7 +1163,7 @@ class ProviderStoreTest {
         assertTrue("written back", f.readText().contains("sessionHeader"))
     }
 
-    /** 试调用走真的适配器:带客户端标识和声明的会话头、带一个试用的工具;回了工具调用才算通过,服务端的报错原样带回。 */
+    /** The test call goes through the real adapter: it carries the client identifier, the declared session header and a trial tool; only a tool call in the reply counts as a pass, and server errors are passed back unchanged. */
     @Test
     fun probeGoesThroughTheRealAdapterWithHeaders() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
@@ -1189,7 +1189,7 @@ class ProviderStoreTest {
             assertTrue(e.error.message.orEmpty(), e.error.message.orEmpty().contains("MissingSessionID"))
             assertNull(server.takeRequest().getHeader("x-test-session"))
 
-            // Responses 不给回复上限;回了函数调用就算通过
+            // Responses gets no reply cap; a function call in the reply counts as a pass
             server.enqueue(okhttp3.mockwebserver.MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
                 "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c1\",\"name\":\"get_time\",\"arguments\":\"{}\"}}\n\n" +
                     "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n",
@@ -1206,7 +1206,7 @@ class ProviderStoreTest {
         }
     }
 
-    /** 接口通、模型只回了话不调用工具:不是失败,但要分得出来。 */
+    /** The endpoint works but the model only replied with text and called no tool: not a failure, but the two must be distinguishable. */
     @Test
     fun probeThatGetsOnlyTextReportsNoToolCall() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
@@ -1220,7 +1220,7 @@ class ProviderStoreTest {
         }
     }
 
-    /** 试调用给 Messages 的回复上限留得够一次工具调用(16 个 token 装不下)。 */
+    /** The test call leaves enough of the Messages reply limit for one tool call (16 tokens is not enough). */
     @Test
     fun probeLeavesRoomForAToolCall() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
@@ -1238,7 +1238,7 @@ class ProviderStoreTest {
         }
     }
 
-    // ---------- 用量 ----------
+    // ---------- Usage ----------
 
     @Test
     fun everyModelHandedOutIsMeteredUnderTheRoleItWasAskedFor() = runTest {
@@ -1328,7 +1328,7 @@ class ProviderStoreTest {
         assertEquals(listOf(available.id), seen.map { it.providerId })
     }
 
-    /** 主动能力和服务商各有各的预算:用真的账本记账、也从它查当天用量。 */
+    /** Proactive capability and provider each have their own budget: the real ledger records usage and is also queried for today's usage. */
     private class Budgets(dir: File) {
         var clock = java.time.Instant.parse("2026-11-10T04:00:00Z").toEpochMilli()
         val ledger = UsageLedger(File(dir, "usage.json"), now = { clock }, flushDelayMs = 60_000, zone = { java.time.ZoneOffset.UTC })
@@ -1369,7 +1369,7 @@ class ProviderStoreTest {
         s.use(ModelRole.Light, p.id, "m2", none)
         assertTrue(s.setDailyTokenBudget(p.id, 10_000))
         b.proactiveLimit = 10_000
-        // 另一家记的主动能力用量也算在同一份预算里
+        // Proactive usage recorded under another provider also counts against the same budget
         b.ledger.record(UsageSource("other", "O", "x", UsagePurpose.Proactive), Usage(10_000, 0))
         val before = b.ledger.snapshot()
 
@@ -1385,13 +1385,13 @@ class ProviderStoreTest {
         s.modelFor(ModelRole.Main)!!.complete("s", emptyList(), emptyList())
         assertEquals(5L, b.ledger.providerTokensToday(p.id))
 
-        // 第二天恢复
+        // Recovers the next day
         b.clock += 24 * UsageLedger.HOUR_MS
         s.proactiveModel()!!.complete("s", emptyList(), emptyList())
         assertEquals("轻量模型选了 m2 就用 m2", "m2", b.ledger.snapshot().rows.last { it.key.purpose == UsagePurpose.Proactive && it.key.providerId == p.id }.key.model)
     }
 
-    /** 服务商不报用量时 Token 数不涨,靠请求次数的上限停下(默认 20 万 Token 时是 800 次);主模型的调用不受影响。 */
+    /** When the provider reports no usage the token count does not grow, so calls stop at the request-count limit (800 calls at the default 200k tokens); main-model calls are unaffected. */
     @Test fun proactiveCallsStopAtTheDailyCallLimitWhenNoUsageIsReported() = runTest {
         val b = Budgets(tmp.newFolder())
         val s = budgeted(b)
@@ -1415,8 +1415,8 @@ class ProviderStoreTest {
     }
 
     /**
-     * 只剩最后一次请求额度时,适配器在同一次调用里要再发一个请求(这里是不认 include 参数的 Responses 服务:400 后去掉参数重发):
-     * 不发,次数停在上限上;已经发出去的那一个照实记账。用的是真的适配器和账本。
+     * With only one request left in the quota, the adapter wants to send another request within the same call (here a Responses service that rejects the include parameter: after a 400 it retries without it):
+     * the retry is not sent and the count stops at the limit; the request already sent is recorded as it happened. This uses the real adapter and ledger.
      */
     @Test fun proactiveRetryInsideOneCallStopsAtTheCallLimit() = runTest {
         val server = okhttp3.mockwebserver.MockWebServer().also { it.start() }
@@ -1449,7 +1449,7 @@ class ProviderStoreTest {
         }
     }
 
-    /** 判定到八成就自己停(在 TriageRunner 里);直接的主动能力调用照样能用到整份。 */
+    /** Triage stops itself once it reaches eighty percent (inside TriageRunner); direct proactive calls can still use the whole budget. */
     @Test fun directProactiveCallsMayUseTheWholeBudgetPastTheTriageShare() = runTest {
         val b = Budgets(tmp.newFolder())
         val s = budgeted(b)
@@ -1463,7 +1463,7 @@ class ProviderStoreTest {
         s.proactiveModel()!!.complete("s", emptyList(), emptyList())
     }
 
-    /** 请求次数上限跟着 Token 上限走:调高 Token 上限后,不报用量的服务商不会停在 200 次。 */
+    /** The request-count limit follows the token limit: after raising the token limit, a provider that reports no usage no longer stops at 200 calls. */
     @Test fun raisingTheTokenLimitRaisesTheDerivedCallLimit() = runTest {
         val b = Budgets(tmp.newFolder())
         b.proactiveLimit = 50_000
@@ -1494,7 +1494,7 @@ class ProviderStoreTest {
         assertNull(budgeted(Budgets(tmp.newFolder())).proactiveModel())
     }
 
-    /** 主动能力的模型:回复限短;服务商写明了档位的取最低一档,没写明的照用这个用途选的档位;主动能力以外不受影响。 */
+    /** The proactive capability model: the reply is capped short; when the provider declares levels, the lowest one is used, and otherwise the level chosen for this purpose applies; nothing outside the proactive capability is affected. */
     @Test fun proactiveModelIsBuiltWithACapAndTheLowestDeclaredEffort() {
         val s = store()
         val p = s.connect("P", ProviderConfig.Kind.OpenAiCompat, "https://p.test/v1", "k", listOf(
@@ -1506,7 +1506,7 @@ class ProviderStoreTest {
         s.proactiveModel()
         assertEquals("minimal", setups.last().reasoningEffort)
         assertEquals(ProactiveModelSetup.CAP_THINKING, setups.last().maxOutputTokens)
-        // 请求是哪一种,一路带到建模型的那份设置里:回复长的(当日归纳之类)不另设上限,档位照旧取最低的
+        // The kind of request is carried all the way into the settings used to build the model: long-reply calls (daily summaries and the like) get no extra cap, and the level is still the lowest one
         for (call in listOf(ProactiveCall.Notes, ProactiveCall.Day, ProactiveCall.Span)) {
             s.proactiveTargeted(call)
             assertNull(call.name, setups.last().maxOutputTokens)
@@ -1519,7 +1519,7 @@ class ProviderStoreTest {
         assertNull(setups.last().maxOutputTokens)
         assertEquals(TriageTargetOf(p.id, "P", "m1"), s.proactiveTarget())
 
-        // 轻量模型单独选了 m2(服务商没写档位):不猜,不发档位
+        // The light model picks m2 separately (the provider declares no levels): do not guess, send no level
         s.use(ModelRole.Light, p.id, "m2", none)
         s.proactiveModel()
         assertNull(setups.last().reasoningEffort)
@@ -1538,8 +1538,8 @@ class ProviderStoreTest {
         assertEquals(ProactiveModelSetup.CAP, ProactiveModelSetup.of(ProviderConfig.Kind.Anthropic, null, null, ProactiveCall.Learn).second)
     }
 
-    // 分段、当日、周、月归纳的回复有十几句、每句上百字:不另设上限(不管开没开思考、走哪种协议),和普通任务一样用适配器的默认。
-    // 短上限只给判定和归纳话题;它得放得下写满的一批判定(8 条、每条一句最长的理由)
+    // Segment, daily, weekly and monthly summaries run to a dozen-plus sentences of a hundred-plus characters each: no extra cap (whether or not thinking is on, and whichever protocol is used), so the adapter default applies as for ordinary tasks.
+    // The short cap applies only to triage and topic summarization; it must hold a full batch of triage verdicts (8 items, each with its longest one-sentence reason)
     @Test fun longProactiveCallsAreNotCapped() {
         val listed = ReasoningOptions(listOf("none", "low", "high"), fromProvider = true)
         for (call in listOf(ProactiveCall.Notes, ProactiveCall.Day, ProactiveCall.Span)) {
@@ -1557,7 +1557,7 @@ class ProviderStoreTest {
         assertNull(store().proactiveTarget())
     }
 
-    // 目标和模型是同一次读配置得来的:给出的目标就是建模型用的那条配置
+    // The target and the model come from the same config read: the target returned is the config used to build the model
     @Test fun proactiveTargetedModelIsBuiltFromTheTargetItNames() {
         val s = store()
         assertNull(s.proactiveTargeted(ProactiveCall.Triage))

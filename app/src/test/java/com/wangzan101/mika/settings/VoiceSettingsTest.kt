@@ -25,7 +25,7 @@ class VoiceSettingsTest {
         settings.setChoice(choice)
 
         settings.reconcileTtsChoice(store)
-        // 旧标记不再写入;选择原样保留,只记下已迁移
+        // The old markers are no longer written; the choice is kept as is and only the migration is recorded
         assertTrue(store.provider(p.id)!!.ttsModels.isEmpty())
         assertEquals(choice, settings.state.value.choice)
         assertTrue(prefs.getBoolean("voice_tts_role_migrated", false))

@@ -128,7 +128,7 @@ class PrerequisitesTest {
         )
     }
 
-    // 修复 1 M4:「需要你」提醒被用户或系统调低时提示,但不挡任务
+    // Fix 1 M4: warn when the "needs you" alert is lowered by the user or the system, but do not block tasks
     @Test
     fun attentionLoweredIsAWarning() {
         val c = Prerequisites.check(ready.copy(attentionLowered = true), hasMainModel = true)
@@ -136,7 +136,7 @@ class PrerequisitesTest {
         assertTrue(c.canStartTask)
     }
 
-    // 「需要你处理」和「任务结果」两个频道各种组合:一处判断,带上是哪个被调低
+    // Every combination of the two channels "needs your attention" and "task result": one check reports which one was lowered
     @Test
     fun loweredChannelCombinations() {
         fun problems(attention: Boolean, result: Boolean) =
@@ -148,7 +148,7 @@ class PrerequisitesTest {
         assertTrue(Prerequisites.check(ready.copy(resultLowered = true), hasMainModel = true).canStartTask)
     }
 
-    // 总开关关着时只报「通知未允许」,不重复提示频道
+    // When the master switch is off, only "notifications not allowed" is reported; the channels are not reported again
     @Test
     fun masterSwitchOffHidesChannelProblems() {
         val c = Prerequisites.check(
@@ -157,7 +157,7 @@ class PrerequisitesTest {
         assertEquals(listOf<Problem>(Problem.NotificationsOff), c.problems)
     }
 
-    // 网页、沙箱任务不需要内置助手:照样能开始,用到手机时才报 phone_unavailable;问题照样列出来提示
+    // Web and sandbox tasks do not need the built-in helper: they can still start, and phone_unavailable is only reported once the phone is used; the problem is still listed as a hint
     @Test
     fun phoneHelperOnlyNeededForPhoneApps() {
         listOf(
@@ -169,7 +169,7 @@ class PrerequisitesTest {
             assertFalse(c.phoneReady)
             assertEquals(listOf<Problem>(Problem.PhoneHelper(s)), c.problems)
         }
-        // 安卓 12 以下只报系统太旧
+        // Below Android 12, only the system-too-old problem is reported
         assertEquals(
             listOf<Problem>(Problem.SystemTooOld),
             Prerequisites.check(ready.copy(sdkInt = 30, builtinShell = BuiltinShellStatus.NotPaired), hasMainModel = true).problems,

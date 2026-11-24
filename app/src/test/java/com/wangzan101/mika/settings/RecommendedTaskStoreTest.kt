@@ -132,9 +132,9 @@ class RecommendedTaskStoreTest {
         val retired = listOf("整理 PDF 摘要" to "把发来的 PDF 整理成一段摘要")
         val tasks = RecommendedTaskStore(file)
         tasks.ensureLoaded(seed = { emptyList() }, retired = { retired })
-        // 没动过的下线示例剔掉;同一个提示词但标题是用户自己写的,留着
+        // The retired sample is dropped when untouched; the same prompt under a title the user wrote themselves is kept
         assertEquals(listOf("订几个闹钟", "我自己的任务"), tasks.tasks.value.map { it.title })
-        // 用户加一条后写回文件,下线的也不会再出现在读取结果里
+        // After the user adds one and it is written back to the file, the retired one no longer shows up in the loaded result either
         assertNull(tasks.add("新的", "新的提示词"))
         val reopened = RecommendedTaskStore(file)
         reopened.ensureLoaded(seed = { emptyList() }, retired = { retired })

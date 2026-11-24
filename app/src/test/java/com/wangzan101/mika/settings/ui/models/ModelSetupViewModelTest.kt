@@ -70,11 +70,11 @@ class ModelSetupViewModelTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-    /** 按地址给出列模型的结果;没写的地址列出空表。 */
+    /** Gives the model-listing result by address; an address that is not registered lists an empty catalog. */
     private val listing = mutableMapOf<String, ModelListResult>()
     private val listCalls = mutableListOf<Triple<ProviderConfig.Kind, String, String?>>()
     private val listHeaders = mutableListOf<Map<String, String>>()
-    /** 下一次列模型抛这个;用来确认异常收成失败,不打掉测试协程。 */
+    /** The next model listing throws this; used to confirm exceptions become a failure without killing the test coroutine. */
     private var listBoom: Throwable? = null
     private var ids = 0
 
@@ -91,7 +91,7 @@ class ModelSetupViewModelTest {
         },
     )
 
-    /** 建过的模型(模型名、请求头等); 显式试调用的结果由 [reply] 决定。 */
+    /** Models that were built (model name, request headers, etc.); the result of an explicit test call is decided by [reply]. */
     private val built = mutableListOf<Pair<String, ClientSetup>>()
     private var reply: suspend () -> ModelReply = { ModelReply(listOf(Part.ToolCall("c1", "get_time", "{}")), StopReason.ToolUse, null) }
     private val probes = mutableListOf<Triple<String, List<Message>, List<ToolSpec>>>()
@@ -143,7 +143,7 @@ class ModelSetupViewModelTest {
         assertFalse(legacy.systemSilent.value)
     }
 
-    /** 模型名不限制用途;只有主模型先试调用一次(之后核实过不再试)。 */
+    /** A model name does not restrict the role; only the main model is probed once up front (and not again once verified). */
     @Test fun modelNamesDoNotRestrictExplicitRoleChangesAndOnlyMainIsProbed() = runTest {
         val store = store()
         val id = "fishaudio/drama-3-int4"
@@ -158,7 +158,7 @@ class ModelSetupViewModelTest {
         assertEquals(setOf(id), store.provider(provider.id)?.verifiedModels)
     }
 
-    /** 主模型试调用没通过(不调用工具、找不到模型):原来的主模型不动,说原因;看图、轻量不试。 */
+    /** The main model's test call fails (no tool call, model not found): the previous main model stays and the reason is shown; vision and light are not probed. */
     @Test fun failedMainProbeKeepsThePreviousMain() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a"), ListedModel("b")))
@@ -183,7 +183,7 @@ class ModelSetupViewModelTest {
         assertEquals("轻量不试调用", 2, built.size)
     }
 
-    /** 手填的轻量模型先试调用:没通过(找不到、不调用工具)原来的轻量不动,也不记为手填;列表里选的不试。 */
+    /** A hand-typed light model is probed first: if it fails (not found, no tool call) the previous light model stays and it is not recorded as hand-typed; models picked from the list are not probed. */
     @Test fun typedLightModelWithFailingProbeKeepsThePreviousLight() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a"), ListedModel("b")))
@@ -207,7 +207,7 @@ class ModelSetupViewModelTest {
         assertEquals("列表里选的轻量不试调用", listOf("typo", "typo2"), built.map { it.first })
     }
 
-    /** 手填的看图模型只回话、不调用工具也算通过(看图不靠工具):用上,记为手填和核实过。 */
+    /** A hand-typed vision model that only replies without calling a tool still passes (vision does not rely on tools): it is used and recorded as hand-typed and verified. */
     @Test fun typedVisionModelThatOnlyRepliesIsAccepted() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a")))
@@ -224,7 +224,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("vl-typed"), built.map { it.first })
     }
 
-    /** 备援手填的先试调用一次,通了才设上;列表里选的备援不试。 */
+    /** A hand-typed fallback is probed once and only set on success; fallbacks picked from the list are not probed. */
     @Test fun typedFallbackProbesOnce() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a"), ListedModel("b")))
@@ -246,7 +246,7 @@ class ModelSetupViewModelTest {
         assertEquals("列表里选的备援不试调用", listOf("backup-typed", "nope"), built.map { it.first })
     }
 
-    /** 「用作」里手填的轻量模型先试调用,没通过原来的轻量不动;列表里的直接用,不发请求。 */
+    /** A hand-typed light model inside "use as" is probed first, and on failure the previous light model stays; one from the list is used directly without sending a request. */
     @Test fun typedLightViaUseAsIsProbedButListedLightIsNot() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a"), ListedModel("b")))
@@ -267,7 +267,7 @@ class ModelSetupViewModelTest {
         assertEquals("列表里的不试调用", 1, built.size)
     }
 
-    /** 跳过测试存下的那家:从列表里选主模型的备援也先试调用;没通过这一位不动。看图备援不试。 */
+    /** For a provider saved by skipping the test, a main-model fallback picked from the list is probed too; on failure that slot stays unchanged. A vision fallback is not probed. */
     @Test fun mainFallbackFromAnUntestedProviderIsProbed() = runTest {
         val store = store()
         val listed = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a"), ListedModel("b")))
@@ -291,7 +291,7 @@ class ModelSetupViewModelTest {
         assertEquals("看图备援不试", 2, built.size)
     }
 
-    /** 「用作 → 主模型」先试调用,没通过原来的主模型不动;通过才换。 */
+    /** "Use as → main model" probes first; on failure the previous main model stays, and only a pass switches it. */
     @Test fun useFromProviderProbesMainFirst() = runTest {
         val store = store()
         val p = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("xxx-tts-proxy")))
@@ -316,7 +316,7 @@ class ModelSetupViewModelTest {
 
     private val localSpeechUrl = "http://192.168.2.231:8091/v1"
 
-    /** 第一家、还没有主模型:手填了模型名的只试它一个,通了当主模型。 */
+    /** First provider, no main model yet: when a model name was typed in, only that one is probed, and on success it becomes the main model. */
     @Test fun firstProviderProbesOnlyTheTypedModelBeforeMakingItMain() = runTest {
         val models = listOf(ListedModel("fishaudio/drama-3-int4"), ListedModel("vendor/model-123"))
         listing[localSpeechUrl] = ModelListResult.Ok(models)
@@ -339,7 +339,7 @@ class ModelSetupViewModelTest {
         assertNull(vm.state.value.probeNote)
     }
 
-    /** 已经有主模型时「测试并保存」只列模型:不发对话请求,主模型不变。 */
+    /** With a main model already set, "test and save" only lists models: no chat request is sent and the main model is unchanged. */
     @Test fun savingAnotherProviderOnlyListsModels() = runTest {
         val store = store()
         val first = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a")))
@@ -420,7 +420,7 @@ class ModelSetupViewModelTest {
         assertEquals(models, saved.models)
     }
 
-    /** 目录里有、但 Claire 调不了的模型(只写了别的接口):设成看图/轻量前必须试调用,不通就不设。 */
+    /** A model that is in the catalog but that Claire cannot call (only other APIs are listed): it must be probed before being set as vision/light, and is not set when the probe fails. */
     @Test fun listedModelMikaCannotCallIsProbedBeforeBecomingVisionOrLight() = runTest {
         val store = store()
         val p = store.connect(
@@ -438,7 +438,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("vendor/opaque-image"), built.map { it.first })
     }
 
-    /** 首次上手推荐的模型没通过:服务商照样存下、不定主模型,说原因并给「选主模型」;选的时候再试调用。 */
+    /** The model recommended during first-time setup fails: the provider is still saved without a main model, the reason is shown and "choose a main model" is offered; the choice is probed again. */
     @Test fun onboardingKeepsTheProviderWithoutAMainWhenTheCandidateFails() = runTest {
         val model = ListedModel("fishaudio/drama-3-int4")
         listing[localSpeechUrl] = ModelListResult.Ok(listOf(model, ListedModel("vendor/chat")))
@@ -470,7 +470,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.canNext)
     }
 
-    /** 手填的是列表写明 Claire 调不了的模型:不试它,改试推荐的对话模型。 */
+    /** The hand-typed model is one the listing says Claire cannot call: it is not probed; the recommended chat model is probed instead. */
     @Test fun onboardingSkipsATypedModelMikaCannotCallAndProbesAChatModel() = runTest {
         val model = ListedModel("vendor/opaque-speech", unsupportedApis = listOf("/v1/audio/speech"))
         listing[localSpeechUrl] = ModelListResult.Ok(listOf(model, ListedModel("vendor/chat")))
@@ -488,7 +488,7 @@ class ModelSetupViewModelTest {
         assertEquals(setOf("vendor/chat"), store.providers.value.single().verifiedModels)
     }
 
-    /** 第一家:列出模型就存下,再让推荐的那一个调用一次工具,通了当主模型。 */
+    /** First provider: listing the models saves it, then the recommended one is asked to call a tool once, and on success it becomes the main model. */
     @Test fun testAndSaveProbesTheRecommendedModelForTheFirstMain() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -549,7 +549,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("glm-x"), built.map { it.first })
     }
 
-    /** Cloudflare Workers AI 的目录不可用时，输入账号和模型 ID 并直接保存。 */
+    /** When the Cloudflare Workers AI catalog is unavailable, entering the account and model ID and saving directly. */
     @Test fun cloudflarePresetFullFlowFromAccountIdToSavedProvider() = runTest {
         val cf = ProviderPresets.all.first { it.label == "Cloudflare Workers AI" }
         val store = store()
@@ -562,7 +562,7 @@ class ModelSetupViewModelTest {
         assertFalse(form.canTest)
         assertEquals(tr(com.wangzan101.mika.R.string.model_url_account_id), form.urlProblem)
 
-        // 用户输入 Account ID 与 API Key
+        // The user enters the Account ID and the API Key
         val actualUrl = "https://api.cloudflare.com/client/v4/accounts/my_acc_123/ai/v1"
         vm.setAccountId("my_acc_123")
         vm.setApiKey("cf_token_xyz")
@@ -572,7 +572,7 @@ class ModelSetupViewModelTest {
         assertNull(form.urlProblem)
         assertTrue(form.canTest)
 
-        // Cloudflare 不提供列模型接口 (GET /models 返回 405/NotSupported)
+        // Cloudflare offers no model-listing endpoint (GET /models returns 405/NotSupported)
         listing[actualUrl] = ModelListResult.Failed(ListFailure.NotSupported)
         vm.testAndSave(); runCurrent()
 
@@ -580,7 +580,7 @@ class ModelSetupViewModelTest {
         assertTrue(form.noList)
         assertFalse("Requires model name to probe", form.canTest)
 
-        // 用户输入模型名 @cf/openai/gpt-oss-20b
+        // The user enters the model name @cf/openai/gpt-oss-20b
         vm.setModel("@cf/openai/gpt-oss-20b")
         assertTrue(vm.state.value.form.canTest)
 
@@ -595,7 +595,7 @@ class ModelSetupViewModelTest {
         assertTrue(built.isEmpty())
     }
 
-    /** 自定义填了某家的官方地址:建议改用那家的预设;地址就是预设的、接口类型不同时一并说;改用时 Key 留着。 */
+    /** A custom entry uses some provider's official address: suggest switching to that provider's preset; when the address is the preset's but the API type differs, say so too; switching keeps the key. */
     @Test fun officialHostSuggestsThePreset() = runTest {
         val vm = vm()
         vm.selectPreset(ProviderPresets.custom.label)
@@ -611,7 +611,7 @@ class ModelSetupViewModelTest {
             ModelSetupCopy.presetSuggestion(f),
         )
         assertEquals(ProviderConfig.Kind.Gemini, f.exampleKind)
-        // 同一主机的别的路径(如它的兼容接口):照样建议,但不说接口类型不对
+        // Another path on the same host (such as its compatible endpoint): still suggest it, but do not say the API type is wrong
         vm.setBaseUrl("https://generativelanguage.googleapis.com/v1beta/openai")
         assertEquals("Gemini", vm.state.value.form.suggestedPreset?.label)
         assertFalse(vm.state.value.form.presetKindMismatch)
@@ -626,8 +626,8 @@ class ModelSetupViewModelTest {
         assertNull("选了预设就不再建议", after.suggestedPreset)
     }
 
-    /** 手填:主模型先试调用这一个,通了记为手填和核实过;备援不试调用。 */
-    /** 不提供列表的那家:主模型先试调用;主模型备援不在目录里(手填的)也试一次;轻量备援从列表选不试。 */
+    /** Hand-typed: the main model is probed on this one, and on success it is recorded as hand-typed and verified; fallbacks are not probed. */
+    /** A provider that offers no list: the main model is probed first; a main-model fallback that is not in the catalog (hand-typed) is probed once too; a light fallback picked from the list is not probed. */
     @Test fun manualMainIsProbedOnceAndUnlistedMainFallbackIsProbedToo() = runTest {
         val store = store()
         val provider = store.connect("Local", ProviderConfig.Kind.OpenAiCompat, "https://chat.test/v1", "", emptyList())
@@ -648,7 +648,7 @@ class ModelSetupViewModelTest {
         assertEquals(2, probes.size)
     }
 
-    /** 旧版本存下的不提供列表的服务商(手填的模型从没试过):提醒,「重新测试」通了提醒消失、记下;不通说原因。 */
+    /** A provider without a list saved by an older version (its hand-typed models were never probed): warn; a passing "retest" clears the warning and records it, while a failing one shows the reason. */
     @Test fun unverifiedManualModelsWarnUntilRetested() = runTest {
         val store = store()
         val p = store.connect("generativelanguage.googleapis.com", ProviderConfig.Kind.OpenAiCompat, "https://generativelanguage.googleapis.com", "k", emptyList())
@@ -670,7 +670,7 @@ class ModelSetupViewModelTest {
         assertNull(vm.state.value.retest[p.id to "gemini"])
         assertEquals(listOf("backup"), vm.state.value.unverified(vm.state.value.providers.single()))
         assertEquals(listOf("gemini", "gemini"), built.map { it.first })
-        // 有列表的服务商不提醒
+        // Providers with a list are not warned about
         listing[deepseekUrl] = deepseek
         vm.openForm(); vm.selectPreset("DeepSeek"); vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         val ds = vm.state.value.providers.first { it.name == "DeepSeek" }
@@ -678,7 +678,7 @@ class ModelSetupViewModelTest {
         assertEquals(emptyList<String>(), vm.state.value.unverified(vm.state.value.providers.first { it.name == "DeepSeek" }))
     }
 
-    /** 明文 http:本机、局域网的不提示;别的地址提醒一句,照样能测试。 */
+    /** Plain http: no warning for localhost or the local network; other addresses get one warning but can still be tested. */
     @Test fun plainHttpToARemoteHostWarnsButDoesNotBlock() = runTest {
         val vm = vm()
         vm.selectPreset(ProviderPresets.custom.label)
@@ -720,7 +720,7 @@ class ModelSetupViewModelTest {
         vm.pick(ModelRole.Main, store.providers.value.single().id, "deepseek-chat"); runCurrent()
         vm.openForm(); vm.selectPreset("通义千问"); vm.setApiKey("qk"); vm.testAndSave(); runCurrent()
         val qwen = vm.state.value.providers.first { it.name == "通义千问" }
-        // 选择页列出所有服务商的全部模型,不按能力过滤
+        // The selection page lists every model of every provider, without filtering by capability
         assertEquals(listOf(3, 2), vm.state.value.providers.map { vm.state.value.options(it).size })
         vm.pick(ModelRole.Vision, qwen.id, "qwen-plain"); runCurrent()
         val vision = store.configFor(ModelRole.Vision)!!
@@ -731,13 +731,13 @@ class ModelSetupViewModelTest {
         assertEquals("deepseek-chat", store.configFor(ModelRole.Main)?.model)
         assertTrue(vm.state.value.picked(ModelRole.Vision, qwen.id, "qwen-plain"))
         assertEquals(listOf(ModelRole.Vision), vm.state.value.rolesOf(qwen))
-        // 用主模型:看图这一路用主模型,不再有单独的看图配置
+        // Use the main model: the vision path uses the main model, with no separate vision config anymore
         vm.choose(ModelRole.Vision, RoleChoice.SameAsMain); runCurrent()
         assertEquals("deepseek-chat", store.configFor(ModelRole.Vision)?.model)
         assertFalse(vm.state.value.picked(ModelRole.Vision, qwen.id, "qwen-plain"))
         assertEquals(1, store.list().size)
         assertEquals(emptyList<ModelRole>(), vm.state.value.rolesOf(qwen))
-        // 不用
+        // Off
         vm.choose(ModelRole.Vision, RoleChoice.Off); runCurrent()
         assertNull(store.configFor(ModelRole.Vision))
         assertEquals(RoleChoice.Off, vm.state.value.roles.vision)
@@ -766,10 +766,10 @@ class ModelSetupViewModelTest {
         assertTrue("自定义的 OpenAI 兼容接口可以不填 Key", vm.state.value.form.canTest)
         listing["http://192.168.1.5:8000/v1"] = ModelListResult.Failed(ListFailure.NotSupported)
         vm.testAndSave(); runCurrent()
-        // 服务不提供列表:先要一个模型名,没存
+        // The service offers no list: a model name is required first, so nothing was saved
         assertTrue(store.providers.value.isEmpty())
         assertFalse(vm.state.value.canNext)
-        // 可直接保存手填模型。下一步需要明确选一个主模型。
+        // The hand-typed model can be saved directly. The next step requires explicitly choosing a main model.
         vm.setModel("chatty"); vm.saveWithoutTest(); runCurrent()
         val p = store.providers.value.single()
         assertEquals("192.168.1.5", p.name)
@@ -831,7 +831,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("不支持工具调用" to false), ModelSetupCopy.tags(o[2]))
     }
 
-    /** 自定义服务商可以起名字(去掉首尾空白);不填用地址的主机名。同一个地址起不同的名字是两家。 */
+    /** A custom provider can be named (leading and trailing whitespace is trimmed); when left blank the host name of the address is used. The same address under different names counts as two providers. */
     @Test fun customProviderUsesTheGivenNameOrFallsBackToTheHost() = runTest {
         val url = "https://relay.example.com/v1"
         listing[url] = ModelListResult.Ok(listOf(ListedModel("m1")))
@@ -852,13 +852,13 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("k1", "k2"), store.providers.value.map { store.providerKey(it.id) })
     }
 
-    /** 名字有长度上限;换成预设时清掉;地址是某家预设的,默认名就是预设名;预设的名字不受表单里的名字影响。 */
+    /** Names have a length cap; the name is cleared when switching to a preset; when the address belongs to a preset the default name is the preset name; the preset's name is not affected by the name in the form. */
     @Test fun customNameIsCappedAndOnlyAppliesToCustom() = runTest {
         val vm = vm()
         vm.selectPreset(ProviderPresets.custom.label)
         vm.setName("名".repeat(ModelSetupViewModel.MAX_NAME + 8))
         assertEquals(ModelSetupViewModel.MAX_NAME, vm.state.value.form.name.length)
-        // 按字符截:emoji 不被截成半个
+        // Truncated by code point, so an emoji is not cut in half
         vm.setName("😀".repeat(ModelSetupViewModel.MAX_NAME + 3))
         val capped = vm.state.value.form.name
         assertEquals(ModelSetupViewModel.MAX_NAME, capped.codePointCount(0, capped.length))
@@ -870,7 +870,7 @@ class ModelSetupViewModelTest {
         assertEquals("DeepSeek", vm.state.value.form.copy(name = "别的名字").providerName)
     }
 
-    /** 列模型出错时显示原因，手填后再测试仍只查询目录。 */
+    /** A listing error shows the reason, and retesting after typing a model still only queries the catalog. */
     @Test fun listErrorShowsTheReasonAndOpensTheModelField() = runTest {
         for ((i, failure) in listOf(ListFailure.Auth, ListFailure.Server, ListFailure.BadResponse).withIndex()) {
             val url = "https://relay$i.example.com/v1"
@@ -891,7 +891,7 @@ class ModelSetupViewModelTest {
         }
     }
 
-    /** 列表里已有该模型时沿用目录记录。 */
+    /** When the list already contains the model, the catalog entry is reused. */
     @Test fun typedModelThatIsListedIsNotMarkedTyped() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -901,12 +901,12 @@ class ModelSetupViewModelTest {
         val p = store.providers.value.single()
         assertEquals(emptySet<String>(), p.typedModels)
         assertEquals("deepseek-reasoner", store.configFor(ModelRole.Main)?.model)
-        // 收起「手动填写」就不用填的那个
+        // Collapsing "manual entry" drops the field that would otherwise need filling in
         vm.openForm(); vm.setApiKey("sk"); vm.setManual(true); vm.setModel("x"); vm.setManual(false)
         assertEquals("", vm.state.value.form.typedModel)
     }
 
-    /** 选择页里有列表的那家也能手填;通了记为手填,刷新列表后还在,标「手填」。 */
+    /** A provider that has a list can still be given a hand-typed model in the picker; on success it is recorded as hand-typed, survives a list refresh and is tagged "hand-typed". */
     @Test fun pickerAllowsTypingAModelForAListedProvider() = runTest {
         val store = store()
         val p = store.connect("DeepSeek", ProviderConfig.Kind.OpenAiCompat, deepseekUrl, "sk", deepseek.models)
@@ -920,14 +920,14 @@ class ModelSetupViewModelTest {
         val options = vm.state.value.options(store.provider(p.id)!!)
         assertTrue(options.single { it.id == "deepseek-v9" }.typed)
         assertFalse(options.single { it.id == "deepseek-chat" }.typed)
-        // 选列表里的不记为手填
+        // Picking one from the list does not record it as hand-typed
         vm.pick(ModelRole.Main, p.id, "deepseek-chat"); runCurrent()
         assertEquals(setOf("deepseek-v9"), store.provider(p.id)?.typedModels)
     }
 
-    // ---------- 不测试,直接保存 ----------
+    // ---------- Saving directly without testing ----------
 
-    /** 一次网络都不打:不列模型、不试调用,只存下地址、Key 和「没测过」这件事。 */
+    /** Not a single network call: no model listing, no test call, only the address, the key and the fact that it is "not tested". */
     @Test fun saveWithoutTestStoresProviderWithoutListingOrProbe() = runTest {
         val store = store()
         val vm = vm(store)
@@ -940,9 +940,9 @@ class ModelSetupViewModelTest {
         assertEquals(emptyList<ListedModel>(), p.models)
         assertEquals(emptySet<String>(), p.verifiedModels)
         assertTrue("标成没测过", p.savedUntested)
-        // 存进文件也在
+        // It is there in the file too
         assertTrue(store().provider(p.id)!!.savedUntested)
-        // 留给用户明确选择主模型。
+        // Left for the user to choose a main model explicitly.
         assertNull(store.roles.value.main)
         val s = vm.state.value
         assertFalse("保存后表单收起", s.showForm)
@@ -951,7 +951,7 @@ class ModelSetupViewModelTest {
         assertTrue("存好后说清它没测过", s.probeNote?.contains(p.name) == true)
     }
 
-    /** 跳过测试存下的手填模型:重开后选它当主模型,先试调用一次,通了才用(这家也不再算没测过)。 */
+    /** A hand-typed model saved by skipping the test: after reopening it is picked as the main model, probed once and used only on success (the provider no longer counts as untested either). */
     @Test fun savedManualModelIsProbedOnceBeforeBecomingMainAfterReload() = runTest {
         val store = store()
         val vm = vm(store)
@@ -976,7 +976,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("deepseek-v9"), built.map { it.first })
     }
 
-    /** 已经有主模型时跳过测试存下另一家:主模型不变。 */
+    /** Saving another provider without testing while a main model exists: the main model is unchanged. */
     @Test fun saveWithoutTestKeepsTheCurrentMainModel() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -991,7 +991,7 @@ class ModelSetupViewModelTest {
         assertEquals(main, store.configFor(ModelRole.Main))
     }
 
-    /** 地址格式不对、或该填 Key 的没填,什么都不存。 */
+    /** An invalid address format, or a required key left blank, stores nothing. */
     @Test fun saveWithoutTestRefusesAnInvalidForm() = runTest {
         val store = store()
         val vm = vm(store)
@@ -1004,13 +1004,13 @@ class ModelSetupViewModelTest {
         assertFalse("地址没写协议", vm.state.value.form.canSaveUntested)
         vm.saveWithoutTest(); runCurrent()
         assertTrue(store.providers.value.isEmpty())
-        // 自己跑的服务不要 Key,可以存
+        // Self-hosted services need no key, so saving is allowed
         vm.setBaseUrl("http://127.0.0.1:11434/v1")
         vm.setApiKey("")
         assertTrue(vm.state.value.form.canSaveUntested)
     }
 
-    /** 已经测过的那家再跳过测试存一次:服务商不重复,Key 换成新的,已核实过的模型留着。 */
+    /** Saving an already-tested provider again with the test skipped: the provider is not duplicated, the key is replaced with the new one, and verified models are kept. */
     @Test fun saveWithoutTestKeepsExistingProviderAndItsVerifiedModels() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1028,9 +1028,9 @@ class ModelSetupViewModelTest {
         assertFalse("核实过的模型让这家不算没测过", after.savedUntested)
     }
 
-    // ---------- 粘贴进来的 Key 里有换行、零宽或非 ASCII ----------
+    // ---------- A pasted key containing newlines, zero-width characters or non-ASCII ----------
 
-    /** 中间的换行原样留下,立刻标红,两个保存动作都不发请求、也不存。 */
+    /** A newline in the middle is kept as is and flagged immediately; neither save action sends a request or stores anything. */
     @Test fun newlineInTheKeyIsRejectedAndNotSaved() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1049,7 +1049,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.showForm)
     }
 
-    /** `\r` 和 `\r\n` 同样留下,不改写,也不崩溃。 */
+    /** `\r` and `\r\n` are likewise kept, not rewritten, and do not crash. */
     @Test fun crlfInTheKeyIsRejectedAndDoesNotCrash() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1069,7 +1069,7 @@ class ModelSetupViewModelTest {
         assertFalse(vm.state.value.form.canSaveUntested)
     }
 
-    /** 中文前缀留下,立刻标红,测试和直接保存都不发请求、也不存。改掉之后提示跟着消失。 */
+    /** A Chinese prefix is kept and flagged immediately; neither testing nor direct saving sends a request or stores anything. The notice disappears once it is removed. */
     @Test fun chinesePrefixIsRejectedAndNotSaved() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1091,7 +1091,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.form.canTest)
     }
 
-    /** 清空等于把整段删掉:红字和「去掉不可见字符」都收起,空着时两个保存动作仍不可用。 */
+    /** Clearing counts as deleting the whole thing: both the red text and "invisible characters removed" are dismissed, and while it is empty neither save action is available. */
     @Test fun clearingTheKeyDropsHintsAndLeavesSaveDisabled() = runTest {
         val store = store()
         val vm = vm(store)
@@ -1118,7 +1118,7 @@ class ModelSetupViewModelTest {
         assertFalse(vm.state.value.form.canSaveUntested)
     }
 
-    /** 零宽空格去掉后按普通 Key 用,不标成非法字符。 */
+    /** Once the zero-width spaces are stripped it is used as a normal key and not flagged as illegal characters. */
     @Test fun zeroWidthSpaceIsStrippedAndTreatedAsANormalKey() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1132,7 +1132,7 @@ class ModelSetupViewModelTest {
         assertEquals("sk-abc", store.providerKey(store.providers.value.single().id))
     }
 
-    /** 中间的普通空格不是非法字符:照旧拿去问服务商,失败走原来的「连接失败」。 */
+    /** An ordinary space in the middle is not an illegal character: it is still sent to the provider, and a failure goes through the existing "connection failed". */
     @Test fun spaceInsideTheKeyStillHitsTheProvider() = runTest {
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Auth)
         val store = store()
@@ -1146,7 +1146,7 @@ class ModelSetupViewModelTest {
         assertTrue(store.providers.value.isEmpty())
     }
 
-    /** 换 Key 走同一套:换行和中文前缀都不保存、也不重新列模型。零宽去掉后可以换。 */
+    /** Changing the key follows the same rules: newlines and Chinese prefixes are neither saved nor cause a new model listing. Once the zero-width characters are stripped the key can be changed. */
     @Test fun changeKeyRefusesNewlinesAndIllegalCharacters() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1166,7 +1166,7 @@ class ModelSetupViewModelTest {
         assertEquals("sk-2", listCalls.last().third)
     }
 
-    /** 列模型时头值仍抛异常:收成失败,不打掉协程,也不把异常原文(可能含 Key)露出去。 */
+    /** The header value still throws during listing: it is turned into a failure without killing the coroutine, and the raw exception text (which may contain the key) is not exposed. */
     @Test fun listingExceptionDoesNotCrashAndHidesTheHeaderValue() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
@@ -1181,7 +1181,7 @@ class ModelSetupViewModelTest {
         assertEquals("sk", store.providerKey(id))
     }
 
-    /** 删服务商前预览依赖它的语音模型:能力引用照实返回,确认面板靠它说清影响。 */
+    /** Previews the voice models that depend on the provider before deleting it: capability references are returned as they are, so the confirmation panel can spell out the impact. */
     @Test fun providerDeletionPreviewsDependentVoiceModels() = runTest {
         val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
         catalog.upsertService(VoiceService("provider:p1", "One", VoiceAccount.ExistingProvider("p1")))

@@ -18,7 +18,7 @@ class ProviderKeySitesTest {
 
     @Test
     fun `同一主机路径不同也认`() {
-        // 自定义表单里手填了官方地址、路径和预设不一样,也按主机认出来
+        // An official URL typed into the custom form by hand, with a path that differs from the preset, is still recognized by host
         assertEquals("https://platform.deepseek.com/api_keys", ProviderKeySites.forBaseUrl("https://api.deepseek.com/v1"))
     }
 
@@ -32,9 +32,9 @@ class ProviderKeySitesTest {
 
     @Test
     fun `每个云服务商预设都能认出申请页`() {
-        // 官方 Key 申请页暂未确认的预设:显式豁免,确认了就把映射补上、从这里去掉
+        // Presets whose official key page is not confirmed yet: exempted explicitly; once confirmed, add the mapping and remove them from here
         val unmapped = setOf("OpenDesign Go", "OpenCode Go")
-        // 自建(本机地址)和自定义(空地址)不在内;映射表跟着预设清单走,漏了就失败
+        // Self-hosted (local address) and custom (empty address) presets are not included; the mapping follows the preset list, so a missing entry fails
         val missing = ProviderPresets.all
             .filter { !it.selfHosted && it.baseUrl.isNotEmpty() }
             .filter { it.label !in unmapped }

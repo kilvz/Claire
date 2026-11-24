@@ -16,7 +16,7 @@ class ProviderPresetsTest {
 
     private fun preset(label: String) = ProviderPresets.all.single { it.label == label }
 
-    /** 地址、名字不重复(按地址认预设);云端的都走 https,明文 http 只给自己机器上跑的。 */
+    /** Addresses and names are unique (presets are identified by address); all cloud presets use https, and plain http is only for services running on your own machine. */
     @Test fun urlsAreUniqueAndOnlySelfHostedUsePlainHttp() {
         val withUrl = ProviderPresets.all.filter { it.baseUrl.isNotEmpty() }
         assertEquals(withUrl.size, withUrl.map { it.baseUrl }.distinct().size)
@@ -28,7 +28,7 @@ class ProviderPresetsTest {
         }
     }
 
-    /** 自己跑的服务:地址可改、Key 可不填,名字仍用预设名;云端预设地址不给改、Key 必填。 */
+    /** Self-hosted services: the address is editable and the key is optional, but the name still comes from the preset; cloud presets have a fixed address and require a key. */
     @Test fun selfHostedPresetsHaveEditableUrlAndOptionalKey() {
         val ollama = AddForm.of(preset("Ollama")).copy(baseUrl = "http://192.168.1.20:11434/v1")
         assertTrue(ollama.urlEditable)
@@ -42,7 +42,7 @@ class ProviderPresetsTest {
         assertTrue(openAi.copy(apiKey = "sk").canTest)
     }
 
-    /** 主机名对得上就认出是哪家(路径不论);自己跑的服务、认不出的地址不算。 */
+    /** A matching host name is enough to recognize the provider (the path does not matter); self-hosted services and unrecognized addresses are not matched. */
     @Test fun presetByHost() {
         assertEquals("Gemini", ProviderPresets.forHost("https://generativelanguage.googleapis.com")?.label)
         assertEquals("Gemini", ProviderPresets.forHost(" https://generativelanguage.googleapis.com/v1beta/openai/ ")?.label)
@@ -54,23 +54,23 @@ class ProviderPresetsTest {
         assertNull(ProviderPresets.forHost("https://models.example.com/v1"))
         assertNull(ProviderPresets.forHost("http://127.0.0.1:11434/v1"))
         assertNull(ProviderPresets.forHost("not a url"))
-        // 每个有地址、不是自己跑的预设都认得出自己
+        // Every preset that has an address and is not self-hosted recognizes itself
         ProviderPresets.all.filter { it.baseUrl.isNotEmpty() && !it.selfHosted }.forEach {
             assertEquals(it.label, ProviderPresets.forHost(it.baseUrl)?.label)
         }
     }
 
-    /** DeepSeek 的 V4 两个模型上下文都是 1M:窗口按旧默认 64k 时压缩频繁改写前缀,前缀缓存整段失效。 */
+    /** Both DeepSeek V4 models have a 1M context: with the old 64k default window, compaction rewrites the prefix so often that the prefix cache is invalidated for the whole segment. */
     @Test fun deepSeekPresetUsesTheFullWindow() {
         val deepseek = preset("DeepSeek")
         assertEquals(1_000_000, deepseek.capabilities.contextTokens)
         assertFalse(deepseek.capabilities.vision)
     }
 
-    /** 预置的思考档位只来自官方文档:DeepSeek 的 reasoning_effort 可能值是 none/low/high/max(none 关思考),别名不预置。 */
+    /** Curated reasoning levels come only from official documentation: DeepSeek's reasoning_effort values are none/low/high/max (none turns thinking off), and aliases are not preset. */
     @Test fun reasoningLevelsAreCuratedAndOfficialOnly() {
         assertEquals(listOf("none", "low", "high", "max"), preset("DeepSeek").reasoningLevels)
-        // 没核实的店家一律不预置,界面上照旧不出档位(见 ReasoningOptions)
+        // Providers that have not been verified are never preset, and the UI keeps showing no levels (see ReasoningOptions)
         ProviderPresets.all.filter { it.label != "DeepSeek" }.forEach { p ->
             assertEquals(p.label, emptyList<String>(), p.reasoningLevels)
         }
@@ -100,7 +100,7 @@ class ProviderPresetsTest {
         assertTrue(form.copy(apiKey = "test-key").canTest)
     }
 
-    /** Coding Plan 的 Key 和标准 API 不通用;地址要落在官方分开的 OpenAI 兼容端点上。 */
+    /** Coding Plan keys are not interchangeable with the standard API; the address must point at the official, separate OpenAI-compatible endpoint. */
     @Test fun codingPlanUsesItsOwnDocumentedEndpoint() {
         val standard = preset("智谱")
         val coding = preset("智谱 Coding Plan")
@@ -109,7 +109,7 @@ class ProviderPresetsTest {
         assertNotEquals(standard.baseUrl, coding.baseUrl)
     }
 
-    /** Cloudflare Workers AI 预设要求用户替换 {account_id}，地址可编辑，且能按模板匹配实际端点。 */
+    /** The Cloudflare Workers AI preset requires the user to replace {account_id}; the address is editable and the template matches the actual endpoint. */
     @Test fun cloudflarePresetRequiresAccountIdAndHasEditableUrl() {
         val cf = preset("Cloudflare Workers AI")
         assertEquals(ProviderConfig.Kind.OpenAiCompat, cf.kind)

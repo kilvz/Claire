@@ -29,7 +29,7 @@ class WebSearchSettingsTest {
         googleSearch: () -> WebSearch? = { null },
     ) = WebSearchSettings(prefs, identityCipher, groundingStatus, googleSearch)
 
-    /** 升级前只存了 enabled、endpoint、api_key_encrypted。 */
+    /** Before the upgrade only enabled, endpoint and api_key_encrypted were stored. */
     private fun legacy(prefs: MemoryPrefs, endpoint: String, key: String) {
         prefs.edit().putBoolean("enabled", true).putString("endpoint", endpoint)
             .putString("api_key_encrypted", Base64.getEncoder().encodeToString(key.toByteArray())).commit()
@@ -76,7 +76,7 @@ class WebSearchSettingsTest {
         assertEquals(WebSearchProvider.Exa, config.provider)
         assertEquals("exa-key", config.current.apiKey)
         assertTrue(settings(prefs).service() is ExaSearch)
-        // 保存后写成新的样子,旧的两个键删掉
+        // After saving it is written in the new shape and the two old keys are removed
         settings(prefs).set(config)
         assertNull(prefs.getString("endpoint", null))
         assertNull(prefs.getString("api_key_encrypted", null))

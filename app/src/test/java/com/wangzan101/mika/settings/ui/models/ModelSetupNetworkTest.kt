@@ -28,7 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** 对着本地服务核对目录请求与用户单独确认的模型试调用。 */
+/** Checks catalog requests and the model test call the user confirms individually against a local service. */
 class ModelSetupNetworkTest {
     @get:Rule val texts = ChineseTexts()
     @get:Rule val tmp = TemporaryFolder()
@@ -78,7 +78,7 @@ class ModelSetupNetworkTest {
 
         runBlocking {
             vm.saveWithoutTest()
-            // 第一家服务商一出现，表单就可能隐藏；保存手填模型并重置表单后才回到 Idle。
+            // The form may hide as soon as the first provider appears; it returns to Idle only after the hand-typed model is saved and the form is reset.
             withTimeout(15_000) { vm.state.first { !it.showForm && it.form.test == ListState.Idle } }
         }
         val saved = store.providers.value.single()
@@ -102,8 +102,8 @@ class ModelSetupNetworkTest {
     }
 
     /**
-     * 已经有主模型时保存服务商只发一次 GET;之后每次换主模型只对那一个模型发一次请求,没通过原来的主模型不变;
-     * 核实过的模型不再发请求。
+     * With a main model already set, saving a provider sends only one GET; afterwards each main-model change sends one request for that model alone, and on failure the previous main model stays unchanged;
+     * verified models are no longer probed.
      */
     @Test fun savingWithAMainSendsOnlyTheCatalogRequestAndEachMainChoiceProbesOnce() {
         server.enqueue(modelList("gpt-x", "gpt-y", "tts-z"))
@@ -132,7 +132,7 @@ class ModelSetupNetworkTest {
         assertTrue(requests[2].body.readUtf8().contains("\"model\":\"gpt-x\""))
     }
 
-    /** 手填的轻量模型对那一个模型发一次试调用;没通过,原来的轻量不动。 */
+    /** A hand-typed light model is probed once for that one model; on failure the previous light model stays. */
     @Test fun typedLightModelIsProbedOnceAndRejectedOnFailure() {
         server.enqueue(modelList("gpt-x"))
         server.enqueue(rejected())
@@ -152,7 +152,7 @@ class ModelSetupNetworkTest {
         assertTrue(requests.last().body.readUtf8().contains("\"model\":\"gpt-typo\""))
     }
 
-    /** 第一家、还没有主模型:推荐的模型没通过时服务商照样存下、不定主模型,只发了一次试调用。 */
+    /** First provider, no main model yet: when the recommended model fails, the provider is still saved without a main model, and only one test call was sent. */
     @Test fun failedFirstProbeKeepsTheProviderWithoutAMain() {
         server.enqueue(modelList("gpt-x", "gpt-y"))
         server.enqueue(rejected())
@@ -178,7 +178,7 @@ class ModelSetupNetworkTest {
         assertEquals(listOf("/models"), List(server.requestCount) { server.takeRequest().path })
     }
 
-    /** 第一家、还没有主模型:只对推荐的那一个模型发一次试调用(走它自己的接口),通了当主模型;再测试只测确认的那个。 */
+    /** First provider, no main model yet: one test call is sent for the recommended model only (through its own endpoint), and on success it becomes the main model; retesting probes only the confirmed one. */
     @Test fun firstProviderProbesOnlyTheRecommendedResponsesModel() {
         server.enqueue(modelList("gpt-x", "gpt-y"))
         server.enqueue(toolCall())

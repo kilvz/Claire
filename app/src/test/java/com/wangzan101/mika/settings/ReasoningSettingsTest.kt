@@ -101,12 +101,12 @@ class ReasoningSettingsTest {
         assertEquals(emptyList<String>(), ReasoningOptions.of(direct, ListedModel("m", reasoning = false))!!.levels)
         val xai = ProviderConfig("x", ProviderConfig.Kind.Xai, "https://example.test", "m", caps)
         assertFalse(ReasoningOptions.of(xai, null)!!.fromProvider)
-        // 订阅登录不跟列表里写的别的协议走,档位也按它实际走的 Responses 给(和建模型同一个判断)
+        // A subscription login does not follow a different protocol written in the listing, and levels are offered for the Responses protocol it actually uses (the same decision as when building the model)
         val viaMessages = ListedModel("m", endpoint = ModelEndpoint(ModelProtocol.Messages, "https://example.test"))
         assertFalse(ReasoningOptions.of(xai, viaMessages)!!.fromProvider)
         assertEquals(ProviderConfig.Kind.Xai, ProviderStore.adapterFor(xai, viaMessages.endpoint).first)
-        // 列表还没加载、或只说了能思考没给档位:OpenAI 兼容接口给通用档位并标来源不是服务商,
-        // Anthropic / Gemini 仍不猜(各模型写法不一样,猜错了每次都被拒)
+        // The listing is not loaded yet, or it only says the model can think without giving levels: OpenAI-compatible endpoints get the generic levels and are marked as not provider-sourced,
+        // while Anthropic / Gemini are still not guessed (each model is written differently, and a wrong guess is rejected every time)
         val thinking = ListedModel("m", reasoning = true)
         val generic = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max")
         for (kind in listOf(ProviderConfig.Kind.Anthropic, ProviderConfig.Kind.Gemini)) {
@@ -120,7 +120,7 @@ class ReasoningSettingsTest {
         assertFalse(ReasoningOptions.of(compat, thinking)!!.fromProvider)
     }
 
-    // 预设里官方文档写明档位的兼容服务商(DeepSeek)按预设给;列表写明过的仍以列表为准,自定义地址照旧不猜
+    // Compatible providers whose official docs specify levels in the preset (DeepSeek) get them from the preset; levels declared in the listing still win, and custom addresses are still not guessed
     @Test fun presetLevelsFillInWhenTheListingDeclaresNone() {
         val s = store()
         val p = s.connect("DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com", "k", listOf(ListedModel("deepseek-flash")))
@@ -128,47 +128,47 @@ class ReasoningSettingsTest {
         val options = ReasoningOptions.of(s.configFor(ModelRole.Main)!!, p.models!!.first())!!
         assertEquals(listOf("none", "low", "high", "max"), options.levels)
         assertFalse(options.fromProvider)
-        // 档位进得了 setReasoningEffort 的校验,也到得了请求
+        // The level passes setReasoningEffort's validation and reaches the request
         assertTrue(s.setReasoningEffort(ModelRole.Main, "none"))
         s.modelFor(ModelRole.Main)
         assertEquals("none", setups.last().reasoningEffort)
-        // 列表写明档位的以列表为准
+        // Levels declared in the listing take precedence
         val declared = ProviderConfig("c2", ProviderConfig.Kind.OpenAiCompat, "https://agg.example/v1", "m2", caps)
         val listed = ReasoningOptions.of(declared, ListedModel("m2", reasoningEfforts = listOf("low")))!!
         assertEquals(listOf("low"), listed.levels)
         assertTrue(listed.fromProvider)
-        // 对不上预设的地址(第三方网关):给通用档位,入口不再整行消失
+        // An address that matches no preset (third-party gateway): generic levels are offered, and the row no longer disappears entirely
         val custom = ProviderConfig("c3", ProviderConfig.Kind.OpenAiCompat, "https://custom.example/v1", "m3", caps)
         assertFalse(ReasoningOptions.of(custom, ListedModel("m3"))!!.fromProvider)
     }
 
-    // DeepSeek 列表只写开着思考的强度(low / high / max),官方文档另写 none 关掉思考:读到列表后照样关得掉(#563)
+    // The DeepSeek listing only gives the efforts with thinking on (low / high / max), while the official docs also list none for turning thinking off: it can still be turned off after the listing is read (#563)
     @Test fun listedLevelsKeepTheDocumentedOffSwitch() {
         val deepSeek = ListedModel("deepseek-flash", reasoningEfforts = listOf("low", "high", "max"))
         val official = ProviderConfig("d1", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com", "deepseek-flash", caps)
         val options = ReasoningOptions.of(official, deepSeek)!!
         assertEquals(listOf("none", "low", "high", "max"), options.levels)
         assertTrue(options.fromProvider)
-        // 地址写成 /v1、对不上预设时,以前整行没有,现在照列表给
+        // With the address written as /v1 and matching no preset, the whole row used to be missing; now the listing is used
         val v1 = official.copy(baseUrl = "https://api.deepseek.com/v1")
         assertEquals(listOf("low", "high", "max"), ReasoningOptions.of(v1, deepSeek)!!.levels)
-        // 列表已有 none、或这家文档没写 none、或列表说没有档位:都不补
+        // The listing already has none, this provider's docs do not list none, or the listing says there are no levels: nothing is added
         assertEquals(listOf("none", "high"), ReasoningOptions.of(official, ListedModel("m", reasoningEfforts = listOf("none", "high")))!!.levels)
         val agg = ProviderConfig("d2", ProviderConfig.Kind.OpenAiCompat, "https://agg.example/v1", "m", caps)
         assertEquals(listOf("low"), ReasoningOptions.of(agg, ListedModel("m", reasoningEfforts = listOf("low")))!!.levels)
         assertEquals(emptyList<String>(), ReasoningOptions.of(official, ListedModel("m", reasoningEfforts = emptyList()))!!.levels)
-        // 列表让这个模型走别的协议(这里是 Messages)时,OpenAI 兼容文档里的 none 不适用
+        // When the listing routes this model to another protocol (Messages here), the none from the OpenAI-compatible docs does not apply
         val viaMessages = deepSeek.copy(endpoint = ModelEndpoint(ModelProtocol.Messages, "https://api.deepseek.com/anthropic", null))
         assertEquals(listOf("low", "high", "max"), ReasoningOptions.of(official, viaMessages)!!.levels)
     }
 
-    // Anthropic 列表写明的档位照给;只接受按预算思考的模型能思考但没有可选档位,也不接受档位
+    // Levels declared in the Anthropic listing are offered as-is; a model that only accepts budget-based thinking can think but has no selectable levels, and does not accept a level either
     @Test fun anthropicOffersExactlyTheCatalogLevels() {
         val cfg = ProviderConfig("c", ProviderConfig.Kind.Anthropic, "https://api.anthropic.example", "m", caps)
         val adaptive = ListedModel("m", reasoning = true, reasoningEfforts = listOf("low", "medium", "high"),
             thinkingTypes = listOf("adaptive", "enabled"))
         assertEquals(listOf("low", "medium", "high"), ReasoningOptions.of(cfg, adaptive)!!.levels)
-        // 不接受 disabled 的,列表就没有 none
+        // It does not accept disabled, so the listing has no none
         assertFalse("none" in ReasoningOptions.of(cfg, adaptive)!!.levels)
         val budgetOnly = ListedModel("m", reasoning = true, reasoningEfforts = emptyList(), thinkingTypes = listOf("enabled", "disabled"))
         assertEquals(emptyList<String>(), ReasoningOptions.of(cfg, budgetOnly)!!.levels)
@@ -180,7 +180,7 @@ class ReasoningSettingsTest {
         assertFalse(s.setReasoningEffort(ModelRole.Main, "none"))
     }
 
-    // 列表写明的思考方式随列表存下,建模型时交给适配器;旧版本存的列表没有这一项,不给档位、不出错
+    // The thinking types declared in the listing are stored with it and handed to the adapter when the model is built; lists saved by older versions lack this field and get no levels, without failing
     @Test fun thinkingTypesSurviveReloadAndOldListsGetNoOptions() {
         val s = store()
         val listed = ListedModel("m", reasoning = true, reasoningEfforts = listOf("none", "high"), thinkingTypes = listOf("adaptive", "disabled"))
@@ -193,7 +193,7 @@ class ReasoningSettingsTest {
         assertEquals(listOf("adaptive", "disabled"), setups.last().thinkingTypes)
         assertEquals("high", setups.last().reasoningEffort)
 
-        // 去掉新字段,模拟旧版本存下的列表
+        // Strip the new fields to simulate a list saved by an older version
         val file = tmp.root.resolve("providers.json")
         file.writeText(file.readText().replace(Regex(""","reasoningEfforts":\[[^]]*]"""), "")
             .replace(Regex(""","thinkingTypes":\[[^]]*]"""), ""))
@@ -228,7 +228,7 @@ class ReasoningSettingsTest {
         assertEquals(listOf("low", "max"), ReasoningOptions.of(s.configFor(ModelRole.Main)!!, listed)!!.levels)
         assertFalse(s.setReasoningEffort(ModelRole.Main, "ultra"))
         assertTrue(s.setReasoningEffort(ModelRole.Main, "low"))
-        // 模拟旧版本已经落盘的 ultra:读入时清掉,不能继续发出去让每次调用都 HTTP 400。
+        // Simulate an ultra already written to disk by an older version: it is cleared on read, so it can no longer be sent and make every call return an HTTP 400.
         val file = tmp.root.resolve("providers.json")
         file.writeText(file.readText().replace("\"reasoningEffort\":\"low\"", "\"reasoningEffort\":\"ultra\""))
         val reloaded = store()

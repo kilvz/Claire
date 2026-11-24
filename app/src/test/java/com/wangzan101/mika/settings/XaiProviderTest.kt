@@ -16,7 +16,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import javax.crypto.KeyGenerator
 
-/** 订阅登录存进和 API Key 一样的加密文件,列模型时用访问令牌,不把令牌写进配置。 */
+/** Subscription logins are stored in the same encrypted file as API keys; listing models uses the access token, and the token is never written into the config. */
 class XaiProviderTest {
     @get:Rule val tmp = TemporaryFolder()
 
@@ -50,7 +50,7 @@ class XaiProviderTest {
         s.listModels(p)
         assertEquals(Triple(ProviderConfig.Kind.Xai, XaiAuth.API_BASE, "xai-access-SECRET"), calls.single())
         assertTrue(s.use(ModelRole.Main, p.id, "grok-4", caps))
-        // 再登录更新同一家
+        // Signing in again updates the same provider
         s.connectAccount(session.copy(accessToken = "xai-access-2"), listOf(ListedModel("grok-4")))
         assertEquals(1, s.providers.value.count { it.kind == ProviderConfig.Kind.Xai })
         s.signOutAccount(p.id)

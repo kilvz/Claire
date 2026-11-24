@@ -21,7 +21,7 @@ import com.wangzan101.mika.ui.firstThatStarts
 class StatusCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    // 频道设置页打不开时依次退回,第一个能开的就停
+    // Falls back through the channel settings pages when one will not open, and stops at the first that opens
     @Test
     fun firstThatStartsFallsBack() {
         val tried = mutableListOf<String>()
@@ -74,7 +74,7 @@ class StatusCopyTest {
         assertNull(StatusCopy.paymentLines(null, null, null))
     }
 
-    // 照着记住的路线做、一次做几步时,卡片上写明在干什么
+    // When following a remembered route or doing several steps at once, the card states what is happening
     @Test
     fun replayAndBatchCopy() {
         assertEquals("按以往的做法快速执行中(第 2/5 步)", StatusCopy.progress(RunProgress.Replay(2, 5)))
@@ -86,7 +86,7 @@ class StatusCopyTest {
         assertEquals("按以往的做法快速执行中(第 2/5 步)", liveLine(replaying))
         val batching = ChatViewModel.reduce(replaying, TaskState.Running(1, "一起做", "do_steps", RunProgress.Batch(3)))
         assertEquals("一次执行 3 步", liveLine(batching))
-        // 步骤列表只列实际做过的事
+        // The step list only shows what was actually done
         assertEquals(emptyList<StepRow>(), batching.steps)
     }
 

@@ -49,7 +49,7 @@ class ProviderStoreGroupTest {
         val b = s.member(p, "m2")
         val g = ModelGroup("g", "主力兜底", members = listOf(GroupMember(a, 0), GroupMember(b, 1)))
         assertTrue(s.saveGroup(g))
-        // 没选用途,组成员也不会被 prune 掉
+        // Group members are not pruned even when no role uses them
         assertEquals(setOf(a, b), s.configs.value.map { it.id }.toSet())
         assertTrue(s.choose(ModelRole.Main, RoleChoice.Group("g")))
         assertEquals("g", s.roles.value.mainGroup)
@@ -72,7 +72,7 @@ class ProviderStoreGroupTest {
         val g = ModelGroup("g", "g", members = listOf(GroupMember(a), GroupMember(b)))
         assertTrue(s.saveGroup(g))
         assertFalse(s.choose(ModelRole.Main, RoleChoice.Group("g")))
-        // 看图组只要有能看图的成员就能选
+        // A vision group is selectable as long as it has at least one member that can see
         val v = ModelGroup("v", "v", members = listOf(GroupMember(a), GroupMember(s.member(p, "eye", vision = true))))
         assertTrue(s.saveGroup(v))
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.Group("v")))
@@ -142,7 +142,7 @@ class ProviderStoreGroupTest {
         assertTrue(s.saveGroup(ModelGroup("g", "g", members = listOf(GroupMember(a), GroupMember(b)))))
         assertTrue(s.choose(ModelRole.Main, RoleChoice.Group("g")))
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.SameAsMain))
-        // Vision=SameAsMain 会跟随主组,但不该拿「主组没有视觉成员」来拦保存
+        // Vision=SameAsMain follows the main group, but "main group has no vision member" must not block saving
         assertTrue(s.saveGroup(ModelGroup("g", "主力改名", members = listOf(GroupMember(a), GroupMember(b)))))
         assertEquals("主力改名", s.group("g")!!.name)
         assertEquals("g", s.roles.value.resolveGroup(ModelRole.Main))

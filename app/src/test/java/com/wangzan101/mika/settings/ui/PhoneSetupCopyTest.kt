@@ -19,7 +19,7 @@ import org.junit.Test
 class PhoneSetupCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    /** 给用户看的字里不出现这些技术说法(系统设置里本来就有的选项名除外,见下)。 */
+    /** These technical terms must not appear in user-facing text (except option names that already exist in system settings, see below). */
     private val jargon = listOf("shell", "端口", "mDNS", "TLS", "Binder", "uid", "进程")
 
     private fun allText(): List<String> = buildList {
@@ -72,7 +72,7 @@ class PhoneSetupCopyTest {
         assertEquals(41235, ConnectPortInput.parse("41235"))
         assertEquals(41235, ConnectPortInput.parse(" 41 235 "))
         assertEquals(41235, ConnectPortInput.parse("４１２３５"))
-        // 整段粘了「IP 地址和端口」也行
+        // Pasting a whole "IP address and port" works too
         assertEquals(41235, ConnectPortInput.parse("192.0.2.10:41235"))
         assertEquals(41235, ConnectPortInput.parse("192.0.2.10：41235"))
         assertEquals(1, ConnectPortInput.parse("1"))
@@ -84,7 +84,7 @@ class PhoneSetupCopyTest {
     fun reconnectOnlyWhenRetryingIsTheFix() {
         val reconnectable = statuses.filter { PhoneSetupCopy.canReconnect(it) }
         assertEquals(
-            // root 被拒绝、没回应:点重试再问一次 su；Shizuku 服务未跑/绑定失败同样直接点重试；非本机地址修正后也可重试。
+            // root denied or no answer: tapping retry asks su again; a Shizuku service that is not running or a failed bind also retries directly; after fixing a non-local address a retry works too.
             listOf(
                 BuiltinShellFailure.ConnectFailed, BuiltinShellFailure.NotLocal, BuiltinShellFailure.HelperStartFailed,
                 BuiltinShellFailure.RootDenied, BuiltinShellFailure.RootNoAnswer,
@@ -95,7 +95,7 @@ class PhoneSetupCopyTest {
         reconnectable.forEach { s ->
             assertEquals(Fix.RetryPhoneHelper, StatusCopy.directFix(Problem.PhoneHelper(s)))
         }
-        // 没配对要走引导;无线调试关着要先去打开;没 Wi-Fi 会自己恢复;配对失效要重新配对;Shizuku 未安装/未授权要去手机操作页处理
+        // Not paired goes through the guide; wireless debugging off must be turned on first; no Wi-Fi recovers by itself; a stale pairing needs re-pairing; Shizuku not installed or not authorized is handled on the phone operations page
         listOf(
             BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff, BuiltinShellStatus.Connecting,
             BuiltinShellStatus.Running, BuiltinShellStatus.Failed(BuiltinShellFailure.NoWifi),
@@ -111,7 +111,7 @@ class PhoneSetupCopyTest {
             val p = Problem.PhoneHelper(s)
             val fix = when {
                 PhoneSetupCopy.canReconnect(s) -> Fix.RetryPhoneHelper
-                // 这个 Wi-Fi 还没允许无线调试:直接去亲手打开一次
+                // This Wi-Fi has not allowed wireless debugging yet: go turn it on there yourself
                 s == BuiltinShellStatus.Failed(BuiltinShellFailure.WifiNotAllowed) -> Fix.OpenWirelessDebugging
                 s == BuiltinShellStatus.Failed(BuiltinShellFailure.ShizukuNotInstalled) ||
                     s == BuiltinShellStatus.Failed(BuiltinShellFailure.ShizukuPermissionNeeded) -> Fix.OpenPhoneOps
@@ -124,12 +124,12 @@ class PhoneSetupCopyTest {
 
     @Test
     fun copyIsPlainChinese() {
-        // 连不上时要用户照着「无线调试」页面填端口:只有这一句直说「端口」
+        // When the connection fails the user has to copy the port from the "Wireless debugging" page: this is the only sentence that says "port" outright
         val portAllowed = PhoneSetupCopy.failure(BuiltinShellFailure.ConnectFailed).body
         allText().forEach { t ->
             assertTrue("empty copy", t.isNotBlank())
             jargon.forEach { j -> if (!(j == "端口" && t == portAllowed)) assertFalse("「$j」 in: $t", t.contains(j, ignoreCase = true)) }
-            // 只有系统里那个选项名本身带 adb
+            // Only the system option name itself contains adb
             if (t.contains("adb")) assertTrue(t, t.contains("「停用 adb 授权超时功能」"))
         }
     }
@@ -142,7 +142,7 @@ class PhoneSetupCopyTest {
         assertEquals("重试", PhoneSetupCopy.fixLabel(BuiltinShellStatus.Failed(BuiltinShellFailure.HelperStartFailed).fix))
     }
 
-    /** USB 命令起的助手停了:设置页、横幅都直说停了、再运行命令;不往无线调试引(有的手机根本没有)。 */
+    /** The helper started by a USB command has stopped: the settings page and the banner both say plainly that it stopped and to run the command again; they do not point to wireless debugging (some phones do not have it at all). */
     @Test
     fun usbHelperStoppedSaysHowToStartItAgain() {
         val stopped = BuiltinShellStatus.Failed(BuiltinShellFailure.UsbHelperStopped)
@@ -152,7 +152,7 @@ class PhoneSetupCopyTest {
         assertFalse(line, line.contains("无线调试"))
         assertEquals(BuiltinShellFix.RunUsbCommand, stopped.fix)
         assertEquals("复制", PhoneSetupCopy.fixLabel(stopped.fix))
-        // 本来就是用命令起的:卡片说「再运行一次」,不说「打不开无线调试」
+        // It was started with the command all along: the card says "run it again", not "wireless debugging will not open"
         val (againTitle, againBody) = PhoneSetupCopy.usbCard(HelperRestart.UsbCommand)
         assertEquals("再运行一次启动命令", againTitle)
         assertTrue(againBody.contains("重启后"))
@@ -166,7 +166,7 @@ class PhoneSetupCopyTest {
         assertTrue(PhoneSetupCopy.USB_BODY.contains("重启后"))
     }
 
-    /** 「用 root 启动」用不了时,设置页、横幅都直说原因和怎么办;拒绝、没回应的给重试。正在用 root 启动时照实说。 */
+    /** When "start with root" is unavailable, the settings page and the banner both state the reason and what to do; denial and no answer offer a retry. When root start is in progress it says so. */
     @Test
     fun rootStartStatusSaysWhyAndWhatToDo() {
         val denied = BuiltinShellStatus.Failed(BuiltinShellFailure.RootDenied)
@@ -181,11 +181,11 @@ class PhoneSetupCopyTest {
         assertFalse(PhoneSetupCopy.canReconnect(gone))
         assertEquals("手机助手没在运行,正在用 root 启动…", PhoneSetupCopy.statusLine(BuiltinShellStatus.Connecting, rootStart = true))
         assertEquals(PhoneSetupCopy.statusLine(BuiltinShellStatus.Connecting), PhoneSetupCopy.statusLine(BuiltinShellStatus.Connecting, rootStart = false))
-        // 经 root 起的不靠 Wi-Fi:USB 调试关着也不提醒断 Wi-Fi 会停
+        // Starting through root does not rely on Wi-Fi: with USB debugging off there is no warning that losing Wi-Fi will stop it
         assertEquals(PhoneSetupCopy.statusLine(BuiltinShellStatus.Running), PhoneSetupCopy.statusLine(BuiltinShellStatus.Running, usbDebugging = false, rootStart = true))
     }
 
-    /** 自动启动没有开关:首次明确授权,之后自动;拒绝和没回应都能亲手重试。Root 命令仍默认关闭。 */
+    /** Auto-start has no toggle: the first grant is explicit and afterwards it is automatic; denial and no answer can both be retried by hand. Root commands are still off by default. */
     @Test
     fun rootLinesFollowAuthorization() {
         assertEquals(PhoneSetupCopy.ROOT_PENDING, PhoneSetupCopy.rootStartLine(RootGrant.Pending))
@@ -206,7 +206,7 @@ class PhoneSetupCopyTest {
         assertEquals("用 root 启动手机助手", PhoneSetupCopy.ROOT_START)
     }
 
-    /** USB 启动不承诺拔线后一定能用:成功页、设置页和重跑卡片都给出通用恢复办法。 */
+    /** USB start does not promise it keeps working after unplugging: the success screen, the settings page and the rerun card all give the generic way to recover. */
     @Test
     fun usbCopyDoesNotPromiseUnplugSurvival() {
         listOf(
@@ -219,12 +219,12 @@ class PhoneSetupCopyTest {
             assertTrue(text, text.contains("再运行一次"))
             assertFalse(text, text.contains("拔掉数据线也会继续运行"))
         }
-        // 无线调试路径的提示不受 USB 恢复说明影响
+        // The hints on the wireless debugging path are not affected by the USB recovery note
         assertFalse(PhoneSetupCopy.successNote(HelperRestart.Wireless).contains("拔掉数据线"))
         assertFalse(PhoneSetupCopy.usageNote(HelperRestart.Wireless).contains("拔掉数据线"))
     }
 
-    /** Shizuku 失败文案、重试/去设置分支、启动中/运行中状态行和重启后提示。 */
+    /** Shizuku failure copy, the retry / go-to-settings branches, the starting and running status lines, and the after-reboot hint. */
     @Test
     fun shizukuFailuresHaveClearCopyAndActions() {
         listOf(

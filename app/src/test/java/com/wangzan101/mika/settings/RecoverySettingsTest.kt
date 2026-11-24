@@ -21,7 +21,7 @@ class RecoverySettingsTest {
     }
 
     @Test fun oldInstallWithoutChoiceKeysCountsAsUntouched() {
-        // 旧版本只写「已生效」:false 分不出是没动过还是关掉过,一律当没动过,连接可用时按默认打开
+        // Older versions only wrote "applied": false cannot tell never-touched from turned-off, so it always counts as never-touched and defaults to on when the capability is available
         val prefs = MemoryPrefs()
         prefs.edit().putBoolean("accessibility", true).putBoolean("battery_whitelist", false)
             .putBoolean("restore_after_reboot", false).commit()
@@ -35,7 +35,7 @@ class RecoverySettingsTest {
         val saved = RecoveryConsent(applied = setOf(a11y, restore), declined = setOf(battery))
         RecoverySettings(prefs).save(saved)
         assertEquals(saved, RecoverySettings(prefs).consent.value)
-        // 亲手关掉后又打开:回到「要」
+        // Turned off by hand and then on again: back to "wanted"
         RecoverySettings(prefs).save(saved.chose(battery, true))
         assertTrue(RecoverySettings(prefs).consent.value.wants(battery))
     }
@@ -45,7 +45,7 @@ class RecoverySettingsTest {
         val s = RecoverySettings(prefs)
         s.save(RecoveryConsent(applied = setOf(restore)))
         s.recordRestore(RestoreOutcome.NotRecovered)
-        // 别的项变了:开机结果仍然有效
+        // Another item changed: the reboot result is still valid
         s.save(RecoveryConsent(applied = setOf(restore), declined = setOf(battery)))
         assertEquals(RestoreOutcome.NotRecovered, RecoverySettings(prefs).lastRestore.value)
         s.save(RecoveryConsent(declined = setOf(battery)))
@@ -53,7 +53,7 @@ class RecoverySettingsTest {
         assertNull(RecoverySettings(prefs).lastRestore.value)
     }
 
-    /** 内存里的设置,只够这几项读写。 */
+    /** In-memory preferences, only enough for these few keys. */
     private class MemoryPrefs : SharedPreferences {
         private val values = HashMap<String, Any?>()
 

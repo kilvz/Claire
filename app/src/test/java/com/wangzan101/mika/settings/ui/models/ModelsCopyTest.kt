@@ -17,7 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 模型页的文字:用途卡、服务商一行、删除提示,以及列表排序。 */
+/** Text on the models page: role cards, the provider row, the delete prompt, and the option ordering. */
 class ModelsCopyTest {
     @get:Rule val texts = ChineseTexts()
 
