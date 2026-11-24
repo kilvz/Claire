@@ -20,27 +20,27 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** 通话球的形态:连接=网,平时=球(安静慢转),听/说=波(随真实电平),办事中=轨道。 */
+/** Shapes of the call ball: connecting = web, idle = globe (quiet and slow-turning), listening/speaking = wave (following the real level), task running = orbits. */
 enum class VoiceCallShape { Web, Globe, Wave, Orbits }
 
-/** 默认点阵颜色:近处青白,远处深蓝,按投影深度插值(通话页按主题另传)。 */
+/** Default dot colors: cyan-white up close, deep blue far away, interpolated by projection depth (the call page passes per-theme colors). */
 private val NearColor = Color(0xFF8EFAFF)
 private val FarColor = Color(0xFF123A72)
 
-/** 相机距离(单位球半径的倍数):透视近大远小的强度。 */
+/** Camera distance (a multiple of the unit sphere radius): the strength of the perspective (near things larger, far things smaller). */
 private const val CAMERA = 3.4f
 
 private const val DEFAULT_DOT_RADIUS = 0.023f
 
-/** 电平过了多少球就从环换成波。 */
+/** Above this level the ball switches from the globe to the wave. */
 const val VOICE_WAVE_LEVEL = 0.04f
 
 /**
- * 自绘 3D 点阵球:斐波那契球面点云绕 Y 轴慢转 + 轻微 X 倾角,透视投影(近大远小),
- * 深度明暗(近青白 → 远深蓝)。形态随 [shape] 在四种之间渐变:[level] 是驱动波形的真实电平
- * (0..1,取听/说里大的那个)。数学全部自写,无外部库;大小由调用方给(dp 参数化)。
- * 生命周期外停帧:跟着 [Lifecycle.State.STARTED] 走,不可见一帧不画;系统关动画时静止,
- * 只随电平起伏(不自己摆)。
+ * Self-drawn 3D dotted sphere: a Fibonacci sphere point cloud slowly rotating around the Y axis with a slight X tilt, perspective projection (near larger, far smaller),
+ * and depth shading (cyan-white near → deep blue far). The shape cross-fades between the four based on [shape]: [level] is the real level driving the wave
+ * (0..1, taking the larger of listening/speaking). All the math is hand-written, no external libraries; the size is given by the caller (parameterized in dp).
+ * Frames stop outside the lifecycle: it follows [Lifecycle.State.STARTED] and never draws when invisible; with system animations off it is static,
+ * only rising and falling with the level (no self-animation).
  */
 @Composable
 fun VoiceCallBall(
@@ -48,7 +48,7 @@ fun VoiceCallBall(
     level: Float,
     modifier: Modifier = Modifier,
     dotCount: Int = 340,
-    /** 点的半径(相对球半径);小尺寸的球要放大点才看得清。 */
+    /** Radius of a dot (relative to the sphere radius); small balls need larger dots to stay legible. */
     dotRadius: Float = DEFAULT_DOT_RADIUS,
     near: Color = NearColor,
     far: Color = FarColor,
@@ -70,10 +70,10 @@ fun VoiceCallBall(
     }
 }
 
-/** 一个点:球面静止位置、初始方位角、所属轨道与轨道相位。 */
+/** One dot: the resting position on the sphere, its initial azimuth, the orbit it belongs to, and its orbit phase. */
 private class Dot(val x: Float, val y: Float, val z: Float, val theta: Float, val orbit: Int, val orbitAngle: Float)
 
-/** 点云与每帧的投影计算;几何常量初始化一次,帧内只有数学,没有分配。 */
+/** The point cloud and the per-frame projection math; geometry constants are initialized once, and frames only do math with no allocation. */
 private class DotBall(count: Int) {
     private val dots: Array<Dot>
     private val webPairs: IntArray
@@ -98,7 +98,7 @@ private class DotBall(count: Int) {
                 orbit = i % ORBIT_COUNT, orbitAngle = (i / ORBIT_COUNT) * (2f * PI.toFloat()) / (count / ORBIT_COUNT),
             )
         }
-        // 网的边:球面上弦长小于阈值的点对,初始化算一次
+        // Web edges: pairs of points on the sphere whose chord length is below the threshold, computed once at init
         val pairs = ArrayList<Int>(count * 3)
         for (i in dots.indices) for (j in i + 1 until dots.size) {
             val dx = dots[i].x - dots[j].x
@@ -118,7 +118,7 @@ private class DotBall(count: Int) {
         order = IntArray(count) { it }
     }
 
-    /** 轨道面的倾角与转速:三条倾斜轨道,方向、速度各异。 */
+    /** Tilt and speed of the orbit planes: three tilted orbits with different directions and speeds. */
     private val orbitTiltX = floatArrayOf(0.5f, -0.9f, 1.9f)
     private val orbitTiltY = floatArrayOf(0f, 0.7f, -0.5f)
     private val orbitSpeed = floatArrayOf(0.9f, -0.7f, 1.15f)
@@ -137,7 +137,7 @@ private class DotBall(count: Int) {
         val cx = scope.size.width / 2f
         val cy = scope.size.height / 2f
         val dt = if (lastT < 0f || static) 0f else (t - lastT).coerceIn(0f, 0.05f)
-        // 形态权重渐变;静止时直接到位
+        // Shape weights cross-fade; when static they go straight to the target
         for (k in weights.indices) {
             val target = if (k == shape.ordinal) 1f else 0f
             weights[k] = when {
@@ -154,18 +154,18 @@ private class DotBall(count: Int) {
         val cosT = cos(TILT_X)
         val sinT = sin(TILT_X)
         val w = weights
-        // 待机的球安静地呼吸一下(很轻),显得有生命又不闹
+        // The idle globe breathes quietly (very slightly), so it feels alive without being busy
         val breath = 1f + 0.02f * w[1] * sin(t * 0.7f)
         val n = dots.size
         for (i in 0 until n) {
             val d = dots[i]
-            // 网/球共用整个球面(球安静慢转);波沿半径随电平起伏;轨道沿倾斜轨道跑
+            // Web/globe share the whole sphere (the globe turns slowly and quietly); the wave rises and falls along the radius with the level; orbits run along the tilted tracks
             val wave = 1f + WAVE_AMP * smoothLevel * (0.35f + 0.65f * sin(3f * d.theta + t * 3.5f) * sin(2.5f * d.y + t * 2f))
             val orbitAngle = d.orbitAngle + t * orbitSpeed[d.orbit]
             var ox = cos(orbitAngle)
             var oy = 0f
             var oz = sin(orbitAngle)
-            // 轨道面:X 倾角再 Y 倾角
+            // Orbit plane: X tilt then Y tilt
             var ty = oy * cos(orbitTiltX[d.orbit]) - oz * sin(orbitTiltX[d.orbit])
             var tz = oy * sin(orbitTiltX[d.orbit]) + oz * cos(orbitTiltX[d.orbit])
             oy = ty
@@ -178,7 +178,7 @@ private class DotBall(count: Int) {
             val bx = (w[0] + w[1]) * d.x + w[2] * d.x * wave + w[3] * ox
             val by = (w[0] + w[1]) * d.y + w[2] * d.y * wave + w[3] * oy
             val bz = (w[0] + w[1]) * d.z + w[2] * d.z * wave + w[3] * oz
-            // 整体绕 Y 慢转 + X 轻倾
+            // Overall slow rotation around Y + slight X tilt
             val rx = bx * cosY + bz * sinY
             val rz1 = -bx * sinY + bz * cosY
             val ry = by * cosT - rz1 * sinT
@@ -190,7 +190,7 @@ private class DotBall(count: Int) {
             sd[i] = ((rz + 1.3f) / 2.6f).coerceIn(0f, 1f)
             sz[i] = rz
         }
-        // 远的先画,近的盖上面;帧间顺序几乎不乱,插入排序就近 O(n)
+        // Draw far ones first and let near ones cover them; the order barely changes between frames, so insertion sort is nearly O(n)
         for (i in 1 until n) {
             val v = order[i]
             val vz = sz[v]
@@ -201,7 +201,7 @@ private class DotBall(count: Int) {
             }
             order[j + 1] = v
         }
-        // 网的连线在点下面
+        // The web's connecting lines go underneath the dots
         val webW = w[0]
         if (webW > 0.01f) {
             for (p in 0 until webPairs.size / 2) {

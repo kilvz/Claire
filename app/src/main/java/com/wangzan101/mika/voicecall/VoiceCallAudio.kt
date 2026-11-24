@@ -25,52 +25,52 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 通话音频设备的全部抽象:采集、播放、音频焦点与通话模式。
- * 编排层只依赖本接口,测试用手写 fake,生产实现是 [AndroidVoiceCallAudio]。
+ * The complete abstraction of voice call audio devices: capture, playback, audio focus and call mode.
+ * The orchestration layer depends only on this interface; tests use hand-written fakes, and the production implementation is [AndroidVoiceCallAudio].
  */
 interface VoiceCallAudio {
-    /** 系统把麦克风静音(被别的组件占用等)时置 true。 */
+    /** Set to true when the system silences the microphone (e.g. taken over by another component). */
     val micSilenced: StateFlow<Boolean>
 
-    /** 采集块流:16kHz 单声道 PCM16,约 20ms 一块;采集停止或出错时 channel 关闭。 */
+    /** Capture chunk stream: 16 kHz mono PCM16, about 20 ms per chunk; the channel is closed when capture stops or fails. */
     val captureChunks: ReceiveChannel<ShortArray>
 
-    /** 音频焦点被抢时回调(任意线程);编排层据此结束通话。 */
+    /** Callback when audio focus is taken away (on any thread); the orchestration layer ends the call on it. */
     var onFocusLost: (() -> Unit)?
 
-    /** 电话功能忙(通话中或响铃)时不允许开始语音通话。 */
+    /** Starting a voice call is not allowed while telephony is busy (in a call or ringing). */
     fun isTelephonyBusy(): Boolean
 
-    /** 进入通话音频模式并申请音频焦点;失败返回 false。 */
+    /** Enter call audio mode and request audio focus; returns false on failure. */
     fun requestCallAudio(): Boolean
 
-    /** 放弃音频焦点并恢复普通音频模式;可重复调用。 */
+    /** Abandon audio focus and restore normal audio mode; safe to call repeatedly. */
     fun abandonCallAudio()
 
     /**
-     * 以指定音源([android.media.MediaRecorder.AudioSource])开始采集;初始化失败返回 false,
-     * 是否换音源重试由编排层决定(回退链不放这里)。
+     * Start capture with the given audio source ([android.media.MediaRecorder.AudioSource]); returns false if initialization fails,
+     * and whether to retry with another source is left to the orchestration layer (the fallback chain does not live here).
      */
     fun startCapture(inputSource: Int): Boolean
 
-    /** 停止采集并释放麦克风;可重复调用。 */
+    /** Stop capture and release the microphone; safe to call repeatedly. */
     fun stopCapture()
 
-    /** 建好并启动 24kHz 单声道 PCM16 播放轨;失败返回 false。 */
+    /** Create and start the 24 kHz mono PCM16 playback track; returns false on failure. */
     fun startPlayback(): Boolean
 
-    /** 阻塞写一整块 24kHz 单声道 PCM16;轨死了抛 [IOException]。 */
+    /** Blocking write of one whole chunk of 24 kHz mono PCM16; throws [IOException] if the track is dead. */
     suspend fun writePlayback(pcm: ByteArray, byteCount: Int)
 
-    /** barge-in:pause/flush/play,把已在硬件缓冲里的旧音频立刻丢掉。 */
+    /** barge-in: pause/flush/play, dropping the old audio already in the hardware buffer immediately. */
     fun interruptPlayback()
 
-    /** 停止并释放播放轨;可重复调用。 */
+    /** Stop and release the playback track; safe to call repeatedly. */
     fun stopPlayback()
 }
 
-/** 生产实现:AudioRecord(经 [PcmRecorder])、AudioTrack 与 AudioManager 的直接封装,无任何策略。 */
-@SuppressLint("MissingPermission") // RECORD_AUDIO 由通话面板在启动会话前请求
+/** Production implementation: a thin wrapper around AudioRecord (via [PcmRecorder]), AudioTrack and AudioManager, with no policy of its own. */
+@SuppressLint("MissingPermission") // RECORD_AUDIO is requested by the call panel before starting the session
 class AndroidVoiceCallAudio(context: Context) : VoiceCallAudio {
     private val manager = context.applicationContext.getSystemService(AudioManager::class.java)
     private val _micSilenced = MutableStateFlow(false)
@@ -190,7 +190,7 @@ class AndroidVoiceCallAudio(context: Context) : VoiceCallAudio {
         try {
             output.play()
         } catch (_: IllegalStateException) {
-            // 下一次 writePlayback 会以轨状态错误失败,由编排层归类为播放错误
+            // The next writePlayback will fail with a track-state error, which the orchestration layer classifies as a playback error
         }
     }
 

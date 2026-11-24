@@ -4,8 +4,8 @@ import com.wangzan101.mika.calls.VolcRealtimeClient
 import kotlin.math.sin
 
 /**
- * 接通提示音:本地合成的 [FIRST_TONE_HZ]Hz、[SECOND_TONE_HZ]Hz 正弦各 [TONE_MS] 毫秒,
- * 线性淡入淡出避免爆音。直接写播放轨,不进播放队列、不计入电平。
+ * Connect tone: locally synthesized [FIRST_TONE_HZ]Hz and [SECOND_TONE_HZ]Hz sine waves, [TONE_MS] milliseconds each,
+ * with linear fade-in/fade-out to avoid pops. Written directly to the playback track, bypassing the playback queue and not counted in the level.
  */
 object VoiceCallTone {
     const val TONE_MS = 65
@@ -14,7 +14,7 @@ object VoiceCallTone {
     private const val FADE_MS = 5
     private const val AMPLITUDE = 0.35 * Short.MAX_VALUE
 
-    /** 返回 16 位单声道小端 PCM:两段各 [TONE_MS] 毫秒。 */
+    /** Returns 16-bit mono little-endian PCM: two segments of [TONE_MS] milliseconds each. */
     fun connectTonePcm(sampleRate: Int = VolcRealtimeClient.OUTPUT_SAMPLE_RATE): ByteArray {
         require(sampleRate > 0) { "sampleRate must be positive" }
         val segmentSamples = sampleRate * TONE_MS / 1000

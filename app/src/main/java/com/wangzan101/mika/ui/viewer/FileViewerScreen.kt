@@ -125,21 +125,21 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
-/** 文本类和 Markdown 最多读这么多字节,再多只显示前面一部分。 */
+/** Text-like files and Markdown are read up to this many bytes; beyond that only the leading part is shown. */
 private const val TEXT_CAP = 1 shl 20
 
-/** 图片解码的最长边,超过就按比例缩小,免得大图占满内存。 */
+/** Longest side for image decoding; anything larger is scaled down proportionally so big images do not fill memory. */
 private const val IMAGE_MAX_SIDE = 4096
 
-/** 每段文本的行数:长文本分段放进懒加载列表,只排看得见的几段。 */
+/** Lines per text chunk: long text is split into chunks and put in a lazy list, so only the visible chunks are laid out. */
 private const val LINES_PER_CHUNK = 200
 
-/** 跳到命中处时上面留一点空,好看见上下文。 */
+/** When jumping to a hit, leave a little space above it so the context is visible. */
 private val FindTopMargin = 8.dp
 
 private val MonoText = MikaType.Hint.copy(fontFamily = FontFamily.Monospace)
 
-/** 读进来的内容;PDF 不在这里,它按页现读现画。 */
+/** The loaded content; PDF is not included here — it is read and drawn page by page on demand. */
 private sealed interface Loaded {
     data class Text(val text: String, val truncated: Boolean) : Loaded
     data class Html(val html: String) : Loaded
@@ -147,9 +147,9 @@ private sealed interface Loaded {
 }
 
 /**
- * 文件查看页:顶栏是返回、文件名和「分享」「用其他应用打开」;下面按 [kind] 显示内容。
- * 文本和 Markdown 还能在页内查找、一键复制全文,入口在顶栏。
- * [kind] 为 null(这里不认识的类型)时只说一句,并给「用其他应用打开」。
+ * File viewing screen: the top bar holds back, the file name, "share" and "open with another app"; content is shown below according to [kind].
+ * Text and Markdown can also be searched in-page and copied in full with one tap, with the entry points in the top bar.
+ * When [kind] is null (a type not recognized here) just a note is shown and "open with another app" is offered.
  */
 @Composable
 fun FileViewerScreen(uri: Uri, name: String, kind: ViewerKind?, onBack: () -> Unit) {
@@ -161,10 +161,10 @@ fun FileViewerScreen(uri: Uri, name: String, kind: ViewerKind?, onBack: () -> Un
         find.close()
         focus.clearFocus()
     }
-    // 查找开着时,返回键先收起查找条,而不是退出查看页
+    // While find is open, the back key first dismisses the find bar instead of leaving the viewer
     BackHandler(enabled = find.active, onBack = closeFind)
 
-    // PDF 走自己的加载器;其余类型在这里读好,顶栏的搜索、复制才知道有没有内容可用
+    // PDF goes through its own loader; the other kinds are read here, so the top bar's search and copy know whether there is content available
     val loaded by produceState<Result<Loaded>?>(null, uri, kind) {
         if (kind == null || kind == ViewerKind.Pdf) return@produceState
         value = withContext(Dispatchers.IO) { runCatching { load(context, uri, kind) } }
@@ -220,7 +220,7 @@ private fun load(context: Context, uri: Uri, kind: ViewerKind): Loaded = when (k
         },
     )
     else -> {
-        // 多读一个字节,用来判断是不是被截断了;截在多字节字符中间时解码会换成替代符,不影响前面的内容
+        // Read one extra byte to determine whether it was truncated; if the cut lands mid multi-byte character, decoding replaces it with a substitute, which does not affect the preceding content
         val bytes = open(context, uri).use { input ->
             val buf = ByteArray(TEXT_CAP + 1)
             var n = 0
@@ -240,7 +240,7 @@ private fun load(context: Context, uri: Uri, kind: ViewerKind): Loaded = when (k
 private fun open(context: Context, uri: Uri) =
     context.contentResolver.openInputStream(uri) ?: error("打不开 $uri")
 
-/** 把文本放进剪贴板;太长放不下时说一声,别假装复制成功;文件只读到一部分时也照实说。 */
+/** Put the text on the clipboard; if it is too long to fit, say so rather than pretend it succeeded; also be honest when only part of the file was read. */
 private fun copyText(context: Context, name: String, text: String, truncated: Boolean) {
     val copied = runCatching {
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(name, text))
@@ -253,9 +253,9 @@ private fun copyText(context: Context, name: String, text: String, truncated: Bo
     Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
 }
 
-// ---------- 查找条 ----------
+// ---------- Find bar ----------
 
-/** 页内查找条:输入后自动搜,显示第几处/共几处,上一个、下一个、关闭。 */
+/** In-page find bar: search automatically as you type, show which hit / total hits, plus previous, next and close. */
 @Composable
 private fun ViewerFindBar(find: FindState, onQuery: (String) -> Unit, onClose: () -> Unit) {
     val c = MikaTheme.colors
@@ -318,15 +318,15 @@ private fun FindAction(icon: ImageVector, label: String, tag: String, onClick: (
     ) { Icon(icon, label, Modifier.size(17.dp), tint = MikaTheme.colors.ink3) }
 }
 
-/** 命中处的底色:当前那一处用实色,其余淡一点。 */
+/** Background color of a hit: the current one uses the solid color, the rest are lighter. */
 private fun findColors(c: MikaColors): Pair<Color, Color> =
     c.warnSolid.copy(alpha = if (c.isDark) 0.45f else 0.32f) to c.warnSolid
 
-// ---------- 各类内容 ----------
+// ---------- Content kinds ----------
 
 /**
- * Markdown:按块懒加载(大文件不再一次排完),用和对话里同一个解析器和块样式。
- * 查找时命中处标色,「下一处」滚到命中所在的块。
+ * Markdown: lazily loaded by block (large files are no longer laid out all at once), using the same parser and block styles as in the conversation.
+ * While searching, hits are highlighted and "next hit" scrolls to the block containing it.
  */
 @Composable
 private fun MarkdownView(l: Loaded.Text, find: FindState) {
@@ -360,8 +360,8 @@ private fun MarkdownView(l: Loaded.Text, find: FindState) {
 }
 
 /**
- * 等宽、可选中;按行分段放进懒加载列表,长文件也只排看得见的部分。长行自动折行。
- * 查找命中处标色;跳到某一处时先滚到它所在的段,再按文字排版的结果挪到那一行。
+ * Monospace and selectable; split by line into chunks placed in a lazy list, so long files only lay out the visible part. Long lines wrap automatically.
+ * Search hits are highlighted; jumping to a hit first scrolls to its chunk, then shifts to that line based on the text layout result.
  */
 @Composable
 private fun PlainTextView(l: Loaded.Text, find: FindState) {
@@ -372,7 +372,7 @@ private fun PlainTextView(l: Loaded.Text, find: FindState) {
     val current = finds.hits.getOrNull(find.index)
     val list = rememberLazyListState()
     val layouts = remember { mutableStateMapOf<Int, TextLayoutResult>() }
-    // 排版结果只在查找时用来对准命中的那一行,查完就放掉,别让整份文件的排版一直留在内存里
+    // Layout results are only used during find to align with the hit line, so release them afterwards; do not keep the whole file's layout in memory
     LaunchedEffect(find.active) { if (!find.active) layouts.clear() }
     val density = LocalDensity.current
     val (soft, strong) = findColors(c)
@@ -380,7 +380,7 @@ private fun PlainTextView(l: Loaded.Text, find: FindState) {
         val hit = current ?: return@LaunchedEffect
         val item = hit.chunk + if (l.truncated) 1 else 0
         list.scrollToItem(item)
-        // 段可能比屏幕高(也可能在文件末尾,滚不到顶):等这一段排好版,再按它在视口里的位置挪到命中的那一行
+        // A chunk may be taller than the screen (and may be at the end of the file, so it cannot scroll to the top): wait for this chunk to be laid out, then shift to the hit line based on its position in the viewport
         val layout = withTimeoutOrNull(1_000) { snapshotFlow { layouts[hit.chunk] }.filterNotNull().first() } ?: return@LaunchedEffect
         val box = runCatching { layout.getBoundingBox(hit.range.first) }.getOrNull() ?: return@LaunchedEffect
         val itemTop = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == item }?.offset ?: 0
@@ -404,14 +404,14 @@ private fun PlainTextView(l: Loaded.Text, find: FindState) {
     }
 }
 
-/** 给 [ranges] 标上底色;[focused] 那一处用深色,好看出当前停在哪儿。 */
+/** Highlight [ranges] with a background color; the [focused] hit uses the darker color so it is clear where the current position is. */
 private fun String.withFind(ranges: List<IntRange>, focused: IntRange?, soft: Color, strong: Color): AnnotatedString =
     if (ranges.isEmpty()) AnnotatedString(this) else buildAnnotatedString {
         append(this@withFind)
         ranges.forEach { addStyle(SpanStyle(background = if (it == focused) strong else soft), it.first, it.last + 1) }
     }
 
-/** 网页:一个新的 WebView,脚本打开、可双指缩放、按宽视口排版;点链接交给系统处理。 */
+/** Web page: a fresh WebView with scripts enabled, pinch-to-zoom, and a wide-viewport layout; taps on links are handed to the system. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun HtmlView(html: String) {
@@ -433,7 +433,7 @@ private fun HtmlView(html: String) {
     )
 }
 
-/** 图片:铺满可见区域(按比例),双指缩放,放大后单指拖动,双击放大或还原。 */
+/** Image: fill the visible area (proportionally), pinch to zoom, drag with one finger once zoomed in, double tap to zoom in or restore. */
 @Composable
 private fun PictureView(bitmap: Bitmap) {
     val zoom = remember { Zoom() }
@@ -449,7 +449,7 @@ private fun PictureView(bitmap: Bitmap) {
 
 // ---------- PDF ----------
 
-/** 打开的 PDF:各页的原始尺寸先读好(排版占位用),画页时一页一页来(渲染器同时只能开一页)。 */
+/** An opened PDF: the original size of each page is read first (for layout placeholders), and pages are drawn one at a time (the renderer can only have one page open at a time). */
 private class PdfDoc(private val fd: ParcelFileDescriptor) {
     private val renderer = PdfRenderer(fd)
     private val lock = Mutex()
@@ -467,7 +467,7 @@ private class PdfDoc(private val fd: ParcelFileDescriptor) {
         }
     }
 
-    /** 等手上这一页画完再关。 */
+    /** Wait for the current page to finish rendering before closing. */
     fun close() {
         CoroutineScope(Dispatchers.IO).launch {
             lock.withLock {
@@ -478,7 +478,7 @@ private class PdfDoc(private val fd: ParcelFileDescriptor) {
     }
 }
 
-/** PDF:页按屏宽一列排开,只画看得见的页(滑走的页回收位图);双指缩放整列;底部「3 / 12」。 */
+/** PDF: pages are stacked in one column sized to the screen width, only visible pages are drawn (scrolled-away pages release their bitmaps); pinch zooms the whole column; "3 / 12" at the bottom. */
 @Composable
 private fun PdfView(uri: Uri, openElsewhere: () -> Unit) {
     val context = LocalContext.current
@@ -523,7 +523,7 @@ private fun PdfPages(doc: PdfDoc) {
     }
 }
 
-/** 视口中线所在的那一页。 */
+/** The page that the viewport's midline falls on. */
 private fun currentPage(list: LazyListState): Int {
     val info = list.layoutInfo
     val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2
@@ -542,7 +542,7 @@ private fun PdfPage(doc: PdfDoc, index: Int, size: IntSize) {
             if (widthPx <= 0) return@produceState
             val b = runCatching { doc.render(index, widthPx) }.getOrNull() ?: return@produceState
             value = b
-            // 滑出列表或尺寸变了:先撤下再回收,别让界面画到已回收的位图
+            // Scrolled out of the list or the size changed: unset it first, then recycle, so the UI never draws a recycled bitmap
             try { awaitCancellation() } finally { value = null; b.recycle() }
         }
         bitmap?.let { b ->
@@ -552,9 +552,9 @@ private fun PdfPage(doc: PdfDoc, index: Int, size: IntSize) {
     }
 }
 
-// ---------- 缩放 ----------
+// ---------- Zoom ----------
 
-/** 缩放和平移的状态:1 到 5 倍,平移不超出放大后的边。 */
+/** Zoom and pan state: 1x to 5x, panning never goes beyond the edges of the zoomed-in content. */
 private class Zoom {
     var scale by mutableFloatStateOf(1f)
     var offset by mutableStateOf(Offset.Zero)
@@ -573,8 +573,8 @@ private class Zoom {
 }
 
 /**
- * 双指缩放、平移;[panWithOneFinger] 为真时放大后单指也能拖。
- * 在事件的第一轮里先拿到,两指时滚动列表就收不到,单指照常滚。
+ * Pinch to zoom and pan; when [panWithOneFinger] is true, one finger can drag after zooming in.
+ * Grabbed in the first event pass, so with two fingers the list does not receive the scroll while one finger still scrolls normally.
  */
 private fun Modifier.zoomable(zoom: Zoom, panWithOneFinger: Boolean): Modifier = this
     .pointerInput(zoom) {
@@ -597,7 +597,7 @@ private fun Modifier.zoomable(zoom: Zoom, panWithOneFinger: Boolean): Modifier =
         translationY = zoom.offset.y
     }
 
-// ---------- 状态 ----------
+// ---------- States ----------
 
 @Composable
 private fun Loading() {

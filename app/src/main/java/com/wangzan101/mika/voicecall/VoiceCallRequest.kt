@@ -1,29 +1,29 @@
 package com.wangzan101.mika.voicecall
 
-/** 回声窗容量:只保留助手最近说过的这么多个字,更早的内容不再参与回声判定。 */
+/** Echo window capacity: only the most recent characters the assistant has said are kept; anything earlier no longer participates in echo detection. */
 const val ECHO_WINDOW_CAPACITY_CHARS = 500
 
 /**
- * 语音请求执行安全闸:实时会话里模型通过 mika_request 提交的请求,必须先过这五条规则才允许执行,
- * 宁可拒执行,不可误执行。
+ * Safety gate for executing voice requests: a request submitted by the model via mika_request in a real-time session must pass these five rules before it may run;
+ * better to reject execution than to execute wrongly.
  *
- * ① 无当轮转写 → Reject;② callId 已见过(含跨轮重放)→ Reject;③ utterance 归一化后不是当轮转写
- * 的子串 → Reject 且不消费转写——单向包含:模型可以只摘用户说的片段,不能往里添用户没说的话;
- * ④ utterance 归一化后与回声窗内助手内容互为子串 → Reject(回声是对称判定,两个方向都算);
- * ⑤ 通过 → Accept(原始转写),转写一次性消费。
+ * ① No transcript for the current turn → Reject; ② callId already seen (including cross-turn replay) → Reject; ③ the utterance, after normalization, is not a
+ * substring of the current turn's transcript → Reject and the transcript is not consumed — one-way containment: the model may quote only fragments of what the user said, it may not add words the user did not say;
+ * ④ the utterance, after normalization, and the assistant content in the echo window are substrings of each other → Reject (echo is a symmetric test, both directions count);
+ * ⑤ pass → Accept (the original transcript), and the transcript is consumed once.
  *
- * @param echoWindow 助手已说内容的环形缓冲,容量 [ECHO_WINDOW_CAPACITY_CHARS] 字。
+ * @param echoWindow ring buffer of what the assistant has said, with a capacity of [ECHO_WINDOW_CAPACITY_CHARS] characters.
  */
 class VoiceCallRequest(
     private val echoWindow: RingBuffer<String> = RingBuffer(ECHO_WINDOW_CAPACITY_CHARS),
 ) {
-    /** offer 过的 callId 即刻作废:即使当时被拒,之后用同一 callId 重放也一律 Reject。 */
+    /** A callId that has been offered is invalidated immediately: even if it was rejected then, replaying with the same callId later is always rejected. */
     private val seenCallIds = mutableSetOf<String>()
 
-    /** 当轮用户转写,只留最新一条;Accept 时一次性消费。 */
+    /** The current turn's user transcript, only the latest one is kept; consumed once on Accept. */
     private var currentTranscript: String? = null
 
-    /** 登记当轮 final+complete 的用户转写;新一轮覆盖旧转写。 */
+    /** Record the current turn's final+complete user transcript; a new turn overwrites the old transcript. */
     @Synchronized
     fun onUserTranscript(text: String) {
         currentTranscript = text
@@ -35,11 +35,11 @@ class VoiceCallRequest(
         val transcript = currentTranscript ?: return VoiceCallDecision.Reject
         val normalizedUtterance = normalizeForMatch(utterance)
         val normalizedTranscript = normalizeForMatch(transcript)
-        // 空串是任何串的子串,归一化后为空宁可拒执行
+        // An empty string is a substring of any string, so if it is empty after normalization, better to reject execution
         if (normalizedUtterance.isEmpty() || normalizedTranscript.isEmpty()) {
             return VoiceCallDecision.Reject
         }
-        // ③ 单向包含:模型给的 utterance 必须落在当轮转写里;比转写还长就是把用户没说的话塞进来了
+        // ③ One-way containment: the utterance given by the model must fall within the current turn's transcript; being longer than the transcript means words the user never said were inserted
         if (normalizedUtterance !in normalizedTranscript) {
             return VoiceCallDecision.Reject
         }
@@ -53,21 +53,21 @@ class VoiceCallRequest(
 }
 
 sealed interface VoiceCallDecision {
-    /** 放行,携带原始(未归一化)的当轮用户转写。 */
+    /** Allow, carrying the original (non-normalized) current-turn user transcript. */
     data class Accept(val text: String) : VoiceCallDecision
 
     data object Reject : VoiceCallDecision
 }
 
-/** 归一化:去空白、去标点、统一小写,只留字母与数字(含 CJK 表意字符)。 */
+/** Normalization: strip whitespace and punctuation, lowercase, keeping only letters and digits (including CJK ideographs). */
 private fun normalizeForMatch(text: String): String =
     text.lowercase().filter(Char::isLetterOrDigit)
 
 private fun isMutualSubstring(a: String, b: String): Boolean = a in b || b in a
 
 /**
- * 按字符计容量的环形缓冲:逐条追加,总字符数超出 [capacityChars] 时从最旧整条丢弃;
- * 单条超过容量只保留尾部最近的内容。
+ * A ring buffer with a capacity counted in characters: items are appended one by one, and when the total character count exceeds [capacityChars], whole entries are dropped from the oldest end;
+ * a single entry larger than the capacity keeps only its most recent tail.
  */
 class RingBuffer<T : CharSequence>(private val capacityChars: Int) {
     init {

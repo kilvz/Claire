@@ -10,30 +10,30 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 
-/** 通话面板状态行缓冲的上限:进度行最多留这么多条,更旧的滚掉。 */
+/** Upper bound of the call panel's status line buffer: at most this many progress lines are kept, older ones scroll off. */
 const val VOICE_LINE_MAX_COUNT = 12
 
-/** 一条状态行最长这么多字,超出截断;面板一瞥可读,细节本来就不该上来。 */
+/** A status line is at most this many characters, longer ones are truncated; the panel must be readable at a glance, and details should not surface there anyway. */
 const val VOICE_LINE_MAX_CHARS = 40
 
-/** 回给实时模型的结果文本上限:协议帧对工具结果有总长度限制,给外层包装留余量。 */
+/** Upper bound of the result text sent back to the real-time model: protocol frames impose a total length limit on tool results, leaving headroom for the outer wrapper. */
 const val VOICE_RESULT_MAX_CHARS = 1_800
 
 /**
- * 语音请求的任务入口,装配时接与聊天页相同的任务发起方式(新建会话后交给任务服务),
- * 返回这次任务的会话编号。
+ * Task entry point for voice requests; at assembly time it is wired to the same task-start mechanism as the chat page (create a new conversation, then hand it to the task service),
+ * returning the conversation ID of this task.
  */
 fun interface VoiceCallTaskLauncher {
     fun launch(goal: String): String
 }
 
 /**
- * 语音请求 → 既有任务入口的一次性目的地路由。同一时刻只接待一个请求(先到先得,
- * 后来的立即回拒,不重复发起任务);按会话编号经 [runState] 订阅该任务自己的状态
- * (并行任务时绝不收全局状态流);进度滚动成短状态行([lines]);任务停下等用户
- * (确认/回答/接管/需要动手的前置)时提示「去任务页看」并交还模型;用户开口打断
- * ([onBargeIn])取消已启动未完成的任务(不声称撤销已生效的操作);任务到终态把结果
- * 文本回给实时模型,由模型只复述一次。
+ * One-shot destination routing from voice requests to the existing task entry point. Only one request is served at a time (first come, first served,
+ * later ones are rejected immediately and no duplicate task is started); the task's own state is subscribed by conversation ID via [runState]
+ * (never the global state flow when tasks run in parallel); progress rolls into short status lines ([lines]); when the task stops to wait for the user
+ * (confirmation/answer/takeover/a prerequisite requiring manual action) it prompts "go look at the task page" and hands control back to the model; when the user speaks to interrupt
+ * ([onBargeIn]) it cancels tasks that were started but not finished (without claiming to undo operations already in effect); when the task reaches a terminal state the result
+ * text is sent back to the real-time model, for the model to restate it once.
  */
 class VoiceCallRoute(
     private val launcher: VoiceCallTaskLauncher,
@@ -43,12 +43,12 @@ class VoiceCallRoute(
 ) {
     private val _lines = MutableStateFlow<List<String>>(emptyList())
 
-    /** 面板滚动的状态行,最多 [VOICE_LINE_MAX_COUNT] 条,连续重复的只留一条。 */
+    /** The panel's scrolling status lines, at most [VOICE_LINE_MAX_COUNT], with consecutive duplicates kept only once. */
     val lines: StateFlow<List<String>> = _lines
 
     private val _busy = MutableStateFlow(false)
 
-    /** 是否有请求正在执行(认领到终态/交还之间);通话页据此把球换成办事形态。 */
+    /** Whether a request is currently executing (between claiming and reaching a terminal state / handing off); the call page uses this to switch the ball into task mode. */
     val busy: StateFlow<Boolean> = _busy
 
     private val lock = Any()
@@ -58,8 +58,8 @@ class VoiceCallRoute(
     private var lastCancelledId: String? = null
 
     /**
-     * 把一个过了安全闸的语音请求交给任务体系执行,挂起到任务终态(或交还)才返回;
-     * 每个受理的 callId 恰好回一次结果。装配方在通话协程域里 launch 调用,别在事件循环里直接 await。
+     * Hand a voice request that passed the safety gate to the task system for execution, suspending until the task reaches a terminal state (or is handed off) and only then returning;
+     * each accepted callId gets exactly one result. The assembly side launches this in the call's coroutine scope; do not await it directly in the event loop.
      */
     suspend fun execute(callId: String, text: String) {
         val claimGeneration = synchronized(lock) {
@@ -88,7 +88,7 @@ class VoiceCallRoute(
                 sendResult(callId, RESULT_START_FAILURE)
                 return
             }
-            // 认领之后、状态流登记之前发生的打断:任务一出现就取消(登记前 onBargeIn 已按会话编号取消过,这里幂等兜底)
+            // An interruption that happened after claiming but before the state flow was registered: cancel as soon as the task appears (onBargeIn already cancelled by conversation ID before registration; this is an idempotent fallback)
             if (synchronized(lock) { bargeInGeneration } != claimGeneration) {
                 cancelOnce(conversationId)
             }
@@ -112,7 +112,7 @@ class VoiceCallRoute(
                 is TaskState.Succeeded -> sendResult(callId, end.answer.ifBlank { RESULT_DONE_FALLBACK }.capResult())
                 is TaskState.Failed -> sendResult(callId, end.reason.ifBlank { RESULT_FAILED_FALLBACK }.capResult())
                 TaskState.Cancelled -> sendResult(callId, RESULT_CANCELLED)
-                else -> sendResult(callId, RESULT_START_FAILURE) // takeWhile 只在终态或交还停,理论不可达
+                else -> sendResult(callId, RESULT_START_FAILURE) // takeWhile only stops at a terminal state or a hand-off, so this is theoretically unreachable
             }
         } finally {
             synchronized(lock) {
@@ -123,7 +123,7 @@ class VoiceCallRoute(
         }
     }
 
-    /** 用户开口打断:取消已启动还没跑完的任务;没有任务在跑时不做任何事。 */
+    /** User interrupts by speaking: cancel tasks that were started but have not finished running; does nothing when no task is running. */
     fun onBargeIn() {
         val id = synchronized(lock) {
             bargeInGeneration++
@@ -132,7 +132,7 @@ class VoiceCallRoute(
         cancelOnce(id)
     }
 
-    /** 同一个任务只取消一次:登记前的代次检查和 onBargeIn 可能都盯上它。 */
+    /** Cancel a given task only once: both the generation check before registration and onBargeIn may target it. */
     private fun cancelOnce(conversationId: String) {
         val shouldCancel = synchronized(lock) {
             if (lastCancelledId == conversationId) false else {
@@ -149,7 +149,7 @@ class VoiceCallRoute(
         }
     }
 
-    /** 任务服务登记运行是异步的:刚 launch 完 runState 可能还查不到,轮询等它出现。 */
+    /** The task service registers a run asynchronously: runState may not find it right after launch, so poll until it appears. */
     private suspend fun awaitRunState(conversationId: String): StateFlow<TaskState>? {
         var waited = 0L
         while (true) {
@@ -166,7 +166,7 @@ class VoiceCallRoute(
         private const val RUN_STATE_TIMEOUT_MS = 5_000L
         private const val RUN_STATE_POLL_MS = 100L
 
-        // 回给实时模型的固定文本(模型侧指令风格,与协议层既有回复一致用英文;任务自身的答案/原因原样透传)
+        // Fixed text sent back to the real-time model (model-side instruction style, in English to match the existing replies in the protocol layer; the task's own answer/reason is passed through as-is)
         const val RESULT_BUSY = "Another request is still running. Tell the user the previous request is still being handled; they can ask again when it finishes."
         const val RESULT_START_FAILURE = "The task could not be started. Apologize briefly and suggest the user start it from the task page instead."
         const val RESULT_NEEDS_USER = "The task started but needs the user to act on the phone (approve, answer, or take over). Tell the user to open the task page to continue."
@@ -176,7 +176,7 @@ class VoiceCallRoute(
     }
 }
 
-/** 需要用户在手机上动一下手的状态:确认、回答、接管,或标明 needsYou 的前置等待;排队等开始不算。 */
+/** States that need the user to do something on the phone: confirm, answer, take over, or a prerequisite wait marked with needsYou; queued-waiting-to-start does not count. */
 private fun TaskState.needsUserOnPhone(): Boolean = when (this) {
     is TaskState.Held -> reason.needsYou
     is TaskState.WaitingConfirmation, is TaskState.WaitingTakeover, is TaskState.WaitingInput -> true
@@ -184,9 +184,9 @@ private fun TaskState.needsUserOnPhone(): Boolean = when (this) {
 }
 
 /**
- * 任务状态 → 一行给通话面板的短状态([VOICE_LINE_MAX_CHARS] 字内)。
- * 运行中取模型的进度话,剥掉坐标(点击/滑动位置)与带引号的标题(日程名、联系人名、
- * 消息内容这类细节不上通话面板);剥完没剩东西时用一行笼统说法。Idle 没有可说的,返回 null。
+ * Task state → one short status line for the call panel (within [VOICE_LINE_MAX_CHARS] characters).
+ * While running, use the model's progress narration, stripping coordinates (tap/swipe positions) and quoted titles (schedule names, contact names,
+ * message contents and similar details do not belong on the call panel); if nothing is left after stripping, use a generic line. Idle has nothing to say, so return null.
  */
 fun TaskState.toVoiceLine(): String? = when (this) {
     TaskState.Idle -> null
@@ -204,14 +204,14 @@ private fun voiceLineOf(raw: String): String {
     return if (cleaned.isBlank()) tr(R.string.voicecall_task_running) else cleaned.take(VOICE_LINE_MAX_CHARS)
 }
 
-/** 坐标形态:界面树/点击位置常见的 [x,y]、(x,y) 及其全角变体;bounds 是相邻两对,逐对剥。 */
+/** Coordinate shapes: the [x,y] and (x,y) forms common in UI trees and tap positions, plus their full-width variants; bounds are two adjacent pairs, stripped pair by pair. */
 private val COORDINATE_PATTERN = Regex("""[\[\(（【]\s*\d+\s*[,，、]\s*\d+\s*[\]\)）】]""")
 
-/** 带引号的一段:日程标题、联系人名、消息内容这类细节通常被引起来,整段剥掉。【】也按引号段剥(非数字形态)。 */
+/** A quoted stretch: details such as schedule titles, contact names and message contents are usually quoted, so the whole stretch is stripped. 【】 is also stripped as a quoted stretch (the non-numeric form). */
 private val QUOTED_PATTERN = Regex("""「[^」]*」|『[^』]*』|《[^》]*》|【[^】]*】|"[^"]*"|“[^”]*”|‘[^’]*’|'[^']*'""")
 
 private val WHITESPACE_RUN = Regex("""\s+""")
 
-/** 剥掉坐标与引号包裹的标题等细节,并把剥出的空白收拢。 */
+/** Strip coordinates and quoted titles and other details, and collapse the whitespace left behind. */
 fun stripVoiceLineDetails(text: String): String =
     WHITESPACE_RUN.replace(COORDINATE_PATTERN.replace(QUOTED_PATTERN.replace(text, ""), ""), " ").trim()

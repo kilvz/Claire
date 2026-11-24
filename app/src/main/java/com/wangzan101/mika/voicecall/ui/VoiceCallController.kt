@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 一通通话的页面侧持有物:会话、路由、免提、转写、上屏的对话流,以及页面此刻显不显。 */
+/** What the page side of a call holds: the session, the route, speakerphone routing, the transcript, the on-screen feed, and whether the page is currently visible. */
 @Stable
 class VoiceCallHolder(
     val session: VoiceCallSession,
@@ -70,16 +70,16 @@ class VoiceCallHolder(
     var visible by mutableStateOf(true)
 }
 
-/** 通话页此刻在哪个阶段:门禁(还没通话)或通话中。 */
+/** Which stage the call page is at right now: gate (no call yet) or in a call. */
 sealed interface VoiceCallStage {
     data class Gate(val stage: VoiceCallGateStage) : VoiceCallStage
     data class InCall(val call: VoiceCallHolder) : VoiceCallStage
 }
 
 /**
- * 通话页的装配与状态控制。生产依赖全部注入([deps]);一通电话从 [start] 开始:
- * 缺凭据/缺权限先进门禁,齐了才建会话。装配方不在会话事件循环里 await 路由:
- * onVoiceRequest 一律 `scope.launch { route.execute(...) }`。
+ * Assembly and state control for the call page. All production dependencies are injected ([deps]); a call starts from [start]:
+ * missing credentials/permissions go to the gate first, and the session is only created once everything is in place. The assembly side never awaits the route in the session's event loop:
+ * onVoiceRequest always does `scope.launch { route.execute(...) }`.
  */
 @Stable
 class VoiceCallController(
@@ -112,14 +112,14 @@ class VoiceCallController(
         if (realtime.migrated) runCatching { realtime.credentials() }.getOrNull()
         else deps.credentials(profile.id)
 
-    /** 拆掉当前通话的协程域(换新一通、收起终态通话、宿主离开时);会话自身已是终态或会被调用方先落终态。 */
+    /** Tear down the current call's coroutine scope (when swapping in a new call, collapsing a terminal call, or when the host leaves); the session is already terminal itself or the caller sets it terminal first. */
     private fun cancelCallScope() {
         callScope?.cancel()
         callScope = null
         currentRealtime = null
     }
 
-    /** 入口(听筒按钮/胶囊菜单/直开 extra):活的通话只重新亮出,终态的换新一通。 */
+    /** Entry points (earpiece button / capsule menu / direct-open extra): a live call is just brought back into view, a terminal one gets a new call. */
     fun start() {
         val current = stage
         if (current is VoiceCallStage.InCall && current.call.session.state.value !is VoiceCallState.Ended) {
@@ -143,7 +143,7 @@ class VoiceCallController(
             stage = VoiceCallStage.Gate(VoiceCallGateStage.NeedCredentials)
             return
         }
-        // 应用内通话只用双向实时语音协议:别的协议进不去,也不静默失败,门禁页说明并引到配置
+        // In-app calls only use the bidirectional real-time voice protocol: other protocols cannot get in, and it does not fail silently — the gate page explains and points to the configuration
         if (profile.protocol != CallVoiceProtocol.VOLC_DUPLEX) {
             stage = VoiceCallStage.Gate(VoiceCallGateStage.UnsupportedProtocol)
             return
@@ -159,7 +159,7 @@ class VoiceCallController(
         }
     }
 
-    /** 系统权限框的结果:给了直接开;没给且不再询问,换「去设置」。 */
+    /** Result of the system permission dialog: if granted, open straight away; if not granted and it will not ask again, switch to "go to settings". */
     fun onPermissionResult(granted: Boolean) {
         if (granted) {
             openCall()
@@ -171,13 +171,13 @@ class VoiceCallController(
         }
     }
 
-    /** 回到前台时重查:在设置里开了权限就直接开。 */
+    /** Re-check when returning to the foreground: if the permission was granted in settings, open straight away. */
     fun onResume() {
         val current = stage
         if (current is VoiceCallStage.Gate && (current.stage == VoiceCallGateStage.NeedPermission || current.stage == VoiceCallGateStage.PermissionDenied) && micGranted()) openCall()
     }
 
-    /** 收起:通话还活着就只藏页面(前台服务保活);失败不重试的落 Ended 收场;已结束的直接拆掉。 */
+    /** Collapse: if the call is still alive just hide the page (the foreground service keeps it alive); a failure without retry settles into Ended; an already-ended call is torn down directly. */
     fun collapse() {
         when (val current = stage) {
             is VoiceCallStage.Gate -> stage = null
@@ -188,7 +188,7 @@ class VoiceCallController(
                         cancelCallScope()
                     }
                     is VoiceCallState.Failed -> {
-                        // 失败不重试直接收起:落终态收场后把页面一并拆掉(只 end 不收页,用户得再点一次)
+                        // Failure without retry and collapsed straight away: settle into a terminal state and tear down the page as well (end alone without removing the page would make the user tap again)
                         current.call.session.end(EndReason.Hangup)
                         stage = null
                         cancelCallScope()
@@ -200,18 +200,18 @@ class VoiceCallController(
         }
     }
 
-    /** 宿主要离开了:没终的通话挂断,转写在 close 里 NonCancellable 写完。 */
+    /** The host is leaving: hang up any call that is not terminal; the transcript is finished writing in close under NonCancellable. */
     fun teardown() {
         val current = stage as? VoiceCallStage.InCall ?: return
         if (current.call.session.state.value !is VoiceCallState.Ended) current.call.session.end(EndReason.Hangup)
         stage = null
         cancelCallScope()
-        // 页面销毁后状态收集也随之没了:写回在这里兜底。先等会话收尾(最后一段转写先落进聚合),
-        // close 幂等且 NonCancellable,已写过不重复、域被取消也写完。
+        // Once the page is destroyed state collection is gone too: do the write-back here as a fallback. Wait for the session's wind-down first (so the last transcript segment lands in the aggregation first),
+        // close is idempotent and NonCancellable, so it does not write twice and still completes even if the scope is cancelled.
         val session = current.call.session
         val transcript = current.call.transcript
-        // 必须挂在比页面长寿的作用域上:teardown 只在组合销毁时触发,此时 deps.scope 正被取消,
-        // 在那里 launch 的函数体根本轮不到执行、join 也会因父作用域取消而抛掉 close
+        // It must hang on a scope that outlives the page: teardown only fires when the composition is destroyed, at which point deps.scope is being cancelled,
+        // so a body launched there would never get to run and join would also drop close because the parent scope was cancelled
         deps.appScope.launch {
             session.awaitFinished()
             transcript.close()
@@ -232,7 +232,7 @@ class VoiceCallController(
             appendTurn = deps.appendTurn,
         )
         val feed = VoiceCallFeed()
-        // 路由的回调要回头告诉会话(打字结果已显示),会话又要路由来派发请求:先声明,下面建好
+        // The route's callback needs to tell the session (a typed result has been displayed), and the session needs the route to dispatch requests: declare it first, create it below
         lateinit var session: VoiceCallSession
         val callScope = CoroutineScope(SupervisorJob(deps.scope.coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default)
         this.callScope = callScope
@@ -241,7 +241,7 @@ class VoiceCallController(
             runState = deps.runState,
             sendResult = { callId, text ->
                 if (callId.startsWith(VoiceCallSession.TYPED_CALL_PREFIX)) {
-                    // 打字的请求模型侧没有 function_call,结果回本地:进转写(答),面板状态行已由路由自己上过
+                    // For a typed request the model side has no function_call, so the result goes back locally: into the transcript (answer); the panel status lines have already been shown by the route itself
                     typedResultText(text).let {
                         transcript.onAssistant(it)
                         feed.onAssistant(it, isFinal = true)
@@ -299,7 +299,7 @@ class VoiceCallController(
             },
             onAssistantDraft = feed::onAssistantDraft,
         )
-        // 已有活动会话时服务拒第二通:立即销毁新会话,不让它占音频
+        // When there is already an active session the service rejects a second one: destroy the new session immediately so it does not take the audio
         val attached = runCatching { deps.attachService(session) }.getOrElse {
             session.end(EndReason.Hangup)
             return
@@ -308,17 +308,17 @@ class VoiceCallController(
             session.end(EndReason.Hangup)
             return
         }
-        // 办事状态进对话流:busy 起落开/收步骤卡,状态行变化加步骤
+        // Task status into the feed: busy starting/stopping opens/closes the step card, status-line changes add steps
         callScope.launch { combine(route.busy, route.lines, ::Pair).collect { (busy, lines) -> feed.onTask(busy, lines) } }
         stage = VoiceCallStage.InCall(VoiceCallHolder(session, route, VoiceCallAudioRoute(deps.context), transcript, feed))
     }
 }
 
-/** 通话页的生产依赖;都是函数,宿主(ChatScreen 所在层)按 App 容器填。 */
+/** Production dependencies of the call page; all functions, filled by the host (the layer holding ChatScreen) from the app container. */
 class VoiceCallDeps(
     val context: android.content.Context,
     val scope: CoroutineScope,
-    /** 应用级作用域(比页面长寿):页面销毁后仍要跑完的收尾用它。 */
+    /** App-level scope (outlives the page): used for wind-up work that must still complete after the page is destroyed. */
     val appScope: CoroutineScope,
     val profile: () -> CallVoiceProfile,
     val credentials: (String) -> VolcRealtimeCredentials?,
@@ -332,8 +332,8 @@ class VoiceCallDeps(
 )
 
 /**
- * 通话页的宿主:跟着 [openSignal] 的变化开(或重新亮出)通话;门禁的三个按钮、权限回执、
- * 回前台重查都接好。通话页本身不感知前台服务在不在——保活是服务的事,页面只看会话状态。
+ * Host of the call page: opens (or brings back into view) the call as [openSignal] changes; the gate's three buttons, the permission result and
+ * the re-check on returning to the foreground are all wired up. The call page itself does not care whether the foreground service exists — staying alive is the service's job, the page only watches the session state.
  */
 @Composable
 fun VoiceCallHost(deps: VoiceCallDeps, openSignal: Int, onGoConfigure: (VoiceCallGateStage) -> Unit) {
@@ -363,7 +363,7 @@ fun VoiceCallHost(deps: VoiceCallDeps, openSignal: Int, onGoConfigure: (VoiceCal
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { controller.onResume() }
     DisposableEffect(controller) { onDispose { controller.teardown() } }
 
-    // 通话的状态推进:接通接管免提路由,终态恢复路由并批量写回转写(NonCancellable 在 close 内)
+    // Call state progression: once connected, take over speakerphone routing; at a terminal state restore the route and write the transcript back in a batch (NonCancellable inside close)
     val call = (controller.stage as? VoiceCallStage.InCall)?.call
     LaunchedEffect(call) {
         if (call == null) return@LaunchedEffect

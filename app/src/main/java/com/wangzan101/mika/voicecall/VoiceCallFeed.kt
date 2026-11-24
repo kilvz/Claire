@@ -3,25 +3,25 @@ package com.wangzan101.mika.voicecall
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** 通话页对话流里的一条:一句话(你/Claire,说到一半的是 partial),或一张办事步骤卡。 */
+/** One entry in the call page's conversation feed: a sentence (you/Claire, the half-spoken one is partial), or a task step card. */
 sealed interface VoiceCallFeedItem {
     val id: Long
 
     data class Said(override val id: Long, val speaker: Speaker, val text: String, val partial: Boolean) : VoiceCallFeedItem
 
-    /** 一次办事:步骤按出现顺序排,最后一条是当前这步;[running] 为 false 时已办完(成败看最后一步的话)。 */
+    /** One task run: steps are ordered by appearance, the last one is the current step; when [running] is false it has finished (success is judged by the last step's wording). */
     data class Task(override val id: Long, val steps: List<String>, val running: Boolean) : VoiceCallFeedItem
 
     enum class Speaker { User, Mika }
 }
 
 /**
- * 通话页的对话流:把会话的转写(含说到一半的)和路由的办事状态排成一列,给页面直接画气泡。
- * 只管显示,不写存储(写回聊天是 [VoiceCallTranscript] 的事)。各回调可能来自不同线程,内部加锁。
+ * The call page's conversation feed: lays out the session transcript (including half-spoken parts) and the route's task status in one column, for the page to draw bubbles directly.
+ * Display only, no storage (writing back to the chat is [VoiceCallTranscript]'s job). The callbacks may come from different threads, so it locks internally.
  *
- * - 你说的:partial 段落替换同一条,final 落定。
- * - Claire 说的:草稿逐段替换同一条,final(或被打断时的 non-final)落定。
- * - 办事:路由 busy 起来开一张卡,之后每出现一行新状态就加一步,busy 落下卡片收尾。
+ * - What you said: partial segments replace the same entry, final settles it.
+ * - What Claire said: drafts replace the same entry piece by piece, final (or the non-final one when interrupted) settles it.
+ * - Tasks: a card is opened when the route becomes busy, then each new status line adds a step, and the card is closed when busy drops.
  */
 class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
     private val _items = MutableStateFlow<List<VoiceCallFeedItem>>(emptyList())
@@ -36,16 +36,16 @@ class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
 
     fun onAssistantDraft(text: String) = said(VoiceCallFeedItem.Speaker.Mika, text, partial = true)
 
-    /** 助手一段话落定;被打断的(isFinal=false)也落定,说到哪算哪。 */
+    /** Settle one stretch of assistant speech; interrupted ones (isFinal=false) are settled too, keeping whatever was said. */
     @Suppress("UNUSED_PARAMETER")
     fun onAssistant(text: String, isFinal: Boolean) = said(VoiceCallFeedItem.Speaker.Mika, text, partial = false)
 
-    /** 路由的办事状态:[busy] 是否在办,[lines] 是路由滚动的状态行(新的在最后)。 */
+    /** The route's task status: [busy] whether a task is running, [lines] the route's scrolling status lines (newest last). */
     fun onTask(busy: Boolean, lines: List<String>) = synchronized(lock) {
         val open = openTaskId
         if (open == null) {
             if (!busy) return@synchronized
-            // 开卡时的状态行是上一次办事留下的,不算这次的步骤
+            // The status lines at card-opening time are left over from the previous task and do not count as this run's steps
             taskBaseline = lines
             val id = nextId++
             openTaskId = id

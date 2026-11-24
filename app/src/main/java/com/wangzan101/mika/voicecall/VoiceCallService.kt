@@ -24,16 +24,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 
 /**
- * 语音通话的麦克风型前台服务:通话期间撑住进程,退后台麦克风不被掐断;ongoing 通知(CATEGORY_CALL)
- * 带挂断动作。锁屏时不打开通话页——通知点击只把 App 带到前台。
+ * The microphone-type foreground service for voice calls: keeps the process alive during a call so the microphone is not cut off in the background; the ongoing notification (CATEGORY_CALL)
+ * carries a hang-up action. It does not open the call page when the screen is locked — tapping the notification only brings the app to the foreground.
  *
- * 单会话互斥:同一时刻只托管一通 [VoiceCallSession]。[attach] 在已有活动会话(未 Ended)时**拒**第二通
- * (返回 false,调用方须自行销毁新会话)——「拒」语义保证任一时刻只有一个会话持有通话音频
- * (VoiceCallAudio.requestCallAudio/abandonCallAudio 的多会话互斥靠这层兜底)。
+ * Single-session exclusivity: only one [VoiceCallSession] is hosted at a time. When there is already an active session (not Ended), [attach] **rejects** a second one
+ * (returns false, and the caller must destroy the new session itself) — this "reject" semantics guarantees that only one session holds the call audio at any moment
+ * (the multi-session exclusivity of VoiceCallAudio.requestCallAudio/abandonCallAudio relies on this as a backstop).
  *
- * 装配(通话页,Task 7):建会话 → `attach(context, session)` 返回 true 才算占上;false 立即销毁新会话。
- * Android 14+ 麦克风型前台服务只能在 App 前台起,且 startForeground 时 RECORD_AUDIO 已授予——
- * 通话页在请求权限通过后才建会话,顺序天然满足。
+ * Assembly (call page, Task 7): create a session → `attach(context, session)`, and only a true return means it has claimed the slot; on false destroy the new session immediately.
+ * On Android 14+ a microphone-type foreground service can only be started while the app is in the foreground, and RECORD_AUDIO must already be granted at startForeground —
+ * the call page creates the session only after the permission request is approved, so the order naturally holds.
  */
 class VoiceCallService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -55,7 +55,7 @@ class VoiceCallService : Service() {
             pending
         }
         if (call == null || session != null) {
-            // 重复 start / 无待托管会话:没事可干;已有会话在跑则保持现状
+            // Duplicate start / no session to host: nothing to do; if a session is already running, keep the status quo
             if (session == null) stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -67,19 +67,19 @@ class VoiceCallService : Service() {
             }
         }.isSuccess
         if (!promoted) {
-            // 提不前台就没资格保活:把会话还给调用方的生命周期(前台时通话照常,退后台由系统静音路径兜出 MicSilent)
+            // If it cannot be promoted to the foreground it has no right to stay alive: hand the session back to the caller's lifecycle (the call goes on while in the foreground; going to the background is covered by the system's muting path raising MicSilent)
             synchronized(companionLock) { if (activeSession === call) activeSession = null }
             stopSelf(startId)
             return START_NOT_STICKY
         }
         session = call
-        // 清掉上一通电话残留的挂断点击,别让旧信号挂断新会话
+        // Clear the leftover hang-up taps from the previous call so an old signal does not hang up the new session
         while (hangupRequests.tryReceive().isSuccess) Unit
         raceSessionEnd(call)
         return START_NOT_STICKY
     }
 
-    /** select 竞速:通话协程自己走到终态,与通知挂断,谁先到听谁的。 */
+    /** select race: whichever comes first wins — the call coroutine reaching its terminal state itself, or a hang-up from the notification. */
     private fun raceSessionEnd(call: VoiceCallSession) {
         raceJob = scope.launch {
             val endedNaturally = async { call.state.first { it is VoiceCallState.Ended } }
@@ -97,7 +97,7 @@ class VoiceCallService : Service() {
 
     private fun detach(call: VoiceCallSession) {
         synchronized(companionLock) { if (activeSession === call) activeSession = null }
-        // 旧会话的收尾晚于新会话接班:前台状态与通知已属于新会话,旧会话只还坑位,不动服务
+        // The old session winds down after a new session has taken over: the foreground state and notification already belong to the new session, so the old one only frees its slot and leaves the service alone
         if (session !== call) return
         session = null
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -109,7 +109,7 @@ class VoiceCallService : Service() {
         val call = session
         session = null
         synchronized(companionLock) { if (activeSession === call) activeSession = null }
-        // 服务被系统收掉而通话还活着:落终态释放音频,不留没人管的孤儿通话
+        // The service was killed by the system while the call is still alive: reach a terminal state to release the audio, leaving no orphaned call behind
         if (call != null && call.state.value !is VoiceCallState.Ended) call.end(EndReason.Hangup)
         scope.cancel()
         super.onDestroy()
@@ -122,7 +122,7 @@ class VoiceCallService : Service() {
             enableVibration(false)
             setShowBadge(false)
         })
-        // 锁屏不开通话页:点击只把 App 带到前台,通话页由 App 内的状态自己决定显隐
+        // Do not open the call page from the lock screen: tapping only brings the app to the foreground, and the call page's visibility is decided by in-app state itself
         val open = PendingIntent.getActivity(
             this, NOTIFICATION_ID, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -155,16 +155,16 @@ class VoiceCallService : Service() {
 
         private val companionLock = Any()
 
-        /** 已占位的活动会话(可能还没被服务领走)。 */
+        /** The active session that has claimed the slot (which may not have been taken over by the service yet). */
         @Volatile private var activeSession: VoiceCallSession? = null
 
-        /** 等服务 onStartCommand 领走的会话;attach 与服务启动之间的交接箱。 */
+        /** The session waiting to be taken over by the service's onStartCommand; the handover box between attach and the service start. */
         @Volatile private var pendingSession: VoiceCallSession? = null
 
         /**
-         * 占会话坑位并拉起前台服务。已有活动会话(未 Ended)时拒第二通,返回 false,
-         * 调用方须立即销毁自己新建的会话(end(EndReason.Hangup) 或任其收尾)。
-         * startForegroundService 抛异常(如后台启动被拒)时坑位回滚,异常原样上抛。
+         * Claim the session slot and bring up the foreground service. When there is already an active session (not Ended), the second call is rejected and false is returned,
+         * and the caller must immediately destroy the session it just created (end(EndReason.Hangup) or let it wind down).
+         * If startForegroundService throws (e.g. a background start is denied), the claim is rolled back and the exception is rethrown as-is.
          */
         fun attach(context: Context, session: VoiceCallSession): Boolean {
             synchronized(companionLock) {

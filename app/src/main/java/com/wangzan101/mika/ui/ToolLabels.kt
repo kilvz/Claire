@@ -7,18 +7,18 @@ import com.wangzan101.mika.core.tool.LegacyNames
 import com.wangzan101.mika.core.tool.ToolIndex
 
 /**
- * 工具在界面上的说法:工具声明里的 label(中文)按界面语言换成对应的资源;没有 label 的原样显示工具名。
- * 改名前的运行记录里的旧名按 [legacy] 认成现在的工具。
+ * How tools are named in the UI: the label declared by a tool (Chinese) is swapped for the corresponding resource based on the UI language; tools without a label show the tool name as-is.
+ * Old names in run records from before the rename are resolved to the current tool via [legacy].
  */
 class ToolLabels(private val tools: ToolIndex, private val legacy: LegacyNames = legacyNames()) {
     fun label(tool: String): String {
-        // 没声明 label 的工具用工具名兜底查表(查不到仍显示工具名),声明了的照旧按声明文案查。
+        // Tools that declare no label fall back to looking up the table by tool name (still show the tool name if not found); declared ones are looked up by declared text as before.
         val declared = (tools[tool] ?: legacy.resolve(tool)?.let { tools[it] })?.label ?: tool
         return TOOL_LABELS[declared]?.let { tr(it) } ?: declared
     }
 
     companion object {
-        /** 工具声明里的 label → 界面文字;中文资源与 label 一字不差(ToolLabelsTest 核对每个工具都有)。 */
+        /** Declared tool label → UI text; the Chinese resource matches the label character for character (ToolLabelsTest verifies every tool has one). */
         val TOOL_LABELS: Map<String, Int> = mapOf(
             "短信验证码登录" to R.string.sms_login_tool,
             "查看已装的 App" to R.string.tool_list_apps,

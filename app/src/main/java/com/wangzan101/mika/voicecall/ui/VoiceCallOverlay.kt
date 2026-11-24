@@ -92,14 +92,14 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 /**
- * 语音通话页:通话就是一段对话。全屏 Dialog(返回键、点外部都不收起),跟随 App 的浅/深色与强调色。
+ * The voice call page: a call is just a conversation. A full-screen Dialog (neither the back key nor tapping outside dismisses it), following the app's light/dark theme and accent color.
  *
- * 顶栏:收起 ⌄ + 小点阵球(形态随状态)+「和 Claire 通话中」与一句状态(在听你说 / 在想 / Claire 在说 /
- * 正在办事 / 已静音;终态是结束或出错文案)。中间是对话流:你说的、Claire 说的实时成气泡(说到一半的半透明),
- * 办事是步骤卡,出错是带「重试」的卡,还没人开口时居中放一颗大球。底部控制台:声波条 + 静音 / 打字 /
- * 挂断(带计时)/ 免提;结束后控制台换成「回到聊天」。
+ * Top bar: collapse ⌄ + a small dotted ball (shape follows the state) + "In a call with Claire" and a status phrase (listening to you / thinking / Claire speaking /
+ * working on it / muted; terminal states show the end or error text). In the middle is the conversation feed: what you said and what Claire said become bubbles in real time (half-spoken ones are translucent),
+ * tasks are step cards, errors are cards with "retry", and while nobody has spoken yet a big ball sits in the center. The bottom console: level bars + mute / type /
+ * hang up (with a timer) / speakerphone; after the call ends the console is replaced by "back to chat".
  *
- * 页面只认 [VoiceCallHolder] 里各路状态流,不依赖前台服务在位(见 [VoiceCallController])。
+ * The page only reads the various state flows inside [VoiceCallHolder] and does not depend on the foreground service being present (see [VoiceCallController]).
  */
 @Composable
 fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
@@ -150,7 +150,7 @@ fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
                     endedText = (state as? VoiceCallState.Ended)?.let { stringResource(R.string.voicecall_ended_after, voiceCallStatusText(it), clock) },
                     onRetry = session::retry,
                 )
-                // 还没人开口:中间放一颗大球,别让页面空着
+                // Nobody has spoken yet: put a big ball in the center so the page is not empty
                 if (items.isEmpty() && state !is VoiceCallState.Failed && state !is VoiceCallState.Ended) {
                     VoiceCallBall(
                         shape, level, Modifier.align(Alignment.Center).size(200.dp).testTag("voicecall-ball-${shape.name}"),
@@ -178,26 +178,26 @@ fun VoiceCallOverlay(call: VoiceCallHolder, onCollapse: () -> Unit) {
     }
 }
 
-/** 顶栏那一句:接通后说轮到谁,其余时候就是连接/结束/出错文案。 */
+/** The phrase in the top bar: once connected it says whose turn it is, otherwise it is the connecting/ended/error text. */
 @Composable
 private fun statusLine(state: VoiceCallState, turn: VoiceCallTurn, muted: Boolean, busy: Boolean): String = when {
     state !is VoiceCallState.Active -> voiceCallStatusText(state)
     muted -> stringResource(R.string.voicecall_status_muted)
     turn == VoiceCallTurn.Speaking -> stringResource(R.string.voicecall_status_speaking)
-    // 在办事时它等的是任务,不是在想:优先说「正在办事 · 可以接着聊」
+    // While working on a task it is waiting on the task, not thinking: prefer "working on it · you can keep chatting"
     busy -> stringResource(R.string.voicecall_status_working)
     turn == VoiceCallTurn.Thinking -> stringResource(R.string.voicecall_status_thinking)
     else -> stringResource(R.string.voicecall_status_listening)
 }
 
-/** 点阵球的近/远色:强调色系,近处亮、远处融进底色;出错换成错误色。 */
+/** Near/far colors of the dotted ball: from the accent family, bright up close and blending into the background far away; on error they switch to the error color. */
 private fun ballColors(c: MikaColors, failed: Boolean): Pair<Color, Color> {
     val tone = if (failed) c.bad else c.accent
     return if (c.isDark) lerp(tone, Color.White, 0.45f) to lerp(c.bg, tone, 0.35f)
     else tone to lerp(c.bg, tone, 0.22f)
 }
 
-/** 通话计时:接通后走,结束/失败停在最后的值(那是这通的时长)。 */
+/** Call timer: runs once connected, and stops at the last value on end/failure (that is this call's duration). */
 @Composable
 private fun rememberCallClock(state: VoiceCallState): String {
     val last = remember { mutableStateOf("0:00") }
@@ -212,7 +212,7 @@ private fun rememberCallClock(state: VoiceCallState): String {
     return clock
 }
 
-/** 接通时刻在终态后也留着(对话流顶上那行「已接通 · 时间」不消失)。 */
+/** The connect time is kept after a terminal state too (the "connected · time" line at the top of the feed does not disappear). */
 @Composable
 private fun rememberStartedAt(state: VoiceCallState): Long? {
     val kept = remember { mutableStateOf<Long?>(null) }
@@ -220,7 +220,7 @@ private fun rememberStartedAt(state: VoiceCallState): Long? {
     return kept.value
 }
 
-/** 全屏、不可点外部收起的 Dialog;状态栏/导航栏图标跟随深浅色。 */
+/** Full-screen Dialog that cannot be dismissed by tapping outside; the status bar / navigation bar icons follow the light/dark theme. */
 @Composable
 private fun CallDialog(content: @Composable () -> Unit) {
     Dialog(
@@ -237,8 +237,8 @@ private fun CallDialog(content: @Composable () -> Unit) {
         val view = LocalView.current
         SideEffect {
             val window = view.dialogWindow() ?: return@SideEffect
-            // 整页不透明,后面不用变暗:去掉变暗标志(只把亮度调 0 不够,系统见到变暗窗口就把状态栏图标强制成白色),
-            // 系统栏刷成页面底色,不再露出一条变暗的旧界面
+            // The whole page is opaque, so nothing behind needs dimming: drop the dim flag (just setting the brightness to 0 is not enough — when the system sees a dimmed window it forces the status bar icons to white),
+            // and paint the system bars with the page background so no dimmed old screen shows through
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             @Suppress("DEPRECATION")
@@ -254,7 +254,7 @@ private fun CallDialog(content: @Composable () -> Unit) {
     }
 }
 
-/** 往上找到承载这段 Compose 内容的 Dialog 窗口;中间可能隔着几层容器,不能只看直接父级。 */
+/** Walk up to the Dialog window hosting this Compose content; there may be several container layers in between, so looking only at the direct parent is not enough. */
 private fun View.dialogWindow(): Window? {
     var p: ViewParent? = parent
     while (p != null) {
@@ -264,7 +264,7 @@ private fun View.dialogWindow(): Window? {
     return null
 }
 
-/** 页面骨架:App 底色 + 顶栏(收起、[header] 小图、标题、状态句)+ 一道细线,[content] 排在下面。 */
+/** Page skeleton: app background + top bar (collapse, [header] small graphic, title, status sentence) + a hairline, with [content] laid out below. */
 @Composable
 private fun CallPage(
     onCollapse: () -> Unit,
@@ -307,7 +307,7 @@ private fun CallPage(
     }
 }
 
-/** 对话流:接通行 + 气泡 + 步骤卡;出错卡与结束行挂在最后。新内容进来自动滚到底。 */
+/** Conversation feed: connected line + bubbles + step cards; the error card and ended line hang at the end. It scrolls to the bottom automatically as new content arrives. */
 @Composable
 private fun CallFeed(
     items: List<VoiceCallFeedItem>,
@@ -357,7 +357,7 @@ private fun SystemPill(text: String) {
     }
 }
 
-/** 一句话的气泡:你说的靠右淡强调色底(同聊天里你的气泡),Claire 说的靠左卡片底;说到一半的半透明。 */
+/** Bubble for one sentence: yours is right-aligned on a light accent background (same as your bubbles in the chat), Claire's is left-aligned on the card background; half-spoken ones are translucent. */
 @Composable
 private fun SaidBubble(item: VoiceCallFeedItem.Said, max: androidx.compose.ui.unit.Dp) {
     val c = MikaTheme.colors
@@ -366,14 +366,14 @@ private fun SaidBubble(item: VoiceCallFeedItem.Said, max: androidx.compose.ui.un
         val shape = if (mine) MikaShapes.UserBubble else MikaShapes.AnswerBubble
         val base = Modifier.widthIn(max = max).alpha(if (item.partial) 0.6f else 1f).animateContentSize()
         if (mine) {
-            // 你说的/打的照原样显示
+            // What you said/typed is shown as-is
             Text(
                 if (item.partial) item.text + "…" else item.text,
                 base.background(c.accent.copy(alpha = 0.14f), shape).padding(horizontal = 14.dp, vertical = 10.dp).testTag("voicecall-said-user"),
                 style = MikaType.Body, color = c.ink,
             )
         } else {
-            // Claire 的回答可能带 Markdown(打字请求的结果就是任务的书面答复),和聊天里一样渲染,别露出星号
+            // Claire's answer may contain Markdown (the result of a typed request is the task's written answer), so render it as in the chat rather than exposing the asterisks
             MarkdownText(
                 item.text, MikaType.Body.copy(color = c.ink),
                 base.background(c.surface, shape).border(1.dp, c.hair, shape).padding(horizontal = 14.dp, vertical = 10.dp).testTag("voicecall-said-mika"),
@@ -383,7 +383,7 @@ private fun SaidBubble(item: VoiceCallFeedItem.Said, max: androidx.compose.ui.un
     }
 }
 
-/** 办事步骤卡:前面的步骤都打勾,最后一步在办时转圈、办完时打勾。 */
+/** Task step card: earlier steps are all checked; the last step spins while running and gets a check when done. */
 @Composable
 private fun TaskCard(item: VoiceCallFeedItem.Task) {
     val c = MikaTheme.colors
@@ -407,7 +407,7 @@ private fun TaskCard(item: VoiceCallFeedItem.Task) {
                         }
                     }
                 }
-                // 步骤行可能是任务答复的开头,带 Markdown;一行小字里不排版,去掉符号、并成一行
+                // A step line may be the opening of the task answer and contain Markdown; a single small line is not typeset, so strip the markers and join it into one line
                 val plain = remember(step) { MarkdownModel.toPlainText(step).replace(LINE_BREAKS, " ") }
                 Text(
                     plain, Modifier.padding(start = 10.dp), style = MikaType.Body,
@@ -436,8 +436,8 @@ private fun FailedCard(text: String, onRetry: () -> Unit) {
 }
 
 /**
- * 底部控制台:声波条(你说话是强调色,Claire 说话是次级墨色,静音时平躺)、可展开的打字行,
- * 一排按钮:静音、打字、挂断(带计时)、免提。没接通前静音与打字不可用。
+ * Bottom console: level bars (accent color while you speak, secondary ink while Claire speaks, flat when muted), an expandable type line,
+ * and a row of buttons: mute, type, hang up (with a timer), speakerphone. Mute and type are unavailable before the call connects.
  */
 @Composable
 private fun CallDock(
@@ -490,7 +490,7 @@ private fun CallDock(
     }
 }
 
-/** 圆形开关按钮:平时淡底墨色图标,打开时反色(墨色底、底色图标)。 */
+/** Circular toggle button: normally a light background with an ink-colored icon; when on it inverts (ink background, background-colored icon). */
 @Composable
 private fun RoundToggle(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -512,7 +512,7 @@ private fun RoundToggle(
     }
 }
 
-/** 打字行:打字与说话同路,发出去和说的一样进对话流。 */
+/** Type line: typing takes the same path as speaking, so sending it enters the conversation feed just like saying it. */
 @Composable
 private fun TypeLine(onSend: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -543,7 +543,7 @@ private fun TypeLine(onSend: (String) -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** 声波条:一排竖条,中间高两边低,高度随 [level] 起伏;系统关动画时只随电平变,不自己摆。 */
+/** Level bars: a row of vertical bars, tall in the middle and short at the edges, whose height follows [level]; with system animations off they only vary with the level and do not animate on their own. */
 @Composable
 private fun LevelBars(level: Float, color: Color, modifier: Modifier = Modifier) {
     val reduceMotion = MikaTheme.reduceMotion
@@ -592,14 +592,14 @@ private fun PillButton(label: String, modifier: Modifier = Modifier, onClick: ()
 }
 
 /**
- * 进通话前的门:没权限、权限被拒过、没配凭据、配置的协议不支持通话,各占一页;
- * 都在页内给按钮,不自动弹系统框。
+ * The gate before entering a call: no permission, permission previously denied, no credentials configured, or the configured protocol does not support calls — each gets its own page;
+ * all of them offer a button within the page and never pop the system dialog automatically.
  */
 enum class VoiceCallGateStage { NeedPermission, PermissionDenied, NeedCredentials, UnsupportedProtocol, NeedListenSpeak }
 
 /**
- * 门禁页:和通话页同一个骨架(App 底色、同一顶栏),中间一颗安静的球 + 说明 + 主按钮。
- * [stage] 决定文案与主按钮:请求权限 / 去设置 / 去配置。
+ * Gate page: the same skeleton as the call page (app background, same top bar), with a quiet ball in the center plus an explanation and a primary button.
+ * [stage] decides the text and the primary button: request permission / go to settings / go to configuration.
  */
 @Composable
 fun VoiceCallGate(

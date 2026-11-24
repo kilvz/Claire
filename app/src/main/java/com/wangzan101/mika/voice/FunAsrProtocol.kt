@@ -10,24 +10,24 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * 自建 Fun-ASR 实时服务(Fun-ASR 仓库里的 `serve_realtime_ws.py`)的协议:
- * 文字 `START` 开始一次识别(回 `{"event":"started"}`),之后送 16 kHz 单声道 PCM16 二进制帧;
- * 服务端约每半秒回一份到此刻的全文 `{"sentences":[{"text",...}],"partial":"...","is_final":false}`,
- * 每份都是整份替换(`sentences` 是定下来的句子,`partial` 是还在变的那句);
- * 文字 `STOP` 收尾:先回 `is_final` 为 true 的终结果,再回 `{"event":"stopped"}`。
- * 指定识别语言时先发 `LANGUAGE:<中文语言名>`(服务端回 `language_set`),再发 `START`,确认语言的回应排在「开始」前面。
- * 一段话说得长(中间没有停顿、VAD 还没切句)时,服务端只拿最近 15 秒(`--partial-window-sec`)去解 `partial`,
- * 前面的字就从 `partial` 里掉出去了,要等这段说完才整段放进 `sentences`。所以窗口往后挪时
- * (`partial_start_ms` 变大、`sentences` 没变),这里把一份份 `partial` 接成到此刻的全文([PartialStitch]):
- * 留住的字当作定下的接在句子后面;等服务端把这段放进 `sentences`(或给终结果)就丢掉它。终结果只用服务端的。
- * 每次按住说话用一个新连接,不复用。
+ * Protocol of the self-hosted Fun-ASR real-time service (`serve_realtime_ws.py` in the Fun-ASR repo):
+ * the text `START` begins a recognition session (the server replies `{"event":"started"}`), after which 16 kHz mono PCM16 binary frames are sent;
+ * the server replies roughly every half second with the full text so far `{"sentences":[{"text",...}],"partial":"...","is_final":false}`,
+ * each reply being a full replacement (`sentences` are the finalized sentences, `partial` is the sentence still changing);
+ * the text `STOP` wraps up: the server first sends the final result with `is_final` true, then `{"event":"stopped"}`.
+ * When a recognition language is specified, `LANGUAGE:<Chinese language name>` is sent first (the server replies `language_set`), then `START`, so the language confirmation precedes "start".
+ * When a stretch of speech is long (no pause in between, VAD has not split the sentence yet), the server only feeds the most recent 15 seconds (`--partial-window-sec`) into `partial`,
+ * so earlier characters fall out of `partial` and only appear in `sentences` once the stretch is finished. Therefore when the window shifts forward
+ * (`partial_start_ms` grows while `sentences` is unchanged), the successive `partial`s are stitched here into the full text so far ([PartialStitch]):
+ * the retained text is treated as finalized and appended after the sentences; it is discarded once the server puts this stretch into `sentences` (or gives a final result). Only the server's final results are used.
+ * Every push-to-talk uses a new connection, never reused.
  *
- * 这套消息不限于 Fun-ASR 的模型:别的模型(如 Qwen3-ASR)前面放一层说这套消息的服务,填进同一栏就能用,这里不区分。
+ * This message set is not limited to Fun-ASR models: another model (e.g. Qwen3-ASR) fronted by a service speaking this message set can be entered in the same field and works; no distinction is made here.
  */
 internal class FunAsrProtocol(private val language: AsrLanguage = AsrLanguage.Auto) : LiveAsrProtocol {
     private var final: String? = null
     private var lockedCount = 0
-    /** 当前这段(还没放进 `sentences` 的)到此刻的字。 */
+    /** The characters so far of the current stretch (not yet placed into `sentences`). */
     private val stitch = PartialStitch()
 
     override fun opening() = listOfNotNull(language.takeIf { it != AsrLanguage.Auto }?.let { "LANGUAGE:${it.funAsrName}" }, "START")
@@ -37,10 +37,10 @@ internal class FunAsrProtocol(private val language: AsrLanguage = AsrLanguage.Au
         val root = Json.parseToJsonElement(message).jsonObject
         when (root["event"]?.jsonPrimitive?.contentOrNull) {
             "started" -> return LiveAsrUpdate.Started
-            // 没送过音频时服务端不给终结果、直接回 stopped:当没听清
+            // If no audio was ever sent, the server gives no final result and replies stopped directly: treat it as nothing was heard
             "stopped" -> return LiveAsrUpdate.Ended(final ?: "")
             null -> Unit
-            else -> return LiveAsrUpdate.None // hotwords_set、language_set 等确认
+            else -> return LiveAsrUpdate.None // confirmations such as hotwords_set, language_set
         }
         val sentences = (root["sentences"] as? JsonArray).orEmpty()
             .mapNotNull { (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull?.trim() }
@@ -51,7 +51,7 @@ internal class FunAsrProtocol(private val language: AsrLanguage = AsrLanguage.Au
         }
         val partial = root["partial"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
         if (sentences.size != lockedCount) {
-            // 这段已经整段放进 sentences:留住的字由它带着;下一份 partial 是新的一段,不和这段对齐
+            // This stretch has been fully placed into sentences: the retained text is carried by it; the next partial is a new stretch and is not aligned with this one
             lockedCount = sentences.size
             stitch.reset()
         }
@@ -64,18 +64,18 @@ internal class FunAsrProtocol(private val language: AsrLanguage = AsrLanguage.Au
     }
 
     companion object {
-        /** 自建服务怎么部署(Fun-ASR-Nano 的实时服务、Qwen3-ASR + vLLM)写在这份文档里;设置页的「部署说明」打开它。 */
+        /** How to deploy the self-hosted service (Fun-ASR-Nano's real-time service, Qwen3-ASR + vLLM) is written in this document; the settings page's "deployment notes" opens it. */
         const val DEPLOY_GUIDE = "https://github.com/kilvz/Claire/blob/main/docs/dev/live-asr.md"
 
-        /** 服务端默认端口。 */
+        /** Default port of the service. */
         const val DEFAULT_PORT = 10095
 
-        /** 卡片、诊断里只写主机和端口,不写路径和参数。 */
+        /** Cards and diagnostics show only the host and port, not the path and parameters. */
         fun hostOf(url: String): String = runCatching { URI(url).let { u -> u.host + if (u.port > 0) ":${u.port}" else "" } }.getOrDefault(url)
 
         /**
-         * 用户填的服务地址规范成 ws(s) 地址:没写协议当 ws,http(s) 换成 ws(s),没写端口补 [DEFAULT_PORT];
-         * 不是合法地址(没有主机、协议不对、带账号密码)返回 null。
+         * Normalize the service address entered by the user into a ws(s) address: no protocol is treated as ws, http(s) is changed to ws(s), and a missing port is filled with [DEFAULT_PORT];
+         * returns null if it is not a valid address (no host, wrong protocol, contains credentials).
          */
         fun normalize(input: String): String? {
             val raw = input.trim()

@@ -4,9 +4,9 @@ import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 
 /**
- * 通话页的文案映射:每类错误、每种结束原因各占一条独立说法;RESUMED 超时落的
- * Ended(Background) 在这里翻成「请回到前台」。打字请求(合成 callId,模型侧没有 function_call)
- * 的结果回到本地:路由的模型指令文案换成本地说法,任务自己的答案/原因原样透传。
+ * Copy mapping for the call page: each error kind and each end reason has its own separate wording; the
+ * Ended(Background) produced when RESUMED times out is rendered here as "please return to the foreground". Results of typed requests (synthesized callId,
+ * no function_call on the model side) come back locally: the route's model-instruction text is swapped for the local wording, and the task's own answer/reason is passed through as-is.
  */
 
 fun voiceCallErrorText(error: VoiceCallError): String = tr(
@@ -33,7 +33,7 @@ fun voiceCallEndText(reason: EndReason): String = tr(
     },
 )
 
-/** 顶部状态点旁边那句:进行中是状态词,终态就是结束/错误文案。 */
+/** The line next to the status dot at the top: in progress it is a status word, in a terminal state it is the end/error text. */
 fun voiceCallStatusText(state: VoiceCallState): String = when (state) {
     VoiceCallState.Connecting -> tr(R.string.voicecall_status_connecting)
     VoiceCallState.MicCheck -> tr(R.string.voicecall_status_mic_check)
@@ -42,7 +42,7 @@ fun voiceCallStatusText(state: VoiceCallState): String = when (state) {
     is VoiceCallState.Failed -> voiceCallErrorText(state.error)
 }
 
-/** 打字请求的结果文本:路由常量是给模型的英文指令,落本地换成本地说法;其余(任务的答案/原因)原样。 */
+/** Result text of a typed request: the route constants are English instructions meant for the model, so they are swapped for local wording here; the rest (the task's answer/reason) is kept as-is. */
 fun typedResultText(text: String): String = when (text) {
     VoiceCallRoute.RESULT_BUSY -> tr(R.string.voicecall_task_running)
     VoiceCallRoute.RESULT_START_FAILURE -> tr(R.string.voicecall_task_failed)

@@ -8,8 +8,8 @@ import com.wangzan101.mika.ui.MdBlock
 import com.wangzan101.mika.ui.findRanges
 
 /**
- * 查看页的查找状态:开没开、搜什么、命中多少处、现在第几处。
- * 命中内容由正在显示的视图算好,再用 [report] 回报;输入框和计数条只读这里。
+ * Find state for the viewer screen: whether it is open, what is being searched, how many hits there are, and which one is current.
+ * The hits are computed by the view currently being displayed and then reported back via [report]; the input box and counter bar only read from here.
  */
 internal class FindState {
     var active by mutableStateOf(false)
@@ -21,7 +21,7 @@ internal class FindState {
     var index by mutableStateOf(0)
         private set
 
-    /** 命中太多,只数到了前 [FIND_LIMIT] 处。 */
+    /** Too many hits; only the first [FIND_LIMIT] were counted. */
     var more by mutableStateOf(false)
         private set
 
@@ -35,7 +35,7 @@ internal class FindState {
         more = false
     }
 
-    /** 换了搜索词就从第一处看起;计数等视图算好再经 [report] 填进来。 */
+    /** A new search term starts from the first hit; the count is filled in later by the view via [report]. */
     fun updateQuery(value: String) {
         if (value == query) return
         query = value
@@ -46,7 +46,7 @@ internal class FindState {
 
     fun prev() { if (count > 0) index = (index + count - 1) % count }
 
-    /** 视图算完这一轮的命中后回报。 */
+    /** Report back once the view has computed this round's hits. */
     fun report(hits: Int, more: Boolean) {
         count = hits
         this.more = more
@@ -54,16 +54,16 @@ internal class FindState {
     }
 }
 
-/** 文本类文件里的一处命中:[chunk] 是第几段,range 是这一段里的位置。 */
+/** One hit inside a text-like file: [chunk] is which chunk, range is the position within that chunk. */
 internal data class TextHit(val chunk: Int, val range: IntRange)
 
-/** 文本类文件的全部命中;也记着是不是因为太多被截断了。 */
+/** All hits in a text-like file; also records whether they were truncated for being too many. */
 internal class TextFinds(val hits: List<TextHit>, val more: Boolean) {
-    /** 每一段里要标的位置,按段分好,列表只给看得见的几段。 */
+    /** The positions to mark within each chunk, grouped by chunk; the list only covers the chunks that are visible. */
     val byChunk: Map<Int, List<IntRange>> = hits.groupBy({ it.chunk }, { it.range })
 }
 
-/** 在分段显示的文本里找 [query];位置按段算,跳转时就能直接去那一段。 */
+/** Find [query] in chunked text; positions are per chunk, so jumping can go straight to that chunk. */
 internal fun findInChunks(chunks: List<String>, query: String): TextFinds {
     if (query.isEmpty()) return TextFinds(emptyList(), more = false)
     val hits = ArrayList<TextHit>()
@@ -75,15 +75,15 @@ internal fun findInChunks(chunks: List<String>, query: String): TextFinds {
 }
 
 /**
- * Markdown 里的一处命中:[block] 是顶层第几块,[text] 是命中的那段文字本身,
- * [occurrence] 是它在这一段里第几次出现 —— 显示时靠这两个认出「当前这一处」。
+ * One hit in Markdown: [block] is the top-level block index, [text] is the matched piece of text itself,
+ * and [occurrence] is which occurrence it is within that piece — these two identify "the current hit" when displaying.
  */
 internal data class BlockHit(val block: Int, val text: CharSequence, val occurrence: Int)
 
-/** Markdown 的全部命中;也记着是不是因为太多被截断了。 */
+/** All hits in Markdown; also records whether they were truncated for being too many. */
 internal class BlockFinds(val hits: List<BlockHit>, val more: Boolean)
 
-/** 在 Markdown 的各段文字里找 [query];命中记在顶层的块上,跳转时滚到那一块。 */
+/** Find [query] across the text pieces of Markdown; hits are recorded on top-level blocks, so jumping scrolls to that block. */
 internal fun findInBlocks(blocks: List<MdBlock>, query: String): BlockFinds {
     if (query.isEmpty()) return BlockFinds(emptyList(), more = false)
     val hits = ArrayList<BlockHit>()
@@ -101,7 +101,7 @@ internal fun findInBlocks(blocks: List<MdBlock>, query: String): BlockFinds {
     return BlockFinds(hits, more = false)
 }
 
-/** Markdown 按显示顺序排开的各段文字:段落、标题、代码、引用和列表里的块、表格的格。 */
+/** The text pieces of Markdown laid out in display order: paragraphs, headings, code, blocks inside quotes and lists, and table cells. */
 internal fun MdBlock.textPieces(out: MutableList<CharSequence>) {
     when (this) {
         is MdBlock.Para -> out += text

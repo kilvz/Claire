@@ -5,19 +5,19 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * 一通语音通话的文字聚合:用户每段完整话语开一轮([onUser]),助手在两段用户话语之间
- * 说的都并进当轮的答([onAssistant]);会话结束把整通问答批量写回发起会话([close]),
- * 与聊天走同一个存储入口。
+ * Text aggregation for one voice call: each complete utterance from the user opens a turn ([onUser]); everything the assistant says between two user utterances
+ * is merged into the answer of the current turn ([onAssistant]); when the call ends the whole Q&A is written back to the originating conversation in a batch ([close]),
+ * through the same storage entry as the chat.
  *
- * 装配:会话编排的用户/助手转写回调(只要 final)喂进来;[conversationId] 是发起这次通话
- * 的会话(从胶囊直开、没有发起会话时为 null,不写回);[appendTurn] 接对话存储的逐轮写入。
+ * Assembly: the call orchestrator's user/assistant transcript callbacks (final only) feed it; [conversationId] is the conversation that
+ * started this call (null when opened directly from the capsule with no originating conversation, in which case nothing is written back); [appendTurn] is the conversation store's per-turn writer.
  */
 class VoiceCallTranscript(
     private val conversationId: () -> String?,
     private val appendTurn: suspend (conversationId: String, turn: ChatTurn) -> Unit,
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
-    /** 一轮问答:用户问的、助手答的(多段按行拼)、问的时刻(毫秒)。 */
+    /** One Q&A turn: what the user asked, what the assistant answered (multiple segments joined by lines), and when it was asked (milliseconds). */
     data class Turn(val question: String, val answer: String, val at: Long)
 
     private val lock = Any()
@@ -25,7 +25,7 @@ class VoiceCallTranscript(
     private var open: Turn? = null
     private var closed = false
 
-    /** 用户说了一段完整的话:闭合上一轮,开新一轮。空白忽略。 */
+    /** The user said one complete utterance: close the previous turn and open a new one. Blank input is ignored. */
     fun onUser(text: String) {
         if (text.isBlank()) return
         synchronized(lock) {
@@ -35,7 +35,7 @@ class VoiceCallTranscript(
         }
     }
 
-    /** 助手说了一段话:并进当轮的答;用户还没开口(如问候语)就聚成一条空问轮。空白忽略。 */
+    /** The assistant said a segment: merge it into the current turn's answer; if the user has not spoken yet (e.g. a greeting) it accumulates into an empty-question turn. Blank input is ignored. */
     fun onAssistant(text: String) {
         if (text.isBlank()) return
         synchronized(lock) {
@@ -46,14 +46,14 @@ class VoiceCallTranscript(
         }
     }
 
-    /** 截至此刻的全部轮次,含还没等来回答的那一轮。 */
+    /** All turns as of now, including the turn still waiting for its answer. */
     fun turns(): List<Turn> = synchronized(lock) { done + listOfNotNull(open) }
 
     /**
-     * 会话结束写回:把有问有答的轮次逐条写进发起会话,只写一次——
-     * 重复结束不再写;收尾在通话协程域被取消时也照常写完(NonCancellable),
-     * 装配方在通话收尾的 finally 里直接调即可。空问轮(只有助手说过话,如纯问候)不写;
-     * 有问无答的轮次(没等来回答就挂了)也不写——空 outcome 的聊天气泡没有意义。
+     * Write back when the call ends: write the turns that have both a question and an answer into the originating conversation one by one, exactly once —
+     * a repeated close does not write again; the write-back still completes when the call's coroutine scope is cancelled (NonCancellable),
+     * so the assembly side can simply call it in the call's final finally block. Empty-question turns (only the assistant spoke, e.g. a pure greeting) are not written;
+     * turns with a question but no answer (hung up before the answer arrived) are not written either — a chat bubble with an empty outcome is meaningless.
      */
     suspend fun close() {
         val (snapshot, id) = synchronized(lock) {

@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 通话状态机:显式枚举,任何时刻必居其一,不用布尔拼接。 */
+/** Call state machine: an explicit enumeration, exactly one at any moment, not stitched together from booleans. */
 sealed interface VoiceCallState {
     data object Connecting : VoiceCallState
     data object MicCheck : VoiceCallState
@@ -34,8 +34,8 @@ sealed interface VoiceCallState {
 }
 
 /**
- * 接通后这一刻轮到谁:听(等你开口/你在说)、想(你说完了,等回答)、说(Claire 的声音正在播)。
- * 只在 [VoiceCallState.Active] 里有意义;通话页据此给出「在听你说 / 在想 / Claire 在说」。
+ * Whose turn it is once connected: listening (waiting for you to speak / you are speaking), thinking (you finished, waiting for an answer), speaking (Claire's voice is playing).
+ * Meaningful only inside [VoiceCallState.Active]; the call page uses it to show "listening to you / thinking / Claire speaking".
  */
 enum class VoiceCallTurn { Listening, Thinking, Speaking }
 
@@ -44,15 +44,15 @@ enum class EndReason { Hangup, Notification, IncomingCall, TimeLimit, Background
 enum class VoiceCallError { Auth, ConnectTimeout, Disconnected, RateLimited, Provider, MicSilent, AudioFocus, Playback, Busy }
 
 /**
- * 应用内实时语音通话编排。一次接通的全链:等前台 RESUMED → 电话忙检测 → 音频焦点 → 连接实时会话 →
- * 开麦校验(VOICE_COMMUNICATION 初始化失败在编排层回退 MIC)→ 起播 → 本地两音提示音 →
- * 云端问候语(每会话只播一次)→ Active。
+ * In-app real-time voice call orchestration. The full chain of one connection: wait for foreground RESUMED → telephony-busy check → audio focus → connect the real-time session →
+ * mic check (VOICE_COMMUNICATION init failure falls back to MIC in the orchestration layer) → start playback → local two-tone prompt tone →
+ * cloud greeting (played only once per session) → Active.
  *
- * Active 后三路并行:事件消费(下行音频进 20 秒上限的 [CallPlaybackQueue];barge-in 代次作废 + 硬件 flush;
- * mika_request 先登记当轮转写再过安全闸)、采集上行(20ms 帧绝对 deadline pacing)、10 分钟上限。
- * 收尾幂等:挂断/结束/失败统一走 finally 释放焦点、采集、播放与实时会话;外部取消不算失败。
+ * After Active, three paths run in parallel: event consumption (downstream audio goes into the 20-second-capped [CallPlaybackQueue]; barge-in invalidates the generation + hardware flush;
+ * mika_request first registers the current turn's transcript then passes the safety gate), upstream capture (20ms frames with absolute deadline pacing), and the 10-minute limit.
+ * Wind-down is idempotent: hangup/end/failure all go through the same finally that releases focus, capture, playback and the real-time session; external cancellation does not count as failure.
  *
- * 安全闸([requestGate])每会话新建、跨重试不重置:callId 一次性要扛住重连重放。
+ * The safety gate ([requestGate]) is created once per session and not reset across retries: it must withstand reconnection replays for its callIds.
  */
 class VoiceCallSession(
     private val scope: CoroutineScope,
@@ -66,7 +66,7 @@ class VoiceCallSession(
     private val onBargeIn: () -> Unit = {},
     private val onUserTranscript: (text: String, isFinal: Boolean) -> Unit = { _, _ -> },
     private val onAssistantTranscript: (text: String, isFinal: Boolean) -> Unit = { _, _ -> },
-    /** 助手这一轮到目前为止的文字(逐段累积),供通话页实时显示;落定仍走 [onAssistantTranscript]。 */
+    /** The assistant's text so far in this turn (accumulated segment by segment), for the call page to display live; settling still goes through [onAssistantTranscript]. */
     private val onAssistantDraft: (text: String) -> Unit = {},
     private val timeLimitMs: Long = MAX_CALL_DURATION_MS,
     private val resumedTimeoutMs: Long = RESUMED_TIMEOUT_MS,
@@ -84,10 +84,10 @@ class VoiceCallSession(
     val turn: StateFlow<VoiceCallTurn> = _turn
     private val _muted = MutableStateFlow(false)
 
-    /** 静音:麦克风照常采集,上行改送静音帧(保持节奏,服务端只当你没说话),电平归零。跨重试保留。 */
+    /** Mute: capture continues as usual, but upstream sends silent frames instead (keeping the pace, so the server just sees you as not speaking) and the level drops to zero. Preserved across retries. */
     val muted: StateFlow<Boolean> = _muted
 
-    /** 最近一次真正写进播放轨的云端音频时刻(clockNanos);播放停下一阵后轮回到听。 */
+    /** The time (clockNanos) of the most recent cloud audio actually written to the playback track; after playback has been idle for a while the turn returns to listening. */
     @Volatile private var lastSpokeNanos = 0L
 
     private val lock = Any()
@@ -108,8 +108,8 @@ class VoiceCallSession(
     }
 
     /**
-     * 回复已在本地显示(打字请求的结果只进转写/面板,云端不会播报):不会再有播放把「在想」带回「在听」,
-     * 由装配方显示后告诉会话。正在播报时不动,播完自然回到听。
+     * The reply is already displayed locally (the result of a typed request only goes into the transcript/panel; the cloud will not speak it): no more playback will bring "thinking" back to "listening",
+     * so the assembly side tells the session after displaying it. While speaking it does nothing; when playback ends it naturally returns to listening.
      */
     fun onLocalReply() {
         _turn.compareAndSet(VoiceCallTurn.Thinking, VoiceCallTurn.Listening)
@@ -118,9 +118,9 @@ class VoiceCallSession(
     private var typedCount = 0
 
     /**
-     * 通话面板的文字输入:打字与说话同路——登记进转写(问),并以合成 callId([TYPED_CALL_PREFIX]+序号)
-     * 直接派发给语音请求处理。打字本就是用户亲述,不过安全闸(闸防的是模型伪造);装配方对
-     * 合成 callId 的结果回本地(进转写/面板),协议层没有它登记的 callId。仅 Active 态受理,空白忽略。
+     * Text input from the call panel: typing takes the same path as speaking — it is registered into the transcript (question), and dispatched straight to the voice request handler
+     * with a synthesized callId ([TYPED_CALL_PREFIX]+sequence number). Typing is the user's own speech, so it does not pass the safety gate (the gate guards against model forgery); the assembly side handles
+     * results for synthesized callIds locally (into the transcript/panel), since the protocol layer has no callId registered for them. Accepted only in the Active state, blank input ignored.
      */
     fun sendUserText(text: String) {
         val clean = text.trim()
@@ -133,8 +133,8 @@ class VoiceCallSession(
     }
 
     /**
-     * 终态转换:已终态时再调是 no-op(收尾幂等)。唯一例外是 Failed → Ended:
-     * 失败后用户不重试、直接离开时通话页负责收场,前台服务据此收工;落了 Ended 后 retry 不再有效。
+     * Terminal transition: calling again once terminal is a no-op (idempotent wind-down). The only exception is Failed → Ended:
+     * when the user does not retry after a failure and just leaves, the call page is responsible for the wrap-up and the foreground service uses it to stop; after Ended is set, retry no longer takes effect.
      */
     fun end(reason: EndReason) {
         val job = synchronized(lock) {
@@ -150,15 +150,15 @@ class VoiceCallSession(
     }
 
     /**
-     * 等当前这次尝试的收尾跑完(挂断后仍有一路 finally:关实时会话、停采集与播放)。
-     * 页面销毁时先等它,最后一段转写才不会丢;不能在本会话自己的协程域里调(会自等)。
+     * Wait for the current attempt's wind-down to finish (after hang-up there is still a finally path: close the real-time session, stop capture and playback).
+     * When the page is destroyed, wait for it first so the last transcript segment is not lost; do not call it from this session's own coroutine scope (it would wait on itself).
      */
     suspend fun awaitFinished() {
         val job = synchronized(lock) { runJob }
         job?.join()
     }
 
-    /** 就地重试:仅 Failed 态有效,attempt++ 后重跑整个连接流程;安全闸与回声窗不重置。 */
+    /** Retry in place: only valid in the Failed state, reruns the whole connection flow after attempt++; the safety gate and echo window are not reset. */
     fun retry() {
         val oldJob: Job?
         val attempt: Int
@@ -170,7 +170,7 @@ class VoiceCallSession(
             attempt = failed.attempt
         }
         val job = scope.launch {
-            oldJob?.join() // 等上一次尝试的收尾跑完再重新占音频设备
+            oldJob?.join() // Wait for the previous attempt's wind-down to finish before taking the audio device again
             runAttempt(attempt + 1)
         }
         synchronized(lock) { runJob = job }
@@ -196,7 +196,7 @@ class VoiceCallSession(
         try {
             synchronized(lock) {
                 retryScheduled = false
-                // 启动竞速:上一终态已被 end/hangup 落下时,本次尝试直接放弃
+                // Start race: if a terminal state has already been set by end/hangup, abandon this attempt right away
                 if (terminal && _state.value !is VoiceCallState.Failed) return
                 terminal = false
             }
@@ -220,7 +220,7 @@ class VoiceCallSession(
             _state.value = VoiceCallState.Active(nowMillis())
             runActive(realtime)
         } catch (cancelled: CancellationException) {
-            throw cancelled // 外部取消不是失败,终态由取消方决定
+            throw cancelled // External cancellation is not a failure; the terminal state is decided by the canceller
         } catch (failure: VoiceCallFailure) {
             fail(failure.error, attempt)
         } catch (error: VolcRealtimeException) {
@@ -247,7 +247,7 @@ class VoiceCallSession(
         } ?: false
     }
 
-    /** VOICE_COMMUNICATION 触发平台 AEC/NS;初始化失败的回退链放在编排层,不放采集实现里。 */
+    /** VOICE_COMMUNICATION enables the platform's AEC/NS; the fallback chain for init failure lives in the orchestration layer, not in the capture implementation. */
     private fun startCaptureWithFallback() {
         if (audio.startCapture(MediaRecorder.AudioSource.VOICE_COMMUNICATION)) return
         if (audio.startCapture(MediaRecorder.AudioSource.MIC)) return
@@ -255,8 +255,8 @@ class VoiceCallSession(
     }
 
     /**
-     * 开麦校验:限时内要收到一块有声音的音频,且未被系统静音。
-     * 刚切进通话模式时不少音频硬件会先给几块全零(预热),所以全零块跳过、只在整个窗口都没声音时才判失败。
+     * Mic check: a chunk of audio with sound must arrive within the time limit, and the system must not have muted the mic.
+     * Right after switching into call mode, many audio devices first deliver a few all-zero chunks (warming up), so all-zero chunks are skipped and failure is only declared if the whole window stays silent.
      */
     private suspend fun checkMic() {
         val heard = withTimeoutOrNull(micCheckTimeoutMs) {
@@ -271,7 +271,7 @@ class VoiceCallSession(
         _micLevel.value = levelOf(heard)
     }
 
-    /** 提示音直接写播放轨,不进播放队列、不计电平。 */
+    /** The prompt tone is written directly to the playback track; it does not enter the playback queue and is not counted in the level. */
     private suspend fun playTone() {
         val tone = VoiceCallTone.connectTonePcm()
         try {
@@ -287,7 +287,7 @@ class VoiceCallSession(
     private fun greetOnce(realtime: CallRealtimeSession) {
         if (greeted || greeting.isBlank()) return
         if (!realtime.sendGreeting(greeting)) throw VoiceCallFailure(VoiceCallError.Provider)
-        echoWindow.append(greeting) // 问候语也是助手已说内容,进回声窗
+        echoWindow.append(greeting) // The greeting is also something the assistant said, so it enters the echo window
         greeted = true
     }
 
@@ -302,7 +302,7 @@ class VoiceCallSession(
                     delay(timeLimitMs)
                     end(EndReason.TimeLimit)
                 }
-                // 系统通话(来电/去电)会顶掉我们的通话:通话中轮询音频模式,进来就以「来电」收场
+                // A system call (incoming/outgoing) displaces our call: poll the audio mode during the call and wrap up as "incoming call" when one comes in
                 launch {
                     while (true) {
                         delay(PHONE_CALL_POLL_MS)
@@ -346,7 +346,7 @@ class VoiceCallSession(
                 is VolcRealtimeEvent.UserTranscript -> {
                     onUserTranscript(event.text, event.isFinal)
                     if (event.isFinal && event.isCurrentTurn) _turn.value = VoiceCallTurn.Thinking
-                    // 先登记当轮 final+complete 转写,之后的 function_call 才有资格过闸
+                    // Register the current turn's final+complete transcript first, so a later function_call is eligible to pass the gate
                     if (event.isFinal && event.isCompleteFinal && event.isCurrentTurn && !event.hasUnresolvedPriorTurn) {
                         requestGate.onUserTranscript(event.text)
                     }
@@ -412,7 +412,7 @@ class VoiceCallSession(
         }
     }
 
-    /** barge-in 作废代次后,迟到的旧代次块在写入前被 isCurrent 拦下,绝不入耳。 */
+    /** After barge-in invalidates the generation, late blocks from the old generation are blocked by isCurrent before being written, and never reach the ear. */
     private suspend fun writeLoop(queue: CallPlaybackQueue) {
         val pcm = ByteArray(CallPlaybackQueue.WRITE_BYTES)
         while (true) {
@@ -435,7 +435,7 @@ class VoiceCallSession(
         }
     }
 
-    /** 播放停下 [SPEAKING_IDLE_MS] 还没新音频,就当这轮说完了,轮回到听。 */
+    /** If playback has stopped for [SPEAKING_IDLE_MS] with no new audio, consider the turn finished and switch back to listening. */
     private suspend fun watchSpeaking() {
         while (true) {
             delay(TURN_POLL_MS)
@@ -471,9 +471,9 @@ class VoiceCallSession(
         const val MAX_CALL_DURATION_MS = 10 * 60_000L
         const val RESUMED_TIMEOUT_MS = 3_000L
         const val MIC_CHECK_TIMEOUT_MS = 3_000L
-        /** 通话中查系统音频模式的间隔:来电/去电抢走通话音频时尽快收场。 */
+        /** Interval for checking the system audio mode during a call: wrap up as soon as an incoming/outgoing call takes over the call audio. */
         const val PHONE_CALL_POLL_MS = 1_000L
-        /** 播放停了多久算这轮说完。 */
+        /** How long playback has been stopped before the turn is considered finished. */
         const val SPEAKING_IDLE_MS = 700L
         const val TURN_POLL_MS = 100L
         private const val MAX_ASSISTANT_TURN_CHARS = 1_024

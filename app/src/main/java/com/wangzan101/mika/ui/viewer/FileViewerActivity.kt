@@ -18,11 +18,11 @@ import com.wangzan101.mika.ui.theme.animationsOff
 import com.wangzan101.mika.ui.theme.systemBarsFor
 
 /**
- * App 里的文件查看页:网页、Markdown、PDF、图片和文本类文件在这里直接看,不用另找 App。
- * 自成一个 Activity,对话里的文件卡片之外,别处(悬浮胶囊、通知)也能用 [FileViewer.open] 打开。
+ * The in-app file viewing screen: web pages, Markdown, PDF, images and text-like files are viewed here directly, without hunting for another app.
+ * It is a standalone Activity, so besides file cards in the conversation it can also be opened from elsewhere (floating capsule, notifications) via [FileViewer.open].
  */
 class FileViewerActivity : ComponentActivity() {
-    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    // On Android 12 and earlier, wrap with the language chosen in the app; from 13 on the system applies it itself
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguage.wrap(newBase))
     }
@@ -50,7 +50,7 @@ class FileViewerActivity : ComponentActivity() {
     }
 }
 
-/** 打开文件的入口:能在 App 里看的进 [FileViewerActivity],其余交给系统里能打开它的 App。 */
+/** Entry point for opening files: those viewable in the app go to [FileViewerActivity]; the rest are handed to whichever app in the system can open them. */
 object FileViewer {
     fun kindOf(context: Context, uri: Uri, name: String): ViewerKind? =
         ViewerKinds.of(runCatching { context.contentResolver.getType(uri) }.getOrNull(), name)
@@ -63,14 +63,14 @@ object FileViewer {
         context.startActivity(intent)
     }
 
-    /** 用其他应用打开:系统的选择面板,没有能打开的 App 时提示一句。 */
+    /** Open with another app: the system chooser, with a hint shown when no app can open it. */
     fun openElsewhere(context: Context, uri: Uri, name: String) {
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeOf(context, uri))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         start(context, Intent.createChooser(intent, name), tr(R.string.viewer_no_open_app))
     }
 
-    /** 分享:把文件发给别的 App(带读取授权)。 */
+    /** Share: send the file to another app (with read permission granted). */
     fun share(context: Context, uri: Uri, name: String) {
         val intent = Intent(Intent.ACTION_SEND).setType(mimeOf(context, uri)).putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

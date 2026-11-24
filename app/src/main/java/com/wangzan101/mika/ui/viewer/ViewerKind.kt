@@ -1,6 +1,6 @@
 package com.wangzan101.mika.ui.viewer
 
-/** 内置查看器能显示的几类文件;不在这里的交给别的 App。 */
+/** The kinds of files the built-in viewer can display; anything not listed here is handed to another app. */
 enum class ViewerKind { Html, Markdown, Pdf, Image, Text }
 
 object ViewerKinds {
@@ -17,8 +17,8 @@ object ViewerKinds {
     )
 
     /**
-     * 按内容提供方给的 MIME 类型认,认不出(空、`application/octet-stream`、泛泛的 `text/plain`)时看扩展名。
-     * 明确的 HTML / Markdown / PDF / 图片类型直接定;`text/plain` 的 .md 仍按 Markdown 显示。都不是返回 null。
+     * Detect by the MIME type supplied by the content provider; when that is inconclusive (empty, `application/octet-stream`, a generic `text/plain`) fall back to the extension.
+     * Explicit HTML / Markdown / PDF / image types are decided directly; a `text/plain` .md is still shown as Markdown. Returns null if none match.
      */
     fun of(mime: String?, name: String): ViewerKind? {
         val m = mime?.substringBefore(';')?.trim()?.lowercase().orEmpty()
