@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.remote
 import kotlinx.coroutines.delay
 import java.util.UUID
 
-/** 远程入口共用的业务错误;HTTP 状态和 MCP isError 由各自适配器决定。 */
+/** Business errors shared by the remote entry points; the HTTP status and MCP isError are decided by each adapter. */
 sealed class RemoteTaskError(val code: Code, message: String) : Exception(message) {
     enum class Code { INVALID_ARGUMENT, NOT_FOUND, GONE, CONFLICT, UNAVAILABLE }
     class General(code: Code, message: String) : RemoteTaskError(code, message)
@@ -19,7 +19,7 @@ data class RemoteWait(val task: RemoteTask, val changed: Boolean)
 data class RemoteCancellation(val taskId: String, val accepted: Boolean, val status: String? = null)
 data class RemoteSteerReceipt(val taskId: String, val messageId: String)
 
-/** CLI API 与 MCP 共用的任务用例。归属由传入的已 scope 的 [tasks] 与 [records] 共同保证。 */
+/** Task use cases shared by the CLI API and MCP. Ownership is guaranteed jointly by the passed-in scoped [tasks] and [records]. */
 class RemoteTaskService(
     private val tasks: RemoteTasks,
     private val pollMs: Long = 250,

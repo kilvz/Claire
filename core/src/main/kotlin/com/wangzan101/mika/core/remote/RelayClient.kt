@@ -31,8 +31,9 @@ import kotlin.random.Random
 enum class RelayState { Off, Connecting, Online, Offline, Unauthorized, Incompatible }
 
 /**
- * 只从已配对的 TLS 网关接收MCP 和任务 API 请求。连接可以重建,请求从不重放。
- * 一个连接最多八个请求;取消/断线中断等待,但不声称撤销已经执行的动作。
+ * Only receives MCP and task API requests from an already paired TLS gateway. The connection may be re-established; requests are never replayed.
+ * One connection carries at most eight requests; cancellation/disconnect interrupts the wait, but does not claim that an already executed
+ * action was undone.
  */
 class RelayClient(private val scope: CoroutineScope, private val handle: (HttpRequest) -> HttpResponse,
     private val http: OkHttpClient = RelayGateway.http().newBuilder().callTimeout(0, TimeUnit.SECONDS)
@@ -47,7 +48,7 @@ class RelayClient(private val scope: CoroutineScope, private val handle: (HttpRe
     private var identity: String? = null
     private val networkChanges = Channel<Unit>(Channel.CONFLATED)
 
-    /** Android 网络切换时关闭旧通道,唤醒退避等待;仍不重放任何请求。 */
+    /** On an Android network switch, close the old channel and wake the backoff wait; still no request is replayed. */
     @Synchronized fun networkChanged() {
         if (identity == null) return
         current?.dispose()
@@ -89,7 +90,7 @@ class RelayClient(private val scope: CoroutineScope, private val handle: (HttpRe
         running?.cancel(); running = null
         current?.dispose(); current = null
         mutable.value = RelayState.Off
-        while (networkChanges.tryReceive().isSuccess) { /* 丢弃上次连接的网络事件。 */ }
+        while (networkChanges.tryReceive().isSuccess) { /* Discard the network event from the previous connection. */ }
     }
 
     private inner class Session(parent: CoroutineScope) : WebSocketListener() {
@@ -171,7 +172,7 @@ class RelayClient(private val scope: CoroutineScope, private val handle: (HttpRe
         private val json = Json { encodeDefaults = false }
         private val REQUEST_HEADERS = setOf("authorization", "origin", "x-mika-client", "content-type", "accept", "mcp-protocol-version", "mcp-method", "mcp-name", "mcp-session-id", "last-event-id")
         private val RESPONSE_HEADERS = setOf("content-type", "allow", "retry-after", "www-authenticate", "mcp-protocol-version")
-        /** 网关看到的调用方:IPv4 地址或 IPv6 的 /64 前缀;网关没给时为空,这些调用方共用一份冷却。 */
+        /** The caller as seen by the gateway: an IPv4 address or the /64 prefix of an IPv6 address; empty when the gateway did not supply it, in which case these callers share one cooldown. */
         private val CLIENT = Regex("[0-9A-Fa-f.:/]{0,64}")
         private fun relayPath(path: String) = path == "/mcp" || path == "/api/v1" || path.startsWith("/api/v1/")
         private fun validHeaders(headers: Map<String, String>): Boolean = headers.size <= 16 &&

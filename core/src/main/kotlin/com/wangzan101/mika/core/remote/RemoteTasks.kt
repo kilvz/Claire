@@ -8,7 +8,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.security.MessageDigest
 
-/** 电脑交来的一个任务:[state] 为空表示已经交给任务服务、还没登记上(马上就会有)。 */
+/** A task submitted by a computer: a null [state] means it has been handed to the task service but not registered yet (it will be shortly). */
 data class RemoteTask(
     val id: String,
     val conversation: String,
@@ -18,13 +18,13 @@ data class RemoteTask(
     val steers: List<RemoteSteer> = emptyList(),
     val runId: String? = null,
     val files: List<TaskFile> = emptyList(),
-    /** 访问令牌的不可逆摘要;只用于归属判断,从不出现在响应里。旧数据首次读取时归属给首个已授权客户端。 */
+    /** Irreversible digest of the access token; used only for ownership checks, never appears in responses. On first read, legacy data is assigned to the first authorized client. */
     val owner: String? = null,
 )
 
 data class RemoteTaskPage(val tasks: List<RemoteTask>, val nextBefore: String? = null)
 
-/** 只报告电脑追加的消息;joined 表示进入当前任务上下文,不是执行成功。 */
+/** Reports only messages appended by the computer; joined means it entered the current task's context, not that it was executed successfully. */
 data class RemoteSteer(val messageId: String, val state: String)
 
 sealed interface StartOutcome {
@@ -32,36 +32,36 @@ sealed interface StartOutcome {
     data class Refused(val message: String) : StartOutcome
 }
 
-/** 访问令牌只以 SHA-256 摘要进入任务层;接口、日志和导出都不保存或暴露原令牌。 */
+/** Access tokens enter the task layer only as SHA-256 digests; the API, logs and exports never store or expose the original token. */
 object RemoteOwnership {
     const val UNSCOPED = "unscoped"
-    /** USB 任务随本机连接方式保留，认证仍使用当前开机生成的令牌。 */
+    /** USB tasks are kept along with the local connection method; authentication still uses the token generated at the current boot. */
     const val USB = "usb"
     fun of(token: String): String = MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
 
 /**
- * App 一侧给电脑连接的任务出入口。[scope] 是每次已认证请求的唯一归属入口;HTTP 与 MCP 都必须使用它,
- * 使同一个 computer-access token 才能读、改、上传、下载或导出自己创建的任务。
+ * The task entry point the app side provides to computer connections. [scope] is the sole ownership entry for each authenticated request; both
+ * HTTP and MCP must use it, so that the same computer-access token can only read, modify, upload, download or export the tasks it created itself.
  */
 interface RemoteTasks {
     val fileAccess: RemoteTaskFiles? get() = null
     fun scope(owner: String): RemoteTasks = this
     fun start(goal: String, conversation: String?, requestId: String? = null, attachments: List<String> = emptyList()): StartOutcome
     fun get(id: String): RemoteTask?
-    /** 新的在前。保留给原有 MCP 与直接服务调用。 */
+    /** Newest first. Kept for the existing MCP and direct service calls. */
     fun list(limit: Int): List<RemoteTask>
-    /** 稳定的游标页;不支持游标的旧实现仍可按原有列表工作。 */
+    /** Stable cursor pagination; older implementations without cursor support can still work off the original list. */
     fun page(limit: Int, before: String? = null): RemoteTaskPage = RemoteTaskPage(list(limit))
-    /** 只在任务正等着回答追问时调用;交给任务时返回 true。 */
+    /** Called only when the task is currently waiting for an answer to a follow-up question; returns true when it was handed to the task. */
     fun answer(id: String, text: String): Boolean
-    /** 原子确认消息进入当前任务的收件箱;不能转成新任务。返回消息编号,拒绝为 null。 */
+    /** Atomically confirms the message entered the current task's inbox; it cannot be turned into a new task. Returns the message ID, or null if refused. */
     fun steer(id: String, text: String): String?
     fun cancel(id: String): Boolean
 }
 
-/** 任务状态对电脑的说法;只读任务自己的状态,不另记。 */
+/** How task state is described to a computer; it only reads the task's own state and keeps no separate record. */
 object RemoteStatus {
     const val STARTING = "starting"
     const val RUNNING = "running"
@@ -93,7 +93,7 @@ object RemoteStatus {
 
     fun finished(status: String) = status == DONE || status == FAILED || status == CANCELLED
 
-    /** 一个任务此刻的样子:状态、最近的进度说明、等什么、结果。 */
+    /** What a task looks like right now: status, latest progress note, what it is waiting for, and the result. */
     fun describe(t: RemoteTask): JsonObject = buildJsonObject {
         val s = t.state
         val status = of(s)

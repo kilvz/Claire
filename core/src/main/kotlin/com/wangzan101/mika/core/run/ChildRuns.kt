@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable data class ChildRecord(val id: String, val parentId: String, val phase: ChildPhase,
     val result: String? = null, val atMs: Long,
-    /** 派下去的问题;界面上一行字说清这个子任务在干什么。 */
+    /** The question that was delegated; a single line in the UI that makes clear what this child task is doing. */
     val goal: String = "")
 
 interface ChildRunStore {
@@ -36,7 +36,7 @@ data class ChildResult(val id: RunId, val phase: ChildPhase, val text: String)
 
 fun interface ChildRunHost { suspend fun spawn(spec: RunSpec, format: String?): ChildResult }
 
-/** 子 Run 先保存结论预览再交给父 Run；父 Run 消失时保留 Unknown 记录，不自动重跑。 */
+/** The child Run saves its result preview before handing it to the parent Run; if the parent Run disappears, an Unknown record is kept and no automatic rerun happens. */
 class ChildAgentRunner(
     private val create: (RunSpec, ResourceScope) -> AgentLoop,
     private val store: ChildRunStore,
@@ -76,8 +76,8 @@ class ChildAgentRunner(
                 TaskState.Cancelled -> INTERRUPTED
                 else -> "no result"
             }
-            // 失败不能记成完成:spawn_agent 的 ok 就是按 Completed 判的,以前 Failed 被写成 Completed,
-            // 父模型会把失败的子任务当成成功结果汇总。
+            // A failure must not be recorded as completed: spawn_agent's ok is decided by Completed, and Failed used to be written as Completed,
+            // so the parent model would summarize a failed child task as a successful result.
             val phase = when (end) {
                 is TaskState.Failed -> ChildPhase.Failed
                 TaskState.Cancelled -> ChildPhase.Interrupted
@@ -85,7 +85,7 @@ class ChildAgentRunner(
             }
             val checked = if (format == "json" && runCatching { Json.parseToJsonElement(raw) }.isFailure)
                 "$raw\n(the child run's JSON did not pass validation; the original text is kept)" else raw
-            // 只截短落盘预览;交回父 Run 的原文由 spawn_agent 按本次请求的额度截断并报告原长。
+            // Only the stored preview is truncated; the original text handed back to the parent Run is truncated by spawn_agent according to this request's budget, with the original length reported.
             val preview = checked.take(MAX_RESULT_CHARS)
             store.save(ChildRecord(spec.id.value, parent.value, phase, preview, clock(), goal = goal))
             if (!ownerAlive(parent)) {
@@ -104,7 +104,7 @@ class ChildAgentRunner(
     fun cancelAll(parent: RunId) { synchronized(active) { active[parent]?.toList() }.orEmpty().forEach(AgentLoop::cancel) }
 
     companion object {
-        /** 子任务记录的落盘预览上限,不是交回父任务的结果上限。 */
+        /** The cap on the child task record's stored preview, not the cap on the result handed back to the parent task. */
         const val MAX_RESULT_CHARS = 4000
         private const val INTERRUPTED = "interrupted"
     }

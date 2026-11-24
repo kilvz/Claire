@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.run
 
 import com.wangzan101.mika.core.action.ConfirmChoice
 
-/** 渠道入站在这里验主人、问题编号与确认权限；普通新消息始终新开任务。 */
+/** Channel ingress verifies the owner, question ID and confirmation permission here; an ordinary new message always starts a new task. */
 class ChannelGateway(
     private val owners: OwnerIdentity,
     private val activeAsk: (String) -> Delivery.Ask?,

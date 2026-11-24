@@ -44,15 +44,15 @@ fun interface ChannelInputSink { suspend fun receive(input: ChannelInput) }
 
 enum class SendOutcome { Delivered, Failed, Uncertain }
 
-/** 渠道负责收发，不决定谁是主人、谁能批准。 */
+/** A channel is responsible for sending and receiving; it does not decide who the owner is or who may approve. */
 interface Channel {
     val id: String
     val supportsImages: Boolean get() = false
-    /** 能在这个渠道里回答付款确认(只有付款要问,只在手机上同意)。 */
+    /** Can answer payment confirmations in this channel (only payments ask, and approvals are given only on the phone). */
     val confirms: Boolean
     fun isAlive(peer: ChannelPeer): Boolean = true
     fun start(sink: ChannelInputSink): AutoCloseable
-    /** 入站消息已持久化为任务后确认；没有待处理账本的渠道无需实现。 */
+    /** Confirms that an inbound message has been persisted as a task; channels without a pending ledger need not implement it. */
     fun acknowledge(messageId: String) = Unit
     suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome
     /** Best-effort "typing..." while a task runs; channels without one ignore the call. */
@@ -65,7 +65,7 @@ interface Channel {
     fun shouldAcknowledge(peer: ChannelPeer): Boolean = true
 }
 
-/** 配对不等于主人；只有已绑定的 peer 才能给 Run 发消息。 */
+/** Pairing does not mean owner; only a bound peer can send messages to a Run. */
 interface OwnerIdentity {
     fun isOwner(peer: ChannelPeer): Boolean
 }

@@ -9,8 +9,9 @@ import kotlinx.serialization.json.putJsonArray
 import java.net.URLDecoder
 
 /**
- * 普通 HTTP/JSON 的只读 Web 控制台入口,和任务 API 并列挂在 [RemoteTaskApi.ROOT] 下。
- * 认证由调用方统一完成(局域网 [RemoteHost]、出站隧道 [RelayClient]),这里只管路由、分页和截断。
+ * The read-only web console entry point over plain HTTP/JSON, mounted alongside the task API under [RemoteTaskApi.ROOT].
+ * Authentication is handled uniformly by the caller (LAN [RemoteHost], outbound tunnel [RelayClient]); this class only handles routing,
+ * pagination and truncation.
  */
 class CompanionApi(private val companion: RemoteCompanion) {
 
@@ -131,7 +132,7 @@ class CompanionApi(private val companion: RemoteCompanion) {
         const val RUNNING = "${RemoteTaskApi.ROOT}/running"
         private val ID = Regex("[A-Za-z0-9_-]+")
 
-        /** [RemoteEndpoints] 据此把只读控制台的路径交给这里,其余仍走任务 API。 */
+        /** [RemoteEndpoints] uses this to hand the read-only console paths here; everything else still goes to the task API. */
         fun owns(path: String) = path == CONVERSATIONS || path == RUNNING || path.startsWith("$CONVERSATIONS/")
     }
 }

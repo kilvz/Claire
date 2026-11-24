@@ -3,17 +3,18 @@ package com.wangzan101.mika.core.remote
 import com.wangzan101.mika.core.agent.TaskState
 
 /**
- * Web 控制台要用的只读入口。和 [RemoteTasks] 分开:任务入口只认电脑交来的任务,
- * 这里看到的是手机上的对话和正在跑的任务,由 App 一侧从现有的对话存储与任务中心读取,不另存一份。
+ * The read-only entry points the web console needs. Kept separate from [RemoteTasks]: the task entry points only accept tasks handed over by a
+ * computer, whereas here you see the phone's conversations and currently running tasks, read by the app side from the existing conversation storage
+ * and task centre without keeping a second copy.
  */
 interface RemoteCompanion {
-    /** 最近的对话在前;没有内容的对话不列。 */
+    /** Most recent conversations first; conversations with no content are not listed. */
     fun conversations(limit: Int): List<RemoteConversation>
 
-    /** 一个对话的轮次;对话不存在返回 null。[from] 小于 0 时取最后一段。 */
+    /** The turns of one conversation; returns null when the conversation does not exist. When [from] is less than 0, the last segment is taken. */
     fun conversation(id: String, from: Int, limit: Int): RemoteConversationPage?
 
-    /** 此刻在跑、排队或等用户的任务,包含手机上发起的。 */
+    /** Tasks that are currently running, queued or waiting for the user, including those started on the phone. */
     fun running(): List<RemoteRunning>
 
     companion object {
@@ -21,10 +22,10 @@ interface RemoteCompanion {
         const val MAX_LIST = 50
         const val DEFAULT_PAGE = 8
         const val MAX_PAGE = 10
-        /** 轮次分页的 from 用它表示「取最后一段」。 */
+        /** A turn page's from uses this to mean "take the last segment". */
         const val TAIL = -1
-        // 一页最多 10 轮、单轮各项合计上限约 35 KB(按 3 字节/UTF-16 单元的 CJK 估算),
-        // 整页留在 relay 单帧 1 MiB 以内;截断过的字段由 truncated 标出。
+        // At most 10 turns per page, with each turn's fields capped at about 35 KB in total (estimated with CJK at 3 bytes per UTF-16 unit),
+        // so the whole page stays within the relay's 1 MiB single frame; truncated fields are marked by truncated.
         const val MAX_USER_TEXT = 2_000
         const val MAX_OUTCOME = 4_000
         const val MAX_NOTE = 500
@@ -53,7 +54,7 @@ data class RemoteConversationPage(
     val turns: List<RemoteTurn>,
 )
 
-/** 一轮对话;超长的字段截断并标 [truncated]。 */
+/** One conversation turn; overly long fields are truncated and marked by [truncated]. */
 data class RemoteTurn(
     val index: Int,
     val userText: String,
@@ -65,7 +66,7 @@ data class RemoteTurn(
     val truncated: Boolean = false,
 )
 
-/** 一个正在跑的任务,状态沿用 [RemoteStatus] 的说法。 */
+/** A running task, with status following [RemoteStatus]'s vocabulary. */
 data class RemoteRunning(
     val conversationId: String,
     val goal: String,
@@ -79,7 +80,7 @@ data class RemoteRunning(
     val truncated: Boolean = false,
 )
 
-/** 截断文本时守住代理对(emoji 不会被截成半个),截了就在末尾加省略号。 */
+/** Guards surrogate pairs when truncating text (an emoji is never cut in half); if something was cut, an ellipsis is appended at the end. */
 object RemoteText {
     data class Clipped(val text: String, val truncated: Boolean)
 
@@ -92,8 +93,9 @@ object RemoteText {
 }
 
 /**
- * 把手机上的任务状态翻成控制台的说法。纯函数,放在 core:App 只提供对话编号、目标和当前状态,
- * 状态怎么读、截断多少都只有这一处,Web 端和以后别的客户端不会各说各的。
+ * Translates the phone's task state into the console's vocabulary. A pure function, kept in core: the app only supplies the conversation ID, goal
+ * and current state, and how the state is read and how much is truncated lives in exactly one place, so the web side and any future clients do
+ * not each say something different.
  */
 object RemoteRunningView {
     fun of(conversationId: String, goal: String, state: TaskState, runId: String? = null): RemoteRunning {

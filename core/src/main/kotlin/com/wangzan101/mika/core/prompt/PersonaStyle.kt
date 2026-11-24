@@ -4,25 +4,26 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 人格里由界面选项决定的那部分。每个不是默认值的选项对应 `prompts/persona/style.md` 里的一句固定文字,
- * 拼在人格块里、用户自己写的指令前面;全是默认值时一句都不加。
+ * The part of the persona determined by UI options. Every option that is not the default corresponds to one fixed sentence in
+ * `prompts/persona/style.md`, spliced into the persona block ahead of the user's own instructions; when everything is default, nothing is added.
  *
- * 选项有意做得少:一种基础风格定调子,三个三档选项管最常被要求改的三件事(表情符号、回答长短、进度说明的详略),
- * 其余的写进指令。它们只落在固定头允许人格改的范围里:语气、回答长短、进度说明的写法、格式偏好。
- * 「少问我」「跳过核对」这类属于授权和证据规则,不做成选项。
+ * The options are deliberately few: one base style sets the tone, three three-level options cover the three things most often asked to be
+ * changed (emoji, answer length, verbosity of progress notes), and everything else goes into the instructions. They only fall within what the
+ * fixed head allows the persona to change: tone, answer length, how progress notes are written, formatting preferences.
+ * Things like "ask me less" and "skip verification" belong to authorization and evidence rules and are not made into options.
  */
 @Serializable
 data class PersonaStyle(
-    /** 基础风格和语气。 */
+    /** Base style and tone. */
     val base: Base = Base.Default,
-    /** 表情符号。 */
+    /** Emoji. */
     val emoji: Level = Level.Default,
-    /** 回答篇幅。 */
+    /** Answer length. */
     val length: Level = Level.Default,
-    /** 办事时进度说明的详略。 */
+    /** Verbosity of progress notes while working on a task. */
     val progress: Level = Level.Default,
 ) {
-    /** [wire] 是存盘和配置文件里的写法,也是 style.md 里键的后半段。 */
+    /** [wire] is the spelling used in saved data and config files, and also the second half of the keys in style.md. */
     @Serializable
     enum class Base(val wire: String) {
         @SerialName("default") Default("default"),
@@ -40,13 +41,13 @@ data class PersonaStyle(
 
     val isDefault: Boolean get() = this == DEFAULT
 
-    /** 选中的各项在 style.md 里的键,顺序固定(同一组选项拼出来的文字逐字节一样)。 */
+    /** The style.md keys of the selected options, in a fixed order (the same option set always yields byte-for-byte identical text). */
     internal fun keys(): List<String> = buildList {
         if (base != Base.Default) add("base.${base.wire}")
         for ((name, level) in levels()) if (level != Level.Default) add("$name.${level.wire}")
     }
 
-    /** 三档选项:名字 → 取值,按界面上的顺序。 */
+    /** The three-level options: name -> value, in UI order. */
     fun levels(): List<Pair<String, Level>> = listOf("emoji" to emoji, "length" to length, "progress" to progress)
 
     companion object {

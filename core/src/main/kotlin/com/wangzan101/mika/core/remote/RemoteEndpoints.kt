@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.net.InetAddress
 
 /**
- * HTTP 与 MCP 每次请求都从同一个已认证归属构造任务服务,避免某条协议路径绕过任务、文件或导出权限。
- * 只读 Web 控制台([RemoteCompanion])与任务 API 并列,同样走这里的认证入口。
+ * Every HTTP and MCP request builds its task service from the same authenticated ownership, so no protocol path can bypass task, file or export
+ * permissions. The read-only web console ([RemoteCompanion]) sits alongside the task API and likewise goes through the authentication entry here.
  */
 class RemoteEndpoints(
     private val tasks: RemoteTasks,

@@ -1,15 +1,16 @@
 package com.wangzan101.mika.core.prompt
 
 /**
- * 工具结果与主循环里给模型的反馈文字(提示、错误说明、提醒、参考资料的标题),都在 prompts/feedback/ 下的 .md 文件里:
- * 每条以一行「## 键」开头,下面到下一条之前是原文(可以多行,首尾空行不算);{{name}} 由调用方填。
+ * The feedback text given to the model in tool results and in the main loop (hints, error explanations, reminders, titles of reference material)
+ * all lives in .md files under prompts/feedback/: each entry starts with a line "## key", and below it up to the next entry is the raw
+ * text (may span multiple lines; leading and trailing blank lines do not count); {{name}} is filled in by the caller.
  */
 object Feedback {
-    /** 反馈文件;键在所有文件里唯一。 */
+    /** Feedback files; keys are unique across all files. */
     val FILES = listOf("tools", "loop")
     private val HEADING = Regex("^## ([a-z0-9_.]+)$")
 
-    /** 反馈条目(键 → 原文):每次现算,不缓存——提示词语言换了,下次取就跟着换。 */
+    /** Feedback entries (key -> raw text): computed on every access, not cached — if the prompt language changes, the next lookup follows it. */
     private val entries: Map<String, String>
         get() {
             val out = LinkedHashMap<String, String>()
@@ -17,7 +18,7 @@ object Feedback {
             return out
         }
 
-    /** 一个反馈文件里的各条(键 → 原文),按出现顺序;第一条之前的说明不算。 */
+    /** The entries in one feedback file (key -> raw text), in order of appearance; explanatory text before the first entry does not count. */
     fun parse(text: String): List<Pair<String, String>> {
         val out = mutableListOf<Pair<String, String>>()
         var key: String? = null
@@ -37,7 +38,7 @@ object Feedback {
 
     fun has(key: String): Boolean = key in entries
 
-    /** 键以 [prefix] 开头的各条,键去掉前缀(例如按错误码给的说明)。 */
+    /** The entries whose key starts with [prefix], with the prefix removed from the key (e.g. explanations given per error code). */
     fun section(prefix: String): Map<String, String> =
         entries.filterKeys { it.startsWith(prefix) }.mapKeys { it.key.removePrefix(prefix) }
 

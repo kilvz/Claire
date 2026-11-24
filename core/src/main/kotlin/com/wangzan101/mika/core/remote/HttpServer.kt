@@ -13,7 +13,7 @@ import java.net.SocketException
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 一次 HTTP 请求。头名一律小写;[remote] 是对方的地址(限流、近期连接按它算)。 */
+/** One HTTP request. Header names are always lowercase; [remote] is the peer's address (rate limiting and recent connections are counted by it). */
 class HttpRequest(
     val method: String,
     val path: String,
@@ -21,9 +21,9 @@ class HttpRequest(
     val body: ByteArray,
     val remote: InetAddress,
     val query: String = "",
-    /** 失败冷却按它记。本地监听就是对方地址;经网关转发的是网关看到的调用方地址,与本地地址分开记。 */
+    /** Failure cooldown is recorded by it. For local listening it is the peer address; for requests forwarded through the gateway it is the caller address the gateway sees, recorded separately from the local address. */
     val source: String = remote.hostAddress ?: "?",
-    /** 已认证连接的任务归属;未经过 RemoteAccess 的适配器调用只使用兼容作用域。 */
+    /** Task ownership of the authenticated connection; adapter calls that did not go through RemoteAccess only use the compatibility scope. */
     val accessOwner: String? = null,
 ) {
     fun header(name: String): String? = headers[name.lowercase()]
@@ -39,13 +39,14 @@ class HttpResponse(val status: Int, val body: ByteArray = ByteArray(0), val head
     }
 }
 
-/** 请求本身不合 HTTP 规矩(太大、格式不对):直接回 [status] 并断开。 */
+/** The request itself breaks HTTP rules (too large, malformed): reply [status] directly and disconnect. */
 class HttpProtocolException(val status: Int, message: String) : IOException(message)
 
 /**
- * 只为电脑连接用的极简 HTTP/1.1 服务:一个端口、每个连接一个线程、连接数有上限,请求头和正文都有大小上限。
- * 只认 Content-Length 和 chunked 两种正文;不做 TLS(只在局域网和私有网络里用,靠访问令牌把关)。
- * [accept] 按两端地址决定收不收这个连接(不收就当场关掉,不回任何字节)。
+ * A minimal HTTP/1.1 server used only for computer connections: one port, one thread per connection, a cap on the number of connections, and
+ * size caps on both request headers and bodies. Only Content-Length and chunked request bodies are recognised; no TLS (only used on LANs and
+ * private networks, gated by an access token). [accept] decides by both addresses whether to accept this connection (if not, it is closed on
+ * the spot, without writing a single byte).
  */
 class MiniHttpServer(
     private val bind: InetSocketAddress,
@@ -60,10 +61,10 @@ class MiniHttpServer(
     private val open = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Socket, Boolean>())
     @Volatile private var server: ServerSocket? = null
 
-    /** 实际监听的端口(给 0 时由系统挑)。 */
+    /** The port actually listened on (when 0 is given, the system picks one). */
     val port: Int get() = server?.localPort ?: -1
 
-    /** 绑定端口并开始收连接;绑定失败抛出异常(端口被占等)。 */
+    /** Bind the port and start accepting connections; binding failure throws (port already in use, etc.). */
     @Synchronized fun start() {
         check(!running.get()) { "already running" }
         val s = ServerSocket()
@@ -130,8 +131,9 @@ class MiniHttpServer(
         const val MAX_BODY = 256 * 1024
 
         /**
-         * 读一个请求;对方在请求开始前关了连接时返回 null。对方先问能不能发正文(`Expect: 100-continue`,
-         * 命令行工具发稍大的正文时会这样)而给了 [output] 时,先答一句「继续」,免得它干等。
+         * Read one request; returns null when the peer closed the connection before the request started. When the peer first asks whether it
+         * may send a body (`Expect: 100-continue`, which command-line tools do when sending a somewhat larger body) and [output] is given,
+         * answer "continue" first so it does not wait for nothing.
          */
         fun readRequest(input: InputStream, remote: InetAddress, output: OutputStream? = null): HttpRequest? {
             val head = readHead(input) ?: return null
@@ -145,7 +147,7 @@ class MiniHttpServer(
                 if (colon <= 0) throw HttpProtocolException(400, "bad header")
                 val name = line.substring(0, colon).trim().lowercase()
                 val value = line.substring(colon + 1).trim()
-                // 同名头合并;Content-Length 重复且不同时按坏请求
+                // Merge headers with the same name; duplicate Content-Length headers with different values are treated as a bad request
                 headers[name] = headers[name]?.let { old ->
                     if (name == "content-length" && old != value) throw HttpProtocolException(400, "conflicting length")
                     if (name == "content-length") old else "$old, $value"
@@ -179,7 +181,7 @@ class MiniHttpServer(
                     if (buf.size() == 0) return null
                     throw HttpProtocolException(400, "truncated head")
                 }
-                // 两个请求之间多出来的空行忽略
+                // Ignore extra blank lines between two requests
                 if (buf.size() == 0 && (b == '\r'.code || b == '\n'.code)) continue
                 buf.write(b)
                 if (buf.size() > MAX_HEAD) throw HttpProtocolException(431, "head too large")
@@ -214,7 +216,7 @@ class MiniHttpServer(
             val out = ByteArrayOutputStream()
             while (true) {
                 val size = readLine(input).substringBefore(';').trim().toIntOrNull(16) ?: throw HttpProtocolException(400, "bad chunk")
-                // 按剩余额度检查,避免相加溢出后放行超大分块并尝试分配内存。
+                // Check against the remaining budget, so that an overflow when adding cannot let an oversized chunk through and try to allocate memory.
                 if (size < 0 || size > MAX_BODY - out.size()) throw HttpProtocolException(413, "body too large")
                 if (size == 0) {
                     while (readLine(input).isNotEmpty()) Unit
@@ -232,7 +234,7 @@ class MiniHttpServer(
             500 to "Internal Server Error", 503 to "Service Unavailable",
         )
 
-        /** HEAD 保留正文对应的响应头和长度，但不发送正文。 */
+        /** HEAD keeps the response headers and length corresponding to the body, but does not send the body. */
         fun write(output: OutputStream, r: HttpResponse, close: Boolean, headOnly: Boolean = false) {
             val head = StringBuilder("HTTP/1.1 ${r.status} ${REASONS[r.status] ?: "Status"}\r\n")
             r.headers.forEach { (k, v) -> head.append(k).append(": ").append(v).append("\r\n") }

@@ -3,38 +3,42 @@ package com.wangzan101.mika.core.prompt
 import com.wangzan101.mika.core.agent.TokenEstimate
 
 /**
- * 人格提示词层:界面选项对应的固定句子([PersonaStyle])加用户写的一段正文,拼在身份、准则、通用规则之后,各能力说明之前。
- * 固定头尾在 `prompts/persona/layer.md`:它说明人格能改什么、不能改什么,并且明确人格不是用户的消息、
- * 不能授权任何动作。正文里的标签样子的文字会被转义,控制字符和 bidi 控制符会被去掉,长度按 token 有上限。
- * 零宽连接符留着(波斯语的写法和组合表情要用),所以认标签时允许字母之间夹着这类看不见的字符。
+ * The persona prompt layer: the fixed sentences corresponding to the UI options ([PersonaStyle]) plus a block of body text written by the
+ * user, concatenated after identity, guidelines and general rules, and before the capability descriptions.
+ * The fixed head and tail are in `prompts/persona/layer.md`: it explains what the persona can and cannot change, and states explicitly that
+ * the persona is not a message from the user and cannot authorize any action. Tag-like text in the body is escaped, control characters and
+ * bidi control characters are removed, and the length is capped by token count.
+ * Zero-width joiners are kept (Persian orthography and combined emoji need them), so tag detection allows such invisible characters between letters.
  *
- * 不选人格、或人格里选项全是默认值且正文为空时 [layer] 返回 null,系统提示词与没有这个功能时逐字节一致。
+ * When no persona is selected, or all options are defaults and the body is empty, [layer] returns null, and the system prompt is byte-for-byte
+ * identical to the version without this feature.
  */
 object PersonaPrompt {
     const val MAX_NAME = 40
-    /** 助理默认的自称。 */
+    /** The assistant's default self-reference. */
     const val DEFAULT_NICKNAME = "Claire"
-    /** 称呼最多这么多个字(按码点)。 */
+    /** The form of address can be at most this many characters (by code point). */
     const val MAX_NICKNAME = 16
     const val MAX_PROMPT_CHARS = 4_000
-    /** 正文拼进提示词的硬上限;存储层按字符再限一次,这里防绕过。 */
+    /** Hard cap on the body after it is spliced into the prompt; the storage layer limits by character count again, this guards against bypasses. */
     const val MAX_PROMPT_TOKENS = 3_000
 
     private val NEWLINES = Regex("[\\r\\n]+")
-    /** `persona` 七个字母,相邻两个之间允许夹格式字符(零宽空格、零宽连接符、软连字符……)。 */
+    /** The seven letters of `persona`, with format characters (zero-width space, zero-width joiner, soft hyphen, ...) allowed between adjacent ones. */
     private const val SPLIT_WORD = """p\p{Cf}*e\p{Cf}*r\p{Cf}*s\p{Cf}*o\p{Cf}*n\p{Cf}*a"""
-    /** 标签样子的文字:半角或全角尖括号,斜杠前后可以有空白,单词可以被看不见的字符拆开。 */
+    /** Tag-like text: half-width or full-width angle brackets, optional whitespace around the slash, and words that may be split by invisible characters. */
     private val TAG_LIKE = Regex("""(?i)[<\uFF1C]\s*/?[\s\p{Cf}]*$SPLIT_WORD(?![\p{L}\p{N}_])[^>\uFF1E]*[>\uFF1E]""")
-    /** 改变显示方向的控制符:ALM、LRM、RLM、嵌入/覆盖(U+202A–202E)、隔离(U+2066–2069)。 */
+    /** Control characters that change the display direction: ALM, LRM, RLM, embeddings/overrides (U+202A–202E), isolates (U+2066–2069). */
     private val BIDI = Regex("[\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]")
 
-    /** 选项的固定句子:键 → 原文(`prompts/persona/style.md`,格式同 feedback 文件)。每次现算,不缓存——提示词语言换了,下次取就跟着换。 */
+    /** Fixed sentences for the options: key -> raw text (`prompts/persona/style.md`, same format as the feedback files). Computed on every access, not cached — if the prompt language changes, the next lookup follows it. */
     private val styleText: Map<String, String>
         get() = Feedback.parse(Prompts.read("persona/style.md")).toMap()
 
     /**
-     * 拼好的那一层。选项的句子在前(每条一行,前面加「- 」),用户写的正文在后,中间空一行;
-     * 只有正文时和加选项之前逐字节一样。选项全默认且正文为空时没有可拼的,返回 null。
+     * The assembled layer. The option sentences come first (one per line, prefixed with "- "), then the user-written body, separated by a blank
+     * line; with only a body it is byte-for-byte the same as before the options existed. When all options are defaults and the body is empty
+     * there is nothing to assemble, so it returns null.
      */
     fun layer(
         name: String, body: String, style: PersonaStyle = PersonaStyle.DEFAULT, assistant: String = DEFAULT_NICKNAME,
@@ -46,16 +50,18 @@ object PersonaPrompt {
     }
 
     /**
-     * 人格块里属于这一套人格的那一段:选项的句子加用户写的正文(清洗过),和 [layer] 里放进去的一字不差。
-     * 界面预览时用它把这一段和固定头尾分开上色。两样都没有时是空串。
+     * The part of the persona block that belongs to this particular persona: the option sentences plus the user-written body (sanitized),
+     * exactly what is placed inside [layer]. The UI preview uses it to colour this part separately from the fixed head and tail. Empty string
+     * when neither is present.
      */
     fun content(body: String, style: PersonaStyle = PersonaStyle.DEFAULT): String =
         listOf(styleLines(style), cleanBody(body)).filter { it.isNotBlank() }.joinToString("\n\n")
 
     /**
-     * 称呼:助理的自称,进固定的身份句(在人格块的围栏之外),所以只留名字里该有的字符:
-     * 各种文字的字母、数字、组合记号、空格,以及连字符、间隔号和波斯语要用的零宽不连字符;别的一律去掉。
-     * 连续空白并成一个空格,最多 [MAX_NICKNAME] 个字;清洗后是空的就用 [DEFAULT_NICKNAME]。
+     * Form of address: the assistant's self-reference, which goes into the fixed identity sentence (outside the fence of the persona block), so
+     * keep only the characters that belong in a name: letters from any script, digits, combining marks, spaces, plus hyphens, interpuncts and the
+     * zero-width non-joiner needed by Persian; everything else is dropped. Runs of whitespace collapse into one space, at most [MAX_NICKNAME]
+     * characters; if it is empty after sanitizing, use [DEFAULT_NICKNAME].
      */
     fun nickname(raw: String?): String {
         val kept = StringBuilder()
@@ -76,20 +82,20 @@ object PersonaPrompt {
         return clipped.ifEmpty { DEFAULT_NICKNAME }
     }
 
-    /** 用户输入的称呼能不能原样用:留空可以(就是默认),否则清洗前后必须一样(没有被去掉或截掉的字)。界面据此提示。 */
+    /** Whether the user's form of address can be used as-is: blank is OK (that means the default), otherwise it must be unchanged after sanitizing (no characters dropped or truncated). The UI shows a hint based on this. */
     fun nicknameAccepted(raw: String): Boolean = raw.isBlank() || nickname(raw) == raw.trim().replace(Regex("\\s+"), " ")
 
     private val NICKNAME_MARKS = setOf('-'.code, '·'.code, '・'.code, 0x200C)
     private val COMBINING = setOf(Character.NON_SPACING_MARK, Character.COMBINING_SPACING_MARK)
 
-    /** 选项对应的那几行;全默认时为空串。句子是代码自己的,不经过清洗。 */
+    /** The lines corresponding to the options; empty string when everything is default. The sentences belong to the code itself and are not sanitized. */
     internal fun styleLines(style: PersonaStyle): String =
         style.keys().joinToString("\n") { key -> "- " + checkNotNull(styleText[key]) { "missing persona style $key" } }
 
-    /** style.md 里的全部键(给测试核对:每个选项取值都有一句,没有多余的)。 */
+    /** All keys in style.md (for tests to check: every option value has a sentence, and there are no extras). */
     internal val styleKeys: Set<String> get() = styleText.keys
 
-    /** 名称进 `name="…"` 属性:先去换行、控制字符和 bidi 控制符,限长,再转义,免得截断的实体留在属性里。 */
+    /** The name goes into the `name="…"` attribute: first strip newlines, control characters and bidi control characters, limit the length, then escape, so no truncated entity is left inside the attribute. */
     internal fun escapeName(name: String): String = name.trim()
         .replace(NEWLINES, " ")
         .filterNot { it.isISOControl() }
@@ -100,7 +106,7 @@ object PersonaPrompt {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
 
-    /** 正文:去掉控制字符和 bidi 控制符,转义标签样子的文字,再按 token 安全截断。 */
+    /** Body text: remove control characters and bidi control characters, escape tag-like text, then truncate safely by token count. */
     internal fun cleanBody(body: String): String {
         val text = body.trim()
             .filterNot { it.isISOControl() && it != '\n' && it != '\t' }

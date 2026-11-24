@@ -12,17 +12,17 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * 电脑拉取一次运行记录。格式版本 [FORMAT]:头里写清 task_id → conversation_id → run_id,
- * `run` 是再脱敏一遍的 run.json,`events` 是再脱敏一遍的事件。
- * 不带截图文件体;事件里的 media 只留编号和步号。进行中(还没有收尾)标 [partial]。
+ * A computer pulling one run record. Format version [FORMAT]: the header states task_id -> conversation_id -> run_id,
+ * `run` is run.json after another pass of redaction, and `events` are the events after another pass of redaction.
+ * Screenshot file bodies are not included; media in events keeps only the ID and step number. In progress (not yet finished) is marked [partial].
  */
 object RunRecordExport {
     const val FORMAT = 1
 
-    /** 和手机 `files/runs/<id>/` 的目录名同一套。 */
+    /** The same scheme as the directory names under `files/runs/<id>/` on the phone. */
     val RUN_ID = Regex("""\d{8}-\d{6}-[a-z0-9]{6}""")
 
-    /** 参数、工具结果、核查细节是嵌在字符串里的 JSON,按网页数据那条脱敏路再走一遍。 */
+    /** Arguments, tool results and verification details are JSON embedded inside strings, so they go through the page-data redaction path once more. */
     private val JSON_TEXT = setOf("argsJson", "resultJson", "detailJson")
 
     data class Payload(val json: JsonObject, val jsonl: String)
@@ -56,7 +56,7 @@ object RunRecordExport {
         return Payload(json, jsonl)
     }
 
-    /** 所有字符串再过 [Redactor.text];嵌套 JSON 文本再过 [Redactor.pageData](含 Key、JWT、凭据字段)。 */
+    /** Every string passes through [Redactor.text] again; nested JSON text passes through [Redactor.pageData] again (covers Key, JWT and credential fields). */
     fun redact(element: JsonElement): JsonElement = when (element) {
         is JsonObject -> JsonObject(element.mapValues { (key, value) ->
             if (key in JSON_TEXT && value is JsonPrimitive && value.isString) JsonPrimitive(Redactor.pageData(value.content))
@@ -72,8 +72,8 @@ object RunRecordExport {
 }
 
 /**
- * 按任务编号或运行记录编号取可导出的记录。手机上发起的运行不在此列。
- * 实现方只读已经落盘的记录,不附带截图字节。
+ * Looks up an exportable record by task ID or run record ID. Runs started on the phone are not included.
+ * Implementations only read records already written to disk and attach no screenshot bytes.
  */
 interface RunExportSource {
     fun scope(owner: String): RunExportSource = this
@@ -81,17 +81,18 @@ interface RunExportSource {
 }
 
 sealed interface RunExportLookup {
-    /** 没有这个电脑任务,也没有可导出的运行记录。 */
+    /** No such computer task, and no exportable run record either. */
     data object Missing : RunExportLookup
 
-    /** 任务还记着运行编号,记录文件已经不在了。 */
+    /** The task still remembers the run ID, but the record file is gone. */
     data class Gone(val taskId: String, val runId: String) : RunExportLookup
 
     data class Found(val record: RunExportRecord) : RunExportLookup
 }
 
 /**
- * [runId] 与 [summary] 同有同无:任务已经交出去、运行记录还没开,两者都空,导出标 partial。
+ * [runId] and [summary] are both present or both absent: the task has been handed off but the run record has not started yet, so both are empty and
+ * the export is marked partial.
  */
 data class RunExportRecord(
     val taskId: String?,
