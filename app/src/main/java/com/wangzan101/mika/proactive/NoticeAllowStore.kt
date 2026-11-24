@@ -9,16 +9,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 
 /**
- * 主动能力读哪些 App 的通知:包名白名单,自己一个 JSON 文件,整份原子替换。默认空:一个都不读。
+ * Which Apps' notifications the proactive capability reads: a package-name whitelist in its own JSON file, replaced atomically as a whole.
+ * Empty by default: nothing is read.
  *
- * 文件读不出来(坏了、是更新的版本写的)按空的算——宁可少读;但这不等于用户一个都没选:[readable] 这时为 false,
- * 别处不能凭这份空名单去删已经攒下的东西(见 LearnRunner.poke)。用户下一次改名单时照常写,之后就读得出来了。
+ * If the file cannot be read (corrupt, or written by a newer version) it counts as empty — reading less is preferred; but that does not mean
+ * the user selected none: [readable] is false then, and nothing else may use this empty list to delete what has already been accumulated (see
+ * LearnRunner.poke). The next time the user changes the list it is written as usual, and it becomes readable afterwards.
  *
- * 写不下去(存储满了之类)时往少读的一边靠:去掉一个 App 照样在内存里生效(这次运行里不再读它),加一个 App 不生效;
- * 两种都如实说没存下来([setAllowed] 返回 false),不抛出去。没存下来的「去掉」重启后要补做,见 [AllowEdits]。
+ * When it cannot be written (storage full or the like), it errs toward reading less: removing an App still takes effect in memory (it is no
+ * longer read for this run), adding one does not; both honestly report that it was not saved ([setAllowed] returns false) and nothing is
+ * thrown. A "remove" that was not saved must be redone after a restart, see [AllowEdits].
  */
 class NoticeAllowStore(private val file: File) {
-    /** 名单是不是真的读出来了(没有文件算读出来了:就是空的)。 */
+    /** Whether the list really was read (no file counts as read: it is simply empty). */
     @Volatile var readable: Boolean = true
         private set
 
@@ -28,15 +31,17 @@ class NoticeAllowStore(private val file: File) {
     fun current(): Set<String> = mutable.value
 
     /**
-     * 内存里的名单比文件里的少(有「去掉」没存下来):下次改名单时不管变没变都再写一遍。
-     * 页面看这个提示用户再选一次——只要还没写成就一直提示,不看最近那一次改动成没成。
+     * The in-memory list has fewer entries than the file (some "remove" was not saved): on the next list change, write again regardless of
+     * whether anything changed. The page uses this to ask the user to choose again — the prompt stays as long as the list is not written,
+     * regardless of whether the latest change succeeded.
      */
     @Volatile var dirty = false
         private set
 
     /**
-     * 读不读这个 App 的通知。返回是不是已经存下来了(名单本来就是这样、文件也对得上的,不用写,算存下来了)。
-     * 没存下来时:去掉的照样在内存里去掉,加的不加(这个 App 本来就在名单里的不受影响,仍算成)。
+     * Whether this App's notifications are read. Returns whether it has been saved (when the list already looks like this and the file
+     * matches, nothing is written and it counts as saved). When it was not saved: a removal still takes effect in memory, an addition does
+     * not (an App already on the list is unaffected and still counts as saved).
      */
     @Synchronized fun setAllowed(pkg: String, allowed: Boolean): Boolean {
         val now = current()
@@ -48,7 +53,7 @@ class NoticeAllowStore(private val file: File) {
             dirty = true
             return false
         }
-        // 没写成的只是补写别的 App 的「去掉」:这个 App 本来就在名单里,文件里也在
+        // What failed to be written is only the retry of other Apps' pending "remove": this App is already on the list, and in the file too
         return next == now
     }
 
@@ -59,7 +64,7 @@ class NoticeAllowStore(private val file: File) {
         return false
     }
 
-    /** 整份写下去;成了才换内存里的那份。写不下去(存储满了、目录不可写)返回 false,内存里的不动。 */
+    /** Write the whole list; only replace the in-memory copy once it succeeds. Returns false when it cannot be written (storage full, directory not writable), leaving memory untouched. */
     private fun persist(next: Set<String>): Boolean {
         try {
             file.parentFile?.mkdirs()
@@ -68,7 +73,7 @@ class NoticeAllowStore(private val file: File) {
                 put("allowed", JsonArray(next.sorted().map(::JsonPrimitive)))
             }
             val tmp = File(file.parentFile, file.name + ".tmp")
-            // 先落盘再替换:断电后不会留下一个空文件顶替原来的名单
+            // Flush to disk before replacing: a power cut never leaves an empty file in place of the original list
             java.io.FileOutputStream(tmp).use { out ->
                 out.write(json.toString().toByteArray(Charsets.UTF_8))
                 out.fd.sync()
@@ -98,20 +103,22 @@ class NoticeAllowStore(private val file: File) {
     }
 }
 
-/** 用户选了「不读」、名单文件却没写成的 App(只有包名):存在偏好里,重启后先照办。 */
+/** Apps the user chose "do not read" for while the list file could not be written (package names only): kept in preferences and applied first after a restart. */
 interface AllowRevokes {
     var allowRevoked: Set<String>
 }
 
 /**
- * 改名单的两步:写名单文件;「不读」没写成时把这个 App 记进 [AllowRevokes]。
- * 不记的话,这次运行里是不读了,可文件里还留着它,进程一重启又读起来,用户并不知道。
+ * Changing the list takes two steps: write the list file; when a "do not read" could not be written, record this App in [AllowRevokes].
+ * Without recording, it would not be read for this run, but it stays in the file and reading resumes after the process restarts, without the
+ * user knowing.
  *
- * 这一记只是尽力而为:名单写不下去多半是存储满了,那时偏好多半也写不下去(写没写成这里不知道)。
- * 真正兜底的是页面上那句「没存下来,请再选一次」——只要名单还没写成就一直在([NoticeAllowStore.dirty])。
+ * This recording is best effort: the list usually cannot be written because storage is full, in which case the preferences usually cannot be
+ * written either (whether that write succeeded is unknown here). The real fallback is the page's "not saved, please choose again" — it stays
+ * as long as the list is not written ([NoticeAllowStore.dirty]).
  */
 internal object AllowEdits {
-    /** 读不读这个 App:返回名单文件存下来没有(见 [NoticeAllowStore.setAllowed])。 */
+    /** Whether this App's notifications are read: returns whether the list file was saved (see [NoticeAllowStore.setAllowed]). */
     fun set(store: NoticeAllowStore, revokes: AllowRevokes, pkg: String, allowed: Boolean): Boolean {
         val saved = store.setAllowed(pkg, allowed)
         val pending = revokes.allowRevoked
@@ -124,7 +131,7 @@ internal object AllowEdits {
         return saved
     }
 
-    /** 启动时:上次没存下来的「不读」先从内存里的名单去掉,再试着写一遍;写成了的不再记。要在读任何通知之前调。 */
+    /** On startup: first remove the "do not read" entries that were not saved last time from the in-memory list, then try to write it again; ones that succeed are no longer recorded. Call before reading any notification. */
     fun replay(store: NoticeAllowStore, revokes: AllowRevokes) {
         val pending = revokes.allowRevoked
         if (pending.isEmpty()) return

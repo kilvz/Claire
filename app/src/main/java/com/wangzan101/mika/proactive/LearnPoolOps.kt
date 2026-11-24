@@ -7,8 +7,8 @@ import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.job
 
-// 学习:主题池与联系人池的读写、额度与状态发布
-/** 话题池没读出来时读一次;读不出来(密钥库一时不可用、IO)为 null,下次再试,绝不拿空池去盖文件。 */
+// Learning: read/write for the topic pool and the contact pool, budget and status publishing
+/** Read once if the topic pool is not loaded yet; null when it cannot be read (keystore temporarily unavailable, IO), retried next time — never overwrite the file with an empty pool. */
 internal fun LearnRunner.loadedPool(): TopicPool? {
     pool?.let { return it }
     return try {
@@ -27,7 +27,7 @@ internal fun LearnRunner.loadedPool(): TopicPool? {
     }
 }
 
-/** 联系人没读出来时读一次;读不出来为 null,下次再试,绝不拿空的去盖文件。 */
+/** Read once if contacts are not loaded yet; null when they cannot be read, retried next time — never overwrite the file with an empty one. */
 internal fun LearnRunner.loadedContacts(): ContactPool? {
     contactPool?.let { return it }
     return try {
@@ -35,7 +35,7 @@ internal fun LearnRunner.loadedContacts(): ContactPool? {
             contactPool = it
             contactsFlow.value = ContactsView(it.all(), it.blockedCount)
             purgeContacts(it, purges.contactPurges)
-            // 以前按通知键存下来的:同名的并成一条(要在上面补做完记着的删除之后,那些记的是以前的 id)
+            // Ones stored earlier by notification key: merge entries with the same name (must run after the recorded deletes are redone above, since those record the old ids)
             if (it.adoptIdentities()) saveContacts(it)
         }
     } catch (e: CancellationException) {
@@ -46,12 +46,12 @@ internal fun LearnRunner.loadedContacts(): ContactPool? {
     }
 }
 
-/** 存上了返回 true。 */
+/** Returns true when saved. */
 internal fun LearnRunner.saveContacts(c: ContactPool): Boolean {
     contactsFlow.value = ContactsView(c.all(), c.blockedCount)
     return try {
         contactStore.save(c.data())
-        // 做过的补删这下落盘了
+        // The pending deletes have now been persisted
         if (contactPurgesApplied.isNotEmpty()) {
             purges.contactPurges = purges.contactPurges - contactPurgesApplied
             contactPurgesApplied = emptySet()
@@ -65,14 +65,14 @@ internal fun LearnRunner.saveContacts(c: ContactPool): Boolean {
     }
 }
 
-/** 存上了返回 true。 */
+/** Returns true when saved. */
 internal fun LearnRunner.save(p: TopicPool): Boolean {
     topicsFlow.value = p.all()
     topicsBlockedFlow.value = p.blockedCount
     return try {
         store.save(p.data())
         savedTopics = p.all().mapTo(HashSet()) { it.id }
-        // 做过的补删这下落盘了
+        // The pending deletes have now been persisted
         if (topicPurgesApplied.isNotEmpty()) {
             purges.topicPurges = purges.topicPurges - topicPurgesApplied
             topicPurgesApplied = emptySet()
@@ -81,14 +81,14 @@ internal fun LearnRunner.save(p: TopicPool): Boolean {
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        // 存不下也不丢内存里的,下次有改动时再存
+        // If it cannot be saved, the in-memory copy is kept anyway and saved on the next change
         log("learn pool save failed: ${e.javaClass.simpleName}")
         false
     }
 }
 
 internal fun LearnRunner.budgetLeft(now: Long): Boolean = budgetOutDay != dayOf(now) &&
-    // 归纳按整份预算算(判定只用其中一部分,见 [ProactiveBudget.triageExhausted])
+    // Learning counts against the whole budget (the decision pass uses only part of it, see [ProactiveBudget.triageExhausted])
     ProactiveBudget.exhausted(hooks.tokensToday(), hooks.callsToday(), budgetLimit()) == null
 
 internal fun LearnRunner.dayOf(ms: Long): Long = Instant.ofEpochMilli(ms).atZone(zone()).toLocalDate().toEpochDay()

@@ -5,8 +5,9 @@ import android.service.notification.StatusBarNotification
 import com.wangzan101.mika.MikaApp
 
 /**
- * 主动能力的通知监听。组件默认是停用的,功能打开时才由 [ProactiveRuntime] 启用(系统「通知使用权」列表里才有 Claire)。
- * 这里只把系统回调转给 [ProactiveRuntime],连上之前什么都不做。
+ * The proactive capability's notification listener. The component is disabled by default and only enabled by [ProactiveRuntime] once the
+ * feature is on (only then does Claire appear in the system's "notification access" list). All this does is forward system callbacks to
+ * [ProactiveRuntime]; before it connects it does nothing.
  */
 class NoticeListenerService : NotificationListenerService() {
     private val runtime get() = (application as MikaApp).proactive
@@ -16,7 +17,7 @@ class NoticeListenerService : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
-        // 断开之后不能再调这个监听的任何方法;之后只能由 [ProactiveRuntime] 经静态的 requestRebind 请系统重绑
+        // After disconnecting, no method of this listener may be called; from then on only [ProactiveRuntime] can ask the system to rebind via the static requestRebind
         runtime.onDisconnected(this)
     }
 
@@ -25,20 +26,20 @@ class NoticeListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?, rankingMap: RankingMap?, reason: Int) {
-        // 用户点开、划掉、清空:已经看过了,从收件箱里去掉;App 自己撤回、超时等不算
+        // The user opened, dismissed or cleared: it has been seen, remove it from the inbox; an App withdrawing it, a timeout and the like do not count
         if (sbn != null && reason in SEEN_REASONS) runtime.onSeen(sbn.key, reason)
     }
 
-    /** 请系统解绑;只在连着时有效,不在连着时调用会抛异常,这里吞掉。返回请求有没有发出去。 */
+    /** Ask the system to unbind; only valid while connected, calling it otherwise throws, and that is swallowed here. Returns whether the request went out. */
     fun unbindQuietly(): Boolean = runCatching { requestUnbind() }.isSuccess
 
     /**
-     * 通知栏里现有的通知;读不出来为 null——系统可能给 null,也可能抛异常(还没连上、刚断开)。
-     * 读不出来和「通知栏是空的」要分开:前者这次补收等于没做,还得再试。
+     * The notifications currently in the shade; null when unreadable — the system may return null or throw (not connected yet, just
+     * disconnected). Unreadable must be kept apart from "the shade is empty": for the former, this catch-up capture did nothing and must be retried.
      */
     fun activeOrNull(): Array<StatusBarNotification>? = runCatching { activeNotifications }.getOrNull()
 
-    /** 系统给这条通知排的重要程度(NotificationManager.IMPORTANCE_*);读不出来(还没连上、系统没给)为 null。 */
+    /** The importance the system assigned to this notification (NotificationManager.IMPORTANCE_*); null when unreadable (not connected yet, or the system did not provide it). */
     fun importanceOf(key: String): Int? = runCatching {
         val ranking = Ranking()
         if (currentRanking.getRanking(key, ranking)) ranking.importance else null

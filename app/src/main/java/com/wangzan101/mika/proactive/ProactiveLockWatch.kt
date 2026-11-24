@@ -9,15 +9,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 主动能力自己的锁屏状态:熄屏时不让手机为这个功能醒一次。
+ * The proactive capability's own lock state: while the screen is off, the phone is not woken up for this feature.
  *
- * 状态每次都从系统读([read]:屏幕亮不亮、锁屏界面在不在),SCREEN_OFF / SCREEN_ON / USER_PRESENT 广播只当
- * 「该重新看一眼」,由 [ProactiveRuntime] 转来调 [refresh]。熄屏时只等广播,什么都不定时做。
- * 唯一要轮询的是「亮着但锁屏界面还在」:有的解锁路子先发 USER_PRESENT、锁屏界面过一会才退下,之后不再有广播
- * (见 [com.wangzan101.mika.task.LockState] 上面的说明)。只在读到这种状态、且在看守([start] 之后)时
- * 每 [POLL_MS] 再读一次;读到别的(熄屏或已解锁)就停掉轮询。要不要轮询由纯函数 [shouldPoll] 决定。
+ * The state is read from the system every time ([read]: whether the screen is on and whether the keyguard is showing); the SCREEN_OFF /
+ * SCREEN_ON / USER_PRESENT broadcasts only mean "look again" and are forwarded by [ProactiveRuntime] to [refresh]. While the screen is off it
+ * only waits for broadcasts and does nothing on a timer. The only thing polled is "on but keyguard still showing": some unlock paths send
+ * USER_PRESENT first and retract the keyguard a moment later, with no further broadcast (see the note above
+ * [com.wangzan101.mika.task.LockState]). Only when that state is read and while watching (after [start]) is it re-read every [POLL_MS]; reading
+ * anything else (screen off or already unlocked) stops the polling. Whether to poll is decided by the pure function [shouldPoll].
  *
- * 所有方法都要在 [scope] 那条串行的协程上调(广播也先丢到那里),所以不另加锁。
+ * All methods must be called on the serial coroutine of [scope] (broadcasts are thrown there first too), so no extra locking is needed.
  */
 internal class ProactiveLockWatch(private val read: () -> Reading, private val scope: CoroutineScope) {
     data class Reading(val interactive: Boolean, val keyguardLocked: Boolean) {
@@ -26,26 +27,26 @@ internal class ProactiveLockWatch(private val read: () -> Reading, private val s
 
     private var active = false
     private val _locked = MutableStateFlow(true)
-    /** 熄屏或锁屏;[start] 之前没读过,当锁着(宁可少读)。 */
+    /** Screen off or locked; not read before [start], so it is treated as locked (reading less is preferred). */
     val locked: StateFlow<Boolean> = _locked.asStateFlow()
 
-    /** 正在跑的轮询;只有「在看守、亮着、锁屏界面还在」时才有。测试看它。 */
+    /** The running poll; it only exists while watching, with the screen on and the keyguard still showing. Tests look at it. */
     internal var pollJob: Job? = null
         private set
 
-    /** 开始看守:读一次。 */
+    /** Start watching: read once. */
     fun start() {
         active = true
         refresh()
     }
 
-    /** 停止看守:停掉轮询;之后 [refresh] 照样读,但不再开轮询。 */
+    /** Stop watching: stop polling; [refresh] still reads afterwards, but no longer starts polling. */
     fun stop() {
         active = false
         cancelPoll()
     }
 
-    /** 从系统读一次,并按读到的决定开不开、停不停轮询。 */
+    /** Read from the system once, and start or stop polling based on what was read. */
     fun refresh() {
         val r = read()
         _locked.value = r.locked
@@ -53,7 +54,7 @@ internal class ProactiveLockWatch(private val read: () -> Reading, private val s
         else if (pollJob?.isActive != true) pollJob = scope.launch { poll() }
     }
 
-    /** 轮询自己读到不该再轮询时直接退出,不经 [refresh] 取消自己。 */
+    /** The poll loop exits by itself once it reads that it should no longer poll, instead of cancelling itself through [refresh]. */
     private suspend fun poll() {
         while (true) {
             delay(POLL_MS)
@@ -74,7 +75,7 @@ internal class ProactiveLockWatch(private val read: () -> Reading, private val s
     companion object {
         const val POLL_MS = 500L
 
-        /** 只有在看守、屏幕亮着、锁屏界面还在时才轮询;熄屏一律不轮询(等 SCREEN_ON)。 */
+        /** Poll only while watching, with the screen on and the keyguard still showing; never poll with the screen off (wait for SCREEN_ON). */
         fun shouldPoll(active: Boolean, r: Reading): Boolean = active && r.interactive && r.keyguardLocked
     }
 }

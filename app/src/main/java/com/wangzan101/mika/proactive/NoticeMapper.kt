@@ -7,11 +7,11 @@ import androidx.core.app.NotificationCompat
 import com.wangzan101.mika.core.proactive.NoticeMessage
 import com.wangzan101.mika.core.proactive.NoticeRecord
 
-/** 从系统通知里原样取出的几项(都还没清洗);[RawNotice.toRecord] 是纯函数,可以在电脑上测。 */
+/** A few fields taken verbatim from a system notification (none cleaned yet); [RawNotice.toRecord] is pure and can be tested on a desktop. */
 data class RawNotice(
     val key: String,
     val packageName: String,
-    /** 系统记下的发出时间(StatusBarNotification.postTime),不用 App 自己填的 `when`。 */
+    /** The posting time recorded by the system (StatusBarNotification.postTime), not the App-supplied `when`. */
     val postTime: Long,
     val title: String?,
     val bigText: String?,
@@ -22,14 +22,14 @@ data class RawNotice(
     val ongoing: Boolean,
     val clearable: Boolean,
     val category: String?,
-    /** 会话样式里系统另给的会话名(群名);没有为 null。 */
+    /** The conversation name (group name) the system provides separately in the messaging style; null when absent. */
     val conversationTitle: String? = null,
-    /** 会话样式里系统说的「这是不是群聊」;没说为 null。 */
+    /** Whether the system says "this is a group chat" in the messaging style; null when it does not say. */
     val groupConversation: Boolean? = null,
-    /** 系统给这条通知排的重要程度(NotificationManager.IMPORTANCE_*);拿不到为 null。 */
+    /** The importance the system assigned to this notification (NotificationManager.IMPORTANCE_*); null when unavailable. */
     val importance: Int? = null,
 ) {
-    /** 正文优先取展开后的长文本,没有再取一行的正文;有会话样式或带消息列表的算会话。 */
+    /** Text prefers the expanded long text and falls back to the single-line text; a messaging style or a message list makes it a conversation. */
     fun toRecord(): NoticeRecord = NoticeRecord(
         key = key,
         packageName = packageName,
@@ -43,10 +43,10 @@ data class RawNotice(
         foregroundService = flags and Notification.FLAG_FOREGROUND_SERVICE != 0,
         clearable = clearable,
         category = category,
-        // 只有带会话样式的才信这两项:别的通知里这两个键没有约定的意思
+        // Only trust these two with a messaging style: in other notifications these keys have no agreed meaning
         group = groupConversation.takeIf { messagingStyle || messages.isNotEmpty() },
         conversationTitle = conversationTitle?.takeIf { messagingStyle || messages.isNotEmpty() },
-        // 「默认」以下(低、最低)是不出声的;拿不到重要程度时当会出声
+        // Below "default" (low, min) is silent; when the importance is unavailable, treat it as audible
         silent = importance != null && importance < IMPORTANCE_DEFAULT,
     )
 
@@ -57,8 +57,8 @@ data class RawNotice(
 }
 
 /**
- * StatusBarNotification → [RawNotice]。通知的 extras 是别的 App 塞进来的,读的时候可能抛任何异常:
- * 调用方([read])整个兜住,读不了就当没有这条。
+ * StatusBarNotification → [RawNotice]. A notification's extras are stuffed in by other Apps, so reading them can throw anything: the caller
+ * ([read]) catches it all and treats an unreadable one as if this notification did not exist.
  */
 object NoticeMapper {
     fun read(sbn: StatusBarNotification): RawNotice? = runCatching { readUnsafe(sbn) }.getOrNull()
@@ -89,7 +89,7 @@ object NoticeMapper {
         )
     }
 
-    /** 没能取出会话样式时,直接读 EXTRA_MESSAGES 里的每条消息(键名与系统 Notification.MessagingStyle.Message 一致)。 */
+    /** When the messaging style cannot be extracted, read each message from EXTRA_MESSAGES directly (key names match the system's Notification.MessagingStyle.Message). */
     @Suppress("DEPRECATION")
     private fun legacyMessages(extras: Bundle): List<NoticeMessage> =
         runCatching { extras.getParcelableArray(Notification.EXTRA_MESSAGES) }.getOrNull().orEmpty().mapNotNull { p ->

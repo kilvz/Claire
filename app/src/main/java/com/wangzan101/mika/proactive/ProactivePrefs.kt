@@ -4,12 +4,13 @@ import android.content.SharedPreferences
 import com.wangzan101.mika.core.proactive.TriageConsent
 
 /**
- * 主动能力的几项小状态:打开功能的时间、上次锁屏的时间、去重表(只有通知键的哈希和时间,不含通知内容,也没有原始的键)、
- * 用户同意过的服务商 id 与模型名;几个子开关和各个 App 的来源档位;归纳里还没落盘的删除([LearnPurges]:
- * 包名、「敏感类」这个记号,和单删的那些——话题、句子的随机编号,某天某周某月的日子,联系人的身份 id。
- * 联系人的身份 id 是从 App 和会话名算出来的哈希,和去重表里通知键的哈希是一类东西:没有名字本身,但不是随机的);
- * 今天的提醒对话是哪一个(对话 id 和日子)。收件箱、判定结果都不落盘;
- * 通知文字只在用户点开提醒时写进那个对话(见 [NoticeTalks]),不在这里。
+ * A few small pieces of proactive state: when the feature was turned on, the last lock time, the dedup table (only notification-key hashes and
+ * times, no notification content and no raw keys), the provider id and model name the user consented to; the sub-switches and each App's source
+ * tier; the deletes in learning that have not been persisted ([LearnPurges]: package names, the "sensitive category" marker, and the single
+ * deletes — random ids for topics and sentences, the day of a given day/week/month, contact identity ids, which are hashes computed from the App
+ * and conversation name, the same kind of thing as the notification-key hashes in the dedup table: not the name itself, but not random); which
+ * reminder chat is today's (chat id and day). The inbox and the decision results are never persisted; notification text is only written into
+ * that chat when the user opens a reminder (see [NoticeTalks]), never here.
  */
 class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowRevokes {
     var enabledAtMs: Long
@@ -27,8 +28,8 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
     fun clearDedup() { prefs.edit().remove(DEDUP).apply() }
 
     /**
-     * 用户同意把通知文字发给哪一家的哪个模型(判定、归纳都用它);没同意过、或关掉总开关之后为 null。
-     * 没有它,什么都不发。
+     * Which provider's which model the user consented to send notification text to (used by both the decision pass and learning); null before
+     * consent, or after the master switch is turned off. Without it, nothing is sent.
      */
     var consent: TriageConsent?
         get() {
@@ -43,35 +44,36 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
             e.commit()
         }
 
-    /** 「敏感类推断」(健康、财务、宗教、政治、性取向);默认关。 */
+    /** "Sensitive-category inference" (health, finances, religion, politics, sexual orientation); off by default. */
     var learnSensitive: Boolean
         get() = prefs.getBoolean(LEARN_SENSITIVE, false)
         set(v) { prefs.edit().putBoolean(LEARN_SENSITIVE, v).commit() }
 
     /**
-     * 「当日消息归纳」:默认关。开着时归纳的 App 的通知原文会加密存在本机(最多两天,见 [NoticeJournalFile]);
-     * 关掉时存着的原文一并删掉(已经归纳出的句子和各级归纳留着)。有自己的说明,不跟着总开关的同意自动打开。
+     * "Daily notification digest": off by default. While on, the raw notifications of learned Apps are stored encrypted on this device (at most
+     * two days, see [NoticeJournalFile]); turning it off deletes the stored raw text too (sentences already digested and the digests at each
+     * level are kept). It has its own disclosure and does not turn on automatically with the master switch's consent.
      */
     var learnDigest: Boolean
         get() = prefs.getBoolean(LEARN_DIGEST, false)
         set(v) { prefs.edit().putBoolean(LEARN_DIGEST, v).commit() }
 
-    /** 激进程度(见 [com.wangzan101.mika.core.proactive.LearnLevel]);存的是它的名字,默认最保守的一档。 */
+    /** Aggressiveness (see [com.wangzan101.mika.core.proactive.LearnLevel]); its name is stored, defaulting to the most conservative level. */
     var learnLevel: String?
         get() = prefs.getString(LEARN_LEVEL, null)
         set(v) { prefs.edit().putString(LEARN_LEVEL, v).commit() }
 
-    /** 来源档位调成「高」的 App(只有包名);「低」的在 [learnOptOut] 里,读而两边都不在的是「中」。 */
+    /** Apps whose source tier is set to "high" (package names only); "low" ones are in [learnOptOut], and read ones in neither are "medium". */
     var learnHigh: Set<String>
         get() = prefs.getStringSet(LEARN_HIGH, null)?.toSet().orEmpty()
         set(v) { prefs.edit().putStringSet(LEARN_HIGH, HashSet(v)).commit() }
 
-    /** 来源档位是「低」的 App(只有包名):读它的通知、判定和提醒,但不从它归纳。默认空。 */
+    /** Apps whose source tier is "low" (package names only): their notifications, decisions and reminders are read, but nothing is learned from them. Empty by default. */
     var learnOptOut: Set<String>
         get() = prefs.getStringSet(LEARN_OPT_OUT, null)?.toSet().orEmpty()
         set(v) { prefs.edit().putStringSet(LEARN_OPT_OUT, HashSet(v)).commit() }
 
-    /** 今天的提醒对话(见 [NoticeTalks]):对话 id,和它是哪一天开的(本地日期的纪元日)。没开过为 null。 */
+    /** Today's reminder chat (see [NoticeTalks]): chat id, and the day it was opened on (epoch day of the local date). Null when none was opened. */
     var hintTalk: Pair<String, Long>?
         get() {
             val id = prefs.getString(HINT_TALK_ID, null) ?: return null
@@ -83,17 +85,17 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
             e.apply()
         }
 
-    /** 话题池上还没做成的删除、合并(见 [LearnPurges]),按记下的先后。 */
+    /** Deletes and merges not yet applied on the topic pool (see [LearnPurges]), in the order recorded. */
     override var topicPurges: Set<String>
         get() = ordered(LEARN_PURGE_TOPICS)
         set(v) { prefs.edit().putOrdered(LEARN_PURGE_TOPICS, v).commit() }
 
-    /** 联系人上还没做成的,按记下的先后。 */
+    /** Not yet applied on contacts, in the order recorded. */
     override var contactPurges: Set<String>
         get() = ordered(LEARN_PURGE_CONTACTS)
         set(v) { prefs.edit().putOrdered(LEARN_PURGE_CONTACTS, v).commit() }
 
-    /** 两份一次落盘:中间进程没了也不会只记上一半。 */
+    /** Persist both in one write: if the process dies in between, only half is never recorded. */
     override fun addToTopicsAndContacts(mark: String) {
         prefs.edit()
             .putOrdered(LEARN_PURGE_TOPICS, topicPurges - mark + mark)
@@ -102,8 +104,9 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
     }
 
     /**
-     * 按记下的先后读出来。偏好里的字符串集合不保先后,所以先后另存成一行一个的字符串([key] 加 [ORDER]),和集合一起写。
-     * 两样对不上时(只认集合的旧版本后来又改过)只认集合,先后就没有了。
+     * Read them out in the order recorded. A string set in preferences does not preserve order, so the order is stored separately as one entry
+     * per line ([key] plus [ORDER]) and written together with the set. When the two do not match (an older version that only knew the set
+     * changed it later), only the set is trusted and the order is lost.
      */
     private fun ordered(key: String): Set<String> {
         val set = prefs.getStringSet(key, null)?.toSet().orEmpty()
@@ -114,17 +117,17 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
     private fun SharedPreferences.Editor.putOrdered(key: String, v: Set<String>): SharedPreferences.Editor =
         putStringSet(key, HashSet(v)).putString(key + ORDER, v.joinToString("\n"))
 
-    /** 句子和各级归纳上还没落盘的删除(包名,和单删的记号:句子的编号、某天某周某月的日子)。 */
+    /** Deletes not yet persisted on the sentences and digests at each level (package names, and single-delete markers: sentence id, the day of a given day/week/month). */
     override var digestPurges: Set<String>
         get() = prefs.getStringSet(LEARN_PURGE_DIGEST, null)?.toSet().orEmpty()
         set(v) { prefs.edit().putStringSet(LEARN_PURGE_DIGEST, HashSet(v)).commit() }
 
-    /** 通知原文上还没落盘的按 App 删除(包名)。 */
+    /** Per-App deletes not yet persisted on the raw notification journal (package names). */
     override var journalPurges: Set<String>
         get() = prefs.getStringSet(LEARN_PURGE_JOURNAL, null)?.toSet().orEmpty()
         set(v) { prefs.edit().putStringSet(LEARN_PURGE_JOURNAL, HashSet(v)).commit() }
 
-    /** 用户选了「不读」、名单文件没写成的 App(只有包名);启动时补做([AllowEdits.replay])。 */
+    /** Apps the user chose "do not read" for while the list file could not be written (package names only); redone on startup ([AllowEdits.replay]). */
     override var allowRevoked: Set<String>
         get() = prefs.getStringSet(ALLOW_REVOKED, null)?.toSet().orEmpty()
         set(v) { prefs.edit().putStringSet(ALLOW_REVOKED, HashSet(v)).commit() }
@@ -134,7 +137,7 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
         private const val ENABLED_AT = "enabled_at_ms"
         private const val LAST_LOCKED_AT = "last_locked_at_ms"
         private const val DEDUP = "dedup_v2"
-        // 键名里只写着判定,存的是判定和归纳共用的那一份同意
+        // The key names only mention the decision pass, but what is stored is the consent shared by the decision pass and learning
         private const val CONSENT_PROVIDER = "triage_consent_provider"
         private const val CONSENT_MODEL = "triage_consent_model"
         private const val LEARN_OPT_OUT = "learn_opt_out"
@@ -143,7 +146,7 @@ class ProactivePrefs(private val prefs: SharedPreferences) : LearnPurges, AllowR
         private const val LEARN_LEVEL = "learn_level"
         private const val LEARN_HIGH = "learn_high"
         private const val LEARN_PURGE_TOPICS = "learn_purge_topics"
-        /** 记着的那些的先后(见 [ordered]):键名是集合的键加上它。 */
+        /** The order of the recorded entries (see [ordered]): the key name is the set's key plus this. */
         private const val ORDER = "_order"
         private const val HINT_TALK_ID = "hint_talk_id"
         private const val HINT_TALK_DAY = "hint_talk_day"

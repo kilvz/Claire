@@ -17,11 +17,11 @@ import com.wangzan101.mika.proactive.LearnRunner.Companion.MARK_DAY
 import com.wangzan101.mika.proactive.LearnRunner.Companion.MARK_WEEK
 import com.wangzan101.mika.proactive.LearnRunner.Companion.MARK_MONTH
 
-// 学习:主题与联系人的删改合并、清除与删除记录
+// Learning: deleting, merging and clearing topics and contacts, and the delete records
 internal fun LearnRunner.deleteTopic(id: String) {
     val p = loadedPool() ?: return
     if (p.delete(id)) {
-        // 先记下来再存:没存上、进程又没了的,下次读出来时补做(见 [LearnPurges])
+        // Record first, then save: if saving fails and the process dies, it is redone on the next load (see [LearnPurges])
         val mark = MARK_TOPIC + id
         purges.topicPurges = purges.topicPurges - mark + mark
         topicPurgesApplied = topicPurgesApplied + mark
@@ -32,20 +32,24 @@ internal fun LearnRunner.deleteTopic(id: String) {
 }
 
 /**
- * 把话题 [fromId] 并进 [intoId](用户在话题页上做的;规则见 [TopicPool.merge]):事件上、联系人上指着 [fromId] 的改指 [intoId]。
- * 不走删除那条路:并掉的名字不进「不再记录」,连接也不丢。
+ * Merge topic [fromId] into [intoId] (done by the user on the topics page; rules in [TopicPool.merge]): references to [fromId] on events and
+ * contacts are repointed to [intoId]. It does not go through the delete path: the merged-away name does not enter "no longer recorded", and
+ * links are not lost.
  *
- * 和删除一样先记下来再存(见 [LearnPurges]),存上了才划掉;没存上、进程又没了的,下次读出来时照记下的先后补做:
- * - 话题那份:不补做的话,文件里两个话题都还在。用户并完接着把并好的那个删了(删除是记着的、会补做),
- *   补做时文件里没有这次合并,并掉的那个就带着它的证据回来了,名字也不在「不再记录」里。
- * - 联系人那份:这会儿读不出来、或改了没存上的,文件里连着的还是并掉的那个 id;等话题那份存上了,
- *   下次整理就把这些连接当成指着空处的去掉了。
- * 这一笔两份一次记上([LearnPurges.addToTopicsAndContacts]):只记上话题那一半的话,补做时联系人上的连接就丢了。
+ * Like a delete, it is recorded before saving (see [LearnPurges]) and cleared only once saved; if saving fails and the process dies, it is
+ * redone in the recorded order on the next load:
+ * - The topics side: without the redo, both topics would still be in the file. If the user then deletes the merged result (that delete is
+ *   recorded and will be redone), the redo would find no merge in the file, so the merged-away one comes back with its evidence, and its name
+ *   is not in "no longer recorded" either.
+ * - The contacts side: if unreadable at that moment, or changed but not saved, the file still links the merged-away id; once the topics side
+ *   is saved, the next tidy-up treats those links as pointing at nothing and drops them.
+ * Both are recorded in one step ([LearnPurges.addToTopicsAndContacts]): recording only the topics half would lose the contact links on redo.
  *
- * 记号里只有两个 id,补做时两个话题都得在文件里。有一个还不在文件里(刚归纳出来、没存上的)时先存一次,还存不上就不并——
- * 并了也记不住:进程一没,目标不在文件里,这次合并补不回来,并掉的那个又回来了。合并分不开,存不下的时候宁可不做。
+ * The marker holds only the two ids, so both topics must be in the file at redo time. If one is not there yet (just distilled, not saved),
+ * save first; if it still cannot be saved, do not merge — a merge could not be recorded either: if the process dies, the target is not in the
+ * file, this merge cannot be redone, and the merged-away one comes back. A merge cannot be split, so when it cannot be saved it is better not to do it.
  *
- * 先存联系人再存话题:中途进程没了,联系人上连着的是还在的那个话题。
+ * Save contacts before topics: if the process dies mid-way, the contacts link to the topic that still exists.
  */
 internal fun LearnRunner.mergeTopic(fromId: String, intoId: String) {
     val p = loadedPool() ?: return
@@ -61,7 +65,7 @@ internal fun LearnRunner.mergeTopic(fromId: String, intoId: String) {
     buffer.remapTopic(fromId, intoId)
     val c = contactPool
     if (c == null) {
-        // 联系人还没读出来:读出来的那一刻把记着的(连同这一项)做掉;读不出来就留到读得出来时
+        // Contacts are not loaded yet: they are applied (including this entry) the moment they load; if they cannot be read, it waits until they can
         loadedContacts()
     } else {
         c.remapTopic(fromId, intoId)
@@ -71,7 +75,7 @@ internal fun LearnRunner.mergeTopic(fromId: String, intoId: String) {
     save(p)
 }
 
-/** 记着的一次合并:并掉的话题 id、并进去的 id;不是合并的记号、写得不对的为 null。 */
+/** A recorded merge: the merged-away topic id and the id merged into; null for non-merge markers or malformed ones. */
 internal fun LearnRunner.mergeIn(mark: String): Pair<String, String>? {
     if (!mark.startsWith(MARK_MERGE)) return null
     val ids = mark.removePrefix(MARK_MERGE).split(MERGE_INTO)
@@ -79,12 +83,13 @@ internal fun LearnRunner.mergeIn(mark: String): Pair<String, String>? {
 }
 
 /**
- * 清空全部:话题和联系人(联系人不记进「不再记录」,是重来)。哪一份读不出来,就把它的文件整份删掉:
- * 清空不能因为读不出来就什么都没做(联系人那份这样删时,「不再记录」的名单也没了:读不出来,留不住)。
- * 读得出来的照常清、存,另存的旧文件一并删。
+ * Clear everything: topics and contacts (contacts do not go into "no longer recorded"; this is a fresh start). Whichever store cannot be
+ * read, its file is deleted outright: clearing must not end up doing nothing just because it cannot be read (deleting the contacts file that
+ * way also loses the "no longer recorded" list: unreadable means it cannot be kept). Ones that can be read are cleared and saved as usual,
+ * and the old files saved aside are deleted too.
  */
 internal fun LearnRunner.clearAll() {
-    // 正在发的那一批取消,缓冲里没发的也清掉:不然回复回来又把刚清空的加回去,剩下的通知文字过后还会发给模型
+    // Cancel the batch in flight and clear the unsent ones in the buffer: otherwise a reply coming back would add back what was just cleared, and the remaining notification text would still be sent to the model later
     stopRequest()
     buffer.clear()
     val p = loadedPool()
@@ -92,7 +97,7 @@ internal fun LearnRunner.clearAll() {
     if (p != null) {
         topicsGone(p.all().map { it.id }.toSet())
         p.clear()
-        // 清空了却没存上:文件里还是旧的,下次启动又读回来了。那就把文件删掉
+        // Cleared but not saved: the file still holds the old data and it would come back on the next start. So delete the file
         topicsCleared = save(p) || wipe("topics") { store.wipe() }
     } else {
         topicsCleared = wipe("topics") { store.wipe() }
@@ -103,8 +108,8 @@ internal fun LearnRunner.clearAll() {
     val c = loadedContacts()
     val contactsCleared: Boolean
     if (c != null) {
-        // 内存里本来就是空的也照存:可能是之前删了却没存上,文件里还是旧的——这时跳过不存,
-        // 下面又把记着的待删划掉,旧的联系人下次启动就回来了
+        // Save even when memory is already empty: a previous delete may not have been saved and the file may still hold the old data — skipping
+        // the save here, with the recorded pending deletes cleared below, would bring the old contacts back on the next start
         c.clear()
         contactsCleared = saveContacts(c) || wipe("contacts") { contactStore.wipe() }
     } else {
@@ -113,25 +118,26 @@ internal fun LearnRunner.clearAll() {
         contactsFlow.value = ContactsView()
     }
     dropBroken()
-    // 清空了、落了盘的,没有还要补做的删除。既没存上也没删掉的(文件里还是旧的):记一个「全清」,
-    // 内存里已经是空的了,下次存上时划掉;在那之前进程没了的,下次读出来时照它清空(见 purgeTopics、purgeContacts)
+    // Cleared and persisted: no deletes are left to redo. When it was neither saved nor deleted (the file still holds the old data): record a
+    // "wipe all"; memory is already empty, so it is cleared when the next save succeeds; if the process dies before that, it is applied on the
+    // next load (see purgeTopics, purgeContacts)
     purges.topicPurges = if (topicsCleared) emptySet() else setOf(MARK_ALL)
     topicPurgesApplied = purges.topicPurges
     purges.contactPurges = if (contactsCleared) emptySet() else setOf(MARK_ALL)
     contactPurgesApplied = purges.contactPurges
-    // 通知原文和当日消息归纳也清掉(删不掉的,它们各自记着,见 dropJournal、dropDigest)
+    // Clear the raw notifications and the daily notification digest too (whatever cannot be deleted is recorded by each of them, see dropJournal, dropDigest)
     dropJournal()
     dropDigest()
     if (host != null) evaluate()
 }
 
-/** 关掉「敏感类推断」并选了删除:删掉标了敏感的话题,去掉联系人上「伴侣」的票。当时读不出来的那一份记下来,读得出来时补做。 */
+/** "Sensitive-category inference" turned off with deletion chosen: delete topics marked sensitive and drop the contacts' "partner" votes. Whichever store is unreadable at that moment is recorded and redone once readable. */
 internal fun LearnRunner.deleteSensitive() = purge(PURGE_SENSITIVE)
 
-/** 清掉某个 App 的:话题上它的证据,和它的联系人(同样不记进「不再记录」)。当时读不出来的那一份记下来,读得出来时补做。 */
+/** Clear one App's data: its evidence on topics and its contacts (also not recorded into "no longer recorded"). Whichever store is unreadable at that moment is recorded and redone once readable. */
 internal fun LearnRunner.clearApp(packageName: String) = purge(packageName)
 
-/** 删掉一个联系人:同一个会话以后也不再记。 */
+/** Delete one contact: the same conversation is not recorded again either. */
 internal fun LearnRunner.deleteContact(id: String) {
     loadedContacts()?.let {
         if (it.delete(id)) {
@@ -144,48 +150,50 @@ internal fun LearnRunner.deleteContact(id: String) {
     }
 }
 
-/** 用户设关系;null 是交回给 Claire 判断。 */
+/** The user sets the relation; null hands it back to Claire to decide. */
 internal fun LearnRunner.setContactRelation(id: String, relation: ContactRelation?) {
     loadedContacts()?.let { if (it.setRelation(id, relation)) saveContacts(it) }
 }
 
-/** 重新允许删掉过的话题(一次全部)。 */
+/** Allow deleted topics again (all at once). */
 internal fun LearnRunner.allowDeletedTopics() {
     loadedPool()?.let { if (it.allowAgain()) save(it) }
 }
 
-/** 重新允许删掉过的联系人(一次全部)。 */
+/** Allow deleted contacts again (all at once). */
 internal fun LearnRunner.allowDeletedContacts() {
     loadedContacts()?.let { if (it.allowAgain()) saveContacts(it) }
 }
 
 /**
- * [what] 是 [PURGE_SENSITIVE] 或一个包名:两份里各删一遍。先记进 [purges] 再做,删过的那份存上了才划掉:
- * 所以当时读不出来的、删了却没存上就没了进程的,下次读出来时([loadedPool]、[loadedContacts])都会补做。
- * 存上之后就不再记着,不会过后再做一遍、把这之后新攒的也删掉。
+ * [what] is [PURGE_SENSITIVE] or a package name: one delete pass over each of the two stores. Record into [purges] first, then act, and
+ * clear only once the store that was edited has been saved: so anything unreadable at the time, or deleted without being saved before the
+ * process died, is redone on the next load ([loadedPool], [loadedContacts]). Once saved it is no longer recorded, so it will not be redone
+ * later and delete what has been added since.
  */
 internal fun LearnRunner.purge(what: String) {
     if (what != PURGE_SENSITIVE) {
-        // 这个 App 正在发的那一批(归纳话题的、分段归纳的)取消,缓冲里它还没发的也去掉:
-        // 不然回复回来又把刚清掉的话题、联系人加回去,剩下的通知文字过后还会发给模型
+        // Cancel this App's batch in flight (topic digest or segmented digest) and drop its unsent entries from the buffer: otherwise a reply
+        // coming back would add back the topics and contacts just cleared, and the remaining notification text would still be sent to the model
         if (notesApp == what || buffer.sending().firstOrNull()?.packageName == what) stopRequest()
         buffer.purge { it != what }
-        // 「清掉这个 App 的」也清通知原文里它的那些段;日志这时读不出来就整份删(原文不留着等以后补删)。
-        // 开关关着时日志本来就删掉了
+        // "Clear this App's data" also clears its entries in the raw notification journal; if the journal cannot be read right now, delete it
+        // outright (raw text is not kept waiting for a later redo). While the switches are off the journal is already gone
         if (on() && digest()) {
             if (loadedJournal() == null) {
-                // 整份删;删不掉的话 dropJournal 记着,读得出来时补做
+                // Delete it all; if that fails, dropJournal records it and it is redone once readable
                 dropJournal()
             } else {
                 journalRemove(setOf(what))
             }
         }
-        // 句子和各级归纳:开关关着时也还留着,所以照样清。这时读不出来(密钥库一时不可用)的,不整份删——
-        // 里面有留两年的月归纳;记下来,读得出来时补做(见 loadedDigest)
+        // Sentences and digests at each level: they are kept while the switches are off, so they are cleared as well. When unreadable right
+        // now (keystore temporarily unavailable), do not delete everything — it holds monthly digests kept for two years; record it and redo it
+        // once readable (see loadedDigest)
         digestRemove(setOf(what), stopRequests = true)
     }
     purges.addToTopicsAndContacts(what)
-    // 这一次才读出来的,读出来的那一刻已经把记着的(连同这一项)做掉了
+    // Ones loaded only now already applied the recorded entries (including this one) at the moment they were loaded
     val hadTopics = pool != null
     val p = loadedPool()
     if (p != null && hadTopics) purgeTopics(p, setOf(what))
@@ -198,15 +206,16 @@ internal fun LearnRunner.purge(what: String) {
 internal fun LearnRunner.purgeTopics(p: TopicPool, what: Set<String>) {
     if (what.isEmpty()) return
     val gone = HashSet<String>()
-    // 照记下的先后做(见 [LearnPurges]):并完才删的,删的是并好的那个,并进过它的名字要跟着进「不再记录」;
-    // 先删了一个名字、后来又把同名的另一个并进别的,这个名字算并掉的。已经存上了的再做一遍什么都不会变:
-    // 并掉、删掉的那个 id 不在了,id 也不会再发给别的话题
+    // Follow the recorded order (see [LearnPurges]): when a delete came after a merge, it deletes the merged result, and the names merged into
+    // it must enter "no longer recorded" as well; when a name was deleted first and another topic with the same name was later merged into
+    // something else, that name counts as merged away. Re-applying ones already saved changes nothing: the merged-away or deleted id is gone,
+    // and an id is never assigned to another topic
     for (w in what) when {
         w == MARK_ALL -> { gone += p.all().map { it.id }; p.clear() }
         w == PURGE_SENSITIVE -> gone += p.deleteSensitive()
         w.startsWith(MARK_MERGE) -> mergeIn(w)?.let { (from, into) -> p.merge(from, into) }
         w.startsWith(MARK_TOPIC) -> w.removePrefix(MARK_TOPIC).let { if (p.delete(it)) gone += it }
-        // 别的记号不是话题池的事(也不能当包名去清)
+        // Other markers are not the topic pool's business (and must not be treated as package names to clear)
         w.startsWith(":") -> {}
         else -> gone += p.clearApp(w)
     }
@@ -217,12 +226,12 @@ internal fun LearnRunner.purgeTopics(p: TopicPool, what: Set<String>) {
 
 internal fun LearnRunner.purgeContacts(c: ContactPool, what: Set<String>) {
     if (what.isEmpty()) return
-    // 照记下的先后做。记着的合并:连着并掉的那个话题的,改连并进去的那个
+    // Follow the recorded order. Recorded merges: links to the merged-away topic are repointed to the one merged into
     for (w in what) when {
         w == MARK_ALL -> c.clear()
         w == PURGE_SENSITIVE -> c.deleteSensitive()
         w.startsWith(MARK_MERGE) -> mergeIn(w)?.let { (from, into) -> c.remapTopic(from, into) }
-        // 不在了也要记进「不再记录」(见 [ContactPool.forget])
+        // Even if it is gone it must be recorded into "no longer recorded" (see [ContactPool.forget])
         w.startsWith(MARK_CONTACT) -> c.forget(w.removePrefix(MARK_CONTACT))
         w.startsWith(":") -> {}
         else -> c.clearApp(w)
@@ -232,8 +241,8 @@ internal fun LearnRunner.purgeContacts(c: ContactPool, what: Set<String>) {
 }
 
 /**
- * 在归纳那份上照 [marks] 删一遍(包名:去掉这个 App 的;记号:单删的那一句、那一天、那一周、那个月)。
- * 返回其中真删掉了东西的几项。
+ * Run one delete pass over the digest store following [marks] (package name: remove this App's; markers: the single sentence, day, week or
+ * month to delete). Returns the entries that actually deleted something.
  */
 internal fun LearnRunner.applyDigestPurges(d: DigestPool, marks: Set<String>): Set<String> = marks.filterTo(HashSet()) { w ->
     when {
@@ -248,9 +257,10 @@ internal fun LearnRunner.applyDigestPurges(d: DigestPool, marks: Set<String>): S
 }
 
 /**
- * 从归纳那份里删东西([marks] 的写法见 [applyDigestPurges])。删掉了什么就先记进 [purges] 再存,存上了才划掉(见 [saveDigest]):
- * 没存上、进程又没了的,下次读出来时补做([loadedDigest])。这时读不出来的整个记下来,读得出来时补做。
- * 什么都没删掉、但其中有上回没存上的:再存一次。[stopRequests]:删掉了东西就取消在做的当日(周、月)归纳。
+ * Delete things from the digest store ([marks] format in [applyDigestPurges]). Whatever is deleted is recorded into [purges] before saving,
+ * and cleared only once saved (see [saveDigest]): anything not saved before the process died is redone on the next load ([loadedDigest]).
+ * When unreadable at the moment, everything is recorded and redone once readable. When nothing was deleted but some of it was left unsaved
+ * last time: save once more. [stopRequests]: when something was deleted, cancel the daily (weekly, monthly) digest in progress.
  */
 internal fun LearnRunner.digestRemove(marks: Set<String>, stopRequests: Boolean = false) {
     if (marks.isEmpty()) return
@@ -271,13 +281,13 @@ internal fun LearnRunner.digestRemove(marks: Set<String>, stopRequests: Boolean 
     }
 }
 
-/** 用户删了东西:两份另存的旧文件都删掉(读不出来的副本里可能还有刚删的)。删不掉只记一笔。 */
+/** The user deleted something: delete the old files saved aside by both stores (the unreadable copies may still hold what was just deleted). A failed delete is only logged. */
 internal fun LearnRunner.dropBroken() {
     wipe("topics copies") { store.dropBroken() }
     wipe("contacts copies") { contactStore.dropBroken() }
 }
 
-/** 删掉了返回 true;删不掉只记一笔,返回 false。 */
+/** Returns true when deleted; when it cannot be deleted, it only logs and returns false. */
 internal inline fun LearnRunner.wipe(what: String, block: () -> Unit): Boolean =
     try {
         block()

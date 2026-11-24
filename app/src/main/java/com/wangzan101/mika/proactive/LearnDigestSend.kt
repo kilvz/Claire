@@ -14,11 +14,12 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
-// 学习:汇总摘要与笔记摘要的模型调用
+// Learning: model calls for the rollup digests and the note digests
 /**
- * 当日、周、月归纳共用的发请求:同意、建模型、失败后停一段都和别的批一样。[begin] 在请求发出前记下在做哪一份;
- * [request] 调模型;[apply] 把读懂了的结果记进 [pool],返回写进日志的一句;[tried] 给这一份的失败次数加一
- * (模型回了错、回复读不懂才算;根本没连上的不算)。
+ * Request sending shared by the daily, weekly and monthly digests: consent, model creation and the pause after a failure work the same as for
+ * the other batches. [begin] records which one is in flight before the request goes out; [request] calls the model; [apply] writes the
+ * understood result into [pool] and returns a line for the log; [tried] increments this one's failure count
+ * (only when the model returned an error or the reply could not be understood; failing to connect at all does not count).
  */
 internal fun LearnRunner.sendRollup(
     scope: CoroutineScope, what: String, call: ProactiveCall, pool: DigestPool, begin: () -> Unit,
@@ -57,7 +58,7 @@ internal fun LearnRunner.sendRollup(
         dayInFlight = null
         spanInFlight = null
         try {
-            // 途中被清空过的(句子换成了新的一份),这次的结果不写回去
+            // Cleared mid-flight (the sentences were replaced with a new copy): do not write this result back
             val stillOk = digestPool === pool &&
                 runCatching { on() && digest() && consent() == consented && consented.covers(hooks.target()) }.getOrDefault(false)
             if (!stillOk) {
@@ -85,7 +86,7 @@ internal fun LearnRunner.sendRollup(
             failed(clock())
             tried()
         }
-        // 先叫等着的判定(判定先),再看自己还有没有要发的
+        // Wake the waiting decision pass first (the decision goes first), then check whether there is anything else to send
         slot.wakeOthers(this@sendRollup)
         evaluate()
     }
@@ -95,9 +96,11 @@ internal fun LearnRunner.sendRollup(
 }
 
 /**
- * 当日消息归纳的第 1 级:这个 App 还没归纳过的通知原文(最旧的先发,一批最多 [LearnTuning.NOTES_BATCH_MAX] 段)交给模型出几句话。
- * 同意、建模型、失败后停一段都和归纳话题的那一批一样。这一批回来之后:读懂了的记下句子;模型回了错、回复读不懂的也算做过
- * (不再发同一批);根本没连上的、被取消的(锁屏、开关变了)不算,留着下次。
+ * Level 1 of the daily notification digest: hand this App's not-yet-digested raw notifications (oldest first, at most
+ * [LearnTuning.NOTES_BATCH_MAX] entries per batch) to the model to produce a few sentences. Consent, model creation and the pause after a
+ * failure work the same as for the topic-digest batch. When the batch comes back: understood sentences are recorded; a model error or an
+ * unreadable reply also counts as done (the same batch is not sent again); failing to connect at all or a cancellation (screen lock, switch
+ * changed) does not count, and the batch is kept for next time.
  */
 internal fun LearnRunner.sendNotes(scope: CoroutineScope, packageName: String) {
     val j = journal ?: return publish(LearnStatus.Waiting)
@@ -136,7 +139,7 @@ internal fun LearnRunner.sendNotes(scope: CoroutineScope, packageName: String) {
         slot.release(this@sendNotes)
         notesApp = null
         try {
-            // 途中被清空过(日志、句子换成了新的一份)的,这次的结果不能写回去:那会把清掉的东西带回来
+            // Cleared mid-flight (the journal or the sentences were replaced with a new copy): this result must not be written back — that would bring back what was cleared
             val stillOk = journal === j && digestPool === pool &&
                 runCatching { on() && digest() && eligible(packageName) && consent() == consented && consented.covers(hooks.target()) }
                     .getOrDefault(false)
@@ -147,7 +150,7 @@ internal fun LearnRunner.sendNotes(scope: CoroutineScope, packageName: String) {
                     val before = pool.data()
                     val added = pool.add(packageName, batch, result.notes, z, clock())
                     pool.expire(dayOf(clock()))
-                    // 句子存上了,才把原文标成「做过了」并存:中途进程没了,最坏是同一批再归纳一次,不会丢
+                    // Only once the sentences are saved are the raw notifications marked "done" and saved: if the process dies mid-way, the worst case is digesting the same batch twice, nothing is lost
                     if (saveDigest(pool)) {
                         j.markNoted(batch)
                         saveJournal()
@@ -156,8 +159,8 @@ internal fun LearnRunner.sendNotes(scope: CoroutineScope, packageName: String) {
                         val drops = result.dropped.entries.joinToString(",") { "${it.key}=${it.value}" }
                         log("notes batch: ${batch.size} entries, $added notes" + if (drops.isEmpty()) "" else ", dropped $drops")
                     } else {
-                        // 句子没存上:这一批不算做过。原文要是照样标成「做过了」并存下去,重启后句子没有、原文也不再排队,
-                        // 这一批就永远丢了。内存里的句子也退回去——留着的话,下次再归纳这一批就重了
+                        // The sentences were not saved: this batch does not count as done. If the raw notifications were still marked "done" and saved, then after a restart there would be no sentences and the raw ones would no longer be queued,
+                        // so this batch would be lost forever. Roll back the in-memory sentences too — keeping them would duplicate the batch on the next digest
                         restoreDigest(before)
                         failed(clock())
                         log("notes batch not kept: ${batch.size} entries, digest save failed")
@@ -179,7 +182,7 @@ internal fun LearnRunner.sendNotes(scope: CoroutineScope, packageName: String) {
             log("notes apply failed: ${e.javaClass.simpleName}")
             failed(clock())
         }
-        // 先叫等着的判定(判定先),再看自己还有没有要发的
+        // Wake the waiting decision pass first (the decision goes first), then check whether there is anything else to send
         slot.wakeOthers(this@sendNotes)
         evaluate()
     }

@@ -76,12 +76,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 「Claire 知道了什么」里的各级页面。最上面是索引(栈是空的):每天、每周、每月各一行,话题、联系人、清除各一个入口。
- * 往下:某一天([Day])、某一周或某个月([Span])的句子;再往下是一句的依据([DayLine]、[SpanLine])和一句分段归纳
- * 那段时间的通知原文([Note])。
+ * The pages under "What Claire Knows", one level at a time. The top is the index (empty stack): one row each for days, weeks and months, and one
+ * entry each for topics, contacts and clearing. Below that: the sentences of one day ([Day]), one week or one month ([Span]); below that the
+ * basis of a sentence ([DayLine], [SpanLine]), and the raw notifications of the period behind a segmented digest sentence ([Note]).
  *
- * 用稳定的东西认(哪一天、哪一周、哪一句、句子的 id),不用列表里的位置:下面的数据随时会变(重做、删除往上传、到期)。
- * 指的东西不在了就退回上一级([KnowData.valid]),删除也就不会落到「现在排在那个位置上的另一条」头上。
+ * Pages are identified by stable things (which day, which week, which sentence, a sentence's id), never by position in a list: the data below
+ * changes at any time (redone, deletions bubbling up, expiry). When what a page points at is gone it falls back to the level above
+ * ([KnowData.valid]), so a delete never lands on "whatever is in that position now".
  */
 internal sealed interface KnowPage {
     data object Topics : KnowPage
@@ -89,18 +90,18 @@ internal sealed interface KnowPage {
     data object Clear : KnowPage
     data class Day(val day: Long) : KnowPage
     data class Span(val kind: SpanKind, val start: Long) : KnowPage
-    /** 当日归纳里的一句:看它依据的分段归纳。 */
+    /** One sentence of a daily digest: see the segmented digests it is based on. */
     data class DayLine(val day: Long, val line: DigestLine) : KnowPage
-    /** 周、月归纳里的一句:看它出自哪几天、哪几周。 */
+    /** One sentence of a weekly or monthly digest: see which days (weeks) it comes from. */
     data class SpanLine(val kind: SpanKind, val start: Long, val line: DigestLine) : KnowPage
-    /** 一句分段归纳:看它那段时间的通知原文。 */
+    /** One segmented digest sentence: see the raw notifications from that period. */
     data class Note(val id: String) : KnowPage
 }
 
-/** 这一页存着的归纳(运行时那几条流此刻的值),和由它算出来的:索引上列哪些、某一页指的东西还在不在。 */
+/** The digests stored for this page (the current values of the runtime's flows), and what is derived from them: which entries the index lists, and whether what a page points at still exists. */
 internal class KnowData(
     val today: Long,
-    /** 现在能做新的归纳(总开关、「当日消息归纳」都开着,模型确认过):今天、本周、本月即使还没有东西也各占一行。 */
+    /** Whether new digests can be made now (master switch and "daily notification digest" both on, model confirmed): today, this week and this month each get a row even with nothing in them yet. */
     val canMake: Boolean,
     val notes: List<DigestNote>,
     val days: List<DayDigest>,
@@ -115,11 +116,11 @@ internal class KnowData(
 
     fun span(kind: SpanKind, start: Long): SpanDigest? = spans(kind).firstOrNull { it.start == start }
 
-    /** 索引上「每天」列的日子,新的在前:有当日归纳的、还有分段归纳的(归纳还没做出来、或被删掉了,句子还在),能做时加上今天。 */
+    /** The days listed under "days" on the index, newest first: those with a daily digest and those that still have segmented digests (not yet merged into one, or deleted while the sentences remain), plus today when new ones can be made. */
     fun dayKeys(): List<Long> =
         (days.map { it.day } + notes.map { it.day } + if (canMake) listOf(today) else emptyList()).distinct().sortedDescending()
 
-    /** 索引上「每周」「每月」列的,新的在前:存着的,能做时加上本周(本月)。 */
+    /** What is listed under "weeks" and "months" on the index, newest first: the stored ones, plus this week (this month) when new ones can be made. */
     fun spanKeys(kind: SpanKind): List<Long> =
         (spans(kind).map { it.start } + if (canMake) listOf(current(kind)) else emptyList()).distinct().sortedDescending()
 
@@ -133,7 +134,7 @@ internal class KnowData(
     }
 }
 
-/** 各级页面都要用的那些:数据、怎么起名字、怎么写日期、往下一级和回上一级。 */
+/** What every page needs: the data, how names are built, how dates are written, and going down a level and back up. */
 private class KnowUi(
     val runtime: ProactiveRuntime,
     val data: KnowData,
@@ -144,13 +145,13 @@ private class KnowUi(
     val monthText: (Long) -> String,
     val dateFormat: java.text.DateFormat,
     val timeFormat: java.text.DateFormat,
-    /** 「归纳到现在」这会儿点了也做不了的原因;做得了为 null。 */
+    /** Why "digest up to now" cannot be done right now; null when it can. */
     val blockedNote: String?,
     val listState: (KnowPage) -> LazyListState,
     val open: (KnowPage) -> Unit,
     val up: () -> Unit,
 ) {
-    /** 一个月的归纳管的是结束在这个月的那几周,和日历上的月份差几天:把实际管到的日子写出来。 */
+    /** A month's digest covers the weeks that end in that month, which differ by a few days from the calendar month: write out the days it actually covers. */
     fun cover(month: Long): String = DigestPool.monthCover(month).let { "${dayText(it.first)} – ${dayText(it.last)}" }
 
     fun spanName(kind: SpanKind, start: Long): String =
@@ -168,13 +169,15 @@ private class KnowUi(
 }
 
 /**
- * 主动能力 ›「Claire 知道了什么」:归纳出的内容,和它们的删除。分几级([KnowPage]):先是一页索引,点进去才列句子,
- * 再点一句看它是照着什么写的。设置都在上一页([ProactiveScreen]);这里不看开关也照样显示存着的东西(关着时东西还留着),
- * 只有「归纳到现在」那几行要开着、模型确认过才给。
- * 句子、概述、话题名、名字、通知原文都来自别处(模型照着通知写的、通知里的),一律当普通文字显示。
+ * Proactive capability › "What Claire Knows": what has been digested, and deleting it. Several levels ([KnowPage]): first an index page, and
+ * sentences are listed only after tapping in; tapping a sentence shows what it was written from. Settings all live on the previous page
+ * ([ProactiveScreen]); here the stored data is shown regardless of the switches (while off the data is still kept), and only the "digest up to
+ * now" rows require them to be on and the model confirmed.
+ * Sentences, summaries, topic names, names and raw notification text all come from elsewhere (written by the model from notifications, or from the
+ * notifications themselves) and are always shown as plain text.
  *
- * 存着的东西能有几百行(一天几十上百句分段归纳,话题、联系人各几百个):索引页只有十几行,长的列表都在下一级,
- * 一行一项按需渲染([LazyPage]、[card])。
+ * The stored data can run to hundreds of rows (dozens to a hundred segmented digest sentences a day, hundreds each of topics and contacts): the
+ * index page has only a dozen rows, and the long lists are one level down, rendered on demand row by row ([LazyPage], [card]).
  */
 @Composable
 fun ProactiveLearnScreen(onBack: () -> Unit) {
@@ -199,7 +202,7 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
     val contacts = contactsView.contacts
     var editRelation by remember { mutableStateOf<ObservedContact?>(null) }
     var merging by remember { mutableStateOf<ObservedTopic?>(null) }
-    // 模型配置和用量账本只在主动能力开着时才碰(和主动能力页一样);话题和删除关着时也能用
+    // The model config and usage ledger are touched only while the proactive capability is on (same as the proactive page); topics and deletes work even when it is off
     var usageTick by remember { mutableStateOf(0) }
     val budgetOut = remember(enabled, state, limit, usageTick) {
         if (!enabled) false else runtime.triageUsage().let { (tokens, calls) ->
@@ -216,7 +219,7 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
     LaunchedEffect(enabled, consent, targetRead) { target = if (enabled) runtime.triageTarget() else null }
     LifecycleResumeEffect(Unit) {
         targetRead++
-        // 打开(回到)本页时读出话题池并整理一遍
+        // When the page is opened (or returned to), load the topic pool and tidy it up
         runtime.onLearn { open() }
         onPauseOrDispose {}
     }
@@ -231,28 +234,28 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
     fun label(pkg: String) = labels[pkg] ?: pkg
     val dateFormat = remember { android.text.format.DateFormat.getMediumDateFormat(context) }
     val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(context) }
-    // 「11月9日」「2026年11月」:按系统语言和历法的写法(系统自己的格式器,不拿它的写法去喂别的格式器)
+    // "November 9" and "November 2026": formatted per the system language and calendar (using the system's own formatter; its output is not fed into another formatter)
     val dayFormat = remember { android.icu.text.DateFormat.getInstanceForSkeleton("MMMd", java.util.Locale.getDefault()) }
     val monthFormat = remember { android.icu.text.DateFormat.getInstanceForSkeleton("yMMMM", java.util.Locale.getDefault()) }
     fun dayText(epochDay: Long): String = dayFormat.format(java.util.Date(java.time.LocalDate.ofEpochDay(epochDay).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()))
     fun monthText(epochDay: Long): String = monthFormat.format(java.util.Date(java.time.LocalDate.ofEpochDay(epochDay).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()))
     val gate = TriageGate.of(enabled, consent, target)
-    // 已经归纳出的东西关了开关也还留着(只是不再做新的)。「归纳到现在」那几行只在真能做的时候给
+    // What has already been digested is kept even when the switches are off (only new ones stop). The "digest up to now" rows are shown only when it can really be done
     val canMake = enabled && digestOn && gate == TriageGate.Ready
     val blockedNote = makeBlocked(budgetOut, state.status)?.let { stringResource(it) }
     val today = java.time.LocalDate.now().toEpochDay()
     val data = remember(today, canMake, notes, days, weeks, months) { KnowData(today, canMake, notes, days, weeks, months) }
 
-    // 一级一级往下走的栈(空的是索引)。指的东西不在了的那几级不显示,并从栈里去掉
+    // The stack of pages, one level down at a time (empty is the index). Levels whose target is gone are not shown and are removed from the stack
     var stack by remember { mutableStateOf(listOf<KnowPage>()) }
     val shown = stack.dropLastWhile { !data.valid(it) }
     LaunchedEffect(shown, stack) { if (shown != stack) stack = shown }
-    // 各级页面滚到哪儿了:从下一级回来时还在原处;那一级从栈里出去了就不留
+    // Where each page had scrolled to: coming back from a level below returns to the same place; a level that leaves the stack is forgotten
     val indexScroll = rememberScrollState()
     val listStates = remember { HashMap<KnowPage, LazyListState>() }
     LaunchedEffect(shown) { listStates.keys.retainAll(shown.toSet()) }
     val up = { if (shown.isEmpty()) onBack() else stack = shown.dropLast(1) }
-    // 返回先退回上一级,到索引了才离开这一页
+    // Back goes up one level first, and leaves this page only at the index
     BackHandler(onBack = up)
     var moreDays by remember { mutableStateOf(false) }
     var moreWeeks by remember { mutableStateOf(false) }
@@ -299,7 +302,7 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
         )
     }
     editRelation?.let { c ->
-        // 关系由用户设:列出几种关系和「不确定」;「交回给 Claire 判断」是清掉用户设的
+        // The relation is set by the user: list the relations and "unknown"; "hand back to Claire" clears what the user set
         MikaDialog(
             onDismissRequest = { editRelation = null },
             title = { Text(stringResource(R.string.proactive_learn_relation_title, c.name)) },
@@ -319,16 +322,17 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
                     }
                 }
             },
-            // 点一项就设好并关掉,所以只有「取消」一个按钮。它要放在 confirmButton 上:MikaDialog 总会画出那一格,
-            // 放在 dismissButton 上的话旁边会多出一个没有字的蓝色按钮(和「应用访问」里改分类的弹窗同一个写法)
+            // Tapping an item sets it and closes the dialog, so the only button is "cancel". It goes on confirmButton: MikaDialog always draws
+            // that slot, and putting it on dismissButton would add a wordless blue button beside it (the same pattern as the classification dialog under "App access")
             confirmButton = { TextButton({ editRelation = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
     merging?.let { t ->
-        // 把这个话题并进另一个:列出其他话题(名字像的排在前面),点一个就并好并关掉。并了分不开,弹窗里写明。
-        // 话题可以有几百个:列表限高、能滚。
-        // 先后只在弹窗打开时排一次:开着的时候话题池会变(来了一批归纳、有通知被点开),跟着重排的话,
-        // 手指落下去的那一行可能已经换成了别的话题,而点一下就并了、分不开。中途没了的话题从列表里去掉
+        // Merge this topic into another: list the other topics (similar names first); tapping one merges and closes. A merge cannot be undone,
+        // and the dialog says so. There can be hundreds of topics: the list has a max height and scrolls.
+        // The order is computed once, when the dialog opens: while it is open the topic pool changes (a digest batch arrives, a notification is
+        // opened), and re-sorting along with it could put a different topic under the finger that is about to land, while one tap merges and
+        // cannot be undone. Topics that disappear meanwhile are dropped from the list
         val order = remember(t.id) { TopicPool.mergeCandidates(t, topics, System.currentTimeMillis()).map { it.id } }
         val others = remember(order, topics) { topics.associateBy { it.id }.let { now -> order.mapNotNull(now::get) } }
         MikaDialog(
@@ -347,7 +351,7 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
                     }
                 }
             },
-            // 只有「取消」一个按钮,放在 confirmButton 上(同上面改关系的弹窗)
+            // Only one "cancel" button, on confirmButton (same as the relation dialog above)
             confirmButton = { TextButton({ merging = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
@@ -367,9 +371,9 @@ fun ProactiveLearnScreen(onBack: () -> Unit) {
     }
 }
 
-// ---- 页面的骨架:长列表一行一项按需渲染 ----
+// ---- Page skeleton: long lists rendered on demand, one row at a time ----
 
-/** 带返回的顶栏下面一个按需渲染的列表(和 [PageScaffold] 一样的留白,只是不一次把所有行都画出来)。 */
+/** A top bar with back, then a list rendered on demand (the same padding as [PageScaffold], just without drawing every row at once). */
 @Composable
 private fun LazyPage(title: String, onBack: () -> Unit, state: LazyListState, content: LazyListScope.() -> Unit) {
     PageBackground {
@@ -385,13 +389,13 @@ private fun LazyPage(title: String, onBack: () -> Unit, state: LazyListState, co
     }
 }
 
-/** 一张卡片里的各项:行([row],有分隔线)和说明([note],没有)。 */
+/** The items inside one card: rows ([row], with separators) and notes ([note], without). */
 private class CardRows {
     class Entry(val key: String?, val isRow: Boolean, val content: @Composable (first: Boolean) -> Unit)
 
     val entries = ArrayList<Entry>()
 
-    /** [key]:这一行指的东西(句子的 id 之类),列表变了它也认得出是同一行;没有就按位置。[first]:它前面这张卡里还没有别的行。 */
+    /** [key]: what this row points at (a sentence id and the like), so it is still recognized as the same row when the list changes; without it, position is used. [first]: there is no other row before it in this card. */
     fun row(key: String? = null, content: @Composable (first: Boolean) -> Unit) {
         entries += Entry(key, true, content)
     }
@@ -401,7 +405,7 @@ private class CardRows {
     }
 }
 
-/** 一张卡拆成懒加载的行时,每行的圆角:首行上圆、末行下圆。 */
+/** The corner radii of each row when a card is split into lazily loaded rows: round on top for the first, round at the bottom for the last. */
 private fun cardRowShape(i: Int, n: Int): RoundedCornerShape {
     val r = MikaRadius.Card
     return RoundedCornerShape(
@@ -411,8 +415,8 @@ private fun cardRowShape(i: Int, n: Int): RoundedCornerShape {
 }
 
 /**
- * 懒加载列表里的一张分组卡片([GroupCard] 的样子,拆成一行一项)。[id] 在这一页里不能重复。
- * 列表里的 key 重了会崩,所以行自己带的 key 万一重了(存着的数据里有两个一样的 id)就退回按位置。
+ * A grouped card inside a lazy list (the look of [GroupCard], split into one row per item). [id] must be unique within the page.
+ * Duplicate keys in a list crash, so if a row's own key happens to repeat (two identical ids in the stored data) it falls back to position.
  */
 private fun LazyListScope.card(id: String, build: CardRows.() -> Unit) {
     val entries = CardRows().apply(build).entries
@@ -432,9 +436,9 @@ private fun LazyListScope.label(id: String, text: @Composable () -> String) {
     item(key = "label:$id", contentType = 2) { GroupLabel(text()) }
 }
 
-// ---- 索引 ----
+// ---- Index ----
 
-/** 一份归纳在索引上的那一行小字:有概述写概述;没有(老的、被清掉了)写「几句 · 哪些 App」;一句都没有的写 [empty]。 */
+/** The small second line for a digest on the index: the summary if there is one; otherwise (old ones, cleared ones) "how many sentences · which Apps"; with no sentence at all, [empty]. */
 @Composable
 private fun digestSub(ui: KnowUi, brief: String, lines: List<DigestLine>, empty: Int): String = when {
     lines.isEmpty() -> stringResource(empty)
@@ -478,7 +482,7 @@ private fun spanSub(ui: KnowUi, kind: SpanKind, start: Long): String {
     }
 }
 
-/** 索引上先列几行,更早的点一下再展开(每天最多三十多行、每周二十多行,不必懒加载,但也不必一上来全摆出来)。 */
+/** The index lists a few rows first and expands older ones on tap (at most thirty-odd days and twenty-odd weeks; no need for lazy loading, but no need to show them all up front either). */
 private const val INDEX_DAYS = 7
 private const val INDEX_WEEKS = 4
 private const val INDEX_MONTHS = 3
@@ -530,7 +534,7 @@ private fun IndexPage(
     }
 }
 
-// ---- 某一天:当日归纳的句子,和这一天的分段归纳 ----
+// ---- One day: the sentences of its daily digest, and that day's segmented digests ----
 
 @Composable
 private fun DayPage(ui: KnowUi, page: KnowPage.Day) {
@@ -546,11 +550,11 @@ private fun DayPage(ui: KnowUi, page: KnowPage.Day) {
             d?.lines?.forEach { line ->
                 row { first -> ListRow(null, line.text, ui.apps(line), first = first, onClick = { ui.open(KnowPage.DayLine(day, line)) }) { RowChevron() } }
             }
-            // 这一天的句子太多、没能全放进去的:说出来,这一份不是照着全部写的
+            // This day had too many sentences and not all fit: say so, this one was not written from all of them
             if (d != null && d.leftOut > 0) note { EmptyNote(stringResource(R.string.proactive_learn_left_out, d.leftOut)) }
             if (canMake) row { first ->
                 val made = d?.let { stringResource(R.string.proactive_learn_day_made, ui.timeFormat.format(java.util.Date(it.madeAtMs))) }
-                // 预算用完了之类:点了也发不出去,写明原因,不给按钮(照样能点的话,点了没有任何反应)
+                // Budget exhausted and the like: tapping would send nothing, so state the reason and give no button (if it were tappable anyway, tapping would do nothing)
                 ListRow(
                     null, stringResource(R.string.proactive_learn_day_make), ui.blockedNote ?: made, first = first,
                     onClick = if (ui.blockedNote != null) null else ({ ui.runtime.onLearn { digestToday() } }),
@@ -576,7 +580,7 @@ private fun DayPage(ui: KnowUi, page: KnowPage.Day) {
     }
 }
 
-/** 一句分段归纳:点开看它那段时间的通知原文;右边删掉。 */
+/** One segmented digest sentence: tap to see the raw notifications from that period; delete on the right. */
 @Composable
 private fun NoteRow(ui: KnowUi, n: DigestNote, first: Boolean) {
     ListRow(null, n.text, ui.noteSub(n), first = first, onClick = { ui.open(KnowPage.Note(n.id)) }) {
@@ -584,7 +588,7 @@ private fun NoteRow(ui: KnowUi, n: DigestNote, first: Boolean) {
     }
 }
 
-// ---- 某一周、某个月 ----
+// ---- One week, one month ----
 
 @Composable
 private fun SpanPage(ui: KnowUi, page: KnowPage.Span) {
@@ -603,7 +607,7 @@ private fun SpanPage(ui: KnowUi, page: KnowPage.Span) {
         card("digest") {
             spanNote(d, (kind to start) in ui.removedSpans, kind, canMake)?.let { text -> note { EmptyNote(stringResource(text)) } }
             d?.lines?.forEach { line ->
-                // 一句下面写它是哪几天的(周归纳)、来自哪些 App
+                // Under each sentence, which days it comes from (weekly digests) and which Apps
                 val sub = ((if (isWeek) line.days.sorted().map(ui.dayText) else emptyList()) + line.apps.map(ui.label)).joinToString(" · ")
                 row { first -> ListRow(null, line.text, sub, first = first, onClick = { ui.open(KnowPage.SpanLine(kind, start, line)) }) { RowChevron() } }
             }
@@ -627,7 +631,7 @@ private fun SpanPage(ui: KnowUi, page: KnowPage.Span) {
                 ListRow(null, stringResource(R.string.proactive_learn_delete), first = first, onClick = { ui.runtime.onLearn { deleteSpan(kind, start) } })
             }
         }
-        // 这一周的各天(这个月的各周):这一份还没做出来的时候,从这里也看得到这段时间里已经有的东西
+        // The days of this week (the weeks of this month): while this digest has not been made yet, what already exists in the period is visible here too
         if (isWeek) {
             val inWeek = ui.data.dayKeys().filter { DigestPool.weekOf(it) == start }
             if (inWeek.isNotEmpty()) {
@@ -656,9 +660,9 @@ private fun SpanPage(ui: KnowUi, page: KnowPage.Span) {
     }
 }
 
-// ---- 一句的依据 ----
+// ---- The basis of a sentence ----
 
-/** 当日归纳里的一句是照着哪几句分段归纳写的(句子上记着它们的 id;分段归纳只留八天,过期的、删掉的说个数)。 */
+/** Which segmented digest sentences a daily digest sentence was written from (their ids are recorded on the sentence; segmented digests are kept only eight days, and expired or deleted ones are just counted). */
 @Composable
 private fun DayLinePage(ui: KnowUi, page: KnowPage.DayLine) {
     val line = page.line
@@ -677,8 +681,8 @@ private fun DayLinePage(ui: KnowUi, page: KnowPage.DayLine) {
 }
 
 /**
- * 周、月归纳里的一句出自哪几天、哪几周:句子上只记到「哪几天(哪几周)」,没记是其中哪一句,所以点开是去那一天(那一周)的页面。
- * 那一份已经到期或删掉了的只写一句,不能点。
+ * Which days (weeks) a weekly or monthly digest sentence comes from: the sentence only records "which days (weeks)", not which sentence within
+ * them, so tapping goes to that day's (that week's) page. One that has expired or been deleted just shows a line and cannot be tapped.
  */
 @Composable
 private fun SpanLinePage(ui: KnowUi, page: KnowPage.SpanLine) {
@@ -714,8 +718,10 @@ private fun SpanLinePage(ui: KnowUi, page: KnowPage.SpanLine) {
 }
 
 /**
- * 一句分段归纳是照着哪些通知写的。句子只记了 App、会话名和起止时间,所以列的是那个会话(没记会话名的是那个 App)
- * 在那段时间里还存着的通知,可能比当时依据的多几段。原文只留两天:没有了的时候说清是到期了、开关关着被删了,还是读不出来。
+ * Which notifications a segmented digest sentence was written from. The sentence only records the App, conversation name and start/end time, so
+ * what is listed is the notifications of that conversation (of that App when no conversation name was recorded) still stored for that period,
+ * possibly a few more than were used. Raw text is kept only two days: when there is none, say clearly whether it expired, was deleted because
+ * the switch is off, or cannot be read.
  */
 @Composable
 private fun NotePage(ui: KnowUi, page: KnowPage.Note) {
@@ -742,7 +748,7 @@ private fun NotePage(ui: KnowUi, page: KnowPage.Note) {
                     }
                     r.entries.forEach { e ->
                         row { first ->
-                            // 句子没记会话名的:这几段可能来自好几个会话,把各自的会话名写出来
+                            // The sentence recorded no conversation name: these entries may come from several conversations, so write each one's conversation name
                             val chat = e.title.takeIf { n.title == null && it.isNotBlank() }
                             ListRow(null, e.text, listOfNotNull(chat, e.sender, ui.timeFormat.format(java.util.Date(e.atMs))).joinToString(" · "), first = first)
                         }
@@ -753,13 +759,13 @@ private fun NotePage(ui: KnowUi, page: KnowPage.Note) {
     }
 }
 
-// ---- 话题、联系人、清除 ----
+// ---- Topics, contacts, clearing ----
 
 @Composable
 private fun TopicsPage(ui: KnowUi, topics: List<ObservedTopic>, level: LearnLevel, storeUnavailable: Boolean, onMerge: (ObservedTopic) -> Unit) {
-    // 只有一个话题时没有可并的对象,不给「并入」
+    // With only one topic there is nothing to merge into, so "merge into" is not offered
     val merge: ((ObservedTopic) -> Unit)? = if (topics.size > 1) onMerge else null
-    // 几天算已确立跟着激进程度走。只在话题变了的时候重排,不是每次重组都排一遍
+    // How many days count as established follows the aggressiveness level. Sorted only when the topics change, not on every recomposition
     val (sure, unsure) = remember(topics, level) {
         val now = System.currentTimeMillis()
         topics.sortedByDescending { it.score(now) }.partition { level.established(it) }
@@ -812,9 +818,9 @@ private fun ClearPage(
 ) {
     PageScaffold(stringResource(R.string.proactive_know_clear), ui.up) {
         GroupCard {
-            // 「清空全部」一直在:页面上什么都没列出来时也可能有东西——哪一份存盘读不出来的时候,它只能靠清空删掉(见 StoreCodec)
+            // "Clear all" is always present: there may be something even when the page lists nothing — when one of the stores cannot be read, clearing is the only way to delete it (see StoreCodec)
             ListRow(null, stringResource(R.string.proactive_learn_clear_all), first = true, onClick = onClearAll)
-            // 清掉某个 App 的:有话题证据、有联系人,或各级归纳里有它的句子的 App 都列出来
+            // Clear one App's data: list every App that has topic evidence, has contacts, or has sentences in digests at any level
             clearable.forEach { pkg ->
                 ListRow(null, stringResource(R.string.proactive_learn_clear_app, ui.label(pkg)), onClick = { onClearApp(pkg) })
             }
@@ -836,13 +842,13 @@ private fun ClearPage(
     }
 }
 
-/** 一个话题:名字(纯文字)、种类、哪些 App 在几天里印证过、上次出现、点开/划掉几次;右边删掉。 */
+/** One topic: name (plain text), kind, which Apps confirmed it over how many days, when it last appeared, how often opened/dismissed; delete on the right. */
 @Composable
 private fun TopicRow(
     t: ObservedTopic, first: Boolean, label: (String) -> String, dateFormat: java.text.DateFormat, onMerge: (() -> Unit)?, onDelete: () -> Unit,
 ) {
     val apps = t.evidence.keys.joinToString(", ", transform = label)
-    // 话题名按纯文字显示;敏感的在后面加一个纯文字的小标记
+    // The topic name is shown as plain text; sensitive ones get a small plain-text tag after it
     ListRow(
         null, if (t.sensitive) t.label + " · " + stringResource(R.string.proactive_learn_sensitive_tag) else t.label,
         stringResource(R.string.proactive_learn_topic_detail, stringResource(kindLabel(t.kind)), apps, t.days, dateFormat.format(java.util.Date(t.lastSeenMs))),
@@ -857,8 +863,8 @@ private fun TopicRow(
 }
 
 /**
- * 一个联系人:名字(纯文字)、类型、哪个 App、关系(猜的标「猜测」,用户设的标「你设定的」)、出现过几天、上次出现;
- * 下一行是连着的话题。右边改关系、删掉。
+ * One contact: name (plain text), type, which App, relation (guessed ones are tagged "guessed", user-set ones "set by you"), over how many days
+ * seen, when last seen; the next line is the linked topics. On the right, edit the relation and delete.
  */
 @Composable
 private fun ContactRow(
@@ -910,9 +916,11 @@ private fun kindLabel(k: TopicKind): Int = when (k) {
 }
 
 /**
- * 「清空来自它的」列哪些 App:话题上有它的证据、有它的联系人,分段归纳、当日(周、月)归纳里有依据过它的句子,
- * 某一份归纳的概述是照着它的句子写的(概述还在时才算;分段归纳到期之后,它可能只剩在概述里),
- * 或者还留着它的通知原文([raw])——刚来了几条通知、还没归纳出任何东西的 App 只有原文,不列它就只能全部清空。
+ * Which Apps "clear what came from it" lists: those with evidence on topics, with contacts, with sentences in segmented digests or in daily
+ * (weekly, monthly) digests that were based on them, those whose sentences a digest's summary was written from (only counted while the summary
+ * still exists; after segmented digests expire, an App may survive only in the summary), or those whose raw notifications are still kept
+ * ([raw]) — an App that just got a few notifications and has digested nothing exists only as raw text, and without listing it the only option
+ * would be clearing everything.
  */
 internal fun clearableApps(
     topics: List<com.wangzan101.mika.core.proactive.ObservedTopic>,
@@ -925,7 +933,7 @@ internal fun clearableApps(
     topics.forEach { addAll(it.evidence.keys) }
     contacts.forEach { add(it.packageName) }
     notes.forEach { add(it.packageName) }
-    // 概述清掉之后来源记录可能还留着:只在概述还有字时才算,不然列出来的 App 其实已经没东西可清
+    // Source records may remain after a summary was cleared: count them only while the summary still has text, otherwise listed Apps would have nothing left to clear
     days.forEach { d ->
         d.lines.forEach { addAll(it.apps) }
         if (d.brief.isNotEmpty()) addAll(d.briefApps)
@@ -938,19 +946,20 @@ internal fun clearableApps(
 }
 
 /**
- * 某一天的页面上,当日归纳那张卡片顶上的一句说明;不用说为 null(有句子)。页面上写的要是真的:
- * 说「会自动归纳」「点下面这一行」的那几句,只在现在真能做([canMake]:总开关、「当日消息归纳」都开着,模型确认过)时才用。
+ * The explanatory line at the top of the daily digest card on a day's page; null when none is needed (there are sentences). What the page says
+ * must be true: the lines saying "it will be digested automatically" or "tap the row below" are used only when it can really be done now
+ * ([canMake]: master switch and "daily notification digest" both on, model confirmed).
  */
 internal fun dayNote(digest: DayDigest?, removed: Boolean, isToday: Boolean, canMake: Boolean): Int? = when {
     digest != null -> if (digest.lines.isEmpty()) R.string.proactive_learn_day_nothing else null
-    // 被删掉的:不会再自动做了。今天的在能做的时候可以点下面那一行做回来
+    // Deleted ones: they will not be made automatically again. Today's can be brought back by tapping the row below when it can be done
     removed -> if (isToday && canMake) R.string.proactive_learn_span_removed else R.string.proactive_know_removed
     !canMake -> R.string.proactive_learn_empty
     isToday -> R.string.proactive_learn_day_none
     else -> R.string.proactive_know_day_pending
 }
 
-/** 某一周(某个月)的页面上,那张卡片顶上的一句说明;[canMake] 是「这是本周(本月),而且现在能做」。 */
+/** The explanatory line at the top of that card on a week's (month's) page; [canMake] means "this is the current week (month) and it can be done now". */
 internal fun spanNote(digest: SpanDigest?, removed: Boolean, kind: SpanKind, canMake: Boolean): Int? = when {
     digest != null -> if (digest.lines.isEmpty()) R.string.proactive_learn_span_nothing else null
     removed -> if (canMake) R.string.proactive_learn_span_removed else R.string.proactive_know_removed
@@ -960,9 +969,10 @@ internal fun spanNote(digest: SpanDigest?, removed: Boolean, kind: SpanKind, can
 }
 
 /**
- * 手动「归纳到现在」这会儿为什么做不了(要显示的那句话);做得了为 null。
- * 预算用完了——按账本算出来的([budgetOut]),或者请求时被拒、执行器记着今天不再发([LearnStatus.BudgetUsedUp]);
- * 「应用访问」设置读不出来、整个停着。这些时候点了按钮也不会发请求,页面要说出来而不是没有反应。
+ * Why the manual "digest up to now" cannot be done right now (the line to show); null when it can. Budget exhausted — computed from the ledger
+ * ([budgetOut]), or rejected when requesting and the executor recorded that nothing more is sent today ([LearnStatus.BudgetUsedUp]); the
+ * "App access" settings cannot be read and everything is suspended. In those cases tapping the button would send no request, so the page must say
+ * so instead of doing nothing.
  */
 internal fun makeBlocked(budgetOut: Boolean, status: LearnStatus): Int? = when {
     status == LearnStatus.Suspended -> R.string.proactive_status_access

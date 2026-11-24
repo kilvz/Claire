@@ -23,19 +23,20 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * 「值得提醒」的入口:胶囊上的条数从这里取;点胶囊上的数字、或主动能力页那一行,就把那几条写成对话里 Claire 的一条消息([openTalk])。
- * 不调模型、不触发通知自带的点击或回复;写进对话之后的事(用户回一句、任务开始)和别的对话一样。
+ * The entry point for "worth a reminder": the count on the capsule comes from here; tapping the number on the capsule, or the row on the
+ * proactive page, writes those entries as one message from Claire in a chat ([openTalk]). It does not call the model or trigger the
+ * notifications' own click or reply; what happens after it is written into the chat (the user replies, a task starts) is the same as any chat.
  */
 object NoticeHintList {
-    /** 还没看的条数;主动能力开关关着时是 0,也不去建主动能力(见 [FeatureFlags.proactiveChanges])。不计时,只跟着变化。 */
+    /** How many are unseen; 0 while the proactive switch is off, and the proactive runtime is not even created (see [FeatureFlags.proactiveChanges]). No timing, it only follows changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun unseenCount(context: Context): Flow<Int> = FeatureFlags.get(context).proactiveChanges().flatMapLatest { on ->
         if (on) (context.applicationContext as MikaApp).proactive.hints.map { it.unseen } else flowOf(0)
     }.distinctUntilChanged()
 
     /**
-     * 用户点开了提醒:见 [ProactiveRuntime.openHintTalk]。返回提醒对话的 id(已设为当前对话);没有可开的、出了错为 null。
-     * 只在看得到提醒的地方调(那时主动能力开着)。
+     * The user opened the reminder: see [ProactiveRuntime.openHintTalk]. Returns the id of the reminder chat (already made the current chat);
+     * null when there is nothing to open or an error occurred. Call only where reminders are visible (the proactive runtime is on then).
      */
     suspend fun openTalk(context: Context): String? = try {
         (context.applicationContext as MikaApp).proactive.openHintTalk()
@@ -50,8 +51,9 @@ object NoticeHintList {
 }
 
 /**
- * 主动能力页上的那一行(胶囊显示不了提醒时的入口:开关不是「一直显示」、或人在 Claire 里):「值得提醒 (N)」,
- * 下面两个数是看过的和没看就处理了的条数;点开是同一个提醒对话,在 Claire 里打开。
+ * The row on the proactive page (the entry when the capsule cannot show reminders: the switch is not "always show", or the person is inside
+ * Claire): "Worth a reminder (N)", with the two numbers below being how many were seen and how many were handled unseen; tapping it opens the
+ * same reminder chat, inside Claire.
  */
 @Composable
 internal fun NoticeHintEntry(state: NoticeHints.State) {

@@ -66,12 +66,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 设置 › 主动能力。只放要用户做决定的:
- * 状态卡(总开关、一句现在的状态、要处理时给一个按钮)→「Claire 知道了什么」的入口
- * → 设置(激进程度、敏感类推断、当日消息归纳、每日上限)→ 读哪些 App(每个 App 不读 / 低 / 中 / 高;列表可能很长,放在设置后面)
- * → 诊断(默认折起:监听状态、计数、失败重试、最近的通知)→ 页尾说明
- * (发什么、存什么、留多久)。归纳出的内容和它们的删除在下一页([ProactiveLearnScreen])。
- * 通知内容和模型写的判定理由都来自别处,一律当普通文字显示:不识别链接,不渲染格式。
+ * Settings › proactive capability. Only things the user must decide on:
+ * the status card (master switch, one line of current state, a button when action is needed) → the entry to "What Claire Knows"
+ * → settings (aggressiveness, sensitive-category inference, daily notification digest, daily limit) → which Apps are read (per App: off /
+ * low / medium / high; the list can be long, so it comes after settings) → diagnostics (collapsed by default: listener state, counts, retry
+ * failed, recent notifications) → footer notes (what is sent, what is stored, for how long). What has been digested, and deleting it, is on the
+ * next page ([ProactiveLearnScreen]). Notification content and the model's stated reasons come from elsewhere and are always shown as plain
+ * text: links are not detected and no formatting is rendered.
  */
 @Composable
 fun ProactiveScreen(onBack: () -> Unit) {
@@ -94,14 +95,14 @@ fun ProactiveScreen(onBack: () -> Unit) {
     val contactsView by runtime.learnContactsView.collectAsState()
     val limit by runtime.triageLimit.collectAsState()
     val accessKnown by runtime.accessKnown.collectAsState(runtime.accessKnownNow())
-    // 判定和归纳实际会用的服务商和模型:功能开着时才去取(关着不碰模型配置;打开开关那一下另取);回到本页时重读
+    // The provider and model the decision pass and learning will actually use: fetched only while the feature is on (off, the model config is untouched; turning the switch on fetches it separately); re-read when returning to this page
     var target by remember { mutableStateOf<TriageTarget?>(null) }
     var targetRead by remember { mutableStateOf(0) }
     LaunchedEffect(enabled, consent, targetRead) { target = if (enabled) runtime.triageTarget() else null }
-    // 确认框里给用户看的那一家那个模型;[confirmEnables] 为 true 是从关着打开(同意了才开),否则是开着时(重新)确认
+    // The provider and model shown to the user in the dialog; [confirmEnables] true means turning it on from off (only turned on after consent), otherwise it is a (re)confirmation while already on
     var confirmModel by remember { mutableStateOf<TriageTarget?>(null) }
     var confirmEnables by remember { mutableStateOf(false) }
-    // 打开总开关:配了模型就先弹确认框(同意了才开);没配模型先开着收,不发任何东西。关掉直接关
+    // Turning the master switch on: with a model configured, show the dialog first (only turned on after consent); with none, turn it on to capture and send nothing. Turning it off turns it off directly
     val toggle: (Boolean) -> Unit = { on ->
         if (!on) runtime.setEnabled(false)
         else {
@@ -116,15 +117,16 @@ fun ProactiveScreen(onBack: () -> Unit) {
     var search by remember { mutableStateOf("") }
     var addingApps by rememberSaveable { mutableStateOf(false) }
     var pickApp by remember { mutableStateOf<String?>(null) }
-    // 改「读不读、哪一档」没存下来(存储满了之类):提示再选一次。只要名单还有没写成的「不读」就一直提示
-    // (上次运行留下的也算),不只看最近那一次——中间改别的 App 的档位是成的,不能把提示带走
+    // A change to "read or not, which tier" was not saved (storage full or the like): prompt to choose again. The prompt stays as long as the
+    // list still has an unwritten "do not read" (including what a previous run left), regardless of the latest change — changing another App's
+    // tier in between succeeded and must not clear the prompt
     var unsaved by remember { mutableStateOf(runtime.allowed.dirty) }
     var pickLevel by remember { mutableStateOf(false) }
     var confirmDigestOn by remember { mutableStateOf(false) }
     var confirmSensitiveOn by remember { mutableStateOf(false) }
     var confirmSensitiveOff by remember { mutableStateOf(false) }
     var diagOpen by rememberSaveable { mutableStateOf(false) }
-    // 「由 Claire 助手授权」:要用助手或已配对的连接(和恢复开关看的是同一个条件);跑的过程中按钮不能再点
+    // "Grant via the Claire assistant": needs the assistant or a paired connection (the same condition as the restore switch); the button cannot be tapped while it runs
     val phone = remember { PhoneServices.of(context) }
     val shellStatus by phone.shellControl.status.collectAsState()
     val helperShell by phone.hub.shell.collectAsState()
@@ -133,9 +135,9 @@ fun ProactiveScreen(onBack: () -> Unit) {
     var granting by remember { mutableStateOf(false) }
     var grantMessage by remember { mutableStateOf<Int?>(null) }
     val uiScope = rememberCoroutineScope()
-    // 超时后命令仍可能生效:监听连上时也重读授权
+    // After a timeout the command may still take effect: re-read authorization when the listener connects
     LaunchedEffect(connected) { authorized = runtime.authorized() }
-    // 从系统设置回来时重读授权;话题和联系人的个数要读出池子才有(顺带整理一遍)
+    // Re-read authorization when returning from the system settings; the topic and contact counts require the pools to be loaded (which tidies them up as well)
     LifecycleResumeEffect(Unit) {
         authorized = runtime.authorized()
         targetRead++
@@ -143,7 +145,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
         onPauseOrDispose {}
     }
     LaunchedEffect(Unit) {
-        // Claire 自己的各个安装包(正式版、.dev 等)不给选
+        // Claire's own packages (release, .dev, etc.) are not offered for selection
         apps = withContext(Dispatchers.IO) {
             runCatching { launchableApps(app.packageManager, app.packageName) }.getOrDefault(emptyList())
                 .filterNot { NoticeFilter.isSelf(it.first) }
@@ -152,7 +154,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
     val labels = apps.toMap()
     fun label(pkg: String) = labels[pkg] ?: pkg
     fun tierOf(pkg: String): SourceTier = when (pkg) { in optOut -> SourceTier.Low; in high -> SourceTier.High; else -> SourceTier.Mid }
-    // 模型配置和用量账本只在主动能力开着时才碰
+    // The model config and usage ledger are touched only while the proactive capability is on
     var usageTick by remember { mutableStateOf(0) }
     if (enabled) {
         val version by remember { runtime.usageVersion() }.collectAsState()
@@ -162,19 +164,19 @@ fun ProactiveScreen(onBack: () -> Unit) {
     val budgetOut = enabled && ProactiveBudget.exhausted(tokens, calls, limit) != null
     val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(context) }
     val dateFormat = remember { android.text.format.DateFormat.getMediumDateFormat(context) }
-    // 「Claire 知道了什么」是本页下面的一页;放在所有 remember 之后,回来时本页的状态还在
+    // "What Claire Knows" is a page below this one; it comes after every remember so this page's state survives coming back
     var knownOpen by rememberSaveable { mutableStateOf(false) }
     if (knownOpen) return ProactiveLearnScreen(onBack = { knownOpen = false })
     val gate = TriageGate.of(true, consent, target)
 
     PageScaffold(stringResource(R.string.proactive_title), onBack) {
-        // ---- 状态卡:开关,和一句现在的状态;要用户处理时给一个按钮 ----
+        // ---- Status card: the switch and one line of current state; a button when the user must act ----
         GroupCard {
             ListRow(null, stringResource(R.string.proactive_switch), first = true, onClick = { toggle(!enabled) }) {
                 MikaSwitch(enabled, toggle, Modifier.testTag("proactive-switch"))
             }
             if (enabled) when {
-                // 「应用访问」读不出来:整个停着,别的状态这时都不作数
+                // "App access" cannot be read: everything is suspended and no other state applies right now
                 !accessKnown -> ListRow(null, stringResource(R.string.proactive_status_access))
                 !authorized -> {
                     ListRow(null, stringResource(R.string.proactive_listener, stringResource(R.string.proactive_state_unauthorized))) {
@@ -184,7 +186,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
                             }
                         }) { Text(stringResource(R.string.proactive_open_access)) }
                     }
-                    // 第二条路:不去系统页,由手机助手以 shell 身份打开;先确认,跑的时候转圈、不能再点
+                    // The second way: instead of going to the system page, have the phone assistant grant it with shell identity; confirm first, and while it runs show a spinner and block taps
                     ListRow(
                         null, stringResource(R.string.proactive_helper_grant),
                         (grantMessage ?: R.string.proactive_helper_unavailable.takeIf { !helperUsable })?.let { stringResource(it) },
@@ -195,7 +197,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
                 }
                 gate == TriageGate.NoModel -> ListRow(null, stringResource(R.string.proactive_triage_no_model))
                 gate == TriageGate.NeedsConsent -> {
-                    // 还没同意过(没配模型时打开的),或者同意过但服务商、模型变了
+                    // Not consented yet (turned on with no model configured), or consented but the provider or model changed
                     val ask = { target?.let { confirmEnables = false; confirmModel = it } }
                     ListRow(
                         null, stringResource(if (consent == null) R.string.proactive_status_consent else R.string.proactive_triage_reconfirm),
@@ -205,16 +207,16 @@ fun ProactiveScreen(onBack: () -> Unit) {
                     }
                 }
                 budgetOut -> ListRow(null, stringResource(R.string.proactive_learn_state_budget))
-                // 连不上判定用的模型、正停着:不写「正在工作」
+                // The decision pass's model is unreachable and it is paused: do not say "working"
                 triage.status == TriageStatus.Unreachable -> ListRow(null, stringResource(R.string.proactive_triage_state_unreachable))
                 !connected -> ListRow(null, stringResource(R.string.proactive_listener, stringResource(R.string.proactive_state_unbound)))
                 else -> ListRow(null, stringResource(R.string.proactive_status_working, inbox.received))
             }
         }
-        // 值得提醒的入口(胶囊显示不了时从这里进)和两个反馈数
+        // The "worth a reminder" entry (used when the capsule cannot show it) and the two feedback counts
         if (enabled) NoticeHintEntry(runtime.hints.collectAsState().value)
 
-        // ---- 归纳出的内容在下一页 ----
+        // ---- What has been digested is on the next page ----
         GroupCard {
             ListRow(
                 null, stringResource(R.string.proactive_learn_title),
@@ -223,14 +225,14 @@ fun ProactiveScreen(onBack: () -> Unit) {
             ) { RowChevron() }
         }
 
-        // ---- 设置 ----
+        // ---- Settings ----
         GroupLabel(stringResource(R.string.settings_title))
         GroupCard {
-            // 激进程度:一次调一组门槛(话题几天算数、每天提醒多少、归纳出的东西带不带进任务)
+            // Aggressiveness: one choice adjusts a whole set of thresholds (how many days a topic counts, how many reminders per day, whether digested content is carried into tasks)
             ListRow(null, stringResource(R.string.proactive_learn_level), stringResource(levelDesc(level)), first = true, onClick = { pickLevel = true }) {
                 RowValue(stringResource(levelName(level)))
             }
-            // 敏感类推断:默认关;打开先确认,关掉时问已存的敏感话题删不删
+            // Sensitive-category inference: off by default; confirm before turning it on, and ask whether to delete the stored sensitive topics when turning it off
             val toggleSensitive: (Boolean) -> Unit = { on -> if (on) confirmSensitiveOn = true else confirmSensitiveOff = true }
             ListRow(
                 null, stringResource(R.string.proactive_learn_sensitive), stringResource(R.string.proactive_learn_sensitive_sub),
@@ -238,7 +240,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
             ) {
                 MikaSwitch(sensitiveOn, toggleSensitive, Modifier.testTag("proactive-learn-sensitive"))
             }
-            // 当日消息归纳:要把通知原文存在本机,所以打开前单独说明、单独确认;关掉就把存着的原文删掉
+            // Daily notification digest: it stores raw notifications on this device, so it has its own explanation and confirmation before turning on; turning it off deletes the stored raw text
             val toggleDigest: (Boolean) -> Unit = { on -> if (on) confirmDigestOn = true else runtime.setLearnDigest(false) }
             ListRow(
                 null, stringResource(R.string.proactive_learn_digest_switch),
@@ -259,16 +261,16 @@ fun ProactiveScreen(onBack: () -> Unit) {
                 },
             )
         }
-        // 不是最保守的一档时,把「带进任务是什么意思、发给谁」那句常驻在这里(弹窗里也有)
+        // At any level other than the most conservative, the "what being carried into tasks means and to whom it is sent" line stays here (it is in the dialog too)
         if (level != LearnLevel.Conservative) DetailNote(
             stringResource(R.string.proactive_learn_level_summary),
             stringResource(R.string.proactive_learn_level_note),
             Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
         )
 
-        // ---- 读哪些 App:选了的列在这里,每个是低 / 中 / 高;「选择更多」展开全部 App ----
+        // ---- Which Apps are read: the chosen ones are listed here, each as low / medium / high; "choose more" expands all Apps ----
         GroupLabel(stringResource(R.string.proactive_apps, allowed.size))
-        // 名单读不出来时按空的读:说清楚,免得用户以为自己一个都没选过
+        // When the list cannot be read it is treated as empty: say so, so the user does not think they never selected anything
         if (!runtime.allowed.readable) FooterNote(stringResource(R.string.proactive_apps_unreadable))
         if (unsaved) FooterNote(stringResource(R.string.proactive_apps_unsaved))
         GroupCard {
@@ -289,7 +291,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
         }
         FooterNote(stringResource(R.string.proactive_apps_sub))
 
-        // ---- 诊断:排查用的,默认折起 ----
+        // ---- Diagnostics: for troubleshooting, collapsed by default ----
         GroupCard {
             ListRow(null, stringResource(R.string.proactive_diag), first = true, onClick = { diagOpen = !diagOpen }) { RowChevron() }
         }
@@ -298,7 +300,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
             ::label, timeFormat, dateFormat,
         )
 
-        // ---- 页尾:发什么、存什么、留多久;关掉开关会怎样 ----
+        // ---- Footer: what is sent, what is stored, for how long; what happens when the switch is off ----
         FooterNote(stringResource(R.string.proactive_footer_send))
         FooterNote(stringResource(R.string.proactive_footer_store))
         FooterNote(stringResource(if (digestOn) R.string.proactive_footer_digest else R.string.proactive_footer_no_text))
@@ -311,7 +313,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
             title = { Text(stringResource(R.string.proactive_triage_consent_title)) },
             text = { Text(consentText(t, digestOn, level)) },
             confirmButton = {
-                // 记下的是框里给用户看过的这一家这个模型
+                // What is recorded is exactly the provider and model shown to the user in the dialog
                 TextButton({
                     if (confirmEnables) runtime.setEnabled(true, t) else runtime.confirmModel(t)
                     confirmModel = null
@@ -362,8 +364,8 @@ fun ProactiveScreen(onBack: () -> Unit) {
             dismissButton = { TextButton({ confirmGrant = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
-    // 一个 App 读不读、读的话哪一档。点一项就设好并关掉,所以只有「取消」一个按钮(放在 confirmButton 上:
-    // MikaDialog 总会画出那一格)。不读和低会把它存着的原文和句子删掉,各项下面的说明里写着
+    // Whether an App is read and, if so, at which tier. Tapping an item sets it and closes the dialog, so the only button is "cancel" (put on
+    // confirmButton: MikaDialog always draws that slot). Off and low delete its stored raw notifications and sentences, as each item's subtitle says
     pickApp?.let { pkg ->
         val current = if (pkg in allowed) tierOf(pkg) else null
         MikaDialog(
@@ -436,7 +438,7 @@ fun ProactiveScreen(onBack: () -> Unit) {
         )
     }
     if (confirmSensitiveOff) {
-        // 默认的(主按钮)是删除;另一个是保留但不再增加。点框外不关开关
+        // The default (primary button) is delete; the other keeps them but adds no more. Tapping outside the dialog does not flip the switch
         MikaDialog(
             onDismissRequest = { confirmSensitiveOff = false },
             title = { Text(stringResource(R.string.proactive_learn_sensitive_off_title)) },
@@ -458,8 +460,10 @@ fun ProactiveScreen(onBack: () -> Unit) {
 }
 
 /**
- * 确认框里的话:发给谁、归纳出什么、存在哪;再按此刻的设置补上——「当日消息归纳」开着时连原文也存,
- * 激进程度不是最保守的一档时归纳出的东西还会发给执行任务的模型。这些设置关了总开关也还留着,所以每次确认都按当时的说。
+ * The text in the confirmation dialog: who it is sent to, what is digested, where it is stored; then appended according to the settings right
+ * now — with "daily notification digest" on, raw notifications are stored too, and at any level other than the most conservative, digested
+ * content is also sent to the model that runs tasks. These settings remain after the master switch is turned off, so every confirmation says
+ * what applies at that moment.
  */
 @Composable
 internal fun consentText(target: TriageTarget, digestOn: Boolean, level: LearnLevel): String = listOfNotNull(
@@ -492,15 +496,16 @@ private fun tierDesc(t: SourceTier): Int = when (t) {
     SourceTier.High -> R.string.proactive_learn_tier_high_sub
 }
 
-/** 收件箱预览里每条通知下最多显示几段之前的文字。 */
+/** How many earlier text segments are shown at most under each notification in the inbox preview. */
 private const val HISTORY_SHOWN = 5
 
-/** 主动能力每日预算的几个预设;范围照 TokenBudgetLimits。 */
+/** The presets for the proactive daily budget; ranges follow TokenBudgetLimits. */
 private val BUDGET_PRESETS = listOf(100_000L, 200_000L, 500_000L, 1_000_000L, 2_000_000L)
 
 /**
- * 诊断(默认折起):监听状态、今天的计数、判定和归纳的状态、失败的再试一次、每个 App 的归纳计数、最近收到的通知和判定结果。
- * 排查问题时用,平时不用看。计数里不显示任何通知文字;「最近的通知」显示的是还在内存里的那些。
+ * Diagnostics (collapsed by default): listener state, today's counts, the state of the decision pass and learning, retrying failures, each
+ * App's learning counters, and the recently received notifications with their decisions. For troubleshooting; no need to look at it normally.
+ * The counters show no notification text; "recent notifications" shows those still in memory.
  */
 @Composable
 private fun Diagnostics(
@@ -539,7 +544,7 @@ private fun Diagnostics(
                 else -> counts
             }
             ListRow(null, line, counts.takeIf { it != line && triage.status != TriageStatus.Sending })
-            // 连不上而停着时也给这个入口:那一批没有记成失败(失败数是 0),不给的话用户只能干等
+            // Offer this entry even when paused for unreachability: that batch was not recorded as failed (the failure count is 0), and without it the user can only wait
             if (c.failed > 0 || triage.status == TriageStatus.Unreachable) {
                 ListRow(null, stringResource(R.string.proactive_triage_retry), onClick = { runtime.retryTriage() })
             }
@@ -558,7 +563,7 @@ private fun Diagnostics(
         }
     }
 
-    // 每个 App 归纳了多少(不显示名字):联系人比名字多很多,说明通知键不是一个会话一个
+    // How much was learned per App (names are not shown): many more contacts than names means notification keys are not one per conversation
     val counted = allowed.filterNot(NoticeFilter::isSelf).sortedBy { label(it).lowercase() }
     if (counted.isNotEmpty()) {
         GroupLabel(stringResource(R.string.proactive_learn_apps))
@@ -590,7 +595,7 @@ private fun Diagnostics(
                     style = MikaType.Hint, color = MikaTheme.colors.ink3,
                 )
                 if (r.title.isNotBlank()) Text(r.title, style = MikaType.Body, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                // 同一条通知重发前显示过的话(最后一段就是下面的正文,不重复);只显示最近 HISTORY_SHOWN 段,更早的给个数
+                // Text shown before the same notification was reposted (the last segment is the body below, so it is not repeated); only the latest HISTORY_SHOWN segments are shown, earlier ones are just counted
                 val earlier = inbox.history[r.key].orEmpty().dropLast(1)
                 if (earlier.size > HISTORY_SHOWN) {
                     Text(stringResource(R.string.proactive_history_more, earlier.size - HISTORY_SHOWN), style = MikaType.Hint, color = MikaTheme.colors.ink3)
@@ -609,9 +614,10 @@ private fun Diagnostics(
 }
 
 /**
- * 一条通知的判定标签:判定 · 理由(或内置说明);失败的说失败;还没判的没有标签。理由按纯文字显示。
- * 判过(或判失败)之后又有新内容的(在冷却、或冷却过了在等再判),照旧显示上次的结果,紧跟一句「有新内容,稍后再判」
- * (放在理由前面,理由长了被截掉的也不是它)。
+ * The decision label for one notification: decision · reason (or a built-in explanation); a failure says failed; one not judged yet has no
+ * label. Reasons are shown as plain text. When new content arrives after a judge (or a judge failure) (cooling down, or cooled down and waiting
+ * to be judged again), the previous result is still shown, immediately followed by a short "new content, judged later" (placed before the
+ * reason, so a long reason being truncated never cuts it off).
  */
 @Composable
 private fun triageLabel(marks: Map<String, TriageMark>, r: NoticeRecord): String? {
@@ -627,7 +633,7 @@ private fun triageLabel(marks: Map<String, TriageMark>, r: NoticeRecord): String
     return verdictLabel((any as TriageMark.Done).verdict, null)
 }
 
-/** 判定 · [hint](有的话)· 理由(或内置说明)。 */
+/** Decision · [hint] (if any) · reason (or a built-in explanation). */
 @Composable
 private fun verdictLabel(v: TriageVerdict, hint: String?): String {
     val decision = stringResource(when (v.decision) {
