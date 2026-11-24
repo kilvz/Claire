@@ -164,7 +164,7 @@ private data class SendRequest(
 class WechatApiException(val code: Int, message: String) : IOException(message)
 class WechatHttpException(val httpCode: Int) : IOException("WeChat HTTP $httpCode")
 
-/** 微信 Bot 的 HTTPS JSON 客户端。只负责协议，不持有任务或安卓生命周期。 */
+/** HTTPS JSON client for the WeChat Bot. Only handles the protocol; it holds no task or Android lifecycle. */
 class WechatApi(
     private val client: OkHttpClient,
     private val channelVersion: String,
@@ -192,7 +192,7 @@ class WechatApi(
     fun updates(account: WechatAccount, cursor: String): WechatUpdates =
         execute(updatesRequest(account, cursor), WechatUpdates.serializer())
 
-    /** 长轮询随调用协程取消，避免停止或换账号后旧请求继续与新请求并行。 */
+    /** The long poll is cancelled along with the calling coroutine, so old requests do not keep running in parallel with new ones after a stop or an account switch. */
     suspend fun updatesCancellable(account: WechatAccount, cursor: String): WechatUpdates =
         executeCancellable(updatesRequest(account, cursor), WechatUpdates.serializer())
 

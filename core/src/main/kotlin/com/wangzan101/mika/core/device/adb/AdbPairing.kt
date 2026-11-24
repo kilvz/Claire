@@ -9,18 +9,18 @@ import javax.crypto.AEADBadTagException
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLSocket
 
-/** adbd 通过 mDNS 公布的服务类型。 */
+/** The service types adbd advertises via mDNS. */
 object AdbServiceTypes {
-    /** 「使用配对码配对」对话框开着时才公布。 */
+    /** Advertised only while the "Pair with pairing code" dialog is open. */
     const val PAIRING = "_adb-tls-pairing._tcp"
-    /** 无线调试开着时公布;端口每次开关无线调试都会变。 */
+    /** Advertised while wireless debugging is on; the port changes every time wireless debugging is toggled. */
     const val CONNECT = "_adb-tls-connect._tcp"
 }
 
-/** 在本机网络上找 adbd 公布的服务端口;找不到(超时)返回 null。 */
+/** Finds the service ports adbd advertises on this device's network; returns null when none is found (timeout). */
 /**
- * 找本机 adbd 公布的服务端口。同一服务可能查到好几条(关了又开无线调试后,旧的那条可能还留在 mDNS 里,新的改名带上序号),
- * 全部交出,先查到的在前,由调用方挨个试。
+ * Finds the service ports advertised by adbd on this device. Several entries may be found for the same service (after turning wireless debugging off and on again, the old entry may still linger in mDNS while the new one is renamed with a suffix),
+ * so all of them are returned, earliest found first, and the caller tries them one by one.
  */
 fun interface AdbServiceFinder {
     suspend fun findPorts(serviceType: String, timeoutMs: Long): List<Int>
@@ -28,23 +28,23 @@ fun interface AdbServiceFinder {
 
 class AdbPairingException(val reason: Reason, message: String, cause: Throwable? = null) : IOException(message, cause) {
     enum class Reason {
-        /** 目标不是本机自己的地址:建 Socket 前拒绝,不能按网络故障重试。 */
+        /** The target is not this device's own address: rejected before creating the Socket, must not be retried as a network failure. */
         NOT_LOCAL,
         CONNECT_FAILED, TLS_FAILED, WRONG_CODE, PROTOCOL,
     }
 }
 
-/** 配对成功时设备回报的身份(通常是 type=1 的设备 GUID)。 */
+/** The identity the device reports when pairing succeeds (usually the device GUID with type=1). */
 class AdbPeerInfo(val type: Int, val data: String)
 
 /**
- * 无线调试的配对码配对(客户端)。流程:
- * TLS 1.3 → 导出 64 字节密钥("adb-label\0")→ 口令 = 配对码 + 导出密钥 → 交换 SPAKE2 消息 →
- * 用协商出的 AES-GCM 互换 8192 字节的 PeerInfo(我们发 adb 公钥,设备回 GUID)。
- * 每个包前有 6 字节头:版本(1)、类型(0=SPAKE2,1=PEER_INFO)、负载长度(大端 uint32)。
+ * Pairing with a pairing code for wireless debugging (client side). Flow:
+ * TLS 1.3 → export a 64-byte key ("adb-label\0") → password = pairing code + exported key → exchange SPAKE2 messages →
+ * exchange 8192-byte PeerInfo using the negotiated AES-GCM (we send the adb public key, the device replies with the GUID).
+ * Every packet is preceded by a 6-byte header: version (1), type (0=SPAKE2, 1=PEER_INFO), payload length (big-endian uint32).
  */
 class AdbPairing(private val tls: AdbTls) {
-    /** 与本机设备配对;校验结果同时就是实际连接地址,不再解析原 host。 */
+    /** Pairs with the device on this machine; the validation result is also the address actually connected to, so the original host is not parsed again. */
     fun pair(host: String, port: Int, code: String, timeoutMs: Int = 15_000): AdbPeerInfo {
         val target = AdbHosts.ownSocketAddress(host, port) ?: throw AdbPairingException(
             AdbPairingException.Reason.NOT_LOCAL,
@@ -81,7 +81,7 @@ class AdbPairing(private val tls: AdbTls) {
         System.arraycopy(key, 0, info, 1, key.size)
         writePacket(output, TYPE_PEER_INFO, auth.encrypt(info))
 
-        // 配对码不对时,设备解不开我们的 PeerInfo,直接断开
+        // When the pairing code is wrong, the device cannot decrypt our PeerInfo and simply disconnects
         val sealed = try {
             readPacket(input, TYPE_PEER_INFO)
         } catch (e: IOException) {
@@ -118,7 +118,7 @@ class AdbPairing(private val tls: AdbTls) {
             out.flush()
         }
 
-        /** 读一个包并核对类型;对方在包头之前断开返回 null。 */
+        /** Reads one packet and checks its type; returns null when the peer disconnects before the header. */
         fun readPacket(input: DataInputStream, expectedType: Byte): ByteArray? {
             val header = ByteArray(6)
             try {

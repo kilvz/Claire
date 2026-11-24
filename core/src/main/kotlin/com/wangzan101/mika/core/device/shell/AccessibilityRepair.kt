@@ -12,48 +12,48 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** App 看到的 Claire 无障碍服务:系统列表里有没有它([enabled]),服务实例是否连着([connected])。 */
+/** Claire's accessibility service as the App sees it: whether it is in the system list ([enabled]) and whether the service instance is connected ([connected]). */
 data class A11yObservation(val enabled: Boolean, val connected: Boolean) {
     /**
-     * 服务没在运行,就要修:不管是系统里开着却没绑定(进程被杀后系统当它崩溃了),
-     * 还是被从系统列表里拿掉了(强行停止时系统会这样做)。用户要关掉就关「替我打开无障碍」。
+     * The service is not running, so it must be repaired: whether it is on in the system but not bound (after the process is killed the system treats it as crashed),
+     * or it was removed from the system list (the system does that on a force stop). To turn it off, the user disables "turn on accessibility for me".
      */
     val stuck: Boolean get() = !connected
 }
 
-/** 自动重启无障碍服务进行到哪一步:要用服务的一方据此决定多等一会儿还是马上放弃。 */
+/** How far the automatic restart of the accessibility service has got: a party that needs the service uses this to decide whether to wait a bit longer or give up immediately. */
 enum class RepairPhase {
-    /** 没有要修的(服务连着、用户在 Claire 里关掉了替我打开、助手不在、试过两次放弃了)。 */
+    /** Nothing to repair (the service is connected, the user turned off turn-on-for-me in Claire, the helper is not there, or it gave up after two attempts). */
     Idle,
-    /** 卡住了,先等一会儿看系统自己会不会连上。 */
+    /** Stuck; wait a while first to see whether the system connects it by itself. */
     Pending,
-    /** 正在去掉再加回、等服务连上。 */
+    /** Removing and re-adding it, waiting for the service to connect. */
     Repairing,
 }
 
-/** 上一次自动重启无障碍服务的结果(只记在内存里,给设置页说一句)。 */
+/** Result of the last automatic restart of the accessibility service (kept in memory only, to say one line on the settings page). */
 data class RepairOutcome(val restarted: Boolean, val atMillis: Long, val attempts: Int)
 
 /**
- * Claire 的无障碍服务没在运行时自动打开:内置助手在运行时,用它把 Claire 的服务写回系统列表
- * ([RecoveryPermissions.restartAccessibility]:列表里有就去掉再加回让系统重新绑定,没有就直接加上)。
- * App 自己有修改系统设置的授权时([direct])直接写,不用等助手(无线调试关着也能修)。
- * 只看三路状态:服务([A11yObservation])、内置助手和用户是否已解锁;任一变化都重新判断,不轮询。
+ * Turns Claire's accessibility service back on automatically when it is not running: while the built-in helper is running, use it to write Claire's service back into the system list
+ * ([RecoveryPermissions.restartAccessibility]: if it is in the list, remove and re-add it so the system binds it again; if not, just add it).
+ * When the App itself holds the permission to modify system settings ([direct]) it writes directly, without waiting for the helper (repair also works with wireless debugging off).
+ * Only three inputs are watched: the service ([A11yObservation]), the built-in helper, and whether the user has unlocked; any change triggers a fresh decision, with no polling.
  *
- * - 只要没在运行就修;只有用户在 Claire 里关掉了「替我打开无障碍」才不管。
- * - 开机后用户还没解锁过一次时(凭据加密的存储还没解开),不支持直接启动的服务本来就绑不上:这时不修,
- *   等用户解锁([watch] 的 unlocked 变为 true)后再判断一次,该修照样修。
- * - 刚卡住时先等 [GRACE_MS]:进程刚起来时系统通常马上会连上,不必动手。
- * - 每次卡住最多试 [MAX_ATTEMPTS] 次,间隔逐次拉长;还是没连上就停下,留给界面上手动处理的提示。
- *   服务连上了才算这一次过去,之后再断开重新计数。
+ * - Repair whenever it is not running; only a user turning off "turn on accessibility for me" in Claire makes it leave it alone.
+ * - Before the user has unlocked once since boot (the credential-encrypted storage is not yet unlocked), services that do not support direct start cannot be bound anyway: no repair then,
+ *   and once the user unlocks (unlocked of [watch] becomes true) it decides again and repairs when needed.
+ * - When it first gets stuck, wait [GRACE_MS] first: right after the process starts the system usually connects at once, so no action is needed.
+ * - Each stuck episode is tried at most [MAX_ATTEMPTS] times with growing intervals; if it still does not connect, stop and leave it to the hint for manual handling in the UI.
+ *   This episode counts as over only once the service is connected; a later disconnect starts the count again.
  */
 class AccessibilityRepair(
     private val restart: suspend (gapMs: Long) -> PermissionResult,
     private val consent: () -> RecoveryConsent,
-    /** App 自己就能写系统设置(拿到了修改系统设置的授权)时为 true:这时不用等内置助手。 */
+    /** True when the App itself can write system settings (it holds the permission to modify system settings): then the built-in helper is not waited for. */
     private val direct: () -> Boolean = { false },
     private val now: () -> Long = System::currentTimeMillis,
-    /** 明确退出后为 false:不写回无障碍;下次手动打开时 [watch] 的 active 流会重新判断。 */
+    /** False after an explicit exit: nothing is written back for accessibility; when it is turned on manually next time, the active flow of [watch] decides again. */
     private val allowed: () -> Boolean = { true },
 ) {
     private val _last = MutableStateFlow<RepairOutcome?>(null)
@@ -72,9 +72,9 @@ class AccessibilityRepair(
     )
 
     /**
-     * 一直看着,直到被取消。修的过程中状态的变化(包括自己去掉又加回)按最新的一份再判断一次。
-     * [unlocked] 是开机后用户解锁过没有;没解锁时不修,解锁时它的变化让这里再判断一次。
-     * [active] 在没有明确退出时为 true;退出和手动打开的变化也会让这里重新判断。
+     * Watches continuously until cancelled. Changes of state during a repair (including its own removal and re-adding) cause one more decision on the latest state.
+     * [unlocked] is whether the user has unlocked since boot; nothing is repaired while it is false, and its change on unlock makes this decide again.
+     * [active] is true when there has been no explicit exit; changes from exiting and from turning on manually also make this decide again.
      */
     suspend fun watch(
         service: StateFlow<A11yObservation>,
@@ -134,17 +134,17 @@ class AccessibilityRepair(
     companion object {
         const val GRACE_MS = 3_000L
         const val MAX_ATTEMPTS = 2
-        /** 去掉和加回之间的停顿,逐次拉长(1 秒、2 秒):两次写入挨得太近,系统可能只看到最后的列表。 */
+        /** Pause between the removal and the re-adding, growing each time (1 s, 2 s): when two writes are too close together, the system may only see the final list. */
         const val GAP_MS = 1_000L
         const val BACKOFF_MS = 5_000L
         const val CONNECT_TIMEOUT_MS = 8_000L
-        /** 从卡住到放弃最长要多久:先等一会儿,两次去掉再加回、各等连上,中间退避一次,再留些跑命令的余量。 */
+        /** The longest it takes from getting stuck to giving up: the initial wait, two remove-and-re-add rounds each waiting for the connect, one backoff in between, plus some margin for running commands. */
         const val WORST_CASE_MS = GRACE_MS + MAX_ATTEMPTS * CONNECT_TIMEOUT_MS + GAP_MS * 3 + BACKOFF_MS + 2_000L
 
         /**
-         * 要用无障碍服务时等它:先照常等 [baseMs];还没连上、但正要修或正在修([phase] 不是 Idle),
-         * 就接着等到连上或修的那一边停下(修好了服务已经连着,放弃了返回 null),总共不超过 [capMs]。
-         * 没有要修的就和以前一样,[baseMs] 到了返回 null。
+         * Waits for the accessibility service when it is needed: first waits [baseMs] as usual; if it is still not connected but a repair is pending or under way ([phase] is not Idle),
+         * keep waiting until it connects or the repair side stops (on success the service is already connected; on giving up it returns null), never exceeding [capMs] in total.
+         * With nothing to repair it behaves as before and returns null once [baseMs] has elapsed.
          */
         suspend fun <T : Any> awaitService(
             service: StateFlow<T?>,

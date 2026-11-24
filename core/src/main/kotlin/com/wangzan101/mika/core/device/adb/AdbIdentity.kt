@@ -24,8 +24,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Claire 自己的 adb 身份:一把 RSA-2048 钥匙 + 自签名证书。配对时把 [adbPublicKey] 交给设备,
- * 之后每次 TLS 连接都出示 [certificate](设备只比对证书里的公钥)。
+ * Claire's own adb identity: one RSA-2048 key plus a self-signed certificate. During pairing [adbPublicKey] is given to the device,
+ * and every subsequent TLS connection presents [certificate] (the device only compares the public key inside the certificate).
  */
 class AdbIdentity(val keyPair: KeyPair, val name: String) {
     val publicKey: RSAPublicKey get() = keyPair.public as RSAPublicKey
@@ -33,15 +33,15 @@ class AdbIdentity(val keyPair: KeyPair, val name: String) {
     val certificate: X509Certificate by lazy { SelfSignedCertificate.create(keyPair) }
 
     /**
-     * 设备 keystore 里的一行:base64(524 字节公钥结构) + 空格 + 名字。
-     * 名字里不能有空白:系统设置按空白切分这一行,名字带空格时「已配对的设备」里删不掉。
+     * One line in the device keystore: base64 (the 524-byte public key structure) + space + name.
+     * The name must contain no whitespace: system settings split this line on whitespace, so a name with spaces cannot be removed from "Paired devices".
      */
     val adbPublicKey: String by lazy {
         Base64.getEncoder().encodeToString(AdbPublicKey.encode(publicKey)) + " " + name.replace(Regex("\\s"), "_")
     }
 
     companion object {
-        /** 新钥匙的公开指数:F4(65537)。读回钥匙时拿不到指数就按它补,并验证补得对。 */
+        /** Public exponent of new keys: F4 (65537). When the exponent cannot be obtained while reading a key back, it is filled in with this value and the fill is verified. */
         val PUBLIC_EXPONENT: BigInteger = RSAKeyGenParameterSpec.F4
 
         fun generate(name: String): AdbIdentity {
@@ -51,8 +51,8 @@ class AdbIdentity(val keyPair: KeyPair, val name: String) {
         }
 
         /**
-         * 从存下的 PKCS#8 读回身份。不要求平台给的是带 CRT 参数的私钥:只要是 RSA 私钥就取模数,
-         * 公开指数按 [publicExponent] 找。读不出抛 [AdbKeyUnreadableException]。
+         * Reads the identity back from stored PKCS#8. It does not require the platform to provide a private key with CRT parameters: any RSA private key yields the modulus,
+         * and the public exponent is recovered via [publicExponent]. Throws [AdbKeyUnreadableException] when it cannot be read.
          */
         fun fromPkcs8(pkcs8: ByteArray, name: String): AdbIdentity {
             val kf = KeyFactory.getInstance("RSA")
@@ -67,8 +67,8 @@ class AdbIdentity(val keyPair: KeyPair, val name: String) {
         }
 
         /**
-         * 私钥对应的公开指数:平台给了 CRT 形式就直接用;否则从 PKCS#8 里的 RSAPrivateKey 结构读;
-         * 结构里没有(写的是 0)才按 [PUBLIC_EXPONENT] 补,补之前签一次名验一次,对不上就抛,不拿错的公钥去连。
+         * The public exponent for the private key: if the platform provides the CRT form, use it directly; otherwise read it from the RSAPrivateKey structure in the PKCS#8;
+         * only when it is absent there (written as 0) is [PUBLIC_EXPONENT] filled in, and before filling it in a signature is made and verified once; on mismatch it throws rather than connecting with a wrong public key.
          */
         internal fun publicExponent(key: RSAPrivateKey, pkcs8: ByteArray): BigInteger {
             (key as? RSAPrivateCrtKey)?.publicExponent?.takeIf { it.signum() > 0 }?.let { return it }
@@ -86,25 +86,25 @@ class AdbIdentity(val keyPair: KeyPair, val name: String) {
     }
 }
 
-/** 已存的钥匙在,却读不出来(解不开或解析不了)。不能悄悄换新的:设备只认配对时那一把。 */
+/** A stored key exists but cannot be read (cannot be decrypted or parsed). It must not be silently replaced: the device only accepts the one from pairing. */
 class AdbKeyUnreadableException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/** 钥匙此刻的状况(诊断信息用)。 */
+/** The key's current state (for diagnostics). */
 enum class AdbKeyState {
-    /** 这个进程里还没用过钥匙。 */
+    /** The key has not been used in this process yet. */
     NotLoaded,
-    /** 读回了已存的那把。 */
+    /** The stored key was read back. */
     Loaded,
-    /** 之前没有(或配对时换掉了读不出的那把),新建了一把并存下。 */
+    /** There was none before (or the unreadable one was replaced during pairing), so a new one was created and stored. */
     Created,
-    /** 存着一把却读不出来:要重新配对。 */
+    /** One is stored yet unreadable: pairing again is required. */
     Unreadable,
 }
 
 /**
- * 一个进程里的 adb 身份只有一份:配对和连接拿到的一定是同一把钥匙,不会因为某次读失败各用各的。
- * 只有配对([forPairing])会在存着的钥匙读不出时换一把新的(配对本来就会把新钥匙交给设备);
- * 连接([forConnect])遇到读不出就抛 [AdbKeyUnreadableException],界面据此请用户重新配对。
+ * There is only one adb identity per process: pairing and connecting always get the same key, and a failed read never leaves them each using their own.
+ * Only pairing ([forPairing]) replaces a stored key that cannot be read with a new one (pairing hands the new key to the device anyway);
+ * connecting ([forConnect]) throws [AdbKeyUnreadableException] when the key cannot be read, and the UI asks the user to pair again based on that.
  */
 class AdbIdentitySource(
     private val store: AdbKeyStore,
@@ -116,15 +116,15 @@ class AdbIdentitySource(
     @Volatile var state: AdbKeyState = AdbKeyState.NotLoaded
         private set
 
-    /** 最近一次读不出的原因(诊断信息用);读得出时为 null。 */
+    /** Reason of the most recent failed read (for diagnostics); null when it can be read. */
     @Volatile var problem: String? = null
         private set
 
-    /** 连接用:已存的那把;一把都没有就新建并存下;存着却读不出就抛,不覆盖。 */
+    /** For connecting: the stored key; if there is none, create one and store it; if one is stored but unreadable, throw instead of overwriting. */
     @Synchronized
     fun forConnect(): AdbIdentity = cached ?: load()
 
-    /** 配对用:和 [forConnect] 同一把;只有存着的读不出时,在这里换一把新的存下(随后的配对会把它交给设备)。 */
+    /** For pairing: the same key as [forConnect]; only when the stored one is unreadable is a new one created and stored here (the following pairing hands it to the device). */
     @Synchronized
     fun forPairing(): AdbIdentity = cached ?: try {
         load()
@@ -134,7 +134,7 @@ class AdbIdentitySource(
         create()
     }
 
-    /** 解除配对:钥匙和缓存一起删掉,下次配对用新钥匙。 */
+    /** Unpairing: delete the key together with the cache; the next pairing uses a new key. */
     @Synchronized
     fun forget() {
         cached = null
@@ -176,8 +176,8 @@ class AdbIdentitySource(
 }
 
 /**
- * 钥匙(PKCS#8)的存取。App 里用 Android Keystore 包一层加密存放。
- * [read] 没存过返回 null;存着却读不出抛 [AdbKeyUnreadableException](两者要分开,后者不能当作没有)。
+ * Storage for the key (PKCS#8). In the App it is stored encrypted, wrapped by a layer of Android Keystore.
+ * [read] returns null when nothing was stored; when something is stored but cannot be read it throws [AdbKeyUnreadableException] (the two must be kept apart; the latter must not be treated as absent).
  */
 interface AdbKeyStore {
     fun read(): ByteArray?
@@ -186,8 +186,8 @@ interface AdbKeyStore {
 }
 
 /**
- * 加密存放在文件里的钥匙:文件内容 = 1 字节 IV 长度 + IV + AES-GCM 密文。
- * IV 由 Cipher 自己生成(Android Keystore 的密钥不许调用方指定 IV)。
+ * A key stored encrypted in a file: file content = 1-byte IV length + IV + AES-GCM ciphertext.
+ * The IV is generated by the Cipher itself (Android Keystore keys do not allow the caller to specify an IV).
  */
 class WrappedKeyFile(private val file: File, private val wrappingKey: () -> SecretKey) : AdbKeyStore {
     override fun read(): ByteArray? {
@@ -222,8 +222,8 @@ class WrappedKeyFile(private val file: File, private val wrappingKey: () -> Secr
 }
 
 /**
- * 从 PKCS#8 里读 RSA 公开指数:PrivateKeyInfo ::= SEQUENCE { version, algorithm, privateKey OCTET STRING },
- * privateKey 里是 RSAPrivateKey ::= SEQUENCE { version, modulus, publicExponent, ... }。结构不对返回 null。
+ * Reads the RSA public exponent from PKCS#8: PrivateKeyInfo ::= SEQUENCE { version, algorithm, privateKey OCTET STRING },
+ * privateKey holds RSAPrivateKey ::= SEQUENCE { version, modulus, publicExponent, ... }. Returns null when the structure is wrong.
  */
 internal object Pkcs8Rsa {
     fun publicExponent(pkcs8: ByteArray): BigInteger? = runCatching {
@@ -235,7 +235,7 @@ internal object Pkcs8Rsa {
         BigInteger(rsa.read(0x02))
     }.getOrNull()
 
-    /** 只够读上面那几层的 DER:按顺序取指定标签的内容。 */
+    /** Just enough DER to read the levels above: takes the content of the given tag in order. */
     private class Der(private val b: ByteArray) {
         private var pos = 0
 
@@ -255,8 +255,8 @@ internal object Pkcs8Rsa {
 }
 
 /**
- * adb 的 RSA 公钥二进制格式(全部小端,共 524 字节):
- * 模数字数(64)、n0inv = −1/n mod 2^32、模数 n、rr = (2^2048)^2 mod n、公开指数。
+ * adb's RSA public key binary format (all little-endian, 524 bytes in total):
+ * modulus word count (64), n0inv = −1/n mod 2^32, modulus n, rr = (2^2048)^2 mod n, public exponent.
  */
 object AdbPublicKey {
     private const val WORDS = 64
@@ -278,7 +278,7 @@ object AdbPublicKey {
     }
 }
 
-/** 最小的自签名 X.509 v3 证书(无扩展):CN=Claire,1970-01-01 到 2099-12-31,SHA256withRSA。 */
+/** The smallest self-signed X.509 v3 certificate (no extensions): CN=Claire, 1970-01-01 to 2099-12-31, SHA256withRSA. */
 internal object SelfSignedCertificate {
     private val SHA256_WITH_RSA = byteArrayOf(0x2a, 0x86.toByte(), 0x48, 0x86.toByte(), 0xf7.toByte(), 0x0d, 0x01, 0x01, 0x0b)
     private val COMMON_NAME = byteArrayOf(0x55, 0x04, 0x03)

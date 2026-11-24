@@ -4,7 +4,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** 主屏状态,与 Agent 的虚拟屏无关。读不到状态时由端口报错,不推定已解锁。 */
+/** Main-screen state, unrelated to the Agent's virtual display. When the state cannot be read the port reports an error; being unlocked is never assumed. */
 data class DeviceState(val interactive: Boolean, val keyguardShowing: Boolean, val deviceLocked: Boolean,
     val secure: Boolean, val helperAvailable: Boolean, val userUnlocked: Boolean) {
     val ready: Boolean get() = interactive && !keyguardShowing && !deviceLocked && userUnlocked
@@ -12,7 +12,7 @@ data class DeviceState(val interactive: Boolean, val keyguardShowing: Boolean, v
 
 enum class CredentialKind { Pin, Password }
 
-/** 凭据只在本机确定性流程内短暂存在;不提供带原文的 toString。用完擦除。 */
+/** The credential exists only briefly inside the deterministic on-device flow; no toString with the plaintext is provided. Wiped when done. */
 class DeviceCredential(val kind: CredentialKind, val value: CharArray, val revision: String = "") : AutoCloseable {
     override fun close() { value.fill('\u0000') }
     override fun toString() = "DeviceCredential($kind, redacted)"
@@ -25,33 +25,33 @@ class DeviceCredential(val kind: CredentialKind, val value: CharArray, val revis
     }
 }
 
-/** 平台适配:唤醒、显示系统凭据页、确认输入目标、输入。绝不改变系统锁屏凭据。 */
+/** Platform adapter: wake, show the system credential page, confirm the input target, type. Never changes the system lock screen credential. */
 interface DeviceAccessPort {
     suspend fun state(): DeviceState
     suspend fun wake(): Boolean
     suspend fun dismiss(): Boolean
-    /** 安全锁屏还停在通知/指纹页时,尝试一次通用的系统导航来露出凭据页;不识别文字,不输入凭据。 */
+    /** When the secure lock screen is still on the notification/fingerprint page, attempts one generic system navigation to expose the credential page; recognizes no text and types no credential. */
     suspend fun revealCredential(): Boolean = false
-    /** 上滑后仍是生物识别优先页、没有凭据框时,做一次通用的回退点击(点最大的可点目标);找不到目标就不动。 */
+    /** When the biometric-first page remains after swiping up and there is no credential field, does one generic fallback tap (tapping the largest tappable target); if no target is found it does nothing. */
     suspend fun revealCredentialFallback(): Boolean = false
     suspend fun credentialReady(kind: CredentialKind): Boolean
-    /** 只读识别当前唯一的系统凭据框;未知、歧义或平台不支持时返回 null,不聚焦或输入。 */
+    /** Read-only recognition of the single system credential field currently shown; returns null when it is unknown, ambiguous, or unsupported by the platform, and neither focuses nor types. */
     suspend fun detectedCredentialKind(): CredentialKind? = null
-    /** 认不出凭据页时给出不含屏上文字和凭据的受限诊断,便于定位通用识别规则的缺口。 */
+    /** When the credential page cannot be recognized, returns restricted diagnostics containing no on-screen text and no credential, so gaps in the generic recognition rules can be located. */
     suspend fun credentialDiagnostics(): List<String> = emptyList()
     suspend fun enter(credential: DeviceCredential): Boolean
 }
 
-/** 许可和凭据来自手机设置,电脑不能修改。输入前持久化占位,失败/取消/崩溃后不再自动重试。 */
+/** Permission and credential come from the phone settings and cannot be changed by the computer. A placeholder is persisted before typing, so nothing is retried automatically after a failure, cancellation, or crash. */
 interface DeviceAccessStore {
     val enabled: Boolean
-    /** 本机任务的独立开关,与 [enabled] 互不带动;默认关。 */
+    /** A separate switch for on-device tasks, independent of [enabled]; off by default. */
     val localEnabled: Boolean get() = false
     val credentialConfigured: Boolean
     val attemptBlocked: Boolean
     fun credential(): DeviceCredential?
     fun beginAttempt(credential: DeviceCredential): Boolean
-    /** 本机任务输入凭据前落自己的占位;开关关着或已暂停时返回 false。 */
+    /** Records its own placeholder before an on-device task types the credential; returns false when the switch is off or paused. */
     fun beginLocalAttempt(): Boolean = false
     fun completeAttempt(credential: DeviceCredential)
 }
@@ -60,10 +60,10 @@ data class DeviceAccessResult(val status: String, val state: DeviceState?, val e
     val credentialConfigured: Boolean, val attemptBlocked: Boolean,
     val storedKind: CredentialKind? = null, val detectedKind: CredentialKind? = null,
     val keyguardDiagnostics: List<String> = emptyList(),
-    /** 这次流程真的把手机从熄屏/锁屏带到可用(唤醒、上滑或注入凭据);用户中途自己解开的不算。 */
+    /** This flow really brought the phone from screen-off/locked to usable (wake, swipe-up, or credential injection); a user unlocking on their own in the meantime does not count. */
     val performedUnlock: Boolean = false)
 
-/** 整个进程共用一份。并发调用串行化,成功依据系统状态,不依据按键或命令的返回码。 */
+/** One instance is shared by the whole process. Concurrent calls are serialized, and success is judged by the system state, not by key-press or command return codes. */
 class DeviceAccess(private val port: DeviceAccessPort, private val store: DeviceAccessStore,
     private val pollMs: Long = 150, private val waitMs: Long = 5_000) {
     private val mutex = Mutex()
@@ -82,13 +82,13 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
         result(if (after?.interactive == true) "awake" else "wake_failed", after)
     }
 
-    /** 远程来源(连接电脑)的解锁:只认远程开关。 */
+    /** Unlock for a remote source (a connected computer): only the remote switch applies. */
     suspend fun unlock(authorized: () -> Boolean = { true }): DeviceAccessResult = unlockUsing(local = false, authorized)
 
-    /** 本机任务(界面发起/定时)的解锁:只认本机开关,与远程开关互不影响。 */
+    /** Unlock for on-device tasks (started from the UI or by a schedule): only the on-device switch applies, independently of the remote switch. */
     suspend fun unlockLocal(authorized: () -> Boolean = { true }): DeviceAccessResult = unlockUsing(local = true, authorized)
 
-    /** 来源授权只能进一步收窄对应开关；等待锁和系统界面后、每次操作前都重新核对。 */
+    /** The source authorization can only narrow the corresponding switch further; it is re-checked before every operation, including after waiting on the lock and system UI. */
     private suspend fun unlockUsing(local: Boolean, authorized: () -> Boolean): DeviceAccessResult = mutex.withLock {
         fun allowed() = (if (local) store.localEnabled else store.enabled) && authorized()
         prepare(local, authorized)?.let { return@withLock it }
@@ -108,10 +108,10 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
         if (!port.dismiss()) return@withLock result("dismiss_failed", read())
         now = await { !allowed() || it.ready || it.secure && it.keyguardShowing } ?: return@withLock result("device_unavailable")
         if (!allowed()) return@withLock result("disabled", now)
-        // 非安全锁屏由这次流程上滑解开、或这次流程唤醒了熄屏:算这次解的;安全锁屏没输入凭据就开了是用户同时自己解的
+        // A non-secure lock screen dismissed by this flow's swipe, or a screen-off woken by this flow, counts as unlocked by this flow; a secure lock screen that opened without a credential was unlocked by the user at the same time
         if (now.ready) return@withLock result("unlocked", now, performedUnlock = woke || !wasSecure)
         if (!now.secure) return@withLock result("unlock_failed", now)
-        // 远程分流在加载凭据前先看占位,省一次解密;本机分流的独立占位在输入前由 beginLocalAttempt 原子检查
+        // The remote branch checks the placeholder before loading the credential, saving one decryption; the on-device branch's separate placeholder is checked atomically by beginLocalAttempt before typing
         if (!local && store.attemptBlocked) return@withLock result("attempt_blocked", now)
         val credential = store.credential() ?: return@withLock result("credential_required", now)
         credential.use {
@@ -126,14 +126,14 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
                 if (!allowed()) return@withLock result("disabled", current)
                 if (!current.helperAvailable) return@withLock result("helper_unavailable", current)
                 targetReady = port.credentialReady(it.kind)
-                // dismiss 后先给系统凭据页一个轮询周期;仍认不出时才做一次导航,避免在已经可用的 PIN 页上多余滑动。
+                // After dismiss, give the system credential page one polling cycle first; only if it is still unrecognized do one navigation, avoiding a needless swipe on an already usable PIN page.
                 if (!targetReady) {
                     if (!revealed && waited >= pollMs) {
                         if (!allowed()) return@withLock result("disabled", current)
                         revealed = true
                         port.revealCredential()
                     } else if (revealed && !fallbackTried && waited >= pollMs * 2) {
-                        // 上滑后仍是生物识别优先页(没有凭据框)时,再给一次回退点击的机会。
+                        // When the biometric-first page remains after swiping up (no credential field), give the fallback tap one more chance.
                         if (!allowed()) return@withLock result("disabled", current)
                         fallbackTried = true
                         port.revealCredentialFallback()
@@ -156,7 +156,7 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
             if (!allowed()) return@withLock result("disabled", read())
             val reserved = if (local) store.beginLocalAttempt() else store.beginAttempt(it)
             if (!reserved) return@withLock result("attempt_blocked", read())
-            // 从此刻起中断也保留占位,不重复输入。只有系统已解锁才清掉。
+            // From this point on, even an interruption keeps the placeholder so nothing is typed twice. It is only cleared once the system is unlocked.
             if (!allowed()) return@withLock result("disabled", read())
             if (!port.enter(it)) {
                 val after = read()

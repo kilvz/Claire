@@ -6,10 +6,10 @@ import java.net.InetSocketAddress
 import java.net.NetworkInterface
 
 /**
- * adb 只连本机自己:127/8、IPv6 回环,或本机网卡上的地址。
+ * adb only connects to this device itself: 127/8, the IPv6 loopback, or an address on one of this device's network interfaces.
  *
- * 这里不把域名交给系统解析。除精确的 `localhost`(可带一个末尾点,固定映射到 127.0.0.1)外,只收数字字面量;
- * 解析、核对和随后 Socket 实际使用的是同一个 [InetAddress],不存在校验后再解析原字符串的间隙。
+ * Domains are never handed to the system resolver here. Apart from the exact `localhost` (which may have one trailing dot and is always mapped to 127.0.0.1), only numeric literals are accepted;
+ * parsing, verification and the address the Socket then actually uses are the same [InetAddress], so there is no window in which the original string gets resolved again after validation.
  */
 object AdbHosts {
     private val LOOPBACK4 = byteArrayOf(127, 0, 0, 1)
@@ -20,7 +20,7 @@ object AdbHosts {
         val addresses: List<InetAddress>,
     )
 
-    /** 返回已核对为本机的地址;域名、非法字面量和别的机器的地址都返回 null。全程不做 DNS。 */
+    /** Returns the address once verified as this device's own; domains, invalid literals and addresses of other machines all return null. No DNS at any point. */
     fun ownAddress(host: String): InetAddress? {
         val interfaces = runCatching {
             NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().map {
@@ -30,7 +30,7 @@ object AdbHosts {
         return ownAddress(host, interfaces)
     }
 
-    /** 返回可直接交给 Socket 的已解析地址,调用方不得再用原 host 建 [InetSocketAddress]。 */
+    /** Returns an already-resolved address that can be handed straight to a Socket; the caller must not build an [InetSocketAddress] from the original host again. */
     fun ownSocketAddress(host: String, port: Int): InetSocketAddress? =
         ownAddress(host)?.let { InetSocketAddress(it, port) }
 
@@ -44,7 +44,7 @@ object AdbHosts {
 
     private fun sameAddress(target: InetAddress, local: InetAddress): Boolean {
         if (!target.address.contentEquals(local.address)) return false
-        // 不带 scope 的字面量按地址匹配;带了的必须落到同一块网卡,不能拿同名地址的另一块网卡放行。
+        // A literal without a scope matches by address; one with a scope must land on the same interface, so another interface with an identically named address must not be accepted.
         return target !is Inet6Address || local !is Inet6Address || target.scopeId == 0 || target.scopeId == local.scopeId
     }
 
@@ -57,13 +57,13 @@ object AdbHosts {
         if (host.startsWith('[') || host.endsWith(']')) {
             if (!host.startsWith('[') || !host.endsWith(']') || host.length < 3) return null
             host = host.substring(1, host.length - 1)
-            // 方括号是 IPv6 字面量写法,不是任意字符串的通用包装。
+            // Square brackets are the IPv6 literal notation, not a generic wrapper for arbitrary strings.
             if (':' !in host || '[' in host || ']' in host) return null
         }
         return if (':' in host) parseIpv6(host, interfaces) else parseIpv4(host)?.let { InetAddress.getByAddress(null, it) }
     }
 
-    /** 严格四段十进制;不收缩写、十六进制、八进制或一个整数表示的 IPv4。 */
+    /** Strictly four decimal parts; no shortened, hexadecimal, octal, or single-integer form of IPv4. */
     private fun parseIpv4(host: String): ByteArray? {
         val parts = host.split('.')
         if (parts.size != 4) return null
@@ -89,7 +89,7 @@ object AdbHosts {
             else -> interfaces.firstOrNull { it.name == zone }?.index ?: return null
         }
         val bytes = ipv6Bytes(address) ?: return null
-        // IPv4-mapped IPv6 统一成 IPv4,确保 127/8 和本机网卡比较不会被 16 字节表示绕过。
+        // IPv4-mapped IPv6 is normalized to IPv4 so that the 127/8 and local-interface comparisons cannot be bypassed by the 16-byte representation.
         if (isIpv4Mapped(bytes)) {
             if (scope != 0) return null
             return InetAddress.getByAddress(null, bytes.copyOfRange(12, 16))
@@ -100,7 +100,7 @@ object AdbHosts {
     private fun isIpv4Mapped(bytes: ByteArray): Boolean =
         (0 until 10).all { bytes[it] == 0.toByte() } && bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
 
-    /** 自行展开 IPv6,避免 InetAddress.getByName 即使对畸形数字输入也可能走系统名字解析。 */
+    /** Expands IPv6 by itself, avoiding InetAddress.getByName, which may still go through the system name resolver even for malformed numeric input. */
     private fun ipv6Bytes(address: String): ByteArray? {
         if (address.isEmpty()) return null
         val halves = address.split("::")
@@ -136,7 +136,7 @@ object AdbHosts {
         return out
     }
 
-    /** 返回 16 位组;末尾嵌入式 IPv4 占两组。 */
+    /** Returns the 16-bit groups; a trailing embedded IPv4 occupies two groups. */
     private fun ipv6Groups(text: String, allowIpv4: Boolean): List<Int>? {
         if (text.isEmpty()) return emptyList()
         val parts = text.split(':')

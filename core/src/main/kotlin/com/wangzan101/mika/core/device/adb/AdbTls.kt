@@ -12,14 +12,14 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.X509ExtendedKeyManager
 import javax.net.ssl.X509ExtendedTrustManager
 
-/** TLS 导出密钥(RFC 8446 §7.5)。JDK 没有公开接口,由平台提供:Android 上是 `SSLSockets.exportKeyingMaterial`。 */
+/** TLS keying material export (RFC 8446 §7.5). The JDK has no public interface for it, so the platform provides one: on Android it is `SSLSockets.exportKeyingMaterial`. */
 fun interface KeyingMaterialExporter {
     fun export(socket: SSLSocket, label: String, length: Int): ByteArray
 }
 
 /**
- * adb 用的 TLS 1.3:双方都出示自签名证书,互不校验证书链。
- * 配对时身份由 SPAKE2 绑定到导出密钥上;连接时由设备比对我们证书里的公钥。只连本机自己的地址。
+ * The TLS 1.3 that adb uses: both sides present self-signed certificates and neither validates the other's certificate chain.
+ * During pairing the identity is bound to the exported key by SPAKE2; when connecting, the device compares the public key in our certificate. Only this device's own addresses are connected to.
  */
 class AdbTls(
     val identity: AdbIdentity,
@@ -32,7 +32,7 @@ class AdbTls(
         ctx
     }
 
-    /** 用调用方已核对的 [target] 新建 TCP 连接并完成 TLS 握手;不重新解析主机名。 */
+    /** Opens a new TCP connection to the caller-verified [target] and completes the TLS handshake; the host name is not resolved again. */
     fun connect(target: InetSocketAddress, timeoutMs: Int): SSLSocket {
         val plain = Socket()
         try {
@@ -46,7 +46,7 @@ class AdbTls(
         return wrap(plain, target, client = true)
     }
 
-    /** 在已有连接上做 TLS 握手;[client] = false 只给测试里的假服务端用。 */
+    /** Performs the TLS handshake over an existing connection; [client] = false is only for the fake server in tests. */
     fun wrap(plain: Socket, target: InetSocketAddress, client: Boolean): SSLSocket {
         val host = target.address?.hostAddress ?: throw IllegalArgumentException("ADB address must be resolved")
         val s = context.socketFactory.createSocket(plain, host, target.port, true) as SSLSocket

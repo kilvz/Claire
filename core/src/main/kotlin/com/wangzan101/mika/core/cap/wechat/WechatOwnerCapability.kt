@@ -16,23 +16,23 @@ import com.wangzan101.mika.core.tool.str
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 把任务结果投递到机主微信的出口;绑定校验、去重与真实发送都在 app 一侧,core 只认这个接口。 */
+/** The outlet that delivers task results to the owner's WeChat; binding checks, deduplication and the actual sending all live on the app side, and core only knows this interface. */
 fun interface WechatOwnerPort {
     suspend fun send(text: String): WechatOwnerResult
 }
 
 /**
- * 一次推送的结局。[Uncertain] 是「交给渠道了但没拿到确证」,与失败一样如实告诉模型,都不许自动重发;
- * [message] 是给模型看的实话(失败原因、不可用缘由),原样进结果。
+ * The outcome of one push. [Uncertain] means "handed to the channel but no confirmation received"; like a failure it is reported truthfully to the model, and neither may be retried automatically;
+ * [message] is the truth shown to the model (failure reason, reason for being unavailable) and goes into the result verbatim.
  */
 data class WechatOwnerResult(val status: Status, val message: String? = null) {
     enum class Status { Delivered, Uncertain, Failed, Unavailable }
 }
 
-/** 一种语言的闸门模式:发送动词与机主目标都出现、且动词之前没有否定词,才算明确要发。 */
+/** Gate patterns for one language: only when both a send verb and an owner target appear, and no negation precedes the verb, does it count as an explicit request to send. */
 private class GatePattern(val verb: Regex, val target: Regex, val negation: Regex)
 
-/** 各语言的显式意图模式表;以后加语言在这里添一行。 */
+/** Table of explicit-intent patterns per language; add a row here when another language is supported later. */
 private val GATE_PATTERNS = listOf(
     GatePattern(
         verb = Regex("发送|发到|发给|推送|推给|推到|转发|传给|发"),
@@ -47,9 +47,9 @@ private val GATE_PATTERNS = listOf(
 )
 
 /**
- * 用户开局这句话([goal])是不是明确说了「把结果发到我的微信」。
- * 动词与目标各自整句匹配,不设字数距离窗口(长句照常见于真实请求);否定词只看它是否出现在发送动词之前,
- * 拿不准时不放行——这道闸只决定工具进不进供给,宁缺毋滥。
+ * Whether the user's opening sentence ([goal]) explicitly says "send the result to my WeChat".
+ * The verb and the target are each matched anywhere in the sentence, with no character-distance window (long sentences are common in real requests); a negation only counts if it appears before the send verb,
+ * and when it is not clear it does not pass — this gate only decides whether the tool is offered, so it errs on the side of exclusion.
  */
 fun explicitWechatOwnerRequest(goal: String): Boolean = GATE_PATTERNS.any { p ->
     val verb = p.verb.find(goal) ?: return@any false
@@ -58,8 +58,8 @@ fun explicitWechatOwnerRequest(goal: String): Boolean = GATE_PATTERNS.any { p ->
 }
 
 /**
- * 机主微信推送能力:用户在任务里明说「发我微信」、app 一侧又有绑定的投递出口时,才给模型 wechat_send_owner。
- * 端口为空时不出工具、不出段落(装配层据此决定装不装,见 TaskTools 里包它的匿名 Provider)。
+ * Owner WeChat push capability: wechat_send_owner is offered to the model only when the user explicitly says "send to my WeChat" in the task and the app side has a bound delivery outlet.
+ * When the port is null, neither the tool nor the section is emitted (the assembly layer uses this to decide whether to install it; see the anonymous Provider wrapping it in TaskTools).
  */
 internal class WechatOwnerCapability(private val port: WechatOwnerPort?) : Capability {
     override val id: String = WECHAT_OWNER
@@ -79,11 +79,11 @@ internal class WechatOwnerCapability(private val port: WechatOwnerPort?) : Capab
     companion object {
         const val WECHAT_OWNER = "wechat_owner"
         const val SEND_OWNER = "wechat_send_owner"
-        /** 一次推送正文的上限(字)。 */
+        /** Upper limit on the body of one push (in characters). */
         const val TEXT_MAX = 4000
         val KEY = CapabilityKey<WechatOwnerPort>(WECHAT_OWNER)
 
-        /** 行为守则:工具被供给时随系统提示词给出。 */
+        /** Behavioral guidelines: given with the system prompt when the tool is offered. */
         private const val SECTION = "WeChat owner push: the user explicitly asked for this task's result to be sent to their bound WeChat chat. " +
             "Call wechat_send_owner once, when the task is done, with only the final result and any honest uncertainty. " +
             "A delivered status means the channel accepted the text, not that the owner has read it. " +
@@ -92,7 +92,7 @@ internal class WechatOwnerCapability(private val port: WechatOwnerPort?) : Capab
     }
 }
 
-/** 这一能力的全部工具;无状态,端口在任务开局经 [WechatOwnerCapability.KEY] 进工具上下文。 */
+/** All tools of this capability; stateless, the port enters the tool context at task start via [WechatOwnerCapability.KEY]. */
 internal val wechatOwnerAgentTools: List<AgentTool> = listOf(WechatSendOwner())
 
 private class WechatSendOwner : AgentTool {
@@ -108,7 +108,7 @@ private class WechatSendOwner : AgentTool {
         listOf("text"),
     )
 
-    /** 能力没进装配(没绑定出口)时工具不在,双重确认。 */
+    /** Double confirmation: the tool is absent when the capability was not assembled (no delivery outlet bound). */
     override fun available(ctx: ToolContext) = ctx[WechatOwnerCapability.KEY] != null
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution {
