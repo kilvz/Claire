@@ -62,7 +62,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 通过真实触摸验证推开聊天页、半程取消、横向滚动优先、窄窗口/RTL 和返回层级。 */
+/** Uses real touch input to verify swiping the chat screen open, cancelling halfway, horizontal scrolling taking priority, narrow windows / RTL, and the back hierarchy. */
 @RunWith(AndroidJUnit4::class)
 class ChatDrawerGestureTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -198,7 +198,7 @@ class ChatDrawerGestureTest {
         assertClosed()
     }
 
-    /** 停住后再松手以排除惯性,按实际拖出位置验证 40% 分界,并覆盖越过中点的情况。 */
+    /** Holds still before releasing to rule out momentum, verifies the 40% threshold by the actual dragged-out position, and covers the cases past the midpoint. */
     @Test fun slowReleaseOpensAtFortyPercentAndRemainsMonotonic() {
         show()
         val drawerWidth = compose.onNodeWithTag("drawer").fetchSemanticsNode().size.width

@@ -33,8 +33,8 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 聊天页上滑离开末尾时在输入栏上方浮出「回到底部」玻璃圆按钮；
- * 点击后平滑滚回末尾（含最后一条超过一屏的情况）并隐藏按钮；右下角有小窗时避开它。
+ * When the chat screen is scrolled up away from the bottom, a glassy round "back to bottom" button floats above the input bar;
+ * tapping it smoothly scrolls back to the bottom (including when the last message is taller than one screen) and hides the button; when there is a small window in the bottom-right corner, the button avoids it.
  */
 @RunWith(AndroidJUnit4::class)
 class ChatScrollToBottomTest {

@@ -33,7 +33,7 @@ import java.util.UUID
 import com.wangzan101.mika.chat.ui.ChatViewModel
 import com.wangzan101.mika.chat.ui.TaskActions
 
-/** 文件库多选:勾两行、底部计数、全选/取消、加入待发栏。复制用假实现,不碰真实工作区。 */
+/** File library multi-select: checking two rows, the count at the bottom, select all / deselect, and adding to the pending tray. Copying uses a fake implementation and never touches the real workspace. */
 @RunWith(AndroidJUnit4::class)
 class FileLibrarySelectTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

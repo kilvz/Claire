@@ -31,8 +31,8 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 侧栏搜索:输入标题里的词、正文里的词都能列出对话;清空后回到入口和原来的列表;点结果打开那个对话。
- * 不用真机的任务环境。
+ * Drawer search: entering a word from the title or a word from the body lists the conversation; clearing it returns to the entry point and the original list; tapping a result opens that conversation.
+ * Does not need the on-device task environment.
  */
 @RunWith(AndroidJUnit4::class)
 class ChatSearchTest {
@@ -89,29 +89,29 @@ class ChatSearchTest {
         val vm = vm()
         show(vm)
 
-        // 标题命中
+        // Title match
         compose.onNodeWithTag("drawer-search").performClick().performTextInput("订票")
         awaitRow("订票")
         compose.onNodeWithText("搜索结果").assertExists()
 
-        // 正文命中:标题是「订票」,搜的是回答里的词
+        // Body match: the title is the ticket-booking one, but the search term comes from the answer
         compose.onNodeWithTag("drawer-search").performTextReplacement("验证码")
         awaitRow("订票")
         compose.onNode(hasTestTag("conversation-row") and hasText("订票"))
             .assert(hasText("验证码", substring = true))
 
-        // 什么都没有
+        // Nothing matches
         compose.onNodeWithTag("drawer-search").performTextReplacement("没有这个词")
         compose.waitUntil(5_000) {
             compose.onAllNodesWithText("没有找到「没有这个词」").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // 清空:入口回来,搜索框的清除按钮消失
+        // Clear: the entry point comes back and the search field's clear button disappears
         compose.onNodeWithTag("drawer-search-clear").performClick()
         compose.onNodeWithTag("drawer-search-clear").assertDoesNotExist()
         compose.onNodeWithContentDescription("新对话").assertExists()
 
-        // 再搜另一个对话,点结果打开它
+        // Search for another conversation, then tap the result to open it
         compose.onNodeWithTag("drawer-search").performTextReplacement("天气")
         awaitRow("查天气")
         compose.onNode(hasTestTag("conversation-row") and hasText("查天气")).performClick()

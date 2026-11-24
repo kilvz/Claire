@@ -26,7 +26,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
-/** 目录浏览与引导式连接页面的 UI 冒烟:条目渲染、搜索过滤、自定义入口、预设页只呈现声明字段。 */
+/** UI smoke test for catalog browsing and the guided connect page: item rendering, search filtering, the custom entry point, and the preset page showing only the declared fields. */
 @RunWith(AndroidJUnit4::class)
 class McpCatalogScreenTest {
     @get:Rule val compose = createComposeRule()
@@ -92,7 +92,7 @@ class McpCatalogScreenTest {
         compose.setContent { McpConnectScreen(connector, onDone = {}, onBack = {}) }
         compose.onNodeWithText("Tenant").assertIsDisplayed()
         compose.onNodeWithText("Token").assertIsDisplayed()
-        // 预设页不展示端点/transport,也不自行拼 URL。
+        // The preset page does not show the endpoint/transport and does not build a URL itself.
         compose.onAllNodesWithText("https://example.com/mcp").assertCountEquals(0)
         compose.onNodeWithTag("mcp-connect-action").assertIsDisplayed()
     }

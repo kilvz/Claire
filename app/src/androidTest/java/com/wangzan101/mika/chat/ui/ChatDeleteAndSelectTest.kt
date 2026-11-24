@@ -50,8 +50,8 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 侧栏长按一条对话在原地弹出菜单(置顶、改名、删除,点外面收起):删除先确认、删掉、列表当场更新;改名后列表换成新名字;置顶后排到最上面带图钉。
- * 还有对话页里长按回答、用户的话弹出复制 / 引用 / 选择文字:选择文字后能选中,引用随下一句话发出去。不用真机的任务环境。
+ * Long-pressing a conversation in the drawer opens a menu in place (pin, rename, delete; tapping outside dismisses it): delete asks for confirmation first, then deletes, and the list updates immediately; after a rename the list shows the new name; after pinning, the row moves to the top with a pin icon.
+ * Also covers long-pressing an answer or a user message on the chat screen to get copy / quote / select text: after selecting text the message becomes selectable, and a quote is sent along with the next message. Does not need the on-device task environment.
  */
 @RunWith(AndroidJUnit4::class)
 class ChatDeleteAndSelectTest {
@@ -182,7 +182,7 @@ class ChatDeleteAndSelectTest {
             .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
         assertTrue(body, "天气" in body && "停止" in body && "2" in body && "保留" in body)
 
-        // 取消:什么都不删
+        // Cancel: nothing is deleted
         compose.onNodeWithText("取消").performClick()
         compose.waitForIdle()
         assertTrue(removed.isEmpty())
@@ -197,7 +197,7 @@ class ChatDeleteAndSelectTest {
         compose.onNodeWithText("订票").assertExists()
     }
 
-    /** 多选批量删除:顶部「多选」进入,勾选 / 全选,底部写着已选几条;确认弹窗写明删几个、停几个任务;删完列表当场只剩没选的。 */
+    /** Multi-select bulk delete: entered through the "Select" item at the top, with row checkboxes and select all / deselect all, and a selected count at the bottom; the confirmation dialog states how many conversations will be deleted and how many tasks stopped; after deleting, only the unselected conversations remain in the list. */
     @Test fun selectModeDeletesSeveralChatsAtOnce() {
         listOf("a" to "天气", "b" to "订票", "c" to "周报").forEach { (id, title) ->
             store.append(id, Turn("说说 $title", "好", "succeeded"))
@@ -206,24 +206,24 @@ class ChatDeleteAndSelectTest {
         val vm = vm(DeleteImpact(runningTask = true, schedules = 2))
         show(vm, drawerOpen = true)
 
-        // 上游已将多选入口移到会话的长按菜单,并默认选中该会话。
+        // Upstream has moved the multi-select entry point into the conversation's long-press menu and selects that conversation by default.
         compose.onNodeWithText("天气").performTouchInput { longClick() }
         compose.onNodeWithTag("drawer-menu-select").performClick()
         compose.onNodeWithText("已选 1 条").assertExists()
         compose.onNode(hasTestTag("conversation-row") and hasText("天气")).performClick()
         compose.waitForIdle()
-        // 每行左边出现勾选框;点一行是勾选,不再是打开对话
+        // A checkbox appears on the left of each row; tapping a row toggles selection instead of opening the conversation
         compose.onAllNodesWithTag("conversation-check", useUnmergedTree = true).assertCountEquals(3)
         compose.onNodeWithText("已选 0 条").assertExists()
         compose.onNodeWithTag("drawer-delete-selected").assertIsNotEnabled()
 
-        // 全选 / 取消全选
+        // Select all / deselect all
         compose.onNodeWithTag("drawer-select-all").performClick()
         compose.onNodeWithText("已选 3 条").assertExists()
         compose.onNodeWithTag("drawer-select-all").performClick()
         compose.onNodeWithText("已选 0 条").assertExists()
 
-        // 勾两条
+        // Check two of them
         compose.onNode(hasTestTag("conversation-row") and hasText("天气")).performClick()
         compose.onNode(hasTestTag("conversation-row") and hasText("周报")).performClick()
         compose.onNodeWithText("已选 2 条").assertExists()
@@ -234,7 +234,7 @@ class ChatDeleteAndSelectTest {
             .getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.joinToString { it.text }.orEmpty()
         assertTrue(body, "2" in body && "停止" in body && "4" in body && "保留" in body)
 
-        // 取消:什么都不删,还在多选里
+        // Cancel: nothing is deleted and we stay in multi-select
         compose.onNodeWithTag("dismiss-delete-many-conversation").performClick()
         compose.waitForIdle()
         assertTrue(removed.isEmpty())
@@ -249,14 +249,14 @@ class ChatDeleteAndSelectTest {
         assertEquals(0, compose.onAllNodesWithText("周报").fetchSemanticsNodes().size)
         compose.onNode(hasScrollAction() and hasAnyAncestor(hasTestTag("drawer"))).performScrollToNode(hasText("订票"))
         compose.onNodeWithText("订票").assertExists()
-        // 删完自动退出多选
+        // After deleting, multi-select exits automatically
         compose.onNodeWithTag("drawer-select-bar").assertDoesNotExist()
         compose.onNodeWithTag("drawer-select-cancel").assertDoesNotExist()
         compose.onNode(hasTestTag("conversation-row") and hasText("订票")).performClick()
         compose.waitUntil(5_000) { vm.ui.value.conversationId == "b" }
     }
 
-    /** 长按在原地弹出菜单:抬起的那一行(还是那个标题)和三项置顶、改名、删除;只是打开菜单什么都不改。 */
+    /** Long-pressing pops the menu up in place: the row that was pressed (with the same title) plus the three items pin, rename, and delete; merely opening the menu changes nothing. */
     @Test fun longPressShowsTheThreeActions() {
         store.append("a", Turn("查天气", "晴", "succeeded"))
         store.setTitle("a", "天气")
@@ -268,13 +268,13 @@ class ChatDeleteAndSelectTest {
         compose.onNodeWithTag("drawer-menu-rename").assert(hasText("改名"))
         compose.onNodeWithTag("drawer-menu-delete").assert(hasText("删除"))
         compose.onNodeWithText("取消置顶").assertDoesNotExist()
-        // 菜单开着时后面的内容不给无障碍读,只剩抬起的那一行
+        // While the menu is open, the content behind it is hidden from accessibility, leaving only the pressed row
         assertEquals(1, compose.onAllNodesWithText("天气").fetchSemanticsNodes().size)
         assertEquals("天气", store.title("a"))
         assertEquals(null, store.pinnedAt("a"))
     }
 
-    /** 点菜单外面收起菜单,什么都不改;侧栏里那一行还在。 */
+    /** Tapping outside the menu dismisses it without changing anything; that row is still in the drawer. */
     @Test fun tappingOutsideClosesTheMenu() {
         store.append("a", Turn("查天气", "晴", "succeeded"))
         store.setTitle("a", "天气")
@@ -282,7 +282,7 @@ class ChatDeleteAndSelectTest {
 
         compose.onNodeWithText("天气").performTouchInput { longClick() }
         compose.onNodeWithTag("drawer-menu-pin").assertExists()
-        // 右下角:菜单靠左接在那一行下面,碰不到
+        // Bottom right corner: the menu is anchored to the left just below that row, so it cannot be hit here
         compose.onNodeWithTag("drawer-menu").performTouchInput { click(percentOffset(0.95f, 0.95f)) }
         compose.waitForIdle()
         compose.onNodeWithTag("drawer-menu").assertDoesNotExist()
@@ -293,7 +293,7 @@ class ChatDeleteAndSelectTest {
         assertEquals(null, store.pinnedAt("a"))
     }
 
-    /** 改名:输入框里是现在的标题,换成新的保存;列表当场换名字,存下的也是新的。 */
+    /** Rename: the field holds the current title; replace it and save; the list shows the new name immediately and the stored title is the new one as well. */
     @Test fun renameUpdatesTheRow() {
         store.append("a", Turn("查天气", "晴", "succeeded"))
         store.setTitle("a", "天气")
@@ -310,11 +310,11 @@ class ChatDeleteAndSelectTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithText("上海出行").fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, compose.onAllNodesWithText("天气").fetchSemanticsNodes().size)
         assertEquals("上海出行", store.title("a"))
-        // 之后才到的起好的标题不盖掉
+        // A title that arrives later does not overwrite it
         assertTrue(!store.setTitle("a", "天气"))
     }
 
-    /** 置顶:排到「置顶」一段最上面、带图钉;再取消置顶回到「最近」。 */
+    /** Pin: the row moves to the top of the pinned section with a pin icon; unpinning returns it to recent. */
     @Test fun pinMovesTheRowToTheTop() {
         store.append("a", Turn("查天气", "晴", "succeeded"))
         store.setTitle("a", "天气")
@@ -338,7 +338,7 @@ class ChatDeleteAndSelectTest {
         assertEquals(null, store.pinnedAt("a"))
     }
 
-    // 长按消息弹出菜单;选「选择文字」后那条换回系统的长按选中,侧栏不跟着打开
+    // Long-pressing a message opens the menu; after choosing "Select text" that message switches back to the system's long-press selection, and the drawer does not open along with it
     @Test fun answerAndUserTextAreSelectableFromTheMenu() {
         store.append("s", Turn("今天天气怎么样", "上海今天**晴**,详见 [天气](https://example.com)", "succeeded"))
         val vm = vm()
@@ -362,7 +362,7 @@ class ChatDeleteAndSelectTest {
         compose.onNode(hasText("今天天气怎么样") and hasAnyAncestor(hasTestTag("selectable-user"))).assertExists()
     }
 
-    // 长按回答选「引用」:输入框上方出现引用小条,写一句发出去,引用跟着这句话交给任务,小条消失;气泡上方显示引的那条
+    // Long-press an answer and choose "Quote": a quote chip appears above the input box; type a message and send it, the quote is handed to the task along with that message, and the chip disappears; the quoted message is shown above the bubble
     @Test fun longPressQuoteThenSend() {
         store.append("q", Turn("今天天气怎么样", "上海今天**晴**", "succeeded"))
         val vm = vm()
@@ -383,13 +383,13 @@ class ChatDeleteAndSelectTest {
         compose.onNodeWithTag("quote-chip").assertDoesNotExist()
         compose.onNodeWithTag("sent-quote").assertExists()
 
-        // × 去掉引用
+        // The × removes the quote
         compose.runOnUiThread { vm.quote(QuoteMessage.From.You, "今天天气怎么样") }
         compose.onNodeWithContentDescription("去掉引用").performClick()
         compose.onNodeWithTag("quote-chip").assertDoesNotExist()
     }
 
-    // 长按一条答完的回答「从这里分支」:复制到这一轮(含),切到新对话,标题带后缀,原对话不变
+    // Long-press a finished answer and choose "Branch from here": everything up to and including this turn is copied, the app switches to a new conversation whose title has a suffix, and the original conversation is unchanged
     @Test fun branchFromAnAnswerOpensTheCopiedChat() {
         store.append("s", Turn("今天天气怎么样", "上海今天晴", "succeeded"))
         store.append("s", Turn("那明天呢", "明天多云", "succeeded"))
@@ -406,11 +406,11 @@ class ChatDeleteAndSelectTest {
         assertEquals("今天天气怎么样 · 分支", store.title(branch))
         assertEquals(store.branchOrigin(branch)?.parentId, "s")
         assertEquals(listOf("今天天气怎么样", "那明天呢"), vm.ui.value.exchanges.map { it.goal })
-        // 原对话还是两轮
+        // The original conversation still has two turns
         assertEquals(2, store.turns("s").size)
     }
 
-    // 长按自己说过的话「从这里重新问」:复制这一轮之前,输入框预填原话,不自动发送
+    // Long-press something you said and choose "Ask again from here": everything before this turn is copied, the input box is prefilled with the original text, and nothing is sent automatically
     @Test fun retryFromAUserMessagePrefillsTheNewChat() {
         store.append("s", Turn("今天天气怎么样", "上海今天晴", "succeeded"))
         store.append("s", Turn("那明天呢", "明天多云", "succeeded"))

@@ -44,14 +44,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** 对话页的附件:「＋」的回调、相册页、输入框上方待发的那一排、发出去的消息怎么画。 */
+/** Attachments on the chat screen: the "+" callback, the photo album page, the row of pending attachments above the input box, and how sent messages are drawn. */
 @RunWith(AndroidJUnit4::class)
 class ChatAttachmentsTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    /** 假的图:每张都是一块 40×30 的空图,不读手机。 */
+    /** Fake images: each one is a blank 40×30 bitmap; nothing is read from the phone. */
     private val images = AttachImages { _, _ -> ImageBitmap(40, 30) }
 
     private fun composer(
@@ -256,7 +256,7 @@ class ChatAttachmentsTest {
     }
 
     @Test fun plusSheetOmitsRedundantSubtitlesAndShortensBrowser() {
-        // 避免「首次打开弹照片权限」打断断言
+        // Avoid the photo-permission prompt on first open interrupting the assertions
         RecentPhotos.markAsked(compose.activity)
         compose.setContent {
             MikaTheme {
@@ -278,13 +278,13 @@ class ChatAttachmentsTest {
                 )
             }
         }
-        // 冗余副标题删掉
+        // The redundant subtitles are gone
         compose.onAllNodesWithText("现在拍一张").assertCountEquals(0)
         compose.onAllNodesWithText("存一份待办清单").assertCountEquals(0)
         compose.onAllNodesWithText("跑一条已存的多步骤任务").assertCountEquals(0)
-        // 保留的副标题还在
+        // The kept subtitle is still there
         compose.onNodeWithText("从相册选,可多选").assertExists()
-        // 浏览器副标题精简成「内置浏览器」
+        // The browser subtitle is shortened to the built-in browser label
         compose.onNodeWithText("内置浏览器").assertExists()
     }
 

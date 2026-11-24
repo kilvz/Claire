@@ -38,8 +38,8 @@ import java.util.Collections
 import kotlin.coroutines.resume
 
 /**
- * 真机测试:任务里真实的网页接管路径。接管状态机 → 任务的接管端口(和 TaskRun 里同样委托给 [WebStack])
- * → 标签锁住、同一个页面到主屏 → 用户点「处理好了」→ 交还状态机 → 标签放回、解锁、计数与登录标记交给 Agent。
+ * On-device test: the real web takeover path inside a task. Takeover state machine → the task's takeover port (delegating to [WebStack] just as TaskRun does)
+ * → the tab is locked and the same page moves to the main screen → the user taps "Done" → control returns to the state machine → the tab is put back, unlocked, and the count plus the login marker are handed to the Agent.
  */
 @RunWith(AndroidJUnit4::class)
 class WebStackTakeoverTest {
@@ -60,7 +60,7 @@ class WebStackTakeoverTest {
                 .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(instr.context)).build()
             stack = WebStack.create(ctx, "run-1", bounds.width(), bounds.height(), ctx.resources.displayMetrics.densityDpi, listOf(loader))
         }
-        // 和 TaskRun 的接管端口一样:网页部分交给 WebStack,按钮动作交回状态机
+        // Same as TaskRun's takeover port: the web part is delegated to WebStack, button actions go back to the state machine
         val port = object : TakeoverPort {
             override suspend fun agentTopTask() = -1
             override suspend fun targetTask() = -1
@@ -134,7 +134,7 @@ class WebStackTakeoverTest {
         assertTrue(takeover.handOver())
         assertNotNull(DeviceSupport.pollUntil(5_000) { displayOf(tab)?.takeIf { it == Display.DEFAULT_DISPLAY } })
         assertTrue(withContext(Dispatchers.Main) { stack.pool.isLocked(tab.id) })
-        // 用户手上的页面 Agent 动不了
+        // The Agent cannot touch the page that is in the user's hands
         assertEquals(ActionResult.Failed("handed_over"), s.tapXY(10, 10))
         assertEquals("请登录示例商城\n金额:9.90", WebHandover.session.value?.message)
         assertEquals("\"填了一半\"", js(tab, "document.getElementById('plain').value"))

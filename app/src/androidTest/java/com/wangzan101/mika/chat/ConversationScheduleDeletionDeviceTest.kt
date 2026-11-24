@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 真机走 App 的生产接线与真实文件:删历史不删计划,保留下来的提醒只写一段新历史。 */
+/** On a real device, exercises the app's production wiring and real files: deleting the history does not delete the schedule, and the retained reminder writes only one fresh piece of history. */
 @RunWith(AndroidJUnit4::class)
 class ConversationScheduleDeletionDeviceTest {
     @Test

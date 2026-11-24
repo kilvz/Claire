@@ -24,8 +24,8 @@ import kotlin.coroutines.resume
 import com.wangzan101.mika.core.workspace.SandboxTree
 
 /**
- * 真机测试:网页下载落到工作区的 downloads/,上传只交工作区文件。用本地夹具里的 blob: 下载(不依赖外网);
- * http(s) 下载的 Cookie、上限、状态由 JVM 的 WebDownloadsTest 用 MockWebServer 覆盖(真机上明文本地服务被系统挡住)。
+ * On-device test: web downloads land in the workspace's downloads/, and uploads only hand over workspace files. Uses blob: downloads from a local fixture (no external network);
+ * Cookie handling, limits, and status for http(s) downloads are covered by the JVM WebDownloadsTest with MockWebServer (plain-text local servers are blocked by the system on a real device).
  */
 @RunWith(AndroidJUnit4::class)
 class WebFilesTest {
@@ -36,7 +36,7 @@ class WebFilesTest {
 
     @Before
     fun setUp() {
-        // 和真的一样放在沙箱的 work/ 下;上传交给页面的是缓存里中转区的副本
+        // Placed under the sandbox's work/ just like the real thing; the upload hands the page a copy from the cache staging area
         ws = File(ctx.filesDir, "sandbox/work/c-webfiles-test").apply { deleteRecursively(); mkdirs() }
         val bounds = ctx.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
         instr.runOnMainSync {
@@ -87,7 +87,7 @@ class WebFilesTest {
         val d = DeviceSupport.pollUntil(10_000) { runBlocking { stack.screen.downloads() }.firstOrNull { it.status == "done" } }
         assertNotNull(d)
         assertTrue(d!!.file, d.file.startsWith("/workspace/downloads/") && ".." !in d.file && d.file.count { it == '/' } == 3)
-        // 工作区里除了 downloads/ 没多出别的东西,工作区外更没有
+        // Nothing besides downloads/ appeared in the workspace, and certainly nothing outside it
         assertEquals(listOf("downloads"), ws.list()!!.toList())
         assertFalse(File(ws.parentFile, "x.sh").exists())
     }
@@ -114,14 +114,14 @@ class WebFilesTest {
         assertTrue("$r", r is ActionResult.Ok)
         assertTrue((r as ActionResult.Ok).hint!!.contains("photo.txt"))
         assertNotNull(DeviceSupport.pollUntil(5_000) { runBlocking { js("window.picked") }.takeIf { it == "\"photo.txt:5\"" } })
-        // 页面拿到的是中转区的副本;任务结束时删掉
+        // The page receives a copy from the staging area; it is deleted when the task ends
         val staging = File(ctx.cacheDir, UploadStaging.DIR)
         assertEquals(1, staging.list().orEmpty().size)
         instr.runOnMainSync { stack.close() }
         assertTrue(staging.list().orEmpty().isEmpty())
     }
 
-    /** 工作区里的硬链接(可能链着 Claire 的私有文件)不交给页面,也不留副本。 */
+    /** Hard links inside the workspace (which may link to Claire's private files) are not handed to the page, and no copy is left behind. */
     @Test
     fun uploadRefusesHardLinkedFiles() = runBlocking<Unit> {
         val secret = File(ctx.filesDir, "webfiles-secret.txt").apply { writeText("secret") }
@@ -151,7 +151,7 @@ class WebFilesTest {
         Thread.sleep(500)
         assertEquals("null", js("window.picked"))
         assertEquals(1, withContext(Dispatchers.Main) { stack.pool.current("run-files")!!.choosersRefused })
-        // 页面照常能操作
+        // The page can still be operated as usual
         assertTrue(tap("blobcsv") is ActionResult.Ok)
     }
 }

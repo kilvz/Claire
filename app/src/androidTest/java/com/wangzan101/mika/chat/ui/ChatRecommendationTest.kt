@@ -25,7 +25,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.UUID
 
-/** 空输入框可直接填推荐任务;已有草稿时,误触只会询问,明确确认后才替换。 */
+/** With an empty input box a recommended task can be filled in directly; when a draft already exists, an accidental tap only asks, and the draft is replaced only after an explicit confirmation. */
 @RunWith(AndroidJUnit4::class)
 class ChatRecommendationTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

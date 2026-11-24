@@ -11,9 +11,9 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 /**
- * 真机测试里把 Claire 的界面固定成简体中文(断言写的是简体中文):安卓 13 起经系统的「应用语言」临时换成简体中文,测完换回;
- * 要放在最外层(`@get:Rule(order = Int.MIN_VALUE)`),在界面起来之前换好。
- * 安卓 12 及以前没有单个 App 的语言,测试界面跟着系统:请在简体中文系统上跑。
+ * Pins Claire's UI to Simplified Chinese for on-device tests (the assertions are written in Simplified Chinese): from Android 13 on, it temporarily switches to Simplified Chinese through the system's "app languages" and switches back after the test;
+ * it must be placed outermost (`@get:Rule(order = Int.MIN_VALUE)`) so the switch happens before the UI comes up.
+ * Android 12 and earlier have no per-app language, so the test UI follows the system: run those on a Simplified Chinese system.
  */
 class ChineseUi : TestRule {
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
