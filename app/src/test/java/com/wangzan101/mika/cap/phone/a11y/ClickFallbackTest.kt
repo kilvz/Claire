@@ -37,10 +37,10 @@ class ClickFallbackTest {
         assertFalse(ClickFallback.mayBeOutward("Repositories", null))
         assertFalse(ClickFallback.mayBeOutward("设置", "com.app:id/settings_tab"))
 
-        // 可点控件的名字长也照样认:点之前的不可逆判定不看总长,没名字的容器拿的是子节点的字连起来的
+        // A long name on a clickable control is still recognised: the irreversible pre-click check ignores total length, and a container without a name uses its children's text joined together
         assertTrue(ClickFallback.mayBeOutward("Send message to Alice Johnson", null))
         assertTrue(ClickFallback.mayBeOutward("立即支付 ¥1,299.00 (含运费¥12.00)", null))
-        // 不可点的长正文不拦;开关词按包含比,长的不查
+        // Long body text that is not clickable is not blocked; toggle words are matched by containment, so long ones are not checked
         assertFalse(ClickFallback.mayBeOutward("Post-processing runs on every frame before it is shown", null, clickable = false))
         assertFalse(ClickFallback.mayBeOutward("关注我们的公众号,每周推送最新的开源项目和工具教程", null))
 
@@ -48,7 +48,7 @@ class ClickFallbackTest {
         assertNull(ClickFallback.pickTarget(900, 2160, w, h, listOf(sendBtn)))
     }
 
-    /** 开关类按钮点第二次会把刚打开的状态关回去(自绘图标在画面上又看不出变化),只能靠名字拦。 */
+    /** Clicking a toggle-style button a second time turns the state that was just switched on back off (a custom-drawn icon shows no visible change in the frame either), so it can only be blocked by name. */
     @Test fun statefulTogglesAreNotRetriedOnSecondChannel() {
         assertTrue(ClickFallback.mayBeOutward("收藏", null))
         assertTrue(ClickFallback.mayBeOutward("已关注", null))

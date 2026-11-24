@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PageLoansTest {
-    /** 任务一侧:记下做了什么;[accept]/[adopts] 决定借不借得进、收不收下。 */
+    /** The task side: records what was done; [accept]/[adopts] decide whether the page can be borrowed in and whether it is adopted. */
     private class Task(var accept: Boolean = true, var adopts: Boolean = true) : PageLoans.Borrower<String> {
         val log = mutableListOf<String>()
         override fun take(tab: String) = accept.also { log += "take $tab" }
@@ -27,7 +27,7 @@ class PageLoansTest {
         val l = loans.claim("c1", "r1", "tab")!!
         assertEquals("c1", loans.lentTo.value)
         assertNull(loans.offeredTo)
-        // 已经借出:别的任务、同一对话再来都借不到(答应的已用掉)
+        // Already lent out: another task or the same conversation coming back cannot borrow it (the promise has been used up)
         loans.offer("c1")
         assertNull(loans.claim("c1", "r3", "tab"))
         val t = Task()
@@ -47,7 +47,7 @@ class PageLoansTest {
         assertNull(loans.current)
         assertNull(loans.lentTo.value)
         assertEquals(listOf("take tab", "give tab"), t.log)
-        // 还回来之后摸页面、关页面都和任务无关
+        // After it is given back, touching and closing the page have nothing to do with the task
         loans.touched("tab")
         assertFalse(loans.closing("tab"))
         assertEquals(2, t.log.size)
@@ -89,12 +89,12 @@ class PageLoansTest {
         val loans = PageLoans<String>()
         loans.offer("c1")
         val l = loans.claim("c1", "r1", "tab")!!
-        // 任务还没接上,页面就关了:浏览器页自己关掉它
+        // The page is closed before the task is attached: the browser page closes it itself
         assertFalse(loans.closing("tab"))
         val t = Task()
         assertFalse(loans.bind(l, t))
         assertEquals(emptyList<String>(), t.log)
-        // 答应了还没取走时关页面:答应的作废
+        // Closing the page while an offer is accepted but not yet taken: the offer is voided
         loans.offer("c2")
         loans.closing("other")
         assertNull(loans.claim("c2", "r2", "tab"))

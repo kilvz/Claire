@@ -16,7 +16,7 @@ class CustomSearchEngineTest {
         assertNull(CustomSearchEngine.create("Example", "ftp://example.com/?q=%s"))
         assertNull(CustomSearchEngine.create("Example", "not a url %s"))
         assertNull(CustomSearchEngine.create("Example", "https://example.com/?q=%s extra"))
-        // 占位符要在主机名后面
+        // The placeholder must come after the host name
         assertNull(CustomSearchEngine.create("Example", "https://%s.example.com/?q=x"))
     }
 
