@@ -746,7 +746,8 @@ internal fun VoiceSheetHost(vh: VoiceHold, onPickSpeech: () -> Unit) {
     val action: String
     val go: () -> Unit
     // Built-in recognizer missing: offer to install it — the Play Store page
-    // for "Speech Services by Google". The Google app alone is not the recognizer.
+    // for "Speech Recognition & Synthesis" (formerly "Speech Services by Google").
+    // The Google app alone is not the recognizer.
     var install: (() -> Unit)? = null
     when (sheet) {
         is VoiceSheet.Unavailable -> {

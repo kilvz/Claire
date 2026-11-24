@@ -29,9 +29,9 @@
     <string name="voice_unavailable_title">還不能語音輸入</string>
     <string name="voice_unavailable_no_engine">這臺手機沒有自帶的語音辨識，也還沒選轉文字的模型。到「設定 › 模型 › 語音轉文字」選一個服務商的語音模型就能用。</string>
     <string name="voice_unavailable_system_gone">語音轉文字選的是手機自帶的辨識，這臺手機現在沒有。到「設定 › 模型 › 語音轉文字」換一個就能用。</string>
-    <string name="voice_unavailable_built_in_missing">自帶辨識會把你的聲音轉成文字，這樣你就能直接對 Claire 說話，不用打字。但這臺手機沒有安裝語音辨識服務，所以自帶辨識用不了。安裝「Google 語音服務」就能用 —— 光裝 Google 應用是不夠的。也可以到「設定 › 模型 › 語音轉文字」選一個服務商的語音模型。</string>
+    <string name="voice_unavailable_built_in_missing">自帶辨識會把你的聲音轉成文字，這樣你就能直接對 Claire 說話，不用打字。但這臺手機沒有安裝語音辨識服務，所以自帶辨識用不了。安裝「Speech Recognition &amp; Synthesis」（原「Google 語音服務」）就能用 —— 光裝 Google 應用是不夠的。也可以到「設定 › 模型 › 語音轉文字」選一個服務商的語音模型。</string>
     <string name="voice_get_speech_service">安裝語音服務</string>
-    <string name="voice_speech_service_store_failed">打不開「Google 語音服務」的 Play 商店頁面。請在 Play 商店裡找到它並安裝。</string>
+    <string name="voice_speech_service_store_failed">打不開「Speech Recognition &amp; Synthesis」（原「Google 語音服務」）的 Play 商店頁面。請在 Play 商店裡找到它並安裝。</string>
     <string name="voice_unavailable_system_silent">手機自帶的語音辨識沒有回應，聽不到字。到「設定 › 模型 › 語音轉文字」選一個服務商的語音模型就能用。</string>
     <string name="voice_unavailable_system_failed">手機自帶的語音辨識沒能啟動。可以再試一次，或到「設定 › 模型 › 語音轉文字」換一種辨識方式。</string>
     <string name="voice_service_permission_title">手機的語音辨識還不能錄音</string>

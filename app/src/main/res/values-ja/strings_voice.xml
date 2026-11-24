@@ -30,9 +30,9 @@
     <string name="voice_unavailable_title">音声入力の準備ができていません</string>
     <string name="voice_unavailable_no_engine">このスマホには内蔵の音声認識がなく、音声文字変換のモデルも選ばれていません。「設定 › モデル › 音声文字変換」でプロバイダーの音声モデルを選ぶと使えます。</string>
     <string name="voice_unavailable_system_gone">音声文字変換はスマホ内蔵の音声認識に設定されていますが、このスマホには今はありません。「設定 › モデル › 音声文字変換」で別のものを選んでください。</string>
-    <string name="voice_unavailable_built_in_missing">内蔵の音声認識はあなたの声をテキストに変えるので、入力する代わりに Claire に話しかけられます。でもこのスマホには音声認識サービスがインストールされていないので、内蔵の音声認識は使えません。「Speech Services by Google」をインストールすれば使えるようになります。Google アプリだけでは含まれていません。「設定 › モデル › 音声文字変換」でプロバイダーの音声モデルを選ぶこともできます。</string>
+    <string name="voice_unavailable_built_in_missing">内蔵の音声認識はあなたの声をテキストに変えるので、入力する代わりに Claire に話しかけられます。でもこのスマホには音声認識サービスがインストールされていないので、内蔵の音声認識は使えません。「Speech Recognition &amp; Synthesis」をインストールすれば使えるようになります。Google アプリだけでは含まれていません。「設定 › モデル › 音声文字変換」でプロバイダーの音声モデルを選ぶこともできます。</string>
     <string name="voice_get_speech_service">音声サービスを入手</string>
-    <string name="voice_speech_service_store_failed">「Speech Services by Google」の Play ストアのページを開けませんでした。Play ストアで見つけてインストールしてください。</string>
+    <string name="voice_speech_service_store_failed">「Speech Recognition &amp; Synthesis」の Play ストアのページを開けませんでした。Play ストアで見つけてインストールしてください。</string>
     <string name="voice_unavailable_system_silent">スマホ内蔵の音声認識が応答せず、言葉が届きませんでした。「設定 › モデル › 音声文字変換」でプロバイダーの音声モデルを選ぶと使えます。</string>
     <string name="voice_unavailable_system_failed">スマホ内蔵の音声認識を開始できませんでした。もう一度試すか、「設定 › モデル › 音声文字変換」で別の認識方法を選んでください。</string>
     <string name="voice_service_permission_title">スマホの音声認識がまだ録音できません</string>

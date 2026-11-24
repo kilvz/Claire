@@ -29,9 +29,9 @@
     <string name="voice_unavailable_title">还不能语音输入</string>
     <string name="voice_unavailable_no_engine">这台手机没有自带的语音识别，也还没选转文字的模型。到「设置 › 模型 › 语音转文字」选一个服务商的语音模型就能用。</string>
     <string name="voice_unavailable_system_gone">语音转文字选的是手机自带的识别，这台手机现在没有。到「设置 › 模型 › 语音转文字」换一个就能用。</string>
-    <string name="voice_unavailable_built_in_missing">自带识别会把你的声音转成文字，这样你就能直接对 Claire 说话，不用打字。但这台手机没有安装语音识别服务，所以自带识别用不了。安装“Google 语音服务”就能用 —— 光装 Google 应用是不够的。也可以到「设置 › 模型 › 语音转文字」选一个服务商的语音模型。</string>
+    <string name="voice_unavailable_built_in_missing">自带识别会把你的声音转成文字，这样你就能直接对 Claire 说话，不用打字。但这台手机没有安装语音识别服务，所以自带识别用不了。安装“Speech Recognition &amp; Synthesis”（原“Google 语音服务”）就能用 —— 光装 Google 应用是不够的。也可以到「设置 › 模型 › 语音转文字」选一个服务商的语音模型。</string>
     <string name="voice_get_speech_service">安装语音服务</string>
-    <string name="voice_speech_service_store_failed">打不开“Google 语音服务”的 Play 商店页面。请在 Play 商店里找到它并安装。</string>
+    <string name="voice_speech_service_store_failed">打不开“Speech Recognition &amp; Synthesis”（原“Google 语音服务”）的 Play 商店页面。请在 Play 商店里找到它并安装。</string>
     <string name="voice_unavailable_system_silent">手机自带的语音识别没有响应，听不到字。到「设置 › 模型 › 语音转文字」选一个服务商的语音模型就能用。</string>
     <string name="voice_unavailable_system_failed">手机自带的语音识别没能启动。可以再试一次，或到「设置 › 模型 › 语音转文字」换一种识别方式。</string>
     <string name="voice_service_permission_title">手机的语音识别还不能录音</string>

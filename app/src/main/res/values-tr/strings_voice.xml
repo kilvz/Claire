@@ -30,9 +30,9 @@
     <string name="voice_unavailable_title">Ses girişi hazır değil</string>
     <string name="voice_unavailable_no_engine">Bu telefonda yerleşik konuşma tanıma yok ve hiçbir konuşmadan yazıya modeli seçilmedi. Ayarlar › Modeller › Konuşmadan yazıya\'da bir sağlayıcının konuşma modelini seçin, çalışacaktır.</string>
     <string name="voice_unavailable_system_gone">Konuşmadan yazıya, telefonun yerleşik tanımasına ayarlı, ancak bu telefonda artık yok. Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tane seçin.</string>
-    <string name="voice_unavailable_built_in_missing">Yerleşik seçenek sesini yazıya çevirir, böylece yazmak yerine Claire ile konuşabilirsin. Ancak bu telefonda yüklü bir konuşma tanıma hizmeti yok, bu yüzden çalışamaz. Bir tane edinmek için “Speech Services by Google” uygulamasını yükle — Google uygulaması tek başına bunu içermez. Ya da Ayarlar › Modeller › Konuşmadan yazıya bölümünde bir sağlayıcının konuşma modelini seç.</string>
+    <string name="voice_unavailable_built_in_missing">Yerleşik seçenek sesini yazıya çevirir, böylece yazmak yerine Claire ile konuşabilirsin. Ancak bu telefonda yüklü bir konuşma tanıma hizmeti yok, bu yüzden çalışamaz. Bir tane edinmek için “Speech Recognition &amp; Synthesis” uygulamasını yükle — Google uygulaması tek başına bunu içermez. Ya da Ayarlar › Modeller › Konuşmadan yazıya bölümünde bir sağlayıcının konuşma modelini seç.</string>
     <string name="voice_get_speech_service">Konuşma hizmetini al</string>
-    <string name="voice_speech_service_store_failed">“Speech Services by Google” için Play Store sayfası açılamadı. Play Store\'da arayıp yükleyin.</string>
+    <string name="voice_speech_service_store_failed">“Speech Recognition &amp; Synthesis” için Play Store sayfası açılamadı. Play Store\'da arayıp yükleyin.</string>
     <string name="voice_unavailable_system_silent">Telefonun yerleşik konuşma tanıması yanıt vermedi, bu yüzden hiçbir kelime gelmedi. Ayarlar › Modeller › Konuşmadan yazıya\'da bir sağlayıcının konuşma modelini seçin, çalışacaktır.</string>
     <string name="voice_unavailable_system_failed">Telefonun yerleşik konuşma tanıması başlatılamadı. Tekrar deneyin ya da Ayarlar › Modeller › Konuşmadan yazıya\'da başka bir tanıma yöntemi seçin.</string>
     <string name="voice_service_permission_title">Telefonun konuşma tanıması henüz kaydedemiyor</string>
