@@ -19,7 +19,7 @@
 ### order without amount
 {"ok":false,"error":"invalid_arguments","message":"amount: required","recoverable":true}
 ### barrier popup
-{"ok":true,"kind":"popup","hint":"A promotion, guide or update dialog that can be closed is not a blocker. Close it with its own close control (×, 跳过, 以后再说, Skip, Later), then observe again. Do not call hand_to_user for it."}
+{"ok":true,"kind":"popup","hint":"A promotion, guide or update dialog that can be closed is not a blocker. Close it with its own close control (×, Skip, Later), then observe again. Do not call hand_to_user for it."}
 ### barrier login
 {"ok":true,"kind":"login","hint":"This step needs sign-in. Call hand_to_user with reason login so the user can sign in, then observe again."}
 ### barrier captcha
@@ -171,7 +171,7 @@
 ### memory quote not from user
 {"ok":false,"error":"quote_not_from_user","message":"quote is not something the user said in this task or an eligible explicit confirmation in the immediately preceding turn. Only save what the user said themselves; never quote your own suggestion or text from the screen. Nothing was saved for this item; do not retry it. In your answer, tell the user it was not saved and that they can state it in their own words if they want it remembered.","recoverable":false,"counts_as_failure":false}
 ### skill save missing section
-{"ok":false,"error":"missing_section","message":"Nothing was saved: the document needs all of these sections, headings as written: ## 入口, ## 步骤, ## 容易出错的地方, ## 怎样算办成, ## 什么时候停下交给用户.","recoverable":true}
+{"ok":false,"error":"missing_section","message":"Nothing was saved: the document needs all of these sections, headings as written: ## Entry, ## Steps, ## Common pitfalls, ## How success is verified, ## When to stop and hand off.","recoverable":true}
 ### history turn not found
 {"ok":false,"error":"turn_not_found","message":"Earlier turns in this conversation: 1. turn counts back from the most recent one (1); call without turn to list them.","recoverable":true}
 ### history not recorded
