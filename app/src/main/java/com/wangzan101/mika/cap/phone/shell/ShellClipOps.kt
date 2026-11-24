@@ -14,8 +14,8 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.READ_CLIPBOARD
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.EXTRA_IS_SENSITIVE
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.EXTRA_SUPPRESS_CLIPBOARD_OVERLAY
 
-// 助手服务:剪贴板读写保护与设备文件策略
-/** 剪贴板此刻是不是 Claire 放进去的 [ours];读不到(有内容但取不到)时不当成空的。 */
+// Assistant service: clipboard read/write protection and the device file policy
+/** Whether the clipboard right now holds what Claire put there ([ours]); unreadable (has content but cannot be fetched) is never treated as empty. */
 internal fun ShellService.nowState(ours: String?): ShellClip.Now {
     val now = clipboard.primaryClip
     return when (ShellClip.read(now != null, clipboard.hasPrimaryClip(), clipboard.primaryClipDescription != null)) {
@@ -29,7 +29,7 @@ internal fun ShellService.nowState(ours: String?): ShellClip.Now {
     }
 }
 
-/** shell 要有后台读剪贴板的权限、且读剪贴板的权限操作没被关掉,才算读得到。 */
+/** Reading counts as possible only if shell has the background clipboard read permission and the clipboard read app-op has not been turned off. */
 internal fun ShellService.canReadClipboard(): Boolean = runCatching {
     val granted = context.checkPermission(READ_CLIPBOARD_IN_BACKGROUND, Process.myPid(), Process.myUid()) ==
         PackageManager.PERMISSION_GRANTED
@@ -46,8 +46,9 @@ internal fun ShellService.suppressOverlay(clip: ClipData): ClipData {
 }
 
 /**
- * Claire 粘贴的内容(可能是地址、手机号等)标成敏感:系统和输入法的剪贴板预览、历史不显示原文。
- * 只标 Claire 自己放进去的,还原用户的剪贴板时保持原样。
+ * Marks content Claire pastes (possibly an address, phone number and so on) as sensitive: the system and IME clipboard
+ * previews and history will not show the original text. Only what Claire put there is marked; restoring the user's
+ * clipboard leaves it as it was.
  */
 internal fun ShellService.markSensitive(clip: ClipData): ClipData {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return clip

@@ -9,11 +9,11 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.INJECT_MODE_WA
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.injectMode
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.sendPair
 
-// 助手服务:向指定屏幕注入按键与触摸
+// Assistant service: injecting keys and touches into a given display
 internal inline fun ShellService.injectPair(down: InputEvent, up: InputEvent, displayId: Int, fallback: () -> Boolean): Boolean =
     sendPair({ inject(down, displayId) }, { inject(up, displayId) }, fallback)
 
-/** 同 [injectPair],但定向投给 [targetUid] 拥有的焦点窗口,不经过全局输入焦点。 */
+/** Like [injectPair], but targeted at the focused window owned by [targetUid], bypassing the global input focus. */
 internal inline fun ShellService.injectPairTo(down: InputEvent, up: InputEvent, displayId: Int, targetUid: Int, fallback: () -> Boolean): Boolean =
     sendPair({ injectTo(down, displayId, targetUid) }, { injectTo(up, displayId, targetUid) }, fallback)
 
@@ -29,9 +29,11 @@ internal fun ShellService.inject(event: InputEvent, displayId: Int, waitForFinis
 }
 
 /**
- * 只投给 [targetUid] 拥有的焦点窗口,等处理完再返回;焦点不在它那里时系统拒绝,事件不会落到别的窗口。
- * 用安卓 13 起的隐藏重载 `injectInputEvent(event, mode, targetUid)`,没有这个重载时不注入。
- * 失败只记异常类型:被拒的原因里不含按键,但这条路径输入的是锁屏凭据,不留多余信息。
+ * Injects only into the focused window owned by [targetUid] and waits for handling to finish; the system refuses when
+ * focus is not there, so the event never lands in another window. Uses the hidden overload
+ * `injectInputEvent(event, mode, targetUid)` available since Android 13; without that overload nothing is injected.
+ * On failure only the exception type is logged: the rejection reason carries no key information, but this path types
+ * lock-screen credentials, so no extra information is left behind.
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.injectTo(event: InputEvent, displayId: Int, targetUid: Int): Boolean = try {
@@ -44,7 +46,7 @@ internal fun ShellService.injectTo(event: InputEvent, displayId: Int, targetUid:
     false
 }
 
-/** API 34 起注入入口在 InputManagerGlobal,更早在 InputManager。 */
+/** Since API 34 the injection entry point is InputManagerGlobal; earlier it is InputManager. */
 @SuppressLint("PrivateApi")
 internal fun ShellService.inputManager(): Any = runCatching {
     Class.forName("android.hardware.input.InputManagerGlobal").getMethod("getInstance").invoke(null)

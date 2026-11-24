@@ -12,7 +12,7 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.FLAG_OWN_DISPL
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.displayFlags
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.IME_POLICY
 
-// 助手服务:虚拟屏创建、亮屏保活、方向同步与窗口模式
+// Assistant service: virtual display creation, keep-awake, orientation sync and windowing mode
 internal fun ShellService.createVirtualDisplay(surface: Surface, width: Int, height: Int, dpi: Int, trusted: Boolean): Int {
     val flags = displayFlags(Build.VERSION.SDK_INT, trusted)
     val vd = displayManager.createVirtualDisplay("mika-agent", width, height, dpi, surface, flags)
@@ -36,7 +36,7 @@ internal fun ShellService.pokeDisplay(displayId: Int): Boolean {
     }
 }
 
-/** 这块屏所在的显示组(DisplayInfo.displayGroupId,隐藏字段);读不到为 null。 */
+/** The display group this display belongs to (DisplayInfo.displayGroupId, a hidden field); null when it cannot be read. */
 @SuppressLint("PrivateApi")
 internal fun ShellService.displayGroup(displayId: Int): Int? = runCatching {
     val global = Class.forName("android.hardware.display.DisplayManagerGlobal").getMethod("getInstance").invoke(null)!!
@@ -44,13 +44,14 @@ internal fun ShellService.displayGroup(displayId: Int): Int? = runCatching {
     info.javaClass.getField("displayGroupId").getInt(info)
 }.getOrNull()
 
-/** 只往这个服务自己建的虚拟屏上启动,调用方传错屏号(比如主屏)也不会打扰用户。 */
+/** Launches only onto virtual displays this service created itself, so a wrong display ID from the caller (the main display, say) cannot disturb the user. */
 internal fun ShellService.ownDisplay(displayId: Int): Boolean = synchronized(displays) { displayId in displays }
 
 /**
- * STEAL_TOP_FOCUS_DISABLED 保住主屏焦点,但有的系统因此不再采纳后台 Activity 的转屏请求。
- * 有 Claire 的屏时开一个方向监听,只纠正自己这块屏的方向,保留原来的焦点隔离。
- * 监听在锁外建(注册要走 binder);两次建屏同时进来时只留一个,多出来的关掉。
+ * STEAL_TOP_FOCUS_DISABLED preserves main-screen focus, but some systems then stop honouring rotation requests from
+ * background activities. While a Claire display exists, start an orientation watcher that corrects only the
+ * orientation of this display and keeps the original focus isolation. The watcher is created outside the lock
+ * (registration goes over binder); when two display creations race, only one is kept and the extra one is closed.
  */
 internal fun ShellService.ensureOrientationWatch() {
     if (Build.VERSION.SDK_INT < 34 || synchronized(displays) { orientationWatch != null }) return
@@ -70,8 +71,9 @@ internal fun ShellService.ensureOrientationWatch() {
 }
 
 /**
- * 按各屏最上面任务的应用窗口比例纠正屏方向。锁里只拍一份屏的快照;
- * 查任务、读字段、freezeDisplayRotation 和退回的 `wm` 命令都在锁外,不挡建屏、放屏和启动。
+ * Corrects each display's orientation to the app window proportions of its top task. Only a snapshot of the displays
+ * is taken under the lock; task queries, field reads, freezeDisplayRotation and the `wm` fallback command all run
+ * outside the lock, so they do not hold up display creation, release or launch.
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.syncDisplayOrientations() {
@@ -83,7 +85,7 @@ internal fun ShellService.syncDisplayOrientations() {
         val taskId = TASK_INFO.getField("taskId").getInt(task)
         val compat = runCatching { TASK_INFO.getField("appCompatTaskInfo").get(task) }.getOrNull() ?: task
         val cls = compat.javaClass
-        // 安卓 15 起另有明确的 letterbox 标志;14 的宽高只在部分 letterbox 模式下填充。
+        // Android 15 has an explicit letterbox flag as well; on 14 the width and height are only filled in some letterbox modes.
         if (runCatching { cls.getField("topActivityBoundsLetterboxed").getBoolean(compat) }.getOrDefault(true).not()) return@runCatching
         val width = runCatching { cls.getField("topActivityLetterboxWidth").getInt(compat) }.getOrDefault(0)
         val height = runCatching { cls.getField("topActivityLetterboxHeight").getInt(compat) }.getOrDefault(0)
@@ -93,7 +95,7 @@ internal fun ShellService.syncDisplayOrientations() {
             mode.physicalWidth, mode.physicalHeight, display.rotation, width, height,
             requestedOrientations[taskId] ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED,
         ) ?: return@runCatching
-        // 快照之后这块屏可能已经放掉了
+        // The display may already have been released after the snapshot
         if (!ownDisplay(id)) return@runCatching
         val ok = runCatching {
             val wm = Class.forName("android.view.WindowManagerGlobal").getMethod("getWindowManagerService").invoke(null)!!
@@ -105,15 +107,16 @@ internal fun ShellService.syncDisplayOrientations() {
 }
 
 /**
- * 只设置刚建好的 Claire 屏,不改主屏。有的系统会把新建的外接/虚拟屏默认设成 freeform,
- * App 因此缩成小窗,无障碍坐标还会受窗口缩放影响。建屏后、启动任何页面前明确使用全屏模式,
- * 后续的 App 启动、页面跳转和从主屏挪回来的任务都沿用这块屏的策略。
+ * Sets only the freshly created Claire display, never the main display. Some systems default a new external/virtual
+ * display to freeform, which shrinks apps into small windows and also makes accessibility coordinates subject to
+ * window scaling. Explicitly use fullscreen mode after creating the display and before launching any page; later app
+ * launches, page transitions and tasks moved back from the main display all follow this display's policy.
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.setFullscreenWindowingMode(displayId: Int) {
     runCatching {
         val wm = Class.forName("android.view.WindowManagerGlobal").getMethod("getWindowManagerService").invoke(null)!!
-        // WindowConfiguration.WINDOWING_MODE_FULLSCREEN = 1 (隐藏常量)
+        // WindowConfiguration.WINDOWING_MODE_FULLSCREEN = 1 (hidden constant)
         wm.javaClass.getMethod("setWindowingMode", Int::class.java, Int::class.java).invoke(wm, displayId, 1)
     }.onFailure {
         Log.w(TAG, "setWindowingMode failed, falling back to wm", it)
@@ -123,7 +126,7 @@ internal fun ShellService.setFullscreenWindowingMode(displayId: Int) {
     }
 }
 
-/** IWindowManager.setDisplayImePolicy:输入法不弹到用户的主屏。选哪种策略见 IME_POLICY。 */
+/** IWindowManager.setDisplayImePolicy: the IME does not pop up on the user's main display. See IME_POLICY for which policy is chosen. */
 @SuppressLint("PrivateApi")
 internal fun ShellService.setImePolicy(displayId: Int) {
     runCatching {

@@ -12,12 +12,13 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.MessageDigest
 
-/** 一行回复;[close] 为 true 时回完就断开连接。 */
+/** One-line reply; when [close] is true, disconnect after replying. */
 class BridgeReply(val json: String, val close: Boolean = false)
 
 /**
- * 沙箱里 `mika` 命令与 Claire 之间的协议:一行一个 JSON 请求 `{"token","method","params"}`,一行一个 JSON 回复。
- * 手机方法只转给当前任务的动作入口;命令进程不能直接接触虚拟屏。
+ * The protocol between the `mika` command in the sandbox and Claire: one JSON request per line
+ * `{"token","method","params"}` and one JSON reply per line. Phone methods are only forwarded to the current task's
+ * action entry; the command process cannot touch the virtual display directly.
  */
 object BridgeProtocol {
     const val MAX_REQUEST = 64 * 1024
@@ -29,7 +30,7 @@ object BridgeProtocol {
         data object End : Line
     }
 
-    /** 读一行(不含换行);超过 [max] 字节就不再读下去。末尾没有换行的半行算结束。 */
+    /** Reads one line (without the newline); stops reading beyond [max] bytes. A trailing partial line with no newline counts as the end. */
     fun readLine(input: InputStream, max: Int = MAX_REQUEST): Line {
         val buf = ByteArrayOutputStream()
         while (true) {
@@ -42,8 +43,9 @@ object BridgeProtocol {
     }
 
     /**
-     * [progress] 返回 false 表示这次被限流丢掉了;[share] 收到沙箱路径与可选的保存名,失败抛 [SandboxError];
-     * [info] 给出 Claire 版本、是否联网等。令牌不对、请求不是 JSON 对象或太大:回一个错误并断开。
+     * [progress] returning false means this one was dropped by throttling; [share] receives the sandbox path and an
+     * optional save name and throws [SandboxError] on failure; [info] gives Claire's version, whether networked, and so
+     * on. A wrong token, or a request that is not a JSON object or is too large: reply with an error and disconnect.
      */
     suspend fun handle(
         line: String, token: String,
@@ -51,7 +53,7 @@ object BridgeProtocol {
         share: suspend (String, String?) -> String,
         info: () -> JsonObject,
         phone: (suspend (String, JsonObject) -> JsonObject)? = null,
-        /** 意外的失败交给 Claire 自己记日志;回给沙箱的只有错误码。 */
+        /** Unexpected failures are left for Claire to log herself; only the error code goes back to the sandbox. */
         onError: (Throwable) -> Unit = {},
     ): BridgeReply {
         if (line.toByteArray(Charsets.UTF_8).size > MAX_REQUEST) return error("too_large", close = true)
@@ -99,8 +101,9 @@ object BridgeProtocol {
     }
 
     /**
-     * 任务卡片上的一行字:去掉控制字符、格式字符(零宽字符、改写方向的字符等,能让显示的字和实际的字对不上)
-     * 和行/段分隔符,按码点截到 [MAX_PROGRESS] 个(不劈开代理对)。
+     * A line of text on the task card: strips control characters, format characters (zero-width characters,
+     * direction-override characters and the like, which can make the displayed text disagree with the actual text) and
+     * line/paragraph separators, then truncates to [MAX_PROGRESS] code points (without splitting surrogate pairs).
      */
     internal fun cleanProgress(s: String): String {
         val out = StringBuilder()
@@ -123,7 +126,7 @@ object BridgeProtocol {
     }.toString(), close)
 }
 
-/** 每 [intervalMs] 最多放过一次进度,多余的丢弃。 */
+/** Lets at most one progress through per [intervalMs]; extras are dropped. */
 class ProgressGate(private val intervalMs: Long = 1_000, private val now: () -> Long = System::currentTimeMillis) {
     private var last = Long.MIN_VALUE
 

@@ -116,7 +116,7 @@ internal class ShellCallAudio(private val context: Context) {
         var toCall: Array<ParcelFileDescriptor>? = null
         var session: Session? = null
         try {
-            // 一份规格,开场建一次、假死重建也用它;出来的都是已确认在播的 track。
+            // One spec, built once when the session opens and reused to rebuild after a hang; every track it yields is confirmed playing.
             val trackFactory: () -> AudioTrack = {
                 val built = if (backend == DIRECT) {
                     trackBuilder(AudioAttributes.Builder()
@@ -321,14 +321,15 @@ internal class ShellCallAudio(private val context: Context) {
         }
 
         /**
-         * 播放头冻住([HEAD_STALL_MS] 没动)且还有东西该播(刚写过数据、或 track 里还压着没播的):
-         * track 已死(厂商栈假死),继续写只会把积压滚大,要重建。
+         * The playback head is frozen (unchanged for [HEAD_STALL_MS]) and something should still play (data was just
+         * written, or the track still holds unplayed data): the track is dead (vendor stack hang), and further writes
+         * only grow the backlog, so it must be rebuilt.
          */
         fun headStalled(nowMs: Long): Boolean =
             playbackHeadFrames >= 0L && lastHeadAdvanceMs >= 0L && nowMs - lastHeadAdvanceMs >= HEAD_STALL_MS &&
                 (nowMs - lastWriteMs <= HEAD_FLOW_MS || trackQueuedFrames() > 0L)
 
-        /** track 里压着没播的帧数(本纪元数据 + 先导静音 − 播放头);头未知为 -1。 */
+        /** Frames queued in the track but not yet played (this epoch's data + priming silence − playback head); -1 when the head is unknown. */
         fun trackQueuedFrames(): Long =
             if (playbackHeadFrames < 0L) -1L
             else (playbackEpochDataBytes / 2L + playbackPrimeFrames - playbackHeadFrames).coerceAtLeast(0L)
@@ -367,8 +368,9 @@ internal class ShellCallAudio(private val context: Context) {
     }
 
     /**
-     * 播放重建的节流:假死的 track 重建一次多半能回来,真坏的重建也救不了。
-     * 窗口 [windowMs] 内最多 [maxInWindow] 次、相邻两次至少隔 [minIntervalMs];放弃才交还系统。
+     * Rebuild throttling for playback: rebuilding a hung track usually brings it back, while a truly broken one
+     * cannot be saved by rebuilding either. At most [maxInWindow] times within [windowMs], with at least
+     * [minIntervalMs] between two consecutive rebuilds; only when giving up is the call handed back to the system.
      */
     internal class PlaybackRebuildPolicy(
         private val maxInWindow: Int = 3,
@@ -378,11 +380,11 @@ internal class ShellCallAudio(private val context: Context) {
         private var lastRebuildAtMs = -1L
         private val recent = ArrayDeque<Long>()
 
-        /** 距上次重建太近:这次先不动(等下一个评估点),不算失败。 */
+        /** Too soon after the last rebuild: skip it this time (wait for the next evaluation point); not a failure. */
         @Synchronized fun throttled(nowMs: Long): Boolean =
             lastRebuildAtMs >= 0L && nowMs - lastRebuildAtMs < minIntervalMs
 
-        /** 记一次重建;窗口内次数用尽返回 false(真坏,交还系统)。 */
+        /** Records one rebuild; returns false when the budget within the window is used up (truly broken, handed back to the system). */
         @Synchronized fun allow(nowMs: Long): Boolean {
             while (recent.isNotEmpty() && nowMs - recent.first() > windowMs) recent.removeFirst()
             if (recent.size >= maxInWindow) return false
@@ -399,7 +401,7 @@ internal class ShellCallAudio(private val context: Context) {
         private val backend: Int,
         private val record: AudioRecord,
         private var track: AudioTrack,
-        /** 重建假死 track 用:按开场同一份规格建一块已开始播放的新 track。 */
+        /** Used to rebuild a hung track: builds a new, already-playing track from the same spec as the opening one. */
         private val trackFactory: () -> AudioTrack,
         private val down: ParcelFileDescriptor,
         private val up: ParcelFileDescriptor,
@@ -637,9 +639,10 @@ internal class ShellCallAudio(private val context: Context) {
         }
 
         /**
-         * track 假死(播放头不走或写入持续为零)时重建,而不是干等到 1.5s 交还系统:
-         * 丢掉管子里积压的旧音频(有界),从接近现场的地方接着播,积压不再利滚利。
-         * 重建也救不回来(次数用尽)才按「上行播放无进展」交还系统。
+         * Rebuild when the track hangs (the playback head does not advance, or writes stay at zero) instead of waiting
+         * out the 1.5 s before handing back to the system: drop the stale audio backed up in the pipe (bounded) and
+         * resume close to the live point, so the backlog no longer compounds. Only when rebuilding cannot save it either
+         * (budget exhausted) is it handed back to the system as "uplink playback made no progress".
          */
         private fun checkPlaybackHealth(now: Long) {
             samplePlaybackHead(now)
@@ -802,14 +805,14 @@ internal class ShellCallAudio(private val context: Context) {
         private const val MAX_CAPTURE_SILENCE_POLL_GAP_MS = DEVICE_CHECK_MS * 3
         private const val MAX_UPLINK_WRITE_STALL_MS = 1_500L
         private const val MAX_FLUSH_BYTES = 256 * 1024
-        /** 播放头冻结判定:这么久没动算死;期间要有数据在写或积压未播才成立。 */
+        /** Playback head stall threshold: unchanged for this long counts as dead; it only holds if data is being written or a backlog is unplayed. */
         private const val HEAD_STALL_MS = 1_000L
         private const val HEAD_FLOW_MS = 500L
-        /** track 里压着超过 2 秒没播:消费已经跟不上,重建并丢弃旧音频。 */
+        /** More than 2 seconds of unplayed data queued in the track: consumption has fallen behind; rebuild and drop the stale audio. */
         private const val MAX_TRACK_QUEUE_FRAMES = PLAY_RATE * 2L
-        /** 写入持续这么久为零就动手重建(旧的 1.5s 直接交还系统仍作兜底)。 */
+        /** Writes staying at zero this long trigger a rebuild (handing back to the system at the old 1.5 s remains the last resort). */
         private const val ZERO_REBUILD_MS = 600L
-        /** 重建时从管子丢弃旧音频的上界(约 4 秒);应用侧队列另有自己的上限兜底。 */
+        /** Upper bound on stale audio dropped from the pipe during a rebuild (about 4 seconds); the app-side queue has its own cap as a backstop. */
         private const val MAX_REBUILD_DROP_BYTES = PLAY_RATE * 2L * 4L
         private val PIPE_CLOSED get() = OsConstants.POLLERR or OsConstants.POLLHUP or OsConstants.POLLNVAL
 

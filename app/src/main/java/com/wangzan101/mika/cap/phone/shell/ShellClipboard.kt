@@ -12,10 +12,11 @@ import android.os.Process
 import java.lang.reflect.Method
 
 /**
- * shell 进程直接访问系统剪贴板。有的系统里 ClipboardManager 读剪贴板前会先读 Settings,
- * 但 app_process 没有普通 App 的进程登记,不能经 ActivityThread 获取 ContentProvider。
- * Binder 仍按包名、uid、用户和设备检查权限;这里只避开 Java 包装层额外的 Settings 查询。
- * 认不出的接口(例如更早版本的签名)退回 ClipboardManager,行为与以前一样。
+ * The shell process accesses the system clipboard directly. On some systems ClipboardManager reads Settings before
+ * reading the clipboard, but app_process has no process registration like a normal app and cannot get a
+ * ContentProvider through ActivityThread. Binder still checks permissions by package name, uid, user and device; this
+ * only bypasses the Java wrapper's extra Settings query. An unrecognized interface (for example an earlier signature)
+ * falls back to ClipboardManager and behaves as before.
  */
 @SuppressLint("PrivateApi")
 internal class ShellClipboard(private val context: Context) {
@@ -46,22 +47,22 @@ internal class ShellClipboard(private val context: Context) {
     val primaryClipDescription: ClipDescription?
         get() = getDescription.let { if (it == null) manager.primaryClipDescription else call(it) as ClipDescription? }
     fun hasPrimaryClip(): Boolean = hasClip.let { if (it == null) manager.hasPrimaryClip() else call(it) as Boolean }
-    // 写入仍走框架原来的 ClipData 准备和清空流程,只替换有额外 Settings 查询的读取路径。
+    // Writes still go through the framework's original ClipData preparation and clearing flow; only the read path that does the extra Settings query is replaced.
     fun setPrimaryClip(clip: ClipData) = manager.setPrimaryClip(clip)
     fun clearPrimaryClip() = manager.clearPrimaryClip()
 
-    /** 按能力找接口:先认原版签名,再认已知的扩展签名;都不是就返回 null,由调用方退回 ClipboardManager。 */
+    /** Finds the interface by capability: try the original signature first, then the known extended ones; if neither matches, return null and let the caller fall back to ClipboardManager. */
     private fun method(name: String): Method? {
         if (service == null) return null
         val type = runCatching { Class.forName("android.content.IClipboard") }.getOrNull() ?: return null
         val s = String::class.java
         val i = Int::class.javaPrimitiveType!!
         val candidates = listOf(
-            // Android 14+:包名、attributionTag、userId、deviceId
+            // Android 14+: package name, attributionTag, userId, deviceId
             arrayOf(s, s, i, i),
-            // Android 12–13:包名、attributionTag、userId
+            // Android 12–13: package name, attributionTag, userId
             arrayOf(s, s, i),
-            // 有的系统把读取扩成:包名、应用名、隐私栈、attributionTag、userId、deviceId、是否用户操作
+            // Some systems extend the read to: package name, app name, privacy stack, attributionTag, userId, deviceId, whether it is a user action
             arrayOf(s, s, s, s, i, i, Boolean::class.javaPrimitiveType!!),
         )
         return candidates.firstNotNullOfOrNull { runCatching { type.getMethod(name, *it) }.getOrNull() }
@@ -70,9 +71,9 @@ internal class ShellClipboard(private val context: Context) {
     private fun call(method: Method): Any? {
         val userId = Process.myUid() / 100_000
         val args: Array<Any?> = when (method.parameterTypes.size) {
-            // 后台保存/还原不是用户点「粘贴」,不伪造用户操作;隐私栈与框架默认值一样为空。
+            // Background save/restore is not the user tapping "paste", so no user action is faked; the privacy stack is empty like the framework default.
             7 -> arrayOf(ShellContext.SHELL_PACKAGE, callerLabel, "", null, userId, 0, false)
-            // ShellContext 是默认设备的系统上下文,与原 ClipboardManager 使用的设备一致。
+            // ShellContext is the system context of the default device, the same device the original ClipboardManager uses.
             4 -> arrayOf(ShellContext.SHELL_PACKAGE, null, userId, 0)
             else -> arrayOf(ShellContext.SHELL_PACKAGE, null, userId)
         }

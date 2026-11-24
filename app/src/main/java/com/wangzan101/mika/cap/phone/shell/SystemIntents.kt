@@ -7,24 +7,27 @@ import android.provider.CalendarContract
 import com.wangzan101.mika.core.screen.uistate.SystemAction
 
 /**
- * 系统动作用的安卓标准 intent:设闹钟、计时器、打开闹钟列表(AlarmClock),打开预填好的新日程(CalendarContract 的插入页)。
- * 先写成与安卓无关的 [Spec](单测直接比),再换成 [Intent]。内置助手只放行这几种([allowed]),不替 Claire 启动任意的 intent。
+ * Standard Android intents for system actions: set an alarm, set a timer, open the alarm list (AlarmClock), open a
+ * pre-filled new calendar event (the CalendarContract insert page). Actions are first expressed as an Android-free
+ * [Spec] (compared directly in unit tests) and then turned into an [Intent]. The built-in helper allows only these
+ * ([allowed]) and never launches an arbitrary intent on Claire's behalf.
  */
 object SystemIntents {
-    /** 日程插入页按类型匹配:直接写明类型,不靠日历提供方去查(查它要日历的可见性)。 */
+    /** The event insert page is matched by type: state the type explicitly instead of asking a calendar provider (querying it requires calendar visibility). */
     const val EVENTS_TYPE = "vnd.android.cursor.dir/event"
     const val EVENTS_URI = "content://${CalendarContract.AUTHORITY}/events"
 
-    /** Claire 的兼容性自检页:内置助手认出这个组件后以 shell 身份直接开到 Claire 的屏上,不按 [allowed] 走。 */
+    /** Claire's compatibility self-check page: when the built-in helper recognizes this component it opens it on Claire's display as shell, bypassing [allowed]. */
     const val OWN_PAGE_CLASS = "com.wangzan101.mika.selfcheck.SelfCheckTargetActivity"
 
-    /** 能接这个 intent 的一个页面;[system] 是系统自带的 App。 */
+    /** One page that can handle this intent; [system] means the app ships with the system. */
     data class Handler(val packageName: String, val className: String, val system: Boolean)
 
     /**
-     * 交给哪一个:只有一个就是它;用户设过默认的([defaultPackage],系统按默认解析出来的包,不是选择器)用默认的;
-     * 否则先挑系统自带的,再按先后。直接指定到那个页面:悄悄设好的动作不该在 Claire 的屏上留一个「用哪一个」的选择框。
-     * 没有为 null(不支持,模型退回去操作界面)。
+     * Which one to hand it to: if there is only one, that one; if the user set a default ([defaultPackage], the
+     * package the system resolves as default, not the chooser), use the default; otherwise prefer a system app, then
+     * take the first. Target that page directly: an action set silently should not leave an "open with which?"
+     * chooser on Claire's display. Null when there is none (unsupported; the model falls back to operating the UI).
      */
     fun choose(handlers: List<Handler>, defaultPackage: String?): Handler? =
         handlers.singleOrNull()
@@ -32,14 +35,14 @@ object SystemIntents {
             ?: handlers.firstOrNull { it.system }
             ?: handlers.firstOrNull()
 
-    /** 一个 intent 的内容:动作、数据和类型、附加值(只有 Int、Long、Boolean、String、整数列表)。 */
+    /** The contents of one intent: action, data and type, and extras (only Int, Long, Boolean, String and integer lists). */
     data class Spec(val action: String, val data: String? = null, val type: String? = null, val extras: Map<String, Any> = emptyMap())
 
     fun spec(a: SystemAction): Spec = when (a) {
         is SystemAction.SetAlarm -> Spec(AlarmClock.ACTION_SET_ALARM, extras = buildMap {
             put(AlarmClock.EXTRA_HOUR, a.hour)
             put(AlarmClock.EXTRA_MINUTES, a.minute)
-            // 不开时钟的界面:直接设好
+            // Do not open the clock UI: set it directly
             put(AlarmClock.EXTRA_SKIP_UI, true)
             a.label?.let { put(AlarmClock.EXTRA_MESSAGE, it) }
             if (a.days.isNotEmpty()) put(AlarmClock.EXTRA_DAYS, ArrayList(a.days))
@@ -61,7 +64,7 @@ object SystemIntents {
         })
     }
 
-    /** 内置助手只替 Claire 启动这几种:动作在表里,插入的只能是日程。 */
+    /** The built-in helper launches only these on Claire's behalf: the action must be in the list, and an insert may only be a calendar event. */
     fun allowed(action: String?, data: String?): Boolean = when (action) {
         AlarmClock.ACTION_SET_ALARM, AlarmClock.ACTION_SET_TIMER, AlarmClock.ACTION_SHOW_ALARMS -> data == null
         Intent.ACTION_INSERT -> data == EVENTS_URI

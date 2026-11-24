@@ -27,8 +27,8 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 
 /**
- * shell 进程里的系统上下文。系统服务会核对「包名属于调用方 uid」,
- * 所以对外报 com.android.shell(uid 2000),而不是 Claire 自己的包名。
+ * The system context inside the shell process. System services check that "the package name belongs to the caller uid",
+ * so it reports com.android.shell (uid 2000) instead of Claire's own package name.
  */
 internal class ShellContext private constructor(base: Context) : ContextWrapper(base) {
     override fun getPackageName(): String = SHELL_PACKAGE
@@ -44,7 +44,7 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
         @SuppressLint("PrivateApi", "DiscouragedPrivateApi")
         fun create(): Context {
             val at = Class.forName("android.app.ActivityThread")
-            // UserService 进程通常已有 ActivityThread;没有时按 app_process 的方式自建一个
+            // The UserService process usually already has an ActivityThread; when it does not, create one the app_process way
             val thread = at.getMethod("currentActivityThread").invoke(null) ?: newActivityThread(at)
             val system = at.getDeclaredMethod("getSystemContext").invoke(thread) as Context
             val ctx = ShellContext(system)

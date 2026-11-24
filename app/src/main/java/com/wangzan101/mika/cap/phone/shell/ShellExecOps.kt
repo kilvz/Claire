@@ -10,10 +10,10 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.CMD_TIMEOUT_S
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.COMMAND_OUTPUT_MAX
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.READER_JOIN_MS
 
-// 助手服务:执行命令与解锁
+// Assistant service: running commands and unlocking
 internal fun ShellService.commandResult(code: Int, output: String) = Bundle().apply { putInt("exitCode", code); putString("output", output) }
 
-/** 以 shell 身份跑 `sh -c`,合并输出,限时限长;[displayId] 不为空时放进 MIKA_DISPLAY_ID。 */
+/** Runs `sh -c` as shell with merged output, bounded time and length; a non-null [displayId] is put into MIKA_DISPLAY_ID. */
 internal fun ShellService.exec(command: String, displayId: Int?): Bundle {
     fun result(code: Int, output: String) = commandResult(code, output)
     if (command.isBlank() || command.length > 4_000) return result(-1, "Invalid command length.")
@@ -46,8 +46,8 @@ internal fun ShellService.exec(command: String, displayId: Int?): Bundle {
 internal fun ShellService.exec(vararg cmd: String): Int = sh(*cmd).first
 
 /**
- * 跑一条 shell 命令,返回 (退出码, 输出);超时返回 -1。
- * 输出在单独线程里读,卡住的命令不会把 binder 线程永远堵住。
+ * Runs one shell command and returns (exit code, output); returns -1 on timeout.
+ * Output is read on a separate thread, so a stuck command never blocks the binder thread forever.
  */
 internal fun ShellService.sh(vararg cmd: String): Pair<Int, String> {
     val p = try {

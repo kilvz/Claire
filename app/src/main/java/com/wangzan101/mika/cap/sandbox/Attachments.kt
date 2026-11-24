@@ -18,7 +18,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
-/** 附加进来的一批文件:[added] 是 (沙箱路径, 大小),[rejected] 是没收下的文件名(太大或读不了)。 */
+/** A batch of attached files: [added] is (sandbox path, size), [rejected] is the file names not taken (too large or unreadable). */
 data class ImportResult(
     val added: List<Pair<String, Long>>,
     val rejected: List<String>,
@@ -29,7 +29,7 @@ data class AttachmentFailure(val name: String, val reason: AttachmentFailureReas
 
 enum class AttachmentFailureReason { TOO_LARGE, LOW_DEVICE_SPACE, WORKSPACE_LIMIT, IO_ERROR }
 
-/** 单文件与工作区两道存储上限;设置里调档后由调用方注入,默认与历史写死值一致。 */
+/** The per-file and workspace storage limits; the caller injects them after the setting changes, with defaults matching the previously hard-coded values. */
 data class AttachmentLimits(
     val maxFileBytes: Long = Attachments.MAX_BYTES,
     val workspaceMaxBytes: Long = Attachments.WORKSPACE_MAX,
@@ -37,7 +37,7 @@ data class AttachmentLimits(
     companion object { val DEFAULT = AttachmentLimits() }
 }
 
-/** 用户在聊天里附加的文件:复制进当前对话工作区的 inbox/,沙箱里在 /workspace/inbox/。 */
+/** Files the user attaches in a chat: copied into the current conversation workspace's inbox/, which is /workspace/inbox/ inside the sandbox. */
 object Attachments {
     const val MAX_BYTES = 200L shl 20
     const val MIN_FREE = 500L shl 20
@@ -46,7 +46,7 @@ object Attachments {
     private const val MAX_NAME = 120
     private const val TAG = "MikaAttachments"
 
-    /** 去掉路径分隔符、控制字符和格式字符,保留中文与空格,不超过 120 字;什么都不剩时叫 attachment。 */
+    /** Strips path separators, control characters and format characters, keeps Chinese text and spaces, at most 120 characters; when nothing remains it is called attachment. */
     fun safeName(display: String): String {
         val sb = StringBuilder()
         var i = 0
@@ -57,23 +57,25 @@ object Attachments {
             sb.appendCodePoint(cp)
         }
         val name = sb.toString().trim().trimStart('.')
-        // 文件系统按字节算长度:中文名 120 字也可能超过 255 字节;截短时保留扩展名
+        // The filesystem measures length in bytes: even 120 Chinese characters can exceed 255 bytes; keep the extension when truncating
         return ShareRules.fitName(name.ifEmpty { "attachment" }, maxChars = MAX_NAME)
     }
 
-    /** 已有同名文件时加「 (2)」「 (3)」……,扩展名留在最后。 */
+    /** Appends " (2)", " (3)" and so on when a file of that name exists, keeping the extension last. */
     fun numbered(name: String, n: Int): String = WorkspaceFileGate.numbered(name, n)
 
     /**
-     * 复制到 [workspace] 下的 inbox/;每个文件 ≤ [AttachmentLimits.maxFileBytes](超过的删掉、记进 rejected)。
-     * 每个文件开始前(复制中每 16 MB 也)看一次空间:手机可用空间低于 500 MB、或工作区超过 [AttachmentLimits.workspaceMaxBytes] 就不收。
-     * 经 [gate] 在 inbox/ 里新建(不覆盖、按句柄核实):inbox 被沙箱里的命令换成链接也写不出去;失败时只删自己建的那个文件。
+     * Copies into inbox/ under [workspace]; each file is ≤ [AttachmentLimits.maxFileBytes] (larger ones are deleted and
+     * recorded in rejected). Space is checked before each file starts (and every 16 MB during a copy): nothing is taken
+     * when the phone has less than 500 MB free or the workspace exceeds [AttachmentLimits.workspaceMaxBytes]. Files are
+     * created in inbox/ through [gate] (no overwrite, verified by handle), so even if inbox is swapped for a symlink by a
+     * sandbox command the write cannot escape; on failure only the file it created itself is deleted.
      */
     suspend fun importInto(
         context: Context, uris: List<Uri>, workspace: File, gate: WorkspaceFileGate, tree: SandboxTree,
         freeBytes: () -> Long = { workspace.usableSpace }, workspaceBytes: () -> Long = { 0L },
         limits: AttachmentLimits = AttachmentLimits.DEFAULT,
-    ): ImportResult = tree.shared { withContext(Dispatchers.IO) { // 写进 files/sandbox/:和重置互斥
+    ): ImportResult = tree.shared { withContext(Dispatchers.IO) { // written under files/sandbox/: mutually exclusive with reset
         val added = mutableListOf<Pair<String, Long>>()
         val failures = mutableListOf<AttachmentFailure>()
         for (uri in uris) {

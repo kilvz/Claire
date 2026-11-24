@@ -16,12 +16,15 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * Agent 的 root 命令:经 `su -c` 以 root 跑,标准输出、标准错误分开收(各最多 1 MB),到时限结束。
- * 命令先编成 base64 再在 root 的 sh 里解开交给 `sh -c`:外层那一行总是合法的 sh,命令里的引号、换行原样到达,
- * 写错的命令由里层 sh 报错,和「su 拒绝了」分得开(外层先打一行标记,拿不到标记就是 su 没跑)。
- * Root 侧独立监督命令进程组。App 到时限或取消时关闭标准输入，通知 Root 侧结束进程组。
- * [allowed] 每次执行前都重新检查:任务装着端口时用户关掉设置,后面的调用也不能再启动 su。
- * [su] 给出 su 的完整路径(找不到为 null);su 没跑这条命令时经 [refused] 报出去(null 是 su 不在了),由设置那边记下并关掉这一项。
+ * The Agent's root commands: run as root through `su -c`, with stdout and stderr collected separately (at most 1 MB
+ * each) and ended at the time limit. The command is first encoded as base64 and decoded in root's sh only to be handed
+ * to `sh -c`: the outer line is always valid sh, quotes and newlines in the command arrive unchanged, and a mistyped
+ * command is reported by the inner sh, which is distinguishable from "su refused" (the outer layer prints a marker
+ * first; no marker means su did not run). The Root side supervises the command's process group independently. When the
+ * app hits the time limit or is cancelled it closes stdin, telling the Root side to end the process group. [allowed] is
+ * rechecked before every execution: if the user turns the setting off while the task holds the port, later calls must
+ * still not start su. [su] gives su's full path (null when not found); when su did not run this command it is reported
+ * through [refused] (null means su is gone), which the settings side records and uses to turn this item off.
  */
 class RootCommands(
     private val su: () -> String?,
@@ -29,7 +32,7 @@ class RootCommands(
     private val refused: (SuAnswer?) -> Unit,
 ) : RootPort {
     override suspend fun run(command: String, timeoutMs: Long): RootRun = runInterruptible(Dispatchers.IO) {
-        // 设置是任务运行期间也能改的;端口只是装配结果,不是长期有效的授权凭证
+        // Settings can change while the task runs; the port is only an assembly result, not a long-lived authorization credential
         if (!allowed()) return@runInterruptible RootRun.Denied
         val su = su() ?: return@runInterruptible RootRun.Unavailable.also { refused(null) }
         val started = SystemClock.elapsedRealtime()
@@ -46,7 +49,7 @@ class RootCommands(
         val (stdout, outDropped) = awaitOutput(out)
         val (stderr, errDropped) = awaitOutput(err)
         if (!stdout.startsWith(MARK)) {
-            // 标记都没打出来:su 没跑这条命令
+            // Not even the marker appeared: su did not run this command
             val a = if (!exited) SuAnswer.NoAnswer else SuAnswer.Denied
             refused(a)
             return@runInterruptible if (a == SuAnswer.NoAnswer) RootRun.NoAnswer else RootRun.Denied
@@ -56,7 +59,7 @@ class RootCommands(
     }
 
     private fun stop(p: Process) {
-        // 即使 su 是守护进程的客户端，关闭管道也会通知实际执行命令的 Root 端。
+        // Even when su is a client of a daemon, closing the pipe still notifies the Root side that actually runs the command.
         runCatching { p.outputStream.close() }
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(STOP_GRACE_MS)
         var interrupted = false
@@ -70,7 +73,7 @@ class RootCommands(
                 try {
                     if (p.waitFor(remaining, TimeUnit.NANOSECONDS)) return
                 } catch (_: InterruptedException) {
-                    // 给监督脚本时间处理 EOF，避免先杀掉还没开始监听的 su。
+                    // Give the supervisor script time to handle EOF, so su is not killed before it has even started listening.
                     interrupted = true
                 }
             }
@@ -96,12 +99,12 @@ class RootCommands(
         "" to 0L
     }
 
-    /** 在单独的线程上读(不占公共线程池)。 */
+    /** Reads on a dedicated thread (does not occupy the shared thread pool). */
     private fun <T> onThread(block: () -> T): CompletableFuture<T> = CompletableFuture<T>().also { f ->
         Thread({ runCatching(block).fold({ f.complete(it) }, { f.completeExceptionally(it) }) }, "mika-root").apply { isDaemon = true }.start()
     }
 
-    /** 读完一个流,最多留 [MAX_BYTES],多的数着丢掉。 */
+    /** Drains a stream, keeping at most [MAX_BYTES] and counting the rest as dropped. */
     private fun drain(stream: InputStream): Pair<String, Long> {
         val buf = ByteArrayOutputStream()
         var dropped = 0L

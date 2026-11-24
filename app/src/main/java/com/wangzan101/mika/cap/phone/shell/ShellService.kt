@@ -41,48 +41,50 @@ import kotlin.system.exitProcess
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
- * 以 shell 身份(uid 2000)常驻,持有 Agent 的虚拟屏,跑在内置助手进程([HelperMain])里。
- * 进程结束时虚拟屏及其上的 App 一并销毁,所以必须常驻而不是一次性命令。
+ * Resident as shell (uid 2000), owning the Agent's virtual displays, running inside the built-in helper process
+ * ([HelperMain]). When the process ends, the virtual displays and the apps on them are destroyed with it, so it must
+ * stay resident rather than be a one-shot command.
  *
- * 隐藏接口一律反射调用,反射失败时退回到同等效果的 shell 命令。
+ * Hidden interfaces are always called through reflection; when reflection fails it falls back to a shell command with
+ * the same effect.
  */
 class ShellService(
-    /** 只接受这个 uid(Claire)的调用。 */
+    /** Accepts calls only from this uid (Claire). */
     internal val allowedUid: Int,
-    /** 静音记录放的目录;shell 身份能写的位置。 */
+    /** Directory holding the mute records; a location the shell identity can write to. */
     stateDir: File = File("/data/local/tmp"),
 ) : IMikaShell.Stub() {
     internal val context: Context = ShellContext.create()
     internal val displays = HashMap<Int, VirtualDisplay>()
     internal var orientationWatch: DisplayOrientationWatch? = null
     internal val requestedOrientations = ConcurrentHashMap<Int, Int>()
-    /** 被静音的包 → 静音前的 PLAY_AUDIO 模式("default" 表示原先未设置),落在 [stateDir] 里,进程被杀后下次启动接着恢复。 */
+    /** Muted package → the PLAY_AUDIO mode before muting ("default" means it was not set), kept under [stateDir] so the next start resumes restoring after the process is killed. */
     internal val muted = AudioMuteLedger(File(stateDir, "mika_audio_mute_$allowedUid"))
     internal val callAudio = ShellCallAudio(context)
-    // Bundle 将嵌套的 PFD 复制到 reply，但不会关掉服务端原件。写完 reply 后关闭，
-    // 否则客户端关掉管道时，音频线程永远收不到 EOF。
+    // Bundle copies the nested PFDs into the reply but never closes the server-side originals. They are closed after
+    // the reply is written, otherwise the audio thread never sees EOF when the client closes the pipe.
     internal val returnedCallPipes = ThreadLocal<List<ParcelFileDescriptor>>()
     internal data class FilePolicyState(val session: String, val revision: Long, val roots: List<String>, val recursive: List<Boolean>, val policy: DeviceFilePolicy)
     internal val filePolicyLock = Any()
     @Volatile internal var filePolicy: FilePolicyState? = null
-    /** Claire 所在的用户:本来那份 App 装在这里;别的用户里的是另一份(分身、工作资料)。 */
+    /** The user Claire runs as: the original app copy is installed here; other users hold another copy (clone, work profile). */
     internal val myUser = allowedUid / PER_USER_RANGE
 
-    // 不能用 getSystemService:那样拿到的 DisplayManager 绑的是系统上下文,包名与 shell uid 对不上
+    // Do not use getSystemService: the DisplayManager obtained that way is bound to the system context, so its package name does not match the shell uid
     @SuppressLint("PrivateApi")
     internal val displayManager: DisplayManager =
         DisplayManager::class.java.getDeclaredConstructor(Context::class.java)
             .apply { isAccessible = true }.newInstance(context)
 
-    // 剪贴板要以 shell 包名访问(系统只对来自 shell 的剪贴板认「不弹已复制浮层」的标记);读取绕开 ClipboardManager 里 shell 进程走不通的 Settings 查询
+    // The clipboard must be accessed under the shell package name (the system only honours the "suppress copied overlay" flag for clipboard data from shell); reading bypasses the Settings query in ClipboardManager that does not work in the shell process
     internal val clipboard = ShellClipboard(context)
     internal val clipLock = Any()
-    /** 查占用和启动之间不能插进另一个任务的启动:两个任务同时开同一个 App 时只有一个能成。 */
+    /** No other task's launch may slip in between the occupancy check and the launch: when two tasks open the same app at once, only one can succeed. */
     internal val launchLock = Any()
-    /** setClipText 之前用户的剪贴板(null 表示原先确实是空的,读不到的不会换出);[clipSaved] 为 false 表示没有待还原的。 */
+    /** The user's clipboard before setClipText (null means it really was empty; an unreadable one is never swapped out); [clipSaved] false means there is nothing to restore. */
     internal var savedClip: ClipData? = null
     internal var clipSaved = false
-    /** Claire 最后放进去的文字;还原前据此判断剪贴板还是不是 Claire 的(用户中途复制了别的就不动)。 */
+    /** The text Claire put in last; used before restoring to decide whether the clipboard is still Claire's (if the user copied something else meanwhile, leave it alone). */
     internal var ourText: String? = null
 
     internal val taskManager: Any by lazy {
@@ -96,8 +98,8 @@ class ShellService(
             Log.e(TAG, "createDisplay failed", t)
             -1
         } else {
-            // shell 没有 ADD_TRUSTED_DISPLAY 时(有的系统不给):去掉只对可信屏可用的几项再建一次。
-            // 退回后这块屏没有自己的焦点,自检页读它的标志会报「own focus no」并给出主屏焦点可能受影响的提示(Advice.FocusShared)。
+            // When shell lacks ADD_TRUSTED_DISPLAY (some systems do not grant it): drop the flags that only work on a trusted display and create it once more.
+            // After the fallback this display has no focus of its own; the self-check page reports "own focus no" and warns that main-screen focus may be affected (Advice.FocusShared).
             Log.w(TAG, "createDisplay without trusted display flags, retrying", t)
             try {
                 createVirtualDisplay(surface, width, height, dpi, trusted = false)
@@ -126,7 +128,7 @@ class ShellService(
         }
     }
 
-    /** 自成一组的虚拟屏一直不睡,见 [DisplayAwake]。 */
+    /** A virtual display in a group of its own never sleeps; see [DisplayAwake]. */
     internal val awake by lazy {
         val timer = Executors.newSingleThreadScheduledExecutor { Thread(it, "mika-display-awake").apply { isDaemon = true } }
         DisplayAwake(::pokeDisplay) { r ->
@@ -135,7 +137,7 @@ class ShellService(
         }
     }
 
-    /** IPowerManager 和它按屏报用户操作的方法;拿不到为 null(只记一次,屏照常用,只是没人替它续亮)。 */
+    /** IPowerManager and its per-display user activity method; null when unavailable (logged once, the display still works, only nothing keeps it awake). */
     @get:SuppressLint("PrivateApi")
     internal val userActivity: Pair<Any, Method>? by lazy {
         runCatching {
@@ -147,7 +149,7 @@ class ShellService(
 
     override fun releaseDisplay(displayId: Int) {
         awake.stop(displayId)
-        // 锁里只摘下来,关监听(binder)和放屏在锁外做
+        // Only remove it under the lock; closing the watcher (binder) and releasing the display happen outside it
         val (vd, watch) = synchronized(displays) {
             displays.remove(displayId) to (if (displays.isEmpty()) orientationWatch.also { orientationWatch = null } else null)
         }
@@ -157,15 +159,17 @@ class ShellService(
     }
 
     /**
-     * 先确认用户没在主屏用这个 App:若它在主屏有可见的任务就不启动(返回 [START_IN_USE_ON_MAIN]),
-     * 否则系统会把用户正在看的界面挪走或打断。后台任务可以被拉到虚拟屏上。
-     * 再解析启动入口(包里有些 Activity 是跳板,直接启动会立刻跳走、只在虚拟屏留下空任务),
-     * 以 shell 包名调用 IActivityTaskManager.startActivityAsUser,带 ActivityOptions.setLaunchDisplayId。
-     * 占用只看本来那份(Claire 所在用户里的):用户在主屏用着装在别的用户里的那份时,不挡这一份。
+     * First confirm the user is not using this app on the main display: if it has a visible task there, do not launch
+     * (return [START_IN_USE_ON_MAIN]), since the system would otherwise move away or interrupt what the user is looking
+     * at. Background tasks may be pulled onto the virtual display. Then resolve the launch entry (some activities in a
+     * package are trampolines that jump away immediately and leave only an empty task on the virtual display), and call
+     * IActivityTaskManager.startActivityAsUser with the shell package name and ActivityOptions.setLaunchDisplayId.
+     * Occupancy only considers the original copy (in the user Claire runs as): a copy installed in another user that the
+     * user is using on the main display does not block this one.
      */
     override fun startApp(displayId: Int, packageName: String): Int = start(displayId, packageName, myUser)
 
-    /** ILauncherApps(LauncherApps 背后的系统服务);拿不到为 null。 */
+    /** ILauncherApps (the system service behind LauncherApps); null when unavailable. */
     internal val launcherApps: Any? by lazy {
         runCatching {
             val binder = Class.forName("android.os.ServiceManager").getMethod("getService", String::class.java).invoke(null, "launcherapps")
@@ -174,13 +178,13 @@ class ShellService(
     }
 
     /**
-     * 只有这个 App 的任务全在 Claire 的屏上时才结束进程再启动(回到初始页面)。
-     * 它在别的屏上还有任务(用户的状态)就绝不结束,改为普通启动并返回 [START_OK_COLD_IGNORED];
-     * 用户正在主屏用它时不启动。
+     * End the process and start again (back to the initial page) only when all of this app's tasks are on Claire's
+     * displays. If it still has tasks on other displays (user state), never end it; start normally instead and return
+     * [START_OK_COLD_IGNORED]. Do not launch while the user is using it on the main display.
      */
     override fun restartApp(displayId: Int, packageName: String): Int = restart(displayId, packageName, myUser)
 
-    /** 在另一份用户里打开:只认 [appCopyUsers] 判为能用的那几份(私密空间、别人的用户一律不碰),规则见 [AppCopies]。 */
+    /** Opens in another user copy: only copies [appCopyUsers] deems usable are accepted (private space and other people's users are never touched); rules in [AppCopies]. */
     override fun startAppInUser(displayId: Int, packageName: String, userId: Int, cold: Boolean): Int {
         if (userId == myUser) return if (cold) restartApp(displayId, packageName) else startApp(displayId, packageName)
         if (!ownDisplay(displayId)) return START_ERROR
@@ -210,9 +214,10 @@ class ShellService(
     }
 
     /**
-     * 打开链接或设置页。外壳这边再按 [ShellLinks] 查一次链接;解析不到返回 [START_UNRESOLVED]。
-     * 能打开它的 App 在主屏有任务就不启动:带 NEW_TASK 的链接可能落进那个任务,出现在用户眼前。
-     * 只有一个 App 能打开时直接指定到那个页面,免得系统另选。
+     * Opens a link or settings page. The shell side checks the link once more through [ShellLinks]; returns
+     * [START_UNRESOLVED] when nothing resolves. Do not launch when an app that can open it has a task on the main
+     * display: a link with NEW_TASK may land in that task and appear before the user. When only one app can open it,
+     * target that page directly so the system does not pick another.
      */
     override fun startView(displayId: Int, action: String?, uri: String?, packageName: String?): Int = synchronized(launchLock) {
         if (!ownDisplay(displayId)) return START_ERROR
@@ -220,7 +225,7 @@ class ShellService(
         val intent = Intent(action ?: Intent.ACTION_VIEW).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         uri?.let { intent.data = Uri.parse(it) }
         packageName?.let { intent.setPackage(it) }
-        // 网页式链接只交给声明了可从链接打开的页面,不碰 App 的内部页面
+        // A web-style link only goes to pages that declare they are openable from links, never an app's internal page
         if (action == null) intent.addCategory(Intent.CATEGORY_BROWSABLE)
         val candidates = activitiesFor(intent, null) ?: return START_ERROR
         if (candidates.isEmpty()) return START_UNRESOLVED
@@ -253,8 +258,10 @@ class ShellService(
     }
 
     /**
-     * 把文字分享给 [packageName]:ACTION_SEND text/plain 带 EXTRA_TEXT,只交给这个包。它没有收文字分享的页面返回 [START_UNRESOLVED];
-     * 和 [startApp] 一样,用户在主屏用着它时不启动。只有一个收分享的页面时直接指定,有几个时由系统问用哪一个。
+     * Shares text with [packageName]: ACTION_SEND text/plain with EXTRA_TEXT, delivered only to that package. Returns
+     * [START_UNRESOLVED] when it has no page accepting text shares; like [startApp], do not launch while the user is
+     * using it on the main display. Target the page directly when there is only one share target; with several, the
+     * system asks which one.
      */
     override fun startShare(displayId: Int, packageName: String, text: String): Int = synchronized(launchLock) {
         if (!ownDisplay(displayId)) return START_ERROR
@@ -286,8 +293,10 @@ class ShellService(
     }
 
     /**
-     * 把一个工作区文件分享给 [packageName]:ACTION_SEND + EXTRA_STREAM,content URI 允许对方读,只交给这个包。
-     * 它没有收这类分享的页面返回 [START_UNRESOLVED];用户在主屏用着它时不启动。只打开分享页,发不发由模型在那一页上点。
+     * Shares one workspace file with [packageName]: ACTION_SEND + EXTRA_STREAM, with the content URI readable by the
+     * receiver and delivered only to that package. Returns [START_UNRESOLVED] when it has no page accepting such
+     * shares; do not launch while the user is using it on the main display. Only the share page is opened; whether to
+     * send is up to the model tapping on that page.
      */
     override fun startShareFile(displayId: Int, packageName: String, uri: String, mime: String, text: String): Int = synchronized(launchLock) {
         if (!ownDisplay(displayId)) return START_ERROR
@@ -320,13 +329,16 @@ class ShellService(
     }
 
     /**
-     * 系统动作(见 [SystemIntents]):只放行那几种 intent。没有页面接返回 [START_UNRESOLVED];和 [startView] 一样,
-     * 接手的 App 在主屏有任务就不启动。先以 shell 身份启动;不成(接手的页面要求 shell 没有的权限,如设闹钟)时发出 Claire 做好的
-     * [asMika]:以 Claire 的身份启动(权限按 Claire 查),屏和后台启动按发出的这一方(shell)查,仍落在这块屏上。
+     * System actions (see [SystemIntents]): only those intents are allowed through. Returns [START_UNRESOLVED] when no
+     * page accepts it; like [startView], do not launch when the receiving app has a task on the main display. Try
+     * launching as shell first; when that fails (the receiving page requires a permission shell lacks, such as setting
+     * an alarm), send the [asMika] PendingIntent Claire prepared: it launches as Claire (permissions checked as
+     * Claire), while the display and background-start checks follow the sender (shell), and it still lands on this
+     * display.
      */
     override fun startSystemAction(displayId: Int, intent: Intent, asMika: android.app.PendingIntent?): Int = synchronized(launchLock) {
         if (!ownDisplay(displayId)) return START_ERROR
-        // Claire 自己的兼容性自检页:以 shell 身份直接开到这块屏
+        // Claire's own compatibility self-check page: opened directly onto this display as shell
         if (intent.component?.className == SystemIntents.OWN_PAGE_CLASS) return startOwnPage(displayId, intent)
         if (!SystemIntents.allowed(intent.action, intent.dataString)) return START_INVALID_LINK
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -355,7 +367,7 @@ class ShellService(
         }
         if (asShell) return START_OK
         if (asMika == null) return START_ERROR
-        // 安卓 14 起 PendingIntent 的发出方要明说允许它从后台启动页面
+        // Since Android 14 the sender of a PendingIntent must explicitly allow it to start activities from the background
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             options.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
         }
@@ -419,8 +431,9 @@ class ShellService(
     }
 
     /**
-     * IActivityTaskManager.moveRootTaskToDisplay(taskId, displayId),即 `am display move-stack` 背后的调用。
-     * 真机(安卓 14)手动验证:任务在虚拟屏与主屏之间双向都能挪。Claire 启动的任务都是根任务。
+     * IActivityTaskManager.moveRootTaskToDisplay(taskId, displayId), the call behind `am display move-stack`.
+     * Manually verified on a real device (Android 14): tasks move both ways between the virtual display and the main
+     * display. Tasks Claire launches are all root tasks.
      */
     override fun moveTask(taskId: Int, displayId: Int): Boolean = try {
         taskManager.javaClass.getMethod("moveRootTaskToDisplay", Int::class.java, Int::class.java)
@@ -432,22 +445,30 @@ class ShellService(
     }
 
     /**
-     * 任务结束时留在主屏后面的任务:任务编号 → 键([AppsAfterTask.keyOf])。下次 Claire 打开同一份 App 时把它挪回来([resumeKept])。
-     * 只在内存里:助手重启后不认得,打开时照常走启动入口(系统多半也会把这个后台任务拉过来)。
+     * Tasks kept behind the main display when a task ended: task ID → key ([AppsAfterTask.keyOf]). The next time
+     * Claire opens the same app copy it is moved back ([resumeKept]). In memory only: after a helper restart it is
+     * unknown, so opening goes through the normal launch entry (the system will most likely pull that background task
+     * over anyway).
      */
     internal val kept = HashMap<Int, String>()
 
     /**
-     * 任务结束:按 [AppsAfterTask] 定下这块屏上每个任务的去留,留下的挪到主屏最后面,再释放这块屏(屏带着
-     * FLAG_DESTROY_CONTENT_ON_REMOVAL,没挪走的随屏关掉)。顺序:定去留 → 挪留下的 → 再看一眼出声的 → 等它们退到看不见([SettleBehind])
-     * → 还看得见的挪回这块屏 → 释放。静音由 Claire 在这之后还原,留下的 App 不会在还原时突然出声。
+     * End of a task: decide each task's fate on this display per [AppsAfterTask], move the kept ones to the back of the
+     * main display, then release this display (it carries FLAG_DESTROY_CONTENT_ON_REMOVAL, so whatever was not moved is
+     * closed with it). Order: decide fates → move the kept ones → look once more at the audible ones → wait for them to
+     * retreat out of sight ([SettleBehind]) → move back to this display anything still visible → release. Claire
+     * restores muting after this, so kept apps do not suddenly make noise during the restore.
      *
-     * 挪到最后面的做法(都是安卓原版的接口):先用 WindowContainerTransaction.setHidden 把任务藏起来,
-     * 再 moveRootTaskToDisplay 挪到主屏(系统总是把它放在最上面,藏着就不显示、不拿焦点、不让用户正在用的页面暂停),
-     * 接着在同一个事务里 reorder 到最后面并取消隐藏。隐藏或移动本身失败时照旧随屏关掉。
+     * How moving to the back works (all Android-original interfaces): first hide the task with
+     * WindowContainerTransaction.setHidden, then moveRootTaskToDisplay to the main display (the system always puts it on
+     * top; hidden means it is not shown, takes no focus and does not pause the page the user is using), then reorder to
+     * the back and unhide in the same transaction. If hiding or moving itself fails, it is closed with the display as
+     * before.
      *
-     * 挪和收尾在 [launchLock] 里做;中间等过渡(最多 [SettleBehind.TIMEOUT_MS])不占着锁,别的任务照常能打开 App。
-     * 这段时间里被别的任务拿到它屏上的不再管;留下的任务也要等收尾时才记进 [kept],等的时候 [resumeKept] 不会拿它。
+     * Moving and wrapping up run under [launchLock]; waiting for the transition in between (at most
+     * [SettleBehind.TIMEOUT_MS]) does not hold the lock, so other tasks can still open apps. Tasks that another task
+     * took onto its own display during that time are no longer handled; kept tasks are recorded into [kept] only when
+     * wrapping up, and [resumeKept] will not take them while waiting.
      */
     override fun finishDisplay(displayId: Int, keep: Array<String>?, close: Array<String>?): Bundle? {
         val sorting = synchronized(launchLock) {
@@ -458,7 +479,7 @@ class ShellService(
         return synchronized(launchLock) { closeOut(displayId, sorting, settled) }
     }
 
-    /** [finishDisplay] 的第一段:留下的([moved])已挪到主屏;[hidden] 是挪过去以后取消隐藏没做成的。 */
+    /** The first stage of [finishDisplay]: the kept ones ([moved]) have been moved to the main display; [hidden] are those whose unhide failed after moving. */
     internal class Sorting(
         val moved: MutableList<AppsAfterTask.Fate>,
         val closed: MutableList<String>,
@@ -466,14 +487,14 @@ class ShellService(
         val hidden: Set<Int>,
     )
 
-    /** OK:挪到主屏最后面了;HIDDEN:挪过去了,但取消隐藏没做成,还藏着;UNSUPPORTED:这台系统挪不了。 */
+    /** OK: moved to the back of the main display; HIDDEN: moved over but the unhide failed, so it is still hidden; UNSUPPORTED: this system cannot move it. */
     internal enum class Behind { OK, HIDDEN, UNSUPPORTED }
 
     internal val ownPackages: Set<String> by lazy {
         runCatching { context.packageManager.getPackagesForUid(allowedUid)?.toSet() }.getOrNull().orEmpty()
     }
 
-    /** 主屏任务的记录:Agent 动作前开始盯,见 [MainScreenWatch]。第一次用到才建(线程、任务栈监听)。 */
+    /** Records of main-display tasks: starts watching before an Agent action, see [MainScreenWatch]. Created on first use (thread, task stack listener). */
     internal val mainWatch by lazy { MainScreenWatch({ taskManager }, ::taskRows) }
 
     override fun watchMainScreen(windowMs: Int): Int = try {
@@ -498,7 +519,7 @@ class ShellService(
     }
 
     override fun injectKey(displayId: Int, keyCode: Int): Boolean {
-        // 与 press_key 同一张白名单:即便调用方出错,也不从这里发出音量、电源、Home 之类的整机按键
+        // The same allowlist as press_key: even if the caller errs, never emit device-wide keys such as volume, power or Home from here
         if (!PressKeys.isAllowed(keyCode)) {
             Log.w(TAG, "refused key $keyCode")
             return false
@@ -506,9 +527,9 @@ class ShellService(
         val now = SystemClock.uptimeMillis()
         val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, 0, VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD)
         val up = KeyEvent.changeAction(down, KeyEvent.ACTION_UP)
-        // 按键由系统按输入焦点路由,不认 event 上的 displayId:不定向的话会投到主屏焦点,虚拟屏上的 App 收不到返回键。
-        // 解析到虚拟屏顶部任务的 uid 时定向投给它;定向没投出去再退回非定向注入(和旧路径一致),最后才走 shell 命令。
-        // 逐级实际走的通道记进日志,方便在真机上定位 back 注入失效(#622)。
+        // The system routes keys by input focus and ignores the displayId on the event: untargeted, they go to the main-screen focus and the app on the virtual display never gets the back key.
+        // When the top task's uid on the virtual display resolves, target it; if targeting does not go through, fall back to untargeted injection (as in the old path), and only then to a shell command.
+        // Log the channel actually used at each level, to help locate back-injection failures on real devices (#622).
         val uid = topTaskUid(displayId)
         var channel = if (uid != null) "targeted" else "nontargeted"
         val ok = if (uid != null) {
@@ -531,7 +552,7 @@ class ShellService(
         return ok
     }
 
-    /** 自有虚拟屏上的 Ctrl+A / Ctrl+V,同时发送修饰键按下和抬起;松开修饰键失败不会把已经发出的正文判成未发送。 */
+    /** Ctrl+A / Ctrl+V on its own virtual display, sending the modifier down and up as well; failing to release the modifier does not mark the already-sent text as unsent. */
     override fun injectCtrlKey(displayId: Int, keyCode: Int): Int {
         if (!ownDisplay(displayId)) return AsciiTextKeys.NOT_SENT
         if (keyCode != KeyEvent.KEYCODE_A && keyCode != KeyEvent.KEYCODE_V) {
@@ -623,9 +644,11 @@ class ShellService(
     }
 
     /**
-     * 一根手指的一笔:按下、按 [times] 逐点移动、在最后一点抬起;每个事件到了它的时刻才注入(事件时间就是那一刻),
-     * App 看到的速度就是 Claire 排好的快慢。只发到 Claire 自己的屏。按下没注入成功返回 false(调用方改走别的路);
-     * 按下之后中途哪个点没注入成功也照样往下走,最后一定补发抬起,不让手指一直按着。
+     * One finger stroke: down, move point by point according to [times], up at the last point; each event is injected
+     * only when its moment arrives (the event time is that moment), so the app sees exactly the pace Claire planned.
+     * Sent only to Claire's own display. Returns false when the down event was not injected (the caller takes another
+     * route); if a later point fails to inject it still continues, and the up event is always sent at the end so the
+     * finger is never left pressed.
      */
     override fun injectStroke(displayId: Int, xs: IntArray, ys: IntArray, times: LongArray): Boolean {
         if (!ownDisplay(displayId)) return false
@@ -651,20 +674,23 @@ class ShellService(
     }
 
     /**
-     * `appops set <pkg> PLAY_AUDIO deny`;首次静音时记下原模式(同时落文件),取消静音时恢复。
-     * 用 deny 而不是 ignore:`ignore` 只是把声音压掉,App 仍处于「在播」、仍持有音频焦点,会抢走前台正在播的 App 的声音(#483/#228);
-     * `deny` 让它的音频起不来,也就不占焦点。原来没设置过的恢复成 allow,不写 default(见 [AudioMuteLedger.restoreMode])。
-     * 命令失败返回 false,且不记录原模式(读不到原值就不改)。作用在 Claire 所在的用户上(本来那份)。
+     * `appops set <pkg> PLAY_AUDIO deny`; the original mode is recorded on the first mute (and written to
+     * the file), and restored when unmuting. Use deny rather than ignore: `ignore` only suppresses the sound, the app
+     * still counts as "playing" and still holds audio focus, stealing the sound of the app playing in the foreground
+     * (#483/#228); `deny` keeps its audio from starting at all, so it holds no focus. A mode that was never set is
+     * restored to allow, not default (see [AudioMuteLedger.restoreMode]). Returns false when the command fails, and
+     * then does not record the original mode (no change when the original value cannot be read). Acts on the user
+     * Claire runs as (the original copy).
      */
     override fun setAudioMuted(packageName: String, muted: Boolean): Boolean = audioMuted(packageName, null, muted)
 
-    /** 同 [setAudioMuted],作用在 [userId] 那份用户里的那份(分身、工作资料);记录按 [AppAudioKey] 分开记。 */
+    /** Same as [setAudioMuted] but acting on the copy in user [userId] (clone, work profile); records are kept separately by [AppAudioKey]. */
     override fun setAudioMutedInUser(packageName: String, userId: Int, muted: Boolean): Boolean {
         if (userId == myUser) return audioMuted(packageName, null, muted)
         return audioMuted(packageName, otherUser(userId) ?: return false, muted)
     }
 
-    /** 启动时把上次没来得及恢复的包还原(只动记录里的)。 */
+    /** At startup, restore packages whose restore did not finish last time (only those in the records). */
     fun recoverMuted() {
         synchronized(muted) { muted.restoreAll(::writeRecorded) }
     }
@@ -676,7 +702,7 @@ class ShellService(
         return audioMode(packageName, otherUser(userId) ?: return null)
     }
 
-    /** "default"(没设置过)按 allow 写,理由同 [AudioMuteLedger.restoreMode]。 */
+    /** "default" (never set) is written as allow, for the reason given in [AudioMuteLedger.restoreMode]. */
     override fun setAudioMode(packageName: String, mode: String): Boolean = audioMode(packageName, null, mode)
 
     override fun setAudioModeInUser(packageName: String, userId: Int, mode: String): Boolean {
@@ -685,8 +711,10 @@ class ShellService(
     }
 
     /**
-     * 该包([userId] 那份用户里的)在主屏上有看得见的任务:用户正在主屏用它。静音按包作用,这时静了它用户手上的也没声了,
-     * Claire 据此不去静它。看不清主屏时按「在用」答,宁可不静也不把用户正在用的静了。
+     * The package (the copy in user [userId]) has a visible task on the main display: the user is using it there.
+     * Muting applies per package, so muting it now would also silence what the user is holding; Claire therefore does
+     * not mute it. When the main display cannot be inspected, answer "in use": better not to mute than to mute what the
+     * user is using.
      */
     override fun visibleOnMainScreen(packageName: String, userId: Int): Boolean =
         try {
@@ -697,17 +725,18 @@ class ShellService(
         }
 
     /**
-     * 只有读得到用户原来的剪贴板才动它:读不到就分不清「原来是空的」和「有内容但看不到」,
-     * 覆盖了就还原不回去,这时返回 [CLIP_UNREADABLE],剪贴板保持原样。
+     * Only touch the user's clipboard when the original can be read: if it cannot, "it was originally empty" and "it
+     * has content but cannot be seen" are indistinguishable, and once overwritten it cannot be restored, so return
+     * [CLIP_UNREADABLE] and leave the clipboard as it is.
      */
     override fun setClipText(text: String): Int = synchronized(clipLock) {
         try {
-            // 上次还原因读不到而没完成时,先再还原一次;仍读不到就不能覆盖此刻可能属于用户的新内容。
+            // If the previous restore did not finish because the clipboard was unreadable, restore once more first; if it is still unreadable, do not overwrite content that may now belong to the user.
             if (clipSaved && !restoreClip()) return CLIP_UNREADABLE
             if (!clipSaved) {
                 if (!canReadClipboard()) return CLIP_UNREADABLE
                 val prior = clipboard.primaryClip
-                // 读到空不一定是空:系统可能悄悄拦下了读取,这时有无、描述还会说有内容
+                // An empty read is not necessarily empty: the system may have silently blocked it, while presence and description still report content
                 when (ShellClip.read(prior != null, clipboard.hasPrimaryClip(), clipboard.primaryClipDescription != null)) {
                     ShellClip.Read.Unreadable -> {
                         Log.i(TAG, "setClipText: clip present but unreadable, not replacing")
@@ -744,8 +773,9 @@ class ShellService(
                 ShellClip.Restore.Clear -> clipboard.clearPrimaryClip()
                 ShellClip.Restore.Leave -> Unit
             }
-            // 写入也可能被系统悄悄拒绝:再读一次,仍是 Claire 的或此刻读不到都保留记录,下次继续尝试。
-            // 用户已经复制了别的内容时保留用户的新内容,留底可以清掉。
+            // The write can also be silently refused by the system: read once more; if it is still Claire's or unreadable
+            // right now, keep the record and try again next time. When the user has already copied something else, keep
+            // the user's new content and the saved copy may be cleared.
             val after = nowState(ourText)
             after != ShellClip.Now.Ours && after != ShellClip.Now.Unreadable
         }.onFailure { Log.w(TAG, "restoreClip failed", it) }.getOrDefault(false)
@@ -778,7 +808,7 @@ class ShellService(
     }
 
     public override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
-        // 内置助手的进程不跟着 Claire 结束,Binder 也可能被别人拿到:只有 Claire 能调用接口方法
+        // The helper process does not end with Claire and the Binder may be obtained by others: only Claire may call interface methods
         if (code in FIRST_CALL_TRANSACTION..LAST_CALL_TRANSACTION &&
             Binder.getCallingUid() != allowedUid
         ) {
@@ -846,7 +876,7 @@ class ShellService(
 
     override fun runCommand(command: String): Bundle = exec(command, null)
 
-    /** 助手进程看 Claire 交来的心愿(见 [setRestoreWish]);Claire 死后据此决定要不要把它拉起来。 */
+    /** The helper process sees the wish Claire hands over (see [setRestoreWish]); after Claire dies it decides from it whether to bring her back up. */
     @Volatile var onRestoreWish: ((Int) -> Unit)? = null
 
     override fun setRestoreWish(flags: Int) {
@@ -866,7 +896,7 @@ class ShellService(
 
     override fun openDevtoolsSocket(name: String): ParcelFileDescriptor? {
         val pid = DevtoolsSocket.pidOf(name) ?: return null
-        // 只连 Claire 自己进程的调试套接字:别的 App 的网页不经这里
+        // Only connect to debug sockets of Claire's own process: other apps' web pages do not go through here
         val uid = runCatching { DevtoolsSocket.procUid(File("/proc/$pid/status").readText()) }.getOrNull()
         if (uid != allowedUid) {
             Log.w(TAG, "devtools socket refused: pid $pid is not Claire's (uid $uid)")
@@ -880,7 +910,7 @@ class ShellService(
             Log.w(TAG, "devtools socket $name: ${e.message}")
             null
         } finally {
-            // 交出去的是复制的 fd,这一份关掉
+            // What is handed out is a duplicated fd, so close this copy
             runCatching { socket.close() }
         }
     }
@@ -909,7 +939,7 @@ class ShellService(
         internal const val TAG = "MikaShell"
         internal const val MAX_TASKS = 100
         internal const val TAP_MS = 50L
-        // injectStroke 一笔的上限:点数、从按下到抬起的毫秒数
+        // Upper bounds for one injectStroke stroke: number of points, milliseconds from down to up
         internal const val STROKE_MAX_POINTS = 1_024
         internal const val STROKE_MAX_MS = 10_000L
         internal const val CMD_TIMEOUT_S = 10L
@@ -922,29 +952,29 @@ class ShellService(
         const val START_IN_USE_ON_MAIN = 1
         const val START_NOT_FOUND = 2
         const val START_ERROR = 3
-        /** 冷启动被改成了普通启动:App 在 Claire 的屏以外还有任务。 */
+        /** The cold start was turned into a normal start: the app still has tasks outside Claire's displays. */
         const val START_OK_COLD_IGNORED = 4
-        /** startView:没有 App 能打开这个链接。 */
+        /** startView: no app can open this link. */
         const val START_UNRESOLVED = 5
-        /** startView:链接不允许打开(见 [ShellLinks])。 */
+        /** startView: the link may not be opened (see [ShellLinks]). */
         const val START_INVALID_LINK = 6
-        /** 这个 App 正在 Claire 的另一块屏上给别的任务用。 */
+        /** This app is being used by another task on another Claire display. */
         const val START_IN_USE_BY_OTHER = 7
-        /** startAppInUser:那份用户不在能用之列(见 [AppCopies])。 */
+        /** startAppInUser: that user copy is not in the usable list (see [AppCopies]). */
         const val START_USER_NOT_ALLOWED = 8
 
-        // appCopyUsers 的 Bundle
+        // Bundle of appCopyUsers
         const val KEY_COPY_USERS = "users"
         const val KEY_COPY_SUMMARY = "summary"
         // UserProperties.PROFILE_API_VISIBILITY_HIDDEN
         internal const val PROFILE_API_VISIBILITY_HIDDEN = 1
 
-        // setClipText 的结果
+        // Results of setClipText
         const val CLIP_SET = 0
         const val CLIP_UNREADABLE = 1
         const val CLIP_FAILED = 2
         internal const val CLIP_LABEL = "Claire"
-        // AppOpsManager 里这个名字是隐藏的
+        // This name is hidden in AppOpsManager
         internal const val OPSTR_READ_CLIPBOARD = "android:read_clipboard"
         internal const val READ_CLIPBOARD_IN_BACKGROUND = "android.permission.READ_CLIPBOARD_IN_BACKGROUND"
 
@@ -955,11 +985,11 @@ class ShellService(
         internal const val INJECT_MODE_WAIT_FOR_FINISH = 2 // InputManager.INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH
         internal const val VIRTUAL_KEYBOARD = -1 // KeyCharacterMap.VIRTUAL_KEYBOARD
         internal const val USER_CURRENT = -2 // UserHandle.USER_CURRENT
-        // WindowConfiguration.ACTIVITY_TYPE_*:桌面、最近任务、助理等是别的种类
+        // WindowConfiguration.ACTIVITY_TYPE_*: home, recents, assistant and so on are other types
         internal const val ACTIVITY_TYPE_UNDEFINED = 0
         internal const val ACTIVITY_TYPE_STANDARD = 1
 
-        // DisplayManager.VIRTUAL_DISPLAY_FLAG_*(部分为隐藏常量)
+        // DisplayManager.VIRTUAL_DISPLAY_FLAG_* (some are hidden constants)
         internal const val FLAG_PUBLIC = 1 shl 0
         internal const val FLAG_OWN_CONTENT_ONLY = 1 shl 3
         internal const val FLAG_SUPPORTS_TOUCH = 1 shl 6
@@ -973,9 +1003,10 @@ class ShellService(
         internal const val FLAG_STEAL_TOP_FOCUS_DISABLED = 1 shl 16
 
         /**
-         * 建虚拟屏用的标志。[trusted] 为 false 时去掉依赖可信屏的那几项:有的系统里 shell 没有
-         * ADD_TRUSTED_DISPLAY,带上 TRUSTED 会被系统以 SecurityException 拒绝;OWN_DISPLAY_GROUP、ALWAYS_UNLOCKED
-         * 和 OWN_FOCUS/STEAL_TOP_FOCUS_DISABLED 同样只对可信屏可用。其余几项与可信与否无关,照旧。
+         * Flags used to create the virtual display. When [trusted] is false the items that depend on a trusted display
+         * are dropped: on some systems shell lacks ADD_TRUSTED_DISPLAY and including TRUSTED is rejected with a
+         * SecurityException; OWN_DISPLAY_GROUP, ALWAYS_UNLOCKED and OWN_FOCUS/STEAL_TOP_FOCUS_DISABLED are likewise
+         * trusted-only. The remaining ones do not depend on trust and are kept.
          */
         internal fun displayFlags(sdk: Int, trusted: Boolean): Int {
             var flags = FLAG_PUBLIC or FLAG_OWN_CONTENT_ONLY or FLAG_SUPPORTS_TOUCH or
@@ -984,8 +1015,9 @@ class ShellService(
                 flags = flags or FLAG_TOUCH_FEEDBACK_DISABLED
                 if (trusted) flags = flags or FLAG_TRUSTED or FLAG_OWN_DISPLAY_GROUP or FLAG_ALWAYS_UNLOCKED
             }
-            // 只有 OWN_FOCUS 时,虚拟屏上启动 App 或 App 自己开新页面都会让它成为「最上层焦点屏」,
-            // 主屏的焦点窗口随之清空;STEAL_TOP_FOCUS_DISABLED(需同时有 OWN_FOCUS、TRUSTED)让它不抢主屏的焦点
+            // With OWN_FOCUS alone, launching an app on the virtual display or the app opening a new page makes it the
+            // "topmost focused display" and the main display's focused window is cleared; STEAL_TOP_FOCUS_DISABLED
+            // (requires both OWN_FOCUS and TRUSTED) keeps it from stealing the main display's focus
             if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && trusted) {
                 flags = flags or FLAG_OWN_FOCUS or FLAG_STEAL_TOP_FOCUS_DISABLED
             }
@@ -993,9 +1025,12 @@ class ShellService(
         }
 
         /**
-         * 注入方式。按键等到系统定下投给谁(WAIT_FOR_RESULT):屏上没有能接按键的窗口时注入报失败,调用方才会退回 shell 命令
-         * 或报动作失败,不再「发了就算成」;只等派发、不等 App 处理完,最多等到系统自己的注入超时。
-         * 触摸照旧不等(ASYNC):一笔划要按时间逐点送,等派发会打乱快慢。[waitForFinish] 的(主屏解锁输入)等 App 处理完。
+         * Injection mode. Keys wait until the system has decided whom to deliver to (WAIT_FOR_RESULT): when the
+         * display has no window that can take keys, injection reports failure and only then does the caller fall back
+         * to a shell command or report the action failed, instead of "sent counts as done"; it waits only for dispatch,
+         * not for the app to finish, up to the system's own injection timeout. Touches still do not wait (ASYNC): a
+         * stroke must be sent point by point on time, and waiting for dispatch would distort the pace. With
+         * [waitForFinish] (main-display unlock input) it waits for the app to finish.
          */
         internal fun injectMode(key: Boolean, waitForFinish: Boolean): Int = when {
             waitForFinish -> INJECT_MODE_WAIT_FOR_FINISH
@@ -1004,8 +1039,9 @@ class ShellService(
         }
 
         /**
-         * 一对按下/抬起:只有按下就没注入成功时才走 [fallback](shell 命令);按下已送达后再退回会造成一次多余的完整点击/按键,
-         * 这时只补发抬起(失败重试一次)。
+         * A down/up pair: [fallback] (a shell command) is used only when the down event was not injected; falling back
+         * after the down was delivered would cause one extra full tap/key press, so then only the up event is sent
+         * (retried once on failure).
          */
         internal inline fun sendPair(down: () -> Boolean, up: () -> Boolean, fallback: () -> Boolean): Boolean {
             if (!down()) return fallback()
@@ -1013,31 +1049,34 @@ class ShellService(
         }
 
         /**
-         * 有没有可定向注入的目标 uid。安卓 13 起才有定向注入重载(`injectInputEvent(event, mode, targetUid)`),
-         * 更早只能走非定向注入;包名缺失或 uid 解析为负(未装)也视为不可定向。
+         * Whether there is a target uid for targeted injection. The targeted overload
+         * (`injectInputEvent(event, mode, targetUid)`) exists only since Android 13; earlier versions can only inject
+         * untargeted; a missing package name or a uid resolving negative (not installed) also counts as untargetable.
          */
         internal fun resolveTargetUid(sdkInt: Int, packageName: String?, userId: Int, uidLookup: (String, Int) -> Int): Int? =
             if (sdkInt < 33 || packageName == null) null else uidLookup(packageName, userId).takeIf { it >= 0 }
 
-        /** 只有缺权限(SecurityException,如 shell 没有 ADD_TRUSTED_DISPLAY)才值得去掉可信标志再试;别的失败照旧报错。 */
+        /** Only a missing permission (SecurityException, e.g. shell lacking ADD_TRUSTED_DISPLAY) is worth retrying without the trusted flags; other failures are reported as before. */
         internal fun retryWithoutTrust(t: Throwable): Boolean = t is SecurityException
 
-        // WindowManager.DISPLAY_IME_POLICY_LOCAL = 0, _FALLBACK_DISPLAY = 1, _HIDE = 2。
-        // 真机(安卓 14)实测 LOCAL:在虚拟屏聚焦输入框后输入法窗口出现在虚拟屏上,主屏焦点不变,无需 HIDE。
+        // WindowManager.DISPLAY_IME_POLICY_LOCAL = 0, _FALLBACK_DISPLAY = 1, _HIDE = 2.
+        // Measured on a real device (Android 14) with LOCAL: after focusing an input field on the virtual display the IME
+        // window appears on the virtual display, main-screen focus is unchanged, and HIDE is unnecessary.
         internal const val IME_POLICY = 0
 
-        // SystemUI 的约定:来自 shell 的剪贴板带上它就不显示「已复制」浮层(否则会弹在用户的主屏上)
+        // SystemUI convention: clipboard data from shell carrying it shows no "copied" overlay (which would otherwise pop up on the user's main display)
         internal const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE" // ClipDescription.EXTRA_IS_SENSITIVE(API 33)
         internal const val EXTRA_SUPPRESS_CLIPBOARD_OVERLAY = "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
 
         /**
-         * 一个任务(页面所在的包 [taskPackages]、所属用户 [taskUser],读不到为 null)是不是 [packageName] 在 [userId] 那份用户里的那份。
-         * [userId] 为空时不分哪一份;任务的用户读不到时算是(宁可当成占用,不冒险打扰用户)。
+         * Whether a task (the packages its pages belong to [taskPackages], its user [taskUser], null when unreadable) is
+         * the copy of [packageName] in user [userId]. A null [userId] does not distinguish copies; when the task's user
+         * is unreadable it counts as a match (prefer treating it as occupied rather than risk disturbing the user).
          */
         internal fun sameCopy(taskPackages: Collection<String>, taskUser: Int?, packageName: String, userId: Int?): Boolean =
             packageName in taskPackages && (userId == null || taskUser == null || taskUser == userId)
 
-        /** 解析 `appops get <pkg> PLAY_AUDIO`:"PLAY_AUDIO: ignore; time=..." → "ignore";未设置 → "default"。 */
+        /** Parses `appops get <pkg> PLAY_AUDIO`: "PLAY_AUDIO: ignore; time=..." → "ignore"; not set → "default". */
         internal fun parsePlayAudioMode(output: String): String = AudioMuteLedger.parseSetMode(output) ?: "default"
     }
 }

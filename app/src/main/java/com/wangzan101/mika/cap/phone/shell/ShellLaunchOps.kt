@@ -26,11 +26,12 @@ import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.TASK_INFO
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.USER_CURRENT
 import com.wangzan101.mika.cap.phone.shell.ShellService.Companion.sameCopy
 
-// 助手服务:启动应用、分身与多用户、自家页面
+// Assistant service: launching apps, app clones and multiple users, and Claire's own page
 /**
- * 在 [userId] 那份用户里启动 [packageName](见 [startApp]);占用只看这一份(包名 + 用户)。
- * [userId] 是 Claire 自己的用户时按原来的方式启动(USER_CURRENT、包管理器给的入口);别的用户先在那份用户里查启动入口,
- * 再以那份用户启动,接口不可用时退回 `am start --user`。
+ * Launches [packageName] in the user copy [userId] (see [startApp]); occupancy is checked per copy only (package name
+ * + user). When [userId] is Claire's own user, launch the original way (USER_CURRENT, the entry point the package
+ * manager provides); for another user, first look up the launch entry in that user, then launch as that user, falling
+ * back to `am start --user` when the interface is unavailable.
  */
 internal fun ShellService.start(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
     if (!ownDisplay(displayId)) return START_ERROR
@@ -38,16 +39,16 @@ internal fun ShellService.start(displayId: Int, packageName: String, userId: Int
         if (inUseOnMainScreen(packageName, userId)) return START_IN_USE_ON_MAIN
         if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
     } catch (t: Throwable) {
-        // 看不清主屏状态时宁可不启动,也不冒险打扰用户
+        // When the main-screen state cannot be determined, better not to launch than to risk disturbing the user
         Log.e(TAG, "cannot inspect main-screen tasks", t)
         return START_ERROR
     }
-    // 上次任务留下的那个任务还在主屏后面:整个挪回来,接着那一页做,不另开一个从头来
+    // The task left behind by the previous task is still behind the main display: move the whole thing back and continue on that page instead of opening a new one from scratch
     if (resumeKept(displayId, packageName, userId)) return START_OK
     val intent = launchIntent(packageName, userId) ?: return START_NOT_FOUND
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
-    // 另一份用户里的先走桌面打开图标的那条路:有的系统对程序启动的另一份先弹「用哪一个打开」,桌面这条路不弹
+    // A copy in another user first tries the launcher-icon path: some systems show an "open with" chooser for a programmatic launch of another copy, while the launcher path does not
     val component = intent.component
     if (userId != myUser && component != null && startAsLauncher(component, userId, options)) return START_OK
     val ok = try {
@@ -70,14 +71,16 @@ internal fun ShellService.start(displayId: Int, packageName: String, userId: Int
 }
 
 /**
- * 像桌面那样打开另一份用户 [userId] 里的启动页 [component]:ILauncherApps.startActivityAsUser(LauncherApps.startMainActivity
- * 背后的接口),带同样的 [options](启动到 Claire 的屏)。系统那边按调用方查能不能碰那份用户:shell 有跨用户的权限,
- * 包名也对得上自己的 uid。接口不在、或被拒(抛错)返回 false,调用方改走 startActivityAsUser。
+ * Opens the launch page [component] in another user copy [userId] the way a launcher would:
+ * ILauncherApps.startActivityAsUser (the interface behind LauncherApps.startMainActivity), with the same [options]
+ * (launch onto Claire's display). The system checks whether the caller may touch that user: shell has cross-user
+ * permission, and the package name matches its own uid. Returns false when the interface is missing or rejected
+ * (throws), and the caller switches to startActivityAsUser.
  */
 internal fun ShellService.startAsLauncher(component: ComponentName, userId: Int, options: Bundle): Boolean = try {
     val la = launcherApps ?: throw IllegalStateException("no launcherapps service")
     val user = UserHandle.getUserHandleForUid(userId * PER_USER_RANGE)
-    // 安卓 11 起:(caller, callingPackage, callingFeatureId, component, sourceBounds, opts, user);更早没有 callingFeatureId
+    // Since Android 11: (caller, callingPackage, callingFeatureId, component, sourceBounds, opts, user); earlier versions have no callingFeatureId
     val m = la.javaClass.methods.first { it.name == "startActivityAsUser" && it.parameterTypes.size in 6..7 && ComponentName::class.java in it.parameterTypes }
     val args: Array<Any?> = if (m.parameterTypes.size == 7) arrayOf(null, ShellContext.SHELL_PACKAGE, null, component, null, options, user)
     else arrayOf(null, ShellContext.SHELL_PACKAGE, component, null, options, user)
@@ -89,8 +92,9 @@ internal fun ShellService.startAsLauncher(component: ComponentName, userId: Int,
 }
 
 /**
- * 打开 [packageName] 用的 intent:Claire 自己的用户里就是包管理器给的入口;别的用户里查那份用户的启动页
- * (隐藏接口 queryIntentActivitiesAsUser,不行改问 `cmd package query-activities --user`)。查不到为 null。
+ * The intent used to open [packageName]: in Claire's own user it is the entry point the package manager provides; in
+ * another user the launch page of that user copy is looked up (the hidden interface queryIntentActivitiesAsUser, or
+ * else `cmd package query-activities --user`). Null when it cannot be found.
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.launchIntent(packageName: String, userId: Int): Intent? {
@@ -109,7 +113,7 @@ internal fun ShellService.launchIntent(packageName: String, userId: Int): Intent
     return Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(ComponentName(pkg, cls))
 }
 
-/** 这些包里有在 Claire 另一块屏(不是 [displayId])上的任务:那是别的任务正在用的 App。[userId] 不为空时只看那份用户里的。 */
+/** One of these packages has a task on another Claire display (not [displayId]): another task is using that app. When [userId] is non-null only that user copy is considered. */
 internal fun ShellService.onOtherOwnDisplay(packages: Collection<String>, displayId: Int, userId: Int? = null): Boolean {
     val others = synchronized(displays) { displays.keys.toSet() } - displayId
     if (others.isEmpty()) return false
@@ -117,18 +121,18 @@ internal fun ShellService.onOtherOwnDisplay(packages: Collection<String>, displa
     return allTasks().any { t -> displayField.getInt(t) in others && packages.any { isCopy(t, it, userId) } }
 }
 
-/** 任务是 [packageName] 在 [userId] 那份用户里的那份(规则见 [sameCopy])。 */
+/** Whether the task is the copy of [packageName] in user [userId] (rules in [sameCopy]). */
 internal fun ShellService.isCopy(task: Any, packageName: String, userId: Int?): Boolean =
     sameCopy(packagesOf(task), runCatching { TASK_INFO.getField("userId").getInt(task) }.getOrNull(), packageName, userId)
 
-/** [restartApp] 作用在 [userId] 那份用户里的那份:只看这一份的任务、只结束这份用户里的进程,装在别的用户里的另一份不动。 */
+/** [restartApp] acting on the copy in user [userId]: only this copy's tasks are considered and only processes in this user are ended; another copy installed in a different user is left alone. */
 internal fun ShellService.restart(displayId: Int, packageName: String, userId: Int): Int = synchronized(launchLock) {
-    // 不是自己建的屏(含主屏)一律不动,更不能先结束进程
+    // Never touch a display it did not create (including the main display), and never end the process first
     if (!ownDisplay(displayId)) return START_ERROR
     val decision = try {
-        // 别的任务正在 Claire 另一块屏上用它:绝不结束它的进程
+        // Another task is using it on another Claire display: never end its process
         if (onOtherOwnDisplay(listOf(packageName), displayId, userId)) return START_IN_USE_BY_OTHER
-        // 要从头开:上次任务留在主屏后面的那份是 Claire 自己留下的,先关掉,不算用户的状态
+        // Starting from scratch: the copy the previous task left behind the main display was left by Claire herself, so close it first; it is not user state
         dropKept(packageName, userId)
         val displayField = TASK_INFO.getField("displayId")
         val taskDisplays = allTasks().filter { isCopy(it, packageName, userId) }.map { displayField.getInt(it) }
@@ -150,8 +154,10 @@ internal fun ShellService.restart(displayId: Int, packageName: String, userId: I
 }
 
 /**
- * 这台手机的用户,按安卓原版的 UserInfo / UserProperties 读(隐藏接口反射):标记、类型、资料组、是否在运行、安静模式、
- * 是否和当前用户共用媒体、是否对别的 App 隐藏。读不到用户列表为 null;单项读不到的留空(按不满足算,见 [AppCopies])。
+ * The users on this phone, read through Android's original UserInfo / UserProperties (hidden interfaces via
+ * reflection): flags, type, profile group, whether running, quiet mode, whether media is shared with the current user,
+ * and whether hidden from other apps. A null user list means it cannot be read; individually unreadable items are left
+ * empty (counted as not satisfied, see [AppCopies]).
  */
 @SuppressLint("PrivateApi")
 internal fun ShellService.users(): List<AppCopies.User>? {
@@ -160,7 +166,7 @@ internal fun ShellService.users(): List<AppCopies.User>? {
     val list = (runCatching { um.javaClass.getMethod("getAliveUsers").invoke(um) }.getOrNull()
         ?: runCatching { um.javaClass.getMethod("getUsers").invoke(um) }.getOrNull()) as? List<*> ?: return null
     val info = Class.forName("android.content.pm.UserInfo")
-    // 系统自己给标记起的名字(dumpsys user 用的同一个 UserInfo.flagsToString,含系统自定义的标记);反射不行时读 dumpsys user
+    // The names the system itself gives the flags (the same UserInfo.flagsToString dumpsys user uses, including vendor-defined flags); when reflection fails, read dumpsys user
     val flagsToString = runCatching { info.getMethod("flagsToString", Int::class.javaPrimitiveType) }.getOrNull()
     val dumped by lazy { sh("dumpsys", "user").takeIf { it.first == 0 }?.second?.let(AppCopies::parseDumpsys).orEmpty() }
     return list.filterNotNull().map { u ->
@@ -184,26 +190,28 @@ internal fun ShellService.users(): List<AppCopies.User>? {
             mediaShared = prop("isMediaSharedWithParent") as? Boolean,
             hidden = (prop("getProfileApiVisibility") as? Int)?.let { it == PROFILE_API_VISIBILITY_HIDDEN },
             flagNames = names,
-            // dumpsys 里的 parentId 就是资料组(不是自己、也不是「不在组里」时才写);读到了一并带上
+            // parentId in dumpsys is the profile group (written only when it is neither itself nor "not in a group"); include it when read
             parentId = group.takeIf { it != id && it != AppCopies.NO_PROFILE_GROUP } ?: if (flagsToString == null) dumped[id]?.parentId else null,
         )
     }
 }
 
-/** flagsToString 的结果(如 "CLONED_PROFILE|FULL|INITIALIZED",有的版本带花括号)拆成名字。 */
+/** Splits the flagsToString result (such as "CLONED_PROFILE|FULL|INITIALIZED"; some versions add braces) into names. */
 internal fun ShellService.flagNames(s: String): List<String> = s.trim('{', '}', ' ').split('|', ' ', ',').map(String::trim).filter(String::isNotEmpty)
 
 /**
- * 以 shell 身份把 Claire 的兼容性自检页([SystemIntents.OWN_PAGE_CLASS])开到这块屏,和 [startApp] 同一条路
- * (startActivityAsUser 带 setLaunchDisplayId,不行退回 `am start --display`)。那一页只对持有 INTERACT_ACROSS_USERS_FULL 的
- * 调用方开放(shell 有,普通 App 没有);shell 启动不受后台启动页面的限制。包名必须是 Claire 自己的,别的组件一律不开。
+ * Opens Claire's compatibility self-check page ([SystemIntents.OWN_PAGE_CLASS]) on this display as shell, the same
+ * path as [startApp] (startActivityAsUser with setLaunchDisplayId, falling back to `am start --display`). That page is
+ * open only to callers holding INTERACT_ACROSS_USERS_FULL (shell has it, ordinary apps do not), and shell launches are
+ * not restricted by background activity start limits. The package name must be Claire's own; no other component is
+ * ever opened.
  */
 internal fun ShellService.startOwnPage(displayId: Int, intent: Intent): Int {
     val component = intent.component ?: return START_INVALID_LINK
     val mine = runCatching { context.packageManager.getPackagesForUid(allowedUid)?.toList() }.getOrNull().orEmpty()
-    // 只有 Claire 调得到这个服务;包名再核一次(查不到 Claire 的包名时只认类名)
+    // Only Claire can reach this service; check the package name once more (when Claire's package names cannot be queried, only the class name is checked)
     if (component.className != SystemIntents.OWN_PAGE_CLASS || (mine.isNotEmpty() && component.packageName !in mine)) return START_INVALID_LINK
-    // 每次都从头开一页:旧的那一页连同它的任务清掉,新的一定在 Claire 屏的最上面
+    // Always open a fresh page: the old page and its task are cleared, so the new one is guaranteed to be on top of Claire's display
     val page = Intent().setComponent(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
     val ok = try {
@@ -222,8 +230,9 @@ internal fun ShellService.startOwnPage(displayId: Int, intent: Intent): Int {
 }
 
 /**
- * 能接 [intent] 的页面,(包名, 完整类名)。系统接口在这一侧查不了时改问系统服务(见 [ActivityQuery]);都不行时为 null。
- * [type] 是 intent 的数据类型(命令里要单独给)。
+ * The pages that can handle [intent], as (package name, fully qualified class name). When the system interface cannot
+ * be used here, ask the system service instead (see [ActivityQuery]); null when neither works. [type] is the intent's
+ * data type (it must be given separately on the command line).
  */
 internal fun ShellService.activitiesFor(intent: Intent, type: String?): List<Pair<String, String>>? = try {
     context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).map { it.activityInfo.packageName to it.activityInfo.name }

@@ -2,13 +2,13 @@ package com.wangzan101.mika.cap.phone.shell
 
 import com.wangzan101.mika.core.tool.LinkPolicy
 
-/** 外壳服务打开链接前的两项判断,不依赖安卓类,单元测试直接调。 */
+/** The two checks the shell service makes before opening a link; depends on no Android classes, so unit tests call it directly. */
 internal object ShellLinks {
-    /** 链接不允许打开时返回 [ShellService.START_INVALID_LINK],允许为 null。分发器已查过,这里再查一次。 */
+    /** Returns [ShellService.START_INVALID_LINK] when the link may not be opened, null when it may. The dispatcher already checked; this checks once more. */
     fun refuse(action: String?, uri: String?, pkg: String?): Int? =
         if (LinkPolicy.check(action, uri, pkg) != null) ShellService.START_INVALID_LINK else null
 
-    /** 能打开链接的 App 里有一个在主屏有任务就算在用;一个都解析不出时看不清,也按在用处理。 */
+    /** In use when any app that can open the link has a task on the main display; when nothing resolves at all it is unclear, so it counts as in use as well. */
     fun inUse(candidates: List<String>, onMainScreen: Set<String>): Boolean =
         candidates.isEmpty() || candidates.any { it in onMainScreen }
 }
