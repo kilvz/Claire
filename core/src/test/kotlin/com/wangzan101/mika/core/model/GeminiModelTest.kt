@@ -49,7 +49,7 @@ class GeminiModelTest {
         assertEquals("gk", req.getHeader("x-goog-api-key"))
     }
 
-    /** 密钥被拒的回调要带上 HTTP 状态码(接线处据此区分 429 冷却与 401/403 耗尽),并就地换下一把 key 重试。 */
+    /** The key-rejected callback must carry the HTTP status code (the wiring uses it to distinguish a 429 cooldown from 401/403 exhaustion), and retry on the spot with the next key. */
     @Test fun keyRejectionCallbackCarriesStatusAndRotates() = runTest {
         server.enqueue(MockResponse().setResponseCode(403).setBody("""{"error":{"message":"permission denied"}}"""))
         server.enqueue(ok(cand("""[{"text":"ok"}]""")))
@@ -187,7 +187,7 @@ class GeminiModelTest {
         val rl = errorOf(429, err(429, "RESOURCE_EXHAUSTED", "slow down"), "Retry-After" to "3")
         assertEquals(3000L, (rl as ModelError.RateLimited).retryAfterMs)
         assertTrue(errorOf(429, err(429, "RESOURCE_EXHAUSTED", "You exceeded your current quota")) is ModelError.RateLimited)
-        // 这个模型的免费额度为零:等也没用,认成这个账号用不了这个模型,试调用时接着试下一个
+        // The free quota for this model is zero: waiting is pointless, so treat it as this account being unable to use this model, and keep trying the next one during the trial call
         val zero = errorOf(429, err(429, "RESOURCE_EXHAUSTED", "Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-x"))
         assertTrue(zero is ModelError.ModelNotAvailable)
         assertTrue(errorOf(404, err(404, "NOT_FOUND", "models/x is not found for API version v1beta, or is not supported for generateContent.")) is ModelError.ModelNotFound)
@@ -227,7 +227,7 @@ class GeminiModelTest {
         assertFalse(mp[1].jsonObject.containsKey("thoughtSignature"))
     }
 
-    // 别的模型产生的调用(没有签名):一轮里第一个调用发跳过校验的占位签名,其余照旧不带
+    // A call produced by another model (no signature): the first call of a turn gets the placeholder signature that skips verification, the rest are sent without one as before
     @Test fun foreignCallGetsSkipSignature() = runTest {
         server.enqueue(ok(cand("""[]""")))
         val foreign = Message(Role.Assistant, listOf(Part.Text("看看"), Part.ToolCall("c1", "phone_tap", "{}"), Part.ToolCall("c2", "phone_back", "{}")), Author.Mika)
@@ -240,7 +240,7 @@ class GeminiModelTest {
 
     @Test fun outputTokensIncludeThoughts() = runTest {
         server.enqueue(ok("""{"candidates":[{"content":{"parts":[{"text":"x"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"thoughtsTokenCount":7}}"""))
-        // 思考另记一份:不算上下文增长(见 UsageMeter)
+        // Thinking is booked separately: it does not count as context growth (see UsageMeter)
         assertEquals(Usage(10, 12, 0, reasoningTokens = 7), model().complete("s", user, emptyList()).usage)
     }
 
@@ -255,7 +255,7 @@ class GeminiModelTest {
         assertFalse(props.obj("additionalProperties").containsKey("additionalProperties"))
     }
 
-    // 插话打断后:半截回复是只有一段文字的 model 回合(没有 thought);插话和运行时状态并进下一个 user 回合,角色交替
+    // After a steering interruption: the truncated reply is a model turn with only a text part (no thought); the steer and the runtime state are merged into the next user turn, and roles keep alternating
     @Test fun interruptedReplyIsATextOnlyModelTurnBeforeTheSteer() = runTest {
         server.enqueue(ok(cand("""[{"text":"好"}]""")))
         model().complete("s", InterruptedHistory.messages, emptyList())

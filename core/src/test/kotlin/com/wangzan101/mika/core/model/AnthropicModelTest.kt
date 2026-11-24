@@ -73,7 +73,7 @@ class AnthropicModelTest {
         assertEquals("adaptive", j["thinking"]!!.jsonObject.str("type"))
         assertEquals("summarized", j["thinking"]!!.jsonObject.str("display"))
         assertEquals("high", j["output_config"]!!.jsonObject.str("effort"))
-        // 开思考时思考也占输出上限,默认上限放大
+        // With thinking on, thinking also counts against the output limit, so the default limit is raised
         assertEquals("16000", j.str("max_tokens"))
 
         server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}"""))
@@ -89,7 +89,7 @@ class AnthropicModelTest {
         assertFalse(off.containsKey("output_config"))
     }
 
-    // 列表写明了思考方式的:不接受自适应思考的模型不发档位,不接受关掉思考的不发 disabled(什么都不发,按服务端默认)
+    // For models whose list spells out the thinking types: models that do not accept adaptive thinking get no effort level, and models that do not accept turning thinking off get no disabled (send nothing at all, leaving it to the server default)
     @Test fun sendsOnlyTheThinkingTypesTheModelAccepts() = runTest {
         repeat(4) { server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}""")) }
         model(reasoningEffort = "high", thinkingTypes = listOf("enabled", "disabled")).complete("s", user, emptyList())
@@ -111,7 +111,7 @@ class AnthropicModelTest {
         Message(Role.User, listOf(Part.Text("go")), Author.Mika),
         Message(Role.Assistant, listOf(
             Part.Thinking("想", SignedThinking.signed(endpoint, "sig-1")), Part.Thinking("", SignedThinking.redacted(endpoint, "xyz")),
-            // 别的服务商留下的思考不能被当成本家的签名发出去
+            // Thinking left behind by another provider must not be sent out as this provider's signed block
             Part.Thinking("旧", """{"endpoint":"https://other.test","via":"reasoning"}"""),
             Part.Text("a"), Part.ToolCall("t1", "phone_tap", "{}"),
         ), Author.Mika),
@@ -120,7 +120,7 @@ class AnthropicModelTest {
 
     private fun sentAssistantBlocks() = sentBody().arr("messages")[1].jsonObject.arr("content").map { it.jsonObject }
 
-    // 带工具调用的回合要把签名思考块原样带回:选了档位和没选(服务端默认可能也在思考)都带;明确关掉思考时不带
+    // Turns with tool calls must replay their signed thinking blocks verbatim: both when an effort level is chosen and when it is not (the server default may also be thinking); nothing is sent when thinking is explicitly turned off
     @Test fun replaysSignedThinkingBlocksUnlessThinkingIsTurnedOff() = runTest {
         val history = signedHistory(endpoint)
         repeat(3) { server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}""")) }
@@ -138,14 +138,14 @@ class AnthropicModelTest {
         assertEquals(listOf("text", "tool_use"), sentAssistantBlocks().map { it.str("type") })
     }
 
-    // 签名只有发它的服务认:另一个地址收到的思考块(换了 Anthropic 兼容服务)不回传
+    // A signature is only accepted by the service that issued it: thinking blocks received from another endpoint (after switching to a different Anthropic-compatible service) are not replayed
     @Test fun doesNotReplaySignaturesToAnotherEndpoint() = runTest {
         server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}"""))
         model(reasoningEffort = "high").complete("s", signedHistory("https://other-gateway.test/v1/messages"), emptyList())
         assertEquals(listOf("text", "tool_use"), sentAssistantBlocks().map { it.str("type") })
     }
 
-    // 工具调用前的进度说明是单独的思考块,排在文字后面:回传时照收到的顺序,不挪到最前面
+    // The progress note before a tool call is a separate thinking block that comes after the text: replay follows the received order and does not move it to the front
     @Test fun replaysBlocksInTheOrderReceived() = runTest {
         server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}"""))
         val history = listOf(
@@ -166,7 +166,7 @@ class AnthropicModelTest {
         """{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation. Remove the block, or set `thinking.block_binding.prefix_mismatch_behavior` to \"drop_block\"."}}""",
     )
 
-    // 展开一组工具、压缩历史以后,签名绑着之前请求前缀的思考块被拒:这次带的都去掉重发一次,之后也不再带;重发后收到的照常回传
+    // After a group of tools is expanded and history is compacted, thinking blocks whose signatures are bound to an earlier request prefix get rejected: drop everything sent this round and resend once, and never send them again afterwards; whatever arrives after the resend is replayed as usual
     @Test fun dropsRejectedThinkingAndSendsAgainOnce() = runTest {
         val m = model(reasoningEffort = "high")
         server.enqueue(staleThinking())
@@ -208,7 +208,7 @@ class AnthropicModelTest {
         server.enqueue(staleThinking())
         server.enqueue(MockResponse().setHeader("Content-Type", "text/event-stream").setBody(sse))
         val shown = mutableListOf<String>()
-        // 没选思考强度(服务端默认可能也在思考)时同样回传、同样去掉重发
+        // With no effort level chosen (the server default may also be thinking) it replays them the same way and drops-and-resends the same way
         val r = model().completeStreaming("s", signedHistory(endpoint), emptyList()) { shown += it }
         assertEquals(listOf(Part.Text("好")), r.parts)
         assertEquals(listOf("好"), shown)
@@ -216,7 +216,7 @@ class AnthropicModelTest {
         assertEquals(listOf("text", "tool_use"), sentAssistantBlocks().map { it.str("type") })
     }
 
-    // 别的 400 照常报错;签名本身坏了(只有前半句)不重发;这次没带思考块(关掉了思考)时不重发;去掉以后还被拒的不再发第三次
+    // Other 400s are reported as usual; a genuinely broken signature (only the first half of the message) is not resent; nothing is resent when no thinking block was sent this round (thinking turned off); a rejection that persists after dropping them does not get a third attempt
     @Test fun otherRejectionsAreNotSentAgain() = runTest {
         suspend fun rejected(m: AnthropicModel) =
             try { m.complete("s", signedHistory(endpoint), emptyList()); null } catch (e: ModelError.Server) { e }
@@ -292,7 +292,7 @@ class AnthropicModelTest {
         assertEquals("object", t[0].jsonObject["input_schema"]!!.jsonObject.str("type"))
     }
 
-    // 对话只在最后一条 user 消息的最后一块上标缓存;前面的消息原样,两次请求的开头逐字相同
+    // The conversation is marked for caching only on the last block of the last user message; earlier messages stay as they are, so the start of both requests is byte-for-byte identical
     @Test fun marksCacheOnLastUserMessage() = runTest {
         val first = listOf(
             Message(Role.User, listOf(Part.Text("goal")), Author.User),
@@ -315,7 +315,7 @@ class AnthropicModelTest {
         assertEquals(listOf(2 to 1), marked(a))
         assertEquals(listOf(4 to 1), marked(b))
         assertEquals("ephemeral", b[4].jsonObject.arr("content")[1].jsonObject["cache_control"]!!.jsonObject.str("type"))
-        // 上一次标记的那块在下一次请求里不带标记,其余逐字相同
+        // The block marked last time carries no mark in the next request; everything else is byte-for-byte identical
         assertEquals(a[0], b[0]); assertEquals(a[1], b[1])
         assertEquals(a[2].jsonObject.arr("content")[0], b[2].jsonObject.arr("content")[0])
     }
@@ -387,7 +387,7 @@ class AnthropicModelTest {
         assertTrue(errorOf(403, """{"error":{"type":"permission_error","message":"Your organization does not have access to the model"}}""") is ModelError.ModelNotAvailable)
         assertTrue(errorOf(413, "{}") is ModelError.ContextTooLong)
         assertTrue(errorOf(400, """{"error":{"type":"invalid_request_error","message":"prompt is too long: 250000 tokens"}}""") is ModelError.ContextTooLong)
-        // 官方接口「输入 + max_tokens」超出窗口(原话取自第三方客户端里的记录),和本机跑的服务开的同形接口:和 OpenAI 兼容接口同一条规则
+        // The official API's "input + max_tokens" exceeds the window (the exact wording is taken from a record in a third-party client), as does the same-shaped API served by a locally run service: same rule as the OpenAI-compatible APIs
         assertTrue(errorOf(400, """{"type":"error","error":{"type":"invalid_request_error","message":"input length and max_tokens exceed context limit: 199926 + 21333 > 200000"}}""") is ModelError.ContextTooLong)
         assertTrue(errorOf(400, """{"error":{"code":400,"message":"request (25123 tokens) exceeds the available context size (16384 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":25123,"n_ctx":16384}}""") is ModelError.ContextTooLong)
         assertTrue(errorOf(400, """{"error":{"message":"Your credit balance is too low"}}""") is ModelError.QuotaExceeded)
@@ -409,7 +409,7 @@ class AnthropicModelTest {
         assertFalse(sentBody().containsKey("system"))
     }
 
-    // 插话打断后:半截回复是只有一个文字块的 assistant 消息(没有思考块);插话和运行时状态并进下一条 user 消息,角色交替
+    // After a steering interruption: the truncated reply is an assistant message with a single text block (no thinking block); the steer and the runtime state are merged into the next user message, and roles keep alternating
     @Test fun interruptedReplyIsATextOnlyAssistantTurnBeforeTheSteer() = runTest {
         server.enqueue(ok("""{"content":[],"stop_reason":"end_turn"}"""))
         model().complete("s", InterruptedHistory.messages, emptyList())

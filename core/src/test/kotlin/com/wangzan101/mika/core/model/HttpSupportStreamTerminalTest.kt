@@ -23,7 +23,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/** 原始 TCP 服务发完 SSE 后故意不关连接:协议终态必须让客户端立即收尾,非终态和截断的语义不变。 */
+/** A raw TCP server deliberately leaves the connection open after sending the SSE: a protocol terminal state must make the client wrap up immediately, while the semantics of non-terminal events and truncation stay unchanged. */
 class HttpSupportStreamTerminalTest {
     private val servers = mutableListOf<HeldSseServer>()
     private val caps = Capabilities(toolCalls = true, vision = false, contextTokens = 32_000, reasoning = false)
@@ -113,12 +113,12 @@ class HttpSupportStreamTerminalTest {
                 withTimeout(3_000) { pending.await() }
                 fail("没有终态的 EOF 应报截断")
             } catch (_: ModelError.StreamCut) {
-                // 原有截断语义不变
+                // The existing truncation semantics are unchanged
             }
         }
     }
 
-    /** 一次请求一个连接;响应不发送 EOF,而是等服务端读到客户端关闭连接。 */
+    /** One connection per request; the response does not send an EOF, but instead waits until the server reads that the client closed the connection. */
     private class HeldSseServer(private val events: List<String>) : Closeable {
         private val listener = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
         private val executor = Executors.newSingleThreadExecutor { runnable ->
@@ -142,7 +142,7 @@ class HttpSupportStreamTerminalTest {
             }
         }
 
-        /** 只关闭响应方向,给客户端一个真实 EOF;用于截断路径。 */
+        /** Closes only the response direction, giving the client a real EOF; used for the truncation path. */
         fun endResponse() { peer?.shutdownOutput() }
 
         override fun close() {
@@ -169,7 +169,7 @@ class HttpSupportStreamTerminalTest {
                     socket.getOutputStream().write(response.toByteArray(Charsets.UTF_8))
                     socket.getOutputStream().flush()
                     while (input.read() != -1) {
-                        // 保持连接,直到客户端按协议终态主动关闭
+                        // Keep the connection open until the client closes it on its own after a protocol terminal state
                     }
                 }
             } finally {

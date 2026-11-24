@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 各家模型交回 JSON 的样子不同:一个容忍的读法,读不出再问一次只要 JSON。 */
+/** Every vendor's model returns JSON in a different shape: one tolerant reader, and when that fails, one more ask for JSON only. */
 class ModelJsonTest {
     private val verdict = """{"checks": [{"criterion": "电量", "status": "met", "quote": "86%"}], "verdict": "pass", "reason": "屏上有"}"""
 
@@ -22,11 +22,11 @@ class ModelJsonTest {
             verdict,
             "```json\n$verdict\n```",
             "好的,核对结果如下:\n$verdict\n以上。",
-            // 对象后面又跟一段带花括号的说明:不能从第一个 { 取到最后一个 }
+            // A note with braces follows the object: you must not take everything from the first { to the last }
             "$verdict\n注:引用格式为 {原文}。",
-            // 前面先有一段不是 JSON 的花括号
+            // A brace that is not JSON comes first
             "按 {checks, verdict} 的格式回答:$verdict",
-            // 字符串里的括号不打乱配平
+            // Braces inside strings do not upset the balancing
             """{"checks": [{"criterion": "标题含 } 和 {", "status": "met", "quote": "a}b{"}], "verdict": "pass", "reason": "x"}""",
         )
         for (s in shapes) assertTrue(s, Verifier.parse(s)?.verdict == Verdict.Pass)
@@ -51,7 +51,7 @@ class ModelJsonTest {
         assertEquals(Verdict.Pass, v.verdict)
         assertEquals(2, m.requests.size)
         assertEquals(ModelJson.JSON_ONLY, (m.requests[1].last().parts.single() as Part.Text).text)
-        // 两次都读不出:没能核实,原因照实说
+        // Nothing readable on either attempt: it could not be verified, and the reason says so plainly
         val bad = Verifier(FakeModel(reply("通过"), reply("还是通过")), null).verify("看电量", criteria, "电量 86%\n依据: 「电量 86%」", ev)
         assertEquals(Verdict.CannotVerify, bad.verdict)
         assertEquals("核查器的回复无法解析", bad.reason)

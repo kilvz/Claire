@@ -3,9 +3,9 @@ package com.wangzan101.mika.core.model
 import com.wangzan101.mika.core.agent.AgentLoop
 
 /**
- * 插话打断流式回复之后发给模型的历史(见 AgentLoop.keepInterrupted):用户的话,
- * 被打断的那段只有文字的回复(句子可能断在半截,不带思考和调用),接着插话和运行时状态两条用户消息。
- * 各服务商的适配器都要把它原样转成合法的请求。
+ * The history sent to the model after a steer interrupts a streaming reply (see AgentLoop.keepInterrupted): the user's words,
+ * the truncated text-only reply (the sentence may break off mid-way, with no thinking and no tool calls), then the steer and the runtime state as two user messages.
+ * Every provider's adapter must convert it verbatim into a valid request.
  */
 internal object InterruptedHistory {
     const val ASK = "详细介绍一下光合作用"

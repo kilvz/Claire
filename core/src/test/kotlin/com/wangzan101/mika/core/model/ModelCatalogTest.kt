@@ -63,7 +63,7 @@ class ModelCatalogTest {
         assertEquals("/v1/models?limit=1000&after_id=claude-a", server.takeRequest().path)
     }
 
-    /** Anthropic 列表的 `capabilities.effort` / `thinking.types`:档位逐项照填,不接受自适应思考的没有档位。 */
+    /** The Anthropic list's `capabilities.effort` / `thinking.types`: effort levels are copied item by item, and models that do not accept adaptive thinking get no levels. */
     @Test fun anthropicReadsEffortLevelsAndThinkingTypes() = runTest {
         fun sup(b: Boolean) = """{"supported":$b}"""
         fun model(id: String, effort: String, types: String) = """{"type":"model","id":"$id","display_name":"$id",
@@ -77,18 +77,18 @@ class ModelCatalogTest {
             ${model("plain", noEffort, """{"adaptive":${sup(false)},"disabled":${sup(true)},"enabled":${sup(true)}}""")}
         ],"has_more":false}"""))
         val byId = models(catalog.anthropic(base, "ak")).associateBy { it.id }
-        // 按由浅到深排;xhigh 没标支持的不给
+        // Ordered shallow to deep; xhigh is not given when it is not marked supported
         assertEquals(listOf("none", "low", "medium", "high", "max"), byId.getValue("full").reasoningEfforts)
         assertEquals(listOf("adaptive", "disabled", "enabled"), byId.getValue("full").thinkingTypes)
-        // 不接受关掉思考的:没有 none
+        // This one does not accept turning thinking off: there is no none
         assertEquals(listOf("low", "medium", "high", "max"), byId.getValue("no-off").reasoningEfforts)
-        // 只接受按预算思考、或不分档位的:能思考但没有可选档位
+        // Only budget-based thinking, or no effort tiers at all: it can think but has no selectable levels
         assertEquals(emptyList<String>(), byId.getValue("budget").reasoningEfforts)
         assertEquals(emptyList<String>(), byId.getValue("plain").reasoningEfforts)
         assertEquals(true, byId.getValue("plain").reasoning)
     }
 
-    /** 按协议逐个给地址的列表:形状照一家订阅服务的真实返回删减而来。 */
+    /** A list that gives an endpoint per protocol: the shape is trimmed down from a subscription service's real response. */
     private val perModelApi = """{"object":"list","data":[
         {"id":"deepseek-v4.1-flash","object":"model","name":"DeepSeek V4.1 Flash","type":"chat",
          "modalities":{"input":["text","image/jpeg","image/png"],"output":["text"]},
@@ -132,7 +132,7 @@ class ModelCatalogTest {
                     reasoning = true, endpoint = ModelEndpoint(ModelProtocol.Messages, "https://gw.test/inference/anthropic/v1")),
                 ListedModel("gemini-4-argon", "Gemini 4 Argon", toolCalls = true, vision = true, contextTokens = 1_048_576,
                     reasoning = true, endpoint = ModelEndpoint(ModelProtocol.GenerateContent, "https://gw.test/inference/google/v1beta")),
-                // 写了几种协议的,取会说的那一种
+                // Several protocols are listed: the one it will speak is picked
                 ListedModel("both", endpoint = ModelEndpoint(ModelProtocol.Messages, "https://gw.test/m/v1")),
             ),
             list,
@@ -140,7 +140,7 @@ class ModelCatalogTest {
         assertEquals(listOf(true, true, true, true, true, true), list.map { it.usable })
     }
 
-    /** 列表写明了不是对话模型的(`type`,或输出里没有文字):记下来,选默认主模型时跳过。 */
+    /** The list states outright that a model is not a chat model (`type`, or no text in the output): record it, and skip it when choosing the default main model. */
     @Test fun openAiCompatReadsWhetherAModelChats() = runTest {
         server.enqueue(ok("""{"data":[
             {"id":"e","type":"embedding"},{"id":"r","type":"rerank"},{"id":"c","type":"chat"},
@@ -151,7 +151,7 @@ class ModelCatalogTest {
         assertEquals(listOf(false, false, true, false, false, null, null), list.map { it.chat })
     }
 
-    /** 接口用 `supported_endpoints` 写明模型能走哪几种端点:记下来,试调用时据此跳过调不了的。 */
+    /** The API states in `supported_endpoints` which endpoints a model can use: record it, and use it to skip the uncallable ones during the trial call. */
     @Test fun openAiCompatReadsSupportedEndpoints() = runTest {
         server.enqueue(ok("""{"data":[
             {"id":"claude-sonnet-5-5","supported_endpoints":["/provider/v1/messages"]},
@@ -168,7 +168,7 @@ class ModelCatalogTest {
                 listOf(ModelProtocol.ChatCompletions, ModelProtocol.Responses),
                 listOf(ModelProtocol.ChatCompletions),
                 listOf(ModelProtocol.GenerateContent),
-                // 裸的 /models 是列模型的端点,列得出来不等于调得动:认不出,照旧去试
+                // A bare /models is the model-listing endpoint; being listable does not mean it can be called: not recognized, so it is tried as before
                 null,
                 null,
             ),
@@ -323,7 +323,7 @@ class ModelCatalogTest {
         assertEquals(ListFailure.BadResponse, failure(catalog.openAiCompat(base, "sk")))
     }
 
-    /** 换行、中文、零宽放进头会让 OkHttp 在发请求前抛。这里收成失败,一个请求都不发。 */
+    /** A newline, Chinese characters, or a zero-width character in the header makes OkHttp throw before the request is sent. Here it is turned into a failure, and not a single request is sent. */
     @Test fun illegalApiKeyFailsBeforeAnyRequest() = runTest {
         assertEquals(ListFailure.IllegalKey, failure(catalog.openAiCompat(base, "sk-\nabc")))
         assertEquals(ListFailure.IllegalKey, failure(catalog.openAiCompat(base, "sk-\r\nabc")))

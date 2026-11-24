@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** OauthUrls 的注释说 userinfo 一律拒绝;只写了密码、没写用户名时也不能例外。 */
+/** OauthUrls' comment says userinfo is always rejected; a password with no username must be no exception. */
 class OauthUrlsUserinfoTest {
     private val hosts = setOf("auth.x.ai")
 

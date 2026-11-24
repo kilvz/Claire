@@ -17,7 +17,7 @@ import org.junit.Before
 import org.junit.Test
 import java.net.Socket
 
-/** 真的开一个端口(只绑本机回环),用 HTTP 客户端走一遍:门口、协议、任务工具、近期连接的统计。 */
+/** Actually opens a port (bound to loopback only) and walks it end to end with an HTTP client: the front door, the protocol, the task tools, and the recent-connection stats. */
 class McpHostHttpTest {
     private val fake = FakeRemoteTasks()
     private val host = RemoteHost(fake, { TOKEN }, port = 0, allowAllInterfaces = false, serverVersion = "test")
