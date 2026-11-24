@@ -15,16 +15,16 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 
-/** 首页上的一条推荐任务。点它只把 [prompt] 填进输入框,不自动发送。 */
+/** A recommended task on the home screen. Tapping it only fills [prompt] into the input box; it is not sent automatically. */
 data class RecommendedTask(val id: String, val title: String, val prompt: String, val fillIn: Boolean = false)
 
-/** 保存没通过时的原因。界面只在写入成功后改列表。 */
+/** The reason a save was rejected. The UI only updates the list after a successful write. */
 enum class RecommendedTaskError { BlankTitle, BlankPrompt, TooLong, TooMany, TooManyFields, SaveFailed, Unreadable }
 
 /**
- * 首页推荐任务。和内置示例是同一份列表:文件还不存在时用 [ensureLoaded] 传入的内容初始化一次,
- * 之后用户的增删改就是这份列表本身。空列表也要写进文件,避免下次启动把删掉的默认任务加回来。
- * 文件读不出来时不覆盖原文件,要等用户明确清空。
+ * Home-screen recommended tasks. This is the same list as the built-in examples: when the file does not exist yet it is initialized once from what [ensureLoaded] passes in,
+ * and from then on the user's additions, edits and deletions are the list itself. An empty list is written to the file too, so deleted default tasks are not added back on the next launch.
+ * When the file cannot be read it is never overwritten; clearing has to be requested explicitly by the user.
  */
 class RecommendedTaskStore(private val file: File, private val ids: () -> String = { UUID.randomUUID().toString() }) {
     private val _tasks = MutableStateFlow<List<RecommendedTask>>(emptyList())
@@ -34,12 +34,12 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
 
     val tasks: StateFlow<List<RecommendedTask>> = _tasks.asStateFlow()
 
-    /** 已有文件读不出来。此时不能增删改,避免用空列表盖掉还没读到的内容。 */
+    /** An existing file cannot be read. Adding, editing and deleting are blocked then, so an empty list cannot overwrite content that has not been read yet. */
     val unreadable: StateFlow<Boolean> = _unreadable.asStateFlow()
 
     /**
-     * 第一次打开时载入列表:文件还没有时用 [seed] 初始化一次。已有列表时把用户没动过的、
-     * 已经下线不再内置的示例([retired])剔掉;改过标题或提示词的、自己加的一条不动。
+     * Load the list the first time it is opened: when the file does not exist yet, initialize it once from [seed]. When a list already exists, drop the examples the user never touched
+     * and that have been retired from the built-ins ([retired]); entries whose title or prompt was edited, and ones the user added, are left alone.
      */
     @Synchronized
     fun ensureLoaded(retired: () -> List<Pair<String, String>> = { emptyList() }, seed: () -> List<Pair<String, String>>) {
@@ -95,7 +95,7 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
         return commit(_tasks.value.filterNot { it.id == id })
     }
 
-    /** 按拖动开始时看到的完整 ID 列表排序，避免并发增删时丢失任务。 */
+    /** Reorder using the complete ID list captured when the drag started, so tasks are not lost during concurrent additions or deletions. */
     @Synchronized
     fun reorder(ids: List<String>): RecommendedTaskError? {
         guard()?.let { return it }
@@ -106,7 +106,7 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
         return if (reordered == current) null else commit(reordered)
     }
 
-    /** 用户明确不要读不出来的旧文件时,换成空列表。 */
+    /** When the user explicitly discards an unreadable old file, replace it with an empty list. */
     @Synchronized
     fun discardUnreadable(): RecommendedTaskError? {
         if (!_unreadable.value) return null
@@ -163,7 +163,7 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
                     if (task.fillIn) put("fillIn", true)
                 }
             }).toString()
-            // 先写临时文件再改名,写到一半被杀不会留下半个文件。目标已存在时改名会失败,这时再覆盖写。
+            // Write a temporary file and then rename it, so being killed halfway leaves no partial file. The rename fails when the target already exists, in which case the file is overwritten directly.
             val tmp = File(parent, "${file.name}.tmp")
             tmp.writeText(json)
             if (!tmp.renameTo(file)) {
@@ -196,7 +196,7 @@ class RecommendedTaskStore(private val file: File, private val ids: () -> String
 
         private fun text(o: JsonObject, key: String) = (o[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-        /** 只去掉首尾空白来判断空;中间的空格和换行留着。 */
+        /** Only leading and trailing whitespace is trimmed for the emptiness check; spaces and line breaks in the middle are preserved. */
         private fun normalize(title: String, prompt: String): Normalized {
             val t = title.trim()
             val p = prompt.trim()

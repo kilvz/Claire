@@ -48,28 +48,28 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.PROBE_MAX_TOKENS
 import com.wangzan101.mika.settings.ProviderStore.Companion.adapterFor
 import com.wangzan101.mika.settings.ProviderStore.Companion.get
 
-// 服务商存储:主动任务计量、搜索接地、语音与图像模型、探测与列模型
+// Provider storage: proactive task metering, search grounding, speech and image models, probing and model listing
 /**
- * 主动能力用的模型:轻量模型,没有时用主模型;用量记在 [UsagePurpose.Proactive] 名下。
- * 每次请求前只查主动能力自己的每日预算(见 [ProactiveBudget]),不查也不占服务商的每日预算。
+ * The model used for proactive features: the light model, or the main model when there is none; usage is recorded under [UsagePurpose.Proactive].
+ * Before every request only the proactive feature's own daily budget is checked (see [ProactiveBudget]); the provider's daily budget is neither checked nor consumed.
  */
 fun ProviderStore.proactiveModel(session: ModelSession = ModelSession.fresh(), call: ProactiveCall = ProactiveCall.Triage): ChatModel? =
     proactiveTargeted(call, session)?.model
 
-/** [proactiveModel] 实际会用的服务商和模型(同样先轻量、后主模型);不建模型、不读 Key。界面据此请用户确认。 */
+/** The provider and model that [proactiveModel] will actually use (likewise light first, then main); no model is built and no Key is read. The UI uses this to ask the user for confirmation. */
 fun ProviderStore.proactiveTarget(): TriageTarget? = proactiveConfig()?.let { (_, cfg) -> targetOf(cfg) }
 
 /**
- * 主动能力的模型(同 [proactiveModel]),连同建它用的那条配置对应的服务商和模型:两样出自同一次读配置。
- * 发请求前对着这个目标查同意,中间换了模型也不会把通知文字发给没同意过的那个。
- * [call] 是这次要发哪一种请求:回复上限跟着它定(见 [ProactiveModelSetup])。没有默认值:漏了它,回复长的那几种就会悄悄用上短上限。
+ * The proactive model (same as [proactiveModel]) together with the provider and model of the config it is built from: both come from a single read of the config.
+ * Consent is checked against this target before a request is sent, so a model swapped in the meantime never receives notification text that was approved for a different one.
+ * [call] is the kind of request being sent: the output limit follows it (see [ProactiveModelSetup]). It has no default: omitting it would silently apply the short limit to the kinds that reply at length.
  */
 fun ProviderStore.proactiveTargeted(call: ProactiveCall, session: ModelSession = ModelSession.fresh()): TargetedModel? =
     proactiveConfig()?.let { (role, cfg) ->
         TargetedModel(targetOf(cfg), meteredWith(cfg, role, session, UsagePurpose.Proactive, ::checkProactiveBudget, call, ::checkProactiveRetry))
     }
 
-/** 主动能力用的那条配置和它的用途:轻量模型,没有时用主模型。只读一次配置。 */
+/** The config used for proactive features and its role: the light model, or the main model when there is none. Reads the config only once. */
 internal fun ProviderStore.proactiveConfig(): Pair<ModelRole, ProviderConfig>? =
     configFor(ModelRole.Light)?.let { ModelRole.Light to it } ?: configFor(ModelRole.Main)?.let { ModelRole.Main to it }
 
@@ -79,7 +79,7 @@ internal fun ProviderStore.meteredFor(
     role: ModelRole, session: ModelSession, purpose: UsagePurpose, beforeCall: (UsageSource) -> Unit,
 ): ChatModel? = configFor(role)?.let { cfg -> meteredWith(cfg, role, session, purpose, beforeCall) }
 
-/** 用 [cfg](已按 [role] 取出的那条配置)建模型,套好计量。[effortOverride] 为组里成员各自的思考档位。 */
+/** Build a model from [cfg] (the config already resolved for [role]) with metering applied. [effortOverride] is the per-member reasoning level within a group. */
 internal fun ProviderStore.meteredWith(
     cfg: ProviderConfig, role: ModelRole, session: ModelSession, purpose: UsagePurpose, beforeCall: (UsageSource) -> Unit,
     call: ProactiveCall = ProactiveCall.Triage,
@@ -99,7 +99,7 @@ internal fun ProviderStore.meteredWith(
         compactionEveryRounds = TEMP_COMPACTION_EVERY_ROUNDS,
     ))
     val roleEffort = effortOverride ?: _roles.value.reasoningEffort(role)
-    // 主动能力:思考取服务商写明的最低档;回复短的那两种请求另设上限(见 ProactiveModelSetup)
+    // Proactive features: reasoning uses the lowest level the provider documents; the two request kinds with short replies get a separate limit (see ProactiveModelSetup)
     val (effort, cap) = if (purpose == UsagePurpose.Proactive) {
         ProactiveModelSetup.of(adapterFor(cfg, listed?.endpoint).first, ReasoningOptions.of(cfg, listed), roleEffort, call)
     } else roleEffort to null
@@ -111,15 +111,15 @@ internal fun ProviderStore.meteredWith(
 }
 
 /**
- * 主动能力的调用只查它自己的每日预算:整份的硬上限(Token 上限,和跟着它算的请求次数上限,见 [ProactiveBudget.check])。
- * 判定只用其中的一部分,那是 [com.wangzan101.mika.proactive.TriageRunner] 自己先停,不在这里。
+ * Calls to proactive features check only their own daily budget: the full hard limits (the token limit, and the request-count limit derived from it, see [ProactiveBudget.check]).
+ * Enforcing only part of it is handled by [com.wangzan101.mika.proactive.TriageRunner] stopping early on its own, not here.
  */
 @Suppress("UNUSED_PARAMETER")
 internal fun ProviderStore.checkProactiveBudget(source: UsageSource) = ProactiveBudget.check(proactiveUsage(), proactiveLimit(), proactiveCalls())
 
 /**
- * 同一次调用里再发一个请求之前:这次调用已经发出的 [started] 个还没记进账本,加上再查。
- * 不然只剩最后一次额度时,一次调用里的兼容重试会把次数上限顶过去。
+ * Before sending another request within the same call: the [started] requests already issued by this call are not yet recorded in the ledger, so they are added to the check.
+ * Otherwise, when only the last request's quota remains, a compatibility retry within one call would push past the request limit.
  */
 @Suppress("UNUSED_PARAMETER")
 internal fun ProviderStore.checkProactiveRetry(source: UsageSource, started: Int) =
@@ -187,8 +187,8 @@ fun ProviderStore.googleGroundingSearch(session: ModelSession = ModelSession.fre
     }
 
 /**
- * 声音模型:地址、Key、请求头取这家服务商;不套对话模型的计量(朗读用量由调用方另记)。
- * 服务商不存在或地址不合法时为 null。合成比一句话慢，读超时放到 120 秒。
+ * Speech model: the address, Key and headers come from this provider; chat-model metering is not applied (the caller records reading usage separately).
+ * Null when the provider does not exist or the address is invalid. Synthesis takes longer than a single sentence, so the read timeout is raised to 120 seconds.
  */
 fun ProviderStore.ttsModel(choice: VoiceChoice, capabilities: TtsCapabilities): TtsModel? {
     val p = provider(choice.providerId) ?: return null
@@ -205,8 +205,8 @@ fun ProviderStore.ttsModel(choice: VoiceChoice, capabilities: TtsCapabilities): 
 }
 
 /**
- * 图片生成用的模型:地址、Key、请求头都取这家服务商;不套对话模型的计量(图片用量由调用方另记)。
- * 服务商、模型或协议缺失时为 null。图比一句话慢,读超时放到 180 秒。
+ * Model used for image generation: the address, Key and headers all come from this provider; chat-model metering is not applied (the caller records image usage separately).
+ * Null when the provider, model or protocol is missing. Images take longer than a single sentence, so the read timeout is raised to 180 seconds.
  */
 fun ProviderStore.imageModel(choice: ImageChoice, capabilities: ImageCapabilities): ImageModel? {
     val p = provider(choice.providerId) ?: return null
@@ -221,10 +221,10 @@ fun ProviderStore.imageModel(choice: ImageChoice, capabilities: ImageCapabilitie
 }
 
 /**
- * 用户确认测试指定模型后，按真实任务的适配器和请求头建出 [model]，
- * 带一个无参数的工具([PROBE_TOOL])、请它调用;回复限得很短(协议允许的话,见 [buildModel])。
- * 回了工具调用为 [ProbeResult.ToolCalled],只回了话为 [ProbeResult.NoToolCall],请求失败带着服务端的报错原样返回。
- * 不计量:这几个 token 不属于任何用途。会话号用新的,不属于任何对话。超时由调用方管。
+ * After the user confirms testing a specific model, build [model] with the adapter and headers used for real tasks,
+ * supply a tool that takes no arguments ([PROBE_TOOL]) and ask the model to call it; the reply is limited to very few tokens (where the protocol allows, see [buildModel]).
+ * A tool call in the reply yields [ProbeResult.ToolCalled], a text-only reply yields [ProbeResult.NoToolCall], and a failed request returns the server's error verbatim.
+ * Not metered: these few tokens belong to no usage purpose. A fresh session ID is used because this belongs to no conversation. Timeouts are the caller's responsibility.
  */
 suspend fun ProviderStore.probe(
     kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String?,
@@ -246,17 +246,17 @@ suspend fun ProviderStore.probe(
     }
 }
 
-/** 服务商最近一次列出的这个模型(单独指定的接口、写明的思考方式等);每次建模型时现查,重新列过就用新的。 */
+/** This model as last listed by the provider (a separately specified endpoint, documented thinking modes, etc.); looked up every time a model is built, so a re-listing takes effect. */
 internal fun ProviderStore.listedOf(cfg: ProviderConfig): ListedModel? =
     provider(cfg.providerId)?.models?.firstOrNull { it.id == cfg.model }
 
-/** 列出这个服务商的可用模型(见 [ModelCatalog]);不属于任何对话,声明了会话头的用新的会话号。 */
+/** List the models available for this provider (see [ModelCatalog]); this belongs to no conversation, so a fresh session ID is used when a session header is declared. */
 suspend fun ProviderStore.listModels(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String? = null): ModelListResult {
     val probeKey = apiKey?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() ?: it }
     return modelLister(kind, baseUrl, probeKey, headers(sessionHeader, ModelSession.fresh()))
 }
 
-/** 重新列一个已连接服务商的模型:用存着的 Key;订阅登录用访问令牌(快过期先换新的)。 */
+/** Re-list the models of a connected provider: uses the stored Key; for subscription sign-in it uses the access token (refreshed first when close to expiry). */
 suspend fun ProviderStore.listModels(p: Provider): ModelListResult {
     if (p.kind != ProviderConfig.Kind.ChatGpt && p.kind != ProviderConfig.Kind.Xai) {
         val key = activeApiKey(p.id) ?: providerKey(p.id)?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() }

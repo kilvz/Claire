@@ -4,11 +4,11 @@ import com.wangzan101.mika.core.cap.phone.OperatingPace
 import com.wangzan101.mika.core.self.SelfConfig
 
 /**
- * 模型能改的那几项设置。[FeatureFlags] 是存储,这里只挑可逆的偏好交给模型:
+ * The few settings the model is allowed to change. [FeatureFlags] is the storage; only reversible preferences are handed to the model here:
  *
- * **不给的**:模型与 Key(换掉自己的脑子、花用户的钱)、任何删除数据(清工作区、重置运行环境、删对话)——不可逆。
- * **也不给**:容器的联网与代理——打开后数据可能离开手机,这道线要用户自己在设置里决定。
- * 给的都能随手改回去。
+ * **Not exposed**: models and Keys (swapping out its own brain, spending the user's money), and any data deletion (clearing the workspace, resetting the runtime environment, deleting conversations) — these are irreversible.
+ * **Also not exposed**: the container's networking and proxy — once enabled, data may leave the phone, and that boundary must be decided by the user in settings.
+ * Everything exposed can be changed back at any time.
  */
 class SelfConfigImpl(
     private val flags: FeatureFlags,

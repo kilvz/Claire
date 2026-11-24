@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.settings.ui.models.refresh
 
-/** 分类名只在界面上出现,core 里不存中文;分类本身是 AI 判断的用途,不改变权限。 */
+/** Category names appear only in the UI and core stores no Chinese; the category is just what the AI judged the app is for and changes no permission. */
 @Composable
 private fun AppCategory.title(): String = stringResource(
     when (this) {
@@ -43,12 +43,12 @@ private fun AppCategory.title(): String = stringResource(
     },
 )
 
-/** 要显示给用户的失败:界面语言的一句话,后面可以带上原始说明方便排查。 */
+/** A failure to show the user: one sentence in the UI language, optionally followed by the raw detail to help with diagnosis. */
 private class Failure(val message: Int, val detail: String? = null)
 
 /**
- * 分类时让模型用界面的语言写理由:同一个应用换语言后旧理由仍是旧语言,这没关系,下次分类会覆盖。
- * 中文按文字体系分,和资源目录(values-zh / values-b+zh+Hant)一致。
+ * Have the model write its reasons in the UI language when classifying: after switching languages an app's old reason stays in the old language, which is fine since the next classification overwrites it.
+ * Chinese is split by script, consistent with the resource directories (values-zh / values-b+zh+Hant).
  */
 internal fun classifierLanguage(locale: java.util.Locale): String = when {
     locale.script == "Hant" || locale.country in setOf("TW", "HK", "MO") -> "Traditional Chinese"
@@ -72,7 +72,7 @@ fun AppAccessScreen(onBack: () -> Unit, classifyApps: Boolean = true) {
     var editing by remember { mutableStateOf<String?>(null) }
     DisposableEffect(store) { val protection = store.protectUi(); onDispose { protection.close() } }
 
-    // 推荐只含还在允许范围内的金融应用:已经禁用的不再重复出现。
+    // Recommendations include only finance apps that are still allowed: already-blocked ones do not appear again.
     val recommended = apps.filter { (pkg, _) ->
         state.classifications[pkg]?.category == AppCategory.Finance && pkg !in state.blocked
     }
@@ -113,7 +113,7 @@ fun AppAccessScreen(onBack: () -> Unit, classifyApps: Boolean = true) {
             busy = false
         }
     }
-    // 打开页面只读取本机应用清单,不把任何内容发给模型。分类要用户点刷新并确认后才做。
+    // Opening the page only reads the local app list and sends nothing to the model. Classification happens only after the user taps refresh and confirms.
     LaunchedEffect(Unit) {
         try {
             loadApps()

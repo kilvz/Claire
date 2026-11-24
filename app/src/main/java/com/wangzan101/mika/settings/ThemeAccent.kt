@@ -1,8 +1,8 @@
 package com.wangzan101.mika.settings
 
 /**
- * 强调色(主按钮、选中、开关、用户消息、链接):默认蓝色,和深浅色([ThemeMode])任意搭配。
- * 不提供绿、橙、红:它们已经表示成功、需要你、出错。各色的取值见 `ui/theme/Colors.kt` 的 `palette`。
+ * Accent colors (primary buttons, selections, switches, user messages, links): blue by default, freely combinable with light or dark ([ThemeMode]).
+ * Green, orange and red are not offered: they already mean success, needs your attention, and error. The values for each color are in `palette` in `ui/theme/Colors.kt`.
  */
 enum class ThemeAccent {
     Blue, Indigo, Purple, Pink, Teal, Graphite;

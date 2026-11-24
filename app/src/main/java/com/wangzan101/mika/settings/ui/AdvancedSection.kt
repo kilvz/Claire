@@ -55,8 +55,8 @@ import com.wangzan101.mika.chat.ui.ChatCopy
 import com.wangzan101.mika.memory.ui.Link
 
 /**
- * 设置 › 文件与计算环境 的文案(纯函数,便于测试)。运行环境对用户是看不见的实现细节(产品决定):
- * 字面上只说「脚本」「处理文件」「运行环境」,不出现沙箱、Linux、PRoot、Alpine 等技术名词。
+ * Copy for Settings › Files and compute environment (pure functions, so they are easy to test). The runtime is an implementation detail invisible to users (a product decision):
+ * the wording only says "scripts", "processing files" and "runtime", and never technical terms such as sandbox, Linux, PRoot or Alpine.
  */
 object SandboxCopy {
     val NETWORK_TITLE: String get() = tr(R.string.sandbox_network)
@@ -72,7 +72,7 @@ object SandboxCopy {
 
     fun clearBody(w: WorkspaceUsage): String = tr(R.string.sandbox_usage_clear_body, workspaceTitle(w))
 
-    /** 工作区那一行的名字:项目工作区标明项目共用;普通对话用标题,删了的写明。 */
+    /** The name shown for a workspace row: project workspaces state that the project shares it; ordinary conversations use the title, and deleted ones say so. */
     fun workspaceTitle(w: WorkspaceUsage): String {
         val name = w.title?.let(ChatCopy::plainTitle)?.takeIf(String::isNotBlank) ?: tr(R.string.sandbox_usage_deleted_chat)
         return if (w.projectId != null) "${tr(R.string.chat_project_shared)} · $name" else name
@@ -85,7 +85,7 @@ object SandboxCopy {
         tr(R.string.sandbox_usage_workspaces) to u.workspacesTotal,
     )
 
-    /** 字节数按人看得懂的单位写。 */
+    /** Write a byte count in units people can read. */
     fun size(bytes: Long): String = when {
         bytes >= 1L shl 30 -> "%.1f GB".format(Locale.ROOT, bytes.toDouble() / (1L shl 30))
         bytes >= 1L shl 20 -> "%.1f MB".format(Locale.ROOT, bytes.toDouble() / (1L shl 20))
@@ -96,7 +96,7 @@ object SandboxCopy {
     val RESET_TITLE: String get() = tr(R.string.sandbox_reset_title)
     val RESET_BODY: String get() = tr(R.string.sandbox_reset_body)
 
-    /** 「重置运行环境」下面的一行:平时说明会怎样,准备中或准备失败时如实说。 */
+    /** The line under "Reset runtime": normally explains what will happen, and states things truthfully while preparing or after preparation failed. */
     fun resetSubtitle(s: SandboxStatus): String = when (s) {
         is SandboxStatus.Installing -> tr(R.string.runtime_preparing)
         is SandboxStatus.Broken -> tr(R.string.sandbox_broken, s.reason)
@@ -105,8 +105,8 @@ object SandboxCopy {
 }
 
 /**
- * 接上真实状态的「文件与计算环境」页内容:联网开关读写 [SandboxState];代理统一在高级与其他页修改,这里不重复显示;
- * 已用空间进页面时在后台读一遍,清理经 [SandboxUsageReader](有任务在跑的对话不清);重置后马上在后台重新准备。
+ * Content of the "Files and compute environment" page wired to real state: the network switch reads and writes [SandboxState]; the proxy is changed uniformly on the advanced and other pages, so it is not duplicated here;
+ * used space is read once in the background when the page opens, clearing goes through [SandboxUsageReader] (conversations with a running task are not cleared); after a reset the runtime is prepared again in the background right away.
  */
 @Composable
 fun AdvancedSettings() {
@@ -158,7 +158,7 @@ fun AdvancedSettings() {
     )
 }
 
-/** 不带状态的「文件与计算环境」页内容,便于测试。不支持的设备整组不显示。 */
+/** The stateless "Files and compute environment" page content, for testing. On unsupported devices the whole group is hidden. */
 @Composable
 fun AdvancedSection(
     status: SandboxStatus,
@@ -166,7 +166,7 @@ fun AdvancedSection(
     isolationIssue: Boolean,
     onNetworkChange: (Boolean) -> Unit,
     onReset: () -> Unit,
-    /** 已用空间;还没读出来为 null(这一组先不显示)。 */
+    /** Used space; null while it has not been read yet (the group is hidden then). */
     usage: SandboxUsage? = null,
     onOpenTerminal: (WorkspaceUsage) -> Unit = {},
     onClearWorkspace: (WorkspaceUsage) -> Unit = {},
@@ -225,8 +225,8 @@ private fun Note(text: String, color: Color) {
 }
 
 /**
- * 已用空间:合计、运行环境、技能、对话的工作区各占多少;下面按对话列出工作区(大的在前),点一行清掉它(先确认),
- * 有任务在跑的对话写明暂时不能清;最后一行清空所有工作区。
+ * Used space: how much the total, the runtime, skills and conversation workspaces each take; below, workspaces are listed per conversation (largest first), tapping a row clears it (after confirmation),
+ * conversations with a running task say they cannot be cleared yet; the last row clears every workspace.
  */
 @Composable
 private fun UsageGroup(

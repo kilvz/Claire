@@ -25,7 +25,7 @@ import com.wangzan101.mika.ui.components.PageScaffold
 import com.wangzan101.mika.ui.components.RowChevron
 import com.wangzan101.mika.ui.theme.MikaTheme
 
-/** 设置 › 环境变量:插件脚本(如 translate)读的名字=值键值对;增删改,空值即删除。 */
+/** Settings › Environment variables: name=value pairs read by plugin scripts (such as translate); add, edit and delete, where an empty value means deletion. */
 @Composable
 fun EnvVarSettingsScreen(store: EnvVarStore, onBack: () -> Unit) {
     val vars by store.changes.collectAsState(initial = store.all())

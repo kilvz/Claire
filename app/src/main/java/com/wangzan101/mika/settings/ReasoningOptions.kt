@@ -4,31 +4,31 @@ import com.wangzan101.mika.core.proactive.ProactiveCall
 import com.wangzan101.mika.core.model.ListedModel
 
 /**
- * 思考档位。服务商列表写明档位的模型,四种协议(Chat Completions、Messages、generateContent、Responses)都照它给
- * (Anthropic 列表逐项写明每个模型支持的档位和思考方式,见 ModelCatalog;OpenAI 兼容协议另补官方文档写明的 `none`,见 [withDocumentedOff]);
- * 没写明时:Responses 一族给通用手动档位,OpenAI 兼容协议先按预设里官方文档写明的档位给(见 [ProviderPreset.reasoningLevels]),
- * 对不上预设的第三方网关也给通用手动档位——两者都带提示,实际支持情况以服务端为准、默认不发字段;其余协议不猜:
- * 各模型认的档位和写法不一样,猜错了每次请求都被拒。
+ * Reasoning levels. For models whose levels the provider listing states, all four protocols (Chat Completions, Messages, generateContent, Responses) follow it
+ * (the Anthropic listing states the levels and thinking modes supported by each model individually, see ModelCatalog; the OpenAI-compatible protocol additionally gets the `none` documented officially, see [withDocumentedOff]);
+ * when not stated: the Responses family gets the generic manual levels, the OpenAI-compatible protocol first uses the levels documented officially in the preset (see [ProviderPreset.reasoningLevels]),
+ * and third-party gateways that match no preset also get the generic manual levels — both are flagged, actual support depends on the server and no field is sent by default; the other protocols are not guessed:
+ * each model accepts different levels and spellings, and a wrong guess gets every request rejected.
  */
 data class ReasoningOptions(val levels: List<String>, val fromProvider: Boolean) {
     companion object {
-        // 列表没说明档位时供手动选择,不声称每个模型都支持;界面会说明,默认始终不指定。
+        // Offered for manual selection when the listing does not state levels, without claiming every model supports them; the UI explains this, and nothing is ever specified by default.
         private val manualLevels = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
         fun of(config: ProviderConfig, listed: ListedModel?): ReasoningOptions? {
             listed?.reasoningEfforts?.let { declared ->
-                // 套餐接口的模型目录曾把服务端不接受的 ultra 列为可选。目录也是外部输入:
-                // 这一条接入只展示请求层真正认识的档位,不能让坏元数据把每次调用都变成 HTTP 400。
+                // The plan endpoint's model catalog once listed ultra as selectable even though the server rejects it. The catalog is external input too:
+                // this integration only shows levels the request layer genuinely knows, so bad metadata cannot turn every call into HTTP 400.
                 val levels = if (config.kind == ProviderConfig.Kind.ChatGpt) declared.filter(manualLevels::contains) else declared
                 return ReasoningOptions(withDocumentedOff(config, listed, levels), fromProvider = true)
             }
-            // 仍返回空选项,使已保存的旧档位能在界面恢复默认。
+            // Empty options are still returned, so a previously saved level can be reset to the default in the UI.
             if (listed?.reasoning == false) return ReasoningOptions(emptyList(), fromProvider = true)
             return when (ProviderStore.adapterFor(config, listed?.endpoint).first) {
                 ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt, ProviderConfig.Kind.Xai ->
                     ReasoningOptions(manualLevels, fromProvider = false)
-                // 预设里这家官方文档写明了几档就给几档;对不上预设的 OpenAI 兼容地址(第三方网关)
-                // 也照给通用档位并标「来源不是服务商」,让入口能渲染、由用户显式承担风险;默认仍是「默认」不发字段。
+                // Offer exactly the levels this vendor documents officially in its preset; OpenAI-compatible addresses that match no preset (third-party gateways)
+                // also get the generic levels, flagged as "not from the provider", so the entry point can render and the user explicitly bears the risk; the default is still "default", sending no field.
                 ProviderConfig.Kind.OpenAiCompat ->
                     ProviderPresets.forBaseUrl(config.baseUrl)?.reasoningLevels
                         ?.takeIf { it.isNotEmpty() }?.let { ReasoningOptions(it, fromProvider = false) }
@@ -38,12 +38,12 @@ data class ReasoningOptions(val levels: List<String>, val fromProvider: Boolean)
         }
 
         /**
-         * 列表写的是开着思考时可选的强度(DeepSeek 的 `effort.supported_levels` 是 low / high / max),
-         * 官方文档另写了 `none` 关掉思考时补在最前面,免得列表一读到就关不掉思考。只补预设里写明的 `none`,不补别的档位。
+         * The listing reports the intensities selectable while thinking is on (DeepSeek's `effort.supported_levels` is low / high / max),
+         * while the official docs separately document `none` for turning thinking off; it is prepended so that thinking cannot become impossible to disable once the listing is read. Only the `none` documented in the preset is added, no other level.
          */
         private fun withDocumentedOff(config: ProviderConfig, listed: ListedModel, levels: List<String>): List<String> {
             if (levels.isEmpty() || OFF in levels) return levels
-            // 按这个模型实际走的接口算:列表给它写了别的协议时不补
+            // Evaluated against the endpoint this model actually uses: nothing is added when the listing assigns it another protocol
             if (ProviderStore.adapterFor(config, listed.endpoint).first != ProviderConfig.Kind.OpenAiCompat) return levels
             val documented = ProviderPresets.forBaseUrl(config.baseUrl)?.reasoningLevels.orEmpty()
             return if (OFF in documented) listOf(OFF) + levels else levels
@@ -54,27 +54,27 @@ data class ReasoningOptions(val levels: List<String>, val fromProvider: Boolean)
 }
 
 /**
- * 主动能力(后台的便宜调用)建模型时的回复上限和思考档位。
+ * The reply limit and reasoning level used when building models for proactive features (cheap background calls).
  *
- * 档位:只在服务商列表写明了这个模型的档位([ReasoningOptions.fromProvider])时,取其中最低的一档(按 [RANK] 排,
- * 列表本身可能没排序;不认识的档位不取);列表没写明的(手动档位、预设档位)不猜,照用这个用途选的档位。
- * 回复上限只有 Messages 和 generateContent 两种协议会带上(见 ProviderStore.buildModel),而且只给回复短的那两种请求
- * (判定、归纳话题,见 [ProactiveCall.long]):思考 token 也算在上限里,能确定不思考时(档位是 none,或 Messages 协议没选档位、
- * 本来就不开思考)给 [CAP],否则给宽一些的 [CAP_THINKING],免得思考把上限吃光、回复是空的。
- * 分段、当日、周、月归纳不另设上限(null,和普通任务一样用适配器的默认):一份有十几句、每句上百字,几百 token 放不下,
- * 被截断的回复读不出来,那一份就一直做不成。
+ * Level: only when the provider listing states this model's levels ([ReasoningOptions.fromProvider]) is the lowest one taken (ranked by [RANK],
+ * since the listing itself may be unordered; unrecognized levels are ignored); when the listing does not state them (manual or preset levels) nothing is guessed and the level selected for this role is used.
+ * The reply limit is only sent with the Messages and generateContent protocols (see ProviderStore.buildModel), and only for the two request kinds with short replies
+ * (triage and topic summarization, see [ProactiveCall.long]): thinking tokens count toward the limit, so when thinking is known to be off (the level is none, or the Messages protocol has no level selected
+ * and thinking is off anyway) [CAP] is used, otherwise the more generous [CAP_THINKING], so thinking cannot consume the whole limit and leave the reply empty.
+ * Segment, daily, weekly and monthly summaries get no separate limit (null, using the adapter default like ordinary tasks): a chunk has a dozen-odd sentences of hundreds of characters each, which a few hundred tokens cannot hold,
+ * and a truncated reply is unreadable, so that chunk would never be completed.
  */
 internal object ProactiveModelSetup {
-    /** 判定一批最多 8 条、每条一句理由;归纳话题最多十几个短标记。按理由都写满算(一个字一个半 token)也放得下。 */
+    /** Triage handles at most 8 items with one sentence of reasoning each; topic summarization handles at most a dozen-odd short labels. It still fits when every reasoning is written in full (counting one and a half tokens per character). */
     const val CAP = 2_400
     const val CAP_THINKING = 4_096
     private val RANK = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
-    /** 服务商写明的档位里最低的一档;没写明、或一档都不认识时为 null。 */
+    /** The lowest of the levels the provider states; null when none are stated or none is recognized. */
     fun lowestDeclared(options: ReasoningOptions?): String? =
         options?.takeIf { it.fromProvider }?.levels?.filter { it in RANK }?.minByOrNull(RANK::indexOf)
 
-    /** 实际用的档位和回复上限(null 是不另设)。[adapter] 是实际走的协议,[roleEffort] 是这个用途选的档位,[call] 是哪一种请求。 */
+    /** The level and reply limit actually used (null means no separate limit). [adapter] is the protocol actually used, [roleEffort] the level selected for this role, and [call] the kind of request. */
     fun of(adapter: ProviderConfig.Kind, options: ReasoningOptions?, roleEffort: String?, call: ProactiveCall): Pair<String?, Int?> {
         val effort = lowestDeclared(options) ?: roleEffort
         val noThinking = effort == "none" || (adapter == ProviderConfig.Kind.Anthropic && effort == null)

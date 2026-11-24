@@ -1,6 +1,6 @@
 package com.wangzan101.mika.settings
 
-/** 背景图片的模糊程度。 */
+/** How much the background image is blurred. */
 enum class SkinBlur {
     Off, Light, Strong;
 
@@ -10,12 +10,12 @@ enum class SkinBlur {
 }
 
 /**
- * 背景图片(皮肤)的设置。图片本身在 `files/skin/`(见 `ui/theme/SkinImage.kt`),这里只是怎么显示它。
+ * Settings for the background image (skin). The image itself lives in `files/skin/` (see `ui/theme/SkinImage.kt`); this only controls how it is displayed.
  *
- * - [version]:0 是没有图(纯色底),每换一张图换一个新值,界面据此重新读图。
- * - [scrim]:盖在图上的页面底色遮罩,百分比,限定在 [MIN_SCRIM]–[MAX_SCRIM],文字靠它看得清。
- * - [focus]:图片裁剪时露出的位置,-1 最上、0 居中、1 最下。
- * - [accentFromImage] 打开且导入时取到了颜色([hue],色相 0–360)时,强调色跟着图片走,不用设置里选的。
+ * - [version]: 0 means no image (solid background); every image change bumps it, and the UI re-reads the image based on it.
+ * - [scrim]: the page background scrim laid over the image, in percent, clamped to [MIN_SCRIM]–[MAX_SCRIM], which keeps text legible.
+ * - [focus]: which part of the image is revealed when cropping, -1 topmost, 0 centered, 1 bottommost.
+ * - When [accentFromImage] is on and a color was sampled during import ([hue], hue 0–360), the accent color follows the image instead of the one chosen in settings.
  */
 data class SkinSpec(
     val version: Long = 0L,
@@ -27,7 +27,7 @@ data class SkinSpec(
 ) {
     val active: Boolean get() = version != 0L
 
-    /** 此刻要用图片的颜色做强调色时是它的色相,否则为 null。 */
+    /** The image's hue when it should currently drive the accent color, otherwise null. */
     val accentHue: Float? get() = hue.takeIf { active && accentFromImage }
 
     companion object {

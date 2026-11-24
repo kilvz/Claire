@@ -13,11 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 「手机操作」那几项能力的记录,以及上次开机自动恢复的结果。开机广播和设置页在同一进程里看同一份。
+ * Records of the "phone operation" capabilities and of the result of the last automatic restore after boot. The boot broadcast and the settings page share the same instance within one process.
  *
- * 每项两个布尔值:原来的键(如 `accessibility`)记「已生效」,含义和以前一样(以前只在命令成功后写 true);
- * `<键>_declined` 记「用户亲手关掉」。旧版本只有前一个键:写着 false 的分不出是没动过还是关掉过,
- * 一律当没动过——新键不存在就是没关掉过,所以升级不用另做迁移,这几项会在连接可用时按默认打开。
+ * Each capability has two booleans: the original key (e.g. `accessibility`) records "in effect", with the same meaning as before (it was only written as true after a command succeeded);
+ * `<key>_declined` records "turned off by the user". Older versions only had the first key: a stored false cannot tell "never touched" from "turned off",
+ * so everything is treated as never touched — a missing new key means it was never turned off, hence no separate migration is needed on upgrade, and these capabilities are enabled by default once the connection is available.
  */
 class RecoverySettings(private val prefs: SharedPreferences) : RecoveryConsentStore {
     private val _consent = MutableStateFlow(read())
@@ -27,10 +27,10 @@ class RecoverySettings(private val prefs: SharedPreferences) : RecoveryConsentSt
     val lastRestore: StateFlow<RestoreOutcome?> = _lastRestore.asStateFlow()
 
     private val _lastA11yLoss = MutableStateFlow(readLoss())
-    /** 上一次 Claire 启动时发现无障碍服务被拿掉或没绑定(诊断信息用)。 */
+    /** At Claire's previous launch the accessibility service was found revoked or not bound (used for diagnostics). */
     val lastA11yLoss: StateFlow<A11yLossRecord?> = _lastA11yLoss.asStateFlow()
 
-    /** Claire 的无障碍服务连上过:之后启动时没连上才算问题,从没设置过的不算。 */
+    /** Claire's accessibility service has connected at least once: failing to connect on a later launch counts as a problem, while never having set it up does not. */
     var accessibilitySeen: Boolean
         get() = prefs.getBoolean(A11Y_SEEN, false)
         set(v) { if (v != accessibilitySeen) prefs.edit().putBoolean(A11Y_SEEN, v).apply() }
@@ -56,7 +56,7 @@ class RecoverySettings(private val prefs: SharedPreferences) : RecoveryConsentSt
             if (restoreChanged) remove(LAST_RESTORE)
         }.commit()
         _consent.value = consent
-        // 重新打开或关掉后,旧的开机结果不再说明问题
+        // After turning it back on or off, the previous boot result no longer indicates anything
         if (restoreChanged) _lastRestore.value = null
     }
 
@@ -87,7 +87,7 @@ class RecoverySettings(private val prefs: SharedPreferences) : RecoveryConsentSt
         private const val A11Y_LOSS = "a11y_loss"
         private const val A11Y_LOSS_AT = "a11y_loss_at"
 
-        /** 产品里的那份(由 [com.wangzan101.mika.cap.phone.PhoneServices] 建)读写的偏好文件。 */
+        /** The preferences file read and written by the production instance (created by [com.wangzan101.mika.cap.phone.PhoneServices]). */
         fun prefs(context: Context): SharedPreferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     }
 }

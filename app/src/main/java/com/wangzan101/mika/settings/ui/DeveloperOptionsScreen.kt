@@ -16,12 +16,12 @@ import com.wangzan101.mika.ui.components.RowChevron
 import com.wangzan101.mika.task.ui.RunMetricsCopy
 import com.wangzan101.mika.task.ui.TraceSettingsRows
 
-/** 一个工程开关:[id] 用作测试标签,[change] 算出改过这一项之后的整组开关。 */
+/** An engineering switch: [id] is used as a test tag, and [change] computes the whole set of switches after toggling this one. */
 data class DevSwitch(
     val id: String, val title: String, val subtitle: String, val checked: Boolean, val change: (Boolean) -> SpeedFlags,
 )
 
-/** 开发者选项的两组:速度(已验证、默认多半开着)和实验(默认关)。开关的值与存储([SpeedFlags])不变。 */
+/** The two groups of developer options: speed (verified, mostly on by default) and experimental (off by default). The switch values and storage ([SpeedFlags]) are unchanged. */
 object DeveloperSwitches {
     fun speed(flags: SpeedFlags): List<DevSwitch> = listOf(
         DevSwitch("adaptive-vision", tr(R.string.dev_adaptive), tr(R.string.dev_adaptive_sub), flags.adaptiveVision) { flags.copy(adaptiveVision = it) },
@@ -39,7 +39,7 @@ object DeveloperSwitches {
     )
 }
 
-/** 「做事方式」一组:任务运行页里的询问 / 自主全局开关。 */
+/** The "way of working" group: the global ask/autonomous switch for the task run page. */
 object AutonomyCopy {
     val GROUP: String get() = tr(R.string.dev_group)
     val TITLE: String get() = tr(R.string.dev_autonomy)
@@ -48,7 +48,7 @@ object AutonomyCopy {
 
 val DEVELOPER_NOTE: String get() = tr(R.string.dev_note)
 
-/** 当前看图模型的「看图定位已验证」:[model] 是它的模型名。 */
+/** The "vision grounding verified" flag of the current vision model: [model] is its model name. */
 data class GroundingSetting(val model: String, val verified: Boolean)
 
 object GroundingCopy {
@@ -59,8 +59,8 @@ object GroundingCopy {
 }
 
 /**
- * 设置 › 高级与其他 › 开发者选项:速度和实验两组开关;
- * 有看图模型时另有它的「看图定位已验证」([grounding] 为 null 时不显示);最后是「运行统计」的入口([onOpenRunStats] 为 null 时不显示)。
+ * Settings › Advanced and other › Developer options: the speed and experimental switch groups;
+ * when a vision model exists, its "vision grounding verified" toggle as well (hidden when [grounding] is null); finally the "run statistics" entry (hidden when [onOpenRunStats] is null).
  */
 @Composable
 fun DeveloperOptionsScreen(
@@ -109,7 +109,7 @@ fun DeveloperOptionsScreen(
 private fun SwitchGroup(switches: List<DevSwitch>, onSpeed: (SpeedFlags) -> Unit, extra: @Composable () -> Unit = {}) {
     GroupCard {
         switches.forEachIndexed { i, s ->
-            // 整行都能点:开关小,行大
+            // The whole row is clickable: the switch is small, the row is large
             ListRow(null, s.title, s.subtitle, first = i == 0, onClick = { onSpeed(s.change(!s.checked)) }) {
                 MikaSwitch(s.checked, { onSpeed(s.change(it)) }, Modifier.testTag("dev-${s.id}"))
             }

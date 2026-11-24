@@ -8,11 +8,11 @@ import com.wangzan101.mika.core.model.usage.TokenBudgetLimits
 import kotlinx.serialization.json.add
 import java.io.IOException
 
-// 服务商存储:用途选择、备用链、模型组与各模型设置
+// Provider storage: role selections, fallback chains, model groups and per-model settings
 /**
- * 定一个用途:用户选什么就是什么,不看能力标记。选具体模型当主模型时把工具调用标记记为 true(运行时据此发工具定义);
- * 看图标记不改存着的,在 [configFor] 里按当下的选择推出来,换走了就跟着回去。之后没人用的配置删掉。
- * 配置不存在、模型名为空或这个用途不接受这种选择(见 [RoleChoices.with])时返回 false。
+ * Assign a role: whatever the user picked wins, capability flags are not consulted. When a concrete model is chosen as the main model, its tool-calls flag is set to true (the runtime relies on it to send tool definitions);
+ * the vision flag does not modify what is stored but is derived in [configFor] from the current selection, and follows back when the selection changes. Configs that nobody uses afterwards are deleted.
+ * Returns false when the config does not exist, the model name is empty, or the role does not accept this kind of selection (see [RoleChoices.with]).
  */
 fun ProviderStore.choose(role: ModelRole, choice: RoleChoice): Boolean {
     return synchronized(this) {
@@ -35,8 +35,8 @@ fun ProviderStore.choose(role: ModelRole, choice: RoleChoice): Boolean {
 }
 
 /**
- * 把服务商 [providerId] 下的 [model] 备成一条配置(没有就按 [caps] 建;工具调用标记记为 true,它要能当主模型用),
- * 返回配置 id;不派给任何用途。服务商不存在返回 null。
+ * Ensure a config exists for [model] under provider [providerId] (created from [caps] if absent; the tool-calls flag is set to true because it must be usable as the main model),
+ * and return the config id; it is not assigned to any role. Returns null if the provider does not exist.
  */
 fun ProviderStore.ensureConfigId(providerId: String, model: String, caps: Capabilities): String? {
     return synchronized(this) {
@@ -59,7 +59,7 @@ fun ProviderStore.ensureConfigId(providerId: String, model: String, caps: Capabi
     }
 }
 
-/** 备援链里混进的角色自身配置清掉。 */
+/** Remove the role's own config from its fallback chain if it slipped in. */
 internal fun ProviderStore.dropRoleFromFallbacks(role: ModelRole) {
     val roleId = _roles.value.resolve(role) ?: return
     val current = _roles.value.fallbacks(role)
@@ -71,14 +71,14 @@ internal fun ProviderStore.dropMainFromFallbacks() {
     dropRoleFromFallbacks(ModelRole.Main)
 }
 
-/** [providerId] 下的 [model] 是不是当前主模型(备援手填时挡下用,MK-1 D1)。 */
+/** Whether [model] under [providerId] is the current main model (used to block it when a fallback is entered manually, MK-1 D1). */
 fun ProviderStore.isMainModel(providerId: String, model: String): Boolean =
     configFor(ModelRole.Main)?.let { it.providerId == providerId && it.model == model } == true
 
 /**
- * 改指定角色备援链的第 [slot] 位: [configId] 为 null 是撤掉这一位(后面的往前补);
- * 已在链里的配置是移动到目标位(不重复占位);新配置在目标位有空位时替换、链未满时接在末尾
- * (中间有空槽也照接,不留空位)。链最长 [MAX_FALLBACKS]。
+ * Change slot [slot] of the given role's fallback chain: a null [configId] removes that slot (later entries shift forward);
+ * a config already in the chain is moved to the target slot (it does not occupy two slots); a new config replaces the entry at the target slot when there is one, and is appended at the end when the chain is not full
+ * (gaps in the middle are filled in too, no empty slot is left). The chain holds at most [MAX_FALLBACKS] entries.
  */
 fun ProviderStore.setFallback(role: ModelRole, slot: Int, configId: String?): Boolean {
     return synchronized(this) {
@@ -104,37 +104,37 @@ fun ProviderStore.setFallback(role: ModelRole, slot: Int, configId: String?): Bo
     }
 }
 
-/** 保持旧方法签名完全兼容 */
+/** Keeps the legacy method signature fully compatible */
 fun ProviderStore.setMainFallback(slot: Int, configId: String?): Boolean = synchronized(this) { setFallback(ModelRole.Main, slot, configId) }
 
-/** 这个组;不存在为 null。 */
+/** The group with this id; null if it does not exist. */
 fun ProviderStore.group(id: String): ModelGroup? = _groups.value.firstOrNull { it.id == id }
 
-/** 这个用途绑定的组;没绑组、或组已不存在时为 null。 */
+/** The group bound to this role; null when no group is bound or the group no longer exists. */
 fun ProviderStore.groupFor(role: ModelRole): ModelGroup? = _roles.value.resolveGroup(role)?.let(::group)
 
 /**
- * 组能不能被 [role] 选中:主模型要求全员支持工具,看图要求至少一个成员能看图,轻量不强制。
- * 组为空、或成员指向的配置已经不在时按不可用算。
+ * Whether the group can be selected for [role]: the main model requires every member to support tools, vision requires at least one member with vision, and light imposes no requirement.
+ * An empty group, or one whose members point to configs that no longer exist, counts as unusable.
  */
 fun ProviderStore.groupUsable(groupId: String, role: ModelRole): Boolean =
     group(groupId)?.usableFor(role) { id -> _configs.value.firstOrNull { it.id == id }?.capabilities } == true
 
-/** 一个组能不能用于某个用途;UI 用它给组列表打标。 */
+/** Whether a group can be used for a role; the UI uses this to badge the group list. */
 fun ProviderStore.groupUsable(group: ModelGroup, role: ModelRole): Boolean =
     group.usableFor(role) { id -> _configs.value.firstOrNull { it.id == id }?.capabilities }
 
 /**
- * 新增或替换同 id 的组。成员指向的配置必须都在;主模型的组必须全员支持工具,看图的组至少要有一个能看图。
- * 不满足时返回 false,不改已有的组。
+ * Add a group, or replace the group with the same id. Every config referenced by a member must still exist; a main-model group needs all members to support tools, and a vision group needs at least one member with vision.
+ * Returns false when these conditions are not met, leaving the existing group unchanged.
  */
 fun ProviderStore.saveGroup(group: ModelGroup): Boolean {
     return synchronized(this) {
         if (group.members.any { m -> _configs.value.none { it.id == m.configId } }) return false
-        // 新加进来的成员要有可用的模型配置;旧设置里已经在组里的留着,由用户在服务商详情里解决
+        // Newly added members need a usable model config; members already in the group from older settings are kept, leaving it to the user to resolve them in the provider details
         val before = group(group.id)?.members?.mapTo(hashSetOf()) { it.configId }.orEmpty()
         if (group.members.any { m -> m.configId !in before && configById(m.configId)?.canUseForChat() != true }) return false
-        // 只看显式绑定的角色;Vision/Light 的「用主模型」不算自己在用这个组,不能拿它来拦保存
+        // Only explicitly bound roles are considered; Vision/Light in "same as main" mode does not count as using this group and must not block saving
         val usedRoles = ModelRole.entries.filter { role -> (_roles.value[role] as? RoleChoice.Group)?.groupId == group.id }
         if (usedRoles.any { role -> !group.usableFor(role) { id -> _configs.value.firstOrNull { it.id == id }?.capabilities } }) return false
         val i = _groups.value.indexOfFirst { it.id == group.id }
@@ -147,7 +147,7 @@ fun ProviderStore.saveGroup(group: ModelGroup): Boolean {
     }
 }
 
-/** 删掉一个组;用它当主模型/看图/轻量的用途退回默认。成员配置没人再用时一起删。 */
+/** Delete a group; roles using it for main/vision/light fall back to their defaults. Member configs nobody uses anymore are deleted along with it. */
 fun ProviderStore.deleteGroup(groupId: String) {
     synchronized(this) {
         _groups.value = _groups.value.filterNot { it.id == groupId }
@@ -157,7 +157,7 @@ fun ProviderStore.deleteGroup(groupId: String) {
     }
 }
 
-/** 建组/加成员时用:有这个服务商的这个模型的配置就复用,没有就按 [caps] 建一条(不选用途)。 */
+/** Used when creating groups/adding members: reuse the config for this provider's model if it exists, otherwise create one from [caps] (assigning no role). */
 fun ProviderStore.ensureConfig(providerId: String, model: String, caps: Capabilities): String? {
     return synchronized(this) {
         val p = provider(providerId) ?: return null
@@ -173,7 +173,7 @@ internal fun ProviderStore.usableGroupIds(): Set<String> = _groups.value.filter 
     g.enabledMembers.any { m -> _configs.value.any { it.id == m.configId } }
 }.map { it.id }.toSet()
 
-/** 组失去成员或能力变化后,把显式绑在它上面、却已经不满足角色要求的用途退回默认。 */
+/** After a group loses members or its capabilities change, roles explicitly bound to it that no longer satisfy the role requirements fall back to their defaults. */
 internal fun ProviderStore.repairGroupRoles() {
     var roles = _roles.value
     for (role in ModelRole.entries) {
@@ -188,7 +188,7 @@ internal fun ProviderStore.repairGroupRoles() {
     _roles.value = roles
 }
 
-/** 只改这个用途;不支持的协议、跟随主模型的用途或列表明确不支持的档位不接受。 */
+/** Changes this role only; rejected for unsupported protocols, roles that follow the main model, or levels the list explicitly reports as unsupported. */
 fun ProviderStore.setReasoningEffort(role: ModelRole, effort: String?): Boolean {
     return synchronized(this) {
         if (_roles.value[role] !is RoleChoice.Model && _roles.value[role] !is RoleChoice.Group) return false
@@ -226,7 +226,7 @@ fun ProviderStore.setModelServiceTier(providerId: String, model: String, tier: O
     }
 }
 
-/** 修改这家每日 Token 预算；写盘失败时保留内存和盘上原值。 */
+/** Update this provider's daily token budget; on a failed write both the in-memory and the on-disk values are kept. */
 fun ProviderStore.setDailyTokenBudget(providerId: String, limit: Long?): Boolean {
     return synchronized(this) {
         if (limit != null && !TokenBudgetLimits.valid(limit)) return false
@@ -246,7 +246,7 @@ internal fun ProviderStore.saveProviderSettings(p: Provider): Boolean {
     return true
 }
 
-/** 记下用户说的 [model] 能不能看图(见 [Provider.visionOverrides]);服务商不存在时返回 false。 */
+/** Record whether the user says [model] can see images (see [Provider.visionOverrides]); returns false if the provider does not exist. */
 fun ProviderStore.setModelVision(providerId: String, model: String, sees: Boolean): Boolean {
     return synchronized(this) {
         val p = provider(providerId) ?: return false
@@ -271,10 +271,10 @@ internal fun ProviderStore.saveRoleSelection(
     return true
 }
 
-/** 看图模型的「看图定位已验证」(开发者选项里改);看图用主模型时改的是主模型那条配置。没有看图模型时不动。 */
+/** The vision model's "vision grounding verified" flag (toggled in developer options); when vision uses the main model, the main model's config is changed instead. Does nothing when there is no vision model. */
 fun ProviderStore.setVisionGroundingVerified(verified: Boolean) {
     synchronized(this) {
-        // 看图是具体模型时改那一条;是组(含「用主模型」跟到主组)时改组里所有启用成员
+        // When vision is a concrete model, change that entry; when it is a group (including "use main model" resolving to the main group), change every enabled member of the group
         val ids = _roles.value.resolveConfig(ModelRole.Vision)?.let { setOf(it) }
             ?: groupFor(ModelRole.Vision)?.enabledMembers?.map { it.configId }?.toSet()
             ?: return

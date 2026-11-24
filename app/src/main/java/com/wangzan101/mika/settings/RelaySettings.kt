@@ -14,12 +14,12 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** [deviceAccess]:经网关来的请求能否唤醒、解锁手机、读锁屏状态。默认关,配对或重新配对都回到关。 */
+/** [deviceAccess]: whether requests arriving through the gateway may wake the phone, unlock it and read the lock-screen state. Off by default; pairing or re-pairing resets it to off. */
 data class RelayConfig(val enabled: Boolean = false, val gateway: String? = null, val deviceAccess: Boolean = false) {
     val paired get() = gateway != null
 }
 
-/** 网关地址和设备凭据整份加密原子保存。状态流只保留非秘密字段;读不懂即关闭。 */
+/** The gateway address and device credentials are stored encrypted as a whole and atomically. The state flow keeps only non-secret fields; anything unreadable counts as off. */
 class RelaySettings(private val dir: File, private val cipher: KeyCipher) {
     private val file = File(dir, "remote-relay.bin")
     private val mutable = MutableStateFlow(runCatching { read()?.let { config(it) } }.getOrNull() ?: RelayConfig())
@@ -49,7 +49,7 @@ class RelaySettings(private val dir: File, private val cipher: KeyCipher) {
             val p = checkNotNull(pairing()) { "Pair the gateway first" }
             write(p, config.value.enabled, on)
         } catch (e: Exception) {
-            // 撤销时存不下也先在进程内关掉,不留下还能用的旧许可。
+            // When revoking, turn it off in-process even if the write fails, so no stale permission that still works is left behind.
             if (!on) mutable.value = mutable.value.copy(deviceAccess = false)
             throw e
         }

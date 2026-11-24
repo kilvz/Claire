@@ -39,9 +39,9 @@ import com.wangzan101.mika.core.model.usage.TokenBudgetLimits
 import com.wangzan101.mika.device.ui.DeviceAccessSection
 
 /**
- * 设置 › 任务运行:自主模式默认关;屏幕常亮、被操作的 App 静音默认开,可以关;[parallel] 不为空(实验开关打开了)时多一行同时进行的任务数。
- * 下面一组是操作节奏:快 / 标准(默认) / 像人,选了下一个任务起生效。
- * [deviceAccess] 非空时挂「锁屏时运行本机任务」一组:与「连接电脑」的远程开关互不影响,凭据编辑区共用。
+ * Settings › Task run: autonomous mode is off by default; keep-screen-on and muting the operated app are on by default and can be turned off; when [parallel] is non-null (the experimental switch is on) an extra row for the number of concurrent tasks appears.
+ * The group below is the operating pace: fast / standard (default) / human, taking effect from the next task on.
+ * When [deviceAccess] is non-null, a "run local tasks while locked" group is attached: it does not affect the remote switch under "connect to computer", and the credential editor is shared.
  */
 @Composable
 fun DuringWorkScreen(
@@ -131,7 +131,7 @@ fun DuringWorkScreen(
             }
             parallel?.let { ParallelRow(it, onParallelMax) }
         }
-        // 锁屏时运行本机任务:独立开关 + 共用的锁屏凭据编辑区(组名/脚注说清与远程开关互不影响)
+        // Run local tasks while locked: a separate switch plus the shared lock-screen credential editor (the group name/footnote make clear it does not affect the remote switch)
         deviceAccess?.let { DeviceAccessSection(it, localTasks = true) }
         if (editingLimit) StepLimitDialog(
             current = stepLimit,
@@ -154,7 +154,7 @@ fun DuringWorkScreen(
             onPick = { onTokenBudget(it); editingTokenBudget = false },
             onDismiss = { editingTokenBudget = false },
         )
-        // 允许 Claire 改自己的设置:默认关,打开后任务里才有 settings_list、settings_set
+        // Allow Claire to change her own settings: off by default; only when on do tasks have settings_list and settings_set
         GroupCard {
             ListRow(
                 MikaIcons.Spark, stringResource(R.string.settings_self_config),
@@ -165,7 +165,7 @@ fun DuringWorkScreen(
                 MikaSwitch(selfConfig, onSelfConfig, Modifier.testTag("work-self-config"))
             }
         }
-        // 允许 Claire 操作自己的界面:默认关;打开后任务里才有 mika_open_screen/open_file/notify/copy
+        // Allow Claire to operate her own UI: off by default; only when on do tasks have mika_open_screen/open_file/notify/copy
         GroupCard {
             ListRow(
                 MikaIcons.Screens, stringResource(R.string.settings_self_operate),
@@ -176,7 +176,7 @@ fun DuringWorkScreen(
                 MikaSwitch(selfOperate, onSelfOperate, Modifier.testTag("work-self-operate"))
             }
         }
-        // 允许你在对话里的小窗直接操作虚拟屏(点/滑/返回);默认关,开着时展开小窗就能直接点
+        // Allow operating the virtual screen directly from the mini window in the conversation (tap/swipe/back); off by default, and when on the mini window can be tapped directly once expanded
         GroupCard {
             ListRow(
                 MikaIcons.Back, stringResource(R.string.settings_pip_operate),
@@ -186,7 +186,7 @@ fun DuringWorkScreen(
                 MikaSwitch(pipOperate, onPipOperate, Modifier.testTag("work-pip-operate"))
             }
         }
-        // 允许外部脚本经广播建定时任务;默认关,开着时仍受每分钟限流并标记来源
+        // Allow external scripts to create scheduled tasks via broadcast; off by default, and even when on they stay rate-limited per minute and marked with their source
         GroupCard {
             ListRow(
                 MikaIcons.Code, stringResource(R.string.settings_external_schedule),
@@ -202,7 +202,7 @@ fun DuringWorkScreen(
             OperatingPace.entries.forEachIndexed { i, p ->
                 RadioRow(paceLabel(p), selected = p == operatingPace, onClick = { onOperatingPace(p) }, subtitle = paceDetail(p), first = i == 0)
             }
-            // 按应用覆盖:单个 App 单独设快慢,没设的跟着上面选的全局档
+            // Per-app overrides: set the pace for individual apps; the rest follow the global pace selected above
             ListRow(
                 null, stringResource(R.string.settings_pace_per_app), stringResource(R.string.settings_pace_per_app_sub),
                 onClick = onOpenAppPace,
@@ -212,10 +212,10 @@ fun DuringWorkScreen(
     }
 }
 
-/** 步数上限的几个现成选项;别的数在输入框里填。 */
+/** The ready-made step limit options; other numbers are entered in the text field. */
 private val STEP_LIMIT_PRESETS = listOf(30, 60, 120, 240)
 
-/** 定时任务最长运行时间:不限制或几档分钟数,选了就生效。 */
+/** Maximum runtime for scheduled tasks: unlimited or one of the minute tiers; picking one takes effect immediately. */
 @Composable
 private fun TriggerRunLimitDialog(current: Int?, onPick: (Int?) -> Unit, onDismiss: () -> Unit) {
     MikaDialog(
@@ -292,7 +292,7 @@ private fun paceDetail(p: OperatingPace): String = stringResource(
     },
 )
 
-/** 同时进行几个任务:设备不支持时灰掉、写明原因,上限固定为 1。 */
+/** How many tasks run at once: greyed out with the reason shown when the device does not support it, with the limit fixed at 1. */
 @Composable
 private fun ParallelRow(p: ParallelSetting, onMax: (Int) -> Unit) {
     val supported = p.limit.reason == null
@@ -317,4 +317,4 @@ private fun ParallelRow(p: ParallelSetting, onMax: (Int) -> Unit) {
     }
 }
 
-// ---------- 悬浮胶囊 ----------
+// ---------- Floating capsule ----------

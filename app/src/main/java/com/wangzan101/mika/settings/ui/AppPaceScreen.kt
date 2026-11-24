@@ -31,8 +31,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 设置 › 干活时 › 操作节奏 › 按应用设置:列表里每个 App 单独一档(快/标准/像人),可增可改可删;
- * 没列入的跟随全局档位。第一次打开时内置 careful App 已预置为「像人」(见 [FeatureFlags.appPaceOverrides])。
+ * Settings › During work › Operating pace › Per-app settings: each app in the list has its own pace (fast/standard/human) and can be added, edited or removed;
+ * apps not in the list follow the global pace. On first open the built-in careful app is already preset to "human" (see [FeatureFlags.appPaceOverrides]).
  */
 @Composable
 fun AppPaceScreen(global: OperatingPace, flags: FeatureFlags, onBack: () -> Unit) {
@@ -41,7 +41,7 @@ fun AppPaceScreen(global: OperatingPace, flags: FeatureFlags, onBack: () -> Unit
     var apps by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<String?>(null) }
-    // 打开页面就读一次(没初始化过会把内置 careful App 预置进去);本机应用清单另读,不用发给任何模型
+    // Read once when the page opens (if never initialized, the built-in careful app is preset); the local app list is read separately and never sent to any model
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             runCatching { flags.appPaceOverrides() }.getOrElse { emptyMap() }.let { overrides = it }
@@ -106,7 +106,7 @@ fun AppPaceScreen(global: OperatingPace, flags: FeatureFlags, onBack: () -> Unit
     }
 }
 
-/** 添加 App:本机装了的 App 里搜一个(包名或名字),已设置过的不再出现。 */
+/** Add an app: search among the apps installed on this device (by package name or label); apps already configured do not appear. */
 @Composable
 private fun AppPacePickerDialog(
     installed: List<Pair<String, String>>,
