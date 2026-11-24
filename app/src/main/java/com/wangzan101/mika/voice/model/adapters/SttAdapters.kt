@@ -305,11 +305,11 @@ private val defaultBailianSession: SttSessionFactory = { _, model, tag, hooks ->
 }
 
 private val defaultSherpaSession: SttSessionFactory = { context, model, _, hooks ->
-    val recognizer = SherpaOnnx.recognizer(context, SherpaOnnxModels.files(context, model.model.id))
     SherpaSpeechSession(
-        hooks.recorder ?: PcmRecorder(streaming = true, unbounded = true),
-        recognizer,
-    )
+        hooks.recorder ?: PcmRecorder(streaming = true, unbounded = true, bufferChunks = 1_200),
+    ) {
+        SherpaOnnx.recognizer(context, SherpaOnnxModels.files(context, model.model.id))
+    }
 }
 
 internal fun languageTag(context: Context, language: String?): String =

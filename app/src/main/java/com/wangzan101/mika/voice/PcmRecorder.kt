@@ -31,10 +31,12 @@ class PcmRecorder(
     private val unbounded: Boolean = false,
     internal val inputSource: Int = MediaRecorder.AudioSource.MIC,
     chunkMs: Int = 50,
+    /** How many chunks can queue while a streaming session is still opening (a recognizer load, a connection); 100 chunks is five seconds. */
+    bufferChunks: Int = 100,
 ) : StreamingRecorder {
     internal val chunkSamples: Int = Wav.RATE * chunkMs / 1000
-    // At most five seconds while a connection is opening. Never silently drop a sample.
-    private val audio = Channel<ShortArray>(100)
+    // At most [bufferChunks] chunks while a connection is opening. Never silently drop a sample.
+    private val audio = Channel<ShortArray>(bufferChunks)
     override val chunks: ReceiveChannel<ShortArray> = audio
     private val _level = MutableStateFlow(0f)
     override val level: StateFlow<Float> = _level

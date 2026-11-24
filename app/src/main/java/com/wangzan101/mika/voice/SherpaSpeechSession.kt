@@ -1,6 +1,7 @@
 package com.wangzan101.mika.voice
 
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
+import com.k2fsa.sherpa.onnx.OnlineStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,25 +17,33 @@ import kotlinx.coroutines.withTimeoutOrNull
  * pause long enough to split sentences) locks the finished segment into
  * [SpeechEvent.Partial]'s stable part.
  *
+ * The recognizer is loaded on a background thread, not on the caller's (usually
+ * the main) thread: the bundled model is tens of megabytes and the downloaded
+ * one hundreds, so loading synchronously made the voice button freeze before
+ * the listening card appeared. The recorder starts immediately and queues
+ * audio while the recognizer loads (see [PcmRecorder]'s buffer), so speech from
+ * the first moment is not lost.
+ *
  * Streaming locally means there is no length cap ([unlimited] is true, like the
  * vendor live-streaming sessions). The recognizer belongs to this one session
  * and is released with it.
  */
 internal class SherpaSpeechSession(
     private val recorder: StreamingRecorder,
-    private val recognizer: OnlineRecognizer,
+    private val loadRecognizer: () -> OnlineRecognizer,
 ) : SpeechSession {
     private val out = SessionEvents()
     override val events: Flow<SpeechEvent> = out.flow
     override val live = true
     override val unlimited = true
 
-    private val stream = recognizer.createStream()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var stable = ""
-    private var tail = ""
-    private var closed = false
+    @Volatile private var stable = ""
+    @Volatile private var tail = ""
+    @Volatile private var closed = false
     private val completing = Any()
+    private var recognizer: OnlineRecognizer? = null
+    private var stream: OnlineStream? = null
     private var pump: Job? = null
     private var levels: Job? = null
 
@@ -52,17 +61,36 @@ internal class SherpaSpeechSession(
     }
 
     private suspend fun pumpAudio() {
+        val rec = runCatching { loadRecognizer() }.getOrNull()
+        val s = rec?.let { runCatching { it.createStream() }.getOrNull() }
+        if (rec == null || s == null) {
+            if (rec != null) runCatching { rec.release() }
+            out.finish(SpeechEvent.Failed(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SherpaFailed)))
+            releaseAll()
+            return
+        }
+        // Publish both together: release()/cancel() may run while the load is still
+        // in flight and must see either both or neither.
+        synchronized(completing) {
+            if (closed) {
+                runCatching { s.release() }
+                runCatching { rec.release() }
+                return
+            }
+            recognizer = rec
+            stream = s
+        }
         try {
             for (chunk in recorder.chunks) {
                 if (out.finished || out.cancelled) break
                 val samples = FloatArray(chunk.size) { chunk[it] / 32768.0f }
-                stream.acceptWaveform(samples, SherpaOnnx.SAMPLE_RATE)
-                while (recognizer.isReady(stream)) recognizer.decode(stream)
-                val text = recognizer.getResult(stream).text.trim()
-                if (recognizer.isEndpoint(stream)) {
+                s.acceptWaveform(samples, SherpaOnnx.SAMPLE_RATE)
+                while (rec.isReady(s)) rec.decode(s)
+                val text = rec.getResult(s).text.trim()
+                if (rec.isEndpoint(s)) {
                     if (text.isNotBlank()) stable = join(stable, text)
                     tail = ""
-                    recognizer.reset(stream)
+                    rec.reset(s)
                     out.send(SpeechEvent.Partial(stable, tail))
                 } else if (text != tail) {
                     tail = text
@@ -71,6 +99,7 @@ internal class SherpaSpeechSession(
             }
         } catch (_: Throwable) {
             out.finish(SpeechEvent.Failed(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SherpaFailed)))
+            releaseAll()
         }
     }
 
@@ -103,8 +132,15 @@ internal class SherpaSpeechSession(
 
     private fun releaseAll() {
         levels?.cancel()
-        runCatching { stream.release() }
-        runCatching { recognizer.release() }
+        val (rec, s) = synchronized(completing) {
+            val r = recognizer
+            val st = stream
+            recognizer = null
+            stream = null
+            r to st
+        }
+        runCatching { s?.release() }
+        runCatching { rec?.release() }
         scope.cancel()
     }
 
