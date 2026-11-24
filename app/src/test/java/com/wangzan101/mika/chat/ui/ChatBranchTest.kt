@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.wangzan101.mika.settings.ui.models.Page
 
-/** 长按哪一条消息能分支:只有已答完的回答,且这个对话没有任务在跑。 */
+/** Which message can be branched by long-pressing: only answers that have finished, and only when no task is running in this conversation. */
 class ChatBranchTest {
     private fun exchange(status: ExchangeStatus) = Exchange("问", emptyList(), status, live = false)
 
@@ -56,7 +56,7 @@ class ChatBranchTest {
         assertNull(retryableTurn(listOf(exchange(ExchangeStatus.Done("答", null)).copy(goal = " ")), "u0", blocked = false))
     }
 
-    /** 这一轮还没结束时用户的话也不能重新问:菜单不显示,和点了之后的判断一致。 */
+    /** While this turn has not finished the user's message cannot be asked again either: the menu is not shown, consistent with the check applied after tapping. */
     @Test fun unfinishedTurnsCannotRetry() {
         listOf(
             ExchangeStatus.Working, ExchangeStatus.WaitingUnlock, ExchangeStatus.Queued("排队"),
@@ -70,7 +70,7 @@ class ChatBranchTest {
         assertEquals(0, retryableTurn(listOf(exchange(ExchangeStatus.Cancelled())), "u0", blocked = false))
     }
 
-    /** 菜单用的键判断和动作用的轮次判断是同一个:能显示就能做,不能做就不显示。 */
+    /** The key-based check used by the menu and the turn-based check used by the action are one and the same: whatever can be shown can be done, and vice versa. */
     @Test fun menuAndActionAgree() {
         val statuses = listOf(ExchangeStatus.Done("答", null), ExchangeStatus.Working, ExchangeStatus.Queued("排队"), ExchangeStatus.Cancelled())
         for (status in statuses) for (blocked in listOf(true, false)) for (goal in listOf("问", " ")) {

@@ -26,12 +26,12 @@ class ChatCopyTest {
         assertEquals(examples.size, examples.map { it.kind }.toSet().size)
         assertEquals(ChatCopy.ExampleKind.Web, examples.first().kind)
         assertTrue(examples.first().prompt.contains("https://github.com/kilvz/Claire"))
-        // 短标题上卡片、完整提示词进输入框:两者分开存
+        // The short title goes on the card and the full prompt goes into the input box: the two are stored separately
         assertEquals(ChatCopy.examples.map { it.title }, ChatCopy.recommendationSeeds().map { it.first })
         assertEquals(ChatCopy.examples.map { it.prompt }, ChatCopy.recommendationSeeds().map { it.second })
     }
 
-    /** 卡片图标按类型挑:提示词和内置示例一字不差才认得出;自己加的任务显示通用图标。 */
+    /** The card icon is picked by kind: a prompt is recognized only when it matches a built-in example exactly; tasks you add yourself show the generic icon. */
     @Test fun kindsOnlyMatchTheBuiltInExamples() {
         val examples = ChatCopy.examples
         examples.forEach { assertEquals(it.kind, ChatCopy.kindOf(it.prompt)) }
@@ -45,7 +45,7 @@ class ChatCopyTest {
         assertEquals("约 ¥0.01–¥0.02", ChatTokensCopy.cost(DeepSeekCost("0.005", "0.015")))
     }
 
-    /** 分支标题:源标题后面加后缀,总长不超过 24 字;截的是源标题,后缀留着,emoji 不截半个。 */
+    /** Branch title: append a suffix to the source title with a total length of at most 24 characters; the source title is what gets truncated, the suffix is kept, and an emoji is never cut in half. */
     @Test fun branchTitleKeepsTheSuffixWhenTruncating() {
         val suffix = " · 分支"
         val long = "一二三四五六七八九十一二三四五六七八九十一二三四五"
@@ -62,11 +62,11 @@ class ChatCopyTest {
         val first = Exchange("查车次\n附件:/workspace/inbox/a.pdf(1 KB)", emptyList(), ExchangeStatus.Working, live = true)
         assertEquals("查车次", ChatCopy.title(listOf(first, first.copy(goal = "再查"))))
         assertEquals("", ChatCopy.title(emptyList()))
-        // 只发了附件:不拿路径当标题
+        // Only attachments were sent: the path is not used as the title
         assertEquals("照片", ChatCopy.title(listOf(first.copy(goal = "附件:/workspace/inbox/a.jpg(1 KB)"))))
         assertEquals("a.pdf", ChatCopy.plainTitle("附件:/workspace/inbox/a.pdf(1 KB)"))
         assertEquals(ScreenCopy.TAG, ChatCopy.plainTitle("[[screen:s1]]"))
-        // 在浏览器页上对着一页问的:页面说明不当标题
+        // Asked on a browser page about that page: the page description is not used as the title
         val paged = com.wangzan101.mika.core.agent.AttachedPage.compose(com.wangzan101.mika.core.agent.AttachedPage.Page("https://a.example/", "页"), "挑一个\n第二行")
         assertEquals("挑一个", ChatCopy.plainTitle(paged))
     }
@@ -95,7 +95,7 @@ class ChatCopyTest {
         assertEquals("", s.recent.single().subtitle)
     }
 
-    /** 置顶的对话在「置顶」一段,最近置顶的在前,不在「最近」里重复;有任务在跑的只列在进行中(带图钉)。 */
+    /** Pinned conversations go in the pinned section, most recently pinned first, and are not repeated under recent; ones with a running task are listed only under running (with a pin). */
     @Test fun drawerListsPinnedAboveRecent() {
         val all = listOf(
             ConversationSummary("a", "一", 40L),
@@ -111,13 +111,13 @@ class ChatCopyTest {
         assertTrue(s.pinned.all { it.pinned })
         assertEquals(listOf("a", "c"), s.recent.map { it.id })
         assertTrue(s.recent.none { it.pinned })
-        // 取消置顶:回到「最近」里按改动时间排的位置
+        // Unpinned: it returns to its position by modification time under recent
         val unpinned = drawerSections(all.map { if (it.id == "b") it.copy(pinnedAt = null) else it }, CurrentConversation("a", false, "一", ""), emptyList(), { null }, true, 0L, zone)
         assertEquals(listOf("e", "d"), unpinned.pinned.map { it.id })
         assertEquals(listOf("a", "b", "c"), unpinned.recent.map { it.id })
     }
 
-    /** 在浏览器页上对着一页开始的对话:侧栏那一条带着网站(画成「网页」小标签和网站名),进行中、最近两段都是。 */
+    /** A conversation started on a browser page about that page: its sidebar entry carries the site (drawn as a small tag plus the site name), in both the running and recent sections. */
     @Test fun drawerMarksConversationsStartedFromAPage() {
         val page = com.wangzan101.mika.chat.PageOrigin("https://shop.example.com/s?k=1", "shop.example.com", "搜索")
         val all = listOf(ConversationSummary("a", "一", 0L, page = page), ConversationSummary("b", "二", 0L), ConversationSummary("c", "三", 0L, page = page))
@@ -126,7 +126,7 @@ class ChatCopyTest {
         assertEquals("shop.example.com", s.running.single().site)
     }
 
-    /** 分支出来的对话在侧栏带分支标记;普通对话不带。 */
+    /** Conversations that came from a branch carry a branch marker in the sidebar; ordinary conversations do not. */
     @Test fun drawerMarksBranchedConversations() {
         val origin = BranchOrigin("parent", 1, afterTurn = true, at = 5L)
         val all = listOf(ConversationSummary("a", "一", 0L, branchOf = origin), ConversationSummary("b", "二", 0L))
@@ -134,19 +134,19 @@ class ChatCopyTest {
         assertEquals(listOf(true, false), s.recent.map { it.branch })
     }
 
-    /** 任务进行中、没开并行:只有当前对话能点。 */
+    /** While a task is running and parallelism is off: only the current conversation can be tapped. */
     @Test fun drawerLocksOtherConversationsWhileBusy() {
         val all = listOf(ConversationSummary("a", "一", 0L), ConversationSummary("b", "二", 0L))
         val s = drawerSections(all, CurrentConversation("a", false, "一", ""), emptyList(), { null }, canSwitch = false, now = 0L, zone = zone)
         assertEquals(listOf(true, false), s.recent.map { it.enabled })
         assertEquals(listOf(true, false), s.recent.map { it.current })
-        // 当前对话还没存进列表时(刚发出第一句)也列在进行中
+        // The current conversation is also listed under running while it is not in the saved list yet (the first message was just sent)
         val fresh = drawerSections(emptyList(), CurrentConversation(null, true, "", "正在处理"), emptyList(), { null }, false, 0L, zone)
         assertEquals("新对话", fresh.running.single().title)
         assertTrue(fresh.running.single().enabled)
     }
 
-    /** 归档的对话不进置顶和最近;当前正在看的那个留着(带归档标记),还在跑任务的仍列在进行中。 */
+    /** Archived conversations are kept out of pinned and recent; the one currently being viewed stays (with the archived mark), and one whose task is still running is listed under running. */
     @Test fun drawerHidesArchivedExceptCurrentAndRunning() {
         val all = listOf(
             ConversationSummary("a", "一", 30L),
@@ -159,17 +159,17 @@ class ChatCopyTest {
         assertTrue(s.running.single().archived)
         assertEquals(listOf("a"), s.recent.map { it.id })
         assertTrue(s.recent.none { it.archived })
-        // 当前看的就是归档的那个:留着,不然不知道自己在哪
+        // The one being viewed is itself the archived one: keep it, otherwise the user would not know where they are
         val cur = drawerSections(all, CurrentConversation("b", false, "二", ""), emptyList(), { null }, canSwitch = true, now = 0L, zone = zone)
         assertEquals(listOf("a", "b"), cur.recent.map { it.id })
         assertTrue(cur.recent.last().archived)
         assertTrue(cur.recent.last().current)
-        // 没归档时一条不少
+        // With nothing archived not a single entry is missing
         val plain = drawerSections(all.map { it.copy(archivedAt = null) }, CurrentConversation("a", false, "一", ""), emptyList(), { null }, true, 0L, zone)
         assertEquals(listOf("a", "b", "c", "d"), plain.recent.map { it.id })
     }
 
-    /** 多选的勾选范围跟着视图走:普通侧栏是列出来的对话,归档视图里是归档的那些;草稿没有编号,勾不了。 */
+    /** The multi-select scope follows the view: in the normal sidebar it is the listed conversations, in the archive view the archived ones; drafts have no id and cannot be selected. */
     @Test fun drawerSelectableIdsFollowTheView() {
         val sections = DrawerSections(
             running = listOf(DrawerConversation("a", "一", "", running = true, current = true, enabled = true)),
@@ -183,7 +183,7 @@ class ChatCopyTest {
         assertEquals(setOf("c"), drawerSelectableIds(sections, archived, archivedView = true))
     }
 
-    /** 搜索筛选:全部含归档,未归档/已归档各取一边;删掉的不搜。 */
+    /** Search filter: all includes archived, active and archived take one side each; deleted ones are not searched. */
     @Test fun drawerSearchCandidatesFilterByArchiveState() {
         val all = listOf(
             ConversationSummary("a", "附件:/workspace/inbox/a.pdf(1 KB)", 3L),
@@ -194,16 +194,16 @@ class ChatCopyTest {
         assertEquals(listOf("a", "b"), drawerSearchCandidates(all, deleted, SearchArchiveFilter.All).map { it.id })
         assertEquals(listOf("a"), drawerSearchCandidates(all, deleted, SearchArchiveFilter.Active).map { it.id })
         assertEquals(listOf("b"), drawerSearchCandidates(all, deleted, SearchArchiveFilter.Archived).map { it.id })
-        // 标题还是侧栏里显示的样子(去掉附件行)
+        // The title is still what the sidebar shows (attachment lines removed)
         assertEquals("a.pdf", drawerSearchCandidates(all, deleted, SearchArchiveFilter.All).first().title)
     }
 
     private fun archivedRow(id: String, archivedAt: Long) =
         DrawerConversation(id, id, "", running = false, current = false, enabled = true, archived = true, archivedAt = archivedAt)
 
-    /** 归档视图按归档时间分段:本周(周一起算)、本月、更早;没记归档时间的归到更早,不会漏。 */
+    /** The archive view groups by archive time: this week (starting Monday), this month, earlier; entries with no recorded archive time go under earlier and are never dropped. */
     @Test fun archiveViewGroupsByWeekMonthAndOlder() {
-        val now = at(2026, 11, 12, 15) // 周四
+        val now = at(2026, 11, 12, 15) // Thursday
         val rows = listOf(
             archivedRow("a", at(2026, 11, 12, 9)),
             archivedRow("b", at(2026, 11, 9, 20)),
@@ -222,7 +222,7 @@ class ChatCopyTest {
         assertEquals(listOf(ArchivePeriod.Earlier), unknown.map { it.period })
     }
 
-    /** 一行写清归档了多久:当天是「今天归档」,其余是「归档于 N 天前」。 */
+    /** One line states how long ago it was archived: today is "archived today", otherwise "archived N days ago". */
     @Test fun archivedAgoSaysTodayOrDays() {
         val now = at(2026, 11, 12, 15)
         assertEquals("今天归档", archivedAgo(at(2026, 11, 12, 9), now, zone))

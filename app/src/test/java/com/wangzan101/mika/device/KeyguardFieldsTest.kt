@@ -34,7 +34,7 @@ class KeyguardFieldsTest {
         assertFalse(KeyguardFields.matches(CredentialKind.Password, id, "android.widget.EditText", true, true, false, untyped = true, digitPad = true))
         assertTrue(KeyguardFields.matches(CredentialKind.Password, id, "android.widget.EditText", true, true, false, untyped = true, digitPad = false))
         assertFalse(KeyguardFields.matches(CredentialKind.Pin, id, "android.widget.EditText", true, true, false, untyped = true, digitPad = false))
-        // 声明了文字输入类型的密码框,旁边有数字也还是密码框
+        // A password field declared with a text input type is still a password field even when a digit pad is beside it
         assertTrue(KeyguardFields.matches(CredentialKind.Password, id, "android.widget.EditText", true, true, false, untyped = false, digitPad = true))
         assertFalse(KeyguardFields.matches(CredentialKind.Pin, id, "android.widget.EditText", true, true, false, untyped = false, digitPad = true))
     }

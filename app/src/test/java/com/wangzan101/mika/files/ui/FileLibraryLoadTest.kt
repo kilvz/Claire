@@ -62,7 +62,7 @@ class FileLibraryLoadTest {
         assertFalse(recovered.partial)
     }
 
-    /** 归档状态和标题一起读出来,文件行据此标出「来自已归档对话」。 */
+    /** The archived state is read out together with the title, so the file rows can be marked as coming from an archived conversation. */
     @Test fun archivedConversationsAreReportedAlongsideTitles() {
         val store = ConversationStore(tmp.newFolder())
         store.append("kept", Turn("message", "", "succeeded"))

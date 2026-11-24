@@ -11,7 +11,7 @@ class KeyguardRevealTest {
 
     @Test fun noCandidatesOrAllTooSmallReturnNull() {
         assertNull(KeyguardReveal.fallbackTarget(emptyList(), window, 0.08f))
-        // 小文字链接(取消/紧急呼叫)面积不到阈值,不算
+        // Small text links (cancel / emergency call) stay below the area threshold and do not count
         val small = listOf(
             KeyguardReveal.Candidate(b(0, 2200, 300, 2300), clickable = true, digit = false),
         )
@@ -20,8 +20,8 @@ class KeyguardRevealTest {
 
     @Test fun digitsAndNonClickableAreExcluded() {
         val candidates = listOf(
-            KeyguardReveal.Candidate(b(200, 1600, 880, 2100), clickable = true, digit = true), // 数字键,排除
-            KeyguardReveal.Candidate(b(200, 1600, 880, 2100), clickable = false, digit = false), // 不可点,排除
+            KeyguardReveal.Candidate(b(200, 1600, 880, 2100), clickable = true, digit = true), // Digit key, excluded
+            KeyguardReveal.Candidate(b(200, 1600, 880, 2100), clickable = false, digit = false), // Not clickable, excluded
         )
         assertNull(KeyguardReveal.fallbackTarget(candidates, window, 0.08f))
     }

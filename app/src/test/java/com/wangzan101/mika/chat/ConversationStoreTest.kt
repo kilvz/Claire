@@ -137,7 +137,7 @@ class ConversationStoreTest {
         assertEquals(listOf(LegacyTurn("问题", "答案", "succeeded")), old)
     }
 
-    /** 留在后台运行的那一页(站点)和它后来关掉的原因跟着那一轮存下;没留页的轮次不写这两个字段。 */
+    /** The page (site) left running in the background and the reason it was later closed are stored with that turn; turns that left no page do not write these two fields. */
     @Test fun persistsKeptPage() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -150,7 +150,7 @@ class ConversationStoreTest {
         assertFalse("keptPage" in java.io.File(dir, "$id.json").readText().substringAfter("谢谢"))
     }
 
-    /** 这一轮用过的能力组跟着存下(下一轮开局据此预先展开);没用过的不写这个字段。 */
+    /** The capability groups used in this turn are stored with it (the next turn pre-expands them at the start); turns that used none do not write this field. */
     @Test fun persistsUsedGroups() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -161,7 +161,7 @@ class ConversationStoreTest {
         assertFalse("groups" in java.io.File(dir, "$id.json").readText().substringAfter("谢谢"))
     }
 
-    /** 插话打断的那段回复和插话一一对应存下;没打断过的轮次不写这个字段,旧文件读出来是空的。 */
+    /** Each reply interrupted by a steer is stored one-to-one with that steer; turns with no interruption do not write this field, and old files read back empty. */
     @Test fun persistsInterruptedReplies() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -174,7 +174,7 @@ class ConversationStoreTest {
         assertFalse("interruptedReplies" in java.io.File(dir, "$id.json").readText().substringAfter("谢谢"))
     }
 
-    /** 取消占位结果的来源跟着存下;后续摘要清掉来源,旧文件和普通轮次读出来为空。 */
+    /** The origin of a placeholder cancellation outcome is stored with it; a later summary clears the origin, and old files and ordinary turns read it back as empty. */
     @Test fun persistsOutcomeSystemType() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -187,7 +187,7 @@ class ConversationStoreTest {
         assertEquals(null, ConversationStore(dir).turns(id).first().outcomeSystemType)
     }
 
-    /** 插话之前已经说完的回复同样一一对应存下;没有时不写这个字段。 */
+    /** Replies that had already finished before a steer are likewise stored one-to-one; when there are none the field is not written. */
     @Test fun persistsFinishedReplies() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -198,7 +198,7 @@ class ConversationStoreTest {
         assertFalse("finishedReplies" in java.io.File(dir, "$id.json").readText().substringAfter("谢谢"))
     }
 
-    /** 删对话:对话文件、标题、挪到一边的损坏文件、临时文件都删掉,列表里没有了,别的对话不动;删完发一次改动。 */
+    /** Delete conversation: the conversation file, the title, the corrupted file moved aside and the temp file are all deleted, it disappears from the list, other conversations are untouched; one change is emitted after the deletion. */
     @Test fun deleteRemovesTheConversationAndItsSidecars() = kotlinx.coroutines.runBlocking {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -228,7 +228,7 @@ class ConversationStoreTest {
         assertEquals(null, store.pinnedAt(id))
     }
 
-    /** 用户改的名字说了算:后台起标题晚到也不盖掉;起好了的标题用户照样能改;空的不改。 */
+    /** The name the user set wins: a late auto-title from the background does not overwrite it; the user can still rename a conversation that already has a title; an empty name changes nothing. */
     @Test fun renameByUserWinsOverAutoTitle() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -250,7 +250,7 @@ class ConversationStoreTest {
         assertFalse(store.rename(other, "再改"))
     }
 
-    /** 置顶记在 `.pin` 里(置顶的时间),重开还在;列表带上置顶时间,不改对话的先后;取消置顶就没了。 */
+    /** Pinning is recorded in `.pin` (the pin time) and survives a reopen; the list carries the pin time without changing conversation order; unpinning removes it. */
     @Test fun pinPersistsAndShowsInTheList() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -264,12 +264,12 @@ class ConversationStoreTest {
         assertTrue(again.setPinned("a", false))
         assertEquals(null, again.pinnedAt("a"))
         assertFalse(java.io.File(dir, "a.pin").exists())
-        // 删掉的对话不再置顶回来
+        // A deleted conversation does not come back as pinned
         again.delete("b")
         assertFalse(again.setPinned("b", true))
     }
 
-    /** 删之后才到的补写(后台起好的标题、收尾后补的结局)不把对话写回来;再存进一轮就是重新用这个编号。 */
+    /** Writes that arrive after the deletion (an auto-title finished in the background, an outcome added after wrap-up) do not bring the conversation back; appending another turn reuses that id. */
     @Test fun lateWritesDoNotReviveADeletedConversation() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -366,7 +366,7 @@ class ConversationStoreTest {
         assertEquals(2, b.turns(id).size)
     }
 
-    // 任务结束后补记忆提示、删记忆时,这一轮的文件卡片不能丢
+    // Adding a memory hint after the task ends or deleting a memory must not lose this turn's file cards
     @Test fun filesSurviveNoteUpdatesAndStrip() {
         val dir = tmp.newFolder("d")
         val store = ConversationStore(dir)
@@ -380,7 +380,7 @@ class ConversationStoreTest {
         assertTrue(r.first.memoryNotes.isEmpty())
     }
 
-    // 写过哪个对话就发出它的编号:存进一轮、改一轮、去掉记忆提示
+    // Whichever conversation was written emits its id: appending a turn, updating a turn, dropping the memory hint
     @Test fun announcesChangedConversations() = kotlinx.coroutines.test.runTest {
         val s = ConversationStore(tmp.newFolder("c"))
         val seen = mutableListOf<String>()
@@ -393,11 +393,11 @@ class ConversationStoreTest {
         s.updateTurn("a", "missing") { it }
         s.stripMemory(setOf("m1"))
         assertEquals(listOf("a", "b", "a", "a"), seen)
-        // 只有删对话才发 deletions
+        // Only deleting a conversation emits deletions
         assertEquals(emptyList<String>(), deleted)
     }
 
-    /** 从哪一页开始的对话:记在旁边的 .page 文件里,列表里带着;旧对话没有它照常读;删对话一起删掉。 */
+    /** Which page the conversation started from: recorded in the adjacent .page file and carried in the list; old conversations without it still read fine; deleting the conversation deletes it too. */
     @Test fun pageOriginPersistsAndIsOptional() {
         val dir = tmp.newFolder("c")
         val a = ConversationStore(dir)
@@ -412,9 +412,9 @@ class ConversationStoreTest {
         val listed = b.list().associateBy { it.id }
         assertEquals("shop.example.com", listed.getValue(paged).page?.host)
         assertEquals(null, listed.getValue(plain).page)
-        // 对话文件的格式不变:没有多出来的字段
+        // The conversation file format is unchanged: no extra fields
         assertFalse(java.io.File(dir, "$paged.json").readText().contains("shop.example.com"))
-        // 坏了的 .page 当作没有
+        // A corrupted .page is treated as absent
         java.io.File(dir, "$plain.page").writeText("{not json")
         assertEquals(null, b.pageOrigin(plain))
         b.delete(paged)
@@ -423,8 +423,8 @@ class ConversationStoreTest {
     }
 
     /**
-     * 「用户此刻在哪个对话」也记下来:进程重启后胶囊据此接着那个对话,而不是靠文件时间猜最近的;
-     * 新开还没说话的对话记成 [CurrentChat.Fresh];删掉它时一起清掉;这个文件不进对话列表。
+     * "Which conversation the user is in right now" is recorded too: after a process restart the capsule resumes that conversation from it, instead of guessing the most recent one by file timestamps;
+     * a newly opened conversation with no messages yet is recorded as [CurrentChat.Fresh]; deleting it clears this too; this file does not appear in the conversation list.
      */
     @Test fun remembersTheConversationOnScreen() {
         val dir = tmp.newFolder("c")
@@ -435,23 +435,23 @@ class ConversationStoreTest {
 
         a.setCurrent(CurrentChat.Fresh)
         assertEquals(CurrentChat.Fresh, a.currentChat())
-        // 新开的对话还没有对话文件,重启后照样读得回来
+        // A newly opened conversation has no conversation file yet, but it still reads back after a restart
         assertEquals(CurrentChat.Fresh, ConversationStore(dir).currentChat())
         assertEquals(listOf(id), ConversationStore(dir).list().map { it.id })
 
         a.setCurrent(CurrentChat.Open(id))
         assertEquals(CurrentChat.Open(id), ConversationStore(dir).currentChat())
         assertEquals(CurrentChat.Open(id), ConversationStore(dir).current.value)
-        // 记在旁边的 current 文件里,不动对话文件、不进列表
+        // Recorded in the adjacent current file, without touching the conversation file or entering the list
         assertEquals(setOf("$id.json", "current"), dir.list()!!.toSet())
         assertEquals(listOf(id), a.list().map { it.id })
 
-        // 删掉这个对话:指向它的记录一起清掉,胶囊回落到最近那个
+        // Delete this conversation: the record pointing at it is cleared too, and the capsule falls back to the most recent one
         a.delete(id)
         assertEquals(null, ConversationStore(dir).currentChat())
     }
 
-    /** 分支复制到选定的那一轮(含在内),之后的不复制;源对话原样不动。 */
+    /** The branch copies up to and including the selected turn and nothing after it; the source conversation stays as it is. */
     @Test fun branchCopiesThroughTheChosenTurn() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -465,11 +465,11 @@ class ConversationStoreTest {
             listOf(Turn("一", "甲", "succeeded", atMs = 11L), Turn("二", "乙", "succeeded", atMs = 22L)),
             ConversationStore(dir).turns(target),
         )
-        // 源对话仍是三轮
+        // The source conversation still has three turns
         assertEquals(listOf("一", "二", "三"), store.turns(source).map { it.userText })
     }
 
-    /** 分支带走标题、网页来源和分支来源,不带走置顶。 */
+    /** The branch carries over the title, the page origin and the branch origin, but not the pin. */
     @Test fun branchCopiesTitlePageAndOriginButNotPin() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -489,7 +489,7 @@ class ConversationStoreTest {
         assertEquals(null, again.pinnedAt(target))
     }
 
-    /** 源不存在、源文件损坏、轮次越界、目标已有对话文件:都返回 false,什么都不写。 */
+    /** Source missing, source file corrupted, turn index out of range, target conversation file already existing: all return false and write nothing. */
     @Test fun branchRejectsBadInput() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -514,7 +514,7 @@ class ConversationStoreTest {
         assertEquals(listOf("已有"), store.turns(target).map { it.userText })
     }
 
-    /** 分支可以再分支,轮数按上一级的分支内容算,来源指向上一个对话。 */
+    /** A branch can be branched again; the turn count follows the parent branch's content and the origin points at the previous conversation. */
     @Test fun branchOfBranchWorks() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -531,7 +531,7 @@ class ConversationStoreTest {
         assertEquals(source, store.branchOrigin(middle)?.parentId)
     }
 
-    /** 删对话时分支来源一起删掉。 */
+    /** Deleting a conversation deletes its branch origin too. */
     @Test fun deleteRemovesBranchSidecar() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -546,7 +546,7 @@ class ConversationStoreTest {
         assertEquals(null, store.branchOrigin(target))
     }
 
-    /** 列表带上分支来源;普通对话、没有 .branch 的旧对话为 null。 */
+    /** The list carries the branch origin; it is null for ordinary conversations and for old conversations without a .branch file. */
     @Test fun listExposesBranchOrigin() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -560,7 +560,7 @@ class ConversationStoreTest {
         assertEquals(null, listed.getValue(source).branchOf)
     }
 
-    /** 从用户消息重新问:只复制这一轮之前的轮次,来源记 after=false。 */
+    /** Ask again from a user message: only the turns before this one are copied, and the origin records after=false. */
     @Test fun branchBeforeCopiesOnlyEarlierTurns() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -581,7 +581,7 @@ class ConversationStoreTest {
         assertEquals(listOf("一", "二", "三"), store.turns(source).map { it.userText })
     }
 
-    /** 第一轮之前没有轮次:分支是空的,不进侧栏;标题和来源已经写好,第一句话存进来后接着用。 */
+    /** No turns before the first one: the branch is empty and does not appear in the sidebar; the title and origin are already written and are used once the first message is stored. */
     @Test fun branchBeforeTheFirstTurnMakesAnEmptyBranch() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -602,8 +602,8 @@ class ConversationStoreTest {
         assertTrue(store.list().any { it.id == target })
     }
 
-    /** 重新问也拒绝坏输入:源不存在、轮次越界、目标已有文件。 */
-    /** 人格绑定读得回来;切换只记变化,同一个再写不重复记;null 表示回到默认。 */
+    /** Asking again also rejects bad input: source missing, turn out of range, target file already exists. */
+    /** The persona binding reads back; switching records only changes, and writing the same one again is not recorded twice; null means back to the default. */
     @Test fun personaBindingRoundTripsAndRecordsSwitches() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -621,7 +621,7 @@ class ConversationStoreTest {
         assertFalse(java.io.File(dir, "$id.persona").exists())
     }
 
-    /** 分支复制当前人格,不复制切换记录;删对话连旁文件一起删。 */
+    /** A branch copies the current persona but not the switch history; deleting a conversation deletes its sidecar too. */
     @Test fun personaBindingFollowsBranchesAndDeletion() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -638,7 +638,7 @@ class ConversationStoreTest {
         assertFalse(java.io.File(dir, "$source.persona").exists())
     }
 
-    /** 不合法的人格 id 不写;旁文件里的坏 id 当没有。 */
+    /** An invalid persona id is not written; a bad id in the sidecar is treated as absent. */
     @Test fun personaBindingRejectsBadIds() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -649,7 +649,7 @@ class ConversationStoreTest {
         assertNull(store.persona(id))
     }
 
-    /** 归档的对话默认不进侧栏;要全部时用 includeArchived;换个实例也还在,取消归档后回来。 */
+    /** Archived conversations are kept out of the sidebar by default; use includeArchived to get them all; it survives a new instance, and the conversation returns after unarchiving. */
     @Test fun archivedConversationsHiddenUntilRequested() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -671,7 +671,7 @@ class ConversationStoreTest {
         assertEquals(setOf("a", "b"), reopened.list().map { it.id }.toSet())
     }
 
-    /** 取消归档记下恢复时间(自动归档据此给一段宽限);删对话时一起删。 */
+    /** Unarchiving records the restore time (auto-archiving uses it to grant a grace period); deleting the conversation deletes it too. */
     @Test fun unarchiveRecordsTheRestoreTime() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -687,7 +687,7 @@ class ConversationStoreTest {
         assertNull(ConversationStore(dir).restoredAt("a"))
     }
 
-    /** 删掉归档的对话时,旁文件一起删;用新实例看,免得进程里的删除记录挡住。 */
+    /** Deleting an archived conversation deletes its sidecar too; check with a new instance so the in-process deletion record does not get in the way. */
     @Test fun deleteRemovesArchiveSidecar() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -702,7 +702,7 @@ class ConversationStoreTest {
         assertTrue(ConversationStore(dir).list(includeArchived = true).isEmpty())
     }
 
-    /** 从归档的对话分出来的分支是新的、活跃的,不继承归档。 */
+    /** A branch made from an archived conversation is new and active and does not inherit the archive. */
     @Test fun branchDoesNotInheritArchive() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -718,7 +718,7 @@ class ConversationStoreTest {
         assertTrue(store.list().none { it.id == source })
     }
 
-    /** 归档旁文件读不懂时当作没归档,不挡住列表。 */
+    /** When the archive sidecar cannot be parsed it is treated as not archived and does not block the list. */
     @Test fun corruptArchiveFileIsTreatedAsActive() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -729,7 +729,7 @@ class ConversationStoreTest {
         assertEquals(listOf("a"), store.list().map { it.id })
     }
 
-    /** 归档的对话来了新的一轮就自动取消归档;只改已有那一轮、只改标题不算。 */
+    /** A new turn in an archived conversation unarchives it automatically; updating an existing turn or changing only the title does not count. */
     @Test fun appendClearsArchiveButEditingAnExistingTurnDoesNot() {
         val dir = tmp.newFolder("c")
         val store = ConversationStore(dir)
@@ -771,14 +771,14 @@ class ConversationStoreTest {
         assertTrue(store.branch(a, branched, 0))
         assertEquals("proj-1", ConversationStore(dir).projectId(branched))
 
-        // 删除源对话连带清掉它的 .project 旁文件,分支保留
+        // Deleting the source conversation also clears its .project sidecar; the branch is kept
         store.delete(a)
         assertNull(store.projectId(a))
         assertFalse(File(dir, "$a.project").exists())
         assertFalse(store.setProject(a, "proj-2"))
         assertEquals("proj-1", store.projectId(branched))
 
-        // 解绑回到独立对话
+        // Unbinding returns to a standalone conversation
         assertTrue(store.setProject(branched, null))
         assertNull(store.projectId(branched))
         assertFalse(File(dir, "$branched.project").exists())

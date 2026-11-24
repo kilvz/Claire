@@ -8,11 +8,11 @@ import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * 英文(默认)、简体和繁体三份界面文字要一一对上:同样的条目、同样的占位符(繁体对照简体);英文里不该留着没翻的中文。
- * 其他语言([others])也要和英文一一对上,复数按各自语言的数量词写全。
+ * The three sets of UI texts, English (default), Simplified Chinese and Traditional Chinese, must line up one-to-one: the same entries and the same placeholders (Traditional checked against Simplified); English must not keep untranslated Chinese.
+ * The other languages ([others]) must also line up with English one-to-one, with plurals written out for every quantity word of that language.
  */
 class StringResourcesTest {
-    /** 中英以外的一种界面语言:资源文件夹,和这种语言的复数要写哪几个数量词(按 CLDR 的复数规则)。 */
+    /** A UI language other than Chinese and English: its resource folder, and which quantity words its plurals must define (per CLDR plural rules). */
     private class Other(val folder: String, val locale: Locale, val quantities: Set<String>) {
         val texts by lazy { ResFileTexts(folder, locale) }
     }
@@ -25,7 +25,7 @@ class StringResourcesTest {
         Other("values-es", Locale.forLanguageTag("es"), setOf("one", "many", "other")),
         Other("values-pt", Locale.forLanguageTag("pt"), setOf("one", "many", "other")),
         Other("values-ru", Locale.forLanguageTag("ru"), setOf("one", "few", "many", "other")),
-        // 印尼语的资源文件夹沿用安卓的旧语言代码 in
+        // The Indonesian resource folder keeps Android's legacy language code in
         Other("values-in", Locale.forLanguageTag("id"), setOf("other")),
         Other("values-tr", Locale.forLanguageTag("tr"), setOf("other")),
     )
@@ -34,7 +34,7 @@ class StringResourcesTest {
     private val zh = ResFileTexts.chinese
     private val hant = ResFileTexts.traditional
 
-    /** 标了 translatable="false" 的条目只在默认文件里。 */
+    /** Entries marked translatable="false" exist only in the default file. */
     private val fixed: Set<String> = ResFileTexts.resFiles("values").flatMap { f ->
         val nodes = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(f).getElementsByTagName("string")
         (0 until nodes.length).map { nodes.item(it) as Element }.filter { it.getAttribute("translatable") == "false" }.map { it.getAttribute("name") }
@@ -49,7 +49,7 @@ class StringResourcesTest {
 
     @Test
     fun placeholdersMatch() {
-        // 日期两种语言取的字段不同(中文写月份数字,英文写月份名)
+        // The date takes different fields in the two languages (Chinese writes the month number, English writes the month name)
         for (name in zh.strings.keys - setOf("date_month_day", "date_year_month_day")) assertEquals(name, args(en.strings.getValue(name)), args(zh.strings.getValue(name)))
         for (name in zh.plurals.keys) {
             val expected = args(zh.plurals.getValue(name).getValue("other"))
@@ -94,7 +94,7 @@ class StringResourcesTest {
         }
     }
 
-    /** 不用汉字的语言里不该留着没翻的中文;日语本来就用汉字,不查。 */
+    /** Languages that do not use Han characters should have no untranslated Chinese left; Japanese uses Han characters by nature, so it is not checked. */
     @Test
     fun otherLanguagesHaveNoChineseLeftOver() {
         val cjk = Regex("[\\u4e00-\\u9fff]")
@@ -105,7 +105,7 @@ class StringResourcesTest {
         }
     }
 
-    /** 每种界面语言在资源里都有对应的文件夹,ui_locale 写的就是这种语言。 */
+    /** Every UI language has a matching resource folder, and ui_locale names that same language. */
     @Test
     fun everyAppLanguageHasItsTexts() {
         val byLanguage = others.associateBy { AppLanguage.modernCode(it.locale.language) }
@@ -128,30 +128,30 @@ class StringResourcesTest {
 
     @Test
     fun languageFromTag() {
-        // 单测里没有安卓的 ICU:补文字体系这一步换成假的,只认一个私用标签是繁体
+        // Unit tests have no Android ICU: the script-completion step is replaced with a fake that recognizes only one private-use tag as Traditional
         val likely = { tag: String -> if (tag == "zh-x-hant") "Hant" else "Hans" }
         fun of(tag: String?) = AppLanguage.fromTag(tag, likely)
         assertEquals(AppLanguage.System, of(null))
         assertEquals(AppLanguage.System, of(""))
-        // 以前选「中文」存下的是 zh-Hans
+        // Choosing "Chinese" in the past stored zh-Hans
         assertEquals(AppLanguage.SimplifiedChinese, of("zh-Hans"))
         assertEquals(AppLanguage.TraditionalChinese, of("zh-Hant"))
         assertEquals(AppLanguage.SimplifiedChinese, of("zh"))
-        // 没写文字体系时按补出来的算
+        // When no script is written, the completed one is used
         assertEquals(AppLanguage.TraditionalChinese, of("zh-x-hant"))
-        // 写了文字体系就按写的,不再补
+        // When a script is written, it is used as written and not completed
         assertEquals(AppLanguage.SimplifiedChinese, AppLanguage.fromTag("zh-Hans") { "Hant" })
         assertEquals(AppLanguage.English, of("en"))
         assertEquals(AppLanguage.English, of("fr-FR"))
         assertEquals(AppLanguage.Arabic, of("ar"))
         assertEquals(AppLanguage.Arabic, of("ar-MA"))
         assertEquals(AppLanguage.Persian, of("fa-IR"))
-        // 其他语言只看语言代码,地区不管
+        // Other languages look only at the language code and ignore the region
         assertEquals(AppLanguage.Japanese, of("ja-JP"))
         assertEquals(AppLanguage.Portuguese, of("pt-PT"))
         assertEquals(AppLanguage.Portuguese, of("pt-BR"))
         assertEquals(AppLanguage.Spanish, of("es-419"))
-        // 印尼语:现行代码和安卓 Locale 还在用的旧代码都认
+        // Indonesian: both the current code and the legacy code Android Locale still uses are recognized
         assertEquals(AppLanguage.Indonesian, of("id-ID"))
         assertEquals(AppLanguage.Indonesian, of("in-ID"))
     }

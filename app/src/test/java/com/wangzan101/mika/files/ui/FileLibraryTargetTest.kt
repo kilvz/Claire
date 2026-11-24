@@ -15,7 +15,7 @@ class FileLibraryTargetTest {
 
     @Test fun outputFileJumpsToTheTurnFileCard() {
         assertEquals(ChatTarget.Files(3), fileLibraryTarget(source, input = false))
-        // 产物卡片属于整轮,不跟随某次插话
+        // The output file card belongs to the whole turn and does not follow a particular steer
         assertEquals(ChatTarget.Files(3), fileLibraryTarget(source.copy(steerIndex = 1), input = false))
     }
 }

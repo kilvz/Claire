@@ -20,23 +20,23 @@ class WorkspaceResolverTest {
 
         val project = projects.create("科研").getOrThrow()
 
-        // 独立对话 -> Conversation(id)
+        // Standalone conversation -> Conversation(id)
         assertEquals(WorkspaceKey.Conversation("c1"), resolver.resolve("c1"))
         assertNull(resolver.projectIdOf("c1"))
         assertFalse(resolver.isShared("c1"))
 
-        // 未落盘草稿选中有效项目 -> Project(id)
+        // Unsaved draft with a valid project selected -> Project(id)
         drafts["draft-1"] = project.id
         assertEquals(WorkspaceKey.Project(project.id), resolver.resolve("draft-1"))
         assertEquals(project.id, resolver.projectIdOf("draft-1"))
         assertTrue(resolver.isShared("draft-1"))
 
-        // 落盘旁文件优先于草稿缓存
+        // The persisted sidecar takes precedence over the draft cache
         assertTrue(conversations.setProject("c2", project.id))
         assertEquals(WorkspaceKey.Project(project.id), resolver.resolve("c2"))
         assertTrue(resolver.isShared("c2"))
 
-        // 项目不存在或已删时安全回落为独立对话工作区
+        // Falls back safely to a standalone conversation workspace when the project is missing or deleted
         assertTrue(conversations.setProject("c3", "missing-project"))
         assertEquals(WorkspaceKey.Conversation("c3"), resolver.resolve("c3"))
         assertNull(resolver.projectIdOf("c3"))

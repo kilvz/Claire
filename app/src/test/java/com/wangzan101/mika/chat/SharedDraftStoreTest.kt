@@ -136,7 +136,7 @@ class SharedDraftStoreTest {
         assertTrue(store.attachmentFile("pending.jpg")!!.exists())
         assertEquals(SharedDraft("c1", "pending", pendingImg), SharedDraftStore(dir).readPending())
 
-        // 正在导入中的图片在同会话覆盖保存时不会被提前删除,导入结束后才释放删除。
+        // An image that is being imported is not deleted early when the same conversation is saved over; deletion is released only after the import finishes.
         val nextImg = image(store, "next.jpg", byteArrayOf(3))
         store.setImporting("first.jpg", true)
         assertTrue(store.save(SharedDraft("c1", "next", nextImg)))
@@ -201,14 +201,14 @@ class SharedDraftStoreTest {
         assertTrue(store.save(draft))
         assertEquals(draft, SharedDraftStore(dir).read())
 
-        // 只删除其中一个附件时,其余附件和文件保留。
+        // Removing only one of the attachments keeps the other attachments and their files.
         store.removeAttachment("c1", doc.fileName)
         assertEquals(SharedDraft("c1", "请一起整理", listOf(photo, audio)), SharedDraftStore(dir).read())
         assertFalse(store.attachmentFile(doc.fileName)!!.exists())
         assertTrue(store.attachmentFile(photo.fileName)!!.exists())
         assertTrue(store.attachmentFile(audio.fileName)!!.exists())
 
-        // 导入保护覆盖所有附件。
+        // The import guard covers all attachments.
         store.setImporting(listOf(photo.fileName, audio.fileName), true)
         store.clear("c1")
         assertTrue(store.attachmentFile(photo.fileName)!!.exists())
@@ -217,7 +217,7 @@ class SharedDraftStoreTest {
         assertFalse(store.attachmentFile(photo.fileName)!!.exists())
         assertFalse(store.attachmentFile(audio.fileName)!!.exists())
 
-        // 超过上限或重复 fileName 时拒绝保存。
+        // Saving is rejected when the limit is exceeded or a fileName is duplicated.
         val ten = (1..10).map { i -> image(store, "f$i.jpg", byteArrayOf(i.toByte())) }
         assertFalse(store.save(SharedDraft("c2", "", ten)))
         assertFalse(store.save(SharedDraft("c2", "", listOf(ten[0], ten[0]))))

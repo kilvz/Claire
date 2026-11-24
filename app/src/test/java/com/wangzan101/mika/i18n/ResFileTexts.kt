@@ -8,8 +8,8 @@ import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * JVM 单测里的界面文字:直接读 `src/main/res/<folder>/` 下的资源文件,按安卓的规则去掉转义,
- * 免得为了取文字起一个安卓环境。[folder] 是 `values`(英文)或 `values-zh`(简体中文)或 `values-b+zh+Hant`(繁体中文)。
+ * UI texts in JVM unit tests: read the resource files under `src/main/res/<folder>/` directly and strip escapes by Android's rules,
+ * so that fetching a text does not require starting an Android environment. [folder] is `values` (English), `values-zh` (Simplified Chinese) or `values-b+zh+Hant` (Traditional Chinese).
  */
 class ResFileTexts(folder: String, private val locale: Locale) : UiTexts {
     val strings: Map<String, String>
@@ -49,12 +49,12 @@ class ResFileTexts(folder: String, private val locale: Locale) : UiTexts {
     override fun plural(id: Int, count: Int, args: Array<out Any?>): String {
         val name = pluralNames[id] ?: error("no R.plurals with id $id")
         val forms = plurals[name] ?: error("no plurals $name")
-        // 英文:1 用 one;中文只有 other
+        // English: use one for 1; Chinese has only other
         val raw = (if (count == 1) forms["one"] else null) ?: forms.getValue("other")
         return String.format(locale, raw, *(if (args.isEmpty()) arrayOf(count) else args))
     }
 
-    /** 不翻译的字(translatable="false")只在默认文件里。 */
+    /** Strings that are not translated (translatable="false") exist only in the default file. */
     private val fallback: ResFileTexts? = if (folder == "values") null else english
 
     companion object {
@@ -70,7 +70,7 @@ class ResFileTexts(folder: String, private val locale: Locale) : UiTexts {
         private val stringNames by lazy { names(R.string::class.java) }
         private val pluralNames by lazy { names(R.plurals::class.java) }
 
-        /** 安卓资源文字的转义:引号里原样保留空白,引号外连续空白并成一个;反斜杠转义。 */
+        /** Android resource text escaping: whitespace inside quotes is preserved as-is, consecutive whitespace outside quotes collapses into one space; backslash escapes are honored. */
         fun unescape(raw: String): String {
             val out = StringBuilder()
             var quoted = false
@@ -110,7 +110,7 @@ class ResFileTexts(folder: String, private val locale: Locale) : UiTexts {
     }
 }
 
-/** 测试里把界面文字固定成中文(断言写的是中文)。 */
+/** Pins the UI texts to Chinese in tests (the assertions are written in Chinese). */
 class ChineseTexts : ExternalResource() {
     private var previous: UiTexts? = null
     override fun before() {
@@ -123,7 +123,7 @@ class ChineseTexts : ExternalResource() {
     }
 }
 
-/** 测试里把界面文字换成英文。 */
+/** Switches the UI texts to English in tests. */
 class EnglishTexts : ExternalResource() {
     private var previous: UiTexts? = null
     override fun before() {

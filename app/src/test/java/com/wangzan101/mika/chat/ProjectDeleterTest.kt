@@ -76,15 +76,15 @@ class ProjectDeleterTest {
         assertFalse(projects.get(p2.id) == null)
     }
 
-    /** 新对话发出首句、任务还在跑:有 `.project` 旁文件,首轮等任务收尾才写进对话文件,它也是项目里的对话。 */
+    /** A new conversation whose first message was sent while the task is still running: it has a `.project` sidecar and its first turn is written to the conversation file only after the task wraps up, so it still counts as a conversation in the project. */
     @Test fun deleteAlsoStopsAndRemovesAMemberWhoseFirstTurnIsNotSavedYet() = runTest {
         val projects = ProjectStore(tmp.newFolder("projects"))
         val conversations = ConversationStore(tmp.newFolder("chats"))
         val p = projects.create("科研").getOrThrow()
         val p2 = projects.create("日常").getOrThrow()
-        // 和 ChatViewModel.begin 一样:交给服务之前先写旁文件
+        // Same as ChatViewModel.begin: write the sidecar before handing the message to the service
         conversations.setProject("fresh", p.id)
-        // 别的项目里同样还没存下首轮的,不算
+        // One in another project whose first turn is likewise not saved yet does not count
         conversations.setProject("elsewhere", p2.id)
         conversations.append("other", Turn("q", "a", "succeeded"))
 
@@ -107,7 +107,7 @@ class ProjectDeleterTest {
         val job = launch { deleter.delete(p.id) }
         runCurrent()
         assertEquals(listOf("fresh"), cancelled)
-        // 任务停下时照常补写这一轮,然后才退出
+        // When the task stops, this turn is still written in as usual, and only then does it exit
         conversations.append("fresh", Turn("q", "", "cancelled"))
         active.value = listOf("elsewhere", "other")
         job.join()

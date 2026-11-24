@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PipPhysicsTest {
-    // 1080×2400 的屏幕:顶栏占 300(含状态栏)、输入栏占 250(含导航栏),系统栏是 60 和 40
+    // On a 1080×2400 screen: the top bar takes 300 (including the status bar) and the composer takes 250 (including the navigation bar); the system bars are 60 and 40
     private val collapsedTop = 300f
     private val collapsedBottom = 250f
     private val safeTop = 60f
@@ -23,7 +23,7 @@ class PipPhysicsTest {
         val (top, bottom) = insets(0.5f)
         assertEquals(180f, top, 0.01f)
         assertEquals(145f, bottom, 0.01f)
-        // 越出范围的比例夹住
+        // Shares outside the range are clamped
         assertEquals(collapsedTop to collapsedBottom, insets(3f))
         assertEquals(safeTop to safeBottom, insets(-1f))
     }
@@ -34,10 +34,10 @@ class PipPhysicsTest {
         val margin = 30f
         val collapsed = PipPhysics.Bounds(1080f, 2400f, pipWidth, pipHeight, margin, collapsedTop, collapsedBottom)
         val expanded = PipPhysics.Bounds(1080f, 2400f, pipWidth, pipHeight, margin, safeTop, safeBottom)
-        // 展开时上边贴着状态栏、下边贴着导航栏:整屏都能停,不只在中间
+        // When expanded it hugs the status bar at the top and the navigation bar at the bottom: it can rest anywhere on the screen, not only in the middle
         assertEquals(30f to 90f, expanded.position(Corner.TopStart))
         assertEquals(830f to 1860f, expanded.position(Corner.BottomEnd))
-        // 收起时仍然在顶栏下面、输入栏上面
+        // When collapsed it still stays below the top bar and above the composer
         assertEquals(30f to 330f, collapsed.position(Corner.TopStart))
         assertEquals(830f to 1650f, collapsed.position(Corner.BottomEnd))
     }

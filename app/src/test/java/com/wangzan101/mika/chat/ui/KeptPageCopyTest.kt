@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/** 对话页那一轮下面留页的那一行:还开着、关了(带原因或不带),和剩余时间的说法。 */
+/** The kept-page row under a turn on the chat page: still open, closed (with or without a reason), and the wording for the remaining time. */
 class KeptPageCopyTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -17,10 +17,10 @@ class KeptPageCopyTest {
 
     @Test fun rowFollowsTheLivePageAndTheTurnRecord() {
         assertEquals(KeptRow.Live(page), KeptRow.of(ex("r1", kept = "course.example.com"), page))
-        // 刚收尾、那一轮还没读回留页的记录时,照样按此刻留着的那一页显示
+        // Right after wrap-up, while that turn has not read back its kept-page record yet, it still shows the page kept at this moment
         assertEquals(KeptRow.Live(page), KeptRow.of(ex("r1"), page))
         assertEquals(KeptRow.Closed("expired"), KeptRow.of(ex("r1", kept = "course.example.com", closed = "expired"), null))
-        // 别的一轮留的页不挂到这一轮下面
+        // A page kept by another turn is not attached under this turn
         assertEquals(KeptRow.Closed(null), KeptRow.of(ex("r0", kept = "a.example.com"), page))
         assertNull(KeptRow.of(ex("r2"), page))
         assertNull(KeptRow.of(ex(null), null))

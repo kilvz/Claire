@@ -27,7 +27,7 @@ class ChatRowsTest {
         val previous = List(30) { Exchange("问题 $it", emptyList(), ExchangeStatus.Done("回答 $it", null), live = false) }
         val oldTail = count(previous) - 1
         val sent = previous + Exchange("刚发送的新一轮", emptyList(), ExchangeStatus.Working, live = true)
-        // 新一轮是用户气泡、工作区、状态行三项。这个目标只依赖当前状态,与旧布局里有几项无关。
+        // A new turn has three items: the user bubble, the workspace and the status line. This target depends only on the current state, regardless of how many items the old layout had.
         assertEquals(oldTail + 3, count(sent) - 1)
     }
 
@@ -46,12 +46,12 @@ class ChatRowsTest {
         val first = Exchange("开应用", emptyList(), ExchangeStatus.Failed("手机操作没准备好"), live = false, runId = "run-1")
         val second = Exchange("聊两句", emptyList(), ExchangeStatus.Done("好的", null), live = false, runId = "run-2")
         val both = listOf(first, second)
-        // 挂在触发它的那一轮后面:第一轮后面多一行,末尾没有
+        // Attached after the turn that triggered it: one extra row after the first turn, none at the end
         assertEquals(
             listOf("u0", "r0", "ps0", "u1", "r1"),
             chatItemKeys(both, kept = null, phoneSetupRow = phoneSetupRow(PhoneSetupPrompt.Need("c", "run-1"), "c", both), hasBlocked = false),
         )
-        // 配不上具体轮次(编号还没同步进来):照旧挂在最后
+        // Cannot be matched to a specific turn (the id has not been synced in yet): appended at the end as before
         assertEquals(
             listOf("u0", "r0", "u1", "r1", "phone-setup"),
             chatItemKeys(both, kept = null, phoneSetupRow = phoneSetupRow(PhoneSetupPrompt.Need("c", "run-9"), "c", both), hasBlocked = false),
@@ -62,14 +62,14 @@ class ChatRowsTest {
     fun setupLineStaysOutOfOtherConversationsAndEmptyLists() {
         val ex = Exchange("问", emptyList(), ExchangeStatus.Done("答", null), live = false, runId = "run-1")
         val list = listOf(ex)
-        // 别的对话触发的:这里不显示
+        // Triggered by another conversation: not shown here
         assertEquals(null, phoneSetupRow(PhoneSetupPrompt.Need("other", "run-1"), "c", list))
-        // 本对话、编号对得上:跟在那轮后面
+        // This conversation with a matching id: follows that turn
         assertEquals(0, phoneSetupRow(PhoneSetupPrompt.Need("c", "run-1"), "c", list))
-        // 本对话、编号对不上或没开出记录:挂最后
+        // This conversation with a non-matching id or with no record opened: appended at the end
         assertEquals(-1, phoneSetupRow(PhoneSetupPrompt.Need("c", "run-9"), "c", list))
         assertEquals(-1, phoneSetupRow(PhoneSetupPrompt.Need("c", null), "c", list))
-        // 没有触发、没有轮次:都不显示
+        // No trigger and no turn: neither is shown
         assertEquals(null, phoneSetupRow(null, "c", list))
         assertEquals(null, phoneSetupRow(PhoneSetupPrompt.Need("c", "run-1"), "c", emptyList()))
     }
