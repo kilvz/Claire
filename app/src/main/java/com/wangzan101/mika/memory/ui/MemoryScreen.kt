@@ -72,13 +72,13 @@ import com.wangzan101.mika.ui.Route
 
 private val SEGMENT_TAGS = Segment.entries.map { "segment-${it.name}" }
 
-/** 记忆按类别分组的顺序和小标题。 */
+/** Order and headings of memory grouped by kind. */
 private val KIND_GROUPS get() = listOf(MemoryKind.fact to tr(R.string.memory_about_you), MemoryKind.preference to tr(R.string.memory_preferences), MemoryKind.procedure to tr(R.string.memory_procedures))
 private val KIND_NAMES get() = listOf(tr(R.string.memory_fact), tr(R.string.memory_preferences), tr(R.string.memory_procedures))
 
 private enum class MemoryDataPage { Home, WebSites, Routes }
 
-/** 记忆和个人技能的首次加载会读盘解密。 */
+/** The first load of memory and personal skills reads from disk and decrypts. */
 @Composable
 internal fun rememberMemoryViewModel(runtime: MemoryRuntime): State<MemoryViewModel?> {
     val scope = rememberCoroutineScope()
@@ -98,7 +98,7 @@ internal fun rememberMemoryViewModel(runtime: MemoryRuntime): State<MemoryViewMo
     }
 }
 
-/** 记忆与数据:保留原来的记忆 / 技能 / 待确认主页,网站登录和操作路线从这里各进一层。 */
+/** Memory & Data: keeps the original memory / skills / pending home, with website logins and operation routes each going one level deeper from here. */
 @Composable
 fun MemoryDataScreen(
     vm: MemoryViewModel,
@@ -121,7 +121,7 @@ fun MemoryDataScreen(
     }
 }
 
-/** 设置 →「记忆与数据」:看得见、改得了、删得掉。分三段:记忆、技能(内容在 [SkillsSection])、待确认。 */
+/** Settings → "Memory & Data": visible, editable, deletable. Three sections: memory, skills (content in [SkillsSection]), pending. */
 @Composable
 fun MemoryScreen(
     vm: MemoryViewModel,
@@ -231,7 +231,7 @@ fun MemoryScreen(
     }
 }
 
-/** 跨会话任务摘要(任务结束自动记的):看得见、删得掉。没有就不占地方。 */
+/** Cross-session task summaries (recorded automatically when a task ends): visible and deletable. Takes up no space when there are none. */
 @Composable
 private fun TaskMemoriesSection(vm: MemoryViewModel) {
     val tasks by vm.tasks.collectAsState()

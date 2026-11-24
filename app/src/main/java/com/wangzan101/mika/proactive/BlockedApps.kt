@@ -7,37 +7,44 @@ import com.wangzan101.mika.core.proactive.NoticeInbox
 import com.wangzan101.mika.core.proactive.NoticeRecord
 
 /**
- * 「应用访问」那份设置此刻的样子:[known] 是读不读得出来,读得出来时 [blocked] 是禁用了的包名。
- * 读不出来不等于一个都没禁用:那时不知道哪些 App 不让碰,主动能力整个停着(不读、不发、不带进任务),攒下的不动。
+ * What the "App access" setting looks like right now: [known] is whether it can be read at all; when it can be read,
+ * [blocked] is the set of disabled package names.
+ * Being unable to read it does not mean nothing is blocked: at that point it is unknown which apps must not be touched,
+ * so proactive capabilities halt entirely (no reading, no sending, not carried into tasks) and whatever has accumulated
+ * stays put.
  */
 data class AppGate(val known: Boolean, val blocked: Set<String>) {
     companion object {
-        /** 从「应用访问」存着的那份来:连读不读得出来一起带上(只带禁用的那份会把读不出来当成一个都没禁用)。 */
+        /** Built from what "App access" has stored: carry along whether it could be read at all (carrying only the blocked set would treat unreadable as nothing blocked). */
         fun of(state: AppAccessState) = AppGate(state.available, state.blocked)
     }
 }
 
-/** 「应用访问」里禁用的 App 在主动能力里的样子:不归纳;禁用之后,已经收下的一并去掉。都在 ProactiveRuntime 那条串行协程上调。 */
+/** How apps disabled in "App access" appear to proactive capabilities: not summarized; after being disabled, already-received ones are removed too. All of these are called on the single serial coroutine in ProactiveRuntime. */
 internal object BlockedApps {
-    /** 这个 App 的通知现在能不能读(包名这一关,在读内容之前):「应用访问」读不出来时一个都不读。 */
+    /** Whether this app's notifications can be read right now (the package-name gate, before reading content): when "App access" cannot be read, nothing is read. */
     fun readable(pkg: String, allowed: Set<String>, gate: AppGate): Boolean =
         gate.known && NoticeFilter.decidePackage(pkg, allowed, gate.blocked) == NoticeDecision.Keep
 
-    /** 这条通知现在收不收(清洗、拆好之后再过一遍);「应用访问」读不出来时一条都不收。 */
+    /** Whether this notification is accepted right now (checked again after cleaning and parsing); when "App access" cannot be read, none are accepted. */
     fun admits(r: NoticeRecord, allowed: Set<String>, gate: AppGate): Boolean =
         gate.known && NoticeFilter.decide(r, allowed, gate.blocked) == NoticeDecision.Keep
 
     /**
-     * 这个 App 现在能不能归纳:勾选了、不是「不从它归纳」、没在「应用访问」里禁用、不是 Claire 自己。
-     * 「应用访问」读不出来不在这里管([blocked] 那时是空的):归纳那边拿这个去清待归纳的事件,读不出来时只该停着,不该清。
+     * Whether this app can be summarized right now: it is checked, not marked "don't learn from it", not disabled in
+     * "App access", and not Claire itself.
+     * "App access" being unreadable is not handled here ([blocked] is empty then): the learning side uses this to clear
+     * events awaiting summarization, and when it is unreadable things should just pause, not be cleared.
      */
     fun learnEligible(pkg: String, allowed: Set<String>, optOut: Set<String>, blocked: Set<String>): Boolean =
         pkg in allowed && pkg !in optOut && pkg !in blocked && !NoticeFilter.isSelf(pkg)
 
     /**
-     * 禁用的 App 变了([blocked] 是现在的整份):它们的记录从收件箱里去掉(判定结果、提醒跟着收件箱走),
-     * 正在发的判定请求是它们的就取消,待归纳的事件去掉、正在发的归纳请求取消(归纳那边按 [learnEligible] 认),
-     * 它们存着的通知原文和归纳出的句子也去掉。
+     * The set of disabled apps changed ([blocked] is the whole current set): their records are removed from the inbox
+     * (decision results and reminders follow the inbox),
+     * in-flight decision requests for them are cancelled, events awaiting summarization are removed and in-flight
+     * summarization requests are cancelled (the learning side relies on [learnEligible]),
+     * and their stored notification bodies and summarized sentences are removed as well.
      */
     fun purge(blocked: Set<String>, inbox: NoticeInbox, triage: TriageRunner, learn: LearnRunner) {
         inbox.removePackages { it !in blocked }
@@ -46,8 +53,10 @@ internal object BlockedApps {
     }
 
     /**
-     * 「应用访问」变了([gate] 是现在的):读得出来就按禁用的那份清一遍([purge]);读不出来什么都不删(不知道禁用了哪些)。
-     * 两种情况都让判定和归纳重新看一遍:读不出来时它们停下在发的请求、停着等,读得出来了接着做——先清后看,禁用的不会又发出去。
+     * "App access" changed ([gate] is the current state): if it can be read, purge according to the blocked set ([purge]);
+     * if it cannot be read, delete nothing (we do not know which apps are blocked).
+     * In both cases make decisions and summarization look again: when unreadable they stop their in-flight requests and
+     * wait; once readable they resume — purge first, then look, so blocked ones will not be sent out again.
      */
     fun accessChanged(gate: AppGate, inbox: NoticeInbox, triage: TriageRunner, learn: LearnRunner) {
         if (gate.known) purge(gate.blocked, inbox, triage, learn) else learn.poke()

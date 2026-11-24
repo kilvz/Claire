@@ -9,7 +9,7 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipFile
 
-/** 安装失败的原因编码;界面据此显示对应文案。 */
+/** Code for the reason an installation failed; the UI uses it to show the corresponding text. */
 class PluginInstallException(
     val code: String,
     message: String? = null,
@@ -26,9 +26,10 @@ object PluginErrors {
 }
 
 /**
- * 把插件 zip 安全地装进 `files/plugins/<id>/`:
- * 防 zip-slip/绝对路径/反斜杠/超量解压,先解到 `.staging`,校验完再原子换入;
- * 同 id 升级时旧目录先移到 `.trash`,换入失败可回滚。
+ * Safely installs a plugin zip into `files/plugins/<id>/`:
+ * guards against zip-slip/absolute paths/backslashes/excessive extraction, first extracts into `.staging`, and swaps it
+ * in atomically after validation;
+ * when upgrading the same id, the old directory is moved to `.trash` first so the swap can be rolled back on failure.
  */
 class PluginInstaller(
     private val filesDir: File,
@@ -38,7 +39,7 @@ class PluginInstaller(
 ) {
     private val pluginsDir: File get() = File(filesDir, "plugins")
 
-    /** SAF 选中的 zip:先复制到缓存,再走 [installZip]。复制/解析都在调用方的 IO 线程上。 */
+    /** A zip picked via SAF: copy it to the cache first, then go through [installZip]. Copying/parsing happen on the caller's IO thread. */
     fun install(uri: Uri, resolver: ContentResolver): Result<PluginRecord> = runCatching {
         val dir = File(cacheDir, "plugin-install").apply { mkdirs() }
         val temp = File(dir, "${UUID.randomUUID()}.zip")
@@ -53,7 +54,7 @@ class PluginInstaller(
         }
     }
 
-    /** 测试与内部使用的入口:直接装一个本地 zip 文件。 */
+    /** Entry point for tests and internal use: install a local zip file directly. */
     fun installZip(zip: File): Result<PluginRecord> = runCatching { installZipOrThrow(zip) }
 
     private fun installZipOrThrow(zip: File): PluginRecord {
@@ -135,7 +136,7 @@ class PluginInstaller(
         }
     }
 
-    /** 拒绝绝对路径、反斜杠、盘符、`.`/`..` 段;返回去掉结尾 `/` 的相对路径。 */
+    /** Rejects absolute paths, backslashes, drive letters and `.`/`..` segments; returns the relative path with the trailing `/` removed. */
     private fun checkName(raw: String): String {
         if (raw.isEmpty() || raw.startsWith("/") || raw.startsWith("\\")) {
             throw PluginInstallException(PluginErrors.UNSAFE_PATH, "absolute path: $raw")
@@ -166,7 +167,7 @@ class PluginInstaller(
         return out.toString(Charsets.UTF_8.name())
     }
 
-    /** 读 [remaining] 字节以内;超出抛 [PluginErrors.TOO_LARGE]。返回实际读取字节数。 */
+    /** Reads up to [remaining] bytes; exceeding that throws [PluginErrors.TOO_LARGE]. Returns the number of bytes actually read. */
     private fun copyLimited(input: InputStream, output: java.io.OutputStream, remaining: Long): Long {
         val buf = ByteArray(8192)
         var total = 0L

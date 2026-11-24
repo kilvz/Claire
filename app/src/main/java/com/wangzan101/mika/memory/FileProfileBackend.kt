@@ -9,7 +9,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** 与普通记忆分开的用户画像文件；全量原子替换，保留被替代条目。 */
+/** User profile file kept separate from regular memory; full atomic replacement, superseded entries are retained. */
 class FileProfileBackend(private val file: File, private val cipher: KeyCipher) : ProfileBackend {
     private val codec = ListSerializer(ProfileEntry.serializer())
 

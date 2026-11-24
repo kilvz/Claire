@@ -41,16 +41,16 @@ import com.wangzan101.mika.core.tool.Verb
 import com.wangzan101.mika.settings.ui.models.edit
 import com.wangzan101.mika.voice.ui.nameOf
 
-/** 页面三段:已记下的、个人技能、等你确认的(待批准的做法 + 技能与 App 知识草稿)。 */
+/** The three page segments: recorded, personal skills, waiting for your confirmation (practices awaiting approval + skill and app knowledge drafts). */
 enum class Segment { Memories, Skills, Pending }
 
-/** 列表里的一条记忆;[source] 是「你在 10 月 23 日说:『…』」或「你手写的」。 */
+/** One memory in the list; [source] is "You said on October 23: '…'" or "you wrote it by hand". */
 data class Row(
     val id: String, val kind: MemoryKind, val content: String, val keywords: List<String>, val source: String,
     val pinned: Boolean, val pending: Boolean, val replaces: String?,
 )
 
-/** [clearStage]:0 没在清除,1 第一次确认,2 第二次确认。[message] 是一次性的提示(比如「这类信息我不会记」)。 */
+/** [clearStage]: 0 = not clearing, 1 = first confirmation, 2 = second confirmation. [message] is a one-off notice (e.g. "I won't remember this kind of information"). */
 data class MemoryUi(
     val segment: Segment = Segment.Memories,
     val query: String = "",
@@ -62,13 +62,14 @@ data class MemoryUi(
     val clearStage: Int = 0,
     val skills: SkillsUi = SkillsUi(),
 ) {
-    /** 「待确认」段的条数:待批准的记忆 + 技能草稿 + 还没收下的 App 知识草稿。 */
+    /** Number of items in the "pending" segment: memories awaiting approval + skill drafts + app knowledge drafts not yet accepted. */
     val pendingCount: Int get() = pending.size + skills.drafts.size + skills.appKnowledge.count { it.stage == AppKnowledgeStage.Draft }
 }
 
 /**
- * 「记忆与技能」页的状态:分段、搜索(空查询按更新时间倒序)、待批准的做法置顶、编辑、置顶、删除、手写新增、
- * 全部清除(两次确认)和三个开关。技能分段见 [SkillsUi]。
+ * State of the "Memory & Skills" page: segments, search (an empty query sorts by update time descending), approved
+ * practices pinned on top, edit, pin, delete, manual add,
+ * clear all (two confirmations) and the three switches. See [SkillsUi] for the skills segment.
  */
 class MemoryViewModel(
     private val store: MemoryStore,
@@ -76,29 +77,29 @@ class MemoryViewModel(
     private val skills: PersonalSkills?,
     scope: CoroutineScope,
     brokenNotice: StateFlow<String?> = MutableStateFlow(null),
-    /** 全部清除:记忆文件、坏文件另存、个人技能都删掉并重建密钥。 */
+    /** Clear all: deletes the memory file, corrupt files moved aside and personal skills, and rebuilds the key. */
     private val wipe: () -> Unit = { store.clearAll() },
     private val clock: () -> Long = System::currentTimeMillis,
-    /** 删掉了一条记忆:对话里指向它的提示也去掉。 */
+    /** A memory was deleted: hints in conversations that point to it are removed too. */
     private val onForgotten: (String) -> Unit = {},
-    /** 收下改过的技能时校验提到的工具名。 */
+    /** Validates the tool names mentioned when accepting an edited skill. */
     private val toolNames: Set<String> = knownToolNames(),
-    /** 跑技能脚本的工具名。 */
+    /** Tool name for running skill scripts. */
     private val scriptTool: String? = knownTools().nameOf(Verb.RunBundledScript),
-    /** 收下改过的技能时:提到跑脚本的工具的,脚本得是清单里标为可运行的。 */
+    /** When accepting an edited skill: if it mentions the script-running tool, the script must be marked runnable in the manifest. */
     private val runnableScripts: Set<String> = emptySet(),
     private val appDrafts: AppKnowledgeDraftStore? = null,
-    /** 内置技能的名字:导入的技能不能用。 */
+    /** Names of built-in skills: imported skills cannot use them. */
     private val builtinSkillNames: Set<String> = emptySet(),
-    /** 示范草稿收下、拒绝或删除后清掉本机轨迹。 */
+    /** Clears local traces after a demo draft is accepted, rejected or deleted. */
     private val onSkillRetired: (PersonalSkill) -> Unit = {},
-    /** 跨会话任务摘要;开关关着或没给时为 null。 */
+    /** Cross-session task summaries; null when the switch is off or none is provided. */
     private val taskMemory: TaskMemoryStore? = null,
 ) {
     private val local = MutableStateFlow(MemoryUi())
     private val skillsVersion = MutableStateFlow(0)
 
-    /** 跨会话任务摘要(新的在前);开关关着时恒为空。 */
+    /** Cross-session task summaries (newest first); always empty when the switch is off. */
     val tasks: StateFlow<List<TaskMemory>> = taskMemory?.items ?: MutableStateFlow(emptyList())
 
     val ui: StateFlow<MemoryUi> = combine(local, store.items, settings.switches, brokenNotice, skillsVersion) { l, items, sw, broken, _ ->
@@ -122,7 +123,7 @@ class MemoryViewModel(
         if (store.forget(id).isSuccess) onForgotten(id)
     }
     fun approve(id: String) { store.approve(id) }
-    /** 待批准的做法点「不要」= 删除。 */
+    /** Clicking "No" on a practice awaiting approval = delete. */
     fun reject(id: String) = delete(id)
 
     fun add(kind: MemoryKind, content: String, keywords: List<String>) =
@@ -139,7 +140,7 @@ class MemoryViewModel(
 
     fun setSwitches(transform: (MemorySwitches) -> MemorySwitches) = settings.update(transform)
 
-    /** 删掉一条任务摘要(跨会话检索用的经验缓存)。 */
+    /** Deletes a task summary (the experience cache used for cross-session retrieval). */
     fun deleteTask(id: String) { taskMemory?.forget(id) }
 
     private fun report(e: Throwable?) {
@@ -160,13 +161,15 @@ class MemoryViewModel(
 
     private fun row(m: MemoryItem) = Row(m.id, m.kind, m.content, m.keywords, sourceLine(m.source), m.pinned, m.status == MemoryStatus.pending, m.replaces)
 
-    // ---- 技能分段 ----
+    // ---- Skills segment ----
     private fun skillsUi(): SkillsUi = skills?.let { SkillsUi.of(it, appDrafts) } ?: SkillsUi()
     private fun skillsChanged() = skillsVersion.update { it + 1 }
 
     /**
-     * 收下草稿;[edited] 是用户改过的全文,和起草出来的一样要过格式与安全校验,不过就不收并说明。
-     * 导入的草稿是别人写的,没改过也照样再校验一遍;自学的草稿起草时已按那次运行的工具校验过,没改过就不再查。
+     * Accepts a draft; [edited] is the full text the user edited, which, like a freshly drafted one, must pass format
+     * and safety validation — if it fails, do not accept it and explain.
+     * Imported drafts are written by someone else, so validate them again even if unedited; self-learned drafts were
+     * already validated against that run's tools when drafted, so skip validation if they are unedited.
      */
     fun approveSkill(draftId: String, edited: String? = null) {
         val p = skills ?: return
@@ -191,7 +194,9 @@ class MemoryViewModel(
     }
 
     /**
-     * 导入别人分享的技能全文:过了校验放进「待确认」并切过去,返回 null;不过就返回原因,由导入框自己显示(框还开着,粘的字不丢)。
+     * Imports the full text of a skill shared by someone else: if it passes validation, put it into "pending" and switch
+     * there, returning null; if it fails, return the reason and let the import box display it (the box stays open so the
+     * pasted text is not lost).
      */
     fun importSkill(text: String): String? {
         val p = skills ?: return tr(R.string.skill_bad_format)
@@ -211,7 +216,7 @@ class MemoryViewModel(
 
     fun suspendSkill(name: String) = changeSkill(name) { it.copy(status = SkillStatus.suspended) }
 
-    /** 恢复时清掉旧结果,免得下一次一不顺又马上被停用。 */
+    /** Clear old outcomes when restoring, so it is not immediately suspended again on the next hiccup. */
     fun restoreSkill(name: String) = changeSkill(name) {
         it.copy(status = it.restoredStatus(), outcomes = emptyList())
     }
@@ -251,7 +256,7 @@ class MemoryViewModel(
         fun sourceLine(s: MemorySource): String =
             if (s.type == "manual") tr(R.string.memory_manual)
             else SimpleDateFormat(tr(R.string.date_pattern_md), uiLocale()).format(Date(s.atMs)).let { day ->
-                // Claire 自己归纳出来的:引的是用户提出要求的那句话,不能说成「你说的」
+                // Summarized by Claire itself: it quotes the sentence where the user made the request, so it cannot be phrased as "what you said"
                 if (s.type == com.wangzan101.mika.core.learn.memory.MemoryContext.INFERRED) tr(R.string.memory_inferred, day, s.quote.orEmpty())
                 else if (s.channel != null && s.channel != "Ui") tr(R.string.memory_said_via, day, s.channel, s.quote.orEmpty())
                 else tr(R.string.memory_said, day, s.quote.orEmpty())
@@ -260,14 +265,16 @@ class MemoryViewModel(
 }
 
 /**
- * 一份 App 知识补充。待确认的:[revision] 为 true 是对在用那份的修订,否则是第一次补充;
- * [changedLines] 是相对在用那份(第一次补充时相对空白)加了、去掉的行。
- * [replaced]:收下的修订正在试用,暂时顶替了这一份(不注入;修订被归档就换回来)。
+ * One piece of app knowledge supplement. Pending: [revision] true means it is a revision of the in-use one, otherwise
+ * it is the first supplement;
+ * [changedLines] are the lines added or removed relative to the in-use one (relative to blank for a first supplement).
+ * [replaced]: an accepted revision is being trialed and temporarily supersedes this one (not injected; switched back if
+ * the revision is archived).
  */
 data class AppKnowledgeRow(val id: String, val name: String, val markdown: String, val stage: AppKnowledgeStage,
     val revision: Boolean = false, val changedLines: List<String> = emptyList(), val replaced: Boolean = false)
 
-/** 技能分段的内容:待收下的草稿和已收下的个人技能(在用的在前)。 */
+/** Contents of the skills segment: drafts awaiting acceptance and accepted personal skills (in-use ones first). */
 
 data class SkillsUi(val drafts: List<SkillRow> = emptyList(), val installed: List<SkillRow> = emptyList(),
     val appKnowledge: List<AppKnowledgeRow> = emptyList()) {
@@ -301,7 +308,7 @@ data class SkillsUi(val drafts: List<SkillRow> = emptyList(), val installed: Lis
             )
         }
 
-        /** 更新草稿相对原来那份(技能或 App 知识补充):「+ 」新增的行、「- 」去掉的行(不比空行)。 */
+        /** Lines changed in an updated draft relative to the original (skill or app knowledge supplement): lines added as "+ " and lines removed as "- " (blank lines not compared). */
         fun changedLines(old: String, new: String): List<String> {
             val before = old.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
             val after = new.lines().map { it.trimEnd() }.filter { it.isNotBlank() }
@@ -317,13 +324,13 @@ data class SkillsUi(val drafts: List<SkillRow> = emptyList(), val installed: Lis
     }
 }
 
-/** [id] 是草稿编号(已收下的为技能名);[changedLines] 是更新草稿相对原技能改了的行。 */
+/** [id] is the draft id (the skill name once accepted); [changedLines] are the lines changed in an updated draft relative to the original skill. */
 data class SkillRow(
     val id: String, val name: String, val display: String, val description: String, val markdown: String,
     val suspended: Boolean = false, val trial: Boolean = false, val canRestore: Boolean = false,
     val recent: List<String> = emptyList(), val changedLines: List<String> = emptyList(),
-    /** 用户在任务里要求写下的(不是从办成的任务里学来的)。 */
+    /** The user asked for this to be written down during a task (not learned from a completed task). */
     val userCreated: Boolean = false,
-    /** 从别人分享的全文导入的。 */
+    /** Imported from the full text shared by someone else. */
     val imported: Boolean = false,
 )

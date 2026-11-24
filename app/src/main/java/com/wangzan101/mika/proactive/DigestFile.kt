@@ -9,10 +9,13 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * 当日消息归纳攒下的句子(见 [com.wangzan101.mika.core.proactive.DigestPool])整份加密成 `proactive/digest.bin`
- * (AES-GCM,正式用 `KeystoreKeyCipher("mika-proactive-digest")`)。句子是模型照着通知写的,说的是别人发来的事:
- * 和通知日志一样,确实坏了的文件直接删掉,不改名另存;这会儿读不了的(密钥库忙、取钥出错)照常抛出,文件不动——
- * 哪些算坏见 [StoreCodec]。
+ * The sentences accumulated by the daily message digest (see [com.wangzan101.mika.core.proactive.DigestPool]) are
+ * encrypted in their entirety into `proactive/digest.bin`
+ * (AES-GCM, production uses `KeystoreKeyCipher("mika-proactive-digest")`). The sentences are written by the model based
+ * on notifications and describe what other people sent:
+ * as with the notification log, a genuinely corrupt file is simply deleted, not renamed aside; if it cannot be read
+ * right now (keystore busy, key retrieval error), throw as usual and leave the file alone —
+ * see [StoreCodec] for what counts as corrupt.
  */
 class DigestFile(dir: File, private val cipher: KeyCipher) : DigestStore {
     private val poolDir = File(dir, "proactive")
@@ -22,7 +25,7 @@ class DigestFile(dir: File, private val cipher: KeyCipher) : DigestStore {
     @Synchronized
     override fun load(): DigestData {
         if (!file.exists()) return DigestData()
-        val bytes = file.readBytes() // 读不了是 IO 故障,照常抛出
+        val bytes = file.readBytes() // Failure to read is an IO fault, so throw as usual
         return StoreCodec.read(bytes, cipher, DigestData.serializer(), VERSION) ?: run {
             wipe()
             DigestData()
@@ -43,7 +46,7 @@ class DigestFile(dir: File, private val cipher: KeyCipher) : DigestStore {
     }
 
     companion object {
-        /** 这份存盘现在的写法是第几版;读到更新的就不碰(见 [StoreCodec])。改了写法、旧代码读了会出错或丢东西时加一。 */
+        /** Which version of the on-disk format this is; if a newer one is read, leave it alone (see [StoreCodec]). Bump this when the format changes such that old code would fail or lose data when reading it. */
         const val VERSION = 1
         const val FILE = "digest.bin"
         const val KEY_ALIAS = "mika-proactive-digest"

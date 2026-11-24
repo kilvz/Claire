@@ -4,8 +4,10 @@ import com.wangzan101.mika.core.tool.ScriptRunner
 import java.io.File
 
 /**
- * 提示词钩子:把拼好的系统提示词依次过每个启用了 `promptTransform` 的插件脚本(stdin 进原提示词、stdout 出改写后)。
- * 单个脚本 3 秒超时或非零退出就用原提示词继续;`MIKA_MODEL` 进脚本环境,按模型作用域。结果按(内容 + 模型)缓存。
+ * Prompt hook: passes the assembled system prompt through every plugin script that has `promptTransform` enabled in
+ * turn (the original prompt goes in on stdin, the rewritten one comes out on stdout).
+ * If a single script times out after 3 seconds or exits non-zero, continue with the original prompt; `MIKA_MODEL` is
+ * placed in the script environment, scoped per model. Results are cached by (content + model).
  */
 class PluginPromptHook(
     private val registry: PluginRegistry,

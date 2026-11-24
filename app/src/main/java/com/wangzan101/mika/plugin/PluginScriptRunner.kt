@@ -9,8 +9,10 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * 在 App 进程内跑插件脚本:`sh <script> <argsFile>`。stdout/stderr 全收,超时用 [destroyForcibly] 杀掉。
- * [shell] 默认 `/system/bin/sh`,测试里注入 `sh`;`MIKA_ARGS_FILE` 与 [envProvider] 的配置(环境变量页)都进进程环境。
+ * Runs plugin scripts inside the App process: `sh <script> <argsFile>`. stdout/stderr are fully collected, and on
+ * timeout the process is killed with [destroyForcibly].
+ * [shell] defaults to `/system/bin/sh`, tests inject `sh`; `MIKA_ARGS_FILE` and the configuration from [envProvider]
+ * (the environment variables page) both go into the process environment.
  */
 class PluginScriptRunner(
     private val shell: String = "/system/bin/sh",
@@ -59,10 +61,10 @@ class PluginScriptRunner(
         }
 }
 
-/** 插件脚本输出最多进内存这么多;再多的丢弃(免得一个脚本把内存写爆)。 */
+/** Maximum plugin script output kept in memory; anything beyond is discarded (so a single script cannot blow up memory). */
 private const val MAX_OUTPUT_BYTES = 1_000_000
 
-/** 读 [input] 最多 [maxBytes] 字节,其余读完丢弃后返回。 */
+/** Reads at most [maxBytes] bytes from [input], drains the rest, then returns. */
 internal fun readCapped(input: java.io.InputStream, maxBytes: Int): String {
     val out = java.io.ByteArrayOutputStream()
     val chunk = ByteArray(8192)

@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** 设置 › 插件:安装 zip、启停、卸载,只看详情(技能/权限),不提供工具和页面入口。 */
+/** Settings › Plugins: install a zip, enable/disable, uninstall, view details only (skills/permissions); no tools or page entry points are provided. */
 @Composable
 fun PluginsScreen(registry: PluginRegistry, onBack: () -> Unit) {
     val plugins by registry.plugins.collectAsState()

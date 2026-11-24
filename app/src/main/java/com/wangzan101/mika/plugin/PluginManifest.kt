@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-/** 插件 manifest(Schema 1);P1a 只接受技能,P1b/P2/P3 再逐步放开工具、页面与设置。 */
+/** Plugin manifest (Schema 1); P1a accepts skills only, and P1b/P2/P3 gradually open up tools, pages and settings. */
 @Serializable
 data class PluginManifest(
     val schema: Int = 0,
@@ -24,8 +24,10 @@ data class PluginManifest(
     val promptTransform: String? = null,
 ) {
     /**
-     * 校验 manifest;返回问题编码(空表示通过)。P1a 的 fail closed:只接受只带技能的插件,
-     * 任何权限、工具、页面或设置都拒绝安装。[currentAppVersion] 用于 `minApp` 比较。
+     * Validates the manifest; returns problem codes (empty means it passed). P1a fails closed: only plugins carrying
+     * skills alone are accepted,
+     * and any permission, tool, page or setting makes installation fail. [currentAppVersion] is used for the `minApp`
+     * comparison.
      */
     fun validate(currentAppVersion: String = BuildConfig.VERSION_NAME): List<String> = buildList {
         if (schema != SCHEMA) add(ERR_SCHEMA)
@@ -48,7 +50,7 @@ data class PluginManifest(
         val seen = mutableSetOf<String>()
         for (s in skills) {
             if (!SKILL_NAME.matches(s.name) || !seen.add(s.name)) add(ERR_SKILL)
-            // 技能目录只能是包内 skills/<name>,不允许 ..、绝对路径或别名
+            // A skill directory must be skills/<name> inside the package; no .., absolute path or alias allowed
             if (s.path != "skills/${s.name}" || s.path.contains("..")) add(ERR_SKILL_PATH)
         }
     }
@@ -57,7 +59,7 @@ data class PluginManifest(
         const val SCHEMA = 1
         const val KIND_CAPABILITY = "capability"
 
-        /** 全局唯一的插件 id;同时用作 `files/plugins/<id>/` 目录名,正则保证拼不出路径。 */
+        /** Globally unique plugin id; also used as the `files/plugins/<id>/` directory name, and the regex guarantees no path can be built from it. */
         val ID = Regex("^[a-z0-9]+(\\.[a-z0-9_-]+)+$")
         val SKILL_NAME = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -79,7 +81,7 @@ data class PluginManifest(
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        /** 未知字段忽略(向前兼容);格式错误抛 [kotlinx.serialization.SerializationException]。 */
+        /** Unknown fields are ignored (forward compatible); a format error throws [kotlinx.serialization.SerializationException]. */
         fun parse(text: String): PluginManifest = json.decodeFromString(text)
     }
 }
@@ -105,7 +107,7 @@ data class PluginPageDecl(val id: String = "", val entry: String = "", val title
 @Serializable
 data class PluginSettingDecl(val key: String = "", val type: String = "string", val label: String? = null)
 
-/** 注册表里的一条;manifest 是内容真源,这里存启用状态与安装信息。 */
+/** One entry in the registry; the manifest is the source of truth for content, while this stores enabled state and install info. */
 @Serializable
 data class PluginRecord(
     val id: String,
@@ -118,7 +120,7 @@ data class PluginRecord(
     val permissions: List<String> = emptyList(),
 )
 
-/** 语义化版本的解析与比较(只用于 `minApp`)。 */
+/** Semantic version parsing and comparison (used only for `minApp`). */
 internal object SemVer {
     private val RE = Regex(
         "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)" +
@@ -128,7 +130,7 @@ internal object SemVer {
 
     fun isValid(version: String): Boolean = RE.matches(version)
 
-    /** -1/0/1;构建元数据不参与比较,预发布版本低于同版本正式版。 */
+    /** -1/0/1; build metadata does not participate in the comparison, and a pre-release ranks below the release of the same version. */
     fun compare(a: String, b: String): Int {
         val (ac, ap) = parts(a) ?: return a.compareTo(b)
         val (bc, bp) = parts(b) ?: return a.compareTo(b)
@@ -163,10 +165,10 @@ internal object SemVer {
     private fun Int.sign(): Int = if (this < 0) -1 else if (this > 0) 1 else 0
 }
 
-/** 插件脚本目前能声明的权限白名单;不在这里的一律拒装。 */
+/** Allowlist of permissions plugin scripts can currently declare; anything not listed here is refused installation. */
 private val ALLOWED_PLUGIN_PERMISSIONS = setOf("run-scripts", "rewrite-prompt")
 
-/** 脚本路径必须落在插件包内且是 `.sh`:非空、以 `.sh` 结尾、非绝对路径、无反斜杠、不含 `..` 或空段。 */
+/** A script path must stay inside the plugin package and be a `.sh`: non-empty, ending in `.sh`, not absolute, no backslashes, no `..` or empty segments. */
 private fun validScriptPath(p: String?): Boolean =
     p != null && p.endsWith(".sh") && !p.startsWith("/") && !p.contains('\\') &&
         p.split('/').none { it == ".." || it.isEmpty() }

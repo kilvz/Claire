@@ -204,9 +204,11 @@ class PersonalRuntime(private val app: MikaApp) {
 }
 
 /**
- * 给个人助理看的长期记忆:置顶在前、新的在前,最多 [PERSONAL_MEMORY_ITEMS] 条、[max] 个字。
- * 按整条装:下一条装不下就到此为止,不从中间截断。Claire 自己归纳出来的那几条不是用户说的,标记放在这一条的最前面——
- * 放在后面的话,正好被截到的那一条会只剩内容、丢了这唯一的来源说明。
+ * Long-term memory shown to the personal assistant: pinned first, newest first, at most [PERSONAL_MEMORY_ITEMS] items
+ * and [max] characters.
+ * It fits whole items: if the next one does not fit, stop there rather than truncating mid-item. The entries Claire
+ * inferred itself are not what the user said, so the marker goes at the very front of such an item —
+ * if it went at the end, an item cut off exactly there would keep only its content and lose this sole source note.
  */
 internal fun personalMemoryText(items: List<MemoryItem>, max: Int = PERSONAL_MEMORY_CHARS): String {
     val out = StringBuilder()

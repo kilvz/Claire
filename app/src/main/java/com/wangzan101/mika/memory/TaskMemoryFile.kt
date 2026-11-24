@@ -19,9 +19,11 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
- * 跨会话任务摘要加密成 `task_memory/task_memory.bin`(AES-GCM,密钥由调用方给,正式用 `KeystoreKeyCipher("mika-memory")`)。
- * 和记忆文件同一套做法:写临时文件后原子改名,解不开(密钥丢了)或内容坏了不覆盖、改名另存、从空开始。
- * 这是机器写的经验缓存,坏了静默从空开始,不弹提示。
+ * Encrypts cross-session task summaries into `task_memory/task_memory.bin` (AES-GCM; the key is supplied by the caller,
+ * production uses `KeystoreKeyCipher("mika-memory")`).
+ * Same approach as the memory file: write to a temporary file then rename atomically; if decryption fails (key lost) or
+ * the content is corrupt, do not overwrite — rename it aside and start from empty.
+ * This is a machine-written experience cache, so if it is corrupted start silently from empty without showing a prompt.
  */
 class TaskMemoryFile(
     dir: File,
@@ -41,7 +43,7 @@ class TaskMemoryFile(
         return try {
             json.decodeFromString(serializer, cipher.decrypt(bytes).toString(Charsets.UTF_8))
         } catch (e: Exception) {
-            // 密钥库一时不可用不等于文件坏了:抛出,下次再读,绝不另存
+            // Keystore being temporarily unavailable does not mean the file is corrupt: throw, retry next read, never move it aside
             if (e is UserNotAuthenticatedException || e is KeyStoreException || e is ProviderException) throw e
             moveAside()
             emptyList()
@@ -56,7 +58,7 @@ class TaskMemoryFile(
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
-    /** 「全部清除」:删任务摘要文件(含另存的坏文件)。密钥重建由调用方删别名后做。 */
+    /** "Wipe everything": deletes the task summary files (including the bad file moved aside). The key rebuild is done by the caller after deleting the alias. */
     @Synchronized
     fun wipe() {
         memDir.listFiles()?.forEach { it.delete() }

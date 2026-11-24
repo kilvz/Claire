@@ -7,9 +7,10 @@ import com.wangzan101.mika.core.learn.skills.PluginSkills
 import java.io.File
 
 /**
- * 从 `files/plugins/<id>/skills/<name>/SKILL.md` 读已启用插件的技能。
- * 技能名是 `<pluginId>/<name>`;坏掉的技能跳过,不让整个插件消失。
- * [plugins] 每次调用现取,停用后下一次查找就看不到;任务开始时可用 [snapshot] 固定一份。
+ * Reads the skills of enabled plugins from `files/plugins/<id>/skills/<name>/SKILL.md`.
+ * A skill's name is `<pluginId>/<name>`; broken skills are skipped so the whole plugin does not disappear.
+ * [plugins] is fetched fresh on each call, so a disabled plugin is invisible to the next lookup; at the start of a task
+ * use [snapshot] to pin one.
  */
 class PluginSkillsProvider(
     private val plugins: () -> List<PluginRecord>,
@@ -24,7 +25,7 @@ class PluginSkillsProvider(
     override fun read(info: GuideInfo, file: String): String? =
         load().firstOrNull { it.info.name == info.name }?.let { readFile(it, file) }
 
-    /** 任务开始时的固定快照:本次任务里启用/停用从下一次任务生效。 */
+    /** Fixed snapshot taken at the start of a task: enabling/disabling during this task takes effect from the next task. */
     fun snapshot(): PluginSkills {
         val refs = load()
         return object : PluginSkills {
@@ -58,7 +59,7 @@ class PluginSkillsProvider(
         if (!dir.path.startsWith(base.path + File.separator)) return null
         val markdown = File(dir, SKILL_FILE)
         if (!markdown.isFile) return null
-        // 防符号链接把 SKILL.md 指到插件目录外
+        // Prevent symlinks from pointing SKILL.md outside the plugin directory
         if (!markdown.canonicalFile.path.startsWith(dir.path + File.separator)) return null
         val (meta, body) = FrontMatter.parse(markdown.readText())
         if (body.isBlank()) return null

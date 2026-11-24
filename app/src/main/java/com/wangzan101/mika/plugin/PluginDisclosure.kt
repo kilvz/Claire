@@ -1,8 +1,10 @@
 package com.wangzan101.mika.plugin
 
 /**
- * 装一个插件前给用户看的披露:会得到哪些工具(名字 → 风险等级)与会不会改写系统提示词。
- * 插件脚本跑在 App 进程内,UI 用这份披露诚实地告诉用户它能读到对话、记忆和模型密钥。
+ * Disclosure shown to the user before installing a plugin: which tools it will get (name → risk level) and whether it
+ * will rewrite the system prompt.
+ * Plugin scripts run inside the App process, and the UI uses this disclosure to honestly tell the user that they can
+ * read conversations, memory and model keys.
  */
 data class PluginDisclosure(val tools: List<Pair<String, String>>, val rewritesPrompt: Boolean)
 
@@ -11,7 +13,7 @@ fun PluginManifest.disclosure(): PluginDisclosure = PluginDisclosure(
     rewritesPrompt = promptTransform != null,
 )
 
-/** 插件默认的提示词规则(persona.conf):全是注释,等于不改提示词;「还原默认」写回这份。 */
+/** Default prompt rules for plugins (persona.conf): all comments, i.e. no prompt change; "Restore defaults" writes this back. */
 val DEFAULT_PERSONA_CONF: String = """
     # 提示词改写配置。改完下一次任务生效。
     # prefix / suffix:整段包在系统提示词外面(各一行)

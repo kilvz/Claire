@@ -18,9 +18,11 @@ import kotlinx.serialization.json.JsonObject
 import java.io.File
 
 /**
- * 已安装插件与启用状态的唯一入口。磁盘布局见 `PluginInstaller`:
- * `files/plugins/<id>/` 是包内容,`files/plugins/registry.json` 只存安装信息与启停开关。
- * 启动时按目录里的 manifest 对账,目录消失的记录自动丢弃。
+ * The single entry point for installed plugins and their enabled state. See `PluginInstaller` for the disk layout:
+ * `files/plugins/<id>/` is the package content, and `files/plugins/registry.json` stores only install info and the
+ * enabled/disabled switches.
+ * At startup it reconciles against the manifests in the directories, and records whose directory has disappeared are
+ * dropped automatically.
  */
 class PluginRegistry(
     private val filesDir: File,
@@ -38,14 +40,14 @@ class PluginRegistry(
 
     private val skills = PluginSkillsProvider({ _plugins.value }, root, log)
 
-    /** 给技能目录用的只读来源:每次查找现读启停状态。 */
+    /** Read-only source for the skill catalog: reads the enabled state fresh on each lookup. */
     val skillsProvider: PluginSkills get() = skills
 
     init {
         reload()
     }
 
-    /** 任务开始时固定一份,本次任务里启用/停用从下一次任务生效。 */
+    /** Pinned at the start of a task; enabling/disabling during this task takes effect from the next task. */
     fun skillsSnapshot(): PluginSkills = skills.snapshot()
 
     fun enabledPlugins(): List<PluginRecord> = _plugins.value.filter { it.enabled }
@@ -59,7 +61,7 @@ class PluginRegistry(
             .getOrNull()
     }
 
-    /** 启用插件的工具规格(名字拼成 `plugin_<id去点>_<工具名>`);脚本目录是插件目录。 */
+    /** Tool specs of enabled plugins (name assembled as `plugin_<id with dots removed>_<tool name>`); the script directory is the plugin directory. */
     fun toolSpecs(): List<PluginToolSpec> = enabledPlugins().flatMap { record ->
         val m = manifest(record.id) ?: return@flatMap emptyList<PluginToolSpec>()
         val dir = pluginDir(record.id) ?: return@flatMap emptyList<PluginToolSpec>()
@@ -76,7 +78,7 @@ class PluginRegistry(
         }.distinctBy { it.name }
     }
 
-    /** 重新扫目录对账;启动时和安装后调用。 */
+    /** Rescans the directories and reconciles; called at startup and after installation. */
     fun reload() = synchronized(lock) {
         root.mkdirs()
         val stored = readRegistry()
@@ -90,7 +92,7 @@ class PluginRegistry(
             val manifest = runCatching { PluginManifest.parse(File(dir, PluginInstaller.MANIFEST).readText()) }
                 .onFailure { log("could not read ${dir.name}/manifest.json", it) }
                 .getOrNull() ?: continue
-            // 目录名必须和 manifest id 一致,避免读到别的插件的数据
+            // The directory name must match the manifest id, to avoid reading another plugin's data
             if (manifest.id != dir.name) {
                 log("ignoring ${dir.name}: manifest id is ${manifest.id}", null)
                 continue
@@ -115,7 +117,7 @@ class PluginRegistry(
 
     fun reloadAsync(): Job = scope.launch(Dispatchers.IO) { reload() }
 
-    /** 安装器成功把目录换入后登记;同 id 升级保留原来的启用状态和安装时间。 */
+    /** Registered after the installer has successfully swapped the directory in; upgrading the same id keeps the previous enabled state and install time. */
     fun install(record: PluginRecord) = synchronized(lock) {
         val old = _plugins.value.firstOrNull { it.id == record.id }
         val merged = record.copy(
@@ -133,7 +135,7 @@ class PluginRegistry(
         writeRegistry(next)
     }
 
-    /** 删插件目录与注册表项;用户对话/记忆不受影响。 */
+    /** Deletes the plugin directory and registry entry; user conversations/memory are unaffected. */
     fun uninstall(id: String): Boolean = synchronized(lock) {
         if (!PluginManifest.ID.matches(id)) return@synchronized false
         val next = _plugins.value.filter { it.id != id }
@@ -174,7 +176,7 @@ class PluginRegistry(
     }
 }
 
-/** 插件工具声明的风险等级(manifest 里的字符串)映射到 core 的 [Risk];不认识的按只读算。 */
+/** Maps a plugin tool's declared risk level (the string in the manifest) to core's [Risk]; unknown ones count as read-only. */
 private fun String?.toRisk(): Risk = when (this?.lowercase()) {
     "write" -> Risk.Write
     "external" -> Risk.External
