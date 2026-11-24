@@ -27,6 +27,12 @@ object SherpaOnnx {
         val joiner: String,
         val tokens: String,
         val asset: Boolean,
+        /**
+         * The transducer architecture these files were exported as. The ONNX metadata says the same,
+         * but sherpa-onnx trusts this value when it is set: loading a zipformer2 export as zipformer
+         * reads state tensors that are not there and aborts the native library (the app just closes).
+         */
+        val modelType: String,
     )
 
     /** The English model shipped in the APK (see assets/sherpa/en-20m/). */
@@ -36,15 +42,17 @@ object SherpaOnnx {
         joiner = "sherpa/en-20m/joiner-epoch-99-avg-1.int8.onnx",
         tokens = "sherpa/en-20m/tokens.txt",
         asset = true,
+        modelType = "zipformer",
     )
 
-    /** A model unpacked by [com.wangzan101.mika.voice.model.SherpaModelStore]. */
+    /** A model unpacked by [com.wangzan101.mika.voice.model.SherpaModelStore]; the downloads are zipformer2 exports. */
     fun downloadedFiles(dir: File): ModelFiles = ModelFiles(
         encoder = File(dir, "encoder.onnx").absolutePath,
         decoder = File(dir, "decoder.onnx").absolutePath,
         joiner = File(dir, "joiner.onnx").absolutePath,
         tokens = File(dir, "tokens.txt").absolutePath,
         asset = false,
+        modelType = "zipformer2",
     )
 
     /**
@@ -64,7 +72,7 @@ object SherpaOnnx {
                 tokens = files.tokens,
                 numThreads = 2,
                 provider = "cpu",
-                modelType = "zipformer",
+                modelType = files.modelType,
             ),
             endpointConfig = EndpointConfig(),
             enableEndpoint = true,
