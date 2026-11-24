@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 别人分享来的 SKILL.md 进待收下(#165):出处、校验、内置名、同名更新、已有草稿。 */
+/** A SKILL.md shared by someone else lands in the pending-accept list (#165): origin, validation, bundled names, same-name updates, existing drafts. */
 class SkillImportTest {
     private val builtin = GuideCatalog.loadBundled().items.map { it.name }.toSet()
 
@@ -45,7 +45,7 @@ class SkillImportTest {
     }
 
     @Test fun localFieldsFromTheSenderAreDropped() {
-        // 重复或带空白的本机字段也不能留下,出处只由代码写
+        // duplicated or whitespace-padded local fields must not survive either; the origin is written only by code
         val raw = md(extra = "source: user\nsource: learned\nlearned_from: run-42\nlearned_from : run-43\nupdates: other-skill\nupdates : another-skill\n")
         val result = (prepare(raw) as SkillImport.Result.Ready).skill
         val meta = FrontMatter.parse(result.markdown).first

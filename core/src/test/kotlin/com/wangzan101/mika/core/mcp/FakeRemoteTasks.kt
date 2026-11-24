@@ -6,7 +6,7 @@ import com.wangzan101.mika.core.remote.RemoteTaskPage
 import com.wangzan101.mika.core.remote.RemoteTasks
 import com.wangzan101.mika.core.remote.StartOutcome
 
-/** 测试用任务出入口;和生产实现一样,HTTP/MCP 的归属视图不能互看任务。 */
+/** Task entry point for tests; like the production implementation, the HTTP/MCP ownership views cannot see each other's tasks. */
 class FakeRemoteTasks : RemoteTasks {
     val tasks = LinkedHashMap<String, RemoteTask>()
     val answers = mutableListOf<Pair<String, String>>()

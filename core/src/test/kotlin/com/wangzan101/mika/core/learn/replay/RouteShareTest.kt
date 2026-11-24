@@ -36,20 +36,20 @@ class RouteShareTest {
         override val label = null
     }
 
-    /** 指纹认「同一条路」的口径与 [samePath] 一致:锚点不算,工具/参数/目标算。 */
+    /** What the fingerprint treats as "the same path" matches [samePath]: anchors do not count, tool/args/target do. */
     @Test fun fingerprintIgnoresAnchorsAndAgreesWithSamePath() {
         val a = route(tap)
         val otherAnchors = a.copy(steps = listOf(
             tap.copy(before = Anchors("com.jingdong", listOf("首页")), after = Anchors("com.jingdong", listOf("已签")))))
         assertEquals(RouteFingerprint.of(a), RouteFingerprint.of(otherAnchors))
         assertTrue(samePath(a, otherAnchors))
-        // 模板、参数、目标、App 有一个不同就不同
+        // a difference in any one of template, args, target or app makes it different
         assertNotEquals(RouteFingerprint.of(a), RouteFingerprint.of(a.copy(template = "京东签到")))
         assertNotEquals(RouteFingerprint.of(a), RouteFingerprint.of(a.copy(steps = listOf(tap.copy(argsJson = "{}")))))
         assertNotEquals(RouteFingerprint.of(a), RouteFingerprint.of(a.copy(steps = listOf(
             tap.copy(target = tap.target!!.copy(ordinal = 1))))))
         assertNotEquals(RouteFingerprint.of(a), RouteFingerprint.of(a.copy(packages = listOf("com.jd"))))
-        // 包名顺序不影响指纹
+        // package order does not affect the fingerprint
         assertEquals(RouteFingerprint.of(a.copy(packages = listOf("a", "b"))), RouteFingerprint.of(a.copy(packages = listOf("b", "a"))))
     }
 
@@ -66,10 +66,10 @@ class RouteShareTest {
         assertEquals(listOf("step 1: unknown tool no_such_tool"), RouteShareLint.check(unknown, tools))
         val notRoutable = RouteShare.of(route(tap.copy(tool = "phone_run")), "x")
         assertEquals(listOf("step 1: phone_run is not a replayable action"), RouteShareLint.check(notRoutable, tools))
-        // 内容被改过而指纹没跟着算:拒绝
+        // the content was altered without the fingerprint being recomputed: reject
         val tampered = RouteShare.decode(RouteShare.of(route(tap), "x").encode().replace("签到", "已签"))
         assertTrue(RouteShareLint.check(tampered, tools).any { it.startsWith("fingerprint") })
-        // 停用的、模板空的、参数不是 JSON 对象的
+        // disabled, empty template, args that are not a JSON object
         val disabled = RouteShare.of(route(tap).copy(disabled = true), "x")
         assertTrue(RouteShareLint.check(disabled, tools).any { it.contains("disabled") })
         val blank = RouteShare.of(route(tap).copy(template = " "), "x")
@@ -78,14 +78,14 @@ class RouteShareTest {
         assertTrue(RouteShareLint.check(badArgs, tools).any { it.contains("not a JSON object") })
     }
 
-    /** 路线实际碰到的 App 从锚点里取;审核据此核对「步骤没走到声明的 App 之外」。 */
+    /** The apps a route actually touches come from the anchors; the lint checks against them that "no step went outside the declared apps". */
     @Test fun touchedPackagesComesFromAnchors() {
         val share = RouteShare.of(route(tap, type), "京东签到")
         assertEquals(setOf("com.jingdong"), RouteShareLint.touchedPackages(share))
         val extra = share.copy(route = share.route.copy(steps = listOf(
             tap, type.copy(before = Anchors("com.other", listOf("首页"))))))
         assertEquals(setOf("com.jingdong", "com.other"), RouteShareLint.touchedPackages(extra))
-        // 最后一步点完跳进别的 App(比如点了分享):这一步之前在原 App,之后在别的 App,后面没有步骤了,别的 App 也算碰到
+        // the last step jumped to another app after the tap (e.g. tapping share): before this step it was in the original app, after it in another app, and there are no further steps, so the other app also counts as touched
         val jumps = share.copy(route = share.route.copy(steps = listOf(
             type, tap.copy(target = tap.target!!.copy(name = "分享"), after = Anchors("com.other", listOf("分享到"))))))
         assertEquals(setOf("com.jingdong", "com.other"), RouteShareLint.touchedPackages(jumps))
@@ -104,7 +104,7 @@ class RouteShareTest {
             RouteShare.decode(current.encode().replace("\"schema\":1", "\"schema\":99"))
             org.junit.Assert.fail("unknown schema must be rejected")
         } catch (e: IllegalArgumentException) {
-            // 认不出的版本不收
+            // an unrecognized version is not accepted
         }
     }
 }

@@ -38,16 +38,16 @@ class ReplayerScreenMapTest {
 
     @Test fun divergesWhenLandingOnWrongScreenAfterRetry() = runTest {
         val s = Notes.screen()
-        // 点了「新建」却去了设置页（changed=true，但落错屏）
+        // tapped "New" but landed on the settings page (changed=true, yet the wrong screen)
         s.pages["settings"] = listOf(ui("@e1", "text", "设置", listOf(0, 0, 999, 60), clickable = false))
         s.links["home" to "新建"] = "settings"
         val out = replayer(s).run(RouteChoice(Notes.route(), listOf("x")))
         assertTrue(out is ReplayOutcome.Diverged)
         val d = out as ReplayOutcome.Diverged
-        assertEquals(1, d.done) // 第 2 步（点「新建」）对不上
-        assertTrue(d.executed) // 这一步真的执行过
+        assertEquals(1, d.done) // step 2 (tapping "New") does not match
+        assertTrue(d.executed) // this step really did run
         assertNotNull(d.screenMap)
         assertTrue(d.screenMap!!.contains("设置"))
-        assertTrue(d.screenMap!!.contains("从这屏可走")) // 交还文案含「落在哪屏 + 从这走」
+        assertTrue(d.screenMap!!.contains("从这屏可走")) // the hand-back text names which screen it landed on + what is reachable from here
     }
 }

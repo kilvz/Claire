@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 照着做了才算，声明了地点时必须有发生在该地点的成功动作。 */
+/** Only actually following it counts; when places are declared, there must be a successful action that happened at that place. */
 class SkillFollowTest {
     private val tools = knownTools()
     private fun read(name: String, at: Long) = RunEvent.SkillUsed(at, name, "viewed")
@@ -27,7 +27,7 @@ class SkillFollowTest {
     @Test fun readingAfterTheWorkOrOnlyFailedActionsDoNotCount() {
         assertTrue(followed(listOf(act(5), read("s", 10))).isEmpty())
         assertTrue(followed(listOf(read("s", 10), act(20, ok = false))).isEmpty())
-        // 读屏、查技能不是动手
+        // reading the screen or looking up a skill is not acting
         assertTrue(followed(listOf(read("s", 10), act(20, tool = "phone_observe"), act(21, tool = "skill_read"))).isEmpty())
     }
 
@@ -36,7 +36,7 @@ class SkillFollowTest {
         val inWechat = act(20).copy(resultJson = """{"ok":true,"actionApp":"com.tencent.mm"}""")
         assertEquals(setOf("s"), followed(listOf(read("s", 10), inWechat), wechat))
         assertTrue(followed(listOf(read("s", 10), act(20), saw(21, Place.app("com.tencent.mm"))), wechat).isEmpty())
-        // 进微信是在读技能之前,读完以后在别处动手
+        // WeChat is entered before the skill is read, so the action after reading happens elsewhere
         assertTrue(followed(listOf(saw(5, Place.app("com.tencent.mm")), read("s", 10), act(20)), wechat).isEmpty())
     }
 
@@ -61,7 +61,7 @@ class SkillFollowTest {
         assertEquals(setOf("wx"), followed(events, places))
     }
 
-    // 界面一个字也读不出来时没有读屏记录:调用结果里报的 currentApp / currentSite 照样算进过
+    // when not a single character can be read off the screen there is no screen observation record: currentApp / currentSite reported in tool results still count as having visited
     @Test fun currentAppInToolResultsCountsAsVisiting() {
         val wechat = mapOf("s" to SkillPlaces(packages = setOf("com.tencent.mm")))
         val result = RunEvent.ToolResult(20, 1, "phone_tap", """{"ok":true,"screen":{"currentApp":"com.tencent.mm","full":false}}""", true, null)
@@ -69,11 +69,11 @@ class SkillFollowTest {
         val bili = mapOf("s" to SkillPlaces(domains = setOf("bilibili.com")))
         val page = RunEvent.ToolResult(20, 1, "web_navigate", """{"ok":true,"currentSite":"m.bilibili.com"}""", true, null)
         assertEquals(setOf("s"), followed(listOf(read("s", 10), page), bili))
-        // 读技能之前的结果不算
+        // results from before the skill was read do not count
         assertTrue(followed(listOf(result.copy(atMs = 5), read("s", 10), act(20)), wechat).isEmpty())
     }
 
-    // 技能头部写的可能是知识名、别名、显示名(手写的),也可能是包名(自学的):认得出的都换成包名、域名
+    // skill headers may hold a knowledge name, an alias, a display name (hand-written) or a package name (learned): anything recognizable is converted to package names and domains
     @Test fun catalogResolvesKnowledgeNamesAliasesAndKeepsRawPackages() {
         val skills = InMemoryPersonalSkills(
             personalSkill("by-name", extraMeta = "apps: [\"wechat\"]\nsites: [\"bilibili.com\"]\n"),
@@ -88,13 +88,13 @@ class SkillFollowTest {
         assertTrue("bilibili.com" in byName.domains)
         assertEquals(setOf("com.tencent.mm"), catalog.skillPlaces("by-alias")!!.packages)
         assertTrue("com.example.app" in catalog.skillPlaces("by-package")!!.packages)
-        // 认不出来、也不像包名的不算写了:不然这份技能永远认不出照着做了
+        // unrecognizable values that do not look like package names do not count as declared: otherwise this skill would never recognize that it was followed
         assertEquals(false, catalog.skillPlaces("unknown")!!.declared)
         assertEquals(false, catalog.skillPlaces("plain")!!.declared)
         assertNull(catalog.skillPlaces("missing"))
     }
 
-    // App 和网站知识互相登记的一起算:技能写了网站,任务在它的 App 里做,也算照着做了
+    // app and site knowledge that register each other count together: a skill declares a site and the task is done in its app, which still counts as following it
     @Test fun appAndSiteKnowledgeAreLinked() {
         val skills = InMemoryPersonalSkills(personalSkill("bili", extraMeta = "sites: [\"bilibili.com\"]\n"))
         val places = GuideCatalog.withPersonal(GuideCatalog.loadBundled(), skills).skillPlaces("bili")!!

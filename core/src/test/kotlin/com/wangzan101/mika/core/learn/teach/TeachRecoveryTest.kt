@@ -32,7 +32,7 @@ class TeachRecoveryTest {
         assertEquals(TeachPhase.Idle, TeachRecovery.afterLoad(session(TeachPhase.Idle)).phase)
     }
 
-    /** 重启以后仍然知道正文是不是模型写的：「这次没接模型」的说明不能靠重启后的配置去猜。 */
+    /** After a restart it still knows whether the body was written by the model: the "no model was used this time" note must not be guessed from the config after restart. */
     @Test fun theModelUseFlagSurvivesASaveAndLoad() {
         val session = session(TeachPhase.Reviewing, draftId = "d1").copy(byModel = true)
         assertEquals(true, TeachCodec.decode(TeachCodec.encode(session)).byModel)

@@ -77,7 +77,7 @@ class SkillSaveTest {
         assertEquals(SkillStatus.trial, saved.status)
         assertTrue(saved.createdByUser)
         assertEquals("user", FrontMatter.parse(saved.markdown).first["source"])
-        // 存下就在技能目录里:搜得到、读得到,读到的版本号和存下时给的一致
+        // once saved it is in the skill catalog: searchable and readable, and the version read back matches the one returned at save time
         val catalog = GuideCatalog.withPersonal(bundled, s.store)
         assertTrue(catalog.find("点咖啡").any { it.name == "order-coffee" && it.kind == "personal" })
         val read = s.tools.call("skill_read", buildJsonObject { put("name", "personal:order-coffee") })
@@ -89,11 +89,11 @@ class SkillSaveTest {
         val old = personalSkill("order-coffee", description = "点咖啡")
         val s = setup(InMemoryPersonalSkills(old), said = "把点咖啡的技能改一下,先看优惠券")
         val quote = "把点咖啡的技能改一下"
-        // 没读就改:不收,原样不动
+        // editing without reading first: rejected, left untouched
         val blind = s.tools.call("skill_save", save(md(), quote))
         assertEquals("exists", blind.s("error"))
         assertEquals(old, s.store.get("order-coffee"))
-        // 版本号对不上(中途被改过):不收
+        // version mismatch (changed in the meantime): rejected
         val stale = s.tools.call("skill_save", save(md(), quote, version = "000000000000"))
         assertEquals("changed_since_read", stale.s("error"))
         val version = s.tools.call("skill_read", buildJsonObject { put("name", "order-coffee") }).s("version")

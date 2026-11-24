@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.learn.skills
 
-/** 测试用的内存实现,语义同 app 层的文件实现。 */
+/** In-memory implementation for tests, with the same semantics as the file-based implementation in the app layer. */
 class InMemoryPersonalSkills(vararg skills: PersonalSkill) : PersonalSkills {
     private val active = linkedMapOf<String, PersonalSkill>().apply { skills.forEach { put(it.name, it) } }
     private val drafts = linkedMapOf<String, PersonalSkill>()

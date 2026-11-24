@@ -117,7 +117,7 @@ class TeachRouteTest {
         assertTrue(route.apps.single().browser)
     }
 
-    /** 只有窗口、没有点按的示范(浏览器整段收不到点击)折完没有任何真实操作,也不能凭空造出 App 入口。 */
+    /** A demo with only windows and no taps (the browser delivers no clicks at all) folds to no real operation, and an app entry point must not be invented out of nowhere. */
     @Test fun aWindowOnlyDemoFoldsToNoRealAction() {
         val steps = listOf(
             step(0, launcher, TeachKind.Window, title = "桌面"),

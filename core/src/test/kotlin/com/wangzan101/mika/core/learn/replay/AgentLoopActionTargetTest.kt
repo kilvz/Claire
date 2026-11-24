@@ -40,7 +40,7 @@ class AgentLoopActionTargetTest {
         assertEquals("phone_tap", t.tool); assertEquals(2, t.step); assertTrue(t.effective)
         assertEquals(Selector("button", "搜索", "a:id/s", listOf(0, 0, 999, 100), 0, uniqueAtRecord = true), t.target)
         assertEquals("com.x", t.before.packageName)
-        // 和同一调用的工具结果按调用 id 配对
+        // paired with the tool result of the same call by call id
         val all = events(SpeedFlags(replay = true), ActionResult.Ok(changed = true))
         val at = all.filterIsInstance<RunEvent.ActionTarget>().single()
         assertTrue(at.callId != null)
@@ -74,7 +74,7 @@ class AgentLoopActionTargetTest {
         assertEquals(listOf("b.1", "b.2"), targets.map { it.callId })
         assertEquals("搜索", targets[0].target!!.name)
         assertFalse(targets.any { it.incomplete })
-        // 界面变了的子步各存一张画面(wait 没有屏幕),工具结果里带编号
+        // each sub-step whose screen changed stores its own frame (wait has no screen); the tool result carries the id
         val subResults = got.filterIsInstance<RunEvent.ToolResult>().filter { it.source == "batch" }
         assertEquals(2, subResults.count { it.screenshotId != null })
         assertTrue(shots.containsAll(subResults.mapNotNull { it.screenshotId }))

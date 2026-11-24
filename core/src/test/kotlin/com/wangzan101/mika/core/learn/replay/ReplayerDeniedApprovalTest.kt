@@ -14,10 +14,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 远程(MCP)、定时等非 Ui 来源的运行也照常回放路线(TaskRun 对所有来源都接了 routes)。
- * 路线里记录过的付款步骤,在这些运行里此刻一律被拒(#217 的 approval_unavailable),
- * Replayer 应把它当作对不上交还模型,而不是和 AgentLoop 修掉的那次一样直接抛
- * "unexpected refusal" 崩掉整个任务(RouteReplay 的契约:路线出问题都不影响任务)。
+ * Runs from non-Ui origins such as remote (MCP) and scheduled replay routes as usual too (TaskRun wires routes for every origin).
+ * Payment steps recorded in a route are uniformly denied at this moment in these runs (#217's approval_unavailable);
+ * the Replayer should treat that as a mismatch and hand back to the model, instead of crashing the whole task
+ * with "unexpected refusal" the way the case AgentLoop fixed did (RouteReplay's contract: route problems never affect the task).
  */
 class ReplayerDeniedApprovalTest {
     @Test fun deniedPaymentStepHandsBackToTheModelInsteadOfCrashing() = runTest {
@@ -33,7 +33,7 @@ class ReplayerDeniedApprovalTest {
         val route = Route("r-pay", "买{1}", 1, listOf("com.shop"), emptyMap(), listOf(step), lastUsedMs = 0)
         val sink = Events()
         val d: ToolDispatcher = toolDispatcher(s).also { it.captureTargets = true }
-        // 回放沿用这次运行的 provenance:远程来源付款一律拒绝(见 ApprovalPolicy)
+        // replay inherits this run's provenance: payments from remote origins are always denied (see ApprovalPolicy)
         val executor = ActionExecutor(d, OperationGuards(), ConfirmationGate(), {}, ActionRecorder(sink),
             provenance = RunProvenance(RunOrigin.Mcp, Attendance.Unattended))
         val out = Replayer(d, executor, gate = {}, sink = sink).run(RouteChoice(route, listOf("矿泉水")))
@@ -41,7 +41,7 @@ class ReplayerDeniedApprovalTest {
         assertTrue("the denied tap must not run", s.taps.isEmpty())
     }
 
-    /** 对照:同样的路线在 Ui/在场运行里走既有 confirmation_required 路径,照常交还模型、不崩。 */
+    /** Contrast: in a Ui/attended run the same route takes the existing confirmation_required path and still hands back to the model without crashing. */
     @Test fun confirmationRequiredStepStillStopsForConfirmation() = runTest {
         val shop = listOf(
             ui("@e1", "text", "订单确认", listOf(0, 0, 999, 60), clickable = false),

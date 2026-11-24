@@ -76,7 +76,7 @@ class TeachDraftTest {
         assertTrue(md.contains(TeachSkill.STOP_IF_UNMATCHED))
     }
 
-    /** 目标是什么语言，模型就按什么语言写；技能正文不带中文的「观察到」也不能因此丢掉模型稿。 */
+    /** The model writes in whatever language the goal uses; the skill body lacking the Chinese "observed" labels must not cause the model draft to be dropped. */
     @Test fun modelDraftInTheGoalLanguageIsKeptWithoutChineseEvidenceLabels() = runBlocking {
         val reply = """
             ---
@@ -107,7 +107,7 @@ class TeachDraftTest {
         assertTrue("保留的模型稿要标成模型写的", skill.byModel)
     }
 
-    /** 模型稿不成形时仍然退回本机整理，不因此丢掉整次示范。 */
+    /** When the model draft is malformed it still falls back to local assembly rather than losing the whole demonstration. */
     @Test fun brokenModelDraftFallsBackToLocalAssembly() = runBlocking {
         val skill = drafted("Just a sentence, no sections at all.")
         assertNotNull(skill)
@@ -115,7 +115,7 @@ class TeachDraftTest {
         assertFalse("本机整理的稿不能被标成模型写的", skill.byModel)
     }
 
-    /** 模型说「试跑成功」就不收它的稿：补上的出处提示不能把这句话洗白。 */    @Test fun modelClaimingATrialRunFallsBackToTheLocalAssembly() = runBlocking {
+    /** If the model claims a "trial run succeeded", its draft is not accepted: the appended source note cannot whitewash that claim. */    @Test fun modelClaimingATrialRunFallsBackToTheLocalAssembly() = runBlocking {
         val reply = """
             ---
             name: xhs-search-save
@@ -142,7 +142,7 @@ class TeachDraftTest {
         assertTrue(skill.skill.markdown.contains("This draft was assembled locally from the demonstrated route"))
     }
 
-    /** 只剩「启动 App」的路线整不出技能:没有真实操作的示范不该变成一份空壳。 */
+    /** A route left with only "launch the app" cannot produce a skill: a demonstration with no real operations should not turn into an empty shell. */
     @Test fun aRouteWithoutAnyRealActionProducesNoSkill() = runBlocking {
         val onlyLaunch = TeachRoute(
             steps = listOf(RouteStep("com.xingin.xhs", "启动 com.xingin.xhs", null)),
