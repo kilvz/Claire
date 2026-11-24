@@ -23,7 +23,7 @@ import com.wangzan101.mika.chat.ui.AgentPip
 import com.wangzan101.mika.chat.ui.PipUi
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 真实后台 Activity → ImageReader → Task 预览帧 → 应用内画中画,检查整条链路。 */
+/** Real background Activity → ImageReader → Task preview frame → in-app picture-in-picture: checks the whole chain. */
 @RunWith(AndroidJUnit4::class)
 class BackgroundLandscapePreviewTest {
     @get:Rule val compose = createComposeRule()
@@ -38,7 +38,7 @@ class BackgroundLandscapePreviewTest {
             }
             val pkg = InstrumentationRegistry.getInstrumentation().context.packageName
             DeviceSupport.sh("am start -W --display ${agent.display.displayId} -n $pkg/${RotationTestActivity::class.java.name} --ei orientation 0")
-            // 转屏时宽高会先变,像素仍可能是旧帧;等后台 Activity 的四个象限真的画好。
+            // On rotation the width and height change first while the pixels may still be from the old frame; wait until the background Activity's four quadrants are actually drawn.
             compose.waitUntil(10_000) { agent.display.frames.value?.let(::readyFrame) == true }
             compose.waitForIdle()
             compose.waitUntil(5_000) { compose.onAllNodesWithTag("pip-frame", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }

@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 import java.util.UUID
 import com.wangzan101.mika.settings.ui.models.edit
 
-/** 模型管理宿主 → 本机归属校验 → 持久化和重排期；工具解析另由 core 契约测试覆盖。 */
+/** Model management host → local ownership check → persistence and rescheduling; tool parsing is covered separately by the core contract tests. */
 @RunWith(AndroidJUnit4::class)
 class ScheduleEditDeviceTest {
     @Test fun adminEditsTheSamePersistedPlanAndCannotEditAnotherConversation() = runBlocking {

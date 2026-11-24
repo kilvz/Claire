@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.chat.ui.KeptLine
 import com.wangzan101.mika.chat.ui.draft
 
-/** 留在后台运行的那一页在界面上:对话里那一行、胶囊、展开的卡片(实时画面、剩余时间、来源对话、两个按钮)。 */
+/** The page kept running in the background, as seen in the UI: the row in the chat, the pill, and the expanded card (live screen, remaining time, source conversation, two buttons). */
 @RunWith(AndroidJUnit4::class)
 class KeptPageUiTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

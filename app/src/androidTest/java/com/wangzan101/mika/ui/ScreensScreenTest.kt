@@ -20,7 +20,7 @@ import com.wangzan101.mika.chat.ui.ScreenRow
 import com.wangzan101.mika.chat.ui.ScreensContent
 import com.wangzan101.mika.chat.ui.ScreensCopy
 
-/** 「后台屏」那一页:空态、一块屏一行、点开小画面(只用假数据,不建真屏)。 */
+/** The "background screens" page: empty state, one row per screen, and opening a small preview (fake data only, no real screens created). */
 @RunWith(AndroidJUnit4::class)
 class ScreensScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -43,7 +43,7 @@ class ScreensScreenTest {
         compose.onNodeWithText(ScreensCopy.EMPTY).assertIsDisplayed()
     }
 
-    /** 一个任务一张卡:在做什么、在用哪个 App、状态都在;点那一行回到它所属的对话。 */
+    /** One card per task: what it is doing, which app it is using, and its state are all present; tapping the row returns to the conversation it belongs to. */
     @Test fun oneCardPerTaskOpensItsConversation() {
         show(listOf(row(12), row(-1, "queued")))
         compose.onNodeWithText("正在用设置").assertIsDisplayed()
@@ -54,14 +54,14 @@ class ScreensScreenTest {
         assertEquals(listOf("open conv-k12"), calls)
     }
 
-    /** 还没建屏的那块没有「看画面」:没有画面可看,不给一个点了没反应的入口。 */
+    /** The entry whose screen is not built yet has no "view screen": there is nothing to show, so it does not offer an entry point that does nothing when tapped. */
     @Test fun aScreenThatIsNotBuiltYetHasNoPreview() {
         show(listOf(row(12), row(-1, "queued")))
         compose.onNodeWithTag("screens-preview-queued").assertDoesNotExist()
         compose.onNodeWithTag("screens-preview-k12").performScrollTo().assertIsDisplayed()
     }
 
-    /** 点一下展开、再点收起:按钮上的说法跟着换。 */
+    /** Tap to expand, tap again to collapse: the wording on the button changes accordingly. */
     @Test fun previewToggles() {
         show(listOf(row(12)))
         compose.onNodeWithTag("screens-preview-k12").performScrollTo().performClick()

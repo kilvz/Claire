@@ -44,8 +44,8 @@ import com.wangzan101.mika.chat.ui.ChatWithDrawer
 import com.wangzan101.mika.chat.ui.TaskActions
 
 /**
- * 侧栏项目分组 UI 测试:新建项目并在其中发起对话、聊天页顶部显示项目胶囊、
- * 折叠/展开项目、重命名项目、以及删除项目时清理成员对话并保留独立对话。
+ * Drawer project grouping UI test: create a project and start a conversation in it, show the project pill at the top of the chat page,
+ * collapse/expand a project, rename a project, and clean up member conversations on project deletion while keeping standalone conversations.
  */
 @RunWith(AndroidJUnit4::class)
 class ProjectDrawerUiTest {
@@ -151,7 +151,7 @@ class ProjectDrawerUiTest {
         val vm = vm(projectImpact = ProjectDeleteImpact(conversations = 2, runningTasks = 1, schedules = 2))
         show(vm, drawerOpen = true)
 
-        // 展开/收起项目会隐藏和重新显示成员对话
+        // Expanding/collapsing a project hides and re-shows its member conversations
         compose.onNode(hasTestTag("conversation-row") and hasText("成员聊天")).assertExists()
         compose.onNode(hasTestTag("project-header") and hasText("客户端")).performClick()
         compose.waitForIdle()
@@ -160,7 +160,7 @@ class ProjectDrawerUiTest {
         compose.waitForIdle()
         compose.onNode(hasTestTag("conversation-row") and hasText("成员聊天")).assertExists()
 
-        // 长按项目头重命名为「端侧内核」
+        // Long-press the project header to rename it to "On-device Kernel"
         compose.onNode(hasTestTag("project-header") and hasText("客户端")).performTouchInput { longClick() }
         compose.onNodeWithTag("project-menu-rename").performClick()
         compose.onNodeWithTag("project-name-field").performTextReplacement("端侧内核")
@@ -168,7 +168,7 @@ class ProjectDrawerUiTest {
         compose.waitForIdle()
         compose.onNode(hasTestTag("project-header") and hasText("端侧内核")).assertExists()
 
-        // 长按项目头删除项目:确认弹窗写明影响并保留原有对话
+        // Long-press the project header to delete the project: the confirmation dialog states the impact and the existing conversations are kept
         compose.onNode(hasTestTag("project-header") and hasText("端侧内核")).performTouchInput { longClick() }
         compose.onNodeWithTag("project-menu-delete").performClick()
         compose.onNodeWithTag("delete-project-body").assertExists()

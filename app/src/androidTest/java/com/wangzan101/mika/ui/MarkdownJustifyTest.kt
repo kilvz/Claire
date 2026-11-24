@@ -14,8 +14,8 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.memory.ui.Row
 
 /**
- * 回答正文的两端对齐:排版要在真机上正常渲染,尤其是引用块——它外面是按内容量高的 Row,
- * 取宽度不能走子组合(BoxWithConstraints),否则会拿不到 intrinsic 而崩。
+ * Justified alignment of the answer body: the layout must render correctly on a real device, especially for block quotes — around them is a Row
+ * sized to its content, and measuring width must not go through a subcomposition (BoxWithConstraints), or the intrinsic measurements are unavailable and it crashes.
  */
 @RunWith(AndroidJUnit4::class)
 class MarkdownJustifyTest {

@@ -29,7 +29,7 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 import com.wangzan101.mika.settings.ui.models.edit
 
-/** 真机完整链路：固定模型回复，真实 TaskRun、虚拟屏、系统设置与触控输入。 */
+/** Full on-device chain: fixed model replies, a real TaskRun, a virtual display, system settings, and touch input. */
 class InlineScreenControlDeviceTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val ctx = instr.targetContext
@@ -97,7 +97,7 @@ class InlineScreenControlDeviceTest {
         model.awaitCall()
         val run = DeviceTaskState.run(vm.ui.value.conversationId!!)!!
         assertNotNull(DeviceSupport.pollUntil(10_000) { run.frames.value })
-        // 用真实输入框验证坐标，避免依赖某一版系统设置的语言或导航状态。
+        // Verify coordinates against a real input field, so the test doesn't depend on one particular Settings version's language or navigation state.
         DeviceSupport.startTestActivity(run.displayId.value, FieldsTestActivity::class.java)
         compose.onNodeWithTag("operation-screen-pane").assertExists()
         fit(run)
@@ -146,7 +146,7 @@ class InlineScreenControlDeviceTest {
         assertTrue(runBlocking { run.screenBack(frame.width, frame.height) })
         compose.onNodeWithTag("screen-control-toggle").performClick()
         assertNotNull(DeviceSupport.pollUntil(5_000) { true.takeIf { run.manualControl.state.value == ManualControl.State.Automatic } })
-        // 接管前已在等待的模型回复必须丢弃，而非执行这次返回动作。
+        // A model reply already pending before takeover must be discarded rather than executing this back action.
         model.feed("phone_back")
         val fresh = model.awaitCall()
         assertTrue(fresh.messages.toString().contains("The screen changed"))

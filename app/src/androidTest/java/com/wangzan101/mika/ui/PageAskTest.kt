@@ -38,8 +38,8 @@ import com.wangzan101.mika.chat.ui.ConversationRowContent
 import com.wangzan101.mika.chat.ui.DrawerConversation
 
 /**
- * 浏览器页上「问 Claire」那一块的几种样子:平时的输入条 → 干活中的半屏面板(光边、步骤、停止)→ 你在页面上动手后收成小卡片、
- * 顶上一条「继续」;Claire 问你时面板自己打开。不跑任务,直接给状态。
+ * The states of the "Ask Claire" block on a browser page: the usual input bar → the half-screen panel while working (glowing border, steps, stop) → after you touch the page it collapses into a small card
+ * with a "resume" banner on top; the panel opens by itself when Claire asks you something. No task is run; states are fed in directly.
  */
 @RunWith(AndroidJUnit4::class)
 class PageAskTest {
@@ -73,7 +73,7 @@ class PageAskTest {
         compose.onNodeWithTag("page-ask-bar").assertIsDisplayed()
         compose.onNodeWithText(PageAskCopy.HINT).assertIsDisplayed()
 
-        // 用户问了:面板打开,Claire 在干活,四周亮光边,输入框右边是停止键
+        // The user asked: the panel opens, Claire is working, a glowing border surrounds it, and the stop button sits to the right of the input field
         compose.runOnIdle {
             chat.show("conv-1", card(TaskState.Running(2, "", reason = "正在点「加入购物车」")), thread)
             chat.open = true
@@ -85,7 +85,7 @@ class PageAskTest {
         compose.onNodeWithText("好的，我先看一下这一页。").assertIsDisplayed()
         compose.onNodeWithTag("capsule-stop").assertIsDisplayed()
 
-        // 你在页面上动手:收成小卡片,顶上一条「继续」,不再亮光边
+        // You touched the page: it collapses into a small card with a "resume" banner on top, and the glowing border is gone
         compose.runOnIdle { chat.show("conv-1", card(TaskState.Held(TaskGate.paused(TaskGate.USER_ON_PAGE))), thread) }
         compose.onNodeWithTag("page-card").assertIsDisplayed()
         compose.onNodeWithTag("page-paused-banner").assertIsDisplayed()
@@ -94,7 +94,7 @@ class PageAskTest {
         compose.onNodeWithTag("page-panel").assertDoesNotExist()
         compose.runOnIdle { assertEquals(PageAskMode.Card, chat.mode) }
 
-        // 点卡片展开回面板
+        // Tapping the card expands it back into the panel
         compose.onNodeWithTag("page-card").performClick()
         compose.onNodeWithTag("page-panel").assertIsDisplayed()
         compose.onNodeWithTag("page-panel-collapse").performClick()
@@ -109,7 +109,7 @@ class PageAskTest {
         compose.runOnIdle { chat.show("conv-1", card(TaskState.WaitingInput("要哪个颜色？", listOf("午夜黑", "云白"))), thread) }
         compose.onNodeWithTag("page-panel").assertIsDisplayed()
         compose.onNodeWithText("午夜黑").assertIsDisplayed()
-        // 结束了、收起来:回到输入条
+        // Finished and collapsed: back to the input bar
         compose.runOnIdle {
             chat.show("conv-1", card(TaskState.Succeeded("加好了")), thread)
             chat.open = false
@@ -117,7 +117,7 @@ class PageAskTest {
         compose.onNodeWithTag("page-ask-bar").assertIsDisplayed()
     }
 
-    /** 侧栏里从一页开始的对话:标题后面「网页」小标签,下面一行是网站;别的对话没有。 */
+    /** A conversation in the drawer that started from a page: a small "web" tag after the title and the site on the next line; other conversations have neither. */
     @Test
     fun drawerRowShowsTheWebTagAndSite() {
         compose.setContent {

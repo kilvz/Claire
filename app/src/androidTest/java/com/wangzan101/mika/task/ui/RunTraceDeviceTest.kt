@@ -84,7 +84,7 @@ class RunTraceDeviceTest {
                 compose.onNodeWithContentDescription("菜单").performClick()
                 compose.onNodeWithText("设置").performClick()
                 compose.onNodeWithText("记录详细 Trace").assertDoesNotExist()
-                compose.onNode(hasText("高级") and hasClickAction()).performScrollTo().performClick() // 开发者选项归在「高级」里
+                compose.onNode(hasText("高级") and hasClickAction()).performScrollTo().performClick() // Developer options live under "Advanced"
                 compose.onNodeWithText("开发者选项").performScrollTo().performClick()
                 compose.onNodeWithText("Trace 存储上限").performScrollTo().performClick()
                 compose.onNode(hasSetTextAction()).performTextReplacement("0")
@@ -95,12 +95,12 @@ class RunTraceDeviceTest {
                 assertTrue(com.wangzan101.mika.record.DetailedTraces(app).limitMiB == 37)
                 compose.onNodeWithText("记录详细 Trace").performScrollTo().performClick()
                 assertTrue(app.detailedTraces.enabled)
-                compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() } // 回「高级」
+                compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() } // Back to "Advanced"
                 compose.awaitOne("开发者选项").assertExists()
                 compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
                 compose.awaitOne("设置").assertExists()
                 compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-                // 设置是从侧栏进的:退出设置回到打开着的侧栏,再返回一次收起它,露出对话页
+                // Settings was entered from the drawer: backing out of settings returns to the still-open drawer, one more back closes it and reveals the chat page
                 compose.waitUntil(10_000) { compose.onAllNodesWithTag("drawer").fetchSemanticsNodes().isNotEmpty() }
                 compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
                 compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("drawer").assertIsNotDisplayed() }.isSuccess }
@@ -111,16 +111,16 @@ class RunTraceDeviceTest {
                 compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("查看过程").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithContentDescription("查看过程").performSemanticsAction(SemanticsActions.OnClick)
                 compose.waitUntil(15_000) { compose.onAllNodesWithText("运行过程").fetchSemanticsNodes().isNotEmpty() }
-                // 运行过程页先出标题、再读出这次运行的头部:等头部里「更多详情」那一行出来
+                // The run process page shows the title first, then reads the header for this run: wait for the "more details" row in the header to appear
                 compose.waitUntil(10_000) { compose.onAllNodesWithText("更多详情").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("详细 Trace"))
                 compose.onNodeWithText("详细 Trace").performScrollTo().performClick()
-                // 页面在任务刚开始时就打开了:请求那一行要等这次请求录完、页面重读之后才出来
+                // The page was opened right when the task started: the request row only appears after this request has been recorded and the page re-reads
                 val usage = "输入 1200 · 缓存读取 512 · 未命中 688"
                 compose.waitUntil(30_000) { compose.onAllNodesWithText(usage, substring = true).fetchSemanticsNodes().isNotEmpty() }
                 val run = com.wangzan101.mika.record.RunStore(app).list().first { "TRACE_FIXTURE" in it.goal }
                 compose.waitUntil(30_000) { !app.detailedTraces.store.recording(run.id) }
-                // 请求正文被截过,录完的整次 Trace 仍标「部分记录」
+                // The request body was truncated, so the completed trace is still marked "partial record"
                 compose.waitUntil(5_000) { compose.onAllNodesWithText("部分记录").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText(usage, substring = true).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
                 compose.onNodeWithText("保存本次 Trace").assertExists()

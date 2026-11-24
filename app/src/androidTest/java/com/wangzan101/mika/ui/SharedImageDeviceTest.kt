@@ -28,7 +28,7 @@ import com.wangzan101.mika.settings.ui.models.use
 
 @RunWith(AndroidJUnit4::class)
 class SharedImageDeviceTest {
-    /** 走真实 ACTION_SEND、系统内容 URI 和生产 Activity,确认图片只进私有草稿,不自动启动任务。 */
+    /** Goes through a real ACTION_SEND, system content URI, and production Activity, confirming the image only lands in a private draft and does not automatically start a task. */
     @Test
     fun imageShareBecomesPrivateDraftWithoutStartingTask() {
         val encoded = ByteArrayOutputStream()
@@ -186,7 +186,7 @@ class SharedImageDeviceTest {
         }
     }
 
-    /** 界面已在后台存活时收到分享:空输入框直接填入当前会话,已有草稿时等待用户确认替换或取消。 */
+    /** Receiving a share while the UI is already alive in the background: with an empty input field it fills the current conversation directly; when a draft exists it waits for the user to confirm replacement or cancel. */
     @Test
     fun shareWhileActivityAliveTargetsCurrentConversationAndPromptsWhenDraftExists() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

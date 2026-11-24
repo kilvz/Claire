@@ -81,7 +81,7 @@ class SavedChecklistsDeviceTest {
         return vm
     }
 
-    /** 清单管理页现在只经设置页进入;管理类用例直接组合这个屏,不再走输入栏星标。 */
+    /** The checklist management page is now entered only via Settings; management tests compose this screen directly instead of going through the star in the input bar. */
     private fun showChecklists() {
         compose.setContent { SavedChecklistsScreen(lists, onBack = {}) }
         compose.waitForIdle()

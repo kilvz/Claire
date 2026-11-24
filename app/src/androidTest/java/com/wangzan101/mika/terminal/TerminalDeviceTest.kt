@@ -20,8 +20,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机 spike:确认 PRoot 里的 pty 能用(用户终端的 P0 门槛)。
- * 需要 arm64 设备、已装好运行环境;其他设备上自动跳过。
+ * On-device spike: confirms the pty inside PRoot works (the P0 gate for the user terminal).
+ * Requires an arm64 device with the runtime environment installed; skipped automatically on other devices.
  */
 @RunWith(AndroidJUnit4::class)
 class TerminalDeviceTest {

@@ -61,7 +61,7 @@ class SavedTasksDeviceTest {
 
     @After fun cleanUp() { scope.cancel(); directory.deleteRecursively() }
 
-    /** 同一用例里聊天屏与常用任务页来回切:Compose 测试规则只允许 setContent 一次,所以只挂一个宿主、换页靠状态。 */
+    /** Switching back and forth between the chat screen and the saved-tasks page within one test: the Compose test rule allows setContent only once, so a single host is mounted and pages are switched via state. */
     private var page by mutableStateOf<(@Composable () -> Unit)?>(null)
     private var hosted = false
 
@@ -86,7 +86,7 @@ class SavedTasksDeviceTest {
         return vm
     }
 
-    /** 推荐任务页现在只经设置页进入;管理类用例直接组合这个屏,不再走输入栏星标。 */
+    /** The recommended-tasks page is now entered only via Settings; management tests compose this screen directly instead of going through the star in the input bar. */
     private fun showSavedTasks() = host { RecommendedTasksScreen(tasks, onBack = {}, onPick = {}) }
 
     @Test fun saveHistoryEditAndReuseWithoutSendingOrLosingDraft() {

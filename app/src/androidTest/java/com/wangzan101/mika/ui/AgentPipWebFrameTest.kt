@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.chat.ui.AgentPip
 import com.wangzan101.mika.chat.ui.PipUi
 
-/** 小窗按画面比例定大小:横向网页看得到左右两端,长屏手机的画面看得到最底下。 */
+/** The PiP window is sized to the frame's aspect ratio: a landscape web page shows both left and right edges, and a tall phone screen shows its very bottom. */
 @RunWith(AndroidJUnit4::class)
 class AgentPipWebFrameTest {
     @get:Rule val compose = createComposeRule()
@@ -56,7 +56,7 @@ class AgentPipWebFrameTest {
 
     @Test fun tallPhoneFrameShowsItsBottom() {
         compose.mainClock.autoAdvance = false
-        // 长屏手机的画面(高约为宽的 2.2 倍):最底下一截涂成绿色,小窗按画面比例定高,底部不能被裁掉
+        // A tall phone screen (height about 2.2x its width): the bottom strip is painted green; the PiP window derives its height from the aspect ratio, so the bottom must not be cropped
         val frame = Bitmap.createBitmap(360, 794, Bitmap.Config.ARGB_8888)
         Canvas(frame).apply {
             drawColor(Color.WHITE)

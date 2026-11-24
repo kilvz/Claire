@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 使用独立测试记录，不操作真实设备或调用模型。 */
+/** Uses an isolated test recording; does not operate a real device or call a model. */
 @RunWith(AndroidJUnit4::class)
 class TaskReportScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

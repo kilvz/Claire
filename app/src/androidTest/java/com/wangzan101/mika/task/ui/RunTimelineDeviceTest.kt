@@ -34,8 +34,8 @@ import com.wangzan101.mika.task.TaskEnvironment
 import com.wangzan101.mika.ui.MainActivity
 
 /**
- * 真机:脚本模型跑一个 3 步任务(打开设置、看屏幕、交结果),在结果卡片上点「查看过程」,
- * 时间线上应有 3 行,点有画面的那行能看到当时的缩略图。需要内置助手在运行、Claire 无障碍服务已开启。
+ * Real device: a scripted model runs a 3-step task (open settings, observe the screen, submit the result), then tap "View Process" on the result card;
+ * the timeline should have 3 rows, and tapping the row that has a screenshot shows the thumbnail from that moment. Requires the built-in assistant to be running and the Claire accessibility service enabled.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -88,7 +88,7 @@ class RunTimelineDeviceTest {
         compose.onNodeWithText("第 4 步").assertDoesNotExist()
         compose.onNodeWithText("办成了").assertExists()
 
-        // 当时的画面跟在步骤里:点开「看看设置首页」那一步就显示,再点收起
+        // The screen from that moment is attached to the step: expanding "look at the settings home page" shows it, tapping again collapses it
         val shots = hasContentDescription("的画面", substring = true)
         compose.onAllNodes(shots).fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
         compose.onNodeWithText("第 2 步").performClick()

@@ -36,7 +36,7 @@ import com.wangzan101.mika.chat.ui.draft
 import com.wangzan101.mika.settings.ui.models.edit
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 人工配合的物理姿态验收；仅显式传入 -e physicalFold true 时执行，不模拟设备状态。 */
+/** Manual physical-posture acceptance; runs only when -e physicalFold true is passed explicitly, and does not simulate device state. */
 class PhysicalFoldDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext

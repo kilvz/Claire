@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.selfcheck.ui.SelfCheckContent
 import com.wangzan101.mika.selfcheck.ui.SelfCheckCopy
 
-/** 设置 › 恢复与修复 › 兼容性自检:不带真实自检的页面,看各状态下显示什么、按钮交给谁。 */
+/** Settings › Restore & Repair › Compatibility self-check: the page without a real self-check, covering what each state shows and who receives the button presses. */
 @RunWith(AndroidJUnit4::class)
 class SelfCheckScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
