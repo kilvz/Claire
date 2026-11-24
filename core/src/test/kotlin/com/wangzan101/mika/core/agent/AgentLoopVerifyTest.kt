@@ -35,16 +35,16 @@ private fun text(s: String) = ModelReply(listOf(Part.Text(s)), StopReason.EndTur
 private fun observe() = tools(call("phone_observe"))
 private fun waits(n: Int) = (1..n).map { tools(call("wait", """{"seconds":${1 + it / 10.0}}""")) }.toTypedArray()
 
-/** FakeScreen 上有一个「搜索」按钮:这个回答的引文读到过。 */
+/** FakeScreen has a single button whose name means "Search": the quote in this answer was actually read. */
 private const val GROUNDED = "屏上有「搜索」按钮"
-/** 价格屏上没有:字面核对对不上。 */
+/** Not on the price screen: the literal check does not match. */
 private const val UNGROUNDED = "价格是 ¥89"
 
 private const val PASS = """{"checks": [{"criterion": "t", "status": "met", "quote": "搜索"}], "verdict": "pass", "reason": "屏上有"}"""
 private const val FAIL = """{"checks": [{"criterion": "t", "status": "unmet", "quote": null}], "verdict": "fail", "reason": "屏上没有价格"}"""
 private const val CANNOT = """{"checks": [{"criterion": "t", "status": "unknown", "quote": null}], "verdict": "cannot_verify", "reason": "结果页看不到"}"""
 
-/** 不带调用的回复就是最终回答;核对按风险来,没对上只退回一次,再不行标成未确认交出。 */
+/** A reply without tool calls is the final answer; checking depends on risk, a mismatch is sent back only once, and failing that it is handed over marked unconfirmed. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AgentLoopVerifyTest {
     private class ListSink : RunSink {
@@ -55,22 +55,22 @@ class AgentLoopVerifyTest {
     private fun loop(main: FakeModel, checker: FakeModel = FakeModel(), screen: FakeScreen = FakeScreen(), maxSteps: Int = 60, sink: RunSink = RunSink.NONE) =
         AgentLoop(main, toolDispatcher(screen), "BASE", maxSteps, sink = sink, verifier = Verifier(checker, null))
 
-    /** 第 [i] 次请求最后一条消息里的提醒正文(运行时状态接在它后面)。 */
+    /** The notice body in the last message of request [i] (the runtime state follows it). */
     private fun FakeModel.lastNotice(i: Int): String = ContextBuilder.bodyOf(requests[i].last()).orEmpty()
 
-    // ---- 结局 ----
+    // ---- Outcomes ----
 
     @Test fun replyWithoutToolsEndsTheTask() = runTest {
-        // 聊天、常识:没调过工具,不核对,原样交出
+        // Chat, general knowledge: no tool was ever called, so no verification; handed over as is
         val checker = FakeModel()
         val r = loop(FakeModel(text("你好!有什么可以帮你?")), checker).run("你好")
         com.wangzan101.mika.core.testing.assertAnswered("你好!有什么可以帮你?", r)
-        // 什么也没核对:不是核实过,也不是没能核实
+        // Nothing was checked: it counts as neither reviewed nor unverifiable
         assertFalse((r as TaskState.Succeeded).reviewed)
         assertTrue(checker.requests.isEmpty())
     }
 
-    // 用户同意了一次操作,模型却没做就回了话:提醒一次照做或说明为什么不做;第二次照常收下,不再提醒
+    // The user approved an action but the model replied without doing it: nudge once to do it or explain why not; accept the second reply as is, with no further nudge
     @Test fun approvalThenTextIsNudgedOnce() = runTest {
         val main = FakeModel(
             observe(), tools(call("request_confirmation", """{"action":"send","target":"张三","content":"转账 ¥25","amount":"¥25","app":"com.x"}""")),
@@ -88,7 +88,7 @@ class AgentLoopVerifyTest {
         assertEquals(4, main.requests.size)
     }
 
-    // 改了状态之后没有重新读过就回答:回答说的结果没人看过,另请核查模型;读过了就不用
+    // The answer came without re-reading after a state change: nobody has seen the result it describes, so ask the verifier model instead; not needed if it was re-read
     @Test fun changeWithoutReadGoesToTheVerifier() = runTest {
         val checker = FakeModel(text(PASS))
         val r = loop(FakeModel(tools(call("phone_tap", """{"x":1,"y":1}""")), text("点好了")), checker).run("点一下")
@@ -115,7 +115,7 @@ class AgentLoopVerifyTest {
         assertFalse(sink.events.any { it is RunEvent.AnswerCheck || it is RunEvent.Verifier })
     }
 
-    // 报了失败的动作什么也没改成:回答前不为它要求再读一遍
+    // An action that reported failure changed nothing: no re-read is required for it before the answer
     @Test fun failedActionNeedsNoReadBeforeTheAnswer() = runTest {
         val screen = FakeScreen().apply { result = ActionResult.Failed("ref_expired") }
         val main = FakeModel(tools(call("phone_tap", """{"x":1,"y":1}""")), text("没点上"))
@@ -155,7 +155,7 @@ class AgentLoopVerifyTest {
         val r = l.run("找搜索")
         val running = seen as TaskState.Running
         assertEquals("先看看首页", running.narration)
-        // 进度说明不是回答:任务接着做,回答是后面那条不带调用的回复
+        // A progress note is not an answer: the task goes on, and the answer is the later reply without tool calls
         assertEquals(GROUNDED, (r as TaskState.Succeeded).answer)
     }
 
@@ -166,7 +166,7 @@ class AgentLoopVerifyTest {
         assertTrue("$r", r is TaskState.Succeeded && r.verified)
     }
 
-    // ---- 核对的触发 ----
+    // ---- What triggers verification ----
 
     @Test fun groundedAnswerIsNotSentToTheVerifier() = runTest {
         val checker = FakeModel()
@@ -181,7 +181,7 @@ class AgentLoopVerifyTest {
     @Test fun answerWithoutCheckableFactsIsNotChecked() = runTest {
         val checker = FakeModel()
         val r = loop(FakeModel(observe(), text("看过了,就是这一页")), checker).run("看看")
-        // 没什么可核对的:不算核实过,也不算没能核实(界面不打标)
+        // Nothing checkable: counted as neither reviewed nor unverifiable (the UI shows no badge)
         assertTrue("$r", r is TaskState.Succeeded && !r.reviewed && !r.verified && !r.doubtful)
         assertTrue(checker.requests.isEmpty())
     }
@@ -191,11 +191,11 @@ class AgentLoopVerifyTest {
         val checker = FakeModel(text(FAIL), text(FAIL))
         val sink = ListSink()
         val r = loop(main, checker, sink = sink).run("看价格")
-        // 退回一次,提醒里点名没对上的那一处
+        // Sent back once, and the nudge names the part that did not match
         val nudge = main.lastNotice(2)
         assertEquals(ContextKind.Notice, ContextBuilder.kindOf(main.requests[2].last()))
         assertTrue(nudge, "- 89" in nudge)
-        // 再没对上:不再退回,照样交出,标成未确认
+        // Still mismatched: no second send-back, handed over as is and marked unconfirmed
         assertEquals(3, main.requests.size)
         r as TaskState.Succeeded
         assertEquals(UNGROUNDED, r.answer)
@@ -204,7 +204,7 @@ class AgentLoopVerifyTest {
         assertTrue(r.note!!.startsWith(AgentLoop.UNCONFIRMED_NOTE))
         assertEquals(2, checker.requests.size)
         assertEquals(listOf("89", "屏上没有价格"), sink.events.filterIsInstance<RunEvent.Unconfirmed>().single().items)
-        // 核查记下核的是哪一步的回答
+        // The verification event records which step's answer was checked
         assertEquals(listOf(2, 3), sink.events.filterIsInstance<RunEvent.Verifier>().map { it.step })
     }
 
@@ -228,11 +228,11 @@ class AgentLoopVerifyTest {
         l.resumeAfterTakeover(AgentLoop.USER_FINISHED_NOTE)
         assertEquals(TaskState.Succeeded(GROUNDED, verified = false, note = "结果页看不到", sources = (run.await() as TaskState.Succeeded).sources), run.await())
         assertEquals(1, checker.requests.size)
-        // 核查请求里写明这是做过不可逆事的任务
+        // The verification request states that this task performed an irreversible action
         assertTrue(checker.requests.single().toString(), "irreversible" in checker.requests.single().toString())
     }
 
-    // ---- 来源 ----
+    // ---- Sources ----
 
     @Test fun sourcesComeFromTheLedger() = runTest {
         val sink = ListSink()
@@ -247,10 +247,10 @@ class AgentLoopVerifyTest {
         assertTrue(r.sources.isEmpty())
     }
 
-    // ---- 核查器本身 ----
+    // ---- The verifier itself ----
 
     @Test fun verifierRequestCarriesNoWorkerHistory() = runTest {
-        // 干活模型说的话、工具结果里的提示都不能进核查请求
+        // Nothing the worker model said, and no hint from a tool result, may enter the verification request
         val screen = FakeScreen().apply { result = ActionResult.Ok(hint = "TOOL_MARKER") }
         val main = FakeModel(
             ModelReply(listOf(Part.Thinking("THINK_MARKER"), Part.Text("WORKER_MARKER"), call("phone_tap", """{"x":1,"y":1}""")), StopReason.ToolUse, null),
@@ -271,7 +271,7 @@ class AgentLoopVerifyTest {
         }
         val l = AgentLoop(FakeModel(observe(), text(UNGROUNDED)), toolDispatcher(FakeScreen()), "BASE", verifier = Verifier(stuck, null))
         val run = async { l.run("t") }
-        runCurrent() // 停在核查调用里(不推进虚拟时间,免得走到超时)
+        runCurrent() // Stops inside the verification call (without advancing virtual time, to avoid hitting the timeout)
         assertEquals(AgentLoop.VERIFYING_NOTE, (l.state.value as TaskState.Running).note)
         l.cancel()
         assertEquals(TaskState.Cancelled, run.await())

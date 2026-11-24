@@ -18,7 +18,7 @@ class EachLoopDetectorTest {
 
     @Test fun tapWaitBackThreeTimesFiresOnceAtTheNinth() {
         val d = EachLoopDetector()
-        // 开详情→等加载→返回 的逐条干活:wait 不断 streak(对齐 do_each.md 的含等待示例)
+        // Working item by item with open details → wait for loading → go back: wait does not break the streak (matching the example with a wait in do_each.md)
         val rounds = List(4) { listOf(Verb.Tap, Verb.Wait, Verb.Back) }.flatten()
         val fired = d.feedAll(rounds)
         assertEquals(listOf(8), fired.indices.filter { fired[it] })
@@ -37,7 +37,7 @@ class EachLoopDetectorTest {
 
     @Test fun twoScreenCompareNeverFires() {
         val d = EachLoopDetector()
-        // motif 里必须恰一个 Back 且至少一个 Tap:[Observe, Back] 不含 Tap,不触发
+        // The motif must contain exactly one Back and at least one Tap: [Observe, Back] has no Tap, so it does not trigger
         assertFalse(d.feedAll(List(4) { listOf(Verb.Observe, Verb.Back) }.flatten()).any { it })
     }
 
@@ -45,7 +45,7 @@ class EachLoopDetectorTest {
         val d = EachLoopDetector()
         assertFalse(d.feedAll(List(2) { listOf(Verb.Tap, Verb.Back) }.flatten()).any { it })
         assertFalse(d.feed(Verb.Tap, false))
-        // 失败后重新攒满 3 次才触发(证明失败前的半截没算进去)
+        // After a failure the streak must build up 3 times again before firing (proving the partial run before the failure was not counted)
         val fired = d.feedAll(List(3) { listOf(Verb.Tap, Verb.Back) }.flatten())
         assertEquals(listOf(5), fired.indices.filter { fired[it] })
     }

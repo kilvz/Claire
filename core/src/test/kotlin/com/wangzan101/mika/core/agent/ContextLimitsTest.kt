@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 触发点刚好不低于 [trigger] 的最小窗口(触发点随窗口单调不减)。 */
+/** The smallest window whose trigger point is not below [trigger] (the trigger point is monotonic non-decreasing in the window). */
 internal fun windowFor(trigger: Int): Int {
     var lo = 1
     var hi = 100_000_000
@@ -16,18 +16,18 @@ internal fun windowFor(trigger: Int): Int {
     return lo
 }
 
-/** 还没校准时整份请求的估算(消息 + 固定开销,乘 [ContextCompressor.UNCALIBRATED_SCALE])。 */
+/** The estimate for the whole request before calibration (messages + fixed overhead, multiplied by [ContextCompressor.UNCALIBRATED_SCALE]). */
 internal fun uncalibrated(ms: List<Message>, overhead: Int = 0) = UsageMeter.of(ms, overhead, ContextCompressor.UNCALIBRATED_SCALE)
 
 class ContextLimitsTest {
     @Test fun smallLocalWindow32k() {
         val l = ContextLimits.of(32_000)
-        // 输出预留 8K(窗口的四分之一),余量 6K(可用的四分之一)
+        // Output reservation 8K (a quarter of the window), margin 6K (a quarter of the usable part)
         assertEquals(24_000, l.usable)
         assertEquals(6_000, l.margin)
         assertEquals(18_000, l.trigger)
         assertEquals(12_000, l.target)
-        // 固定开销 11K 算在整份请求里,不再从触发点里扣第二次:消息还有 7K 可用,不会一开局就压
+        // The 11K fixed overhead is counted within the whole request and not deducted from the trigger point a second time: 7K remains for messages, so no compaction happens at the start
         assertTrue(l.trigger - 11_000 >= 7_000)
     }
 
@@ -51,7 +51,7 @@ class ContextLimitsTest {
             assertTrue("$w", l.trigger >= w * ContextLimits.MIN_TRIGGER_SHARE && l.trigger <= l.usable)
             assertTrue("$w", l.target < l.trigger)
         }
-        // 按模型给的触发点:限在下限和可用窗口之间;目标跟着降
+        // Using the trigger point given by the model: clamped between the floor and the usable window; the target drops accordingly
         assertEquals(16_000, ContextLimits.of(32_000, triggerOverride = 1_000).trigger)
         assertEquals(24_000, ContextLimits.of(32_000, triggerOverride = 99_999).trigger)
         val low = ContextLimits.of(1_000_000, triggerOverride = 600_000)

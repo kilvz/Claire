@@ -40,7 +40,7 @@ class ContextBuilderTest {
         assertEquals(ContextKind.Notice, ContextBuilder.kindOf(m))
         assertEquals("步数自查", ContextBuilder.sourceOf(m))
         assertEquals("正文里有 <\\/context> 也不会提前合上", ContextBuilder.bodyOf(m))
-        // 用户原话、工具结果不是上下文
+        // The user's own words and tool results are not context
         assertNull(ContextBuilder.kindOf(Message(Role.User, listOf(Part.Text("帮我查天气")), Author.Mika)))
         assertNull(ContextBuilder.kindOf(Message(Role.Tool, listOf(Part.ToolResult("c", ContextBuilder.envelope(ContextKind.Notice, "x", "y"), false)), Author.Mika)))
         assertNull(ContextBuilder.kindOf(Message(Role.User, listOf(Part.Text("<context kind=\"unknown\" source=\"x\">\n\n</context>")), Author.Mika)))
@@ -63,12 +63,12 @@ class ContextBuilderTest {
         assertEquals("站s · s.example.com", ContextBuilder.sourceOf(s.messages[5]))
         assertEquals("索引", ContextBuilder.bodyOf(s.messages[6]))
         assertEquals(listOf("a", "s"), s.knowledge.map { it.name })
-        // 参考资料标明可能过时;记忆标明是用户以前说的
+        // Reference material is marked as possibly outdated; memory is marked as something the user said earlier
         assertTrue(Trust.Reference.label in text(s.messages[4]) && Trust.UserMemory.label in text(s.messages[1]))
     }
 
     @Test fun knowledgeItemCappedWithHint() {
-        // 上限按 token:汉字约 0.75 个 token,两倍上限的字数一定超
+        // The limit is in tokens: a Chinese character is about 0.75 token, so twice the limit in characters always exceeds it
         val long = "字".repeat(KNOWLEDGE_BODY_LIMIT * 2)
         val s = ContextBuilder().start("t", knowledge = listOf(app("a", body = long)))
         val body = ContextBuilder.bodyOf(s.messages[1])!!
@@ -78,7 +78,7 @@ class ContextBuilderTest {
     }
 
     @Test fun layerBudgetClipsThenDrops() {
-        // L2 上限 5000 token:第一份 3000 全给(4000 个汉字),第二份截到剩下的 2000,第三份没额度了不给
+        // The L2 limit is 5000 tokens: the first item gets all 3000 (4000 Chinese characters), the second is clipped to the remaining 2000, and there is no quota left for the third
         val b = ContextBuilder(ContextBudget(layers = mapOf(ContextLayer.Knowledge to 5_000), knowledgeItem = 10_000))
         val s = b.start("t", knowledge = (1..3).map { app("k$it", body = "字".repeat(4_000)) })
         val bodies = s.messages.mapNotNull { m -> ContextBuilder.bodyOf(m)?.takeIf { ContextBuilder.kindOf(m) == ContextKind.AppKnowledge } }
@@ -87,12 +87,12 @@ class ContextBuilderTest {
         assertTrue("${TokenEstimate.of(bodies[1])}", TokenEstimate.of(bodies[1]) in 1_995..2_000)
         assertTrue(bodies[1].endsWith(KNOWLEDGE_TRUNCATED_HINT))
         assertEquals(listOf("k1", "k2"), s.knowledge.map { it.name })
-        // 中途再来一份:L2 已满,不给
+        // Another item arrives later: L2 is full, so it is not given
         assertNull(b.knowledge(app("k4"), "", withLinks = false))
     }
 
     @Test fun totalBudgetTrimsLowPriorityLayersFirst() {
-        // 总额 4000 token:L5 先拿走 2250(3000 个汉字,不截),L2 截到剩下的 1750;技能索引是找技能的唯一入口,额度用完也整份给
+        // Total 4000 tokens: L5 takes 2250 first (3000 Chinese characters, not clipped) and L2 is clipped to the remaining 1750; the skills index is the only way to find skills, so it is given in full even when the quota is exhausted
         val b = ContextBuilder(ContextBudget(total = 4_000))
         val s = b.start("t", memory = "忆".repeat(3_000), knowledge = listOf(app("a", body = "知".repeat(3_000))),
             skillsIndex = "索".repeat(800))
@@ -101,7 +101,7 @@ class ContextBuilderTest {
         val clipped = TokenEstimate.of(ContextBuilder.bodyOf(s.messages[2])!!)
         assertTrue("$clipped", clipped in 1_745..1_750)
         assertEquals(800, ContextBuilder.bodyOf(s.messages[3])!!.length)
-        // L5 即使超出总额也不丢
+        // L5 is kept even if it exceeds the total
         val big = ContextBuilder(ContextBudget(total = 100)).start("t", priorTurns = "前".repeat(500), memory = "忆".repeat(500))
         assertEquals(listOf(ContextKind.PriorTurns, ContextKind.Memory, null), big.messages.map { ContextBuilder.kindOf(it) })
     }
@@ -127,7 +127,7 @@ class ContextBuilderTest {
 
     @Test fun runtimeStateFormats() {
         val b = ContextBuilder(zone = utc)
-        val t0 = 1_793_000_000_000L // 2026-10-26 07:33 UTC,周一
+        val t0 = 1_793_000_000_000L // 2026-10-26 07:33 UTC, Monday
         fun body(place: Place?, label: String? = null, mode: String? = null, step: Int = 3) =
             ContextBuilder.bodyOf(Message(Role.User, listOf(b.runtimeState(place, label, mode, step, 60, t0)), Author.Mika))
         assertEquals("Current place: no screen or page read yet\nStep: 3 of at most 60\nLocal time: 2026-10-26 07:33 Monday", body(null))
@@ -139,7 +139,7 @@ class ContextBuilderTest {
         assertEquals(ContextKind.RuntimeState, ContextBuilder.kindOf(b.runtimeState(null, null, null, 1, 60, t0).text))
     }
 
-    // 用户最近一句话的开头摆在生成处:模型照这句话的语言写给用户,读到的内容是别的语言也不跟着换
+    // The start of the user's latest message is placed at the point of generation: the model writes to the user in that message's language and does not switch to the language of the content it read
     @Test fun runtimeStateQuotesUserWordsForReplyLanguage() {
         val b = ContextBuilder(zone = utc)
         fun last(words: String?) = ContextBuilder.bodyOf(Message(Role.User, listOf(b.runtimeState(null, null, null, 1, 60, 0, words)), Author.Mika))!!.lines().last()
@@ -151,7 +151,7 @@ class ContextBuilderTest {
         assertEquals("Local time: 1970-01-01 00:00 Thursday", last("   "))
     }
 
-    // 从通知里得来的那一段:自己的种类和可信度说明,和「用户告诉你的」分开;排在记忆之后、用户的话之前;没有就不带
+    // The piece derived from notifications: it has its own kind and trust description, separate from "what the user told you"; it comes after memory and before the user's words; omitted when absent
     @Test fun observedPieceIsSeparateFromMemoryAndComesBeforeTheTask() {
         val s = ContextBuilder().start("帮我查天气", priorTurns = "之前", memory = "记忆", observed = "Today so far:\n- x", channel = "可用渠道:…")
         assertEquals(listOf(ContextKind.PriorTurns, ContextKind.Memory, ContextKind.Observed, null, ContextKind.Channel), s.messages.map { ContextBuilder.kindOf(it) })
@@ -164,7 +164,7 @@ class ContextBuilderTest {
         assertEquals(listOf(ContextKind.Memory, null), none.messages.map { ContextBuilder.kindOf(it) })
     }
 
-    // 记忆和之前几轮把任务层的额度占满时,这一段也整段进,不从中间截:里面是一对对不可信标记,截了就丢了结束标记
+    // Even when memory and earlier turns have used up the task layer's quota, this piece still goes in whole and is never cut in the middle: it contains pairs of untrusted markers, and cutting it would lose the closing marker
     @Test fun observedPieceIsNeverCutInTheMiddle() {
         val observed = "Today so far:\n<untrusted>\n" + (1..40).joinToString("\n") { "- 第 $it 件事,说得比较长一些" } + "\n</untrusted>"
         val s = ContextBuilder().start(
@@ -178,13 +178,13 @@ class ContextBuilderTest {
 }
 
 /**
- * 运行时状态:每步一段,接在这一步最后一条消息的末尾,只追加;发过的消息一概不改,
- * 所以第 N 步的请求是第 N+1 步请求的前缀(裁剪、折叠的档位移动处除外)。
+ * Runtime state: one piece per step, appended at the end of that step's last message, append-only; messages already
+ * sent are never changed, so the request at step N is a prefix of the request at step N+1 (except where clipping or folding moves the bands).
  */
 class RuntimeStateHistoryTest {
     private fun tools(vararg c: Part.ToolCall) = ModelReply(c.toList(), StopReason.ToolUse, null)
     private val finish = com.wangzan101.mika.core.testing.answerReply("ok")
-    /** 一次请求按消息逐条序列化;前缀关系按字符串判断。 */
+    /** Serializes one request message by message; the prefix relation is judged on strings. */
     private fun wire(req: List<Message>) = req.joinToString("\n") { it.toString() }
 
     private fun run(flags: SpeedFlags, vararg script: ModelReply, web: com.wangzan101.mika.core.cap.web.FakeWebPort? = null): FakeModel {
@@ -201,7 +201,7 @@ class RuntimeStateHistoryTest {
             assertTrue("request ${i + 1} is not a prefix of request ${i + 2}", wire(b).startsWith(wire(a)))
         }
         m.requests.forEachIndexed { i, req ->
-            // 每步一段,都还在;最新一段在最后一条消息的末尾
+            // One piece per step, all still present; the latest piece is at the end of the last message
             assertEquals(i + 1, req.runtimeStates().size)
             assertTrue(req.runtimeStates().last().contains("Step: ${i + 1} of at most 20"))
             val tail = req.last().parts.last() as Part.Text
@@ -213,13 +213,13 @@ class RuntimeStateHistoryTest {
 
     @Test fun requestsAreAppendOnlyInPlainMode() = assertAppendOnly(run(SpeedFlags.OFF, *waits))
 
-    // 读屏在阶梯档位内(不超过 5 次)也不动前缀
+    // Screen reads within the band (at most 5) do not disturb the prefix either
     @Test fun observationsWithinBandAreAppendOnly() =
         assertAppendOnly(run(SpeedFlags.OFF, *(1..5).map { tools(Part.ToolCall("o$it", "phone_observe", """{"n":$it}""")) }.toTypedArray()))
 
     @Test fun stateRidesOnTheStepsOwnMessage() {
         val m = run(SpeedFlags.OFF, tools(Part.ToolCall("o1", "phone_observe", "{}")))
-        // 第 1 步接在任务原话上(没有别的上下文);第 2 步接在 observe 的工具结果上,而不是另起一条
+        // Step 1 rides on the task's own words (there is no other context); step 2 rides on the observe tool result instead of starting a new message
         val first = m.requests[0]
         assertEquals(1, first.size)
         assertEquals("t", (first[0].parts[0] as Part.Text).text)
@@ -235,7 +235,7 @@ class RuntimeStateHistoryTest {
         val go = tools(Part.ToolCall("n1", "web_navigate", """{"url":"https://shop.example.com/a"}"""))
         val desktop = run(SpeedFlags.OFF, go, web = web)
         assertTrue(desktop.requests[1].runtimeStates().last(), desktop.requests[1].runtimeStates().last().startsWith("Current place: website shop.example.com (desktop version)"))
-        // 版本以浏览器此刻实际用的为准,不看本任务调没调过 web_site_mode
+        // The version reflects what the browser is actually using now, not whether this task called web_site_mode
         web.mode = "mobile"
         val mobile = run(SpeedFlags.OFF, go, web = web)
         assertTrue(mobile.requests[1].runtimeStates().last().startsWith("Current place: website shop.example.com (mobile version)"))
@@ -254,7 +254,7 @@ class RuntimeStateHistoryTest {
         val c = ContextCompressor(TOOLS).compress(h, contextTokens = 1000)
         assertTrue(c.foldedSteps > 0)
         assertTrue(knowledge in c.messages)
-        // 留下的状态都是没折叠的那些步自己的
+        // The states that remain all belong to the steps that were not folded
         assertEquals(30 - c.foldedSteps, c.messages.runtimeStates().size)
     }
 
@@ -269,14 +269,14 @@ class RuntimeStateHistoryTest {
         }
         AgentLoop(model, toolDispatcher(FakeScreen()), "BASE", maxSteps = 10, clock = { 0L }, zone = ZoneId.of("UTC")).run("t")
         assertEquals(3, systems.size)
-        // 第一次读屏展开了手机一组:系统提示词只在那之后变一次,之后逐字相同
+        // The first screen read expands the phone group: the system prompt changes only once after that, and is identical word for word from then on
         assertEquals(2, systems.distinct().size)
         assertEquals(systems[1], systems[2])
         assertEquals("Current place: no screen or page read yet", m.requests[0].runtimeStates().single().lines()[0])
     }
 }
 
-/** 开局已列出全部技能:前台到了关联技能的 App 也不再补技能索引,开局那份不改。 */
+/** All skills are already listed at the start: when the foreground reaches an app with related skills, no skills index is added and the initial one is unchanged. */
 class ForegroundAddsNoSkillsIndexTest {
     @Test fun foregroundAppAddsNoSkillLines() = runBlocking {
         val catalog = com.wangzan101.mika.core.learn.knowledge.GuideCatalog.loadBundled()
@@ -292,7 +292,7 @@ class ForegroundAddsNoSkillsIndexTest {
         val last = m.requests.last().filter { ContextBuilder.kindOf(it) == ContextKind.SkillsIndex }
         assertEquals(1, first.size)
         assertEquals(first, last)
-        // 微信的知识正文照样在进入时补上
+        // WeChat's knowledge body is still added on entry
         assertTrue(m.requests.last().any { ContextBuilder.kindOf(it) == ContextKind.AppKnowledge })
         assertTrue(ContextBuilder.bodyOf(first.single())!!.contains("- skill:messaging("))
     }

@@ -33,12 +33,12 @@ import org.junit.Test
 import com.wangzan101.mika.core.testing.BATCHABLE
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
-/** 元素:名字 → 归一化 bounds;每次读屏换下一屏(读完最后一屏就停在它);动作结果按顺序取。 */
+/** Elements: name → normalized bounds; each screen read advances to the next screen (after the last one it stays there); action results are consumed in order. */
 private class BatchScreen(vararg val screens: List<Pair<String, List<Int>>>) : ScreenPort by FakeScreen() {
     val calls = mutableListOf<String>()
     var reads = 0
     val results = ArrayDeque<ActionResult>()
-    /** 设了就一直显示这一屏(模拟等关卡期间屏幕换了)。 */
+    /** When set, this screen is shown from then on (simulating a screen change while waiting at the gate). */
     var replaced: List<Pair<String, List<Int>>>? = null
     var settles = 0
     override suspend fun waitStable(timeoutMs: Long): Boolean { settles++; return true }
@@ -50,7 +50,7 @@ private class BatchScreen(vararg val screens: List<Pair<String, List<Int>>>) : S
     private fun next(): ActionResult = results.removeFirstOrNull() ?: ActionResult.Ok(changed = true)
     override suspend fun tapRef(ref: String, snapshotId: String): ActionResult { calls += "tapRef $ref $snapshotId"; return next() }
     override suspend fun tapXY(x: Int, y: Int): ActionResult { calls += "tapXY $x $y"; return next() }
-    // 端口写完读回过、一致(真实端口都会读回)
+    // The port reads back after typing and the values match (real ports always read back)
     override suspend fun typeText(ref: String?, snapshotId: String?, text: String): ActionResult {
         calls += "type $text"; return results.removeFirstOrNull() ?: ActionResult.Ok(verification = Verification.MATCH)
     }
@@ -84,7 +84,7 @@ class BatchRunnerTest {
         assertEquals(RunEvent.Batch(events.filterIsInstance<RunEvent.Batch>().single().atMs, 3, 3, false, null), events.filterIsInstance<RunEvent.Batch>().single())
     }
 
-    // 第一步做完时用户插了话:后面的子步不做,各给一条「为新消息跳过」的结果,整批交回循环去送插话
+    // The user interjects after the first step completes: the remaining sub-steps are not run and each gets a "skipped for a new message" result; the whole batch goes back to the loop to deliver the interjection
     @Test fun newUserMessageStopsBatchAtTheNextBoundary() = runTest {
         val s = BatchScreen(home)
         val d = toolDispatcher(s)
@@ -105,7 +105,7 @@ class BatchRunnerTest {
         assertTrue(events.filterIsInstance<RunEvent.Batch>().single().stopped)
     }
 
-    // 子步里的等待被插话截断:这一步算没做,和后面的一起跳过,不等满也不接着做
+    // A wait sub-step is cut short by the interjection: this step counts as not done and is skipped together with the rest; the wait does not run to completion and nothing else runs
     @Test fun steerCuttingAWaitStepSkipsItAndTheRest() = runTest {
         val s = BatchScreen(home)
         val inbox = com.wangzan101.mika.core.run.RunInbox()
@@ -139,12 +139,12 @@ class BatchRunnerTest {
         val last = r["steps"]!!.jsonArray.last().jsonObject
         assertEquals("搜索结果", last.s("expect"))
         assertEquals(listOf("back"), s.calls)
-        // 屏上有的文字就算对上
+        // Text that is present on the screen counts as matched
         val ok = runner(toolDispatcher(BatchScreen(home))).run(steps(st("phone_back", expect = "搜索"), st("phone_back")), "c2").content
         assertEquals("true", ok.s("ok"))
     }
 
-    // 网站说到上限了:这一步之后的不再做,结果里带着那句话
+    // The site reports its limit: nothing after this step is run, and the result carries that message
     @Test fun stopsWhenALimitIsReported() = runTest {
         val s = BatchScreen(home)
         val port = object : ScreenPort by s {
@@ -171,7 +171,7 @@ class BatchRunnerTest {
         assertEquals(2, r["completed"]!!.jsonPrimitive.int)
         assertEquals("false", r["steps"]!!.jsonArray.last().jsonObject.s("executed"))
         assertEquals(listOf("tapRef @e1 p1", "type 你好"), s.calls)
-        assertEquals(3, gates) // 先过关卡再按此刻的屏幕判,第 3 步判出不可逆就不执行
+        assertEquals(3, gates) // Gate first, then judge against the current screen; step 3 is judged irreversible and is not executed
         assertNotNull(events.filterIsInstance<RunEvent.Confirmation>().singleOrNull())
     }
 
@@ -190,7 +190,7 @@ class BatchRunnerTest {
     }
 
     @Test fun laterRefTranslatedThroughStabilizer() = runTest {
-        // 第一步之后屏幕变了:端口给「确定」换了编号,模型编号仍是第一屏的
+        // The screen changes after the first step: the port gives the "Confirm" button a new ref, while the model's ref still comes from the first screen
         val after = listOf("提示" to listOf(0, 300, 999, 400), "搜索框" to listOf(0, 0, 999, 80), "确定" to listOf(400, 500, 600, 560))
         val before = listOf("搜索框" to listOf(0, 0, 999, 80), "确定" to listOf(400, 500, 600, 560))
         val s = BatchScreen(before, after)
@@ -238,13 +238,13 @@ class BatchRunnerTest {
         assertTrue("steps" in BatchRunner.parse("""{"steps":[]}""", avail, BATCHABLE).second!!)
         assertEquals(1, BatchRunner.parse("""{"steps":[{"tool":"phone_back","args":{}}]}""", avail, BATCHABLE).first!!.size)
         assertTrue("expect" in BatchRunner.parse("""{"steps":[{"tool":"phone_back","args":{},"expect":"${"x".repeat(201)}"},{"tool":"phone_back","args":{}}]}""", avail, BATCHABLE).second!!)
-        // 此刻没提供的工具(开关关着的 phone_open_link)也不行
+        // A tool that is not offered right now (phone_open_link with its switch off) is rejected too
         assertTrue("phone_open_link" in BatchRunner.parse("""{"steps":[{"tool":"phone_back","args":{}},{"tool":"phone_open_link","args":{}}]}""", setOf("phone_back"), BATCHABLE).second!!)
         assertEquals(2, BatchRunner.parse("""{"steps":[{"tool":"phone_back","args":{}},{"tool":"phone_back"}]}""", avail, BATCHABLE).first!!.size)
     }
 
     @Test fun gateBeforeIrreversibleCheck() = runTest {
-        // 等锁屏/被拿走的关卡期间屏幕换了:同一位置现在是「提交订单」,按过关卡之后的屏幕判,不点
+        // The screen changes while waiting at a gate for a locked screen or a taken-away phone: the same position now shows the "Submit order" button; judgement uses the screen as of after the gate, so nothing is tapped
         val s = BatchScreen(listOf("确定" to listOf(400, 450, 600, 550), "返回" to listOf(0, 900, 100, 999)))
         onGate = { if (gates == 2) s.replaced = listOf("提交订单" to listOf(400, 450, 600, 550)) }
         val r = runner(toolDispatcher(s)).run(steps(st("phone_back"), st("phone_tap", """{"x":500,"y":500}""")), "c1").content
@@ -255,7 +255,7 @@ class BatchRunnerTest {
     @Test fun waitsForStableScreenBetweenSteps() = runTest {
         val s = BatchScreen(home)
         runner(toolDispatcher(s)).run(steps(st("phone_back"), st("phone_back", expect = "搜索"), st("phone_back")), "c1")
-        // 步与步之间等两次;端口在动作里已等过界面(报了变没变),判效果时不再另等
+        // Two waits between steps; the port already waited for the UI inside the action (reporting whether it changed), so judging the effect does not wait again
         assertEquals(2, s.settles)
     }
 

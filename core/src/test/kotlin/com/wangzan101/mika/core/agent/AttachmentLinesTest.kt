@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.agent
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 附件行的写法:话在前、每个附件一行在后,拆回来;旧对话里的写法,只是看着像附件行的话。 */
+/** The attachment-line format: the words first and one line per attachment after them, and parsing it back; the format stored in old conversations; and lines that only look like attachment lines. */
 class AttachmentLinesTest {
     @Test fun composeWritesWhatParseReads() {
         val files = listOf("/workspace/inbox/a.png" to "3 KB", "/workspace/inbox/b.docx" to "1.0 MB")
@@ -13,7 +13,7 @@ class AttachmentLinesTest {
         assertEquals("附件:/workspace/inbox/a.png(3 KB)", AttachmentLines.compose("", listOf("/workspace/inbox/a.png" to "3 KB")))
     }
 
-    // 旧对话里存下的写法:名字里带括号、只有附件没有话、大小是字节
+    // Format saved in older conversations: parentheses inside the name, attachments with no words, and a size in bytes
     @Test fun oldMessagesParseTheSameWay() {
         assertEquals(
             AttachmentLines.Parsed(listOf("/workspace/inbox/报表 (1).csv" to "2 KB", "/workspace/inbox/x" to "512 B"), ""),

@@ -14,11 +14,11 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 /**
- * 成本剖析:跑真实 AgentLoop 拿每轮的确切 token 结构,再套一个缓存模型估「钱」花在哪。
- * 口径:overhead = 系统提示词 + 工具定义(每轮重发、可缓存);history = 消息文本(可缓存);
- * image = 每次看屏一张 ~1280px JPEG(983 token)。假模型无视觉,截图按 983/次估算,落在观察结果进入的下一轮。
- * 缓存模型(Anthropic 式):命中前缀 ×0.1、新写入 ×1.25。
- * 跑法:./gradlew :core:test --tests '*CostBreakdownTest' --info
+ * Cost breakdown: runs the real AgentLoop to get the exact token structure of each round, then applies a cache model to estimate where the "money" goes.
+ * Conventions: overhead = system prompt + tool definitions (resent every round, cacheable); history = message text (cacheable);
+ * image = one ~1280px JPEG per screen look (983 tokens). The fake model has no vision, so screenshots are estimated at 983 each and land in the round after the observation result enters.
+ * Cache model (Anthropic style): prefix hit ×0.1, new write ×1.25.
+ * How to run: ./gradlew :core:test --tests '*CostBreakdownTest' --info
  */
 class CostBreakdownTest {
 
@@ -27,7 +27,7 @@ class CostBreakdownTest {
 
     private fun historyTokens(req: FakeRequest): Int = TokenEstimate.of(req.messages)
 
-    /** 一个「看屏 → 点 → 看屏 …」的手机任务:cycles 次点击,cycles+1 次看屏,2+2*cycles 轮。 */
+    /** A phone task of "look at the screen → tap → look at the screen …": cycles taps, cycles+1 screen looks, 2+2*cycles rounds. */
     private suspend fun phoneScenario(name: String, cycles: Int): List<FakeRequest> {
         val screens = (0..cycles).map { i ->
             Screen("com.android.settings", listOf(
@@ -81,7 +81,7 @@ class CostBreakdownTest {
             requests.forEachIndexed { i, req ->
                 val overhead = overheadTokens(req.system, req.tools)
                 val hist = historyTokens(req)
-                val newImg = if (i % 2 == 1) imgPerObserve else 0 // 观察结果截图在下一轮进历史
+                val newImg = if (i % 2 == 1) imgPerObserve else 0 // The observation-result screenshot enters the history in the next round
                 totalOverhead += overhead
                 totalHistory += hist
                 val overheadChanged = overhead != prevOverhead

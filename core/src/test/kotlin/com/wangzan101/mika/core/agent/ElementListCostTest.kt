@@ -13,9 +13,9 @@ import kotlinx.serialization.json.put
 import org.junit.Test
 
 /**
- * 元素列表（页面结构）的成本剖析：用一张接近真实的屏（几十个元素）测
- * 当前序列化（bounds→size，无损）相对旧 bounds 格式的 token 差异。
- * 只做测量，不改生产代码。跑法：./gradlew :core:test --tests '*ElementListCostTest' --info
+ * Cost breakdown of the element list (page structure): using a near-real screen (a few dozen elements), measure
+ * the token difference between the current serialization (bounds→size, lossless) and the old bounds format.
+ * Measurement only; no production code is changed. How to run: ./gradlew :core:test --tests '*ElementListCostTest' --info
  */
 class ElementListCostTest {
 
@@ -28,7 +28,7 @@ class ElementListCostTest {
             val bottom = (y + 40).coerceAtMost(2400)
             els += UiElement("@e$n", role, name, 540, y * 24 / 10, listOf(0, top, 999, bottom), null, clickable, editable, scrollable)
         }
-        // 顶部栏 + 标题
+        // Top bar + title
         el("text", "返回", 60, clickable = true)
         el("text", "商品详情", 60)
         el("text", "收藏", 60, clickable = true)
@@ -36,42 +36,42 @@ class ElementListCostTest {
         el("text", "【旗舰店】新款无线降噪耳机 主动降噪 蓝牙5.3 长续航", 460)
         el("text", "¥ 899", 560)
         el("text", "已售 1.2万+", 620)
-        // 服务标签一排
+        // A row of service labels
         el("text", "假一赔十", 700)
         el("text", "极速发货", 700)
         el("text", "7天无理由", 700)
-        // 优惠券、服务
+        // Coupons, services
         el("text", "领券", 780, clickable = true)
         el("text", "满899减100", 780)
         el("text", "服务", 860, clickable = true)
         el("text", "支持分期 · 官方质保", 860)
-        // 选择规格
+        // Spec selection
         el("text", "颜色分类", 940, clickable = true)
         el("text", "曜石黑 · 象牙白 · 远峰蓝", 940)
         el("text", "数量", 1020, clickable = true)
         el("edit", "数量 1", 1020, editable = true)
-        // 评价
+        // Reviews
         el("text", "商品评价(2.3万+)", 1120, clickable = true)
         el("text", "音质很好，降噪效果明显，戴着舒服", 1200)
         el("text", "续航给力，通勤一周充一次", 1260)
-        // 图文详情
+        // Image and text details
         el("text", "图文详情", 1360, clickable = true)
         el("text", "店铺推荐", 1460, clickable = true)
         el("text", "同店好物", 1560, clickable = true)
-        // 猜你喜欢（可滚动列表）
+        // Recommendations (a scrollable list)
         el("text", "猜你喜欢", 1680)
         el("text", "相似商品1 无线耳机 ￥399", 1780)
         el("text", "相似商品2 头戴耳机 ￥599", 1880)
         el("text", "相似商品3 运动耳机 ￥299", 1980)
         el("text", "相似商品4 充电盒 ￥129", 2080)
         el("text", "相似商品5 收纳包 ￥59", 2180)
-        // 底部操作栏
+        // Bottom action bar
         el("text", "店铺", 2360, clickable = true)
         el("text", "客服", 2360, clickable = true)
         el("text", "购物车", 2360, clickable = true)
         el("button", "加入购物车", 2360, clickable = true)
         el("button", "立即购买", 2360, clickable = true)
-        // 弹窗：选择规格
+        // Dialog: spec selection
         el("text", "选择 颜色分类 / 数量", 1200)
         el("text", "曜石黑", 1300, clickable = true)
         el("text", "象牙白", 1300, clickable = true)
@@ -86,7 +86,7 @@ class ElementListCostTest {
         put("elements", elements)
     }
 
-    /** 把当前 size 格式还原成旧 bounds 格式（[l,t,r,b]），模拟改动前发送的内容。 */
+    /** Converts the current size format back to the old bounds format ([l,t,r,b]), simulating what was sent before the change. */
     private fun toOldBounds(e: JsonElement): JsonElement {
         val o = e.jsonObject
         val c = o["center"]?.jsonObject
@@ -144,7 +144,7 @@ class ElementListCostTest {
             if (cost > 0) sb.append("  %-12s %5d token  (%4.0f%%)\n".format(f, cost, cost * 100.0 / t(fullRaw)))
         }
 
-        // 换算到一次任务：8 次看屏、16 轮，每轮全量重发一次（差分链每 5 次断一次 ≈ 全量占一部分，这里按全量计是上界）
+        // Scaled to one task: 8 screen looks, 16 rounds, with the full list resent every round (the diff chain breaks every 5 reads, so the full list is only part of that; counting it as full here is an upper bound)
         val perScreenSave = t(oldBoundsRaw) - t(fullRaw)
         sb.append("\nD（bounds→size）每屏省 %d token；8 次看屏 ≈ 省 %d token（%d 计价单位，1.25× 首次写入）。\n".format(
             perScreenSave, perScreenSave * 8, (perScreenSave * 8 * 1.25).toInt()))

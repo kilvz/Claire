@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Q3+Q4 原型验证：就地循环与失败语义。
+ * Q3+Q4 prototype validation: in-place looping and failure semantics.
  */
 class EachRunnerTest {
 
@@ -19,7 +19,7 @@ class EachRunnerTest {
         put("name", JsonPrimitive(name))
     }
 
-    /** Q3：就地循环（做一条就地移除一条，列表上移）与「打开→返回」对执行器无差别，contentKey 照常去重。 */
+    /** Q3: an in-place loop (remove each item as it is done, so the list shifts up) makes no difference to the runner compared with "open → back", and contentKey dedups as usual. */
     @Test
     fun inPlaceRemovalDedupsWhenItemsShiftUp() = runBlocking {
         val list = mutableListOf("A", "B", "C")
@@ -28,17 +28,17 @@ class EachRunnerTest {
 
         val summary = runner.run(
             read = { list.mapIndexed { i, n -> el("@e$i", "ViewGroup", n) } },
-            scroll = { /* 就地循环没有滚动 */ },
+            scroll = { /* an in-place loop has no scrolling */ },
             doItem = { item -> processed += item.name; list.remove(item.name); true },
         )
 
-        assertEquals(listOf("A", "B", "C"), processed)  // 每条恰好一次，尽管列表逐条上移
+        assertEquals(listOf("A", "B", "C"), processed)  // Each item exactly once, even though the list shifts up item by item
         assertEquals(3, summary.done)
         assertEquals(0, summary.failed)
         assertNull(summary.stoppedAt)
     }
 
-    /** Q4 Stop（安全默认）：第一条失败就停，失败那条不记 done（留给上层决定重试），后面的不再做。 */
+    /** Q4 Stop (safe default): stop at the first failure; the failed item is not counted as done (left to the caller to decide on retry), and later items are not touched. */
     @Test
     fun stopHaltsAtFirstFailure() = runBlocking {
         val items = listOf("A", "B", "C", "D", "E")
@@ -46,15 +46,15 @@ class EachRunnerTest {
         val summary = runner.run(
             read = { items.mapIndexed { i, n -> el("@e$i", "ViewGroup", n) } },
             scroll = { },
-            doItem = { it.name != "B" },   // B 失败
+            doItem = { it.name != "B" },   // B fails
         )
-        assertEquals(1, summary.done)                    // 只有 A
+        assertEquals(1, summary.done)                    // Only A
         assertEquals(1, summary.failed)                  // B
-        assertEquals("ViewGroup|B", summary.stoppedAt)   // 停在 B
+        assertEquals("ViewGroup|B", summary.stoppedAt)   // Stopped at B
         assertEquals(listOf("ViewGroup|A", "ViewGroup|B"), summary.perItem.map { it.contentKey })
     }
 
-    /** Q4 Skip：失败也记 done、继续做后面的，投递类「一条失败不挡一屏」用这个。 */
+    /** Q4 Skip: a failure is still counted as done and later items continue; used for delivery-style work where "one failure must not block a screen". */
     @Test
     fun skipContinuesPastFailure() = runBlocking {
         val items = listOf("A", "B", "C", "D", "E")
@@ -64,9 +64,9 @@ class EachRunnerTest {
             scroll = { },
             doItem = { it.name != "B" },
         )
-        assertEquals(4, summary.done)                    // A,C,D,E
+        assertEquals(4, summary.done)                    // A, C, D, E
         assertEquals(1, summary.failed)                  // B
-        assertNull(summary.stoppedAt)                    // 跑完，没停
+        assertNull(summary.stoppedAt)                    // Ran to completion, never stopped
         assertEquals(5, summary.perItem.size)
         assertEquals(
             listOf(true, false, true, true, true),

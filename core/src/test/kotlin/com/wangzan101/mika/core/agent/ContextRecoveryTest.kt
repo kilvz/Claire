@@ -24,7 +24,7 @@ class ContextRecoveryTest {
         assertEquals(listOf(user, user, rule), ContextRecovery.ensure(listOf(user, user, rule), listOf(user)))
     }
 
-    // 运行时状态接在插话末尾;折叠把它去掉后插话仍算在,不再被接到最新的消息后面
+    // The runtime state is appended to the end of the interjection; after folding removes it, the interjection still counts and is no longer appended after the latest message
     @Test fun steerWithRuntimeStateStaysInPlaceAfterCompaction() {
         val steer = Message(Role.User, listOf(Part.Text("<user_interjection>\n顺便看下设置"), Part.Text(state)), Author.User)
         val full = listOf(task) + (1..3).flatMap(::round) + steer + (4..20).flatMap(::round)
@@ -35,7 +35,7 @@ class ContextRecoveryTest {
             assertEquals(compressed, sent)
             val at = sent.indexOfFirst { m -> m.author == Author.User && "顺便看下设置" in m.toString() }
             assertEquals(1, sent.count { m -> m.author == Author.User && "顺便看下设置" in m.toString() })
-            // 在保留下来的最近几步之前,最后一条仍是最新的工具结果
+            // It comes before the kept latest steps, and the last message is still the latest tool result
             assertTrue(at < sent.indexOfFirst { it.role == Role.Assistant })
             assertEquals(full.last(), sent.last())
         }
@@ -53,7 +53,7 @@ class ContextRecoveryTest {
     @Test fun neverInsertsBetweenACallAndItsResult() {
         val steer = Message(Role.User, listOf(Part.Text("<user_interjection>\n停一下")), Author.User)
         val r2 = round(2)
-        // 完整历史里插话夹在调用与结果之间(并行写入时可能这样记)
+        // In the full history the interjection sits between the call and its result (parallel writes can record it this way)
         val full = listOf(task) + r2[0] + steer + r2[1] + round(3)
         val sent = ContextRecovery.ensure(full, listOf(task) + r2 + round(3))
         assertEquals(listOf(task) + r2 + steer + round(3), sent)
