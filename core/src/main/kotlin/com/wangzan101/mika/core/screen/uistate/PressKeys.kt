@@ -1,8 +1,9 @@
 package com.wangzan101.mika.core.screen.uistate
 
 /**
- * press_key 只放行导航和编辑键。音量、电源/休眠/唤醒、Home、最近任务、搜索/助手、相机、媒体键
- * 都作用于整台手机而不是 Claire 的屏幕,一律拒绝。外壳进程注入按键时再查一遍同一张表。
+ * press_key only allows navigation and editing keys. Volume, power/sleep/wake, Home, recents, search/assistant,
+ * camera and media keys act on the whole phone rather than on Claire's screen, so they are always rejected.
+ * The shell process checks the same table again when it injects a key.
  */
 object PressKeys {
     val BY_NAME: Map<String, Int> = linkedMapOf(
@@ -16,7 +17,7 @@ object PressKeys {
 
     fun isAllowed(keyCode: Int): Boolean = keyCode in CODES
 
-    /** 名字或数字;不在白名单里返回 null。 */
+    /** A name or a number; returns null when it is not in the allowlist. */
     fun resolve(key: String): Int? {
         val k = key.trim()
         val code = k.toIntOrNull() ?: BY_NAME[k] ?: return null

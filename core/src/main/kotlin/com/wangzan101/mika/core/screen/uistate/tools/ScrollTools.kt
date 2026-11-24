@@ -24,7 +24,7 @@ import com.wangzan101.mika.core.screen.uistate.action
 import com.wangzan101.mika.core.screen.uistate.lastOrSnapshot
 import com.wangzan101.mika.core.screen.uistate.screen
 
-/** 滑动(横滑可能是「滑动删除」,要按目标判不可逆)。 */
+/** Scrolling (a horizontal swipe may be "swipe to delete", so irreversibility is judged by the target). */
 internal class Scroll(f: ScreenFamily) : ScreenTool(f, "scroll") {
     override val verb = Verb.Scroll
     override val batchable = true
@@ -50,18 +50,18 @@ internal class Scroll(f: ScreenFamily) : ScreenTool(f, "scroll") {
         val x = a.coord("x"); val y = a.coord("y")
         if ((x == null) != (y == null)) throw ArgError("x", "give both x and y or neither")
         val cx = x ?: 500; val cy = y ?: 500
-        // direction 是内容移动方向,手指反向滑动。
+        // direction is the direction the content moves, so the finger swipes the opposite way.
         val dist = min(650, amount * 100)
         val dx = when (dir) { "left" -> dist; "right" -> -dist; else -> 0 }
         val dy = when (dir) { "up" -> dist; "down" -> -dist; else -> 0 }
         fun bound(v: Double) = max(50, min(949, v.roundToInt()))
-        // 手机默认纵向滚动先让无障碍控件执行滚动;端口找不到可滚控件时自己退到手势。
+        // On the phone, vertical scrolling by default first lets an accessibility control perform the scroll; the port falls back to a gesture itself when it finds no scrollable control.
         val r = if (family.id == "phone" && dir in setOf("up", "down") && x == null && amount == 3)
             ctx.action(ctx.screen.scroll(null, null, dir == "down"))
         else swipeNormalized(ctx, bound(cx - dx / 2.0), bound(cy - dy / 2.0), bound(cx + dx / 2.0), bound(cy + dy / 2.0))
         if (r.content["ok"] != JsonPrimitive(true)) return r
         val finger = when (dir) { "up" -> "down"; "down" -> "up"; "left" -> "right"; else -> "left" }
-        // 没动(多半到头了)由分发器按实际效果判,结果里另标 atEnd
+        // No movement (most likely already at the end) is judged by the dispatcher from the actual effect; atEnd is also flagged in the result
         val content = r.content + mapOf("direction" to JsonPrimitive(dir), "fingerMoved" to JsonPrimitive(finger))
         return ToolExecution(JsonObject(content), changed = r.changed)
     }

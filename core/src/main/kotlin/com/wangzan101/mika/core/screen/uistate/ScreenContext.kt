@@ -20,38 +20,40 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /*
- * 工具上下文里的界面状态:开局由 [Interfaces.attach] 放进去,有界面的工具(手机、网页、通用工具里点名屏幕的)从这里取。
- * 工具引擎(core/tool)不认识这些,只经 [com.wangzan101.mika.core.tool.SurfaceLayer] 用到界面一侧。
+ * Interface state inside the tool context: put in at startup by [Interfaces.attach], and taken from here by tools that
+ * have an interface (phone, web, and the generic tools that name a screen).
+ * The tool engine (core/tool) knows nothing about this and only reaches the interface side via
+ * [com.wangzan101.mika.core.tool.SurfaceLayer].
  */
 
-/** 界面状态在工具上下文里的键。 */
+/** Key of the interface state in the tool context. */
 internal val INTERFACES = CapabilityKey<Interfaces>("interfaces")
 
-/** 本任务的界面状态(开局放进来的那一份)。 */
+/** Interface state of this task (the copy put in at startup). */
 internal val ToolContext.interfaces: Interfaces get() = this[INTERFACES] ?: error("interfaces not attached")
 
-/** 分发器那个任务的界面状态(执行入口、回放按读屏判定时用)。 */
+/** Interface state of the dispatcher's task (used by the execution entry points and when replaying decisions based on a screen read). */
 internal val ToolDispatcher.interfaces: Interfaces get() = ctx.interfaces
 
-/** 每块屏的读屏状态,按能力的 id。 */
+/** Screen-read state of each screen, keyed by the capability id. */
 internal val ToolContext.sessions: Map<String, ScreenSession> get() = interfaces.sessions
 
-/** 最近操作的是哪块屏。 */
+/** Which screen was touched most recently. */
 internal val ToolContext.focus: SurfaceFocus get() = interfaces.focus
 
-/** 此刻在操作的那块屏的读屏状态(分发器在每次调用前按工具所属的屏记下,见 [focus])。 */
+/** Screen-read state of the screen being operated right now (the dispatcher records it before each call per the screen the tool belongs to, see [focus]). */
 internal val ToolContext.session: ScreenSession get() = sessions.getValue(focus.current.id)
 internal val ToolContext.screen: ScreenPort get() = session.screen
 
-/** 此刻在操作的那块屏。 */
+/** The screen being operated right now. */
 internal val ToolContext.surface: Surface get() = focus.current
 internal val ToolContext.lastSnapshot: ScreenSnapshot? get() = session.lastSnapshot
 
-/** 此刻那块屏上 find_visually 找到的点(@vN);那块屏上任何写操作后清空。 */
+/** Points found by find_visually on the current screen (@vN); cleared after any write operation on that screen. */
 internal val ToolContext.located: LocateRegistry get() = session.located
 internal val ToolContext.locatedInfo: MutableMap<String, Located> get() = session.locatedInfo
 
-/** 上次写操作之后看过 describe:这期间的坐标点击按看图得来的点对待。 */
+/** describe has been looked at since the last write operation: coordinate taps in that window are treated as points obtained from looking at the image. */
 internal var ToolContext.described: Boolean
     get() = session.described
     set(v) { session.described = v }
@@ -59,21 +61,21 @@ internal val ToolContext.locator: Locator? get() = session.locator
 
 internal fun ToolContext.clearLocated() = session.clearLocated()
 
-/** 端口的动作结果转成工具结果:没变化、被切到别的 App、页面没静下来都写进提示;失败按错误码给说明。 */
+/** Turn the port's action result into a tool result: no change, being switched to another App, and the page not settling are all written into the hint; failures are explained per error code. */
 internal fun ToolContext.action(r: ActionResult): ToolExecution = when (r) {
     is ActionResult.Ok -> {
-        // 被切到别的 App(不是目标 App 自己调起的付款页之类):付款申报作废
+        // Switched to another App (not a payment page opened by the target App itself, etc.): the payment declaration is voided
         if (r.appSwitched != null && !r.switchedByTarget) refusedPay = null
         val hints = listOfNotNull(
             HINT_TAP_UNCHANGED.takeIf { r.changed == false && !reportsEffect && r.opened == null },
-            // 开到用户主屏上又挪回来的,由下面那句说清,不再说被切走
+            // Opened onto the user's home screen and then pulled back is explained by the next clause, so do not also report being switched away
             r.appSwitched?.takeIf { r.opened == null }?.let { switchHint(it, r.switchedByTarget) },
             HINT_NOT_SETTLED.takeIf { r.settled == false },
             r.coveredBy?.let { Feedback.format("covered_by", "pkg" to it) },
             r.opened?.let { openedHint(it) },
-            // 系统在用户屏上问的,留给用户选:不说怎么选
+            // The system asks on the user's screen, so leave it to the user: do not say how to choose
             r.chooser?.takeIf { r.opened?.picker != true }?.let { Feedback.format("launch.chooser", "pkg" to it.packageName) },
-            // 要的就是另一份时,开出另一份不用再提醒;开出的不是要的那份,照实说
+            // When the other copy is the one wanted, opening it needs no reminder; when what was opened is not the wanted copy, say so plainly
             (r.opened?.inProfile ?: r.inProfile)?.takeIf { it == OpenedElsewhere.OTHER_PROFILE && r.requestedUser == null }?.let { Feedback["profile.other"] },
             r.requestedUser?.takeIf { r.profileUser != null && r.profileUser != it }?.let { wanted ->
                 if (r.inProfile == OpenedElsewhere.MAIN_PROFILE) Feedback["profile.main_not_requested"]
@@ -107,10 +109,13 @@ internal fun ToolContext.action(r: ActionResult): ToolExecution = when (r) {
 }
 
 /**
- * 动作让 App 开到了用户主屏上时给模型的那句:挪回来了就说在 Claire 的屏上接着做、别再点一次;系统在用户屏上问打开哪一个的,
- * 说留给用户选、别再点也别替用户选,下一个动作会等用户选完;用户关了那个问题、用户亲手处理完了的,照实说;
- * 要用户亲手处理的弹窗(登录验证一类)留在用户屏上,说别挪回来、请用户在那里点;留在用户屏上没动的(用户正用着),
- * 说别再来、请用户处理。
+ * What the model is told when an action opened the App on the user's home screen: if it has been pulled back, say to
+ * continue on Claire's screen and not to tap again; if the system is asking on the user's screen which one to open, say
+ * it is left for the user to choose, not to tap again or choose for the user, and that the next action will wait for the
+ * user to finish; if the user closed that prompt or handled it personally, say so plainly;
+ * for a popup that needs the user's own handling (login verification and the like) left on the user's screen, say not
+ * to pull it back and ask the user to tap there; for something left untouched on the user's screen (the user is using
+ * it), say not to come again and ask the user to handle it.
  */
 internal fun openedHint(o: OpenedElsewhere): String {
     val app = o.app ?: o.packageName
@@ -125,8 +130,9 @@ internal fun openedHint(o: OpenedElsewhere): String {
 }
 
 /**
- * 稳定编号开着时先把模型编号翻译成端口编号再交给 [act]:编号已退役返回 ref_expired,不执行;
- * 旧一屏的编号仍在最新一屏时照常执行并标 relocated。运行记录里另记端口编号。
+ * With stable refs enabled, first translate the model ref into a port ref before handing it to [act]: if the ref has
+ * been retired, return ref_expired without executing; a ref from an older screen that is still in the latest screen is
+ * executed as usual and marked relocated. The port ref is recorded separately in the run record.
  */
 internal suspend fun ToolContext.withPortRef(ref: Pair<String, String>?, act: suspend (Pair<String, String>?) -> ToolExecution): ToolExecution {
     val st = session.stabilizer
@@ -141,8 +147,8 @@ internal suspend fun ToolContext.withPortRef(ref: Pair<String, String>?, act: su
         record = JsonObject(e.record + buildJsonObject { put("portRef", r.portRef); put("portSnapshotId", r.portSnapshotId) }))
 }
 
-/** 坐标换算用的一屏:最近一次读屏,还没读过就读一次。 */
+/** The screen used for coordinate conversion: the latest screen read, reading one first if nothing has been read yet. */
 internal suspend fun ToolContext.lastOrSnapshot(): ScreenSnapshot = session.lastSnapshot ?: session.snapshot()
 
-/** 确认申报的 app 按当前那块屏的写法校验(手机上是包名,网页上是站点主机名)。 */
+/** Validate the declared app as the current screen spells it (the package name on the phone, the site host on the web). */
 internal fun ToolContext.confirmTarget(app: String): String = surface.declaredTarget(app)

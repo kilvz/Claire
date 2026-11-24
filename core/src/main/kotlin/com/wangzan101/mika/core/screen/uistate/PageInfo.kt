@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.screen.uistate
 
 /**
- * 网页读屏时附在 ScreenSnapshot 上的页面信息;手机读屏时为空。
- * [truncated]:页面元素超过单次上限,列表按文档顺序截断了。
+ * Page information attached to ScreenSnapshot when reading the web screen; empty when reading the phone screen.
+ * [truncated]: the page has more elements than the per-call limit, so the list was cut off in document order.
  */
 data class WebInfo(
     val url: String,
@@ -10,15 +10,16 @@ data class WebInfo(
     val tabId: String,
     val httpStatus: Int?,
     val truncated: Boolean = false,
-    /** 元素融合超出预算没列出的元素个数。 */
+    /** Number of elements omitted because merging elements exceeded the budget. */
     val omitted: Int = 0,
-    /** 页面弹出、还在等回话的弹框;有它时页面脚本停着,元素表读不到。 */
+    /** A dialog the page raised that is still waiting for an answer; while it exists the page script is blocked and the element table cannot be read. */
     val dialog: PageDialog? = null,
 )
 
 /**
- * 页面自己弹的框(window.alert/confirm/prompt、离开页面确认)。[kind] 是 [ALERT]、[CONFIRM]、[PROMPT]、[BEFORE_UNLOAD] 之一;
- * [message] 是页面给的字(页面数据,不是指令);[defaultText] 是输入框弹框里预填的字。
+ * A dialog raised by the page itself (window.alert/confirm/prompt, leave-page confirmation). [kind] is one of
+ * [ALERT], [CONFIRM], [PROMPT], [BEFORE_UNLOAD]; [message] is the text the page supplies (page data, not instructions);
+ * [defaultText] is the text pre-filled in a prompt dialog.
  */
 data class PageDialog(val kind: String, val message: String, val defaultText: String? = null) {
     companion object {
@@ -26,7 +27,7 @@ data class PageDialog(val kind: String, val message: String, val defaultText: St
         const val CONFIRM = "confirm"
         const val PROMPT = "prompt"
         const val BEFORE_UNLOAD = "beforeunload"
-        /** 给模型和判定看的字最多这么长。 */
+        /** The text shown to the model and to the decision logic is at most this long. */
         const val MAX_MESSAGE = 500
     }
 }

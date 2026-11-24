@@ -18,7 +18,7 @@ import kotlinx.serialization.json.put
 import com.wangzan101.mika.core.screen.uistate.screen
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 诊断空白、加载中、锁屏或受保护的屏幕;要过锁屏关卡(锁着屏诊断不出东西)。 */
+/** Diagnose a blank, loading, locked, or protected screen; passes the lock-screen gate (nothing can be diagnosed while locked). */
 internal class Diagnose(f: ScreenFamily) : ScreenTool(f, "diagnose") {
     override val verb = Verb.Diagnose
     override val label = "检查屏幕"
@@ -39,14 +39,14 @@ internal class Diagnose(f: ScreenFamily) : ScreenTool(f, "diagnose") {
                     ScreenState.NORMAL -> if (c.takeoverReason == ScreenDiagnosis.UNSUPPORTED_BROWSER) put("hint", HINT_UNSUPPORTED_BROWSER)
                     ScreenState.BLANK -> put("hint", when {
                         c.currentApp == null && c.cause == ScreenDiagnosis.NO_WINDOW -> Feedback[family.emptyHint]
-                        // 前台 App 在,只是窗口读不到:不是没打开,不要再启动
+                        // The foreground App is there, only the window is unreadable: this is not "not opened", so do not start it again
                         c.currentApp != null && c.cause == ScreenDiagnosis.UNREADABLE_WINDOW -> Feedback.format("unreadable_window", "app" to c.currentApp)
                         else -> Feedback["screen.blank"]
                     })
                     ScreenState.LOADING -> put("hint", Feedback["screen.loading"])
                     ScreenState.PROTECTED -> put("hint", HINT_PROTECTED)
                     ScreenState.CAPTURE_UNAVAILABLE -> put("hint", HINT_DISPLAY_CAPTURE)
-                    // 被限制访问:除了交给用户,还要别马上重试
+                    // Access restricted: besides handing over to the user, do not retry immediately
                     ScreenState.NEEDS_HUMAN -> put("hint", if (c.takeoverReason == "access_blocked") Feedback["barrier.access_blocked"]
                         else Feedback.format("screen.needs_human", "reason" to c.takeoverReason))
                 }

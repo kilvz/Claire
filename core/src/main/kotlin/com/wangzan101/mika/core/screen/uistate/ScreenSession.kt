@@ -35,71 +35,72 @@ import com.wangzan101.mika.core.tool.okObj
 import com.wangzan101.mika.core.net.UrlHost
 
 internal const val MAX_ELEMENTS = 200
-/** 一次全量屏幕之后最多接几次差异。 */
+/** Maximum number of diffs chained after one full screen read. */
 private const val MAX_CHAIN_DIFFS = 5
-/** 写操作后读屏前等界面稳定的上限。 */
+/** Upper bound on waiting for the interface to settle after a write operation and before reading the screen. */
 private const val INLINE_SETTLE_MS = 1500L
-/** OCR 是读屏补充，不能无限期挡住下一次模型调用。 */
+/** OCR supplements the screen read and must not stall the next model call indefinitely. */
 private const val OCR_WAIT_MS = 2000L
-/** 树不够用时屏上文字就是主要材料:多等一会儿(端口要先等画面停稳再认)。 */
+/** When the tree is not enough, on-screen text is the main material: wait longer (the port first waits for the picture to settle before recognizing). */
 private const val OCR_WAIT_POOR_MS = 5000L
-/** 不可逆判定要按 ref 所属的那次读屏找元素,留最近几次。 */
+/** Irreversibility checks need to find an element by the screen read the ref belongs to, so keep the most recent few. */
 private const val RECENT_SNAPSHOTS = 8
-/** 记住多少个发出过的 snapshotId。 */
+/** How many issued snapshotIds to remember. */
 private const val ISSUED_MEMORY = 256
-/** 结果里「到上限了」那句话最多留这么长。 */
+/** Maximum length kept for the "limit reached" sentence in results. */
 private const val LIMIT_TEXT_MAX = 120
-/** 一次就读到空树时等这么久再重读一次:窗口刚切走、正在重绘、无障碍还没吐出节点,都会让这一屏暂时是空的。 */
+/** Wait this long and read once more when the very first read yields an empty tree: a window just switched away, a redraw in progress, or accessibility not having emitted nodes yet can all leave this screen temporarily empty. */
 private const val BLANK_RETRY_MS = 300L
 
-/** find_visually 找到的一个点:找的是什么、给的原文、视觉模型看到的字;不可逆判定都要看。[unverified]:只靠看图、没有佐证。 */
+/** A point found by find_visually: what was looked for, the text given, the words the vision model saw; irreversibility checks consider all of them. [unverified]: based on looking at the picture only, with no corroboration. */
 internal class Located(val target: String, val text: String?, val seen: String?, val unverified: Boolean = false)
 
 /**
- * 一块屏的读屏状态:稳定编号、模型最近拿到的屏幕与差异链、最近几次读屏、看图找到的点。每块屏一份,
- * 那一套屏幕工具只用自己的这份;画面编号与回看几块屏共用([shots])。
+ * Screen-read state of one screen: stable refs, the screen and diff chain the model last received, the most recent
+ * screen reads, and the points found visually. One per screen; that set of screen tools only uses its own copy;
+ * screenshot ids and the recall of recent screens are shared ([shots]).
  */
 internal class ScreenSession(
     val surface: Surface,
     stableRefs: Boolean,
     private val visionEnabled: Boolean,
     private val recordFrames: Boolean,
-    /** 最近一次读到的界面文字(几块屏共用);动作之后读到的和它一样就不再记一遍。 */
+    /** The interface text read most recently (shared across screens); after an action, text identical to it is not recorded again. */
     private val lastRead: () -> String?,
     val shots: Shots,
     vision: VisionService? = null,
     private val adaptiveVision: Boolean = false,
 ) {
-    /** 手机模型结果不按元素数量截断;网页仍沿用自己的输出预算。 */
+    /** Phone model results are not truncated by element count; the web still uses its own output budget. */
     private val modelElementsLimit get() = if (surface.id == "phone") Int.MAX_VALUE else MAX_ELEMENTS
     val screen: ScreenPort get() = surface.screen
     private var textOnlyDepth = 0
 
-    /** 复合手机命令内部只留文字与状态,图片需要时再由模型请求。 */
+    /** Inside composite phone commands only text and state are kept; images are requested by the model when needed. */
     suspend fun <T> textOnly(block: suspend () -> T): T {
         textOnlyDepth++
         try { return block() } finally { textOnlyDepth-- }
     }
 
     val stabilizer = if (stableRefs) RefStabilizer(surface.family.snapshotPrefix) else null
-    /** 模型最近一次拿到的屏幕(observe 或写操作结果里的 screen),差异的 base。 */
+    /** The screen the model received most recently (observe, or the screen in a write result); the base for diffs. */
     private var shown: ModelSnapshot? = null
-    /** 最近一次全量屏幕及其后各次差异的 snapshotId:差异要靠这整条链才看得懂,缺一条就发全量。 */
+    /** snapshotIds of the latest full screen read and each diff after it: a diff can only be understood through the whole chain, so a full read is sent when one link is missing. */
     private val chain = mutableListOf<String>()
-    /** 模型此刻还看得到的读屏 snapshotId;null 表示循环还没告诉过(都看得到)。 */
+    /** Screen-read snapshotIds the model can still see right now; null means the loop has not reported yet (all visible). */
     var visible: Set<String>? = null
     var lastSnapshot: ScreenSnapshot? = null
     val recentSnapshots = ArrayDeque<ScreenSnapshot>()
     val readAt = mutableMapOf<String, Long>()
-    /** 这块屏发出过的 snapshotId(比 [RECENT_SNAPSHOTS] 长:模型可能拿很早的编号来用)。 */
+    /** snapshotIds this screen has issued (longer than [RECENT_SNAPSHOTS]: the model may use a much older ref). */
     private val issued = object : LinkedHashMap<String, Unit>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?) = size > ISSUED_MEMORY
     }
 
-    /** find_visually 在这块屏上找到的点(@vN);这块屏上任何写操作后清空。 */
+    /** Points found by find_visually on this screen (@vN); cleared after any write operation on this screen. */
     val located = LocateRegistry()
     val locatedInfo = mutableMapOf<String, Located>()
-    /** 上次写操作之后看过 describe:这期间的坐标点击按看图得来的点对待。 */
+    /** describe has been looked at since the last write operation: coordinate taps in that window are treated as points obtained from the picture. */
     var described = false
     val locator = vision?.let { Locator(screen, it, located, surface.family) }
 
@@ -123,29 +124,30 @@ internal class ScreenSession(
         if (current) screen.checkAppAccess()
     }
 
-    /** 这个 snapshotId(读屏的,或看图找到的点的)是这块屏发出的。 */
+    /** This snapshotId (of a screen read, or of a point found visually) was issued by this screen. */
     fun owns(snapshotId: String): Boolean = snapshotId in issued || located.has(snapshotId)
 
-    /** 这块屏读过几次屏(登记编号的读);判效果时据此知道动作之后有没有读过。 */
+    /** How many times this screen has been read (reads that register refs); used when judging effects to know whether a read happened after the action. */
     var reads = 0
         private set
 
     /**
-     * 模型手里的最近一屏已经过时:动作之后界面变了,而结果里没有带回动作之后的屏幕。下次读屏前一直为 true。
+     * The latest screen in the model's hands has gone stale: the interface changed after the action, and the result
+     * did not carry the screen from after the action. Stays true until the next screen read.
      */
     var stale = false
         private set
 
-    /** Claire 自己动过这块屏(停留里轻轻滚了几下):模型手里那一屏的位置已不准,标成过时。 */
+    /** Claire itself touched this screen (a gentle scroll while dwelling): the positions in the model's copy are no longer accurate, so mark it stale. */
     fun movedByMika() { stale = true }
 
     /**
-     * 读一屏并登记编号。[internal]:不是给模型看的(按描述找目标时),模型手里那屏过没过时照旧;
-     * 端口原样的这一屏留作接着那个动作的「动作前」([probe] 用它,不再读一次)。
-     * 一次就读到空树时会等 [BLANK_RETRY_MS] 再读一次,用读到内容的那一次:瞬时读不到不该被当成这一屏真的空。
+     * Read one screen and register refs. [internal]: not for the model (when locating a target from a description), so whether the model's copy went stale is unchanged;
+     * the screen exactly as the port returned it is kept as the "before" for the following action ([probe] uses it instead of reading again).
+     * When the first read yields an empty tree, wait [BLANK_RETRY_MS] and read again, using the attempt that got content: a momentary failure to read should not mean this screen is really blank.
      */
     suspend fun snapshot(internal: Boolean = false): ScreenSnapshot = screen.snapshot().let { first ->
-        // 一次就读到空树:稍等再读一次,两次都空才交给判定。瞬时读不到不该让整屏被判 unusable 而赶模型去整页 OCR。
+        // Empty tree on the first read: wait a moment and read again; only hand it to the verdict if both reads are empty. A momentary miss should not get the whole screen judged unusable and push the model to whole-page OCR.
         val second = if (blankTree(first)) {
             delay(BLANK_RETRY_MS)
             screenAttempt { screen.snapshot() }
@@ -163,18 +165,18 @@ internal class ScreenSession(
         while (recentSnapshots.size > RECENT_SNAPSHOTS) recentSnapshots.removeFirst().snapshotId.let { id -> readAt.remove(id) }
     }
 
-    /** 这一屏的树里一个带名字的元素都没有:多半是刚切走/正在重绘/节点还没吐出来,值得再读一次。 */
+    /** Not a single named element in this screen's tree: most likely just switched away / redrawing / nodes not emitted yet, so it is worth reading once more. */
     private fun blankTree(s: ScreenSnapshot): Boolean {
         if (s.protected) return false
-        // 窗口读不到(unreadableApp)不重试:那是无障碍服务或权限层面的持续状态,不是节点还没吐出来,重读也读不到;
-        // 把它当瞬时问题会在这个 App 的每一次读屏上白等一次重读。
+        // Do not retry when the window cannot be read (unreadableApp): that is a persistent state at the accessibility service or permission level, not nodes yet to be emitted, and re-reading will not help;
+        // treating it as a momentary problem would waste one extra read on every screen read of this App.
         if (s.unreadableApp != null) return false
         if (!s.hasWindow) return false
         val named = s.elements.count { it.name.isNotBlank() }
         return s.elements.isEmpty() || (named == 0 && s.elements.size <= 1)
     }
 
-    /** 此刻重新读一屏,不登记编号、不改模型手里的读屏;读不到为 null。 */
+    /** Read the screen again right now without registering refs or changing the model's screen read; null when unreadable. */
     suspend fun peek(): ScreenSnapshot? = screenAttempt { screen.peek() }
 
     suspend fun observe(withImage: Boolean, adaptiveImage: Boolean = false, recordFrame: Boolean = true): ToolExecution {
@@ -206,7 +208,7 @@ internal class ScreenSession(
             else if (s.protected) { put("protected", true); put("hint", HINT_PROTECTED) }
             else if (unreadable(s) != null && ocr.isNullOrEmpty()) {
                 put("readable", false)
-                // 窗口不可读不等于画面不可用:有截图和视觉定位时,不能把它盖成只能 Back 或交用户。
+                // A window that cannot be read does not mean the picture is unusable: with a screenshot and visual locating available, it must not be reduced to Back or handing over to the user.
                 put("hint", unreadableHint(s, tree, ocrStatus))
             }
             else if (s.packageName == null && s.elements.isEmpty() && !s.hasWindow) put("hint", Feedback[surface.family.emptyHint])
@@ -220,10 +222,10 @@ internal class ScreenSession(
             put("truncated", hidden > 0 || omitted > 0)
             if (omitted > 0) put("omitted", hidden + omitted)
         }
-        // 受保护或持续全黑的帧都不给视觉模型;后者仍保留可读控件供降级操作。
+        // Protected frames and persistently black frames are never given to the vision model; the latter still keeps readable controls for degraded operation.
         val png = if ((sendImage && textOnlyDepth == 0 || (recordFrames && recordFrame && textOnlyDepth == 0)) &&
             !s.protected && s.captureError == null) screen.screenshotPng() else null
-        // 只有主模型能看图才留图；付款页和普通页面按同一规则处理
+        // Keep the image only when the main model can see pictures; payment pages and ordinary pages follow the same rule
         val kept = png?.takeIf { visionEnabled }
         shots.remember(Recall(shotId, shots.step, s.packageName, kept, observationText(s, ocr.orEmpty())))
         val image = png.takeIf { sendImage }
@@ -231,10 +233,10 @@ internal class ScreenSession(
     }
 
     /**
-     * 主模型能看图时此刻屏幕的一帧(原图)和它的 screenshotId,登记进回看。和读屏同样的规则:
-     * 受保护页面不截；屏上还没有 App、截不到时为 null。
+     * One frame of the current screen (the original image) and its screenshotId when the main model can see pictures, registered for recall. Same rules as screen reads:
+     * no capture on protected pages; null when no App is on the screen yet or the capture fails.
      */
-    /** 本地回放帧：不依赖看图模型，不登记模型截图编号，也不更新读屏状态。 */
+    /** Local replay frame: does not rely on the vision model, does not register a model screenshot id, and does not update screen-read state. */
     suspend fun playbackFrame(): ByteArray? = kotlinx.coroutines.withTimeoutOrNull(1_000L) {
         if (!recordFrames || textOnlyDepth != 0) return@withTimeoutOrNull null
         screenAttempt {
@@ -256,8 +258,8 @@ internal class ScreenSession(
     }
 
     /**
-     * 主模型能看图时动作之后发的一屏:画面和元素表必须是同一时刻的,模型按元素表里的 ref/snapshotId 操作,画面只用来看懂。
-     * 和 observe 同一套：受保护页面不发画面；屏上还没有 App 时为 null。
+     * The screen sent after an action when the main model can see pictures: the picture and the element table must be from the same moment; the model acts via the ref/snapshotId in the
+     * element table and uses the picture only to understand. Same set as observe: no picture on protected pages; null when no App is on the screen yet.
      */
     suspend fun currentView(): ToolDispatcher.Glance? {
         if (!visionEnabled && !adaptiveVision) return null
@@ -273,12 +275,12 @@ internal class ScreenSession(
             val shotId = (obs.content["screenshotId"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
             return ToolDispatcher.Glance(JsonObject(obs.content - "ok"), obs.image, shotId, obs.observations)
         }
-        // 先读元素表(登记 snapshotId),再按这一屏判能不能截:受保护页面不截
+        // Read the element table first (registering the snapshotId), then decide from this screen whether a capture is allowed: no capture on protected pages
         val obs = screenAttempt { observe(withImage = false) } ?: return null
         val s = lastSnapshot ?: return null
         val shotId = (obs.content["screenshotId"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
         val png = if (s.protected || s.captureError != null) null else screenAttempt { obs.frame ?: if (screen.isProtected()) null else screen.screenshotPng() }
-        // 回看里这一张补上画面
+        // Fill in the picture for this entry in the recall list
         val recalls = shots.recalls
         if (png != null) recalls.indexOfLast { it.id == shotId }.takeIf { it >= 0 }?.let { i ->
             val r = recalls[i]; recalls[i] = Recall(r.id, r.step, r.app, png, r.elementsText)
@@ -286,7 +288,7 @@ internal class ScreenSession(
         return ToolDispatcher.Glance(JsonObject(obs.content - "ok"), png, shotId, obs.observations)
     }
 
-    /** 动作成功后附上此刻的一屏(端口在动作里已等过界面变化):元素表放进 screen 字段,画面另附,结果里写上它的 screenshotId。 */
+    /** After a successful action, attach the current screen (the port already waited for an interface change inside the action): the element table goes into the screen field, the picture is attached separately, and its screenshotId is written into the result. */
     suspend fun withFrame(r: ToolExecution): ToolExecution {
         val v = currentView() ?: return r
         return r.with(content = JsonObject(r.content + ("screen" to v.content) + ("screenshotId" to JsonPrimitive(v.imageId))), images = listOfNotNull(v.image),
@@ -295,8 +297,8 @@ internal class ScreenSession(
     }
 
     /**
-     * 写操作成功后:等界面稳定(上限 [INLINE_SETTLE_MS])再读一屏,和模型上次拿到的屏幕比,差异放进 screen 字段。
-     * base 或最近一次全量屏幕模型已看不到时发全量。读不到屏幕就照原样返回动作结果。
+     * After a successful write operation: wait for the interface to settle (at most [INLINE_SETTLE_MS]), read one screen, compare it with the screen the model received last, and put the diff into the screen field.
+     * When the base or the latest full screen is no longer visible to the model, send a full read. If the screen cannot be read, return the action result as is.
      */
     suspend fun withScreen(r: ToolExecution): ToolExecution {
         val cur = try {
@@ -311,13 +313,13 @@ internal class ScreenSession(
             return r
         }
         val v = visible
-        // 连续差异最多 MAX_CHAIN_DIFFS 次就发一次全量:链越长越难读,压缩时要保留的往返也越多
+        // Send a full read after at most MAX_CHAIN_DIFFS consecutive diffs: the longer the chain, the harder it is to read, and the more round trips compression has to preserve
         val seen = chain.isNotEmpty() && chain.size - 1 < MAX_CHAIN_DIFFS && (v == null || chain.all { it in v })
         val s = cur.screen
         val (tree, ocr, ocrStatus) = readTree(s)
         val shotId = shots.next()
         val diff = if (s.protected) {
-            // 受保护页面看不到画面和元素；下一次从全量重新开始
+            // Protected pages expose neither picture nor elements; the next read starts over from a full screen
             shown = null; chain.clear()
             buildJsonObject {
                 put("snapshotId", cur.snapshotId); put("currentApp", s.packageName); put("full", false)
@@ -343,9 +345,9 @@ internal class ScreenSession(
                     } ?: treeHint(tree, ocrStatus)?.let { mapOf("hint" to JsonPrimitive(it)) } ?: emptyMap())))
         }
         val text = observationText(s, ocr.orEmpty())
-        // 和上一次读到的一样就不再记一遍,免得把较早的读屏挤出去
+        // If it is identical to the previous read, do not record it again, so that earlier screen reads are not pushed out
         val read = if (lastRead() != text) interfaceRead(s, ocr.orEmpty()) else null
-        // 和 observe 同样的规则:不可用画面不截;只有主模型能看图才留图回看
+        // Same rules as observe: no capture of unusable pictures; keep the image for recall only when the main model can see pictures
         val imageReason = if (adaptiveVision && visionEnabled && tree.poor) tree.reason else null
         val sendImage = visionEnabled && (!adaptiveVision || imageReason != null)
         val png = if ((recordFrames || sendImage) && textOnlyDepth == 0 && !s.protected && s.captureError == null) {
@@ -353,7 +355,7 @@ internal class ScreenSession(
         } else null
         val kept = png?.takeIf { visionEnabled }
         shots.remember(Recall(shotId, shots.step, s.packageName, kept, text))
-        // 旧模式总附画面；分级模式只在元素明显不足时附画面。
+        // Legacy mode always attaches the picture; adaptive mode attaches it only when the elements are clearly insufficient.
         val attach = kept?.takeIf { sendImage && r.images.isEmpty() }
         val shownDiff = if (imageReason == null) diff else JsonObject(diff + ("imageReason" to JsonPrimitive(imageReason)))
         return r.with(content = JsonObject(r.content + ("screen" to onSurface(shownDiff))),
@@ -361,7 +363,7 @@ internal class ScreenSession(
             screenElements = ScreenJson.elements(s, modelElementsLimit).first, imageIds = if (attach != null) listOf(shotId) else r.imageIds).observing(read)
     }
 
-    /** 动作之前的界面状态(不登记编号)和一帧画面,判效果用;读不到的为 null。 */
+    /** Interface state before the action (refs not registered) plus one frame, used for judging effects; null when unreadable. */
     class EffectProbe internal constructor(before: ScreenSnapshot?, frame: FrameGrid?) {
         var before: ScreenSnapshot? = before
             internal set
@@ -369,15 +371,15 @@ internal class ScreenSession(
             internal set
     }
 
-    /** 这次动作前看的那一眼,动作判完效果前留着:动作开始之前 Claire 自己又动过界面时由 [reprobe] 重看。 */
+    /** The look taken before this action, kept until its effect is judged: re-looked by [reprobe] when Claire itself touched the interface again right before the action started. */
     private var pendingProbe: EffectProbe? = null
 
-    /** 这次动作的效果判完了(或不判了)。 */
+    /** The effect of this action has been judged (or is no longer judged). */
     fun probeDone() { pendingProbe = null }
 
     /**
-     * 动作开始之前 Claire 自己动过界面(网页停留里轻轻滚了页面):重看一眼当作动作前的样子,免得把这点滚动算成动作的效果;
-     * 模型手里那一屏的位置也已不准,标成过时。没有在等判效果的动作时什么也不做。
+     * Claire itself touched the interface right before the action started (a gentle page scroll while dwelling on the web): look again as the pre-action state, so that this scrolling is not counted as the action's
+     * effect; the positions in the model's copy are no longer accurate either, so mark it stale. Does nothing when no action is waiting for effect judgement.
      */
     suspend fun reprobe() {
         val p = pendingProbe ?: return
@@ -385,14 +387,14 @@ internal class ScreenSession(
         withTimeoutOrNull(EffectTuning.PROBE_MS) { p.before = peek(); p.frame = grid() }
     }
 
-    /** 刚为按描述找目标读的一屏:给模型的 snapshotId 和端口原样的一屏;被 [probe] 取走或作废前有效。 */
+    /** The screen just read for locating a target from a description: the snapshotId given to the model and the screen exactly as the port returned it; valid until taken by [probe] or discarded. */
     private var primed: Pair<String, ScreenSnapshot>? = null
 
     fun clearPrimed() { primed = null }
 
     /**
-     * 动作前看一眼,最多花 [EffectTuning.PROBE_MS];来不及的部分为 null(之后只按端口的事实判)。
-     * 动作用的正是刚按描述读的那一屏([snapshotId] 对得上)就用它,不再读一次。
+     * Take a look before the action, spending at most [EffectTuning.PROBE_MS]; the part that does not fit in time is null (afterwards only the port's facts are used).
+     * When the action uses exactly the screen just read from a description ([snapshotId] matches), reuse it instead of reading again.
      */
     suspend fun probe(snapshotId: String? = null): EffectProbe {
         val ready = primed?.takeIf { it.first == snapshotId }?.second
@@ -411,11 +413,11 @@ internal class ScreenSession(
     private suspend fun grid(): FrameGrid? = screenAttempt { screen.frameGrid() }
 
     /**
-     * 动作成功之后判它对界面状态的实际效果(见 [ActionEffect]),写进结果的 effect 字段,并按效果给提示;结果的 changed 跟着效果走。
-     * 动作之后已经读过([readsAtAction] 之后又读过,即结果里带了界面)就用那一份。否则:端口在动作里已等过界面(报了变没变或页面静没静)
-     * 就直接看一眼,没等过才等界面稳定(上限 [EffectTuning.SETTLE_MS])。看起来没变时再等 [EffectTuning.RECHECK_MS] 重看一次(异步更新)。
-     * 整个判断最多多花 [EffectTuning.BUDGET_MS],到了就按端口的事实下结论。只读界面、取画面,不做任何动作。
-     * 界面变了而结果里没有新的界面时,标记模型手里的那份已过时([stale])。
+     * After a successful action, judge its actual effect on the interface state (see [ActionEffect]), write it into the result's effect field, and give hints based on the effect; the result's changed follows the effect.
+     * If a read already happened after the action (another read after [readsAtAction], i.e. the result carries the interface), use that one. Otherwise: if the port already waited for the interface inside the action (it reported
+     * whether anything changed or the page settled), just take a look; only wait for the interface to settle (at most [EffectTuning.SETTLE_MS]) when it did not. When it looks unchanged, wait [EffectTuning.RECHECK_MS] and look once more (asynchronous update).
+     * The whole judgement spends at most [EffectTuning.BUDGET_MS] extra; once reached, conclude from the port's facts. It only reads the interface and takes frames, never performs any action.
+     * When the interface changed but the result carries no new interface, mark the model's copy as stale ([stale]).
      */
     suspend fun withEffect(
         r: ToolExecution, probe: EffectProbe, verb: Verb, readsAtAction: Int, target: UiElement?, region: List<Int>?, typed: String?,
@@ -436,7 +438,7 @@ internal class ScreenSession(
             pressedEnter = c["pressedEnter"] == JsonPrimitive(true), secret = c["secret"] == JsonPrimitive(true),
         )
         var effect: ActionEffect? = judge(null, null)
-        // 动作之后看到的界面里新出现的「到上限了」的说法(看过两次时任一次有就算:提示条一会儿就消失)
+        // A "limit reached" message newly appearing in the interface seen after the action (counted if either of the two looks has it: the banner disappears after a moment)
         var limit: String? = null
         withTimeoutOrNull(EffectTuning.BUDGET_MS) {
             if (!fresh && !portWaited) settle(EffectTuning.SETTLE_MS)
@@ -444,14 +446,14 @@ internal class ScreenSession(
             limit = LimitNotice.find(probe.before, after)
             effect = judge(after, grid())
             if (effect?.kind == EffectKind.NoEffect) {
-                // 界面可能是异步更新的:再等一会儿重看一次,仍没变才算没效果
+                // The interface may update asynchronously: wait a moment and look again; only count it as no effect if it is still unchanged
                 delay(EffectTuning.RECHECK_MS)
                 val again = peek()
                 limit = limit ?: LimitNotice.find(probe.before, again)
                 effect = judge(again, grid())
             }
         }
-        // 树读不出点的那一处(只在手机上判:网页没有树够不够用这回事):看不出变化不等于没点上
+        // Where the tree cannot expose the tap point (judged on the phone only: the web has no notion of a tree being good enough): no visible change does not mean the tap missed
         val e = effect?.let { judged ->
             if (surface.id != "phone") return@let judged
             val quality = probe.before?.let { TreeAdequacy.ofTree(it).quality } ?: lastTree?.quality
@@ -471,12 +473,12 @@ internal class ScreenSession(
         return r.with(content = content, changed = changed)
     }
 
-    /** 最近一次读屏判的树够不够用;判效果时据此说「看不出变化」还是「没点上」。 */
+    /** Whether the tree judged on the latest screen read was adequate; used when judging effects to say "no visible change" versus "the tap missed". */
     private var lastTree: TreeCheck? = null
 
     /**
-     * 这一屏的树缺了一块或不能用(只在手机上判,和读屏结果里的 treeQuality 同一口径):光看树判不准时按最近一次读屏(读过屏上文字)的判断。
-     * 按描述找输入框在树里找不到时,据此改看图找。
+     * Whether this screen's tree is missing a piece or unusable (judged on the phone only, by the same measures as treeQuality in read results): when judging from the tree alone is unreliable, use the verdict of the latest screen read (which read on-screen text).
+     * When looking for an input field from a description fails in the tree, this is what switches to looking visually.
      */
     fun treeBlind(s: ScreenSnapshot): Boolean = surface.id == "phone" &&
         (TreeAdequacy.ofTree(s).quality ?: lastTree?.quality).let { it == TreeQuality.Partial || it == TreeQuality.Unusable }
@@ -485,11 +487,11 @@ internal class ScreenSession(
         screenAttempt { screen.waitStable(ms) }
     }
 
-    /** 读屏前刚从用户主屏挪回来的 App:和动作结果里的 opened 同样的字段,另带那句说明。 */
+    /** An App just pulled back from the user's home screen before this screen read: the same fields as opened in action results, plus that explanatory note. */
     private fun openedJson(o: OpenedElsewhere): JsonObject = JsonObject(o.toJson() + ("note" to JsonPrimitive(openedHint(o))))
 
     /**
-     * 前台 App 打开着、窗口却读不到时给模型的说明(不是「没打开」,不要再启动);读得到或不知道前台是谁时为 null。
+     * The note given to the model when the foreground App is open but its window cannot be read (this is not "not opened", so do not start it again); null when readable or when the foreground is unknown.
      */
     private fun unreadable(s: ScreenSnapshot): String? {
         val app = s.unreadableApp ?: return null
@@ -497,13 +499,13 @@ internal class ScreenSession(
         return Feedback.format("unreadable_window", "app" to app)
     }
 
-    /** 窗口不可读但截图可用时,保留「不要重复启动」,后续路线改用这棵树的 OCR/视觉回退。 */
+    /** When the window is unreadable but screenshots work, keep the "do not start it again" part and let the following route use this tree's OCR/vision fallback. */
     private fun unreadableHint(s: ScreenSnapshot, tree: TreeCheck, ocrStatus: String?): String {
         val fallback = treeHint(tree, ocrStatus) ?: return unreadable(s)!!
         return Feedback.format("unreadable_window.fallback", "app" to s.unreadableApp!!, "fallback" to fallback)
     }
 
-    /** 这一次读到的界面状态:可读元素的文字、在哪、网页标题、输入框里的字。 */
+    /** The interface state read this time: text of readable elements, where it is, the web page title, and the text inside input fields. */
     private fun interfaceRead(s: ScreenSnapshot, ocr: List<VisibleTextLine> = emptyList()): Observation {
         val f = inputFields(s)
         val place = s.web?.url?.let(Place::page) ?: s.packageName?.let(Place::app)
@@ -512,9 +514,9 @@ internal class ScreenSession(
     }
 
     /**
-     * 这一屏的树够不够用([TreeAdequacy]),和要补上的屏上文字(OCR,只留树里没有的、去掉认错的行)。
-     * 树明显够用、受保护时不读字;判不准时读字再定;树不够用时一定读字:看不到图的主模型靠它,
-     * 能看图的主模型也拿它的位置去点,证据账本(回答来源、核查)和 phone_collect 也只能从这里拿到屏上写着什么。
+     * Whether this screen's tree is adequate ([TreeAdequacy]), and the on-screen text to supplement it (OCR, keeping only what the tree lacks and dropping misrecognized lines).
+     * When the tree is clearly adequate or the page is protected, do not read text; when the verdict is uncertain, read text and then decide; when the tree is insufficient, always read text: the main model that cannot see pictures relies
+     * on it, and a main model that can see pictures also uses its positions to tap; the evidence ledger (answer sources, verification) and phone_collect can also only learn what the screen says from here.
      */
     private suspend fun readTree(s: ScreenSnapshot): TreeRead {
         val tree = TreeAdequacy.ofTree(s)
@@ -522,15 +524,15 @@ internal class ScreenSession(
         val (ocr, status) = visibleText(s, if (tree.poor) OCR_WAIT_POOR_MS else OCR_WAIT_MS)
         val checked = TreeAdequacy.withText(tree, ocr)
         lastTree = checked
-        // 树不够用、屏上文字也一行没有:照实说为什么,模型才知道该看图找,而不是再读一次
+        // The tree is insufficient and no on-screen text was read either: state plainly why, so the model knows to look visually instead of reading again
         return TreeRead(checked, ocr, status.takeIf { quality(checked) != null && ocr.isNullOrEmpty() })
     }
 
     /**
-     * 屏上树里没有的文字,和一行也没读到时的原因:empty(画面上没认出字)、illegible(认出的都是认错的)、
-     * timeout(时限内没认完)、unavailable(端口给不出:没有画面、画面一直在大变)、failed(识别出错)。
-     * 不读(网页、受保护、没窗口)时都为 null。树在读的过程中变了也照样读:字的位置来自画面本身,
-     * 端口自己会等画面停稳,认的过程中整页变了会重认。
+     * The on-screen text the tree does not contain, and the reason when not a single line was read: empty (no text recognized on the picture), illegible (everything recognized was misrecognition),
+     * timeout (not finished recognizing within the limit), unavailable (the port cannot provide it: no picture, or the picture keeps changing drastically), failed (recognition error).
+     * Both are null when not reading (web, protected, no window). It reads even if the tree changed during the read: the text positions come from the picture itself,
+     * the port waits for the picture to settle by itself, and it re-recognizes if the whole page changes during recognition.
      */
     private suspend fun visibleText(s: ScreenSnapshot, waitMs: Long): Pair<List<VisibleTextLine>?, String?> {
         if (surface.id != "phone" || s.protected || s.captureError != null || !s.hasWindow) return null to null
@@ -545,10 +547,10 @@ internal class ScreenSession(
         return VisibleText.missing(s, legible) to null
     }
 
-    /** 写进读屏结果的 treeQuality:只在手机上、树不够用时写(网页没有屏上文字可补)。 */
+    /** The treeQuality written into read results: only on the phone and only when the tree is insufficient (the web has no on-screen text to supplement it). */
     private fun quality(tree: TreeCheck): String? = tree.quality?.takeIf { surface.id == "phone" && tree.poor }?.wire
 
-    /** 树不够用时给模型的说明:屏上文字从哪来、怎么点;配了看图模型时再说没有字的图标怎么找;连字也读不到时说为什么、该怎么找。 */
+    /** The note given to the model when the tree is insufficient: where on-screen text comes from and how to tap it; when a vision model is configured, also how to find icons with no text; when even text cannot be read, why and how to look instead. */
     private fun treeHint(tree: TreeCheck, ocrStatus: String? = null): String? = when {
         quality(tree) == null -> null
         ocrStatus != null && locator != null -> Feedback.format("tree_poor.no_text.visual", "ocr" to ocrStatus)
@@ -558,21 +560,21 @@ internal class ScreenSession(
     }
 
     /**
-     * 核查前再看一眼:此刻重新读这块屏(不登记编号,模型手里的 ref 不受影响),[withImage] 时另截一张图(防截屏页面不截);
-     * 读到了时再加上能力另给的 [extra](网页正文的开头:读屏只有视口里的元素)。读不到也照样返回(没有观察)。
+     * One more look before verification: read this screen again right now (without registering refs, so the model's refs are unaffected), and when [withImage] also take a screenshot (no capture on capture-protected pages);
+     * when the read succeeds, also add [extra] supplied by the capability (the start of a web page body: a screen read only has the elements in the viewport). It is returned even when unreadable (no observation).
      */
     suspend fun freshLook(withImage: Boolean, extra: (suspend () -> Observation?)? = null): Look {
         val s = screenAttempt { screen.snapshot() }
         val png = if (withImage && s != null && !s.protected && s.captureError == null) {
             screenAttempt { screen.screenshotPng() }
         } else null
-        // 树不够用时照样读屏上文字:核查要看的是屏上写着什么
+        // Read on-screen text as usual when the tree is insufficient: verification cares about what the screen says
         val seen = s?.let { interfaceRead(it, readTree(it).ocr.orEmpty()) }?.takeIf { it.text.isNotEmpty() }
         val more = if (s != null) extra?.invoke() else null
         return Look(listOfNotNull(seen, more), png, s?.protected == true)
     }
 
-    /** 「在哪」按这块屏的说法报(网页上是站点):和 observe 一样,手机与网页的「在哪」不混。 */
+    /** Report "where" the way this screen words it (on the web it is the site): as in observe, the phone's and the web's "where" are never mixed. */
     private fun onSurface(o: JsonObject): JsonObject {
         val key = surface.family.placeKey
         if (key == ScreenFamily.APP_PLACE || ScreenFamily.APP_PLACE !in o) return o
@@ -580,7 +582,7 @@ internal class ScreenSession(
     }
 }
 
-/** 这一屏输入框(不是提示语、不是密码框)里的字,和有输入焦点的那个;证据账本据此分辨输入框回显、接管时用户填的字。 */
+/** The text inside this screen's input fields (not hints, not password fields), and the one with input focus; the evidence ledger uses this to distinguish input echo from text the user typed during takeover. */
 internal fun inputFields(s: ScreenSnapshot): InputFields {
     val fields = s.elements.filter { it.editable && !it.hint && !it.secret && it.name.isNotBlank() }
     return InputFields(fields.map { it.name.replace('\n', ' ') }, fields.firstOrNull { it.focused }?.name?.replace('\n', ' '))
@@ -588,13 +590,13 @@ internal fun inputFields(s: ScreenSnapshot): InputFields {
 
 internal class InputFields(val names: List<String>, val focused: String?)
 
-/** 一次读屏的树判断、补上的屏上文字,和树不够用而文字一行也没有时的原因(见 ScreenSession.visibleText)。 */
+/** The tree verdict of one screen read, the on-screen text it supplemented, and the reason when the tree was insufficient and not a single line of text was read (see ScreenSession.visibleText). */
 internal data class TreeRead(val tree: TreeCheck, val ocr: List<VisibleTextLine>?, val ocrStatus: String?)
 
-/** 读屏的元素文字,一行一个;第一行是前台 App。没有文字时为空串。密码框里的字不记。 */
+/** The element text of a screen read, one per line; the first line is the foreground App. Empty string when there is no text. Text in password fields is not recorded. */
 internal fun screenText(s: ScreenSnapshot): String {
     val names = s.elements.filter { it.meaningful && it.name.isNotBlank() && !it.secret }.map { it.name.replace('\n', ' ') }
-    // 网页标题不在元素里,也是这一屏的事实(页面给的,和元素文字一样是待核对的材料);没有可读元素的网页也照样留着
+    // The web page title is not in the elements, but it is also a fact of this screen (supplied by the page and, like element text, material to be verified); keep it even for web pages with no readable elements
     val title = s.web?.title?.takeIf { it.isNotBlank() }?.let { "网页标题:${it.replace('\n', ' ')}" }
     val dialog = s.web?.dialog?.let { "网页弹框(${it.kind}):${it.message.replace('\n', ' ')}" }
     if (names.isEmpty() && title == null && dialog == null) return ""
@@ -602,7 +604,7 @@ internal fun screenText(s: ScreenSnapshot): String {
     return (listOfNotNull(where, title, dialog) + names).joinToString("\n").take(MAX_READ_CHARS)
 }
 
-/** 无障碍文字仍是主证据；本机 OCR 只追加树里缺失的屏幕文字。 */
+/** Accessibility text is still the primary evidence; local OCR only appends on-screen text missing from the tree. */
 private fun observationText(s: ScreenSnapshot, ocr: List<VisibleTextLine>): String {
     val tree = screenText(s)
     if (ocr.isEmpty()) return tree
@@ -612,7 +614,7 @@ private fun observationText(s: ScreenSnapshot, ocr: List<VisibleTextLine>): Stri
 
 internal fun toPx(n: Int, size: Int) = (n * (size - 1) / 999.0).roundToInt()
 
-/** 读屏结果里的页面弹框:模型要先用 web_interact 的 dialog 回话,页面才会接着跑。 */
+/** A page dialog in a screen-read result: the model must first reply via web_interact's dialog before the page continues running. */
 internal fun dialogJson(d: PageDialog): JsonObject = buildJsonObject {
     put("kind", d.kind)
     put("message", d.message.take(PageDialog.MAX_MESSAGE))

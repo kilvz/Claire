@@ -2,21 +2,22 @@ package com.wangzan101.mika.core.screen.uistate
 
 enum class ScreenState(val wire: String) {
     NORMAL("normal"),
-    /** 没有窗口或没有可读元素。 */
+    /** No window, or no readable elements. */
     BLANK("blank"),
-    /** 界面在持续变化,还没加载完。 */
+    /** The interface keeps changing; it has not finished loading. */
     LOADING("loading"),
-    /** 有明确依据认定的防截屏页面。 */
+    /** A screen-capture-protected page established by clear evidence. */
     PROTECTED("protected"),
-    /** 画面持续不可用;黑像素本身不能证明是防截屏还是虚拟屏没有合成出内容。 */
+    /** The picture stays unavailable; black pixels alone cannot prove capture protection versus a virtual display that failed to composite content. */
     CAPTURE_UNAVAILABLE("capture_unavailable"),
-    /** 登录、验证码、支付等需要用户亲自处理的页面。 */
+    /** A page that requires the user to handle it personally, such as login, verification codes, or payment. */
     NEEDS_HUMAN("needs_human"),
 }
 
 /**
- * [takeoverReason] 是建议 hand_to_user 使用的 reason;[cause] 是判定依据的简短说明。
- * 例外:[ScreenDiagnosis.UNSUPPORTED_BROWSER](网站拒绝内置浏览器)不需要人,state 为 NORMAL、needsHuman 为 false,该换路线。
+ * [takeoverReason] is the reason suggested for hand_to_user; [cause] is a short note on what the verdict is based on.
+ * Exception: [ScreenDiagnosis.UNSUPPORTED_BROWSER] (the site rejects the built-in browser) does not need a human; the
+ * state is NORMAL, needsHuman is false, and the route should be changed instead.
  */
 data class ScreenCheck(
     val state: ScreenState,
@@ -27,9 +28,12 @@ data class ScreenCheck(
 )
 
 /**
- * 端口采集到的事实。[blackFrames] 是每次界面安静时画面是否全黑的结果,按时间顺序;拿不到画面时为空。
- * [hasWindow] 是有读得到根节点的 App 窗口;[anyWindow] 是有 App 窗口(根节点读不到也算)。
- * [foregroundApp] 是窗口读不到时按焦点窗口或最上面的任务得知的前台 App;不知道为 null。
+ * Facts the port collected. [blackFrames] holds, in time order, whether the picture was entirely black each time the
+ * interface went quiet; empty when no picture is available.
+ * [hasWindow] means there is an App window whose root node can be read; [anyWindow] means there is an App window (even
+ * if its root node cannot be read).
+ * [foregroundApp] is the foreground App learned from the focused window or the topmost task when windows cannot be
+ * read; null when unknown.
  */
 data class ScreenFacts(
     val currentApp: String?,
@@ -44,12 +48,12 @@ data class ScreenFacts(
 )
 
 object ScreenDiagnosis {
-    /** 屏上一个 App 窗口都没有(虚拟屏刚建好时就是这样)。 */
+    /** Not a single App window on the screen (this is the case right after a virtual display is created). */
     const val NO_WINDOW = "no window"
     const val UNREADABLE_WINDOW = "unreadable window"
     const val DISPLAY_CAPTURE_UNAVAILABLE = "display_capture_unavailable"
     const val DISPLAY_CAPTURE = "display_capture"
-    /** 网页:网站不支持内置浏览器(要求换浏览器或下载 App)。 */
+    /** Web: the site does not support the built-in browser (it demands another browser or an App download). */
     const val UNSUPPORTED_BROWSER = "unsupported_browser"
 
     private val CAPTCHA = listOf(
@@ -62,7 +66,7 @@ object ScreenDiagnosis {
         "获取验证码", "发送验证码", "短信验证码", "get code", "send code", "verification code",
     )
 
-    /** 屏上文字里第一个付款字样(确认支付、支付密码一类);没有为 null。 */
+    /** The first payment wording in the on-screen text (confirm payment, payment password and the like); null if none. */
     fun paymentText(texts: List<String>): String? {
         val text = Hant.fold(texts.joinToString("\n")).lowercase()
         return PAYMENT.firstOrNull { it in text }
@@ -73,7 +77,7 @@ object ScreenDiagnosis {
         fun hit(words: List<String>) = words.firstOrNull { it in text }
         fun human(reason: String, cause: String) = ScreenCheck(ScreenState.NEEDS_HUMAN, f.currentApp, true, reason, cause)
 
-        // 页面切换时画面也可能短暂全黑:界面还在变就按加载中处理
+        // The picture may also go briefly black during a page transition: treat it as loading while the interface is still changing
         if (f.changing && f.blackFrames.any { it }) {
             return ScreenCheck(ScreenState.LOADING, f.currentApp, false, cause = "black frame while the screen keeps changing")
         }
@@ -84,8 +88,8 @@ object ScreenDiagnosis {
             hit(SMS_CODE) != null -> "login" to "verification code text: ${hit(SMS_CODE)}"
             else -> null
         }
-        // 两次安静时都全黑,只能确定画面不能用。黑像素不能区分安全窗口和虚拟屏合成失败。
-        // 树够用就降级走控件;树也没有信息时才需要用户在自己的屏幕上接管。
+        // Black at both quiet checks means only that the picture is unusable. Black pixels cannot distinguish a secure window from failed virtual-display compositing.
+        // If the tree suffices, degrade to the controls; only when the tree has no information either does the user need to take over on their own screen.
         if ((f.hasWindow || f.anyWindow || f.foregroundApp != null) && f.blackFrames.size >= 2 && f.blackFrames.all { it }) {
             val needsHuman = human != null || f.readableElements == 0
             return ScreenCheck(

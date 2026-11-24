@@ -25,7 +25,7 @@ import com.wangzan101.mika.core.screen.uistate.lastSnapshot
 import com.wangzan101.mika.core.screen.uistate.screen
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 读这块屏:元素表(observe 按配置补截图)、单独截图。 */
+/** Read this screen: the element table (observe also adds a screenshot depending on configuration), or a standalone screenshot. */
 internal class Observe(f: ScreenFamily) : ScreenTool(f, "observe") {
     override val verb = Verb.Observe
     override val label = "看屏幕"
@@ -83,7 +83,7 @@ internal class Screenshot(f: ScreenFamily) : ScreenTool(f, "screenshot") {
             catch (e: SandboxError) { return fail(e.code, e.message ?: e.code, e.recoverable) }
         val s = ctx.lastSnapshot
         val shots = ctx.shots
-        // 和读屏一样登记进回看,旧图被裁掉后还能按 screenshotId 找回;付款页的图不留
+        // Register it for recall as screen reads do, so the old image can still be found by screenshotId after being trimmed; payment page images are not kept
         val shotId = shots.next()
         shots.remember(Recall(shotId, ctx.currentStep, s?.packageName, png, s?.let(::screenText).orEmpty()))
         return ToolExecution(okObj {

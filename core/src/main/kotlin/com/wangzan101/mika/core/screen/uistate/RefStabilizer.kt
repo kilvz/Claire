@@ -4,8 +4,9 @@ import kotlin.math.hypot
 import kotlin.math.min
 
 /**
- * 给模型看的一屏:[elements] 的 ref 已换成模型编号,[snapshotId] 是这块屏的前缀加序号("p1"、"w2"…);
- * [port] 是端口原样的快照,[toPort] 是模型编号 → 端口编号。
+ * One screen as shown to the model: the refs in [elements] have been replaced with model refs, [snapshotId] is this
+ * screen's prefix plus a sequence number ("p1", "w2"…); [port] is the snapshot exactly as the port returned it,
+ * [toPort] maps model refs → port refs.
  */
 data class ModelSnapshot(
     val snapshotId: String,
@@ -13,7 +14,7 @@ data class ModelSnapshot(
     val elements: List<UiElement>,
     val toPort: Map<String, String>,
 ) {
-    /** 换成模型编号的快照;不可逆判定、坐标换算都用它。 */
+    /** The snapshot with model refs; used for irreversibility checks and coordinate conversion. */
     val screen: ScreenSnapshot by lazy {
         val refs = toPort.entries.associate { (model, original) -> original to model }
         port.copy(
@@ -24,50 +25,54 @@ data class ModelSnapshot(
     }
 }
 
-/** 编号解析不出来的原因;[wire] 写进工具结果的 `cause`。 */
+/** Why a ref could not be resolved; [wire] is written into the tool result's `cause`. */
 enum class StaleCause(val wire: String) {
-    /** snapshotId 不是这块屏发过的,或太旧已经不记得。 */
+    /** The snapshotId was never issued for this screen, or it is too old to remember. */
     SnapshotUnknown("snapshot_unknown"),
-    /** 编号是给的那一屏之后才有的:新编号配了旧 snapshotId。 */
+    /** The ref came into existence after the screen that was given: a new ref paired with an old snapshotId. */
     RefNotInSnapshot("ref_not_in_snapshot"),
-    /** 编号不在最新一屏里:元素没了,或编号写错。 */
+    /** The ref is not in the latest screen: the element is gone, or the ref is mistyped. */
     RefRetired("ref_retired"),
-    /** 编号还在,但从模型看到的那一屏算起元素挪远了。 */
+    /** The ref still exists, but the element has moved too far since the screen the model saw. */
     ElementMoved("element_moved"),
 }
 
 sealed interface Resolved {
-    /** [relocated]:模型给的是旧一屏的 snapshotId,编号在最新一屏里仍指同一元素。 */
+    /** [relocated]: the model gave the snapshotId of an older screen, and the ref still points to the same element in the latest screen. */
     data class Current(val portRef: String, val portSnapshotId: String, val relocated: Boolean) : Resolved
     data class Stale(val cause: StaleCause) : Resolved
 }
 
-/** 沿用旧编号允许的最大中心位移:屏幕短边的这个比例(与端口找回的上限一致)。 */
+/** Maximum center shift allowed when reusing an old ref: this fraction of the screen's short side (the same limit as the port's relocation). */
 const val STABLE_REF_MAX_SHIFT = RELOCATE_MAX_SHIFT
 
-/** 旧 snapshotId 能翻译的最多几屏之前;更早的按过期处理。 */
+/** How many screens back an old snapshotId can still be translated; anything older is treated as expired. */
 private const val KEEP_CENTERS = 20
 
 /**
- * 跨读屏的稳定元素编号。端口编号只在一次读屏内有效;这里让相邻两屏里没变的元素保持同一个模型编号,
- * 动作时再翻译回端口编号,端口照旧负责过期判断与找回。
+ * Stable element refs across screen reads. Port refs are only valid within a single screen read; this keeps the same
+ * model ref for elements that did not change between two adjacent screens, translates it back to a port ref when
+ * acting, and leaves expiry checks and relocation to the port as before.
  *
- * 沿用旧编号的条件不比端口的找回([relocate])宽:键(角色 + 名字 + 资源 ID)在新旧两屏里都唯一、
- * 前台 App 没换、遍历顺序里前一个有名字的元素(上下文)相同或页面整体没动且它还在原地、
- * 中心位移不超过短边的 [STABLE_REF_MAX_SHIFT];列表里的元素(落在可滚动容器里)还要页面没滚动、它没挪窝。
- * 列表里重复的同名元素(一排「关注」)永远拿新编号:滚动后同一位置已经是另一行。
- * 没名字也没资源 ID 的元素认不出是不是同一个,也拿新编号。编号任务内单调递增,退役的不再复用。
+ * The conditions for reusing an old ref are no looser than the port's relocation ([relocate]): the key (role + name +
+ * resource ID) is unique in both the old and the new screen, the foreground App has not changed, the previous named
+ * element in traversal order (the context) is the same, or the page as a whole did not change and it is still in
+ * place, and the center shift does not exceed [STABLE_REF_MAX_SHIFT] of the short side; elements in a list (inside a
+ * scrollable container) additionally require that the page did not scroll and that they did not move.
+ * Duplicate same-named elements in a list (a row of "Follow" buttons) always get a new ref: after scrolling, the same
+ * position is already a different row. Elements with neither a name nor a resource ID cannot be recognized as the
+ * same one and also get a new ref. Refs increase monotonically within a task, and retired ones are never reused.
  *
- * snapshotId 是 [prefix] 加序号:每块屏一个前缀,看编号就知道是哪块屏的。
+ * snapshotId is [prefix] plus a sequence number: each screen has a prefix, so a ref tells you which screen it is from.
  */
 class RefStabilizer(private val prefix: String = "s") {
     private var nextRef = 1
     private var count = 0
     var latest: ModelSnapshot? = null
         private set
-    /** 最新一屏里每个编号首次出现在第几屏;编号一旦从某屏消失就不会再出现,所以它在 [born, 最新一屏] 里连续存在。 */
+    /** The screen each ref in the latest screen first appeared in; a ref never reappears once it disappears from a screen, so it exists continuously over [born, latest screen]. */
     private var born = mapOf<String, Int>()
-    /** 最近 [KEEP_CENTERS] 屏里每个模型编号的中心;旧 snapshotId 翻译时限制累计位移。 */
+    /** The center of each model ref in the most recent [KEEP_CENTERS] screens; bounds cumulative shift when translating an old snapshotId. */
     private val centers = LinkedHashMap<Int, Map<String, Pair<Int, Int>>>()
 
     fun next(port: ScreenSnapshot): ModelSnapshot {
@@ -85,7 +90,7 @@ class RefStabilizer(private val prefix: String = "s") {
             val k = key(e)
             val old = prevByKey[k]?.singleOrNull()?.takeIf { (j, _) ->
                 identifiable(e) && newCount[k] == 1 && relocate(before[j], before, after, shortSide) == Relocation.Found(i) &&
-                    // 列表项会复用:只有页面没滚、它还在原地才算同一个
+                    // List items are reused: only count it as the same one if the page did not scroll and it is still in place
                     (!(before[j].inList || after[i].inList) || (still && shift(before[j], after[i]) <= shortSide * SAME_SPOT_SHIFT))
             }?.value
             val ref = old?.ref ?: "@e${nextRef++}"
@@ -104,14 +109,14 @@ class RefStabilizer(private val prefix: String = "s") {
         val n = snapshotId.removePrefix(prefix).takeIf { snapshotId.startsWith(prefix) }?.toIntOrNull()
             ?: return Resolved.Stale(StaleCause.SnapshotUnknown)
         if (n < 1 || n > count) return Resolved.Stale(StaleCause.SnapshotUnknown)
-        // 太旧的一屏连当时有哪些编号都没留着:先报 snapshot_unknown,不能把未知/退役编号误报成 ref_retired。
+        // For a screen too old even the refs it had are not kept: report snapshot_unknown first, and never misreport an unknown/retired ref as ref_retired.
         if (n != count && n !in centers) return Resolved.Stale(StaleCause.SnapshotUnknown)
-        // 编号得真是那一屏里的,模型拼错的组合不放过
+        // The ref must really belong to that screen; do not let mistyped combinations through
         val from = born[ref] ?: return Resolved.Stale(StaleCause.RefRetired)
         if (from > n) return Resolved.Stale(StaleCause.RefNotInSnapshot)
         val portRef = cur.toPort[ref] ?: return Resolved.Stale(StaleCause.RefRetired)
         if (n != count) {
-            // 每屏之间都没挪远,累计起来也可能挪远了:从模型看到的那一屏算起
+            // It may not have moved far between any two screens, yet the shifts can add up: measure from the screen the model saw
             val then = centers[n]?.get(ref) ?: return Resolved.Stale(StaleCause.SnapshotUnknown)
             val now = centers[count]?.get(ref) ?: return Resolved.Stale(StaleCause.SnapshotUnknown)
             val limit = min(cur.port.width, cur.port.height) * STABLE_REF_MAX_SHIFT
@@ -128,8 +133,9 @@ class RefStabilizer(private val prefix: String = "s") {
         hypot((a.centerX - b.centerX).toDouble(), (a.centerY - b.centerY).toDouble())
 
     /**
-     * 和端口读屏时一样的特征:上下文是遍历顺序里前一个有名字的元素;
-     * 中心落在别的可滚动元素范围里的算在列表里(端口快照里没有父子关系,按范围推断)。
+     * The same characteristics the port uses when reading a screen: the context is the previous named element in
+     * traversal order; an element whose center falls inside another scrollable element's bounds counts as being in a
+     * list (the port snapshot has no parent-child relations, so it is inferred from bounds).
      */
     private fun locators(s: ScreenSnapshot): List<ElementLocator> {
         val panes = s.elements.filter { it.scrollable && it.bounds.size == 4 }

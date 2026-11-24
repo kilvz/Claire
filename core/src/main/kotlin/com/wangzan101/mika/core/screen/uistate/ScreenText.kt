@@ -7,14 +7,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 object ScreenText {
-    /** 一行一个元素:`@e3 button "搜索" (500,50)`,中心点与点按坐标同为 0–999;超预算时截断并在末尾说明剩余数量。 */
+    /** One element per line: `@e3 button "Search" (500,50)`; the center point uses the same 0–999 coordinates as tap; when over budget, truncate and state the remaining count at the end. */
     fun render(s: ScreenSnapshot, maxChars: Int = 6000): String {
         val lines = s.elements.filter { it.meaningful }.map { line(it, s) }
         val out = StringBuilder()
         var shown = 0
         for (l in lines) {
             val remaining = lines.size - shown - 1
-            // 预留页脚空间,保证整体不超预算
+            // Reserve room for the footer so the output as a whole stays within budget
             val reserve = if (remaining > 0) footer(remaining).length + 1 else 0
             if (out.length + l.length + 1 + reserve > maxChars) break
             out.append(l).append('\n')
@@ -34,7 +34,7 @@ object ScreenText {
 }
 
 object ScreenJson {
-    /** observe 的元素数组;center 换成与 tap 坐标相同的 0–999(像素只在端口内部用);bounds 换成 size=[宽,高](同一网格,省两个冗余角坐标);返回数组与被截掉的元素数。 */
+    /** Element array for observe; center is converted to the same 0–999 coordinates as tap (pixels are only used inside the port); bounds becomes size=[width,height] (same grid, saving the two redundant corner coordinates); returns the array and the number of elements truncated. */
     fun elements(s: ScreenSnapshot, maxElements: Int): Pair<JsonArray, Int> {
         val all = s.elements.filter { it.meaningful }
         val arr = buildJsonArray {

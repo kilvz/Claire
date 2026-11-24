@@ -39,21 +39,21 @@ import com.wangzan101.mika.core.screen.uistate.withPortRef
 
 private const val KEYCODE_ENTER = 66
 
-/** 输入、清空另收的参数:一个点的坐标(ref 也可以是看图找到的 @vN),树读不到输入框时直接往那一点打字。 */
+/** Extra parameters taken by typing and clearing: the coordinates of a point (ref may also be a visually found @vN); when the tree cannot read the input field, type straight at that point. */
 private val POINT_ARGS = mapOf(
     "x" to int("Instead of a ref: the input box's point (e.g. a visibleText center), tapped before typing. $COORD", 0, 999),
     "y" to int(COORD, 0, 999),
 )
 
-/** 往哪儿打字:树里的元素(编号),或一个点(像素;[located] 是看图找到的 @vN,不是为 null)。 */
+/** Where to type: an element in the tree (ref), or a point (pixels; [located] is a visually found @vN, not null in that case). */
 private sealed interface FieldAim {
     data class Ref(val ref: Pair<String, String>?) : FieldAim
     data class Point(val x: Int, val y: Int, val located: String?) : FieldAim
 }
 
 /**
- * 按参数定往哪儿打字:没给点时是编号(或焦点所在的框);给了坐标或 @vN 时是那一点,@vN 要和找到时的画面对得上。
- * 不能用的 @vN 返回给模型的失败结果。
+ * Decide from the arguments where to type: a ref (or the focused field) when no point is given; that point when coordinates or @vN are given, where @vN must still match the picture from when it was found.
+ * An unusable @vN yields a failure result for the model.
  */
 private suspend fun aim(a: Args, ctx: ToolContext): Pair<FieldAim?, ToolExecution?> {
     val ref = a.ref(located = true)
@@ -72,7 +72,7 @@ private suspend fun aim(a: Args, ctx: ToolContext): Pair<FieldAim?, ToolExecutio
     return FieldAim.Ref(ref) to null
 }
 
-/** 往看图找到的点上打字、清空时结果里写上找的是什么;没佐证的点标出来。 */
+/** When typing into or clearing a visually found point, write what it was looking for into the result; flag uncorroborated points. */
 private fun located(ctx: ToolContext, aim: FieldAim?, r: ToolExecution): ToolExecution {
     val ref = (aim as? FieldAim.Point)?.located ?: return r
     val info = ctx.locatedInfo[ref] ?: return r
@@ -80,7 +80,7 @@ private fun located(ctx: ToolContext, aim: FieldAim?, r: ToolExecution): ToolExe
     return if (extra.isEmpty()) r else r.with(content = JsonObject(r.content + extra))
 }
 
-/** 输入(带回车时可能是发送,要按目标判不可逆)。 */
+/** Type text (with Enter it may send, so irreversibility is judged by the target). */
 internal class TypeText(f: ScreenFamily) : ScreenTool(f, "type_text") {
     override val verb = Verb.TypeText
     override val batchable = true
@@ -124,7 +124,7 @@ internal class TypeText(f: ScreenFamily) : ScreenTool(f, "type_text") {
             put("recoverable", true)
         })
         val switched = typed.appSwitched
-        // 读不回来就不按回车:可能把没打进去的内容提交出去;前台被切走时回车会打到别的 App 上
+        // Do not press Enter when the input cannot be read back: it could submit content that was not typed; when the foreground was switched away, Enter would land in another App
         val pressEnter = enter && v != Verification.UNKNOWN && switched == null
         if (pressEnter) {
             val k = screen.pressKey(KEYCODE_ENTER)
@@ -150,7 +150,7 @@ internal class TypeText(f: ScreenFamily) : ScreenTool(f, "type_text") {
 
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = refTarget(o, r, ctx.lastSnapshot) ?: pointTarget(o)
 
-    // 只有端口明确说不是密码框才写出输入的字
+    // Write out the typed text only when the port explicitly says it is not a password field
     override fun logTyped(o: JsonObject, r: ToolExecution) =
         o.argStr("text")?.takeIf { r.content["secret"] == JsonPrimitive(false) }?.let { "「${it.take(40)}」" }
 }
@@ -179,5 +179,5 @@ internal class ClearText(f: ScreenFamily) : ScreenTool(f, "clear_text") {
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = refTarget(o, r, ctx.lastSnapshot) ?: pointTarget(o)
 }
 
-/** 往坐标点上打字、清空时动作清单里写的对象。 */
+/** The target written in the action log when typing into or clearing a coordinate point. */
 private fun pointTarget(o: JsonObject): String? = o["x"]?.let { x -> "${x},${o["y"]}" }
