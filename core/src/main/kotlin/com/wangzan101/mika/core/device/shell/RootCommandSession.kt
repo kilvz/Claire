@@ -1,12 +1,12 @@
 package com.wangzan101.mika.core.device.shell
 
-/** 在 su 的执行端监督命令。标准输入留给 App，关闭时结束这次命令的进程组。 */
+/** Supervises the command on su's execution side. Standard input is left to the App, and closing it ends the process group of this command. */
 object RootCommandSession {
     private const val SYSTEM_SHELL = "/system/bin/sh"
 
     /**
-     * 只探测固定系统路径，不从命令的环境或用户目录取监督程序。
-     * 没有可用的 setsid 或 kill 时仍按原方式执行，由 App 结束 su 兜底。
+     * Only fixed system paths are probed; supervisor programs are not taken from the command's environment or the user's directory.
+     * When no usable setsid or kill exists it still runs the original way, with the App ending su as a fallback.
      */
     val androidScript = script(
         shell = SYSTEM_SHELL,
@@ -22,8 +22,8 @@ object RootCommandSession {
     )
 
     /**
-     * 调用方把命令放在变量 c 中。setsid 会派生进程时由 -w 等待，监督脚本在新会话内取得实际组号。
-     * 参数只接受代码里固定的可执行文件和参数，不用于拼接用户输入。
+     * The caller puts the command in the variable c. When setsid forks a process, -w waits for it, and the supervisor script obtains the real group id within the new session.
+     * The parameters only accept executables and arguments fixed in the code; they are never used to splice user input.
      */
     internal fun script(shell: String, setsid: List<List<String>>, kill: List<List<String>>): String {
         require(setsid.all { it.isNotEmpty() } && kill.all { it.isNotEmpty() })

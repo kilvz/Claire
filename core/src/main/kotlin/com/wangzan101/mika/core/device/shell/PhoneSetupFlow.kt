@@ -1,54 +1,54 @@
 package com.wangzan101.mika.core.device.shell
 
-/** 引导的六步,按顺序。 */
+/** The six guide steps, in order. */
 enum class SetupStep { DeveloperOptions, UsbDebugging, Accessibility, WirelessDebugging, PairingCode, Connect }
 
-/** [Skipped]:用户跳过了这一步(只有无障碍能跳过)。 */
+/** [Skipped]: the user skipped this step (only accessibility can be skipped). */
 enum class StepMark { Done, Current, Todo, Failed, Skipped }
 
 enum class SetupPhase {
-    /** 等用户做某一步。 */
+    /** Waiting for the user to do one of the steps. */
     Guide,
-    /** 正在配对、连接、启动:显示进度。 */
+    /** Pairing, connecting or starting: show progress. */
     Working,
     Success,
-    /** 出错:[SetupView.failure] 给原因和修复,[SetupView.suspect] 指出最可能要回去重做的一步。 */
+    /** Something went wrong: [SetupView.failure] gives the cause and the fix, [SetupView.suspect] indicates the step most likely to need redoing. */
     Failed,
-    /** 这个环境里没有能起助手的路(见 [PhoneSetupFlow.unavailable]):一开始就说明,不给走不通的步骤。 */
+    /** There is no way to start the helper in this environment (see [PhoneSetupFlow.unavailable]): say so up front instead of offering steps that cannot work. */
     Unavailable,
 }
 
-/** 配对通知频道的样子:[Off] 被关掉,通知发不出来;[Lowered] 被用户调成不在屏幕顶部弹出,还能下拉通知栏去填。 */
+/** The shape of the pairing notification channel: [Off] is disabled and notifications cannot be posted; [Lowered] was set by the user so it no longer pops up at the top of the screen, but the notification shade can still be pulled down to fill it in. */
 enum class PairingChannelHealth { Ready, Lowered, Off }
 
-/** 配对码要填在通知里,通知这边没准备好的地方。 */
+/** What is not ready on the notification side, when the pairing code has to be filled in the notification. */
 enum class PairingNotifyIssue {
-    /** 没允许 Claire 发通知(权限或整个 App 的通知开关)。 */
+    /** Claire is not allowed to post notifications (permission or the App-wide notification switch). */
     NotificationsOff,
-    /** 「配对」这一类通知被关掉了。 */
+    /** The "pairing" notification category is turned off. */
     ChannelOff,
-    /** 「配对」通知不会弹出:不挡,只提醒。 */
+    /** The "pairing" notification will not pop up: this does not block, it only warns. */
     NotHeadsUp,
 }
 
 /**
- * 引导页的输入:系统设置里读到的开关、用户自己的确认和助手的状态。
- * 读到的开关只用来自动打勾和给提示,不拦死:有的手机读不到或读不准,用户点了「我已经打开了,下一步」([confirmed])就往下走。
- * [wirelessDebugging] 为 null 表示这台手机读不到这个开关(不按原版写设置项):不拦着,当作开着往下走。
- * [confirmed] 是用户说已经做好的几步;[revisit] 是用户在清单里点了前面的某一步,要回去重做。
- * [repair] 是用户在设置页点了「重新配对」:即便已在运行,也回到配对那一步,直到新的配对开始。
- * [usbDebugging] 开着时,Wi-Fi 断开、无线调试被系统关掉后助手也不会停。
- * [accessibility] 是 Claire 的无障碍服务在运行:配对时由它读出配对码;用户可以跳过([accessibilitySkipped]),退回在通知里填。
- * [restrictedSettings] 是系统可能拦着不让打开无障碍(没从应用商店装的 App 要先在应用信息里允许受限制的设置)。
- * [notificationsAllowed]、[pairingChannel] 决定配对码能不能填在通知里。
- * 下面三项决定要不要给「改用电脑启动」(见 [SetupView.usbFallback]):
- * [wirelessMissing] 是系统里根本没有无线调试这一项(原版开机时总会写好这项设置,读不到就是系统没带这个功能);
- * [stalledMs] 是停在无线调试、配对(还没找到配对窗口)、自动连接这几处多久没有进展(见 [PhoneSetupFlow.stallPoint]);
- * [usbAsked] 是用户点了「找不到无线调试?」,或卡片已经出现过(出现后不再收回,免得一会儿有一会儿没)。
- * [restart] 是助手停了以后靠什么再起来(见 [HelperRestart]):只用 USB 启动命令起过时,无线调试和配对两步记作跳过,
- * 助手停了就停在连接一步说它停了、给命令,不退回无线调试一步。
- * [developerSettingsMissing] 是系统里打不开「开发者选项」页(跳过去的 Intent 没有页面接):和 [wirelessMissing] 一起成立时,
- * 用户既开不了 USB 调试也开不了无线调试,见 [PhoneSetupFlow.unavailable]。
+ * Inputs of the guide page: the switches read from system settings, the user's own confirmations, and the helper's status.
+ * The switches that were read are only used to tick automatically and give hints; they never hard-block: some phones cannot read them or read them wrongly, so once the user taps "I've turned it on, next" ([confirmed]) it moves on.
+ * [wirelessDebugging] being null means this phone cannot read this switch (the setting item is not written the stock way): it does not block and is treated as on.
+ * [confirmed] holds the steps the user says are done; [revisit] is a previous step the user tapped in the checklist and wants to redo.
+ * [repair] means the user tapped "re-pair" on the settings page: even when already running, it goes back to the pairing step until a new pairing starts.
+ * While [usbDebugging] is on, the helper does not stop when Wi-Fi drops or wireless debugging is turned off by the system.
+ * [accessibility] means Claire's accessibility service is running: during pairing it reads the pairing code; the user may skip it ([accessibilitySkipped]) and fall back to filling the code in the notification.
+ * [restrictedSettings] means the system may block turning accessibility on (an App not installed from an app store must first allow restricted settings in its app info).
+ * [notificationsAllowed] and [pairingChannel] decide whether the pairing code can be filled in the notification.
+ * The next three decide whether to offer "start with a computer instead" (see [SetupView.usbFallback]):
+ * [wirelessMissing] means there is no wireless debugging item in the system at all (stock Android always writes this setting at boot, so if it cannot be read the system does not have this feature);
+ * [stalledMs] is how long it has been without progress at the wireless debugging step, at pairing (before the pairing window is found), or at automatic connection (see [PhoneSetupFlow.stallPoint]);
+ * [usbAsked] means the user tapped "Can't find wireless debugging?" or the card has already appeared (once shown it is not taken away again, so it does not keep disappearing and reappearing).
+ * [restart] is what brings the helper back after it stops (see [HelperRestart]): when it was only ever started by the USB launch command, the wireless debugging and pairing steps count as skipped,
+ * and once the helper stops the guide stays on the connect step saying it stopped and giving the command, without falling back to the wireless debugging step.
+ * [developerSettingsMissing] means the "Developer options" page cannot be opened in the system (the Intent to it has no activity to handle it): when this holds together with [wirelessMissing],
+ * the user can turn on neither USB debugging nor wireless debugging, see [PhoneSetupFlow.unavailable].
  */
 data class SetupInputs(
     val developerOptions: Boolean,
@@ -71,57 +71,57 @@ data class SetupInputs(
     val developerSettingsMissing: Boolean = false,
 )
 
-/** 配对或连接没成功时最可能的原因:[step] 这一步读到是关着的;[unreadable] 为真是这台手机根本读不到。 */
+/** The most likely cause when pairing or connecting did not succeed: the setting for [step] was read as off; [unreadable] is true when this phone simply cannot read it. */
 data class SetupSuspect(val step: SetupStep, val unreadable: Boolean)
 
 data class SetupView(
     val phase: SetupPhase,
     val marks: Map<SetupStep, StepMark>,
-    /** 此刻该做的一步(Guide 和 Failed 时);Working/Success 时为 null。 */
+    /** The step to do right now (for Guide and Failed); null for Working/Success. */
     val current: SetupStep?,
     val failure: BuiltinShellStatus.Failed? = null,
-    /** 配对窗口已经找到:提示用户去通知里填码。 */
+    /** The pairing window has been found: prompt the user to fill the code in the notification. */
     val portFound: Boolean = false,
-    /** 停在配对一步时通知这边的问题;[needsNotifications] 为真时要先修好才能在通知里填码。 */
+    /** The notification-side problem while on the pairing step; when [needsNotifications] is true it must be fixed first before the code can be filled in the notification. */
     val notifyIssue: PairingNotifyIssue? = null,
-    /** 配对一步时无障碍开着:Claire 自己读配对码,不用去通知里填。 */
+    /** On the pairing step with accessibility on: Claire reads the pairing code itself, no need to fill it in the notification. */
     val autoRead: Boolean = false,
-    /** 无障碍一步时给出「去应用信息允许受限制的设置」的入口。 */
+    /** On the accessibility step, offer the entry to "allow restricted settings in app info". */
     val showAppInfo: Boolean = false,
-    /** 失败时最可能要回去重做的前一步,界面给一个回去的按钮。 */
+    /** The previous step most likely to need redoing when it fails; the UI offers a go-back button for it. */
     val suspect: SetupSuspect? = null,
-    /** 当前这一步是用户点回来重做的:界面给「回到原来的步骤」。 */
+    /** The current step is one the user tapped to redo: the UI offers "back to the original step". */
     val revisiting: Boolean = false,
-    /** 在当前这一步给「改用电脑启动」的卡片:无线调试多半用不了,或者卡住了。正常走下去时不给。 */
+    /** Offer the "start with a computer instead" card on the current step: wireless debugging most likely does not work, or it is stuck. Not offered when things proceed normally. */
     val usbFallback: Boolean = false,
-    /** 助手停了以后靠什么再起来(照抄 [SetupInputs.restart]):成功页的提醒、「改用电脑启动」卡片怎么说看它。 */
+    /** What brings the helper back after it stops (copied from [SetupInputs.restart]): it decides what the success page reminder and the "start with a computer instead" card say. */
     val restart: HelperRestart = HelperRestart.None,
 ) {
-    /** 通知发不出来(没允许,或「配对」通知被关):配对码要填在通知里,先修好。 */
+    /** Notifications cannot be posted (not allowed, or the "pairing" notification is off): the pairing code has to be filled in the notification, so fix this first. */
     val needsNotifications: Boolean
         get() = notifyIssue == PairingNotifyIssue.NotificationsOff || notifyIssue == PairingNotifyIssue.ChannelOff
 }
 
 /**
- * 引导页的状态机:每次输入变化(系统设置开关、用户确认、助手状态、找配对窗口的进度)都重新算一遍,不存中间状态。
- * 成功只看助手:连上了就算设置好,不管前面读到什么。前面几步读到做好了就自动打勾;读到没做好、用户也没确认,就停在那一步,
- * 但用户随时可以点「我已经打开了,下一步」往下走,所以哪一步都不会卡死。
- * 读到开关被关掉、又没确认过时,不管助手之前怎样,都退回那一步。
+ * State machine of the guide page: it recomputes on every input change (system setting switches, user confirmations, helper status, pairing-window discovery progress) and keeps no intermediate state.
+ * Success looks only at the helper: once connected it counts as set up, regardless of what was read earlier. Earlier steps are ticked automatically when read as done; when read as not done and the user has not confirmed, it stays on that step,
+ * but the user can always tap "I've turned it on, next" to move on, so no step can dead-end.
+ * When a switch is read as off and the user has not confirmed it, it falls back to that step no matter what the helper did before.
  */
 object PhoneSetupFlow {
-    /** 配对、连接时可能因为前面的开关没开而失败的几类(配对码不对说明配对窗口开着,不算)。 */
+    /** The kinds of failure during pairing or connection that may come from an earlier switch being off (a wrong pairing code means the pairing window is open, so it does not count). */
     private val SWITCH_RELATED = setOf(BuiltinShellFailure.PairingWindowClosed, BuiltinShellFailure.ConnectFailed, BuiltinShellFailure.Unknown)
 
-    /** 用户能点回去重做的几步:自动连接那一步没有要用户做的事。 */
+    /** The steps the user can tap to redo: the automatic connection step has nothing for the user to do. */
     val REVISITABLE: Set<SetupStep> = SetupStep.entries.toSet() - SetupStep.Connect
 
-    /** 有「我已经打开了,下一步」的几步:读的是系统开关(无障碍另有跳过)。 */
+    /** The steps with an "I've turned it on, next" option: these read system switches (accessibility has its own skip instead). */
     val CONFIRMABLE: Set<SetupStep> = setOf(SetupStep.DeveloperOptions, SetupStep.UsbDebugging, SetupStep.WirelessDebugging)
 
-    /** 停在 [stallPoint] 这么久没有进展,就给「改用电脑启动」。 */
+    /** After no progress at [stallPoint] for this long, offer "start with a computer instead". */
     const val STALL_MS = 45_000L
 
-    /** 这几类失败说明无线调试这条路走不通,给「改用电脑启动」:找不到配对窗口、连不上、电脑起的助手停了。 */
+    /** These kinds of failure mean the wireless debugging path does not work and "start with a computer instead" is offered: no pairing window found, cannot connect, the computer-started helper stopped. */
     private val USB_FAILURES = setOf(BuiltinShellFailure.PairingWindowClosed, BuiltinShellFailure.ConnectFailed, BuiltinShellFailure.UsbHelperStopped)
 
     fun view(i: SetupInputs): SetupView {
@@ -130,9 +130,9 @@ object PhoneSetupFlow {
     }
 
     /**
-     * 这个环境能不能设置手机操作:系统里打不开开发者选项页、也没有无线调试这一项,就没有能起助手的路
-     * (USB 调试和无线调试都在开发者选项里,电脑启动也要 USB 调试)。助手已经在运行、正在起来,或以前起来过,
-     * 说明有别的路,不算。
+     * Whether phone control can be set up in this environment: when the developer options page cannot be opened and there is no wireless debugging item, there is no way to start the helper
+     * (both USB debugging and wireless debugging live under developer options, and computer launch also needs USB debugging). If the helper is already running, is starting, or was started before,
+     * that means some other path exists and this does not apply.
      */
     fun unavailable(developerSettingsMissing: Boolean, wirelessMissing: Boolean, status: BuiltinShellStatus, restart: HelperRestart): Boolean =
         developerSettingsMissing && wirelessMissing && restart == HelperRestart.None &&
@@ -142,8 +142,8 @@ object PhoneSetupFlow {
         unavailable(i.developerSettingsMissing, i.wirelessMissing, i.status, i.restart)
 
     /**
-     * 卡住计时算在哪一处:停在无线调试一步、停在配对一步还没找到配对窗口(系统一直没有配对服务)、正在自动连接。
-     * 前面几步要用户自己去系统设置里找,花多久都正常,不算;换了地方就从头算。
+     * Which point the stall timer is counted at: stuck on the wireless debugging step, stuck on the pairing step before the pairing window is found (the system never offered a pairing service), or auto-connecting.
+     * The earlier steps require the user to go find things in system settings, where any amount of time is normal and does not count; moving to a different point restarts the count.
      */
     fun stallPoint(v: SetupView): SetupStep? = when {
         v.phase == SetupPhase.Working -> SetupStep.Connect
@@ -154,8 +154,8 @@ object PhoneSetupFlow {
     }
 
     /**
-     * 要不要给「改用电脑启动」:系统没有无线调试、用户说找不到,都只在走到无线调试这一步以后给(电脑启动也要先做完前两步);
-     * 配对、连接失败在上面几类里,或者用户说开了、助手却读到关着;在 [stallPoint] 停了 [STALL_MS] 以上。别的时候不给。
+     * Whether to offer "start with a computer instead": no wireless debugging in the system and the user saying they cannot find it are only offered after reaching the wireless debugging step (computer launch also requires the first two steps to be done);
+     * also when pairing/connection failed in the kinds above, or the user says it is on while the helper reads it as off; and when stalled at [stallPoint] for [STALL_MS] or more. Not offered otherwise.
      */
     private fun usbFallback(v: SetupView, i: SetupInputs): Boolean {
         if (v.phase == SetupPhase.Success) return false
@@ -170,18 +170,18 @@ object PhoneSetupFlow {
         val status = effectiveStatus(i.status, i.repair)
         if (status == BuiltinShellStatus.Running) return SetupView(SetupPhase.Success, marks(SetupStep.entries.size, i), null)
         val natural = natural(i, status)
-        // 正在连接时以进度为准;读到更前面的一步被关掉时先回那一步
+        // While connecting, progress takes precedence; when an earlier step is read as off, go back to that step first
         val back = i.revisit?.takeIf { it in REVISITABLE && status != BuiltinShellStatus.Connecting } ?: return natural
         val earlier = natural.phase == SetupPhase.Guide && natural.current != null && natural.current < back
         if (earlier) return natural
-        // 别的步骤照旧打勾或标失败,原来停着的那一步先变回待做
+        // Other steps are still ticked or marked failed, and the step that was current first turns back into to-do
         val marks = natural.marks.mapValues { (_, m) -> if (m == StepMark.Current) StepMark.Todo else m } + (back to StepMark.Current)
         return guide(back, i).copy(marks = marks, revisiting = true)
     }
 
     /**
-     * 没有回头重做时的样子。正在连接(包括助手换手、刚起来等交接)以进度为准,不因为读到无线调试关着就退回那一步:
-     * 电脑起的助手、能替用户打开无线调试时,都不用用户去开。USB 启动命令起的助手停了,同样不往无线调试引。
+     * The view when not redoing an earlier step. While connecting (including a helper swap, or a freshly started one awaiting handoff) progress takes precedence, and it does not fall back to that step just because wireless debugging was read as off:
+     * with a computer-started helper, or when wireless debugging can be turned on for the user, the user does not have to turn it on. A stopped helper started by the USB command likewise does not point to wireless debugging.
      */
     private fun natural(i: SetupInputs, status: BuiltinShellStatus): SetupView {
         if (blocks(SetupStep.DeveloperOptions, i)) return guide(SetupStep.DeveloperOptions, i)
@@ -194,12 +194,12 @@ object PhoneSetupFlow {
                 failure = status,
             )
         }
-        // 读不到开关时以助手的说法为准;用户确认过就不拦
+        // When the switch cannot be read, the helper's word is authoritative; if the user confirmed, do not block
         val wirelessConfirmed = SetupStep.WirelessDebugging in i.confirmed
         val wirelessOff = !wirelessConfirmed &&
             (i.wirelessDebugging == false || (i.wirelessDebugging == null && status == BuiltinShellStatus.WirelessDebuggingOff))
         if (wirelessOff) return guide(SetupStep.WirelessDebugging, i)
-        // 用户说开了,助手却读到关着、不去连:不一直转圈,指出是哪一步并给回去的按钮
+        // The user says it is on but the helper reads it as off and will not connect: do not spin forever; point out which step and offer a go-back button
         if (status == BuiltinShellStatus.WirelessDebuggingOff && wirelessConfirmed && i.wirelessDebugging != true) {
             return SetupView(
                 SetupPhase.Failed, marks(SetupStep.Connect.ordinal, i, current = SetupStep.Connect, mark = StepMark.Failed), SetupStep.Connect,
@@ -209,7 +209,7 @@ object PhoneSetupFlow {
         return when (status) {
             BuiltinShellStatus.Running -> error("handled above")
             BuiltinShellStatus.Connecting -> error("handled above")
-            // 配对过、无线调试开着而状态还没跟上:实现马上会自动连,先显示「正在连接」
+            // Paired and wireless debugging is on but the status has not caught up yet: the implementation connects automatically right away, so show "connecting" first
             BuiltinShellStatus.WirelessDebuggingOff -> working(i)
             BuiltinShellStatus.NotPaired -> guide(SetupStep.PairingCode, i)
             is BuiltinShellStatus.Failed -> {
@@ -227,11 +227,11 @@ object PhoneSetupFlow {
 
     private fun working(i: SetupInputs) = SetupView(SetupPhase.Working, marks(SetupStep.Connect.ordinal, i, current = SetupStep.Connect), null)
 
-    /** 读到这一步没做好,用户也没确认(无障碍还可以跳过):停在这一步。 */
+    /** This step was read as not done and the user has not confirmed it (accessibility may still be skipped): stay on this step. */
     private fun blocks(step: SetupStep, i: SetupInputs): Boolean =
         detected(step, i) == false && step !in i.confirmed && !(step == SetupStep.Accessibility && i.accessibilitySkipped)
 
-    /** 从系统设置读到的这一步做没做好;读不到、或这一步不是开关时为 null。 */
+    /** Whether this step was read as done from system settings; null when it cannot be read or the step is not a switch. */
     fun detected(step: SetupStep, i: SetupInputs): Boolean? = when (step) {
         SetupStep.DeveloperOptions -> i.developerOptions
         SetupStep.UsbDebugging -> i.usbDebugging
@@ -240,7 +240,7 @@ object PhoneSetupFlow {
         SetupStep.PairingCode, SetupStep.Connect -> null
     }
 
-    /** 配对、连接要靠开发者选项和无线调试:按顺序找第一个读到关着(用户确认过才走到这里)或读不到的。 */
+    /** Pairing and connecting depend on developer options and wireless debugging: find the first one, in order, that is read as off (the user must have confirmed it to get this far) or cannot be read. */
     private fun suspect(i: SetupInputs): SetupSuspect? = when {
         !i.developerOptions -> SetupSuspect(SetupStep.DeveloperOptions, unreadable = false)
         i.wirelessDebugging != true -> SetupSuspect(SetupStep.WirelessDebugging, unreadable = i.wirelessDebugging == null)
@@ -263,10 +263,10 @@ object PhoneSetupFlow {
         else -> null
     }
 
-    /** 只用 USB 启动命令起过助手时没走的两步。 */
+    /** The two steps not walked through when the helper was only ever started by the USB launch command. */
     private val WIRELESS_STEPS = setOf(SetupStep.WirelessDebugging, SetupStep.PairingCode)
 
-    /** 前 [done] 步做完(跳过的无障碍、USB 启动时没走的无线调试和配对记成跳过),[current] 这一步打 [mark],其余待做。 */
+    /** The first [done] steps are done (a skipped accessibility, or the wireless debugging and pairing steps left out for USB launch, count as skipped), the [current] step gets [mark], and the rest are to-do. */
     private fun marks(done: Int, i: SetupInputs, current: SetupStep? = null, mark: StepMark = StepMark.Current): Map<SetupStep, StepMark> =
         SetupStep.entries.associateWith { s ->
             when {
@@ -278,7 +278,7 @@ object PhoneSetupFlow {
             }
         }
 
-    /** 「重新配对」时,配对开始([BuiltinShellStatus.Connecting])之前助手在不在运行都当作还没配对。 */
+    /** When re-pairing, whether the helper is running does not matter before pairing begins ([BuiltinShellStatus.Connecting]): it is treated as not paired. */
     fun effectiveStatus(status: BuiltinShellStatus, repair: Boolean): BuiltinShellStatus =
         if (repair && status !is BuiltinShellStatus.Connecting) BuiltinShellStatus.NotPaired else status
 }

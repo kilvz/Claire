@@ -1,28 +1,28 @@
 package com.wangzan101.mika.core.device.shell
 
 /**
- * Claire 交给内置助手的心愿:自己的进程被杀后要不要把它拉起来([revive]),拉起来之前要不要把 Claire 的无障碍服务写回系统列表([accessibility])。
- * 助手读不到 Claire 的设置,只认 Claire 最后一次经 Binder 交来的这一份(见 [RestoreWishSender])。
+ * The wish Claire hands to the built-in helper: whether to bring it back up after its process is killed ([revive]), and whether to write Claire's accessibility service back into the system list before doing so ([accessibility]).
+ * The helper cannot read Claire's settings and only honors the latest copy Claire delivered over the Binder (see [RestoreWishSender]).
  */
 data class RestoreWish(val revive: Boolean, val accessibility: Boolean) {
-    /** 经 AIDL 传的整数。 */
+    /** Integer passed over AIDL. */
     val flags: Int get() = (if (revive) REVIVE else 0) or (if (accessibility) ACCESSIBILITY else 0)
 
     companion object {
         const val REVIVE = 1
         const val ACCESSIBILITY = 2
 
-        /** 助手刚起来、Claire 还没交来心愿时:什么都不做。 */
+        /** When the helper has just started and Claire has not delivered a wish yet: do nothing. */
         val NONE = RestoreWish(revive = false, accessibility = false)
 
         fun fromFlags(flags: Int) = RestoreWish(flags and REVIVE != 0, flags and ACCESSIBILITY != 0)
 
         /**
-         * 异常死亡时恢复用户还在用的能力:胶囊一直显示、任务在跑、或无障碍服务已打开。
-         * 最后一种也把服务授权恢复回来,不能只在常驻胶囊或有任务时才修。
-         * 用户明确退出(包括清掉最近任务)后,[userExited] 让心愿为空,直到下次手动打开 Claire。
-         * 无障碍服务只在用户没在 Claire 里关掉「替我打开无障碍」([accessibilityWanted])、
-         * 而且此刻系统列表里确实有 Claire([accessibilityOn])时才写回:用户趁 Claire 活着在系统设置里关掉的,不替他打开。
+         * On an abnormal death, restore the capabilities the user was still using: the capsule is always shown, a task is running, or the accessibility service is already on.
+         * The last one also restores the service permission; it must not be fixed only when the persistent capsule is present or a task is running.
+         * After the user explicitly exits (including clearing recent tasks), [userExited] makes the wish empty until Claire is opened manually next time.
+         * The accessibility service is only written back when the user has not turned off "turn on accessibility for me" inside Claire ([accessibilityWanted])
+         * and Claire is actually in the system list right now ([accessibilityOn]): if the user turned it off in the system settings while Claire was alive, it is not turned back on for them.
          */
         fun of(
             capsuleAlways: Boolean,
@@ -39,8 +39,8 @@ data class RestoreWish(val revive: Boolean, val accessibility: Boolean) {
 }
 
 /**
- * Claire 一侧:把心愿交给手里的助手。换了助手(新的 Binder)或心愿变了才交;交失败不记,下次再交。
- * [send] 返回是否交到了。
+ * The Claire side: hands the wish to the helper in hand. It is only delivered when the helper changes (a new Binder) or the wish changes; a failed delivery is not recorded and is retried next time.
+ * [send] returns whether it was delivered.
  */
 class RestoreWishSender<T : Any>(private val send: (T, RestoreWish) -> Boolean) {
     private var shell: T? = null
@@ -64,14 +64,14 @@ class RestoreWishSender<T : Any>(private val send: (T, RestoreWish) -> Boolean) 
     }
 }
 
-/** 助手在交接时告诉 Claire 的:上次把它拉起来的时间、最近窗口内拉了几次、上次因为拉得太勤而作罢的时间(墙上时钟毫秒,0 表示没有)。 */
+/** What the helper tells Claire during the handoff: when it last brought Claire up, how many times it has done so within the recent window, and when it last gave up for pulling too often (wall-clock milliseconds, 0 means never). */
 data class HelperRestoreReport(val lastRestoredAtMs: Long, val recent: Int, val gaveUpAtMs: Long) {
     val empty: Boolean get() = lastRestoredAtMs == 0L && gaveUpAtMs == 0L
 }
 
 /**
- * 助手一侧:Claire 的进程没了、过了 [GRACE_MS] 还没回来时,决定要不要把它拉起来。
- * 只看 Claire 最后交来的 [RestoreWish] 和系统是否把包标成强停;[windowMs] 里最多拉 [maxAttempts] 次,拉起来又马上死掉就停手,等窗口过去。
+ * The helper side: decides whether to bring Claire up when its process is gone and has not returned after [GRACE_MS].
+ * It only looks at the [RestoreWish] Claire delivered last and whether the system has marked the package as force-stopped; it restores at most [maxAttempts] times within [windowMs], and if Claire dies again right after being brought up it stops and waits for the window to pass.
  */
 class HelperRestorePolicy(
     private val maxAttempts: Int = MAX_ATTEMPTS,
@@ -79,13 +79,13 @@ class HelperRestorePolicy(
 ) {
     enum class Decision {
         Restore,
-        /** Claire 没要(用户明确退出了,或没有还在用、需要恢复的能力)。 */
+        /** Claire did not ask for it (the user explicitly exited, or no capability is still in use that needs restoring). */
         NotWanted,
-        /** 用户在系统里强行停止了 Claire;这次死亡不能像异常死亡一样自动拉回。 */
+        /** The user force-stopped Claire in the system; this death must not be brought back automatically like an abnormal death. */
         ForceStopped,
-        /** 等的这一会儿里 Claire 自己回来了(或正在交接)。 */
+        /** Claire came back on its own during this wait (or is handing off). */
         AppBack,
-        /** 最近拉得太勤:Claire 一拉起来就又死,不再拉。 */
+        /** Pulled too often recently: Claire dies again as soon as it is brought up, so it stops pulling. */
         BackedOff,
     }
 
@@ -115,41 +115,41 @@ class HelperRestorePolicy(
     }
 
     private fun prune(now: Long) {
-        // 时钟倒退时也清掉:看不清就不算
+        // Also cleared when the clock goes backwards: if it cannot be told clearly, it does not count
         while (attempts.isNotEmpty() && (now - attempts.first() >= windowMs || now < attempts.first())) attempts.removeFirst()
     }
 
     companion object {
-        /** Claire 死后先等这么久:系统或用户可能马上把它重新打开,那就不用助手动手。 */
+        /** Wait this long after Claire dies: the system or the user may reopen it right away, in which case the helper does not need to act. */
         const val GRACE_MS = 8_000L
         const val MAX_ATTEMPTS = 3
         const val WINDOW_MS = 10 * 60_000L
     }
 }
 
-/** 助手把 Claire 拉起来之前,写回无障碍服务的命令(安卓原版 settings 的写法)。 */
+/** The command that writes the accessibility service back before the helper brings Claire up (written the way stock Android's settings does it). */
 object RestoreCommands {
     const val ENABLE_ACCESSIBILITY = "settings put secure accessibility_enabled 1"
 
-    /** 列表里没有 Claire 就追加(别的服务一个不动),有就只把总开关打开;[current] 是 `settings get` 读到的原样输出。 */
+    /** Appends Claire when it is not in the list (leaving the other services untouched), and only turns on the master switch when it is; [current] is the raw output read by `settings get`. */
     fun accessibility(current: String?, component: String): List<String> =
         if (AccessibilityList.contains(current, component)) listOf(ENABLE_ACCESSIBILITY)
         else PermissionCommands.writeAccessibility(AccessibilityList.with(current, component))
 }
 
-/** Claire 启动时看到的无障碍服务问题:被从系统列表里拿掉了,或在列表里却一直没绑定。 */
+/** The accessibility service problem seen when Claire starts: it was removed from the system list, or it is in the list but never got bound. */
 enum class A11yLoss { Removed, Unbound }
 
-/** 上一次在 Claire 启动时看到的无障碍服务问题和时间(墙上时钟毫秒)。 */
+/** The accessibility service problem seen at the last Claire start, and when (wall-clock milliseconds). */
 data class A11yLossRecord(val loss: A11yLoss, val atMs: Long)
 
 object A11yStartCheck {
-    /** 等服务连上的时长:进程刚起来时系统通常几秒内就会绑定。 */
+    /** How long to wait for the service to connect: right after the process starts the system usually binds it within a few seconds. */
     const val CONNECT_WAIT_MS = 5_000L
 
     /**
-     * [initial] 是 Claire 刚起来时的样子,[connectedSoon] 是 [CONNECT_WAIT_MS] 内连上了没有;
-     * [expected] 为 false(服务从没连上过,比如还没设置)时不算问题。
+     * [initial] is the state right after Claire started, [connectedSoon] is whether it connected within [CONNECT_WAIT_MS];
+     * when [expected] is false (the service has never connected, e.g. not set up yet) it is not a problem.
      */
     fun loss(initial: A11yObservation, connectedSoon: Boolean, expected: Boolean): A11yLoss? = when {
         !expected || initial.connected -> null

@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.device.shell
 
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** 测试和还没接上真实现时用:记下调用,状态由调用方摆。[pairingResult] 是 [startPairing] 之后的状态。 */
+/** For tests and for when the real implementation is not wired up yet: records calls, and the caller sets the status. [pairingResult] is the status after [startPairing]. */
 class FakeBuiltinShellControl(
     initial: BuiltinShellStatus = BuiltinShellStatus.NotPaired,
     var pairingResult: BuiltinShellStatus = BuiltinShellStatus.Running,

@@ -9,8 +9,8 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 
 /**
- * 助手进程把 Binder 交给 Claire 时双方共用的约定:provider 的方法名和 Bundle 键、助手的进程名、启动命令,
- * 以及 Claire 一侧收下之前要过的检查。
+ * The convention shared by both sides when the helper process hands its Binder to Claire: the provider's method name and Bundle keys, the helper's process name, the launch commands,
+ * and the checks Claire has to pass before accepting it.
  */
 object HelperHandoff {
     const val SHELL_UID = 2000
@@ -20,18 +20,18 @@ object HelperHandoff {
     const val METHOD_ATTACH = "attach"
     const val HELPER_CLASS = "com.wangzan101.mika.shell.HelperMain"
 
-    // 助手 → Claire
+    // Helper → Claire
     const val KEY_NONCE = "nonce"
     const val KEY_BINDER = "binder"
     const val KEY_UID = "uid"
     const val KEY_PID = "pid"
     const val KEY_APK = "apk"
-    /** 助手把 Claire 拉起来的记录(见 [HelperRestoreReport]);没拉过时不带。 */
+    /** Record of the helper bringing Claire back up (see [HelperRestoreReport]); absent when it never did. */
     const val KEY_RESTORED_AT = "restoredAt"
     const val KEY_RESTORES = "restores"
     const val KEY_GAVE_UP_AT = "restoreGaveUpAt"
 
-    // Claire → 助手
+    // Claire → Helper
     const val KEY_ACCEPTED = "accepted"
     const val KEY_NEXT = "next"
     const val KEY_TOKEN = "token"
@@ -39,17 +39,17 @@ object HelperHandoff {
 
     fun authority(packageName: String) = "$packageName.helper"
 
-    /** 助手的进程名(app_process 的 --nice-name);同时用来认出旧的助手实例。 */
+    /** The helper's process name (app_process's --nice-name); also used to recognize old helper instances. */
     fun processName(packageName: String) = "$packageName:helper"
 
     /**
-     * 经 adbd 的 exec: 服务执行的命令(adbd 用 `sh -c` 跑它)。流一关,adbd 就把 sh 那一组进程都杀掉,
-     * 所以助手用 setsid 另起会话;sh 再 `read` 等着,直到 App 收到交接后关流,
-     * 免得 setsid 还没生效 sh 就退出、助手被连带杀掉。
+     * Command executed by the adbd exec: service (adbd runs it with `sh -c`). As soon as the stream closes, adbd kills the whole group of processes belonging to that sh,
+     * so the helper starts a new session with setsid; sh then waits in `read` until the App has received the handoff and closes the stream,
+     * so that sh does not exit before setsid takes effect and take the helper down with it.
      *
-     * 口令不进命令行(同为 shell 的进程能读 /proc/<pid>/cmdline):App 开流后写一行 [stdinLine],
-     * sh 读进变量,再用内建 echo 经管道交给助手;助手的标准输入是这条管道,不是 adb 的流。
-     * [certPin] 是 Claire 签名证书的指纹,不是秘密,放在参数里。
+     * The nonce does not go on the command line (processes that are also shell can read /proc/<pid>/cmdline): after opening the stream the App writes one line, [stdinLine];
+     * sh reads it into a variable and passes it to the helper through a pipe using the built-in echo; the helper's stdin is this pipe, not the adb stream.
+     * [certPin] is the fingerprint of Claire's signing certificate, not a secret, so it goes in the arguments.
      */
     fun command(apkPath: String, packageName: String, appUid: Int, certPin: String): String =
         "read n; (echo \"\$n\" | CLASSPATH=${quote(apkPath)} setsid app_process /system/bin " +
@@ -59,29 +59,29 @@ object HelperHandoff {
     fun stdinLine(nonce: String): ByteArray = "$nonce\n".toByteArray(Charsets.UTF_8)
 
     /**
-     * 经 su 起助手时交给 `su 2000 -c` 的命令:先打一行 `id -u`,App 读到 2000(su 答应了、也切到了 shell 身份)才写口令;
-     * 之后和 [command] 一样(口令走标准输入,App 收到交接后关流)。su 没答应时一行也没有,口令就不写出去。
+     * Command passed to `su 2000 -c` when starting the helper via su: it first prints one line `id -u`, and only when the App reads 2000 (su agreed and also switched to the shell identity) is the nonce written;
+     * after that it is the same as [command] (the nonce goes over stdin, and the App closes the stream after receiving the handoff). When su did not agree there is no line at all, so the nonce is never written out.
      */
     fun rootCommand(apkPath: String, packageName: String, appUid: Int, certPin: String): String =
         "id -u; " + command(apkPath, packageName, appUid, certPin)
 
-    /** 「用电脑启动」的脚本文件名,放在 App 的外部文件目录里(电脑经 USB 调试以 shell 身份读它)。 */
+    /** File name of the "start with a computer" script, placed in the App's external files directory (a computer reads it as the shell identity over USB debugging). */
     const val USB_SCRIPT = "usb-start.sh"
 
-    /** 主用户的外部存储在 shell 里也叫 /sdcard;给用户看的命令用这个短写法。别的用户照实际路径写。 */
+    /** The primary user's external storage is also called /sdcard for the shell; the command shown to the user uses this short form. For other users the real path is written out. */
     private const val PRIMARY_STORAGE = "/storage/emulated/0/"
 
-    /** 电脑上要跑的那条命令。[scriptPath] 是脚本在手机上的实际路径。 */
+    /** The command to run on the computer. [scriptPath] is the script's actual path on the phone. */
     fun usbCommand(scriptPath: String): String =
         "adb shell sh " + (if (scriptPath.startsWith(PRIMARY_STORAGE)) "/sdcard/" + scriptPath.removePrefix(PRIMARY_STORAGE) else scriptPath)
 
     /**
-     * 电脑经 USB 调试跑的启动脚本:起的是和 [command] 同一个助手、同样的参数,口令换成 [nonce](写在脚本里,见 [HandoffNonces.usbNonce])。
-     * adb shell 的会话一结束(命令跑完、拔线),adbd 就把它那一组进程杀掉:助手用 nohup 忽略挂断信号,再用 setsid 另起会话,放到后台的子 shell 里起
-     * (子 shell 退出后它归 init 管),标准输出和错误丢掉,不再连着 adb 的流;脚本再等一会儿让 setsid 生效,
-     * 看助手进程还在就说一句「正在启动」,不在(多半是口令过期或 Claire 不认)就请用户打开 Claire 再跑一次。
-     * 多数手机这样起助手后拔线也能继续用;部分系统会在拔线时停止助手,这时插回数据线再跑一次本命令即可恢复,脚本不保证拔线后一定能用。
-     * 只用安卓原版 sh 和 toybox 里有的命令。不是 shell 身份(没经 adb 跑)时不起:Claire 只收 shell 交来的助手。
+     * The launch script a computer runs over USB debugging: it starts the same helper with the same arguments as [command], with the nonce replaced by [nonce] (written into the script, see [HandoffNonces.usbNonce]).
+     * As soon as the adb shell session ends (the command finishes, the cable is unplugged), adbd kills the whole group of processes belonging to that session: the helper uses nohup to ignore the hangup signal, then setsid to start a new session, launched inside a background subshell
+     * (once the subshell exits it is owned by init), with stdout and stderr discarded so it is no longer attached to the adb stream; the script then waits a while for setsid to take effect,
+     * and if the helper process is still there it says "starting", and if not (most likely the nonce expired or Claire did not accept it) it asks the user to open Claire and run it again.
+     * On most phones the helper keeps working after the cable is unplugged this way; some systems stop the helper when the cable is unplugged, in which case plugging the cable back in and running this command again restores it. The script does not guarantee it works after unplugging.
+     * It only uses the stock Android sh and commands found in toybox. It does not start when not running as the shell identity (not run through adb): Claire only accepts helpers handed over by shell.
      */
     fun usbScript(apkPath: String, packageName: String, appUid: Int, certPin: String, nonce: String, scriptPath: String): String {
         val name = quote(processName(packageName))
@@ -111,14 +111,14 @@ object HelperHandoff {
     }
 
     /**
-     * 什么时候重写「用电脑启动」脚本:助手来了或走了,以及口令被整体作废([HandoffNonces.resets],如解除配对)时;
-     * 发出的值是此刻助手在不在。后一种助手可能一直不在,不跟着它重写的话脚本里留的就是作废的口令。
+     * When to rewrite the "start with a computer" script: when the helper comes or goes, and when the nonces are invalidated wholesale ([HandoffNonces.resets], e.g. unpairing);
+     * the emitted value is whether the helper is present right now. In the latter case the helper may never be present, and without rewriting on it the script would keep an invalidated nonce.
      */
     fun usbScriptWrites(helper: Flow<Any?>, resets: Flow<Int>): Flow<Boolean> = combine(helper, resets) { h, _ -> h != null }
 
     /**
-     * 此刻该写的脚本:助手连着([connected])就写不带口令的 [usbStub],也不去要口令;否则写带新口令的 [usbScript]。
-     * [certPin]、[nonce] 只在要写带口令的脚本时才取。
+     * The script that should be written right now: when the helper is connected ([connected]) write [usbStub] without a nonce and do not request one; otherwise write [usbScript] with a fresh nonce.
+     * [certPin] and [nonce] are only obtained when a script with a nonce is to be written.
      */
     fun usbFile(
         connected: Boolean, apkPath: String, packageName: String, appUid: Int, certPin: () -> String, nonce: () -> String, scriptPath: String,
@@ -126,7 +126,7 @@ object HelperHandoff {
         if (connected) usbStub(packageName, scriptPath)
         else usbScript(apkPath, packageName, appUid, certPin(), nonce(), scriptPath)
 
-    /** 助手已连着时换上的脚本:不带口令,只说一句。进程不在了(比如手机重启过、Claire 还没打开)就请用户先打开 Claire。 */
+    /** The script swapped in once the helper is connected: no nonce, just one message. If the process is gone (e.g. the phone rebooted and Claire has not been opened yet) it asks the user to open Claire first. */
     fun usbStub(packageName: String, scriptPath: String): String {
         val name = quote(processName(packageName))
         return """
@@ -141,7 +141,7 @@ object HelperHandoff {
             |""".trimMargin()
     }
 
-    /** 签名证书(DER)的 SHA-256 指纹;多个签名者时排序后用逗号连起来。没有证书返回 null。 */
+    /** SHA-256 fingerprint of the signing certificate (DER); with multiple signers they are sorted and joined by commas. Returns null when there is no certificate. */
     fun certPin(certs: List<ByteArray>?): String? {
         if (certs.isNullOrEmpty()) return null
         return certs.map { c -> MessageDigest.getInstance("SHA-256").digest(c).joinToString("") { "%02x".format(it) } }
@@ -152,7 +152,7 @@ object HelperHandoff {
 
     enum class CallerClass { Root, Shell, ShellOtherUser, OrdinaryApp, Other }
 
-    /** 只保留排查交接所需的调用方类别,不把具体 UID 写进诊断。 */
+    /** Only keeps the caller class needed for diagnosing handoffs, without writing the concrete UID into diagnostics. */
     fun callerClass(uid: Int): CallerClass {
         val appId = uid % PER_USER_RANGE
         return when {
@@ -165,19 +165,19 @@ object HelperHandoff {
     }
 
     enum class Reject {
-        /** 调用方不是 shell(uid 2000)。 */
+        /** The caller is not shell (uid 2000). */
         NotShell,
-        /** 助手自报的 uid/pid 和 Binder 看到的调用方对不上。 */
+        /** The uid/pid the helper reports do not match the caller seen on the Binder. */
         IdMismatch,
-        /** 助手跑的不是当前安装的这份 APK(Claire 更新过):让它退出,重新起一个。 */
+        /** The helper is not running the currently installed APK (Claire was updated): have it exit and start a new one. */
         StaleApk,
         NoBinder,
         BadNonce,
-        /** Binder 所在的进程不是来交接的那个。 */
+        /** The process holding the Binder is not the one handing off. */
         BinderElsewhere,
     }
 
-    /** 不碰 Binder 就能做的检查;通过返回 null。口令另由 [HandoffNonces] 核对。 */
+    /** Checks that can be done without touching the Binder; returns null when they pass. The nonce is verified separately by [HandoffNonces]. */
     fun check(
         callingUid: Int, callingPid: Int, reportedUid: Int, reportedPid: Int,
         helperApk: String?, appApk: String, hasBinder: Boolean,
@@ -190,7 +190,7 @@ object HelperHandoff {
     }
 }
 
-/** 当前启动尝试的交接拒绝;新启动、成功交接或解除配对后不再展示上一次的原因。 */
+/** Handoff rejections of the current launch attempt; the previous reason is no longer shown after a new launch, a successful handoff, or unpairing. */
 class HandoffDiagnostics {
     @Volatile var lastRejection: String? = null
         private set
@@ -207,9 +207,9 @@ class HandoffDiagnostics {
 }
 
 /**
- * 持久化的几枚口令:[resume] 给正在跑的助手下次交接用,[launch] 给刚从 adbd 起的新助手用,
- * [launchAt] 是 [launch] 的签发时间(开机以来的毫秒数);[usb] 写在「用电脑启动」的脚本里,
- * [usbAt] 是它的签发时间(墙上时钟的毫秒数:脚本要跨过重启还能用)。
+ * The persisted nonces: [resume] is used for the next handoff of the running helper, [launch] is used for a new helper just started from adbd,
+ * [launchAt] is when [launch] was issued (milliseconds since boot); [usb] is written into the "start with a computer" script,
+ * and [usbAt] is when it was issued (wall-clock milliseconds: the script has to keep working across reboots).
  */
 data class NonceSlots(
     val resume: String? = null, val launch: String? = null, val launchAt: Long = 0,
@@ -222,9 +222,9 @@ interface NonceStore {
 }
 
 /**
- * Claire 生成、一次有效的交接口令。任何一枚被用掉,几枚都作废,并换发一枚新的 [NonceSlots.resume] 给收下的助手;
- * 存下来是为了 Claire 进程被杀后,还活着的助手拿它重新交接时新进程认得。
- * [clock] 量启动口令的时效(开机以来),[wallClock] 量「用电脑启动」口令的时效。
+ * A single-use handoff nonce generated by Claire. Once any one of them is used, all of them are invalidated and a new [NonceSlots.resume] is issued to the accepted helper;
+ * it is stored so that after the Claire process is killed, the new process still recognizes an alive helper that re-handoffs with it.
+ * [clock] measures the launch nonce's age (since boot), [wallClock] measures the age of the "start with a computer" nonce.
  */
 class HandoffNonces(
     private val store: NonceStore,
@@ -236,8 +236,8 @@ class HandoffNonces(
     fun issueLaunch(): String = random().also { store.save(store.load().copy(launch = it, launchAt = clock())) }
 
     /**
-     * 写进「用电脑启动」脚本的口令。手上那枚还新(剩下的时效超过一半)就接着用,免得电脑正在跑脚本时被换掉;
-     * 否则换发一枚。和别的口令一样用掉一次就作废(见 [accept])。
+     * The nonce written into the "start with a computer" script. If the one at hand is still fresh (more than half its lifetime remains) keep using it, so it is not swapped while the computer is running the script;
+     * otherwise issue a new one. Like the other nonces it is invalidated after a single use (see [accept]).
      */
     @Synchronized
     fun usbNonce(): String {
@@ -252,14 +252,14 @@ class HandoffNonces(
         if (nonce == null) return false
         val s = store.load()
         val age = clock() - s.launchAt
-        // 启动口令只在交接等待期内有效;没用上的过期作废
+        // The launch nonce is only valid within the handoff wait window; unused ones expire and become void
         val launch = s.launch?.takeIf { age in 0..LAUNCH_TTL_MS }
-        // 脚本里的口令等的是用户插线跑命令,给得长一些;过期或时钟倒退都不认
+        // The nonce in the script waits for the user to plug in and run the command, so it is given longer; expired ones or a clock going backwards do not count
         val usb = s.usb?.takeIf { wallClock() - s.usbAt in 0..USB_TTL_MS }
         return same(nonce, s.resume) or same(nonce, launch) or same(nonce, usb)
     }
 
-    /** 口令对就用掉它并返回换发的新口令,不对返回 null。 */
+    /** If the nonce matches, consumes it and returns the newly issued nonce; otherwise returns null. */
     @Synchronized
     fun accept(nonce: String?): String? {
         if (!matches(nonce)) return null
@@ -267,7 +267,7 @@ class HandoffNonces(
     }
 
     private val _resets = MutableStateFlow(0)
-    /** 口令被整体作废([clear])的次数:变了就说明写出去的口令(如脚本里那枚)都不能用了。 */
+    /** The number of times the nonces were invalidated wholesale ([clear]): when it changes, any nonce already written out (such as the one in the script) can no longer be used. */
     val resets: StateFlow<Int> = _resets.asStateFlow()
 
     @Synchronized
@@ -280,11 +280,11 @@ class HandoffNonces(
         b != null && MessageDigest.isEqual(a.toByteArray(Charsets.UTF_8), b.toByteArray(Charsets.UTF_8))
 
     companion object {
-        /** 覆盖 App 开着流等交接、引擎再等一轮交接的总时长。 */
+        /** Covers the total duration of the App holding the stream open waiting for the handoff plus the engine waiting one more round. */
         const val LAUNCH_TTL_MS = 30_000L
         /**
-         * 「用电脑启动」口令的时效:脚本写好后,用户可能过一阵才插线跑命令(或重启后再跑一次)。
-         * Claire 每次打开、看不到助手、打开引导页时都会重写脚本,用了一半就换新的。
+         * Lifetime of the "start with a computer" nonce: after the script is written, the user may plug in and run the command some time later (or run it once more after a reboot).
+         * Claire rewrites the script every time it is opened, when it cannot see the helper, and when the guide page is opened, so it is swapped once half of its life is used.
          */
         const val USB_TTL_MS = 24 * 60 * 60_000L
         private val rng = SecureRandom()

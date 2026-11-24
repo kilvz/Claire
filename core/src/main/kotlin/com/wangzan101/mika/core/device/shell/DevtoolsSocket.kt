@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.device.shell
 
 /**
- * WebView 调试接口的本地抽象套接字:每个开着调试的进程一个,名为 `webview_devtools_remote_<pid>`。
- * 内置助手代连时只认这个样子的名字,且 pid 必须属于 Claire 的 uid。
+ * Local abstract socket of the WebView debugging interface: one per process that has debugging enabled, named `webview_devtools_remote_<pid>`.
+ * When the built-in helper connects on its behalf, it only accepts names of this shape, and the pid must belong to Claire's uid.
  */
 object DevtoolsSocket {
     private const val PREFIX = "webview_devtools_remote_"
@@ -10,10 +10,10 @@ object DevtoolsSocket {
 
     fun name(pid: Int): String = "$PREFIX$pid"
 
-    /** 名字里的 pid;不是这个样子(多了前后缀、前导 0、超出范围)返回 null。 */
+    /** The pid in the name; null when the name is not of this shape (extra prefix/suffix, leading zero, out of range). */
     fun pidOf(name: String): Int? = NAME.matchEntire(name)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
 
-    /** `/proc/<pid>/status` 里的真实 uid(Uid 行第一列);没有这一行返回 null。 */
+    /** The real uid from `/proc/<pid>/status` (first column of the Uid line); null when that line is absent. */
     fun procUid(status: String): Int? =
         status.lineSequence().firstOrNull { it.startsWith("Uid:") }
             ?.removePrefix("Uid:")?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.toIntOrNull()

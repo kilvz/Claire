@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 一条到常驻助手的「连接」:助手进程不跟着解绑结束,Binder 由 [source] 提供(没有时为 null)。
- * 对外和按服务绑定的连接一样:[shell] 只在绑定期间有值,[dropped] 表示连上过、仍需要、但现在断了。
- * 解绑时用 [release] 让助手撤掉这次绑定留下的改动(虚拟屏、静音、剪贴板),效果等同于服务结束。
+ * A "connection" to the resident helper: the helper process does not end when it is unbound, and the Binder is supplied by [source] (null when there is none).
+ * Externally it behaves like a service-bound connection: [shell] only has a value while bound, and [dropped] means it was connected, is still needed, but is broken right now.
+ * On unbind, [release] makes the helper undo the changes left by this binding (virtual display, mute, clipboard), equivalent to the service ending.
  *
- * [scope] 必须是单线程顺序执行的:解绑的撤销排在之后再绑定的发布前面,新任务建的屏不会被上一次的撤销误删。
+ * [scope] must execute sequentially on a single thread: the undo from unbinding is ordered before the publishing of a later binding, so screens created by a new task are not deleted by mistake by the previous undo.
  */
 class HelperLink<T : Any>(
     private val source: StateFlow<T?>,
@@ -63,7 +63,7 @@ class HelperLink<T : Any>(
         if (last != null) scope.launch { runCatching { release(last) } }
     }
 
-    /** 「重新连接」:绑定着却没有助手时请看门狗马上再起一次。 */
+    /** "Reconnect": while bound but with no helper, ask the watchdog to start one again right away. */
     fun reconnect() {
         val ask = synchronized(this) { wanted && _shell.value == null }
         if (ask) need()

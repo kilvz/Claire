@@ -3,100 +3,100 @@ package com.wangzan101.mika.core.device.shell
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 内置助手(经本机「无线调试」、电脑或 su 以 shell 身份拉起的特权进程)此刻的状态。
- * 界面、设置页和任务入口都只看它;配对、连接、看门狗的实现各自把结果写成这几种之一。
+ * Current state of the built-in helper (the privileged process launched via the device's own "wireless debugging", a computer, or su as the shell identity).
+ * The UI, settings page and task entry points look only at this; the pairing, connection and watchdog implementations each write their results as one of these states.
  */
 sealed interface BuiltinShellStatus {
-    /** 还没配对过(或解除了配对):要走一遍引导。 */
+    /** Never paired (or pairing was removed): the guide must be walked through. */
     data object NotPaired : BuiltinShellStatus
 
-    /** 配对过,但无线调试关着:打开后会自动连上。 */
+    /** Paired, but wireless debugging is off: it connects automatically once turned on. */
     data object WirelessDebuggingOff : BuiltinShellStatus
 
-    /** 正在配对、连接或启动助手。 */
+    /** Pairing, connecting, or starting the helper. */
     data object Connecting : BuiltinShellStatus
 
     data object Running : BuiltinShellStatus
 
-    /** 出错了:[reason] 说明是哪一类,[fix] 是一键修复走哪条路。 */
+    /** Something went wrong: [reason] says which kind, [fix] is the one-tap repair path. */
     data class Failed(val reason: BuiltinShellFailure, val fix: BuiltinShellFix = reason.defaultFix) : BuiltinShellStatus
 }
 
-/** 失败的类别。文案在界面层;这里只区分「用户该做什么」不同的情况。 */
+/** Kinds of failure. The wording lives in the UI layer; this only distinguishes cases where the user has to do something different. */
 enum class BuiltinShellFailure(val defaultFix: BuiltinShellFix, val duringPairing: Boolean) {
-    /** 配对码不对或已过期。 */
+    /** The pairing code is wrong or has expired. */
     WrongCode(BuiltinShellFix.RePair, duringPairing = true),
-    /** 配对窗口在填码前关掉了(找不到配对端口)。 */
+    /** The pairing window closed before the code was entered (the pairing port cannot be found). */
     PairingWindowClosed(BuiltinShellFix.RePair, duringPairing = true),
-    /** 没连 Wi-Fi:无线调试打不开或连不上。 */
+    /** Not connected to Wi-Fi: wireless debugging cannot be turned on or cannot be reached. */
     NoWifi(BuiltinShellFix.OpenWifi, duringPairing = false),
-    /** Claire 替用户打开无线调试,系统马上又关掉了:这个 Wi-Fi 还没被允许无线调试,要用户亲手打开一次并允许。 */
+    /** Claire turned wireless debugging on for the user and the system turned it off again right away: this Wi-Fi has not been allowed for wireless debugging yet, so the user must turn it on by hand once and allow it. */
     WifiNotAllowed(BuiltinShellFix.OpenWirelessDebugging, duringPairing = false),
-    /** 连不上本机的无线调试。 */
+    /** Cannot connect to the device's own wireless debugging. */
     ConnectFailed(BuiltinShellFix.Retry, duringPairing = false),
-    /** ADB 目标不是本机自己的地址:调用方错误,不是会自己恢复的网络故障。 */
+    /** The ADB target is not this device's own address: a caller error, not a self-recovering network fault. */
     NotLocal(BuiltinShellFix.Retry, duringPairing = false),
-    /** 已配对的授权不认了(太久没用被系统撤销,或用户在系统里删了)。 */
+    /** The paired authorization is no longer accepted (revoked by the system after long disuse, or deleted by the user in the system). */
     AuthorizationRevoked(BuiltinShellFix.RePair, duringPairing = false),
-    /** 配对用的钥匙存着却读不出来了:设备只认那一把,不能悄悄换,要重新配对(配对时才换新钥匙)。 */
+    /** The pairing key is stored but can no longer be read: the device only accepts that one, so it cannot be swapped silently and pairing must be redone (a new key is only created during pairing). */
     KeyUnreadable(BuiltinShellFix.RePair, duringPairing = false),
-    /** 连上了,助手却没能启动或交接。 */
+    /** Connected, but the helper failed to start or to hand off. */
     HelperStartFailed(BuiltinShellFix.Retry, duringPairing = false),
     /**
-     * 经 USB 启动命令起的助手停了(多半是手机重启过),又没配对过无线调试,Claire 自己起不来:
-     * 再运行一次启动命令。不往无线调试引:有的手机根本没有能用的无线调试。
+     * The helper started by the USB launch command stopped (most likely after a phone reboot) and wireless debugging was never paired, so Claire cannot start it itself:
+     * run the launch command again. It does not point to wireless debugging: some phones have no usable wireless debugging at all.
      */
     UsbHelperStopped(BuiltinShellFix.RunUsbCommand, duringPairing = false),
-    /** 打开了「用 root 启动」,su 却拒绝了:不再自己去问,等用户点重试(重试时 su 会再弹一次授权)。 */
+    /** "Start with root" is enabled but su denied: it stops asking on its own and waits for the user to tap retry (retry makes su show the authorization prompt again). */
     RootDenied(BuiltinShellFix.Retry, duringPairing = false),
-    /** su 没回话(授权弹框没人点):同样等用户点重试。 */
+    /** su did not answer (nobody tapped the authorization prompt): likewise it waits for the user to tap retry. */
     RootNoAnswer(BuiltinShellFix.Retry, duringPairing = false),
-    /** 打开了「用 root 启动」,手机上却找不到 su 了(root 被去掉了):关掉这一项,或去配对无线调试。 */
+    /** "Start with root" is enabled but su can no longer be found on the phone (root was removed): turn this option off, or go pair wireless debugging. */
     RootUnavailable(BuiltinShellFix.RePair, duringPairing = false),
-    /** su 答应了,却切不到 shell 身份:这种 su 起不了助手,改用无线调试或电脑。 */
+    /** su agreed but cannot switch to the shell identity: such su cannot start the helper, so use wireless debugging or a computer instead. */
     RootNoShellUid(BuiltinShellFix.RePair, duringPairing = false),
-    /** 手机上还没装 Shizuku。 */
+    /** Shizuku is not installed on the phone. */
     ShizukuNotInstalled(BuiltinShellFix.Retry, duringPairing = false),
-    /** Shizuku 装了但服务没跑起来(比如重启后还没激活)。 */
+    /** Shizuku is installed but its service is not running (for example not yet activated after a reboot). */
     ShizukuNotRunning(BuiltinShellFix.Retry, duringPairing = false),
-    /** Shizuku 跑着,还没给 Claire 授权。 */
+    /** Shizuku is running but Claire has not been authorized yet. */
     ShizukuPermissionNeeded(BuiltinShellFix.Retry, duringPairing = false),
-    /** 经 Shizuku 调起助手,却没能绑定或交接过来。 */
+    /** The helper was launched via Shizuku but could not be bound or handed off. */
     ShizukuBindFailed(BuiltinShellFix.Retry, duringPairing = false),
     Unknown(BuiltinShellFix.Retry, duringPairing = false),
 }
 
 enum class BuiltinShellFix {
-    /** 用已配对的钥匙再连一次。 */
+    /** Connect once more with the paired key. */
     Retry,
-    /** 重新走配对那一步。 */
+    /** Go through the pairing step again. */
     RePair,
-    /** 去系统的 Wi-Fi 设置。 */
+    /** Go to the system Wi-Fi settings. */
     OpenWifi,
-    /** 去开发者选项里亲手打开无线调试。 */
+    /** Turn wireless debugging on by hand in developer options. */
     OpenWirelessDebugging,
-    /** 再运行一次 USB 启动命令(界面给出命令和复制按钮)。 */
+    /** Run the USB launch command again (the UI shows the command and a copy button). */
     RunUsbCommand,
 }
 
 /**
- * 助手停了以后靠什么再起来,取决于它上次是怎么起的。停了时往哪儿引用户、成功页和设置页怎么说,都看它。
+ * What brings the helper back after it stops depends on how it was started last time. This decides where to point the user when it stops and what the success page and settings page say.
  */
 enum class HelperRestart {
-    /** 还没设置过。 */
+    /** Not set up yet. */
     None,
-    /** 配对过无线调试:Claire 自己经它再起;手机重启后打开无线调试就行(能替用户打开时连这一步也不用)。 */
+    /** Wireless debugging has been paired: Claire restarts it through that; after a phone reboot, just turn wireless debugging on (when it can be turned on for the user, even that step is unnecessary). */
     Wireless,
     /**
-     * 只用 USB 启动命令起过、没配对过无线调试:Claire 自己起不来,停了(比如手机重启后)要再运行一次命令。
-     * 有的手机没有能用的无线调试,只能走这条路,所以这时不提示去打开无线调试。
+     * Only ever started by the USB launch command, never paired wireless debugging: Claire cannot start it itself, so once it stops (for example after a phone reboot) the command must be run again.
+     * Some phones have no usable wireless debugging and this is the only path, so in this case it does not prompt to turn wireless debugging on.
      */
     UsbCommand,
-    /** 经 Shizuku 起助手:不需要无线调试或电脑命令。 */
+    /** Starting the helper via Shizuku: no wireless debugging or computer command needed. */
     Shizuku,
 }
 
-/** 找「使用配对码配对设备」窗口公布的配对端口(本机 mDNS)的结果。 */
+/** Result of finding the pairing port announced by the "Pair device with pairing code" window (local mDNS). */
 sealed interface PairingDiscovery {
     data object Idle : PairingDiscovery
     data object Searching : PairingDiscovery
@@ -104,54 +104,54 @@ sealed interface PairingDiscovery {
 }
 
 /**
- * 内置助手对界面的接口。实现负责配对(mDNS 找端口、6 位码)、连接本机 adbd、拉起并看住助手;
- * 所有结果都通过 [status] 反映出来,动作本身不抛异常。
+ * The interface the built-in helper exposes to the UI. The implementation handles pairing (finding the port via mDNS, the 6-digit code), connecting to the local adbd, launching and watching the helper;
+ * every result is reflected through [status], and the actions themselves do not throw.
  */
 interface BuiltinShellControl {
     val status: StateFlow<BuiltinShellStatus>
     val pairingDiscovery: StateFlow<PairingDiscovery>
 
-    /** 配对过无线调试(Claire 能自己经它起助手、跑命令)。助手也可能是电脑经 USB 起的,所以在运行不等于配对过。 */
+    /** Wireless debugging has been paired (Claire can start the helper and run commands through it itself). The helper may also have been started by a computer over USB, so running does not mean paired. */
     val paired: Boolean get() = status.value != BuiltinShellStatus.NotPaired
 
-    /** 助手停了以后靠什么再起来(见 [HelperRestart])。 */
+    /** What brings the helper back after it stops (see [HelperRestart]). */
     val restart: HelperRestart get() = when {
         status.value == BuiltinShellStatus.Failed(BuiltinShellFailure.UsbHelperStopped) -> HelperRestart.UsbCommand
         paired -> HelperRestart.Wireless
         else -> HelperRestart.None
     }
 
-    /** 用户打开了「用 root 启动」且此刻能用:看门狗先经 su 起助手(状态是正在连接时,界面说正在用 root 启动)。 */
+    /** The user enabled "start with root" and it is usable right now: the watchdog starts the helper via su first (while the status is connecting, the UI says it is starting with root). */
     val rootStart: Boolean get() = false
 
-    /** 此刻优先走 Shizuku 起助手(非仅无线调试模式且 Shizuku 已就绪)。 */
+    /** Prefer starting the helper via Shizuku right now (not in wireless-debugging-only mode and Shizuku is ready). */
     val shizukuStart: Boolean get() = false
 
-    /** 当前选择的启动通道。 */
+    /** Currently selected launch transport. */
     val transport: ShellTransport get() = ShellTransport.Auto
 
-    /** 切换启动通道。 */
+    /** Switches the launch transport. */
     fun selectTransport(transport: ShellTransport) {}
 
-    /** 开始找配对端口(用户正在去打开配对窗口)。重复调用无害:还在找就从这时起重新计时。 */
+    /** Starts looking for the pairing port (the user is on their way to open the pairing window). Calling it repeatedly is harmless: if a search is running, the timer restarts from now. */
     fun startDiscovery()
     fun stopDiscovery()
 
-    /** 用 6 位配对码配对,成功后接着连接并启动助手。[port] 为空时用找到的配对端口。 */
+    /** Pairs with the 6-digit pairing code, then connects and starts the helper on success. When [port] is null, uses the discovered pairing port. */
     suspend fun startPairing(code: String, port: Int? = null)
 
-    /** 用已配对的钥匙重新连接并启动助手。 */
+    /** Reconnects with the paired key and starts the helper. */
     suspend fun retry()
 
-    /** 删除配对钥匙、停掉助手、撤销助手给 Claire 的授权;之后状态是 [BuiltinShellStatus.NotPaired]。 */
+    /** Deletes the pairing key, stops the helper and revokes the helper's authorization for Claire; the status is then [BuiltinShellStatus.NotPaired]. */
     suspend fun unpair()
 }
 
-/** 配对码:6 位数字。用户可能带空格、横线或全角数字,一并规范掉;不是 6 位数字就返回 null。 */
+/** Pairing code: 6 digits. The user may include spaces, dashes or full-width digits, which are all normalized away; returns null when it is not 6 digits. */
 object PairingCode {
     const val LENGTH = 6
 
-    /** 输入法可能打出的各种横线:半角、全角、连字号、短横、长横。 */
+    /** The various dashes an input method may produce: half-width, full-width, hyphen, en dash, em dash. */
     private const val DASHES = "-－‐‑–—"
 
     fun normalize(input: String): String? {
@@ -161,6 +161,6 @@ object PairingCode {
         return digits.takeIf { it.length == LENGTH && it.all { c -> c in '0'..'9' } }
     }
 
-    /** 手动输入的端口:1–65535。 */
+    /** Manually entered port: 1–65535. */
     fun port(input: String): Int? = input.trim().toIntOrNull()?.takeIf { it in 1..65535 }
 }

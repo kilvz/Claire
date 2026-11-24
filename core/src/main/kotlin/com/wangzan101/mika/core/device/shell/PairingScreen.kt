@@ -1,15 +1,15 @@
 package com.wangzan101.mika.core.device.shell
 
-/** 从系统配对窗口上读到的配对码和端口;没读到或有歧义时为 null。 */
+/** The pairing code and port read from the system pairing window; null when not read or ambiguous. */
 data class PairingScreenReading(val code: String?, val port: Int?)
 
-/** 用读到的码去配对;[port] 为空时用找到的配对端口。 */
+/** Pairs using the code that was read; when [port] is null, uses the discovered pairing port. */
 data class PairingAttempt(val code: String, val port: Int?)
 
 /**
- * 从一个窗口的全部文字里认出配对码和「IP:端口」。只看文字的样子,不靠控件 id、界面语言或某种布局:
- * 配对码是整段文字恰好 6 位数字(中间可以有空格);端口取「IPv4:端口」或「[IPv6]:端口」里冒号后的数字。
- * 同一窗口里出现两个不同的码或端口就当没读到,宁可退回让用户手动填。
+ * Recognizes the pairing code and "IP:port" from all the text of a window. It only looks at the shape of the text, not at view ids, the UI language, or any particular layout:
+ * the pairing code is a whole piece of text of exactly 6 digits (spaces may appear in between); the port is the number after the colon in "IPv4:port" or "[IPv6]:port".
+ * If two different codes or ports appear in the same window it counts as not read, preferring to fall back to manual entry by the user.
  */
 object PairingScreen {
     private val CODE = Regex("""\d{6}""")
@@ -31,8 +31,8 @@ object PairingScreen {
     }
 
     /**
-     * 该不该拿读到的码去配对:有码、有端口(屏上读到,或已找到配对窗口)、这个码没试过,
-     * 而且助手正等着配对(不在配对中、没有已经好了)。码不对时同一个码不会再试,等配对窗口换新码。
+     * Whether to pair with the code that was read: there is a code, there is a port (read on screen, or the pairing window has been found), the code has not been tried,
+     * and the helper is waiting to pair (not pairing already, not already done). After a wrong code the same code is not retried; it waits for the pairing window to show a new code.
      */
     fun attempt(reading: PairingScreenReading, portFound: Boolean, status: BuiltinShellStatus, tried: Set<String>): PairingAttempt? {
         val code = reading.code ?: return null

@@ -21,7 +21,7 @@ enum class Expect {
     @SerialName("takeover") Takeover,
 }
 
-/** 客观核对项;JSON 里以 "type" 区分。 */
+/** Objective check item; distinguished by "type" in JSON. */
 @Serializable
 sealed interface Check {
     @Serializable @SerialName("answer_contains")
@@ -30,29 +30,29 @@ sealed interface Check {
     @Serializable @SerialName("answer_regex")
     data class AnswerRegex(val pattern: String) : Check
 
-    /** 回答条目必须都出现在最后几次读屏文字中。 */
+    /** Every item of the answer must appear in the screen text of the last few reads. */
     @Serializable @SerialName("answer_grounded")
     data class AnswerGrounded(val minItems: Int = 1) : Check
 
-    /** [packageName] 可写成 `{app:<能力>}`(见 [APP_CAPABILITIES]),跑的时候换成这台手机上的 App。 */
+    /** [packageName] can be written as `{app:<capability>}` (see [APP_CAPABILITIES]) and is replaced with the App on this phone at run time. */
     @Serializable @SerialName("screen_has")
     data class ScreenHas(val packageName: String, val text: String, val deepLink: String? = null) : Check
 
-    /** probe 必须是 [PROBE_ALLOWLIST] 里的名字。 */
+    /** probe must be a name from [PROBE_ALLOWLIST]. */
     @Serializable @SerialName("probe_equals")
     data class ProbeEquals(val probe: String, val expected: String, val contains: Boolean = false) : Check
 
-    /** 这次任务开头带上了至少 [min] 条记忆(代码记录的 memory_used)。记忆题的第二题用。 */
+    /** At least [min] memories were carried into the start of this task (memory_used, as recorded by the code). Used by the second task of the memory test. */
     @Serializable @SerialName("memory_used")
     data class MemoryUsed(val min: Int = 1) : Check
 
     /**
-     * 这次任务里 Agent 有没有向用户追问(ask_user):[expected] 为 true 时须问过,false 时须一次没问。
-     * 「该问还是该自己定」的题用:目标里缺了只有用户知道的信息就该问;只是没说偏好就该按常理定下并说明。
+     * Whether the Agent asked the user during this task (ask_user): it must have asked when [expected] is true, and never asked when false.
+     * Used by "ask or decide yourself" tasks: if the goal lacks information only the user knows it should ask; if merely a preference was not stated it should decide sensibly and explain.
      */
     @Serializable @SerialName("asked_user")
     data class AskedUser(val expected: Boolean = true) : Check
-    /** 任务结束后在新的网页标签里打开 [url] 读整页,要能找到 [text](忽略空白)。 */
+    /** After the task, open [url] in a new web tab and read the whole page; [text] must be findable there (ignoring whitespace). */
     @Serializable @SerialName("web_has")
     data class WebHas(val url: String, val text: String) : Check
 
@@ -66,13 +66,13 @@ sealed interface Check {
 }
 
 /**
- * 一道评测题。goal、marker、核对项里的字符串可写 `{run}` 和 `{probe:<名字>}`,跑前由 [EvalTasks.substitute] 替换;
- * `probesBefore` 是「占位名 → 白名单探针名」,跑任务前先执行这些探针得到期望值。
- * `apps` 和 screen_has 的包名可写 `{app:<能力>}`(手机自带的某类 App,见 [APP_CAPABILITIES]),由 [EvalTasks.resolveApps] 换成这台手机上的包名,
- * 题目不钉某个品牌的包名。
+ * One evaluation task. Strings in goal, marker and the check items can contain `{run}` and `{probe:<name>}`, replaced before the run by [EvalTasks.substitute];
+ * `probesBefore` is "placeholder name → allowlisted probe name": those probes are executed before the task runs to obtain the expected values.
+ * Package names in `apps` and screen_has can be written as `{app:<capability>}` (some kind of App that ships with the phone, see [APP_CAPABILITIES]) and are replaced by [EvalTasks.resolveApps] with the package name on this phone,
+ * so tasks do not pin the package name of a particular brand.
  *
- * `requires` 的写法:`installed:<包名>`;`app:<能力>`(这台手机上有处理这类事的 App);
- * `signedIn:<包名或网站>`(用户登录过:网站看设置「网站登录」里的登记,App 看人工标记;旧写法 `login:<包名>`、`site:<网站>` 照样认)。
+ * `requires` is written as: `installed:<package name>`; `app:<capability>` (this phone has an App that handles this kind of thing);
+ * `signedIn:<package name or site>` (the user is signed in: for sites it looks at the registration under the "site sign-in" setting, for Apps at a manual mark; the old forms `login:<package name>` and `site:<site>` are still accepted).
  */
 @Serializable
 data class EvalTask(
@@ -88,31 +88,31 @@ data class EvalTask(
     val marker: String? = null,
     val answers: Map<String, String> = emptyMap(),
     val probesBefore: Map<String, String> = emptyMap(),
-    /** 给评审看的说明(这道题为什么这样出),评测器不用。 */
+    /** An explanation for reviewers (why this task is designed this way); the evaluator does not use it. */
     val note: String? = null,
-    /** 配对题:train(学技能的一轮跑)或 test(对比的一轮跑);评测器按 `-e split` 选。 */
+    /** Paired task: train (the round that learns the skill) or test (the round used for comparison); the evaluator selects it with `-e split`. */
     val split: String? = null,
-    /** 同一 session 的题在同一个对话里按 id 顺序跑(记忆题:先告诉、再用上)。 */
+    /** Tasks with the same session run in one conversation in id order (memory test: tell first, then use it). */
     val session: String? = null,
-    /** 回放评测用的变体:换说法或换参数的同一件事;`evalVariants on` 时先跑原题记下路线,再跑这些。 */
+    /** Variants for replay evaluation: the same thing with different wording or different parameters; with `evalVariants on` the original task runs first to record the route, then these run. */
     val variants: List<Variant> = emptyList(),
-    /** 强制渠道:"web" 或 "app";非空时目标前加「用网页」/「用 App」(两条路线对比用)。 */
+    /** Forced channel: "web" or "app"; when not empty, "use the web" / "use the App" is prefixed to the goal (for comparing the two routes). */
     val channel: String? = null,
     /**
-     * 题目分池:tune(调提示词、知识时看的题)或 holdout(只在决定发版时看结果,不拿来调);评测器按 `-e evalSplit` 选。
-     * 和 [split](配对题的 train/test 两轮)是两回事。
+     * Task pool: tune (the tasks looked at while tuning prompts and knowledge) or holdout (results only looked at when deciding a release, never used for tuning); the evaluator selects it with `-e evalSplit`.
+     * This is unrelated to [split] (the train/test rounds of paired tasks).
      */
     val partition: String? = null,
     /**
-     * 撞上这些障碍(屏上看得出来,见 [RunFacts.takeoverBarrier])后交给用户接管的,单列成「交给用户」([Scoring.handedOver]),
-     * 不算办成也不算别的失败,算不算由人定。为空时按类别取默认([Scoring.takeoverKinds]):读类题是 login,其余不认。
+     * A task handed over to the user after hitting one of these barriers (visible on screen, see [RunFacts.takeoverBarrier]) is listed separately as "handed over" ([Scoring.handedOver]),
+     * counting neither as accomplished nor as another kind of failure; whether it counts is left to humans. When empty the default comes from the category ([Scoring.takeoverKinds]): login for read tasks, none for the rest.
      */
     val acceptTakeoverOn: List<String>? = null,
 )
 
 /**
- * 「手机自带的某类 App」按安卓标准 Intent 找:跑题前用这些 Intent 查出这台手机上能处理的 App(候选),
- * 跑完后优先取 Agent 实际打开过的那个候选。没有标准 Intent 的(备忘录)只能跑完后取 Agent 打开的 App。
+ * "Some kind of App that ships with the phone" is found via standard Android Intents: before the task these Intents are used to look up the Apps on this phone that can handle them (candidates),
+ * and after the run the candidate the Agent actually opened is preferred. Kinds without a standard Intent (notes) can only use the App the Agent opened after the run.
  */
 data class AppIntent(val action: String, val category: String? = null)
 
@@ -130,23 +130,23 @@ val APP_CAPABILITIES: Map<String, List<AppIntent>> = mapOf(
 
 object AppCapabilities {
     private val COMPONENT = Regex("^\\s*([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+)/\\S+")
-    /** 系统的「选择用哪个 App」界面不是候选。 */
+    /** The system's "choose which App" UI is not a candidate. */
     private const val SYSTEM_PACKAGE = "android"
 
-    /** `cmd package resolve-activity --brief` / `query-activities --brief` 输出里的包名,按出现顺序去重。 */
+    /** The package names in the output of `cmd package resolve-activity --brief` / `query-activities --brief`, deduplicated in order of appearance. */
     fun packagesIn(output: String): List<String> =
         output.lines().mapNotNull { COMPONENT.find(it)?.groupValues?.get(1) }.filter { it != SYSTEM_PACKAGE }.distinct()
 
-    /** 查某个 Intent 的 shell 命令(参数来自 [APP_CAPABILITIES],任务文件写不进去)。 */
+    /** The shell commands that query one Intent (the arguments come from [APP_CAPABILITIES] and cannot be written in a task file). */
     fun commands(i: AppIntent): List<String> {
         val args = "-a ${i.action}" + (i.category?.let { " -c $it" } ?: "")
         return listOf("cmd package resolve-activity --brief $args", "cmd package query-activities --brief $args")
     }
 
     /**
-     * 跑完后 `{app:<能力>}` 取哪个包:Agent 打开过的候选优先(手机上可能有好几个日历),其次第一个候选。
-     * 没有候选(没有标准 Intent 或这台手机上查不到)时,只认 Agent 打字时在前台的 App([written],见 [RunFacts.appsWrittenIn]),
-     * 而且只有一个;说不准是哪个就不定(核对按没找到算),不拿「第一个打开的 App」凑数。[own] 是 Claire 自己的包名。
+     * Which package `{app:<capability>}` resolves to after the run: candidates the Agent opened are preferred (a phone may have several calendars), then the first candidate.
+     * When there are no candidates (no standard Intent, or none found on this phone), it only accepts the App in the foreground while the Agent was typing ([written], see [RunFacts.appsWrittenIn]),
+     * and only when there is exactly one; if it cannot be told which it is, it stays undecided (the check counts as not found) instead of using "the first App opened" as a filler. [own] is Claire's own package name.
      */
     fun choose(candidates: List<String>, launched: List<String>, own: String? = null, written: List<String> = emptyList()): String? {
         val used = launched.filter { it != own && it != SYSTEM_PACKAGE }
@@ -156,17 +156,17 @@ object AppCapabilities {
     }
 }
 
-/** [EvalTask.channel] 的取值与加在目标前的说法。 */
+/** The values of [EvalTask.channel] and the wording prefixed to the goal. */
 val CHANNEL_PREFIX = mapOf("web" to "用网页", "app" to "用 App")
 
 /**
- * 原题的一个变体。[checks] 为空沿用原题的核对项。换参数时参数要在 [goal] 里逐字写出(回放只认原话里出现的槽值)。
- * 其余字段(App、类别、步数、时限、标记等)都沿用原题。
+ * A variant of the original task. When [checks] is empty the original task's checks are reused. When parameters change, they must be spelled out verbatim in [goal] (replay only recognizes slot values that appear in the original wording).
+ * All other fields (apps, category, steps, time limit, marker, etc.) are inherited from the original task.
  */
 @Serializable
 data class Variant(val goal: String, val checks: List<Check>? = null)
 
-/** 只读设备探针:名字 → shell 命令。评测器只执行这里列出的命令,任务文件不能写任意命令。 */
+/** Read-only device probes: name → shell command. The evaluator only executes the commands listed here; task files cannot supply arbitrary commands. */
 val PROBE_ALLOWLIST: Map<String, String> = mapOf(
     "android_release" to "getprop ro.build.version.release",
     "android_sdk" to "getprop ro.build.version.sdk",
@@ -182,7 +182,7 @@ val PROBE_ALLOWLIST: Map<String, String> = mapOf(
     "auto_time" to "settings get global auto_time",
     "default_browser" to "cmd package resolve-activity --brief -a android.intent.action.VIEW -d https://example.com",
     "default_home" to "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
-    /** 内部存储根目录里的文件和文件夹(建文件夹类题核对用,不依赖哪个文件管理 App)。 */
+    /** Files and folders in the root of internal storage (used by folder-creation checks without depending on any particular file manager App). */
     "storage_root" to "ls -1 /sdcard/",
 )
 
@@ -190,17 +190,17 @@ object EvalTasks {
     private val json = Json { explicitNulls = false }
     private val ID = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
     private val SPLITS = setOf("train", "test")
-    /** [EvalTask.partition] 的取值。 */
+    /** The values of [EvalTask.partition]. */
     val PARTITIONS = setOf("tune", "holdout")
     private val PROBE_REF = Regex("""\{probe:([^}]*)\}""")
     private val APP_REF = Regex("""\{app:([^}]*)\}""")
     private val REQUIREMENT_KINDS = setOf("installed", "login", "site", "signedIn", "app")
 
-    /** 题目里用到的 `{app:<能力>}`。 */
+    /** The `{app:<capability>}` references used by the task. */
     fun appCapabilities(t: EvalTask): Set<String> =
         APP_REF.findAll(json.encodeToString(EvalTask.serializer(), t)).map { it.groupValues[1] }.toSet()
 
-    /** 把 `{app:<能力>}` 换成 [apps] 里的包名(能力 → 包名);[apps] 里没有的能力原样留着,`apps` 列表里没换上的去掉。 */
+    /** Replaces `{app:<capability>}` with the package name from [apps] (capability → package name); capabilities missing from [apps] are left as they are, and entries in the `apps` list that cannot be resolved are dropped. */
     fun resolveApps(t: EvalTask, apps: Map<String, String>): EvalTask {
         fun s(x: String) = APP_REF.replace(x) { m -> apps[m.groupValues[1]] ?: m.value }
         return t.copy(
@@ -209,7 +209,7 @@ object EvalTasks {
         )
     }
 
-    /** 目标前加渠道说法([CHANNEL_PREFIX]);目标里已经这么说了(不计空白)就不再加。 */
+    /** Prefixes the channel wording to the goal ([CHANNEL_PREFIX]); if the goal already says so (ignoring whitespace) it is not added again. */
     fun withChannel(goal: String, channel: String?): String {
         val prefix = channel?.let { CHANNEL_PREFIX[it] } ?: return goal
         fun squash(x: String) = x.filterNot(Char::isWhitespace)
@@ -218,15 +218,15 @@ object EvalTasks {
 
     fun parse(json: String): EvalTask = this.json.decodeFromString(EvalTask.serializer(), json)
 
-    /** 原题的各个变体,编号为 `<原题>~v<n>`(从 1 起);没有变体返回空。 */
+    /** The original task's variants, numbered `<original>~v<n>` (starting at 1); empty when there are no variants. */
     fun variantsOf(t: EvalTask): List<EvalTask> = t.variants.mapIndexed { i, v ->
         t.copy(id = "${t.id}~v${i + 1}", goal = v.goal, checks = v.checks ?: t.checks, variants = emptyList())
     }
 
-    /** 单题合法性(含各变体);空列表 = 合法。 */
+    /** Validity of a single task (including all its variants); an empty list means valid. */
     fun validate(t: EvalTask): List<String> {
         val errs = mutableListOf<String>()
-        // 变体按原题编号查,错误前面标上是第几个变体
+        // Variants are validated under the original task's id, with errors prefixed by which variant they belong to
         variantsOf(t).forEachIndexed { i, v -> validate(v.copy(id = t.id)).forEach { errs += "${t.id}: variant[${i + 1}]: $it" } }
         if (!ID.matches(t.id)) errs += "id「${t.id}」须为小写字母数字加连字符"
         if (t.goal.isBlank()) errs += "${t.id}: goal 为空"
@@ -259,7 +259,7 @@ object EvalTasks {
                     if (c.pattern.isEmpty()) errs += "${t.id}: checks[$i] pattern 为空"
                     else runCatching { Regex(c.pattern) }
                         .onFailure { errs += "${t.id}: checks[$i] 正则无效:${it.message}" }
-                        // 能匹配空串的正则对任何回答都成立
+                        // A regex that can match the empty string holds for any answer
                         .onSuccess { if (it.containsMatchIn("")) errs += "${t.id}: checks[$i] 正则能匹配空串,核对不了任何东西" }
                 is Check.AnswerContains ->
                     if (c.all.isEmpty() || c.all.any { it.isBlank() }) errs += "${t.id}: checks[$i] all 为空或含空串"
@@ -283,17 +283,17 @@ object EvalTasks {
         return errs
     }
 
-    /** 整个任务集:逐题校验,再查 id 重复。 */
+    /** The whole task set: validate task by task, then check for duplicate ids. */
     fun validateAll(ts: List<EvalTask>): List<String> =
         ts.flatMap { validate(it) } +
             ts.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.map { "id「$it」重复" }
 
-    /** 替换 `{run}` 和 `{probe:<名字>}`;probes 是 probesBefore 的执行结果(占位名 → 输出)。 */
+    /** Substitutes `{run}` and `{probe:<name>}`; probes is the result of running probesBefore (placeholder name → output). */
     fun substitute(t: EvalTask, run: String, probes: Map<String, String>): EvalTask {
         fun s(x: String): String = PROBE_REF.replace(x.replace("{run}", run)) { m ->
             probes[m.groupValues[1]]?.trim() ?: m.value
         }
-        // 正则里插入的探针值按字面量处理
+        // Probe values inserted into a regex are treated as literals
         fun re(x: String): String = PROBE_REF.replace(x.replace("{run}", Regex.escape(run))) { m ->
             probes[m.groupValues[1]]?.let { Regex.escape(it.trim()) } ?: Regex.escapeReplacement(m.value)
         }

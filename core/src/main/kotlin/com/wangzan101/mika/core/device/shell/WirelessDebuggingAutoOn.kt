@@ -5,70 +5,70 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** 替用户打开无线调试停下来的原因;停下后要等换了 Wi-Fi、用户亲手打开过、点了重试或助手起来了才再写。 */
+/** Why turning wireless debugging on for the user stopped; after stopping it only writes again once the Wi-Fi changed, the user turned it on by hand, retry was tapped, or the helper came up. */
 enum class AutoOnBlock {
-    /** 写了打开,系统马上又拨回关着:这个 Wi-Fi 还没被允许无线调试(系统同时会问用户要不要允许)。 */
+    /** It was written as on and the system switched it back off right away: this Wi-Fi has not been allowed for wireless debugging yet (the system also asks the user whether to allow it). */
     NotAllowedHere,
-    /** 系统不让写(写入抛异常或返回失败)。 */
+    /** The system does not allow the write (it throws or returns failure). */
     Refused,
-    /** 连着替用户打开了 [WirelessDebuggingAutoOn.MAX_WRITES] 次,助手还是没起来。 */
+    /** It turned it on for the user [WirelessDebuggingAutoOn.MAX_WRITES] times in a row and the helper still did not come up. */
     GaveUp,
 }
 
-/** 此刻要不要替用户打开无线调试。 */
+/** Whether to turn wireless debugging on for the user right now. */
 sealed interface AutoOnGate {
     data object Act : AutoOnGate
-    /** 离上一次写太近:等 [ms] 再来。 */
+    /** Too close to the previous write: come back after [ms]. */
     data class Wait(val ms: Long) : AutoOnGate
     data class Skip(val reason: AutoOnSkip) : AutoOnGate
 }
 
 enum class AutoOnSkip {
-    /** 用户在 Claire 里关掉了「自动打开无线调试」。 */
+    /** The user turned off "turn on wireless debugging automatically" in Claire. */
     Declined,
-    /** Claire 没有修改系统设置的授权。 */
+    /** Claire does not hold the permission to modify system settings. */
     NoPermission,
-    /** 没连 Wi-Fi:系统不会在没有 Wi-Fi 时打开无线调试(写了也会被拨回)。 */
+    /** Not connected to Wi-Fi: the system does not turn wireless debugging on without Wi-Fi (a write would be switched back anyway). */
     NoWifi,
-    /** 已经停下了,见 [AutoOnBlock]。 */
+    /** It has already stopped, see [AutoOnBlock]. */
     Blocked,
 }
 
 /**
- * 内置助手要启动、无线调试却关着时,替用户把它打开(只开不关)。助手一旦起来就不再需要无线调试,
- * 但重新启动它(重启手机后、Claire 更新后、助手没了)要靠无线调试;而安卓原版在 Wi-Fi 断开时、重启后都会把它关掉。
+ * When the built-in helper needs to start but wireless debugging is off, turns it on for the user (only on, never off). Once the helper is up, wireless debugging is no longer needed,
+ * but restarting it (after a phone reboot, after a Claire update, when the helper is gone) depends on wireless debugging; and stock Android turns it off whenever Wi-Fi disconnects and after a reboot.
  *
- * 只在用户没关掉「自动打开无线调试」、Claire 自己拿着修改系统设置的授权、连着 Wi-Fi 时写。
- * 要助手启动时助手当然不在,经已配对连接跑命令又要先有无线调试,所以只有 App 直接写这一条路;做不到就不动,界面照旧给手动打开的办法。
+ * It only writes when the user has not turned off "turn on wireless debugging automatically", Claire itself holds the permission to modify system settings, and Wi-Fi is connected.
+ * When the helper needs to start it is of course absent, and running commands over the paired connection requires wireless debugging to be on first, so having the App write directly is the only path; when that is not possible it does nothing and the UI keeps offering the manual way to turn it on.
  *
- * 依赖的安卓原版行为(AdbDebuggingManager 对 `adb_wifi_enabled` 的处理):
- * - 设置被写成 1 后,系统检查当前 Wi-Fi:没连 Wi-Fi 就马上写回 0;
- *   这个网络(按 BSSID)不在「始终允许」名单里,也马上写回 0,同时弹框问用户「允许在此网络上使用无线调试吗」(可勾「始终允许」)。
- *   用户点了允许,系统自己再写回 1 并打开;拒绝就一直关着。
- * - 网络在名单里:保持 1,随后起无线调试服务(端口由连接那一步照常去找)。
- * 所以写完后看 [settleMs]:这段时间里读到关着就当这个 Wi-Fi 还没被允许,停下([AutoOnBlock.NotAllowedHere]),
- * 不再反复写(每写一次系统就弹一次框),直到换了 Wi-Fi、用户亲手打开、点了重试或助手起来了([reset])。
- * 有的系统对这一项另有处理(写入被拒、写了不生效),一样停下,不钻各家的实现。
- * 写之间按 [gapAfter] 拉开间隔;连着写了 [MAX_WRITES] 次助手都没起来也停下。
+ * Stock Android behavior it relies on (how AdbDebuggingManager handles `adb_wifi_enabled`):
+ * - after the setting is written to 1, the system checks the current Wi-Fi: with no Wi-Fi connection it immediately writes 0 back;
+ *   if this network (by BSSID) is not in the "always allow" list it also writes 0 back immediately, while showing a dialog asking the user "Allow wireless debugging on this network?" (with an "always allow" checkbox).
+ *   If the user allows it, the system writes 1 back itself and turns it on; if the user declines it stays off.
+ * - if the network is in the list: it stays 1, and the wireless debugging service is started afterwards (the port is discovered as usual by the connection step).
+ * So after writing it watches [settleMs]: reading it as off within that time means this Wi-Fi has not been allowed yet, so it stops ([AutoOnBlock.NotAllowedHere])
+ * and does not keep writing (each write makes the system show the dialog again) until the Wi-Fi changes, the user turns it on by hand, retry is tapped, or the helper comes up ([reset]).
+ * Some systems handle this item differently (the write is refused, or it has no effect); it stops the same way without digging into each vendor's implementation.
+ * Writes are spaced apart according to [gapAfter]; writing [MAX_WRITES] times in a row without the helper starting also makes it stop.
  */
 class WirelessDebuggingAutoOn(
-    /** 用户要不要这一项(没在 Claire 里关掉「自动打开无线调试」)。 */
+    /** Whether the user wants this capability (has not turned off "turn on wireless debugging automatically" in Claire). */
     private val wants: () -> Boolean,
-    /** Claire 自己拿着修改系统设置的授权。 */
+    /** Claire itself holds the permission to modify system settings. */
     private val canWrite: () -> Boolean,
-    /** 系统的无线调试开关;读不到为 null。 */
+    /** The system's wireless debugging switch; null when it cannot be read. */
     private val read: () -> Boolean?,
-    /** 把无线调试开关写成打开;系统不让写时返回 false 或抛异常。 */
+    /** Writes the wireless debugging switch as on; returns false or throws when the system does not allow the write. */
     private val write: () -> Boolean,
     private val now: () -> Long = System::currentTimeMillis,
     private val settleMs: Long = SETTLE_MS,
     private val pollMs: Long = POLL_MS,
 ) {
     private val _blocked = MutableStateFlow<AutoOnBlock?>(null)
-    /** 停下来的原因;没停下为 null。给设置页和状态说一句。 */
+    /** Why it stopped; null when it has not stopped. Provides a line for the settings page and the status. */
     val blocked: StateFlow<AutoOnBlock?> = _blocked.asStateFlow()
 
-    /** 正在写、等系统处理:这段时间里开关的变化由这里判断,别人不要跟着动。 */
+    /** Currently writing and waiting for the system to settle: switch changes during this time are judged here, so others must not follow them. */
     @Volatile var writing = false
         private set
 
@@ -81,7 +81,7 @@ class WirelessDebuggingAutoOn(
         return decide(wants(), canWrite(), wifi, _blocked.value, writes, now() - lastWriteAt)
     }
 
-    /** 写打开并等系统处理完。开关保持打开返回 true;被拒或被拨回返回 false,并记下原因停下。 */
+    /** Writes it on and waits for the system to settle. Returns true if the switch stays on; returns false when it was refused or switched back, recording the reason and stopping. */
     suspend fun turnOn(): Boolean {
         synchronized(this) {
             writing = true
@@ -103,7 +103,7 @@ class WirelessDebuggingAutoOn(
         }
     }
 
-    /** 换了 Wi-Fi、用户亲手打开了无线调试或点了重试、助手起来了:从头算。 */
+    /** The Wi-Fi changed, the user turned wireless debugging on by hand, retry was tapped, or the helper came up: start over. */
     @Synchronized
     fun reset() {
         writes = 0
@@ -116,14 +116,14 @@ class WirelessDebuggingAutoOn(
     }
 
     companion object {
-        /** 写完后看多久有没有被系统拨回去;原版是收到设置变化后马上处理,几百毫秒内就会拨回。 */
+        /** How long to watch after writing for the system switching it back; stock Android handles the setting change immediately and switches it back within a few hundred milliseconds. */
         const val SETTLE_MS = 3_000L
         const val POLL_MS = 250L
         const val MAX_WRITES = 3
         const val BASE_GAP_MS = 10_000L
         const val MAX_GAP_MS = 5 * 60_000L
 
-        /** 写过 [writes] 次之后,下一次至少隔多久:第一次不等,之后 10 秒、20 秒……封顶 5 分钟。 */
+        /** The minimum wait before the next write after [writes] writes: none for the first, then 10 seconds, 20 seconds… capped at 5 minutes. */
         fun gapAfter(writes: Int): Long =
             if (writes <= 0) 0L else (BASE_GAP_MS shl (writes - 1).coerceAtMost(20)).coerceAtMost(MAX_GAP_MS)
 

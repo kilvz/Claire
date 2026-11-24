@@ -14,39 +14,39 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** 经已配对的无线调试连接,以 shell 身份跑一条命令,返回它的输出。连接断了就抛异常。 */
+/** Runs one command as the shell identity over the paired wireless debugging connection and returns its output. Throws when the connection is lost. */
 fun interface ShellCommandRunner {
     suspend fun exec(command: String): String
 }
 
 /**
- * 手机操作的几项能力:默认打开(连接可用时 Claire 自己补上),都能在设置里关掉,解除配对时一并收回。
- * [RestoreAfterReboot] 和 [AutoWirelessDebugging] 用的是同一份修改系统设置的授权(都只用来打开无线调试),
- * 两项都关掉才收回。
+ * The capabilities of phone control: on by default (Claire fills them in itself when a connection is available), all can be turned off in settings, and all are revoked when unpairing.
+ * [RestoreAfterReboot] and [AutoWirelessDebugging] use the same permission to modify system settings (both are only used to turn on wireless debugging),
+ * so it is only revoked when both are turned off.
  */
 enum class RecoveryCapability {
     Accessibility, BatteryWhitelist, RestoreAfterReboot,
-    /** 要重新启动内置助手、无线调试却关着时替用户打开(见 [WirelessDebuggingAutoOn])。 */
+    /** Turns wireless debugging on for the user when the built-in helper needs restarting but it is off (see [WirelessDebuggingAutoOn]). */
     AutoWirelessDebugging;
 
-    /** 要靠修改系统设置的授权。 */
+    /** Requires the permission to modify system settings. */
     val writesSecureSettings: Boolean get() = this == RestoreAfterReboot || this == AutoWirelessDebugging
 }
 
 /**
- * 每项能力的两件事分开记:[applied] 是 Claire 已经替用户在系统里打开、此刻有效的;
- * [declined] 是用户亲手关掉的,之后不再自动打开。两边都没有的就是「没动过」,按默认打开。
+ * Two things are recorded separately for each capability: [applied] means Claire has already turned it on in the system for the user and it is in effect right now;
+ * [declined] means the user turned it off by hand, so it will not be turned on automatically again. Neither means "untouched", which counts as on by default.
  */
 data class RecoveryConsent(
     val applied: Set<RecoveryCapability> = emptySet(),
     val declined: Set<RecoveryCapability> = emptySet(),
 ) {
-    /** 用户要不要这一项:没亲手关掉就是要(开关显示的就是它)。 */
+    /** Whether the user wants this capability: it is wanted unless turned off by hand (this is what the switch shows). */
     fun wants(c: RecoveryCapability): Boolean = c !in declined
 
     fun isApplied(c: RecoveryCapability): Boolean = c in applied
 
-    /** 用户要、却还没生效的几项:连接一可用就补上。 */
+    /** Capabilities the user wants that are not in effect yet: filled in as soon as a connection is available. */
     val pending: List<RecoveryCapability> get() = RecoveryCapability.entries.filter { wants(it) && !isApplied(it) }
 
     fun chose(c: RecoveryCapability, on: Boolean): RecoveryConsent = copy(declined = if (on) declined - c else declined + c)
@@ -61,19 +61,19 @@ interface RecoveryConsentStore {
 
 sealed interface PermissionResult {
     data object Done : PermissionResult
-    /** 手机操作还没设置好,没有能用的连接。 */
+    /** Phone control is not set up yet, so there is no usable connection. */
     data object NoRunner : PermissionResult
     data class Failed(val detail: String) : PermissionResult
 }
 
-/** 这几项能力对应的 shell 命令(原版 pm / cmd deviceidle / settings 的写法)。 */
+/** The shell commands for these capabilities (written the way stock pm / cmd deviceidle / settings does it). */
 object PermissionCommands {
     const val WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS"
     const val READ_ACCESSIBILITY = "settings get secure enabled_accessibility_services"
     const val EXIT_MARK = "__mika_exit="
 
     fun accessibilityService(pkg: String): String {
-        // 包名(applicationId)可能带后缀(并存安装的版本),服务类却仍在 App 的命名空间里:包名是类名前缀时用简写,否则写完整类名
+        // The package name (applicationId) may carry a suffix (for side-by-side installed versions), while the service class still lives in the App's namespace: use the short form when the package name is a prefix of the class name, otherwise write the full class name
         val service = "com.wangzan101.mika.a11y.MikaAccessibilityService"
         return "$pkg/${if (service.startsWith("$pkg.")) service.removePrefix(pkg) else service}"
     }
@@ -82,25 +82,25 @@ object PermissionCommands {
     fun whitelistAdd(pkg: String) = "cmd deviceidle whitelist +$pkg"
     fun whitelistRemove(pkg: String) = "cmd deviceidle whitelist -$pkg"
 
-    /** 写回整张无障碍服务列表。空了就删掉这一项并关总开关,免得留下一个空字符串。 */
+    /** Writes back the whole accessibility services list. When empty, delete the item and turn off the master switch so that no empty string is left behind. */
     fun writeAccessibility(list: String): List<String> =
         if (list.isEmpty()) listOf("settings delete secure enabled_accessibility_services", "settings put secure accessibility_enabled 0")
         else listOf("settings put secure enabled_accessibility_services ${quote(list)}", "settings put secure accessibility_enabled 1")
 
     fun quote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
-    /** exec 服务拿不到退出码:在输出末尾补一行标记。pm、cmd 失败时多半只在输出里写一句,不能只看有没有输出。 */
+    /** The exec service does not expose the exit code: append a marker line to the end of the output. When pm or cmd fails it usually just prints a message in the output, so the presence of output alone cannot be used. */
     fun checked(command: String): String = "$command 2>&1; echo $EXIT_MARK\$?"
 
     fun exitCode(output: String): Int? =
         output.lineSequence().map { it.trim() }.lastOrNull { it.startsWith(EXIT_MARK) }?.removePrefix(EXIT_MARK)?.toIntOrNull()
 }
 
-/** `enabled_accessibility_services` 是冒号分隔的组件名;组件名有「包名/.类名」和「包名/完整类名」两种写法。 */
+/** `enabled_accessibility_services` is a colon-separated list of component names; a component name can be written as "package/.Class" or "package/full.Class". */
 object AccessibilityList {
     fun entries(raw: String?): List<String> {
         val v = raw?.trim().orEmpty()
-        if (v == "null") return emptyList() // `settings get` 对没写过的项输出 null
+        if (v == "null") return emptyList() // `settings get` outputs null for items that were never written
         return v.split(':').map { it.trim() }.filter { it.isNotEmpty() }
     }
 
@@ -124,10 +124,10 @@ object AccessibilityList {
 }
 
 /**
- * 按用户的选择打开或收回这几项能力。都要靠已配对的连接(shell 身份)去改系统设置,[runner] 为 null 就是还没有能用的连接。
- * 用户的选择([RecoveryConsent.declined])和系统里是否生效([RecoveryConsent.applied])分开记:
- * 打开的选择没连接时也先记下,等 [applyPending] 补上;命令失败时两样都保持原样,界面如实显示。
- * 几个入口串着执行,自动补上和用户拨开关不会交错。
+ * Turns these capabilities on or revokes them according to the user's choices. All of them need the paired connection (shell identity) to change system settings; a null [runner] means there is no usable connection yet.
+ * The user's choice ([RecoveryConsent.declined]) and whether it is in effect in the system ([RecoveryConsent.applied]) are recorded separately:
+ * a choice to turn on is recorded even without a connection and filled in later by [applyPending]; when a command fails both are left as they were and the UI shows it honestly.
+ * The entry points run serially, so automatic filling in and the user flipping switches do not interleave.
  */
 class RecoveryPermissions(
     private val runner: () -> ShellCommandRunner?,
@@ -137,18 +137,18 @@ class RecoveryPermissions(
     private val lock = Mutex()
     private val _autoFailed = MutableStateFlow<Set<RecoveryCapability>>(emptySet())
 
-    /** 自动补上时没成功的几项(不打扰用户,只在设置页那一项下面说一句);之后成功了就去掉。 */
+    /** Capabilities that failed during automatic filling in (without bothering the user, only a line under that item on the settings page); removed once they succeed later. */
     val autoFailed: StateFlow<Set<RecoveryCapability>> = _autoFailed.asStateFlow()
 
-    /** 用户拨开关:打开直接执行,不再确认;关掉马上收回,并记下「用户亲手关掉」。 */
+    /** The user flips a switch: turning on executes directly with no further confirmation; turning off revokes immediately and records "turned off by hand". */
     suspend fun set(capability: RecoveryCapability, on: Boolean): PermissionResult = lock.withLock {
         val now = store.consent.value
         val shell = runner()
         if (shell == null) {
             return@withLock when {
-                // 先记下要,连接可用时自动补上;界面提示先完成设置
+                // Record the request first and fill it in automatically once a connection is available; the UI prompts to finish setup
                 on -> PermissionResult.NoRunner.also { store.save(now.chose(capability, true)) }
-                // 没生效过,没有要收回的
+                // It was never in effect, so there is nothing to revoke
                 !now.isApplied(capability) -> PermissionResult.Done.also { store.save(now.chose(capability, false)) }
                 else -> PermissionResult.NoRunner
             }
@@ -162,8 +162,8 @@ class RecoveryPermissions(
     }
 
     /**
-     * 连接刚可用时调:把用户没关掉、也还没生效的几项打开。不弹任何东西;失败的记进 [autoFailed],
-     * 下次连接可用时再试。没有连接就什么都不做。
+     * Called when a connection has just become available: turns on the capabilities the user has not turned off and that are not in effect yet. Nothing is shown to the user; failures are recorded in [autoFailed]
+     * and retried the next time a connection is available. Without a connection it does nothing.
      */
     suspend fun applyPending(): PermissionResult = lock.withLock {
         val shell = runner() ?: return@withLock PermissionResult.NoRunner
@@ -177,7 +177,7 @@ class RecoveryPermissions(
         failure ?: PermissionResult.Done
     }
 
-    /** 一直看着内置助手的状态:每次变成运行中(连接刚可用)就 [applyPending];明确退出期间不动系统设置。 */
+    /** Keeps watching the built-in helper's status: every time it becomes running (a connection has just become available) it calls [applyPending]; system settings are left alone while the user has explicitly exited. */
     suspend fun applyWhenRunning(status: Flow<BuiltinShellStatus>, active: Flow<Boolean> = flowOf(true)) {
         combine(status, active, ::Pair).collect { (state, allowed) ->
             if (allowed && state == BuiltinShellStatus.Running) applyPending()
@@ -185,13 +185,13 @@ class RecoveryPermissions(
     }
 
     /**
-     * 解除配对时用:收回 Claire 在这里打开过的每一项,外加修改系统设置的授权(无论记录如何都收一次,收不存在的授权无害)。
-     * 用户自己在系统里开的无障碍或白名单不是这里给的,不动。「已生效」无论成败都清空:配对没了,这些能力也不再生效;
-     * 用户的选择留着:再配对时没关掉的几项照样自动打开,亲手关掉的仍然关着。
+     * Used when unpairing: revokes every capability Claire turned on here, plus the permission to modify system settings (revoked once regardless of the record; revoking a permission that does not exist is harmless).
+     * Accessibility or whitelisting the user enabled themselves in the system did not come from here and is left alone. "In effect" is cleared regardless of the outcome: the pairing is gone, so these capabilities stop being in effect;
+     * the user's choices are kept: on re-pairing the ones not turned off are turned on automatically as before, and the ones turned off by hand stay off.
      */
     suspend fun revokeAll(): PermissionResult = lock.withLock {
         val now = store.consent.value
-        // 修改系统设置的授权两项共用,收一次就够:只留 RestoreAfterReboot 那一条
+        // The permission to modify system settings is shared by two capabilities, so revoking it once is enough: only the RestoreAfterReboot entry is kept
         val granted = now.applied.filterNot { it.writesSecureSettings }.toSet() + RecoveryCapability.RestoreAfterReboot
         store.save(now.copy(applied = emptySet()))
         _autoFailed.value = emptySet()
@@ -200,16 +200,16 @@ class RecoveryPermissions(
     }
 
     /**
-     * 让 Claire 的无障碍服务重新运行起来(服务没在运行时用,见 [AccessibilityRepair]),别的服务一个不动:
-     * 列表里没有 Claire 就直接加上;有却没绑定,就先去掉,等 [gapMs] 让系统处理完,再重读列表加回去。
-     * 去掉之后一定会加回去,中途被取消也一样,免得把服务留在关着的状态;加回失败时写回原来的列表,仍报失败。不改 [RecoveryConsent]:这不是打开或收回能力。
+     * Makes Claire's accessibility service run again (used when the service is not running, see [AccessibilityRepair]), leaving every other service untouched:
+     * when Claire is not in the list it is added directly; when it is there but not bound, it is first removed, then after waiting [gapMs] for the system to settle the list is read again and it is added back.
+     * Once removed it is always added back, even if cancelled midway, so the service is not left in the off state; if adding back fails, the original list is written back and the failure is still reported. [RecoveryConsent] is not modified: this is not turning a capability on or off.
      */
     suspend fun restartAccessibility(gapMs: Long): PermissionResult = lock.withLock {
         val shell = runner() ?: return@withLock PermissionResult.NoRunner
         val me = PermissionCommands.accessibilityService(packageName)
         try {
             val current = shell.exec(PermissionCommands.READ_ACCESSIBILITY)
-            // 不在列表里(被强行停止时系统会拿掉):直接加上;在列表里却没绑定:去掉再加回,系统才会重新绑定
+            // Not in the list (the system removes it when force-stopped): add it directly; in the list but not bound: remove and add back so the system rebinds it
             if (!AccessibilityList.contains(current, me)) return@withLock runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(current, me)))
             val removed = runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.without(current, me)))
             if (removed != PermissionResult.Done) return@withLock removed
@@ -217,9 +217,9 @@ class RecoveryPermissions(
                 delay(gapMs)
                 val now = shell.exec(PermissionCommands.READ_ACCESSIBILITY)
                 val back = runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(now, me)))
-                // 加回失败时把原来的列表(连同总开关)写回:宁可回到「有却没绑定」,也不让 Claire 从列表里消失;
-                // 写回只是兜底,这次仍按加回失败报
-                // (读到的原样带着换行;它本来就有 Claire,with 只把它整理成干净的列表,内容不变)
+                // When adding back fails, write the original list back (along with the master switch): better to return to "present but unbound" than to let Claire disappear from the list;
+                // the write-back is only a fallback, and this attempt is still reported as a failure to add back
+                // (the raw read includes a newline; it already contains Claire, and with only tidies it into a clean list without changing the content)
                 if (back != PermissionResult.Done) runCatching { runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(current, me))) }
                 back
             }
@@ -230,7 +230,7 @@ class RecoveryPermissions(
         }
     }
 
-    /** 每项各自执行,一项失败不挡住后面的;返回第一处失败。 */
+    /** Each capability is executed on its own, a failure in one does not block the rest; returns the first failure. */
     private suspend fun run(shell: ShellCommandRunner, capabilities: List<RecoveryCapability>, on: Boolean): PermissionResult {
         var failure: PermissionResult? = null
         for (c in capabilities) {
@@ -249,7 +249,7 @@ class RecoveryPermissions(
     private suspend fun commands(shell: ShellCommandRunner, c: RecoveryCapability, on: Boolean): List<String> = when (c) {
         RecoveryCapability.RestoreAfterReboot, RecoveryCapability.AutoWirelessDebugging -> when {
             on -> listOf(PermissionCommands.grantWriteSecureSettings(packageName))
-            // 另一项还要用这份授权:只记下关掉,不收回
+            // Another capability still needs this permission: only record it as off, do not revoke
             RecoveryCapability.entries.any { it != c && it.writesSecureSettings && store.consent.value.isApplied(it) } -> emptyList()
             else -> listOf(PermissionCommands.revokeWriteSecureSettings(packageName))
         }

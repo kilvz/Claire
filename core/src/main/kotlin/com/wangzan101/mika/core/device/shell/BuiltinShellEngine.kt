@@ -19,47 +19,47 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 引擎要的平台能力。阻塞调用都在 IO 调度器上执行。 */
+/** Platform capabilities the engine needs. Blocking calls all run on the IO dispatcher. */
 interface BuiltinShellPlatform {
     fun paired(): Boolean
     fun setPaired(paired: Boolean)
-    /** 无线调试开关;读不到为 null(不拦着往下走)。 */
+    /** Wireless debugging switch; null when it cannot be read (does not block further progress). */
     fun wirelessDebugging(): Boolean?
     fun wifiConnected(): Boolean
     suspend fun findPairingPort(timeoutMs: Long): Int?
-    /** 用配对码配对;失败抛 [AdbPairingException]。 */
+    /** Pairs with the pairing code; throws [AdbPairingException] on failure. */
     fun pair(port: Int, code: String)
-    /** 连本机 adbd 并起助手(不等交接);失败抛 [AdbConnectionException],存着的钥匙读不出抛 [AdbKeyUnreadableException]。 */
+    /** Connects to the local adbd and launches the helper (does not wait for handoff); throws [AdbConnectionException] on failure, and [AdbKeyUnreadableException] when the stored key cannot be read. */
     suspend fun launchHelper()
-    /** 让正在跑的助手撤掉改动并退出;没有就什么都不做。 */
+    /** Asks the running helper to revert its changes and exit; does nothing when there is none. */
     fun stopHelper()
-    /** 删掉配对钥匙和交接口令;「用 root 启动」也一并关掉(解除配对就是停止手机操作,看门狗不再经 su 把助手起回来)。 */
+    /** Deletes the pairing key and the handoff nonce; also turns off "start with root" (unpairing means stopping phone control, so the watchdog no longer brings the helper back via su). */
     fun forget()
-    /** 没配对时收下过助手(是电脑经 USB 起的):它停了要告诉用户怎么再起,而不是当作从没设置过。持久化。 */
+    /** The helper was accepted while unpaired (started by a computer over USB): once it stops, tell the user how to start it again rather than treating it as never set up. Persisted. */
     fun usbStarted(): Boolean
     fun setUsbStarted(on: Boolean)
-    /** 「用 root 启动」此刻能不能用(用户的开关、有没有 su、su 上一次的答复);默认没有这条路。 */
+    /** Whether "start with root" is usable right now (the user's switch, whether su exists, su's last answer); by default this path is unavailable. */
     fun rootStart(): RootStart = RootStart.Off
     /**
-     * 经 su 以 shell 身份起助手(不等交接),返回 su 的答复:[SuAnswer.Granted] 时助手已在起,交接由引擎等;
-     * 手机上找不到 su 了为 null。失败抛异常(当作原因不明)。
+     * Launches the helper as the shell identity via su (does not wait for handoff) and returns su's answer: on [SuAnswer.Granted] the helper is already starting and the engine waits for the handoff;
+     * null when su can no longer be found on the phone. Throws on failure (treated as an unknown cause).
      */
     suspend fun launchHelperAsRoot(): SuAnswer? = null
-    /** 记下 su 的答复,持久化;null 是忘掉上一次的拒绝(用户点了重试)。 */
+    /** Records su's answer, persisted; null means forgetting the last denial (the user tapped retry). */
     fun setRootAnswer(answer: SuAnswer?) {}
-    /** 用户明确点了 Root 失败后的重试。返回 true 表示平台已发起异步授权,完成后会通知引擎。 */
+    /** The user explicitly tapped retry after a Root failure. Returns true when the platform has started an asynchronous authorization that will notify the engine once done. */
     fun requestRootStart(): Boolean = false
-    /** 当前选择的启动通道;默认 [ShellTransport.Auto]。 */
+    /** Currently selected launch transport; defaults to [ShellTransport.Auto]. */
     fun transport(): ShellTransport = ShellTransport.Auto
-    /** 持久化并更新启动通道选择。 */
+    /** Persists and updates the launch transport selection. */
     fun setTransport(transport: ShellTransport) {}
-    /** 此刻 Shizuku 的安装、运行和授权状态;默认不可用。 */
+    /** Current Shizuku install, running and authorization state; unavailable by default. */
     fun shizukuState(): ShizukuPlatformState = ShizukuPlatformState.Unavailable
-    /** 经 Shizuku 调起助手(不等交接);成功返回 null,失败返回具体原因。 */
+    /** Launches the helper via Shizuku (does not wait for handoff); returns null on success and the specific cause on failure. */
     suspend fun launchHelperViaShizuku(): BuiltinShellFailure? = BuiltinShellFailure.ShizukuNotRunning
 }
 
-/** 看门狗重起助手的间隔:第 n 次失败后等 base·2^(n-1),封顶 [maxMs];连续失败 [maxAttempts] 次后停下等人或等开关变化。 */
+/** Watchdog interval for restarting the helper: after the n-th failure wait base·2^(n-1), capped at [maxMs]; after [maxAttempts] consecutive failures it stops and waits for the user or for a switch change. */
 data class Backoff(val baseMs: Long = 2_000, val maxMs: Long = 60_000, val maxAttempts: Int = 5) {
     fun delayAfter(failures: Int): Long? {
         if (failures >= maxAttempts) return null
@@ -70,7 +70,7 @@ data class Backoff(val baseMs: Long = 2_000, val maxMs: Long = 60_000, val maxAt
 object BuiltinShellFailures {
     fun ofPairing(reason: AdbPairingException.Reason) = when (reason) {
         AdbPairingException.Reason.WRONG_CODE -> BuiltinShellFailure.WrongCode
-        // 配对端口连不上:配对窗口已经关了(端口随窗口一起消失)
+        // The pairing port is unreachable: the pairing window is already closed (the port disappears along with the window)
         AdbPairingException.Reason.CONNECT_FAILED -> BuiltinShellFailure.PairingWindowClosed
         AdbPairingException.Reason.TLS_FAILED, AdbPairingException.Reason.PROTOCOL -> BuiltinShellFailure.Unknown
         AdbPairingException.Reason.NOT_LOCAL -> BuiltinShellFailure.NotLocal
@@ -84,18 +84,18 @@ object BuiltinShellFailures {
         AdbConnectionException.Reason.PROTOCOL -> BuiltinShellFailure.ConnectFailed
     }
 
-    /** 看门狗自己再试有没有用:钥匙被撤销、地址不合法、没 Wi-Fi、缺 Shizuku/授权要等用户或开关变化。 */
+    /** Whether the watchdog retrying on its own helps: a revoked key, an invalid address, no Wi-Fi, or missing Shizuku/authorization must wait for the user or a switch change. */
     fun retryable(f: BuiltinShellFailure) = f == BuiltinShellFailure.ConnectFailed ||
         f == BuiltinShellFailure.HelperStartFailed || f == BuiltinShellFailure.ShizukuBindFailed ||
         f == BuiltinShellFailure.Unknown
 }
 
 /**
- * 内置助手的状态与看门狗。[helper] 有值就是助手的 Binder 在手(Running);
- * 没有时:Claire 自己起得来(用户打开了「用 root 启动」且能用,或配过对)就先等 [graceMs](还活着的助手会在 Claire 进程起来后自己交接),
- * 再起一个:先经 su(见 [BuiltinShellPlatform.rootStart]),不行或没打开再经 adbd;失败按 [backoff] 重试。
- * su 拒绝或不回话时记下来,不再自己去问,等用户点重试。
- * 要起助手时无线调试关着,有 [autoOn] 就先替用户打开(条件和停下的规矩见 [WirelessDebuggingAutoOn])。
+ * State and watchdog of the built-in helper. A non-null [helper] means the helper's Binder is in hand (Running);
+ * when it is null: if Claire can start it itself (the user enabled "start with root" and it is usable, or pairing has been done) it first waits [graceMs] (a still-alive helper hands off on its own once the Claire process is up),
+ * then starts one: first via su (see [BuiltinShellPlatform.rootStart]), and if that fails or is not enabled, via adbd; on failure it retries according to [backoff].
+ * When su denies or does not answer, that is recorded and it stops asking on its own, waiting for the user to tap retry.
+ * If wireless debugging is off when the helper needs to start, and [autoOn] is present, it first turns it on for the user (conditions and stopping rules are in [WirelessDebuggingAutoOn]).
  */
 class BuiltinShellEngine(
     private val platform: BuiltinShellPlatform,
@@ -114,7 +114,7 @@ class BuiltinShellEngine(
     private val _discovery = MutableStateFlow<PairingDiscovery>(PairingDiscovery.Idle)
     override val pairingDiscovery: StateFlow<PairingDiscovery> = _discovery.asStateFlow()
 
-    /** 最近一次配对或连接失败的异常类别和说明(诊断信息用,原文未脱敏);连上后清空。 */
+    /** Exception type and message of the most recent pairing or connection failure (for diagnostics, not redacted); cleared once connected. */
     @Volatile var lastError: String? = null
         private set
 
@@ -143,7 +143,7 @@ class BuiltinShellEngine(
 
     override val rootStart: Boolean get() = platform.rootStart() == RootStart.Ready
 
-    /** Claire 自己起得来助手:按当前通道看 Shizuku、su 或已配对的无线调试。 */
+    /** Claire can start the helper itself: depending on the current transport, check Shizuku, su or paired wireless debugging. */
     private fun selfStart(): Boolean = when (platform.transport()) {
         ShellTransport.Shizuku -> platform.shizukuState().ready
         ShellTransport.WirelessDebugging -> rootStart || platform.paired()
@@ -153,14 +153,14 @@ class BuiltinShellEngine(
     private fun initialStatus(): BuiltinShellStatus = when {
         helper.value != null -> BuiltinShellStatus.Running
         selfStart() -> BuiltinShellStatus.Connecting
-        // 电脑起过的助手可能还活着,等它来交接
+        // A helper started by the computer may still be alive; wait for it to hand off
         platform.transport() != ShellTransport.Shizuku && platform.usbStarted() -> BuiltinShellStatus.Connecting
         else -> idleStatus()
     }
 
     /**
-     * Claire 自己起不来、手里也没有助手时的状态:Shizuku 模式下报 Shizuku 缺哪一步;
-     * 自动模式下若未配对且已装 Shizuku 也如实提示;否则看 root、电脑启动或未配对。
+     * Status when Claire cannot start the helper itself and holds no helper: in Shizuku mode it reports which Shizuku step is missing;
+     * in automatic mode it also reports honestly when unpaired with Shizuku installed; otherwise it looks at root, computer launch or being unpaired.
      */
     private fun idleStatus(): BuiltinShellStatus = when (platform.transport()) {
         ShellTransport.Shizuku -> BuiltinShellStatus.Failed(platform.shizukuState().failure())
@@ -179,7 +179,7 @@ class BuiltinShellEngine(
         return if (platform.usbStarted()) BuiltinShellStatus.Failed(BuiltinShellFailure.UsbHelperStopped) else BuiltinShellStatus.NotPaired
     }
 
-    /** 开始看着助手:掉线就重起。只在功能打开时调。 */
+    /** Starts watching the helper: restart it when it drops. Called only when the feature is enabled. */
     @Synchronized
     fun start() {
         if (started) return
@@ -191,14 +191,14 @@ class BuiltinShellEngine(
                     synchronized(this@BuiltinShellEngine) { failures = 0; retryJob?.cancel(); pendingImmediate = false }
                     lastError = null
                     autoOn?.reset()
-                    // 没配对、也没用 root 或 Shizuku 就来了:是电脑经 USB 起的。记下来,它停了才知道该怎么提示
+                    // It arrived unpaired and without root or Shizuku: it was started by a computer over USB. Record it so that, once it stops, the right guidance can be shown
                     if (!platform.paired() && platform.rootStart() == RootStart.Off && !shizukuStart && platform.transport() != ShellTransport.Shizuku) {
                         platform.setUsbStarted(true)
                     }
                     _status.value = BuiltinShellStatus.Running
                 } else if (!selfStart()) {
-                    // App 刚起来时还活着的助手会自己来交接;用着用着断了也可能是正在换一个新的来交接:
-                    // 都先等一会儿再说它停了,免得界面一闪「已停止」
+                    // A helper still alive when the App just started hands off on its own; a drop during use may also mean a new one is being swapped in to hand off:
+                    // wait a while before declaring it stopped, so the UI does not flash "stopped"
                     if (platform.transport() != ShellTransport.Shizuku && platform.usbStarted()) {
                         _status.value = BuiltinShellStatus.Connecting
                         schedule(graceMs)
@@ -217,7 +217,7 @@ class BuiltinShellEngine(
         }
     }
 
-    /** 有人要用助手却没有:没在起、也没排着重试就马上起一次。 */
+    /** Someone needs the helper but none is available: if it is not starting and no retry is queued, start one immediately. */
     fun need() {
         if (helper.value != null || !selfStart()) return
         synchronized(this) { if (retryJob?.isActive == true) return }
@@ -226,8 +226,8 @@ class BuiltinShellEngine(
     }
 
     /**
-     * 「用 root 启动」的开关或 su 的答复变了(用户在设置、引导页里打开、关掉、重新授权):助手不在就按新的情况从头再试;
-     * Claire 自己起不来了就照实改状态。
+     * The "start with root" switch or su's answer changed (the user enabled, disabled or re-authorized it in settings or the guide): if the helper is absent, retry from scratch under the new conditions;
+     * if Claire can no longer start it itself, update the status accordingly.
      */
     fun rootChanged() {
         if (platform.transport() == ShellTransport.Shizuku) return
@@ -241,7 +241,7 @@ class BuiltinShellEngine(
         if (selfStart()) schedule(0) else _status.value = idleStatus()
     }
 
-    /** 切换启动通道:停掉旧通道上的助手并按新通道重新连接或更新状态。 */
+    /** Switches the launch transport: stop the helper on the old transport and reconnect or update the status per the new transport. */
     override fun selectTransport(transport: ShellTransport) {
         if (platform.transport() == transport) return
         platform.setTransport(transport)
@@ -260,7 +260,7 @@ class BuiltinShellEngine(
         }
     }
 
-    /** Shizuku 状态或授权变了:仅无线调试模式不动;有助手就保持运行;否则按新状态马上试或照实改状态。 */
+    /** Shizuku state or authorization changed: in wireless-debugging-only mode nothing happens; if a helper is present it keeps running; otherwise try immediately per the new state or update the status accordingly. */
     fun shizukuChanged() {
         if (platform.transport() == ShellTransport.WirelessDebugging) return
         synchronized(this) {
@@ -274,11 +274,11 @@ class BuiltinShellEngine(
     }
 
     /**
-     * 无线调试开关变了:刚打开就从头再试。关掉时只改状态,不马上替用户打开(用户可能是亲手关的),等要用助手时再说。
-     * Claire 自己正在写这个开关时不跟着动:系统可能马上拨回去,由写的那一边判断。
+     * The wireless debugging switch changed: if it was just turned on, retry from scratch. If it was turned off, only update the status and do not turn it on for the user right away (the user may have turned it off by hand); wait until the helper is needed.
+     * While Claire itself is writing this switch, do not follow it: the system may switch it back right away, and the writing side decides.
      */
     fun wirelessDebuggingChanged() {
-        // 经 su 或纯 Shizuku 起助手不看无线调试
+        // Starting the helper via su or pure Shizuku does not look at wireless debugging
         if (helper.value != null || !platform.paired() || rootStart || platform.transport() == ShellTransport.Shizuku) return
         if (autoOn?.writing == true) return
         if (platform.wirelessDebugging() == false) {
@@ -291,8 +291,8 @@ class BuiltinShellEngine(
     }
 
     /**
-     * 连上了 Wi-Fi:之前卡在「没有 Wi-Fi」就马上再试(不用能上网);能替用户打开无线调试时,
-     * 卡在无线调试关着(包括上一个网络不允许)也马上再试。换了网络,上一个网络上的拒绝不再算数。
+     * Wi-Fi connected: retry immediately if previously stuck on "no Wi-Fi" (internet access is not required); when wireless debugging can be turned on for the user,
+     * also retry immediately if stuck on wireless debugging being off (including the previous network not allowing it). The network changed, so the previous network's denial no longer counts.
      */
     fun wifiAvailable() {
         if (platform.transport() == ShellTransport.Shizuku) return
@@ -304,12 +304,12 @@ class BuiltinShellEngine(
         schedule(0)
     }
 
-    /** 无线调试关着时显示的状态:这个 Wi-Fi 上刚被系统拨回过就照实说,否则就是关着。 */
+    /** Status shown while wireless debugging is off: report honestly if the system just switched it back on this Wi-Fi, otherwise it is simply off. */
     private fun offStatus(): BuiltinShellStatus =
         if (autoOn?.blocked?.value == AutoOnBlock.NotAllowedHere) BuiltinShellStatus.Failed(BuiltinShellFailure.WifiNotAllowed)
         else BuiltinShellStatus.WirelessDebuggingOff
 
-    /** 无线调试关着:能替用户打开就打开,开着没被拨回返回 true 接着连;否则写好状态返回 false。 */
+    /** Wireless debugging is off: turn it on for the user when possible and return true to continue connecting if it stays on without being switched back; otherwise set the status and return false. */
     private suspend fun turnOnWirelessDebugging(): Boolean {
         val auto = autoOn ?: return false.also { _status.value = offStatus() }
         when (val g = auto.gate(platform.wifiConnected())) {
@@ -317,7 +317,7 @@ class BuiltinShellEngine(
                 _status.value = BuiltinShellStatus.Connecting
                 if (withContext(io) { auto.turnOn() }) return true
             }
-            // 离上一次写太近:到时候再来一次
+            // Too close to the previous write: try again when the time comes
             is AutoOnGate.Wait -> synchronized(this) {
                 retryJob = scope.launch {
                     delay(g.ms)
@@ -377,7 +377,7 @@ class BuiltinShellEngine(
             }
             ShellTransport.WirelessDebugging -> Unit
         }
-        // 先走 root:不用配对、不用 Wi-Fi;不行时配过对就接着走无线调试
+        // Try root first: no pairing and no Wi-Fi needed; if that fails and pairing has been done, continue with wireless debugging
         if (rootStart) {
             _status.value = BuiltinShellStatus.Connecting
             val failure = attemptRoot()
@@ -406,7 +406,7 @@ class BuiltinShellEngine(
         failed(failure)
     }
 
-    /** 报失败;看门狗自己再试有用的按 [backoff] 排下一次。 */
+    /** Reports a failure; when the watchdog retrying on its own helps, schedules the next one per [backoff]. */
     private fun failed(failure: BuiltinShellFailure) {
         _status.value = BuiltinShellStatus.Failed(failure)
         val next = synchronized(this) { ++failures }
@@ -420,7 +420,7 @@ class BuiltinShellEngine(
         }
     }
 
-    /** 经 Shizuku 起一次助手并等交接。 */
+    /** Launches the helper once via Shizuku and waits for the handoff. */
     private suspend fun attemptShizuku(): BuiltinShellFailure? {
         val failure = try {
             withContext(io) { platform.launchHelperViaShizuku() }
@@ -440,7 +440,7 @@ class BuiltinShellEngine(
         return BuiltinShellFailure.ShizukuBindFailed
     }
 
-    /** 经 su 起一次助手并等交接;su 的答复记下来(拒绝、不回话之后就不再自己去问)。 */
+    /** Launches the helper once via su and waits for the handoff; su's answer is recorded (after a denial or silence it no longer asks on its own). */
     private suspend fun attemptRoot(): BuiltinShellFailure? {
         val answer = try {
             withContext(io) { platform.launchHelperAsRoot() }
@@ -485,7 +485,7 @@ class BuiltinShellEngine(
 
     override fun startDiscovery() {
         synchronized(this) {
-            // 还在找也重新开始:用户又回到配对这件事上了,找的时限从现在算
+            // Restart even if a search is running: the user is back on pairing, so the search deadline starts now
             discoveryJob?.cancel()
             _discovery.value = PairingDiscovery.Searching
             discoveryJob = scope.launch {
@@ -540,7 +540,7 @@ class BuiltinShellEngine(
             retryJob = null
             pendingImmediate = false
         }
-        // 用户看着 su 拒绝、没回话的提示点了重试:由平台明确再请求一次,未授权状态不会自动问 su
+        // The user tapped retry on the su-denied or su-silent prompt: have the platform explicitly request once more, since the unauthorized state will not ask su automatically
         val s = _status.value
         if (platform.transport() != ShellTransport.Shizuku && s is BuiltinShellStatus.Failed && s.reason in ROOT_ASKABLE) {
             if (platform.requestRootStart()) {
@@ -549,7 +549,7 @@ class BuiltinShellEngine(
             }
             platform.setRootAnswer(null)
         }
-        // 用户点了重试:之前替用户打开无线调试时的拒绝不再算数(不允许的网络上系统会再问一次)
+        // The user tapped retry: the previous denial when turning on wireless debugging for the user no longer counts (on a disallowed network the system asks again)
         autoOn?.reset()
         if (helper.value != null) {
             _status.value = BuiltinShellStatus.Running
@@ -566,7 +566,7 @@ class BuiltinShellEngine(
         }
         launchLock.withLock {
             withContext(io) {
-                // 先忘掉「电脑起过」:助手停下时状态就是没设置,不提示再跑命令
+                // Forget "started by computer" first: once the helper stops the state is simply not set up, with no prompt to run the command again
                 platform.setUsbStarted(false)
                 runCatching { platform.stopHelper() }
                 platform.forget()
@@ -577,7 +577,7 @@ class BuiltinShellEngine(
     }
 
     private companion object {
-        /** 点重试会再问 su 的几种失败。 */
+        /** Failures on which tapping retry will ask su again. */
         val ROOT_ASKABLE = setOf(BuiltinShellFailure.RootDenied, BuiltinShellFailure.RootNoAnswer, BuiltinShellFailure.RootNoShellUid)
     }
 }

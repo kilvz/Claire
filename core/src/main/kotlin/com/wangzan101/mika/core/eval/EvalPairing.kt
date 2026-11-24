@@ -1,10 +1,10 @@
 package com.wangzan101.mika.core.eval
 
-/** 并行评测的分组:同一组的题同时跑。 */
+/** Grouping for parallel evaluation: tasks in the same group run at the same time. */
 object EvalPairing {
     /**
-     * 按题目顺序贪心:每组从第一道还没分出去的题开始,往后找用到的 App 与组里都不相交的题,直到满 [n] 道。
-     * 同一个 App 不能同时在两块屏上,所以 App 有重叠的题不同组;没写 `apps` 的题不知道会用到什么,单独一组。
+     * Greedy in task order: each group starts from the first task not yet assigned and looks ahead for tasks whose apps are disjoint from everyone already in the group, until it holds [n] tasks.
+     * The same app cannot be on two screens at once, so tasks with overlapping apps go in different groups; a task without `apps` has no known apps, so it gets a group of its own.
      */
     fun groups(tasks: List<EvalTask>, n: Int): List<List<EvalTask>> {
         val left = tasks.toMutableList()

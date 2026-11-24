@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.eval
 
 /**
- * 屏上看得出的障碍:登录墙、人机验证各自的字样(登录框、验证码输入、重新登录按钮……)。
- * 评测只在屏上真有这种字样时才认模型报告的障碍([RunFacts.takeoverBarrier]),不只听模型说。
+ * Barriers that are visible on screen: the wording of login walls and human verification respectively (login dialog, verification code entry, sign-in-again button…).
+ * The evaluation honors a barrier reported by the model ([RunFacts.takeoverBarrier]) only when such wording is really on screen, not just because the model says so.
  */
 object BarrierSignals {
     private val SIGNALS = mapOf(
@@ -13,7 +13,7 @@ object BarrierSignals {
         "captcha" to listOf("人机验证", "安全验证", "滑块验证", "拖动滑块", "请完成验证", "验证您是真人", "captcha", "verify you are human", "not a robot"),
     )
 
-    /** [texts](一屏的元素文字)里有 [kind] 这种障碍的字样;不认识的障碍种类为 false。 */
+    /** Whether [texts] (the element texts of one screen) contain wording for a [kind] barrier; false for unknown barrier kinds. */
     fun shows(kind: String, texts: List<String>): Boolean {
         val words = SIGNALS[kind] ?: return false
         val text = texts.joinToString("\n").lowercase()

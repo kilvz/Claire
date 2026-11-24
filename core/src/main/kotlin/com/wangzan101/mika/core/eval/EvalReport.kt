@@ -9,10 +9,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.util.Locale
 import kotlin.math.ceil
 
-/** 每百万 token 单价;运行时传入,不写进仓库。 */
+/** Price per million tokens; passed in at runtime, not written into the repository. */
 data class Prices(val inputPerM: Double, val outputPerM: Double, val cachedPerM: Double)
 
-/** 运行汇总 markdown。只放指标和每题结论,不放回答全文和截图(它会提交进仓库)。 */
+/** Run summary markdown. Only metrics and per-task conclusions; no full answers or screenshots (it gets committed to the repository). */
 object EvalReport {
     fun markdown(
         run: String,
@@ -20,18 +20,18 @@ object EvalReport {
         scores: List<Pair<TaskScore, Observed>>,
         skipped: List<Pair<String, String>>,
         prices: Prices?,
-        /** 本次运行的开关组合([com.wangzan101.mika.core.agent.SpeedFlags.describe])。 */
+        /** The combination of switches for this run ([com.wangzan101.mika.core.agent.SpeedFlags.describe]). */
         flags: String = "none",
-        /** 并行评测时整轮从第一题开始到最后一题结束的时间;串行时为空,不出这一行。 */
+        /** In parallel evaluation, the time of the whole round from the first task starting to the last task finishing; empty when serial, in which case the row is omitted. */
         totalWallMs: Long? = null,
-        /** 同时跑几题(evalParallel);1 为串行。 */
+        /** How many tasks run at once (evalParallel); 1 means serial. */
         parallel: Int = 1,
-        /** 回放评测(evalVariants)里先跑、用来记下路线的原题;单列一节,不计入指标。 */
+        /** In replay evaluation (evalVariants), the original tasks run first to record the routes; listed in a separate section and not counted in the metrics. */
         originals: List<Pair<TaskScore, Observed>> = emptyList(),
     ): String {
         val n = scores.size
         val passed = scores.count { it.first.passed }
-        // 回答如实说没办成的(判过结局)不算报成功
+        // An answer that honestly says it was not accomplished (an outcome was judged) does not count as reported success
         val reportedSuccess = scores.count { Scoring.recorded(it.second).outcome == "succeeded" }
         val falseSuccess = scores.count { it.first.falseSuccess }
         val unverified = scores.count { it.first.unverified }
@@ -58,7 +58,7 @@ object EvalReport {
         sb.appendLine("| 假成功率(占全部) | ${ratio(falseSuccess, n)} |")
         sb.appendLine("| 未核实成功 | $unverified |")
         sb.appendLine("| 未核实且没过 | ${scores.count { it.first.failureClass == FailureClass.unverified_wrong }} |")
-        // 撞上屏上看得出的登录墙等交给了用户:单列,不算办成(算不算由人定)
+        // Hit a barrier visible on screen such as a login wall and handed over to the user: listed separately and not counted as accomplished (whether it counts is left to humans)
         scores.mapNotNull { it.first.handedOver }.groupingBy { it }.eachCount().toSortedMap()
             .forEach { (kind, c) -> sb.appendLine("| 交给用户:$kind(不算办成) | $c |") }
         sb.appendLine("| 步数中位数 | ${num(median(steps))} |")
@@ -70,9 +70,9 @@ object EvalReport {
         sb.appendLine("| 模型等待占比 | ${percent(scores.sumOf { it.second.modelMs }, wallT)} |")
         sb.appendLine("| 工具执行占比 | ${percent(scores.sumOf { it.second.toolMs }, wallT)} |")
         val waitT = scores.sumOf { it.second.waitMs }
-        // 等界面的时间要工具上报;一条都没有就是没量到,不写 0%
+        // Time waiting for the UI has to be reported by tools; if there is not a single entry it was not measured, so do not write 0%
         sb.appendLine("| 其中等界面占比 | ${if (waitT == 0L) "(暂无数据)" else percent(waitT, wallT)} |")
-        // 模型、工具之外:等用户回答或同意、重试退避、界面开销;三项加起来是 100%
+        // Beyond model and tools: waiting for the user to answer or approve, retry backoff, UI overhead; the three add up to 100%
         val otherT = (wallT - scores.sumOf { it.second.modelMs } - scores.sumOf { it.second.toolMs }).coerceAtLeast(0)
         sb.appendLine("| 其他/等用户占比 | ${percent(otherT, wallT)} |")
         sb.appendLine("| 回放命中 | ${scores.sumOf { it.second.replayHits }} |")
@@ -90,7 +90,7 @@ object EvalReport {
         val perTask = scores.filter { it.second.inputTokens > 0 }.map { it.second.cachedTokens * 100.0 / it.second.inputTokens }
         sb.appendLine("| 每题缓存命中率中位数 | ${if (perTask.isEmpty()) "—" else num(median(perTask)) + "%"} |")
         if (prices != null) {
-            // 输入 token 含缓存部分,缓存部分按缓存单价计
+            // Input tokens include the cached part, and the cached part is priced at the cached rate
             val cost = ((inT - cachedT) * prices.inputPerM + cachedT * prices.cachedPerM + outT * prices.outputPerM) / 1_000_000
             sb.appendLine("| 花费 | ${num(cost)} |")
         }
@@ -114,7 +114,7 @@ object EvalReport {
         sb.appendLine("| id | 结局 | 通过 | 类别 | 核查 | 步数 | 秒数 | 输入 token | 缓存命中率 | 输出 token |")
         sb.appendLine("|---|---|---|---|---|---|---|---|---|---|")
         scores.forEach { (s, o) ->
-            // 交出了回答、判下来没办成的:写判的结局
+            // An answer was given and it was judged as not accomplished: write the judged outcome
             val judged = o.judged?.takeIf { Scoring.recorded(o) !== o }?.let { "(判:$it)" }.orEmpty()
             sb.appendLine("| ${s.id} | ${o.outcome}$judged${s.handedOver?.let { "(交给用户:$it)" }.orEmpty()} | ${if (s.passed) "是" else "否"} | ${s.failureClass?.name ?: ""} | ${o.verdict ?: ""} | ${o.steps} | " +
                 "${num(o.wallMs / 1000.0)} | ${o.inputTokens} | ${percent(o.cachedTokens, o.inputTokens)} | ${o.outputTokens} |")
@@ -151,8 +151,8 @@ object EvalReport {
     }
 
     /**
-     * 「运行小结」一节:有运行记录的题按 [RunMetrics] 汇总(第一次反馈、来回次数、时间去向;批里的子步不重复计),
-     * 再逐题一行。没有一题有记录时不出这一节。
+     * The "run summary" section: tasks that have a run record are aggregated by [RunMetrics] (first feedback, number of round trips, where time went; sub-steps inside a batch are not counted twice),
+     * followed by one row per task. When no task has a record the section is omitted.
      */
     private fun metricsSection(sb: StringBuilder, scores: List<Pair<TaskScore, Observed>>) {
         val rows = scores.mapNotNull { (s, o) -> o.metrics?.let { s.id to it } }
@@ -181,7 +181,7 @@ object EvalReport {
         sb.appendLine()
     }
 
-    /** 每题的运行小结,一个 JSON 数组(评测结果目录下的 metrics.json),每项是 `id` 和 `metrics`;没有运行记录的题不列。 */
+    /** The per-task run summary as a JSON array (metrics.json in the evaluation results directory), each item being `id` and `metrics`; tasks without a run record are not listed. */
     fun metricsJson(scores: List<Pair<TaskScore, Observed>>): String = JsonArray(scores.mapNotNull { (s, o) ->
         o.metrics?.let { m -> JsonObject(mapOf("id" to JsonPrimitive(s.id), "metrics" to METRICS_JSON.encodeToJsonElement(RunMetrics.serializer(), m))) }
     }).toString()
@@ -190,12 +190,12 @@ object EvalReport {
 
     private fun secs(ms: Long) = num(Math.round(ms / 100.0) / 10.0)
 
-    /** 门槛结论:[passed] 为 false 时 [reasons] 列出没达标的地方。 */
+    /** Gate verdict: when [passed] is false, [reasons] lists what was not met. */
     data class Gate(val passed: Boolean, val reasons: List<String>)
 
     /**
-     * 配对题的门槛:带着学到的技能跑的一轮([treated])假成功必须为 0,
-     * 且办成数不低于基线([baseline])减 1。
+     * The gate for paired tasks: the round run with the learned skills ([treated]) must have zero false successes,
+     * and its accomplished count must be no lower than the baseline ([baseline]) minus 1.
      */
     fun gate(baseline: List<TaskScore>, treated: List<TaskScore>): Gate {
         val reasons = mutableListOf<String>()
@@ -208,8 +208,8 @@ object EvalReport {
     }
 
     /**
-     * 基线与带技能两轮的对比报告:办成率、假成功率、未核实成功,有观察数据时再加步数与耗时中位数;
-     * 每份学到的技能被用了几次([skillUse]);最后是门槛结论。
+     * A comparison report of the baseline and the round with skills: accomplishment rate, false success rate, unverified successes, plus median steps and duration when observation data is available;
+     * how many times each learned skill was used ([skillUse]); and finally the gate verdict.
      */
     fun compare(
         baseline: List<TaskScore>,
@@ -236,7 +236,7 @@ object EvalReport {
             sb.appendLine("| 步数中位数 | ${num(bs)} | ${num(ts)} | ${signedNum(ts - bs)} |")
             val bt = med(baselineObserved) { it.wallMs / 1000.0 }; val tt = med(treatedObserved) { it.wallMs / 1000.0 }
             sb.appendLine("| 耗时中位数(秒) | ${num(bt)} | ${num(tt)} | ${signedNum(tt - bt)} |")
-            // 用量按题号配对:两轮都跑了的题才比,各取每题的中位数(两轮题数不同时合计没法比)
+            // Usage is paired by task id: only tasks run in both rounds are compared, taking the median per task (totals are not comparable when the two rounds have different task counts)
             val bById = baseline.map { it.id }.zip(baselineObserved).toMap()
             val pairs = treated.map { it.id }.zip(treatedObserved).mapNotNull { (id, t) -> bById[id]?.let { it to t } }
             if (pairs.isNotEmpty()) {
@@ -273,7 +273,7 @@ object EvalReport {
         return if (s.size % 2 == 1) s[m] else (s[m - 1] + s[m]) / 2
     }
 
-    /** 最近秩法:排序后第 ceil(0.9n) 个。 */
+    /** Nearest-rank method: the ceil(0.9n)-th item after sorting. */
     internal fun p90(xs: List<Double>): Double {
         if (xs.isEmpty()) return 0.0
         val s = xs.sorted()
