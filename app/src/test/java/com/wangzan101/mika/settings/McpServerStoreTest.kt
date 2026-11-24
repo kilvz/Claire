@@ -42,7 +42,7 @@ import kotlin.concurrent.thread
 class McpServerStoreTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    /** 只反转字节;用来确认 secret 文件不是明文。 */
+    /** Reverses bytes only; used to confirm the secret file is not plaintext. */
     private class ReverseCipher : KeyCipher {
         override fun encrypt(plain: ByteArray) = plain.reversedArray()
         override fun decrypt(data: ByteArray) = data.reversedArray()
@@ -81,7 +81,7 @@ class McpServerStoreTest {
     @Test fun rejectsUnsafeUrls() {
         val s = store()
         assertTrue(s.add("x", "http://example.com/mcp").isFailure)
-        assertTrue(s.add("x", "http://localhost:1234/mcp").isFailure) // 需要显式 allowLocalHttp
+        assertTrue(s.add("x", "http://localhost:1234/mcp").isFailure) // requires an explicit allowLocalHttp
         assertTrue(s.add("x", "https://user:pw@example.com/mcp").isFailure)
         assertTrue(s.add("x", "http://169.254.169.254/mcp").isFailure)
         assertTrue(s.add("x", "https://169.254.169.254/mcp").isFailure)
@@ -98,7 +98,7 @@ class McpServerStoreTest {
             s.update(it.copy(allowLocalHttp = true)).getOrThrow()
         }
         assertEquals(true, ok.allowLocalHttp)
-        // 改成 http 的本地地址后可以通过
+        // Once changed to a local http address it passes
         assertEquals(null, s.validate(ok.copy(url = "http://localhost:1/mcp")))
     }
 
@@ -106,12 +106,12 @@ class McpServerStoreTest {
         val s = store()
         fun config(url: String, allowLocalHttp: Boolean) =
             McpServerConfig(name = "m", url = url, allowLocalHttp = allowLocalHttp)
-        // Tailscale 等组网工具用的 100.64/10:勾选允许本地 http 后应视为私有地址放行
+        // 100.64/10 used by mesh tools such as Tailscale: with local http allowed it should be treated as a private address and permitted
         assertEquals(null, s.validate(config("http://100.64.0.1:8080/mcp", allowLocalHttp = true)))
         assertEquals(null, s.validate(config("http://100.127.255.254/mcp", allowLocalHttp = true)))
-        // 没勾选仍然不放行 http(和本地地址一致)
+        // Without the opt-in, http is still rejected (same as for local addresses)
         assertNotNull(s.validate(config("http://100.64.0.1:8080/mcp", allowLocalHttp = false)))
-        // 公网地址即使勾选也不放行
+        // Public addresses are still rejected even with the opt-in
         assertNotNull(s.validate(config("http://8.8.8.8/mcp", allowLocalHttp = true)))
     }
 
@@ -139,7 +139,7 @@ class McpServerStoreTest {
         }
     }
 
-    /** 假的 stdio server:只回答 initialize 和 tools/list,用来验证 store 的启动与接入。 */
+    /** Fake stdio server: only answers initialize and tools/list, used to verify the store's launch and connection handling. */
     private fun stdioLauncher(): McpStdioLauncher = McpStdioLauncher { _, _, _ ->
         val toServer = PipedOutputStream()
         val fromClient = PipedInputStream(toServer)
@@ -202,7 +202,7 @@ class McpServerStoreTest {
         connections.close()
     }
 
-    /** 不回话的 stdio server:握手一直等不到回答。 */
+    /** Silent stdio server: the handshake never receives a reply. */
     private fun silentProcess(): McpStdioProcess {
         val toServer = PipedOutputStream()
         val fromClient = PipedInputStream(toServer, 1 shl 16)
@@ -221,7 +221,7 @@ class McpServerStoreTest {
         }
     }
 
-    /** 像沙箱那样:进程活着时拿着树的租约,关掉时交还;被独占的收回时停进程、记进 [revokes]。命令是 silent 的不回话。 */
+    /** Acts like the sandbox: holds a lease on the tree while the process is alive and gives it back on close; when an exclusive holder reclaims it, the process is stopped and the event counted in [revokes]. A command of "silent" does not reply. */
     private fun leasingLauncher(tree: SandboxTree, closes: AtomicInteger, revokes: AtomicInteger = AtomicInteger()): McpStdioLauncher {
         val inner = stdioLauncher()
         return McpStdioLauncher { ws, argv, _ ->
@@ -237,7 +237,7 @@ class McpServerStoreTest {
         }
     }
 
-    /** 任务收尾关它的 ResourceScope(TaskRun 的 finally,含取消、失败):连上的 server 关掉,沙箱的许可放掉,独占的不再被挡。 */
+    /** Closing the task's ResourceScope at teardown (TaskRun's finally, including cancellation and failure): connected servers are closed, the sandbox permit is released, and exclusive holders are no longer blocked. */
     @Test fun taskScopeCloseClosesConnectionsAndFreesThePermit() = runBlocking {
         val tree = SandboxTree()
         val closes = AtomicInteger()
@@ -246,17 +246,17 @@ class McpServerStoreTest {
         val resources = ResourceScope()
         val connections = s.connectionsFor(resources, workspace = "ws")
         assertEquals(1, connections.connections.size)
-        // 任务里还开着:普通的独占要用时收回租约(停进程),不会等上整个任务
+        // Still open within the task: a normal exclusive request reclaims the lease (stopping the process) instead of waiting out the whole task
         resources.close()
         assertEquals(1, closes.get())
-        connections.close() // 收尾里再关一次不重复
+        connections.close() // closing again during teardown is not repeated
         assertEquals(1, closes.get())
         withTimeout(5_000) { tree.exclusive { } }
-        // 任务早就结束:没有租约,独占的直接拿到,不调收回
+        // The task ended long ago: no lease remains, so the exclusive request is granted directly without invoking the revoke
         assertEquals(1, closes.get())
     }
 
-    /** 任务开着时换运行环境:独占的收回租约,停掉 server,不等任务结束。 */
+    /** Changing the runtime environment while a task is open: the exclusive request reclaims the lease and stops the server instead of waiting for the task to end. */
     @Test fun exclusiveStopsALongLivedServerInsteadOfWaiting() = runBlocking {
         val tree = SandboxTree()
         val closes = AtomicInteger()
@@ -270,7 +270,7 @@ class McpServerStoreTest {
         resources.close()
     }
 
-    /** 任务被取消在连接中途:已经连上的也关掉、许可放掉。 */
+    /** Task cancelled mid-connection: whatever already connected is closed too, and the permit is released. */
     @Test fun cancelDuringConnectClosesWhatConnected() = runBlocking {
         val tree = SandboxTree()
         val closes = AtomicInteger()
@@ -279,14 +279,14 @@ class McpServerStoreTest {
         s.add(McpServerConfig(name = "silent", url = "", transport = "stdio", command = "silent")).getOrThrow()
         val resources = ResourceScope()
         val job = launch(Dispatchers.IO) { s.connectionsFor(resources, workspace = "ws") }
-        withTimeout(5_000) { while (s.health.value[ok.id] == null) delay(20) } // 回话的那个先连上
+        withTimeout(5_000) { while (s.health.value[ok.id] == null) delay(20) } // the replying one connects first
         job.cancelAndJoin()
         resources.close()
-        assertEquals(2, closes.get()) // 连上的那个关掉,连到一半的那个也关掉
+        assertEquals(2, closes.get()) // the connected one is closed, and so is the one caught mid-connect
         withTimeout(5_000) { tree.exclusive { } }
     }
 
-    /** 一个慢 server 不拖住任务开头:到总时限就跳过它(关掉)、记成失败,连上的照常用。 */
+    /** A slow server must not hold up the start of the task: once the overall budget is hit it is skipped (closed) and recorded as a failure, while connected servers keep working. */
     @Test fun slowServerIsSkippedAfterTheBudget() = runBlocking {
         val fast = MockWebServer().also { it.start() }
         try {
@@ -306,7 +306,7 @@ class McpServerStoreTest {
             assertFalse(s.health.value.getValue(cs.id).ok)
             assertTrue(s.health.value.getValue(cs.id).message.orEmpty().contains("skipped"))
             assertTrue(s.health.value.getValue(cf.id).ok)
-            assertEquals(1, closes.get()) // 跳过的那个进程已经关掉
+            assertEquals(1, closes.get()) // the skipped process has already been closed
             withTimeout(5_000) { tree.exclusive { } }
             connections.close()
         } finally {
@@ -584,7 +584,7 @@ class McpServerStoreTest {
         assertEquals("encrypted-only", reopened.secret(valid.id, "apiKey"))
     }
 
-    /** 目录里同一预设换了形态(本地包 → 官方远程 OAuth):重连时旧形态留下的秘密不能让新配置永久「未知字段」。 */
+    /** The same preset in the catalog changes shape (local package → official remote OAuth): on reconnect, the secrets left behind by the old shape must not leave the new config permanently reporting "unknown fields". */
     @Test fun replacingPresetWithNewShapeDropsSecretsTheNewShapeDoesNotUse() {
         val label = McpCopy(mapOf("en" to "Token"))
         val local = McpPreset(
@@ -599,12 +599,12 @@ class McpServerStoreTest {
         s.setSecret(old.id, "token", "old-local-token")
         s.setOAuthTokens(old.id, McpOAuthTokens(accessToken = "stale", clientId = "c", tokenEndpoint = "https://oauth.example/token"))
 
-        // 同一形态重试:秘密和授权都保留
+        // Retrying with the same shape: both the secret and the authorization are kept
         s.savePreset(s.servers.value.single()).getOrThrow()
         assertEquals("old-local-token", s.secret(old.id, "token"))
         assertEquals("stale", s.oauthTokens(old.id)?.accessToken)
 
-        // 换成远程 OAuth:沿用同一 id,但旧字段秘密和发给旧目标的令牌都清掉
+        // Switched to remote OAuth: the same id is reused, but the old field secrets and the token issued to the old target are cleared
         val replaced = s.savePreset(McpServerConfig(name = "Docs", url = remote.endpoint, transport = "streamable-http", auth = "oauth", presetId = "docs", presetSnapshot = remote)).getOrThrow()
         assertEquals(old.id, replaced.id)
         assertTrue(s.secrets(old.id).isEmpty())

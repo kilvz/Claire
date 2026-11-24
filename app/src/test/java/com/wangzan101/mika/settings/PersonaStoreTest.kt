@@ -46,7 +46,7 @@ class PersonaStoreTest {
         assertEquals(2, store(dir).personas.value.size)
     }
 
-    /** 选项跟着人格存下来,复制、改名都带着;只有选项、没写指令的人格也能存。 */
+    /** The options are stored along with the persona and carried through copy and rename; a persona with only options and no prompt can be saved too. */
     @Test fun styleIsStoredAndCarriedByUpdateAndDuplicate() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -61,7 +61,7 @@ class PersonaStoreTest {
         assertEquals(changed.style, s.duplicate(p.id).getOrThrow().style)
     }
 
-    /** 加选项之前存的文件没有 style:照常读出来,选项全是默认。 */
+    /** Files written before options existed have no style: they still load, with every option at its default. */
     @Test fun filesWrittenBeforeOptionsStillLoad() {
         val dir = tmp.newFolder("p")
         File(dir, "personas.json").writeText(
@@ -73,7 +73,7 @@ class PersonaStoreTest {
         assertTrue(p.style.isDefault)
     }
 
-    /** 不认识的选项取值(以后的版本、手改的文件)按默认读;文件不被改名成 .bad,别的人格也还在。 */
+    /** Unrecognised option values (from later versions or hand-edited files) are read as defaults; the file is not renamed to .bad and the other personas are still there. */
     @Test fun unknownOptionValuesLoadAsDefaultInsteadOfInvalidatingTheFile() {
         val dir = tmp.newFolder("p")
         File(dir, "personas.json").writeText(
@@ -87,7 +87,7 @@ class PersonaStoreTest {
         assertEquals(listOf("personas.json"), dir.list()!!.toList())
     }
 
-    /** 设置里选的在用的那一套:记得住,只能指向列表里有的,删掉它就回到没有在用的。 */
+    /** The persona chosen as active in settings: the choice persists, it may only point to one in the list, and deleting it goes back to having none active. */
     @Test fun activePersonaPersistsAndClearsWhenDeleted() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -100,10 +100,10 @@ class PersonaStoreTest {
         assertTrue(s.setActive(a.id))
         assertEquals(a, s.active())
         assertEquals(a.id, store(dir).activeId.value)
-        // 改内容不动在用的;在用的拿到的是改完的那份
+        // Editing the content does not touch the active selection; the active persona returns the edited copy
         val renamed = s.update(a.copy(name = "A2")).getOrThrow()
         assertEquals(renamed, store(dir).active())
-        // 删别的不影响;删在用的,同一次写盘里清掉
+        // Deleting another one has no effect; deleting the active one clears it in the same write to disk
         assertTrue(s.delete(b.id))
         assertEquals(a.id, s.activeId.value)
         assertTrue(s.delete(a.id))
@@ -112,7 +112,7 @@ class PersonaStoreTest {
         assertTrue(s.setActive(null))
     }
 
-    /** 旧文件没有 active;手改的文件里 active 指向不存在的人格:都当没有在用的,文件照常读。 */
+    /** Old files have no active field; in hand-edited files active points at a persona that does not exist: both count as nothing active, and the file loads as usual. */
     @Test fun missingOrDanglingActiveMeansNothingInUse() {
         val old = tmp.newFolder("old")
         File(old, "personas.json").writeText("""{"version":1,"personas":[{"id":"a","name":"A","prompt":"x"}]}""")
@@ -124,11 +124,11 @@ class PersonaStoreTest {
         assertEquals(listOf("personas.json"), dangling.list()!!.toList())
     }
 
-    /** 人格页直接改在用的那一套:还没有时第一次改动才建一套并设为在用;改完等于默认的不建。 */
+    /** Editing the active persona right on the persona page: when none exists yet, the first real change creates one and marks it active; if the result equals the default, nothing is created. */
     @Test fun editActiveCreatesOnTheFirstRealChangeThenUpdatesInPlace() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
-        // 点了本来就选着的「默认」:什么都不留
+        // Picking "Default" when it was already selected: nothing is kept
         s.editActive("我的风格") { it.copy(style = it.style.copy(base = PersonaStyle.Base.Default)) }.getOrThrow()
         assertTrue(s.personas.value.isEmpty())
         assertNull(s.activeId.value)
@@ -146,13 +146,13 @@ class PersonaStoreTest {
         assertEquals(PersonaStyle(base = PersonaStyle.Base.Crisp, emoji = PersonaStyle.Level.Less), store(dir).active()?.style)
         assertEquals(1, s.personas.value.size)
 
-        // 再点一次已经选着的档位:不写、不涨修订号
+        // Picking a tier that is already selected once more: no write and no revision bump
         val same = s.editActive("不会用到") { it.copy(style = it.style.copy(emoji = PersonaStyle.Level.Less)) }.getOrThrow()
         assertEquals(2, same.revision)
         assertEquals(second.updatedAt, same.updatedAt)
     }
 
-    /** 存着几套、但没有在用的(从按对话绑定的旧版升级上来就是这样):第一次改动新建一套并选用,原有的不动。 */
+    /** Several personas are saved but none is active (this is what upgrading from the old version that bound personas per conversation looks like): the first change creates a new one and selects it, leaving the existing ones alone. */
     @Test fun editActiveWithSavedPersonasButNoneInUseAddsANewOneAndLeavesTheRestAlone() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -166,7 +166,7 @@ class PersonaStoreTest {
         assertEquals(2, s.personas.value.size)
     }
 
-    /** 称呼跟着人格存;只改称呼也算真的改动(会建一套并在用);带符号、太长的称呼存不进去。 */
+    /** The nickname is stored with the persona; changing only the nickname also counts as a real change (it creates a persona and makes it active); a nickname containing symbols or one that is too long cannot be saved. */
     @Test fun nicknameIsStoredAndValidated() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -177,13 +177,13 @@ class PersonaStoreTest {
         assertTrue(s.editActive("x") { it.copy(nickname = "Kaguya!") }.isFailure)
         assertTrue(s.editActive("x") { it.copy(nickname = "字".repeat(17)) }.isFailure)
         assertEquals("Kaguya", s.active()?.nickname)
-        // 清空就是默认的 Claire;这一套别的也都是默认,就什么都不改了
+        // Clearing it means the default Claire; everything else in this persona is default too, so nothing is changed
         val cleared = s.editActive("x") { it.copy(nickname = "") }.getOrThrow()
         assertEquals("Claire", cleared.assistant)
         assertTrue(cleared.changesNothing)
     }
 
-    /** 称呼填的就是 Claire、别的全默认:等于没改,不建。旧文件没有 nickname:按 Claire。 */
+    /** The nickname is exactly Claire and everything else is at its default: this equals no change, so nothing is created. Old files have no nickname: treated as Claire. */
     @Test fun defaultNicknameChangesNothing() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -193,7 +193,7 @@ class PersonaStoreTest {
         assertEquals("Claire", store(dir).get("a")?.assistant)
     }
 
-    /** 新建的一套直接在用;改名只动名称;复制的名称由界面给、不是在用的。 */
+    /** A newly created persona is in use right away; renaming changes only the name; the copy's name is supplied by the UI and the copy is not the active one. */
     @Test fun createRenameAndDuplicate() {
         val dir = tmp.newFolder("p")
         val s = store(dir)
@@ -214,7 +214,7 @@ class PersonaStoreTest {
         assertEquals(40, s.duplicate(long.id) { "$it 副本" }.getOrThrow().name.length)
     }
 
-    /** 最多 20 套:到了上限,新建、复制、第一次改动都不再加。 */
+    /** At most 20 personas: once the limit is reached, creating, duplicating and the first edit all stop adding. */
     @Test fun thereIsAnUpperLimitOnHowManyAreKept() {
         val s = store(tmp.newFolder("p"))
         repeat(PersonaStore.MAX_PERSONAS) { assertTrue(s.add("P$it", "", "x").isSuccess) }
@@ -267,7 +267,7 @@ class PersonaStoreTest {
         assertFalse(PersonaStore.isValidId(null))
     }
 
-    /** 测试里用到的上限,和 PersonaPrompt 的常量对上;改名时只改这里一处。 */
+    /** The limits used in tests, matched against the PersonaPrompt constants, so a rename only has to be done here. */
     private object PersonaPromptLimit {
         const val NAME = com.wangzan101.mika.core.prompt.PersonaPrompt.MAX_NAME
         const val CHARS = com.wangzan101.mika.core.prompt.PersonaPrompt.MAX_PROMPT_CHARS

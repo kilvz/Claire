@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import javax.crypto.KeyGenerator
 
-/** 经 USB 的电脑连接:开关怎么变、令牌何时换、连接信息文件何时写何时删、不跨重启,和局域网那种互不影响。 */
+/** Computer connection over USB: how the switch toggles, when the token is rotated, when the connection-info file is written or deleted, that it does not survive a reboot, and that it is independent of the LAN mode. */
 class McpUsbSettingsTest {
     @get:Rule val tmp = TemporaryFolder()
     private var boot = "5"
@@ -36,14 +36,14 @@ class McpUsbSettingsTest {
         val t = u.enable()
         assertTrue(t.length >= 40)
         assertEquals(t, u.enable())
-        // 没在监听前不写给电脑
+        // Nothing is written for the computer before it is listening
         assertFalse(info.exists())
         u.publish(8765)
         val o = Json.parseToJsonElement(info.readText()).jsonObject
         assertEquals("http://127.0.0.1:8765/mcp", o["url"]!!.jsonPrimitive.content)
         assertEquals("Bearer $t", o["headers"]!!.jsonObject["Authorization"]!!.jsonPrimitive.content)
         assertEquals("5", o["boot"]!!.jsonPrimitive.content)
-        // 进程重启(同一次开机)接着开着、令牌不变
+        // A process restart (same boot session) keeps it on and the token unchanged
         val again = usb()
         assertTrue(again.enabled.value)
         assertEquals(t, again.token())
@@ -81,7 +81,7 @@ class McpUsbSettingsTest {
         val after = usb()
         assertFalse(after.enabled.value)
         assertNull(after.token())
-        // 上次开机留下的连接信息也清掉
+        // The connection info left over from the previous boot is cleared too
         assertFalse(info.exists())
     }
 
@@ -96,7 +96,7 @@ class McpUsbSettingsTest {
         val u = usb()
         McpModes.apply(McpModes.ACTION_USB_ON, n, u)
         assertTrue(u.enabled.value)
-        // 打开 USB 不会打开局域网那种
+        // Turning on USB does not turn on the LAN mode
         assertFalse(n.enabled.value)
         assertFalse(network().enabled.value)
         assertEquals(McpModes.Listen.LoopbackOnly, McpModes.listen(n.enabled.value, u.enabled.value))
@@ -104,7 +104,7 @@ class McpUsbSettingsTest {
         val t = u.token()
         McpModes.apply(McpModes.ACTION_USB_ON, n, u)
         assertEquals(t, u.token())
-        // 没有动作(服务被系统重建)、不认识的动作:开关不变
+        // No action (service recreated by the system) or an unrecognised action: the switch does not change
         McpModes.apply(null, n, u)
         McpModes.apply("something.else", n, u)
         assertTrue(u.enabled.value)
@@ -113,7 +113,7 @@ class McpUsbSettingsTest {
         assertFalse(u.enabled.value)
         assertEquals(McpModes.Listen.Off, McpModes.listen(n.enabled.value, u.enabled.value))
 
-        // 通知上的「关闭」两种都关
+        // "Turn off" on the notification turns off both
         n.setEnabled(true)
         u.enable()
         assertEquals(McpModes.Listen.PrivateNetworks, McpModes.listen(n.enabled.value, u.enabled.value))

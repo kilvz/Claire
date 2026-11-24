@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 外观改了(设置页或任务里)界面当场跟着换,不靠重建界面。 */
+/** When the appearance changes (from the settings page or from a task) the UI updates in place, without recreating the interface. */
 class FeatureFlagsThemeTest {
     @Test fun defaultsToSystemAndUnknownFallsBack() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()
@@ -62,13 +62,13 @@ class FeatureFlagsThemeTest {
         val spec = SkinSpec(version = 7L, scrim = 88, blur = SkinBlur.Strong, focus = -0.5f, accentFromImage = false, hue = 210f)
         flags.setSkin(spec)
         assertEquals(spec, flags.skin())
-        // 手改过的、旧版本存下的越界值:遮罩不低于下限,位置在 -1..1
+        // Hand-edited or out-of-range values persisted by older versions: the scrim never drops below its minimum, position is kept within -1..1
         prefs.edit().putInt("skin_scrim", 10).putFloat("skin_focus", 9f).putString("skin_blur", "Gauss").commit()
         val read = flags.skin()
         assertEquals(SkinSpec.MIN_SCRIM, read.scrim)
         assertEquals(1f, read.focus)
         assertEquals(SkinBlur.Light, read.blur)
-        // 换回纯色时取到的颜色一起清掉
+        // Switching back to a solid colour also clears the colour sampled from the image
         flags.setSkin(read.copy(version = 0L, hue = null))
         assertNull(flags.skin().hue)
     }

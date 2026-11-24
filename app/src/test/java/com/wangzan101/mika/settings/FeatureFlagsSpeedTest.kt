@@ -14,11 +14,11 @@ class FeatureFlagsSpeedTest {
 
     @Test fun earlierUpgradeOnlyAddsReplayOnce() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()
-        // 上一版升级过、用户又关掉了连续操作:这次只加上回放、大小模型分工和界面压表,不动别的
+        // Upgraded in the previous release, and the user turned continuous steps back off: this pass only adds replay, large/small model split and screen table compaction, nothing else
         prefs.edit().putString("speed_flags", "inlineScreen,adaptiveVision").putBoolean("speed_defaults_applied_v2", true).commit()
         val flags = FeatureFlags(prefs)
         assertEquals(SpeedFlags(inlineScreen = true, adaptiveVision = true, replay = true, lightSteps = true, tablesAtBirth = true), flags.speedFlags())
-        // 升级之后用户手动关掉回放就保持关闭
+        // If the user manually turns replay off after the upgrade, it stays off
         flags.setSpeed(flags.speedFlags().copy(replay = false))
         assertFalse(FeatureFlags(prefs).speedFlags().replay)
     }

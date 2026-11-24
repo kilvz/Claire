@@ -46,10 +46,10 @@ class McpSettingsTest {
         val token = settings().token()
         assertTrue(token.length >= 40)
         assertEquals(token, settings().token())
-        // 文件里是密文,读不出原文
+        // The file holds ciphertext, so the plaintext cannot be read from it
         val raw = tmp.root.resolve("mcp-token.bin").readBytes()
         assertFalse(String(raw, Charsets.ISO_8859_1).contains(token))
-        // 换一个钥匙(比如重装后钥匙库没了)就读不出旧令牌,另生成一个
+        // With a different key (for example the keystore is gone after a reinstall) the old token can no longer be decrypted, and a new one is generated
         val other = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
         assertNotEquals(token, McpSettings(tmp.root, AesGcmKeyCipher { other }).token())
     }
@@ -68,7 +68,7 @@ class McpSettingsTest {
         assertEquals(McpSettings.DEFAULT_PORT, s.port)
         s.setPort(9123)
         assertEquals(9123, s.port)
-        // 重读(下次启动)照旧,开关等别的设置不受影响
+        // Re-reading (at the next start) keeps the same value, and other settings such as the switch are unaffected
         s.setEnabled(true)
         val reloaded = settings()
         assertEquals(9123, reloaded.port)
@@ -87,7 +87,7 @@ class McpSettingsTest {
     }
 
     @Test fun handEditedPortInFileStillRead() {
-        // 改动前只能手工编辑 mcp.json 里的 port;这种存量配置继续按它读
+        // Before this change, port in mcp.json could only be edited by hand; such existing configs keep being read from it
         tmp.root.resolve("mcp.json").writeText("""{"enabled":false,"port":9123,"historyEnabled":false}""")
         assertEquals(9123, settings().port)
     }

@@ -57,7 +57,7 @@ class FeatureFlagsCapsuleTest {
         assertEquals(listOf(CapsuleIdleOpacity.P40, CapsuleIdleOpacity.P100), seen)
     }
 
-    /** 内存里的设置,改动时同步通知监听者(和系统实现一样在写入后回调)。 */
+    /** In-memory settings store that notifies listeners synchronously on change (callback after write, like the real implementation). */
     internal class MemoryPrefs : SharedPreferences {
         private val values = HashMap<String, Any?>()
         private val listeners = mutableSetOf<SharedPreferences.OnSharedPreferenceChangeListener>()

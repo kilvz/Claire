@@ -3,7 +3,7 @@ package com.wangzan101.mika.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 单文件与工作区两道存储限额:默认与历史写死值一致,只认档位内的值。 */
+/** Two storage limits, per file and per workspace: defaults match the legacy hard-coded values, and only values within the tiers are accepted. */
 class FeatureFlagsStorageLimitsTest {
     @Test fun defaultsMatchLegacyConstantsAndKeepOnlyKnownTiers() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()
@@ -13,7 +13,7 @@ class FeatureFlagsStorageLimitsTest {
         flags.setAttachmentMaxMb(1024)
         assertEquals(1024, flags.attachmentMaxMb())
         assertEquals(1024L shl 20, flags.attachmentMaxBytes())
-        // 不在几档里的(手改的、以后去掉的一档)按默认算
+        // Values outside the tiers (hand-edited, or a tier removed later) fall back to the default
         flags.setAttachmentMaxMb(300)
         assertEquals(200, flags.attachmentMaxMb())
         prefs.edit().putInt("attachment_file_limit_mb", 7).commit()

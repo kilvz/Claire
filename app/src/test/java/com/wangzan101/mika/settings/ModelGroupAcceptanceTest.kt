@@ -26,9 +26,9 @@ import org.junit.rules.TemporaryFolder
 import javax.crypto.KeyGenerator
 
 /**
- * 模型组的全链路验收（不依赖设备）:ProviderStore 建两个服务商和组 → 主成员鉴权失败 → 第二成员接管 →
- * 用量按成员记 → 坏成员进入冷却 → 同一对话继续用接管后的成员。
- * 真机上的同样流程仍要跑一次（见 MODEL-GROUP-PLAN.md §18）。
+ * End-to-end acceptance for model groups (no device required): ProviderStore creates two providers and a group → the primary member fails authentication → the second member takes over →
+ * usage is recorded per member → the bad member enters cooldown → the same conversation keeps using the member that took over.
+ * The same flow still has to be run once on a real device (see MODEL-GROUP-PLAN.md §18).
  */
 class ModelGroupAcceptanceTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -67,7 +67,7 @@ class ModelGroupAcceptanceTest {
         val first = pool.complete("s", listOf(userMessage("hi")), emptyList())
         assertEquals(listOf(Part.Text("from 1")), first.parts)
 
-        // m1 抛鉴权错误也被记了一笔(只有次数),m2 正常记 token
+        // m1 throwing an auth error is still recorded (count only); m2 records tokens normally
         assertEquals(
             listOf(
                 UsageSource(a.id, "A", "m1", UsagePurpose.Main) to null,
@@ -78,13 +78,13 @@ class ModelGroupAcceptanceTest {
         assertEquals(1, calls["m1"])
         assertEquals(1, calls["m2"])
 
-        // 同一个池再来一次:m1 在冷却,直接走 m2;粘性也会把 m2 放在最前
+        // Another round on the same pool: m1 is cooling down, so it goes straight to m2; stickiness also puts m2 first
         val second = pool.complete("s", listOf(userMessage("again")), emptyList())
         assertEquals(listOf(Part.Text("from 2")), second.parts)
         assertEquals(1, calls["m1"])
         assertEquals(2, calls["m2"])
 
-        // 新任务(新池)同一对话也跳过冷却中的 m1
+        // A new task (new pool) on the same conversation also skips m1 while it is cooling down
         val fresh = s.modelFor(ModelRole.Main, ModelSession.of("conv")) as GroupPool
         fresh.complete("s", listOf(userMessage("third")), emptyList())
         assertEquals(1, calls["m1"])
@@ -101,6 +101,6 @@ class ModelGroupAcceptanceTest {
     }
 }
 
-/** 测试里的用户消息短写法;Author 必须写明,这里统一用 User。 */
+/** Shorthand for a user message in tests; Author has to be explicit, so User is used uniformly here. */
 private fun userMessage(text: String): Message =
     Message(com.wangzan101.mika.core.model.Role.User, listOf(Part.Text(text)), com.wangzan101.mika.core.model.Author.User)

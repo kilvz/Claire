@@ -16,7 +16,7 @@ class MemorySettingsTest {
 
     @Test fun olderSettingsUpgradeOnceThenUserChoiceSticks() {
         val file = File(tmp.root, "memory.json")
-        // 旧版本存下的:当时默认关
+        // Stored by an older version: off by default back then
         file.writeText("""{"useMemory":true,"autoRemember":false,"learnSkills":false}""")
         val settings = MemorySettings(file)
         assertTrue(settings.switches.value.learnSkills)
@@ -25,7 +25,7 @@ class MemorySettingsTest {
         assertFalse(MemorySettings(file).switches.value.learnSkills)
     }
 
-    // 「让 Claire 自己归纳着记」默认关;旧文件里没有这一项也是关;打开后记得住
+    // "Let Claire summarise and remember on its own" is off by default; a missing entry in old files also means off; once turned on it is remembered
     @Test fun inferMemoriesOffByDefaultAndSticks() {
         val file = File(tmp.root, "memory.json")
         assertFalse(MemorySettings(file).switches.value.inferMemories)
@@ -34,16 +34,16 @@ class MemorySettingsTest {
         assertFalse(settings.switches.value.inferMemories)
         settings.update { it.copy(inferMemories = true) }
         assertTrue(MemorySettings(file).switches.value.inferMemories)
-        // 别的开关不受影响
+        // Other switches are unaffected
         assertTrue(MemorySettings(file).switches.value.autoRemember)
     }
 
     @Test fun rememberTasksOnByDefaultAndSticks() {
         val file = File(tmp.root, "memory.json")
-        // 没存过 rememberTasks 的旧文件:默认开
+        // Old files that never stored rememberTasks: on by default
         file.writeText("""{"useMemory":true,"autoRemember":true,"learnSkills":true}""")
         assertTrue(MemorySettings(file).switches.value.rememberTasks)
-        // 用户关掉后保持关
+        // Once the user turns it off it stays off
         val settings = MemorySettings(file)
         settings.update { it.copy(rememberTasks = false) }
         assertFalse(MemorySettings(file).switches.value.rememberTasks)

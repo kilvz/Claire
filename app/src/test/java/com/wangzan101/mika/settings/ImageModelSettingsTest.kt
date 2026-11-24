@@ -107,7 +107,7 @@ class ImageModelSettingsTest {
         val caps = settings.capabilities()!!
         assertEquals("image-model", store.imageModel(choice, caps)?.name)
         assertEquals("fishaudio/drama-3-int4", store.imageModel(choice.copy(model = "fishaudio/drama-3-int4"), caps)?.name)
-        // 手填的、不在列表里的模型不再因标记或名字被排除
+        // Models typed in by hand that are not in the list are no longer excluded because of a mark or by name
         assertEquals("custom", store.imageModel(choice.copy(model = "custom"), caps)?.name)
     }
 }

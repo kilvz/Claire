@@ -3,7 +3,7 @@ package com.wangzan101.mika.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 每任务沙箱命令累计时长:默认 30 分钟,只认那几档,别的值按默认算。 */
+/** Cumulative sandbox command time per task: defaults to 30 minutes, only the known tiers are accepted, anything else falls back to the default. */
 class FeatureFlagsSandboxBudgetTest {
     @Test fun defaultsToThirtyMinutesAndKeepsOnlyKnownTiers() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()
@@ -13,7 +13,7 @@ class FeatureFlagsSandboxBudgetTest {
         assertEquals(120, flags.sandboxBudgetMinutes())
         flags.setSandboxBudgetMinutes(30)
         assertEquals(30, flags.sandboxBudgetMinutes())
-        // 不在几档里的(手改的、以后去掉的一档)按默认算
+        // Values outside the tiers (hand-edited, or a tier removed later) fall back to the default
         flags.setSandboxBudgetMinutes(45)
         assertEquals(30, flags.sandboxBudgetMinutes())
         prefs.edit().putInt("sandbox_budget_limit_minutes", 7).commit()

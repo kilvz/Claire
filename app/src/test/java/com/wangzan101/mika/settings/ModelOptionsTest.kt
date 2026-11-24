@@ -51,7 +51,7 @@ class ModelOptionsTest {
         assertEquals(null, ModelOptions.defaultMain(ModelOptions.merge(listOf(ListedModel("embed", toolCalls = false)), base)))
     }
 
-    /** 先自家的(预设的模型词),再接口明说能调用工具的,其余照列表顺序;明说不会调用工具的、像向量 / 语音 / 画图的不试。 */
+    /** The provider's own models (matching the preset family tokens) first, then models the API explicitly says can call tools, then the rest in listing order; models that explicitly cannot call tools, and ones that look like embedding / speech / image models, are not tried. */
     @Test fun candidatesPreferTheProvidersOwnFamily() {
         val listed = listOf(
             ListedModel("antdigital/Ling-3.1-flash", toolCalls = true),
@@ -73,7 +73,7 @@ class ModelOptionsTest {
             ModelOptions.candidates(options, qwen),
         )
         assertEquals("qwen-plus", ModelOptions.defaultMain(options, qwen))
-        // 认不出是哪家:接口明说能调用工具的在前,其余照列表顺序
+        // Provider cannot be identified: models the API explicitly says can call tools come first, the rest keep listing order
         assertEquals(listOf("antdigital/Ling-3.1-flash", "qwen-plus", "qwen-max", "Other/Chat", "moonshot-v1"), ModelOptions.candidates(options))
         assertEquals(qwen, ModelOptions.familyOf("https://dashscope.aliyuncs.com/compatible-mode/v1/"))
         assertEquals(emptyList<String>(), ModelOptions.familyOf("https://openrouter.ai/api/v1"))
@@ -81,13 +81,13 @@ class ModelOptionsTest {
 
     private fun ids(listed: List<ListedModel>, tokens: List<String>) = ModelOptions.candidates(ModelOptions.merge(listed, base), tokens)
 
-    /** 自家的模型按版本新的在前,不管接口给的顺序;同版本的照列表顺序,不评 flash、pro、lite 哪个好。 */
+    /** The provider's own models go newest version first regardless of the API's order; models of the same version keep listing order, and no judgement is made about whether flash, pro or lite is better. */
     @Test fun ownModelsNewestVersionFirst() {
         assertEquals(
             listOf("x4", "x-3.1-pro", "x-3-flash", "x-3-pro", "x-2.5-flash", "x-2.0-flash-001"),
             ids(listOf("x-2.5-flash", "x-3-flash", "x-2.0-flash-001", "x-3.1-pro", "x4", "x-3-pro").map { ListedModel(it) }, listOf("x")),
         )
-        // 横线分开的小版本、带字母的版本号;b / k 结尾的是参数量、上下文长度,不算版本
+        // Hyphen-separated minor versions and version numbers containing letters; a trailing b / k is a parameter count or context length, not a version
         assertEquals(
             listOf("claude-haiku-4-5-20251001", "claude-opus-4-1-20250805", "claude-3-5-haiku-20241022"),
             ids(listOf("claude-3-5-haiku-20241022", "claude-opus-4-1-20250805", "claude-haiku-4-5-20251001").map { ListedModel(it) }, listOf("claude")),
@@ -95,7 +95,7 @@ class ModelOptionsTest {
         assertEquals(listOf("qwen3-max", "qwen2.5-72b-instruct"), ids(listOf(ListedModel("qwen2.5-72b-instruct"), ListedModel("qwen3-max")), listOf("qwen")))
     }
 
-    /** 同一个版本:正式版在前,再是 latest 别名,预览、试验的在后;同一档里没写日期的在前,再按日期新的在前。 */
+    /** Within the same version: stable releases first, then the latest alias, then previews and experimental builds; within a tier, entries without a date come first, then newer dates first. */
     @Test fun stableBeforePreviewAtTheSameVersion() {
         assertEquals(
             listOf("x-2.5-flash", "x-2.5-flash-2025-08-07", "x-2.5-flash-latest", "x-2.5-flash-preview-09-2025", "x-2.5-flash-exp-0827", "x-2.5-flash-preview-05-20"),
@@ -105,11 +105,11 @@ class ModelOptionsTest {
                 listOf("x"),
             ),
         )
-        // 更新的版本哪怕只是预览,也排在老版本的正式版前面
+        // A newer version ranks ahead of an older stable release even if it is only a preview
         assertEquals(listOf("x-3-pro-preview", "x-2.5-pro"), ids(listOf(ListedModel("x-2.5-pro"), ListedModel("x-3-pro-preview")), listOf("x")))
     }
 
-    /** 读不出版本的(别名之类)在读得出的后面,彼此照列表顺序。 */
+    /** Entries whose version cannot be parsed (aliases and the like) come after the parsable ones, keeping listing order among themselves. */
     @Test fun unparsableVersionsAfterParsedOnes() {
         assertEquals(
             listOf("x-2-mini", "x-1.5", "x-flash-latest", "x-chat", "x-pro"),
@@ -117,7 +117,7 @@ class ModelOptionsTest {
         )
     }
 
-    /** 外层先后不变:自家的在前,再是接口明说能调用工具的;版本只在自家同一档里比,别家的照列表顺序。 */
+    /** The outer ordering is unchanged: the provider's own models first, then models the API explicitly says can call tools; versions are only compared within the provider's own tier, while other vendors keep listing order. */
     @Test fun versionOrderStaysInsideTheOuterOrder() {
         val listed = listOf(
             ListedModel("other-9"),
@@ -128,11 +128,11 @@ class ModelOptionsTest {
             ListedModel("other-5"),
         )
         assertEquals(listOf("x-2", "x-1", "x-3", "other-1", "other-9", "other-5"), ids(listed, listOf("x")))
-        // 没有自家的词:照旧,不按版本排
+        // No family tokens: ordering stays as is, with no version sorting
         assertEquals(listOf("x-1", "x-2", "other-1", "other-9", "x-3", "other-5"), ids(listed, emptyList()))
     }
 
-    /** 接口列出来老的 2.5 在前:先试的是最新的,向量模型、别家的 gemma 不先试。 */
+    /** The API lists the older 2.5 models first: the newest is tried first, while the embedding model and another vendor's gemma are not tried first. */
     @Test fun realisticGeminiListTriesTheNewestFirst() {
         val listed = listOf(
             ListedModel("gemini-2.5-flash", displayName = "Gemini 2.5 Flash"),
@@ -171,7 +171,7 @@ class ModelOptionsTest {
         }
         assertFalse("接口说是对话模型就照接口", ModelOptions.looksNonChat(opt("my-embed-chat", chat = true)))
         assertTrue(ModelOptions.looksNonChat(opt("x", chat = false)))
-        // 全都像别的用途:没有候选,默认主模型退回第一个可当主模型的
+        // Everything looks like some other purpose: there are no candidates, so the default main model falls back to the first model that can serve as main
         val only = ModelOptions.merge(listOf(ListedModel("text-embedding-v4")), base)
         assertEquals(emptyList<String>(), ModelOptions.candidates(only))
         assertEquals("text-embedding-v4", ModelOptions.defaultMain(only))
@@ -240,7 +240,7 @@ class ModelOptionsTest {
         }
     }
 
-    /** 只写了 Claire 不会说的协议的模型:对话用途的选择器不列(调用必然失败),服务商详情和声音模型照样列出。 */
+    /** Models that only advertise a protocol Claire does not speak: they are not listed in chat-role pickers (calls would always fail), but still appear in provider details and among speech models. */
     @Test fun unusableModelsAreHiddenFromRolePickersButShownInTheFullCatalog() {
         val p = Provider("p", "Local", ProviderConfig.Kind.OpenAiCompat, "https://local.test/v1", models = listOf(
             ListedModel("chat-model"),

@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 「完全退出」的标记:默认没有,记下后跨进程还在,松开时发一次。 */
+/** The "full quit" flag: absent by default, persists across processes once set, and is emitted once when cleared. */
 class FeatureFlagsQuitTest {
     @Test fun quitDefaultsOffAndIsKept() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()

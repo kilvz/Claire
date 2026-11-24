@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 「允许 Claire 操作自己的界面」默认关,只能用户改;它不在模型能改的设置白名单里。 */
+/** "Allow Claire to operate its own interface" is off by default and only the user can change it; it is not in the whitelist of settings the model may modify. */
 class FeatureFlagsSelfOperateTest {
     @Test fun defaultsOffAndToggles() {
         val flags = FeatureFlags(FeatureFlagsCapsuleTest.MemoryPrefs())

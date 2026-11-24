@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FeatureFlagsPersonaTest {
-    /** 发行版和调试版一样默认开;关掉后记得住。 */
+    /** On by default in release builds just like debug builds; once turned off, the choice persists. */
     @Test fun defaultsOnAndPersistsChanges() {
         val prefs = FeatureFlagsCapsuleTest.MemoryPrefs()
         val flags = FeatureFlags(prefs)
