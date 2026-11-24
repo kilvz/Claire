@@ -32,21 +32,21 @@ class ChecksTest {
             3) 十月的银杏 大道
         """.trimIndent()
         assertTrue(Checks.passes(Check.AnswerGrounded(3), obs(answer, screens)))
-        // 条目不够
+        // Not enough items
         assertFalse(Checks.passes(Check.AnswerGrounded(4), obs(answer, screens)))
     }
 
-    // 不带值的列表条目整段在屏上才算一条;编出来的不算,条目数不够就不过
+    // A list item without a value counts only when the whole item is on screen; invented ones don't count, and too few items means failure
     @Test fun answerGroundedRejectsInventedItem() {
         val answer = "1. 秋天第一杯奶茶\n2. 冬天第一顿火锅"
         assertFalse(Checks.passes(Check.AnswerGrounded(2), obs(answer, screens)))
-        // 写成引文的编造标题直接不过
+        // An invented title written as a quotation fails outright
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("1. 「秋天第一杯奶茶」\n2. 「冬天第一顿火锅」", screens)))
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("", screens)))
     }
 
     @Test fun answerGroundedIgnoresEvidenceLine() {
-        // 和核查兜底同一条规则:「依据:」以后都是依据,不算回答里的条目
+        // Same rule as the verifier backstop: everything after the evidence label counts as evidence, not as an item of the answer
         val answer = "1. 秋天第一杯奶茶\n2. 周末去哪玩\n依据:我在首页看到了这些标题,共两条"
         assertTrue(Checks.passes(Check.AnswerGrounded(2), obs(answer, screens)))
         assertFalse(Checks.passes(Check.AnswerGrounded(2), obs("1. 秋天第一杯奶茶\n依据:首页\n2. 周末去哪玩", screens)))
@@ -54,7 +54,7 @@ class ChecksTest {
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs(fullWidth, screens)))
     }
 
-    // 计算器、天气卡片、应用详情页的读屏文字(节选自真机运行记录)
+    // Screen-reader text from the calculator, the weather card and an app detail page (excerpted from real-device run records)
     private val calc = listOf("更多选项\n56,088\nMC\nM+\n清除\n乘\n7\n8\n9")
     private val weather = listOf("今天天气 - 百度\n宝安区 商业街\n23°\n23~31°C\n晴\n24 优\n体感23° 北风3级")
     private val market = listOf("哔哩哔哩\n3.6 9150 人评分\n3.6\n9150 人评分\n46 亿 次安装\n216 MB")
@@ -73,7 +73,7 @@ class ChecksTest {
         val o = obs(a, calc).copy(goal = "用手机自带的计算器算 123×456,告诉我结果")
         assertTrue(Checks.passes(Check.AnswerGrounded(1), o))
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs(a, calc)))
-        // 题目里的词不能替编造的值打掩护
+        // Words from the goal must not cover for a fabricated value
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("用「计算器」算出来是 57,088。", calc).copy(goal = o.goal)))
     }
 
@@ -81,32 +81,32 @@ class ChecksTest {
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("计算器屏幕上显示的结果是 57,088。", calc)))
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("- 评分：4.2（9150 人评分）", market)))
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("- 城市：北京", weather)))
-        // 带值的那一行里不加引号的字(「多云」)不是字面核对的事实,值属于什么由核查模型判;写成引文就核
+        // Unquoted words on a line with a value (e.g. "cloudy") are not facts checked literally; what the value belongs to is up to the verifier model; written as a quotation they are checked
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs("- 天气：晴 23°", weather)))
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("- 天气：「多云」 23°", weather)))
-        // 只有连接性的话、没有可核对的值:不够条目数
+        // Only connective prose, no checkable value: not enough items
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("我已经看完了,结果很好。", calc)))
     }
 
     @Test fun commentaryLabelsAreProseNotLabelledValues() {
-        // 「补充：」「说明：」这类是附带的话,不是要从屏上读到的值
+        // Labels like "supplement:" or "explanation:" are incidental remarks, not values that have to be read off the screen
         val a = "计算器屏幕上显示的结果是 56,088。\n补充：我没有改动计算器里的任何设置。\n- 说明：只看了一眼结果"
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs(a, calc)))
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs("- 天气：晴 23°\n备注：页面里还有广告,没有点开", weather)))
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs("- 评分：3.6\n另外：没有点安装\n具体依据：应用详情页", market)))
-        // 附带的话里写了数值,数值照样要在屏上
+        // If an incidental remark states a number, that number still has to be on screen
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs("- 天气：晴 23°\n补充：明天 35°", weather)))
     }
 
     @Test fun zeroWidthCharactersOnScreenAreIgnored() {
-        // 有的 App 在商品标题的字之间插零宽字符,读屏文字里的 316 实际是 3、1、6 中间各隔一个零宽字符
+        // Some apps insert zero-width characters between the characters of a product title; the 316 in the screen-reader text is really 3, 1 and 6 with a zero-width character between each
         val zw = listOf("\u200B", "\u200C", "\u200D", "\uFEFF", "\u2060")
         for (z in zw) {
             val shop = listOf("保${z}温${z}杯 3${z}1${z}6${z}L${z}不${z}锈${z}钢 79.00 0人付款")
             assertTrue(z, Checks.passes(Check.AnswerGrounded(2), obs("1. 保温杯 316L 不锈钢 — 79.00 元", shop)))
             assertFalse(z, Checks.passes(Check.AnswerGrounded(1), obs("1. 保温杯 304L 不锈钢 — 79.00 元", shop)))
         }
-        // 回答里夹着零宽字符也一样
+        // The same holds when the answer contains zero-width characters
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs("- 评分：3\u200B.6", market)))
     }
 
@@ -115,13 +115,13 @@ class ChecksTest {
     }
 
     @Test fun partialNumbersDoNotMatchInsideOtherNumbers() {
-        // 屏上的元素不能拼成一整串再找子串;数值按整个数比
+        // Screen elements must not be concatenated into one string and searched for substrings; numbers are compared as whole numbers
         for (fake in listOf("6088", "88")) assertFalse(fake, Checks.passes(Check.AnswerGrounded(1), obs("结果是 $fake。", calc)))
         for (fake in listOf("4.6", "1.5")) assertFalse(fake, Checks.passes(Check.AnswerGrounded(1), obs("- 评分：$fake", market)))
         assertTrue(Checks.passes(Check.AnswerGrounded(1), obs("- 评分：3.6", market)))
     }
 
-    // 不带值的列表条目(「天气：多云」)整段在屏上某一行才算一条;只是某个词的一部分(「晴天娃娃」里的晴)不算
+    // A list item without a value ("weather: cloudy") counts only when the whole item is on one screen line; being part of a word (the "sunny" in "sunny doll") does not count
     @Test fun bareListItemsCountOnlyWhenOnScreen() {
         val far = listOf("晴天娃娃 推荐\n广告\n广告\n广告\n23°\n23~31°C\n多云")
         assertFalse(Checks.passes(Check.AnswerGrounded(2), obs("- 天气：晴\n- 气温：23~31°C", far)))
@@ -151,7 +151,7 @@ class ChecksTest {
     }
 
     @Test fun answerGroundedDropsTrivialItems() {
-        // 单字、标点这类条目哪个屏上都有,不能拿来凑数
+        // Single characters, punctuation and the like appear on any screen and must not be used to pad the count
         val answer = "1. 首\n2. 推\n3. 。"
         assertFalse(Checks.passes(Check.AnswerGrounded(1), obs(answer, screens)))
         assertFalse(Checks.passes(Check.AnswerGrounded(2), obs("1. 秋天第一杯奶茶\n2. 页", screens)))

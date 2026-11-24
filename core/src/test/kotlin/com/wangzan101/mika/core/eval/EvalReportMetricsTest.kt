@@ -26,7 +26,7 @@ class EvalReportMetricsTest {
         assertTrue(md, "| 用时中位数(秒) | 20 |" in md)
         assertTrue(md, "| 第一次反馈中位数(秒) | 3 |" in md)
         assertTrue(md, "| 平均和模型来回 | 6 |" in md)
-        // 40 秒里模型 20 秒、读 8 秒、操作 4 秒,其余 8 秒
+        // Of the 40 seconds: 20 on the model, 8 reading, 4 acting, the remaining 8
         assertTrue(md, "| 模型思考占比 | 50.0% |" in md)
         assertTrue(md, "| 读屏占比 | 20.0% |" in md)
         assertTrue(md, "| 操作占比 | 10.0% |" in md)

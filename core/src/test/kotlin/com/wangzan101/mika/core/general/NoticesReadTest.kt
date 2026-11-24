@@ -48,7 +48,7 @@ class NoticesReadTest {
         override suspend fun digests(level: DigestLevel): DigestsView? = if (readable) stored[level] ?: DigestsView(emptyList()) else null
         override val zone: ZoneId = ZoneOffset.UTC
         val asked = ArrayList<Pair<Long, Long>>()
-        // 固定的「现在」:今天下午三点
+        // Fixed "now": 3 p.m. today
         override fun now() = today + 15 * hour
         override fun appLabel(packageName: String) =
             mapOf("com.chat" to "微信", "com.shop" to "淘宝", "com.odd" to """Bob's Shop: "Deals" <b>""")[packageName] ?: packageName
@@ -81,7 +81,7 @@ class NoticesReadTest {
 
     private fun call(s: NoticeSource, args: String) = runBlocking { tools(s).execute(Part.ToolCall("n", NOTICES_READ, args), ActionPass()) }
 
-    // 没给来源、不是用户在手机上发起的、只读运行:都不出现
+    // No source given, not started by the user on the phone, a read-only run: it never shows up
     @Test fun offeredOnlyToTasksTheUserStartedOnThePhone() {
         fun offered(notices: NoticeSource?, spec: RunSpec) = NOTICES_READ in tools(notices, spec).definitions().map { it.name }
         val ui = RunSpec(RunId("now"), "x", "thread")
@@ -93,7 +93,7 @@ class NoticesReadTest {
         assertFalse(offered(source(), ui.copy(readOnly = true)))
     }
 
-    // 默认:今天各 App 收到几段,加上已经写好的分段归纳;问的是当天零点到次日零点
+    // Default: how many notifications each app received today, plus the per-segment digests already written; the window asked for is midnight to midnight
     @Test fun summaryListsAppsAndNotes() {
         val s = source()
         val r = call(s, "{}").content
@@ -111,13 +111,13 @@ class NoticesReadTest {
         assertEquals("微信", note["app"]!!.jsonPrimitive.content)
         for (field in listOf("chat", "text")) assertTrue(note[field]!!.jsonPrimitive.content.startsWith(Untrusted.OPEN))
         assertFalse("items" in r)
-        // 昨天
+        // Yesterday
         val y = call(source(), """{"day":"yesterday"}""").content
         assertEquals(listOf("淘宝"), (y["apps"] as JsonArray).map { (it as JsonObject)["app"]!!.jsonPrimitive.content })
         assertEquals(1, (y["notes"] as JsonArray).size)
     }
 
-    // 原文:由旧到新;说话的人、会话名、正文各自套着不可信标记,里面自带的标记是坏的;是群还是私聊是我们给的
+    // Source texts: oldest to newest; sender, chat name and body are each wrapped as untrusted and markers inside them are neutralized; whether it is a group or a private chat is what we supply
     @Test fun messagesAreWrappedPieceByPiece() {
         val items = (call(source(), """{"view":"messages"}""").content["items"] as JsonArray).map { it as JsonObject }
         assertEquals(listOf(0, 1, 2), items.map { it["n"]!!.jsonPrimitive.int })
@@ -141,7 +141,7 @@ class NoticesReadTest {
         assertEquals(1, call(source(), """{"view":"messages","query":"家长会"}""").content["total"]!!.jsonPrimitive.int)
         assertEquals(1, call(source(), """{"view":"messages","query":"王老师"}""").content["total"]!!.jsonPrimitive.int)
         assertEquals(0, call(source(), """{"view":"messages","query":"没有这句"}""").content["total"]!!.jsonPrimitive.int)
-        // 很多条:一页大约 PAGE_CHARS 字,带 nextOffset 接着读,读完为止
+        // Many messages: a page is about PAGE_CHARS characters, read on with nextOffset until done
         val many = Fake(today - hour, (0 until 60).map { NoticeEntry("com.chat", today + it * 60_000L, "群", "甲", "话".repeat(280) + it) }, emptyList())
         var offset = 0
         val seen = ArrayList<Int>()
@@ -155,14 +155,14 @@ class NoticesReadTest {
         assertEquals((0 until 60).toList(), seen)
     }
 
-    // 记录是今天半道才开始的:说明从几点起、不全
+    // The record only started partway through today: say from when, and that it is incomplete
     @Test fun saysWhenTheRecordStartedAndThatItIsIncomplete() {
         val r = call(source(since = today + 8 * hour), "{}").content
         assertEquals(JsonPrimitive(true), r["incomplete"])
         assertTrue(r["recordedSince"]!!.jsonPrimitive.content.endsWith(" 08:00"))
     }
 
-    // 不作为观察记进账本;进运行记录前文字遮掉,时间、App、条数照记
+    // Not recorded into the ledger as observations; the text is masked before it goes into the run record, while time, app and counts are still recorded
     @Test fun nothingReadIsKeptInTheRunRecord() {
         val exec = call(source(), """{"view":"messages"}""")
         assertTrue(exec.observations.isEmpty())
@@ -178,7 +178,7 @@ class NoticesReadTest {
         assertEquals(2, ((summary["apps"] as JsonArray)[0] as JsonObject)["notifications"]!!.jsonPrimitive.int)
     }
 
-    // 读不出来(刚被关掉、等太久、存着的那份读不出):报错,不是一份空的「今天什么都没有」
+    // Cannot read (just turned off, waited too long, the stored copy is unreadable): report an error, not an empty "nothing today"
     @Test fun aFailedReadIsAnErrorNotAnEmptyDay() {
         val r = call(Fake(today, emptyList(), emptyList(), readable = false), "{}").content
         assertEquals(JsonPrimitive(false), r["ok"])
@@ -188,8 +188,8 @@ class NoticesReadTest {
         assertEquals("notices_unavailable", m["error"]!!.jsonPrimitive.content)
     }
 
-    // 分段归纳多了也分页:不悄悄丢掉前面的;总数、接着读的位置都给
-    // 分段归纳那份读不出来:通知条数照给,另说明句子这会儿读不出来——不是「今天没有归纳」
+    // Many digests are paged too: nothing earlier is silently dropped; the total and the next offset are both given
+    // The digests cannot be read: still give the notification counts, and say the sentences cannot be read right now — it is not "no digests today"
     @Test fun unreadableNotesAreReportedNotShownAsNone() {
         val entry = NoticeEntry("com.chat", today + hour, "家长群", "王老师", "明天开家长会")
         val note = DigestNote("d1", "com.chat", today / (24 * hour), today + hour, today + hour, 1, title = "家长群", text = "王老师通知明天开家长会", madeAtMs = today + hour)
@@ -198,11 +198,11 @@ class NoticesReadTest {
         assertEquals(JsonPrimitive(true), broken["notesUnavailable"])
         assertEquals(0, broken["notesTotal"]!!.jsonPrimitive.int)
         assertEquals(1, (broken["apps"] as JsonArray).size)
-        // 读得出来时不带这个字段
+        // When it is readable, this field is absent
         assertNull(call(Fake(today, listOf(entry), listOf(note)), "{}").content["notesUnavailable"])
     }
 
-    // App 的名字收过一遍再给模型(搭不出标记);用户照原来的名字说、照收过的名字说,都筛得到它
+    // App names are sanitized before being given to the model (so markers cannot be assembled); whether the user names the original or the sanitized name, the filter still finds it
     @Test fun appNamesAreNarrowedAndStillSelectable() {
         val odd = NoticeEntry("com.odd", today + hour, "到货", null, "你的订单到了")
         val other = NoticeEntry("com.chat", today + hour, "家长群", "王老师", "明天开家长会")
@@ -237,15 +237,15 @@ class NoticesReadTest {
         assertTrue(pages > 1)
     }
 
-    // 有通知、但来源档位不够格没给出来的 App:说有几个(两种读法都说)
+    // Apps that had notifications but were withheld because their source tier was not high enough: say how many (in both views)
     @Test fun saysHowManyAppsWereWithheld() {
         val s = Fake(today - hour, emptyList(), emptyList(), withheld = 3)
         assertEquals(3, call(s, "{}").content["appsWithheld"]!!.jsonPrimitive.int)
         assertEquals(3, call(s, """{"view":"messages"}""").content["appsWithheld"]!!.jsonPrimitive.int)
     }
 
-    // 走真的一整条:模型调工具 → 执行 → 运行记录。活动那条的名字就是工具名(RunLearning 靠它认「这次读过通知」);
-    // 交给模型的结果里有原文,运行记录里的、跟踪里的没有
+    // Go through one real end-to-end path: model calls the tool → execution → run record. The activity's label is the tool name (RunLearning relies on it to recognize "notifications were read this time");
+    // the result given to the model has the source texts, the one in the run record and in the trace does not
     @Test fun aRealRunRecordsTheCallButNotTheText() {
         val events = ArrayList<com.wangzan101.mika.core.run.record.RunEvent>()
         val sink = object : com.wangzan101.mika.core.run.record.RunSink {
@@ -256,7 +256,7 @@ class NoticesReadTest {
         val model = com.wangzan101.mika.core.agent.FakeModel(
             com.wangzan101.mika.core.model.ModelReply(listOf(Part.ToolCall("c1", NOTICES_READ, """{"view":"messages"}""")), com.wangzan101.mika.core.model.StopReason.ToolUse, null),
             com.wangzan101.mika.core.model.ModelReply(listOf(Part.ToolCall("c2", NOTICES_READ, "{}")), com.wangzan101.mika.core.model.StopReason.ToolUse, null),
-            // 按人名筛:这个人名是从通知里来的,调用参数、活动的对象里都不能留
+            // Filter by a person's name: that name came from a notification, so it must not remain in the call arguments or in the activity's target
             com.wangzan101.mika.core.model.ModelReply(listOf(Part.ToolCall("c3", NOTICES_READ, """{"view":"messages","query":"王老师","app":"微信"}""")), com.wangzan101.mika.core.model.StopReason.ToolUse, null),
             com.wangzan101.mika.core.testing.answerReply("今天有三条"),
         )
@@ -268,16 +268,16 @@ class NoticesReadTest {
         val results = events.filterIsInstance<com.wangzan101.mika.core.run.record.RunEvent.ToolResult>()
         assertEquals(3, results.size)
         assertTrue(results.all { it.tool == NOTICES_READ })
-        // 调用参数照记,只是筛的那段字遮掉
+        // Call arguments are recorded as usual, only the filtered text is masked
         val asked = events.filterIsInstance<com.wangzan101.mika.core.run.record.RunEvent.ModelReply>().mapNotNull { it.argsJson }
         assertTrue(asked.toString(), asked.any { "微信" in it && "query" in it })
-        // 模型拿到的那份里有
+        // The copy the model gets has it
         val sent = model.requests.last().flatMap { it.parts }.filterIsInstance<Part.ToolResult>()
         assertEquals(3, sent.size)
         assertTrue(sent.all { canary in it.content })
-        // 运行记录里没有(整份事件里都没有)
+        // Not in the run record (nowhere in the whole event)
         for (word in listOf(canary, "家长群", "王老师", "张三", "快递已发货")) assertFalse(word, events.any { word in it.toString() })
-        // 跟踪里:请求体里的工具结果是这段字符串,存之前遮掉
+        // In the trace: the tool result in the request body is this string, and it is masked before being stored
         for (r in sent) {
             val body = buildJsonObject {
                 put("messages", JsonArray(listOf(
@@ -307,7 +307,7 @@ class NoticesReadTest {
             lines = listOf(DigestViewLine("十月换了工作", listOf("com.chat")))))),
     )
 
-    // 存着的各天、各周、各月的归纳:一句一项,新的那份在前;写着是哪一段的(日期是我们的)、是不是还没过完时做的;句子套着不可信标记
+    // Stored daily, weekly and monthly digests: one sentence per item, the newer set first; they say which period (the dates are ours) and whether it was made before the period ended; the sentences are wrapped as untrusted
     @Test fun storedDigestsCanBeReadByLevel() {
         val s = Fake(today, emptyList(), emptyList(), stored = storedDigests())
         val days = call(s, """{"view":"days"}""").content
@@ -321,7 +321,7 @@ class NoticesReadTest {
         assertTrue(items[0]["soFarAsOf"]!!.jsonPrimitive.content.endsWith(" 15:00"))
         assertNull(items[1]["soFarAsOf"])
         assertNull(items[1]["inputsLeftOut"])
-        // 做的时候有几句放不下的那一份:说出来(这一份没有照着那段时间的全部写)
+        // The one made while some sentences did not fit: say so (this one was not written from all of that period)
         val week = (call(s, """{"view":"weeks"}""").content["items"] as JsonArray).map { it as JsonObject }
         assertEquals(JsonPrimitive(3), week[0]["inputsLeftOut"])
         assertEquals(listOf("微信", "淘宝"), (items[2]["apps"] as JsonArray).map { it.jsonPrimitive.content })
@@ -330,26 +330,26 @@ class NoticesReadTest {
             assertTrue(v, v.startsWith(Untrusted.OPEN) && v.trimEnd().endsWith(Untrusted.CLOSE))
             assertEquals(v, 1, Regex("</untrusted>").findAll(v).count())
         }
-        // 不看通知原文那一份:没有 recordedSince 这些
+        // This view does not look at the notification sources: no recordedSince and the like
         assertFalse("recordedSince" in days || "apps" in days)
         val weeks = call(s, """{"view":"weeks"}""").content
         assertEquals("2026-11-02 to 2026-11-08", ((weeks["items"] as JsonArray).single() as JsonObject)["period"]!!.jsonPrimitive.content)
         assertNull(weeks["linesWithheld"])
-        // 月归纳管的是结束在这个月的几周:月份和实际管到的日子都写
+        // A monthly digest covers the weeks ending in that month: both the month and the actual days covered are written
         val months = call(s, """{"view":"months"}""").content
         assertEquals("2026-10 (2026-09-28 to 2026-10-25)", ((months["items"] as JsonArray).single() as JsonObject)["period"]!!.jsonPrimitive.content)
-        // 可以按 App、按一段字筛;筛完没有和一份都没存分得清
+        // Filterable by app and by a piece of text; filtering down to nothing is distinguishable from having none stored
         assertEquals(2, call(s, """{"view":"days","app":"淘宝"}""").content["total"]!!.jsonPrimitive.int)
         val none = call(s, """{"view":"days","query":"没有这句"}""").content
         assertEquals(0, none["total"]!!.jsonPrimitive.int)
         assertEquals(2, none["stored"]!!.jsonPrimitive.int)
         assertEquals(1, call(s, """{"view":"days","query":"张三"}""").content["total"]!!.jsonPrimitive.int)
         assertEquals(0, call(Fake(today, emptyList(), emptyList()), """{"view":"weeks"}""").content["stored"]!!.jsonPrimitive.int)
-        // 读不出来是报错
+        // Unreadable is an error
         assertEquals("notices_unavailable", call(Fake(today, emptyList(), emptyList(), readable = false), """{"view":"months"}""").content["error"]!!.jsonPrimitive.content)
     }
 
-    // 归纳多了也分页,读得完;进运行记录前句子遮掉,哪一段、哪些 App、几句照记
+    // Many digests are paged as well and can be read through; the sentences are masked before going into the run record, while the period, apps and counts are still recorded
     @Test fun storedDigestsArePagedAndMaskedInTheRecord() {
         val lines = (0 until 60).map { DigestViewLine("句".repeat(280) + it, listOf("com.chat")) }
         val s = Fake(today, emptyList(), emptyList(), stored = mapOf(DigestLevel.Week to DigestsView(listOf(DigestView(monday - 7, monday - 1, today, false, lines)))))

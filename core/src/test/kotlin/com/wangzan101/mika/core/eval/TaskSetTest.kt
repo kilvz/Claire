@@ -6,32 +6,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** 仓库里的评测任务集(eval/tasks/<类别>/…/<id>.json)。 */
+/** The repo's eval task set (eval/tasks/<category>/…/<id>.json). */
 class TaskSetTest {
     private val evalDir = listOf("eval", "../eval").map(::File).first { File(it, "tasks").isDirectory }
     private val tasksDir = File(evalDir, "tasks")
     private val files = tasksDir.walkTopDown().filter { it.isFile && it.extension == "json" }.sortedBy { it.path }.toList()
     private val tasks = files.map { it to EvalTasks.parse(it.readText()) }
 
-    /** 文件相对 tasks 的目录,如 read/content。 */
+    /** The file's directory relative to tasks, e.g. read/content. */
     private fun group(f: File) = f.parentFile.relativeTo(tasksDir).invariantSeparatorsPath
 
-    /** 专项题集(配对题、记忆题)单独放一个目录,不按类别分目录。 */
+    /** Special task suites (skill pairs, memory tasks) live in their own directory instead of being split by category. */
     private fun suite(f: File) = group(f).substringBefore('/').takeIf { it in SUITES }
 
     @Test fun allTasksParseAndValidate() {
         assertTrue(files.isNotEmpty())
         assertEquals(emptyList<String>(), EvalTasks.validateAll(tasks.map { it.second }))
         tasks.forEach { (f, t) ->
-            // 网页题单放 web 目录:类别各异,不碰手机上的 App 时 apps 可以为空
+            // Web tasks sit in the web directory: their categories vary, and apps may be empty when no phone app is touched
             if (group(f) == WEB) {
                 assertTrue("${t.id}: 网页题的 id 以 web- 开头", t.id.startsWith("web-"))
                 t.apps.forEach { assertTrue("${t.id}: 缺 installed:$it", pinnedOk(t, it)) }
                 return@forEach
             }
-            // 类别目录和题目里的类别一致:评测器按目录选题
+            // The category directory matches the task's category: the harness selects tasks by directory
             if (suite(f) == null) assertEquals(f.path, t.category.name.lowercase(), group(f).substringBefore('/'))
-            // 本来就做不成、也不需要哪个 App 的题(月球温度)可以不写 apps
+            // Tasks that are impossible by nature and need no particular app (the moon's temperature) may omit apps
             assertTrue("${t.id}: apps 为空", t.apps.isNotEmpty() || t.category == EvalCategory.Impossible)
             t.apps.forEach { assertTrue("${t.id}: 缺 installed:$it", pinnedOk(t, it)) }
             if (t.category == EvalCategory.Impossible) assertEquals(t.id, Expect.Failed, t.expect)
@@ -40,7 +40,7 @@ class TaskSetTest {
         }
     }
 
-    /** 第三方 App 要写 installed:;手机自带的写 {app:<能力>},不要求 installed:。 */
+    /** Third-party apps need installed:; built-in phone apps are written {app:<capability>} and do not require installed:. */
     private fun pinnedOk(t: EvalTask, app: String) = APP_TOKEN.matches(app) || "installed:$app" in t.requires
 
     @Test fun idsUniqueAndMatchFileNames() {
@@ -96,7 +96,7 @@ class TaskSetTest {
     }
 
     @Test fun partitionsAreStratified() {
-        // 每题都分到调优池或保留池;保留池约占三成,按目录分层,各目录都有保留题
+        // Every task goes to the tuning pool or the holdout pool; the holdout is about 30%, stratified by directory so every directory has holdouts
         tasks.forEach { (f, t) -> assertTrue("${f.path}: 缺 partition", t.partition in EvalTasks.PARTITIONS) }
         val holdout = tasks.count { it.second.partition == "holdout" }
         assertTrue("保留池 $holdout / ${tasks.size}", holdout * 100 in tasks.size * 25..tasks.size * 35)
@@ -104,7 +104,7 @@ class TaskSetTest {
             val h = ts.count { it.second.partition == "holdout" }
             assertTrue("$g: 保留 $h / ${ts.size}", h >= 1 && h * 100 in ts.size * 20..ts.size * 40)
         }
-        // 一组配对题、一个记忆 session 同在一池,不拆开
+        // A skill pair and a memory session stay in one pool together and are never split
         tasks.filter { suite(it.first) == "skills" }.map { it.second }.groupBy { it.id.substringBeforeLast('-') }
             .forEach { (g, ts) -> assertEquals(g, 1, ts.map { it.partition }.toSet().size) }
         tasks.filter { suite(it.first) == "memory" }.map { it.second }.groupBy { it.session }
@@ -112,7 +112,7 @@ class TaskSetTest {
     }
 
     @Test fun askingTasksCanContinue() {
-        // 要求先问的题得带自动回答,否则评测里问了没人答,只能等到超时
+        // Tasks that must ask first need canned answers; otherwise nobody answers during the eval and the run just waits until it times out
         tasks.map { it.second }.filter { t -> t.checks.any { it is Check.AskedUser && it.expected } }
             .also { assertTrue(it.isNotEmpty()) }
             .forEach { assertTrue("${it.id}: 要问的题缺 answers", it.answers.isNotEmpty()) }
@@ -125,12 +125,12 @@ class TaskSetTest {
             val marker = t.marker
             assertTrue("${t.id}: 没有 marker", marker != null && "{run}" in marker)
             assertTrue("${t.id}: 目标里没写 marker", marker!! in t.goal)
-            // 造出来的数据要能被评测器自己找回来
+            // The data created must be findable again by the harness itself
             assertTrue("${t.id}: 没有按 marker 核对", t.checks.any { (it is Check.ScreenHas && marker in it.text) || (it is Check.ProbeEquals && marker in it.expected) })
         }
     }
 
-    /** 询问时只有花钱的那一步先问:下单题停在确认卡片上;发送、删除这类不花钱的题直接做完,不先问。 */
+    /** Only the step that spends money asks first: order tasks stop at the confirmation card; tasks that spend nothing, like sending or deleting, are finished without asking first. */
     @Test fun irreversibleTasksAskOnlyBeforeSpending() {
         val irreversible = tasks.map { it.second }.filter { it.category == EvalCategory.Irreversible }
         assertTrue(irreversible.isNotEmpty())
@@ -138,24 +138,24 @@ class TaskSetTest {
         assertTrue(spending.isNotEmpty() && free.isNotEmpty())
         spending.forEach { t ->
             val card = t.checks.filterIsInstance<Check.ConfirmationShows>()
-            // 卡片上要看得出在哪家、做什么、多少钱
+            // The card must show where, what and how much
             assertTrue("${t.id}: 只有下单要确认", card.isNotEmpty() && card.all { it.action == "下单" })
             assertTrue("${t.id}: 下单要核对对象和金额", card.any { it.target != null && it.amount != null })
-            // 会花真实账号的钱:只在用户在场、人工标记账号已登录后才跑
+            // Spends real account money: run only with the user present and the account manually marked as signed in
             assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
             assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
         }
         free.forEach { t ->
             assertEquals(t.id, Expect.Succeeded, t.expect)
             assertTrue("${t.id}: 不花钱的题不该有确认卡片", t.checks.none { it is Check.ConfirmationShows })
-            // 用户说清了要做什么就不该再问;只有删哪条这类只有用户知道的才问
+            // If the user said clearly what to do, it should not ask again; it asks only for things only the user knows, like which item to delete
             val asked = t.checks.filterIsInstance<Check.AskedUser>()
             assertTrue("${t.id}: 要核对问没问用户", asked.size == 1)
-            // 不可逆的事只做在这道题自己带标记的数据上
+            // Irreversible actions are done only on data the task itself marked
             val marker = t.marker
             assertTrue("${t.id}: 要有含 {run} 的 marker", marker != null && "{run}" in marker)
             assertTrue("${t.id}: 目标里要写 marker", marker!! in t.goal)
-            // 发到真实账号的题:只在用户在场、人工标记账号已登录后才跑,发出后到 App 里核对
+            // Tasks that send to a real account: run only with the user present and the account manually marked as signed in, and verify in the app after sending
             if (t.apps.any { !it.startsWith("{app:") }) {
                 assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
                 assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
@@ -165,7 +165,7 @@ class TaskSetTest {
     }
 
     @Test fun systemAppsAreNotPinned() {
-        // 「手机自带」的 App 包名因机型而异:题里写能力,跑的时候按标准 Intent 找这台手机上的,核对也不钉包名
+        // The package name of a built-in phone app varies by model: the task names a capability, the run finds the one on this phone via the standard Intent, and the check doesn't pin the package name either
         val system = tasks.map { it.second }.filter { "手机自带" in it.goal }
         assertTrue(system.isNotEmpty())
         system.forEach { t ->
@@ -178,7 +178,7 @@ class TaskSetTest {
     private companion object {
         val SUITES = setOf("skills", "memory")
         val APP_TOKEN = Regex("^\\{app:[a-z]+\\}$")
-        /** 网页题的目录。 */
+        /** The directory for web tasks. */
         const val WEB = "web"
     }
 

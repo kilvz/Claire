@@ -20,14 +20,14 @@ class EvalReportCompareTest {
         assertTrue(report.contains("通过:"))
         assertTrue(EvalReport.gate(base, treated).passed)
 
-        // 少了两题:不通过
+        // Two tasks missing: fail
         val worse = listOf(s("a", true), s("b", false), s("c", false), s("d", false))
         val g = EvalReport.gate(base, worse)
         assertFalse(g.passed)
         assertEquals(1, g.reasons.size)
         assertTrue(g.reasons.single().contains("少了 2 题"))
 
-        // 有一题假成功:不通过,并列出题号
+        // One task is a false success: fail, and list its id
         val lying = listOf(s("a", true), s("b", true), s("c", true), s("d", false, falseSuccess = true))
         val g2 = EvalReport.gate(base, lying)
         assertFalse(g2.passed)
@@ -46,7 +46,7 @@ class EvalReportCompareTest {
     @Test fun tokensPairedByTaskId() {
         fun o(input: Long, cached: Long, output: Long) =
             Observed("succeeded", "", emptyList(), null, emptyMap(), emptyMap(), 1, 1, input, output, cached, null)
-        // 基线 a b c d,带技能一轮只跑了 a c:只比 a、c 两题
+        // Baseline is a b c d; the with-skill round ran only a and c: compare just a and c
         val treated = listOf(s("c", true), s("a", true))
         val r = EvalReport.compare(base, treated, emptyMap(),
             listOf(o(1000, 200, 50), o(99_999, 0, 9_999), o(3000, 600, 70), o(99_999, 0, 9_999)), listOf(o(2400, 1800, 60), o(800, 600, 40)))

@@ -10,8 +10,8 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * 改名前记下的运行(如调优组那一晚的记录)按旧名对照表读:评测从记录里取的事实、核查当时的证据,
- * 和同一次运行用现在的名字记下时一模一样,重新打分结果不变。
+ * Runs recorded before the rename (such as the tuning group's records from that night) are read through the old-name table:
+ * the facts the eval takes from the record and the evidence the verifier had then match the same run recorded under the current names, so rescoring is unchanged.
  */
 class RecordedRunNamesTest {
     private var t = 0L
@@ -19,7 +19,7 @@ class RecordedRunNamesTest {
     private fun reply(step: Int, tool: String, args: String = "{}") = RunEvent.ModelReply(++t, step, "", tool, args, null, null, null)
     private fun result(step: Int, tool: String, json: String) = RunEvent.ToolResult(++t, step, tool, json, null, null)
 
-    /** 一次手机加网页、登录接管后交卷的运行,用现在的名字记下。 */
+    /** One run that used the phone plus the web and was handed over after a login wall, recorded under the current names. */
     private val current: List<RunEvent> = listOf(
         reply(1, "phone_launch_app", """{"package":"com.example.notes"}"""), result(1, "phone_launch_app", """{"ok":true}"""),
         screen(2, "com.example.notes", "新建", "搜索"), reply(2, "phone_type_text", """{"text":"买牛奶"}"""), result(2, "phone_type_text", """{"ok":true}"""),
@@ -32,7 +32,7 @@ class RecordedRunNamesTest {
         RunEvent.Verifier(++t, "pass", "{}", step = 8),
     )
 
-    /** 同一次运行在改名前记下的样子:每个改过名的工具换回它的旧名。 */
+    /** The same run as recorded before the rename: every renamed tool is switched back to its old name. */
     private val old: List<RunEvent> = run {
         val legacy = legacyNames()
         val former = legacy.names.flatMap { o -> legacy.replacements(o).map { it to o } }.toMap()
@@ -54,9 +54,9 @@ class RecordedRunNamesTest {
     @Test fun oldNamesRescoreLikeTheCurrentOnes() {
         assertNotEquals("the fixture must really use old names", current.map { (it as? RunEvent.ModelReply)?.tool }, old.map { (it as? RunEvent.ModelReply)?.tool })
         assertEquals(facts(current, TOOLS), facts(old, RECORDED_TOOLS))
-        // 不按对照表读,旧记录取到的事实就不一样(这个测试守得住)
+        // Without reading through the table, the old record yields different facts (this test guards that)
         assertNotEquals(facts(current, TOOLS), facts(old, TOOLS))
-        // 核查当时的证据也一样
+        // The evidence the verifier had at the time matches too
         val (v, f) = RecordedVerifications.pairs(current).single()
         val answer = RecordedVerifications.answer(current, f).orEmpty()
         assertEquals(RecordedVerifications.ledgerSources(current, v, f, "", answer), RecordedVerifications.ledgerSources(old, v, f, "", answer))

@@ -14,7 +14,7 @@ class EvalTaskVariantsTest {
          ]}
     """.trimIndent()
 
-    // 变体没写核对项就沿用原题的;写了就用自己的;编号接在原题后面
+    // A variant without checks inherits the original's; with checks it uses its own; ids continue after the original
     @Test fun parsesVariantsAndInheritsChecks() {
         val t = EvalTasks.parse(json)
         assertEquals(2, t.variants.size)
@@ -26,7 +26,7 @@ class EvalTaskVariantsTest {
         assertEquals(t.apps, vs[1].apps)
         assertTrue(vs.all { it.variants.isEmpty() })
         assertTrue(EvalTasks.validate(t).isEmpty())
-        // 没有变体的题照旧
+        // A task with no variants behaves as before
         assertEquals(emptyList<EvalTask>(), EvalTasks.variantsOf(t.copy(variants = emptyList())))
     }
 

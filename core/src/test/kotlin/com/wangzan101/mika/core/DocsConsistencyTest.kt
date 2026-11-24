@@ -6,23 +6,23 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 文档和代码不脱节:文档里反引号包着的文件路径、Kotlin 类名、工具名,必须在仓库里真的有。
- * 范围:README.md、docs/ 下全部 .md(含 docs/readme/ 里各语言的 README)、eval/README.md、tools/sandbox/README.md。
- * 另外,同样这些文档里不写死会变的个数(内置知识、工具、服务商、评测题有多少),见 [docsDoNotHardCodeCounts]。
+ * The docs and the code must not drift apart: file paths, Kotlin class names and tool names wrapped in backticks in the docs must really exist in the repo.
+ * Scope: README.md, every .md under docs/ (including the per-language READMEs in docs/readme/), eval/README.md, tools/sandbox/README.md.
+ * Also, these same docs must not hard-code counts of things that change (how many built-in knowledge entries, tools, providers or eval tasks), see [docsDoNotHardCodeCounts].
  *
- * 只检查「整段反引号内容就是一个标识符」的写法;下面这些一律不查(规则,不是白名单):
- *  - 围栏代码块(```)整块不看;行内反引号里含空白的是命令或代码片段;
- *  - 含 < > * … { } ( ) = : " ' $ , ; | # 的是占位、通配、调用、键值、示例值;
- *  - 以 / ~ 开头的是设备或系统路径,含 :// 的是网址;
- *  - 路径:带 / 的,只有第一段是仓库根下真有的目录或文件才查(`files/sandbox/rootfs`、`read/system` 这类是运行时产物或分类名);
- *    不带 / 的,只有代码类扩展名(kt、py、xml 等)才查,json、md、txt 这类常是运行时产物;
- *    查的时候:根目录下直接存在,或「模块/包路径/文件」的简写(`app/task/X.kt`),或中间用 ... 省略(`core/.../X.kt`),或短文件名在仓库任意位置;
- *  - 类名:大驼峰且至少两个大写字母(`Claire` 这样的单词不当类名);在 core、app 的源码(含测试)里有 class/object/interface/typealias
- *    声明、顶层函数声明,或同名文件;源码里从本仓库以外的包导入过的(安卓、JDK、库的类)不归本仓库管;
- *    源码里作为字符串字面量出现的展示名(如服务商名 `DeepSeek`)也不是类,见 [displayNames];
- *  - 工具名:只查「第一段是现有工具名的第一段」的 snake_case(`max_seconds` 这样的参数名不查),对照 [knownToolNames],
- *    那是工具注册处的名单,不是金样快照;Android 字符串资源名(`R.string.*`,如 `settings_all_ready_detail`)
- *    长得像工具名但不是工具,见 [stringResourceNames],不查。
+ * Only the form "the whole backticked span is one identifier" is checked; none of the following are checked (these are rules, not a whitelist):
+ *  - fenced code blocks (```) are skipped as a whole; an inline backticked span containing whitespace is a command or code fragment;
+ *  - spans containing < > * … { } ( ) = : " ' $ , ; | # are placeholders, wildcards, calls, key/value pairs or example values;
+ *  - spans starting with / or ~ are device or system paths, and ones containing :// are URLs;
+ *  - paths: for ones containing /, only check when the first segment is a directory or file that really exists at the repo root (`files/sandbox/rootfs`, `read/system` and the like are runtime artifacts or category names);
+ *    for ones without /, only check code-like extensions (kt, py, xml, etc.); json, md, txt and the like are usually runtime artifacts;
+ *    when checking: it exists directly under the root, or it is the "module/package path/file" shorthand (`app/task/X.kt`), or the middle is elided with ... (`core/.../X.kt`), or the short file name appears anywhere in the repo;
+ *  - class names: upper camel case with at least two uppercase letters (a word like `Claire` does not count as a class); the core and app sources (tests included) must have a class/object/interface/typealias
+ *    declaration, a top-level function declaration, or a file of the same name; classes imported from packages outside this repo (Android, JDK, library classes) are not this repo's concern;
+ *    a display name that appears as a string literal in the sources (such as the provider name `DeepSeek`) is not a class either, see [displayNames];
+ *  - tool names: only check snake_case whose first segment is the first segment of an existing tool name (parameter names like `max_seconds` are not checked), against [knownToolNames],
+ *    which is the list at the tool registry, not a golden snapshot; Android string resource names (`R.string.*`, such as `settings_all_ready_detail`)
+ *    look like tool names but are not tools, see [stringResourceNames], not checked.
  */
 class DocsConsistencyTest {
     private val root = File("..").canonicalFile
@@ -50,7 +50,7 @@ class DocsConsistencyTest {
         return list.filter { it.isFile }
     }
 
-    /** 去掉围栏代码块后,取所有行内反引号里的内容。 */
+    /** Strip fenced code blocks, then collect the contents of every inline backticked span. */
     private fun spans(text: String): List<String> {
         var fenced = false
         val prose = text.lines().filter { line ->
@@ -62,12 +62,12 @@ class DocsConsistencyTest {
     private val notIdentifier = Regex("""[\s<>*…{}()=:"'$,;|#]""")
     private val pathExtensions = setOf("kt", "kts", "java", "md", "json", "xml", "txt", "yml", "yaml", "gradle", "toml", "properties", "py", "sh", "js", "html", "pro", "aidl", "cpp", "h")
     private val tool = Regex("""[a-z][a-z0-9]*(_[a-z0-9]+)+""")
-    // 状态码不是模型工具名,即使其前缀与工具相同;微信消息里的字段名也一样(不是发给模型的工具)。
+    // Status codes are not model tool names even when their prefix matches a tool; field names in WeChat messages are the same (not tools exposed to the model).
     private val nonToolNames = setOf("copy_not_found", "copy_not_opened", "task_progress", "image_item")
 
     /**
-     * 实时语音会话里注册给模型的工具(定义在 app 的通话协议层,不在 core 的工具表里):
-     * 文档提到它们时按「确实存在」放过。
+     * Tools registered for the model in live voice sessions (defined in the app's call protocol layer, not in core's tool table):
+     * when the docs mention them, let them pass as "really existing".
      */
     private val sessionToolNames = setOf("mika_request")
     private val classLike = Regex("""[A-Z][A-Za-z0-9]*""")
@@ -76,13 +76,13 @@ class DocsConsistencyTest {
     private val toolPrefixes: Set<String> by lazy { toolNames.map { it.substringBefore('_') }.toSet() }
 
     /**
-     * 电脑/远程 API 的名字,不是发给模型的工具名。`mika_` 现在是自身工具的前缀,文档里这些
-     * 远程调用名不能再靠「前缀不认识」自动放过,逐个列出来。
+     * Names of the computer/remote API, not tool names exposed to the model. `mika_` is now the prefix of our own tools,
+     * so these remote call names in the docs can no longer pass automatically by "unknown prefix"; list them one by one.
      */
     private val remoteApiNames = setOf(
         "mika_run_task", "mika_task_status", "mika_wait_task", "mika_answer", "mika_steer_task",
         "mika_cancel_task", "mika_list_tasks", "mika_device_state", "mika_wake_device", "mika_unlock_device",
-        // 电脑侧控制 API 的名字(不是发给模型的工具);`task_` 因 task_memory_* 成了工具前缀后也要逐个列出。
+        // Names of the computer-side control API (not tools exposed to the model); `task_` became a tool prefix because of task_memory_*, so it must be listed one by one too.
         "task_steer", "task_id", "task_recovery", "task_files", "task_interrupted", "task_result_v2",
     )
 
@@ -90,14 +90,14 @@ class DocsConsistencyTest {
         !s.startsWith("/") && !s.startsWith("~") && "://" !in s &&
             ('/' in s || s.substringAfterLast('.', "").let { it in pathExtensions && s.length > it.length + 1 })
 
-    /** 文档里写的是 App 运行时才有的东西(设备上的目录和文件),不在仓库里;逐个写明为什么。 */
+    /** What these docs describe are things that only exist while the app runs (directories and files on the device), not in the repo; spell out the reason for each. */
     private val runtimeOnly = mapOf(
         "eval/logged-in.txt" to "评测的人工登录标记,放在设备上 App 的外部文件目录,不进仓库",
         "usb-start.sh" to "手机助手启动脚本由 App 写到设备外部文件目录,不进仓库",
         "connect-computer.sh" to "电脑连接脚本由 App 写到设备外部文件目录,不进仓库",
     )
 
-    /** 只有仓库根下确有的一级目录或文件开头的路径、以及代码类的短文件名,才是在指仓库里的东西;其余是运行时产物或相对写法。 */
+    /** Only paths that start with a top-level directory or file that really exists under the repo root, and code-like short file names, point at something in the repo; the rest are runtime artifacts or relative notations. */
     private val topLevel: Set<String> by lazy { File(root, ".").list().orEmpty().filter { it !in skipDirs }.toSet() }
     private val codeExtensions = setOf("kt", "kts", "java", "py", "sh", "gradle", "xml", "aidl", "cpp", "h")
 
@@ -105,7 +105,7 @@ class DocsConsistencyTest {
         val clean = rel.removePrefix("./").trimEnd('/')
         if (clean.isEmpty() || clean in runtimeOnly) return true
         val dir = rel.endsWith("/")
-        // 中间用 ... 省略的写法:开头是真目录前缀,结尾是某个文件路径的结尾(可不带扩展名)
+        // The "..." elision form: the head is a real directory prefix, the tail is the end of some file path (the extension may be left off)
         if ("..." in clean) {
             val head = clean.substringBefore("...").trimEnd('/')
             val tail = clean.substringAfterLast("...").trimStart('/')
@@ -117,7 +117,7 @@ class DocsConsistencyTest {
         val first = clean.substringBefore('/')
         if (first !in topLevel) return true
         if (File(root, clean).exists()) return true
-        // 「模块/包路径/文件」的简写(如 app/task/X.kt 指 app/src/main/java/.../task/X.kt):模块下任一路径以后面部分结尾即可
+        // The "module/package path/file" shorthand (e.g. app/task/X.kt means app/src/main/java/.../task/X.kt): any path under the module that ends with the remainder matches
         val rest = clean.substringAfter('/')
         return if (dir) repoDirs.any { it.startsWith("$first/") && (it.endsWith("/$rest")) }
         else repoFiles.any { it.startsWith("$first/") && it.endsWith("/$rest") }
@@ -130,15 +130,15 @@ class DocsConsistencyTest {
         Regex("""(?m)^import\s+(?!com\.wangzan101\.mika\.)[\w.]+\.$name\b""").containsMatchIn(sourceText)
 
     /**
-     * 在源码里作为字符串字面量出现的展示名,不是类:服务商/品牌名(如设置页上显示的 `DeepSeek`)
-     * 只出现在界面文字里,文档提到它是在断言这段文字存在,不是在引用一个类。
+     * A display name that appears as a string literal in the sources is not a class: provider/brand names (such as `DeepSeek`
+     * shown on the settings screen) appear only in UI text; the docs mentioning one assert that this text exists, not that a class is referenced.
      */
     private val displayNames = setOf("DeepSeek")
 
     /**
-     * Android 字符串资源名(`R.string.*`):`settings_all_ready_detail`、`phone_repair_sub` 这类
-     * 以下划线连接的资源名,第一段常和工具名前缀撞上(`settings`、`phone`),但它们不是模型工具。
-     * 对照 app/src/main/res 下各 values 目录的 strings*.xml 里声明的 name。
+     * Android string resource names (`R.string.*`): underscore-joined resource names like `settings_all_ready_detail`
+     * and `phone_repair_sub` often have a first segment that collides with a tool prefix (`settings`, `phone`), but they are not model tools.
+     * Checked against the name declared in strings*.xml in each values directory under app/src/main/res.
      */
     private val stringResourceNames: Set<String> by lazy {
         File(root, "app/src/main/res").walkTopDown()
@@ -162,8 +162,8 @@ class DocsConsistencyTest {
     }
 
     /**
-     * 会变的东西不写死个数:「18 份 App」「60 多个工具」「128 道评测题」(英文的「18 apps」「60+ tools」)这类写法一加内容就过期。
-     * 要列清单就用 README 里生成的段落(`./gradlew updateReadme`);确实要写个数的那一行末尾加 [countOk] 并说明为什么。
+     * Things that change must not be pinned to a fixed count: phrasings like "18 apps", "60+ tools" or "128 eval tasks" (in Chinese, a numeral plus a measure word) go stale as soon as content is added.
+     * To list things, use the generated sections in the README (`./gradlew updateReadme`); if a line really must state a count, append [countOk] to it and say why.
      */
     private val hardCount = Regex(
         """\d+\s*多?\s*(份|个|道|家)\s*(内置)?\s*(App|app|网站|站点|技能|工具|服务商|预设|(真机)?评测题)""" +

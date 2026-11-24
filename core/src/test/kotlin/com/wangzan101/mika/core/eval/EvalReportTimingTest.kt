@@ -19,7 +19,7 @@ class EvalReportTimingTest {
         assertTrue(md, "| 模型调用次数中位数 | 6 |" in md)
         assertTrue(md, "| 模型调用次数 P90 | 10 |" in md)
         assertTrue(md, "| 缓存命中率(cached/input) | 25.0% |" in md)
-        // 总耗时 30 秒:模型 15 秒、工具 5 秒
+        // 30 seconds in total: 15 for the model, 5 for tools
         assertTrue(md, "| 模型等待占比 | 50.0% |" in md)
         assertTrue(md, "| 工具执行占比 | 16.7% |" in md)
         assertTrue(md, "| 回放命中 | 0 |" in md)
@@ -27,7 +27,7 @@ class EvalReportTimingTest {
         assertTrue(md, "inlineScreen,replay" in md)
     }
 
-    // 占比加起来是 100%:模型、工具之外的是「其他/等用户」;没量到等界面时写「(暂无数据)」
+    // The shares add up to 100%: everything besides model and tools is "other/waiting for the user"; when waiting time was not measured, the no-data marker is shown instead
     @Test fun sharesSumToHundredWithOtherRow() {
         val scores = listOf(pair("a", 4, 400, 100, 5_000, 2_000), pair("b", 6, 300, 50, 5_000, 2_000), pair("c", 10, 300, 100, 5_000, 1_000))
         val md = EvalReport.markdown("r1", "m", scores, emptyList(), null)
@@ -35,7 +35,7 @@ class EvalReportTimingTest {
         assertTrue(md, "| 其中等界面占比 | (暂无数据) |" in md)
     }
 
-    // 回放评测:变体的回放命中、交还与交还后办成;原题单列,不进指标
+    // Replay eval: variants' replay hits, hand-backs and completions after a hand-back; the original tasks are listed separately and do not enter the metrics
     @Test fun replayRatesAndOriginalsSection() {
         fun v(id: String, passed: Boolean, hits: Int, backs: Int) = TaskScore(id, passed, false, false, emptyList(), null) to
             Observed("succeeded", "", emptyList(), null, emptyMap(), emptyMap(), 2, 10_000, 0, 0, 0, null, replayHits = hits, replayHandBacks = backs)

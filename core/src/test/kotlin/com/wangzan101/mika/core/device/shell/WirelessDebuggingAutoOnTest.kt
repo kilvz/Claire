@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WirelessDebuggingAutoOnTest {
-    /** 假的系统开关:[revert] 为 true 时写了打开过一会儿又被系统拨回关着(不允许的 Wi-Fi)。 */
+    /** Fake system switch: when [revert] is true, an "on" we wrote is flipped back off by the system a moment later (a Wi-Fi that is not allowed). */
     private inner class FakeSwitch {
         var on: Boolean? = false
         var revert = false
@@ -19,7 +19,7 @@ class WirelessDebuggingAutoOnTest {
         private var readsSinceWrite = 0
 
         fun read(): Boolean? {
-            // 原版收到设置变化后才拨回:写完先读到打开,随后读到关着
+            // The real thing only flips it back after it sees a settings change: right after a write we read "on", then "off"
             if (revert && on == true && ++readsSinceWrite > 1) on = false
             return on
         }
@@ -50,7 +50,7 @@ class WirelessDebuggingAutoOnTest {
             WirelessDebuggingAutoOn.decide(wants, canWrite, wifi, blocked, writes, since)
 
         assertEquals(AutoOnGate.Act, d())
-        // 用户关掉了这一项:不管别的,一律不写
+        // The user turned this off: no matter what else, never write
         assertEquals(AutoOnGate.Skip(AutoOnSkip.Declined), d(wants = false, blocked = AutoOnBlock.NotAllowedHere, wifi = false))
         assertEquals(AutoOnGate.Skip(AutoOnSkip.NoPermission), d(canWrite = false))
         assertEquals(AutoOnGate.Skip(AutoOnSkip.NoWifi), d(wifi = false))
@@ -77,7 +77,7 @@ class WirelessDebuggingAutoOnTest {
         assertEquals(true, switch.on)
         assertNull(a.blocked.value)
         assertFalse(a.writing)
-        // 紧接着又要写:按退避等
+        // Asked to write again right away: wait out the backoff
         assertTrue(a.gate(wifi = true) is AutoOnGate.Wait)
     }
 
@@ -88,12 +88,12 @@ class WirelessDebuggingAutoOnTest {
         assertFalse(a.turnOn())
         assertEquals(AutoOnBlock.NotAllowedHere, a.blocked.value)
         assertEquals(false, switch.on)
-        // 停下后过多久都不再写(每写一次系统就弹一次框)
+        // Once stopped, never write again no matter how long passes (each write pops a system dialog)
         clock += 3_600_000
         assertEquals(AutoOnGate.Skip(AutoOnSkip.Blocked), a.gate(wifi = true))
         assertEquals(1, switch.writes)
 
-        // 换了 Wi-Fi、用户亲手打开或点了重试:从头算
+        // Wi-Fi changed, the user turned it on by hand, or retry was tapped: start over
         a.reset()
         assertNull(a.blocked.value)
         assertEquals(AutoOnGate.Act, a.gate(wifi = true))
@@ -121,13 +121,13 @@ class WirelessDebuggingAutoOnTest {
             clock += 3_600_000
             assertEquals(AutoOnGate.Act, a.gate(wifi = true))
             assertTrue(a.turnOn())
-            // 系统(或别的原因)又把它关了,助手没起来
+            // The system (or something else) turned it off again; the helper never came up
             switch.on = false
         }
         clock += 3_600_000
         assertEquals(AutoOnGate.Skip(AutoOnSkip.Blocked), a.gate(wifi = true))
         assertEquals(AutoOnBlock.GaveUp, a.blocked.value)
-        // 助手起来了(引擎调 reset):重新计数
+        // The helper came up (the engine calls reset): count from scratch
         a.reset()
         assertEquals(AutoOnGate.Act, a.gate(wifi = true))
     }
