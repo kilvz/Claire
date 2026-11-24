@@ -18,9 +18,9 @@ import okhttp3.Request
 import java.util.Base64
 
 /**
- * Gemini 图像模型（`gemini-*-image*`）的 generateContent 接口：要求 `responseModalities` 含 IMAGE，
- * 参考图用 inlineData 放在同一轮 parts 里，比例走 `generationConfig.imageConfig.aspectRatio`。
- * 文本模型不会走这个适配器；设置页单独选图片模型。
+ * The generateContent API of Gemini image models (`gemini-*-image*`): requires `responseModalities` to include IMAGE,
+ * reference images go into the same round of parts as inlineData, and the aspect ratio goes through `generationConfig.imageConfig.aspectRatio`.
+ * Text models never go through this adapter; image models are chosen separately on the settings page.
  */
 class GeminiImageModel(
     baseUrl: String = "https://generativelanguage.googleapis.com",
@@ -28,7 +28,7 @@ class GeminiImageModel(
     private val model: String,
     override val capabilities: ImageCapabilities,
     private val http: OkHttpClient,
-    /** 每个请求都带的头（见 [ClientHeaders]）；Key 的头由这里自己加。 */
+    /** Headers sent with every request (see [ClientHeaders]); key headers are added here. */
     private val headers: Map<String, String> = emptyMap(),
 ) : ImageModel {
     override val name: String get() = model

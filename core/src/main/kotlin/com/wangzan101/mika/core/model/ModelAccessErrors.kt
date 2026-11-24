@@ -7,21 +7,21 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 各适配器共用:HTTP 400 / 403 / 404 的报错内容说的是「这个模型不行」,而不是 Key 或请求本身不对时,认出是哪一种。
- * 各家的报错格式、措辞不同,这里只看内容里有没有这几类说法(不分大小写):
- * - 不支持调用工具(「does not support tools」「function calling is not supported」「不支持工具」…)→ [ModelError.ToolsUnsupported];
- * - 这个模型不能走当前这个接口(服务商要求另一套接口形状,如「Model … must be called via /messages」、
- *   「unsupported_model」…,见 [ENDPOINT_MISMATCH])→ [ModelError.ModelNotAvailable],带上服务端的原话:
- *   换一个模型或换接口类型才行,和「这个账号用不了它」一样处理,接着试下一个;
- * - 这个账号用不了这个模型(「not activated」「not authorized to access this model」「does not have access to the model」
- *   「Model.AccessDenied」「未开通」「无权限」…),或这个模型已经下线(「no longer available」「has been retired」
- *   「model … is deprecated」「已下线」…)→ [ModelError.ModelNotAvailable],带上服务端的原话;
- * - 没有这个模型(「model_not_found」「model not found」「model does not exist」「not found for API version」「模型不存在」…)
- *   → [ModelError.ModelNotFound],带上 JSON 里的原话([jsonDetail])。
- * 404 没说前两类时由调用方照旧按找不到模型处理(同样带上 [jsonDetail]);认不出为 null,调用方按状态码处理。401 一律是 Key 的问题,不看。
+ * Shared by all adapters: when the error content of HTTP 400 / 403 / 404 says "this model is the problem" rather than the key or the request itself being wrong, work out which case it is.
+ * Providers differ in error format and wording, so only whether the content contains one of these kinds of phrasing is checked (case-insensitive):
+ * - tool calling not supported ("does not support tools", "function calling is not supported", the Chinese wording for "tools not supported"…) → [ModelError.ToolsUnsupported];
+ * - this model cannot go through the current API (the provider requires a different API shape, e.g. "Model … must be called via /messages",
+ *   "unsupported_model"…, see [ENDPOINT_MISMATCH]) → [ModelError.ModelNotAvailable], with the provider's own words:
+ *   switching to another model or another API type is required, handled the same as "this account cannot use it", then try the next one;
+ * - this account cannot use this model ("not activated", "not authorized to access this model", "does not have access to the model",
+ *   "Model.AccessDenied", the Chinese wording for "not activated" / "no permission"…), or this model has been taken offline ("no longer available", "has been retired",
+ *   "model … is deprecated", the Chinese wording for "taken offline"…) → [ModelError.ModelNotAvailable], with the provider's own words;
+ * - no such model ("model_not_found", "model not found", "model does not exist", "not found for API version", the Chinese wording for "model does not exist"…)
+ *   → [ModelError.ModelNotFound], with the original wording from the JSON ([jsonDetail]).
+ * When a 404 does not say either of the first two, the caller still treats it as model not found (also with [jsonDetail]); unrecognized is null and the caller goes by the status code. A 401 is always a key problem and is not inspected.
  *
- * HTTP 429 一般是限流或额度用完,由调用方处理;只有内容说这个账号在这个模型上的额度是零(「limit: 0」
- * 「doesn't have a free quota tier」…,见 [QUOTA_ZERO])时算这个模型用不了,给 [ModelError.ModelNotAvailable]:等多久也不会好,换一个模型才行。
+ * HTTP 429 is usually a rate limit or exhausted quota, handled by the caller; only when the content says this account's quota on this model is zero ("limit: 0",
+ * "doesn't have a free quota tier"…, see [QUOTA_ZERO]) is the model considered unusable, giving [ModelError.ModelNotAvailable]: waiting will not help, another model is needed.
  */
 object ModelAccessErrors {
     private val json = Json { ignoreUnknownKeys = true }
@@ -41,17 +41,17 @@ object ModelAccessErrors {
         "is not available on", "not available on", "not allowed to access", "require_workers_paid",
         "has been deprecated", "was deprecated",
         "未开通", "没有开通", "尚未开通", "无权限", "没有权限使用", "无权访问", "无权使用",
-        // 模型已经下线
+        // The model has been taken offline
         "no longer available", "has been retired", "has been discontinued", "has been shut down",
         "已下线", "已停用", "已下架", "已停止服务",
     )
 
     /**
-     * 说「这个模型不能走这个接口」的:一家服务商把模型按接口形状分开放(如某一系模型只挂在 `/messages`,
-     * 在 OpenAI 兼容的那条路上调用它一律 400 「must be called via /provider/v1/messages」),换一种接口类型、
-     * 或换下面一个模型才通。这不是 Key、地址或网络的问题,当这个模型用不了,接着试下一个。
-     * 只在报错说的是模型时才算(见 [aboutTheModel]):「Your API key is not supported for this endpoint」这类说的是 Key,
-     * 照旧交给调用方按状态码处理(403 是 Key 的问题,整次保存照旧挡住)。
+     * Those saying "this model cannot go through this API": a provider splits models by API shape (e.g. one model family is only available under `/messages`,
+     * and calling it on the OpenAI-compatible route always returns 400 "must be called via /provider/v1/messages"), only another API type
+     * or the next model in the list works. This is not a key, URL or network problem; treat the model as unusable and try the next one.
+     * Only counts when the error is about the model (see [aboutTheModel]): "Your API key is not supported for this endpoint" is about the key,
+     * so it is still left to the caller to handle by status code (403 is a key problem, and saving is still blocked as before).
      */
     private val ENDPOINT_MISMATCH = listOf(
         "unsupported_model",
@@ -61,10 +61,10 @@ object ModelAccessErrors {
         "unsupported for this endpoint",
     )
 
-    /** 说「模型 … 已弃用 / 已下线」:单说 deprecated 也可能是某个参数弃用了,要和 model 连着说才算。 */
+    /** Says "model … is deprecated / retired": deprecated alone may refer to a parameter being deprecated, so it only counts when said together with model. */
     private val MODEL_RETIRED = Regex("""\bmodels?\b[^;,\n]{0,80}?\b(?:is|has been|was)\s+(?:deprecated|retired)|\bdeprecated\s+models?\b""")
 
-    /** 429 里说这个账号在这个模型上的额度为零:数到 `limit: 0`、`"quotaValue": "0"`,或明说没有免费额度档。 */
+    /** A 429 saying this account's quota on this model is zero: matches `limit: 0`, `"quotaValue": "0"`, or explicitly no free quota tier. */
     private val QUOTA_ZERO = Regex(
         """\blimit\s*:\s*0(?![\d.])|"quotavalue"\s*:\s*"?0"?\s*[,}]|(?:doesn't|does not|don't|do not) have (?:a |any )?free quota tier|has no free quota tier""",
     )
@@ -74,7 +74,7 @@ object ModelAccessErrors {
         "not found for api version", "模型不存在", "找不到模型",
     )
 
-    /** [model] 是请求的模型名。 */
+    /** [model] is the requested model name. */
     fun of(status: Int, body: String, model: String): ModelError? {
         val lower = body.lowercase()
         if (status == 429) return if (QUOTA_ZERO.containsMatchIn(lower)) ModelError.ModelNotAvailable(model, detail(body)) else null
@@ -88,21 +88,21 @@ object ModelAccessErrors {
         }
     }
 
-    /** 报错说的是模型本身:提到 model(含 `unsupported_model`、`"param":"model"`),或原话里直接点了请求的模型名。 */
+    /** The error is about the model itself: it mentions model (including `unsupported_model`, `"param":"model"`), or the original wording names the requested model directly. */
     private fun aboutTheModel(lower: String, body: String, model: String): Boolean =
         "model" in lower || (model.isNotBlank() && model.lowercase() in (said(body) ?: body).lowercase())
 
-    /** 服务端的原话:JSON 里的([said]),不是 JSON 就是整段;太长的截短([clip])。 */
+    /** The provider's own words: the one in the JSON ([said]), or the whole body when it is not JSON; long ones are clipped ([clip]). */
     internal fun detail(body: String): String = clip(said(body) ?: body)
 
-    /** 同 [detail],但只要 JSON 里的原话:不是 JSON 的(地址不对时反向代理回的 HTML 页、空内容)为空。 */
+    /** Same as [detail], but only the wording from the JSON: empty when it is not JSON (the HTML page a reverse proxy returns for a wrong URL, empty content). */
     internal fun jsonDetail(body: String): String = said(body)?.let(::clip).orEmpty()
 
-    /** 去掉首尾空白;超过 [DETAIL_MAX] 个字时截短,末尾加「…」,看得出后面还有。 */
+    /** Trim surrounding whitespace; when longer than [DETAIL_MAX] characters, clip it and append "…" so it shows there is more. */
     internal fun clip(text: String): String =
         text.trim().let { if (it.length <= DETAIL_MAX) it else it.take(DETAIL_MAX).trimEnd() + "…" }
 
-    /** JSON 对象(有的服务回数组,取第一个)里的 `error.message`、`error`(是字符串时)、`message`、`msg`、`detail`;都没有为 null。 */
+    /** `error.message`, `error` (when it is a string), `message`, `msg`, `detail` in the JSON object (some services return an array, take the first one); null when none of them exist. */
     private fun said(body: String): String? {
         val parsed = runCatching { json.parseToJsonElement(body) }.getOrNull()
         val root = parsed as? JsonObject ?: (parsed as? JsonArray)?.firstOrNull() as? JsonObject

@@ -57,7 +57,7 @@ internal suspend inline fun Request.Builder.postInference(
     protocol: InferenceProtocol, payload: JsonObject, provider: () -> String = { protocol.provider },
 ): Request.Builder {
     val context = currentCoroutineContext()
-    // 追踪和请求计数都靠这个标记辨认推理流量；同协程里的令牌刷新、目录请求不能算成模型调用。
+    // Tracing and request counting both use this tag to identify inference traffic; token refreshes and catalog requests in the same coroutine must not count as model calls.
     if (context[TraceCall] != null || context[ModelHttpAttempts] != null) {
         tag(InferenceRequest::class.java, InferenceRequest(protocol, payload, provider()))
     }

@@ -16,8 +16,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * Gemini TTS：generateContent + `responseModalities: ["AUDIO"]` + speechConfig 里的预置音色。
- * 常见返回是 `audio/L16` 原始 PCM，这里按 mime 里的采样率包成 WAV；别的音频格式按文件头认。
+ * Gemini TTS: generateContent + `responseModalities: ["AUDIO"]` + a prebuilt voice in speechConfig.
+ * The common response is raw PCM as `audio/L16`; here it is wrapped into WAV using the sample rate from the mime type, and other audio formats are recognized by their file header.
  */
 class GeminiTtsModel(
     baseUrl: String = "https://generativelanguage.googleapis.com",

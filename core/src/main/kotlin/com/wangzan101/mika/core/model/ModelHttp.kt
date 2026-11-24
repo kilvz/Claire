@@ -9,22 +9,22 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * 对话适配器以外也要照同一套说法报错的地方(比如语音转文字)用:发一个请求,把 HTTP 状态和报错内容转成 [ModelError]。
- * 映射本身从各适配器原样搬来,适配器改成调这里,避免两份各改各的。
+ * Used by places outside the chat adapters that must report errors the same way (e.g. speech-to-text): send a request and convert the HTTP status and error content into a [ModelError].
+ * The mapping was moved over from the adapters unchanged; the adapters call this instead so there are not two copies drifting apart.
  */
 object ModelHttp {
     class Reply(val status: Int, val retryAfter: String?, val body: String) {
         val ok: Boolean get() = status in 200..299
     }
 
-    /** 发出请求并读完回复;网络失败抛 [ModelError.Network],取消协程会取消请求。 */
+    /** Send the request and read the whole reply; a network failure throws [ModelError.Network], cancelling the coroutine cancels the request. */
     suspend fun send(http: OkHttpClient, request: Request): Reply =
         HttpSupport.execute(http, request).let { Reply(it.status, it.retryAfter, it.body) }
 
     /**
-     * OpenAI 兼容接口(对话、转写同一套)的错误映射。[model] 是请求的模型名。
-     * 没有更具体说法的 HTTP 错误(>= 400)一律归 [ModelError.Server](MK-1 第 2 批:分类依状态码,不依 body 能否解析,
-     * 备援链接得住);只有 HTTP 200 的内容解析不了才是 [ModelError.BadResponse]。
+     * Error mapping for OpenAI-compatible APIs (chat and transcription share the same one). [model] is the requested model name.
+     * HTTP errors (>= 400) without a more specific meaning all become [ModelError.Server] (MK-1 batch 2: classification goes by status code, not by whether the body parses,
+     * so the failover chain survives); only content from HTTP 200 that cannot be parsed is [ModelError.BadResponse].
      */
     fun openAiError(status: Int, retryAfter: String?, body: String, model: String): ModelError =
         ModelAccessErrors.of(status, body, model) ?: reasoningEffortRejected(status, body) ?: when {
@@ -38,7 +38,7 @@ object ModelHttp {
             else -> if (status >= 400) ModelError.Server(status, ModelAccessErrors.detail(body)) else ModelError.BadResponse("HTTP $status ${body.take(200)}")
         }
 
-    /** HTTP 200 SSE 中的错误帧也按 HTTP 错误的分类交给重试和备援。 */
+    /** Error frames inside an HTTP 200 SSE stream are also classified like HTTP errors and handed to retry and failover. */
     fun streamError(root: JsonObject): ModelError? {
         val error = root["error"] ?: return null
         val errorObject = error as? JsonObject
@@ -53,10 +53,10 @@ object ModelHttp {
         }
     }
 
-    /** HTTP 400 的报错说请求超出了模型的上下文(见 [saysContextTooLong])。OpenAI 兼容、Responses、Anthropic 三种接口共用;本机跑的服务三种接口都可能开。 */
+    /** An HTTP 400 error saying the request exceeds the model's context (see [saysContextTooLong]). Shared by the OpenAI-compatible, Responses and Anthropic APIs; a locally run service may expose all three. */
     fun contextTooLong(status: Int, body: String): Boolean = status == 400 && saysContextTooLong(body)
 
-    /** HTTP 400 明确指出思考强度参数无效。只认参数名或完整的协议字段,不从任意“unsupported”文字猜。 */
+    /** HTTP 400 explicitly stating the reasoning effort parameter is invalid. Only the parameter name or a complete protocol field is accepted, no guessing from arbitrary "unsupported" text. */
     fun reasoningEffortRejected(status: Int, body: String): ModelError.ReasoningEffortRejected? {
         if (status != 400) return null
         val root = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()
@@ -70,12 +70,12 @@ object ModelHttp {
     }
 
     /**
-     * 报错内容说请求超出了模型的上下文。各家原话不同(`context_length_exceeded`、「maximum context length」、
-     * 「exceeds the available context size」、「is longer than the model's context length」、「exceeds the context window」、
-     * 「is greater than the context length」、带图时的「is longer than the maximum model length」…):
-     * 认「超出 / 长于 / 大于 / max」后面不远处(同一句里)跟着上下文的长度、大小、上限、窗口或模型长度,不分大小写;
-     * 原来认的 `context_length`、「maximum context」照旧;另认一个本机服务旧版的「loaded with context length of only」。
-     * 只提到「context window」这类词不算:报错里可能回显了请求里的话。
+     * The error content says the request exceeds the model's context. Providers word it differently (`context_length_exceeded`, "maximum context length",
+     * "exceeds the available context size", "is longer than the model's context length", "exceeds the context window",
+     * "is greater than the context length", "is longer than the maximum model length" when images are attached…):
+     * matches "exceed / longer than / larger than / greater than / max" followed shortly after (in the same sentence) by context length, size, limit, window or model length, case-insensitive;
+     * the previously recognized `context_length` and "maximum context" are unchanged; also recognizes an older locally run service's "loaded with context length of only".
+     * A mention of "context window" alone does not count: the error may echo wording from the request.
      */
     internal fun saysContextTooLong(text: String): Boolean = CONTEXT_TOO_LONG.containsMatchIn(text)
 
@@ -86,7 +86,7 @@ object ModelHttp {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Gemini 原生接口的错误映射。 */
+    /** Error mapping for the native Gemini API. */
     fun geminiError(status: Int, retryAfter: String?, body: String, model: String): ModelError {
         val err = try { json.parseToJsonElement(body).jsonObject["error"] as? JsonObject } catch (e: Exception) { null }
         val st = (err?.get("status") as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -95,7 +95,7 @@ object ModelHttp {
         ModelAccessErrors.of(status, body, model)?.let { return it }
         return when {
             status == 401 || status == 403 -> ModelError.Auth()
-            // 这个模型额度为零的 429 上面已认成用不了;其余 429 按可重试限流处理(其限流与额度文案混用,无法可靠区分)
+            // A 429 for zero quota on this model was already recognized as unusable above; other 429s are treated as retryable rate limits (their rate-limit and quota wording is mixed, so they cannot be told apart reliably)
             status == 429 || st == "RESOURCE_EXHAUSTED" -> ModelError.RateLimited(HttpSupport.retryAfterMs(retryAfter, msg))
             status == 404 -> ModelError.ModelNotFound(model, ModelAccessErrors.jsonDetail(body))
             status == 413 || (status == 400 && lower.contains("token") &&

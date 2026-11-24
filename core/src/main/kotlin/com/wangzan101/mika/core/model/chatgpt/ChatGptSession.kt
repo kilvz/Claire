@@ -12,8 +12,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * 一个 ChatGPT 账号的登录:注册给出的 [clientId]、核对过的身份([sub]、[email])和令牌。
- * 整份按 API Key 的方式加密保存。退出登录后令牌清空([signedIn] 为假),注册和身份留着,再登录沿用同一个 client_id。
+ * The sign-in of one ChatGPT account: the [clientId] returned by registration, the verified identity ([sub], [email]) and the tokens.
+ * The whole thing is stored encrypted like an API Key. After signing out the tokens are cleared ([signedIn] is false), the registration and identity are kept, and signing in again reuses the same client_id.
  */
 @Serializable
 data class ChatGptSession(
@@ -28,7 +28,7 @@ data class ChatGptSession(
 ) {
     val signedIn: Boolean get() = accessToken.isNotEmpty() || refreshToken.isNotEmpty()
 
-    /** 用户同意了用套餐额度调用。 */
+    /** The user agreed to call with plan quota. */
     val planUsage: Boolean get() = ChatGptAuth.PLAN_SCOPE in scopes
 
     fun signedOut() = copy(accessToken = "", refreshToken = "", idToken = "", expiresAtMs = 0)
@@ -44,9 +44,9 @@ data class ChatGptSession(
 }
 
 /**
- * 调用时用的访问令牌:快过期(不到 [refreshAheadMs])或被拒了([BearerToken.get] 的 fresh)就用刷新令牌换一组新的,
- * 新的刷新令牌和访问令牌一起存下([save])。同一时刻只有一个在换(刷新令牌换一次就作废,并发换会互相顶掉)。
- * 刷新令牌已不能用:清掉令牌、抛 [ModelError.SignInExpired](要重新登录);网络或服务端一时出错照常抛,令牌留着。
+ * The access token used for calls: when it is about to expire (less than [refreshAheadMs] left) or was rejected (fresh in [BearerToken.get]), a new set is obtained with the refresh token,
+ * and the new refresh token is stored together with the access token ([save]). Only one refresh runs at a time (a refresh token is invalidated once used, concurrent refreshes would cancel each other out).
+ * Refresh token no longer usable: clear the tokens and throw [ModelError.SignInExpired] (signing in again is required); a transient network or server error is thrown as usual and the tokens are kept.
  */
 class ChatGptTokens(
     private val auth: ChatGptAuth,
@@ -84,7 +84,7 @@ class ChatGptTokens(
                     save(s.signedOut())
                     throw ModelError.SignInExpired()
                 }
-                // 客户端配置不对等:重试没用,但也不是令牌失效,不清
+                // Client configuration problems and the like: retrying does not help, but the token is not invalid either, so do not clear
                 throw ModelError.Auth()
             }
             is TokenResult.Failed -> throw r.error
@@ -93,10 +93,10 @@ class ChatGptTokens(
 }
 
 /**
- * 走一遍登录:开本机回调 → [openBrowser] 打开授权页 → 等回调 → 核对 → 换令牌 → 验 ID 令牌 → 看有没有授予套餐额度。
- * 回调到了以后的这几步(至多 [finishTimeoutMs])做完,才把结果网页回给浏览器:[page] 收到 null 是成功,否则是失败的原因。
- * [clientId] 是以前注册过的(第一次为 null,注册成功后经 [onRegistered] 交出,换令牌前就该存下);
- * [previous] 是上次的登录(用来带上 ID 令牌和邮箱,省掉选账号)。失败抛 [SignInException]。
+ * Run through a sign-in: open the local callback → [openBrowser] opens the authorization page → wait for the callback → verify → exchange the token → verify the ID token → check whether plan quota was granted.
+ * The steps after the callback arrives (at most [finishTimeoutMs]) are completed before the result page is returned to the browser: [page] receives null on success, otherwise the reason for the failure.
+ * [clientId] is one registered previously (null the first time; once registration succeeds it is handed out via [onRegistered], and should be stored before the token exchange);
+ * [previous] is the previous sign-in (used to pass the ID token and email, skipping account selection). Throws [SignInException] on failure.
  */
 suspend fun signInWithChatGpt(
     auth: ChatGptAuth,
@@ -124,7 +124,7 @@ suspend fun signInWithChatGpt(
     return outcome!!.getOrThrow()
 }
 
-/** 做完回调之后的几步,至多 [timeoutMs]:超时算连不上;别的异常都归成 [SignInException];取消照常往外抛。 */
+/** The steps after the callback, at most [timeoutMs]: a timeout counts as a connection failure; other exceptions are turned into [SignInException]; cancellation is rethrown as usual. */
 private suspend fun finishSignIn(timeoutMs: Long, block: suspend () -> ChatGptSession): Result<ChatGptSession> = try {
     Result.success(withTimeout(timeoutMs) { block() })
 } catch (e: TimeoutCancellationException) {

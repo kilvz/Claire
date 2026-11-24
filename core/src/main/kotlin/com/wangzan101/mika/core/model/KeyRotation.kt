@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.model
 
-/** 每个逻辑请求中每把密钥最多尝试一次;预算、取消与网络错误仍由原 HTTP 调用处理。拒绝回调带上 HTTP 状态码,接线处据此区分 429 冷却与 401/403 耗尽。 */
+/** Each key is tried at most once per logical request; budgets, cancellation and network errors are still handled by the original HTTP call. The rejection callback carries the HTTP status code, which the wiring uses to distinguish 429 cooldown from 401/403 exhaustion. */
 internal suspend fun requestWithKeyRotation(
     nextKey: () -> String?,
     rejected: ((String, Long?, Int) -> Unit)?,

@@ -3,16 +3,16 @@ package com.wangzan101.mika.core.model
 interface ChatModel {
     val capabilities: Capabilities
 
-    /** 模型名,只用于记录。 */
+    /** Model name, used for logging only. */
     val name: String get() = ""
 
-    /** 失败时抛 [ModelError]。 */
+    /** Throws [ModelError] on failure. */
     suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply
 }
 
-/** 支持逐段文字的模型；不支持的实现继续走 [ChatModel.complete]。 */
+/** Models that support incremental text; implementations that do not keep using [ChatModel.complete]. */
 interface StreamingChatModel : ChatModel {
-    /** [onText] 收到的是本次请求已生成的可见文字全文；不包含模型私有思考或工具参数。 */
+    /** [onText] receives the full visible text generated so far for this request; it excludes the model's private reasoning and tool arguments. */
     suspend fun completeStreaming(
         system: String, messages: List<Message>, tools: List<ToolSpec>, onText: (String) -> Unit,
     ): ModelReply

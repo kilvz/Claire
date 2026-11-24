@@ -6,22 +6,22 @@ data class Capabilities(
     val contextTokens: Int,
     val reasoning: Boolean,
     /**
-     * 看图定位(在截图上框出元素)的准度已经过验证。没验证的模型框出来的点,find_visually 要另有佐证才交出去。
+     * Visual grounding accuracy (boxing elements on a screenshot) has been verified. For unverified models, the points they box need separate corroboration before find_visually hands them out.
      */
     val groundingVerified: Boolean = false,
-    /** 服务端怎样复用相同的提示词开头(省钱、提速);由适配器按它决定请求里带不带缓存标记。 */
+    /** How the server reuses identical prompt prefixes (saves money, speeds things up); the adapter uses it to decide whether the request carries cache markers. */
     val promptCaching: PromptCaching = PromptCaching.Implicit,
-    /** 服务商明确公布的一次请求图片上限;未知时不猜。 */
+    /** Per-request image limit explicitly published by the provider; do not guess when unknown. */
     val maxImages: Int = Int.MAX_VALUE,
-    /** 可选的本地压缩触发点，按整份请求的 token 数计。 */
+    /** Optional local compaction trigger, measured in tokens for the whole request. */
     val compactionTriggerTokens: Int? = null,
-    /** 按往返轮数触发压缩:活着的工具往返超过 keepRecent + 这个值就折(null=不按轮数,只按大小)。 */
+    /** Triggers compaction by round-trip count: once live tool round trips exceed keepRecent + this value, compact (null = do not trigger by round count, size only). */
     val compactionEveryRounds: Int? = null,
 )
 
 /**
- * [Implicit]:服务端自动按相同开头复用,请求里不用标。[Explicit]:要在消息上标出缓存到哪里(cache_control),
- * 不标就不复用。[None]:不复用。
+ * [Implicit]: the server automatically reuses identical prefixes, nothing must be marked in the request. [Explicit]: where the cache ends must be marked on messages (cache_control),
+ * unmarked content is not reused. [None]: no reuse.
  */
 enum class PromptCaching(val wire: String) {
     Implicit("implicit"), Explicit("explicit"), None("none");

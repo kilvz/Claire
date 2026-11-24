@@ -85,7 +85,7 @@ class KeyPoolManager(
             return
         }
         val previous = providerPools[providerId]
-        // 请求时会反复注册同一份配置,不能重建池并把轮询计数归零。
+        // The same configuration is registered repeatedly during requests; do not rebuild the pool and reset the round-robin counter.
         if (previous?.keys?.map { it.key } == keys) return
         val existing = previous?.keys?.associateBy { it.key }.orEmpty()
         val entries = keys.map { k ->
@@ -152,8 +152,8 @@ class KeyPoolManager(
     }
 
     /**
-     * 上游拒绝密钥(429/401/403)后的池侧处理:429 是临时限流,按 [retryAfterMs](或默认)冷却;
-     * 401/403 是密钥无效或被封,标 [KeyStatus.Exhausted] 不再复活,免得坏密钥每轮冷却期满又被轮询选中。
+     * Pool-side handling after the upstream rejects a key (429/401/403): 429 is a temporary rate limit, cooled down for [retryAfterMs] (or the default);
+     * 401/403 means the key is invalid or blocked, mark it [KeyStatus.Exhausted] with no revival, so a bad key is not picked by the round-robin again after each cooldown.
      */
     @Synchronized
     fun markRejected(providerId: String, key: String, status: Int, retryAfterMs: Long? = null) {

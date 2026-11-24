@@ -1,20 +1,20 @@
 package com.wangzan101.mika.core.model
 
 /**
- * 一个组的策略。v1 实现 [Failover]；[Weighted]、[LeastLatency]、[CostFirst] 先留接口,
- * 选择和记录已经能跑,界面上逐步放开。
+ * Strategy of a group. v1 implements [Failover]; [Weighted], [LeastLatency] and [CostFirst] keep their interfaces for now,
+ * selection and recording already work, they are enabled in the UI gradually.
  */
 enum class GroupStrategy(val wire: String) {
-    /** 按 priority 顺序,前一个失败才用下一个。 */
+    /** In priority order; the next one is used only when the previous one fails. */
     Failover("failover"),
 
-    /** 新对话按 weight 分配一个成员,之后粘住;不是按每个请求轮询。 */
+    /** A new conversation is assigned one member by weight and sticks to it afterwards; not round-robin per request. */
     Weighted("weighted"),
 
-    /** 按近期成功率和延迟选;样本少的成员保留一点探索。 */
+    /** Chosen by recent success rate and latency; members with few samples keep a bit of exploration. */
     LeastLatency("least-latency"),
 
-    /** 按用户填的费用档位选;没有费用数据的成员排在后面。 */
+    /** Chosen by the cost rank the user filled in; members without cost data are placed later. */
     CostFirst("cost-first");
 
     companion object {
@@ -23,23 +23,23 @@ enum class GroupStrategy(val wire: String) {
 }
 
 /**
- * 组里的一个成员。[configId] 指向 [com.wangzan101.mika.settings.ProviderConfig] 的 id;
- * 组成员会让这条配置不被 `ProviderStore.prune` 删掉。
+ * A member of a group. [configId] points to the id of [com.wangzan101.mika.settings.ProviderConfig];
+ * being a group member keeps that configuration from being removed by `ProviderStore.prune`.
  */
 data class GroupMember(
     val configId: String,
-    /** 越小越先;同优先级按成员列表顺序。 */
+    /** Smaller comes first; equal priorities follow the member list order. */
     val priority: Int = 0,
-    /** 1..100,只有 [GroupStrategy.Weighted] 用。 */
+    /** 1..100, used only by [GroupStrategy.Weighted]. */
     val weight: Int = 1,
     val enabled: Boolean = true,
-    /** 覆盖角色选的思考档位;null 跟随角色。成员不支持时忽略。 */
+    /** Overrides the reasoning effort chosen for the role; null follows the role. Ignored when the member does not support it. */
     val reasoningEffort: String? = null,
-    /** 只有 [GroupStrategy.CostFirst] 用:越小越便宜;null 表示用户没填。 */
+    /** Used only by [GroupStrategy.CostFirst]: smaller means cheaper; null means the user did not fill it in. */
     val costRank: Int? = null,
 )
 
-/** 限额;v1 不读,v2 接。 */
+/** Limits; not read in v1, wired up in v2. */
 data class GroupLimits(
     val requestsPerMinute: Int? = null,
     val maxConcurrent: Int? = null,
@@ -48,25 +48,25 @@ data class GroupLimits(
 )
 
 /**
- * 模型组:一组具体模型,按 [strategy] 选一个来回答。[members] 的顺序是界面上的顺序;
- * 实际先后看 [GroupMember.priority]。组不能套组。
+ * Model group: a set of concrete models, one is chosen to answer according to [strategy]. The order of [members] is the order in the UI;
+ * the actual order follows [GroupMember.priority]. Groups cannot nest.
  */
 data class ModelGroup(
     val id: String,
     val name: String,
     val strategy: GroupStrategy = GroupStrategy.Failover,
     val members: List<GroupMember> = emptyList(),
-    /** 同一对话尽量固定在一个成员上,保护前缀缓存;默认开。 */
+    /** Keep the same conversation on one member as far as possible to protect the prefix cache; on by default. */
     val sticky: Boolean = true,
-    /** v3:允许无工具、只读的并行 racing;默认关。 */
+    /** v3: allow tool-free, read-only parallel racing; off by default. */
     val raceReadOnly: Boolean = false,
     val limits: GroupLimits = GroupLimits(),
 ) {
     val enabledMembers: List<GroupMember> get() = members.filter { it.enabled }
 
     /**
-     * 这个组能不能被某个用途选中。主模型要求全员支持工具调用;看图要求至少一个成员能看图;
-     * 轻量不强制(不支持工具时 lightSteps 自己不会启用)。[capsOf] 取不到配置时按不满足算。
+     * Whether this group can be selected for a given use. The main model requires every member to support tool calls; vision requires at least one member that can see images;
+     * lightweight is not enforced (lightSteps does not enable itself when tools are unsupported). When [capsOf] cannot get the configuration, treat it as unmet.
      */
     fun usableFor(role: ModelRole, capsOf: (String) -> Capabilities?): Boolean {
         val caps = enabledMembers.mapNotNull { capsOf(it.configId) }
@@ -79,16 +79,16 @@ data class ModelGroup(
     }
 }
 
-/** 成员的稳定身份:按服务商 + 模型名,不按配置 id(配置删了重建会变)。 */
+/** Stable identity of a member: provider + model name, not the configuration id (which changes when a configuration is deleted and recreated). */
 data class MemberKey(val providerId: String, val model: String) {
     override fun toString(): String = if (providerId.isEmpty()) model else "$providerId/$model"
 }
 
-/** 这一次请求对成员的要求;由 ModelCaller 按实际请求算。 */
+/** What this request requires of a member; computed by ModelCaller from the actual request. */
 data class ModelNeed(
     val toolCalls: Boolean = false,
     val vision: Boolean = false,
     val images: Int = 0,
-    /** 估算的整份请求 token(消息 + 固定开销),用来筛掉窗口太小的成员。 */
+    /** Estimated tokens of the whole request (messages + fixed overhead), used to filter out members with too small a window. */
     val estimatedTokens: Int = 0,
 )

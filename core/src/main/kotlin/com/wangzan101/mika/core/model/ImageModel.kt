@@ -4,22 +4,22 @@ import kotlinx.serialization.json.JsonObject
 import java.util.Base64
 
 /**
- * 图片生成模型。和对话模型分开：图片模型的请求不是一段对话，也没有工具调用、上下文、思维链。
- * 返回的图按 [GeneratedImage] 交给上层；HTTP/服务商错误仍用 [ModelError]，
- * 只有图片自己的限制（不支持这种比例、改图、解不开的图）用 [ImageError]。
+ * Image generation model. Kept separate from chat models: a request to an image model is not a conversation and has no tool calls, context or chain of thought.
+ * Returned images are handed to the upper layer as [GeneratedImage]; HTTP/provider errors still use [ModelError],
+ * only limits of the image model itself (unsupported aspect ratio, editing, undecodable image) use [ImageError].
  */
 interface ImageModel {
-    /** 模型名，只用于记录。 */
+    /** Model name, used for logging only. */
     val name: String
 
-    /** 这个模型支持什么；上层在发请求前按它拒绝不支持的请求，避免先花钱再报错。 */
+    /** What this model supports; the upper layer rejects unsupported requests based on it before sending, avoiding paying first and failing later. */
     val capabilities: ImageCapabilities
 
-    /** 失败时抛 [ModelError] 或 [ImageError]。 */
+    /** Throws [ModelError] or [ImageError] on failure. */
     suspend fun generate(request: ImageRequest): ImageResponse
 }
 
-/** 比例。服务商叫法不同，[wire] 是 Gemini 的写法，OpenAI 一类按它换成尺寸。 */
+/** Aspect ratio. Providers name them differently; [wire] is Gemini's notation, OpenAI-style APIs convert it to a size. */
 enum class ImageAspect(val wire: String) {
     Square("1:1"),
     Portrait("2:3"),
@@ -28,10 +28,10 @@ enum class ImageAspect(val wire: String) {
     Wide("16:9"),
 }
 
-/** 一张参考图。图片模型要的是原图，不经过 [ModelImage] 的读屏压缩。 */
+/** A reference image. Image models want the original image, without [ModelImage]'s screen-read compression. */
 class ImageReference(val bytes: ByteArray, val mime: String)
 
-/** 一次生成请求。[count] 是希望要几张；服务商实际给几张以结果为准。 */
+/** A generation request. [count] is how many are wanted; how many the provider actually returns is determined by the result. */
 data class ImageRequest(
     val prompt: String,
     val aspect: ImageAspect = ImageAspect.Square,
@@ -39,7 +39,7 @@ data class ImageRequest(
     val references: List<ImageReference> = emptyList(),
 )
 
-/** 服务商返回的一张图。[width]/[height] 读不出来时为 0，不猜。 */
+/** One image returned by the provider. [width]/[height] are 0 when they cannot be read; do not guess. */
 class GeneratedImage(
     val bytes: ByteArray,
     val mime: String,
@@ -51,8 +51,8 @@ class GeneratedImage(
 class ImageResponse(val images: List<GeneratedImage>, val usage: Usage? = null)
 
 /**
- * 一个图片模型能做什么。能力按实测写，不按模型名猜；上层只发这里写明的请求。
- * [aspects] 是能生成的比例；[maxReferences] 是改图时最多几张参考图；[maxCount] 是一次最多要几张。
+ * What an image model can do. Capabilities are written from actual testing, not guessed from the model name; the upper layer only sends requests listed here.
+ * [aspects] are the aspect ratios it can generate; [maxReferences] is the maximum number of reference images when editing; [maxCount] is the maximum number requested at once.
  */
 data class ImageCapabilities(
     val supportsEdit: Boolean,
@@ -61,19 +61,19 @@ data class ImageCapabilities(
     val aspects: Set<ImageAspect> = setOf(ImageAspect.Square),
 )
 
-/** 图片自己的限制：不是服务商的 HTTP 错误，重试或换模型可能有用。 */
+/** Limits of the image model itself: not an HTTP error from the provider; retrying or switching models may help. */
 sealed class ImageError(message: String) : Exception(message) {
-    /** 这个模型/接口不支持这次请求（比例、改图、张数、参考图）。 */
+    /** This model/API does not support the request (aspect ratio, editing, image count, reference images). */
     class Unsupported(message: String) : ImageError(message)
 
-    /** 返回的不是能识别的图片（不是 PNG/JPEG/WebP/GIF，或内容坏了）。 */
+    /** The response is not a recognizable image (not PNG/JPEG/WebP/GIF, or the content is corrupt). */
     class BadImage(message: String) : ImageError(message)
 
-    /** 图太大，不往工作区写。 */
+    /** Image too large; do not write it to the workspace. */
     class TooLarge(val bytes: Long) : ImageError("image is too large")
 }
 
-/** 从文件头认图片格式和尺寸；认不出为 null。只认图片服务商会返回的几种。 */
+/** Recognize the image format and size from the file header; null if unrecognized. Only the few formats image providers return are recognized. */
 internal class ImageBytes(val mime: String, val width: Int, val height: Int)
 
 internal fun sniffImage(bytes: ByteArray): ImageBytes? = when {
@@ -88,7 +88,7 @@ internal fun sniffImage(bytes: ByteArray): ImageBytes? = when {
     else -> null
 }
 
-/** JPEG 的尺寸在 SOF0/SOF1/SOF2 段里；挨个段跳过去找。 */
+/** JPEG dimensions are in the SOF0/SOF1/SOF2 segments; skip through the segments one by one to find them. */
 private fun jpeg(b: ByteArray): ImageBytes? {
     var i = 2
     while (i + 9 < b.size) {
@@ -108,7 +108,7 @@ private fun jpeg(b: ByteArray): ImageBytes? {
     return ImageBytes("image/jpeg", 0, 0)
 }
 
-/** WebP：VP8X 有扩展尺寸，VP8（有损）和 VP8L（无损）各按自己的头读。 */
+/** WebP: VP8X has extended dimensions, VP8 (lossy) and VP8L (lossless) each read from their own header. */
 private fun webp(b: ByteArray): ImageBytes? {
     var i = 12
     while (i + 8 <= b.size) {
@@ -145,7 +145,7 @@ private fun le16(b: ByteArray, at: Int): Int = u8(b, at) or (u8(b, at + 1) shl 8
 private fun le32(b: ByteArray, at: Int): Int = u8(b, at) or (u8(b, at + 1) shl 8) or (u8(b, at + 2) shl 16) or (u8(b, at + 3) shl 24)
 private fun ascii(b: ByteArray, at: Int, n: Int): String = String(b, at, n, Charsets.ISO_8859_1)
 
-/** 服务商返回的图按内容认格式；b64 和 URL 两条路共用。 */
+/** Detect the format of an image returned by the provider from its content; shared by the b64 and URL paths. */
 internal fun decodeImage(bytes: ByteArray, revisedPrompt: String? = null): GeneratedImage {
     if (bytes.size > MAX_IMAGE_BYTES) throw ImageError.TooLarge(bytes.size.toLong())
     val info = sniffImage(bytes) ?: throw ImageError.BadImage("response is not a PNG, JPEG, WebP or GIF image")
@@ -159,10 +159,10 @@ internal fun decodeBase64Image(text: String, revisedPrompt: String? = null): Gen
     return decodeImage(bytes, revisedPrompt)
 }
 
-/** 一张生成图的最大字节数；超过不写进工作区。 */
+/** Maximum byte size of one generated image; larger ones are not written to the workspace. */
 internal const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
-/** 给 multipart 的图片挑一个扩展名；不认识时按 png。 */
+/** Pick a file extension for an image in a multipart body; falls back to png when unrecognized. */
 internal fun extensionOf(mime: String): String = when (mime.substringAfter('/', "").lowercase()) {
     "jpeg", "jpg" -> "jpg"
     "webp" -> "webp"
@@ -170,7 +170,7 @@ internal fun extensionOf(mime: String): String = when (mime.substringAfter('/', 
     else -> "png"
 }
 
-/** 把图片请求的参数摘要成 tracing/用量用的 JSON（multipart 请求也能记一条）。 */
+/** Summarize the image request parameters into JSON for tracing/usage (so multipart requests get a record too). */
 internal fun imageTracePayload(model: String, request: ImageRequest): JsonObject = kotlinx.serialization.json.buildJsonObject {
     put("model", kotlinx.serialization.json.JsonPrimitive(model))
     put("prompt", kotlinx.serialization.json.JsonPrimitive(request.prompt.take(200)))
