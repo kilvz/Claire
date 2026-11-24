@@ -18,12 +18,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** 图片服务的接口形态。存名字，只能往后加、不能改名或删，旧设置才读得回来。 */
+/** Wire shape of the image service. Names are stored, so entries may only be appended — never renamed or deleted — otherwise old settings could not be read back. */
 enum class ImageProtocol(val wire: String) {
-    /** OpenAI Images：`/images/generations` 与 `/images/edits`。 */
+    /** OpenAI Images: `/images/generations` and `/images/edits`. */
     OpenAiImages("openai-images"),
 
-    /** Gemini 图像模型：generateContent + responseModalities。 */
+    /** Gemini image models: generateContent + responseModalities. */
     GeminiImage("gemini-image");
 
     companion object {
@@ -31,13 +31,13 @@ enum class ImageProtocol(val wire: String) {
     }
 }
 
-/** 用户为图片生成选的服务商、模型和接口；Key 仍由 [ProviderStore] 按服务商保存，不复制到这里。 */
+/** The provider, model and protocol the user chose for image generation; keys are still stored per provider by [ProviderStore] and not copied here. */
 data class ImageChoice(val providerId: String, val model: String, val protocol: ImageProtocol)
 
 /**
- * 图片相关的设置，存在 [FeatureFlags] 那份设置里，一个键、一段 JSON；读不出来一律当默认值。
- * [enabled] 是总开关，默认关；没有选模型时工具也不提供。保存到相册另有一个开关，默认关；
- * [askBeforeSave] 默认开，每次保存都走现有的审批卡；[askBeforeGenerate] 默认关，避免每张图都打断。
+ * Image-related settings, stored in the [FeatureFlags] preferences as one key holding one JSON blob; anything unreadable falls back to the defaults.
+ * [enabled] is the master switch, off by default; when no model is selected the tools are not offered either. Saving to the album has its own switch, off by default;
+ * [askBeforeSave] is on by default, so every save goes through the existing approval card; [askBeforeGenerate] is off by default, to avoid interrupting for every image.
  */
 data class ImageSettingsState(
     val enabled: Boolean = false,
@@ -46,7 +46,7 @@ data class ImageSettingsState(
     val saveEnabled: Boolean = false,
     val askBeforeSave: Boolean = true,
     val askBeforeGenerate: Boolean = false,
-    /** 服务商/模型不支持改图时用户在设置里关掉；关掉后 image_edit 不发给模型。 */
+    /** Turned off by the user in settings when the provider/model cannot edit images; once off, image_edit is not sent to the model. */
     val supportsEdit: Boolean = true,
 ) {
     companion object {
@@ -75,7 +75,7 @@ class ImageModelSettings(private val prefs: SharedPreferences) {
 
     fun setSupportsEdit(on: Boolean) = update { copy(supportsEdit = on) }
 
-    /** 这次选的服务商/模型能做什么。能力按协议给初值，用户可再关掉改图。 */
+    /** What the currently selected provider/model can do. Capabilities are initialized from the protocol, and the user can additionally turn editing off. */
     fun capabilities(): ImageCapabilities? {
         val choice = _state.value.choice ?: return null
         val base = when (choice.protocol) {

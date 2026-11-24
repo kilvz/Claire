@@ -15,15 +15,15 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * 设置 › 环境变量:名字=值 的键值对,插件脚本和提示词钩子跑起来时经它拿到(如 `MIKA_TRANSLATE_BASE/KEY/MODEL`)。
- * 值可能含密钥,但按「功能前置、安全后置」暂存明文;加密留作后置项。
+ * Settings › Environment variables: name=value key-value pairs that plugin scripts and prompt hooks read when they run (e.g. `MIKA_TRANSLATE_BASE/KEY/MODEL`).
+ * Values may contain secrets, but following "functionality first, security later" they are currently stored in plaintext; encryption is left as a later item.
  */
 class EnvVarStore(private val dir: File) {
     private val file = File(dir, FILE)
     @Volatile private var cached: Map<String, String>? = null
     private val _changes = MutableStateFlow(emptyMap<String, String>())
 
-    /** 给设置页观察的当前值;每次改动后更新。 */
+    /** Current values observed by the settings page; updated after every change. */
     val changes: StateFlow<Map<String, String>> get() = _changes.asStateFlow()
 
     @Synchronized fun all(): Map<String, String> {
@@ -34,7 +34,7 @@ class EnvVarStore(private val dir: File) {
         return m
     }
 
-    /** 存下 [k]=[v];[v] 为空等于删掉这一条。 */
+    /** Stores [k]=[v]; an empty [v] is equivalent to deleting this entry. */
     fun set(k: String, v: String) {
         synchronized(this) {
             val next = all().toMutableMap()

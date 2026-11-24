@@ -25,15 +25,15 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.XAI_ACCOUNT
 import com.wangzan101.mika.settings.ProviderStore.Companion.adapterFor
 import com.wangzan101.mika.settings.ProviderStore.Companion.get
 
-// 服务商存储:按用途、配置与模型组造出可调用的模型及备用链
+// Provider storage: builds callable models and fallback chains from roles, configs and model groups
 /**
- * 这个用途实际用的配置;没选、不用时为 null。看图标记按当下推出来,不看存着的列表数据有没有写:
- * 看图这一路总是 true(用户选了它来看图);别的用途按 [ModelOptions.seesImages]——用户在这个模型上说过的为准,
- * 没说过而看图也用这条配置(选了同一个模型,或「用主模型」)的,同样算能看,截图直接附给它,不必另调一次看图。
+ * The config this role actually uses; null when nothing is selected or the role is unused. The image-seeing flag is derived on the spot rather than read from whatever the stored listing data says:
+ * for the vision role it is always true (the user selected it to see images); other roles follow [ModelOptions.seesImages] — what the user said about this model wins,
+ * and when nothing was said but vision also uses this config (the same model is selected, or "use the main model"), it likewise counts as able to see, so a screenshot is attached directly instead of making a separate vision call.
  */
 fun ProviderStore.configFor(role: ModelRole): ProviderConfig? {
     val choices = _roles.value
-    // 组按「排在最前的启用成员」给界面一个代表;真正的路由在 modelFor 里按成员走
+    // For a group, the first enabled member is given to the UI as the representative; the real routing goes through the members inside modelFor
     val id = choices.resolveConfig(role) ?: groupFor(role)?.enabledMembers?.firstOrNull()?.configId ?: return null
     val cfg = _configs.value.firstOrNull { it.id == id } ?: return null
     val sees = role == ModelRole.Vision || ModelOptions.seesImages(cfg.capabilities.vision,
@@ -41,7 +41,7 @@ fun ProviderStore.configFor(role: ModelRole): ProviderConfig? {
     return if (sees == cfg.capabilities.vision) cfg else cfg.copy(capabilities = cfg.capabilities.copy(vision = sees))
 }
 
-/** 主模型在它那家还没测试通过时给出那一家(见 [Provider.untested]);任务因模型失败时据此提示去「重新测试」。 */
+/** Returns the provider of the main model when it has not passed its test there yet (see [Provider.untested]); when a task fails because of the model, this is used to suggest "test again". */
 fun ProviderStore.untestedMainProvider(): Provider? {
     val cfg = configFor(ModelRole.Main) ?: return null
     val candidates = groupFor(ModelRole.Main)?.enabledMembers?.mapNotNull { m -> _configs.value.firstOrNull { it.id == m.configId } }
@@ -50,17 +50,17 @@ fun ProviderStore.untestedMainProvider(): Provider? {
 }
 
 /**
- * 这个用途用的模型,套好计量;没选、不用时为 null。用量记在 [role] 名下:「用主模型」的看图、轻量调用
- * 记作看图、轻量,服务商和模型是主模型那条配置的。这是 App 里建可调用模型的唯一入口(主动能力走 [proactiveModel])。
- * 选了模型组时返回 [GroupPool]:成员各自计量,组本身只负责选择和转移。
- * [session] 是这次调用属于的对话(同一段对话里建的模型都给同一个);服务商声明了会话头的,每个请求都带上它。
+ * The model used for this role, with metering wrapped around it; null when nothing is selected or the role is unused. Usage is recorded under [role]'s name: vision and light calls that "use the main model"
+ * are recorded as vision and light, with the provider and model of the main model's config. This is the only entry point in the app for building callable models (the proactive capability goes through [proactiveModel]).
+ * When a model group is selected it returns a [GroupPool]: each member meters its own usage, and the group itself only handles selection and transfer.
+ * [session] is the conversation this call belongs to (models built within one conversation all get the same one); for providers that declare a session header, every request carries it.
  */
 fun ProviderStore.modelFor(role: ModelRole, session: ModelSession = ModelSession.fresh()): ChatModel? {
     groupFor(role)?.let { group -> return groupModelFor(role, group, session) }
     return meteredFor(role, session, UsagePurpose.of(role), ::checkDailyBudget)
 }
 
-/** 按组的成员顺序建出每个成员;成员的上下文设置、思考档位、请求头都按各自的配置来。 */
+/** Builds each member in the group's member order; each member's context settings, reasoning level and request headers follow its own config. */
 internal fun ProviderStore.groupModelFor(role: ModelRole, group: ModelGroup, session: ModelSession): ChatModel? {
     val members = group.members.filter { it.enabled }.mapNotNull { m ->
         val cfg = _configs.value.firstOrNull { it.id == m.configId } ?: return@mapNotNull null
@@ -80,17 +80,17 @@ internal fun ProviderStore.groupModelFor(role: ModelRole, group: ModelGroup, ses
     )
 }
 
-/** 成员不支持角色选的档位时传 null,免得把一个服务商不认的值发出去。 */
+/** Passes null when the member does not support the level selected for the role, so a value the provider does not recognize is never sent out. */
 internal fun ProviderStore.memberReasoningEffort(cfg: ProviderConfig, p: Provider, effort: String?): String? {
     if (effort == null) return null
     val levels = ReasoningOptions.of(cfg, listedOf(cfg))?.levels ?: return null
     return effort.takeIf { it in levels }
 }
 
-/** [configId] 这条配置本身(不按用途推看图标记);不存在为 null。 */
+/** The config [configId] itself (without deriving the image-seeing flag for a role); null when it does not exist. */
 fun ProviderStore.configById(configId: String): ProviderConfig? = _configs.value.firstOrNull { it.id == configId }
 
-/** 这条配置当指定角色用时的样子: 看图标记按角色规矩推导。 */
+/** How this config looks when used for the given role: the image-seeing flag is derived by the role rules. */
 internal fun ProviderStore.asRole(cfg: ProviderConfig, role: ModelRole): ProviderConfig {
     val sees = role == ModelRole.Vision || ModelOptions.seesImages(cfg.capabilities.vision,
         provider(cfg.providerId)?.visionOverrides?.get(cfg.model), usedForVision = _roles.value.resolve(ModelRole.Vision) == cfg.id)
@@ -100,8 +100,8 @@ internal fun ProviderStore.asRole(cfg: ProviderConfig, role: ModelRole): Provide
 internal fun ProviderStore.asMain(cfg: ProviderConfig): ProviderConfig = asRole(cfg, ModelRole.Main)
 
 /**
- * 按配置 id 建一个当指定角色用的模型(备援链用):计量、每日预算检查都和该角色同一条路。
- * 配置不存在为 null。
+ * Builds a model for the given role from a config id (for fallback chains): metering and the daily budget check follow the same path as that role.
+ * Null when the config does not exist.
  */
 fun ProviderStore.modelForRoleConfig(role: ModelRole, configId: String, session: ModelSession = ModelSession.fresh()): ChatModel? {
     val raw = configById(configId) ?: return null
@@ -128,15 +128,15 @@ fun ProviderStore.modelForRoleConfig(role: ModelRole, configId: String, session:
 }
 
 /**
- * 按配置 id 建一个当主模型用的模型(备援链用,见 [RoleChoices.mainFallbacks]):计量、每日预算检查都和主模型同一条路,
- * 用量记在主模型名下。配置不存在为 null。
+ * Builds a model for the main role from a config id (for fallback chains, see [RoleChoices.mainFallbacks]): metering and the daily budget check follow the same path as the main model,
+ * with usage recorded under the main model. Null when the config does not exist.
  */
 fun ProviderStore.modelForConfig(configId: String, session: ModelSession = ModelSession.fresh()): ChatModel? =
     modelForRoleConfig(ModelRole.Main, configId, session)
 
 /**
- * 按指定角色的备援链顺序返回备援模型及其服务商 ID，供故障转移判断预算归属。
- * 配置没了、建不出的位子跳过,链短一点照样能跑。
+ * Returns the fallback models and their provider IDs in the given role's fallback order, so failover can determine budget ownership.
+ * Slots whose config is gone or that cannot be built are skipped; a shorter chain still works.
  */
 fun ProviderStore.fallbackChain(role: ModelRole, session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> {
     val models = ArrayList<ChatModel>()
@@ -153,22 +153,22 @@ fun ProviderStore.fallbackChain(role: ModelRole, session: ModelSession = ModelSe
 }
 
 /**
- * 按 [RoleChoices.mainFallbacks] 的顺序返回备援模型及其服务商 ID，供故障转移判断预算归属。
+ * Returns the fallback models and their provider IDs in the order of [RoleChoices.mainFallbacks], so failover can determine budget ownership.
  */
 fun ProviderStore.mainFallbackChain(session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> =
     fallbackChain(ModelRole.Main, session)
 
-/** 视觉模型备援链 */
+/** Vision model fallback chain */
 fun ProviderStore.visionFallbackChain(session: ModelSession = ModelSession.fresh()): List<ChatModel> =
     fallbackChain(ModelRole.Vision, session).first
 
-/** 轻量模型备援链 */
+/** Lightweight model fallback chain */
 fun ProviderStore.lightFallbackChain(session: ModelSession = ModelSession.fresh()): List<ChatModel> =
     fallbackChain(ModelRole.Light, session).first
 
 fun ProviderStore.mainProviderId(): String? = configFor(ModelRole.Main)?.providerId
 
-/** 每次实际请求前重查配置和账本；达到预算时不发请求，也不记一笔虚假调用。 */
+/** Re-checks the config and the ledger before every actual request; when the budget is reached no request is sent and no phantom call is recorded. */
 internal fun ProviderStore.checkDailyBudget(source: UsageSource) {
     val p = provider(source.providerId) ?: return
     val limit = p.dailyTokenBudget ?: return
@@ -178,20 +178,20 @@ internal fun ProviderStore.checkDailyBudget(source: UsageSource) {
 
 internal fun ProviderStore.headers(sessionHeader: String?, session: ModelSession) = ClientHeaders.of(userAgent, sessionHeader, session)
 
-/** 不属于任何对话的请求(如语音转写)给这家带的头:客户端标识,声明了会话头的用新的会话号。 */
+/** Headers given to this provider for requests that belong to no conversation (such as speech transcription): the client identifier, plus a fresh session ID when it declares a session header. */
 fun ProviderStore.clientHeaders(p: Provider): Map<String, String> = headers(p.sessionHeader, ModelSession.fresh())
 
-/** 模型单独指定了接口的,按它的协议选适配器、用它的地址;否则按配置的接口类型和地址。Key 都用服务商的。 */
+/** When the model specifies an endpoint of its own, pick the adapter by its protocol and use its address; otherwise use the config's API kind and address. In both cases the key is the provider's. */
 /**
- * 请求头四种协议一样带。回复上限([ClientSetup.maxOutputTokens])只给 Messages(本来就必填)和 generateContent;
- * Chat Completions 不给(有的模型只认 `max_tokens`、有的只认 `max_completion_tokens`,给错了整个请求被拒,
- * 连接测试就会误报),Responses 也不给(ChatGPT 套餐那条路不收 `max_output_tokens`)。
- * 读超时([ClientSetup.readTimeoutSeconds])配置了的按它派生 client(共享连接池与代理),慢速本地推理可调大(#295);
- * 没配置用全局默认(120 秒)。派生只在建模型时发生一次,不影响别的模型。
+ * Request headers are carried the same way for all four protocols. The reply limit ([ClientSetup.maxOutputTokens]) is only given to Messages (where it is already required) and generateContent;
+ * not to Chat Completions (some models accept only `max_tokens`, others only `max_completion_tokens`, and passing the wrong one rejects the whole request,
+ * so the connection test would report a false failure), nor to Responses (the ChatGPT plan path does not accept `max_output_tokens`).
+ * When a read timeout ([ClientSetup.readTimeoutSeconds]) is configured, the client is derived from it (sharing the connection pool and proxy), and slow local inference can raise it (#295);
+ * when it is not configured the global default (120 s) is used. The derivation happens only once, when the model is built, and does not affect other models.
  */
 internal fun ProviderStore.buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?, setup: ClientSetup): ChatModel {
     val (kind, adapterBase) = adapterFor(cfg, endpoint)
-    // 订阅登录用服务商当前的地址(登录时可能换过),配置里存的是添加时的
+    // For subscription sign-in use the provider's current address (it may have changed at sign-in); the config stores the one from when it was added
     val baseUrl = if (cfg.kind == ProviderConfig.Kind.Xai) {
         provider(cfg.providerId)?.baseUrl?.takeIf { it.isNotBlank() } ?: adapterBase
     } else adapterBase

@@ -3,8 +3,8 @@ package com.wangzan101.mika.settings
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * 各家官方申请 API Key 的页面,按 baseUrl 的主机名认:选了预设、或自定义手填了官方地址,都能给出直达链接。
- * 只收官方文档/控制台写明的地址,跟着 [ProviderPresets] 的清单走;认不出的为 null,界面上不显示链接。
+ * Each vendor's official page for requesting an API key, recognized by the host of baseUrl: whether a preset was chosen or the official address was typed in under custom, a direct link can be provided.
+ * Only addresses stated in official docs/consoles are included, following the [ProviderPresets] list; unrecognized ones give null and no link is shown in the UI.
  */
 object ProviderKeySites {
     private val byHost: Map<String, String> = mapOf(
@@ -29,6 +29,6 @@ object ProviderKeySites {
         "api.cloudflare.com" to "https://dash.cloudflare.com/profile/api-tokens",
     )
 
-    /** [baseUrl] 的主机名对得上的官方 Key 申请页;认不出(含地址不合法)为 null。 */
+    /** The official key request page whose host matches [baseUrl]; null when unrecognized (including an invalid address). */
     fun forBaseUrl(baseUrl: String): String? = byHost[baseUrl.trim().toHttpUrlOrNull()?.host]
 }

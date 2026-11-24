@@ -9,26 +9,26 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * 设置 › 网络代理,形如 `http://[用户:密码@]主机:端口`;空串表示不用,直连。
- * 地址里可能带账号密码,所以和服务商的 Key 一样经 [KeyCipher] 加密后单独存一个文件,不进明文的偏好设置,也不写进日志。
+ * Settings › Network proxy, of the form `http://[user:password@]host:port`; an empty string means none, i.e. a direct connection.
+ * The address may contain credentials, so like provider keys it is encrypted with [KeyCipher] and stored in its own file; it never goes into the plaintext preferences, nor into the logs.
  *
- * 谁用它:Claire 自己的连接(调模型、列模型、账号登录换令牌、下更新、内置浏览器)经 [NetProxy],本机和局域网地址直连;
- * 文件与计算环境里的命令在允许联网时经环境变量拿到它(见 `AndroidSandbox`)。
+ * Who uses it: Claire's own connections (model calls, listing models, account sign-in token exchange, update downloads, the built-in browser) go through [NetProxy], while loopback and LAN addresses connect directly;
+ * commands in the file and compute environments receive it through an environment variable when networking is allowed (see `AndroidSandbox`).
  *
- * 早先它只给容器用,存在 `container-proxy.bin`(另一把密钥):第一次读时用 [legacyCipher] 解出来、按新的存好,再删掉旧文件。
+ * Earlier it existed only for containers and was stored in `container-proxy.bin` (with a different key): on the first read it is decrypted with [legacyCipher], saved in the new form, and the old file is deleted.
  */
 class NetProxyStore(
     private val dir: File,
     private val cipher: KeyCipher,
     private val legacyCipher: KeyCipher? = null,
-    /** 存了新值之后调(让已建好的连接按新设置重连)。 */
+    /** Called after a new value is stored (so already established connections reconnect with the new settings). */
     private val onChange: () -> Unit = {},
 ) {
     private val file = File(dir, FILE)
     private val legacy = File(dir, LEGACY_FILE)
     @Volatile private var cached: String? = null
 
-    /** 存着的代理;没有、或解不开(换过机、密钥没了)时为空串。 */
+    /** The stored proxy; an empty string when there is none or it cannot be decrypted (device changed, key gone). */
     @Synchronized fun get(): String {
         cached?.let { return it }
         migrate()
@@ -36,7 +36,7 @@ class NetProxyStore(
         return stored.also { cached = it }
     }
 
-    /** 存下 [proxy](去掉两头空白);空的就删掉文件。调用方先用 [valid] 核对过。 */
+    /** Stores [proxy] (surrounding whitespace trimmed); an empty value deletes the file. The caller has already checked it with [valid]. */
     fun set(proxy: String) {
         synchronized(this) {
             val v = proxy.trim()
@@ -48,7 +48,7 @@ class NetProxyStore(
         onChange()
     }
 
-    /** 旧版只给容器用时存的那一份:解得开就按新的存好;新的已经有了、或解不开就不动它,之后存新值时一并删掉。 */
+    /** The copy stored by the older version that only served containers: if it can be decrypted, save it in the new form; if the new one already exists or it cannot be decrypted, leave it alone, and it is deleted along with the next save. */
     private fun migrate() {
         val old = legacyCipher ?: return
         if (file.isFile || !legacy.isFile) return
@@ -72,15 +72,15 @@ class NetProxyStore(
         private const val KEY_ALIAS = "mika-net-proxy"
         private const val LEGACY_KEY_ALIAS = "mika-container-proxy"
 
-        /** 空串(不用),或带协议、主机、端口的代理地址(http、https、socks5、socks5h),后面不带路径。 */
+        /** Empty string (not used), or a proxy address with scheme, host and port (http, https, socks5, socks5h), without a trailing path. */
         fun valid(proxy: String): Boolean = ProxyAddress.valid(proxy)
 
-        /** 给人看的写法:不带账号密码(那一行在设置页上随时看得到)。 */
+        /** Human-readable form: without credentials (that line is visible on the settings page at any time). */
         fun display(proxy: String): String = ProxyAddress.parse(proxy)?.display.orEmpty()
 
         @Volatile private var instance: NetProxyStore? = null
 
-        /** 产品里的那一份;第一次取时把 [NetProxy.shared] 接上它。 */
+        /** The production instance; on first retrieval [NetProxy.shared] is wired to it. */
         fun get(context: Context): NetProxyStore = instance ?: synchronized(this) {
             instance ?: NetProxyStore(
                 File(context.applicationContext.filesDir, "settings"), KeystoreKeyCipher(KEY_ALIAS), KeystoreKeyCipher(LEGACY_KEY_ALIAS),

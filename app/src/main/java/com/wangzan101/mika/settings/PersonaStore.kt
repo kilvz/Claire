@@ -12,8 +12,8 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 一份人格:名字、简介、一组选项和一段提示词正文。选项和正文由 [com.wangzan101.mika.core.prompt.PersonaPrompt] 拼进系统提示词,
- * 固定头尾由代码写死。人格不带工具、权限、记忆或模型,也不参与它们的选择。
+ * One persona: name, description, a set of options and a prompt body. The options and body are assembled into the system prompt by [com.wangzan101.mika.core.prompt.PersonaPrompt],
+ * and the fixed header and footer are hardcoded. A persona carries no tools, permissions, memory or model, and takes no part in choosing them.
  */
 @Serializable
 data class Persona(
@@ -21,22 +21,22 @@ data class Persona(
     val name: String,
     val description: String = "",
     val prompt: String,
-    /** 界面上选的选项;旧文件里没有这一项时全是默认值。 */
+    /** The options selected in the UI; when an old file lacks this field, everything is at its default. */
     val style: PersonaStyle = PersonaStyle.DEFAULT,
-    /** 称呼:助理的自称;空着就是默认的 Claire。进提示词前由 [PersonaPrompt.nickname] 清洗。 */
+    /** Nickname: what the assistant calls itself; empty means the default Claire. Sanitized by [PersonaPrompt.nickname] before entering the prompt. */
     val nickname: String = "",
-    /** 每次保存 +1;v1 只保留最新正文,旧修订不保留。 */
+    /** Incremented on every save; v1 keeps only the latest body and does not retain old revisions. */
     val revision: Int = 1,
     val createdAt: Long = 0,
     val updatedAt: Long = 0,
-    /** v1 不发内置示例;字段预留给以后随包发布。 */
+    /** v1 ships no built-in examples; the field is reserved for bundled releases later. */
     val builtin: Boolean = false,
 )
 
-/** 这一套的自称:清洗过的称呼,没填就是 Claire。 */
+/** This persona's self-name: the sanitized nickname, or Claire when nothing was entered. */
 val Persona.assistant: String get() = PersonaPrompt.nickname(nickname)
 
-/** 这一套实际上什么都不改:选项全默认、没有指令、称呼也是默认的。 */
+/** This persona actually changes nothing: all options at default, no instructions, and the default nickname. */
 val Persona.changesNothing: Boolean
     get() = style.isDefault && prompt.isBlank() && assistant == PersonaPrompt.DEFAULT_NICKNAME
 
@@ -44,19 +44,19 @@ val Persona.changesNothing: Boolean
 private data class PersonaFile(
     val version: Int = 1,
     val personas: List<Persona> = emptyList(),
-    /** 设置里选的、现在在用的那一套的 id;没有为 null(旧文件没有这一项,等于没有在用的)。 */
+    /** Id of the persona selected in settings and currently in use; null when there is none (old files lack this field, which amounts to none in use). */
     val active: String? = null,
 )
 
 /**
- * 人格设置:`files/settings/personas.json`。原子写、带版本号,读不懂时把原文件另存成 `.bad-<时间>` 并当空列表。
- * 除了人格列表,还记着设置里选的「在用的那一套」([activeId]);它和列表在同一次写盘里一起落下,
- * 所以不会出现在用的指向一个已经不在的人格。
- * 不含密钥,不加密;同一进程一份,由 [com.wangzan101.mika.MikaApp] 给出。
+ * Persona settings: `files/settings/personas.json`. Atomic writes, with a version number; when it cannot be read, the original file is saved as `.bad-<time>` and treated as an empty list.
+ * Besides the persona list, it also remembers the "currently in use" one chosen in settings ([activeId]); it is written to disk in the same pass as the list,
+ * so the active one can never point at a persona that no longer exists.
+ * It contains no keys and is not encrypted; one instance per process, provided by [com.wangzan101.mika.MikaApp].
  */
 class PersonaStore(private val dir: File) {
     private val file = File(dir, "personas.json")
-    // coerceInputValues:选项里不认识的取值(以后的版本、手改的文件)按默认读,不让整份文件被当成坏文件
+    // coerceInputValues: unrecognized values in the options (from later versions or hand-edited files) are read as defaults, so the whole file is not treated as corrupt
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
     private val _personas: MutableStateFlow<List<Persona>>
     private val _activeId: MutableStateFlow<String?>
@@ -69,13 +69,13 @@ class PersonaStore(private val dir: File) {
 
     val personas: StateFlow<List<Persona>> = _personas.asStateFlow()
 
-    /** 设置里选的在用的那一套的 id;没有选、或选的那一套被删了为 null。 */
+    /** Id of the active persona chosen in settings; null when none is chosen or the chosen one was deleted. */
     val activeId: StateFlow<String?> = _activeId.asStateFlow()
 
-    /** 在用的那一套;没有为 null(Claire 按平常的方式说话)。 */
+    /** The active persona; null when there is none (Claire speaks in her usual way). */
     fun active(): Persona? = get(_activeId.value)
 
-    /** 选用一套([id] 必须在列表里),或传 null 回到没有在用的。写进去了返回 true。 */
+    /** Selects a persona ([id] must be in the list), or pass null to go back to having none active. Returns true once written. */
     @Synchronized fun setActive(id: String?): Boolean {
         if (id != null && get(id) == null) return false
         if (id == _activeId.value) return true
@@ -99,8 +99,8 @@ class PersonaStore(private val dir: File) {
     }
 
     /**
-     * 改在用的那一套,当场写下去。还没有在用的时,用 [defaultName] 新建一套并设为在用(同一次写盘),
-     * 用户不用先「建一个人格」再调;但改完仍然什么都不改变(选项全默认、指令为空、称呼是默认的)时不建,免得留下一套空的。
+     * Edits the active persona and writes it immediately. When there is none active yet, a new persona is created with [defaultName] and set active (in the same write),
+     * so the user need not "create a persona" before adjusting it; but if the result still changes nothing (all options at default, empty instructions, default nickname) it is not created, to avoid leaving an empty persona behind.
      */
     @Synchronized fun editActive(defaultName: String, change: (Persona) -> Persona): Result<Persona> = runCatching {
         val current = active()
@@ -114,7 +114,7 @@ class PersonaStore(private val dir: File) {
         created
     }
 
-    /** 新建一套全默认的并设为在用:用户新建就是为了马上去调,全默认的一套不会让 Claire 变样。 */
+    /** Creates a fully default persona and sets it active: the user creates one in order to adjust it right away, and a fully default persona does not change Claire. */
     @Synchronized fun create(name: String): Result<Persona> = runCatching {
         val now = System.currentTimeMillis()
         val persona = Persona(name = name.trim(), prompt = "", createdAt = now, updatedAt = now)
@@ -131,7 +131,7 @@ class PersonaStore(private val dir: File) {
     @Synchronized fun update(persona: Persona): Result<Persona> = runCatching {
         validate(persona)
         val existing = _personas.value.firstOrNull { it.id == persona.id } ?: error("persona not found")
-        // 内容没变就不写、不涨修订号(界面上点了现在已经选着的那一档)
+        // If the content did not change, do not write and do not bump the revision (the UI tapped the option that is already selected)
         if (persona.copy(revision = existing.revision, createdAt = existing.createdAt, updatedAt = existing.updatedAt, builtin = existing.builtin) == existing) {
             return@runCatching existing
         }
@@ -145,7 +145,7 @@ class PersonaStore(private val dir: File) {
         next
     }
 
-    /** 复制一份,名称由界面给(各语言的「副本」写法不一样),太长就截;复制出来的不是在用的。 */
+    /** Duplicates one, with the name supplied by the UI (the "copy" wording differs per language), truncated when too long; the copy is not the active one. */
     @Synchronized fun duplicate(id: String, name: (String) -> String = { "$it (copy)" }): Result<Persona> = runCatching {
         val source = get(id) ?: error("persona not found")
         val now = System.currentTimeMillis()
@@ -163,7 +163,7 @@ class PersonaStore(private val dir: File) {
         val existing = get(id) ?: return false
         if (existing.builtin) return false
         val next = _personas.value.filterNot { it.id == id }
-        // 删的正是在用的那一套:同一次写盘里把在用的清掉
+        // Deleting exactly the persona that is active: clear the active one in the same write
         return runCatching { save(next, _activeId.value.takeIf { it != id }); true }.getOrDefault(false)
     }
 
@@ -198,10 +198,10 @@ class PersonaStore(private val dir: File) {
         return runCatching {
             val stored = json.decodeFromString<PersonaFile>(file.readText())
             val personas = stored.personas.filter { ID.matches(it.id) }
-            // 在用的必须指向列表里还在的一套(手改的文件、旧版本留下的悬空 id 都当没有)
+            // The active one must point at a persona still in the list (hand-edited files and dangling ids left by older versions both count as none)
             Loaded(personas, stored.active?.takeIf { id -> personas.any { it.id == id } })
         }.getOrElse {
-            // 读不懂的旧文件留着,别被下一次保存直接盖掉
+            // Keep an unreadable old file around so the next save does not simply overwrite it
             runCatching { file.renameTo(File(dir, "${file.name}.bad-${System.currentTimeMillis()}")) }
             Loaded(emptyList(), null)
         }
@@ -209,7 +209,7 @@ class PersonaStore(private val dir: File) {
 
     companion object {
         const val MAX_DESCRIPTION = 160
-        /** 最多存这么多套;够用,又不至于让列表没法看。 */
+        /** Maximum number of personas stored; enough to be useful without making the list unreadable. */
         const val MAX_PERSONAS = 20
         private val ID = Regex("[A-Za-z0-9_-]{1,64}")
 

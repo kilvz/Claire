@@ -12,18 +12,18 @@ import kotlinx.serialization.json.put
 import java.io.File
 
 /**
- * 「记忆与技能」的开关:[useMemory] 总开关(关 = 不检索、不注入、不提取、不提供记忆工具);
- * [autoRemember]「自动记住我说过的事」;[learnSkills]「从办成的任务里学技能」(默认开,学到的要用户收下才用)。
+ * Switches for "memory and skills": [useMemory] is the master switch (off = no retrieval, no injection, no extraction, no memory tools offered);
+ * [autoRemember] is "automatically remember things I said"; [learnSkills] is "learn skills from completed tasks" (on by default; learned skills are only used once the user accepts them).
  */
 data class MemorySwitches(
     val useMemory: Boolean = true,
     val autoRemember: Boolean = true,
     val learnSkills: Boolean = true,
-    /** 任务结束时自动记一条跨会话摘要,供下次同类任务检索;关掉就既不记、也不提供检索工具。 */
+    /** Automatically record one cross-session summary when a task ends, for retrieval by similar tasks later; when off, nothing is recorded and no retrieval tool is offered either. */
     val rememberTasks: Boolean = true,
     /**
-     * 「让 Claire 自己归纳着记」:用户让它记的时候,内容里有用户没亲口说过的具体值(它自己总结、推断出来的)也存,
-     * 来源另标成 Claire 归纳的。默认关:只记用户亲口说的,别的不收。
+     * "Let Claire summarize and record on her own": when the user asks her to remember something, specific values in the content that the user did not say personally (that she summarized or inferred)
+     * are stored too, with the source marked separately as summarized by Claire. Off by default: only what the user said personally is recorded, nothing else is accepted.
      */
     val inferMemories: Boolean = false,
 ) {
@@ -31,8 +31,8 @@ data class MemorySwitches(
 }
 
 /**
- * 开关存成一个小 JSON 文件;读不懂按默认值。
- * 旧版本存下的文件没有 [LEARN_DEFAULT_APPLIED]:那时「学技能」默认关,读的时候升级一次打开;之后一存就带上它,用户手动关掉就保持关闭。
+ * Switches are stored in one small JSON file; if it cannot be read, the defaults are used.
+ * Files stored by older versions lack [LEARN_DEFAULT_APPLIED]: back then "learn skills" defaulted to off, so it is turned on once while reading; afterwards every save includes the key, and it stays off if the user turns it off manually.
  */
 class MemorySettings(private val file: File) {
     private val _switches = MutableStateFlow(read())

@@ -50,7 +50,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-/** 外部 MCP server 的一条配置;token 不在这个对象里,单独加密存。 */
+/** One external MCP server configuration; the token is not part of this object and is stored separately, encrypted. */
 @Serializable
 data class McpServerConfig(
     val id: String = UUID.randomUUID().toString(),
@@ -63,21 +63,21 @@ data class McpServerConfig(
     val previewChars: Int = 4000,
     val maxCostUnits: Long? = null,
     val allowLocalHttp: Boolean = false,
-    /** streamable-http | http-sse(2024-11-05 旧版) | stdio(沙箱里的本地进程) */
+    /** streamable-http | http-sse (legacy 2024-11-05) | stdio (local process inside the sandbox) */
     val transport: String = "streamable-http",
-    /** stdio 的命令行;不经过 shell,按 argv 直接执行。 */
+    /** Command line for stdio; it does not go through a shell and is executed directly as argv. */
     val command: String = "",
-    /** token | oauth(token 是手动 Bearer/自定义头;oauth 走 OAuth 2.1 登录) */
+    /** token | oauth (token means a manually supplied Bearer/custom header; oauth goes through OAuth 2.1 sign-in) */
     val auth: String = "token",
-    /** 只暴露这些工具;null 表示全部。 */
+    /** Expose only these tools; null means all of them. */
     val allowedTools: List<String>? = null,
-    /** 非密的自定义请求头;Authorization 另存。 */
+    /** Non-secret custom request headers; Authorization is stored separately. */
     val headers: Map<String, String> = emptyMap(),
-    /** 预设 id(来自目录);null 表示自定义配置。 */
+    /** Preset id (from the catalog); null means a custom configuration. */
     val presetId: String? = null,
-    /** 无秘密的连接快照;目录更新不改变已有配置的地址、transport、认证目的地或命令。 */
+    /** Secret-free connection snapshot; catalog updates do not change the address, transport, auth destination or command of an existing configuration. */
     val presetSnapshot: McpPreset? = null,
-    /** 只存非秘密字段值;秘密字段走 [McpFieldSecrets]。 */
+    /** Stores only non-secret field values; secret fields go through [McpFieldSecrets]. */
     val fieldValues: Map<String, String> = emptyMap(),
 )
 
@@ -92,8 +92,8 @@ data class McpConnections(
 data class McpTestResult(val serverName: String?, val instructions: String?, val tools: List<String>)
 
 /**
- * 外部 MCP server 的设置:配置存 `files/settings/mcp-servers.json`,token 用 [KeyCipher] 加密另存。
- * [connectionsFor] 在任务开始时连接所有启用项(整段有总时限),失败、超时的不影响其他任务/其他 server。
+ * Settings for external MCP servers: configurations are stored in `files/settings/mcp-servers.json`, tokens are stored separately, encrypted with [KeyCipher].
+ * [connectionsFor] connects all enabled entries when a task starts (the whole phase has an overall time limit); failures and timeouts do not affect other tasks or other servers.
  */
 class McpServerStore(
     private val dir: File,
@@ -101,13 +101,13 @@ class McpServerStore(
     private val http: OkHttpClient = NetProxy.shared.client(
         OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(70, TimeUnit.SECONDS),
     ),
-    /** stdio server 只能由沙箱启动;为 null 时 stdio 配置会报不可用。 */
+    /** stdio servers can only be launched by the sandbox; when null, stdio configurations report as unavailable. */
     private val stdio: McpStdioLauncher? = null,
-    /** 内置预设目录;测试注入临时目录,App 资产加载在别处接线。UI 用同一份实例取目录。 */
+    /** Built-in preset catalog; tests inject a temporary catalog, app asset loading is wired up elsewhere. The UI reads the catalog from the same instance. */
     val catalog: McpCatalog = McpCatalog.Empty,
-    /** stdio 预设含包时的安装/缓存;为 null 时这类预设报不可用。 */
+    /** Installation/caching when a stdio preset includes a package; when null, such presets report as unavailable. */
     private val packageProvisioner: McpPackageProvisioner? = null,
-    /** stdio 包下载确认;已确认的「包名 + 精确版本 + 来源」持久化,重装 App 后仍有效,不需重复确认。 */
+    /** Download consent for stdio packages; confirmed "package name + exact version + source" triples are persisted, so they stay valid after reinstalling the app and need no repeated confirmation. */
     val packageConsent: McpPackageConsent = McpPackageConsent(File(dir, "mcp-package-consent.json")),
 ) {
     private val file = File(dir, "mcp-servers.json")
@@ -120,7 +120,7 @@ class McpServerStore(
     private val fieldSecrets = McpFieldSecrets(::loadSecrets, ::saveSecrets)
     private val resolver = McpPresetResolver()
     private val _health = MutableStateFlow<Map<String, McpHealth>>(emptyMap())
-    /** 最近一次连接/测试的结果;只在进程内,不落盘。 */
+    /** Result of the most recent connection/test; in-memory only, never written to disk. */
     val health: StateFlow<Map<String, McpHealth>> = _health.asStateFlow()
 
     @Synchronized fun add(name: String, url: String, token: String? = null): Result<McpServerConfig> =
@@ -201,8 +201,8 @@ class McpServerStore(
     }
 
     /**
-     * 按预设 id 新增或替换:重试/重新授权时复用已有配置 id,不产生重复条目(秘密仍归同一 config id)。
-     * 复用 id 也避免同一预设反复添加后出现多个 disabled 副本。
+     * Adds or replaces by preset id: retries and re-authorization reuse the existing configuration id, so no duplicate entries appear (secrets still belong to the same config id).
+     * Reusing the id also avoids accumulating multiple disabled copies when the same preset is added again and again.
      */
     @Synchronized fun savePreset(config: McpServerConfig): Result<McpServerConfig> {
         validate(config)?.let { return Result.failure(IllegalArgumentException(it)) }
@@ -216,8 +216,8 @@ class McpServerStore(
     }
 
     /**
-     * 目录里预设换了形态(如本地包 → 官方远程 OAuth)后按同一 id 替换:新快照不声明的字段秘密删掉,
-     * 否则 resolver 会永远报「未知字段」;连接目标(地址/传输/认证)变了,发给旧目标的令牌也一并作废。
+     * When a preset in the catalog changes shape (e.g. local package → official remote OAuth), replace it under the same id: field secrets not declared by the new snapshot are deleted,
+     * otherwise the resolver would report "unknown field" forever; if the connection target (address/transport/auth) changed, tokens issued to the old target are invalidated as well.
      */
     private fun dropStaleSecrets(old: McpServerConfig, new: McpServerConfig) {
         val declared = new.presetSnapshot?.fields?.map { it.id }?.toSet() ?: return
@@ -241,7 +241,7 @@ class McpServerStore(
     ): Result<McpTestResult> {
         val config = presetConfig(presetId, values).getOrElse { return Result.failure(it) }
         val saved = savePreset(config).getOrElse { return Result.failure(it) }
-        // 只写该预设声明的秘密字段(非空);未知字段不落进加密存储,避免 resolver 永久报「未知字段」。
+        // Write only the secret fields this preset declares (and only non-blank ones); unknown fields never enter encrypted storage, so the resolver does not keep reporting "unknown field".
         val declared = saved.presetSnapshot?.fields?.filter { it.secret }?.map { it.id }?.toSet()
         secrets.forEach { (fieldId, value) ->
             if (value.isNotBlank() && (declared == null || fieldId in declared)) setSecret(saved.id, fieldId, value)
@@ -257,15 +257,15 @@ class McpServerStore(
         return resolver.resolve(snapshot, config.fieldValues + fieldSecrets.all(config.id))
     }
 
-    /** 把 provisioner 返回的可执行目录前缀和预设声明的 argv(首个元素是可执行名)拼成最终 argv。 */
+    /** Combines the executable-directory prefix returned by the provisioner with the preset's declared argv (the first element is the executable name) into the final argv. */
     private fun composeArgv(prefix: List<String>, command: List<String>): List<String> =
         if (prefix.isEmpty() || command.isEmpty()) command
         else listOf(prefix.first() + "/" + command.first()) + command.drop(1)
 
-    /** UI 在用户确认下载后调用;绑定包名 + 精确版本 + 来源。 */
+    /** Called by the UI after the user confirms the download; binds package name + exact version + source. */
     fun acceptPackage(spec: McpPackageSpec) = packageConsent.accept(spec)
 
-    /** 该包(名 + 精确版本 + 来源)是否已确认。 */
+    /** Whether this package (name + exact version + source) has already been confirmed. */
     fun packageAccepted(spec: McpPackageSpec): Boolean = packageConsent.accepted(spec)
 
     fun validate(config: McpServerConfig): String? {
@@ -333,14 +333,14 @@ class McpServerStore(
         }
     }
 
-    /** 刷新所有启用 server 的状态(并行)。 */
+    /** Refreshes the status of all enabled servers (in parallel). */
     suspend fun testAll() = coroutineScope {
         _servers.value.filter { it.enabled }.map { config -> async { test(config) } }.awaitAll()
     }
 
     /**
-     * 任务开头用:连上的归 [owner](任务的 [ResourceScope]),任务收尾关作用域时一起关掉;
-     * 取消落在连接中途或刚连上、还没交回时也不漏(stdio server 的进程和沙箱租约跟着放掉)。
+     * Used at task start: successful connections belong to [owner] (the task's [ResourceScope]) and are closed together when the scope closes at task teardown;
+     * a cancellation landing mid-connection or right after connecting but before hand-off does not leak either (the stdio server process and sandbox lease are released along with it).
      */
     suspend fun connectionsFor(
         owner: ResourceScope,
@@ -350,8 +350,8 @@ class McpServerStore(
     ): McpConnections = owner.acquire(Dispatchers.IO, { c: McpConnections -> c.close() }) { connections(resultStore, workspace, budgetMs) }
 
     /**
-     * 并行连接所有启用项;单个失败只记录,不抛。整段最多等 [budgetMs]:到点还没连上的这次不接,
-     * 记成失败(健康状态里写明超时),不拖住任务开头;已经连上的照常用。被取消时连上的也关掉再抛。
+     * Connects all enabled entries in parallel; a single failure is only recorded, never thrown. The whole phase waits at most [budgetMs]: whatever has not connected by then is skipped for this run,
+     * recorded as a failure (with the timeout noted in the health status) so it does not hold up the task start; already connected servers are used as usual. On cancellation, connected ones are closed before rethrowing.
      */
     suspend fun connections(
         resultStore: com.wangzan101.mika.core.cap.mcp.McpResultStore? = null,
@@ -381,7 +381,7 @@ class McpServerStore(
         val closed = java.util.concurrent.atomic.AtomicBoolean(false)
         return McpConnections(
             connections = connected.map { it.second },
-            // 任务收尾和它的 ResourceScope 都会关;只关一次
+            // Both task teardown and its ResourceScope close this; close only once
             close = {
                 if (closed.compareAndSet(false, true)) connected.forEach { (it.second.endpoint as? Closeable)?.let { c -> runCatching { c.close() } } }
             },
@@ -389,7 +389,7 @@ class McpServerStore(
         )
     }
 
-    /** 连一个 server 并记下健康状态。 */
+    /** Connects one server and records its health status. */
     private suspend fun attempt(
         config: McpServerConfig,
         resultStore: com.wangzan101.mika.core.cap.mcp.McpResultStore?,
@@ -503,8 +503,8 @@ class McpServerStore(
     }
 
     /**
-     * OAuth 2.1 登录:发现授权服务器 → 动态注册本机回调 → 打开浏览器 → 等回调换令牌。
-     * [openBrowser] 在登录开始时调用一次(由 UI 打开系统浏览器);整个流程最多等 5 分钟。
+     * OAuth 2.1 sign-in: discover the authorization server → dynamically register the loopback callback → open the browser → wait for the callback and exchange it for tokens.
+     * [openBrowser] is called once when sign-in starts (the UI opens the system browser); the whole flow waits at most 5 minutes.
      */
     suspend fun authorize(config: McpServerConfig, openBrowser: (String) -> Unit): Result<McpOAuthTokens> {
         validate(config)?.let { return Result.failure(IllegalArgumentException(it)) }
@@ -593,11 +593,11 @@ class McpServerStore(
     private fun isLocalHost(host: String): Boolean = LocalHosts.isPrivateOrMesh(host)
 
     companion object {
-        /** 设置页测试 stdio server 时用的沙箱工作区;任务里用对话 ID。 */
+        /** Sandbox workspace used when the settings page tests a stdio server; inside tasks the conversation ID is used. */
         const val SETTINGS_WORKSPACE = "mcp-settings"
         /**
-         * 任务开头连接外部 server 最多等这么久(所有 server 一起算)。单个 server 自己的超时可以长到几分钟,
-         * 那是给工具调用的;开头只是握手,慢的这次先不接,不让任务一直停在「准备中」。沙箱里的 stdio server 要起 PRoot,留得宽一点。
+         * Maximum time the start of a task waits while connecting external servers (counted across all servers together). A single server's own timeout may be several minutes,
+         * but that is meant for tool calls; the start is only a handshake, so slow ones are skipped for this run instead of leaving the task stuck in "preparing". stdio servers inside the sandbox have to launch PRoot, so a little extra is allowed.
          */
         const val CONNECT_BUDGET_MS = 15_000L
     }

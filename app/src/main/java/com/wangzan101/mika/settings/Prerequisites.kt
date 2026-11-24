@@ -8,52 +8,52 @@ import com.wangzan101.mika.core.device.shell.ShizukuPlatformState
 
 enum class AccessibilityState {
     Off,
-    /** 系统设置里是开着的,服务却没在运行(App 被强行停止后常见),需要关掉再打开。 */
+    /** It is on in system settings but the service is not running (common after the app is force-stopped); it must be turned off and on again. */
     EnabledNotRunning,
     On,
 }
 
 data class SystemStatus(
     val sdkInt: Int,
-    /** 内置助手的状态。 */
+    /** Status of the built-in helper. */
     val builtinShell: BuiltinShellStatus,
     val accessibility: AccessibilityState,
     val notificationsAllowed: Boolean,
-    /** 「需要你处理」通知频道被用户或系统调到了高优先级以下(不弹出、可能不响)。 */
+    /** The "needs your attention" notification channel was lowered below high importance by the user or the system (no pop-up, possibly no sound). */
     val attentionLowered: Boolean = false,
-    /** 「任务结果」通知频道同理。 */
+    /** Same for the "task results" notification channel. */
     val resultLowered: Boolean = false,
-    /** 「配对」通知频道:配对码填在这里,被关掉或调成不弹出时引导页要说。 */
+    /** The "pairing" notification channel: the pairing code is entered there, so the onboarding page must say so when the channel is off or set not to pop up. */
     val pairingChannel: PairingChannelHealth = PairingChannelHealth.Ready,
-    /** 三个任务通知频道现在的重要程度;为空表示频道还没建。通知页据此显示。 */
+    /** Current importance of the three task notification channels; null means the channel has not been created yet. The notifications page displays based on these. */
     val attentionImportance: Int? = null,
     val resultImportance: Int? = null,
     val progressImportance: Int? = null,
-    /** 系统「开发者选项」开着。 */
+    /** The system's "Developer options" are on. */
     val developerOptions: Boolean = false,
-    /** 系统「无线调试」开着。 */
+    /** The system's "Wireless debugging" is on. */
     val wirelessDebugging: Boolean = false,
-    /** 系统里根本没有「无线调试」这一项(没带这个功能):引导页据此给「改用电脑启动」。 */
+    /** The system has no "Wireless debugging" item at all (the feature is not included): the onboarding page uses this to offer "start it from a computer instead". */
     val wirelessDebuggingMissing: Boolean = false,
-    /** 系统里打不开「开发者选项」页:和 [wirelessDebuggingMissing] 一起成立时,这个环境设置不了手机操作。 */
+    /** The "Developer options" page cannot be opened on this system: together with [wirelessDebuggingMissing] this means phone operation cannot be set up in this environment. */
     val developerSettingsMissing: Boolean = false,
-    /** 系统「USB 调试」开着:开着时 Wi-Fi 断开助手也不停。 */
+    /** The system's "USB debugging" is on: while it is on, the helper keeps running even when Wi-Fi disconnects. */
     val usbDebugging: Boolean = true,
-    /** 用户打开了「用 root 启动手机助手」且此刻能用:看门狗经 su 起助手(不靠 Wi-Fi 和无线调试)。 */
+    /** The user enabled "start the phone helper with root" and it works right now: the watchdog starts the helper via su (without relying on Wi-Fi or wireless debugging). */
     val rootStart: Boolean = false,
-    /** 系统可能拦着不让打开无障碍(安卓 13 起,没从应用商店装的 App 要先允许受限制的设置)。 */
+    /** The system may block enabling accessibility (since Android 13, apps not installed from an app store must first be allowed restricted settings). */
     val restrictedSettings: Boolean = false,
-    /** 助手停了以后靠什么再起来:只用 USB 启动命令起过时,各处都不往无线调试引,说清要再运行命令。 */
+    /** What brings the helper back after it stops: when it has only ever been started by the USB start command, nothing should point to wireless debugging; state plainly that the command must be run again. */
     val helperRestart: HelperRestart = HelperRestart.None,
-    /** 开机后用户还没解锁过一次([android.os.UserManager.isUserUnlocked] 为假):无障碍服务这时本来就绑不上。 */
+    /** The user has not unlocked once since boot ([android.os.UserManager.isUserUnlocked] is false): the accessibility service could not be bound at this point anyway. */
     val userLocked: Boolean = false,
-    /** 当前选择的助手启动通道。 */
+    /** The currently selected helper start channel. */
     val shellTransport: ShellTransport = ShellTransport.Auto,
-    /** Shizuku 的安装、运行和授权状态。 */
+    /** Shizuku's install, running and authorization state. */
     val shizuku: ShizukuPlatformState = ShizukuPlatformState.Unavailable,
-    /** 无线调试是否已配对;为空表示沿用 [builtinShell]。 */
+    /** Whether wireless debugging has been paired; null means [builtinShell] is used instead. */
     val wirelessPaired: Boolean? = null,
-    /** 此刻是否优先经 Shizuku 启动助手。 */
+    /** Whether the helper is currently started via Shizuku in preference. */
     val shizukuStart: Boolean = false,
 )
 
@@ -62,34 +62,34 @@ fun SystemStatus.notificationOverview() = NotificationOverview.of(
 )
 
 sealed interface Problem {
-    /** 安卓 12 以下未启用 Claire 的手机操作能力。 */
+    /** Claire's phone-operation capability is not available below Android 12. */
     data object SystemTooOld : Problem
-    /** 内置助手没在运行(没设置、无线调试关着、正在连、出错)。 */
+    /** The built-in helper is not running (not set up, wireless debugging off, connecting, or errored). */
     data class PhoneHelper(val status: BuiltinShellStatus) : Problem
-    /** [userLocked] 为真时没在运行是因为开机后还没解锁过;[restrictedSettings] 为真时系统可能阻止绑定。 */
+    /** When [userLocked] is true it is not running because the device has not been unlocked since boot; when [restrictedSettings] is true the system may be blocking the binding. */
     data class Accessibility(val state: AccessibilityState, val userLocked: Boolean = false, val restrictedSettings: Boolean = false) : Problem
     data object NoModel : Problem
-    /** 不挡任务,只是看不到进度和「需要你」提醒。 */
+    /** Does not block tasks; it only means progress and "needs you" reminders are not seen. */
     data object NotificationsOff : Problem
-    /** 「需要你处理」(接管、提问、确认)或「任务结果」的通知被调低了,不弹出,可能看不到;[attention]、[result] 说明是哪个。 */
+    /** Notifications for "needs your attention" (takeover, question, confirmation) or "task results" were lowered, so they do not pop up and may be missed; [attention] and [result] tell which one. */
     data class AttentionLowered(val attention: Boolean, val result: Boolean) : Problem
-    /** 不挡任务:安卓 12、13 的虚拟屏没有独立焦点,后台操作可能让主屏的输入焦点短暂丢失。 */
+    /** Does not block tasks: on Android 12 and 13 the virtual display has no focus of its own, so background operation may briefly take input focus away from the main screen. */
     data object FocusMayLeak : Problem
 }
 
-/** 开始任务前的检查;界面据此提示,任务入口据此拦住。 */
+/** Checks before starting a task; the UI prompts based on them, and the task entry points block based on them. */
 object Prerequisites {
-    /** 手机 App 操作的最低版本;聊天、网页和沙箱不需要这项能力。 */
+    /** Minimum version for operating phone apps; chat, web and the sandbox do not need this capability. */
     const val MIN_SDK = 31
-    /** 安卓 14 起虚拟屏能有自己的焦点,不再影响主屏。 */
+    /** Since Android 14 the virtual display can have its own focus and no longer affects the main screen. */
     const val OWN_FOCUS_SDK = 34
     private fun isWarning(p: Problem) = p == Problem.NotificationsOff || p == Problem.FocusMayLeak || p is Problem.AttentionLowered
 
     data class Check(val problems: List<Problem>) {
-        /** 挡住任务的问题。手机操作的系统版本、内置助手、无障碍只在操作手机 App 时需要。 */
+        /** Problems that block tasks. The OS version for phone operation, the built-in helper and accessibility are only needed to operate phone apps. */
         val blockers: List<Problem> get() = problems.filter { !isWarning(it) && !phoneOnly(it) }
         val canStartTask: Boolean get() = blockers.isEmpty()
-        /** 能操作手机 App。 */
+        /** Phone apps can be operated. */
         val phoneReady: Boolean get() = problems.none(::phoneOnly)
     }
 
@@ -98,7 +98,7 @@ object Prerequisites {
     fun check(status: SystemStatus, hasMainModel: Boolean): Check = Check(
         buildList {
             if (status.sdkInt < MIN_SDK) add(Problem.SystemTooOld)
-            // 安卓 12 以下手机功能不可用,已由 SystemTooOld 说明
+            // Phone features are unavailable below Android 12, which SystemTooOld already states
             if (status.sdkInt >= MIN_SDK && status.builtinShell != BuiltinShellStatus.Running) {
                 add(Problem.PhoneHelper(status.builtinShell))
             }

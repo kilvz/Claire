@@ -4,12 +4,12 @@ import com.wangzan101.mika.core.model.ListedModel
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-// 服务商存储:连接、记住模型、验证状态与移除服务商
+// Provider storage: connecting, remembering models, verification state and removing providers
 /**
- * 新增或替换同 id 的模型配置(新增的要再交给 [choose],否则下次读入时没人用会被删掉)。
- * 配置挂到 [ProviderConfig.providerId] 指的服务商下(接口类型、地址、名字以服务商的为准);
- * 没指或指的不存在,就按接口类型、地址和名字找对应的服务商,找不到新建一个。
- * [apiKey] 是那个服务商的 Key:null 表示不改,空串表示清除。
+ * Adds or replaces the model config with the same id (a newly added one must still be handed to [choose], otherwise nobody uses it and it is deleted on the next load).
+ * The config is attached to the provider named by [ProviderConfig.providerId] (API kind, address and name always come from the provider);
+ * when that is unset or does not exist, the matching provider is found by API kind, address and name, and a new one is created if none is found.
+ * [apiKey] is the key of that provider: null means leave it unchanged, an empty string means clear it.
  */
 fun ProviderStore.save(cfg: ProviderConfig, apiKey: String?) {
     synchronized(this) {
@@ -27,14 +27,14 @@ fun ProviderStore.save(cfg: ProviderConfig, apiKey: String?) {
 }
 
 /**
- * 「测试并保存」连上了一个服务商:存下它(名字、接口类型、地址、Key)和列出的模型。
- * 接口类型、地址和名字都相同的服务商已经有了,就更新那一个(换 Key、换列表),不重复添加。
- * [apiKey] 为 null 时不改已存的 Key。[verified] 是这次试调用得到回复的模型名,记进 [Provider.verifiedModels];
- * [typed] 是其中用户手填的,记进 [Provider.typedModels]。
- * [signIn] 是 Key 的来历(见 [Provider.signIn]):用户自己填 Key 的为 null,授权来的为那一家的标记。
- * 两种来历各是各的服务商(地址、名字一样也不合并):授权不会顶掉用户自己填的 Key,退出登录也只删授权来的那把。
- * [untested] 为真是用户跳过测试直接存下的(见 [Provider.savedUntested]):一个模型都没列、也没试调用。
- * 已经有这一家、而且它列过模型或核实过时,不会因为这个参数被重新标成没测过。
+ * "Test and save" connected a provider: stores it (name, API kind, address, key) and the listed models.
+ * If a provider with the same API kind, address and name already exists, that one is updated (new key, new list) instead of being added again.
+ * When [apiKey] is null the stored key is left unchanged. [verified] holds the model names that replied during this trial call, recorded into [Provider.verifiedModels];
+ * [typed] holds those among them that the user typed in by hand, recorded into [Provider.typedModels].
+ * [signIn] records where the key came from (see [Provider.signIn]): null when the user entered the key themselves, otherwise the vendor marker for an authorized key.
+ * The two origins are separate providers (not merged even with the same address and name): authorization never displaces a user-entered key, and signing out deletes only the authorized one.
+ * [untested] true means the user saved it by skipping the test (see [Provider.savedUntested]): no models listed and no trial call.
+ * If this provider already exists and has listed models or been verified, this parameter does not mark it as untested again.
  */
 fun ProviderStore.connect(
     name: String, kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, models: List<ListedModel>,
@@ -46,12 +46,12 @@ fun ProviderStore.connect(
 ): Provider {
     return synchronized(this) {
         val found = findOrAddProvider(name, kind, baseUrl, signIn)
-        // 跳过测试时没有列表可存:这家之前列过的留着,不要用空表把已有的列表盖掉
+        // Skipping the test leaves no list to store: keep what this provider listed before, and do not overwrite the existing list with an empty one
         val listed = if (untested && models.isEmpty()) found.models ?: models else models
         val p = found.copy(
             models = listed, sessionHeader = sessionHeader,
             verifiedModels = found.verifiedModels + verified, typedModels = found.typedModels + typed,
-            // 这次没测、这家也没有核实过的模型、也没列过列表,才是「没测过」;别的情况一律按测过
+            // "Untested" only when this run did not test, the provider has no verified models and no list was ever listed; every other case counts as tested
             savedUntested = untested && verified.isEmpty() && found.verifiedModels.isEmpty() && listed.isEmpty(),
         )
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
@@ -62,7 +62,7 @@ fun ProviderStore.connect(
     }
 }
 
-/** 记下服务商最近一次列出的模型。列出来了,就说明「没测过」不再成立(跳过测试存下的那家在这里清掉标记)。 */
+/** Records the models the provider listed most recently. Listing any means "untested" no longer holds (the flag is cleared here for a provider saved by skipping the test). */
 fun ProviderStore.rememberModels(providerId: String, models: List<ListedModel>) {
     synchronized(this) {
         if (provider(providerId) == null) return
@@ -75,9 +75,9 @@ fun ProviderStore.rememberModels(providerId: String, models: List<ListedModel>) 
 }
 
 /**
- * 记下 [model] 在这家试调用得到了回复(见 [Provider.verifiedModels])。
- * 试通过了就说明「没测过」不再成立,跳过测试存下的那家在这里清掉标记——这个模型本来就在
- * [Provider.verifiedModels] 里时也要清,不能直接返回。
+ * Records that [model] got a reply from its trial call at this provider (see [Provider.verifiedModels]).
+ * Passing the test means "untested" no longer holds, so the flag is cleared here for a provider saved by skipping the test — it must also be cleared when this model was
+ * already in [Provider.verifiedModels], so an early return is not allowed.
  */
 fun ProviderStore.markVerified(providerId: String, model: String) {
     synchronized(this) {
@@ -90,7 +90,7 @@ fun ProviderStore.markVerified(providerId: String, model: String) {
     }
 }
 
-/** 记下用户在这家手填的 [model](见 [Provider.typedModels])。 */
+/** Records a [model] the user typed in by hand at this provider (see [Provider.typedModels]). */
 fun ProviderStore.markTyped(providerId: String, model: String) {
     synchronized(this) {
         val p = provider(providerId) ?: return
@@ -101,9 +101,9 @@ fun ProviderStore.markTyped(providerId: String, model: String) {
 }
 
 /**
- * 删掉一个服务商:它下面的模型配置和 Key 一起删。用着它的用途退回默认(主模型变成没选,看图不用,轻量用主模型);
- * 界面上删除前已经说明哪些用途要重新选。删的是 ChatGPT 的,连注册到的 client_id 一起忘掉(本机标识留着):
- * 下次登录重新注册,可以换一个账号。
+ * Deletes a provider: its model configs and key are deleted along with it. Roles using it fall back to the defaults (the main model becomes unset, vision is not used, the light model uses the main model);
+ * the UI has already stated before deleting which roles must be re-chosen. When a ChatGPT one is deleted, the registered client_id is forgotten too (the host identifier is kept):
+ * the next sign-in registers again, so a different account can be used.
  */
 fun ProviderStore.removeProvider(providerId: String) {
     synchronized(this) {
@@ -113,7 +113,7 @@ fun ProviderStore.removeProvider(providerId: String) {
         _providers.value = _providers.value.filterNot { it.id == providerId }
         val gone = _configs.value.filter { it.providerId == providerId }.map { it.id }.toSet()
         _configs.value = _configs.value.filterNot { it.providerId == providerId }
-        // 组失去这些成员;成员全没了的组删掉,用它的用途退回默认
+        // Groups lose these members; groups left with no members are deleted, and roles using them fall back to the defaults
         _groups.value = _groups.value
             .map { g -> g.copy(members = g.members.filterNot { it.configId in gone }) }
             .filter { it.members.isNotEmpty() }

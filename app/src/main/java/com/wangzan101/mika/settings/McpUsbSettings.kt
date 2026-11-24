@@ -17,14 +17,14 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * 经 USB 的电脑连接(电脑用 adb 打开的那种)的开关和令牌。和局域网那种([McpSettings])各管各的,令牌也各用各的。
+ * The switch and token for computer connections over USB (the kind a computer opens with adb). Separate from the LAN kind ([McpSettings]); each keeps its own token.
  *
- * - 打开时生成一个新令牌;已经开着再打开沿用原来的(电脑重跑一次命令,已经配好的不失效)。
- * - 监听起来后 [publish] 把连接信息写到 [infoFile](外部文件目录,安卓 11 起只有 Claire 和 shell 读得到)。
- * - 关掉时忘掉令牌(下次打开换新的)、删掉连接信息文件。
- * - 不跨重启:开关记着是哪次开机([bootId])打开的,换了一次开机就当关着,顺手清掉上次留下的文件。
+ * - Turning it on generates a new token; turning it on again while already on reuses the existing one (a computer that re-runs the command does not lose an already configured setup).
+ * - Once listening, [publish] writes the connection info to [infoFile] (the external files directory; since Android 11 only Claire and the shell can read it).
+ * - Turning it off forgets the token (the next enable gets a new one) and deletes the connection info file.
+ * - It does not survive a reboot: the switch records which boot ([bootId]) it was turned on in; after a different boot it counts as off, and the file left over from last time is cleaned up.
  *
- * 令牌同时以明文写在连接信息文件里(电脑要读),所以 App 自己的私有目录里也存明文,不另加密。
+ * The token is also written in plaintext into the connection info file (the computer has to read it), so it is stored in plaintext in the app's private directory as well, with no extra encryption.
  */
 class McpUsbSettings(
     private val dir: File,
@@ -43,7 +43,7 @@ class McpUsbSettings(
         val o = runCatching { Json.parseToJsonElement(file.readText()) as? JsonObject }.getOrNull()
         val boot = (o?.get("boot") as? JsonPrimitive)?.content
         val t = (o?.get("token") as? JsonPrimitive)?.content?.takeIf { it.length >= MIN_TOKEN }
-        // 旧版用令牌摘要作为归属，在清除上次开机的令牌前先迁移它的任务。
+        // Older versions used a token digest as the ownership; migrate its tasks before the token from the last boot is cleared.
         if (t != null) migrateTaskOwner(RemoteOwnership.of(t))
         if (boot != null && boot == bootId() && t != null) {
             token = t
@@ -54,10 +54,10 @@ class McpUsbSettings(
         }
     }
 
-    /** 开着时的令牌;关着为 null。 */
+    /** The token while it is on; null when off. */
     fun token(): String? = token
 
-    /** 打开;已经开着就沿用原来的令牌。返回此刻的令牌。 */
+    /** Turns it on; if already on, the existing token is reused. Returns the token as of now. */
     @Synchronized fun enable(): String {
         token?.let { return it }
         val t = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(random::nextBytes))
@@ -70,7 +70,7 @@ class McpUsbSettings(
         return t
     }
 
-    /** 关掉:令牌当场作废,连接信息文件删掉。 */
+    /** Turns it off: the token becomes invalid immediately and the connection info file is deleted. */
     @Synchronized fun disable() {
         token = null
         _enabled.value = false
@@ -78,7 +78,7 @@ class McpUsbSettings(
         unpublish()
     }
 
-    /** 监听起来了:把连接信息写给电脑(先写临时文件再改名,电脑正在读时不会读到半截)。关着时什么也不做。 */
+    /** Listening has started: write the connection info for the computer (write a temp file and rename it, so a computer reading at that moment never sees a partial file). Does nothing while off. */
     @Synchronized fun publish(port: Int) {
         val t = token ?: return
         val f = infoFile() ?: return
@@ -91,7 +91,7 @@ class McpUsbSettings(
         }
     }
 
-    /** 没在监听(没开起来、关了):删掉连接信息文件,电脑那边的脚本就知道没开成。 */
+    /** Not listening (never started, or turned off): delete the connection info file so the script on the computer knows it did not start. */
     @Synchronized fun unpublish() {
         runCatching { infoFile()?.delete() }
     }

@@ -17,9 +17,9 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * 电脑连接(MCP)的设置:开关和端口存成一个小 JSON 文件(读不懂按关着);
- * 访问令牌和服务商的 Key 一样经 [KeyCipher] 加密后另存一个文件,第一次要用时生成。
- * 默认关着。
+ * Settings for computer connections (MCP): the switch and port are stored in one small JSON file (if it cannot be read, treated as off);
+ * the access token is encrypted with [KeyCipher] like provider keys and stored in a separate file, generated the first time it is needed.
+ * Off by default.
  */
 class McpSettings(private val dir: File, private val cipher: KeyCipher, private val random: SecureRandom = SecureRandom()) {
     private val file = File(dir, "mcp.json")
@@ -28,7 +28,7 @@ class McpSettings(private val dir: File, private val cipher: KeyCipher, private 
     private val _historyEnabled: MutableStateFlow<Boolean>
     @Volatile private var cachedToken: String? = null
 
-    /** 监听的端口;文件里没写就用 [DEFAULT_PORT]。 */
+    /** The port to listen on; [DEFAULT_PORT] is used when the file does not specify one. */
     val port: Int get() = portValue
 
     @Volatile private var portValue: Int
@@ -40,7 +40,7 @@ class McpSettings(private val dir: File, private val cipher: KeyCipher, private 
         portValue = (o?.get("port") as? JsonPrimitive)?.intOrNull?.takeIf { it in PORT_RANGE } ?: DEFAULT_PORT
     }
 
-    /** 换一个监听端口(电脑连接开着时由调用方重绑并重写连接信息);[port] 必须在 [PORT_RANGE] 里。 */
+    /** Changes the listening port (while computer connections are on, the caller rebinds and rewrites the connection info); [port] must be within [PORT_RANGE]. */
     @Synchronized fun setPort(port: Int) {
         require(port in PORT_RANGE) { "port must be in $PORT_RANGE" }
         if (port == portValue) return
@@ -62,14 +62,14 @@ class McpSettings(private val dir: File, private val cipher: KeyCipher, private 
         save()
     }
 
-    /** 当前的访问令牌;还没有(或读不出来)就生成一个存下。 */
+    /** The current access token; if there is none yet (or it cannot be read), generate one and store it. */
     @Synchronized fun token(): String {
         cachedToken?.let { return it }
         val stored = runCatching { if (tokenFile.isFile) String(cipher.decrypt(tokenFile.readBytes()), Charsets.UTF_8) else null }.getOrNull()
         return stored?.takeIf { it.length >= MIN_TOKEN }?.also { cachedToken = it } ?: regenerate()
     }
 
-    /** 换一个新令牌:旧的当场失效,连着的电脑要换上新的才能再用。 */
+    /** Issues a new token: the old one stops working immediately, and connected computers must adopt the new one before they can be used again. */
     @Synchronized fun regenerate(): String {
         val bytes = ByteArray(32).also(random::nextBytes)
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
@@ -92,7 +92,7 @@ class McpSettings(private val dir: File, private val cipher: KeyCipher, private 
 
     companion object {
         const val DEFAULT_PORT = 8765
-        /** 端口允许的范围;读取和写入同一套。 */
+        /** Allowed port range; reading and writing use the same one. */
         val PORT_RANGE = 1024..65535
         private const val MIN_TOKEN = 32
     }

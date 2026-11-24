@@ -42,8 +42,8 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.USE_MAIN
 import com.wangzan101.mika.settings.ProviderStore.Companion.USE_NONE
 import com.wangzan101.mika.settings.ProviderStore.Companion.get
 
-// 服务商存储:读写配置文件、迁移与修复旧数据
-/** 删掉没有用途、也没有组在用的模型配置。Key 存在服务商上,不受影响。 */
+// Provider storage: reading and writing the config file, migrations and repairing old data
+/** Deletes model configs that no role uses and no group references. Keys live on the provider, so they are unaffected. */
 internal fun ProviderStore.prune() {
     val used = _roles.value.referenced + _groups.value.flatMap { g -> g.members.map { it.configId } }
     _configs.value = _configs.value.filter { it.id in used }
@@ -66,13 +66,13 @@ internal fun ProviderStore.load() {
     }
     migrate()
     repairStaleContextDefaults()
-    // 组成员指向的配置不在了(旧文件、服务商被删):从组里去掉;成员全没了的组删掉
+    // Configs referenced by group members no longer exist (old files, deleted providers): drop them from the group; delete groups left with no members
     val validConfigIds = _configs.value.map { it.id }.toSet()
     _groups.value = _groups.value
         .map { g -> g.copy(members = g.members.filter { it.configId in validConfigIds }) }
         .filter { it.members.isNotEmpty() }
     repairGroupRoles()
-    // 指向不存在的配置/组的选择退回默认,没人用的配置删掉;和文件里的不一样(含刚迁移的用途)才写回
+    // Choices pointing at non-existent configs/groups fall back to the defaults and unused configs are deleted; write back only when this differs from the file (including roles just migrated)
     _roles.value = _roles.value.keepOnly(validConfigIds, usableGroupIds())
     dropMainFromFallbacks()
     repairUnavailableReasoningEfforts()
@@ -84,8 +84,8 @@ internal fun ProviderStore.load() {
 }
 
 /**
- * 旧版本的 `roles` 只记显式指定的配置 id,没指定的按默认规则分配:主模型取第一个配置,看图在主模型能看图时由它兼任,
- * 轻量跟随主模型。这里把那时实际生效的分配写明成 [RoleChoices],之后不再有隐含的规则。
+ * The old version's `roles` only recorded explicitly chosen config ids; anything unset was assigned by default rules: the main model took the first config, vision was served by the main model when that could see images,
+ * and light followed the main model. This spells out the assignment actually in effect back then as [RoleChoices], so that no implicit rules remain afterwards.
  */
 internal fun ProviderStore.migrateRoles(old: JsonObject?): RoleChoices {
     val ids = _configs.value.map { it.id }.toSet()
@@ -100,9 +100,9 @@ internal fun ProviderStore.migrateRoles(old: JsonObject?): RoleChoices {
 }
 
 /**
- * 把没有归属的模型配置(旧版本的文件)归到服务商下:按 [ProviderConnection.keyOf] 分组,每组一个服务商,
- * Key 取组里任一条按配置 id 存的(密文原样搬过去)。先写含新旧两份的 Key 文件,再写配置,最后清掉不属于任何服务商的 Key;
- * 中途断掉的话,下次读入时没归属的配置还在,会重做。都归好了就只清理残留的 Key。
+ * Attaches unattributed model configs (files written by older versions) to providers: group by [ProviderConnection.keyOf], one provider per group,
+ * taking the key stored under any config id in the group (the ciphertext is moved over as is). First write the key file containing both new and old entries, then write the configs, and finally remove keys that belong to no provider;
+ * if it is interrupted midway, the unattributed configs are still there on the next load and this is redone. Once everything is attributed, only leftover keys are cleaned up.
  */
 internal fun ProviderStore.migrate() {
     val known = _providers.value.map { it.id }.toSet()
@@ -129,12 +129,12 @@ internal fun ProviderStore.migrate() {
 }
 
 /**
- * 模型目录或客户端认识的档位变化后,旧选择不能继续原样发给服务端:能确定当前选项时,失效项退回默认;
- * 没有档位元数据、协议本就不提供这项设置的旧配置不动,避免把仍可由服务端处理的值误删。
+ * After the model catalog or the levels the client knows change, old choices can no longer be sent to the server unchanged: when the current options can be determined, invalid entries fall back to the default;
+ * old configs that have no level metadata and whose protocol never offered this setting are left alone, to avoid wrongly deleting values the server can still handle.
  */
 internal fun ProviderStore.repairUnavailableReasoningEfforts() {
     val repaired = _roles.value.reasoningEfforts.mapNotNull { (role, effort) ->
-        // 组里只要有一个成员支持这个档位就留着:路由到不支持的成员时由 memberReasoningEffort 去掉
+        // Keep it as long as one member of the group supports this level: it is stripped by memberReasoningEffort when routing to a member that does not
         val cfgs = groupFor(role)?.enabledMembers?.mapNotNull { m -> _configs.value.firstOrNull { it.id == m.configId } }
             ?: listOfNotNull(configFor(role))
         if (cfgs.isEmpty()) return@mapNotNull null
@@ -149,9 +149,9 @@ internal fun ProviderStore.repairUnavailableReasoningEfforts() {
 }
 
 /**
- * 预设的默认上下文更新后,把当年按旧默认存下的配置跟上去:仅当存着的正是旧默认、这家预设现在的默认已经不同、
- * 用户没给这个模型单独写过窗口时才改;用户改过的任何值一律不动。只在 [load] 读入后跑一次,
- * 改动随读入后的统一写回落盘。窗口按旧值 64k 时,压缩会频繁改写请求前缀,服务商的前缀缓存整段失效(见 [ProviderPresets])。
+ * After a preset's default context is updated, bring configs stored with the old default up to date: only when the stored value is exactly the old default, the preset's current default already differs,
+ * and the user has not written a window for this model separately; any value the user changed is never touched. Runs once after [load] reads the data in,
+ * and the changes are persisted by the unified write-back that follows loading. With the old 64k window, compaction rewrites the request prefix frequently and the provider's prefix cache is invalidated wholesale (see [ProviderPresets]).
  */
 internal fun ProviderStore.repairStaleContextDefaults() {
     val fixed = _configs.value.mapNotNull { c ->
@@ -172,7 +172,7 @@ internal fun ProviderStore.providerOf(o: JsonObject) = Provider(
     name = o.str("name"),
     kind = ProviderConfig.Kind.valueOf(o.str("kind")),
     baseUrl = o.str("baseUrl"),
-    // 旧版本存下的没有这一项:按地址对得上的预设补上(读入后写回文件时记进去)
+    // Files from older versions lack this field: fill it in from the preset matching the address (recorded when writing the file back after loading)
     sessionHeader = o["sessionHeader"]?.jsonPrimitive?.content ?: ProviderPresets.forBaseUrl(o.str("baseUrl"))?.sessionHeader,
     signIn = o["signIn"]?.jsonPrimitive?.content,
     dailyTokenBudget = o.positiveLong("dailyTokenBudget")?.takeIf(TokenBudgetLimits::valid),
@@ -194,7 +194,7 @@ internal fun ProviderStore.providerOf(o: JsonObject) = Provider(
     ttsModels = (o["ttsModels"] as? JsonArray).orEmpty().mapNotNull {
         (it as? JsonPrimitive)?.takeIf { value -> value.isString }?.content?.trim()?.takeIf(String::isNotEmpty)
     }.toSet(),
-    // 旧版本存下的没有这一项:那时每一家都走过「测试并保存」,按测过算
+    // Files from older versions lack this field: back then every provider went through "test and save", so it counts as tested
     savedUntested = o["untested"]?.jsonPrimitive?.booleanOrNull ?: false,
     models = o["models"]?.jsonArray?.map { e ->
         val m = e.jsonObject
@@ -264,7 +264,7 @@ internal fun ProviderStore.groupOf(o: JsonObject) = ModelGroup(
     } ?: GroupLimits(),
 )
 
-/** `uses` 里的一个用途:`{"use":"model","config":id}`、`{"use":"group","group":id}`、`{"use":"main"}` 或 `{"use":"none"}`;认不出的按默认。 */
+/** One role in `uses`: `{"use":"model","config":id}`, `{"use":"group","group":id}`, `{"use":"main"}` or `{"use":"none"}`; unrecognized ones fall back to the default. */
 internal fun ProviderStore.choicesOf(o: JsonObject): RoleChoices {
     fun choice(role: ModelRole): RoleChoice? {
         val c = runCatching { o[role.name]?.jsonObject }.getOrNull() ?: return null

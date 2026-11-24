@@ -3,25 +3,25 @@ package com.wangzan101.mika.settings
 import android.app.NotificationManager
 import com.wangzan101.mika.task.TaskService
 
-/** 一个通知频道现在的样子(只看系统里的重要程度)。 */
+/** The current state of one notification channel (only looking at its importance in the system). */
 enum class ChannelLevel {
-    /** 频道被关掉了(或总开关关着)。 */
+    /** The channel has been turned off (or the master switch is off). */
     Off,
-    /** 会在屏幕上弹出。 */
+    /** Pops up on the screen. */
     HeadsUp,
-    /** 只安静地进通知栏。 */
+    /** Only goes quietly into the notification shade. */
     Quiet,
 }
 
-/** 通知页里一个频道的一行:[warn] 为真表示和期望不一致(该弹出的没弹出),要标出来。 */
+/** One channel row on the notifications page: [warn] true means it differs from what is expected (something that should pop up does not), and it must be flagged. */
 data class ChannelRow(val channelId: String, val level: ChannelLevel, val warn: Boolean)
 
-/** 通知的总体情况,显示在设置里「通知」一行的右侧。 */
+/** Overall notification status, shown to the right of the "Notifications" row in settings. */
 sealed interface NotificationSummary {
     data object Normal : NotificationSummary
-    /** [count] 个频道该弹出却没弹出。 */
+    /** [count] channels should pop up but do not. */
     data class Lowered(val count: Int) : NotificationSummary
-    /** App 的通知总开关关着。 */
+    /** The app's master notification switch is off. */
     data object AllOff : NotificationSummary
 }
 
@@ -34,9 +34,9 @@ data class NotificationOverview(
 ) {
     companion object {
         /**
-         * 由总开关和三个频道的重要程度得出每行状态和总体状态。重要程度为空表示频道还没建,按建立时的级别算。
-         * 「需要你处理」「任务结果」应当弹出,不是「会弹出」就标警告(已关闭也算);「任务进度」安静或关闭都不影响任务,不标。
-         * 总开关关着时三行都是「已关闭」、不标警告(问题在总开关)。
+         * Derives each row's state and the overall state from the master switch and the importance of the three channels. A null importance means the channel has not been created yet, so the level it gets on creation is assumed.
+         * "Needs your attention" and "Task results" are supposed to pop up, so anything other than "pops up" is flagged (being off counts too); "Task progress" being quiet or off does not affect tasks, so it is not flagged.
+         * When the master switch is off all three rows read "off" and nothing is flagged (the problem is the master switch).
          */
         fun of(appAllowed: Boolean, attention: Int?, result: Int?, progress: Int?): NotificationOverview {
             fun row(id: String, importance: Int?, shouldPopUp: Boolean): ChannelRow {

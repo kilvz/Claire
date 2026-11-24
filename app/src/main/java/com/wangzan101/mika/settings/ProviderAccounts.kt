@@ -20,20 +20,20 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.OPENROUTER_SIGN_IN
 import com.wangzan101.mika.settings.ProviderStore.Companion.XAI_ACCOUNT
 import com.wangzan101.mika.settings.ProviderStore.Companion.get
 
-// 服务商存储:ChatGPT、xAI、OpenRouter 账号登录与令牌刷新
-/** ChatGPT 服务商的登录(和 API Key 存在同一处、同样加密);没有或解不开为 null。 */
+// Provider storage: ChatGPT, xAI and OpenRouter account sign-in and token refresh
+/** ChatGPT provider sign-in (stored in the same place as the API key, encrypted the same way); null when absent or undecryptable. */
 fun ProviderStore.chatGptSession(providerId: String): ChatGptSession? = ChatGptSession.fromJson(providerKey(providerId))
 
-/** 已连接的 ChatGPT 服务商(只有一家)。 */
+/** The connected ChatGPT provider (there is only one). */
 fun ProviderStore.chatGptProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.ChatGpt }
 
-/** 登录成功:存下登录和列出的模型;已有 ChatGPT 服务商就更新那一家。 */
+/** Sign-in succeeded: stores the sign-in and the listed models; if a ChatGPT provider already exists, that one is updated. */
 fun ProviderStore.connectChatGpt(session: ChatGptSession, models: List<ListedModel>): Provider = synchronized(this) {
     connect(CHATGPT_NAME, ProviderConfig.Kind.ChatGpt, ChatGptAuth.API_BASE, session.toJson(), models) }
 
 /**
- * 退出登录:先在服务端注销刷新令牌(确认不了也照样清),再清掉本机的令牌;注册(client_id)和账号留着,再登录时沿用。
- * 返回服务端是否确认了注销。服务商和它的模型、用途都不动。
+ * Sign out: first revoke the refresh token on the server (clear it locally anyway if that cannot be confirmed), then clear the token on this device; the registration (client_id) and account are kept and reused on the next sign-in.
+ * Returns whether the server confirmed the revocation. The provider, its models and its roles are left untouched.
  */
 suspend fun ProviderStore.signOutChatGpt(providerId: String): Boolean {
     val s = chatGptSession(providerId) ?: return true
@@ -43,8 +43,8 @@ suspend fun ProviderStore.signOutChatGpt(providerId: String): Boolean {
 }
 
 /**
- * 这台设备在 ChatGPT 那边的本机标识和注册到的 client_id。标识第一次用时生成,之后一直不变;client_id 注册后记下,
- * 退出登录后留着(再登录沿用,不重复注册),删掉 ChatGPT 服务商时忘掉。两者都不是密钥,明文存。
+ * This device's host identifier on ChatGPT's side and the client_id it registered. The identifier is generated on first use and never changes afterwards; the client_id is recorded once registered,
+ * kept after signing out (reused on the next sign-in, so no re-registration), and forgotten when the ChatGPT provider is deleted. Neither is a secret, so both are stored in plaintext.
  */
 fun ProviderStore.chatGptRegistration(): Pair<String, String?> {
     return synchronized(this) {
@@ -58,7 +58,7 @@ fun ProviderStore.chatGptRegistration(): Pair<String, String?> {
     }
 }
 
-/** 记下注册到的 client_id(换令牌前就记,换失败了下次也不用重新注册)。 */
+/** Records the registered client_id (recorded before the token exchange, so a failed exchange does not force a re-registration next time). */
 fun ProviderStore.rememberChatGptClient(clientId: String) {
     synchronized(this) {
         val host = chatGptRegistration().first
@@ -78,13 +78,13 @@ internal fun ProviderStore.tokensFor(providerId: String): ChatGptTokens = synchr
     }
 }
 
-/** 订阅账号的登录(和 API Key 存在同一处、同样加密);没有或解不开为 null。 */
+/** Subscription account sign-in (stored in the same place as the API key, encrypted the same way); null when absent or undecryptable. */
 fun ProviderStore.accountSession(providerId: String): AccountSession? = AccountSession.fromJson(providerKey(providerId))
 
 fun ProviderStore.xaiProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.Xai }
 
 /**
- * 登录成功:存下登录和列出的模型。同一家账号登录只有一个服务商,再登录就更新它。
+ * Sign-in succeeded: stores the sign-in and the listed models. An account sign-in for one vendor has only one provider, so signing in again updates it.
  */
 fun ProviderStore.connectAccount(session: AccountSession, models: List<ListedModel>): Provider {
     return synchronized(this) {
@@ -103,7 +103,7 @@ fun ProviderStore.connectAccount(session: AccountSession, models: List<ListedMod
     }
 }
 
-/** 退出登录:只清这台手机上的令牌。xAI 账号里的授权要到 xAI 的设置里自己断开。 */
+/** Sign out: clears only the token on this phone. Authorization inside the xAI account has to be disconnected by the user in xAI's settings. */
 fun ProviderStore.signOutAccount(providerId: String) {
     synchronized(this) {
         val s = accountSession(providerId) ?: return
@@ -124,17 +124,17 @@ internal fun ProviderStore.saveAccount(providerId: String, session: AccountSessi
     }
 }
 
-/** 用 OpenRouter 账号授权连上的那一家;没有为 null。 */
+/** The provider connected via OpenRouter account authorization; null when there is none. */
 fun ProviderStore.openRouterAccount(): Provider? = _providers.value.firstOrNull { it.signIn == OPENROUTER_SIGN_IN }
 
 /**
- * 授权换到了 Key:按 OpenRouter 预设存成一家普通的 OpenAI 兼容服务商(Key 照常加密),标上是授权来的。
- * 已经有授权来的那一家就更新它;用户自己填 Key 的 OpenRouter 不动,两家并存。
+ * Authorization produced a key: store it as an ordinary OpenAI-compatible provider following the OpenRouter preset (the key is encrypted as usual), marked as obtained via authorization.
+ * If that authorized provider already exists it is updated; an OpenRouter entry where the user entered the key themselves is left alone and the two coexist.
  */
 fun ProviderStore.connectOpenRouter(apiKey: String, models: List<ListedModel>): Provider = synchronized(this) {
     connect(OPENROUTER_NAME, ProviderConfig.Kind.OpenAiCompat, OpenRouterAuth.API_BASE, apiKey, models, signIn = OPENROUTER_SIGN_IN) }
 
-/** 退出 OpenRouter 登录:删掉这台手机上的 Key;服务商、模型和用途留着。OpenRouter 那边的 Key 要用户到 Keys 页面删。 */
+/** Signs out of OpenRouter: deletes the key on this phone; the provider, models and roles are kept. The key on OpenRouter's side has to be deleted by the user on the Keys page. */
 fun ProviderStore.signOutOpenRouter(providerId: String) {
     synchronized(this) {
         if (provider(providerId)?.signIn == OPENROUTER_SIGN_IN && providerId in keys) setKey(providerId, "")
@@ -142,8 +142,8 @@ fun ProviderStore.signOutOpenRouter(providerId: String) {
 }
 
 /**
- * 刷新换到的令牌写回去,前提是这期间存着的登录没变:换令牌要等网络,用户可能已经退出或重新登录,
- * 那样旧的刷新结果不能盖掉(否则退出了又被悄悄登录回来,或新登录被旧令牌顶掉)。
+ * Writes back the tokens obtained from a refresh, but only if the stored sign-in has not changed in the meantime: a token exchange waits on the network, and the user may have signed out or signed in again by then,
+ * in which case the stale refresh result must not overwrite it (otherwise a signed-out account would be quietly signed back in, or a fresh sign-in would be displaced by an old token).
  */
 internal fun ProviderStore.saveRefreshed(providerId: String, before: AccountSession, after: AccountSession) {
     synchronized(this) {
