@@ -13,21 +13,21 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * 从一个来源查最新版本。[source] 是镜像前缀(空串表示直连 GitHub),完整请求地址是 `source + 官方地址`。
+ * Looks up the latest version from a single source. [source] is the mirror prefix (an empty string means connecting to GitHub directly); the complete request URL is `source + official URL`.
  *
- * 先问 GitHub API(信息最全,带更新说明、大小和摘要);镜像不支持 API 时退到发布页:
- * 从 `/releases/latest` 的跳转或页面里取最新 tag,再从 `/releases/expanded_assets/<tag>` 读出 APK 文件名和 SHA-256。
- * 两条都走不通就算这个来源没查到,由 [UpdateChecker] 换下一个来源。
+ * The GitHub API is queried first (the most complete information, including release notes, size and digest); when a mirror does not support the API it falls back to the releases page:
+ * take the latest tag from the redirect of `/releases/latest` or from the page itself, then read the APK file names and SHA-256 from `/releases/expanded_assets/<tag>`.
+ * If neither path works, this source is treated as having found nothing and [UpdateChecker] moves on to the next source.
  *
- * 请求用 OkHttp 的异步接口,响应体读取期间也保持可取消。
+ * Requests use OkHttp's asynchronous API, and reading the response body remains cancellable as well.
  */
 internal object UpdateProbe {
     private const val MAX_METADATA_BYTES = 2L * 1024 * 1024
 
-    /** 发布页里的最新版本链接。脚本里拼接出来的 `releases/tag/' + ...` 不会匹配。 */
+    /** Latest-version links inside the releases page. The `releases/tag/' + ...` concatenations produced by scripts will not match. */
     private val TAG = Regex("""releases/tag/([A-Za-z0-9._+-]+)""")
 
-    /** 附件行里的 APK 文件名;只取文件名,下载地址统一按官方仓库拼。 */
+    /** APK file name inside an asset row; only the file name is taken, the download URL is always assembled from the official repository. */
     private val APK = Regex("""releases/download/[^"'\s<>]+?/([^"'/\s<>]+\.apk)""", RegexOption.IGNORE_CASE)
 
     private val DIGEST = Regex("""sha256:[0-9a-fA-F]{64}""")
@@ -61,8 +61,8 @@ internal object UpdateProbe {
                 null
             }?.let { return it }
         }
-        // 直连时 API 已经给了明确回应(比如限流 403):GitHub 是通的,这次就是没查到,不再多打一次网页。
-        // 镜像的 403 通常只是「不代理 API」,还要试发布页。
+        // When connecting directly, the API already gave a definitive answer (for example a rate-limit 403): GitHub is reachable and this attempt simply found nothing, so do not hit the web page again.
+        // A mirror's 403 usually only means "the API is not proxied", so the releases page still has to be tried.
         if (source.isEmpty() && apiFailure is HttpFailure) return null
 
         val base = releasesUrl.trimEnd('/')
@@ -88,7 +88,7 @@ internal object UpdateProbe {
 
     private val testClient by lazy { UpdateChecker.defaultClient() }
 
-    /** 给「测试镜像」用:整次测试限时,并复用客户端。 */
+    /** Used by "test mirror": bounds the whole test with a timeout and reuses the client. */
     suspend fun test(
         prefix: String,
         client: OkHttpClient = testClient,
@@ -106,8 +106,8 @@ internal object UpdateProbe {
     }
 
     /**
-     * 最新 tag:有的镜像把 `/releases/latest` 原样跳转,`Location` 里就带着 tag;
-     * 有的镜像自己跟到底,返回 200 的发布页,再从页面里找。两种都认。
+     * Latest tag: some mirrors pass the `/releases/latest` redirect through as-is, so the tag is already carried in `Location`;
+     * others follow it all the way and return the 200 releases page, from which the tag is then extracted. Both are handled.
      */
     private suspend fun latestTag(client: OkHttpClient, url: String, userAgent: String): String? {
         val noRedirect = client.newBuilder().followRedirects(false).build()
@@ -133,7 +133,7 @@ internal object UpdateProbe {
         }
     }
 
-    /** 已知长度可以提前拒绝，实际读取上限也覆盖分块和解压后的响应。 */
+    /** A known length allows rejecting early, and the actual read limit also covers chunked and decompressed responses. */
     private fun Response.readMetadata(): String {
         val metadata = body ?: throw IOException("empty body")
         if (metadata.contentLength() > MAX_METADATA_BYTES || metadata.source().request(MAX_METADATA_BYTES + 1)) {
@@ -163,8 +163,8 @@ internal object UpdateProbe {
         }
 
     /**
-     * 从 GitHub 的附件列表网页里读 APK:每一行一个附件,行内有下载路径和 `sha256:...`。
-     * 网页结构变了就退回全文找文件名(这时没有摘要,安装前仍会验签名)。
+     * Reads the APKs from GitHub's asset-list web page: one asset per row, with the download path and `sha256:...` inside the row.
+     * If the page structure changes, it falls back to searching the whole text for file names (no digest then, but the signature is still verified before installing).
      */
     private fun parseAssets(html: String, tag: String, base: String): List<Releases.ReleaseAsset> {
         val byName = LinkedHashMap<String, String?>()

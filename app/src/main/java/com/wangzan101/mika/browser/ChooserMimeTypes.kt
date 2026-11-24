@@ -1,9 +1,9 @@
 package com.wangzan101.mika.browser
 
-/** 网页文件选择框给的类型 → 系统选择器的 MIME 类型。 */
+/** Types supplied by the web page's file chooser → MIME types for the system picker. */
 object ChooserMimeTypes {
     /**
-     * 扩展名(以 `.` 开头)交给 [mimeOf] 换成 MIME,其他原样;空的丢掉;一个都没有时用全部类型。
+     * Extensions (starting with `.`) are passed to [mimeOf] to be converted into MIME types, everything else is kept as-is; empty entries are dropped; when none are left, all types are used.
      */
     fun of(acceptTypes: List<String>, mimeOf: (String) -> String?): List<String> {
         val types = acceptTypes.mapNotNull { raw ->

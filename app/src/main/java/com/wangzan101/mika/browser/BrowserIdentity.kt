@@ -7,25 +7,25 @@ import kotlinx.serialization.json.contentOrNull
 import java.io.File
 
 /**
- * 浏览器页用手机版还是电脑版网页:
- * - 用户自己浏览默认手机版;在「更多」里换成电脑版的网站记在 [UserSiteModes],下次也用电脑版;
- * - 「给 Claire 登录」(从常用网站打开还没登录的网站)时整个标签照 Claire 办事时的身份走([agentMobile]),
- *   登录留下的 Cookie 和 Claire 办事时看到的网站是同一版,Claire 那边也是登录的。
- * Agent 自己的标签不看这里,按站点记住的那份照旧(默认电脑版)。
+ * Whether the browser page uses mobile or desktop web pages:
+ * - The user's own browsing defaults to mobile; sites switched to desktop under "More" are recorded in [UserSiteModes] and keep using desktop next time;
+ * - During "log in for Claire" (opening a site that is not logged in yet from the frequently used sites) the whole tab follows the identity Claire uses when working ([agentMobile]),
+ *   so the cookies left by logging in match the version of the site Claire sees while working, and Claire is logged in there too.
+ * Agent tabs of their own ignore this and keep following the per-site record (desktop by default).
  */
 object BrowserIdentity {
-    /** 返回 true 用手机版。 */
+    /** Returns true to use the mobile version. */
     fun mobile(loginForMika: Boolean, agentMobile: Boolean, userDesktop: Boolean): Boolean =
         if (loginForMika) agentMobile else !userDesktop
 
-    /** 从常用网站打开:还没登录的走「给 Claire 登录」。 */
+    /** Opened from the frequently used sites: one that is not logged in yet goes through "log in for Claire". */
     fun loginFlow(site: FavoriteSite): Boolean = !site.loggedIn
 }
 
 /**
- * 用户在浏览器页里换成电脑版的网站(默认手机版)。按主机名记,去掉开头的 www.;子域名跟着上级走
- * (记了 example.com,m.example.com 也用电脑版)。和 Agent 的那份分开存,互不影响。
- * 存在 App 私有目录的一个 JSON 文件里,坏了就从空表开始。
+ * Sites the user switched to desktop in the browser page (mobile by default). Recorded by host name with a leading www. removed; subdomains follow their parent
+ * (recording example.com makes m.example.com use desktop as well). Stored separately from the Agent's copy, so the two do not affect each other.
+ * Stored in a JSON file in the app's private directory; if it is corrupted, it restarts from an empty list.
  */
 class UserSiteModes(dir: File) {
     private val file = File(dir, FILE)
@@ -52,7 +52,7 @@ class UserSiteModes(dir: File) {
         }
     }
 
-    /** 记下这个网站用哪一版;换回手机版时连上级域名的记录一起去掉,否则还会跟着上级走。 */
+    /** Records which version this site uses; when switching back to mobile, the parent domain's record is removed as well, otherwise the site would still follow the parent. */
     @Synchronized
     fun set(host: String, desktop: Boolean) {
         val k = key(host) ?: return

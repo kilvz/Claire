@@ -14,21 +14,21 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.File
 
-/** 存下的一页书签:网址、标题(可以为空,显示时用网站名)、加入的时间;[edited] 是用户自己改过标题。 */
+/** A saved page bookmark: URL, title (may be empty, in which case the site name is shown), the time it was added; [edited] means the user changed the title themselves. */
 data class PageBookmark(val url: String, val title: String, val addedAtMs: Long, val edited: Boolean = false)
 
 /**
- * 浏览器页的书签:用户自己保存的具体网页,最近加入的在前,同一网址(不计 # 后面)只留一条,至多 [limit] 条。
- * 只收 http/https 网页。存在 App 私有目录的一个 JSON 文件里;文件坏了就从空表重新开始。
+ * Bookmarks on the browser page: individual web pages saved by the user, most recently added first, only one entry per URL (ignoring everything after #), at most [limit] entries.
+ * Only http/https pages are accepted. Stored in a JSON file in the app's private directory; if the file is corrupted, it restarts from an empty list.
  */
 class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock: () -> Long = System::currentTimeMillis) {
     private val file = File(dir, FILE)
     private val _entries = MutableStateFlow(load())
 
-    /** 最近加入的在前。 */
+    /** Most recently added first. */
     val entries: StateFlow<List<PageBookmark>> = _entries.asStateFlow()
 
-    /** 加入书签;网址不是 http/https 网页时为 false。同一网址再存一次会挪到最前、标题换成新的。 */
+    /** Adds a bookmark; false when the URL is not an http/https page. Saving the same URL again moves it to the front and replaces the title with the new one. */
     @Synchronized
     fun add(url: String, title: String?): Boolean {
         val u = clean(url) ?: return false
@@ -38,7 +38,7 @@ class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock
         return true
     }
 
-    /** 当前页标题后到时补上:只改已有的那一条,不挪位置;用户自己改过标题的不动。 */
+    /** Fills in the current page's title when it arrives later: only updates the existing entry without moving it; entries whose title the user changed are left alone. */
     @Synchronized
     fun retitle(url: String, title: String) {
         val key = key(url)
@@ -47,7 +47,7 @@ class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock
         save(_entries.value.map { if (key(it.url) == key) it.copy(title = t) else it })
     }
 
-    /** 用户自己改标题;空标题不生效。改过之后页面标题再变也不覆盖。 */
+    /** The user changes the title themselves; an empty title has no effect. Once changed, later changes to the page title do not overwrite it. */
     @Synchronized
     fun rename(url: String, title: String) {
         val t = title.trim()
@@ -57,7 +57,7 @@ class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock
         save(_entries.value.map { if (key(it.url) == key) it.copy(title = t, edited = true) else it })
     }
 
-    /** 删掉一条;没有这一条时为 false。 */
+    /** Deletes one entry; false when there is no such entry. */
     @Synchronized
     fun remove(url: String): Boolean {
         val key = key(url)
@@ -103,7 +103,7 @@ class PageBookmarks(dir: File, private val limit: Int = LIMIT, private val clock
         _entries.value = list
         file.parentFile?.mkdirs()
         val json = JsonArray(list.map { buildJsonObject { put("url", it.url); put("title", it.title); put("at", it.addedAtMs); put("edited", it.edited) } }).toString()
-        // 先写临时文件再改名,写到一半被杀不会留下半个文件
+        // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
         val tmp = File(file.parentFile, "$FILE.tmp")
         tmp.writeText(json)
         if (!tmp.renameTo(file)) {

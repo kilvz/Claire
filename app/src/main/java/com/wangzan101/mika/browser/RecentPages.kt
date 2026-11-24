@@ -13,20 +13,20 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.File
 
-/** 最近打开的一页:网址、标题(读不到时为空)、打开的时间。 */
+/** A recently opened page: URL, title (empty when it cannot be read), and when it was opened. */
 data class RecentPage(val url: String, val title: String, val openedAtMs: Long)
 
 /**
- * 浏览器页的历史记录:用户在 Claire 的浏览器页里打开过的网页,最近的在前,至多 [limit] 条。
- * 同一网址(不计 # 后面的部分)只留一条,再打开时挪到最前、标题换成新的。
- * 起始页只列最近 [START_LIMIT] 条,历史页列全部。
- * 存在 App 私有目录的一个 JSON 文件里;文件坏了就从空表重新开始。
+ * History of the browser page: web pages the user has opened in Claire's browser page, most recent first, at most [limit] entries.
+ * Only one entry per URL (ignoring the part after #); opening it again moves it to the front and replaces the title with the new one.
+ * The start page lists only the most recent [START_LIMIT] entries, while the history page lists all of them.
+ * Stored in a JSON file in the app's private directory; if the file is corrupted, it restarts from an empty list.
  */
 class RecentPages(dir: File, private val limit: Int = LIMIT, private val clock: () -> Long = System::currentTimeMillis) {
     private val file = File(dir, FILE)
     private val _entries = MutableStateFlow(load())
 
-    /** 最近的在前。 */
+    /** Most recent first. */
     val entries: StateFlow<List<RecentPage>> = _entries.asStateFlow()
 
     @Synchronized
@@ -38,7 +38,7 @@ class RecentPages(dir: File, private val limit: Int = LIMIT, private val clock: 
         save((listOf(page) + rest).take(limit))
     }
 
-    /** 当前页标题后到时补上:只改已有的那一条,不挪位置。 */
+    /** Fills in the current page's title when it arrives later: only updates the existing entry without moving it. */
     @Synchronized
     fun retitle(url: String, title: String) {
         val key = key(url)
@@ -47,7 +47,7 @@ class RecentPages(dir: File, private val limit: Int = LIMIT, private val clock: 
         save(_entries.value.map { if (key(it.url) == key) it.copy(title = t) else it })
     }
 
-    /** 删掉一条;没有这一条时为 false。 */
+    /** Deletes one entry; false when there is no such entry. */
     @Synchronized
     fun remove(url: String): Boolean {
         val key = key(url)
@@ -81,7 +81,7 @@ class RecentPages(dir: File, private val limit: Int = LIMIT, private val clock: 
         _entries.value = list
         file.parentFile?.mkdirs()
         val json = JsonArray(list.map { buildJsonObject { put("url", it.url); put("title", it.title); put("at", it.openedAtMs) } }).toString()
-        // 先写临时文件再改名,写到一半被杀不会留下半个文件
+        // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
         val tmp = File(file.parentFile, "$FILE.tmp")
         tmp.writeText(json)
         if (!tmp.renameTo(file)) {
@@ -91,9 +91,9 @@ class RecentPages(dir: File, private val limit: Int = LIMIT, private val clock: 
     }
 
     companion object {
-        /** 历史记录最多留这么多条。 */
+        /** Maximum number of history entries kept. */
         const val LIMIT = 500
-        /** 起始页「最近打开」只列这么多条。 */
+        /** The start page's "recently opened" section lists only this many entries. */
         const val START_LIMIT = 10
         private const val FILE = "browser_recent.json"
     }

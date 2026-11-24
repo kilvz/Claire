@@ -4,15 +4,15 @@ import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.task.TaskGate
 import com.wangzan101.mika.task.TaskService.Companion.isActive
 
-/** 浏览器页底部此刻是什么:平时的输入条、半屏对话面板、收起来的小卡片。 */
+/** What the bottom of the browser page currently shows: the usual input bar, the half-screen conversation panel, or the collapsed small card. */
 enum class PageAskMode { Bar, Panel, Card }
 
 /**
- * 在浏览器页上问 Claire 那一块怎么显示(纯逻辑)。[state] 是这一页的对话里此刻那件事的状态(没有为 null),
- * [open] 是面板开着(用户问了、点开了小卡片、Claire 要你回话时打开;用户收起、你在页面上动手时收起)。
- * - 面板开着就是面板;
- * - 收着、那件事还没结束:底部一张小卡片(说它此刻在做什么);你在页面上动手而暂停时卡片写「已暂停」,顶上一条「你在操作，Claire 已暂停 · 继续」;
- * - 其余(没有任务、已经结束又收起来了):平时的输入条。
+ * How the ask-Claire block on the browser page is displayed (pure logic). [state] is the state of the current task in this page's conversation (null when there is none),
+ * [open] is whether the panel is open (it opens when the user asks, taps the small card, or Claire needs your reply; it collapses when the user collapses it or when you start interacting with the page).
+ * - If the panel is open, it is the panel;
+ * - If collapsed and that task is not finished yet: a small card at the bottom (saying what it is doing right now); when paused because you are interacting with the page, the card says "paused" and a banner at the top says "You are interacting, Claire is paused · Resume";
+ * - Otherwise (no task, or already finished and collapsed again): the usual input bar.
  */
 object PageAskModel {
     fun mode(state: TaskState?, open: Boolean): PageAskMode = when {
@@ -21,14 +21,14 @@ object PageAskModel {
         else -> PageAskMode.Bar
     }
 
-    /** 你在页面上亲手操作,Claire 停着等你点「继续」。 */
+    /** You are interacting with the page yourself, and Claire is stopped waiting for you to tap "Resume". */
     fun pausedForUser(state: TaskState?): Boolean =
         state is TaskState.Held && state.reason.code == "paused" && state.reason.why == TaskGate.USER_ON_PAGE
 
-    /** 页面四周亮一圈光边:Claire 正在干活(不是在等你、不是暂停)。 */
+    /** A glowing border around the page: Claire is working (not waiting for you and not paused). */
     fun glow(state: TaskState?): Boolean = state is TaskState.Running
 
-    /** Claire 要你回话(回答、同意、接手、动一下手):从别的状态进到这里时面板自己打开。 */
+    /** Claire needs your reply (an answer, approval, takeover, or a nudge): the panel opens by itself when this state is entered from another state. */
     fun needsYou(state: TaskState?): Boolean = when (state) {
         is TaskState.WaitingInput, is TaskState.WaitingConfirmation, is TaskState.WaitingTakeover -> true
         is TaskState.Held -> state.reason.needsYou
@@ -36,8 +36,8 @@ object PageAskModel {
     }
 
     /**
-     * 状态从 [before] 变成 [after] 时面板该怎么变:true 打开、false 收起、null 不动。
-     * 你在页面上动手而暂停时收起成小卡片(让开页面);Claire 新要你回话时打开。
+     * How the panel should change when the state goes from [before] to [after]: true opens it, false collapses it, null leaves it alone.
+     * It collapses into the small card when paused because you are interacting with the page (getting out of the page's way); it opens when Claire newly needs your reply.
      */
     fun follow(before: TaskState?, after: TaskState?): Boolean? = when {
         pausedForUser(after) && !pausedForUser(before) -> false

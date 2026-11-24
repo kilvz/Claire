@@ -8,9 +8,9 @@ import java.net.URLEncoder
 import java.util.UUID
 
 /**
- * 一个搜索引擎:起始页和地址栏显示名字([displayName]),搜索词换成搜索网址([searchUrl]),
- * 再从网址读回搜索词([queryOf],用来在「最近打开」和地址栏里显示搜的词)。
- * 内置的几个是 [SearchEngine],用户自己加的是 [CustomSearchEngine]。
+ * A search engine: the start page and address bar show the name ([displayName]), a search term is turned into a search URL ([searchUrl]),
+ * and the search term is read back from the URL ([queryOf], used to show the searched term in "recently opened" and in the address bar).
+ * The built-in ones are [SearchEngine]; the ones the user adds are [CustomSearchEngine].
  */
 sealed interface SearchEngineSpec {
     val id: String
@@ -18,22 +18,22 @@ sealed interface SearchEngineSpec {
 
     fun searchUrl(query: String): String
 
-    /** 网址是这个引擎的搜索结果页时为搜的词,否则为 null。 */
+    /** The searched term when the URL is this engine's search-results page, otherwise null. */
     fun queryOf(url: String): String?
 
     companion object {
-        /** 网址是 [engines] 里哪个引擎的搜索结果页、搜的是什么;都不是为 null。只解码一次。 */
+        /** Which engine in [engines] the URL is a search-results page of, and what was searched; null when it is none of them. Decodes only once. */
         fun match(url: String, engines: List<SearchEngineSpec>): Pair<SearchEngineSpec, String>? =
             engines.firstNotNullOfOrNull { e -> e.queryOf(url)?.let { e to it } }
 
-        /** 网址是 [engines] 里哪个引擎的搜索结果页;都不是为 null。 */
+        /** Which engine in [engines] the URL is a search-results page of; null when it is none of them. */
         fun of(url: String, engines: List<SearchEngineSpec>): SearchEngineSpec? = match(url, engines)?.first
     }
 }
 
 /**
- * 内置的搜索引擎。每个只是一个前缀:搜索网址是前缀加编码后的词,反过来从网址认出搜的是什么。
- * 名字按界面语言取:品牌名多数语言照写,简中写「必应」「谷歌」「百度」。
+ * The built-in search engines. Each is just a prefix: the search URL is the prefix plus the encoded term, and conversely the searched term is recognized from the URL.
+ * Names follow the UI language: most languages write the brand names as-is, while Simplified Chinese uses their localized forms.
  */
 enum class SearchEngine(override val id: String, private val nameRes: Int, private val prefix: String) : SearchEngineSpec {
     Bing("bing", R.string.browser_engine_bing, "https://www.bing.com/search?q="),
@@ -57,9 +57,9 @@ enum class SearchEngine(override val id: String, private val nameRes: Int, priva
 }
 
 /**
- * 用户自己加的搜索引擎:一个网址模板,用 [PLACEHOLDER] 代表搜索词,例如 `https://example.com/search?q=%s`。
- * 模板必须正好一个占位符;生出的网址以模板前半段开头,后面(有的话)是模板后半段。
- * 从网址读回搜索词时,后半段为空就取到 `&` 或 `#` 为止,否则取到后半段出现的位置为止。
+ * A search engine added by the user: a URL template in which [PLACEHOLDER] stands for the search term, for example `https://example.com/search?q=%s`.
+ * The template must contain exactly one placeholder; the generated URL starts with the first half of the template and continues (if anything follows) with its second half.
+ * When reading the search term back from a URL, if the second half is empty the term runs up to `&` or `#`; otherwise it runs up to where the second half appears.
  */
 @ConsistentCopyVisibility
 data class CustomSearchEngine private constructor(
@@ -86,7 +86,7 @@ data class CustomSearchEngine private constructor(
         return decode(raw)
     }
 
-    /** 模板后半段出现的位置:后面得是结尾、`&` 或 `#`,免得搜索词里正好也有这一段时截错。 */
+    /** Position where the template's second half appears: it must be followed by the end, `&` or `#`, so that a search term which happens to contain that segment is not cut at the wrong place. */
     private fun suffixStart(rest: String): Int? {
         var from = 0
         while (true) {
@@ -101,11 +101,11 @@ data class CustomSearchEngine private constructor(
     companion object {
         const val PLACEHOLDER = "%s"
 
-        /** 按用户输入的名字和网址建一个;名字为空、网址不是 http(s) 或不是正好一个占位符时为 null。 */
+        /** Creates one from the name and URL entered by the user; null when the name is empty, the URL is not http(s), or there is not exactly one placeholder. */
         fun create(name: String, template: String): CustomSearchEngine? =
             create("custom:" + UUID.randomUUID(), name, template)
 
-        /** 从存下的内容还原;不合法(旧版本、文件被改坏)时为 null。 */
+        /** Restores from stored content; null when invalid (an older version, or the file was corrupted). */
         internal fun create(id: String, name: String, template: String): CustomSearchEngine? {
             val n = name.trim()
             val t = template.trim()

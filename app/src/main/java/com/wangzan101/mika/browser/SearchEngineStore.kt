@@ -11,15 +11,15 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 
-/** 浏览器可选的搜索引擎:当前选的和用户自己加的。 */
+/** The search engines available in the browser: the currently selected one and the ones the user added. */
 data class SearchEngineChoices(val selected: SearchEngineSpec, val custom: List<CustomSearchEngine>) {
-    /** 选择列表里的全部:内置在前,自定义在后。 */
+    /** Everything in the choice list: built-in engines first, custom ones after. */
     val all: List<SearchEngineSpec> get() = SearchEngine.entries + custom
 }
 
 /**
- * 用户在起始页选的搜索引擎和自定义的搜索引擎,下次打开还是这样。
- * 存在 App 私有目录的一个 JSON 文件里;文件不存在、坏了或认不出来时用 [SearchEngine.Bing]、没有自定义。
+ * The search engine the user selected on the start page and the custom search engines; it stays this way next time.
+ * Stored in a JSON file in the app's private directory; when the file is missing, corrupted or unrecognizable, [SearchEngine.Bing] is used with no custom engines.
  */
 class SearchEngineStore(dir: File) {
     private val file = File(dir, FILE)
@@ -35,7 +35,7 @@ class SearchEngineStore(dir: File) {
         save(_choices.value)
     }
 
-    /** 加一个自定义搜索引擎并换成它;同一个 id 已经有了就不动。 */
+    /** Adds a custom search engine and switches to it; does nothing when the same id already exists. */
     @Synchronized
     fun addCustom(engine: CustomSearchEngine) {
         val c = _choices.value
@@ -44,7 +44,7 @@ class SearchEngineStore(dir: File) {
         save(_choices.value)
     }
 
-    /** 删掉一个自定义搜索引擎;删的是当前选的就换回必应。 */
+    /** Deletes a custom search engine; when the deleted one is the currently selected one, switches back to Bing. */
     @Synchronized
     fun removeCustom(id: String) {
         val c = _choices.value
@@ -89,7 +89,7 @@ class SearchEngineStore(dir: File) {
                     ),
                 )
             }.toString()
-            // 先写临时文件再改名,写到一半被杀不会留下半个文件
+            // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
             val tmp = File(file.parentFile, "$FILE.tmp")
             tmp.writeText(json)
             if (!tmp.renameTo(file)) {

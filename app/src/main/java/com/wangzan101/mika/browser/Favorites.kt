@@ -14,19 +14,19 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 
-/** 「常用网站」里的一格:打开时去的主机名、在 Claire 里是否登录着(这个网站的任一主机名登录着就算)。 */
+/** One tile in "frequently used sites": the host name opened when tapped, and whether it is logged in in Claire (any host name of this site being logged in counts). */
 data class FavoriteSite(val host: String, val loggedIn: Boolean)
 
-/** 用户对「常用网站」的改动:自己加的([pinned],按加入的先后)和从里面移除的([hidden])。 */
+/** The user's changes to "frequently used sites": the ones added manually ([pinned], in order of addition) and the ones removed ([hidden]). */
 data class FavoriteEdits(val pinned: List<String> = emptyList(), val hidden: Set<String> = emptySet())
 
 /**
- * 浏览器页「常用网站」:用户自己加的网站在前,后面是站点登记表里的网站(Agent 和用户访问过的;登录过的在前)。
- * 同一网站(同一可注册域名)只占一格,打开时去其中最短的主机名。
+ * "Frequently used sites" on the browser page: sites added by the user come first, followed by the sites from the site registry (visited by the Agent or the user; logged-in ones first).
+ * Each site (each registrable domain) occupies only one tile, and tapping it opens the shortest host name among them.
  *
- * 只记用户的改动,不动站点登记表:从常用里移除只是不显示,登录状态、Cookie 和 Agent 用的登记都照旧
- * (退出登录在设置页「网站登录」里做);再加回来就又显示。
- * 存在 App 私有目录的一个 JSON 文件里;文件坏了就从空表重新开始。
+ * Only the user's changes are recorded and the site registry is left untouched: removing from the frequently used list merely hides the site, while the login state, cookies and the registry used by the Agent stay as they are
+ * (logging out is done on the settings page under "site logins"); adding it back shows it again.
+ * Stored in a JSON file in the app's private directory; if the file is corrupted, it restarts from an empty list.
  */
 class BrowserFavorites(dir: File) {
     private val file = File(dir, FILE)
@@ -34,7 +34,7 @@ class BrowserFavorites(dir: File) {
 
     val edits: StateFlow<FavoriteEdits> = _edits.asStateFlow()
 
-    /** 加入常用:放到自己加的最后;以前移除过的这个网站重新显示。 */
+    /** Adds to the frequently used list: appended after the manually added ones; a site that was removed before is shown again. */
     @Synchronized
     fun add(host: String) {
         val h = norm(host) ?: return
@@ -43,7 +43,7 @@ class BrowserFavorites(dir: File) {
         save(FavoriteEdits(e.pinned.filter { siteKey(it) != site } + h, e.hidden - site))
     }
 
-    /** 从常用移除:自己加的去掉,登记表里来的不再显示。 */
+    /** Removes from the frequently used list: manually added ones are dropped, ones coming from the registry are no longer shown. */
     @Synchronized
     fun remove(host: String) {
         val h = norm(host) ?: return
@@ -70,7 +70,7 @@ class BrowserFavorites(dir: File) {
             put("pinned", JsonArray(e.pinned.map(::JsonPrimitive)))
             put("hidden", JsonArray(e.hidden.sorted().map(::JsonPrimitive)))
         }.toString()
-        // 先写临时文件再改名,写到一半被杀不会留下半个文件
+        // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file
         val tmp = File(file.parentFile, "$FILE.tmp")
         tmp.writeText(json)
         if (!tmp.renameTo(file)) {
@@ -80,7 +80,7 @@ class BrowserFavorites(dir: File) {
     }
 
     companion object {
-        /** 网格至多这么多格网站(再加一格「＋」,一行四个正好三行)。 */
+        /** The grid holds at most this many site tiles (plus one "＋" tile, exactly three rows of four). */
         const val LIMIT = 11
         private const val FILE = "browser_favorites.json"
 
@@ -90,10 +90,10 @@ class BrowserFavorites(dir: File) {
             return WebUrlPolicy.host(if ("://" in s) s else "https://$s")
         }
 
-        /** 同一网站的标记:可注册域名,拿不准时是主机名本身。 */
+        /** The marker for a site: its registrable domain, or the host name itself when that cannot be determined. */
         fun siteKey(host: String): String = WebUrlPolicy.registrable(host) ?: host
 
-        /** 合成网格:自己加的在前(按加入先后),再按登记表的顺序;同一网站一格,移除过的不显示,至多 [limit] 格。 */
+        /** Builds the grid: manually added ones first (in order of addition), then in registry order; one tile per site, removed ones are not shown, at most [limit] tiles. */
         fun combine(edits: FavoriteEdits, registry: List<SiteEntry>, limit: Int = LIMIT): List<FavoriteSite> {
             val bySite = registry.groupBy { siteKey(it.host) }
             fun loggedIn(site: String) = bySite[site].orEmpty().any { it.loggedInByUser }
@@ -111,13 +111,13 @@ class BrowserFavorites(dir: File) {
             return out.values.take(limit)
         }
 
-        /** [host] 所在的网站在 Claire 里是否登录着(登记表里这个网站的任一主机名登录着)。 */
+        /** Whether the site that [host] belongs to is logged in in Claire (any host name of this site in the registry is logged in). */
         fun loggedIn(registry: List<SiteEntry>, host: String): Boolean {
             val site = siteKey(host)
             return registry.any { it.loggedInByUser && siteKey(it.host) == site }
         }
 
-        /** [host] 所在的网站在不在 [sites] 里。 */
+        /** Whether the site that [host] belongs to is present in [sites]. */
         fun contains(sites: List<FavoriteSite>, host: String): Boolean {
             val site = siteKey(host)
             return sites.any { siteKey(it.host) == site }

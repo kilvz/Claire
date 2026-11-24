@@ -102,8 +102,8 @@ internal val MiniShape = MikaShapes.Tile
 internal val InitialSmall = MikaType.Caption.copy(fontWeight = FontWeight.Bold)
 
 /**
- * 网站的方块:有存下的网站图标就画在白底上;没有时是按主机名定的底色加名字的第一个字。
- * 图标文件在后台读,读过的留在进程里的小缓存里(按文件和保存时间)。
+ * A site tile: when a stored site icon exists it is drawn on a white background; otherwise the background is the color derived from the host name with the first character of the name on it.
+ * Icon files are read in the background, and icons already read stay in a small in-process cache (keyed by file and stored time).
  */
 @Composable
 fun SiteTile(face: SiteFace, size: Dp, shape: Shape, initialStyle: TextStyle) {
@@ -137,8 +137,8 @@ private fun rememberSiteIcon(face: SiteFace): ImageBitmap? {
 }
 
 /**
- * 网页的顶栏:关闭(回起始页)、地址栏、刷新(加载时是停止),下面一条 2dp 的进度条。
- * 地址栏平时只显示锁和网站名(搜索结果页是搜的词),电脑版时带一个「电脑版」小标签;点了展开成完整网址可改,右边「取消」收回。
+ * The web page's top bar: close (back to the start page), address bar, refresh (stop while loading), with a 2dp progress bar below.
+ * The address bar normally shows only the lock and the site name (the search term for search-results pages), with a small "desktop" tag in desktop mode; tapping it expands to the full editable URL, with "cancel" on the right to collapse it again.
  */
 @Composable
 fun BrowserPageBar(
@@ -214,7 +214,7 @@ private fun AddressPill(page: BrowserPage, face: SiteFace?, engines: List<Search
 
 private val TagText = MikaType.Micro.copy(fontWeight = FontWeight.SemiBold)
 
-/** 展开的地址栏:完整网址全选着,键盘上是「前往」。 */
+/** The expanded address bar: the full URL is selected, and the keyboard key is "go". */
 @Composable
 private fun AddressEditor(url: String, modifier: Modifier, onGo: (String) -> Unit) {
     val c = MikaTheme.colors
@@ -239,7 +239,7 @@ private fun AddressEditor(url: String, modifier: Modifier, onGo: (String) -> Uni
     }
 }
 
-/** 网页下面的工具栏:后退、前进、起始页、分享、更多。 */
+/** The toolbar below the web page: back, forward, home, share, more. */
 @Composable
 fun BrowserToolbar(
     page: BrowserPage,
@@ -266,7 +266,7 @@ fun BrowserToolbar(
     }
 }
 
-/** 「给 Claire 登录」的横幅:说明这次用的是 Claire 办事时的那一版,登录完点「登录好了」。 */
+/** The "log in for Claire" banner: explains that this uses the same version Claire uses when working, and "logged in" is tapped once the login is finished. */
 @Composable
 fun LoginBanner(desktop: Boolean, onDone: () -> Unit) {
     val c = MikaTheme.colors
@@ -287,8 +287,8 @@ fun LoginBanner(desktop: Boolean, onDone: () -> Unit) {
 }
 
 /**
- * 「更多」面板:顶上是这个网站(图标、名字、主机名),下面刷新、复制链接、在其他浏览器里打开、加入常用网站(已在常用时是从常用移除)、
- * 换成电脑版 / 换回手机版(这个网站下次也这样)。点任何一项先关面板再做。
+ * The "more" sheet: at the top is this site (icon, name, host name), below are refresh, copy link, open in another browser, add to frequently used sites (remove from them when already there),
+ * switch to desktop / back to mobile (this site keeps doing so next time). Tapping any item closes the sheet first and then acts.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -362,7 +362,7 @@ fun BrowserMoreSheet(
 }
 
 /**
- * 书签面板:全部书签,最近加入的在前;「整理」进整理,点一行改标题,× 移除,「完成」退出。
+ * Bookmarks sheet: all bookmarks, most recently added first; "edit" enters editing, tapping a row renames it, × removes it, and "done" exits.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -440,7 +440,7 @@ fun BookmarksSheet(
     }
 }
 
-/** 改书签标题:预填现在的标题,空标题不保存。 */
+/** Renames a bookmark: pre-fills the current title; an empty title is not saved. */
 @Composable
 private fun RenameBookmarkDialog(bookmark: PageBookmark, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var title by rememberSaveable(bookmark.url) { mutableStateOf(bookmark.title) }

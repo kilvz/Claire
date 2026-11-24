@@ -58,8 +58,8 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import kotlinx.coroutines.delay
 
 /**
- * 下载面板:系统下载里的这个 App 的下载,最新的在前;每秒刷新一次。
- * 正在下载的可取消;下完的点一行打开,旁边分享或删除;删除前确认。
+ * Downloads panel: this app's downloads from the system download manager, newest first; refreshed once per second.
+ * Running downloads can be cancelled; tapping a completed row opens it, with share or delete beside it; deletion asks for confirmation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

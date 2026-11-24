@@ -17,13 +17,13 @@ import java.io.IOException
 import java.util.UUID
 
 /**
- * 一个 GitHub 下载镜像。[prefix] 形如 `https://ghfast.top/`,完整地址是 prefix + 官方附件地址。
- * 用户可改名、改地址、调顺序、增删;GitHub 官方始终排在最后兜底,不在这个列表里。
+ * A single GitHub download mirror. [prefix] looks like `https://ghfast.top/`; the complete URL is prefix + the official asset URL.
+ * The user can rename it, change the address, reorder, add and remove; official GitHub is always tried last as a fallback and is not part of this list.
  */
 @Serializable
 data class UpdateMirror(val id: String, val name: String, val prefix: String)
 
-/** 更新走的镜像设置:总开关和按顺序尝试的列表。 */
+/** The mirror settings used for updates: the master switch and the list tried in order. */
 @Serializable
 data class MirrorSettings(val enabled: Boolean = false, val mirrors: List<UpdateMirror> = emptyList()) {
     companion object {
@@ -31,13 +31,13 @@ data class MirrorSettings(val enabled: Boolean = false, val mirrors: List<Update
     }
 }
 
-/** 保存镜像列表没通过时的原因。界面只在写入成功后改列表。 */
+/** The reason a mirror-list save was rejected. The UI only changes the list after a successful write. */
 enum class UpdateMirrorError { InvalidName, InvalidPrefix, Duplicate, TooMany, SaveFailed, Unreadable }
 
 /**
- * 用户可管理的更新镜像列表。文件还不存在时写入 [UpdateMirrors.PRESETS] 一次;
- * 之后用户的增删改、排序就是这份列表本身,升级 App 不会把用户改过的顺序盖掉。
- * 读不出来时不覆盖原文件,要等用户明确恢复默认。
+ * User-managed list of update mirrors. When the file does not exist yet, [UpdateMirrors.PRESETS] is written once;
+ * after that the user's additions, edits and ordering are this list itself, so upgrading the app will not overwrite an order the user has changed.
+ * When the file cannot be read, the original file is left untouched and nothing happens until the user explicitly restores the defaults.
  */
 class UpdateMirrorStore(
     private val file: File,
@@ -52,7 +52,7 @@ class UpdateMirrorStore(
     val mirrors: StateFlow<List<UpdateMirror>> = _mirrors.asStateFlow()
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
-    /** 已有文件读不出来。此时不能增删改,避免用空列表盖掉还没读到的内容。 */
+    /** An existing file could not be read. Additions, edits and deletions are blocked then, so that an empty list cannot overwrite content that was never read. */
     val unreadable: StateFlow<Boolean> = _unreadable.asStateFlow()
 
     @Synchronized
@@ -62,7 +62,7 @@ class UpdateMirrorStore(
         when (val read = read()) {
             Read.Missing -> {
                 val seeded = presets()
-                // 写不进去也先把预设放进内存:下载和检查更新照样能用,下次改动再写。
+                // Even if the write fails, put the presets in memory first: downloads and update checks still work, and the next change writes again.
                 write(false, seeded)
                 publish(false, seeded)
             }
@@ -76,7 +76,7 @@ class UpdateMirrorStore(
         }
     }
 
-    /** 下载和检查更新取这一份:开关和列表一起读,保证是同一次设置。 */
+    /** Downloads and update checks take this snapshot: the switch and the list are read together, guaranteeing they come from the same settings. */
     @Synchronized
     fun snapshot(): MirrorSettings {
         ensureLoaded()
@@ -123,7 +123,7 @@ class UpdateMirrorStore(
         return commit(_enabled.value, _mirrors.value.filterNot { it.id == id })
     }
 
-    /** 按拖动开始时看到的完整 ID 列表排序,避免并发增删时丢失镜像。 */
+    /** Reorders according to the full list of IDs seen when the drag started, so that concurrent additions or deletions cannot lose mirrors. */
     @Synchronized
     fun reorder(ids: List<String>): UpdateMirrorError? {
         guard()?.let { return it }
@@ -134,7 +134,7 @@ class UpdateMirrorStore(
         return if (reordered == current) null else commit(_enabled.value, reordered)
     }
 
-    /** 用户明确要回预设时调用;读不出来的旧文件也在这里被换掉。 */
+    /** Called when the user explicitly wants to return to the presets; an unreadable old file is also replaced here. */
     @Synchronized
     fun resetDefaults(): UpdateMirrorError? = commit(_enabled.value, presets())
 
@@ -185,7 +185,7 @@ class UpdateMirrorStore(
         if (!parent.isDirectory && !parent.mkdirs()) return false
         return try {
             val json = storageJson.encodeToString(MirrorSettings(enabled, mirrors))
-            // 先写临时文件再改名,写到一半被杀不会留下半个文件。目标已存在时改名会失败,这时再覆盖写。
+            // Write a temporary file first and then rename it, so being killed halfway cannot leave half a file. Renaming fails when the target already exists, in which case fall back to overwriting it.
             val tmp = File(parent, "${file.name}.tmp")
             tmp.writeText(json)
             if (!tmp.renameTo(file)) {
@@ -204,7 +204,7 @@ class UpdateMirrorStore(
         data object Failed : Read
     }
 
-    /** 空名字用主机名;太长返回空(调用方报 [UpdateMirrorError.InvalidName])。 */
+    /** An empty name falls back to the host name; too long returns null (the caller reports [UpdateMirrorError.InvalidName]). */
     private fun displayName(name: String, prefix: String): String? {
         val trimmed = name.trim()
         if (trimmed.codePointCount(0, trimmed.length) > UpdateMirrors.NAME_MAX) return null
@@ -222,15 +222,15 @@ class UpdateMirrorStore(
     }
 }
 
-/** 镜像地址的规则、预设,以及一次更新要尝试的完整地址列表。 */
+/** Rules and presets for mirror addresses, plus the complete list of URLs to try for one update. */
 object UpdateMirrors {
-    /** 再多会让一次检查同时打出去太多请求。 */
+    /** Any more would fire too many requests at once during a single check. */
     const val MAX = 8
     const val NAME_MAX = 40
 
     /**
-     * 预设:2026-11-15 实测能下载 Claire 发布附件的服务。地址只保留协议、主机和路径,末尾补斜杠;
-     * 完整下载地址是 `prefix + https://github.com/...`。前两个还能用于检查更新(一个走 API,一个走发布页)。
+     * Presets: services that were verified on 2026-11-15 to download Claire release assets. Addresses keep only the scheme, host and path, with a trailing slash;
+     * the complete download URL is `prefix + https://github.com/...`. The first two can also be used for update checks (one via the API, one via the releases page).
      */
     val PRESETS = listOf(
         UpdateMirror("preset-gh-proxy", "GH-Proxy", "https://gh-proxy.com/"),
@@ -239,8 +239,8 @@ object UpdateMirrors {
     )
 
     /**
-     * 把用户输入的镜像地址规范成 `https://主机[:端口][/路径]/`:
-     * 只接受 HTTPS,不带账号密码、查询串和片段;不合法时返回空。
+     * Normalizes a user-entered mirror address into `https://host[:port][/path]/`:
+     * only HTTPS is accepted, without credentials, query string or fragment; returns null when it is invalid.
      */
     fun normalizePrefix(raw: String): String? {
         val url = raw.trim().toHttpUrlOrNull() ?: return null
@@ -255,8 +255,8 @@ object UpdateMirrors {
     fun host(prefix: String): String = prefix.toHttpUrlOrNull()?.host.orEmpty()
 
     /**
-     * 一次更新按顺序尝试的完整地址:用户镜像(开启时,按列表顺序)在前,GitHub 官方永远最后。
-     * 关闭镜像或列表为空时只有官方地址。
+     * The complete URLs tried in order for one update: user mirrors (when enabled, in list order) first, official GitHub always last.
+     * When mirrors are disabled or the list is empty, only the official URL is present.
      */
     fun candidates(officialUrl: String, settings: MirrorSettings): List<String> = buildList {
         if (settings.enabled) settings.mirrors.forEach { add(it.prefix + officialUrl) }

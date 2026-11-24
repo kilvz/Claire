@@ -123,7 +123,7 @@ import com.wangzan101.mika.settings.ui.models.Page
 import com.wangzan101.mika.settings.ui.models.pick
 import com.wangzan101.mika.ui.ToolLabels
 
-/** 浏览器页上「问 Claire」那一块的固定说法。 */
+/** Fixed strings for the "ask Claire" block on the browser page. */
 object PageAskCopy {
     val HINT: String get() = tr(R.string.browser_ask_hint)
     val FROM_PAGE: String get() = tr(R.string.browser_ask_from_page)
@@ -142,11 +142,11 @@ object PageAskCopy {
 }
 
 /**
- * 浏览器页上对着这一页问 Claire 的状态:这一页接着哪个对话([conversationId],同一页或同一网站最近问过的,见 [PageConversations];
- * 选了「新对话」时 [fresh])、底部那一块开着没有([open])、输入框里的字和带上的选中文字;那个对话里此刻的任务([run]、[card])
- * 和对话的来回([thread],和悬浮胶囊的对话卡片同一套排法)。
- * 发出去的第一句带上这一页的说明([AttachedPage]),页面借给那个任务([UserBrowser.lend]);任务在跑时说的话是插话(回答提问时是回答),
- * 都走任务服务现有的入口。只在主线程用。
+ * State for asking Claire about this page on the browser page: which conversation this page continues ([conversationId], the one most recently asked on the same page or site, see [PageConversations];
+ * [fresh] when "new conversation" is chosen), whether the bottom block is open ([open]), the text in the input field and the selected text carried along; the current task in that conversation ([run], [card])
+ * and the conversation's exchanges ([thread], laid out the same way as the floating capsule's conversation card).
+ * The first message sent carries a description of this page ([AttachedPage]), and the page is lent to that task ([UserBrowser.lend]); anything said while the task is running is a steer (an answer when it is asking a question),
+ * all through the task service's existing entry points. Only used on the main thread.
  */
 @Stable
 class PageChat(private val context: Context, private val browser: UserBrowser, private val scope: CoroutineScope) {
@@ -158,17 +158,17 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
 
     var conversationId by mutableStateOf<String?>(null)
         private set
-    /** 接着的那个对话的标题(给「接着「…」」那一行)。 */
+    /** The title of the conversation being continued (for the "continuing ..." row). */
     var title by mutableStateOf<String?>(null)
         private set
-    /** 这一页上已经问过(这个对话是这次在这一页上开始或接上的),不再显示「接着 · 新对话」。 */
+    /** Something has already been asked on this page (this conversation was started or picked up on this page this time), so "continuing · new conversation" is no longer shown. */
     var started by mutableStateOf(false)
         private set
     var fresh by mutableStateOf(false)
     var open by mutableStateOf(false)
     var draft by mutableStateOf("")
     var selection by mutableStateOf<String?>(null)
-    /** 点了文字选择菜单里的「问 Claire」:输入框要拿焦点(每次加一)。 */
+    /** "Ask Claire" in the text selection menu was tapped: the input field should take focus (incremented each time). */
     var focusAsk by mutableIntStateOf(0)
         private set
 
@@ -176,7 +176,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         private set
     var thread by mutableStateOf<ChatThread?>(null)
         private set
-    /** 此刻那件事的步骤在哪(「网页」「App」),和 [CardContent.Working] 的步骤一一对应。 */
+    /** Where each step of the current task runs ("web page" or "app"), matching the steps of [CardContent.Working] one to one. */
     var stepTags by mutableStateOf<List<String?>>(emptyList())
         private set
     private var run: TaskRun? = null
@@ -191,7 +191,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
     val mode: PageAskMode get() = PageAskModel.mode(state?.takeIf { it.isActive() }, open)
     val target: String? get() = if (fresh) null else conversationId
 
-    /** 打开了一页(或换了一页):还没在这一页上问过时,按这一页找接着的对话。 */
+    /** A page was opened (or changed): when nothing has been asked on this page yet, find the conversation to continue for this page. */
     fun onPage(url: String?) {
         if (url == null) {
             reset()
@@ -205,7 +205,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         }
     }
 
-    /** 页面关了:回到什么都没有。 */
+    /** The page was closed: back to nothing. */
     private fun reset() {
         started = false
         fresh = false
@@ -214,13 +214,13 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         follow(null, null)
     }
 
-    /** 选中的文字要问 Claire:带上它,输入框拿焦点。 */
+    /** The selected text is to be asked about: carry it along and give the input field focus. */
     fun askAbout(text: String) {
         selection = AttachedPage.clip(text)
         focusAsk++
     }
 
-    /** 发出输入框里的话:那件事在跑时是插话(在问你时是回答),否则在这一页上开始(带上页面说明,借出页面)。 */
+    /** Sends what is in the input field: while the task is running it is a steer (an answer when it is asking you), otherwise it starts on this page (carrying the page description and lending the page). */
     fun send() {
         val words = draft.trim()
         val sel = selection
@@ -229,7 +229,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
             if (words.isEmpty() && sel == null) return
             if (live.state.value is TaskState.WaitingInput) TaskService.answer(context, words.ifEmpty { sel.orEmpty() }, live.key)
             else {
-                // 插话里带着新选中的字:和开头一样写成页面说明(这一页此刻的样子)
+                // A steer that carries newly selected text is written as a page description like the opening message (the page as it looks right now)
                 val text = sel?.let { browser.pageInfo()?.let { p -> AttachedPage.compose(p.copy(selection = it), words) } } ?: words
                 TaskService.start(context, text, live.conversationId, messageId = UUID.randomUUID().toString())
             }
@@ -252,7 +252,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         follow(id, title.takeIf { id == conversationId })
     }
 
-    /** 换成跟着对话 [id]:读它记下的轮次,盯着它此刻的任务。 */
+    /** Switches to following conversation [id]: reads its recorded turns and watches its current task. */
     private fun follow(id: String?, title: String?) {
         this.title = title
         if (id == conversationId && watching != null) return
@@ -287,7 +287,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
             val r = pair?.first
             if (r != null) run = r
             val c = pair?.second ?: card?.run?.takeIf { !it.state.isActive() } ?: run?.let { gone ->
-                // 任务已从列表里拿掉:按它最后的状态留着,等这一轮记进对话
+                // The task has been removed from the list: keep it in its final state until this turn is recorded into the conversation
                 CapsuleRun(gone.key, gone.conversationId, gone.state.value, Takeover.Stage.None, gone.goal, exchange, runId = gone.runId.value)
             }
             val next = c?.let(model::cardRunOf)
@@ -306,7 +306,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         return ChatViewModel.reduce(before.copy(activities = acts), s, ::appLabel, toolLabels::label).also { exchange = it }
     }
 
-    // 每一步在哪:那一步的活动对象是「网站 …」的是网页,是包名的是 App
+    // Where each step runs: a step whose activity target starts with "website ..." runs on the web page, one that is a package name runs in the app
     private fun tagsOf(c: CardRun?): List<String?> {
         val ex = c?.run?.exchange ?: return emptyList()
         val content = CapsuleCards.content(c) as? CardContent.Working ?: return emptyList()
@@ -347,7 +347,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
 
     private fun appLabel(pkg: String): String = appLabels.getOrPut(pkg) { ConfirmationNotifier.appLabel(context, pkg) }
 
-    /** 面板、小卡片上的按钮:都走任务服务现有的动作,带着那件事的编号。 */
+    /** Buttons on the panel and the small card: all go through the task service's existing actions, carrying that task's key. */
     val actions = object : CardActions {
         override fun collapse() { open = false }
         override fun stop(runKey: String) = TaskService.cancel(context, runKey)
@@ -375,7 +375,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         override fun dropScreen() = Unit
     }
 
-    /** 界面测试用:不跟任何任务,直接显示 [card] 和 [thread](对话 [id])。 */
+    /** For UI tests: follow no task and display [card] and [thread] directly (conversation [id]). */
     @androidx.annotation.VisibleForTesting
     internal fun show(id: String?, card: CardRun?, thread: ChatThread?) {
         watching?.cancel()
@@ -387,26 +387,26 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         lastState = card?.run?.state
     }
 
-    /** 交还接手的页面(「处理好了」)。 */
+    /** Hands back the taken-over page ("done handling it"). */
     fun handBack() {
         val r = run ?: return
         TaskService.handBack(context, waitKey = r.takeover?.waitKey, runKey = r.key)
     }
 
-    /** 用户亲手摸了页面。 */
+    /** The user touched the page themselves. */
     fun touched() = browser.userTouched()
 
     private companion object {
         const val TAG = "MikaPageChat"
-        /** 运行记录里网页那一屏的对象写成「网站 <域名>」。 */
+        /** In run records the target of the web-page screen is written as "website <domain>". */
         const val SITE_PREFIX = "网站 "
     }
 }
 
 /**
- * 网页视图的容器:手指一按下就告诉 [onTouch]。只有经窗口送来的真实触摸会经过这里;Claire 自己的输入(DevTools 的鼠标键盘直接进页面,
- * 原生触摸直接发给网页视图)不经过它,所以不会把自己的动作当成用户在操作。
- * 网页的文字选择菜单里加一项「问 Claire」([onAsk]),点了先读出选中的字,读完调它给的 done 收起菜单。
+ * Container for the web view: as soon as a finger touches down, [onTouch] is told. Only real touches delivered through the window pass through here; Claire's own input (DevTools mouse and keyboard go straight into the page,
+ * and native touches are dispatched straight to the web view) does not, so its own actions are never mistaken for the user interacting.
+ * Adds an "ask Claire" item to the web page's text selection menu ([onAsk]); when tapped, the selected text is read first, and the given done is then called to close the menu.
  */
 class PageFrame(context: Context, private val onTouch: () -> Unit, private val onAsk: (done: () -> Unit) -> Unit) : FrameLayout(context) {
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
@@ -420,12 +420,12 @@ class PageFrame(context: Context, private val onTouch: () -> Unit, private val o
     private inner class AskCallback(private val inner: ActionMode.Callback) : ActionMode.Callback2() {
         override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean = inner.onCreateActionMode(mode, menu).also { if (it) addAsk(menu) }
 
-        // 网页内核准备菜单时会清空重排:排完再加
+        // The web engine clears and rearranges the menu while preparing it: add the item after it has been arranged
         override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = inner.onPrepareActionMode(mode, menu).also { addAsk(menu) }
 
         override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
             if (item.itemId != ASK_ID) return inner.onActionItemClicked(mode, item)
-            // 读出选中的字之后再收起菜单(收起时选中的字可能随之取消)
+            // Read the selected text before closing the menu (closing it may cancel the selection along the way)
             onAsk { mode.finish() }
             return true
         }
@@ -447,8 +447,8 @@ class PageFrame(context: Context, private val onTouch: () -> Unit, private val o
 }
 
 /**
- * 盖在网页上的那几样(放在网页区域的 Box 里):干活时四周的光边;你在页面上动手、Claire 暂停时顶上一条「继续」;
- * 面板开着时下半截的对话面板([PagePanel]),收着、那件事还没结束时底部的小卡片([PageCard])。平时的输入条不在这里(在网页下面)。
+ * The pieces overlaid on the web page (inside the web page area's Box): the border glow while working; the "resume" banner at the top when you are interacting with the page and Claire is paused;
+ * the half-height conversation panel ([PagePanel]) when the panel is open, and the small card at the bottom ([PageCard]) when it is collapsed and the task is not finished yet. The usual input bar is not here (it is below the web page).
  */
 @Composable
 fun BoxScope.PageAskOverlay(chat: PageChat, site: String, pageTitle: String) {
@@ -464,10 +464,10 @@ fun BoxScope.PageAskOverlay(chat: PageChat, site: String, pageTitle: String) {
     }
 }
 
-/** 对话面板占网页区域的高度比例:上面露出来的网页就是 Claire 在操作的那一页。 */
+/** Fraction of the web page area the conversation panel occupies: the web page visible above it is the page Claire is working on. */
 private const val PANEL_SHARE = 0.58f
 
-/** 页面四周的一圈淡紫光边:Claire 正在这一页上干活。不挡触摸。 */
+/** A soft purple border glow around the page: Claire is working on this page. It does not block touch. */
 @Composable
 fun PageGlow(modifier: Modifier = Modifier) {
     Box(
@@ -486,12 +486,12 @@ fun PageGlow(modifier: Modifier = Modifier) {
 }
 
 private const val GLOW_LAYERS = 4
-/** Claire 在页面上干活时光边的颜色(淡紫,和页面本身的颜色分得开)。 */
+/** The glow color while Claire works on the page (a soft purple, distinct from the page's own colors). */
 private val GlowColor = Color(0xFF7B5CFF)
 
 /**
- * 平时浏览器页底部那一条:「✦ 问问 Claire…」输入框;这一页有接着的对话时上面一行「接着「…」 · 新对话」;
- * 选中文字问的时候上面一条「选中的文字」和 ×。
+ * The usual bar at the bottom of the browser page: the "✦ Ask Claire..." input field; when this page has a conversation to continue, a row above it reading "continuing ... · new conversation";
+ * and when asking about selected text, a chip above it labeled "selected text" with a ×.
  */
 @Composable
 fun PageAskBar(chat: PageChat, modifier: Modifier = Modifier) {
@@ -520,13 +520,13 @@ fun PageAskBar(chat: PageChat, modifier: Modifier = Modifier) {
 
 private const val TITLE_MAX = 16
 
-/** 卡片里「新对话」「接着上次聊」的说法(和悬浮胶囊同一套字)。 */
+/** The wording for "new conversation" and "continue last chat" in the card (the same strings as the floating capsule). */
 private object CardCopyText {
     val NEW_CHAT: String get() = tr(R.string.chat_new)
     val CONTINUE_LAST: String get() = tr(R.string.card_continue_last)
 }
 
-/** 输入框上面带着的选中文字:淡色一条,右边 × 不带它。 */
+/** The selected text carried above the input field: a light chip, with × on the right to drop it. */
 @Composable
 private fun SelectionChip(text: String, onRemove: () -> Unit) {
     val c = MikaTheme.colors
@@ -547,7 +547,7 @@ private fun SelectionChip(text: String, onRemove: () -> Unit) {
     }
 }
 
-/** 输入框:左边 ✦,写了字(或带着选中的字)右边是发送;有 [stop] 时右边一直有停止键。 */
+/** The input field: ✦ on the left; when there is text (or selected text carried along), send is on the right; when [stop] is given, a stop button stays on the right. */
 @Composable
 private fun AskField(chat: PageChat, hint: String, stop: (() -> Unit)?) {
     val c = MikaTheme.colors
@@ -586,10 +586,10 @@ private val PanelShape = MikaShapes.SheetTop
 private val CardShape = MikaShapes.Card
 
 /**
- * 半屏对话面板:盖在网页下半截,上面露出来的网页就是 Claire 正在操作的那一页。顶上是网站名、「从这一页开始 · 页面标题」、
- * 「在聊天中打开」和收起;中间是这个对话的来回(和悬浮胶囊的对话卡片同一套排法);干活中下面是步骤,标出那一步在网页还是 App 上;
- * 要你点的按钮(回答的选项、同意、接手、继续)固定在下面;最下面是输入框:在跑时说的话是插话(右边停止键),Claire 问你时是回答,
- * 结束后是在这一页上接着问。页面在你手上(接手中)时是「处理好了」。
+ * Half-screen conversation panel: covers the lower half of the web page, and the web page visible above it is the page Claire is working on. At the top are the site name, "from this page · page title",
+ * "open in chat" and collapse; in the middle are this conversation's exchanges (laid out the same way as the floating capsule's conversation card); while working, the steps are below, marking whether each runs on the web page or in an app;
+ * the buttons that need you (answer options, approve, take over, resume) are pinned at the bottom; the input field is at the very bottom: what is said while running is a steer (with a stop button on the right), an answer when Claire asks you something,
+ * and after it finishes, a follow-up question on this page. When the page is in your hands (taken over), it is "done handling it".
  */
 @Composable
 fun PagePanel(chat: PageChat, site: String, pageTitle: String, modifier: Modifier = Modifier) {
@@ -630,7 +630,7 @@ fun PagePanel(chat: PageChat, site: String, pageTitle: String, modifier: Modifie
             ) { Icon(MikaIcons.Close, null, Modifier.size(17.dp), tint = c.ink3) }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(c.hair))
-        // 步骤紧接在对话来回的最后一条(「网站 · 在干活」那一行)下面,和对话页一样跟着往下长,不压到面板底部
+        // The steps sit right below the last exchange (the "website · working" row) and grow downward like on the chat page, without being pushed to the bottom of the panel
         val steps: (@Composable () -> Unit)? = if (content is CardContent.Working && content.steps.isNotEmpty()) {
             { Box(Modifier.padding(bottom = 6.dp)) { Steps(content.steps, StepsMax, chat.stepTags) } }
         } else null
@@ -662,7 +662,7 @@ fun PagePanel(chat: PageChat, site: String, pageTitle: String, modifier: Modifie
 private val StepsMax = 132.dp
 
 /**
- * 面板收起时底部的小卡片:那件事此刻在做什么,点一下展开。你在页面上动手而暂停时写「已暂停」和「继续」。
+ * The small card at the bottom while the panel is collapsed: what the task is doing right now; tap to expand. When paused because you are interacting with the page, it says "paused" and offers "resume".
  */
 @Composable
 fun PageCard(chat: PageChat, modifier: Modifier = Modifier) {
@@ -689,7 +689,7 @@ fun PageCard(chat: PageChat, modifier: Modifier = Modifier) {
     }
 }
 
-/** 你在页面上动手、Claire 停下时顶上那一条:「你在操作，Claire 已暂停 · 继续」。 */
+/** The banner at the top when you are interacting with the page and Claire stopped: "You are interacting, Claire is paused · Resume". */
 @Composable
 fun PausedBanner(onResume: () -> Unit, modifier: Modifier = Modifier) {
     Row(
@@ -708,7 +708,7 @@ fun PausedBanner(onResume: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** 对话页上那句话是在浏览器页上对着一页问的:气泡上面一小块「网页 · 网站」,带着选中的字时下面是那段字。 */
+/** The chat message was asked about a page on the browser page: a small "web page · site" chip above the bubble, with that text below when selected text was carried. */
 @Composable
 internal fun SentPage(page: AttachedPage.Page, maxWidth: androidx.compose.ui.unit.Dp) {
     val c = MikaTheme.colors

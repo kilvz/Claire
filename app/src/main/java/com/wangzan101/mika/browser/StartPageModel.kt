@@ -10,21 +10,21 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 /**
- * 「最近打开」的一行:搜索写成「搜索：<词>」(副标题是用的搜索引擎),网页是标题(读不到时用网站名)和网站名。
- * [host] 是网页的主机名(画图标用),搜索为 null。
+ * One row in "recently opened": a search is shown as "Search: <term>" (the subtitle is the search engine used), while a web page shows its title (falling back to the site name when unreadable) and the site name.
+ * [host] is the web page's host name (used to draw the icon) and is null for searches.
  */
 data class RecentItem(val url: String, val title: String, val subtitle: String, val host: String?, val search: Boolean, val openedAtMs: Long)
 
-/** 输入时下面的一条联想:[search] 为真是用当前搜索引擎搜输入的这句,否则打开 [url]。 */
+/** One suggestion shown below the input while typing: when [search] is true the typed text is searched with the current search engine, otherwise [url] is opened. */
 data class Suggestion(val title: String, val subtitle: String, val url: String, val search: Boolean, val host: String?)
 
-/** 起始页上的排法:最近打开、输入联想、相对时间。都是纯函数,名字由调用方按主机名给(见 [SiteLooks.face])。 */
+/** Layout logic for the start page: recently opened, typing suggestions, relative time. All pure functions; names are supplied by the caller by host name (see [SiteLooks.face]). */
 object StartPageModel {
     val RECENT_SOURCE: String get() = tr(R.string.browser_recent_source)
-    /** 联想里最近打开的至多几条。 */
+    /** Maximum number of recently opened entries among the suggestions. */
     const val MAX_RECENT_SUGGESTIONS = 5
 
-    /** 最近打开排成行:同一网址(不计 # 后面)只留最近的一条,最近的在前。 */
+    /** Arranges recently opened entries into rows: only the most recent entry per URL (ignoring the part after #), most recent first. */
     fun recentRows(
         pages: List<RecentPage>,
         nameOf: (String) -> String,
@@ -44,8 +44,8 @@ object StartPageModel {
     }
 
     /**
-     * 输入时的联想:第一条是这句话本身——像网址的打开它,其余用 [engine] 搜;后面是最近打开里标题或网址包含这句话的(不分大小写)。
-     * 空输入没有联想。
+     * Suggestions while typing: the first one is the text itself — opened when it looks like a URL, otherwise searched with [engine]; after that come recently opened entries whose title or URL contains the text (case-insensitive).
+     * Empty input yields no suggestions.
      */
     fun suggestions(input: String, recent: List<RecentItem>, engine: SearchEngineSpec = SearchEngine.Bing): List<Suggestion> {
         val q = input.trim()
@@ -60,7 +60,7 @@ object StartPageModel {
         return listOf(first) + hits
     }
 
-    /** 相对时间:「刚刚」「10 分钟前」「今天 11:20」「昨天」「10 月 21 日」,不在今年的带年份。 */
+    /** Relative time: "just now", "10 minutes ago", "today 11:20", "yesterday", "Oct 21", with the year added when it is not the current year. */
     fun relativeTime(atMs: Long, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): String {
         val diff = nowMs - atMs
         if (diff in 0 until 60_000) return tr(R.string.browser_just_now)

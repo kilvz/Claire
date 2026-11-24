@@ -1,19 +1,19 @@
 package com.wangzan101.mika.browser
 
 /**
- * 浏览器页的网页视图挂在哪一处。网页标签只有一个(放在进程里),浏览器页却可能同时有几处:App 的界面不止一个实例时
- * (从通知、桌面、别的 App 又打开了一个,盖在原来那个上面),每个实例都可能停在浏览器页,都会给网页留一个容器。
- * 一个视图同一时间只能挂在一个容器里,挂错了(挂进被盖住的那个)用户看到的就是一片空白。
+ * Where the browser page's web view is attached. There is only one web tab (kept in the process), but there can be several browser pages at once: when the app has more than one UI instance
+ * (another one was opened from a notification, the launcher or another app and covers the previous one), each instance may be sitting on the browser page and each leaves a container for the web view.
+ * A view can be attached to only one container at a time, and if it is attached to the wrong one (the covered instance) the user sees just a blank area.
  *
- * 规则:挂在有容器的几处里最近一次回到前台([started])的那一处,同样新的取后来的。那一处走了换到剩下里最近回到前台的。
- * [close] 告诉调用方走的是不是最后一处:只有最后一处走了(且不是转屏)才关网页,别处离开浏览器页不关别人正看着的网页。
+ * Rule: attach to the host among those with containers that most recently came to the foreground ([started]), and on a tie prefer the later one. When that host leaves, switch to the remaining one that most recently came to the foreground.
+ * [close] tells the caller whether the host leaving is the last one: only when the last one leaves (and it is not a configuration change) is the web page closed; hosts leaving the browser page elsewhere do not close a page someone else is viewing.
  *
- * [C] 是承载视图的容器,[A] 是这一处所在的界面(挂上去时视图的环境换成它)。只在主线程调用。
+ * [C] is the container holding the view, [A] is the UI the host belongs to (the view's context is switched to it when attaching). Only call on the main thread.
  */
 class PageHosts<C : Any, A : Any> {
-    /** 一处浏览器页。 */
+    /** One browser page host. */
     class Host<C : Any, A : Any>(val activity: A) {
-        /** 这一处此刻给网页留的容器;没有打开的网页时为 null。 */
+        /** The container this host currently leaves for the web view; null when no page is open. */
         var container: C? = null
             internal set
         internal var startedAt = 0L
@@ -22,29 +22,29 @@ class PageHosts<C : Any, A : Any> {
     private val hosts = mutableListOf<Host<C, A>>()
     private var clock = 0L
 
-    /** 这一处进了浏览器页。 */
+    /** This host entered the browser page. */
     fun open(host: Host<C, A>) {
         if (host !in hosts) hosts += host
     }
 
-    /** 这一处离开了浏览器页(或界面没了);返回 true 表示已经没有别的浏览器页了。 */
+    /** This host left the browser page (or its UI is gone); returns true when no other browser page is left. */
     fun close(host: Host<C, A>): Boolean {
         hosts.remove(host)
         host.container = null
         return hosts.isEmpty()
     }
 
-    /** 这一处回到了前台(看得见了)。 */
+    /** This host came back to the foreground (is visible). */
     fun started(host: Host<C, A>) {
         host.startedAt = ++clock
     }
 
-    /** 这一处的容器有了或没了。 */
+    /** This host's container appeared or disappeared. */
     fun setContainer(host: Host<C, A>, container: C?) {
         host.container = container
     }
 
-    /** 视图该挂的那一处:还在浏览器页上、有容器的几处里最近回到前台的;没有为 null。 */
+    /** The host the view should attach to: among those still on the browser page that have a container, the one that most recently came to the foreground; null when there is none. */
     fun target(): Host<C, A>? =
         hosts.withIndex().filter { it.value.container != null }
             .maxWithOrNull(compareBy<IndexedValue<Host<C, A>>>({ it.value.startedAt }, { it.index }))?.value
