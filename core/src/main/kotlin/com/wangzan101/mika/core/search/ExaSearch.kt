@@ -14,8 +14,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * Exa 搜索:`POST https://api.exa.ai/search`,`Authorization: Bearer`,请求体 `{"query","numResults","contents":{"highlights":true}}`。
- * 只要 highlights(和查询相关的片段,不另收费),不要整页 text;摘要取 highlights,没有时取 summary 或 text。
+ * Exa search: `POST https://api.exa.ai/search`, `Authorization: Bearer`, request body `{"query","numResults","contents":{"highlights":true}}`.
+ * Only highlights are wanted (fragments relevant to the query, not billed extra), not the full-page text; the snippet is taken from highlights, or from summary or text when they are missing.
  */
 class ExaSearch(
     apiKey: String,

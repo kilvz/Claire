@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.roundToInt
 
-/** 参数校验失败;message 点名字段。 */
+/** Argument validation failed; the message names the field. */
 internal class ArgError(val field: String, msg: String) : Exception("$field: $msg")
 
 private val REF_RE = Regex("^@[ev][1-9]\\d*$")
@@ -17,7 +17,7 @@ internal val LOCATED_REF = Regex("^@v[1-9]\\d*$")
 internal class Args(val tool: ToolDef, val o: JsonObject) {
     init {
         o.keys.firstOrNull { it !in tool.allowed }?.let {
-            // 说清楚能用哪些参数;能按元素操作的工具另说元素编号从哪来(按字找元素不是参数)
+            // State clearly which arguments can be used; tools that operate on elements explain separately where element numbers come from (finding an element by text is not an argument)
             val unknown = Feedback.format("args.unknown", "tool" to tool.name, "allowed" to tool.allowed.filter { k -> k != "reason" }.joinToString())
             throw ArgError(it, if ("ref" in tool.allowed) Feedback.format("args.unknown_ref", "unknown" to unknown) else unknown)
         }
@@ -51,7 +51,7 @@ internal class Args(val tool: ToolDef, val o: JsonObject) {
         return d.toInt()
     }
 
-    /** 坐标容忍 [a,b](取中点)。 */
+    /** Coordinate tolerance [a,b] (the midpoint is taken). */
     fun coord(k: String): Int? {
         val v = o[k]
         if (v is JsonArray && v.size == 2) {
@@ -101,7 +101,7 @@ internal class Args(val tool: ToolDef, val o: JsonObject) {
         }
     }
 
-    /** [located]:也接受 find_visually 给的 @vN(点击和往一点上打字、清空能用)。 */
+    /** [located]: also accepts the @vN given by find_visually (usable for tapping, typing into a point and clearing). */
     fun ref(located: Boolean = false): Pair<String, String>? {
         val r = str("ref"); val s = str("snapshotId")
         if (r == null && s == null) return null

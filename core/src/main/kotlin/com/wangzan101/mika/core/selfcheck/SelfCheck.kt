@@ -1,40 +1,40 @@
 package com.wangzan101.mika.core.selfcheck
 
 /**
- * 兼容性自检的一项。列的顺序就是跑的顺序;[needs] 里有一项没过(失败或被跳过)这一项就跳过,并写明是缺了哪一项。
- * [key] 是报告里的英文名,[timeoutMs] 是这一项最多跑多久(整次自检另有总时限,见 [SelfCheckRunner.TOTAL_BUDGET_MS])。
+ * One item of the compatibility self-check. The order of the entries is the order they run in; when any item in [needs] did not pass (failed or was skipped), this item is skipped and the missing item is named.
+ * [key] is the English name in the report, [timeoutMs] is how long this item may run at most (the whole self-check has its own total limit, see [SelfCheckRunner.TOTAL_BUDGET_MS]).
  */
 enum class SelfCheck(val key: String, val timeoutMs: Long) {
-    /** 机型、系统版本、处理器架构、内存、屏幕、有没有无线调试、Claire 的版本。 */
+    /** Model, OS version, CPU architecture, memory, screen, whether wireless debugging exists, Claire's version. */
     DEVICE("device", 5_000),
-    /** 无障碍开着且已绑定、通知允许、电池不受限制。 */
+    /** Accessibility is on and bound, notifications are allowed, battery is unrestricted. */
     PERMISSIONS("permissions", 5_000),
-    /** 内置助手在运行、怎么起来的、一次简单调用来回多久。 */
+    /** The built-in helper is running, how it was started, and how long one simple call takes round trip. */
     HELPER("helper", 15_000),
-    /** 能建 Claire 的虚拟屏;安卓 14 起它有没有自己的焦点。 */
+    /** Claire's virtual display can be created; from Android 14 on, whether it has a focus of its own. */
     VIRTUAL_DISPLAY("virtual display", 10_000),
-    /** 在虚拟屏上打开 Claire 自己的自检页,再打开系统设置(只看不点),确认开在 Claire 的屏上、不在主屏。 */
+    /** Open Claire's own self-check page on the virtual display, then open system settings (only look, do not tap), and confirm they open on Claire's display, not on the main screen. */
     APP_LAUNCH("app launch", 20_000),
-    /** 自检页的控件树读得到、要的控件都在;虚拟屏的截图不是一片黑或一片空。 */
+    /** The view tree of the self-check page can be read and all the required controls are there; the virtual display's screenshot is not all black or all blank. */
     SCREEN_READING("screen reading", 10_000),
-    /** 在自检页上点按、打英文和中文、滚动、返回,每一样都回读核对。 */
+    /** On the self-check page tap, type English and Chinese, scroll and go back; each is verified by reading back. */
     ACTIONS("actions", 20_000),
-    /** 自检页一直在动的十几秒里,虚拟屏的画面一直在变、控件树一直读得到。 */
+    /** While the self-check page keeps animating for a dozen or so seconds, the virtual display's frames keep changing and the view tree stays readable. */
     STAYS_ALIVE("stays alive", 25_000),
-    /** 主屏最上面的任务从头到尾没变。 */
+    /** The topmost task on the main screen did not change from start to finish. */
     MAIN_SCREEN("main screen", 5_000),
-    /** 内置浏览器打开一页本地网页(不联网),读出文字、点一下按钮再核对。 */
+    /** The built-in browser opens a local web page (no network), reads the text out, taps a button and verifies it. */
     BROWSER("browser", 15_000),
-    /** 沙箱里跑 `echo ok` 和一行 Python(只在 arm64 上;运行环境没准备好算部分可用,不现装)。 */
+    /** Run `echo ok` and one line of Python in the sandbox (arm64 only; a runtime that is not prepared counts as partially usable, nothing is installed on the spot). */
     SANDBOX("sandbox", 20_000),
-    /** 能打开里面 App 的另一份用户(分身、工作资料)有几份;只数,不列 App,私密空间不算。 */
+    /** How many additional users (clones, work profiles) can open the apps inside; only counted, apps are not listed, the private space is excluded. */
     APP_COPIES("app copies", 10_000),
     ;
 
-    /** 报告里的编号,从 1 起。 */
+    /** The number in the report, starting at 1. */
     val number: Int get() = ordinal + 1
 
-    /** 先要过的几项。 */
+    /** The items that have to pass first. */
     val needs: List<SelfCheck>
         get() = when (this) {
             DEVICE, PERMISSIONS, BROWSER, SANDBOX -> emptyList()
@@ -52,76 +52,76 @@ enum class SelfCheck(val key: String, val timeoutMs: Long) {
 enum class CheckStatus {
     Pending, Running, Pass, Partial, Fail, Skipped;
 
-    /** 过了:能用,或部分能用。依赖它的项照跑。 */
+    /** Passed: usable, or partially usable. Items that depend on it still run. */
     val passed: Boolean get() = this == Pass || this == Partial
 
-    /** 已经有结论(不再变)。 */
+    /** Already has a conclusion (no longer changes). */
     val final: Boolean get() = this != Pending && this != Running
 }
 
 /**
- * 给用户的一句话说的是哪种情况(界面按它取本地化的文字,报告里不写)。都是通用的说法:原因加上能做的下一步。
+ * Which situation the one-liner given to the user describes (the UI uses it to look up localized text, it is not written into the report). All are generic: the cause plus the next step that can be taken.
  */
 enum class Advice {
-    /** 系统版本低于安卓 12,手机操作用不了。 */
+    /** The OS version is below Android 12, so phone control is unavailable. */
     PhoneTooOld,
-    /** 系统里没有无线调试:改用电脑经 USB 启动。 */
+    /** There is no wireless debugging in this system: start via a computer over USB instead. */
     NoWirelessDebugging,
-    /** 这个环境里开发者选项和无线调试都没有,操作不了手机里的 App;聊天、网页、文件和计算照常可用。 */
+    /** This environment has neither developer options nor wireless debugging, so apps on the phone cannot be controlled; chat, web, files and calculation still work as usual. */
     PhoneControlUnavailable,
-    /** 无障碍没开。 */
+    /** Accessibility is not enabled. */
     TurnOnAccessibility,
-    /** 无障碍开着却没在运行:关掉再打开。 */
+    /** Accessibility is enabled but not running: turn it off and on again. */
     RestartAccessibility,
-    /** 通知没允许:看不到进度和「需要你」的提醒。 */
+    /** Notifications are not allowed: progress and "needs you" reminders cannot be seen. */
     AllowNotifications,
-    /** 电池受限制:后台可能被停掉。 */
+    /** The battery is restricted: background work may be stopped. */
     AllowBattery,
-    /** 内置助手没在运行:先完成手机操作的设置。 */
+    /** The built-in helper is not running: finish the phone control setup first. */
     SetUpPhoneControl,
-    /** 建不了虚拟屏。 */
+    /** The virtual display cannot be created. */
     DisplayFailed,
-    /** 安卓 14 以下虚拟屏没有自己的焦点,后台操作时主屏的输入焦点可能短暂丢失。 */
+    /** Below Android 14 a virtual display has no focus of its own, so the main screen's input focus may briefly be lost during background work. */
     FocusShared,
-    /** 页面没开到 Claire 的屏上。 */
+    /** The page did not open on Claire's display. */
     LaunchFailed,
-    /** 系统设置开到了主屏上。 */
+    /** System settings opened on the main screen. */
     OpenedOnMainScreen,
-    /** 系统设置正在你的主屏上用着,这一步没去打开它。 */
+    /** System settings are in use on your main screen, so this step did not open them. */
     SettingsInUse,
-    /** 控件树读不到或缺控件。 */
+    /** The view tree cannot be read or is missing controls. */
     ReadFailed,
-    /** 截图是一片黑或一片空。 */
+    /** The screenshot is all black or all blank. */
     BlankFrames,
-    /** 点按、打字、滚动或返回没生效。 */
+    /** Tapping, typing, scrolling or going back had no effect. */
     ActionFailed,
-    /** 虚拟屏的画面过一会儿就不动了。 */
+    /** The virtual display's frames stop after a while. */
     FramesStopped,
-    /** 主屏最上面的任务变了。 */
+    /** The topmost task on the main screen changed. */
     MainScreenChanged,
-    /** 系统里没有可用的 WebView。 */
+    /** There is no usable WebView in this system. */
     NoWebView,
-    /** 内置浏览器没读出或没点成。 */
+    /** The built-in browser did not read anything out or the tap did not work. */
     WebFailed,
-    /** 沙箱只在 arm64 手机上有。 */
+    /** The sandbox only exists on arm64 phones. */
     SandboxUnsupported,
-    /** 运行环境还没准备好。 */
+    /** The runtime is not prepared yet. */
     SandboxNotPrepared,
-    /** 命令没跑出预期的结果。 */
+    /** The command did not produce the expected result. */
     SandboxFailed,
-    /** 这一项超时。 */
+    /** This item timed out. */
     TimedOut,
-    /** 这一项出错。 */
+    /** This item hit an error. */
     Error,
-    /** 整次自检的时间用完了。 */
+    /** The time for the whole self-check ran out. */
     OutOfTime,
-    /** 用户取消了。 */
+    /** The user cancelled. */
     Cancelled,
 }
 
 /**
- * 一项跑完的结论。[detail] 是写进报告的一行事实(英文,不含个人数据:不写账号、App 列表、用户的内容、序列号);
- * [advice] 让界面给一句本地化的大白话;通过时一般为空。
+ * The conclusion of a finished item. [detail] is the one line of fact written into the report (English, with no personal data: no accounts, app lists, user content or serial numbers);
+ * [advice] lets the UI add one plain-language localized sentence; it is usually empty when the item passed.
  */
 data class CheckOutcome(val status: CheckStatus, val detail: String, val advice: Advice? = null) {
     companion object {
@@ -132,7 +132,7 @@ data class CheckOutcome(val status: CheckStatus, val detail: String, val advice:
     }
 }
 
-/** 一项此刻的状态:还没跑、在跑、或者结论;[blockedBy] 是因为它没过才跳过的那一项。 */
+/** An item's state right now: not run yet, running, or a conclusion; [blockedBy] is the item that did not pass and caused this one to be skipped. */
 data class CheckResult(
     val check: SelfCheck,
     val status: CheckStatus = CheckStatus.Pending,
@@ -143,9 +143,9 @@ data class CheckResult(
 )
 
 /**
- * 报告抬头的设备事实,都来自系统公开的接口;不含序列号、账号这类能认出人的东西。
- * [wirelessDebugging] 系统里有没有无线调试这一项,读不准为 null;[developerOptionsPage] 系统里打不打得开开发者选项页,不知道为 null。
- * [phoneControlUnavailable] 是这个环境没有能起助手的路(和引导页同一个判断)。
+ * The device facts in the report header, all from public system APIs; they contain nothing that identifies a person, such as serial numbers or accounts.
+ * [wirelessDebugging]: whether this system has wireless debugging, null when it cannot be read reliably; [developerOptionsPage]: whether the developer options page can be opened on this system, null when unknown.
+ * [phoneControlUnavailable]: this environment has no way to start the helper (the same decision as on the onboarding page).
  */
 data class DeviceFacts(
     val manufacturer: String,
@@ -162,31 +162,31 @@ data class DeviceFacts(
     val developerOptionsPage: Boolean? = null,
     val phoneControlUnavailable: Boolean = false,
 ) {
-    /** 机型:型号里已带厂商名时只写型号。 */
+    /** Model name: only the model when the model string already contains the manufacturer name. */
     val modelName: String get() = if (model.startsWith(manufacturer, ignoreCase = true)) model.trim() else "$manufacturer $model".trim()
 
     val arm64: Boolean get() = ARM64 in abis
 
     companion object {
         const val ARM64 = "arm64-v8a"
-        /** 手机操作的最低系统版本(安卓 12)。 */
+        /** Minimum OS version for phone control (Android 12). */
         const val MIN_PHONE_SDK = 31
-        /** 安卓 14 起虚拟屏能有自己的焦点。 */
+        /** From Android 14 on a virtual display can have its own focus. */
         const val OWN_FOCUS_SDK = 34
     }
 }
 
 /**
- * 自检要的安卓能力。界面那边的实现在 app 里;单元测试换成假的。
- * 每一项都可能因超时或用户取消被打断,要能及时停下;出错可以直接抛,跑的那一边按失败记。
+ * The Android capabilities the self-check needs. The UI-side implementation lives in the app; unit tests substitute a fake.
+ * Every item may be interrupted by a timeout or by the user cancelling and must be able to stop promptly; errors may be thrown directly, and the runner records them as failures.
  */
 interface SelfCheckPort {
-    /** 第一项「设备」的事实(只读系统接口,很快)。 */
+    /** The facts for the first item "device" (reads system APIs only, very fast). */
     suspend fun facts(): DeviceFacts
 
-    /** 跑一项([SelfCheck.DEVICE] 以外;那一项由 [facts] 判)。 */
+    /** Run one item (other than [SelfCheck.DEVICE]; that one is judged by [facts]). */
     suspend fun check(check: SelfCheck): CheckOutcome
 
-    /** 放掉跑的过程中占着的一切(虚拟屏、自检页、网页标签、助手连接)。跑完、取消、出错都会调,可能调不止一次。 */
+    /** Release everything held during the run (virtual display, self-check page, web tabs, helper connection). Called after finishing, cancelling and on error, possibly more than once. */
     suspend fun release()
 }

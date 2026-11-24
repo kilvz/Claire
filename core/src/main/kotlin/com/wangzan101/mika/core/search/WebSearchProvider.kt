@@ -1,34 +1,34 @@
 package com.wangzan101.mika.core.search
 
 /**
- * 网页搜索由哪家服务提供。各家的请求方式和返回格式各不相同,没有通用约定,所以按服务商分别实现,不设「自定义端点」:
- * 要接别的搜索,可以自建 SearXNG(它本身就能聚合几十个搜索引擎),或者接一个提供搜索工具的 MCP 服务器。
- * 几家托管的服务地址固定,只填密钥;SearXNG 填实例地址、不要密钥。[wire] 存进设置,只能往后加、不能改名或删。
+ * Which service provides web search. Each provider has its own request style and response format with no common convention, so they are implemented per provider and there is no "custom endpoint":
+ * to connect another search, self-host SearXNG (which itself aggregates dozens of search engines), or connect an MCP server that offers a search tool.
+ * The hosted services have fixed addresses and only need a key; SearXNG needs the instance address and no key. [wire] is stored in settings and can only be added to; it cannot be renamed or removed.
  */
 enum class WebSearchProvider(val wire: String) {
     /** Google Search grounding via Gemini API (`tools: [{googleSearch: {}}]`). */
     Google("google"),
-    /** You.com:不填密钥走免费接口(每天 100 次),填了走付费接口。 */
+    /** You.com: with no key the free endpoint is used (100 times a day); with a key the paid endpoint is used. */
     You("you"),
-    /** Jina 搜索(s.jina.ai):必须有密钥。 */
+    /** Jina search (s.jina.ai): a key is required. */
     Jina("jina"),
-    /** Exa 搜索(api.exa.ai):必须有密钥。 */
+    /** Exa search (api.exa.ai): a key is required. */
     Exa("exa"),
-    /** DeepSeek 搜索(api.deepseek.com/v1/tools/search):必须有密钥,和对话用的是同一个 DeepSeek API Key。 */
+    /** DeepSeek search (api.deepseek.com/v1/tools/search): a key is required, and it is the same DeepSeek API Key used for chat. */
     DeepSeek("deepseek"),
-    /** 自建的 SearXNG 实例:填实例地址,不要密钥;实例要打开 JSON 输出。 */
+    /** A self-hosted SearXNG instance: enter the instance address, no key; the instance must have JSON output enabled. */
     SearXNG("searxng");
 
-    /** 要用户填地址:SearXNG 的实例地址。 */
+    /** Requires the user to enter an address: the instance address of SearXNG. */
     val needsEndpoint: Boolean get() = this == SearXNG
 
-    /** 有密钥框。 */
+    /** Has a key field. */
     val takesKey: Boolean get() = this != SearXNG && this != Google
 
-    /** 不填密钥不能用,也不让保存。 */
+    /** Cannot be used without a key, and cannot be saved without one either. */
     val keyRequired: Boolean get() = this == Jina || this == Exa || this == DeepSeek
 
-    /** 照 [endpoint]、[apiKey]、[groundingAvailable] 这一家能不能用;能用为 null。 */
+    /** Whether this provider can be used given [endpoint], [apiKey] and [groundingAvailable]; null when it can. */
     fun problem(endpoint: String, apiKey: String, groundingAvailable: Boolean = true): Problem? = when {
         this == Google && !groundingAvailable -> Problem.UnsupportedProvider
         needsEndpoint && WebSearch.parseEndpoint(endpoint) == null -> Problem.Endpoint
@@ -39,7 +39,7 @@ enum class WebSearchProvider(val wire: String) {
     enum class Problem { Endpoint, Key, UnsupportedProvider }
 
     companion object {
-        /** 设置里存的值;认不出时为 null。 */
+        /** The value stored in settings; null when it is not recognized. */
         fun of(wire: String?): WebSearchProvider? = entries.firstOrNull { it.wire == wire }
     }
 }

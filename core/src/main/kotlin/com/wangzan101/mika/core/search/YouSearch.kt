@@ -14,10 +14,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * You.com 网页搜索。没有密钥时走免费的 `GET https://api.you.com/v1/agents/search?query=&count=`(不用账号,每天 100 次);
- * 有密钥时走 `POST https://ydc-index.io/v1/search`,带 X-API-Key。两边返回同一种 `{"results":{"web":[…]}}`,
- * 摘要取 description,没有时取第一段 snippets。一条都没搜到时接口照样回 200,但 `results` 里没有 `web`(`{"results":{}}`),
- * 这是「没有结果」,不是出错。
+ * You.com web search. With no key it uses the free `GET https://api.you.com/v1/agents/search?query=&count=` (no account needed, 100 times a day);
+ * with a key it uses `POST https://ydc-index.io/v1/search`, with X-API-Key. Both return the same `{"results":{"web":[…]}}`,
+ * the snippet is taken from description, or from the first entry of snippets when it is missing. When nothing is found the API still returns 200, but `results` has no `web` (`{"results":{}}`),
+ * which means "no results", not an error.
  */
 class YouSearch(
     apiKey: String? = null,

@@ -1,21 +1,21 @@
 package com.wangzan101.mika.core.script
 
 /**
- * 模型或站点命令写的 JS 源码的词法检查。
+ * Lexical check of JS source written by the model or by site commands.
  *
- * [usesImport]:字符串、注释、正则字面量之外有没有 `import` 这个词(动态 import 会在全局作用域里跑模块,绕开只读包装)。
- * `/` 是除号还是正则的开头,有时只看词法分不清(`)`、`}`、`++` 之后,以及 of/yield/await 这类既可能是关键字也可能是变量名的词之后):
- * 这时两种读法都走一遍,任何一种读法在代码里读到 import 都算有。读法按 (位置, `/` 的读法, 括号栈) 去重,不会成倍增长;
- * 读不通的读法(正则或字符串没合上就到行尾)作废。宁可误拦,不漏。
+ * [usesImport]: whether the word `import` appears outside strings, comments and regex literals (a dynamic import runs a module in the global scope, bypassing the read-only wrapper).
+ * Whether a `/` is a division sign or the start of a regex sometimes cannot be told from the lexemes alone (after `)`, `}`, `++`, and after words such as of/yield/await that may be either a keyword or a variable name):
+ * in that case both readings are followed, and any reading that sees import inside the code counts as present. Readings are deduplicated by (position, reading of `/`, bracket stack), so they do not multiply;
+ * readings that cannot be parsed (a regex or string not closed before the end of the line) are discarded. Better to block by mistake than to miss.
  */
 object JsSource {
     private enum class Slash { Regex, Divide, Both }
 
     private data class State(val pos: Int, val slash: Slash, val stack: List<Char>)
 
-    /** 之后的 `/` 一定是正则开头的关键字。 */
+    /** Keywords after which a `/` always starts a regex. */
     private val BEFORE_EXPRESSION = setOf("return", "typeof", "instanceof", "in", "new", "delete", "void", "throw", "case", "do", "else")
-    /** 可能是关键字也可能是变量名的词:之后的 `/` 两种读法都走。 */
+    /** Words that may be either a keyword or a variable name: a `/` after them is followed both ways. */
     private val EITHER = setOf("of", "yield", "await", "let", "async", "get", "set", "static")
 
     fun usesImport(code: String): Boolean {
@@ -30,7 +30,7 @@ object JsSource {
         return false
     }
 
-    /** 从 [start] 起读一条读法,遇到两可的 `/` 就把两种读法交给 [fork] 并停下。读到 import 返回 true。 */
+    /** Reads one reading starting at [start]; on an ambiguous `/` it hands both readings to [fork] and stops. Returns true when import is read. */
     private class Lexer(private val code: String, start: State, private val fork: (State) -> Unit) {
         private var i = start.pos
         private var slash = start.slash
@@ -85,7 +85,7 @@ object JsSource {
         private fun identStart(c: Char) = c == '$' || c == '_' || c == '\\' || c.isLetter()
         private fun identPart(c: Char) = identStart(c) || c.isDigit() || c == '‌' || c == '‍'
 
-        /** 一个标识符;`\uXXXX`、`\u{…}` 转义解开后再比。 */
+        /** One identifier; `\uXXXX` and `\u{…}` escapes are decoded before comparing. */
         private fun word(): String {
             val out = StringBuilder()
             while (i < n && identPart(code[i])) {
@@ -100,7 +100,7 @@ object JsSource {
             return out.toString()
         }
 
-        /** 字符串字面量;到行尾还没合上(且不是续行)为 false。 */
+        /** String literal; false if it is not closed by the end of the line (and is not a line continuation). */
         private fun string(q: Char): Boolean {
             i++
             while (i < n) {
@@ -115,7 +115,7 @@ object JsSource {
             return false
         }
 
-        /** 模板字符串的文字部分,从当前位置读到反引号(结束)或 `${`(压栈,回到代码)。 */
+        /** The text part of a template literal, read from the current position to the backtick (end) or `${` (push onto the stack, back to code). */
         private fun template(): Boolean {
             while (i < n) {
                 val c = code[i]
@@ -129,7 +129,7 @@ object JsSource {
             return false
         }
 
-        /** 正则字面量(含字符类里的 `/`)和标志;到行尾还没合上为 false。 */
+        /** Regex literal (including `/` inside a character class) and flags; false if it is not closed by the end of the line. */
         private fun regex(): Boolean {
             i++
             var inClass = false

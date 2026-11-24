@@ -1,16 +1,16 @@
 package com.wangzan101.mika.core.self
 
 /**
- * 用户浏览器能代开的地址:只 http/https、不要账号密码、长度有限。
- * 核心不引用网页能力(依赖方向:能力 → 核心),所以这里只做基本检查;
- * App 侧打开时 [com.wangzan101.mika.core.self.SelfPort] 的实现还会经浏览器自己的 WebUrlPolicy 再查一遍。
+ * Addresses the user's browser may open on behalf of the model: http/https only, no username or password, length-limited.
+ * The core does not reference the web capability (dependency direction: capability → core), so only basic checks are done here;
+ * when the app side opens one, the [com.wangzan101.mika.core.self.SelfPort] implementation checks again through the browser's own WebUrlPolicy.
  */
 object SelfUrlPolicy {
     const val MAX_URL = 2048
 
     private val SCHEME = Regex("^([A-Za-z][A-Za-z0-9+.-]*):")
 
-    /** null = 可以;否则是给模型看的原因。 */
+    /** null = allowed; otherwise the reason shown to the model. */
     fun check(url: String): String? {
         val u = url.trim()
         if (u.length > MAX_URL) return "the URL is longer than $MAX_URL characters"
@@ -25,7 +25,7 @@ object SelfUrlPolicy {
         return null
     }
 
-    /** 主机名(小写、去掉开头的 www.);解析不出为 null。 */
+    /** Host name (lowercase, leading www. removed); null when it cannot be parsed. */
     fun host(url: String): String? = runCatching {
         val authority = url.trim().substringAfter("://", "").substringBefore('/').substringBefore('?').substringBefore('#')
         if (authority.isEmpty() || '@' in authority) return@runCatching null
@@ -33,7 +33,7 @@ object SelfUrlPolicy {
         h.trim().trimEnd('.').lowercase().removePrefix("www.").takeIf { it.isNotEmpty() }
     }.getOrNull()
 
-    /** 用户给的主机名或网址 → 主机名。 */
+    /** A host name or URL given by the user → host name. */
     fun hostOf(input: String): String? {
         val s = input.trim()
         return host(if ("://" in s) s else "https://$s")

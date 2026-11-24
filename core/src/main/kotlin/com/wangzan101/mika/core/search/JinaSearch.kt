@@ -16,10 +16,10 @@ import okhttp3.Request
 import okhttp3.Response
 
 /**
- * Jina 搜索:`POST https://s.jina.ai/`,请求体 `{"q","num"}`,`Authorization: Bearer`;
- * 带 `X-Respond-With: no-content` 只要标题、网址和摘要,不把每页正文拉回来。结果在 `data[]`,摘要取 description,没有时取 content。
- * 一条都没搜到时 Jina 回的是 422(实测:`{"code":422,"status":42206,"message":"No search results available for query …"}`),
- * 这是「没有结果」,不是出错;别的 422 照旧当出错。
+ * Jina search: `POST https://s.jina.ai/`, request body `{"q","num"}`, `Authorization: Bearer`;
+ * with `X-Respond-With: no-content` only the title, URL and snippet are fetched, so the full text of each page is not pulled back. Results are in `data[]`, the snippet is taken from description, or from content when it is missing.
+ * When nothing is found, Jina returns 422 (measured: `{"code":422,"status":42206,"message":"No search results available for query …"}`),
+ * which means "no results", not an error; any other 422 is still treated as an error.
  */
 class JinaSearch(
     apiKey: String,
@@ -54,7 +54,7 @@ class JinaSearch(
 
     companion object {
         const val URL = "https://s.jina.ai/"
-        /** Jina 零命中时错误体里的 status。 */
+        /** The status in the error body when Jina returns zero hits. */
         private const val NO_RESULTS_STATUS = 42206
         private const val MAX_ERROR_BODY = 16_384L
     }

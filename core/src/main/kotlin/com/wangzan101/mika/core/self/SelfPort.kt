@@ -8,82 +8,82 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * 模型看和操作 Claire 自己的唯一入口(App 实现,核心只认这些数据)。
+ * The only way for the model to see and operate Claire itself (implemented by the app; the core only knows this data).
  *
- * 手机那一套工具不能碰 Claire 自己的包(见 [com.wangzan101.mika.core.action.ConfirmDecision] 的 ownApp):
- * 不自己给自己点同意、不自己改设置。这个端口是正门,只做几件明确的事:
- * 读自身状态、打开自己的页面/文件、发通知、写剪贴板。每件都在用户开关和当次同意之下。
+ * The phone tool set cannot touch Claire's own package (see ownApp of [com.wangzan101.mika.core.action.ConfirmDecision]):
+ * it does not approve things for itself and does not change settings itself. This port is the front door and does only a few explicit things:
+ * read self status, open its own pages/files, send notifications, write the clipboard. Each is under the user's switch and the consent of that moment.
  */
 interface SelfPort {
-    /** 此刻的自身状态。只含组件与计数,不含 Key/Token/其他对话内容/浏览历史。 */
+    /** The self status right now. Contains only components and counts, no keys/tokens/other conversation content/browsing history. */
     suspend fun status(): SelfStatus
 
-    /** 打开 Claire 自己的一页。前台进导航栈,后台发通知。 */
+    /** Open one of Claire's own pages. In the foreground it enters the navigation stack; in the background a notification is sent. */
     suspend fun openScreen(screen: SelfScreen, note: String? = null): SelfResult
 
-    /** 用 App 内查看器打开本任务工作区里的文件([path] 形如 /workspace/…)。 */
+    /** Open a file in this task's workspace ([path] looks like /workspace/…) with the in-app viewer. */
     suspend fun openFile(path: String, name: String? = null): SelfResult
 
-    /** 给用户发一条通知;[screen] 不为 null 时带一个「查看」动作。 */
+    /** Send the user one notification; when [screen] is not null it carries a "view" action. */
     suspend fun notify(title: String, body: String, screen: SelfScreen? = null): SelfResult
 
-    /** 把文字写进剪贴板;只写不读。 */
+    /** Write text into the clipboard; write only, never read. */
     suspend fun copy(text: String): Boolean
 
-    // ---- 用户浏览器(B 阶段) ----
+    // ---- User browser (phase B) ----
 
-    /** 用户浏览器此刻的样子;只读。 */
+    /** What the user's browser looks like right now; read-only. */
     suspend fun browserState(): SelfBrowserState = SelfBrowserState()
 
-    /** 在用户看得见的浏览器里打开一页;[show] 为 false 时只放进后台标签(需要多标签)。 */
+    /** Open a page in the browser the user can see; with [show] false it only goes into a background tab (multi-tab needed). */
     suspend fun openInBrowser(url: String, show: Boolean, reason: String?): SelfResult =
         SelfResult(ok = false, reason = "not_supported")
 
-    /** 用浏览器默认搜索引擎搜索并打开结果页。 */
+    /** Search with the browser's default search engine and open the results page. */
     suspend fun searchInBrowser(query: String, show: Boolean): SelfResult =
         SelfResult(ok = false, reason = "not_supported")
 
-    /** 站点登记表:登录状态与最近的验证码/风控记录。 */
+    /** Site registry: sign-in state and recent captcha/risk-control records. */
     suspend fun sites(): List<SelfSite> = emptyList()
 
-    /** 打开「给 Claire 登录」页,让用户自己登录 [host]。 */
+    /** Open the "sign in for Claire" page so the user can sign in to [host] themselves. */
     suspend fun loginSite(host: String): SelfResult = SelfResult(ok = false, reason = "not_supported")
 
-    /** 用户说登录好了:核对一次并记下登录状态。 */
+    /** The user says the sign-in is done: verify once and record the sign-in state. */
     suspend fun confirmLogin(): SelfResult = SelfResult(ok = false, reason = "not_supported")
 
-    /** 常用网站:list / add / remove;[host] 在 add/remove 时必填。返回改动后的列表。 */
+    /** Favourite sites: list / add / remove; [host] is required for add/remove. Returns the list after the change. */
     suspend fun favorites(op: String, host: String?): List<SelfFavorite> = emptyList()
 
-    /** 打开链接的同意文案(用 App 当前语言);[query] 不为 null 时是搜索。 */
+    /** Consent text for opening a link (in the app's current language); when [query] is not null it is a search. */
     fun browserConsent(url: String, query: String?, replaces: Boolean): SelfConsent = SelfConsent("", "", "")
 
-    /** 代登录的同意文案。 */
+    /** Consent text for signing in on the user's behalf. */
     fun loginConsent(host: String, replaces: Boolean): SelfConsent = SelfConsent("", "", "")
 }
 
-/** 用户浏览器此刻的样子;不含历史。 */
+/** What the user's browser looks like right now; no history. */
 data class SelfBrowserState(
     val pageOpen: Boolean = false,
     val host: String? = null,
     val title: String? = null,
     val url: String? = null,
-    /** 这一页正借给任务(本任务或别的任务),不能硬抢。 */
+    /** This page is currently lent to a task (this task or another one) and must not be taken over. */
     val loaned: Boolean = false,
-    /** 是否支持多标签(单标签时 show=false 不行)。 */
+    /** Whether multi-tab is supported (with a single tab, show=false is not possible). */
     val multiTab: Boolean = false,
 )
 
-/** 站点登记表的一项。 */
+/** One entry in the site registry. */
 data class SelfSite(val host: String, val loggedIn: Boolean, val challenged: Boolean = false)
 
-/** 常用网站的一格。 */
+/** One favourite site entry. */
 data class SelfFavorite(val host: String, val loggedIn: Boolean)
 
-/** 一次同意的文案与两个选项(已按 App 语言写好)。 */
+/** The text of one consent and its two options (already written in the app's language). */
 data class SelfConsent(val prompt: String, val allow: String, val deny: String)
 
-/** Claire 自己的顶层页面;只给这些,不给权限/root/开发者等高级子页。 */
+/** Claire's own top-level pages; only these are offered, no advanced sub-pages such as permissions/root/developer. */
 enum class SelfScreen(val wire: String) {
     Chat("chat"),
     Settings("settings"),
@@ -101,13 +101,13 @@ enum class SelfScreen(val wire: String) {
     }
 }
 
-/** 一次自身操作的结果;原因只在失败时出现,给模型看。 */
+/** The result of one self operation; the reason only appears on failure, for the model to read. */
 data class SelfResult(
     val ok: Boolean,
     val opened: Boolean = false,
-    /** 前台已把请求交给界面(界面随后处理)。 */
+    /** The foreground has handed the request to the UI (the UI handles it afterwards). */
     val requested: Boolean = false,
-    /** 后台已发通知,用户点了才进。 */
+    /** A notification has been sent in the background; the user enters only after tapping it. */
     val notified: Boolean = false,
     val foreground: Boolean = false,
     val reason: String? = null,
@@ -123,8 +123,8 @@ fun SelfResult.toJson(): JsonObject = buildJsonObject {
 }
 
 /**
- * 自身状态。字段都可空:拿不到的不写,不猜。
- * 名称类字段(模型名、MCP server 名、网页标题)来自设置或网站,当数据看,不当指令。
+ * Self status. Every field may be null: what cannot be read is not written and not guessed.
+ * Name-like fields (model name, MCP server name, web page title) come from settings or websites and are treated as data, not as instructions.
  */
 data class SelfStatus(
     val appVersion: String = "",
@@ -141,22 +141,22 @@ data class SelfStatus(
     val batteryUnrestricted: Boolean? = null,
     val browserAvailable: Boolean = false,
     val webSearchConfigured: Boolean = false,
-    /** 用户浏览器此刻的站点主机名(只在「操作自己」打开时给)。 */
+    /** Host of the site the user's browser is on right now (only given while "operate self" is on). */
     val userPageHost: String? = null,
     val userPageTitle: String? = null,
     val keptPages: Int = 0,
-    /** 本对话正在跑的任务状态;没有为 null。 */
+    /** State of the task running in this conversation; null when there is none. */
     val taskState: String? = null,
     val taskStep: Int? = null,
-    /** 其他对话正在跑的任务数;只给计数,不给内容。 */
+    /** Number of tasks running in other conversations; only the count is given, not the content. */
     val otherRuns: Int = 0,
-    /** 本对话的定时任务数。 */
+    /** Number of scheduled tasks in this conversation. */
     val plans: Int = 0,
-    /** 有新版时的版本号;没有为 null。 */
+    /** The version number when a new version exists; null when there is none. */
     val updateVersion: String? = null,
     val sandbox: String = "",
     val mcpInbound: Boolean = false,
-    /** 外部 MCP server 的名字;不写地址、Token。 */
+    /** Names of external MCP servers; addresses and tokens are not written. */
     val mcpServers: List<String> = emptyList(),
     val relayEnabled: Boolean = false,
 )

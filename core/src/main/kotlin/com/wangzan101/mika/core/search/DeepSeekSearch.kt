@@ -11,9 +11,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * DeepSeek 搜索:`POST https://api.deepseek.com/v1/tools/search`,`Authorization: Bearer`,
- * 请求体 `{"query","count","need_content":false}`。只要标题、网址和摘要,不把整页正文拉回来;
- * 结果在 `results[]`,摘要取 snippet,没有时取 summary。密钥和对话用的是同一个 DeepSeek API Key。
+ * DeepSeek search: `POST https://api.deepseek.com/v1/tools/search`, `Authorization: Bearer`,
+ * request body `{"query","count","need_content":false}`. Only the title, URL and snippet are wanted, so the full page text is not pulled back;
+ * results are in `results[]`, the snippet is taken from snippet, or from summary when it is missing. The key is the same DeepSeek API Key used for chat.
  */
 class DeepSeekSearch(
     apiKey: String,
@@ -27,7 +27,7 @@ class DeepSeekSearch(
         val body = buildJsonObject {
             put("query", query)
             put("count", n)
-            // 正文按页计费,摘要够用
+            // Page content is billed per page; the snippet is enough
             put("need_content", false)
         }
         val request = Request.Builder().url(url).header("Authorization", "Bearer $key").post(SearchHttp.json(body)).build()

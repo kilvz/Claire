@@ -4,9 +4,9 @@ import java.net.URLEncoder
 import java.util.Locale
 
 /**
- * 把一次自检写成纯文字报告:抬头是版本和设备事实,下面每项一行「编号 名字: 结论 — 事实」,英文键,谁都看得懂。
- * 只写 [DeviceFacts] 和各项的 [CheckResult.detail],不写账号、App 列表、用户的内容、序列号;
- * 最后整段交给 [sanitize](App 里是「复制诊断信息」那一套脱敏),每一项的事实先压成一行、截短。
+ * Write one self-check as a plain-text report: the header holds the version and device facts, then each item is one line "number name: verdict — fact", English keys, understandable by anyone.
+ * Only [DeviceFacts] and each item's [CheckResult.detail] are written, no accounts, app lists, user content or serial numbers;
+ * finally the whole text goes through [sanitize] (in the app this is the same redaction as "copy diagnostic info"), and each item's fact is first flattened to one line and shortened.
  */
 object SelfCheckReport {
     const val HEADER = "Claire self-check"
@@ -28,7 +28,7 @@ object SelfCheckReport {
         for (r in state.results) appendLine(line(r))
     }.trimEnd() + "\n")
 
-    /** 一项一行:`8 stays alive: FAIL — frames stopped after 6 s`。 */
+    /** One line per item: `8 stays alive: FAIL — frames stopped after 6 s`. */
     fun line(r: CheckResult): String {
         val detail = oneLine(r.detail)
         return "${r.check.number} ${r.check.key}: ${label(r.status)}" + if (detail.isEmpty()) "" else " — $detail"
@@ -59,13 +59,13 @@ object SelfCheckReport {
     private fun gb(bytes: Long): String =
         if (bytes <= 0) "unknown" else String.format(Locale.ROOT, "%.1f GB", bytes / (1024.0 * 1024 * 1024))
 
-    /** 反馈问题的标题:`[兼容性] Android <版本> <型号>`,型号就是系统给的那个(不另加厂商名)。 */
+    /** The title of the feedback issue: the compatibility tag followed by `Android <version> <model>`; the model is exactly what the system reports (no manufacturer name added). */
     fun issueTitle(f: DeviceFacts?): String =
         if (f == null) "[兼容性]" else "[兼容性] Android ${f.androidRelease} ${f.model.trim()}".trim()
 
     /**
-     * 新建问题的地址:选好设备反馈的模板,只预填标题。报告太长,不放进地址里(地址有长度上限),由用户粘贴。
-     * [newIssue] 是仓库的新建问题地址。
+     * URL for creating a new issue: pick the device feedback template and pre-fill only the title. The report is too long to put into the URL (URLs have a length limit), so the user pastes it.
+     * [newIssue] is the repository's new-issue URL.
      */
     fun issueUrl(newIssue: String, f: DeviceFacts?): String =
         "$newIssue?template=$ISSUE_TEMPLATE&title=${encode(issueTitle(f))}"

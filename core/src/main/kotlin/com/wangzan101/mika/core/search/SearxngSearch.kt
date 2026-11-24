@@ -8,9 +8,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * 自建的 SearXNG 实例:`GET {实例地址}/search?q=&format=json`,结果在 `results[]`,摘要取 content。
- * 实例默认不开 JSON 输出,没开时回 403,要在 settings.yml 的 `search.formats` 里加上 json;这和密钥无关,单独说明。
- * SearXNG 不按条数返回,这里只取前 count 条。
+ * A self-hosted SearXNG instance: `GET {instance address}/search?q=&format=json`, results are in `results[]`, the snippet is taken from content.
+ * Instances do not enable JSON output by default and return 403 when it is off; json must be added to `search.formats` in settings.yml. This is unrelated to the key and is explained separately.
+ * SearXNG does not return results by count, so only the first count entries are taken here.
  */
 class SearxngSearch(
     private val base: HttpUrl,
@@ -18,8 +18,8 @@ class SearxngSearch(
 ) : WebSearch {
     override suspend fun search(query: String, count: Int): WebSearchResult {
         val n = count.coerceIn(1, WebSearch.MAX_COUNT)
-        // 填的是实例地址;已经写到 /search 的也认
-        // 写成 /search/ 时 pathSegments 末位是空串,取最后一个非空段才不会再拼出 /search/search
+        // The instance address is what the user enters; one that already ends in /search is accepted too
+        // With /search/ the last pathSegments entry is an empty string, so taking the last non-empty segment avoids appending another /search and producing /search/search
         val path = if (base.pathSegments.lastOrNull { it.isNotEmpty() } == "search") base.newBuilder() else base.newBuilder().addPathSegment("search")
         val url = path.addQueryParameter("q", query).addQueryParameter("format", "json").build()
         return SearchHttp.call(client, Request.Builder().url(url).get().build(), special = { response ->

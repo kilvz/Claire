@@ -23,11 +23,11 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 /**
- * 自身工具:读自身状态、打开自己的页面/文件、发通知、写剪贴板。
+ * Self tools: read self status, open own pages/files, send notifications, write the clipboard.
  *
- * 这些工具不动屏幕(offScreen),不经过手机/网页那套屏幕关卡;它们的授权是用户设置里的
- * 「允许 Claire 操作自己的界面」,敏感动作还要在 execute 里用 [com.wangzan101.mika.core.tool.AskPort] 当次问用户。
- * 手机工具仍然不能碰 Claire 自己的包(见 ConfirmDecision.ownApp),这里不是绕过它,而是另一条正门。
+ * These tools do not touch the screen (offScreen) and do not go through the phone/web screen gates; their authorization is the user setting
+ * "allow Claire to operate its own interface", and sensitive actions additionally ask the user at that moment inside execute via [com.wangzan101.mika.core.tool.AskPort].
+ * The phone tools still cannot touch Claire's own package (see ConfirmDecision.ownApp); this is not a bypass of that but another front door.
  */
 internal interface SelfTool : AgentTool {
     override val offScreen: Boolean get() = true
@@ -40,12 +40,12 @@ private fun port(ctx: ToolContext): SelfPort =
 private fun operate(ctx: ToolContext): SelfPort =
     ctx.config.selfOperate ?: error("self tools are only offered when the user allows it")
 
-/** 只读:自身状态。 */
+/** Read-only: self status. */
 internal object MikaStatus : SelfTool {
     override val verb = Verb.SelfStatus
     override val label = "查看自身状态"
     override val risk = Risk.Read
-    /** 只读、不碰屏幕;走只读调用那条路,不经过写操作入口。 */
+    /** Read-only and does not touch the screen; goes through the read-only call path, not the write entry point. */
     override val offScreen = false
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("mika_status", Prompts.tool("mika_status"))
@@ -56,7 +56,7 @@ internal object MikaStatus : SelfTool {
     }
 }
 
-/** 打开 Claire 自己的一页;只改用户眼前的页面,不改任何设置。 */
+/** Open one of Claire's own pages; changes only the page in front of the user, no settings. */
 internal object MikaOpenScreen : SelfTool {
     override val verb = Verb.SelfOpenScreen
     override val label = "打开 Claire 的页面"
@@ -81,7 +81,7 @@ internal object MikaOpenScreen : SelfTool {
     }
 }
 
-/** 用 App 内查看器打开工作区里的文件。 */
+/** Open a file in the workspace with the in-app viewer. */
 internal object MikaOpenFile : SelfTool {
     override val verb = Verb.SelfOpenFile
     override val label = "打开文件"
@@ -108,7 +108,7 @@ internal object MikaOpenFile : SelfTool {
     }
 }
 
-/** 给用户发一条通知;每任务最多 3 条。 */
+/** Send the user one notification; at most 3 per task. */
 internal object MikaNotify : SelfTool {
     override val verb = Verb.SelfNotify
     override val label = "发通知"
@@ -141,7 +141,7 @@ internal object MikaNotify : SelfTool {
     private const val MAX_NOTIFY = 3
 }
 
-/** 写剪贴板;不读。 */
+/** Write the clipboard; never read. */
 internal object MikaCopy : SelfTool {
     override val verb = Verb.SelfCopy
     override val label = "复制文字"
@@ -162,7 +162,7 @@ internal object MikaCopy : SelfTool {
     }
 }
 
-/** 在用户看得见的浏览器里打开一页;用户当次点头才开。 */
+/** Open a page in the browser the user can see; it opens only when the user agrees at that moment. */
 internal object MikaOpenInBrowser : SelfTool {
     override val verb = Verb.SelfOpenBrowser
     override val label = "在浏览器里打开"
@@ -202,7 +202,7 @@ internal object MikaOpenInBrowser : SelfTool {
         o.argStr("url")?.let(SelfUrlPolicy::host) ?: o.argStr("url")
 }
 
-/** 用浏览器的默认搜索引擎搜索并打开结果页。 */
+/** Search with the browser's default search engine and open the results page. */
 internal object MikaSearchInBrowser : SelfTool {
     override val verb = Verb.SelfSearch
     override val label = "在浏览器里搜索"
@@ -241,12 +241,12 @@ internal object MikaSearchInBrowser : SelfTool {
     override fun logTarget(o: kotlinx.serialization.json.JsonObject, r: ToolExecution, ctx: ToolContext): String? = o.argStr("query")
 }
 
-/** 站点登记表:哪些已登录、哪些最近被验证码/风控拦过。只读。 */
+/** Site registry: which sites are signed in and which were recently stopped by a captcha/risk control. Read-only. */
 internal object MikaSites : SelfTool {
     override val verb = Verb.SelfSites
     override val label = "查看网站登录"
     override val risk = Risk.Read
-    /** 走只读调用那条路,不碰屏幕。 */
+    /** Goes through the read-only call path and does not touch the screen. */
     override val offScreen = false
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("mika_sites", Prompts.tool("mika_sites"))
@@ -269,7 +269,7 @@ internal object MikaSites : SelfTool {
     }
 }
 
-/** 用户浏览器此刻的页面;只读。 */
+/** The page the user's browser is on right now; read-only. */
 internal object MikaUserPage : SelfTool {
     override val verb = Verb.SelfUserPage
     override val label = "查看正在看的网页"
@@ -293,7 +293,7 @@ internal object MikaUserPage : SelfTool {
     }
 }
 
-/** 打开「给 Claire 登录」页,让用户自己登录。 */
+/** Open the "sign in for Claire" page so the user signs in themselves. */
 internal object MikaLoginSite : SelfTool {
     override val verb = Verb.SelfLogin
     override val label = "请你登录网站"
@@ -327,7 +327,7 @@ internal object MikaLoginSite : SelfTool {
     override fun logTarget(o: kotlinx.serialization.json.JsonObject, r: ToolExecution, ctx: ToolContext): String? = o.argStr("host")
 }
 
-/** 用户说登录好了:核对一次并记下登录状态。 */
+/** The user says the sign-in is done: verify once and record the sign-in state. */
 internal object MikaConfirmLogin : SelfTool {
     override val verb = Verb.SelfConfirmLogin
     override val label = "核对登录"
@@ -341,7 +341,7 @@ internal object MikaConfirmLogin : SelfTool {
         ToolExecution(operate(ctx).confirmLogin().toJson())
 }
 
-/** 常用网站:list / add / remove;改动可逆,不要当次同意。 */
+/** Favourite sites: list / add / remove; the change is reversible, no consent for this call. */
 internal object MikaFavorites : SelfTool {
     override val verb = Verb.SelfFavorites
     override val label = "常用网站"

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 一次自检此刻的样子:[results] 按 [SelfCheck] 的顺序,每项一条。 */
+/** What one self-check looks like right now: [results] follows the order of [SelfCheck], one entry per item. */
 data class SelfCheckState(
     val phase: Phase = Phase.Idle,
     val results: List<CheckResult> = SelfCheck.entries.map { CheckResult(it) },
@@ -20,14 +20,14 @@ data class SelfCheckState(
 
     fun of(check: SelfCheck): CheckResult = results[check.ordinal]
 
-    /** 跑完或取消了:可以出报告。 */
+    /** Finished or cancelled: the report can be produced. */
     val ended: Boolean get() = phase == Phase.Done || phase == Phase.Cancelled
 }
 
 /**
- * 按顺序跑完 [SelfCheck] 的每一项:先要过的没过就跳过并写明缺哪一项;每项有自己的时限,整次还有总时限 [budgetMs],
- * 时间用完了余下的都记为跳过。出错按失败记,不中断后面的项。不论跑完、出错还是被取消,最后都调 [SelfCheckPort.release]。
- * [state] 随时给出进度,界面照着画。一个实例只跑一次。
+ * Run every item of [SelfCheck] in order: if a required item did not pass, skip this one and state which item is missing; each item has its own time limit, and the whole run has a total limit [budgetMs],
+ * after which the remaining items are all recorded as skipped. Errors are recorded as failures and do not stop later items. Whether the run finished, errored or was cancelled, [SelfCheckPort.release] is called at the end.
+ * [state] reports progress at any time, and the UI draws from it. An instance runs only once.
  */
 class SelfCheckRunner(
     private val port: SelfCheckPort,
@@ -70,7 +70,7 @@ class SelfCheckRunner(
             withTimeoutOrNull(limit) { if (c == SelfCheck.DEVICE) device() else port.check(c) }
                 ?: CheckOutcome.fail("timed out after ${seconds(limit)} s", Advice.TimedOut)
         } catch (e: TimeoutCancellationException) {
-            // 端口里自己的时限到了(不是这次自检被取消)
+            // The port's own time limit expired (this self-check was not cancelled)
             CheckOutcome.fail("timed out inside the check", Advice.TimedOut)
         } catch (e: CancellationException) {
             throw e
@@ -92,7 +92,7 @@ class SelfCheckRunner(
         _state.value = s.copy(results = s.results.map { if (it.check == r.check) r else it })
     }
 
-    /** 结束:还没结论的(取消时正在跑的和后面的)都记为跳过。 */
+    /** Finish: everything that has no conclusion yet (the one running at cancellation and all after it) is recorded as skipped. */
     private fun finish(phase: SelfCheckState.Phase, start: Long) {
         val s = _state.value
         _state.value = s.copy(
@@ -103,14 +103,14 @@ class SelfCheckRunner(
     }
 
     companion object {
-        /** 整次自检的总时限:各项的时限加起来比这长,正常情况下远用不完。 */
+        /** Total time limit for the whole self-check: the per-item limits add up to more than this, but normally it is far from exhausted. */
         const val TOTAL_BUDGET_MS = 90_000L
 
         private fun seconds(ms: Long) = (ms + 999) / 1000
 
         /**
-         * 「设备」这一项:安卓 12 以下手机操作用不了;这个环境没有能起助手的路也用不了;
-         * 没有无线调试只能用电脑启动,算部分可用。
+         * The "device" item: below Android 12 phone control is unavailable; it is also unavailable when this environment has no way to start the helper;
+         * without wireless debugging only starting from a computer is possible, which counts as partially usable.
          */
         fun judgeDevice(f: DeviceFacts): CheckOutcome {
             val detail = "Android ${f.androidRelease} (SDK ${f.sdk}), ${f.abis.firstOrNull() ?: "unknown ABI"}" +

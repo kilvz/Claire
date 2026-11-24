@@ -18,21 +18,21 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 /**
- * 模型改 Claire 自己设置的唯一入口(App 实现,核心只认这几个键)。
+ * The only way for the model to change Claire's own settings (implemented by the app; the core only knows these keys).
  *
- * 能改什么由 App 定:**模型与 Key、删除数据一律不给**——前者等于让模型换掉自己的脑子、花用户的钱,
- * 后者不可逆。给的都是可逆的偏好项。
+ * What can be changed is decided by the app: **the model and Key, and deleting data, are never offered** — the former amounts to letting the model swap out its own brain and spend the user's money,
+ * the latter is irreversible. Everything offered is a reversible preference.
  *
- * 用户没开「允许 Claire 改自己的设置」时这个工具根本不提供,所以模型碰不到它。
+ * When the user has not enabled "allow Claire to change its own settings", this tool is not offered at all, so the model cannot reach it.
  */
 interface SelfConfig {
-    /** 现在能改哪些项、各自是什么值。 */
+    /** Which items can be changed right now, and what each one's value is. */
     fun options(): List<Option>
 
-    /** 改一项;[value] 必须在 [Option.choices] 里。成功返回 null,否则是一句原因。 */
+    /** Change one item; [value] must be one of [Option.choices]. Returns null on success, otherwise a reason. */
     fun set(key: String, value: String): String?
 
-    /** 一项设置;[label] 是给人看的名字,[value] 是现在的值,[choices] 是可选的几个值(空的表示自由文本)。 */
+    /** One setting; [label] is the human-readable name, [value] is the current value, [choices] are the selectable values (empty means free text). */
     data class Option(val key: String, val label: String, val value: String, val choices: List<String> = emptyList())
 }
 
@@ -42,7 +42,7 @@ const val SETTINGS_SET = "settings_set"
 private fun port(ctx: ToolContext): SelfConfig =
     ctx.config.selfConfig ?: error("settings tools are only offered when the user allows it")
 
-/** 列出 Claire 自己能改的设置:键、给人看的名字、现在的值、可选值。只读。 */
+/** List the settings Claire can change itself: keys, human-readable names, current values, selectable values. Read-only. */
 internal object SettingsList : AgentTool {
     override val verb = Verb.SettingsList
     override val label = "查看设置"
@@ -65,12 +65,12 @@ internal object SettingsList : AgentTool {
     }
 }
 
-/** 改 Claire 自己的一项设置;键和值都得来自 [SettingsList]。 */
+/** Change one of Claire's own settings; both the key and the value must come from [SettingsList]. */
 internal object SettingsSet : AgentTool {
     override val verb = Verb.SettingsSet
     override val label = "改设置"
     override val risk = Risk.Write
-    /** 不动屏幕:改的是 Claire 自己的设置,和当前任务的屏无关。 */
+    /** Does not touch the screen: it changes Claire's own settings, unrelated to the current task's screen. */
     override val offScreen = true
 
     override fun available(ctx: ToolContext) = ctx.config.selfConfig != null
