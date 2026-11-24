@@ -77,28 +77,28 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import kotlin.math.ceil
 
-/** 胶囊外面留给阴影的边:浮层窗口按内容大小,阴影画在窗口里面;留得越少,窗口挡住下面 App 的透明边越窄。 */
+/** Margin left around the capsule for the shadow: the overlay window matches the content size and the shadow is drawn inside the window; the less margin left, the narrower the transparent border of the window covering the app below. */
 internal val CapsuleShadowRoom = 8.dp
 private val CapsuleHeight = 40.dp
 private val BarHeight = 48.dp
 private val LogoSize = 30.dp
 private const val FADE_MS = 400
-/** 截到屏幕时一颗上那一闪:多亮、多久退掉。 */
+/** The flash on the ball when a screen is captured: how bright and how long it takes to fade. */
 private const val FLASH_ALPHA = 0.8f
 private const val FLASH_MS = 320
-/** 一颗展开成胶囊、缩回一颗的时长。 */
+/** Duration of the ball expanding into a capsule and shrinking back to a ball. */
 private const val MORPH_MS = 260
-/** 长按说话时放大多少、外圈多粗、变过去多久。 */
+/** How much it scales up during hold-to-talk, how thick the outer ring is, and how long the transition takes. */
 private const val HOLD_SCALE = 0.06f
 private val HoldRing = 3.dp
 private const val HOLD_MS = 180
-/** 干活中的圈转一周的时长。 */
+/** Time for one full turn of the ring while working. */
 private const val SPIN_MS = 1_200
 private val CapsuleText = TextStyle(fontSize = 13.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
 private val BarDetail = TextStyle(fontSize = 11.5.sp, lineHeight = 15.sp)
 private val CountText = TextStyle(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)
 
-/** 胶囊上的固定说法。 */
+/** Fixed strings on the capsule. */
 object CapsuleCopy {
     val STOP: String get() = tr(R.string.capsule_stop)
     val EXPAND: String get() = tr(R.string.capsule_expand)
@@ -106,7 +106,7 @@ object CapsuleCopy {
     val SWAP_SIDE: String get() = tr(R.string.capsule_swap_side)
     const val IDLE = "Claire"
 
-    /** 读屏时一颗图标的说法:在做什么、要不要你处理、结果;好几件时的件数已在 [CapsuleView.Shown.text] 里。 */
+    /** What screen readers announce for the ball: what it is doing, whether it needs you, and the result; the count when there are several items is already in [CapsuleView.Shown.text]. */
     fun describe(view: CapsuleView.Shown): String = when {
         view.kind == CapsuleKind.Idle -> IDLE
         view.kind == CapsuleKind.Notice -> tr(R.string.notice_hint_capsule_desc, view.count)
@@ -118,18 +118,18 @@ object CapsuleCopy {
 }
 
 /**
- * 悬浮胶囊,不带状态:平时是一颗 Claire 图标,状态画在外圈和角标上(干活中蓝弧绕着转、等条件灰圈、要你处理整颗变橙、
- * 外圈一呼一吸;好几件时角上写件数;办好了绿勾,没办成、已停止灰色角标;空闲时什么都没有);
- * [CapsuleView.Shown.pill] 时展开成一行字的胶囊(要你处理、刚办完),宽度慢慢变,图标贴着停靠的那一边([side])不动;
- * App 交到你手上时是顶部那一条「你来处理 · 不做了 · 处理好了」。
- * 胶囊只一行字,最宽到屏幕的 60%,超出截断;同一个 [CapsuleView.Shown.widthEpoch] 里只变宽不变窄。
- * 点一颗或胶囊交给 [onTap](展开卡片),读屏时这一下的说法是 [tapLabel];那一条上的两个按钮交给 [onStop]、[onHandBack]。
- * [onSwapSide] 给了时读屏软件多一个「移到屏幕另一边」,代替拖动。[alpha] 只淡底和图标,外圈和角标保持实色。
- * 双击由调用方从两次 [onTap] 认出来;读屏软件的双击就是点按,所以 [onSendScreen] 给了时另有一个截屏操作。
- * 两种截屏入口都只把屏幕放进卡片预览,明确按发送后才进对话。
- * [flash] 每加一,一颗上闪一下(截到了屏幕)。
- * [holding] 时是长按说话中:胶囊稍微放大、外面一圈蓝边。[onTalk] 给了时读屏软件多一个说话的操作([talkLabel]),代替长按:
- * 点一下开始、再点一下发出。
+ * The floating capsule, holding no state: normally it is a single Claire icon, with state drawn on the outer ring and the corner badge (while working a blue arc spins around it, holding shows a gray ring, needing you turns the whole thing orange,
+ * the ring breathes in and out; with several items the count is written on the corner; done gets a green check, failed and stopped get gray badges; idle shows nothing);
+ * with [CapsuleView.Shown.pill] it expands into a one-line capsule (needs you, just finished), whose width changes gradually, with the icon hugging the docked side ([side]) without moving;
+ * when the app is handed over to you it is the bar at the top: "You handle it · Not doing it · Handled".
+ * The capsule holds a single line of text, at most 60% of the screen width, truncated beyond that; within the same [CapsuleView.Shown.widthEpoch] it only grows, never shrinks.
+ * Tapping the ball or the capsule goes to [onTap] (expand the card); for screen readers this tap is announced as [tapLabel]; the two buttons on that bar go to [onStop] and [onHandBack].
+ * When [onSwapSide] is provided, screen readers get an extra "Move to the other side of the screen" in place of dragging. [alpha] fades only the background and the icon, while the ring and badge stay solid.
+ * Double taps are recognized by the caller from two [onTap]s; a screen-reader double tap is just a tap, so when [onSendScreen] is provided there is an extra capture-screen action.
+ * Both capture entries only put the screen into the card preview; it enters the conversation only after Send is explicitly pressed.
+ * Each increment of [flash] makes the ball flash once (a screen was captured).
+ * While [holding] it is hold-to-talk: the capsule scales up slightly, with a blue ring around it. When [onTalk] is provided, screen readers get an extra talk action ([talkLabel]) instead of a long press:
+ * tap once to start, tap again to send.
  */
 @Composable
 fun CapsuleContent(
@@ -148,7 +148,7 @@ fun CapsuleContent(
     onTalk: (() -> Unit)? = null,
     talkLabel: String = "",
 ) {
-    // 淡下去、恢复都慢慢来;关了动画时直接换
+    // Both fading out and coming back are gradual; with animations off it switches instantly
     val shown = if (MikaTheme.reduceMotion) alpha else animateFloatAsState(alpha, tween(FADE_MS), label = "fade").value
     val a11y = Modifier.semantics {
         customActions = listOfNotNull(
@@ -163,15 +163,15 @@ fun CapsuleContent(
     }
 }
 
-/** 一颗或展开的胶囊:同一块玻璃底,看得见的宽度在两者之间慢慢变(只在画的时候变,见 [Morph]);[end] 时贴右边(图标在右)。 */
+/** The ball or the expanded capsule: one and the same glass background, with the visible width gradually morphing between the two (changing only while drawing, see [Morph]); with [end] it hugs the right side (icon on the right). */
 @Composable
 private fun Capsule(view: CapsuleView.Shown, end: Boolean, onTap: () -> Unit, tapLabel: String, a11y: Modifier, alpha: Float, flash: Int, holding: Boolean) {
     val c = MikaTheme.colors
-    // 长按说话中:放大一点、外面一圈蓝边(画在阴影边里,窗口大小不变)
+    // Hold-to-talk: scaled up slightly with a blue ring around it (drawn in the shadow margin, so the window size does not change)
     val press = if (MikaTheme.reduceMotion) (if (holding) 1f else 0f)
         else animateFloatAsState(if (holding) 1f else 0f, tween(HOLD_MS), label = "hold").value
     val need = view.kind.needsYou || view.needCount > 0
-    // 截到屏幕:白光从亮到无,和截图时屏幕闪一下一个意思;关了动画时不闪
+    // Screen captured: a white glow fading from bright to nothing, the same idea as the screen flashing when a screenshot is taken; no flash with animations off
     val glow = remember { Animatable(0f) }
     val still = MikaTheme.reduceMotion
     val morph = rememberMorph(animate = !still)
@@ -206,7 +206,7 @@ private fun Capsule(view: CapsuleView.Shown, end: Boolean, onTap: () -> Unit, ta
             else Box(Modifier.size(CapsuleHeight), contentAlignment = Alignment.Center) { CapsuleLogo() }
             if (glow.value > 0f) Box(Modifier.matchParentSize().background(androidx.compose.ui.graphics.Color.White.copy(alpha = glow.value)))
         }
-        // 外圈和角标不随底淡下去;缩回时贴着图标那一边,不跟着还没收完的宽度走
+        // The ring and the badge do not fade with the background; while shrinking back they hug the icon's side instead of following the width that has not finished collapsing
         if (!view.pill) Box(Modifier.align(if (end) Alignment.CenterEnd else Alignment.CenterStart).size(CapsuleHeight)) {
             Ring(view.kind, need, Modifier.matchParentSize())
             Badge(view, need, Modifier.align(Alignment.TopEnd).offset(3.dp, (-3).dp))
@@ -214,12 +214,12 @@ private fun Capsule(view: CapsuleView.Shown, end: Boolean, onTap: () -> Unit, ta
     }
 }
 
-/** 展开的胶囊里那一行:图标、状态标记、字;贴右边时图标在最右,和一颗时的位置一样。 */
+/** The row inside the expanded capsule: icon, state marker, text; when docked right the icon is at the far right, in the same place as on the ball. */
 @Composable
 private fun PillRow(view: CapsuleView.Shown, end: Boolean, need: Boolean) {
     val c = MikaTheme.colors
     val maxWidth = (LocalConfiguration.current.screenWidthDp * 0.6f).dp
-    // 同一件事、同一个状态里换句只变宽:记下这一段里最宽的时候
+    // Within the same item and the same state, changing the sentence only grows the width: remember the widest moment in this epoch
     var widest by remember(view.widthEpoch) { mutableIntStateOf(0) }
     val minWidth = with(LocalDensity.current) { widest.toDp() }
     Row(
@@ -240,7 +240,7 @@ private fun PillRow(view: CapsuleView.Shown, end: Boolean, need: Boolean) {
     }
 }
 
-/** 文字前面的状态标记:要你处理是呼吸点,办好了是勾,没办成是叹号,已停止是停止,后台网页运行中是绿点。 */
+/** The state marker before the text: a breathing dot when it needs you, a check when done, an exclamation when it failed, a stop sign when cancelled, and a green dot while a background page is running. */
 @Composable
 private fun Leading(kind: CapsuleKind) {
     val c = MikaTheme.colors
@@ -254,7 +254,7 @@ private fun Leading(kind: CapsuleKind) {
     }
 }
 
-/** 后台网页运行中:绿色圆点,外面一圈淡绿。 */
+/** Background page running: a green dot inside a pale green ring. */
 @Composable
 private fun LiveDot(c: MikaColors) {
     Box(Modifier.size(14.dp).testTag("capsule-live-dot"), contentAlignment = Alignment.Center) {
@@ -263,7 +263,7 @@ private fun LiveDot(c: MikaColors) {
     }
 }
 
-/** 需要你:橙色圆点,外面一圈淡橙一呼一吸;关了动画时不动。 */
+/** Needs you: an orange dot inside a pale orange ring that breathes in and out; still with animations off. */
 @Composable
 private fun BreathingDot(c: MikaColors) {
     val halo = breathe(still = 0f)
@@ -273,13 +273,13 @@ private fun BreathingDot(c: MikaColors) {
     }
 }
 
-/** 一呼一吸(0..1 来回);关了动画时停在 [still]。 */
+/** Breathing (from 0 to 1 and back); stays at [still] with animations off. */
 @Composable
 private fun breathe(still: Float): Float = if (MikaTheme.reduceMotion) still else rememberInfiniteTransition(label = "breathe").animateFloat(
     0f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "breathe",
 ).value
 
-/** 一颗图标的外圈:干活中一段蓝弧绕着转(关了动画时是一整圈不动),等条件灰色一整圈,要你处理橙色一整圈一呼一吸;其余没有。 */
+/** The ball's outer ring: a blue arc spinning around while working (a full static ring with animations off), a full gray ring while holding, a full orange ring breathing in and out when it needs you; nothing otherwise. */
 @Composable
 private fun Ring(kind: CapsuleKind, need: Boolean, modifier: Modifier) {
     val c = MikaTheme.colors
@@ -308,8 +308,8 @@ private fun Ring(kind: CapsuleKind, need: Boolean, modifier: Modifier) {
 }
 
 /**
- * 一颗图标角上的标:好几件时写件数(要你处理橙、等条件灰、其余蓝);只一件时办好了绿勾,没办成、已停止灰色。
- * 值得提醒([CapsuleKind.Notice])时写还没看的条数,一条也写。
+ * The badge on the ball's corner: with several items it shows the count (orange when it needs you, gray while holding, blue otherwise); with a single item, a green check when done, gray when failed or cancelled.
+ * When it warrants a notice ([CapsuleKind.Notice]) it shows the number of unseen items, writing it even for a single one.
  */
 @Composable
 private fun Badge(view: CapsuleView.Shown, need: Boolean, modifier: Modifier) {
@@ -345,9 +345,9 @@ private fun Badge(view: CapsuleView.Shown, need: Boolean, modifier: Modifier) {
 }
 
 /**
- * 一颗和胶囊之间宽度慢慢变,只变画出来的那块玻璃,不逐帧改布局:浮层窗口跟着内容大小,布局一变窗口就要跟着重排、换画布,
- * 逐帧变就一卡一卡。[target] 是内容此刻的宽,[width] 是看得见的宽(动画),[hold] 是动画期间布局占的宽——起点和终点里宽的那个,
- * 所以变宽时窗口一下到最宽、变窄时等画完才缩,一次变形窗口至多变一次。第一次出现和关了动画时直接是内容的宽度。
+ * The width morphs gradually between the ball and the capsule, changing only the glass that is drawn without touching the layout per frame: the overlay window follows the content size, and any layout change forces the window to relayout and swap canvases,
+ * so changing per frame would stutter. [target] is the content's width right now, [width] is the visible width (animated), and [hold] is the width taken by the layout during the animation — the wider of the start and end points,
+ * so when widening the window jumps to the widest at once, when narrowing it shrinks only after drawing finishes, and one morph changes the window at most once. On first appearance and with animations off it is the content width directly.
  */
 private class Morph {
     val width = Animatable(0f)
@@ -371,7 +371,7 @@ private fun rememberMorph(animate: Boolean): Morph {
     return m
 }
 
-/** 布局占 [Morph.hold] 和内容里宽的那个,内容贴着停靠的那一边摆([end] 时贴右边):向里长、向边收,图标不动。 */
+/** The layout takes the wider of [Morph.hold] and the content, and the content is placed against the docked side ([end] means right): it grows inward and collapses toward the edge, so the icon stays put. */
 private fun Modifier.morphLayout(m: Morph, end: Boolean): Modifier = layout { measurable, constraints ->
     val p = measurable.measure(constraints.copy(minWidth = 0))
     if (p.width != m.target) m.target = p.width
@@ -380,8 +380,8 @@ private fun Modifier.morphLayout(m: Morph, end: Boolean): Modifier = layout { me
 }
 
 /**
- * 玻璃底(同 [glass]),只画看得见的那一段宽、贴着停靠的那一边:阴影、裁切、底色和描边都按它,宽度变时只重画图层。
- * [alpha] 淡底和里面的图标。
+ * The glass background (same as [glass]) draws only the visible span of the width, against the docked side: shadow, clipping, fill and outline all follow it, so a width change only repaints layers.
+ * [alpha] fades the background and the icon inside it.
  */
 private fun Modifier.morphGlass(m: Morph, end: Boolean, c: MikaColors, need: Boolean, alpha: Float): Modifier =
     graphicsLayer {
@@ -402,7 +402,7 @@ private fun Modifier.morphGlass(m: Morph, end: Boolean, c: MikaColors, need: Boo
             if (need) c.warnSolid.copy(alpha = 0.5f) else c.glassEdge, style = Stroke(stroke))
     }
 
-/** 宽 [width](0 或超出时按整块)、贴着一边([end] 时逻辑末端)的胶囊形;[inset] 往里收(画描边用)。 */
+/** A pill shape of width [width] (the whole block when 0 or overflowing) hugging one side (the logical end when [end]); [inset] shrinks it inward (used for drawing the outline). */
 private class EdgePill(private val width: Float, private val end: Boolean, private val inset: Float = 0f) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val w = if (width > 0f) width.coerceAtMost(size.width) else size.width
@@ -413,7 +413,7 @@ private class EdgePill(private val width: Float, private val end: Boolean, priva
     }
 }
 
-/** App 在你手上时顶部那一条:「你来处理」和下面一行小字,右边「不做了」「处理好了」。 */
+/** The bar at the top while the app is in your hands: "You handle it" with a small line below it, and "Not doing it" / "Handled" on the right. */
 @Composable
 private fun TakeoverBar(view: CapsuleView.Shown, onStop: () -> Unit, onHandBack: () -> Unit) {
     val c = MikaTheme.colors
@@ -443,15 +443,15 @@ private fun TakeoverBar(view: CapsuleView.Shown, onStop: () -> Unit, onHandBack:
     }
 }
 
-/** 胶囊上的 Claire 图标(圆形)。 */
+/** The Claire icon on the capsule (circular). */
 @Composable
 private fun CapsuleLogo() {
     MikaLogo(LogoSize, corner = LogoSize / 2)
 }
 
 /**
- * 浮在别的 App 上的玻璃底:浮层窗口里拿不到下面 App 的画面做模糊,用接近不透明的卡片底、细描边和悬浮阴影;
- * 需要你时叠一层淡橙、描边变橙。
+ * Glass background floating above other apps: an overlay window cannot get the picture of the app below for blurring, so it uses a nearly opaque card background, a thin outline and a floating shadow;
+ * when it needs you, a pale orange layer is added and the outline turns orange.
  */
 internal fun Modifier.glass(c: MikaColors, shape: Shape, need: Boolean): Modifier =
     shadow(8.dp, shape, clip = false, ambientColor = c.floatShadow.copy(alpha = 0.25f), spotColor = c.floatShadow.copy(alpha = 0.3f))

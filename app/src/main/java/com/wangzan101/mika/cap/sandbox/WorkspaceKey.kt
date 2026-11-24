@@ -3,11 +3,11 @@ package com.wangzan101.mika.cap.sandbox
 import com.wangzan101.mika.chat.ProjectStore
 
 /**
- * 沙箱工作区标识:要么归属单条对话([Conversation]),要么归属整个项目([Project])。
+ * Sandbox workspace identifier: it belongs either to a single conversation ([Conversation]) or to an entire project ([Project]).
  *
- * 对话与内置固定工作区(`self-check`、`mcp-settings`)沿用原 ID 作为传输标识([wire]),
- * 宿主目录为 `c-<id>`(或 `h-<hash>`);项目工作区使用 `p:<id>` 作为传输标识,宿主目录为 `p-<id>`。
- * 合法对话编号不含 `:`,两者在磁盘目录和序列化键上不会撞名。
+ * Conversations and the built-in fixed workspaces (`self-check`, `mcp-settings`) keep their original ID as the wire identifier ([wire]),
+ * with a host directory of `c-<id>` (or `h-<hash>`); project workspaces use `p:<id>` as the wire identifier and `p-<id>` as the host directory.
+ * Valid conversation IDs contain no `:`, so the two can never collide on disk directories or serialization keys.
  */
 sealed interface WorkspaceKey {
     val wire: String

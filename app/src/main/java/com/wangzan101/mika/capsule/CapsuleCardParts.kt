@@ -63,14 +63,14 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import kotlinx.coroutines.flow.first
 
 /**
- * 干活中的步骤(旧的在上):按内容高、最多 [max] 高。放不下时最新一步留在底下,旧的在上面截掉、顶上淡出,往上滚看更早的;
- * 来了新的一步时,本来就在底部才跟着往下,往上翻着看时不拽回去(同 [ThreadList])。
- * [tags] 和 [steps] 一一对应:那一步在哪(「网页」「App」),写成步骤前面的小标签;没有为 null。
+ * Steps while working (oldest on top): sized to content, at most [max] tall. When they do not fit, the newest step stays at the bottom, older ones are cut off above with a fade at the top, and scrolling up shows earlier ones;
+ * when a new step arrives, follow it down only if already at the bottom, and do not drag the view back down while the user is scrolling up (same as [ThreadList]).
+ * [tags] corresponds one-to-one with [steps]: where that step happened ("web page", "App"), rendered as a small label before the step; null when there is none.
  */
 @Composable
 internal fun Steps(steps: List<String>, max: Dp, tags: List<String?> = emptyList()) {
     val c = MikaTheme.colors
-    // 倒着排:第 0 项是最新一步,贴在底下
+    // Reversed order: item 0 is the newest step, pinned at the bottom
     val state = rememberLazyListState()
     var following by remember { mutableStateOf(true) }
     LaunchedEffect(state) {
@@ -89,13 +89,13 @@ internal fun Steps(steps: List<String>, max: Dp, tags: List<String?> = emptyList
             .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
             .drawWithContent {
                 drawContent()
-                // 上面还有更早的步骤:顶上淡出
+                // There are still earlier steps above: fade out at the top
                 if (state.canScrollForward) drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, endY = fade), blendMode = BlendMode.DstIn)
             },
         state = state,
         reverseLayout = true,
     ) {
-        // 按从旧到新的序号作 key:往上翻着看时来了新的一步,看着的那几步留在原处
+        // Use the oldest-to-newest index as the key: when a new step arrives while scrolling up, the steps being viewed stay in place
         items(steps.size, key = { steps.lastIndex - it }) { j ->
             val i = steps.lastIndex - j
             val current = j == 0
@@ -132,7 +132,7 @@ internal fun TextLink(text: String, color: Color = MikaTheme.colors.accent, onCl
     )
 }
 
-/** 虚拟屏小画面,点一下放大。 */
+/** Small virtual-screen view; tap to enlarge. */
 @Composable
 internal fun MiniScreen(frame: Bitmap, onZoom: () -> Unit) {
     val c = MikaTheme.colors
@@ -152,7 +152,7 @@ internal fun MiniScreen(frame: Bitmap, onZoom: () -> Unit) {
     }
 }
 
-/** 放大的画面:点一下回到卡片。 */
+/** Enlarged screen: tap to return to the card. */
 @Composable
 internal fun Zoomed(frame: Bitmap, actions: CardActions) {
     val image = remember(frame) { frame.asImageBitmap() }
@@ -171,7 +171,7 @@ internal fun Zoomed(frame: Bitmap, actions: CardActions) {
     }
 }
 
-/** 画面的宽高比,夹在合理范围里(防止异常尺寸撑坏卡片)。 */
+/** The screen's aspect ratio, clamped to a sane range (so an abnormal size cannot break the card). */
 internal fun ratio(b: Bitmap): Float = ratio(b.width, b.height)
 
 internal fun ratio(width: Int, height: Int): Float = if (height <= 0) 0.45f else (width.toFloat() / height).coerceIn(0.3f, 1.8f)

@@ -57,96 +57,96 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
- * 悬浮胶囊的接线:把各任务的状态([TaskCenterState.runs] 和每个 [TaskRun] 的状态、接管阶段、活动)、开关、
- * Claire 界面在不在前台([AppForeground])、屏幕亮没亮([DeviceStateWatcher])、无障碍服务在不在交给 [CapsuleModel],
- * 按它的结果经 [com.wangzan101.mika.cap.phone.a11y.OverlayHost] 加上、挪动或拆掉浮层窗口。
- * 点一颗或胶囊展开卡片([CapsuleCards] 定内容,只说一件事),点卡片外面、收起按钮或返回收回成一颗(看过的不再展开,模型记着);卡片和胶囊上的按钮都转成任务服务现有的动作。
- * 一颗和卡片各在一个窗口里、各待各的位置(见 [window]):展开时一颗那个窗口显式隐藏,卡片在自己的窗口里从那一颗的方位缩放、淡入,
- * 收起时缩回去,一颗再在边上冒出来([OverlayMotion]:只动图层,不挪窗口,也不逐帧改窗口大小)。
- * 双击一颗或胶囊(见 [DoubleTap]:单击要等双击的时限过去才展开,两下还要同来源、落点相近)把用户此刻的屏幕截进那张卡片的输入框预览,
- * 不直接发出;用户看过预览、按发送后才和在卡片里发一句话走同一条路。卡片输入框左边的截屏按钮也挂在输入框上面,可以补一句再发。
- * 截的时候浮层先藏起来,截完再出来,一颗上闪一下。
- * 卡片底部的输入框点开时浮层才能接收键盘,发出、收起、点外面、按返回时马上还回去;输入法弹出时胶囊和卡片挪到它上面。
- * 长按一颗或胶囊说话(见 [CapsuleTalk]、[CapsuleVoicePanel]):按着时整屏压暗、胶囊旁边浮出面板和「取消」「改一改」两个落点,
- * 松开直接发给单击会展开的那张卡片(和双击发屏幕同一套找目标),拖到「改一改」打开卡片、字在输入框里,拖到「取消」丢掉;
- * 发出、没听清、用不了时胶囊上闪一句([note])。面板在一颗那个窗口下面的另一个窗口里,不接触摸。
- * 卡片展开时才收那件事的画面(每秒至多 [PREVIEW_FPS] 张,没变不推)。平时是一颗图标,有事要说时展开成胶囊(模型定);
- * 可以拖,松手贴到最近的左边或右边;停的位置按边和高度比例记在 [FeatureFlags],转屏后按比例重新摆。
- * 卡片左右居中(对话卡片固定高,任务卡片按内容高、最多一样高),按着标题栏上下拖,上边的比例另记一份,换卡片时上边不动;
- * 对话卡片的来回从 [ConversationStore] 读(和对话页同一份),
- * 操作过的 App 从那一轮的运行记录([RunStore])里读。
- * 浮层画不出来(服务刚断开、系统不让)时这个服务实例上不再重试,胶囊不出现,通知照旧。全部在主线程。
+ * Wiring for the floating capsule: it hands each task's state ([TaskCenterState.runs] plus every [TaskRun]'s state, takeover stage and activities), the switches,
+ * whether Claire's UI is in the foreground ([AppForeground]), whether the screen is on ([DeviceStateWatcher]) and whether the accessibility service exists to [CapsuleModel],
+ * and, based on its result, adds, moves or tears down the overlay windows through [com.wangzan101.mika.cap.phone.a11y.OverlayHost].
+ * Tapping the ball or the capsule expands the card ([CapsuleCards] decides the content and tells a single item); tapping outside the card, the collapse button or Back shrinks it back to a ball (what was seen is not expanded again, and the model remembers); the buttons on the card and the capsule all map to existing task-service actions.
+ * The ball and the card each live in their own window and keep their own positions (see [window]): on expansion the ball's window is explicitly hidden and the card scales and fades in within its own window from the ball's direction,
+ * and on collapse it shrinks back and the ball pops out at the edge again ([OverlayMotion]: only layers move; the window is not repositioned and its size is not changed per frame).
+ * Double-tapping the ball or capsule (see [DoubleTap]: a single tap waits out the double-tap timeout before expanding, and the two taps must come from the same source and land close together) captures the user's current screen into that card's input-field preview,
+ * without sending it directly; only after the user has seen the preview and pressed Send does it take the same path as sending a message from the card. The screenshot button to the left of the card's input field also attaches it above the input field, so an extra message can be added before sending.
+ * While capturing, the overlay is hidden first and comes back afterwards, with a flash on the ball.
+ * Only while the card's bottom input field is open can the overlay accept the keyboard; it is handed back immediately on send, collapse, tapping outside or Back; when the IME appears, the capsule and the card move above it.
+ * Long-pressing the ball or capsule talks (see [CapsuleTalk], [CapsuleVoicePanel]): while held, the whole screen dims and a panel with two targets, "Cancel" and "Amend", floats up next to the capsule;
+ * releasing sends straight to the card that a single tap would expand (same target lookup as sending a screen on double tap), dragging to "Amend" opens the card with the text in the input field, and dragging to "Cancel" discards it;
+ * when sent, not heard clearly, or unavailable, a line flashes on the capsule ([note]). The panel lives in another window below the ball's window and does not take touches.
+ * That item's screen is only captured while the card is expanded (at most [PREVIEW_FPS] frames per second; nothing is pushed when unchanged). Normally it is a single icon, and it expands into a capsule when there is something to say (the model decides);
+ * it can be dragged, and on release it snaps to the nearest left or right edge; the resting position is recorded by edge and height ratio in [FeatureFlags], and re-placed by ratio after rotation.
+ * The card is horizontally centered (a conversation card has a fixed height; a task card is sized to content, at most the same height), dragged up and down by its title bar, with the top ratio recorded separately, so switching cards leaves the top edge unchanged;
+ * the conversation card's thread is read from [ConversationStore] (the same copy as the chat page),
+ * and the apps operated are read from that turn's run record ([RunStore]).
+ * If the overlay cannot be drawn (the service just disconnected, the system refuses), no further retries happen on this service instance; the capsule does not appear and notifications carry on as before. Everything runs on the main thread.
  */
 class CapsuleController(
     internal val context: Context,
     internal val tasks: TaskCenterState,
     internal val foreground: AppForeground,
-    /** 几个任务共用的接管队列:卡片和那一条上的先后从这里读。 */
+    /** The takeover queue shared by several tasks: the card and that bar read the ordering from it. */
     internal val takeoverQueue: TakeoverQueue,
 ) {
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     internal val model = CapsuleModel(::reasonLabel)
     internal val flags = FeatureFlags.get(context)
-    /** 任务结束后留在后台运行的那一页(没有任务时胶囊说它,卡片里能看画面、关掉)。 */
+    /** The page left running in the background after the task ended (with no task, the capsule talks about it and the card can show its screen and close it). */
     internal val keeper get() = (context.applicationContext as MikaApp).pageKeeper
     internal val toolLabels by lazy { ToolLabels(knownTools()) }
     internal val appLabels = HashMap<String, String>()
-    /** 各任务这一问一答此刻的样子,和对话页同一套推法(步骤、要你做的事、结果)。 */
+    /** How each task's current exchange looks right now, derived the same way as on the chat page (steps, what it needs from you, result). */
     internal val exchanges = HashMap<String, Exchange>()
 
     internal var view by mutableStateOf<CapsuleView.Shown?>(null)
     internal var card by mutableStateOf<CardView?>(null)
-    /** 同进程的排队队列;卡片按自己的对话数明确排队的项。 */
+    /** The in-process queue; the card counts the items explicitly queued for its own conversation. */
     internal var followUps by mutableStateOf<List<com.wangzan101.mika.task.QueuedFollowUp>>(emptyList())
     internal var preview by mutableStateOf<Bitmap?>(null)
     internal var zoomed by mutableStateOf(false)
     internal var dock by mutableStateOf(flags.capsuleDock())
     internal var edgeHidden by mutableStateOf(false)
     internal var inputUi by mutableStateOf(CardInputUi())
-    /** 截到一屏时加一:一颗上闪一下。 */
+    /** Incremented when a screen is captured: the ball flashes once. */
     internal var flash by mutableIntStateOf(0)
     internal val taps = DoubleTap(
         ViewConfiguration.getDoubleTapTimeout().toLong(),
         ViewConfiguration.get(context).scaledTouchSlop.toFloat(),
     )
     internal data class Touch(val at: Long, val x: Float, val y: Float, val source: Int)
-    /** 最近一次胶囊窗口的 ACTION_DOWN;Compose 的 onClick 不带触摸信息,在这里补上。 */
+    /** The most recent ACTION_DOWN of the capsule window; Compose's onClick carries no touch information, so it is filled in here. */
     internal var capsuleTouch: Touch? = null
     internal var tapJob: Job? = null
 
-    /** 任何不是普通第二下的交互都从这里打断待定点击,避免跨操作拼出双击。 */
+    /** Any interaction that is not an ordinary second tap cancels pending taps here, so a double tap cannot be assembled across actions. */
     internal fun resetTaps() {
         tapJob?.cancel()
         taps.reset()
         capsuleTouch = null
     }
 
-    /** 正在截屏(浮层藏着):这时的点按、再截都不算。 */
+    /** A capture is in progress (the overlay is hidden): taps and further captures are ignored during it. */
     internal var capturing = false
-    /** 在卡片里发了话的那个对话:展开时跟着它的任务,好看到回答。 */
+    /** The conversation where something was sent from the card: expansion follows its task so the answer can be seen. */
     internal var follow: String? = null
-    /** 空闲卡片接着的最近那段对话(点开空闲图标时读一次)。 */
+    /** The most recent conversation the idle card continues (read once when the idle icon is opened). */
     internal var idle: CardView.Chat? = null
-    /** 卡片标题栏的电源按钮点过:卡片里换成「完全退出」的确认,不马上退。 */
+    /** The power button in the card's title bar was tapped: the card switches to the "quit completely" confirmation instead of quitting right away. */
     internal var quitConfirm by mutableStateOf(false)
 
-    /** 长按说话;[talkIdle] 是空闲图标上开始说时去读的最近那段对话(说完发给它)。 */
+    /** Hold-to-talk; [talkIdle] is the most recent conversation read when talking starts from the idle icon (what is said is sent to it). */
     internal val talk = CapsuleTalk(context, { (context.applicationContext as MikaApp).voice }, scope, ::spoken)
     internal var talkIdle: Deferred<CardView.Chat>? = null
-    /** 胶囊上临时闪的一句(已发出、没听清、用不了);到时自己消失。 */
+    /** A line briefly flashed on the capsule (sent, not heard clearly, unavailable); it disappears on its own. */
     internal var note by mutableStateOf<CapsuleNote?>(null)
     internal var noteJob: Job? = null
     internal var noteCount = 0
 
     /**
-     * 对话卡片的来回:[threadOf] 那个对话记下的全部轮次([past],后台从 [ConversationStore] 读,和对话页同一份;还没读到为 null),
-     * 排最后 [shownTurns] 轮,接上还没记进去的任务;[thread] 是此刻给界面的。[threadMark] 是上次读时这个对话里有哪些任务、结束没有,
-     * 变了(任务结束、拿掉,那一轮这时才记进对话)就重读。[placesOf] 按运行记录编号记着那一轮操作过的 App 和网站。
+     * The conversation card's thread: all turns recorded for the conversation [threadOf] ([past], read from [ConversationStore] in the background, the same copy as the chat page; null while not yet read),
+     * taking the last [shownTurns] turns and appending the tasks not yet recorded; [thread] is what is handed to the UI right now. [threadMark] is which tasks this conversation had and whether they had finished at the previous read,
+     * so it re-reads when that changes (a task finishes or is removed, and only then is that turn recorded into the conversation). [placesOf] remembers, by run record ID, the apps and sites that turn operated.
      */
     internal var thread by mutableStateOf<ChatThread?>(null)
     internal var threadOf: String? = null
     internal var past: List<PastTurn>? = null
-    /** 这个对话起好的标题(没有时卡片用第一句话)。 */
+    /** The title already generated for this conversation (when absent, the card uses the first message). */
     internal var pastTitle: String? = null
     internal var shownTurns = CapsuleThreads.PAGE
     internal var threadMark: Any? = null
@@ -154,73 +154,73 @@ class CapsuleController(
     internal val placesOf = HashMap<String, List<String>>()
     internal val runStore by lazy { RunStore(context) }
 
-    /** 卡片看得见的最高高度(像素,按屏幕和输入法定);0 是还没摆过。[cardFraction] 是卡片上边的比例,记在 [FeatureFlags]。 */
+    /** The card's maximum visible height (pixels, derived from the screen and the IME); 0 means it has not been placed yet. [cardFraction] is the card's top ratio, recorded in [FeatureFlags]. */
     internal var cardHeight by mutableIntStateOf(0)
     internal var cardFraction = flags.capsuleCardFraction()
-    /** 卡片标题栏在窗口里的位置:只有按着它能拖卡片。 */
+    /** The card title bar's position within the window: only holding it drags the card. */
     internal var cardHandle: Rect? = null
-    /** 用户屏幕上输入法的上边;没弹出为 null。胶囊和卡片都让开它。 */
+    /** The top edge of the IME on the user's screen; null when it is not shown. Both the capsule and the card move out of its way. */
     internal var imeTop: Int? = null
     /**
-     * 这一轮输入法弹出期间摆卡片用的上边:键盘变高时马上跟,变矮时忽略候选行、工具栏那种一行的高度
-     * (见 [CapsuleDocking.tallestImeTop])。中文输入法打拼音时输入法多一行少一行,卡片不跟着反复变高矮、上下挪。
-     * 输入法收起时清掉,下次弹出重新记。
+     * The top edge used to place the card during this IME session: when the keyboard grows taller, follow at once; when it shrinks, ignore a one-row difference such as a candidate row or the toolbar
+     * (see [CapsuleDocking.tallestImeTop]). When a Chinese IME gains or loses a row while typing pinyin, the card does not keep changing height and shifting up and down.
+     * Cleared when the IME is hidden, and recorded afresh on the next pop-up.
      */
     internal var cardImeTop: Int? = null
     internal var imeJob: Job? = null
 
-    /** 胶囊此刻的透明度(不碰它几秒后淡下去);[lastActive] 是上次碰到或状态变了的时刻。 */
+    /** The capsule's current opacity (it fades out a few seconds after the last touch); [lastActive] is when it was last touched or its state changed. */
     internal var alpha by mutableStateOf(1f)
     internal var lastActive = 0L
     internal var look: Any? = null
     internal var fadeJob: Job? = null
 
-    /** 卡片展开着;[closing] 是正在缩回胶囊那边(动效做完才真的收起)。 */
+    /** The card is expanded; [closing] means it is shrinking back toward the capsule (it only really collapses once the animation finishes). */
     internal var expanded = false
     internal var closing by mutableStateOf(false)
-    /** 卡片真的开始出来了:这时一颗才让开(卡片排版、出来前一颗还在原处,不空着);卡片开始往回缩时一颗就回来。 */
+    /** The card has really started to come out: only then does the ball give way (before the card is laid out and appears, the ball stays put so nothing looks empty); the ball comes back as soon as the card starts shrinking back. */
     internal var cardOut by mutableStateOf(false)
-    /** 展开前那一颗的中心(屏幕纵坐标)和卡片窗口的上边:卡片从那一颗的方位长出来、缩回去。 */
+    /** The center of that ball before expansion (screen y) and the top edge of the card window: the card grows out of and shrinks back toward the ball's direction. */
     internal var anchorY = 0
     internal var cardTop by mutableIntStateOf(0)
     internal var previewKey: String? = null
     internal var previewJob: Job? = null
 
-    /** 「你来处理」那一条的高度比例(只在这次运行里记着)。 */
+    /** The height ratio of the "You handle it" bar (remembered only for this run). */
     internal var barFraction = 0f
     internal var dragging = false
     internal var dragStartX = 0
     internal var dragStartY = 0
     internal var placedY = 0
-    /** 卡片窗口的上边。 */
+    /** The top edge of the card window. */
     internal var cardY = 0
     internal var snap: ValueAnimator? = null
 
     /**
-     * 两个浮层窗口,各自待在自己的位置上,展开、收起时谁都不挪:[window] 放一颗、胶囊和那一条,停在边上;[cardWindow] 放卡片,
-     * 左右居中(收起时显式设为不可见,里面随后空出来,不挡下面的 App)。一个窗口在一颗和卡片的位置间来回挪,系统会把挪动做成滑过去的动画
-     * (安卓原版的窗口移动动画),看上去是一颗从中间滑回边上、卡片从边上滑到中间。
+     * Two overlay windows, each staying in its own position, neither moving on expansion or collapse: [window] holds the ball, the capsule and that bar, parked at the edge; [cardWindow] holds the card,
+     * centered horizontally (explicitly made invisible on collapse, after which it empties out and does not block the app below). If one window moved back and forth between the ball's and the card's positions, the system would turn the move into a sliding animation
+     * (Android's stock window move animation), making it look like the ball sliding back from the middle to the edge and the card sliding from the edge to the middle.
      */
     internal var window: OverlayWindow? = null
     internal var cardWindow: OverlayWindow? = null
-    /** 长按说话时的面板,在一颗那个窗口下面(压暗不盖住胶囊);平时空着没有大小。加不上时不能长按说话。 */
+    /** The panel for hold-to-talk, below the ball's window (the dimming must not cover the capsule); normally empty with no size. If it cannot be added, hold-to-talk is unavailable. */
     internal var panelWindow: OverlayWindow? = null
-    /** 窗口加在哪个服务实例上;服务换了,旧窗口已随旧实例拆掉。 */
+    /** Which service instance the windows were added on; if the service changed, the old windows were already torn down with the old instance. */
     internal var windowOn: ScreenAccessibility? = null
-    /** 在这个服务实例上加窗口失败过:不再试,等服务重连。 */
+    /** Adding windows has failed on this service instance: stop retrying and wait for the service to reconnect. */
     internal var failedOn: ScreenAccessibility? = null
     internal var tick: Job? = null
     internal val ticks = MutableStateFlow(0)
     internal var last: Snapshot? = null
 
     internal val _showing = MutableStateFlow(false)
-    /** 胶囊此刻真的显示在亮着的屏幕上;任务服务据此把「需要你」通知发得安静些。 */
+    /** The capsule is really showing on a lit screen right now; the task service uses this to make "needs you" notifications quieter. */
     val showing: StateFlow<Boolean> = _showing.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun start() {
         val screen = DeviceStateWatcher(context) { -1 }
-        // 用户点了「完全退出」:按开关关着算,直到用户重新打开 Claire([resume] 清掉标记后再亮出来)
+        // The user tapped "quit completely": treat it as the switch being off until the user opens Claire again (nothing reappears until [resume] clears the flag)
         val mode = combine(flags.capsuleModeChanges(), flags.quitChanges()) { m, quit -> if (quit) CapsuleMode.Off else m }
         val fullscreen = combine(flags.capsuleHideFullscreenChanges(), ScreenAccessibility.instance, mode) { enabled, service, m ->
             service.takeIf { enabled && m != CapsuleMode.Off }
@@ -242,19 +242,19 @@ class CapsuleController(
                 }.combine(fullscreen) { s, full -> s.copy(fullscreen = full) },
                 ticks,
                 keeper.page,
-                // 主动能力判为值得提醒、还没看的条数(只要个数)
+                // The number of items the proactive capability judged worth a notice and that are unseen (only the count is needed)
                 com.wangzan101.mika.proactive.NoticeHintList.unseenCount(context),
             ) { s, _, kept, notices -> s.copy(kept = kept, notices = notices) }.collect(::render)
         }
-        // 说话面板出来时铺满整屏(压暗背后),收起时显式收掉(见 [syncPanelWindow])
+        // The talk panel fills the whole screen when it appears (dimming what is behind) and is explicitly removed when it goes away (see [syncPanelWindow])
         scope.launch { snapshotFlow { talk.active }.collect { syncPanelWindow() } }
-        // 排队条:卡片按自己的对话显示还有几件
+        // Queue line: the card shows how many items are left for its own conversation
         scope.launch { (context.applicationContext as MikaApp).followUpQueue.changes.collect { followUps = it } }
-        // 停止后的交代写好(或写不成)时那一轮已改进对话:重读记下的轮次
+        // Once the post-stop summary has been written (or has failed to be), that turn has been merged into the conversation: re-read the recorded turns
         scope.launch { tasks.summarizing.collect { threadOf?.let(::loadPast) } }
-        // 对话删掉了:见 [forget]
+        // A conversation was deleted: see [forget]
         scope.launch { ConversationStore.shared(context).deletions.collect(::forget) }
-        // 卡片上这个对话的标题变了(用户在侧栏改了名、后台起好了标题):卡片顶上「接着「…」聊」跟着换
+        // The title of this conversation on the card changed (the user renamed it in the sidebar, or the title finished generating in the background): the "Continue ‘…’" line at the top of the card follows
         scope.launch {
             val store = ConversationStore.shared(context)
             store.changes.collect { id ->
@@ -266,11 +266,11 @@ class CapsuleController(
                 }
             }
         }
-        // 转屏:按记下的边和比例重新摆;系统给新尺寸可能稍晚一点,过一会儿再摆一次
+        // Rotation: re-place by the recorded edge and ratio; the system may hand over the new size a little late, so place once more after a moment
         context.registerComponentCallbacks(object : ComponentCallbacks {
             override fun onConfigurationChanged(newConfig: Configuration) {
                 resetTaps()
-                // 屏幕尺寸换了,上一轮记的输入法位置不再作数;等输入法窗口的下一次变化重新记
+                // The screen size changed, so the IME position recorded last session no longer applies; record it again on the IME window's next change
                 cardImeTop = null
                 place()
                 scope.launch {
@@ -284,13 +284,13 @@ class CapsuleController(
         })
     }
 
-    /** 用户点了「完全退出」:马上拆掉浮层。进程可能被无障碍服务重新拉起,届时按退出标记不再画(见 [start])。 */
+    /** The user tapped "quit completely": tear down the overlay right away. The process may be restarted by the accessibility service, in which case the quit flag keeps it from drawing (see [start]). */
     fun stopNow() {
         quitConfirm = false
         hide()
     }
 
-    /** 用户又打开了 Claire:退出标记已清掉,按此刻的状态重新画(进程没被杀、又回到前台时用得上)。 */
+    /** The user opened Claire again: the quit flag has been cleared, so draw again from the current state (used when the process was not killed and comes back to the foreground). */
     fun resume() {
         quitConfirm = false
         refresh()
@@ -306,20 +306,20 @@ class CapsuleController(
     internal data class Snapshot(
         val runs: List<CapsuleRun>, val mode: CapsuleMode, val mikaInForeground: Boolean, val locked: Boolean,
         val service: ScreenAccessibility?,
-        /** 任务结束后留在后台运行的那一页。 */
+        /** The page left running in the background after the task ended. */
         val kept: KeptPage? = null,
         val opacity: CapsuleIdleOpacity = CapsuleIdleOpacity.DEFAULT,
         val notices: Int = 0,
-        /** 展开卡片的缩放档位,改了当场生效(见 [CardOverlay])。 */
+        /** The scale level of the expanded card; changes take effect immediately (see [CardOverlay]). */
         val cardScale: CapsuleCardScale = CapsuleCardScale.DEFAULT,
         val hideAtEdge: Boolean = false,
         val fullscreen: Boolean = false,
     )
 
     /**
-     * 各任务此刻的样子。任务收尾后会从 [TaskCenterState.runs] 里拿掉;拿掉时它的状态已是终态,
-     * 还带着它(到任务列表再变为止),模型才能记下「办好了」并停一会儿,停完以后再列着它模型也不算。
-     * 没到终态就被拿掉的(服务被销毁)直接不算。
+     * How each task looks right now. After wrapping up, a task is removed from [TaskCenterState.runs]; by then its state is already terminal,
+     * and it is still carried here (until the task list changes again) so the model can register "done" and pause for a while; once it has paused, listing it again does not count.
+     * Ones removed before reaching a terminal state (the service was destroyed) simply do not count.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     internal fun runs(): Flow<List<CapsuleRun>> {
@@ -331,7 +331,7 @@ class CapsuleController(
             exchanges.keys.retainAll(all.map { it.key }.toSet())
             if (all.isEmpty()) flowOf(emptyList())
             else combine(all.map { r ->
-                // 此刻在操作画面:有自己的虚拟屏,或正在用内置浏览器(卡片据此选任务卡片还是对话卡片)
+                // Operating a screen right now: it has its own virtual display, or is using the built-in browser (the card uses this to choose a task card or a conversation card)
                 combine(r.state, r.takeoverStage, r.activities, r.displayId, r.webOpen) { s, st, acts, display, web ->
                     CapsuleRun(
                         r.key, r.conversationId, s, st, r.goal, exchange(r, s, acts),
@@ -339,7 +339,7 @@ class CapsuleController(
                     )
                 }.combine(r.steers) { c, steers -> c.copy(steers = steers) }
             }) { it.toList() }.combine(takeoverQueue.changes) { list, _ ->
-                // 接管队里的先后:排队变了(前面那件交还了)就重读,下一件马上成为「需要你」
+                // Ordering within the takeover queue: re-read when the queue changes (the item ahead handed back), so the next one becomes "needs you" immediately
                 list.map { c ->
                     val owner = all.firstOrNull { it.key == c.key }?.takeover ?: return@map c
                     val ahead = takeoverQueue.ahead(owner)
@@ -354,12 +354,12 @@ class CapsuleController(
         return ChatViewModel.reduce(before.copy(activities = acts), s, ::appLabel, toolLabels::label).also { exchanges[r.key] = it }
     }
 
-    /** 示范开始后收起卡片，免得盖住用户要指的地方。 */
+    /** Collapse the card once a demonstration starts, so it does not cover the spot the user needs to point at. */
     fun yieldToTeaching() {
         if (expanded) collapse()
     }
 
-    /** 按着标题栏上下拖卡片(左右居中不动);松手记下上边的比例,下次展开、换卡片和转屏后按它摆。 */
+    /** Drag the card up and down by its title bar (horizontally centered and unmoved); on release the top ratio is recorded, and later expansions, card switches and rotations place it by that. */
     internal val cardDrag = object : OverlayDrag {
         override fun start() {
             dragging = true
@@ -388,7 +388,7 @@ class CapsuleController(
         }
     }
 
-    /** 拖胶囊(左右上下)或「你来处理」那一条(只上下);卡片见 [cardDrag]。 */
+    /** Drag the capsule (horizontally and vertically) or the "You handle it" bar (vertically only); for the card see [cardDrag]. */
     internal val drag = object : OverlayDrag {
         override fun start() {
             val w = window ?: return
@@ -435,7 +435,7 @@ class CapsuleController(
         }
     }
 
-    /** 一颗那个窗口交来的长按:开始说、手指移动算落点、松开按落点收尾。 */
+    /** A long press delivered by the ball's window: start talking, finger movement picks the target, and release finishes according to the target. */
     internal val talkHold = object : OverlayHold {
         override fun start(rawX: Float, rawY: Float) = beginTalk(byTouch = true)
 
@@ -457,7 +457,7 @@ class CapsuleController(
         override fun collapse() = this@CapsuleController.collapse()
         override fun stop(runKey: String) = TaskService.cancel(context, runKey)
         override fun takeOver(runKey: String) {
-            // 和通知上的「我来处理」一样带着这次等待的编号:点在已经换掉的旧等待上不算数
+            // Carries the ID of this wait just like "I'll handle it" on the notification: a tap on a wait that has already been replaced does not count
             TaskService.takeOver(context, waitKey = runFor(runKey)?.takeover?.waitKey, runKey = runKey)
             collapse()
         }
@@ -486,7 +486,7 @@ class CapsuleController(
         }
         override fun askQuit() {
             closeInput()
-            // 确认卡片没有自己的标题栏可拖,别拿上一张卡片的位置当把手
+            // The confirmation card has no title bar of its own to drag, so do not use the previous card's position as the handle
             cardHandle = null
             applyDrag()
             quitConfirm = true
@@ -516,7 +516,7 @@ class CapsuleController(
             collapse()
         }
         override fun hideCapsule() {
-            // 和设置 › 悬浮胶囊里选「关闭」同一处:开关一变,render 按 CapsuleModel 收掉胶囊和卡片(hide),任务和通知不受影响
+            // Same place as choosing "off" in Settings › Floating capsule: when the switch changes, render tears down the capsule and the card according to CapsuleModel (hide), while tasks and notifications are unaffected
             flags.setCapsuleMode(CapsuleMode.Off)
             android.widget.Toast.makeText(context, CardCopy.hiddenHint(), android.widget.Toast.LENGTH_LONG).show()
         }
@@ -526,37 +526,37 @@ class CapsuleController(
 
     internal companion object {
         const val TAG = "MikaCapsule"
-        /** 看得见的胶囊离屏幕左右边、离状态栏和底部。 */
+        /** Distance of the visible capsule from the screen's left/right edges and from the status bar and the bottom. */
         const val EDGE_MARGIN_DP = 12
         const val TOP_GAP_DP = 8
-        /** 胶囊、那一条连同阴影边的窗口高度(按比例摆高度时用)。 */
+        /** Window height of the capsule and of that bar including the shadow margin (used when placing the height by ratio). */
         const val PILL_DP = 40 + 16
         const val BAR_DP = 48 + 16
         const val SNAP_MS = 220L
 
         const val ROTATE_SETTLE_MS = 300L
         /**
-         * 输入法一下矮了这么多(dp)才当作换了面板(表情、手写这类),卡片跟着还原;拼音候选行、工具栏
-         * 多一行少一行远不到这个高度,不跟,免得打字时卡片一直变大小(见 [CapsuleDocking.tallestImeTop])。
+         * The IME must shrink by this much (dp) at once to count as a different panel (emoji, handwriting and the like), letting the card restore itself; a pinyin candidate row or the toolbar
+         * gaining or losing one row is nowhere near this height and is ignored, so the card does not keep resizing while typing (see [CapsuleDocking.tallestImeTop]).
          */
         const val IME_SHRINK_JUMP_DP = 120
-        /** 说话时两个落点各自外扩多少算拖到了。 */
+        /** How far each of the two talk targets extends, so that a drag reaching it counts. */
         const val TARGET_SLOP_DP = 14
-        /** 胶囊上闪的那句停多久:发出了、没听清、出错或用不了。 */
+        /** How long the line flashed on the capsule stays: sent, not heard clearly, an error, or unavailable. */
         const val NOTE_SENT_MS = 1_500L
         const val NOTE_SHORT_MS = 2_000L
         const val NOTE_LONG_MS = 3_500L
-        /** 截屏前收起卡片里的输入法,最多等它这么久下去。 */
+        /** Before capturing, dismiss the IME from the card and wait at most this long for it to go down. */
         const val IME_GONE_MS = 700L
         const val IME_POLL_MS = 30L
     }
 }
 
-/** 一颗和卡片两个窗口此刻该不该显示;卡片收尾完成后无论动画停在哪一帧都不能再显示。 */
+/** Whether the ball's and the card's windows should be visible right now; once the card has finished collapsing it must never be shown again, no matter which frame the animation stopped on. */
 internal data class CapsuleWindowVisibility(val capsule: Boolean, val card: Boolean)
 
 internal fun capsuleWindowVisibility(expanded: Boolean, cardOut: Boolean, closing: Boolean): CapsuleWindowVisibility =
     CapsuleWindowVisibility(capsule = !expanded || !cardOut || closing, card = expanded)
 
-/** 胶囊上临时闪的一句:[kind] 定前面的标记(办好了是勾、没办成是叹号);[opensMika] 时点它打开 Claire;[id] 每句不同(胶囊按它重新定宽)。 */
+/** A line briefly flashed on the capsule: [kind] decides the leading marker (a check when done, an exclamation when failed); tapping it opens Claire when [opensMika]; [id] differs per line (the capsule re-measures its width by it). */
 internal data class CapsuleNote(val text: String, val kind: CapsuleKind, val opensMika: Boolean, val id: Int)

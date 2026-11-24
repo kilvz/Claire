@@ -3,7 +3,7 @@ package com.wangzan101.mika.cap.sandbox
 import android.content.Context
 import com.wangzan101.mika.core.workspace.SandboxTree
 
-/** 沙箱在进程里的那一份状态与树锁:由 App 给出,设置页、安装、Agent 看到的是同一份。 */
+/** The single in-process copy of the sandbox's state and tree lock: supplied by the App, so the settings screen, the installer and the Agent all see the same one. */
 interface SandboxOwner {
     val sandboxState: SandboxState
     val sandboxTree: SandboxTree

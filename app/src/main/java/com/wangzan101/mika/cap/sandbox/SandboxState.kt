@@ -24,11 +24,11 @@ import java.nio.file.StandardCopyOption
 enum class InstallStep { Check, Extract, Configure, Skills, Done }
 
 /**
- * 沙箱状态。安装进度记在 `files/sandbox/state.json`(重置时随整个目录删掉);
- * 联网开关是用户设置,记在 `files/sandbox-settings.json`,重置后保留。
+ * Sandbox state. Install progress is recorded in `files/sandbox/state.json` (deleted along with the whole directory on reset);
+ * the network switch is a user setting, recorded in `files/sandbox-settings.json` and kept across resets.
  *
- * 只有记录里「完成到 Done」且根文件系统里有 /bin/sh 才算就绪;装到一半(包括进程在安装中被杀)一律是 Broken,
- * 下次从记录的那一步之后继续。
+ * The sandbox only counts as ready when the record says "completed up to Done" and the root filesystem has /bin/sh; a half-finished install (including the process being killed mid-install) is always Broken,
+ * and the next run resumes after the recorded step.
  */
 class SandboxState internal constructor(
     private val dirs: SandboxDirs,
@@ -44,12 +44,12 @@ class SandboxState internal constructor(
     private val _status = MutableStateFlow(read())
     val status: StateFlow<SandboxStatus> = _status.asStateFlow()
 
-    /** 「允许沙箱联网」,默认开(本地定制:开箱即可联网,无需去设置里手动开)。 */
+    /** "Allow sandbox networking", on by default (a local customization: networking works out of the box, with no need to turn it on manually in settings). */
     var networkAllowed: Boolean
         get() = settings()["networkAllowed"]?.jsonPrimitive?.booleanOrNull ?: true
         set(value) { putSetting("networkAllowed", JsonPrimitive(value)); refresh() }
 
-    /** 断网过滤器装不上时的原因(启动器自检得出);不挡安装,但断网时命令会被拒绝。 */
+    /** Reason the network cutoff filter could not be installed (determined by the launcher's self-check); it does not block installation, but commands are refused while the network is cut. */
     val isolationIssue: String? get() = record()["isolationIssue"]?.jsonPrimitive?.contentOrNull
 
     val installedVersion: String? get() = record()["version"]?.jsonPrimitive?.contentOrNull
@@ -58,7 +58,7 @@ class SandboxState internal constructor(
     fun completedStep(): InstallStep? =
         record()["completedStep"]?.jsonPrimitive?.contentOrNull?.let { n -> InstallStep.entries.firstOrNull { it.name == n } }
 
-    /** 记下「完成到 [s]」并清掉上次的失败原因;Done 时写版本与完成时间。 */
+    /** Record "completed up to [s]" and clear the previous failure reason; on Done, write the version and completion time. */
     @Synchronized
     fun markStep(s: InstallStep) = markStep(s, null)
 
@@ -96,14 +96,14 @@ class SandboxState internal constructor(
         writeJson(recordFile, JsonObject(r))
     }
 
-    /** 重置开始:先删安装记录、显示「重置」,删到一半被杀也不会再显示就绪。 */
+    /** Reset begins: delete the install record first and show "resetting", so that being killed halfway through the deletion can never leave it looking ready. */
     @Synchronized
     internal fun resetting() {
         Files.deleteIfExists(recordFile.toPath())
         installing(tr(R.string.sandbox_resetting), 0)
     }
 
-    /** 安装或重置结束(不论成败):撤掉进行中的状态,按记录重新算。 */
+    /** Install or reset finished (success or failure): drop the in-progress state and recompute from the record. */
     @Synchronized
     internal fun cleared() {
         installing = null
@@ -119,7 +119,7 @@ class SandboxState internal constructor(
         val r = record()
         val step = r["completedStep"]?.jsonPrimitive?.contentOrNull
         val broken = r["broken"]?.jsonPrimitive?.contentOrNull
-        // Alpine 的 /bin/sh 是指向 /bin/busybox 的绝对链接,在宿主上解析不到:只看链接本身
+        // Alpine's /bin/sh is an absolute symlink to /bin/busybox that cannot be resolved on the host: look at the link itself only
         val hasShell = Files.exists(File(dirs.rootfs, "bin/sh").toPath(), LinkOption.NOFOLLOW_LINKS)
         return when {
             step == InstallStep.Done.name && hasShell -> SandboxStatus.Ready(network = networkAllowed)
@@ -137,17 +137,17 @@ class SandboxState internal constructor(
     private fun putSetting(key: String, value: JsonPrimitive) = writeJson(settingsFile, JsonObject(settings() + (key to value)))
 
     companion object {
-        /** 进程里那一份(App 给出):安装服务更新的状态,设置页与 Agent 看到的是同一份。 */
+        /** The single in-process copy (supplied by the App): the state updated by the install service, which the settings screen and the Agent both see. */
         fun get(context: Context): SandboxState = SandboxOwner.of(context).sandboxState
 
         private fun readJson(f: File): Map<String, JsonElement> =
             runCatching { Json.parseToJsonElement(f.readText()).jsonObject }.getOrNull() ?: emptyMap()
 
-        /** 先写临时文件再改名,写到一半被杀不会留下坏文件。 */
+        /** Write a temp file first, then rename it, so being killed mid-write never leaves a corrupt file. */
         private fun writeJson(f: File, o: JsonObject) {
             f.parentFile?.mkdirs()
             val tmp = File(f.path + ".tmp")
-            // 落盘后再改名:断电或被杀时要么是旧记录、要么是新记录
+            // Rename only after flushing to disk: on power loss or a kill, the record is either the old one or the new one
             java.io.FileOutputStream(tmp).use { out -> out.write(o.toString().toByteArray()); out.fd.sync() }
             Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         }

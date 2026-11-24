@@ -4,12 +4,14 @@ import com.wangzan101.mika.core.workspace.WorkspaceFileGate
 import java.io.File
 
 /**
- * PRoot 里能看到的 /dev。不绑整个 /dev:`/dev/socket/`(比如 dnsproxyd,经它能让系统替沙箱做域名解析)
- * 和 binder 设备(`/dev/binder`、`/dev/hwbinder`、`/dev/vndbinder`,经系统服务能把数据带出去)
- * 都能绕过断网,所以只绑下面这些字符设备;`/dev/fd`、`/dev/stdin` 等在根文件系统里建成指向 /proc 的符号链接。
+ * The /dev visible inside PRoot. We do not bind all of /dev: `/dev/socket/` (e.g. dnsproxyd, through which the
+ * system can resolve domain names on the sandbox's behalf) and the binder devices (`/dev/binder`, `/dev/hwbinder`,
+ * `/dev/vndbinder`, through which data can be carried out via system services) would both bypass the network
+ * cutoff, so only the character devices below are bound; `/dev/fd`, `/dev/stdin`, etc. are created in the root
+ * filesystem as symlinks pointing to /proc.
  */
 object ProotDevices {
-    /** 宿主上存在才绑;同一路径绑到沙箱里同一位置。 */
+    /** Bind only if present on the host; the same path is bound at the same location inside the sandbox. */
     val DEVICE_BINDS = listOf(
         "/dev/null",
         "/dev/zero",
@@ -20,7 +22,7 @@ object ProotDevices {
         "/dev/pts",
     )
 
-    /** 根文件系统 /dev 里的符号链接:名字 → 目标。 */
+    /** Symlinks in the root filesystem's /dev: name → target. */
     val DEV_SYMLINKS = linkedMapOf(
         "fd" to "/proc/self/fd",
         "stdin" to "/proc/self/fd/0",
@@ -28,11 +30,11 @@ object ProotDevices {
         "stderr" to "/proc/self/fd/2",
     )
 
-    /** PRoot 的 `-b` 参数(只含宿主上存在的设备)。 */
+    /** PRoot's `-b` arguments (only devices that exist on the host). */
     fun bindArgs(exists: (String) -> Boolean = { File(it).exists() }): List<String> =
         DEVICE_BINDS.filter(exists).flatMap { listOf("-b", it) }
 
-    /** 在根文件系统里建 /dev 目录和 [DEV_SYMLINKS];已是对的不动。经关口:dev 被换成链接时不会建到外面去。 */
+    /** Create the /dev directory and [DEV_SYMLINKS] in the root filesystem; anything already correct is left alone. Goes through the gate: nothing is created outside if dev has been swapped for a link. */
     fun prepareRootfsDev(rootfs: File, gate: WorkspaceFileGate) {
         for ((name, target) in DEV_SYMLINKS) gate.symlink(rootfs, "dev/$name", target)
     }

@@ -5,8 +5,8 @@ import com.wangzan101.mika.chat.Project
 import java.nio.file.Files
 
 /**
- * 一个工作区(对话或项目)占了多少:[dirName] 是它在 `work/` 下的目录名;[conversationId]、[projectId]、[title]
- * 标识它所属的对话或项目(都已删掉、认不出来时为 null);[busy] 为 true 时有任务在跑或排队,不能清。
+ * How much a workspace (conversation or project) occupies: [dirName] is its directory name under `work/`; [conversationId], [projectId] and [title]
+ * identify the conversation or project it belongs to (null when they have been deleted and can no longer be recognized); when [busy] is true a task is running or queued, so it must not be cleared.
  */
 data class WorkspaceUsage(
     val dirName: String,
@@ -17,28 +17,28 @@ data class WorkspaceUsage(
     val projectId: String? = null,
 )
 
-/** 文件与计算环境占的空间:运行环境、技能、各工作区(大的在前)。 */
+/** Space taken by files and the compute environment: runtime, skills, and each workspace (largest first). */
 data class SandboxUsage(val runtime: Long, val skills: Long, val workspaces: List<WorkspaceUsage>) {
     val workspacesTotal: Long get() = workspaces.sumOf { it.bytes }
     val total: Long get() = runtime + skills + workspacesTotal
 }
 
 /**
- * 读、清各对话/项目的工作区。大小按目录树里的普通文件算,不跟进链接(工作区里的命令能建链接,指到哪都不算进来);
- * 清的时候经文件闸门按句柄删、不跟进链接,拿着树锁的独占许可([SandboxDirs.exclusiveWrite])、和命令及其他写入互斥;
- * 所属对话或项目有任务在跑或排队时不清([active]),免得删掉任务正在用的文件。运行环境和技能随 App 自带,不在这里清。
+ * Reads and clears the workspaces of each conversation/project. Sizes are computed from regular files in the directory tree and do not follow links (commands inside a workspace can create links, and whatever they point to is never counted);
+ * clearing goes through the file gate, deleting by handle without following links, holding the tree lock's exclusive permit ([SandboxDirs.exclusiveWrite]) so it is mutually exclusive with commands and other writes;
+ * a workspace is not cleared while its conversation or project has a task running or queued ([active]), so files that a task is using are never deleted. The runtime and skills ship with the App and are not cleared here.
  */
 class SandboxUsageReader(
     private val dirs: SandboxDirs,
-    /** 存着的对话(编号、标题和所属项目)。 */
+    /** Stored conversations (ID, title and owning project). */
     private val conversations: () -> List<ConversationSummary>,
-    /** 有任务在跑或排队的对话。 */
+    /** Conversations that have a task running or queued. */
     private val active: () -> Collection<String>,
-    /** 存着的项目列表(编号和名字)。 */
+    /** Stored project list (ID and name). */
     private val projects: () -> List<Project> = { emptyList() },
     private val resolveWorkspace: ((String) -> WorkspaceKey)? = null,
 ) {
-    /** 读一遍磁盘;工作区可能有很多文件,要在后台线程调。 */
+    /** Scan the disk once; workspaces may contain many files, so call this on a background thread. */
     fun read(): SandboxUsage {
         val projList = projects()
         val projIds = projList.map { it.id }.toSet()
@@ -60,20 +60,20 @@ class SandboxUsageReader(
         return SandboxUsage(AndroidSandbox.treeBytes(dirs.rootfs.toPath()), AndroidSandbox.treeBytes(dirs.skills.toPath()), workspaces)
     }
 
-    /** 清掉 `work/` 下名为 [dirName] 的工作区;有任务在跑时不清,返回 false。 */
+    /** Clear the workspace named [dirName] under `work/`; if a task is running it is not cleared and false is returned. */
     suspend fun clear(dirName: String): Boolean = dirs.exclusiveWrite {
-        // 等树许可和切到 IO 都可能挂起:拿到以后再查,不使用等待前的忙碌快照。
+        // Waiting for the tree permit and switching to IO can both suspend: re-check after acquiring it rather than using the busy snapshot from before the wait.
         if (dirName in busyDirs()) return@exclusiveWrite false
         dirs.deleteWorkDir(dirName)
         true
     }
 
-    /** 清掉所有没在用的工作区;返回因为有任务在跑而留下的个数。 */
+    /** Clear every workspace that is not in use; returns how many were left behind because a task was running. */
     suspend fun clearAll(): Int = dirs.exclusiveWrite {
         val names = dirs.work.listFiles().orEmpty().map { it.name }
         var busy = 0
         for (name in names) {
-            // 前面的工作区可能删很久:每个工作区删除前都重新查。
+            // Deleting earlier workspaces can take a long time: re-check before deleting each workspace.
             if (name in busyDirs()) busy++
             else runCatching { dirs.deleteWorkDir(name) }
         }

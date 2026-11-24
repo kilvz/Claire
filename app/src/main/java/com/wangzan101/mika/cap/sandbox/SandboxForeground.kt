@@ -21,8 +21,8 @@ import com.wangzan101.mika.sandbox.SandboxService
 import com.wangzan101.mika.settings.FeatureFlags
 
 /**
- * 运行环境准备期间的前台服务(类型 dataSync,安卓要求长时间后台工作有前台服务)。
- * 只显示一条低优先级的「Claire 正在准备」,准备完就撤掉;不发结果通知。准备本身在 [RuntimePreparer] 里。
+ * Foreground service for the runtime preparation period (type dataSync; Android requires a foreground service for long-running background work).
+ * It shows only a low-priority "Claire is preparing" notification and removes it once preparation finishes; no result notification is posted. The preparation itself lives in [RuntimePreparer].
  */
 open class SandboxForeground : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -37,7 +37,7 @@ open class SandboxForeground : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // startForegroundService 之后必须尽快进入前台
+        // After startForegroundService we must enter the foreground as soon as possible
         startForeground(ID, notification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         if (FeatureFlags.get(this).quitRequested()) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -77,7 +77,7 @@ open class SandboxForeground : Service() {
         private const val CHANNEL = "runtime_prepare"
         private const val ID = 20
 
-        /** 进入前台、等 [RuntimePreparer] 当前的准备结束。只由 [RuntimePreparer] 调用。 */
+        /** Enter the foreground and wait for [RuntimePreparer]'s current preparation to finish. Called only by [RuntimePreparer]. */
         internal fun start(context: Context) {
             context.startForegroundService(Intent(context, SandboxService::class.java))
         }

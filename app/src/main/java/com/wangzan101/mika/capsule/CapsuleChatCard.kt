@@ -63,8 +63,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 对话卡片:那个对话的来回在中间滚;要你回答、同意时按钮固定在来回下面,再下面是输入框和「回到 Claire」。
- * 不带任务时是空闲卡片(标题栏能切新对话)。空闲时「教 Claire」收在输入栏上方的箭头里,默认不展开。
+ * Conversation card: that conversation's back-and-forth scrolls in the middle; when an answer or approval is needed, the buttons are pinned below the thread, and below those come the input field and "Back to Claire".
+ * Without a task it is the idle card (the title bar can switch to a new conversation). While idle, "Teach Claire" is tucked into the arrow above the input bar and is not expanded by default.
  */
 @Composable
 internal fun ChatCard(
@@ -80,7 +80,7 @@ internal fun ChatCard(
             actions, handle,
         )
         Box(Modifier.padding(top = 8.dp).weight(1f).fillMaxWidth()) {
-            // 换了对话(空闲卡片切到新对话)时从那个对话的最新一问重新读起
+            // When the conversation changes (the idle card switches to a new conversation), start reading again from that conversation's latest exchange
             if (thread != null) key(card.target) { ThreadList(thread, card.conversationId, actions) }
         }
         if (r != null) Pinned(card.content, r.run.key, actions)
@@ -92,8 +92,8 @@ internal fun ChatCard(
 }
 
 /**
- * 空闲卡片输入栏正上方的「教 Claire」:默认只留一个箭头,点开才出现入口,再点收起。
- * 收起时箭头朝上,展开时朝下。学习中的浮层不走这里。
+ * "Teach Claire" directly above the idle card's input bar: by default only an arrow is left, and tapping it reveals the entries; tapping again collapses them.
+ * The arrow points up when collapsed and down when expanded. Learning overlays do not go through here.
  */
 @Composable
 private fun TeachShelf(onTeach: () -> Unit, onVoiceChat: () -> Unit) {
@@ -127,8 +127,8 @@ private fun TeachShelf(onTeach: () -> Unit, onVoiceChat: () -> Unit) {
 }
 
 /**
- * 卡片最底下一行:[primary](「查看过程」「回到 Claire」;空闲卡片还没有对话时没有)和灰色的「关闭悬浮胶囊」。
- * 右上角的 × 只是收起;想让胶囊不再出现的人在这里关,不用去找设置。
+ * The card's bottom line: [primary] ("See process", "Back to Claire"; absent on the idle card when there is no conversation yet) and a gray "Turn off floating capsule".
+ * The × in the top right only collapses the card; people who want the capsule to stop appearing turn it off here instead of looking for the setting.
  */
 @Composable
 internal fun FooterLinks(actions: CardActions, primary: Pair<String, () -> Unit>?) {
@@ -145,8 +145,8 @@ internal fun FooterLinks(actions: CardActions, primary: Pair<String, () -> Unit>
 }
 
 /**
- * 对话的来回(旧的在上):打开时最新那句你说的话停在顶上;滚到顶往前多加载几轮,列表按每条的 key 停在原处;
- * 往下长的字只在你本来就在底部时跟着往下(同对话页);来了新的一问时滚到它。[footer] 排在最后一条后面。
+ * The conversation's back-and-forth (oldest on top): when opened, the latest message you said is parked at the top; scrolling to the top loads more rounds of history, and the list stays put by each item's key;
+ * text that grows downwards is only followed when you were already at the bottom (same as the chat page); when a new exchange arrives it scrolls to it. [footer] is placed after the last item.
  */
 @Composable
 internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: CardActions, footer: (@Composable () -> Unit)? = null) {
@@ -181,7 +181,7 @@ internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: Ca
         state.scrollToItem(thread.anchor)
         following = !state.canScrollForward
     }
-    // 回答按 Markdown 排版(流式时在后台解析),排好了高度才变:按条数和最后一条排出来的高度跟,不按字数
+    // Answers are laid out as Markdown (parsed in the background while streaming), so the height changes only once layout is done: follow based on the item count and the laid-out height of the last item, not on the character count
     LaunchedEffect(state) {
         snapshotFlow {
             val info = state.layoutInfo
@@ -198,7 +198,7 @@ internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: Ca
         LazyColumn(Modifier.testTag("capsule-thread").fillMaxSize().glassSource(backdrop), state = state) {
             items(thread.items, key = { it.key }) { item ->
                 when (item) {
-                    // 带着屏幕的那句:缩略图和「你此刻的屏幕 · App · 时刻」,附言另起一个气泡
+                    // The message that carries a screen: the thumbnail plus "your screen right now · App · time", with any accompanying note in a separate bubble
                     is ThreadItem.User -> BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), contentAlignment = Alignment.CenterEnd) {
                         val maxWidth = maxWidth
                         Column(horizontalAlignment = Alignment.End) {
@@ -209,7 +209,7 @@ internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: Ca
                                     style = Body, color = c.onAccent,
                                 )
                             }
-                            // 插的话的去向(已收到、已加入、下一件事)
+                            // Where the steered message went (received, queued, next item)
                             item.note?.let { Text(it, Modifier.padding(top = 2.dp, end = 4.dp), style = Sub, color = c.ink3) }
                         }
                     }
@@ -217,17 +217,17 @@ internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: Ca
                         item.text, Modifier.padding(bottom = 4.dp), style = Sub,
                         color = if (item.kind.needsYou) c.warn else c.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
-                    // 表格、代码块在自己那块里左右滑,不撑宽卡片;链接另开任务打开,浮层里也能点
+                    // Tables and code blocks scroll horizontally within their own area instead of widening the card; links open in a separate task and are clickable inside the overlay too
                     is ThreadItem.Answer -> if (!item.cut) {
                         MarkdownText(item.text, Body.copy(color = c.ink), Modifier.fillMaxWidth().padding(bottom = 8.dp), streaming = item.streaming)
                     } else Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        // 被插话打断的那段:淡色,下面一行小字(和对话页同一句话)
+                        // The part cut off by a steered message: lighter color, with a small line below (the same sentence as on the chat page)
                         MarkdownText(item.text, Body.copy(color = c.ink2), Modifier.fillMaxWidth(), streaming = false)
                         Text(tr(R.string.steer_interrupted_reply), Modifier.padding(top = 2.dp), style = Sub, color = c.ink3)
                     }
                 }
             }
-            // 接在来回后面的一段(浏览器页面板里此刻的步骤):紧跟着最后一条,跟到底部时一起往下
+            // A section appended after the thread (the current steps in the browser page panel): it follows the last item and moves down with it when following the bottom
             footer?.let { f -> item(FOOTER_KEY) { f() } }
         }
         ScrollToBottomButton(
@@ -257,8 +257,8 @@ internal fun ThreadList(thread: ChatThread, conversationId: String?, actions: Ca
 
 private const val FOOTER_KEY = "thread-footer"
 
-/** 卡片来回里截图缩略图的宽。 */
+/** Width of the screenshot thumbnail in the card's thread. */
 private val ThreadThumbWidth = 78.dp
 
-/** 跟到底部时滚到最后一条再往下这么多像素,由列表夹到真正的底。 */
+/** When following the bottom, scroll this many pixels past the last item; the list clamps it to the real bottom. */
 private const val END_OFFSET = 1_000_000

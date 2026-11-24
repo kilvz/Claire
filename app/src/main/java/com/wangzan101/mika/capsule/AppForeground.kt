@@ -8,12 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Claire 自己的界面(对话页、网页接管页等任一 Activity)此刻是否看得见:数已经 onStart、还没 onStop 的 Activity。
- * 转屏这类重建时旧的先停、新的再起,中间不算离开前台。由 App 在启动时登记,只在主线程回调。
+ * Whether Claire's own UI (any Activity such as the chat page or the web takeover page) is visible right now: counts Activities that have been onStart'ed but not yet onStop'ed.
+ * During a recreation such as a rotation the old one stops first and the new one starts afterwards, and that gap does not count as leaving the foreground. Registered by the App at startup; callbacks arrive only on the main thread.
  */
 class AppForeground : Application.ActivityLifecycleCallbacks {
     private var started = 0
-    /** 因为重建而停下、新实例还没起来的个数。 */
+    /** Number of Activities stopped because of a recreation whose new instance has not started yet. */
     private var recreating = 0
     private val _visible = MutableStateFlow(false)
     val visible: StateFlow<Boolean> = _visible.asStateFlow()

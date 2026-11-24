@@ -21,12 +21,12 @@ import java.security.MessageDigest
 
 class FileTooLarge(val bytes: Long) : Exception("file is larger than ${ShareRules.MAX_BYTES shr 20} MB")
 
-/** 把工作区里的文件存到手机的「下载/Claire」(MediaStore,不需要存储权限)。 */
+/** Save a file from the workspace to the phone's "Downloads/Claire" (MediaStore, no storage permission required). */
 class ShareExporter(private val context: Context) {
     /**
-     * [file] 已过关口核实(不跟随链接打开一次,按句柄确认在它自己的工作区里、是普通文件、只有一个硬链接);
-     * 这里再看大小不超过 100 MB,然后从这同一个句柄复制。检查之后被换成链接或别的文件也读不到外面的东西。
-     * 返回导出的文件,其中 savedAs 是 "Download/Claire/<实际名字>"(重名时系统加序号);不会把 Claire 的私有路径交出去。
+     * [file] has already been verified by the gate (opened once without following links, and confirmed by handle to be inside its own workspace, a regular file with exactly one hard link);
+     * here the size is additionally checked to be at most 100 MB, and then the copy is made from that same handle. If the file is swapped for a link or another file after the check, nothing outside can still be read.
+     * Returns the exported file, whose savedAs is "Download/Claire/<actual name>" (the system appends a sequence number on a name collision); Claire's private paths are never handed out.
      */
     suspend fun export(file: GatedFile, requestedName: String): SharedFile = withContext(Dispatchers.IO) {
         if (!ShareRules.plainName(requestedName)) throw SandboxError("invalid_arguments", "name: must be a plain file name", recoverable = true)
@@ -53,12 +53,12 @@ class ShareExporter(private val context: Context) {
             resolver.openOutputStream(uri)!!.use { out ->
                 val buf = ByteArray(64 * 1024)
                 while (true) {
-                    // 会话关了(任务取消、命令结束)就不再写下去
+                    // Once the session is closed (task cancelled, command finished) stop writing
                     currentCoroutineContext().ensureActive()
                     val n = input.read(buf)
                     if (n < 0) break
                     size += n
-                    // 检查之后文件又变大了:同样按上限算
+                    // The file grew after the check: apply the same limit
                     if (size > ShareRules.MAX_BYTES) throw FileTooLarge(size)
                     out.write(buf, 0, n)
                     digest.update(buf, 0, n)
@@ -75,7 +75,7 @@ class ShareExporter(private val context: Context) {
     }
 
     /**
-     * 删掉本 App 在「下载/Claire」里留下的、没写完的条目(写到一半进程被杀会留下 IS_PENDING 的空壳)。启动时调用。
+     * Delete unfinished entries this App left behind in "Downloads/Claire" (being killed mid-write leaves an IS_PENDING shell). Called at startup.
      */
     fun cleanPending() {
         val resolver = context.contentResolver

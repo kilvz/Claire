@@ -14,20 +14,20 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * 在后台准备运行环境:App 启动时、Claire 升级后、重置后、任务要用而还没准备好时。
- * 对用户不可见,只在准备期间有一条低优先级的中性通知([SandboxForeground])。不联网。
+ * Prepare the runtime in the background: at App startup, after a Claire upgrade, after a reset, and when a task needs it but it is not ready yet.
+ * Invisible to the user; only a low-priority neutral notification ([SandboxForeground]) is shown while preparing. No network access.
  */
 object RuntimePreparer {
     private const val TAG = "RuntimePreparer"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var job: Job? = null
-    /** 这个进程里准备失败过:App 启动时不再自动重试,任务要用时([ensure] 的 retryFailed)才再试。 */
+    /** Preparation has failed in this process: no more automatic retries at App startup; retry only when a task needs it (retryFailed in [ensure]). */
     @Volatile private var failed = false
 
-    /** 正在进行的准备;没有为 null。 */
+    /** The preparation currently in progress; null if none. */
     val current: Job? get() = job?.takeIf { it.isActive }
 
-    /** 需要准备就开始,返回这次准备(已在准备就返回那一个);不需要返回 null。 */
+    /** Start preparing if needed and return this preparation (the existing one if already preparing); return null if not needed. */
     @Synchronized
     fun ensure(context: Context, retryFailed: Boolean = false): Job? {
         if (FeatureFlags.get(context).quitRequested()) return null
@@ -47,7 +47,7 @@ object RuntimePreparer {
             }
         }
         job = j
-        // 前台服务让进程在准备期间不被回收,并显示中性通知;后台时系统不让启动前台服务,就只在进程里准备
+        // The foreground service keeps the process from being reclaimed while preparing and shows the neutral notification; when in the background the system does not allow starting a foreground service, so prepare in-process only
         try {
             SandboxForeground.start(app)
         } catch (e: Exception) {
@@ -56,7 +56,7 @@ object RuntimePreparer {
         return j
     }
 
-    /** 完全退出:取消解包并撤掉准备通知;进度文件仍由安装器按原子写入规则保留,下次打开可重新准备。 */
+    /** Full exit: cancel unpacking and dismiss the preparation notification; the progress file is still kept by the installer under its atomic-write rules, so the next launch can prepare again. */
     @Synchronized
     fun stop(context: Context) {
         job?.cancel()
@@ -64,7 +64,7 @@ object RuntimePreparer {
         context.applicationContext.stopService(Intent(context.applicationContext, SandboxService::class.java))
     }
 
-    /** 要不要准备:没装、装了旧版本(Claire 升级了)、出过错(除非 [skipBroken])。不支持或正在进行的不动。 */
+    /** Whether preparation is needed: not installed, an old version installed (Claire was upgraded), or an error occurred (unless [skipBroken]). Unsupported or in-progress states are left alone. */
     internal fun needsWork(status: SandboxStatus, installed: String?, bundled: String, skipBroken: Boolean): Boolean = when (status) {
         is SandboxStatus.Unsupported, is SandboxStatus.Installing -> false
         is SandboxStatus.Ready -> installed != bundled
