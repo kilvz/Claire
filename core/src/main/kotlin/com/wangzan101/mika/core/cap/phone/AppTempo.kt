@@ -1,20 +1,22 @@
 package com.wangzan101.mika.core.cap.phone
 
 /**
- * 一个 App 在任务里实际按哪套节奏操作:设置里「操作节奏」的全局档位和按应用覆盖解析出来的结果
- * (见 [OperatingPace] 与 app 设置里的按应用列表)。和 App 知识里两态的 [com.wangzan101.mika.core.screen.uistate.PlacePace]
- * 分开:知识只说「这个 App 限制浏览快慢」([AppTempo.CAREFUL]),没有「快」——快来自用户的设置。
+ * Which tempo an App is actually operated at during a task: the result of resolving the global tier of the
+ * "Operating pace" setting together with the per-app overrides (see [OperatingPace] and the per-app list in the app
+ * settings). Kept separate from the two-state [com.wangzan101.mika.core.screen.uistate.PlacePace] in App knowledge:
+ * the knowledge only says "this App limits browsing speed" ([AppTempo.CAREFUL]), it has no "fast" state — fast comes
+ * from the user's settings.
  */
 enum class AppTempo {
-    /** 快:这个 App 里动作之间不停留、打字一次写入、不设屏数上限。 */
+    /** Fast: no dwell between actions in this App, typing written in one go, no screen cap. */
     FAST,
-    /** 标准:同一屏停一小会儿、换屏稍长,打字一段一段。 */
+    /** Standard: a short dwell on the same screen, slightly longer on a screen change, typing in chunks. */
     NORMAL,
-    /** 像人/限制浏览快慢:停得更久、按字数读、打字更慢。 */
+    /** Human-like / browsing-speed limited: dwell longer, read by character count, type slower. */
     CAREFUL;
 
     companion object {
-        /** App 知识头部的 pace 值(`careful`;不写或认不出为 [NORMAL])。 */
+        /** The pace value in the App knowledge header (`careful`; when absent or unrecognized, [NORMAL]). */
         fun of(value: String?): AppTempo = if (value == "careful") CAREFUL else NORMAL
     }
 }

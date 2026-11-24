@@ -20,8 +20,9 @@ import com.wangzan101.mika.core.screen.uistate.action
 import com.wangzan101.mika.core.screen.uistate.session
 
 /**
- * 打开链接或设置页;只在提速开关 deepLinks 打开时提供。不可逆判定里它只是打开页面;
- * 落到付款页时让模型交给用户,页面上的操作照常过关卡。
+ * Open a link or a settings page; only offered when the deepLinks accelerator switch is on. In irreversibility
+ * judgment it only opens a page; when it lands on a payment page it leaves the model to hand over to the user, and
+ * actions on the page go through the gates as usual.
  */
 internal object OpenLink : PhoneTool {
     override val verb = Verb.OpenLink
@@ -48,7 +49,7 @@ internal object OpenLink : PhoneTool {
         if (action == null && (uri to pkg) !in ctx.allowedLinks) {
             return fail("invalid_link", Feedback["link_not_listed"])
         }
-        // 换了页面,之前被拒的付款申报就不是这次的了
+        // Switched pages, so a payment declaration refused earlier no longer applies to this one
         ctx.refusedPay = null
         val r = ctx.action(ctx.phone.screen.openLink(action, uri, pkg))
         if (r.content["ok"] != JsonPrimitive(true)) return r

@@ -30,7 +30,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
-/** 相册审批卡上的 App 字段;不是真实包名,只说明这一步落在相册。 */
+/** The App field on the gallery approval card; not a real package name, it only says this step lands in the gallery. */
 private const val GALLERY_CONFIRM_APP = "mika:gallery"
 
 internal object ImageGenerate : AgentTool {
@@ -82,7 +82,7 @@ internal object ImageGenerate : AgentTool {
         val stored = try {
             response.images.map { port.store(it, a.str("name", max = 120), prompt) }
         } catch (e: Throwable) {
-            // 图已经生成并计费了,不把额度退回去;只是没写进工作区。
+            // The image was already generated and billed, so do not refund the quota; it simply was not written to the workspace.
             return failure(e)
         }
         return result(port, cap, stored, response.images.map { it.bytes }, ctx, response.images.mapNotNull { it.revisedPrompt })
@@ -181,8 +181,9 @@ internal class ImageSave(private val ask: Boolean) : AgentTool {
     override fun available(ctx: ToolContext) = ctx[ImageCapability.KEY]?.let { it.port != null && it.saveEnabled } == true
 
     /**
-     * 保存是改到相册的一步:默认每次都要用户这一次的同意(和 root 命令同一条审批卡)。
-     * 用户关掉「每次保存前先问我」后不再问;无人值守/远程/子任务仍由 [com.wangzan101.mika.core.action.ApprovalPolicy] 拒绝。
+     * Saving is the step that changes the gallery: by default every call needs the user's consent for that
+     * particular run (the same approval card as root commands). Once the user turns off "ask before every
+     * save" it stops asking; unattended/remote/subtask runs are still rejected by [com.wangzan101.mika.core.action.ApprovalPolicy].
      */
     override fun approvalRisk(args: JsonObject): ApprovalRisk = if (ask) {
         ApprovalRisk(ActionRisk.Change, ask = ConfirmationRequest(
@@ -244,7 +245,7 @@ private fun result(
     }
 }, images = if (ctx.config.visionEnabled) bytes else emptyList())
 
-/** 服务商/图片错误 -> 工具结果里稳定的错误码;说明写清楚下一步怎么做。 */
+/** Provider/image error -> a stable error code in the tool result; the description spells out what to do next. */
 private fun failure(e: Throwable): ToolExecution = when (e) {
     is ImageError.Unsupported -> fail("image_unsupported", e.message ?: "This image model does not support that request.")
     is ImageError.BadImage -> fail("image_bad_response", e.message ?: "The image service returned something that is not an image.")

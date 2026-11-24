@@ -5,52 +5,63 @@ import kotlin.random.Random
 import com.wangzan101.mika.core.screen.uistate.IdleScroll
 
 /**
- * 在 App 里一步一步操作的节奏(纯逻辑,不碰时钟和界面):人点完一下总要看一眼才点下一下,到了新的一屏还要先看一会儿。
- * 每做完一个改动屏幕的动作([noteAction])按它有没有换到新的一屏定下离下一个动作至少隔多久;下一个动作之前问 [waitBefore]:
- * 还没隔够就补足余下的时间。
+ * Pacing for step-by-step operation inside Apps (pure logic; touches neither the clock nor the UI): after a click a
+ * person always takes a look before the next click, and on reaching a new screen reads for a while first.
+ * After every screen-changing action ([noteAction]) it fixes the minimum gap until the next action based on
+ * whether it moved to a new screen; before the next action ask [waitBefore]: if the gap is not yet met, top up the
+ * remaining time.
  *
- * - 同一屏上接着做(打字、拨开关、只变了一两个元素):停 [Limits.sameScreenMs] 里随机取的一段;
- * - 换到了新的一屏(界面大变、换了 App):停 [Limits.newScreenMs] 里的一段,另按这一屏上的字数加一段读的时间
- *   ([Limits.readMsPerChar],至多 [Limits.maxReadMs]);
- * - 偶尔([Limits.pauseChance])多停一会儿([Limits.pauseMs]);一次停留不超过 [Limits.maxDwellMs];
- * - 停留从上一个动作做完算起,模型想、读屏花掉的时间都算在内,只补不够的部分。
- * - 这个 App 的实际节奏是 [AppTempo.CAREFUL](设置里像人、按应用覆盖、App 知识说它限制浏览快慢)时按 [careful] 的范围停(更久);
- *   [AppTempo.FAST] 的 App 里做完的动作不记停留,还把之前记下的清掉:里面不等,出去也不补旧的停留。
- * - 限制浏览快慢的 App([capped] 为真)换到新的一屏的次数照样记;给了 [screenCap] 时一个任务里换屏至多这么多次,到了之后 [capReached] 为真,
- *   调用方不再换屏;用户答过话([userAnswered])后重新计数;本任务在这个 App 里做成过对外动作([outwardDone],发送、提交一类)
- *   之后不再设上限。默认不设上限([screenCap] 为 null):硬停下来问人会让读、汇总一类的任务和没人在旁边的任务做不完,
- *   被拦的风险靠更久的停留去压。和网页一页一页看的节奏([com.wangzan101.mika.core.cap.web.PagePacing])是同一套说法。
+ * - Continuing on the same screen (typing, toggling a switch, only one or two elements changed): dwell for a random
+ *   stretch within [Limits.sameScreenMs];
+ * - Moved to a new screen (big UI change, switched App): dwell for a stretch within [Limits.newScreenMs], plus
+ *   reading time for the character count on that screen ([Limits.readMsPerChar], at most [Limits.maxReadMs]);
+ * - Occasionally ([Limits.pauseChance]) dwell a bit longer ([Limits.pauseMs]); a single dwell never exceeds
+ *   [Limits.maxDwellMs];
+ * - A dwell counts from when the previous action finished, so time the model spends thinking and reading the screen
+ *   counts toward it, and only the shortfall is made up.
+ * - When the App's effective tempo is [AppTempo.CAREFUL] (human in settings, a per-app override, or App knowledge
+ *   says it limits browsing speed) it dwells the [careful] range (longer);
+ *   in an [AppTempo.FAST] App completed actions record no dwell and also clear any earlier record: it does not wait
+ *   inside, and leaving it does not make up old dwells either.
+ * - For browsing-speed-limited Apps ([capped] true) transitions to a new screen are still counted; when [screenCap]
+ *   is given, a task may move to a new screen at most that many times, after which [capReached] is true and the
+ *   caller stops switching screens; the count restarts once the user answers ([userAnswered]); after this task has
+ *   completed an outward action in this App ([outwardDone], sending/submitting and the like) no cap is applied
+ *   anymore. By default there is no cap ([screenCap] null): stopping hard to ask a human would leave tasks like
+ *   reading and summarizing unfinished, as well as tasks with nobody around, so the risk of being blocked is
+ *   suppressed with longer dwells. This mirrors the page-by-page pacing of the web
+ *   ([com.wangzan101.mika.core.cap.web.PagePacing]).
  *
- * [Off] 从不等待,也不设上限(「快」、测试、不需要节奏的调用方用它)。
+ * [Off] never waits and sets no cap (used by "fast", tests, and callers that need no pacing).
  */
 class AppPacing(
     private val random: Random?,
     val limits: Limits = Limits(),
     val careful: Limits = Limits.CAREFUL,
-    /** 限制浏览快慢的 App 一个任务里(用户答话之间)最多换到多少次新的一屏;null 为不设上限(默认)。 */
+    /** How many times a browsing-speed-limited App may move to a new screen in one task (between user answers); null means no cap (the default). */
     val screenCap: Int? = null,
 ) {
-    /** 时长单位毫秒。 */
+    /** Durations are in milliseconds. */
     data class Limits(
-        /** 同一屏上接着做时的停留范围。 */
+        /** Dwell range when continuing on the same screen. */
         val sameScreenMs: LongRange = 500L..1_200L,
-        /** 换到新的一屏之后的停留范围(不含读的时间)。 */
+        /** Dwell range after moving to a new screen (excluding reading time). */
         val newScreenMs: LongRange = 900L..2_000L,
-        /** 新的一屏上每个字加多少读的时间;0 为不加。 */
+        /** Reading time added per character on a new screen; 0 adds nothing. */
         val readMsPerChar: Long = 0L,
-        /** 读的时间的上限。 */
+        /** Upper bound on reading time. */
         val maxReadMs: Long = 0L,
-        /** 多停一会儿的机会。 */
+        /** Chance of an extra pause. */
         val pauseChance: Double = 0.05,
-        /** 多停一会儿时另加的范围。 */
+        /** Range added on top when taking an extra pause. */
         val pauseMs: LongRange = 600L..1_500L,
-        /** 一次停留的上限。 */
+        /** Upper bound on a single dwell. */
         val maxDwellMs: Long = 3_500L,
-        /** 新的一屏上停得够久时,停留里可以轻轻滚几下(见 [com.wangzan101.mika.core.screen.uistate.IdleScroll])。 */
+        /** When the dwell on a new screen is long enough, the dwell may scroll gently a few times (see [com.wangzan101.mika.core.screen.uistate.IdleScroll]). */
         val idleScroll: Boolean = false,
     ) {
         companion object {
-            /** 限制浏览快慢的 App(和「像人」时所有 App):停得更久,按字数读,停留里轻轻滚几下。 */
+            /** Browsing-speed-limited Apps (and every App in "human" mode): dwell longer, read by character count, scroll gently during the dwell. */
             val CAREFUL = Limits(
                 sameScreenMs = 900L..2_200L, newScreenMs = 2_500L..5_000L, readMsPerChar = 15L, maxReadMs = 8_000L,
                 pauseChance = 0.1, pauseMs = 2_000L..5_000L, maxDwellMs = 15_000L, idleScroll = true,
@@ -62,24 +73,26 @@ class AppPacing(
 
     private var last: Last? = null
 
-    /** 本任务里(上次用户答话以来)各个限制浏览快慢的 App 换到过几次新的一屏。 */
+    /** How many times each browsing-speed-limited App has moved to a new screen in this task (since the last user answer). */
     private val screens = HashMap<String, Int>()
 
-    /** 本任务里做过对外动作的 App:屏数上限对它们不再算;用户答话也不清。 */
+    /** Apps that performed an outward action in this task: the screen cap no longer applies to them, and a user answer does not clear them. */
     private val outward = HashSet<String>()
 
-    /** 有节奏(不是 [Off])。 */
+    /** Paced (not [Off]). */
     val paced: Boolean get() = random != null
 
     /**
-     * 在 [app](包名;不知道为 null)里做完了一个改动屏幕的动作:[newScreen] 是换到了新的一屏,
-     * [counts] 时这一屏算进限制浏览快慢的 App 的屏数(往下滚读同一页余下的内容不算)。
-     * [tempo] 是这个 App 的实际节奏([AppTempo.FAST] 的不记停留),[capped] 说它是否限制浏览快慢(计屏数、受上限)。
+     * A screen-changing action completed in [app] (package name; null when unknown): [newScreen] means it moved to a
+     * new screen, and with [counts] this screen counts toward the tally of browsing-speed-limited Apps (scrolling down
+     * to read the rest of the same page does not count).
+     * [tempo] is the App's effective tempo (an [AppTempo.FAST] one records no dwell), and [capped] says whether it is
+     * browsing-speed limited (screens counted, cap applied).
      */
     @Synchronized
     fun noteAction(app: String?, nowMs: Long, newScreen: Boolean, tempo: AppTempo = AppTempo.NORMAL, counts: Boolean = newScreen, capped: Boolean = false) {
         val r = random ?: return
-        // 「快」的 App 里做完的动作把之前记下的停留清掉:里面不等,出去也不补旧的停留
+        // An action completed in a "fast" App clears the previously recorded dwell: no waiting inside it, and no making up old dwells when leaving
         if (tempo == AppTempo.FAST) {
             last = null
             return
@@ -92,8 +105,10 @@ class AppPacing(
     }
 
     /**
-     * 下一个动作之前还要等多久:上一个动作之后还没停够时是余下的时间,否则 0。
-     * [textChars] 是此刻这一屏上的字数:上一个动作换到了新的一屏时按它加读的时间。[Off] 恒为 0。
+     * How long to wait before the next action: the remaining time when the dwell after the last action is not yet
+     * met, otherwise 0.
+     * [textChars] is the character count on the current screen: when the last action moved to a new screen it adds
+     * reading time accordingly. Always 0 for [Off].
      */
     @Synchronized
     fun waitBefore(nowMs: Long, textChars: Int = 0): Long {
@@ -103,36 +118,36 @@ class AppPacing(
         return (dwell - (nowMs - l.atMs)).coerceIn(0, l.limits.maxDwellMs)
     }
 
-    /** 这次停留里可以轻轻滚几下:上一个动作换到了新的一屏,且按的范围允许。 */
+    /** Whether this dwell may scroll gently a few times: the last action moved to a new screen and the applicable range allows it. */
     @Synchronized
     fun idleAllowed(): Boolean = last?.let { it.newScreen && it.limits.idleScroll } == true
 
-    /** 本任务里(上次用户答话以来)[app] 换到过几次新的一屏。 */
+    /** How many times [app] has moved to a new screen in this task (since the last user answer). */
     @Synchronized
     fun screensIn(app: String): Int = screens[app] ?: 0
 
-    /** [app] 换到新的一屏的次数已到上限([capped] 的 App 才查):再换屏之前要先停下(用户答应了再看)。普通 App、做过对外动作的 App、[Off] 恒为 false。 */
+    /** Whether [app] has reached the cap on moves to a new screen (checked only for [capped] Apps): it must stop before switching screens again (and look again once the user agrees). Always false for ordinary Apps, Apps that performed an outward action, and [Off]. */
     @Synchronized
     fun capReached(app: String?, capped: Boolean): Boolean =
         random != null && app != null && capped && app !in outward && screenCap != null && screensIn(app) >= screenCap
 
-    /** 本任务在 [app] 里做了一次对外动作(发送、提交):这个 App 余下的时间里不再设屏数上限。 */
+    /** This task performed an outward action (sending, submitting) in [app]: no screen cap applies to this App for the rest of the time. */
     @Synchronized
     fun outwardDone(app: String) {
         if (random != null) outward += app
     }
 
-    /** 用户答过话(回答了追问、交回了接管):各 App 的屏数重新算。 */
+    /** The user answered (replied to a follow-up question, took the session back): screen tallies for every App restart. */
     @Synchronized
     fun userAnswered() = screens.clear()
 
     private fun limitsFor(tempo: AppTempo) = if (tempo == AppTempo.CAREFUL) careful else limits
 
     companion object {
-        /** 从不等待。 */
+        /** Never waits. */
         val Off = AppPacing(null)
 
-        /** 像人在 App 里一步一步操作的节奏;[random] 可换成固定种子(测试)。 */
+        /** Human-like pacing for step-by-step operation inside Apps; [random] can be replaced with a fixed seed (tests). */
         fun human(random: Random = Random.Default, limits: Limits = Limits(), careful: Limits = Limits.CAREFUL) =
             AppPacing(random, limits, careful)
     }

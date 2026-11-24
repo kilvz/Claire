@@ -9,11 +9,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 /**
- * 一个任务里在 App 里按 [AppPacing] 停留:每个改动屏幕的动作做完记下([after]),下一个之前补足没停够的时间([before])。
- * [tempo] 按包名给出这个 App 的实际节奏([AppTempo];「快」的 App 不记也不等),[capped] 说哪些 App 限制浏览快慢(计屏数、受上限)。
- * 给了 [idle]、这次的范围允许、且调用方交了屏幕端口(接下来的动作不按屏上的位置做)时,停留里按它的安排轻轻滚几下([ScreenPort.idleScroll])。
- * 限制浏览快慢的 App 本任务里换屏到了上限,[before] 不再等,抛 [PageLimitReached](和网页同一个结果 page_limit);
- * 停留中用户插了话([waitOrSteer]),抛 [DwellInterrupted]:调用方不做这个动作,没停够的部分下次照样补足。
+ * Per-task dwell inside Apps according to [AppPacing]: after every action that changes the screen record it
+ * ([after]), and before the next one top up whatever time was not yet spent ([before]).
+ * [tempo] gives the effective tempo of an App by package name ([AppTempo]; "fast" Apps neither record nor wait),
+ * and [capped] says which Apps limit browsing speed (screens are counted and capped).
+ * When [idle] is given, the current scope allows it, and the caller supplied a screen port (the upcoming actions do
+ * not depend on positions on screen), scroll gently a few times during the dwell as it plans ([ScreenPort.idleScroll]).
+ * When a browsing-capped App has reached the screen cap in this task, [before] stops waiting and throws
+ * [PageLimitReached] (the same result page_limit as the web); when the user interjects during a dwell
+ * ([waitOrSteer]), it throws [DwellInterrupted]: the caller skips this action, and the shortfall is still made up
+ * next time.
  */
 internal class AppDwell(
     private val pacing: AppPacing,
@@ -23,10 +28,10 @@ internal class AppDwell(
     private val clock: () -> Long = System::currentTimeMillis,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
-    /** 停了多久、停留里轻轻滚了几下。 */
+    /** How long it dwelled, and how many gentle scrolls happened during the dwell. */
     class Dwelt(val waitMs: Long, val idleScrolls: Int)
 
-    /** 停留里轻轻滚了一下之后调用(模型手里那一屏的位置已不准)。 */
+    /** Called after a gentle scroll during the dwell (the screen position the model holds is no longer accurate). */
     var onIdleScroll: () -> Unit = {}
 
     private val tempos = HashMap<String?, AppTempo>()
@@ -34,7 +39,7 @@ internal class AppDwell(
 
     val paced: Boolean get() = pacing.paced
 
-    /** 在 [app] 里做完了一个改动屏幕的动作:[newScreen] 换到了新的一屏,[counts] 时算进屏数(见 [AppPacing.noteAction])。 */
+    /** An action that changes the screen finished in [app]: [newScreen] means it moved to a new screen, and [counts] means it counts toward the screen tally (see [AppPacing.noteAction]). */
     fun after(app: String?, newScreen: Boolean, counts: Boolean = newScreen) {
         if (!paced) return
         val t = tempoOf(app)
@@ -43,8 +48,10 @@ internal class AppDwell(
     }
 
     /**
-     * 在 [app] 里要做下一个改动屏幕的动作之前:没停够就补足。[textChars] 是此刻这一屏上的字数(新的一屏按它加读的时间)。
-     * 「快」的 App 不等也不看上限。[gate] 时先看屏数上限,到了抛 [PageLimitReached]。[port] 给了时停留里可以轻轻滚几下。
+     * Before the next screen-changing action in [app]: top up if not enough time has passed. [textChars] is the
+     * character count on the current screen (a new screen uses it to add reading time).
+     * A "fast" App neither waits nor checks the cap. With [gate], the screen cap is checked first and
+     * [PageLimitReached] is thrown when it is reached. When [port] is given, the dwell may scroll gently a few times.
      */
     suspend fun before(app: String?, textChars: Int, gate: Boolean, port: ScreenPort? = null): Dwelt {
         if (!paced) return Dwelt(0, 0)
@@ -60,20 +67,20 @@ internal class AppDwell(
         return Dwelt(wait, scrolls)
     }
 
-    /** 用户答过话:各 App 的屏数重新算。 */
+    /** The user answered: screen tallies for every App restart. */
     fun userAnswered() = pacing.userAnswered()
 
-    /** 在 [app] 里的对外动作做完;[done](做成了)时这个 App 不再设屏数上限。 */
+    /** An outward action finished in [app]; when [done] (it succeeded) this App no longer has a screen cap. */
     fun outwardEnd(app: String, done: Boolean) {
         if (done) pacing.outwardDone(app)
     }
 
-    /** 停 [ms] 毫秒;用户插了话就不再停,抛 [DwellInterrupted]。 */
+    /** Sleep for [ms] milliseconds; if the user interjects, stop sleeping and throw [DwellInterrupted]. */
     private suspend fun pause(ms: Long) {
         waitOrSteer { sleep(ms) } ?: throw DwellInterrupted()
     }
 
-    /** 停 [wait] 毫秒,其间按 [plan] 轻轻滚几下;端口说这会儿不便滚(弹框、输入法、焦点)就不再滚,照样停够。返回滚了几下。 */
+    /** Sleep [wait] milliseconds, scrolling gently a few times per [plan] along the way; if the port says scrolling is not convenient right now (dialog, IME, focus), stop scrolling but still dwell the full time. Returns how many scrolls happened. */
     private suspend fun idleWait(port: ScreenPort, plan: IdleScroll, wait: Long): Int {
         val start = clock()
         var done = 0

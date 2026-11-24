@@ -32,7 +32,7 @@ import com.wangzan101.mika.core.screen.uistate.AppWait
 import com.wangzan101.mika.core.screen.uistate.action
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 列出、打开手机上的 App:永远作用于手机。 */
+/** List and open Apps on the phone: always acts on the phone. */
 internal object ListApps : PhoneTool {
     override val verb = Verb.ListApps
     override val label = "查看已装的 App"
@@ -42,14 +42,14 @@ internal object ListApps : PhoneTool {
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution {
         val apps = ctx.phone.screen.listApps()
-        // 也装在分身、工作资料一类的另一份用户里的:每一份单列一项,带上打开它要用的 user
+        // Also installed in another user such as a clone or work profile: list each copy as its own entry, carrying the user needed to open it
         val copies = ctx.phone.screen.appCopies().groupBy { it.packageName }
         val access = ctx.phone.screen.appAccess.current()
         return ok {
             put("apps", JsonArray(apps.flatMap { (p, l) ->
                 listOf(buildJsonObject {
                     put("package", p); put("label", l)
-                    // false 是默认态,不为每个 App 重复写;这份结果会留在后续每一步的历史里。
+                    // false is the default state, so it is not repeated for every App; this result stays in the history of every later step.
                     if (p in access.blocked) put("blocked", true)
                     if (p in access.shareAllowed) put("screenShareAllowed", true)
                 }) +
@@ -58,7 +58,7 @@ internal object ListApps : PhoneTool {
         }
     }
 
-    /** 列出的 App 名字不单独作证据,记下来给之后打开 App 的事实用(另一份的名字不记,免得盖掉本来那份的)。 */
+    /** Listed App names are not evidence on their own; they are recorded for the fact of opening an App later (names from another copy are not recorded, so they do not overwrite the original one's). */
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog): List<Observation> {
         if (r.content["ok"] != JsonPrimitive(true)) return emptyList()
         (r.content["apps"] as? JsonArray)?.forEach { a ->
@@ -95,15 +95,15 @@ internal object LaunchApp : PhoneTool {
         val user = a.int("user", 0, MAX_USER)
         val cold = a.bool("cold", false)
         val wait = a.int("wait", 1, MAX_WAIT_S)
-        // 只打开列出过的那几份:不在可用的另一份用户里(私密空间、别人的用户、没装)的一律不碰
+        // Only open the copies that were listed: anything not in an available other user (private space, someone else's user, not installed) is left alone
         if (user != null && ctx.phone.screen.appCopies().none { it.packageName == p && it.userId == user }) {
             return ctx.action(ActionResult.Failed(COPY_NOT_FOUND))
         }
-        // 换了 App,之前被拒的付款申报就不是这次的了
+        // Switched Apps, so a payment declaration refused earlier no longer applies to this one
         ctx.refusedPay = null
         suspend fun open() = if (user != null) ctx.phone.screen.openAppCopy(p, user, cold) else ctx.phone.screen.openApp(p, cold)
         var opened = open()
-        // 别的任务正用着、模型要了等:等它放开再开一次;互相等(谁也等不到)、等到时限仍被占着,照实说
+        // Another task is using it and the model asked to wait: wait for it to be released, then try opening again; when tasks wait on each other (nobody can get it) or it is still occupied at the deadline, say so plainly
         if (wait != null && opened is ActionResult.Failed && opened.reason == APP_IN_USE_BY_OTHER_TASK) {
             when (ctx.phone.screen.awaitAppFree(p, user, wait * 1_000L)) {
                 AppWait.Free -> opened = open()
@@ -129,9 +129,9 @@ internal object LaunchApp : PhoneTool {
         })
     }
 
-    /** 安卓的用户编号上限(UserHandle.PER_USER_RANGE 以内)。 */
+    /** Upper bound on Android's user number (within UserHandle.PER_USER_RANGE). */
     private const val MAX_USER = 99_999
-    /** 等别的任务放开 App 最多等几秒:再长不如先做别的,或告诉用户。 */
+    /** How many seconds at most to wait for another task to release the App: beyond that it is better to do something else first or tell the user. */
     const val MAX_WAIT_S = 180
     const val COPY_NOT_FOUND = "copy_not_found"
     const val WAIT_WOULD_DEADLOCK = "app_wait_would_deadlock"
@@ -139,8 +139,11 @@ internal object LaunchApp : PhoneTool {
 }
 
 /**
- * 任务结束时这个 App 留着还是关掉。默认留着(放回后台,停在做完的那一页,下次接着用),结束时正在出声的关掉;
- * 用户说了要它接着放、或做完就关(临时登录一类)时用它标出来。只记下,此刻什么也不动;同一份 App 再标一次以最后一次为准。
+ * Whether to keep this App around or close it when the task ends. Kept by default (sent back to the background,
+ * left on the page it finished on, to be continued next time), except that anything still playing sound at the end
+ * is closed; mark it here when the user said it should keep playing, or should be closed when done (a one-time
+ * sign-in and the like). This only records it and changes nothing right now; marking the same App again takes the
+ * last mark.
  */
 internal object AppAfterTask : PhoneTool {
     override val verb = Verb.AppAfterTask
@@ -156,7 +159,7 @@ internal object AppAfterTask : PhoneTool {
         ),
         listOf("package", "action", "reason"))
 
-    /** 只是记下,不切换在操作的那块屏。 */
+    /** Only records it; does not switch the screen being operated on. */
     override fun aimAt(o: JsonObject): String? = null
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution {
@@ -187,8 +190,9 @@ internal object AppAfterTask : PhoneTool {
 }
 
 /**
- * 把一段文字分享给一个 App(ACTION_SEND text/plain),在 Claire 的屏上打开它的分享页:收件人、发出都在那一页上点,
- * 这里不发出任何东西。读不到的界面里打不进字时,经分享把字带进去。
+ * Share a piece of text to an App (ACTION_SEND text/plain), opening its share sheet on Claire's screen: picking the
+ * recipient and sending both happen on that page, and nothing is sent from here. When text cannot be typed into a
+ * UI that cannot be read, bring it in via sharing.
  */
 internal object ShareText : PhoneTool {
     override val verb = Verb.ShareText
@@ -208,12 +212,12 @@ internal object ShareText : PhoneTool {
         val p = a.str("package")!!
         if (!LinkPolicy.PACKAGE.matches(p)) throw ArgError("package", "must be an Android package name")
         val text = a.str("text", max = 10000)!!
-        // 换了 App,之前被拒的付款申报就不是这次的了
+        // Switched Apps, so a payment declaration refused earlier no longer applies to this one
         ctx.refusedPay = null
         val r = ctx.action(ctx.phone.screen.shareText(p, text))
         if (r.content["ok"] != JsonPrimitive(true)) return r
         ctx.appOpened = true
-        // 系统先问用哪一个(装了两份、分享页不止一个)时提示已经说了怎么选;到了分享页再说下一步
+        // The system first asks which one to use (two copies installed, more than one share target): the hint already explains how to choose; say the next step once on the share page
         val opened = if (r.content["chooser"] != null) r else withHint(r, Feedback["share.opened"])
         return unreadable(ctx, p, opened)
     }
@@ -233,7 +237,7 @@ private fun withHint(r: ToolExecution, hint: String): ToolExecution {
     return ToolExecution(JsonObject(r.content + ("hint" to JsonPrimitive(all))), changed = r.changed)
 }
 
-/** 到了前台却读不到窗口(安全窗口、启动画面……):照实说,免得模型以为没打开又去启动。 */
+/** Came to the foreground but the window cannot be read (secure window, splash screen, ...): say so plainly, so the model does not think it failed to open and launch it again. */
 private suspend fun unreadable(ctx: ToolContext, p: String, r: ToolExecution): ToolExecution {
     val s = ctx.session.peek()
     if (s?.unreadableApp != p || s.elements.any { it.meaningful }) return r

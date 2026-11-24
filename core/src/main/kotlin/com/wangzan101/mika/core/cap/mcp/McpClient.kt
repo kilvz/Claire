@@ -26,19 +26,19 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.security.MessageDigest
 
-/** 传输层只须实现这两个操作；每个 Run 开局调用一次 tools，之后目录不变。 */
+/** The transport layer only has to implement these two operations; tools is called once at the start of each Run, after which the catalog does not change. */
 interface McpEndpoint {
     val serverId: String
     val instructions: String? get() = null
     fun tools(): List<McpToolDescriptor>
     suspend fun call(name: String, arguments: JsonObject): McpResult
 
-    /** 连接时从服务端读到的资源目录;不支持就是空。 */
+    /** Resource catalog read from the server at connect time; empty if unsupported. */
     fun resources(): List<McpResourceDescriptor> = emptyList()
     suspend fun readResource(uri: String): McpResult =
         McpResult("MCP server does not support resources", isError = true)
 
-    /** 连接时从服务端读到的提示词模板;不支持就是空。 */
+    /** Prompt templates read from the server at connect time; empty if unsupported. */
     fun prompts(): List<McpPromptDescriptor> = emptyList()
     suspend fun getPrompt(name: String, arguments: JsonObject): McpResult =
         McpResult("MCP server does not support prompts", isError = true)
@@ -60,7 +60,7 @@ data class McpToolDescriptor(
 
 data class McpResult(val text: String, val isError: Boolean = false, val costUnits: Long = 0)
 
-/** resources/list 的一项;v1 只用 uri/name/description 给模型看。 */
+/** One entry of resources/list; v1 only shows uri/name/description to the model. */
 data class McpResourceDescriptor(
     val uri: String,
     val name: String,
@@ -68,7 +68,7 @@ data class McpResourceDescriptor(
     val mimeType: String? = null,
 )
 
-/** prompts/list 的一项。 */
+/** One entry of prompts/list. */
 data class McpPromptDescriptor(
     val name: String,
     val description: String = "",
@@ -81,13 +81,13 @@ data class McpPromptArgument(
     val required: Boolean = false,
 )
 
-/** 每个服务独立配置；Restricted 不采信服务自称的只读注解。 */
+/** Configured independently per server; Restricted does not trust the read-only annotations a service claims for itself. */
 enum class McpTrust { Restricted, TrustAnnotations }
 
-/** 长结果的完整文本由宿主保存；返回的引用只含文件路径或资源 ID。 */
+/** The full text of a long result is saved by the host; the returned reference only contains a file path or resource ID. */
 fun interface McpResultStore { fun save(serverId: String, toolName: String, content: String): String }
 
-/** 挂着 MCP 连接器时给模型的查询风格段落(prompts/capabilities/mcp-lookup.md)。 */
+/** Query-style section given to the model when MCP connectors are attached (prompts/capabilities/mcp-lookup.md). */
 internal const val MCP_LOOKUP_SECTION = "mcp-lookup"
 
 data class McpConnection(
@@ -96,15 +96,15 @@ data class McpConnection(
     val maxCostUnits: Long? = null,
     val previewChars: Int = 4000,
     val trust: McpTrust = McpTrust.Restricted,
-    /** 只暴露这些工具;null 表示全部,空集表示一个都不给。 */
+    /** Expose only these tools; null means all of them, and the empty set means none at all. */
     val allowedTools: Set<String>? = null,
-    /** 界面上这个连接器叫什么(用户配置的名字);默认服务端编号。 */
+    /** What this connector is called in the UI (the user-configured name); defaults to the server ID. */
     val displayName: String = endpoint.serverId,
 ) {
     init { require(previewChars > 0 && (maxCostUnits == null || maxCostUnits >= 0)) }
 }
 
-/** 没有只读注解就按可写处理；破坏性与开放世界操作记成不可逆、对外(审批记录据此知道任务做过对外的事)。 */
+/** Without a read-only annotation it is treated as writable; destructive and open-world operations are recorded as irreversible and external (approval records use this to know the task did something external). */
 fun mcpApprovalRisk(a: McpAnnotations, trust: McpTrust = McpTrust.TrustAnnotations): ApprovalRisk = when {
     a.destructiveHint == true -> ApprovalRisk(ActionRisk.Irreversible)
     a.openWorldHint == true -> ApprovalRisk(ActionRisk.External)
@@ -158,7 +158,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
         )
     }
 
-    /** resources/read 合成一个只读工具;服务端有同名工具时让位给服务端。 */
+    /** resources/read is synthesized into a read-only tool; if the server has a tool with the same name, defer to the server. */
     private fun resourceTool(connection: McpConnection): AgentTool? {
         val resources = endpoint.resources()
         if (resources.isEmpty() || "resource_read" in serverToolNames) return null
@@ -184,7 +184,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
         )
     }
 
-    /** prompts/get 合成一个只读工具,参数名和说明来自 prompts/list。 */
+    /** prompts/get is synthesized into a read-only tool; argument names and descriptions come from prompts/list. */
     private fun promptTool(connection: McpConnection): AgentTool? {
         val prompts = endpoint.prompts()
         if (prompts.isEmpty() || "prompt_get" in serverToolNames) return null
@@ -222,7 +222,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
 
 internal data class McpToolAssembly(val tool: AgentTool, val failure: String?)
 
-/** 单个声明损坏时保留可诊断的占位工具，[name] 与正常装配路径使用同一个最终名字。 */
+/** Keeps a diagnosable placeholder tool when a single declaration is broken; [name] uses the same final name as the normal assembly path. */
 internal fun assembleMcpTool(
     capability: String,
     endpoint: McpEndpoint,
@@ -250,8 +250,11 @@ private const val MCP_INITIAL_HASH_CHARS = 8
 private const val MCP_MAX_HASH_CHARS = 56
 
 /**
- * 生成稳定且全局唯一的工具名。未超限、清洗后也不撞名的声明保持原样；其余声明按原工具名排序分配短名，
- * 因此服务端返回顺序不影响结果。短名与已有名字再次相撞时增加摘要长度，而不是把冲突留到注册阶段。
+ * Generates stable and globally unique tool names. Declarations that stay within the limit and do not collide
+ * after sanitizing are kept as-is; the remaining declarations get short names assigned in sorted order of the
+ * original tool name, so the order the server returns them in does not affect the result. If a short name
+ * collides with an existing name again, the digest length is increased instead of leaving the conflict to be
+ * discovered at registration time.
  */
 internal fun mcpToolNames(serverId: String, toolNames: List<String>): List<String> {
     require(toolNames.size == toolNames.toSet().size) { "duplicate MCP tool names: $toolNames" }
@@ -275,7 +278,7 @@ internal fun mcpToolNames(serverId: String, toolNames: List<String>): List<Strin
     return toolNames.map { assigned.getValue(it) }
 }
 
-/** 普通格式保留完整的服务编号和工具名；超长或清洗撞名时改成带摘要的短格式。 */
+/** The normal form keeps the full server ID and tool name; when too long or colliding after sanitizing, it switches to the digest-suffixed short form. */
 internal fun mcpToolName(serverId: String, toolName: String, short: Boolean = false): String {
     val plain = mcpPlainToolName(serverId, toolName)
     return if (!short && plain.length <= MCP_TOOL_NAME_MAX) plain
@@ -349,9 +352,11 @@ private class McpClientTool(
         .mapValues { (_, value) -> value as? JsonObject ?: JsonObject(emptyMap()) }
     private val required: List<String> = (schema["required"] as? JsonArray).orEmpty()
         .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString && p.content.isNotBlank() }?.content }
-    // required 可能指向 properties 里没声明的参数(只写了 $ref、生成器漏了等):补一个空的宽松 schema,
-    // 否则 Args 先按 allowed 拒绝传它、再按 required 拒绝不传它,工具两条路都调不成。required 里点了 reason 的
-    // 也补进来:那是服务端自己的参数(见 ToolDef.ownReason),不再是附加的用意说明。
+    // required may point at arguments that properties does not declare (only `$ref` was written, the generator
+    // missed them, etc.): add an empty permissive schema, otherwise Args first rejects passing it under allowed and
+    // then rejects not passing it under required, so the tool cannot be called either way. Names mentioned in
+    // required are added as well: that is the server's own parameter (see ToolDef.ownReason), no longer the
+    // purpose note we attach.
     private val declaredProps: Map<String, JsonObject> =
         props + required.filterNot { it in props }.associateWith { JsonObject(emptyMap()) }
     override val def: ToolDef = ToolDef(
@@ -381,14 +386,14 @@ private class McpClientTool(
         resultStore = resultStore,
         previewChars = previewChars,
         call = {
-            // reason 是我们给工具统一加的用意说明;服务端没把它声明成自己的参数时剥掉再发,schema 严格的服务会拒
+            // reason is the purpose note we add to every tool; when the server did not declare it as its own parameter, strip it before sending, since servers with strict schemas reject it
             val args = if (def.ownReason || "reason" !in a.o) a.o else JsonObject(a.o - "reason")
             endpoint.call(descriptor.name, args)
         },
     )
 }
 
-/** resources/prompts 合成的只读工具;结果裁剪、预算、不可信标记和普通 MCP 工具共用一套。 */
+/** Read-only tools synthesized from resources/prompts; result trimming, budget, and untrusted marking are shared with regular MCP tools. */
 private class McpSyntheticTool(
     override val capability: String,
     private val serverId: String,
@@ -435,7 +440,7 @@ private suspend fun mcpExecution(
     if (!budget.charge(costUnits)) return ToolExecution(buildJsonObject {
         put("ok", false); put("error", "mcp_cost_limit")
     })
-    // 界面(任务卡片、胶囊)和运行记录据此知道这次调用走的是哪个连接器
+    // The UI (task cards, capsule) and the run log use this to know which connector this call went through
     context.mcpConnector = displayName
     val finish = context.onMcpCallStarted?.invoke(displayName)
     val result = try {

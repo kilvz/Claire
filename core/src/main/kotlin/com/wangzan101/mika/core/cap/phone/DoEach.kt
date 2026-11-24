@@ -21,10 +21,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * `do_each`:对列表里的每个条目跑同一段步骤(打开→操作→返回),一轮一条,不让模型逐条过脑子。
- * 循环引擎(找下一个→跳过已做→滚动找更多→到底即停)是 [EachRunner]/ScrollCursor,本工具只负责三件事:
- * 按 item 匹配当前屏的条目、把 body 整段交给 phone_run(复用它的逐步重找与条件等待)、滚动找更多。
- * 每条结束给一份紧凑摘要,N 轮压成 1 轮,而不是逐条截图。
+ * `do_each`: run the same steps (open → act → back) for every entry in a list, one entry per round, so the model
+ * does not have to reason through them one by one.
+ * The loop engine (find the next → skip done ones → scroll for more → stop at the end) is [EachRunner]/ScrollCursor;
+ * this tool only handles three things: matching the current screen's entries by item, handing the whole body to
+ * phone_run (reusing its step-by-step re-finding and conditional waiting), and scrolling for more.
+ * Each entry produces a compact summary, compressing N rounds into 1 instead of one screenshot per entry.
  */
 internal object DoEach : PhoneTool {
     override val verb = Verb.DoEach
@@ -92,7 +94,7 @@ internal object DoEach : PhoneTool {
 
         val runner = EachRunner(role, text, onError)
         var subIndex = 0
-        // @item 按 ref 直点:read 用登记式的读屏(ref 才能被 tap 解析),并把这一屏的 snapshotId 交给这轮动作。
+        // @item taps directly by ref: read uses the registered form of screen reading (only then can ref be resolved by tap), and hands this screen's snapshotId to this round's actions.
         var currentSnapshotId: String? = null
         val summary = runner.run(
             read = {
@@ -131,7 +133,7 @@ internal object DoEach : PhoneTool {
         })
     }
 
-    /** 把 body 里指代本轮条目的 @item 换成这条的 ref + snapshotId(直接点,不靠名字回找);其余原样,整段交给 phone_run。 */
+    /** Replaces the @item in body that refers to this round's entry with that entry's ref + snapshotId (tap directly, not by finding the name again); everything else is left as-is and the whole block is handed to phone_run. */
     private fun resolveItem(step: JsonElement, item: EachCursor.Item, snapshotId: String?): JsonElement {
         val o = step as? JsonObject ?: return step
         val tt = (o["targetText"] as? JsonPrimitive)?.takeIf { it.isString }?.content

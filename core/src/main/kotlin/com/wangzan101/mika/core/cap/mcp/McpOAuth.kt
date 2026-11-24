@@ -20,10 +20,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 
-/** OAuth 失败;消息只带错误类别/代码,不带令牌或响应正文。 */
+/** OAuth failure; the message only carries the error category/code, never a token or response body. */
 class McpOAuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/** 一次 OAuth 登录的随机值。[redirectUri] 是本机回调地址。 */
+/** Random values for one OAuth login. [redirectUri] is the local callback address. */
 data class McpOAuthAttempt(
     val state: String,
     val verifier: String,
@@ -32,7 +32,7 @@ data class McpOAuthAttempt(
     val challenge: String get() = Pkce.challenge(verifier)
 }
 
-/** 授权服务器的端点(RFC 8414 / RFC 9728 发现结果)。 */
+/** Endpoints of the authorization server (RFC 8414 / RFC 9728 discovery result). */
 data class McpOAuthServer(
     val authorizationEndpoint: HttpUrl,
     val tokenEndpoint: HttpUrl,
@@ -41,10 +41,10 @@ data class McpOAuthServer(
     val scope: String? = null,
 )
 
-/** 动态注册得到的公开客户端(RFC 7591)。 */
+/** Public client obtained via dynamic registration (RFC 7591). */
 data class McpOAuthRegistration(val clientId: String, val clientSecret: String?)
 
-/** 加密存储的令牌;刷新时只需要 tokenEndpoint、clientId 和 refreshToken。 */
+/** Encrypted-at-rest tokens; refreshing only needs tokenEndpoint, clientId, and refreshToken. */
 @Serializable
 data class McpOAuthTokens(
     val accessToken: String,
@@ -60,10 +60,13 @@ data class McpOAuthTokens(
 }
 
 /**
- * MCP 的 OAuth 2.1 客户端(RFC 9728 资源元数据 → RFC 8414 授权服务器元数据 → RFC 7591 动态注册 → PKCE 授权码)。
+ * OAuth 2.1 client for MCP (RFC 9728 resource metadata → RFC 8414 authorization server metadata → RFC 7591
+ * dynamic registration → PKCE authorization code).
  *
- * 只做公开客户端:注册时 `token_endpoint_auth_method=none`,不保存密钥(个别服务器仍会给 client_secret,原样带上)。
- * 所有端点必须是 HTTPS;本机/私有地址的 HTTP 只在测试和 localhost 开发时接受。令牌只进内存/加密存储,不进日志。
+ * Public clients only: registration uses `token_endpoint_auth_method=none` and no secret is stored (a few servers
+ * still hand out a client_secret, which is passed along as-is).
+ * All endpoints must be HTTPS; HTTP for local/private addresses is accepted only in tests and localhost
+ * development. Tokens go only into memory/encrypted storage, never into logs.
  */
 class McpOAuth(
     private val http: OkHttpClient,
@@ -76,7 +79,7 @@ class McpOAuth(
         .followSslRedirects(false)
         .build()
 
-    /** 从 MCP server 地址发现授权服务器;没有资源元数据时退回 server 同源。 */
+    /** Discover the authorization server from the MCP server address; when there is no resource metadata, fall back to the server's own origin. */
     suspend fun discover(serverUrl: HttpUrl): McpOAuthServer {
         val resourceMetadata = fetchMetadata(
             listOfNotNull(
@@ -106,7 +109,7 @@ class McpOAuth(
         return McpOAuthServer(authorization, token, registration, resource, scopes)
     }
 
-    /** 动态注册公开客户端;redirect URI 用本机回调。 */
+    /** Dynamically register a public client; the redirect URI is the local callback. */
     suspend fun register(server: McpOAuthServer, redirectUri: String, clientName: String = "Claire"): McpOAuthRegistration {
         val endpoint = server.registrationEndpoint ?: throw McpOAuthException("oauth_registration_unsupported")
         requireSafeEndpoint(endpoint)
@@ -127,7 +130,7 @@ class McpOAuth(
         return McpOAuthRegistration(clientId, root["client_secret"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() })
     }
 
-    /** 授权页地址(PKCE S256 + state + RFC 8707 resource)。 */
+    /** Authorization page URL (PKCE S256 + state + RFC 8707 resource). */
     fun authorizeUrl(
         server: McpOAuthServer,
         registration: McpOAuthRegistration,
@@ -144,7 +147,7 @@ class McpOAuth(
         .apply { server.scope?.let { addQueryParameter("scope", it) } }
         .build().toString()
 
-    /** 用授权码换令牌。 */
+    /** Exchange the authorization code for tokens. */
     suspend fun exchange(
         server: McpOAuthServer,
         registration: McpOAuthRegistration,
@@ -163,7 +166,7 @@ class McpOAuth(
         return readTokens(postForm(server.tokenEndpoint, form), registration, server.tokenEndpoint, resource)
     }
 
-    /** 用 refresh token 换新 access token;服务器没给新 refresh token 时沿用旧的。 */
+    /** Exchange the refresh token for a new access token; if the server issues no new refresh token, keep the old one. */
     suspend fun refresh(tokens: McpOAuthTokens): McpOAuthTokens {
         val refresh = tokens.refreshToken?.takeIf { it.isNotBlank() } ?: throw McpOAuthException("oauth_refresh_missing")
         val endpoint = tokens.tokenEndpoint.toHttpUrlOrNull()?.also(::requireSafeEndpoint)
@@ -180,7 +183,7 @@ class McpOAuth(
         return next.copy(refreshToken = next.refreshToken ?: refresh)
     }
 
-    /** 用户拒绝或回调带错误:只认 state 对得上的。 */
+    /** User denied, or the callback carries an error: only accept it when state matches. */
     fun readCallbackError(params: Map<String, String>, attempt: McpOAuthAttempt): McpOAuthException? {
         val state = params["state"]
         if (state != attempt.state) return McpOAuthException("oauth_state_mismatch")
@@ -189,7 +192,7 @@ class McpOAuth(
         return McpOAuthException("oauth_denied_" + (params["error"]?.take(40) ?: "no_code"))
     }
 
-    /** 回调里取授权码;state 必须匹配。 */
+    /** Take the authorization code from the callback; state must match. */
     fun readCode(params: Map<String, String>, attempt: McpOAuthAttempt): String {
         if (params["state"] != attempt.state) throw McpOAuthException("oauth_state_mismatch")
         return params["code"]?.takeIf { it.isNotBlank() } ?: throw McpOAuthException("oauth_no_code")
@@ -224,9 +227,10 @@ class McpOAuth(
     }
 
     /**
-     * 授权服务器元数据的地址,按 MCP 规范的先后试。issuer 带路径(如 `https://auth.example.com/tenant1`)时,
-     * RFC 8414 把 well-known 插在主机和路径之间,OpenID 先同样插入、再按 OIDC Discovery 接在路径后面;
-     * 不带路径时就是根上的两处。
+     * Addresses of the authorization server metadata, tried in the order the MCP spec prescribes. When the issuer
+     * has a path (such as `https://auth.example.com/tenant1`), RFC 8414 inserts well-known between the host and the
+     * path, while OpenID first inserts it the same way and then appends it after the path per OIDC Discovery; with
+     * no path these are just the two locations at the root.
      */
     private fun authServerMetadataUrls(issuer: HttpUrl): List<HttpUrl> {
         val path = issuer.encodedPath.trimEnd('/')
@@ -254,7 +258,7 @@ class McpOAuth(
         return null
     }
 
-    /** 资源元数据不在 well-known 时,按 MCP 规范从 401 的 WWW-Authenticate 里找 `resource_metadata`。 */
+    /** When resource metadata is not at the well-known location, look for `resource_metadata` in the 401's WWW-Authenticate header per the MCP spec. */
     private suspend fun probeResourceMetadata(serverUrl: HttpUrl): JsonObject? {
         val response = try {
             executeRaw(

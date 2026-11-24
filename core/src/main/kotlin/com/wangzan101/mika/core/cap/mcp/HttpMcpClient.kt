@@ -30,18 +30,20 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** 连接外部 MCP server 失败(网络、HTTP、JSON-RPC 或协议不匹配)。消息不包含令牌/请求头。 */
+/** Failed to connect to an external MCP server (network, HTTP, JSON-RPC, or protocol mismatch). The message contains no tokens or request headers. */
 class McpClientException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * 外部 MCP server 的最小 Streamable HTTP 客户端(2025-03-26)。
+ * Minimal Streamable HTTP client for an external MCP server (2025-03-26).
  *
- * [connect] 完成 initialize / notifications/initialized / tools/list,之后 [tools] 返回开局时的目录,
- * [call] 只发 tools/call。目录在连接时冻结,和 [McpEndpoint] 的约定一致。
+ * [connect] performs initialize / notifications/initialized / tools/list; afterwards [tools] returns the
+ * catalog from when the session started and [call] only sends tools/call. The catalog is frozen at connect
+ * time, as agreed with [McpEndpoint].
  *
- * 不自动重试 tools/call(结果未知,避免重复副作用);网络、HTTP 非 2xx、JSON-RPC error 都转成
- * [McpResult.isError] 或 [McpClientException],不抛到任务循环外。
- * 令牌等自定义头只放在请求里,不写日志。
+ * tools/call is not retried automatically (the outcome is unknown; avoiding duplicate side effects); network
+ * failures, non-2xx HTTP statuses, and JSON-RPC errors all turn into [McpResult.isError] or
+ * [McpClientException] and are not thrown out of the task loop.
+ * Custom headers such as tokens are only put on requests and never written to logs.
  */
 class HttpMcpEndpoint private constructor(
     override val serverId: String,
@@ -59,7 +61,7 @@ class HttpMcpEndpoint private constructor(
     override val instructions: String?,
 ) : McpEndpoint, Closeable {
     private val json = Json { ignoreUnknownKeys = true }
-    // MCP 端点不应该靠重定向跳转;禁止重定向,避免把请求(含认证头)带去别的主机
+    // An MCP endpoint should not hop via redirects; disallow them so requests (with auth headers) never go to another host
     private val client = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
 
     override fun tools(): List<McpToolDescriptor> = tools
@@ -104,7 +106,7 @@ class HttpMcpEndpoint private constructor(
         }
     }
 
-    /** 关闭会话(如果服务端给了会话编号);失败忽略。 */
+    /** Close the session (if the server issued a session id); failures are ignored. */
     override fun close() {
         val sid = sessionId ?: return
         runCatching {
@@ -113,7 +115,7 @@ class HttpMcpEndpoint private constructor(
                 .header("MCP-Session-Id", sid)
                 .header("MCP-Protocol-Version", protocolVersion)
                 .build()
-            // 关闭不阻塞调用方(设置页/任务收尾);失败忽略
+            // Closing must not block the caller (settings screen / task teardown); failures are ignored
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) = Unit
                 override fun onResponse(call: Call, response: Response) = response.close()
@@ -189,8 +191,9 @@ class HttpMcpEndpoint private constructor(
         private val json = Json { ignoreUnknownKeys = true }
 
         /**
-         * 连接并读取工具目录。返回的 endpoint 已经初始化;失败时 [Result.failure] 里是 [McpClientException]。
-         * [clientInfo] 里的 name/version 只用于 initialize,不参与认证。
+         * Connect and read the tool catalog. The returned endpoint is already initialized; on failure
+         * [Result.failure] holds a [McpClientException]. The name/version in [clientInfo] are only used for
+         * initialize and play no part in authentication.
          */
         suspend fun connect(
             serverId: String,
@@ -272,7 +275,7 @@ class HttpMcpEndpoint private constructor(
                 pages++
             } while (cursor != null && pages < MAX_TOOL_PAGES)
 
-            // resources/prompts 是可选能力:服务端自称支持却报错时,工具照常可用,不让整个连接失败
+            // resources/prompts are optional capabilities: if the server claims support but errors out, tools stay usable and the whole connection is not failed
             val caps = initResult["capabilities"] as? JsonObject
             val resources = if (caps?.get("resources") is JsonObject) {
                 try {
@@ -440,7 +443,7 @@ class HttpMcpEndpoint private constructor(
 
 private val JSON_MEDIA = "application/json".toMediaType()
 
-/** OkHttp 的异步调用包成可取消的 suspend;取消时取消底层 call。 */
+/** Wraps an OkHttp async call as a cancellable suspend function; cancelling cancels the underlying call. */
 internal suspend fun Call.await(timeoutSec: Int): Response = suspendCancellableCoroutine { continuation ->
     timeout()?.timeout(timeoutSec.toLong(), TimeUnit.SECONDS)
     continuation.invokeOnCancellation { cancel() }
@@ -455,7 +458,7 @@ internal suspend fun Call.await(timeoutSec: Int): Response = suspendCancellableC
     })
 }
 
-/** SSE 长连接不能设整次调用超时(会在一段时间后掐断流);只等响应头,之后的超时由协议层控制。 */
+/** An SSE long-lived connection must not carry a whole-call timeout (it would cut the stream off after a while); wait only for the response headers, and let the protocol layer govern timeouts from then on. */
 internal suspend fun Call.awaitStream(): Response = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object : Callback {

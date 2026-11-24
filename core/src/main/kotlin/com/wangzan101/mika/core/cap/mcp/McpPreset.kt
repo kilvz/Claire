@@ -119,8 +119,9 @@ object McpCatalogParser {
     }
 
     /**
-     * 宽松解析:目录级错误(JSON 结构、格式版本)仍失败;单条损坏或重复 ID 的预设跳过、保留可用项。
-     * 供随 App 打包的目录加载使用——一条坏数据不阻塞其余条目。
+     * Lenient parsing: catalog-level errors (JSON structure, format version) still fail; individually broken
+     * presets or duplicate IDs are skipped and the usable entries are kept.
+     * Used for loading the catalog bundled with the App — one bad entry does not block the rest.
      */
     fun parseLenient(text: String): McpCatalog {
         val catalog = try {

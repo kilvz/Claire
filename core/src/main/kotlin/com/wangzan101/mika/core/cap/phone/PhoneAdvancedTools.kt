@@ -27,7 +27,7 @@ import com.wangzan101.mika.core.screen.uistate.lastOrSnapshot
 import com.wangzan101.mika.core.screen.uistate.screen
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 按界面实际内容推进，直到找到目标或内容停止变化。 */
+/** Advances by the UI's actual content until the target is found or the content stops changing. */
 internal object PhoneFind : PhoneTool {
     override val verb = Verb.PhoneFind
     override val risk = Risk.Write
@@ -88,7 +88,7 @@ internal object PhoneFind : PhoneTool {
     }
 }
 
-/** 按无障碍事件醒来，避免固定间隔反复读屏。 */
+/** Wakes up on accessibility events instead of repeatedly reading the screen at a fixed interval. */
 internal object PhoneWait : PhoneTool {
     override val verb = Verb.WaitFor
     override val risk = Risk.Read
@@ -149,7 +149,7 @@ internal object PhoneEventTool : PhoneTool {
     }
 }
 
-/** 结构化读取当前可见窗口，保留列表行和表单字段的父子关系。 */
+/** Structurally reads the currently visible window, preserving the parent-child relations of list rows and form fields. */
 internal object PhoneExtract : PhoneTool {
     override val verb = Verb.PhoneExtract
     override val risk = Risk.Read
@@ -211,7 +211,7 @@ internal object PhoneExtract : PhoneTool {
     }
 }
 
-/** 查顶层弹窗；指定按钮文字时才点击，避免猜测弹窗用途。 */
+/** Inspects the top-level dialog; it only clicks when a button text is specified, avoiding guesses about what the dialog does. */
 internal object PhoneDialog : PhoneTool {
     override val verb = Verb.PhoneDialog
     override val risk = Risk.Write
@@ -271,7 +271,7 @@ internal object PhoneDialog : PhoneTool {
     private fun containsDialog(node: UiTreeNode): Boolean = node.role.contains("Dialog", true) || node.children.any(::containsDialog)
 }
 
-/** 单指路径或双指缩放，所有坐标均为 0-999。 */
+/** Single-finger paths or two-finger pinch; all coordinates are 0-999. */
 internal object PhoneGesture : PhoneTool {
     override val verb = Verb.PhoneGesture
     override val risk = Risk.Write
@@ -307,9 +307,9 @@ internal object PhoneGesture : PhoneTool {
     }
 }
 
-/** Android shell 身份命令；与沙箱进程的命令入口分开。 */
+/** Android shell identity commands; kept separate from the sandbox process's command entry point. */
 internal object PhoneCommand : PhoneTool {
-    /** 连着失败这么多次就提醒别再换着写法试。 */
+    /** After this many consecutive failures, remind the model not to keep trying different spellings. */
     private const val REPEATED_FAILURES = 2
     override val verb = Verb.PhoneCommand
     override val risk = Risk.Write
@@ -323,7 +323,7 @@ internal object PhoneCommand : PhoneTool {
         val command = a.str("command", max = 4_000)!!
         val phone = ctx.phone
         val purpose = CommandSteer.purpose(command)
-        // 已提醒过还在用 shell 点、打字、按键、启动,或用 shell 分享文字:不执行,只说该用哪个工具
+        // Already reminded yet still using the shell to tap, type, press keys, launch, or share text: do not execute, only say which tool to use
         if (CommandSteer.refuses(purpose, phone.commandSteered)) return ToolExecution(buildJsonObject {
             put("ok", false); put("error", "use_phone_tool")
             put("hint", Feedback.format("system_command.refused", "use" to Feedback[purpose!!.feedbackKey]))
@@ -331,7 +331,7 @@ internal object PhoneCommand : PhoneTool {
         val result = ctx.screen.systemCommand(command) ?: return fail("no_app_open")
         phone.commandFailures = if (result.exitCode == 0) 0 else phone.commandFailures + 1
         if (purpose != null) phone.commandSteered = true
-        // 模仿专门工具的命令、连着失败的命令:第一次提醒换回专门工具,照样执行
+        // Commands that imitate a dedicated tool, or keep failing: on the first one, remind the model to switch back to the dedicated tool and still execute
         val hints = listOfNotNull(
             purpose?.let { Feedback[it.feedbackKey] },
             Feedback["system_command.failed_again"].takeIf { phone.commandFailures >= REPEATED_FAILURES },

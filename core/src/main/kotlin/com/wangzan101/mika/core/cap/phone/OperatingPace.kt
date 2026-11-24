@@ -4,26 +4,30 @@ import com.wangzan101.mika.core.screen.uistate.PlacePace
 import kotlin.random.Random
 
 /**
- * 设置里的「操作节奏」:在 App 里操作快还是像人。手势本身(落指停顿、按住时长、落点偏差、弧线)三种都像人,见 [GesturePacing]。
+ * The "operating pace" in settings: whether to operate fast or human-like inside Apps. The gestures themselves (pause
+ * before landing, hold duration, landing jitter, arcs) are human-like in all three tiers, see [GesturePacing].
  *
- * - [FAST]:动作之间不另停、打字一次写入全文、不设屏数上限(以前的做法);
- * - [STANDARD](默认):打字一段一段打出来,动作之间停一小会儿(同一屏约 0.5–1.2 秒、新的一屏约 1–2 秒),
- *   限制浏览快慢的 App 按慢的那一套(停得更久、按字数读、屏数有上限、打字更慢);
- * - [HUMAN]:所有 App 都按慢的那一套停留和打字;屏数上限仍只给限制浏览快慢的 App。
+ * - [FAST]: no extra dwell between actions, typing writes the whole text at once, no screen cap (the previous
+ *   behavior);
+ * - [STANDARD] (default): typing is emitted in chunks, and actions dwell briefly between each other (about
+ *   0.5–1.2 seconds on the same screen, about 1–2 seconds on a new screen), while browsing-speed-limited Apps follow
+ *   the slower set (dwell longer, read by character count, screen caps apply, type slower);
+ * - [HUMAN]: every App uses the slower set for dwelling and typing; the screen cap still applies only to
+ *   browsing-speed-limited Apps.
  *
- * 全局档位和按应用覆盖([AppPacePlan])一起决定每个 App 的实际节奏。
+ * The global tier and the per-app overrides ([AppPacePlan]) together decide each App's effective pacing.
  */
 enum class OperatingPace {
     FAST, STANDARD, HUMAN;
 
-    /** 这个任务在 App 里一步一步操作的节奏(没有按应用覆盖时的样子;有覆盖见 [AppPacePlan])。 */
+    /** Pacing for step-by-step operation inside Apps during this task (as it looks without per-app overrides; with overrides see [AppPacePlan]). */
     fun appPacing(random: Random = Random.Default): AppPacing = when (this) {
         FAST -> AppPacing.Off
         STANDARD -> AppPacing.human(random)
         HUMAN -> AppPacing.human(random, limits = AppPacing.Limits.CAREFUL)
     }
 
-    /** 这个档位下 App 里按哪套节奏操作(停留与打字;见 [AppTempo])。 */
+    /** Which tempo Apps are operated at under this tier (dwelling and typing; see [AppTempo]). */
     val tempo: AppTempo
         get() = when (this) {
             FAST -> AppTempo.FAST
@@ -31,27 +35,27 @@ enum class OperatingPace {
             HUMAN -> AppTempo.CAREFUL
         }
 
-    /** 在 App 知识说 [pace] 的 App 里打字的节奏。 */
+    /** Typing pacing inside an App whose App knowledge says [pace]. */
     fun typing(pace: PlacePace, random: Random = Random.Default): TypingPacing = when {
         this == FAST -> TypingPacing.Instant
         this == HUMAN || pace == PlacePace.CAREFUL -> TypingPacing.human(random, TypingPacing.Limits.CAREFUL)
         else -> TypingPacing.human(random)
     }
 
-    /** 在按 [tempo] 节奏的 App 里打字的节奏(快一次写入,careful 打得更慢)。 */
+    /** Typing pacing inside an App running at [tempo] (fast writes at once, careful types slower). */
     fun typing(tempo: AppTempo, random: Random = Random.Default): TypingPacing = when (tempo) {
         AppTempo.FAST -> TypingPacing.Instant
         AppTempo.CAREFUL -> TypingPacing.human(random, TypingPacing.Limits.CAREFUL)
         AppTempo.NORMAL -> TypingPacing.human(random)
     }
 
-    /** 这个档位下 App 里打字的节奏(快一次写入,像人/careful 更慢;按应用覆盖后的档位用它)。 */
+    /** Typing pacing inside Apps under this tier (fast writes at once, human/careful is slower; used for the tier after per-app overrides). */
     fun typing(random: Random = Random.Default): TypingPacing = typing(tempo, random)
 
     companion object {
         val DEFAULT = STANDARD
 
-        /** 存下的名字(大小写不论);认不出为 null。 */
+        /** The stored name (case-insensitive); null when unrecognized. */
         fun parse(value: String?): OperatingPace? = entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) }
     }
 }

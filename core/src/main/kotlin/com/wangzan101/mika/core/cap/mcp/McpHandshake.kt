@@ -19,8 +19,9 @@ internal class McpHandshakeInfo(
 )
 
 /**
- * initialize → notifications/initialized → tools/list → resources/list、prompts/list。
- * 只给用 JSON-RPC 长连接的传输(旧版 SSE、stdio)共用;resources/prompts 是可选能力,自称支持却报错时降级为空。
+ * initialize → notifications/initialized → tools/list → resources/list, prompts/list.
+ * Shared only by transports that use a long-lived JSON-RPC connection (legacy SSE, stdio); resources/prompts are
+ * optional capabilities, and if the server claims support but errors out they degrade to empty.
  */
 internal suspend fun mcpHandshake(
     requestedProtocol: String,
@@ -54,7 +55,7 @@ internal suspend fun mcpHandshake(
     return McpHandshakeInfo(negotiated, serverName, instructions, tools, resources, prompts)
 }
 
-/** tools/list 是必选能力,分页错误直接让连接失败。 */
+/** tools/list is a required capability, so a paging error fails the connection outright. */
 private suspend fun <T> mcPages(
     request: suspend (String, JsonObject) -> JsonObject,
     method: String,
@@ -76,7 +77,7 @@ private suspend fun <T> mcPages(
     return out
 }
 
-/** resources/prompts 可选:服务端自称支持却报错时返回空表,不影响工具连接。 */
+/** resources/prompts are optional: if the server claims support but errors out, return an empty list without affecting the tool connection. */
 private suspend fun <T> optionalPages(
     request: suspend (String, JsonObject) -> JsonObject,
     method: String,

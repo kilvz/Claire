@@ -24,25 +24,28 @@ import java.io.Reader
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-/** 一条长驻的 stdio 进程;由宿主(手机的 Linux 沙箱)启动,不是 App 直接 exec。 */
+/** A long-lived stdio process; started by the host (the phone's Linux sandbox), not exec'd directly by the App. */
 interface McpStdioProcess : Closeable {
     val stdin: OutputStream
     val stdout: InputStream
     val stderr: InputStream
 }
 
-/** 启动 stdio server;[workspace] 是沙箱里的对话工作区,[environment] 是解析出的显式环境(秘密经这里进进程,不进 argv)。 */
+/** Starts a stdio server; [workspace] is the conversation workspace inside the sandbox, [environment] is the resolved explicit environment (secrets reach the process this way, not via argv). */
 fun interface McpStdioLauncher {
     suspend fun launch(workspace: String, argv: List<String>, environment: Map<String, String>): McpStdioProcess
 }
 
 /**
- * MCP 的 stdio 传输(换行分隔的 JSON-RPC):stdin 写请求,stdout 读响应,stderr 只读不解析。
+ * MCP's stdio transport (newline-delimited JSON-RPC): write requests to stdin, read responses from stdout, and
+ * read stderr without parsing it.
  *
- * 进程必须在 Linux 沙箱里启动,而不是 App 进程直接 exec:stdio server 是用户装的第三方程序,
- * 不应该拿到 App 私有目录(令牌、对话)的读取权限。这里的 [McpStdioLauncher] 由 App 的沙箱实现。
+ * The process must be started inside the Linux sandbox rather than exec'd directly by the App process: a stdio
+ * server is a third-party program installed by the user and should not get read access to the App's private
+ * directories (tokens, conversations). The [McpStdioLauncher] here is implemented by the App's sandbox.
  *
- * 和别的传输一样:目录在连接时冻结,`tools/call` 不自动重试,关闭时杀掉整条进程树。
+ * Like the other transports: the catalog is frozen at connect time, `tools/call` is never retried automatically,
+ * and closing kills the whole process tree.
  */
 class StdioMcpEndpoint private constructor(
     override val serverId: String,
@@ -142,8 +145,9 @@ class StdioMcpEndpoint private constructor(
         private val json = Json { ignoreUnknownKeys = true }
 
         /**
-         * 启动并完成 initialize / tools/list 等握手。命令按 argv 直接执行(不经过 shell),
-         * 由 [launcher] 在沙箱里启动;[workspace] 是沙箱里的对话 ID。
+         * Start the process and complete the initialize / tools/list handshake. The command is executed directly
+         * as argv (not through a shell), started inside the sandbox by [launcher]; [workspace] is the conversation
+         * ID inside the sandbox.
          */
         suspend fun connect(
             serverId: String,
@@ -274,7 +278,7 @@ class StdioMcpEndpoint private constructor(
             }
         }
 
-        /** 读一行,最多 [MAX_LINE_CHARS];超过就报错,避免恶意 server 用一条超长行撑爆内存。 */
+        /** Read one line, up to [MAX_LINE_CHARS]; error out beyond that so a malicious server cannot exhaust memory with one enormous line. */
         private fun readLine(reader: Reader): String? {
             val out = StringBuilder()
             var any = false
@@ -293,8 +297,9 @@ class StdioMcpEndpoint private constructor(
 }
 
 /**
- * 把命令字符串拆成 argv:支持单/双引号与反斜杠转义,不做变量展开,也不经过 shell。
- * 引号没闭合时抛 [McpClientException]。
+ * Split a command string into argv: supports single/double quotes and backslash escapes, performs no variable
+ * expansion, and does not go through a shell.
+ * Throws [McpClientException] when a quote is left unclosed.
  */
 fun parseStdioCommand(line: String): List<String> {
     val out = mutableListOf<String>()
