@@ -528,13 +528,13 @@ skill_search #213e710254e0
 skill_read #76caa0888fe6
 skill_save #94198f2e6220
 memory_search #3c5972a055ae
-memory_save #d0db4dde2bd3
+memory_save #c5da78f8e962
 memory_edit #dc33f1f00285
 history_read #247f7b0b8cdf
 spawn_agent #4e5b66f607ea
 view_past_screens #2d409bae0381
 hand_to_user #26582d67eb46
-handle_obstacle #31695598de59
+handle_obstacle #4fb0d5e0baa9
 do_steps #1c706a471692
 phone_observe #7f08ffaddb70
 phone_list_elements #882ee52750e8

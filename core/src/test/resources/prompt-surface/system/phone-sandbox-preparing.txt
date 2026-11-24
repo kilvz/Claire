@@ -432,7 +432,7 @@ request_confirmation #e0ecd89f01b3
 end_not_done #3933215b408e
 view_past_screens #2d409bae0381
 hand_to_user #8af7d38230f9
-handle_obstacle #1a00c1e71b3c
+handle_obstacle #ce49c4765f00
 phone_observe #7f08ffaddb70
 phone_list_elements #882ee52750e8
 phone_screenshot #0c4d626da2f6

@@ -501,7 +501,7 @@ request_confirmation #bb3dc29ee4ed
 end_not_done #3933215b408e
 view_past_screens #2d409bae0381
 hand_to_user #26582d67eb46
-handle_obstacle #31695598de59
+handle_obstacle #4fb0d5e0baa9
 phone_observe #7f08ffaddb70
 phone_list_elements #882ee52750e8
 phone_screenshot #0c4d626da2f6
