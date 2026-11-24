@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.export
 
-/** 文件名与包内路径的清洗;规则和现有分享/附件保持同一方向,但这里不依赖沙箱能力包。 */
+/** Sanitizing of file names and in-package paths; the rules follow the same direction as the existing share/attachment code, but nothing here depends on the sandbox capability package. */
 object ExportNames {
     const val MAX_NAME = 120
     const val MAX_NAME_BYTES = 240
@@ -19,7 +19,7 @@ object ExportNames {
         return fit(cleaned)
     }
 
-    /** 按字符数和 UTF-8 字节数截短,保留扩展名和字符边界。 */
+    /** Truncates by character count and UTF-8 byte count, preserving the extension and character boundaries. */
     fun fit(name: String): String = fit(name, "")
 
     private fun fit(name: String, suffix: String): String {
@@ -40,7 +40,7 @@ object ExportNames {
         return prefix.trimEnd() + suffix + ext
     }
 
-    /** 同名时加「 (2)」「 (3)」……,扩展名留在最后。 */
+    /** On duplicate names appends " (2)", " (3)", ... and keeps the extension at the end. */
     fun unique(name: String, used: MutableSet<String>): String {
         val fitted = fit(name)
         if (used.add(fitted)) return fitted
@@ -74,7 +74,7 @@ object ExportNames {
         return out.toString()
     }
 
-    /** zip 条目只接受相对路径;拒绝绝对路径、反斜杠、`.`/`..` 段、盘符和空段。 */
+    /** Zip entries accept relative paths only; absolute paths, backslashes, `.`/`..` segments, drive letters and empty segments are rejected. */
     fun entryPath(path: String): String {
         require(path.isNotBlank()) { "empty entry path" }
         require(!path.startsWith("/") && !path.startsWith("\\")) { "absolute entry path: $path" }

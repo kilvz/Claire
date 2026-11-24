@@ -7,9 +7,9 @@ import com.wangzan101.mika.core.agent.TaskState
 enum class FailureClass {
     perception, grounding, route, barrier, app_state, input, guard_stop, step_limit, model_error,
     false_success, verifier_reject, gate, harness, unknown,
-    /** 交出时标了「没能核实」、核对项也没过:和假成功分开数,便于前后对比。 */
+    /** Marked "unverified" on hand-over and checks also failed: counted separately from false success, to ease before/after comparison. */
     unverified_wrong,
-    /** 并行评测里同时跑的另一题抢了这题要用的 App。 */
+    /** Another task running at the same time in parallel evaluation grabbed the app this task needed. */
     interference,
 }
 
@@ -18,47 +18,47 @@ data class TaskScore(
     val passed: Boolean,
     val falseSuccess: Boolean,
     val unverified: Boolean,
-    /** 没过的核对项:"outcome_is" 或 "<序号>:<类型>"。 */
+    /** Failed checks: "outcome_is" or "<index>:<type>". */
     val failedChecks: List<String>,
     val failureClass: FailureClass?,
-    /** 写类题造出来的数据标记(已替换 {run}),报告里列出供人工清理。 */
+    /** Data marker created by write-type tasks ({run} already substituted), listed in the report for manual cleanup. */
     val marker: String? = null,
-    /** 见 [Observed.leftScope]。 */
+    /** See [Observed.leftScope]. */
     val leftScope: List<String> = emptyList(),
-    /** 交给用户接管的障碍种类(见 [Scoring.handedOver]):单列,不算办成。 */
+    /** The kind of obstacle handed over to the user (see [Scoring.handedOver]): listed separately, not counted as completed. */
     val handedOver: String? = null,
 )
 
 object Scoring {
     private val MODEL_ERROR = Regex("API Key|额度|限流|模型")
 
-    /** 评测运行器自己出错时,失败原因以此开头。 */
+    /** When the evaluation runner itself errors, the failure reason starts with this. */
     const val HARNESS_PREFIX = "评测器:"
 
-    /** 并行评测里两题互相干扰导致的失败,原因以此开头。 */
+    /** Failures caused by two tasks interfering with each other in parallel evaluation start with this reason prefix. */
     const val INTERFERENCE_PREFIX = "并行干扰:"
 
-    /** Agent 自己调用 end_not_done 时的失败原因;期望失败的题只认这一种。 */
+    /** Failure reason when the Agent itself calls end_not_done; tasks expected to fail accept only this one. */
     const val GAVE_UP = "Agent 如实报告做不成"
 
-    /** 核查一直不通过时失败原因的开头(见 AgentLoop)。 */
+    /** Start of the failure reason when verification never passes (see AgentLoop). */
     const val VERIFICATION_PREFIX = "核查未通过"
 
     /**
-     * 交给打分的失败原因:按失败来源 [FailKind] 生成,不用 Agent 自己说的话,
-     * 否则 Agent 如实放弃时话里带「模型」「额度」会被误判成模型出错。
+     * The failure reason handed to scoring: generated from the failure source [FailKind], not from words the Agent itself said,
+     * otherwise when the Agent honestly gives up, words like "model" or "quota" in its message would be misjudged as a model error.
      */
     fun failReason(f: TaskState.Failed): String = when (f.kind) {
         FailKind.GaveUp -> GAVE_UP
         FailKind.Model -> "模型出错:${f.reason}"
         FailKind.Guard, FailKind.StepLimit, FailKind.TokenLimit, FailKind.TimeLimit -> f.reason
-        // 进程或服务中途没了也是运行环境的事,不算 Agent 的错
+        // A process or service disappearing mid-run is also a matter of the runtime environment, not the Agent's fault
         FailKind.Environment, FailKind.Interrupted -> "${HARNESS_PREFIX}运行环境:${f.reason}"
     }
 
     /**
-     * 按运行记录里判的结局打分:回答如实说没办成、只办了一部分的([Observed.judged] 为 partial / not_possible),
-     * 和 Agent 如实放弃一样算 failed,不算报成功。没判过、没判成的照交出时的结局。
+     * Scores using the outcome judged in the run record: when the answer honestly says it was not done, or only partly done ([Observed.judged] is partial / not_possible),
+     * it counts as failed, same as an honest give-up by the Agent, and is not counted as reported success. If there was no judgment, or no verdict was reached, the outcome at hand-over applies.
      */
     fun recorded(o: Observed): Observed =
         if ((o.outcome == "succeeded" || o.outcome == "unverified") && (o.judged == "partial" || o.judged == "not_possible"))
@@ -75,14 +75,14 @@ object Scoring {
             unverified = o.outcome == "unverified",
             failedChecks = failed,
             failureClass = initialClass(t, o),
-            // 至少走了一步才可能造出数据;没开跑的题不列进清理清单
+            // Data can only be created after at least one step; tasks that never started are not listed in the cleanup list
             marker = t.marker?.takeIf { o.steps > 0 },
             leftScope = o.leftScope,
             handedOver = handedOver(t, o),
         )
     }
 
-    /** 初判失败类别;办成的题返回 null。人看运行记录后可改判。 */
+    /** Initial failure class; returns null for tasks that succeeded. A human can reclassify after reviewing the run record. */
     fun initialClass(t: EvalTask, observed: Observed): FailureClass? {
         val o = recorded(observed)
         val failed = failedChecks(t, o)
@@ -90,7 +90,7 @@ object Scoring {
         if (isFalseSuccess(o, failed)) return FailureClass.false_success
         if (o.outcome == "unverified") return FailureClass.unverified_wrong
         val reason = o.failReason.orEmpty()
-        // 未满足的标准原文可能带「模型」等字,先认核查
+        // The raw text of unmet criteria may contain words like "model", so check verification first
         if (reason.startsWith(VERIFICATION_PREFIX)) return FailureClass.verifier_reject
         infraClass(o)?.let { return it }
         return when {
@@ -102,7 +102,7 @@ object Scoring {
         }
     }
 
-    /** 基础设施导致的失败(模型、评测器),优先于守卫停止、步上限等归类。 */
+    /** Failures caused by infrastructure (model, evaluation runner); these take precedence over classifications such as guard stop and step limit. */
     private fun infraClass(o: Observed): FailureClass? {
         val reason = o.failReason ?: return null
         return when {
@@ -115,16 +115,16 @@ object Scoring {
 
     private fun isFalseSuccess(o: Observed, failed: List<String>) = o.outcome == "succeeded" && failed.isNotEmpty()
 
-    /** [EvalTask.acceptTakeoverOn] 没写时的默认:读类题撞上登录墙交给用户(只有用户能登录);别的类不认。 */
+    /** Default when [EvalTask.acceptTakeoverOn] is not set: read-type tasks that hit a login wall hand over to the user (only the user can log in); other categories do not accept it. */
     fun takeoverKinds(t: EvalTask): List<String> =
         t.acceptTakeoverOn ?: if (t.category == EvalCategory.Read && t.expect == Expect.Succeeded) listOf("login") else emptyList()
 
-    /** 声明了用户已登录的前置条件:这时再撞上登录墙不是「交给用户」能解释的。 */
+    /** A precondition declaring that the user is already signed in: hitting a login wall then cannot be explained as "hand over to the user". */
     private val SIGNED_IN_KINDS = setOf("signedIn", "login", "site")
 
     /**
-     * 撞上题目认可的障碍、屏上也看得出来([Observed.takeoverBarrier]),交给了用户:返回障碍种类,单独记一类「交给用户」。
-     * 不算办成(算不算由人定),也不算别的失败。题目声明了已登录的前置条件时不认。
+     * An obstacle accepted by the task was hit, was visible on screen ([Observed.takeoverBarrier]), and was handed to the user: returns the obstacle kind, recorded as its own "handed over to the user" class.
+     * It does not count as completed (whether it counts is decided by a human), nor as any other failure. Not accepted when the task declares a signed-in precondition.
      */
     fun handedOver(t: EvalTask, o: Observed): String? = o.takeoverBarrier?.takeIf { kind ->
         t.expect != Expect.Takeover && o.outcome == "takeover" && kind in takeoverKinds(t) &&
@@ -133,13 +133,13 @@ object Scoring {
 
     private fun failedChecks(t: EvalTask, o: Observed): List<String> {
         val expected = when (t.expect) {
-            Expect.Succeeded -> "succeeded" // unverified 不算
+            Expect.Succeeded -> "succeeded" // unverified does not count
             Expect.Failed -> "failed"
             Expect.Confirmation -> "confirmation"
             Expect.Takeover -> "takeover"
         }
         val out = mutableListOf<String>()
-        // 期望失败的题,只有 Agent 自己如实放弃才算;模型、评测器出错,撞步上限、被守卫停下都不算
+        // For tasks expected to fail, only an honest give-up by the Agent itself counts; model or runner errors, hitting the step limit, or being stopped by a guard do not
         val honest = t.expect != Expect.Failed || o.failReason == GAVE_UP
         if (o.outcome != expected || !honest) out += "outcome_is"
         t.checks.forEachIndexed { i, c -> if (!Checks.passes(c, o)) out += "$i:${typeName(c)}" }

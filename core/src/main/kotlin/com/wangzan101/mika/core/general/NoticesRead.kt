@@ -34,23 +34,23 @@ import kotlinx.serialization.json.put
 const val NOTICES_READ = "notices_read"
 
 /**
- * 读从各个 App 收到的通知(这两天的原文,和存着的各天、各周、各月的归纳):用户问「今天都收到了什么」「某某说了什么」「上周有什么事」时用,不用去一个个打开 App 看。
- * - `view=summary`(默认):这一天各 App 收到几段,加上已经写好的分段归纳(每句是模型照着一批通知写的;多了分页)。
- * - `view=messages`:通知原文,由旧到新,分页;可以按 App、按字样筛。
- * - `view=days` / `weeks` / `months`:存着的各天、各周、各月的归纳(比原文留得久),新的在前,分页;问起前几天、上周、上个月时用。
+ * Reads notifications received from various apps (the last two days of text, plus the stored daily, weekly and monthly digests): used when the user asks "what came in today", "what did so-and-so say" or "what happened last week", without opening each app.
+ * - `view=summary` (default): how many pieces each app received that day, plus the section digests already written (each sentence is written by the model from a batch of notifications; paginated when there are many).
+ * - `view=messages`: the notification text itself, oldest first, paginated; can be filtered by app and by text.
+ * - `view=days` / `weeks` / `months`: the stored daily, weekly and monthly digests (kept longer than the raw text), newest first, paginated; used when asking about previous days, last week or last month.
  *
- * 给出来的不是全部时都明说:记录从几点起才全(`recordedSince`、`incomplete`)、后面还有没给的(`nextOffset`)、
- * 有几个 App 因为来源档位不够格没给(`appsWithheld`)。读不出来是报错,不是「什么都没收到」。
+ * Whenever what is returned is not everything, it says so explicitly: from what time the record is complete (`recordedSince`, `incomplete`), that more remains (`nextOffset`),
+ * and how many apps were withheld because their source tier does not qualify (`appsWithheld`). A failed read is an error, not "nothing came in".
  *
- * 只读,不碰屏幕。数据由 App 给([com.wangzan101.mika.core.proactive.NoticeSource]);没给(功能没开、不是用户在手机上发起的任务)时不出现。
- * 读到的都是别的 App、别人写的字:每一样都套不可信标记(里面自带的标记先弄坏)。不作为观察记进核查的账本;
- * 进运行记录前文字遮掉(见 [com.wangzan101.mika.core.run.record.Redactor.result]):通知原文只在本机留两天,不能借运行记录多留。
- * 读过通知的任务,结束后不自动提取记忆(见 RunLearning)。
+ * Read-only; does not touch the screen. Data is provided by the app ([com.wangzan101.mika.core.proactive.NoticeSource]); the tool does not appear when it is not provided (the feature is off, or the task was not started by the user on the phone).
+ * Everything read was written by other apps and other people: each item is wrapped in the untrusted marker (any marker already inside is broken first). It is not recorded into the verification ledger as observations;
+ * text is masked before entering the run record (see [com.wangzan101.mika.core.run.record.Redactor.result]): notification text is kept on the device for only two days and must not last longer by way of the run record.
+ * Tasks that read notifications do not extract memories automatically after finishing (see RunLearning).
  */
 internal object NoticesRead : AgentTool {
-    /** 一页里各段原文加起来大约多少字(至少给一段)。 */
+    /** Roughly how many characters of section text fit in one page (at least one section is always given). */
     const val PAGE_CHARS = 6_000
-    /** 一段原文最多留多少字。 */
+    /** Maximum characters kept per text section. */
     private const val TEXT_CHARS = 300
     private const val NAME_CHARS = 80
     private val TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
@@ -72,7 +72,7 @@ internal object NoticesRead : AgentTool {
 
     override fun available(ctx: ToolContext): Boolean {
         val spec = ctx.config.runSpec
-        // 只给用户在手机上发起的任务;条件检查这类只读运行、别处来的任务都不给
+        // Offered only for tasks the user started on the phone; read-only runs such as condition checks, and tasks coming from elsewhere, do not get it
         return ctx.config.notices != null && (spec == null || (spec.provenance.origin == RunOrigin.Ui && !spec.readOnly))
     }
 
@@ -90,10 +90,10 @@ internal object NoticesRead : AgentTool {
         val day = Instant.ofEpochMilli(source.now()).atZone(zone).toLocalDate().let { if (yesterday) it.minusDays(1) else it }
         val from = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val to = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        // 读不出来不能装成「这一天什么都没有」
+        // A failed read must not masquerade as "nothing came in that day"
         val view = source.read(from, to) ?: return fail("notices_unavailable",
             "The notification record could not be read just now (it may have just been turned off, or the store is busy). This does not mean nothing came in: tell the user it could not be read.")
-        // App 的名字是那个 App 自己起的:收一遍再给(见 NoticeFilter.appName)
+        // The app name is whatever that app calls itself: sanitize it before returning (see NoticeFilter.appName)
         fun label(pkg: String) = NoticeFilter.appName(source.appLabel(pkg), pkg)
         fun wanted(pkg: String) = app == null || pkg.equals(app, ignoreCase = true) || source.appLabel(pkg).contains(app, ignoreCase = true) || NoticeFilter.appName(app).let { it.isNotEmpty() && label(pkg).contains(it, ignoreCase = true) }
         fun time(ms: Long) = TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
@@ -101,10 +101,10 @@ internal object NoticesRead : AgentTool {
 
         return ToolExecution(okObj {
             put("day", if (yesterday) "yesterday" else "today")
-            // 记录是从什么时候开始的:更早的、锁屏期间没留在通知栏里的,这里没有
+            // When the record starts: nothing earlier, and nothing that was not left in the notification shade while the screen was locked, is here
             put("recordedSince", STAMP.format(Instant.ofEpochMilli(view.sinceMs).atZone(zone)))
             if (view.sinceMs > from) put("incomplete", true)
-            // 有通知、但来源档位不够格没给出来的 App:只说有几个
+            // Apps that had notifications but were withheld because their source tier does not qualify: only the count is reported
             if (view.withheldApps > 0) put("appsWithheld", view.withheldApps)
             if (!messages) {
                 put("apps", JsonArray(entries.groupBy { it.packageName }.map { (pkg, list) ->
@@ -119,7 +119,7 @@ internal object NoticesRead : AgentTool {
                     page += n
                     chars += size
                 }
-                // 分段归纳那份这会儿读不出来:下面是空的,但不是「没有」
+                // The section digests cannot be read at the moment: what follows is empty, but not "there are none"
                 if (view.notesUnavailable) put("notesUnavailable", true)
                 put("notesTotal", notes.size)
                 put("notes", JsonArray(page.mapIndexed { i, n ->
@@ -165,16 +165,16 @@ internal object NoticesRead : AgentTool {
     private val DAY = DateTimeFormatter.ISO_LOCAL_DATE
     private val MONTH = DateTimeFormatter.ofPattern("yyyy-MM", Locale.ENGLISH)
 
-    /** 存着的各天(各周、各月)的归纳:一句一项,新的那份在前,同一份里按原来的次序;分页、筛选和原文一样。 */
+    /** Stored daily (weekly, monthly) digests: one sentence per item, newest digest first, original order within a digest; paging and filtering work as with the raw text. */
     private suspend fun digests(source: NoticeSource, viewName: String, level: DigestLevel, app: String?, query: String?, offset: Int): ToolExecution {
         val got = source.digests(level) ?: return fail("notices_unavailable",
             "The stored digests could not be read just now (they may have just been turned off, or the store is busy). This does not mean there are none: tell the user they could not be read.")
         val zone = source.zone
-        // App 的名字是那个 App 自己起的:收一遍再给(见 NoticeFilter.appName)
+        // The app name is whatever that app calls itself: sanitize it before returning (see NoticeFilter.appName)
         fun label(pkg: String) = NoticeFilter.appName(source.appLabel(pkg), pkg)
         fun wanted(pkg: String) = app == null || pkg.equals(app, ignoreCase = true) || source.appLabel(pkg).contains(app, ignoreCase = true) || NoticeFilter.appName(app).let { it.isNotEmpty() && label(pkg).contains(it, ignoreCase = true) }
         fun date(day: Long) = DAY.format(LocalDate.ofEpochDay(day))
-        // 这一份管的是哪几天:日期是我们自己写的。月归纳管的是结束在这个月的那几周,和日历上的月份差几天,所以两样都写
+        // Which days this digest covers: the dates are our own. A monthly digest covers the weeks that end within that month, which differ from the calendar month by a few days, so both are given
         fun period(d: DigestView) = when (level) {
             DigestLevel.Day -> date(d.start)
             DigestLevel.Week -> "${date(d.start)} to ${date(d.end)}"
@@ -193,7 +193,7 @@ internal object NoticesRead : AgentTool {
         }
         return ToolExecution(okObj {
             put("view", viewName)
-            // 存着几份(不管筛没筛):一份都没有和「筛完没有」要分得清
+            // How many digests are stored (regardless of filtering): "none stored" and "none after filtering" must be distinguishable
             put("stored", got.digests.size)
             if (got.withheldLines > 0) put("linesWithheld", got.withheldLines)
             put("total", hits.size)
@@ -201,9 +201,9 @@ internal object NoticesRead : AgentTool {
                 buildJsonObject {
                     put("n", offset + i)
                     put("period", period(d))
-                    // 那段时间还没过完时做的:只到做的那一刻为止
+                    // Made before that period was over: it covers only up to the moment it was made
                     if (d.partial) put("soFarAsOf", STAMP.format(Instant.ofEpochMilli(d.madeAtMs).atZone(zone)))
-                    // 做这一份时有几句放不下、没看到:这一份没有照着那段时间的全部写
+                    // Some sentences did not fit or were not seen when this digest was made: it was not written from everything in that period
                     if (d.leftOut > 0) put("inputsLeftOut", d.leftOut)
                     put("apps", JsonArray(l.apps.map { JsonPrimitive(label(it)) }))
                     put("text", untrusted(l.text, TEXT_CHARS))

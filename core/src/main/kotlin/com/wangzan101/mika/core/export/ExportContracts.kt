@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.export
 
 /**
- * 一次导出的选择:对话编号、勾了哪些消息块、内容选项。
- * [allSelected] 为真时 [blocks] 不参与判断(默认全选);空集且 [allSelected] 为假表示什么也不要。
+ * The choices for one export: conversation id, which message blocks are checked, and content options.
+ * When [allSelected] is true, [blocks] is not consulted (everything is selected by default); an empty set with [allSelected] false means nothing at all.
  */
 data class ExportSelection(
     val conversationId: String,
@@ -13,7 +13,7 @@ data class ExportSelection(
 @JvmInline
 value class ExportBlockId(val value: String)
 
-/** 消息块的稳定编号;对话是追加写的,轮次和插话位置在存下来以后都不再变。 */
+/** Stable ids of message blocks; the conversation is append-only, so turn numbers and steer positions never change after being stored. */
 object ExportIds {
     fun user(turn: Int) = ExportBlockId("u$turn")
     fun steer(turn: Int, index: Int) = ExportBlockId("m$turn-$index")
@@ -28,7 +28,7 @@ enum class ExportCapability {
     Preview, Share, Paging, Streaming, Background, RequiresActivity,
 }
 
-/** 用户能看到的格式;同一个 [id] 可以注册多个后端引擎。 */
+/** A format visible to the user; multiple backend engines may be registered under the same [id]. */
 data class ExportFormat(
     val id: String,
     val nameKey: String,
@@ -72,14 +72,14 @@ data class ExportWarning(val code: String, val detail: String)
 
 enum class AssetKind { Image, File, UserScreen }
 
-/** 平台无关的资产来源;由 app 侧的 [ExportAssetReader] 打开。 */
+/** Platform-independent asset source; opened by [ExportAssetReader] on the app side. */
 sealed interface AssetRequest {
     data class Workspace(val path: String) : AssetRequest
     data class UserScreen(val screenId: String) : AssetRequest
     data class ContentUri(val uri: String) : AssetRequest
 }
 
-/** 只带元数据,不把字节放进 AST。 */
+/** Metadata only; bytes are not put into the AST. */
 data class ExportAsset(
     val id: String,
     val kind: AssetKind,

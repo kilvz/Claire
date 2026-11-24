@@ -34,22 +34,22 @@ import java.util.Locale
 const val HISTORY_READ = "history_read"
 
 /**
- * 查这个对话之前几轮的记录:不带 turn 列出之前的轮次(新的在前:第几轮、用户说了什么、结局、时刻),
- * 带 turn 读那一轮记下的东西(完整结局、验收与已确认进度、Claire 的进度说明、读到的原文),按条分页。
- * 只认本次运行开局带来的那几轮([com.wangzan101.mika.core.run.RunSpec.priorTurns],同一个对话),只读;
- * 原文取自运行记录(落盘时已脱敏、截短),不带截图。读到的原文作为观察交给核查,回答里可以引用。
- * 只在给了运行记录、而之前有记过运行的轮次时提供。
+ * Reads records of earlier turns of this conversation: without turn, lists the earlier turns (newest first: turn number, what the user said, outcome, time);
+ * with turn, reads what was recorded for that turn (full outcome, acceptance and confirmed progress, Claire's progress notes, text that was read), paginated item by item.
+ * Only the turns brought in at the start of this run are recognized ([com.wangzan101.mika.core.run.RunSpec.priorTurns], same conversation), and access is read-only;
+ * the text comes from the run record (already redacted and truncated when written to disk), without screenshots. The text that is read is handed to verification as observations and may be quoted in the answer.
+ * Offered only when a run record is available and there are earlier turns with a recorded run.
  */
 internal object HistoryRead : AgentTool {
-    /** 列表最多列几轮(新的在前)。 */
+    /** Maximum number of turns listed (newest first). */
     const val LIST_MAX = 20
-    /** 一页里各条原文加起来大约多少字(至少给一条)。 */
+    /** Roughly how many characters of item text fit in one page (at least one item is always given). */
     const val PAGE_CHARS = 8_000
-    /** 一条原文最多留多少字。 */
+    /** Maximum number of characters kept per text item. */
     const val ITEM_CHARS = 2_000
-    /** 读一轮时结局最多留多少字。 */
+    /** Maximum number of characters kept for the outcome when reading a turn. */
     const val OUTCOME_CHARS = 3_000
-    /** 列表里用户原话、结局各留多少字。 */
+    /** Characters kept for the user's words and the outcome in the list. */
     private const val GIST_CHARS = 200
 
     private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ENGLISH)
@@ -134,21 +134,21 @@ internal object HistoryRead : AgentTool {
                 if (next < items.size) put("nextOffset", next)
             }
         }
-        // 读到的原文交给核查:回答里用到之前几轮读到的东西时有据可查(出处另记为 history,不指回当时的画面)
+        // The text read is handed to verification, so using things read in earlier turns in the answer is traceable (the source is recorded separately as history and does not point back to the screen at that time)
         val observations = page.mapNotNull { item ->
             item.obsKind?.let { Observation(it, item.text, source = SOURCE, title = item.where, trust = if (item.untrusted) Trust.Untrusted else Trust.Trusted) }
         }
         return ToolExecution(content, observations = observations)
     }
 
-    /** 记录里一条可读的东西:验收/进度、Claire 的进度说明(note),或读到的原文(观察的种类)。 */
+    /** One readable thing from the record: acceptance/progress, Claire's progress note, or text that was read (the observation kind). */
     private class Item(val kind: String, val text: String, val where: String?, val untrusted: Boolean, val obsKind: ObsKind?)
 
     private fun items(events: List<RunEvent>): List<Item> {
         val seen = mutableSetOf<String>()
         return events.mapNotNull { e ->
             when (e) {
-                // 不带调用的回复就是那一轮的回答,已经在 outcome 里
+                // A reply without a tool call is that turn's answer and is already in outcome
                 is RunEvent.ModelReply -> e.text.trim().takeIf { e.acted && e.tool != null && it.isNotEmpty() && seen.add(it) }
                     ?.let { Item(NOTE, clip(it, ITEM_CHARS), null, false, null) }
                 is RunEvent.Observed -> e.text.trim().takeIf { it.isNotEmpty() && seen.add(it) }?.let {
@@ -183,16 +183,16 @@ internal object HistoryRead : AgentTool {
     private fun clip(s: String, max: Int) = if (s.length <= max) s else s.take(max - 1) + "…"
 
     /**
-     * 一轮的结果。通知提醒那一轮([NoticeTurn])列的是别的 App、别人写的字:套上不可信标记再给,并标上 [NOTICE]——
-     * 模型据此知道这一轮不是用户说的;记运行记录时据此不记它的内容([com.wangzan101.mika.core.run.record.Redactor.result])。
+     * The result of a turn. For a notification-reminder turn ([NoticeTurn]) the listed text was written by another app and another person: it is wrapped in the untrusted marker before being returned and marked with [NOTICE] —
+     * so the model knows this turn was not said by the user, and so the run record does not record its content ([com.wangzan101.mika.core.run.record.Redactor.result]).
      */
     private fun outcome(t: Turn, max: Int): String = clip(t.outcome, max).let { if (NoticeTurn.isNotice(t)) NoticeTurn.untrusted(it) else it }
 
-    /** 读记录出错当没有:查不到不影响任务。 */
+    /** A failed record read is treated as absent: not finding it does not affect the task. */
     private suspend fun <T> safe(fallback: T, read: suspend () -> T): T =
         try { read() } catch (e: CancellationException) { throw e } catch (e: Exception) { fallback }
 
-    /** 结果里标「这一轮是通知提醒」的字段。 */
+    /** The field in the result marking "this turn is a notification reminder". */
     const val NOTICE = "notice"
     private const val NOTE = "note"
     private const val PROGRESS = "progress"

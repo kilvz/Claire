@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.general
 
 import com.wangzan101.mika.core.tool.AgentTool
 
-/** 通用工具(不属于哪块屏):等待、回看、问用户、确认、交给用户、处理障碍、没办成就结束、查读知识与技能、按用户要求写下技能、记忆、查这个对话之前几轮的记录。按发给模型的顺序。 */
+/** General tools (not tied to any screen): wait, look back, ask the user, request confirmation, hand over to the user, handle obstacles, end when not done, search and read knowledge and skills, save a skill at the user's request, memory, and reading records of earlier turns of this conversation. In the order sent to the model. */
 internal object GeneralGroup {
     val tools: List<AgentTool> = listOf(
         Wait, ViewPastScreens, ViewUserScreen, AskUser, RequestConfirmation, HandToUser, HandleObstacle, EndNotDone,

@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.export
 
 /**
- * 导出文档里给人看的文字。core 取不到 Android 资源,由 app 用当前语言构造后传进来;
- * JSON 后端尽量不用这些标签,保持机器可读的稳定英文键。
+ * Human-readable text in the exported document. core cannot access Android resources, so the app builds it in the current language and passes it in;
+ * JSON backends avoid these labels where possible, keeping stable machine-readable English keys.
  */
 data class ExportLabels(
     val user: String,
@@ -30,7 +30,7 @@ data class ExportLabels(
     val step: String,
 ) {
     companion object {
-        /** 测试和没有本地化时的英文兜底。 */
+        /** English fallback for tests and when there is no localization. */
         val English = ExportLabels(
             user = "User", mika = "Claire", steer = "Message during the task", answer = "Answer",
             toolSteps = "Tool steps", attachments = "Attachments", screens = "Screenshots", files = "Files",

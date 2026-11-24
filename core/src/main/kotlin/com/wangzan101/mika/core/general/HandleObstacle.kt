@@ -14,7 +14,7 @@ import com.wangzan101.mika.core.tool.ok
 import com.wangzan101.mika.core.tool.str
 import kotlinx.serialization.json.put
 
-/** 说出挡住当前 App 或网页的是什么,拿到该怎么处理的下一步。 */
+/** State what is blocking the current app or web page, and get the next step for how to handle it. */
 internal object HandleObstacle : SurfaceAware {
     override val verb = Verb.HandleObstacle
     override val label = "遇到障碍"

@@ -21,7 +21,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 机器可读的导出;块类型和字段名保持稳定英文,不随界面语言变化。 */
+/** Machine-readable export; block types and field names stay stable English and do not change with the UI language. */
 class JsonExportBackend : ExportBackend {
     override val descriptor = ExportDescriptor(
         id = "core-json",

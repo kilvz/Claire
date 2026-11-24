@@ -9,8 +9,8 @@ import com.wangzan101.mika.core.screen.user.UserScreenMessage
 import java.util.Locale
 
 /**
- * 把对话、运行记录和资产解析成与渲染无关的 [ExportDocument]。
- * 内容过滤只在这里做一次:后端拿到的就是最终要导出的内容。
+ * Resolves conversations, run records and assets into a render-independent [ExportDocument].
+ * Content filtering happens only once, here: backends receive exactly the content to be exported.
  */
 class ExportDocumentBuilder(
     private val source: ExportSource,
@@ -161,7 +161,7 @@ class ExportDocumentBuilder(
         return asset
     }
 
-    /** 失败/取消的原因已经放在 outcome 里,正文不重复;成功的回答和未核实的回答保留原文。 */
+    /** The reason for failure/cancellation is already in outcome, so the body does not repeat it; successful and unverified answers keep the original text. */
     private fun answerMarkdown(turn: ExportTurnRecord): String = when (turn.status) {
         "failed", "cancelled" -> ""
         else -> turn.outcome
@@ -188,7 +188,7 @@ class ExportDocumentBuilder(
         val attachments: List<Pair<String, String>>,
     )
 
-    /** 组合消息按 网页来源 → 引用 → 屏幕 → 附件 → 正文 的顺序拆,后面的解析只看剩下的字。 */
+    /** A composite message is split in the order page source → quote → screens → attachments → body; later parses only look at the remaining text. */
     private fun parseMessage(raw: String): ParsedMessage {
         var text = raw
         val page = AttachedPage.parse(text).let { p -> p.page?.also { text = p.words } }

@@ -21,7 +21,7 @@ import com.wangzan101.mika.core.tool.str
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 做不成、问用户或交给用户的工具:结果里带给循环的 [Outcome]。 */
+/** Tools for failing, asking the user, or handing over to the user: the result carries an [Outcome] for the loop. */
 internal object EndNotDone : AgentTool {
     override val verb = Verb.EndNotDone
     override val label = "说明没办成的原因"
@@ -65,7 +65,7 @@ internal object AskUser : AgentTool {
     }
 }
 
-/** 交给用户亲手操作屏幕;要过锁屏关卡(用户要在屏上操作)。 */
+/** Hands the screen over to the user to operate in person; has to pass the lock-screen gate (the user must act on the screen). */
 internal object HandToUser : SurfaceAware {
     override val verb = Verb.HandToUser
     override val label = "请你接手"
@@ -86,9 +86,9 @@ internal object HandToUser : SurfaceAware {
         val r = TAKEOVER_REASON_ALIASES[raw] ?: raw
         if (r !in TAKEOVER_REASONS) throw ArgError("reason", "must be one of ${TAKEOVER_REASONS.joinToString("|")}")
         val m = a.str("message", max = 1000)!!
-        // 付款:模型没写的项用之前被拒的付款申报里的
+        // Payment: fields the model did not write are taken from the previously rejected payment declaration
         val declared = ctx.refusedPay.takeIf { r == "payment" }
-        // 只给紧接着的那次付款接管用,之后无关的付款不串用
+        // Used only for the payment hand-over immediately following; unrelated later payments do not reuse it
         if (declared != null) ctx.refusedPay = null
         val item = a.str("item", max = 10000)?.let(::capField) ?: declared?.content
         val amount = a.str("amount", max = 10000)?.let(::capField) ?: declared?.amount

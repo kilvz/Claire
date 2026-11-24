@@ -3,8 +3,8 @@ package com.wangzan101.mika.core.export
 import com.wangzan101.mika.core.run.record.Redactor
 
 /**
- * 导出前脱敏。密钥样式永远按运行记录那套规则处理([Redactor.text]);
- * 手机号、邮箱、私有路径只在用户选 [RedactionLevel.SecretsAndPii] 时处理,避免默认误伤正文。
+ * Redaction before export. Secret patterns are always handled by the run-record rules ([Redactor.text]);
+ * phone numbers, emails and private paths are handled only when the user chooses [RedactionLevel.SecretsAndPii], so that body text is not damaged by default.
  */
 object ExportRedactor {
     private const val MASK = "***"

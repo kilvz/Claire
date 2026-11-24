@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.export
 
 import java.io.InputStream
 
-/** 快照输入:app 侧把对话文件、运行记录和工作区资产映射成这几类记录。 */
+/** Snapshot input: the app side maps conversation files, run records and workspace assets into these record types. */
 interface ExportSource {
     suspend fun turns(conversationId: String): List<ExportTurnRecord>
     suspend fun run(runId: String): ExportRunRecord?
@@ -30,7 +30,7 @@ data class ExportRunRecord(
     val steps: List<ToolStep>,
 )
 
-/** 渲染时按需打开资产字节;core 测试用内存实现。 */
+/** Opens asset bytes on demand while rendering; core tests use an in-memory implementation. */
 interface ExportAssetReader {
     suspend fun open(asset: ExportAsset): InputStream?
 }

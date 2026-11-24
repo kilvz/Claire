@@ -8,11 +8,11 @@ import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** 暂存目录与最终包之间的那一步:清单、校验和、zip。 */
+/** The step between the staging directory and the final package: manifest, checksums, zip. */
 object ExportPackage {
     const val MANIFEST = "manifest.json"
 
-    /** 暂存目录里除清单以外的条目,按路径排序;链接不跟着走。 */
+    /** Entries in the staging directory other than the manifest, sorted by path; links are not followed. */
     fun contentEntries(root: File): List<ManifestEntry> = files(root)
         .filter { it.relativeTo(root).invariantSeparatorsPath != MANIFEST }
         .map { file ->
@@ -25,7 +25,7 @@ object ExportPackage {
         File(root, MANIFEST).writeText(ExportManifestJson.encode(manifest))
     }
 
-    /** 暂存目录整个打成 zip;清单必须已经写好。 */
+    /** Zips the whole staging directory; the manifest must already be written. */
     fun zip(root: File, out: File) {
         out.parentFile?.mkdirs()
         ZipOutputStream(BufferedOutputStream(FileOutputStream(out))).use { zip ->
@@ -38,7 +38,7 @@ object ExportPackage {
         }
     }
 
-    /** 单文件输出:暂存里除清单外只有一个文件时复制它。 */
+    /** Single-file output: copies the one file in staging when it is the only entry besides the manifest. */
     fun copySingle(root: File, out: File): Boolean {
         val single = files(root).filter { it.relativeTo(root).invariantSeparatorsPath != MANIFEST }
         if (single.size != 1) return false
@@ -60,7 +60,7 @@ object ExportPackage {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    /** 只收普通文件;符号链接不跟,目录不递归进去再绕回来。 */
+    /** Collects regular files only; symbolic links are not followed, and directories are not recursed into to loop back. */
     private fun files(root: File): List<File> {
         if (!root.isDirectory) return emptyList()
         return root.walkTopDown()

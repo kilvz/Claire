@@ -13,7 +13,7 @@ data class ExportProgress(
     val bytesWritten: Long = 0,
 )
 
-/** 后端往暂存目录里写条目;路径由 [ExportNames.entryPath] 校验。 */
+/** A backend writes entries into the staging directory; paths are validated by [ExportNames.entryPath]. */
 interface ExportSink {
     fun open(path: String): OutputStream
 }
@@ -39,7 +39,7 @@ interface ExportBackend {
     )
 }
 
-/** 用户按格式选,运行时按后端跑;同一 formatId 可以有多个引擎。 */
+/** The user picks by format, and the runtime runs by backend; the same formatId may have multiple engines. */
 class ExportRegistry(
     private val formats: List<ExportFormat>,
     private val backends: List<ExportBackend>,

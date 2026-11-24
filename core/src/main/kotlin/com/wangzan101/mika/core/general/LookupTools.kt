@@ -27,7 +27,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 查 App 与网站知识;只读目录,有目录才提供。 */
+/** Looks up app and website knowledge; reads the catalog only, and is offered only when a catalog exists. */
 internal object KnowledgeSearch : AgentTool {
     override val verb = Verb.KnowledgeSearch
     override val label = "查找 App/网站知识"
@@ -51,7 +51,7 @@ internal object KnowledgeSearch : AgentTool {
     }
 }
 
-/** 查技能(内置技能与用户在用的个人技能);只读目录,有目录才提供。 */
+/** Looks up skills (built-in skills and the personal skills the user is using); reads the catalog only, and is offered only when a catalog exists. */
 internal object SkillSearch : AgentTool {
     override val verb = Verb.SkillSearch
     override val label = "查找技能"
@@ -65,7 +65,7 @@ internal object SkillSearch : AgentTool {
         matches(ctx, a.str("query", max = 200)!!, null, SKILL_KINDS)
 }
 
-/** 读 App 或网站知识的正文或附件。 */
+/** Reads the body or attachments of app or website knowledge. */
 internal object KnowledgeRead : AgentTool {
     override val verb = Verb.KnowledgeRead
     override val label = "查看 App/网站知识"
@@ -83,7 +83,7 @@ internal object KnowledgeRead : AgentTool {
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution = read(a, ctx, KNOWLEDGE_KINDS)
 }
 
-/** 读技能的正文或附件,含用户的个人技能。 */
+/** Reads the body or attachments of a skill, including the user's personal skills. */
 internal object SkillRead : AgentTool {
     override val verb = Verb.SkillRead
     override val label = "查看技能"
@@ -124,15 +124,15 @@ private suspend fun read(a: Args, ctx: ToolContext, among: Set<String>): ToolExe
     return when (val v = catalog.view(name, file, toolsNote(runner?.offered() == true), among)) {
         is GuideView.Failed -> fail(v.error, v.message)
         is GuideView.Found -> {
-            // 能跑脚本时列出这一条带的脚本和此刻能不能跑;scriptSource 是跑脚本时 source 要填的值
-            // 个人技能只有文字;插件技能走插件自己的工具,不走 run_bundled_script
+            // When scripts can be run, list the scripts this entry ships and whether each can be run right now; scriptSource is the value to put in source when running a script
+            // Personal skills are text only; plugin skills go through the plugin's own tools, not run_bundled_script
             val dir = if (v.info.kind == PERSONAL_KIND || v.info.kind == PLUGIN_KIND) "" else catalog.scriptSource(v.info)
             val scripts = if (ready && dir.isNotEmpty()) runner!!.scripts(dir) else emptyList()
             ok {
                 put("name", v.info.name); put("kind", v.info.kind); put("file", v.file)
                 put("content", v.content); put("truncated", v.truncated)
                 put("files", JsonArray(v.info.files.map(::JsonPrimitive)))
-                // 个人技能的版本号:改写它(skill_save)时带上,中途被别处改过就对不上
+                // Version of a personal skill: pass it along when rewriting it (skill_save); if it was changed elsewhere in the meantime, the version will not match
                 if (v.info.kind == PERSONAL_KIND && v.file == v.info.files.firstOrNull())
                     ctx.config.personalSkills?.get(v.info.name)?.let { put("version", PersonalSkills.version(it.markdown)) }
                 if (scripts.isNotEmpty()) {
