@@ -22,7 +22,7 @@ internal object HandleObstacle : SurfaceAware {
     override val withScreens = true
     override val def = ToolDef("handle_obstacle",
         Prompts.tool("handle_obstacle"),
-        mapOf("kind" to str("What is in the way: popup = a promotion, guide or update dialog that can be closed; login = a sign-in wall; captcha = a human-verification puzzle; access_blocked = the app or site is limiting access (操作频繁, 环境异常, or a verification that keeps coming back); payment = paying, entering a password or an identity check.", BARRIER_KINDS),
+        mapOf("kind" to str("What is in the way: popup = a promotion, guide or update dialog that can be closed; login = a sign-in wall; captcha = a human-verification puzzle; access_blocked = the app or site is limiting access ("too many requests", "unusual environment", or a verification that keeps coming back); payment = paying, entering a password or an identity check.", BARRIER_KINDS),
             "reason" to str("What on the screen shows it.")),
         listOf("kind"))
 

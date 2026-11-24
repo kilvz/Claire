@@ -1,5 +1,5 @@
-# 预先编译清单:安装后系统按它把这些代码提前编译成机器码,第一次进各个页面就不用边解释边跑。
-# 界面库自带清单,这里只补 Mika 自己的代码:启动和各个页面(Application、界面、设置、对话存储)。
+# Ahead-of-time compile list: after installation the system uses it to compile this code to machine code in advance, so the first visit to each screen does not have to run interpreted.
+# The UI libraries ship their own list; this one only adds Mika's own code: startup and the various screens (Application, UI, settings, conversation storage).
 HSPLcom/wangzan101/mika/MikaApp;->**(**)**
 HSPLcom/wangzan101/mika/ui/**;->**(**)**
 HSPLcom/wangzan101/mika/settings/**;->**(**)**

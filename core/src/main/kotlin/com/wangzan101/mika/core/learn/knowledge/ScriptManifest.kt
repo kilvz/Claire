@@ -14,7 +14,7 @@ data class ScriptEntry(val file: String, val runnable: Boolean, val needs: List<
  * run_bundled_script, knowledge_read and skill_read all treat it as the source of truth.
  */
 object ScriptManifest {
-    const val NEEDS_NETWORK = "needs network access: the user can turn on \"Allow scripts to go online\" (允许脚本联网) in Claire's settings"
+    const val NEEDS_NETWORK = "needs network access: the user can turn on \"Allow scripts to go online\" in Claire's settings"
     private val json = Json { ignoreUnknownKeys = true }
     private val INTERPRETERS = mapOf("py" to "/usr/bin/python3", "mjs" to "/usr/bin/node", "js" to "/usr/bin/node", "sh" to "/bin/sh")
 

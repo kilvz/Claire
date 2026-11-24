@@ -103,7 +103,7 @@ internal object MemorySave : AgentTool {
         Prompts.tool("memory_save"),
         mapOf(
             "kind" to str("fact = about the user, preference = what the user likes, procedure = how the user wants a kind of task done.", listOf("fact", "preference", "procedure")),
-            "content" to str("One sentence in the third person, at most 200 characters, e.g. 用户点外卖不要香菜."),
+            "content" to str("One sentence in the third person, at most 200 characters, e.g. The user does not want cilantro in takeout orders."),
             "quote" to str("The user's exact words this is based on."),
             "keywords" to buildJsonObject {
                 put("type", "array"); put("description", "Optional, up to 8 search words incl. synonyms.")
