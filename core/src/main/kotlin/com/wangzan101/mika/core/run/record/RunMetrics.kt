@@ -4,26 +4,26 @@ import com.wangzan101.mika.core.model.usage.DeepSeekCost
 import kotlinx.serialization.Serializable
 
 /**
- * 一次运行的小结,全部由运行记录里的事件算出(纯函数,见 [of]),落盘后不随事件清理而丢(见 [RunMetricsStore])。
- * 时间都从 [RunEvent.TaskStarted] 算起:之前的准备(载入知识、连手机)不计。
+ * Summary of one run, computed entirely from the events in the run record (a pure function, see [of]); once persisted it is not lost when events are pruned (see [RunMetricsStore]).
+ * All times are measured from [RunEvent.TaskStarted]: earlier preparation (loading knowledge, connecting the phone) is not counted.
  *
- * - [totalMs]:开始到 [RunEvent.TaskEnded];没结束的([ended] 为 false)到最后一个事件。
- * - [firstFeedbackMs]:开始到用户第一次看到这次运行的实际进展——最早一条真执行了的模型回复到手([RunEvent.ModelReply.repliedAtMs],
- *   旧记录用它的 [RunEvent.atMs]):这时界面显示它的进度说明、要做的事或回答;或最早一条活动(回放不经模型时,第一步做完)。
- *   改派掉的轻量模型回复不算(用户看不到);回答逐段显示时第一段字会更早,没记录,不算。两样都没有为 null。
- * - [modelCalls]:模型回复事件数,即主循环的请求次数(含改派掉的轻量模型回复,[lightCalls] 是其中轻量模型的);
- *   [callsWithoutUsage] 是其中服务商没报用量的。token 是这些回复的用量之和([inputTokens] 含 [cachedTokens])。
- * - [allCalls] 等:运行期间经计量的全部外层逻辑调用([RunEvent.ModelCalls],含旁路调用和外层重试);
- *   [allHttpCalls] 是实际 HTTP 请求数(另含适配器内部重发),旧记录没有这项时为 null。
- * - [modelMs]:各次回复的请求耗时之和(最后一次请求发出到收完);之前失败的请求和退避另记在 [retryWaitMs]。
- * - [observeMs] / [actMs]:顶层工具调用(模型直接调的、回放的)的执行耗时,按执行入口给活动定的种类分:风险为只读的是读
- *   (读屏、读网页、列元素、截图、查资料……),其余是操作(点、输入、滑、打开 App……)。一批动作、页面脚本的外层调用里,
- *   子步中的读计入读、其余计入操作,不重复计;没有活动的控制类调用(等待、问用户、请确认、交给用户、说做不成)不算读也不算操作。
- *   [uiWaitMs] 是等界面的时间:单个工具里端口等界面稳定的部分(端口能报时才有,仍算在那次读或操作里),
- *   加上一批动作里各步做完后按条件等界面的时间——后者和单独调等待工具一样不算操作,落在 [otherMs] 里。
- * - [otherMs]:总时长减模型、读、操作,剩下的是等用户、重试退避、控制类调用、核查与其他开销。
- * - [steps]:主循环走到第几轮(真执行了的回复里最大的步号);[observeCalls] / [actCalls] 是读、操作各做了几次(含子步)。
- * - [outcome]:[RunEvent.TaskEnded.outcome],没结束为 unfinished;[failKind] 是失败的类别;[judged] 是交出回答后另判的结局。
+ * - [totalMs]: from start to [RunEvent.TaskEnded]; for an unfinished run ([ended] false) up to the last event.
+ * - [firstFeedbackMs]: from start until the user first saw real progress of this run — the earliest model reply that was actually executed arriving ([RunEvent.ModelReply.repliedAtMs],
+ *   or its [RunEvent.atMs] in old records): from then on the UI shows its progress description, the action to take or the answer; or the earliest activity (when replaying without the model, the first step is done).
+ *   Dispatched-away light model replies do not count (users cannot see them); when the answer is shown paragraph by paragraph the first characters appear earlier, but that is not recorded and does not count. Null when neither exists.
+ * - [modelCalls]: the number of model reply events, i.e. the main loop's request count (including dispatched-away light model replies; [lightCalls] is how many of them were light-model ones);
+ *   [callsWithoutUsage] is how many of them had no usage reported by the provider. The tokens are the sum of these replies' usage ([inputTokens] includes [cachedTokens]).
+ * - [allCalls] etc.: all metered outer logical calls during the run ([RunEvent.ModelCalls], including side calls and outer retries);
+ *   [allHttpCalls] is the number of actual HTTP requests (plus resends inside the adapter), null in old records that lack this field.
+ * - [modelMs]: the sum of request time over the replies (from the last request being sent until the reply was fully received); earlier failed requests and backoff are recorded separately in [retryWaitMs].
+ * - [observeMs] / [actMs]: execution time of top-level tool calls (those the model calls directly and those from replay), split by the activity kind assigned at the execution entry point: read-only risk counts as observe
+ *   (reading the screen, reading web pages, listing elements, screenshots, looking things up, …), everything else counts as act (tap, type, swipe, opening apps, …). For the outer call of a batch of actions or a page script,
+ *   reads in the sub-steps count as observe and the rest as act, with no double counting; control calls that have no activity (waiting, asking the user, requesting confirmation, handing to the user, saying it cannot be done) count as neither observe nor act.
+ *   [uiWaitMs] is time spent waiting on the UI: the part of a single tool's time spent inside the port waiting for the UI to settle (only when the port can report it; it still counts inside that observe or act),
+ *   plus time spent in a batch waiting on the UI conditionally after each step is done — the latter, like calling the wait tool on its own, does not count as act and lands in [otherMs].
+ * - [otherMs]: total duration minus model, observe and act; the remainder is waiting for the user, retry backoff, control calls, verification and other overhead.
+ * - [steps]: how many rounds the main loop reached (the largest step number among replies that were actually executed); [observeCalls] / [actCalls] are how many observe and act calls were made (including sub-steps).
+ * - [outcome]: [RunEvent.TaskEnded.outcome], unfinished when the run did not end; [failKind] is the failure category; [judged] is the outcome judged separately after the answer was handed over.
  */
 @Serializable
 data class RunMetrics(
@@ -58,15 +58,15 @@ data class RunMetrics(
 ) {
     val otherMs: Long get() = (totalMs - modelMs - observeMs - actMs).coerceAtLeast(0)
 
-    /** 输入加输出(缓存命中含在输入里)。 */
+    /** Input plus output (cache hits are included in input). */
     val tokens: Long get() = inputTokens + outputTokens
 
-    /** 办成了:报了成功(含没能核实的),交出回答后也没判成只办了一部分或办不到。 */
+    /** Succeeded: it reported success (including success that could not be verified), and the judgment after handing over the answer did not find it only partly done or impossible. */
     val succeeded: Boolean get() = outcome in SUCCESS && judged !in NOT_DONE
 
     /**
-     * 按事件顺序累计;[build] 随时可调。运行记录的写线程用它边写边算,不必在收尾时重读整份记录。
-     * 只留每个工具结果的几项数字,不留原文。
+     * Accumulates in event order; [build] may be called at any time. The run record's writer thread uses it to compute while writing, without re-reading the whole record at wrap-up.
+     * Only a few numbers per tool result are kept, never the original text.
      */
     class Builder(private val runId: String = "") {
         private class Tool(val step: Int, val source: String, val callId: String?, val durationMs: Long, val waitMs: Long)
@@ -88,7 +88,7 @@ data class RunMetrics(
         private var steps = 0
         private var judged: String? = null
         private val tools = mutableListOf<Tool>()
-        /** (来源, 步, 调用 id) → 活动种类(observe / act)。 */
+        /** (source, step, call id) → activity kind (observe / act). */
         private val kinds = HashMap<Triple<String, Int, String?>, String>()
 
         fun add(e: RunEvent) {
@@ -125,7 +125,7 @@ data class RunMetrics(
             if (firstFeedback == null || at < firstFeedback!!) firstFeedback = at
         }
 
-        /** 没有开始事件(记录开了却没跑起来)时为 null。 */
+        /** Null when there is no start event (the record was opened but the run never got going). */
         fun build(): RunMetrics? {
             val start = started ?: return null
             val end = ended
@@ -136,13 +136,13 @@ data class RunMetrics(
             for (t in top) {
                 val kind = kindOf(t)
                 val inner = nested.filter { it.step == t.step }
-                // 外层调用的耗时已含子步:子步里的读计入读,余下的算操作
+                // The outer call's duration already includes its sub-steps: reads in sub-steps count as observe, the remainder counts as act
                 val innerObserve = inner.filter { kindOf(it) == OBSERVE }.sumOf { it.durationMs }.coerceAtMost(t.durationMs)
                 when {
                     kind == OBSERVE -> observe += t.durationMs
-                    // 外层调用记的 waitMs 是子步之后按条件等界面的时间,不在子步里,也不算操作
+                    // The waitMs recorded on the outer call is conditional UI waiting after the sub-steps; it is not inside the sub-steps and does not count as act
                     inner.isNotEmpty() -> { observe += innerObserve; act += (t.durationMs - innerObserve - t.waitMs).coerceAtLeast(0) }
-                    // 为节奏补的停留(waitMs)算等待,不算操作
+                    // Pauses added for pacing (waitMs) count as waiting, not as act
                     kind != null -> act += (t.durationMs - t.waitMs).coerceAtLeast(0)
                     else -> Unit
                 }
@@ -187,19 +187,19 @@ data class RunMetrics(
         private const val OBSERVE = "observe"
         private const val ACT = "act"
         private const val ROLE_LIGHT = "light"
-        /** 包在外层调用里的子步:一批动作里的一步、页面脚本里的一个动作。 */
+        /** Sub-steps wrapped inside an outer call: one step of a batch of actions, one action of a page script. */
         private val NESTED = setOf("batch", "script")
         private val SUCCESS = setOf("succeeded", "unverified")
         private val NOT_DONE = setOf("partial", "not_possible")
 
-        /** 一次运行的小结;没有开始事件时为 null。 */
+        /** The summary of one run; null when there is no start event. */
         fun of(events: List<RunEvent>, runId: String = ""): RunMetrics? = Builder(runId).apply { events.forEach(::add) }.build()
     }
 }
 
 /**
- * 多次运行的汇总([of]):办成率、用时与第一次反馈的中位数、平均来回次数与 token,以及时间的去向(各项之和占总时长之和)。
- * 第一次反馈只在有这一项的运行里取中位数;一次都没有为 null。
+ * Aggregate over multiple runs ([of]): success rate, median duration and first feedback, average round trips and tokens, and where the time went (each part's sum as a share of the total duration sum).
+ * The first feedback median is taken only over runs that have this figure; null when no run has it.
  */
 data class RunStats(
     val runs: Int,
@@ -231,7 +231,7 @@ data class RunStats(
             otherMs = runs.sumOf { it.otherMs },
         )
 
-        /** 中位数;偶数个取中间两个的平均(向下取整)。空表为 null。 */
+        /** Median; for an even count, the average of the two middle values (rounded down). Null for an empty list. */
         fun median(xs: List<Long>): Long? {
             if (xs.isEmpty()) return null
             val s = xs.sorted()

@@ -1,17 +1,17 @@
 package com.wangzan101.mika.core.run.record
 
 /**
- * 一个对话里各轮合起来用了多少 token,按每轮的运行小结([RunMetrics])算,口径和「查看过程」顶上那一行同一个
- * ([RunMetrics.tokens]:主循环每次回复报的输入加输出)。
+ * How many tokens all turns of one conversation used together, computed from each turn's run summary ([RunMetrics]); the same
+ * measure as the line at the top of "view process" ([RunMetrics.tokens]: input plus output reported by each main-loop reply).
  *
- * [missing] 是没算全的轮次:小结还没写好、旧到被清掉了(只留最近 [RunMetricsStore.DEFAULT_KEEP] 份),
- * 或有的回复服务商没报用量;这时界面写「至少」,不估算。
+ * [missing] counts the turns that are not fully accounted for: the summary is not written yet, it was old enough to be pruned (only the most recent [RunMetricsStore.DEFAULT_KEEP] are kept),
+ * or some replies had no usage reported by the provider; the UI then says "at least" instead of estimating.
  */
 data class ConversationTokens(val tokens: Long, val turns: Int, val missing: Int) {
     val partial: Boolean get() = missing > 0
 
     companion object {
-        /** 一轮的 token;没有小结、或一个也没报(全是 0)时为 null,界面不写「0 Token」。 */
+        /** Tokens for one turn; null when there is no summary, or when nothing at all was reported (all zeros), so the UI does not write "0 Token". */
         fun turn(m: RunMetrics?, includeSideCalls: Boolean = false): Long? {
             m ?: return null
             val input = m.allInputTokens
@@ -20,7 +20,7 @@ data class ConversationTokens(val tokens: Long, val turns: Int, val missing: Int
             return tokens.takeIf { it > 0 }
         }
 
-        /** [runIds] 是这个对话里已经结束的各轮(同一个只算一次);一个数也没有时为 null,界面不显示。 */
+        /** [runIds] are the finished turns of this conversation (a repeated id counts once); null when there is not a single number, so the UI shows nothing. */
         fun of(runIds: List<String>, metrics: Map<String, RunMetrics>): ConversationTokens? {
             val ids = runIds.distinct()
             var sum = 0L

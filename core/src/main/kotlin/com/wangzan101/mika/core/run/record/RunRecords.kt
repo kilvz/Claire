@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.run.record
 
 /**
- * 读已经存下的运行记录(只读):概要(run.json)和事件(events.jsonl)。记录落盘时已脱敏、截短,读出来原样给。
- * 记录已被清掉、编号不认识或读不出时返回 null / 空表,不抛异常。由 app 一侧按落盘的记录实现。
+ * Reads run records that are already stored (read-only): the summary (run.json) and the events (events.jsonl). Records are already redacted and truncated when written, so they are returned as they are.
+ * Returns null / an empty list when the record has been pruned, the id is unknown or it cannot be read; it never throws. Implemented on the app side against the records written to disk.
  */
 interface RunRecords {
     suspend fun summary(runId: String): RunSummary?

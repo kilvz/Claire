@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlin.math.roundToInt
 
-/** 截图上的标记，坐标沿用工具的 0–999；元素位置与滚动方向示意不声称是实际触点。 */
+/** A mark drawn on a screenshot; coordinates follow the tools' 0–999 scheme. Element positions and scroll-direction hints do not claim to be the actual touch points. */
 @Serializable
 data class PlaybackMark(val kind: String, val x: Int, val y: Int, val endX: Int? = null, val endY: Int? = null, val approximate: Boolean = false) {
     fun valid(): Boolean = x in 0..999 && y in 0..999 && when (kind) {
@@ -50,5 +50,5 @@ data class PlaybackMark(val kind: String, val x: Int, val y: Int, val endX: Int?
     }
 }
 
-/** 只供本地记录的图像，不进入模型请求或工具结果 JSON。 */
+/** Images for the local record only; they never enter model requests or tool result JSON. */
 class PlaybackCapture(val before: ByteArray?, val after: ByteArray?, val mark: PlaybackMark?)

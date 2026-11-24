@@ -5,7 +5,7 @@ import com.wangzan101.mika.core.tool.HandBack
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** 运行中的输入唯一入口;用户原话无限排队且逐字保留,停止信号直接送达。 */
+/** The single entry point for input during a run; the user's own words queue without limit and are kept verbatim, while stop signals are delivered directly. */
 class RunInbox {
     data class UserSteer(val messageId: String, val text: String, val currentTaskOnly: Boolean = false)
 
@@ -22,10 +22,10 @@ class RunInbox {
     @Volatile private var closed = false
     @Volatile private var stopRequested = false
     private var remaining: List<UserSteer> = emptyList()
-    /** 每句插话都唤醒正在等待的模型请求(撤掉它,带着这句话重问);正在执行的工具不受影响。 */
+    /** Every steer wakes the model request that is waiting (cancels it and asks again with this message); a tool that is executing is unaffected. */
     internal val redirects = Channel<Unit>(Channel.CONFLATED)
     private val pending = MutableStateFlow(false)
-    /** 有插话还没交给模型:撤掉也不丢东西的等待据此提前结束(见 [waitOrSteer])。 */
+    /** A steer has not been handed to the model yet: waits that lose nothing when cancelled end early because of it (see [waitOrSteer]). */
     val signal = SteerSignal(pending)
 
     internal fun bind(to: Handler) {
@@ -45,7 +45,7 @@ class RunInbox {
         return InputReceipt.Accepted
     }
 
-    /** 远程追加只属于当前任务;与关闭、取消互斥,拒绝时不转成下一任务。 */
+    /** A remote append belongs to the current task only; it is mutually exclusive with closing and cancellation, and when rejected it does not turn into the next task. */
     fun steerCurrent(messageId: String, text: String): InputReceipt = synchronized(lock) {
         if (closed || stopRequested) InputReceipt.Closed
         else enqueue(UserSteer(messageId, text, currentTaskOnly = true))
@@ -74,7 +74,7 @@ class RunInbox {
         return InputReceipt.Accepted
     }
 
-    /** 只撤回还在收件箱里、手机上插的消息;和交给模型、收尾互斥。电脑追加的([UserSteer.currentTaskOnly])撤不回,由电脑那边定。 */
+    /** Withdraws only messages still in the inbox that were inserted on the phone; mutually exclusive with handing to the model and with wrap-up. What the desktop appended ([UserSteer.currentTaskOnly]) cannot be withdrawn and is decided on the desktop side. */
     fun withdrawSteer(id: String): Boolean = synchronized(lock) {
         val i = steers.indexOfFirst { it.messageId == id }
         if (closed || i < 0 || steers[i].currentTaskOnly) return@synchronized false
@@ -84,10 +84,10 @@ class RunInbox {
         true
     }
 
-    /** 有没有还没交给模型的插话;只看不取(批量执行在子步之间据此停下)。 */
+    /** Whether there is a steer not yet handed to the model; peeks without taking (batch execution stops between sub-steps based on it). */
     fun hasSteers(): Boolean = synchronized(lock) { steers.isNotEmpty() }
 
-    /** 只在模型调用之前或一批工具完成之后取;清除已不再需要的 redirect 唤醒。 */
+    /** Taken only before a model call or after a batch of tools completes; clears redirect wake-ups that are no longer needed. */
     internal fun takeSteers(): List<UserSteer> = synchronized(lock) {
         val out = steers.toList()
         steers.clear()
@@ -96,7 +96,7 @@ class RunInbox {
         out
     }
 
-    /** 收尾以后还没消费的插话交给宿主作为下一任务。 */
+    /** Steers not yet consumed at wrap-up are handed to the host as the next task. */
     internal fun close(): List<UserSteer> = synchronized(lock) {
         if (closed) return@synchronized remaining
         closed = true
@@ -108,8 +108,8 @@ class RunInbox {
     }
 
     /**
-     * 要交出回答、就此收尾时调用:还有没交给模型的插话就不关(返回 false,调用方带着它接着做);
-     * 没有就关上(返回 true),此后的插话才成为下一任务。看和关在同一把锁里,中间插不进话。
+     * Called when handing over the answer and wrapping up: if there is still a steer not handed to the model, it does not close (returns false, and the caller carries on with it);
+     * otherwise it closes (returns true) and only later steers become the next task. The check and the close are in the same lock, so no message can slip in between.
      */
     internal fun closeUnlessSteered(): Boolean = synchronized(lock) {
         if (steers.isNotEmpty()) return@synchronized false
@@ -119,7 +119,7 @@ class RunInbox {
 
     fun nextTaskMessages(): List<UserSteer> = synchronized(lock) { remaining.toList() }
 
-    /** 宿主收尾或取消尚未开跑的任务时，把未消费的用户原话交给下一个任务。 */
+    /** When the host wraps up or cancels a task that has not started running, hands the unconsumed user words to the next task. */
     fun handoffUnconsumed(): List<UserSteer> = synchronized(lock) {
         close()
         remaining.also { remaining = emptyList() }

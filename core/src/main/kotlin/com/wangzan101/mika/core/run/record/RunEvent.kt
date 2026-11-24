@@ -12,12 +12,12 @@ import com.wangzan101.mika.core.screen.observation.Observation
 import com.wangzan101.mika.core.screen.observation.Place
 import com.wangzan101.mika.core.screen.observation.Trust
 
-/** 运行记录里的一个事件;落盘为 events.jsonl 的一行,`type` 字段区分种类。 */
+/** One event in a run record; persisted as one line of events.jsonl, with the `type` field distinguishing the kinds. */
 @Serializable
 sealed interface RunEvent {
     val atMs: Long
 
-    /** 一次已执行屏幕动作的前后帧。缺图保留 null，不拿邻近截图冒充；与路线重新执行无关。 */
+    /** The before and after frames of an executed screen action. A missing image stays null rather than being faked with a nearby screenshot; unrelated to re-executing a route. */
     @Serializable @SerialName("task_playback")
     data class TaskPlayback(
         override val atMs: Long, val step: Int, val tool: String, val callId: String,
@@ -25,24 +25,24 @@ sealed interface RunEvent {
         val succeeded: Boolean = true, val source: String = "model",
     ) : RunEvent
 
-    /** [origin] 是谁发起的这次运行(`RunOrigin` 的小写名);手机上发起的不写。两个预算不限制时都为 null。 */
+    /** [origin] is who started this run (lowercase name of `RunOrigin`); not written for runs started on the phone. Both budgets are null when unlimited. */
     @Serializable @SerialName("task_started")
     data class TaskStarted(
         override val atMs: Long, val goal: String, val model: String,
         val origin: String? = null, val stepLimit: Int? = null, val tokenBudget: Long? = null,
     ) : RunEvent
 
-    /** 本任务发给模型的系统提示词与工具定义的摘要([com.wangzan101.mika.core.prompt.PromptVersion])。 */
+    /** Digest of the system prompt and tool definitions this task sent to the model ([com.wangzan101.mika.core.prompt.PromptVersion]). */
     @Serializable @SerialName("prompt_version")
     data class PromptVersion(override val atMs: Long, val hash: String) : RunEvent
 
-    /** 数量或边界进度;总数未知时 [total] 为 null,[boundary] 是最新确认的位置、日期或条目。 */
+    /** Count or boundary progress; [total] is null when the total is unknown, and [boundary] is the latest confirmed position, date or item. */
     @Serializable
     data class Progress(val name: String, val done: Int? = null, val total: Int? = null, val boundary: String? = null)
 
     /**
-     * [fallback] 表示没能列出标准,[criteria] 只是用户原话。执行中的进度更新也复用这个事件:
-     * [progress] 是最近确认的数量/边界,[complete] 表示全部判据已满足或数量到达,主循环据此收尾。
+     * [fallback] means the criteria could not be listed and [criteria] is only the user's own words. In-flight progress updates reuse this event too:
+     * [progress] is the latest confirmed count/boundary and [complete] means all criteria are satisfied or the count has been reached, which the main loop uses to wrap up.
      */
     @Serializable @SerialName("criteria")
     data class Criteria(
@@ -56,7 +56,7 @@ sealed interface RunEvent {
         val confirmedIds: Set<Int>? = null,
     ) : RunEvent
 
-    /** [tool]/[argsJson] 是本轮实际执行的那一个调用;参数已脱敏。 */
+    /** [tool]/[argsJson] is the single call actually executed in this round; the arguments are already redacted. */
     @Serializable @SerialName("model_reply")
     data class ModelReply(
         override val atMs: Long,
@@ -67,27 +67,27 @@ sealed interface RunEvent {
         val inputTokens: Int?,
         val outputTokens: Int?,
         val cachedTokens: Int?,
-        /** 最后一次发请求到收完回复;之前失败的请求和退避另记在 [retryWaitMs]。 */
+        /** From the last request being sent until the reply was fully received; earlier failed requests and backoff are recorded separately in [retryWaitMs]. */
         val latencyMs: Long = 0,
-        /** 本次调用实际用的模型;null = 主模型。 */
+        /** The model actually used for this call; null = the main model. */
         val model: String? = null,
-        /** 大小模型分工起作用时:main / light / light_rejected(轻量模型的回复没执行,改问了主模型);否则 null。 */
+        /** When the main/light model split is in effect: main / light / light_rejected (the light model's reply was not executed and the main model was asked instead); otherwise null. */
         val role: String? = null,
-        /** 实际回答的成员属于哪个模型组;单模型为 null。 */
+        /** Which model group the member that actually answered belongs to; null for a single model. */
         val group: String? = null,
-        /** 重试前花掉的时间:失败的那几次请求加退避等待。 */
+        /** Time spent before retrying: the failed requests plus backoff waiting. */
         val retryWaitMs: Long = 0,
         /**
-         * 回复到手的时刻:界面上这一步的说明、要做的事或回答从这时显示出来(带调用的回复执行完才记,[atMs] 比它晚)。
-         * 改派掉的轻量模型回复和旧记录里没有。
+         * The moment the reply arrived: the step's description, the action to take or the answer starts being shown in the UI from this point (a reply that carries a call is recorded only after it has been executed, so [atMs] is later than this).
+         * Not present for dispatched-away light model replies or in old records.
          */
         val repliedAtMs: Long? = null,
     ) : RunEvent {
-        /** 这次回复真的驱动了这一步(改派掉的轻量模型回复不算)。 */
+        /** Whether this reply really drove this step (dispatched-away light model replies do not count). */
         val acted: Boolean get() = role != "light_rejected"
     }
 
-    /** [resultJson] 含守卫结论,整条记下;只有超过 [MAX_RESULT] 字才截短并留标记。 */
+    /** [resultJson] includes the guard verdict and is recorded in full; it is truncated with a marker only when it exceeds [MAX_RESULT] characters. */
     @Serializable @SerialName("tool_result")
     data class ToolResult(
         override val atMs: Long,
@@ -96,28 +96,28 @@ sealed interface RunEvent {
         val resultJson: String,
         val changed: Boolean?,
         val screenshotId: Int?,
-        /** 工具执行耗时,含端口内等界面稳定;不含等用户(确认、追问、接管)。 */
+        /** Tool execution time, including waiting inside the port for the UI to settle; excluding waiting for the user (confirmation, follow-up questions, takeover). */
         val durationMs: Long = 0,
-        /** 其中等界面稳定的部分(端口能报时才有值),以及为节奏有意停下的时间(网页一页没看够就换页时补的停留)。 */
+        /** The part of it spent waiting for the UI to settle (a value only when the port can report it), plus time deliberately paused for pacing (an extra pause when flipping to the next page before the current one has been seen long enough). */
         val waitMs: Long = 0,
-        /** model | batch | replay | script(web_script 里的动作) */
+        /** model | batch | replay | script (an action inside web_script) */
         val source: String = "model",
-        /** 模型这次调用的 id;路线据此把动作和它的结果配对。 */
+        /** The id of this model call; routes use it to pair an action with its result. */
         val callId: String? = null,
     ) : RunEvent
 
-    /** 回放路线走到第 [step]/[total] 步;[matched] 为 false 表示在此交还给模型。 */
+    /** Replaying a route, now at step [step]/[total]; [matched] false means control is handed back to the model here. */
     @Serializable @SerialName("replay")
     data class Replay(override val atMs: Long, val routeId: String, val step: Int, val total: Int, val matched: Boolean, val detail: String) : RunEvent
 
-    /** 一批动作走到第 [step]/[total] 步;[stopped] 时 [reason] 说明为何停在这里。 */
+    /** A batch of actions is at step [step]/[total]; when [stopped], [reason] says why it stopped here. */
     @Serializable @SerialName("batch")
     data class Batch(override val atMs: Long, val step: Int, val total: Int, val stopped: Boolean, val reason: String?) : RunEvent
 
     /**
-     * 一次写操作当时的目标元素与前后锚点(工具结果截短后元素列表不全,路线靠它);[argsJson] 已脱敏。
-     * [effective]:ok 且界面变了,或输入回读一致,或启动成功。[callId] 与同一调用的 [ToolResult.callId] 相同;
-     * [protected]:动作前那一屏受系统防截屏保护。
+     * The target element and the before/after anchors of a write action at that time (the element list is incomplete after the tool result was truncated, so routes rely on it); [argsJson] is already redacted.
+     * [effective]: ok and the UI changed, or the typed input reads back the same, or the launch succeeded. [callId] is the same as [ToolResult.callId] of the same call;
+     * [protected]: the screen before the action was protected by the system's screenshot block.
      */
     @Serializable @SerialName("action_target")
     data class ActionTarget(
@@ -133,22 +133,22 @@ sealed interface RunEvent {
         val protected: Boolean = false,
         /** model | batch */
         val source: String = "model",
-        /** 取不到这一步的目标和锚点(批里的子步);路线不能缺步,整条不记。 */
+        /** The target and anchors of this step could not be obtained (a sub-step inside a batch); a route cannot have missing steps, so nothing is recorded at all. */
         val incomplete: Boolean = false,
     ) : RunEvent
 
     /**
-     * 存下了一帧画面(可视化用:回看、来源里的截图):第 [step] 步的第 [mediaId] 张,[place] 是那时在哪(包名或「网站 域名」)。
-     * 旧记录里是 screen_saved(读取时换成这一种)。
+     * A saved screen frame (for visualization: review, screenshots in sources): image number [mediaId] of step [step], with [place] being where it was at the time (package name, or "site domain").
+     * In old records this is screen_saved (converted to this kind on read).
      */
     @Serializable @SerialName("media")
     data class Media(override val atMs: Long, val mediaId: Int, val step: Int, val place: String?) : RunEvent
 
     /**
-     * 记进证据账本的一条观察(见 [com.wangzan101.mika.core.screen.observation.Observation]):原文已脱敏、截短,和运行时账本里那一条一样,
-     * 评测据此原样重建账本。[id] 是账本里的编号(回答的来源按它指回);[kind] 是观察的种类,[source] 是给出它的能力。
-     * [inputs]、[focused] 是那时输入框里的字(分辨输入框回显用;读页面内容时为 null)。
-     * 旧记录里是 screen_text(只记读界面与整页正文,读取时换成这一种,[id] 为 0)。
+     * An observation recorded in the evidence ledger (see [com.wangzan101.mika.core.screen.observation.Observation]): the text is already redacted and truncated, identical to the entry in the runtime ledger,
+     * so evaluation rebuilds the ledger from it verbatim. [id] is the id in the ledger (answer sources point back with it); [kind] is the observation kind and [source] the capability that produced it.
+     * [inputs] and [focused] are the text that was in the input fields at the time (used to tell input-field echoes apart; null when reading page content).
+     * In old records this is screen_text (which recorded only screen reads and full-page text, converted to this kind on read with [id] 0).
      */
     @Serializable @SerialName("observed")
     data class Observed(
@@ -156,18 +156,18 @@ sealed interface RunEvent {
         val source: String? = null, val place: Place? = null, val title: String? = null,
         val inputs: List<String>? = null, val focused: String? = null, val untrusted: Boolean = false,
     ) : RunEvent {
-        /** 换回一条观察。 */
+        /** Converts back into an observation. */
         fun observation() = Observation(ObsKind.ofWire(kind) ?: ObsKind.Read, text, source, place, title,
             trust = if (untrusted) Trust.Untrusted else Trust.Trusted, inputs = inputs?.let { InputHints(it, focused) }, step = step, atMs = atMs, id = id)
 
         companion object {
-            /** 账本里记下的一条观察。 */
+            /** An observation recorded in the ledger. */
             fun of(o: Observation) = Observed(o.atMs, o.step, o.text, o.id, o.kind.wire, o.source, o.place, o.title,
                 o.inputs?.names, o.inputs?.focused, o.trust == Trust.Untrusted)
         }
     }
 
-    /** 一次实际工具调用的进度。读取类可合并展示,动作类逐条展示;[obsIds] 指向这一步读到的原文,[title] 是读到的那一页的标题。 */
+    /** Progress of one actual tool call. Read-type calls may be shown merged, action-type ones one by one; [obsIds] point to the text read in this step and [title] is the title of the page that was read. */
     @Serializable @SerialName("activity")
     data class Activity(
         override val atMs: Long,
@@ -180,11 +180,11 @@ sealed interface RunEvent {
         val source: String = "model",
         val callId: String? = null,
         val title: String? = null,
-        /** 这次调用没成功([effect] 是错误码,只给开发看)。 */
+        /** This call did not succeed ([effect] is an error code, shown to developers only). */
         val failed: Boolean = false,
-        /** 不可逆判定认出这是一次对外动作(发送、提交);停止后交代做了什么时按它数发出了几次。 */
+        /** The irreversible-action check recognized this as an outward action (send, submit); when explaining afterwards what was done after a stop, it is used to count how many were sent. */
         val outward: Boolean = false,
-        /** 这次调用走过的外部 MCP 连接器(配置里的名字);没走 MCP 为 null。 */
+        /** The external MCP connector this call went through (the name from configuration); null when MCP was not used. */
         val mcpConnector: String? = null,
     ) : RunEvent
 
@@ -202,8 +202,8 @@ sealed interface RunEvent {
     ) : RunEvent
 
     /**
-     * 一次对外、不可逆或要花钱的动作的审批结论(代码判的,不是模型自述)。[source] 是谁发起的(model / batch / script / replay);
-     * [payment] 为 true 时这一步要花钱(询问时只有它要用户同意);[decision] allowed / required / mismatch / denied。
+     * The approval verdict for an outward, irreversible or money-spending action (decided by code, not self-reported by the model). [source] is who started it (model / batch / script / replay);
+     * [payment] true means this step costs money (when asking, only it requires the user's consent); [decision] is allowed / required / mismatch / denied.
      */
     @Serializable @SerialName("approval")
     data class Approval(
@@ -218,49 +218,49 @@ sealed interface RunEvent {
     data class Barrier(override val atMs: Long, val kind: String) : RunEvent
 
     /**
-     * 最终回答的字面核对(第 [step] 步的回答):[claims] 是回答里可核对的事实数,[unmatched] 是在读到的材料里找不到的那几处;
-     * [outward] 表示本任务做过对外或不可逆的事(因此另请了核查模型)。
+     * Literal check of the final answer (the answer of step [step]): [claims] is the number of checkable facts in the answer, and [unmatched] are the ones not found in the material that was read;
+     * [outward] means this task did something outward or irreversible (and a verification model was therefore called in separately).
      */
     @Serializable @SerialName("answer_check")
     data class AnswerCheck(override val atMs: Long, val step: Int, val claims: Int, val unmatched: List<String>, val outward: Boolean = false) : RunEvent
 
-    /** 交出的回答里退回一次后仍没对上、标成未确认的几处。 */
+    /** The few spots in the handed-over answer that still did not match after being returned once and were marked unconfirmed. */
     @Serializable @SerialName("unconfirmed")
     data class Unconfirmed(override val atMs: Long, val step: Int, val items: List<String>) : RunEvent
 
-    /** 代码从证据账本里找到的回答来源(App 或网页、第几步、那一步的截图);界面上的「来源」用它。 */
+    /** Answer sources that code found in the evidence ledger (app or web page, which step, the screenshot of that step); the "Sources" UI uses it. */
     @Serializable @SerialName("sources")
     data class Sources(override val atMs: Long, val items: List<com.wangzan101.mika.core.safety.verify.AnswerSource>) : RunEvent
 
-    /** [step]:核查的是哪一步的最终回答(旧记录里是 finish 调用;这条事件可能记在那次回复之前,也可能在之后);旧记录没有。 */
+    /** [step]: which step's final answer was verified (in old records this was the finish call; this event may be recorded before or after that reply); absent in old records. */
     @Serializable @SerialName("verifier")
     data class Verifier(override val atMs: Long, val verdict: String, val detailJson: String, val step: Int? = null) : RunEvent
 
-    /** 本任务记忆块里实际列出的条目(代码记录,不是模型自述)。 */
+    /** The items actually listed in this task's memory block (recorded by code, not self-reported by the model). */
     @Serializable @SerialName("memory_used")
     data class MemoryUsed(override val atMs: Long, val ids: List<String>) : RunEvent
 
-    /** Agent 用 memory_save 存下了一条;[status] 为 active / pending。 */
+    /** The agent saved one item with memory_save; [status] is active / pending. */
     @Serializable @SerialName("memory_saved")
     data class MemorySaved(override val atMs: Long, val id: String, val kind: String, val status: String) : RunEvent
 
-    /** 用到的个人技能:[how] = viewed(Agent 用 skill_read 看了它);旧记录里还有 injected(以前任务开始注入了全文),读时一样算用到。 */
+    /** A personal skill that was used: [how] = viewed (the agent looked at it with skill_read); old records also have injected (the full text used to be injected at task start), which counts as used on read as well. */
     @Serializable @SerialName("skill_used")
     data class SkillUsed(override val atMs: Long, val name: String, val how: String) : RunEvent
 
     @Serializable @SerialName("compressed")
     data class Compressed(override val atMs: Long, val foldedSteps: Int) : RunEvent
 
-    /** [outcome]:succeeded / unverified / failed / cancelled / error;[kind] 是失败的类别(FailKind 的小写名),其余为 null,旧记录没有。 */
+    /** [outcome]: succeeded / unverified / failed / cancelled / error; [kind] is the failure category (lowercase name of FailKind), null otherwise, and absent in old records. */
     @Serializable @SerialName("task_ended")
     data class TaskEnded(override val atMs: Long, val outcome: String, val answerOrReason: String, val kind: String? = null) : RunEvent
 
     /**
-     * 本次运行期间经计量的模型调用合计(见 [com.wangzan101.mika.core.model.usage.RunUsageTally])。
-     * [calls] 是外层逻辑调用数,包含意图判断、核查、看图、压缩等旁路调用和外层失败重试;
-     * [httpCalls] 是实际交给 HTTP 客户端的推理请求数,另含适配器内部的兼容重发。旧记录没有这项,不能由 [calls] 反推。
-     * [unreported] / [httpUnreported] 分别是没报用量的逻辑调用数、没有对应最终用量的实际请求数,不估算失败请求的 token。
-     * 收尾时记一条,在 [TaskEnded] 之后;交出回答后的结局判定、记忆提取不在其中(Token 用量页都算)。
+     * Totals of metered model calls during this run (see [com.wangzan101.mika.core.model.usage.RunUsageTally]).
+     * [calls] is the number of outer logical calls, including side calls for intent detection, verification, image reading, compression and so on, plus outer-level failure retries;
+     * [httpCalls] is the number of inference requests actually handed to the HTTP client, plus compatibility resends inside the adapter. Old records lack this field and it cannot be inferred from [calls].
+     * [unreported] / [httpUnreported] are, respectively, the number of logical calls with no reported usage and the number of actual requests with no corresponding final usage; tokens for failed requests are not estimated.
+     * One is recorded at wrap-up, after [TaskEnded]; judging the outcome after the answer was handed over and memory extraction are not included (the Token Usage page counts them both).
      */
     @Serializable @SerialName("model_calls")
     data class ModelCalls(
@@ -270,8 +270,8 @@ sealed interface RunEvent {
     ) : RunEvent
 
     /**
-     * 回答交给用户之后,另请模型按用户要的结果给这次运行判的结局(见 [com.wangzan101.mika.core.agent.OutcomeJudge]):
-     * [outcome] 为 done / partial / not_possible / unknown(没判成);[reason] 一句话说缺了什么。记在 [TaskEnded] 之后;旧记录没有。
+     * After the answer is handed to the user, a separately invoked model judges how this run turned out against the result the user wanted (see [com.wangzan101.mika.core.agent.OutcomeJudge]):
+     * [outcome] is done / partial / not_possible / unknown (judging failed); [reason] says in one sentence what was missing. Recorded after [TaskEnded]; absent in old records.
      */
     @Serializable @SerialName("outcome")
     data class OutcomeJudged(override val atMs: Long, val outcome: String, val reason: String = "", val model: String? = null) : RunEvent
@@ -279,17 +279,17 @@ sealed interface RunEvent {
     companion object {
         const val MAX_FIELD = 2000
 
-        /** 工具结果的上限:远大于一屏元素列表,只为挡住异常大的输出撑爆记录文件和内存。 */
+        /** Upper bound for a tool result: far larger than one screen's element list, it only guards against abnormally large output blowing up the record file and memory. */
         const val MAX_RESULT = 100_000
 
         val json = Json { classDiscriminator = "type"; ignoreUnknownKeys = true }
 
         fun encode(e: RunEvent): String = json.encodeToString(serializer(), e)
 
-        /** 一行记录;改名前的事件(screen_text、screen_saved)先换成现在的写法再读。 */
+        /** One record line; events from before the rename (screen_text, screen_saved) are converted to their current shape before reading. */
         fun decode(line: String): RunEvent = json.decodeFromJsonElement(serializer(), LegacyEvents.upgrade(json.parseToJsonElement(line)))
 
-        /** 运行记录里写的地方:App 是包名,站点是「网站 域名」(和以往的记录同一写法)。 */
+        /** The place written into run records: an app is its package name, a site is "site domain" (the same form as in past records). */
         fun placeLabel(p: Place?): String? = p?.let { if (it.kind == com.wangzan101.mika.core.screen.observation.PlaceKind.Site) "网站 ${it.name}" else it.name }
 
         fun clip(s: String): String = if (s.length <= MAX_FIELD) s else s.take(MAX_FIELD) + "…(已截短)"
@@ -299,7 +299,7 @@ sealed interface RunEvent {
     }
 }
 
-/** run.json 的内容:一次运行的概要,由事件累计而来。 */
+/** The contents of run.json: a summary of one run, accumulated from events. */
 @Serializable
 data class RunSummary(
     val id: String,
@@ -311,18 +311,18 @@ data class RunSummary(
     val answerOrReason: String? = null,
     val criteria: List<String> = emptyList(),
     val verdict: String? = null,
-    /** 交出回答后判的结局([RunEvent.OutcomeJudged.outcome]);没判过(失败、取消、旧记录)为 null。 */
+    /** The outcome judged after the answer was handed over ([RunEvent.OutcomeJudged.outcome]); null when it was never judged (failed, cancelled, old record). */
     val judged: String? = null,
     val steps: Int = 0,
-    /** 这次运行的步数上限(见 [RunEvent.TaskStarted.stepLimit]);旧记录或不限制为 null。 */
+    /** The step limit of this run (see [RunEvent.TaskStarted.stepLimit]); null in old records or when unlimited. */
     val stepLimit: Int? = null,
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
     val cachedTokens: Int = 0,
-    /** 谁发起的(见 [RunEvent.TaskStarted.origin]);手机上发起的为空。 */
+    /** Who started it (see [RunEvent.TaskStarted.origin]); empty for runs started on the phone. */
     val origin: String? = null,
 ) {
-    /** 把一个事件计入概要。 */
+    /** Folds one event into the summary. */
     fun with(e: RunEvent): RunSummary = when (e) {
         is RunEvent.TaskStarted -> copy(model = e.model, origin = e.origin, stepLimit = e.stepLimit)
         is RunEvent.Criteria -> copy(criteria = e.criteria)

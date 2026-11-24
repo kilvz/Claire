@@ -5,9 +5,9 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 /**
- * 一组同生共死的系统资源(虚拟屏、网页显示等):用 [acquire] 建,建好当场登记,[close] 时按登记的反序放掉。
- * 「建完交回调用方再记到字段」中间隔着一次挂起,任务恰在这时取消,建好的东西就没人记得放;登记在建的同一段里做,就没有这个空档。
- * 任意线程可用;每个资源只放一次,[close] 可重复调。
+ * A group of system resources that live and die together (virtual screen, web display, etc.): created with [acquire], registered on the spot once created, and released in reverse registration order by [close].
+ * "Create, hand back to the caller, then record in a field" has a suspension point in between; if the task is cancelled right there, nobody remembers to release what was created. Registering inside the same section as the creation leaves no such gap.
+ * Usable from any thread; each resource is released exactly once and [close] may be called repeatedly.
  */
 class ResourceScope {
     private class Entry(val context: CoroutineContext, val release: () -> Unit)
@@ -17,8 +17,8 @@ class ResourceScope {
     private var closed = false
 
     /**
-     * 在 [context] 里调 [create],建好立即登记,收尾时同样在 [context] 里调 [release]。
-     * 建好之后即使任务被取消(取消在交回时抛出),资源也已归作用域。作用域已关时建出来的立即放掉,并抛 [IllegalStateException]。
+     * Calls [create] in [context], registers the result immediately, and at teardown calls [release] in [context] as well.
+     * Once created, the resource belongs to the scope even if the task is then cancelled (the cancellation is thrown when returning to the caller). If the scope is already closed, whatever was created is released at once and [IllegalStateException] is thrown.
      */
     suspend fun <T> acquire(context: CoroutineContext, release: (T) -> Unit, create: suspend () -> T): T =
         withContext(context) {
@@ -31,7 +31,7 @@ class ResourceScope {
             made
         }
 
-    /** 按登记的反序放掉全部;一个放不掉不影响其余,放完后抛出第一个错误。不受取消打断。 */
+    /** Releases everything in reverse registration order; one failure does not affect the rest, and the first error is thrown after all are released. Not interrupted by cancellation. */
     suspend fun close() {
         val todo = synchronized(lock) {
             closed = true

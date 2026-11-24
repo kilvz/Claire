@@ -13,7 +13,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
-/** 每个运行独立的控制权。接管先等当前屏幕动作结束，交回先等用户输入结束。 */
+/** Control ownership, one per run. A takeover first waits for the current screen action to finish; a hand-back first waits for the user input to finish. */
 class ManualControl {
     enum class State { Automatic, Requesting, Manual, Closed }
     class Interrupted : Exception("The user changed the screen. Read the current screen again before acting.")
@@ -52,7 +52,7 @@ class ManualControl {
         val planned = currentCoroutineContext()[Plan]?.takeIf { it.owner === this }?.version ?: version
         while (true) {
             awaitAutomatic()
-            // 普通任务的父/子动作可以并行。只在切换控制权或改尺寸时排空已开始的动作。
+            // Parent and child actions of a normal task may run in parallel. Only drain actions that have already started when control changes hands or the screen is resized.
             val admitted = ownership.withLock {
                 if (_state.value != State.Automatic) false
                 else { activeActions.update { it + 1 }; true }
@@ -93,12 +93,12 @@ class ManualControl {
         }
     }
 
-    /** 返回 null 表示已失去控制权，不能把旧触点送进后来启动的任务。 */
+    /** Returning null means control has been lost: stale touch points must not be fed into a task started later. */
     suspend fun <T : Any> userInput(block: suspend () -> T): T? = input.withLock {
         if (_state.value != State.Manual) null else block()
     }
 
-    /** 改变屏幕布局时排空自动/人工输入，不改变归属；旧模型计划和观察同时失效。 */
+    /** Drains automatic/manual input when the screen layout changes, without changing ownership; older model plans and observations are invalidated at the same time. */
     suspend fun reconfigure(block: suspend () -> Boolean): Boolean {
         suspend fun resize() = block().also { if (it) version++ }
         while (true) {
@@ -119,7 +119,7 @@ class ManualControl {
     }
 
     suspend fun end(accepted: suspend () -> Boolean = { true }) = input.withLock {
-        // 旧通知和失败的主屏接管请求不应交出当前虚拟屏的控制权。
+        // Stale notifications and failed main-screen takeover requests must not hand over control of the current virtual screen.
         if (accepted() && _state.value == State.Manual) {
             version++
             _state.value = State.Automatic

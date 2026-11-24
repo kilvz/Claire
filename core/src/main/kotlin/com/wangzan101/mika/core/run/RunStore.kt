@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.run
 
-/** 运行状态的最小持久化记录。运行中断后只告知并允许重跑，不从屏幕中途续跑。 */
+/** Minimal persisted record of a run's state. After an interruption a run is only reported and allowed to be re-run, never resumed from the middle of the screen. */
 data class StoredRun(
     val id: RunId,
     val threadId: String,
@@ -11,14 +11,14 @@ data class StoredRun(
     val roundInProgress: Boolean = false,
     val triggerWindowKey: String? = null,
     val runSucceeded: Boolean? = null,
-    /** 非本机任务的回复地址与入站编号；旧记录缺省时仍按本机任务恢复。 */
+    /** Reply address and inbound id for a non-local task; when an old record lacks them it is still restored as a local task. */
     val channelPeer: ChannelPeer? = null,
     val channelMessageId: String? = null,
-    /** 给人看、记进对话的原话;条件检查运行的 [goal] 是生成的检查目标,这里存用户写的条件原文。 */
+    /** The user's own words shown to people and recorded in the conversation; for a condition-check run [goal] is the generated check goal, while this stores the original condition text the user wrote. */
     val userText: String? = null,
-    /** 持久排队项的编号;恢复时据此防止已登记的运行被再次入队执行。 */
+    /** The id of the persisted queue entry; on recovery it is used to prevent a run that is already registered from being enqueued and executed again. */
     val followUpId: String? = null,
-    /** 详细运行记录的编号;进程中断后只读它生成交代,不据此重放工具调用。 */
+    /** The id of the detailed run record; after a process interruption it is only read to produce an account, never to replay tool calls. */
     val recordId: String? = null,
 )
 
@@ -27,7 +27,7 @@ interface RunStore {
     fun get(id: RunId): StoredRun?
     fun all(): List<StoredRun>
 
-    /** 重启时逐个标记中断，不能静默把工具调用再跑一遍。[live] 里是此刻还在跑的运行,不动它们。 */
+    /** Marks runs as interrupted one by one on restart; tool calls must not silently run a second time. [live] holds the runs still running right now, which are left alone. */
     fun interruptUnfinished(live: Set<RunId> = emptySet()): List<StoredRun> {
         val interrupted = all().filter { it.phase != RunPhase.Ended && it.phase != RunPhase.Interrupted && it.id !in live }
         interrupted.forEach { save(it.copy(phase = RunPhase.Interrupted)) }

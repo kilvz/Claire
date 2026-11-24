@@ -8,22 +8,22 @@ import com.wangzan101.mika.core.agent.Turn
     override fun toString(): String = value
 }
 
-/** 一次运行的不可变开局信息。后续步骤会补能力、资源预算与审批快照。 */
+/** The immutable opening information of one run. Later steps add capabilities, resource budgets and approval snapshots. */
 data class RunSpec(
     val id: RunId,
     val goal: String,
     val threadId: String,
     val priorTurns: List<Turn> = emptyList(),
     val provenance: RunProvenance = RunProvenance(),
-    /** null 表示默认能力；子 Run 可给严格子集。 */
+    /** null means the default capabilities; a child Run may provide a strict subset. */
     val capabilities: Set<String>? = null,
-    /** 条件检查 Run 只允许读取；网页导航作为取得读取对象的准备动作例外。 */
+    /** A condition-check Run may only read; web navigation is excepted as a preparatory action for obtaining the object to read. */
     val readOnly: Boolean = false,
     val parent: RunId? = null,
     val stepBudget: Int? = null,
-    /** 主循环、旁路调用和子任务共享的已报告 Token 预算；null 不限制。 */
+    /** The reported-token budget shared by the main loop, side calls and child tasks; null means unlimited. */
     val tokenBudget: Long? = null,
-    /** 由同一批次并行派发的子任务，宿主为它单独分配有状态的资源。 */
+    /** A child task dispatched in parallel by the same batch; the host allocates stateful resources for it separately. */
     val parallelChild: Boolean = false,
 ) {
     init {
@@ -32,14 +32,14 @@ data class RunSpec(
     }
 }
 
-/** 从本次对话送给运行的输入。取消走控制通道,不会等在插话队列里。 */
+/** Input sent to a run from this conversation. Cancellation goes through the control channel and never waits in the steer queue. */
 sealed interface RunInput {
     /**
-     * 插话是补充:撤掉还在等的模型请求,接在已有历史后面重问(做过的一概保留);正在执行的工具照常做完、结果照记,
-     * 撤掉也不丢东西的等待提前结束(见 [waitOrSteer])。
+     * A steer is a supplement: the pending model request is cancelled and asked again after the existing history (everything already done is kept); a tool that is executing finishes as usual and its result is still recorded,
+     * and waits that lose nothing when cancelled end early (see [waitOrSteer]).
      */
     data class Steer(val messageId: String, val text: String) : RunInput
-    /** 和 [Steer] 走同一条路(旧入口的名字)。 */
+    /** Takes the same path as [Steer] (the name of the old entry point). */
     data class Redirect(val messageId: String, val text: String) : RunInput
     data class Answer(val text: String, val askId: String? = null) : RunInput
     data class Confirm(val choice: ConfirmChoice, val askId: String? = null) : RunInput

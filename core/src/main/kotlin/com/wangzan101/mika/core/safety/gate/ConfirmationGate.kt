@@ -9,34 +9,34 @@ import java.math.BigDecimal
 import kotlin.math.abs
 import com.wangzan101.mika.core.tool.Verb
 
-/** 模型申报的一次要花钱的操作;字段已去首尾空白、截短,界面上照此显示。[app] 是包名。 */
+/** A money-spending operation declared by the model; fields are trimmed and truncated, and the UI displays them as they are. [app] is the package name. */
 data class ConfirmationRequest(val action: IrrevAction, val target: String, val content: String, val amount: String?, val app: String)
 
 sealed interface DeclareResult {
-    /** 申报的 App 和前台不一致(或读不到前台),不交给用户。 */
+    /** The declared app does not match the foreground (or the foreground cannot be read), so it is not passed to the user. */
     data object Mismatch : DeclareResult
-    /** 本任务里用户已经拒绝过同一 App 的同类操作,不再问。 */
+    /** The user has already declined the same kind of operation for the same app in this task; do not ask again. */
     data object Declined : DeclareResult
-    /** 付款不走这里,走接管。 */
+    /** Payments do not go this way; they go through takeover. */
     data object Unsupported : DeclareResult
     data object Pending : DeclareResult
 }
 
 sealed interface Permit {
     data object Allowed : Permit
-    /** 没有同意。 */
+    /** No approval. */
     data object NoGrant : Permit
-    /** 有同意,但和这一步对不上(或已过期);这次同意已作废。 */
+    /** There is an approval, but it does not match this step (or has expired); that approval is void. */
     data class Mismatch(val reason: String) : Permit
 }
 
 /**
- * 用户对一次要花钱的操作的同意(询问时只有付款要问):只放行紧接着的那一个匹配操作。
- * 同意绑定申报内容:同一前台 App、同类动作、对象出现在屏上(发送时在标题栏),发送时要发的字与申报相等,
- * 应付上下文里申报的金额在屏上;普通页面上的价格、待遇和区间不是应付金额,不参与核对;
- * 下一次命中的不可逆操作无论对不对得上都用掉它。中间做了打字以外的写操作(包括返回、打开 App)、
- * 或过了 [MAX_STEPS] 步,同意作废。只能同意这一次;只在一次任务内有效,任务开始和结束时 [reset]。
- * 任务循环和界面回答可能在不同线程,读写都加锁。
+ * The user's approval for one money-spending operation (when asking, only payments are asked about): it lets through only the one matching operation that immediately follows.
+ * The approval is bound to the declared content: the same foreground app, the same kind of action, the target shown on the screen (in the title bar for sends), the text to send equal to the declared one,
+ * and the declared amount on screen within the payable context; prices, deals and ranges on ordinary pages are not payable amounts and take no part in the check;
+ * the next irreversible operation that hits consumes it whether it matches or not. If a write operation other than typing happens in between (including back and opening an app),
+ * or more than [MAX_STEPS] steps pass, the approval is void. Only this single occurrence can be approved; it is valid only within one task, and is [reset] at task start and end.
+ * The task loop and the UI answer may be on different threads, so all reads and writes are locked.
  */
 class ConfirmationGate {
     private class Grant(val request: ConfirmationRequest, val step: Int)
@@ -53,12 +53,12 @@ class ConfirmationGate {
         return DeclareResult.Pending
     }
 
-    /** [step] 是回答所在的步数,过期按它算。 */
+    /** [step] is the step number the reply belongs to; expiry is computed from it. */
     fun decide(approved: Boolean, step: Int = 0) {
         decide(if (approved) ConfirmChoice.Once else ConfirmChoice.Deny, step)
     }
 
-    /** 按用户的选择记一次性同意。 */
+    /** Records a one-time approval according to the user's choice. */
     @Synchronized fun decide(choice: ConfirmChoice, step: Int) {
         val req = pending ?: return
         pending = null
@@ -70,9 +70,9 @@ class ConfirmationGate {
     }
 
     /**
-     * [screen] 是此刻的一屏;[typing] 是这一步要输入并回车的文字(type_text 时)。
-     * [seen] 是看图找到的点复看确认过的所见文字:读屏里没有文字(自绘界面)时,对象可以对它核,
-     * 要发的字读不到也就不核(画面上的字核不了)。有同意时不论结果都用掉它。付款永远不放行。
+     * [screen] is the current screen; [typing] is the text to type and enter at this step (for type_text).
+     * [seen] is the visible text confirmed by re-inspecting the point found from the image: when the screen read has no text (a self-drawn UI), the target can be checked against it,
+     * and if the text to send cannot be read it is not checked (text in the image cannot be checked). Whenever there is an approval it is consumed regardless of the result. Payments are never let through.
      */
     @Synchronized fun permits(hit: Irreversible, screen: ScreenSnapshot?, step: Int, typing: String? = null, seen: List<String> = emptyList()): Permit {
         val g = grant ?: return Permit.NoGrant
@@ -92,8 +92,8 @@ class ConfirmationGate {
     }
 
     /**
-     * 不在屏上的一步(工具声明了要问,如会改动东西的 root 命令):同意的就是这一条,申报一字不差才放行。
-     * 有同意时不论结果都用掉它。
+     * A step that is not on the screen (the tool declared that it must ask, e.g. a root command that changes things): the approval is for exactly this request, so it is let through only when it matches the declaration exactly.
+     * Whenever there is an approval it is consumed regardless of the result.
      */
     @Synchronized fun permitsExactly(ask: ConfirmationRequest, step: Int): Permit {
         val g = grant ?: return Permit.NoGrant
@@ -105,23 +105,23 @@ class ConfirmationGate {
         }
     }
 
-    /** 读屏里一个带字的元素都没有(自绘界面、画布)。 */
+    /** The screen read has no element carrying text at all (a self-drawn UI, a canvas). */
     private fun textless(s: ScreenSnapshot) = s.elements.none { it.name.isNotBlank() }
 
-    /** 申报的对象出现在复看确认过的所见文字里(至少两个字)。 */
+    /** The declared target appears in the visible text that re-inspection confirmed (at least two characters). */
     private fun seenShows(r: ConfirmationRequest, seen: List<String>): Boolean {
         val t = norm(r.target).take(MATCH_CHARS)
         return t.length >= 2 && seen.any { t in norm(it) }
     }
 
-    /** 执行了一个写操作:打字和清空输入框不影响同意,其余(点别处、滑动、返回、打开 App)让它作废。 */
-    /** 有一次已同意、还没用掉的操作。 */
+    /** A write operation was executed: typing and clearing input fields do not affect the approval, everything else (tapping elsewhere, swiping, back, opening an app) voids it. */
+    /** There is an approved operation that has not been consumed yet. */
     val hasGrant: Boolean @Synchronized get() = grant != null
 
-    /** 用户同意了、还没被用掉的那次操作;没有为 null。 */
+    /** The operation the user approved and that has not been consumed yet; null when there is none. */
     val granted: ConfirmationRequest? @Synchronized get() = grant?.request
 
-    /** [verb]:刚执行的写操作做的动作;输入、清空不作废同意(同意的就是要输入的这一步)。 */
+    /** [verb]: the action of the write operation just executed; typing and clearing do not void the approval (the approval is for the step that is about to type). */
     @Synchronized fun noteWrite(verb: Verb?) {
         if (verb !in KEEPS_GRANT) grant = null
     }
@@ -133,8 +133,8 @@ class ConfirmationGate {
     }
 
     /**
-     * 对象要在屏上不可编辑的文字里(输入框里打的不算),至少两个字;
-     * 发送时只认屏幕顶部的标题栏(聊天对象的名字在那里),其余动作屏上任何地方都行。
+     * The target must appear in non-editable text on the screen (text typed into input fields does not count), at least two characters;
+     * for sends only the title bar at the top of the screen counts (that is where the chat partner's name is), while for other actions anywhere on the screen will do.
      */
     private fun targetShown(r: ConfirmationRequest, s: ScreenSnapshot): Boolean {
         val t = norm(r.target).take(MATCH_CHARS)
@@ -145,8 +145,8 @@ class ConfirmationGate {
     }
 
     /**
-     * 要发的就是同意的那段话:点发送时某个输入框里的字和它相等,type_text 回车时要输入的字和它相等。
-     * 申报被截短(以 … 结尾)时比前缀。
+     * The text to send must be exactly the approved text: when tapping send, the text in one of the input fields equals it; when type_text presses enter, the text to type equals it.
+     * When the declaration was truncated (ends with …), prefixes are compared.
      */
     private fun contentMatches(content: String, s: ScreenSnapshot, typing: String?): Boolean {
         val capped = content.endsWith("…")
@@ -157,8 +157,8 @@ class ConfirmationGate {
     }
 
     /**
-     * 金额是否参与这次核对,和风险分类使用同一个应付上下文。明确下单、工具声明的金额动作始终要金额;
-     * 普通提交、删除只有屏上有合计或付款面板时才要,避免把页面里的区间或待遇当成付款并反复要权。
+     * Whether the amount takes part in this check; the risk classification uses the same payable context. Explicit ordering and amount actions declared by a tool always require the amount;
+     * an ordinary submit or delete requires it only when the screen shows a total or a payment panel, so that ranges or deals on a page are not mistaken for a payment and approval is not demanded over and over.
      */
     private fun amountBinds(hit: Irreversible, s: ScreenSnapshot): Boolean = when (hit.action) {
         IrrevAction.order, IrrevAction.pay, IrrevAction.other -> true
@@ -167,11 +167,11 @@ class ConfirmationGate {
     }
 
     /**
-     * 申报的金额只和屏上带币种(¥/￥、元、$)的数比:「已售25件」「满25减3」不算;输入框和提示语里的不算;
-     * 紧挨着优惠、减、抵扣、运费、券、红包、已省(或带负号)的金额不算。
-     * 有合计/实付/应付/总计时:可滚动区外的每个合计都要等于申报的金额;都在滚动区里时看离按钮最近的那个;
-     * 合计字样在、金额读不出(同一行后面几段拼起来也读不出)时不放行。
-     * 没有合计时要等于可滚动区之外最大的那个金额。申报里没有数字不放行。
+     * The declared amount is compared only with numbers on the screen that carry a currency (¥, ￥, $, or a trailing yuan unit): "25 sold", "spend 25, save 3" do not count; neither does what is in input fields or hints;
+     * amounts immediately next to discount, minus, deduction, shipping, coupon, red packet or saved (or carrying a minus sign) do not count.
+     * When there are total / paid / due / subtotal labels: every total outside scrollable areas must equal the declared amount; when they are all inside scrollable areas, the one nearest the button is used;
+     * when a total label is present but the amount cannot be read (not even by joining the following pieces on the same row), it is not let through.
+     * With no total, it must equal the largest amount outside the scrollable areas. A declaration with no digits is not let through.
      */
     private fun amountShown(amount: String?, s: ScreenSnapshot, button: String): Boolean {
         val declared = amount?.let { currencyFree(it) }?.let { NUMBER.find(it)?.value }?.toBigDecimalOrNull() ?: return false
@@ -193,7 +193,7 @@ class ConfirmationGate {
         return same(largest)
     }
 
-    /** 合计标签后面的金额:先看它自己,再把同一行右边的几段按横向顺序拼上去看。 */
+    /** The amount after a total label: first look at the label itself, then join the pieces to its right on the same row in horizontal order and look again. */
     private fun totalOf(label: UiElement, shown: List<UiElement>): BigDecimal? {
         fun after(text: String) = TOTAL_LABELS.mapNotNull { w -> text.indexOf(w).takeIf { it >= 0 }?.let { text.substring(it + w.length) } }
             .firstNotNullOfOrNull { amounts(it).firstOrNull() }
@@ -202,7 +202,7 @@ class ConfirmationGate {
 
     private fun currencyFree(t: String) = t.replace(THOUSANDS, "")
 
-    /** 带币种的金额,去掉紧挨着优惠一类字样或带负号的。 */
+    /** Currency amounts, excluding those immediately preceded by discount-type words or carrying a minus sign. */
     private fun amounts(name: String): List<BigDecimal> {
         val t = currencyFree(Hant.fold(name))
         return CURRENCY.findAll(t).filter { m ->
@@ -223,10 +223,10 @@ class ConfirmationGate {
     private fun norm(s: String) = s.filterNot { it.isWhitespace() }.lowercase()
 
     companion object {
-        /** 同意后过了这么多步还没用就作废。 */
+        /** The approval is void if it is not used within this many steps after approval. */
         const val MAX_STEPS = 3
         const val MATCH_CHARS = 20
-        /** 发送对象要在这条线(0–999)以上:屏幕顶部约 15% 的标题栏。 */
+        /** The send target must be above this line (0–999): the title bar in roughly the top 15% of the screen. */
         const val TITLE_BAND = 150
         private val NUMBER = Regex("\\d+(\\.\\d+)?")
         private val CURRENCY = Regex("[¥￥$＄]\\s*(\\d+(?:\\.\\d+)?)|(\\d+(?:\\.\\d+)?)\\s*元")

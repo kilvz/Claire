@@ -9,8 +9,8 @@ import kotlinx.serialization.json.booleanOrNull
 import com.wangzan101.mika.core.tool.Verb
 
 /**
- * 运行记录的脱敏:密码框里输入的字、形如 API Key 的串一律记为 `***`。
- * 调用方不确定目标是不是密码框时应按是处理(宁可少记)。
+ * Redaction for run records: text typed into password fields and strings that look like API keys are always recorded as `***`.
+ * When the caller is unsure whether the target is a password field, it should treat it as one (better to record too little than too much).
  */
 object Redactor {
     const val MASK = "***"
@@ -18,17 +18,17 @@ object Redactor {
     private val SK_KEY = Regex("""\bsk-[A-Za-z0-9_\-]{16,}""")
     private val BEARER = Regex("""\bBearer\s+[A-Za-z0-9._~+/=\-]{8,}""")
     private val GOOGLE_KEY = Regex("""\bAIza[0-9A-Za-z_\-]{30,}""")
-    /** Google 新格式的认证 Key:`AQ.` 开头,后面一长串 base64url 字符。 */
+    /** Google's new-format auth key: starts with `AQ.`, followed by a long run of base64url characters. */
     private val GOOGLE_AUTH_KEY = Regex("""\bAQ\.[0-9A-Za-z_\-]{20,}""")
     private val GITHUB_TOKEN = Regex("""\bgh[pousr]_[A-Za-z0-9]{20,}""")
 
-    /** [secretField]:端口报告这次输入的目标是密码框。 */
-    /** [verb]:调用的工具做的动作(不认识的工具为 null)。 */
+    /** [secretField]: the port reports that the target of this input is a password field. */
+    /** [verb]: the action performed by the called tool (null for an unrecognized tool). */
     fun args(verb: Verb?, argsJson: String, secretField: Boolean): String {
         if (verb == Verb.MemorySave || verb == Verb.MemoryEdit) return maskFields(argsJson, MEMORY_ARGS)
         if (verb == Verb.Script) return script(argsJson)
         if (verb == Verb.PhoneCommand) return maskFields(argsJson, setOf("command"))
-        // 读通知时筛的那段字多半是通知里的人名、会话名:和读到的原文一样不记
+        // The text filtered on when reading notifications is mostly the names of people and chats in them: like the text actually read, it is not recorded
         if (verb == Verb.NoticesRead) return maskFields(argsJson, setOf("query"))
         if (verb == Verb.PhoneRun) return phoneRun(argsJson)
         if (verb != Verb.TypeText || !secretField) return text(argsJson)
@@ -36,12 +36,12 @@ object Redactor {
             Json.parseToJsonElement(argsJson) as? JsonObject
         } catch (e: SerializationException) {
             null
-        } ?: return MASK // 解析不了就整段不记,宁可丢信息
+        } ?: return MASK // If it cannot be parsed, nothing is recorded at all; dropping information is the lesser evil
         val masked = if ("text" in o) JsonObject(o + ("text" to JsonPrimitive(MASK))) else o
         return text(masked.toString())
     }
 
-    /** 条件式手机命令里的输入内容可能是密码,整段按字段打码。 */
+    /** The input passed to a conditional phone command may be a password, so everything is masked field by field. */
     private fun phoneRun(argsJson: String): String {
         val o = try { Json.parseToJsonElement(argsJson) as? JsonObject } catch (e: SerializationException) { null } ?: return MASK
         val commands = o["commands"] as? JsonArray ?: return text(argsJson)
@@ -54,8 +54,8 @@ object Redactor {
     }
 
     /**
-     * web_script 的源码:脚本里要输入的字可能写成任何形式(交给 mika.type、先存进变量、拼接),
-     * 和 type_text 一样不知道是不是密码框,一律按是处理:源码里每个字符串字面量都打码,只留引号种类(模板字符串留 `${…}` 的位置)。
+     * The source code of web_script: text to be typed by the script may be written in any form (handed to mika.type, stored in a variable first, concatenated),
+     * and as with type_text it is unknown whether the target is a password field, so treat it as one: every string literal in the source is masked, keeping only the quote style (template strings keep the position of `${…}`).
      */
     private fun script(argsJson: String): String {
         val o = try { Json.parseToJsonElement(argsJson) as? JsonObject } catch (e: SerializationException) { null } ?: return MASK
@@ -72,21 +72,21 @@ object Redactor {
 
     private val NOTICE_TEXT_FIELDS = setOf("chat", "sender", "text")
 
-    /** 工具结果进运行记录前:记忆的内容、用户交回时写的备注不记(编号、种类照记)。 */
+    /** Before a tool result enters the run record: the contents of memories and notes written by the user when handing back are not recorded (ids and kinds still are). */
     fun result(verb: Verb?, content: JsonObject): JsonObject = when (verb) {
         Verb.MemorySearch -> (content["memories"] as? JsonArray)?.let { arr ->
             JsonObject(content + ("memories" to JsonArray(arr.map { m ->
                 (m as? JsonObject)?.let { if ("content" in it) JsonObject(it + ("content" to JsonPrimitive(MASK))) else it } ?: JsonPrimitive(MASK)
             })))
         } ?: content
-        // 读到的通知原文和照着它写的句子不进运行记录(本机只留两天,不能借记录多留):时间、App、条数照记
+        // Notification text that was read, and sentences written from it, do not enter the run record (the device keeps it for only two days, so the record must not keep it longer): time, app and item count are still recorded
         Verb.NoticesRead -> JsonObject(content.mapValues { (k, v) ->
             if ((k == "items" || k == "notes") && v is JsonArray) JsonArray(v.map { item ->
                 (item as? JsonObject)?.let { o -> JsonObject(o.mapValues { (f, x) -> if (f in NOTICE_TEXT_FIELDS) JsonPrimitive(MASK) else x }) } ?: JsonPrimitive(MASK)
             }) else v
         })
-        // 通知提醒那一轮(history_read 标着 notice)的内容是别的 App 的通知原文:和 notices_read 读到的一样不进运行记录
-        // (第几轮、状态、时间照记)。不遮的话,任务里回头查一下那一轮,通知原文就留在可以导出的记录里了
+        // The content of the notification-reminder turn (history_read marked with notice) is another app's raw notification text: like what notices_read read, it does not enter the run record
+        // (turn number, status and time are still recorded). Without masking, looking that turn up again during the task would leave the notification text in a record that can be exported
         Verb.HistoryRead -> noticeOutcomeMasked(content).let { top ->
             (top["turns"] as? JsonArray)?.let { arr ->
                 JsonObject(top + ("turns" to JsonArray(arr.map { t -> (t as? JsonObject)?.let(::noticeOutcomeMasked) ?: t })))
@@ -110,24 +110,24 @@ object Redactor {
     }
 
     private val STRING_LITERAL = Regex("""'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`""")
-    /** 模板字符串里的 ${…}:表达式不是字面量,位置留着,前后的字打码。 */
+    /** `${…}` inside a template string: the expression is not a literal, so its position is kept and the text around it is masked. */
     private val TEMPLATE_HOLE = Regex("""\$\{[^}]*\}""")
     private val MEMORY_ARGS = setOf("content", "quote", "keywords")
 
-    /** 一次性码一类的词。 */
+    /** Words for one-time codes and the like. */
     private val CODE_WORD = Regex("""验证|校验码|动态码|动态密码|确认码|安全码|短信|口令|(?i:\b(?:code|otp|passcode|pin|2fa)\b)""")
-    /** 4–8 位数字,中间可以隔单个空格或连字符(「4 8 2 9 1 3」「482-913」)。 */
+    /** 4–8 digits, optionally separated by single spaces or hyphens ("4 8 2 9 1 3", "482-913"). */
     private val CODE_DIGITS = Regex(
         """(?<![\d.¥$€£])(?<!\d,)(?<![¥$€£] )\d(?:[ \-]?\d){3,7}(?!\d)(?!\.\d)(?!,\d{3}(?!\d))""" +
-            // 后面跟着单位、年份、货币的是量,不是码
+            // Followed by a unit, a year or a currency, it is a quantity, not a code
             """(?!\s*(?:年|元|块|角|分钟|小时|秒|天|月|日|号|次|个|人|件|条|米|公里|千米|克|公斤|千克|斤|吨|度|℃|°|%|‰|[¥$€£]|(?i:km|kg|mb|gb|kb|ms|cm|mm|mah|rmb|usd|cny)\b))""",
     )
-    /** 码和这类词之间至多隔几个字(哪一边都算)。 */
+    /** At most this many characters may separate a code and such a word (counting either side). */
     private const val CODE_WINDOW = 24
 
     /**
-     * 证据账本里的材料(读屏、网页、命令输出)进账前经它:[text] 认得的 Key 之外,一次性码也遮住——
-     * 前后 [CODE_WINDOW] 个字以内有「验证」「短信」「code」一类词的 4–8 位数字。密码框的字本来就不进读屏文字。
+     * Material for the evidence ledger (screen reads, web pages, command output) passes through this before entering the ledger: besides the keys [text] recognizes, one-time codes are masked too —
+     * 4–8 digits with a word like "verification", "SMS" or "code" within [CODE_WINDOW] characters before or after. Text typed into password fields never enters screen text in the first place.
      */
     fun evidence(s: String): String {
         val t = text(s)
@@ -145,14 +145,14 @@ object Redactor {
         return BEARER.replace(out, "Bearer $MASK")
     }
 
-    // ---------- 网页网络数据 ----------
+    // ---------- Web network data ----------
 
     data class Network(val url: String?, val body: String?, val headers: Map<String, String>?)
 
     /**
-     * 网页网络数据(地址、响应正文、头)离开网络记录前一律经它:交给模型、进核查证据、进运行记录都是同一份。
-     * 名字像凭据的查询参数、JSON/表单字段、头的值记为 `***`(按词判断:author、keyword 不算);
-     * OAuth 回跳里的 code、state 一并遮住;此外 JWT、又长又杂(大小写字母加数字)的串、[text] 认得的 Key 也遮住。
+     * Web network data (URL, response body, headers) always passes through this before leaving the network log: what is handed to the model, what enters verification evidence and what enters the run record are the same copy.
+     * Query parameters, JSON/form fields and header values whose names look like credentials are recorded as `***` (judged word by word: author and keyword do not count);
+     * code and state in OAuth redirects are masked as well; so are JWTs, long mixed strings (upper- and lowercase letters plus digits) and the keys [text] recognizes.
      */
     fun network(url: String? = null, body: String? = null, headers: Map<String, String>? = null): Network = Network(
         url = url?.let { values(maskUrl(it), slash = false) },
@@ -161,8 +161,8 @@ object Redactor {
     )
 
     /**
-     * 读脚本、站点命令从页面上读出来的数据(JSON):和网络响应正文同一套规则(凭据名字的字段、JWT、又长又杂的串、Key),
-     * 只是长串不跨斜杠认(结果里常有网址,路径各段分开看)。
+     * Data (JSON) read off a page by read scripts and site commands: the same rules as network response bodies (fields with credential-like names, JWTs, long mixed strings, keys),
+     * except that long strings are not recognized across slashes (results often contain URLs, so each path segment is looked at separately).
      */
     fun pageData(s: String): String = values(maskBody(s), slash = false)
 
@@ -175,7 +175,7 @@ object Redactor {
     private val CASE_BOUNDARY = Regex("(?<=[a-z0-9])(?=[A-Z])")
     private val WORD_SPLIT = Regex("[^A-Za-z0-9]+")
 
-    /** 名字按词拆开(驼峰、下划线、连字符)后有像凭据的词。 */
+    /** Whether the name, split into words (camel case, underscores, hyphens), contains a credential-like word. */
     internal fun secretName(name: String): Boolean {
         val words = name.split(WORD_SPLIT).flatMap { it.split(CASE_BOUNDARY) }.map { it.lowercase() }.filter { it.isNotEmpty() }
         return words.any { it in SECRET_WORDS } || words.joinToString("") in SECRET_COMPOUNDS
@@ -184,7 +184,7 @@ object Redactor {
     private val OAUTH_MARKERS = setOf("state", "redirect_uri", "client_id", "code_verifier")
     private val OAUTH_RESULTS = setOf("code", "state")
 
-    /** 查询串或片段里的 a=b&c=d:凭据名字的值遮住;像 OAuth 回跳的(有 state 等,且带 code 或凭据)把 code、state 也遮住。[bareKey]:单个 key 也算凭据。 */
+    /** `a=b&c=d` in a query string or fragment: the values of credential-like names are masked; for ones that look like an OAuth redirect (has state etc. and carries code or a credential), code and state are masked too. [bareKey]: a lone `key` also counts as a credential. */
     private fun maskParams(q: String, bareKey: Boolean): String {
         val parts = q.split('&')
         val names = parts.map { it.substringBefore('=').lowercase() }
@@ -222,7 +222,7 @@ object Redactor {
     private val LONG_WITH_SLASH = Regex("""[A-Za-z0-9_\-+/=]{32,}""")
     private val LONG = Regex("""[A-Za-z0-9_\-+=]{32,}""")
 
-    /** 值里的 JWT、又长又杂的串、已知格式的 Key。地址里不跨斜杠认(路径各段分开看)。 */
+    /** JWTs, long mixed strings and known-format keys inside values. In URLs they are not recognized across slashes (each path segment is looked at separately). */
     private fun values(s: String, slash: Boolean): String {
         var out = JWT.replace(s, MASK)
         out = (if (slash) LONG_WITH_SLASH else LONG).replace(out) { m ->
