@@ -32,7 +32,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 「应用访问」里禁用一个 App 之后:它已收的记录、待判定、提醒、待归纳的事件都去掉,在发的请求取消,不再发它的。 */
+/** After an App is blocked in "App access": its collected records, items awaiting triage, alerts and events awaiting learning are all removed, requests in flight are cancelled, and nothing from it is sent again. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class BlockedAppsTest {
     private class Fake(var reply: String) : ChatModel {
@@ -66,7 +66,7 @@ class BlockedAppsTest {
     private inner class Env(val scope: TestScope) {
         val allowed = setOf("com.chat", "com.other")
         val blocked = HashSet<String>()
-        /** 「应用访问」读不读得出来。 */
+        /** Whether "App access" can be read. */
         var known = true
         val gate get() = AppGate(known, blocked.toSet())
         val locked = MutableStateFlow(false)
@@ -101,7 +101,7 @@ class BlockedAppsTest {
         }
 
         private var n = 0
-        /** 照 ProactiveRuntime.admit 那样收一条:进收件箱,也进归纳的缓冲。 */
+        /** Accept one record the way ProactiveRuntime.admit does: into the inbox and into the learning buffer. */
         fun post(pkg: String) {
             n++
             val r = NoticeRecord("$pkg-$n", pkg, scope.testScheduler.currentTime + n, "title $n", "text $n")
@@ -119,13 +119,13 @@ class BlockedAppsTest {
             changed()
         }
 
-        /** 「应用访问」读不出来了 / 又读得出来了。 */
+        /** "App access" has become unreadable / readable again. */
         fun access(known: Boolean) {
             this.known = known
             changed()
         }
 
-        /** 照 ProactiveRuntime 收到「应用访问变了」那样做。 */
+        /** Do what ProactiveRuntime does on receiving "App access changed". */
         private fun changed() {
             BlockedApps.accessChanged(gate, inbox, triage, learn)
             scope.runCurrent()
@@ -147,12 +147,12 @@ class BlockedAppsTest {
 
     @Test fun blockingPurgesQueuedRecordsHintsAndEvents() = runTest {
         val e = Env(this)
-        // 先有一条判成值得提醒、在提醒列表里
+        // First there is one record triaged as worth an alert, so it is in the alert list
         e.post("com.chat")
         wait(TriagePlanner.WINDOW_MS)
         e.syncHints()
         assertEquals(1, e.hints.state.value.list.size)
-        // 再来几条待判定、待归纳的
+        // Then a few more awaiting triage and learning
         e.post("com.chat"); e.post("com.other")
         assertEquals(2, e.triage.state.value.counts.pending)
         assertEquals(3, e.learn.state.value.pending)
@@ -164,7 +164,7 @@ class BlockedAppsTest {
         assertTrue(e.hints.state.value.list.isEmpty())
         assertEquals(1, e.learn.state.value.pending)
         assertEquals(1, e.learn.state.value.buffered)
-        // 凑批到点、归纳到期:只发别的 App 的
+        // A batch fills up and comes due, and learning is due: only the other App's records are sent
         wait(TriagePlanner.WINDOW_MS)
         wait(LearnTuning.DUE_AGE_MS)
         e.post("com.other")
@@ -187,7 +187,7 @@ class BlockedAppsTest {
         assertEquals(1, e.distil.cancelled)
         assertEquals(0, e.learn.state.value.buffered)
         assertTrue(e.inbox.state.value.records.isEmpty())
-        // 放行也没有结果、也不再发
+        // Even when let through, they yield no result and nothing is sent again
         e.judge.gate!!.complete(Unit)
         e.distil.gate!!.complete(Unit)
         wait(24 * 3_600_000L)
@@ -209,7 +209,7 @@ class BlockedAppsTest {
         assertEquals(1, e.triage.state.value.marks.size)
     }
 
-    // ---- 「应用访问」那份设置读不出来:不知道哪些 App 不让碰,整个停着,攒下的不动 ----
+    // ---- The "App access" settings cannot be read: which Apps must not be touched is unknown, so everything stays suspended and what has accumulated is left as is ----
 
     @get:org.junit.Rule val tmp = org.junit.rules.TemporaryFolder()
 
@@ -217,14 +217,14 @@ class BlockedAppsTest {
         val broken = java.io.File(tmp.root, "broken.json").apply { writeText("{broken") }
         val state = com.wangzan101.mika.settings.AppAccessStore(broken).current()
         assertFalse(state.available)
-        // 读不出来时那份「禁用的」是空的:只看它会当成一个都没禁用
+        // When it cannot be read, the "blocked" set is empty: relying on it alone would look like nothing is blocked
         assertTrue(state.blocked.isEmpty())
         val unknown = AppGate.of(state)
         assertFalse(unknown.known)
         val r = NoticeRecord("k", "com.chat", 1L, "title", "text")
         assertFalse(BlockedApps.readable("com.chat", setOf("com.chat"), unknown))
         assertFalse(BlockedApps.admits(r, setOf("com.chat"), unknown))
-        // 没有那份文件是读得出来的(一个都没禁用)
+        // A missing file is readable (nothing is blocked)
         val fresh = com.wangzan101.mika.settings.AppAccessStore(java.io.File(tmp.root, "none.json")).current()
         val known = AppGate.of(fresh)
         assertTrue(known.known)
@@ -235,7 +235,7 @@ class BlockedAppsTest {
 
     @Test fun unreadableAppAccessStopsRequestsAndKeepsWhatIsQueued() = runTest {
         val e = Env(this)
-        // 这一批有 DUE_COUNT 条:判定的回复给每一条都判上(默认的假回复只判前两条,其余的会算失败再发)
+        // This batch has DUE_COUNT records: the triage reply gives every one of them a verdict (the default fake reply only judges the first two, and the rest count as failed and are sent again)
         e.judge.reply = (1..LearnTuning.DUE_COUNT).joinToString(",", """{"items":[""", "]}") { """{"id":"n$it","decision":"ignore","reason":"r"}""" }
         e.judge.gate = CompletableDeferred()
         e.distil.gate = CompletableDeferred()
@@ -248,7 +248,7 @@ class BlockedAppsTest {
         val buffered = e.learn.state.value.buffered
 
         e.access(known = false)
-        // 在发的两个请求都停了;收件箱里的、待归纳的一条没少
+        // Both requests in flight have stopped; not a single inbox record or item awaiting learning is lost
         assertFalse(e.triage.requestActive)
         assertFalse(e.learn.requestActive)
         assertEquals(1, e.judge.cancelled)
@@ -258,7 +258,7 @@ class BlockedAppsTest {
         assertEquals(records, e.inbox.state.value.records.size)
         assertEquals(buffered, e.learn.state.value.buffered)
         assertEquals(buffered, e.learn.state.value.pending)
-        // 这期间来的通知不收;等多久都不发
+        // Notifications arriving meanwhile are not accepted; nothing is sent no matter how long it waits
         e.post("com.chat"); e.post("com.other")
         wait(24 * 3_600_000L)
         assertEquals(records, e.inbox.state.value.records.size)
@@ -266,12 +266,12 @@ class BlockedAppsTest {
         assertEquals(1, e.judge.packages.size)
         assertEquals(1, e.distil.packages.size)
 
-        // 读得出来了:接着做,原来那些重新发
+        // Readable again: work resumes and the earlier records are sent again
         e.judge.gate = null
         e.distil.gate = null
         e.access(known = true)
         wait(TriagePlanner.WINDOW_MS)
-        // 停下的那次不算失败,也没有别的重发:归纳重发那一批;判定一批最多 MAX_BATCH 条,这些分两批发完
+        // The suspended attempt does not count as a failure, and there is no other resend: learning resends its batch; triage takes at most MAX_BATCH per batch, so these go out in two batches
         assertTrue(LearnTuning.DUE_COUNT in NoticeTriage.MAX_BATCH + 1..2 * NoticeTriage.MAX_BATCH)
         assertEquals(listOf("com.chat", "com.chat", "com.chat"), e.judge.packages)
         assertEquals(listOf("com.chat", "com.chat"), e.distil.packages)
@@ -283,10 +283,10 @@ class BlockedAppsTest {
         assertEquals(0, e.learn.state.value.feed.getValue("com.chat").failed)
     }
 
-    // 读不出来的那一阵里用户把它重置、又禁用了一个 App:读得出来时先清掉它的,再接着做,不会把它的发出去
+    // While it was unreadable the user reset it and blocked one App: once readable, that App is purged first and work resumes, so nothing from it is sent
     @Test fun whenAppAccessComesBackTheBlockedAppIsPurgedBeforeAnythingIsSent() = runTest {
         val e = Env(this)
-        // 还没凑够一批、没到点:都在排队
+        // No full batch yet and nothing due: everything is queued
         e.post("com.chat"); e.post("com.chat"); e.post("com.other")
         e.access(known = false)
         wait(24 * 3_600_000L)

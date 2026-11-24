@@ -31,7 +31,7 @@ class TaskMemoryFileTest {
     private fun brokenFiles() = memDir().listFiles { f -> f.name.startsWith("task_memory.bin.broken-") }.orEmpty().toList()
 
     @Test fun roundTrip() {
-        assertEquals(emptyList<TaskMemory>(), file().load()) // 没有文件 = 空,不算坏
+        assertEquals(emptyList<TaskMemory>(), file().load()) // No file = empty, not corrupt
         file().save(items)
         assertEquals(items, file().load())
     }
@@ -54,7 +54,7 @@ class TaskMemoryFileTest {
         assertEquals("task_memory.bin.broken-$stamp", broken.name)
         assertArrayEquals(original, broken.readBytes())
         assertFalse(bin.exists())
-        // 之后的写入不碰另存的文件
+        // Later writes leave the file moved aside untouched
         f.save(items.take(1))
         assertArrayEquals(original, broken.readBytes())
         assertEquals(items.take(1), file(other).load())
@@ -76,7 +76,7 @@ class TaskMemoryFileTest {
 
     @Test fun wipeRemovesFiles() {
         file().save(items)
-        file(KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()).load() // 产生一份另存
+        file(KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()).load() // Produces a copy moved aside
         file().save(items)
         val f = file()
         f.wipe()

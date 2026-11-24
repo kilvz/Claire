@@ -64,7 +64,7 @@ class LearnRunnerTest {
         var gate: CompletableDeferred<Unit>? = null
         var cancelled = 0
         var error: Exception? = null
-        /** 设了就在下一次调用里不理取消:等它放行后抛「预算用完」(只用一次)。 */
+        /** When set, the next call ignores cancellation: after it is released it throws "budget exhausted" (used only once). */
         var late: CompletableDeferred<Unit>? = null
         override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
             calls += messages
@@ -81,7 +81,7 @@ class LearnRunnerTest {
                 cancelled++
                 throw e
             }
-            // 分段归纳(当日消息归纳的第 1 级)的请求另给回复
+            // Segmented digest requests (level 1 of the daily notification digest) get a separate reply
             val text = (messages.single().parts.single() as Part.Text).text
             val out = when {
                 text.startsWith("Language for notes") -> notesReply()
@@ -93,14 +93,14 @@ class LearnRunnerTest {
             return ModelReply(listOf(Part.Text(out)), StopReason.EndTurn, null)
         }
         var notesReply: () -> String = { """{"notes":[]}""" }
-        /** 当日归纳(第 2 级)的请求的回复。 */
+        /** The reply to daily digest requests (level 2). */
         var dayReply: () -> String = { """{"lines":[]}""" }
-        /** 周归纳(第 3 级)、月归纳(第 4 级)的请求的回复。 */
+        /** The reply to weekly digest (level 3) and monthly digest (level 4) requests. */
         var weekReply: () -> String = { """{"lines":[]}""" }
         var monthReply: () -> String = { """{"lines":[]}""" }
-        /** 周、月归纳的输入第二行写着是哪一周、哪个月。 */
+        /** The second line of the weekly and monthly digest input says which week or month it is. */
         private fun isSpan(text: String, what: String) = text.startsWith("Language for the digest") && text.lineSequence().drop(1).firstOrNull()?.startsWith("$what: ") == true
-        /** 第 [i] 次请求是哪一种:learn(归纳话题)、notes(分段归纳)、day(当日归纳)、week、month。 */
+        /** Which kind the [i]th request was: learn (topic digest), notes (segmented digest), day (daily digest), week, month. */
         fun kind(i: Int) = when {
             input(i).startsWith("Language for notes") -> "notes"
             isSpan(input(i), "Week") -> "week"
@@ -119,7 +119,7 @@ class LearnRunnerTest {
         var saves = 0
         var failLoad = false
         var failSave = false
-        /** 另存的旧文件有几份、整份删过几次。 */
+        /** How many old copies were moved aside, and how many times everything was deleted. */
         var brokenCopies = 0
         var wipes = 0
         override fun load(): TopicPoolData {
@@ -166,7 +166,7 @@ class LearnRunnerTest {
         var saves = 0
         var wipes = 0
         var failLoad = false
-        /** 存盘这一步出错(存储满了之类);[saveAttempts] 连没存上的也数。 */
+        /** The save step fails (storage full and the like); [saveAttempts] counts the failed ones too. */
         var failSave = false
         var saveAttempts = 0
         override fun load(): DigestData {
@@ -187,9 +187,9 @@ class LearnRunnerTest {
     }
 
     private class MemPurges : LearnPurges {
-        /** 写过几次(每写一次就是一次偏好落盘)。 */
+        /** How many writes happened (each write is one preferences commit). */
         var writes = 0
-        /** 话题那份下一次写上之后要做的事(只做一次):模拟写完这一笔进程就没了。 */
+        /** What to run after the next write of the topic set (only once): simulates the process dying right after that write. */
         var afterTopicWrite: (() -> Unit)? = null
         override var topicPurges: Set<String> = emptySet()
             set(v) { field = v; writes++; afterTopicWrite?.also { afterTopicWrite = null }?.invoke() }
@@ -236,27 +236,27 @@ class LearnRunnerTest {
         val contacts = MemContacts()
         var consent: TriageConsent? = TriageConsent.of(target)
         var effective: TriageTarget? = target
-        /** 建模型那一次读到的目标(null 时同 [effective])。 */
+        /** The target read when the model was built (null means the same as [effective]). */
         var built: TriageTarget? = null
         val model = Fake()
         val store = MemStore()
         var calls = 0L
-        /** 建模型(要解密 Key)这一步出错。 */
+        /** The model-build step (which decrypts the Key) fails. */
         var buildFails = false
-        /** 读「现在配的是哪个模型」这一步出错(配置一时读不出来)。 */
+        /** Reading "which model is configured now" fails (the configuration is temporarily unreadable). */
         var targetFails = false
-        /** 读锁屏状态这一步出错。 */
+        /** Reading the lock state fails. */
         var lockReadFails = false
         var builds = 0
-        /** 每次建模型时说的是要发哪一种请求(回复上限跟着它定)。 */
+        /** Which kind of request is announced each time the model is built (the reply size limit follows from it). */
         val asked = mutableListOf<ProactiveCall>()
         val purges = MemPurges()
-        /** 「当日消息归纳」开关。 */
+        /** The "daily notification digest" switch. */
         var digest = false
         val journal = MemJournal()
         val digestStore = MemDigest()
         val optOut = HashSet<String>()
-        /** 「应用访问」读不出来。 */
+        /** "App access" cannot be read. */
         var suspended = false
         val runner = LearnRunner(
             TriageHooks(
@@ -298,7 +298,7 @@ class LearnRunnerTest {
             scope.runCurrent()
         }
 
-        /** 聊天 App 里一个会话发来 [count] 条:同一个键(同一个 tag 重发)、同一个标题。 */
+        /** A conversation in a chat App sends [count] messages: the same key (the same tag reposted), the same title. */
         fun chat(key: String, title: String, count: Int = 1, pkg: String = "com.chat") {
             repeat(count) {
                 n++
@@ -320,10 +320,10 @@ class LearnRunnerTest {
         val e = Env(this)
         e.post(count = LearnTuning.DUE_COUNT - 1)
         assertEquals(LearnStatus.Waiting, e.runner.state.value.status)
-        // 过了 30 分钟、几个小时,没有任何事发生:不发(没有定时器)
+        // 30 minutes and then hours pass with nothing happening: nothing is sent (there is no timer)
         wait(5 * 3_600_000L)
         assertTrue(e.model.calls.isEmpty())
-        // 有事发生(又来一条别的 App 的)时才看一遍:这时最旧的早过了 30 分钟
+        // It only looks when something happens (another App's notification arrives): by then the oldest one is long past 30 minutes
         e.post(pkg = "com.other")
         assertEquals(1, e.model.calls.size)
         assertEquals(listOf("com.shop"), e.model.packages())
@@ -355,7 +355,7 @@ class LearnRunnerTest {
         e.post(count = 12)
         assertEquals(LearnStatus.Locked, e.runner.state.value.status)
         assertTrue(e.model.calls.isEmpty())
-        // 解锁后发;发的途中锁屏:取消,事件留着
+        // It sends after unlocking; locking while sending cancels it and the events stay
         e.model.gate = CompletableDeferred()
         e.locked.value = false
         runCurrent()
@@ -367,7 +367,7 @@ class LearnRunnerTest {
         assertEquals(1, e.model.cancelled)
         assertEquals(12, e.runner.state.value.pending)
         assertEquals(0, e.runner.state.value.feed.getValue("com.shop").failed)
-        // 再解锁:重新发同一批
+        // Unlock again: the same batch is sent again
         e.model.gate = null
         e.model.reply = { newTopic("n1") }
         e.locked.value = false
@@ -376,7 +376,7 @@ class LearnRunnerTest {
         assertEquals(0, e.runner.state.value.pending)
     }
 
-    // 锁屏取消了请求,模型却不理取消、晚些时候才回来;这期间解锁后新的一批已经在发:晚回来的那次什么都不能动
+    // Locking cancelled the request but the model ignored the cancellation and returned later; meanwhile a new batch is already being sent after unlocking: the late return must not change anything
     @Test fun staleRequestReturningLateDoesNotTouchTheNewerBatch() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1") }
@@ -415,7 +415,7 @@ class LearnRunnerTest {
         assertEquals(1, e.model.calls.size)
     }
 
-    // 模型回了、但回复读不懂:这批丢掉不重试;下一批要停一段才发(不定时,到点后等下一件事发生)
+    // The model replied but the reply is unreadable: this batch is dropped without retry; the next batch waits out a hold before sending (no timer: once the hold is over it waits for the next event)
     @Test fun unreadableReplyDropsTheBatchAndHoldsTheNextOne() = runTest {
         val e = Env(this)
         e.model.reply = { "I cannot help with that." }
@@ -423,26 +423,26 @@ class LearnRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(0, e.runner.state.value.buffered)
         assertEquals(1, e.runner.state.value.feed.getValue("com.shop").failed)
-        // 马上又攒够一批:停着,不发
+        // Another full batch is ready at once: it stays held and nothing is sent
         e.post(count = 12)
         assertEquals(1, e.model.calls.size)
         assertEquals(LearnStatus.Waiting, e.runner.state.value.status)
         assertEquals(12, e.runner.state.value.pending)
         e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent()
         assertEquals(1, e.model.calls.size)
-        // 到点了也没有定时器;有事发生时才发
+        // Even once the hold is over there is no timer; it sends only when something happens
         wait(LearnTuning.failureHoldMs(1))
         assertEquals(1, e.model.calls.size)
         e.model.reply = { newTopic("n1") }
         e.post(pkg = "com.other")
         assertEquals(2, e.model.calls.size)
         assertEquals(listOf("com.shop", "com.shop"), e.model.packages())
-        // 成了一次就不再停:别的 App 攒够了马上发
+        // After one success it stops holding: another App with a full batch sends right away
         e.post(pkg = "com.other", count = 11)
         assertEquals(3, e.model.calls.size)
     }
 
-    // 模型一出问题,到期的各个 App 不会一批接一批地发出去、失败
+    // Once the model has a problem, the due Apps are not sent batch after batch only to fail
     @Test fun oneFailureDoesNotCascadeAcrossApps() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Server(500)
@@ -456,7 +456,7 @@ class LearnRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(24, e.runner.state.value.pending)
         assertEquals(LearnStatus.Waiting, e.runner.state.value.status)
-        // 连续失败,一级一级停得更久:2、5、15、30 分钟,之后都是 30 分钟
+        // With consecutive failures the hold grows step by step: 2, 5, 15, 30 minutes, then always 30
         var expected = 1
         for (hold in listOf(2, 5, 15, 30, 30)) {
             wait(hold * 60_000L - 1)
@@ -467,11 +467,11 @@ class LearnRunnerTest {
             if (expected < 3) expected++
             assertEquals(expected, e.model.calls.size)
         }
-        // 三个 App 各丢了一批,之后没有东西可发
+        // Three Apps each lost one batch; afterwards there is nothing left to send
         assertEquals(0, e.runner.state.value.buffered)
     }
 
-    // 根本没连上模型(模型只在家里的网络上、人出门了):这批留着,停一段再试,连上了就归纳
+    // The model is not reachable at all (it is only on the home network and the person went out): the batch is kept and retried after a hold; once connected it is learned
     @Test fun unreachableModelKeepsTheBatchAndRetriesLater() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Network()
@@ -487,11 +487,11 @@ class LearnRunnerTest {
         e.post()
         assertEquals(2, e.model.calls.size)
         assertEquals(14, e.runner.state.value.pending)
-        // 第二次失败停 5 分钟
+        // The second failure holds for 5 minutes
         wait(LearnTuning.failureHoldMs(1))
         e.post()
         assertEquals(2, e.model.calls.size)
-        // 连上了:同一批(最旧的 12 条)发出去,归纳完
+        // Connected: the same batch (the oldest 12 entries) goes out and is learned
         e.model.error = null
         e.model.reply = { newTopic("n1") }
         wait(LearnTuning.failureHoldMs(2))
@@ -503,7 +503,7 @@ class LearnRunnerTest {
         assertEquals(12, e.runner.state.value.feed.getValue("com.shop").distilled)
     }
 
-    // 建模型(要解密 Key)出错:不是这批的问题,留着;也停一段,不会每来一条通知就再出一次错
+    // Building the model (which decrypts the Key) fails: that is not this batch's fault, so it is kept; a hold applies too, so it does not fail again on every new notification
     @Test fun modelBuildFailureKeepsTheBatchAndHolds() = runTest {
         val e = Env(this)
         e.buildFails = true
@@ -524,7 +524,7 @@ class LearnRunnerTest {
         assertEquals(6, e.runner.state.value.pending)
     }
 
-    // 用户打开归纳页:不再停着,有到期的马上再试一次(多半是刚改了设置)
+    // The user opens the learn page: the hold is lifted and anything due is retried at once (usually right after a settings change)
     @Test fun openingThePageLiftsTheHold() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Network()
@@ -539,7 +539,7 @@ class LearnRunnerTest {
         assertEquals(LearnStatus.Idle, e.runner.state.value.status)
     }
 
-    // 关掉归纳再打开:从头算,不带着上次的停顿
+    // Turning learning off and on again: it starts from scratch without the previous hold
     @Test fun switchingOffForgetsTheHold() = runTest {
         val e = Env(this)
         e.model.error = ModelError.Server(500)
@@ -571,13 +571,13 @@ class LearnRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(LearnStatus.BudgetUsedUp, e.runner.state.value.status)
         assertEquals(12, e.runner.state.value.pending)
-        // 当天不再发
+        // Nothing more is sent that day
         e.post()
         e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent()
         assertEquals(1, e.model.calls.size)
-        // 账本那边到上限也不发
+        // Nothing is sent when the ledger has reached its limit either
         val f = Env(this)
-        // 请求次数的上限跟着 Token 上限走;归纳按整份算
+        // The request-count limit follows the token limit; a digest counts as a whole
         f.calls = ProactiveBudget.callLimit(ProactiveBudget.DEFAULT_DAILY_LIMIT)
         f.post(count = 12)
         assertTrue(f.model.calls.isEmpty())
@@ -590,7 +590,7 @@ class LearnRunnerTest {
         e.post(count = 12)
         assertEquals(LearnStatus.NeedsConsent, e.runner.state.value.status)
         assertTrue(e.model.calls.isEmpty())
-        // 发的途中换了模型:结果不用,事件留着
+        // The model is switched while sending: the result is discarded and the events are kept
         e.effective = target
         e.model.gate = CompletableDeferred()
         e.runner.poke(); runCurrent()
@@ -604,7 +604,7 @@ class LearnRunnerTest {
         assertEquals(LearnStatus.NeedsConsent, e.runner.state.value.status)
     }
 
-    // 门口查同意时是同意过的模型,建模型时配置已被改成别的:不发,事件留着待归纳
+    // Consent at the gate was for the agreed model, but the configuration changed to another by the time the model is built: nothing is sent and the events stay pending
     @Test fun targetChangedBetweenTheGateAndTheBuildSendsNothing() = runTest {
         val e = Env(this)
         e.built = target.copy(providerId = "p2")
@@ -627,7 +627,7 @@ class LearnRunnerTest {
         e.post(pkg = "com.chat", count = 20)
         assertEquals(0, e.runner.state.value.buffered)
         e.post(pkg = "com.shop", count = 5)
-        // 先收下、再关掉:已收的去掉
+        // Captured first, then turned off: what was captured is dropped
         e.optOut += "com.shop"
         e.runner.poke(); runCurrent()
         assertEquals(0, e.runner.state.value.buffered)
@@ -648,8 +648,8 @@ class LearnRunnerTest {
         assertTrue(e.model.calls.isEmpty())
     }
 
-    // 池子里的话题比给模型看的位置多:这一批的 App 自己印证过的那个哪怕弱也给模型看(它再推同样的东西时模型才引用得上,
-    // 不然只能另起一个说法差不多的);别的 App 的一批还是只按强度挑,轮不到它
+    // The pool holds more topics than the slots shown to the model: the one this batch's App has evidence for is shown even when weak (so the model can cite it when it proposes the same thing again;
+    // otherwise it can only start another one with a similar name); for other Apps' batches it is still picked by strength alone, so it gets no slot
     @Test fun theAppsOwnTopicsAreShownToTheModelEvenWhenWeak() = runTest {
         val e = Env(this)
         val today = 20_000L
@@ -661,7 +661,7 @@ class LearnRunnerTest {
         e.post(count = 12)
         val lines = e.model.input(0).lines()
         assertEquals(LearnTuning.EXISTING_MAX, lines.count { it.contains("] kind: ") })
-        // 排在第一个(话题名在那一行的下一行,不可信的块里)
+        // It comes first (the topic name is on the line below, inside the untrusted block)
         assertEquals("Tents", lines[lines.indexOfFirst { it.contains("] kind: ") } + 1])
         e.post(pkg = "com.other", count = 12)
         assertEquals(listOf("com.shop", "com.other"), e.model.packages())
@@ -678,7 +678,7 @@ class LearnRunnerTest {
         assertEquals(2, e.store.saves)
     }
 
-    // 「敏感类推断」关掉之后,早先归到敏感话题上的通知才被点开:不往上补
+    // With "sensitive-category inference" off, notifications assigned earlier to a sensitive topic are only now tapped: nothing is added back
     @Test fun lateOutcomeSkipsSensitiveTopicsWhenTheSwitchIsOff() = runTest {
         val e = Env(this)
         e.sensitive = true
@@ -690,7 +690,7 @@ class LearnRunnerTest {
         e.runner.removed("k1", NotificationListenerService.REASON_CLICK)
         assertEquals(0, e.store.data.topics.single().opened)
         assertEquals(saves, e.store.saves)
-        // 再打开开关:之后点开的照常补
+        // Turn the switch back on: later taps are recorded as usual
         e.sensitive = true
         e.runner.removed("k2", NotificationListenerService.REASON_CLICK)
         assertEquals(1, e.store.data.topics.single().opened)
@@ -720,7 +720,7 @@ class LearnRunnerTest {
         e.post(count = 12)
         assertTrue(e.model.input(1).contains("Sensitive topics: allowed"))
         assertTrue(e.store.data.topics.single().sensitive)
-        // 关掉并选删除:删掉并存盘
+        // Turn it off and choose delete: they are deleted and saved
         e.sensitive = false
         val saves = e.store.saves
         e.runner.deleteSensitive()
@@ -728,7 +728,7 @@ class LearnRunnerTest {
         assertEquals(saves + 1, e.store.saves)
     }
 
-    // ---- 联系人与关系 ----
+    // ---- Contacts and relations ----
 
     private val aliceReply =
         """{"signals":[{"ids":["n1","n2"],"new":{"kind":"interest","label":"Hiking"}}],"contacts":[{"ids":["n1","n2","n3"],"type":"person","relation":"friend","name":"Mallory"}]}"""
@@ -738,11 +738,11 @@ class LearnRunnerTest {
         e.model.reply = { aliceReply }
         e.chat("0|com.chat|7|null|1", "Alice", count = 6)
         e.chat("0|com.chat|8|null|1", "Promo", count = 6)
-        // 和第一部分一样:12 条只发一次请求
+        // As in the first part: 12 entries still make only one request
         assertEquals(1, e.model.calls.size)
         assertTrue(e.model.input(0).lines().contains("Contacts: on"))
         val c = e.contacts.data.contacts.single()
-        // 名字取自通知标题,不取模型给的
+        // The name comes from the notification title, not from the model
         assertEquals("Alice", c.name)
         assertEquals("com.chat", c.packageName)
         assertEquals(listOf(e.store.data.topics.single().id), c.topics)
@@ -750,11 +750,11 @@ class LearnRunnerTest {
         assertEquals(1, f.contactsAccepted)
         assertEquals(0, f.contactDroppedTotal)
         assertEquals(listOf("Alice"), e.runner.contactsView.value.contacts.map { it.name })
-        // 只有键和标题的哈希,没有原始的键
+        // Only hashes of the key and title, never the raw key
         assertFalse(c.id.contains("com.chat") || c.id.contains("Alice"))
     }
 
-    // 先存话题再存联系人:联系人存下去的那一刻,它连着的话题已经在存好的话题池里了
+    // Topics are saved before contacts: at the moment contacts are saved, the topics they link to are already in the saved topic pool
     @Test fun topicsAreSavedBeforeTheContactsThatLinkToThem() = runTest {
         val e = Env(this)
         val order = ArrayList<String>()
@@ -804,10 +804,10 @@ class LearnRunnerTest {
         val id = e.contacts.data.contacts.single().id
         e.runner.setContactRelation(id, ContactRelation.Family)
         assertEquals(ContactRelation.Family, e.contacts.data.contacts.single().userRelation)
-        // 删掉话题:联系人上的连接也去掉
+        // Deleting a topic: its links on contacts are removed too
         e.runner.deleteTopic(e.store.data.topics.single().id)
         assertTrue(e.contacts.data.contacts.single().topics.isEmpty())
-        // 删掉联系人:同一个会话不再记
+        // Deleting a contact: the same conversation is not recorded again
         e.runner.deleteContact(id)
         assertTrue(e.contacts.data.contacts.isEmpty())
         assertEquals(1, e.runner.contactsView.value.blocked)
@@ -818,7 +818,7 @@ class LearnRunnerTest {
         assertEquals(0, e.runner.contactsView.value.blocked)
         e.chat("a", "Alice", count = 12)
         assertEquals(1, e.contacts.data.contacts.size)
-        // 清掉某个 App 的、清空全部:联系人也去掉,但不挡
+        // Clearing one App and clearing all: contacts are removed too, but not blocked
         e.runner.clearApp("com.chat")
         assertTrue(e.contacts.data.contacts.isEmpty())
         assertEquals(0, e.runner.contactsView.value.blocked)
@@ -830,8 +830,8 @@ class LearnRunnerTest {
         assertEquals(0, e.runner.contactsView.value.blocked)
     }
 
-    // 话题页上把一个话题并进另一个:存下来只剩并进去的那个,证据并过去;联系人上的连接改指它;早先归到并掉的那个上的通知
-    // 之后才被点开,算到它上面;模型再新起并掉的那个名字,不另起。并掉不是删掉:不进「不再记录」,不记待删
+    // Merging one topic into another on the topics page: only the target survives on disk, the evidence moves over, and contact links are repointed to it; notifications assigned earlier to the merged-away topic
+    // that are opened afterwards count on it; when the model starts the merged-away name again, no new topic is made. Merging is not deleting: the name does not go into "never record again" and no pending delete is recorded
     @Test fun mergingATopicMovesItsEvidenceLinksAndName() = runTest {
         val e = Env(this)
         e.model.reply = { aliceReply }
@@ -852,30 +852,30 @@ class LearnRunnerTest {
         assertEquals(listOf(trails), e.runner.contactsView.value.contacts.single().topics)
         assertTrue(e.store.data.blocked.isEmpty())
         assertEquals(0, e.runner.topicsBlocked.value)
-        // 两份都存上了:没有记着要补做的
+        // Both were saved: nothing is recorded as pending replay
         assertTrue(e.purges.topicPurges.isEmpty())
         assertTrue(e.purges.contactPurges.isEmpty())
-        // 归到「Hiking」上的那条聊天通知这时才被点开
+        // The chat notification assigned to "Hiking" is only now tapped
         e.runner.removed("a0", NotificationListenerService.REASON_CLICK)
         assertEquals(1, e.store.data.topics.single().opened)
-        // 模型再新起「Hiking」:算到「Trails」上
+        // The model starts "Hiking" again: it counts on "Trails"
         e.model.reply = { newTopic("n1") }
         e.post(count = 12)
         assertEquals(listOf("Trails"), e.store.data.topics.map { it.label })
         assertFalse(LearnDrop.Blocked in e.runner.state.value.feed.getValue("com.shop").dropped)
-        // 换一个进程:存下来的就是并好的样子,名字也还认
+        // New process: what is stored is the merged shape, and the name is still recognised
         assertEquals(1, e.store.data.merged.size)
         val again = newProcess(e)
         again.open()
         assertEquals(listOf(trails), again.topics.value.map { it.id })
-        // 同一个、已经没有的:什么都不做,也不存
+        // The same topic, or one that is gone: nothing is done and nothing is saved
         val saves = e.store.saves
         e.runner.mergeTopic(trails, trails)
         e.runner.mergeTopic(hiking, trails)
         assertEquals(saves, e.store.saves)
     }
 
-    /** 两个话题「Hiking」(聊天 App 里 Alice 的会话连着它)和「Trails」。返回两个的 id。 */
+    /** The two topics "Hiking" (linked to by Alice's conversation in the chat App) and "Trails". Returns both ids. */
     private fun TestScope.hikingAndTrails(e: Env): Pair<String, String> {
         e.model.reply = { aliceReply }
         repeat(12) { e.runner.capture(NoticeRecord("a$it", "com.chat", e.now(), "Alice", "message $it")) }
@@ -887,8 +887,8 @@ class LearnRunnerTest {
         return hiking to e.store.data.topics.single { it.label == "Trails" }.id
     }
 
-    // 合并没存上(存储满了之类),用户接着把并好的那个删了,也没存上,进程没了。下次读出来:文件里两个话题都还在,
-    // 合并和删除都得补做——只补删除的话,并掉的那个带着它的证据回来了,名字也不在「不再记录」里
+    // The merge failed to save (storage full and the like), the user then deleted the merged result and that failed to save too, and the process died. On the next read: both topics are still in the file,
+    // and both the merge and the delete must be replayed — replaying only the delete would bring the merged-away topic back with its evidence, and its name would not be in "never record again"
     @Test fun anUnsavedMergeIsRedoneBeforeTheDeleteThatFollowedIt() = runTest {
         val e = Env(this)
         val (hiking, trails) = hikingAndTrails(e)
@@ -902,14 +902,14 @@ class LearnRunnerTest {
         again.open()
         assertTrue(again.topics.value.isEmpty())
         assertTrue(e.store.data.topics.isEmpty())
-        // 两个名字都进了「不再记录」
+        // Both names went into "never record again"
         assertEquals(setOf(TopicPool.fingerprint("Hiking"), TopicPool.fingerprint("Trails")), e.store.data.blocked.toSet())
         assertTrue(e.purges.topicPurges.isEmpty())
-        // 联系人上不再连着它们
+        // Contacts no longer link to them
         assertTrue(e.contacts.data.contacts.single().topics.isEmpty())
     }
 
-    // 只是合并没存上、进程没了:下次读出来补做,不用用户再并一次;并掉的名字照样认
+    // Only the merge failed to save and the process died: it is replayed on the next read without the user merging again; the merged-away name is still recognised
     @Test fun anUnsavedMergeIsRedoneWhenThePoolLoadsAgain() = runTest {
         val e = Env(this)
         val (hiking, trails) = hikingAndTrails(e)
@@ -925,14 +925,14 @@ class LearnRunnerTest {
         assertTrue(e.store.data.blocked.isEmpty())
         assertEquals(listOf(trails), e.contacts.data.contacts.single().topics)
         assertTrue(e.purges.topicPurges.isEmpty())
-        // 存上了就不再记着:再换一个进程不会重做,也不多存
+        // Once saved it is no longer recorded: another process neither redoes it nor saves extra
         val saves = e.store.saves
         newProcess(e).open()
         assertEquals(saves, e.store.saves)
     }
 
-    // 合并的那一刻联系人那份读不出来(密钥库一时不可用),话题那份照常并了、存了。联系人读得出来之后:
-    // 连着并掉的那个话题的改连并进去的那个,不被当成指着空处的连接去掉
+    // At the moment of the merge the contacts store cannot be read (the keystore is briefly unavailable), while the topic store merges and saves as usual. Once contacts can be read:
+    // links to the merged-away topic are repointed to the target instead of being dropped as links pointing nowhere
     @Test fun contactLinksFollowAMergeMadeWhileContactsWereUnreadable() = runTest {
         val e = Env(this)
         val (hiking, trails) = hikingAndTrails(e)
@@ -950,7 +950,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 联系人那份改了却没存上、进程没了:下次读出来补做
+    // The contacts store was changed but failed to save and the process died: it is replayed on the next read
     @Test fun contactLinksFollowAMergeWhoseContactSaveFailed() = runTest {
         val e = Env(this)
         val (hiking, trails) = hikingAndTrails(e)
@@ -965,7 +965,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 一次合并要记到话题、联系人两份上。记完进程就没了(两份文件都还没改):下次读出来两份都补做,联系人上的连接跟着改指
+    // One merge is recorded on both the topic and contact stores. The process dies right after recording (neither file has changed yet): on the next read both are replayed and contact links follow the repoint
     @Test fun aMergeRecordedJustBeforeTheProcessDiedIsRedoneOnBothStores() = runTest {
         class Died : Error("process death")
         val e = Env(this)
@@ -985,8 +985,8 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 同一个名字上「删掉」和「并进别的」是后做的算数,没存上、进程没了之后补做也一样:
-    // 先删了「Tea」(兴趣),后把同名的另一个(在买的)并进「Drinks」→「Tea」算并掉的,不在「不再记录」里
+    // For the same name, whichever of "delete" and "merge into another" came later wins, and the same holds for a replay after a failed save and process death:
+    // deleting "Tea" (an interest) first, then merging another with the same name (shopping) into "Drinks" → "Tea" counts as merged away and is not in "never record again"
     @Test fun unsavedDeletesAndMergesAreRedoneInTheOrderTheUserMadeThem() = runTest {
         fun topic(id: String, kind: TopicKind, label: String) = ObservedTopic(id, kind, label, start, start, mapOf("com.shop" to listOf(20_000L)))
         val tea = TopicPool.fingerprint("Tea")
@@ -1003,7 +1003,7 @@ class LearnRunnerTest {
         assertEquals(listOf("k4"), e.store.data.topics.map { it.id })
         assertEquals("k4", e.store.data.merged[tea])
         assertFalse(tea in e.store.data.blocked)
-        // 反过来:先把一个并掉,后把同名的另一个删了 →「Tea」不再记
+        // The other way round: merge one away first, then delete the other with the same name → "Tea" is never recorded again
         val f = Env(this)
         f.store.data = TopicPoolData(topics = listOf(
             topic("k1", TopicKind.Interest, "Tea"), topic("k3", TopicKind.Shopping, "Tea"), topic("k4", TopicKind.Routine, "Drinks")))
@@ -1018,7 +1018,7 @@ class LearnRunnerTest {
         assertTrue(tea in f.store.data.blocked)
     }
 
-    // 两个同名的话题先后并进两个不同的目标:名字算在后并的那个目标上,正着做、反着做补出来都得对
+    // Two topics with the same name are merged into two different targets one after the other: the name counts on the later target, and the replay must be correct whether applied forwards or backwards
     @Test fun theLaterOfTwoSameNameMergesWinsAfterAReplay() = runTest {
         fun topic(id: String, kind: TopicKind, label: String) = ObservedTopic(id, kind, label, start, start, mapOf("com.shop" to listOf(20_000L)))
         for (reverse in listOf(false, true)) {
@@ -1036,8 +1036,8 @@ class LearnRunnerTest {
         }
     }
 
-    // 目标是刚归纳出来、还没存上的话题(存储满了之类):这时不并。记号里只有两个 id,进程一没目标不在文件里,
-    // 这次合并补不回来;并了的话,用户看到并好了,重启后并掉的那个却回来了、目标没了
+    // The target is a topic just learned and not saved yet (storage full and the like): no merge happens. The mark holds only two ids, so if the process dies the target is not in the file
+    // and this merge cannot be replayed; had it merged, the user would see it merged, yet after a restart the merged-away topic would be back and the target gone
     @Test fun aMergeIntoATopicThatIsNotSavedYetIsNotDone() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1") }
@@ -1049,11 +1049,11 @@ class LearnRunnerTest {
         val trails = e.runner.topics.value.single { it.label == "Trails" }.id
         assertEquals(listOf(hiking), e.store.data.topics.map { it.id })
         e.runner.mergeTopic(hiking, trails)
-        // 没并:两个都还在,什么都没记
+        // Not merged: both are still there and nothing was recorded
         assertEquals(setOf(hiking, trails), e.runner.topics.value.map { it.id }.toSet())
         assertTrue(e.purges.topicPurges.isEmpty())
         assertTrue(e.purges.contactPurges.isEmpty())
-        // 存得上了:先把话题池存上,再并
+        // Saving works again: the topic pool is saved first, then the merge happens
         e.store.failSave = false
         e.runner.mergeTopic(hiking, trails)
         assertEquals(listOf(trails), e.store.data.topics.map { it.id })
@@ -1061,7 +1061,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.topicPurges.isEmpty())
     }
 
-    // 连着并了两回都没存上:补做时照先后来,一路跟到最后并进去的那个
+    // Two merges in a row both failed to save: the replay follows their order and ends on the last target
     @Test fun unsavedMergesInARowEndUpOnTheLastTopic() = runTest {
         val e = Env(this)
         val (hiking, trails) = hikingAndTrails(e)
@@ -1084,7 +1084,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 请求在途时用户把它要引用的话题并掉了:回复引用的还是并掉的那个,算到并进去的那个上,不当成「被删了」丢掉
+    // While the request is in flight the user merges away the topic it will cite: the reply still cites the merged-away one, which counts on the target rather than being dropped as "deleted"
     @Test fun aReplyCitingATopicMergedMeanwhileCountsOnTheOther() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1") }
@@ -1097,7 +1097,7 @@ class LearnRunnerTest {
         e.model.gate = CompletableDeferred()
         e.post(count = 12)
         assertEquals(3, e.model.calls.size)
-        // 这次给模型看的话题里「Hiking」是第几个
+        // Which position "Hiking" takes among the topics shown to the model this time
         val lines = e.model.input(2).lines()
         val ref = lines[lines.indexOf("Hiking") - 1].substringAfter("[").substringBefore("]")
         e.model.reply = { """{"signals":[{"ids":["n1"],"topic":"$ref"}]}""" }
@@ -1133,7 +1133,7 @@ class LearnRunnerTest {
         ObservedContact("c2", "com.mail", "Bob", 1L, start, days = listOf(20_000L)),
     ))
 
-    // 「清空全部」时四份都读不出来:连文件一起删掉,不能什么都没做(读不出来的存盘只有这一条出路)
+    // During "clear all" all four stores cannot be read: delete the files along with them rather than doing nothing (deleting is the only way out for a store that cannot be read)
     @Test fun clearAllWorksWhenNothingCanBeRead() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1154,16 +1154,16 @@ class LearnRunnerTest {
         assertEquals(0, e.contacts.brokenCopies)
         assertTrue(e.store.data.topics.isEmpty())
         assertTrue(e.contacts.data.contacts.isEmpty())
-        // 都清空了,记着的补删也不用做了
+        // Everything is cleared, so the recorded pending deletes are not needed
         assertEquals(emptySet<String>(), e.purges.topicPurges)
         assertEquals(emptySet<String>(), e.purges.contactPurges)
-        // 之后照常能用:不用等读得出来
+        // It works as usual afterwards, without waiting for it to become readable
         e.model.reply = { newTopic("n1") }
         e.post(count = 12)
         assertEquals(listOf("Hiking"), e.store.data.topics.map { it.label })
     }
 
-    // 「清空全部」读得出来、却存不上:文件里还是旧的,下次启动会读回来——把文件删掉
+    // "Clear all" can read but cannot save: the file still holds the old data and the next start would read it back — so delete the file
     @Test fun clearAllDeletesTheFileWhenTheEmptyPoolCannotBeSaved() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -1178,7 +1178,7 @@ class LearnRunnerTest {
         assertTrue(e.runner.topics.value.isEmpty())
     }
 
-    // 关掉「敏感类推断」并删除时读不出来:记下来,读得出来时先补删(进程没了也还记着:记在 LearnPurges 里)
+    // Turning off "sensitive-category inference" and deleting while it cannot be read: record it, and replay the delete first once readable (it survives process death, recorded in LearnPurges)
     @Test fun sensitiveDeleteIsMadeUpWhenTheStoresCanBeReadAgain() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -1188,7 +1188,7 @@ class LearnRunnerTest {
         assertEquals(2, e.store.data.topics.size)
         assertEquals(setOf(LearnRunner.PURGE_SENSITIVE), e.purges.topicPurges)
         assertEquals(setOf(LearnRunner.PURGE_SENSITIVE), e.purges.contactPurges)
-        // 换一个进程(新的 LearnRunner、同一份记录):一读出来就补删,还没等到任何别的操作
+        // A new process (a fresh LearnRunner over the same records): the delete is replayed as soon as it reads, before any other operation
         e.store.failLoad = false; e.contacts.failLoad = false
         val again = LearnRunner(
             TriageHooks(target = { target }, model = { null }, tokensToday = { 0 }, callsToday = { 0 },
@@ -1204,7 +1204,7 @@ class LearnRunnerTest {
         assertEquals(emptySet<String>(), e.purges.contactPurges)
     }
 
-    // 「清掉这个 App 的」也一样;只有一份读不出来时,读得出来的那份当场清
+    // The same for "clear this App's": when only one store cannot be read, the readable one is cleared on the spot
     @Test fun clearAppIsMadeUpForTheStoreThatCouldNotBeRead() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -1221,7 +1221,7 @@ class LearnRunnerTest {
         assertEquals(emptySet<String>(), e.purges.contactPurges)
     }
 
-    // 删了却没存上:还记着(这时进程没了,下次读出来会补做)
+    // Deleted but not saved: it stays recorded (if the process dies now, the next read replays it)
     @Test fun aPurgeThatCouldNotBeSavedStaysPending() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -1232,19 +1232,19 @@ class LearnRunnerTest {
         assertEquals(setOf("com.chat"), e.purges.contactPurges)
         assertEquals(listOf("Hiking"), e.runner.topics.value.map { it.label })
         assertEquals(listOf("Bob"), e.runner.contactsView.value.contacts.map { it.name })
-        // 文件里还是旧的
+        // The file still holds the old data
         assertEquals(2, e.store.data.topics.size)
         assertEquals(2, e.contacts.data.contacts.size)
     }
 
-    // 删了、当时没存上、后来存上了:不再记着。否则下次启动会再删一遍,把这之后新攒的也删掉
+    // Deleted, unsaved at the time, saved later: no longer recorded. Otherwise the next start would delete again and take out whatever was accumulated afterwards
     @Test fun aPurgeIsNotRepeatedOnceItReachedTheDisk() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
         e.contacts.data = seededContacts()
         e.store.failSave = true; e.contacts.failSave = true
         e.runner.clearApp("com.chat")
-        // 存盘好了;这个 App 之后又攒出了新的话题和联系人
+        // Saving works again; this App then accumulates new topics and contacts
         e.store.failSave = false; e.contacts.failSave = false
         e.model.reply = { aliceReply }
         e.chat("a", "Alice", count = 12)
@@ -1252,7 +1252,7 @@ class LearnRunnerTest {
         assertEquals(emptySet<String>(), e.purges.contactPurges)
         assertEquals(setOf("com.shop", "com.chat"), e.store.data.topics.single().evidence.keys)
         assertEquals(setOf("Alice", "Bob"), e.contacts.data.contacts.map { it.name }.toSet())
-        // 换一个进程再打开:新攒的还在
+        // Open again in a new process: what was newly accumulated is still there
         val again = LearnRunner(
             TriageHooks(target = { target }, model = { null }, tokensToday = { 0 }, callsToday = { 0 },
                 usageVersion = { MutableStateFlow(0L) }, busy = MutableStateFlow(false)),
@@ -1264,7 +1264,7 @@ class LearnRunnerTest {
         assertEquals(setOf("Alice", "Bob"), e.contacts.data.contacts.map { it.name }.toSet())
     }
 
-    // 同一个进程里对同一个 App 再点一次「清掉」:照样再删(上一次之后内存里可能又攒了新的)
+    // Tapping "clear" for the same App again in the same process deletes again (new data may have accumulated in memory since last time)
     @Test fun askingAgainPurgesAgain() = runTest {
         val e = Env(this)
         e.runner.open()
@@ -1280,7 +1280,7 @@ class LearnRunnerTest {
         assertEquals(emptySet<String>(), e.purges.topicPurges)
     }
 
-    // 用户删了东西:读不出来时另存的旧文件(里面可能还有刚删的)一并删掉
+    // When the user deletes things: the old copies moved aside while unreadable (which may still hold what was just deleted) are deleted as well
     @Test fun deletionsDropTheSetAsideCopies() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -1295,13 +1295,13 @@ class LearnRunnerTest {
         copies(); e.runner.clearAll(); assertTrue(gone())
     }
 
-    // ---- 通知日志(通知原文,「当日消息归纳」用) ----
+    // ---- Notification journal (raw notifications, used by the "daily notification digest") ----
 
     private fun TestScope.lockAndUnlock(e: Env) {
         e.locked.value = true; runCurrent(); e.locked.value = false; runCurrent()
     }
 
-    // 只有「当日消息归纳」开着才记,而且只记归纳收的那些 App
+    // Recorded only while the "daily notification digest" is on, and only for the Apps learning accepts
     @Test fun journalTakesOnlyWhatLearningTakesAndOnlyWhenDigestIsOn() = runTest {
         val e = Env(this)
         e.post(pkg = "com.shop")
@@ -1311,7 +1311,7 @@ class LearnRunnerTest {
         e.post(pkg = "com.shop", count = 2)
         e.post(pkg = "com.bank")
         assertEquals(2, e.runner.state.value.journal)
-        // 归纳关着时一条都不记
+        // With learning off, not a single entry is recorded
         e.on = false
         e.post(pkg = "com.shop")
         e.on = true
@@ -1319,7 +1319,7 @@ class LearnRunnerTest {
         assertEquals(listOf("text 2", "text 3"), e.journal.texts)
     }
 
-    // 不定时存盘:锁屏时存;攒够 20 段存一次;不再看守时存
+    // No timer-based saves: save on lock; save once 20 entries have accumulated; save when the watchman stops
     @Test fun journalIsSavedOnLockAndEveryTwentyEntries() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1329,15 +1329,15 @@ class LearnRunnerTest {
         assertEquals(1, e.journal.saves)
         assertEquals(3, e.journal.texts.size)
         e.locked.value = false; runCurrent()
-        // 没有新的,解锁不重复存
+        // Nothing new, so unlocking does not save again
         assertEquals(1, e.journal.saves)
-        // 一个 App 攒不到 12 条就不会发请求,换着 App 来,只看存盘
+        // No single App reaches 12 entries, so no request is sent; cycling through Apps, only the saves matter
         (1..LearnRunner.JOURNAL_FLUSH_EVERY).forEach { e.post(pkg = "com.b${it % 4}") }
         assertEquals(2, e.journal.saves)
         assertEquals(3 + LearnRunner.JOURNAL_FLUSH_EVERY, e.journal.texts.size)
     }
 
-    // 到期的要删,没有新通知来也一样(下一次锁屏或解锁时)
+    // Expired entries are deleted even when no new notification arrives (at the next lock or unlock)
     @Test fun journalExpiresWithoutNewNotifications() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1351,7 +1351,7 @@ class LearnRunnerTest {
         assertEquals(0, e.runner.state.value.journal)
     }
 
-    // 换一个进程:接着上次存下的;同一条通知原样重发不再记一遍
+    // New process: it continues from what was saved; the same notification reposted unchanged is not recorded again
     @Test fun journalSurvivesARestartWithoutDuplicates() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1367,12 +1367,12 @@ class LearnRunnerTest {
         again.capture(NoticeRecord("k", "com.chat", e.now() + 5, "家长群", "明天开会", sender = "王老师", group = true))
         again.capture(NoticeRecord("k", "com.chat", e.now() + 9, "家长群", "收到", sender = "李老师", group = true))
         assertEquals(3, again.state.value.journal)
-        // 清掉另一个 App 的:有改动,存一次盘(这个实例没在看守,没有锁屏来触发存盘)
+        // Clearing another App's: there are changes, so it saves once (this instance is not watching, so no lock triggers a save)
         again.clearApp("com.gone")
         assertEquals(listOf("王老师" to "明天开会", "李老师" to "收到"), e.journal.data!!.entries.map { it.sender to it.text })
     }
 
-    /** 换一个进程:同样的文件、同样记着的待删,新的实例。 */
+    /** A new process: the same files and the same recorded pending deletes, in a new instance. */
     private fun newProcess(e: Env) = LearnRunner(
         TriageHooks(target = { target }, model = { null }, tokensToday = { 0 }, callsToday = { 0 },
             usageVersion = { MutableStateFlow(0L) }, busy = MutableStateFlow(false)),
@@ -1384,7 +1384,7 @@ class LearnRunnerTest {
 
     private fun rawApps(e: Env) = e.journal.data?.entries.orEmpty().map { it.packageName }
 
-    // 不再从这个 App 归纳时原文那份正好读不出来:记下来,读得出来时先补删。不然之后这个 App 又被允许,旧原文就又回来了
+    // The raw text store cannot be read exactly when learning stops for this App: record it and replay the delete first once readable. Otherwise, if the App is allowed again later, the old raw text comes back
     @Test fun revokedAppsRawTextIsRemovedOnceTheJournalLoadsAgain() = runTest {
         val e = Env(this)
         e.journal.data = NoticeJournalData(sinceMs = e.now() - 2_000, entries = listOf(
@@ -1397,21 +1397,21 @@ class LearnRunnerTest {
         e.runner.forgetApps(setOf("com.a"))
         assertEquals(setOf("com.a"), e.purges.journalPurges)
         assertEquals("读不出来不整份删", 0, e.journal.wipes)
-        // 之后读得出来了,这个 App 也重新被允许
+        // Later it becomes readable and the App is allowed again too
         e.journal.failLoad = false
         e.optOut -= "com.a"
         val view = e.runner.notices(e.now() - 10_000, e.now() + 1, LearnLevel.Balanced) { SourceTier.High }!!
         assertEquals(listOf("com.b"), view.entries.map { it.packageName })
         assertEquals(listOf("com.b"), rawApps(e))
         assertTrue("存上了就不再记着", e.purges.journalPurges.isEmpty())
-        // 重新允许之后新来的照常记、照常留着:换一个进程也不会被上次的待删带走
+        // After being allowed again, new entries are recorded and kept as usual: a new process will not sweep them away with the earlier pending delete
         e.runner.capture(NoticeRecord("n1", "com.a", e.now(), "新会话", "重新允许之后的"))
         lockAndUnlock(e)
         val again = newProcess(e)
         assertEquals(listOf("com.b", "com.a"), again.notices(e.now() - 10_000, e.now() + 1, LearnLevel.Balanced) { SourceTier.High }!!.entries.map { it.packageName })
     }
 
-    // 删了却没存上、进程又没了:文件里还是旧的。记着的待删在下次读出来时补做
+    // Deleted but not saved and the process died again: the file still holds the old data. The recorded pending delete is replayed on the next read
     @Test fun revokedAppsRawTextStaysDeletedAfterAFailedSaveAndARestart() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1432,7 +1432,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.journalPurges.isEmpty())
     }
 
-    // 「清掉这个 App 的」时原文读不出来:整份删;连删也删不掉的话记着这个 App,读得出来时补做
+    // "Clear this App's" while the raw text cannot be read: delete everything; if even that fails, record this App and replay it once readable
     @Test fun clearingAnAppWhileTheJournalCanNeitherBeReadNorDeletedIsReplayedLater() = runTest {
         val e = Env(this)
         e.journal.data = NoticeJournalData(sinceMs = e.now() - 2_000, entries = listOf(
@@ -1443,14 +1443,14 @@ class LearnRunnerTest {
         e.journal.failLoad = true
         e.journal.failWipe = true
         e.runner.clearApp("com.a")
-        // 读不出来时本来是整份删;删不掉,记着的就是「全清」
+        // Being unreadable normally means deleting everything; since that fails, the record is "clear all"
         assertEquals(setOf(":all"), e.purges.journalPurges)
         e.journal.failLoad = false
         e.journal.failWipe = false
         assertTrue(newProcess(e).notices(e.now() - 10_000, e.now() + 1, LearnLevel.Balanced) { SourceTier.High }!!.entries.isEmpty())
         assertTrue(e.journal.data!!.entries.isEmpty())
         assertTrue(e.purges.journalPurges.isEmpty())
-        // 删得掉的时候整份删了,就没有要补做的
+        // When deleting works, everything is deleted and there is nothing to replay
         val e2 = Env(this)
         e2.journal.data = NoticeJournalData(sinceMs = e2.now() - 2_000, entries = listOf(NoticeEntry("com.a", e2.now() - 1_000, "旧会话", text = "要清掉的")))
         e2.digest = true
@@ -1460,7 +1460,7 @@ class LearnRunnerTest {
         assertTrue(e2.purges.journalPurges.isEmpty())
     }
 
-    // 页面要知道还留着哪些 App 的通知原文(只有包名):只有原文、还没归纳出东西的 App 也得能单独清掉
+    // The page must know which Apps still have raw notifications (package names only): an App with only raw text and nothing learned must be clearable on its own
     @Test fun stateListsTheAppsThatStillHaveRawText() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1469,7 +1469,7 @@ class LearnRunnerTest {
         assertEquals(setOf("com.a", "com.b"), e.runner.state.value.journalApps)
         e.runner.clearApp("com.a")
         assertEquals(setOf("com.b"), e.runner.state.value.journalApps)
-        // 换一个进程、没在看守:打开内容页时把原文读出来,页面上照样列得出
+        // A new process, not watching: opening the content page reads the raw text, and the page can still list them
         lockAndUnlock(e)
         val again = newProcess(e)
         assertEquals(emptySet<String>(), again.state.value.journalApps)
@@ -1477,7 +1477,7 @@ class LearnRunnerTest {
         assertEquals(setOf("com.b"), again.state.value.journalApps)
     }
 
-    // 清空全部时,有一份既读不出来、文件也删不掉:不能当成清掉了。记一个「全清」,读得出来时照它清空
+    // During clear all one store can neither be read nor deleted: that must not count as cleared. Record a "clear all" and empty it accordingly once readable
     @Test fun clearAllThatCouldNotWipeAFileIsFinishedWhenItLoadsAgain() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1494,7 +1494,7 @@ class LearnRunnerTest {
         assertEquals(setOf(":all"), e.purges.contactPurges)
         assertEquals(setOf(":all"), e.purges.journalPurges)
         assertEquals(setOf(":all"), e.purges.digestPurges)
-        // 存储好了,换一个进程:读出来时都清空,并且存上、不再记着
+        // Storage works again and a new process starts: everything is emptied as it is read, saved, and no longer recorded
         e.store.failLoad = false; e.store.failWipe = false
         e.contacts.failLoad = false; e.contacts.failWipe = false
         e.journal.failLoad = false; e.journal.failWipe = false
@@ -1512,12 +1512,12 @@ class LearnRunnerTest {
         for (left in listOf(e.purges.topicPurges, e.purges.contactPurges, e.purges.journalPurges, e.purges.digestPurges)) assertTrue(left.isEmpty())
     }
 
-    // 单删一个联系人没存上(内存里已经空了,文件里还在),再清空全部:内存是空的也得把文件清掉,不能只把待删划掉
+    // A single contact delete failed to save (memory is already empty, the file is not), then clear all: even with empty memory the file must be cleared, not just the pending delete crossed out
     @Test fun clearAllAfterAnUnsavedContactDeleteStillCleansTheFile() = runTest {
         fun seeded() = Env(this).also {
             it.contacts.data = ContactPoolData(contacts = listOf(ObservedContact("c1", "com.a", "张三", 1L, start, days = listOf(20_000L))))
         }
-        // 清空时存储已经好了:存上空的,不再记着
+        // Storage already works when clearing: the empty state is saved and nothing stays recorded
         seeded().let { e ->
             e.contacts.failSave = true
             e.runner.deleteContact("c1")
@@ -1531,7 +1531,7 @@ class LearnRunnerTest {
             again.open()
             assertTrue(again.contactsView.value.contacts.isEmpty())
         }
-        // 清空时还是存不上:退到删文件
+        // Saving still fails when clearing: fall back to deleting the file
         seeded().let { e ->
             e.contacts.failSave = true
             e.runner.deleteContact("c1")
@@ -1540,7 +1540,7 @@ class LearnRunnerTest {
             assertTrue(e.contacts.data.contacts.isEmpty())
             assertTrue(e.purges.contactPurges.isEmpty())
         }
-        // 清空时既存不上也删不掉:待删不能丢,记成「全清」;存储好了之后补清
+        // Clearing can neither save nor delete: the pending delete must not be lost, so it is recorded as "clear all"; once storage works it is finished
         seeded().let { e ->
             e.contacts.failSave = true
             e.runner.deleteContact("c1")
@@ -1558,7 +1558,7 @@ class LearnRunnerTest {
         }
     }
 
-    // 第一次清空全部时联系人既没存上也没删掉,存储好了之后在同一个进程里再清一次:内存早就空了,这一次也要真的把文件清掉
+    // The first clear all could neither save nor delete contacts; after storage recovered, clearing again in the same process: memory has long been empty, but this time the file really must be cleared
     @Test fun aSecondClearAllFinishesWhatTheFirstCouldNot() = runTest {
         val e = Env(this)
         e.contacts.data = ContactPoolData(contacts = listOf(ObservedContact("c1", "com.a", "张三", 1L, start, days = listOf(20_000L))))
@@ -1574,7 +1574,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 以前按通知键存下来的联系人:读出来时同名的并成一条并存上;记着的、没存上的删除(记的是以前的 id)先补做,删掉的不借着合并回来
+    // Contacts stored earlier by notification key: on load, those with the same name are merged into one and saved; recorded deletes that never saved (recorded under the old id) are replayed first, so deleted ones do not come back through the merge
     @Test fun storedContactsAreMergedByConversationNameWhenLoaded() = runTest {
         fun old(key: String, title: String) = com.wangzan101.mika.core.proactive.ContactIdentity.of(
             "com.chat", key, title, com.wangzan101.mika.core.proactive.ContactIdStrategy.KeyAndTitle)!!.id
@@ -1592,11 +1592,11 @@ class LearnRunnerTest {
         assertEquals(listOf("家长群"), shown.map { it.name })
         assertEquals(listOf(19_998L, 19_999L, 20_000L), shown.single().days)
         assertTrue(shown.single().established)
-        // 存上了:文件里也是并好的一条,记着的删除划掉了
+        // Saved: the file holds the single merged entry and the recorded delete is crossed out
         assertEquals(1, e.contacts.data.contacts.size)
         assertTrue(e.contacts.data.contacts.single().id.startsWith("t"))
         assertTrue(e.purges.contactPurges.isEmpty())
-        // 换一个进程再读:不再动
+        // Read again in a new process: nothing changes
         val saves = e.contacts.saves
         val again = newProcess(e)
         again.open()
@@ -1604,8 +1604,8 @@ class LearnRunnerTest {
         assertEquals(saves, e.contacts.saves)
     }
 
-    // 换身份之后没存上(存储满了之类),用户删掉了换好的那一条,也没存上,进程没了。下次读出来的还是换之前的文件:
-    // 记着的删除要作数,同名的那几条不能再换一遍身份就回来
+    // The re-identification failed to save (storage full and the like), the user deleted the re-identified entry and that failed to save too, and the process died. The next read still sees the pre-migration file:
+    // the recorded delete must count, so the entries with the same name must not come back just by being re-identified again
     @Test fun aDeleteMadeAfterAnUnsavedMigrationStillHolds() = runTest {
         fun old(key: String, title: String) = com.wangzan101.mika.core.proactive.ContactIdentity.of(
             "com.chat", key, title, com.wangzan101.mika.core.proactive.ContactIdStrategy.KeyAndTitle)!!.id
@@ -1630,7 +1630,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.contactPurges.isEmpty())
     }
 
-    // 清空全部正常做完:没有记着的待删(以前记着的也一并划掉)
+    // Clear all completed normally: no pending deletes remain recorded (earlier records are crossed out too)
     @Test fun clearAllLeavesNoPendingDeletionsWhenItWorked() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1642,11 +1642,11 @@ class LearnRunnerTest {
         for (left in listOf(e.purges.topicPurges, e.purges.contactPurges, e.purges.journalPurges, e.purges.digestPurges)) assertTrue(left.toString(), left.isEmpty())
     }
 
-    // 一个通知键被认成反复重发的状态显示(导航播报之类):它刚收进来、还没归纳的那几条去掉,通知原文里的也去掉;别的键不动
+    // A notification key is recognised as a repeatedly reposted status display (navigation prompts and the like): the entries just captured and not yet learned are dropped, along with their raw notifications; other keys are untouched
     @Test fun aKeyRecognisedAsAStatusDisplayLosesWhatItJustAdded() = runTest {
         val e = Env(this)
         e.digest = true
-        // 同一个键上一小时前的一条正常通知(很多 App 所有推送共用一个通知键):不能跟着丢
+        // A normal notification on the same key from an hour earlier (many Apps use one notification key for all pushes): it must not be dropped with them
         e.runner.capture(NoticeRecord("nav", "com.maps", e.now(), "常去的地方有新的评价", "点开看看"))
         wait(3_600_000L)
         val burst = e.now()
@@ -1657,14 +1657,14 @@ class LearnRunnerTest {
         e.runner.dropLive("nav", "com.maps", burst + 6_000L - 60_000L)
         assertEquals(listOf("常去的地方有新的评价", "周边优惠"), e.journal.data!!.entries.map { it.title })
         assertEquals(2, e.runner.state.value.journal)
-        // 没有这个键的东西时什么都不做
+        // With nothing under this key, nothing happens
         val saves = e.journal.saves
         e.runner.dropLive("nothing", "com.maps", 0)
         assertEquals(saves, e.journal.saves)
     }
 
-    // 认出一个键是状态显示时,正在给这个 App 写分段归纳的请求取消:不然回复回来,照着刚去掉的那几条原文写的句子还是进了归纳。
-    // 别的 App 的请求不动
+    // When a key is recognised as a status display, the segmented digest request being written for this App is cancelled: otherwise a late reply would still put sentences written from the raw text just dropped into the digest.
+    // Requests for other Apps are left alone
     @Test fun aNotesRequestInFlightIsCancelledWhenItsAppTurnsOutToPostAStatusDisplay() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1683,8 +1683,8 @@ class LearnRunnerTest {
         assertEquals(19, e.runner.state.value.journal)
     }
 
-    // 认出状态显示时,归纳话题的请求正带着它刚收进来的那几条在途:取消,那几条去掉。不然回复回来,照着它们归纳出的话题还是存下了;
-    // 锁屏再取消一次的话,它们回到待归纳,解锁后又发给模型
+    // When the status display is recognised, the topic digest request in flight carries the entries just captured: cancel it and drop them. Otherwise a late reply would still store topics learned from them;
+    // if locking cancels it a second time they return to pending and are sent to the model again after unlocking
     @Test fun aLearnRequestInFlightIsCancelledWhenItCarriesAStatusDisplay() = runTest {
         val e = Env(this)
         repeat(9) { i -> e.runner.capture(NoticeRecord("normal-$i", "com.maps", e.now(), "普通通知 $i", "普通内容 $i")) }
@@ -1703,7 +1703,7 @@ class LearnRunnerTest {
         e.model.gate!!.complete(Unit)
         runCurrent()
         assertTrue(e.store.data.topics.isEmpty())
-        // 剩下的照常再发(到期之后),里面没有那几条
+        // The rest is sent again as usual (once due), without those entries
         e.model.gate = null
         e.model.reply = { """{"signals":[]}""" }
         wait(LearnTuning.DUE_AGE_MS + 1)
@@ -1711,7 +1711,7 @@ class LearnRunnerTest {
         val resent = e.model.calls.indices.first { it > 0 && e.model.packages()[it] == "com.maps" }
         assertTrue(e.model.input(resent).contains("普通内容 0"))
         assertFalse(e.model.input(resent).contains("NAV_TEXT"))
-        // 别的键、这个键更早的事件在途时不取消
+        // No cancellation while entries for other keys, or earlier entries of this key, are in flight
         val f = Env(this)
         f.model.gate = CompletableDeferred()
         f.post(pkg = "com.maps", count = 12)
@@ -1721,8 +1721,8 @@ class LearnRunnerTest {
         assertTrue(f.runner.requestActive)
     }
 
-    // 认出状态显示的那一刻通知原文读不出来(密钥库一时不可用):记下来,读得出来时先去掉那一阵的再选批。
-    // 不然它们还算没归纳过,下一次分段归纳又发给模型。同一个键上之后的正常通知不动
+    // The raw notifications cannot be read at the moment the status display is recognised (the keystore is briefly unavailable): record it, and once readable drop that burst before choosing a batch.
+    // Otherwise they would still count as unlearned and be sent to the model again with the next segmented digest. Normal notifications on the same key afterwards are untouched
     @Test fun aStatusDisplaysRawTextIsRemovedOnceTheJournalLoadsAgain() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1745,7 +1745,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.journalPurges.isEmpty())
     }
 
-    // 原文去掉了却没存上、进程没了:文件里还是旧的,下次读出来补做
+    // The raw text was dropped but not saved and the process died: the file still holds the old data, replayed on the next read
     @Test fun aStatusDisplaysRawTextRemovalSurvivesAFailedSave() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1766,7 +1766,7 @@ class LearnRunnerTest {
         assertTrue(e.purges.journalPurges.isEmpty())
     }
 
-    // 每一条清除路径都要把通知原文带走(和「禁用 App 后要清掉排着队的」是同一类)
+    // Every clearing path must take the raw notifications with it (the same category as "queued items are cleared when an App is blocked")
     @Test fun journalFollowsEveryPurgePath() = runTest {
         fun Env.seed(): Env {
             digest = true
@@ -1775,19 +1775,19 @@ class LearnRunnerTest {
             return this
         }
         fun apps(e: Env) = e.journal.data?.entries.orEmpty().map { it.packageName }
-        // 取消勾选、在「应用访问」里禁用、「不从它归纳」:都是这个 App 不再归纳,然后重新看一遍
+        // Unchecking it, blocking it in "App access", or "do not learn from it": all mean this App is no longer learned from, and then it looks again
         Env(this).seed().let { e ->
             e.optOut += "com.a"
             e.runner.forgetApps(setOf("com.a"))
             assertEquals(listOf("com.b"), apps(e))
             assertEquals(1, e.runner.state.value.journal)
         }
-        // 清掉这个 App 的
+        // Clear this App's
         Env(this).seed().let { e ->
             e.runner.clearApp("com.a")
             assertEquals(listOf("com.b"), apps(e))
         }
-        // 清空全部
+        // Clear all
         Env(this).seed().let { e ->
             lockAndUnlock(e)
             assertEquals(3, apps(e).size)
@@ -1795,7 +1795,7 @@ class LearnRunnerTest {
             assertEquals(emptyList<String>(), apps(e))
             assertEquals(0, e.runner.state.value.journal)
         }
-        // 关掉「当日消息归纳」
+        // Turn off the "daily notification digest"
         Env(this).seed().let { e ->
             lockAndUnlock(e)
             e.digest = false
@@ -1804,7 +1804,7 @@ class LearnRunnerTest {
             assertTrue(e.journal.wipes > 0)
             assertEquals(0, e.runner.state.value.journal)
         }
-        // 关掉归纳、关掉主动能力(都走 clear)
+        // Turn off learning and turn off proactive features (both go through clear)
         Env(this).seed().let { e ->
             lockAndUnlock(e)
             e.on = false
@@ -1814,14 +1814,14 @@ class LearnRunnerTest {
         }
     }
 
-    // 日志一时读不出来:不记、不存(不拿空的去盖);「清空全部」「清掉这个 App 的」照样把文件删掉
+    // The journal is temporarily unreadable: nothing is recorded or saved (no empty data written over it); "clear all" and "clear this App's" still delete the file
     @Test fun unreadableJournalIsNeverOverwrittenButCanStillBeWiped() = runTest {
         val e = Env(this)
         e.digest = true
         e.post(pkg = "com.a", count = 2)
         lockAndUnlock(e)
         val saved = e.journal.data
-        // 换一个进程,这时读不出来
+        // A new process, and now it cannot be read
         e.journal.failLoad = true
         val again = LearnRunner(
             TriageHooks(target = { target }, model = { null }, tokensToday = { 0 }, callsToday = { 0 },
@@ -1841,17 +1841,17 @@ class LearnRunnerTest {
         assertEquals(null, e.journal.data)
     }
 
-    // ---- 当日消息归纳的第 1 级:分段归纳 ----
+    // ---- Level 1 of the daily notification digest: segmented digest ----
 
     private val oneNote = """{"notes":[{"ids":["e1","e2"],"text":"买的东西发货了"}]}"""
 
-    // 一个 App 攒够 20 段没归纳过的:发一批(只有这个 App、没有工具),记下句子和它的依据,这一批不再发
+    // One App accumulates 20 unlearned entries: a batch is sent (that App only, no tools), the sentence and its grounds are stored, and this batch is not sent again
     @Test fun notesBatchIsSentWhenDueAndStoredWithItsGrounds() = runTest {
         val e = Env(this)
         e.digest = true
         e.model.notesReply = { oneNote }
         e.post(pkg = "com.shop", count = LearnTuning.NOTES_DUE_COUNT - 1)
-        // 归纳话题的那一批(12 条)先发过了;分段归纳还差一段
+        // The topic digest batch (12 entries) already went out; the segmented digest is one entry short
         assertEquals(listOf(false), e.model.calls.indices.map(e.model::isNotes))
         e.post(pkg = "com.shop")
         assertEquals(listOf(false, true), e.model.calls.indices.map(e.model::isNotes))
@@ -1862,14 +1862,14 @@ class LearnRunnerTest {
         assertEquals("com.shop", note.packageName)
         assertEquals(2, note.count)
         assertEquals(listOf("买的东西发货了"), e.runner.digestNotes.value.map { it.text })
-        // 这 20 段记成做过了(原文还留着),不再发
+        // These 20 entries are marked done (the raw text stays) and are not sent again
         assertEquals(LearnTuning.NOTES_DUE_COUNT, e.journal.data!!.entries.count { it.noted })
         e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent()
         assertEquals(2, e.model.calls.size)
         assertEquals(LearnStatus.Waiting, e.runner.state.value.status)
     }
 
-    // 攒不够 20 段的,最旧的一段过了两小时也发(有事发生时才看,不定时)
+    // Short of 20 entries, it still sends once the oldest entry is two hours old (it only looks when something happens; no timer)
     @Test fun notesBatchIsSentWhenItsOldestEntryIsOldEnough() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1877,13 +1877,13 @@ class LearnRunnerTest {
         e.post(pkg = "com.a", count = 3)
         wait(LearnTuning.NOTES_DUE_AGE_MS)
         assertTrue(e.model.calls.none { e.model.isNotes(e.model.calls.indexOf(it)) })
-        // 归纳话题的那一批(过了 30 分钟)先发,回来之后接着发分段归纳
+        // The topic digest batch (over 30 minutes old) goes first, and the segmented digest follows once it returns
         e.post(pkg = "com.other")
         assertEquals(listOf("com.a" to false, "com.a" to true), e.model.calls.indices.map { e.model.packages()[it] to e.model.isNotes(it) })
         assertEquals(1, e.digestStore.data.notes.size)
     }
 
-    // 回复读不懂:这一批算做过(不再发同一批),停一段;根本没连上:留着,停一段之后再发同一批
+    // Unreadable reply: this batch counts as done (the same batch is not sent again) and a hold follows; not connected at all: it is kept and the same batch is sent after a hold
     @Test fun notesFailuresFollowTheSameRulesAsLearning() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1894,7 +1894,7 @@ class LearnRunnerTest {
         assertEquals(20, e.journal.data!!.entries.count { it.noted })
         assertTrue(e.digestStore.data.notes.isEmpty())
         assertEquals(LearnStatus.Waiting, e.runner.state.value.status)
-        // 没连上
+        // Not connected
         val f = Env(this)
         f.digest = true
         f.model.reply = { """{"signals":[]}""" }
@@ -1914,7 +1914,7 @@ class LearnRunnerTest {
         assertEquals(listOf("买的东西发货了"), f.digestStore.texts)
     }
 
-    // 锁屏:正在发的分段归纳取消,那一批留着,解锁后重发
+    // Locking: the segmented digest in flight is cancelled, that batch is kept, and it is sent again after unlocking
     @Test fun lockCancelsTheNotesRequestAndKeepsTheBatch() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1931,7 +1931,7 @@ class LearnRunnerTest {
         assertEquals(listOf("买的东西发货了"), e.digestStore.texts)
     }
 
-    // 清除的几条路都带走攒下的句子;关开关不带走(只删通知原文);请求在途时清空的,结果回来不能把清掉的带回来
+    // The clearing paths all take the accumulated sentences with them; turning switches off does not (only raw notifications are deleted); when clearing happens while a request is in flight, the late result must not bring back what was cleared
     @Test fun notesFollowEveryPurgePath() = runTest {
         fun seeded(): Env = Env(this).also { e ->
             e.digest = true
@@ -1944,7 +1944,7 @@ class LearnRunnerTest {
         seeded().let { e -> e.optOut += "com.a"; e.runner.forgetApps(setOf("com.a")); assertEquals(listOf("com.b"), apps(e)); assertEquals(1, e.runner.digestNotes.value.size) }
         seeded().let { e -> e.runner.clearApp("com.a"); assertEquals(listOf("com.b"), apps(e)) }
         seeded().let { e -> e.runner.clearAll(); assertEquals(emptyList<String>(), apps(e)); assertTrue(e.runner.digestNotes.value.isEmpty()) }
-        // 关掉「当日消息归纳」、关掉总开关:通知原文删掉,已经写下的句子留着(页面上还看得到、删得掉)
+        // Turning off the "daily notification digest" and the master switch: raw notifications are deleted while sentences already written stay (still visible and deletable on the page)
         seeded().let { e ->
             e.digest = false; e.runner.poke()
             assertEquals(listOf("com.a", "com.b"), apps(e)); assertEquals(0, e.digestStore.wipes); assertEquals(null, e.journal.data)
@@ -1959,7 +1959,7 @@ class LearnRunnerTest {
             e.runner.deleteNote(id)
             assertEquals(listOf("com.b"), apps(e))
         }
-        // 在途时清空
+        // Cleared while in flight
         val e = Env(this)
         e.digest = true
         e.post(pkg = "com.a", count = 19)
@@ -1975,7 +1975,7 @@ class LearnRunnerTest {
         assertEquals(null, e.journal.data)
     }
 
-    // 页面上点开一句分段归纳:给出它那段时间、那个 App 还存着的通知;过了两天的没有了;关掉「当日消息归纳」之后说的是「关着」
+    // Tapping a segmented digest sentence on the page: returns that App's notifications still stored for that period; after two days there are none; with the "daily notification digest" off it reports "off"
     @Test fun aNotesRawNotificationsCanBeLookedUpWhileTheyLast() = runTest {
         val e = Env(this)
         e.digest = true
@@ -1994,12 +1994,12 @@ class LearnRunnerTest {
         assertEquals(RawNotices.Off, e.runner.rawFor(note))
     }
 
-    // ---- 当日消息归纳的第 2 级:当日归纳 ----
+    // ---- Level 2 of the daily notification digest: daily digest ----
 
     private val oneLine = """{"lines":[{"ids":["s1"],"text":"买的东西发货了,今天到"}]}"""
     private fun TestScope.nudge(e: Env) { e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent() }
 
-    /** 今天有一句分段归纳的环境。 */
+    /** An environment with one segmented digest sentence for today. */
     private fun TestScope.withANote(): Env = Env(this).also { e ->
         e.digest = true
         e.model.notesReply = { oneNote }
@@ -2008,7 +2008,7 @@ class LearnRunnerTest {
         assertEquals(listOf("learn", "notes"), e.model.kinds)
     }
 
-    // 一天过完之后(有事发生时才看)把那一天的句子合成一份;放进请求的只有句子和 App 的名字;做过了不重做
+    // Once a day is over (it only looks when something happens) that day's sentences are merged into one; only the sentences and App names go into the request; once done it is not redone
     @Test fun dayDigestIsMadeOnceTheDayIsOver() = runTest {
         val e = withANote()
         nudge(e)
@@ -2032,7 +2032,7 @@ class LearnRunnerTest {
         assertEquals(calls, e.model.calls.size)
     }
 
-    // 模型和句子一起给的一句概述存下来给页面用;任务拿不到它(读通知的工具、带进任务的那一段都只从句子里取)
+    // The one-sentence overview the model gives with the sentences is stored for the page; tasks never get it (the read-notifications tool and the section carried into tasks take only sentences)
     @Test fun theBriefIsStoredForThePageAndNeverGivenToTasks() = runTest {
         val e = withANote()
         e.model.dayReply = { """{"lines":[{"ids":["s1"],"text":"买的东西发货了"}],"brief":"概述只给页面看"}""" }
@@ -2044,7 +2044,7 @@ class LearnRunnerTest {
         val given = e.runner.digests(DigestLevel.Day, LearnLevel.Aggressive, tier)!!
         assertEquals(listOf("买的东西发货了"), given.digests.single().lines.map { it.text })
         assertFalse("概述" in e.runner.observed(LearnLevel.Aggressive, tier).orEmpty())
-        // 重做时模型没给:不留着上一份的
+        // Not given by the model when redone: the previous one is not kept
         e.model.dayReply = { """{"lines":[{"ids":["s1"],"text":"买的东西发货了"}]}""" }
         e.runner.digestToday()
         runCurrent()
@@ -2053,7 +2053,7 @@ class LearnRunnerTest {
 
     private val fiveNotes = """{"notes":[""" + (1..5).joinToString(",") { """{"ids":["e$it"],"text":"第 $it 件事"}""" } + "]}"
 
-    // 今天的句子攒够了,不用用户去点:有事发生时自动做一份「到现在为止」的;没有新句子、离上一份不够久都不再做;过完这一天重做完整的
+    // Once today's sentences have accumulated enough, without a tap from the user: when something happens it automatically makes an "up to now" one; it does not redo it without new sentences or when the last one is too recent; after the day ends it is redone complete
     @Test fun todaysDigestIsMadeWithoutBeingAskedOnceEnoughNotesHaveGathered() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2064,19 +2064,19 @@ class LearnRunnerTest {
         val d = e.digestStore.data.days.single()
         assertTrue(d.partial)
         assertEquals(20_000L, d.day)
-        // 没有新句子:再有事也不重做(哪怕离上一份已经够久)
+        // No new sentences: no redo even when something happens (even if the last one is long past)
         nudge(e)
         wait(LearnTuning.TODAY_AUTO_INTERVAL_MS)
         nudge(e)
         assertEquals(e.model.kinds.toString(), 1, e.model.kinds.count { it == "day" })
-        // 过完这一天:重做完整的
+        // The day is over: a complete one is redone
         wait(LearnTuning.DAY_MS)
         nudge(e)
         assertEquals("day", e.model.kinds.last())
         assertFalse(e.digestStore.data.days.single { it.day == 20_000L }.partial)
     }
 
-    // 今天自动做的几次回复都读不懂:不再自动试;但这不算在「这一天完整的那一份」头上,过完这一天照样做
+    // Every automatic reply today is unreadable: it stops trying automatically; but these do not count against "the complete digest for this day", which is still made once the day is over
     @Test fun unreadableAutomaticDigestsDoNotUseUpTheFullDigestsTries() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2097,7 +2097,7 @@ class LearnRunnerTest {
         assertFalse("完整的那一份照样做了", d.partial)
     }
 
-    // 用户删掉了今天的那一份:不自动做回来(哪怕又来了新句子)
+    // The user deleted today's: it is not made again automatically (even if new sentences arrive)
     @Test fun aDeletedTodayIsNotMadeAgainByItself() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2114,7 +2114,7 @@ class LearnRunnerTest {
         assertEquals(days, e.model.kinds.count { it == "day" })
     }
 
-    // 建模型时说清要发哪一种请求:回复长的(分段、当日、周、月归纳)不能和判定共用一个短上限
+    // The model is built with which kind of request it is for: long replies (segmented, daily, weekly, monthly digests) must not share the short limit used for triage
     @Test fun everyRequestSaysWhichKindItIsWhenTheModelIsBuilt() = runTest {
         val e = withANote()
         assertEquals(listOf(ProactiveCall.Learn, ProactiveCall.Notes), e.asked)
@@ -2126,14 +2126,14 @@ class LearnRunnerTest {
         assertEquals(listOf(ProactiveCall.Day, ProactiveCall.Span, ProactiveCall.Span), e.asked.takeLast(3))
     }
 
-    // 用户点「归纳今天到现在的」:马上做一份标着「到现在为止」的;这一天过完后重做完整的
+    // The user taps "digest today up to now": one marked "up to now" is made at once; after the day ends it is redone complete
     @Test fun todayOnDemandIsPartialAndIsRedoneAfterTheDay() = runTest {
         val e = withANote()
         e.runner.digestToday()
         runCurrent()
         assertEquals("day", e.model.kinds.last())
         assertTrue(e.digestStore.data.days.single().partial)
-        // 再点一次才再做;今天没有句子时点了不发请求
+        // It is only redone on another tap; with no sentences today a tap sends no request
         val calls = e.model.calls.size
         nudge(e)
         assertEquals(calls, e.model.calls.size)
@@ -2150,7 +2150,7 @@ class LearnRunnerTest {
         assertTrue(empty.model.calls.isEmpty())
     }
 
-    // 那一天还有没做过分段归纳的通知:先做分段归纳,再做当日归纳
+    // Notifications from that day have not been segmented yet: the segmented digest runs first, then the daily digest
     @Test fun dayDigestWaitsForTheDaysNotes() = runTest {
         val e = withANote()
         e.post(pkg = "com.mail", count = 3)
@@ -2162,7 +2162,7 @@ class LearnRunnerTest {
         assertTrue("[s2]" in e.model.input(e.model.calls.lastIndex))
     }
 
-    // 回复总读不懂:同一天在一个进程里最多试 3 次;没连上模型的不算次数
+    // The reply is always unreadable: at most 3 tries per day within one process; failures to reach the model do not count
     @Test fun unreadableDayDigestIsTriedAFewTimesOnly() = runTest {
         val e = withANote()
         e.model.dayReply = { "I cannot do that." }
@@ -2175,7 +2175,7 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.days.isEmpty())
     }
 
-    // 清除路径:清掉这个 App 的、清空全部都带走当日归纳;关掉「当日消息归纳」不带走;请求在途时清空的不会写回来;可以单删一天
+    // Clearing paths: clearing this App's and clearing all take the daily digest with them; turning off the "daily notification digest" does not; clearing while a request is in flight is not written back; a single day can be deleted
     @Test fun dayDigestFollowsThePurgePaths() = runTest {
         fun TestScope.made(): Env = withANote().also { e ->
             wait(LearnTuning.DAY_MS)
@@ -2185,10 +2185,10 @@ class LearnRunnerTest {
         made().let { e -> e.runner.clearApp("com.shop"); assertTrue(e.digestStore.data.days.single().lines.isEmpty()) }
         made().let { e -> e.digest = false; e.runner.poke(); assertEquals(1, e.digestStore.data.days.single().lines.size); assertEquals(1, e.runner.digestDays.value.size) }
         made().let { e -> e.runner.clearAll(); assertTrue(e.digestStore.data.days.isEmpty()) }
-        // (同一个测试里几个环境共用一个虚拟时钟,这一份的那一天不是第一天)
+        // (several environments in one test share a virtual clock, so this digest's day is not the first day)
         made().let { e ->
             e.runner.deleteDay(e.digestStore.data.days.single().day)
-            // 留下的只是「删掉了」的记号:没有句子,读的人看不到
+            // All that remains is a "deleted" mark: no sentences, invisible to readers
             assertTrue(e.runner.digestDays.value.isEmpty())
             assertTrue(e.digestStore.data.days.single().let { it.removed && it.lines.isEmpty() })
         }
@@ -2204,14 +2204,14 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.days.isEmpty() && e.digestStore.data.notes.isEmpty())
     }
 
-    // 昨天的归纳已经做了,昨晚的通知之后才补收进来:写成句子之后,昨天重做一份,只重做一次
+    // Yesterday's digest was already made and last night's notifications are captured only afterwards: once they become sentences, yesterday is redone — exactly once
     @Test fun aDayIsRedoneOnceWhenLateNotesArrive() = runTest {
         val e = withANote()
         wait(LearnTuning.DAY_MS)
         nudge(e)
         assertEquals(1, e.model.kinds.count { it == "day" })
         e.model.dayReply = { """{"lines":[{"ids":["s1","s2"],"text":"连同后来补收到的"}]}""" }
-        // 过了一会儿才补收进来:发出时间是昨天
+        // Captured later: they were posted yesterday
         wait(60_000)
         repeat(20) { i -> e.runner.capture(NoticeRecord("late$i", "com.mail", e.now() - LearnTuning.DAY_MS + i, "title", "late $i")) }
         runCurrent()
@@ -2223,7 +2223,7 @@ class LearnRunnerTest {
         assertEquals(calls, e.model.calls.size)
     }
 
-    // 当日归纳在途时,其中一个 App 不再归纳:请求取消,那个 App 的句子不会出现在任何一句里;之后按剩下的重做
+    // While the daily digest is in flight one App stops being learned from: the request is cancelled so that App's sentences appear in no line; afterwards it is redone from the rest
     @Test fun purgingAnAppCancelsTheDayRequestInFlight() = runTest {
         val e = withANote()
         e.post(pkg = "com.mail", count = 20)
@@ -2239,7 +2239,7 @@ class LearnRunnerTest {
         e.model.gate!!.complete(Unit)
         runCurrent()
         assertTrue(e.digestStore.data.days.isEmpty())
-        // 再要一次:只剩一个 App 的句子,合并句里引用的第二句已经不存在,整句不要
+        // Ask again: only one App's sentences remain, so the merged line citing a second sentence that no longer exists is dropped entirely
         e.model.gate = null
         e.runner.digestToday()
         runCurrent()
@@ -2248,11 +2248,11 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.days.single().lines.isEmpty())
     }
 
-    // ---- 带进任务的那一段:按激进程度和来源档位挑 ----
+    // ---- The section carried into tasks: picked by aggressiveness level and source tier ----
 
     private fun ObservedTopic.on(vararg apps: Pair<String, List<Long>>) = copy(evidence = apps.toMap())
 
-    // 早该淡忘的话题、联系人(很久没有新归纳、也没开过内容页,还没被整理掉)不带进任务;用户自己定过关系的联系人照带
+    // Topics and contacts that should already have faded (nothing newly learned for a long time, no content page opened, not tidied away yet) are not carried into tasks; contacts the user gave a relation to still are
     @Test fun observedLeavesOutWhatShouldAlreadyBeForgotten() = runTest {
         val e = Env(this)
         val long = start - 70L * LearnTuning.DAY_MS
@@ -2271,10 +2271,10 @@ class LearnRunnerTest {
         val text = e.runner.observed(LearnLevel.Balanced) { SourceTier.High }!!
         for (yes in listOf("最近的话题", "最近的人", "用户定过的人")) assertTrue(yes, yes in text)
         for (no in listOf("很久以前的话题", "很久没联系的人")) assertFalse(no, no in text)
-        // 只是不带:池里的没动,也没有为此存盘(整理照旧在收下新归纳、打开内容页时做)
+        // Only left out: the pool is untouched and nothing was saved for this (tidying still happens when new learnings are accepted and when a content page opens)
         assertEquals(2, e.store.data.topics.size)
         assertEquals(0, e.store.saves)
-        // 只剩该淡忘的:整段没有
+        // Only forgettable ones left: no section at all
         e.store.data = TopicPoolData(topics = e.store.data.topics.take(1))
         e.contacts.data = ContactPoolData(contacts = e.contacts.data.contacts.take(1))
         val alone = Env(this).also { it.store.data = e.store.data; it.contacts.data = e.contacts.data }
@@ -2304,27 +2304,27 @@ class LearnRunnerTest {
         e.optOut += "com.low"
         val tier: (String) -> SourceTier = { when (it) { "com.high" -> SourceTier.High; "com.low" -> SourceTier.Low; else -> SourceTier.Mid } }
 
-        // 最保守的一档:什么都不带
+        // The most conservative level: nothing is carried
         assertEquals(null, e.runner.observed(LearnLevel.Conservative, tier))
 
-        // 平衡:只有来源是「高」的;话题要够天数;敏感的在开关关着时不带
+        // Balanced: only high-tier sources; topics need enough days; sensitive ones are left out while the switch is off
         val balanced = e.runner.observed(LearnLevel.Balanced, tier)!!
         for (yes in listOf("高档的一句", "昨天高档的", "徒步", "张三 (friend, set by the user)")) assertTrue(yes, yes in balanced)
-        // 昨天那一份做的时候有 9 句放不下:标题里说出来;今天那一份没有漏的,不说
+        // When yesterday's was made 9 sentences did not fit: the heading says so; today's leaves nothing out, so it does not
         assertTrue("Yesterday (9 notes did not fit when this was written, so it is not everything):" in balanced)
         assertFalse("Today so far (" in balanced && "did not fit" in balanced.substringBefore("Yesterday"))
         for (no in listOf("中档的一句", "两档合在一起的", "跑鞋", "只有一天", "体检", "不归纳的", "李四", "还没确立")) assertFalse(no, no in balanced)
 
-        // 激进:「中」也带,话题一天就算;「低」的(不归纳)仍然不带
+        // Aggressive: medium is carried too and one day is enough for a topic; low tier (not learned from) is still left out
         val aggressive = e.runner.observed(LearnLevel.Aggressive, tier)!!
         for (yes in listOf("中档的一句", "两档合在一起的", "跑鞋", "只有一天", "李四")) assertTrue(yes, yes in aggressive)
         for (no in listOf("体检", "不归纳的", "还没确立")) assertFalse(no, no in aggressive)
 
-        // 「敏感类推断」开着才带敏感的
+        // Sensitive ones are carried only while "sensitive-category inference" is on
         e.sensitive = true
         assertTrue("体检" in e.runner.observed(LearnLevel.Balanced, tier)!!)
 
-        // 「当日消息归纳」关着:不带归纳的句子,话题和联系人照带;归纳关着:什么都不带
+        // With the "daily notification digest" off: digest sentences are left out while topics and contacts still go in; with learning off: nothing is carried
         e.digest = false
         val noDigest = e.runner.observed(LearnLevel.Balanced, tier)!!
         assertFalse("高档的一句" in noDigest)
@@ -2333,7 +2333,7 @@ class LearnRunnerTest {
         assertEquals(null, e.runner.observed(LearnLevel.Aggressive, tier))
     }
 
-    // 「应用访问」读不出来:原文、句子、话题都还在,但不收新的、不发、不往任务里带;读得出来了照旧
+    // "App access" cannot be read: raw text, sentences and topics all remain, but nothing new is captured, nothing is sent and nothing is carried into tasks; once readable again it is as before
     @Test fun suspendedKeepsEverythingButCollectsSendsAndCarriesNothing() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2362,7 +2362,7 @@ class LearnRunnerTest {
         assertEquals(null, e.runner.observed(LearnLevel.Aggressive, tier))
         assertEquals(null, e.runner.notices(from, to, LearnLevel.Aggressive, tier))
         assertEquals(null, e.runner.digests(DigestLevel.Day, LearnLevel.Aggressive, tier))
-        // 这期间来的不收(原文也不记),手动要一份归纳也不发
+        // What arrives meanwhile is not captured (nor journaled), and asking for a digest by hand sends nothing
         e.post(pkg = "com.high", count = 20)
         e.runner.digestToday()
         wait(LearnTuning.DAY_MS / 2)
@@ -2377,14 +2377,14 @@ class LearnRunnerTest {
         e.suspended = false
         e.runner.poke()
         runCurrent()
-        // 接着做的只有本来就排着的(没凑够一批、这时到期了的那几条去归纳话题);
-        // 停着的时候点的「归纳今天到现在的」不作数,读得出来了也不补发
+        // Only what was already queued resumes (the few entries that had not formed a batch and are now due go off for topic learning);
+        // a "digest today up to now" tapped while suspended does not count and is not sent later either
         assertEquals(listOf("learn"), e.model.kinds.drop(calls))
         assertTrue("昨天的一句" in e.runner.observed(LearnLevel.Aggressive, tier)!!)
         assertEquals(journal.size, e.runner.notices(from - LearnTuning.DAY_MS, to + LearnTuning.DAY_MS, LearnLevel.Aggressive, tier)!!.entries.size)
     }
 
-    // 任务读通知:只给档位够格的 App 的原文和句子;「当日消息归纳」关着、最保守的一档时没有
+    // Tasks reading notifications: only raw text and sentences of Apps whose tier qualifies; none when the "daily notification digest" is off or at the most conservative level
     @Test fun noticesForTasksFollowTheLevelAndTier() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2399,16 +2399,16 @@ class LearnRunnerTest {
         assertEquals(setOf("com.high"), balanced.entries.map { it.packageName }.toSet())
         assertEquals(20, balanced.entries.size)
         assertEquals(listOf("com.high"), balanced.notes.map { it.packageName })
-        // 另一个 App 也有通知,只是档位不够:给个数,好让读的人说「还有一个 App 的没看」
+        // Another App has notifications too but its tier is too low: a count is given so the reader can say "one more App's were not looked at"
         assertEquals(1, balanced.withheldApps)
         val aggressive = e.runner.notices(from, to, LearnLevel.Aggressive, tier)!!
         assertEquals(40, aggressive.entries.size)
         assertEquals(2, aggressive.notes.size)
         assertEquals(0, aggressive.withheldApps)
         assertFalse(aggressive.notesUnavailable)
-        // 时间范围之外的不给
+        // Nothing outside the time range is given
         assertTrue(e.runner.notices(to, to + LearnTuning.DAY_MS, LearnLevel.Aggressive, tier)!!.entries.isEmpty())
-        // 归纳那份这会儿读不出来(换一个进程):原文照给,句子是空的,并且说得出「读不出来」
+        // The digest store cannot be read right now (new process): raw text is still given, sentences are empty, and it can report "unavailable"
         e.digestStore.failLoad = true
         val unreadable = restarted(e).notices(from, to, LearnLevel.Aggressive, tier)!!
         assertEquals(40, unreadable.entries.size)
@@ -2419,13 +2419,13 @@ class LearnRunnerTest {
         assertEquals(null, e.runner.notices(from, to, LearnLevel.Aggressive, tier))
     }
 
-    // ---- 当日消息归纳的第 3 级(周)、第 4 级(月) ----
-    // 测试的第一天(纪元日 20000)是 2024-10-04 周五:这一周从 9-30(19996)到 10-06,算十月的;下周一是 20003;11-01 是 20028
+    // ---- Level 3 (weekly) and level 4 (monthly) of the daily notification digest ----
+    // The test's first day (epoch day 20000) is Friday 2024-10-04: that week runs from 9-30 (19996) to 10-06 and counts as October; next Monday is 20003; 11-01 is 20028
 
     private val weekLine = """{"lines":[{"ids":["d1"],"text":"10 月 4 日买的东西发货了"}],"brief":"这一周:买的东西发货"}"""
     private val monthLine = """{"lines":[{"ids":["d1"],"text":"十月初买的东西到了"}],"brief":"这个月:东西到了"}"""
 
-    /** 周五有一句分段归纳、周六做了周五的当日归纳的环境。 */
+    /** An environment with one segmented digest sentence on Friday and Friday's daily digest made on Saturday. */
     private fun TestScope.withADay(): Env = withANote().also { e ->
         e.model.weekReply = { weekLine }
         e.model.monthReply = { monthLine }
@@ -2434,7 +2434,7 @@ class LearnRunnerTest {
         assertEquals("day", e.model.kinds.last())
     }
 
-    // 一周过完之后(有事发生时才看)把这一周各天的当日归纳合成一份:放进请求的只有当日归纳的句子,每句写着是哪一天的;做过了不重做
+    // Once a week is over (it only looks when something happens) that week's daily digests are merged into one: only daily digest sentences go into the request, each stating its day; once done it is not redone
     @Test fun weekDigestIsMadeOnceTheWeekIsOver() = runTest {
         val e = withADay()
         wait(LearnTuning.DAY_MS)
@@ -2452,7 +2452,7 @@ class LearnRunnerTest {
         val w = e.digestStore.data.weeks.single()
         assertEquals(19_996L, w.start)
         assertFalse(w.partial)
-        // 模型一起给的一句概述也存下了
+        // The one-sentence overview the model gave along with them is stored too
         assertEquals("这一周:买的东西发货", w.brief)
         val line = w.lines.single()
         assertEquals("10 月 4 日买的东西发货了", line.text)
@@ -2466,7 +2466,7 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.months.isEmpty())
     }
 
-    // 一个月过完之后把结束在这个月的各周的周归纳合成一份;输入只有周归纳的句子
+    // Once a month is over, the weekly digests of the weeks ending in it are merged into one; the input is only weekly digest sentences
     @Test fun monthDigestIsMadeOnceTheMonthIsOver() = runTest {
         val e = withADay()
         wait(2 * LearnTuning.DAY_MS)
@@ -2494,7 +2494,7 @@ class LearnRunnerTest {
         assertEquals(calls, e.model.calls.size)
     }
 
-    // 用户点「归纳本周到现在的」:今天有新句子就先把今天到现在的做了,再做这一周的;两份都标着「到现在为止」,过完之后各自重做完整的
+    // The user taps "digest this week up to now": if today has new sentences, today up to now is made first, then the week; both are marked "up to now" and each is redone complete afterwards
     @Test fun weekOnDemandDoesTodayFirstAndIsRedoneAfterTheWeek() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2503,11 +2503,11 @@ class LearnRunnerTest {
         assertEquals(listOf("day", "week"), e.model.kinds.takeLast(2))
         assertTrue(e.digestStore.data.days.single().partial)
         assertTrue(e.digestStore.data.weeks.single().partial)
-        // 再点一次:今天没有新句子,只重做这一周的
+        // Tapping again: today has no new sentences, so only the week is redone
         e.runner.digestWeek()
         runCurrent()
         assertEquals(listOf("day", "week", "week"), e.model.kinds.takeLast(3))
-        // 没点的时候不自己做
+        // Without a tap it does not do it by itself
         val calls = e.model.calls.size
         nudge(e)
         assertEquals(calls, e.model.calls.size)
@@ -2516,7 +2516,7 @@ class LearnRunnerTest {
         assertEquals(listOf("day", "week"), e.model.kinds.takeLast(2))
         assertFalse(e.digestStore.data.days.single().partial)
         assertFalse(e.digestStore.data.weeks.single().partial)
-        // 这一周什么都没有时点了不发请求
+        // With nothing in the week, a tap sends no request
         val empty = Env(this)
         empty.digest = true
         empty.runner.digestWeek()
@@ -2525,7 +2525,7 @@ class LearnRunnerTest {
         assertTrue(empty.model.calls.isEmpty())
     }
 
-    // 用户点「归纳本月到现在的」:今天、本周、本月依次做,都标着「到现在为止」
+    // The user taps "digest this month up to now": today, this week and this month are done in turn, all marked "up to now"
     @Test fun monthOnDemandDoesTodayAndTheWeekFirst() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2539,7 +2539,7 @@ class LearnRunnerTest {
         assertEquals("十月初买的东西到了", m.lines.single().text)
     }
 
-    // 这一周的当日归纳都没有值得说的:不问模型,直接记成做过了(不然上面一级一直等它);月也一样
+    // The week's daily digests have nothing worth saying: without asking the model it is recorded as done (otherwise the level above keeps waiting for it); the same for the month
     @Test fun aWeekWithNothingToMergeIsRecordedWithoutAModelCall() = runTest {
         val e = withANote()
         e.model.dayReply = { """{"lines":[]}""" }
@@ -2557,10 +2557,10 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.months.single().lines.isEmpty())
     }
 
-    // 这一周里还有通知没做过分段归纳:先做分段归纳、再做那一天的当日归纳,最后才做这一周的
+    // Notifications in this week have not been segmented yet: the segmented digest runs first, then that day's daily digest, and only then this week's
     @Test fun weekDigestWaitsForTheWeeksNotesAndDays() = runTest {
         val e = withADay()
-        // 周六来了几条,还没攒够一批
+        // A few arrived on Saturday, not yet enough for a batch
         e.post(pkg = "com.mail", count = 3)
         e.model.dayReply = { """{"lines":[{"ids":["s1"],"text":"周六的邮件"}]}""" }
         e.model.weekReply = { """{"lines":[{"ids":["d1","d2"],"text":"两天的事"}]}""" }
@@ -2572,7 +2572,7 @@ class LearnRunnerTest {
         assertEquals(listOf(20_000L, 20_001L), e.digestStore.data.weeks.single().lines.single().days)
     }
 
-    // 周一一早先做了上周的周归纳,周日夜里的通知之后才补收进来:周日的当日归纳做出来之后,上周跟着重做一次
+    // Monday morning made last week's digest first, and Sunday night's notifications are captured only afterwards: once Sunday's daily digest is made, last week is redone along with it
     @Test fun aWeekIsRedoneOnceWhenOneOfItsDaysIsDoneLater() = runTest {
         val e = withADay()
         wait(2 * LearnTuning.DAY_MS)
@@ -2581,7 +2581,7 @@ class LearnRunnerTest {
         e.model.dayReply = { """{"lines":[{"ids":["s1"],"text":"周日夜里补收到的"}]}""" }
         e.model.weekReply = { """{"lines":[{"ids":["d1","d2"],"text":"重做的一周"}]}""" }
         wait(60_000)
-        // 发出时间是周日
+        // They were posted on Sunday
         repeat(20) { i -> e.runner.capture(NoticeRecord("late$i", "com.mail", e.now() - LearnTuning.DAY_MS + i, "title", "late $i")) }
         runCurrent()
         nudge(e)
@@ -2594,7 +2594,7 @@ class LearnRunnerTest {
         assertEquals(calls, e.model.calls.size)
     }
 
-    // 回复总读不懂:同一周在一个进程里最多试 3 次,之后不再试
+    // The reply is always unreadable: at most 3 tries per week within one process, then it stops
     @Test fun unreadableWeekDigestIsTriedAFewTimesOnly() = runTest {
         val e = withADay()
         e.model.weekReply = { "I cannot do that." }
@@ -2607,7 +2607,7 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.weeks.isEmpty())
     }
 
-    // 清除路径:清掉这个 App 的、关掉「当日消息归纳」、清空全部都带走周、月归纳;可以单删一周、一个月;删一句分段归纳,各级里依据它的句子都没了
+    // Clearing paths: clearing this App's, turning off the "daily notification digest" and clearing all take weekly and monthly digests with them; a single week or month can be deleted; deleting a segmented digest sentence removes every line based on it at every level
     @Test fun spanDigestsFollowThePurgeAndDeletePaths() = runTest {
         fun TestScope.made(): Env = withANote().also { e ->
             e.model.weekReply = { weekLine }
@@ -2621,7 +2621,7 @@ class LearnRunnerTest {
             e.runner.clearApp("com.shop")
             assertTrue(e.digestStore.data.weeks.single().lines.isEmpty() && e.digestStore.data.months.single().lines.isEmpty())
         }
-        // 关掉「当日消息归纳」:周、月归纳留着
+        // Turning off the "daily notification digest": weekly and monthly digests stay
         made().let { e ->
             e.digest = false
             e.runner.poke()
@@ -2648,7 +2648,7 @@ class LearnRunnerTest {
         }
     }
 
-    // 周归纳在途时:清空全部,结果不写回来;其中一个 App 不再归纳,请求取消
+    // While the weekly digest is in flight: clear all and the result is not written back; when one App stops being learned from, the request is cancelled
     @Test fun purgesCancelASpanRequestInFlight() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2680,7 +2680,7 @@ class LearnRunnerTest {
         assertTrue(f.digestStore.data.weeks.isEmpty() && f.digestStore.data.days.isEmpty())
     }
 
-    // 「本月到现在的」:今天所在的这一周要到下个月才结束时,这一周算下个月的,不放进这个月——只把今天到现在的做了,不做周、月
+    // "This month up to now": when today's week only ends next month, that week counts towards next month and is kept out of this one — only today up to now is made, no week or month
     @Test fun monthOnDemandLeavesOutAWeekThatEndsNextMonth() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2688,7 +2688,7 @@ class LearnRunnerTest {
         e.model.dayReply = { oneLine }
         e.model.weekReply = { weekLine }
         e.model.monthReply = { monthLine }
-        // 10-30 周三:这一周在 11-03 结束
+        // 10-30, a Wednesday: this week ends on 11-03
         wait(26 * LearnTuning.DAY_MS)
         e.post(pkg = "com.shop", count = 20)
         e.runner.digestMonth()
@@ -2697,16 +2697,16 @@ class LearnRunnerTest {
         assertFalse("week" in e.model.kinds || "month" in e.model.kinds)
         assertTrue(e.digestStore.data.days.single().partial)
         assertTrue(e.digestStore.data.weeks.isEmpty() && e.digestStore.data.months.isEmpty())
-        // 没有东西可做的那次点按不留着:之后也不会自己冒出一份本月的
+        // A tap with nothing to do is not kept: no monthly digest appears by itself later either
         nudge(e)
         assertFalse("week" in e.model.kinds || "month" in e.model.kinds)
     }
 
-    // 带进任务的那一段:刚过完的那一周、那个月的归纳(完整的那份)也带,同样只带依据的 App 都够格的句子;「到现在为止」的不当成上周
+    // The section carried into tasks: the digest of the week and month just finished (the complete one) is carried too, again only with sentences whose source Apps all qualify; an "up to now" one does not count as last week
     @Test fun observedCarriesLastWeekAndLastMonth() = runTest {
         val e = Env(this)
         e.digest = true
-        // 今天是 20000(2024-10-04 周五):上周从 19989(9-23)起,上个月是九月(管 8-26 到 9-29)
+        // Today is 20000 (Friday 2024-10-04): last week starts at 19989 (9-23) and last month is September (covering 8-26 to 9-29)
         val lastWeek = 19_989L
         val sept = java.time.LocalDate.of(2024, 9, 1).toEpochDay()
         e.digestStore.data = DigestData(
@@ -2722,14 +2722,14 @@ class LearnRunnerTest {
         assertTrue(balanced, "Last month (2024-08-26 to 2024-09-29):" in balanced && "九月高档的一句" in balanced)
         for (no in listOf("上周中档的一句", "本周到现在的")) assertFalse(no, no in balanced)
         assertTrue("上周中档的一句" in e.runner.observed(LearnLevel.Aggressive, tier)!!)
-        // 上周那份还只是「到现在为止」的(过完之后还没重做):不带
+        // Last week's is still only "up to now" (not redone after the week ended): not carried
         e.runner.clearAll()
         e.digestStore.data = DigestData(weeks = listOf(SpanDigest(lastWeek, start, listOf(DigestLine("半截的", apps = listOf("com.high"))), partial = true)))
         val f = Env(this).also { it.digest = true; it.digestStore.data = e.digestStore.data }
         assertEquals(null, f.runner.observed(LearnLevel.Balanced, tier))
     }
 
-    // 任务读存着的归纳:各级新的在前,只给依据的 App 都够格的句子,给不出句子的那份不列,没给的句子有个数;条件和读通知原文一样
+    // Tasks reading stored digests: at each level newest first, only sentences whose source Apps all qualify, a digest yielding no sentences is not listed, and withheld sentences are counted; the conditions match those for raw notifications
     @Test fun digestsForTasksFollowTheLevelAndTier() = runTest {
         val e = Env(this)
         e.digest = true
@@ -2747,7 +2747,7 @@ class LearnRunnerTest {
         val days = e.runner.digests(DigestLevel.Day, LearnLevel.Balanced, tier)!!
         assertEquals(listOf(19_999L), days.digests.map { it.start })
         assertEquals(listOf("昨天高档的"), days.digests.single().lines.map { it.text })
-        // 做的时候漏了几句也带给读的人
+        // Sentences left out when it was made are still reported to the reader
         assertEquals(4, days.digests.single().leftOut)
         assertEquals(2, days.withheldLines)
         val all = e.runner.digests(DigestLevel.Day, LearnLevel.Aggressive, tier)!!
@@ -2756,7 +2756,7 @@ class LearnRunnerTest {
         assertEquals(0, all.withheldLines)
         val week = e.runner.digests(DigestLevel.Week, LearnLevel.Balanced, tier)!!.digests.single()
         assertEquals(19_989L to 19_995L, week.start to week.end)
-        // 月归纳:给的是它实际管到的日子(2024 年 10 月管 9-30 到 10-27)
+        // Monthly digest: it reports the days it actually covers (October 2024 covers 9-30 to 10-27)
         val month = e.runner.digests(DigestLevel.Month, LearnLevel.Balanced, tier)!!.digests.single()
         assertEquals(java.time.LocalDate.of(2024, 9, 30).toEpochDay() to java.time.LocalDate.of(2024, 10, 27).toEpochDay(), month.start to month.end)
         assertTrue(month.partial)
@@ -2764,9 +2764,9 @@ class LearnRunnerTest {
         assertEquals(null, e.runner.digests(DigestLevel.Week, LearnLevel.Aggressive, tier))
     }
 
-    // ---- 删了就不再自动做 ----
+    // ---- Once deleted, it is not made automatically again ----
 
-    // 删掉昨天的当日归纳:不再做回来——那天还有句子、之后又补收到那天的通知也一样;周一也不会拿它去做周归纳
+    // Deleting yesterday's daily digest: it is not made again — not even when that day still has sentences or notifications from it are captured later; Monday will not use it for the weekly digest either
     @Test fun aDeletedDayDigestIsNotMadeAgain() = runTest {
         val e = withADay()
         e.runner.deleteDay(20_000)
@@ -2774,7 +2774,7 @@ class LearnRunnerTest {
         val days = e.model.kinds.count { it == "day" }
         nudge(e)
         assertEquals(days, e.model.kinds.count { it == "day" })
-        // 又补收到周五的通知(发出时间是周五),写成了句子:周五的当日归纳仍然不做
+        // Friday's notifications are captured later (posted on Friday) and become sentences: Friday's daily digest is still not made
         repeat(20) { i -> e.runner.capture(NoticeRecord("late$i", "com.mail", start + 20 * 3_600_000L + i, "title", "late $i")) }
         runCurrent()
         nudge(e)
@@ -2786,7 +2786,7 @@ class LearnRunnerTest {
         assertTrue(e.runner.digestWeeks.value.isEmpty())
     }
 
-    // 删掉上周的周归纳:不再做回来——之后周日夜里的通知补收进来、周日的当日归纳做了出来,也不带着它重做;月归纳也不会拿它当输入
+    // Deleting last week's digest: it is not made again — even when Sunday night's notifications are captured later and Sunday's daily digest is made, it is not redone along with them; the monthly digest does not take it as input either
     @Test fun aDeletedWeekDigestIsNotMadeAgain() = runTest {
         val e = withADay()
         wait(2 * LearnTuning.DAY_MS)
@@ -2809,7 +2809,7 @@ class LearnRunnerTest {
         assertTrue(e.digestStore.data.months.isEmpty())
     }
 
-    // 删掉本周「到现在为止」的那份:不会自己再出现,这一周过完也不自动做;再点一次才重新做,之后照常在周末补成完整的
+    // Deleting this week's "up to now" digest: it does not reappear by itself and is not made automatically when the week ends; another tap remakes it, and it is then completed as usual at the weekend
     @Test fun aDeletedCurrentWeekComesBackOnlyWhenAskedAgain() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2822,7 +2822,7 @@ class LearnRunnerTest {
         nudge(e)
         assertEquals(1, e.model.kinds.count { it == "week" })
         assertTrue(e.runner.digestWeeks.value.isEmpty())
-        // 这时已经是下一周:删掉的那一周没有按钮可点了。另起一个环境看「再点一次」
+        // It is the next week by now: the deleted week has no button left to tap. A separate environment checks "tap again"
         val f = withANote()
         f.model.weekReply = { weekLine }
         val thisWeek = DigestPool.weekOf(f.now() / LearnTuning.DAY_MS)
@@ -2837,7 +2837,7 @@ class LearnRunnerTest {
         assertTrue(f.runner.digestWeeks.value.single().partial)
     }
 
-    // 刚点了「归纳本周到现在的」还没发出去就删:那一次点按作废,不会过后冒出来
+    // "Digest this week up to now" was just tapped and then deleted before it was sent: that tap is void and does not surface later
     @Test fun deletingClearsAQueuedTap() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2856,7 +2856,7 @@ class LearnRunnerTest {
         assertFalse("week" in e.model.kinds || "month" in e.model.kinds)
     }
 
-    // 用户单独删掉的话题:模型之后再新起同名的不收,页面上有个数,丢弃原因里记着;重新允许之后可以再学。清空全部不算
+    // A topic the user deleted on its own: when the model starts the same name again it is not accepted, the page shows a count and the drop reason records it; after allowing them again it can be learned. Clear all does not count as this
     @Test fun aDeletedTopicIsNotLearnedAgain() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1", "n2") }
@@ -2873,14 +2873,14 @@ class LearnRunnerTest {
         assertTrue(e.store.data.blocked.isEmpty())
         e.post(count = LearnTuning.DUE_COUNT)
         assertEquals(listOf("Hiking"), e.store.data.topics.map { it.label })
-        // 清空全部是重来:不记
+        // Clear all is a fresh start: nothing is recorded
         e.runner.clearAll()
         assertEquals(0, e.runner.topicsBlocked.value)
         e.post(count = LearnTuning.DUE_COUNT)
         assertEquals(listOf("Hiking"), e.store.data.topics.map { it.label })
     }
 
-    // 本周的归纳被删掉之后点「归纳本月到现在的」:不顺带把本周的做回来;这个月没有别的周可用,也就不做
+    // After this week's digest is deleted, tapping "digest this month up to now": it does not bring this week back along the way; with no other week to use in this month, nothing is made
     @Test fun monthOnDemandDoesNotBringBackADeletedWeek() = runTest {
         val e = withANote()
         e.model.weekReply = { weekLine }
@@ -2895,7 +2895,7 @@ class LearnRunnerTest {
         assertFalse("month" in e.model.kinds)
         assertEquals(setOf(SpanKind.Week to 19_996L), e.runner.digestRemoved.value)
         assertTrue(e.runner.digestWeeks.value.isEmpty() && e.runner.digestMonths.value.isEmpty())
-        // 今天的当日归纳被删掉之后点「归纳本周到现在的」:同样不把今天的做回来
+        // After today's daily digest is deleted, tapping "digest this week up to now": today's is likewise not brought back
         val f = withANote()
         f.model.weekReply = { weekLine }
         f.runner.digestToday()
@@ -2910,9 +2910,9 @@ class LearnRunnerTest {
         assertTrue(f.runner.digestDays.value.isEmpty())
     }
 
-    // ---- 开关关着时:已经归纳出的东西还留着,清除、删除、到期照样做 ----
+    // ---- While the switches are off: what was already learned stays, and clearing, deleting and expiry still run ----
 
-    /** 有句子、当日、周、月归纳各一份的环境。 */
+    /** An environment with one sentence and one daily, weekly and monthly digest each. */
     private fun TestScope.withEveryLevel(): Env = withANote().also { e ->
         e.model.weekReply = { weekLine }
         e.model.monthReply = { monthLine }
@@ -2921,7 +2921,7 @@ class LearnRunnerTest {
         assertEquals(1, e.digestStore.data.months.single().lines.size)
     }
 
-    // 关掉总开关(同意随之没了):请求取消,通知原文和没处理完的清掉;句子和各级归纳留着,也不再发任何请求
+    // Turning the master switch off (consent goes with it): requests are cancelled and raw notifications and unfinished work are cleared; sentences and digests at each level stay, and no further request is sent
     @Test fun turningTheFeatureOffKeepsWhatWasDistilled() = runTest {
         val e = withEveryLevel()
         e.post(pkg = "com.shop", count = 3)
@@ -2940,13 +2940,13 @@ class LearnRunnerTest {
         e.post(pkg = "com.shop", count = 20)
         nudge(e)
         assertEquals(calls, e.model.calls.size)
-        // 关着的时候也带不进任务、工具也读不到
+        // While off nothing is carried into tasks and the tools cannot read it either
         val high: (String) -> SourceTier = { SourceTier.High }
         assertEquals(null, e.runner.observed(LearnLevel.Aggressive, high))
         assertEquals(null, e.runner.digests(DigestLevel.Day, LearnLevel.Aggressive, high))
     }
 
-    // 关着的时候(总开关关着,或「当日消息归纳」关着):清掉某个 App、把它调成不再归纳、单删、清空全部,都照样去掉各级里的句子
+    // While off (master switch off, or "daily notification digest" off): clearing an App, tuning it to no longer learn, single deletes and clear all all still remove sentences at every level
     @Test fun purgesAndDeletesWorkWhileSwitchedOff() = runTest {
         for (off in listOf<(Env) -> Unit>({ it.on = false; it.consent = null; it.runner.clear() }, { it.digest = false; it.runner.poke() })) {
             withEveryLevel().let { e ->
@@ -2983,7 +2983,7 @@ class LearnRunnerTest {
         }
     }
 
-    // 关着的时候期限照算:打开页面时,过了期的句子和归纳照样删
+    // Retention still applies while off: when the page opens, expired sentences and digests are deleted as usual
     @Test fun expiryStillRunsWhileSwitchedOff() = runTest {
         val e = withEveryLevel()
         e.digest = false
@@ -2998,8 +2998,8 @@ class LearnRunnerTest {
         assertEquals(1, e.digestStore.data.weeks.size)
     }
 
-    // 总开关开着、但用户还没同意过把通知发给模型(没配模型时打开的):归纳这边什么都不攒,原文也不落盘;
-    // 同意之后才开始收。同意过、只是模型变了在等重新确认的,照收不发
+    // The master switch is on but the user has never consented to sending notifications to the model (turned on before any model was configured): learning accumulates nothing and raw text is not written to disk;
+    // capturing starts only after consent. If consent was given and only the model changed while waiting for re-confirmation, it captures but does not send
     @Test fun nothingIsGatheredForLearningBeforeConsent() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3013,7 +3013,7 @@ class LearnRunnerTest {
         e.model.notesReply = { oneNote }
         e.post(pkg = "com.shop", count = 20)
         assertEquals(listOf("learn", "notes"), e.model.kinds)
-        // 模型变了:同意的记录还在,对不上现在的模型。不发,但接着收
+        // The model changed: the consent record is still there but does not match the current model. Nothing is sent, but capturing continues
         val f = Env(this)
         f.digest = true
         f.effective = TriageTarget("other", "Other", "m2")
@@ -3023,16 +3023,16 @@ class LearnRunnerTest {
         assertEquals(LearnStatus.NeedsConsent, f.runner.state.value.status)
     }
 
-    // ---- 清除要彻底,读不出来的时候不能误删 ----
+    // ---- Clearing must be thorough, and nothing is wrongly deleted while unreadable ----
 
-    // 读哪些 App 的名单读不出来时,每个 App 都「不够格」:不再收、不再发,但存着的原文和各级归纳一条不删。
-    // 用户随后只把一个 App 勾回来,别的 App 攒下的照样留着——只有点了名的(取消勾选、调成低、被禁用)才删
+    // When the roster of which Apps may be read is unreadable, every App is "ineligible": nothing is captured or sent, but not one stored raw notification or digest sentence is deleted.
+    // The user then checks just one App back in and what the others accumulated stays — only named ones (unchecked, tuned to low, blocked) are deleted
     @Test fun onlyNamedAppsAreForgotten() = runTest {
         val e = withEveryLevel()
         e.post(pkg = "com.shop", count = 3)
         lockAndUnlock(e)
         val journal = e.journal.data!!.entries.size
-        // 名单读不出来:com.shop 一下子「不够格」了
+        // The roster is unreadable: com.shop suddenly becomes "ineligible"
         e.optOut += "com.shop"
         e.runner.poke()
         assertEquals(1, e.digestStore.data.notes.size)
@@ -3043,17 +3043,17 @@ class LearnRunnerTest {
         val calls = e.model.calls.size
         e.post(pkg = "com.shop", count = 20)
         assertEquals(calls, e.model.calls.size)
-        // 用户把另一个 App 勾了回来(名单从此读得出来,里面没有 com.shop):com.shop 的归纳还在
+        // The user checks another App back in (the roster becomes readable and holds no com.shop): com.shop's digests are still there
         e.runner.forgetApps(emptySet())
         e.runner.poke()
         assertEquals(1, e.digestStore.data.months.single().lines.size)
-        // 点了名的才删
+        // Only named Apps are deleted
         e.runner.forgetApps(setOf("com.shop"))
         assertTrue(e.digestStore.data.notes.isEmpty())
         assertTrue(e.digestStore.data.days.single().lines.isEmpty())
         assertTrue(e.digestStore.data.weeks.single().lines.isEmpty() && e.digestStore.data.months.single().lines.isEmpty())
         assertTrue(e.journal.data!!.entries.isEmpty())
-        // 归纳那份读不出来时点名:记下来,读得出来时补做
+        // Named while the digest store cannot be read: record it and replay once readable
         val f = Env(this)
         f.digestStore.data = DigestData(days = listOf(DayDigest(19_990, start, listOf(DigestLine("购物的一句", apps = listOf("com.shop"))))))
         f.digestStore.failLoad = true
@@ -3065,7 +3065,7 @@ class LearnRunnerTest {
         assertTrue(f.purges.digestPurges.isEmpty())
     }
 
-    // 「清空来自某 App 的」:它正在发的那一批取消,回复回来不把话题加回去;缓冲里它还没发的也去掉,过后不会再发给模型
+    // "Clear what came from an App": its batch in flight is cancelled and a late reply adds no topics back; its unsent entries in the buffer are dropped so they are never sent to the model later
     @Test fun clearingAnAppStopsItsBatchAndDropsItsPendingEvents() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1", "n2") }
@@ -3079,7 +3079,7 @@ class LearnRunnerTest {
         e.model.gate!!.complete(Unit)
         runCurrent()
         assertTrue(e.store.data.topics.isEmpty())
-        // 剩下的只有另一个 App 的那两条
+        // Only the other App's two entries remain
         assertEquals(2, e.runner.state.value.pending)
         e.model.gate = null
         wait(LearnTuning.DUE_AGE_MS + 1)
@@ -3088,7 +3088,7 @@ class LearnRunnerTest {
         assertFalse(e.model.input(1).contains("com.shop"))
     }
 
-    // 「清空全部」:正在发的那一批取消、结果不写回,缓冲清空
+    // "Clear all": the batch in flight is cancelled, its result is not written back, and the buffer is emptied
     @Test fun clearingEverythingStopsTheBatchAndEmptiesTheBuffer() = runTest {
         val e = Env(this)
         e.model.reply = { newTopic("n1", "n2") }
@@ -3107,8 +3107,8 @@ class LearnRunnerTest {
         assertEquals(1, e.model.calls.size)
     }
 
-    // 「清空来自某 App 的」时归纳那份读不出来(密钥库一时不可用):不整份删(里面有留两年的月归纳),记下来;
-    // 读得出来时补做,做完、存上了就不再记着——之后新攒的不受影响
+    // "Clear what came from an App" while the digest store cannot be read (the keystore is briefly unavailable): do not delete it wholesale (it holds monthly digests kept for two years); record it instead;
+    // replay it once readable, and stop recording it once done and saved — later accumulations are unaffected
     @Test fun clearingAnAppWhileDigestsAreUnreadableIsDoneLaterNotByWipingEverything() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3126,7 +3126,7 @@ class LearnRunnerTest {
         assertEquals(listOf("聊天的一句"), e.digestStore.data.days.single().lines.map { it.text })
         assertEquals(listOf("只有聊天的"), e.digestStore.data.months.single().lines.map { it.text })
         assertTrue(e.purges.digestPurges.isEmpty())
-        // 清空全部时,记着的也一并清掉
+        // Clear all also wipes what was recorded
         val f = Env(this)
         f.digestStore.failLoad = true
         f.runner.clearApp("com.shop")
@@ -3135,9 +3135,9 @@ class LearnRunnerTest {
         assertTrue(f.purges.digestPurges.isEmpty())
     }
 
-    // ---- 删了却没存上:记着,下次读出来时补做;存上了才不再记 ----
+    // ---- Deleted but not saved: recorded and replayed on the next read; only once saved is it no longer recorded ----
 
-    /** 同一份存盘、同一份记着的删除,换一个进程。 */
+    /** A new process over the same stores and the same recorded deletes. */
     private fun restarted(e: Env) = LearnRunner(
         TriageHooks(target = { target }, model = { null }, tokensToday = { 0 }, callsToday = { 0 },
             usageVersion = { MutableStateFlow(0L) }, busy = e.busy),
@@ -3164,7 +3164,7 @@ class LearnRunnerTest {
         e.runner.open()
     }
 
-    // 清掉某个 App 的、调成不读或低:归纳读得出来、删了却没存上,也要记着(不是只在读不出来时才记)
+    // Clearing an App, tuning it to unread or low: when the digest store reads fine but the delete cannot be saved, it must still be recorded (not only when it cannot be read)
     @Test fun purgingAnAppIsRememberedWhenTheDigestCannotBeSaved() = runTest {
         for (viaTier in listOf(false, true)) {
             val e = Env(this)
@@ -3172,10 +3172,10 @@ class LearnRunnerTest {
             e.digestStore.failSave = true
             if (viaTier) e.runner.forgetApps(setOf("com.shop")) else e.runner.clearApp("com.shop")
             assertTrue("$viaTier", "com.shop" in e.purges.digestPurges)
-            // 这次运行里已经看不到了;文件里还是旧的
+            // Invisible within this run already; the file still holds the old data
             assertEquals(listOf("邮件的一句"), e.runner.digestNotes.value.map { it.text })
             assertEquals(2, e.digestStore.data.notes.size)
-            // 换一个进程:读出来时补做,存上了就不再记
+            // New process: replayed on read, and no longer recorded once saved
             e.digestStore.failSave = false
             val again = restarted(e)
             again.open()
@@ -3186,7 +3186,7 @@ class LearnRunnerTest {
         }
     }
 
-    // 单删一句、某一天、某一周、某个月的归纳:没存上、进程又没了,下次启动不能回来
+    // Deleting a single sentence, a day, a week or a month: a failed save plus process death must not bring it back on the next start
     @Test fun singleDigestDeletesSurviveAFailedSaveAndARestart() = runTest {
         val e = Env(this)
         seedDigests(e)
@@ -3197,7 +3197,7 @@ class LearnRunnerTest {
         e.runner.deleteSpan(SpanKind.Month, 19_967)
         assertEquals(setOf(":note:d1", ":day:19999", ":week:19992", ":month:19967"), e.purges.digestPurges)
         assertEquals(listOf("d2"), e.runner.digestNotes.value.map { it.id })
-        // 文件里一样都没少
+        // Nothing is missing from the file
         assertEquals(2, e.digestStore.data.notes.size)
         assertEquals(1, e.digestStore.data.weeks.single().lines.size)
 
@@ -3206,18 +3206,18 @@ class LearnRunnerTest {
         again.open()
         assertEquals(listOf("d2"), again.digestNotes.value.map { it.id })
         assertEquals(listOf(20_000L), again.digestDays.value.map { it.day })
-        // 依据过那一句的当日归纳的句子也跟着去掉了(和当场删一样)
+        // The daily digest lines based on that sentence are removed as well (the same as an immediate delete)
         assertEquals(listOf("今天邮件的"), again.digestDays.value.single().lines.map { it.text })
         assertTrue(again.digestWeeks.value.isEmpty())
         assertTrue(again.digestMonths.value.isEmpty())
-        // 删掉的那一天、那一周、那个月留着「删过」的记号:不会被自动做回来
+        // The deleted day, week and month keep a "deleted" mark: they are not remade automatically
         assertTrue(e.digestStore.data.days.single { it.day == 19_999L }.removed)
         assertTrue(e.digestStore.data.weeks.single().removed)
         assertTrue(e.digestStore.data.months.single().removed)
         assertEquals(emptySet<String>(), e.purges.digestPurges)
     }
 
-    // 没存上之后,这个进程里下一次存上了:不再记着——过后不会把这之后新攒的也删掉
+    // After a failed save, the next save in this process succeeds: it is no longer recorded — so later accumulations are not deleted afterwards
     @Test fun aLaterSuccessfulSaveSettlesTheRememberedDeletes() = runTest {
         val e = Env(this)
         seedDigests(e)
@@ -3225,19 +3225,19 @@ class LearnRunnerTest {
         e.runner.clearApp("com.shop")
         e.runner.deleteNote("d2")
         assertEquals(setOf("com.shop", ":note:d2"), e.purges.digestPurges)
-        // 再点一次同样的删除(已经没东西可删):只是再存一次
+        // Tapping the same delete again (nothing left to delete): this just saves once more
         e.digestStore.failSave = false
         e.runner.deleteNote("d2")
         assertEquals(emptySet<String>(), e.purges.digestPurges)
         assertTrue(e.digestStore.data.notes.isEmpty())
-        // 之后这个 App 又攒了新的:换一个进程也不会被删
+        // This App then accumulates new data: a new process does not delete it
         e.digestStore.data = e.digestStore.data.copy(notes = listOf(DigestNote("d9", "com.shop", 20_000L, e.now(), e.now(), 1, text = "新的一句", madeAtMs = e.now())))
         val again = restarted(e)
         again.open()
         assertEquals(listOf("d9"), again.digestNotes.value.map { it.id })
     }
 
-    // 没有可删的就不记、不存:启动时把「应用访问」里禁用的 App 整份再清一遍,不该每次都写偏好、写文件
+    // With nothing to delete, nothing is recorded and no save happens: at startup the Apps blocked in "App access" are cleared all over again, and that must not write preferences and files every time
     @Test fun forgettingAppsWithNothingStoredWritesNothing() = runTest {
         val e = Env(this)
         seedDigests(e)
@@ -3248,7 +3248,7 @@ class LearnRunnerTest {
         assertEquals(attempts, e.digestStore.saveAttempts)
     }
 
-    // 单删一个话题、一个联系人:没存上、进程又没了,下次启动不能回来;话题的名字照样记进「不再学」
+    // Deleting one topic or one contact: a failed save plus process death must not bring it back on the next start; the topic name is still recorded in "do not learn"
     @Test fun singleTopicAndContactDeletesSurviveAFailedSaveAndARestart() = runTest {
         val e = Env(this)
         e.store.data = seededTopics()
@@ -3277,30 +3277,30 @@ class LearnRunnerTest {
         assertEquals(1, e.contacts.data.blocked.size)
         assertEquals(emptySet<String>(), e.purges.topicPurges)
         assertEquals(emptySet<String>(), e.purges.contactPurges)
-        // 别的话题、联系人都还在
+        // Other topics and contacts remain
         assertEquals(seededTopics().topics.size - 1, e.store.data.topics.size)
     }
 
-    // ---- 分段归纳的句子没存上:原文不能先标成「做过了」 ----
+    // ---- The segmented digest sentence was not saved: the raw text must not be marked done first ----
 
-    // 句子没存上时,原文照样排着队(标成「做过了」并存下去的话:重启后句子没有、原文也不再归纳,这一批就丢了);
-    // 内存里的句子退回去;一直存不上就不再发请求;存得上了再归纳一次,这回留得住
+    // When the sentence is not saved the raw text stays queued (had it been marked done and saved, a restart would leave no sentence and the raw text would never be learned again, losing the batch);
+    // the in-memory sentence is rolled back; while saving keeps failing no further request is sent; once saving works it is learned once more, and this time it sticks
     @Test fun notesAreNotMarkedDoneUntilTheyAreSaved() = runTest {
         val e = Env(this)
         e.digest = true
-        // 请求回来的那一刻存盘开始出错
+        // Saving starts failing the moment the request returns
         e.model.notesReply = { e.digestStore.failSave = true; oneNote }
         fun notesCalls() = e.model.kinds.count { it == "notes" }
 
         e.post(count = LearnTuning.NOTES_DUE_COUNT)
         assertEquals(1, notesCalls())
-        // 文件里没有句子;原文一条都没标成做过;内存里也没留下这一批的句子
+        // No sentence in the file; not one raw entry marked done; no sentence from this batch left in memory either
         assertTrue(e.digestStore.data.notes.isEmpty())
         assertEquals(0, e.journal.data!!.entries.count { it.noted })
         assertTrue(e.runner.digestNotes.value.isEmpty())
         assertEquals(LearnTuning.NOTES_DUE_COUNT, e.runner.state.value.journal)
 
-        // 一直存不上:停着的那一阵过了也不再发(先补存,存不上就不发)
+        // Saving keeps failing: even after the hold passes nothing more is sent (it saves first, and sends nothing if that fails)
         wait(LearnTuning.FAILURE_HOLD_MS.last() + 1)
         e.runner.poke()
         runCurrent()
@@ -3311,7 +3311,7 @@ class LearnRunnerTest {
         assertEquals(LearnStatus.StoreUnavailable, e.runner.state.value.status)
         assertEquals(0, e.journal.data!!.entries.count { it.noted })
 
-        // 存得上了:把这一批归纳一次,这回句子和「做过了」都落了盘
+        // Saving works again: the batch is learned once more, and both the sentence and the "done" marks reach the disk this time
         e.model.notesReply = { oneNote }
         e.digestStore.failSave = false
         e.runner.poke()
@@ -3319,13 +3319,13 @@ class LearnRunnerTest {
         assertEquals(2, notesCalls())
         assertEquals(listOf("买的东西发货了"), e.digestStore.data.notes.map { it.text })
         assertEquals(LearnTuning.NOTES_DUE_COUNT, e.journal.data!!.entries.count { it.noted })
-        // 换一个进程:句子在,这一批原文不再排队
+        // New process: the sentence is there and this raw batch is no longer queued
         val again = restarted(e)
         again.open()
         assertEquals(1, again.digestNotes.value.size)
     }
 
-    // 归纳那份有没存上的删除时,不发分段归纳的请求(结果留不住);存得上了,先把那次删除落盘,再发
+    // While the digest store holds an unsaved delete no segmented digest request is sent (the result could not be kept); once saving works that delete is written first, then the request goes out
     @Test fun noNotesRequestWhileADeleteIsStillUnsaved() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3348,7 +3348,7 @@ class LearnRunnerTest {
         assertEquals(listOf("com.shop"), e.digestStore.data.notes.map { it.packageName })
     }
 
-    // 当日归纳的结果没存上:不重发请求,下一次有事时先补存
+    // The daily digest result failed to save: the request is not re-sent, and the next time something happens it saves first
     @Test fun aDayDigestThatCouldNotBeSavedIsWrittenLaterWithoutAskingAgain() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3362,7 +3362,7 @@ class LearnRunnerTest {
         assertEquals(1, e.model.kinds.count { it == "day" })
         assertTrue(e.digestStore.data.days.isEmpty())
         assertEquals(1, e.runner.digestDays.value.size)
-        // 存得上了:下一次有事(哪怕没有归纳要做)就补存上,不再问模型
+        // Saving works again: the next event (even with nothing to learn) saves it, without asking the model again
         e.digestStore.failSave = false
         e.runner.poke()
         runCurrent()
@@ -3370,8 +3370,8 @@ class LearnRunnerTest {
         assertEquals(1, e.model.kinds.count { it == "day" })
     }
 
-    // 分段归纳的请求在途时,用户清掉了另一个 App 的、偏偏没存上;随后句子也没存上要退回去:
-    // 退回去的是「清掉之后」的样子,那次清除照样记着、照样作数
+    // While the segmented digest request is in flight the user clears another App's and that save happens to fail; then the sentence itself fails to save and must be rolled back:
+    // what is rolled back is the state "after the clear", and that clear is still recorded and still counts
     @Test fun backingOutNotesKeepsADeleteMadeWhileTheRequestWasInFlight() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3381,7 +3381,7 @@ class LearnRunnerTest {
         e.runner.open()
         e.model.gate = CompletableDeferred()
         e.post(count = LearnTuning.NOTES_DUE_COUNT)
-        // 归纳话题的那一批先发;放它过去,让分段归纳的请求停在途中
+        // The topic digest batch goes first; let it through so the segmented digest request stays in flight
         while (e.model.kinds.lastOrNull() != "notes") {
             e.model.gate!!.complete(Unit)
             e.model.gate = CompletableDeferred()
@@ -3395,12 +3395,12 @@ class LearnRunnerTest {
         e.model.gate!!.complete(Unit)
         e.model.gate = null
         runCurrent()
-        // 句子没留下,清掉的也没回来,那次清除还记着
+        // No sentence was kept, what was cleared did not come back, and that clear is still recorded
         assertTrue(e.runner.digestNotes.value.isEmpty())
         assertEquals(setOf("com.gone"), e.purges.digestPurges)
         assertEquals(0, e.journal.data!!.entries.count { it.noted })
         assertEquals(listOf("old"), e.digestStore.data.notes.map { it.id })
-        // 存得上了:清除落盘,再把那一批归纳一次
+        // Saving works again: the clear reaches the disk, then the batch is learned once more
         e.digestStore.failSave = false
         wait(LearnTuning.FAILURE_HOLD_MS.last() + 1)
         e.runner.poke()
@@ -3409,9 +3409,9 @@ class LearnRunnerTest {
         assertEquals(listOf("com.shop"), e.digestStore.data.notes.map { it.packageName })
     }
 
-    // ---- 留存期:到期的按期从文件里去掉,读的人也拿不到 ----
+    // ---- Retention: expired entries are removed from the file on schedule and readers cannot get them ----
 
-    // 通知原文:读进来时就有过期的,内存里当场去掉了——文件里也得去掉(等别的改动顺带存的话,可能一直等不到)
+    // Raw notifications: some are already expired when loaded and are dropped from memory at once — they must be removed from the file too (waiting for another change to save along could mean waiting forever)
     @Test fun expiredRawTextIsRemovedFromTheFileAsSoonAsItIsLoaded() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3425,14 +3425,14 @@ class LearnRunnerTest {
         runCurrent()
         assertEquals(listOf("还新的原文"), e.journal.texts)
         assertEquals(saves + 1, e.journal.saves)
-        // 没有过期的就不为这个多存一次(换一个进程,让它把原文读进来)
+        // Without expired entries it does not save an extra time for this (a new process reads the raw text in)
         val again = restarted(e)
         val view = again.notices(e.now() - LearnTuning.DAY_MS, e.now() + 1, LearnLevel.Aggressive) { SourceTier.High }!!
         assertEquals(listOf("还新的原文"), view.entries.map { it.text })
         assertEquals(saves + 1, e.journal.saves)
     }
 
-    // 各级归纳:任务来读的时候,过了留存期的不给,文件里也去掉——不用等用户打开页面
+    // Digests at each level: when a task reads them, expired ones are withheld and removed from the file too — no need to wait for the user to open the page
     @Test fun expiredDigestsAreNeitherGivenToTasksNorKept() = runTest {
         val today = 20_000L
         fun line(text: String) = listOf(DigestLine(text, apps = listOf("com.shop")))
@@ -3453,14 +3453,14 @@ class LearnRunnerTest {
             ),
         )
         val tier: (String) -> SourceTier = { SourceTier.High }
-        // 三条读的路,各自从一份没清过的文件开始
+        // Three read paths, each starting from an unpurged file
         run {
             val e = Env(this); e.digest = true; e.digestStore.data = data
             val days = e.runner.digests(DigestLevel.Day, LearnLevel.Balanced, tier)!!
             assertEquals(listOf("昨天"), days.digests.flatMap { d -> d.lines.map { it.text } })
             assertEquals(listOf("上周"), e.runner.digests(DigestLevel.Week, LearnLevel.Balanced, tier)!!.digests.flatMap { d -> d.lines.map { it.text } })
             assertEquals(listOf("上个月"), e.runner.digests(DigestLevel.Month, LearnLevel.Balanced, tier)!!.digests.flatMap { d -> d.lines.map { it.text } })
-            // 文件里也去掉了
+            // Removed from the file too
             assertEquals(listOf("kept"), e.digestStore.data.notes.map { it.id })
             assertEquals(listOf(today - 1), e.digestStore.data.days.map { it.day })
             assertEquals(1, e.digestStore.data.weeks.size)
@@ -3480,7 +3480,7 @@ class LearnRunnerTest {
             for (no in listOf("过期的一天", "过期的一周", "过期的一个月")) assertFalse(no, no in carried)
             assertEquals(listOf(today - 1), e.digestStore.data.days.map { it.day })
         }
-        // 没人读也一样:平常有事看一遍时就清
+        // The same with nobody reading: it is purged during the usual look when something happens
         run {
             val e = Env(this); e.digest = true; e.digestStore.data = data
             e.post()
@@ -3489,7 +3489,7 @@ class LearnRunnerTest {
             assertEquals(1, e.digestStore.data.weeks.size)
             assertEquals(1, e.digestStore.data.months.size)
         }
-        // 「当日消息归纳」关着(东西还留着,期限照算):已经读进来的那份照样清
+        // With the "daily notification digest" off (data stays, retention still applies): what has been loaded is still purged
         run {
             val e = Env(this); e.digest = false
             e.digestStore.data = DigestData(days = listOf(DayDigest(today - LearnTuning.DAYS_KEEP + 1, 1, line("快到期的一天")), DayDigest(today - 1, 1, line("昨天"))))
@@ -3501,7 +3501,7 @@ class LearnRunnerTest {
         }
     }
 
-    // 会话样式的通知:正文是空的,话在消息列表里——归纳的请求里要有这回才见到的那几条
+    // Conversation-style notifications: the body is empty and the words are in the message list — the learning request must contain the messages seen this time
     @Test fun newMessagesReachTheLearningRequest() = runTest {
         val e = Env(this)
         repeat(LearnTuning.DUE_COUNT) { i ->
@@ -3515,10 +3515,10 @@ class LearnRunnerTest {
         assertTrue("第 ${LearnTuning.DUE_COUNT} 句" in input)
     }
 
-    // ---- 在发的请求不该被无关的事取消 ----
+    // ---- A request in flight must not be cancelled by unrelated events ----
 
-    // 上一次看守时在发的是某个 App 的分段归纳;看守停了又开,这一次在发的是别的 App 的归纳话题。
-    // 这时前一个 App 不再归纳了:不能凭上一次留下的「在发的是它的」把现在这个请求取消掉
+    // The previous watch had one App's segmented digest in flight; the watch stopped and restarted, and this time another App's topic digest is in flight.
+    // Now the first App stops being learned from: the leftover "its request is in flight" from last time must not cancel the current request
     @Test fun aRequestLeftFromAnEarlierWatchDoesNotCancelALaterOne() = runTest {
         val model = Fake().also { it.gate = CompletableDeferred() }
         val busy = MutableStateFlow(false)
@@ -3540,7 +3540,7 @@ class LearnRunnerTest {
         assertEquals(listOf("notes"), model.kinds)
         first.cancel()
         runCurrent()
-        // 有任务在跑时重新开始看守,攒够一批;任务跑完,发的是归纳话题的请求
+        // The watch restarts while a task is running and a batch accumulates; when the task finishes, the topic digest request goes out
         busy.value = true
         backgroundScope.launch { runner.watch(locked) { locked.value } }
         runCurrent()
@@ -3559,7 +3559,7 @@ class LearnRunnerTest {
         assertEquals(listOf("notes", "learn"), model.kinds)
     }
 
-    // 看一遍时读配置出了一次错:在发的请求不动,只是这一回不发新的
+    // Reading the configuration fails once during a look: the request in flight is untouched and nothing new is sent this time
     @Test fun aFailedConfigurationReadLeavesTheRequestInFlightAlone() = runTest {
         val e = Env(this)
         e.model.gate = CompletableDeferred()
@@ -3582,7 +3582,7 @@ class LearnRunnerTest {
         assertEquals(listOf("Hiking"), e.store.data.topics.map { it.label })
     }
 
-    // 锁屏状态读不出来的时候不能留着请求:锁屏不发是硬规矩,不知道锁没锁就当锁了。这一批留着
+    // A request must not stay in flight while the lock state cannot be read: not sending while locked is a hard rule, so unknown counts as locked. This batch is kept
     @Test fun aFailedLockReadStopsTheRequest() = runTest {
         val e = Env(this)
         e.model.gate = CompletableDeferred()
@@ -3596,8 +3596,8 @@ class LearnRunnerTest {
         assertEquals(LearnTuning.DUE_COUNT, e.runner.state.value.pending)
     }
 
-    // 删掉今天的当日归纳:页面要说得出「删掉了,不会再自动做」(不是「还没有,过完这一天会自动归纳」);
-    // 用户又点了「归纳到现在」做回来之后,就不再算删掉的
+    // Deleting today's daily digest: the page must be able to say "deleted, it will not be made automatically again" (not "not yet; once the day is over it will be learned automatically");
+    // after the user taps "digest up to now" and makes it again, it no longer counts as deleted
     @Test fun aDeletedDayIsReportedAsDeleted() = runTest {
         val e = Env(this)
         e.digest = true
@@ -3611,7 +3611,7 @@ class LearnRunnerTest {
         e.runner.deleteDay(20_000)
         assertTrue(e.runner.digestDays.value.isEmpty())
         assertEquals(setOf(20_000L), e.runner.digestRemovedDays.value)
-        // 换一个进程也说得出来
+        // It can say so in a new process too
         val again = restarted(e)
         again.open()
         assertEquals(setOf(20_000L), again.digestRemovedDays.value)

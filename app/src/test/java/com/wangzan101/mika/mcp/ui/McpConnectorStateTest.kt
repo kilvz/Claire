@@ -167,7 +167,7 @@ class McpConnectorStateTest {
         val connector = McpConnectorState(store, cat, kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined))
         connector.openPreset("acme")
         connector.updateField("tenant", "north")
-        // 返回目录(不 reset 连接器)后重新打开同一预设:非秘密草稿还在,连接状态复位。
+        // After returning to the directory (without resetting the connector), reopen the same preset: the non-secret draft is still there and the connection state is reset.
         connector.openPreset("acme")
         val form = connector.stage.value as McpConnectStage.Form
         assertEquals(mapOf("tenant" to "north"), form.values)
@@ -182,7 +182,7 @@ class McpConnectorStateTest {
         connector.openPreset("acme")
         connector.updateField("tenant", "north")
         connector.updateField("token", "bearer-secret")
-        // 返回目录后重开同一预设:非秘密草稿保留,秘密草稿丢弃(不再残留显示)。
+        // After returning to the directory and reopening the same preset: the non-secret draft is kept, the secret draft is discarded (no leftover display).
         connector.openPreset("acme")
         val form = connector.stage.value as McpConnectStage.Form
         assertEquals(mapOf("tenant" to "north"), form.values)
@@ -197,7 +197,7 @@ class McpConnectorStateTest {
         store.add(config)
         store.setSecret(config.id, "token", "old-secret")
 
-        // 非空替换;空值保留;未声明的字段被忽略。
+        // Non-blank replaces; blank keeps the old value; undeclared fields are ignored.
         connector.replaceSecrets(config, mapOf("token" to "new-secret", "nope" to "x"))
         assertEquals("new-secret", store.secret(config.id, "token"))
         assertNull(store.secret(config.id, "nope"))
@@ -245,13 +245,13 @@ class McpConnectorStateTest {
         connector.openPreset("fs")
         assertTrue((connector.stage.value as McpConnectStage.Form).needsPackageConsent)
 
-        // 未确认:不发起连接,也不触发任何安装。
+        // Not confirmed: no connection is attempted and no install is triggered.
         connector.connect()
         assertFalse(store.packageAccepted(spec))
         assertTrue(port.runs.none { it.firstOrNull() == "npm" })
         assertFalse((connector.stage.value as McpConnectStage.Form).connecting)
 
-        // 确认后:接受包并继续连接,成功。
+        // After confirmation: the package is accepted and connecting continues, successfully.
         connector.confirmPackage()
         connector.inFlight?.join()
         assertTrue(store.packageAccepted(spec))

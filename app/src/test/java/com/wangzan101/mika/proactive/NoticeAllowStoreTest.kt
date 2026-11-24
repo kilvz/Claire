@@ -23,7 +23,7 @@ class NoticeAllowStoreTest {
         assertEquals(false, File(f.parentFile, f.name + ".tmp").exists())
     }
 
-    // 读不出来的名单按空的算(宁可少读),但要说得出「这是没读出来,不是用户一个都没选」:别处不能凭它去删东西
+    // An unreadable allow-list counts as empty (better to read too little), but it must be able to say "this was unreadable, not that the user selected nothing": nothing else may delete based on it
     @Test fun unreadableFileReadsAsEmptyAndSaysSo() {
         val f = tempFile()
         f.parentFile.mkdirs()
@@ -34,10 +34,10 @@ class NoticeAllowStoreTest {
             assertEquals(bad, emptySet<String>(), store.current())
             assertEquals(bad, false, store.readable)
         }
-        // 真的是空的:读得出来
+        // Genuinely empty: readable
         f.writeText("""{"version":1,"allowed":[]}""")
         assertEquals(true, NoticeAllowStore(f).readable)
-        // 用户改了名单:照常写,之后读得出来
+        // The user changed the list: it writes as usual and reads back afterwards
         f.writeText("{not json")
         val store = NoticeAllowStore(f)
         store.setAllowed("com.example", true)
@@ -46,11 +46,11 @@ class NoticeAllowStoreTest {
         assertEquals(true, NoticeAllowStore(f).readable)
     }
 
-    // ---- 名单写不下去(存储满了之类):往少读的一边靠,并如实说没存下来 ----
+    // ---- The list cannot be written (storage full and the like): lean towards reading less, and say honestly that it was not saved ----
 
     private class Revokes(override var allowRevoked: Set<String> = emptySet()) : AllowRevokes
 
-    /** 让写入必定出错:临时文件的位置上放一个目录(不用改权限,也不用真把盘写满)。 */
+    /** Force writes to fail: put a directory where the temp file goes (no permission changes and no need to actually fill the disk). */
     private fun breakWrites(f: File) = File(f.parentFile, f.name + ".tmp").mkdir()
     private fun mendWrites(f: File) = File(f.parentFile, f.name + ".tmp").delete()
 
@@ -60,12 +60,12 @@ class NoticeAllowStoreTest {
         assertTrue(store.setAllowed("com.chat", true))
         assertTrue(store.setAllowed("com.other", true))
         breakWrites(f)
-        // 不抛出去;说没存下来;这次运行里已经不读它了,别的 App 不受影响
+        // Nothing is thrown; it reports that it was not saved; that App is no longer read within this run, and other Apps are unaffected
         assertFalse(store.setAllowed("com.chat", false))
         assertEquals(setOf("com.other"), store.current())
-        // 文件里还是旧的:只靠内存的话,重启后又读它了
+        // The file still holds the old entry: relying on memory alone, a restart would read it again
         assertEquals(setOf("com.chat", "com.other"), NoticeAllowStore(f).current())
-        // 再选一次(名单看上去没变)也会重写;写得下去了就存下来
+        // Selecting it again (the list looks unchanged) also rewrites; once writes succeed it gets saved
         mendWrites(f)
         assertTrue(store.setAllowed("com.chat", false))
         assertEquals(setOf("com.other"), NoticeAllowStore(f).current())
@@ -81,7 +81,7 @@ class NoticeAllowStoreTest {
         assertEquals(setOf("com.other"), NoticeAllowStore(f).current())
     }
 
-    // 已经在名单里的 App 再设一次(只是改档位):名单没变,不写文件,写不下去也不碍事
+    // Setting an App that is already on the list again (only its tier changes): the list is unchanged, no file write, and a failing write does not matter
     @Test fun unchangedListNeedsNoWrite() {
         val f = tempFile()
         val store = NoticeAllowStore(f)
@@ -90,13 +90,13 @@ class NoticeAllowStoreTest {
         breakWrites(f)
         assertTrue(store.setAllowed("com.chat", true))
         assertTrue(store.setAllowed("com.none", false))
-        // 有一个「去掉」没存下来之后,别的 App 改档位仍然算成(它本来就在名单里,文件里也在)
+        // After one "removal" failed to save, changing another App's tier still succeeds (it was already on the list, and in the file too)
         assertFalse(store.dirty)
         assertFalse(store.setAllowed("com.other", false))
         assertTrue(store.dirty)
         assertTrue(store.setAllowed("com.chat", true))
         assertEquals(setOf("com.chat"), store.current())
-        // 那一个「去掉」还是没写成:仍然说得出来(页面据此一直提示),写成了才不说
+        // That one "removal" still has not been written: it still reports so (the page keeps warning accordingly), and only stops once written
         assertTrue(store.dirty)
         mendWrites(f)
         assertTrue(store.setAllowed("com.chat", true))
@@ -104,7 +104,7 @@ class NoticeAllowStoreTest {
         assertEquals(setOf("com.chat"), NoticeAllowStore(f).current())
     }
 
-    // 没存下来的「不读」记在偏好里:重启后先照办(文件里还留着它),写成了就不再记
+    // A "don't read" that failed to save is recorded in preferences: after a restart it takes effect first (the file still holds it), and once written it is no longer recorded
     @Test fun unsavedRemovalSurvivesARestart() {
         val f = tempFile()
         val revokes = Revokes()
@@ -116,7 +116,7 @@ class NoticeAllowStoreTest {
         assertFalse(AllowEdits.set(store, revokes, "com.chat", false))
         assertEquals(setOf("com.chat"), revokes.allowRevoked)
 
-        // 重启,还是写不下去:文件里有它,但内存里的名单没有;仍然记着
+        // Restart, writes still fail: it is in the file but not in the in-memory list; it is still recorded
         val second = NoticeAllowStore(f)
         assertEquals(setOf("com.chat", "com.other"), second.current())
         AllowEdits.replay(second, revokes)
@@ -124,7 +124,7 @@ class NoticeAllowStoreTest {
         assertEquals(setOf("com.chat"), revokes.allowRevoked)
         assertTrue(second.dirty)
 
-        // 再重启,写得下去了:补写进文件,不再记
+        // Restart again, writes now succeed: it is written into the file and no longer recorded
         mendWrites(f)
         val third = NoticeAllowStore(f)
         AllowEdits.replay(third, revokes)
@@ -133,7 +133,7 @@ class NoticeAllowStoreTest {
         assertTrue(revokes.allowRevoked.isEmpty())
     }
 
-    // 「不读」没存下来之后用户又把它选回来:存成了才读,也不再记着要去掉它
+    // After a "don't read" failed to save, the user selects it again: it is read only once saved, and it is no longer recorded for removal
     @Test fun grantingAgainClearsTheUnsavedRemoval() {
         val f = tempFile()
         val revokes = Revokes()
@@ -141,7 +141,7 @@ class NoticeAllowStoreTest {
         AllowEdits.set(store, revokes, "com.chat", true)
         breakWrites(f)
         assertFalse(AllowEdits.set(store, revokes, "com.chat", false))
-        // 还写不下去:加不回来,仍然不读、仍然记着
+        // Writes still fail: it cannot be added back, so it is still unread and still recorded
         assertFalse(AllowEdits.set(store, revokes, "com.chat", true))
         assertEquals(emptySet<String>(), store.current())
         assertEquals(setOf("com.chat"), revokes.allowRevoked)

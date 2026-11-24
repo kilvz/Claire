@@ -16,7 +16,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 「清空来自它的」列哪些 App:只在归纳里出现过的 App 也要列出来(只看话题和联系人的话,那样的 App 没有入口)。 */
+/** Which Apps "Clear what came from it" lists: an App that only ever appeared in digests must be listed too (going by topics and contacts alone, such an App would have no entry point). */
 class ClearableAppsTest {
     @Test fun appsThatOnlyAppearInDigestsAreListedToo() {
         val topic = ObservedTopic("k1", TopicKind.Interest, "徒步", 1L, 1L).copy(evidence = mapOf("com.topic" to listOf(20_000L)))
@@ -31,12 +31,12 @@ class ClearableAppsTest {
         )
         assertEquals(setOf("com.day", "com.note"), clearableApps(emptyList(), emptyList(), emptyList(), listOf(day), emptyList()))
         assertEquals(emptySet<String>(), clearableApps(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
-        // 只留着通知原文、还没归纳出任何东西的 App 也列出来
+        // Apps that only have raw notification text left and nothing learned yet are listed too
         assertEquals(setOf("com.day", "com.note", "com.raw"), clearableApps(emptyList(), emptyList(), emptyList(), listOf(day), emptyList(), setOf("com.raw", "com.note")))
     }
 
-    // 一个 App 只剩在某一份归纳的概述里(存下的句子没引过它,它的分段归纳、那一天的归纳都到期了):照样列出来。
-    // 清掉它之后那份概述清空,和它无关的句子留着,列表里也不再有它。日、周、月各走一遍真的池子
+    // An App survives only in one digest's overview (the stored lines never cite it, and its segment digest and that day's digest have expired): it is still listed.
+    // After clearing it, that overview is emptied, lines unrelated to it stay, and the list no longer contains it. The day, week and month paths each run against a real pool
     @Test fun appsThatOnlySurviveInAnOverviewAreListedAndCanBeCleared() {
         val utc = java.time.ZoneOffset.UTC
         val day = 20_000L
@@ -49,7 +49,7 @@ class ClearableAppsTest {
         fun listed(p: DigestPool) = clearableApps(emptyList(), emptyList(), p.all(), p.days(), p.spans(SpanKind.Week) + p.spans(SpanKind.Month))
         fun both(p: DigestPool) = p.dayInput(day).let { input -> input.indices.map { NoteSignal(listOf(it), input[it].text) } }
 
-        // 当日归纳:存下的句子只引了 B,概述是照着 A、B 写的;分段归纳到期
+        // Day digest: the stored lines cite only B, while the overview was written from A and B; the segment digests have expired
         pool().let { p ->
             val input = p.dayInput(day)
             p.setDay(day, input, listOf(NoteSignal(listOf(input.indexOfFirst { it.packageName == "com.b" }), "只写了 B 的")), at, partial = false, brief = "A 和 B 的事")
@@ -61,7 +61,7 @@ class ClearableAppsTest {
             assertEquals(listOf("只写了 B 的"), p.days().single().lines.map { it.text })
             assertEquals(setOf("com.b"), listed(p))
         }
-        // 周归纳:那一天的归纳也到期了,A 只剩在周归纳的概述里
+        // Week digest: that day's digest has expired too, so A survives only in the week digest's overview
         pool().let { p ->
             p.setDay(day, p.dayInput(day), both(p), at, partial = false)
             val week = DigestPool.weekOf(day)
@@ -76,7 +76,7 @@ class ClearableAppsTest {
             assertEquals(listOf("这一周只写了 B 的"), p.spans(SpanKind.Week).single().lines.map { it.text })
             assertEquals(setOf("com.b"), listed(p))
         }
-        // 月归纳:周归纳也到期了,A 只剩在月归纳的概述里
+        // Month digest: the week digest has expired too, so A survives only in the month digest's overview
         pool().let { p ->
             p.setDay(day, p.dayInput(day), both(p), at, partial = false)
             val week = DigestPool.weekOf(day)
@@ -96,23 +96,23 @@ class ClearableAppsTest {
         }
     }
 
-    // 概述已经清掉、只剩旧的来源记录:不能凭它把 App 列出来(已经没东西可清了)
+    // The overview is already cleared and only the old source record remains: it must not get the App listed (there is nothing left to clear)
     @Test fun aClearedOverviewsLeftoverSourcesAreNotListed() {
         val lines = listOf(DigestLine("只写了 B 的", apps = listOf("com.b")))
         val day = DayDigest(20_000, 1L, lines, brief = "", briefApps = listOf("com.a", "com.b"))
         val span = SpanDigest(19_996, 1L, lines, brief = "", briefApps = listOf("com.a", "com.b"))
         assertEquals(setOf("com.b"), clearableApps(emptyList(), emptyList(), emptyList(), listOf(day), listOf(span)))
-        // 概述还在时才算
+        // It only counts while the overview is still there
         assertEquals(setOf("com.b", "com.a"), clearableApps(emptyList(), emptyList(), emptyList(), listOf(day.copy(brief = "A 和 B")), emptyList()))
         assertEquals(setOf("com.b", "com.a"), clearableApps(emptyList(), emptyList(), emptyList(), emptyList(), listOf(span.copy(brief = "A 和 B"))))
     }
 
-    // 「归纳到现在」做不了的几种情况都有一句话可说;做得了时没有
+    // Each case where "learn up to now" cannot run has a sentence to explain it; when it can run there is none
     @Test fun manualDigestSaysWhyItCannotRun() {
         assertEquals(null, makeBlocked(budgetOut = false, status = LearnStatus.Idle))
         assertEquals(null, makeBlocked(budgetOut = false, status = LearnStatus.Waiting))
         assertEquals(com.wangzan101.mika.R.string.proactive_learn_state_budget, makeBlocked(budgetOut = true, status = LearnStatus.Idle))
-        // 账本上还有、但请求时被拒过(执行器记着今天不再发)
+        // The ledger still has budget, but a request was previously denied (the executor remembers not to send again today)
         assertEquals(com.wangzan101.mika.R.string.proactive_learn_state_budget, makeBlocked(budgetOut = false, status = LearnStatus.BudgetUsedUp))
         assertEquals(com.wangzan101.mika.R.string.proactive_status_access, makeBlocked(budgetOut = false, status = LearnStatus.Suspended))
         assertEquals(com.wangzan101.mika.R.string.proactive_status_access, makeBlocked(budgetOut = true, status = LearnStatus.Suspended))

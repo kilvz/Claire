@@ -12,7 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 「Claire 知道了什么」分级页面的纯逻辑:索引上列哪些,某一页指的东西还在不在。 */
+/** Pure logic of the "What Claire knows" drill-down pages: which entries the index lists, and whether what a given page points at is still there. */
 class KnowPagesTest {
     private val today = 20_000L
     private val week = DigestPool.weekOf(today)
@@ -24,7 +24,7 @@ class KnowPagesTest {
         weeks: List<SpanDigest> = emptyList(), months: List<SpanDigest> = emptyList(),
     ) = KnowData(today, canMake, notes, days, weeks, months)
 
-    // 每天:有当日归纳的、只有分段归纳的(归纳还没做出来或被删了)都列;能做时今天总有一行;新的在前,不重复
+    // Per day: days with a day digest and days with only segment digests (the digest has not been produced yet or was deleted) are both listed; when it can be made, today always has a row; newest first, no duplicates
     @Test fun theIndexListsDaysWithADigestOrNotesAndTodayWhenItCanBeMade() {
         assertTrue(data().dayKeys().isEmpty())
         assertEquals(listOf(today), data(canMake = true).dayKeys())
@@ -36,7 +36,7 @@ class KnowPagesTest {
         assertEquals(listOf(today, today - 1), data(canMake = true, days = listOf(DayDigest(today - 1, 1, listOf(line)))).dayKeys())
     }
 
-    // 每周、每月:存着的;能做时本周、本月各有一行
+    // Per week and per month: whatever is stored; when it can be made, the current week and the current month each have a row
     @Test fun theIndexListsStoredSpansAndTheCurrentOnesWhenTheyCanBeMade() {
         val old = SpanDigest(week - 14, 1, listOf(line))
         assertEquals(listOf(week - 14), data(weeks = listOf(old)).spanKeys(SpanKind.Week))
@@ -45,7 +45,7 @@ class KnowPagesTest {
         assertTrue(data().spanKeys(SpanKind.Month).isEmpty())
     }
 
-    // 一页指的东西不在了就不算数(页面退回上一级):按哪一天、哪一句认,不按位置
+    // A page stops counting once what it points at is gone (the page falls back to its parent): identity is by which day and which line, not by position
     @Test fun aPageIsValidOnlyWhileWhatItPointsAtIsStillThere() {
         val other = DigestLine("另一句", notes = listOf("n2"), apps = listOf("com.chat"))
         val d = data(
@@ -58,7 +58,7 @@ class KnowPagesTest {
         assertFalse("今天还没有东西、也做不了", d.valid(KnowPage.Day(today)))
         assertTrue(data(canMake = true).valid(KnowPage.Day(today)))
         assertTrue(d.valid(KnowPage.DayLine(today - 1, line)))
-        // 那一句被去掉、换成了别的一句:原来那一页不再算数,不会落到现在排在那个位置上的另一句头上
+        // That line was dropped and replaced by a different one: the original page no longer counts, and it does not fall onto the other line now sitting in that position
         val replaced = data(days = listOf(DayDigest(today - 1, 2, listOf(other))))
         assertFalse(replaced.valid(KnowPage.DayLine(today - 1, line)))
         assertTrue(replaced.valid(KnowPage.DayLine(today - 1, other)))
@@ -71,7 +71,7 @@ class KnowPagesTest {
         assertFalse(d.valid(KnowPage.Note("n9")))
     }
 
-    // 说「会自动归纳」「点下面这一行」的那几句,只在现在真能做的时候才用;做不了时只说「还没有」
+    // The sentences that say "it will be learned automatically" or "tap the row below" are only used when that can really happen now; when it cannot, they only say "not yet"
     @Test fun theNoteOverADaysDigestOnlyPromisesWhatCanHappen() {
         val full = DayDigest(today, 1, listOf(line))
         val empty = DayDigest(today, 1, emptyList())
@@ -83,7 +83,7 @@ class KnowPagesTest {
         assertEquals(R.string.proactive_know_day_pending, dayNote(null, removed = false, isToday = false, canMake = true))
         assertEquals(R.string.proactive_learn_empty, dayNote(null, removed = false, isToday = true, canMake = false))
         assertEquals(R.string.proactive_learn_empty, dayNote(null, removed = false, isToday = false, canMake = false))
-        // 删掉了的:只有今天、而且能做的时候才说「想要的话点下面这一行」
+        // Deleted ones: only for today, and only when it can be made, does it say "tap the row below if you want it"
         assertEquals(R.string.proactive_learn_span_removed, dayNote(null, removed = true, isToday = true, canMake = true))
         assertEquals(R.string.proactive_know_removed, dayNote(null, removed = true, isToday = true, canMake = false))
         assertEquals(R.string.proactive_know_removed, dayNote(null, removed = true, isToday = false, canMake = true))

@@ -27,7 +27,7 @@ class MemoryViewModelTest {
     @get:Rule val texts = ChineseTexts()
 
     @get:Rule val tmp = TemporaryFolder()
-    // 来历一行按本机时区显示日期:取本机时区那天的中午,在哪个时区跑都是 10 月 23 日
+    // The provenance line shows the date in the device's time zone: use noon of that day in the device's time zone, so it reads October 23 whichever time zone the test runs in
     private val said = MemorySource("user_said", "以后点外卖都不要香菜", "c1", LocalDateTime.of(2025, 10, 23, 12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
     private val store = memoryStore().apply {
         add(MemoryKind.fact, "用户住在张江", listOf("家"), MemorySource("manual", atMs = 1)).getOrThrow()
@@ -44,12 +44,12 @@ class MemoryViewModelTest {
         return MemoryViewModel(store, MemorySettings(settingsFile), null, backgroundScope, broken, wipe = { wiped++ }).also { runCurrent() }
     }
 
-    // Claire 自己归纳出来的那条:来历写明是它归纳的,引的是用户提要求的那句,不写成「你说的」
+    // The entry Claire inferred itself: the provenance says it inferred it, quotes the user's request, and does not read "you said"
     @Test fun inferredMemoryShowsItWasMikasConclusion() = runTest {
         store.add(MemoryKind.fact, "用户常在张江路一带活动", emptyList(), said.copy(type = com.wangzan101.mika.core.learn.memory.MemoryContext.INFERRED, quote = "你自己总结几条写进记忆")).getOrThrow()
         val vm = vm()
         assertEquals("Claire 在 10 月 23 日按你的要求归纳:『你自己总结几条写进记忆』", vm.ui.value.rows.first { it.content == "用户常在张江路一带活动" }.source)
-        // 开关默认关,打开后存得住
+        // The switch defaults to off; once turned on it persists
         assertFalse(vm.ui.value.switches.inferMemories)
         vm.setSwitches { it.copy(inferMemories = true) }
         runCurrent()
@@ -84,7 +84,7 @@ class MemoryViewModelTest {
         vm.search("咖啡"); runCurrent()
         assertEquals(listOf("用户喝咖啡不加糖"), vm.ui.value.rows.map { it.content })
         vm.search(""); runCurrent()
-        // 空查询按更新时间倒序
+        // An empty query lists by update time, newest first
         assertEquals(3, vm.ui.value.rows.size)
     }
 
@@ -155,7 +155,7 @@ class MemoryViewModelTest {
         skills.putPending("d1", com.wangzan101.mika.core.learn.skills.PersonalSkill("meeting-notes", skillMd("meeting-notes", "## 步骤\n1. 点搜索"), com.wangzan101.mika.core.learn.skills.SkillStatus.pending, "r1", null, 0, emptyList()))
         val vm = skillsVm(skills)
         assertEquals(listOf("d1"), vm.ui.value.skills.drafts.map { it.id })
-        // 改过的全文同样过校验:缺小节、带敏感信息、提到没有的工具都不收
+        // The edited full text passes the same validation: a missing section, sensitive information, or a mention of a tool that does not exist are all rejected
         vm.approveSkill("d1", skillMd("meeting-notes", "## 步骤\n1. 点搜索框")); runCurrent()
         assertTrue(vm.ui.value.message!!.contains("五个小节"))
         vm.dismissMessage()
@@ -198,7 +198,7 @@ class MemoryViewModelTest {
         assertTrue(vm.ui.value.skills.installed.isEmpty())
     }
 
-    // ---- 导入别人分享的技能(#165) ----
+    // ---- Importing skills shared by other people (#165) ----
 
     @Test fun importedSkillWaitsInPendingThenTrial() = runTest {
         val skills = com.wangzan101.mika.task.MapSkills()
@@ -219,7 +219,7 @@ class MemoryViewModelTest {
         val vm = skillsVm(com.wangzan101.mika.task.MapSkills(), builtin = setOf("meeting-notes"))
         assertEquals("和内置技能重名了，改个名字再试。", vm.importSkill(fullMd("meeting-notes", "1. 点搜索框")))
         assertTrue(vm.importSkill(skillMd("other", "## 步骤\n1. 点搜索框"))!!.contains("五个小节"))
-        // 原因由导入框自己显示,页面上不另弹提示
+        // The import dialog shows the reason itself; the page does not pop up a separate notice
         assertEquals(null, vm.ui.value.message)
         assertTrue(vm.ui.value.skills.drafts.isEmpty())
     }
@@ -234,7 +234,7 @@ class MemoryViewModelTest {
         vm.approveSkill("d1"); runCurrent()
         assertEquals("里面提到了 Claire 没有的工具", vm.ui.value.message)
         assertTrue(skills.get("meeting-notes") == null)
-        // 自学的草稿起草时已经按那次运行的工具查过,没改过就照旧收下
+        // A self-learned draft was already checked against that run's tools when it was drafted, so it is accepted as-is if unedited
         vm.approveSkill("d2"); runCurrent()
         assertTrue(skills.get("learned") != null)
     }

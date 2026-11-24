@@ -12,7 +12,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** 仓库里的飞书示例要和当前阶段的校验规则一致:P1a 能装,工具版/连接器版留给后续阶段。 */
+/** The Feishu example in the repo must match the validation rules of the current stage: P1a installs, while the tool version/connector version are left for later stages. */
 class PluginSampleTest {
     @get:Rule val tmp = TemporaryFolder()
 

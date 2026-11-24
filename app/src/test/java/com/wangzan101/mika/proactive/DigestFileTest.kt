@@ -29,7 +29,7 @@ class DigestFileTest {
         }
     }
 
-    // 解不开或坏了的文件直接删掉(不改名另存);之后照常存取;整份删掉在什么都没有时也不出错
+    // Undecryptable or corrupt files are simply deleted (not renamed aside); saving and loading work as usual afterwards; wiping is safe when nothing exists
     @Test fun brokenFileIsDeletedAndWipeIsSafe() {
         file().wipe()
         file().save(data)

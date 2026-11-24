@@ -54,7 +54,7 @@ class McpPackageManagerTest {
     private fun assertThrowsSuspend(type: Class<out Throwable>, block: suspend () -> Unit): SandboxError =
         assertThrows(type) { runBlocking { block() } } as SandboxError
 
-    /** 记录 run 的命令、按命令类型回结果;block 非空时 run 挂起(用于取消)。 */
+    /** Records the commands passed to run and answers by command type; while block is non-null, run suspends (used for cancellation). */
     private class FakePort : SandboxPort {
         override val tree = SandboxTree()
         val runs = mutableListOf<List<String>>()
@@ -96,21 +96,21 @@ class McpPackageManagerTest {
         val consent = McpPackageConsent()
         val manager = McpPackageManager(port)
 
-        // 未确认且未缓存:要求确认,不执行任何安装。
+        // Not confirmed and not cached: consent is required and no install runs.
         val denied = assertThrowsSuspend(SandboxError::class.java) { manager.prepare("w", npm, confirmed = false) }
         assertEquals("mcp_package_consent", denied.code)
         assertTrue("no install must run before consent", port.runs.none { it.firstOrNull() == "npm" })
 
-        // 版本不同:同一包名同意也不算。
+        // Different version: consent for the same package name does not count.
         consent.accept(npm.copy(version = "9.9.9"))
         assertThrowsSuspend(SandboxError::class.java) { manager.prepare("w", npm, confirmed = consent.accepted(npm)) }
 
-        // 来源不同:不算。
+        // Different source: does not count.
         consent.clear()
         consent.accept(npm.copy(source = "https://elsewhere.example"))
         assertThrowsSuspend(SandboxError::class.java) { manager.prepare("w", npm, confirmed = consent.accepted(npm)) }
 
-        // 精确同意后,安装进行;取消时不得留下成功标记、不得执行服务。
+        // With exact consent the install proceeds; on cancellation it must leave no success marker and must not run the service.
         consent.clear()
         consent.accept(npm)
         port.block = CompletableDeferred()
@@ -126,20 +126,20 @@ class McpPackageManagerTest {
         consent.accept(npm)
         val manager = McpPackageManager(port)
 
-        // 首次安装:跑 npm install + touch 标记,返回 .bin 目录前缀。
+        // First install: runs npm install + touch marker and returns the .bin directory prefix.
         val prefix = manager.prepare("w1", npm, confirmed = true)
         assertEquals(listOf("/opt/mika/mcp-cache/npm-_scope_server-filesystem-1.2.3/node_modules/.bin"), prefix)
         assertEquals(1, port.runs.count { it.firstOrNull() == "npm" })
 
-        // 已缓存:不再安装(同一工作区)。
+        // Already cached: no reinstall (same workspace).
         manager.prepare("w1", npm, confirmed = false)
         assertEquals(1, port.runs.count { it.firstOrNull() == "npm" })
 
-        // 共享缓存:另一工作区复用同一份,不重装。
+        // Shared cache: another workspace reuses the same copy instead of reinstalling.
         manager.prepare("w2", npm, confirmed = false)
         assertEquals(1, port.runs.count { it.firstOrNull() == "npm" })
 
-        // 失败不留标记,可重试。
+        // Failure leaves no marker and can be retried.
         val p2 = FakePort()
         p2.installExit = 1
         p2.installOutput = "EACCES"
@@ -171,7 +171,7 @@ class McpPackageManagerTest {
         val a = McpPackageConsent(file)
         assertFalse(a.accepted(npm))
         a.accept(npm)
-        // 新实例从磁盘读回已确认项;换版本/来源不算同一项。
+        // A new instance reads confirmed entries back from disk; a different version/source does not count as the same entry.
         val b = McpPackageConsent(file)
         assertTrue(b.accepted(npm))
         assertFalse(b.accepted(npm.copy(version = "9.9.9")))
@@ -197,12 +197,12 @@ class McpPackageManagerTest {
         assertTrue("mcp-server-fetch==0.9.0" in pypiInstall)
         assertTrue("--only-binary=:all:" in pypiInstall)
 
-        // 秘密绝不出现在 argv 前缀或安装命令里。
+        // Secrets must never appear in the argv prefix or the install command.
         for (argv in port.runs) assertFalse("secret must not reach argv", argv.any { it.contains("SECRET") })
         assertFalse(npmPrefix.any { it.contains("SECRET") })
     }
 
-    /** 只回答 initialize 和 tools/list 的 stdio server,供 store 测试验证启动与 argv 组合。 */
+    /** A stdio server that only answers initialize and tools/list, letting store tests check startup and argv composition. */
     private fun stdioProcess(): McpStdioProcess {
         val toServer = PipedOutputStream()
         val fromClient = PipedInputStream(toServer)
@@ -238,7 +238,7 @@ class McpPackageManagerTest {
         }
     }
 
-    /** 预设含包的 stdio 服务:未确认不安装不启动;确认后安装并拼成 argv 前缀/可执行名。 */
+    /** A stdio service whose preset ships a package: without confirmation it neither installs nor starts; after confirmation it installs and builds the argv prefix/executable name. */
     @Test fun storeRequiresConsentAndComposesPackageArgv() = runBlocking {
         val preset = McpPreset(
             id = "fs", name = "Filesystem", summary = McpCopy(mapOf("en" to "Filesystem")),
@@ -255,12 +255,12 @@ class McpPackageManagerTest {
         val config = s.presetConfig("fs", emptyMap()).getOrThrow()
         s.add(config).getOrThrow()
 
-        // 未确认:连接失败,不安装、不启动。
+        // Not confirmed: the connection fails, and nothing is installed or started.
         assertTrue(s.test(config).isFailure)
         assertNull(launchedArgv)
         assertTrue(port.runs.none { it.firstOrNull() == "npm" })
 
-        // 确认后:安装并启动,argv 拼成「缓存 .bin 目录 / 可执行名」。
+        // After confirmation: it installs and starts, with argv composed as "cache .bin directory / executable name".
         s.acceptPackage(preset.packageSpec!!)
         assertTrue(s.test(config).isSuccess)
         assertEquals(listOf("/opt/mika/mcp-cache/npm-server-filesystem-1.0.0/node_modules/.bin/mcp-server-filesystem"), launchedArgv)

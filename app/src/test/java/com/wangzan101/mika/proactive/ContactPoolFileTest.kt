@@ -38,7 +38,7 @@ class ContactPoolFileTest {
         file().save(data)
         assertEquals(data, file().load())
         assertEquals(ContactRelation.Classmate, file().load().contacts.single().relation)
-        // 和话题池各是各的文件、各用各的密钥
+        // Separate files and separate keys from the topic pool
         assertFalse(File(tmp.root, "proactive/topics.bin").exists())
         assertNotEquals(TopicPoolFile.KEY_ALIAS, ContactPoolFile.KEY_ALIAS)
         val bytes = bin.readBytes()
@@ -57,7 +57,7 @@ class ContactPoolFileTest {
         assertEquals(data, file().load())
     }
 
-    // 用户删了东西时:另存的旧文件删掉,现在的那份不动
+    // When the user has deleted things: the old files moved aside are removed, and the current one is left untouched
     @Test fun dropBrokenRemovesOnlyTheSetAsideCopies() {
         file().save(data)
         bin.writeBytes(byteArrayOf(1, 2, 3))
@@ -68,11 +68,11 @@ class ContactPoolFileTest {
         file().dropBroken()
         assertEquals(listOf("contacts.bin"), dir.list()!!.toList())
         assertEquals(data, file().load())
-        // 没有可删的也不出错
+        // Nothing to remove is also fine
         file().dropBroken()
     }
 
-    // 「清空全部」:文件、临时文件、另存的旧文件都删掉;目录还没有时也不出错
+    // "Clear all": the file, temp files and old files moved aside are all removed; a missing directory is fine too
     @Test fun wipeRemovesEverything() {
         file().wipe()
         file().save(data)

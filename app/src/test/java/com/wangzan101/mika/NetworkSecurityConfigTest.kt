@@ -8,8 +8,8 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * 网络安全配置的守护:企业内网自建服务靠这两条声明直连(明文 http + 用户安装的 CA),
- * 删掉任何一条都会退化成「只信系统证书的加密端点」,#361 的场景重新连不上。
+ * Guard for the network security config: self-hosted services on a company intranet rely on these two declarations to connect directly (plain http + user-installed CAs),
+ * and removing either one degrades this to "encrypted endpoints that trust only system certificates", so the scenario in #361 cannot connect again.
  */
 class NetworkSecurityConfigTest {
 
@@ -22,15 +22,15 @@ class NetworkSecurityConfigTest {
         return configs.item(0) as Element
     }
 
-    /** 用户自己在本机或局域网跑的模型服务多半只有 http,这条删了它们全连不上。 */
+    /** Model services users run on their own machine or LAN usually speak only http; remove this and none of them can connect. */
     @Test
     fun cleartextStaysPermitted() {
         assertEquals("true", baseConfig().getAttribute("cleartextTrafficPermitted"))
     }
 
     /**
-     * 公司内部 CA 签发的自建端点(GPUStack/vLLM 一类)全靠用户 CA 这条:显式声明锚点后系统默认
-     * 不再接受用户证书,普通用户没有 root 装不进系统信任区。装 CA 需用户在系统设置里主动操作。
+     * Self-hosted endpoints signed by an internal company CA (GPUStack/vLLM and the like) depend entirely on the user CA entry: once trust anchors are declared explicitly, the system no longer
+     * accepts user certificates by default, and a regular user without root cannot install into the system trust store. Installing a CA requires the user to act in system settings.
      */
     @Test
     fun trustAnchorsIncludeUserInstalledCertificates() {

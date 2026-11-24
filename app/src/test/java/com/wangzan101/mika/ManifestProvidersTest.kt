@@ -7,7 +7,7 @@ import org.w3c.dom.Element
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-/** 清单里会让进程一启动就崩的配置,在电脑上先拦住(真机才会暴露的那一类)。 */
+/** Manifest settings that crash the process on startup, caught here on the desktop first (the kind only a real device would expose). */
 class ManifestProvidersTest {
 
     private val androidNs = "http://schemas.android.com/apk/res/android"
@@ -29,7 +29,7 @@ class ManifestProvidersTest {
             if (!isFileProvider) continue
             fileProviders++
             val name = p.getAttributeNS(androidNs, "name")
-            // FileProvider.attachInfo 在 grantUriPermissions 不为 true 时抛 SecurityException,进程起不来
+            // FileProvider.attachInfo throws SecurityException when grantUriPermissions is not true, and the process will not start
             assertEquals("$name grantUriPermissions", "true", p.getAttributeNS(androidNs, "grantUriPermissions"))
             assertEquals("$name exported", "false", p.getAttributeNS(androidNs, "exported"))
         }
@@ -43,13 +43,13 @@ class ManifestProvidersTest {
         val providers = doc.getElementsByTagName("provider")
         val p = (0 until providers.length).map { providers.item(it) as Element }
             .single { it.getAttributeNS(androidNs, "name") == ".shell.HelperHandoffProvider" }
-        // shell 要能调到它;普通 App 没有这个权限,连 provider 都拿不到
+        // shell must be able to reach it; a regular app lacks this permission and cannot even obtain the provider
         assertEquals("true", p.getAttributeNS(androidNs, "exported"))
         assertEquals("android.permission.INTERACT_ACROSS_USERS_FULL", p.getAttributeNS(androidNs, "permission"))
         assertEquals("\${applicationId}.helper", p.getAttributeNS(androidNs, "authorities"))
     }
 
-    /** 电脑连接的服务对外开放只为让 adb shell 起它:普通 App 没有这个权限,起不了、也开关不了 USB 方式。 */
+    /** The computer-connection service is exported only so adb shell can start it: a regular app lacks this permission, so it can neither start it nor toggle the USB mode. */
     @Test
     fun computerAccessServiceIsOnlyStartableWithShellLevelPermission() {
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
@@ -60,11 +60,11 @@ class ManifestProvidersTest {
         assertEquals("true", s.getAttributeNS(androidNs, "exported"))
         assertEquals("android.permission.INTERACT_ACROSS_USERS_FULL", s.getAttributeNS(androidNs, "permission"))
         assertEquals("specialUse", s.getAttributeNS(androidNs, "foregroundServiceType"))
-        // 没有 intent-filter:只能按组件名显式起
+        // No intent-filter: it can only be started explicitly by component name
         assertEquals(0, s.getElementsByTagName("intent-filter").length)
     }
 
-    /** 清单里登记的组件都按全名找得到类(搬了代码的入口留着同名的薄壳)。 */
+    /** Every component registered in the manifest resolves to a class by its full name (entry points whose code moved keep a thin shell under the same name). */
     @Test
     fun everyComponentClassExists() {
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
@@ -81,8 +81,8 @@ class ManifestProvidersTest {
     }
 
     /**
-     * 测试 APK 清单里的页面、服务运行在测试包自己的进程里,那里没有 Kotlin 标准库(和 App 重复的依赖不打进测试 APK):
-     * 每个都要有同名的 Java 源文件。类名对不上、或写成 Kotlin,真机上一打开就崩,读屏只读到一块空屏。
+     * Screens and services in the test APK manifest run in the test package's own process, which has no Kotlin standard library (dependencies duplicated with the app are not packed into the test APK):
+     * each must have a Java source file with the same name. If the class name does not match, or it is written in Kotlin, it crashes on a real device the moment it opens, and a screen reader finds only a blank screen.
      */
     @Test
     fun testApkComponentsAreJavaClassesWithMatchingNames() {
@@ -100,8 +100,8 @@ class ManifestProvidersTest {
     }
 
     /**
-     * 拍照附件走系统相机:声明用到相机、但不是必需(没有相机的设备照常安装)。这条声明不能删:
-     * 有的系统按 APK 特征给应用分类,没有它时 Claire 可能被当成游戏、限制刷新率。
+     * Photo attachments go through the system camera: declare that the camera is used, but not as required (devices without a camera still install as usual). This declaration must not be removed:
+     * some systems classify apps by APK characteristics, and without it Claire may be treated as a game and get its refresh rate capped.
      */
     @Test
     fun cameraIsDeclaredAsOptionalFeature() {
@@ -115,7 +115,7 @@ class ManifestProvidersTest {
     }
 
     /**
-     * 定位权限隐含「需要定位硬件」;网页定位不是必需功能,声明成非必需,没有 GPS 的设备也能装。
+     * Location permissions imply "location hardware is required"; web-based location is not an essential feature, so declare it non-required and devices without GPS can still install.
      */
     @Test
     fun locationIsDeclaredAsAnOptionalFeature() {
@@ -132,8 +132,8 @@ class ManifestProvidersTest {
     }
 
     /**
-     * 兼容性自检的测试页对外开放只为让内置助手(shell)开它:调用方必须持有 INTERACT_ACROSS_USERS_FULL,普通 App 打不开;
-     * 没有 intent-filter,只能按组件名开;单独一个任务、不进最近任务。助手认的类名和清单一致。
+     * The compatibility self-check test page is exported only so the built-in assistant (shell) can open it: the caller must hold INTERACT_ACROSS_USERS_FULL, so a regular app cannot open it;
+     * there is no intent-filter, so it can only be opened by component name; it runs in its own task and stays out of recents. The class name the assistant uses matches the manifest.
      */
     @Test
     fun selfCheckTargetIsOnlyStartableWithShellLevelPermission() {
@@ -219,7 +219,7 @@ class ManifestProvidersTest {
         }
     }
 
-    /** 内置助手进程按这个全名启动。 */
+    /** The built-in assistant process is started by this full class name. */
     @Test
     fun helperEntryClassExists() {
         val c = Class.forName(com.wangzan101.mika.core.device.shell.HelperHandoff.HELPER_CLASS, false, javaClass.classLoader)

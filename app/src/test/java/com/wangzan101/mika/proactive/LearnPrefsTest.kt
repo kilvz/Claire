@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LearnPrefsTest {
-    // 没同意过;敏感类推断默认关;调成「低」的 App 默认没有
+    // Never consented; sensitive inference is off by default; no App is tuned to "low" by default
     @Test fun defaultsAreOff() {
         val p = ProactivePrefs(FeatureFlagsCapsuleTest.MemoryPrefs())
         assertNull(p.consent)
@@ -28,7 +28,7 @@ class LearnPrefsTest {
         assertEquals(setOf("com.tencent.mm"), back.learnOptOut)
     }
 
-    // 判定和归纳共用的那一份同意:记下、读回、清掉
+    // The single consent shared by triage and learning: stored, read back, cleared
     @Test fun consentSurvivesAndCanBeCleared() {
         val raw = FeatureFlagsCapsuleTest.MemoryPrefs()
         val p = ProactivePrefs(raw)
@@ -38,14 +38,14 @@ class LearnPrefsTest {
         assertNull(ProactivePrefs(raw).consent)
     }
 
-    // 没做成的删除要记到下一次进程里
+    // Deletions that did not go through must be recorded into the next process
     @Test fun pendingPurgesSurvive() {
         val raw = FeatureFlagsCapsuleTest.MemoryPrefs()
         val p = ProactivePrefs(raw)
         assertEquals(emptySet<String>(), p.topicPurges)
         assertEquals(emptySet<String>(), p.contactPurges)
         assertEquals(emptySet<String>(), p.digestPurges)
-        // 记着的合并(两个话题 id,中间一个 >)也原样存、原样读
+        // A recorded merge (two topic ids with a > in between) is stored and read back verbatim
         val merge = ":merge:k0123456789ab>kba9876543210"
         p.topicPurges = setOf(LearnRunner.PURGE_SENSITIVE, "com.chat", merge)
         p.contactPurges = setOf("com.chat", merge)
@@ -58,7 +58,7 @@ class LearnPrefsTest {
         assertEquals(emptySet<String>(), ProactivePrefs(raw).topicPurges)
     }
 
-    // 话题、联系人上记着的要照先后补做:先后也得存下来(偏好里的字符串集合自己不保先后)
+    // Pending work recorded on topics and contacts must be replayed in order: the order must be persisted too (a string set in preferences does not keep order by itself)
     @Test fun pendingPurgesKeepTheirOrder() {
         val raw = FeatureFlagsCapsuleTest.MemoryPrefs()
         val p = ProactivePrefs(raw)
@@ -66,20 +66,20 @@ class LearnPrefsTest {
         var set = emptySet<String>()
         for (m in marks) { set = set - m + m; p.topicPurges = set }
         assertEquals(marks, ProactivePrefs(raw).topicPurges.toList())
-        // 划掉几个之后剩下的先后不变
+        // After striking a few out, the rest keep their order
         val struck = setOf(marks[3], marks[17])
         p.topicPurges = p.topicPurges - struck
         assertEquals(marks - struck, ProactivePrefs(raw).topicPurges.toList())
-        // 只认集合的旧版本写的(没有先后那一项):照常读得出来,只是不分先后
+        // Written by an older version that only knows the set (no order entry): it still reads back, just without order
         val old = FeatureFlagsCapsuleTest.MemoryPrefs()
         old.edit().putStringSet("learn_purge_topics", setOf("com.a", ":topic:k1")).commit()
         assertEquals(setOf("com.a", ":topic:k1"), ProactivePrefs(old).topicPurges)
-        // 旧版本后来又改过集合、先后那一项对不上了:只认集合
+        // The old version later changed the set so the order entry no longer matches: only the set is honoured
         raw.edit().putStringSet("learn_purge_topics", setOf("com.z")).commit()
         assertEquals(setOf("com.z"), ProactivePrefs(raw).topicPurges)
     }
 
-    // 一次合并两份都要记:一次写上,排在各自的末尾
+    // One merge must be recorded on both lists: written in a single save, appended to the end of each
     @Test fun aMergeIsRecordedOnBothListsAtOnce() {
         val raw = FeatureFlagsCapsuleTest.MemoryPrefs()
         val p = ProactivePrefs(raw)

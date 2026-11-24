@@ -39,9 +39,9 @@ class FileScreenMapStoreTest {
         val store = FileScreenMapStore(tmp.root)
         store.save("com.example.app", graph("A"))
         val dir = File(tmp.root, "knowledge/apps/com.example.app")
-        // 写完整后不残留 .tmp
+        // No leftover .tmp after a complete write
         assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") })
-        // 再存一个不同内容 → 读到的是完整的新图，不是半写
+        // Saving different content again → reading back yields the complete new graph, never a partial write
         store.save("com.example.app", graph("B"))
         assertEquals(setOf("B"), store.load("com.example.app")!!.nodes.keys)
     }
