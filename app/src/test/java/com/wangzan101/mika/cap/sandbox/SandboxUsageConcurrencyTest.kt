@@ -100,12 +100,12 @@ class SandboxUsageConcurrencyTest {
         verifyWritesWaitForCleanup { reader.clearAll() == 0 }
     }
 
-    // 删对话时删工作区走同一条独占的路
+    // Deleting a conversation's workspace goes through the same exclusive path
     @Test(timeout = 10_000) fun conversationDeleteBlocksNewWorkspaceWrites() = runBlocking {
         verifyWritesWaitForCleanup { dirs.deleteWorkspace(WorkspaceKey.Conversation("a")); true }
     }
 
-    // 删一个没往工作区写过东西的对话(没有工作区):没东西可删,不拿独占许可,也就不收回别的对话开着的终端、stdio MCP server 拿着的租约
+    // Deleting a conversation that never wrote into a workspace (has no workspace): there is nothing to delete, so no exclusive permit is taken, and therefore terminals open for other conversations and leases held by stdio MCP servers are not revoked
     @Test(timeout = 10_000) fun deletingAConversationWithoutAWorkspaceKeepsOtherLeases() = runBlocking {
         workspace("b")
         var revoked = false

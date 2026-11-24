@@ -17,7 +17,7 @@ class CapsuleCardScaleTest {
     }
 
     @Test fun normalKeepsTodaySWidth() {
-        // 标准档与现状一致:放得下就 322dp,窄屏上让到屏宽−24dp,极窄不低于 240dp
+        // The standard tier matches the status quo: 322dp when it fits, reduced to screen width − 24dp on narrow screens, and never below 240dp on very narrow ones
         assertEquals(322.dp, CapsuleCardScale.Normal.width(600))
         assertEquals(322.dp, CapsuleCardScale.Normal.width(360))
         assertEquals(296.dp, CapsuleCardScale.Normal.width(320))
@@ -26,8 +26,8 @@ class CapsuleCardScaleTest {
 
     @Test fun scaledWidthNeverLeavesTheSamePixelBounds() {
         for (s in CapsuleCardScale.entries) {
-            // 渲染宽 = 原始 dp × factor,换算后任意档位都落在和标准档同一个等效区间:
-            // [240dp, 屏宽−24dp];超窄屏(屏宽−24 < 240)上和现状一样按下限 240dp 算
+            // Rendered width = raw dp × factor, and once converted every tier lands in the same effective range as the standard tier:
+            // [240dp, screen width − 24dp]; on ultra-narrow screens (screen width − 24 < 240) the 240dp lower bound applies, as before
             for (screen in listOf(250, 320, 360, 411, 600, 840)) {
                 val rendered = s.width(screen) * s.factor
                 val upper = maxOf(screen - 24, 240).dp
@@ -38,9 +38,9 @@ class CapsuleCardScaleTest {
     }
 
     @Test fun wideScreenKeepsFullCardWidthWhenItFits() {
-        // 600dp 宽的屏(折叠屏展开)上,130% 渲染 322×1.3=418.6dp,仍放得下 576dp,所以不压宽
+        // On a 600dp-wide screen (an unfolded foldable), 130% renders 322×1.3=418.6dp, which still fits within 576dp, so the width is not squeezed
         assertEquals(322.dp, CapsuleCardScale.XLarge.width(600))
-        // 360dp 窄屏上压到屏宽−24dp 的等效
+        // On a 360dp narrow screen it is squeezed to the equivalent of screen width − 24dp
         assertEquals(336.dp, CapsuleCardScale.XLarge.width(360) * CapsuleCardScale.XLarge.factor)
     }
 }

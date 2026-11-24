@@ -80,19 +80,19 @@ class ProcRunnerArgsTest {
         assertEquals("mika-bridge-x", bridged["MIKA_BRIDGE"]); assertEquals("tok", bridged["MIKA_TOKEN"])
     }
 
-    /** 解析出的 stdio 秘密环境只在显式 allowlist 上追加:保留 PATH/HOME/TZ 等基础项,不继承宿主/App 环境,非法键与 NUL 拒绝。 */
+    /** The secrets environment parsed from stdio is appended only on top of an explicit allowlist: baseline entries such as PATH/HOME/TZ are kept, the host/App environment is not inherited, and illegal keys and NUL are rejected. */
     @Test fun sandboxProcessEnvironmentUsesExplicitAllowlist() {
         val env = ProcRunner.env(dirs, null, null, "conv1", extra = mapOf("SECRET_API_KEY" to "k", "REGION" to "cn"))
-        // 基础项仍在
+        // Baseline entries are still present
         assertEquals("/root", env["HOME"])
         assertEquals(ProcRunner.PATH, env["PATH"])
         assertTrue(env.containsKey("TZ"))
-        // 只追加解析出的环境
+        // Only the parsed environment is appended
         assertEquals("k", env["SECRET_API_KEY"])
         assertEquals("cn", env["REGION"])
-        // 不继承宿主 / App 环境:键只落在显式 allowlist 内
+        // Host / App environment is not inherited: keys only fall within the explicit allowlist
         assertTrue(env.keys.none { it == "LD_PRELOAD" || it.startsWith("ANDROID_") || it == "JAVA_HOME" })
-        // 非法键(格式不符)与 NUL 值拒绝;不允许覆盖基础项
+        // Illegal keys (malformed) and NUL values are rejected; baseline entries cannot be overridden
         for (bad in listOf("1BAD", "A-B", "A.B", "PATH")) {
             assertThrows(IllegalArgumentException::class.java) {
                 ProcRunner.env(dirs, null, null, "conv1", extra = mapOf(bad to "v"))
@@ -103,7 +103,7 @@ class ProcRunnerArgsTest {
         }
     }
 
-    /** 代理只在给了时出现:大小写两套变量都给(有的工具只认大写),本机地址照旧直连。 */
+    /** The proxy appears only when one is supplied: both upper- and lower-case variable sets are provided (some tools only honor the upper case), and local addresses are still connected to directly. */
     @Test fun proxyIsPassedOnlyWhenGiven() {
         val none = ProcRunner.env(dirs, null, null, "conv1", proxy = "")
         assertTrue(none.keys.none { it.lowercase().endsWith("_proxy") })
@@ -127,7 +127,7 @@ class ProcRunnerArgsTest {
     }
 
     @Test fun fixedOffsetTimezonesKeepTheirSign() {
-        // POSIX 的 TZ 里 GMT+8 表示比 UTC 慢 8 小时,不能把 GMT+08:00 原样给出。
+        // In POSIX TZ, GMT+8 means 8 hours behind UTC, so GMT+08:00 cannot be passed through as-is.
         val cases = mapOf(
             "GMT+08:00" to "Etc/GMT-8", "GMT-05:00" to "Etc/GMT+5", "GMT+05:45" to "<+0545>-05:45",
             "GMT-03:30" to "<-0330>03:30", "GMT" to "UTC", "UTC" to "UTC",
@@ -144,7 +144,7 @@ class ProcRunnerArgsTest {
             assertFalse(id, f.name.contains(".."))
         }
         assertEquals(dirs.workspace(WorkspaceKey.Conversation("x/y")), dirs.workspace(WorkspaceKey.Conversation("x/y")))
-        // 简单名字和哈希名字分在两个前缀下:「h-…」样子的 ID 不会撞上别的对话的哈希目录;项目工作区固定为 p-<id>
+        // Simple names and hashed names live under two separate prefixes: an ID shaped like "h-…" cannot collide with another conversation's hashed directory; project workspaces are always p-<id>
         val hashed = dirs.workspace(WorkspaceKey.Conversation("a/b")).name
         assertTrue(hashed, hashed.startsWith("h-"))
         assertEquals("c-$hashed", dirs.workspace(WorkspaceKey.Conversation(hashed)).name)

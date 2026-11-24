@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CapsuleDockTest {
-    // 1000×2000 的屏幕,状态栏 80,底部手势条 40;看得见的胶囊离边 30,离上下 20,阴影边 10
+    // A 1000×2000 screen with a status bar of 80 and a bottom gesture bar of 40; the visible capsule sits 30 from the sides, 20 from top and bottom, with a 10 shadow edge
     private val area = DockArea.of(OverlayArea(1000, 2000, insetTop = 80, insetBottom = 40), margin = 30, gap = 20, room = 10)
 
     @Test fun areaAvoidsBarsAndKeepsMargins() {
@@ -18,7 +18,7 @@ class CapsuleDockTest {
         assertEquals(1850, CapsuleDocking.y(1f, area, 100))
         assertEquals(970, CapsuleDocking.y(0.5f, area, 100))
         assertEquals(0.5f, CapsuleDocking.fraction(970, area, 100), 0.001f)
-        // 超出范围的夹住
+        // Out-of-range values are clamped
         assertEquals(0f, CapsuleDocking.fraction(-500, area, 100))
         assertEquals(1f, CapsuleDocking.fraction(5000, area, 100))
         assertEquals(90, CapsuleDocking.y(-3f, area, 100))
@@ -28,18 +28,18 @@ class CapsuleDockTest {
         val landscape = DockArea.of(OverlayArea(2000, 1000, insetLeft = 80, insetTop = 40), margin = 30, gap = 20, room = 10)
         val f = CapsuleDocking.fraction(CapsuleDocking.y(0.25f, area, 100), area, 100)
         val y = CapsuleDocking.y(f, landscape, 100)
-        // 横屏:上 50、下 990,范围 840 的四分之一
+        // Landscape: 50 at the top, 990 at the bottom, a quarter of the 840 range
         assertEquals(50 + 210, y)
-        // 刘海在左边:左边停靠时让开它
+        // The notch is on the left: docking on the left side keeps clear of it
         assertEquals(100, CapsuleDocking.dockedX(DockSide.Left, landscape, 200))
         assertEquals(1780, CapsuleDocking.dockedX(DockSide.Right, landscape, 200))
     }
 
     @Test fun tallerWindowMovesUpToFit() {
-        // 卡片 600 高,从胶囊的高度往下放不下
+        // The card is 600 tall and does not fit downward from the capsule's height
         assertEquals(1950 - 600, CapsuleDocking.fitY(CapsuleDocking.y(1f, area, 100), area, 600))
         assertEquals(500, CapsuleDocking.fitY(500, area, 600))
-        // 比整个范围还高:贴着顶
+        // Taller than the whole range: it sticks to the top
         assertEquals(90, CapsuleDocking.fitY(500, area, 5000))
     }
 
@@ -55,19 +55,19 @@ class CapsuleDockTest {
         assertEquals(DockSide.Left, CapsuleDocking.release(380, 500, 200, 100, area).side)
         assertEquals(20, CapsuleDocking.dockedX(DockSide.Left, area, 200))
         assertEquals(780, CapsuleDocking.dockedX(DockSide.Right, area, 200))
-        // 刘海在左边时两侧让开的宽度不同:左边 100,右边 20
+        // With the notch on the left the clearances of the two sides differ: 100 on the left, 20 on the right
         val lopsided = DockArea.of(OverlayArea(2000, 1000, insetLeft = 80, insetTop = 40), margin = 30, gap = 20, room = 10)
         assertEquals(100, CapsuleDocking.edgeOffset(DockSide.Left, lopsided))
         assertEquals(20, CapsuleDocking.edgeOffset(DockSide.Right, lopsided))
     }
 
     @Test fun keyboardPushesTheRangeUp() {
-        // 输入法上边在 1200:看得见的部分离它 20
+        // The IME top is at 1200: the visible part stays 20 away from it
         val up = area.above(1200, gap = 20, room = 10)
         assertEquals(1190, up.bottom)
         assertEquals(1190 - 600, CapsuleDocking.fitY(CapsuleDocking.y(1f, area, 100), up, 600))
         assertEquals(area, area.above(null, 20, 10))
-        // 输入法比可摆范围还高:不越过顶
+        // The IME is taller than the allowed range: do not go past the top
         assertEquals(area.top, area.above(10, 20, 10).bottom)
     }
 
@@ -76,14 +76,14 @@ class CapsuleDockTest {
         val releaseY = 900
         val dock = CapsuleDocking.release(450, releaseY, 200, 100, up, fractionArea = area)
 
-        // 松手比例按完整区域记;贴边动画结束后的 place 仍还原到松手高度,无动画直接 place 也一样
+        // The release fraction is recorded against the full area; the place performed after the snapping animation still restores the release height, and placing directly without animation does the same
         assertEquals((releaseY - area.top) / (area.bottom - area.top - 100).toFloat(), dock.fraction, 0.0001f)
         assertEquals(releaseY, CapsuleDocking.y(dock.fraction, area, 100))
         assertEquals(releaseY, CapsuleDocking.fitY(CapsuleDocking.y(dock.fraction, area, 100), up, 100))
-        // 输入法收起后仍回这个高度
+        // After the IME is dismissed it still returns to this height
         assertEquals(releaseY, CapsuleDocking.fitY(CapsuleDocking.y(dock.fraction, area, 100), area, 100))
 
-        // 转屏仍使用同一个完整区域比例,再按新方向的输入法范围夹住
+        // On rotation the same full-area fraction is still used, then clamped to the IME range of the new orientation
         val landscape = DockArea.of(OverlayArea(2000, 1000, insetLeft = 80, insetTop = 40), margin = 30, gap = 20, room = 10)
         val landscapeUp = landscape.above(600, gap = 20, room = 10)
         val rotatedY = CapsuleDocking.y(dock.fraction, landscape, 100)
@@ -92,60 +92,60 @@ class CapsuleDockTest {
 
     @Test fun cardKeepsTheTallestImeOfThisRound() {
         val jump = 300
-        // 输入法弹出:上边 1200,记下来
+        // The IME appears: top at 1200, remember it
         assertEquals(1200, CapsuleDocking.tallestImeTop(null, 1200, jump))
-        // 打拼音多出一行候选(键盘变高,上边到了 1120):马上跟,卡片不留在输入法后面
+        // Typing pinyin adds a candidate row (the keyboard gets taller, its top moves to 1120): follow at once so the card is not left behind the IME
         assertEquals(1120, CapsuleDocking.tallestImeTop(1200, 1120, jump))
-        // 候选行收回去(上边回到 1200):只矮了一行,不跟
+        // The candidate row retracts (top back to 1200): it only shrank by one row, do not follow
         assertEquals(1120, CapsuleDocking.tallestImeTop(1120, 1200, jump))
-        // 换成旁边高一点的输入法(矮不到一个门槛):也不跟
+        // Switching to a slightly taller IME next to it (shrink below one threshold): do not follow either
         assertEquals(1120, CapsuleDocking.tallestImeTop(1120, 1400, jump))
-        // 换成表情面板再换回来这种一下矮很多:跟,卡片还原
+        // Switching to an emoji panel and back shrinks a lot in one go: follow, and the card is restored
         assertEquals(1500, CapsuleDocking.tallestImeTop(1120, 1500, jump))
-        // 收起:清掉,下次弹出重新记
+        // Dismissed: clear it, and record it afresh next time it appears
         assertNull(CapsuleDocking.tallestImeTop(1500, null, jump))
     }
 
-    // ---------- 卡片 ----------
+    // ---------- Card ----------
 
-    /** 最高的卡片(看得见 1160 高)连同上下阴影边的窗口高。 */
+    /** The window height of the tallest card (1160 visible) together with its top and bottom shadow edges. */
     private val full = 1160 + 20
 
     @Test fun cardCapIsAShareOfTheScreen() {
-        // 2000 高的屏幕:最高 58%,放得下就是它(对话卡片就这么高,任务卡片最多这么高)
+        // A screen 2000 tall: at most 58%, which is what fits (chat cards are exactly this tall, task cards at most this tall)
         assertEquals(1160, CardDocking.maxHeight(2000, area, room = 10))
-        // 输入法弹出(上边 1200):收到它上面,中间那段变矮
+        // The IME appears (top at 1200): shrink to above it, so the middle stretch gets shorter
         val up = area.above(1200, gap = 20, room = 10)
         assertEquals(1190 - 90 - 20, CardDocking.maxHeight(2000, up, room = 10))
-        // 横屏:按横屏的高度算
+        // Landscape: computed from the landscape height
         val landscape = DockArea.of(OverlayArea(2000, 1000, insetLeft = 80, insetTop = 40), margin = 30, gap = 20, room = 10)
         assertEquals(580, CardDocking.maxHeight(1000, landscape, room = 10))
     }
 
     @Test fun cardTopFollowsItsFraction() {
-        // 上边在 90..(1950 - 最高的卡片) 之间按比例摆:最高的卡片正中、顶、底
+        // The top is placed proportionally between 90..(1950 - tallest card): center, top and bottom of the tallest card
         assertEquals(90 + 340, CardDocking.y(0.5f, area, area, full, full))
         assertEquals(90, CardDocking.y(0f, area, area, full, full))
         assertEquals(1950 - full, CardDocking.y(1f, area, area, full, full))
-        // 转屏后同一个比例
+        // The same fraction after rotating
         val landscape = DockArea.of(OverlayArea(2000, 1000, insetLeft = 80, insetTop = 40), margin = 30, gap = 20, room = 10)
         assertEquals(50 + 170, CardDocking.y(0.5f, landscape, landscape, 600, 600))
     }
 
     @Test fun shorterTaskCardSharesTheTopWithTheChatCard() {
-        // 任务卡片按内容只有 500 高:上边和同一比例的对话卡片一样,往下短一截
+        // By content the task card is only 500 tall: its top matches the chat card at the same fraction while it is shorter downward
         for (f in listOf(0f, 0.3f, 0.5f, 1f)) {
             assertEquals(CardDocking.y(f, area, area, full, full), CardDocking.y(f, area, area, full, 500))
         }
-        // 以前按固定高卡片记的比例当作上边的比例读:对话卡片摆回原处
+        // A fraction recorded earlier against the fixed-height card is read as a fraction of the top: the chat card returns to its place
         assertEquals(CapsuleDocking.y(0.7f, area, full), CardDocking.y(0.7f, area, area, full, full))
     }
 
     @Test fun switchingCardsKeepsTheTopAndShiftsUpOnlyWhenItOverflows() {
         val top = CardDocking.y(1f, area, area, full, 500)
-        // 任务卡片换成对话卡片:放得下,上边不动,往下长
+        // Switching the task card to the chat card: it fits, so the top stays put and it grows downward
         assertEquals(top, CardDocking.y(1f, area, area, full, full))
-        // 输入法弹出(上边 1200):短的卡片放得下就不动,对话卡片(收矮到 1100 + 阴影边)往上挪到刚好放下
+        // The IME appears (top at 1200): the short card stays put if it fits, while the chat card (shrunk to 1100 + shadow edge) moves up just enough to fit
         val up = area.above(1200, gap = 20, room = 10)
         val shortTop = CardDocking.y(0f, area, up, full, 500)
         assertEquals(90, shortTop)
@@ -158,14 +158,14 @@ class CapsuleDockTest {
         assertEquals(90, CardDocking.dragY(430, -1000f, area, area, full, full))
         assertEquals(1950 - full, CardDocking.dragY(430, 2000f, area, area, full, full))
         assertEquals(530, CardDocking.dragY(430, 100f, area, area, full, full))
-        // 短的任务卡片往下拖到底:上边停在对话卡片也放得下的地方,记下的比例不出范围
+        // Dragging the short task card all the way down: the top stops where the chat card would also fit, and the recorded fraction stays within range
         assertEquals(1950 - full, CardDocking.dragY(430, 2000f, area, area, full, 500))
         assertEquals(1f, CardDocking.release(1950 - full, area, full))
         assertEquals(0.5f, CardDocking.release(430, area, full), 0.001f)
-        // 按没让输入法的范围记:输入法收起后还在原处,换成别的高度上边也一样
+        // Recorded against the range that does not avoid the IME: after the IME is dismissed it is still in place, and the top is equally unchanged when switching to another height
         assertEquals(430, CardDocking.y(CardDocking.release(430, area, full), area, area, full, full))
         assertEquals(430, CardDocking.y(CardDocking.release(430, area, full), area, area, full, 500))
-        // 输入法弹出时拖:整张不出它上面
+        // Dragging while the IME is up: the whole card stays above it
         val up = area.above(1200, gap = 20, room = 10)
         assertEquals(1190 - 500, CardDocking.dragY(430, 2000f, area, up, full, 500))
     }

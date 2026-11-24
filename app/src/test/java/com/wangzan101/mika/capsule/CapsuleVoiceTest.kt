@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** 胶囊长按说话:松开时手指落在哪个圆上、长按和拖动怎么分、发出后胶囊上闪的那句。 */
+/** Speaking by long-pressing the capsule: which circle the finger lands on at release, how hold and drag are told apart, and the line that flashes on the capsule after sending. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CapsuleVoiceTest {
     @get:Rule val texts = ChineseTexts()
@@ -24,14 +24,14 @@ class CapsuleVoiceTest {
     }
 
     @Test fun justOutsideCancelCircleStillCancels() {
-        // 圆外 10px,外扩 14px 以内
+        // 10px outside the circle, within the 14px expansion
         assertEquals(CapsuleVoice.Drop.Cancel, CapsuleVoice.drop(90f, 230f, cancel, edit, slopPx = 14))
         assertEquals(CapsuleVoice.Drop.Cancel, CapsuleVoice.drop(130f, 272f, cancel, edit, slopPx = 14))
     }
 
     @Test fun farFromBothCirclesIsSend() {
         assertEquals(CapsuleVoice.Drop.Send, CapsuleVoice.drop(230f, 900f, cancel, edit, slopPx = 14))
-        // 两个圆中间、都不够近
+        // Between the two circles, near enough to neither
         assertEquals(CapsuleVoice.Drop.Send, CapsuleVoice.drop(231f, 230f, cancel, edit, slopPx = 14))
     }
 
@@ -40,7 +40,7 @@ class CapsuleVoiceTest {
     }
 
     @Test fun circlesNotLaidOutYetMeanSend() {
-        // 面板还没排好版(圆的位置还没报上来)时不会误判成取消
+        // While the panel has not been laid out yet (circle positions not reported), it is not mistaken for a cancel
         assertEquals(CapsuleVoice.Drop.Send, CapsuleVoice.drop(0f, 0f, Rect.Zero, Rect.Zero, slopPx = 14))
     }
 
@@ -49,7 +49,7 @@ class CapsuleVoiceTest {
         assertEquals(HoldGesture.Kind.Tap, g.down())
         assertEquals(HoldGesture.Kind.Tap, g.move(5f))
         assertEquals(HoldGesture.Kind.Hold, g.timeout())
-        // 长按以后再怎么移都还是长按,不变成拖
+        // After a hold, any further movement stays a hold and never becomes a drag
         assertEquals(HoldGesture.Kind.Hold, g.move(200f))
     }
 
@@ -76,7 +76,7 @@ class CapsuleVoiceTest {
         assertEquals("已发出：查一下天气", CapsuleVoice.sent(CardInputKind.Start, "查一下天气"))
     }
 
-    // 松开后引擎一直不给结果:到时限一定要收尾,面板不能永远停在「转文字…」
+    // The engine never returns a result after release: the deadline must finish it, the panel cannot stay on "transcribing…" forever
     @Test fun waitFiresWhenTheSessionNeverAnswers() = runTest {
         var fired = 0
         val wait = VoiceWait(backgroundScope) { fired++ }
@@ -94,7 +94,7 @@ class CapsuleVoiceTest {
         val wait = VoiceWait(backgroundScope) { fired++ }
         wait.arm(8_000)
         advanceTimeBy(1_000)
-        // 会话按时交出结果:面板已经收起,兜底不再开火
+        // The session hands over the result on time: the panel is already dismissed, so the fallback no longer fires
         wait.cancel()
         advanceTimeBy(60_000)
         runCurrent()
@@ -106,7 +106,7 @@ class CapsuleVoiceTest {
         val wait = VoiceWait(backgroundScope) { fired++ }
         wait.arm(8_000)
         advanceTimeBy(5_000)
-        // 重新按住:上一段的兜底作废,从这次松开重新算
+        // Pressing again: the previous fallback is voided and the count restarts from this release
         wait.arm(8_000)
         advanceTimeBy(7_999)
         runCurrent()

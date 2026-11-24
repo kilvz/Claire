@@ -12,14 +12,14 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
-/** 已用空间:大小不跟进链接;清理按句柄删、不跟进链接;有任务在跑的对话不清。 */
+/** Used space: sizes do not follow links; clearing deletes by handle without following links; conversations with a running task are left alone. */
 class SandboxUsageReaderTest {
     private val tmp: File = Files.createTempDirectory("usage").toFile()
     private val dirs = SandboxDirs(File(tmp, "files/sandbox"), File(tmp, "cache"), File(tmp, "lib"), JVM_GATE, SandboxTree())
     private val active = mutableListOf<String>()
     private val reader = SandboxUsageReader(dirs, { listOf(ConversationSummary("a", "查快递", 0), ConversationSummary("b", "整理表格", 0)) }, { active })
 
-    /** 工作区外面一个大文件,工作区里有指向它(和它所在目录)的链接。 */
+    /** A large file outside the workspace, plus links inside the workspace pointing to it (and to its directory). */
     private val outside = File(tmp, "outside").apply { mkdirs() }
     private val big = File(outside, "big.bin").apply { writeBytes(ByteArray(50_000)) }
 

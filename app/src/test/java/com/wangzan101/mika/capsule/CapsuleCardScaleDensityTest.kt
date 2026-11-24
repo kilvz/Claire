@@ -7,8 +7,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * 锁定缩放用的 [Density] 构造:卡片缩放靠换 LocalDensity 实现,dp 和 sp 必须等比放大,
- * 哪个分量起作用、起多大,以这里的实测为准(Compose 的换算公式没有公开承诺)。
+ * The [Density] construction used to lock in the zoom: card scaling is done by swapping LocalDensity, so dp and sp must scale by the same ratio;
+ * which component takes effect and by how much is settled by the measurements here (Compose's conversion formula is not publicly guaranteed).
  */
 class CapsuleCardScaleDensityTest {
     private val base = Density(2.75f, 1.3f)

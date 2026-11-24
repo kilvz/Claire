@@ -23,7 +23,7 @@ import java.nio.file.LinkOption
 import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
 
-/** 自带的运行环境换成用宿主 tar 现做、再用 xz 压的小包;不联网。 */
+/** The bundled runtime is replaced with a small archive built on the fly by the host tar and then compressed with xz; no network is used. */
 class RootfsInstallerTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -88,7 +88,7 @@ class RootfsInstallerTest {
         expectFailure { installer(client = null).install { _, _ -> } }
         assertEquals(InstallStep.Extract, state.completedStep())
         assertTrue(state.status.value is SandboxStatus.Broken)
-        // 重新读状态(像进程重启那样)也不是就绪
+        // Re-reading the state (as if the process restarted) is still not Ready
         assertTrue(SandboxState(dirs, File(tmp, "files/sandbox-settings.json")) { listOf("arm64-v8a") }.status.value is SandboxStatus.Broken)
         val steps = mutableListOf<InstallStep>()
         installer().install { s, _ -> steps += s }
@@ -99,7 +99,7 @@ class RootfsInstallerTest {
 
     @Test
     fun interruptedExtractionStartsOver() = runBlocking {
-        // 像进程在解包中被杀那样:记录停在 Check,留下半个 rootfs.new
+        // As if the process were killed mid-extraction: the recorded step stays at Check, leaving a half-written rootfs.new
         installer().install { _, _ -> }
         state.markStep(InstallStep.Check)
         File(dirs.root, "rootfs.new/half").apply { parentFile?.mkdirs() }.writeText("x")
@@ -174,8 +174,8 @@ class RootfsInstallerTest {
     }
 
     /**
-     * 写 files/sandbox/ 的(技能同步、跑命令……)和重置互斥:重置等正在写的写完再删,删到一半没人往里建目录;
-     * 等许可期间被重置了的同步不再写(真机上 App 启动时的同步正撞上重置,最后的 rmdir 报 ENOTEMPTY)。
+     * Writers into files/sandbox/ (skills sync, running commands, ...) are mutually exclusive with reset: reset waits for in-flight writers to finish and only then deletes, so nobody creates directories inside while the deletion is underway;
+     * a sync that was reset while waiting for permission no longer writes (on real devices the sync at App startup collides with a reset and the final rmdir reports ENOTEMPTY).
      */
     @Test
     fun resetWaitsForWritersAndLateSyncSkips() = runBlocking {
@@ -192,7 +192,7 @@ class RootfsInstallerTest {
         }
         writing.await()
         val reset = launch(kotlinx.coroutines.Dispatchers.IO) { installer().reset() }
-        // 重置排着队时新来的写者也排在它后面
+        // While the reset is queued, newly arriving writers also queue up behind it
         val late = launch(kotlinx.coroutines.Dispatchers.IO) {
             SkillsSync.sync(dirs, mapOf("skills/a/scripts/manifest.json" to "[]".toByteArray())) { state.status.value is SandboxStatus.Ready }
         }
@@ -233,7 +233,7 @@ class RootfsInstallerTest {
 
     private fun sha256(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b).joinToString("") { "%02x".format(it) }
 
-    /** 小根文件系统:bin/sh、etc/marker、若干文件;宿主 tar 打包后用 xz 压。 */
+    /** A small root filesystem: bin/sh, etc/marker, and a few files; packed by the host tar and then compressed with xz. */
     private fun makeBundle(marker: String): ByteArray {
         val src = Files.createTempDirectory(tmp.toPath(), "src").toFile()
         File(src, "bin").mkdirs()

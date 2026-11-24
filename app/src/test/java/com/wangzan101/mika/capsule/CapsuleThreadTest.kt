@@ -34,10 +34,10 @@ class CapsuleThreadTest {
         }
     }
 
-    // ---------- 一轮怎么排 ----------
+    // ---------- How a turn is laid out ----------
 
     @Test fun chatTurnIsBubbleAndFullAnswer() {
-        // 回答原样留着 Markdown,卡片里排版
+        // The answer keeps its Markdown untouched; layout happens inside the card
         val t = CapsuleThreads.build(listOf(PastTurn(turn("在吗", "# 在\n\n**有事**请说\n\n| 项 | 值 |\n|---|---|\n| a | 1 |\n"))), 10, emptyList())
         assertEquals(listOf("你:在吗", "答:# 在\n\n**有事**请说\n\n| 项 | 值 |\n|---|---|\n| a | 1 |"), texts(t))
         assertEquals("在吗", t.title)
@@ -64,7 +64,7 @@ class CapsuleThreadTest {
         assertEquals(listOf("你:算一下", "注:没办成", "答:模型没回", "你:写首诗", "你:短一点", "注:已停止"), texts(CapsuleThreads.build(past, 10, emptyList())))
     }
 
-    // 停了的那一轮:「已停止」那一行下面是交代;交代还在写时是「正在整理已做的事…」
+    // For a stopped turn, the wrap-up follows the "stopped" line; while the wrap-up is still being written it reads "tidying up what was done…"
     @Test fun stoppedTurnShowsItsSummaryUnderTheNote() {
         val past = listOf(
             PastTurn(turn("看设置", "停止前看完了网络、蓝牙;显示、声音还没看。", status = "cancelled", runId = "r1"), places = listOf("设置")),
@@ -74,9 +74,9 @@ class CapsuleThreadTest {
             "你:看设置", "注:设置 · 已停止", "答:停止前看完了网络、蓝牙;显示、声音还没看。",
             "你:写首诗", "注:已停止", "注:正在整理已做的事…",
         ), texts(CapsuleThreads.build(past, 10, emptyList(), summarizing = setOf("r2"))))
-        // 写不成:只留那一行
+        // If the wrap-up cannot be written, only that line remains
         assertEquals(listOf("你:写首诗", "注:已停止"), texts(CapsuleThreads.build(past.drop(1), 10, emptyList())))
-        // 还没记进对话的那一件也一样
+        // The same applies to a run that has not yet been recorded into the conversation
         val r = live("a", TaskState.Cancelled, CapsuleKind.Cancelled, runId = "r3")
         assertEquals(listOf("你:问题a", "注:已停止", "注:正在整理已做的事…"),
             texts(CapsuleThreads.build(emptyList(), 10, listOf(r), summarizing = setOf("r3"))))
@@ -93,14 +93,14 @@ class CapsuleThreadTest {
         assertEquals(listOf("购物", "example.com"), CapsuleThreads.places(acts) { if (it == "com.shop.app") "购物" else it })
     }
 
-    // ---------- 进行中的那一件 ----------
+    // ---------- The one in progress ----------
 
     @Test fun streamingAnswerGrowsAfterTheQuestion() {
         val r = live("a", TaskState.Running(1, "n"), CapsuleKind.Running, runId = "ra", draft = "**今天**晴")
         val t = CapsuleThreads.build(listOf(PastTurn(turn("早", "早上好", runId = "r0"))), 10, listOf(r))
         assertEquals(listOf("你:早", "答:早上好", "你:问题a", "答:**今天**晴"), texts(t))
         assertTrue((t.items.last() as ThreadItem.Answer).streaming)
-        // 还没写出字:说此刻在做什么
+        // No text written yet: say what is being done right now
         val thinking = live("a", TaskState.Running(1, "n"), CapsuleKind.Running, line = "在想下一步")
         assertEquals(listOf("你:问题a", "注:在想下一步"), texts(CapsuleThreads.build(emptyList(), 10, listOf(thinking))))
     }
@@ -122,7 +122,7 @@ class CapsuleThreadTest {
         val queuedCancel = live("c", TaskState.Cancelled, CapsuleKind.Cancelled)
         val going = live("d", TaskState.Running(1, "n"), CapsuleKind.Running)
         val other = live("e", TaskState.Running(1, "n"), CapsuleKind.Running).let { it.copy(run = it.run.copy(conversationId = "c2")) }
-        // 卡片里结束的按最近在前排;来回里先结束的在上,进行中的最后
+        // Ones that ended in the card are ordered most recent first; within the exchange, ones that finished earlier come first and in-progress ones last
         val tail = CapsuleThreads.liveTail(listOf(going, other, notYet, recorded, queuedCancel), "c1", setOf("r1"))
         assertEquals(listOf("b", "d"), tail.map { it.run.key })
     }
@@ -134,7 +134,7 @@ class CapsuleThreadTest {
         assertEquals(before, after)
     }
 
-    // ---------- 分页与打开时停在哪 ----------
+    // ---------- Paging and where it stops when opened ----------
 
     @Test fun latestTenTurnsFirstThenEarlier() {
         val past = (1..25).map { PastTurn(turn("问$it", "答$it", runId = "r$it")) }
@@ -144,7 +144,7 @@ class CapsuleThreadTest {
         assertEquals("问1", first.title)
         val more = CapsuleThreads.build(past, CapsuleThreads.PAGE * 2, emptyList())
         assertEquals("你:问6", texts(more).first())
-        // 往前加的几轮都在前面:原来那几条的 key 不变,列表据此停在原处
+        // The turns added earlier all come first: the keys of the existing items stay unchanged, so the list keeps its position
         assertEquals(first.items.map { it.key }, more.items.takeLast(first.items.size).map { it.key })
         val all = CapsuleThreads.build(past, CapsuleThreads.PAGE * 3, emptyList())
         assertTrue(!all.hasEarlier)
@@ -156,13 +156,13 @@ class CapsuleThreadTest {
         val t = CapsuleThreads.build(past, 10, emptyList())
         assertEquals(2, t.anchor)
         assertEquals(ThreadItem.User("p1-u0", "二"), t.items[t.anchor])
-        // 进行中的那一问在最后:从它读起
+        // The in-progress question is last: reading starts there
         val going = CapsuleThreads.build(past, 10, listOf(live("a", TaskState.Running(1, "n"), CapsuleKind.Running, draft = "在写")))
         assertEquals("你:问题a", texts(going)[going.anchor])
         assertEquals(0, ChatThread(emptyList()).anchor)
     }
 
-    // 进行中插的话接在原话后面,下面写着去向(和对话页同一套说法);最新那句是打开时的落点
+    // Steers sent while running follow the original message with their destination written below (the same wording as the chat page); the newest one is where the view lands when opened
     @Test fun liveSteersFollowTheGoalWithWhereTheyWent() {
         val base = live("a", TaskState.Running(1, "n"), CapsuleKind.Running, draft = "在写")
         val run = base.copy(run = base.run.copy(steers = listOf(
@@ -187,7 +187,7 @@ class CapsuleThreadTest {
         assertEquals(listOf("问题a", "留下的话"), t.items.filterIsInstance<ThreadItem.User>().map { it.text })
     }
 
-    // 插话打断的那段回复排在那句插话前面(和对话页一样);记下的一轮和进行中的一件同样排,key 不重复
+    // The part of the reply that a steer interrupted is ordered before that steer (as on the chat page); a recorded turn and an in-progress run are ordered the same way, and keys do not repeat
     @Test fun interruptedReplySitsAboveItsSteer() {
         val past = listOf(PastTurn(Turn("查天气", "明天多云", "succeeded", runId = "r1",
             steers = listOf("改成查明天", "顺便看看后天"), interruptedReplies = listOf("今天晴,最高", ""))))
@@ -202,7 +202,7 @@ class CapsuleThreadTest {
         assertEquals("你:改成查明天", texts(t)[t.anchor])
     }
 
-    // 插话之前已经说完的回复排在那句插话前面,照回答的样子;还没交给模型的插话排在正在写的回答后面
+    // A reply that had already finished before the steer is ordered before that steer, styled like an answer; a steer not yet handed to the model is ordered after the answer being written
     @Test fun finishedReplyAndWaitingSteerOrder() {
         val past = listOf(PastTurn(Turn("查天气", "明天多云", "succeeded", runId = "r1",
             steers = listOf("改成查明天"), finishedReplies = listOf("今天晴,最高 25 度。"))))

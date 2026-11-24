@@ -20,7 +20,7 @@ class CapsulePreviewTest {
         runCurrent()
         source.emit(Frame("1"))
         runCurrent()
-        // 200 毫秒内来的三张只留最后一张
+        // Of the three frames arriving within 200 milliseconds only the last is kept
         source.emit(Frame("2"))
         source.emit(Frame("3"))
         source.emit(Frame("4"))
@@ -42,7 +42,7 @@ class CapsulePreviewTest {
         source.emit(first)
         advanceTimeBy(300)
         runCurrent()
-        // 同一张、内容一样的新拷贝:都不推
+        // The same frame and a new copy with identical content: neither is pushed
         source.emit(first)
         advanceTimeBy(300)
         runCurrent()
