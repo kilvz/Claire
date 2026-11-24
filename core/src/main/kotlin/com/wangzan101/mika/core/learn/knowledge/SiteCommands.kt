@@ -9,27 +9,27 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** 站点命令的一个参数;[type] 是 string / integer / number / boolean。 */
+/** One argument of a site command; [type] is string / integer / number / boolean. */
 @Serializable
 data class CommandArg(val name: String, val type: String, val required: Boolean = false, val description: String = "")
 
-/** 站点命令的声明(脚本头部);[file] 是站点目录下的相对路径 `scripts/<name>.js`。 */
+/** A site command declaration (the script header); [file] is the path relative to the site directory, `scripts/<name>.js`. */
 @Serializable
 data class SiteCommandDecl(val name: String, val description: String, val args: List<CommandArg> = emptyList(), val returns: String, val file: String)
 
-/** 一条可运行的站点命令:所属站点、声明、脚本正文(头部之后)。 */
+/** One runnable site command: the site it belongs to, the declaration, and the script body (after the header). */
 data class SiteCommand(val site: String, val decl: SiteCommandDecl, val body: String)
 
 /**
- * 站点命令:站点知识目录里的 `scripts/<name>.js`(不在 scripts/manifest.json 里的那些),在当前页面的读取世界里只读地跑。
- * 文件以一段块注释开头:第一行是 [MARK],之后一行一项,到注释结束为止,例如
+ * Site commands: `scripts/<name>.js` in a site knowledge directory (the ones not listed in scripts/manifest.json), run read-only in the current page's reading world.
+ * The file opens with a block comment: the first line is [MARK], then one item per line up to the end of the comment, for example
  * - `name: list_results`
- * - `description: 列出当前结果页上的条目`
- * - `arg: limit integer - 最多几条`
- * - `arg: query string required - 只要标题里有这段字的`
+ * - `description: list the entries on the current results page`
+ * - `arg: limit integer - at most how many`
+ * - `arg: query string required - only those whose title contains this text`
  * - `returns: [{title, url}]`
  *
- * name 与文件名相同;arg 可以有多行,写作「名字 类型 [required] [- 说明]」;头部之后是 async 函数体,参数在 `args` 里。
+ * name is the same as the file name; arg may appear on several lines, written as "name type [required] [- description]"; after the header comes the async function body, with the arguments in `args`.
  */
 object SiteCommandFile {
     const val MARK = "/* mika-command"
@@ -41,12 +41,12 @@ object SiteCommandFile {
 
     fun isCommand(text: String): Boolean = clean(text).startsWith(MARK)
 
-    /** [decl] 在没有错误时才有;[body] 是头部之后的脚本。 */
+    /** [decl] is present only when there are no errors; [body] is the script after the header. */
     class Parsed(val decl: SiteCommandDecl?, val body: String, val errors: List<String>)
 
     private fun clean(text: String) = text.removePrefix("﻿").replace("\r\n", "\n").trimStart()
 
-    /** [file] 是站点目录下的相对路径(`scripts/<name>.js`)。 */
+    /** [file] is the path relative to the site directory (`scripts/<name>.js`). */
     fun parse(file: String, text: String): Parsed {
         val t = clean(text)
         if (!t.startsWith(MARK)) return Parsed(null, "", listOf("头部要以 `$MARK` 开头"))
@@ -86,13 +86,13 @@ object SiteCommandFile {
         args.groupBy { it.name }.filterValues { it.size > 1 }.keys.forEach { errors += "arg $it 重复" }
         if (body.isEmpty()) errors += "脚本正文为空"
         if (body.length > BODY_LIMIT) errors += "脚本正文 ${body.length} 字,超过 $BODY_LIMIT"
-        // 动态 import 会在读取世界的全局作用域里跑模块,绕开只读包装
+        // A dynamic import would run the module in the reading world's global scope, bypassing the read-only wrapper
         if (JsSource.usesImport(body)) errors += "脚本正文不能用 import(字符串、注释之外不能出现这个词)"
         val decl = if (errors.isEmpty()) SiteCommandDecl(name!!, description!!, args, returns!!, file) else null
         return Parsed(decl, body, errors)
     }
 
-    /** 模型给的参数按声明查:没声明的、缺了必填的、类型不对的,返回问题说明;没问题为 null。 */
+    /** Checks the arguments the model gave against the declaration: undeclared ones, missing required ones and wrong types return a description of the problem; null when all is fine. */
     fun checkArgs(decl: SiteCommandDecl, args: JsonObject): String? {
         val declared = decl.args.associateBy { it.name }
         args.keys.firstOrNull { it !in declared }?.let {
@@ -116,7 +116,7 @@ object SiteCommandFile {
         return null
     }
 
-    /** 站点知识块里列出的一行。 */
+    /** One line as listed in the site knowledge block. */
     fun line(d: SiteCommandDecl): String {
         val sig = d.args.joinToString(", ") { it.name + (if (it.required) "" else "?") + ": " + it.type }
         val notes = d.args.filter { it.description.isNotEmpty() }.joinToString("; ") { "${it.name} ${it.description}" }

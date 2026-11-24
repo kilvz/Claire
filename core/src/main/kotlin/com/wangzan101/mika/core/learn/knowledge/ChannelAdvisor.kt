@@ -3,8 +3,8 @@ package com.wangzan101.mika.core.learn.knowledge
 import com.wangzan101.mika.core.net.UrlHost
 
 /**
- * 选渠道用的事实:已装的包名、在 Claire 里登录着的站点主机名、内置浏览器能不能用、
- * 最近在 Claire 里碰到过人机验证或访问拦截的站点主机名。
+ * Facts used to pick a channel: installed package names, host names of sites signed in within Claire, whether the built-in browser is available,
+ * and host names of sites that recently hit a verification challenge or access block within Claire.
  */
 data class ChannelFacts(
     val installed: Set<String>,
@@ -13,15 +13,15 @@ data class ChannelFacts(
     val challengedSites: Set<String> = emptySet(),
 )
 
-/** 给任务开头的一行「可用渠道」:代码只给事实,选哪条由模型按网页规则决定。 */
+/** The one-line "available channels" given at the start of a task: the code supplies facts only; which one to choose is decided by the model per the web rules. */
 object ChannelAdvisor {
     private const val HEADER = "Available channels: "
-    /** 只列排在前面的几个,和每任务至多注入的参考资料份数相当。 */
+    /** Lists only the first few, comparable to the maximum number of references injected per task. */
     private const val MAX_CHANNELS = 3
 
     /**
-     * 例:「可用渠道:小红书 — App:已安装(com.xingin.xhs),有 App 做法;网页:xiaohongshu.com,有网页做法,在 Claire 里登录过(m.xiaohongshu.com)」。
-     * [entries] 按匹配顺序,只取前 [MAX_CHANNELS] 个渠道。没有可说的为 null。
+     * Example: "Available channels: Xiaohongshu — app: installed (com.xingin.xhs), known way to do it in the app; web: xiaohongshu.com, known way to do it on the web, signed in within Claire (m.xiaohongshu.com)".
+     * [entries] in match order, taking only the first [MAX_CHANNELS] channels. Null when there is nothing to say.
      */
     fun line(entries: List<KnowledgeEntry>, skills: GuideCatalog?, facts: ChannelFacts): String? {
         val parts = entries.groupBy { it.service }.mapNotNull { (name, same) -> channel(name, same, skills, facts) }.take(MAX_CHANNELS)
@@ -31,7 +31,7 @@ object ChannelAdvisor {
 
     private fun channel(name: String, same: List<KnowledgeEntry>, skills: GuideCatalog?, facts: ChannelFacts): String? {
         val packages = same.flatMap { it.packages }.distinct()
-        // App 条目关联的站点名就是站点的主域名
+        // The site names associated with an app entry are the site's main domains
         val domains = same.flatMap { it.domains + if (it.surface == Surface.Android) it.related else emptyList() }.map { it.trim().lowercase().removePrefix("www.") }.filter { it.isNotEmpty() }.distinct()
         val app = if (packages.isEmpty()) null else {
             val state = packages.firstOrNull { it in facts.installed }?.let { "app: installed ($it)" } ?: "app: not installed"

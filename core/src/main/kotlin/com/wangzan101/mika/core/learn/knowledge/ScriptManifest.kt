@@ -5,20 +5,20 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import com.wangzan101.mika.core.workspace.SandboxPaths
 
-/** 技能脚本清单(`scripts/manifest.json`)里的一项;[file] 是技能目录下的相对路径。 */
+/** One item in the skill script manifest (`scripts/manifest.json`); [file] is a path relative to the skill directory. */
 @Serializable
 data class ScriptEntry(val file: String, val runnable: Boolean, val needs: List<String> = emptyList(), val network: Boolean = false, val reason: String? = null)
 
 /**
- * 技能目录下 `scripts/manifest.json`:`[{file, runnable, needs, network, reason?}]`,[ScriptEntry.file] 是技能目录下的相对路径。
- * run_bundled_script 与 knowledge_read、skill_read 都以它为准。
+ * `scripts/manifest.json` under a skill directory: `[{file, runnable, needs, network, reason?}]`, where [ScriptEntry.file] is a path relative to the skill directory.
+ * run_bundled_script, knowledge_read and skill_read all treat it as the source of truth.
  */
 object ScriptManifest {
     const val NEEDS_NETWORK = "needs network access: the user can turn on \"Allow scripts to go online\" (允许脚本联网) in Claire's settings"
     private val json = Json { ignoreUnknownKeys = true }
     private val INTERPRETERS = mapOf("py" to "/usr/bin/python3", "mjs" to "/usr/bin/node", "js" to "/usr/bin/node", "sh" to "/bin/sh")
 
-    /** 读不懂时为空;路径不是技能目录里的相对路径的项丢掉。 */
+    /** Empty when it cannot be read; entries whose path is not relative to the skill directory are dropped. */
     fun parse(text: String): List<ScriptEntry> = try {
         json.decodeFromString<List<ScriptEntry>>(text).filter { safe(it.file) }
     } catch (e: SerializationException) {
@@ -27,10 +27,10 @@ object ScriptManifest {
         emptyList()
     }
 
-    /** 用绝对路径:不受工作区里同名文件或 PATH 的影响。 */
+    /** Use absolute paths: unaffected by a same-named file in the workspace or by PATH. */
     fun interpreterFor(file: String): String? = INTERPRETERS[file.substringAfterLast('.', "").lowercase()]
 
-    /** 此刻能不能跑,不能时给出原因:标为不可运行的用它自己的原因;需要联网而联网关着的,提示去设置里打开。 */
+    /** Whether it can run right now, and the reason when it cannot: one marked not runnable uses its own reason; one that needs the network while networking is off is told to turn it on in settings. */
     fun effectiveRunnable(e: ScriptEntry, networkAllowed: Boolean): Pair<Boolean, String?> = when {
         !e.runnable -> false to (e.reason ?: "cannot be run for now")
         interpreterFor(e.file) == null -> false to "unsupported script type"

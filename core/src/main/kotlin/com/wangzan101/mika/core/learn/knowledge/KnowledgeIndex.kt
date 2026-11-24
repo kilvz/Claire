@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.system.exitProcess
 
-/** 索引里的一条:App(APP.md)、站点(SITE.md)或技能(SKILL.md)的头部;[files] 是同目录下的附件(相对路径)。 */
+/** One entry in the index: the header of an app (APP.md), site (SITE.md) or skill (SKILL.md); [files] are the attachments in the same directory (relative paths). */
 @Serializable
 data class IndexEntry(
     val kind: String,
@@ -23,18 +23,18 @@ data class IndexEntry(
     val sites: List<String> = emptyList(),
     val open: String? = null,
     val mode: String? = null,
-    /** App 或站点对浏览快慢的要求(`careful`:限制浏览快慢);不写为 null。 */
+    /** The app's or site's requirement on browsing pace (`careful`: limit browsing pace); null when not written. */
     val pace: String? = null,
     val links: List<String> = emptyList(),
     val packageAliases: Map<String, String> = emptyMap(),
     val files: List<String> = emptyList(),
-    /** 站点命令(`scripts/<name>.js` 的头部),只有站点有。 */
+    /** Site commands (the header of `scripts/<name>.js`); only sites have them. */
     val commands: List<SiteCommandDecl> = emptyList(),
 )
 
 /**
- * 内置知识的目录约定与构建期索引:`knowledge/apps/<id>/APP.md`、`knowledge/sites/<域名>/SITE.md`、`skills/<id>/SKILL.md`。
- * 运行时列不了资源目录,所以构建时扫一遍、校验头部,写成 [RESOURCE];校验不过构建失败。
+ * Directory conventions and build-time index for built-in knowledge: `knowledge/apps/<id>/APP.md`, `knowledge/sites/<domain>/SITE.md`, `skills/<id>/SKILL.md`.
+ * Resource directories cannot be listed at runtime, so one pass runs at build time, validates the headers and writes [RESOURCE]; a validation failure fails the build.
  */
 object KnowledgeIndex {
     const val RESOURCE = "knowledge/index.json"
@@ -45,19 +45,19 @@ object KnowledgeIndex {
     const val SKILL = "skill"
     val KINDS = listOf(APP, SITE, SKILL)
 
-    /** 资源里的目录。 */
+    /** The directories in the resources. */
     fun dirOf(kind: String) = when (kind) { APP -> "knowledge/apps"; SITE -> "knowledge/sites"; else -> "skills" }
     fun fileOf(kind: String) = when (kind) { APP -> "APP.md"; SITE -> "SITE.md"; else -> "SKILL.md" }
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false; prettyPrint = true; prettyPrintIndent = " " }
     private val DOMAIN = Regex("[a-z0-9]+(?:-[a-z0-9]+)*(?:\\.[a-z0-9]+(?:-[a-z0-9]+)*)+")
     private val REF = Regex("references/[A-Za-z0-9_./-]*[A-Za-z0-9_/-]")
-    /** 头部认得的键;写错的键(如把 assistant 拼错)构建失败,不悄悄丢掉。 */
+    /** Keys recognized in the header; a wrong key (such as a misspelled assistant) fails the build instead of being silently dropped. */
     val KEYS = setOf(
         "name", "display", "description", "packages", "domains", "aliases", "terms", "apps", "sites", "open", "mode", "pace",
         "links", "package_aliases", "assistant", "assistant_entries", "assistant_wait_ms",
     )
-    /** App、站点头部 pace 能写的值。 */
+    /** The values pace may take in an app or site header. */
     val PACES = setOf("careful")
     private val ENTRY_REF = Regex("\\b(app|site|skill):([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)")
 
@@ -66,7 +66,7 @@ object KnowledgeIndex {
 
     class Result(val entries: List<IndexEntry>, val errors: List<String>)
 
-    /** 扫 [root](资源根目录)下三棵树;许可证文件 LICENSE.md 不查本机路径。 */
+    /** Scan the three trees under [root] (the resource root); local paths are not checked in the license file LICENSE.md. */
     fun build(root: File): Result {
         val errors = mutableListOf<String>()
         val entries = mutableListOf<IndexEntry>()
@@ -159,8 +159,8 @@ object KnowledgeIndex {
     }
 
     /**
-     * `scripts/` 下的 .js:列在 scripts/manifest.json 里的是沙箱脚本;其余在站点知识里必须是站点命令(带 [SiteCommandFile.MARK] 头部),
-     * 头部校验不过构建失败。站点命令只能写在站点知识里。
+     * .js files under `scripts/`: those listed in scripts/manifest.json are sandbox scripts; the rest, in site knowledge, must be site commands (with a [SiteCommandFile.MARK] header),
+     * and a header that fails validation fails the build. Site commands may only be written in site knowledge.
      */
     private fun commands(kind: String, dir: File, err: (String) -> Unit): List<SiteCommandDecl> {
         val scripts = File(dir, "scripts")
@@ -190,7 +190,7 @@ object KnowledgeIndex {
         for (e in entries) {
             e.sites.filter { it !in sites }.forEach { err("${where(e)}: sites 里的 $it 不存在") }
             e.apps.filter { it !in apps }.forEach { err("${where(e)}: apps 里的 $it 不存在") }
-            // App 与站点互相关联:一边写了,另一边也要写
+            // Apps and sites reference each other: when one side writes it, the other side must too
             if (e.kind == APP) e.sites.mapNotNull(sites::get).filter { e.name !in it.apps }.forEach { err("${where(it)}: apps 里缺少 ${e.name}(${where(e)} 关联了它)") }
             if (e.kind == SITE) e.apps.mapNotNull(apps::get).filter { e.name !in it.sites }.forEach { err("${where(it)}: sites 里缺少 ${e.name}(${where(e)} 关联了它)") }
         }
@@ -203,7 +203,7 @@ object KnowledgeIndex {
                 for (line in text.lines()) {
                     val named = ENTRY_REF.findAll(line).map { it.groupValues[1] to it.groupValues[2] }.toList()
                     named.filter { it !in byKey }.forEach { (k, n) -> err("${where(e)}/$file: 提到的 $k:$n 不存在") }
-                    // 一行里点名了另一个条目时,附件路径按那个条目找
+                    // When a line names another entry, attachment paths are resolved under that entry
                     val target = named.singleOrNull()?.let(byKey::get) ?: e
                     REF.findAll(line).map { it.value }.filter { !File(File(root, where(target)), it).exists() }
                         .forEach { err("${where(e)}/$file: 附件 $it 不存在于 ${where(target)}") }
@@ -216,7 +216,7 @@ object KnowledgeIndex {
         }
     }
 
-    /** 构建任务入口:`<资源根目录> <输出的 index.json>`。校验不过打印原因并以非零退出。 */
+    /** Build task entry point: `<resource root> <output index.json>`. If validation fails it prints the reasons and exits non-zero. */
     @JvmStatic
     fun main(args: Array<String>) {
         val r = build(File(args[0]))

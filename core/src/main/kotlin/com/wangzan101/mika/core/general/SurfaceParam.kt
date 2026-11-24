@@ -13,8 +13,8 @@ import com.wangzan101.mika.core.screen.uistate.focus
 private const val SURFACE = "surface"
 
 /**
- * 说的是哪块屏的通用工具(确认、接管、报障碍):本任务有两块以上的屏时多一个 surface 参数,
- * 不给时是最近一次屏幕工具的那块。分发器在调用前按它记下在操作哪块屏,工具照常用此刻那块屏。
+ * Shared by tools that say which screen they mean (confirm, take over, report an obstacle): when this task has more than one screen, an extra surface parameter is added,
+ * and when it is omitted, the screen the latest screen tool acted on. Before the call, the dispatcher records from it which screen is being operated on, and the tool still uses that screen as of that moment.
  */
 internal interface SurfaceAware : AgentTool {
     override fun def(ctx: ToolContext): ToolDef {
@@ -25,7 +25,7 @@ internal interface SurfaceAware : AgentTool {
 
     override fun aimAt(o: JsonObject): String? = o.argStr(SURFACE)
 
-    /** 给了 surface 时核对它是本任务的一块屏。 */
+    /** When surface is given, check that it is one of this task's screens. */
     fun checkSurface(a: Args, ctx: ToolContext) {
         val id = a.str(SURFACE) ?: return
         if (ctx.focus[id] == null) throw ArgError(SURFACE, "must be one of ${ctx.focus.surfaces.joinToString("|") { it.id }}")

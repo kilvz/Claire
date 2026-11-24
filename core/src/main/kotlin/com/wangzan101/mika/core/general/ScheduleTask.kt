@@ -118,7 +118,7 @@ internal object ScheduleTask : AgentTool {
             }
             return ToolExecution(okObj {
                 put("changed", changed)
-                // 计划在、却没改成:只有恢复认领过(跑过或正在跑)的一次性计划会这样
+                // The plan exists but was not changed: this only happens for a one-time plan that resume already claimed (it has run or is running)
                 if (!changed) put("reason", if (op == "resume" && admin.list(thread).any { it.id == id }) "already_ran" else "plan_not_found")
             })
         }
@@ -182,7 +182,7 @@ internal object ScheduleTask : AgentTool {
         })
     }
 
-    /** 缺省字段保留；清空钟点/间隔、条件、提醒和冷却有显式的空值语义。验证与页面共用。 */
+    /** Omitted fields are preserved; clearing clocks/interval, condition, reminder and cooldown has explicit empty-value semantics. Validation is shared with the screen. */
     private fun editedPlan(a: Args, original: TriggerDefinition): TriggerDefinition {
         val goal = a.str("goal", max = 4000) ?: original.goal
         val reminder = a.str("reminder", min = 0, max = 2000)?.trim()?.ifEmpty { null }

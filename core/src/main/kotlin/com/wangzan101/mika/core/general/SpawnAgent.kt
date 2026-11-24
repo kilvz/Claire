@@ -35,14 +35,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object SpawnAgent : AgentTool {
-    /** 子任务默认的步数、步数上限。 */
+    /** Default step budget and maximum step budget for a child task. */
     const val DEFAULT_STEPS = 15
     const val MAX_STEPS = 40
-    /** 子任务结果默认留多少字、最多留多少字、最少留多少字。 */
+    /** How many characters of a child result are kept by default, the most, and the least. */
     const val DEFAULT_RESULT_CHARS = 4_000
     const val MAX_RESULT_CHARS = 8_000
     const val MIN_RESULT_CHARS = 500
-    /** 一次最多并排派几个。再多分几次调用,免得一轮的 token 预算被一次吃光。 */
+    /** How many at most can be dispatched side by side in one go. Beyond that, split into several calls so one round's token budget is not eaten up at once. */
     const val MAX_BATCH = 20
 
     override val verb = Verb.SpawnAgent
@@ -63,14 +63,14 @@ internal object SpawnAgent : AgentTool {
         val parent = ctx.config.runSpec ?: error("no parent RunSpec")
         val host = ctx.config.childHost ?: error("no child host")
         val format = a.str("format")
-        // 只校验是整数;超出范围的拉回范围内,不当错误(子任务照样能派)
+        // Only check that it is an integer; out-of-range values are pulled back into range instead of being an error (the child can still be dispatched)
         val steps = (a.int("maxSteps", Int.MIN_VALUE, Int.MAX_VALUE) ?: DEFAULT_STEPS).coerceIn(1, MAX_STEPS)
         val limit = (a.int("maxResultChars", Int.MIN_VALUE, Int.MAX_VALUE) ?: DEFAULT_RESULT_CHARS).coerceIn(MIN_RESULT_CHARS, MAX_RESULT_CHARS)
         val goals = a.strList("tasks", min = 1, max = MAX_BATCH, itemMax = 4000)
             ?: listOfNotNull(a.str("goal", max = 4000)).takeIf { it.isNotEmpty() }
             ?: return failure("给一个 goal,或用 tasks 一次派几个")
         if (goals.size == 1) return runOne(goals[0], parent, host, format, steps, limit)
-        // 多个:同时开跑,全等完成再回;任何一个失败都不影响别的,各自结果单独报
+        // Several: start them all at once and return once all are done; a failure in any one does not affect the others, and each result is reported separately
         val results = coroutineScope {
             goals.map { goal ->
                 async {
@@ -115,7 +115,7 @@ internal object SpawnAgent : AgentTool {
         }, observations = listOf(Observation(ObsKind.Reply, text, source = "child", trust = Trust.Untrusted)))
     }
 
-    /** 合并正文，并按同一顺序返回每项的状态等元数据。 */
+    /** Merge the bodies, and return each item's status and other metadata in the same order. */
     private fun merge(results: List<Pair<String, ToolExecution>>): ToolExecution {
         val okAll = results.all { (_, r) -> r.content["ok"] == JsonPrimitive(true) }
         val text = results.joinToString("\n\n") { (goal, r) ->

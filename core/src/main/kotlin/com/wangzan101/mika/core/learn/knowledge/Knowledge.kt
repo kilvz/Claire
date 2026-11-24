@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.learn.knowledge
 
 enum class Surface { Android, Web, Desktop }
 
-/** 一份 App(APP.md,[Surface.Android])或站点(SITE.md,[Surface.Web])知识。 */
+/** One piece of knowledge for an app (APP.md, [Surface.Android]) or a site (SITE.md, [Surface.Web]). */
 data class KnowledgeEntry(
     val name: String,
     val display: String,
@@ -13,20 +13,20 @@ data class KnowledgeEntry(
     val open: String?,
     val description: String,
     val body: String?,
-    /** 同一 App 有多个包名时,别名到各自包名的对应(如“美团外卖”→外卖独立包)。 */
+    /** When the same app has multiple package names, the mapping from each alias to its package (e.g. “Meituan Waimai” → the delivery service's standalone package). */
     val packageAliases: Map<String, String> = emptyMap(),
-    /** 真机验证过、可用 open_link 直达的页面;头部写作 `links: ["名称 | uri", "名称 | uri | 包名", …]`。 */
+    /** Pages verified on a real device and reachable directly with open_link; the header writes `links: ["name | uri", "name | uri | package", …]`. */
     val links: List<Link> = emptyList(),
-    /** 同一服务另一种运行面的条目名:App 条目写它的站点,站点条目写它的 App。 */
+    /** The name of the same service's entry on its other surface: an app entry names its site, a site entry names its app. */
     val related: List<String> = emptyList(),
-    /** 站点命令的声明(只有站点有);脚本正文由 [GuideCatalog.siteCommands] 取。 */
+    /** Declarations of site commands (sites only); the script body is fetched by [GuideCatalog.siteCommands]. */
     val commands: List<SiteCommandDecl> = emptyList(),
-    /** 正文附了 Claire 自学、还没核实的 App 知识试用稿。 */
+    /** The body carries a trial draft of app knowledge self-learned by Claire that has not been verified yet. */
     val trial: Boolean = false,
 ) {
-    /** 同一服务的 App 与站点共用的名字:站点关联了 App 时取 App 的名字。 */
+    /** The name shared by an app and a site of the same service: when the site lists an app, the app's name is taken. */
     val service: String get() = if (surface == Surface.Web) related.firstOrNull() ?: name else name
 }
 
-/** 一条可直达的链接;网页链接要带 [packageName](由哪个 App 打开)。 */
+/** A directly reachable link; a web link must carry [packageName] (which app opens it). */
 data class Link(val name: String, val uri: String, val packageName: String? = null)

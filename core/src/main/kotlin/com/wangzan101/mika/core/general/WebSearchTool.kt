@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 经用户配置的搜索端点直接查网页;失败时明确让模型退回浏览器,不暗中换服务。 */
+/** Queries the web directly through the search endpoint configured by the user; on failure it plainly tells the model to fall back to the browser rather than silently switching services. */
 internal object WebSearchTool : AgentTool {
     override val verb = Verb.WebSearch
     override val label = "搜索网页"

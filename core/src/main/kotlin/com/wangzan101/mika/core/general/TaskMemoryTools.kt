@@ -36,7 +36,7 @@ private val TASK_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-
 
 private fun taskTime(ms: Long, zone: ZoneId): String = TASK_TIME.format(Instant.ofEpochMilli(ms).atZone(zone))
 
-/** 跨会话任务摘要的索引 / 时间线 / 单步原文,三层分开给,默认不把全量塞进上下文。 */
+/** Index / timeline / single-step full text of cross-session task summaries, given as three separate layers; by default the whole thing is not stuffed into the context. */
 internal object TaskMemorySearch : AgentTool {
     override val verb = Verb.TaskMemorySearch
     override val risk = Risk.Read
@@ -75,7 +75,7 @@ internal object TaskMemorySearch : AgentTool {
     }
 }
 
-/** 选中一条任务摘要后,读它的时间线(只给每一步的标签,不给原文)。 */
+/** After picking one task summary, read its timeline (only each step's label is given, not the full text). */
 internal object TaskMemoryTimeline : AgentTool {
     override val verb = Verb.TaskMemoryTimeline
     override val risk = Risk.Read
@@ -102,7 +102,7 @@ internal object TaskMemoryTimeline : AgentTool {
     }
 }
 
-/** 时间线里的一步读原文:那一步读到的屏/页/命令输出(截短、已脱敏)。 */
+/** Read the full text of one step in the timeline: the screen/page/command output that step read (truncated and already redacted). */
 internal object TaskMemoryStepRead : AgentTool {
     override val verb = Verb.TaskMemoryStep
     override val risk = Risk.Read

@@ -25,8 +25,8 @@ import com.wangzan101.mika.core.screen.uistate.lastSnapshot
 import com.wangzan101.mika.core.screen.uistate.session
 
 /**
- * 花钱的那一步(下单、屏上有应付金额时的提交等)前请用户同意;询问时只有这一种要问。付款本身不在这里,交给用户亲手付。
- * 申报的前台核对用此刻重新读的一屏(不登记编号,不动模型手里的 ref)。
+ * Asks the user to agree before the step that spends money (placing an order, submitting when the screen shows an amount due, etc.); this is the only thing to ask for. Paying itself is not here: it is left for the user to do by hand.
+ * The foreground check of what is declared uses a screen re-read at this moment (no ID is registered, and the refs held by the model are left untouched).
  */
 internal object RequestConfirmation : SurfaceAware {
     override val verb = Verb.RequestConfirmation
@@ -42,7 +42,7 @@ internal object RequestConfirmation : SurfaceAware {
             "app" to str(APP_NOTE),
         ), listOf("action", "target", "content", "amount", "app"))
 
-    /** app 参数写什么按本任务的屏说:一块屏时写那块的写法,几块屏时各写一句。 */
+    /** What to write for the app parameter follows this task's screens: with one screen use that screen's wording, with several screens write one clause for each. */
     override fun def(ctx: ToolContext): ToolDef {
         val base = super.def(ctx)
         val surfaces = ctx.focus.surfaces
@@ -63,7 +63,7 @@ internal object RequestConfirmation : SurfaceAware {
                 a.str("amount", max = 10000)?.let(::capField), a.str("app")!!.trim())
             return fail("payment_requires_takeover", HINT_PAYMENT_TAKEOVER)
         }
-        // 只有花钱要问:写不出金额的操作不用申请,直接做
+        // Only spending money needs asking: an action with no amount needs no approval, so just do it
         if (a.str("amount")?.any(Char::isDigit) != true) throw ArgError("amount",
             "required: the total the user will pay, as shown on screen. An action that spends no money needs no approval: do it directly")
         val app = ctx.confirmTarget(a.str("app")!!.trim())
