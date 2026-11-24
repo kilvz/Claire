@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 调用参数与「在哪」的纯逻辑:坏参数按空对象处理,站点只从成功的网页读取结果里推。 */
+/** Pure logic for call arguments and for "where": malformed arguments are treated as an empty object, and the site is inferred only from the results of successful web reads. */
 class CallJsonTest {
     @Test fun parseArgsReturnsAnObjectOrAnEmptyOne() {
         assertEquals(1, (parseArgs("""{"a":1}""")["a"] as JsonPrimitive).content.toInt())
@@ -27,7 +27,7 @@ class CallJsonTest {
             put("currentApp", "com.outer.app"); put("screen", screen)
         }))
         assertEquals(Place.app("com.screen.app"), placeOf(buildJsonObject { put("screen", screen) }))
-        // App 先于 Site,即使站点写在外层、App 只写在 screen 里
+        // App takes precedence over Site, even when the site is written on the outer object and the app only inside screen
         assertEquals(Place.app("com.screen.app"), placeOf(buildJsonObject {
             put("currentSite", "outer.example"); put("screen", screen)
         }))

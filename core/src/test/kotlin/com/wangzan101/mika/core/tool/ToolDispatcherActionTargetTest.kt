@@ -40,18 +40,18 @@ class ToolDispatcherActionTargetTest {
         d.execute(call("phone_tap", """{"ref":"@e2","snapshotId":"s1"}"""))
         val (target, before) = d.interfaces.lastActionTarget()!!
         assertEquals(Selector("button", "新建", "n:id/new", listOf(800, 900, 999, 999), 0, uniqueAtRecord = true), target)
-        // 时间样式的字、目标自己、列表里的条目都不当锚点
+        // Text that looks like a time, the target itself, and entries inside the list are not used as anchors
         assertEquals(Anchors("com.notes", listOf("备忘录", "全部笔记")), before)
     }
 
     @Test fun coordinateTapCapturesElementAtPoint() = runTest {
         val s = NotesScreen(); val d = toolDispatcher(s).also { it.captureTargets = true }
         d.execute(call("phone_observe"))
-        // 落在列表(大)和「购物清单」(小)里:取最小的那个
+        // Inside both the list (large) and the "Shopping list" button (small): take the smallest one
         d.execute(call("phone_tap", """{"x":500,"y":230}"""))
         val (target, before) = d.interfaces.lastActionTarget()!!
         assertEquals(Selector("button", "购物清单", null, listOf(0, 200, 999, 260), 0, uniqueAtRecord = true), target)
-        // 有资源 ID 的排前面
+        // Ones with a resource ID come first
         assertEquals(listOf("新建", "备忘录", "全部笔记"), before.texts)
     }
 
@@ -104,7 +104,7 @@ class ToolDispatcherActionTargetTest {
             el("@e9", "edit", "写点什么", listOf(0, 120, 999, 900), editable = true),
             el("@e10", "button", "完成", listOf(800, 0, 999, 60), clickable = true),
         )
-        // 输入框里的字是内容不是界面,不当锚点
+        // Text in an input field is content, not interface, so it is not used as an anchor
         assertEquals(Anchors("com.notes", listOf("新笔记", "完成")), d.interfaces.actionAfter())
     }
 }

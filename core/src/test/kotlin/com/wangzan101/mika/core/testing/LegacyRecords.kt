@@ -7,7 +7,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * 测试用:旧运行记录里的一条 screen_text(读屏交给模型的元素文字),按读旧记录的同一条路读进来(读出来是编号为 0 的 observed)。
+ * Test helper: one screen_text entry from a legacy run record (the element text handed to the model when reading a screen),
+ * decoded through the same path used for old records (the result is an Observed numbered 0).
  */
 fun legacyScreenText(
     atMs: Long, step: Int, app: String?, names: List<String>, site: String? = null, inputs: List<String>? = null, focused: String? = null,

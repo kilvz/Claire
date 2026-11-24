@@ -20,7 +20,7 @@ import org.junit.Test
 import java.util.Base64
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
-/** 一屏几个按钮;[names] 决定屏上的字,截图按次计数。 */
+/** A screen with a few buttons; [names] determines the text on the screen, and screenshots are counted per call. */
 private class FrameScreen(var names: List<String> = listOf("搜索")) : ScreenPort by FakeScreen() {
     var shots = 0
     var secure = false
@@ -56,10 +56,10 @@ class ToolDispatcherFrameTest {
         assertEquals(1, r.images.size)
         val id = r.content.s("screenshotId")
         assertEquals(listOf<Int?>(id.toInt()), r.imageIds)
-        // 附的帧登记进回看,旧图被裁掉后还能找回
+        // Attached frames are registered for recall, so older pictures can still be retrieved once they are trimmed
         val back = d.execute(call("view_past_screens", """{"ids":[$id]}"""))
         assertEquals(1, back.images.size)
-        // 发给模型时按统一编码:JPEG,长边 1280
+        // Encoded uniformly when sent to the model: JPEG, long edge 1280
         val part = d.modelImage(r.images.single(), r.imageIds.single())
         assertEquals("image/jpeg", part.mime)
         assertEquals(1280, maxOf(part.width, part.height))
@@ -67,7 +67,7 @@ class ToolDispatcherFrameTest {
         assertEquals(part.width to part.height, JvmTestImageOps.size(Base64.getDecoder().decode(part.pngBase64)))
     }
 
-    // 动作后附的画面总是连同同一时刻、可操作的元素表:按里面的 ref/snapshotId 就能点
+    // The picture attached after an action always comes with the actionable element list from the same moment: any ref/snapshotId inside can be tapped directly
     @Test fun frameComesWithTheActionableElementList() = runTest {
         val s = FrameScreen()
         val d = toolDispatcher(s, visionEnabled = true)
@@ -78,7 +78,7 @@ class ToolDispatcherFrameTest {
         assertEquals("搜索", el.s("name"))
         val tap = d.execute(call("phone_tap", """{"ref":"${el.s("ref")}","snapshotId":"${screen.s("snapshotId")}"}"""))
         assertEquals(tap.content.toString(), "true", tap.content.s("ok"))
-        // 付款页画面和元素表都可用
+        // On a payment page both the picture and the element list are available
         val pay = FrameScreen(listOf("确认支付", "¥89.00"))
         val pr = toolDispatcher(pay, visionEnabled = true).execute(call("phone_back"))
         assertEquals(1, pr.images.size); assertTrue(pay.shots > 0)
@@ -116,7 +116,7 @@ class ToolDispatcherFrameTest {
         for ((name, args) in listOf("phone_back" to "{}", "phone_launch_app" to """{"package":"com.x"}""", "phone_swipe" to """{"startX":1,"startY":1,"endX":9,"endY":9}""")) {
             assertEquals(name, 1, d.execute(call(name, args)).images.size)
         }
-        // 只读的工具不附
+        // Read-only tools attach none
         assertTrue(d.execute(call("phone_list_apps")).images.isEmpty())
     }
 
@@ -140,7 +140,7 @@ class ToolDispatcherFrameTest {
         val d = toolDispatcher(pay, visionEnabled = true)
         val r = d.execute(call("phone_back"))
         assertEquals(1, r.images.size); assertTrue(pay.shots > 0); assertTrue(d.keepsRecallImages())
-        // 屏上还没有 App:没东西可截,不是错误
+        // No app on screen yet: there is nothing to capture, and that is not an error
         val empty = FrameScreen().apply { this.empty = true }
         assertTrue(toolDispatcher(empty, visionEnabled = true).execute(call("phone_back")).images.isEmpty())
     }
@@ -173,7 +173,7 @@ class ToolDispatcherFrameTest {
         d.execute(call("phone_observe"))
         val before = s.shots
         val r = d.execute(call("phone_back"))
-        // 带屏幕时用读屏那一张,不另截
+        // When a screen is included, reuse the one from the screen read instead of capturing another
         assertEquals(before + 1, s.shots)
         assertEquals(1, r.images.size)
         val screen = r.content["screen"] as JsonObject
@@ -185,14 +185,14 @@ class ToolDispatcherFrameTest {
         val d = toolDispatcher(s, visionEnabled = true, adaptiveVision = true, recordFrames = true, inlineScreen = true)
         val observed = d.execute(call("phone_observe"))
         assertTrue(observed.images.isEmpty())
-        assertEquals(1, s.shots) // 运行记录仍有画面，不等于发给模型
+        assertEquals(1, s.shots) // the run record still holds a picture, but that does not mean it was sent to the model
         val action = d.execute(call("phone_back"))
         assertTrue(action.images.isEmpty())
         assertTrue("snapshotId" in action.content["screen"]!!.jsonObject)
-        assertEquals(3, s.shots) // 新增操作前回放帧；操作后复用已有记录帧，不重复截图
+        assertEquals(3, s.shots) // a rehearsal frame before the new action; afterwards the existing recorded frame is reused, so no duplicate screenshot
         assertTrue(action.playback?.before != null)
         assertTrue(action.playback?.after === action.frame)
-        assertEquals(1, d.execute(call("phone_screenshot")).images.size) // 模型发现歧义时仍可主动补图
+        assertEquals(1, d.execute(call("phone_screenshot")).images.size) // the model can still ask for extra pictures when it spots ambiguity
     }
 
     @Test fun adaptiveVisionEscalatesUnreadableControlsButExplicitElementReadStaysTextOnly() = runTest {

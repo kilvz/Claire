@@ -10,17 +10,19 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * 「模型看到了什么」的快照:每次请求的系统提示词(摘要)、工具列表、逐条消息(角色、上下文种类与来源、首行、全文摘要)。
- * 首行便于看差异,摘要保证任何一个字变了都会被发现。系统提示词和工具列表只在变了时记。
+ * Snapshot of "what the model saw": per request, the system prompt (digest), the tool list, and each message (role, context kind
+ * and source, first line, whole-text digest).
+ * The first line makes differences easy to spot; the digest guarantees that a change to even one character is caught. The system
+ * prompt and the tool list are recorded only when they change.
  *
- * 金样文件在 core/src/test/resources/loop-snapshots/;重新生成:
+ * Golden files live in core/src/test/resources/loop-snapshots/; regenerate with:
  *   ./gradlew :core:test --tests '*LoopScenarioTest' -PupdateSnapshots
  */
 object LoopSnapshot {
     private val dir = File(System.getProperty("mika.snapshotDir") ?: "src/test/resources/loop-snapshots")
     private val update = System.getProperty("mika.updateSnapshots") == "true"
 
-    /** 和金样比对;开了重新生成就直接写入。 */
+    /** Compare against the golden file; when regeneration is on, write it out directly. */
     fun check(name: String, actual: String) {
         val file = File(dir, "$name.txt")
         if (update) {
@@ -32,7 +34,7 @@ object LoopSnapshot {
         assertEquals("快照 $name 变了;确认是有意的改动后用 -PupdateSnapshots 重新生成", file.readText(), actual)
     }
 
-    /** 一个场景的快照:结局,然后各个模型(主模型、辅助角色)收到的请求。 */
+    /** Snapshot of one scenario: the outcome, then the requests received by each model (main model, auxiliary roles). */
     fun render(outcome: String, models: List<Pair<String, FakeChatModel>>): String = buildString {
         appendLine("outcome: " + outcome.replace("\n", "⏎"))
         for ((role, m) in models) {
@@ -50,7 +52,8 @@ object LoopSnapshot {
                     appendLine("tools: #${hash(r.tools.joinToString("\n") { it.name + "\n" + it.description + "\n" + it.parametersJsonSchema })} ${r.toolNames}")
                     tools = r.tools
                 }
-                // 和上一次请求相同的开头只记条数:请求前缀逐步只增,变了(压缩、裁剪)就会从变的那条起全部列出
+                // For the prefix shared with the previous request, record only the count: the request prefix only grows step by
+                // step, so when it changes (compaction, trimming) everything from the changed message onward is listed in full
                 val same = r.messages.zip(previous).takeWhile { (a, b) -> a == b }.size
                 if (same > 0) appendLine("… $same messages unchanged")
                 r.messages.drop(same).forEach { append(message(it)) }

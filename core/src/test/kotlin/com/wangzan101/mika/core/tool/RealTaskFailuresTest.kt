@@ -23,13 +23,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 真机任务里几类失败的通用修法:读不到窗口不等于没打开、网页打不开照实报、搜索框里回车不算发送。 */
+/** General fixes for several kinds of failure seen in real-device tasks: an unreadable window does not mean the app is not open, an unreachable web page is reported as such, and pressing Enter in a search box does not count as sending. */
 class RealTaskFailuresTest {
     private var n = 0
     private fun call(name: String, args: String = "{}") = Part.ToolCall("c${++n}", name, args)
     private fun JsonObject.s(k: String) = this[k]!!.jsonPrimitive.content
 
-    /** 打开了 App、窗口却读不到(安全窗口、启动画面):读屏只有包名,没有元素。 */
+    /** The app is open but the window cannot be read (secure window, splash screen): the screen read has only the package name, no elements. */
     private class UnreadableScreen(private val inner: FakeScreen = FakeScreen(), var unreadable: String? = "com.bank") : ScreenPort by inner {
         override suspend fun snapshot() = ScreenSnapshot("p${++reads}", null, emptyList(), 1080, 2400, unreadableApp = unreadable)
         override suspend fun peek() = snapshot()
@@ -44,7 +44,7 @@ class RealTaskFailuresTest {
         val hint = o.s("hint")
         assertTrue(hint, "do not launch it again" in hint && "hand_to_user" in hint)
         assertFalse("back once" in hint)
-        // 启动后到了前台却读不到:照实说,不叫人再启动
+        // After launching it reaches the foreground but cannot be read: say so plainly, don't tell anyone to launch it again
         val l = d.execute(call("phone_launch_app", """{"package":"com.bank"}""")).content
         assertEquals("true", l.s("ok")); assertEquals("false", l.s("readable"))
         assertTrue(l.s("hint"), "do not launch it again" in l.s("hint"))
@@ -101,17 +101,17 @@ class RealTaskFailuresTest {
     private val enter = args("""{"text":"耳机","pressEnter":true}""")
 
     @Test fun enterInASearchFieldIsReversibleByElementSemantics() {
-        // 打了字之后名字就是打的字:靠控件自己的提示语、角色或语义认出搜索框
+        // Once text is typed the name is the typed text: recognize the search box from the control's own hint, role, or semantics
         assertNull(IrreversibleDetector.classify("phone_type_text", enter, snap(el("耳机", placeholder = "搜索商品"))))
         assertNull(IrreversibleDetector.classify("phone_type_text", enter, snap(el("耳机", role = "SearchView\$SearchAutoComplete"))))
         assertNull(IrreversibleDetector.classify("web_type_text", enter, snap(el("耳机", role = "searchbox"))))
         assertNull(IrreversibleDetector.classify("web_type_text", enter, snap(el("耳机", role = "textbox", search = true))))
-        // 别的输入框里回车照旧按发送
+        // Enter in other input fields still counts as sending
         assertEquals(IrrevAction.send, IrreversibleDetector.classify("phone_type_text", enter, snap(el("耳机", placeholder = "说点什么")))?.action)
         assertEquals(IrrevAction.send, IrreversibleDetector.classify("phone_type_text", enter, snap(el("帮我搜索一下")))?.action)
     }
 
-    /** 用错了屏的编号、被拒的调用不改「最近操作的屏」:之后不点名屏幕的确认、接管照旧说的是原来那块。 */
+    /** Calls using the wrong screen's id, and rejected calls, do not change the "last operated screen": later confirmations and takeovers that do not name a screen still refer to the original one. */
     @Test fun misaimedCallsDoNotMoveTheRememberedScreen() = runTest {
         val d = toolDispatcher(FakeScreen(), web = FakeWebPort())
         val ex = com.wangzan101.mika.core.action.ActionExecutor(d, com.wangzan101.mika.core.safety.guard.OperationGuards(), null, gate = {},
@@ -120,7 +120,7 @@ class RealTaskFailuresTest {
         val webSid = d.execute(call("web_observe")).content.s("snapshotId")
         d.execute(call("phone_observe"))
         assertEquals("phone", d.surface)
-        // 交给另一块屏的工具:被拒,不改
+        // A tool belonging to the other screen: rejected, nothing changes
         val wrong = ex.run(call("web_tap", """{"ref":"@e1","snapshotId":"${d.execute(call("phone_observe")).content.s("snapshotId")}"}"""), com.wangzan101.mika.core.action.Origin.Model(2))
         assertTrue(wrong.toString(), "wrong_surface" in wrong.toString())
         assertEquals("phone", d.surface)

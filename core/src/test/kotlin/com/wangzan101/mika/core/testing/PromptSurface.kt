@@ -7,8 +7,8 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * 提示词表面的金样:全文写出(不是摘要),审改动时直接看得到差在哪。
- * 金样在 core/src/test/resources/prompt-surface/;重新生成:
+ * Golden files for the prompt surface: written in full (not digested), so reviewing a change shows exactly what differs.
+ * Golden files live in core/src/test/resources/prompt-surface/; regenerate with:
  *   ./gradlew :core:test --tests '*PromptSurface*' -PupdateSnapshots
  */
 object PromptSurface {
@@ -26,7 +26,7 @@ object PromptSurface {
         assertEquals("提示词表面 $name 变了;确认是有意的改动后用 -PupdateSnapshots 重新生成", file.readText(), actual)
     }
 
-    /** 一种能力组合:系统提示词全文,再列发给模型的工具(名字 + 定义摘要,定义全文在 tools 里)。 */
+    /** One capability combination: the full system prompt, then the tools sent to the model (name + digest of the definition; the full definitions are under tools). */
     fun system(system: String, tools: List<ToolSpec>): String = buildString {
         appendLine(system)
         appendLine()
@@ -34,7 +34,7 @@ object PromptSurface {
         tools.forEach { appendLine("${it.name} #${hash(spec(it))}") }
     }
 
-    /** 一次请求的全貌:系统提示词全文,再按发给模型的顺序列每个工具的定义全文。 */
+    /** The full picture of one request: the complete system prompt, then each tool's full definition in the order it was sent to the model. */
     fun layer(system: String, tools: List<ToolSpec>): String = buildString {
         appendLine(system)
         appendLine()
@@ -48,7 +48,7 @@ object PromptSurface {
 
     private fun spec(t: ToolSpec) = "## ${t.name}\n${t.description}\n${t.parametersJsonSchema}\n"
 
-    /** 内部角色(标准、核查、描述、定位等)的提示词全文。 */
+    /** Full prompts of the internal roles (standard, verifier, describe, locate, and so on). */
     fun roles(): String = buildString {
         for (name in ROLES) {
             appendLine("## $name")
@@ -62,7 +62,7 @@ object PromptSurface {
         checkNotNull(PromptSurface::class.java.getResourceAsStream("/prompts/roles/$name.md")) { "missing role prompt $name" }
             .bufferedReader(Charsets.UTF_8).use { it.readText() }
 
-    /** 一组「标签 → 发给模型的字」逐条写出。 */
+    /** Write out a set of "tag -> text sent to the model" pairs one by one. */
     fun entries(items: List<Pair<String, String>>): String = buildString {
         items.forEach { (k, v) -> appendLine("### $k"); appendLine(v) }
     }

@@ -5,7 +5,7 @@ import com.wangzan101.mika.core.screen.uistate.ScreenPort
 import com.wangzan101.mika.core.screen.uistate.ScreenSnapshot
 import com.wangzan101.mika.core.screen.uistate.UiElement
 
-/** 剧本里的一屏。 */
+/** One screen in the script. */
 data class Screen(val app: String, val elements: List<UiElement>)
 
 fun button(ref: String, name: String, y: Int = 500) =
@@ -18,8 +18,9 @@ fun field(ref: String, name: String, y: Int = 900, hint: Boolean = true) =
     UiElement(ref, "edit", name, 540, y * 24 / 10, listOf(0, y - 40, 999, y + 40), null, true, true, false, hint = hint)
 
 /**
- * 按剧本换屏的手机屏幕:读屏(编号 s1、s2…)给出当前一屏;每个写操作取 [results] 里的下一个结果(用完为 Ok(changed=true)),
- * 结果是画面变了的 Ok 就换到下一屏(最后一屏之后停在最后一屏)。不登记编号的 peek 编号 p1、p2…。
+ * Phone screen that advances through the script: a screen read (ids s1, s2, …) returns the current screen; each write action
+ * takes the next result from [results] (Ok(changed=true) once they run out). If the result is an Ok reporting a changed screen,
+ * move on to the next screen (after the last screen it stays there). Peeks, which do not register an id, are numbered p1, p2, ….
  */
 class ScriptedScreen(private val screens: List<Screen>, results: List<ActionResult> = emptyList()) : ScreenPort {
     private val results = ArrayDeque(results)

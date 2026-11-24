@@ -4,7 +4,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** open_link 的注释说拒绝文件与脚本类协议;浏览器内部协议同样不该交给系统去打开。 */
+/** The open_link documentation says file and script-like schemes are refused; browser-internal schemes should likewise never be handed to the system to open. */
 class LinkPolicySchemeTest {
     @Test fun browserInternalSchemesAreRefused() {
         for (u in listOf("data:text/html,hello", "about:blank", "blob:https://example.com/abc")) {

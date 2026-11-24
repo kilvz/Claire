@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/** 坐标容忍 [a,b] 时,非有限的中点应当报错,不能静默变成 0。 */
+/** When a coordinate tolerates [a,b] pairs, a non-finite midpoint must raise an error rather than silently become 0. */
 class ArgsCoordTest {
     private fun args(v: JsonElement) = Args(
         ToolDef("t", "d", mapOf("x" to JsonObject(emptyMap())), emptyList()),

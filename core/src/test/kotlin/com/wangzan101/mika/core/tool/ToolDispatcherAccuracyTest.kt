@@ -19,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
-/** 端口核实到的事实(变化、被切走、重定位、回读、防截屏、诊断)要原样交给模型。 */
+/** The facts the port established (change, being switched away, relocation, read-back, screen-capture protection, diagnostics) must be handed to the model verbatim. */
 class ToolDispatcherAccuracyTest {
     private fun call(name: String, args: String = "{}") = Part.ToolCall("c1", name, args)
     private fun JsonObject.s(k: String) = this[k]!!.jsonPrimitive.content
@@ -34,10 +34,10 @@ class ToolDispatcherAccuracyTest {
         assertFalse(r.content.b("changed"))
         assertEquals("no_effect", r.content.effect().s("kind"))
         val h = r.content.s("hint")
-        // 只说看到的事实,不暗示「没点中」;不要原样再来,换个做法
+        // State only the observed fact, never hint that "the tap missed"; don't repeat it as-is, try another way
         assertFalse(h, "missed" in h)
         assertTrue(h, "do not repeat" in h.lowercase() && "another way" in h)
-        // 没变就不算「屏幕过时」
+        // No change means the screen does not count as stale
         assertNull(r.content["interfaceStale"])
     }
 
@@ -47,13 +47,13 @@ class ToolDispatcherAccuracyTest {
         assertEquals(true, r.changed); assertTrue(r.content.b("changed"))
         assertEquals("small_change", r.content.effect().s("kind"))
         assertTrue(r.content.s("hint"), "Check" in r.content.s("hint"))
-        // 动作之后没带回屏幕:模型手里那一屏已过时
+        // No screen came back after the action: the screen the model holds is now stale
         assertTrue(r.content.b("interfaceStale"))
     }
 
     @Test fun portWithoutVerificationGetsChangedFromTheEffect() = runTest {
         val r = toolDispatcher(FakeScreen()).execute(call("phone_back"))
-        // 端口没说变没变:按前后两屏判,两屏一样就是没变
+        // Whether it changed: the port didn't say, so judge from the before and after screens; identical screens mean no change
         assertEquals(false, r.changed); assertNull(r.content["changed"])
         assertEquals("no_effect", r.content.effect().s("kind"))
     }
@@ -139,7 +139,7 @@ class ToolDispatcherAccuracyTest {
 
         val prot = toolDispatcher(FlagScreen(false, true), visionEnabled = true).execute(call("phone_observe"))
         assertTrue(prot.content.b("protected")); assertTrue("hand_to_user" in prot.content.s("hint"))
-        assertNull(prot.image) // 黑屏图不给模型
+        assertNull(prot.image) // a black screenshot is not given to the model
     }
 
     @Test fun screenshotOfProtectedPage() = runTest {
@@ -180,7 +180,7 @@ class ToolDispatcherAccuracyTest {
             .execute(call("phone_scroll", """{"direction":"up"}""")).content
         assertEquals("down", stuck.s("fingerMoved"))
         assertTrue(stuck.b("atEnd"))
-        // 先确认方向再下「到头了」的结论;不用点击的「可能没点中」说法
+        // Confirm the direction before concluding "at the end"; avoid the tap-oriented "may have missed" wording
         assertTrue(stuck.s("hint"), "direction" in stuck.s("hint") && "missed" !in stuck.s("hint"))
     }
 
@@ -189,7 +189,7 @@ class ToolDispatcherAccuracyTest {
         override suspend fun checkScreen() = ScreenCheck(ScreenState.BLANK, null, false, cause = "no window")
     }
 
-    /** 有 App 窗口,只是根节点读不到:不是空屏,不该叫它 phone_launch_app。 */
+    /** There is an app window, only the root node cannot be read: this is not an empty screen, so the hint should not be to call phone_launch_app. */
     private class UnreadableScreen : ScreenPort by FakeScreen() {
         override suspend fun snapshot() = ScreenSnapshot("p1", null, emptyList(), 1080, 2400, hasWindow = true)
         override suspend fun checkScreen() = ScreenCheck(ScreenState.BLANK, null, false, cause = "unreadable window")

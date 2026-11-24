@@ -17,7 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 分发器判动作效果:异步更新再看一次、端口等过就不再等、多花的时间有上限、changed 跟着效果走。 */
+/** How the dispatcher judges action effects: asynchronous updates are re-checked, a port that already waited is not waited on again, the extra time spent is capped, and changed follows the effect. */
 class ToolDispatcherEffectTest {
     private fun call(name: String, args: String = "{}") = Part.ToolCall("c1", name, args)
     private fun JsonObject.kind() = this["effect"]!!.jsonObject["kind"]!!.jsonPrimitive.content
@@ -26,7 +26,7 @@ class ToolDispatcherEffectTest {
         UiElement("@e${i + 1}", "text", n, 500, 100 + i * 100, listOf(0, 40 + i * 40, 999, 70 + i * 40), null, true, false, false)
     }, 1080, 2400)
 
-    /** 动作 [afterMs] 毫秒之后界面才换成 [later](异步更新);[peekMs] 是看一眼要花的时间;[result] 是端口的动作结果。 */
+    /** The UI switches to [later] only [afterMs] milliseconds after the action (asynchronous update); [peekMs] is how long one look takes; [result] is the port's action result. */
     private class LateScreen(
         val now: () -> Long, val first: ScreenSnapshot, val later: ScreenSnapshot, val afterMs: Long,
         val peekMs: Long = 0, val result: ActionResult = ActionResult.Ok(),
@@ -56,7 +56,7 @@ class ToolDispatcherEffectTest {
         assertEquals(null, r.content["actionApp"])
     }
 
-    // 动作之后新出现「到上限了」的提示:结果里写 limitReached 和停下的提示;动作前就在屏上的说明文字不算
+    // A "limit reached" notice appears only after the action: the result reports limitReached along with a hint to stop; descriptive text that was already on screen before the action does not count
     @Test fun limitNoticeAfterTheActionIsReported() = runTest {
         val s = LateScreen({ currentTime }, page("职位详情", "立即沟通"), page("职位详情", "立即沟通", "今日沟通次数已用完，明天再来吧"), afterMs = 0)
         val c = toolDispatcher(s).execute(call("phone_tap", """{"x":500,"y":500}""")).content
@@ -66,7 +66,7 @@ class ToolDispatcherEffectTest {
         assertEquals(null, toolDispatcher(faq).execute(call("phone_tap", """{"x":500,"y":500}""")).content["limitReached"])
     }
 
-    // 提示条来得晚一点(第一次看没有、重看时才有)也算
+    // A notice that arrives a little late (absent on the first look, present on the re-check) counts as well
     @Test fun lateLimitToastIsCaughtByTheRecheck() = runTest {
         val s = LateScreen({ currentTime }, page("列表"), page("列表", "操作过于频繁，请稍后再试"), afterMs = EffectTuning.RECHECK_MS / 2)
         val c = toolDispatcher(s).execute(call("phone_tap", """{"x":500,"y":500}""")).content
@@ -119,13 +119,13 @@ class ToolDispatcherEffectTest {
     }
 
     @Test fun extraTimePerActionIsBounded() = runTest {
-        // 看一眼要 2 秒的慢端口:判效果最多多花 BUDGET_MS,到了就按端口的事实下结论
+        // A slow port where one look takes 2 seconds: judging the effect costs at most BUDGET_MS extra, then it concludes from the port's facts
         val s = LateScreen({ currentTime }, page("列表"), page("列表"), afterMs = 0, peekMs = 2_000, result = ActionResult.Ok(changed = true))
         val d = toolDispatcher(s)
         val start = currentTime
         val c = d.execute(call("phone_back")).content
         val spent = currentTime - start
-        // 动作前看一眼、动作后的判断各有上限
+        // The look before the action and the judgement after it each have their own cap
         assertTrue("spent $spent", spent <= EffectTuning.PROBE_MS + EffectTuning.BUDGET_MS)
         assertEquals("small_change", c.kind())
     }
