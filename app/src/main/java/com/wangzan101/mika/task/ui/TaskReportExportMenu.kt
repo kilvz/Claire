@@ -68,13 +68,13 @@ internal fun ReportExportMenu(runId: String, report: TaskReport?) {
             Toast.makeText(context, if (ok) R.string.report_saved else R.string.report_save_failed, Toast.LENGTH_LONG).show()
         }
     }
-    // 复制和分享都直接用报告正文，省去先落盘再打开复制的步骤。
+    // Copy and share both use the report body directly, skipping the step of writing to disk first and then opening it to copy.
     fun copy(text: String) {
         context.getSystemService(ClipboardManager::class.java)
             ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.report_title), text))
         Toast.makeText(context, R.string.report_copied, Toast.LENGTH_SHORT).show()
     }
-    // 纯文本分享走 EXTRA_TEXT；太长会撞 Binder 限制，明确提示改用文件分享。
+    // Plain-text sharing goes through EXTRA_TEXT; too long a text hits the Binder limit, so the user is explicitly told to use file sharing instead.
     fun shareText(text: String) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
         try {
@@ -85,7 +85,7 @@ internal fun ReportExportMenu(runId: String, report: TaskReport?) {
             Toast.makeText(context, R.string.report_share_failed, Toast.LENGTH_LONG).show()
         }
     }
-    // TXT / Markdown / Word 先写进缓存再以只读 content:// 地址交给分享面板，不受文本长度限制。
+    // TXT / Markdown / Word are written to the cache first and then handed to the share sheet as a read-only content:// address, so they are not limited by text length.
     fun shareFile(format: TaskReportExport.Format) {
         val r = report ?: return
         sharing = true
@@ -107,7 +107,7 @@ internal fun ReportExportMenu(runId: String, report: TaskReport?) {
             }
             val send = Intent(Intent.ACTION_SEND).setType(format.mime).putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            // 部分接收方靠 ClipData 拿文件名和类型，也靠它拿到读授权。
+            // Some receivers take the file name and type from ClipData, and get the read grant from it as well.
             send.clipData = ClipData.newUri(context.contentResolver, "", uri)
             try {
                 context.startActivity(Intent.createChooser(send, context.getString(R.string.report_title)))

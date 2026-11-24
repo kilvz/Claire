@@ -7,8 +7,8 @@ import android.net.Uri
 import com.wangzan101.mika.task.ConfirmationNotifier
 
 /**
- * 按系统意图识别桌面和默认浏览器,不认品牌、不写死包名。
- * 任何一步查不到都返回空集/回退包名:折叠因此 fail-open,不误删步骤。
+ * Identifies launchers and default browsers by system intents, without brand recognition or hard-coded package names.
+ * If any step cannot be resolved it returns an empty set / falls back to the package name: folding therefore fails open and never drops steps by mistake.
  */
 internal object TeachApps {
     fun launchers(context: Context): Set<String> = runCatching {

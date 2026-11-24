@@ -39,14 +39,14 @@ import java.io.IOException
 import com.wangzan101.mika.settings.ui.models.Page
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 运行还在录 Trace 时,多久重读一次。 */
+/** How often to re-read while the run is still recording its trace. */
 private const val TRACE_REFRESH_MS = 1_000L
 
 @Composable
 internal fun RunTraceSection(runId: String) {
     val context = LocalContext.current
     val store = (context.applicationContext as MikaApp).detailedTraces.store
-    // 运行过程页在任务跑着时就能打开:还在录就按秒重读,录完再读最后一次就停
+    // The run-process page can be opened while the task is running: re-read every second while still recording, then read one last time after recording finishes and stop
     val loaded by produceState<Pair<TraceArchive, List<TraceRow>>?>(null, runId) {
         var archive: TraceArchive? = null
         while (true) {

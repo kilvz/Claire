@@ -98,7 +98,7 @@ import kotlin.math.roundToInt
 import com.wangzan101.mika.chat.ui.draft
 import com.wangzan101.mika.settings.ui.models.pick
 
-/** 新建和编辑共用一份草稿；预览不另猜时间，直接显示将要保存的计划。 */
+/** Creation and editing share one draft; the preview does not guess times separately but shows the plan that is about to be saved. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlanEditorDialog(
@@ -113,7 +113,7 @@ fun PlanEditorDialog(
         mutableStateOf(original?.toPlanDraft() ?: initialDraft ?: newPlanDraft(System.currentTimeMillis()))
     }
     var attempted by remember(original?.id) { mutableStateOf(false) }
-    // 点日历/时钟图标时打开的选择器;选完日期接着选时间,都确认后才写回草稿。
+    // The picker opened when tapping the calendar/clock icon; after picking a date it goes on to pick a time, and only after both are confirmed is it written back to the draft.
     var pickingDate by remember(original?.id) { mutableStateOf(false) }
     var pickingTime by remember(original?.id) { mutableStateOf<TimeTarget?>(null) }
     val pickerZone = runCatching { ZoneId.of(draft.zone.trim()) }.getOrElse { ZoneId.systemDefault() }
@@ -378,7 +378,7 @@ private fun PlanField(
     )
 }
 
-/** 输入框右侧的取时间按钮:点开选择器,输入框本身仍可直接改文本。 */
+/** The time-picking button on the right of the input field: it opens the picker, and the input field itself can still be edited as text. */
 @Composable
 private fun FieldIconButton(icon: ImageVector, description: String, tag: String, onClick: () -> Unit) {
     Box(
@@ -389,7 +389,7 @@ private fun FieldIconButton(icon: ImageVector, description: String, tag: String,
     }
 }
 
-/** 每天/每周的当地时刻:每个时刻一颗芯片,点时刻改时间,点叉删掉,再加一颗就是新增。 */
+/** Local times for daily/weekly schedules: one chip per time; tap the time to change it, tap the cross to delete it, and add another chip to create a new one. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ClockChips(
@@ -438,7 +438,7 @@ private fun ClockChips(
     }
 }
 
-/** 时间选择器是为哪个字段打开的:首次执行(带已选日期),或某个当地时刻(下标为空表示新增)。 */
+/** Which field the time picker was opened for: the first run (with the date already picked), or one of the local times (a null index means adding a new one). */
 private sealed interface TimeTarget {
     data class FirstRun(val date: LocalDate) : TimeTarget
     data class Clock(val index: Int?) : TimeTarget
@@ -447,7 +447,7 @@ private sealed interface TimeTarget {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlanDatePickerDialog(initial: LocalDate, onDismiss: () -> Unit, onPicked: (LocalDate) -> Unit) {
-    // 日期选择器的日期是 UTC 零点的毫秒数
+    // The date picker's dates are milliseconds at UTC midnight
     val state = rememberDatePickerState(
         initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
     )
@@ -469,7 +469,7 @@ private fun PlanDatePickerDialog(initial: LocalDate, onDismiss: () -> Unit, onPi
     }
 }
 
-/** 时、分两列滚轮;停在中间一行的数字就是选中的值。 */
+/** Two wheel columns for hour and minute; the number resting on the middle row is the selected value. */
 @Composable
 private fun PlanTimePickerDialog(initial: LocalTime, title: String, onDismiss: () -> Unit, onPicked: (LocalTime) -> Unit) {
     var hour by remember(initial) { mutableIntStateOf(initial.hour) }
@@ -478,7 +478,7 @@ private fun PlanTimePickerDialog(initial: LocalTime, title: String, onDismiss: (
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            // 时间按「时:分」从左到右读,不跟着界面语言反过来
+            // Times read left to right as "hour:minute" and are not flipped by the UI language
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -513,7 +513,7 @@ private fun NumberWheel(count: Int, initial: Int, tag: String, onValueChange: (I
     val selected by remember {
         derivedStateOf { (scroll.value.toFloat() / itemPx).roundToInt().coerceIn(0, count - 1) }
     }
-    // 拖完/惯性停下后吸到最近一格,中间那格就是选中的值
+    // After dragging or coasting stops it snaps to the nearest slot, and the middle slot is the selected value
     LaunchedEffect(scroll, itemPx) {
         snapshotFlow { scroll.isScrollInProgress }.collect { scrolling ->
             if (!scrolling) {

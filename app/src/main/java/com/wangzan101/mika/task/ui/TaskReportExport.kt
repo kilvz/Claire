@@ -11,13 +11,13 @@ import com.wangzan101.mika.settings.ui.models.use
 import com.wangzan101.mika.ui.MarkdownModel
 import com.wangzan101.mika.ui.MdBlock
 
-/** 纯本地导出；复用 Markdown 模型，DOCX 使用标准 OOXML ZIP，不把 HTML 改后缀。 */
+/** Purely local export; it reuses the Markdown model, DOCX uses a standard OOXML ZIP, and HTML is never just renamed with another extension. */
 object TaskReportExport {
     enum class Format(val extension: String, val mime: String) {
         Markdown("md", "text/markdown"), Word("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), Text("txt", "text/plain")
     }
 
-    // 模型偶尔在粗体结束符前留下空格。只修正显示标记，不更改回答文字或原始记录。
+    // The model sometimes leaves a space before the bold terminator. Only display markers are corrected; the answer text and the raw record are not changed.
     fun displayMarkdown(answer: String, goal: String = ""): String {
         var fence: String? = null
         val important = buildList {
@@ -39,7 +39,7 @@ object TaskReportExport {
             if (important == null) return repaired
             return buildString {
                 var end = 0
-                // 已加粗的内容和链接地址不再嵌套 Markdown 标记。
+                // Content that is already bold and link addresses are no longer nested with Markdown markers.
                 Regex("\\*\\*[^*]+\\*\\*|\\]\\([^)]*\\)").findAll(repaired).forEach {
                     append(important.replace(repaired.substring(end, it.range.first)) { m -> "**${m.value}**" })
                     append(it.value); end = it.range.last + 1
@@ -76,7 +76,7 @@ object TaskReportExport {
         append(displayMarkdown(report.answer, report.header.goal)).append('\n')
     }
 
-    /** 纯文本正文:去掉 Markdown 标记,供复制和分享直接粘贴到聊天、邮件和笔记。 */
+    /** Plain-text body: Markdown markers removed, so copying and sharing can paste directly into chats, emails and notes. */
     fun text(report: TaskReport): String = MarkdownModel.toPlainText(markdown(report))
 
     fun write(report: TaskReport, format: Format, output: OutputStream) {
@@ -91,7 +91,7 @@ object TaskReportExport {
     private fun writeDocx(blocks: List<MdBlock>, output: OutputStream) {
         val document = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${blocksXml(blocks)}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>"""
-        // 释放压缩器，但不接管调用方的输出流。
+        // Releases the compressor without taking over the caller's output stream.
         ZipOutputStream(object : java.io.FilterOutputStream(output) { override fun close() { flush() } }).use { zip ->
         fun part(name: String, xml: String) {
             zip.putNextEntry(ZipEntry(name)); zip.write(xml.toByteArray(Charsets.UTF_8)); zip.closeEntry()

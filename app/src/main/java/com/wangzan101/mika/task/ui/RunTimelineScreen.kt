@@ -82,16 +82,16 @@ import com.wangzan101.mika.ui.MarkdownModel
 import com.wangzan101.mika.ui.MarkdownText
 
 /**
- * 一次运行的时间线(只读):顶部是目标、标准、一行小结(点开看时间去向)和结局(模型调用次数这类细节收在「更多详情」里),
- * 下面是竖线步骤,每步一行,点有画面的步骤看当时的画面。
+ * The timeline of one run (read-only): at the top are the goal, the criteria, a one-line summary (tap to see where the time went) and the outcome (details such as
+ * model call counts are folded into "More details"); below is the vertical step list, one row per step, and tapping a step with a picture shows the picture from then.
  */
-/** 任务还在跑时,运行记录多久重读一次。 */
+/** How often to re-read the run record while the task is still running. */
 private const val LIVE_REFRESH_MS = 1_000L
 
 @Composable
 fun RunTimelineScreen(vm: RunTimelineViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    // 还在跑就每秒再读一次运行记录(不自动滚到底:用户翻到哪就停在哪)
+    // While still running, re-read the run record once a second (no auto-scroll to the bottom: it stays wherever the user scrolled)
     val ui by produceState<TimelineUi>(TimelineUi.Loading, vm) {
         while (true) {
             val next = withContext(Dispatchers.IO) { vm.load() }
@@ -157,9 +157,9 @@ fun RunTimelineScreen(vm: RunTimelineViewModel, onBack: () -> Unit) {
 private fun HeaderGroup(h: TimelineHeader, stepCount: Int, onExport: () -> Unit) {
     val c = MikaTheme.colors
     var more by rememberSaveable { mutableStateOf(false) }
-    // 1. 结果总览:一眼看清办没办成 + 目标 + 用时/步数/Token
+    // 1. Result overview: see at a glance whether it got done + the goal + duration/steps/Token
     ResultSummaryCard(h, stepCount)
-    // 2. 完成标准(有才显示)
+    // 2. Completion criteria (shown only when there are any)
     if (h.criteria.isNotEmpty()) {
         GroupCard {
             Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 13.dp, bottom = 13.dp)) {
@@ -175,7 +175,7 @@ private fun HeaderGroup(h: TimelineHeader, stepCount: Int, onExport: () -> Unit)
             }
         }
     }
-    // 3. 技术详情(折叠):模型来回、Token、步数上限这些细节收起来
+    // 3. Technical details (collapsed): details such as model round trips, Token and step limit are folded away
     GroupCard {
         ListRow(null, stringResource(R.string.timeline_more), onClick = { more = !more }) {
             RowValue(if (more) stringResource(R.string.collapse) else stringResource(R.string.expand))
@@ -219,7 +219,7 @@ private fun HeaderGroup(h: TimelineHeader, stepCount: Int, onExport: () -> Unit)
     }
 }
 
-/** 结果总览卡:左边圆形状态图标 + 结局一句 + 目标,下面分隔线和用时/步数/Token 三栏,一眼看清办没办成。 */
+/** Result overview card: a round status icon on the left + one line of outcome + the goal, then a divider and three columns for duration/steps/Token, so it is clear at a glance whether it got done. */
 @Composable
 private fun ResultSummaryCard(h: TimelineHeader, stepCount: Int) {
     val c = MikaTheme.colors
@@ -273,7 +273,7 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
     val shot = s.screenshotId
     val failed = s.result?.startsWith(stringResource(R.string.result_error_prefix)) == true
     val hasMore = s.said.isNotEmpty() || s.activities.isNotEmpty() || s.tags.isNotEmpty() || shot != null
-    // 经 MCP 的一步:标题说连接器名,不露出 MCP 工具的原始名字
+    // A step via MCP: the title gives the connector name and does not expose the raw MCP tool name
     val mcpLabels = s.activities.filter { it.kind == "mcp" }.map { it.label }.distinct()
     val title = if (mcpLabels.isNotEmpty()) mcpLabels.joinToString(" · ")
         else listOfNotNull(s.tool, s.detail).joinToString(" · ")
@@ -341,7 +341,7 @@ private fun TagChip(t: Tag) {
     )
 }
 
-/** 当时的画面:在后台线程解码;文件已被清理时只说一句。 */
+/** The picture from then: decoded on a background thread; when the file has already been cleaned up it just says so. */
 @Composable
 private fun Shot(vm: RunTimelineViewModel, id: Int, step: Int) {
     val image by produceState<ImageBitmap?>(null, id) {

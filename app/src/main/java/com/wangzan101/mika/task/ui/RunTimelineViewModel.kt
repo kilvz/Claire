@@ -20,10 +20,10 @@ import com.wangzan101.mika.ui.ToolLabels
 
 enum class TagTone { Ok, Warn, Bad }
 
-/** 时间线上的标签:守卫、核查、确认、接管、障碍的结论。 */
+/** Tags on the timeline: the conclusions of guards, verification, confirmation, takeover and barriers. */
 data class Tag(val text: String, val tone: TagTone)
 
-/** 实际执行入口报出的活动;连续的读取可以合在一行,动作保持逐条可见。 */
+/** Activities reported by the actual execution entry point; consecutive reads can be merged into one row, while actions stay individually visible. */
 data class TimelineActivity(
     val kind: String,
     val label: String,
@@ -33,7 +33,7 @@ data class TimelineActivity(
     val obsIds: List<Int> = emptyList(),
 )
 
-/** 已记录的耗时。批量/脚本的子动作包含在外层工具耗时里，只计一次。 */
+/** Recorded elapsed times. Sub-actions of a batch/script are included in the outer tool's time and are counted only once. */
 data class StepTiming(
     val modelMs: Long? = null,
     val toolMs: Long? = null,
@@ -43,8 +43,8 @@ data class StepTiming(
 }
 
 /**
- * 时间线的一行。[said] 是模型这一步说的话(截到 80 字),[tool] 是工具的中文说法,
- * [detail] 是参数里最能说明对象的那一个(记录里已脱敏,原样显示),[screenshotId] 是这一步存下的画面。
+ * One row of the timeline. [said] is what the model said in this step (clipped to 80 characters), [tool] is the tool's Chinese label,
+ * [detail] is the single argument that best identifies the object (already redacted in the record and shown as is), and [screenshotId] is the picture saved for this step.
  */
 data class TimelineStep(
     val step: Int,
@@ -62,32 +62,32 @@ data class TimelineHeader(
     val goal: String,
     val criteria: List<String>,
     val outcome: String,
-    /** 结局的基调:已办成(绿)、没办成(红)、只办成一部分(黄)、其余(灰)。 */
+    /** Tone of the outcome: done (green), not done (red), only partly done (yellow), everything else (grey). */
     val outcomeTone: TileTone = TileTone.Neutral,
-    /** 这次运行还没结束:结局、核查、统计都还没写齐,页面按秒接着读(见 [RunTimelineScreen])。 */
+    /** This run has not ended yet: outcome, verification and statistics are not all written, so the page keeps reading every second (see [RunTimelineScreen]). */
     val running: Boolean = false,
     val verdict: String,
     val duration: String?,
     val modelCalls: Int,
-    /** 这次运行的步数上限;不限制或旧记录为 null。 */
+    /** Step limit of this run; null when unlimited or for old records. */
     val stepLimit: Int? = null,
-    /** 这次运行用的人格(名字 · 修订号);没有为 null。 */
+    /** The persona this run used (name · revision); null when none. */
     val persona: String? = null,
-    /** 用了几步(和 [stepLimit] 一起显示);步数用完后的最后一轮收尾记作第上限加一步,不算一步,所以不超过上限。 */
+    /** How many steps were used (shown together with [stepLimit]); the final wrap-up round after the steps run out is recorded as limit plus one and is not counted as a step, so the limit is never exceeded. */
     val stepsUsed: Int = 0,
-    /** 整个运行共享的已报告 Token 预算；旧记录或不限制为 null。 */
+    /** The reported-token budget shared by the whole run; null for old records or when unlimited. */
     val tokenBudget: Long? = null,
-    /** 全部计量调用的已报告输入加输出；运行中尚无总计事件时先显示主循环用量。 */
+    /** Reported input plus output across all metered calls; while running, before there is a totals event, the main loop's usage is shown first. */
     val tokensUsed: Long = 0,
     val usedMemory: List<String> = emptyList(),
-    /** 这次运行的小结;记录里没有开始事件时为 null(只显示用时)。 */
+    /** The summary of this run; null when the record has no start event (only the duration is shown). */
     val metrics: RunMetrics? = null,
     val confirmedIds: Set<Int>? = null,
 )
 
 sealed interface TimelineUi {
     data object Loading : TimelineUi
-    /** 记录已被清理(只保留最近 30 次)或编号不对。 */
+    /** The record has been cleaned up (only the latest 30 are kept) or the ID is wrong. */
     data object Expired : TimelineUi
     data class Ready(val header: TimelineHeader, val steps: List<TimelineStep>) : TimelineUi
 
@@ -96,14 +96,14 @@ sealed interface TimelineUi {
     }
 }
 
-/** 一次运行的只读时间线。[load] 读盘,要在后台线程调。 */
+/** Read-only timeline of one run. [load] reads from disk and must be called on a background thread. */
 class RunTimelineViewModel(
     private val store: RunStore, val runId: String,
     private val toolLabels: ToolLabels = ToolLabels(knownTools()),
     private val resolveMemory: (List<String>) -> List<String> = { emptyList() },
     /**
-     * 这次运行的任务此刻还在跑。没有结束记录、任务也不在了(进程被杀、记录写到一半)的运行算已结束,
-     * 页面不为它一直按秒重读。
+     * The task of this run is still running right now. A run with no end record whose task is also gone (the process was killed, the record was half written) counts as ended,
+     * and the page does not keep re-reading it every second.
      */
     private val alive: (runId: String) -> Boolean = { false },
 ) {
@@ -127,7 +127,7 @@ class RunTimelineViewModel(
             outcomeTone = outcomeTone(summary?.outcome ?: ended?.outcome,
                 summary?.judged ?: events.filterIsInstance<RunEvent.OutcomeJudged>().lastOrNull()?.outcome,
                 running = ended == null && summary?.endedAtMs == null && alive(runId)),
-            // 结束事件或结束时间只要有一个就算跑完了;都没有时还要任务真在跑,界面据此决定要不要按秒重读
+            // An end event or an end time, either one, means it has finished; when neither exists the task must really be running, and the UI uses that to decide whether to re-read every second
             running = ended == null && summary?.endedAtMs == null && alive(runId),
             verdict = verdictLabel(summary?.verdict ?: events.filterIsInstance<RunEvent.Verifier>().lastOrNull()?.verdict),
             duration = endMs?.let { duration(it - startMs) },
@@ -152,7 +152,7 @@ class RunTimelineViewModel(
     companion object {
         const val SAID_MAX = 80
 
-        /** 按步号归组;没有步号的事件(核查、确认、接管、障碍)挂在它之前最近的一步上。 */
+        /** Groups by step number; events without a step number (verification, confirmation, takeover, barrier) hang on the most recent step before them. */
         internal fun steps(events: List<RunEvent>, toolLabel: (String) -> String = { it }): List<TimelineStep> {
             val rows = LinkedHashMap<Int, TimelineStep>()
             val modelTimes = mutableMapOf<Int, Long>()
@@ -162,7 +162,7 @@ class RunTimelineViewModel(
             fun at(step: Int) = rows.getOrPut(step) { TimelineStep(step, "", null, null, null, emptyList(), null) }.also { current = step }
             fun tag(t: Tag) { current?.let { s -> rows[s] = rows.getValue(s).let { it.copy(tags = it.tags + t) } } }
             for (e in events) when (e) {
-                // 改派掉的轻量模型回复没执行,不进步骤;调用次数照算
+                // A lightweight-model reply that was reassigned was not executed, so it does not enter the steps; the call count still includes it
                 is RunEvent.ModelReply -> {
                     val elapsed = e.latencyMs.coerceAtLeast(0) + e.retryWaitMs.coerceAtLeast(0)
                     if (elapsed > 0) modelTimes[e.step] = modelTimes.getOrDefault(e.step, 0) + elapsed
@@ -189,7 +189,7 @@ class RunTimelineViewModel(
                 is RunEvent.Media -> at(e.step).let { rows[e.step] = it.copy(screenshotId = it.screenshotId ?: e.mediaId) }
                 is RunEvent.Activity -> {
                     val row = at(e.step)
-                    // 经 MCP 的调用自成一种行:说连接器名,不把 MCP 工具名露给用户
+                    // Calls via MCP form their own kind of row: they name the connector and do not expose the MCP tool name to the user
                     val mcp = e.mcpConnector?.let(StatusCopy::calledMcp)
                     val next = TimelineActivity(if (mcp != null) "mcp" else e.kind, mcp ?: toolLabel(e.label), e.target, e.effect, obsIds = e.obsIds)
                     val last = row.activities.lastOrNull()
@@ -212,7 +212,7 @@ class RunTimelineViewModel(
             }
             return rows.values.map { row ->
                 val results = toolTimes[row.step].orEmpty()
-                // do_steps 和复合工具也会记子动作;外层的 durationMs 已包含它们。
+                // do_steps and composite tools record sub-actions too; the outer durationMs already includes them.
                 val outer = results.filter { it.source == "model" && it.durationMs > 0 }
                 val measured = (outer.ifEmpty { results.filter { it.durationMs > 0 } }).sumOf { it.durationMs }
                 row.copy(
@@ -247,12 +247,12 @@ class RunTimelineViewModel(
             return DETAIL_KEYS.firstNotNullOfOrNull { k -> (o[k] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } }?.let(::clipSaid)
         }
 
-        // 结果可能被截短成不合法的 JSON:ok / error 只按顶层键的写法找(元素文字里的引号是转义过的,不会误中)
+        // The result may be truncated into invalid JSON: ok / error are found only in their top-level key form (quotes inside element text are escaped and do not falsely match)
         private val NOT_OK = Regex(""""ok"\s*:\s*false""")
         private val NOT_COUNTED = Regex(""""counts_as_failure"\s*:\s*false""")
         private val ERROR = Regex(""""error"\s*:\s*"([a-z_]+)"""")
 
-        /** 回放按实际调用匹配结果后复用同一份错误译名，不从轮次或模型计划猜失败原因。 */
+        /** Playback matches results by actual call and then reuses the same error labels instead of guessing the failure cause from the turn or the model's plan. */
         internal fun failureLabel(json: String): String? {
             val parsed = parse(json)
             if (parsed != null && parsed["ok"] != JsonPrimitive(false)) return null
@@ -266,8 +266,8 @@ class RunTimelineViewModel(
         }
 
         private fun resultLabel(json: String, changed: Boolean?): String = when {
-            // 按规矩没收、结果里写明不计入失败的(写记忆时)不是出错:只说没收和原因,不带「出错」,这一步也就不标成失败。
-            // 同样的错误码别的工具(存技能、改资料)照旧算失败,照旧说出错
+            // A seizure by the rules whose result states it does not count as a failure (when writing memory) is not an error: only the seizure and the reason are stated, without "error", so this step is not marked failed either.
+            // The same error code from other tools (saving a skill, editing a profile) still counts as a failure and still says error
             NOT_OK.containsMatchIn(json) -> ERROR.find(json)?.groupValues?.get(1).let { code ->
                 ChatCopy.declinedLabel(code)?.takeIf { NOT_COUNTED.containsMatchIn(json) }
                     ?: ERROR_LABELS[code]?.let { tr(R.string.result_error_detail, it) } ?: tr(R.string.result_error)
@@ -285,8 +285,8 @@ class RunTimelineViewModel(
         }
 
         /**
-         * 结果里 guard 数组的每一项。完整的 JSON 直接解析;被截短时从 `"guard":[` 往后逐个取出完整的对象,
-         * 截断处那个不完整的丢掉。
+         * Each item of the guard array in the result. Complete JSON is parsed directly; when truncated, complete objects are taken one by one starting from `"guard":[`,
+         * and the incomplete one at the truncation point is dropped.
          */
         private fun guardObjects(json: String): List<JsonObject> {
             parse(json)?.let { o -> return (o["guard"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty() }
@@ -357,7 +357,7 @@ class RunTimelineViewModel(
 
         private fun verdictLabel(verdict: String?) = if (verdict == null) tr(R.string.verify_none) else verifierTag(verdict).text
 
-        /** 结局的基调:已办成绿、没办成红、只办成一部分/做不了黄、进行中或没核实的灰。 */
+        /** Tone of the outcome: done is green, not done is red, only partly done / not possible is yellow, and running or unverified is grey. */
         private fun outcomeTone(outcome: String?, judged: String?, running: Boolean): TileTone = when {
             running -> TileTone.Neutral
             outcome == "failed" || outcome == "error" -> TileTone.Bad
@@ -366,7 +366,7 @@ class RunTimelineViewModel(
             else -> TileTone.Neutral
         }
 
-        /** [judged]:交出回答后判的结局;回答如实说没办成、只办了一部分的按它写。 */
+        /** [judged]: the outcome judged after the answer was delivered; when the answer honestly says it was not done or only partly done, this is what is written. */
         private fun outcomeLabel(outcome: String?, judged: String?) = when {
             outcome != "succeeded" && outcome != "unverified" -> outcomeLabel(outcome)
             judged == "partial" -> tr(R.string.outcome_partial)

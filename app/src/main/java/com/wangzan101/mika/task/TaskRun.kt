@@ -75,14 +75,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 浮层恢复声音的路由:只有真正把 App 交到用户手上的接管才处理;接管对象从任务开跑起就一直存在,
- * 不能仅凭非空提前返回。等待接管、网页接管或没有接管目标时都落到普通手机音频路径。
+ * Overlay sound-restore routing: only a takeover that really hands the app to the user is handled; the takeover object exists from the moment the task starts,
+ * so non-null alone is not a reason to return early. Waiting for takeover, web takeover, or no takeover target at all all fall through to the normal phone audio path.
  */
 internal fun restorePipSound(takeover: Takeover?, restorePhone: () -> Unit) {
     if (takeover?.unmute() != true) restorePhone()
 }
 
-/** 浮层再静上的路由,条件与 [restorePipSound] 相同。 */
+/** Overlay re-mute routing; the conditions are the same as [restorePipSound]. */
 internal fun mutePipSound(takeover: Takeover?, mutePhone: () -> Unit) {
     if (takeover?.muteBack() != true) mutePhone()
 }
@@ -106,11 +106,11 @@ internal fun taskTranscribePort(
 private val deepSeekPrices by lazy { DeepSeekPriceCache(ProviderStore.modelHttp) }
 
 /**
- * 一个任务的全部状态:虚拟屏、循环、关卡、接管、静音、监视。[TaskService] 只管服务生命周期、意图分发与通知。
- * 本任务自己的流只在它是「显示中」的任务([service.taskState.shownRun])时同步写到服务对外的流;
- * 别的任务(并行时)、或被新任务换下去的旧任务的写入只落在自己这份,不会盖掉显示中的那个。
- * [scope] 是服务的作用域:旁路协程挂在它下面,不随任务协程一起取消,由 [execute] 收尾时取消。
- * [slot] 决定它的通知编号与按钮请求码;[parallel] 为 true 时(开关 parallelTasks)打开 App 前查别的任务是否在用。
+ * All state of one task: virtual screen, loop, gate, takeover, mute, watchers. [TaskService] handles only the service lifecycle, intent dispatch and notifications.
+ * This task's own flows are mirrored to the service's outward flows only while it is the "shown" task ([service.taskState.shownRun]);
+ * writes by other tasks (when parallel), or by an old task replaced by a new one, land only in its own copy and never overwrite the shown one.
+ * [scope] is the service's scope: side coroutines hang off it, are not cancelled along with the task coroutine, and are cancelled by [execute] at teardown.
+ * [slot] determines its notification IDs and button request codes; when [parallel] is true (the parallelTasks flag) it checks whether another task is using the app before opening it.
  */
 class TaskRun(
     val conversationId: String,
@@ -125,7 +125,7 @@ class TaskRun(
     private var manualTarget: ManualTarget? = null
     internal var manualTargetNow: (suspend () -> ManualTarget?)? = null
 
-    /** 只给当前运行的实际画面接管，已有主屏接管或无画面时不开放输入。 */
+    /** Only opens manual control on the current run's actual screen; no input is offered when a main-screen control already exists or there is no picture. */
     override suspend fun beginScreenControl(): Boolean {
         if (stopPressed || job?.isActive != true || !manualControl.begin()) return false
         return try {
@@ -167,7 +167,7 @@ class TaskRun(
 
     override suspend fun resizeScreen(width: Int, height: Int): Boolean {
         if (width < 64 || height < 64 || job?.isActive != true) return false
-        // 网页的手机版/桌面版视口由浏览器自己管理；这里调整后台手机屏。
+        // The mobile/desktop viewport of the web page is managed by the browser itself; here we adjust the background phone screen.
         if (runState._webOpen.value) return false
         val display = activePhoneDisplay ?: return false
         val viewport = phoneViewport(width, height, service.resources.displayMetrics.densityDpi)
@@ -179,7 +179,7 @@ class TaskRun(
                 appliedViewport = display.displayId to viewport
                 manualTarget = manualTarget?.takeIf { it.identity == "phone:${display.displayId}" }?.copy(
                     width = display.previewWidth, height = display.previewHeight, inputWidth = display.width, inputHeight = display.height)
-                // 新 Surface 的首帧之前不接受旧画面输入；任务仍在同一个 displayId 上。
+                // No input based on the old picture is accepted before the first frame of the new Surface; the task stays on the same displayId.
                 withTimeoutOrNull(2_000) { display.frames.filterNotNull().first() }
                 true
             }
@@ -207,54 +207,54 @@ class TaskRun(
     internal var provenance = RunProvenance()
     internal var triggerWindowKey: String? = null
     internal var triggerActionGoal: String? = null
-    /** 条件检查运行时用户写的条件原文;对话和通知显示它,不显示生成的检查目标 [goal]。 */
+    /** The user's own condition text when this runs as a condition check; the conversation and notifications show it instead of the generated check goal [goal]. */
     internal var triggerCondition: String? = null
     internal var triggerThreadId: String? = null
     internal var mcpExternalId: String? = null
     internal var workflowAttemptId: String? = null
     internal var channelPeer: ChannelPeer? = null
     internal var channelMessageId: String? = null
-    /** 主循环已经给出结局的时间；与结果实际发出之间的耗时用于定位渠道回传延迟。 */
+    /** When the main loop produced the outcome; the time until the result is actually sent is used to locate channel round-trip delay. */
     @Volatile internal var resultReadyAtMs = 0L
         private set
     internal val conditionCheck get() = triggerActionGoal != null
     @Volatile internal var children: ChildAgentRunner? = null
-    /** 这次任务连上的外部 MCP server;结束时关闭会话。 */
+    /** External MCP servers this task connected to; their sessions are closed at the end. */
     @Volatile internal var mcpConnections: com.wangzan101.mika.settings.McpConnections? = null
 
     /**
-     * 这次任务接上的全部外部 MCP 端点,交给 toolDispatcher 的就这一份。别的来源(以后的扩展等)也提供这类端点时在这里拼上,
-     * 不给 toolDispatcher 另加参数;各来源连上的都要归任务的 ResourceScope,收尾时一起关。
+     * All external MCP endpoints this task is connected to; this single list is what toolDispatcher gets. When other sources (future extensions, etc.)
+     * also provide such endpoints, they are merged here and toolDispatcher gets no extra parameter; whatever each source connects must belong to the task's ResourceScope and be closed together at teardown.
      */
     internal fun mcpEndpoints(): List<com.wangzan101.mika.core.cap.mcp.McpConnection> = buildList {
         mcpConnections?.let { addAll(it.connections) }
     }
-    /** 本次任务使用的沙箱工作区(同项目对话共用 `p:<projectId>`,其余沿用对话工作区)。 */
+    /** The sandbox workspace this task uses (conversations of the same project share `p:<projectId>`; the rest keep the conversation workspace). */
     internal val workspaceKey: WorkspaceKey by lazy { WorkspaceResolver.resolveFor(service, conversationId) }
 
-    /** 自己的一份;显示中时同步写到服务对外的那份。[show] 时整份抄过去。 */
-    /** App 给的模型来源、评测钩子、屏幕画面的开关。 */
+    /** Its own copy; mirrored to the service's outward copy while shown. [show] copies the whole thing over. */
+    /** The model source, evaluation hooks and screen-picture switches provided by the app. */
     internal val env = TaskEnvironment.of(service)
-    /** 这段对话对外的会话号:这次运行建的模型(主、轻量、看图,及核查、意图判断、停止交代等旁路)都用它。 */
+    /** The session ID this conversation is exposed under: every model created for this run (main, lightweight, vision, and side paths such as verification, intent detection and stop summaries) uses it. */
     internal val session = ModelSession.of(conversationId)
-    /** App 给的手机服务(共用的 shell 连接、「去设置」提示)、记忆、经验路线、异常退出后的恢复。 */
+    /** Phone services provided by the app (shared shell connection, "go to settings" prompts), memory, learned routes, and recovery after an abnormal exit. */
     internal val phoneServices = PhoneServices.of(service)
     internal val memoryRuntime = MemoryRuntime.of(service)
     internal val routeStore = FileRouteStore.shared(service)
     internal val recovery = TaskRecovery.of(service)
 
-    /** 本任务的界面可见状态(14 个 Mirrored 状态流 + 发布锁 + 结束标志)。 */
+    /** This task's UI-visible state (14 Mirrored state flows + publish lock + ended flag). */
     internal val runState = TaskRunState(service, conversationId, env) { service.taskState.shownRun === this }
 
-    /** 静音等恢复记录按它分开,几个任务各记各的。 */
+    /** Mute and other restore records are kept apart by it, so each of several tasks keeps its own. */
     override val key: String = UUID.randomUUID().toString()
     internal val inbox = RunInbox()
-    /** 插话的收发、去向与撤回。 */
+    /** Sending, receiving, routing and withdrawing of steers. */
     private val steerCoordinator = SteerCoordinator(
         service, conversationId, runState, inbox,
         loop = { loop }, stopPressed = { stopPressed }, mcpExternalId = { mcpExternalId },
     )
-    /** 生命周期控制与用户交互(取消、接管、问答、确认、收尾)。 */
+    /** Lifecycle control and user interaction (cancel, takeover, questions, confirmation, teardown). */
     private val runControl = TaskRunControl(
         service, conversationId, scope, runState, inbox,
         loop = { loop }, gate = { gate }, takeover = { takeover },
@@ -265,14 +265,14 @@ class TaskRun(
         key = key,
         setStopPressed = { stopPressed = it },
     )
-    /** 收尾后的交代与学习。 */
+    /** The wrap-up explanation and the learning after teardown. */
     private val runTeardown = RunTeardown(
         service, conversationId, goal, runState,
         kit = { kit }, env = env, session = session, memoryRuntime = memoryRuntime,
         routeStore = routeStore,
         workflowAttemptId = { workflowAttemptId }, noticeTainted = { noticeTainted }, provenance = { provenance },
     )
-    /** 手机侧运行时(浮层声音、静音、目标监视、浏览器页触摸暂停)。 */
+    /** Phone-side runtime (overlay sound, mute, target watchers, touch pause on browser pages). */
     internal val phoneRuntime = PhoneRuntime(
         service, conversationId, scope, runState,
         publish = ::publish,
@@ -284,43 +284,43 @@ class TaskRun(
 
     val state: StateFlow<TaskState> get() = runState.state
     val runId: StateFlow<String?> get() = runState.runId
-    /** 本任务导出的文件;结束时随这一轮存进对话。 */
+    /** Files exported by this task; saved into the conversation with this turn when it ends. */
     val sharedFiles: StateFlow<List<SharedFile>> get() = runState.sharedFiles
-    /** 本任务生成并留在工作区里的音频;结束时随这一轮存进对话。 */
+    /** Audio generated by this task and left in the workspace; saved into the conversation with this turn when it ends. */
     val audios: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>> get() = runState.audios
-    /** 本任务生成并留在工作区里的图;结束时随这一轮存进对话。 */
+    /** Images generated by this task and left in the workspace; saved into the conversation with this turn when it ends. */
     val photos: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>> get() = runState.photos
     val takeoverStage: StateFlow<Takeover.Stage> get() = runState.takeoverStage
     val frames: StateFlow<Bitmap?> get() = runState.frames
-    /** 个人助手的缩略图只收本任务获准展示的手机画面。 */
+    /** The personal assistant's thumbnail accepts only the phone frames this task is allowed to show. */
     val phoneFrames: StateFlow<Bitmap?> get() = runState.phoneFrames
-    /** 本任务到此刻的活动(实际做过的事);悬浮胶囊的卡片按任务取,不只看显示中的那个。 */
+    /** This task's activity so far (what was actually done); the floating capsule takes cards per task, not only for the shown one. */
     val activities: StateFlow<List<RunEvent.Activity>> get() = runState.activities
-    /** 本任务的虚拟屏编号;屏到用到系统命令、事件工具或第一次打开 App 时才建,之前和释放之后为 -1。 */
+    /** This task's virtual display ID; the screen is created only when a system command, an event tool, or the first app launch needs it, and it is -1 before that and after release. */
     val displayId: StateFlow<Int> get() = runState.displayId
-    /** 本任务小窗的直接操作口;屏建好才有,释放后回到 null。 */
+    /** The direct-input handle for this task's small window; present once the screen exists, back to null after release. */
     val pipInput: StateFlow<PipInput?> get() = runState.pipInput
-    /** 本任务小窗目标的声音是否被用户恢复过;界面据此把按钮显示成「恢复声音」或「静音」。 */
+    /** Whether the sound of this task's small-window target has been restored by the user; the UI uses it to label the button "Restore sound" or "Mute". */
     val pipSoundOn: StateFlow<Boolean> get() = runState.pipSoundOn
-    /** 此刻在用内置浏览器(工具的界面是网页);没用、任务结束后为 false。 */
+    /** Currently using the built-in browser (the tools' UI is a web page); false when not in use and after the task ends. */
     val webOpen: StateFlow<Boolean> get() = runState.webOpen
-    /** 本任务进行中插的话和它们的去向;悬浮胶囊的对话卡片按任务取。 */
+    /** Steers injected while this task was running and where they went; the floating capsule's conversation card is taken per task. */
     val steers: StateFlow<List<SteerNote>> get() = runState.steers
 
-    /** 让界面显示这个任务:成为显示中的任务,并把自己的各项抄到服务对外的流。 */
+    /** Make the UI show this task: become the shown task and copy its own values into the service's outward flows. */
     fun show() = synchronized(service.taskState.shownLock) {
         service.taskState.shownRun = this
         runState.copyOut()
     }
 
-    /** 跑 [execute] 的协程,由服务启动后填上。 */
+    /** The coroutine running [execute], filled in by the service once it has started it. */
     @Volatile var job: Job? = null
         internal set(v) {
             field = v
             if (cancelRequested) v?.cancel()
         }
     @Volatile private var cancelRequested = false
-    /** 用户点了停止:还没交给模型的插话一起作废,不当成下一件事。 */
+    /** The user pressed stop: steers not yet handed to the model are discarded as well and do not become the next item. */
     @Volatile internal var stopPressed = false
     @Volatile internal var loop: AgentLoop? = null
     val activeAsk: Delivery.Ask? get() = runControl.activeAsk
@@ -331,15 +331,15 @@ class TaskRun(
         private set
     @Volatile private var awake: KeepAwake? = null
     /**
-     * 收尾时还有任务排着:先替接班的拿一份屏幕锁再放开自己的,服务收尾时交给放出来的那个,它开跑拿上自己那份后放开;
-     * 没人接班、或没跑起来就结束了,由服务放开。否则这里一放开,屏幕若已过了系统的熄屏时间就当场熄掉,
-     * 接班的拿锁点不亮屏幕,一开跑就停在等解锁。重复放开不会多算(见 [SharedWakeLock])。
+     * If tasks are still queued at teardown: take a screen lock on behalf of the successor before releasing its own; the service hands it to the released one during teardown,
+     * and that one releases it after taking its own when it starts. If nobody takes over, or it ends before starting, the service releases it. Otherwise releasing here,
+     * with the system screen-off time already passed, would turn the screen off on the spot, and the successor could not light it up with the lock, stalling at waiting for unlock as soon as it starts. Releasing repeatedly is not double-counted (see [SharedWakeLock]).
      */
     @Volatile internal var wakeHandoff: WakeLockPort? = null
-    /** shell 进程没了,虚拟屏和上面的 App 一起没了;任务没法接着做。 */
+    /** The shell process is gone, so the virtual screen and the apps on it are gone too; the task cannot go on. */
     @Volatile var shellDied = false
         internal set
-    /** 已接上的手机侧;浮层恢复声音据此找到当前目标 App,收尾时清空。 */
+    /** The phone side that is connected; overlay sound restore uses it to find the current target app, cleared at teardown. */
     @Volatile internal var phone: PhoneSide? = null
     fun cancel() {
         runControl.cancel()
@@ -370,43 +370,43 @@ class TaskRun(
     fun skip(waitKey: Int?) = takeoverAction { it.skip(waitKey) }
     fun putAside(waitKey: Int?) = takeoverAction { it.putAside(waitKey) }
 
-    /** 浮层上的声音开关:恢复过声音的再按一次静回去,没恢复的按一次恢复(重复点击重试真实动作);没有手机侧或目标 App 时不动。 */
+    /** Sound toggle on the overlay: press again to mute if the sound was restored, press once to restore if it was not (repeated taps retry the real action); does nothing without a phone side or target app. */
     fun togglePipSound() = phoneRuntime.togglePipSound()
 
-    /** 回答提问;已经不在等(超时后才答、已答过)时调 [tooLate] 告诉用户这条回答没用上。 */
+    /** Answer a question; when no longer waiting (answered after the timeout, or already answered) it calls [tooLate] to tell the user this answer was not used. */
     fun answer(text: String, tooLate: () -> Unit) = runControl.answer(text, tooLate)
 
-    /** 渠道已经核对过提问编号；仍由同一个收件箱回答，避免绕过运行生命周期。 */
+    /** The channel has already verified the question ID; the answer still goes through the same inbox so the run lifecycle is not bypassed. */
     suspend fun answerFromChannel(text: String, askId: String): Boolean = runControl.answerFromChannel(text, askId)
 
-    /** 新指令取代尚未回答的普通提问；旧任务按取消收尾，排队的新指令随后执行。 */
+    /** A new instruction replaces an ordinary question that has not been answered yet; the old task tears down as cancelled and the queued new instruction runs afterwards. */
     fun cancelAsk(askId: String): Boolean = runControl.cancelAsk(askId)
 
-    /** 同一对话在任务进行中的新原话，交给下一次模型步；准备阶段也会先排在 Inbox。 */
+    /** New user words for the same conversation while a task runs, handed to the next model step; during preparation they are queued in the Inbox first. */
     fun steer(text: String, messageId: String = UUID.randomUUID().toString()) = steerCoordinator.steer(text, messageId)
 
-    /** 远程追加只归当前任务;与状态发布互斥,收件箱再原子核对是否已经结束/取消。 */
+    /** A remote steer belongs only to the current task; it is mutually exclusive with state publishing, and the inbox then atomically checks whether the run already ended or was cancelled. */
     fun steerRemote(text: String): String? = steerCoordinator.steerRemote(text)
 
-    /** 撤回手机上插的、模型还没取走的那句;已取走、已收尾或是电脑追加的(收件箱拒绝)返回 false,去向不变。 */
+    /** Withdraw a steer made on the phone that the model has not taken yet; returns false if already taken, already torn down, or appended from a computer (rejected by the inbox), with its routing unchanged. */
     fun withdrawSteer(messageId: String): Boolean = steerCoordinator.withdrawSteer(messageId)
 
-    /** 手机插话可转下一任务;远程插话只能用于当前任务,未消费的一律作废,不改变来源和权限。 */
+    /** A phone steer can carry over to the next task; a remote steer can only be used for the current task, so anything unconsumed is discarded, without changing origin or permissions. */
     fun handoffUnconsumed(cancelled: Boolean = stopPressed) = steerCoordinator.handoffUnconsumed(cancelled)
 
-    /** 这次任务真的用过的能力组(手机、网页、沙箱);记进这一轮,下一轮开局预先展开。 */
+    /** Capability groups this task actually used (phone, web, sandbox); recorded in this turn so the next turn expands them up front. */
     @Volatile var usedGroups: List<String> = emptyList()
         private set
 
     fun joinedSteers(): List<String> = steerCoordinator.joinedSteers()
 
-    /** 和 [joinedSteers] 一一对应:每句插话打断的那段回复,没打断的是空串。 */
+    /** One-to-one with [joinedSteers]: the part of the reply that each steer interrupted, an empty string if it interrupted none. */
     fun joinedInterrupted(): List<String> = steerCoordinator.joinedInterrupted()
 
-    /** 和 [joinedSteers] 一一对应:每句插话交给模型之前已经说完的那段回复,没有的是空串。 */
+    /** One-to-one with [joinedSteers]: the part of the reply already finished before each steer was handed to the model, an empty string if none. */
     fun joinedFinished(): List<String> = steerCoordinator.joinedFinished()
 
-    /** 运行事件里界面要跟的两样:实际做过的事,和插话已交给模型。 */
+    /** The two things the UI follows in run events: what was actually done, and that a steer has been handed to the model. */
     internal val liveEvents = object : RunSink {
         override fun event(e: RunEvent) {
             when {
@@ -421,25 +421,25 @@ class TaskRun(
         }
     }
 
-    /** 通知和卡片的按钮都带着它所属的申报 [key];点在已经换掉的旧通知、旧卡片上不算数。 */
+    /** Notification and card buttons all carry the [key] of the request they belong to; taps on an old notification or card that has already been replaced do not count. */
     fun confirm(choice: ConfirmChoice, key: Int?) = runControl.confirm(choice, key)
 
     /**
-     * 任务的终态:[execute] 收尾之后才写,不经 [publish]。不论显示的是不是自己,都先把本次的运行编号记到
-     * 自己对话名下([TaskService.endedRunIds]),界面收到结束状态时按对话取;显示中时也写 [TaskService.endedRunId]。
+     * The task's final state: written only after [execute] tears down, not through [publish]. Whether or not it is the shown task, the run ID of this run is first recorded
+     * under its own conversation ([TaskService.endedRunIds]) so the UI can look it up by conversation when it receives the end state; while shown, [TaskService.endedRunId] is written too.
      */
     fun end(end: TaskState) = runControl.end(end)
 
-    /** 超出并行上限在排队;放出来开跑时 [dequeue]。 */
+    /** Queued because the parallel limit was exceeded; [dequeue] runs when it is released to start. */
     fun queue(position: Int) = runControl.queue(position)
     fun dequeue() = runControl.dequeue()
 
-    /** 本任务的沙箱:一个任务一份(导出额度按任务算),工作区是本对话的。 */
+    /** This task's sandbox: one per task (the export quota is counted per task), with this conversation's workspace. */
     internal val sandbox by lazy { AndroidSandbox(service, SandboxState.get(service), onShared = ::addShared) }
 
     internal val audioSettings by lazy { com.wangzan101.mika.settings.VoiceSettings.get(service) }
 
-    /** 未迁移的任务保持原有的一次性端口决定;只有迁移后的目录选择需要动态刷新。 */
+    /** Unmigrated tasks keep the original one-time port decision; only the migrated catalog selection needs to be refreshed dynamically. */
     private val legacyTranscribePort by lazy {
         val voiceModels = com.wangzan101.mika.voice.model.VoiceModelEnvironment.get(service)
         val choice = com.wangzan101.mika.voice.SpeechSettings.get(service).choice.value as? com.wangzan101.mika.voice.SpeechChoice.Provider
@@ -448,7 +448,7 @@ class TaskRun(
         com.wangzan101.mika.media.AndroidTranscribePort(service, conversationId, choice, voiceModels.stt) { workspaceKey }
     }
 
-    /** 迁移后的转写端口:目录与执行都按当前批量 STT 决定,配置失效只让转写工具不可用。 */
+    /** The migrated transcription port: both catalog and execution are decided by the current batch STT, and a stale configuration only makes the transcription tool unavailable. */
     internal val transcribePort: com.wangzan101.mika.core.cap.transcribe.TranscribePort?
         get() {
             if (provenance.origin != RunOrigin.Ui) return null
@@ -464,12 +464,12 @@ class TaskRun(
         }
 
     /**
-     * 本任务的音频端口:用户配置并打开了声音模型、且这是手机上开始的任务时才建。
-     * 定时、远程、子任务、条件检查没有它,音频工具也就不会发给模型。
+     * This task's audio port: created only when the user has configured and enabled a voice model and this task was started on the phone.
+     * Scheduled, remote, subtask and condition-check runs do not have it, so the audio tools are not given to the model either.
      */
     internal val imageSettings by lazy { com.wangzan101.mika.settings.ImageModelSettings.get(service) }
 
-    /** 本任务的图片端口:用户配置并打开了图片模型、且这是手机上开始的任务时才建。 */
+    /** This task's image port: created only when the user has configured and enabled an image model and this task was started on the phone. */
     internal val imagePort by lazy {
         val state = imageSettings.state.value
         val choice = state.choice
@@ -481,7 +481,7 @@ class TaskRun(
         }
     }
 
-    /** 把工作区里的一张图复制成别的 App 可读的 content URI(分享用);越界、不是图片、太大时为 null。 */
+    /** Copies an image from the workspace into a content URI other apps can read (for sharing); null when out of bounds, not an image, or too large. */
     internal suspend fun shareWorkspaceImage(path: String): com.wangzan101.mika.media.ShareableFile? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val trimmed = path.trim()
         val prefix = com.wangzan101.mika.core.workspace.SandboxPaths.WORKSPACE + "/"
@@ -547,29 +547,29 @@ class TaskRun(
             resolveWorkspace = { workspaceKey },
         )
 
-    /** 沙箱导出了一个文件(share_file 或 `mika share`)。 */
+    /** The sandbox exported a file (share_file or `mika share`). */
     fun addShared(f: SharedFile) = runState.addShared(f)
 
-    /** 音频能力生成了一段音频(写进工作区时由端口回调)。 */
+    /** The audio capability generated a piece of audio (called back by the port when written into the workspace). */
     fun addAudio(a: com.wangzan101.mika.core.chat.GeneratedAudio) = runState.addAudio(a)
 
-    /** 音频能力把一段音频存进了音乐库:当作这一轮导出的文件,聊天里出现卡片。 */
+    /** The audio capability saved a piece of audio into the music library: treated as a file exported in this turn, and a card appears in the chat. */
     fun addSavedAudio(s: com.wangzan101.mika.core.model.SavedAudio) = runState.addSavedAudio(s)
 
     fun addSaved(s: com.wangzan101.mika.core.cap.image.SavedImage) = runState.addSaved(s)
 
     fun clearTakeoverStage() = runState.clearTakeoverStage()
 
-    /** 此刻要显示的状态;已收尾时为空,不再重画通知。 */
+    /** The state to show right now; null once torn down, so notifications are no longer redrawn. */
     fun shownState(): TaskState? = runState.shownState()
 
-    /** 因模型失败、主模型在它那家还没测试通过时,提示去那家「重新测试」(见 [RetestHint])。测试换了主模型时不看设置里的配置。 */
+    /** On a model failure where the main model has not passed a test at its provider yet, suggest "test again" for that provider (see [RetestHint]). When testing swapped the main model, the configuration in settings is not consulted. */
     private fun withRetestHint(end: TaskState): TaskState {
         if (end !is TaskState.Failed || env.modelFactory !== TaskEnvironment.defaultModelFactory) return end
         return RetestHint.apply(end, ProviderStore.get(service).untestedMainProvider()) { tr(R.string.fail_model_untested, it) }
     }
 
-    /** execute 收尾;拆成独立函数以缩小 execute 的 suspend 状态机(超大 suspend 函数会被 ART 校验器拒绝)。 */
+    /** Teardown of execute; split into its own function to shrink execute's suspend state machine (an oversized suspend function is rejected by the ART verifier). */
     private suspend fun cleanup(c: RunAssembly) {
         withContext(NonCancellable) { manualControl.close() }
         manualTarget = null
@@ -588,7 +588,7 @@ class TaskRun(
         c.shellDeath?.let { d -> runCatching { c.shellBinder?.unlinkToDeath(d, 0) } }
         loop = null
         children = null
-        // 早点关:后面收尾要等屏和网页;resources 关时还会再关一次(只关一次,不重复)
+        // Close early: the teardown below waits on the screen and the web page; closing resources closes it once more (closed once only, no duplicates)
         mcpConnections?.close()
         mcpConnections = null
         c.mcpEvents?.close()
@@ -598,12 +598,12 @@ class TaskRun(
         takeover = null
         handoverRef = null
         sideScope = null
-        // 借来的页面还回浏览器页(在关掉网页这一套之前)
+        // Return borrowed pages to the browser pages (before the web stack is shut down)
         withContext(Dispatchers.Main + NonCancellable) { runCatching { UserBrowser.existing()?.loans?.end(key) } }
         withContext(Dispatchers.IO + NonCancellable) {
-            // 前面哪步抛错,屏和网页显示也照放(按建的反序)
+            // Even if an earlier step threw, the screen and web display are still released (in reverse order of creation)
             try {
-                // 先定 Claire 屏上 App 的去留(留下的挪到主屏后面、正在出声的关掉)并释放屏,再还原静音:留下的不会突然出声
+                // First decide the fate of the apps on Claire's screen (kept ones are moved behind the main screen, ones still playing sound are closed) and release the screen, then restore mute: what is kept does not suddenly make noise
                 val apps = phone?.takeIf { !shellDied }?.let { p ->
                     p.display.current?.let { d -> AppsAfterTaskEnd.finish(p.shell, d.displayId, c.afterTask) }
                 }
@@ -621,7 +621,7 @@ class TaskRun(
                     r.close()
                     if (BuildConfig.DEBUG) c.runStore?.mirrorToExternal(r.runId)
                 }
-                // 恢复抛错也要撤掉「在跑」的登记,否则这份记录永远不归恢复处理
+                // Even if restoring throws, the "running" registration is removed, otherwise this record would never be handled by recovery again
                 try { c.mute?.restoreAll() } finally { recovery.endRun(key) }
                 c.watcher?.close()
             } finally {
@@ -629,13 +629,13 @@ class TaskRun(
             }
         }
         phone = null
-        // 屏释放后、对外报结束前清掉:界面看到任务结束时已经没有屏了
+        // Clear after the screen is released and before the end is reported outward: by the time the UI sees the task ended there is no screen
         runState._displayId.value = -1
         runState._pipInput.value = null
         runState._pipSoundOn.value = false
         runState._appShown.value = false
         if (c.connection != null) phoneServices.sharedShell.release()
-        // 这次运行解锁过手机才挂着回锁义务;还有别的任务在跑就等,都结束了在这里锁回去(没有义务时立即返回)
+        // A relock obligation exists only if this run unlocked the phone; wait if other tasks are running, and lock again here once all are done (returns immediately when there is no obligation)
         withContext(Dispatchers.Main + NonCancellable) { service.finishTaskRelock(this@TaskRun) }
     }
 
@@ -644,11 +644,11 @@ class TaskRun(
         phone = null
         val a = RunAssembly(
             traces = (service.application as MikaApp).detailedTraces,
-            // 整个运行共用一份已报告 Token 预算；子任务沿用协程上下文里的这份，不另开额度。
+            // The whole run shares one reported-token budget; subtasks inherit the one in the coroutine context and do not open an allowance of their own.
             tokenBudget = if (conditionCheck) null else FeatureFlags.get(service).taskTokenBudget(),
             showCost = FeatureFlags.get(service).showTaskCost(),
             approvalControl = (service.application as MikaApp).approvalControl,
-            // 任务期间的旁路协程(助手连接状态、静音与挪走监视、状态发布),任务结束一并取消
+            // Side coroutines during the task (assistant connection state, mute and move-away watchers, state publishing), all cancelled when the task ends
             side = CoroutineScope(
                 scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]) +
                     CoroutineExceptionHandler { _, e -> Log.w(TAG, "task side job failed", e) },
@@ -656,10 +656,10 @@ class TaskRun(
         )
         sideScope = a.side
         try {
-            // 用户在「干活时」关掉了常亮就不拿唤醒锁;开跑就按此刻的状态(准备中)拿上:
-            // 开模型、读知识、选路线、判断意图这些第一步之前的准备和推理期间屏幕也不熄
+            // If the user turned off keep-screen-on "while working", no wake lock is taken; when starting, take it according to the current state (preparing):
+            // so the screen does not go off during the preparation and reasoning before the first step, such as opening models, reading knowledge, choosing routes and detecting intent
             awake = if (FeatureFlags.get(service).keepScreenOn()) KeepAwake(service.wakeLock.lease(), a.side).also { it.onState(runState._state.value) } else null
-            // 前一个任务替这个拿着的那份,自己的拿上了就放开
+            // The lease the previous task held on this one's behalf is released as soon as its own is taken
             wakeHandoff?.release()
             wakeHandoff = null
             val m = assembleModels() ?: return TaskState.Failed(tr(R.string.fail_no_main_model), FailKind.Environment)
@@ -667,7 +667,7 @@ class TaskRun(
             val taskGate = assembleGate(ph)
             val rec = assembleRecord(a)
             val mem = assembleMemory(m, ph)
-            // 系统里没有 WebView 时没有网页工具
+            // Without a WebView in the system there are no web tools
             val web = assembleWeb(a, ph)
             if (conditionCheck && web == null) return TaskState.Failed(tr(R.string.fail_no_web), FailKind.Environment)
             lendPage(a, m, ph, web)
@@ -686,49 +686,50 @@ class TaskRun(
     @Volatile internal var handoverRef: Takeover? = null
     @Volatile private var sideScope: CoroutineScope? = null
 
-    /** 任务收尾后判结局、学东西要用的;[execute] 里填上。 */
+    /** Needed after teardown to judge the outcome and to learn; filled in by [execute]. */
     @Volatile internal var kit: LearnKit? = null
 
-    /** 停下时正在写的那段字(模型请求已流出的可见文字);收尾前取,收尾后状态就换成终态了。 */
+    /** The text being written when it stopped (visible text already streamed by the model request); taken before teardown, since the state becomes the final one afterwards. */
     fun draftText(): String? = runState.draftText()
 
-    /** 停止后有没有可交代的:做过至少一件事,或停下时已经写出了字。 */
+    /** Whether there is anything to report after stopping: at least one thing was done, or text had already been written when it stopped. */
     fun hasStopMaterial(draft: String?): Boolean = runState.hasStopMaterial(draft)
 
-    /** 真正失败后的断点交代:只按记录拼,不再请模型,也不把短失败原因改写成成功。 */
+    /** The checkpoint summary after a real failure: assembled from the record only, without asking the model again, and without rewriting a short failure reason as success. */
     suspend fun checkpointSummary(): String? = runTeardown.checkpointSummary()
 
     /**
-     * 用户停止之后:按这次已经做了的事写几行交代(见 [StopSummary]),只读运行记录,不再操作任何东西。
-     * 轻量模型优先,没配用主模型;没模型、出错、超时就按记录直接拼。没什么可交代的为 null。
+     * After the user stops: write a few lines summing up what this run has already done (see [StopSummary]), reading only the run record and operating nothing.
+     * A lightweight model is preferred, falling back to the main model; with no model, on error, or on timeout it is assembled directly from the record. Null when there is nothing to report.
      */
     suspend fun stopSummary(draft: String?): String? = runTeardown.stopSummary(draft)
 
     /**
-     * 结果交给用户之后调用(不拖慢、不改交出的回答):回答按用户的要求判结局([OutcomeJudge],轻量模型优先),
-     * 记进运行记录和这一轮对话;只有办成的([LearnGate])才记路线、给回放的路线记成功。
-     * 放弃、失败、取消的不判(结局已经清楚),返回 null;判不成是 [RunOutcome.Unknown]。
+     * Called after the result is handed to the user (without slowing it down or changing the delivered answer): the answer's outcome is judged
+     * against the user's request ([OutcomeJudge], lightweight model first) and recorded in the run record and this turn of the conversation; only what
+     * succeeded ([LearnGate]) records a route, and marks the replayed route as successful. Abandoned, failed and cancelled runs are not judged (the
+     * outcome is already clear) and return null; a failed judgment is [RunOutcome.Unknown].
      */
     suspend fun settleOutcome(end: TaskState, conversations: ConversationStore): JudgedOutcome? = runTeardown.settleOutcome(end, conversations)
 
     /**
-     * 结果通知发出之后调用:记下用到的个人技能的结果、提取记忆、起草技能,提示挂到这一轮的结果卡片上并存进对话。
-     * 在进程级的作用域里跑,服务退出也不中断。
+     * Called after the result notification is sent: record the results of the personal skills that were used, extract memories, draft skills, and attach the hints
+     * to this turn's result card and save them into the conversation. Runs in a process-level scope, so it is not interrupted when the service exits.
      */
-    /** 开工时这段对话里有没有通知提醒(见 [NoticeTurn]);[execute] 一开始按存着的全部轮次定。 */
+    /** Whether this conversation had notification reminders when the task started (see [NoticeTurn]); [execute] determines it at the start from all stored turns. */
     @Volatile internal var noticeTainted = false
 
     suspend fun learnAfter(end: TaskState, outcome: RunOutcome?, conversations: ConversationStore) = runTeardown.learnAfter(end, outcome, conversations)
 
     internal fun publish(state: TaskState) {
-        // 被挪走后到 gate 拦下之前,循环可能还在推理:对外先显示暂停
-        // 循环自己报的终态不往外发:终态只由 [end] 在记好运行编号之后写,否则界面先收到结束、拿不到编号
+        // Between being moved away and the gate stopping it, the loop may still be reasoning: show it as paused outward first
+        // A final state reported by the loop itself is not published: the final state is written only by [end] after the run ID is recorded, otherwise the UI would receive the end before it can get the ID
         if (!TaskService.loopMayPublish(state)) return
         val shown = when {
             state is TaskState.Running && manualControl.state.value in setOf(com.wangzan101.mika.core.run.ManualControl.State.Requesting, com.wangzan101.mika.core.run.ManualControl.State.Manual) ->
                 TaskState.Held(TaskGate.paused(tr(R.string.gate_user_on_page)))
             state is TaskState.Running && gate?.movedAwayPending == true -> TaskState.Held(TaskGate.paused(TaskGate.MOVED_AWAY))
-            // 用户在借出的页面上操作:到关卡之前也先显示暂停
+            // The user is interacting with a borrowed page: show it as paused before the gate is even reached
             state is TaskState.Running && gate?.userOnPagePending == true -> TaskState.Held(TaskGate.paused(TaskGate.USER_ON_PAGE))
             else -> state
         }
@@ -740,11 +741,11 @@ class TaskRun(
         service.refreshNotifications(this)
     }
 
-    /** 网页接管界面顶部的说明:接管原因的话,付款时再带上商品、金额、地址。 */
+    /** The note at the top of the web-takeover UI: the reason for the takeover, plus the goods, amount and address when paying. */
     internal fun takeoverMessage(state: TaskState): String? = runControl.takeoverMessage(state)
 
     internal companion object {
-        /** 网页界面时画中画取画面的间隔。 */
+        /** Interval for capturing frames for Picture-in-Picture while on the web UI. */
         const val WEB_FRAME_MS = 500L
         const val SHELL_WAIT_MS = 15_000L
         const val DISPLAY_RETRY_MS = 1_000L

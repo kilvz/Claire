@@ -16,7 +16,7 @@ data class PlaybackStep(
     val mark: PlaybackMark? = null, val succeeded: Boolean = true, val legacy: Boolean = false,
     val callId: String? = null, val failure: String? = null, val elementClick: Boolean = false,
 ) {
-    /** 没有采集的帧不是丢失文件，也不生成空白播放项。 */
+    /** A frame that was not captured is not a missing file, and no blank playback item is generated for it. */
     val frames: List<PlaybackFrame> get() = if (legacy) listOfNotNull(beforeId?.let { PlaybackFrame(it, null) })
         else listOfNotNull(beforeId?.let { PlaybackFrame(it, false) }, afterId?.let { PlaybackFrame(it, true) })
 }
@@ -33,7 +33,7 @@ data class TaskReport(
     val stages: List<PlaybackStage> = emptyList(), val missingFrames: Int = 0,
 )
 
-/** 只读运行记录，不持有工具分发器、设备端口或任务执行入口。 */
+/** Reads run records only; holds no tool dispatcher, device port or task execution entry point. */
 class TaskReportViewModel(private val store: RunStore, val runId: String) {
     fun load(): TaskReport? {
         val timeline = RunTimelineViewModel(store, runId).load() as? TimelineUi.Ready ?: return null
@@ -69,7 +69,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
                 PlaybackStep(e.step, e.tool, e.beforeId, e.afterId,
                     e.mark?.takeIf { e.succeeded && it.valid() && e.beforeId != null }?.let { if (elementClick) it.copy(approximate = true) else it }, e.succeeded, callId = e.callId, failure = failure, elementClick = elementClick)
             }
-            // 旧记录没有实际动作坐标，不从模型计划推测。
+            // Old records have no actual action coordinates, so nothing is inferred from the model's plan.
             return events.filterIsInstance<RunEvent.Media>().distinctBy { it.mediaId }
                 .map { PlaybackStep(it.step, null, it.mediaId, null, legacy = true) }
         }
@@ -80,7 +80,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
             return ref?.let { !Regex("^@v[1-9]\\d*$").matches(it) } ?: ("element" in o)
         }
 
-        /** 关键页和阶段按证据截图定位，不能用打开它之前的动作画面代替。 */
+        /** Key pages and stages are located by evidence screenshots; the action frame from before it was opened must not be used instead. */
         internal fun framePosition(frames: List<ReplayFrame>, screenshotId: Int?, stepIndex: Int = 0): Int {
             val exact = frames.indexOfFirst { it.frame.screenshotId == screenshotId }
             return if (exact >= 0) exact else frames.indexOfFirst { it.stepIndex >= stepIndex }.coerceAtLeast(0)
@@ -89,7 +89,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
         internal fun frameDuration(frame: ReplayFrame): Long =
             if (frame.frame.after == false) 1_200L else FRAME_DURATION_MS
 
-        /** 只选正文引用过的页面文字，并通过观测编号→实际调用关联截图，不能按轮次猜批次子动作。 */
+        /** Only page text referenced by the answer is selected, and screenshots are linked through observation ID → actual call; batch sub-actions must not be guessed by turn. */
         internal fun keyPages(events: List<RunEvent>, answer: String, steps: List<PlaybackStep>, frames: List<ReplayFrame>): List<ReportPage> {
             val normalizedAnswer = normalize(answer)
             val activities = events.filterIsInstance<RunEvent.Activity>()
@@ -105,7 +105,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
                 ReportPage(title, index, frame.frame.screenshotId)
             }.distinctBy { normalize(it.title) }.takeLast(4)
             if (pages.isNotEmpty()) return pages
-            // 没有可确认的引用页面，只承诺这是记录结束时的画面。
+            // There is no referenced page that can be confirmed, so it only promises that this is the frame at the end of the record.
             return frames.lastOrNull()?.let { listOf(ReportPage(tr(R.string.report_final_page), it.stepIndex, it.frame.screenshotId)) }.orEmpty()
         }
 
@@ -116,7 +116,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
             available.firstOrNull { steps[it].tool in setOf("phone_type_text", "phone_clear_text", "web_type") }
                 ?.let { result += PlaybackStage(it, tr(R.string.playback_stage_input)) }
             result += pages.map { PlaybackStage(it.stepIndex, it.title, it.screenshotId) }
-            // 同一步既是开始/输入阶段又有证据页时，保留能直达证据的入口。
+            // When the same step is both the start/input stage and has an evidence page, keep the entry that leads straight to the evidence.
             return result.asReversed().distinctBy { it.stepIndex }.sortedBy { it.stepIndex }
         }
 

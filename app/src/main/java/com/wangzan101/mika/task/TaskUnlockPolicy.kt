@@ -5,8 +5,8 @@ import com.wangzan101.mika.core.run.RunOrigin
 import com.wangzan101.mika.wechat.WechatChannel
 
 /**
- * 开跑时为定时任务、已授权的微信任务、或本机开关开着的界面任务提供解锁；实际解锁时仍重新读取对应授权。
- * 其他来源(MCP、子任务)永远拿不到解锁授权。
+ * At start it provides unlocking for scheduled tasks, authorized WeChat tasks, or UI tasks with the local switch on; the relevant authorization is still re-read when actually unlocking.
+ * Other origins (MCP, subtasks) never get unlock authorization.
  */
 internal fun taskUnlockAuthorization(
     origin: RunOrigin,

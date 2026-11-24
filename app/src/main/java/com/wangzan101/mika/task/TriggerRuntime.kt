@@ -35,10 +35,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-/** 安卓闹钟的薄壳；时间与去重由持久化 TriggerStore 决定，闹钟广播可以重复来。 */
+/** Thin wrapper around Android alarms; timing and de-duplication are decided by the persistent TriggerStore, and alarm broadcasts may arrive repeatedly. */
 object TriggerRuntime {
     private var recovered = false
-    /** 存下并布置闹钟;系统没准许准时闹钟(到点可能不准时或起不来)时引导用户去开一次,结果里照实说有没有提示到。 */
+    /** Saves and arms alarms; when the system has not granted exact alarms (which may then fire late or not at all) it guides the user to enable them once, and the result faithfully reports whether the user was prompted. */
     @Synchronized fun schedule(context: Context, definition: TriggerDefinition, replaceExisting: Boolean = false): Scheduled {
         val store = store(context)
         if (replaceExisting) check(store.edit(definition)) { tr(R.string.trigger_deleted) }
@@ -46,13 +46,13 @@ object TriggerRuntime {
         engine(context, store).rearm(System.currentTimeMillis())
         val granted = canScheduleExactly(context)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        // 只有通知真的发出去了才算提示过;没发出去下次再试
+        // It only counts as prompted if the notification was really posted; if not, try again next time
         val notified = ExactAlarmGuide.shouldPrompt(granted, prefs.getBoolean(PROMPTED, false)) && promptExactAlarm(context)
         if (notified) prefs.edit().putBoolean(PROMPTED, true).apply()
         return Scheduled(granted, notified)
     }
 
-    /** 模型编辑仍限本对话；在同一锁内复核后保存，不能把已删除或换了归属的计划写回来。 */
+    /** Model edits are still limited to this conversation; they are re-checked and saved under the same lock, so a plan that was deleted or changed owner cannot be written back. */
     @Synchronized fun edit(context: Context, threadId: String, id: String,
         change: (TriggerDefinition) -> TriggerDefinition): EditedSchedule? {
         val current = store(context).get(id)?.takeIf { it.threadId == threadId } ?: return null
@@ -61,12 +61,12 @@ object TriggerRuntime {
         return EditedSchedule(plan, schedule(context, plan, replaceExisting = true))
     }
 
-    /** 系统的「闹钟和提醒」授权页(安卓 12 起)。 */
+    /** The system's "Alarms & reminders" authorization page (Android 12 and up). */
     fun exactAlarmSettings(context: Context): Intent =
         Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    /** 第一次没有权限就建了定时任务:发一条通知,点开就是授权页(任务在后台跑,不直接跳页面)。返回通知有没有发出去。 */
+    /** A schedule was created without the permission the first time: post a notification that opens the authorization page (the task runs in the background, so no page is opened directly). Returns whether the notification was posted. */
     private fun promptExactAlarm(context: Context): Boolean {
         val notifications = context.getSystemService(NotificationManager::class.java)
         if (!notifications.areNotificationsEnabled()) return false
@@ -85,11 +85,11 @@ object TriggerRuntime {
         else engine(context, store(context)).rearm(System.currentTimeMillis())
     }
 
-    /** 完全退出时只撤系统闹钟,不改计划与待处理账本;下次打开 App 由 [rearm] 接着排。 */
+    /** On a full quit only the system alarms are withdrawn, without changing the plans or the pending ledger; the next time the app opens, [rearm] continues scheduling. */
     @Synchronized fun suspendAlarms(context: Context) = arm(context, null)
 
     @Synchronized fun fire(context: Context) {
-        // 已发出的广播可能晚于退出到达:不要认领时段,也不要发提醒,重新打开后仍可按原账本恢复
+        // An already-sent broadcast may arrive after the quit: do not claim the window or post reminders; after reopening it can still be recovered from the ledger
         if (FeatureFlags.get(context).quitRequested()) {
             arm(context, null)
             return
@@ -97,7 +97,7 @@ object TriggerRuntime {
         engine(context, store(context)).fire(System.currentTimeMillis())
     }
 
-    /** 设备时区变化后,跟随旧设备时区的当地时间计划重算到新时区;显式钉了其他时区的不动。没有基线(首次使用)就只记下当前时区。 */
+    /** After the device time zone changes, plans that follow the old device zone's local time are recomputed for the new zone; those pinned explicitly to another zone are left alone. Without a baseline (first use) it only records the current zone. */
     @Synchronized fun syncTimeZone(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val current = ZoneId.systemDefault().id
@@ -162,7 +162,7 @@ object TriggerRuntime {
 
     @Synchronized fun list(context: Context): List<TriggerDefinition> = store(context).all()
 
-    /** 这个计划在 [key] 这一次之前接连失败了几次,见 [com.wangzan101.mika.core.trigger.failureStreakBefore]。 */
+    /** How many times this plan failed in a row before the window [key], see [com.wangzan101.mika.core.trigger.failureStreakBefore]. */
     @Synchronized fun failureStreakBefore(context: Context, key: String): Int = com.wangzan101.mika.core.trigger.failureStreakBefore(store(context).windows(), key)
 
     fun canScheduleExactly(context: Context): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -172,7 +172,7 @@ object TriggerRuntime {
         TriggerSnapshot(it.all(), it.windows())
     }
 
-    /** 暂停或恢复;改不了(没有这个计划、恢复跑过的一次性计划)时返回 false,见 [TriggerEngine.setEnabled]。 */
+    /** Pause or resume; returns false when it cannot be changed (no such plan, or re-enabling a one-off plan that has already run), see [TriggerEngine.setEnabled]. */
     @Synchronized fun setEnabled(context: Context, id: String, enabled: Boolean): Boolean =
         store(context).let { engine(context, it).setEnabled(id, enabled, System.currentTimeMillis()) }
 
@@ -317,7 +317,7 @@ object TriggerRuntime {
     private const val KEY_DEVICE_ZONE = "device_timezone"
 }
 
-/** 准时闹钟权限的引导:没开时只主动提醒一次,之后在定时任务页一直写明。 */
+/** Guidance for the exact-alarm permission: when not granted it actively prompts only once, and afterwards the schedules page always states it. */
 object ExactAlarmGuide {
     val TITLE: String get() = tr(R.string.trigger_alarm_title)
     val BODY: String get() = tr(R.string.trigger_alarm_body)

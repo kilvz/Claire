@@ -31,8 +31,8 @@ import com.wangzan101.mika.ui.theme.MikaRadius
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * 采集和暂停时贴在屏幕上方的一条。用的是无障碍浮层，和悬浮胶囊同一类窗口，不申请通知权限，也不申请「显示在其他应用上层」。
- * 加不上就返回 false。这条属于 Claire 自己的界面，轨迹里会丢掉。
+ * The bar pinned to the top of the screen while recording and while paused. It uses an accessibility overlay, the same kind of window as the floating capsule, and requests neither notification permission nor "display over other apps".
+ * Returns false if it cannot be added. It belongs to Claire's own UI, so it is dropped from the trace.
  */
 class TeachChip(
     private val onPause: () -> Unit,
@@ -45,7 +45,7 @@ class TeachChip(
 
     fun visible(): Boolean = window?.isOpen == true
 
-    /** 必须在主线程调用。已经显示时只换文案。 */
+    /** Must be called on the main thread. When already shown it only swaps the text. */
     fun show(target: TeachPhase): Boolean {
         if (Looper.myLooper() != Looper.getMainLooper()) return false
         if (target != TeachPhase.Recording && target != TeachPhase.Paused) {

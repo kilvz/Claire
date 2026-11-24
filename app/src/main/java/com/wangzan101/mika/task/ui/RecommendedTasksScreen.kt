@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
 import com.wangzan101.mika.chat.ui.ChatCopy
 import com.wangzan101.mika.ui.Route
 
-/** 常用任务共用首页的本地列表；设置入口编辑，聊天入口选取并填入输入框。 */
+/** Frequently used tasks share the home page's local list; the settings entry edits them, the chat entry selects one and fills it into the input box. */
 @Composable
 fun RecommendedTasksScreen(store: RecommendedTaskStore, onBack: () -> Unit, onPick: ((RecommendedTask) -> Unit)? = null, onOpenChecklists: (() -> Unit)? = null, onOpenWorkflows: (() -> Unit)? = null) {
     remember(store) {
@@ -294,7 +294,7 @@ internal fun RecommendedTaskDialog(store: RecommendedTaskStore, initial: Recomme
 
 }
 
-/** 行尾的删除。单独可点,不会连着打开编辑。 */
+/** Delete at the end of the row. Independently tappable, so it does not open editing along with it. */
 @Composable
 private fun DeleteTaskButton(onClick: () -> Unit) {
     val label = stringResource(R.string.recommendations_delete)
@@ -317,7 +317,7 @@ private fun recommendationError(error: RecommendedTaskError): String = when (err
     RecommendedTaskError.Unreadable -> stringResource(R.string.recommendations_unreadable)
 }
 
-/** 设置列表里只露一行,避免一条长提示词把整页撑开。 */
+/** Shows only one line in the settings list, so a single long prompt does not stretch the whole page. */
 private fun promptPreview(prompt: String): String {
     val flat = prompt.replace(Regex("\\s+"), " ").trim()
     val max = 60

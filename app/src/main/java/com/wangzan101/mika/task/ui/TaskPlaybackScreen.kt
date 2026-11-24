@@ -83,7 +83,7 @@ fun TaskPlaybackScreen(vm: TaskReportViewModel, initialScreenshotId: Int?, onBac
     val frames = report?.frames.orEmpty()
     LaunchedEffect(frames, initialScreenshotId) {
         if (position < 0 && frames.isNotEmpty()) {
-            // 关键页直接打开对应截图；普通回放从首张可用画面开始。
+            // Key pages open their screenshot directly; ordinary playback starts from the first available frame.
             position = TaskReportViewModel.framePosition(frames, initialScreenshotId)
         }
     }
@@ -187,7 +187,7 @@ fun TaskPlaybackScreen(vm: TaskReportViewModel, initialScreenshotId: Int?, onBac
     }
 }
 
-/** 拖动超过阈值后按主方向翻一帧；短拖动、取消和边界不误触放大或跳多帧。 */
+/** Flips one frame along the dominant direction after a drag passes the threshold; short drags, cancellation and boundaries do not trigger zoom or multi-frame jumps by mistake. */
 internal fun replaySwipeDirection(dx: Float, dy: Float, threshold: Float): Int {
     val distance = if (abs(dx) >= abs(dy)) dx else dy
     return when { abs(distance) < threshold -> 0; distance < 0 -> 1; else -> -1 }
@@ -220,7 +220,7 @@ private fun AnimatedPlaybackImage(vm: TaskReportViewModel, frame: ReplayFrame, m
         displayed = LoadedPlayback(frame, bitmap)
         ready()
     }
-    // 已解码的图片及其自身标记一起交叉淡入，手动/自动走同一路径，不闪空、不串标记。
+    // The decoded image and its own mark cross-fade together, and manual/automatic stepping go through the same path, so nothing flashes empty and marks never leak across frames.
     Crossfade(displayed, modifier, animationSpec = tween(TaskReportViewModel.TRANSITION_MS), label = "replay-frame") { loaded ->
         if (loaded?.bitmap != null) Box(Modifier.fillMaxSize().testTag("playback-frame-${loaded.frame.frame.screenshotId}")) {
             FittedPlaybackImage(loaded.bitmap, loaded.frame.mark, Modifier.fillMaxSize())

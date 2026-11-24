@@ -4,7 +4,7 @@ import android.view.accessibility.AccessibilityEvent
 import com.wangzan101.mika.core.learn.teach.TeachEventKind
 import com.wangzan101.mika.core.learn.teach.TeachObservation
 
-/** 把一次无障碍事件抄成纯数据。不保留节点，也不在这里写日志。 */
+/** Copies one accessibility event into plain data. It keeps no nodes and writes no logs here. */
 object TeachEvents {
     fun capture(event: AccessibilityEvent, displayId: Int): TeachObservation? {
         val kind = when (event.eventType) {
@@ -39,7 +39,7 @@ object TeachEvents {
             try {
                 source?.recycle()
             } catch (e: Exception) {
-                // 节点已经回收
+                // The node has already been recycled
             }
         }
     }
