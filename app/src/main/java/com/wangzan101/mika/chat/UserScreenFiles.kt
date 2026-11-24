@@ -12,9 +12,9 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
- * 用户发来的屏幕跟着对话存:放在那个对话的工作区里(`/workspace/screens/<编号>.jpg` 和 `.json`),和附件同一处,
- * 对话的工作区删掉时一起没了;沙箱里的命令也读得到这张图。读写都经工作区的文件闸门(沙箱里的命令换成链接也读写不到别处),
- * 写时拿着树锁的许可(和重置互斥)。
+ * Screens the user sent are stored alongside the conversation: in that conversation's workspace (`/workspace/screens/<id>.jpg` and `.json`), the same place as attachments,
+ * so they disappear with the conversation's workspace; commands in the sandbox can read the image too. All reads and writes go through the workspace's file gate (commands in the sandbox cannot read or write elsewhere even via symlinks),
+ * and writes hold the tree lock's permit (mutually exclusive with a reset).
  */
 class UserScreenFiles(
     private val dirs: SandboxDirs,
@@ -22,7 +22,7 @@ class UserScreenFiles(
 ) {
     constructor(context: Context) : this(SandboxDirs(context), WorkspaceResolver.resolver(context))
 
-    /** 存进对话 [conversationId],返回带编号的说明。 */
+    /** Stores it in conversation [conversationId] and returns the description with its id. */
     suspend fun save(conversationId: String, shot: CapturedScreen): UserScreen = dirs.tree.shared {
         withContext(Dispatchers.IO) {
             val id = "s" + UUID.randomUUID().toString().replace("-", "").take(12)
@@ -39,7 +39,7 @@ class UserScreenFiles(
 
     suspend fun image(conversationId: String, id: String): ByteArray? = read(conversationId, "$id.jpg")
 
-    /** 这个对话里的屏幕,交给任务按编号取。 */
+    /** The screens in this conversation, handed to the task so it can fetch them by id. */
     fun source(conversationId: String): UserScreenSource = object : UserScreenSource {
         override suspend fun screen(id: String) = this@UserScreenFiles.screen(conversationId, id)
         override suspend fun image(id: String) = this@UserScreenFiles.image(conversationId, id)

@@ -29,7 +29,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 
 internal val LocalOperationScreenDocked = staticCompositionLocalOf { false }
 
-/** 实时操作画面与会话列表共用左侧区域；运行中的画面由调用方提供触控与接管按钮。 */
+/** The live operation screen shares the left-side area with the conversation list; for a running screen the caller supplies the touch handling and takeover button. */
 @Composable
 internal fun OperationScreenPane(frame: Bitmap?, mode: PipMode, onConversations: () -> Unit, onClose: () -> Unit,
     modifier: Modifier = Modifier, imageModifier: Modifier = Modifier, controls: (@Composable () -> Unit)? = null,

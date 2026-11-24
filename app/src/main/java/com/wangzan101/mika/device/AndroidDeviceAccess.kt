@@ -24,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** App 级唯一实例:设置页与经过认证的 MCP 共用,不经过模型、屏幕工具或运行记录。 */
+/** App-level singleton: shared by the settings page and authenticated MCP, never routed through the model, the screen tools or the run record. */
 class AndroidDeviceAccess(context: Context, helper: () -> IMikaShell?) {
     val settings = DeviceAccessSettings(File(context.filesDir, "settings"), KeystoreKeyCipher("mika-device-access"))
     val access = DeviceAccess(AndroidDeviceAccessPort(context, helper), settings)
@@ -47,8 +47,8 @@ internal class AndroidDeviceAccessPort(context: Context, private val helper: () 
     }
 
     /**
-     * 上滑后仍是生物识别优先页、没有凭据框时,点 SystemUI 里最大的可点非数字目标一次(「用密码解锁」这类大按钮)。
-     * 只认大面积目标,「取消」「紧急呼叫」等小文字链接被排除;没有符合条件的就不点。
+     * When, after the swipe-up, it is still the biometric-first page and there is no credential field, tap the largest clickable non-digit target in SystemUI once (a big button such as "unlock with PIN").
+     * Only large-area targets are accepted; small text links such as "cancel" and "emergency call" are excluded; if nothing qualifies, nothing is tapped.
      */
     override suspend fun revealCredentialFallback(): Boolean = withContext(Dispatchers.IO) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@withContext false
@@ -85,11 +85,11 @@ internal class AndroidDeviceAccessPort(context: Context, private val helper: () 
     }
 
     /**
-     * 只认主屏 SystemUI 中唯一、类型匹配的密码框。SIM PIN/无法识别的页面不尝试。
-     * 没有密码节点时,完整且布局一致的数字键盘可作为 PIN 输入目标;普通密码和图案页不降级。
-     * 凭据按键要只投给 SystemUI 的窗口,靠安卓 13 起的定向注入;更早的系统在占位之前就报不支持,不留下暂停。
-     * 输入框没拿到焦点时先请它聚焦,不行再点它一下;纯数字键盘不点击容器,只接受已聚焦的 SystemUI 窗口。
-     * 认不出时在日志里记一句原因,不含屏上文字。
+     * Only accepts the single, type-matching password field in the main display's SystemUI. SIM PIN / unrecognizable pages are not attempted.
+     * When there is no password node, a complete and consistently laid-out numeric keypad can serve as the PIN input target; ordinary password and pattern pages are not downgraded.
+     * Credential key events must be injected only into the SystemUI window, relying on the targeted injection available from Android 13; older systems report unsupported before anything is held down, leaving no pause behind.
+     * When the input field does not have focus, ask it to focus first, and click it once if that fails; for a pure numeric keypad the container is not clicked, and only an already-focused SystemUI window is accepted.
+     * When it cannot be recognized, one line recording the reason is logged, containing no on-screen text.
      */
     override suspend fun credentialReady(kind: CredentialKind): Boolean = withContext(Dispatchers.IO) {
         val fields = credentialFields().filter { it.kind == kind }
@@ -104,12 +104,12 @@ internal class AndroidDeviceAccessPort(context: Context, private val helper: () 
         ready
     }
 
-    /** 只读识别当前唯一的系统凭据输入目标,不聚焦、不输入,不按容器名字推测锁屏类型。 */
+    /** Read-only identification of the single current system credential input target: no focusing, no input, and no guessing the lock screen type from the container's name. */
     override suspend fun detectedCredentialKind(): CredentialKind? = withContext(Dispatchers.IO) {
         scanCredentialFields().targets.singleOrNull()?.kind
     }
 
-    /** MCP 可直接带回的受限诊断:只有 SystemUI 窗口、密码节点和数字键盘的技术属性,没有节点文字。 */
+    /** The restricted diagnostics MCP can return directly: only technical attributes of SystemUI windows, password nodes and the numeric keypad, with no node text. */
     override suspend fun credentialDiagnostics(): List<String> = withContext(Dispatchers.IO) {
         scanCredentialFields().diagnostics.also { Log.i(TAG, "keyguard diagnostics: ${it.joinToString()}") }
     }
@@ -190,7 +190,7 @@ internal class AndroidDeviceAccessPort(context: Context, private val helper: () 
             }
             if (pinLayout) pinPads += CredentialTarget(null, window, CredentialKind.Pin)
         }
-        // 有密码节点时沿用原路径,即使它无法识别也不猜测;没有时才考虑纯数字 PIN 页。
+        // With password nodes present, stay on the original path: even if they cannot be recognized, nothing is guessed; only when there are none is the pure numeric PIN page considered.
         val targets = if (passwordNodes == 0) pinPads else fields
         return CredentialScan(targets, diagnostics.take(MAX_DIAGNOSTICS))
     }
@@ -205,7 +205,7 @@ internal class AndroidDeviceAccessPort(context: Context, private val helper: () 
         }
     }
 
-    /** 凭据框已有输入时按已有长度回删;空框(最常见,也是生物识别优先页)不删,避免空框 DEL 关掉密码页。 */
+    /** When the credential field already has input, backspace as many times as its current length; an empty field (the most common case, and also the biometric-first page) is not cleared, so a DEL on an empty field cannot dismiss the password page. */
     private fun residualClear(kind: CredentialKind): Int {
         val target = credentialFields().singleOrNull { it.kind == kind } ?: return 0
         val node = target.node ?: return 0

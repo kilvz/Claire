@@ -6,9 +6,9 @@ import com.wangzan101.mika.cap.sandbox.WorkspaceKey
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 把对话编号解析成它此刻该用的沙箱工作区([WorkspaceKey]):
- * - 已绑定或草稿选定有效项目 -> [WorkspaceKey.Project]
- * - 未归属项目或项目已不存在 -> [WorkspaceKey.Conversation]
+ * Resolves a conversation id into the sandbox workspace ([WorkspaceKey]) it should use right now:
+ * - bound, or a draft with a valid project selected -> [WorkspaceKey.Project]
+ * - no project assigned, or the project no longer exists -> [WorkspaceKey.Conversation]
  */
 class WorkspaceResolver(
     private val conversations: ConversationStore,

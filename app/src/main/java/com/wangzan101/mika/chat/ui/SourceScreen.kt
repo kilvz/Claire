@@ -52,7 +52,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 
-/** 一次答复的来源:每条是「第几步 · 在哪 · 标题」,下面是当时的画面;没有画面的(后台读的网页正文、文件、命令输出)是摘录原文。 */
+/** The sources of one answer: each entry is "step N · where · title", with the screen of that moment below it; entries without a screen (page text read in the background, files, command output) show an excerpt of the original. */
 @Composable
 fun SourceScreen(vm: SourceViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
@@ -78,7 +78,7 @@ fun SourceScreen(vm: SourceViewModel, onBack: () -> Unit) {
                                         listOfNotNull(stringResource(R.string.step_number, entry.step), entry.place, entry.title).joinToString(" · "),
                                         style = MikaType.BodyStrong, color = c.ink,
                                     )
-                                    // 有画面就只给画面:识别出的文字和画面重复;没有画面时摘录就是唯一的依据
+                                    // With a screen, show only the screen: the recognized text duplicates the image; without a screen the excerpt is the only evidence
                                     if (entry.screenshots.isEmpty()) {
                                         entry.text?.let { Text(it, Modifier.padding(top = 6.dp), style = MikaType.Caption, color = c.ink2) }
                                     }
@@ -110,7 +110,7 @@ private fun SourceShot(vm: SourceViewModel, id: Int) {
     }
 }
 
-/** 全屏看一张画面,点一下或按返回收起。 */
+/** View one screen full-screen; tap once or press back to dismiss. */
 @Composable
 private fun ZoomedShot(image: ImageBitmap, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {

@@ -6,16 +6,16 @@ import kotlin.math.hypot
 import kotlin.math.pow
 
 /**
- * 画中画小窗的手势物理,单位是像素和秒,与界面无关以便测试。
- * 松手时按速度投射落点(像列表惯性滚动减速到停),再找最近的角;
- * 归位用临界阻尼弹簧(阻尼比 1、响应 0.4 秒):不回弹,并能从当前速度接着走,随时可打断。
+ * The gesture physics of the picture-in-picture window, in pixels and seconds, independent of the UI so it can be tested.
+ * On release it projects the landing point from the velocity (like a list's inertial scroll decelerating to a stop), then picks the nearest corner;
+ * snapping home uses a critically damped spring (damping ratio 1, response 0.4 s): no bounce back, it can carry on from the current velocity, and it can be interrupted at any time.
  */
 object PipPhysics {
     enum class Corner { TopStart, TopEnd, BottomStart, BottomEnd }
 
     /**
-     * 小窗可停的区域:[width]×[height] 是整块画面,[pipWidth]×[pipHeight] 是小窗当前大小;
-     * [top]/[bottom] 是要让开的顶栏和输入框高度,[margin] 是离边的距离。
+     * The area the window can rest in: [width]×[height] is the whole screen, [pipWidth]×[pipHeight] is the window's current size;
+     * [top]/[bottom] are the heights of the top bar and input field to keep clear of, and [margin] is the distance from the edges.
      */
     data class Bounds(
         val width: Float,
@@ -26,7 +26,7 @@ object PipPhysics {
         val top: Float,
         val bottom: Float,
     ) {
-        /** 地方不够(窗口太窄或太矮,比如键盘弹出)时宁可靠左上,也不钻到顶栏下面。 */
+        /** When there is not enough room (the window is too narrow or too short, e.g. when the keyboard pops up), hug the top-left rather than slide under the top bar. */
         fun position(c: Corner): Pair<Float, Float> {
             val left = margin
             val right = maxOf(left, width - pipWidth - margin)
@@ -44,9 +44,9 @@ object PipPhysics {
     private const val DECELERATION = 0.998f
 
     /**
-     * 小窗要离屏幕上下边多远。[collapsedShare] 为 1 是收起的小窗:让开顶栏和输入栏([collapsedTop]/[collapsedBottom]);
-     * 为 0 是展开的大窗:只让开系统栏([safeTop]/[safeBottom])——这时整块背景已经压暗,顶栏和输入栏本来也点不到,
-     * 小窗可以放到整屏,不再只能在中间一小块里挪。之间按比例插值,展开收起时跟着慢慢挪。
+     * How far the window should keep from the top and bottom edges of the screen. [collapsedShare] of 1 is the collapsed window: keep clear of the top bar and input bar ([collapsedTop]/[collapsedBottom]);
+     * 0 is the expanded large window: keep clear only of the system bars ([safeTop]/[safeBottom]) — by then the whole background is dimmed, so the top bar and input bar could not be tapped anyway,
+     * and the window can cover the whole screen instead of moving only within a small patch in the middle. In between it interpolates proportionally, so it glides along as the window expands and collapses.
      */
     fun restingInsets(
         collapsedTop: Float, collapsedBottom: Float,
@@ -57,10 +57,10 @@ object PipPhysics {
         return at(safeTop, collapsedTop) to at(safeBottom, collapsedBottom)
     }
 
-    /** 以 [velocity](像素/秒)甩出后,按每毫秒衰减到 0.998 倍的减速,最终还能滑多远。 */
+    /** How far it will still slide after being flung at [velocity] (pixels/second), decelerating to 0.998 of the speed per millisecond. */
     fun project(velocity: Float): Float = (velocity / 1000f) * DECELERATION / (1f - DECELERATION)
 
-    /** 从 ([x],[y]) 以速度 ([vx],[vy]) 松手后应吸附的角。 */
+    /** The corner it should snap to after being released from ([x],[y]) with velocity ([vx],[vy]). */
     fun snapCorner(x: Float, y: Float, vx: Float, vy: Float, bounds: Bounds): Corner {
         val px = x + project(vx)
         val py = y + project(vy)
@@ -70,14 +70,14 @@ object PipPhysics {
         }
     }
 
-    /** 一维弹簧的状态:位置与速度。 */
+    /** The state of a one-dimensional spring: position and velocity. */
     data class Motion(val position: Float, val velocity: Float)
 
     class Spring(response: Float = 0.4f, dampingRatio: Float = 1f) {
         private val stiffness = (2 * PI / response).pow(2).toFloat()
         private val damping = (4 * PI * dampingRatio / response).toFloat()
 
-        /** 前进 [dt] 秒(半隐式欧拉;单帧最长按 32 毫秒算,掉帧时不至于发散)。 */
+        /** Advance [dt] seconds (semi-implicit Euler; a single frame is capped at 32 milliseconds, so dropped frames do not make it diverge). */
         fun step(m: Motion, target: Float, dt: Float): Motion {
             val t = dt.coerceIn(0f, MAX_DT)
             val v = m.velocity + (-stiffness * (m.position - target) - damping * m.velocity) * t

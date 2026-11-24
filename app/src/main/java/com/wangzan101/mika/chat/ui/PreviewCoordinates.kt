@@ -2,7 +2,7 @@ package com.wangzan101.mika.chat.ui
 
 import kotlin.math.min
 
-/** ContentScale.Fit + 居中显示的逆变换；留白、非法尺寸和画面外的触点一律不送给设备。 */
+/** Inverse transform of ContentScale.Fit with centering; letterboxing, invalid sizes and touches outside the image are never sent to the device. */
 internal fun previewPoint(x: Float, y: Float, viewWidth: Int, viewHeight: Int, imageWidth: Int, imageHeight: Int): Pair<Int, Int>? {
     if (viewWidth <= 0 || viewHeight <= 0 || imageWidth <= 0 || imageHeight <= 0 || !x.isFinite() || !y.isFinite()) return null
     val scale = min(viewWidth.toFloat() / imageWidth, viewHeight.toFloat() / imageHeight)

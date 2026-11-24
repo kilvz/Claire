@@ -54,12 +54,12 @@ import java.io.File
 import com.wangzan101.mika.settings.ui.models.use
 import com.wangzan101.mika.ui.MarkdownText
 
-/** 要分享的一问一答。 */
+/** A question-and-answer pair to be shared. */
 data class ShareRequest(val goal: String, val answer: String)
 
 /**
- * 分享卡片(样式 1 · 白卡):顶部 Claire logo + 名字,中间「问 + 答」,底部项目地址。
- * 固定宽度、高度随内容撑开,白底、浅色,不随界面深浅色变化;正文用 Markdown 渲染、不截断。
+ * The share card (style 1 · white card): Claire logo + name at the top, "question + answer" in the middle, and the project address at the bottom.
+ * Fixed width, height grows with the content; white background, light palette, it does not follow the UI's light/dark mode; the body is rendered as Markdown and is not truncated.
  */
 @Composable
 fun ShareCardContent(goal: String, answer: String, logo: ImageBitmap, modifier: Modifier = Modifier) {
@@ -91,8 +91,8 @@ fun ShareCardContent(goal: String, answer: String, logo: ImageBitmap, modifier: 
 }
 
 /**
- * 分享卡片的离屏渲染 + 分享:[request] 非空时把卡片画进离屏图层、存成 PNG 交系统分享面板,然后 [onDone] 清空。
- * 放在对话框/页面根处;平时为 null 不占画面。卡片宽固定、高随内容,转出的位图也随内容变高。
+ * Off-screen rendering and sharing of the share card: when [request] is non-null, the card is drawn into an off-screen layer, saved as a PNG and handed to the system share sheet, then [onDone] clears it.
+ * Placed at the root of a dialog/page; it is null the rest of the time and takes up no screen space. The card width is fixed and its height follows the content, so the rendered bitmap also grows taller with the content.
  */
 @Composable
 fun ShareCardHost(request: ShareRequest?, onDone: () -> Unit) {
@@ -138,7 +138,7 @@ fun ShareCardHost(request: ShareRequest?, onDone: () -> Unit) {
     }
 }
 
-/** 把卡片位图写成 PNG 放进 cache/report-share/,返回交给分享面板的只读 content:// 地址;失败为 null。 */
+/** Writes the card bitmap as a PNG into cache/report-share/ and returns the read-only content:// address handed to the share sheet; null on failure. */
 private fun saveShareCard(context: Context, bitmap: Bitmap): Uri? = runCatching {
     val dir = File(context.cacheDir, "report-share").apply { mkdirs() }
     val file = File(dir, "mika-share-${System.currentTimeMillis()}.png")

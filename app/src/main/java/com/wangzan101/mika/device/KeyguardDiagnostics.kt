@@ -2,7 +2,7 @@ package com.wangzan101.mika.device
 
 import com.wangzan101.mika.core.device.CredentialKind
 
-/** 锁屏识别诊断只保留系统控件的技术属性;资源名和类名也限制字符与长度,不接纳屏上文字。 */
+/** Lock screen detection diagnostics keep only technical attributes of system controls; resource and class names are restricted in characters and length too, and on-screen text is never accepted. */
 internal object KeyguardDiagnostics {
     fun name(value: CharSequence?): String = value?.toString().orEmpty().take(160).map { c ->
         if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c in "_.\$:/-") c else '_'

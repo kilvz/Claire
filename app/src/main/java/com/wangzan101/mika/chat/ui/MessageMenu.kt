@@ -62,8 +62,8 @@ import com.wangzan101.mika.settings.ui.models.edit
 import com.wangzan101.mika.ui.Route
 
 /**
- * 对话页里长按的一条消息:[key] 认是哪一条(「选择文字」记的就是它),[from] 是谁说的,[text] 是复制、引用用的纯文字
- * (回答去掉了 Markdown 符号,用户的话去掉了附件、屏幕、引用那几行),[bounds] 是它在窗口里的位置和大小,[lifted] 画抬起的那一张。
+ * A message long-pressed in the conversation page: [key] identifies which one it is (this is what "select text" records), [from] is who said it, [text] is the plain text used for copying and quoting
+ * (for answers the Markdown symbols are stripped, for the user's own words the attachment, screen and quote lines are removed), [bounds] is its position and size in the window, [lifted] draws the raised copy.
  */
 internal class MessageTarget(
     val key: String,
@@ -73,16 +73,16 @@ internal class MessageTarget(
     val lifted: @Composable () -> Unit,
 )
 
-/** 对话页给消息的长按菜单:[selecting] 是此刻处在「选择文字」里的那一条,[open] 弹出菜单。 */
+/** The long-press menu the conversation page gives messages: [selecting] is the one currently in "select text" mode, [open] pops up the menu. */
 internal class MessageMenuHost(val selecting: String?, val open: (MessageTarget) -> Unit)
 
-/** 没有时(单独测某个部件)消息照旧长按就选中文字。 */
+/** When absent (testing a single component in isolation), long-pressing a message still selects text. */
 internal val LocalMessageMenu = compositionLocalOf<MessageMenuHost?> { null }
 
 /**
- * 一条消息的文字部分:长按(振一下)弹出复制 / 引用 / 选择文字的菜单;选了「选择文字」的那条换回系统的长按选中([selectTag] 标在选区上)。
- * 文字里的链接照旧点开(点击由里面的文字先处理)。文件卡片、「查看过程」不包在里面。[text] 为空时不弹菜单。
- * [modifier] 是这条消息自己的底(背景、宽度、内边距),抬起的那张按它的位置和大小摆;外边距放在外面。
+ * The text part of a message: a long press (with one haptic tick) pops up the copy / quote / select-text menu; the one that chose "select text" goes back to the system's long-press selection ([selectTag] tags the selection).
+ * Links in the text still open as before (the tap is handled by the text inside first). File cards and "view process" are not wrapped in here. When [text] is blank no menu is shown.
+ * [modifier] is this message's own backing (background, width, padding), and the raised copy is laid out by its position and size; outer margins go outside.
  */
 @Composable
 internal fun MessageArea(
@@ -101,9 +101,9 @@ internal fun MessageArea(
     }
     val haptic = LocalHapticFeedback.current
     val label = stringResource(R.string.chat_message_actions)
-    // 在窗口里的位置和大小(不裁掉滚出列表的部分);只在回调里读,不引起重组
+    // Position and size in the window (not clipped to the part scrolled out of the list); only read inside the callback, so it does not trigger recomposition
     val bounds = remember { mutableStateOf(Rect.Zero) }
-    // 手势一直用最新的这一份(流式回答时会不停重组),不因重组重启、丢掉按到一半的长按
+    // The gesture always uses the latest copy of this (streaming answers recompose nonstop), so it does not restart on recomposition or lose a long press that is halfway through
     val open by rememberUpdatedState({ host.open(MessageTarget(key, from, text, bounds.value, lifted)) })
     Box(
         Modifier
@@ -111,7 +111,7 @@ internal fun MessageArea(
             .then(modifier)
             .pointerInput(Unit) {
                 detectTapGestures(onLongPress = {
-                    // 和系统里长按一样振一下
+                    // One haptic tick, same as a system long press
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     open()
                 })
@@ -122,8 +122,8 @@ internal fun MessageArea(
 }
 
 /**
- * 长按一条消息后的菜单(和侧栏里长按对话同一个样子,见 [LongPressMenu]):那条消息抬起,下面是复制、引用、选择文字;
- * 一条已答完的回答还能「从这里分支」,用户自己的话能「从这里重新问」(见 [onBranch]、[onBranchRetry])。用户自己的话靠右,菜单也靠右。
+ * The menu after long-pressing a message (same look as long-pressing a conversation in the sidebar, see [LongPressMenu]): that message is raised, and below are copy, quote and select text;
+ * an answer that has finished can also "branch from here", and the user's own words can "ask again from here" (see [onBranch], [onBranchRetry]). The user's own words sit on the right, and so does the menu.
  */
 @Composable
 internal fun MessageMenu(
@@ -159,7 +159,7 @@ internal fun MessageMenu(
     )
 }
 
-/** 菜单开着时后面那层:安卓 12 起按出现的进度模糊([MenuBlur]),无障碍也只读菜单。菜单没开时什么也不加。 */
+/** The layer behind while the menu is open: from Android 12 it blurs according to the reveal progress ([MenuBlur]), and accessibility reads only the menu. Adds nothing when the menu is not open. */
 internal fun Modifier.behindMenu(open: Boolean, progress: () -> Float): Modifier =
     if (!open) this else this
         .then(
@@ -170,18 +170,18 @@ internal fun Modifier.behindMenu(open: Boolean, progress: () -> Float): Modifier
         )
         .clearAndSetSemantics {}
 
-/** 把消息的纯文字放进剪贴板,提示一句「已复制」。 */
+/** Puts the message's plain text on the clipboard and shows a brief "copied" toast. */
 internal fun copyMessage(context: Context, text: String) {
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Claire", text))
     Toast.makeText(context, context.getString(R.string.chat_copied), Toast.LENGTH_SHORT).show()
 }
 
-/** 引用怎么念给读屏:「引用 Claire:……」「引用你的话:……」。 */
+/** How a quote is read out to the screen reader: "quoting Claire: …", "quoting what you said: …". */
 @Composable
 private fun quoteDescription(q: QuoteMessage.Quote): String =
     stringResource(if (q.from == QuoteMessage.From.Mika) R.string.chat_quoting_mika else R.string.chat_quoting_you, q.text)
 
-/** 输入框上方待发的引用:左边一道竖线,引的内容最多两行,右边 × 去掉。 */
+/** The pending quote above the input field: a vertical bar on the left, at most two lines of quoted content, an × on the right to remove it. */
 @Composable
 internal fun QuoteChip(quote: QuoteMessage.Quote, onRemove: () -> Unit, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -208,7 +208,7 @@ internal fun QuoteChip(quote: QuoteMessage.Quote, onRemove: () -> Unit, modifier
     }
 }
 
-/** 用户的话里引的那条:气泡上方一小块淡色,最多两行。 */
+/** The line quoted in the user's own message: a small pale block above the bubble, at most two lines. */
 @Composable
 internal fun SentQuote(quote: QuoteMessage.Quote, maxWidth: Dp) {
     val c = MikaTheme.colors

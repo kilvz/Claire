@@ -9,7 +9,7 @@ import android.os.Parcelable
 import android.os.Process
 import com.wangzan101.mika.chat.SharedDraftStore
 
-/** 系统分享进来的内容:一段文字,或带附言的一个或多个文件;对不上、过长、非法的一律拒收。 */
+/** Content shared in from the system: a piece of text, or one or more files with an accompanying note; anything mismatched, too long or illegal is rejected outright. */
 internal sealed interface ShareContent {
     data class Text(val text: String) : ShareContent
     data class Files(
@@ -37,7 +37,7 @@ internal sealed interface ParsedShare<out U> {
 internal fun isShareIntent(intent: Intent): Boolean =
     intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE
 
-/** 纯逻辑解析分享字段,便于在 JVM 单测里覆盖单文件、多文件与各类异常输入。 */
+/** Pure-logic parsing of the share fields, so JVM unit tests can cover single files, multiple files and every kind of malformed input. */
 internal fun <U> parseShareInput(
     multiple: Boolean,
     type: String?,
@@ -74,7 +74,7 @@ internal fun <U> parseShareInput(
     return ParsedShare.Files(text, accepted, normalizedType, clipUris.toSet(), overLimit)
 }
 
-/** 读出分享 intent 的内容;不是分享(ACTION_SEND/ACTION_SEND_MULTIPLE)时为 null。 */
+/** Reads the content of a share intent; null when it is not a share (ACTION_SEND/ACTION_SEND_MULTIPLE). */
 internal fun readShare(intent: Intent): ShareContent? {
     val multiple = when (intent.action) {
         Intent.ACTION_SEND -> false
@@ -133,7 +133,7 @@ internal fun readShare(intent: Intent): ShareContent? {
     }
 }
 
-/** 检查分享方的读取权，避免用 Claire 的相册或文件夹权限代读任意 URI。 */
+/** Checks the sharer's read permission, so Claire's gallery or folder permissions are never used to read arbitrary URIs on their behalf. */
 internal fun Activity.shareCanRead(intent: Intent, uri: Uri, clipUris: Set<Uri>): Boolean {
     if (uri.scheme != "content") return false
     val read = Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -141,7 +141,7 @@ internal fun Activity.shareCanRead(intent: Intent, uri: Uri, clipUris: Set<Uri>)
         if (Build.VERSION.SDK_INT >= 35) {
             caller?.let { return@runCatching it.checkContentUriPermission(uri, read) == PackageManager.PERMISSION_GRANTED }
         }
-        // 旧系统无法查询启动方，只接受带有读取标志、并且 Claire 确实有 URI 授权的内容。
+        // Older systems cannot query the caller, so only accept content that carries the read flag and for which Claire really does hold a URI grant.
         (intent.flags and read) != 0 && (uri in clipUris || intent.data == uri) &&
             checkUriPermission(uri, Process.myPid(), Process.myUid(), read) == PackageManager.PERMISSION_GRANTED
     }.getOrDefault(false)

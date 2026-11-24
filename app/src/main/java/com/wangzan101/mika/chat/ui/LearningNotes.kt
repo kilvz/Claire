@@ -17,7 +17,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.memory.ui.Link
 
-/** 结果卡片下的小字:记住了什么、学会或停用了哪项技能,各带按钮。 */
+/** The small print under the result card: what was remembered, and which skill was learned or suspended, each with its own buttons. */
 internal fun LazyListScope.learningNotes(index: Int, ex: Exchange, vm: ChatViewModel) {
     val runId = ex.runId ?: return
     if (ex.memoryNotes.isEmpty() && ex.skillNotes.isEmpty()) return

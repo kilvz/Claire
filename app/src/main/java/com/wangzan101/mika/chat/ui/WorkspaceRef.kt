@@ -3,7 +3,7 @@ package com.wangzan101.mika.chat.ui
 import com.wangzan101.mika.core.workspace.SandboxPaths
 import com.wangzan101.mika.ui.MarkdownModel
 
-/** 把回复里抽出的 `/workspace/...` 引用转成附件渲染模型(照片/文件分好,大小留空);越界(`..`)的引用丢弃。 */
+/** Turns the `/workspace/...` references extracted from a reply into the attachment render model (photos/files separated, the size left blank); references that escape the sandbox (`..`) are dropped. */
 fun outputRefsParsed(answer: String): AttachmentMessage.Parsed {
     val items = MarkdownModel.workspaceRefs(answer)
         .filter { SandboxPaths.normalize(it) != null }

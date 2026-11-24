@@ -14,7 +14,7 @@ data class SourceEntry(
 
 data class SourceUi(val legacyText: String?, val entries: List<SourceEntry>)
 
-/** 从已保存的运行记录还原回答来源；旧记录没有 Sources 时保留最后一组截图。 */
+/** Restores the sources of an answer from the saved run record; when an old record has no Sources, the last set of screenshots is kept. */
 class SourceViewModel(
     private val store: RunStore,
     private val runId: String?,

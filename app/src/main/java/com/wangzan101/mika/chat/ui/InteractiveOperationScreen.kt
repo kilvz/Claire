@@ -40,7 +40,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/** 触点只送给传入的那一次运行；首次触摸只申请接管，不重放在等待期间可能已失效的触点。 */
+/** Touches are sent only to the single run that was passed in; the first touch only requests takeover and does not replay touches that may have gone stale while waiting. */
 @Composable
 internal fun InteractiveOperationScreen(run: ScreenControl, frame: Bitmap?, mode: PipMode, onConversations: () -> Unit, onClose: () -> Unit) {
     val control by run.manualControl.state.collectAsState()
@@ -86,7 +86,7 @@ internal fun InteractiveOperationScreen(run: ScreenControl, frame: Bitmap?, mode
                 val event = awaitPointerEvent()
                 if (event.changes.size != 1) multiple = true
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                // 取消/被别的手势接走时不注入一个补造的点击。
+                // On cancel or when another gesture takes over, do not inject a made-up tap.
                 if (change.isConsumed) { multiple = true; break }
                 end = change
                 if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) moved = true

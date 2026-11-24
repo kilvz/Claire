@@ -37,15 +37,15 @@ import kotlinx.coroutines.delay
 
 private val RowShape = MikaShapes.Button
 
-/** 一轮下面留页的那一行该怎么显示:还开着(绿色那一行,能关)、已经关了(一句灰字)、或这一轮没留页。 */
+/** How the kept-page line under a round should be displayed: still open (the green line, which can be closed), already closed (one line of grey text), or no page kept for this round. */
 sealed interface KeptRow {
     data class Live(val page: KeptPage) : KeptRow
     data class Closed(val reason: String?) : KeptRow
 
     companion object {
         /**
-         * [ex] 那一轮下面显示什么:此刻留着的 [live] 就是这一轮留的,是 [Live];这一轮记着留过页、而它已经不在了,是 [Closed]
-         * (没记下原因的按 Claire 退出了说);别的为 null。
+         * What to show under the round [ex]: if the currently kept [live] page is the one this round kept, it is [Live]; if this round has a record that it kept a page and that page is no longer there, it is [Closed]
+         * (with no recorded reason, it says Claire exited); otherwise null.
          */
         fun of(ex: Exchange, live: KeptPage?): KeptRow? = when {
             live != null && ex.runId != null && live.runId == ex.runId -> Live(live)
@@ -55,7 +55,7 @@ sealed interface KeptRow {
     }
 }
 
-/** 一轮下面留页的那一行(见 [KeptRow])。 */
+/** The kept-page line under a round (see [KeptRow]). */
 internal fun LazyListScope.keptPageRow(index: Int, ex: Exchange, live: KeptPage?, onClose: () -> Unit) {
     val row = KeptRow.of(ex, live) ?: return
     item("k$index") {
@@ -69,7 +69,7 @@ internal fun LazyListScope.keptPageRow(index: Int, ex: Exchange, live: KeptPage?
     }
 }
 
-/** 绿色那一行:「这一页保持在后台运行」,下面「站点 · 还剩多久后自动关」,右边「关闭」。剩下的时间每分钟走一次。 */
+/** The green line: "this page keeps running in the background", below it "site · time left until it closes automatically", and "Close" on the right. The remaining time ticks once per minute. */
 @Composable
 fun KeptLine(page: KeptPage, onClose: () -> Unit) {
     val c = MikaTheme.colors
