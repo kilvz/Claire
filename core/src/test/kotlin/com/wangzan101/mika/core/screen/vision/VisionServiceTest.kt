@@ -51,7 +51,7 @@ class VisionServiceTest {
         val imgs = msg.parts.drop(1).map { it as Part.Image }
         assertEquals(2, imgs.size)
         assertTrue(imgs.all { it.mime == "image/jpeg" })
-        // 大图按长边 1280 缩小后再发
+        // Large images are scaled down to a 1280 long side before being sent
         assertEquals(1280 to 640, ops.size(Base64.getDecoder().decode(imgs[0].pngBase64)))
         assertEquals(10 to 10, ops.size(Base64.getDecoder().decode(imgs[1].pngBase64)))
     }

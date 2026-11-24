@@ -13,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** SearXNG、Jina、Exa、DeepSeek 几家的请求形状、解析和出错时的说法。 */
+/** Request shapes, parsing, and failure wording for SearXNG, Jina, Exa, and DeepSeek. */
 class ProviderSearchTest {
     private fun ok(body: String) = MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody(body)
 
@@ -86,7 +86,7 @@ class ProviderSearchTest {
 
     @Test fun jinaNoResults422IsAnEmptySuccess() = withServer(
         MockResponse().setResponseCode(422).setBody(
-            // 真机实测的零命中返回
+            // Zero-hit response captured on a real device
             """{"data":null,"code":422,"name":"AssertionFailureError","status":42206,"message":"No search results available for query zq site:example.invalid","readableMessage":"AssertionFailureError: No search results available for query zq site:example.invalid"}""",
         ),
     ) { server ->
@@ -161,7 +161,7 @@ class ProviderSearchTest {
         assertEquals("authentication_failed", (DeepSeekSearch("bad", client, server.url("/")).search("q", 5) as WebSearchResult.Failure).code)
     }
 
-    // ---------- 共用 ----------
+    // ---------- Shared ----------
 
     @Test fun providersNeedTheRightFields() {
         assertEquals(WebSearchProvider.Google, WebSearchProvider.entries.first())

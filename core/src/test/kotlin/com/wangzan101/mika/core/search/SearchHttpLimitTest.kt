@@ -77,7 +77,7 @@ class SearchHttpLimitTest {
                 exchange.sendResponseHeaders(200, if (chunked) 0 else body.size.toLong())
                 exchange.responseBody.write(body)
                 exchange.responseBody.flush()
-                // 保持 HTTP 正文未结束，客户端应当在超限时自行返回。
+                // Keep the HTTP body unfinished; the client should return on its own once the limit is exceeded.
                 if (holdOpen) check(release.await(10, TimeUnit.SECONDS))
             } finally {
                 exchange.close()

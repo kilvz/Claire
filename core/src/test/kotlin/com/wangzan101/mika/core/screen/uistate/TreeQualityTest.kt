@@ -22,7 +22,7 @@ class TreeQualityTest {
     private fun el(i: Int, name: String, bounds: List<Int>, clickable: Boolean = false) =
         UiElement("@e$i", "TextView", name, 0, 0, bounds, null, clickable, false, false)
 
-    /** 竖着排一列有名字的元素,每个 60 高。 */
+    /** A vertical column of named elements, each 60 tall. */
     private fun rows(n: Int, top: Int = 100) = (0 until n).map { i -> el(i + 1, "第${i + 1}行", listOf(50, top + i * 60, 950, top + i * 60 + 50), clickable = true) }
 
     private fun shot(elements: List<UiElement>, nodes: List<UiTreeNode> = emptyList(), protected: Boolean = false, unreadable: String? = null) =
@@ -31,13 +31,13 @@ class TreeQualityTest {
 
     private fun line(text: String, top: Int, confidence: Float? = null) = VisibleTextLine(text, listOf(100, top, 600, top + 40), confidence)
 
-    // ---- 只看树 ----
+    // ---- Tree only ----
 
     @Test fun protectedEmptyAndUnreadableTreesAreClassifiedWithoutOcr() {
         assertEquals(TreeCheck(TreeQuality.Protected), TreeAdequacy.ofTree(shot(rows(10), protected = true)))
         assertEquals(TreeCheck(TreeQuality.Unusable, "empty_elements"), TreeAdequacy.ofTree(shot(emptyList())))
         assertEquals(TreeCheck(TreeQuality.Unusable, "unreadable_window"), TreeAdequacy.ofTree(shot(emptyList(), unreadable = "com.example")))
-        // 没有窗口也没有 App:空屏,没什么可补
+        // No window and no app: a blank screen, nothing to supplement
         assertEquals(TreeQuality.Adequate, TreeAdequacy.ofTree(ScreenSnapshot("p", null, emptyList(), 1080, 2400, hasWindow = false)).quality)
     }
 
@@ -45,7 +45,7 @@ class TreeQualityTest {
         val blank = (1..4).map { el(it, "", listOf(0, it * 100, 100, it * 100 + 50), clickable = true) }
         assertEquals(TreeCheck(TreeQuality.Unusable, "unlabeled_controls"), TreeAdequacy.ofTree(shot(blank)))
         assertEquals(TreeCheck(TreeQuality.Partial, "unlabeled_controls"), TreeAdequacy.ofTree(shot(blank + el(9, "标题", listOf(0, 0, 999, 80)))))
-        // 只有一个没名字的可滚动容器:树里一个字也没有
+        // Only one unnamed scrollable container: not a single word in the tree
         val list = UiElement("@e1", "RecyclerView", "", 0, 0, listOf(0, 0, 999, 999), null, false, false, true)
         assertEquals(TreeCheck(TreeQuality.Unusable, "no_text"), TreeAdequacy.ofTree(shot(listOf(list))))
     }
@@ -56,7 +56,7 @@ class TreeQualityTest {
     }
 
     @Test fun richNamedTreeIsNotDowngradedByUnlabeledControls() {
-        // 商品页:大量带名字的文本(标题/价格),少数可点控件没有名字——树文字已足够,不该因无名控件转 OCR
+        // Product page: plenty of named text (titles/prices), a few clickable controls without names — the tree text is already sufficient, so it must not fall back to OCR because of unnamed controls
         val rich = (1..65).map { i -> el(i, "商品$i", listOf(50, 100 + i * 30, 900, 120 + i * 30)) }
         val unnamedButton = el(70, "", listOf(0, 0, 999, 80), clickable = true)
         assertEquals(TreeCheck(TreeQuality.Adequate), TreeAdequacy.ofTree(shot(rich + unnamedButton)))
@@ -65,23 +65,23 @@ class TreeQualityTest {
     @Test fun largeTextlessAreaNeedsOcrUnlessItOnlyBacksNamedElements() {
         val named = rows(8)
         val textNodes = named.map { UiTreeNode("TextView", it.bounds, text = it.name) }
-        // 屏幕下半一大块没有字的画布,有名字的元素都在上面
+        // A large textless canvas on the lower half of the screen; the named elements all sit above it
         val canvas = UiTreeNode("View", listOf(0, 600, 999, 999))
         assertEquals(TreeCheck(null), TreeAdequacy.ofTree(shot(named, textNodes + canvas)))
-        // 垫在整屏下面的背景图:有名字的元素都落在它里面,不算盲区
+        // A background image behind the whole screen: every named element falls inside it, so it is not a blind spot
         val backdrop = UiTreeNode("ImageView", listOf(0, 0, 999, 999))
         assertEquals(TreeCheck(TreeQuality.Adequate), TreeAdequacy.ofTree(shot(named, listOf(backdrop) + textNodes)))
     }
 
-    // ---- 读字之后 ----
+    // ---- After reading text ----
 
     @Test fun ocrTextOutsideTheTreeDecidesPartialOrAdequate() {
         val unsure = TreeCheck(null)
         assertEquals(TreeCheck(TreeQuality.Partial, "text_outside_tree"), TreeAdequacy.withText(unsure, listOf(line("甲", 100), line("乙", 200), line("丙", 300))))
         assertEquals(TreeCheck(TreeQuality.Adequate), TreeAdequacy.withText(unsure, listOf(line("甲", 100))))
-        // 没读到字:照旧判不准,不写 treeQuality
+        // No text read: still undecided, treeQuality is not written
         assertEquals(unsure, TreeAdequacy.withText(unsure, null))
-        // 树已经判定的不改
+        // A verdict already made from the tree is not changed
         val empty = TreeCheck(TreeQuality.Unusable, "empty_elements")
         assertEquals(empty, TreeAdequacy.withText(empty, emptyList()))
     }
@@ -92,11 +92,11 @@ class TreeQualityTest {
             line("HA3)", 400), line("A", 450), line("・・・", 500), line("(1)", 550), line("5G", 600), line("模糊的字", 650, confidence = 0.2f),
         )
         assertEquals(listOf("张三", "明天见", "12:30", "Tom", "OK", "¥89"), VisibleText.legible(lines).map { it.text })
-        // 以西文为主的屏上,短串照留
+        // On a screen dominated by Latin text, short strings are kept
         assertEquals(listOf("HA3)", "5G", "Settings"), VisibleText.legible(listOf(line("HA3)", 100), line("5G", 200), line("Settings", 300))).map { it.text })
     }
 
-    // ---- 读屏结果 ----
+    // ---- Screen read result ----
 
     private class OcrScreen(var elements: List<UiElement>, val lines: List<VisibleTextLine>) : ScreenPort by FakeScreen() {
         var ocrReads = 0
@@ -155,13 +155,13 @@ class TreeQualityTest {
     @Test fun elementListAndFreshLookReadTextOnDemandWhenTreeIsPoor() = runTest {
         val s = OcrScreen(emptyList(), chat)
         val d = toolDispatcher(s)
-        // phone_collect 逐屏读的就是 list_elements:树不够用时照样带上屏上文字
+        // phone_collect reads screen by screen through exactly list_elements: when the tree is inadequate it still carries the on-screen text
         val listed = d.executeRead(Part.ToolCall("l", "phone_list_elements", "{}"))
         assertEquals(3, listed.content["visibleText"]!!.jsonArray.size)
-        // 核查前再看一眼也读屏上文字
+        // Taking another look before verification also reads the on-screen text
         val fresh = d.evidence().fresh.joinToString("\n") { it.text }
         assertTrue(fresh, "明天见" in fresh)
-        // 树够用时不读字
+        // When the tree is adequate, no text is read
         s.elements = rows(8)
         val before = s.ocrReads
         d.evidence()

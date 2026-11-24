@@ -7,13 +7,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 画面粗比较:合成的画面(像素函数),整屏与目标区域分别算变了多少。 */
+/** Coarse frame comparison: with synthetic frames (a pixel function), measures how much the whole screen and the target region each changed. */
 class FrameDiffTest {
     private val w = 1080
     private val h = 2400
     private fun gray(v: Int) = (0xff shl 24) or (v shl 16) or (v shl 8) or v
 
-    /** 白底,[boxes] 里的矩形(像素)涂成 [v]。 */
+    /** White background, with the rectangles (in pixels) in [boxes] painted [v]. */
     private fun frame(v: Int = 0, vararg boxes: IntArray) = FrameGrid.sample(w, h) { x, y ->
         if (boxes.any { x in it[0] until it[2] && y in it[1] until it[3] }) gray(v) else gray(255)
     }!!

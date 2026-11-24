@@ -16,7 +16,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 自身工具:开关/来源的暴露矩阵、只读状态、文件路径、通知限流、剪贴板。 */
+/** Self tools: the exposure matrix for switches/sources, read-only status, file paths, notification rate limiting, and the clipboard. */
 class SelfToolsTest {
     private class FakeSelf : SelfPort {
         var status = SelfStatus(

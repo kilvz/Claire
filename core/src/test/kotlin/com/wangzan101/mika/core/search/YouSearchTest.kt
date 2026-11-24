@@ -71,7 +71,7 @@ class YouSearchTest {
     }
 
     @Test fun noHitsIsAnEmptySuccessNotAFailure() = withServer(ok("""{"results":{},"metadata":{"query":"q"}}""")) { server ->
-        // 免费接口零命中时的真实返回:results 里没有 web
+        // The real response of the free endpoint for zero hits: no web key inside results
         assertEquals(WebSearchResult.Success(emptyList()), you(server).search("q", 5))
     }
 

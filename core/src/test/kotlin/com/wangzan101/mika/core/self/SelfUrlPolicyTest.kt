@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 代开地址的规则:只 http/https,不要账号密码,长度有限;与 web_navigate 同一条基础规则。 */
+/** Rules for proxied URLs: http/https only, no username or password, bounded length; the same underlying rule as web_navigate. */
 class SelfUrlPolicyTest {
     @Test fun acceptsWebUrls() {
         assertNull(SelfUrlPolicy.check("https://example.com/a?q=1"))

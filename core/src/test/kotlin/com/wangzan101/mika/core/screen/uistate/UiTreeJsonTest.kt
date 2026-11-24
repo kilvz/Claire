@@ -41,7 +41,7 @@ class UiTreeJsonTest {
         val after = screen(second = "已查看", extra = true)
         val change = UiTreeJson.changes(before, after)
         val updated = change["updated"]!!.jsonArray
-        // 树只报结构变化:新增节点 @e3 在;@e2 只改了文字(结构没变),由 elements 差异报,这里不再重复
+        // The tree reports structural changes only: the new node @e3 is listed; @e2 only changed its text (structure unchanged), which the elements diff reports, so it is not repeated here
         assertEquals(listOf("w7/0/2"), updated.map { it.jsonObject["path"]!!.jsonPrimitive.content })
         assertEquals("@e3", updated[0].jsonObject["node"]!!.jsonObject["ref"]!!.jsonPrimitive.content)
         assertTrue(change["removed"]!!.jsonArray.isEmpty())

@@ -6,14 +6,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 搜索摘要截到 600 个码点,不能留下半个代理对。 */
+/** Search snippets are clipped to 600 code points and must not leave half a surrogate pair. */
 class SearchSnippetClipTest {
     @Test fun blankUrlsAreDropped() {
         assertNull(SearchHttp.hit("t", "  ", "s"))
     }
 
     @Test fun longSnippetsAreClippedWithoutSplittingASurrogatePair() {
-        // 开头一个 ASCII 字符让第 600 个 char 正好落在某个 emoji 的高代理上
+        // The leading ASCII character makes the 600th char land exactly on the high surrogate of an emoji
         val text = SearchHttp.hit("t", "https://example.com", "x" + "😀".repeat(700))!!.snippet
         assertTrue(text.endsWith("…"))
         val body = text.removeSuffix("…")

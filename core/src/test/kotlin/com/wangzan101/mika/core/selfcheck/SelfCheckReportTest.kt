@@ -66,7 +66,7 @@ class SelfCheckReportTest {
         assertTrue(line.length < 260)
     }
 
-    /** 报告只有固定的几行抬头和每项一行:没有地方放账号、App 列表、用户内容或序列号。 */
+    /** The report has only a fixed set of header lines and one line per check: nowhere to put accounts, an app list, user content, or serial numbers. */
     @Test
     fun onlyKnownLinesAppear() {
         val text = SelfCheckReport.render(done())
