@@ -52,15 +52,15 @@ class TeachDraftTest {
     @Test fun requestTellsTheModelToUseDirectLaunchesAndLinks() {
         val req = TeachDraft.request(session(), route())
         assertTrue(req.contains("启动 com.xingin.xhs"))
-        assertTrue(req.contains("直接打开"))
-        assertTrue(req.contains("不要写") && req.contains("桌面"))
+        assertTrue(req.contains("open <link> directly"))
+        assertTrue(req.contains("Do not write about the home screen"))
     }
 
     @Test fun requestCarriesTheFoldedHumanSteps() {
         val req = TeachDraft.request(session(), route())
-        assertTrue(req.contains("已按 Claire 的直达能力省掉"))
+        assertTrue(req.contains("Omitted thanks to Claire's direct capabilities"))
         assertTrue(req.contains("点了「小红书」"))
-        assertTrue(req.contains("输入的文字没有保存"))
+        assertTrue(req.contains("Typed text was not saved"))
     }
 
     @Test fun localAssemblyNeverMentionsTheDesktop() {
@@ -111,7 +111,7 @@ class TeachDraftTest {
     @Test fun brokenModelDraftFallsBackToLocalAssembly() = runBlocking {
         val skill = drafted("Just a sentence, no sections at all.")
         assertNotNull(skill)
-        assertTrue(skill!!.skill.markdown.contains("这份由本机按示范路线整理"))
+        assertTrue(skill!!.skill.markdown.contains("This draft was assembled locally from the demonstrated route"))
         assertFalse("本机整理的稿不能被标成模型写的", skill.byModel)
     }
 
@@ -139,7 +139,7 @@ class TeachDraftTest {
         val skill = drafted(reply)
         assertNotNull(skill)
         assertFalse("声称试跑成功的模型稿不能收", skill!!.skill.markdown.contains("已经试跑成功"))
-        assertTrue(skill.skill.markdown.contains("这份由本机按示范路线整理"))
+        assertTrue(skill.skill.markdown.contains("This draft was assembled locally from the demonstrated route"))
     }
 
     /** 只剩「启动 App」的路线整不出技能:没有真实操作的示范不该变成一份空壳。 */

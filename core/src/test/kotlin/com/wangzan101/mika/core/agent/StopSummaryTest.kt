@@ -56,7 +56,7 @@ class StopSummaryTest {
         val summary = StopSummary.plain("找咖啡馆", events, null)
         val facts = StopSummary.facts("找咖啡馆", events, null)
         assertTrue(summary, "已确认进度:目标 2/3" in summary && "0/3" !in summary)
-        assertTrue(facts, "<progress>\n目标 2/3\n</progress>" in facts && "0/3" !in facts)
+        assertTrue(facts, "<progress>\ngoal 2/3\n</progress>" in facts && "0/3" !in facts)
     }
 
     @Test fun plainSummaryCountsBatchActionsAndNamesThem() {
@@ -103,10 +103,10 @@ class StopSummaryTest {
         assertTrue(light.offeredTools.single().isEmpty())
         val input = (light.requests.single().single().parts.single() as Part.Text).text
         assertTrue(input, input.contains("<request>\n把推荐里的岗位都打个招呼\n</request>"))
-        assertTrue(input, input.contains("第 3 步 点击 · jobs.example.com(对外发出) —— 用意:给张三的产品经理岗位打招呼"))
-        assertTrue(input, input.contains("第 6 步 点击 · jobs.example.com(没成功) —— 用意:给赵六的测试岗位打招呼"))
+        assertTrue(input, input.contains("Step 3 点击 · jobs.example.com (sent externally) — Intent: 给张三的产品经理岗位打招呼"))
+        assertTrue(input, input.contains("Step 6 点击 · jobs.example.com (failed) — Intent: 给赵六的测试岗位打招呼"))
         // 连着读同一处只记一行
-        assertEquals(1, Regex("第 2 步 读网页").findAll(input).count())
+        assertEquals(1, Regex("Step 2 读网页").findAll(input).count())
         assertTrue(input, input.contains("<last_read>\n推荐职位:张三"))
         assertTrue(input, input.contains("<draft>\n写到一半\n</draft>"))
         assertTrue(light.system!!.isNotBlank())
@@ -122,7 +122,7 @@ class StopSummaryTest {
         val many = (1..500).flatMap { listOf(said(it, "phone_tap", "第 $it 个".repeat(50)), act(it, "phone_tap", "com.a.b")) }
         val facts = StopSummary.facts("g", many, "x".repeat(10_000))
         assertTrue("${facts.length}", facts.length < 15_000)
-        assertTrue(facts.contains("中间省略"))
+        assertTrue(facts.contains("more actions omitted"))
     }
 
     @Test fun fallsBackToMainModelThenToPlainText() = runTest {

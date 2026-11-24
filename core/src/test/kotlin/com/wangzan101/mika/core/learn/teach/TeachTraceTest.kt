@@ -116,7 +116,7 @@ class TeachTraceTest {
         assertTrue(s.steps[2].needsClarification)
         assertFalse(s.steps[0].needsClarification && s.steps[0].nodeName == null && s.steps[0].viewId != null)
         val line = teachLine(s.steps[2])
-        assertTrue(line.contains("没有可靠"))
+        assertTrue(line.contains("no reliable UI node"))
         assertFalse(Regex("\\d+\\s*,\\s*\\d+").containsMatchIn(line))
         assertFalse(teachGoalAccepted("密码是 123456"))
         val edited = TeachTrace.annotate(s, s.steps[0].id, secret, null)
@@ -130,7 +130,7 @@ class TeachTraceTest {
         assertFalse(s.steps.single().insufficient)
         val note = TeachTrace.annotate(s, s.steps.single().id, null, "右上角才是筛选，不是底部标签")
         s = (note as TeachEdit.Ok).session
-        assertTrue(teachLine(s.steps.single()).contains("[你说明的]"))
+        assertTrue(teachLine(s.steps.single()).contains("[explained by you]"))
         s = TeachTrace.remove(s, s.steps.single().id)
         assertTrue(s.steps.isEmpty())
     }
@@ -167,7 +167,7 @@ class TeachTraceTest {
         assertTrue(skill.markdown.contains(TeachSkill.NOT_TRIAL_RUN))
         assertTrue(skill.markdown.contains(TeachSkill.NOT_ABSENT))
         assertTrue(skill.markdown.contains(TeachSkill.STOP_IF_UNMATCHED))
-        assertTrue(skill.markdown.contains("[观察到]"))
+        assertTrue(skill.markdown.contains("[observed]"))
         assertFalse(skill.markdown.contains("试跑成功了"))
         assertNull(SkillDrafter.validate(skill.markdown, emptySet(), null))
         val request = model.requests.single().joinToString { it.parts.filterIsInstance<Part.Text>().joinToString { p -> p.text } }

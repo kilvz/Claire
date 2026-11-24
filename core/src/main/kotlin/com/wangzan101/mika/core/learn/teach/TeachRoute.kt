@@ -50,11 +50,11 @@ data class TeachRoute(
                 val previous = lastApp
                 when {
                     previous == null && viaLauncher ->
-                        out += RouteStep(pkg, "启动 $name", null)
+                        out += RouteStep(pkg, "Launch $name", null)
                     viaLauncher && pkg == previous ->
-                        out += RouteStep(pkg, "回到 $name", null)
+                        out += RouteStep(pkg, "Back to $name", null)
                     previous != null && pkg != previous ->
-                        out += RouteStep(pkg, (if (pkg in apps) "回到 " else "改用 ") + name, null)
+                        out += RouteStep(pkg, (if (pkg in apps) "Back to " else "Switch to ") + name, null)
                 }
                 lastApp = pkg
                 viaLauncher = false
@@ -88,11 +88,11 @@ data class TeachRoute(
         private fun foldLine(step: TeachStep): String {
             val target = step.nodeName ?: step.viewId
             return when (step.kind) {
-                TeachKind.Window -> step.window?.let { "切到「$it」" } ?: "切换了界面"
-                TeachKind.Click -> target?.let { "点了「$it」" } ?: "点了一下"
-                TeachKind.LongClick -> target?.let { "长按了「$it」" } ?: "长按了一下"
-                TeachKind.Type -> target?.let { "在「$it」输入了文字" } ?: "输入了文字"
-                TeachKind.Scroll -> "滚动"
+                TeachKind.Window -> step.window?.let { "switched to \"$it\"" } ?: "switched screens"
+                TeachKind.Click -> target?.let { "tapped \"$it\"" } ?: "tapped"
+                TeachKind.LongClick -> target?.let { "long-pressed \"$it\"" } ?: "long-pressed"
+                TeachKind.Type -> target?.let { "typed into \"$it\"" } ?: "typed"
+                TeachKind.Scroll -> "scrolled"
             }
         }
     }

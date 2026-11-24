@@ -111,7 +111,7 @@ class SkillDrafterTest {
         assertTrue(lines.all { it.where == "com.tencent.mm" })
         assertEquals(false, lines.last().changed)
         val text = ActionDigest.render(lines)
-        assertTrue(text.contains("<输入内容>"))
+        assertTrue(text.contains("typed <text>"))
         assertFalse(text.contains("明天回家吃饭"))
         assertFalse(text.contains("张三"))
         assertEquals(2, ActionDigest.of(runEvents(), TOOLS, maxLines = 2).size)
@@ -140,9 +140,9 @@ class SkillDrafterTest {
         assertFalse(request.contains("晚上一起吃饭"))
         assertFalse(request.contains("老妈"))
         assertFalse(request.contains("明天回家吃饭"))
-        assertTrue(request.contains("目标:给『<参数>』发『<参数>』"))
-        assertTrue(request.contains("<输入内容>"))
-        assertTrue(request.contains("tap 「搜索」"))
+        assertTrue(request.contains("Goal: 给『<参数>』发『<参数>』"))
+        assertTrue(request.contains("typed <text>"))
+        assertTrue(request.contains("tap \"搜索\""))
         assertTrue(model.offeredTools.single().isEmpty())
     }
 
@@ -320,9 +320,9 @@ class SkillDrafterTest {
         val lines = ActionDigest.of(runEvents(extra = web), TOOLS)
         val nav = lines.single { it.tool == "web_navigate" }
         assertEquals("shop.example.com", nav.target) // 只记站点,不记查询串
-        assertEquals("网站 shop.example.com", nav.where)
+        assertEquals("website shop.example.com", nav.where)
         val tapOnPage = lines.single { it.step == 12 }
-        assertEquals("网站 shop.example.com", tapOnPage.where)
+        assertEquals("website shop.example.com", tapOnPage.where)
         assertEquals("李四的订单 2024-001", tapOnPage.target)
         // 回到手机:又记在 App 下
         assertEquals("com.tencent.mm", lines.single { it.step == 13 }.where)

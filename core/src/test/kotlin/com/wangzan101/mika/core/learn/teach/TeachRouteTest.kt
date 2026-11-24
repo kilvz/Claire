@@ -42,8 +42,8 @@ class TeachRouteTest {
         )
         val route = fold(steps)
         assertEquals(2, route.steps.size)
-        assertTrue(route.steps[0].text.startsWith("启动"))
-        assertTrue(route.steps[1].text.contains("点了「搜索」"))
+        assertTrue(route.steps[0].text.startsWith("Launch"))
+        assertTrue(route.steps[1].text.contains("tapped \"搜索\""))
         assertEquals(2, route.folded.size)
         assertTrue(route.folded.any { it.contains("小红书") })
         assertEquals(listOf("com.xingin.xhs"), route.apps.map { it.packageName })
@@ -64,11 +64,11 @@ class TeachRouteTest {
         val route = TeachRoute.fold(steps, setOf(launcher), emptySet()) { if (it == "com.a") "A" else "B" }
         assertEquals(listOf("com.a", "com.b"), route.apps.map { it.packageName })
         assertEquals(5, route.steps.size)
-        assertTrue(route.steps[0].text.contains("点了「首页」"))
-        assertEquals("改用 B", route.steps[1].text)
-        assertTrue(route.steps[2].text.contains("点了「开始」"))
-        assertEquals("回到 A", route.steps[3].text)
-        assertTrue(route.steps[4].text.contains("点了「返回」"))
+        assertTrue(route.steps[0].text.contains("tapped \"首页\""))
+        assertEquals("Switch to B", route.steps[1].text)
+        assertTrue(route.steps[2].text.contains("tapped \"开始\""))
+        assertEquals("Back to A", route.steps[3].text)
+        assertTrue(route.steps[4].text.contains("tapped \"返回\""))
         assertEquals(4, route.folded.size)
     }
 
@@ -92,7 +92,7 @@ class TeachRouteTest {
         val route = fold(steps)
         assertEquals(1, route.steps.size)
         assertTrue(route.steps.none { it.kind == null })
-        assertTrue(route.steps.single().text.contains("点了「搜索」"))
+        assertTrue(route.steps.single().text.contains("tapped \"搜索\""))
         assertTrue(route.folded.isEmpty())
     }
 
@@ -107,8 +107,8 @@ class TeachRouteTest {
         val route = fold(steps)
         assertEquals(listOf("com.xingin.xhs"), route.apps.map { it.packageName })
         assertEquals(2, route.steps.size)
-        assertTrue(route.steps[0].text.startsWith("启动"))
-        assertTrue(route.steps[1].text.contains("点了「搜索」"))
+        assertTrue(route.steps[0].text.startsWith("Launch"))
+        assertTrue(route.steps[1].text.contains("tapped \"搜索\""))
     }
 
     @Test fun marksTheDefaultBrowserForThePrompt() {

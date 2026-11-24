@@ -265,7 +265,7 @@ fun teachLine(step: TeachStep): String {
         if (place.isNotBlank()) append(" (").append(place).append(")")
         if (step.insufficient) append(". Not enough information; this cannot be written as a coordinate action")
         step.correction?.let { append(". [changed by you] ").append(it) }
-        step.explanation?.let { append("。[你说明的] ").append(it) }
+        step.explanation?.let { append(". [explained by you] ").append(it) }
     }
 }
 
