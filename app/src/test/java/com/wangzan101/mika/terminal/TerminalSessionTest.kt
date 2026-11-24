@@ -82,7 +82,7 @@ class TerminalSessionTest {
         assertTrue(shell.closed)
     }
 
-    /** 界面一时跟不上(主线程卡一下)时不丢块:丢掉的块会让屏上缺一段,还可能切断转义序列或半个字。 */
+    /** A viewer that momentarily falls behind (the main thread stalls for a bit) loses no chunks: a dropped chunk would leave a gap on screen and could even cut an escape sequence or half a character. */
     @Test fun aViewerThatFallsBehindStillGetsEveryChunk() = runBlocking {
         val shell = FakeShell()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -100,13 +100,13 @@ class TerminalSessionTest {
                 }
             }
             withTimeout(2_000) { subscribed.await() }
-            // 前 66 行一行一块地写:界面手里 1 块、缓冲 64 块,第 66 块要么挤掉最旧的,要么让读输出的一侧等着。
-            // 每块都是先进环形缓冲再交给界面,所以两种写法下这 66 行都等得到;后面的一次写完
+            // Write the first 66 lines one line per chunk: the viewer holds 1 chunk and the buffer holds 64, so chunk 66 either evicts the oldest one or makes the side reading the output wait.
+            // Every chunk goes into the ring buffer before it reaches the viewer, so all 66 lines arrive under either strategy; the rest is written in one go
             for (i in 1..66) {
                 val line = "line-$i\n"
                 shell.writer.write(line.toByteArray()); shell.writer.flush()
                 withTimeout(2_000) { while (!String(session.snapshot()).endsWith(line)) delay(2) }
-                // 界面先拿到第 1 块再写后面的,缓冲才是从第 2 块开始装
+                // Let the viewer get chunk 1 before the rest is written, so the buffer fills starting from chunk 2
                 if (i == 1) withTimeout(2_000) { holding.await() }
             }
             shell.writer.write((67..100).joinToString("") { "line-$it\n" }.toByteArray()); shell.writer.flush()
@@ -122,7 +122,7 @@ class TerminalSessionTest {
         }
     }
 
-    /** 输入没人读(沙箱那头在等界面)时,写输入也不能卡住调用方:按键行是在主线程上写的。 */
+    /** When nobody reads the input (the sandbox side is waiting on the viewer), writing input must not block the caller either: keystroke lines are written on the main thread. */
     @Test fun writingDoesNotBlockTheCallerWhenInputIsNotRead() = runBlocking {
         val shell = FakeShell()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

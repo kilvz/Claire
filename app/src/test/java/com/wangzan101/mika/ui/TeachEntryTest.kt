@@ -10,7 +10,7 @@ import com.wangzan101.mika.teach.ui.showDone
 class TeachEntryTest {
     private fun saved(goal: String) = TeachSession(id = "s1", goal = goal, phase = TeachPhase.Saved)
 
-    /** 收下以后又带着另一个目标进来:先问新目标,不要停在上一份的「已学会」页。 */
+    /** After saving a goal, coming in with another goal asks about the new one first instead of stopping on the previous "learned" page. */
     @Test fun aNewGoalBringsBackTheIntroInsteadOfTheOldDonePage() {
         assertFalse(showDone(saved("在小红书搜装修"), "在地图里找充电桩"))
     }

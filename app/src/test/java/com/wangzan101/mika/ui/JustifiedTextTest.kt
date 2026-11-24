@@ -3,26 +3,26 @@ package com.wangzan101.mika.ui
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 中文两端对齐只在字与字之间摊间距,决定「哪里能摊」的是 [cjkGapRanges]。 */
+/** Chinese justification only spreads spacing between adjacent characters; [cjkGapRanges] decides where spacing may go. */
 class JustifiedTextTest {
     private fun ranges(text: String) = cjkGapRanges(text, 0, text.length)
 
     @Test
     fun gapsBetweenHanCharacters() {
-        // 四个字之间有 3 个相邻字对
+        // Four characters give 3 adjacent character pairs
         assertEquals(listOf(0..0, 1..1, 2..2), ranges("中文字数"))
     }
 
     @Test
     fun noGapsAroundPunctuation() {
-        // 「，」两侧不摊:中文标点自带全角空隙,再拉就散了
+        // No spacing on either side of the full-width comma: Chinese punctuation already carries a full-width gap, and stretching it would break it apart
         assertEquals(listOf(0..0), ranges("中文，字"))
     }
 
     @Test
     fun noGapsAroundLatinAndDigits() {
         assertEquals(emptyList<IntRange>(), ranges("App123"))
-        // 汉字与英文相邻处也不摊,英文单词内部更不能被拉开
+        // No spacing where Han characters sit next to Latin text either, and an English word must never be stretched from the inside
         assertEquals(emptyList<IntRange>(), ranges("读PDF"))
         assertEquals(listOf(1..1), ranges("a中文b"))
     }
@@ -34,7 +34,7 @@ class JustifiedTextTest {
 
     @Test
     fun surrogatePairsStayWhole() {
-        // 扩展 B 区的字是代理对,区间不能劈开
+        // Characters in Extension B are surrogate pairs, so a range must not split them
         val text = "𠀀𠀁" // 𠀀𠀁
         assertEquals(listOf(0..1), ranges(text))
     }

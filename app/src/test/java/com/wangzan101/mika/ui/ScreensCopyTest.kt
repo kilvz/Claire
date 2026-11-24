@@ -12,21 +12,21 @@ import com.wangzan101.mika.chat.ui.ScreenRow
 import com.wangzan101.mika.chat.ui.ScreensCopy
 import com.wangzan101.mika.chat.ui.orderedScreens
 
-/** 「后台屏」那一页的排序和文字(不碰界面,也不碰真任务)。 */
+/** Ordering and copy for the "Background screens" page (touches neither the UI nor real tasks). */
 class ScreensCopyTest {
     @get:Rule val texts = ChineseTexts()
 
     private fun row(displayId: Int, key: String = "k$displayId", foreground: String? = null, web: Boolean = false) =
         ScreenRow(key, "c$displayId", "做点什么", displayId, TaskState.Running(0, "打开设置"), foreground, web)
 
-    /** 建了屏的在前(按建屏先后);还没建屏(-1)的排在后面,彼此保持原来的先后。 */
+    /** Built screens come first (in the order they were built); screens not built yet (-1) come last, keeping their original relative order. */
     @Test fun screensAreOrderedWithUnbuiltOnesLast() {
         val rows = listOf(row(-1, "a"), row(15), row(-1, "b"), row(12))
         assertEquals(listOf("k12", "k15", "a", "b"), orderedScreens(rows).map { it.key })
         assertEquals(emptyList<ScreenRow>(), orderedScreens(emptyList()))
     }
 
-    /** 第二行说在用哪个 App,不写屏号、像素、密度这些开发用的东西。 */
+    /** The second line says which app is in use; it does not mention screen numbers, pixels or density, which are developer details. */
     @Test fun placeSaysWhichAppNotDisplayInternals() {
         assertEquals("正在用微信", ScreensCopy.place(row(12, foreground = "微信")))
         assertEquals("正在用浏览器", ScreensCopy.place(row(-1, web = true)))
@@ -37,7 +37,7 @@ class ScreensCopyTest {
         }
     }
 
-    /** 每种状态都有一句;等着的、要你动手的和真在干活的分得开。 */
+    /** Every state has its own phrase; waiting, needing you to act, and actually working are kept apart. */
     @Test fun everyStateHasALabel() {
         assertEquals("正在执行", ScreensCopy.state(TaskState.Running(1, "点了一下")))
         assertEquals("任务完成", ScreensCopy.state(TaskState.Succeeded("好了")))
@@ -49,7 +49,7 @@ class ScreensCopyTest {
             TaskState.Held(GateReason("waiting_user", "在系统的选择框里选一个", needsYou = true)),
         )
         assertEquals(listOf("等你处理", "等你处理", "等你处理"), needsYou.map(ScreensCopy::state))
-        // 只是等条件(锁屏、助手没连上)的不算「要你处理」
+        // Waiting only on a condition (lock screen, assistant not connected) does not count as "needs you"
         assertEquals("等待中", ScreensCopy.state(TaskState.Held(GateReason("locked", "锁屏了"))))
         assertEquals("等待中", ScreensCopy.state(TaskState.Idle))
     }

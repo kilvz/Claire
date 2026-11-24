@@ -55,7 +55,7 @@ class UsageCopyTest {
     }
 
     @Test fun colorsFollowTheFixedOrderAndFoldBeyondThree() {
-        // 连着的按连接先后:甲 0、丙 1、丁 2,删掉的排在后面
+        // Connected ones follow connection order: A 0, C 1, D 2; the removed one comes last
         assertEquals(mapOf("p1" to 0, "p3" to 1, "p4" to 2, "p2" to null), report.providers.associate { it.id to UsageCopy.colorSlot(it) })
     }
 

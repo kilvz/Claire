@@ -33,8 +33,8 @@ import java.io.PipedOutputStream
 
 class TerminalHubTest {
     private companion object {
-        // 等的是异步链(SharedFlow 收集 → 会话关闭 → 守护线程关 shell),CI 满载时 2s 不够;
-        // 条件满足即返回,预算只影响失败路径。
+        // We are waiting on an async chain (SharedFlow collection → session close → daemon thread closing the shell);
+        // 2s is not enough on a fully loaded CI. It returns as soon as the condition holds, so the budget only affects the failure path.
         const val CLOSE_WAIT_MS = 15_000L
     }
     @get:Rule val tmp = TemporaryFolder()

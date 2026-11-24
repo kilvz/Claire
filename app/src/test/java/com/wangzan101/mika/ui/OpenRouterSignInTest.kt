@@ -45,8 +45,8 @@ import com.wangzan101.mika.settings.ui.models.signOutAccount
 import com.wangzan101.mika.settings.ui.models.signedInShown
 
 /**
- * 用 OpenRouter 账号登录走一遍:浏览器(假的)打开授权页,带着 code 回到本机回调,换到 Key,
- * 按 OpenRouter 预设存成服务商、选上主模型、打开详情;退出只删本机的 Key。换 Key 的接口是本地假服务。
+ * Sign in with an OpenRouter account, end to end: the (fake) browser opens the authorization page, comes back to the local callback with the code, and exchanges it for a Key,
+ * stored as a provider with the OpenRouter preset, with a main model picked and the details opened; signing out only deletes the local Key. The key-exchange endpoint is a local fake server.
  */
 class OpenRouterSignInTest {
     @get:Rule val texts = ChineseTexts()
@@ -75,7 +75,7 @@ class OpenRouterSignInTest {
         },
     )
 
-    /** 假浏览器:打开授权页时照用户同意了那样,带着 code 和 state 请求本机回调;[pages] 记下回调后浏览器里显示的结果。 */
+    /** Fake browser: when the authorization page is opened it calls the local callback with code and state just as an approving user would; [pages] records what the browser shows after the callback. */
     private inner class Browser(private val approve: Boolean = true) : SignInBrowser {
         val opened = mutableListOf<String>()
         val pages = mutableListOf<String?>()
@@ -116,9 +116,9 @@ class OpenRouterSignInTest {
         assertTrue(browser.opened.single().startsWith("https://openrouter.ai/auth?"))
         val sent = server.takeRequest().body.readUtf8()
         assertTrue(sent, sent.contains("\"code\":\"the-code\""))
-        // Key 只加密存,不进配置文件
+        // The Key is stored encrypted only and never goes into a config file
         tmp.root.walk().filter(File::isFile).forEach { f -> assertFalse(f.name, f.readText().contains("SECRET")) }
-        // 重新读入时还认得是授权来的
+        // After reloading it is still recognized as coming from sign-in
         assertEquals(p.id, store().openRouterAccount()?.id)
 
         vm.signedInShown()
@@ -160,14 +160,14 @@ class OpenRouterSignInTest {
         assertEquals(existing.id, ui.signedInProvider)
         assertTrue(ui.openRouterAccount!!.signedIn)
         assertEquals(models, s.openRouterAccount()?.models)
-        // 不再按 ttsModels 标记排除:第一个可用的对话模型成为主模型
+        // No longer excluded by the ttsModels marker: the first usable chat model becomes the main model
         assertNotNull(ui.roles.main)
         assertEquals("fishaudio/drama-3-int4", s.configFor(com.wangzan101.mika.core.model.ModelRole.Main)?.model)
     }
 
     /**
-     * 用户已经自己填了 OpenRouter 的 Key:授权登录另存一家,不顶掉那把 Key;退出登录只删授权来的那把。
-     * 之后再自己填 Key「测试并保存」,也只更新自己填的那一家,不碰授权来的。
+     * The user has already typed an OpenRouter Key themselves: signing in saves a separate provider and does not replace that Key; signing out deletes only the one that came from sign-in.
+     * Typing a Key again later with "Test and save" updates only the user's own provider and leaves the signed-in one alone.
      */
     @Test fun signInKeepsAKeyTheUserTypedForOpenRouter() {
         val s = store()
@@ -178,19 +178,19 @@ class OpenRouterSignInTest {
         assertEquals("sk-or-v1-signed", s.providerKey(signed.id))
         assertNull(typed.signIn)
         assertEquals(signed.id, s.openRouterAccount()?.id)
-        // 再登录一次更新授权来的那一家,不多出第三家
+        // Signing in once more updates the signed-in provider instead of adding a third one
         assertEquals(signed.id, s.connectOpenRouter("sk-or-v1-again", emptyList()).id)
         assertEquals(2, s.providers.value.size)
-        // 自己再填一次 Key:更新自己那一家
+        // Typing the Key again updates the user's own provider
         assertEquals(typed.id, s.connect("OpenRouter", ProviderConfig.Kind.OpenAiCompat, OpenRouterAuth.API_BASE, "sk-typed-2", emptyList()).id)
         assertEquals("sk-or-v1-again", s.providerKey(signed.id))
         s.signOutOpenRouter(signed.id)
         assertNull(s.providerKey(signed.id))
         assertEquals("sk-typed-2", s.providerKey(typed.id))
-        // 填 Key 的那一家不能被当成登录退出
+        // The provider created by typing a Key must not be treated as a sign-in to sign out
         s.signOutOpenRouter(typed.id)
         assertEquals("sk-typed-2", s.providerKey(typed.id))
-        // 重新读入后两家照样分开
+        // After reloading, the two providers are still kept apart
         val reloaded = store()
         assertEquals(signed.id, reloaded.openRouterAccount()?.id)
         assertEquals("sk-typed-2", reloaded.providerKey(typed.id))

@@ -23,7 +23,7 @@ class TaskPlaybackActionsTest {
         val h = store.open("查询帖子")
         images.forEach { (id, content) ->
             h.media(id, content.toByteArray())
-            // 此处测试已保存记录的回放，不以瞬间灌入截图触发有界写盘队列的丢帧策略。
+            // This test covers playback of an already saved record, not the frame-dropping policy of the bounded disk queue that a sudden flood of screenshots would trigger.
             val deadline = System.nanoTime() + 2_000_000_000L
             while (store.screen(h.runId, id) == null && System.nanoTime() < deadline) Thread.sleep(1)
             assertNotNull("fixture frame $id was not persisted", store.screen(h.runId, id))
@@ -41,7 +41,7 @@ class TaskPlaybackActionsTest {
             RunEvent.Activity(3, 10, "act", "phone_tap", obsIds = listOf(9), callId = "open"),
             RunEvent.TaskPlayback(4, 11, "phone_back", "back", 25, 26),
         ), mapOf(22 to "list", 23 to "post detail", 25 to "post detail", 26 to "list"))
-        // 两个列表之间必须能停在帖子详情，不能只断言有点击标记。
+        // Playback must be able to stop on the post detail between the two lists; asserting a tap mark alone is not enough.
         assertEquals(listOf(22, 23, 25, 26), r.frames.map { it.frame.screenshotId })
         assertEquals("tap", r.frames.first().mark?.kind)
         assertTrue(r.frames.drop(1).all { it.mark == null })

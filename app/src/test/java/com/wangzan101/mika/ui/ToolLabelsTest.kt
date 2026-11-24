@@ -12,7 +12,7 @@ import org.junit.Test
 class ToolLabelsTest {
     @get:Rule val texts = ChineseTexts()
 
-    /** 每个声明了 label 的工具都有界面文字,中文和声明一字不差;英文另有一份。 */
+    /** Every tool that declares a label has UI text, and the Chinese matches the declaration word for word; English has a separate set. */
     @Test
     fun everyDeclaredLabelIsLocalized() {
         val tools = knownTools()
@@ -30,7 +30,7 @@ class ToolLabelsTest {
         assertEquals("Copy device file", labels.label("copy_device_file"))
     }
 
-    /** 没声明 label 的工具按工具名查界面文字;查不到才显示工具名本身。 */
+    /** Tools without a declared label look up UI text by tool name; only when nothing is found does the tool name itself show. */
     @Test
     fun toolWithoutDeclaredLabelIsLocalizedByName() {
         val labels = ToolLabels(knownTools())

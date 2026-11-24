@@ -83,7 +83,7 @@ class MarkdownModelTest {
         assertEquals(listOf(listOf("苹果", "5"), listOf("梨", "")), t.rows.map { r -> r.map { it.text } })
     }
 
-    /** 流式输出写到一半、或格式写坏了,都照常出结果,不抛异常。 */
+    /** Output cut off mid-stream, or with broken formatting, still produces a result instead of throwing. */
     @Test
     fun partialAndMalformedInputNeverThrows() {
         val code = MarkdownModel.parse("看这里:\n```py\nprint(1)").last() as MdBlock.Code
@@ -154,7 +154,7 @@ class MarkdownModelTest {
             listOf("/workspace/my report.csv", "/workspace/报告.png"),
             MarkdownModel.workspaceRefs("[a](/workspace/my%20report.csv) ![图](/workspace/%E6%8A%A5%E5%91%8A.png)"),
         )
-        // 同一个文件一个编码一个裸写,解码后只留一张卡
+        // The same file once percent-encoded and once written bare: after decoding only one card remains
         assertEquals(
             listOf("/workspace/a b.png"),
             MarkdownModel.workspaceRefs("![x](/workspace/a%20b.png) ![y](</workspace/a b.png>)"),

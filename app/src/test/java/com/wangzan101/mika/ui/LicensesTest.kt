@@ -7,7 +7,7 @@ import java.io.File
 import com.wangzan101.mika.about.ui.Licenses
 
 class LicensesTest {
-    /** 单元测试的工作目录是 app/;仓库根目录在上一级。 */
+    /** The unit test working directory is app/; the repository root is one level up. */
     private val notices = File("../licenses/THIRD_PARTY_NOTICES.md").takeIf { it.isFile } ?: File("licenses/THIRD_PARTY_NOTICES.md")
 
     @Test
@@ -34,7 +34,7 @@ class LicensesTest {
         assertEquals("0BSD", byName.getValue("XZ for Java").license)
     }
 
-    /** 「开源许可」页逐个列出自带运行环境里的软件包,每个都有许可证。 */
+    /** The "open-source licenses" page lists every package in the bundled runtime, and each has a license. */
     @Test
     fun runtimePackagesListed() {
         val manifest = File("src/main/assets/runtime/packages.json")

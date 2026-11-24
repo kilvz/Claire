@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/** Telegram 用纸飞机,不再和微信共用双气泡图标。 */
+/** Telegram uses a paper plane and no longer shares the double-bubble icon with WeChat. */
 class MikaIconsTest {
     @Test fun telegramIsAPaperPlaneOnTheSameGrid() {
         val telegram = MikaIcons.Telegram
