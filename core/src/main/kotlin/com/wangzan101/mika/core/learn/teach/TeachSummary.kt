@@ -4,29 +4,29 @@ import com.wangzan101.mika.core.learn.skills.PersonalSkill
 import kotlinx.coroutines.CancellationException
 
 /**
- * 一次整理的编排:整理出技能、写进待确认。
+ * Orchestration of one assembly: assemble the skill and write it into pending confirmation.
  *
- * 用户在总结期间丢弃这次示范、或已经开始新的示范,就什么都不写——模型已经回来的稿也不能落到待确认里,
- * 否则技能清单里会出现一份没人认领的草稿。写盘本身由调用方在同一把锁里再核对一次会话,
- * 这里的两道 [current] 检查只是把「不用再往下走」早一点发现(模型调用也是一笔花费)。
+ * If the user discards this demonstration during the summary, or has already started a new demonstration, nothing is written — a draft the model has already returned must not land in pending confirmation either,
+ * or an unclaimed draft would appear in the skill list. Persisting is itself re-checked against the session by the caller under the same lock;
+ * the two [current] checks here only discover "no need to go any further" a little earlier (a model call is also an expense).
  */
 object TeachSummary {
     sealed interface Outcome {
-        /** 草稿写进了待确认;[byModel] 说明正文是不是模型写的。 */
+        /** The draft was written into pending confirmation; [byModel] says whether the body was written by the model. */
         data class Drafted(val draftId: String, val skill: PersonalSkill, val byModel: Boolean) : Outcome
 
-        /** 这次示范还在,但没整理出能用的稿。 */
+        /** The demonstration still exists, but no usable draft was assembled. */
         data object Failed : Outcome
 
-        /** 会话已经被丢弃或换成了新的一次,什么都没写。 */
+        /** The session was discarded or replaced with a new one, and nothing was written. */
         data object Abandoned : Outcome
     }
 
     /**
-     * @param current 现在还是不是这一次示范
-     * @param build 交给模型或本机整理
-     * @param store 写进待确认并记进会话;会话已经不是这一次时必须返回 false
-     * @param newId 新草稿的编号
+     * @param current whether it is still this demonstration
+     * @param build handed to the model or assembled locally
+     * @param store writes into pending confirmation and records it in the session; must return false when the session is no longer this one
+     * @param newId the id of the new draft
      */
     suspend fun run(
         current: () -> Boolean,

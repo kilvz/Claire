@@ -3,31 +3,31 @@ package com.wangzan101.mika.core.model
 import okhttp3.Request
 
 /**
- * 粘贴进来的 API Key 怎么收。
+ * How a pasted API key is accepted.
  *
- * OkHttp 4.12 的 `Headers.checkValue` 只接受制表符和 U+0020..U+007E。`\n`、`\r`、其它小于 0x20 的控制字符,
- * 以及任何大于 0x7E 的字符(中文、emoji、全角符号)都会在构造 Request 时抛 [IllegalArgumentException],
- * 而且发生在发出请求之前,调用方的网络 try/catch 罩不住。
+ * OkHttp 4.12's `Headers.checkValue` accepts only tabs and U+0020..U+007E. `\n`, `\r` and other control characters below 0x20,
+ * as well as any character above 0x7E (Chinese, emoji, full-width symbols), make building the Request throw [IllegalArgumentException],
+ * and this happens before the request is sent, so the caller's network try/catch does not cover it.
  *
- * 零宽 / BOM 这类看不见的字符直接去掉,剩下的还能当普通 Key 用。换行(`\n`、`\r`)和其它放不进请求头的字符
- * 原样留下,由 [Accepted.notice] 标成 [Notice.IllegalCharacters],调用方不要拿去发请求或保存。
+ * Invisible characters such as zero-width ones and BOMs are simply removed, and the rest can still be used as an ordinary key. Newlines (`\n`, `\r`) and other characters that do not fit in a request header
+ * are left as they are and marked as [Notice.IllegalCharacters] by [Accepted.notice]; the caller must not send or save them.
  */
 object ApiKeyText {
     enum class Notice {
-        /** 没有去掉什么,字符也都放得进请求头。 */
+        /** Nothing was removed, and all characters fit in a request header. */
         None,
-        /** 只去掉了零宽、BOM 这类看不见的字符;剩下的是可用的 Key。 */
+        /** Only invisible characters such as zero-width ones and BOMs were removed; what remains is a usable key. */
         InvisibleRemoved,
-        /** 还含有放不进请求头的字符(含换行)。这些字符没有被改掉。 */
+        /** Still contains characters that do not fit in a request header (including newlines). These characters were not changed. */
         IllegalCharacters,
     }
 
     data class Accepted(val text: String, val notice: Notice)
 
     /**
-     * 按一次输入(粘贴或逐字改)收 Key:去掉看不见的零宽 / BOM,不改其余字符。
-     * `\n`、`\r` 留在原文里,和中文、emoji 一样算放不进请求头。
-     * 首尾空白留着,由保存时的 `trim()` 处理;中间的普通空格也留着,照旧拿去问服务商。
+     * Accept a key from one input (a paste or a character-by-character edit): remove invisible zero-width characters and BOMs, leave the other characters unchanged.
+     * `\n` and `\r` stay in the text and, like Chinese and emoji, count as not fitting in a request header.
+     * Leading and trailing whitespace is kept and handled by the `trim()` at save time; ordinary spaces in the middle are also kept and used as-is when asking the provider.
      */
     fun accept(raw: String): Accepted {
         var removedInvisible = false
@@ -45,28 +45,28 @@ object ApiKeyText {
     }
 
     /**
-     * [value] 整段都能放进 OkHttp 的头值。空串可以;制表符和 U+0020..U+007E 可以;
-     * 其余控制字符和非 ASCII 不行。查的是将要放进头的整段(含 `Bearer ` 前缀)。
+     * Whether all of [value] can go into an OkHttp header value. The empty string is fine; tabs and U+0020..U+007E are fine;
+     * other control characters and non-ASCII are not. It checks the whole value that will go into the header (including the `Bearer ` prefix).
      */
     fun isHeaderLegal(value: String): Boolean = value.all { c -> c == '\t' || c.code in 0x20..0x7E }
 
-    /** 零宽、BOM、以及改写文字方向的格式字符。这些粘贴时常被带进来,本身不是密钥的一部分。 */
+    /** Zero-width characters, BOMs, and formatting characters that change text direction. These are often brought in by pasting and are not part of the key itself. */
     private fun isInvisible(c: Char): Boolean = when (c) {
         '\u061C', // ARABIC LETTER MARK
         '\u180E', // MONGOLIAN VOWEL SEPARATOR
         '\uFEFF', // BOM / ZERO WIDTH NO-BREAK SPACE
         -> true
-        in '\u200B'..'\u200F', // ZWSP、ZWNJ、ZWJ、LRM、RLM
-        in '\u202A'..'\u202E', // 双向嵌入 / 覆盖
-        in '\u2060'..'\u2069', // 词连接符、不可见运算符、双向隔离
+        in '\u200B'..'\u200F', // ZWSP, ZWNJ, ZWJ, LRM, RLM
+        in '\u202A'..'\u202E', // bidirectional embedding / override
+        in '\u2060'..'\u2069', // word joiner, invisible operators, bidirectional isolates
         -> true
         else -> false
     }
 }
 
 /**
- * 把 [value] 放进名为 [name] 的头。不合法时抛 [ModelError.IllegalHeader],不调用 OkHttp
- * (它抛的 [IllegalArgumentException] 消息里带着头的原文,会把 Key 打进日志)。
+ * Put [value] into the header named [name]. Throws [ModelError.IllegalHeader] when it is illegal, without calling OkHttp
+ * (the message of the [IllegalArgumentException] it throws contains the raw header value and would write the key into the logs).
  */
 fun Request.Builder.headerOrReject(name: String, value: String): Request.Builder {
     if (!ApiKeyText.isHeaderLegal(value)) throw ModelError.IllegalHeader(name)

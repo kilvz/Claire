@@ -19,17 +19,17 @@ import okhttp3.Request
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Anthropic Messages API。
- * - 历史里的 System 消息并入 system 文本(Anthropic 没有 system 角色消息)。
- * - 选了思考强度时开自适应思考(`thinking.type = adaptive`)并把档位放进 `output_config.effort`;选 `none` 时关掉。
- *   列表写明了模型接受哪几种思考方式([thinkingTypes])的,不接受的那种不发(什么都不发,按服务端默认)。
- *   思考块的 `signature` 连同收到它的地址存在 [Part.Thinking.opaque] 里([SignedThinking]),
- *   带工具调用的回合原样回传给同一个地址(不回传会被服务端拒绝),块的顺序照收到的不变。
- *   签名还和产生它时的系统提示词、工具、前面的消息绑定;这些变了(展开一组工具、压缩历史等)以后,Claude 5.1 起的模型可能
- *   拒绝回传的思考块([STALE_THINKING]),这时按文档的恢复办法去掉思考块再发一次(Claire 在这些模型上开思考只会是自适应思考,文档说
- *   自适应思考不要求助手回合以思考块开头;这里把这次带的都去掉,见 [dropStaleThinking]),之后的请求也不再带它们
- *   ([staleThinking])。
- * - 相邻同角色消息合并(Anthropic 要求 user/assistant 交替)。
+ * The Anthropic Messages API.
+ * - System messages in the history are merged into the system text (Anthropic has no system-role messages).
+ * - When a thinking effort is chosen, adaptive thinking is enabled (`thinking.type = adaptive`) and the level goes into `output_config.effort`; choosing `none` turns it off.
+ *   When the listing states which thinking types the model accepts ([thinkingTypes]), the unsupported one is not sent (nothing is sent, leaving the server default).
+ *   The thinking block's `signature` is stored in [Part.Thinking.opaque] together with the address it was received from ([SignedThinking]),
+ *   and turns that contain tool calls pass it back unchanged to the same address (otherwise the server rejects it), with the blocks in the order they were received.
+ *   The signature is also bound to the system prompt, the tools and the preceding messages at the time it was produced; once these change (expanding a group of tools, compacting history, etc.), models from Claude 5.1 on may
+ *   reject the passed-back thinking blocks ([STALE_THINKING]); in that case, following the documented recovery, the thinking blocks are dropped and the request is sent once more (on these models Claire's thinking is only ever adaptive thinking, and the docs say
+ *   adaptive thinking does not require assistant turns to start with a thinking block; here everything carried this time is dropped, see [dropStaleThinking]), and later requests no longer carry them
+ *   ([staleThinking]).
+ * - Adjacent messages with the same role are merged (Anthropic requires user/assistant alternation).
  */
 class AnthropicModel(
     baseUrl: String = "https://api.anthropic.com",
@@ -37,21 +37,21 @@ class AnthropicModel(
     private val model: String,
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
-    /** 回复上限(`max_tokens`,必填);null 按默认:开了思考的 [THINKING_MAX_TOKENS],否则 [DEFAULT_MAX_TOKENS]。 */
+    /** Reply limit (`max_tokens`, required); null uses the default: [THINKING_MAX_TOKENS] with thinking on, otherwise [DEFAULT_MAX_TOKENS]. */
     maxTokens: Int? = null,
-    /** 每个请求都带的头(见 [ClientHeaders]);Key 的头由适配器自己加。 */
+    /** Headers sent with every request (see [ClientHeaders]); the key header is added by the adapter itself. */
     private val headers: Map<String, String> = emptyMap(),
-    /** 用户选的思考强度;null 不发,`none` 关掉思考,其余作为 `output_config.effort` 发出。 */
+    /** Thinking effort chosen by the user; null sends nothing, `none` turns thinking off, anything else is sent as `output_config.effort`. */
     private val reasoningEffort: String? = null,
     /**
-     * 列表写明这个模型接受的思考方式(见 [ListedModel.thinkingTypes]);不含 `adaptive` 的不发档位,不含 `disabled` 的不发 `none`。
-     * null 是列表没说(档位来自别的列表写法),照档位发。
+     * The thinking types the listing says this model accepts (see [ListedModel.thinkingTypes]); when it does not include `adaptive` the effort is not sent, and when it does not include `disabled` nothing is sent for `none`.
+     * null means the listing does not say (the effort comes from another kind of listing), so it is sent as given.
      */
     private val thinkingTypes: List<String>? = null,
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/v1/messages"
-    /** 实际发出的 `thinking.type`:`adaptive`、`disabled`,或 null(不发)。 */
+    /** The `thinking.type` actually sent: `adaptive`, `disabled`, or null (not sent). */
     private val thinkingType: String? = when (reasoningEffort) {
         null -> null
         "none" -> "disabled"
@@ -61,8 +61,8 @@ class AnthropicModel(
     private val json = Json { ignoreUnknownKeys = true }
     private val ephemeral = buildJsonObject { put("type", "ephemeral") }
     /**
-     * 被拒的那次请求带的思考块([Part.Thinking.opaque]);历史里还留着,之后的请求都不带。
-     * 每个任务建一个模型,子任务和它共用,所以可能有几个协程同时用。
+     * The thinking blocks ([Part.Thinking.opaque]) carried by the request that was rejected; they stay in the history, but later requests do not carry them.
+     * One model is created per task and shared with its subtasks, so several coroutines may use it at the same time.
      */
     private val staleThinking: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
@@ -78,7 +78,7 @@ class AnthropicModel(
         system: String, messages: List<Message>, tools: List<ToolSpec>, onText: (String) -> Unit,
     ): ModelReply {
         val stream = AnthropicStream(endpoint, onText, ::parseUsage)
-        // 被拒的那次没有事件(不是 2xx 时 HttpSupport.stream 不调 accept),重发接着用这个 stream
+        // The rejected attempt produces no events (HttpSupport.stream does not call accept for a non-2xx), so the resend keeps using this stream
         val (status, retryAfter, text) = dropStaleThinking(messages) {
             HttpSupport.stream(http, request(system, messages, tools, stream = true), stream::accept)
         }
@@ -90,9 +90,9 @@ class AnthropicModel(
     }
 
     /**
-     * 发一次;服务端说回传的思考块前缀对不上([STALE_THINKING])时,把这次带的思考块都记进 [staleThinking] 再发一次(只一次)。
-     * 文档给的做法是去掉报错点名的那块和它之后的;这里全去掉,不用按 `messages.N` 找位置,代价是更早的有效思考也不带了。
-     * 这次没带思考块的不重发,照常报错。
+     * Send once; when the server says the prefix of the passed-back thinking blocks does not match ([STALE_THINKING]), record all thinking blocks carried this time in [staleThinking] and send once more (only once).
+     * The documented approach drops the block named in the error and the ones after it; here everything is dropped, so no position has to be found via `messages.N`, at the cost of no longer carrying earlier valid thinking either.
+     * When no thinking blocks were carried this time, nothing is resent and the error is reported as usual.
      */
     private suspend fun dropStaleThinking(messages: List<Message>, send: suspend () -> RawResponse): RawResponse {
         val sent = messages.filter { it.role == Role.Assistant }.flatMap { it.parts }.filterIsInstance<Part.Thinking>()
@@ -102,7 +102,7 @@ class AnthropicModel(
         return send()
     }
 
-    /** 这一块回不回传:关掉思考时不带;别的地址收到的不带(签名只有发它的服务认);被拒的那次请求带过的不带([staleThinking])。 */
+    /** Whether this block is passed back: not when thinking is turned off; not when it was received from another address (a signature is only honored by the service that issued it); not when the rejected request carried it ([staleThinking]). */
     private fun replays(p: Part.Thinking): Boolean {
         val opaque = p.opaque ?: return false
         return thinkingType != "disabled" && opaque !in staleThinking && SignedThinking.block(p, endpoint) != null
@@ -116,7 +116,7 @@ class AnthropicModel(
             put("model", model)
             put("max_tokens", maxTokens)
             if (stream) put("stream", true)
-            // Anthropic 拒绝空文本块,system 为空时整个字段省略
+            // Anthropic rejects empty text blocks, so the whole field is omitted when system is empty
             if (systemText.isNotBlank()) put("system", buildJsonArray {
                 add(buildJsonObject {
                     put("type", "text"); put("text", systemText); put("cache_control", ephemeral)
@@ -166,7 +166,7 @@ class AnthropicModel(
     }
 
     private fun buildMessages(messages: List<Message>): JsonArray {
-        // (role, blocks) 先按相邻同角色合并,再输出
+        // (role, blocks): merge adjacent same-role entries first, then emit
         val merged = mutableListOf<Pair<String, MutableList<JsonObject>>>()
         for (m in messages) {
             if (m.role == Role.System) continue
@@ -175,7 +175,7 @@ class AnthropicModel(
             if (blocks.isEmpty()) continue
             if (merged.lastOrNull()?.first == role) merged.last().second += blocks else merged += role to blocks.toMutableList()
         }
-        // 对话缓存到最后一条 user 消息为止,下一步的开头与它相同就从缓存取;助手消息可能以思考块结尾,不标
+        // Cache the conversation up to the last user message, so the next step can start from cache when its beginning is identical; assistant messages may end with a thinking block, so they are not marked
         val lastUser = merged.indexOfLast { it.first == "user" }
         return buildJsonArray {
             merged.forEachIndexed { i, (role, blocks) ->
@@ -185,7 +185,7 @@ class AnthropicModel(
         }
     }
 
-    // tool_result 必须排在同一 user 消息的其它块之前
+    // tool_result must come before the other blocks of the same user message
     private fun userBlocks(m: Message): List<JsonObject> {
         val results = m.parts.filterIsInstance<Part.ToolResult>().map { r ->
             buildJsonObject {
@@ -211,9 +211,9 @@ class AnthropicModel(
         return results + rest
     }
 
-    // 开思考时,带工具调用的回合必须把上一条助手消息的思考块连同签名原样带回,块的顺序照收到的:
-    // 新模型在工具调用前写的进度说明是单独的思考块,排在文字后面;挪到前面,服务端会当作前面的内容改过了。
-    // 明确关掉思考时不带,免得和当前请求的思考配置冲突;别的地址收到的、被拒的那次请求带过的也不带([replays])。
+    // With thinking on, a turn containing tool calls must pass back the previous assistant message's thinking blocks together with their signatures, unchanged, in the order they were received:
+    // the progress note newer models write before a tool call is a separate thinking block placed after the text; moving it in front makes the server treat the preceding content as modified.
+    // When thinking is explicitly off they are not carried, to avoid conflicting with the current request's thinking configuration; neither are ones received from another address or carried by the rejected request ([replays]).
     private fun assistantBlocks(m: Message): List<JsonObject> = m.parts.mapNotNull { p ->
         when (p) {
             is Part.Thinking -> if (replays(p)) SignedThinking.block(p, endpoint) else null
@@ -268,7 +268,7 @@ class AnthropicModel(
         fun n(k: String) = (u[k] as? JsonPrimitive)?.intOrNull
         val inT = n("input_tokens") ?: return null
         val cached = n("cache_read_input_tokens")
-        // Anthropic 的 input_tokens 不含缓存部分;统一成总输入口径。output_tokens 含思考但不单独报,reasoningTokens 记 0
+        // Anthropic's input_tokens excludes the cached part; normalize to total input. output_tokens includes thinking but is not reported separately, so reasoningTokens is recorded as 0
         return Usage(inT + (cached ?: 0) + (n("cache_creation_input_tokens") ?: 0), n("output_tokens") ?: 0, cached ?: 0, cacheReported = cached != null)
     }
 }
@@ -327,7 +327,7 @@ private class AnthropicStream(
             }
             "message_delta" -> {
                 reason = ((root["delta"] as? JsonObject)?.get("stop_reason") as? JsonPrimitive)?.contentOrNull ?: reason
-                // 用量是累计值:带了整数的字段(输出,也可能有输入、缓存)覆盖 message_start 的,没带的、null 的沿用;收尾时再解析
+                // Usage is cumulative: fields carrying an integer (output, and possibly input or cache) override those from message_start, while absent or null ones are kept; parsed again at the end
                 (root["usage"] as? JsonObject)?.let { delta ->
                     usage = JsonObject(usage.orEmpty() + delta.filterValues { (it as? JsonPrimitive)?.intOrNull != null })
                 }
@@ -339,7 +339,7 @@ private class AnthropicStream(
     }
 
     fun finish(): ModelReply {
-        // message_delta 带来 stop_reason 时内容块都已收齐,只差 message_stop 也算完整;两样都没有是连接中途被断开
+        // When message_delta brings stop_reason all content blocks are already complete, and missing only message_stop still counts as complete; having neither means the connection was cut midway
         if (!stopped && reason == null) throw ModelError.StreamCut()
         val parts = blocks.values.mapNotNull { block ->
             when (block.type) {
@@ -367,20 +367,20 @@ private class AnthropicStream(
     }
 }
 
-/** 默认回复上限;开了思考时思考也占这个额度,4K 往往在出答案前就用完,给 [THINKING_MAX_TOKENS]。 */
+/** Default reply limit; when thinking is on, thinking also draws on this budget, and 4K is often used up before an answer appears, hence [THINKING_MAX_TOKENS]. */
 private const val DEFAULT_MAX_TOKENS = 4096
 private const val THINKING_MAX_TOKENS = 16_000
 
 /**
- * 回传的思考块前缀对不上时报错里的一句(Anthropic 文档 Preserved thinking 一节的原文)。
- * 只有前半句「Invalid `signature` in `thinking` block」、没有这一句的是签名本身坏了,不重发,照常报错。
+ * One phrase from the error reported when the prefix of passed-back thinking blocks does not match (verbatim from the Preserved thinking section of Anthropic's docs).
+ * An error with only the first half, "Invalid `signature` in `thinking` block", and without this phrase means the signature itself is broken: no resend, the error is reported as usual.
  */
 private const val STALE_THINKING = "bound to a different conversation"
 
 /**
- * 记在 [Part.Thinking.opaque] 里的 Anthropic 思考块:带签名的 thinking 是 `{"endpoint":…,"signature":…}`,
- * redacted_thinking 是 `{"endpoint":…,"redacted":…}`。签名只有发它的服务认,回放时只认同一个地址收到的;
- * 别的地址(另一个 Anthropic 兼容服务)、别家适配器存的都不回传。
+ * An Anthropic thinking block stored in [Part.Thinking.opaque]: a signed thinking block is `{"endpoint":...,"signature":...}`,
+ * and redacted_thinking is `{"endpoint":...,"redacted":...}`. A signature is only honored by the service that issued it, so on replay only blocks received from the same address are honored;
+ * blocks from another address (a different Anthropic-compatible service) or stored by another adapter are never passed back.
  */
 internal object SignedThinking {
     fun signed(endpoint: String, signature: String): String =
@@ -389,7 +389,7 @@ internal object SignedThinking {
     fun redacted(endpoint: String, data: String): String =
         buildJsonObject { put("endpoint", endpoint); put("redacted", data) }.toString()
 
-    /** [p] 是从 [endpoint] 收到的思考块时,回放用的那一块;别处来的、认不出的为 null。 */
+    /** When [p] is a thinking block received from [endpoint], the block to use for replay; null when it came from elsewhere or cannot be recognized. */
     fun block(p: Part.Thinking, endpoint: String): JsonObject? {
         val o = p.opaque?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() } ?: return null
         if ((o["endpoint"] as? JsonPrimitive)?.contentOrNull != endpoint) return null

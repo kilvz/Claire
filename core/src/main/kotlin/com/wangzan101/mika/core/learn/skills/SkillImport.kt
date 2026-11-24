@@ -3,22 +3,22 @@ package com.wangzan101.mika.core.learn.skills
 import com.wangzan101.mika.core.learn.knowledge.FrontMatter
 
 /**
- * 别人分享来的一份 SKILL.md 变成待收下的草稿(#165)。不经过模型,也不直接进试用:要用户在「待确认」里看过、收下才用。
- * 出处由代码写成导入([PersonalSkill.SOURCE_IMPORTED]),自学用的几行去掉;格式、大小、敏感内容过和自学草稿同一道校验
- * ([SkillDrafter.validate])。内置技能的名字不能用;同名的个人技能已有时成为它的更新草稿,收下前能看到改了哪几行。
+ * A SKILL.md shared by someone else becomes a draft awaiting acceptance (#165). It does not go through the model and does not go straight into trial: the user must review it under "pending confirmation" and accept it before it is used.
+ * The source is written by code as imported ([PersonalSkill.SOURCE_IMPORTED]) and the lines used only for self-learning are removed; format, size and sensitive content go through the same validation as self-learning drafts
+ * ([SkillDrafter.validate]). Names of built-in skills cannot be used; when a personal skill with the same name already exists, the result becomes an update draft for it, so the changed lines can be seen before accepting.
  */
 object SkillImport {
     sealed interface Result {
-        /** 放进待收下时用的编号和草稿。 */
+        /** The id to store it under while it awaits acceptance, and the draft. */
         data class Ready(val id: String, val skill: PersonalSkill) : Result
-        /** 不收:[problem] 是 [SkillDrafter.validate] 的码,或 `builtin_name`、`draft_pending`。 */
+        /** Rejected: [problem] is a [SkillDrafter.validate] code, or `builtin_name` or `draft_pending`. */
         data class Rejected(val problem: String) : Result
     }
 
-    /** 本机才有意义的几行(出处、学自哪次运行、更新指向);分享出去时去掉,导入时由代码重写。 */
+    /** Lines that only make sense on this device (source, which run it was learned from, what it updates); they are removed when sharing and rewritten by code on import. */
     private val LOCAL_FIELDS = listOf("updates", "learned_from", "source")
 
-    /** 分享出去的全文:去掉 [LOCAL_FIELDS],其余原样。 */
+    /** The full text as shared: [LOCAL_FIELDS] are removed, everything else is left as-is. */
     fun shareable(markdown: String): String =
         LOCAL_FIELDS.fold(markdown.replace("\r\n", "\n")) { m, k -> PersonalSkills.withoutField(m, k) }
 

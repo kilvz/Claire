@@ -19,15 +19,15 @@ import kotlinx.serialization.json.putJsonObject
 import java.util.Base64
 
 /**
- * MCP 的 JSON-RPC 处理(Streamable HTTP 传输,只回单个 JSON,不开 SSE 流)。两代协议都认:
- * 新一代每个请求自带版本和客户端能力(`_meta` 里的 `io.modelcontextprotocol/…`,并在 HTTP 头里重复一遍,两边要一致),
- * 没有握手和会话;老一代先 `initialize` 握手。服务端不发请求、不发通知,也不发会话编号,所以老一代也是无状态的。
- * 进到这里的请求已经过了 [RemoteAccess](令牌、来源、限流、路径)。
+ * MCP JSON-RPC handling (Streamable HTTP transport, replying with a single JSON body, no SSE stream). Both protocol generations are accepted:
+ * in the modern generation each request carries its version and client capabilities (the `io.modelcontextprotocol/...` keys in `_meta`, repeated in HTTP headers that must match),
+ * with no handshake and no session; the legacy generation does an `initialize` handshake first. The server sends no requests, no notifications and no session id, so the legacy generation is stateless too.
+ * Requests reaching here have already passed [RemoteAccess] (token, origin, rate limit, path).
  */
 class McpRpc(
     private val tools: McpTaskTools,
     private val serverVersion: String,
-    /** 每个过了门口、能读出来的请求:对方说自己是哪个客户端(没说时为空)。 */
+    /** Every request that passed the gate and could be read: which client the other side says it is (empty when it does not say). */
     private val onRequest: (remote: java.net.InetAddress, clientName: String?) -> Unit = { _, _ -> },
 ) {
     fun handle(req: HttpRequest): HttpResponse {
@@ -45,7 +45,7 @@ class McpRpc(
         if (msg !is JsonObject || (msg["jsonrpc"] as? JsonPrimitive)?.contentOrNull != "2.0") return error(400, null, INVALID_REQUEST, "Not a JSON-RPC 2.0 message")
         val method = (msg["method"] as? JsonPrimitive)?.takeIf { it.isString }?.content
         val id = msg["id"]
-        // 客户端发来的回应(我们不发请求,不会有)和通知:收下,不回内容
+        // Responses sent by the client (we send no requests, so there should be none) and notifications: accept them and reply with no content
         if (method == null) return if ("result" in msg || "error" in msg) HttpResponse.empty(202) else error(400, null, INVALID_REQUEST, "Missing method")
         if (id == null) {
             onRequest(req.remote, null)
@@ -65,7 +65,7 @@ class McpRpc(
         else legacy(req, id, method, params)
     }
 
-    /** 新一代:版本、方法、工具名在头里各写一遍,和正文对不上就拒绝;不认的版本列出认的。 */
+    /** Modern generation: version, method and tool name are also written in the headers and rejected when they do not match the body; for an unrecognized version, the supported ones are listed. */
     private fun modern(req: HttpRequest, id: JsonElement, method: String, params: JsonObject, meta: JsonObject, version: String): HttpResponse {
         val headerVersion = req.header("mcp-protocol-version")
         if (headerVersion == null) return error(400, id, HEADER_MISMATCH, "Missing MCP-Protocol-Version header")
@@ -107,11 +107,11 @@ class McpRpc(
         return ok(id, complete)
     }
 
-    /** 老一代:先握手(选双方都认的版本),之后照常调用;不发会话编号。 */
+    /** Legacy generation: handshake first (choosing a version both sides accept), then calls as usual; no session id is sent. */
     private fun legacy(req: HttpRequest, id: JsonElement, method: String, params: JsonObject): HttpResponse {
         val headerVersion = req.header("mcp-protocol-version")
         if (headerVersion != null && method != "initialize" && headerVersion !in LEGACY_VERSIONS) {
-            // 头里写的是新一代的版本,正文却没带新一代必有的 _meta
+            // The header names a modern-generation version, but the body does not carry the _meta that generation requires
             return if (headerVersion in MODERN_VERSIONS) error(400, id, INVALID_PARAMS, "Missing _meta.$META_VERSION")
             else unsupported(id, headerVersion)
         }
@@ -145,7 +145,7 @@ class McpRpc(
         data class Bad(val message: String) : Call
     }
 
-    /** 工具名不认得、参数不是对象:协议错误。参数内容不对、任务找不到:工具执行出错(isError),交给对面的模型看着改。 */
+    /** Unrecognized tool name or arguments that are not an object: protocol error. Wrong argument contents or task not found: tool execution error (isError), left to the model on the other side to fix. */
     private fun callTool(params: JsonObject): Call {
         val name = (params["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return Call.Bad("params.name must be a string")
         if (!tools.has(name)) return Call.Bad("Unknown tool: $name")
@@ -196,12 +196,12 @@ class McpRpc(
         const val PATH = "/mcp"
         const val MODERN = "2026-07-28"
         val MODERN_VERSIONS = listOf(MODERN)
-        /** 新的在前;握手时对方要的不认就给第一个。 */
+        /** Newest first; during the handshake, if the version the other side asks for is not supported, the first one is given. */
         val LEGACY_VERSIONS = listOf("2025-11-25", "2025-06-18", "2025-03-26")
 
         /**
-         * 新一代要求这些方法的完整结果带缓存提示(`ttlMs`、`cacheScope`),缺了客户端会拒收整个结果。
-         * 工具列表要看这台手机接没接设备能力,不是人人一样,所以只许同一令牌复用(private),新鲜 5 分钟。
+         * The modern generation requires the complete results of these methods to carry cache hints (`ttlMs`, `cacheScope`); without them the client rejects the whole result.
+         * The tool list depends on whether device capabilities are attached on this phone and is not the same for everyone, so it may only be reused for the same token (private), and stays fresh for 5 minutes.
          */
         val CACHEABLE = setOf("server/discover", "tools/list")
         const val LIST_TTL_MS = 300_000L
@@ -230,14 +230,14 @@ class McpRpc(
             putJsonObject("error") { put("code", code); put("message", message) }
         }.toString())
 
-        /** 门口挡下的请求:HTTP 状态码说明白,正文是不带 id 的 JSON-RPC 错误。 */
+        /** Requests stopped at the gate: the HTTP status code says it clearly, and the body is a JSON-RPC error without an id. */
         fun transportError(status: Int, message: String, headers: Map<String, String> = emptyMap()): HttpResponse =
             HttpResponse.json(status, buildJsonObject {
                 put("jsonrpc", "2.0")
                 putJsonObject("error") { put("code", INVALID_REQUEST); put("message", message) }
             }.toString(), headers)
 
-        /** 头里放不下的值写成 `=?base64?…?=`,比较前先解开。 */
+        /** Values that do not fit in a header are written as `=?base64?...?=` and decoded before comparison. */
         fun decodeHeader(v: String): String? =
             if (v.startsWith("=?base64?") && v.endsWith("?=") && v.length >= 11) {
                 runCatching { String(Base64.getDecoder().decode(v.substring(9, v.length - 2)), Charsets.UTF_8) }.getOrNull()

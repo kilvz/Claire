@@ -17,14 +17,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * 一次人工示范。只在 [TeachPhase.Recording] 收下事件。
- * [Ready] 是用户已看过说明、还没点「开始示范」。
+ * One human demonstration. Events are collected only in [TeachPhase.Recording].
+ * [Ready] means the user has read the instructions but has not yet tapped "start demonstration".
  */
 @Serializable
 enum class TeachPhase {
     Idle, Ready, Recording, Paused, Reviewing, Drafting, Interrupted, Saved;
 
-    /** 正在看用户操作，或暂停后还会继续看。这时不要另开任务。 */
+    /** Currently watching the user operate, or paused but still going to watch. Do not start another task at this point. */
     fun blocksTasks(): Boolean = this == Recording || this == Paused
 
     fun collects(): Boolean = this == Recording
@@ -36,8 +36,8 @@ enum class TeachEventKind { Click, LongClick, Text, Scroll, Window }
 enum class TeachKind { Click, LongClick, Type, Scroll, Window }
 
 /**
- * 无障碍回调当场抄下来的一份。 [text] 只在内存里用来判断敏不敏感，步骤里不保存。
- * [displayId] 0 是用户主屏。
+ * A copy taken on the spot from an accessibility callback. [text] is used only in memory to decide whether it is sensitive and is not stored in the steps.
+ * [displayId] 0 is the user's main screen.
  */
 data class TeachObservation(
     val atMs: Long,
@@ -77,15 +77,15 @@ data class TeachSession(
     val truncated: Boolean = false,
     val draftId: String? = null,
     val updatedAt: Long = 0L,
-    /** 收下后展示给用户的技能名。旧会话没有这个字段。 */
+    /** The skill name shown to the user after acceptance. Old sessions do not have this field. */
     val acceptedName: String? = null,
-    /** 整理时正文是模型写的（false 是按本机规则整理）；旧会话没有这个字段。 */
+    /** Whether the body was written by the model when it was assembled (false means it was assembled by local rules); old sessions do not have this field. */
     val byModel: Boolean? = null,
 ) {
     fun step(id: Int): TeachStep? = steps.find { it.id == id }
 }
 
-/** 用户主屏。别的屏（虚拟屏上的任务）不记。 */
+/** The user's main screen. Other screens (tasks on virtual displays) are not recorded. */
 const val TEACH_MAIN_DISPLAY = 0
 
 private const val MAX_STEPS = 24
@@ -97,7 +97,7 @@ private val GENERIC_CLASS = setOf(
     "FrameLayout", "LinearLayout", "RelativeLayout", "View", "ViewGroup", "DecorView", "PopupDecorView",
 )
 
-/** 目标能不能当作示范的题目。敏感内容直接拒绝，不落盘。 */
+/** Whether the goal can serve as the subject of a demonstration. Sensitive content is rejected outright and never written to disk. */
 fun teachGoalAccepted(goal: String): Boolean {
     val t = goal.trim()
     return t.isNotEmpty() && t.length <= 200 && SensitiveFilter.hit(t) == null
@@ -105,7 +105,7 @@ fun teachGoalAccepted(goal: String): Boolean {
 
 object TeachTrace {
     /**
-     * 不在采集中、不是主屏、是 Claire 自己的界面、或没有包名：原样返回，不新增步骤。
+     * Not collecting, not the main screen, Claire's own UI, or no package name: return unchanged without adding a step.
      */
     fun reduce(session: TeachSession, event: TeachObservation, ownPackage: String): TeachSession {
         if (!session.phase.collects()) return session
@@ -136,7 +136,7 @@ object TeachTrace {
     fun remove(session: TeachSession, id: Int): TeachSession =
         session.copy(steps = session.steps.filterNot { it.id == id })
 
-    /** 旧版可能把已标记为敏感的事件内容存成节点标签或窗口。 */
+    /** Older versions may have stored the content of events marked sensitive as the node label or window. */
     fun redactStored(session: TeachSession): TeachSession = session.copy(steps = session.steps.map { step ->
         if (!step.sensitiveOmitted) step else {
             val insufficient = step.kind != TeachKind.Scroll
@@ -145,7 +145,7 @@ object TeachTrace {
         }
     })
 
-    /** 订正或说明里有敏感内容则不改、不落盘。空白表示去掉。 */
+    /** If a correction or explanation contains sensitive content, nothing is changed and nothing is written to disk. Blank means remove it. */
     fun annotate(session: TeachSession, id: Int, correction: String?, explanation: String?): TeachEdit {
         val step = session.step(id) ?: return TeachEdit.Missing
         val nextCorrection = cleanNote(correction)
@@ -275,7 +275,7 @@ object TeachSkill {
     const val NOT_TRIAL_RUN = "Claire has not replayed this successfully yet."
     const val NOT_ABSENT = "An entrance that this demonstration did not use is not evidence that it does not exist."
     const val STOP_IF_UNMATCHED = "If the current screen does not show the entrance or preconditions written above, stop applying this skill and fall back to ordinary looking around and asking."
-    /** 模型读到试用中的示范技能时加在正文前。 */
+    /** Prepended to the body when the model reads a demonstrated skill that is in trial. */
     const val USE_NOTE =
         "[Demonstrated, not trial-run. Claire has not successfully replayed this. " +
             "Apply it only when the current screen matches the entrance and preconditions written below. " +
@@ -291,7 +291,7 @@ object TeachSkill {
         return FrontMatter.parse(skill.markdown).first["source"] == SOURCE
     }
 
-    /** 只有来源是示范、并且轨迹编号对得上，审核结束才删那份轨迹。别的技能不动它。 */
+    /** Only when the source is a demonstration and the trace id matches is that trace deleted when review ends. Other skills leave it alone. */
     fun retiresTrace(skill: PersonalSkill, traceId: String): Boolean =
         isDemonstrated(skill) && sessionId(skill.learnedFrom) == traceId
 
@@ -299,8 +299,8 @@ object TeachSkill {
 }
 
 /**
- * 采集或暂停时必须有一个不靠通知权限的可见控件，上面能暂停或结束。
- * 控件加不上就不能开始；控件中途消失就停止采集。
+ * While collecting or paused there must be a visible control that does not rely on the notification permission, on which the user can pause or finish.
+ * If the control cannot be added, collecting must not start; if the control disappears midway, collecting stops.
  */
 object TeachWatch {
     fun allowsCollecting(controlVisible: Boolean): Boolean = controlVisible
@@ -311,9 +311,9 @@ object TeachWatch {
     }
 }
 
-/** 发给模型的脱敏摘要，或本机直接整理出的草稿。 */
+/** The redacted summary sent to the model, or the draft assembled directly on the device. */
 object TeachDraft {
-    /** 整理出来的技能，以及它是不是模型写的（不是就按本机规则整理）。 */
+    /** The assembled skill, and whether it was written by the model (if not, it was assembled by local rules). */
     data class Result(val skill: PersonalSkill, val byModel: Boolean)
 
     fun request(session: TeachSession, route: TeachRoute): String = buildString {
@@ -380,7 +380,7 @@ object TeachDraft {
         return ensureCaveats(md)
     }
 
-    /** 模型稿也补上这三句，并强制出处，避免把没走到的入口写成不存在或声称试跑成功。 */
+    /** Add these three sentences to a model draft too, and force the source in, so entrances that were not walked are not written as nonexistent and a successful trial run is not claimed. */
     fun ensureCaveats(md: String): String {
         var text = md
         if (TeachSkill.NOT_ABSENT !in text) text = insertBefore(text, listOf("How success is verified", "怎样算办成"), TeachSkill.NOT_ABSENT)
@@ -396,8 +396,8 @@ object TeachDraft {
     }
 
     /**
-     * 有模型就先把脱敏摘要交给它；稿不可用或没有模型时，用本机整理的那份。
-     * 返回的技能始终是待确认，且标明来自示范；[Result.byModel] 说明这次正文是不是模型写的。
+     * If a model is available, give it the redacted summary first; if its draft is unusable or there is no model, use the locally assembled one.
+     * The returned skill is always pending confirmation and marked as coming from a demonstration; [Result.byModel] says whether the body was written by the model this time.
      */
     suspend fun draft(
         session: TeachSession,
@@ -412,7 +412,7 @@ object TeachDraft {
         if (route.steps.none { it.kind != null } || !teachGoalAccepted(session.goal)) return null
         val fromModel = model?.let { ask(it, session, route) }?.let { raw ->
             val body = PersonalSkills.withoutField(SkillDrafter.stripFence(raw), "updates")
-            // 「试跑成功」要查模型原稿:先补上出处提示再查,那句话就被盖过去了,永远查不出来。
+            // A claimed "trial run succeeded" has to be checked on the model's original draft: if the source caveat is added first, that sentence is covered up and can never be detected.
             if (!acceptsModel(body)) return@let null
             val caveated = ensureCaveats(body)
             caveated.takeIf { SkillDrafter.validate(caveated, toolNames, scriptTool, runnableScripts) == null }
@@ -485,7 +485,7 @@ object TeachCodec {
     fun decode(text: String): TeachSession = json.decodeFromString(TeachSession.serializer(), text)
 }
 
-/** 只允许放进待确认，不允许直接启用。 */
+/** Only allowed to be placed into pending confirmation, never enabled directly. */
 object TeachPublish {
     fun toPending(store: PersonalSkills, id: String, skill: PersonalSkill) {
         require(skill.status == SkillStatus.pending) { "demonstrated skill must stay pending" }

@@ -2,14 +2,14 @@ package com.wangzan101.mika.core.learn.skills
 
 import com.wangzan101.mika.core.learn.knowledge.GuideInfo
 
-/** 插件技能的 kind;名字是 `<plugin-id>/<skill-name>`,只读,随插件启用/停用出现或消失。 */
+/** The kind of plugin skills; the name is `<plugin-id>/<skill-name>`, read-only, appearing or disappearing as the plugin is enabled/disabled. */
 const val PLUGIN_KIND = "plugin"
 
-/** 已启用插件提供的只读技能;实现由 app 层提供,按当前注册表现读。 */
+/** Read-only skills offered by enabled plugins; the implementation is provided by the app layer and reads the current registry live. */
 interface PluginSkills {
-    /** 只返回已启用插件的技能;kind = [PLUGIN_KIND],name = `<pluginId>/<skillName>`。 */
+    /** Returns only skills of enabled plugins; kind = [PLUGIN_KIND], name = `<pluginId>/<skillName>`. */
     fun entries(): List<GuideInfo>
 
-    /** 读某个文件的正文(SKILL.md 或附件,去掉头部);读不到返回 null。 */
+    /** Read the body of a file (SKILL.md or an attachment, with the front matter stripped); returns null if it cannot be read. */
     fun read(info: GuideInfo, file: String): String?
 }

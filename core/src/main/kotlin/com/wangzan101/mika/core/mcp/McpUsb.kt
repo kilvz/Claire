@@ -8,21 +8,21 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * 经 USB 的电脑连接:电脑用 adb 打开、只在本机回环上监听,电脑经 `adb forward` 连进来。
- * 这里是和电脑之间的约定:连接信息文件的内容、电脑上跑的脚本。都只用安卓原版 sh 和 toybox 里有的命令。
+ * Computer connection over USB: opened by the computer with adb, listening only on the local loopback, and the computer connects in via `adb forward`.
+ * This is the contract with the computer: the contents of the connection info file and the script that runs on the computer. Both use only stock Android sh and commands available in toybox.
  */
 object McpUsb {
-    /** 连接信息文件名,放在 App 的外部文件目录里:安卓 11 起别的 App 读不到,电脑经 USB 调试以 shell 身份读。 */
+    /** Name of the connection info file, placed in the app's external files directory: since Android 11 other apps cannot read it, while the computer reads it as the shell user over USB debugging. */
     const val INFO_FILE = "mcp-usb.json"
 
-    /** 电脑上跑的脚本文件名,和「用电脑启动」的脚本放在一起。 */
+    /** Name of the script that runs on the computer, kept together with the "start from the computer" script. */
     const val SCRIPT = "connect-computer.sh"
 
     private val pretty = Json { prettyPrint = true }
 
     /**
-     * 连接信息:电脑上的 MCP 客户端要填的地址和请求头,加上要先跑的端口转发。
-     * [boot] 是这次开机的编号(和 shell 里 `settings get global boot_count` 读到的一样),脚本据此认出不是上次开机留下的旧文件。
+     * Connection info: the address and request headers the MCP client on the computer has to fill in, plus the port forward to run first.
+     * [boot] is this boot's id (the same value as `settings get global boot_count` reads in a shell), which the script uses to tell that it is not an old file left over from the previous boot.
      */
     fun info(port: Int, token: String, boot: String): String = pretty.encodeToString(
         kotlinx.serialization.json.JsonObject.serializer(),
@@ -39,15 +39,15 @@ object McpUsb {
         },
     ) + "\n"
 
-    /** 电脑上把本机端口转到手机回环端口的命令;拔插数据线后要再跑一次。 */
+    /** The command that forwards a local port on the computer to the phone's loopback port; it must be run again after unplugging and replugging the cable. */
     fun forward(port: Int) = "adb forward tcp:$port tcp:$port"
 
     /**
-     * 电脑经 USB 调试跑的脚本(`adb shell sh <scriptPath>`,关掉时末尾加 `off`)。不带任何口令或令牌,可以一直放着。
-     * 打开:先跑一次「用电脑启动」的脚本 [helperScript](手机助手不在就起,在就说一句),
-     * 再以 shell 身份起 Claire 的前台服务 [component]、动作 [onAction],等到这次开机的连接信息文件 [infoPath] 写好,把它打出来。
-     * 关掉:起同一服务、动作 [offAction],等连接信息文件被删掉(令牌随之作废)。
-     * 不是 shell 身份时不跑:服务只收持有 shell 级权限的调用方,普通 App 起不了它。
+     * The script run by the computer over USB debugging (`adb shell sh <scriptPath>`; append `off` to turn it off). It carries no passphrase or token and can be left in place.
+     * On: first run the "start from the computer" script [helperScript] (starting the phone helper if it is not running, or just saying a word if it is),
+     * then start Claire's foreground service [component] with action [onAction] as the shell user, wait for this boot's connection info file [infoPath] to be written, and print it.
+     * Off: start the same service with action [offAction] and wait for the connection info file to be deleted (the token is invalidated with it).
+     * It does not run without shell identity: the service only accepts callers holding shell-level privileges, and an ordinary app cannot start it.
      */
     fun script(scriptPath: String, helperScript: String, infoPath: String, component: String, onAction: String, offAction: String, port: Int): String {
         val again = "adb shell sh $scriptPath"

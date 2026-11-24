@@ -1,9 +1,9 @@
 package com.wangzan101.mika.core.learn.teach
 
-/** 折叠后的一条路线步骤。[kind] 为 null 表示合成的启动/切换步,不是示范里的一次操作。 */
+/** One route step after folding. [kind] being null means it is a synthesized launch/switch step, not an action from the demonstration. */
 data class RouteStep(val app: String?, val text: String, val kind: TeachKind?)
 
-/** 这次示范里真正用到的 App。 [browser] 由调用方按系统默认浏览器判断，只作为提示。 */
+/** The apps actually used in this demonstration. [browser] is decided by the caller from the system default browser and is only a hint. */
 data class RouteApp(val packageName: String, val label: String, val browser: Boolean)
 
 data class TeachRoute(
@@ -12,11 +12,11 @@ data class TeachRoute(
     val folded: List<String>,
 ) {
     /**
-     * 把「人的操作」整理成「Claire 的做法」的确定性第一步:
-     * 回桌面、找图标、点开 App 这些只是为了让人进到 App 里,技能里写成「启动/改用/回到 <App>」。
+     * The deterministic first step that turns "what the person did" into "how Claire does it":
+     * going back to the home screen, finding an icon and tapping the app only serve to get a person into the app, so the skill writes them as "launch/switch to/back to <App>".
      *
-     * 识别不到桌面时([launcherPackages] 为空)整段原样保留,不误删任何步骤。
-     * 识别不到浏览器时只是不给角色提示,不影响折叠。
+     * When the launcher cannot be identified ([launcherPackages] is empty), everything is kept as-is so no step is deleted by mistake.
+     * When the browser cannot be identified, only the role hint is skipped; folding is unaffected.
      */
     companion object {
         fun fold(
@@ -40,7 +40,7 @@ data class TeachRoute(
                     viaLauncher = true
                     return@forEach
                 }
-                // 窗口本身不是操作:它可能是负一屏、输入法、系统弹层,不能因此把那个包当成这次要用的 App。
+                // A window change is not an action: it may be the minus-one screen, the input method or a system overlay, so the package must not be taken as an app used by this demonstration because of it.
                 if (step.kind == TeachKind.Window) return@forEach
                 if (pkg == null) {
                     out += RouteStep(null, teachLine(step), step.kind)
@@ -59,7 +59,7 @@ data class TeachRoute(
                 lastApp = pkg
                 viaLauncher = false
                 apps.getOrPut(pkg) { RouteApp(pkg, name, pkg in browserPackages) }
-                // 窗口切换本身不是操作:它是上一步的结果,或已经由合成步表达。
+                // A window switch is not an action: it is the result of the previous step, or is already expressed by a synthesized step.
                 if (step.kind != TeachKind.Window) out += RouteStep(pkg, teachLine(step), step.kind)
             }
             return TeachRoute(out, apps.values.toList(), folded)
@@ -83,7 +83,7 @@ data class TeachRoute(
         }
 
         /**
-         * 只用于给人看「省掉了什么」和给模型一条对照。不带包名和窗口的技术说明。
+         * Only used to show a person "what was left out" and to give the model a comparison. It carries no package names or window details.
          */
         private fun foldLine(step: TeachStep): String {
             val target = step.nodeName ?: step.viewId

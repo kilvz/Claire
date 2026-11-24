@@ -7,30 +7,30 @@ import com.wangzan101.mika.core.agent.TaskState
 
 @Suppress("EnumEntryName")
 /**
- * [verified]:办成了([LearnGate]),试用据此转正式(存下的名字沿用,旧记录照样读);
- * [unverified]:判下来办成,核查却没通过;[unreviewed]:没判成结局,不说明技能灵不灵,停用时不算。
+ * [verified]: the task was done ([LearnGate]), and a trial skill turns active on this (the stored name is kept, so old records still read the same);
+ * [unverified]: judged as done but verification did not pass; [unreviewed]: no outcome was judged, which says nothing about whether the skill works and does not count toward suspension.
  */
 enum class SkillResult { verified, unverified, failed, verifier_rejected, unreviewed }
 
 /**
- * 结果卡片下的技能提示:「Claire 学会了一项技能:… · 看看」([draftId])、
- * 「这项技能最近不灵,先停用了 · 恢复 · 删除」([suspended] 是技能名)。
+ * The skill note under the result card: "Claire learned a new skill: ... · Take a look" ([draftId]),
+ * or "This skill has not been working lately, so it was suspended · Restore · Delete" ([suspended] is the skill name).
  */
 data class SkillNote(val text: String, val draftId: String? = null, val suspended: String? = null)
 
-/** 个人技能的最近使用结果与自动停用(运行中不灵就停用)。 */
+/** Recent usage outcomes of personal skills and automatic suspension (a skill that fails during a run is suspended). */
 object SkillOutcomes {
     const val KEEP = 5
     private const val WINDOW = 3
     private const val BAD_IN_WINDOW = 2
-    /** 结果卡片与核查退回:照着技能做却被核查退回,判为 verifier_rejected。 */
+    /** Result card and verifier rejection: following the skill yet being sent back by verification is judged as verifier_rejected. */
     const val VERIFIER_REJECTED_MARK = "核查未通过"
 
     /**
-     * 追加一次结果并只留最近 [KEEP] 次;按规则可能转为停用。
-     * 试用和正式用同一套停用门槛:只在「照着做被核查退回」或「最近几次里有多次不灵」时才停用。
-     * 试用技能一次 [SkillResult.failed] 不再直接停用——一次失败可能是任务别处的问题(步数用完、放弃),
-     * 说明不了技能本身不灵,误停用还会把「没办成」挂到根本没跑过的技能上(见 #569)。
+     * Append one outcome and keep only the most recent [KEEP]; the rules may turn the skill into suspended.
+     * Trial and active skills use the same suspension threshold: suspend only when "following it was sent back by verification" or "several of the recent runs did not work".
+     * A single [SkillResult.failed] no longer suspends a trial skill directly — one failure may be a problem elsewhere in the task (out of steps, gave up),
+     * which says nothing about whether the skill itself works, and a false suspension would also pin "did not get done" on a skill that was never run at all (see #569).
      */
     fun record(s: PersonalSkill, r: SkillResult, followed: Boolean): PersonalSkill {
         val outcomes = (s.outcomes + r.name).takeLast(KEEP)
@@ -45,22 +45,22 @@ object SkillOutcomes {
         )
     }
 
-    /** 最近 3 次(没核对过的不算)里有 2 次不是核实过的,或这次照着做被核查退回。 */
+    /** Two of the last 3 runs (unreviewed ones excluded) were not verified, or following it this time was sent back by verification. */
     fun shouldSuspend(all: List<String>, lastFollowedRejected: Boolean): Boolean {
         val outcomes = all.filter { it != SkillResult.unreviewed.name }
         return lastFollowedRejected || outcomes.takeLast(WINDOW).count { it != SkillResult.verified.name } >= BAD_IN_WINDOW
     }
 
     /**
-     * 任务结局对应的结果;取消的不记(null)。[outcome] 是交出回答后判的结局([RunOutcome]):
-     * 回答如实说没办成、只办了一部分的算 failed;没判成的不说明技能灵不灵,算 unreviewed;
-     * 办成的按 [LearnGate] 算 verified(没跑核查也算),核查跑过却没通过的算 unverified;
-     * 失败的只有放弃、步数用完算 failed,模型出错、环境出问题、操作保护停下、进程中断、Token 预算用完的算 unreviewed。
+     * The result corresponding to the task's ending; cancelled ones are not recorded (null). [outcome] is the verdict after the answer was handed over ([RunOutcome]):
+     * an answer that honestly says it was not done, or only partly done, counts as failed; an unjudged run says nothing about whether the skill works and counts as unreviewed;
+     * a done task counts as verified per [LearnGate] (even if no verification ran), and one where verification ran but did not pass counts as unverified;
+     * of failures only giving up and running out of steps count as failed; model errors, environment problems, stopping by operation guards, process interruption and running out of the token budget count as unreviewed.
      */
     fun resultOf(end: TaskState, outcome: RunOutcome): SkillResult? = when (end) {
         is TaskState.Succeeded -> when {
             outcome == RunOutcome.Partial || outcome == RunOutcome.NotPossible -> SkillResult.failed
-            // 退回一次后仍有没对上的:照着技能做也没做对,和以前被核查退回一样(判没判成都是)
+            // Still something unmatched after one rejection: following the skill still did not get it right, same as being sent back by verification before (whether or not the outcome was judged)
             end.unconfirmed.isNotEmpty() -> SkillResult.verifier_rejected
             outcome == RunOutcome.Unknown -> SkillResult.unreviewed
             LearnGate.done(end, outcome) -> SkillResult.verified
@@ -69,7 +69,7 @@ object SkillOutcomes {
         is TaskState.Failed -> when {
             VERIFIER_REJECTED_MARK in end.reason -> SkillResult.verifier_rejected
             end.kind == FailKind.GaveUp || end.kind == FailKind.StepLimit -> SkillResult.failed
-            // 模型出错、运行环境出问题、操作保护停下、进程中断、Token 预算或定时任务运行时间用完:和照着做灵不灵无关(#569)
+            // Model errors, environment problems, stopping by operation guards, process interruption, running out of the token budget or of a scheduled task's runtime: unrelated to whether following the skill works (#569)
             else -> SkillResult.unreviewed
         }
         else -> null

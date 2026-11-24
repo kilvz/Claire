@@ -25,41 +25,41 @@ import com.wangzan101.mika.core.tool.Verb
 import com.wangzan101.mika.core.net.UrlHost
 
 /**
- * 起草技能的全部输入:[events] 是这次运行的事件,[toolNames] 是 Claire 当前的工具名,
- * [tools] 按名字查工具做的动作。
+ * All the input for drafting a skill: [events] are this run's events, [toolNames] are Claire's current tool names,
+ * and [tools] looks up what a tool does by name.
  */
-/** [answer] 是交给用户的最终回答,[sources] 是代码找到的回答来源(见 [AnswerSource])。 */
+/** [answer] is the final answer handed to the user; [sources] are the answer's sources found by code (see [AnswerSource]). */
 data class DraftInput(
     val runId: String, val goal: String, val answer: String, val sources: List<AnswerSource>, val events: List<RunEvent>,
     val toolNames: Set<String>, val tools: ToolIndex,
 )
 
-/** 做事的动作(手机、网页、沙箱);读屏、查技能、收尾这类不算步数。 */
+/** Actions that get things done (phone, web, sandbox); reading the screen, looking up skills, wrapping up and the like do not count as steps. */
 internal val ACTION_VERBS = setOf(Verb.Tap, Verb.Scroll, Verb.Swipe, Verb.TypeText, Verb.ClearText, Verb.Back, Verb.PressKey, Verb.LaunchApp, Verb.ShareText,
     Verb.Navigate, Verb.Upload, Verb.Tabs, Verb.RunCommand, Verb.RunBundledScript, Verb.WriteFile, Verb.ShareFile)
 
-/** 什么时候值得起草;开关与评测模式由调用方判断。 */
+/** When drafting is worthwhile; the switch and the evaluation mode are decided by the caller. */
 object Eligibility {
     const val MIN_ACTIONS = 5
 
-    /** null = 可以起草;否则是不起草的原因。[done]:这次运行算办成了([com.wangzan101.mika.core.agent.LearnGate])。 */
+    /** null = drafting is allowed; otherwise the reason not to draft. [done]: this run counts as getting the task done ([com.wangzan101.mika.core.agent.LearnGate]). */
     fun check(events: List<RunEvent>, followedPersonalSkill: String?, tools: ToolIndex, done: Boolean): String? {
         val ended = events.filterIsInstance<RunEvent.TaskEnded>().lastOrNull()
         return when {
             ended?.outcome != "succeeded" -> "not_succeeded"
             !done -> "not_done"
-            // 这次用户已经让 Claire 照他的意思写下了技能,不再另起一份草稿
+            // The user already had Claire write the skill down the way they wanted in this run, so do not start a separate draft
             events.any { it is RunEvent.ToolResult && tools.verb(it.tool) == Verb.SkillSave && it.resultJson.contains("\"ok\":true") } -> "skill_saved"
-            // 出错的动作不算步数(结果可能被截短,按原文判)
+            // Failed actions do not count as steps (results may be truncated, so judge by the raw text)
             events.count { it is RunEvent.ToolResult && tools.verb(it.tool) in ACTION_VERBS && !it.resultJson.contains("\"ok\":false") } < MIN_ACTIONS -> "too_few_actions"
             else -> interrupted(events) ?: "followed_personal_skill".takeIf { followedPersonalSkill != null }
         }
     }
 
-    /** 这次的经过有一段不是 Claire 自己走的(跳过了接管、用户自己办完、不同意确认),从它学不到东西:返回原因,否则 null。 */
+    /** Part of this run was not walked by Claire itself (takeover skipped, the user finished it themselves, a confirmation declined), so nothing can be learned from it: returns the reason, otherwise null. */
     fun interrupted(events: List<RunEvent>): String? = when {
         events.any { it is RunEvent.Takeover && it.outcome == "skipped" } -> "takeover_skipped"
-        // 用户自己办完的:那段路线 Claire 没走过
+        // The user finished it themselves: Claire never walked that part of the route
         events.any { it is RunEvent.Takeover && it.outcome == "user_finished" } -> "takeover_user_finished"
         events.any { it is RunEvent.Confirmation && it.decision in DECLINED } -> "confirmation_declined"
         else -> null
@@ -69,15 +69,15 @@ object Eligibility {
 }
 
 /**
- * 动作清单的一行:只有工具、目标元素名字、所在 App 或网站([where],网站写成「网站 主机名」)、是否生效、错误码。
- * [typed]:这一步是输入文字。
+ * One line of the action list: only the tool, the target element's name, the app or site it was in ([where], a site is written as "website hostname"), whether it took effect, and the error code.
+ * [typed]: this step typed text.
  */
 data class ActionLine(
     val step: Int, val tool: String, val target: String?, val where: String?, val changed: Boolean?, val error: String?,
     val typed: Boolean = false,
 )
 
-/** 从运行事件里取精简的动作清单。不取屏幕全文;`type_text` 的文字不取(渲染成 `<输入内容>`)。 */
+/** Build a compact action list from the run events. The full screen text is not taken; the text of `type_text` is not taken either (rendered as `<text>`). */
 object ActionDigest {
     private val ELEMENT = Regex("\"ref\":\"(@e\\d+)\",\"role\":\"[^\"]*\",\"name\":(\"(?:[^\"\\\\]|\\\\.)*\")")
     private val CURRENT_APP = Regex("\"currentApp\":\"([^\"]+)\"")
@@ -87,7 +87,7 @@ object ActionDigest {
     fun of(events: List<RunEvent>, tools: ToolIndex, maxLines: Int = 60): List<ActionLine> {
         val args = HashMap<Int, JsonObject>()
         var names = emptyMap<String, String>()
-        // 手机上在哪个 App、网页上在哪个站点;onWeb 是此刻在哪一边
+        // Which app on the phone and which site on the web; onWeb says which side we are on right now
         var app: String? = null
         var site: String? = null
         var onWeb = false
@@ -102,14 +102,14 @@ object ActionDigest {
                     else -> Unit
                 }
                 is RunEvent.ToolResult -> {
-                    // 读屏结果可能被截短成不完整的 JSON,逐个元素按文本取 ref→名字,只用来给目标命名
+                    // A screen-read result may be truncated into incomplete JSON, so take ref→name from each element by text; used only to name the target
                     val verb = tools.verb(e.tool)
                     if (verb in READS) {
                         names = ELEMENT.findAll(e.resultJson).associate { m -> m.groupValues[1] to unquote(m.groupValues[2]) }
                         CURRENT_APP.find(e.resultJson)?.let { app = it.groupValues[1]; onWeb = false }
                         CURRENT_SITE.find(e.resultJson)?.let { site = it.groupValues[1]; onWeb = true }
                     } else {
-                        // 动作结果里带的 screen 也报在哪
+                        // The screen included in an action result also reports where we are
                         CURRENT_SITE.find(e.resultJson)?.let { site = it.groupValues[1]; onWeb = true }
                             ?: CURRENT_APP.find(e.resultJson)?.let { app = it.groupValues[1]; onWeb = false }
                     }
@@ -119,13 +119,13 @@ object ActionDigest {
                     if (verb == Verb.LaunchApp || verb == Verb.ShareText) arg("package")?.let { app = it; onWeb = false }
                     if (verb == Verb.Navigate) arg("url")?.let(UrlHost::of)?.let { site = it; onWeb = true }
                     val target = when (verb) {
-                        // 只记分享给了哪个 App,不记文字:可能带个人信息
+                        // Record only which app it was shared to, not the text: it may contain personal information
                         Verb.LaunchApp, Verb.ShareText -> arg("package")
                         Verb.PressKey -> arg("key") ?: arg("keys")
-                        // 只记站点,不记网址:查询串里可能有个人信息
+                        // Record only the site, not the URL: the query string may contain personal information
                         Verb.Navigate -> arg("url")?.let(UrlHost::of)
                         Verb.Tabs -> arg("action")
-                        // 命令、路径、上传的文件可能带个人信息:不记
+                        // Commands, paths and uploaded files may contain personal information: do not record them
                         Verb.RunCommand, Verb.RunBundledScript, Verb.WriteFile, Verb.ShareFile, Verb.Upload -> null
                         else -> arg("ref")?.let { names[it] }?.takeIf { it.isNotBlank() }
                     }
@@ -140,7 +140,7 @@ object ActionDigest {
         return out
     }
 
-    /** 目标不取自读屏的动作。 */
+    /** Actions whose target is not taken from a screen read. */
 
     fun render(lines: List<ActionLine>): String = lines.joinToString("\n") { l ->
         buildString {
@@ -171,25 +171,25 @@ object ActionDigest {
 
 sealed interface DraftResult {
     /**
-     * [isUpdateOf]:模型判为已有个人技能的同一类事,作为它的更新起草;
-     * [replacesPending]:判为一份待确认草稿的同一类事,是那份草稿的编号——存回原处换掉它,不另起一份。
+     * [isUpdateOf]: the model judged this to be the same kind of thing as an existing personal skill, so it is drafted as an update to it;
+     * [replacesPending]: judged to be the same kind of thing as a draft awaiting confirmation; this is that draft's id — store it back in place of that draft instead of starting a new one.
      */
     data class Draft(val skill: PersonalSkill, val isUpdateOf: String?, val replacesPending: String? = null) : DraftResult
     data class Dropped(val reason: String) : DraftResult
 }
 
 /**
- * 一次单独的模型调用(不带工具)把办成的任务写成技能草稿,再由代码校验;不过就丢弃,不打扰用户。
- * 发给模型的是目标、最终回答、回答的来源(哪一步在哪儿读的)和动作清单;目标里的值、输入的文字换成占位,不含读到的原文。
- * 另列出已有的个人技能(连同待确认的草稿):这次的事和哪份是同一类事,由模型在头部写 `updates: <名字>` 说明,代码只核对名字确有其事。
+ * A single model call (without tools) turns a task that got done into a skill draft, which code then validates; if it does not pass, it is dropped without bothering the user.
+ * The model receives the goal, the final answer, where the answer came from (which step read what, and where) and the action list; values in the goal and typed text become placeholders, and the raw text that was read is not included.
+ * Existing personal skills are listed too (along with drafts awaiting confirmation): which of them this run is the same kind of thing as is stated by the model in the front matter as `updates: <name>`, and code only checks that the name really exists.
  */
 class SkillDrafter(private val model: ChatModel) {
     suspend fun draft(input: DraftInput, existing: PersonalSkills, catalog: GuideCatalog): DraftResult {
-        // 这一次的值(目标里引号内的、这次输入的文字、数字)换成占位,技能下次换个对象也用得上;
-        // 回答和屏上的字照原样给、照原样收:里面的页面、按钮名字正是做法本身
+        // This run's specific values (quoted content in the goal, the text typed this time, numbers) are replaced with placeholders, so the skill still works next time on a different subject;
+        // the answer and the on-screen words are sent and received as-is: the page and button names in them are the procedure itself
         val literals = SkillRedactor.literals(input.goal, emptyList()) + SkillRedactor.textLiterals(typedTexts(input.events, input.tools))
         val keepDigits = catalogDigits(catalog)
-        // 已有技能的名字照原样给(换了数字就对不上了);它们是用户自己的技能,不是这一次的值
+        // Existing skill names are given as-is (replacing digits would break the match); they are the user's own skills, not this run's values
         val request = SkillRedactor.scrubNumbers(SkillRedactor.redact(request(input), literals), keepDigits) + "\n" + existingSkills(existing)
         val reply = try {
             model.complete(PROMPT, listOf(Message(Role.User, listOf(Part.Text(request)), Author.Mika)), emptyList())
@@ -199,9 +199,9 @@ class SkillDrafter(private val model: ChatModel) {
             return DraftResult.Dropped("model_error")
         }
         val redacted = SkillRedactor.redact(stripFence(reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text }), literals)
-        // 先按原样查一遍:草稿里写了密码、卡号这类东西,说明起草走偏了,数字换掉也不收
+        // Check it as-is first: if the draft contains passwords, card numbers and the like, drafting went off track, and it is rejected even after numbers are replaced
         if (SensitiveFilter.hit(redacted) != null) return DraftResult.Dropped("sensitive")
-        // 要更新哪份在换数字之前取:技能名里的数字是名字的一部分
+        // Read which one it updates before replacing numbers: digits in a skill name are part of the name
         val updates = (FrontMatter.parse(redacted).first["updates"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
         val md = PersonalSkills.withoutField(SkillRedactor.scrubNumbers(redacted, keepDigits), "updates")
 
@@ -209,16 +209,16 @@ class SkillDrafter(private val model: ChatModel) {
         val meta = FrontMatter.parse(md).first
         val name = meta["name"] as String
 
-        // 模型指的是一份待确认的草稿:换掉那份(它若是某份已有技能的更新,新草稿接着更新那份);
-        // 指的是已收下的(在用、试用或停用的):作为它的更新。名字对不上的(没有这份、是内置技能)不算,当作新的一份
+        // The model points at a draft awaiting confirmation: replace that one (if it was an update to an existing skill, the new draft keeps updating that one);
+        // if it points at an accepted one (in use, trial or suspended): treat it as an update to it. A name that does not match (no such skill, or it is a built-in) does not count and is treated as a new skill
         val pending = updates?.let { u -> existing.drafts().entries.firstOrNull { it.value.name == u } }
         val updateOf = if (pending != null) pending.value.replacesDraftOf else updates?.takeIf { existing.get(it) != null }
-        // 新起草的不能顶掉内置技能、已有个人技能或草稿;更新草稿一律用被更新那份的名字(收下时覆盖它,头部名字要对得上)
+        // A new draft must not take the place of a built-in skill, an existing personal skill or a draft; an update draft always uses the name of the one it updates (accepting it overwrites that one, so the header name has to match)
         if (pending == null && updateOf == null &&
             (existing.get(name) != null || existing.pending().any { it.name == name } || catalog.items.any { it.name == name }))
             return DraftResult.Dropped("name_taken")
         val finalName = pending?.value?.name ?: updateOf ?: name
-        // 出自哪次运行由代码写:请求里的数字都换成了占位,模型抄不出真的运行编号
+        // Which run it came from is written by code: numbers in the request were all replaced with placeholders, so the model cannot copy the real run id
         val finalMd = PersonalSkills.withField(PersonalSkills.withName(md, finalName), "learned_from", input.runId)
 
         val skill = PersonalSkill(
@@ -229,7 +229,7 @@ class SkillDrafter(private val model: ChatModel) {
         return DraftResult.Draft(skill, updateOf, pending?.key)
     }
 
-    /** 已有的个人技能(已收下的在前,待确认的草稿在后,各按名字排),每份一行:名字、显示名、描述。 */
+    /** Existing personal skills (accepted ones first, drafts awaiting confirmation after, each sorted by name), one line each: name, display name, description. */
     private fun existingSkills(existing: PersonalSkills): String {
         val lines = (existing.list().sortedBy { it.name } + existing.pending().sortedBy { it.name }).map { s ->
             val meta = FrontMatter.parse(s.markdown).first
@@ -239,7 +239,7 @@ class SkillDrafter(private val model: ChatModel) {
     }
 
 
-    /** 这次 type_text 输入的文字(密码框的已在记录里换成 ***)。 */
+    /** The text typed with type_text this run (for password fields it was already replaced with *** in the record). */
     private fun typedTexts(events: List<RunEvent>, tools: ToolIndex): List<String> = events.filterIsInstance<RunEvent.ModelReply>()
         .filter { tools.verb(it.tool) == Verb.TypeText }
         .mapNotNull { e ->
@@ -247,7 +247,7 @@ class SkillDrafter(private val model: ChatModel) {
             (o?.get("text") as? JsonPrimitive)?.contentOrNull?.takeIf { it != "***" }
         }
 
-    /** 内置技能名字、显示名、别名里自带的数字(如铁路 App 的名字),草稿里保留。 */
+    /** Digits that come with built-in skill names, display names and aliases (such as the name of a railway app); these are kept in the draft. */
     private fun catalogDigits(catalog: GuideCatalog): Set<String> =
         catalog.items.filter { it.kind != PERSONAL_KIND }.flatMap { listOf(it.name, it.display) + it.aliases }
             .flatMap { Regex("\\d{2,}").findAll(SkillRedactor.norm(it)).map { m -> m.value }.toList() }.toSet()
@@ -266,7 +266,7 @@ class SkillDrafter(private val model: ChatModel) {
     }
 
     companion object {
-        /** 模型回复外面包着的代码块围栏去掉。 */
+        /** Strip the code block fence wrapped around the model's reply. */
         fun stripFence(text: String): String {
             val t = text.trim()
             if (!t.startsWith("```")) return t
@@ -276,9 +276,9 @@ class SkillDrafter(private val model: ChatModel) {
         const val MAX_CHARS = 4000
 
         /**
-         * 技能文档的格式与安全校验(起草的草稿、用户改过再收下的全文都过这一关);通过返回 null,否则返回原因:
-         * 名字合法、有描述、五个小节齐全、不超过 [MAX_CHARS] 字、反引号里的工具名都在 [toolNames] 里、敏感过滤不命中;
-         * 提到跑技能脚本的工具([scriptTool])时,文中的脚本路径至少有一个、且都得是 [runnableScripts](清单里标为可运行的)里的。
+         * Format and safety validation of a skill document (both drafted drafts and the full text edited by the user before acceptance go through it); returns null when it passes, otherwise the reason:
+         * the name is valid, there is a description, all five sections are present, no more than [MAX_CHARS] characters, every tool name in backticks is in [toolNames], and the sensitive filter does not match;
+         * when the skill-script tool ([scriptTool]) is mentioned, the text must contain at least one script path and all of them must be in [runnableScripts] (marked runnable in the catalog).
          */
         fun validate(md: String, toolNames: Set<String>, scriptTool: String?, runnableScripts: Set<String> = emptySet()): String? {
             val (meta, body) = FrontMatter.parse(md)
@@ -302,9 +302,9 @@ class SkillDrafter(private val model: ChatModel) {
         val SECTIONS = listOf("Entry", "Steps", "Common pitfalls", "How success is verified", "When to stop and hand off")
         /** Skills stored before the switch to English headings stay readable; validation accepts either set. */
         val LEGACY_SECTIONS = listOf("入口", "步骤", "容易出错的地方", "怎样算办成", "什么时候停下交给用户")
-        /** 反引号里形如工具名的标识符。 */
+        /** Identifiers that look like tool names, inside backticks. */
         private val TOOL_MENTION = Regex("`([a-z][a-z0-9_]*)`")
-        /** 文中的技能脚本路径,如 `scripts/extract_pdf.py` 或 `skills/documents/scripts/extract_pdf.py`。 */
+        /** A skill script path in the text, such as `scripts/extract_pdf.py` or `skills/documents/scripts/extract_pdf.py`. */
         private val SCRIPT_PATH = Regex("[A-Za-z0-9_./-]*scripts/[A-Za-z0-9_./-]+\\.(?:py|mjs|js|sh)(?![A-Za-z0-9_])")
 
         val PROMPT: String get() = Prompts.role("skill_draft")

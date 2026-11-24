@@ -14,15 +14,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
 
 /**
- * 这次运行照着做了哪几份个人技能。用 `skill_read` 读过只说明看过,结果要记到真照着做了的技能上(#569):
+ * Which personal skills were actually followed in this run. Reading one with `skill_read` only means it was looked at; the result must be recorded on the skill that was really followed (#569):
  *
- * 1. 读完之后成功动过手(点、输入、打开 App、开网页、跑命令……,见 [ACTION_VERBS]);读完就回答或放弃的不算。
- * 2. 技能头部写了 App 或网站时,同一次成功动作的结果必须能确认它在其中一个地方执行。
+ * 1. Something was successfully done after the read (tap, type, open an app, open a web page, run a command..., see [ACTION_VERBS]); answering or giving up right after reading does not count.
+ * 2. When the skill's front matter names an app or a site, the result of the same successful action must confirm that it was executed in one of those places.
  *
- * 都按运行记录里实际发生的算,不要模型自己申报。宁可少认:没认出来只是这次不记,认错了会让好技能被停用。
+ * Everything is judged by what actually happened in the run record, not by what the model claims. Prefer under-counting: a miss only means it is not recorded this time, while a false match could get a good skill suspended.
  */
 object SkillFollow {
-    /** [places] 给出一份技能写明的 App 和网站;不认识这份技能时为 null,按没写算。 */
+    /** [places] gives the apps and sites a skill declares; it is null when the skill is not known, which counts as declaring nothing. */
     fun followed(events: List<RunEvent>, used: List<RunEvent.SkillUsed>, tools: ToolIndex, places: (String) -> SkillPlaces?): Set<String> =
         used.groupBy { it.name }.filter { (name, reads) ->
             val readAt = reads.minOf { it.atMs }
