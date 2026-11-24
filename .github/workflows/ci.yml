@@ -1,6 +1,6 @@
 name: CI
 
-# 只做 CI：单元测试、Android 打包、CLI 契约和网关集成。发布（CD）仍是手工流程。
+# CI only: unit tests, Android packaging, CLI contract, and relay integration. Publishing (CD) is still a manual process.
 on:
   pull_request:
   push:
@@ -10,8 +10,8 @@ on:
 permissions:
   contents: read
 
-# 同一个 PR 推新提交时取消上一次还没跑完的，main 上的推送各自跑完。
-# 推送和手动触发按 run_id 各占一组，不会被后来的运行取消。
+# Pushing new commits to the same PR cancels the previous unfinished run; pushes to main each run to completion.
+# Pushes and manual triggers each get their own group keyed by run_id, so later runs do not cancel them.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -27,7 +27,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # 默认缓存策略：默认分支可写，其他分支（含 PR）只读。
+      # Default cache policy: writable on the default branch, read-only on other branches (including PRs).
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
@@ -60,7 +60,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
-      # cliTest 先跑 cliContractTest（经真实子进程调 Python CLI），再跑 companions/mika/tests 下的 unittest。
+      # cliTest first runs cliContractTest (invoking the Python CLI through a real subprocess), then the unittest suite under companions/mika/tests.
       - name: CLI tests
         run: ./gradlew :core:cliTest -PmikaPython=python3 --stacktrace
       - name: Translation tool tests
@@ -90,15 +90,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # compileSdk 36；构建工具版本取 AGP 8.7.3 的默认值。action 顺带接受 SDK 许可。
+      # compileSdk 36; the build-tools version uses the AGP 8.7.3 default. The action also accepts the SDK licenses.
       - uses: android-actions/setup-android@v4
         with:
           packages: "platform-tools platforms;android-36 build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-provider: basic
-      # assembleDebug 验证单测碰不到的打包路径：31MB 的 rootfs、jniLibs 旧式解压、AIDL、Compose。
-      # 编译设备测试以检查设置交互等回归用例；这里没有连接设备，不执行 instrumentation。
+      # assembleDebug verifies packaging paths that unit tests cannot reach: the 31MB rootfs, legacy jniLibs extraction, AIDL, and Compose.
+      # Compiles the device tests to catch regressions such as settings interactions; no device is attached here, so instrumentation does not run.
       - name: Unit tests, debug build, and device test compilation
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:compileDebugAndroidTestKotlin --stacktrace
       - name: Upload test reports
@@ -133,7 +133,7 @@ jobs:
       - name: Relay Go unit tests
         working-directory: companions/relay
         run: go test ./...
-      # relayTest 会先 go build 出真实网关，再在回环上跑 Kotlin→网关→隧道全链路。
+      # relayTest first runs go build for the real relay, then exercises the full Kotlin→relay→tunnel path over loopback.
       - name: Relay integration test
         run: ./gradlew :core:relayTest --stacktrace
       - name: Upload test reports

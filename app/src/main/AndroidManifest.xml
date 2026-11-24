@@ -5,26 +5,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Opt-in, task-scoped incoming SMS only; never request READ_SMS or the default SMS role. -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <!-- 按住说话时录音，转成文字；用户浏览器里的网页要麦克风时也用它。 -->
+    <!-- Record while push-to-talk, then transcribe to text; also used when pages in the user's browser request the microphone. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- 用户浏览器里的网页要摄像头（Claire 自己拍照走系统相机，不用这个权限）；网页请求时先弹框问用户。 -->
+    <!-- Pages in the user's browser request the camera (Claire takes its own photos through the system camera and does not use this permission); when a page requests it, first show a dialog asking the user. -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- 用户浏览器里的网页要定位；网页请求时先弹框问用户。 -->
+    <!-- Pages in the user's browser request location; when a page requests it, first show a dialog asking the user. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- 用户在关于页下载新版后，交给系统安装器确认覆盖安装。 -->
+    <!-- After the user downloads a new version on the About page, hand it to the system installer to confirm the overwrite install. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 沙箱联网时读当前网络的 DNS 服务器 -->
+    <!-- Read the current network's DNS servers when the sandbox goes online -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- 语音通话:通话期间后台持麦走麦克风型前台服务；安卓 12 以下免提切换要改音频路由(普通权限,安装即授)。 -->
+    <!-- Voice calls: hold the microphone in the background during a call via a microphone-type foreground service; on Android 12 and below, switching to speaker requires changing the audio route (normal permission, granted at install). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
-    <!-- 通话功能:拨号、读通话状态,以及安卓 13+ 的「通话助手」框架(伴侣角色经 shell 授予)。 -->
+    <!-- Call features: dialing, reading call state, and the Android 13+ "call companion" framework (companion role granted via shell). -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -34,16 +34,16 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- 批量日程经安卓日历提供方一次写入；用户未授权时退回系统日历的新建页。 -->
+    <!-- Batch schedules are written at once through the Android calendar provider; when the user has not granted permission, fall back to the system calendar's create-event page. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
-    <!-- phone_set_alarm / phone_set_timer:经安卓标准接口请时钟 App 设闹钟、计时器(普通权限,安装即有) -->
+    <!-- phone_set_alarm / phone_set_timer: ask the clock app to set alarms and timers through the standard Android interface (normal permission, available at install) -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <!-- 「重启后自动恢复」:开机时重新打开无线调试。这个授权普通安装拿不到,只在用户打开那个开关后
-         经已配对的连接授予;不在这里声明的话连授予都做不了 -->
+    <!-- "Auto-restore after reboot": reopen wireless debugging at boot. This grant cannot be obtained by a normal install;
+         it is granted only through an already-paired connection after the user turns that switch on. Without declaring it here, even granting would be impossible -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- 对话页附件面板里的「最近的照片」:安卓 13 起读照片,14 起可以只给部分照片,12 及以前读外部存储。
-         不给也能用系统照片选择器、文件选择器;拍照走系统相机,不要相机权限 -->
+    <!-- "Recent photos" in the conversation attachment panel: reads photos from Android 13, can share only selected photos from 14, and reads external storage on 12 and below.
+         Without it, the system photo picker and file picker still work; taking photos uses the system camera and needs no camera permission -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission
@@ -53,23 +53,23 @@
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
-    <!-- 对话页附件可以拍照(走系统相机),声明用到相机、但不是必需:没有相机的设备照常安装。
-         有的系统按 APK 特征给应用分类,不声明时 Claire 可能被当成游戏、限制刷新率;这条声明要留着 -->
+    <!-- Conversation attachments can take photos (through the system camera), so the camera is declared as used but is not required: devices without a camera still install normally.
+         Some systems classify apps by APK features; without this declaration Claire may be treated as a game and have its refresh rate limited, so this declaration must stay -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- 语音输入要麦克风,但不是必需:没有麦克风的设备照常安装,只是用不了语音 -->
+    <!-- Voice input needs the microphone, but it is not required: devices without a microphone still install normally, they just cannot use voice -->
     <uses-feature
         android:name="android.hardware.microphone"
         android:required="false" />
 
-    <!-- 通话功能要电话硬件,但不是必需:没有通话模块的设备照常安装,只是用不了通话。 -->
+    <!-- Call features need telephony hardware, but it is not required: devices without a call module still install normally, they just cannot make calls. -->
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
 
-    <!-- 网页定位用到位置权限,但不是必需:没有定位硬件的设备照常安装,只是网页拿不到位置 -->
+    <!-- Web location uses the location permission, but it is not required: devices without location hardware still install normally, web pages just cannot get location -->
     <uses-feature
         android:name="android.hardware.location"
         android:required="false" />
@@ -77,7 +77,7 @@
         android:name="android.hardware.location.gps"
         android:required="false" />
 
-    <!-- list_apps 列出可启动的 App;解析系统权限框所在的包,用于判断「被切走」 -->
+    <!-- list_apps lists launchable apps; resolve the package that hosts the system permission dialog, used to determine "switched away" -->
     <queries>
         <intent><action android:name="android.telecom.InCallService" /></intent>
         <intent>
@@ -87,7 +87,7 @@
         <intent>
             <action android:name="android.content.pm.action.REQUEST_PERMISSIONS" />
         </intent>
-        <!-- 系统动作:先查有没有时钟、日历 App 接,没有就退回去操作界面 -->
+        <!-- System actions: first check whether a clock or calendar app handles them; if not, fall back to operating the UI -->
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
@@ -101,15 +101,15 @@
             <action android:name="android.intent.action.INSERT" />
             <data android:mimeType="vnd.android.cursor.dir/event" />
         </intent>
-        <!-- 语音输入:安卓 11 起不声明这条,查手机自带识别服务永远查不到 -->
+        <!-- Voice input: since Android 11, without declaring this, the phone's built-in recognition service can never be found -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
-        <!-- 引导页先看系统里打不打得开开发者选项页:打不开(有的运行环境不带安卓的系统设置)就一开始说明手机操作用不了 -->
+        <!-- The onboarding page first checks whether the system developer options page can be opened: if not (some runtime environments lack Android system settings), it states up front that phone control is unavailable -->
         <intent>
             <action android:name="android.settings.APPLICATION_DEVELOPMENT_SETTINGS" />
         </intent>
-        <!-- 账号认证器所在的包:没有桌面图标的系统账号登录服务也要看得见,它的登录页冒到主屏上时留给用户处理 -->
+        <!-- Package hosting the account authenticator: system account sign-in services with no launcher icon must also be visible, so their login pages can be left to the user when they pop onto the home screen -->
         <intent>
             <action android:name="android.accounts.AccountAuthenticator" />
         </intent>
@@ -125,7 +125,7 @@
         android:localeConfig="@xml/locales_config"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <!-- 界面只有一个:从桌面、通知、别的 App 或命令打开都回到这一个(新的打开交给 onNewIntent),不在上面叠出第二个 -->
+        <!-- There is only one UI: opening from the launcher, a notification, another app, or a command all return to this one (new opens go to onNewIntent), rather than stacking a second one on top -->
         <activity
             android:name=".ui.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density"
@@ -138,12 +138,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 覆盖磁贴长按的系统默认应用详情页，直接回到 Claire。 -->
+            <!-- Overrides the system default app details page shown on tile long-press, returning directly to Claire. -->
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <!-- 系统分享的文字、链接或文件（单个或多个）先进对话草稿。 -->
+            <!-- Text, links, or files (single or multiple) shared by the system first go into the conversation draft. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -164,7 +164,7 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.NoDisplay" />
 
-        <!-- 通知里接管按钮的落点:从通知启动 Activity 才会收起通知栏,让用户直接看到挪到主屏的 App -->
+        <!-- Destination for the takeover button in notifications: only starting an Activity from a notification collapses the notification shade, letting the user directly see the app moved to the home screen -->
         <activity
             android:name=".takeover.TakeoverActivity"
             android:excludeFromRecents="true"
@@ -173,7 +173,7 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.NoDisplay" />
 
-        <!-- App 里的文件查看页(网页、Markdown、PDF、图片、文本);页内查找时输入法调窗口高度 -->
+        <!-- In-app file viewer (web pages, Markdown, PDF, images, text); the IME adjusts the window height during in-page search -->
         <activity
             android:name=".ui.viewer.FileViewerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density"
@@ -181,7 +181,7 @@
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Mika" />
 
-        <!-- 用户自己打开的终端:只从 App 内进,不导出;转屏不重建,输入法调窗口高度 -->
+        <!-- User-opened terminal: entered only from within the app, not exported; does not recreate on rotation, IME adjusts the window height -->
         <activity
             android:name=".ui.terminal.TerminalActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density"
@@ -189,7 +189,7 @@
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Mika" />
 
-        <!-- 网页接管:把后台的网页标签(同一个 WebView)拿到主屏给用户处理 -->
+        <!-- Web takeover: bring a background web tab (the same WebView) to the home screen for the user to handle -->
         <activity
             android:name=".web.WebTakeoverActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density"
@@ -199,8 +199,8 @@
             android:taskAffinity=""
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- 兼容性自检在 Claire 虚拟屏上操作的测试页。对外开放只为让内置助手(shell)按组件名把它开到 Claire 的屏上:
-             调用方必须持有 INTERACT_ACROSS_USERS_FULL,shell 有,普通 App 没有;没有 intent-filter。单独一个任务,不进最近任务 -->
+        <!-- Test page operated by the compatibility self-check on Claire's virtual display. Exported only so the built-in assistant (shell) can start it by component name onto Claire's display:
+             callers must hold INTERACT_ACROSS_USERS_FULL, which shell has and ordinary apps do not; no intent-filter. Its own task, excluded from recents -->
         <activity
             android:name=".selfcheck.SelfCheckTargetActivity"
             android:excludeFromRecents="true"
@@ -235,10 +235,10 @@
                 android:resource="@xml/accessibility_service" />
         </service>
 
-        <!-- 主动能力:默认停用,第一次打开功能时由 ProactiveRuntime 启用,系统「通知使用权」列表里才出现;
-             之后关掉功能只解绑、不再停用(组件一停用系统就收回使用权)。
-             exported=false 与 NotificationListenerService 文档里的清单示例一致(系统按 BIND_NOTIFICATION_LISTENER_SERVICE 绑定);
-             只滤掉常驻通知,不滤静默通知(用户常把微信设成静默)。 -->
+        <!-- Proactive capabilities: disabled by default; enabled by ProactiveRuntime when the feature is first opened, so it appears in the system "notification access" list;
+             afterwards, turning the feature off only unbinds and does not disable it (once a component is disabled, the system revokes access).
+             exported=false matches the manifest example in the NotificationListenerService docs (the system binds with BIND_NOTIFICATION_LISTENER_SERVICE);
+             only ongoing notifications are filtered out, not silent ones (users often set WeChat to silent). -->
         <service
             android:name=".proactive.NoticeListenerService"
             android:enabled="false"
@@ -262,7 +262,7 @@
                 android:value="Runs a user-requested phone task on the app's own virtual display and shows its progress; afterwards keeps the one web page the user asked to keep open running, for at most two hours" />
         </service>
 
-        <!-- 通话:Telecom 绑定伴侣 InCallService,系统电话仍用自己的通话界面;前台服务在锁屏时撑住进程。 -->
+        <!-- Calls: Telecom binds the companion InCallService, while system calls still use their own call UI; the foreground service keeps the process alive while the screen is locked. -->
         <service
             android:name=".calls.MikaInCallService"
             android:exported="true"
@@ -284,13 +284,13 @@
 
         <receiver android:name=".calls.CallNotificationAction" android:exported="false" />
 
-        <!-- 应用内语音通话:通话期间撑住进程与后台麦克风;通知带挂断动作,锁屏时不打开通话页。 -->
+        <!-- In-app voice calls: keep the process and background microphone alive during a call; the notification has a hang-up action and does not open the call page when the screen is locked. -->
         <service
             android:name=".voicecall.VoiceCallService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- 用户绑定并打开微信渠道后保持长轮询；没有本地服务器，任务仍交给 TaskService。 -->
+        <!-- After the user binds and enables the WeChat channel, keep long polling; there is no local server, and tasks are still handed to TaskService. -->
         <service
             android:name=".wechat.WechatService"
             android:exported="false"
@@ -300,7 +300,7 @@
                 android:value="Keeps the user-enabled WeChat bot connection available so private messages can be handed to the app's existing task service" />
         </service>
 
-        <!-- 用户配置并打开 Telegram 机器人后保持长轮询；没有本地服务器，任务仍交给 TaskService。 -->
+        <!-- After the user configures and enables the Telegram bot, keep long polling; there is no local server, and tasks are still handed to TaskService. -->
         <service
             android:name=".telegram.TelegramService"
             android:exported="false"
@@ -311,9 +311,9 @@
         </service>
 
         <!--
-            电脑连接(MCP):用户在设置里打开、或电脑经 USB 调试打开后才运行,让监听端口在后台也开着;关掉就停。
-            对外开放只为让 adb shell 能起它(am start-foreground-service):调用方必须持有 INTERACT_ACROSS_USERS_FULL,
-            shell 有,普通 App 拿不到,adb 也授不了
+             Computer connection (MCP): runs only after the user enables it in settings, or after the computer enables it via USB debugging, keeping the listening port open in the background; stops when turned off.
+             Exported only so adb shell can start it (am start-foreground-service): callers must hold INTERACT_ACROSS_USERS_FULL,
+             which shell has, ordinary apps cannot get, and adb cannot grant either
         -->
         <service
             android:name=".mcp.McpService"
@@ -325,7 +325,7 @@
                 android:value="Keeps user-enabled computer access available through a private-network or USB endpoint, or an outbound connection to the user's remote gateway, so authorized clients can hand tasks to the app" />
         </service>
 
-        <!-- 用 ChatGPT 登录期间:用户在浏览器里登录时撑住进程,本机回调才有人接;登录一结束就停 -->
+        <!-- During ChatGPT sign-in: keep the process alive while the user logs in in the browser, so the local callback has a receiver; stops as soon as sign-in ends -->
         <service
             android:name=".settings.ChatGptSignInService"
             android:exported="false"
@@ -335,15 +335,15 @@
                 android:value="Keeps sign-in alive while the user finishes account login in the external browser, for a loopback callback or device-code polling" />
         </service>
 
-        <!-- 后台准备运行环境(解出随 APK 自带的根文件系统),只在准备期间运行 -->
+        <!-- Prepare the runtime environment in the background (unpack the root filesystem bundled with the APK); runs only during preparation -->
         <service
             android:name=".sandbox.SandboxService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- 网页上传:把暂存的上传文件以只读 content:// 地址交给内置浏览器的文件选择框,不对外导出。
-             FileProvider 要求 grantUriPermissions=true,否则进程启动时就抛异常;
-             这里从不把地址授权给别的 App,读取方只有本进程里的 WebView。 -->
+        <!-- Web uploads: hand staged upload files to the built-in browser's file chooser as read-only content:// URIs, not exported.
+             FileProvider requires grantUriPermissions=true, otherwise it throws at process startup;
+             URIs are never granted to other apps here, and the only reader is the WebView in this process. -->
         <provider
             android:name=".web.WebFilesProvider"
             android:authorities="${applicationId}.webfiles"
@@ -354,7 +354,7 @@
                 android:resource="@xml/web_files" />
         </provider>
 
-        <!-- 对话页附件:相机把照片写进缓存里的 camera/,点开已发附件时复制出的一份在 viewing/;不对外导出,用到时临时授权 -->
+        <!-- Conversation attachments: the camera writes photos into camera/ under the cache, and the copy made when opening an already-sent attachment goes in viewing/; not exported, granted temporarily when used -->
         <provider
             android:name=".chat.AttachFilesProvider"
             android:authorities="${applicationId}.attachfiles"
@@ -365,7 +365,7 @@
                 android:resource="@xml/attach_files" />
         </provider>
 
-        <!-- 任务报告分享:cache/report-share/ 里的临时正文,以只读地址交给系统分享面板,不对外导出 -->
+        <!-- Task report sharing: temporary body text under cache/report-share/, handed to the system share sheet as a read-only URI, not exported -->
         <provider
             android:name=".ui.ReportFilesProvider"
             android:authorities="${applicationId}.reportfiles"
@@ -376,7 +376,7 @@
                 android:resource="@xml/report_files" />
         </provider>
 
-        <!-- 走网络代理时 Claire 自己下的更新安装包:只读交给系统安装器,不对外导出,安装时临时授权 -->
+        <!-- Update installers downloaded by Claire itself when using the network proxy: handed read-only to the system installer, not exported, granted temporarily at install time -->
         <provider
             android:name=".about.UpdateFilesProvider"
             android:authorities="${applicationId}.updatefiles"
@@ -387,13 +387,13 @@
                 android:resource="@xml/update_files" />
         </provider>
 
-        <!-- 配对通知输入框填的配对码 -->
+        <!-- Pairing code entered in the pairing notification's input field -->
         <receiver
             android:name=".setup.PairingCodeReceiver"
             android:exported="false" />
 
-        <!-- 内置助手(shell 身份)交接 Binder 的入口:shell 有这个权限,普通 App 没有;
-             进入后还要核对调用方 uid、一次性口令和 APK,见 HelperHub.offer -->
+        <!-- Entry point for the built-in assistant (shell identity) to hand over a Binder: shell has this permission, ordinary apps do not;
+             after entering, the caller uid, one-time token, and APK are also verified, see HelperHub.offer -->
         <provider
             android:name=".shell.HelperHandoffProvider"
             android:authorities="${applicationId}.helper"
@@ -409,7 +409,7 @@
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
-        <!-- 开机广播只由系统发出(受保护的广播),按要求导出 -->
+        <!-- The boot broadcast is sent only by the system (protected broadcast), exported as required -->
         <receiver
             android:name=".setup.BootRestoreReceiver"
             android:exported="true">
@@ -422,7 +422,7 @@
         </receiver>
         <receiver android:name=".task.TriggerAlarmReceiver" android:exported="false" />
 
-        <!-- 外部脚本建任务的广播入口:对外开放(无权限),由「允许外部脚本建任务」开关 + 每分钟限流 + 来源标记把关 -->
+        <!-- Broadcast entry point for external scripts to create tasks: exported (no permission), guarded by the "allow external scripts to create tasks" switch + per-minute rate limit + source tag -->
         <receiver
             android:name=".task.ExternalScheduleReceiver"
             android:exported="true">

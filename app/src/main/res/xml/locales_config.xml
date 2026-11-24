@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 系统「应用语言」里能选的语言(安卓 13 起);和设置页的语言开关是同一个值 -->
+<!-- Languages selectable under the system "App languages" setting (Android 13+); the same value as the language switch on the settings page -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
     <locale android:name="ar" />
