@@ -4,7 +4,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 显式「发我微信」意图闸门:中英两套模式都命中,否定句排除,长句不按字数窗口截断。 */
+/** Gate for an explicit "send it to my WeChat" intent: both the Chinese and the English pattern sets match, negated sentences are excluded, and long sentences are not cut short by a character-count window. */
 class WechatOwnerRequestTest {
     @Test fun chineseExplicitSendMatches() {
         assertTrue(explicitWechatOwnerRequest("把今天的新闻摘要发到我的微信"))

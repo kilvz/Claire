@@ -20,7 +20,7 @@ import com.wangzan101.mika.core.screen.uistate.WebInfo
 class ElementProbeTest {
     private val info = WebInfo("https://a.test/", "t", "t1", null)
 
-    // 主文档:按钮(29)、跨源框架占位(8,里面是帧 X);跨源框架里有一个按钮(79)
+    // Main document: a button (29) and a cross-origin frame placeholder (8, wrapping frame X); the cross-origin frame holds one button (79)
     private val page = PageTree.parse(
         """{"els":[{"r":"button","n":"","x":10,"y":10,"w":100,"h":40,"c":1},
             {"r":"text","n":"展开","x":10,"y":60,"w":100,"h":20},
@@ -31,7 +31,7 @@ class ElementProbeTest {
 
     private fun json(s: String): JsonElement = Json.parseToJsonElement(s)
 
-    /** 一个按方法名回话的假 DevTools;[routes] 返回 null 表示不回(模拟挂住)。 */
+    /** A fake DevTools that answers by method name; a null from [routes] means no reply (simulating a hang). */
     private fun server(routes: (String, JsonObject) -> String?): FakeDevTools {
         val s = FakeDevTools()
         s.onMessage = { c, m ->
@@ -110,18 +110,18 @@ class ElementProbeTest {
         val methods = conn.received.map { it.getValue("method").jsonPrimitive.content }
         assertTrue("不取整棵 DOM", "DOM.getDocument" !in methods)
         assertTrue("释放对象组", "Runtime.releaseObjectGroup" in methods)
-        // 命中检测点在框与占位可见部分相交处的中心
+        // The hit-test point is the center of where the box intersects the visible part of the placeholder
         val hit = conn.received.first { it.getValue("method").jsonPrimitive.content == "DOM.getNodeForLocation" }.getValue("params").jsonObject
         assertEquals(70, hit.getValue("x").jsonPrimitive.int)
         assertEquals(130, hit.getValue("y").jsonPrimitive.int)
     }
 
     @Test fun frameLocalBoxesAreShiftedByTheFrameContentOrigin() {
-        // 框按框架内坐标给出(10,10..130,50):顶层坐标处命中不到,加上框架内容区左上角(2,102)后命中
+        // The box is given in frame-local coordinates (10,10..130,50): it does not hit at top-level coordinates, but does once the frame content origin (2,102) is added
         val server = server(routes(crossBox = quad(10, 10, 130, 50), hitAt = { x, y -> if (y > 100) 80 else 1 }))
         val out = withSession(server) { ElementProbe(it).enrich(page, "refs()", 2.0) } as ElementProbe.Outcome.Fused
         val cross = out.result.elements.single { it.name == "CrossChild" }
-        // CSS (12..132, 112..152) → 视图中心 (144, 264)
+        // CSS (12..132, 112..152) → viewport center (144, 264)
         assertTrue("${cross.centerX},${cross.centerY}", abs(cross.centerX - 144) <= 2 && abs(cross.centerY - 264) <= 2)
     }
 
@@ -176,7 +176,7 @@ class ElementProbeTest {
     }
 
     @Test fun locateTapsTheVisiblePartInsideTheFrame() {
-        // 按钮一半伸出框架内容区(2..298):点取露在框架里那部分的中心
+        // The button sticks halfway out of the frame content area (2..298): tap the center of the part that shows inside the frame
         val server = server(routes(crossBox = quad(250, 110, 400, 150)))
         val p = withSession(server) { ElementProbe(it).locate(ElementProbe.Anchor(79, setOf(79, 80), 8)) }!!
         assertEquals(274.0 to 130.0, p.x to p.y)

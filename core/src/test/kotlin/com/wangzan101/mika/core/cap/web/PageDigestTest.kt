@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 页面脚本 digest 的输出(格式同 page.js)→ 收起、拼正文、判定、时间。 */
+/** Output of the page-script digest (same format as page.js) → collapse, compose the text, verdict, times. */
 class PageDigestTest {
     private fun digest(json: String) = PageDigest.parse(Json.parseToJsonElement(json).jsonObject)
 
@@ -22,7 +22,7 @@ class PageDigestTest {
 
     private val prose = "This paragraph is the article body and carries the actual information the reader came for. ".repeat(6).trim()
 
-    /** 一篇文章:顶部导航、正文、推荐卡片、页脚。 */
+    /** One article page: top navigation, body text, recommendation cards, footer. */
     private val article = """
         {"url":"https://news.example.com/a","title":"Rain expected","parts":[
           {"g":"navigation","label":"Main","lines":["Home","World","Sport","Weather","Money"],"chars":30,"linkChars":30,"repeat":5,"links":5},
@@ -55,7 +55,7 @@ class PageDigestTest {
         assertEquals(r.text.length, q.chars)
     }
 
-    /** [2] 先在收起的块里出现、正文里又链到的地址留在链接表里;只在块里的去掉。 */
+    /** [2] A URL that first shows up in a collapsed block and is linked again from the body stays in the link list; ones found only in the block are removed. */
     @Test fun aCollapsedLinkThatMainContentRepeatsStays() {
         val (r, _) = read(article)
         assertEquals(listOf("https://agency.example.org/report", "https://news.example.com/1"), r.links.map { it.second })
@@ -71,7 +71,7 @@ class PageDigestTest {
         assertEquals(4, r.links.size)
     }
 
-    /** [3] 以文字为主的侧栏、页脚(链接占得少)照读。 */
+    /** [3] Mostly textual asides and footers (holding few links) are still read as-is. */
     @Test fun aTextualLandmarkIsNotCollapsed() {
         val aside = "The author has covered weather for twenty years and lives on the coast."
         val (r, q) = read("""
@@ -83,7 +83,7 @@ class PageDigestTest {
         assertEquals(0, q.folded)
     }
 
-    /** [4] 目录页、搜索结果页:那串链接就是正文,不收起(按地标以外的文字量)。 */
+    /** [4] Index and search-result pages: that run of links is the body, so it is not collapsed (judged by the amount of text outside landmarks). */
     @Test fun aListThatIsThePageItselfIsNotCollapsed() {
         val items = (1..20).joinToString(",") { "\"Result $it title\"" }
         val nav = (1..30).joinToString(",") { "\"Section $it\"" }
@@ -95,12 +95,12 @@ class PageDigestTest {
             ],"links":[],"images":[],"dialogs":[],"signals":{"textChars":640,"linkChars":630,"prominent":["Results"]}}
         """)
         assertTrue(r.text.contains("Result 20 title"))
-        // 导航很长,但它是地标:照收
+        // The navigation is long, but it is a landmark: it is kept as is
         assertFalse(r.text.contains("Section 30"))
         assertEquals(1, q.folded)
     }
 
-    /** [4] 收完剩下的字太少时,从最大的块起放回。 */
+    /** [4] When collapsing would leave too little text, blocks are put back starting with the largest. */
     @Test fun collapsingNeverLeavesAlmostNothing() {
         val nav = (1..30).joinToString(",") { "\"Section $it\"" }
         val foot = (1..10).joinToString(",") { "\"Link $it\"" }
@@ -112,7 +112,7 @@ class PageDigestTest {
         assertEquals(setOf(1), PageDigest.foldSet(parts))
     }
 
-    /** [4] 最大的块比块外的文字还多:它就是正文,不收。 */
+    /** [4] The largest block outweighs the text outside it: it is the body, so it is not collapsed. */
     @Test fun theLargestBlockOutweighingFreeTextStays() {
         val cards = (1..12).joinToString(",") { "\"Card $it with a short line\"" }
         val parts = PageDigest.parse(Json.parseToJsonElement("""
@@ -160,7 +160,7 @@ class PageDigestTest {
         assertEquals(ReadVerdict.NEEDS_SIGN_IN, q.verdict)
     }
 
-    /** [1] 登录字样只看登录框、标题、对话框:页面别处的「Log in」按钮不算。 */
+    /** [1] Sign-in wording is only looked for in the sign-in box, the title and dialogs: a "Log in" button elsewhere on the page does not count. */
     @Test fun signInWordsCountOnlyInTheBoxTitleOrDialogs() {
         val (_, q) = read("""
             {"url":"https://app.example.com/x","title":"Settings","parts":["Change PIN","Old","New"],"links":[],"images":[],"dialogs":[],
@@ -169,7 +169,7 @@ class PageDigestTest {
         assertEquals(ReadVerdict.THIN, q.verdict)
     }
 
-    /** [1] 文章页旁边一个小登录框:正文照读,不算要先登录。 */
+    /** [1] A small sign-in box beside an article page: the body is still read, so it does not count as needing sign-in. */
     @Test fun aSmallSignInBoxBesideALongArticleIsFine() {
         val long = "$prose ".repeat(4).trim()
         val (_, q) = read("""
@@ -193,7 +193,7 @@ class PageDigestTest {
         assertEquals("HTTP 403", forbidden.cause)
     }
 
-    /** 文章正文里提到「captcha」不算被拒:只看醒目处。 */
+    /** Mentioning "captcha" in the article body does not count as refused: only prominent places are checked. */
     @Test fun anArticleAboutCaptchasIsNotRefused() {
         val body = "How a captcha works and why sites use one. $prose"
         val (_, q) = read("""
@@ -215,7 +215,7 @@ class PageDigestTest {
         assertEquals(ReadVerdict.THIN, short.verdict)
     }
 
-    /** [9] 小图(图标)不算;重叠的图只算一次。 */
+    /** [9] Small images (icons) do not count; overlapping images are counted only once. */
     @Test fun pictureCoverIgnoresIconsAndCountsOverlapOnce() {
         fun share(vararg b: PageDigest.Box) = PageDigest.pictureShare(PageDigest.Signals(regionW = 1000, regionH = 1000, pictures = b.toList()))
         val icons = (0 until 100).map { PageDigest.Box((it % 10) * 100, (it / 10) * 100, 40, 40) }.toTypedArray()

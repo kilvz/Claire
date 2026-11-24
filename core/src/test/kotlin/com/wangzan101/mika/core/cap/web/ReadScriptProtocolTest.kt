@@ -20,7 +20,7 @@ class ReadScriptProtocolTest {
            "parent":{"callFrames":[{"url":"${if (scriptFrame) ReadScriptProtocol.PRELUDE_URL else "app.js"}"}]}}}}""")
 
     @Test fun anyRequestFromTheScriptIsAViolation() {
-        // 读脚本不碰网络:同源 GET 也不行
+        // Read scripts never touch the network: not even a same-origin GET
         for ((m, u) in listOf("GET" to "https://shop.test/api?x=1", "GET" to "https://shop.test:443/api", "POST" to "https://shop.test/api",
             "GET" to "https://evil.test/api", "PUT" to "https://api.shop.test/x")) {
             val v = ReadScriptProtocol.requestViolation(request(m, u))
@@ -28,14 +28,14 @@ class ReadScriptProtocolTest {
             assertTrue(v!!, v.contains("web_capture"))
         }
         assertNotNull(ReadScriptProtocol.requestViolation(request("GET", "https://cdn.test/x", redirect = true)))
-        // 页面自己的请求不管
+        // Requests made by the page itself are ignored
         assertNull(ReadScriptProtocol.requestViolation(request("POST", "https://evil.test/x", scriptFrame = false)))
         assertNull(ReadScriptProtocol.requestViolation(request("GET", "https://shop.test/x", scriptFrame = false)))
     }
 
     @Test fun preludeHasNoWayToTheNetwork() {
         val p = ReadScriptProtocol.PRELUDE
-        // 原生 fetch 不再留给读取世界;fetch 和能发请求的函数、构造器一律报 blocked_network
+        // The native fetch is no longer left to the reader world; fetch and every function or constructor that can send requests report blocked_network uniformly
         assertFalse(p.contains("G.fetch"))
         assertFalse(p.contains("nativeFetch"))
         assertTrue(p.contains(ReadScriptProtocol.NETWORK_MESSAGE))

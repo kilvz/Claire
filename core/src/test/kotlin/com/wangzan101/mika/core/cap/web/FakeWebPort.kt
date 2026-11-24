@@ -8,13 +8,13 @@ import com.wangzan101.mika.core.screen.uistate.UiElement
 import com.wangzan101.mika.core.screen.uistate.WebInfo
 import com.wangzan101.mika.core.screen.uistate.PageDialog
 
-/** 假网页端口:记录调用,结果可按测试改。读屏编号 w<tab>-<n>,和手机的永不相同。 */
+/** Fake web port: records calls, and results can be swapped per test. Snapshot ids are w<tab>-<n> and never collide with the phone's. */
 class FakeWebPort : WebPort {
     val calls = mutableListOf<String>()
     var url = "https://shop.example.com/cart"
     var title = "购物车"
     var tabId = "t1"
-    /** 当前标签的版本(siteMode 的回答)。 */
+    /** Site version of the current tab (the answer of siteMode). */
     var mode: String? = "desktop"
     override suspend fun siteMode(): String? = mode
     var elements: List<UiElement> = listOf(
@@ -30,16 +30,16 @@ class FakeWebPort : WebPort {
     var downloadList = listOf(DownloadInfo("/workspace/downloads/a.pdf", 1234, "application/pdf", "done", null))
     var reads = 0
     var check: ScreenCheck? = null
-    /** 当前标签正交给用户:读页、执行脚本、打开网址、切换标签都报 handed_over。 */
+    /** The current tab is handed over to the user: reading the page, running scripts, opening URLs and switching tabs all report handed_over. */
     var handedOver = false
     var downloadsAvailable = true
-    /** null:不支持切换手机版/桌面版(用接口的默认实现)。 */
+    /** null: switching between mobile and desktop sites is unsupported (falls back to the interface default). */
     var siteModeHost: String? = null
-    /** 有没有 DevTools:没有时网络记录与等网络空闲报不可用。 */
+    /** Whether DevTools is present: without it, network capture and waiting for network idle report unavailable. */
     var devtools = false
     var captured: List<CapturedResponse> = emptyList()
     var waitOutcome = WaitOutcome(true, 120, url)
-    /** 页面弹出、等回话的弹框;读屏里带上。 */
+    /** A dialog the page popped up and is waiting on an answer for; carried in snapshots. */
     var dialog: PageDialog? = null
     override suspend fun answerDialog(accept: Boolean, text: String?): ActionResult {
         if (dialog == null) return ActionResult.Failed(NO_DIALOG)
@@ -47,16 +47,16 @@ class FakeWebPort : WebPort {
         dialog = null
         return result
     }
-    /** 停留时轻轻滚一下的回答:false 表示这会儿不便滚。 */
+    /** The answer for a gentle scroll while idling: false means scrolling is not convenient right now. */
     var idleOk = true
-    /** 轻轻滚一下时页面的变化(测试按需换掉元素)。 */
+    /** How the page changes on a gentle scroll (tests replace elements as needed). */
     var onIdle: () -> Unit = {}
     override suspend fun idleScroll(fraction: Double): Boolean { calls += "idle $fraction"; if (idleOk) onIdle(); return idleOk }
     override suspend fun doubleTapRef(ref: String, snapshotId: String): ActionResult { calls += "doubleTapRef $ref $snapshotId"; return result }
 
     private fun read() = ScreenSnapshot("w$tabId-${++reads}", null, elements, 1080, 2400, web = WebInfo(url, title, tabId, 200, dialog = dialog))
     override suspend fun snapshot() = read().also { calls += "snapshot" }
-    // 和真实端口一样:看一眼不登记编号,不算一次读屏
+    // Like the real port: a peek registers no snapshot id and does not count as a page read
     override suspend fun peek() = ScreenSnapshot("w$tabId-peek", null, elements, 1080, 2400, web = WebInfo(url, title, tabId, 200, dialog = dialog))
     override suspend fun screenshotPng(): ByteArray? = null
     override suspend fun tapRef(ref: String, snapshotId: String): ActionResult { calls += "tapRef $ref $snapshotId"; return result }
@@ -83,7 +83,7 @@ class FakeWebPort : WebPort {
         if (handedOver) throw WebTabHandedOver(tabId)
         calls += "readPage $maxChars $offset" + if (scrollLazy) "" else " noscroll"; return page
     }
-    /** web_read_page 的质量信号;后台读网址时 [readUrlError] 不为空就当打不开。 */
+    /** Quality signal of web_read_page; when reading a URL in the background, a non-null [readUrlError] means it counts as unopenable. */
     var quality: ReadQuality? = null
     var readUrlError: String? = null
     override suspend fun read(req: PageRead): PageText {
@@ -91,7 +91,7 @@ class FakeWebPort : WebPort {
         calls += "readUrl ${req.url}" + if (req.unfold) " unfold" else ""
         return page.copy(url = req.url, quality = quality, netError = readUrlError)
     }
-    /** 最近一次读脚本收到的参数(站点命令的 args)。 */
+    /** Args received by the most recent script run (the args of a site command). */
     var evalArgs: kotlinx.serialization.json.JsonObject? = null
     override suspend fun evaluate(script: String, timeoutMs: Long, args: kotlinx.serialization.json.JsonObject?): EvalJs {
         if (handedOver) throw WebTabHandedOver(tabId)
@@ -113,7 +113,7 @@ class FakeWebPort : WebPort {
         calls += "upload $ref ${paths.joinToString(",")}"; return result
     }
     override suspend fun historyBack(): ActionResult { calls += "historyBack"; return result }
-    /** 能留页时(有留页的那一份);[keptHost] 是此刻已经留着的另一页的站点。 */
+    /** When pages can be kept open (the variant that supports it); [keptHost] is the site of the other page currently kept. */
     var keepAvailable = false
     var keptHost: String? = null
     var usersPage = false

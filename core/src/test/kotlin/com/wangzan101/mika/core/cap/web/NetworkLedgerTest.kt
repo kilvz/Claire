@@ -90,12 +90,12 @@ class NetworkLedgerTest {
         l.onEvent("Network.requestWillBeSent", sent("m", "https://a.test/v.mp4", type = "Media"), 0)
         l.onEvent("Network.requestWillBeSent", sent("b", "https://a.test/beacon", type = "Ping"), 0)
         assertEquals(0, l.inFlight(10))
-        // 响应是事件流的请求也算长连接
+        // A request whose response is an event stream also counts as long-lived
         l.onEvent("Network.requestWillBeSent", sent("sse", "https://a.test/sse"), 0)
         assertEquals(1, l.inFlight(10))
         l.onEvent("Network.responseReceived", resp("sse", mime = "text/event-stream"), 100)
         assertEquals(0, l.inFlight(110))
-        // 长轮询:超过 staleMs 还没回的不算在途
+        // Long polling: one that has not answered after staleMs no longer counts as in flight
         l.onEvent("Network.requestWillBeSent", sent("poll", "https://a.test/poll"), 1000)
         assertEquals(1, l.inFlight(5000))
         assertEquals(0, l.inFlight(11_001))
@@ -156,7 +156,7 @@ class NetworkLedgerTest {
         assertTrue(l.get("2")!!.bodyTruncated)
         l.putBody("3", "y".repeat(90), base64Encoded = false)
         l.putBody("4", "z".repeat(90), base64Encoded = false)
-        // 总量超了:最早取到的正文先丢,丢了还能再取
+        // Total cap exceeded: the earliest body fetched is dropped first, and once dropped it can be fetched again
         assertNull(l.get("1")!!.body)
         assertEquals(NetworkLedger.BodyFetch("1", null), l.bodyToFetch("1"))
         assertTrue(l.totalBodyBytes() <= 250)

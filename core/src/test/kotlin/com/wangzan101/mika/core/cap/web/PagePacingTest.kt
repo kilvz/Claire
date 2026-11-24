@@ -13,7 +13,7 @@ import com.wangzan101.mika.core.screen.uistate.dwellStopped
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** 一页一页看的节奏:第一页不等、停够了不等、换网站不等,停留有上下限且随看过的页数变长。 */
+/** Pacing for reading page by page: no wait on the first page, no wait once the dwell has elapsed, no wait when switching sites; the dwell is bounded below and above and grows with the number of pages seen. */
 class PagePacingTest {
     private val limits = PagePacing.Limits()
 
@@ -33,7 +33,7 @@ class PagePacingTest {
             val dwell = p.noteLoad("https://shop.example.com/list?page=2", 1_000)
             assertTrue("$dwell", dwell in limits.firstDwellMs)
             assertEquals(dwell, p.waitBefore("shop.example.com", 1_000))
-            // 模型自己想、读花掉的时间算在停留里
+            // Time the model spends thinking and reading counts toward the dwell
             assertEquals(dwell - 1_500, p.waitBefore("shop.example.com", 2_500))
             assertEquals(0, p.waitBefore("shop.example.com", 1_000 + dwell))
             assertEquals(0, p.waitBefore("shop.example.com", 100_000))
@@ -64,9 +64,9 @@ class PagePacingTest {
         val p = PagePacing.human(Random(3))
         p.noteLoad("https://www.shop.example.com/", 0)
         p.noteLoad("https://m.shop.example.com/item/1", 100)
-        // 同一个可注册域名:第二页
+        // Same registrable domain: the second page
         assertTrue(p.waitBefore("example.com", 200) > 0)
-        // 别的网站:不等;到了别的网站之后,回原网站的动作也不按原网站那一页等
+        // Another site: no wait; and after visiting another site, an action returning to the original site does not wait for that site's page either
         assertEquals(0, p.waitBefore("news.example.org", 200))
         assertEquals(0, p.noteLoad("https://news.example.org/", 300))
         assertEquals(0, p.waitBefore("shop.example.com", 400))
@@ -76,7 +76,7 @@ class PagePacingTest {
     fun `pages outside the window no longer count`() {
         val p = PagePacing.human(Random(5))
         p.noteLoad("https://shop.example.com/", 0)
-        // 过了时间窗,再来又是这个网站的第一页
+        // Past the time window, coming back counts as the first page of this site again
         assertEquals(0, p.noteLoad("https://shop.example.com/again", limits.windowMs + 1))
     }
 
@@ -97,7 +97,7 @@ class PagePacingTest {
         d.onWait = { waited += it }
         d.seen("https://shop.example.com/")
         assertEquals(0, d.before())
-        // 同一页(只差 #)不算新的一页
+        // The same page (differing only in #) does not count as a new page
         d.seen("https://shop.example.com/#top")
         assertEquals(0, d.before())
         d.seen("https://shop.example.com/list?page=2")
@@ -106,12 +106,12 @@ class PagePacingTest {
         assertTrue("$w", w in (limits.firstDwellMs.first - 1_000)..(limits.firstDwellMs.last - 1_000))
         assertEquals(listOf(w), slept)
         assertEquals(listOf(w), waited)
-        // 停够了:下一个动作不再等
+        // Dwell satisfied: the next action no longer waits
         assertEquals(0, d.before())
-        // 加载了更多:又是一页
+        // More content loaded: that counts as another page
         d.loadedMore()
         assertTrue(d.before() > 0)
-        // 打开别的网站不等
+        // Opening another site does not wait
         d.seen("https://shop.example.com/list?page=3")
         assertEquals(0, d.before("https://news.example.org/"))
     }
@@ -129,14 +129,14 @@ class PagePacingTest {
                 t += 40_000
             }
         }
-        // 普通网站的范围不变
+        // The range for ordinary sites is unchanged
         val p = PagePacing.human(Random(2))
         p.noteLoad("https://shop.example.com/", 0)
         assertTrue(p.noteLoad("https://shop.example.com/2", 1) in limits.firstDwellMs)
         assertTrue(c.firstDwellMs.first > limits.firstDwellMs.last && c.maxDwellMs > limits.maxDwellMs)
     }
 
-    /** 设了上限的节奏:普通网站 [CAP] 页,限制浏览快慢的网站 [CAREFUL_CAP] 页。 */
+    /** Pacing with a cap set: [CAP] pages for ordinary sites, [CAREFUL_CAP] pages for sites that throttle browsing. */
     private fun capped(seed: Int) = PagePacing.human(
         Random(seed), limits = PagePacing.Limits(pageCap = CAP), careful = PagePacing.Limits.CAREFUL.copy(pageCap = CAREFUL_CAP),
     )
@@ -157,17 +157,17 @@ class PagePacingTest {
         repeat(CAP - 1) { p.noteLoad("https://shop.example.com/p$it", it * 60_000L) }
         assertFalse(p.capReached("shop.example.com"))
         p.noteLoad("https://www.shop.example.com/last", 3_000_000)
-        // 过了时间窗的页也算:上限按整个任务数
+        // Pages past the time window count too: the cap covers the whole task
         assertTrue(p.capReached("m.shop.example.com"))
         assertEquals(CAP, p.pagesOn("shop.example.com"))
-        // 别的网站另算
+        // Other sites are counted separately
         assertFalse(p.capReached("news.example.org"))
         p.userAnswered()
         assertFalse(p.capReached("shop.example.com"))
-        // 限制浏览快慢的网站上限更低
+        // Sites that throttle browsing get a lower cap
         repeat(CAREFUL_CAP) { p.noteLoad("https://jobs.example.com/p$it", it.toLong(), PlacePace.CAREFUL) }
         assertTrue(p.capReached("jobs.example.com", PlacePace.CAREFUL))
-        // 不设节奏时也不设上限
+        // With no pacing set there is no cap either
         repeat(50) { PagePacing.Off.noteLoad("https://shop.example.com/p$it", 0) }
         assertFalse(PagePacing.Off.capReached("shop.example.com"))
     }
@@ -179,12 +179,12 @@ class PagePacingTest {
         repeat(CAP) { p.noteLoad("https://shop.example.org/p$it", it * 1_000L) }
         assertTrue(p.capReached("jobs.example.com"))
         p.outwardDone("www.jobs.example.com")
-        // 做过对外动作:这个网站(同一可注册域名)不再设上限,停留照旧
+        // Once an outward action was done here: this site (same registrable domain) is no longer capped, and dwelling continues as before
         assertFalse(p.capReached("m.jobs.example.com"))
         val d = p.noteLoad("https://jobs.example.com/more", 100_000)
         assertTrue("$d", d > 0)
         assertEquals(d, p.waitBefore("jobs.example.com", 100_000))
-        // 用户答话后照样不设;别的网站不受影响
+        // Still uncapped after the user answers; other sites are unaffected
         p.userAnswered()
         repeat(CAP * 2) { p.noteLoad("https://jobs.example.com/x$it", 200_000L + it) }
         assertFalse(p.capReached("jobs.example.com"))
@@ -198,7 +198,7 @@ class PagePacingTest {
         val d = PageDwell(PagePacing.human(Random(9), limits = PagePacing.Limits(pageCap = 2)), clock = { now }, sleep = { now += it })
         for (i in 1..2) { d.seen("https://jobs.example.com/p$i"); now += 60_000 }
         assertTrue(runCatching { d.before() }.exceptionOrNull() is PageLimitReached)
-        // 正在做的对外动作不拦;没做成的不解除上限
+        // An outward action in progress is not blocked; one that did not complete does not lift the cap
         d.outwardStart("jobs.example.com")
         d.before()
         d.outwardEnd("jobs.example.com", done = false)
@@ -206,7 +206,7 @@ class PagePacingTest {
         d.outwardStart("jobs.example.com")
         d.outwardEnd("jobs.example.com", done = true)
         d.seen("https://jobs.example.com/p3")
-        // 解除之后照样补足停留
+        // After the cap is lifted the dwell is still served
         assertTrue(d.before() > 0)
     }
 
@@ -226,10 +226,10 @@ class PagePacingTest {
         assertEquals(JsonPrimitive(3), budget["used"])
         assertEquals(JsonPrimitive(3), budget["limit"])
         assertTrue(runCatching { d.before("https://shop.example.com/p4") }.exceptionOrNull() is PageLimitReached)
-        // 往下滚(不看上限)和别的网站照常
+        // Scrolling down (which ignores the cap) and other sites work as usual
         assertEquals(0, d.before(gate = false))
         assertEquals(0, d.before("https://news.example.org/"))
-        // 用户答过话:接着看
+        // The user has answered: carry on reading
         d.userAnswered()
         assertEquals(0, d.before())
     }
@@ -244,7 +244,7 @@ class PagePacingTest {
         d.seen("https://www.jobs.example.com/b")
         val w = d.before()
         assertTrue("$w", w in PagePacing.Limits.CAREFUL.firstDwellMs)
-        // 同一个主机只问一次
+        // The same host is only asked once
         assertEquals(listOf("jobs.example.com"), asked)
     }
 
@@ -259,17 +259,17 @@ class PagePacingTest {
         d.seen("https://shop.example.com/")
         d.seen("https://shop.example.com/2")
         val w = d.before(port = port)
-        // 停够的总时长不变,滚了 1–3 下
+        // The total dwell time is unchanged, with 1–3 scrolls
         assertEquals(w, slept.sum())
         val scrolls = port.calls.filter { it.startsWith("idle ") }
         assertTrue("$scrolls", scrolls.size in 1..3)
         assertEquals(scrolls.size, idled)
-        // 按坐标做的动作(不给端口)不滚
+        // Coordinate-based actions (no port given) do not scroll
         d.seen("https://shop.example.com/3")
         port.calls.clear()
         d.before()
         assertTrue(port.calls.isEmpty())
-        // 端口说这会儿不便滚:滚一下都不成就不再试,照样停够
+        // The port says scrolling is not convenient now: after a single failed attempt it stops trying and still dwells the full time
         d.seen("https://shop.example.com/4")
         port.calls.clear(); slept.clear(); idled = 0
         port.idleOk = false

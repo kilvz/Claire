@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 片段(fragment)里的问号不是查询串,不能从里面读出包名。 */
+/** A question mark inside the fragment is not a query string, so a package name cannot be read from it. */
 class WebUrlQueryParamTest {
     @Test fun aQuestionMarkInsideTheFragmentIsNotAQueryString() {
         val link = WebUrlPolicy.external("market://details#frag?id=com.evil.app")!!

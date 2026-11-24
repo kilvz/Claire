@@ -4,7 +4,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 短写 / 整数 / 八进制 IPv4 也是本机或内网地址,不能绕过下载前的字面 IP 检查。 */
+/** Short-form / integer / octal IPv4 notations are localhost or intranet addresses too, so they must not bypass the literal-IP check made before a download. */
 class DownloadShortIpv4Test {
     @Test fun shortIntegerAndOctalIpv4LiteralsAreRefused() {
         for (u in listOf(

@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit
 class SelectorPolicyTest {
     companion object {
         /**
-         * 都是按 value 属性选元素的写法(在浏览器里对着 value 不同的两个输入框,命中的不一样)。
-         * ReadScriptEnforcementTest 拿同一批去跑页面里的 JS 版,两边要一样。
+         * All of these select elements by the value attribute (in a browser, against two inputs holding different values, they match different ones).
+         * ReadScriptEnforcementTest runs the same batch through the JS version inside the page; the two sides must agree.
          */
         val BY_VALUE = listOf(
             """input[value^="h"]""",
@@ -35,22 +35,22 @@ class SelectorPolicyTest {
             """input[value^='h' i]""",
             """form:has(input[value^="h"])""",
             """input:is([value^="h"])""",
-            // 引号里的注释记号不算数:只按字面去注释的话,中间那段 [value 就被当成注释吃掉了
+            // Comment markers inside quotes do not count: stripping comments purely literally would swallow the [value part in the middle
             """input:not([data-x="/*"])[value^="h"]:not([data-y="*/"])""",
-            // 引号里转义后面的换行算在转义里,续行的反斜杠加换行也不结束这段字
+            // Inside quotes, a newline following an escape belongs to the escape, and a backslash plus newline continuing the line does not end the string either
             "input:not([data-x=\"\\41\n\"])[value^=\"h\"]",
             "input:not([data-x=\"\\41\r\n\"])[value^=\"h\"]",
             "input:not([data-x=\"a\\\nb\"])[value^=\"h\"]",
-            // 没写完的引号和方括号,浏览器读到结尾自己补上
+            // Unterminated quotes and square brackets are closed at end of input by the browser
             """input[value^="h""",
-            // 不带引号的 url( 到 ) 为止是一个记号,里面的注释记号、引号不算数;:is() 丢掉这一项,后面的照样生效
+            // An unquoted url( runs to ) as a single token, so comment markers and quotes inside it do not count; :is() drops that item and the rest still applies
             """input:is(url(/*),[value^="h"])""",
             """input:is(url(x"),[value^="h"])""",
             """input:where(u\72 l(/*),[value^="h"])""",
             """input:is(URL( /*),[value^="h"])""",
         )
 
-        /** 不按 value 属性选的,照常放行。 */
+        /** Selectors that do not select by the value attribute pass as usual. */
         val NOT_BY_VALUE = listOf(
             "li.item",
             """input[name="q"]""",
@@ -68,7 +68,7 @@ class SelectorPolicyTest {
             """[title="/*"], [data-x="*/"]""",
             """a[data-url="x"]""",
             "a.url",
-            // 引号里的 url( 不算:url( 要在还原之后找
+            // url( inside quotes does not count: url( must be looked for after unescaping
             """[style*="url("]""",
         )
     }
@@ -88,13 +88,13 @@ class SelectorPolicyTest {
         assertEquals("a b", SelectorPolicy.plain("a/* [value] */b"))
         assertEquals("a ", SelectorPolicy.plain("a/* not closed"))
         assertEquals("""[title=""][x=""]""", SelectorPolicy.plain("""[title="[value\"/*"][x='\27']"""))
-        // 换行一律按 \n 算;没转义的换行让引号里的字到此为止
+        // Newlines are always treated as \n; an unescaped newline ends the quoted run right there
         assertEquals("[a=\"\"\n[value]", SelectorPolicy.plain("[a=\"x\r\n[value]"))
-        // 0、代理区、超出范围的码点换成替换字符;末尾单独的反斜杠也是
+        // 0, surrogate and out-of-range code points become the replacement character; so does a lone trailing backslash
         assertEquals("\uFFFD\uFFFD\uFFFD\uFFFD", SelectorPolicy.plain("""\0 \D800 \110000 \"""))
     }
 
-    /** 页面里的 JS 版和 Kotlin 版判断一样:上面两组,加一批在属性名前后随机拼上容易出错的片段的。机器上没有 Node 时跳过。 */
+    /** The JS version inside the page decides the same as the Kotlin version: the two groups above, plus a batch with error-prone fragments randomly spliced in around attribute names. Skipped when Node is not on the machine. */
     @Test fun jsVersionAgrees() {
         val node = ReadScriptEnforcementTest.node()
         assumeTrue("no node on this machine", node != null)
@@ -119,7 +119,7 @@ class SelectorPolicyTest {
         val js = runCatching { Json.parseToJsonElement(out).jsonArray.map { it.jsonPrimitive.boolean } }.getOrElse { error("node output: $out") }
         assertEquals(all.size, js.size)
         for ((i, s) in all.withIndex()) assertEquals(s, SelectorPolicy.selectsByValue(s), js[i])
-        // 随机拼的里两种结果都要有不少,不然比的只是一边
+        // The randomly assembled cases must yield plenty of both outcomes, otherwise only one side is being compared
         val hits = random.count { SelectorPolicy.selectsByValue(it) }
         assertTrue("$hits of ${random.size}", hits > 300 && random.size - hits > 300)
     }

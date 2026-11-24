@@ -21,7 +21,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** wechat_send_owner 工具:供给随端口有无,参数上限拒超,端口结局如实进结果。 */
+/** The wechat_send_owner tool: offered depending on whether a port exists, over-limit arguments rejected, and the port's outcome reported faithfully in the result. */
 class WechatOwnerToolTest {
     private class FakePort(var result: WechatOwnerResult) : WechatOwnerPort {
         val sent = mutableListOf<String>()
@@ -57,7 +57,7 @@ class WechatOwnerToolTest {
         assertTrue(tool.logged)
         assertTrue(tool.available(ctx(capability)))
         assertFalse(capability.sections(PromptEnv(offered = setOf("wechat_send_owner"), inlineScreen = false)).isEmpty())
-        // 工具不在本任务供给里时守则也不出现
+        // The guideline does not appear either when the tool is not offered in this task
         assertTrue(capability.sections(PromptEnv(offered = emptySet(), inlineScreen = false)).isEmpty())
     }
 
