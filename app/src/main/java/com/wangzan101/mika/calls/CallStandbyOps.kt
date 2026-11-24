@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import com.wangzan101.mika.calls.CallRuntime.Companion.STANDBY_START_MS
 
-// 电话运行时:后台待命前台服务与自动接听暂停
+// Call runtime: background standby foreground service and auto-answer pause
 /** Initial authorization comes only from this explicit action in the unlocked phone UI. */
 suspend fun CallRuntime.startBackgroundStandby(): CallActionResult = onMain {
     val config = settings.state.value

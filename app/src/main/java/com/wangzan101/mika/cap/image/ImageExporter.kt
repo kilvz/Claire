@@ -14,9 +14,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
-/** 把一张图片存到手机的「相册/Claire」(MediaStore,不需要存储权限)。 */
+/** Saves an image to "Pictures/Claire" on the phone (MediaStore, no storage permission required). */
 class ImageExporter(private val context: Context) {
-    /** [name] 是想要的文件名;系统重名时自动加序号。返回相册里的实际名字和 content URI。 */
+    /** [name] is the desired file name; the system appends a sequence number automatically on collisions. Returns the actual name in the album and the content URI. */
     suspend fun save(bytes: ByteArray, mime: String, name: String): SavedImage = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val display = if (name.substringAfterLast('.', "").isEmpty()) "$name.${extensionOf(mime)}" else name
@@ -49,7 +49,7 @@ class ImageExporter(private val context: Context) {
         SavedImage("$DIRECTORY/$actual", uri.toString(), bytes.size.toLong())
     }
 
-    /** 删掉本 App 在「相册/Claire」里留下的、没写完的条目(写到一半进程被杀会留下 IS_PENDING 的空壳)。启动时调用。 */
+    /** Deletes unfinished entries this app left behind in "Pictures/Claire" (a process killed mid-write leaves an IS_PENDING shell behind). Called on startup. */
     fun cleanPending() {
         val resolver = context.contentResolver
         val args = Bundle().apply {

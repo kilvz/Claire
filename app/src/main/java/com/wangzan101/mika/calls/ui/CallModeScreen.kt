@@ -64,7 +64,7 @@ internal fun callModeLine(snapshot: VoiceCatalogSnapshot, engine: CallEngine): S
 internal fun silenceSeconds(ms: Int): String = String.format(Locale.getDefault(), "%.1f", ms / 1000f)
 
 /**
- * 「通话方式」: standard calls listen, think and speak with the chosen models; realtime is the advanced choice.
+ * "Call mode": standard calls listen, think and speak with the chosen models; realtime is the advanced choice.
  * Applies to in-app voice calls, and to phone calls unless they have their own setting.
  */
 @Composable
@@ -126,7 +126,7 @@ fun CallModeScreen(onBack: () -> Unit, onOpenStt: () -> Unit, onOpenTts: () -> U
             }
             GroupLabel(stringResource(R.string.call_mode_rhythm))
             GroupCard {
-                // 拖动时只改本地值,松手才写进目录,免得每一帧都落盘
+                // While dragging only the local value changes; it is written to the catalog on release, so it is not persisted on every frame
                 var dragging by remember(s.silenceMs) { mutableFloatStateOf(s.silenceMs.toFloat()) }
                 ListRow(null, stringResource(R.string.call_mode_silence),
                     stringResource(R.string.call_mode_silence_sub, silenceSeconds(dragging.roundToInt())), first = true)

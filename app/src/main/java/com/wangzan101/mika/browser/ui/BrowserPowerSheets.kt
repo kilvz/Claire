@@ -59,7 +59,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.delay
 
-/** 起点页右上角的菜单:标签页、历史记录、清除浏览数据。 */
+/** The menu at the top right of the start page: tabs, history, clear browsing data. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserMenuSheet(tabsCount: Int, onDismiss: () -> Unit, onTabs: () -> Unit, onHistory: () -> Unit, onClearData: () -> Unit) {
@@ -82,7 +82,7 @@ fun BrowserMenuSheet(tabsCount: Int, onDismiss: () -> Unit, onTabs: () -> Unit, 
     }
 }
 
-/** 标签页面板:打开着的标签,点一下换过去,× 关掉;右上角新建。 */
+/** The tabs panel: the open tabs, tap one to switch to it, × to close it; create a new one at the top right. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabsSheet(
@@ -141,7 +141,7 @@ fun TabsSheet(
     }
 }
 
-/** 完整历史:全部记录,整理时点 × 删一条;底部清除全部。 */
+/** Full history: every record; while tidying up, tap × to delete one; clear everything at the bottom. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistorySheet(
@@ -220,7 +220,7 @@ fun HistorySheet(
     }
 }
 
-/** 清除浏览数据:勾选历史、网站数据、缓存,一起清。网站数据会退出所有网站。 */
+/** Clear browsing data: tick history, site data and cache to clear them together. Site data logs out of every site. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClearDataSheet(onDismiss: () -> Unit, onClear: (history: Boolean, siteData: Boolean, cache: Boolean) -> Unit) {
@@ -257,7 +257,7 @@ fun ClearDataSheet(onDismiss: () -> Unit, onClear: (history: Boolean, siteData: 
     }
 }
 
-/** 页内查找条:输入后自动搜,显示第几处/共几处,上一个、下一个、关闭。 */
+/** The in-page find bar: searches automatically as you type, shows the current match out of the total, previous, next, close. */
 @Composable
 fun BrowserFindBar(find: FindState, onQuery: (String) -> Unit, onPrev: () -> Unit, onNext: () -> Unit, onClose: () -> Unit) {
     val c = MikaTheme.colors

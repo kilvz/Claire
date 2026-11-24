@@ -9,7 +9,7 @@ import com.wangzan101.mika.calls.CallRuntime.Tracked
 import com.wangzan101.mika.calls.CallRuntime.Work
 import com.wangzan101.mika.calls.CallRuntime.Companion.disconnected
 
-// 电话运行时:系统通话事件与自动接听触发
+// Call runtime: system call events and auto-answer triggering
 internal fun CallRuntime.onCallAdded(service: MikaInCallService, call: Call) {
     unobservedManagedCall = false
     tracked.getOrPut(call) { Tracked(call, service) }

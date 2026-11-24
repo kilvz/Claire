@@ -29,7 +29,7 @@ enum class IncomingCallType(val title: Int, private vararg val labels: String) {
             var word = raw.replaceFirst(prefix, "")
             repeat(2) {
                 word = word.replaceFirst(suffix, "").trim()
-                // 已确认是标记语境时，末尾括号视为来源署名一并剥掉（不点名具体来源）
+                // When it is confirmed to be a marking context, the trailing parentheses are treated as the source attribution and stripped as well (without naming the specific source)
                 if (word.contains(Regex("标记|标注"))) word = word.replaceFirst(bareSource, "").trim()
             }
             if (requireMark && word == raw) return null

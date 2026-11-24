@@ -72,13 +72,15 @@ import com.wangzan101.mika.ui.components.PageBackground
 import com.wangzan101.mika.ui.theme.MikaType
 
 /**
- * 浏览器页(侧栏「浏览器」):没有打开的网页时是起始页([BrowserStart]:搜索框、常用网站、最近打开),
- * 打开了是网页([BrowserPageBar] + 网页 + [BrowserToolbar],「更多」是 [BrowserMoreSheet])。
- * 网页底下是「问问 Claire」([PageAskBar]):对着这一页问,这一页借给那个任务当它的当前网页标签;干活时网页下半截盖一块对话面板
- * ([PagePanel]),页面四周亮一圈光边([PageGlow]);你一摸页面 Claire 就暂停,面板收成小卡片([PageCard]),顶上一条「继续」([PausedBanner])。
- * 选中网页上的文字时,文字选择菜单里多一项「问 Claire」,选中的字带进去。状态在 [PageChat]。
- * 系统返回键先在网页里后退,退不了回到起始页,起始页上再按回到进来的地方。
- * 网页视图放在进程里([UserBrowser]),转屏时接着用;离开这一页(不是转屏、也没有别处的浏览器页)时关掉。
+ * The browser page ("Browser" in the sidebar): with no web page open it is the start page ([BrowserStart]: search box, favorites, recent),
+ * with one open it is the web page ([BrowserPageBar] + page + [BrowserToolbar]; "more" is [BrowserMoreSheet]).
+ * Under the page is "Ask Claire" ([PageAskBar]): ask about this page, and the page is lent to that task as its current web tab; while it works,
+ * the lower half of the page is covered by a conversation panel ([PagePanel]) and a ring of light glows around the page ([PageGlow]); as soon as
+ * you touch the page Claire pauses, the panel shrinks to a small card ([PageCard]) and a "continue" bar appears on top ([PausedBanner]).
+ * When text on the page is selected, the text selection menu gets an extra "Ask Claire" item that carries the selected text along. State is in [PageChat].
+ * The system back key first goes back inside the page; when it cannot, it returns to the start page, and on the start page it goes back to where you came from.
+ * The web view lives in the process ([UserBrowser]) and keeps being used across rotation; it is closed when leaving this page (not a rotation, and no
+ * browser page elsewhere).
  */
 @Composable
 fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
@@ -137,10 +139,10 @@ fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
     val toast: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     val scope = rememberCoroutineScope()
     val chat = remember(browser) { PageChat(context.applicationContext, browser, scope) }
-    // 换了一页(还没在这一页上问过时)重新找接着的对话;关了网页回到什么都没有
+    // When the page changes (and nothing has been asked on this page yet) look again for the conversation to continue; closing the page returns to nothing
     val pageUrl = page?.url
     LaunchedEffect(pageUrl) { chat.onPage(pageUrl) }
-    // 系统选择器返回前先保留原请求 ID，新的请求等原选择器结束再弹。
+    // Keep the original request ID until the system chooser returns; a new request is only shown after the original chooser finishes.
     LaunchedEffect(filePick, filePickerId) {
         val request = filePick ?: return@LaunchedEffect
         if (filePickerId != null || request.started || browser.filePick.value?.id != request.id) return@LaunchedEffect
@@ -151,8 +153,8 @@ fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
         if (params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) pickFiles.launch(types) else pickFile.launch(types)
     }
 
-    // 这一处浏览器页:进来时登记,回到前台时把网页视图要过来(界面有两个实例时挂在看得见的那个上),
-    // 离开时交还;最后一处离开(不是转屏)才关网页
+    // This browser page place: registered on entry, takes the web view over when back in the foreground (with two UI instances it is attached to
+    // the visible one), and hands it back on leaving; the page is closed only when the last place leaves (and it is not a rotation)
     val place = remember(browser, activity) { browser.newHost(activity ?: context.applicationContext) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(browser, place, lifecycle) {
@@ -222,7 +224,7 @@ fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
                 if (loginBanner) LoginBanner(desktop = p.desktop, onDone = browser::confirmLogin)
                 val mode = chat.mode
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    // 网页视图由 UserBrowser 放进这个容器(换了标签也放进同一个);手指按下告诉借着页面的任务,选中文字时菜单里有「问 Claire」
+                    // The web view is put into this container by UserBrowser (the same one even after switching tabs); a finger down tells the task borrowing the page, and selecting text puts "Ask Claire" in the menu
                     AndroidView(
                         factory = { ctx ->
                             PageFrame(ctx, onTouch = chat::touched, onAsk = { done ->
@@ -417,7 +419,7 @@ private fun mediaPermissionText(resources: Array<String>): String = when {
     else -> tr(R.string.browser_permission_microphone)
 }
 
-/** 网页给的文件类型换成系统选择器认的 MIME;扩展名查系统表,没有就用全部类型。 */
+/** Converts the file types given by the page into MIME types the system chooser understands; extensions are looked up in the system table, falling back to all types when absent. */
 private fun chooserMimeTypes(params: WebChromeClient.FileChooserParams): Array<String> =
     ChooserMimeTypes.of(params.acceptTypes.toList()) { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it) }.toTypedArray()
 
@@ -437,7 +439,7 @@ private fun WebPermissionDialog(site: String, what: String, onAllow: () -> Unit,
     )
 }
 
-/** 系统分享面板:网址,标题作主题。打不开时返回原因。 */
+/** System share sheet: the URL, with the title as the subject. Returns the reason when it cannot be opened. */
 private fun share(context: Context, url: String, title: String): String? {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
     if (title.isNotBlank()) send.putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TITLE, title)
@@ -449,7 +451,7 @@ private fun share(context: Context, url: String, title: String): String? {
     }
 }
 
-/** 交给系统默认的浏览器打开。打不开时返回原因。 */
+/** Hands it to the system default browser to open. Returns the reason when it cannot be opened. */
 private fun openOutside(context: Context, url: String): String? = try {
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
     null
@@ -457,7 +459,7 @@ private fun openOutside(context: Context, url: String): String? = try {
     tr(R.string.browser_no_other_browser)
 }
 
-/** 页面弹框:提示只有「好」;确认和离开页面有「取消」;输入框弹框带一个输入框。 */
+/** Page dialog: an alert only has "OK"; the confirm and leave-page dialogs also have "Cancel"; a prompt dialog carries one input field. */
 @Composable
 private fun PageDialogBox(d: PageDialog, answer: (Boolean, String?) -> Unit) {
     var input by remember(d) { mutableStateOf(d.defaultText.orEmpty()) }

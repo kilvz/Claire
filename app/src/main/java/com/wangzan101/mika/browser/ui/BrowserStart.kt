@@ -92,15 +92,17 @@ val BROWSER_LOGIN_LEGEND: String get() = tr(R.string.browser_login_legend)
 val BROWSER_ADD_HINT: String get() = tr(R.string.browser_add_hint)
 private const val COLUMNS = 4
 
-/** 起始页上最多列出几条书签,更多的在「全部」里。 */
+/** How many bookmarks the start page lists at most; the rest are under "all". */
 private const val MAX_BOOKMARKS = 5
 
 /**
- * 浏览器的起始页:顶栏是返回、下载、更多和「浏览器」;一个大搜索框(用 [engine] 搜索,下面一行小字点开换引擎、加自己的引擎),
- * 输入时下面是联想(先是搜这句话或打开这个网址,再是最近打开里对得上的);
- * 「常用网站」一行四个(图标、名字,登录着的带小绿点,最后一格「＋」),「整理」或长按进整理(图标轻轻抖,× 移除,「完成」退出);
- * 「书签」最近加入的几条,「全部」打开书签页;
- * 「最近打开」最近 10 条(右边是时间,标题右边「全部」打开完整历史)。整理和输入中按返回先退出它们。
+ * The browser's start page: the top bar has back, downloads, more and "Browser"; a large search box (searches with [engine], and the small line
+ * below opens a menu to switch engines or add your own),
+ * while typing, suggestions appear below (first searching this phrase or opening this URL, then matches among recently opened pages);
+ * "favorites" in rows of four (icon, name, a small green dot when logged in, and a "+" in the last cell), entering edit mode via "edit" or a long
+ * press (icons shake gently, × removes, "done" exits);
+ * "bookmarks" shows the few most recently added, and "all" opens the bookmarks page;
+ * "recently opened" shows the last 10 (time on the right, "all" next to the title opens the full history). While editing or typing, back first exits those.
  */
 @Composable
 fun BrowserStart(
@@ -205,7 +207,7 @@ fun BrowserStart(
     }
 }
 
-/** 大搜索框:52 高的白色胶囊,聚焦时一圈强调色;键盘上是「前往」。 */
+/** The large search box: a white pill 52 high, with an accent ring when focused; the keyboard key is "go". */
 @Composable
 private fun BigSearchField(value: String, onChange: (String) -> Unit, onGo: () -> Unit) {
     val c = MikaTheme.colors
@@ -248,7 +250,7 @@ private fun Caption(text: String) {
     )
 }
 
-/** 搜索框下的一行小字「用必应搜索」:点一下换搜索引擎。 */
+/** The small line under the search box, "search with Bing": tap it to switch the search engine. */
 @Composable
 private fun EngineNote(engine: SearchEngineSpec, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -261,7 +263,7 @@ private fun EngineNote(engine: SearchEngineSpec, onClick: () -> Unit) {
     )
 }
 
-/** 换搜索引擎的弹窗:内置和自定义的排成一列单选项,选中就收起;下面可以再加一个,自定义的能删。 */
+/** The switch-search-engine dialog: built-in and custom engines laid out as a column of radio rows, dismissed on selection; another can be added below, and custom ones can be removed. */
 @Composable
 private fun EnginePicker(
     engine: SearchEngineSpec,
@@ -303,7 +305,7 @@ private fun EnginePicker(
     )
 }
 
-/** 加自定义搜索引擎:名字和一个用 %s 代表搜索词的网址模板;不合法时提示,不收起。 */
+/** Add a custom search engine: a name and a URL template with %s standing for the search term; when invalid it shows a hint and does not dismiss. */
 @Composable
 private fun CustomEngineDialog(onSave: (CustomSearchEngine) -> Unit, onDismiss: () -> Unit) {
     val c = MikaTheme.colors
@@ -341,7 +343,7 @@ private fun CustomEngineDialog(onSave: (CustomSearchEngine) -> Unit, onDismiss: 
     )
 }
 
-/** 分组标题,右边可带一个小字链接([action])。 */
+/** A section header, optionally with a small text link on the right ([action]). */
 @Composable
 private fun SectionHeader(title: String, action: String? = null, onAction: () -> Unit = {}) {
     val c = MikaTheme.colors
@@ -365,7 +367,7 @@ private fun Legend(text: String, dot: Boolean) {
     }
 }
 
-/** 常用网站一行四格;[onAdd] 不为 null 时最后一格是「＋」。 */
+/** Favorites, four cells per row; when [onAdd] is not null the last cell is "+". */
 @Composable
 private fun SiteGrid(
     sites: List<FavoriteSite>,
@@ -478,7 +480,7 @@ private fun RecentCard(recent: List<RecentItem>, face: (String) -> SiteFace, now
     }
 }
 
-/** 起始页上的书签:最近加入的至多 [MAX_BOOKMARKS] 条;没有时说明怎么加。 */
+/** Bookmarks on the start page: at most [MAX_BOOKMARKS] of the most recently added; when there are none, explains how to add one. */
 @Composable
 private fun BookmarkCard(bookmarks: List<PageBookmark>, face: (String) -> SiteFace, onOpen: (PageBookmark) -> Unit) {
     val c = MikaTheme.colors
@@ -518,7 +520,7 @@ private fun SuggestionCard(list: List<Suggestion>, face: (String) -> SiteFace, o
     }
 }
 
-/** 起始页上的一行:左边 28 的小图标,标题(一行)和小字,右边可放时间。 */
+/** A row on the start page: a 28 small icon on the left, a title (one line) and small text, with room for a time on the right. */
 @Composable
 internal fun SmallRow(
     title: String,

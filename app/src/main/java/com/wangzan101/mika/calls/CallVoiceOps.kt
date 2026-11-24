@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.calls.CallRuntime.Companion.STANDARD_PROFILE_ID
 
-// 电话运行时:语音档案、通话语音选择与试音
+// Call runtime: voice profiles, call voice selection and audio test
 fun CallRuntime.activeVoiceProfile(): CallVoiceProfile {
     val config = settings.state.value
     if (standardCalls) {
@@ -107,8 +107,8 @@ suspend fun CallRuntime.selectVoiceProfile(id: String): CallActionResult = onMai
 }
 
 /**
- * 迁移后选电话用的实时语音:[ref] 为 null 跟随「语音通话」,否则电话单独用 [ref](可带电话专用音色 [speaker])。
- * 实际用的模型变了就关掉自动接听,要用户在新模型上重新确认;凭据与验证镜像由目录同步。
+ * Selects the realtime voice used for phone calls after migration: when [ref] is null it follows "voice calls", otherwise phone calls use [ref] on their own (optionally with a phone-only voice [speaker]).
+ * Auto-answer is turned off whenever the model actually in use changes, so the user has to confirm again on the new model; credentials and verification mirroring are synced from the catalog.
  */
 suspend fun CallRuntime.selectCallVoice(ref: VoiceModelRef?, speaker: String = ""): CallActionResult = onMain {
     if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")

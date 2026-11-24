@@ -303,9 +303,10 @@ internal class CallPlaybackQueue(capacityBytes: Int = MAX_PENDING_BYTES) {
     companion object {
         private const val BYTES_PER_SECOND = VolcRealtimeClient.OUTPUT_SAMPLE_RATE * 2
         const val WRITE_BYTES = BYTES_PER_SECOND / 50
-        // 云端按 24kHz 实时生成，播放必须跟上。个别手机(见 #695)的电话 AudioTrack 会反复死/重建、
-        // 播放线程欠载，消费阶段性落后于生成；8 秒太小，会把这可恢复的设备抖动升级成「积压超限」。
-        // 放宽到 20 秒吸收累计缺口，同时保留硬上限：真卡死仍会交还系统，不会让音频无限延迟。
+        // The cloud generates in real time at 24 kHz, so playback must keep up. On a few phones (see #695) the call AudioTrack
+        // repeatedly dies/is recreated and the playback thread underruns, so consumption temporarily lags behind generation; 8 seconds is too small
+        // and would upgrade this recoverable device jitter into "backlog exceeded". Relaxing it to 20 seconds absorbs the accumulated gap
+        // while keeping a hard cap: a genuine stall still hands control back to the system, and audio never gets delayed indefinitely.
         const val MAX_PENDING_BYTES = BYTES_PER_SECOND * 20
     }
 }

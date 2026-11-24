@@ -13,7 +13,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
-/** 把一段音频存到手机的「音乐/Claire」(MediaStore.Audio,不需要存储权限)。 */
+/** Saves an audio clip to "Music/Claire" on the phone (MediaStore.Audio, no storage permission required). */
 class AudioExporter(private val context: Context) {
     suspend fun save(bytes: ByteArray, mime: String, name: String): SavedAudio = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
@@ -47,7 +47,7 @@ class AudioExporter(private val context: Context) {
         SavedAudio("$DIRECTORY/$actual", uri.toString(), bytes.size.toLong())
     }
 
-    /** 删掉上次进程留下的、没写完的音乐库条目;启动时调用。 */
+    /** Deletes unfinished music library entries left behind by the previous process; called on startup. */
     fun cleanPending() {
         val resolver = context.contentResolver
         val args = Bundle().apply {

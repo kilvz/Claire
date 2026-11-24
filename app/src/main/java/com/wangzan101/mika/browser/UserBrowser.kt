@@ -38,8 +38,9 @@ import java.io.File
 import java.util.UUID
 
 /**
- * 浏览器页此刻打开的网页。[desktop]:标签此刻用的是电脑版网页;[loginFor]:这次是「给 Claire 登录」,为要登录的网站
- * (照 Claire 办事时的身份打开,见 [BrowserIdentity]),平常浏览为 null。
+ * The web page the browser page currently has open. [desktop]: the tab is currently using the desktop version of the page; [loginFor]: this is a
+ * "log in for Claire" session, for the site to log in to (opened under the identity Claire uses when acting, see [BrowserIdentity]); null for
+ * ordinary browsing.
  */
 data class BrowserPage(
     val url: String,
@@ -52,39 +53,44 @@ data class BrowserPage(
     val loginFor: String? = null,
 )
 
-/** 用户浏览器里网页弹出的文件选择框，选好的 URI 只交给发起请求的标签。 */
+/** The file chooser a page pops up in the user browser; the chosen URI is handed only to the tab that made the request. */
 class FilePickRequest(val tab: WebTab, val callback: ValueCallback<Array<Uri>>, val params: WebChromeClient.FileChooserParams) {
     val id: String = UUID.randomUUID().toString()
     @Volatile var started = false
 }
 
-/** 标签页列表里的一项:[active] 是此刻看着的那一个。 */
+/** One entry in the tab list: [active] is the one being viewed right now. */
 data class BrowserTab(val id: String, val title: String, val url: String, val host: String?, val active: Boolean)
 
-/** 全屏视频:网页给的视图和它要求的回调。 */
+/** Fullscreen video: the view supplied by the page and the callback it requires. */
 class FullscreenVideo(val view: View, val callback: WebChromeClient.CustomViewCallback)
 
-/** 页内查找:是否开着、搜的词、共几处、现在是第几处(都从 1 数)。 */
+/** In-page find: whether it is open, the search term, how many matches there are, and which match is current (all counted from 1). */
 data class FindState(val active: Boolean = false, val query: String = "", val matches: Int = 0, val index: Int = 0)
 
-/** WebView 给的当前匹配序号从 0 数;界面显示从 1 数,没有匹配时为 0。 */
+/** WebView reports the current match ordinal counting from 0; the UI displays it from 1, and shows 0 when there are no matches. */
 internal fun findMatchIndex(active: Int, matches: Int): Int =
     if (matches > 0) (active + 1).coerceIn(1, matches) else 0
 
 /**
- * 用户自己用的浏览器(侧栏「浏览器」):一个看得见的 [WebTab],和 Agent 的标签同一个网页配置(Cookie、网页存储)。
- * 在这里登录了,Claire 办事时也是登录的。用哪一版网页由 [BrowserIdentity] 定:平常默认手机版、按网站可换成电脑版
- * (记在 [modes]),「给 Claire 登录」时照 Claire 办事时的那一版;规则只装在这个标签上(WebDevtools.setModePolicy),
- * Agent 的标签不受影响。
+ * The browser the user uses themselves ("Browser" in the sidebar): one visible [WebTab] sharing the same web profile (cookies, web storage) as
+ * the Agent's tabs. Logging in here also means being logged in when Claire acts. Which version of a page is used is decided by [BrowserIdentity]:
+ * the mobile version by default, switchable per site to the desktop version (recorded in [modes]); for "log in for Claire" it uses the version
+ * Claire uses when acting; the policy is installed only on this tab (WebDevtools.setModePolicy), so the Agent's tabs are unaffected.
  *
- * 不进任何任务的标签池,也不走 [com.wangzan101.mika.cap.web.WebHandover] 的那一次接管:Agent 的标签、接管照常进行,互不影响。
- * 标签放在进程里(转屏、页面重建时同一个 WebView 接着用),离开浏览器页时关掉。界面不止一个实例时,浏览器页可能同时有几处:
- * 视图挂在哪一处、哪一处走了才关网页,见 [PageHosts]。
- * WebView 的环境是 [MutableContextWrapper]:挂到界面上时换成那个 Activity(下拉框、长按菜单要它),摘下时换回 App。
- * 页面打开前过一遍 [WebUrlPolicy.checkNavigable];访问过的页面记进 [recent];页面停下来后看一眼登录状态,记进站点登记表。
- * 用户在页面上问 Claire 时,看着的这一页借给那个对话的任务当当前网页标签(见 [loans]):页面开关弹窗时借的跟着换,
- * 关掉页面时交给任务接着用、不销毁;用户亲手摸页面([userTouched])时告诉借着它的任务。
- * 只在主线程调用。
+ * It does not enter any task's tab pool and does not go through the takeover in [com.wangzan101.mika.cap.web.WebHandover]: the Agent's tabs and
+ * takeovers carry on as usual, independently of it.
+ * Tabs live in the process (the same WebView keeps being used across rotation and page recreation) and are closed when leaving the browser page.
+ * When the UI has more than one instance the browser page may exist in several places at once: see [PageHosts] for which place the view is attached
+ * to and which place leaving closes the page.
+ * The WebView's context is a [MutableContextWrapper]: it is switched to that Activity when attached to the UI (dropdowns and long-press menus need
+ * it) and switched back to the App when detached.
+ * Pages go through [WebUrlPolicy.checkNavigable] before opening; visited pages are recorded in [recent]; once a page settles, the login state is
+ * checked and recorded in the site registry.
+ * When the user asks Claire on a page, the page being viewed is lent to that conversation's task as its current web tab (see [loans]): the lent page
+ * follows when a page opens or closes a popup, and when the page is closed it is handed to the task to keep using rather than being destroyed; when
+ * the user touches the page by hand ([userTouched]) the task borrowing it is told.
+ * Only called on the main thread.
  */
 class UserBrowser private constructor(private val app: Context) {
     val sites: SiteRegistry = WebSites.registry(app)
@@ -93,81 +99,81 @@ class UserBrowser private constructor(private val app: Context) {
     val favorites = BrowserFavorites(dir)
     val bookmarks = PageBookmarks(dir)
     val looks = SiteLooks(dir)
-    /** 用户浏览器的下载:交给系统下载,列表也问系统要。 */
+    /** Downloads in the user browser: handed to the system downloader, and the list is requested from the system as well. */
     val downloads = BrowserDownloads(app, dir)
-    /** 起始页和地址栏用的搜索引擎;用户可以在起始页换,也可以自己加。 */
+    /** The search engine used by the start page and the address bar; the user can switch it on the start page or add their own. */
     val searchEngine = SearchEngineStore(dir)
     private val modes = UserSiteModes(dir)
-    /** 看着的这一页借给任务(见 [PageLoans])。 */
+    /** The page being viewed, lent to a task (see [PageLoans]). */
     val loans = PageLoans<WebTab>()
-    /** 标签编号:每个都不一样(页面和它弹出的窗口可能先后借给同一个任务)。 */
+    /** Tab number: unique for every tab (a page and the popup it opens may be lent to the same task one after the other). */
     private var tabCount = 0
 
     private val main = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val wrapper = MutableContextWrapper(app)
-    /** 普通标签(弹出的窗口不在里面),按打开顺序。 */
+    /** Ordinary tabs (popups are not included), in the order they were opened. */
     private val openTabs = ArrayList<WebTab>()
     private var tab: WebTab? = null
         set(value) {
             if (field !== value) denyPendingPermissions()
             field = value
         }
-    /** 页面弹出的窗口开着时([tab] 是弹窗),打开它的那一页;没有弹窗为 null。 */
+    /** While a page's popup is open ([tab] is the popup), the page that opened it; null when there is no popup. */
     private var opener: WebTab? = null
     private val hosts = PageHosts<ViewGroup, Context>()
-    /** 每个标签各自的「给 Claire 登录」网站;平常浏览为 null。 */
+    /** Each tab's own "log in for Claire" site; null for ordinary browsing. */
     private val loginFor = HashMap<WebTab, String?>()
-    /** 每个标签各自的登录探测任务。 */
+    /** Each tab's own login probe task. */
     private val probes = HashMap<WebTab, Runnable>()
 
     private val _page = MutableStateFlow<BrowserPage?>(null)
-    /** 为 null 时没有打开的网页(显示起始页)。 */
+    /** When null there is no open web page (the start page is shown). */
     val page: StateFlow<BrowserPage?> = _page.asStateFlow()
 
     private val _tabs = MutableStateFlow<List<BrowserTab>>(emptyList())
-    /** 打开的普通标签,按打开顺序;[BrowserTab.active] 是看着的那一个。 */
+    /** The open ordinary tabs, in the order they were opened; [BrowserTab.active] is the one being viewed. */
     val tabs: StateFlow<List<BrowserTab>> = _tabs.asStateFlow()
 
     private val _find = MutableStateFlow(FindState())
-    /** 页内查找的状态;关闭时为 [FindState.active] = false。 */
+    /** The in-page find state; [FindState.active] = false when it is closed. */
     val find: StateFlow<FindState> = _find.asStateFlow()
 
     private val _fullscreen = MutableStateFlow<FullscreenVideo?>(null)
-    /** 正在全屏播放的视频;没有为 null。 */
+    /** The video currently playing fullscreen; null when there is none. */
     val fullscreen: StateFlow<FullscreenVideo?> = _fullscreen.asStateFlow()
 
     private val _dialog = MutableStateFlow<PageDialog?>(null)
-    /** 页面弹出、等用户回话的框。 */
+    /** A dialog the page has popped up and is waiting for the user to answer. */
     val dialog: StateFlow<PageDialog?> = _dialog.asStateFlow()
 
     private val _notice = MutableStateFlow<String?>(null)
-    /** 给用户的一句提示(拦下了什么、页面崩了);显示后调 [noticeShown]。 */
+    /** A one-line notice for the user (what was blocked, the page crashed); call [noticeShown] after showing it. */
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
     private val _filePick = MutableStateFlow<FilePickRequest?>(null)
-    /** 网页要选文件,等界面弹系统选择器;选好后调 [answerFileChooser]。 */
+    /** The page wants to pick a file and waits for the UI to show the system chooser; call [answerFileChooser] once chosen. */
     val filePick: StateFlow<FilePickRequest?> = _filePick.asStateFlow()
 
     private val mediaPermissions = BrowserPermissionRequests<PermissionRequest>()
-    /** 网页要摄像头、麦克风等,等界面问用户;回答时调 [answerPagePermission]。 */
+    /** The page wants the camera, microphone, etc. and waits for the UI to ask the user; call [answerPagePermission] to answer. */
     internal val pagePermission = mediaPermissions.pending
 
     private val locationPermissions = BrowserPermissionRequests<GeolocationPermissions.Callback>()
-    /** 网页要定位,等界面问用户;回答时调 [answerGeolocation]。 */
+    /** The page wants geolocation and waits for the UI to ask the user; call [answerGeolocation] to answer. */
     internal val geoPermission = locationPermissions.pending
 
-    /** 系统选择器回来了:交回网页;取消(空)交 null。 */
+    /** The system chooser has returned: hand the result back to the page; a cancellation (empty) is handed back as null. */
     fun answerFileChooser(id: String, uris: List<Uri>?) {
         val r = _filePick.takeFileRequest(id, FilePickRequest::id) ?: return
         r.callback.onReceiveValue(uris?.takeIf { tab === r.tab && it.isNotEmpty() }?.toTypedArray())
     }
 
-    /** 用户同意或拒绝网页用摄像头、麦克风。 */
+    /** The user allows or denies the page's use of the camera and microphone. */
     fun answerPagePermission(id: String, grant: Boolean) {
         val request = mediaPermissions.take(id)?.value ?: return
         if (grant) {
-            // 只授摄像头和麦克风,请求里夹带的 MIDI、受保护媒体不放行
+            // Grant only the camera and microphone; MIDI and protected media bundled into the request are not allowed through
             val allowed = request.resources
                 .filter { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE || it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }
                 .toTypedArray()
@@ -177,7 +183,7 @@ class UserBrowser private constructor(private val app: Context) {
         }
     }
 
-    /** 用户同意或拒绝网页用定位。 */
+    /** The user allows or denies the page's use of geolocation. */
     fun answerGeolocation(id: String, grant: Boolean) {
         val r = locationPermissions.take(id) ?: return
         r.value.invoke(r.origin, grant, false)
@@ -195,17 +201,18 @@ class UserBrowser private constructor(private val app: Context) {
     }
 
     /**
-     * 打开地址栏或搜索框里的一句话(见 [AddressInput])。打不开时返回给用户看的原因,不动当前页面。
+     * Opens whatever was typed into the address bar or search box (see [AddressInput]). When it cannot be opened, returns a reason to show the user
+     * without touching the current page.
      */
     fun submit(input: String): String? {
         val url = AddressInput.resolve(input, searchEngine.choices.value.selected) ?: return null
         return open(url)
     }
 
-    /** 平常浏览打开网址;打不开时返回原因。 */
+    /** Opens a URL for ordinary browsing; returns the reason when it cannot be opened. */
     fun open(url: String): String? = load(url, null)
 
-    /** 在新标签打开一页;[select] 为 false 时留在后台,不切过去。打不开时返回原因。 */
+    /** Opens a page in a new tab; with [select] false it stays in the background without switching to it. Returns the reason when it cannot be opened. */
     fun openInNewTab(url: String, select: Boolean): String? {
         refusal(url)?.let { return it }
         val prev = tab
@@ -220,13 +227,13 @@ class UserBrowser private constructor(private val app: Context) {
         return null
     }
 
-    /** 打开常用网站:还没登录的走「给 Claire 登录」,照 Claire 办事时的那一版打开。 */
+    /** Opens a favorite site: ones not yet logged in go through "log in for Claire" and open with the version Claire uses when acting. */
     fun openFavorite(site: FavoriteSite): String? =
         load("https://${site.host}/", site.host.takeIf { BrowserIdentity.loginFlow(site) })
 
     /**
-     * 当前网站换成电脑版([desktop])或换回手机版,记住,下次也这样;不再算「给 Claire 登录」。
-     * 按新的版本重新打开当前页。
+     * Switches the current site to the desktop version ([desktop]) or back to the mobile version, remembers it for next time; it no longer counts as
+     * "log in for Claire". Reopens the current page with the new version.
      */
     fun setDesktop(desktop: Boolean) {
         val t = tab ?: return
@@ -237,12 +244,13 @@ class UserBrowser private constructor(private val app: Context) {
         navigate(t, url)
     }
 
-    /** 「给 Claire 登录」此刻要登录的网站;平常浏览为 null。只在主线程调用。 */
+    /** The site "log in for Claire" currently needs to log in to; null for ordinary browsing. Only called on the main thread. */
     fun loginHost(): String? = tab?.let { loginFor[it] }
 
     /**
-     * 「给 Claire 登录」里点了「登录好了」:看一眼页面。看出还没登录时提示一句;看出已登录、或看不出来(信用户的话)时
-     * 把这个网站记成已登录,回到起始页。页面还在加载等看不了时,等 [CONFIRM_WAIT_MS] 后按看不出来算。
+     * "I'm logged in" was tapped in "log in for Claire": take a look at the page. If it clearly is not logged in, show a notice; if it is logged in,
+     * or it cannot be told (taking the user's word), mark this site as logged in and return to the start page. When the page cannot be inspected yet
+     * because it is still loading, wait [CONFIRM_WAIT_MS] and treat it as cannot be told.
      */
     fun confirmLogin() {
         val t = tab ?: return
@@ -284,7 +292,7 @@ class UserBrowser private constructor(private val app: Context) {
 
     private fun navigate(t: WebTab, url: String) {
         scope.launch {
-            // 和 Agent 的标签一样:导航前按这个标签的规则把桌面版或手机版的设置与仿真换好(至多等一小会儿)
+            // Like the Agent's tabs: before navigating, apply this tab's rules to the desktop/mobile settings and emulation (waiting at most a moment)
             t.devtools.beforeLoad(t, url)
             if (!t.destroyed) t.view.loadUrl(url)
         }
@@ -300,14 +308,14 @@ class UserBrowser private constructor(private val app: Context) {
         refresh()
     }
 
-    /** 系统返回键:网页能后退就后退,不能时开着弹窗就关掉弹窗,否则关掉当前标签。没有打开的网页时返回 false。 */
+    /** System back key: go back in the page when possible; otherwise close the popup if one is open, and otherwise close the current tab. Returns false when no page is open. */
     fun systemBack(): Boolean {
         val v = tab?.view ?: return false
         if (v.canGoBack()) v.goBack() else if (opener != null) closePopup() else closeActiveTab()
         return true
     }
 
-    /** 关掉所有标签回到起始页。借给任务的标签交给任务接着用(任务收下了就不销毁)。 */
+    /** Closes all tabs and returns to the start page. Tabs lent to a task are handed over for the task to keep using (not destroyed once the task has taken them). */
     fun closePage() {
         answerPendingRequests()
         stopFind()
@@ -331,7 +339,7 @@ class UserBrowser private constructor(private val app: Context) {
         publishTabs()
     }
 
-    /** 开一个空标签并显示起始页。 */
+    /** Opens an empty tab and shows the start page. */
     fun newTab() {
         if (opener != null) closePopup()
         stopFind()
@@ -341,7 +349,7 @@ class UserBrowser private constructor(private val app: Context) {
         _dialog.value = null
     }
 
-    /** 换到标签 [id];找不到不动。 */
+    /** Switches to tab [id]; does nothing when it cannot be found. */
     fun selectTab(id: String) {
         val target = openTabs.firstOrNull { it.id == id } ?: return
         if (target === tab && opener == null) return
@@ -361,17 +369,17 @@ class UserBrowser private constructor(private val app: Context) {
         publishTabs()
     }
 
-    /** 关掉标签 [id];关的是看着的,就换到旁边一个,没有就回起始页。 */
+    /** Closes tab [id]; if it was the one being viewed, switch to a neighbor, or return to the start page when there is none. */
     fun closeTab(id: String) {
         val t = openTabs.firstOrNull { it.id == id } ?: return
-        // 关的是弹窗的父页:先把弹窗收起来,否则弹窗关掉时会回到一个已经没了的页面
+        // The tab being closed is the popup's parent page: close the popup first, otherwise closing the popup would return to a page that no longer exists
         if (t === opener) closePopup()
         if (t === tab) denyPendingPermissions()
         val index = openTabs.indexOf(t)
         openTabs.removeAt(index)
         loginFor.remove(t)
         probes.remove(t)?.let(main::removeCallbacks)
-        // 只借出/看着的标签才走借出逻辑;关后台标签不该把当前页答应借出的那份作废
+        // Only a lent or currently viewed tab goes through the lending logic; closing a background tab must not void the one the current page promised to lend
         val handed = if (t === tab || loans.current?.tab === t) loans.closing(t) else false
         if (!handed) t.destroy() else handedOff(t)
         if (t === tab) {
@@ -389,7 +397,7 @@ class UserBrowser private constructor(private val app: Context) {
         publishTabs()
     }
 
-    /** 关掉看着的标签(有弹窗时先关弹窗)。 */
+    /** Closes the tab being viewed (closing the popup first when one is open). */
     fun closeActiveTab() {
         if (opener != null) {
             closePopup()
@@ -418,7 +426,7 @@ class UserBrowser private constructor(private val app: Context) {
         }
     }
 
-    /** 把看着的标签挂到界面上;新开还没加载的标签回到起始页。 */
+    /** Attaches the tab being viewed to the UI; a newly opened tab that has not loaded yet shows the start page. */
     private fun showActive() {
         val t = tab ?: run {
             _page.value = null
@@ -430,9 +438,9 @@ class UserBrowser private constructor(private val app: Context) {
         _dialog.value = t.dialogs.current
     }
 
-    // ---------- 页内查找 ----------
+    // ---------- In-page find ----------
 
-    /** 打开页内查找条。 */
+    /** Opens the in-page find bar. */
     fun startFind() {
         if (tab == null) return
         _find.value = FindState(active = true)
@@ -459,9 +467,9 @@ class UserBrowser private constructor(private val app: Context) {
         _find.value = FindState()
     }
 
-    // ---------- 全屏视频 ----------
+    // ---------- Fullscreen video ----------
 
-    /** 退出全屏,让网页恢复内嵌播放。 */
+    /** Exits fullscreen so the page returns to inline playback. */
     fun exitFullscreen() {
         val f = _fullscreen.value ?: return
         _fullscreen.value = null
@@ -474,9 +482,9 @@ class UserBrowser private constructor(private val app: Context) {
         (f.view.parent as? ViewGroup)?.removeView(f.view)
     }
 
-    // ---------- 清除浏览数据 ----------
+    // ---------- Clear browsing data ----------
 
-    /** 清掉选中的浏览数据。网站数据会退出所有网站,包括 Claire 办事时用的那些。 */
+    /** Clears the selected browsing data. Site data logs out of every site, including the ones Claire uses when acting. */
     fun clearBrowsingData(history: Boolean, siteData: Boolean, cache: Boolean) {
         if (history) recent.clear()
         if (siteData) {
@@ -496,22 +504,22 @@ class UserBrowser private constructor(private val app: Context) {
         }
     }
 
-    // 交给任务的标签:不再是这里的(视图已由任务挂到它的网页显示上),环境换回 App(不留着界面)
+    // A tab handed to a task: it is no longer ours (the view has been attached by the task to its own web display), and the context is switched back to the App (not keeping the UI around)
     private fun handedOff(t: WebTab) {
         wrapper.baseContext = app
         Log.i(TAG, "browser page ${t.id} handed to the task that borrowed it")
     }
 
-    // ---------- 在这一页上问 Claire ----------
+    // ---------- Ask Claire on this page ----------
 
-    /** 此刻看着的这一页(给 Claire 的说明用);没有打开的网页为 null。 */
+    /** The page being viewed right now (used to describe it to Claire); null when no page is open. */
     fun pageInfo(): com.wangzan101.mika.core.agent.AttachedPage.Page? {
         val url = currentUrl()?.takeIf { it.startsWith("http") } ?: return null
         val title = tab?.view?.title?.takeIf { it != url }.orEmpty().ifEmpty { _page.value?.title.orEmpty() }
         return com.wangzan101.mika.core.agent.AttachedPage.Page(url, title)
     }
 
-    /** 读用户在页面上选中的字,交给 [onText](没选、读不到为 null)。 */
+    /** Reads the text the user selected on the page and passes it to [onText] (null when nothing is selected or it cannot be read). */
     fun readSelection(onText: (String?) -> Unit) {
         val t = tab ?: return onText(null)
         t.view.evaluateJavascript(SELECTION_SCRIPT) { raw ->
@@ -520,19 +528,19 @@ class UserBrowser private constructor(private val app: Context) {
         }
     }
 
-    /** 用户在这一页上问了,页面借给对话 [conversationId] 接下来开跑的任务。 */
+    /** The user asked on this page, so the page is lent to the task the conversation [conversationId] is about to start. */
     fun lend(conversationId: String) = loans.offer(conversationId)
 
-    /** 对话 [conversationId] 的任务 [runKey] 开跑时来取答应借给它的页面;没答应过、页面没了、已借出时为 null。 */
+    /** Called when the task [runKey] of conversation [conversationId] starts, to claim the page promised to it; null when nothing was promised, the page is gone, or it has already been lent. */
     fun claim(conversationId: String, runKey: String): PageLoans.Loan<WebTab>? =
         loans.claim(conversationId, runKey, tab?.takeIf { !it.destroyed && !it.crashed })
 
-    /** 用户亲手摸了看着的页面(真实的触摸,不是 Claire 自己发的输入)。 */
+    /** The user touched the page being viewed themselves (a real touch, not input injected by Claire). */
     fun userTouched() {
         tab?.let(loans::touched)
     }
 
-    /** 回答页面弹框。 */
+    /** Answers the page's dialog. */
     fun answerDialog(accept: Boolean, text: String?) {
         tab?.dialogs?.answer(accept, text)
         _dialog.value = tab?.dialogs?.current
@@ -542,22 +550,22 @@ class UserBrowser private constructor(private val app: Context) {
         _notice.value = null
     }
 
-    /** 一处浏览器页(界面的一个实例上)要用的位置;交给 [openHost]、[setContainer]、[hostStarted]、[closeHost]。 */
+    /** A place a browser page occupies (on one instance of the UI); used with [openHost], [setContainer], [hostStarted], [closeHost]. */
     fun newHost(activity: Context): PageHosts.Host<ViewGroup, Context> = PageHosts.Host(activity)
 
-    /** 这一处进了浏览器页。 */
+    /** This place has entered the browser page. */
     fun openHost(host: PageHosts.Host<ViewGroup, Context>) {
         hosts.open(host)
         place()
     }
 
-    /** 这一处回到了前台:网页视图挂到它这里。 */
+    /** This place is back in the foreground: the web view is attached here. */
     fun hostStarted(host: PageHosts.Host<ViewGroup, Context>) {
         hosts.started(host)
         place()
     }
 
-    /** 这一处给网页留的容器有了([container])或没了(null)。 */
+    /** The container this place reserves for the page has appeared ([container]) or is gone (null). */
     fun setContainer(host: PageHosts.Host<ViewGroup, Context>, container: ViewGroup?) {
         val old = host.container
         hosts.setContainer(host, container)
@@ -566,8 +574,8 @@ class UserBrowser private constructor(private val app: Context) {
     }
 
     /**
-     * 这一处离开了浏览器页。是最后一处、又不是转屏([keepPage] 为 false)时关掉网页;
-     * 不是最后一处时网页留给别处(视图换到别处去)。
+     * This place has left the browser page. When it is the last place and this is not a rotation ([keepPage] is false), the page is closed;
+     * when it is not the last place, the page is left for another place (the view moves elsewhere).
      */
     fun closeHost(host: PageHosts.Host<ViewGroup, Context>, keepPage: Boolean) {
         host.container?.removeAllViews()
@@ -575,8 +583,8 @@ class UserBrowser private constructor(private val app: Context) {
     }
 
     /**
-     * 把网页视图挂到该挂的那一处([PageHosts.target]),环境换成那一处的界面;没有能挂的地方时摘下,环境换回 App
-     * (不留着旧界面)。
+     * Attaches the web view to the place it belongs ([PageHosts.target]) and switches the context to that place's UI; when there is nowhere to
+     * attach it, detaches it and switches the context back to the App (not keeping the old UI around).
      */
     private fun place() {
         val v = tab?.view
@@ -603,14 +611,14 @@ class UserBrowser private constructor(private val app: Context) {
             builtInZoomControls = true
             displayZoomControls = false
         }
-        // 用户亲手看、亲手点:电脑版也不定死缩放,能双指放大
+        // The user looks at and taps it by hand: even the desktop version does not fix the zoom, so pinch-to-zoom works
         t.devtools.setHandOperated(t)
         t.devtools.setModePolicy(t) { host ->
             BrowserIdentity.mobile(loginForMika = loginFor[t] != null, agentMobile = t.devtools.agentWantsMobile(host), userDesktop = modes.isDesktop(host))
         }
         t.view.setFindListener { active, matches, _ ->
             if (t === tab) {
-                // activeMatchOrdinal 从 0 数;界面显示从 1 数,0 处时显示 0
+                // activeMatchOrdinal counts from 0; the UI displays from 1, and shows 0 when there are 0 matches
                 _find.value = _find.value.copy(
                     matches = matches.coerceAtLeast(0),
                     index = findMatchIndex(active, matches),
@@ -670,7 +678,7 @@ class UserBrowser private constructor(private val app: Context) {
             }
         }
 
-        /** 用户自己看的这个标签要选文件:交给界面弹系统选择器。 */
+        /** The tab the user is viewing wants to pick a file: hand it to the UI to show the system chooser. */
         override fun onFileChooser(tab: WebTab, callback: ValueCallback<Array<Uri>>, params: WebChromeClient.FileChooserParams): Boolean {
             if (tab !== this@UserBrowser.tab) return false
             val previous = _filePick.value
@@ -679,10 +687,10 @@ class UserBrowser private constructor(private val app: Context) {
             return true
         }
 
-        /** 用户自己看的这个标签要摄像头、麦克风等:交给界面问用户。 */
+        /** The tab the user is viewing wants the camera, microphone, etc.: hand it to the UI to ask the user. */
         override fun onPermissionRequest(tab: WebTab, request: PermissionRequest): Boolean {
             if (tab !== this@UserBrowser.tab) return false
-            // 只接摄像头和麦克风;MIDI、受保护媒体这些照旧拒绝
+            // Accept only the camera and microphone; MIDI, protected media and the like are still denied
             if (request.resources.none { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE || it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }) return false
             mediaPermissions.replace(request.origin.toString(), request)?.value?.deny()
             return true
@@ -692,7 +700,7 @@ class UserBrowser private constructor(private val app: Context) {
             pagePermission.value?.takeIf { it.value === request }?.let { mediaPermissions.take(it.id) }
         }
 
-        /** 用户自己看的这个标签要定位:交给界面问用户。 */
+        /** The tab the user is viewing wants geolocation: hand it to the UI to ask the user. */
         override fun onGeolocationRequest(tab: WebTab, origin: String?, callback: GeolocationPermissions.Callback): Boolean {
             if (tab !== this@UserBrowser.tab || origin.isNullOrBlank()) return false
             geoPermission.value?.let { answerGeolocation(it.id, false) }
@@ -731,7 +739,7 @@ class UserBrowser private constructor(private val app: Context) {
         }
 
         override fun onCrashed(tab: WebTab) {
-            // 在回调之外销毁
+            // Destroy outside the callback
             main.post {
                 if (opener != null && tab === this@UserBrowser.tab) closePopup() else closeTab(tab.id)
                 _notice.value = tr(R.string.browser_crashed)
@@ -739,9 +747,10 @@ class UserBrowser private constructor(private val app: Context) {
         }
 
         /**
-         * 页面要开新窗口(target=_blank、window.open):只认用户点出来的,只开一层。新窗口盖在当前页上显示,
-         * 当前页留着([opener]):「用第三方账号登录」这类弹窗登录完要把结果交回打开它的页面,页面没了就停在白屏。
-         * 弹窗关掉自己,或在弹窗里退无可退时,回到打开它的那一页。
+         * The page wants to open a new window (target=_blank, window.open): only user-initiated ones are accepted, and only one level deep. The new
+         * window is displayed over the current page, which is kept ([opener]): a popup such as "sign in with a third-party account" has to hand the
+         * result back to the page that opened it once login finishes, and without that page it would be left on a blank screen.
+         * When the popup closes itself, or cannot go back any further inside the popup, return to the page that opened it.
          */
         override fun onCreateWindow(tab: WebTab, isUserGesture: Boolean, resultMsg: Message): Boolean {
             if (!isUserGesture || tab !== this@UserBrowser.tab || opener != null) return false
@@ -756,7 +765,7 @@ class UserBrowser private constructor(private val app: Context) {
             loginFor[popup] = null
             this@UserBrowser.tab = popup
             place()
-            // 借给任务的是看得见的那一个:跟着换成弹出的窗口
+            // The one lent to the task is the visible one: it follows along and becomes the popup
             loans.swapped(tab, popup)
             publishTabs()
             return true
@@ -767,7 +776,7 @@ class UserBrowser private constructor(private val app: Context) {
         }
     }
 
-    /** 关掉弹出的窗口,回到打开它的那一页;没有弹窗时返回 false。 */
+    /** Closes the popup and returns to the page that opened it; returns false when there is no popup. */
     private fun closePopup(): Boolean {
         val o = opener ?: return false
         denyPendingPermissions()
@@ -787,8 +796,10 @@ class UserBrowser private constructor(private val app: Context) {
     }
 
     /**
-     * 页面脚本多在加载完后才画出账号区:停一会儿再看登录状态;还在加载或地址变了就再等,至多几次。
-     * 登记表里有的网站按看到的记上或去掉;没有的只在看出已登录时记上(用户在这里登录了新网站)。
+     * Page scripts usually draw the account area only after loading finishes: pause for a moment before checking the login state; if the page is
+     * still loading or the URL has changed, wait again, at most a few times.
+     * Sites already in the registry are marked or unmarked according to what was seen; sites that are not in it are recorded only when the page is
+     * clearly logged in (the user logged in to a new site here).
      */
     private fun scheduleProbe(t: WebTab, attempt: Int) {
         probes.remove(t)?.let(main::removeCallbacks)
@@ -809,7 +820,7 @@ class UserBrowser private constructor(private val app: Context) {
                     state == LoginState.SignedIn -> sites.markLoggedIn(host)
                     else -> Unit
                 }
-                // 「给 Claire 登录」时自己看出登录好了:告诉用户一声(横幅随登录状态收起)
+                // In "log in for Claire", detecting that the login succeeded tells the user once (the banner collapses with the login state)
                 if (login != null && !wasIn && state == LoginState.SignedIn && BrowserFavorites.siteKey(host) == BrowserFavorites.siteKey(login)) {
                     _notice.value = LOGGED_IN_NOTICE
                 }
@@ -820,7 +831,7 @@ class UserBrowser private constructor(private val app: Context) {
         main.postDelayed(run, PROBE_DELAY_MS)
     }
 
-    /** 页面加载完后读网站名(页面声明的网站名或标题),记进 [looks]。 */
+    /** After the page finishes loading, read the site name (the name the page declares or its title) and record it in [looks]. */
     private fun readName(t: WebTab, url: String) {
         val host = WebUrlPolicy.host(url) ?: return
         if (AddressInput.searchQuery(url, searchEngine.choices.value.all) != null) return
@@ -834,21 +845,21 @@ class UserBrowser private constructor(private val app: Context) {
 
     companion object {
         private const val TAG = "MikaUserBrowser"
-        /** 这个标签不属于任何任务。 */
+        /** This tab does not belong to any task. */
         const val OWNER = "user-browser"
         private const val PROBE_DELAY_MS = 1_500L
         private const val PROBE_RETRIES = 3
         private const val CONFIRM_WAIT_MS = 2_500L
-        /** 收下的网站图标至少这么大,存的时候至多这么大(像素)。 */
+        /** Accepted site icons are at least this large and are stored at most this large (pixels). */
         private const val MIN_ICON_PX = 16
         private const val MAX_ICON_PX = 128
         val LOGGED_IN_NOTICE: String get() = tr(R.string.browser_logged_in)
-        /** 页面上选中的字(含输入框里选中的那段)。 */
+        /** The text selected on the page (including the selected part inside an input field). */
         private const val SELECTION_SCRIPT = "(function(){var s=window.getSelection();var t=s?String(s):'';" +
             "var a=document.activeElement;if(!t&&a&&typeof a.selectionStart==='number'&&a.type!=='password')" +
             "t=String(a.value||'').substring(a.selectionStart,a.selectionEnd);return t;})()"
 
-        /** 进程里已经有的那一份;还没打开过浏览器页为 null(不为它建一份)。 */
+        /** The existing instance in the process; null when the browser page has never been opened (no instance is created for it). */
         fun existing(): UserBrowser? = instance
 
         @Volatile private var instance: UserBrowser? = null

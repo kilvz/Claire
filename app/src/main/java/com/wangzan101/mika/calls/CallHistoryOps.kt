@@ -5,7 +5,7 @@ import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.settings.modelFor
 import kotlinx.coroutines.CancellationException
 
-// 电话运行时:通话记录与通话摘要
+// Call runtime: call history and call summaries
 suspend fun CallRuntime.setHistoryHandled(id: String, handled: Boolean): CallActionResult = onMain {
     historyResult(records.setHandled(id, handled), if (handled) "已标为已处理" else "已标为待处理")
 }

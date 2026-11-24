@@ -7,7 +7,7 @@ import com.wangzan101.mika.calls.CallRuntime.Tracked
 import com.wangzan101.mika.calls.CallRuntime.Work
 import com.wangzan101.mika.calls.CallRuntime.Companion.CALL_CHANGED
 
-// 电话运行时:拨号、接听、按键、挂断与接管
+// Call runtime: dialing, answering, keypad, hang-up and takeover
 suspend fun CallRuntime.dial(number: String, simId: String? = null, task: CallTaskBrief? = null): CallActionResult = onMain {
     val taskSnapshot = try {
         task?.validatedSnapshot()
