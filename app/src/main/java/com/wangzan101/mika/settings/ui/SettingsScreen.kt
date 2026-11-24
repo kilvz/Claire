@@ -101,13 +101,13 @@ import com.wangzan101.mika.workflow.ui.WorkflowsScreen
 
 private const val SHIZUKU_SETUP_GUIDE_URL = "https://shizuku.rikka.app/guide/setup/"
 
-/** 设置里能进入的子页面;[Home] 是设置首页,[Advanced] 集中放置连接、维护和工程能力。 */
+/** Subpages reachable from settings; [Home] is the settings home page, [Advanced] gathers connection, maintenance and engineering capabilities. */
 private enum class SettingsPage { Home, Advanced, AppAccess, SmsLogin, PhoneOps, Calls, Wechat, Telegram, DuringWork, AppPace, Capsule, Language, Notifications, Recommendations, Checklists, Workflows, Sandbox, Plugins, EnvVars, Recovery, SelfCheck, ComputerAccess, McpServers, Root, Developer, DeviceDirectories, RunStats, Proactive, Backup }
 
 /**
- * 设置页:总状态卡 + 常用 / 我的数据 / 其他。高级与其他只增加一层,各子页返回来时的页面。
- * 模型页由 [onOpenModels]、记忆与数据由 [onOpenMemory]、关于页由 [onOpenAbout] 交给 Activity。
- * 修复动作由 [onFix] 交给 Activity 去做(请求权限、跳转系统设置)。
+ * Settings page: overall status card + everyday / my data / other. Advanced & other adds only one more level, and each subpage returns to the page it came from.
+ * The model page is delegated to the Activity through [onOpenModels], memory & data through [onOpenMemory], the About page through [onOpenAbout].
+ * Fix actions are delegated to the Activity through [onFix] (requesting permissions, jumping to system settings).
  */
 @Composable
 fun SettingsScreen(
@@ -122,17 +122,17 @@ fun SettingsScreen(
     onOpenFiles: () -> Unit = {},
     onOpenPersonal: () -> Unit = {},
     onOpenPlans: () -> Unit = {},
-    /** 任务运行里的「自主模式」:当前值和换它的办法。 */
+    /** "Autonomous mode" under Task running: its current value and how to change it. */
     autonomous: Boolean = false,
     onAutonomous: (Boolean) -> Unit = {},
-    /** 查到的新版本号;有它时「关于 Claire」一行写「x 可更新」带红点。 */
+    /** The newer version number that was found; when present the "About Claire" row says "x available" with a red dot. */
     updateVersion: String? = null,
     onOpenAbout: () -> Unit = {},
-    /** 通话设置迁移后打开统一语音模型目录。 */
+    /** Open the unified voice model catalog after call settings were migrated. */
     onOpenVoiceCatalog: () -> Unit = {},
-    /** 外部 MCP server 设置(outbound);为空时不显示入口。 */
+    /** External MCP server settings (outbound); the entry is hidden when null. */
     mcpServers: com.wangzan101.mika.settings.McpServerStore? = null,
-    /** 人格设置;为空时不显示入口。 */
+    /** Persona settings; the entry is hidden when null. */
     onOpenPersonas: (() -> Unit)? = null,
     openPhoneOps: Boolean = false,
     onPhoneOpsOpened: () -> Unit = {},
@@ -140,11 +140,11 @@ fun SettingsScreen(
     val configs by store.configs.collectAsState()
     val roles by store.roles.collectAsState()
     val groups by store.groups.collectAsState()
-    // 开发者选项里的「看图定位已验证」跟着看图模型(看图用主模型时是主模型那条配置)
+    // The "vision verified" entry in developer options follows the vision model (when vision uses the main model it is the main model's config)
     val visionConfig = remember(configs, roles) { store.configFor(ModelRole.Vision) }
     var page by rememberSaveable { mutableStateOf(if (openPhoneOps) SettingsPage.PhoneOps else SettingsPage.Home) }
     var explaining by remember { mutableStateOf<Problem?>(null) }
-    // 「完全退出」先问一句:任务、胶囊和通知都会停
+    // "Quit completely" asks first: tasks, the capsule and notifications all stop
     var confirmingQuit by remember { mutableStateOf(false) }
 
     LaunchedEffect(openPhoneOps) {
@@ -161,7 +161,7 @@ fun SettingsScreen(
     }
     val onProblem: (Problem) -> Unit = { p -> StatusCopy.directFix(p)?.let(::fix) ?: run { explaining = p } }
 
-    // 并行任务的上限只在实验开关 parallelTasks 打开时出现;设备能力按此刻算,第二块屏建失败过就按失败算
+    // The parallel task limit only appears when the experimental switch parallelTasks is on; device capability is evaluated at this moment, and once a second display has failed to be created it counts as failed
     val context = LocalContext.current
     val recommendedTasks = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).recommendedTasks }
     val savedChecklists = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).savedChecklists }
@@ -200,13 +200,13 @@ fun SettingsScreen(
     val capsuleMode by remember(flags) { flags.capsuleModeChanges() }.collectAsState(flags.capsuleMode())
     var capsuleIdleOpacity by remember { mutableStateOf(flags.capsuleIdleOpacity()) }
     var capsuleCardScale by remember { mutableStateOf(flags.capsuleCardScale()) }
-    // 换语言时界面会重建,这里每次进来读一次即可
+    // The UI is rebuilt when the language changes, so reading it once on entry is enough here
     val language = remember { AppLanguage.current(context) }
     val runtimeLimit by (context.applicationContext as com.wangzan101.mika.MikaApp).taskState.parallelLimit.collectAsState()
     var speed by remember { mutableStateOf(flags.speedFlags()) }
     val scope = rememberCoroutineScope()
     val sandboxStatus by remember { SandboxState.get(context) }.status.collectAsState()
-    // 网络代理:只在这里改;读设置要解密、看浏览器支不支持要加载 WebView,都放到后台
+    // Network proxy: only edited here; reading the setting needs decryption and checking browser support needs WebView loaded, so both go to the background
     val proxies = remember { NetProxyStore.get(context) }
     var proxy by remember { mutableStateOf<String?>(null) }
     var browserProxy by remember { mutableStateOf<WebProxy.Mode?>(null) }
@@ -232,8 +232,8 @@ fun SettingsScreen(
             secondDisplayFailed = runtimeLimit.reason == ParallelCapability.SECOND_DISPLAY_FAILED,
         ),
     )
-    // 开发者选项只在调试版和性能测试版里列出:发布版的各开关按评测结果统一定默认值。
-    // 主动能力不在里面:入口在设置首页,每个版本都有,默认关着
+    // Developer options are only listed in debug and performance-test builds: in release builds every switch gets its default fixed by the evaluation results.
+    // Proactive capabilities are not in there: the entry is on the settings home page, present in every build, and off by default
     val showDeveloper = com.wangzan101.mika.record.DetailedTraces.supportedBuild
     val toHome = { page = SettingsPage.Home }
     val toAdvanced = { page = SettingsPage.Advanced }
@@ -458,7 +458,7 @@ fun SettingsScreen(
                 flags.setAutoArchiveDays(days)
                 autoArchiveDays = days
                 editingAutoArchive = false
-                // 选完马上按新设置跑一次,老对话立刻进归档
+                // Run once with the new setting right after picking, so old conversations go into the archive immediately
                 (context.applicationContext as com.wangzan101.mika.MikaApp).autoArchiveNow()
             },
             onDismiss = { editingAutoArchive = false },
@@ -466,12 +466,12 @@ fun SettingsScreen(
     }
 }
 
-/** 不带状态的设置首页,便于测试。首页只列常用入口,高级能力统一从 [onOpenAdvanced] 进入。 */
+/** Stateless settings home page, easy to test. The home page lists only everyday entries; advanced capabilities are all reached through [onOpenAdvanced]. */
 @Composable
 fun SettingsContent(
     status: SystemStatus,
     androidRelease: String,
-    /** 当前主模型的名字;没有可用的主模型时为空。 */
+    /** Name of the current main model; empty when there is no usable main model. */
     mainModel: String?,
     onBack: () -> Unit,
     onProblem: (Problem) -> Unit,
@@ -484,16 +484,16 @@ fun SettingsContent(
     telegramState: TelegramConnectionState = TelegramConnectionState.NeedsSetup,
     telegramConfigured: Boolean = false,
     onOpenTelegram: () -> Unit = {},
-    /** 「主动能力」的入口,在「微信」和「任务运行」之间。 */
+    /** Entry to "Proactive", between "WeChat" and "Task running". */
     onOpenProactive: () -> Unit = {},
     onOpenAppAccess: () -> Unit = {},
     onOpenSmsLogin: () -> Unit = {},
     onOpenDuringWork: () -> Unit = {},
-    /** 悬浮胶囊此刻的选择,写在「悬浮胶囊」一行的右边。 */
+    /** The floating capsule's current choice, written at the right of the "Floating capsule" row. */
     capsuleMode: CapsuleMode = CapsuleMode.DEFAULT,
     onOpenCapsule: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
-    /** 此刻选的界面语言,写在「语言与外观」一行的右边。 */
+    /** The UI language selected right now, written at the right of the "Language & appearance" row. */
     language: AppLanguage = AppLanguage.System,
     onOpenLanguage: () -> Unit = {},
     onOpenMemory: (() -> Unit)? = null,
@@ -510,7 +510,7 @@ fun SettingsContent(
     onOpenAbout: () -> Unit = {},
     personalStart: Boolean = false,
     onPersonalStart: ((Boolean) -> Unit)? = null,
-    /** 自动归档:多久没有新消息的对话自动归档;0 表示关闭。 */
+    /** Auto-archive: how long a conversation without new messages goes before it is archived automatically; 0 means off. */
     autoArchiveDays: Int = 0,
     onOpenAutoArchive: () -> Unit = {},
 ) {
@@ -561,7 +561,7 @@ fun SettingsContent(
                 RowValue(languageLabel(language))
                 RowChevron()
             }
-            // 人格和语言、外观是一类:定 Claire 怎么表现的全局取值。行尾是现在在用的,主界面上没有别的地方显示它
+            // Persona belongs with language and appearance: global values that shape how Claire behaves. The row value shows what is in use now, and nowhere else on the main screen displays it
             onOpenPersonas?.let { open ->
                 val personas = (LocalContext.current.applicationContext as? com.wangzan101.mika.MikaApp)?.personas
                 ListRow(MikaIcons.Chats, stringResource(R.string.persona_title), onClick = open) {
@@ -624,7 +624,7 @@ fun SettingsContent(
     }
 }
 
-/** 高级与其他:网络与连接、维护、开发者三组;各能力仍使用原来的完整子页。 */
+/** Advanced & other: three groups — network & connections, maintenance, developer; every capability still uses its original full subpage. */
 @Composable
 fun AdvancedSettingsContent(
     onBack: () -> Unit,
@@ -722,7 +722,7 @@ fun AdvancedSettingsContent(
             }
         }
 
-        // 完全退出:和无障碍服务不同,它只是让 Claire 安静下来;下次打开 App 就回来
+        // Quit completely: unlike the accessibility service this only quiets Claire down; she comes back the next time the app is opened
         GroupCard {
             ListRow(
                 MikaIcons.Power, stringResource(R.string.quit_title), stringResource(R.string.quit_row_sub),
@@ -732,7 +732,7 @@ fun AdvancedSettingsContent(
     }
 }
 
-/** 「手机操作」一行尾部的状态胶囊:无障碍和内置助手都就绪才是「可用」。 */
+/** Status pill at the end of the "Phone control" row: "Ready" only when both accessibility and the built-in helper are ready. */
 @Composable
 private fun PhoneOpsPill(status: SystemStatus) {
     when {
@@ -750,8 +750,8 @@ private fun sandboxValue(s: SandboxStatus): String = when (s) {
 }
 
 /**
- * 页面顶上的总状态:一切正常是「一切就绪」;否则变成第一个问题的提示,带修复按钮。
- * 焦点提醒改不了,只在手机操作页的「系统版本」一行里提示,不占这里。
+ * Overall status at the top of the page: "All set" when everything is fine; otherwise it becomes the first problem's prompt with a fix button.
+ * The focus warning cannot be changed, so it is only mentioned on the "System version" row of the Phone control page and does not take up space here.
  */
 @Composable
 private fun StatusSummary(check: Prerequisites.Check, onProblem: (Problem) -> Unit) {

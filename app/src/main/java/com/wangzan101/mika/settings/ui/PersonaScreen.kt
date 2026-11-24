@@ -60,15 +60,15 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.settings.ui.models.pick
 
 /**
- * 设置 › 人格。打开就是现在在用的那一套:在页面上随便改,点底部的「保存」才写下去,从下一条消息起对所有对话生效;
- * 有没保存的改动就离开会先问一句。还没有在用的时页面显示全默认,第一次保存才建一套(名称「我的风格」)并设为在用。
- * 多套人格收在页底的「管理人格」里,只用一套的人不用进去。
+ * Settings › Persona. It opens on the one currently in use: edit freely on the page, and nothing is written until "Save" at the bottom is tapped, taking effect for all conversations from the next message on;
+ * leaving with unsaved changes asks first. When no persona is in use yet the page shows all defaults, and the first save creates one (named "My style") and sets it as active.
+ * Multiple personas are kept under "Manage personas" at the bottom of the page; people who use only one never need to go in.
  */
 @Composable
 fun PersonaScreen(store: PersonaStore, onBack: () -> Unit) {
     var managing by rememberSaveable { mutableStateOf(false) }
     if (managing) {
-        // 系统返回键和左上角返回一致:回到人格页,不直接退出
+        // The system back button behaves like the top-left back arrow: return to the persona page, do not exit directly
         BackHandler { managing = false }
         ManagePersonas(store, onBack = { managing = false })
     } else {
@@ -89,12 +89,12 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
     val myStyle = stringResource(R.string.persona_my_style)
     val saveFailed = stringResource(R.string.persona_save_failed)
 
-    // 这一页改的是草稿,点「保存」才写下去;在用的那一套换了或被别处改了,草稿跟着重取
+    // This page edits a draft; nothing is written until "Save" is tapped. If the active persona changes or is edited elsewhere, the draft is re-read
     var style by remember(active?.id, active?.revision) { mutableStateOf(savedStyle) }
     var prompt by remember(active?.id, active?.revision) { mutableStateOf(savedPrompt) }
     var nickname by remember(active?.id, active?.revision) { mutableStateOf(savedNickname) }
     var picking by rememberSaveable { mutableStateOf<String?>(null) }
-    // 有没保存的改动时,离开(返回、去管理人格)先问一句;这里记着问完要去哪
+    // With unsaved changes, leaving (back, or going to manage personas) asks first; this remembers where to go after the prompt
     var leaving by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val dirty = style != savedStyle || prompt.trim() != savedPrompt || nickname.trim() != savedNickname
@@ -104,10 +104,10 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
     BackHandler(enabled = dirty) { leaving = onBack }
 
     PageScaffold(stringResource(R.string.persona_title), onBack = { leave(onBack) }) {
-        // 存了不止一套时说清楚这一页改的是哪一套
+        // When more than one persona is stored, make clear which one this page edits
         if (active != null && personas.size > 1) FooterNote(stringResource(R.string.persona_editing, active.name))
 
-        // 称呼:Claire 的自称,空着就是 Claire;只接受名字里该有的字符,别的当场提示,不悄悄删
+        // Nickname: what Claire calls herself, blank means Claire; only characters a name should have are accepted, anything else is flagged right away instead of being silently removed
         GroupCard {
             InputRow(
                 stringResource(R.string.persona_nickname), nickname, { nickname = it.replace('\n', ' ') },
@@ -147,7 +147,7 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
         }
 
         GroupLabel(stringResource(R.string.persona_prompt))
-        // 卡片本身就是输入框的外形:里面是不带描边的输入区(同卡片里的输入行),不再套一层直角的框
+        // The card itself is shaped like an input field: inside is a borderless input area (like the input rows in a card), with no extra square-cornered frame around it
         GroupCard {
             Box(Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(horizontal = 16.dp, vertical = 14.dp)) {
                 if (prompt.isEmpty()) Text(stringResource(R.string.persona_prompt_hint), style = MikaType.Body, color = c.ink3)
@@ -159,13 +159,13 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
                 )
             }
         }
-        // 字数和上限提示放在卡片下面,和别处的页脚小字一个样子
+        // The character count and limit hint go below the card, looking the same as the footer fine print elsewhere
         if (tooLong) FooterNote(stringResource(R.string.persona_prompt_too_long, PersonaPrompt.MAX_PROMPT_CHARS), color = c.bad)
         else FooterNote(stringResource(R.string.persona_counter, prompt.length, TokenEstimate.of(prompt)))
         FooterNote(stringResource(R.string.persona_empty_sub))
         FooterNote(stringResource(R.string.persona_applies_note))
 
-        // 没改过、或指令太长时点不了;保存成功就回上一页
+        // Not tappable when nothing changed or the instructions are too long; on a successful save it goes back to the previous page
         MikaButton(
             stringResource(R.string.save),
             {
@@ -218,15 +218,15 @@ private fun PersonaPage(store: PersonaStore, onBack: () -> Unit, onManage: () ->
     }
 }
 
-/** 起名字的对话框在做哪件事:新建一套,还是给已有的一套改名。 */
+/** What the naming dialog is doing: creating a new persona, or renaming an existing one. */
 private sealed interface Naming {
     data object New : Naming
     data class Rename(val persona: Persona) : Naming
 }
 
 /**
- * 管理人格:存下来的各套,点一行弹操作面板(用这一套、改名、复制一份、删除),在用的那一套带「在用」。
- * 要改内容得先选用它,再回人格页调整;这里只管「有哪几套、用哪一套」。
+ * Manage personas: the stored ones; tapping a row opens an action sheet (use this one, rename, duplicate, delete), and the active one carries an "In use" pill.
+ * To change the content, select it first and then go back to the persona page to adjust it; this screen only deals with "which ones exist and which one is in use".
  */
 @Composable
 private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
@@ -235,7 +235,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
     val active = personas.firstOrNull { it.id == activeId }
     val context = LocalContext.current
     val saveFailed = stringResource(R.string.persona_save_failed)
-    // 各语言「副本」的写法和位置不一样:先用占位符拿到格式,复制时再把名称放进去
+    // The wording and position of the "copy" suffix differ per language: take the format with a placeholder first, then insert the name when copying
     val copyName = stringResource(R.string.persona_copy_name, NAME_SLOT)
     var acting by remember { mutableStateOf<Persona?>(null) }
     var deleting by remember { mutableStateOf<Persona?>(null) }
@@ -268,7 +268,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
         if (full) FooterNote(stringResource(R.string.persona_limit, PersonaStore.MAX_PERSONAS))
         FooterNote(stringResource(R.string.persona_manage_note))
 
-        // 在用的那一套确实拼出了提示词时,才有「预览完整提示词」;点一下展开,再点收起
+        // "Preview full prompt" only exists when the active persona actually produces a prompt; tap to expand, tap again to collapse
         val layer = active?.let { PersonaPrompt.layer(it.name, it.prompt, it.style, it.assistant) }
         if (layer != null) {
             GroupCard {
@@ -295,7 +295,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
                 if (!full) SheetAction(stringResource(R.string.persona_copy)) {
                     done(store.duplicate(p.id) { name -> copyName.replace(NAME_SLOT, name) })
                 } else null,
-                // 删除先确认:删掉在用的那一套,Claire 就回到默认的说话方式
+                // Delete asks for confirmation first: deleting the active persona sends Claire back to the default way of speaking
                 SheetAction(stringResource(R.string.confirm_delete), destructive = true) { deleting = p },
             ),
             onDismiss = { acting = null },
@@ -309,7 +309,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
             title = stringResource(if (n is Naming.New) R.string.persona_new else R.string.drawer_rename),
             onSave = { name ->
                 when (n) {
-                    // 新建的一套直接在用,回人格页去调
+                    // A newly created persona is used right away; go back to the persona page to adjust it
                     is Naming.New -> store.create(name).also(::done).onSuccess { onBack() }
                     is Naming.Rename -> done(store.rename(n.persona.id, name))
                 }
@@ -334,7 +334,7 @@ private fun ManagePersonas(store: PersonaStore, onBack: () -> Unit) {
     }
 }
 
-/** 起名字:单行输入框,空或太长时说明原因并禁用保存。 */
+/** Naming: a single-line input; when empty or too long it explains why and disables Save. */
 @Composable
 private fun NameDialog(initial: String, note: String?, title: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(initial) }
@@ -370,8 +370,8 @@ private fun NameDialog(initial: String, note: String?, title: String, onSave: (S
 }
 
 /**
- * 完整提示词的预览:固定规则用灰色,这一套人格自己的内容([own]:选项的句子和用户写的指令)用正文色,
- * 一眼分得出哪些是改得动的。[own] 在 [layer] 里找不到(不该发生)时整段按灰色显示。
+ * Preview of the full prompt: the fixed rules in gray, this persona's own content ([own]: the sentences from the options and the instructions the user wrote) in body color,
+ * so at a glance it is clear which parts can be changed. If [own] is not found in [layer] (which should not happen), the whole text is shown in gray.
  */
 @Composable
 private fun previewText(layer: String, own: String): AnnotatedString {
@@ -390,14 +390,14 @@ private fun previewText(layer: String, own: String): AnnotatedString {
 }
 
 /**
- * 固定规则在提示词文件里是按固定列宽折好行的,原样显示在手机上每行都断在半句。预览时把段内的换行接成空格,
- * 让文字按屏幕宽度自己折;段与段之间的空行、以及 `<persona …>` 这样单独成行的标签不动。
+ * In the prompt file the fixed rules are wrapped at a fixed column width, so shown as-is on a phone every line is cut mid-sentence. The preview joins line breaks within a paragraph with spaces,
+ * letting the text wrap to the screen width; the blank lines between paragraphs, and tags such as `<persona …>` that stand on their own line, are left as they are.
  */
 private fun reflow(fixed: String): String = fixed.split("\n\n").joinToString("\n\n") { para ->
     if (para.trimStart().startsWith("<")) para else para.replace("\n", " ")
 }
 
-/** 列表里一套人格下面那行小字:有简短说明用它(导入的可能带),否则把不是默认的几项拼起来。 */
+/** The small line under a persona in the list: use the short description when there is one (imported ones may carry it), otherwise join up the items that are not at their default. */
 @Composable
 private fun summary(p: Persona): String {
     if (p.description.isNotBlank()) return oneLine(p.description)
@@ -411,7 +411,7 @@ private fun summary(p: Persona): String {
     return oneLine(parts.joinToString(" · "))
 }
 
-/** 设置首页「人格」一行行尾的值:默认 / 存了多套时在用那一套的名称 / 基础风格的叫法 / 已调整。 */
+/** Value at the end of the "Persona" row on the settings home page: Default / the name of the active persona when several are stored / the base style's name / Adjusted. */
 @Composable
 internal fun personaSummaryValue(store: PersonaStore): String {
     val personas by store.personas.collectAsState()
@@ -425,7 +425,7 @@ internal fun personaSummaryValue(store: PersonaStore): String {
     }
 }
 
-/** 一个三档选项在界面上的样子:标题、(可选)一句说明、三档的叫法、现在选的是第几档,以及选了第 i 档之后的 [PersonaStyle]。 */
+/** What a three-level option looks like in the UI: a title, an optional one-line description, the labels for the three levels, which level is selected now, and the [PersonaStyle] resulting from picking level i. */
 private class StyleOption(
     val tag: String,
     val title: Int,
@@ -435,13 +435,13 @@ private class StyleOption(
     val pick: (PersonaStyle, Int) -> PersonaStyle,
 )
 
-/** 三档里「默认」排在中间。 */
+/** Among the three levels "Default" sits in the middle. */
 private const val DEFAULT_LEVEL = 1
 
-/** 取「副本」格式时占名称位置的字符;名称里不会有它(控制字符存不进去)。 */
+/** Character that holds the name slot when resolving the "copy" format; names never contain it (control characters cannot be stored). */
 private const val NAME_SLOT = "\u0001"
 
-/** 三个三档选项:表情符号、回答篇幅、进度说明,放在一张卡片里。 */
+/** The three three-level options: emoji, answer length and progress notes, placed in one card. */
 private fun levelOptions(style: PersonaStyle): List<StyleOption> {
     val levels = PersonaStyle.Level.entries
     val scale = listOf(R.string.persona_level_less, R.string.persona_level_default, R.string.persona_level_more)
@@ -469,7 +469,7 @@ private fun baseLabel(base: PersonaStyle.Base): Int = when (base) {
     PersonaStyle.Base.Playful -> R.string.persona_base_playful
 }
 
-/** 基础风格每一项下面那句说明,照 style.md 里模型实际收到的那句写的。 */
+/** The description under each base style entry, written to match the sentence the model actually receives in style.md. */
 private fun baseAbout(base: PersonaStyle.Base): Int = when (base) {
     PersonaStyle.Base.Default -> R.string.persona_default_sub
     PersonaStyle.Base.Crisp -> R.string.persona_base_crisp_sub
@@ -477,10 +477,10 @@ private fun baseAbout(base: PersonaStyle.Base): Int = when (base) {
     PersonaStyle.Base.Playful -> R.string.persona_base_playful_sub
 }
 
-/** 列表里只露一行:压成一行,太长截断加省略号,免得一段长指令把整页撑开。 */
+/** Only one line shows in the list: flatten into a single line, truncating with an ellipsis when too long, so one long instruction cannot stretch the whole page. */
 private fun oneLine(text: String): String = clip(text.replace(Regex("\\s+"), " ").trim(), 60)
 
-/** 按码点截到 [max] 个字,截了就加省略号(不把一个表情劈成两半)。 */
+/** Clip to [max] characters by code point, appending an ellipsis when clipped (never splitting an emoji in half). */
 private fun clip(text: String, max: Int): String {
     if (text.codePointCount(0, text.length) <= max) return text
     return text.substring(0, text.offsetByCodePoints(0, max)) + "…"

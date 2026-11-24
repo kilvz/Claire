@@ -35,7 +35,7 @@ import com.wangzan101.mika.ui.components.SelectChip
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 每个用途自己的档位;跟随主模型时说明继承,显式选同一个模型仍能独立设置。 */
+/** Each role has its own level; when following the main model it states that the setting is inherited, while explicitly picking the same model still allows an independent setting. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ReasoningControl(ui: ModelSetupUi, role: ModelRole, modifier: Modifier = Modifier, onSelect: (String?) -> Unit) {
@@ -75,7 +75,7 @@ internal fun ReasoningControl(ui: ModelSetupUi, role: ModelRole, modifier: Modif
     )
 }
 
-/** 卡片下方的轻量设置入口：没有额外表格或底色，保留足够的点击高度。 */
+/** Lightweight settings entry below the card: no extra table or background fill, but keeps a tap target tall enough. */
 @Composable
 internal fun ModelOptionButton(text: String, tag: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(

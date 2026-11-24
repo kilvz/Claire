@@ -43,7 +43,7 @@ import com.wangzan101.mika.ui.theme.MikaSize
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 设置 › 模型:和上手时的配置模型是同一页([ModelSetupScreen]),不在引导流程里。 */
+/** Settings › Models: the same page as the model configuration during onboarding ([ModelSetupScreen]), not part of the onboarding flow. */
 @Composable
 fun ModelsScreen(
     store: ProviderStore, onBack: () -> Unit,
@@ -57,7 +57,7 @@ fun ModelsScreen(
     ModelSetupScreen(store, onboarding = false, onBack = onBack, onDone = onBack, onOpenSpeech = onOpenSpeech, onOpenVoice = onOpenVoice, onOpenImage = onOpenImage, onOpenUsage = onOpenUsage, onOpenVoiceCatalog = onOpenVoiceCatalog, onOpenCallMode = onOpenCallMode)
 }
 
-/** 子页面共用的骨架:顶栏 + 可滚动内容。 */
+/** Shared skeleton for subpages: top bar + scrollable content. */
 @Composable
 internal fun Page(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     val scrollState = rememberSaveable(saver = androidx.compose.foundation.ScrollState.Saver) {
@@ -73,7 +73,7 @@ internal fun Page(title: String, onBack: () -> Unit, content: @Composable () -> 
     }
 }
 
-/** 用途卡:大图标块、「名字 · 做什么」、选了什么(模型名用等宽字)、说明。 */
+/** Role card: a large icon tile, "name · what it does", what is selected (model names in monospace), and a description. */
 @Composable
 internal fun RoleCard(icon: ImageVector, label: String, line: ModelsCopy.RoleLine, first: Boolean = false, tag: String, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -107,7 +107,7 @@ internal fun RoleCard(icon: ImageVector, label: String, line: ModelsCopy.RoleLin
 
 private val RoleTileShape = MikaShapes.Chip
 
-/** 服务商一行:左边是名字首字的图标块;[warning] 是要提醒的一句(用提醒色另起一行)。 */
+/** Provider row: an icon tile with the first letter of the name on the left; [warning] is a line to flag (shown in the warning color on its own line). */
 @Composable
 internal fun ProviderRow(p: Provider, line: String, first: Boolean, warning: String? = null, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -132,4 +132,4 @@ internal fun ProviderRow(p: Provider, line: String, first: Boolean, warning: Str
     }
 }
 
-// ---------- 选某个用途用哪个模型 ----------
+// ---------- Choosing which model a role uses ----------

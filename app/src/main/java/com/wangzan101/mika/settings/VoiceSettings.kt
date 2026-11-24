@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-/** 声音服务的接口形态。存名字，只能往后加、不能改名或删。 */
+/** Interface shape of a speech service. Stored by name: entries may only be appended, never renamed or removed. */
 enum class TtsProtocol(val wire: String) {
     /** OpenAI Speech:POST /audio/speech。 */
     OpenAiSpeech("openai-speech"),
@@ -25,7 +25,7 @@ enum class TtsProtocol(val wire: String) {
     /** Gemini TTS:generateContent + responseModalities AUDIO。 */
     GeminiTts("gemini-tts"),
 
-    /** 内置 Android 系统语音合成;只用于目录能力提示,旧版选择从不落成它。 */
+    /** Built-in Android system speech synthesis; used only for catalog capability hints, and the legacy choice never settles on it. */
     AndroidSystem("android-system");
 
     companion object {
@@ -36,7 +36,7 @@ enum class TtsProtocol(val wire: String) {
 internal fun normalizeVoiceSpeed(value: Float): Float =
     if (value.isFinite()) value.coerceIn(0.25f, 4f) else 1f
 
-/** 用户选的声音、模型和接口；Key 仍由 [ProviderStore] 按服务商保存。 */
+/** The voice, model and protocol the user chose; the key is still stored per provider by [ProviderStore]. */
 data class VoiceChoice(
     val providerId: String,
     val model: String,
@@ -47,22 +47,22 @@ data class VoiceChoice(
 )
 
 /**
- * 声音设置。默认允许朗读（用户点按钮才会合成），但不自动朗读、不给 speak 工具：
- * [enabled] 是总开关；[autoRead] 打开后完成的回答自动读；[speakTool] 打开后模型可以主动说一句；
- * [maxCharsPerSpeak] 是单次朗读的字数上限，防止误读整篇长文烧钱。
+ * Voice settings. Reading aloud is allowed by default (synthesis only happens when the user taps a button), but there is no automatic reading and no speak tool:
+ * [enabled] is the master switch; with [autoRead] on, finished answers are read aloud automatically; with [speakTool] on, the model may speak a sentence on its own;
+ * [maxCharsPerSpeak] is the character limit for a single reading, preventing a whole long text from being read out by mistake and burning money.
  */
 data class VoiceSettingsState(
     val enabled: Boolean = true,
     val choice: VoiceChoice? = null,
-    /** 迁移后的音色/语速/流式使用偏好;模型选择在目录里,这里只留使用偏好。 */
+    /** Voice/speed/streaming usage preferences after migration; the model choice lives in the catalog, so only usage preferences remain here. */
     val voice: String = "",
     val speed: Float = 1.0f,
     val streaming: Boolean = false,
     val autoRead: Boolean = false,
     val speakTool: Boolean = false,
-    /** 允许把生成的音频存进手机音乐库;默认关。 */
+    /** Allow saving generated audio into the phone's music library; off by default. */
     val saveEnabled: Boolean = false,
-    /** 每次保存前是否问用户;默认问。 */
+    /** Whether to ask the user before every save; asks by default. */
     val askBeforeSave: Boolean = true,
     val maxCharsPerSpeak: Int = DEFAULT_MAX_CHARS,
 ) {
@@ -83,7 +83,7 @@ class VoiceSettings(private val prefs: SharedPreferences) {
     /** Usage preferences remain in this store; migration reads but never rewrites them. */
     internal fun legacySnapshot(): VoiceSettingsState = state.value
 
-    /** 旧版在声音页直接填写模型。首次升级时保留这个选择及其音色和协议;选择经统一目录迁移,这里不再按标记过滤。 */
+    /** The legacy version filled in the model directly on the voice page. On first upgrade this choice is kept along with its voice and protocol; the choice is migrated through the unified catalog, and it is no longer filtered by tag here. */
     internal fun reconcileTtsChoice(store: ProviderStore) {
         val choice = state.value.choice
         if (!prefs.getBoolean(KEY_TTS_ROLE_MIGRATED, false)) {
@@ -131,13 +131,13 @@ class VoiceSettings(private val prefs: SharedPreferences) {
 
     fun setMaxChars(n: Int) = update { copy(maxCharsPerSpeak = n.coerceIn(1, VoiceSettingsState.MAX_CHARS_LIMIT)) }
 
-    /** 按当前协议给的能力。音色不限制（由服务商校验）；OpenAI 支持多种容器，Gemini 这里统一回到 WAV。 */
+    /** Capabilities for the current protocol. Voices are unrestricted (validated by the provider); OpenAI supports several containers, while Gemini is normalized back to WAV here. */
     fun capabilities(): TtsCapabilities? {
         val choice = _state.value.choice ?: return null
         return capabilities(choice.protocol)
     }
 
-    /** 迁移后按目录模型的协议给能力;字数上限仍取这里的使用偏好。 */
+    /** After migration, capabilities follow the catalog model's protocol; the character limit still comes from the usage preference here. */
     fun capabilities(protocol: TtsProtocol): TtsCapabilities = when (protocol) {
         TtsProtocol.OpenAiSpeech -> TtsCapabilities(
             voices = null,

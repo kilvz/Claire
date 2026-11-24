@@ -26,8 +26,8 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /**
- * 设置 › 网络代理 的文案(纯函数,便于测试)。地址只写协议、主机、端口,不带账号密码(这一行随时看得到)。
- * 只在设置首页这一处改;文件与计算环境页那一行只是引过来看。
+ * Copy for Settings › Network proxy (pure functions, easy to test). The address shows only the protocol, host and port, never credentials (this line is always visible).
+ * It is only edited here on the settings home page; the row on the Files & compute environment page just displays it.
  */
 object NetProxyCopy {
     val TITLE: String get() = tr(R.string.net_proxy)
@@ -35,12 +35,12 @@ object NetProxyCopy {
     val HINT: String get() = tr(R.string.net_proxy_hint)
     val INVALID: String get() = tr(R.string.net_proxy_invalid)
 
-    /** 设置首页那一行右边:没设写「未设置」,设了写地址。 */
+    /** Right side of the row on the settings home page: "Not set" when unset, the address when set. */
     fun value(proxy: String): String = NetProxyStore.display(proxy).ifEmpty { tr(R.string.settings_not_set) }
 
     /**
-     * 那一行下面的说明:平时说它管哪些连接;只给容器用的写法、浏览器用不上时照实说。
-     * [browser] 为空表示还没查出浏览器这边的情况。
+     * Description below that row: normally says which connections it covers; when the form is container-only or the browser cannot use it, it says so plainly.
+     * [browser] empty means the browser side has not been checked yet.
      */
     fun subtitle(proxy: String, browser: WebProxy.Mode?): String {
         val address = ProxyAddress.parse(proxy)
@@ -53,7 +53,7 @@ object NetProxyCopy {
     }
 }
 
-/** 改网络代理:一个输入框,空着表示不用;写得不对时就地说怎么写,不存。 */
+/** Edit the network proxy: one input field; empty means unused; when the value is invalid it explains the format inline and does not save. */
 @Composable
 fun NetProxyDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }

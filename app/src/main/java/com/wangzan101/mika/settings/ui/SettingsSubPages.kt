@@ -39,23 +39,23 @@ import com.wangzan101.mika.browser.ui.WebSitesSection
 import com.wangzan101.mika.browser.ui.WebSitesState
 import com.wangzan101.mika.ui.Route
 
-// ---------- 手机操作 ----------
+// ---------- Phone control ----------
 
-/** 设置 › 网站登录。 */
+/** Settings › Website logins. */
 @Composable
 fun WebSitesScreen(state: WebSitesState, onBack: () -> Unit) {
     PageScaffold(stringResource(R.string.settings_web_logins), onBack) { WebSitesSection(state, labeled = false) }
 }
 
-// ---------- 高级 ----------
+// ---------- Advanced ----------
 
-/** 设置 › 文件与计算环境:允许脚本联网、网络代理、已用空间(按对话清理工作区)、重置运行环境。 */
+/** Settings › Files & compute environment: allow scripts to go online, network proxy, space used (clean the workspace per conversation), reset the runtime environment. */
 @Composable
 fun SandboxScreen(onBack: () -> Unit) {
     PageScaffold(stringResource(R.string.settings_sandbox), onBack) { AdvancedSettings() }
 }
 
-/** 设置 › 记住的操作路线:[count] 条,可以全部清除(先确认);[count] 为空表示还没读出来。 */
+/** Settings › Remembered action routes: [count] entries, all of which can be cleared (with confirmation); an empty [count] means it has not been read yet. */
 @Composable
 fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
@@ -83,7 +83,7 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** 设置 › 恢复与修复:手机操作的几个授权开关,下面是兼容性自检的入口。 */
+/** Settings › Recovery & repair: the phone-action permission switches, followed by the entry to the compatibility self-check. */
 @Composable
 fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}) {
     PageScaffold(stringResource(R.string.settings_recovery), onBack) {
@@ -97,7 +97,7 @@ fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}) {
     }
 }
 
-/** 外观的当前说法(设置页和这一行都用)。 */
+/** Current wording for the appearance (used by the settings page and this row). */
 fun appearanceLabel(mode: ThemeMode): String = tr(
     when (mode) {
         ThemeMode.System -> R.string.appearance_system
@@ -107,8 +107,8 @@ fun appearanceLabel(mode: ThemeMode): String = tr(
 )
 
 /**
- * 背景图片的调节:遮罩浓度、图片位置、模糊、强调色跟不跟图片、换回纯色。
- * 页面底下就是这张图,拖的时候当场看到效果;值变了才写设置(整数百分比、位置按 5% 一档),不是每一帧都写。
+ * Background image adjustments: scrim strength, image position, blur, whether the accent color follows the image, and switching back to a solid color.
+ * The image is the page background itself, so dragging shows the effect right away; settings are written only when the value changes (integer percentages, position in 5% steps), not every frame.
  */
 @Composable
 internal fun SkinControls(skin: SkinSpec, onChange: (SkinSpec) -> Unit, onClear: () -> Unit) {

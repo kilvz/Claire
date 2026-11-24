@@ -34,7 +34,7 @@ import java.time.format.DateTimeFormatter
 import com.wangzan101.mika.memory.ui.Link
 
 /**
- * 设置 › 通知:显示系统通知频道状态，并设置定时任务的免打扰时段。
+ * Settings › Notifications: shows the system notification channel status and sets the do-not-disturb window for scheduled tasks.
  */
 @Composable
 fun NotificationsScreen(status: SystemStatus, onFix: (Fix) -> Unit, onBack: () -> Unit) {
@@ -125,7 +125,7 @@ private fun ChannelRowItem(title: String, whenText: String, row: ChannelRow, fix
     }
 }
 
-// ---------- 任务运行 ----------
+// ---------- Task runs ----------
 
-/** 并行任务的设置:用户设的上限 [max](1–3),和设备此刻允许的 [limit]。 */
+/** Parallel task settings: the limit the user set [max] (1–3), and what the device allows right now [limit]. */
 data class ParallelSetting(val max: Int, val limit: ParallelLimit)

@@ -23,7 +23,7 @@ import com.wangzan101.mika.ui.components.RowChevron
 import com.wangzan101.mika.ui.components.RowValue
 import com.wangzan101.mika.ui.theme.MikaIcons
 
-/** 只认几档的设置(沙箱时长、上传体积、工作区空间等):一行显示当前档位,点开单选;没有「不限制」。 */
+/** Settings that only accept a few tiers (sandbox duration, upload size, workspace space, etc.): one row shows the current tier, tapping opens single-select; there is no "unlimited". */
 @Composable
 internal fun TierSettingRow(
     @StringRes title: Int,

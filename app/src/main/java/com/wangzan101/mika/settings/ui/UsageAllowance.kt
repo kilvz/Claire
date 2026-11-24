@@ -91,7 +91,7 @@ private fun AllowanceRow(
                 Log.w("MikaAllowance", "服务商额度请求无效（${source.name}）")
                 null
             }
-            // 列表和密钥版本可能已更新，但界面还没来得及重组。
+            // The list and key revision may have been updated, but the UI has not recomposed yet.
             if (store.matchesAllowanceConnection(provider, revision)) {
                 value = result
                 if (result != null) updated = Instant.now()

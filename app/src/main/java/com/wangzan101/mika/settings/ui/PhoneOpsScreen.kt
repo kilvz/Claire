@@ -41,7 +41,7 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.memory.ui.Link
 
-/** 设置 › 手机操作:权限与配对的状态,重新配对、解除配对。Root 能力集中在高级与其他的独立页面。 */
+/** Settings › Phone actions: permission and pairing status, re-pair, unpair. Root capabilities live on their own page under Advanced & other. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PhoneOpsScreen(
@@ -67,7 +67,7 @@ fun PhoneOpsScreen(
                 MikaIcons.Hand, stringResource(R.string.settings_a11y), first = true,
                 onClick = check.problems.firstOrNull { it is Problem.Accessibility }?.let { { onProblem(it) } },
             ) { RowValue(a11yText, a11yTone) }
-            // 安卓 12 以下手机功能不可用,不列这一行(系统版本那一行已说明)
+            // Phone features are unavailable below Android 12, so this row is not listed (the system version row already says so)
             if (status.sdkInt >= Prerequisites.MIN_SDK) {
                 val helper = status.builtinShell
                 val (hText, hTone) = PhoneSetupCopy.statusValue(helper)
@@ -226,4 +226,4 @@ fun PhoneOpsScreen(
     }
 }
 
-// ---------- 通知 ----------
+// ---------- Notifications ----------

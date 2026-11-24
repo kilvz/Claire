@@ -15,25 +15,25 @@ import com.wangzan101.mika.core.device.shell.BuiltinShellFix
 import com.wangzan101.mika.core.device.shell.BuiltinShellStatus
 import com.wangzan101.mika.ui.components.ValueTone
 
-/** 设置页能直接做的修复动作。 */
+/** Fix actions the settings page can carry out directly. */
 enum class Fix {
     OpenAccessibility, AllowNotifications, AddModel,
-    /** 直接打开「需要你处理」/「任务结果」/「任务进度」频道的设置页,打开「在屏幕上弹出」;打不开退回应用通知总页。 */
+    /** Open the settings page of the "Needs you" / "Task results" / "Task progress" channel directly and turn on "Pops up"; if that cannot be opened, fall back to the app's notification overview page. */
     OpenAttentionChannel, OpenResultChannel, OpenProgressChannel,
     OpenLiveTaskSettings,
-    /** 「配对」通知频道的设置页:配对码要填在这类通知里。 */
+    /** Settings page of the "Pairing" notification channel: the pairing code has to be entered in that kind of notification. */
     OpenPairingChannel,
-    /** 本 App 的「应用信息」页:系统拦着不让开无障碍时,在这里允许受限制的设置。 */
+    /** This app's "App info" page: when the system blocks turning on accessibility, allow restricted settings there. */
     OpenAppInfo,
-    // 内置助手
+    // Built-in helper
     OpenPhoneSetup, RepairPhoneHelper, RetryPhoneHelper, UnpairPhoneHelper, OpenPhoneOps,
     OpenAboutPhone, OpenDeveloperOptions, OpenUsbDebugging, OpenWirelessDebugging, OpenWifi,
 }
 
-/** 顶部横幅的一行字和右侧链接。 */
+/** One line of text for the top banner plus the link on its right. */
 data class BannerCopy(val title: String, val detail: String, val link: String)
 
-/** 点开问题时的说明:用大白话讲清楚是什么、怎么办;[fix] 为空表示没有一键修复。 */
+/** Explanation shown when a problem is tapped open: plain language covering what it is and what to do; an empty [fix] means there is no one-tap fix. */
 data class Explanation(
     val title: String,
     val body: String,
@@ -43,18 +43,18 @@ data class Explanation(
 )
 
 object StatusCopy {
-    /** 正在经某个 MCP 连接器调用(任务卡片、胶囊的「在做什么」)。 */
+    /** Currently calling through an MCP connector (task card, the capsule's "what it's doing"). */
     fun callingMcp(connector: String): String = tr(R.string.progress_calling_mcp, connector)
 
-    /** 已经经某个 MCP 连接器调用过(步骤列表、时间线)。 */
+    /** Has already called through an MCP connector (step list, timeline). */
     fun calledMcp(connector: String): String = tr(R.string.progress_called_mcp, connector)
 
-    /** 不经模型连做几步时卡片和通知上的说法。 */
+    /** Wording on the card and notification when several steps run in a row without the model. */
     fun progress(p: RunProgress): String = when (p) {
         is RunProgress.Replay -> tr(R.string.progress_replay, p.step, p.total)
         is RunProgress.Batch -> trPlural(R.plurals.progress_batch, p.steps)
         is RunProgress.Task -> p.goals?.let(::goals) ?: p.display
-        // 只是在等另一个任务,不要用户做什么
+        // Only waiting for another task; the user does not need to do anything
         is RunProgress.WaitingForApp -> tr(R.string.progress_waiting_app, p.app)
     }
 
@@ -63,7 +63,7 @@ object StatusCopy {
         goals.confirmed.size, goals.items.size,
     )
 
-    /** 付款接管的商品、金额、地址,一行一项;都没有时为 null。卡片和通知共用。 */
+    /** Item, amount and address of a payment takeover, one per line; null when all are absent. Shared by the card and the notification. */
     fun paymentLines(item: String?, amount: String?, address: String?): String? =
         listOfNotNull(
             item?.takeIf { it.isNotBlank() }?.let { tr(R.string.payment_item, it) },
@@ -71,7 +71,7 @@ object StatusCopy {
             address?.takeIf { it.isNotBlank() }?.let { tr(R.string.payment_address, it) },
         ).joinToString("\n").ifEmpty { null }
 
-    /** 任务开工时仍连不上无障碍:已启用和未启用是两种处理,不能都说成没开。 */
+    /** Accessibility is still unreachable when the task starts: enabled and not enabled are handled differently, so they cannot both be described as off. */
     fun accessibilityUnavailable(enabled: Boolean): String =
         tr(if (enabled) R.string.task_a11y_not_running else R.string.task_no_a11y)
 
@@ -81,25 +81,25 @@ object StatusCopy {
         AccessibilityState.EnabledNotRunning -> tr(R.string.state_not_running) to ValueTone.Bad
     }
 
-    /** 不用说明、点了直接修的问题。 */
+    /** Problems that are fixed directly on tap, with no explanation needed. */
     fun directFix(p: Problem): Fix? = when (p) {
         Problem.NotificationsOff -> Fix.AllowNotifications
         is Problem.AttentionLowered -> headsUpFix(p)
         Problem.NoModel -> Fix.AddModel
-        // 引导页把每一步都讲清楚了,不再弹说明
+        // The onboarding page explains every step, so no explanation is popped up again
         is Problem.PhoneHelper -> when {
             PhoneSetupCopy.canReconnect(p.status) -> Fix.RetryPhoneHelper
             (p.status as? BuiltinShellStatus.Failed)?.reason == BuiltinShellFailure.ShizukuNotInstalled ||
                 (p.status as? BuiltinShellStatus.Failed)?.reason == BuiltinShellFailure.ShizukuPermissionNeeded -> Fix.OpenPhoneOps
-            // 这个 Wi-Fi 还没允许无线调试:直接去亲手打开一次(系统会问要不要允许)
+            // Wireless debugging is not allowed on this Wi-Fi yet: go turn it on by hand once (the system will ask whether to allow it)
             (p.status as? BuiltinShellStatus.Failed)?.fix == BuiltinShellFix.OpenWirelessDebugging -> Fix.OpenWirelessDebugging
             else -> Fix.OpenPhoneSetup
         }
         else -> null
     }
 
-    // ---- 设置 › 通知 ----
-    /** 停止之后、交代还没写好时那一行小字(对话页和悬浮卡片一样)。 */
+    // ---- Settings › Notifications ----
+    /** The small line shown after stopping, while the summary has not been written yet (same on the chat page and the floating card). */
     val STOP_SUMMARIZING: String get() = tr(R.string.stop_summarizing)
     val NOTIFICATIONS: String get() = tr(R.string.notifications_title)
     val PROGRESS_CHANNEL: String get() = tr(R.string.channel_progress)
@@ -127,7 +127,7 @@ object StatusCopy {
     val RESULT_CHANNEL: String get() = tr(R.string.channel_result)
     val HEADS_UP_ACTION: String get() = tr(R.string.heads_up_action)
 
-    /** 被调低的两个频道里先处理「需要你处理」。 */
+    /** Of the two lowered channels, handle "Needs you" first. */
     fun headsUpFix(p: Problem.AttentionLowered): Fix = if (p.attention) Fix.OpenAttentionChannel else Fix.OpenResultChannel
 
     private fun headsUpTitle(p: Problem.AttentionLowered) =
@@ -150,11 +150,11 @@ object StatusCopy {
             BuiltinShellStatus.Connecting -> BannerCopy(tr(R.string.banner_connecting), tr(R.string.banner_connecting_detail), tr(R.string.view))
             is BuiltinShellStatus.Failed ->
                 if (st.reason == BuiltinShellFailure.NoWifi) BannerCopy(tr(R.string.banner_paused), PhoneSetupCopy.NO_WIFI_LINE, tr(R.string.view))
-                // 电脑起的助手停了:标题照实说,下面一句说怎么再起
+                // The computer-started helper stopped: state it plainly in the title, and say how to start it again in the line below
                 else if (st.reason == BuiltinShellFailure.UsbHelperStopped) BannerCopy(
                     PhoneSetupCopy.failure(st.reason).title, PhoneSetupCopy.failure(st.reason).body, tr(R.string.view),
                 )
-                // 「用 root 启动」用不了:标题说原因,下面一句说怎么办;拒绝、没回应的直接给重试
+                // "Start with root" is unusable: the title gives the reason and the line below says what to do; for a denial or no answer, offer retry directly
                 else if (st.reason in PhoneSetupCopy.ROOT_FAILURES) BannerCopy(
                     PhoneSetupCopy.failure(st.reason).title, PhoneSetupCopy.failure(st.reason).body,
                     if (PhoneSetupCopy.canReconnect(st)) PhoneSetupCopy.RECONNECT else tr(R.string.view),
@@ -178,7 +178,7 @@ object StatusCopy {
                 tr(if (p.restrictedSettings) R.string.banner_a11y_restricted_detail else R.string.banner_a11y_off_detail),
                 tr(R.string.turn_on_go),
             )
-            // 开机后还没解锁过时服务本来就绑不上:解锁后会自己恢复,不让用户去关掉再打开
+            // The service cannot bind before the first unlock after boot anyway: it recovers by itself after unlocking, so do not make the user turn it off and on
             AccessibilityState.EnabledNotRunning -> when {
                 p.userLocked -> BannerCopy(tr(R.string.banner_a11y_locked), tr(R.string.banner_a11y_locked_detail), tr(R.string.view))
                 p.restrictedSettings -> BannerCopy(
@@ -244,24 +244,24 @@ object StatusCopy {
     }
 
     /**
-     * 任务卡片上跑命令这一步的说明:「正在处理文件:<命令前 40 字>」,联网时注明「可联网」。
-     * 运行环境对用户不可见,字面上不说沙箱。
+     * Description of the run-command step on the task card: "Working on files: <first 40 characters of the command>", with "online" noted when networking is allowed.
+     * The runtime environment is invisible to users, so the text never says sandbox.
      */
     fun sandboxCommand(command: String, network: Boolean): String = sandboxLine(tr(R.string.sandbox_command_prefix), command, 40, network)
 
-    /** 跑技能脚本时:「正在运行脚本」。 */
+    /** While running a skill script: "Running a script". */
     fun sandboxScript(network: Boolean): String = tr(R.string.sandbox_script) + if (network) " · $SANDBOX_ONLINE" else ""
 
-    /** 命令里 `mika progress` 报的进度。 */
+    /** Progress reported by `mika progress` inside a command. */
     fun sandboxProgress(text: String, network: Boolean): String = sandboxLine("", text, 60, network)
 
     val SANDBOX_ONLINE: String get() = tr(R.string.sandbox_online)
 
-    /** 工具在等运行环境准备好时。 */
+    /** When a tool is waiting for the runtime environment to be ready. */
     val RUNTIME_PREPARING: String get() = tr(R.string.runtime_preparing)
 
     private fun sandboxLine(prefix: String, text: String, max: Int, network: Boolean): String {
-        // 和 `mika progress` 一样去掉控制字符、零宽与改写方向的字符,卡片上显示的就是实际的命令
+        // Strip control characters, zero-width and bidi override characters just like `mika progress`, so the card shows the actual command
         val one = com.wangzan101.mika.cap.sandbox.BridgeProtocol.cleanProgress(text.replace(Regex("\\s+"), " "))
         val cut = if (one.codePointCount(0, one.length) > max) one.substring(0, one.offsetByCodePoints(0, max)) + "…" else one
         return prefix + cut + if (network) " · $SANDBOX_ONLINE" else ""

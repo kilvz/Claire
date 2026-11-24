@@ -17,12 +17,12 @@ import com.wangzan101.mika.ui.components.RadioRow
 import com.wangzan101.mika.ui.theme.MikaTheme
 import java.text.NumberFormat
 
-/** 设置与运行记录里都显示完整数字，避免紧凑格式把预算四舍五入成另一个值。 */
+/** Both settings and run logs show the full number, so a compact format cannot round the budget into a different value. */
 internal fun tokenBudgetNumber(value: Long): String = NumberFormat.getIntegerInstance().format(value)
 
 /**
- * 每任务和每服务商共用的预算选择：不限、预设，或范围内的自定义整数。
- * 主动能力的每日预算没有「不限」([unlimited] 为 false),预设档位另给([presets])。
+ * Budget picker shared by per-task and per-provider settings: unlimited, a preset, or a custom integer within range.
+ * The daily budget for proactive capabilities has no "unlimited" ([unlimited] is false), and its presets are supplied separately ([presets]).
  */
 @Composable
 internal fun TokenBudgetDialog(

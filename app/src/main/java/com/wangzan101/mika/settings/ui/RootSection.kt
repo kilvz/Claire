@@ -31,7 +31,7 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.settings.ui.models.refresh
 
-/** 设置 › 高级与其他 › Root。只有高级页检测到 su 才能进入;打开时再刷新一次能力。 */
+/** Settings › Advanced & other › Root. Only reachable when the advanced page detects su; capabilities are refreshed again when opened. */
 @Composable
 fun RootScreen(helperRow: Boolean, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -43,7 +43,7 @@ fun RootScreen(helperRow: Boolean, onBack: () -> Unit) {
     }
 }
 
-/** 自动启动没有开关;首次或失败后点那一行明确请求。Root 命令开关开启前先展示高风险确认。 */
+/** Auto-start has no switch; on first use or after a failure, tap that row to explicitly request it. The Root command switch shows a high-risk confirmation before being turned on. */
 @Composable
 fun RootSection(
     state: RootControl.State,

@@ -68,7 +68,7 @@ internal fun RelaySection(runtime: McpRuntime, mcp: Boolean, onCopy: (String) ->
         onCopyToken = { change { val token = runtime.settings.token(); withContext(Dispatchers.Main) { onCopy(token) } } })
 }
 
-/** 纯展示与用户动作回调,测试不依赖真实网关。配对码不进可恢复状态;旧令牌不显示。 */
+/** Pure display plus user action callbacks; tests do not depend on a real gateway. The pairing code never enters restorable state; old tokens are not shown. */
 @Composable
 internal fun RelayControls(config: RelayConfig, state: RelayState, busy: Boolean, failed: Boolean,
     onPair: (String, String) -> Unit, onEnabled: (Boolean) -> Unit, onUnpair: () -> Unit,

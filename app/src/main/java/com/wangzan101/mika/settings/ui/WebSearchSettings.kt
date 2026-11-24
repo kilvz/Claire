@@ -40,9 +40,9 @@ import com.wangzan101.mika.ui.components.SelectChip
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 网页搜索设置里要的文字;不碰界面,单测直接测。 */
+/** Text needed by the web search settings; it does not touch the UI, so unit tests test it directly. */
 internal object WebSearchCopy {
-    /** 服务商在界面上的名字:品牌名,不翻译。 */
+    /** The provider's name in the UI: a brand name, not translated. */
     fun name(p: WebSearchProvider): String = when (p) {
         WebSearchProvider.Google -> "Google Search"
         WebSearchProvider.You -> "You.com"
@@ -52,7 +52,7 @@ internal object WebSearchCopy {
         WebSearchProvider.SearXNG -> "SearXNG"
     }
 
-    /** 选中这一家时,服务商下面那一行:它怎么用、要填什么。 */
+    /** The line below the provider when this one is selected: how it is used and what has to be filled in. */
     fun note(p: WebSearchProvider): String = tr(
         when (p) {
             WebSearchProvider.Google -> R.string.web_search_note_google
@@ -73,7 +73,7 @@ internal object WebSearchCopy {
 
     fun keyLabel(p: WebSearchProvider): String = tr(if (p.keyRequired) R.string.web_search_api_key_required else R.string.web_search_api_key)
 
-    /** 要填地址的只有 SearXNG:它的实例地址。 */
+    /** Only SearXNG needs an address: the URL of its instance. */
     fun endpointLabel(): String = tr(R.string.web_search_searxng_url)
 
     const val ENDPOINT_PLACEHOLDER = "https://searx.example.org"
@@ -88,7 +88,7 @@ internal object WebSearchCopy {
         WebSearchProvider.Problem.UnsupportedProvider -> groundingUnavailableMessage(grounding)
     }
 
-    /** 有密钥框的那几家去哪里拿密钥(官方的密钥页);You.com 不填也能用,填了额度更高。 */
+    /** Where to get a key for the providers that have a key field (their official key pages); You.com works without one, and gives a higher quota with it. */
     fun keyPage(p: WebSearchProvider): String? = when (p) {
         WebSearchProvider.You -> "https://you.com/platform/api-keys"
         WebSearchProvider.Jina -> "https://jina.ai/?sui=apikey"
@@ -97,7 +97,7 @@ internal object WebSearchCopy {
         else -> null
     }
 
-    /** 高级与其他那一行右边:开着时写用的哪一家,关着写「关闭」。 */
+    /** Right side of the row under Advanced & other: which provider is in use when on, "Off" when off. */
     fun value(config: WebSearchConfig): String = when {
         !config.enabled -> tr(R.string.state_off)
         config.provider == WebSearchProvider.Google && !config.grounding.available ->
@@ -107,12 +107,12 @@ internal object WebSearchCopy {
 }
 
 /**
- * 高级与其他里的网页搜索设置;仍是原有设置层级中的一个对话框,不增加新页面。
- * 上面一排服务商(和识别语言一样的胶囊),下面只放选中那一家要填的:托管的几家只有密钥(Jina、Exa 必填),
- * SearXNG 只有实例地址。
- * 各家填的东西分开记着,来回切换不会丢、也不会串到别家。
- * 没填好时「保存」照样能点:点了不保存,把要填的那一栏标红、写明缺什么并把光标放过去;
- * 一打开不标红,只有点过保存、或那一栏填过又清空时才标。必须有密钥的那几家标着「必填」;有密钥框的都给出拿密钥的链接。
+ * Web search settings under Advanced & other; still a dialog within the existing settings hierarchy, adding no new page.
+ * A row of providers on top (chips, the same as for the recognition language), and below it only what the selected provider needs: the hosted ones just a key (Jina and Exa required),
+ * SearXNG just the instance URL.
+ * What is entered for each provider is stored separately, so switching back and forth loses nothing and never spills into another provider.
+ * When something is missing, "Save" can still be tapped: tapping does not save; it marks the field to fill in red, spells out what is missing and moves the cursor there;
+ * nothing is marked red on open, only after Save has been tapped or a field was filled and then cleared. The providers that must have a key are labelled "Required"; every key field gets a link for obtaining a key.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -124,7 +124,7 @@ fun WebSearchDialog(initial: WebSearchConfig, onDismiss: () -> Unit, onSave: (We
     val entry = entries[provider] ?: WebSearchEntry()
     val config = WebSearchConfig(enabled, provider, entries.toMap(), grounding)
     val problem = config.problem
-    // 点过保存(换一家就重新算)、填过的那几栏:只有这时才把缺的标红
+    // Only fields that were hit by a Save tap (recomputed when switching provider) or that have been typed in get marked red when something is missing
     var tried by remember(initial) { mutableStateOf(false) }
     val touched = remember(initial) { mutableStateMapOf<Pair<WebSearchProvider, WebSearchProvider.Problem>, Boolean>() }
     fun shows(why: WebSearchProvider.Problem) = problem == why && (tried || touched[provider to why] == true)
@@ -242,11 +242,11 @@ fun WebSearchDialog(initial: WebSearchConfig, onDismiss: () -> Unit, onSave: (We
                         supportingText = if (error) ({ Text(WebSearchCopy.problem(provider, WebSearchProvider.Problem.Key, grounding)) }) else null,
                     )
                     WebSearchCopy.keyPage(provider)?.let { page ->
-                        // 没有能打开网页的应用时 openUri 会抛错:这时什么都不做
+                        // openUri throws when there is no app that can open web pages: do nothing in that case
                         TextButton({ runCatching { uri.openUri(page) } }, Modifier.testTag("web-search-get-key")) { Text(stringResource(R.string.web_search_get_key)) }
                     }
                 }
-                // 原来那段说明里要紧的两点:密钥加密存在本机、结果按不可信内容处理
+                // The two important points from the original description: keys are stored encrypted on this device, and results are treated as untrusted content
                 Text(
                     stringResource(R.string.web_search_privacy), Modifier.padding(top = 8.dp).testTag("web-search-privacy"),
                     style = MikaType.Hint, color = MikaTheme.colors.ink3,
