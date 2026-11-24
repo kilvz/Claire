@@ -40,7 +40,7 @@ class ManualControlTest {
         runCurrent()
         assertTrue(control.begin())
         control.end()
-        // 别处的读屏也不能使接管之前准备的动作重新有效。
+        // A screen read from elsewhere must not make an action prepared before the takeover valid again.
         control.automatic(observation = true) {}
         proceed.complete(Unit)
         assertTrue(plan.await() is ManualControl.Interrupted)
@@ -53,7 +53,7 @@ class ManualControlTest {
         assertTrue(runCatching { control.automatic {} }.exceptionOrNull() is ManualControl.Interrupted)
         control.automatic(observation = true, refreshed = { it: Boolean -> it }) { false }
         assertTrue(runCatching { control.automatic {} }.exceptionOrNull() is ManualControl.Interrupted)
-        control.automatic(observation = true, refresh = false) {} // 子任务的读不能替主任务确认画面。
+        control.automatic(observation = true, refresh = false) {} // A subtask's read cannot confirm the screen on behalf of the main task.
         assertTrue(runCatching { control.automatic {} }.exceptionOrNull() is ManualControl.Interrupted)
         control.automatic(observation = true) {}
         assertEquals("done", control.automatic { "done" })
@@ -127,7 +127,7 @@ class ManualControlTest {
             }
             assertTrue(runCatching { control.automatic(observer = parentObservation) {} }.exceptionOrNull() is ManualControl.Interrupted)
         }
-        // 子任务的观察不能替父任务清除读屏要求；父任务的新计划也需自行读屏。
+        // A subtask's observation cannot clear the screen-read requirement for the parent task; a new parent plan must read the screen itself.
         control.plan(parent) {
             assertTrue(runCatching { control.automatic(observer = parentObservation) {} }.exceptionOrNull() is ManualControl.Interrupted)
             control.automatic(observation = true, observer = parentObservation) {}

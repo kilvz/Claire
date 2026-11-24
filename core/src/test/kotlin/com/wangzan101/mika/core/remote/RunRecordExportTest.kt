@@ -64,7 +64,7 @@ class RunRecordExportTest {
         assertEquals(true, RunRecordExport.of(record(ended = false)).json["partial"]!!.jsonPrimitive.boolean)
         val finished = RunRecordExport.of(record(ended = true))
         assertEquals(false, finished.json["partial"]!!.jsonPrimitive.boolean)
-        // 概要还没刷新,但事件里已经收尾:不算进行中。
+        // The summary has not been refreshed, but the events already ended the run: it does not count as in progress.
         val stale = record(ended = false).let { it.copy(events = it.events + RunEvent.TaskEnded(30, "failed", "stopped", "environment")) }
         assertEquals(false, RunRecordExport.of(stale).json["partial"]!!.jsonPrimitive.boolean)
     }

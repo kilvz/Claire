@@ -13,9 +13,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 随 App 发布的知识、技能、提示词里提到的工具名都得是现在登记的:
- * 带屏幕前缀的(phone_…、web_…)、改名前的旧名(browser_…、launch_app 一类)、反引号里的旧名都算提到工具。
- * 也守着旧名对照表:每个旧名都对得上现在的工具。
+ * Tool names mentioned in the knowledge, skills and prompts shipped with the app must all be currently registered:
+ * screen-prefixed ones (phone_…, web_…), names from before the rename (browser_…, launch_app and the like) and old names
+ * in backticks all count as mentioning a tool. It also guards the legacy name table: every old name maps to a current tool.
  */
 class ToolNamesInTextTest {
     private val roots = listOf("src/main/resources/knowledge", "src/main/resources/skills", "src/main/resources/prompts").map(::File)
@@ -38,9 +38,9 @@ class ToolNamesInTextTest {
     }
 
     /**
-     * 知识和技能里叫模型去跑的东西都得真有:脚本路径(`scripts/x.py`、`sites/a.b/scripts/x.py`、单写文件名 `x.py`)
-     * 要对得上清单里标为可运行的脚本;当成命令来用的标识符(反引号里的 `a_b` 前后是「用 / 运行 / 调用 / command / 脚本」这类说法,
-     * 或写成 `a_b(` 调用的样子)要是登记的工具、工具的参数或头部的键。
+     * Everything the knowledge and skills tell the model to run must actually exist: script paths (`scripts/x.py`, `sites/a.b/scripts/x.py`,
+     * a bare file name `x.py`) must match a script marked runnable in the manifest; an identifier used as a command (a backticked `a_b`
+     * preceded or followed by wording such as use / run / invoke / command / script, or written as a `a_b(` call) must be a registered tool, a tool argument or a header key.
      */
     @Test fun everyCommandMentionExists() {
         val bad = commandMentions(File("src/main/resources"))
@@ -54,7 +54,7 @@ class ToolNamesInTextTest {
         val bad = mutableListOf<String>()
         for (dir in listOf("knowledge", "skills")) for (f in File(resources, dir).walkTopDown().filter { it.isFile && it.extension == "md" }) {
             val rel = f.relativeTo(resources).invariantSeparatorsPath
-            // 条目目录,和 run_bundled_script 的 skill 参数同一写法:skills/documents、skills/documents
+            // The entry directory, written the same way as run_bundled_script's skill argument: skills/documents, skills/documents
             val entry = rel.removePrefix("knowledge/").split('/').take(2).joinToString("/")
             val text = f.readText()
             for (m in scriptPath.findAll(text)) {
@@ -86,9 +86,9 @@ class ToolNamesInTextTest {
         assertEquals(listOf("phone_launch_app"), legacy.replacements("launch_app"))
         assertEquals(listOf("web_navigate"), legacy.replacements("browser_navigate"))
         assertEquals(listOf("web_wait_for"), legacy.replacements("browser_wait"))
-        // 名字没变的不在表里
+        // Names that did not change are not in the table
         assertTrue(legacy.replacements("finish").isEmpty() && legacy.replacements("run_command").isEmpty())
-        // 每个旧名都对得上现在的工具,同一个旧名对上的工具做同一件事;拆成知识、技能两个的除外
+        // Every old name maps to a current tool, and the tools one old name maps to do the same thing; except those split into separate knowledge and skill tools
         val split = setOf(setOf(Verb.KnowledgeSearch, Verb.SkillSearch), setOf(Verb.KnowledgeRead, Verb.SkillRead))
         for (old in legacy.names) {
             val now = legacy.replacements(old)

@@ -10,7 +10,7 @@ import org.junit.Test
 import com.wangzan101.mika.core.testing.verb
 
 class RedactorTest {
-    /** Google 新格式的认证 Key(AQ. 开头)和旧的 AIza 一样,经 Redactor 的每条路都遮住。 */
+    /** Google's new-format auth keys (starting with AQ.), like the old AIza ones, are masked on every path through Redactor. */
     @Test fun googleAuthKeyMaskedEverywhere() {
         val key = "AQ." + "Ab8RN6Lq_x-Zt3VwP0kJ9sYcH2mE4uFgD7aB"
         fun gone(s: String) { assertFalse(s, s.contains(key)); assertFalse(s, s.contains("Ab8RN6Lq_x-Zt3VwP0kJ9sYcH2mE4uFgD7aB")) }
@@ -20,7 +20,7 @@ class RedactorTest {
         gone(Redactor.pageData("""{"value":"$key"}"""))
         val n = Redactor.network(url = "https://a.test/p?x=$key", body = """{"k":"$key"}""", headers = mapOf("X-Goog-Api-Key" to key, "X-Note" to key))
         gone(n.url!!); gone(n.body!!); n.headers!!.values.forEach(::gone)
-        // 太短的、不是开头的不算
+        // Too short, or not at the start, does not count
         assertEquals("AQ.short", Redactor.text("AQ.short"))
         assertEquals("XAQ.Ab8RN6Lq_x-Zt3VwP0kJ9sY", Redactor.text("XAQ.Ab8RN6Lq_x-Zt3VwP0kJ9sY"))
     }
@@ -44,7 +44,7 @@ class RedactorTest {
         val gh = "ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789"
         val t2 = Redactor.text("g=$google h=$gh")
         assertFalse(t2.contains(google)); assertFalse(t2.contains(gh))
-        // 不是密码框,但参数里有 Key 样子的串也要遮
+        // Not a password field, but a key-like string among the arguments is masked anyway
         val a = Redactor.args(verb("phone_type_text"), """{"text":"$key"}""", secretField = false)
         assertFalse(a.contains(key))
     }
@@ -63,11 +63,11 @@ class RedactorTest {
     }
 
     @Test fun scriptStringLiteralsAllMasked() {
-        // 不管字怎么交出去:直接给 mika.type、先存变量、拼接、写进 DOM
+        // However the text is handed over: straight to mika.type, stored in a variable first, concatenated, written into the DOM
         val c = scriptCode("const s = await mika.snapshot();\nawait mika.type(find(s, '密码'), 'hunter2');\nconst pw = \"abc\" + 'def';\n" +
             "document.querySelector('#p').value = pw;\nawait mika.type(s.elements[0], `x${'$'}{pw}y${'$'}{'zz'}`);")
         for (secret in listOf("hunter2", "abc", "def", "密码", "#p", "zz", "`x")) assertFalse(secret, secret in c)
-        // 只留形状:引号种类、模板里表达式的位置、代码本身
+        // Only the shape is kept: the kind of quotes, where expressions sit in the template, the code itself
         assertTrue(c, "mika.type(find(s, '***'), '***')" in c)
         assertTrue(c, "\"***\" + '***'" in c)
         assertTrue(c, "`***${'$'}{pw}***${'$'}{'***'}***`" in c)

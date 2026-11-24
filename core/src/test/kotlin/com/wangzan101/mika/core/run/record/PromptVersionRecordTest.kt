@@ -14,8 +14,8 @@ import org.junit.Test
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
 /**
- * 运行记录里记下本任务提示词的版本:每组都展开时发给模型的系统提示词加工具定义的摘要,
- * 和这次实际展开了哪几组无关(只有手机时,展开了手机一组后看到的就是它)。
+ * The run record stores the version of this task's prompt: a digest of the system prompt plus tool definitions the model would
+ * receive with every group expanded, independent of which groups this run actually expanded (with phone only, that is what you see once the phone group is expanded).
  */
 class PromptVersionRecordTest {
     private suspend fun run(tools: ToolDispatcher): Pair<String, String> {

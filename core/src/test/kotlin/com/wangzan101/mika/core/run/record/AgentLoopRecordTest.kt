@@ -49,9 +49,9 @@ class AgentLoopRecordTest {
         )
         val ev = run(m).events
         assertEquals(
-            // 坐标处没有元素:不可逆判定无从判断,放行并记一条 gate_unresolved
-            // 最后一条不带调用的回复是回答:先字面核对,再记下代码找到的来源
-            // 第一次读屏展开手机工具且没有清单：下一轮先记录补建提醒，组装请求时记录工具展开。
+            // No element at the coordinates: an irreversible decision cannot be judged, so it is allowed through and a gate_unresolved entry is recorded
+            // The last reply without a tool call is the answer: checked literally first, then the sources the code found are recorded
+            // The first screen read opens the phone tools and there is no plan yet: the next round first records a reminder to create one, and assembling the request records that the tools were opened.
             listOf("TaskStarted", "PromptVersion", "ModelReply", "ToolResult", "Observed", "Activity", "State", "State", "ModelReply", "ToolResult", "Activity", "State", "ModelReply", "AnswerCheck", "Sources", "TaskEnded"),
             ev.map { it::class.simpleName },
         )
@@ -67,7 +67,7 @@ class AgentLoopRecordTest {
         assertEquals("act", (ev[10] as RunEvent.Activity).kind)
         val end = ev.last() as RunEvent.TaskEnded
         assertEquals("succeeded", end.outcome); assertEquals("好了", end.answerOrReason)
-        // 观察保留采集时刻,但按因果关系记在所属工具结果之后。
+        // An observation keeps the time it was captured, but for causality it is recorded after the tool result it belongs to.
         assertTrue(ev.zipWithNext().all { (a, b) -> a.atMs <= b.atMs || (a is RunEvent.ToolResult && b is RunEvent.Observed) })
     }
 
@@ -83,7 +83,7 @@ class AgentLoopRecordTest {
             return sink.events.first() as RunEvent.TaskStarted
         }
         assertEquals("mcp", started(com.wangzan101.mika.core.run.RunOrigin.Mcp).origin)
-        // 手机上发起的不写,记录和以前一样
+        // Runs started on the phone are not written, so the record is as before
         assertNull(started(com.wangzan101.mika.core.run.RunOrigin.Ui).origin)
         assertEquals("mcp", RunSummary(id = "x", goal = "g", startedAtMs = 0).with(RunEvent.TaskStarted(0, "g", "m", "mcp")).origin)
     }
@@ -105,7 +105,7 @@ class AgentLoopRecordTest {
         }
         val m = FakeModel(reply(call("phone_observe")), com.wangzan101.mika.core.testing.answerReply("x"))
         val r = run(m, screen).events.filterIsInstance<RunEvent.ToolResult>().first()
-        // 记录是回放和调试的依据:超过普通字段上限的工具结果也要整条留下
+        // The record is the basis for replay and debugging: a tool result beyond the normal field limit is still kept in full
         assertTrue("length ${r.resultJson.length}", r.resultJson.length > RunEvent.MAX_FIELD)
         assertTrue(r.resultJson.contains("第 150 行很长很长的文字内容"))
         assertTrue(r.resultJson.startsWith("{\"ok\":true"))
@@ -126,7 +126,7 @@ class AgentLoopRecordTest {
         val m = FakeModel(reply(call("phone_observe")), com.wangzan101.mika.core.testing.answerReply("x"))
         val sink = run(m, frames = true)
         assertEquals(listOf(1), sink.screens.map { it.first })
-        // 画面只进记录,不发给看不了图的模型
+        // The frame goes into the record only, never to a model that cannot see images
         assertTrue(m.requests[1].none { msg -> msg.parts.any { it is Part.Image } })
         val noFrames = run(FakeModel(reply(call("phone_observe")), com.wangzan101.mika.core.testing.answerReply("x")))
         assertTrue(noFrames.screens.isEmpty())
@@ -157,7 +157,7 @@ class AgentLoopRecordTest {
     }
 
     @Test fun guardStopBeforeExecutionMasked() {
-        // 同一个输入反复做，只有实际界面不变才会被守卫叫停；记录仍要脱敏
+        // Repeating the same input is only stopped by the guard when the actual screen does not change; the record is still redacted
         val m = FakeModel(reply(call("phone_type_text", """{"text":"hunter2"}""")), repeatLast = true)
         val ev = run(m, FakeScreen().apply { result = ActionResult.Ok(changed = false, secret = true) }).events
         val end = ev.last() as RunEvent.TaskEnded
@@ -218,7 +218,7 @@ class AgentLoopRecordTest {
         }
         val m = FakeModel(reply(call("phone_observe")), reply(call("phone_tap", """{"x":1,"y":1}""")), com.wangzan101.mika.core.testing.answerReply("x"))
         val texts = run(m, screen).events.filterIsInstance<RunEvent.Observed>()
-        // 读界面记一份(和账本里那一条一样,带编号);tap 带回的那一屏也记(见 actionReturnedScreenIsRecorded)
+        // A screen read is recorded once (the same as the ledger entry, with an id); the screen a tap brings back is recorded too (see actionReturnedScreenIsRecorded)
         assertEquals(1, texts[0].step)
         assertEquals(1, texts[0].id)
         assertEquals(Place.app("com.x"), texts[0].place)
@@ -235,7 +235,7 @@ class AgentLoopRecordTest {
             val sink = run(m, screen, vision = vision, inline = inline)
             val texts = sink.events.filterIsInstance<RunEvent.Observed>()
             assertEquals("inline=$inline vision=$vision", listOf("当前 App:com.x", "明天晴 25 度"), texts.single().text.lines())
-            // 评测取证据的口径能找到只出现在动作带回的屏幕里的答案
+            // The evaluation's evidence rules can find an answer that appears only in the screen an action brought back
             assertTrue(com.wangzan101.mika.core.eval.Checks.grounded("明天晴 25 度", com.wangzan101.mika.core.eval.RunFacts.evidence(sink.events, TOOLS, "", "明天晴 25 度"), 1))
         }
     }
@@ -253,7 +253,7 @@ class AgentLoopRecordTest {
         assertTrue(t.text.length <= EvidenceLedger.READ_CHARS)
     }
 
-    // 新记录里每条进账的观察都记下了:离线重建的账本和运行时的一模一样(读界面、动作带回的界面、命令输出、工具事实)
+    // Every observation that entered the ledger is recorded in the new record: the ledger rebuilt offline is identical to the runtime one (screen reads, screens returned by actions, command output, tool facts)
     @Test fun recordedObservationsRebuildTheSameLedger() {
         val sb = com.wangzan101.mika.core.cap.sandbox.FakeSandbox().apply {
             next = { r -> com.wangzan101.mika.core.cap.sandbox.CommandResult(0, false, false, 10, "共 42 行 ${r.argv}", 0, false) }
@@ -271,7 +271,7 @@ class AgentLoopRecordTest {
         val live = kotlinx.coroutines.runBlocking { tools.evidence(fresh = false) }.ledger.all
         assertTrue(live.size >= 3)
         assertEquals(live, com.wangzan101.mika.core.eval.RunFacts.ledger(sink.events, TOOLS).all)
-        // 每条都跟在读到它的那次调用的结果后面
+        // Each one follows the result of the call that read it
         val ev = sink.events
         ev.forEachIndexed { i, e -> if (e is RunEvent.Observed) assertTrue(ev[i - 1] is RunEvent.ToolResult || ev[i - 1] is RunEvent.Observed) }
     }
@@ -283,7 +283,7 @@ class AgentLoopRecordTest {
             com.wangzan101.mika.core.testing.answerReply("x"),
         )
         val ev = run(m).events
-        // 只有合法的上报记一条障碍,且紧跟它的工具结果
+        // Only a valid report records a barrier, and it follows right after its tool result
         val b = ev.filterIsInstance<RunEvent.Barrier>()
         assertEquals(listOf("access_blocked"), b.map { it.kind })
         val at = ev.indexOf(b.single())

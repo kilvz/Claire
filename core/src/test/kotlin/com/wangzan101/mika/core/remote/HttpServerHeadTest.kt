@@ -76,7 +76,7 @@ class HttpServerHeadTest {
         socket.connect(InetSocketAddress(loopback, port), 2_000)
         socket.soTimeout = 2_000
         socket.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
-        // 读取至连接关闭，同时验证 HEAD 没有正文和后续 GET 的完整响应。
+        // Read until the connection closes, which also verifies that HEAD has no body and that the following GET responds in full.
         socket.getInputStream().bufferedReader(Charsets.UTF_8).readText()
     }
 }

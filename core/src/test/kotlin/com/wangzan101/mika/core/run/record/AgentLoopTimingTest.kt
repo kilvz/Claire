@@ -33,7 +33,7 @@ class AgentLoopTimingTest {
     private fun call(name: String, args: String = "{}") = Part.ToolCall("t${++seq}", name, args)
     private fun reply(c: Part.ToolCall) = ModelReply(listOf(c), StopReason.ToolUse, null)
 
-    /** 每次调用把假时钟推进 [ms]。 */
+    /** Advances the fake clock by [ms] on every call. */
     private fun slow(inner: ChatModel, ms: Long) = object : ChatModel by inner {
         override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
             now += ms
@@ -63,7 +63,7 @@ class AgentLoopTimingTest {
         assertEquals("model", observe.source)
     }
 
-    // 等用户回答(ask_user)的时间不算进工具耗时:那是等人,不是 Claire 慢
+    // Time spent waiting for the user's answer (ask_user) does not count toward tool time: that is waiting on a person, not Claire being slow
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun durationMsExcludesUserWaits() = runTest {
         val m = FakeModel(reply(call("ask_user", """{"prompt":"发给谁?"}""")), com.wangzan101.mika.core.testing.answerReply("x"))
@@ -78,7 +78,7 @@ class AgentLoopTimingTest {
         assertEquals(0L, asked.durationMs)
     }
 
-    // 重试前花的时间(失败的那次请求和退避)单记 retryWaitMs,不算进这次回复的 latencyMs
+    // Time spent before a retry (the failed request and the backoff) is recorded separately as retryWaitMs and is not part of this reply's latencyMs
     @Test fun retryWaitSplitFromLatency() {
         var first = true
         val inner = FakeModel(com.wangzan101.mika.core.testing.answerReply("x"))
@@ -97,11 +97,11 @@ class AgentLoopTimingTest {
         val r = events.filterIsInstance<RunEvent.ModelReply>().single()
         assertEquals(1200L, r.latencyMs)
         assertEquals(500L, r.retryWaitMs)
-        // 到手时刻含之前的重试:用户在这时看到回答
+        // The arrival time includes the earlier retries: this is when the user saw the answer
         assertEquals(1700L, r.repliedAtMs)
     }
 
-    // 带调用的回复执行完才记;到手的时刻另记,第一次反馈按它算
+    // A reply with a tool call is recorded only after the call finishes; its arrival time is recorded separately, and first feedback is computed from it
     @Test fun replyArrivalRecordedBeforeToolTime() {
         val screen = object : ScreenPort by FakeScreen() {
             override suspend fun snapshot() = FakeScreen().snapshot().also { now += 300 }
@@ -113,7 +113,7 @@ class AgentLoopTimingTest {
         assertEquals(1000L, RunMetrics.of(events)!!.firstFeedbackMs)
     }
 
-    // 失败的结局带上类别
+    // A failed outcome carries its kind
     @Test fun failedEndCarriesItsKind() {
         val broken = object : ChatModel by FakeModel(com.wangzan101.mika.core.testing.answerReply("x")) {
             override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = throw ModelError.Auth()

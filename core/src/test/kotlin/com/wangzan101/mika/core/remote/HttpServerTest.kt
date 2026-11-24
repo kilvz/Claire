@@ -89,7 +89,7 @@ class HttpServerTest {
                 socket.connect(InetSocketAddress(loopback, server.port), 2_000)
                 socket.soTimeout = 2_000
                 socket.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
-                // 读取到服务端关闭连接;忽略 close 时会超时,不能只检查响应头。
+                // Read until the server closes the connection; if close is ignored this times out, so checking only the response headers is not enough.
                 socket.getInputStream().bufferedReader().readText()
             } finally {
                 server.stop()

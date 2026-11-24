@@ -20,11 +20,11 @@ class RunMetricsTest {
     private fun activity(at: Long, step: Int, kind: String, label: String, callId: String, source: String = "model") =
         RunEvent.Activity(at, step, kind, label, source = source, callId = callId)
 
-    /** 打开 App、读一屏、交回答:每一项都能对上。 */
+    /** Open an app, read a screen, deliver the answer: every field lines up. */
     @Test fun computesEachFieldFromASimpleRun() {
         val events = listOf(
             started(),
-            // 第 1 步:回复 3.2 秒时到手,执行完才记
+            // Step 1: the reply arrived at 3.2s and is recorded only after execution finishes
             result(3_900, 1, "phone_launch_app", 700, "c1"),
             activity(3_900, 1, "act", "phone_launch_app", "c1"),
             reply(3_900, 1, "phone_launch_app", latency = 2_000, repliedAt = 3_200, input = 1_000, output = 50, cached = 600),
@@ -119,7 +119,7 @@ class RunMetricsTest {
     @Test fun firstFeedbackSkipsRejectedLightRepliesAndUsesReplyArrival() {
         val m = RunMetrics.of(listOf(
             started(1_000),
-            // 轻量模型的回复改派掉了,用户没看到
+            // The lightweight model's reply was reassigned, so the user never saw it
             reply(1_500, 1, "phone_tap", role = "light_rejected"),
             result(4_000, 1, "phone_observe", 500, "c1"),
             activity(4_000, 1, "observe", "phone_observe", "c1"),
@@ -148,7 +148,7 @@ class RunMetricsTest {
         assertEquals(0, m.modelCalls)
     }
 
-    /** 一批动作:外层的耗时含子步,子步里的读计入读,其余算操作,不重复计。 */
+    /** A batch of actions: the outer duration covers the inner steps, reads inside them count as reads and the rest as actions, never double-counted. */
     @Test fun batchSplitsItsInnerStepsWithoutDoubleCounting() {
         val m = RunMetrics.of(listOf(
             started(0),
@@ -165,7 +165,7 @@ class RunMetricsTest {
         assertEquals(1, m.actCalls)
     }
 
-    /** 一批里各步做完后按条件等界面的时间(外层的 waitMs)算等待,落在其他里,不算操作。 */
+    /** Inside a batch, time spent waiting on the screen after each step per the conditions (the outer waitMs) counts as waiting, lands in other, and is not counted as acting. */
     @Test fun batchConditionWaitsAreWaitingNotActing() {
         val m = RunMetrics.of(listOf(
             started(0),
@@ -194,7 +194,7 @@ class RunMetricsTest {
     }
 
     @Test fun pacedDwellCountsAsWaitNotAction() {
-        // 网页换页前补的停留记在 waitMs:算等待,不算操作
+        // The dwell added before a web page turn is recorded in waitMs: it counts as waiting, not acting
         val m = RunMetrics.of(listOf(
             started(0),
             result(5_000, 1, "web_tap", 5_000, "c1", wait = 4_000),
@@ -222,7 +222,7 @@ class RunMetricsTest {
         assertEquals(4, m.allHttpCalls)
         assertEquals(900L, m.allInputTokens)
         assertEquals(30L, m.allOutputTokens)
-        // 收尾后的那一条不改总时长
+        // The entry after the wrap-up does not change the total duration
         assertEquals(100L, m.totalMs)
     }
 
