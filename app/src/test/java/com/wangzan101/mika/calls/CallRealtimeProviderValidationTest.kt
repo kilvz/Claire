@@ -10,7 +10,7 @@ class CallRealtimeProviderValidationTest {
         var dials = 0
         val failure = runCatching {
             val provider = ProfileRealtimeProvider()
-            provider.validate(CallVoiceProfile(), "x".repeat(16_385))
+            provider.validate(CallVoiceProfile(), "x".repeat(VolcRealtimeProtocol.MAX_PROMPT_CHARS + 1))
             startCallSession(CallDirection.OUTGOING, connect = { Unit }, awaitCarrier = { dials++ })
         }.exceptionOrNull()
         assertTrue(failure is IllegalArgumentException)

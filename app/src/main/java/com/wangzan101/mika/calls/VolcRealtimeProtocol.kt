@@ -35,7 +35,7 @@ data class VolcRealtimeConfig(
         const val DEFAULT_SPEAKER = "zh_female_vv_jupiter_bigtts"
         // English call instructions are longer than the earlier Chinese ones; this still covers the largest task plus
         // the largest saved notes and owner rules that CallPolicy and CallSettings allow.
-        private const val MAX_PROMPT_CHARS = 24_000
+        internal const val MAX_PROMPT_CHARS = 24_000
     }
 }
 
