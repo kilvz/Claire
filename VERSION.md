@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.1.2 (versionCode 64)
+- **Claire version:** 2.1.3 (versionCode 65)
 - **Base version:** upstream Mika 0.1.51 (commit `a85b8a7b`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -91,6 +91,15 @@ recorded base version.
   finished test shows the transcript. When Google's speech app is
   installed but Android offers no recognition service, the missing-voice
   sheet opens its settings instead of a store page that says Installed.
+- 2.1.3: built-in speech recognition now uses a Google recognizer that is
+  installed even when the phone has no default recognition service set,
+  instead of showing install instructions. It looks for the service in
+  Speech Recognition & Synthesis, the Google app and Android System
+  Intelligence, tries them by name when Android offers no default, and
+  moves on to the next one when the current one fails. On-device speech
+  models load in the background, so the listening card appears at once
+  instead of the voice button freezing while a large model loads, and
+  speech from that moment is kept.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

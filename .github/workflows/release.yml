@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.1.2: the multilingual on-device speech model now loads as the zipformer2 export it is, so testing or using it no longer closes the app. A model download keeps running when you leave the page, and once the bytes arrive it shows an unpacking step instead of a progress bar that looks stuck at 100%; the speech test waits for that to finish instead of saying the model is missing. While a test is listening, microphone updates no longer replace the words already on screen, and a finished test shows what the recognizer heard. If Google's speech app is installed but Android offers no recognition service, the missing-voice sheet now opens that app's settings instead of a Play Store page that already says Installed.
+            New in 2.1.3: built-in speech recognition now uses a Google recognizer that is installed even when the phone has no default recognition service set, instead of showing install instructions — it looks for the service in Speech Recognition & Synthesis, the Google app and Android System Intelligence, tries them by name when Android offers no default, and moves on to the next one when the current one fails. On-device speech models load in the background, so the listening card appears at once instead of the voice button freezing while a large model loads, and speech from that moment is kept.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
