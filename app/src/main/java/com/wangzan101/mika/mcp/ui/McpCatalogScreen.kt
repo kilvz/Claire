@@ -51,8 +51,8 @@ import com.wangzan101.mika.memory.ui.Link
 import com.wangzan101.mika.ui.Route
 
 /**
- * 目录的粗分类:25 个细分 key 归并成约 10 个粗类,stdio(在本机运行)单独一类。
- * 粗类只决定「服务放哪个分类页」;细分 key 仍留在目录数据里,不影响连接。
+ * Coarse categories of the catalog: the 25 fine-grained keys are merged into about 10 coarse categories, with stdio (running on this device) as its own category.
+ * The coarse category only decides which category page a service is placed on; the fine-grained key stays in the catalog data and does not affect connecting.
  */
 internal object McpCategory {
     const val ALL = "all"
@@ -67,7 +67,7 @@ internal object McpCategory {
     const val MAPS = "maps"
     const val LOCAL = "local"
 
-    /** 分类胶囊顺序(不含「全部」,它固定在最前)。 */
+    /** Order of the category pills (excluding "All", which is always pinned first). */
     val order = listOf(AI, DATA, DEV, COMM, PROD, DESIGN, CLOUD, WEB, MAPS, LOCAL)
 
     private val fineToCoarse = mapOf(
@@ -114,7 +114,7 @@ internal object McpCategory {
     }
 }
 
-/** 设置 › MCP 服务器 › 服务目录:搜索、按粗分类筛选、点开一条进引导式连接;自定义入口始终可见。 */
+/** Settings › MCP servers › Service catalog: search, filter by coarse category, tap an entry for the guided connection; the custom entry is always visible. */
 @Composable
 fun McpCatalogScreen(
     catalog: McpCatalog,
@@ -201,7 +201,7 @@ private fun CategoryChips(selected: String, onSelect: (String) -> Unit) {
     }
 }
 
-/** 一张卡拆成懒加载的行时,每行的圆角:首行上圆、末行下圆。 */
+/** Corner shape for each row when a card is split into lazily loaded rows: rounded on top for the first row and on the bottom for the last row. */
 private fun rowShape(i: Int, n: Int): RoundedCornerShape {
     val r = MikaRadius.Card
     return RoundedCornerShape(

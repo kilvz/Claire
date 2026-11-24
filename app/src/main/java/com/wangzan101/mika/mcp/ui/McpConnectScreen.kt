@@ -45,7 +45,7 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 设置 › MCP 服务器 › 引导式连接:只呈现预设声明的字段,连接/授权/确认包/成功/失败按 [McpConnectorState]。 */
+/** Settings › MCP servers › Guided connection: exposes only the fields a preset declares; connecting/authorizing/package confirmation/success/failure follow [McpConnectorState]. */
 @Composable
 fun McpConnectScreen(
     connector: McpConnectorState,

@@ -49,7 +49,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.launch
 
-/** 设置 › MCP 服务器 › 自定义服务器:完整自定义 HTTP/SSE/stdio,含多请求头与折叠的高级数值项。 */
+/** Settings › MCP servers › Custom server: fully custom HTTP/SSE/stdio, including multiple request headers and collapsible advanced numeric fields. */
 @Composable
 fun McpCustomServerScreen(
     store: McpServerStore,
@@ -111,7 +111,7 @@ fun McpCustomServerScreen(
         } else {
             store.update(cfg).also {
                 if (it.isSuccess) {
-                    // 传输/认证切换时清掉不再适用的旧秘密,避免残留。
+                    // When the transport/auth switches, clear old secrets that no longer apply so nothing is left behind.
                     when {
                         cfg.transport == "stdio" -> {
                             store.setToken(cfg.id, null)

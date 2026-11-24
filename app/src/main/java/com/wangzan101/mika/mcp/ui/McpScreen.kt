@@ -60,7 +60,7 @@ import com.wangzan101.mika.device.ui.DeviceAccessSection
 import com.wangzan101.mika.memory.ui.Link
 import com.wangzan101.mika.settings.ui.RelaySection
 
-/** 展示现有连接状态,不把启用开关或监听端口当作电脑已连接。刷新仍只在本页,沿用两秒间隔。 */
+/** Shows the existing connection state, and does not treat the enabled switch or the listening port as the computer being connected. Refreshing stays on this page only, at the same two-second interval. */
 @Composable
 fun McpScreen(runtime: McpRuntime, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -111,7 +111,7 @@ fun McpScreen(runtime: McpRuntime, onBack: () -> Unit) {
     )
 }
 
-/** 一份只读页面快照。引导选择和折叠状态不写入连接设置。 */
+/** A read-only snapshot for the page. The guided selection and collapsed state are not written into the connection settings. */
 internal data class ComputerAccessUi(
     val server: McpServerState,
     val networkEnabled: Boolean,
@@ -178,7 +178,7 @@ internal fun ComputerAccessPage(
                 }
                 ListRow(
                     MikaIcons.Link, stringResource(R.string.mcp_port_title), ui.port.toString(),
-                    // 端口被占时换一个;改动即重绑并按新端口重写电脑上的连接脚本
+                    // Pick another one when the port is taken; any change immediately rebinds and rewrites the connection script on the computer for the new port
                     onClick = { editingPort = true },
                 )
             }
@@ -199,7 +199,7 @@ internal fun ComputerAccessPage(
     }
 }
 
-/** 监听端口的编辑:默认 8765 一个快捷项,别的口在输入框里填(1024–65535)。 */
+/** Editing the listening port: one shortcut for the default 8765, other ports are entered in the text field (1024–65535). */
 @Composable
 private fun PortDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
     var custom by remember { mutableStateOf(if (current != McpSettings.DEFAULT_PORT) current.toString() else "") }
@@ -324,7 +324,7 @@ private fun NetworkGuide(ui: ComputerAccessUi, mcp: Boolean, onNetworkEnabled: (
                 kind = ButtonKind.Text, size = ButtonSize.Small)
         }
         if (preview) {
-            // 预览只用占位符;真实令牌只在用户点击复制时进入剪贴板。
+            // The preview uses placeholders only; the real token reaches the clipboard only when the user taps copy.
             val config = McpRuntime.clientConfig(address?.let { McpRuntime.url(it, ui.port) } ?: "<address>", "<token>")
             CommandText(config, Modifier.testTag("computer-config-preview"))
         }

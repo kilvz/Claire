@@ -33,7 +33,7 @@ import com.wangzan101.mika.memory.ui.Link
 
 private enum class McpRoute { List, Catalog, Connect, Manage, Custom }
 
-/** 设置 › MCP 服务器:连接外部 MCP server(outbound),和「连接电脑」的 inbound 设置分开。 */
+/** Settings › MCP servers: connect to external MCP servers (outbound), kept separate from the inbound "connect the computer" settings. */
 @Composable
 fun McpServersScreen(store: McpServerStore, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()

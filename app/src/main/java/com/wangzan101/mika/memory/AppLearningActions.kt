@@ -6,7 +6,7 @@ import com.wangzan101.mika.chat.ui.LearningActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** 结果卡片上记忆与技能提示的按钮,作用在进程内同一份记忆与个人技能([memory])上;读写都在后台线程。 */
+/** The memory and skill hint buttons on the result card; they act on the same in-process memory and personal skills ([memory]); reads and writes both happen on a background thread. */
 class AppLearningActions(private val context: Context, private val memory: MemoryRuntime) : LearningActions {
     private val store get() = memory.store()
     private val skills get() = memory.skills()
@@ -17,7 +17,7 @@ class AppLearningActions(private val context: Context, private val memory: Memor
     override suspend fun approve(pendingId: String) = io { store.approve(pendingId) }
     override suspend fun forget(memoryId: String) = io { store.forget(memoryId).isSuccess }
     override fun viewSkill(draftId: String) = memory.requestOpen(MemoryOpen(draftId))
-    // 恢复时清掉旧结果,免得下一次一不顺又马上被停用
+    // Clear the old result on restore, so that the next hiccup does not get it disabled again right away
     override suspend fun restoreSkill(name: String) {
         io { skills.update(name) {
             it.copy(status = it.restoredStatus(), outcomes = emptyList())

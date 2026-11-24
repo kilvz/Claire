@@ -13,8 +13,8 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 
 /**
- * 分享前把工作区里的音频复制到「下载/Claire/share」:MediaStore 的 content URI 可以被对方 App 读取,
- * 不需要 FileProvider 或存储权限。复制出来的是独立的一份,任务结束、工作区被清理后对方仍能读。
+ * Before sharing, copies the audio from the workspace to "Downloads/Claire/share": the MediaStore content URI can be read by the receiving app,
+ * with no FileProvider or storage permission needed. The copy is independent, so the other side can still read it after the task ends and the workspace is cleaned up.
  */
 class AudioShareExporter(private val context: Context) {
     suspend fun save(bytes: ByteArray, mime: String, name: String): ShareableFile = withContext(Dispatchers.IO) {
@@ -48,7 +48,7 @@ class AudioShareExporter(private val context: Context) {
         ShareableFile(uri, mime)
     }
 
-    /** 删掉上次进程留下的、没写完的分享副本;启动时调用。 */
+    /** Deletes half-written share copies left by the previous process; called at startup. */
     fun cleanPending() {
         val resolver = context.contentResolver
         val args = Bundle().apply {

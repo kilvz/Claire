@@ -18,8 +18,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * 音频能力的手机实现:模型调用直接用 [model];合成结果经工作区文件闸门写进 `out/audio/`;
- * 存音乐库走 [AudioExporter](MediaStore Music/Claire,不需要存储权限)。
+ * Phone implementation of the audio capability: model calls use [model] directly; synthesis results are written into `out/audio/` through the workspace file gate;
+ * saving to the music library goes through [AudioExporter] (MediaStore Music/Claire, no storage permission needed).
  */
 class AndroidAudioPort(
     private val context: Context,

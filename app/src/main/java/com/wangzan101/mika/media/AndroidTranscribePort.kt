@@ -24,8 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 转写能力的手机实现:从工作区经文件闸门读音频。
- * 迁移后只使用目录里当前批量 STT 的显式协议;系统识别和流式 ASR 仍不接文件。
+ * Phone implementation of the transcription capability: reads audio from the workspace through the file gate.
+ * After the migration it only uses the explicit protocol of the current batch STT in the catalog; system recognition and streaming ASR still do not accept files.
  */
 class AndroidTranscribePort(
     private val context: Context,

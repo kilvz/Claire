@@ -15,14 +15,14 @@ import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.task.TaskService
 
 /**
- * 电脑连接打开期间的前台服务:只为让进程在后台活着、端口一直开着;收到的任务照旧交给 [TaskService] 去跑。
- * 任务服务没任务时会自己退出,所以监听不放在它里面。常驻通知上能直接关掉电脑连接(两种都关)。
- * 被系统回收后会重建(START_STICKY);开关都关了就当场退出。
+ * Foreground service that runs while computer access is on: it only keeps the process alive in the background and the port open; incoming tasks are still handed to [TaskService] to run.
+ * The task service exits by itself when it has no tasks, so listening does not live inside it. The ongoing notification can turn computer access off directly (turning both kinds off).
+ * It is recreated after being reclaimed by the system (START_STICKY); when all switches are off it exits on the spot.
  *
- * 电脑经 USB 调试打开、关掉 USB 方式也是起这个服务:清单里它对外开放,但要求调用方持有
- * INTERACT_ACROSS_USERS_FULL。这个权限 shell 有,普通 App 拿不到(只给系统签名和安装器,adb 也授不了),
- * 所以只有 `adb shell am start-foreground-service` 这样以 shell 身份发起的才起得了;Claire 自己起不受限。
- * 以前台服务的方式起:安卓 12 起后台的 App 一般不能自己开前台服务,但由 shell 发起的启动不在此限。
+ * Turning the USB mode on and off from the computer over USB debugging also starts this service: it is exported in the manifest, but the caller must hold
+ * INTERACT_ACROSS_USERS_FULL. The shell has this permission, ordinary apps cannot get it (it is only granted to system signatures and the installer, and adb cannot grant it either),
+ * so only a start issued as the shell, such as `adb shell am start-foreground-service`, can bring it up; Claire starting it itself is not restricted.
+ * Started as a foreground service: since Android 12 background apps generally cannot start foreground services themselves, but starts issued by the shell are exempt.
  */
 class McpService : Service() {
     private val runtime get() = (application as MikaApp).mcp
@@ -34,7 +34,7 @@ class McpService : Service() {
         val quitting = FeatureFlags.get(this).quitRequested()
         val applied = !quitting && runCatching { McpModes.apply(intent?.action, runtime.settings, runtime.usb, runtime.relaySettings) }
             .onFailure { Log.w("MikaMcp", "could not update computer access settings", it) }.isSuccess
-        // startForegroundService 之后必须尽快进前台,哪怕马上就要退出;系统不让进前台时就此退出,不让进程崩
+        // After startForegroundService the service must enter the foreground as soon as possible, even if it is about to exit; if the system refuses the foreground, exit right there instead of letting the process crash
         val foreground = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -82,7 +82,7 @@ class McpService : Service() {
     }
 
     companion object {
-        /** 和任务通知(槽位编号、结果编号段)错开。 */
+        /** Kept clear of the task notifications (slot numbers, result ID ranges). */
         private const val NOTIFICATION_ID = 30_001
     }
 }

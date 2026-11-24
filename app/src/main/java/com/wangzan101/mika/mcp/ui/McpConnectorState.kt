@@ -12,12 +12,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 引导式接入的连接阶段。目录浏览与连接编排的状态机,UI 只读这份状态、不自行拼装 URL/header/argv。 */
+/** Connection stages of the guided setup. The state machine for catalog browsing and connection orchestration; the UI only reads this state and does not assemble URLs/headers/argv on its own. */
 sealed interface McpConnectStage {
-    /** 正在浏览目录(或未打开任何预设)。 */
+    /** Browsing the catalog (or no preset has been opened). */
     data object Browsing : McpConnectStage
 
-    /** 已打开某个预设:填字段 / 授权 / 确认 stdio 包 / 等待连接。 */
+    /** A preset has been opened: fill in fields / authorize / confirm the stdio package / wait for the connection. */
     data class Form(
         val preset: McpPreset,
         val values: Map<String, String>,
@@ -27,13 +27,13 @@ sealed interface McpConnectStage {
         val error: String?,
     ) : McpConnectStage
 
-    /** 连接成功并启用;tools 来自真实工具目录。 */
+    /** Connected successfully and enabled; tools come from the real tool catalog. */
     data class Connected(val config: McpServerConfig, val tools: List<String>) : McpConnectStage
 }
 
 /**
- * 把目录预设编排成现有 [McpServerStore] 的连接路径:填字段 →(必要时授权/确认包)→ 连接并读取工具。
- * 秘密只经 store 的加密存储,不进这份状态之外的任何日志或普通配置。
+ * Orchestrates a catalog preset into the existing [McpServerStore] connection path: fill in fields → (authorize / confirm the package if needed) → connect and read tools.
+ * Secrets only go through the store's encrypted storage and never into any log or plain config outside this state.
  */
 class McpConnectorState(
     private val store: McpServerStore,
@@ -43,11 +43,11 @@ class McpConnectorState(
     private val _stage = MutableStateFlow<McpConnectStage>(McpConnectStage.Browsing)
     val stage: StateFlow<McpConnectStage> = _stage.asStateFlow()
 
-    /** 进行中的连接/授权任务;测试用 join 等待落定,UI 用 [cancel] 中止。 */
+    /** The in-flight connection/authorization job; tests wait for it to settle with join, the UI aborts it with [cancel]. */
     internal var inFlight: Job? = null
         private set
 
-    /** 打开预设,只呈现该预设声明的字段;stdio 含包且尚未确认时进入待确认。重新打开同一预设保留未提交的非秘密草稿,秘密草稿丢弃。 */
+    /** Open a preset, exposing only the fields that preset declares; when stdio includes a package that has not been confirmed yet, enter the pending-confirmation stage. Reopening the same preset keeps uncommitted non-secret drafts and drops secret drafts. */
     fun openPreset(id: String) {
         cancel()
         val preset = catalog.presets.find { it.id == id } ?: return
@@ -67,7 +67,7 @@ class McpConnectorState(
         }
     }
 
-    /** 更新字段:秘密字段与普通字段分开存放,秘密永不进入普通配置。 */
+    /** Update a field: secret fields and ordinary fields are stored separately, and secrets never enter the plain config. */
     fun updateField(id: String, value: String) {
         val form = _stage.value as? McpConnectStage.Form ?: return
         val isSecret = form.preset.fields.any { it.id == id && it.secret }
@@ -78,14 +78,14 @@ class McpConnectorState(
         }
     }
 
-    /** 确认 stdio 包(名 + 精确版本 + 来源)后继续连接。 */
+    /** Confirm the stdio package (name + exact version + source) and then continue connecting. */
     fun confirmPackage() {
         val form = _stage.value as? McpConnectStage.Form ?: return
         form.preset.packageSpec?.let { store.acceptPackage(it) }
         connect()
     }
 
-    /** 无认证 / API Key / stdio(已确认包)的连接入口。OAuth 用 [authorize]。 */
+    /** Connection entry point for no auth / API key / stdio (with the package already confirmed). For OAuth use [authorize]. */
     fun connect() {
         val form = _stage.value as? McpConnectStage.Form ?: return
         val preset = form.preset
@@ -107,7 +107,7 @@ class McpConnectorState(
         }
     }
 
-    /** OAuth:保存配置后走现有发现/注册/PKCE 流程;回调拿到令牌后自动读取工具目录。重试/重新授权复用同一 config id,不产生重复条目。 */
+    /** OAuth: after saving the config, go through the existing discovery/registration/PKCE flow; once the callback obtains a token, read the tool catalog automatically. Retry/re-authorization reuse the same config id and do not create duplicate entries. */
     fun authorize(openBrowser: (String) -> Unit) {
         val form = _stage.value as? McpConnectStage.Form ?: return
         val preset = form.preset
@@ -132,12 +132,12 @@ class McpConnectorState(
         }
     }
 
-    /** 失败后重试:走原预设的当前字段与已确认状态。 */
+    /** Retry after a failure: uses the original preset's current fields and confirmed state. */
     fun retry() = connect()
 
     /**
-     * 只替换 [secrets] 中非空字段的秘密;空值保留原秘密。只写加密存储,不进普通配置。
-     * 未在预设快照里声明的字段被忽略,防止把任意键写成秘密。
+     * Replaces secrets only for the non-empty entries in [secrets]; empty values keep the previous secret. Only writes to encrypted storage, never to the plain config.
+     * Fields not declared in the preset snapshot are ignored, so arbitrary keys cannot be written as secrets.
      */
     fun replaceSecrets(config: McpServerConfig, secrets: Map<String, String>) {
         val declared = config.presetSnapshot?.fields?.filter { it.secret }?.map { it.id }?.toSet()
@@ -148,7 +148,7 @@ class McpConnectorState(
         }
     }
 
-    /** 取消进行中的连接/下载;草稿(非秘密输入)保留在 Form 里。 */
+    /** Cancel the in-flight connection/download; drafts (non-secret input) stay in the Form. */
     fun cancel() {
         inFlight?.cancel()
         inFlight = null
@@ -156,7 +156,7 @@ class McpConnectorState(
         if (form.connecting) _stage.value = form.copy(connecting = false)
     }
 
-    /** 返回目录浏览。 */
+    /** Return to catalog browsing. */
     fun close() {
         cancel()
         _stage.value = McpConnectStage.Browsing
@@ -170,11 +170,11 @@ class McpConnectorState(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // 缺失必填字段等预检错误也以失败态呈现,不冒泡崩溃。
+                // Precheck errors such as missing required fields are also presented as a failure state instead of bubbling up and crashing.
                 form.copy(connecting = false, error = e.message ?: e.javaClass.simpleName)
             }
             _stage.value = if (result is McpConnectStage.Form) {
-                // 连接期间字段仍可编辑;落定时把当前草稿(非秘密值 + 秘密值 + 包确认态)带回来,别用点击瞬间的旧快照覆盖编辑。
+                // Fields remain editable while connecting; when it settles, carry the current draft (non-secret values + secret values + package confirmation state) forward, and do not overwrite edits with the stale snapshot from the moment of the click.
                 val current = _stage.value as? McpConnectStage.Form
                 result.copy(
                     values = current?.values ?: result.values,

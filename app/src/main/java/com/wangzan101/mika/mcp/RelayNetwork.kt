@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 
-/** 只在远程访问开启期间观察默认网络,不创建 VPN、不绑定或改变其他模块的网络。 */
+/** Only observes the default network while remote access is on; does not create a VPN, bind, or otherwise change networking for other modules. */
 internal class RelayNetwork(context: Context, private val changed: () -> Unit) {
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
     private var callback: ConnectivityManager.NetworkCallback? = null

@@ -24,9 +24,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * 图片能力的手机实现:模型调用直接用 [model];产物经工作区文件闸门写进 `out/images/`;
- * 存相册走 [ImageExporter](MediaStore Pictures/Claire,不需要存储权限)。
- * [onGenerated]/[onSaved] 把结果交给任务,聊天里据此出现照片格子与「已存入相册」卡片。
+ * Phone implementation of the image capability: model calls use [model] directly; artifacts are written into `out/images/` through the workspace file gate;
+ * saving to the gallery goes through [ImageExporter] (MediaStore Pictures/Claire, no storage permission needed).
+ * [onGenerated]/[onSaved] hand the result to the task, which is how the photo tile and the "saved to gallery" card appear in the chat.
  */
 class AndroidImagePort(
     private val context: Context,
@@ -90,7 +90,7 @@ class AndroidImagePort(
         }
     }
 
-    /** `/workspace/...` → 工作区里的相对路径;越界、空段、`.`、`..` 都不收。 */
+    /** `/workspace/...` → the relative path inside the workspace; rejects escapes, empty segments, `.` and `..`. */
     private fun relative(path: String): String? {
         val prefix = SandboxPaths.WORKSPACE + "/"
         val p = path.trim()
@@ -101,7 +101,7 @@ class AndroidImagePort(
         return rel
     }
 
-    /** 文件名提示:去掉路径分隔符等危险字符,没有扩展名时按图片类型补上。 */
+    /** Filename hint: strips dangerous characters such as path separators, and appends an extension based on the image type when there is none. */
     private fun baseName(hint: String?, prompt: String, mime: String): String {
         val raw = hint?.takeIf { it.isNotBlank() } ?: prompt.lineSequence().firstOrNull().orEmpty().take(24)
         val safe = Attachments.safeName(raw).ifBlank { "image" }

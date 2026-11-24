@@ -48,7 +48,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import kotlinx.coroutines.launch
 import com.wangzan101.mika.memory.ui.Link
 
-/** 设置 › MCP 服务器 › 服务管理:查看真实工具、启停、重新测试、重新授权、替换凭据、删除。 */
+/** Settings › MCP servers › Server management: view real tools, start/stop, retest, re-authorize, replace credentials, delete. */
 @Composable
 fun McpServerManageScreen(
     store: McpServerStore,

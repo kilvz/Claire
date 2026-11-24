@@ -29,8 +29,8 @@ internal suspend fun readAloud(
 }
 
 /**
- * 迁移后的朗读入口:模型从目录解析、经同一控制器/注册表创建,音色/语速/流式偏好留在 [settings]。
- * 未选模型、关闭总开关或文本为空时静默跳过;解析失败抛给调用方显示。
+ * Post-migration read-aloud entry point: the model is resolved from the catalog and created through the same controller/registry; voice/speed/streaming preferences stay in [settings].
+ * Silently skips when no model is selected, the master switch is off, or the text is empty; resolution failures are thrown to the caller for display.
  */
 internal suspend fun readAloudMigrated(
     text: String,

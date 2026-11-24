@@ -12,8 +12,8 @@ import kotlinx.serialization.json.Json
 import com.wangzan101.mika.settings.ui.models.use
 
 /**
- * 一个品牌标志:24×24 视口里的若干 path(`d` 为旧版单 path 写法)、图形颜色、填充规则。
- * [tile] 是太亮的品牌色:此时它做底色、图形用深色;为空则用默认浅色底。
+ * A brand logo: several paths in a 24×24 viewport (`d` is the legacy single-path form), the drawing color, and the fill rule.
+ * [tile] is for brand colors that are too bright: then it serves as the background color and the drawing uses a dark color; when null, the default light background is used.
  */
 @Serializable
 data class McpLogoData(
@@ -30,13 +30,13 @@ data class McpLogoData(
 private data class McpLogosDto(val formatVersion: Int, val logos: Map<String, McpLogoData>)
 
 /**
- * 品牌 logo 资产:解析 `assets/mcp/mcp-logos.json`,把每个品牌的 path + 官方品牌色懒加载成
- * 自着色的 [ImageVector](不引图片加载库)。`logo(id)` 未命中返回 null,由调用方退回分类图标。
+ * Brand logo assets: parses `assets/mcp/mcp-logos.json` and lazily turns each brand's paths + official brand color into
+ * a self-tinted [ImageVector] (no image loading library). `logo(id)` returns null on a miss, and the caller falls back to the category icon.
  */
 class McpLogos private constructor(private val logos: Map<String, McpLogoData>) {
     private val cache = mutableMapOf<String, ImageVector?>()
 
-    /** 有品牌标时它的底色(品牌自带的亮色底,否则默认浅色底);没有品牌标返回 null。 */
+    /** The background color when a brand logo exists (the brand's own light backdrop if it has one, otherwise the default light background); null when there is no brand logo. */
     fun tile(id: String): Color? {
         val data = logos[id] ?: return null
         return data.tile?.let(::parseColor) ?: DefaultTile
@@ -64,10 +64,10 @@ class McpLogos private constructor(private val logos: Map<String, McpLogoData>) 
         private val json = Json { ignoreUnknownKeys = true }
         private val hex = Regex("^#?[0-9A-Fa-f]{6}$")
 
-        /** 品牌标的默认底:两种模式都用固定浅色,深色品牌标在深色模式下也可读(生成器按它算对比度)。 */
+        /** Default backdrop for brand logos: a fixed light color in both modes, so dark brand marks stay readable in dark mode (the generator computes contrast against it). */
         val DefaultTile = Color(0xFFF4F4F5)
 
-        /** 宽松解析:整体损坏返回空;单条没有 path 或 color 非法则跳过该条。 */
+        /** Lenient parsing: returns empty if the whole payload is corrupted; skips individual entries that have no path or an invalid color. */
         fun parse(text: String): McpLogos = try {
             val dto = json.decodeFromString<McpLogosDto>(text)
             McpLogos(dto.logos.filterValues { it.allPaths.isNotEmpty() && hex.matches(it.color) && (it.tile == null || hex.matches(it.tile)) })
