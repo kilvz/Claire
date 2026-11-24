@@ -26,20 +26,20 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 读屏时经 DevTools 会话给页面脚本的元素表补无障碍信息,再交给 [ElementFusion] 合并。
+ * During observation, adds accessibility information to the page script's element table through the DevTools session, then hands it to [ElementFusion] to merge.
  *
- * 换节点号的做法:页面脚本本来就按编号表留着元素引用,让它把这张表原样交出(一次 Runtime.evaluate 拿到数组对象,
- * 一次 Runtime.getProperties 拆出每个元素的对象引用),再并发 DOM.describeNode 换成 backendNodeId。
- * 不往页面写标记(不触发页面和我们自己的变化计数),不取整棵 DOM.getDocument(大页面上几 MB),
- * 也不靠坐标命中(命中的常是按钮里的文字子元素,要再往上找)。N 个 describeNode 同时发出,往返只算一轮。
+ * How node ids are obtained: the page script already keeps element references by ref, so have it hand that table over as-is (one Runtime.evaluate gets the array object,
+ * one Runtime.getProperties unwraps each element's object reference), then concurrently DOM.describeNode to turn them into backendNodeIds.
+ * No markers are written into the page (so neither the page's nor our own change counters fire), the whole DOM.getDocument is not fetched (several MB on large pages),
+ * and coordinate hit-testing is not relied on (a hit is often the text child inside a button, and one would have to walk upwards). N describeNode calls go out at once, so only one round trip is counted.
  *
- * 之后:Page.getFrameTree → 每帧 Accessibility.getFullAXTree(frameId)(跨源框架和主文档在同一目标里,按帧取);
- * 只有无障碍树有的候选:DOM.getBoxModel 取框、DOM.getNodeForLocation 确认在最上面;
- * 不可点的文字、图片:DOMDebugger.getEventListeners 看有没有点击类监听器。
- * 整个过程限时 [timeoutMs];超时、出错都返回 [Outcome.Skipped],调用方照用页面脚本的结果。
+ * Afterwards: Page.getFrameTree → Accessibility.getFullAXTree(frameId) per frame (cross-origin frames and the main document are in the same target, fetched per frame);
+ * for candidates only in the accessibility tree: DOM.getBoxModel for the box and DOM.getNodeForLocation to confirm they are on top;
+ * for non-clickable text and images: DOMDebugger.getEventListeners to see whether there are click-type listeners.
+ * The whole process is bounded by [timeoutMs]; on timeout or error it returns [Outcome.Skipped] and the caller uses the page script's result as-is.
  */
 class ElementProbe(private val session: CdpSession, private val timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
-    // 单个调用的上限放宽些:总时限先到,整次放弃,而不是某一步超时后带着残缺的数据往下走
+    // The per-call limit is a bit looser: the overall deadline fires first and abandons the whole attempt, rather than one step timing out and continuing with incomplete data
     private val callTimeoutMs = timeoutMs + 1_000
     sealed interface Outcome {
         class Fused(val result: ElementFusion.Result, val anchors: Map<String, Anchor>, val stats: String) : Outcome
@@ -47,14 +47,14 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
     }
 
     /**
-     * 只有无障碍树有的元素,点之前重新找它用:[hits] 是它自己和子孙的节点号(命中这些都算点到它),
-     * [ownerId] 是所在框架元素的节点号(框若按框架内坐标给出,用它换算)。
+     * For elements only in the accessibility tree, to find them again before clicking: [hits] are the node ids of the element itself and its descendants (a hit on any of them counts as hitting it),
+     * [ownerId] is the node id of the containing frame element (used to convert coordinates when the box is given in frame-local coordinates).
      */
     data class Anchor(val backendId: Int, val hits: Set<Int>, val ownerId: Int?)
 
     /**
-     * 找到的位置(顶层视口 CSS 像素):[box] 整个框,([x],[y]) 是框在可见范围里那部分的中心(点它就点这里);
-     * [onTop] 命中检测结果,检测不了为 null。
+     * Where it was found (top-level viewport CSS pixels): [box] is the whole box, ([x],[y]) is the center of the part of the box inside the visible range (clicking it clicks there);
+     * [onTop] is the hit test result, null when it cannot be determined.
      */
     data class Placed(val box: ElementFusion.Box, val onTop: Boolean?, val x: Double = box.cx, val y: Double = box.cy)
 
@@ -62,7 +62,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
 
     private class Skip(message: String) : Exception(message)
 
-    /** [refNodes] 是在页面主环境里求值、返回本次编号表元素数组的表达式;[scale] 是 CSS 像素 → 视图像素。 */
+    /** [refNodes] is the expression evaluated in the page's main world that returns the array of elements in this ref table; [scale] is CSS pixels → view pixels. */
     suspend fun enrich(page: ScreenSnapshot, refNodes: String, scale: Double): Outcome {
         val started = System.nanoTime()
         return try {
@@ -90,7 +90,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
         val frameList = frames.await()
         val owners = HashMap<Int, String>()
         refs.forEach { r -> if (r.backendId != null && r.frameId != null) owners[r.backendId] = r.frameId }
-        // describeNode 没给出框架号的,反过来按帧问它的框架元素
+        // For ones where describeNode gave no frame id, ask for their frame owner per frame instead
         val known = owners.values.toSet()
         frameList.drop(1).filter { it.id !in known }.take(MAX_FRAMES).map { f ->
             async { frameOwner(f.id)?.let { it to f.id } }
@@ -128,7 +128,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
         Outcome.Fused(result, refAnchors, stats)
     }
 
-    /** 主文档、跨源占位里的框架优先,至多 [MAX_FRAMES] 个(不含主文档)。 */
+    /** The main document and frames inside cross-origin placeholders come first, at most [MAX_FRAMES] (excluding the main document). */
     private fun framesToRead(input: ElementFusion.Input, frames: List<ElementFusion.Frame>): List<String> {
         val behind = HashSet<String>()
         input.pageIds.forEachIndexed { i, id -> if (id != null && input.page[i].role == "frame") input.owners[id]?.let(behind::add) }
@@ -202,8 +202,8 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
     }.getOrElse { if (it is CancellationException) throw it else false }
 
     /**
-     * 取框并做命中检测(点取框在 [clip] 里可见部分的中心)。坐标按顶层视口理解没命中、而它在框架里时,
-     * 再按「框架内坐标 + 框架内容区左上角」试一次:不同版本的内核对框架里节点给的坐标系可能不同。
+     * Fetches the box and runs a hit test (the click point is the center of the part of the box visible within [clip]). If understanding the coordinates as top-level viewport coordinates misses, and the element is inside a frame,
+     * try once more with "frame-local coordinates + top-left corner of the frame's content area": different kernel versions may give nodes inside frames coordinates in different systems.
      */
     suspend fun place(anchor: Anchor, clip: ElementFusion.Box? = null): Placed? {
         val box = boxOf(anchor.backendId) ?: return null
@@ -222,8 +222,8 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
     }
 
     /**
-     * 点之前重新找只有无障碍树有的元素:先滚进视口(DOM 命令,不是滚轮),再取框;
-     * 在框架里的,点取框在框架内容区里可见部分的中心。元素已不在为 null。
+     * Finds an accessibility-tree-only element again before clicking: first scroll it into the viewport (a DOM command, not a wheel), then fetch the box;
+     * for ones inside a frame, the click point is the center of the part of the box visible within the frame's content area. Null when the element no longer exists.
      */
     suspend fun locate(anchor: Anchor): Placed? = withTimeoutOrNull(LOCATE_TIMEOUT_MS) {
         runCatching { session.send("DOM.scrollIntoViewIfNeeded", buildJsonObject { put("backendNodeId", anchor.backendId) }, timeoutMs = LOCATE_TIMEOUT_MS) }
@@ -262,12 +262,12 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
         const val DEFAULT_TIMEOUT_MS = 1_500L
         const val LOCATE_TIMEOUT_MS = 1_000L
         private const val RELEASE_TIMEOUT_MS = 300L
-        /** 除主文档外最多读这么多个框架的无障碍树。 */
+        /** At most this many frames' accessibility trees are read, excluding the main document. */
         const val MAX_FRAMES = 12
         private const val GROUP = "mika-elements"
         private val POINTER_EVENTS = setOf("click", "mousedown", "mouseup", "pointerdown", "pointerup", "touchstart", "touchend")
 
-        /** `Page.getFrameTree` 的 frameTree → 先序的帧列表,主文档在最前。 */
+        /** `Page.getFrameTree`'s frameTree → a pre-order frame list with the main document first. */
         fun parseFrameTree(tree: JsonObject): List<ElementFusion.Frame> {
             val out = ArrayList<ElementFusion.Frame>()
             fun walk(t: JsonObject, parent: String?, depth: Int) {
@@ -281,7 +281,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
             return out
         }
 
-        /** `Accessibility.getFullAXTree` 的 nodes → [ElementFusion.AxNode],order 按 childIds 深度优先重排(不依赖返回顺序)。 */
+        /** `Accessibility.getFullAXTree`'s nodes → [ElementFusion.AxNode], with order recomputed depth-first by childIds (independent of the returned order). */
         fun parseAxTree(nodes: List<JsonObject>, frameId: String): List<ElementFusion.AxNode> {
             val byId = LinkedHashMap<String, JsonObject>()
             for (n in nodes) n.str("nodeId")?.let { byId[it] = n }
@@ -318,7 +318,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
             }
         }
 
-        // 布尔为真、三态为 true/mixed、记号不是 false 的属性名
+        // Property names that are boolean true, tristate true/mixed, or whose token is not false
         private fun states(props: JsonArray?): Set<String> {
             val out = HashSet<String>()
             for (p in props.orEmpty()) {
@@ -331,7 +331,7 @@ class ElementProbe(private val session: CdpSession, private val timeoutMs: Long 
             return out
         }
 
-        /** 四个顶点(x1,y1,…,x4,y4)→ 外接矩形。 */
+        /** The four corners (x1,y1,…,x4,y4) → the enclosing rectangle. */
         fun quadBox(q: JsonArray?): ElementFusion.Box? {
             val v = q?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull } ?: return null
             if (v.size < 8) return null

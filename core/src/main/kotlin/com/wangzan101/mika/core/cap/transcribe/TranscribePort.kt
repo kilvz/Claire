@@ -1,15 +1,15 @@
 package com.wangzan101.mika.core.cap.transcribe
 
-/** 把一个工作区音频转成文字。 */
+/** Transcribes an audio file in the workspace into text. */
 interface TranscribePort {
-    /** 路径是 `/workspace/...`；读文件、选服务商、发请求都由 App 侧做。 */
+    /** The path is `/workspace/...`; reading the file, choosing the provider and sending the request are all done on the App side. */
     suspend fun transcribe(path: String, language: String?): Transcript
 }
 
-/** 转写结果；[language] 是服务商/设置给的语言，不知道为 null。 */
+/** Transcription result; [language] is the language given by the provider/settings, null when unknown. */
 class Transcript(val text: String, val language: String? = null)
 
-/** 转写自己的错误；服务商的 HTTP 错误仍用 [com.wangzan101.mika.core.model.ModelError]。 */
+/** Errors of transcription itself; provider HTTP errors still use [com.wangzan101.mika.core.model.ModelError]. */
 sealed class TranscribeError(message: String) : Exception(message) {
     class Unsupported(message: String) : TranscribeError(message)
     class TooLarge(val bytes: Long) : TranscribeError("audio is too large")

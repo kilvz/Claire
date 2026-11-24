@@ -21,7 +21,7 @@ import com.wangzan101.mika.core.workspace.SandboxPaths
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.put
 
-/** 把工作区里的一段音频转成文字;只读,不动屏幕。 */
+/** Turns a piece of audio in the workspace into text; read-only, does not touch the screen. */
 internal object AudioTranscribe : AgentTool {
     override val capability: String get() = TRANSCRIBE
     override val verb = Verb.AudioTranscribe

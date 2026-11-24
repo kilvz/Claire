@@ -17,15 +17,15 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 一条双向字节流。关闭后两个方向都结束,阻塞中的读要能因此返回或抛错。 */
+/** A bidirectional byte stream. Once closed both directions end, and a blocking read must return or throw because of it. */
 interface CdpStream : Closeable {
     val input: InputStream
     val output: OutputStream
 }
 
 /**
- * 到 DevTools 端点的字节通道。端点是不透明的字符串(本地抽象套接字名、经 shell 中转的地址等),
- * 由实现自己解释;每次 [open] 都是一条新连接。调用方在 IO 线程上调用,可以阻塞。
+ * Byte channel to a DevTools endpoint. The endpoint is an opaque string (a local abstract socket name, an address relayed through a shell, and so on)
+ * interpreted by the implementation itself; every [open] is a new connection. Callers invoke it on IO threads, so it may block.
  */
 fun interface CdpTransport {
     fun open(endpoint: String): CdpStream
@@ -37,7 +37,7 @@ data class CdpTargetInfo(
     val type: String,
     val url: String = "",
     val title: String = "",
-    /** 已有别的客户端连着这个目标时 DevTools 不给这个字段。 */
+    /** DevTools omits this field when another client is already attached to the target. */
     val webSocketDebuggerUrl: String? = null,
 )
 
@@ -49,7 +49,7 @@ data class CdpBrowserVersion(
     val webSocketDebuggerUrl: String? = null,
 )
 
-/** DevTools 的 HTTP 发现接口:`/json/version`、`/json/list`。每次请求单开一条连接。 */
+/** DevTools' HTTP discovery interface: `/json/version`, `/json/list`. Each request opens its own connection. */
 object CdpDiscovery {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -63,14 +63,14 @@ object CdpDiscovery {
 
     fun parseList(body: String): List<CdpTargetInfo> = json.decodeFromString(body)
 
-    /** `ws://localhost/devtools/page/ID` → `/devtools/page/ID`;传输层不管主机,只要路径。 */
+    /** `ws://localhost/devtools/page/ID` → `/devtools/page/ID`; the transport layer ignores the host and only needs the path. */
     fun webSocketPath(webSocketUrl: String): String {
         val rest = webSocketUrl.substringAfter("://", webSocketUrl)
         val slash = rest.indexOf('/')
         return if (slash < 0) "/" else rest.substring(slash)
     }
 
-    /** 整个请求至多 [timeoutMs]:到点关掉连接,阻塞中的读写随之返回,以 [CdpTimeoutException] 失败。 */
+    /** The whole request takes at most [timeoutMs]: at the deadline the connection is closed, blocking reads and writes return, and it fails with [CdpTimeoutException]. */
     suspend fun get(transport: CdpTransport, endpoint: String, path: String, host: String = DEFAULT_HOST, timeoutMs: Long = DEFAULT_TIMEOUT_MS): String =
         withStreamDeadline(timeoutMs, "GET $path", open = { transport.open(endpoint) }) { s ->
             s.use {
@@ -93,7 +93,7 @@ object CdpDiscovery {
             }
         }
 
-    /** DevTools 只接受主机名为 localhost 或 IP 的请求(防 DNS 重绑定)。 */
+    /** DevTools only accepts requests whose host name is localhost or an IP (to prevent DNS rebinding). */
     const val DEFAULT_HOST = "localhost"
     const val DEFAULT_TIMEOUT_MS = 5_000L
 }
@@ -101,15 +101,15 @@ object CdpDiscovery {
 private val deadlines = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
- * 在 IO 线程上打开流并做一段会阻塞的读写,至多 [timeoutMs]。到点(或调用方被取消,见 closeOnCancel)就关掉流,
- * 阻塞的读写随之抛错返回,不会把调用方和它持有的锁一直卡住。超时以 [CdpTimeoutException] 失败。
- * 阻塞的那段在独立的协程里跑,调用方不用等它结束就能返回。
+ * Opens a stream on IO threads and performs a blocking stretch of reads and writes, at most [timeoutMs]. At the deadline (or when the caller is cancelled, see closeOnCancel) the stream is closed,
+ * so the blocking reads and writes throw and return instead of leaving the caller and the locks it holds stuck. A timeout fails with [CdpTimeoutException].
+ * The blocking stretch runs in its own coroutine, so the caller can return without waiting for it to finish.
  */
 internal suspend fun <S : Closeable, T> withStreamDeadline(
     timeoutMs: Long,
     what: String,
     open: () -> S,
-    /** 调用方被取消时立刻关流;为 false 时让这段读写自己做完(仍受 [timeoutMs] 限制)。 */
+    /** Close the stream immediately when the caller is cancelled; when false, let that stretch of reads and writes finish on its own (still bounded by [timeoutMs]). */
     closeOnCancel: Boolean = true,
     block: (S) -> T,
 ): T {
@@ -129,7 +129,7 @@ internal suspend fun <S : Closeable, T> withStreamDeadline(
         fired.set(true)
         opened.get()?.let { runCatching { it.close() } }
     }
-    // 看门狗跟着这段读写走,不跟调用方:调用方先走了,读写仍有上限
+    // The watchdog follows this stretch of reads and writes, not the caller: even if the caller leaves first, they are still bounded
     work.invokeOnCompletion { watchdog.cancel() }
     try {
         return work.await()
@@ -145,7 +145,7 @@ internal suspend fun <S : Closeable, T> withStreamDeadline(
 internal object Http {
     private const val MAX_LINE = 16 * 1024
 
-    /** 读一行(去掉 CRLF);流在行首就结束返回 null。 */
+    /** Reads one line (dropping the CRLF); returns null when the stream ends at the start of the line. */
     fun readLine(input: InputStream): String? {
         val buf = ByteArrayOutputStream()
         while (true) {
@@ -162,7 +162,7 @@ internal object Http {
         return s.removeSuffix("\r")
     }
 
-    /** 头部名一律转小写。 */
+    /** Header names are always lowercased. */
     fun readHeaders(input: InputStream): Map<String, String> {
         val headers = LinkedHashMap<String, String>()
         while (true) {
@@ -175,8 +175,8 @@ internal object Http {
     }
 
     /**
-     * 读满 [n] 字节,流先结束就返回已读到的部分。不用 InputStream.readNBytes:安卓 13 才有,
-     * 同样不用 ByteArrayOutputStream.toString(Charset)。
+     * Reads up to [n] bytes, returning the part read if the stream ends first. Not using InputStream.readNBytes: that only exists from Android 13,
+     * and likewise not ByteArrayOutputStream.toString(Charset).
      */
     fun readUpTo(input: InputStream, n: Int): ByteArray {
         val out = ByteArray(n)

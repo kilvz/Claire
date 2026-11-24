@@ -6,14 +6,14 @@ import java.nio.file.LinkOption
 import com.wangzan101.mika.core.workspace.SandboxError
 import com.wangzan101.mika.core.workspace.SandboxPaths
 
-/** 存到「下载/Claire」的规则;share_file 工具和沙箱里的 `mika share` 共用,两条路一样严。 */
+/** Rules for saving to "Downloads/Claire"; shared by the share_file tool and `mika share` inside the sandbox, both equally strict. */
 object ShareRules {
     const val MAX_BYTES = 100L shl 20
 
     /**
-     * [path] 是沙箱路径(相对路径以 /workspace 为基),必须在工作区里、经 [SandboxPort.hostPath] 解析(链接逃逸为 null),
-     * 是普通文件(不跟随链接)、不超过 100 MB;[name] 默认用文件自己的名字,必须是不含控制字符的单个文件名。
-     * 返回宿主文件与保存名;不合规则抛 [SandboxError]。
+     * [path] is a sandbox path (relative paths are based on /workspace) and must be inside the workspace, resolved through [SandboxPort.hostPath] (link escapes become null),
+     * a regular file (symlinks are not followed), and at most 100 MB; [name] defaults to the file's own name and must be a single file name without control characters.
+     * Returns the host file and the save name; throws [SandboxError] when the rules are not met.
      */
     fun check(sandbox: SandboxPort, workspace: String, path: String, name: String?): Pair<File, String> {
         val p = SandboxPaths.normalize(path)?.takeIf(SandboxPaths::isWritable)
@@ -36,15 +36,15 @@ object ShareRules {
 
     fun plainName(n: String): Boolean = SandboxPaths.plainName(n)
 
-    /** 不让导出:安装包放进「下载」里,用户一点就可能装上沙箱里做出来的 App。 */
+    /** Never exported: an installation package dropped into "Downloads" could be installed by the user with a single tap, running an App built inside the sandbox. */
     private val REFUSED_TYPES = setOf("apk", "apks", "xapk", "aab")
 
     fun refusedType(name: String): Boolean = name.substringAfterLast('.', "").trim().lowercase() in REFUSED_TYPES
 
-    /** 文件名上限 255 字节(UTF-8),留出系统加「 (n)」序号的余地。 */
+    /** File name limit is 255 bytes (UTF-8), leaving room for the system to append a " (n)" sequence number. */
     const val NAME_MAX_BYTES = 240
 
-    /** 按 UTF-8 字节(和可选的字数)截短,保留扩展名(扩展名本身太长时不保留),不劈开字符。 */
+    /** Truncates by UTF-8 bytes (and optionally code point count), keeping the extension (dropped when the extension itself is too long), never splitting a character. */
     fun fitName(name: String, maxBytes: Int = NAME_MAX_BYTES, maxChars: Int = Int.MAX_VALUE): String {
         fun bytes(t: String) = t.toByteArray(Charsets.UTF_8).size
         fun chars(t: String) = t.codePointCount(0, t.length)

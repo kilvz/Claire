@@ -4,8 +4,8 @@ import com.wangzan101.mika.core.screen.uistate.DOUBLE_TAP_GAP_MS
 import kotlinx.coroutines.delay
 
 /**
- * 双击:同一点上两次按下抬起,第二次的 clickCount 是 2,页面收到 click、click、dblclick(和真人双击一样)。
- * 两次之间隔 [gapMs],在浏览器认双击的时限内。
+ * Double click: two press/release pairs at the same point, with clickCount 2 on the second one, so the page receives click, click, dblclick (just like a real double click).
+ * The two are [gapMs] apart, within the time limit in which the browser recognizes a double click.
  */
 suspend fun InputTrack.mouseDoubleClick(x: Double, y: Double, gapMs: Long = DOUBLE_TAP_GAP_MS) {
     mouse("mouseMoved", x, y, "none", 0, 0)

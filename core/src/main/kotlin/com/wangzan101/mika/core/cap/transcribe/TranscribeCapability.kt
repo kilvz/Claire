@@ -8,7 +8,7 @@ import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.tool.AgentTool
 import com.wangzan101.mika.core.tool.ToolContext
 
-/** 转写能力:把工作区里的音频文件转成文字;动态端口由目录和执行按当前选择过滤。 */
+/** Transcribe capability: turns audio files in the workspace into text; the dynamic port is filtered by the catalog and execution according to the current selection. */
 const val TRANSCRIBE = "transcribe"
 
 internal class TranscribeCapability(

@@ -12,7 +12,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
 
-/** 沙箱命令请求手机工具时,交回本任务的动作执行入口。 */
+/** Entry point this task's action executor is handed back to when a sandbox command requests a phone tool. */
 fun interface PhoneCommandHandler {
     suspend fun call(tool: String, args: JsonObject): JsonObject
 }
@@ -25,78 +25,78 @@ sealed interface SandboxStatus {
     data class Broken(val reason: String) : SandboxStatus
 }
 
-/** Agent 接触 Linux 沙箱的唯一入口;路径都是沙箱里的路径([SandboxPaths])。 */
+/** The only entry point through which the Agent touches the Linux sandbox; all paths are paths inside the sandbox ([SandboxPaths]). */
 interface SandboxPort {
     val folderFiles: FolderFiles? get() = null
 
-    /** 沙箱目录的树锁:往工作区写的都在它的许可里写。 */
+    /** Tree lock of the sandbox directory: everything written into the workspace is written under its permit. */
     val tree: SandboxTree
 
     fun status(): SandboxStatus
 
-    /** 用户是否允许沙箱联网(运行环境还没准备好时也知道);默认按就绪状态里的。 */
+    /** Whether the user allows the sandbox to access the network (known even when the runtime is not ready yet); by default taken from the ready status. */
     fun networkAllowed(): Boolean = (status() as? SandboxStatus.Ready)?.network == true
 
-    /** [cwd]:`/workspace` 下的相对路径,null 为 `/workspace` 本身。 */
+    /** [cwd]: relative path under `/workspace`, null means `/workspace` itself. */
     suspend fun run(workspace: String, argv: List<String>, cwd: String?, timeoutMs: Long, onProgress: (String) -> Unit): CommandResult
 
     /**
-     * 启动一条长驻命令(stdio MCP server),stdin/stdout/stderr 直接接到进程。默认不支持;
-     * 实现必须把进程关在沙箱里,不能让它拿到 App 私有目录。[environment] 是显式追加的环境
-     * (秘密经这里进进程,不进 argv),实现按 allowlist 合并,不继承宿主/App 环境。
+     * Starts a long-running command (a stdio MCP server); stdin/stdout/stderr are wired directly to the process. Unsupported by default;
+     * an implementation must lock the process inside the sandbox and must not let it obtain the App's private directories. [environment] is the explicitly appended
+     * environment (secrets enter the process through here, not via argv); implementations merge it against an allowlist and do not inherit the host/App environment.
      */
     suspend fun openProcess(workspace: String, argv: List<String>, cwd: String? = null, environment: Map<String, String> = emptyMap()): SandboxProcess =
         throw SandboxError("sandbox_stdio_unsupported", "This device cannot run stdio MCP servers.", recoverable = true)
 
     /**
-     * 用户自己打开的终端:在 [workspace] 里起一个带伪终端的 shell。它不属于任何任务,不经过模型,
-     * 也不写运行记录;和 [run] 一样按当时的联网设置执行。默认不支持。
+     * A terminal the user opens: starts a shell with a pseudo-terminal in [workspace]. It belongs to no task, does not go through the model,
+     * and writes no run record; like [run], it executes under the network setting in effect at the time. Unsupported by default.
      */
     suspend fun openShell(workspace: String, cols: Int = 80, rows: Int = 24): SandboxShell =
         throw SandboxError("sandbox_shell_unsupported", "This device cannot open a terminal.", recoverable = true)
 
-    /** 当前任务提供手机工具入口时，命令可通过桥接调用；旧实现仍可只实现 [run]。 */
+    /** When the current task provides a phone-tool entry, commands can call it through the bridge; older implementations may still implement only [run]. */
     suspend fun runWithPhone(workspace: String, argv: List<String>, cwd: String?, timeoutMs: Long,
         onProgress: (String) -> Unit, phone: PhoneCommandHandler?): CommandResult =
         run(workspace, argv, cwd, timeoutMs, onProgress)
 
-    /** 沙箱路径对应的宿主文件;越界(含符号链接指到外面)或 [forWrite] 时不在工作区下,返回 null。只用来判断,读写走 [files]。 */
+    /** The host file corresponding to a sandbox path; returns null when the path escapes the boundary (including symlinks pointing outside) or, when [forWrite] is set, is not under the workspace. Used only for checking; reads and writes go through [files]. */
     fun hostPath(workspace: String, sandboxPath: String, forWrite: Boolean): File?
 
-    /** 宿主侧读写沙箱目录里的文件都过这一道:打开一次、在句柄上核实、再在这个句柄上读写。 */
+    /** All host-side reads and writes of files in the sandbox directory pass through this gate: open once, verify on the handle, then read and write on that same handle. */
     val files: WorkspaceFileGate
 
-    /** 规范化后的沙箱路径 → (宿主根目录, 根下相对路径),交给 [files];技能目录只读,越界为 null。工作区目录不存在时建上。 */
+    /** Normalized sandbox path → (host root directory, path relative to that root), handed to [files]; skill directories are read-only, out-of-bounds is null. Creates the workspace directory if it does not exist. */
     fun hostRoot(workspace: String, normalized: String, forWrite: Boolean): Pair<File, String>?
 
-    /** 存到手机的「下载/Claire」,返回 "Download/Claire/<名字>"。 */
+    /** Saves to "Downloads/Claire" on the phone and returns "Download/Claire/<name>". */
     suspend fun share(file: File, name: String): String
 
     fun freeBytes(): Long
     fun workspaceBytes(workspace: String): Long
 
     /**
-     * 存完整输出到 /workspace/.mika/out-<n>.txt,返回沙箱路径。经 [files] 新建(.mika 被换成链接等时抛异常,不写任何东西)。
+     * Saves the complete output to /workspace/.mika/out-<n>.txt and returns the sandbox path. Created through [files] (throws and writes nothing if .mika has been replaced by a link, etc.).
      */
     fun saveOutput(workspace: String, text: String): String
 
-    /** [skillPath]:`/opt/mika/skills` 下的技能目录(相对路径);读随 App 打包的那份清单,没有为空。 */
+    /** [skillPath]: a skill directory under `/opt/mika/skills` (relative path); reads the manifest bundled with the App, empty if there is none. */
     fun scriptManifest(skillPath: String): List<ScriptEntry>
 
     /**
-     * 运行环境还没准备好(首次启动解包中、或还没开始)时:开始准备并等它,最多 [timeoutMs];返回等完后的状态。
-     * 不支持的设备、准备失败时尽快返回。默认实现不等。
+     * While the runtime is not ready yet (first-launch unpacking, or not started yet): begin preparing and wait for it, at most [timeoutMs]; returns the status after the wait.
+     * Returns as soon as possible on unsupported devices or when preparation fails. The default implementation does not wait.
      */
     suspend fun awaitReady(timeoutMs: Long): SandboxStatus = status()
 
-    /** 把 `/opt/mika/skills` 核对成随 App 打包的那份:多出、缺少、改过的都重新同步。失败只记下,不抛。 */
+    /** Reconciles `/opt/mika/skills` against the copy bundled with the App: extra, missing and modified entries are all re-synced. Failures are only recorded, never thrown. */
     suspend fun prepare() {}
 
-    /** [skillPath] 下的 [file] 与打包的那份逐字节相同;不同就重新同步一次再核,仍不同为 false。 */
+    /** [file] under [skillPath] is byte-identical to the bundled copy; if it differs, re-sync once and check again, returning false if it still differs. */
     suspend fun verifyScript(skillPath: String, file: String): Boolean = true
 }
 
-/** [SandboxPort.openProcess] 返回的长驻进程;关闭时整棵进程树结束。 */
+/** The long-running process returned by [SandboxPort.openProcess]; closing it terminates the entire process tree. */
 interface SandboxProcess : Closeable {
     val stdin: OutputStream
     val stdout: InputStream
@@ -104,19 +104,19 @@ interface SandboxProcess : Closeable {
 }
 
 /**
- * 用户终端的会话:[input] 写进 shell 的 stdin,[output] 是 stdout 和 stderr 合并后的输出。
- * 关闭时整棵进程树结束;树锁被重置/清理收回时 [revoked] 变为 true。
+ * A user terminal session: [input] is written to the shell's stdin, [output] is the merged output of stdout and stderr.
+ * Closing it terminates the entire process tree; [revoked] becomes true once the tree lock is reclaimed by a reset/cleanup.
  */
 interface SandboxShell : Closeable {
     val input: OutputStream
     val output: InputStream
 
-    /** shell 退出时的退出码;被信号杀死是 128 + 信号。 */
+    /** Exit code when the shell exits; when killed by a signal it is 128 + the signal. */
     val exited: Deferred<Int>
 
-    /** 被 [SandboxTree] 的独占许可收回(重置、清工作区)后为 true。 */
+    /** True after being reclaimed by the exclusive permit of [SandboxTree] (reset, clearing the workspace). */
     val revoked: StateFlow<Boolean>
 
-    /** 改窗口大小;实现不支持时什么也不做。 */
+    /** Resizes the window; does nothing when the implementation does not support it. */
     fun resize(cols: Int, rows: Int) {}
 }

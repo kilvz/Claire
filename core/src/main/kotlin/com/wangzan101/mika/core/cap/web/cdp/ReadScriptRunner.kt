@@ -26,10 +26,10 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 一个标签的读脚本(见 [ReadScriptProtocol]):在主框架的读取世界里跑,一次一个。
- * 读取世界建一次、留着用(state 跨调用保留),页面换了文档它就没了,下次再建(结果里 fresh=true)。
- * 兜底:跑着时脚本发出任何网络请求、主框架要跳转(先 `Page.stopLoading`)都让这次以错误结束。
- * 到时限先让脚本之后的 sleep 失败;连这都等不到回应(同步死循环占着页面)才打断执行。
+ * A tab's read script (see [ReadScriptProtocol]): runs in the main frame's read world, one at a time.
+ * The read world is created once and kept for reuse (its state survives across calls); when the page loads a new document it is gone and is recreated next time (with fresh=true in the result).
+ * Safety net: while it runs, any network request issued by the script or any navigation of the main frame (`Page.stopLoading` first) makes this run end with an error.
+ * At the deadline the script's subsequent sleeps are first made to fail; only if even that gets no reply (a synchronous infinite loop is hogging the page) is execution interrupted.
  */
 class ReadScriptRunner(val session: CdpSession, private val sessionId: String? = null) {
     private val lock = Mutex()
@@ -38,7 +38,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
 
     private class World(val frameId: String, val context: Int, val origin: String?, val fresh: Boolean)
 
-    /** 连接断了抛 [CdpConnectionClosedException](由调用方判断是不是标签崩了)。 */
+    /** Throws [CdpConnectionClosedException] when the connection drops (the caller decides whether the tab crashed). */
     suspend fun run(code: String, args: JsonObject?, timeoutMs: Long): EvalJs = lock.withLock {
         coroutineScope {
             val outcome = CompletableDeferred<EvalJs>()
@@ -46,7 +46,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
             val answered = AtomicBoolean(false)
             var world: World? = null
 
-            // 先订阅再动手:事件流不重放
+            // Subscribe before acting: the event stream is not replayed
             launch(start = CoroutineStart.UNDISPATCHED) {
                 session.events.collect { e ->
                     if (e.sessionId != sessionId) return@collect
@@ -55,7 +55,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
                     when (e.method) {
                         "Runtime.executionContextDestroyed" -> if ((p["executionContextId"] as? JsonPrimitive)?.intOrNull == w.context) gone(outcome)
                         "Runtime.executionContextsCleared" -> gone(outcome)
-                        // 不开 Runtime 时没有上下文销毁的事件:主框架换了文档,世界就没了
+                        // Without Runtime enabled there are no context-destroyed events: when the main frame switches documents, the world is gone
                         "Page.frameNavigated" -> if (mainFrameNavigated(p, w.frameId)) gone(outcome)
                         "Network.requestWillBeSent" -> if (running.get()) ReadScriptProtocol.requestViolation(p)?.let {
                             outcome.complete(EvalJs.Failed(BLOCKED_NETWORK, it))
@@ -121,7 +121,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
         outcome.complete(EvalJs.Failed(NAVIGATED, "the page loaded a new document while the script ran, so the script stopped and its state is gone; read the new page"))
     }
 
-    /** 脚本没跑完就收尾:先让它之后的 sleep 失败;这都等不到回应时它在跑同步死循环,才打断。 */
+    /** Wraps up a script that did not finish: its subsequent sleeps are first made to fail; only when even that gets no reply is it running a synchronous infinite loop, and only then is it interrupted. */
     private suspend fun stop(ctx: Int) {
         val answeredStop = try {
             session.send("Runtime.evaluate", buildJsonObject { put("expression", ReadScriptProtocol.STOP); put("contextId", ctx) }, sessionId, STEP_TIMEOUT_MS)
@@ -134,10 +134,10 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
         if (!answeredStop) runCatching { session.send("Runtime.terminateExecution", JsonObject(emptyMap()), sessionId, STEP_TIMEOUT_MS) }
     }
 
-    /** 留着的读取世界还在就用它,不在(或第一次)就建一个并装上前置脚本。 */
+    /** If the kept read world is still there, use it; otherwise (or the first time) create one and install the prelude script. */
     private suspend fun ensureWorld(): World {
-        // 不开 Runtime:开着它时页面能察觉到调试器(有的网站因此一直重载);隔离世界、求值都不需要它
-        // 兜底要看的事件:跳转请求、网络请求(已开着的再开一次无妨)
+        // Runtime is not enabled: while it is on, pages can detect the debugger (some sites therefore keep reloading); isolated worlds and evaluation do not need it
+        // Events the safety net needs: navigation requests and network requests (enabling an already enabled domain again is harmless)
         session.send("Page.enable", JsonObject(emptyMap()), sessionId, STEP_TIMEOUT_MS)
         session.send("Network.enable", JsonObject(emptyMap()), sessionId, STEP_TIMEOUT_MS)
         val frameId = session.send("Page.getFrameTree", JsonObject(emptyMap()), sessionId, STEP_TIMEOUT_MS)["frameTree"]
@@ -147,7 +147,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
         context = null
         val ctx = session.send("Page.createIsolatedWorld", buildJsonObject {
             put("frameId", frameId); put("worldName", worldName)
-            // 协议里的参数名就是这么拼的
+            // This is how the parameter name is spelled in the protocol
             put("grantUniveralAccess", false)
         }, sessionId, STEP_TIMEOUT_MS)["executionContextId"]?.jsonPrimitive?.intOrNull
             ?: throw CdpException(0, "no execution context", "Page.createIsolatedWorld")
@@ -160,7 +160,7 @@ class ReadScriptRunner(val session: CdpSession, private val sessionId: String? =
         return World(frameId, ctx, origin, fresh = true)
     }
 
-    /** 读取世界装好了时为页面的源;世界没了或没装为 null。 */
+    /** The page's origin when the read world is installed; null when the world is gone or was not installed. */
     private suspend fun probe(ctx: Int): String? = try {
         val r = session.send("Runtime.evaluate", buildJsonObject {
             put("expression", ReadScriptProtocol.PROBE); put("contextId", ctx); put("returnByValue", true)

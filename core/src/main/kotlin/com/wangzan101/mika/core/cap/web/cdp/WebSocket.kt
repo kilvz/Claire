@@ -13,8 +13,8 @@ import java.util.Base64
 class WebSocketException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /**
- * RFC 6455 客户端,跑在任意 [CdpStream] 上。不协商扩展和子协议。
- * [receive] 只给一个线程调用;写操作内部串行,任何线程都可以发。
+ * An RFC 6455 client running on any [CdpStream]. No extensions or subprotocols are negotiated.
+ * [receive] may only be called from one thread; writes are serialized internally, so any thread may send.
  */
 class WebSocketConnection private constructor(
     private val stream: CdpStream,
@@ -27,7 +27,7 @@ class WebSocketConnection private constructor(
     @Volatile private var closeSent = false
     @Volatile private var aborted = false
 
-    /** 对端关闭帧里的状态码和原因;没收到为 null。 */
+    /** The status code and reason from the peer's close frame; null if none was received. */
     @Volatile var closeCode: Int? = null
         private set
     @Volatile var closeReason: String = ""
@@ -39,8 +39,8 @@ class WebSocketConnection private constructor(
     }
 
     /**
-     * 阻塞到下一条完整的数据消息。ping 自动回 pong,分片自动拼接。
-     * 对端发关闭帧时回一个关闭帧并返回 null。
+     * Blocks until the next complete data message. Pings are answered with pongs automatically, and fragments are reassembled automatically.
+     * When the peer sends a close frame, a close frame is sent back and null is returned.
      */
     fun receive(): String? {
         var assembling: ByteArrayOutputStream? = null
@@ -93,12 +93,12 @@ class WebSocketConnection private constructor(
             if (fin && assembling == null) return payload.toString(Charsets.UTF_8)
             if (assembling == null) assembling = ByteArrayOutputStream(maxOf(payload.size * 2, 1024))
             assembling.write(payload)
-            // ByteArrayOutputStream.toString(Charset) 安卓 13 才有
+            // ByteArrayOutputStream.toString(Charset) only exists from Android 13
             if (fin) return String(assembling.toByteArray(), Charsets.UTF_8)
         }
     }
 
-    /** 发关闭帧;之后对端回的关闭帧由 [receive] 收走。只发一次。 */
+    /** Sends a close frame; the peer's close frame in reply is then consumed by [receive]. Sent only once. */
     fun sendClose(code: Int = CLOSE_NORMAL, reason: String = "") {
         val r = reason.toByteArray(Charsets.UTF_8).let { if (it.size > 123) it.copyOf(123) else it }
         synchronized(writeLock) {
@@ -108,7 +108,7 @@ class WebSocketConnection private constructor(
         }
     }
 
-    /** 直接断开底层流,阻塞中的 [receive] 会抛错。 */
+    /** Aborts the underlying stream directly; a blocking [receive] throws. */
     fun abort() {
         aborted = true
         runCatching { stream.close() }
@@ -175,7 +175,7 @@ class WebSocketConnection private constructor(
         fun acceptFor(key: String): String =
             Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-1").digest((key + GUID).toByteArray(Charsets.US_ASCII)))
 
-        /** 在 [stream] 上做升级握手;失败时关闭流并抛 [WebSocketException]。阻塞。 */
+        /** Performs the upgrade handshake on [stream]; on failure the stream is closed and [WebSocketException] is thrown. Blocking. */
         fun connect(
             stream: CdpStream,
             path: String,
@@ -188,7 +188,7 @@ class WebSocketConnection private constructor(
                     "Sec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n\r\n"
                 stream.output.write(req.toByteArray(Charsets.US_ASCII))
                 stream.output.flush()
-                // 握手后的帧可能已经进了缓冲,之后都从这个缓冲流读
+                // Frames after the handshake may already be buffered, so read from this buffered stream from now on
                 val input = stream.input.buffered(64 * 1024)
                 val status = Http.readLine(input) ?: throw WebSocketException("no handshake response")
                 if (status.split(' ').getOrNull(1) != "101") throw WebSocketException("handshake rejected: $status")

@@ -30,12 +30,12 @@ import com.wangzan101.mika.core.screen.uistate.withPortRef
 import com.wangzan101.mika.core.screen.uistate.DwellStop
 import com.wangzan101.mika.core.screen.uistate.dwellStopped
 
-/** 复制、剪切、粘贴。 */
+/** Copy, cut, paste. */
 private val CLIPBOARD_KEYS = setOf("KeyC", "KeyX", "KeyV")
 
 /**
- * web_interact:按 action 校验参数(多给的参数报错,不默默忽略),坐标按最近一屏换成 view 像素,
- * 稳定编号开着时两头的编号都先翻译成端口编号。组合键、拖动、下拉选择可能触发提交,要按目标判不可逆。
+ * web_interact: validates arguments by action (extra arguments are reported as errors, not silently ignored); coordinates are converted to view pixels against the latest screen,
+ * and when stable numbering is on, refs on both sides are first translated to port refs. Key combos, dragging and drop-down selection may trigger a submit, so whether they are irreversible is decided per target.
  */
 internal object Interact : WebTool {
     override val verb = Verb.Interact
@@ -83,11 +83,11 @@ internal object Interact : WebTool {
             "key" -> {
                 val spec = a.str("key", max = 60) ?: throw ArgError("key", "required for action key")
                 val combo = CdpKeys.parseCombo(spec) ?: throw ArgError("key", "not a supported key or combination: '$spec'. Use names like Enter, Escape, Tab, ArrowDown, Control+A, Shift+Tab")
-                // 剪贴板快捷键会把用户剪贴板里的东西交给网页(或改掉剪贴板):不做
+                // Clipboard shortcuts would hand the user's clipboard contents to the page (or overwrite the clipboard): not done
                 if (combo.modifiers.any { it == KeyModifier.Control || it == KeyModifier.Meta } && combo.key.code in CLIPBOARD_KEYS) {
                     throw ArgError("key", "clipboard shortcuts (copy, cut, paste) are not allowed; use web_type_text to enter text")
                 }
-                // 回车一类的键可能提交、换页:和点击一样先补足这一页的停留
+                // Keys such as Enter may submit or navigate: as with clicks, first top up the dwell for this page
                 try { ctx.dwell?.before(port = w) } catch (e: DwellStop) { return dwellStopped(e) }
                 ctx.action(w.pressCombo(combo))
             }
@@ -111,7 +111,7 @@ internal object Interact : WebTool {
         }
     }
 
-    /** 一个落点:编号([refKey],snapshotId 共用)或 0–999 坐标;两样都给、坐标只给一半时报错,都没给为 null。 */
+    /** A single target point: a ref ([refKey], sharing snapshotId) or 0–999 coordinates; errors when both are given or only half of the coordinates is given, null when neither is given. */
     private suspend fun point(a: Args, ctx: ToolContext, refKey: String, xKey: String, yKey: String): WebPoint? {
         val ref = a.str(refKey)
         val x = a.coord(xKey); val y = a.coord(yKey)
@@ -127,7 +127,7 @@ internal object Interact : WebTool {
         return WebPoint.Xy(toPx(x, s.width), toPx(y!!, s.height))
     }
 
-    /** 稳定编号开着时先翻译模型编号;失效原因原样交给统一的 ref_expired 结果,不执行动作。 */
+    /** Translates the model's ref first when stable numbering is on; an expired reason is passed through unchanged to the unified ref_expired result and the action is not performed. */
     private suspend fun withPortPoint(p: WebPoint, ctx: ToolContext, act: suspend (WebPoint) -> ToolExecution): ToolExecution {
         val st = ctx.session.stabilizer
         if (p !is WebPoint.Ref || st == null) return act(p)

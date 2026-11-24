@@ -25,11 +25,11 @@ import com.wangzan101.mika.core.screen.uistate.CdpKeys
 import com.wangzan101.mika.core.screen.uistate.KeyCombo
 import com.wangzan101.mika.core.screen.uistate.KeyModifier
 
-// 网页上的真实鼠标、键盘(Input 域)。坐标一律是主框架视口的 CSS 像素,和页面脚本给的一致。
-// 节奏(轨迹、按住时长、键间隔、滚轮分格)由 [InputPacing] 给,默认 [InputPacing.Instant] 不加停顿。
-// 滚轮只能用在正在显示的标签上:后台标签上 mouseWheel 会挂住,并卡死这个页面之后的所有 Input 命令(调用方负责判断)。
+// Real mouse and keyboard input on web pages (the Input domain). Coordinates are always CSS pixels of the main frame's viewport, matching what the page script reports.
+// Pacing (path, hold durations, key gaps, wheel notches) comes from [InputPacing]; the default [InputPacing.Instant] adds no pauses.
+// The wheel may only be used on the tab currently being shown: on a background tab mouseWheel hangs and blocks every later Input command for this page (the caller is responsible for checking).
 
-/** view 像素与 CSS 像素的换算;[scale] 是每个 CSS 像素占多少 view 像素(view 宽 ÷ 页面视口宽)。 */
+/** Conversion between view pixels and CSS pixels; [scale] is how many view pixels each CSS pixel occupies (view width ÷ page viewport width). */
 object CdpGeometry {
     fun scale(viewWidth: Int, cssViewportWidth: Double): Double =
         if (viewWidth > 0 && cssViewportWidth > 0) viewWidth / cssViewportWidth else 1.0
@@ -37,12 +37,12 @@ object CdpGeometry {
     fun toCss(viewPx: Int, scale: Double): Double = if (scale > 0) viewPx / scale else viewPx.toDouble()
 }
 
-// ---------- 一次输入动作 ----------
+// ---------- One input action ----------
 
 /**
- * 一次输入动作的结果。[NotSent]:一个会改动页面的事件都没发出去(会话已断、第一发就被协议拒绝),
- * 换原生输入重做是安全的。[Uncertain]:发出过事件后失败(包括超时),页面可能已经收到,不能再做一遍;
- * 此时按着的鼠标键、键盘键已尽力抬起。
+ * The result of one input action. [NotSent]: not a single event that would change the page went out (the session is already closed, or the very first send was rejected by the protocol),
+ * so redoing it with native input is safe. [Uncertain]: it failed after events were sent (including timeouts), so the page may already have received them and it must not be done again;
+ * in that case any mouse buttons and keyboard keys still held have been released as far as possible.
  */
 sealed interface InputOutcome<out T> {
     data class Done<T>(val value: T) : InputOutcome<T>
@@ -51,8 +51,8 @@ sealed interface InputOutcome<out T> {
 }
 
 /**
- * 一次输入动作里发出的命令都经它:记下是否可能已有事件到达页面,以及此刻按着的鼠标键和键盘键,
- * 失败时据此抬起。只读的查询(取视口、读选项)不算事件。
+ * Every command sent during one input action goes through this: it records whether an event may already have reached the page and which mouse buttons and keyboard keys are currently held,
+ * so they can be released on failure. Read-only queries (fetching the viewport, reading options) do not count as events.
  */
 class InputTrack internal constructor(
     val session: CdpSession,
@@ -65,7 +65,7 @@ class InputTrack internal constructor(
     private var dragging = false
     private val heldKeys = ArrayList<CdpKey>()
 
-    /** 会改动页面的命令。发出前会话已断:没送达。协议回了错误:这一发没生效,之前没发过就仍算没送达。 */
+    /** A command that changes the page. Session already closed before sending: not delivered. The protocol returned an error: this send had no effect, so if nothing was sent before it still counts as not delivered. */
     internal suspend fun effect(method: String, params: JsonObject): JsonObject {
         if (session.closed.value) throw CdpConnectionClosedException("CDP session closed before $method")
         val before = mayHaveDelivered
@@ -83,7 +83,7 @@ class InputTrack internal constructor(
 
     internal suspend fun mouse(type: String, x: Double, y: Double, button: String, buttons: Int, clickCount: Int) {
         val s = session.inputScale
-        // 先记下再发:按下这一发超时也可能已按下
+        // Record before sending: this press may have taken effect even if it times out
         if (type == "mousePressed") pressedAt = x to y
         effect(
             "Input.dispatchMouseEvent",
@@ -110,7 +110,7 @@ class InputTrack internal constructor(
         session.pointer = x to y
     }
 
-    /** 按节奏停一会儿;[Instant][InputPacing.Instant] 时不停。 */
+    /** Pauses briefly according to the pacing; no pause with [Instant][InputPacing.Instant]. */
     internal suspend fun pause(ms: Long) {
         if (ms > 0) delay(ms)
     }
@@ -137,7 +137,7 @@ class InputTrack internal constructor(
         if (type == "keyUp") heldKeys.remove(k)
     }
 
-    /** 尽力抬起按着的键:每一发都有短上限,失败不管(页面 Input 可能已卡住)。 */
+    /** Releases the held keys as best it can: every send has a short limit and failures are ignored (the page's Input may already be stuck). */
     internal suspend fun release() {
         suspend fun quiet(method: String, params: JsonObject) {
             runCatching { session.send(method, params, timeoutMs = RELEASE_TIMEOUT_MS) }
@@ -163,10 +163,10 @@ class InputTrack internal constructor(
     }
 }
 
-/** 做一次不加节奏的输入动作(见下)。 */
+/** Performs one input action without pacing (see below). */
 suspend fun <T> CdpSession.input(timeoutMs: Long, block: suspend InputTrack.() -> T): InputOutcome<T> = input(timeoutMs, InputPacing.Instant, block)
 
-/** 做一次输入动作,节奏按 [pacing];每发命令上限 [timeoutMs]。失败分「没送达」和「不确定」,后者已抬起按着的键。 */
+/** Performs one input action with pacing from [pacing]; each command is bounded by [timeoutMs]. Failures are split into "not sent" and "uncertain"; in the latter case the held keys have been released. */
 suspend fun <T> CdpSession.input(timeoutMs: Long, pacing: InputPacing, block: suspend InputTrack.() -> T): InputOutcome<T> {
     val t = InputTrack(this, timeoutMs, pacing)
     return try {
@@ -184,8 +184,8 @@ suspend fun <T> CdpSession.input(timeoutMs: Long, pacing: InputPacing, block: su
 }
 
 /**
- * 页面视觉视口的 CSS 宽度,来自浏览器的排版数据(Page.getLayoutMetrics),不经页面脚本:
- * 页面改不了它,拿来把 view 像素换成 Input 用的 CSS 像素。
+ * CSS width of the page's visual viewport, taken from the browser's layout data (Page.getLayoutMetrics) without going through the page script:
+ * the page cannot change it, so it is used to convert view pixels into the CSS pixels that Input expects.
  */
 suspend fun InputTrack.viewportCssWidth(): Double {
     val m = query("Page.getLayoutMetrics")
@@ -193,7 +193,7 @@ suspend fun InputTrack.viewportCssWidth(): Double {
     return width("cssVisualViewport") ?: width("cssLayoutViewport") ?: throw CdpException(0, "no viewport size", "Page.getLayoutMetrics")
 }
 
-/** 移过去(按节奏沿一段轨迹,停一下)、按下、按住一会儿、抬起;页面看到的是可信的鼠标点击(pointerType mouse)。 */
+/** Moves there (along a path according to the pacing, then pauses), presses, holds briefly and releases; the page sees a trustworthy mouse click (pointerType mouse). */
 suspend fun InputTrack.mouseClick(x: Double, y: Double) {
     approach(x, y)
     pause(pacing.dwell())
@@ -202,10 +202,10 @@ suspend fun InputTrack.mouseClick(x: Double, y: Double) {
     mouse("mouseReleased", x, y, "left", 0, 1)
 }
 
-/** 只移动鼠标(按节奏沿一段轨迹):触发 mouseover/mouseenter 和 CSS :hover。 */
+/** Only moves the mouse (along a path according to the pacing): triggers mouseover/mouseenter and CSS :hover. */
 suspend fun InputTrack.mouseMove(x: Double, y: Double) = approach(x, y)
 
-/** 指针从上一次的位置(不知道就从附近某处)移到 (x, y),最后一发正好落在目标上。 */
+/** Moves the pointer from its last position (or from somewhere nearby if unknown) to (x, y), with the final send landing exactly on the target. */
 private suspend fun InputTrack.approach(x: Double, y: Double) {
     val from = session.pointer ?: pacing.origin(x, y)
     val points = pacing.path(from, x to y)
@@ -216,8 +216,8 @@ private suspend fun InputTrack.approach(x: Double, y: Double) {
 }
 
 /**
- * 指针移到 (x, y) 后转滚轮,一格一格地滚 [distance] CSS 像素(正为向下),格与格之间停一下。
- * 只用于正在显示的标签(见文件开头)。
+ * Moves the pointer to (x, y), then turns the wheel, scrolling [distance] CSS pixels notch by notch (positive is downward), pausing between notches.
+ * Only for the tab currently being shown (see the top of the file).
  */
 suspend fun InputTrack.mouseWheel(x: Double, y: Double, distance: Double) {
     approach(x, y)
@@ -228,8 +228,8 @@ suspend fun InputTrack.mouseWheel(x: Double, y: Double, distance: Double) {
 }
 
 /**
- * 指针不动,在它此刻的位置(不知道在哪就在 ([x], [y]))转滚轮,一格一格地滚 [distance] CSS 像素(正为向下)。
- * 停留时顺手滚一下用:不发鼠标移动,不悬停。只用于正在显示的标签(见文件开头)。
+ * The pointer does not move; the wheel turns at its current position (or at ([x], [y]) if unknown), scrolling [distance] CSS pixels notch by notch (positive is downward).
+ * For scrolling casually during a dwell: no mouse move is sent and nothing is hovered. Only for the tab currently being shown (see the top of the file).
  */
 suspend fun InputTrack.wheelInPlace(x: Double, y: Double, distance: Double) {
     val (px, py) = session.pointer ?: (x to y)
@@ -240,9 +240,9 @@ suspend fun InputTrack.wheelInPlace(x: Double, y: Double, distance: Double) {
 }
 
 /**
- * 按住左键从起点分 [steps] 步拖到终点。按指针事件写的拖动(滑块、拖排序)直接收到移动;
- * 页面用 HTML 原生拖放(draggable)时,先让浏览器把拖动交给我们(setInterceptDrags),
- * 拿到拖动数据后在终点补 dragEnter/dragOver/drop。返回是否走了原生拖放。
+ * Holds the left button and drags from the start point to the end point in [steps] steps. Dragging implemented with pointer events (sliders, reordering) receives the moves directly;
+ * when the page uses native HTML drag-and-drop (draggable), the browser is first asked to hand the drag to us (setInterceptDrags),
+ * and once the drag data arrives, dragEnter/dragOver/drop are sent at the destination. Returns whether the native drag-and-drop path was taken.
  */
 suspend fun InputTrack.mouseDrag(fromX: Double, fromY: Double, toX: Double, toY: Double, steps: Int, stepDelayMs: Long = 16): Boolean = coroutineScope {
     val intercept = runCatching { query("Input.setInterceptDrags", buildJsonObject { put("enabled", true) }) }.isSuccess
@@ -272,7 +272,7 @@ suspend fun InputTrack.mouseDrag(fromX: Double, fromY: Double, toX: Double, toY:
     }
 }
 
-/** 按一次组合键:修饰键依次按下,主键按下抬起,修饰键倒序抬起。出字的键用 keyDown(带 text),其余用 rawKeyDown。 */
+/** Presses a key combination once: the modifiers are pressed in order, the main key is pressed and released, then the modifiers are released in reverse order. Keys that produce text use keyDown (with text); the others use rawKeyDown. */
 suspend fun InputTrack.pressCombo(combo: KeyCombo) {
     var held = 0
     for (m in combo.modifiers) {
@@ -293,9 +293,9 @@ suspend fun InputTrack.pressCombo(combo: KeyCombo) {
 }
 
 /**
- * 打字:有节奏时字母、数字、空格逐键敲(大写字母带 Shift),键间隔长短不一;其余的字(标点、中文、换行)
- * 一段一段整段交给焦点,像输入法提交。没有节奏、或文字长过 [InputPacing.Limits.maxKeyedChars] 时整段交给焦点(像粘贴)。
- * 不会因为文字里的换行按下回车。
+ * Typing: when paced, letters, digits and spaces are typed key by key (uppercase letters with Shift), with varying gaps between keys; the remaining characters (punctuation, Chinese, newlines)
+ * are handed to the focused element in whole runs, like an IME commit. When not paced, or when the text is longer than [InputPacing.Limits.maxKeyedChars], the whole text is handed to the focused element (like a paste).
+ * Newlines in the text never cause Enter to be pressed.
  */
 suspend fun InputTrack.typeText(text: String) {
     if (!pacing.paced || text.length > pacing.limits.maxKeyedChars) return insertText(text)
@@ -320,7 +320,7 @@ suspend fun InputTrack.typeText(text: String) {
     }
 }
 
-/** 打字时怎么分段:[keyed] 的一段逐键敲,其余整段提交。 */
+/** How typing is split into runs: a [keyed] run is typed key by key, the rest are submitted whole. */
 object TypingRuns {
     data class Run(val text: String, val keyed: Boolean)
 
@@ -344,28 +344,28 @@ object TypingRuns {
     }
 }
 
-/** 把文字整段交给当前焦点(和输入法提交一样触发 input 事件)。 */
+/** Hands the whole text to the current focus (fires an input event just like an IME commit). */
 suspend fun InputTrack.insertText(text: String) {
     effect("Input.insertText", buildJsonObject { put("text", text) })
 }
 
-// ---------- 原生下拉框 ----------
+// ---------- Native drop-downs ----------
 
 data class SelectOption(val text: String, val value: String, val disabled: Boolean)
 
 sealed interface SelectOutcome {
-    /** [byScript]:键盘没选中,改由脚本设值并补发 input/change(不是可信事件)。 */
+    /** [byScript]: the keyboard did not select it, so the value was set by script and input/change were fired manually (not trusted events). */
     data class Selected(val index: Int, val text: String, val changed: Boolean, val byScript: Boolean) : SelectOutcome
     data object NotASelect : SelectOutcome
     data object Disabled : SelectOutcome
     data class NoSuchOption(val available: List<String>) : SelectOutcome
     data class OptionDisabled(val text: String) : SelectOutcome
-    /** 键盘和脚本都没让它选中这一项。 */
+    /** Neither the keyboard nor a script could make it select this item. */
     data class NotApplied(val text: String) : SelectOutcome
 }
 
 object SelectMatch {
-    /** 先按 value 完全相等,再按显示文字(去空白)相等,最后不分大小写;都没有为 null。 */
+    /** First an exact match on value, then a match on the shown text (trimmed), and finally case-insensitive; null when none match. */
     fun indexOf(options: List<SelectOption>, wanted: String): Int? {
         val w = wanted.trim()
         options.indexOfFirst { it.value == wanted }.takeIf { it >= 0 }?.let { return it }
@@ -395,10 +395,10 @@ private fun callResult(r: JsonObject): JsonObject {
 }
 
 /**
- * 选中 (x, y) 处原生下拉框里的一项。做法:按坐标找到节点(DOM.getNodeForLocation,穿透 shadow 与 iframe),
- * 往上找到 select;聚焦后用方向键一格一格移到目标项,每按一次读回当前项。
- * 方向键是可信的键盘事件,页面框架看到的是真实的 input/change,也不会弹出系统选择框。
- * 方向键走不到(页面拦了按键、多选框)时才用脚本设值并补发 input/change。聚焦、按键、脚本设值都算改动页面的事件。
+ * Selects an item of the native drop-down at (x, y). How: find the node by coordinates (DOM.getNodeForLocation, piercing shadow roots and iframes),
+ * walk up to the select; after focusing it, move to the target option one step at a time with the arrow keys, reading back the current option after each press.
+ * Arrow keys are trusted keyboard events, so page frameworks see real input/change, and the system picker is never shown.
+ * Only when the arrow keys cannot get there (the page intercepts keys, a multi-select) is the value set by script and input/change fired manually. Focusing, key presses and scripted setting all count as events that change the page.
  */
 suspend fun InputTrack.selectOptionAt(x: Double, y: Double, wanted: String): SelectOutcome {
     runCatching { query("DOM.enable") }
@@ -435,7 +435,7 @@ suspend fun InputTrack.selectOptionAt(x: Double, y: Double, wanted: String): Sel
             effect("DOM.focus", buildJsonObject { put("objectId", selectId) })
             var at = start
             var presses = 0
-            // 每按一次读回;按了没动(页面拦了按键)就不再按,总次数不超过选项数
+            // Read back after each press; if pressing did not move it (the page intercepts keys), stop pressing, and never press more times than there are options
             while (at != target && presses <= options.size) {
                 pressCombo(KeyCombo(emptyList(), CdpKeys.named(if (at < target) "ArrowDown" else "ArrowUp")!!))
                 presses++

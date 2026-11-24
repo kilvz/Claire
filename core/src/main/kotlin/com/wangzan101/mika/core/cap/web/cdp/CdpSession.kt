@@ -28,25 +28,25 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
-/** 协议事件。[sessionId] 非空表示来自扁平化附着的子会话(`Target.setAutoAttach` 且 `flatten=true`)。 */
+/** A protocol event. A non-null [sessionId] means it comes from a child session of a flattened attach (`Target.setAutoAttach` with `flatten=true`). */
 data class CdpEvent(val method: String, val params: JsonObject, val sessionId: String? = null)
 
-/** 对端对某个调用回了 error 对象。 */
+/** The peer returned an error object for a call. */
 class CdpException(val code: Int, val errorMessage: String, val method: String, val data: String? = null) :
     RuntimeException("$method failed ($code): $errorMessage" + (data?.let { " — $it" } ?: ""))
 
 class CdpTimeoutException(val method: String, val timeoutMs: Long) : IOException("$method timed out after ${timeoutMs}ms")
 
-/** 连接已断或已关闭;断开时还没回的调用都以它失败。 */
+/** The connection is already lost or closed; when it drops, calls still awaiting a reply fail with this. */
 class CdpConnectionClosedException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 /**
- * 一条 DevTools WebSocket 上的 JSON-RPC 会话。一个读协程负责收包:按 id 交还响应,其余作为事件发出;
- * 发送在 IO 线程上,写帧串行。同一条连接可以带多个扁平化子会话,用 sessionId 区分。
+ * A JSON-RPC session over one DevTools WebSocket. A single reader coroutine receives packets: responses are returned by id, everything else is emitted as an event;
+ * sending happens on IO threads and frames are written serially. The same connection can carry multiple flattened child sessions, distinguished by sessionId.
  *
- * 事件流不重放,没有订阅者时事件直接丢弃;缓冲 [eventBuffer] 条,订阅者跟不上时丢最旧的,
- * 读协程从不因事件阻塞(否则响应也会被卡住)。需要完整事件序列的订阅者要及时消费,
- * 并在发出触发事件的命令前就开始订阅。
+ * The event stream is not replayed; events are dropped outright when there are no subscribers. [eventBuffer] events are buffered, and when a subscriber cannot keep up the oldest are dropped,
+ * so the reader coroutine never blocks on events (otherwise responses would be stuck too). Subscribers that need the complete event sequence must consume promptly
+ * and start subscribing before sending the command that triggers the events.
  */
 class CdpSession(
     private val ws: WebSocketConnection,
@@ -63,12 +63,12 @@ class CdpSession(
     val events: SharedFlow<CdpEvent> = _events.asSharedFlow()
 
     /**
-     * Input 域(鼠标、拖放)坐标与 CSS 像素之比:发出去的坐标 = CSS 像素 × 它。
-     * 平时为 1;视口仿真带缩放(桌面宽度的页面缩进手机视图)时,Input 按缩放前的视图坐标解释,由设仿真的一方改掉。
+     * Ratio of Input domain (mouse, drag-and-drop) coordinates to CSS pixels: the coordinates sent = CSS pixels × this.
+     * Normally 1; when viewport emulation includes scaling (a desktop-width page shrunk into a phone view), Input interprets coordinates in the pre-scale view coordinate system, and whoever sets up the emulation changes this.
      */
     @Volatile var inputScale: Double = 1.0
 
-    /** 上一次鼠标事件落在哪(CSS 像素);还没发过为 null。下一次移动从这里沿轨迹过去。 */
+    /** Where the last mouse event landed (CSS pixels); null if none has been sent yet. The next move travels from here along a path. */
     @Volatile var pointer: Pair<Double, Double>? = null
 
     private val _closed = MutableStateFlow(false)
@@ -86,7 +86,7 @@ class CdpSession(
         val id = nextId.getAndIncrement()
         val p = Pending(method, CompletableDeferred())
         pending[id] = p
-        // 读协程先置 closeError 再清空 pending:这里放进去之后再查一次,就不会漏掉
+        // The reader coroutine sets closeError before clearing pending: check once more after registering here, so nothing is missed
         closeError?.let {
             pending.remove(id)
             throw CdpConnectionClosedException(it.message ?: "closed", it.cause)
@@ -98,7 +98,7 @@ class CdpSession(
             if (sessionId != null) put("sessionId", JsonPrimitive(sessionId))
         }.toString()
         try {
-            // 写也有上限:对端不读、缓冲写满时到点断开连接,不让调用方一直卡在写上
+            // Writes are bounded too: when the peer stops reading and the buffer fills up, the connection is dropped at the deadline rather than leaving the caller stuck in the write
             withStreamDeadline(timeoutMs, method, open = { Closeable { ws.abort() } }, closeOnCancel = false) { ws.sendText(msg) }
         } catch (e: IOException) {
             pending.remove(id)
@@ -112,12 +112,12 @@ class CdpSession(
         }
     }
 
-    /** 发关闭帧并断开;未完成的调用立即失败。 */
+    /** Sends the close frame and disconnects; unfinished calls fail immediately. */
     override fun close() {
         if (closeError != null) return
         shutdown(CdpConnectionClosedException("CDP session closed"))
         runCatching { ws.sendClose() }
-        // 给对端一点时间回关闭帧,然后硬断
+        // Give the peer a moment to send its close frame back, then hard-abort
         scope.launch {
             withTimeoutOrNull(CLOSE_GRACE_MS) { reader.join() }
             ws.abort()
@@ -170,7 +170,7 @@ class CdpSession(
         synchronized(this) {
             if (closeError != null) return
             closeError = error
-            // 先让调用方能看见已关闭,再唤醒在途调用;调用方捕获异常后可立即按关闭状态恢复。
+            // Let callers see "closed" first, then wake in-flight calls; after catching the exception a caller can recover immediately according to the closed state.
             _closed.value = true
         }
         for (id in pending.keys.toList()) {
@@ -188,7 +188,7 @@ class CdpSession(
         private val EMPTY = JsonObject(emptyMap())
         private val json = Json { ignoreUnknownKeys = true }
 
-        /** 打开传输、做 WebSocket 握手,返回会话。[path] 取自目标的 webSocketDebuggerUrl。超时抛 [CdpTimeoutException]。 */
+        /** Opens the transport, performs the WebSocket handshake and returns the session. [path] comes from the target's webSocketDebuggerUrl. Throws [CdpTimeoutException] on timeout. */
         suspend fun connect(
             transport: CdpTransport,
             endpoint: String,
@@ -198,7 +198,7 @@ class CdpSession(
             eventBuffer: Int = DEFAULT_EVENT_BUFFER,
             handshakeTimeoutMs: Long = CdpDiscovery.DEFAULT_TIMEOUT_MS,
         ): CdpSession {
-            // 握手至多 [handshakeTimeoutMs]:到点关掉流,卡住的握手随之失败
+            // The handshake gets at most [handshakeTimeoutMs]: at the deadline the stream is closed and a stuck handshake fails with it
             val ws = withStreamDeadline(handshakeTimeoutMs, "WebSocket handshake $path", open = { transport.open(endpoint) }) { s ->
                 WebSocketConnection.connect(s, path, host, maxMessageBytes)
             }

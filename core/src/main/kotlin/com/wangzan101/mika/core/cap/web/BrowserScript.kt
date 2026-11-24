@@ -18,11 +18,11 @@ import com.wangzan101.mika.core.tool.SubActions
 const val SCRIPT_CODE_MAX_CHARS = 8_000
 const val SCRIPT_DEFAULT_TIMEOUT_MS = 30_000
 const val SCRIPT_MAX_TIMEOUT_MS = 60_000
-/** 一次脚本里最多几个动作(点、输入、打开网址)。 */
+/** Maximum number of actions (tap, type, open a URL) in one script. */
 const val SCRIPT_MAX_ACTIONS = 20
-/** 一次脚本里最多几次 mika.navigate;整页跳走本来就会结束脚本,这条只管同页内跳转后继续的情况。 */
+/** Maximum number of mika.navigate calls in one script; a full-page navigation ends the script anyway, so this only covers continuing after an in-page navigation. */
 const val SCRIPT_MAX_NAVIGATIONS = 3
-/** 一次脚本里最多几次读(snapshot、read):每次都进运行记录。 */
+/** Maximum number of reads (snapshot, read) in one script: each one goes into the run log. */
 const val SCRIPT_MAX_READS = 40
 private const val MAX_LOGS = 50
 private const val MAX_LOG_CHARS = 500
@@ -38,12 +38,12 @@ private const val TEXT_MAX_CHARS = 30_000
 private const val TEXT_DEFAULT_CHARS = 4_000
 private const val WAIT_DEFAULT_MS = 5_000
 
-/** 这些错误一出现整个脚本就停:剩下的动作不再做,交回模型。 */
+/** As soon as one of these errors occurs the whole script stops: the remaining actions are not performed and control goes back to the model. */
 private val FATAL = setOf(com.wangzan101.mika.core.run.ManualControl.CHANGED, "confirmation_required", "guard_stopped", "handed_over", "tab_crashed", "no_tab_open")
 
 /**
- * 一次 web_script 的 `mika.*` 调用:校验参数、计上限、翻译成工具调用交给 [sub](子步编号 `<callId>.<n>`),
- * 把结果整理成脚本拿到的值;记下每一步的结局,最后整理成工具结果。
+ * The `mika.*` calls of one web_script: validates arguments, counts against the limits, translates them into tool calls handed to [sub] (sub-step ids `<callId>.<n>`),
+ * and shapes the results into the values the script receives; records how each step ended and finally assembles the tool result.
  */
 internal class ScriptCalls(private val callId: String, private val sub: SubActions?, private val tools: ToolIndex) : ScriptBridge {
     private val steps = mutableListOf<JsonObject>()
@@ -57,7 +57,7 @@ internal class ScriptCalls(private val callId: String, private val sub: SubActio
     private var abort: ScriptAbort? = null
     private var abortExtra: JsonObject = JsonObject(emptyMap())
 
-    /** 做这个动作的工具。 */
+    /** The tool that performs this action. */
     private fun tool(verb: Verb): String = tools.nameOf(verb, WEB)!!
 
     override fun log(text: String) {
@@ -133,7 +133,7 @@ internal class ScriptCalls(private val callId: String, private val sub: SubActio
             }
             return fail(error ?: "failed", message)
         }
-        // 写操作之后页面变了,旧编号作废;要再点就再 snapshot
+        // The page changed after a write action, so old refs are invalid; take another snapshot before tapping again
         if (write) snapshotId = null
         return when (op) {
             "snapshot" -> {
@@ -162,8 +162,8 @@ internal class ScriptCalls(private val callId: String, private val sub: SubActio
     }
 
     /**
-     * mika.query / queryAll / text:校验、计数,交回 `{ok, read:{mode, selector, fields, limit, maxChars}}`,由端口在读取世界里读。
-     * 按 value 属性选元素不行(能一位一位猜出隐藏字段的值),转义、注释、命名空间的写法也认([SelectorPolicy])。
+     * mika.query / queryAll / text: validates, counts, and returns `{ok, read:{mode, selector, fields, limit, maxChars}}`; the port performs the read in the read world.
+     * Selecting elements by the value attribute is not allowed (the value of hidden fields could be guessed digit by digit); escaped, commented and namespaced spellings are also recognized ([SelectorPolicy]).
      */
     private fun pageRead(op: String, args: JsonObject): JsonObject {
         val selector = str(args, "selector")?.takeIf { it.length <= SELECTOR_MAX_CHARS } ?: return bad("mika.$op needs a CSS selector (at most $SELECTOR_MAX_CHARS characters)")
@@ -198,7 +198,7 @@ internal class ScriptCalls(private val callId: String, private val sub: SubActio
         }
     }
 
-    /** 整理成 web_script 的工具结果。 */
+    /** Assembles the tool result of web_script. */
     fun content(run: ScriptRun): JsonObject {
         val stopped = abort
         return buildJsonObject {
@@ -251,7 +251,7 @@ internal class ScriptCalls(private val callId: String, private val sub: SubActio
 
     private fun str(o: JsonObject, k: String): String? = (o[k] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
 
-    /** 没给为 0;给了但不合法为 null。 */
+    /** 0 when not given; null when given but invalid. */
     private fun int(o: JsonObject, k: String, min: Int, max: Int): Int? {
         val v = o[k] ?: return 0
         if (v is JsonNull) return 0
