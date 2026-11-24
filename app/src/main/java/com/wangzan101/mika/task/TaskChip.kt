@@ -11,7 +11,7 @@ import com.wangzan101.mika.ui.ToolLabels
 private val tools by lazy { knownTools() }
 private val labels by lazy { ToolLabels(tools) }
 
-/** 收起时优先显示需要用户处理的事项，运行中显示当前大阶段。 */
+/** When collapsed, show the things that need the user first; while running, show the current major stage. */
 internal fun taskChip(origin: RunOrigin, state: TaskState, stage: TaskStage? = null): String? {
     if (origin != RunOrigin.Ui) return null
     val label = when (state) {
@@ -31,7 +31,7 @@ internal fun taskChip(origin: RunOrigin, state: TaskState, stage: TaskStage? = n
     return tr(label)
 }
 
-/** 没有旁白时展开卡片也能看懂当前动作；等模型时不沿用上一步的工具名。 */
+/** Without narration the expanded card should still make the current action readable; while waiting for the model it doesn't reuse the previous step's tool name. */
 internal fun chipDetail(state: TaskState.Running, stage: TaskStage? = null): String {
     if (stage != null) return "${stage.ordinal} · ${stage.detail}"
     val tool = state.tool

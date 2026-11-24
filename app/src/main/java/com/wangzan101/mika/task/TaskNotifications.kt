@@ -52,15 +52,15 @@ import com.wangzan101.mika.task.TaskService.Companion.send
 import com.wangzan101.mika.task.TaskService.Companion.resultDelivery
 import com.wangzan101.mika.task.TaskService.Companion.describe
 
-// 任务服务:进度、需要处理与结果通知
-/** 已交还、循环还没往下走的那一小段:不再显示接管按钮。 */
+// Task service: progress, attention and result notifications
+/** The brief moment after handing back while the loop hasn't moved on: no more takeover buttons are shown. */
 internal fun TaskService.awaitingUser(run: TaskRun, state: TaskState) =
     state !is TaskState.WaitingTakeover || run.takeoverStage.value != Takeover.Stage.None
 
-/** 主屏一次只交一个 App:接管排在别的任务后面时先不给接管按钮。 */
+/** Only one app is handed over on the main screen at a time: no takeover button is offered while this takeover is queued behind another task. */
 internal fun TaskService.takeoverFirst(run: TaskRun) = run.takeover?.let(takeoverQueue::isFirst) ?: true
 
-/** 用 [run] 的进度通知编号进前台;还没有任务对象时用第一个槽位的。 */
+/** Enter the foreground with [run]'s progress notification ID; use the first slot's ID when there is no task object yet. */
 internal fun TaskService.startInForeground(run: TaskRun?, n: Notification) {
     val nid = run?.let { id(ID_PROGRESS, it) } ?: ID_PROGRESS
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -109,7 +109,7 @@ internal fun TaskService.progressNotification(run: TaskRun, state: TaskState): N
     return b.build()
 }
 
-/** 忙着却还没有任务对象时(收尾被打断等)也得马上进前台。 */
+/** Must enter the foreground right away when busy but without a task object yet (e.g. teardown was interrupted). */
 internal fun TaskService.preparingNotification(): Notification = Notification.Builder(this, CHANNEL_PROGRESS)
     .setSmallIcon(R.drawable.ic_notification)
     .setContentTitle("Claire")
@@ -124,8 +124,8 @@ internal fun TaskService.answerTooLate() = Handler(Looper.getMainLooper()).post 
 }
 
 /**
- * 等待接管或回答时另发的醒目通知;其余状态没有。
- * 悬浮胶囊正显示在亮着的屏幕上时照发,但安静地进通知栏(胶囊已经变橙,见 [alertQuietly]);锁屏、胶囊关着或画不出来时照旧弹出。
+ * The prominent extra notification sent while waiting for a takeover or an answer; none for the other states.
+ * It is still sent while the floating capsule is showing on a lit screen, but quietly into the notification shade (the capsule has already turned orange, see [alertQuietly]); when the screen is locked, or the capsule is off or can't be drawn, it pops up as usual.
  */
 internal fun TaskService.attentionNotification(run: TaskRun, state: TaskState): Notification? {
     if (!awaitingUser(run, state)) return null
@@ -160,15 +160,15 @@ internal fun TaskService.attentionNotification(run: TaskRun, state: TaskState): 
         .setContentText(text)
         .setStyle(Notification.BigTextStyle().bigText(text))
         .setCategory(Notification.CATEGORY_REMINDER)
-        .setOnlyAlertOnce(true) // 同一次等待里换按钮不再响铃;离开等待时撤掉,下一次会重新提醒
+        .setOnlyAlertOnce(true) // don't ring again when buttons change within the same wait; it is removed when leaving the wait, so the next one alerts anew
         .setContentIntent(openApp(run.conversationId))
     if (quiet) b.alertQuietly()
     when (state) {
         is TaskState.WaitingTakeover -> takeoverActions(run).forEach(b::addAction)
         is TaskState.WaitingInput -> {
             b.addAction(replyAction(run, state.options))
-            // 安卓通知最多显示 3 个按钮,所以是「回复」+ 前两个选项;
-            // 全部选项都放进回复的快捷选项(RemoteInput choices),多出的选项在那里能选到
+            // Android notifications show at most 3 buttons, so this is "Reply" plus the first two options;
+            // all options go into the reply's quick choices (RemoteInput choices), so the extra ones can be picked there
             state.options.orEmpty().take(2).forEachIndexed { i, o -> b.addAction(answerAction(run, o, i)) }
         }
         else -> Unit
@@ -201,7 +201,7 @@ internal fun TaskService.takeoverActions(run: TaskRun): List<Notification.Action
     )
 }
 
-/** 经由不显示界面的 Activity:从通知启动 Activity 才会收起通知栏。 */
+/** Goes through an Activity with no UI: launching an Activity from a notification is what collapses the notification shade. */
 internal fun TaskService.takeoverAction(run: TaskRun, title: String, action: String, code: Int): Notification.Action {
     val pi = PendingIntent.getActivity(
         this, code + SLOT_STRIDE * run.slot, Intent(this, TakeoverActivity::class.java).setAction(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -216,7 +216,7 @@ internal fun TaskService.replyAction(run: TaskRun, options: List<String>?): Noti
     val input = RemoteInput.Builder(KEY_REPLY).setLabel(getString(R.string.reply_hint))
         .apply { if (!options.isNullOrEmpty()) setChoices(options.toTypedArray()) }
         .build()
-    // 回复内容要由系统填进 Intent,只能用可变的 PendingIntent(Intent 是显式的)
+    // The system has to fill the reply into the Intent, so only a mutable PendingIntent works (the Intent is explicit)
     val pi = PendingIntent.getService(
         this, 6 + SLOT_STRIDE * run.slot, Intent(this, TaskService::class.java).setAction(ACTION_ANSWER).putExtra(EXTRA_RUN, run.key),
         PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -251,8 +251,8 @@ internal suspend fun TaskService.notifyResult(run: TaskRun, result: Delivery.Res
 }
 
 /**
- * 定时任务这次又没成,连上之前接连失败的到了 [FAILURE_STREAK_NOTICE] 次及以上时是总次数(含这次):
- * 通知标题写明连着失败了几次、提醒去暂停或修改,免得每次只看到一条普通的失败。查不到记录时按没有连续失败算。
+ * A scheduled task failed again: once the consecutive failures including this one reach [FAILURE_STREAK_NOTICE] or more, this is the total count (including this one):
+ * the notification title states how many times in a row it failed and suggests pausing or editing, so the user doesn't just see an ordinary failure every time. When the record can't be read, no streak is assumed.
  */
 internal fun TaskService.failureStreak(run: TaskRun, end: TaskState): Int? {
     val key = run.triggerWindowKey ?: return null

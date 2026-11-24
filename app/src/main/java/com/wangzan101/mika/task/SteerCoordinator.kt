@@ -8,8 +8,8 @@ import com.wangzan101.mika.core.run.RunInbox
 import java.util.UUID
 
 /**
- * 一个任务进行中插的话的收发、去向与撤回。原 TaskRun 里的插话逻辑整体搬到这里。
- * 需要读的 TaskRun 瞬时字段([loop]/[stopPressed]/[mcpExternalId])经 lambda 注入,读当前值。
+ * Sending, receiving, routing and withdrawal of messages injected while a task is running. The steering logic from the original TaskRun was moved here wholesale.
+ * The transient TaskRun fields it needs ([loop]/[stopPressed]/[mcpExternalId]) are injected as lambdas that read the current value.
  */
 internal class SteerCoordinator(
     private val service: TaskService,
@@ -20,17 +20,17 @@ internal class SteerCoordinator(
     private val stopPressed: () -> Boolean,
     private val mcpExternalId: () -> String?,
 ) {
-    /** 插话撤掉的那段回复,等这一批插话里第一句交给模型时挂到它上面。 */
+    /** The stretch of reply that a steer cut off, attached to the first steer of the batch when it is handed to the model. */
     private val steerJoin = SteerJoin()
 
     /**
-     * 同一对话在任务进行中的新原话，交给下一次模型步；准备阶段也会先排在 Inbox。
-     * [messageId] 是界面给这句话的编号,界面据此标出它的去向(见 [SteerNote])。
+     * New user text in the same conversation while the task is running, handed to the next model step; during the preparation phase it is also queued in the Inbox first.
+     * [messageId] is the ID the UI assigned to this message; the UI uses it to show where the message went (see [SteerNote]).
      */
     fun steer(text: String, messageId: String = UUID.randomUUID().toString()) {
         synchronized(service.taskState.shownLock) {
             state._steers.value = state._steers.value + SteerNote(messageId, text, SteerState.Pending)
-            // 收件箱收下了就马上告诉用户:模型此刻的请求已撤掉,下一步就带着这句话想(交给模型时再改成已加入)
+            // Tell the user as soon as the inbox accepts it: the model's current request has been cancelled and the next step will think with this message (changed to joined when handed to the model)
             if (inbox.steer(messageId, text) == InputReceipt.Accepted) markSteers(setOf(messageId), SteerState.Received, from = SteerState.Pending)
             else {
                 if (stopPressed()) markSteers(setOf(messageId), SteerState.Cancelled)
@@ -42,13 +42,13 @@ internal class SteerCoordinator(
         }
     }
 
-    /** 远程追加只归当前任务;与状态发布互斥,收件箱再原子核对是否已经结束/取消。 */
+    /** A remote addition belongs to the current task only; this is mutually exclusive with state publishing, and the inbox then atomically verifies whether the run has already ended/been cancelled. */
     fun steerRemote(text: String): String? = synchronized(state.publishLock) delivery@{
         if (state.ended || stopPressed() || mcpExternalId() == null || state._state.value !is TaskState.Running) return@delivery null
         if (loop()?.state?.value?.let { it !is TaskState.Running } == true) return@delivery null
         val id = UUID.randomUUID().toString()
         synchronized(service.taskState.shownLock) {
-            // 先记消息,再唤醒模型;消费事件可能紧跟着发生,不能把 Joined 改回 Received。
+            // Record the message first, then wake the model; the consumption event may follow immediately, so Joined must not be turned back into Received.
             state._steers.value = state._steers.value + SteerNote(id, text, SteerState.Received, remote = true)
             if (inbox.steerCurrent(id, text) != InputReceipt.Accepted) {
                 state._steers.value = state._steers.value.filterNot { it.id == id }
@@ -58,14 +58,14 @@ internal class SteerCoordinator(
         }
     }
 
-    /** 撤回手机上插的、模型还没取走的那句;已取走、已收尾或是电脑追加的(收件箱拒绝)返回 false,去向不变。 */
+    /** Withdraw a message injected from the phone that the model hasn't taken yet; returns false and leaves the routing unchanged if it was already taken, the run has finished, or it was a remote addition (rejected by the inbox). */
     fun withdrawSteer(messageId: String): Boolean = synchronized(service.taskState.shownLock) {
         if (!inbox.withdrawSteer(messageId)) return@synchronized false
         markSteers(setOf(messageId), SteerState.Withdrawn)
         true
     }
 
-    /** 手机插话可转下一任务;远程插话只能用于当前任务,未消费的一律作废,不改变来源和权限。 */
+    /** Steers from the phone can carry over to the next task; remote steers are only good for the current task, so any unconsumed ones are discarded, without changing their origin or permissions. */
     fun handoffUnconsumed(cancelled: Boolean = stopPressed()) {
         val left = inbox.handoffUnconsumed()
         val (discard, next) = left.partition { cancelled || it.currentTaskOnly }
@@ -76,10 +76,10 @@ internal class SteerCoordinator(
 
     fun joinedSteers(): List<String> = joined().map { it.text }
 
-    /** 和 [joinedSteers] 一一对应:每句插话打断的那段回复,没打断的是空串。 */
+    /** One-to-one with [joinedSteers]: the stretch of reply each steer interrupted, empty string when it interrupted nothing. */
     fun joinedInterrupted(): List<String> = joined().map { it.interrupted.orEmpty() }
 
-    /** 和 [joinedSteers] 一一对应:每句插话交给模型之前已经说完的那段回复,没有的是空串。 */
+    /** One-to-one with [joinedSteers]: the stretch of reply already finished and shown before each steer was handed to the model, empty string when there is none. */
     fun joinedFinished(): List<String> = joined().map { it.finished.orEmpty() }
 
     private fun joined() = state._steers.value.filter { it.state == SteerState.Joined }
@@ -88,7 +88,7 @@ internal class SteerCoordinator(
         synchronized(service.taskState.shownLock) { state._steers.value = steerJoin.joined(state._steers.value, id) }
     }
 
-    /** 把 [ids] 这几句改成 [to];给了 [from] 时只改还在那个状态的(收下和交给模型可能先后颠倒,不往回改)。 */
+    /** Set the [ids] entries to [to]; when [from] is given only those still in that state are changed (acceptance and handoff to the model can arrive out of order, so never move backwards). */
     private fun markSteers(ids: Set<String>, to: SteerState, from: SteerState? = null) {
         if (ids.isEmpty()) return
         synchronized(service.taskState.shownLock) {
@@ -96,7 +96,7 @@ internal class SteerCoordinator(
         }
     }
 
-    // 供 TaskRun 的 liveEvents 委托(插话相关事件)
+    // Delegates for TaskRun's liveEvents (steering-related events)
     fun onInterrupted(detail: String) { steerJoin.interrupted(detail) }
     fun onFinished(detail: String) { steerJoin.finished(detail) }
     fun onSteerReceived(detail: String) { joinSteer(detail) }

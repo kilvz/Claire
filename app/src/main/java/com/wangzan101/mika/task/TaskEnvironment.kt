@@ -15,43 +15,43 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 
 /**
- * 任务从 App 拿的:模型从哪来、评测钩子、显示中的任务此刻有没有屏幕画面。整个进程一份,由 App 给出;
- * 测试换掉里面的模型来源与钩子。
+ * What a task takes from the App: where the models come from, the eval hooks, and whether the displayed task currently has a screen image. One per process, provided by the App;
+ * tests swap out the model sources and hooks inside it.
  */
 class TaskEnvironment {
-    /** 显示中的任务的虚拟屏编号;没有任务、或还没建过屏(用到系统命令、事件工具或第一次打开 App 时才建)时为 -1。 */
+    /** Virtual display ID of the displayed task; -1 when there is no task, or no display has been created yet (it is created when a shell command, an events tool or the first app launch needs it). */
     val agentDisplayId = MutableStateFlow(-1)
-    /** 显示中的任务已经在虚拟屏上打开过 App(屏建好了不算:只跑系统命令时屏是空的)。 */
+    /** The displayed task has already opened an app on the virtual display (merely creating the display doesn't count: it is empty when only shell commands run). */
     val agentAppShown = MutableStateFlow(false)
-    /** 显示中的任务正在用内置浏览器(画中画要显示网页画面)。 */
+    /** The displayed task is currently using the built-in browser (picture-in-picture should show the web surface). */
     val webScreenOpen = MutableStateFlow(false)
-    /** 画中画有画面可看:虚拟屏上打开过 App,或在用内置浏览器。只建了空屏的任务不算。 */
+    /** There is something for picture-in-picture to show: an app was opened on the virtual display, or the built-in browser is in use. A task that only created an empty display doesn't count. */
     val previewOpen: Flow<Boolean> = combine(agentAppShown, webScreenOpen) { app, web -> app || web }
 
-    // 三个工厂的 ModelSession 是这次调用属于的对话(ModelSession.of(对话 id)):同一段对话里建的模型都给同一个,
-    // 服务商要会话号的就照它路由、复用缓存
+    // The ModelSession handed to the three factories is the conversation this call belongs to (ModelSession.of(conversation id)): models created within the same conversation all get the same one,
+    // so providers that require a session ID route and reuse caches by it
 
-    /** 主模型来自设置里的模型配置;测试可换成脚本模型。 */
+    /** The main model comes from the model configuration in settings; tests can swap in a scripted model. */
     @Volatile var modelFactory: (Context, ModelSession) -> ChatModel? = defaultModelFactory
-    /** 轻量模型(列成功标准等);为空时由主模型兼任。测试换主模型时一并换掉,免得调到设置里的真模型。 */
+    /** The light model (listing success criteria, etc.); when null the main model doubles for it. Swapped out together with the main model in tests, so the real model from settings isn't hit. */
     @Volatile var lightModelFactory: (Context, ModelSession) -> ChatModel? = defaultLightModelFactory
-    /** 视觉模型(核查时看截图);设置里没有能看图的模型时为空。 */
+    /** The vision model (reads screenshots when verifying); null when settings have no model that can see images. */
     @Volatile var visionModelFactory: (Context, ModelSession) -> ChatModel? = defaultVisionModelFactory
-    /** 视觉模型备援链 */
+    /** Vision model fallback chain */
     @Volatile var visionFallbackFactory: (Context, ModelSession) -> List<ChatModel> = defaultVisionFallbackFactory
-    /** 轻量模型备援链 */
+    /** Light model fallback chain */
     @Volatile var lightFallbackFactory: (Context, ModelSession) -> List<ChatModel> = defaultLightFallbackFactory
-    /** 独立的决策接口,不占主/视觉/轻量用途。测试可注入;替换主模型时不隐式调用真实决策服务。 */
+    /** A separate decision interface that doesn't take up the main/vision/light roles. Tests can inject it; replacing the main model never implicitly calls the real decision service. */
     @Volatile var decisionModelFactory: (Context) -> DecisionModel? = defaultDecisionModelFactory
 
     fun decisionModel(context: Context): DecisionModel? =
         if (modelFactory !== defaultModelFactory && decisionModelFactory === defaultDecisionModelFactory) null
         else decisionModelFactory(context)
 
-    /** 评测跑器用的钩子;产品里全是默认值。 */
+    /** Hooks used by the eval runner; all defaults in the product. */
     val evalHooks = EvalHooks()
 
-    /** 给出进程里那一份的 Application。 */
+    /** An Application that provides the process-wide instance. */
     interface Owner {
         val tasks: TaskEnvironment
     }

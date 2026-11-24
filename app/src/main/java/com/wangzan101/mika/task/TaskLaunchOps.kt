@@ -41,8 +41,8 @@ import com.wangzan101.mika.task.TaskService.Companion.cancel
 import com.wangzan101.mika.task.TaskService.Companion.answer
 import com.wangzan101.mika.task.TaskService.Companion.describe
 
-// 任务服务:新任务开始、命名对话与运行启动
-/** 正在采集或暂停的示范里不开始任务，也不把排队项取走。 */
+// Task service: starting new tasks, naming conversations and launching runs
+/** Don't start a task while a demo is being captured or is paused, and don't take queued items away either. */
 internal fun TaskService.teachingBlocks(): Boolean {
     val app = application as? com.wangzan101.mika.MikaApp ?: return false
     return app.teachReady && app.teach.blocksTasks()
@@ -71,7 +71,7 @@ internal fun TaskService.begin(newGoal: String, requestedConversation: String?,
         return
     }
     parallel = FeatureFlags.get(this).speedFlags().parallelTasks
-    // 同一对话里正在执行或排队的任务收到新原话时，交给它的 Inbox。
+    // When a running or queued task in the same conversation receives new user text, hand it to that task's Inbox.
     requestedConversation?.let(center::byConversation)?.let { existing ->
         if (provenance.origin == RunOrigin.Ui) {
             if (messageId != null) existing.steer(newGoal, messageId) else existing.steer(newGoal)
@@ -79,8 +79,8 @@ internal fun TaskService.begin(newGoal: String, requestedConversation: String?,
             return
         }
     }
-    // 插话到的时候那个任务已经收尾:作为这个对话的下一件事,不因服务还在收尾而丢掉。
-    // 走同一个持久队列:即使对话刚好空着,也先写盘再认领和开始。
+    // The task had already finished when the steer arrived: keep it as the next job for this conversation instead of dropping it because the service is still winding down.
+    // It goes through the same persistent queue: even if the conversation happens to be idle, write it to disk first, then claim and start it.
     if (messageId != null && requestedConversation != null) {
         val item = QueuedFollowUp(messageId, requestedConversation, newGoal, System.currentTimeMillis(), QueuedSource.Fallback,
             provenance = provenance, channelPeer = channelPeer, channelMessageId = channelMessageId)
@@ -98,8 +98,8 @@ internal fun TaskService.begin(newGoal: String, requestedConversation: String?,
 }
 
 /**
- * 活任务检查之后的公共部分:建/排一个任务。[followUp] 是排队里取出来的项(或引导 fallback):
- * 运行真正 `markRunning` 时才结束它的持久排队生命周期;这个对话刚好又有任务时,tryStart 会在同一个锁里把它放回队列。
+ * Common part after the live-task checks: create or queue a task. [followUp] is an item taken from the queue (or a guided fallback):
+ * its persistent queue lifetime ends only when the run actually calls `markRunning`; if this conversation happens to have a task again, tryStart puts it back into the queue under the same lock.
  */
 internal fun TaskService.startNew(newGoal: String, requestedConversation: String?,
     provenance: RunProvenance = RunProvenance(), triggerKey: String? = null,
@@ -115,11 +115,11 @@ internal fun TaskService.startNew(newGoal: String, requestedConversation: String
         return
     }
     parallel = FeatureFlags.get(this).speedFlags().parallelTasks
-    // 别的对话的任务正在跑、并行关着(或已到上限)时不丢:登记处让它排在后面,那个任务收尾时放出来。
-    // 对话页先等服务空下来再交过来,但查完到交到之间别处(定时、电脑)可能先开始了一个,这里同样排上
+    // When a task in another conversation is running and parallelism is off (or at its limit), nothing is dropped: the registry queues it behind, and it is released when that task finishes.
+    // The conversation page waits for the service to go idle before handing over, but between that check and the handover something else (a schedule, the computer) may have started one, so queue it here as well
     val store = ConversationStore.shared(this)
     val conversationId = requestedConversation ?: store.newConversation()
-    // 定时和电脑交来的任务不丢:这个对话还有任务时排在它后面
+    // Scheduled and computer-handled tasks are never dropped: they queue behind if this conversation still has a task
     val queueHere = provenance.origin == RunOrigin.Trigger || provenance.origin == RunOrigin.Mcp || provenance.origin == RunOrigin.Channel
     when (val r = center.tryStart(conversationId, newGoal, queueInConversation = queueHere,
         channelPeer = channelPeer, channelMessageId = channelMessageId, followUp = followUp)) {
@@ -144,9 +144,9 @@ internal fun TaskService.startNew(newGoal: String, requestedConversation: String
             acknowledgeChannel(channelPeer, channelMessageId)
             taskState._busy.value = true
             taskState._conversationId.value = conversationId
-            // 先登记再显示:界面收到它的状态时,任务列表里已经有它(对话、原话)
+            // Register before showing: by the time the UI receives its state, the task is already in the list (conversation, user text)
             publishRuns()
-            // 清空成功标准、运行编号,显示排队
+            // Clear the success criteria and run ID, and show it as queued
             if (center.running().none { it.conversationId == conversationId }) r.run.show()
             r.run.queue(r.position)
             keepForeground()
@@ -155,7 +155,7 @@ internal fun TaskService.startNew(newGoal: String, requestedConversation: String
             nameConversation(store, conversationId, newGoal, provenance)
             taskState._busy.value = true
             taskState._conversationId.value = conversationId
-            // 清空成功标准、运行编号,状态置为「正在准备」
+            // Clear the success criteria and run ID, and set the state to "preparing"
             val run = r.run
             run.provenance = provenance
             run.triggerWindowKey = triggerKey
@@ -171,7 +171,7 @@ internal fun TaskService.startNew(newGoal: String, requestedConversation: String
             run.channelMessageId = channelMessageId
             acceptChannel(run)
             acknowledgeChannel(channelPeer, channelMessageId)
-            // 先登记再显示:界面收到它的状态时,任务列表里已经有它(对话、原话)
+            // Register before showing: by the time the UI receives its state, the task is already in the list (conversation, user text)
             publishRuns()
             run.show()
             val fg = foreground
@@ -185,13 +185,13 @@ internal fun TaskService.startNew(newGoal: String, requestedConversation: String
     }
 }
 
-/** 用户(或电脑)在新对话里交来的第一句话:后台请模型起一个标题记下(只起一次,起不出来就不记)。 */
+/** The first message the user (or the computer) hands over in a new conversation: ask a model in the background for a title and record it (only once; if it fails, nothing is recorded). */
 internal fun TaskService.nameConversation(store: ConversationStore, id: String, first: String, provenance: RunProvenance) {
     if (provenance.origin != RunOrigin.Ui && provenance.origin != RunOrigin.Mcp && provenance.origin != RunOrigin.Channel) return
     scope.launch(Dispatchers.IO + store.meter(id)) {
         runCatching {
             val env = TaskEnvironment.of(this@nameConversation)
-            // 起标题也属于这段对话,和对话里的任务用同一个会话号
+            // Titling also belongs to this conversation and uses the same session ID as the tasks in it
             val session = ModelSession.of(id)
             ConversationTitler.ensure(store, id, first) {
                 listOfNotNull(env.lightModelFactory(this@nameConversation, session), env.modelFactory(this@nameConversation, session))
@@ -200,7 +200,7 @@ internal fun TaskService.nameConversation(store: ConversationStore, id: String, 
     }
 }
 
-/** 已经在前台(或即将收尾)时再次进入前台:用前台那个任务的进度通知。 */
+/** Entering the foreground again while already in it (or about to finish): use the foreground task's progress notification. */
 internal fun TaskService.keepForeground() {
     val fg = foreground
     if (fg != null) startInForeground(fg, progressNotification(fg, fg.state.value))
@@ -224,7 +224,7 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
     val meter = store.meter(run.conversationId)
     run.job = scope.launch(meter) {
         center.markRunning(run)
-        // 定时任务没人在场,卡住了没人停:跑过设置里的最长运行时间就停下(默认不限制)
+        // No one is around for a scheduled task, so nothing stops it if it hangs: stop after the maximum run time from settings (unlimited by default)
         val limitMinutes = if (run.triggerWindowKey != null) FeatureFlags.get(service).triggerRunMinutes() else null
         val result = try {
             val prior = runCatching { store.turns(run.conversationId) }.getOrDefault(emptyList()).map(::withKeptState)
@@ -250,9 +250,9 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
         } catch (e: Exception) {
             TaskState.Failed(tr(R.string.task_error, e.message ?: e::class.simpleName), FailKind.Environment)
         }
-        // shell 进程没了,虚拟屏和上面的 App 一起没了;任务没法接着做
+        // The shell process is gone, and the virtual display and the apps on it went with it; the task can't continue
         val end = if (run.shellDied && result !is TaskState.Succeeded) TaskState.Failed(SHELL_DIED, FailKind.Environment) else result
-        // 停下了:界面当场显示已停止,交代随后补上(先登记「正在整理」,界面收到终态时就知道还有话要来)
+        // Stopped: the UI shows stopped on the spot and the summary follows (register "summarizing" first, so the UI knows more is coming when the terminal state arrives)
         val draft = if (end == TaskState.Cancelled) run.draftText() else null
         val stopRunId = run.runId.value?.takeIf { end == TaskState.Cancelled && !run.conditionCheck && run.hasStopMaterial(draft) }
         stopRunId?.let { id -> taskState._summarizing.update { it + id } }
@@ -295,7 +295,7 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
         val deliveryId = "result:${run.key}"
         run.clearTakeoverStage()
         synchronized(notifyLock) { getSystemService(NotificationManager::class.java).cancel(id(ID_ATTENTION, run)) }
-        // 先发结果通知,再在后台学(提取记忆、记技能结果、起草技能);用进程级作用域,服务退出也做完
+        // Send the result notification first, then learn in the background (extract memories, record skill outcomes, draft skills); a process-level scope is used so it finishes even if the service exits
         var delivered = false
         val app = applicationContext
         runCatching {
@@ -305,16 +305,16 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
             center.markResult(run, describe(end).second, deliveryId, successful = end is TaskState.Succeeded)
             RunLearning.launchAfter(MemoryRuntime.of(service).scope + meter, {
                 delivered = notifyResult(run, delivery) == DeliveryState.Delivered
-                // 失败结局不需要额外判定,送达后立即结束定时窗口。
+                // A failed outcome needs no extra judgement; the trigger window ends as soon as it is delivered.
                 if (delivered && end !is TaskState.Succeeded) run.triggerWindowKey?.let { key ->
                     runCatching {
                         TriggerRuntime.actionFailed(app, key, describe(end).second)
                     }.onFailure { Log.w(TAG, "could not record trigger result", it) }
                 }
             }) {
-                // 交出之后:回答按用户的要求判结局(记进运行记录和这一轮对话),只从办成的学
+                // After handoff: judge the answer against the user's request (recorded in the run record and this turn of the conversation), and learn only from runs that succeeded
                 val judged = if (run.workflowAttemptId != null) workflowJudged else runCatching { run.settleOutcome(end, store) }.onFailure { Log.w(TAG, "outcome judging failed", it) }.getOrNull()
-                // 回答如实说没办成、只办了一部分的,和放弃一样记成没办成;没判成的照交出算
+                // If the answer honestly says it was not done or only partly done, record it as not done like an abandonment; an unjudged run counts as delivered
                 val notDone = judged?.outcome == RunOutcome.Partial || judged?.outcome == RunOutcome.NotPossible
                 if (delivered && notDone && end is TaskState.Succeeded) run.triggerWindowKey?.let { key ->
                     runCatching { TriggerRuntime.actionFailed(app, key, judged?.reason?.ifBlank { null } ?: describe(end).second) }
@@ -337,6 +337,6 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
         }
         onRunEnded(run, store)
     }
-    // 收尾前被取消(服务退出)、放出来还没跑就被停掉时,替它拿着的屏幕锁没交出去也没放开:这里放开
+    // If it is cancelled before teardown (service exit), or released and then stopped before it runs, the screen lock held on its behalf was neither handed over nor released: release it here
     run.job?.invokeOnCompletion { waitingLockWatcher.cancel(); run.wakeHandoff?.release(); run.wakeHandoff = null }
 }

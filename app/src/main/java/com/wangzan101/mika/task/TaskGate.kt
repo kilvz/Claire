@@ -11,35 +11,35 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 /**
- * AgentLoop 在每个会改动屏幕的工具之前调用 [pass]。按先后检查:
- * 1. 手机操作助手不可用 → 暂停,等它恢复且用户点「继续」;
- * 2. 任务被挪到主屏(用户在主屏打开了这个 App)→ 暂停,用户点「继续」后才把它挪回虚拟屏;
- *    Claire 不自己判断用户是否用完,避免在用户眼前把 App 抽走;
- * 3. 屏幕熄灭或锁屏 → 定时任务及另行授权的微信任务尝试唤醒/解锁，其他任务等待解锁；亮屏并解锁后自动继续。
- * 前两条只在这一步用的是手机(phone 为 true)时才查:网页、沙箱上的步骤不需要助手,也不会被挪到主屏。
- * 另外,用户在浏览器页上亲手摸了借给任务的页面([onUserOnPage])→ 不论哪种屏都先停下,用户点「继续」再接着做。
- * 不碰界面的步骤(模型推理、读屏)不经过这里,照常进行。
+ * AgentLoop calls [pass] before every tool that changes the screen. The checks, in order:
+ * 1. The phone-control helper is unavailable → pause, wait for it to recover and for the user to tap "Continue";
+ * 2. The task was moved to the main screen (the user opened this app on the main screen) → pause, and move it back to the virtual display only after the user taps "Continue";
+ *    Claire never decides by itself that the user is done, to avoid pulling the app away in front of them;
+ * 3. The screen is off or locked → scheduled tasks and separately authorized WeChat tasks try to wake/unlock it, other tasks wait for the unlock; they continue automatically once the screen is on and unlocked.
+ * The first two are only checked when this step uses the phone (phone is true): steps on the web or in the sandbox need no helper and can't be moved to the main screen.
+ * In addition, when the user personally touches the page lent to the task on the browser page ([onUserOnPage]) → stop first regardless of the surface, and continue once the user taps "Continue".
+ * Steps that don't touch the screen (model inference, reading the screen) don't come through here and proceed as usual.
  */
 class TaskGate(
     private val locked: StateFlow<Boolean>,
     private val shellAvailable: StateFlow<Boolean>,
-    /** 写操作前同步重读系统锁屏状态，避免熄屏广播尚未处理时放行。 */
+    /** Re-read the system lock state synchronously before write operations, so nothing is let through while the screen-off broadcast is still unprocessed. */
     private val refreshLocked: (() -> Unit)? = null,
-    /** 无人值守任务遇到锁屏时调用;返回解锁状态,返回前必须按系统状态刷新 [locked]。 */
+    /** Called when an unattended task hits the lock screen; returns the unlock status, and [locked] must be refreshed from the system state before returning. */
     private val unattendedUnlock: (suspend () -> String)? = null,
     private val unlockFailureMessage: () -> String = { tr(R.string.trigger_unlock_failed) },
-    /** 本地授权(本机存着的解锁授权)的任务:解锁失败后允许转为等用户手动解锁,而不是失败收尾。 */
+    /** For tasks on a local authorization (an unlock authorization stored on this device): after an unlock failure they may switch to waiting for the user to unlock manually instead of ending in failure. */
     private val recoverUnlockFailure: () -> Boolean = { false },
-    /** 转为等用户手动解锁时告知一句(带不含凭据的状态码),好发提醒。 */
+    /** A line to report when switching to waiting for a manual unlock (with a credential-free status code), so a reminder can be sent. */
     private val onRecoveryFailure: (String) -> Unit = {},
     private val moveBack: suspend () -> Boolean,
 ) {
     private val movedAway = MutableStateFlow(false)
     private val userOnPage = MutableStateFlow(false)
     private val resumes = MutableStateFlow(0)
-    /** 任务是否已经至少做过一步(关卡放通过一次):开局那次解锁不算「中途锁屏」。 */
+    /** Whether the task has already done at least one step (the gate has let it through once): the initial unlock doesn't count as a "lock during the run". */
     private var hasPassed = false
-    /** 发现被挪走那一刻的点击计数:之后点的「继续」都算数,哪怕 Agent 还没走到 gate。 */
+    /** Resume-tap count at the moment the move-away was noticed: "Continue" taps after that all count, even if the Agent hasn't reached the gate yet. */
     @Volatile private var resumesAtMove = 0
 
     fun onTaskMovedAway() {
@@ -47,27 +47,27 @@ class TaskGate(
         movedAway.value = true
     }
 
-    /** 已发现被挪走、还没挪回:任务服务据此立即显示暂停,不必等到下一个改动屏幕的工具。 */
+    /** The move-away has been noticed but the move back hasn't happened yet: the task service uses this to show the pause immediately instead of waiting for the next screen-changing tool. */
     val movedAwayPending: Boolean get() = movedAway.value
 
     /**
-     * 用户在浏览器页上亲手摸了借给任务的页面(他在操作,Claire 不能同时动):下一个会改动屏幕的工具之前停下,
-     * 等用户点「继续」;任务服务据此立即显示暂停。
+     * The user personally touched the page lent to the task on the browser page (they are operating, so Claire must not act at the same time):
+     * stop before the next screen-changing tool and wait for the user to tap "Continue"; the task service uses this to show the pause immediately.
      */
     fun onUserOnPage() { userOnPage.value = true }
 
-    /** 用户在借出的页面上操作、还没点「继续」。 */
+    /** The user is operating on the lent-out page and hasn't tapped "Continue" yet. */
     val userOnPagePending: Boolean get() = userOnPage.value
 
-    /** 用户点了「继续」。只对点击之后才开始的、或正在进行的暂停有效;用户在页面上操作的那种暂停当场解除。 */
+    /** The user tapped "Continue". It only applies to pauses that start after the tap or are already in progress; a pause caused by the user operating on the page is lifted on the spot. */
     fun resume() {
         resumes.update { it + 1 }
         userOnPage.value = false
     }
 
     /**
-     * 返回 true 表示这次等待期间发生过锁屏周期(任务已开始之后):调用方据此作废按旧屏幕准备好的动作,
-     * 先重读现在的屏幕。开局的第一次解锁不算。
+     * Returning true means a lock cycle happened during this wait (after the task had started): the caller uses this to discard actions prepared against the old
+     * screen and re-read the current screen first. The initial unlock at the start doesn't count.
      */
     suspend fun pass(phone: () -> Boolean = { true }, setWaiting: (TaskState?) -> Unit): Boolean {
         var recoveredMidRun = false
@@ -96,9 +96,9 @@ class TaskGate(
                         val status = try { unattendedUnlock.invoke() }
                         catch (e: CancellationException) { throw e }
                         catch (_: Exception) { refreshLocked?.invoke(); "internal_error" }
-                        // 无人值守时不能无限等用户来解锁；只认刷新后的系统状态，不认流程自称成功。
+                        // Unattended runs can't wait indefinitely for the user to unlock; trust only the refreshed system state, not the flow claiming success.
                         if (locked.value) {
-                            // 已开始的本地授权任务不杀、也不重复注入凭据:转为等用户手动解锁
+                            // A local-authorization task that has already started is neither killed nor injected with credentials again: instead it waits for the user to unlock manually
                             if (!hasPassed || !recoverUnlockFailure()) throw UnattendedLockException(unlockFailureMessage(), status)
                             onRecoveryFailure(status)
                             locked.first { !it }
@@ -114,42 +114,42 @@ class TaskGate(
         }
     }
 
-    /** 要用户在手机上亲手处理一步,处理好了点「继续」(界面上算「要你处理」)。 */
+    /** Require the user to handle one step by hand on the phone, then tap "Continue" (counts as "needs you" in the UI). */
     suspend fun pauseForUser(why: String, setWaiting: (TaskState?) -> Unit) {
         val seen = resumes.value
         setWaiting(TaskState.Held(GateReason("paused", why, resumable = true, needsYou = true)))
         resumes.first { it != seen }
     }
 
-    /** [seen]:从这个点击计数之后的「继续」才算;默认取当前值(先记下再显示暂停,显示后立刻点的也算)。 */
+    /** [seen]: only "Continue" taps after this count are accepted; defaults to the current value (the count is captured before the pause is shown, so a tap right after it appears still counts). */
     private suspend fun pauseUntilResume(why: String, setWaiting: (TaskState?) -> Unit, seen: Int = resumes.value) {
         setWaiting(TaskState.Held(paused(why)))
         resumes.first { it != seen }
     }
 
     companion object {
-        /** 锁屏或熄屏:解锁后自动继续(运行记录里记成 waiting_unlock)。 */
+        /** Locked or screen off: continue automatically after unlocking (recorded as waiting_unlock in the run record). */
         val LOCKED = GateReason("waiting_unlock")
 
-        /** 暂停,用户点「继续」后才接着做(运行记录里记成 paused,带上原因)。 */
+        /** Pause; continue only after the user taps "Continue" (recorded as paused, with the reason, in the run record). */
         fun paused(why: String) = GateReason("paused", why, resumable = true)
 
-        /** 等用户在手机上动一下手(比如在系统的选择框里选一个),动完自动继续(运行记录里记成 waiting_user)。 */
+        /** Wait for the user to do something by hand on the phone (e.g. pick one in a system chooser), then continue automatically (recorded as waiting_user in the run record). */
         fun userStep(why: String) = GateReason("waiting_user", why, needsYou = true)
 
-        /** 系统在用户屏上问打开 [app] 的哪一个时请用户选的那句;名字读不到时不说名字。 */
+        /** The line asking the user to choose when the system asks which app to open [app] with on the user's screen; the name is omitted when it can't be read. */
         fun pickCopy(app: String?) = app?.let { tr(R.string.gate_pick_app, it) } ?: tr(R.string.gate_pick_system)
 
-        /** 选出来的 [app] 要用户亲手处理时的那句。 */
+        /** The line used when the chosen [app] requires the user to handle it by hand. */
         fun finishCopy(app: String?) = app?.let { tr(R.string.gate_finish_app, it) } ?: tr(R.string.gate_finish_unknown)
 
         val MOVED_AWAY: String get() = tr(R.string.gate_moved_away)
         val MOVE_BACK_FAILED: String get() = tr(R.string.gate_move_back_failed)
         val SHELL_DOWN: String get() = tr(R.string.gate_shell_down)
-        /** 用户在浏览器页上亲手操作借给任务的页面时暂停的原因(界面据此认出这种暂停)。 */
+        /** The reason for pausing when the user personally operates the page lent to the task on the browser page (the UI recognizes this pause by it). */
         val USER_ON_PAGE: String get() = tr(R.string.gate_user_on_page)
     }
 }
 
-/** 无人值守任务无法通过系统锁屏；保留不含凭据的状态码,由任务服务转成有结果通知的失败终态。 */
+/** An unattended task couldn't get past the system lock screen; the credential-free status code is kept so the task service can turn it into a failed terminal state with a result notification. */
 internal class UnattendedLockException(message: String, val status: String) : Exception("$message [$status]")

@@ -22,7 +22,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 恢复时要告诉定时触发的几件事;产品里转给 [TriggerRuntime]。 */
+/** The few things a scheduled trigger must be told during recovery; forwarded to [TriggerRuntime] in the product. */
 interface TriggerOutcomes {
     fun interrupted(key: String, reason: String)
     fun delivered(key: String)
@@ -30,13 +30,13 @@ interface TriggerOutcomes {
 }
 
 /**
- * 对「中断了的运行」的善后:补送已有的回复、状态不明的不重发、否则告知「运行中断」并写进对话。
- * 两个入口:进程重启后的 [recover](App 启动和任务服务启动都会调,进程里只做一次,后到的什么都不做;
- * App 先于进程里任何服务起来,所以第一次调用时不会有本进程新开的运行被误判),
- * 以及任务服务被销毁、进程还在时的 [settleInterrupted]。**从不从中间续跑**:屏幕状态回不去。
+ * Cleanup for "interrupted runs": re-deliver a reply that already exists, don't resend when the state is unknown, and otherwise report
+ * "run interrupted" and write it into the conversation. Two entry points: [recover] after a process restart (called on both App start and
+ * task-service start, runs only once per process with later calls doing nothing; the App comes up before any service in the process,
+ * so on the first call no run newly started by this process can be misjudged), and [settleInterrupted] when the task service is destroyed but the process is still alive. **Never resumes a run mid-way**: the screen state can't be restored.
  *
- * 「已告知」不另设字段,看送达账本:没有回复的运行记着 `interrupted:<运行>` 的提示,状态不明或送达失败的记着对应的提示;
- * 有记录就不再处理。回复送达了的运行直接转为 Ended。所以两个入口、多次调用都只告知一次。
+ * "Already told" needs no separate field: it is read from the delivery ledger. A run without a reply has a notice recorded under `interrupted:<run>`, and a run in an unknown state or with a failed delivery has the corresponding notice;
+ * once a record exists it is skipped. A run whose reply was delivered moves straight to Ended. So both entry points and repeated calls only report once.
  */
 class RunRecovery(
     private val store: RunStore,
@@ -54,7 +54,7 @@ class RunRecovery(
     private val done = AtomicBoolean(false)
     private val lock = Mutex()
 
-    /** 标记在这里同步做完(之后新开的运行不会被碰);善后在 [scope] 里慢慢做。返回这次标为中断的运行,不是第一次调用则为空。 */
+    /** The marking is done synchronously here (runs started afterwards are not touched); the cleanup then runs slowly in [scope]. Returns the runs marked as interrupted this time, empty when it isn't the first call. */
     fun recover(live: Set<RunId> = emptySet()): List<StoredRun> {
         if (!done.compareAndSet(false, true)) return emptyList()
         val interrupted = store.interruptUnfinished(live)
@@ -63,8 +63,8 @@ class RunRecovery(
     }
 
     /**
-     * 把所有中断了、还没告知过的运行善后一次。任务服务被销毁时当场调(进程还在,用户不必等到下次启动才知道),
-     * 启动时的 [recover] 也会扫一遍,接住当场没做完就被杀的。
+     * Settle every interrupted run that hasn't been reported yet, once. Called on the spot when the task service is destroyed (the process is still alive, so the user need not wait until the next start to find out);
+     * [recover] at startup sweeps as well, catching runs that were killed before they could finish.
      */
     fun settleInterrupted() {
         scope.launch {
@@ -115,7 +115,7 @@ class RunRecovery(
         }
     }
 
-    /** 只读上次落盘的事件补交代;记录已清理或读不出时仍保留通用中断原因。 */
+    /** Read only the events persisted last time to fill in the summary; if the record has been cleaned up or can't be read, the generic interruption reason is still kept. */
     private suspend fun interruptedSummary(run: StoredRun, said: String): String? {
         val id = run.recordId ?: return null
         val events = try {

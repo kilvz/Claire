@@ -1,23 +1,23 @@
 package com.wangzan101.mika.task
 
 /**
- * 任务解锁了手机之后留下的回锁义务。解锁时记下主屏无障碍交互计数作基线;
- * 系统确认已重新锁上之前义务一直挂着,回锁被拒或未生效都能重试。
- * 等任务全部结束、主屏交互回到基线(用户没有接着用)才回锁;等待期里有新交互先等一段空闲,
- * 空闲结束按那时的计数作新基线再裁决。
+ * The re-lock obligation left behind after a task unlocks the phone. The main-screen accessibility interaction count is recorded as a baseline on unlock;
+ * the obligation stays pending until the system confirms it is locked again, and a rejected or ineffective re-lock can be retried.
+ * Re-locking only happens once all tasks have finished and main-screen interactions are back at the baseline (the user isn't still using it); if new interactions occur while waiting, wait for an idle stretch first,
+ * and when the idle stretch ends, take the count at that time as the new baseline and decide again.
  */
 internal class TaskRelock {
     private var baseline: Long? = null
 
     @Synchronized fun hasPending() = baseline != null
 
-    /** 一次任务驱动的解锁完成:[interactions] 是此刻的主屏交互计数。义务已挂着时不挪动基线。 */
+    /** A task-driven unlock has completed: [interactions] is the main-screen interaction count at this moment. The baseline is not moved when the obligation is already pending. */
     @Synchronized fun unlocked(interactions: Long) { if (baseline == null) baseline = interactions }
 
-    /** 系统确认已锁:义务了结。 */
+    /** The system confirms it is locked: the obligation is settled. */
     @Synchronized fun confirmed() { baseline = null }
 
-    /** 空闲等待结束:期间没有新交互([start] == [current])才把此刻的计数收为新基线;变了就不收。 */
+    /** The idle wait ended: accept the count at this moment as the new baseline only if there were no new interactions ([start] == [current]); if it changed, don't. */
     @Synchronized fun acceptIdle(start: Long, current: Long): Boolean {
         if (baseline == null || start != current) return false
         baseline = current

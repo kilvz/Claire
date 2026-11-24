@@ -10,37 +10,37 @@ import com.wangzan101.mika.core.screen.uistate.AppWait
 
 sealed interface StartResult<out R> {
     data class Started<R>(val run: R) : StartResult<R>
-    /** 超出并行上限,排在队里第 [position] 个。 */
+    /** Above the parallelism limit, queued at position [position]. */
     data class Queued<R>(val run: R, val position: Int) : StartResult<R>
-    /** 已登记过的渠道消息不再次执行，包括进程重启后服务端重投的消息。 */
+    /** An already registered channel message is never executed again, including ones the server redelivers after a process restart. */
     data object DuplicateChannelMessage : StartResult<Nothing>
-    /** 这个排队项已经登记过运行；无论运行后来是中断、取消还是结束，都不能再次执行。 */
+    /** A run has already been registered for this queued item; it must never execute again, whether that run was later interrupted, cancelled or finished. */
     data object DuplicateFollowUp : StartResult<Nothing>
-    /** 这个对话已经有任务(在跑或在排队):照 M1 规则不收,由对话自己排队。 */
+    /** This conversation already has a task (running or queued): it is not accepted per the M1 rule, and the conversation queues it itself. */
     data object AlreadyRunningInConversation : StartResult<Nothing>
 }
 
 /**
- * 按对话索引的运行中任务、并行上限与跨任务的全局锁。上限为 1 时(开关关着)就是 M1 的一次一个。
- * [create] 在登记时建任务对象;R 在产品里是 [TaskRun],测试里换成普通对象。
+ * Tasks indexed by conversation, the parallelism limit and the cross-task global locks. With a limit of 1 (the switch off) this is M1's one-at-a-time.
+ * [create] builds the task object at registration; R is [TaskRun] in the product and a plain object in tests.
  */
 class TaskCenter<R : Any>(
     private val limit: () -> ParallelLimit,
     private val conversationOf: (R) -> String,
-    /** 任务的唯一编号(通知按钮带着它);同一对话前后两个任务的编号不同。 */
+    /** The task's unique ID (the notification buttons carry it); two consecutive tasks in the same conversation have different IDs. */
     private val keyOf: (R) -> String,
     val store: RunStore = MemoryRunStore(),
     val resources: ResourceScheduler = ResourceScheduler(),
-    /** 同对话下一件任务的持久队列;测试里换成内存实现。 */
+    /** Persistent queue of the next jobs for a conversation; replaced by an in-memory implementation in tests. */
     val followUps: FollowUpQueue = FollowUpQueue(),
-    /** 同工作区串行化使用的键;默认按对话各自隔离,传入工作区解析器后同项目对话会排队串行。 */
+    /** The key used to serialize within a workspace; isolated per conversation by default, and once a workspace resolver is supplied, conversations in the same project queue up serially. */
     private val workspaceOf: (R) -> String = conversationOf,
     private val resolveWorkspace: (String) -> String = { it },
     private val create: (conversationId: String, goal: String) -> R,
 ) {
     private val running = mutableListOf<R>()
     private val queued = mutableListOf<R>()
-    /** 迁移中的调用方继续从这里拿资源，实际所有权归 [resources]。 */
+    /** Callers still being migrated keep taking resources from here; the actual ownership belongs to [resources]. */
     val clipLock get() = resources.clipboard
     val takeoverQueue get() = resources.takeoverQueue
 
@@ -58,7 +58,7 @@ class TaskCenter<R : Any>(
         val workspace = resolveWorkspace(conversationId)
         val sameConversation = byConversation(conversationId) != null
         if (sameConversation && !queueInConversation) {
-            // 点发送和任务收尾撞在一起:在同一个锁里放回队列,调用方据此知道下一件还排着
+            // Tapping send collided with task teardown: put it back into the queue under the same lock, so the caller knows the next job is still queued
             followUp?.let { followUps.add(it) }
             return StartResult.AlreadyRunningInConversation
         }
@@ -71,7 +71,7 @@ class TaskCenter<R : Any>(
             running += run
             StartResult.Started(run)
         } else {
-            // 容量队列也保留持久排队项，真正 markRunning 时才移除；进程死亡不会留下无法恢复的空档。
+            // The capacity queue also keeps the persistent queued item and removes it only on the actual markRunning; a process death leaves no unrecoverable gap.
             store.save(record.copy(phase = RunPhase.Queued))
             queued += run
             StartResult.Queued(run, queued.size)
@@ -86,29 +86,29 @@ class TaskCenter<R : Any>(
     @Synchronized fun byKey(key: String): R? = runs().firstOrNull { keyOf(it) == key }
 
     /**
-     * 任务 [owner] 要在自己的屏上开 [pkg]:没人占、自己占着、或占着的任务已经不在用它([stillUsed] 为假,
-     * 比如 App 自己关掉了)时占下并返回 true;否则另一个任务正在用,返回 false。查与占在同一把锁里,两个任务同时开同一个 App 只有一个能成。
+     * Task [owner] wants to open [pkg] on its own display: claim it and return true when nobody holds it, when the caller itself holds it, or when the holding task
+     * no longer uses it ([stillUsed] is false, e.g. the app was closed by itself); otherwise another task is using it and false is returned. Checking and claiming happen under the same lock, so when two tasks open the same app at once only one can succeed.
      */
     @Synchronized
     fun reserve(pkg: String, owner: String, stillUsed: () -> Boolean): Boolean {
         return resources.reserveApp(pkg, owner, { byKey(it) != null }, stillUsed)
     }
 
-    /** 任务 [owner] 此刻能不能占 [pkg](只查不占,规则同 [reserve])。 */
+    /** Whether task [owner] could claim [pkg] right now (check only, no claim; same rules as [reserve]). */
     @Synchronized
     fun appFree(pkg: String, owner: String, stillUsed: () -> Boolean): Boolean =
         resources.appFree(pkg, owner, { byKey(it) != null }, stillUsed)
 
     /**
-     * 任务 [owner] 等别的任务放开 [pkg],最多 [timeoutMs](见 [ResourceScheduler.awaitApp]:互相等的不等)。
-     * 挂起着等,不拿这里的锁;在不在跑按开始等那一刻的任务名单认。
+     * Task [owner] waits for another task to release [pkg], for at most [timeoutMs] (see [ResourceScheduler.awaitApp]: tasks waiting on each other don't wait).
+     * It waits suspended without taking the lock here; membership is judged by the task list at the moment the wait starts.
      */
     suspend fun awaitApp(pkg: String, owner: String, timeoutMs: Long, free: suspend () -> Boolean): AppWait {
         val active = synchronized(this) { runs().map(keyOf).toSet() }
         return resources.awaitApp(pkg, owner, timeoutMs, { it in active }, free)
     }
 
-    /** 还在排队就移出队伍并返回 true(调用方记为已取消);已经开跑返回 false,由任务自己取消。 */
+    /** Remove it from the queue and return true if it was still queued (the caller records it as cancelled); return false if it has already started, and the task cancels itself. */
     @Synchronized
     fun cancelIfQueued(run: R): Boolean {
         if (queued.none { it === run }) return false
@@ -118,7 +118,7 @@ class TaskCenter<R : Any>(
         return queued.removeAll { it === run }
     }
 
-    /** 任务结束(或排队时被取消);返回因此从队里放出来、该开始跑的任务。 */
+    /** A task ended (or was cancelled while queued); returns the tasks released from the queue that should now start running. */
     @Synchronized
     fun onEnded(run: R): List<R> {
         if (queued.removeAll { it === run }) return emptyList()
@@ -146,11 +146,11 @@ class TaskCenter<R : Any>(
     @Synchronized fun markRunning(run: R) {
         val record = store.get(RunId(keyOf(run)))
         record?.let { store.save(it.copy(phase = RunPhase.Running, roundInProgress = true)) }
-        // 到这一步才结束排队项的持久生命周期；此前崩溃由运行账本去重并报告中断。
+        // Only here does the queued item's persistent lifetime end; a crash before this is deduplicated by the run ledger and reported as interrupted.
         record?.followUpId?.let(followUps::remove)
     }
 
-    /** 详细记录已经开出:账本只存它的编号,进程重启后可以读取事件生成交代。 */
+    /** A detailed record has been opened: the ledger only stores its ID, so after a process restart the events can be read to build the summary. */
     @Synchronized fun markRecord(run: R, recordId: String) {
         store.get(RunId(keyOf(run)))?.let { store.save(it.copy(recordId = recordId)) }
     }
@@ -165,17 +165,17 @@ class TaskCenter<R : Any>(
     }
 
     /**
-     * 收尾边界收到、已经不能注入原 Run 的用户原话:这个对话此刻没有任务就返回 true(调用方尝试开始);
-     * 还有就先写持久队列,写成功返回 false,写失败也返回 true 让调用方走带并发保护的持久化重试。
-     * 查与留在同一把锁里,和 [onEnded] 不会错开。
+     * User text received at the teardown boundary that can no longer be injected into the original Run: returns true if this conversation has no task
+     * right now (the caller tries to start); if it has one, it is written to the persistent queue first, returning false on success and true on failure so the caller goes through the concurrency-guarded persistent retry.
+     * The check and the queueing happen under the same lock, so it can't interleave with [onEnded].
      */
     @Synchronized fun deferOrStart(threadId: String, text: String, id: String, source: QueuedSource = QueuedSource.Fallback): Boolean {
         if (byConversation(threadId) == null) return true
-        // 写失败也交给 startFollowUp 再试一次;tryStart 会在同一把锁里阻止并发,绝不把未落盘项报告成已排队。
+        // Even a failed write is handed to startFollowUp for one more try; tryStart blocks concurrency under the same lock, so an unpersisted item is never reported as queued.
         return !followUps.add(QueuedFollowUp(id, threadId, text, System.currentTimeMillis(), source))
     }
 
-    /** 开始之前先确认排队项已持久化；已经在账本里的 claimed 项不需要重写。 */
+    /** Confirm the queued item is persisted before starting; a claimed item already in the ledger doesn't need rewriting. */
     @Synchronized fun persistFollowUp(item: QueuedFollowUp): Boolean {
         if (store.all().any { it.followUpId == item.id }) {
             followUps.remove(item.id)
@@ -184,7 +184,7 @@ class TaskCenter<R : Any>(
         return followUps.containsId(item.id) || followUps.add(item)
     }
 
-    /** 这个对话的下一件;只取一件,所在对话没有任务时才取。 */
+    /** The next job for this conversation; only one is taken, and only when its conversation has no task. */
     @Synchronized fun takeReady(conversationId: String? = null): List<QueuedFollowUp> {
         val started = store.all().mapNotNull { it.followUpId }.toSet()
         started.forEach(followUps::remove)
@@ -198,5 +198,5 @@ class TaskCenter<R : Any>(
     @Synchronized fun hasFollowUps(conversationId: String): Boolean = followUps.contains(conversationId)
 }
 
-/** 迁移期旧名称，现有调用方和测试仍可逐步转到 TaskCenter。 */
+/** Legacy name from the migration period; existing callers and tests can move to TaskCenter gradually. */
 typealias TaskRegistry<R> = TaskCenter<R>

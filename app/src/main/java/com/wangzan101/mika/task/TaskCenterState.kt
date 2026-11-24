@@ -11,24 +11,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 任务进行中用户在同一对话里插的话:[Pending] 刚发出、还没送到任务,[Received] 任务的收件箱已收下(下一步就处理),
- * [Joined] 已交给当前任务的模型,[Next] 任务已收尾、作为下一件事,[Cancelled] 停止或当前任务收尾时没用上的远程插话,[Withdrawn] 用户已撤回。
+ * Messages the user injects into the same conversation while a task is running: [Pending] just sent and not yet delivered to the task, [Received] the task's inbox has accepted it (it will be handled on the next step),
+ * [Joined] handed to the current task's model, [Next] the task has finished and it becomes the next job, [Cancelled] a stop, or a remote steer that went unused when the current task finished, [Withdrawn] withdrawn by the user.
  */
 enum class SteerState { Pending, Received, Joined, Next, Cancelled, Withdrawn }
 
-/** 还没交给模型的插话(任务就此收尾时作为下一件事,停止时作废)。 */
+/** A steer not yet handed to the model (it becomes the next job if the task finishes here, discarded on stop). */
 val SteerState.unconsumed: Boolean get() = this == SteerState.Pending || this == SteerState.Received
 
 /**
- * [interrupted] 是这句插话撤掉的那段回复里用户已经看到的字;[finished] 是这句插话交给模型之前、已经说完显示出来的回复。
- * 两者都显示在插话上方;没有时为 null。
+ * [interrupted] is the part of the reply that this steer cancelled which the user had already seen; [finished] is the reply that had already finished being shown before this steer was handed to the model.
+ * Both are shown above the steer; null when there is none.
  */
 data class SteerNote(
     val id: String, val text: String, val state: SteerState, val interrupted: String? = null, val finished: String? = null,
     val remote: Boolean = false,
 )
 
-/** 电脑只看到自己追加的消息去向,不带手机上插的话或正文;远程插话撤不回(`RunInbox.withdrawSteer`),[SteerState.Withdrawn] 只为穷举,按没用上报。 */
+/** The computer only sees where its own added messages went, never the steers from the phone or their text; remote steers can't be withdrawn (`RunInbox.withdrawSteer`), so [SteerState.Withdrawn] exists only for exhaustiveness and is reported as not applied. */
 internal fun remoteSteers(notes: List<SteerNote>, finished: Boolean = false): List<RemoteSteer> = notes.filter { it.remote }.map {
     RemoteSteer(it.id, when (it.state) {
         SteerState.Pending, SteerState.Received -> if (finished) "not_applied" else "received"
@@ -38,8 +38,8 @@ internal fun remoteSteers(notes: List<SteerNote>, finished: Boolean = false): Li
 }
 
 /**
- * 运行事件里插话交给模型的先后:`reply_interrupted`([interrupted])或 `reply_finished_before_steer`([finished])先到,
- * 紧接着这一批插话逐句 `steer_received`,那段字只挂到其中第一句上([joined])。
+ * Order in which the run events report steers being handed to the model: `reply_interrupted` ([interrupted]) or `reply_finished_before_steer` ([finished]) arrives first,
+ * immediately followed by `steer_received` for each steer of the batch, and that text is attached only to the first of them ([joined]).
  */
 class SteerJoin {
     @Volatile private var cut: String? = null
@@ -49,7 +49,7 @@ class SteerJoin {
 
     fun finished(text: String) { done = text }
 
-    /** [id] 这句已交给模型:标成 [SteerState.Joined],有刚记下的那段字就挂上(用过即清)。 */
+    /** The steer [id] has been handed to the model: mark it [SteerState.Joined] and attach the text just recorded, if any (cleared once used). */
     fun joined(notes: List<SteerNote>, id: String): List<SteerNote> {
         val c = cut.also { cut = null }
         val d = done.also { done = null }
@@ -59,7 +59,7 @@ class SteerJoin {
     }
 }
 
-/** 进程内 TaskCenter 的展示状态，由 App 容器持有，Service 只是写入它的宿主。 */
+/** Display state of the in-process TaskCenter, owned by the App container; the Service is only the host that writes to it. */
 class TaskCenterState {
     val shownLock = Any()
     @Volatile var shownRun: TaskRun? = null
@@ -92,31 +92,31 @@ class TaskCenterState {
     val _runId = MutableStateFlow<String?>(null)
     val _sharedFiles = MutableStateFlow<List<SharedFile>>(emptyList())
     val sharedFiles: StateFlow<List<SharedFile>> = _sharedFiles.asStateFlow()
-    /** 显示中的任务到此刻生成的音频;结束时随这一轮存进对话。 */
+    /** Audio generated so far by the displayed task; saved into the conversation with this turn when it ends. */
     val _audios = MutableStateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>>(emptyList())
     val audios: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedAudio>> = _audios.asStateFlow()
-    /** 显示中的任务到此刻生成的图;结束时随这一轮存进对话。 */
+    /** Images generated so far by the displayed task; saved into the conversation with this turn when it ends. */
     val _photos = MutableStateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>>(emptyList())
     val photos: StateFlow<List<com.wangzan101.mika.core.chat.GeneratedPhoto>> = _photos.asStateFlow()
     val _endedRunId = MutableStateFlow<String?>(null)
     val endedRunId: StateFlow<String?> = _endedRunId.asStateFlow()
     val _endedRunIds = MutableStateFlow<Map<String, String?>>(emptyMap())
     val endedRunIds: StateFlow<Map<String, String?>> = _endedRunIds.asStateFlow()
-    /** 显示中的任务到此刻的活动(实际做过的事,来自运行事件)。 */
+    /** Activity of the displayed task so far (what was actually done, taken from the run events). */
     val _activities = MutableStateFlow<List<RunEvent.Activity>>(emptyList())
     val activities: StateFlow<List<RunEvent.Activity>> = _activities.asStateFlow()
-    /** 显示中的任务收到的插话和它们的去向。 */
+    /** Steers received by the displayed task and where they went. */
     val _steers = MutableStateFlow<List<SteerNote>>(emptyList())
     val steers: StateFlow<List<SteerNote>> = _steers.asStateFlow()
-    /** 停止之后正在写交代的那几次运行(运行编号);写好记进对话、或写不成,就拿掉。 */
+    /** Runs (run IDs) whose summary is being written after a stop; removed once it is written into the conversation or fails to be written. */
     val _summarizing = MutableStateFlow<Set<String>>(emptySet())
     val summarizing: StateFlow<Set<String>> = _summarizing.asStateFlow()
     val _frames = MutableStateFlow<Bitmap?>(null)
     val frames: StateFlow<Bitmap?> = _frames.asStateFlow()
-    /** 显示中任务的小窗输入口:只有建了虚拟屏、开着「直接操作」开关时才有,屏释放后回到 null。 */
+    /** Picture-in-picture input port for the displayed task: only present when the virtual display exists and the "direct control" switch is on; back to null once the display is released. */
     val _pipInput = MutableStateFlow<com.wangzan101.mika.cap.phone.display.PipInput?>(null)
     val pipInput: StateFlow<com.wangzan101.mika.cap.phone.display.PipInput?> = _pipInput.asStateFlow()
-    /** 显示中任务的小窗目标声音是否被用户恢复过:按钮据此显示「恢复声音」或「静音」。 */
+    /** Whether the user has restored the sound of the displayed task's picture-in-picture target: the button shows "Restore sound" or "Mute" based on this. */
     val _pipSoundOn = MutableStateFlow(false)
     val pipSoundOn: StateFlow<Boolean> = _pipSoundOn.asStateFlow()
 }

@@ -17,15 +17,15 @@ import com.wangzan101.mika.task.TaskService.Companion.RELOCK_POLL_TRIES
 import com.wangzan101.mika.task.TaskService.Companion.RELOCK_POLL_MS
 import com.wangzan101.mika.task.TaskService.Companion.cancel
 
-// 任务服务:任务期间解锁与结束后重新上锁
-/** 一次任务驱动的解锁完成:以此刻的主屏交互计数为基线,并挂上常驻提醒(见 [startUnlockGuard])。 */
+// Task service: unlocking during tasks and re-locking after they end
+/** A task-driven unlock has completed: use the main-screen interaction count at this moment as the baseline and post the persistent reminder (see [startUnlockGuard]). */
 internal fun TaskService.noteTaskUnlock() = taskRelock.unlocked(
     com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility.mainInteractionCount())
 
 /**
- * 任务收尾时调用([ignore] 是正在收尾的这个)。还有任务在跑或排队就等;都结束了才裁决:
- * 已锁→了结;不能锁(无障碍不在、或还留着一页)→警告;等待期里用户动了主屏→等一段空闲再裁;
- * 否则经全局动作回锁,并轮询等系统确认,两次不确认就换成常驻警告。
+ * Called at task teardown ([ignore] being the one finishing). If tasks are still running or queued, wait; only when all are done is a decision made:
+ * already locked → settle; can't lock (accessibility unavailable, or a page is still open) → warn; the user touched the main screen while waiting → wait for an idle stretch and decide again;
+ * otherwise re-lock through the global action and poll for system confirmation, switching to the persistent warning if two attempts go unconfirmed.
  */
 internal suspend fun TaskService.finishTaskRelock(ignore: TaskRun? = null) = relockMutex.withLock {
     val keyguard = getSystemService(android.app.KeyguardManager::class.java)
@@ -50,7 +50,7 @@ internal suspend fun TaskService.finishTaskRelock(ignore: TaskRun? = null) = rel
         TaskRelock.Decision.LOCK -> Unit
     }
     repeat(2) {
-        // 重试间隙里来了新任务、或用户动了手机:这次回锁一律让位,重新裁决
+        // A new task arrived between retries, or the user touched the phone: this re-lock always yields and the decision is made again
         when (decision()) {
             TaskRelock.Decision.NONE -> { clearUnlockGuardIfSafe(); return@withLock }
             TaskRelock.Decision.WAIT -> return@withLock
@@ -70,13 +70,13 @@ internal suspend fun TaskService.finishTaskRelock(ignore: TaskRun? = null) = rel
     notifyRelockFailed()
 }
 
-/** 系统意义上的已锁:锁屏在显示;有安全锁的还要求设备层也锁上。 */
+/** Locked in the system's sense: the keyguard is showing; with a secure lock, the device layer must be locked too. */
 internal fun TaskService.systemLockConfirmed(keyguard: android.app.KeyguardManager): Boolean =
     keyguard.isKeyguardLocked && (!keyguard.isKeyguardSecure || keyguard.isDeviceLocked)
 
 /**
- * 解锁期间挂的常驻提醒:任务被中断、进程没了它也留在通知栏,提醒用户检查锁屏。
- * 通知发不出去(权限、渠道被关)时回锁义务立不住,调用方据此不去解锁。
+ * The persistent reminder posted during unlocking: it stays in the notification shade even if the task is interrupted or the process dies, reminding the user to check the lock screen.
+ * If notifications can't be sent (permission or channel disabled) the re-lock obligation can't be met, so the caller doesn't unlock on that basis.
  */
 internal fun TaskService.startUnlockGuard(): Boolean {
     ensureChannels(this)
@@ -93,12 +93,12 @@ internal fun TaskService.startUnlockGuard(): Boolean {
     }.getOrDefault(false)
 }
 
-/** 没有挂着的回锁义务时摘掉常驻提醒;义务还挂着(别的任务解的)不能摘。 */
+/** Remove the persistent reminder when no re-lock obligation is pending; it must not be removed while one is still pending (unlocked by another task). */
 internal fun TaskService.clearUnlockGuardIfSafe() {
     if (!taskRelock.hasPending()) runCatching { getSystemService(NotificationManager::class.java).cancel(ID_RELOCK) }
 }
 
-/** 回锁没能确认:同一个编号的常驻警告换上岗,用户看到之前一直在。 */
+/** Re-locking couldn't be confirmed: the persistent warning takes over under the same ID and stays until the user has seen it. */
 internal fun TaskService.notifyRelockFailed() {
     ensureChannels(this)
     runCatching {
@@ -111,7 +111,7 @@ internal fun TaskService.notifyRelockFailed() {
     }
 }
 
-/** 解锁失败后转为等用户手动解锁:发一条可点回对话的提醒([status] 是不含凭据的状态码)。 */
+/** After an unlock failure, switch to waiting for the user to unlock manually: send a reminder that taps back into the conversation ([status] being a credential-free status code). */
 internal fun TaskService.notifyUnlockRecoveryNeeded(conversationId: String, status: String) {
     ensureChannels(this)
     val safeStatus = status.takeIf { it.matches(Regex("[a-z_]{1,50}")) }.orEmpty()

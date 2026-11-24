@@ -40,7 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/** 学习相关的一组运行时依赖;由 execute 开局时拼好,收尾/学习阶段读它。 */
+/** A set of runtime dependencies for learning; assembled at the start of execute and read by the teardown/learning phase. */
 internal class LearnKit(
     val switches: MemorySwitches, val memory: MemoryStore?, val utterances: UserUtterances?, val dispatcher: ToolDispatcher,
     val agent: AgentLoop, val catalog: GuideCatalog, val knowledge: KnowledgeStore,
@@ -49,8 +49,8 @@ internal class LearnKit(
 )
 
 /**
- * 收尾后的交代与学习(断点交代、停止交代、结局判定、记忆提取、路线记录)。原 TaskRun 里的对应函数整体搬到这里。
- * 需要读的 TaskRun 瞬时字段经 lambda 注入。
+ * Reporting and learning after teardown (checkpoint summary, stop summary, outcome judging, memory extraction, route recording). The corresponding functions
+ * from the original TaskRun were moved here wholesale. The transient TaskRun fields it needs are injected via lambdas.
  */
 internal class RunTeardown(
     private val service: TaskService,
@@ -66,7 +66,7 @@ internal class RunTeardown(
     private val noticeTainted: () -> Boolean,
     private val provenance: () -> RunProvenance,
 ) {
-    /** 真正失败后的断点交代:只按记录拼,不再请模型,也不把短失败原因改写成成功。 */
+    /** Checkpoint summary after a real failure: assembled only from the records, with no further model call, and a terse failure reason is not rewritten into a success. */
     suspend fun checkpointSummary(): String? {
         val k = kit()
         val runId = state._runId.value
@@ -89,8 +89,8 @@ internal class RunTeardown(
     }
 
     /**
-     * 用户停止之后:按这次已经做了的事写几行交代(见 [StopSummary]),只读运行记录,不再操作任何东西。
-     * 轻量模型优先,没配用主模型;没模型、出错、超时就按记录直接拼。没什么可交代的为 null。
+     * After the user stops: write a few lines about what was already done in this run (see [StopSummary]), reading only the run record and
+     * touching nothing else. The light model is preferred, falling back to the main model when unset; with no model, on error or on timeout it is assembled straight from the record. Null when there is nothing worth reporting.
      */
     suspend fun stopSummary(draft: String?): String? {
         val k = kit()
@@ -98,7 +98,7 @@ internal class RunTeardown(
         val recorded = withContext(Dispatchers.IO) { runId?.let { id -> runCatching { k?.runStore?.events(id) }.getOrNull() } }
         val events = recorded?.takeIf { e -> e.any { it is RunEvent.Activity } } ?: synchronized(state.activityLog) { state.activityLog.toList() }
         if (!StopSummary.worthSaying(events, draft)) return null
-        // 还没开出模型就停下的(准备阶段):按设置现取
+        // Stopped before any model was created (preparation phase): resolve them from the settings now
         val (main, light) = if (k != null) k.model to k.light else withContext(Dispatchers.IO) {
             runCatching { env.modelFactory(service, session) }.getOrNull() to runCatching { env.lightModelFactory(service, session) }.getOrNull()
         }
@@ -110,9 +110,9 @@ internal class RunTeardown(
     }
 
     /**
-     * 结果交给用户之后调用(不拖慢、不改交出的回答):回答按用户的要求判结局([OutcomeJudge],轻量模型优先),
-     * 记进运行记录和这一轮对话;只有办成的([LearnGate])才记路线、给回放的路线记成功。
-     * 放弃、失败、取消的不判(结局已经清楚),返回 null;判不成是 [RunOutcome.Unknown]。
+     * Called after the result has been handed to the user (without slowing that down or changing the delivered answer): the answer is
+     * judged against the user's request ([OutcomeJudge], light model preferred) and recorded in the run record and this turn of the conversation; only runs that succeeded ([LearnGate]) record a route, and the replayed route is marked successful.
+     * Abandoned, failed and cancelled runs are not judged (the outcome is already clear) and return null; a failed judgement is [RunOutcome.Unknown].
      */
     suspend fun settleOutcome(end: TaskState, conversations: ConversationStore): JudgedOutcome? {
         val k = kit() ?: return null
@@ -126,7 +126,7 @@ internal class RunTeardown(
                 .onFailure { Log.w(TAG, "could not save run outcome", it) }
         }
         k.agent.noteOutcome(judged.outcome)
-        // 只有办成的才记成路线;从落盘的运行事件里取
+        // Only runs that succeeded are recorded as routes; taken from the persisted run events
         if (workflowAttemptId() == null && runId != null && LearnGate.shouldSaveRoute(k.routesOn, end, judged.outcome, runId, goal)) k.runStore?.let { s ->
             saveRoute(goal, withContext(Dispatchers.IO) { s.events(runId) }, k.dispatcher.index)
         }
@@ -134,8 +134,8 @@ internal class RunTeardown(
     }
 
     /**
-     * 结果通知发出之后调用:记下用到的个人技能的结果、提取记忆、起草技能,提示挂到这一轮的结果卡片上并存进对话。
-     * 在进程级的作用域里跑,服务退出也不中断。
+     * Called after the result notification has been sent: record the outcome of the personal skills that were used, extract memories and draft
+     * skills, and attach the notices to this turn's result card and save them into the conversation. It runs in a process-level scope, so it is not interrupted when the service exits.
      */
     suspend fun learnAfter(end: TaskState, outcome: RunOutcome?, conversations: ConversationStore) {
         rememberTask()
@@ -171,7 +171,7 @@ internal class RunTeardown(
     }
 
     /**
-     * 任务结束之后:按这次运行的事件记一条跨会话摘要(不拖慢交付,失败不影响任务结局)。
+     * After the task ends: record a cross-conversation summary from this run's events (it does not slow delivery, and a failure does not affect the task outcome).
      */
     private suspend fun rememberTask() {
         val runId = state._runId.value ?: return
@@ -190,7 +190,7 @@ internal class RunTeardown(
         }
     }
 
-    /** 办成的运行记成路线;记不成(不该记、写盘失败)不影响任务结局。 */
+    /** Record a run that succeeded as a route; failing to record it (it shouldn't be recorded, or the write fails) does not affect the task outcome. */
     private suspend fun saveRoute(goal: String, events: List<RunEvent>, tools: ToolIndex) = withContext(Dispatchers.IO) {
         runCatching {
             val route = RouteRecorder.record(goal, events, System.currentTimeMillis(), tools) ?: return@runCatching

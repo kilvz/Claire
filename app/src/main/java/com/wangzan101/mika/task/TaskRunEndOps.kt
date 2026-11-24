@@ -32,10 +32,10 @@ import com.wangzan101.mika.task.TaskService.Companion.TAG
 import com.wangzan101.mika.task.TaskService.Companion.cancel
 import com.wangzan101.mika.task.TaskService.Companion.answer
 
-// 任务服务:运行结束收尾、留着的页面与对话记录
+// Task service: finishing runs, kept pages and conversation records
 /**
- * 停止之后写交代,记成这一轮的回答(结局照旧是取消)。用进程级作用域在后台写:不挡着收尾、下一件事和再点停止,服务退出也写完。
- * 写好或写不成都从「正在整理」里拿掉。
+ * Write the summary after a stop and record it as this turn's answer (the outcome stays cancelled). It is written in the background with a process-level scope: it doesn't block teardown, the next job or tapping stop again, and it finishes even if the service exits.
+ * Whether it is written or not, the entry is removed from "summarizing".
  */
 internal fun TaskService.summarizeStop(run: TaskRun, runId: String, draft: String?, store: ConversationStore) {
     MemoryRuntime.of(this).scope.launch(store.meter(run.conversationId)) {
@@ -51,7 +51,7 @@ internal fun TaskService.summarizeStop(run: TaskRun, runId: String, draft: Strin
     }
 }
 
-/** 失败通知仍只给短原因;对话里补上已确认的进度,下一次「继续」不会把它当成没做过。 */
+/** The failure notification still gives only the short reason; the conversation gets the confirmed progress appended, so the next "continue" doesn't treat it as never done. */
 internal fun TaskService.summarizeFailure(run: TaskRun, runId: String, reason: String, store: ConversationStore) {
     MemoryRuntime.of(this).scope.launch {
         val text = runCatching { run.checkpointSummary() }
@@ -63,26 +63,26 @@ internal fun TaskService.summarizeFailure(run: TaskRun, runId: String, reason: S
     }
 }
 
-/** 任务收尾之后:都结束了就退出前台;还有别的任务就把前台交给它们,并放出排队的任务。 */
+/** After a task's teardown: leave the foreground when all are done; if other tasks remain, hand the foreground to them and release queued tasks. */
 internal fun TaskService.onRunEnded(run: TaskRun, store: ConversationStore) {
     stopChannelTyping(run.key)
     val wasShown = taskState.shownRun === run
     val started = center.onEnded(run)
-    // 收尾时替接班的拿着的屏幕锁交给第一个放出来的;没有放出来的(排着的被取消、同一对话还有任务在跑)就放开
+    // The screen lock held for the successor during teardown is handed to the first released task; if none was released (the queued one was cancelled, the same conversation still has a task running), release it
     run.wakeHandoff?.let { lease ->
         run.wakeHandoff = null
         started.firstOrNull()?.let { it.wakeHandoff = lease } ?: lease.release()
     }
     publishRuns()
     if (wasShown) started.firstOrNull { it.conversationId == run.conversationId }?.show()
-    // 对话空出来就开始留给它的下一件,不等别的对话的任务
+    // Start the next job left for this conversation as soon as it frees up, without waiting for tasks in other conversations
     val ready = center.takeReady(run.conversationId)
     if (center.runs().isEmpty()) {
         if (ready.isNotEmpty()) {
             ready.forEach(::startFollowUp)
             return
         }
-        // 还留着一页在后台运行:前台通知换成它的,服务不退(进程靠它撑着);关掉时由 [onKeptPage] 退出
+        // A page is still running in the background: switch the foreground notification to its own and keep the service in the foreground (the process is held up by it); exiting is handled by [onKeptPage] when it is closed
         val kept = keeper.page.value
         if (kept != null) {
             synchronized(notifyLock) {
@@ -100,13 +100,13 @@ internal fun TaskService.onRunEnded(run: TaskRun, store: ConversationStore) {
             return
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
-        // 先取编号再放开:放开之后才到的新任务会带来更新的编号,这里的 stopSelf 就不会把它停掉
+        // Take the ID before releasing: a new task arriving after the release brings a newer ID, so this stopSelf won't stop it
         val id = lastStartId
         taskState._busy.value = false
         stopSelf(id)
         return
     }
-    // 先换成「正在准备」:放出来的任务可能正好接过前台,通知不能还写着排队
+    // Switch to "preparing" first: a released task may take over the foreground right away, and the notification must not still say queued
     started.forEach { it.dequeue() }
     if (foreground === run) center.running().firstOrNull()?.let { next ->
         foreground = next
@@ -123,8 +123,8 @@ internal fun TaskService.onRunEnded(run: TaskRun, store: ConversationStore) {
 }
 
 /**
- * 留着的那一页变了:还留着就发(或换)它的常驻通知——没有任务在跑时它就是前台通知;关掉了就撤掉通知,
- * 这时没有任务就退出前台、停掉服务。
+ * The kept page changed: if it is still kept, post (or replace) its persistent notification — the foreground notification when no task is running; when it is closed, remove the notification, and
+ * if no task is running at that point, leave the foreground and stop the service.
  */
 internal fun TaskService.onKeptPage(page: com.wangzan101.mika.cap.web.KeptPage?) {
     val nm = getSystemService(NotificationManager::class.java)
@@ -141,7 +141,7 @@ internal fun TaskService.onKeptPage(page: com.wangzan101.mika.cap.web.KeptPage?)
     }
 }
 
-/** 留在后台的那一页的常驻通知:站点、离自动关还剩多久(倒计时),按钮「关闭网页」「打开对话」。 */
+/** The persistent notification for the page kept in the background: the site, how long until it auto-closes (countdown), and the "Close page" / "Open conversation" buttons. */
 internal fun TaskService.keptNotification(page: com.wangzan101.mika.cap.web.KeptPage): Notification {
     val close = PendingIntent.getService(
         this, REQUEST_CLOSE_KEPT, Intent(this, TaskService::class.java).setAction(ACTION_CLOSE_KEPT_PAGE),
@@ -153,7 +153,7 @@ internal fun TaskService.keptNotification(page: com.wangzan101.mika.cap.web.Kept
         .setContentText(page.host)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
-        // 时间那里倒计时到自动关的那一刻(通知文字不会过时)
+        // The timestamp counts down to the auto-close moment (so the notification text doesn't go stale)
         .setWhen(page.closesAt).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
         .setContentIntent(openApp(page.conversationId))
         .addAction(Notification.Action.Builder(null, tr(R.string.kept_close), close).build())
@@ -162,12 +162,12 @@ internal fun TaskService.keptNotification(page: com.wangzan101.mika.cap.web.Kept
 }
 
 /**
- * 给模型的上文里,留页那一轮的页面此刻是不是还开着:记着「留着」却已经不在了(Claire 中途退出过)的,按已关算。
+ * In the context given to the model, whether the page of a turn that kept one is still open right now: one recorded as "kept" but no longer present (Claire exited in between) counts as closed.
  */
 internal fun TaskService.withKeptState(t: Turn): Turn =
     if (t.keptPage != null && t.keptPageClosed == null && keeper.page.value?.runId != t.runId) t.copy(keptPageClosed = KeptPageClose.AppExit.wire) else t
 
-/** 任务结束时记一轮,后续消息可带上它作参考。写盘失败不影响任务结果。 */
+/** Record a turn when the task ends so later messages can carry it as a reference. A write failure doesn't affect the task result. */
 internal fun TaskService.recordTurn(store: ConversationStore, run: TaskRun, end: TaskState, runId: String?, files: List<SharedFile> = emptyList(),
     audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
     photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
@@ -175,7 +175,7 @@ internal fun TaskService.recordTurn(store: ConversationStore, run: TaskRun, end:
     finished: List<String> = emptyList()) {
     val goal = run.triggerCondition ?: run.goal
     val turn = when (end) {
-        // 没核对过的(聊天、回答里没有可核对的值)和核实过的一样记成 succeeded;核对过却没能核实的才记 unverified
+        // Unverified ones (chat, or answers with nothing to verify) are recorded as succeeded just like verified ones; only those reviewed but not verifiable are recorded as unverified
         is TaskState.Succeeded -> if (end.doubtful) Turn(goal, end.answer, "unverified", end.note, unconfirmed = end.unconfirmed, verified = false)
             else Turn(goal, end.answer, "succeeded", verified = end.verified.takeIf { end.reviewed })
         is TaskState.Failed -> Turn(goal, end.reason, "failed")
@@ -183,7 +183,7 @@ internal fun TaskService.recordTurn(store: ConversationStore, run: TaskRun, end:
         else -> return
     }.copy(runId = runId, remoteTaskId = run.mcpExternalId, steers = steers, groups = groups, interruptedReplies = interrupted, finishedReplies = finished,
         audios = audios, photos = photos)
-        // 这一轮留下了一页:记下站点(已经关了的连同原因),对话页那一轮下面据此显示
+        // This turn left a page behind: record the site (along with the reason if it is already closed), which is shown under that turn in the conversation
         .let { t -> keeper.recordFor(runId)?.let { (host, closed) -> t.copy(keptPage = host, keptPageClosed = closed) } ?: t }
     runCatching { store.append(run.conversationId, turn, files) }.onFailure { Log.w(TAG, "could not save conversation turn", it) }
 }

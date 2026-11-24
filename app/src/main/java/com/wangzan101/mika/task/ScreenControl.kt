@@ -2,7 +2,7 @@ package com.wangzan101.mika.task
 
 import com.wangzan101.mika.core.run.ManualControl
 
-/** 界面只依赖本次运行的控制入口，设备测试可替换输入端口。 */
+/** The UI depends only on this run's control entry point; device tests can substitute the input port. */
 internal interface ScreenControl {
     val key: String
     val manualControl: ManualControl
@@ -14,7 +14,7 @@ internal interface ScreenControl {
     suspend fun screenText(width: Int, height: Int, text: String): Boolean
 }
 
-/** 手机预览经过缩放，输入端口使用完整虚拟屏像素；网页也走同一比例转换。 */
+/** The phone preview is scaled, while the input port uses full virtual-display pixels; the web goes through the same ratio conversion. */
 internal fun controlPoint(x: Int, y: Int, previewWidth: Int, previewHeight: Int, inputWidth: Int, inputHeight: Int): Pair<Int, Int> {
     require(previewWidth > 0 && previewHeight > 0 && inputWidth > 0 && inputHeight > 0)
     require(x in 0 until previewWidth && y in 0 until previewHeight)

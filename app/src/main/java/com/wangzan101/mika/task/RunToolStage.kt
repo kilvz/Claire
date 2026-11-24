@@ -34,7 +34,7 @@ import java.io.File
 import com.wangzan101.mika.core.assembly.toolDispatcher
 import com.wangzan101.mika.core.cap.web.WEB
 
-// 运行装配:工具分发器
+// Run assembly: tool dispatcher
 internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: RunPhone, mem: RunMemory, rec: RunRecord, pr: RunPrompt, web: LazyWebPort?): RunTools {
     var smsLogin by a::smsLogin
     var webStack by a::webStack
@@ -61,15 +61,15 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
     val basePrompt = pr.basePrompt
     val personaLabel = pr.personaLabel
     val runSpec = pr.runSpec
-    // 外部 MCP server 只在主任务接;子任务/条件检查/评测不接,避免绕过父任务审批、影响评测可复现
+    // External MCP servers are only connected for the main task; subtasks/condition checks/evals don't connect them, to avoid bypassing the parent task's approvals and hurting eval reproducibility
     if (!conditionCheck) {
-        // 连上的当场归 resources:收尾(含取消、失败、连到一半被停)关作用域时一起关,stdio server 的进程和沙箱租约跟着放掉
+        // Connected ones belong to resources right away: they are closed when the scope is torn down (including cancellation, failure and being stopped mid-connect), releasing the stdio server processes and sandbox leases with them
         mcpConnections = (service.application as MikaApp).mcpServers.connectionsFor(
             resources,
             com.wangzan101.mika.mcp.ConversationMcpResultStore(SandboxDirs(service), workspaceKey),
             workspaceKey.wire,
         )
-        // 连接失败、超过总时限没连上的只在任务卡片上提示一句,不打断任务;详情在设置页的健康状态里
+        // Servers that failed to connect or didn't connect before the overall deadline only get a one-line note on the task card, without interrupting the task; details are in the health status on the settings page
         mcpConnections?.failures?.takeIf { it.isNotEmpty() }?.let { failures ->
             val store = (service.application as MikaApp).mcpServers
             val names = store.servers.value.associate { it.id to it.name }
@@ -78,16 +78,16 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
             }
         }
     }
-    // 对话里有通知提醒(第三方文字)时和电脑交来的任务一样:不管「自主模式」开没开,付款照样先问
+    // When the conversation has notice alerts (third-party text) it is treated like a task handed over from the computer: no matter whether "autonomous mode" is on, payments still ask first
     val runApproval = approvalControl.start(alwaysAsk = provenance.origin == RunOrigin.Mcp || noticeTainted).also { approval = it }
-    // 插件:环境变量、工具规格、提示词钩子共用同一个脚本入口
+    // Plugins: environment variables, tool specs and the prompt hook share the same script entry point
     val pluginRunner = com.wangzan101.mika.plugin.PluginScriptRunner(
         envProvider = { com.wangzan101.mika.settings.EnvVarStore.get(service).all() })
     val pluginTools = (service.application as MikaApp).plugins.toolSpecs()
     val promptHook = com.wangzan101.mika.plugin.PluginPromptHook(
         (service.application as MikaApp).plugins, pluginRunner, { model.name },
         { com.wangzan101.mika.settings.EnvVarStore.get(service).all() })
-    // 一个任务里沙箱命令累计时长上限(设置 › 干活时,默认 30 分钟);主任务和它派的子任务同档,各自独立累计
+    // Cap on the cumulative sandbox command time within one task (Settings › While working, 30 minutes by default); the main task and the subtasks it spawns share the same tier but accumulate independently
     val sandboxBudgetMs = FeatureFlags.get(service).sandboxBudgetMinutes() * 60_000L
     val childRunner = if (provenance.origin == RunOrigin.Ui && web != null) ChildAgentRunner(
         create = { childSpec, childResources ->
@@ -105,7 +105,7 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
                 adaptiveVision = speed.adaptiveVision)
             childTools.manualControl = manualControl
             AgentLoop(model, childTools, basePrompt, maxSteps = childSpec.stepBudget ?: AgentLoop.UNLIMITED_STEPS,
-                // 子任务跟着询问 / 自主;询问时它也过关卡,子任务里花钱的一步一律不做
+                // Subtasks follow ask/autonomous; under ask they go through the gate too, and any step that spends money is never performed in a subtask
                 confirmations = runApproval.gate(), approvals = runApproval, autonomous = runApproval.startedAutonomous,
                 promptTransform = { promptHook.transform(it) },
                 reviewFinalAnswer = false, flags = speed, outwardPacing = OutwardPacing.human(), personaLabel = personaLabel)
@@ -113,8 +113,8 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
         store = (service.application as MikaApp).childRuns,
         ownerAlive = { job?.isActive == true },
     ).also { children = it } else null
-    // 自身端口:只给手机上、有用户的 UI 主任务;子任务、条件检查、定时、渠道、MCP 都没有。
-    // 状态只读工具一直给;操作类工具等用户打开「允许 Claire 操作自己的界面」。
+    // Self port: only for UI main tasks on the phone with a user present; subtasks, condition checks, scheduled, channel and MCP tasks don't get it.
+    // Read-only state tools are always provided; operating tools wait until the user enables "allow Claire to operate its own UI".
     val selfPort = if (provenance.origin == RunOrigin.Ui && !conditionCheck) {
         (service.application as? MikaApp)?.let { app -> com.wangzan101.mika.self.AndroidSelfPort(app, conversationId, key) }
     } else null
@@ -122,7 +122,7 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
         provenance.attendance != Attendance.Unattended && !runSpec.readOnly) {
         DeviceWorkspaceImports(SandboxDirs(service), sandbox::freeBytes, DeviceImportStore.get(service),
             resolveWorkspace = { workspaceKey }, conversationIdFor = { conversationId },
-            limits = { FeatureFlags.get(service).attachmentLimits() }) // 每次导入现取档位,与聊天附件同一套
+            limits = { FeatureFlags.get(service).attachmentLimits() }) // read the tier fresh on each import, the same set as chat attachments
     } else null
     val folders = sandbox.folderFiles as? GrantedFolderFiles
     val tools = toolDispatcher(privatePhone, model.capabilities.vision, catalog, recordFrames = true,
@@ -138,7 +138,7 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
         phoneCalls = (service.application as MikaApp).callPort.takeIf {
             !conditionCheck && (service.application as MikaApp).calls.settings.state.value.enabled
         },
-        // 设置里允许 Claire 改自己时,才把 settings_list、settings_set 发给模型
+        // Only when settings allow Claire to change itself are settings_list and settings_set exposed to the model
         selfConfig = if (FeatureFlags.get(service).selfConfig()) {
             com.wangzan101.mika.settings.SelfConfigImpl(FeatureFlags.get(service))
         } else null,
@@ -148,19 +148,19 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
         taskMemory = taskMemory,
         utterances = utterances, conversationId = conversationId,
         web = web,
-        // 同一个网站一页一页看:换页前补足停留,不连着秒开
+        // Reading the same site page by page: top up the dwell time before changing pages instead of opening them back to back
         webPacing = { PagePacing.human() },
-        // 停留时像人一样把页面轻轻滚几下
+        // While dwelling, scroll the page gently a few times like a human
         webIdleScroll = { IdleScroll(Random.Default) },
-        // 在 App 里一步一步操作:动作之间停一会儿,限制浏览快慢的 App 停得更久、屏数有上限
-        // (全局档位 + 设置里的按应用覆盖)
+        // Operating inside apps step by step: pause between actions, pause longer in apps that throttle browsing speed, with a cap on the number of screens
+        // (global tier + per-app overrides in settings)
         appPacing = { pace.appPacing() },
         appTempo = { pace.of(it).tempo },
         appCapped = { pace.capped(it) },
         appIdleScroll = { IdleScroll(Random.Default) },
-        // 上传只认当前工作区里的普通文件(与沙箱同一套路径规则);技能目录、工作区外一律越界
+        // Uploads only accept regular files inside the current workspace (same path rules as the sandbox); the skills directory and anything outside the workspace are out of bounds
         workspacePath = web?.let { { p: String -> sandbox.uploadCheck(workspaceKey, p) } },
-        // 同项目对话共用 p:<projectId>,其余按对话隔离
+        // Conversations in the same project share p:<projectId>; the rest are isolated per conversation
         sandbox = sandbox, workspace = { workspaceKey.wire },
         sandboxBudgetMs = sandboxBudgetMs,
         deviceFiles = if (deviceImports != null && FeatureFlags.get(service).deviceFiles()) {
@@ -187,25 +187,25 @@ internal suspend fun TaskRun.assembleTools(a: RunAssembly, m: RunModels, ph: Run
         scheduleTrigger = if (provenance.origin == RunOrigin.Ui) { trigger -> TriggerRuntime.schedule(service, trigger) } else null,
         scheduleAdmin = if (provenance.origin == RunOrigin.Ui) LocalScheduleAdmin(service) else null,
         childHost = childRunner,
-        // 用户要求时写下或改写个人技能(和自学收下的放在同一处,设置里立刻能看到)
+        // Personal skills written down or rewritten at the user's request (stored in the same place as the self-learned ones, immediately visible in settings)
         personalSkills = memoryRuntime.skills(),
-        // 这个对话之前几轮的运行记录(只读;history_read 只认 runSpec 里这个对话的轮次)
+        // Run records from earlier turns of this conversation (read-only; history_read only accepts turns of this conversation that are in runSpec)
         runRecords = RunStore(service).reader(),
-        // 这两天的通知原文和存着的各天、各周、各月的归纳(主动能力攒下的):只给用户在手机上发起的任务;主动能力没开时不去碰它
+        // Raw notices from the last two days plus the stored daily, weekly and monthly digests (accumulated by the proactive feature): only for tasks the user started on the phone; not touched when the proactive feature is off
         notices = if (provenance.origin == RunOrigin.Ui && !conditionCheck && FeatureFlags.get(service).proactive()) {
             (service.application as MikaApp).proactive.noticeSource()
         } else null,
-        // 机主结果推送:只给用户明说「发我微信」的手机 UI 主任务;绑定快照、复查与同文幂等都在发送器一侧
+        // Owner result push: only for phone UI main tasks where the user explicitly asked to "send it to my WeChat"; the binding snapshot, re-check and same-text idempotency all live on the sender side
         wechatOwner = if (provenance.origin == RunOrigin.Ui && !conditionCheck && explicitWechatOwnerRequest(goal)) {
             AndroidWechatOwnerPort(service.application as MikaApp, key)
         } else null,
         mcpServers = mcpEndpoints(),
-        // 仅用户明确配置并启用时提供通用搜索;否则继续用浏览器搜索。
+        // General search is only offered when the user has explicitly configured and enabled it; otherwise browser search keeps being used.
         webSearch = com.wangzan101.mika.settings.WebSearchSettings.get(service).service(),
-        // 已 root 的手机上用户打开了「允许 Claire 执行 root 命令」才登记 root 工具(子任务、条件检查不给)
+        // Root tools are only registered when the user has enabled "allow Claire to run root commands" on a rooted phone (not given to subtasks or condition checks)
         root = phoneServices.shellManager.root.takeIf { !conditionCheck && it.commandsAllowed() }
             ?.let { r -> RootCommands(RootShell::su, r::commandsAllowed) { a -> if (a == null) r.suGone() else r.commandsDenied(a) } },
-        // 看/操作 Claire 自己;开关关着时只给只读状态
+        // See/operate Claire itself; only read-only state is provided while the switch is off
         self = selfPort,
         selfOperate = selfPort?.takeIf { FeatureFlags.get(service).selfOperate() },
         pluginTools = pluginTools, pluginScriptRunner = pluginRunner,

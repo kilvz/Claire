@@ -22,7 +22,7 @@ import com.wangzan101.mika.task.TaskService.Companion.notifyDelivery
 import com.wangzan101.mika.task.TaskService.Companion.ID_RESULT
 import com.wangzan101.mika.task.TaskService.Companion.start
 
-// 任务服务:并发名额、追问排队与渠道回执
+// Task service: concurrency slots, follow-up queueing and channel receipts
 internal fun TaskService.localDeliveryChannel(scheduled: Boolean) = LocalChannel { _, delivery ->
     if (delivery is Delivery.Ask) {
         center.byConversation(delivery.threadId)?.let(::refreshNotifications)
@@ -41,37 +41,37 @@ internal fun TaskService.limit(): ParallelLimit {
         .also { taskState._parallelLimit.value = it }
 }
 
-/** 登记处里没人用的最小槽位;只在登记处的锁内调用。 */
+/** The lowest slot nobody uses in the registry; only called under the registry lock. */
 internal fun TaskService.freeSlot(): Int {
     val used = center.runs().map { it.slot }.toSet()
     return generateSequence(0) { it + 1 }.first { it !in used }
 }
 
-/** 这个对话空着就当场开始;还有任务就留在持久队列里,它收尾时([onRunEnded])交出来。查与留在同一把锁里。 */
+/** If this conversation is idle, start right away; if it still has a task, leave it in the persistent queue and hand it out when that task finishes ([onRunEnded]). The check and the queueing happen under the same lock. */
 internal fun TaskService.deferMessage(threadId: String, text: String, messageId: String) {
     val item = QueuedFollowUp(messageId, threadId, text, System.currentTimeMillis(), QueuedSource.Fallback)
     if (center.deferOrStart(threadId, text, messageId, QueuedSource.Fallback)) startFollowUp(item)
     else keepForeground()
 }
 
-/** 用户明确选了「排队」:这个对话还有任务就写进持久队列;刚好空了就当场开始。 */
+/** The user explicitly chose "queue": if this conversation still has a task, write it into the persistent queue; if it just became idle, start it right away. */
 internal fun TaskService.queueFollowUp(threadId: String, text: String, messageId: String, source: QueuedSource) {
     val item = QueuedFollowUp(messageId, threadId, text, System.currentTimeMillis(), source)
     if (center.deferOrStart(threadId, text, messageId, source)) {
-        // 这个对话刚空:不先入队,直接走 startNew;若这中间又来了任务,tryStart 会把它原子放回队列
+        // This conversation just went idle: skip enqueueing and go straight to startNew; if another task arrives in between, tryStart atomically puts it back into the queue
         startFollowUp(item)
     } else {
         keepForeground()
     }
 }
 
-/** 取这个对话的下一件;只取一件,由 startNew 登记或放回。 */
+/** Take the next item for this conversation; only one is taken, and startNew either registers it or puts it back. */
 internal fun TaskService.drainReady(conversationId: String?) {
     if (teachingBlocks()) return
     center.takeReady(conversationId).forEach(::startFollowUp)
 }
 
-/** 起动一件排队项;先确认已经写盘,起不来就放回队列,别停在 claim 状态。 */
+/** Start one queued item; make sure it is already persisted first, and put it back into the queue if the start fails, so it doesn't stay in the claimed state. */
 internal fun TaskService.startFollowUp(item: QueuedFollowUp) {
     if (!center.persistFollowUp(item)) return
     runCatching {
@@ -92,10 +92,10 @@ internal fun TaskService.acknowledgeChannel(peer: ChannelPeer?, messageId: Strin
 }
 
 /**
- * 每个新登记的任务只确认一次，不转发运行阶段。立即进入可靠送达账本并占住发送顺序，
- * 网络发送在后台进行；重复消息不会建任务，因此也不会再确认。
- * Telegram 只在设置后第一次确认（见 TelegramChannel.shouldAcknowledge），
- * 之后的任务没有确认，只有输入提示和最终回答；别的渠道每次都确认。
+ * Each newly registered task is acknowledged only once, and run stages are not forwarded. It goes straight into the reliable delivery ledger and takes its send order,
+ * while the network send happens in the background; a duplicate message creates no task, so it is not acknowledged again either.
+ * Telegram only acknowledges the first one after it is set up (see TelegramChannel.shouldAcknowledge);
+ * tasks after that get no acknowledgement, only typing indicators and the final answer; other channels acknowledge every time.
  */
 internal fun TaskService.acceptChannel(run: TaskRun) {
     val peer = run.channelPeer ?: return
@@ -144,7 +144,7 @@ internal fun TaskService.stopChannelTyping(runKey: String) {
     synchronized(typingLock) { typingJobs.remove(runKey) }?.cancel()
 }
 
-/** 排队中的任务被取消(已移出队伍):没开跑,直接记为已取消;排在它后面的下一件接着取。 */
+/** A queued task was cancelled (already removed from the queue): it never started, so record it as cancelled directly; the next item behind it is taken up. */
 internal fun TaskService.cancelQueued(run: TaskRun) {
     run.handoffUnconsumed(cancelled = true)
     run.mcpExternalId?.let { (application as com.wangzan101.mika.MikaApp).remoteTasks.ended(it, TaskState.Cancelled, run.steers.value, run.runId.value, run.sharedFiles.value) }
