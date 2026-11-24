@@ -26,7 +26,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.put
 
-/** 音乐库审批卡上的 App 字段;不是真实包名。 */
+/** The app field on the music-library approval card; not a real package name. */
 private const val MUSIC_CONFIRM_APP = "mika:music"
 
 internal object AudioGenerate : AgentTool {
@@ -100,7 +100,7 @@ internal class AudioSave(private val ask: Boolean) : AgentTool {
 
     override fun available(ctx: ToolContext) = ctx[AudioCapability.KEY]?.let { it.port != null && it.saveEnabled } == true
 
-    /** 保存是改到音乐库的一步:默认每次都要用户这一次的同意。 */
+    /** Saving is a step that changes the music library: by default it requires the user's approval each time. */
     override fun approvalRisk(args: JsonObject): ApprovalRisk = if (ask) {
         ApprovalRisk(ActionRisk.Change, ask = ConfirmationRequest(
             IrrevAction.other, "", "保存音频到音乐库:${nameOf(args)}", null, MUSIC_CONFIRM_APP,
@@ -154,7 +154,7 @@ private fun failure(e: Throwable): ToolExecution = when (e) {
     else -> fail("audio_failed", e.message?.take(300) ?: "Speech generation failed.")
 }
 
-/** 让 Claire 在本机主动说一句;默认不提供,用户在声音设置里打开后才给。 */
+/** Lets Claire speak a line proactively on this device; not offered by default, only after the user enables it in the voice settings. */
 internal object Speak : AgentTool {
     override val capability: String get() = AUDIO
     override val verb = Verb.Speak

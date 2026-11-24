@@ -60,126 +60,126 @@ import java.io.File
 private val helperFileTools = DeviceFilesGroup.withSearchAndCopy(searchAndCopyTools(DEVICE_FILES))
 
 /**
- * 一个任务的工具:装上手机、网页、沙箱三种能力和核心工具。这是唯一同时认识几种能力的地方。
- * 没给端口的能力照样装上(工具都不提供),按名字查声明时它们的工具也查得到。root 命令例外:没给端口就整个不装。
+ * A task's tools: installs the phone, web, and sandbox capabilities plus the core tools. This is the only place that knows several capabilities at once.
+ * Capabilities whose port was not supplied are still installed (they offer no tools), and their tools can still be found when looking up declarations by name. Root commands are the exception: without a port, nothing is installed at all.
  */
 fun toolDispatcher(
     screen: ScreenPort,
     visionEnabled: Boolean = false,
-    /** 只读的知识与技能目录;为空时不提供 knowledge_search / knowledge_read / skill_search / skill_read。 */
+    /** Read-only knowledge and skill catalog; when null, knowledge_search / knowledge_read / skill_search / skill_read are not offered. */
     skills: GuideCatalog? = null,
-    /** 读屏时另截一张画面给运行记录(看不了图的模型也留画面)。 */
+    /** Also capture a frame for the run record when reading the screen (so frames exist even for models that cannot see images). */
     recordFrames: Boolean = false,
-    /** 看图模型;为空(设置里没有能看图的模型)时不提供视觉类工具。 */
+    /** Vision model; when null (no vision-capable model configured) no vision tools are offered. */
     vision: VisionService? = null,
-    /** 内置浏览器;为空时不提供任何网页工具,只有手机界面。 */
+    /** Built-in browser; when null no web tools are offered, only the phone UI. */
     web: WebPort? = null,
-    /** 网页上传的工作区路径检查(规范化、符号链接解析由 app 侧做)。 */
+    /** Workspace path check for web uploads (normalization and symlink resolution are done on the app side). */
     workspacePath: ((String) -> WorkspacePathCheck)? = null,
-    /** 网页一页一页看的节奏(换页前补足停留,见 [PagePacing]);默认不等。 */
+    /** Pacing for viewing web pages one by one (top up the dwell before changing pages, see [PagePacing]); no waiting by default. */
     webPacing: () -> PagePacing = { PagePacing.Off },
-    /** 网站对浏览快慢的要求(按主机名);默认按 [skills] 里站点知识的 pace。 */
+    /** Each site's browsing-speed requirement (by host name); defaults to the pace from site knowledge in [skills]. */
     webPlacePace: (String) -> PlacePace = { host -> PlacePace.of(skills?.sitePace(host)) },
-    /** 网页停留时轻轻滚几下页面(见 [IdleScroll]);默认不滚。 */
+    /** Gently scroll the page a few times while dwelling on a web page (see [IdleScroll]); no scrolling by default. */
     webIdleScroll: () -> IdleScroll? = { null },
-    /** 在 App 里一步一步操作的节奏(改动屏幕的动作之前补足停留,见 [AppPacing]);默认不等。 */
+    /** Pacing for step-by-step operation inside apps (top up the dwell before actions that change the screen, see [AppPacing]); no waiting by default. */
     appPacing: () -> AppPacing = { AppPacing.Off },
-    /** App 的实际操作节奏(按包名,见 [AppTempo]);默认按 [skills] 里 App 知识的 pace。 */
+    /** The app's actual operation tempo (by package name, see [AppTempo]); defaults to the pace from app knowledge in [skills]. */
     appTempo: (String) -> AppTempo = { pkg -> AppTempo.of(skills?.appPace(pkg)) },
-    /** 哪些 App 限制浏览快慢(按包名,计屏数、受上限);默认同 [appTempo] 取 App 知识里标 careful 的。 */
+    /** Which apps cap browsing speed (by package name; screen counts, subject to a limit); by default the same as [appTempo], taking apps marked careful in app knowledge. */
     appCapped: (String) -> Boolean = { pkg -> PlacePace.of(skills?.appPace(pkg)) == PlacePace.CAREFUL },
-    /** App 里新的一屏上的停留时轻轻滚几下(见 [IdleScroll]);默认不滚。 */
+    /** Gently scroll a few times while dwelling on a new screen in an app (see [IdleScroll]); no scrolling by default. */
     appIdleScroll: () -> IdleScroll? = { null },
-    /** 跨读屏的稳定编号:读屏给模型编号和 s<N>,动作前翻译回端口编号。 */
+    /** Stable references across screen reads: screen reads give the model indexes and s<N>, translated back to port ids before actions. */
     stableRefs: Boolean = false,
-    /** 写操作成功后等界面稳定再读一屏,把与上一屏的差异放进结果的 screen 字段;隐含 [stableRefs]。 */
+    /** After a write action succeeds, wait for the UI to settle and read a screen, putting the diff from the previous screen into the result's `screen` field; implies [stableRefs]. */
     inlineScreen: Boolean = false,
-    /** 先给模型元素表；只在元素信息明显不足时自动附图。动作仍带回元素变化。 */
+    /** Give the model the element table first; attach an image automatically only when element information is clearly insufficient. Actions still return element changes. */
     adaptiveVision: Boolean = false,
-    /** 提速开关 deepLinks:提供打开链接的工具。 */
+    /** Speed-up switch deepLinks: offers the tool for opening links. */
     deepLinks: Boolean = false,
-    /** 记忆;和 [utterances] 都给了才提供 memory_search / memory_save / memory_edit。 */
+    /** Memory; memory_search / memory_save / memory_edit are offered only when [utterances] is supplied too. */
     memory: MemoryStore? = null,
     profile: ProfileStore? = null,
-    /** 用户本次说过的话,memory_save / memory_edit 的引文据此校验;AgentLoop 往里加。 */
+    /** What the user said in this run; quotes for memory_save / memory_edit are validated against it; AgentLoop appends to it. */
     utterances: UserUtterances? = null,
-    /** 本次任务所在的对话;记进记忆的出处。 */
+    /** The conversation this task belongs to; recorded as the source of memories. */
     conversationId: String? = null,
-    /** Linux 沙箱;设备支持时提供沙箱工具(没准备好时工具调用会等它)。 */
+    /** Linux sandbox; sandbox tools are offered when the device supports it (if it is not ready, tool calls wait for it). */
     sandbox: SandboxPort? = null,
-    /** 本次任务的工作区(对话 ID)。 */
+    /** This task's workspace (conversation ID). */
     workspace: () -> String = { "default" },
-    /** 沙箱开始跑一条命令或脚本时(任务卡片显示「沙箱:…」)。 */
+    /** Called when the sandbox starts running a command or script (the task card shows "Sandbox: …"). */
     onSandboxCommand: (String) -> Unit = {},
-    /** 沙箱里 `mika progress` 报的进度。 */
+    /** Progress reported by `mika progress` inside the sandbox. */
     onSandboxProgress: (String) -> Unit = {},
-    /** 沙箱工具在等运行环境准备好(任务卡片显示「正在准备」)。 */
+    /** A sandbox tool is waiting for the runtime to become ready (the task card shows "Preparing"). */
     onSandboxPreparing: () -> Unit = {},
-    /** 开始跑技能脚本时;不给就按 [onSandboxCommand] 报。 */
+    /** Called when a skill script starts running; when absent, reported via [onSandboxCommand]. */
     onSandboxScript: ((String) -> Unit)? = null,
-    /** 这个任务里沙箱命令累计最多跑多久(设置 › 干活时的档位);默认 [SANDBOX_BUDGET_MS]。 */
+    /** Maximum cumulative runtime for sandbox commands in this task (the working tier under settings); defaults to [SANDBOX_BUDGET_MS]. */
     sandboxBudgetMs: Long = SANDBOX_BUDGET_MS,
-    /** 发给主模型的图统一编码用;为空时原样发。 */
+    /** Used to encode images sent to the main model uniformly; when null, images are sent as-is. */
     imageOps: ImageOps? = vision?.ops,
-    /** 开局约束允许的能力；旧调用方不传时仍得到今天的工具。 */
+    /** Capabilities allowed by the initial run constraints; legacy callers that do not pass it still get today's tools. */
     runSpec: RunSpec = RunSpec(RunId("legacy"), "legacy", "legacy"),
-    /** 这次任务接上的所有外部 MCP 端点(不分来源,调用方在一处拼好);每个成为一个能力,按 serverId 区分。 */
+    /** All external MCP endpoints connected for this task (regardless of source; the caller assembles them in one place); each becomes a capability, distinguished by serverId. */
     mcpServers: List<McpConnection> = emptyList(),
-    /** 存下一个定时任务,并说明能不能准时(见 [Scheduled])。 */
+    /** Stores a scheduled task and reports whether it can run on time (see [Scheduled]). */
     scheduleTrigger: ((TriggerDefinition) -> Scheduled)? = null,
     scheduleAdmin: ScheduleAdmin? = null,
     childHost: ChildRunHost? = null,
-    /** 这个对话里用户发来的屏幕;给了而这次的话或之前几轮里带着屏幕时提供 view_user_screen。 */
+    /** Screens the user sent in this conversation; view_user_screen is offered when supplied and this utterance or an earlier turn carries a screen. */
     userScreens: UserScreenSource? = null,
-    /** 用户的个人技能;和 [skills]、[utterances] 都给了才提供 skill_save(用户要求时写下或改一份个人技能)。 */
+    /** The user's personal skills; skill_save is offered only when this, [skills], and [utterances] are all supplied (write or edit a personal skill when the user asks). */
     personalSkills: PersonalSkills? = null,
-    /** 改 Claire 自己设置的白名单入口;为空时不提供 settings_list、settings_set(见 [SelfConfig])。 */
+    /** Whitelisted entry points for changing Claire's own settings; when null, settings_list and settings_set are not offered (see [SelfConfig]). */
     selfConfig: com.wangzan101.mika.core.self.SelfConfig? = null,
-    /** 存下的运行记录;给了、而这个对话之前有记过运行的轮次时提供 history_read(查之前几轮读到的东西)。 */
+    /** Stored run records; history_read is offered when supplied and this conversation has earlier turns with recorded runs (look up what earlier turns read). */
     runRecords: RunRecords? = null,
-    /** 声音生成/保存;为空时不装音频能力(没配置声音模型或用户没打开)。 */
+    /** Audio generation/saving; when null the audio capability is not installed (no audio model configured or the user has not enabled it). */
     audio: com.wangzan101.mika.core.cap.audio.AudioPort? = null,
-    /** 用户允许把音频存进音乐库;默认关。 */
+    /** Whether the user allows saving audio to the music library; off by default. */
     audioSaveEnabled: Boolean = false,
-    /** 每次保存前是否问用户;默认问。 */
+    /** Whether to ask the user before each save; asks by default. */
     audioAskBeforeSave: Boolean = true,
-    /** 用户允许模型主动说话;默认关。 */
+    /** Whether the user allows the model to speak proactively; off by default. */
     audioSpeakTool: Boolean = false,
-    /** 固定音频转写端口;为空且未给 [transcribeProvider] 时不装转写能力。 */
+    /** Fixed audio transcription port; when null and [transcribeProvider] is not supplied, the transcription capability is not installed. */
     transcribe: com.wangzan101.mika.core.cap.transcribe.TranscribePort? = null,
-    /** 随当前 STT 选择动态解析转写端口;目录和执行都重新检查,不重建任务内其他状态。 */
+    /** Resolves the transcription port dynamically according to the current STT selection; both listing and execution re-check it without rebuilding other task state. */
     transcribeProvider: (() -> com.wangzan101.mika.core.cap.transcribe.TranscribePort?)? = null,
-    /** 图片生成/改图/存相册;为空时不装图片能力(没配置图片模型或用户没打开)。 */
+    /** Image generation/editing/saving to the album; when null the image capability is not installed (no image model configured or the user has not enabled it). */
     image: com.wangzan101.mika.core.cap.image.ImagePort? = null,
-    /** 用户允许保存图片到相册;默认关。 */
+    /** Whether the user allows saving images to the album; off by default. */
     imageSaveEnabled: Boolean = false,
-    /** 每次保存前是否问用户;默认问。 */
+    /** Whether to ask the user before each save; asks by default. */
     imageAskBeforeSave: Boolean = true,
-    /** 每个任务最多生成几张;超过后工具拒绝,不去花服务商的钱。 */
+    /** Maximum images to generate per task; beyond that the tool refuses instead of spending the provider's money. */
     imageMaxPerTask: Int = 8,
-    /** 以 root 跑命令(已 root 的手机上用户打开了「允许 Claire 执行 root 命令」才给);为空时 root 工具不登记。 */
+    /** Run commands as root (supplied only when the user enabled "allow Claire to run root commands" on a rooted phone); when null, root tools are not registered. */
     root: RootPort? = null,
-    /** 用户配置并启用的通用网页搜索;为空时保持原有浏览器搜索路径。 */
+    /** General web search configured and enabled by the user; when null, the original browser search path is kept. */
     webSearch: com.wangzan101.mika.core.search.WebSearch? = null,
-    /** 读 Claire 自己的状态;只对手机上、有用户的 UI 主任务给。 */
+    /** Reads Claire's own state; supplied only for UI main tasks on the phone that have a user. */
     self: com.wangzan101.mika.core.self.SelfPort? = null,
-    /** 操作 Claire 自己的界面/文件/通知/剪贴板;用户打开「允许 Claire 操作自己的界面」时才给。 */
+    /** Operate Claire's own UI/files/notifications/clipboard; supplied only when the user enables "allow Claire to operate its own UI". */
     selfOperate: com.wangzan101.mika.core.self.SelfPort? = null,
     phoneCalls: com.wangzan101.mika.core.calls.PhoneCallPort? = null,
     smsLogin: com.wangzan101.mika.core.cap.phone.sms.SmsLoginPort? = null,
-    /** 跨会话任务摘要;给了才提供 task_memory_search / task_memory_timeline / task_memory_step。 */
+    /** Cross-session task summaries; task_memory_search / task_memory_timeline / task_memory_step are offered only when supplied. */
     taskMemory: com.wangzan101.mika.core.learn.memory.TaskMemoryStore? = null,
-    /** 这两天的通知原文和存着的各天、各周、各月的归纳(主动能力攒下的、够格带进任务的);给了才提供 notices_read。 */
+    /** Raw notifications from the last two days plus stored daily, weekly, and monthly digests (accumulated by proactive capabilities and eligible to be brought into tasks); notices_read is offered only when supplied. */
     notices: com.wangzan101.mika.core.proactive.NoticeSource? = null,
-    /** 用户在 UI 发起任务时可访问的设备文件。 */
+    /** Device files accessible when the user starts a task from the UI. */
     deviceFiles: com.wangzan101.mika.core.cap.devicefiles.DeviceFilesPort? = null,
-    /** 把任务结果投递到机主绑定微信的出口;为空(任务没明确要发微信)时不提供 wechat_send_owner。没绑定时出口照样在,发送照实回报不可用。 */
+    /** Outlet that delivers task results to the owner's bound WeChat; when null (the task did not explicitly ask to send WeChat), wechat_send_owner is not offered. When nothing is bound the outlet still exists, and sending honestly reports it as unavailable. */
     wechatOwner: com.wangzan101.mika.core.cap.wechat.WechatOwnerPort? = null,
-    /** 启用的插件工具(名字已拼成 plugin_<id>_<name>);给了 [pluginScriptRunner] 才放进任务。 */
+    /** Enabled plugin tools (names already composed as plugin_<id>_<name>); added to the task only when [pluginScriptRunner] is supplied. */
     pluginTools: List<PluginToolSpec> = emptyList(),
-    /** 在 App 进程内跑插件脚本的入口;为空时插件工具不登记。 */
+    /** Entry point for running plugin scripts inside the app process; when null, plugin tools are not registered. */
     pluginScriptRunner: ScriptRunner? = null,
-    /** 插件脚本参数临时文件放哪;App 用 cacheDir,JVM 测试用 java.io.tmpdir。 */
+    /** Where temporary plugin script argument files go; the app uses cacheDir, JVM tests use java.io.tmpdir. */
     pluginArgsDir: File = File(System.getProperty("java.io.tmpdir"), "mika-plugin-args"),
     /** Streams a document from a system-granted folder to this task's workspace. */
     folderFileImporter: FolderFileImporter? = null,
@@ -213,7 +213,7 @@ fun toolDispatcher(
                 folderTools = if (helper == null) searchAndCopyTools(SANDBOX) else emptyList(),
                 budgetMs = sandboxBudgetMs)
         },
-        // 端口为空时整个能力不进装配(任务没明确要发微信)
+        // When the port is null the whole capability is not assembled (the task did not explicitly ask to send WeChat)
         object : CapabilityProvider {
             override val id = com.wangzan101.mika.core.cap.wechat.WechatOwnerCapability.WECHAT_OWNER
             override fun open(spec: RunSpec) =
@@ -260,21 +260,21 @@ fun toolDispatcher(
     return RunAssembler(providers).assemble(runSpec, config, stableRefs, FORMER_PREFIX, RENAMED, RETIRED, MOVED)
 }
 
-/** 改名前各能力工具名的前缀:手机的没有前缀,网页的是 browser_。 */
+/** Tool-name prefixes per capability before the rename: phone had none, web used browser_. */
 private val FORMER_PREFIX = mapOf(PHONE to "", WEB to "browser_")
-/** 屏幕工具第二次改名时动词部分的变化(以前 → 现在),手机、网页两套一样。 */
+/** Verb-part changes in the screen tools' second rename (before → now); identical for the phone and web sets. */
 private val SCREEN_VERBS_MOVED = mapOf(
     "dump_elements" to "list_elements", "locate_on_screen" to "find_visually",
     "screen_description" to "describe", "check_screen" to "diagnose",
 )
 
-/** 除了前缀,其余部分也改过的(现在的名字 → 最早的名字;第二次改名的屏幕工具最早是几块屏共用的那个名字)。 */
+/** Names whose non-prefix parts also changed (current name → earliest name; for the screen tools renamed a second time, the earliest name was the one shared by several screens). */
 private val RENAMED = mapOf("web_wait_for" to "browser_wait") +
     SCREEN_VERBS_MOVED.flatMap { (old, now) -> listOf(PHONE, WEB).map { "${it}_$now" to old } }
 
 /**
- * 整个换了名字的(以前的名字 → 现在的名字)。一个拆成知识、技能两个的列两个:模型调旧名时按参数挑(见 [LegacyNames.replacements]),
- * 文字里的旧名两个都写上。
+ * Names that changed entirely (old name → current name). One split into knowledge and skill lists both: when the model calls the old name, the choice is made by argument (see [LegacyNames.replacements]),
+ * and for the old name in text both are written.
  */
 private val MOVED: Map<String, List<String>> = mapOf(
     "find_skills" to listOf("knowledge_search", "skill_search"),
@@ -287,25 +287,25 @@ private val MOVED: Map<String, List<String>> = mapOf(
     "recall_screenshot" to listOf("view_past_screens"),
 ) + SCREEN_VERBS_MOVED.flatMap { (old, now) -> listOf(PHONE, WEB).map { "${it}_$old" to listOf("${it}_$now") } }
 
-/** 去掉了、没有替代工具的(以前的名字 → 现在怎么做):以前用工具交结果,现在不带调用的回复就是回答。 */
+/** Removed with no replacement tool (old name → what to do now): results used to be delivered with a tool; now a reply without calls is the answer. */
 private val RETIRED = mapOf(
     "finish" to "reply to the user with your answer as text, without calling any tool",
     "phone_ask_app_ai" to "read the app's own screens yourself (asking an app's built-in AI assistant is no longer available)",
 )
 
-/** 改名前的工具名 → 现在的名字(读旧的路线、运行记录、个人技能时用)。 */
+/** Tool names before the rename → current names (used when reading old routes, run records, and personal skills). */
 fun legacyNames(): LegacyNames =
     LegacyNames(knownTools(), FORMER_PREFIX, RENAMED, retired = RETIRED, moved = MOVED)
 
-/** 读运行记录用的工具声明:改名前记下的旧名也认成现在的工具(动作、能力相同),旧的记录和新的评分一样。 */
+/** Tool declarations used for reading run records: old names recorded before the rename are also recognized as the current tool (same action and capability), so old records score the same as new ones. */
 fun recordedTools(): ToolIndex = legacyNames().let { legacy -> ToolIndex(allTools()) { legacy.resolve(it) } }
 
-/** Claire 所有可能提供的工具,按发给模型的顺序。 */
+/** All tools Claire may offer, in the order sent to the model. */
 internal fun allTools(): List<AgentTool> =
     GeneralGroup.tools + PhoneCapability.tools() + WebGroup.tools + SandboxGroup.tools + com.wangzan101.mika.core.cap.audio.AudioGroup.tools + com.wangzan101.mika.core.cap.transcribe.TranscribeGroup.tools + com.wangzan101.mika.core.cap.image.ImageGroup.tools + RootGroup.tools + com.wangzan101.mika.core.calls.callAgentTools + helperFileTools + com.wangzan101.mika.core.cap.wechat.wechatOwnerAgentTools
 
-/** Claire 所有可能提供的工具的声明。 */
+/** Declarations of all tools Claire may offer. */
 fun knownTools(): ToolIndex = ToolIndex(allTools())
 
-/** Claire 所有可能提供的工具名(技能文档里提到的工具名据此校验)。 */
+/** All tool names Claire may offer (tool names mentioned in skill documents are validated against these). */
 fun knownToolNames(): Set<String> = knownTools().names + DO_STEPS_TOOL

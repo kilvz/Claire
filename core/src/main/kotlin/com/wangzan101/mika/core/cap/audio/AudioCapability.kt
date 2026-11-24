@@ -8,7 +8,7 @@ import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.tool.AgentTool
 import com.wangzan101.mika.core.tool.ToolContext
 
-/** 音频能力:把文字合成成音频文件、把音频存进音乐库。没有配置声音模型时整个能力不装。 */
+/** Audio capability: synthesizes text into audio files and saves audio to the music library. Without a configured voice model the whole capability is not installed. */
 const val AUDIO = "audio"
 
 internal class AudioCapability(

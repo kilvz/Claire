@@ -18,7 +18,7 @@ internal class McpClientProvider(private val connection: McpConnection) : Capabi
     }
 }
 
-/** 目录或能力构造失败只摘掉这个 server;错误留在提示里，不让它拖垮其他能力。 */
+/** A catalog or capability construction failure removes only this server; the error stays in the prompt so it cannot take down the other capabilities. */
 private class McpFailedCapability(
     override val id: String,
     private val serverId: String,

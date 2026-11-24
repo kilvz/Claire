@@ -8,7 +8,7 @@ import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.tool.AgentTool
 import com.wangzan101.mika.core.tool.ToolContext
 
-/** 图片能力:生成、改图、存相册。没有配置图片模型时整个能力不装,工具也不发给模型。 */
+/** Image capability: generation, editing, and saving to the album. Without a configured image model the whole capability is not installed and no tools are sent to the model. */
 const val IMAGE = "image"
 
 internal class ImageCapability(
@@ -34,7 +34,7 @@ internal class ImageCapability(
         ctx[KEY] = this
     }
 
-    /** 本任务已经生成/要生成的张数;超过上限时工具直接拒绝,不去花服务商的钱。 */
+    /** The number of images already generated/planned in this task; beyond the limit the tool refuses outright instead of spending the provider's money. */
     @Synchronized fun reserve(count: Int): Boolean {
         if (count < 1 || used + count > maxPerTask) return false
         used += count

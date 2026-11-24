@@ -2,12 +2,12 @@ package com.wangzan101.mika.core.cap.image
 
 import com.wangzan101.mika.core.tool.AgentTool
 
-/** 图片一组:花一次钱生成/改图、把工作区里的图存进相册。保存的工具只在用户允许时提供。 */
+/** The image group: generate/edit an image at a cost, and save workspace images to the album. The save tool is offered only when the user allows it. */
 internal object ImageGroup {
-    /** 全部声明(不认识本任务的开关);给 knownTools、运行记录认名字用。 */
+    /** All declarations (unaware of this task's switches); used by knownTools and by run records to recognize names. */
     val tools: List<AgentTool> = listOf(ImageGenerate, ImageEdit, ImageSave(ask = true))
 
-    /** 本任务实际给的工具:保存没打开时连声明都不发。 */
+    /** The tools actually offered for this task: when saving is off, even the declaration is not sent. */
     fun forTask(saveEnabled: Boolean, askBeforeSave: Boolean): List<AgentTool> = buildList {
         add(ImageGenerate)
         add(ImageEdit)

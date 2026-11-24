@@ -4,31 +4,31 @@ import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.prompt.Feedback
 import com.wangzan101.mika.core.tool.Verb
 
-/** 循环发给模型的一条提醒:来源标签和正文(由 [ContextBuilder.notice] 包成上下文)。 */
+/** A reminder the loop sends to the model: a source tag and the body (wrapped into context by [ContextBuilder.notice]). */
 internal data class Notice(val source: String, val text: String)
 
-/** 回合策略看的快照:第几步、步数上限。 */
+/** The snapshot the turn policy inspects: current step and step limit. */
 internal data class TurnSnapshot(val step: Int, val maxSteps: Int)
 
-/** 和基础提示词同一条规则:要的结果缺了要用的功能、条目或值是做不成;只有问「有没有」时,App 的搜索明确说没有才是答案。 */
+/** Same rule as the base prompt: a requested result missing the needed feature, item, or value counts as failure; only for a "is there any" question does an explicit none from the app's search count as the answer. */
 internal val ANSWER_OR_FAILURE: String get() = Feedback["answer_or_failure"]
 
-/** 为什么禁止继续操作、只给最后一次收尾机会。 */
+/** Why further actions are forbidden and only a final wrap-up chance is granted. */
 internal enum class Closeout { StepLimit, Completed, NoNewData }
 
 /**
- * 回合策略:每步开头要不要先提醒(中途自查)、回复是空的(或被输出上限截断)时提醒还是结束、核对没对上时怎么提醒、
- * 步数用完后最后一轮说什么、给哪些工具。纯函数,只看传进来的东西。
- * 不带调用的回复本身就是回答,这里不管;只有空回复会被提醒,而且只提醒一次。
+ * Turn policy: whether to remind at the start of each step (mid-run self-check), whether to remind or end when the reply is empty (or truncated by the output limit), how to remind when verification does not match,
+ * what to say in the final turn after steps run out, and which tools to offer. Pure functions that look only at what is passed in.
+ * A reply without calls is itself the answer and is not handled here; only empty replies get a reminder, and only once.
  */
 internal object TurnPolicy {
-    /** 中途自查:步数用到这些比例时提醒一次,找遍了就如实放弃。步数太少的任务不提醒。 */
+    /** Mid-run self-check: remind once each time step usage reaches these fractions; once everything has been searched, give up honestly. Tasks with too few steps get no reminder. */
     private val PROGRESS_CHECKS = listOf(0.5, 0.75)
     private const val PROGRESS_CHECK_MIN_STEPS = 10
-    /** 步数用完后的最后一轮只给放弃这一个工具,回答用文字写。 */
+    /** After steps run out, the final turn offers only the give-up tool; the answer is written as text. */
     val FINAL_VERBS = setOf(Verb.EndNotDone)
 
-    /** 这一步发给模型之前先加的提醒;没有为 null。 */
+    /** The reminder prepended before this step is sent to the model; null when there is none. */
     fun beforeStep(s: TurnSnapshot): Notice? {
         if (s.maxSteps < PROGRESS_CHECK_MIN_STEPS) return null
         val used = s.step - 1
@@ -38,14 +38,14 @@ internal object TurnPolicy {
     }
 
     /**
-     * 回复里没有调用也没有字([truncated]:字被输出上限截断了,不是完整的回答)。[already] 为 true 表示这样的回复刚提醒过一次:
-     * 这次不再提醒,返回 null,任务就此结束。
+     * The reply has neither calls nor text ([truncated]: the text was cut off by the output limit, so it is not a complete answer). [already] true means such a reply has just been reminded once:
+     * do not remind again this time; return null and the task ends here.
      */
     fun afterEmpty(already: Boolean, truncated: Boolean): Notice? =
         if (already) null else Notice(Feedback["nudge_source"], Feedback[if (truncated) "truncated_reply" else "empty_reply"])
 
     /**
-     * 回答核对没对上,退回一次时的提醒:[gaps] 是读到的材料里找不到的那几处,[objections] 是核查模型判没做成的理由,分开说。
+     * The reminder used when answer verification fails and the answer is sent back once: [gaps] are the spots not found in the material that was read, and [objections] are the verifier model's reasons for judging it not done; they are stated separately.
      */
     fun unconfirmed(gaps: List<String>, objections: List<String> = emptyList()): Notice {
         val findings = listOfNotNull(
@@ -55,21 +55,21 @@ internal object TurnPolicy {
         return Notice(Feedback["unconfirmed_source"], Feedback.format("unconfirmed_nudge", "findings" to findings))
     }
 
-    /** 回答的正文不是用户那句的语言([m] 是两边的语族,见 [ReplyLanguage]):退回一次,整段改写成用户的语言。 */
+    /** The answer body is not in the language of the user's utterance ([m] is the language family on both sides, see [ReplyLanguage]): send it back once to rewrite the whole passage in the user's language. */
     fun language(m: ReplyLanguage.Mismatch): Notice =
         Notice(Feedback["language_source"], Feedback.format("language_nudge", "answer" to m.answer.display, "user" to m.user.display))
 
-    /** 回复正文里漏出了对 [tool] 的调用(见 [LeakedToolCall]):退回一次,经工具接口重新调用,或用文字回答。 */
+    /** A call to [tool] leaked into the reply body (see [LeakedToolCall]): send it back once to re-invoke through the tool interface, or to answer in text. */
     fun leakedToolCall(tool: String): Notice =
         Notice(Feedback["leaked_call_source"], Feedback.format("leaked_call_nudge", "tool" to tool))
 
-    /** 用户同意了、或回答了([what]),之后却什么也没做就要交回答:提醒一次照做,或说清为什么不做。 */
+    /** The user agreed or answered ([what]), but the model is about to deliver an answer without doing anything: remind once to follow through, or to state clearly why not. */
     fun followUp(what: String): Notice = Notice(Feedback["followup_source"], Feedback.format("followup_nudge", "what" to what))
 
-    /** 步数用完后最后一轮之前的提醒。 */
+    /** The reminder given just before the final turn after steps run out. */
     fun finalTurn(): Notice = Notice(Feedback["final_source"], Feedback["final_turn"])
 
-    /** 完成或连续无新数据后的收尾:不再给操作工具，但仍可交出结果或如实报告部分完成。 */
+    /** Wrap-up after completion or after consecutive runs with no new data: action tools are no longer offered, but the result can still be delivered or partial completion reported honestly. */
     fun closeout(reason: Closeout, progress: RunProgress.Task? = null): Notice {
         val confirmed = progress?.display?.takeIf { it.isNotBlank() }?.let { "\nLatest confirmed progress: $it" }.orEmpty()
         return when (reason) {
@@ -80,6 +80,6 @@ internal object TurnPolicy {
         }
     }
 
-    /** 最后一轮给模型的工具:只有放弃;做完了就直接用文字回答。 */
+    /** Tools offered to the model in the final turn: only give-up; if the work is done, just answer in text. */
     fun finalTools(specs: List<ToolSpec>, verbOf: (String) -> Verb?): List<ToolSpec> = specs.filter { verbOf(it.name) in FINAL_VERBS }
 }

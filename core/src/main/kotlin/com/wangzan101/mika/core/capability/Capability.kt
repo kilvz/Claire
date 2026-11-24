@@ -11,31 +11,31 @@ import com.wangzan101.mika.core.tool.ToolExecution
 import com.wangzan101.mika.core.tool.Verb
 import kotlinx.serialization.json.JsonObject
 
-/** 能力此刻能不能用。 */
+/** Whether a capability is usable right now. */
 sealed interface CapabilityStatus {
     data object Available : CapabilityStatus
-    /** 能用,但还缺点什么(运行环境在准备、一部分功能没有)。 */
+    /** Usable, but missing something (the runtime is still preparing, part of the functionality is absent). */
     data class Degraded(val reason: String) : CapabilityStatus
     data class Unavailable(val reason: String) : CapabilityStatus
 }
 
 /**
- * 拼系统提示词时各组段落看得到的:本任务发给模型的工具名与开关;
- * [screens] 是本任务发给模型的工具里有几种屏幕(手机、网页……,收着的只给了入口也算)。
+ * What each group's sections can see when the system prompt is assembled: the tool names and switches sent to the model for this task;
+ * [screens] is how many kinds of screens are among this task's offered tools (phone, web, …, folded ones count as long as only their entry point is offered).
  */
 class PromptEnv(
     val offered: Set<String>, val inlineScreen: Boolean, val screens: Int = 1,
-    /** 展开了的能力(不收的也在内);null 是当全都展开了。收着的能力不给自己的段落。 */
+    /** Expanded capabilities (including ones that do not fold); null means treat all as expanded. Folded capabilities do not provide their own sections. */
     val open: Set<String>? = null,
-    /** [screens] 里已展开的那几块屏。 */
+    /** The screens out of [screens] that are expanded. */
     val openScreens: Int = screens,
 ) {
-    /** 能力 [id] 已展开(或不收)。 */
+    /** Capability [id] is expanded (or does not fold). */
     fun isOpen(id: String): Boolean = open == null || id in open
 
     /**
-     * 段落里只在某些工具提供时才成立的一行,行首写 `<!-- needs: 工具名, … -->`:那些工具都在本任务的工具列表里才留下(去掉标记),
-     * 否则整行不要。没有标记的行原样留着。
+     * A line in a section that only applies when certain tools are offered starts with `<!-- needs: tool names, … -->`: it is kept (with the marker removed) only when all those tools are in this task's tool list,
+     * otherwise the whole line is dropped. Lines without the marker are kept as-is.
      */
     fun gate(text: String): String = text.lines().mapNotNull { line ->
         val m = NEEDS.find(line) ?: return@mapNotNull line
@@ -48,79 +48,79 @@ class PromptEnv(
     }
 }
 
-/** 系统提示词里的一组段落;能力各给一组,核心自己也有。 */
+/** A group of sections in the system prompt; each capability provides one group, and the core has its own. */
 internal fun interface PromptSections {
     fun sections(env: PromptEnv): List<String>
 }
 
 /**
- * 一种能力(手机、网页、沙箱……):自己的工具、系统提示词里的段落、屏幕与守卫。
- * 核心只经这个接口认识能力;一个任务一份实例,端口在构造时给。
+ * A capability (phone, web, sandbox, …): its own tools, its sections in the system prompt, screens, and guards.
+ * The core knows capabilities only through this interface; there is one instance per task, and ports are supplied at construction.
  */
 internal interface Capability : PromptSections {
     val id: String
 
     fun status(): CapabilityStatus
 
-    /** 这一组工具用到才展开(见 [com.wangzan101.mika.core.tool.ToolGroups]):开局只有入口工具;不收的一直全在。 */
+    /** This tool group expands only when used (see [com.wangzan101.mika.core.tool.ToolGroups]): at start-up only the entry-point tool is present; groups that do not fold are always fully present. */
     val folds: Boolean get() = false
 
-    /** 端口可用性会随外部选择变化时,目录与执行每次都重新检查;普通能力仍冻结开局目录。 */
+    /** When port availability changes with external selection, the catalog and execution are re-checked every time; ordinary capabilities still freeze the catalog from start-up. */
     val dynamicAvailability: Boolean get() = false
 
-    /** 按这次的话([task])开局就展开这一组(一定用得上时);默认不展开。 */
+    /** Expand this group at start-up based on this run's utterance ([task]) (when it will certainly be used); does not expand by default. */
     fun preload(task: String): Boolean = false
 
-    /** 用户的一句话([text])去掉和本能力有关的说明(浏览器页的页面说明这类)后,用户自己打的字;没有这类说明的原样返回。 */
+    /** What the user typed themselves after removing capability-specific annotations (such as the browser page description) from the user's utterance ([text]); returned as-is when there is no such annotation. */
     fun userWords(text: String): String = text
 
-    /** 本能力可能提供的全部工具;本任务能不能用由各工具自己看上下文。 */
+    /** All tools this capability may offer; whether each is usable in this task is decided by the tool itself from the context. */
     fun tools(): List<AgentTool>
 
-    /** 有屏幕的能力给出它的一套屏幕工具的样子(没接端口时也给)。 */
+    /** A capability with screens provides the shape of its screen tool set (also provided when no port is connected). */
     val family: ScreenFamily? get() = null
 
-    /** 接上了端口的屏幕;没有为 null。本能力那一套屏幕工具只作用在它上面。 */
+    /** The screen whose port is connected; null when there is none. This capability's screen tools operate only on it. */
     val surface: Surface? get() = null
 
-    /** 能跑技能脚本时给出。 */
+    /** Provided when skill scripts can be run. */
     val scripts: BundledScripts? get() = null
 
-    /** 本任务开始:把工具要用的端口与状态放进工具上下文。 */
+    /** Task start: puts the ports and state the tools need into the tool context. */
     fun onTaskStart(ctx: ToolContext) {}
 
-    /** 任务里用户答过话(回答了追问、交回了接管)。 */
+    /** The user has answered during the task (answered a follow-up question, handed back a takeover). */
     fun onUserAnswered(ctx: ToolContext) {}
 
     /**
-     * 在本能力的屏上要做一次对外动作(发送、提交,见 [com.wangzan101.mika.core.action.OutwardPacing])了;[site] 是它所在的网站或 App。
-     * 做完后一定接着 [onOutwardEnd]([done]:做成了)。
+     * An outward action (send, submit, see [com.wangzan101.mika.core.action.OutwardPacing]) is about to be performed on this capability's screen; [site] is the website or app it is on.
+     * [onOutwardEnd] is always called afterwards ([done]: whether it succeeded).
      */
     fun onOutwardStart(ctx: ToolContext, site: String) {}
 
     fun onOutwardEnd(ctx: ToolContext, site: String, done: Boolean) {}
 
     /**
-     * 本能力的屏上要做一个改动屏幕的动作([verb])了:按本能力的节奏先停一会儿(见 [com.wangzan101.mika.core.action.ActionExecutor],
-     * 单步、一批里的每一步都经这里)。[outward]:这一步是对外动作(发送、提交)。默认不停。
+     * An action that changes the screen ([verb]) is about to be performed on this capability's screen: pause first according to this capability's pacing (see [com.wangzan101.mika.core.action.ActionExecutor],
+     * both for single steps and for each step within a batch). [outward]: this step is an outward action (send, submit). No pause by default.
      */
     suspend fun beforeWrite(ctx: ToolContext, verb: Verb?, outward: Boolean): Paced = Paced.NONE
 
-    /** 那个动作做完了([result] 是它的结果);[beforeWrite] 停下没做的不调。 */
+    /** That action has finished ([result] is its result); not called when [beforeWrite] stopped it and it was not performed. */
     fun afterWrite(ctx: ToolContext, verb: Verb?, result: JsonObject) {}
 
-    /** 不动屏幕的工具的守卫,每个任务一份;没有为 null。 */
+    /** Guard for tools that do not touch the screen; one per task; null when there is none. */
     fun guard(): OffScreenGuard? = null
 
     /**
-     * 核查前再看一眼这个能力此刻的样子(不改模型手里的任何东西);[withImage] 时连同一帧画面。没有可看的为 null。
+     * Look once more at this capability's current state before verification (without changing anything the model holds); with [withImage], include a frame as well. Null when there is nothing to look at.
      */
     suspend fun freshLook(ctx: ToolContext, withImage: Boolean): Look? = null
 }
 
 /**
- * 改动屏幕的动作之前按能力的节奏停的结果:停了 [waitMs](算进这次调用的等待),停留里轻轻滚了 [idleScrolls] 下(只进运行记录);
- * [stop] 不为 null 时这个动作不做,它就是这次调用的结果(到了屏数上限、停留中用户插了话)。
+ * Result of pausing according to the capability's pacing before a screen-changing action: paused [waitMs] (counted into this call's wait) and scrolled gently [idleScrolls] times during the dwell (recorded only in the run record);
+ * when [stop] is non-null the action is not performed and [stop] is this call's result (screen limit reached, user interjected during the dwell).
  */
 internal class Paced(val waitMs: Long = 0, val idleScrolls: Int = 0, val stop: ToolExecution? = null) {
     companion object {
@@ -128,5 +128,5 @@ internal class Paced(val waitMs: Long = 0, val idleScrolls: Int = 0, val stop: T
     }
 }
 
-/** 能力放进工具上下文的东西的键;核心不认识里面是什么。 */
+/** Key for something a capability puts into the tool context; the core does not know what is inside. */
 class CapabilityKey<T : Any>(val name: String)

@@ -28,16 +28,16 @@ import kotlinx.serialization.json.put
 import java.util.UUID
 
 /**
- * 等用户:回答追问、交回接管、回答确认。等待期间对外显示等待的状态,等完换回 [running](由调用方给);
- * 用户的决定(或超时、跳过)做成这次调用的工具结果。界面经 [answerInput] 一类方法把用户的回答交进来。
+ * Waiting on the user: answering a follow-up question, handing back a takeover, answering a confirmation. While waiting, the waiting state is shown externally; afterwards it switches back to [running] (supplied by the caller).
+ * The user's decision (or a timeout or skip) becomes this call's tool result. The UI feeds the user's answer in through methods such as [answerInput].
  */
 internal class UserExchange(
     private val tools: ToolDispatcher,
     private val confirmations: ConfirmationGate?,
-    /** 等用户回答确认的时限,到时按不同意;为 null 时一直等。 */
+    /** Time limit for waiting on the user's confirmation answer; on expiry it counts as declined; null means wait indefinitely. */
     private val confirmTimeoutMs: Long?,
     private val inputTimeoutMs: Long,
-    /** 用户本次说的话(memory_save 的引文校验用);不收集时为 null。 */
+    /** What the user said in this run (used to validate quotes for memory_save); null when not collected. */
     private val utterances: () -> UserUtterances?,
     private val setState: (TaskState) -> Unit,
     private val emit: (RunEvent) -> Unit,
@@ -51,7 +51,7 @@ internal class UserExchange(
     @Volatile private var takeoverReply: CompletableDeferred<HandBack>? = null
     @Volatile private var inputReply: CompletableDeferred<String>? = null
     @Volatile private var confirmationReply: CompletableDeferred<ConfirmChoice>? = null
-    /** 回答换成给模型的样子(带着用户屏幕时换成说明,见 [UserScreenTurns.asText]);默认原样。 */
+    /** Converts an answer into the form shown to the model (with a user screen attached it becomes a description, see [UserScreenTurns.asText]); identity by default. */
     var answerText: suspend (String) -> String = { it }
 
     fun begin(thread: String, run: RunProvenance, channel: Interaction = LocalInteraction) {
@@ -79,11 +79,11 @@ internal class UserExchange(
     fun resumeAfterTakeover(result: HandBack, askId: String? = null): Boolean =
         if (matches(askId)) takeoverReply?.complete(result) ?: false else false
 
-    /** 没有在等的问题(已超时、已答过)时返回 false。 */
+    /** Returns false when there is no question being waited on (already timed out or already answered). */
     fun answerInput(text: String, askId: String? = null): Boolean =
         if (matches(askId)) inputReply?.complete(text) ?: false else false
 
-    /** 渠道的新指令取代旧提问：结束这次等待，不让旧任务无限占着会话。 */
+    /** A new instruction from the channel supersedes the old question: end this wait so the old task does not hold the conversation indefinitely. */
     fun cancelInput(askId: String): Boolean {
         val ask = activeAsk
         if (ask?.askId != askId || ask.kind != Delivery.Ask.Kind.Input) return false
@@ -95,7 +95,7 @@ internal class UserExchange(
     fun answerConfirmation(choice: ConfirmChoice, askId: String? = null): Boolean =
         if (matches(askId)) confirmationReply?.complete(choice) ?: false else false
 
-    /** 任务结束:不再等任何回答。 */
+    /** Task finished: no longer wait for any answer. */
     fun clear() {
         takeoverReply = null
         inputReply = null
@@ -103,7 +103,7 @@ internal class UserExchange(
         activeAsk = null
     }
 
-    /** 等用户回答追问,最多 [inputTimeoutMs];超时返回 null。用户的回答可能是验证码一类,不记。 */
+    /** Waits for the user to answer the follow-up question, at most [inputTimeoutMs]; returns null on timeout. The user's answer may be something like a verification code, so it is not recorded. */
     suspend fun awaitAnswer(prompt: String, options: List<String>?): String? {
         if (provenance.attendance == Attendance.Unattended) return null
         val pending = CompletableDeferred<String>().also { inputReply = it }
@@ -122,7 +122,7 @@ internal class UserExchange(
 
     suspend fun input(o: Outcome.Input, running: TaskState): ToolExecution {
         val answer = awaitAnswer(o.prompt, o.options)
-        // 用户在任务里给的事实也是核查的依据
+        // Facts the user supplies during the task are also evidence for verification
         answer?.let { tools.noteUserAnswer(o.prompt, it) }
         setState(running)
         return ToolExecution(buildJsonObject {
@@ -131,7 +131,7 @@ internal class UserExchange(
         })
     }
 
-    /** 等用户交回;取消任务(aborted)时返回 null。等待不超时,避免仍需用户处理时丢掉任务现场。 */
+    /** Waits for the user to hand back; returns null when the task is aborted. The wait never times out, so the task context is not lost while the user still needs to act. */
     suspend fun takeover(o: Outcome.Takeover, running: TaskState): ToolExecution? {
         if (provenance.attendance == Attendance.Unattended || provenance.origin == RunOrigin.Child) return null
         val pending = CompletableDeferred<HandBack>().also { takeoverReply = it }
@@ -170,7 +170,7 @@ internal class UserExchange(
         })
     }
 
-    /** 申报和前台对得上就等用户回答(到时限按不同意,可取消);工具结果就是用户的决定。 */
+    /** If the declaration matches the foreground app, wait for the user's answer (on timeout it counts as declined; cancellable); the tool result is the user's decision. */
     suspend fun confirm(o: Outcome.Confirm, step: Int, running: TaskState): ToolExecution {
         val g = confirmations ?: return ToolExecution(buildJsonObject {
             put("ok", false); put("error", "unknown_tool"); put("tool", RequestConfirmation.name)
@@ -203,7 +203,7 @@ internal class UserExchange(
             emit(event("declined_unattended"))
             return error("confirmation_declined", CONFIRMATION_DECLINED, recoverable = false)
         }
-        // 付款只在手机上同意:渠道、定时、MCP 发起的任务不问
+        // Payments are approved only on the phone: tasks started from a channel, a schedule, or MCP are not asked
         if (provenance.origin != RunOrigin.Ui) {
             g.decide(ConfirmChoice.Deny, step)
             emit(event("declined_remote"))
@@ -214,7 +214,7 @@ internal class UserExchange(
         activeAsk = ask
         setState(TaskState.WaitingConfirmation(r))
         emit(event(null))
-        // 没人回答(不在手机旁)就按不同意,绝不自动同意
+        // With no answer (user not near the phone) it counts as declined; never auto-approve
         val timeout = if (provenance.attendance == Attendance.Reachable) confirmTimeoutMs ?: 15 * 60_000L else confirmTimeoutMs
         val answer = try {
             if (announce(ask) == DeliveryState.Failed) null

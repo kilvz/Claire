@@ -12,7 +12,7 @@ import com.wangzan101.mika.core.tool.ToolConfig
 import com.wangzan101.mika.core.tool.ToolDispatcher
 import com.wangzan101.mika.core.screen.uistate.Interfaces
 
-/** 每个 Run 在开局由 Provider 打开能力；Provider 捕获自己的端口与资源，不进入核心循环。 */
+/** Each run's capabilities are opened by providers at start-up; a provider captures its own ports and resources and does not enter the core loop. */
 internal interface CapabilityProvider {
     val id: String
     fun open(spec: RunSpec): Capability?

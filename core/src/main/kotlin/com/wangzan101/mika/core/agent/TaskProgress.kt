@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 
-/** 数量或边界进度；总数未知时只报已确认的数量和最新边界。 */
+/** Count or boundary progress; when the total is unknown, report only the confirmed count and the latest boundary. */
 internal data class ProgressMetric(
     val name: String,
     val done: Int? = null,
@@ -33,7 +33,7 @@ internal data class ProgressMetric(
     fun state() = RunProgress.Task(name, done, total, boundary)
 }
 
-/** 多个目标逐项确认；只有单目标的任务级数量到达时才可据此收尾。 */
+/** Multiple goals confirmed one by one; a task may only conclude on a count when a single-goal task-level quantity is reached. */
 internal data class CompletionPlan(
     val criteria: List<String> = emptyList(),
     val metric: ProgressMetric? = null,
@@ -76,7 +76,7 @@ internal data class CompletionUpdate(
     val confirmed: Set<Int> = emptySet(),
 )
 
-/** 只在正常的模型请求里带上待确认目标。不根据操作次数、工具成功或自由文本推算完成数。 */
+/** Include pending goals only in normal model requests. Never infer a completed count from operation counts, tool successes, or free text. */
 internal class TaskProgressTracker(private val now: () -> Long, private val emit: (RunEvent) -> Unit) {
     var plan = CompletionPlan()
         private set
@@ -105,7 +105,7 @@ internal class TaskProgressTracker(private val now: () -> Long, private val emit
         return parsed.text
     }
 
-    /** 处理已解析好的进度块(可能来自文字块,也可能来自被误写成工具调用的 `task_progress` 调用)。返回是否有效。 */
+    /** Handles an already-parsed progress block (it may come from a text block, or from a `task_progress` call mistakenly written as a tool invocation). Returns whether it was valid. */
     fun acceptParsed(parsed: CompletionPlanBlock.Extracted, step: Int): Boolean {
         var valid = parsed.errors.isEmpty()
         fun invalid(reason: String) {
@@ -130,8 +130,8 @@ internal class TaskProgressTracker(private val now: () -> Long, private val emit
 }
 
 /**
- * 主模型随实际工具调用或最终回答写出的 <task_progress> JSON 块。它不是工具，不增加请求或 schema；
- * 代码取走后，界面和后续历史只看到外面的普通说明。
+ * The `<task_progress>` JSON block the main model emits alongside real tool calls or its final answer. It is not a tool and adds
+ * no request or schema; after the code strips it out, the UI and subsequent history see only the ordinary prose outside it.
  */
 internal object CompletionPlanBlock {
     private const val OPEN = "<task_progress>"
@@ -141,7 +141,7 @@ internal object CompletionPlanBlock {
 
     class Extracted(val text: String, val updates: List<CompletionUpdate>, val errors: List<String>, val stage: Int?)
 
-    /** 流式文字也可能只到半个开始标记；完整块和末尾未写完的块都不显示。 */
+    /** Streamed text may also stop midway through the opening marker; neither complete blocks nor a trailing unfinished block are displayed. */
     fun visible(text: String): String {
         val complete = BLOCK.replace(text, "")
         val incomplete = incompleteStart(complete)
@@ -245,13 +245,13 @@ internal object CompletionPlanBlock {
 private const val MAX_NAME = 80
 private const val MAX_BOUNDARY = 200
 
-/** 连续没有新数据的采集停止。只有真实观察能重置计数，模型写的进度说明不能。 */
+/** Collection stops after consecutive runs with no new data. Only real observations reset the counter; progress notes written by the model cannot. */
 internal class NewDataTracker {
     private val seen = mutableSetOf<Long>()
     var stale = 0
         private set
 
-    /** 返回 true 表示已到连续无新数据上限。失败、没有文字的调用不打断也不增加计数。 */
+    /** Returns true when the consecutive no-new-data limit is reached. Failed calls and calls without text neither interrupt nor increment the count. */
     fun after(verb: Verb?, exec: ToolExecution): Boolean {
         if (verb !in COLLECTION_VERBS || exec.content["ok"] != JsonPrimitive(true)) return false
         val reads = exec.observations.filter { it.kind != ObsKind.Fact && it.text.isNotBlank() }

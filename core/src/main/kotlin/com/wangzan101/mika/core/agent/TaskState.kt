@@ -3,16 +3,16 @@ package com.wangzan101.mika.core.agent
 import com.wangzan101.mika.core.safety.gate.ConfirmationRequest
 import com.wangzan101.mika.core.safety.verify.AnswerSource
 
-/** 按首轮清单的顺序编号（从 1 开始）；仅包含模型已用证据确认的目标。 */
+/** Numbered in first-round checklist order (starting at 1); includes only goals the model has confirmed with evidence. */
 data class GoalChecklist(val items: List<String>, val confirmed: Set<Int>, val stale: Boolean)
 
-/** 不经模型、一下做好几步时的进度,任务卡片和通知据此写明在干什么。 */
+/** Progress for when several steps are done in one go without the model; task cards and notifications use it to state what is being done. */
 sealed interface RunProgress {
-    /** 照着记住的路线做,正在做第 [step]/[total] 步。 */
+    /** Executing a remembered route, currently on step [step]/[total]. */
     data class Replay(val step: Int, val total: Int) : RunProgress
-    /** 一次执行模型给的 [steps] 步(do_steps)。 */
+    /** Executes [steps] steps supplied by the model in a single go (do_steps). */
     data class Batch(val steps: Int) : RunProgress
-    /** 主模型随工作回报的任务数量/边界进度;[name] 与 [boundary] 已按用户语言书写。 */
+    /** Task count/boundary progress reported by the main model as it works; [name] and [boundary] are already written in the user's language. */
     data class Task(val name: String, val done: Int?, val total: Int?, val boundary: String?, val goals: GoalChecklist? = null) : RunProgress {
         val display: String get() = listOfNotNull(
             name.ifBlank { null },
@@ -21,25 +21,25 @@ sealed interface RunProgress {
         ).joinToString(" · ")
     }
     /**
-     * 另一个任务正用着 [app](界面上的名字),这一步停下来等它放开(打开 App 时模型要了等)。
-     * 只是在等别的任务,不要用户做什么:界面上照样算在干活,不算「要你处理」。
+     * Another task is currently using [app] (its UI name), so this step stops and waits for it to be released (the model asked to wait when opening the app).
+     * It is only waiting for another task and requires nothing from the user: the UI still counts it as working, not as "needs you".
      */
     data class WaitingForApp(val app: String) : RunProgress
 }
 
 sealed interface TaskState {
-    /** 收尾了的几种:回答了、失败了、取消了。 */
+    /** The ways a run can finish: answered, failed, cancelled. */
     sealed interface Terminal : TaskState
-    /** 还没开始运行。 */
+    /** Has not started running yet. */
     data object Idle : TaskState
     /**
-     * [note] 是模型最近一句话,没有话时是最近调用的工具名。
-     * [tool] 是这一步要调用的工具;为空表示这一步还在等模型回复(此时 [note] 仍是上一步的)。
-     * [progress] 非空时这一步不经模型连做几步(回放路线、批量执行)。
-     * [reason] 是模型给这次调用写的用意(调用参数里的 reason);没写时为 null。
-     * [narration] 是模型随这次调用写的话(进度说明,不是回答);界面上「在做什么」先用它,没有再用 [reason]。
-     * [preview] 是当前模型请求已流出的可见文字，尚未确认是最终答复还是工具进度。
-     * [mcpConnector] 是此刻正在调用的外部 MCP 连接器(配置里的名字);只在调用进行期间非空。
+     * [note] is the model's latest utterance; when there is none, it is the name of the most recently called tool.
+     * [tool] is the tool to call in this step; empty means this step is still waiting for the model's reply (in which case [note] still belongs to the previous step).
+     * When [progress] is non-null, this step runs several steps without the model (route replay, batch execution).
+     * [reason] is the intent the model wrote for this call (the `reason` call argument); null when none was written.
+     * [narration] is what the model wrote alongside this call (a progress note, not an answer); the UI prefers it for "what it's doing" and falls back to [reason].
+     * [preview] is the visible text the current model request has already streamed; it is not yet confirmed whether it is the final answer or tool progress.
+     * [mcpConnector] is the external MCP connector being called right now (its configured name); non-null only while the call is in flight.
      */
     data class Running(
         val step: Int, val note: String, val tool: String? = null, val progress: RunProgress? = null, val reason: String? = null,
@@ -47,77 +47,77 @@ sealed interface TaskState {
         val preview: String? = null,
         val mcpConnector: String? = null,
     ) : TaskState
-    /** 一个能力的前置条件此刻不满足,停在这里等(见 [GateReason]);条件满足或用户点了继续后恢复 Running。 */
+    /** A capability's precondition is not met right now, so it stops here and waits (see [GateReason]); it returns to Running once the condition holds or the user taps continue. */
     data class Held(val reason: GateReason) : TaskState
-    /** 付款时 [item]/[amount]/[address] 在接管卡片上单独列出;用 [AgentLoop.resumeAfterTakeover] 交回结局。 */
+    /** During payment, [item]/[amount]/[address] are listed separately on the takeover card; the outcome is handed back via [AgentLoop.resumeAfterTakeover]. */
     data class WaitingTakeover(
         val reason: String, val message: String,
         val item: String? = null, val amount: String? = null, val address: String? = null,
     ) : TaskState
     data class WaitingInput(val prompt: String, val options: List<String>? = null) : TaskState
     /**
-     * 等用户同意一次要花钱的操作(只能同意这一次);用 [AgentLoop.answerConfirmation] 回答,等到回答、取消或超时(超时按不同意)。
+     * Waits for the user to approve a single operation that spends money (approval covers this one time only); answered via [AgentLoop.answerConfirmation], waiting for an answer, a cancellation, or a timeout (a timeout counts as declined).
      */
     data class WaitingConfirmation(val request: ConfirmationRequest) : TaskState
     /**
-     * 模型不带工具调用的回复就是 [answer](原样给用户看)。核对有三种结果:
-     * [reviewed] 为 false 是什么也没核对(聊天、回答里没有可核对的值、也没请核查模型),这时 [verified] 也是 false,界面不打标;
-     * 核对过而且都对上时 [verified] 为 true;核对过却没能核实时 [verified] 为 false,[note] 是原因。
-     * [unconfirmed] 是退回一次后仍没对上的那几处(回答照样交出,这几处标成未确认)。
-     * [sources] 是代码从证据账本里找到的、支撑回答的那几次读取(模型不写依据)。
-     * 学东西(经验路线、个人技能、App 知识)看判过的结局,不看这里的核对,见 [LearnGate]。
+     * A model reply without tool calls is the [answer] (shown to the user as-is). Verification has three outcomes:
+     * [reviewed] false means nothing was verified at all (chat, no verifiable values in the answer, no verifier model requested), in which case [verified] is also false and the UI shows no badge;
+     * [verified] is true when verification ran and everything matched; [verified] is false when verification ran but could not confirm, with [note] giving the reason.
+     * [unconfirmed] holds the spots that still failed to match after one retry (the answer is delivered anyway, with those spots marked unconfirmed).
+     * [sources] are the reads that the code found in the evidence ledger as supporting the answer (the model does not write the basis).
+     * Learning (experience routes, personal skills, app knowledge) looks at the validated outcome, not at this verification; see [LearnGate].
      */
     data class Succeeded(
         val answer: String, val verified: Boolean = true, val note: String? = null,
         val sources: List<AnswerSource> = emptyList(), val unconfirmed: List<String> = emptyList(),
         val reviewed: Boolean = true,
     ) : Terminal {
-        /** 核对过却没能核实(界面标出、评测记成 unverified)。 */
+        /** Verification ran but could not confirm (flagged in the UI, recorded as unverified in evals). */
         val doubtful: Boolean get() = reviewed && !verified
     }
-    /** [kind] 由产生失败的代码自己给出,不从 [reason] 文字里猜。 */
+    /** [kind] is supplied by the code that produced the failure; it is never guessed from the [reason] text. */
     data class Failed(val reason: String, val kind: FailKind, val code: FailureCode? = null) : Terminal
     data object Cancelled : Terminal
 }
 
 /**
- * 为什么停下来等:由给出这个前置条件的能力定(核心不认识具体是什么)。[code] 是运行记录里 state 事件的名字,
- * [why] 是给用户看的说明(可为空),[resumable] 为 true 时用户可以点「继续」,否则条件满足后自动继续。
- * [needsYou] 为 true 时要用户在手机上动一下手才能接着做(界面上算「要你处理」,不只是等条件)。
+ * Why it stopped to wait: decided by the capability that provides this precondition (the core does not know what it is). [code] is the name of the state event in the run record,
+ * [why] is the explanation shown to the user (may be empty), and when [resumable] is true the user can tap "continue"; otherwise it resumes automatically once the condition holds.
+ * When [needsYou] is true, the user must do something on the phone before work can continue (the UI counts this as "needs you", not merely waiting on a condition).
  */
 data class GateReason(val code: String, val why: String = "", val resumable: Boolean = false, val needsYou: Boolean = false) {
-    /** 还没开始、排在开始队列里(并行已满、同一对话已有任务):轮到时自动开始,点「继续」不能让它插队。 */
+    /** Not started yet, queued to start (parallelism is full, or the same conversation already has a task): it starts automatically when its turn comes, and tapping "continue" cannot jump the queue. */
     val queued: Boolean get() = code == QUEUED
 
     companion object {
         const val QUEUED = "queued"
 
-        /** 排队等开始;[why] 是给用户看的那句(比如前面还有几个任务)。 */
+        /** Queued waiting to start; [why] is the sentence shown to the user (e.g. how many tasks are ahead). */
         fun queued(why: String) = GateReason(QUEUED, why)
     }
 }
 
-/** 程序生成的失败原因，供界面选择对应的本地化文案。 */
+/** A program-generated failure reason; the UI uses it to choose the matching localized text. */
 enum class FailureCode { ModelRateLimited }
 
-/** 任务失败的来源。 */
+/** The origin of a task failure. */
 enum class FailKind {
-    /** Agent 调用 end_not_done,如实说做不成。 */
+    /** The agent called end_not_done, honestly reporting it could not do it. */
     GaveUp,
-    /** 模型调用出错、返回异常,或停止操作却没有给出结果。 */
+    /** The model call errored, returned something abnormal, or the run stopped without producing a result. */
     Model,
-    /** 操作保护触发,安全停止。 */
+    /** An action guard triggered, stopping the run safely. */
     Guard,
     StepLimit,
-    /** 每任务或每服务商的 Token 预算用完；不再发收尾请求。 */
+    /** The per-task or per-provider token budget is exhausted; no further wrap-up request is sent. */
     TokenLimit,
-    /** 定时任务跑过了设置里的最长运行时间,停下;和预算用完一样,说明不了做法灵不灵。 */
+    /** A scheduled task ran past the maximum runtime configured in settings and stopped; like an exhausted budget, this says nothing about whether the approach works. */
     TimeLimit,
-    /** 运行环境不满足或出错(手机操作助手、无障碍、没配模型、虚拟屏断开等)。 */
+    /** The runtime environment is unsatisfied or faulty (phone control helper, accessibility, no model configured, virtual screen disconnected, etc.). */
     Environment,
     /**
-     * 已受理,执行它的任务服务或进程中途没了(被系统停掉、进程被杀)。
-     * 打分和运行环境出错一样不算 Agent 的错;学东西、技能试用都不当成做不成(只有 [GaveUp]、[StepLimit] 算)。
+     * Accepted, but the task service or process executing it vanished midway (stopped by the system, process killed).
+     * Scoring, like an environment error, does not count it against the agent; learning and skill trials do not treat it as failure (only [GaveUp] and [StepLimit] count).
      */
     Interrupted,
 }

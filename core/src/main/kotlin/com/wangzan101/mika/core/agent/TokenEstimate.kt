@@ -5,16 +5,16 @@ import com.wangzan101.mika.core.model.Part
 import kotlin.math.ceil
 
 /**
- * 不调分词器的粗估:非汉字字符 / 4 + 汉字 × 0.75;图片知道尺寸时按 宽×高/[PIXELS_PER_TOKEN],不知道按 1000 计。
- * 只用来判断要不要压缩，以及上下文预算里按 token 截断。
- * 中日韩标点、全角字符、假名、谚文和汉字一样按 0.75 计。
+ * Rough estimate without a tokenizer: non-Han characters / 4 + Han characters × 0.75; for images, width×height/[PIXELS_PER_TOKEN] when the size is known, otherwise 1000.
+ * Used only to decide whether to compact, and to truncate by token within the context budget.
+ * CJK punctuation, full-width characters, kana, and hangul are counted at 0.75 like Han characters.
  */
 object TokenEstimate {
     private const val IMAGE_TOKENS = 1000
-    /** 常见服务商的口径(约 28×28 像素一个 token,各家略有出入)。 */
+    /** The convention used by common providers (about one token per 28×28 pixels; providers differ slightly). */
     const val PIXELS_PER_TOKEN = 750.0
 
-    /** 一张 [width]×[height] 的图大约多少 token;尺寸不知道时按 1000。 */
+    /** Approximate tokens for a [width]×[height] image; 1000 when the size is unknown. */
     fun image(width: Int, height: Int): Int = if (width > 0 && height > 0) ceil(width.toLong() * height / PIXELS_PER_TOKEN).toInt() else IMAGE_TOKENS
 
     fun of(messages: List<Message>): Int {
@@ -31,8 +31,8 @@ object TokenEstimate {
     }
 
     /**
-     * 用真实用量校准粗估:返回新的「真实 / 粗估」比值。[previous] 为 null 时直接取这一次的比值,
-     * 否则和之前的平滑合并;结果限在 [MIN_SCALE]..[MAX_SCALE],一次异常的用量不会把估算带偏太多。
+     * Calibrate the rough estimate against actual usage: returns the new "actual / estimated" ratio. When [previous] is null, this run's ratio is used directly;
+     * otherwise it is smoothed together with the previous one. The result is clamped to [MIN_SCALE]..[MAX_SCALE], so a single anomalous usage cannot skew the estimate too far.
      */
     fun calibrated(previous: Double?, estimated: Int, actual: Int): Double {
         if (estimated <= 0 || actual <= 0) return previous ?: 1.0
@@ -45,10 +45,10 @@ object TokenEstimate {
     const val MAX_SCALE = 3.0
     private const val SMOOTHING = 0.3
 
-    /** 同一口径估算一段文字,用于不在消息里的固定开销(基础提示词、工具定义)。 */
+    /** Estimates a piece of text with the same convention, for fixed overhead not present in the messages (base prompt, tool definitions). */
     fun of(text: String): Int = ceil(chars(text)).toInt()
 
-    /** 截到不超过 [maxTokens] 个 token 的最长前缀,末尾接 [hint];只在上下文预算处用。 */
+    /** Cuts to the longest prefix of at most [maxTokens] tokens, appending [hint] at the end; used only for the context budget. */
     fun clip(text: String, maxTokens: Int, hint: String = "…"): String {
         if (maxTokens <= 0 || text.isEmpty()) return ""
         if (of(text) <= maxTokens) return text
@@ -60,7 +60,7 @@ object TokenEstimate {
             val mid = (lo + hi + 1) / 2
             if (of(text.substring(0, mid)) <= room) lo = mid else hi = mid - 1
         }
-        // 不把一个代理对劈成两半
+        // Do not split a surrogate pair in half
         if (lo in 1 until text.length && text[lo - 1].isHighSurrogate() && text[lo].isLowSurrogate()) lo--
         return text.substring(0, lo) + hint
     }

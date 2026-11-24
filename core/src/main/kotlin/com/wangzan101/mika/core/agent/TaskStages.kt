@@ -126,7 +126,7 @@ private val ambiguousOrder = Regex("或者|或是|还是|如果|任选其一|任
 private val appPrefix = Regex("(?:按|依次|顺序[是为：:]?|在|用|打开|到|上|切到|切换到|进入|回到|去|先|然后|接着|最后|再|\\b(?:in|on|open|then|use)\\s+)\\s*$", RegexOption.IGNORE_CASE)
 private val listSeparator = Regex("\\s*(?:→|->|、|，|,|再|然后|接着)\\s*")
 
-// “12306 查票，携程看酒店” names each app at the head of its own clause.
+// Chinese input such as "look up tickets on 12306, see hotels on Ctrip" names each app at the head of its own clause.
 private val clauseBoundary = Regex("""[,，;；。!！:：→]\s*$""")
 private val choiceQuestion = Regex("""^\s*(?:里|中|里面)?\s*(?:哪个|哪一个|选一个|二选一|三选一)""")
 
@@ -159,8 +159,8 @@ private fun orderedApps(words: String, names: Map<String, App>): List<Stage> {
     if (mentions.size < 2 || choiceQuestion.containsMatchIn(words.substring(mentions.last().range.last + 1))) return emptyList()
     val namesOnly = words.trim().split(Regex("""\s+""")).all { it.lowercase() in names }
     val targets = mutableListOf<MatchResult>()
-    // Inspect the actual text before each name. Adjacent words can be a verb ("高德搜索")
-    // or the object of a search ("前五条笔记") even when they also name installed apps.
+    // Inspect the actual text before each name. Adjacent words can be a verb ("Amap search")
+    // or the object of a search ("the first five notes") even when they also name installed apps.
     for ((i, match) in mentions.withIndex()) {
         val gap = words.substring(if (i == 0) 0 else mentions[i - 1].range.last + 1, match.range.first)
         if (i > 0 && gap.trim() == "或") return emptyList()
