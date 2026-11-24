@@ -23,11 +23,11 @@ import kotlinx.coroutines.selects.select
 import com.wangzan101.mika.core.agent.AgentLoop.Companion.VERIFYING_NOTE
 import com.wangzan101.mika.core.agent.AgentLoop.Companion.UNCONFIRMED_NOTE
 
-// Agent 循环:结束、中断、改道与收尾轮
+// Agent loop: finishing, interruption, redirection, and the closeout turn
 /**
- * 不带调用的回复已经记进历史、也显示出来了,这时有插话:接上插话接着做(返回 true)。
- * 屏幕上那段回复要留着:下一步一开始界面上的实时文字就清掉了,所以发 `reply_finished_before_steer` 把它挂到插话上方。
- * 没有插话返回 false,什么也不动。
+ * A reply without tool calls has already been added to the history and displayed, and now an interjection arrives: continue on top of the interjection (return true).
+ * The reply on screen must be kept: the live text in the UI is cleared as soon as the next step starts, so `reply_finished_before_steer` is emitted to attach it above the interjection.
+ * With no interjection, return false and change nothing.
  */
 internal suspend fun AgentLoop.keepFinished(history: MutableList<Message>, inbox: RunInbox?): Boolean {
     val steers = inbox?.takeSteers().orEmpty()
@@ -35,13 +35,13 @@ internal suspend fun AgentLoop.keepFinished(history: MutableList<Message>, inbox
     val current = _state.value as? TaskState.Running
     val shown = current?.preview?.trim()
     if (current?.preview != null) _state.value = current.copy(preview = null)
-    // 不截短:这是一段完整的回答,界面要和没插话时一样显示全文(长度本来就受模型输出上限约束)
+    // Do not truncate: this is a complete answer, and the UI must show the full text as it would without an interjection (the length is already bounded by the model output limit)
     if (!shown.isNullOrEmpty()) emit(RunEvent.State(now(), "reply_finished_before_steer", Redactor.text(shown)))
     appendSteers(history, steers)
     return true
 }
 
-/** 插话只取消正在等待的模型请求(本步不写进历史,下一步带着插话重问);工具调用进入执行入口后由它自己做完。 */
+/** An interjection cancels only the model request being awaited (this step is not written into the history; the next step re-asks with the interjection); once a tool call enters the execution entry point, that entry point completes it itself. */
 internal suspend fun AgentLoop.routedOrRedirect(
     inbox: RunInbox?, history: List<Message>, specs: List<ToolSpec>, track: StepTrack, step: Int, restarted: (Long) -> Unit,
     onText: ((String) -> Unit)?,
@@ -60,9 +60,9 @@ internal suspend fun AgentLoop.routedOrRedirect(
 }
 
 /**
- * 插话撤掉了第 [step] 步的请求:用户已经看到的那段字(界面上的 preview)作为一条只有文字的回复记进历史,
- * 接着才是插话,模型下一次看到的和用户看到的一样。没看到字、或没有插话时什么也不记。
- * 思考内容和半截工具调用本来就不在 preview 里。界面上的那段字在这里清掉,改由 `reply_interrupted` 事件挂到插话上方。
+ * An interjection cancelled the request for step [step]: the text the user has already seen (the preview in the UI) is recorded in the history as a text-only reply,
+ * followed by the interjection, so what the model sees next is the same as what the user saw. Nothing is recorded when no text was seen or there is no interjection.
+ * Reasoning content and half-finished tool calls are not in the preview to begin with. The text on screen is cleared here and instead attached above the interjection by the `reply_interrupted` event.
  */
 internal suspend fun AgentLoop.keepInterrupted(history: MutableList<Message>, inbox: RunInbox?, step: Int) {
     val steers = inbox?.takeSteers().orEmpty()
@@ -78,8 +78,8 @@ internal suspend fun AgentLoop.keepInterrupted(history: MutableList<Message>, in
 }
 
 /**
- * 用户同意了、还没用掉的那次操作,或回答了的追问([answered] 是那个问题,之后又做了别的就是 null):回答交出前还欠着的下文;
- * 都没有为 null。
+ * The operation the user approved but which has not been used up yet, or a follow-up question that was answered ([answered] is that question; null once something else has been done since): the loose end still owed before the answer is handed over;
+ * null when there is neither.
  */
 internal fun AgentLoop.owedFollowUp(answered: String?): String? {
     confirmations?.granted?.let { r ->
@@ -90,9 +90,9 @@ internal fun AgentLoop.owedFollowUp(answered: String?): String? {
 }
 
 /**
- * 第 [step] 步的回复没调工具,文字 [answer] 就是最终回答:按风险核对([AnswerReview]),来源由代码找。
- * 核对没对上:能退回([history] 不为 null,而且本任务还没退回过)就提醒模型一次、返回 null 接着做;
- * 否则照样交出,没对上的几处标成未确认。[facts] 是核对要看的任务情况(见 [ReviewFacts])。
+ * The reply at step [step] made no tool calls, so the text [answer] is the final answer: review it by risk ([AnswerReview]), with sources found by code.
+ * If the review does not match: when a retry is possible ([history] is non-null and this task has not retried yet), remind the model once and return null to keep going;
+ * otherwise hand it over as is, marking the mismatched points as unconfirmed. [facts] is the task situation the review looks at (see [ReviewFacts]).
  */
 internal suspend fun AgentLoop.conclude(task: String, answer: String, step: Int, facts: ReviewFacts, history: MutableList<Message>?): TaskState? {
     if (!reviewFinalAnswer) {
@@ -117,8 +117,8 @@ internal suspend fun AgentLoop.conclude(task: String, answer: String, step: Int,
 }
 
 /**
- * 步数用完后最后给一轮,工具只剩 end_not_done:做完了就用文字回答(照样核对,但不再退回,没对上的标成未确认),
- * 做不成就如实说查过什么。这一轮什么也没给(或被截断)仍算步数用完。
+ * One last turn after the step budget is used up, with only end_not_done left among the tools: if the task is done, answer in text (still reviewed, but no more retries; mismatches are marked unconfirmed);
+ * if not, state truthfully what was checked. If this turn produces nothing (or is truncated), the step budget still counts as used up.
  */
 internal suspend fun AgentLoop.finalTurn(
     task: String, history: MutableList<Message>, specs: List<ToolSpec>, step: Int, labels: Map<String, String>, place: Place?, recorder: ActionRecorder,
@@ -160,7 +160,7 @@ internal suspend fun AgentLoop.finalTurn(
             model = used.name, role = if (caller.recordRoles) caller.roleOf(used) else null,
             group = caller.groupOf(used), repliedAtMs = repliedAtMs,
         ))
-        // 收尾模型也可能正在生成时收到插话。最多重答两次，其余交给下一任务。
+        // The closeout model can also receive an interjection while generating. Re-answer at most twice; the rest goes to the next task.
         if (attempt < 2 && inbox?.hasSteers() == true) {
             if (!calls.isEmpty) history += calls.results()
             if (keepFinished(history, inbox)) return@repeat
@@ -174,7 +174,7 @@ internal suspend fun AgentLoop.finalTurn(
             return conclude(task, text, step, facts, history = null)!!
         }
         val started = now()
-        // 只剩放弃,不改变手机
+        // Only giving up is left; the phone is not changed
         val exec = tools.executeRead(call)
         recorder.result(step, call.name, tools.verb(call.name), exec.content, exec.record, null, null, now() - started, "model", call.id)
         return StopRules.afterFinalTurn(exec.outcome, maxSteps)

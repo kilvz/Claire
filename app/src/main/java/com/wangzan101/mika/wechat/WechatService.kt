@@ -14,7 +14,7 @@ import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.task.TaskService
 
-/** 只保活微信长轮询；任务执行仍由 TaskService 管理。 */
+/** Keeps only the WeChat long polling alive; task execution is still managed by TaskService. */
 class WechatService : Service() {
     private val runtime get() = (application as MikaApp).wechat
 

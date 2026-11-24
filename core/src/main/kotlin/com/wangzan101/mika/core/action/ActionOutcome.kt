@@ -12,24 +12,24 @@ import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 一次动作走完执行入口的结局。 */
+/** The outcome of one action after completing the execution entry point. */
 sealed interface ActionOutcome {
-    /** 执行前的守卫结论。 */
+    /** Guard verdicts from before execution. */
     val before: List<GuardVerdict>
 
     /**
-     * 没有执行。[code]:guard_stopped / guard_warning / confirmation_required / confirmation_mismatch / confirmation_declined /
-     * approval_unavailable / target_unresolved / own_app。
-     * [content] 是交给这次调用方的结果(脚本子步、模型单步照它回;批和回放按 [code] 自己说明)。
+     * Not executed. [code]: guard_stopped / guard_warning / confirmation_required / confirmation_mismatch / confirmation_declined /
+     * approval_unavailable / target_unresolved / own_app.
+     * [content] is the result handed to this call's caller (script substeps and model single steps reply with it; batches and playback explain themselves from [code]).
      */
     data class Refused(
         val code: String, val content: JsonObject, override val before: List<GuardVerdict>, val hit: Irreversible? = null,
     ) : ActionOutcome
 
     /**
-     * 执行了。[exec] 是最终结果(模型单步可能已换成等用户之后的结果或核查退回);[after] 是执行后的守卫结论
-     * (页面脚本的子步结论排在前面);[content] 是交给模型、也记进运行记录的内容。
-     * [shotId]、[picture]:[Frames.Caller] 时留给调用方存的画面;[seen] 是记路线锚点时动作后读的一屏(没读为 null)。
+     * Executed. [exec] is the final result (for a model single step it may already be replaced by the result after waiting for the user, or sent back by the review); [after] holds the post-execution guard verdicts
+     * (substep verdicts from page scripts come first); [content] is what is given to the model and also recorded in the run record.
+     * [shotId], [picture]: the frame left for the caller to save when [Frames.Caller]; [seen] is the screen read after the action while recording route anchors (null when nothing was read).
      */
     data class Ran(
         val exec: ToolExecution, override val before: List<GuardVerdict>, val after: List<GuardVerdict>, val content: JsonObject,
@@ -38,18 +38,18 @@ sealed interface ActionOutcome {
         val verdicts: List<GuardVerdict> get() = before + after
     }
 
-    /** 等用户时任务被取消了。 */
+    /** The task was cancelled while waiting for the user. */
     data class Cancelled(override val before: List<GuardVerdict>) : ActionOutcome
 }
 
-/** 这次调用对调用方的结果:执行了就是执行结果,没执行就是拒绝说明。 */
+/** This call's result for the caller: the execution result when executed, the refusal explanation when not. */
 fun ActionOutcome.execution(): ToolExecution = when (this) {
     is ActionOutcome.Ran -> exec
     is ActionOutcome.Refused -> ToolExecution(content)
     is ActionOutcome.Cancelled -> ToolExecution(buildJsonObject { put("ok", false); put("error", "cancelled"); put("executed", false) })
 }
 
-/** 被拦下时交给调用方的说明,按来源的说法写。 */
+/** The explanation handed to the caller when blocked, worded according to the origin. */
 internal object Refusals {
     const val SINGLE_USE = "One approval lets through only the next matching action, and that action uses it up whether it succeeds or not."
     const val OWN_APP = "own_app"
@@ -57,7 +57,7 @@ internal object Refusals {
         "with item as the product (variant, quantity), amount as the amount due shown on screen, and address as the delivery address."
 
     fun content(code: String, style: RefusalStyle, before: List<GuardVerdict>, hit: Irreversible?, reason: String?): JsonObject = when (style) {
-        // 模型单步被守卫叫停时任务就此结束,用不到说明
+        // When a model single step is stopped by the guard the task ends right there, so the explanation is not needed
         RefusalStyle.Model -> if (code == "approval_unavailable") notRun(code,
             "This step spends money, but this run cannot collect the user's approval. The action was not run. " +
                 "Do not retry this action in this run; explain the limitation to the user.") {
@@ -83,7 +83,7 @@ internal object Refusals {
         RefusalStyle.Code -> notRun(code, code)
     }
 
-    /** 要用户同意的一步(不在屏上、工具声明要问的),这次运行却问不到人。 */
+    /** A step that needs user approval (off-screen, declared by the tool as requiring it), but this run cannot reach anyone to ask. */
     fun unavailable(): JsonObject = buildJsonObject {
         put("ok", false); put("error", "approval_unavailable"); put("message", Feedback["approval.unavailable"])
         put("executed", false); put("recoverable", false); put("counts_as_failure", false)

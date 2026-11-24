@@ -10,13 +10,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-/** 从真实执行结果生成活动,避免由模型的进度文字猜测做了什么。 */
+/** Builds the activity from the real execution result, so what was done is not guessed from the model's progress text. */
 internal object ActivityRecord {
     private val controls = setOf(
         Verb.Wait, Verb.AskUser, Verb.RequestConfirmation, Verb.HandToUser,
         Verb.HandleObstacle, Verb.EndNotDone,
     )
-    // 元素编号(ref)只对模型有意义,不当作给人看的对象
+    // Element ids (ref) mean something only to the model, so they are not recorded as an object to show a human
     private val targetKeys = listOf("package", "url", "path", "query")
 
     fun of(
@@ -25,7 +25,7 @@ internal object ActivityRecord {
     ): RunEvent.Activity? {
         val verb = tools.verb(tool)
         if (verb in controls) return null
-        // 读通知时筛的那段字(人名、会话名)不当作对象记下来
+        // The text filtered out while reading notifications (person names, conversation names) is not recorded as an object
         val target = if (verb == Verb.NoticesRead) null else RunEvent.placeLabel(exec.place)
             ?: targetKeys.firstNotNullOfOrNull { (args[it] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
         val content = exec.content

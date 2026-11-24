@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.protobuf)
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
-    // 沙箱路径契约测试放在 testFixtures,app 的 AndroidSandbox 也跑同一套
+    // The sandbox path contract tests live in testFixtures, and the app's AndroidSandbox runs the same suite
     `java-test-fixtures`
 }
 
@@ -38,12 +38,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
-    // 测试里的 TLS 1.3 与导出密钥:用和 Android 平台同源的 TLS 实现,只进测试类路径
+    // TLS 1.3 and exported keys in tests: use the same TLS implementation the Android platform is based on, test classpath only
     testImplementation(libs.conscrypt.openjdk.uber)
     testFixturesImplementation(libs.junit)
 }
 
-// 运行时列不了资源目录:构建时扫 knowledge/apps、knowledge/sites、skills 的头部,校验后生成索引资源;校验不过构建失败
+// The resource directories cannot be listed at runtime: at build time scan the headers of knowledge/apps, knowledge/sites, and skills, then generate the index resource after validation; a failed validation fails the build
 val knowledgeIndex by tasks.registering(JavaExec::class) {
     val resources = file("src/main/resources")
     val out = layout.buildDirectory.dir("generated/knowledge-index")
@@ -58,7 +58,7 @@ val knowledgeIndex by tasks.registering(JavaExec::class) {
 }
 sourceSets.main { resources.srcDir(knowledgeIndex) }
 
-// README 里会变的清单(内置知识、服务商预设)从源头重新生成,见 testFixtures 里的 ReadmeSections;ReadmeSectionsTest 守着两边一致
+// The parts of the README that change (built-in knowledge, provider presets) are regenerated from the source; see ReadmeSections in testFixtures; ReadmeSectionsTest guards that both sides stay consistent
 val updateReadme by tasks.registering(JavaExec::class) {
     group = "documentation"
     description = "重新生成 README.md 里 generated 标记之间的段落"
@@ -68,8 +68,8 @@ val updateReadme by tasks.registering(JavaExec::class) {
     outputs.upToDateWhen { false }
 }
 
-// 桌面上对着 OpenAI 真实服务走一遍「用 ChatGPT 登录」(登录、列模型、Responses、工具调用、换新令牌),见 docs/dev/chatgpt-signin-check.md。
-// 单独的源码集:不进 core 的产物,也不进 app
+// Walk the whole "Sign in with ChatGPT" flow on desktop against the real OpenAI service (sign-in, list models, Responses, tool calls, token refresh); see docs/dev/chatgpt-signin-check.md.
+// A separate source set: it is not part of core's artifacts, nor part of the app
 val chatgptCheck by sourceSets.creating {
     compileClasspath += sourceSets.main.get().output
     runtimeClasspath += sourceSets.main.get().output
@@ -91,23 +91,23 @@ val chatgptSignInCheck by tasks.registering(JavaExec::class) {
 }
 
 tasks.test {
-    // 跨语言 CLI 契约由 cliTest 显式运行;纯 JVM 测试不要求电脑安装 Python。
+    // The cross-language CLI contract is run explicitly by cliTest; pure JVM tests do not require Python on the machine.
     exclude("**/RemoteCliContractTest*")
-    // 真网关跨语言测试显式运行,普通 JVM 测试不要求安装 Go。
+    // The real-gateway cross-language test is run explicitly; ordinary JVM tests do not require Go to be installed.
     exclude("**/RelayGatewayIntegrationTest*")
-    // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
+    // testFixtures puts core's jar ahead of the test classpath; put the directories first so tests that read resources by directory still find the files
     classpath = sourceSets.main.get().output + classpath
-    // TaskSetTest 读仓库根目录的评测任务集
+    // TaskSetTest reads the evaluation task set in the repository root
     inputs.dir(rootProject.file("eval")).withPropertyName("evalTasks")
-    // DocsConsistencyTest、ReadmeTranslationsTest 读仓库的文档(根目录 README.md,docs/readme/ 下各语言的译文在 docs 里),并对照 app 的源码;文档或 app 源码变了要重跑
+    // DocsConsistencyTest and ReadmeTranslationsTest read the repository documentation (README.md in the root, and the per-language translations under docs/readme/ which live in docs) and compare it against the app sources; a change to the documentation or app sources requires a rerun
     inputs.files(rootProject.file("README.md"), rootProject.file("tools/sandbox/README.md")).withPropertyName("docsFiles")
     inputs.dir(rootProject.file("docs")).withPropertyName("docsDir")
     inputs.dir(rootProject.file("app/src")).withPropertyName("appSources")
-    // updateReadme 先改写 README,同一次构建里测试要读改写后的
+    // updateReadme rewrites README first, so tests in the same build read the rewritten version
     mustRunAfter(updateReadme)
-    // 循环场景的消息序列金样;-PupdateSnapshots 时重新生成(见 LoopSnapshot)
+    // Golden message sequences for loop scenarios; regenerated with -PupdateSnapshots (see LoopSnapshot)
     systemProperty("mika.snapshotDir", file("src/test/resources/loop-snapshots").absolutePath)
-    // 提示词表面(系统提示词、工具定义、反馈文字)的金样;同样用 -PupdateSnapshots 重新生成(见 PromptSurface)
+    // Goldens for the prompt surface (system prompts, tool definitions, feedback text); likewise regenerated with -PupdateSnapshots (see PromptSurface)
     systemProperty("mika.promptSurfaceDir", file("src/test/resources/prompt-surface").absolutePath)
     val updateSnapshots = project.hasProperty("updateSnapshots")
     inputs.property("updateSnapshots", updateSnapshots)
@@ -150,7 +150,7 @@ val cliContractTest by tasks.registering(Test::class) {
     systemProperty("mika.python", providers.gradleProperty("mikaPython").getOrElse("python3"))
 }
 
-// 要 Python 3.10+,不挂在 check 上;需要时显式运行 ./gradlew :core:cliTest
+// Requires Python 3.10+ and is not hooked into check; run ./gradlew :core:cliTest explicitly when needed
 val cliTest by tasks.registering(Exec::class) {
     group = "verification"
     description = "CLI 进程、假 ADB、独立 Skill 与真实 HTTP 契约测试 (Python 3.10+)"

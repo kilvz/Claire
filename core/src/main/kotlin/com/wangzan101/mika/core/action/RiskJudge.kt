@@ -11,19 +11,19 @@ import kotlinx.serialization.json.contentOrNull
 import com.wangzan101.mika.core.tool.Verb
 
 /**
- * 一个动作的风险。[hit] 是不可逆判定的结果(不用判或没命中为 null);[screen] 是判定所依据的那一屏,用到时才读。
- * 工具自己声明风险之后换掉实现即可,判定和审批不用改。
+ * The risk of an action. [hit] is the result of irreversible detection (null when no judgment was needed or nothing was hit); [screen] is the screen the judgment is based on, read only when needed.
+ * Once a tool declares its own risk, swapping in another implementation is enough; detection and approval do not need to change.
  */
 fun interface RiskJudge {
     fun assess(verb: Verb?, hit: Irreversible?, screen: () -> ScreenSnapshot?): Risk
 }
 
-/** 按现有的不可逆判定和读屏信号分级;花不花钱按动作类别和屏上的金额认,不按 App。 */
+/** Grades by the existing irreversible detection and screen-read signals; whether it costs money is determined by the action type and the amount on screen, not by the app. */
 object ClassifiedRisk : RiskJudge {
-    /** 改界面上东西的动作;其余写操作(返回、滑动、打开 App、打开网址)只是在界面间移动。 */
+    /** Actions that change things in the UI; the other write operations (back, swipe, open app, open URL) only move between screens. */
     private val CHANGE_VERBS = setOf(Verb.Tap, Verb.TypeText, Verb.ClearText, Verb.PressKey, Verb.Upload, Verb.Interact)
 
-    /** 这个动作会改界面上的东西(不只是在界面间移动);不可逆、对外的动作也都是这几种动作做出来的。 */
+    /** This action changes things in the UI (not merely moving between screens); irreversible and outward actions are produced by these same action types too. */
     fun changesState(verb: Verb?): Boolean = verb in CHANGE_VERBS
 
     override fun assess(verb: Verb?, hit: Irreversible?, screen: () -> ScreenSnapshot?): Risk {
@@ -34,7 +34,7 @@ object ClassifiedRisk : RiskJudge {
             IrrevAction.other -> ActionRisk.Unknown
         }
         if (hit == null) return Risk(level)
-        // 金额是页面内容,不等于这一步要花钱。明确付款/下单始终拦;其余动作要有合计或付款面板等应付上下文。
+        // An amount is page content and does not mean this step costs money. Explicit payment/order always blocks; other actions need payable context such as a total or a payment panel.
         val payment = when (hit.action) {
             IrrevAction.pay, IrrevAction.order -> true
             IrrevAction.send, IrrevAction.submit -> false
@@ -43,7 +43,7 @@ object ClassifiedRisk : RiskJudge {
         return Risk(level, payment)
     }
 
-    /** 动作落在哪个元素上:带编号的按编号找,打字落在有焦点的输入框,坐标点击取包含该点的最小元素。 */
+    /** Which element the action lands on: one with an id is found by id, typing lands on the focused input field, and a coordinate tap takes the smallest element containing that point. */
     fun target(verb: Verb?, args: JsonObject, s: ScreenSnapshot): UiElement? {
         fun str(k: String) = (args[k] as? JsonPrimitive)?.contentOrNull
         str("ref")?.let { ref -> return s.elements.firstOrNull { it.ref == ref } }

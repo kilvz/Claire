@@ -10,8 +10,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import com.wangzan101.mika.core.tool.Verb
 
 /**
- * 动作的运行记录:工具结果、确认关卡、画面。截图编号在这里统一发(循环自己存的画面也从这里取号)。
- * 记录失败不影响任务。[saveScreen] 为 null 时子步画面不存(编号也不发)。
+ * The action run record: tool results, the confirmation gate, and frames. Screenshot ids are handed out here in one place (frames the loop saves itself also take their numbers from here).
+ * A failed record does not affect the task. When [saveScreen] is null, substep frames are not saved (and no id is handed out).
  */
 class ActionRecorder(
     private val sink: RunSink,
@@ -32,7 +32,7 @@ class ActionRecorder(
         } catch (x: CancellationException) {
             throw x
         } catch (x: Throwable) {
-            // 记录失败不影响任务
+            // A failed record does not affect the task
         }
     }
 
@@ -40,15 +40,15 @@ class ActionRecorder(
         event(RunEvent.Confirmation(clock(), hit.action.name, RunEvent.clip(Redactor.text(hit.matched)), null, null, decision))
 
     /**
-     * 最近一次改了状态的动作(界面上改东西、对外、不可逆,或沙箱里的写操作;报了失败、也没说界面变了的不算)执行之前证据账本的位置;
-     * 之后没有重新读过,回答交出前要另请核查(见 AnswerReview)。还没有这样的动作为 null。
+     * The evidence ledger position before the most recent state-changing action (a UI change, an outward action, an irreversible one, or a write inside the sandbox; one that reported failure and did not say the UI changed does not count);
+     * if nothing has been re-read since, a review must be requested separately before the answer is handed over (see AnswerReview). Null while there has been no such action yet.
      */
     var lastChangeMark: Int? = null
         private set
 
     fun noteChange(ledgerMark: Int) { lastChangeMark = ledgerMark }
 
-    /** 本任务里放行了几个对外或不可逆的动作(发送、提交、下单、删除……);回答交出前据此决定要不要请核查模型。 */
+    /** How many outward or irreversible actions were let through in this task (send, submit, order, delete, …); before the answer is handed over this decides whether to ask the review model. */
     var outwardActs = 0
         private set
 
@@ -58,19 +58,19 @@ class ActionRecorder(
             risk.level.name, risk.payment, decision))
     }
 
-    /** 一次调用的结果;[content] 是交给模型(或调用方)的那份,[extra] 是只进运行记录的字段。 */
+    /** The result of one call; [content] is the copy handed to the model (or the caller), [extra] holds fields that go into the run record only. */
     fun result(
         step: Int, tool: String, verb: Verb?, content: JsonObject, extra: JsonObject, changed: Boolean?, shotId: Int?, durationMs: Long,
         source: String, callId: String, waitMs: Long = 0,
     ) {
-        // 用户的回答可能是验证码一类,不进运行记录
+        // The user's answer may be a verification code and the like, so it does not go into the run record
         val shown = if (verb == Verb.AskUser && content.containsKey("answer")) JsonObject(content + ("answer" to JsonPrimitive(HIDDEN_ANSWER))) else content
         val recorded = Redactor.result(verb, shown).let { if (extra.isEmpty()) it else JsonObject(it + extra) }
         event(RunEvent.ToolResult(clock(), step, tool, RunEvent.clipResult(Redactor.text(recorded.toString())), changed, shotId, durationMs,
             waitMs = waitMs, source = source, callId = callId))
     }
 
-    /** 当场存一张子步画面,返回截图编号;不存画面时为 null。 */
+    /** Save a substep frame on the spot and return the screenshot id; null when frames are not saved. */
     fun saveFrame(png: ByteArray): Int? {
         val save = saveScreen ?: return null
         val id = nextShot()
@@ -79,7 +79,7 @@ class ActionRecorder(
         } catch (x: CancellationException) {
             throw x
         } catch (x: Throwable) {
-            // 同上
+            // Same as above
         }
         return id
     }

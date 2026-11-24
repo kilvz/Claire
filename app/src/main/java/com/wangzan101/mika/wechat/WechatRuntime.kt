@@ -47,7 +47,7 @@ sealed interface WechatConnectionState {
     data class Failed(val message: String) : WechatConnectionState
 }
 
-/** 单账号、私聊文字和图片的微信运行时。监听存活由独立前台服务负责，任务仍只进 TaskService。 */
+/** WeChat runtime for a single account, private-chat text, and images. Keeping the listener alive is handled by a separate foreground service; tasks still only go through TaskService. */
 class WechatRuntime(
     private val context: Context,
     val store: WechatStore,
@@ -145,7 +145,7 @@ class WechatRuntime(
 
     suspend fun startLogin(): WechatQrStart = withContext(Dispatchers.IO) { api.startLogin() }
 
-    /** 调用方取消时只停止本次扫码等待，不影响已绑定账号的监听。 */
+    /** Cancelling from the caller stops only this QR-scan wait and does not affect the listener of an already-bound account. */
     suspend fun awaitLogin(qrcode: String): WechatAccount? {
         require(qrcode.isNotBlank()) { "Missing QR code key" }
         while (currentCoroutineContext().isActive) {
@@ -155,7 +155,7 @@ class WechatRuntime(
                 store.saveAccount(account)
                 store.setEnabled(true)
                 owners.bind(ChannelPeer(WechatChannel.ID, account.ownerId, ""))
-                // 旧账号的长轮询必须在这里取消；新请求从已清空的账号游标开始。
+                // The old account's long poll must be cancelled here; new requests start from the cleared account cursor.
                 restartMonitor()
                 ensureRunning()
                 return account

@@ -5,20 +5,20 @@ import com.wangzan101.mika.core.safety.guard.GuardVerdict
 import com.wangzan101.mika.core.tool.ToolExecution
 import kotlinx.serialization.json.JsonObject
 
-/** 调用方在执行入口里插的几处(只有模型单步用):等用户的结局、交给模型前的最后加工。 */
+/** The hooks the caller inserts into the execution entry point (used only by model single steps): resolving outcomes that wait on the user, and the final shaping before handing off to the model. */
 interface FollowUp {
-    /** 执行之后、守卫核对之前:要等用户的结局(确认、追问、接管)换成最终结果;返回 null 表示任务就此取消。 */
+    /** After execution and before the guard review: replaces an outcome that waits on the user (confirmation, follow-up question, hand-over) with the final result; null means the task is cancelled at this point. */
     suspend fun resolve(exec: ToolExecution): ToolExecution? = exec
 
-    /** 守卫核对之后、记录之前:返回最终结果和交给模型(也记进运行记录)的内容。 */
+    /** After the guard review and before recording: returns the final result and the content handed to the model (which is also recorded in the run record). */
     suspend fun present(exec: ToolExecution, verdicts: List<GuardVerdict>): Presented = Presented(exec, exec.content)
 
-    /** 被确认关卡拦下:说明交给模型之后、记进运行记录之前。 */
+    /** Blocked by the confirmation gate: after the explanation is given to the model and before it is recorded in the run record. */
     fun refused(content: JsonObject) {}
 
     /**
-     * 不在屏上、工具声明要问的一步([request] 是给用户看的申报):当场问用户,返回用户的决定(同意时 ok 为 true,
-     * 同意已记进确认关卡);问不了人为 null(这一步就不做)。
+     * An off-screen step that the tool declares must be asked about ([request] is the declaration shown to the user): ask the user on the spot and return the user's decision (ok is true when approved,
+     * and that approval has been recorded in the confirmation gate); null when there is no one to ask (the step is then not done).
      */
     suspend fun approve(request: ConfirmationRequest): ToolExecution? = null
 

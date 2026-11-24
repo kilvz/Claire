@@ -4,28 +4,28 @@ import com.wangzan101.mika.core.net.UrlHost
 import kotlin.random.Random
 
 /**
- * 对外动作之间的间隔(纯逻辑,不碰时钟和界面):不可逆判定认出的发送、提交(联系别人、投申请)、删除、下单,
- * 在同一个网站或 App 里连着做时,两次之间隔一段随机的时间,像人一条条处理,不连着秒点。
- * 不管中间有没有换页:换页的停留另由网页的节奏管。手机和网页同一套,因为判定是同一个。
+ * Spacing between outward actions (pure logic; it touches neither the clock nor the UI): sends and submissions (contacting someone, filing an application), deletions, and orders identified by irreversible detection,
+ * when done back to back on the same site or app, are separated by a random interval between two of them, as a human handling things one by one would, instead of tapping in quick succession.
+ * This applies whether or not a page change happens in between: the dwell on a page change is governed separately by the web pacing. Phone and web share one set because the detection is the same.
  *
- * - 一个网站(App)里的第一次不等;
- * - 之后每次和上一次至少隔 [Limits.firstGapMs] 里随机取的一段,这个窗口里做得越多,上下限各加一截([Limits.perActionMs]),
- *   都不超过 [Limits.maxGapMs];
- * - 间隔从上一次做完算起,中间读页面、想下一步花掉的时间都算在内,只补不够的部分;
- * - 网页按可注册域名认(www.example.com 和 m.example.com 是同一个),手机按包名;别的网站、App 各算各的。
+ * - The first one on a site (app) does not wait;
+ * - afterwards every one is at least a randomly picked interval from [Limits.firstGapMs] after the previous one; the more are done in this window, the more both bounds grow ([Limits.perActionMs]),
+ *   never exceeding [Limits.maxGapMs];
+ * - the interval counts from the previous completion, so time spent reading the page or thinking about the next step in between is included and only the remainder is waited out;
+ * - web pages are identified by registrable domain (www.example.com and m.example.com are the same), phones by package name; other sites and apps are counted separately.
  *
- * [Off] 从不等待(测试、不需要节奏的调用方用它)。
+ * [Off] never waits (used by tests and by callers that need no pacing).
  */
 class OutwardPacing(private val random: Random?, val limits: Limits = Limits()) {
-    /** 时长单位毫秒。 */
+    /** Durations are in milliseconds. */
     data class Limits(
-        /** 第二次和第一次之间的间隔范围。 */
+        /** The interval range between the second action and the first. */
         val firstGapMs: LongRange = 8_000L..20_000L,
-        /** 之后每多做一次,上下限各加多少(下限、上限)。 */
+        /** How much the lower and upper bounds each grow per further action (lower, upper). */
         val perActionMs: Pair<Long, Long> = 500L to 1_000L,
-        /** 间隔的上限。 */
+        /** The upper bound of the interval. */
         val maxGapMs: Long = 30_000L,
-        /** 算「最近做过几次」的时间窗。 */
+        /** The time window used to count "how many were done recently". */
         val windowMs: Long = 30 * 60_000L,
     )
 
@@ -33,10 +33,10 @@ class OutwardPacing(private val random: Random?, val limits: Limits = Limits()) 
 
     private val done = ArrayDeque<Done>()
 
-    /** 有节奏(不是 [Off])。 */
+    /** Pacing is enabled (not [Off]). */
     val paced: Boolean get() = random != null
 
-    /** 在 [site] 上做下一次对外动作之前还要等多久:上一次之后还没隔够时是余下的时间,否则 0。 */
+    /** How much longer to wait before the next outward action on [site]: the remaining time when the interval after the previous one has not elapsed yet, otherwise 0. */
     @Synchronized
     fun waitBefore(site: String, nowMs: Long): Long {
         if (random == null) return 0
@@ -45,7 +45,7 @@ class OutwardPacing(private val random: Random?, val limits: Limits = Limits()) 
         return (last.gapMs - (nowMs - last.atMs)).coerceIn(0, limits.maxGapMs)
     }
 
-    /** 在 [site] 上做了一次对外动作:按这个窗口里做过几次定下离下一次至少要隔多久。 */
+    /** An outward action was done on [site]: decide from how many were done in this window how long at least must pass until the next one. */
     @Synchronized
     fun noteDone(site: String, nowMs: Long) {
         if (random == null) return
@@ -54,7 +54,7 @@ class OutwardPacing(private val random: Random?, val limits: Limits = Limits()) 
         done.addLast(Done(site, nowMs, gapAfter(count)))
     }
 
-    /** 做过 [n] 次(n ≥ 1)之后到下一次的间隔。 */
+    /** The interval after [n] actions (n ≥ 1) until the next one. */
     private fun gapAfter(n: Int): Long {
         val r = random ?: return 0
         val extra = (n - 1).toLong()
@@ -68,13 +68,13 @@ class OutwardPacing(private val random: Random?, val limits: Limits = Limits()) 
     }
 
     companion object {
-        /** 从不等待。 */
+        /** Never waits. */
         val Off = OutwardPacing(null)
 
-        /** 像人一条条处理的节奏;[random] 可换成固定种子(测试)。 */
+        /** Pacing like a human handling things one by one; [random] can be swapped for a fixed seed (tests). */
         fun human(random: Random = Random.Default, limits: Limits = Limits()) = OutwardPacing(random, limits)
 
-        /** 一屏属于哪个网站或 App:网页([web] 为 true)按可注册域名,手机按包名。 */
+        /** Which site or app a screen belongs to: for a web page ([web] is true) the registrable domain, for a phone the package name. */
         fun siteOf(packageName: String?, web: Boolean): String? {
             val p = packageName?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
             return if (web) UrlHost.registrable(p) ?: p else p

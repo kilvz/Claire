@@ -42,9 +42,9 @@ import com.wangzan101.mika.core.tool.failCode
 import com.wangzan101.mika.core.capability.Paced
 
 /**
- * 所有改变外部世界的动作唯一的执行入口:[ToolDispatcher.execute] 要一张 [ActionPass],只有这里有。
- * 每个来源都按同一顺序:操作守卫 → 锁屏/被拿走的关卡(写操作)→ 不可逆判定与同意核对(按过关卡之后此刻的屏幕)→
- * 执行 → 守卫核对(失败熔断、画面变化、重读)→ 运行记录。来源之间有意的不同只写在 [OriginPolicy] 里。
+ * The single execution entry point for every action that changes the outside world: [ToolDispatcher.execute] requires an [ActionPass], and only this class holds one.
+ * Every origin follows the same order: operation guards → locked-screen / taken-away gate (write operations) → irreversible assessment and consent check (against the screen as it is now after passing the gate) →
+ * execution → guard review (failure circuit breaker, screen change, re-read) → run record. Intentional differences between origins live only in [OriginPolicy].
  */
 class ActionExecutor(
     private val tools: ToolDispatcher,
@@ -52,29 +52,29 @@ class ActionExecutor(
     confirmations: ConfirmationGate?,
     private val gate: suspend () -> Unit,
     val recorder: ActionRecorder,
-    /** 不动屏幕的工具的守卫;没有为 null。 */
+    /** Guard for tools that do not touch the screen; null when there is none. */
     private val offScreen: OffScreenGuard? = null,
     approvals: ApprovalSettings = ApprovalSettings.ASK,
     provenance: RunProvenance = RunProvenance(),
     selfPackage: String? = null,
     autonomous: Boolean = false,
-    /** 同一网站、App 里连着做对外动作(发送、提交)时两次之间的间隔(见 [OutwardPacing]);默认不等。 */
+    /** Interval between two consecutive outward actions (send, submit) on the same site or app (see [OutwardPacing]); no wait by default. */
     private val pacing: OutwardPacing = OutwardPacing.Off,
     private val onScreenAction: ((Verb?, JsonObject, ToolExecution) -> Unit)? = null,
 ) {
     private val decision = ConfirmDecision(tools, confirmations, approvals, recorder = recorder, provenance = provenance, selfPackage = selfPackage, autonomous = autonomous)
     private val pass = ActionPass()
 
-    /** 配了确认关卡(付款能经用户同意后做)。 */
+    /** A confirmation gate is configured (so a payment can be made with user consent). */
     val confirms: Boolean = confirmations != null
 
-    /** 不动屏幕的工具的守卫叫停的结论;没叫停为 null。 */
+    /** Verdict in which the guard for off-screen tools halted; null when it did not halt. */
     val offScreenStop: GuardVerdict? get() = offScreen?.stop
 
     suspend fun run(call: Part.ToolCall, origin: Origin, followUp: FollowUp = FollowUp.NONE): ActionOutcome =
         run(call, origin, followUp, reads = null)
 
-    /** [reads]:页面脚本一次调用里的读单独计数的范围(来源要求隔离时);那里的动作仍按任务计。 */
+    /** [reads]: the scope in which reads inside a single page-script call are counted separately (when the origin requires isolation); actions there still count against the task. */
     private suspend fun run(call: Part.ToolCall, origin: Origin, followUp: FollowUp, reads: GuardScope?): ActionOutcome {
         val control = tools.manualControl ?: return runAutomatic(call, origin, followUp, reads)
         return try { control.plan(tools) { runAutomatic(call, origin, followUp, reads) } }
@@ -91,14 +91,14 @@ class ActionExecutor(
 
     private suspend fun runAutomatic(call: Part.ToolCall, origin: Origin, followUp: FollowUp, reads: GuardScope?): ActionOutcome {
         val args = parseArgs(call.argsJson)
-        // 不动屏幕的工具(沙箱一类):不进屏幕守卫,由各自的守卫另管
+        // Tools that do not touch the screen (sandbox and the like): they do not enter the screen guard, their own guards handle them
         val offScreen = tools.offScreen(call.name)
         val verb = tools.verb(call.name)
-        // 用了另一块屏的编号的:不判不做、不记成在操作哪块屏,直接交给分发器说明该用哪个工具
+        // Using an id from another screen: do not judge or execute, do not record which screen is being operated; hand it straight to the dispatcher to say which tool should be used
         if (tools.misaimed(call.name, args) != null) {
             return ran(Step(call, args, origin, emptyList(), writing = false, offScreen, verb, null, followUp, reads))
         }
-        // 之后的关卡、判定都按这次调用的那块屏(到这次调用结束)
+        // Later gates and judgments all use the screen this call aimed at (until this call ends)
         tools.aim(call.name, args)
         try {
             return aimed(call, origin, followUp, reads, args, offScreen, verb)
@@ -107,12 +107,12 @@ class ActionExecutor(
                 put("ok", false); put("error", e.code); put("message", e.message); put("retryable", false)
                 e.packageName?.let { put("package", it) }
             }
-            // 单步:作为这次工具调用的结果交给模型,让它换路线或向用户说明;批和脚本按 Refused 自己处理
+            // Single step: given to the model as the result of this tool call so it can change course or explain to the user; batches and scripts handle it themselves via Refused
             if (origin.policy.recordsRefusal) followUp.refused(content)
             recorder.result(origin.step, call.name, verb, content, content, null, null, 0, origin.policy.source, call.id)
             return ActionOutcome.Refused(e.code, content, emptyList())
         } finally {
-            // 成功与否由分发器记;这里只结束这一层
+            // Success or failure is recorded by the dispatcher; this only tears down this layer
             tools.release(false)
         }
     }
@@ -120,7 +120,7 @@ class ActionExecutor(
     private suspend fun aimed(
         given: Part.ToolCall, origin: Origin, followUp: FollowUp, reads: GuardScope?, givenArgs: JsonObject, offScreen: Boolean, verb: Verb?,
     ): ActionOutcome {
-        // 按描述指的目标先换成此刻那一屏里的编号:之后的判定、审批、执行和按编号的完全一样;找不到或不唯一就不做
+        // A target given by description is first translated into the id on the current screen: the later judgment, approval, execution are exactly the same as with an id; if it is not found or not unique, nothing is done
         var call = given
         var args = givenArgs
         var note: JsonObject? = null
@@ -143,17 +143,18 @@ class ActionExecutor(
         if (writing && !policy.gatedByCaller) try {
             gate()
         } catch (_: com.wangzan101.mika.core.safety.gate.ScreenRecoveryRequired) {
-            // 等关卡时锁过屏:这一步按的是锁屏前的屏幕,不做;让模型重读现在的屏幕再决定
+            // The screen was locked while waiting at the gate: this step was aimed at the screen from before the lock, so it is not executed; have the model re-read the current screen and decide
             val notice = ToolExecution(buildJsonObject {
                 put("ok", false); put("error", "screen_changed_during_lock"); put("executed", false)
                 put("message", "The phone locked and was unlocked while the task was running. This pending action was not executed. Read the current screen and verify whether the previous action already completed before taking another action.")
             })
             return ran(Step(call, args, origin, before, writing = false, offScreen, verb, null, followUp, reads, preset = notice))
         }
-        // 没有可用的同意就不执行,也不计入失败熔断
+        // Without an available consent nothing is executed, and it does not count toward the failure circuit breaker
         var d = decision.judge(call.name, args, origin)
-        // 不在屏上、工具声明要问的一步(会改动东西的 root 命令):调用方问得到人就当场问,同意了按这次同意再判一次;
-        // 问不到人(这次运行不能问、调用方不是模型单步)就不做,照被拦下记
+        // A step that is off-screen and that the tool declares must be asked about (a root command that changes things): if the caller can reach
+        // a human, ask on the spot, and after approval judge once more with that approval; if no human can be reached (this run cannot ask, or the
+        // caller is not a model single step), do not execute and record it as blocked
         val ask = if (d is Decision.Required || d is Decision.Denied) tools.approvalRisk(call.name, args)?.ask else null
         if (ask != null) {
             val hit = Irreversible(ask.action, ask.content)
@@ -170,15 +171,16 @@ class ActionExecutor(
             Decision.OwnApp -> return ownApp(call, args, origin, before, followUp)
             else -> Unit
         }
-        // 对外动作:和同一网站、App 里的上一次隔开(等的时候任务还能取消,动作还没开始)
+        // Outward action: spacing from the previous one on the same site or app (the task can still be cancelled while waiting; the action has not started)
         val site = decision.outwardSite
         val paced = site?.let { pacing.waitBefore(it, recorder.now()) }?.takeIf { it > 0 } ?: 0L
-        // 等间隔时用户插了话:这次不做,先让模型读那句话。间隔从上一次做完算起,下次再做时余下的照样补上
+        // The user interjected while waiting out the interval: skip this time and let the model read that message first. The interval counts from the previous completion, and the remainder is still applied next time
         if (paced > 0 && waitOrSteer { delay(paced) } == null) {
             return ran(Step(call, args, origin, before, writing = false, offScreen, verb, null, followUp, reads, preset = failCode(SKIPPED_FOR_NEW_MESSAGE)))
         }
-        // 改动屏幕的动作:按这块屏的能力的节奏先停一会儿(App 里见 AppDwell),单步、一批里的每一步都在这里停;
-        // 组合动作(脚本)本身不停,里面的每一步经这里各自停。到了屏数上限、停留中用户插了话就不做
+        // Screen-changing action: pause first at the pace of this screen's capability (see AppDwell in the app); single steps and every step in a
+        // batch pause here, while a composite action (script) does not pause itself — each step inside pauses here on its own. At the screen limit,
+        // or when the user interjects during the pause, nothing is done
         val screenPaced = writing && !offScreen && !tools.composite(call.name)
         val dwelt = if (screenPaced) tools.beforeWrite(call.name, outward = site != null) else Paced.NONE
         dwelt.stop?.let { stop ->
@@ -190,13 +192,13 @@ class ActionExecutor(
         }
         val step = Step(call, args, origin, before, writing, offScreen, verb, (d as? Decision.Traced)?.detail, followUp, reads, note = note,
             pacedMs = paced + dwelt.waitMs, idleScrolls = dwelt.idleScrolls, outward = site != null)
-        // 动作一旦开始就做完并记下:脚本超时、任务取消都不能把它掐在半中间、漏掉记录
-        // 对外动作告诉这块屏的能力(网页的页数上限只管浏览,见 PageDwell)
+        // Once an action starts it is completed and recorded: neither a script timeout nor a task cancellation may cut it off midway or lose the record
+        // An outward action tells this screen's capability (the web page-count limit only governs browsing; see PageDwell)
         site?.let(tools::outwardStart)
         var done = false
         try {
             val outcome = if (policy.actionCapMs == null) ran(step) else {
-                // 先在可取消区取得执行权，再保护脚本动作与记录；不能在 NonCancellable 内等人工交回。
+                // Acquire the execution right in the cancellable region first, then protect the script action and its record; waiting for a manual hand-back must not happen inside NonCancellable.
                 suspend fun finishAction() = withContext(NonCancellable) { ran(step) }
                 tools.withScreenControl(call.name, successful = {
                     it is ActionOutcome.Ran && it.exec.content["ok"] != JsonPrimitive(false)
@@ -216,15 +218,15 @@ class ActionExecutor(
     private class Step(
         val call: Part.ToolCall, val args: JsonObject, val origin: Origin, val before: List<GuardVerdict>, val writing: Boolean,
         val offScreen: Boolean, val verb: Verb?, val traced: String?, val followUp: FollowUp, val reads: GuardScope?,
-        /** 没交给工具就有的结果(按描述找不到目标)。 */
+        /** A result obtained without handing off to the tool (target not found by description). */
         val preset: ToolExecution? = null,
-        /** 附进结果的说明(按描述对上的是谁)。 */
+        /** Note attached to the result (which element the description resolved to). */
         val note: JsonObject? = null,
-        /** 执行前为对外动作的间隔、这块屏的节奏等了多久;算进这次调用的等待。 */
+        /** How long execution waited beforehand for the outward-action interval and this screen's rhythm; counted into this call's wait time. */
         val pacedMs: Long = 0,
-        /** 执行前的停留里轻轻滚了几下;只进运行记录。 */
+        /** How many gentle scrolls happened during the pre-execution dwell; goes into the run record only. */
         val idleScrolls: Int = 0,
-        /** 不可逆判定认出是对外动作(发送、提交);记进这次的活动。 */
+        /** The irreversible assessment identified an outward action (send, submit); recorded in this activity. */
         val outward: Boolean = false,
     )
 
@@ -232,7 +234,7 @@ class ActionExecutor(
         val call = s.call
         val policy = s.origin.policy
         val n = s.origin.step
-        // 页面脚本里的每个动作经这里回来,同样走完整个入口;脚本里的读只在这一次调用里计数
+        // Every action inside a page script comes back through here and also completes the whole entry path; reads inside a script are counted only within this one call
         val subVerdicts = mutableListOf<GuardVerdict>()
         val sub = if (tools.composite(call.name)) {
             val script = Origin.Script(n)
@@ -245,14 +247,14 @@ class ActionExecutor(
             }
         } else null
         val started = recorder.now()
-        // 改状态的动作:记下执行前账本的位置,之后(含这次结果自带的那一屏)有没有重新读过由回答前的核对来看
+        // State-changing action: record the ledger position before execution; whether it was re-read afterwards (including the screen this result carries) is checked before answering
         val changes = tools.declaredRisk(call.name) != Risk.Read && (s.offScreen || ClassifiedRisk.changesState(s.verb))
         val mark = tools.ledgerMark()
         val raw = (s.preset ?: offScreen?.exhausted(call.name)?.let { ToolExecution(it) } ?: execute(s, sub))
             .let { r -> s.note?.let { r.with(content = JsonObject(r.content + it)) } ?: r }
             .let { r -> if (s.pacedMs > 0) r.with(waitMs = r.waitMs + s.pacedMs) else r }
             .let { r -> if (s.idleScrolls > 0) r.with(record = JsonObject(r.record + ("idleScrolls" to JsonPrimitive(s.idleScrolls)))) else r }
-        // 报了失败、也没说界面变了的动作什么也没改成:回答前不用为它再读一遍
+        // An action that reported failure and did not say the UI changed changed nothing: no need to re-read for it before answering
         val failed = raw.content["ok"] == JsonPrimitive(false) && raw.changed != true
         if (changes && s.preset == null && !failed) recorder.noteChange(mark)
         val durationMs = recorder.now() - started
@@ -261,7 +263,7 @@ class ActionExecutor(
 
         val after = subVerdicts.toMutableList()
         after += if (s.offScreen) offScreen?.result(call.name, s.args, resolved.content).orEmpty() else guards.result(call.name, resolved.content)
-        // 动作报回的实际效果先记(没有效果、换了地方),接着的画面就不再按指纹重复记
+        // Record the actual effect the action reports first (no effect, moved elsewhere); the following screen is then no longer recorded again by fingerprint
         (resolved.content["effect"] as? JsonObject)?.takeIf { !s.offScreen }?.let { effect ->
             val kind = (effect["kind"] as? JsonPrimitive)?.content ?: return@let
             after += guards.effect(kind, (effect["treeBlind"] as? JsonPrimitive)?.booleanOrNull == true)
@@ -272,7 +274,7 @@ class ActionExecutor(
         if (guards.progressVersion != beforeFrameProgress) after.removeAll { it.code == "no_progress" }
         if (!s.offScreen) {
             if (s.verb in PAGE_READ_VERBS) {
-                // 读到画面上次变化以来没读到过的内容(新的一屏、整页换了起点、脚本给出新结果)不算重读
+                // Reading content not seen since the screen last changed (a new screen, a page that switched its origin, a new result from the script) does not count as a re-read
                 val fp = elementsHash(elements) ?: resultFingerprint(resolved.content)
                 val beforeReadProgress = guards.progressVersion
                 after += if (s.reads != null) guards.read(call.name, guards.firstSeen(fp, s.reads), s.reads, fp)
@@ -286,7 +288,7 @@ class ActionExecutor(
 
         if (!s.offScreen) onScreenAction?.invoke(s.verb, s.args, exec)
 
-        // 画面:模型单步交给调用方按它的顺序存;子步界面变了才当场存;回放不存
+        // Screen: for a model single step the caller saves it in its own order; a substep saves on the spot only if the UI changed; playback saves nothing
         val picture = if (policy.frames == Frames.Caller && s.verb != Verb.ViewPastScreens && !s.offScreen) exec.image ?: exec.frame else null
         val shotId = when (policy.frames) {
             Frames.Caller -> picture?.let { recorder.nextShot() }
@@ -310,19 +312,19 @@ class ActionExecutor(
     private suspend fun execute(s: Step, sub: SubActions?): ToolExecution {
         val call = if (s.offScreen && offScreen != null) offScreen.capTimeout(s.call, s.args) else s.call
         val cap = s.origin.policy.actionCapMs ?: return tools.execute(call, pass, s.origin.step, sub)
-        // 动作自己有上限
+        // The action has its own cap
         return withTimeoutOrNull(cap) { tools.execute(call, pass, s.origin.step, sub) } ?: ToolExecution(buildJsonObject {
             put("ok", false); put("error", "action_timeout"); put("message", "the action did not finish within ${cap / 1000} s; read the screen before going on")
         })
     }
 
     /**
-     * 开着回放时记路线要的目标元素和前后锚点(动作后多读一屏,返回它)。
-     * 取不到目标、动作却生效了:路线不能缺步,标 incomplete,整条路线不记。
+     * With replay enabled, record the target element and the before/after anchors that the route needs (read one extra screen after the action and return it).
+     * If the target cannot be captured but the action took effect: a route must not miss a step, so mark it incomplete and do not record the whole route.
      */
     private suspend fun routeTarget(call: Part.ToolCall, verb: Verb?, origin: Origin, exec: ToolExecution): ScreenSnapshot? {
         if (!tools.captureTargets || tools.index[call.name]?.routable != true) return null
-        // 只有端口明确说「不是密码框」才记原文
+        // Only record the raw text when the port explicitly says it is not a password field
         val secret = (exec.content["secret"] as? JsonPrimitive)?.booleanOrNull != false
         val args = Redactor.args(verb, call.argsJson, secret)
         val effective = effectiveWrite(verb, exec.content)
@@ -342,7 +344,7 @@ class ActionExecutor(
         return seen
     }
 
-    /** 作用在 Claire 自己身上:不做;模型单步照常拿到说明、记进运行记录。 */
+    /** Acting on Claire itself: not done; a model single step still receives the explanation and it is recorded in the run record. */
     private fun ownApp(call: Part.ToolCall, args: JsonObject, origin: Origin, before: List<GuardVerdict>, followUp: FollowUp): ActionOutcome {
         val content = Refusals.content(Refusals.OWN_APP, origin.policy.refusals, before, null, null)
         if (origin.policy.recordsRefusal) {
@@ -367,7 +369,7 @@ class ActionExecutor(
         return ActionOutcome.Refused(code, content, before, hit)
     }
 
-    /** 要问的一步没有同意(用户没同意,或问不到人):[answer] 就是结果,照被拦下一样记。 */
+    /** A step that must ask was not approved (the user declined, or no human could be reached): [answer] is the result, recorded the same way as a block. */
     private fun declined(
         call: Part.ToolCall, args: JsonObject, origin: Origin, before: List<GuardVerdict>, hit: Irreversible, answer: ToolExecution, followUp: FollowUp,
         code: String,

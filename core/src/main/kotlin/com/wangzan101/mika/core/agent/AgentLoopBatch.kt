@@ -22,10 +22,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-// Agent 循环:一批工具调用的执行与结果事件
+// Agent loop: execution of a batch of tool calls and its result events
 /**
- * 执行一次 do_steps:整批对步数上限算一步,每个子步对守卫和运行记录各算一个动作(由 [BatchRunner] 记)。
- * 批停下时让下一步回到主模型。返回非 null 表示任务就此结束。
+ * Execute one do_steps: the whole batch counts as one step against the step limit, while each substep counts as one action for the guards and the run record (recorded by [BatchRunner]).
+ * When the batch stops, the next step goes back to the main model. A non-null return means the task ends here.
  */
 internal suspend fun AgentLoop.batch(
     first: Part.ToolCall, calls: ReplyCalls, history: MutableList<Message>, specs: List<ToolSpec>, guards: OperationGuards,
@@ -33,11 +33,11 @@ internal suspend fun AgentLoop.batch(
     recordReply: (String?) -> Unit, app: (Place) -> Unit, steerWaiting: () -> Boolean,
     noteVerdicts: (BatchStep, ToolExecution?, List<GuardVerdict>) -> String?,
 ): TaskState? {
-    // 一批打断了逐条干活的连击(这正是提醒想要的方向):连着次数清零重算
+    // A batch breaks the streak of doing things one by one (which is the direction the reminder wants): reset the consecutive count
     eachLoop.reset()
-    // 收着的组里的工具也能放进批里(和单步一样照常执行、展开它那一组)
+    // Tools from a collapsed group can also go into a batch (they execute as usual and expand their group, same as a single step)
     val (parsed, problem) = BatchRunner.parse(first.argsJson, tools.definitions().map { it.name }.toSet(), tools.batchable())
-    // 一批只在一块屏上做:混了两块屏的整批不做
+    // A batch runs on a single screen only: a whole batch that mixes two screens is not executed
     val mixed = parsed?.let { BatchRunner.mixedSurface(it, tools::surfaceOf) }
     val steps = parsed.takeIf { mixed == null }
     val running = TaskState.Running(step, note, tool, steps?.let { RunProgress.Batch(it.size) }, reason, narration)
@@ -54,7 +54,7 @@ internal suspend fun AgentLoop.batch(
     val durationMs = now() - started
     val isError = exec.content["ok"] != JsonPrimitive(true)
     history += calls.results(Part.ToolResult(first.id, ScreenElementTable.text(exec.content, flags.tablesAtBirth && !isError), isError, exec.observations.map { it.tag }))
-    // 批做完(或停下)后再给模型一份当前元素表；只有元素信息不足才附画面。
+    // After the batch finishes (or stops), give the model a current element table; attach a frame only when the element information is insufficient.
     if (steps != null && ranAnyStep(exec.content)) {
         tools.lookNow()?.let { v ->
             history += Message(Role.User, listOfNotNull(Part.Text(batchViewNote(ScreenElementTable.text(v.content, flags.tablesAtBirth))), v.image?.let { tools.modelImage(it, v.imageId) }), Author.Mika)
@@ -63,16 +63,16 @@ internal suspend fun AgentLoop.batch(
     recordReply(BatchRunner.redactArgs(first.argsJson))
     val picture = exec.frame
     val shotId = picture?.let { executor.recorder.nextShot() }
-    // 子步之后按条件等界面的时间另记,小结里算等待
+    // Time spent conditionally waiting for the UI after substeps is recorded separately and counted as waiting in the summary
     emit(RunEvent.ToolResult(now(), step, first.name, RunEvent.clipResult(Redactor.text(exec.content.toString())), exec.changed, shotId, durationMs,
         waitMs = runner?.waitedMs ?: 0, callId = first.id))
     val currentPlace = exec.place
     currentPlace?.let(app)
-    // 要确认不算失败(和单步被拦一样不进失败熔断),但同样交给主模型
-    // 为新插话停下的批同样不算失败
+    // Needing confirmation does not count as a failure (like a blocked single step it does not enter the failure circuit breaker), but it is still handed to the main model
+    // A batch stopped for a new interjection likewise does not count as a failure
     val confirm = exec.content["error"] == JsonPrimitive("confirmation_required") || exec.content["reason"] == JsonPrimitive(BatchRunner.NEW_MESSAGE)
     track.after(tools.verb(first.name), !isError || confirm, runner?.verdicts?.isNotEmpty() == true || exec.content["advice"] != null, exec.changed, false, currentPlace?.name)
-    // 批停下(核对没过、要确认):下一步交给主模型
+    // The batch stopped (review did not pass, or confirmation was needed): the next step goes to the main model
     if (isError) track.markRecovery()
     if (picture != null && shotId != null) {
         record { sink.media(shotId, picture) }
@@ -85,15 +85,15 @@ internal suspend fun AgentLoop.batch(
 internal fun AgentLoop.previewFor(step: Int): ((String) -> Unit)? = if (!streamReplies) null else { raw ->
     val preview = CompletionPlanBlock.visible(raw)
     val current = _state.value as? TaskState.Running
-    // 撤掉之后网络线程可能还送来一段:不再显示,免得屏幕上比历史里多
+    // After removal the network thread may still deliver another chunk: do not show it, so the screen does not hold more than the history
     if (current?.step == step && interruptedStep != step) _state.value = current.copy(preview = preview.takeIf(String::isNotEmpty))
 }
 
-/** do_steps 的结果里至少有一个子步真的执行了(没执行的停止项标着 executed=false)。 */
+/** At least one substep in the do_steps result was actually executed (stop items that did not execute are marked executed=false). */
 internal fun AgentLoop.ranAnyStep(content: JsonObject): Boolean =
     (content["steps"] as? JsonArray)?.any { (it as? JsonObject)?.get("executed") != JsonPrimitive(false) } == true
 
-/** 运行记录里按结果另记的事:报告的障碍(供评测按 barrier 类归因;参数不对被拒的不算)、看过的个人技能、存下的记忆。 */
+/** Things recorded separately from the result in the run record: reported obstacles (so evaluation can attribute them to the barrier category; ones rejected for bad arguments do not count), personal skills that were viewed, and memories saved. */
 internal fun AgentLoop.noteResultEvents(verb: Verb?, content: JsonObject) {
     if (verb == Verb.HandleObstacle && content["ok"] == JsonPrimitive(true)) {
         (content["kind"] as? JsonPrimitive)?.contentOrNull?.let { emit(RunEvent.Barrier(now(), it)) }
@@ -103,7 +103,7 @@ internal fun AgentLoop.noteResultEvents(verb: Verb?, content: JsonObject) {
         content["id"]?.jsonPrimitive?.content ?: "", content["kind"]?.jsonPrimitive?.content ?: "", content["status"]?.jsonPrimitive?.content ?: ""))
 }
 
-/** MCP 调用进行中把 Running 标上连接器名,结束(含失败、取消)时收回;返回的闭包由调用方在 finally 里调。 */
+/** While an MCP call is in progress, mark Running with the connector name and take it back when the call ends (including failure and cancellation); the caller invokes the returned closure in a finally block. */
 internal fun AgentLoop.showMcpCall(connector: String): () -> Unit {
     val before = _state.value
     if (before !is TaskState.Running) return {}

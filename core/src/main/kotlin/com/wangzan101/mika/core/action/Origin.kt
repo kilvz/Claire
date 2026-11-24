@@ -1,75 +1,75 @@
 package com.wangzan101.mika.core.action
 
-/** 子步画面怎么存:交给调用方(模型单步按自己的顺序存)、界面变了才当场存、不存。 */
+/** How substep frames are saved: left to the caller (a model single step saves them in its own order), saved on the spot only when the UI changed, or not saved. */
 enum class Frames { Caller, WhenChanged, None }
 
-/** 被拦下时的说明写给谁看:模型(中文说明、确认流程)、页面脚本(脚本拿到的错误)、调用方自己按代码说明。 */
+/** Who the blocked explanation is written for: the model (Chinese explanation, confirmation flow), the page script (the error the script receives), or the caller explaining by code. */
 enum class RefusalStyle { Model, Script, Code }
 
 /**
- * 一种来源和别的来源有意不同的地方,只在这里写;执行顺序本身对所有来源都一样。
- * [source] 是运行记录里的 source。
+ * The places where one origin intentionally differs from the others, written only here; the execution order itself is identical for every origin.
+ * [source] is the source in the run record.
  */
 data class OriginPolicy(
     val source: String,
-    /** 能用用户的同意放行付款;其余来源碰到付款就停,交还模型,从不假设用户同意过。 */
+    /** Can let a payment through with the user's approval; other origins stop on a payment and hand it back to the model, never assuming the user approved. */
     val usesGrant: Boolean,
-    /** 没配确认关卡时也判不可逆:子步命中就停,不靠关卡。 */
+    /** Judges irreversibility even without a confirmation gate: a substep that hits stops, without relying on the gate. */
     val judgeWithoutGate: Boolean,
-    /** 找不到点在哪个元素上:true 不执行;false 放行但留痕。 */
+    /** Which element is tapped cannot be determined: true means not executed; false means allowed but with a trace left. */
     val refuseUnresolved: Boolean,
-    /** 守卫一有提示就不执行(回放照路线做,任何异样都交还模型)。 */
+    /** Do not execute as soon as a guard flags anything (replay follows the route, so any anomaly is handed back to the model). */
     val stopOnGuardWarning: Boolean,
-    /** 调用方读屏之前刚等过锁屏关卡(回放要按等完之后的一屏核对),执行前不再等一次。 */
+    /** The caller already waited at the locked-screen gate before reading the screen (replay must verify against the screen from after that wait), so do not wait again before executing. */
     val gatedByCaller: Boolean,
-    /** 读只在所属的那次调用里计数,最多提醒、不叫停任务(页面脚本里的轮询读)。 */
+    /** Reads are counted only within the call they belong to; at most a reminder, never stopping the task (polling reads inside a page script). */
     val isolatedReads: Boolean,
-    /** 不为 null 时:动作一旦开始就做完并记下(不可取消),最多等这么久。 */
+    /** When non-null: once an action starts it is completed and recorded (not cancellable), waiting at most this long. */
     val actionCapMs: Long?,
     val frames: Frames,
-    /** 记路线要的目标元素与前后锚点(开着回放时)。 */
+    /** The target element and before/after anchors the route needs (when replay is enabled). */
     val routeTargets: Boolean,
-    /** 被确认关卡拦下的这次调用本身就是交给模型的结果,照常记进运行记录。 */
+    /** A call blocked by the confirmation gate is itself the result handed to the model, so it is recorded in the run record as usual. */
     val recordsRefusal: Boolean,
     val refusals: RefusalStyle,
 )
 
-/** 一次动作从哪来;[step] 是它所在的循环轮次。 */
+/** Where an action comes from; [step] is the loop turn it belongs to. */
 sealed interface Origin {
     val step: Int
     val policy: OriginPolicy
 
-    /** 模型的一次工具调用。 */
+    /** A single tool call by the model. */
     data class Model(override val step: Int) : Origin {
         override val policy get() = MODEL
     }
 
-    /** do_steps 里的一步。 */
+    /** One step inside do_steps. */
     data class Batch(override val step: Int) : Origin {
         override val policy get() = BATCH
     }
 
-    /** web_script 里的一个 `mika.*` 动作。 */
+    /** A `mika.*` action inside web_script. */
     data class Script(override val step: Int) : Origin {
         override val policy get() = SCRIPT
     }
 
-    /** 经验回放的一步(不调模型)。 */
+    /** One step of experience replay (no model call). */
     data object Replay : Origin {
         override val step = 0
         override val policy get() = REPLAY
     }
 
-    /** MCP 服务端的低层工具调用；没有模型，但仍须经过同一执行入口。 */
+    /** A low-level tool call from the MCP server; there is no model, but it still has to pass through the same execution entry point. */
     data class McpTool(override val step: Int) : Origin {
         override val policy get() = MCP_TOOL
     }
 
     companion object {
-        /** 一个页面脚本动作的上限:打开网址最多等 20 秒加载,再留余量等页面安静。 */
+        /** The cap for one page-script action: loading a URL waits at most 20 seconds, with headroom left for the page to settle. */
         const val SCRIPT_ACTION_CAP_MS = 40_000L
 
-        // 只有模型单步能经用户同意放行付款;其余来源碰到付款就停下交还
+        // Only a model single step can let a payment through with user approval; other origins stop on a payment and hand it back
         private val MODEL = OriginPolicy(
             "model", usesGrant = true, judgeWithoutGate = false, refuseUnresolved = false, stopOnGuardWarning = false,
             gatedByCaller = false, isolatedReads = false, actionCapMs = null, frames = Frames.Caller, routeTargets = true,
@@ -80,13 +80,13 @@ sealed interface Origin {
             gatedByCaller = false, isolatedReads = false, actionCapMs = null, frames = Frames.WhenChanged, routeTargets = true,
             recordsRefusal = false, refusals = RefusalStyle.Code,
         )
-        // 脚本是网页上的一段程序,不能作为路线的一步回放
+        // A script is a program on a web page and cannot be replayed as a step of a route
         private val SCRIPT = OriginPolicy(
             "script", usesGrant = false, judgeWithoutGate = true, refuseUnresolved = true, stopOnGuardWarning = false,
             gatedByCaller = false, isolatedReads = true, actionCapMs = SCRIPT_ACTION_CAP_MS, frames = Frames.WhenChanged, routeTargets = false,
             recordsRefusal = false, refusals = RefusalStyle.Script,
         )
-        // 回放与模型单步一致:没配确认关卡时不判
+        // Replay matches the model single step: no judgment when no confirmation gate is configured
         private val REPLAY = OriginPolicy(
             "replay", usesGrant = false, judgeWithoutGate = false, refuseUnresolved = true, stopOnGuardWarning = true,
             gatedByCaller = true, isolatedReads = false, actionCapMs = null, frames = Frames.None, routeTargets = true,
@@ -100,5 +100,5 @@ sealed interface Origin {
     }
 }
 
-/** 动作的发起者。保留 Origin 作为旧调用方的名称；RunOrigin 只表示这次运行从哪来。 */
+/** Who initiated the action. Origin is kept as the name older callers use; RunOrigin only says where this run came from. */
 typealias Invoker = Origin

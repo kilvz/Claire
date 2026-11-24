@@ -40,7 +40,7 @@ private data class WechatState(
     val contextTokens: Map<String, String> = emptyMap(),
     val pending: List<PendingWechatMessage> = emptyList(),
     val recentSources: List<IndexedWechatMessage> = emptyList(),
-    /** 按确认先后保留最近一段，游标回退或进程恢复时也不会再次登记同一消息。 */
+    /** Keeps the most recent window in acknowledgement order, so a cursor rollback or process restart never registers the same message again. */
     val acknowledgedMessages: List<String> = emptyList(),
 )
 
@@ -51,7 +51,7 @@ private data class WechatUnlockGrant(
     val allowed: Boolean = false,
 )
 
-/** 凭证与运行状态分开保存：令牌加密，游标和未交任务的消息原子落盘。 */
+/** Credentials and runtime state are stored separately: the token is encrypted, while the cursor and messages not yet handed to tasks are written to disk atomically. */
 class WechatStore(
     private val dir: File,
     private val cipher: KeyCipher,
@@ -70,11 +70,11 @@ class WechatStore(
     @Synchronized fun account(): WechatAccount? = account
 
     @Synchronized fun saveAccount(value: WechatAccount) {
-        // 撤销独立授权后才碰凭证与账本；后续写失败、进程重启也不能恢复旧授权。
+        // Revoke the separate unlock grant before touching credentials or the ledger; a subsequent write failure or process restart must not restore the old grant.
         setUnlockAllowed(false)
         val sameAccount = account?.let { it.ownerId == value.ownerId && it.botId == value.botId } == true
         if (!sameAccount) {
-            // 先清旧账号的游标与账本；同账号重绑则保留原来的消息状态。
+            // Clear the old account's cursor and ledger first; rebinding the same account keeps the existing message state.
             state = WechatState()
             saveState()
         }
@@ -97,7 +97,7 @@ class WechatStore(
         try {
             saveState(next)
         } catch (failure: Exception) {
-            // 关闭接收没能落盘时，旧 enabled=true 仍在盘上；撤销独立授权，重启也不能解锁。
+            // If persisting the disable failed, the old enabled=true is still on disk; revoke the separate unlock grant so that a restart cannot unlock.
             if (!value) try { setUnlockAllowed(false) } catch (revokeFailure: Exception) {
                 failure.addSuppressed(revokeFailure)
             }
@@ -108,7 +108,7 @@ class WechatStore(
 
     @Synchronized fun unlockAllowed() = _allowUnlock.value && !revocationPending
 
-    /** 优先原子替换授权记录；无法写入时撤权可通过移除原记录完成。 */
+    /** Prefer atomically replacing the grant record; if it cannot be written, revocation can still be completed by removing the existing record. */
     @Synchronized fun setUnlockAllowed(value: Boolean) {
         if (!value) {
             revocationPending = true
@@ -128,7 +128,7 @@ class WechatStore(
         _allowUnlock.value = true
     }
 
-    /** 每次实际解锁前重验来源，旧账号、旧线程或其他渠道不能沿用授权。 */
+    /** Re-verify the source before every actual unlock: an old account, an old thread, or another channel cannot reuse the grant. */
     @Synchronized fun canUnlock(peer: ChannelPeer?): Boolean {
         val current = account ?: return false
         return state.enabled && unlockAllowed() && peer != null &&
@@ -186,7 +186,7 @@ class WechatStore(
         return ChannelPeer(WechatChannel.ID, owner, thread)
     }
 
-    /** 同一消息只入站一次；未确认的会在下次启动由 [pending] 补交。 */
+    /** The same message enters only once; unacknowledged ones are re-submitted from [pending] on the next start. */
     @Synchronized fun journal(messageId: String, peer: ChannelPeer, text: String, replyToAskId: String? = null,
         imageFailure: Boolean = false, expectedAccount: WechatAccount? = null, requireMatchingAsk: Boolean? = null,
         sourceImages: List<SavedWechatImage>? = null): Boolean {
@@ -220,7 +220,7 @@ class WechatStore(
         state = next
     }
 
-    /** 机主结果推送的投递目标:已启用、有账号、机主的回复令牌与已有线程都在才返回;缺一项就没有可投递的出口,也不为此新建线程。 */
+    /** Delivery target for owner result pushes: returned only when receiving is enabled, an account exists, and the owner's reply token plus an existing thread are both present; if any one is missing there is no delivery exit, and no new thread is created for this. */
     @Synchronized fun boundOwnerPeer(): ChannelPeer? {
         val current = account ?: return null
         if (!state.enabled) return null

@@ -6,55 +6,55 @@ import com.wangzan101.mika.core.run.RunOrigin
 import com.wangzan101.mika.core.run.RunProvenance
 
 /**
- * 一个动作的风险等级(记进审批记录,核查据此知道任务做过对外的事)。[Read] 只看或只在界面间移动;[Change] 在界面上改东西(点、打字);
- * [External] 把东西交给别人(发送、提交);[Irreversible] 做了收不回(付款、下单、删除);[Unknown] 看不清点的是什么。
+ * The risk level of an action (recorded in the approval record so the review can tell the task did something outward). [Read] only looks or moves between UI screens; [Change] changes things in the UI (tap, type);
+ * [External] hands something to someone else (send, submit); [Irreversible] cannot be undone (pay, order, delete); [Unknown] what was tapped cannot be determined.
  */
 enum class ActionRisk { Read, Change, External, Irreversible, Unknown;
 
-    /** 会影响屏幕之外的世界(或拿不准会不会)。 */
+    /** Affects the world beyond the screen (or it is unclear whether it does). */
     val outward: Boolean get() = this == External || this == Irreversible || this == Unknown
 }
 
 /**
- * [payment] 为 true 时这一步要花钱(付款、下单,或屏上有应付金额时的对外动作):询问时先问用户。
- * [ask] 不为空时是不在屏上、改了收不回的一步(工具按这次的参数声明,如会改动东西的 root 命令),询问时也先问用户,
- * 给用户看的就是它;同意只放行一字不差的这一步。
+ * When [payment] is true this step costs money (payment, order, or an outward action while an amount due is on screen): the user is asked first.
+ * When [ask] is not null it is an off-screen step that cannot be undone if changed (declared by the tool for these arguments, such as a root command that changes things); the user is asked first here too,
+ * and what the user sees is it; an approval lets through only this exact step.
  */
 data class Risk(val level: ActionRisk, val payment: Boolean = false, val ask: ConfirmationRequest? = null)
 
-/** 用户在确认卡片上的选择:同意这一次,或不同意。 */
+/** The user's choice on the confirmation card: approve this once, or decline. */
 enum class ConfirmChoice { Once, Deny;
 
     val approved: Boolean get() = this != Deny
 }
 
-/** 询问 / 自主:此刻是不是自主模式(中途换成自主时,正在跑的任务从下一步起照它)。由设置提供,测试里换成固定值。 */
+/** Ask / autonomous: whether autonomous mode is on right now (when it is switched to autonomous mid-way, a running task follows it from the next step). Provided by settings; tests swap in a fixed value. */
 fun interface ApprovalSettings {
-    /** 自主模式:连付款也不先问。 */
+    /** Autonomous mode: not even payments are asked about. */
     fun autonomous(): Boolean
 
     companion object {
-        /** 询问(默认):付款和工具声明要问的那几步(见 [Risk.ask])先问。 */
+        /** Ask (default): payments and the steps the tool declares must be asked about (see [Risk.ask]) are asked first. */
         val ASK = ApprovalSettings { false }
     }
 }
 
 sealed interface Approval {
-    /** 不用问。 */
+    /** No need to ask. */
     data object Allow : Approval
-    /** 要用户这一次的同意(有一次性同意就核对并用掉它)。 */
+    /** Needs the user's approval for this one time (an existing single-use approval is checked and used up). */
     data object Ask : Approval
-    /** 本次运行不能向用户要同意，动作必须停下。 */
+    /** This run cannot ask the user for approval, so the action must stop. */
     data object Deny : Approval
 }
 
 /**
- * 审批判定:纯函数。付款和工具声明要问的(见 [Risk.ask])要问;问不到人(无人值守、子任务)或不在手机上
- * (渠道、定时、MCP 发起的)时这些都不做。
+ * Approval decision: a pure function. Payments and what the tool declares must be asked about (see [Risk.ask]) require asking; when no one can be reached (unattended, subtask) or it is not on the phone
+ * (started by a channel, a schedule, or MCP), none of these are done.
  */
 object ApprovalPolicy {
     fun decide(risk: Risk, run: RunProvenance = RunProvenance()): Approval = when {
-        // 无人值守/不在手机上:付款、工具声明要问的、不可逆的都不做;只读、界面改动、对外但可撤销的照做
+        // Unattended / not on the phone: payments, steps the tool declares must be asked about, and irreversible steps are not done; reads, UI changes, and outward but revocable steps go ahead
         (run.attendance == Attendance.Unattended || run.origin != RunOrigin.Ui) &&
             (risk.payment || risk.ask != null || risk.level == ActionRisk.Irreversible) -> Approval.Deny
         !risk.payment && risk.ask == null -> Approval.Allow

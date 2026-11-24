@@ -11,8 +11,10 @@ import com.wangzan101.mika.core.cap.wechat.WechatOwnerResult
 import java.security.MessageDigest
 
 /**
- * 机主结果推送的出口:构造时快照账号与投递目标,发送时重读比对——运行中途换绑、停用或线程失效都判
- * 不可用且一次都不发。投递经 [Outbox]:同一运行同一段文本只发一次,结局不明也不自动重发。
+ * Exit for pushing owner results: the account and delivery target are snapshotted at construction and re-read
+ * for comparison when sending — a rebind, disable, or thread invalidation mid-run all count as unavailable,
+ * so nothing is sent at all. Delivery goes through [Outbox]: the same run sends the same piece of text only
+ * once, and an uncertain outcome is not automatically resent either.
  */
 class AndroidWechatOwnerPort internal constructor(
     private val store: WechatStore,

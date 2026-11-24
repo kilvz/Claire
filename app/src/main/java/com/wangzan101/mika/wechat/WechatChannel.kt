@@ -20,7 +20,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/** 微信只适配收发；主人校验、提问路由和任务执行都在通用渠道层。 */
+/** WeChat only adapts sending and receiving; owner verification, ask routing, and task execution all live in the generic channel layer. */
 class WechatChannel(
     private val store: WechatStore,
     private val api: WechatApi,
@@ -61,7 +61,7 @@ class WechatChannel(
         return withContext(Dispatchers.IO) {
             val started = System.nanoTime()
             val outcome = try {
-                // 与图片路径同款复查:排队到真正调 API 之间暂停或换绑,旧投递不能发出。
+                // Same recheck as the image path: a pause or rebind between queueing and the actual API call must not let the old delivery out.
                 if (!store.accepts(peer, account)) return@withContext SendOutcome.Failed
                 api.sendText(account, peer.peerId, delivery.id, text, store.contextToken(peer.peerId))
                 SendOutcome.Delivered
@@ -97,7 +97,7 @@ class WechatChannel(
             catch (_: IOException) { SendOutcome.Uncertain }
         }
 
-    /** 先补交上次未登记的消息，再取新消息；任务登记处做最终幂等。 */
+    /** First re-submit messages left unregistered last time, then fetch new messages; final idempotency is enforced at the task registry. */
     suspend fun pollOnce(): WechatUpdates? = pollLock.withLock {
         val input = sink ?: return@withLock null
         val account = store.account()?.takeIf { store.enabled() } ?: return@withLock null
@@ -106,7 +106,7 @@ class WechatChannel(
             dispatchPending(pending, account, input)
         }
         val updates = api.updatesCancellable(account, store.cursor())
-        // 换绑或停止后，旧请求的结果不能再写入新会话，也不能推进新账号的游标。
+        // The old request's result must not be written into the new session after a rebind or stop, nor advance the new account's cursor.
         if (store.account() != account || sink !== input || !store.enabled()) return@withLock null
         updates.msgs.forEach { message ->
             val owner = account.ownerId
