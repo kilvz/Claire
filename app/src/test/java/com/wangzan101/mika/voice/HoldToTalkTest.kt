@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HoldToTalkTest {
-    /** 假会话:只记松开、取消各被调了几次;事件由测试直接喂给 [HoldToTalk.onEvent]。 */
+    /** Fake session: only counts how often release and cancel were called; events are fed to [HoldToTalk.onEvent] directly by the test. */
     private class FakeSession(override val live: Boolean = true, override val unlimited: Boolean = false) : SpeechSession {
         override val events: Flow<SpeechEvent> = emptyFlow()
         var released = 0
@@ -53,7 +53,7 @@ class HoldToTalkTest {
         assertEquals(HoldToTalk.State.Idle, hold.state.value)
         assertEquals(1, session.cancelled)
         assertEquals(0, session.released)
-        // 取消以后迟到的结果不再冒出来
+        // Results arriving late after a cancel no longer surface
         hold.onEvent(SpeechEvent.Final("帮我订票"))
         assertEquals(HoldToTalk.State.Idle, hold.state.value)
     }
@@ -71,11 +71,11 @@ class HoldToTalkTest {
         val session = pressed()
         now = 300
         hold.release()
-        // 太短不交给会话去转(服务商的还要花额度):直接丢掉,当没听清
+        // Too short, so it is not handed to the session for transcription (the provider's engine costs quota too): drop it and treat it as not hearing clearly
         assertEquals(0, session.released)
         assertEquals(1, session.cancelled)
         assertEquals(HoldToTalk.State.Problem(null), hold.state.value)
-        // 会话迟到的结果不覆盖「没听清」
+        // A late result from the session does not overwrite the "no match" problem
         hold.onEvent(SpeechEvent.Final("帮我"))
         assertEquals(HoldToTalk.State.Problem(null), hold.state.value)
     }
@@ -93,7 +93,7 @@ class HoldToTalkTest {
 
     @Test
     fun minimumIsConfigurable() {
-        // 输入栏开始听时手指已经按了 300ms,只再数 200ms:合起来不到半秒才算太短
+        // When the input bar starts listening the finger has already been down for 300ms, so only 200ms more is counted: only under half a second in total is too short
         val short = HoldToTalk(clock = { now }, minMs = 200)
         val session = FakeSession().also { short.press(it) }
         now = 250
@@ -112,13 +112,13 @@ class HoldToTalkTest {
         now = 60_000
         hold.tick()
         assertEquals(1, session.released)
-        // 到点以后再 tick 不重复收尾
+        // Ticking after the cap is reached does not wind down again
         now = 61_000
         hold.tick()
         assertEquals(1, session.released)
     }
 
-    // 流式识别不封顶:过了 60 秒照样听,不收尾,松开才收尾
+    // Streaming recognition has no cap: it keeps listening past 60 seconds without winding down, and only the release winds it down
     @Test
     fun unlimitedSessionKeepsListeningPastTheCap() {
         val session = FakeSession(unlimited = true).also { hold.press(it) }
@@ -138,7 +138,7 @@ class HoldToTalkTest {
         hold.release()
         hold.onEvent(SpeechEvent.Converting)
         assertEquals(HoldToTalk.State.Converting, hold.state.value)
-        // 服务商的引擎可能晚到一个音量:转文字时不再回到在听
+        // The provider's engine may deliver a level event late: while converting, do not go back to listening
         hold.onEvent(SpeechEvent.Level(0.5f))
         assertEquals(HoldToTalk.State.Converting, hold.state.value)
         hold.onEvent(SpeechEvent.Final("你好"))
@@ -150,7 +150,7 @@ class HoldToTalkTest {
         val session = pressed(live = false)
         now = 2_000
         hold.release()
-        // 录音器停下要一小会儿,Converting 事件晚到;松开那一刻就该显示转文字,不闪回占位
+        // The recorder takes a moment to stop, so the Converting event arrives late; the instant of release must already show converting, without flashing back to the placeholder
         assertEquals(HoldToTalk.State.Converting, hold.state.value)
         assertEquals(1, session.released)
         hold.tick()
@@ -203,7 +203,7 @@ class HoldToTalkTest {
 
     @Test
     fun earlyFinalWaitsForReleaseThenAppliesOnce() {
-        // 手机自带识别在手还按着时自己结束了:先不交出去,手指离开才算数
+        // The phone's built-in recognition finished on its own while the finger is still down: do not hand it off yet; it counts only once the finger lifts
         val session = pressed()
         now = 2_000
         hold.onEvent(SpeechEvent.Final("帮我订票"))
@@ -215,7 +215,7 @@ class HoldToTalkTest {
         assertTrue(hold.state.value is HoldToTalk.State.Listening)
         hold.release()
         assertEquals(HoldToTalk.State.Done("帮我订票"), hold.state.value)
-        // 会话已经结束,不再去收尾;再松开一次也不重复交出
+        // The session has already ended, so it is not wound down again; releasing once more does not hand it off again
         assertEquals(0, session.released)
         hold.reset()
         hold.release()
@@ -279,7 +279,7 @@ class HoldToTalkTest {
 
     @Test
     fun pressWhileConvertingDropsTheOldSession() {
-        // 服务商转写卡住时用户重新按:旧的那段取消,新的一段照常听、照常出结果
+        // The user presses again while the provider's transcription is stuck: the old segment is cancelled, and the new one listens and produces a result as usual
         val first = pressed(live = false)
         now = 2_000
         hold.release()
@@ -333,7 +333,7 @@ class HoldToTalkTest {
     fun sendArmedKeepsPendingResultAndSendsOnRelease() {
         pressed()
         now = 2_000
-        // 手还按着时会话先结束了:留着,松开在「松开 发送」上才直接发出
+        // The session ended first while the finger is still down: keep the result; it is sent directly only if released over the release-and-send target
         hold.onEvent(SpeechEvent.Final("帮我订票"))
         hold.aim(cancel = false, send = true)
         hold.release()
@@ -383,7 +383,7 @@ class HoldToTalkTest {
         hold.release()
         hold.onEvent(SpeechEvent.Final("帮我订票"))
         hold.reset()
-        // 上一段松开在「松开 发送」上,不影响下一段
+        // The previous segment was released over the release-and-send target, which does not affect the next segment
         pressed()
         now = 4_000
         hold.release()

@@ -32,7 +32,7 @@ class ViewerFindTest {
         val paragraph = finds.hits.first().text
         assertTrue(paragraph.toString().contains("正文里的"))
         assertEquals(listOf(0, 1, 0), finds.hits.map { it.occurrence })
-        // 同一段文字里两处命中认的是同一段;代码块是另一段
+        // Both hits in the same paragraph resolve to the same paragraph; the code block is a different one
         assertEquals(finds.hits[0].text, finds.hits[1].text)
         assertTrue(finds.hits[2].text !== finds.hits[0].text)
     }

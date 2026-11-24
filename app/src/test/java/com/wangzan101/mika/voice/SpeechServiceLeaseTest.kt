@@ -67,7 +67,7 @@ class SpeechServiceLeaseTest {
         assertTrue(binder.calls.isEmpty())
     }
 
-    // 空绑定、绑定失效和服务断开在适配器里都汇入这一个失效回调。
+    // An empty binding, a failed bind and a service disconnection all funnel into this single unavailable callback in the adapter.
     @Test fun unavailableUnbindsBeforeReportingAndIgnoresLaterConnect() {
         val binder = FakeBinder()
         val lease = lease(binder)

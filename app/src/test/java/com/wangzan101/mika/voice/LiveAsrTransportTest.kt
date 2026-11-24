@@ -16,7 +16,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** WebSocket 连接:请求头只带给它的那些,文字和二进制回应都按文字读,握手被拒不带出服务端原话。只连本机的 MockWebServer。 */
+/** WebSocket connection: the request carries only the headers handed to it, text and binary replies are both read as text, and a rejected handshake does not surface the server's own wording. Connects only to a local MockWebServer. */
 class LiveAsrTransportTest {
     private fun withServer(block: suspend (MockWebServer, OkHttpClient) -> Unit) = runBlocking {
         val server = MockWebServer(); val client = OkHttpClient()

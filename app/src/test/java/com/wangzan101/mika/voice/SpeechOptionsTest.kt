@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 「语音转文字」选择页的分组和设置卡片上的两行字。 */
+/** Grouping on the "speech to text" selection page and the two lines of text on the settings card. */
 class SpeechOptionsTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -47,7 +47,7 @@ class SpeechOptionsTest {
         assertEquals(listOf("p1", "speech-out"), groups.map { it.provider.id })
         assertEquals(listOf("gpt-4o", "whisper-1", "gpt-4o-mini", "speech-local", "speech-tts"), groups.first().models)
 
-        // 标了 ttsModels 的模型仍可按显式选择转写;summary 不再因此显示未设置
+        // A model marked in ttsModels can still be explicitly chosen for transcription; summary no longer shows it as not set because of that
         val choice = SpeechChoice.Provider(ttsOnly.id, "speech-local", TranscribeMethod.AudioTranscriptions)
         assertEquals("speech-local", SpeechOptions.summary(choice, SystemCapability(false, false), listOf(ttsOnly)).title)
     }

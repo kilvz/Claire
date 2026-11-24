@@ -171,7 +171,7 @@ class VoiceCallSessionTest {
         assertEquals(listOf(GREETING), h.rt.greetings)
         assertEquals(1, h.audio.playbackStarts)
         assertEquals(listOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION), h.audio.attemptedSources)
-        // 起播后第一笔写入是本地提示音,先于任何云端音频
+        // The first write after playback starts is the local tone, ahead of any cloud audio
         assertTrue(h.audio.written.single().contentEquals(VoiceCallTone.connectTonePcm()))
         assertEquals(0f, h.session.speakerLevel.value, 0.001f)
     }
@@ -256,7 +256,7 @@ class VoiceCallSessionTest {
         lateinit var h: Harness
         h = harness(backgroundScope, clockNanos = { currentTime * 1_000_000L }, nowMillis = { currentTime }, connect = { h.rt })
         runCurrent()
-        // 刚切通话模式时有的音频硬件先吐几块全零,这是预热,不是麦克风坏了
+        // Some audio hardware emits a few all-zero chunks right after switching to call mode; that is warm-up, not a broken microphone
         repeat(3) { h.audio.offerChunk(ShortArray(320)) }
         runCurrent()
         assertTrue(h.session.state.value is VoiceCallState.MicCheck)
@@ -462,7 +462,7 @@ class VoiceCallSessionTest {
         runCurrent()
         h.rt.emit(VolcRealtimeEvent.Audio(pcm3))
         runCurrent()
-        // 提示音 + 打断瞬间已在写入的 pcm1 + 新代次 pcm3;被打断时仍在队列里的 pcm2 绝不入耳
+        // Tone + pcm1 already being written at the moment of the barge-in + pcm3 from the new generation; pcm2, still queued when the barge-in happened, must never reach the ear
         val bodies = h.audio.written.drop(1)
         assertEquals(2, bodies.size)
         assertTrue(bodies[0].contentEquals(pcm1))
@@ -639,10 +639,10 @@ class VoiceCallSessionTest {
         h.audio.offerChunk()
         runCurrent()
         assertTrue(h.session.state.value is VoiceCallState.Active)
-        // 问候语每会话只播一次;提示音每次接通都播
+        // The greeting plays only once per session; the tone plays on every connection
         assertEquals(1, h.rt.greetings.size)
         assertEquals(2, h.audio.written.count { it.contentEquals(VoiceCallTone.connectTonePcm()) })
-        // 重连后同一 callId 重放依旧拒绝
+        // Replaying the same callId after reconnecting is still rejected
         h.rt.emit(VolcRealtimeEvent.UserTranscript("打开微信", isFinal = true))
         h.rt.emit(requestCall("c9", "打开微信"))
         runCurrent()
@@ -654,10 +654,10 @@ class VoiceCallSessionTest {
         val h = harness(backgroundScope, clockNanos = { currentTime * 1_000_000L }, nowMillis = { currentTime }, connect = { throw VolcRealtimeException(VolcRealtimeException.Kind.AUTH) })
         runCurrent()
         assertEquals(VoiceCallState.Failed(VoiceCallError.Auth, 1), h.session.state.value)
-        // 用户不重试、直接离开:通话页负责把 Failed 落进 Ended,前台服务据此收工
+        // The user does not retry and just leaves: the call screen moves Failed into Ended, and the foreground service stops based on that
         h.session.end(EndReason.Hangup)
         assertEquals(VoiceCallState.Ended(EndReason.Hangup), h.session.state.value)
-        h.session.retry() // 落了 Ended 之后重试不再有效
+        h.session.retry() // Retrying no longer has any effect once Ended has landed
         runCurrent()
         assertEquals(VoiceCallState.Ended(EndReason.Hangup), h.session.state.value)
     }
@@ -682,7 +682,7 @@ class VoiceCallSessionTest {
         val requests = mutableListOf<Pair<String, String>>()
         lateinit var h: Harness
         h = harness(backgroundScope, clockNanos = { currentTime * 1_000_000L }, nowMillis = { currentTime }, connect = { h.rt }, onVoiceRequest = { id, text -> requests += id to text })
-        runCurrent() // MicCheck,还没接通
+        runCurrent() // MicCheck, not connected yet
         h.session.sendUserText("喂")
         reachActive(h, this)
         h.session.hangup()

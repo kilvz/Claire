@@ -34,7 +34,7 @@ class VoiceCallRouteTest {
         var nextConversationId = "conv-1"
         var runStateLookups = 0
         var flowReady = true
-        /** 取消任务时顺手把它的状态流置成已取消(真机上任务服务会这么做)。 */
+        /** Also flips the task's state flow to Cancelled while cancelling (the real task service does this on device). */
         var flipFlowOnCancel = true
 
         val launcher = VoiceCallTaskLauncher { goal ->
@@ -80,7 +80,7 @@ class VoiceCallRouteTest {
     @Test
     fun `先到先得——两个 callId 竞争只有一个执行`() = runTest {
         val h = Harness()
-        h.flowReady = false // 任务还没登记,第一个请求在等 runState 出现
+        h.flowReady = false // The task is not registered yet; the first request is waiting for runState to appear
         val first = async { h.route.execute("call-1", "查天气") }
         runCurrent()
         assertEquals(listOf("查天气"), h.launched)
@@ -121,7 +121,7 @@ class VoiceCallRouteTest {
         )
         assertEquals(listOf("正在打开设置", "需要你在任务页处理，去任务页看看"), h.route.lines.value)
 
-        // 交还后路由空出来,下一个请求照跑
+        // After handing back, the route is free again and the next request runs as usual
         h.nextConversationId = "conv-2"
         h.flows["conv-2"] = MutableStateFlow(TaskState.Succeeded("开好了"))
         h.route.execute("call-2", "再试一次")
@@ -171,7 +171,7 @@ class VoiceCallRouteTest {
         assertEquals(listOf("call-1" to "The task was cancelled because the user interrupted."), h.results)
         assertEquals(listOf("正在打开设置", "已取消"), h.route.lines.value)
 
-        // 路由空出来,下一个请求照跑
+        // The route is free again and the next request runs as usual
         h.nextConversationId = "conv-2"
         h.flows["conv-2"] = MutableStateFlow(TaskState.Succeeded("好的"))
         h.route.execute("call-2", "换个话题")
@@ -182,7 +182,7 @@ class VoiceCallRouteTest {
     fun `打断发生在任务登记完成之前——任务一登记就被取消且只取消一次`() = runTest {
         val h = Harness()
         h.flowReady = false
-        h.flipFlowOnCancel = false // 登记时流还不存在,取消落不到流上
+        h.flipFlowOnCancel = false // The flow does not exist at registration time, so the cancellation cannot land on it
         val run = async { h.route.execute("call-1", "查天气") }
         runCurrent()
         assertEquals(listOf("查天气"), h.launched)
@@ -191,7 +191,7 @@ class VoiceCallRouteTest {
         assertEquals(listOf("conv-1"), h.cancelled)
 
         h.flowReady = true
-        h.flows["conv-1"] = MutableStateFlow(TaskState.Cancelled) // 服务侧已把它取消
+        h.flows["conv-1"] = MutableStateFlow(TaskState.Cancelled) // The service side has already cancelled it
         advanceUntilIdle()
         assertTrue(run.isCompleted)
         assertEquals("同一个任务不重复取消", listOf("conv-1"), h.cancelled)
@@ -244,7 +244,7 @@ class VoiceCallRouteTest {
         h.flows["conv-1"] = h.running(1, "点击【通讯录】找到【张三】并呼叫")
         val run = async { h.route.execute("call-1", "打电话") }
         runCurrent()
-        // 剥掉后按既有语义直接收拢(中文词间本来没有空格,不补)
+        // After stripping, the pieces are joined directly under the existing semantics (Chinese words are not spaced anyway, so none are added)
         assertEquals(listOf("点击找到并呼叫"), h.route.lines.value)
         h.flows.getValue("conv-1").value = TaskState.Succeeded("好了")
         advanceUntilIdle()
@@ -269,7 +269,7 @@ class VoiceCallRouteTest {
     @Test
     fun `状态行最长 40 字`() = runTest {
         val h = Harness()
-        val long = "正在处理一件说起来特别特别长的事情".repeat(4) // 60 字
+        val long = "正在处理一件说起来特别特别长的事情".repeat(4) // 60 characters
         h.flows["conv-1"] = h.running(1, long)
         val run = async { h.route.execute("call-1", "干活") }
         runCurrent()

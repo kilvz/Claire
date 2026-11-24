@@ -41,7 +41,7 @@ class SegmentsTest {
     fun partialSplitsLastFourCodePointsAsTail() {
         assertEquals(SpeechEvent.Partial("帮我订", "明天下午"), Segments.split("帮我订明天下午"))
         assertEquals(SpeechEvent.Partial("", "hi"), Segments.split("hi"))
-        // 表情占两个 UTF-16 单位,按码点数不拆开
+        // An emoji takes two UTF-16 units; counting by code point does not split it
         assertEquals(SpeechEvent.Partial("a", "b😀cd"), Segments.split("ab😀cd"))
     }
 }

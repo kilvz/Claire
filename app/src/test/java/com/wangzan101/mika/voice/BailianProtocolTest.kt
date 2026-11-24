@@ -10,7 +10,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 百炼实时语音识别的 run-task 协议;消息样例照官方文档的格式。 */
+/** The run-task protocol of Bailian real-time speech recognition; message samples follow the official documentation format. */
 class BailianProtocolTest {
     private fun obj(s: String) = Json.parseToJsonElement(s).jsonObject
 
@@ -38,7 +38,7 @@ class BailianProtocolTest {
         val finish = obj(p.closing().single()).getValue("header").jsonObject
         assertEquals("finish-task", finish.getValue("action").jsonPrimitive.content)
         assertEquals(taskId, finish.getValue("task_id").jsonPrimitive.content)
-        // 每次会话一个新任务
+        // A new task for every session
         assertFalse(BailianProtocol("fun-asr-realtime").opening().single().contains(taskId))
     }
 
@@ -69,11 +69,11 @@ class BailianProtocolTest {
         assertEquals(LiveAsrUpdate.Text("", "好"), p.read(result(1, "好", end = false)))
         assertEquals(LiveAsrUpdate.Text("", "好，我知道"), p.read(result(1, "好，我知道", end = false)))
         assertEquals(LiveAsrUpdate.Text("好，我知道了。", ""), p.read(result(1, "好，我知道了。", end = true)))
-        // 心跳不改文字
+        // Heartbeats do not change the text
         assertEquals(LiveAsrUpdate.None, p.read(result(0, "", end = false, heartbeat = true)))
         assertEquals(LiveAsrUpdate.Text("好，我知道了。", "明天"), p.read(result(2, "明天", end = false)))
         assertEquals(LiveAsrUpdate.Text("好，我知道了。明天见。", ""), p.read(result(2, "明天见。", end = true)))
-        // 定下的句子不被迟到的中间结果改回去
+        // A finalized sentence is not reverted by a late intermediate result
         assertEquals(LiveAsrUpdate.None, p.read(result(1, "好", end = false)))
         assertEquals(
             LiveAsrUpdate.Ended("好，我知道了。明天见。"),
@@ -117,7 +117,7 @@ class BailianProtocolTest {
         assertEquals("wss://llm-abc123.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference", BailianRegion.Singapore.endpoint("llm-abc123"))
     }
 
-    // 业务空间 ID 拼进主机名:没带 llm- 前缀时补上,只收字母、数字和连字符
+    // Workspace ID is spliced into the hostname: the llm- prefix is added when missing, and only letters, digits and hyphens are accepted
     @Test fun workspaceIdsAreNormalized() {
         assertEquals("", BailianProtocol.workspace("  "))
         assertEquals("llm-abc123", BailianProtocol.workspace(" LLM-abc123 "))

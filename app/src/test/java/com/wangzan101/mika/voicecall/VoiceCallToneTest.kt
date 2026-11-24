@@ -26,7 +26,7 @@ class VoiceCallToneTest {
         val perSegment = samples.size / 2
         val first = zeroCrossings(samples, 0, perSegment)
         val second = zeroCrossings(samples, perSegment, perSegment)
-        // 720Hz × 65ms ≈ 46.8 周期 ≈ 94 次过零;960Hz ≈ 62.4 周期 ≈ 125 次过零(包络不影响计数)
+        // 720Hz × 65ms ≈ 46.8 cycles ≈ 94 zero crossings; 960Hz ≈ 62.4 cycles ≈ 125 zero crossings (the envelope does not affect the count)
         assertTrue("first segment crossings=$first", first in 82..106)
         assertTrue("second segment crossings=$second", second in 110..140)
     }

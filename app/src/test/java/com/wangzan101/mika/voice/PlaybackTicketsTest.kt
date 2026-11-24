@@ -19,12 +19,12 @@ class PlaybackTicketsTest {
     @Test
     fun `写文件完成时旧请求的回调被丢弃`() {
         val tickets = PlaybackTickets()
-        // 第一条请求开始写文件(挂起中),第二条请求紧跟着进来
+        // The first request starts writing the file (suspended), and the second request comes in right after
         val staleWrite = tickets.begin()
         val freshWrite = tickets.begin()
-        // 旧写文件先完成:它的代次已经作废,不允许落地成播放器
+        // The old write finishes first: its generation is already invalidated, so it may not land as a player
         assertFalse(tickets.owns(staleWrite))
-        // 新写文件完成:只有它能继续建 MediaPlayer
+        // The new write finishes: only it may go on to build the MediaPlayer
         assertTrue(tickets.owns(freshWrite))
     }
 
@@ -32,10 +32,10 @@ class PlaybackTicketsTest {
     fun `主动停下后旧播放器的回调被丢弃`() {
         val tickets = PlaybackTickets()
         val playing = tickets.begin()
-        // 用户点了停止;prepare 还在路上的 MediaPlayer 之后才回调 onPrepared
+        // The user tapped stop; the MediaPlayer whose prepare is still in flight only calls back onPrepared afterwards
         tickets.invalidate()
         assertFalse(tickets.owns(playing))
-        // 之后的下一次播放拿到全新代次,不受这次作废影响
+        // The next playback afterwards gets a brand-new generation and is unaffected by this invalidation
         val next = tickets.begin()
         assertTrue(tickets.owns(next))
     }

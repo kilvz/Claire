@@ -8,15 +8,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * chooseRoute 全组合:可用设备集合 × 是否请求免提 × SDK 30/31。
- * 决策策略与 SDK 无关(SDK 只决定落地方式:31+ setCommunicationDevice,以下 speakerphone),
- * 所以每个集合在两个 SDK 上必须给出同一答案。
+ * chooseRoute full matrix: available device set × whether speakerphone is requested × SDK 30/31.
+ * The decision policy is independent of the SDK (the SDK only decides how it is carried out: 31+ setCommunicationDevice, below that speakerphone),
+ * so every set must give the same answer on both SDKs.
  */
 class VoiceCallAudioRouteTest {
 
     private val sdks = listOf(30, 31)
 
-    /** 各 SDK 上答案一致时,一次断言两个 SDK。 */
+    /** Asserts both SDKs at once when the answer is the same on each. */
     private fun assertRoute(
         expected: RouteDevice,
         available: List<RouteDevice>,
@@ -31,7 +31,7 @@ class VoiceCallAudioRouteTest {
         }
     }
 
-    // ---- 仅扬声器 ----
+    // ---- Speaker only ----
 
     @Test
     fun speakerOnly_withoutRequest_staysSpeaker() {
@@ -43,7 +43,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Speaker, listOf(Speaker), speakerRequested = true)
     }
 
-    // ---- 听筒在场 ----
+    // ---- Earpiece present ----
 
     @Test
     fun earpiece_withoutRequest_picksEarpiece() {
@@ -55,7 +55,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Speaker, listOf(Speaker, Earpiece), speakerRequested = true)
     }
 
-    // ---- 有线在场(优先于听筒)----
+    // ---- Wired present (preferred over the earpiece) ----
 
     @Test
     fun wired_withoutRequest_picksWired() {
@@ -67,7 +67,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Speaker, listOf(Speaker, Earpiece, Wired), speakerRequested = true)
     }
 
-    // ---- 蓝牙在场(优先于听筒)----
+    // ---- Bluetooth present (preferred over the earpiece) ----
 
     @Test
     fun bluetooth_withoutRequest_picksBluetooth() {
@@ -79,7 +79,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Speaker, listOf(Speaker, Earpiece, Bluetooth), speakerRequested = true)
     }
 
-    // ---- 全在场:有线优先于蓝牙,蓝牙优先于听筒 ----
+    // ---- All present: wired over Bluetooth, Bluetooth over the earpiece ----
 
     @Test
     fun allPresent_withoutRequest_picksWired() {
@@ -91,7 +91,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Speaker, listOf(Speaker, Earpiece, Wired, Bluetooth), speakerRequested = true)
     }
 
-    // ---- 无私密设备留扬声器(平板形态:无听筒,只有扬声器)----
+    // ---- No private device, stay on the speaker (tablet form factor: no earpiece, speaker only) ----
 
     @Test
     fun noPrivateDevice_withoutRequest_staysSpeaker() {
@@ -103,7 +103,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Wired, listOf(Speaker, Wired, Bluetooth), speakerRequested = false)
     }
 
-    // ---- 边界 ----
+    // ---- Edge cases ----
 
     @Test
     fun emptyAvailable_fallsBackToSpeaker() {
@@ -123,7 +123,7 @@ class VoiceCallAudioRouteTest {
         assertRoute(Bluetooth, listOf(Earpiece, Bluetooth, Speaker), speakerRequested = false)
     }
 
-    // ---- 自动(用户还没表态):耳机接管,没人贴耳听助手,跳过听筒 ----
+    // ---- Auto (the user has not chosen yet): the headset takes over, nobody holds the phone to their ear for the assistant, so skip the earpiece ----
 
     @Test
     fun auto_withWired_picksWiredOverEverything() {

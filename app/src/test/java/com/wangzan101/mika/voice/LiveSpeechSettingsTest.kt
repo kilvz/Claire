@@ -15,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
-/** 自建 Fun-ASR 与百炼的选择、存取、引擎解析和设置页上的说法。 */
+/** Selection, persistence and engine resolution for self-hosted Fun-ASR and Bailian, plus the wording shown on the settings page. */
 class LiveSpeechSettingsTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -47,7 +47,7 @@ class LiveSpeechSettingsTest {
         }
     }
 
-    // 不认识的语言代码不让整条选择失效,当自动
+    // An unknown language code does not invalidate the whole choice; it is treated as automatic
     @Test fun unknownLanguageIsAuto() {
         val prefs = MemoryPrefs().also { it.edit().putString("speech_choice", """{"type":"funasr","url":"ws://h:1","language":"xx"}""").apply() }
         assertEquals(SpeechChoice.FunAsr("ws://h:1"), SpeechSettings(prefs).choice.value)
@@ -85,7 +85,7 @@ class LiveSpeechSettingsTest {
         val prefs = MemoryPrefs(); val cipher = cipher()
         val s = SpeechSettings(prefs, cipher)
         val sg = SpeechChoice.Bailian("paraformer-realtime-v2", BailianRegion.Singapore, "llm-abc123")
-        // 没存过这个地域的 Key 时不能只换模型
+        // With no key stored for this region, the model alone cannot be changed
         assertThrows(IllegalArgumentException::class.java) { s.saveBailian("", sg) }
         s.saveBailian(" sk-test-only ", sg)
         assertFalse(prefs.all.toString().contains("sk-test-only"))
@@ -93,22 +93,22 @@ class LiveSpeechSettingsTest {
         assertEquals(sg, again.choice.value)
         assertEquals("sk-test-only", again.bailianKey(BailianRegion.Singapore))
         assertTrue(again.hasBailianKey(BailianRegion.Singapore))
-        // 北京那一份是另一个
+        // The Beijing entry is a separate one
         assertFalse(again.hasBailianKey(BailianRegion.Beijing)); assertNull(again.bailianKey(BailianRegion.Beijing))
         assertEquals("paraformer-realtime-v2", again.bailianModel(BailianRegion.Singapore))
         assertEquals("llm-abc123", again.bailianWorkspace(BailianRegion.Singapore))
         assertEquals(BailianProtocol.DEFAULT_MODEL, again.bailianModel(BailianRegion.Beijing))
         assertEquals("", again.bailianWorkspace(BailianRegion.Beijing))
-        // 留空沿用已存的 Key,只换模型
+        // Left empty, the stored key is reused and only the model is changed
         again.set(SpeechChoice.Off)
         again.saveBailian("", SpeechChoice.Bailian("fun-asr-realtime", BailianRegion.Singapore))
         assertEquals("sk-test-only", again.bailianKey(BailianRegion.Singapore))
         assertEquals(SpeechChoice.Bailian("fun-asr-realtime", BailianRegion.Singapore), again.choice.value)
-        // 换了密钥读不出来,不会拿错的 Key 去连
+        // With a different key the stored value cannot be read, so the wrong key is never used to connect
         assertNull(SpeechSettings(prefs, cipher()).bailianKey(BailianRegion.Singapore))
         assertThrows(IllegalArgumentException::class.java) { again.saveBailian("k", SpeechChoice.Bailian("bad model")) }
         assertThrows(IllegalArgumentException::class.java) { again.saveBailian("k", SpeechChoice.Bailian(workspace = "abc")) }
-        // 删的是正在用的地域:关掉语音输入
+        // The region being deleted is the one in use: voice input is turned off
         again.clearBailian(BailianRegion.Singapore)
         assertFalse(again.hasBailianKey(BailianRegion.Singapore)); assertNull(again.bailianKey(BailianRegion.Singapore))
         assertEquals(SpeechChoice.Off, again.choice.value)
@@ -127,7 +127,7 @@ class LiveSpeechSettingsTest {
         assertEquals(SpeechChoice.System, s.choice.value)
     }
 
-    // 「千问实时语音识别」一行点圆圈时沿用上次那种;那种用不了了就没有
+    // Tapping the radio button on the "Qwen real-time speech recognition" row reuses the last kind used; if that kind is no longer usable, there is none
     @Test fun lastLiveFollowsTheLastSavedKind() {
         val prefs = MemoryPrefs(); val cipher = cipher()
         val s = SpeechSettings(prefs, cipher)
@@ -139,7 +139,7 @@ class LiveSpeechSettingsTest {
         assertEquals(SpeechChoice.Bailian(region = BailianRegion.Singapore), SpeechSettings(prefs, cipher).lastLive)
         s.clearBailian(BailianRegion.Singapore)
         assertNull(s.lastLive)
-        // 自建的地址还在,在设置页里预填
+        // The self-hosted address is still stored and is prefilled on the settings page
         assertEquals("ws://192.168.1.10:10095", s.funAsrUrl)
     }
 

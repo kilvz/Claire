@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 自建 Fun-ASR 实时服务的消息;样例取自真实服务的回应(说的是一句中文)。 */
+/** Messages of the self-hosted Fun-ASR real-time service; the samples are taken from real service responses (the speech is a Chinese sentence). */
 class FunAsrProtocolTest {
     @Test fun openingAndClosingAreThePlainTextCommands() {
         val p = FunAsrProtocol()
@@ -14,13 +14,13 @@ class FunAsrProtocolTest {
         assertEquals(0L, p.packetGapMs)
     }
 
-    // 指定语言时先发 LANGUAGE(服务端提示词用中文语言名),再发 START;自动时不发
+    // With a language chosen, LANGUAGE goes first (the server prompt uses Chinese language names), then START; nothing is sent when automatic
     @Test fun languageIsSentBeforeStart() {
         assertEquals(listOf("LANGUAGE:中文", "START"), FunAsrProtocol(AsrLanguage.Chinese).opening())
         assertEquals(listOf("LANGUAGE:英文", "START"), FunAsrProtocol(AsrLanguage.English).opening())
         assertEquals(listOf("LANGUAGE:粤语", "START"), FunAsrProtocol(AsrLanguage.Cantonese).opening())
         assertEquals(listOf("START"), FunAsrProtocol(AsrLanguage.Auto).opening())
-        // 服务端对 LANGUAGE 的确认排在 started 前面,不算开始
+        // The server's acknowledgement of LANGUAGE arrives ahead of started and does not count as the start
         assertEquals(LiveAsrUpdate.None, FunAsrProtocol(AsrLanguage.Chinese).read("""{"event": "language_set", "language": "中文"}"""))
     }
 
@@ -38,13 +38,13 @@ class FunAsrProtocolTest {
         assertEquals(LiveAsrUpdate.Ended("先打开微信。给张三发一条消息。"), p.read("""{"event": "stopped"}"""))
     }
 
-    // 一段话说得长、还没切句时服务端只解最近 15 秒:窗口往后挪掉出去的字留在预览里,不被删掉;怎么接见 PartialStitchTest
+    // When an utterance runs long without a sentence break, the server decodes only the most recent 15 seconds: words that slide out of the window stay in the preview instead of being dropped; see PartialStitchTest for how they are joined
     @Test fun textThatSlidesOutOfThePartialWindowIsKept() {
         val p = FunAsrProtocol()
         fun partial(text: String, start: Long, duration: Long) =
             p.read("""{"sentences": [], "partial": "$text", "partial_start_ms": $start, "duration_ms": $duration, "is_final": false}""")
         assertEquals(LiveAsrUpdate.Text("", "今天我们来聊一聊语音识别的问题，首先需要打开设置页面。"), partial("今天我们来聊一聊语音识别的问题，首先需要打开设置页面。", 0, 15000))
-        // 窗口挪了:新的一份从「我们」开始;重叠那截的开头沿用已显示的,到两份一样的地方才换成新的
+        // The window moved: the new snapshot starts a couple of characters in (at the second word); the beginning of the overlapping stretch keeps what is already shown and only switches to the new text where the two agree
         assertEquals(
             LiveAsrUpdate.Text("今天我们来聊一聊语音", "识别的问题，首先需要打开设置页面，然后"),
             partial("我们来聊一聊语音识别的问题，首先需要打开设置页面，然后", 1000, 16000),
@@ -53,12 +53,12 @@ class FunAsrProtocolTest {
             LiveAsrUpdate.Text("今天我们来聊一聊语音识别的问题，", "首先需要打开设置页面，然后找到"),
             partial("聊语音识别的问题。首先需要打开设置页面，然后找到", 2000, 17000),
         )
-        // 窗口没挪、同一截又解了一遍:留住的不动,后面跟着新的
+        // The window did not move and the same stretch was decoded again: the carried text stays put and the new text follows it
         assertEquals(
             LiveAsrUpdate.Text("今天我们来聊一聊语音识别的问题，", "首先需要打开设置页面，然后找到模型"),
             partial("聊语音识别的问题，首先需要打开设置页面，然后找到模型", 2000, 17500),
         )
-        // 这段整段放进 sentences:留下的字作废,只用服务端的句子;下一段从头来,不和上一段对齐
+        // The whole stretch is placed into sentences: the carried characters are discarded and only the server's sentences are used; the next stretch starts from scratch and is not aligned with the previous one
         val whole = "今天我们来聊一聊语音识别的问题，首先需要打开设置页面，然后找到模型。"
         assertEquals(
             LiveAsrUpdate.Text(whole, ""),
@@ -70,7 +70,7 @@ class FunAsrProtocolTest {
         )
     }
 
-    // 留着掉出去的字时松开:终结果只用服务端整段重解的句子,不拼留下的那截
+    // Releasing while carried characters are kept: the final result uses only the server's sentences from re-decoding the whole stretch, and does not splice in the carried part
     @Test fun finalIgnoresCarriedText() {
         val p = FunAsrProtocol()
         p.read("""{"sentences": [], "partial": "今天我们来聊一聊", "partial_start_ms": 0, "duration_ms": 15000, "is_final": false}""")
@@ -85,7 +85,7 @@ class FunAsrProtocolTest {
         assertEquals(LiveAsrUpdate.Ended("今天我们来聊一聊语音识别。"), p.read("""{"event": "stopped"}"""))
     }
 
-    // 窗口挪了但这一份是空的(这一刻没在说话):留住的字还在,后面不跟字
+    // The window moved but this snapshot is empty (no speech at this moment): the carried text remains and nothing follows it
     @Test fun emptyPartialKeepsCarriedText() {
         val p = FunAsrProtocol()
         p.read("""{"sentences": [], "partial": "今天我们来聊一聊", "partial_start_ms": 0, "duration_ms": 15000, "is_final": false}""")
@@ -96,8 +96,8 @@ class FunAsrProtocolTest {
         )
     }
 
-    // 真实服务对一段 40 多秒不停顿的话的全部回应(手机录的音):服务端定下这段之前,每一份预览去掉标点后都是终结果的开头——
-    // 没有接缝处重出来的字,也没有窗口开头解错的字;定下之后和终结果都只用服务端的句子
+    // The complete response of the real service to a 40-plus-second utterance with no pause (audio recorded on a phone): before the server finalizes the stretch, every preview, once punctuation is removed, is a prefix of the final result —
+    // no characters repeated at the seams, and no mis-decoded characters at the start of the window; after it is finalized, both the text and the final result use only the server's sentences
     @Test fun recordedLongUtterancePreviewNeverStraysFromTheFinalText() {
         val lines = FunAsrProtocolTest::class.java.getResource("/voice/funasr-long-utterance.jsonl")!!.readText().trim().lines()
         fun letters(text: String) = text.filter(Char::isLetterOrDigit).lowercase()
@@ -117,13 +117,13 @@ class FunAsrProtocolTest {
         assertEquals(LiveAsrUpdate.Ended(final), p.read("""{"event": "stopped"}"""))
     }
 
-    // 设置页「部署说明」打开的是仓库里这份文档:挪了文档要一起改
+    // The deployment guide on the settings page opens this document in the repository: if the document moves, update this too
     @Test fun deployGuidePointsAtADocInThisRepo() {
         val path = FunAsrProtocol.DEPLOY_GUIDE.substringAfter("/blob/main/", "")
         assertTrue(path, path.isNotEmpty() && java.io.File("..", path).isFile)
     }
 
-    // 没送过音频(或太短)时服务端不给终结果,直接回 stopped:当没听清
+    // When no audio was sent (or it was too short) the server gives no final result and just replies stopped: treat it as not hearing clearly
     @Test fun stoppedWithoutFinalIsEmpty() {
         assertEquals(LiveAsrUpdate.Ended(""), FunAsrProtocol().read("""{"event": "stopped"}"""))
     }
@@ -147,7 +147,7 @@ class FunAsrProtocolTest {
         assertEquals("ws://asr.lan:8080/asr", FunAsrProtocol.normalize("http://asr.lan:8080/asr/"))
         assertEquals("wss://asr.example.com/ws?room=1", FunAsrProtocol.normalize("https://asr.example.com/ws?room=1"))
         assertEquals("ws://[fd00::5]:10095", FunAsrProtocol.normalize("ws://[fd00::5]:10095"))
-        // 规范过的地址再规范一次不变
+        // Normalizing an already normalized address leaves it unchanged
         for (url in listOf("ws://192.168.1.10:10095", "wss://asr.example.com/ws?room=1", "ws://[fd00::5]:10095")) {
             assertEquals(url, FunAsrProtocol.normalize(url))
         }

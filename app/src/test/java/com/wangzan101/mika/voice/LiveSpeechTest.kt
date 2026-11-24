@@ -17,7 +17,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 边说边转的会话:按住时上传、收结果,松开后收尾,只在服务端说结束时给 Final。用自建 Fun-ASR 的协议跑。 */
+/** A session that transcribes while you speak: it uploads and collects results while held, winds down after release, and yields Final only when the server says it is finished. Runs on the self-hosted Fun-ASR protocol. */
 class LiveSpeechTest {
     private class Capture(private val starts: Boolean = true) : StreamingRecorder {
         override val level = MutableStateFlow(0f)
@@ -56,32 +56,32 @@ class LiveSpeechTest {
         val session = LiveSpeech(capture, FunAsrProtocol(), { socket }, this)
         val events = collect(session)
         assertTrue(session.live)
-        // 边说边传:按住多久都行
+        // Upload while speaking: holding for any length of time is fine
         assertTrue(session.unlimited)
         assertEquals("START", socket.text())
-        // 服务端确认前录到的音频先留着
+        // Audio recorded before the server confirms is held back for now
         repeat(2) { capture.chunks.send(ShortArray(800) { 7 }) }
         yield()
         assertTrue(socket.sent.tryReceive().isFailure)
         socket.incoming.send("""{"event": "started"}""")
         val first = socket.audio()
         assertEquals(LiveSpeech.PACKET_SAMPLES * 2, first.size)
-        assertEquals(7.toByte(), first[0]); assertEquals(0.toByte(), first[1]) // 小端
+        assertEquals(7.toByte(), first[0]); assertEquals(0.toByte(), first[1]) // Little endian
         socket.incoming.send("""{"sentences": [], "partial": "你好", "is_final": false}""")
         assertEquals(SpeechEvent.Partial("", "你好"), events.receive())
-        // 一样的快照不重复发
+        // An identical snapshot is not sent again
         socket.incoming.send("""{"sentences": [], "partial": "你好", "is_final": false}""")
         socket.incoming.send("""{"sentences": [{"text": "你好。"}], "partial": "打开", "is_final": false}""")
         assertEquals(SpeechEvent.Partial("你好。", "打开"), events.receive())
         capture.chunks.send(shortArrayOf(1, 2, 3))
         session.release(); session.release()
         assertEquals(SpeechEvent.Converting, events.receive())
-        // 不足一包的尾巴照样送出去,然后是收尾消息
+        // A tail shorter than one packet is still sent, followed by the closing message
         assertArrayEquals(byteArrayOf(1, 0, 2, 0, 3, 0), socket.audio())
         assertEquals("STOP", socket.text())
         socket.incoming.send("""{"sentences": [{"text": "你好。"}, {"text": "打开微信。"}], "partial": "", "is_final": true}""")
         assertEquals(SpeechEvent.Partial("你好。打开微信。", ""), events.receive())
-        assertTrue(events.tryReceive().isFailure) // 终结果到了还要等 stopped
+        assertTrue(events.tryReceive().isFailure) // Even once the final text arrives, stopped is still awaited
         socket.incoming.send("""{"event": "stopped"}""")
         assertEquals(SpeechEvent.Final("你好。打开微信。"), events.receive())
         assertTrue(events.receiveCatching().isClosed)
@@ -89,7 +89,7 @@ class LiveSpeechTest {
         assertTrue(socket.closed); assertTrue(capture.cancelled)
     }
 
-    // 断开但没等到结束:失败,不把没收完的中间结果当最终文字(交出去的字会发给模型)
+    // Disconnected before the end arrived: fail, and do not treat unfinished intermediate text as the final text (whatever is handed off gets sent to the model)
     @Test fun disconnectBeforeEndFails() = test {
         val capture = Capture(); val socket = Socket()
         val session = LiveSpeech(capture, FunAsrProtocol(), { socket }, this)

@@ -38,7 +38,7 @@ class VoiceModelListsTest {
 
     @Test fun `a capability with no binding to copy is not invented`() {
         val merged = VoiceModelLists.merge(builtin, s, VoiceListing(listOf(ListedModel("gpt-realtime", caps = setOf(VoiceCapability.REALTIME)))))
-        // 没有实时模板时,照样留下来,当作「其他模型」给听写/朗读
+        // With no realtime template it is still kept, treated as an "other model" for dictation/read-aloud
         val model = merged.single { it.id == "gpt-realtime" }
         assertTrue(model.guessed)
         assertNull(model.realtime)

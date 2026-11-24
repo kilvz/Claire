@@ -6,7 +6,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** 通话页的错误/结束/状态文案映射:8+1 类错误、5 种结束原因各占一条;RESUMED 超时落的 Ended(Background) 也有独立说法。 */
+/** Copy mapping for errors/endings/status on the call screen: each of the 8+1 error kinds and each of the 5 end reasons gets its own line; the Ended(Background) produced when RESUMED times out also has separate wording. */
 class VoiceCallCopyTest {
 
     @get:Rule val texts = ChineseTexts()
@@ -40,7 +40,7 @@ class VoiceCallCopyTest {
         assertEquals("正在连接…", voiceCallStatusText(VoiceCallState.Connecting))
         assertEquals("正在检查麦克风…", voiceCallStatusText(VoiceCallState.MicCheck))
         assertEquals("已连接", voiceCallStatusText(VoiceCallState.Active(1_000L)))
-        // 终态的状态词就是结束/错误文案
+        // The status wording for terminal states is the end/error copy
         assertEquals("通话已结束", voiceCallStatusText(VoiceCallState.Ended(EndReason.Hangup)))
         assertEquals("连接超时，再试一次", voiceCallStatusText(VoiceCallState.Failed(VoiceCallError.ConnectTimeout, 1)))
     }
@@ -53,7 +53,7 @@ class VoiceCallCopyTest {
         assertEquals("已取消", typedResultText(VoiceCallRoute.RESULT_CANCELLED))
         assertEquals("已完成", typedResultText(VoiceCallRoute.RESULT_DONE_FALLBACK))
         assertEquals("没办成", typedResultText(VoiceCallRoute.RESULT_FAILED_FALLBACK))
-        // 任务自己的答案/原因原样透传
+        // The task's own answer/reason is passed through verbatim
         assertEquals("明天晴天，最高 25 度", typedResultText("明天晴天，最高 25 度"))
         assertNotEquals(VoiceCallRoute.RESULT_BUSY, typedResultText(VoiceCallRoute.RESULT_BUSY))
     }
