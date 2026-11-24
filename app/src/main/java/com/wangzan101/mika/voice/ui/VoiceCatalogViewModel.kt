@@ -4,6 +4,7 @@ import com.wangzan101.mika.core.model.TtsRequest
 import com.wangzan101.mika.core.model.TtsResponse
 import com.wangzan101.mika.voice.model.MigrationResult
 import com.wangzan101.mika.voice.model.SttSelectionController
+import com.wangzan101.mika.voice.model.SttProtocol
 import com.wangzan101.mika.voice.model.TtsSelectionController
 import com.wangzan101.mika.voice.model.VoiceAccountManager
 import com.wangzan101.mika.voice.model.VoiceCapability
@@ -70,6 +71,9 @@ class VoiceCatalogViewModel(
 
     private val _probes = MutableStateFlow<Map<String, VoiceProbeUi>>(emptyMap())
     val probes: StateFlow<Map<String, VoiceProbeUi>> = _probes.asStateFlow()
+
+    /** Stop signals for running STT captures, keyed by the configuration fingerprint the probe started with. */
+    private val sttStops = mutableMapOf<String, CompletableDeferred<Unit>>()
 
     // ---------- accounts, models and services ----------
 
@@ -154,10 +158,19 @@ class VoiceCatalogViewModel(
 
     /** Holds a real microphone capture through [VoiceModelProbe.verifyStt] and records a passing probe. */
     fun verifyStt(ref: VoiceModelRef) {
+        // A live streaming capture only ends when released: a second tap is the user's "stop", not a restart.
+        val current = runCatching { probe.connection(ref) }.getOrNull()
+        val active = current?.let { sttStops[it] }
+        if (active != null && !active.isCompleted) {
+            active.complete(Unit)
+            return
+        }
         val (pending, fingerprint) = startProbe(ref)
+        val stop = CompletableDeferred<Unit>()
+        sttStops[fingerprint] = stop
         scope.launch {
             try {
-                probe.verifyStt(ref).collect { state ->
+                probe.verifyStt(ref, stop).collect { state ->
                     when (state) {
                         VoiceProbeState.Capturing -> setProbe(fingerprint, VoiceProbeUi.Listening(""))
                         is VoiceProbeState.Transcribing -> setProbe(fingerprint, VoiceProbeUi.Listening(state.text))
@@ -170,8 +183,21 @@ class VoiceCatalogViewModel(
                 throw e
             } catch (e: Exception) {
                 pending.complete(ProbeResult.Failed(VoiceModelError.from(e)))
+            } finally {
+                if (sttStops[fingerprint] === stop) sttStops.remove(fingerprint)
             }
         }
+    }
+
+    /** True while [ref]'s STT test captures on a live streaming engine: the test button then stops it. */
+    fun canStopStt(ref: VoiceModelRef): Boolean {
+        if (ref.capability != VoiceCapability.STT) return false
+        val fingerprint = probeFingerprint(ref) ?: return false
+        val stop = sttStops[fingerprint] ?: return false
+        if (stop.isCompleted) return false
+        val protocol = environment.catalog.state.value.models
+            .firstOrNull { it.serviceId == ref.serviceId && it.id == ref.modelId }?.stt?.protocol
+        return protocol in LIVE_STT_PROTOCOLS
     }
 
     /** Synthesizes once, then starts the returned audio through the injected player before reporting success. */
@@ -222,5 +248,15 @@ class VoiceCatalogViewModel(
             }
             pending.complete(ProbeResult.Success)
         }
+    }
+
+    private companion object {
+        /** STT protocols whose sessions stay open until released, so a test needs an explicit stop. */
+        val LIVE_STT_PROTOCOLS = setOf(
+            SttProtocol.DoubaoStreaming,
+            SttProtocol.FunAsrStreaming,
+            SttProtocol.BailianStreaming,
+            SttProtocol.SherpaStreaming,
+        )
     }
 }

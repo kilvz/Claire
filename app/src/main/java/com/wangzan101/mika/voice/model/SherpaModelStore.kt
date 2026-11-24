@@ -31,6 +31,9 @@ object SherpaModelStore {
     private val _states = MutableStateFlow<Map<String, State>>(emptyMap())
     val states: StateFlow<Map<String, State>> = _states
 
+    /** Stable names [SherpaOnnx] loads after extraction; a missing one means the archive did not match. */
+    private val REQUIRED_FILES = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt")
+
     fun dir(context: Context, modelId: String): File = File(context.filesDir, "sherpa/$modelId")
 
     fun ready(context: Context, modelId: String): Boolean {
@@ -51,12 +54,14 @@ object SherpaModelStore {
             ?: throw IOException("Model $modelId has no download")
         update(modelId, State.Downloading(0f))
         val archive = File(context.cacheDir, "sherpa-$modelId.tar.bz2")
+        val staging = File(context.filesDir, "sherpa/$modelId.tmp")
         try {
             fetch(spec.url, archive) { fraction -> update(modelId, State.Downloading(fraction)) }
-            val staging = File(context.filesDir, "sherpa/$modelId.tmp")
             staging.deleteRecursively()
             staging.mkdirs()
             extract(archive, staging, spec)
+            val missing = REQUIRED_FILES.filter { File(staging, it).length() == 0L }
+            if (missing.isNotEmpty()) throw IOException("Archive is missing ${missing.joinToString()}")
             val dest = dir(context, modelId)
             dest.deleteRecursively()
             dest.parentFile?.mkdirs()
@@ -66,6 +71,7 @@ object SherpaModelStore {
         } catch (e: Throwable) {
             update(modelId, State.Failed(e.message ?: "download failed"))
             runCatching { archive.delete() }
+            runCatching { staging.deleteRecursively() }
             throw e
         }
     }

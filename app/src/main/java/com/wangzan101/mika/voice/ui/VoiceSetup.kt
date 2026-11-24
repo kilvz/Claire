@@ -46,6 +46,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.voice.VoicePlayer
 import com.wangzan101.mika.voice.model.ProviderVoiceOffers
 import com.wangzan101.mika.voice.model.adapters.SttHooks
+import com.wangzan101.mika.voice.model.SherpaOnnxModels
 import com.wangzan101.mika.voice.model.SttSelection
 import com.wangzan101.mika.voice.model.SttSelectionController
 import com.wangzan101.mika.core.model.TtsCapabilities
@@ -159,6 +160,7 @@ internal fun VoiceOptionList(
         choices.forEachIndexed { index, choice ->
             val probe = if (choice.offer == null) viewModel.probeFingerprint(choice.ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
             else VoiceProbeUi.Idle
+            val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(choice.ref)
             RadioRow(
                 voiceModelDisplayName(choice.model),
                 selected = choice.ref == selected,
@@ -184,12 +186,14 @@ internal fun VoiceOptionList(
                             is VoiceProbeUi.Failed -> Text(probe.error.detail, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.bad)
                             VoiceProbeUi.Verified -> Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
                         }
+                        if (choice.model.serviceId == SherpaOnnxModels.SERVICE_ID) SherpaDownloadControl(choice.model)
                     }
                 },
                 trailing = {
                     MikaButton(
-                        testLabel, onClick = { onTest(choice) }, kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening,
+                        if (stoppable) stringResource(R.string.chat_stop) else testLabel,
+                        onClick = { onTest(choice) }, kind = ButtonKind.Tonal, size = ButtonSize.Small,
+                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
                         modifier = Modifier.testTag("voice-try-${choice.ref.serviceId}-${choice.ref.modelId}"),
                     )
                 },

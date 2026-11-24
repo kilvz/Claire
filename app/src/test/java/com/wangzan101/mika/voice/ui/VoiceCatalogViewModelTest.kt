@@ -28,12 +28,15 @@ import com.wangzan101.mika.voice.model.voiceTestEnvironment
 import com.wangzan101.mika.voice.model.voiceTestProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,6 +47,31 @@ private class FakeSession(flow: Flow<SpeechEvent>) : SpeechSession {
     override val live = true
     override fun release() {}
     override fun cancel() {}
+}
+
+/** A live, unlimited session: it only finishes when released, like sherpa-onnx and streaming vendors. */
+private class LiveSession : SpeechSession {
+    private val channel = Channel<SpeechEvent>(Channel.UNLIMITED)
+    override val events: Flow<SpeechEvent> = channel.receiveAsFlow()
+    override val live = true
+    override val unlimited = true
+    var released = false
+        private set
+
+    init {
+        channel.trySend(SpeechEvent.Level(0.4f))
+    }
+
+    override fun release() {
+        if (released) return
+        released = true
+        channel.trySend(SpeechEvent.Final("hello"))
+        channel.close()
+    }
+
+    override fun cancel() {
+        channel.close()
+    }
 }
 
 private class MemoryCredentialBackend : VoiceCredentialBackend {
@@ -175,6 +203,34 @@ class VoiceCatalogViewModelTest {
         assertEquals(VoiceProbeUi.Running, viewModel.probes.value[fingerprint])
         runCurrent()
         assertEquals(VoiceProbeUi.Verified, viewModel.probes.value[fingerprint])
+    }
+
+    @Test fun `a second verifyStt on a live model stops the running capture`() = runTest {
+        val catalog = VoiceCatalogStore(MemoryVoiceCatalogBackend(), migrated = true)
+        catalog.upsertService(VoiceService("local", "Local", VoiceAccount.None))
+        catalog.upsertModel(VoiceModel("local", "live", "Live", stt = SttBinding(SttProtocol.SherpaStreaming)))
+        val env = voiceTestEnvironment(catalog, FakeVoiceProviderAccountSource(voiceTestProvider()))
+        val session = LiveSession()
+        val probe = VoiceModelProbe(
+            env,
+            startStt = { session },
+            synthesize = { _, _ -> TtsResponse(byteArrayOf(), "audio/wav") },
+            connectRealtime = {},
+        )
+        val viewModel = viewModel(env, backgroundScope, StandardTestDispatcher(testScheduler), probe)
+        val liveRef = VoiceModelRef("local", "live", VoiceCapability.STT)
+
+        viewModel.verifyStt(liveRef)
+        runCurrent()
+        assertEquals(VoiceProbeUi.Listening(""), viewModel.probeState(liveRef))
+        assertTrue(viewModel.canStopStt(liveRef))
+
+        viewModel.verifyStt(liveRef)
+        runCurrent()
+
+        assertTrue(session.released)
+        assertFalse(viewModel.canStopStt(liveRef))
+        assertEquals(VoiceProbeUi.Verified, viewModel.probeState(liveRef))
     }
 
     @Test fun `saveService and saveUnverified upsert while system entries are protected`() = runTest {

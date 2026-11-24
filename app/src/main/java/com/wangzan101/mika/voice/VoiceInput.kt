@@ -13,6 +13,7 @@ import com.wangzan101.mika.settings.clientHeaders
 import com.wangzan101.mika.settings.providerKey
 import com.wangzan101.mika.voice.model.SttSelection
 import com.wangzan101.mika.voice.model.SttSelectionController
+import com.wangzan101.mika.voice.model.SherpaOnnxModels
 import com.wangzan101.mika.voice.model.VoiceModelEnvironment
 import com.wangzan101.mika.voice.model.VoiceModelError
 import com.wangzan101.mika.voice.model.adapters.SttHooks
@@ -64,7 +65,12 @@ class VoiceInput(
             is SttSelection.Model -> if (selection.ref == SttSelectionController.SYSTEM_STT_REF) {
                 SpeechResolver.resolve(SpeechChoice.System, systemCapability(), emptyList())
             } else {
-                voiceModels.stt.spec(selection.ref)
+                val resolved = voiceModels.stt.spec(selection.ref)
+                // The catalog keeps a downloadable model even before its files exist; say so before the
+                // microphone is requested or a session is opened.
+                if (resolved is SpeechEngineSpec.Sherpa && !SherpaOnnxModels.available(context, resolved.model)) {
+                    SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.SherpaModelMissing)
+                } else resolved
             }
         }
     }

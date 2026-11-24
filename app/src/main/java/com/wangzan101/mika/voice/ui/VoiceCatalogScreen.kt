@@ -166,6 +166,7 @@ internal fun VoiceCatalogContent(viewModel: VoiceCatalogViewModel, onBack: () ->
                 onDelete = { model -> deleting = model },
                 onTest = { ref, request -> viewModel.test(ref, request) },
                 probeState = { ref -> viewModel.probeFingerprint(ref)?.let { probes[it] } ?: VoiceProbeUi.Idle },
+                canStop = { ref -> viewModel.canStopStt(ref) },
             )
         }
     }
@@ -232,6 +233,7 @@ private fun ServiceGroup(
     onDelete: (VoiceModel) -> Unit,
     onTest: (VoiceModelRef, TtsRequest?) -> Unit,
     probeState: (VoiceModelRef) -> VoiceProbeUi,
+    canStop: (VoiceModelRef) -> Boolean,
 ) {
     val system = service.id == SttSelectionController.SYSTEM_STT_SERVICE.id
     GroupCard(Modifier.padding(top = 12.dp)) {
@@ -259,6 +261,7 @@ private fun ServiceGroup(
                 onDelete = { onDelete(model) },
                 onTest = onTest,
                 probeState = probeState,
+                canStop = canStop,
             )
         }
     }
@@ -275,6 +278,7 @@ private fun ModelRow(
     onDelete: () -> Unit,
     onTest: (VoiceModelRef, TtsRequest?) -> Unit,
     probeState: (VoiceModelRef) -> VoiceProbeUi,
+    canStop: (VoiceModelRef) -> Boolean,
 ) {
     val c = MikaTheme.colors
     val ttsSampleText = stringResource(R.string.voice_catalog_tts_sample)
@@ -306,6 +310,7 @@ private fun ModelRow(
                     verified = snapshot.verified(VoiceModelRef(model.serviceId, model.id, VoiceCapability.STT)),
                     testLabel = stringResource(R.string.voice_catalog_test),
                     tag = "voice-cap-stt-${model.id}",
+                    stoppable = canStop(VoiceModelRef(model.serviceId, model.id, VoiceCapability.STT)),
                     onTest = { onTest(VoiceModelRef(model.serviceId, model.id, VoiceCapability.STT), null) },
                 )
             }
@@ -356,7 +361,7 @@ private fun ModelRow(
  * row here; a downloaded model stays available offline for good.
  */
 @Composable
-private fun SherpaDownloadControl(model: VoiceModel) {
+internal fun SherpaDownloadControl(model: VoiceModel) {
     val spec = SherpaOnnxModels.DOWNLOADS[model.id] ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -421,14 +426,18 @@ private fun CapabilityBadge(
     verified: Boolean,
     testLabel: String,
     tag: String,
+    stoppable: Boolean = false,
     onTest: () -> Unit,
 ) {
     val c = MikaTheme.colors
+    val stopping = stoppable && ui is VoiceProbeUi.Listening
     Column(Modifier.testTag(tag)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, style = MikaType.Hint.copy(fontWeight = FontWeight.SemiBold), color = c.ink2)
             Text(protocol, style = MikaType.Hint, color = c.ink3)
-            if (ui !is VoiceProbeUi.Running) {
+            if (stopping) {
+                TextButton(onClick = onTest) { Text(stringResource(R.string.chat_stop), style = MikaType.Hint) }
+            } else if (ui !is VoiceProbeUi.Running && ui !is VoiceProbeUi.Listening) {
                 TextButton(onClick = onTest) { Text(testLabel, style = MikaType.Hint) }
             }
         }

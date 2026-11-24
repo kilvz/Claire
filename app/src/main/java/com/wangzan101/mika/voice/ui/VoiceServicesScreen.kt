@@ -546,6 +546,7 @@ private fun PresetResult(
             refs.forEachIndexed { index, ref ->
                 val model = snapshot.modelOf(ref) ?: return@forEachIndexed
                 val probe = viewModel.probeFingerprint(ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
+                val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(ref)
                 val inUse = when (ref.capability) {
                     VoiceCapability.STT -> snapshot.selections.stt == SttSelection.Model(ref)
                     VoiceCapability.TTS -> snapshot.selections.tts == ref
@@ -554,10 +555,11 @@ private fun PresetResult(
                 ListRow(null, voiceModelDisplayName(model), capabilityLine(setOf(ref.capability)), first = index == 0) {
                     MikaButton(
                         stringResource(
-                            when (ref.capability) {
-                                VoiceCapability.STT -> R.string.voice_try_stt
-                                VoiceCapability.TTS -> R.string.voice_try_tts
-                                VoiceCapability.REALTIME -> R.string.voice_try_realtime
+                            when {
+                                stoppable -> R.string.chat_stop
+                                ref.capability == VoiceCapability.STT -> R.string.voice_try_stt
+                                ref.capability == VoiceCapability.TTS -> R.string.voice_try_tts
+                                else -> R.string.voice_try_realtime
                             },
                         ),
                         onClick = {
@@ -568,7 +570,7 @@ private fun PresetResult(
                             }
                         },
                         kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening,
+                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
                     )
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
