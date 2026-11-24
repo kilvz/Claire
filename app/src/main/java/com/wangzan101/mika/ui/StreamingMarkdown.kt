@@ -1,6 +1,6 @@
 package com.wangzan101.mika.ui
 
-/** 让还没输出完的行也能按 Markdown 预览；这些临时字符不会进入消息记录。 */
+/** Lets lines that haven't finished streaming still preview as Markdown; these temporary characters never enter the message record. */
 internal object StreamingMarkdown {
     private data class Open(val marker: String, val index: Int)
     private val unfinishedLink = Regex("""!?\[([^\]\n]*)\]\([^\)\n]*$""")
@@ -9,9 +9,9 @@ internal object StreamingMarkdown {
 
     fun preview(markdown: String): String {
         if (markdown.isEmpty()) return markdown
-        // 代码块里的标点就是内容，不能把尚未闭合的链接或表格当排版语法改掉。
+        // Punctuation inside a code block is content; don't turn unclosed links or tables into markup syntax.
         if (insideFence(markdown)) return markdown
-        // URL 尚未收完时先显示链接文字，避免 [文字](https://... 直接露出来。
+        // When the URL isn't complete yet, show the link text for now so [text](https://... doesn't appear raw.
         val link = unfinishedLink.find(markdown) ?: unfinishedLabel.find(markdown)
         val visible = if (link == null) markdown else markdown.replaceRange(link.range, link.groupValues[1])
         return closeInline(softenPendingTable(visible))
@@ -80,7 +80,7 @@ internal object StreamingMarkdown {
             if (fence != null) { i++; continue }
             if (c == '\\') { i = (i + 2).coerceAtMost(source.length); continue }
             if (c == ']' && source.getOrNull(i + 1) == '(') {
-                // 已闭合链接的地址不是可见正文，里面的强调符号不用处理。
+                // The destination of an already-closed link isn't visible body text, so emphasis markers inside it need no handling.
                 val end = source.indexOf(')', i + 2)
                 if (end >= 0) { i = end + 1; continue }
             }

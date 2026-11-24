@@ -14,7 +14,7 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
-/** 本机生成的二维码矩阵，包含四周静区。 */
+/** Locally generated QR code matrix, including the quiet zone on all sides. */
 internal data class QrMatrix(val size: Int, private val cells: BooleanArray) {
     operator fun get(x: Int, y: Int): Boolean = cells[y * size + x]
 }
@@ -35,7 +35,7 @@ internal fun encodeQr(content: String): QrMatrix {
     })
 }
 
-/** 按设备像素对齐模块边缘，避免缩放后在模块之间出现灰线。 */
+/** Aligns module edges to device pixels, avoiding gray lines between modules after scaling. */
 @Composable
 internal fun QrCodeImage(content: String, description: String, modifier: Modifier = Modifier) {
     val matrix = remember(content) { encodeQr(content) }

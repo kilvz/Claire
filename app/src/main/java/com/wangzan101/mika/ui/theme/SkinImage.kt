@@ -35,21 +35,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 背景图片:用户从相册选的一张图,存在 App 私有目录 `files/skin/background.webp`。
- * 导入时按屏幕缩小、重新编码,原图的 EXIF(拍摄地点、时间等)不带进来;顺带取出图上的主色(见 [SkinAccent])。
- * 怎么显示(遮罩、模糊、位置、强调色跟不跟图片)在 [SkinSpec]。
+ * Background image: a picture the user picked from the album, stored in the app's private directory `files/skin/background.webp`.
+ * On import it is downscaled to the screen size and re-encoded; the original EXIF (shooting location, time, etc.) is not carried over, and the image's dominant color is extracted along the way (see [SkinAccent]).
+ * How it is displayed (scrim, blur, position, whether the accent follows the image) lives in [SkinSpec].
  */
 object SkinImage {
     private const val DIR = "skin"
     private const val FILE = "background.webp"
 
-    /** 模糊靠先缩到很小再放大:长边缩到这么多像素。安卓 11 也能用,显示时不另算。 */
+    /** Blur is achieved by shrinking very small and scaling back up: the long side is shrunk to this many pixels. Works on Android 11 too, with no extra work when displaying. */
     private const val LIGHT_BLUR_SIDE = 120
     private const val STRONG_BLUR_SIDE = 48
 
     private fun file(context: Context) = File(File(context.filesDir, DIR), FILE)
 
-    /** 读图、缩到不大于屏幕长边、存下,成功后换新版本让界面当场换上。读不出返回 false,原来的不动。 */
+    /** Decodes the image, shrinks it to no larger than the screen's long side, and saves it; on success it bumps the version so the UI switches over immediately. Returns false if it can't be read, leaving the existing image untouched. */
     suspend fun import(context: Context, uri: Uri): Boolean = withContext(Dispatchers.IO) {
         val metrics = context.resources.displayMetrics
         val maxSide = max(metrics.widthPixels, metrics.heightPixels)
@@ -82,12 +82,12 @@ object SkinImage {
             return@withContext false
         }
         val flags = FeatureFlags.get(context)
-        // 新图从居中开始;遮罩、模糊、跟不跟图片取色沿用上次的选择
+        // A new image starts centered; scrim, blur and whether the accent follows the image keep the previous choices
         flags.setSkin(flags.skin().copy(version = System.currentTimeMillis(), focus = 0f, hue = hue))
         true
     }
 
-    /** 换回纯色底,删掉存下的图。 */
+    /** Switch back to a plain color background and delete the stored image. */
     fun clear(context: Context) {
         val flags = FeatureFlags.get(context)
         flags.setSkin(flags.skin().copy(version = 0L, hue = null))
@@ -95,7 +95,7 @@ object SkinImage {
         cached = null
     }
 
-    /** 进程里只留一份解码好的图(按版本和模糊程度),各页面共用。 */
+    /** Keep only one decoded image per process (keyed by version and blur level), shared by all pages. */
     @Volatile private var cached: Pair<Pair<Long, SkinBlur>, ImageBitmap>? = null
 
     fun cachedFor(version: Long, blur: SkinBlur): ImageBitmap? = cached?.takeIf { it.first == version to blur }?.second
@@ -112,7 +112,7 @@ object SkinImage {
         return shown.asImageBitmap().also { cached = (version to blur) to it }
     }
 
-    /** 一半一半地缩到长边不超过 [side],比一步缩到位平滑,放大回去就是柔和的模糊。 */
+    /** Scales down in halves until the long side is at most [side]; smoother than scaling in one step, and scaling back up gives a soft blur. */
     private fun shrink(src: Bitmap, side: Int): Bitmap {
         var b = src
         while (max(b.width, b.height) > side) {
@@ -131,27 +131,27 @@ object SkinImage {
 }
 
 /**
- * 页面背景(图片 + 遮罩)。页面底([com.wangzan101.mika.ui.components.PageBackground])画它;
- * 顶栏、输入栏底下的渐隐这些要挡住滚动内容的地方,照着同一位置再画一遍,看起来和页面底连成一片。
+ * Page background (image + scrim). The page base ([com.wangzan101.mika.ui.components.PageBackground]) draws it;
+ * the top bar, the fade under the input bar and other places that must cover scrolling content draw it again at the same position, so it looks continuous with the page base.
  */
 @Stable
 class SkinBackdrop(image: ImageBitmap) {
-    // 拖滑块时只换这几个值,不重建对象:量好的页面位置留着,画面不闪
+    // Dragging the slider only swaps these values without rebuilding the object: the measured page position is kept, so the picture doesn't flicker
     var image by mutableStateOf(image)
     var focus by mutableStateOf(0f)
     var scrim by mutableStateOf(Color.Transparent)
 
-    /** 页面底在窗口里的位置和大小,由页面底量好。 */
+    /** Position and size of the page base within the window, measured by the page base. */
     var pageOrigin by mutableStateOf(Offset.Zero)
     var pageSize by mutableStateOf(IntSize.Zero)
 
-    /** 在 [scope] 里画出页面背景对应的那一块;[origin] 是这块在窗口里的位置。 */
+    /** Draws the part of the page background corresponding to this block inside [scope]; [origin] is this block's position in the window. */
     fun draw(scope: DrawScope, origin: Offset) = with(scope) {
         val pw = pageSize.width.toFloat()
         val ph = pageSize.height.toFloat()
         clipRect {
             if (pw > 0f && ph > 0f) {
-                // 和图片铺满页面(裁掉多出来的部分)一样的位置,左右居中,上下按 focus
+                // The same placement as an image filling the page (cropping the overflow): centered horizontally, and vertically according to focus
                 val scale = max(pw / image.width, ph / image.height)
                 val dw = image.width * scale
                 val dh = image.height * scale
@@ -168,10 +168,10 @@ class SkinBackdrop(image: ImageBitmap) {
     }
 }
 
-/** 页面底下有背景图片时为它;顶栏、渐隐据此决定画纯色还是画背景。 */
+/** Non-null when a background image is present under the page; the top bar and fades use it to decide between a solid color and the background. */
 val LocalSkinBackdrop = staticCompositionLocalOf<SkinBackdrop?> { null }
 
-/** 设置里的背景图片怎么显示。改了当场换,不重建界面。 */
+/** How the background image from settings is displayed. Changes take effect immediately without rebuilding the UI. */
 @Composable
 fun appearanceSkin(): SkinSpec {
     val context = LocalContext.current
@@ -180,7 +180,7 @@ fun appearanceSkin(): SkinSpec {
     return spec
 }
 
-/** 此刻的页面背景;没设背景图片(或图读不出)时为 null。 */
+/** The page background right now; null when no background image is set (or the image can't be read). */
 @Composable
 fun rememberSkinBackdrop(): SkinBackdrop? {
     val context = LocalContext.current
@@ -191,7 +191,7 @@ fun rememberSkinBackdrop(): SkinBackdrop? {
     val bg = MikaTheme.colors.bg
     val img = image ?: return null
     val backdrop = remember { SkinBackdrop(img) }
-    // 这几个值只在画的时候读,组合时直接换上
+    // These values are only read while drawing, and are swapped in directly at composition time
     backdrop.image = img
     backdrop.focus = spec.focus
     backdrop.scrim = bg.copy(alpha = spec.scrim / 100f)

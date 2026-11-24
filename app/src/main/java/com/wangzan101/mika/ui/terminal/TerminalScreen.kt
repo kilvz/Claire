@@ -52,7 +52,7 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** 终端页的入口:打开(或附着)这个工作区或对话的会话,把状态交给 [TerminalScreen]。 */
+/** Entry point for the terminal page: opens (or attaches to) the session for this workspace or conversation and hands the state to [TerminalScreen]. */
 @Composable
 internal fun TerminalRoute(
     app: MikaApp,

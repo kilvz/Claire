@@ -7,34 +7,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** 词标「Claire」统一用这个字重:比标题轻一档,顶栏、侧栏、回答头看起来是同一个名字。 */
+/** The wordmark "Claire" uses this weight everywhere: one notch lighter than a title, so the top bar, drawer and answer header all read as the same name. */
 val WordmarkWeight = FontWeight.Medium
 
-/** 字号与字重。只定大小、字重、行高,颜色由用的地方给。 */
+/** Font sizes and weights. Only size, weight and line height are defined here; the color is supplied by the place that uses it. */
 object MikaType {
-    /** 大标题:空状态、欢迎页。 */
+    /** Large title: empty states, welcome page. */
     val LargeTitle = TextStyle(fontSize = 28.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
-    /** 页面标题:顶栏。 */
+    /** Page title: top bar. */
     val Title = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-    /** 正文、行标题。 */
+    /** Body text and row titles. */
     val Body = TextStyle(fontSize = 15.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal)
-    /** 卡片标题等需要强调的正文。 */
+    /** Body text that needs emphasis, such as card titles. */
     val BodyStrong = TextStyle(fontSize = 15.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-    /** 说明文字。 */
+    /** Explanatory text. */
     val Caption = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal)
-    /** 分组小标题。 */
+    /** Small group headings. */
     val Label = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
-    /** 提示、页脚。 */
+    /** Hints and footers. */
     val Hint = TextStyle(fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Normal)
-    /** 行尾的值。 */
+    /** The value at the end of a row. */
     val Value = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal)
-    /** 徽标、标签、极小的计数。 */
+    /** Badges, tags, and very small counters. */
     val Micro = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Normal)
-    /** 超大数字:总量、验证码等展示用大数字。 */
+    /** Oversized numbers: large presentation numbers such as totals and verification codes. */
     val Display = TextStyle(fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold)
 }
 
-/** 间距。页面左右留 [Page]。 */
+/** Spacing. Pages keep [Page] on the left and right. */
 object MikaSpace {
     val S4 = 4.dp
     val S8 = 8.dp
@@ -45,7 +45,7 @@ object MikaSpace {
     val Page = 16.dp
 }
 
-/** 各类元素的尺寸。 */
+/** Sizes of the various elements. */
 object MikaSize {
     val TopBar = 56.dp
     val IconButton = 40.dp
@@ -53,44 +53,44 @@ object MikaSize {
     val Button = 52.dp
     val Composer = 52.dp
     val Icon = 22.dp
-    /** 列表行左边的图标块,里面的图形是 [TileIcon]。 */
+    /** The icon tile on the left of a list row; the glyph inside it is [TileIcon]. */
     val Tile = 30.dp
     val TileIcon = 18.dp
-    /** 行尾箭头等小图标。 */
+    /** Small icons such as the chevron at the end of a row. */
     val SmallIcon = 16.dp
     const val IconStroke = 1.7f
 }
 
-/** 圆角。 */
+/** Corner radii. */
 object MikaRadius {
-    /** 极小:徽标、圆点。 */
+    /** Extra small: badges, dots. */
     val Micro = 4.dp
     val BubbleTail = 6.dp
     val Tile = 9.dp
-    /** 小卡片、图片、芯片。 */
+    /** Small cards, images, chips. */
     val Chip = 12.dp
     val Button = 14.dp
     val Card = 16.dp
     val Bubble = 20.dp
-    /** 大卡片、对话框、底部弹窗。 */
+    /** Large cards, dialogs, bottom sheets. */
     val Sheet = 24.dp
 }
 
-/** 常用形状;顶层常量,重组时不新建。 */
+/** Common shapes; top-level constants, so recomposition doesn't create new ones. */
 object MikaShapes {
     val Micro = RoundedCornerShape(MikaRadius.Micro)
     val Card = RoundedCornerShape(MikaRadius.Card)
     val Chip = RoundedCornerShape(MikaRadius.Chip)
     val Sheet = RoundedCornerShape(MikaRadius.Sheet)
-    /** 底部弹窗:上面两个角圆、下面直角。 */
+    /** Bottom sheet: the top two corners are rounded and the bottom ones are square. */
     val SheetTop = RoundedCornerShape(topStart = MikaRadius.Bubble, topEnd = MikaRadius.Bubble)
-    /** 用户消息气泡:右下角是尾角。 */
+    /** User message bubble: the bottom-right corner is the tail. */
     val UserBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail, MikaRadius.Bubble)
-    /** Claire 的回答:左下角是尾角,和用户气泡对称。 */
+    /** Claire's answer: the bottom-left corner is the tail, mirroring the user bubble. */
     val AnswerBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail)
     val Button = RoundedCornerShape(MikaRadius.Button)
     val Tile = RoundedCornerShape(MikaRadius.Tile)
-    /** 输入栏外壳:固定圆角,多行时圆角不变(不像 [Pill] 那样随高度变圆)。 */
+    /** Composer shell: a fixed radius that doesn't change when the input is multiline (unlike [Pill], which gets rounder with height). */
     val Composer = RoundedCornerShape(MikaRadius.Sheet)
     val Pill = CircleShape
 }

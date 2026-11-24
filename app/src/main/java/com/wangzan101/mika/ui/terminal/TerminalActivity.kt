@@ -17,8 +17,8 @@ import com.wangzan101.mika.ui.theme.appearanceDark
 import com.wangzan101.mika.ui.theme.systemBarsFor
 
 /**
- * 用户终端:一个独立页面,里面是这个对话工作区的 shell。不经过模型,不写运行记录;
- * 离开页面不会结束会话(转屏、按 Home 再回来都还在),进程被杀时随 App 一起结束。
+ * User terminal: a standalone page containing a shell for this conversation's workspace. It doesn't go through the model and doesn't write a run record;
+ * leaving the page doesn't end the session (it survives rotation and going Home and back), and it ends together with the app when the process is killed.
  */
 class TerminalActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
@@ -49,7 +49,7 @@ class TerminalActivity : ComponentActivity() {
     }
 }
 
-/** 从对话菜单或设置里的工作区行打开终端。 */
+/** Opens the terminal from the conversation menu or from a workspace row in settings. */
 object TerminalLauncher {
     fun open(context: Context, conversationId: String, title: String?) {
         val intent = Intent(context, TerminalActivity::class.java)

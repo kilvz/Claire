@@ -6,8 +6,8 @@ import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
 
 /**
- * 任务报告分享用的临时文件（cache/report-share/，见 res/xml/report_files.xml）。
- * 只读：分享面板里的接收方拿到的是一次性的读授权，不允许改写或删除。
+ * Temporary files for sharing task reports (cache/report-share/, see res/xml/report_files.xml).
+ * Read-only: a receiver in the share sheet gets a one-time read grant and is not allowed to modify or delete anything.
  */
 class ReportFilesProvider : FileProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {

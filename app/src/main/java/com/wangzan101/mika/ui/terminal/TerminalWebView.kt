@@ -29,7 +29,7 @@ import java.util.concurrent.Executors
 
 private const val TERMINAL_URL = "https://appassets.androidplatform.net/assets/terminal/index.html"
 
-/** 终端 WebView 的句柄:给外面的按键行发焦点/复制请求。 */
+/** Handle for the terminal WebView: lets the key row outside send focus/copy requests. */
 internal class TerminalWebViewHandle internal constructor(
     val view: WebView,
     private val bridge: TerminalBridge,
@@ -95,8 +95,8 @@ internal fun createTerminalWebView(context: Context, session: TerminalSession): 
 }
 
 /**
- * JS 与 Kotlin 之间的桥:输入按字节进 pty,输出按块写回 xterm.js。
- * 输出只在主线程喂给 WebView;输入在一个单线程上按顺序写,避免阻塞 JS 线程。
+ * Bridge between JS and Kotlin: input goes into the pty as bytes, and output is written back to xterm.js in chunks.
+ * Output is fed to the WebView only on the main thread; input is written in order on a single thread so the JS thread isn't blocked.
  */
 internal class TerminalBridge(    private val context: Context,
     private val view: WebView,

@@ -76,13 +76,13 @@ import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 
-/** 按 Markdown 显示一段回答；流式草稿用临时闭合的语法预览。 */
+/** Displays a reply as Markdown; streaming drafts use a syntax preview with temporary closing. */
 private val LocalReportStyle = staticCompositionLocalOf { false }
 
 /**
- * 页内查找要在 Markdown 里标出的词:命中的字都标 [soft]。
- * [focus] 指向的那一段文字(按对象本身认)里的第 [focusIndex] 处标 [strong];其余命中不受影响。
- * 为 null 时和平常一样,所以对话里显示回答不会多花一点力气。
+ * The terms in-page find must mark inside Markdown: every matching character is marked with [soft].
+ * The occurrence at index [focusIndex] inside the text block that [focus] points at (matched by object identity) is marked with [strong]; other hits are unaffected.
+ * When null, everything behaves as usual, so showing a reply in the conversation costs no extra effort.
  */
 internal class FindHighlight(
     val query: String,
@@ -103,7 +103,7 @@ fun MarkdownText(markdown: String, style: TextStyle, modifier: Modifier = Modifi
 
 @Composable
 internal fun MarkdownDocument(markdown: String, streaming: Boolean = false, reportStyle: Boolean = false, content: @Composable (List<MdBlock>) -> Unit) {
-    // 流式片段更新频繁，在后台解析；上一帧保留到新片段准备好，避免主线程卡顿和文字闪空。
+    // Streaming fragments update frequently, so parse them in the background; the previous frame is kept until the new fragment is ready, avoiding main-thread jank and text flashing empty.
     val colors = MikaTheme.colors
     val styles = remember(colors, reportStyle) { MarkdownModel.Styles.of(colors, if (reportStyle) FontWeight.Bold else FontWeight.SemiBold) }
     val blocks = if (streaming) {
@@ -136,13 +136,13 @@ internal fun MarkdownBlocks(blocks: List<MdBlock>, style: TextStyle, modifier: M
     }
 }
 
-/** 单独一块 Markdown:给要按块懒加载的地方(文件查看页)用,块里的样式和 [MarkdownText] 一样。 */
+/** A single Markdown block: for places that lazily load block by block (the file viewer page); styles inside the block are the same as [MarkdownText]. */
 @Composable
 internal fun MarkdownBlock(b: MdBlock, style: TextStyle) {
     Block(b, style, depth = 0)
 }
 
-/** 命中处标底色;[FindHighlight.focus] 那一处用更深的颜色,好让人一眼看到「下一处」跳到了哪里。 */
+/** Highlights the hit with a background color; the one at [FindHighlight.focus] uses a deeper color so it's obvious at a glance where "next" jumped to. */
 private fun CharSequence.withFind(find: FindHighlight?): AnnotatedString {
     val base = this as? AnnotatedString ?: AnnotatedString(toString())
     if (find == null || find.query.isEmpty()) return base
@@ -157,7 +157,7 @@ private fun CharSequence.withFind(find: FindHighlight?): AnnotatedString {
     }
 }
 
-// CJK 表意文字、假名。标点(、。：等全角符号)不算,间距只在字与字之间拉。
+// CJK ideographs and kana. Punctuation (full-width symbols such as 、。：) does not count; spacing is only stretched between character and character.
 private fun isCjkLetter(cp: Int) =
     cp in 0x3040..0x30FF || cp in 0x3400..0x4DBF || cp in 0x4E00..0x9FFF ||
         cp in 0xF900..0xFAFF || cp in 0x20000..0x3FFFF
@@ -165,8 +165,8 @@ private fun isCjkLetter(cp: Int) =
 private val TextStyle.justified: Boolean get() = textAlign == TextAlign.Justify
 
 /**
- * 行内可以摊开的位置:相邻两个汉字(或假名)之间,返回前一个字的区间。
- * 标点、拉丁字母、数字旁边不摊——那是排版里最不该拉宽的地方。
+ * Positions within a line that can be spread: between two adjacent Han characters (or kana); returns the range of the former character.
+ * Nothing is spread next to punctuation, Latin letters or digits — those are exactly the places typesetting should never widen.
  */
 internal fun cjkGapRanges(text: String, start: Int, end: Int): List<IntRange> {
     val out = ArrayList<IntRange>()
@@ -182,19 +182,19 @@ internal fun cjkGapRanges(text: String, start: Int, end: Int): List<IntRange> {
 }
 
 /**
- * 中文两端对齐。
+ * Chinese text justification.
  *
- * 为什么不用 `TextAlign.Justify`:Android 35 之前它只拉词与词之间的空格,中文整行没有空格,
- * 行尾依旧参差不齐,只有夹着英文的那行被硬生生拉开。
+ * Why not `TextAlign.Justify`: before Android 35 it only stretches the spaces between words, and a full Chinese line has no spaces,
+ * so line ends stay ragged, and only lines with English mixed in get forcibly stretched.
  *
- * 做法:先按同样的宽度量一遍,拿到每一行离右边还差多少,把余量摊到这一行相邻汉字的字距上;
- * 再让 [Text] 用同一宽度排版。文案本身不动(不插字符、不加换行),选中、复制、查找、朗读都不受影响。
+ * Approach: first measure at the same width to learn how far each line falls short of the right edge, and spread the remainder over the letter spacing between adjacent Han characters on that line;
+ * then have [Text] lay out at the same width. The copy itself is untouched (no characters inserted, no line breaks added), so selection, copying, find and text-to-speech are unaffected.
  */
 @Composable
 private fun JustifiedText(text: AnnotatedString, style: TextStyle, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     val dense = LocalDensity.current
-    // 宽度从文字自己的排版里拿:不能包 BoxWithConstraints,引用块外面是按内容量高的 Row,子组合量不了 intrinsic。
+    // The width comes from the text's own layout: we can't wrap in BoxWithConstraints, because a quote block's parent is a Row measured by content, and subcomposition can't measure intrinsics.
     var widthPx by remember { mutableIntStateOf(0) }
     val spaced = remember(text, style, widthPx, measurer) {
         if (widthPx <= 0) return@remember text
@@ -211,16 +211,16 @@ private fun JustifiedText(text: AnnotatedString, style: TextStyle, modifier: Mod
         val plain = text.text
         val out = AnnotatedString.Builder(text)
         for (line in 0 until probe.lineCount - 1) {
-            // 最后一行不拉:和书上的段落一样,末行保持自然长度
+            // Don't stretch the last line: like a paragraph in a book, the final line keeps its natural length
             val start = probe.getLineStart(line)
             val end = probe.getLineEnd(line, visibleEnd = true)
             val used = probe.getLineRight(line) - probe.getLineLeft(line)
-            // 留一成余量,免得四舍五入把行尾的字挤到下一行
+            // Keep a ten percent margin so rounding doesn't push the character at the line end onto the next line
             val slack = (widthPx - used) * 0.9f
             if (slack < 0.5f) continue
             val gaps = cjkGapRanges(plain, start, end)
             if (gaps.isEmpty()) continue
-            // 每处最多拉到 0.25 字,太宽反而难看
+            // Stretch by at most 0.25 em at each place; wider actually looks worse
             val em = (slack / gaps.size / fontPx).coerceAtMost(0.25f)
             if (em <= 0f) continue
             gaps.forEach { out.addStyle(SpanStyle(letterSpacing = em.em), it.first, it.last + 1) }
@@ -249,7 +249,7 @@ private fun Block(b: MdBlock, style: TextStyle, depth: Int) {
                 fontSize = when (b.level) { 1 -> 19.sp; 2 -> 17.5.sp; 3 -> 16.sp; else -> style.fontSize },
                 lineHeight = when (b.level) { 1 -> 25.sp; 2 -> 23.sp; else -> style.lineHeight },
                 fontWeight = if (LocalReportStyle.current) FontWeight.Bold else FontWeight.SemiBold,
-                // 标题保持左对齐:两端对齐会把两行以上的标题也拉满,标题不该被撑开
+                // Headings stay left-aligned: justification would stretch headings of two or more lines to full width, and a heading shouldn't be stretched out
                 textAlign = TextAlign.Start,
             ),
         )
@@ -274,14 +274,14 @@ private fun Block(b: MdBlock, style: TextStyle, depth: Int) {
     }
 }
 
-/** 表格:各列取本列最宽的格(有上限,超了换行),各行取本行最高的格;整张表可左右滑动。 */
+/** Table: each column takes the width of its widest cell (capped; beyond that it wraps), each row takes the height of its tallest cell; the whole table can scroll horizontally. */
 @Composable
 private fun TableBlock(t: MdBlock.Table, style: TextStyle) {
     val report = LocalReportStyle.current
     val find = LocalFindHighlight.current
     val cols = t.header.size
     if (cols == 0) return
-    // 单元格按左对齐:表格列宽本来就是定的,两端对齐只会把短句也拉满
+    // Cells are left-aligned: table column widths are fixed anyway, and justification would only stretch short sentences to full width
     val cellStyle = style.copy(fontSize = 13.sp, lineHeight = 19.sp, textAlign = TextAlign.Start)
     val rows = listOf(t.header) + t.rows
     Box(Modifier.then(if (report) Modifier.clip(MikaShapes.Card).background(MikaTheme.colors.surface) else Modifier)
@@ -313,7 +313,7 @@ private fun TableBlock(t: MdBlock.Table, style: TextStyle) {
                 widths[c] = maxOf(widths[c], m.maxIntrinsicWidth(Constraints.Infinity).coerceIn(minCol, maxCol))
             }
             val heights = measurables.chunked(cols).map { row -> row.withIndex().maxOf { (c, m) -> m.minIntrinsicHeight(widths[c]) } }
-            // 同一行的格一样高,边框和表头底色才对齐
+            // Cells in the same row are the same height, so borders and the header background line up
             val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(widths[i % cols], heights[i / cols])) }
             layout(widths.sum(), heights.sum()) {
                 var y = 0
@@ -330,7 +330,7 @@ private fun TableBlock(t: MdBlock.Table, style: TextStyle) {
     }
 }
 
-/** 代码块:顶部一条轻量顶栏(左显示语言标签,右放「复制 / 已复制」按钮),下面横向滚动显示代码正文。 */
+/** Code block: a lightweight top bar on top (language label on the left, a "Copy / Copied" button on the right), with the code body scrolling horizontally below. */
 @Composable
 private fun CodeBlock(b: MdBlock.Code, style: TextStyle) {
     val c = MikaTheme.colors
@@ -347,7 +347,7 @@ private fun CodeBlock(b: MdBlock.Code, style: TextStyle) {
     val shape = MikaShapes.Tile
     val language = b.language
     Column(Modifier.fillMaxWidth().clip(shape).background(c.fill)) {
-        // 包进 SelectionContainer(如「选择文字」模式或个人助理回答)时,顶栏标签和按钮不参与拖选。
+        // When wrapped in a SelectionContainer (e.g. "select text" mode or assistant replies), the top bar label and button don't take part in drag selection.
         DisableSelection {
             Row(
                 Modifier.fillMaxWidth().padding(start = 11.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),

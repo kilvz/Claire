@@ -59,13 +59,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 
 /**
- * 页面底:干净的近白(深色下近黑),不加渐变。
- * 设了背景图片时铺满图片、再盖一层同色遮罩(见 [SkinBackdrop]),卡片和文字照旧。
+ * Page background: clean near-white (near-black in dark mode), with no gradient.
+ * When a background image is set, the image is laid out full-bleed and then covered with a same-color scrim (see [SkinBackdrop]); cards and text are unchanged.
  */
 @Composable
 fun PageBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     val backdrop = rememberSkinBackdrop()
-    // 有没有图都是同一个结构:图是异步读的,换结构会让里面的页面整个重建、丢掉状态
+    // With or without an image the structure is the same: the image is read asynchronously, and switching structures would rebuild the whole page inside and lose its state
     Box(
         modifier.fillMaxSize().background(MikaTheme.colors.bg).then(
             if (backdrop == null) Modifier else Modifier
@@ -78,9 +78,9 @@ fun PageBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.
 }
 
 /**
- * 页面底色:顶栏、输入栏底下的渐隐这些要挡住滚动内容的地方用它。
- * 有背景图片且 [color] 就是页面底色时,照着同一位置画一块页面背景,和页面底连成一片;
- * [fade] 是从透明到页面底色的渐变,有背景图片时当作透明度的遮罩用。
+ * Page background color: used by the top bar, the fade under the input bar, and anywhere else that must hide scrolling content.
+ * When a background image is set and [color] is the page background color, a page background is drawn at the same position so it joins seamlessly with the page background;
+ * [fade] is a gradient from transparent to the page background color, and acts as an opacity mask when a background image is set.
  */
 fun Modifier.pageBackground(color: Color, fade: Brush? = null): Modifier = composed {
     val backdrop = LocalSkinBackdrop.current
@@ -90,7 +90,7 @@ fun Modifier.pageBackground(color: Color, fade: Brush? = null): Modifier = compo
     if (fade == null) {
         placed.drawBehind { backdrop.draw(this, origin) }
     } else {
-        // 先画背景,再按渐变的透明度裁掉:上面透明、下面实
+        // Draw the background first, then clip it by the gradient's alpha: transparent at the top, solid at the bottom
         placed.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawBehind {
                 backdrop.draw(this, origin)
@@ -99,7 +99,7 @@ fun Modifier.pageBackground(color: Color, fade: Brush? = null): Modifier = compo
     }
 }
 
-/** 卡片的底:白底 + 黑 5% 描边 + 极淡阴影;深色下只有描边。 */
+/** Card background: white base + 5% black border + a very faint shadow; in dark mode only the border. */
 fun Modifier.cardSurface(colors: MikaColors, shape: Shape = MikaShapes.Card): Modifier =
     (if (colors.cardShadow.alpha > 0f) {
         shadow(6.dp, shape, clip = false, ambientColor = colors.cardShadow.copy(alpha = 0.45f), spotColor = colors.cardShadow.copy(alpha = 0.16f))
@@ -107,26 +107,26 @@ fun Modifier.cardSurface(colors: MikaColors, shape: Shape = MikaShapes.Card): Mo
         .background(colors.surface, shape)
         .border(0.5.dp, colors.edge, shape)
 
-/** 悬浮元素的阴影(输入栏、浮在内容上的按钮)。 */
+/** Shadow for floating elements (the input bar, buttons floating above content). */
 fun Modifier.floatShadow(colors: MikaColors, shape: Shape): Modifier =
     shadow(14.dp, shape, clip = false, ambientColor = colors.floatShadow.copy(alpha = 0.3f), spotColor = colors.floatShadow.copy(alpha = 0.35f))
 
-/** 一张卡片,内容裁在圆角里(行的按压效果不出角)。 */
+/** A card whose content is clipped inside the rounded corners (so a row's press effect doesn't spill out). */
 @Composable
 fun MikaCard(modifier: Modifier = Modifier, shape: Shape = MikaShapes.Card, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth().cardSurface(MikaTheme.colors, shape).clip(shape), content = content)
 }
 
 /**
- * 分组卡片:一组 [ListRow]。下面自带 12dp 间距,和下一组的 [GroupLabel](上 8)合起来是分组之间的 20。
- * 行与行的分隔线由行自己画,从文字处开始。
+ * Group card: a group of [ListRow]. It carries its own 12dp bottom spacing, which together with the next group's [GroupLabel] (8 on top) makes 20 between groups.
+ * The dividers between rows are drawn by the rows themselves, starting at the text.
  */
 @Composable
 fun GroupCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     MikaCard(modifier.padding(bottom = 12.dp), content = content)
 }
 
-/** 状态卡:左边圆形图标,右边标题和说明。用于页面顶上的总状态。 */
+/** Status card: round icon on the left, title and description on the right. Used for the overall status at the top of a page. */
 @Composable
 fun StateCard(
     icon: ImageVector,
@@ -156,18 +156,18 @@ fun StateCard(
     }
 }
 
-// ---------- 悬浮玻璃 ----------
+// ---------- Floating glass ----------
 
-/** 能做背景模糊(安卓 12 起有 RenderEffect);不能时玻璃退回不透明的卡片底。 */
+/** Background blur is available (RenderEffect since Android 12); when it isn't, glass falls back to the opaque card background. */
 val GlassBlurSupported: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-/** 玻璃后面那层内容的画面:内容用 [glassSource] 画进来,[GlassBar] 取它模糊后垫在自己底下。 */
+/** The image of the content layer behind the glass: content is drawn into it via [glassSource], and [GlassBar] takes it, blurs it and lays it underneath itself. */
 @Stable
 class GlassBackdrop internal constructor(internal val layer: GraphicsLayer) {
     internal var origin by mutableStateOf(Offset.Zero)
 }
 
-/** 不支持模糊时为 null,[GlassBar] 就用不透明底。 */
+/** null when blur is unsupported, in which case [GlassBar] uses an opaque background. */
 @Composable
 fun rememberGlassBackdrop(): GlassBackdrop? {
     if (!GlassBlurSupported) return null
@@ -175,7 +175,7 @@ fun rememberGlassBackdrop(): GlassBackdrop? {
     return remember(layer) { GlassBackdrop(layer) }
 }
 
-/** 把这块内容记成玻璃的背景。玻璃本身不能在这块内容里面。 */
+/** Records this content as the glass backdrop. The glass itself must not be inside this content. */
 fun Modifier.glassSource(backdrop: GlassBackdrop?): Modifier =
     if (backdrop == null) this
     else onGloballyPositioned { backdrop.origin = it.positionInRoot() }
@@ -187,8 +187,8 @@ fun Modifier.glassSource(backdrop: GlassBackdrop?): Modifier =
 private val GlassBlur = BlurEffect(30f, 30f, TileMode.Clamp)
 
 /**
- * 玻璃输入栏的外壳:半透明底 + 背景模糊 + 悬浮阴影,高至少 52。
- * [backdrop] 为 null(不支持模糊、或后面没有内容)时用不透明底。
+ * The shell of the glass input bar: translucent base + background blur + floating shadow, at least 52 high.
+ * When [backdrop] is null (blur unsupported, or nothing behind it), an opaque base is used.
  */
 @Composable
 fun GlassBar(
@@ -225,8 +225,8 @@ fun GlassBar(
 }
 
 /**
- * 一小块悬浮磨砂玻璃:白 72% + 背景模糊 + 细描边 + 悬浮阴影,尺寸随内容(顶栏的菜单/标题/新建按钮用)。
- * [backdrop] 为 null(不支持模糊、或后面没有内容)时用不透明底。
+ * A small piece of floating frosted glass: 72% white + background blur + hairline border + floating shadow, sized to its content (used by the top bar's menu/title/new button).
+ * When [backdrop] is null (blur unsupported, or nothing behind it), an opaque base is used.
  */
 @Composable
 fun GlassSurface(

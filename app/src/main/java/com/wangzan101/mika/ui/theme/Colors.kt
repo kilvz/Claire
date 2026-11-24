@@ -6,65 +6,65 @@ import androidx.compose.ui.graphics.Color
 import com.wangzan101.mika.settings.ThemeAccent
 
 /**
- * 界面用到的全部颜色。页面一律从 [MikaTheme.colors] 取,不写死色值。
- * 实色只用在强调(主按钮、选中、开关、用户消息)和状态(成功、需要你、出错);图标块一律中性。
+ * All the colors the interface uses. Pages always take them from [MikaTheme.colors] and never hardcode color values.
+ * Solid colors are used only for emphasis (primary buttons, selection, switches, user messages) and status (success, needs-you, error); icon tiles are always neutral.
  */
 @Immutable
 class MikaColors(
-    /** 页面背景。 */
+    /** Page background. */
     val bg: Color,
-    /** 卡片、分组。 */
+    /** Cards, groups. */
     val surface: Color,
-    /** 浅填充:次按钮、分段控件底、代码块底。 */
+    /** Light fill: secondary buttons, segmented control background, code block background. */
     val fill: Color,
-    /** 文字三级:正文、次要、辅助。 */
+    /** Three levels of text: primary, secondary, tertiary. */
     val ink: Color,
     val ink2: Color,
     val ink3: Color,
-    /** 正文与辅助之间:比正文淡一点点的字(插话收成小字后用它)。 */
+    /** Between primary and tertiary: text slightly lighter than the body color (used for interjections rendered as small text). */
     val inkSoft: Color,
-    /** 分隔线。 */
+    /** Dividers. */
     val hair: Color,
-    /** 卡片描边。 */
+    /** Card border. */
     val edge: Color,
     val accent: Color,
     val accentSoft: Color,
-    /** 强调色上的文字和图标。 */
+    /** Text and icons on top of the accent color. */
     val onAccent: Color,
     val ok: Color,
     val okSoft: Color,
-    /** 「需要你」:[warn] 用于文字,[warnSolid] 用于圆点、描边。 */
+    /** "Needs you": [warn] is used for text, [warnSolid] for dots and borders. */
     val warn: Color,
     val warnSolid: Color,
     val warnSoft: Color,
     val bad: Color,
     val badSoft: Color,
-    /** 图标块的底。 */
+    /** Background of icon tiles. */
     val neutralSoft: Color,
-    /** Claire 回答的底:比页面背景深一点点的灰,和用户的蓝色气泡区分开。 */
+    /** Background of Claire's answers: a gray slightly darker than the page background, distinguishing it from the user's blue bubble. */
     val answer: Color,
-    /** 灰色胶囊、关着的开关。 */
+    /** Gray pills and switches that are off. */
     val greySoft: Color,
-    /** 悬浮玻璃(输入栏、浮在内容上的按钮)的底和描边。 */
+    /** Background and border of floating glass (the input bar, buttons floating above content). */
     val glass: Color,
     val glassEdge: Color,
-    /** 卡片阴影;深色下卡片只靠描边,为透明。 */
+    /** Card shadow; in dark mode cards rely only on the border, so this is transparent. */
     val cardShadow: Color,
-    /** 悬浮元素的阴影。 */
+    /** Shadow of floating elements. */
     val floatShadow: Color,
-    /** 开关的圆钮。 */
+    /** The switch thumb. */
     val thumb: Color,
     /**
-     * 图表里分类的颜色(例如每家服务商一种),按固定的先后取;超出的归到 [seriesOther]。
-     * 只给图形上色,文字一律用 ink 三级。
+     * Category colors for charts (e.g. one per service provider), taken in a fixed order; anything beyond them falls back to [seriesOther].
+     * Only graphics are colored with these; text always uses one of the three ink levels.
      */
     val series: List<Color>,
     val seriesOther: Color,
-    /** 图表的网格线。 */
+    /** Chart grid lines. */
     val grid: Color,
     val isDark: Boolean,
 ) {
-    /** 换一种强调色,其余不变;淡底的透明度和原来一样(浅色 10%、深色 16%)。 */
+    /** Swap in a different accent color, leaving everything else unchanged; the soft fill keeps its original opacity (10% in light, 16% in dark). */
     fun withAccent(accent: Color, onAccent: Color) = MikaColors(
         bg = bg, surface = surface, fill = fill, ink = ink, ink2 = ink2, ink3 = ink3, inkSoft = inkSoft, hair = hair, edge = edge,
         accent = accent, accentSoft = accent.copy(alpha = if (isDark) 0x29 / 255f else 0x1A / 255f), onAccent = onAccent,
@@ -143,7 +143,7 @@ val DarkColors = MikaColors(
     isDark = true,
 )
 
-/** 按深浅色和强调色取整套颜色。蓝色就是 [LightColors] / [DarkColors] 本身;别的颜色只换强调色那三项。 */
+/** Full color set for a given light/dark mode and accent. Blue is [LightColors] / [DarkColors] themselves; other accents only replace the three accent fields. */
 fun palette(dark: Boolean, accent: ThemeAccent): MikaColors {
     val base = if (dark) DarkColors else LightColors
     if (accent == ThemeAccent.Blue) return base
@@ -152,8 +152,8 @@ fun palette(dark: Boolean, accent: ThemeAccent): MikaColors {
 }
 
 /**
- * 强调色在浅色 / 深色下的取值,和它上面的文字、图标色。
- * 文字的对比度不低于默认蓝色,和页面背景的对比度不低于 3:1(见 `AccentPaletteTest`)。
+ * Values of an accent color in light / dark mode, along with the text and icon color on top of it.
+ * Text contrast is no lower than the default blue, and contrast with the page background is no lower than 3:1 (see the `AccentPaletteTest`).
  */
 fun accentTone(accent: ThemeAccent, dark: Boolean): Pair<Color, Color> = when (accent) {
     ThemeAccent.Blue -> (if (dark) DarkColors else LightColors).let { it.accent to it.onAccent }
@@ -161,9 +161,9 @@ fun accentTone(accent: ThemeAccent, dark: Boolean): Pair<Color, Color> = when (a
     ThemeAccent.Purple -> Color(if (dark) 0xFFBF5AF2 else 0xFF9B3FD9) to Color.White
     ThemeAccent.Pink -> Color(if (dark) 0xFFFF4F80 else 0xFFE0306A) to Color.White
     ThemeAccent.Teal -> Color(if (dark) 0xFF1E9E97 else 0xFF0A8F8A) to Color.White
-    // 深色下的石墨是浅灰,上面配深色字
+    // Graphite in dark mode is light gray, so it pairs with dark text
     ThemeAccent.Graphite -> if (dark) Color(0xFFE5E5EA) to Color(0xFF1C1C1E) else Color(0xFF3A3A3C) to Color.White
 }
 
-/** 没有包在 [MikaTheme] 里时(比如界面测试)按浅色。 */
+/** Falls back to light colors when not wrapped in [MikaTheme] (e.g. in UI tests). */
 val LocalMikaColors = staticCompositionLocalOf { LightColors }

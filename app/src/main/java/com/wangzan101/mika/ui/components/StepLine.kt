@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.wangzan101.mika.ui.theme.MikaColors
 import com.wangzan101.mika.ui.theme.MikaTheme
 
-/** 竖线步骤上一个点的状态:完成是灰点,当前是带光圈的蓝点,暂停是橙点,出错是红点。 */
+/** State of a dot on a vertical step line: Done is a gray dot, Current is a blue dot with a halo, Paused is an orange dot, and Failed is a red dot. */
 enum class StepState { Done, Current, Paused, Failed }
 
 private fun StepState.color(c: MikaColors) = when (this) {
@@ -35,8 +35,8 @@ private fun StepState.halo(c: MikaColors) = when (this) {
 }
 
 /**
- * 竖线步骤里的一步:左边一条 1.5dp 的细线穿过各步,点画在 [dotY] 高度(对齐第一行文字的中线);
- * 第一步的线从点开始、最后一步的线到点为止,步骤之间线是连续的。内容放在右边,可以有多行。
+ * One step in a vertical step line: a thin 1.5dp line runs down the left side through each step, and the dot is drawn at height [dotY] (aligned with the center line of the first text line);
+ * the first step's line starts at the dot and the last step's line ends at the dot, so the line is continuous between steps. Content goes on the right and may span multiple lines.
  */
 @Composable
 fun StepItem(

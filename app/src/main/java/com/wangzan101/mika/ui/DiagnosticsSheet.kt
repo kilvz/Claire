@@ -42,15 +42,15 @@ import kotlinx.coroutines.withContext
 import com.wangzan101.mika.about.ui.AboutCopy
 
 /**
- * 诊断信息的预览:整段文字先给用户看,点「复制」才进剪贴板,点「分享」才交给系统的分享面板;什么都不会自己发出去。
- * [load] 收集并写出那段文字(要读盘,放在后台线程跑);出错时只显示标题和异常类别。
+ * Preview of the diagnostics info: the whole text is shown to the user first; only tapping "Copy" puts it on the clipboard, and only tapping "Share" hands it to the system share sheet; nothing is ever sent on its own.
+ * [load] collects and writes out that text (it reads from disk, so it runs on a background thread); on failure only the title and the exception class are shown.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsSheet(load: () -> String, onDismiss: () -> Unit) {
     val c = MikaTheme.colors
     val context = LocalContext.current
-    // 打开那一刻收一次;之后状态再变也不换,用户看到的就是要复制的
+    // Collect once at the moment it opens; later state changes don't replace it, so the user sees exactly what will be copied
     val text by produceState<String?>(null) {
         value = withContext(Dispatchers.IO) {
             runCatching(load).getOrElse { Diagnostics.sanitize("${Diagnostics.HEADER}\n(failed to collect: ${it.javaClass.simpleName})\n") }

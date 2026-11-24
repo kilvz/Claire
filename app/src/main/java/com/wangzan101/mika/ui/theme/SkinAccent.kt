@@ -6,15 +6,15 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * 从背景图片里取强调色:先找图上最主要的鲜艳颜色的色相([hue]),
- * 再按深浅色调出一个上面放白字和放在页面上都看得清的颜色([tone])。纯计算,不碰安卓。
+ * Extracts the accent color from a background image: first find the hue of the image's dominant vivid color ([hue]),
+ * then derive a shade ([tone]) on which white text and placement on the page are both legible. Pure computation, no Android involvement.
  */
 object SkinAccent {
-    /** 鲜艳的像素至少占这么多,才算图上有主色;不到就当是灰图,不跟着图片取色。 */
+    /** Vivid pixels must make up at least this share for the image to count as having a dominant color; below that it's treated as a gray image and no color is taken from it. */
     private const val MIN_SHARE = 0.05
     private const val BUCKETS = 36
 
-    /** [pixels] 是 ARGB。图基本是灰的(或全透明)时为 null。 */
+    /** [pixels] are ARGB. Returns null when the image is essentially gray (or fully transparent). */
     fun hue(pixels: IntArray): Float? {
         val weight = DoubleArray(BUCKETS)
         val count = IntArray(BUCKETS)
@@ -34,12 +34,12 @@ object SkinAccent {
             count[bucket]++
         }
         if (total == 0) return null
-        // 相邻三格合起来比,正好落在两格交界的颜色不会被分散
+        // Compare three adjacent buckets together, so a color landing exactly on a bucket boundary isn't split apart
         fun at(i: Int) = (i + BUCKETS) % BUCKETS
         val best = (0 until BUCKETS).maxBy { weight[at(it - 1)] + weight[it] + weight[at(it + 1)] }
         val share = (count[at(best - 1)] + count[best] + count[at(best + 1)]).toDouble() / total
         if (share < MIN_SHARE) return null
-        // 三格的加权平均,以中间一格为准处理 0/360 的接缝
+        // Weighted average over the three buckets, keyed on the middle one, to handle the 0/360 seam
         var sum = 0.0
         var w = 0.0
         for (d in -1..1) {
@@ -51,13 +51,13 @@ object SkinAccent {
     }
 
     /**
-     * 用色相 [hue] 做强调色,返回(强调色, 上面的文字色)。
-     * 上面白字的对比度不低于默认蓝色,和页面背景的对比度不低于 3:1;实在调不出来时用默认蓝色。
+     * Uses the hue [hue] as the accent color and returns (accent color, text color on top of it).
+     * The contrast for white text on it is no lower than the default blue, and its contrast with the page background is no lower than 3:1; if nothing works out, the default blue is used.
      */
     fun tone(hue: Float, dark: Boolean): Pair<Color, Color> {
         val base = if (dark) DarkColors else LightColors
         val floor = contrast(base.accent, base.onAccent)
-        // 从亮往暗找第一个白字够清楚的;深色下再要求比页面背景亮得够
+        // Scan from light to dark for the first shade where white text is legible enough; in dark mode it must also be light enough against the page background
         var l = if (dark) 0.70f else 0.60f
         while (l >= 0.15f) {
             val c = Color.hsl(hue, 0.7f, l)
@@ -79,14 +79,14 @@ object SkinAccent {
     }
 }
 
-/** WCAG 2 对比度。 */
+/** WCAG 2 contrast ratio. */
 internal fun contrast(a: Color, b: Color): Double {
     val la = luminance(a)
     val lb = luminance(b)
     return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
-/** WCAG 2 相对亮度(sRGB)。 */
+/** WCAG 2 relative luminance (sRGB). */
 internal fun luminance(c: Color): Double {
     fun channel(v: Float): Double = if (v <= 0.03928f) v / 12.92 else ((v + 0.055) / 1.055).pow(2.4)
     return 0.2126 * channel(c.red) + 0.7152 * channel(c.green) + 0.0722 * channel(c.blue)

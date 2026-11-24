@@ -44,28 +44,28 @@ import com.wangzan101.mika.ui.theme.LightColors
 import java.net.URLDecoder
 import com.wangzan101.mika.ui.theme.MikaColors
 
-/** 回答里的 Markdown 解析成的显示模型:块级结构 + 带样式的行内文字。纯数据,不依赖界面。 */
+/** Display model the Markdown in a reply is parsed into: block structure + styled inline text. Pure data, independent of the UI. */
 sealed interface MdBlock {
     data class Para(val text: AnnotatedString) : MdBlock
     data class Heading(val level: Int, val text: AnnotatedString) : MdBlock
     data class Code(val info: String, val code: String) : MdBlock {
-        /** 顶栏显示的语言标签:CommonMark info 串首个空白分隔词(如 `kotlin {1}` 取 `kotlin`),无则为空。 */
+        /** Language label shown in the top bar: the first whitespace-delimited word of the CommonMark info string (e.g. `kotlin {1}` yields `kotlin`), empty if none. */
         val language: String get() = info.trim().takeWhile { !it.isWhitespace() }
     }
     data class Quote(val blocks: List<MdBlock>) : MdBlock
-    /** [start] 为 null 是无序列表;每个列表项是一组块。 */
+    /** A null [start] means an unordered list; each list item is a group of blocks. */
     data class ListBlock(val start: Int?, val tight: Boolean, val items: List<List<MdBlock>>) : MdBlock
-    /** 每行的格数都补齐到表头的列数。 */
+    /** Each row's cell count is padded up to the header's column count. */
     data class Table(val header: List<AnnotatedString>, val rows: List<List<AnnotatedString>>) : MdBlock
     data object Rule : MdBlock
 }
 
 object MarkdownModel {
-    /** 嵌套再深的引用、列表就按纯文字显示,免得递归太深。 */
+    /** Quotes and lists nested any deeper are shown as plain text, to avoid excessive recursion. */
     private const val MAX_DEPTH = 12
     private val LINK_SCHEMES = setOf("http", "https", "mailto", "tel")
 
-    /** 行内代码和链接的样式;颜色跟着深浅色,由显示的地方按当前配色给。 */
+    /** Styles for inline code and links; the colors follow light/dark mode and are supplied by the display site from the current palette. */
     class Styles(val code: SpanStyle, val link: TextLinkStyles, val strong: FontWeight = FontWeight.SemiBold) {
         companion object {
             fun of(c: MikaColors, strong: FontWeight = FontWeight.SemiBold) = Styles(
@@ -82,7 +82,7 @@ object MarkdownModel {
         .extensions(listOf(TablesExtension.create(), StrikethroughExtension.create()))
         .build()
 
-    /** 解析失败(包括写到一半的流式文字导致的任何意外)时,整段按纯文字一段显示。 */
+    /** When parsing fails (including any surprise caused by half-written streaming text), the whole thing is shown as one plain-text paragraph. */
     fun parse(markdown: String, styles: Styles = Styles.Light): List<MdBlock> = try {
         blocks(parser.parse(markdown), 0, styles)
     } catch (e: Exception) {
@@ -91,19 +91,19 @@ object MarkdownModel {
         plain(markdown)
     }
 
-    /** 流式片段可停在语法中间；只在显示时补全尾部，不修改实际回答。 */
+    /** A streaming fragment may stop in the middle of syntax; only the tail is completed at display time, and the actual reply is not modified. */
     fun parseStreaming(markdown: String, styles: Styles = Styles.Light): List<MdBlock> = parse(StreamingMarkdown.preview(markdown), styles)
 
     /**
-     * 回答去掉 Markdown 符号后的纯文字(复制、引用用):段落、标题、代码照原文,各块之间空一行;
-     * 列表每项一行,前面「• 」或「1. 」;引用每行前面「> 」;表格每行一行、格子之间用制表符;分隔线不要。
+     * The reply as plain text with Markdown markers stripped (for copying and quoting): paragraphs, headings and code keep their original text, with a blank line between blocks;
+     * one line per list item, prefixed with "• " or "1. "; each quote line prefixed with "> "; one line per table row, with cells separated by tabs; thematic breaks are dropped.
      */
     fun toPlainText(markdown: String): String = blocksText(parse(markdown)).trim()
 
     /**
-     * 回复里 Markdown 图片 `![..]` 与链接 `[..]` 的地址中以 `/workspace` 开头者,按出现顺序去重返回。
-     * 地址里的百分号转义解出来(带空格、非 ASCII 的文件名按 CommonMark 要写成 `%20`、`%E6` 这样的形式);
-     * 解不了的非法序列原样保留,字面 `+` 也不是空格。
+     * Of the destinations of Markdown images `![..]` and links `[..]` in the reply, returns those that start with `/workspace`, deduplicated in order of appearance.
+     * Percent escapes in the destination are decoded (file names with spaces or non-ASCII characters must be written as `%20`, `%E6` and the like per CommonMark);
+     * illegal sequences that cannot be decoded are kept as-is, and a literal `+` is not treated as a space either.
      */
     fun workspaceRefs(markdown: String): List<String> = try {
         val out = LinkedHashSet<String>()
@@ -125,7 +125,7 @@ object MarkdownModel {
         emptyList()
     }
 
-    /** 链接地址是按 URI 规则写的:合法 `%HH` 按 UTF-8 解;非法转义不动,`+` 是文件名里的字面加号,不当空格。 */
+    /** Link destinations are written per URI rules: valid `%HH` is decoded as UTF-8; illegal escapes are left alone, and `+` is a literal plus in a file name, not a space. */
     private fun percentDecoded(dest: String): String =
         runCatching { URLDecoder.decode(dest.replace("+", "%2B"), "UTF-8") }.getOrDefault(dest)
 
@@ -194,7 +194,7 @@ object MarkdownModel {
             is StrongEmphasis -> withStyle(SpanStyle(fontWeight = s.strong)) { appendInlines(n, s) }
             is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendInlines(n, s) }
             is Link -> link(n.destination, s) { appendInlines(n, s) }
-            // 聊天里不显示图片,只留替代文字(有可打开的地址就做成链接)
+            // Images are not shown in chat, only their alt text is kept (made into a link when there is an openable address)
             is Image -> link(n.destination, s) { if (n.firstChild != null) appendInlines(n, s) else append(n.destination.orEmpty()) }
             is HtmlInline -> append(n.literal)
             else -> appendInlines(n, s)

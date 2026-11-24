@@ -32,18 +32,18 @@ import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.ThemeAccent
 import com.wangzan101.mika.settings.ThemeMode
 
-/** 动效:时长和曲线。系统关了动画时([MikaTheme.reduceMotion])直接到位。 */
+/** Motion: durations and curves. When system animations are off ([MikaTheme.reduceMotion]) it settles instantly. */
 object MikaMotion {
     const val PAGE_MS = 220
     const val SWITCH_MS = 200
-    /** 减速曲线:起步快、落地慢。 */
+    /** Deceleration curve: starts fast, lands slow. */
     val Decelerate: Easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
 
     fun <T> page(reduceMotion: Boolean): AnimationSpec<T> = if (reduceMotion) snap() else tween(PAGE_MS, easing = Decelerate)
     fun <T> switch(reduceMotion: Boolean): AnimationSpec<T> = if (reduceMotion) snap() else tween(SWITCH_MS, easing = Decelerate)
 }
 
-/** 系统「移除动画」(动画时长缩放为 0)时为真。 */
+/** True when the system has "Remove animations" on (animator duration scale is 0). */
 fun animationsOff(context: Context): Boolean =
     Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
@@ -58,8 +58,8 @@ object MikaTheme {
 }
 
 /**
- * 设置里的外观:跟随系统时看系统,一直浅色/深色时照设置。设置一改(设置页或任务里改的)当场换,不重建界面,
- * 所以页面、输入、滚动位置都不丢。
+ * The appearance from settings: when set to follow the system, use the system; when forced light/dark, obey the setting. A settings change (from the settings page or a background task) switches immediately without rebuilding the UI,
+ * so pages, input and scroll positions are all preserved.
  */
 @Composable
 fun appearanceDark(): Boolean {
@@ -73,7 +73,7 @@ fun appearanceDark(): Boolean {
     }
 }
 
-/** 设置里的强调色(见 [ThemeAccent]);和外观一样,改了当场换、不重建界面。 */
+/** The accent color from settings (see [ThemeAccent]); like the appearance, changes apply immediately without rebuilding the UI. */
 @Composable
 fun appearanceAccent(): ThemeAccent {
     val context = LocalContext.current
@@ -82,10 +82,10 @@ fun appearanceAccent(): ThemeAccent {
     return accent
 }
 
-/** 状态栏、导航栏的图标深浅跟界面一致:界面强制浅色而系统是深色时,图标也得是深色的才看得见。 */
+/** Status bar and navigation bar icons match the interface's light/dark mode: when the UI is forced light but the system is dark, the icons must also be dark to be visible. */
 fun ComponentActivity.systemBarsFor(dark: Boolean) {
     val transparent = android.graphics.Color.TRANSPARENT
-    // 旧系统上导航栏不能全透明,垫一层半透明的底;取值与 enableEdgeToEdge 默认的一致
+    // On older systems the navigation bar can't be fully transparent, so a translucent layer is placed underneath; the values match the enableEdgeToEdge defaults
     val lightScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
     val darkScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
     enableEdgeToEdge(
@@ -95,8 +95,8 @@ fun ComponentActivity.systemBarsFor(dark: Boolean) {
 }
 
 /**
- * 深浅色按设置里的外观([appearanceDark]),强调色按设置里的强调色([appearanceAccent],背景图片要求跟随图片时用图上的主色);
- * 同时把 Material 组件(弹窗、输入框、底部面板)的颜色对上。
+ * Light/dark mode follows the appearance from settings ([appearanceDark]), and the accent follows the accent from settings ([appearanceAccent]; when the background image is set to follow the image, the image's dominant color is used);
+ * at the same time, the colors of Material components (dialogs, text fields, bottom sheets) are matched.
  */
 @Composable
 fun MikaTheme(
@@ -105,7 +105,7 @@ fun MikaTheme(
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // 背景图片设了「强调色跟随图片」时,用图上的主色代替设置里选的强调色
+    // When the background image is set to "accent follows image", the image's dominant color replaces the accent chosen in settings
     val imageHue = appearanceSkin().accentHue
     val colors = remember(dark, accent, imageHue) {
         val base = palette(dark, accent)
@@ -138,7 +138,7 @@ private fun scheme(c: MikaColors): ColorScheme {
         surfaceContainerLowest = c.surface, surfaceContainerLow = c.surface, surfaceContainer = c.surface,
         surfaceContainerHigh = c.surface, surfaceContainerHighest = c.surface, surfaceTint = c.surface,
         outline = c.ink3, outlineVariant = c.hair,
-        // 出错色上的字不跟着强调色变(深色石墨的强调色上是深色字)
+        // Text on the error color doesn't follow the accent (the dark graphite accent has dark text on it)
         error = c.bad, onError = Color.White,
     )
 }

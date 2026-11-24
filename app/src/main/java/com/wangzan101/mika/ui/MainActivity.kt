@@ -157,12 +157,12 @@ class MainActivity : ComponentActivity() {
     private var verifiedShareUris: List<String> = emptyList()
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        // 用户选过「不再询问」时系统不再弹窗,只能去设置里打开
+        // When the user has chosen "don't ask again" the system stops showing the prompt, so the only way is to enable it in settings
         if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings()
         monitor.refresh()
     }
 
-    // 安卓 12 及以前套上 App 里选的语言;13 起系统自己套
+    // Android 12 and earlier: apply the language chosen in the app; from 13 on the system applies it itself
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLanguage.wrap(newBase))
     }
@@ -181,18 +181,18 @@ class MainActivity : ComponentActivity() {
         shareInCurrent = savedInstanceState?.getBoolean(STATE_SHARE_IN_CURRENT, false) ?: false
         shareHandled = savedInstanceState?.getBoolean(STATE_SHARE_HANDLED, false) ?: false
         verifiedShareUris = savedInstanceState?.getStringArrayList(STATE_VERIFIED_SHARE_URIS).orEmpty()
-        // 已处理完的分享在旋转/重建时不重复触发;真正的冷启动分享或尚未完成的后台分享继续收下。
+        // An already handled share is not triggered again on rotation/recreation; a genuine cold-start share or an unfinished background share is still accepted.
         if (!shareHandled && (savedInstanceState == null || isShareIntent(intent))) {
             receiveShare(intent, inCurrentConversation = shareInCurrent)
         }
         monitor = SystemStatusMonitor(this, PhoneServices.of(this).shellControl)
         val store = ProviderStore.get(this)
         setContent {
-            // 外观按设置来,改了当场换;系统栏图标的深浅跟着界面
+            // Appearance follows settings and switches immediately; the tint of the system bar icons follows the interface
             val dark = appearanceDark()
             LaunchedEffect(dark) { systemBarsFor(dark) }
             MikaTheme(dark = dark, reduceMotion = animationsOff(this)) {
-                // 在输入框外面点一下或拖动就收起键盘,全 App 统一
+                // A tap or drag outside the input field dismisses the keyboard, uniformly across the whole app
                 KeyboardDismissArea(Modifier.fillMaxSize()) {
                     MikaRoot(
                         store, monitor, ::perform, requestedConversation, { requestedConversation = null },
@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
                         onSharedDraftOpened = { accepted, draft ->
                             requestedSharedDraft = null
                             shareHandled = true
-                            // 处理完后换掉 intent,避免后续旋转屏幕再次把这次分享当成新分享或重复弹失败提示。
+                            // After handling, swap the intent out so a later rotation doesn't treat this share as a new one or show the failure toast twice.
                             setIntent(Intent(this@MainActivity, MainActivity::class.java))
                             if (!accepted) {
                                 (application as MikaApp).sharedDrafts.discard(draft.attachments)
@@ -236,7 +236,7 @@ class MainActivity : ComponentActivity() {
         takeTeach(intent)
         requestedSharedDraft?.let { app.sharedDrafts.discard(it.draft.attachments) }
         requestedSharedDraft = null
-        // 界面已在后台存活时收到分享:放入当前打开的会话,而不是新建会话。
+        // Share received while the UI is already alive in the background: put it into the currently open conversation instead of starting a new one.
         shareInCurrent = true
         shareHandled = false
         verifiedShareUris = emptyList()
@@ -287,17 +287,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // 用户先前点了「完全退出」:打开 Claire 就回来,胶囊和退出时略过的启动工作在这里补上
+        // The user previously tapped "quit completely": opening Claire brings it back, and the capsule plus the startup work skipped on quit are made up for here
         com.wangzan101.mika.MikaQuit.resume(this)
         monitor.start()
-        // 每次打开都悄悄查一次新版本(两分钟内连着打开的只查一次),失败不吭声
+        // Silently check for a new version on every launch (only once if opened repeatedly within two minutes), and stay quiet on failure
         val app = application as MikaApp
         val check = app.updates.autoCheckInBackground()
         updateWatch = lifecycleScope.launch {
             check.join()
             app.automaticUpdates.watch(app.updates.state)
         }
-        // 电脑连接开着、服务却不在(被系统停过、从后台没能起来):界面在前台时补起来
+        // The desktop connection is on but the service is gone (stopped by the system, or failed to come back from the background): bring it back while the UI is in the foreground
         (application as MikaApp).mcp.ensureRunning()
     }
 
@@ -305,7 +305,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         foreground = true
         monitor.refresh()
-        // 回到前台时按最新设置查一次自动归档(启动时也查过,这里照顾长期不退出的进程)
+        // On returning to the foreground, check auto-archiving once with the latest settings (also checked at startup; this covers long-lived processes)
         (application as MikaApp).autoArchiveNow()
     }
 
@@ -318,7 +318,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         shareJob?.cancel()
-        // 还没绑到对话的私有副本随这次接收结束清掉;已接受的草稿由 CurrentChat 恢复,不在这里删除。
+        // Private copies not yet bound to a conversation are cleared when this receive ends; accepted drafts are restored by CurrentChat and are not deleted here.
         requestedSharedDraft?.let { (application as MikaApp).sharedDrafts.discard(it.draft.attachments) }
         requestedSharedDraft = null
         if (isFinishing) {
@@ -350,8 +350,8 @@ class MainActivity : ComponentActivity() {
                 }
             } else openNotificationSettings()
             Fix.OpenPairingChannel -> openChannelSettings(PairingNotifier.ensureChannel(this).id)
-            Fix.AddModel -> Unit // 设置页自己处理
-            // 换页由 MikaRoot 处理
+            Fix.AddModel -> Unit // handled by the settings page itself
+            // Page switching is handled by MikaRoot
             Fix.OpenPhoneSetup, Fix.OpenPhoneOps, Fix.RepairPhoneHelper -> Unit
             Fix.RetryPhoneHelper -> phone.pairing.scope.launch {
                 phone.sharedShell.reconnect()
@@ -371,7 +371,7 @@ class MainActivity : ComponentActivity() {
 
     private fun openNotificationSettings() = open(appNotificationSettings())
 
-    /** 直接打开某个通知频道的设置页;系统没有这个页面时退回应用通知总页。 */
+    /** Opens the settings page of a specific notification channel directly; falls back to the app's general notification page when the system has no such page. */
     private fun openChannelSettings(channelId: String) {
         val channelPage = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, packageName).putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
@@ -381,7 +381,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** 依次试,第一个能打开的就用:各家设置页不一定都认同一个入口。 */
+    /** Try them in order and use the first one that opens: not every device's settings pages accept the same entry point. */
     private fun openFirst(intents: List<Intent>) {
         val hit = intents.firstOrNull { it.resolveActivity(packageManager) != null } ?: intents.last()
         open(hit)
@@ -402,7 +402,7 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(EXTRA_OPEN_TEACH)
     }
 
-    /** 胶囊菜单「语音聊天」直开:信号 +1 交给界面层;读一次就摘掉,旋转不重复触发。 */
+    /** Direct open from the capsule menu's "voice chat": signal +1 handed to the UI layer; removed after a single read so rotation doesn't trigger it again. */
     private fun takeVoiceCall(intent: Intent) {
         if (!intent.getBooleanExtra(EXTRA_OPEN_VOICE_CALL, false)) return
         voiceCallSignal++
@@ -421,12 +421,12 @@ class MainActivity : ComponentActivity() {
         private const val STATE_VERIFIED_SHARE_URIS = "verified_share_uris"
         private const val TAG = "MikaMain"
 
-        /** 主界面(聊天)此刻是否在前台可见。任务完成时据此决定要不要弹完成通知(#731)。 */
+        /** Whether the main screen (chat) is currently visible in the foreground. Used to decide whether to post a completion notification when a task finishes (#731). */
         @Volatile var foreground: Boolean = false
     }
 }
 
-/** 用系统浏览器打开外部链接(GitHub、X 等);没有浏览器时提示一句。 */
+/** Open an external link (GitHub, X, etc.) in the system browser; show a short toast when there is no browser. */
 internal fun openInBrowser(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
@@ -435,7 +435,7 @@ internal fun openInBrowser(context: Context, url: String) {
     }
 }
 
-/** 依次试 [candidates],第一个 [start] 成功的就停;都不行返回 false。系统设置页各家不一定都有,靠这个退回通用页。 */
+/** Tries [candidates] in order and stops at the first one that [start] succeeds for; returns false if none work. Not every device has every system settings page, so this is how we fall back to a generic page. */
 internal fun <T> firstThatStarts(candidates: List<T>, start: (T) -> Boolean): Boolean = candidates.any(start)
 
 private data class SharedDraftRequest(
@@ -447,8 +447,8 @@ private data class SharedDraftRequest(
 )
 
 /**
- * 页面切换:对话页是根,侧栏和设置等入口把页面压进 [NavStack],返回键和页面上的返回按钮都走 [NavStack.back]。
- * 各页面只通过回调进出,不知道彼此。
+ * Page switching: the chat page is the root, and entry points such as the drawer and settings push pages onto [NavStack]; both the back key and the on-page back button go through [NavStack.back].
+ * Pages come and go only through callbacks and know nothing about each other.
  */
 @Composable
 private fun MikaRoot(
@@ -472,9 +472,9 @@ private fun MikaRoot(
     val nav = rememberNavStack(if (personalStart && requestedConversation == null) Route.Personal else Route.Chat)
     var filesFromDrawer by rememberSaveable { mutableStateOf(false) }
     var filesConversation by rememberSaveable { mutableStateOf<String?>(null) }
-    // 从设置页「重新配对」进来时先回到配对一步
+    // When entered from "re-pair" on the settings page, go back to the pairing step first
     var setupRepair by rememberSaveable { mutableStateOf(false) }
-    // 首次上手正在走哪一步;为空时不在上手流程里。配置模型页从哪儿来就回哪儿去
+    // Which onboarding step is in progress; null when not in the onboarding flow. The model setup page returns to wherever it came from
     var onboarding by rememberSaveable { mutableStateOf<OnboardingStep?>(null) }
     var openPhoneOps by rememberSaveable { mutableStateOf(false) }
     val onFix: (Fix) -> Unit = { fix ->
@@ -502,7 +502,7 @@ private fun MikaRoot(
     val check = Prerequisites.check(status, hasMain)
     val app = context.applicationContext as MikaApp
     val personasOn = FeatureFlags.get(context).persona()
-    // 通话入口:输入栏常驻听筒按钮;信号一涨就亮出通话页(直开 extra 或按钮都行)
+    // Call entry point: a handset button sits permanently in the input bar; as soon as the signal rises the call page appears (via the direct-open extra or the button)
     var localVoiceCall by remember { mutableIntStateOf(0) }
     val voiceCallScope = rememberCoroutineScope()
     val voiceCallResumed = remember { MutableStateFlow(true) }
@@ -528,7 +528,7 @@ private fun MikaRoot(
             attachService = { VoiceCallService.attach(context, it) },
         )
     }
-    // 查到的新版本:侧栏、设置首页、关于页的红点都看它
+    // Newly found version: the red dots on the drawer, settings home and about page all read it
     val updateState by app.updates.state.collectAsState()
     val autoUpdate by app.automaticUpdates.enabled.collectAsState()
     val readyUpdate by app.automaticUpdates.ready.collectAsState()
@@ -565,7 +565,7 @@ private fun MikaRoot(
             onSharedDraftOpened(accepted, draft)
         }
     }
-    // 消费任务或内部通知入口提交的自身操作请求。
+    // Consume self-operation requests submitted from tasks or internal notification entry points.
     suspend fun openSelfFile(file: com.wangzan101.mika.self.SelfFileRequest) {
         if (!AttachFiles.openSent(context, file.conversationId, file.path)) {
             Toast.makeText(context, R.string.self_file_failed, Toast.LENGTH_SHORT).show()
@@ -594,7 +594,7 @@ private fun MikaRoot(
         app.selfUi.consumed(r.id)
     }
     val release = remember { Build.VERSION.RELEASE }
-    // 结果卡片上点了「看看」:打开技能分段
+    // "Take a look" tapped on a result card: open the skills segment
     val memoryRuntime = remember { MemoryRuntime.of(context) }
     val phoneSetup = remember { PhoneServices.of(context).setupPrompt }
     val openMemory by memoryRuntime.openRequest.collectAsState()
@@ -605,7 +605,7 @@ private fun MikaRoot(
             onTeachOpened()
         }
     }
-    // 第一次打开:欢迎 → 配置模型 → 手机操作;配过模型的跳过前两步,手机操作已就绪或看过引导的跳过最后一步
+    // First launch: welcome → model setup → phone operations; skip the first two steps when a model is already configured, and skip the last step when phone operations are ready or the guide has been seen
     val onboardingState = remember { OnboardingState(context) }
     fun onboardingInputs() = Onboarding.Inputs(
         hasMainModel = store.roles.value.hasMain,
@@ -616,7 +616,7 @@ private fun MikaRoot(
     fun goOnboarding(step: OnboardingStep?) {
         onboarding = step
         when (step) {
-            // 上手的每一步都直接放在对话页上面一层,做完回到对话页
+            // Each onboarding step sits directly one layer above the chat page; when done it returns to the chat page
             OnboardingStep.Welcome -> nav.show(Route.Welcome)
             OnboardingStep.Model -> nav.show(Route.ModelSetup)
             OnboardingStep.Phone -> { setupRepair = false; nav.show(Route.PhoneSetup) }
@@ -629,15 +629,15 @@ private fun MikaRoot(
         }
     }
     val phoneSetupNeed by phoneSetup.needed.collectAsState()
-    // 页面有自己的返回处理时(设置页里的子页、侧栏)由它们先接;这里只管退回上一页
+    // When a page has its own back handling (sub-pages inside settings, the drawer), it gets the event first; here we only go back one page
     BackHandler(enabled = nav.canGoBack) { nav.back() }
     val back: () -> Unit = { nav.back() }
-    // 聊天页离开组合树时保留列表位置和输入内容，返回设置页等子页面后原样恢复。
+    // The chat page keeps its list position and input content when it leaves the composition tree, and restores them exactly after returning from sub-pages such as settings.
     val screenStates = rememberSaveableStateHolder()
     val sidebarPage = nav.current in setOf(Route.Chat, Route.Personal, Route.Plans, Route.Memory, Route.Browser)
     AdaptiveWindow(navigation = sidebarPage) {
         val page: @Composable (() -> Unit) -> Unit = { openDrawer ->
-    // 全局换页套滑动推入过渡;页内一律用 route 不用 nav.current:过渡动画期间旧页还在渲染,读实时状态会瞬间变脸
+    // Global page switches get the slide-in push transition; inside a page always use route rather than nav.current, because the old page is still rendering during the transition and reading live state would make it change on the spot
     NavSlide(nav.stack, depth = { it.size }) { stack ->
     val route = stack.last()
     when (route) {
@@ -660,7 +660,7 @@ private fun MikaRoot(
             )
         }
         Route.Chat, Route.Personal -> screenStates.SaveableStateProvider(route.name) {
-            // 对话页重新看得见(回到前台、从别的页面回来):补上别处存进来的轮次,接上别处开始的任务
+            // The chat page is visible again (back in the foreground, or returning from another page): append turns stored elsewhere and pick up tasks started elsewhere
             LifecycleStartEffect(Unit) {
                 app.chat.refresh()
                 onStopOrDispose {}
@@ -708,7 +708,7 @@ private fun MikaRoot(
                                 app.teach.prefill(hint)
                                 nav.push(Route.Teach)
                             },
-                            // 入口常驻:没配凭据/协议不兼容时进的是门禁页(说明 + 去配置),不静默消失
+                            // The entry point is permanent: when credentials aren't configured or the protocol is incompatible it opens the gated page (explanation + go configure) instead of silently disappearing
                             onVoiceCall = { localVoiceCall++ },
                         )
                     }
@@ -813,7 +813,7 @@ private fun MikaRoot(
             )
             val routeStore = remember { FileRouteStore.shared(context) }
             var routeCount by remember { mutableStateOf<Int?>(null) }
-            // 第一次取记忆要读盘解密,放到后台线程;页面的协程跟着这一屏走
+            // The first memory fetch has to read and decrypt from disk, so it runs on a background thread; the page's coroutine is tied to this screen
             val vmScope = rememberCoroutineScope()
             LaunchedEffect(Unit) { routeCount = withContext(Dispatchers.IO) { runCatching { routeStore.count() }.getOrNull() } }
             val vm by produceState<MemoryViewModel?>(null) {
@@ -832,7 +832,7 @@ private fun MikaRoot(
                 }
             }
             vm?.let { m ->
-                // 从结果卡片的「看看」进来:直接看技能分段
+                // Entered from "take a look" on a result card: show the skills segment directly
                 LaunchedEffect(m) {
                     val open = memoryRuntime.openRequest.value
                     if (open != null) m.select(if (open.draftId != null) Segment.Pending else Segment.Skills)
@@ -919,9 +919,9 @@ private fun MikaRoot(
         } else page({})
     }
 
-    // 通话页盖在整棵导航上:全屏 Dialog,收起后宿主还在,服务保活的通话随时能亮回来
+    // The call page is layered over the whole navigation tree: a full-screen Dialog, so the host survives after it's dismissed and a service-kept call can light up again at any time
     VoiceCallHost(voiceCallDeps, voiceCallSignal + localVoiceCall, onGoConfigure = { gate ->
-        // 标准通话缺的是听和说的模型,去「通话方式」;实时通话缺凭据,去电话页的语音设置
+        // A standard call is missing the listen-and-speak models, so go to "call mode"; a realtime call is missing credentials, so go to the voice settings on the phone page
         nav.push(if (gate == com.wangzan101.mika.voicecall.ui.VoiceCallGateStage.NeedListenSpeak) Route.CallMode else Route.Calls)
     })
 
@@ -943,7 +943,7 @@ private fun MikaRoot(
     }
 }
 
-/** 自身工具能打开的 Claire 顶层页;只给这几页,不给权限/root/开发者子页。 */
+/** Claire top-level pages a self tool can open; only these pages are exposed, not the permission/root/developer sub-pages. */
 private fun com.wangzan101.mika.core.self.SelfScreen.route(): Route = when (this) {
     com.wangzan101.mika.core.self.SelfScreen.Chat -> Route.Chat
     com.wangzan101.mika.core.self.SelfScreen.Settings -> Route.Settings
