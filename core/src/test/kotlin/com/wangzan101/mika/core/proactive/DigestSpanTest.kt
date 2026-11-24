@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 周归纳(第 3 级)、月归纳(第 4 级)在 [DigestPool] 里的那部分:该做哪一份、输入、记下、删除往上传、留多久。 */
+/** The week (level 3) and month (level 4) digest parts of [DigestPool]: which span is due, the input, recording, deletion propagating upward, and how long each is kept. */
 class DigestSpanTest {
     private val utc = ZoneOffset.UTC
     private val dayMs = LearnTuning.DAY_MS
@@ -16,7 +16,7 @@ class DigestSpanTest {
     private fun pool(data: DigestData = DigestData()) = DigestPool(data) { "d${++n}" }
     private fun day(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).toEpochDay()
 
-    // 2024-09-30 是周一;这一周到 10-06(周日),算十月的
+    // 2024-09-30 is a Monday; this week runs to 10-06 (Sunday) and counts as October
     private val mon = day(2024, 9, 30)
     private val nextMon = mon + 7
     private val oct = day(2024, 10, 1)
@@ -26,7 +26,7 @@ class DigestSpanTest {
     private val waitIfOwed = { _: Long, owed: Boolean -> owed }
     private val noSkip = { _: Long -> false }
 
-    /** 给 [day] 这一天记下几句分段归纳(一句一段通知),不做当日归纳。返回这几句。 */
+    /** Record a few notes for [day] (one note per notification) without making the day digest. Returns those notes. */
     private fun notes(p: DigestPool, day: Long, vararg texts: String, pkg: String = "com.chat", madeAt: Long = day * dayMs + 20 * 3_600_000L): List<DigestNote> {
         val before = p.all().map { it.id }.toSet()
         val entries = texts.indices.map { NoticeEntry(pkg, day * dayMs + 9 * 3_600_000L + it, "群", "甲", "x", keyId = "k", sig = it) }
@@ -34,7 +34,7 @@ class DigestSpanTest {
         return p.all().filter { it.id !in before }
     }
 
-    /** 给 [day] 这一天记下分段归纳,并做一份当日归纳:一句分段归纳一句(文字就是 [texts])。 */
+    /** Record notes for [day] and make a day digest: one line per note (the text is [texts]). */
     private fun dayWith(p: DigestPool, day: Long, vararg texts: String, pkg: String = "com.chat", partial: Boolean = false, madeAt: Long = day * dayMs + 23 * 3_600_000L): List<DigestNote> {
         val added = notes(p, day, *texts, pkg = pkg, madeAt = madeAt - 1)
         val input = p.dayInput(day)
@@ -52,38 +52,38 @@ class DigestSpanTest {
         assertEquals(mon, DigestPool.weekOf(mon + 6))
         assertEquals(nextMon, DigestPool.weekOf(mon + 7))
         assertEquals(mon - 7, DigestPool.weekOf(mon - 1))
-        // 1970-01-01 是周四:它那一周的周一在纪元之前
+        // 1970-01-01 is a Thursday: the Monday of its week lies before the epoch
         assertEquals(-3L, DigestPool.weekOf(0))
         assertEquals(oct, DigestPool.monthOf(day(2024, 10, 31)))
         assertEquals(nov, DigestPool.monthOf(nov))
-        // 9-30 开始的一周在 10-06 结束:算十月的;10-28 开始的一周在 11-03 结束:算十一月的
+        // The week starting 9-30 ends on 10-06: it counts as October; the week starting 10-28 ends on 11-03: it counts as November
         assertEquals(oct, DigestPool.monthOfWeek(mon))
         assertEquals(nov, DigestPool.monthOfWeek(day(2024, 10, 28)))
     }
 
-    // 该做哪一周:已经过完、有完整的当日归纳、还没有完整周归纳的最早一周;里面还欠着当日归纳的日子先等它
+    // Which week is due: the earliest week that has finished, has complete day digests, and has no complete week digest yet; days inside it that still owe a day digest make it wait
     @Test fun dueWeekIsTheEarliestFinishedWeekWhoseDaysAreDone() {
         val p = pool()
         dayWith(p, mon, "周一的事")
         dayWith(p, mon + 2, "周三的事")
         dayWith(p, nextMon, "下周一的事")
-        // 这一周还没过完
+        // This week isn't over yet
         assertNull(p.dueWeek(mon + 6, waitIfOwed, noSkip))
         assertEquals(mon, p.dueWeek(nextMon, waitIfOwed, noSkip))
-        // 周五有句子还没做当日归纳:先等;说了不等(试了几次都不成)就做
+        // Friday has notes with no day digest yet: wait; when told not to wait (several tries failed) go ahead
         notes(p, mon + 4, "周五的事")
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         assertEquals(mon, p.dueWeek(nextMon, noWait, noSkip))
-        // 调用方自己也可以叫它等(那天还有通知没做过分段归纳)
+        // The caller can also make it wait itself (that day still has notifications without segmentation)
         assertNull(p.dueWeek(nextMon, { d, _ -> d == mon + 5 }, noSkip))
         assertNull(p.dueWeek(nextMon, noWait) { it == mon })
-        // 做完之后轮到下一周(它过完了的话)
+        // After it's done the next week is due (if that week has finished)
         week(p, mon, at = nextMon * dayMs)
         assertNull(p.dueWeek(nextMon + 6, noWait, noSkip))
         assertEquals(nextMon, p.dueWeek(nextMon + 7, noWait, noSkip))
     }
 
-    // 周归纳做完之后,它里面某一天的当日归纳又重做过(补收到了通知):这一周跟着重做一次,而且只一次
+    // After the week digest was made, one of its day digests was redone (notifications were collected late): the week is redone as well, and only once
     @Test fun aWeekIsRedoneWhenOneOfItsDaysIsRedoneLater() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -94,14 +94,14 @@ class DigestSpanTest {
         week(p, mon, at = nextMon * dayMs + 9)
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         assertEquals(listOf("周:重做的周一"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
-        // 做的时间不早于下一级:哪怕时钟往回拨了,也不会一直重做
+        // Made-at is never earlier than the level below: even if the clock is turned back, it won't keep redoing
         p.setDay(mon, p.dayInput(mon), emptyList(), nextMon * dayMs + 100, partial = false)
         week(p, mon, at = 5)
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         assertEquals(nextMon * dayMs + 100, p.span(SpanKind.Week, mon)!!.madeAtMs)
     }
 
-    // 「到现在为止」的那份:自动做的不拿半截的当日归纳当输入;一周过完,到现在为止的周归纳要重做成完整的
+    // The "so far" version: automatic runs don't take half-finished day digests as input; once the week is over, a so-far week digest must be remade as complete
     @Test fun partialsAreOnlyForTheUserAndAreRedoneOnceThePeriodEnds() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -111,17 +111,17 @@ class DigestSpanTest {
         week(p, mon, at = (mon + 1) * dayMs + 1, partial = true)
         assertTrue(p.span(SpanKind.Week, mon)!!.partial)
         assertEquals(2, p.span(SpanKind.Week, mon)!!.inputCount)
-        // 周二过完之前,这一周还欠着当日归纳
+        // Until Tuesday is over, this week still owes a day digest
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         p.setDay(mon + 1, p.dayInput(mon + 1), listOf(NoteSignal(listOf(0), "周二完整的")), (mon + 2) * dayMs, partial = false)
         assertEquals(mon, p.dueWeek(nextMon, waitIfOwed, noSkip))
-        // 只有半截的当日归纳的一周:没有可以自动做的
+        // A week with only half-finished day digests: nothing to auto-make
         val q = pool()
         dayWith(q, mon, "到现在的", partial = true)
         assertNull(q.dueWeek(nextMon, noWait, noSkip))
     }
 
-    // 输入太长:各天轮流取,每天留住排在前面的句子,而不是只剩最前面几天
+    // Input too long: take turns across days, keeping each day's leading lines rather than only the first few days
     @Test fun longInputKeepsTheFirstLinesOfEveryDay() {
         val p = pool()
         val long = "长".repeat(280)
@@ -131,16 +131,16 @@ class DigestSpanTest {
         val perDay = input.groupBy { it.from }.mapValues { it.value.size }
         assertEquals((0 until 7).map { mon + it }.toSet(), perDay.keys)
         assertTrue(perDay.toString(), perDay.values.max() - perDay.values.min() <= 1)
-        // 每天留下的是排在前面的,按天、按原来的次序排
+        // What each day keeps is its leading lines, ordered by day and in the original order
         assertEquals(input.map { it.from }, input.map { it.from }.sorted())
         assertTrue(input.filter { it.from == mon }.mapIndexed { i, l -> l.line.text.startsWith("0-$i") }.all { it })
-        // 不长的时候全放
+        // When it isn't long, everything fits
         val q = pool()
         dayWith(q, mon, "a", "b", "c")
         assertEquals(3, q.spanInput(SpanKind.Week, mon, withPartial = false).size)
     }
 
-    // 周归纳的每句往下记到底:哪几天、哪些分段归纳、哪些 App。指不上依据的、依据已经不在了的整句不要
+    // Each week-digest line records its grounds all the way down: which days, which notes, which apps. Lines with untraceable or vanished grounds are dropped whole
     @Test fun weekLinesKeepTheirGroundsAllTheWayDown() {
         val p = pool()
         val a = dayWith(p, mon, "周一聊天的事")
@@ -155,13 +155,13 @@ class DigestSpanTest {
         assertEquals(2, w.inputCount)
         assertEquals(listOf(mon), p.spans(SpanKind.Week).map { it.start })
         assertEquals(p.data(), pool(p.data()).data())
-        // 请求在途时周三那句被删了(它依据的分段归纳被用户删掉):合了它的那句整句不要
+        // Wednesday's line was deleted while the request was in flight (the user deleted the notes it rested on): the line that merged it is dropped whole
         p.delete(b.single().id)
         p.setSpan(SpanKind.Week, mon, input, listOf(NoteSignal(listOf(0, 1), "两天合起来"), NoteSignal(listOf(0), "只有周一")), 78, partial = false)
         assertEquals(listOf("只有周一"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
     }
 
-    /** 两周、各有周归纳,再合成十月的月归纳(每句周归纳一句)。 */
+    /** Two weeks, each with a week digest, then combined into October's month digest (one line per week line). */
     private fun twoWeeksAndAMonth(p: DigestPool): Pair<List<DigestNote>, List<DigestNote>> {
         val first = dayWith(p, mon, "第一周聊天的事") + dayWith(p, mon + 1, "第一周邮件的事", pkg = "com.mail")
         val second = dayWith(p, nextMon, "第二周聊天的事")
@@ -173,7 +173,7 @@ class DigestSpanTest {
         return first to second
     }
 
-    // 月归纳:输入是结束在这个月的各周的周归纳;每句记着哪几周、哪几天、哪些分段归纳、哪些 App
+    // Month digest: the input is the week digests of the weeks that end in this month; each line records which weeks, days, notes and apps it rests on
     @Test fun monthLinesAreBuiltFromTheWeeksThatEndInTheMonth() {
         val p = pool()
         val (first, second) = twoWeeksAndAMonth(p)
@@ -188,33 +188,33 @@ class DigestSpanTest {
         assertEquals(p.data(), pool(p.data()).data())
     }
 
-    // 该做哪个月:已经过完、有完整的周归纳、还没有完整月归纳的最早一个月;它里面还欠着周归纳的周先等
+    // Which month is due: the earliest month that has finished, has complete week digests, and has no complete month digest yet; weeks inside it that still owe a week digest make it wait
     @Test fun dueMonthWaitsForItsWeeks() {
         val p = pool()
         dayWith(p, mon, "第一周的事")
         dayWith(p, nextMon, "第二周的事")
         week(p, mon, at = nextMon * dayMs)
-        // 十月还没过完
+        // October isn't over yet
         assertNull(p.dueMonth(day(2024, 10, 31), waitIfOwed, noSkip))
-        // 第二周的周归纳还没做:先等;说了不等就做
+        // The second week's digest isn't made yet: wait; when told not to wait, go ahead
         assertNull(p.dueMonth(nov, waitIfOwed, noSkip))
         assertEquals(oct, p.dueMonth(nov, noWait, noSkip))
         assertNull(p.dueMonth(nov, noWait) { it == oct })
         week(p, nextMon, at = (nextMon + 7) * dayMs)
         assertEquals(oct, p.dueMonth(nov, waitIfOwed, noSkip))
-        // 这个月里有一周只有句子、连当日归纳都还没做:也等(做完之后那一周就要做周归纳了)
+        // One week in this month has only notes, not even a day digest: wait as well (once that's done, that week will owe a week digest)
         notes(p, nextMon + 7, "第三周的事")
         assertNull(p.dueMonth(nov, waitIfOwed, noSkip))
         assertEquals(oct, p.dueMonth(nov, noWait, noSkip))
         val input = p.spanInput(SpanKind.Month, oct, withPartial = false)
         p.setSpan(SpanKind.Month, oct, input, emptyList(), nov * dayMs, partial = false)
         assertNull(p.dueMonth(nov, noWait, noSkip))
-        // 之后某一周重做了:这个月跟着重做
+        // A week was redone afterwards: this month is redone as well
         week(p, mon, at = nov * dayMs + 5)
         assertEquals(oct, p.dueMonth(nov, noWait, noSkip))
     }
 
-    // 删除往上传:删掉一句分段归纳,各级里依据过它的句子都去掉;别的不动
+    // Deletion travels upward: deleting a note drops the lines at every level that rested on it; nothing else changes
     @Test fun deletingANoteRemovesEveryLineBuiltOnIt() {
         val p = pool()
         val (first, _) = twoWeeksAndAMonth(p)
@@ -222,12 +222,12 @@ class DigestSpanTest {
         assertTrue(p.day(mon + 1)!!.lines.isEmpty())
         assertEquals(listOf("周:第一周聊天的事"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
         assertEquals(listOf("月:周:第一周聊天的事", "月:周:第二周聊天的事"), p.span(SpanKind.Month, oct)!!.lines.map { it.text })
-        // 不因此重做(下一级没有重做过)
+        // No redo from this (the level below wasn't redone)
         assertNull(p.dueWeek(nov, waitIfOwed, noSkip))
         assertNull(p.dueMonth(nov + 31, waitIfOwed, noSkip))
     }
 
-    // 删掉一天的当日归纳:周、月归纳里依据过这一天的句子去掉;删掉一周的周归纳:月归纳里依据过它的去掉
+    // Deleting a day digest: week and month lines that rested on that day are dropped; deleting a week digest: month lines that rested on it are dropped
     @Test fun deletingADayOrAWeekRemovesTheLinesAbove() {
         val p = pool()
         twoWeeksAndAMonth(p)
@@ -240,11 +240,11 @@ class DigestSpanTest {
         assertFalse(p.deleteSpan(SpanKind.Week, nextMon))
         assertTrue(p.deleteSpan(SpanKind.Month, oct))
         assertTrue(p.spans(SpanKind.Month).isEmpty())
-        // 删月归纳不动下面的
+        // Deleting a month digest leaves the levels below alone
         assertEquals(1, p.spans(SpanKind.Week).size)
     }
 
-    // 清掉某个 App:各级里依据过它的句子都去掉(哪怕同时依据了别的 App)
+    // Purging an app: lines at every level that rested on it are dropped (even if they also rested on other apps)
     @Test fun purgingAnAppReachesEveryLevel() {
         val p = pool()
         twoWeeksAndAMonth(p)
@@ -256,7 +256,7 @@ class DigestSpanTest {
         assertTrue(p.spans(SpanKind.Week).isEmpty() && p.spans(SpanKind.Month).isEmpty())
     }
 
-    // 到期不往上传:下面的到期删掉了,上面的句子留着(只是不再记着已经没了的分段归纳),也不因此重做;各级各有各的期限
+    // Expiry doesn't travel upward: when the lower level expires, the lines above stay (they merely stop referencing notes that are gone), and nothing is redone; each level has its own lifetime
     @Test fun expiryDoesNotTravelUpward() {
         val p = pool()
         twoWeeksAndAMonth(p)
@@ -269,7 +269,7 @@ class DigestSpanTest {
         assertEquals(2, p.spans(SpanKind.Week).size)
         assertNull(p.dueWeek(nextMon + 100, waitIfOwed, noSkip))
         assertNull(p.dueMonth(nextMon + 100, waitIfOwed, noSkip))
-        // 周归纳按它结束的那天算,留 WEEKS_KEEP_DAYS 天;月归纳按那个月的最后一天算,留 MONTHS_KEEP_DAYS 天
+        // Week digests count from the day they end and are kept WEEKS_KEEP_DAYS days; month digests count from the last day of that month and are kept MONTHS_KEEP_DAYS days
         assertFalse(p.expire(mon + 6 + LearnTuning.WEEKS_KEEP_DAYS))
         assertTrue(p.expire(mon + 6 + LearnTuning.WEEKS_KEEP_DAYS + 1))
         assertEquals(listOf(nextMon), p.spans(SpanKind.Week).map { it.start })
@@ -281,7 +281,7 @@ class DigestSpanTest {
         assertTrue(p.spans(SpanKind.Month).isEmpty())
     }
 
-    // 往上归纳之前,今天的当日归纳要不要先(重)做:今天有句子而没有归纳,或做完之后又来了新句子
+    // Before summarizing upward, whether today's digest must be (re)made first: today has notes but no digest, or new notes arrived after it was made
     @Test fun todayIsStaleWhenNotesCameAfterItsDigest() {
         val p = pool()
         assertFalse(p.todayStale(mon))
@@ -293,7 +293,7 @@ class DigestSpanTest {
         assertTrue(p.todayStale(mon))
     }
 
-    // 旧版本存下来的(没有周、月,句子上没有 days、weeks):照样读得出来
+    // Saved by an older version (no weeks or months, no days/weeks on lines): still decodes
     @Test fun olderFilesStillDecode() {
         val old = """{"version":1,"notes":[],"days":[{"day":$mon,"madeAtMs":5,"lines":[{"text":"旧的一句","notes":["d1"],"apps":["com.chat"]}],"noteCount":1}]}"""
         val data = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(DigestData.serializer(), old)
@@ -303,7 +303,7 @@ class DigestSpanTest {
         assertEquals(mon, p.dueWeek(nextMon, waitIfOwed, noSkip))
     }
 
-    // 周归纳的请求在途时,分段归纳到期删掉了(句子上记的 id 被划掉):句子本身还在,结果照常记下,不能当成「依据没了」整份丢掉
+    // Notes expired while the week request was in flight (the ids recorded on the line are struck): the line itself is still there, so the result is recorded as usual and must not be discarded whole as "grounds gone"
     @Test fun notesExpiringDuringARequestDoNotDropTheResult() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -317,25 +317,25 @@ class DigestSpanTest {
         assertEquals(listOf(mon), line.days)
     }
 
-    // 月归纳实际管到哪几天:从算进它的第一周的周一,到算进它的最后一周的周日
+    // Which days a month digest actually covers: from the Monday of the first week counted into it to the Sunday of the last week counted into it
     @Test fun aMonthCoversTheWeeksThatEndInIt() {
-        // 2024 年 10 月:10-01 是周二,它那一周从 9-30 开始;10-31 是周四,它那一周在 11-03 结束,算十一月的,所以十月管到 10-27
+        // October 2024: 10-01 is a Tuesday, so its week starts on 9-30; 10-31 is a Thursday, its week ends on 11-03 and counts as November, so October covers up to 10-27
         assertEquals(day(2024, 9, 30)..day(2024, 10, 27), DigestPool.monthCover(oct))
-        // 11-30 是周六,它那一周在 12-01 结束,算十二月的:十一月管到 11-24
+        // 11-30 is a Saturday, its week ends on 12-01 and counts as December: November covers up to 11-24
         assertEquals(day(2024, 10, 28)..day(2024, 11, 24), DigestPool.monthCover(nov))
-        // 月底正好是周日:管到月底;一号正好是周一:从一号起
+        // When the month ends on a Sunday: cover through month end; when the 1st is a Monday: start on the 1st
         assertEquals(day(2025, 8, 31), DigestPool.monthCover(day(2025, 8, 1)).last)
         assertEquals(day(2025, 9, 1), DigestPool.monthCover(day(2025, 9, 1)).first)
-        // 每一天都正好落在一个月里,和 monthOfWeek 的说法一致
+        // Every day falls in exactly one month, matching monthOfWeek
         for (d in day(2024, 1, 1)..day(2026, 12, 31)) {
             val m = DigestPool.monthOfWeek(DigestPool.weekOf(d))
             assertTrue("$d", d in DigestPool.monthCover(m))
         }
     }
 
-    // ---- 删了就不再自动做 ----
+    // ---- Once deleted, never auto-made again ----
 
-    // 删掉一天的当日归纳:读的人看不到它;它还有句子、之后又补收到新句子,都不再自动做;存下来读回来还是这样
+    // Deleting a day digest: readers no longer see it; even though it still has notes, and new notes arrive later, it is never auto-made again; still so after saving and reloading
     @Test fun aDeletedDayIsNotMadeAgain() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -346,22 +346,22 @@ class DigestSpanTest {
         assertTrue(p.dayRemoved(mon))
         assertEquals(1, p.notes(mon).size)
         assertNull(p.dueDay(mon + 1) { true })
-        // 之后又补收到这一天的通知、写成了句子
+        // Later, notifications for that day are collected and turned into notes
         notes(p, mon, "后来补收到的", madeAt = (mon + 1) * dayMs + 5)
         assertNull(p.dueDay(mon + 1) { true })
         val back = pool(p.data())
         assertNull(back.dueDay(mon + 1) { true })
         assertTrue(back.dayRemoved(mon) && back.days().isEmpty())
-        // 没做过的那一天没有东西可删
+        // A day that was never made has nothing to delete
         assertFalse(p.deleteDay(mon + 3))
-        // 用户自己再要一次:做出来,记号没了;那是「到现在为止」的,过完之后照常补成完整的
+        // The user asks for it again: it is made and the marker is gone; that one is "so far", and after the day ends it is completed as usual
         p.setDay(mon, p.dayInput(mon), listOf(NoteSignal(listOf(0), "重新要的")), (mon + 1) * dayMs + 9, partial = true)
         assertFalse(p.dayRemoved(mon))
         assertEquals(listOf("重新要的"), p.day(mon)!!.lines.map { it.text })
         assertEquals(mon, p.dueDay(mon + 1) { true })
     }
 
-    // 删掉的那一天对周归纳来说就是不在:不当输入,不因为它重做,只剩它的那一周也不会被记成「做过了、没东西」
+    // A deleted day simply doesn't exist for its week digest: it isn't input, doesn't cause a redo, and a week left with only that day isn't recorded as "done, nothing there"
     @Test fun aDeletedDayIsInvisibleToItsWeek() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -371,7 +371,7 @@ class DigestSpanTest {
         assertEquals(listOf("周:周一的事"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         assertEquals(listOf("周一的事"), p.spanInput(SpanKind.Week, mon, withPartial = true).map { it.line.text })
-        // 请求在途时那一天被删了:依据过它的句子不写回来
+        // That day was deleted while the request was in flight: lines that rested on it aren't written back
         val q = pool()
         dayWith(q, mon, "周一的事")
         dayWith(q, mon + 2, "周三的事")
@@ -379,7 +379,7 @@ class DigestSpanTest {
         q.deleteDay(mon + 2)
         q.setSpan(SpanKind.Week, mon, input, listOf(NoteSignal(listOf(0, 1), "两天合的"), NoteSignal(listOf(0), "只有周一")), nextMon * dayMs, partial = false)
         assertEquals(listOf("只有周一"), q.span(SpanKind.Week, mon)!!.lines.map { it.text })
-        // 一周里唯一的一天被删了:这一周没有可做的,也不欠着
+        // The only day in the week was deleted: the week has nothing to do and owes nothing
         val r = pool()
         dayWith(r, mon, "周一的事")
         r.deleteDay(mon)
@@ -388,7 +388,7 @@ class DigestSpanTest {
         assertTrue(r.spans(SpanKind.Week).isEmpty())
     }
 
-    // 删掉一周的周归纳:不再自动做——哪怕之后它里面某一天的当日归纳又重做了;存下来读回来还是这样;用户再要一次才回来
+    // Deleting a week's digest: never auto-made again — even if a day inside it is redone later; still so after saving and reloading; only a fresh user request brings it back
     @Test fun aDeletedWeekIsNotMadeAgain() {
         val p = pool()
         dayWith(p, mon, "周一的事")
@@ -399,21 +399,21 @@ class DigestSpanTest {
         assertTrue(p.spans(SpanKind.Week).isEmpty())
         assertEquals(setOf(mon), p.removedSpans(SpanKind.Week))
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
-        // 下一级后来重做过
+        // The level below was redone afterwards
         p.setDay(mon, p.dayInput(mon), listOf(NoteSignal(listOf(0), "重做的周一")), nextMon * dayMs + 50, partial = false)
         assertNull(p.dueWeek(nextMon, waitIfOwed, noSkip))
         val back = pool(p.data())
         assertNull(back.dueWeek(nextMon, waitIfOwed, noSkip))
         assertEquals(setOf(mon), back.removedSpans(SpanKind.Week))
-        // 没做过的周归纳没有东西可删
+        // A week digest that was never made has nothing to delete
         assertFalse(p.deleteSpan(SpanKind.Week, nextMon))
-        // 用户自己再要一次
+        // The user asks for it again
         week(p, mon, at = nextMon * dayMs + 60, partial = true)
         assertTrue(p.removedSpans(SpanKind.Week).isEmpty())
         assertEquals(listOf("周:重做的周一"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
     }
 
-    // 删掉的那一周对月归纳来说就是不在:月归纳不等它、不拿它当输入、不因为它重做;删掉的月归纳也不再自动做
+    // A deleted week doesn't exist for its month digest: the month doesn't wait for it, doesn't use it as input, and isn't redone because of it; a deleted month digest is never auto-made again either
     @Test fun aDeletedWeekIsInvisibleToItsMonthAndADeletedMonthStaysDeleted() {
         val p = pool()
         twoWeeksAndAMonth(p)
@@ -421,7 +421,7 @@ class DigestSpanTest {
         assertEquals(listOf("月:周:第一周聊天的事", "月:周:第一周邮件的事"), p.span(SpanKind.Month, oct)!!.lines.map { it.text })
         assertNull(p.dueMonth(nov, waitIfOwed, noSkip))
         assertEquals(listOf(mon, mon), p.spanInput(SpanKind.Month, oct, withPartial = true).map { it.from })
-        // 月归纳还没做的时候:删掉的那一周不让它一直等
+        // While the month digest hasn't been made: the deleted week doesn't make it wait indefinitely
         val q = pool()
         dayWith(q, mon, "第一周的事")
         dayWith(q, nextMon, "第二周的事")
@@ -430,14 +430,14 @@ class DigestSpanTest {
         q.deleteSpan(SpanKind.Week, nextMon)
         assertEquals(oct, q.dueMonth(nov, waitIfOwed, noSkip))
         assertEquals(listOf("周:第一周的事"), q.spanInput(SpanKind.Month, oct, withPartial = false).map { it.line.text })
-        // 一个月里唯一的一周被删了:这个月没有可做的,不会被记成「做过了、没东西」
+        // The only week in the month was deleted: the month has nothing to do and isn't recorded as "done, nothing there"
         val r = pool()
         dayWith(r, mon, "第一周的事")
         week(r, mon, at = nextMon * dayMs)
         r.deleteSpan(SpanKind.Week, mon)
         assertNull(r.dueMonth(nov, noWait, noSkip))
         assertTrue(r.spanInput(SpanKind.Month, oct, withPartial = true).isEmpty())
-        // 删掉月归纳:之后某一周重做了也不再自动做;读回来还是这样
+        // Deleting the month digest: even if a week is redone later it is never auto-made again; still so after reloading
         assertTrue(p.deleteSpan(SpanKind.Month, oct))
         assertEquals(setOf(oct), p.removedSpans(SpanKind.Month))
         week(p, mon, at = nov * dayMs + 5)
@@ -446,7 +446,7 @@ class DigestSpanTest {
         assertTrue(p.spans(SpanKind.Month).isEmpty())
     }
 
-    // 今天的当日归纳被删了:要本周、本月到现在的,不顺带把它做回来;记号和那一级留得一样久,清空全部时一起清掉
+    // Today's digest was deleted: asking for this week's or this month's so-far digest doesn't bring it back along the way; the marker lives as long as its level and is cleared with clear-all
     @Test fun deletedMarkersDoNotDragTodayBackAndExpireWithTheirLevel() {
         val p = pool()
         dayWith(p, mon, "今天的事", partial = true)
@@ -466,7 +466,7 @@ class DigestSpanTest {
     }
 
 
-    // 周、月归纳的概述:记下;删掉它依据的一天(一周)、清掉一个 App 时,去掉了句子的那一份一并清掉
+    // Week/month digest summaries: stored; deleting a day (or week) they rested on, or purging an app, also clears the summary of any digest that lost lines
     @Test fun spanBriefsAreStoredAndClearedWithTheLinesTheyDescribed() {
         fun fresh() = pool().also { p ->
             dayWith(p, mon, "周一的事")
@@ -481,25 +481,25 @@ class DigestSpanTest {
             assertEquals("这个月两件事", p.span(SpanKind.Month, oct)!!.brief)
             assertEquals("这一周两件事", pool(p.data()).span(SpanKind.Week, mon)!!.brief)
         }
-        // 删掉一天的当日归纳:周、月里依据过它的句子去掉,概述清掉
+        // Deleting a day digest: week and month lines that rested on it are dropped and the summaries cleared
         fresh().let { p ->
             assertTrue(p.deleteDay(mon))
             assertEquals(listOf("周:周二的事"), p.span(SpanKind.Week, mon)!!.lines.map { it.text })
             assertEquals("", p.span(SpanKind.Week, mon)!!.brief)
             assertEquals("", p.span(SpanKind.Month, oct)!!.brief)
         }
-        // 删掉周归纳:月归纳里依据过它的句子去掉,概述清掉
+        // Deleting a week digest: month lines that rested on it are dropped and the summary cleared
         fresh().let { p ->
             assertTrue(p.deleteSpan(SpanKind.Week, mon))
             assertEquals("", p.span(SpanKind.Month, oct)!!.brief)
         }
-        // 清掉一个 App
+        // Purge an app
         fresh().let { p ->
             assertTrue(p.removePackages { it != "com.mail" })
             assertEquals("", p.span(SpanKind.Week, mon)!!.brief)
             assertEquals("", p.span(SpanKind.Month, oct)!!.brief)
         }
-        // 删一句分段归纳:管着那一天的周、月概述都清掉,哪怕没有句子因此被去掉(分段归纳已经到期、句子上不再记着它的时候)
+        // Deleting a note: the week and month summaries covering that day are cleared even when no line is dropped because of it (e.g. the note already expired and lines no longer record it)
         fresh().let { p ->
             val extra = notes(p, mon + 2, "没进当日归纳的一句").single()
             assertTrue(p.delete(extra.id))
@@ -507,7 +507,7 @@ class DigestSpanTest {
             assertEquals("", p.span(SpanKind.Week, mon)!!.brief)
             assertEquals("", p.span(SpanKind.Month, oct)!!.brief)
         }
-        // 收下的句子比给的少:不留
+        // Fewer lines accepted than given: not kept
         fresh().let { p ->
             val w = p.spanInput(SpanKind.Week, mon, withPartial = false)
             p.setSpan(SpanKind.Week, mon, w, listOf(NoteSignal(listOf(0), "只有一句"), NoteSignal(listOf(9), "没依据")), (mon + 9) * dayMs, partial = false, brief = "两件事")

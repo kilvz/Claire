@@ -190,7 +190,7 @@ class MeteredModelTest {
         assertSame(r, m.complete("s", user, emptyList()))
     }
 
-    // 非 HTTP 模型仍记逻辑调用和最终用量,但不能凭空增加实际请求;不在运行上下文里的调用不算
+    // Non-HTTP models still record logical calls and final usage, but must not fabricate actual requests; calls outside a run context don't count
     @Test fun callsInsideARunAreTalliedForThatRun() = runTest {
         val tally = RunUsageTally()
         val ok = Plain { reply(Usage(100, 20, 60)) }.metered(source, sink)
@@ -210,7 +210,7 @@ class MeteredModelTest {
         assertEquals(100L, e.inputTokens)
         assertEquals(20L, e.outputTokens)
         assertEquals(60L, e.cachedTokens)
-        // 总账照记每一次
+        // The ledger still records every call
         assertEquals(4, recorded.size)
     }
 }

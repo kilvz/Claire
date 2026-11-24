@@ -53,7 +53,7 @@ class RateLimitGovernorTest {
         val start = currentTime
         RateLimitGovernor.awaitClear("m")
         assertEquals(5_000L, currentTime - start)
-        // 消费掉了：第二次不再等
+        // Consumed: the second call doesn't wait
         RateLimitGovernor.awaitClear("m")
         assertEquals(5_000L, currentTime - start)
     }

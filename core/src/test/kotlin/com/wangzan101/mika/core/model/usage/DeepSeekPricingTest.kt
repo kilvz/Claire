@@ -19,7 +19,7 @@ class DeepSeekPricingTest {
     @Test fun calculatesCachePricesAndOnlyShowsARangeInPossiblePeakWindows() {
         val usage = Usage(1_000_000, 1_000_000, 500_000)
         val cost = DeepSeekRunCost()
-        // 北京时间周一 09:00、12:00 和周日 09:00，只有第一笔在可能的高峰窗口内。
+        // Beijing time Monday 09:00 and 12:00, and Sunday 09:00; only the first falls inside a possible peak window.
         cost.add("deepseek-flash", Instant.parse("2026-11-02T01:00:00Z"), usage, 1)
         cost.add("deepseek-flash", Instant.parse("2026-11-02T04:00:00Z"), usage, 1)
         cost.add("deepseek-v4-flash", Instant.parse("2026-11-01T01:00:00Z"), usage, 1)

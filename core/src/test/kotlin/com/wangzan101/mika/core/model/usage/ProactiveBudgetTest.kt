@@ -37,7 +37,7 @@ class ProactiveBudgetTest {
         }
     }
 
-    /** 服务商不报用量时 Token 一直是 0:请求次数到了上限也要停。上限跟着 Token 上限算(2 万 Token 时是下限 200 次)。 */
+    /** When the provider reports no usage, tokens stay at 0: stop once the call count reaches its limit even so. The limit is derived from the token limit (200 calls is the floor for 20k tokens). */
     @Test fun stopsOnceTheDailyCallCountIsReachedEvenWithNoReportedTokens() {
         assertEquals(200L, ProactiveBudget.callLimit(20_000))
         ProactiveBudget.check(0, 20_000, callsToday = 199)
@@ -59,7 +59,7 @@ class ProactiveBudgetTest {
         assertEquals("默认 20 万", 800L, ProactiveBudget.callLimit(ProactiveBudget.DEFAULT_DAILY_LIMIT))
         assertEquals(8_000L, ProactiveBudget.callLimit(2_000_000))
         assertEquals(400_000L, ProactiveBudget.callLimit(TokenBudgetLimits.MAX))
-        // 每次约 500 Token 时先到的是 Token 上限
+        // At about 500 tokens per call, the token limit is reached first
         assertTrue(ProactiveBudget.callLimit(ProactiveBudget.DEFAULT_DAILY_LIMIT) * 500 > ProactiveBudget.DEFAULT_DAILY_LIMIT)
     }
 
@@ -82,7 +82,7 @@ class ProactiveBudgetTest {
         assertEquals(null, ProactiveBudget.triageExhausted(159_999, 639, limit))
         assertEquals(ProactiveBudget.Limit.Tokens, ProactiveBudget.triageExhausted(160_000, 0, limit))
         assertEquals(ProactiveBudget.Limit.Calls, ProactiveBudget.triageExhausted(0, 640, limit))
-        // 整份还有
+        // The overall budget still has room
         assertEquals(null, ProactiveBudget.exhausted(160_000, 640, limit))
         ProactiveBudget.check(160_000, limit, 640)
         assertEquals(ProactiveBudget.Limit.Tokens, ProactiveBudget.exhausted(200_000, 0, limit))

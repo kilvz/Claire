@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 主机名归一化、同站点判定与可注册域名:这几处被知识匹配、网页策略和技能草稿共用。 */
+/** Host name normalization, same-site detection and registrable domains: these are shared by knowledge matching, web policy and skill drafts. */
 class UrlHostTest {
     @Test fun ofNormalizesCaseWwwPortAndTrailingDot() {
         assertEquals("example.com", UrlHost.of("https://WWW.Example.COM:443/a?b=1"))

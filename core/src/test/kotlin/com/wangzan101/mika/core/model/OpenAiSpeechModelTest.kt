@@ -314,7 +314,7 @@ class OpenAiSpeechModelTest {
         assertEquals(0, server.requestCount)
     }
 
-    /** 地址不合法时构造不抛、不发请求,合成时报 [TtsError.Unsupported];[OpenAiSpeechModel.endpointOf] 为 null。 */
+    /** With an invalid address, construction neither throws nor sends a request; synthesis reports [TtsError.Unsupported]; [OpenAiSpeechModel.endpointOf] returns null. */
     @Test fun invalidBaseUrlDoesNotThrowOnConstruction() = runTest {
         assertEquals(null, OpenAiSpeechModel.endpointOf("not a url"))
         assertNotNull(OpenAiSpeechModel.endpointOf(server.url("/v1").toString()))

@@ -20,7 +20,7 @@ class UsageLedgerTest {
     private val hour = UsageLedger.HOUR_MS
     private var clock = 1_000 * hour + 123
     private val file get() = File(tmp.root, "usage/usage.json")
-    // 写出不靠后台定时:测试里直接调 flush
+    // Writing doesn't rely on a background timer: tests call flush directly
     private fun ledger() = UsageLedger(file, now = { clock }, flushDelayMs = 60_000)
 
     private val main = UsageSource("p1", "服务商甲", "m1", UsagePurpose.Main)
@@ -85,7 +85,7 @@ class UsageLedgerTest {
 
     @Test fun proactiveUsageIsLeftOutOfProviderBudgetAndSummedAcrossProvidersOnTheLocalDay() {
         val zone = ZoneId.of("Asia/Shanghai")
-        // 本地 2026-11-10 23:30
+        // Local 2026-11-10 23:30
         clock = Instant.parse("2026-11-10T15:30:00Z").toEpochMilli()
         val l = UsageLedger(file, now = { clock }, zone = { zone }, flushDelayMs = 60_000)
         l.record(main, Usage(100, 20))
@@ -96,7 +96,7 @@ class UsageLedgerTest {
         assertEquals("各服务商合计", 50L, l.proactiveTokensToday())
         assertEquals("统计里照样算进去", 170L, l.snapshot().rows.sumOf { it.counts.input + it.counts.output })
 
-        // 本地零点后重新计数
+        // Counts restart after local midnight
         clock = Instant.parse("2026-11-10T16:00:00Z").toEpochMilli()
         assertEquals(0L, l.proactiveTokensToday())
         l.record(main.copy(purpose = UsagePurpose.Proactive), Usage(5, 5))
@@ -140,7 +140,7 @@ class UsageLedgerTest {
     }
 
     @Test fun dailyBudgetFollowsTheTimeZoneChangedWhileRunning() {
-        // 进程没退出时手机改了时区(系统会改进程的默认时区):「今天」和拆格都按改过之后的时区算,不按建账本时的
+        // The phone's time zone changed while the process kept running (the system updates the process default zone): "today" and the hour buckets follow the new zone, not the one at ledger creation
         val before = TimeZone.getDefault()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"))

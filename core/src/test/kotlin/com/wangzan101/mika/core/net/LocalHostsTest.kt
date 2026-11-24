@@ -44,8 +44,8 @@ class LocalHostsTest {
     }
 
     @Test fun cgnatIsPrivateOrMeshButNotLocal() {
-        // 组网工具(Tailscale 等)常用的 100.64/10:对「明文 http 可不可接受」按私有网段看,
-        // 但严格意义上不是本机/局域网,所以 isLocal 不认、isPrivateOrMesh 认。
+        // 100.64/10, commonly used by mesh tools (Tailscale etc.): treated as a private range when judging whether plain http is acceptable,
+        // but strictly speaking it is neither loopback nor LAN, so isLocal rejects it while isPrivateOrMesh accepts it.
         listOf(
             "100.64.0.1", "100.100.1.2", "100.127.255.254", "::ffff:100.64.0.1",
         ).forEach { assertTrue(it, LocalHosts.isPrivateOrMesh(it)) }
@@ -56,7 +56,7 @@ class LocalHostsTest {
         assertFalse(LocalHosts.isPrivateOrMesh("100.128.0.0"))
         assertFalse(LocalHosts.isPrivateOrMesh("203.0.113.7"))
         assertFalse(LocalHosts.isPrivateOrMesh("::ffff:8.8.8.8"))
-        // 本机、局域网地址它也照认
+        // It still accepts loopback and LAN addresses
         assertTrue(LocalHosts.isPrivateOrMesh("192.168.1.10"))
         assertTrue(LocalHosts.isPrivateOrMesh("localhost"))
     }

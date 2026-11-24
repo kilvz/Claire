@@ -19,7 +19,7 @@ class LearnBufferTest {
         assertEquals(LearnBuffer.Summary(2, 2), b.state.value)
     }
 
-    // 会话样式的通知:归纳用的是消息列表里这回才见到的几条(带着谁说的),不是通知的正文——正文常常是空的或只有最后一句
+    // Conversation-shaped notifications: summarization uses the messages in the message list first seen this time (with who said them), not the notification body — the body is often empty or holds only the last line
     @Test fun newMessagesOfAConversationAreWhatGetsLearnedFrom() {
         val dedup = NoticeDedup()
         val b = LearnBuffer()
@@ -28,18 +28,18 @@ class LearnBufferTest {
                 messages = messages.map { (said, time) -> NoticeMessage("Alice", said, time) })
             dedup.admit(r)?.let { b.capture(r, it.newMessages) }
         }
-        // 正文是空的,话在消息列表里
+        // The body is empty; the words are in the message list
         post(100, "", "明天三点开会" to 90)
-        // 锁屏期间来了两句,通知的正文只有最后一句
+        // Two lines arrived while the screen was locked, and the notification body holds only the last one
         post(200, "好的", "明天三点开会" to 90, "带上合同" to 150, "好的" to 190)
         val batch = b.begin("com.chat")
         assertEquals(listOf("Alice: 明天三点开会", "Alice: 带上合同 / Alice: 好的"), batch.map { it.text })
-        // 发给模型的输入里有这些话
+        // The input sent to the model contains these words
         val input = NoticeLearn.buildInput("com.chat", batch, emptyList(), "English")
         for (said in listOf("明天三点开会", "带上合同", "好的")) assertTrue(said, said in input)
     }
 
-    // 一回见到的新消息太多:最多拿最新的几条,总长也有上限,放不下时留新的
+    // Too many new messages at once: take at most the newest few, with a cap on total length, keeping the new ones when they don't fit
     @Test fun manyNewMessagesAreCappedKeepingTheNewest() {
         val b = LearnBuffer()
         val many = (1..9).map { NoticeMessage("A", "m$it", it.toLong()) }
@@ -52,27 +52,27 @@ class LearnBufferTest {
         val kept = c.begin("com.chat").single().text
         assertTrue(kept.length <= LearnTuning.TEXT_MAX)
         assertTrue(kept.startsWith("A: 3"))
-        // 没有新消息的(不是会话样式的通知):照旧用正文
+        // No new messages (not a conversation-shaped notification): use the body as before
         val d = LearnBuffer()
         d.capture(NoticeRecord("k", "com.shop", 1, "到账通知", "收到 20 元"))
         assertEquals("收到 20 元", d.begin("com.shop").single().text)
     }
 
-    // 每来一句把同一条通知原样重发一遍的 App:同样的文字隔得不久只记一次,跨过零点几分钟的重发也不算第二天的;
-    // 但第二天真的又发来的同一句话是新的一次(话题、联系人要靠它攒「出现了几天」)——归纳完了的也一样
+    // An app that reposts the same notification verbatim for every line: identical text close together is recorded only once, and a repost a few minutes past midnight doesn't count as the next day's;
+    // but the same sentence really sent again the next day is a new occurrence (topics and contacts rely on it to accumulate "how many days it appeared") — the same once summarized
     @Test fun theSameTextCountsAgainOnlyAfterALongGap() {
         val day = 24 * 3_600_000L
         val b = LearnBuffer()
         assertTrue(b.capture(rec("greet", at = day - 10 * 60_000, text = "早上好")))
-        // 零点刚过又原样重发
+        // Reposted verbatim right after midnight
         assertFalse(b.capture(rec("greet", at = day + 5 * 60_000, text = "早上好")))
         b.begin("com.shop")
         b.finish(emptyMap())
         assertFalse(b.capture(rec("greet", at = day + 30 * 60_000, text = "早上好")))
-        // 第二天同一句
+        // The same sentence on the next day
         assertTrue(b.capture(rec("greet", at = 2 * day - 10 * 60_000, text = "早上好")))
         assertEquals(1, b.pendingCount)
-        // 刚好没到半天的不算,到了的算(从最近一次出现算起)
+        // Just under half a day doesn't count, reaching it does (measured from the most recent occurrence)
         val c = LearnBuffer()
         assertTrue(c.capture(rec("k", at = 0)))
         assertFalse(c.capture(rec("k", at = LearnTuning.REPEAT_WINDOW_MS - 1)))
@@ -81,8 +81,8 @@ class LearnBufferTest {
         assertTrue(c.capture(rec("k", at = 3 * LearnTuning.REPEAT_WINDOW_MS - 1)))
     }
 
-    // 一条没人管的通知被 App 每小时原样重发一遍,发了两天:只算一次(不能凭一条旧消息攒出好几天);
-    // 安静了一天之后又来的同一句,才是新的一次
+    // A notification nobody handles is reposted verbatim every hour by the app for two days: it counts once (a single old message must not accumulate several days);
+    // the same sentence returning after a quiet day is a new occurrence
     @Test fun aNotificationRepostedForDaysCountsOnce() {
         val hour = 3_600_000L
         val b = LearnBuffer()
@@ -90,11 +90,11 @@ class LearnBufferTest {
         for (h in 1..48) assertFalse("$h", b.capture(rec("stale", at = h * hour, text = "您有一张优惠券")))
         assertEquals(1, b.pendingCount)
         assertTrue(b.capture(rec("stale", at = (48 + 24) * hour, text = "您有一张优惠券")))
-        // 到期看的还是第一次发出的时间(重发不把它往后推)
+        // Due timing still uses when it was first sent (reposts don't push it later)
         assertEquals("com.shop", b.due(LearnTuning.DUE_AGE_MS, { true }))
     }
 
-    // 32 位的 hashCode 会把「Aa」和「BB」当成同一句;现在的指纹不会
+    // A 32-bit hashCode treats "Aa" and "BB" as the same line; the current fingerprint doesn't
     @Test fun differentTextsWithTheSameHashCodeAreBothKept() {
         assertEquals("Aa".hashCode(), "BB".hashCode())
         val b = LearnBuffer()
@@ -147,7 +147,7 @@ class LearnBufferTest {
         b.finish(mapOf(again[0].seq to setOf("k1")))
         assertEquals(LearnBuffer.Summary(2, 0), b.state.value)
         assertTrue(batch.isNotEmpty())
-        // 归纳完的不留文字
+        // Summarized events keep no text
         assertTrue(b.sending().isEmpty())
     }
 
@@ -158,7 +158,7 @@ class LearnBufferTest {
         assertTrue(b.outcome("a", LearnOutcome.Opened).isEmpty())
         val sent = b.begin("com.shop")
         assertEquals(listOf(LearnOutcome.None, LearnOutcome.Opened), sent.map { it.outcome })
-        // 已经有结果的不改
+        // One that already has an outcome isn't changed
         b.outcome("a", LearnOutcome.Dismissed)
         assertEquals(LearnOutcome.Opened, b.sending().last().outcome)
         assertTrue(b.outcome("missing", LearnOutcome.Opened).isEmpty())
@@ -179,7 +179,7 @@ class LearnBufferTest {
         assertTrue(b.outcome("z", LearnOutcome.Opened).isEmpty())
     }
 
-    // 话题被用户并进了另一个:归到它上面的通知之后才被点开/划掉,算到并进去的那个上
+    // A topic the user merged into another: notifications assigned to it that are opened/dismissed afterwards count toward the one it went into
     @Test fun eventsOfAMergedTopicPointAtTheTopicItWentInto() {
         val b = LearnBuffer()
         b.capture(rec("a")); b.capture(rec("z"))
@@ -191,7 +191,7 @@ class LearnBufferTest {
         assertEquals(setOf("k4"), b.outcome("z", LearnOutcome.Dismissed))
     }
 
-    // 「标题是发言人」这一笔跟着事件走(认联系人时要看)
+    // The "title is the speaker" mark travels with the event (contact recognition looks at it)
     @Test fun theSpeakerTitleMarkTravelsWithTheEvent() {
         val b = LearnBuffer()
         b.capture(rec("a").copy(group = true, titleIsSpeaker = true))
@@ -199,7 +199,7 @@ class LearnBufferTest {
         assertEquals(listOf(true, false), b.begin("com.shop").map { it.titleIsSpeaker })
     }
 
-    // 被认成状态显示的那条通知之后被划掉:它的事件已经去掉了,不往回找同一个键上更早的、不相干的那条算反馈
+    // A notification taken as a status display is dismissed later: its event is already gone, so it doesn't fall back to an earlier, unrelated event under the same key and count it as feedback
     @Test fun dismissingAWithdrawnStatusDisplayDoesNotReachAnOlderEventOfTheKey() {
         val b = LearnBuffer()
         b.capture(rec("shared", at = 1_000, text = "一小时前的正常通知"))
@@ -208,7 +208,7 @@ class LearnBufferTest {
         repeat(3) { i -> b.capture(rec("shared", at = 3_600_000L + i * 2_000L, text = "${300 - i * 10} 米后右转")) }
         assertTrue(b.forgetKey("shared", 3_600_000L - 60_000L))
         assertTrue(b.outcome("shared", LearnOutcome.Dismissed).isEmpty())
-        // 只挡这一次:这个键上又收下新的一条之后照常
+        // It only blocks this once: after a new record is captured under the key things work as usual
         b.forgetKey("shared", 7_200_000L)
         b.capture(rec("shared", at = 9_000_000L, text = "新的正常通知"))
         val next = b.begin("com.shop").single()

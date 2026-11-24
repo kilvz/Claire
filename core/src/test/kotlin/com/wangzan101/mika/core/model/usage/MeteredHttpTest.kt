@@ -28,7 +28,7 @@ import org.junit.Before
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
-/** 计量必须跟着适配器真实发出的请求走,不能只数最外层 complete 被调了几次。 */
+/** Metering must follow the requests the adapter actually sends, not merely count how many times the outermost complete was called. */
 class MeteredHttpTest {
     private lateinit var server: MockWebServer
     private val caps = Capabilities(toolCalls = true, vision = false, contextTokens = 32_000, reasoning = true)

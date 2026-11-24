@@ -92,7 +92,7 @@ class ReasoningEffortTest {
         }
     }
 
-    // DeepSeek 的 /models 把档位写在 effort.supported_levels(#563)
+    // DeepSeek's /models puts the effort levels in effort.supported_levels (#563)
     @Test fun catalogReadsDeepSeekEffortLevels() = runTest {
         MockWebServer().use { server ->
             server.start()
@@ -106,7 +106,7 @@ class ReasoningEffortTest {
             assertEquals(listOf("low", "high", "max"), models[0].reasoningEfforts)
             assertEquals(true, models[0].reasoning)
             assertEquals(emptyList<String>(), models[1].reasoningEfforts)
-            // 不是这种写法的不当成档位
+            // Anything not in this shape is not treated as an effort level
             assertNull(models[2].reasoningEfforts)
             assertNull(models[3].reasoningEfforts)
         }

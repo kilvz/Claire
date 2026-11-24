@@ -19,8 +19,8 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * 主动能力的请求次数上限按实际发出的 HTTP 请求算。适配器在一次调用里会自己再发(这里用的是不认 include 参数的服务:
- * 第一个请求 400,去掉参数再发一个),这些要等调用结束才记进账本——再发之前得把它们加上再查一次上限。
+ * The proactive call limit counts actual HTTP requests sent. The adapter re-sends on its own within a single call (here using a service that rejects the include parameter:
+ * the first request gets a 400, then another is sent without the parameter), and those are only recorded in the ledger when the call ends — before re-sending, they must be added and the limit re-checked.
  */
 class ProactiveRetryBudgetTest {
     private val limit = ProactiveBudget.DEFAULT_DAILY_LIMIT
@@ -47,7 +47,7 @@ class ProactiveRetryBudgetTest {
         suspend fun ask() = model.complete("s", listOf(Message(Role.User, listOf(Part.Text("hi")), Author.Mika)), emptyList())
     }
 
-    // 只剩最后一次额度:第一个请求发出去了,服务不认参数要再发一个——不发,次数停在上限上
+    // Only the last remaining request of budget: the first request went out and the service rejects the parameter so another would be sent — it isn't, and the count stops at the limit
     @Test fun aRetryInsideOneCallDoesNotGoPastTheLastRemainingRequest() = runTest {
         val server = MockWebServer().apply { start() }
         try {
@@ -69,7 +69,7 @@ class ProactiveRetryBudgetTest {
         }
     }
 
-    // 额度够的时候照常重发,两个请求都记账
+    // With enough budget the retry goes out as usual and both requests are recorded
     @Test fun aRetryStillGoesOutWhileThereIsRoom() = runTest {
         val server = MockWebServer().apply { start() }
         try {

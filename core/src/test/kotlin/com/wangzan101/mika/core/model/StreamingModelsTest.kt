@@ -42,7 +42,7 @@ class StreamingModelsTest {
         assertTrue(server.takeRequest().body.readUtf8().contains("\"stream\":true"))
     }
 
-    /** 流式里思考在 `reasoning` 字段、或 `content` 是分块数组的,都认出来,记下收到的位置。 */
+    /** In streams, recognize thinking whether it is in the `reasoning` field or `content` is an array of chunks, and record where it was received. */
     @Test fun openAiStreamReadsReasoningFieldAndChunkedContent() = runTest {
         val model = OpenAiCompatModel(server.url("/v1").toString().trimEnd('/'), "k", "m", caps, OkHttpClient())
         val endpoint = server.url("/v1/chat/completions").toString()
@@ -87,8 +87,8 @@ class StreamingModelsTest {
     }
 
     /**
-     * message_delta 里的用量是累计值,输入和缓存也可能在这里更新(第一组数值取自接口文档里的流式示例):带了的字段以它为准,
-     * 没带的、值为 null 或不是整数的沿用 message_start 的;message_start 全是 0 或没给用量时,按 message_delta 记。
+     * Usage in message_delta is cumulative, and input and cache may also be updated there (the first set of numbers is taken from the streaming example in the API docs): fields it carries win,
+     * while fields it omits, or whose value is null or not an integer, keep the message_start values; when message_start is all zeros or gives no usage, record message_delta's.
      */
     @Test fun anthropicStreamTakesCumulativeUsageFromMessageDelta() = runTest {
         fun reply(start: String, delta: String) = stream(
@@ -135,7 +135,7 @@ class StreamingModelsTest {
     private fun anthropic() = AnthropicModel(server.url("/").toString().trimEnd('/'), "k", "m", caps, OkHttpClient())
     private fun gemini() = GeminiModel(server.url("/").toString().trimEnd('/'), "k", "m", caps, OkHttpClient())
 
-    /** 没收尾就断开的流不能当成回答,而是可重试的一时故障(和接口配置无关)。 */
+    /** A stream that breaks off without finishing is not a reply but a retryable transient failure (unrelated to API configuration). */
     private suspend fun assertCut(model: StreamingChatModel) {
         try {
             model.completeStreaming("s", user, emptyList()) {}
@@ -164,13 +164,13 @@ class StreamingModelsTest {
         assertCut(gemini())
     }
 
-    /** 事件流一帧都没来就断了(比如长时间思考时被网关掐断),同样是可重试的断流。 */
+    /** Breaking off before a single event frame arrives (e.g. the gateway cuts the connection during a long think) is likewise a retryable stream cut. */
     @Test fun eventStreamCutBeforeAnyEventIsRetryable() = runTest {
         server.enqueue(stream())
         assertCut(openAi())
     }
 
-    /** 成功响应却既不是事件流、也没有任何事件(地址指到了网页):是配置问题,不重试。 */
+    /** A successful response that is neither an event stream nor contains any events (the address points at a web page) is a configuration problem, not retried. */
     @Test fun nonStreamBodyWithoutEventsIsBadResponse() = runTest {
         server.enqueue(MockResponse().setHeader("Content-Type", "text/html").setBody("<html>hi</html>"))
         try {
@@ -181,7 +181,7 @@ class StreamingModelsTest {
         }
     }
 
-    /** 收到结束原因就算完整:有的端点不发最后的结束标记。 */
+    /** A finish reason counts as complete: some endpoints don't send the final end marker. */
     @Test fun openAiFinishReasonWithoutDoneIsComplete() = runTest {
         server.enqueue(stream("""{"choices":[{"delta":{"content":"好了"},"finish_reason":"stop"}]}"""))
         val reply = openAi().completeStreaming("s", user, emptyList()) {}

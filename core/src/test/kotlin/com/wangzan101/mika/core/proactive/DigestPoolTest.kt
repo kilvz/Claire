@@ -21,14 +21,14 @@ class DigestPoolTest {
         assertEquals(2, p.add("com.chat", entries, listOf(NoteSignal(listOf(0, 1), "王老师通知明天开会"), NoteSignal(listOf(1, 2, 9), "两个群都在说春游")), utc))
         val (a, b) = p.notes(20_000)
         assertEquals(DigestNote("d1", "com.chat", 20_000, t0, t0 + 60_000, 2, "家长群", "王老师通知明天开会"), a)
-        // 依据的几段不是同一个会话:不写会话名
+        // The referenced messages aren't from the same conversation: no conversation name is written
         assertNull(b.title)
         assertEquals(3 - 1, b.count)
-        // 没有依据、没有文字的不记
+        // No grounds and no text: not recorded
         assertEquals(0, p.add("com.chat", entries, listOf(NoteSignal(listOf(7), "x"), NoteSignal(listOf(0), " ")), utc))
     }
 
-    // 日子取依据的通知里最新那段的;会话名要过和联系人显示名一样的检查(号码、网址不当名字存)
+    // The day comes from the newest referenced notification; the conversation name goes through the same checks as a contact display name (phone numbers and URLs are not stored as names)
     @Test fun dayAndTitle() {
         val p = pool()
         p.add("com.chat", listOf(entry(t0 + day - 9 * 3_600_000L - 1), entry(t0 + day)), listOf(NoteSignal(listOf(0, 1), "跨了午夜")), utc)
@@ -58,24 +58,24 @@ class DigestPoolTest {
         p.add("com.chat", listOf(entry(t0 + day)), listOf(NoteSignal(listOf(0), "第二天的事")), utc)
     }
 
-    // 该做哪一天:今天之前、有句子、还没有完整归纳、那天的通知都做过分段归纳的最早一天
+    // Which day is due: the earliest day before today that has notes, has no complete digest yet, and whose notifications have all been segmented
     @Test fun dueDayIsTheEarliestSettledPastDayWithoutAFullDigest() {
         val p = seeded()
         assertNull(p.dueDay(20_000) { true })
         assertEquals(20_000L, p.dueDay(20_001) { true })
         assertNull(p.dueDay(20_001) { false })
         assertEquals(20_000L, p.dueDay(20_005) { true })
-        // 「到现在为止」的那份不算做完;完整的做过之后轮到下一天;一句都没有的也算做过
+        // The "so far" version doesn't count as done; after a complete one the next day is due; a day with no lines also counts as done
         p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "x")), t0, partial = true)
         assertEquals(20_000L, p.dueDay(20_005) { true })
         p.setDay(20_000, p.dayInput(20_000), emptyList(), t0, partial = false)
         assertEquals(20_001L, p.dueDay(20_005) { true })
         assertEquals(emptyList<DigestLine>(), p.day(20_000)!!.lines)
-        // 那天的通知还有没做过分段归纳的:先等等,不跳到后一天去
+        // Notifications that day still lack segmentation: wait, don't skip ahead to the next day
         assertNull(p.dueDay(20_005) { it != 20_001L })
     }
 
-    // 当日归纳的每句记着依据的句子和它们来自哪些 App;指不上依据的不记
+    // Each day-digest line records the notes it rests on and which apps they came from; lines that can't be traced to notes are not recorded
     @Test fun dayLinesKeepTheirGrounds() {
         val p = seeded()
         val input = p.dayInput(20_000)
@@ -88,7 +88,7 @@ class DigestPoolTest {
         assertEquals(p.data(), pool(p.data()).data())
     }
 
-    // 不再归纳的 App:它的句子去掉,当日归纳里依据过它的那几句也去掉(哪怕同时依据了别的 App)
+    // An app that is no longer summarized: its notes go, and so do the day-digest lines that drew on it (even if they also drew on other apps)
     @Test fun purgingAnAppRemovesTheDayLinesThatDrewOnIt() {
         val p = seeded()
         val input = p.dayInput(20_000)
@@ -114,7 +114,7 @@ class DigestPoolTest {
         assertTrue(p.days().isEmpty())
     }
 
-    // 解锁时先做了昨天的归纳,昨晚的通知之后才补收进来、写成了句子:那一天要重做一份,而且只重做一次
+    // On unlock yesterday's digest was made first, and last night's notifications were collected only afterwards and turned into notes: that day must be redone, and only once
     @Test fun aDayIsRedoneWhenNotesAreWrittenAfterItsDigest() {
         val p = seeded()
         p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "早上做的")), 1_000, partial = false)
@@ -123,14 +123,14 @@ class DigestPoolTest {
         assertEquals(20_000L, p.dueDay(20_005) { true })
         p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(2), "重做的")), 3_000, partial = false)
         assertEquals(20_001L, p.dueDay(20_005) { true })
-        // 句子多过一次能放进请求的数量时也不会一直重做(看的是有没有新写下的句子,不是数量对不对得上)
+        // Even with more notes than fit in one request it doesn't keep redoing (what matters is whether new notes were written, not whether the count adds up)
         val busy = pool()
         repeat(LearnTuning.DAY_NOTES_MAX + 5) { i -> busy.add("com.chat", listOf(entry(t0 + i)), listOf(NoteSignal(listOf(0), "n$i")), utc, nowMs = 10) }
         busy.setDay(20_000, busy.dayInput(20_000), emptyList(), 20, partial = false)
         assertNull(busy.dueDay(20_005) { true })
     }
 
-    // 四级留存是同一个算法:从管的最后一天算起留满 N 天,第 N+1 天去掉
+    // Retention works the same at all four levels: keep N days counted from the last day it covers, drop it on day N+1
     @Test fun everyLevelIsKeptTheSameWayCountedFromItsLastDay() {
         val today = 20_000L
         fun line() = listOf(DigestLine("x", apps = listOf("com.chat")))
@@ -143,7 +143,7 @@ class DigestPoolTest {
             weeks = listOf(SpanDigest(week, 1L, line())),
             months = listOf(SpanDigest(month, 1L, line())),
         )
-        // 每一级:最后一天之后第 N 天还在,第 N+1 天没了
+        // Each level: still there N days after its last day, gone on day N+1
         fun alive(at: Long) = pool(data).also { it.expire(at) }
         assertEquals(1, alive(today + LearnTuning.NOTES_KEEP_DAYS).all().size)
         assertEquals(0, alive(today + LearnTuning.NOTES_KEEP_DAYS + 1).all().size)
@@ -151,25 +151,25 @@ class DigestPoolTest {
         assertEquals(0, alive(today + LearnTuning.DAYS_KEEP + 1).days().size)
         assertEquals(1, alive(week + 6 + LearnTuning.WEEKS_KEEP_DAYS).spans(SpanKind.Week).size)
         assertEquals(0, alive(week + 6 + LearnTuning.WEEKS_KEEP_DAYS + 1).spans(SpanKind.Week).size)
-        // 月归纳从那个月的最后一天算(从月初算的话,早删将近一个月)
+        // Month digests count from the last day of that month (counting from the first day would drop them almost a month early)
         assertEquals(1, alive(monthEnd + LearnTuning.MONTHS_KEEP_DAYS).spans(SpanKind.Month).size)
         assertEquals(0, alive(monthEnd + LearnTuning.MONTHS_KEEP_DAYS + 1).spans(SpanKind.Month).size)
         assertEquals(1, alive(month + LearnTuning.MONTHS_KEEP_DAYS + 1).spans(SpanKind.Month).size)
     }
 
-    // 一天的句子多过一次请求放得下的:各个 App 轮流取、每个 App 留新的(话多的 App 不把别的挤光),没放进去的记数;
-    // 记了数不等于要重做(那样会一直重做)
+    // A day with more notes than fit in one request: take turns across apps, keeping the newest for each app (a chatty app doesn't crowd the others out), and count what didn't fit;
+    // a nonzero count doesn't mean a redo is due (that would redo forever)
     @Test fun aDayWithTooManyNotesKeepsEveryAppAndCountsWhatWasLeftOut() {
         val p = pool()
         val max = LearnTuning.DAY_NOTES_MAX
-        // 上午:别的 App 各一句;之后聊天 App 一口气写了比上限还多的句子
+        // Morning: one line each from the other apps; afterwards the chat app writes more notes than the cap in one go
         p.add("com.mail", listOf(entry(t0, pkg = "com.mail")), listOf(NoteSignal(listOf(0), "上午的邮件")), utc, nowMs = 10)
         p.add("com.bank", listOf(entry(t0 + 1, pkg = "com.bank")), listOf(NoteSignal(listOf(0), "上午的到账")), utc, nowMs = 10)
         repeat(max + 10) { i -> p.add("com.chat", listOf(entry(t0 + 100 + i)), listOf(NoteSignal(listOf(0), "聊天 $i")), utc, nowMs = 10) }
         val input = p.dayInput(20_000)
         assertEquals(max, input.size)
         assertTrue(input.any { it.text == "上午的邮件" } && input.any { it.text == "上午的到账" })
-        // 聊天 App 留的是新的那些;整份按时间由旧到新
+        // The chat app keeps the newer ones; the whole input is ordered oldest to newest
         assertTrue(input.any { it.text == "聊天 ${max + 9}" })
         assertFalse(input.any { it.text == "聊天 0" })
         assertEquals(input.sortedBy { it.fromMs }, input)
@@ -177,13 +177,13 @@ class DigestPoolTest {
         assertEquals(12, p.day(20_000)!!.leftOut)
         assertEquals(max, p.day(20_000)!!.noteCount)
         assertNull(p.dueDay(20_005) { true })
-        // 放得下的一天:没有漏的
+        // A day that fits: nothing left out
         val small = seeded()
         small.setDay(20_000, small.dayInput(20_000), emptyList(), 20, partial = false)
         assertEquals(0, small.day(20_000)!!.leftOut)
     }
 
-    // 周(月)归纳的输入放不下时同样记数
+    // Span (week/month) input that doesn't fit is counted the same way
     @Test fun aSpanRecordsHowManyLowerLinesDidNotFit() {
         val long = "长".repeat(LearnTuning.SPAN_INPUT_CHARS / 2 - 10)
         val week = DigestPool.weekOf(20_000)
@@ -192,7 +192,7 @@ class DigestPoolTest {
         assertEquals(2, input.size)
         p.setSpan(SpanKind.Week, week, input, listOf(NoteSignal(listOf(0), "这一周")), 5, partial = false)
         assertEquals(1, p.spans(SpanKind.Week).single().leftOut)
-        // 这一周的句子都放得下,但其中一天的当日归纳自己做的时候漏了 7 句:这一周也不算看全了;月归纳接着往上带
+        // All of the week's lines fit, but one day's own digest left out 7 lines: the week still isn't seen in full; the month digest carries that count upward
         val month = DigestPool.monthOfWeek(week)
         val q = pool(DigestData(days = listOf(
             DayDigest(week, 1L, listOf(DigestLine("周一", apps = listOf("com.chat"))), leftOut = 7),
@@ -204,7 +204,7 @@ class DigestPoolTest {
         assertEquals(7, q.spans(SpanKind.Month).single().leftOut)
     }
 
-    // 只在周、月归纳里还有它的句子的 App(当日的那几句已经过期):清掉它时这些句子也去掉,别的 App 的留着
+    // An app whose lines only survive in week/month digests (its day-level notes have expired): purging it drops those lines too, while other apps' lines stay
     @Test fun purgingAnAppAlsoDropsWeekAndMonthLinesThatCiteOnlyThem() {
         val p = pool(DigestData(
             weeks = listOf(SpanDigest(19_999, 1L, listOf(DigestLine("聊天的一周", apps = listOf("com.chat")), DigestLine("邮件的一周", apps = listOf("com.mail"))))),
@@ -216,7 +216,7 @@ class DigestPoolTest {
         assertFalse(p.removePackages { it != "com.chat" })
     }
 
-    // 请求在途时某个 App 被清掉了:合并了它的那一句整句不要(文字里还带着它的事),不是只把它从依据里划掉
+    // An app was purged while the request was in flight: the whole line that merged it is dropped (its text still mentions it), not just struck from the grounds
     @Test fun aLineThatDrewOnAPurgedNoteIsDroppedWhole() {
         val p = seeded()
         val input = p.dayInput(20_000)
@@ -226,7 +226,7 @@ class DigestPoolTest {
         assertEquals(listOf("com.chat"), p.day(20_000)!!.lines.single().apps)
     }
 
-    // 用户删掉一句分段归纳:当日归纳里依据过它的句子也去掉(哪怕同时依据了别的句子);别的句子留着,这一天也不因此重做
+    // The user deletes a note: day-digest lines that drew on it go too (even if they also drew on other notes); other lines stay, and the day isn't redone because of it
     @Test fun deletingANoteRemovesTheDayLinesBuiltOnIt() {
         val p = pool()
         p.add("com.chat", listOf(entry(t0), entry(t0 + 1), entry(t0 + 2)),
@@ -237,14 +237,14 @@ class DigestPoolTest {
         assertEquals(listOf("只有三"), p.day(20_000)!!.lines.map { it.text })
         assertEquals(2, p.notes(20_000).size)
         assertNull(p.dueDay(20_001) { true })
-        // 没有这一句:什么都不动
+        // No such note: nothing changes
         assertFalse(p.delete("nope"))
     }
 
 
-    // ---- 一份归纳的一句概述 ----
+    // ---- One-line summary of a digest ----
 
-    // 记下、读回;老的存盘里没有这个字段,读出来是空的
+    // Stored and read back; older saves lack this field, so it reads back empty
     @Test fun theBriefIsStoredWithTheDigestAndSurvivesARoundTrip() {
         val p = seeded()
         val input = p.dayInput(20_000)
@@ -254,12 +254,12 @@ class DigestPoolTest {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
         val old = json.decodeFromString(DigestData.serializer(), """{"days":[{"day":20000,"madeAtMs":1,"lines":[{"text":"x"}]}]}""")
         assertEquals("", pool(old).day(20_000)!!.brief)
-        // 没给的、重做时没给的:空的(不留着上一份的)
+        // Not given, or not given on a redo: empty (the previous one isn't kept)
         p.setDay(20_000, input, listOf(NoteSignal(listOf(0), "聊天的")), t0 + 1, partial = false)
         assertEquals("", p.day(20_000)!!.brief)
     }
 
-    // 收下的句子比给的少(依据不在了、指不上依据)、或一句都没有:概述不留
+    // Fewer lines accepted than given (grounds gone or untraceable), or no lines at all: the summary is not kept
     @Test fun theBriefIsNotKeptWhenALineWasNotStored() {
         val p = seeded()
         val input = p.dayInput(20_000)
@@ -267,33 +267,33 @@ class DigestPoolTest {
         assertEquals("", p.day(20_000)!!.brief)
         p.setDay(20_000, input, emptyList(), t0, partial = false, brief = "没什么事")
         assertEquals("", p.day(20_000)!!.brief)
-        // 请求在途时那个 App 被清掉了:依据过它的那句整句不要,概述也不要
+        // The app was purged while the request was in flight: the line that drew on it is dropped whole, and so is the summary
         p.removePackages { it != "com.mail" }
         p.setDay(20_000, input, listOf(NoteSignal(listOf(0), "聊天的"), NoteSignal(listOf(1), "邮件的")), t0, partial = false, brief = "聊天和邮件")
         assertEquals(listOf("聊天的"), p.day(20_000)!!.lines.map { it.text })
         assertEquals("", p.day(20_000)!!.brief)
     }
 
-    // 这一份里有句子被去掉:概述一并清掉(删了的事不能还留在概述里);没动到的那一份不清
+    // Lines in this digest were removed: its summary is cleared too (deleted things must not linger in a summary); untouched digests keep theirs
     @Test fun removingALineClearsThatDigestsBrief() {
         fun fresh() = seeded().also { p ->
             p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "聊天的"), NoteSignal(listOf(1), "邮件的")), t0, partial = false, brief = "头一天")
             p.setDay(20_001, p.dayInput(20_001), listOf(NoteSignal(listOf(0), "第二天的")), t0 + day, partial = false, brief = "第二天")
         }
-        // 删一句分段归纳
+        // Delete a note
         fresh().let { p ->
             assertTrue(p.delete(p.notes(20_000).first().id))
             assertEquals(listOf("邮件的"), p.day(20_000)!!.lines.map { it.text })
             assertEquals("", p.day(20_000)!!.brief)
             assertEquals("第二天", p.day(20_001)!!.brief)
         }
-        // 清掉一个 App
+        // Purge an app
         fresh().let { p ->
             assertTrue(p.removePackages { it != "com.mail" })
             assertEquals("", p.day(20_000)!!.brief)
             assertEquals("第二天", p.day(20_001)!!.brief)
         }
-        // 删掉的那句没有被哪一句存着的句子依据过(模型写多了、没存下来的那几句可能说过它):概述照样清
+        // The deleted note wasn't referenced by any stored line (the extras the model wrote but that weren't stored may have cited it): the summary is cleared anyway
         seeded().let { p ->
             p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "只写了聊天的")), t0, partial = false, brief = "聊天和邮件")
             val mail = p.notes(20_000).single { it.packageName == "com.mail" }
@@ -307,7 +307,7 @@ class DigestPoolTest {
             assertEquals(1, p.day(20_000)!!.lines.size)
             assertEquals("", p.day(20_000)!!.brief)
         }
-        // 请求在途时删了一句,回复里存下的句子一句没少(都只引了还在的那句),概述却是照着全部写的:不要
+        // A note was deleted while the request was in flight; the reply's stored lines lost none (they all reference the surviving note), yet the summary was written against all of them: reject it
         seeded().let { p ->
             val sent = p.dayInput(20_000)
             assertTrue(p.delete(sent.single { it.packageName == "com.mail" }.id))
@@ -316,7 +316,7 @@ class DigestPoolTest {
             assertEquals(listOf("只写了聊天的"), p.day(20_000)!!.lines.map { it.text })
             assertEquals("", p.day(20_000)!!.brief)
         }
-        // 周归纳的请求在途时删了其中一天的当日归纳:同样不要概述(删周归纳时在途的月归纳也一样)
+        // A day digest was deleted while the week request was in flight: likewise no summary (the same applies when a week digest is deleted while the month request is in flight)
         seeded().let { p ->
             p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "第一天的事")), t0, partial = false)
             p.setDay(20_001, p.dayInput(20_001), listOf(NoteSignal(listOf(0), "第二天的事")), t0 + LearnTuning.DAY_MS, partial = false)
@@ -329,8 +329,8 @@ class DigestPoolTest {
             assertEquals(listOf("只写了第二天"), p.span(SpanKind.Week, week)!!.lines.map { it.text })
             assertEquals("", p.span(SpanKind.Week, week)!!.brief)
         }
-        // 分段归纳到期之后再清 App:那几天有过哪些 App 已经查不到了,存下的句子也没引过它(模型写多了的那几句引过)。
-        // 概述自己记着是照着哪些 App 的句子写的,照样清;别的 App 不受影响
+        // Purging an app after its notes expired: which apps appeared on those days can no longer be looked up, and the stored lines don't cite it either (the extras the model wrote did).
+        // The summary records which apps' lines it was written from, so it is cleared anyway; other apps are unaffected
         seeded().let { p ->
             p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "只写了聊天的")), t0, partial = false, brief = "聊天和邮件")
             p.setDay(20_001, p.dayInput(20_001), listOf(NoteSignal(listOf(0), "第二天的")), t0 + day, partial = false, brief = "第二天")
@@ -343,25 +343,25 @@ class DigestPoolTest {
             assertEquals("", p.day(20_000)!!.brief)
             assertEquals("第二天", p.day(20_001)!!.brief)
         }
-        // 周归纳的概述也记着来源
+        // Week-digest summaries record their sources too
         seeded().let { p ->
             p.setDay(20_000, p.dayInput(20_000), listOf(NoteSignal(listOf(0), "聊天的"), NoteSignal(listOf(1), "邮件的")), t0, partial = false)
             val week = DigestPool.weekOf(20_000)
             val sent = p.spanInput(SpanKind.Week, week, true)
             val chat = sent.indexOfFirst { it.line.apps == listOf("com.chat") }
             p.setSpan(SpanKind.Week, week, sent, listOf(NoteSignal(listOf(chat), "只写了聊天的")), t0 + day, partial = true, brief = "聊天和邮件")
-            // 没有哪句还存着的周归纳句子引过邮件;当日归纳里的那句会被去掉,周归纳的概述按来源清
+            // No stored week line cites mail; the day-level line that does will be dropped, so the week summary is cleared by its sources
             assertTrue(p.removePackages { it != "com.mail" })
             assertEquals(listOf("只写了聊天的"), p.span(SpanKind.Week, week)!!.lines.map { it.text })
             assertEquals("", p.span(SpanKind.Week, week)!!.brief)
         }
-        // 没记来源的概述(加这一项之前存下的):清任何一个 App 时一并清掉
+        // A summary with no recorded sources (saved before this field existed): cleared whenever any app is purged
         pool(DigestData(days = listOf(DayDigest(20_000, t0, listOf(DigestLine("聊天的", apps = listOf("com.chat"))), brief = "以前存下的概述")))).let { p ->
             assertTrue(p.removePackages { it != "com.mail" })
             assertEquals("", p.day(20_000)!!.brief)
             assertEquals(1, p.day(20_000)!!.lines.size)
         }
-        // 分段归纳到期只是划掉句子上记的依据,句子还在:概述留着
+        // Expiry of notes only strikes the grounds recorded on lines; the lines remain, so the summary stays
         fresh().let { p ->
             assertTrue(p.expire(20_000 + LearnTuning.NOTES_KEEP_DAYS + 1))
             assertEquals(2, p.day(20_000)!!.lines.size)
@@ -369,15 +369,15 @@ class DigestPoolTest {
         }
     }
 
-    // ---- 今天「到现在为止」的那一份自动做 ----
+    // ---- Auto-making today's "so far" digest ----
 
-    /** 给今天(20_000)记下 [n] 句分段归纳,都是 [madeAt] 写下的。 */
+    /** Record [n] notes for today (20_000), all written at [madeAt]. */
     private fun today(p: DigestPool, n: Int, madeAt: Long) {
         val entries = (0 until n).map { entry(t0 + it) }
         p.add("com.chat", entries, entries.indices.map { NoteSignal(listOf(it), "第 ${p.all().size + it + 1} 句") }, utc, nowMs = madeAt)
     }
 
-    // 句子攒够了、或者攒了两句以上并且等得够久了,才自动做;一句不做
+    // Auto-make only once enough notes have gathered, or two or more have gathered and they've waited long enough; a single note never triggers it
     @Test fun todaysDigestIsDueOnceEnoughNotesHaveGatheredOrWaited() {
         val hour = 3_600_000L
         val p = pool()
@@ -389,11 +389,11 @@ class DigestPoolTest {
         assertTrue("两句,最早的等够了", p.todayAutoDue(20_000, t0 + LearnTuning.TODAY_AUTO_WAIT_MS))
         today(p, LearnTuning.TODAY_AUTO_READY_NOTES - 2, t0 + hour)
         assertTrue("够数了就不用等", p.todayAutoDue(20_000, t0 + hour))
-        // 别的日子的句子不算今天的
+        // Notes from other days don't count as today's
         assertFalse(p.todayAutoDue(20_001, t0 + 10 * hour))
     }
 
-    // 做过一份之后:要有新句子,而且离上一份够久
+    // After one digest exists: there must be new notes, and enough time since the last one
     @Test fun afterOneDigestTheNextWaitsForNewNotesAndTheInterval() {
         val hour = 3_600_000L
         val p = pool()
@@ -403,7 +403,7 @@ class DigestPoolTest {
         today(p, LearnTuning.TODAY_AUTO_READY_NOTES, t0 + 2 * hour)
         assertFalse("有新句子,但离上一份还不够久", p.todayAutoDue(20_000, t0 + hour + LearnTuning.TODAY_AUTO_INTERVAL_MS - 1))
         assertTrue(p.todayAutoDue(20_000, t0 + hour + LearnTuning.TODAY_AUTO_INTERVAL_MS))
-        // 用户删掉了今天的:不自动做回来
+        // The user deleted today's: it isn't auto-made again
         assertTrue(p.deleteDay(20_000))
         assertFalse(p.todayAutoDue(20_000, t0 + 20 * hour))
     }

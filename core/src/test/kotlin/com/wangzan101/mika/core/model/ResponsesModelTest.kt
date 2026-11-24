@@ -187,7 +187,7 @@ class ResponsesModelTest {
         assertEquals(503, e.status)
     }
 
-    /** 用账号登录(如 xAI)时 403 是订阅档位不够:说清楚、不当成 Key 不对;不用账号登录的 403 照旧。 */
+    /** With an account login (e.g. xAI) a 403 means the subscription tier is insufficient: say so clearly and don't treat it as a bad key; a 403 without account login stays as before. */
     @Test fun accountLogin403MeansThePlanCannotUseThisApi() = runTest {
         server.enqueue(MockResponse().setResponseCode(403).setBody("""{"error":{"code":"permission_denied","message":"tier"}}"""))
         val account = ResponsesModel(server.url("/v1").toString().trimEnd('/'), BearerToken.fixed("k"), "grok-4", caps, OkHttpClient(), accountLogin = "xAI")
@@ -199,7 +199,7 @@ class ResponsesModelTest {
         expect<ModelError.Auth> { model().complete("s", user, emptyList()) }
     }
 
-    /** 找不到模型时带上服务端的原话:按错误代码认出的、只看状态码 404 的都带。 */
+    /** When the model is not found, carry the server's own wording: both those recognized by error code and those recognized only by a 404 status include it. */
     @Test fun modelNotFoundCarriesTheServerMessage() = runTest {
         server.enqueue(MockResponse().setResponseCode(404).setBody("""{"error":{"code":"model_not_found","message":"The model `x` does not exist\n"}}"""))
         assertEquals("The model `x` does not exist", expect<ModelError.ModelNotFound> { model().complete("s", user, emptyList()) }.detail)
@@ -207,7 +207,7 @@ class ResponsesModelTest {
         assertEquals("none of group/rpa's models is ready", expect<ModelError.ModelNotFound> { model().complete("s", user, emptyList()) }.detail)
     }
 
-    /** 超出上下文的 400 和 OpenAI 兼容接口同一条规则:本机跑的服务也开这个接口,原话说的是上下文的大小。 */
+    /** A 400 for exceeding the context follows the same rule as the OpenAI-compatible API: services running locally expose this API too, and their message is about the context size. */
     @Test fun contextTooLongIsRecognizedLikeTheCompatibleApi() = runTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":{"code":400,"message":"request (25123 tokens) exceeds the available context size (16384 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":25123,"n_ctx":16384}}"""))
         expect<ModelError.ContextTooLong> { model().complete("s", user, emptyList()) }
@@ -225,7 +225,7 @@ class ResponsesModelTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":{"code":"subscription_sharing_unsupported_capability","param":"tools[0]"}}"""))
         val bad = expect<ModelError.BadResponse> { model(plan = true).complete("s", user, emptyList()) }
         assertTrue(bad.message!!.contains("tools[0]"))
-        // 不用套餐额度的 429 照常是限流(会重试)
+        // A 429 without plan quota is still rate limiting (and gets retried)
         server.enqueue(MockResponse().setResponseCode(429).setHeader("retry-after", "2").setBody("{}"))
         assertEquals(2000L, expect<ModelError.RateLimited> { model().complete("s", user, emptyList()) }.retryAfterMs)
         assertEquals(4, server.requestCount)
@@ -244,7 +244,7 @@ class ResponsesModelTest {
         assertEquals(listOf(false, true), asked)
         assertEquals("Bearer old", server.takeRequest().getHeader("Authorization"))
         assertEquals("Bearer new", server.takeRequest().getHeader("Authorization"))
-        // 固定 Key 被拒不重试
+        // A fixed key that is rejected is not retried
         server.enqueue(MockResponse().setResponseCode(401).setBody("{}"))
         expect<ModelError.Auth> { model().complete("s", user, emptyList()) }
         assertEquals(3, server.requestCount)
@@ -277,7 +277,7 @@ class ResponsesModelTest {
         throw AssertionError()
     }
 
-    // 插话打断后:半截回复是一条 assistant message(output_text),前面没有 reasoning 项;插话和运行时状态是后面的 user message
+    // After a steer interrupts: the partial reply is one assistant message (output_text) with no reasoning item before it; the steer and the runtime state are the user messages after it
     @Test fun interruptedReplyIsAnAssistantMessageWithoutReasoningBeforeTheSteer() = runTest {
         server.enqueue(stream(completed()))
         model().complete("s", InterruptedHistory.messages, emptyList())
