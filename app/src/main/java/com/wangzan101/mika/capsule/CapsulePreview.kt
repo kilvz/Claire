@@ -6,12 +6,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
 
-/** 卡片上的小画面每秒最多几张。 */
+/** Maximum frames per second for the small preview on the card. */
 const val PREVIEW_FPS = 5
 
 /**
- * 卡片小画面要推的帧:每 [intervalMs] 至多一张,中间来的只留最新的;和上一张推过的一样([same])就不推。
- * 只在卡片展开时收,收起时取消,不收就不推。
+ * The frames to push for the card preview: at most one every [intervalMs], keeping only the latest in between; if it is the same as the last pushed frame ([same]), it is not pushed.
+ * It is only collected while the card is expanded and cancelled when it collapses; when nobody collects, nothing is pushed.
  */
 fun <T : Any> Flow<T>.previewFrames(intervalMs: Long = 1_000L / PREVIEW_FPS, same: (T, T) -> Boolean = { a, b -> a === b }): Flow<T> = flow {
     var last: T? = null
@@ -25,8 +25,8 @@ fun <T : Any> Flow<T>.previewFrames(intervalMs: Long = 1_000L / PREVIEW_FPS, sam
 }
 
 /**
- * 新的一帧和上一张一样(同一张图,或尺寸相同、像素都相同)就不推:网页画面每次给的是新拷贝。
- * 虚拟屏那边旧帧会被回收,所以先看 [Bitmap.isRecycled],别拿回收了的图去比像素。
+ * Do not push when the new frame equals the previous one (the same image, or the same size with identical pixels): the web page image is a new copy every time.
+ * On the virtual display side old frames get recycled, so check [Bitmap.isRecycled] first instead of comparing pixels of a recycled image.
  */
 fun sameFrame(a: Bitmap, b: Bitmap): Boolean =
     a === b || !a.isRecycled && !b.isRecycled && a.width == b.width && a.height == b.height && a.sameAs(b)

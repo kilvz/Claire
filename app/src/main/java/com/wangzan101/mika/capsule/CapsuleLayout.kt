@@ -13,15 +13,15 @@ import com.wangzan101.mika.capsule.CapsuleController.Companion.PILL_DP
 import com.wangzan101.mika.capsule.CapsuleController.Companion.BAR_DP
 import com.wangzan101.mika.capsule.CapsuleController.Companion.SNAP_MS
 
-// 胶囊:位置计算、拖动与贴边
-/** 能摆的范围;[ime] 为 true 时让开输入法([at],默认是此刻的输入法上边)。 */
+// Capsule: position calculation, dragging, and edge snapping
+/** The area it can occupy; when [ime] is true it keeps clear of the IME ([at], defaulting to the current IME top). */
 internal fun CapsuleController.area(ime: Boolean = true, at: Int? = imeTop): DockArea? = windowOn?.overlays()?.area()?.let {
     val room = room()
     DockArea.of(it, margin = dp(EDGE_MARGIN_DP), gap = dp(TOP_GAP_DP), room = room)
         .let { a -> if (ime) a.above(at, dp(TOP_GAP_DP), room) else a }
 }
 
-/** 卡片用的范围:让开这一轮输入法最高的样子;拼音候选行出来、收回去时卡片不跟着变高矮、上下挪。 */
+/** The area for the card: keeps clear of the tallest the IME has been this round, so the card does not change height or shift up and down when the pinyin candidate row appears or retracts. */
 internal fun CapsuleController.cardArea(): DockArea? = area(at = cardImeTop)
 
 internal fun CapsuleController.room() = dp(CapsuleShadowRoom.value.toInt())
@@ -29,8 +29,8 @@ internal fun CapsuleController.room() = dp(CapsuleShadowRoom.value.toInt())
 internal fun CapsuleController.isBar() = view?.kind == CapsuleKind.HandedOver
 
 /**
- * 按记下的位置摆窗口:胶囊贴在记下的那一边,「你来处理」那一条在顶部正中,卡片左右居中、上边按记下的比例摆;
- * 放不下或输入法盖到时往上挪(卡片最高高度同时变矮)。卡片换了高度(换卡片、内容变了)窗口跟着变,再摆一次,上边不动。
+ * Place the windows at the recorded positions: the capsule sticks to the recorded side, the 'you handle it' bar sits at the top center, and the card is horizontally centered with its top set by the recorded fraction;
+ * when it does not fit or the IME would cover it, move it up (and the card's maximum height shrinks accordingly). When the card's height changes (different card, changed content) the window follows and is placed again, with its top staying put.
  */
 internal fun CapsuleController.place() {
     val w = window ?: return
@@ -43,9 +43,9 @@ internal fun CapsuleController.place() {
         w.place(OverlayPlacement(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, placedY))
         return
     }
-    // 卡片展开着时这个窗口是空的,照样停在边上:收起时一颗就在原处出来
+    // While the card is expanded this window is empty, but it still parks at the edge so the dot reappears in place when collapsing
     val d = dock
-    // 输入法盖到原来的位置:胶囊和卡片都挪到它上面,收起后回原处
+    // The IME covers the original position: move both the capsule and the card above it, and return to the original position after collapsing
     val base = area(ime = false) ?: a
     val natural = CapsuleDocking.fitY(CapsuleDocking.y(d.fraction, base, dp(PILL_DP)), base, h)
     placedY = CapsuleDocking.fitY(natural, a, h)
@@ -55,9 +55,9 @@ internal fun CapsuleController.place() {
 }
 
 /**
- * 摆卡片窗口:左右居中、上边按记下的比例。卡片最高高度按屏幕和输入法定,变了内容跟着重排,窗口变了尺寸再摆一次。
- * 输入法按这一轮最高的样子算([cardArea]):打字时拼音候选行多出来一行、收回去,卡片不跟着变高矮也不上下挪。
- * 刚展开、窗口还空着时按卡片会有的高度先摆好(对话卡片固定高;任务卡片按内容高,先按最矮的算),内容出来时不用再挪。
+ * Place the card window: horizontally centered, top set by the recorded fraction. The card's maximum height is decided by the screen and the IME; when the content changes it re-lays out and the window is placed again after being resized.
+ * The IME is measured at its tallest in this round ([cardArea]): when the pinyin candidate row gains or loses a line while typing, the card neither changes height nor shifts up and down.
+ * When it has just expanded and the window is still empty, place it using the height the card will have (fixed for a chat card; content-based for a task card, starting from the shortest), so it does not need to move once content arrives.
  */
 internal fun CapsuleController.placeCard() {
     val w = cardWindow ?: return
@@ -71,31 +71,31 @@ internal fun CapsuleController.placeCard() {
     w.place(OverlayPlacement(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, cardY))
 }
 
-/** 最高的卡片(对话卡片)在没让输入法的范围 [base] 里的窗口高(含阴影边):卡片上边的比例按它算。 */
+/** The window height of the tallest card (the chat card) in the area [base] that does not avoid the IME, shadow edge included: the card's top fraction is computed from it. */
 internal fun CapsuleController.cardFull(base: DockArea): Int =
     CardDocking.maxHeight(windowOn?.overlays()?.area()?.height ?: 0, base, room()) + 2 * room()
 
 /**
- * 能拖哪里:胶囊和那一条整个能拖;卡片只有按着标题栏能拖(中间上下滑是滚动),放大画面时不能拖。
- * 一颗和胶囊还能长按说话(那一条不能;语音输入设成不用时也不能,长按照旧是点按)。
+ * What can be dragged where: the dot and that bar are entirely draggable; the card can only be dragged by its title bar (vertical swipes in the middle scroll), and cannot be dragged while the image is zoomed.
+ * The dot and capsule also support hold-to-talk (the bar cannot; nor can it when voice input is set to off, where holding still counts as a tap).
  */
 internal fun CapsuleController.applyDrag() {
     window?.draggable(drag)
     val talkable = canTalk()
-    // 说着说着不能说了(例如这时 App 交到你手上、胶囊换成那一条):这一段丢掉,不发——用户没机会松开选落点
+    // Talking is no longer allowed (for example the app was handed to you and the capsule turned into that bar): drop this segment and do not send, since the user never got a chance to release over a target
     if (!talkable && talk.active) talk.abort()
     window?.holdable(talkHold.takeIf { talkable }, CapsuleTalk.HOLD_MS)
     cardWindow?.draggable(cardDrag, cardHandle.takeIf { !zoomed } ?: Rect())
 }
 
-/** 卡片报来标题栏的位置。 */
+/** The card reports the position of its title bar. */
 internal fun CapsuleController.onHandle(r: Rect) {
     if (r == cardHandle) return
     cardHandle = r
     applyDrag()
 }
 
-/** 松手后滑到边上;关了动画时直接摆过去。 */
+/** Slide to the edge after release; with animations off, just place it there. */
 internal fun CapsuleController.snapTo(fromX: Int, y: Int, toX: Int) {
     val w = window ?: return
     placedY = y
@@ -115,7 +115,7 @@ internal fun CapsuleController.snapTo(fromX: Int, y: Int, toX: Int) {
     }
 }
 
-/** 读屏时代替拖动:换到另一边。 */
+/** Stand-in for dragging when using a screen reader: swap to the other side. */
 internal fun CapsuleController.swapSide() {
     resetTaps()
     dock = dock.copy(side = if (dock.side == DockSide.Left) DockSide.Right else DockSide.Left)

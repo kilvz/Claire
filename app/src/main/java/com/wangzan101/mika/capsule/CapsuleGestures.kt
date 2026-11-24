@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.capsule.CapsuleController.Touch
 import com.wangzan101.mika.capsule.CapsuleController.Companion.TAG
 
-// 胶囊:点按、展开收起与卡片动作
-/** 胶囊上闪着一句时点它:那句说要打开 Claire 就打开,否则只收掉那句;这一下不参与单击或双击计时。 */
+// Capsule: taps, expand/collapse, and card actions
+/** Tap the capsule while a note is flashing on it: if that note says to open Claire, open it; otherwise just clear the note. This tap does not count toward single- or double-tap timing. */
 internal fun CapsuleController.tapCapsule() {
     val n = note
     clearNote()
@@ -28,7 +28,7 @@ internal fun CapsuleController.tapCapsule() {
     capsuleTouch = null
     val age = touch?.let { SystemClock.uptimeMillis() - it.at }
     if (touch == null || age == null || age !in 0..taps.timeoutMs) {
-        // 读屏直接执行 onClick,没有 MotionEvent:它是一次明确的单击,不和之前摸过胶囊拼成双击
+        // Screen readers run onClick directly, with no MotionEvent: treat it as a definite single tap, and do not pair it with an earlier capsule touch to form a double tap
         resetTaps()
         expand()
         return
@@ -36,7 +36,7 @@ internal fun CapsuleController.tapCapsule() {
     tap(touch)
 }
 
-/** 真实触摸点一颗或胶囊:两下要在系统时限内、同一位置附近且来源相同;单击仍等双击时限过去再展开。 */
+/** A real touch hits the dot or the capsule: the two taps must land within the system timeout, near the same position, and from the same source; a single tap still waits out the double-tap timeout before expanding. */
 internal fun CapsuleController.tap(touch: Touch) {
     if (capturing) return
     when (taps.tap(touch.at, touch.x, touch.y, touch.source)) {
@@ -54,11 +54,11 @@ internal fun CapsuleController.tap(touch: Touch) {
     }
 }
 
-/** 展开卡片(空闲图标是空闲卡片)。每次展开都按用户此刻在哪个对话重读一次空闲卡片,不拿上次那份。 */
+/** Expand the card (the idle icon shows the idle card). Every expansion re-reads the idle card for whichever conversation the user is in right now instead of reusing the previous one. */
 internal fun CapsuleController.expand() {
     val v = view ?: return
-    // 值得提醒:单击把挑出来的几条通知写进今天的提醒对话(Claire 的一条消息,不调模型),那个对话成为当前对话;
-    // 再和空闲时一样展开卡片,卡片接着的就是它。没写成(出了错)也照常展开。双击发屏幕、长按说话和空闲时一样
+    // Worth reminding: a single tap writes the picked notifications into today's reminder conversation (as one message from Claire, without calling the model), and that conversation becomes the current one;
+    // then the card expands as it does when idle, continuing from that conversation. If the write fails (an error occurs), expand as usual. Double tap sends the screen, long press talks, same as when idle
     if (v.kind == CapsuleKind.Notice) {
         scope.launch {
             com.wangzan101.mika.proactive.NoticeHintList.openTalk(context)
@@ -83,7 +83,7 @@ internal fun CapsuleController.expand() {
     }
 }
 
-/** 展开卡片:先记下此刻那一颗的方位,卡片从那边长出来。 */
+/** Expand the card: first record where the dot currently sits, so the card grows out from there. */
 internal fun CapsuleController.open() {
     if (!expanded) anchorY = placedY + (window?.height ?: 0) / 2
     expanded = true
@@ -91,13 +91,13 @@ internal fun CapsuleController.open() {
     syncWindowVisibility()
 }
 
-/** 回到 Claire 的那个对话(和点通知同一个入口)。 */
+/** Return to the conversation in Claire (the same entry point as tapping a notification). */
 internal fun CapsuleController.open(conversationId: String?) {
     runCatching { context.startActivity(TaskService.openAppIntent(context, conversationId)) }
         .onFailure { Log.w(TAG, "could not open Claire from capsule", it) }
 }
 
-/** 点在窗口外面:先关掉放大的画面,再收起卡片。 */
+/** Tap outside the window: dismiss the zoomed image first, then collapse the card. */
 internal fun CapsuleController.outside() {
     when {
         zoomed -> zoom(false)
@@ -110,7 +110,7 @@ internal fun CapsuleController.freshChat(fresh: Boolean) {
     refresh()
 }
 
-/** 收起卡片:输入框马上收起(焦点还给下面的 App),卡片缩回那一颗的方位后([closed])才真的收起;关了动画时直接收起。 */
+/** Collapse the card: the input row collapses immediately (focus goes back to the app below), and the card actually collapses only once it has shrunk back to the dot's position ([closed]); with animations off, collapse immediately. */
 internal fun CapsuleController.collapse() {
     if (!expanded) return
     closeInput()
@@ -130,7 +130,7 @@ internal fun CapsuleController.closed() {
     refresh()
 }
 
-/** 卡片缩放的原点:那一颗停靠的那一边,高度是那一颗的中心在卡片上的位置(超出卡片时取上下边)。 */
+/** Origin of the card's scale animation: the side the dot is docked to, at the height where the dot's center sits on the card (clamped to the top or bottom edge when outside the card). */
 internal fun CapsuleController.cardOrigin(size: Size): TransformOrigin {
     val y = if (size.height > 0f) ((anchorY - cardTop) / size.height).coerceIn(0f, 1f) else 0f
     return TransformOrigin(if (dock.side == DockSide.Right) 1f else 0f, y)

@@ -14,7 +14,7 @@ import com.wangzan101.mika.chat.ui.Exchange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** 设置里「悬浮胶囊」的三选一;存成名字,认不出(没设过、旧版本)时是默认的「一直显示」(随时能双击发这一屏)。 */
+/** The three-way choice for 'floating capsule' in settings; stored as a name, and anything unrecognized (never set, older version) falls back to the default 'always show' (send this screen by double tap at any time). */
 enum class CapsuleMode {
     Off, DuringTasks, Always;
 
@@ -24,7 +24,7 @@ enum class CapsuleMode {
     }
 }
 
-/** 一颗胶囊静置后的不透明度;滑块只停在这四档,设置里存百分比。 */
+/** Opacity of a capsule sitting idle; the slider only stops at these four levels, and settings store the percentage. */
 enum class CapsuleIdleOpacity(val percent: Int) {
     P20(20), P40(40), P70(70), P100(100);
 
@@ -37,16 +37,16 @@ enum class CapsuleIdleOpacity(val percent: Int) {
     }
 }
 
-/** 展开的胶囊卡片整体缩放的档位;滑块只停在这四档,设置里存百分比(85 = 0.85×)。只缩放展开的卡片,
- * 收起的一颗、胶囊条和按住说话面板不跟着变。 */
+/** Levels for the overall scale of the expanded capsule card; the slider only stops at these four levels, and settings store the percentage (85 = 0.85×). Only the expanded card is scaled,
+ * while the collapsed dot, the capsule bar, and the hold-to-talk panel do not follow. */
 enum class CapsuleCardScale(val percent: Int) {
     Small(85), Normal(100), Large(115), XLarge(130);
 
     val factor: Float get() = percent / 100f
 
     /**
-     * 卡片在缩放前用的宽(标准 dp):卡片内容按 [factor] 放大渲染,所以上限除回 [factor],
-     * 任何档位渲染出来都不超过「屏宽 − 24dp」、不小于 240dp,和标准档同一个界。
+     * Width the card uses before scaling (standard dp): the card content is rendered scaled by [factor], so the cap is divided back by [factor],
+     * so that every level renders to at most 'screen width − 24dp' and at least 240dp, the same bounds as the standard level.
      */
     fun width(screenWidthDp: Int): Dp = minOf(CardWidth, ((screenWidthDp - 24) / factor).coerceAtLeast(240f / factor).dp)
 
@@ -56,17 +56,17 @@ enum class CapsuleCardScale(val percent: Int) {
     }
 }
 
-/** 标准档下卡片的宽;放大、缩小档见 [CapsuleCardScale.width]。 */
+/** The card width at the standard level; for the enlarged and reduced levels see [CapsuleCardScale.width]. */
 val CardWidth = 322.dp
 
 /**
- * 一个任务此刻的样子:编号([TaskRun.key])、所在对话、状态、接管走到哪一步;
- * 卡片还要它的目标 [goal] 和这一问一答此刻的样子 [exchange](步骤、要你做的事、结果,和对话页同一套推法)。
- * [queueAhead]/[queueBehind] 是它在接管队里前后各有几件(主屏一次只交一个 App);不在队里或不知道时 [queueAhead] 为 -1,
- * 这时按它开始等接管的先后算。[runId] 是它的运行记录(对话里记下的那一轮带着同一个编号;还没开起记录时为 null)。
- * [onScreen] 是它此刻在操作一块画面:有自己的虚拟屏([com.wangzan101.mika.task.TaskRun.displayId] 不是 -1),
- * 或正在用内置浏览器([com.wangzan101.mika.task.TaskRun.webOpen]);卡片据此选任务卡片还是对话卡片。
- * [steers] 是它进行中插的话和去向([com.wangzan101.mika.task.TaskRun.steers]),对话卡片的来回里接在原话后面。
+ * What a task looks like right now: its key ([TaskRun.key]), the conversation it lives in, its state, and how far the takeover has progressed;
+ * the card also needs its goal [goal] and how the current exchange looks right now [exchange] (steps, what it wants from you, the result, derived the same way as on the conversation screen).
+ * [queueAhead]/[queueBehind] are how many items sit before and after it in the takeover queue (the main screen only hands over one app at a time); when it is not in the queue or that is unknown, [queueAhead] is -1
+ * and ordering then falls back to when it started waiting for takeover. [runId] is its run record (the turn recorded in the conversation carries the same id; null while no record has been started).
+ * [onScreen] means it is currently operating some screen: it has its own virtual display ([com.wangzan101.mika.task.TaskRun.displayId] is not -1),
+ * or it is using the built-in browser ([com.wangzan101.mika.task.TaskRun.webOpen]); the card uses this to choose a task card or a chat card.
+ * [steers] are the interjections made while it is running and their destinations ([com.wangzan101.mika.task.TaskRun.steers]); on a chat card they follow the original utterance in the exchange.
  */
 data class CapsuleRun(
     val key: String,
@@ -83,8 +83,8 @@ data class CapsuleRun(
 )
 
 /**
- * 决定胶囊显示什么的全部输入:各任务([runs],含刚结束、状态已是终态的)、开关、Claire 自己的界面在不在前台、
- * 屏幕亮着且没锁、无障碍服务在运行且浮层画得出来、卡片是不是展开着([cardOpen])、任务结束后留在后台运行的那一页([kept])。
+ * All the inputs that decide what the capsule shows: the tasks ([runs], including just-finished ones whose state is already terminal), the switch, whether Claire's own UI is in the foreground,
+ * whether the screen is on and unlocked, whether the accessibility service is running and overlays can be drawn, whether the card is expanded ([cardOpen]), and the page left running in the background after a task finished ([kept]).
  */
 data class CapsuleInputs(
     val runs: List<CapsuleRun>,
@@ -95,26 +95,26 @@ data class CapsuleInputs(
     val cardOpen: Boolean = false,
     val kept: KeptPage? = null,
     val fullscreen: Boolean = false,
-    /** 主动能力判为值得提醒、用户还没在提醒列表里看过的条数(只要个数,不带通知里的任何字)。 */
+    /** How many notices the proactive feature judged worth reminding and the user has not seen in the reminder list yet (only the count, none of the notification text). */
     val notices: Int = 0,
 )
 
-/** 胶囊的状态,按优先级从高到低排([ordinal] 小的先显示);[Idle] 是「一直显示」时没任务的图标。 */
+/** Capsule states, ordered by priority from high to low (the smaller [ordinal] is shown first); [Idle] is the icon with no task when 'always show' is on. */
 enum class CapsuleKind {
     HandedOver, NeedTakeover, NeedConfirm, NeedAnswer,
-    /** 要你在手机上动一下手(如在系统的选择框里选一个),动完自动接着做。 */
+    /** It wants you to do something on the phone (such as picking one entry in a system chooser); it continues automatically once that is done. */
     NeedStep,
     Held, Running, Done, Failed, Cancelled,
-    /** 没有任务在跑,任务结束后留下的那一页在后台运行(「后台网页运行中」,绿点)。 */
+    /** No task is running and the page left behind after a task finished is still running in the background ('web page running in background', green dot). */
     KeptPage,
-    /** 没有别的事时,有判为值得提醒、还没看过的通知:空闲图标角上一个数,点开是提醒列表。不展开、不写字。 */
+    /** When there is nothing else, there are notices judged worth reminding that have not been seen yet: a number on the corner of the idle icon, tapping it opens the reminder list. It does not expand or show text. */
     Notice,
     Idle;
 
-    /** 要你处理(胶囊变橙)。App 已经交到你手上([HandedOver])是顶部那一条,不算在内。 */
+    /** It needs you to act (the capsule turns orange). The app already handed to you ([HandedOver]) is that bar at the top and does not count. */
     val needsYou: Boolean get() = this == NeedTakeover || this == NeedConfirm || this == NeedAnswer || this == NeedStep
 
-    /** 还没结束(在跑、等你、等条件);[KeptPage]、[Notice]、[Idle] 不算。 */
+    /** Not finished yet (running, waiting for you, waiting on a condition); [KeptPage], [Notice], and [Idle] do not count. */
     val active: Boolean get() = this != Done && this != Failed && this != Cancelled && this != KeptPage && this != Notice && this != Idle
 }
 
@@ -122,11 +122,11 @@ sealed interface CapsuleView {
     data object Hidden : CapsuleView
 
     /**
-     * 显示胶囊(或「你在处理」那一条):[text] 是那一行字(已拼好「共 N 件」),[detail] 只在 [CapsuleKind.HandedOver] 时有,
-     * 是那条下面的小字。[count] 是进行中的任务数([CapsuleKind.Notice] 时是还没看的提醒条数),[needCount] 是其中要你处理的件数。
-     * [runKey]/[conversationId] 是胶囊说的那件事。平时是一颗 Claire 图标(状态画在圈和角标上),
-     * [pill] 时展开成带这一行字的胶囊(有要你处理的、刚办完时)。[widthEpoch] 不变时胶囊只变宽不变窄,
-     * 变了(换了状态或换了一件事)重新定宽。
+     * Shows the capsule (or the 'you are handling it' bar): [text] is that line (already composed, including 'N total'), and [detail] only exists for [CapsuleKind.HandedOver],
+     * as the small line under it. [count] is the number of tasks in progress (for [CapsuleKind.Notice] it is the number of unseen notices), and [needCount] is how many of them need you.
+     * [runKey]/[conversationId] identify the thing the capsule is talking about. Normally it is a Claire icon with the state drawn on the ring and badge;
+     * with [pill] it expands into a capsule carrying that line (when something needs you or something just finished). While [widthEpoch] stays the same the capsule only grows wider, never narrower;
+     * when it changes (state or item changed) the width is calculated anew.
      */
     data class Shown(
         val kind: CapsuleKind,
@@ -142,38 +142,38 @@ sealed interface CapsuleView {
 }
 
 /**
- * 胶囊的纯逻辑:每次输入变了(或到了 [nextChangeAt])调 [update],得到此刻该显示什么。规则:
- * - 不显示:开关关着、无障碍服务不可用、Claire 自己的界面在前台、屏幕关着或锁着;
- * - 一次只显示最要紧的那件事,优先级见 [CapsuleKind];好几件事时拼上「共 N 件」,有要你处理的变橙:「1 件要你处理 · 共 2 件」;
- * - 平时是一颗图标:在跑、等条件时只在圈和角标上变,换了一步不展开;
- * - 有要你处理的、而用户还没在卡片里看过它时展开成胶囊,一直停着,直到打开卡片或那件事不再要你;
- *   打开卡片时看到的那几件(同一件事、同一个等待)记为看过,收起后回到一颗(橙色),来了新的才再展开;
- * - 办好了 / 没办成 / 已停止先展开 [PILL_MS],再缩回一颗带着结果角标,共停 [LINGER_MS] 后消失(「一直显示」时回到图标);
- *   在卡片里看过的直接是一颗;卡片展开着时这段时间停表:用户正看着的结果不会被收走,收起卡片后接着走剩下的时间;
- *   停完消失的不再回来(调用方之后还列着它也不算);对话删掉了([forget])时它已结束的任务马上消失;
- * - 没有任务、结果也停完了,而任务结束后留下的那一页还在后台运行时,展开成「后台网页运行中」一直停着(开关是「从不显示」时照样不显示,
- *   只靠通知);
- * - 再没有别的事、开关是「一直显示」时,有判为值得提醒、还没看过的通知就在图标角上写个数([CapsuleKind.Notice]),不展开、不计时;
- * - 同一件事、同一个状态里换句时每句至少停 [MIN_SENTENCE_MS],这期间来的只留最后一句;换了状态或换了一件事马上换。
- * 卡片按什么先后挑那一件见 [cardRuns]。
- * [reasonLabel] 把接管原因(login 等)换成给人看的名字,认不出为 null。时间由调用方给,测试里用假时钟。
+ * The capsule's pure logic: call [update] whenever the inputs change (or [nextChangeAt] arrives) to get what should be shown right now. Rules:
+ * - Hidden: the switch is off, the accessibility service is unavailable, Claire's own UI is in the foreground, or the screen is off or locked;
+ * - Only the most important item is shown at a time, priority as in [CapsuleKind]; with several items 'N total' is appended, and it turns orange when something needs you: '1 needs you · 2 total';
+ * - Normally a single icon: running or waiting states only change the ring and badge, and moving to the next step does not expand it;
+ * - When something needs you and the user has not seen it in the card yet, it expands into a pill and stays there until the card is opened or that item no longer needs you;
+ *   the items seen when the card opens (same item, same wait) are marked seen, and once collapsed it returns to a single icon (orange), expanding again only for something new;
+ * - Done / failed / stopped first expands as a pill for [PILL_MS], then shrinks to a single icon carrying a result badge, and stays for [LINGER_MS] in total before disappearing (back to the icon with 'always show');
+ *   items already seen in the card go straight to the single icon; while the card is expanded the clock pauses, so a result the user is looking at is not taken away and the remaining time continues after the card collapses;
+ *   what has finished lingering never comes back (even if the caller still lists it); when the conversation is deleted ([forget]) its finished tasks disappear immediately;
+ * - When there is no task and the results have finished lingering, but the page left after a task is still running in the background, it expands into 'web page running in background' and stays (with the switch set to 'never show' it still does not show,
+ *   notifications only);
+ * - When there is nothing else and the switch is 'always show', unseen notices judged worth reminding put a count on the icon's corner ([CapsuleKind.Notice]), without expanding or timing;
+ * - Swapping the sentence within the same item and state keeps each sentence for at least [MIN_SENTENCE_MS], and changes arriving in between keep only the last one; a state or item change swaps immediately.
+ * Which item the card picks and in what order is in [cardRuns].
+ * [reasonLabel] turns a takeover reason (login etc.) into a human-readable name, null when unrecognized. Time comes from the caller; tests use a fake clock.
  */
 class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
     private class Ended(val run: CapsuleRun, val at: Long)
 
-    /** 一件事此刻在等的那一下:同一件、同一个状态、同一个接管阶段算同一个。 */
+    /** The single thing an item is currently waiting on: same item, same state, same takeover stage counts as the same. */
     private data class Mark(val key: String, val state: TaskState, val stage: Takeover.Stage)
 
-    /** 各任务第一次出现的时刻:同样要紧时按先后排,卡片上显示用时。 */
+    /** When each task first appeared: ties are ordered by this, and the card shows the elapsed time. */
     private val firstSeen = HashMap<String, Long>()
     private val ended = HashMap<String, Ended>()
-    /** 停完或对话删掉而拿掉的已结束任务:调用方还列着时不再记进 [ended];调用方不再列的就忘掉。 */
+    /** Finished tasks removed because they finished lingering or their conversation was deleted: no longer recorded in [ended] while the caller still lists them; forgotten once the caller stops listing them. */
     private val dropped = HashSet<String>()
-    /** 在等接管或已经接手的任务,按开始等的先后:主屏一次只交一个,排在前面的先处理。 */
+    /** Tasks waiting for takeover or already handed over, in the order they started waiting: the main screen hands over one at a time, so the front of the queue is handled first. */
     private val takeoverSince = LinkedHashMap<String, Long>()
-    /** 用户在卡片里看过的要你处理和结果:不再展开成胶囊。 */
+    /** Items that need you and results the user has seen in the card: they no longer expand into a pill. */
     private val seen = HashSet<Mark>()
-    /** 卡片展开起的时刻;展开着时结束的任务不往下计时。 */
+    /** When the card was expanded; while it is expanded, tasks that finish do not keep counting down. */
     private var frozenSince: Long? = null
     private var lastRuns: List<CapsuleRun> = emptyList()
 
@@ -182,7 +182,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
     private var shownAt = 0L
     private var epoch = 0
 
-    /** 输入不变时输出下一次会变的时刻(等着换的那句话、办完后缩回一颗和消失);没有为 null。 */
+    /** When the inputs stay the same, the next moment the output will change (the queued sentence to swap to, shrinking back after finishing, and disappearing); null when there is none. */
     var nextChangeAt: Long? = null
         private set
 
@@ -194,7 +194,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         if (inputs.cardOpen) {
             if (frozenSince == null) frozenSince = now
         } else frozenSince?.let { since ->
-            // 收起卡片:展开的这段时间不算,结束的任务接着走剩下的时间
+            // Card collapsed: the time it was expanded does not count, and finished tasks continue with the remaining time
             val paused = now - since
             ended.replaceAll { _, e -> Ended(e.run, e.at + paused) }
             frozenSince = null
@@ -206,13 +206,13 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         val waiting = inputs.runs.filter { it.state is TaskState.WaitingTakeover && it.stage != Takeover.Stage.None }.map { it.key }
         takeoverSince.keys.retainAll(waiting.toSet())
         waiting.forEach { takeoverSince.getOrPut(it) { now } }
-        // 看过的只留还在的;卡片展开着时此刻的要你处理和结果都算看过
+        // Keep only seen marks that still exist; while the card is expanded, anything needing you or any result right now counts as seen
         val marks = needMarks(inputs.runs) + ended.values.map { it.run.mark() }
         seen.retainAll(marks)
         if (inputs.cardOpen) seen += marks
 
         if (inputs.mode == CapsuleMode.Off || !inputs.serviceAvailable || inputs.fullscreen || inputs.mikaInForeground || !inputs.screenInteractive) {
-            // 再出现时直接显示最新的那句,不接着上次的节流
+            // Show the latest sentence directly when it reappears, instead of continuing the previous throttle
             shownIdentity = null
             shownText = null
             return CapsuleView.Hidden
@@ -225,7 +225,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         return throttle(candidate, now)
     }
 
-    /** 对话 [conversationId] 删掉了:它已结束的任务马上从胶囊和卡片上拿掉,进行中的照旧。 */
+    /** Conversation [conversationId] was deleted: its finished tasks are removed from the capsule and card immediately, while running ones stay as they are. */
     fun forget(conversationId: String) = drop(ended.filterValues { it.run.conversationId == conversationId }.keys)
 
     private fun drop(keys: Set<String>) {
@@ -242,7 +242,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         val active = runs.filter { it.state != TaskState.Idle && !it.state.ended() }
         if (active.isEmpty()) return null
         val described = active.map { it to describe(it) }
-        // 同样要紧的几件里先说接管队里排在前面的,再说先开始的那件
+        // Among equally important items, mention the one ahead in the takeover queue first, then the one that started earlier
         val (top, line) = described.minWith(order)
         val count = active.size
         val needCount = described.count { it.second.kind.needsYou }
@@ -258,12 +258,12 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
             count >= 2 -> tr(R.string.capsule_of_total, line.text, count)
             else -> line.text
         }
-        // 有还没在卡片里看过的要你处理:展开成胶囊,一直停着
+        // Something needs you that has not been seen in the card yet: expand into a pill and stay there
         val pill = line.kind.needsYou && described.any { (r, l) -> l.kind.needsYou && r.mark() !in seen }
         return CapsuleView.Shown(line.kind, text, detail, count, needCount, top.key, top.conversationId, pill = pill)
     }
 
-    /** 最近结束的那件:先展开成胶囊,再缩回一颗带着结果角标;在卡片里看过的直接是一颗;卡片展开着时停表。 */
+    /** The most recently finished item: first expands into a pill, then shrinks to a single icon with a result badge; already seen in the card means the single icon directly; the clock pauses while the card is expanded. */
     private fun endedView(now: Long): CapsuleView.Shown? {
         val last = ended.values.maxByOrNull { it.at } ?: return null
         val age = (frozenSince ?: now) - last.at
@@ -280,8 +280,8 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
     }
 
     /**
-     * 卡片从中挑一件的几件事(上一次 [update] 的输入,见 [CapsuleCards.of]):进行中的按要紧程度排(同样要紧的先开始的在前),
-     * 后面是还没消失的已结束的(最近结束的在前)。在跑、等条件时带开始的时刻;等接管的带排在它前后的件数。
+     * The items the card picks one from (the inputs of the last [update], see [CapsuleCards.of]): running ones ordered by importance (equally important ones with the earlier start first),
+     * followed by finished ones that have not disappeared yet (most recently finished first). Running and waiting tasks carry their start time; takeover waiters carry the counts before and after them.
      */
     fun cardRuns(): List<CardRun> {
         val active = lastRuns.filter { it.state != TaskState.Idle && !it.state.ended() }
@@ -299,8 +299,8 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
     }
 
     /**
-     * 单独一件事在卡片里的样子(不经 [update]、不排先后):别处只跟着一件事时用(浏览器页上那一页的对话面板)。
-     * 已结束的按结束的说法;等接管的排位用它自带的队列位置。
+     * How a single item looks in the card (without going through [update] and without ordering): used where only one item is followed elsewhere (the conversation panel of the page on the browser page).
+     * Finished ones use the finished wording; takeover waiters use their own queue position.
      */
     fun cardRunOf(r: CapsuleRun): CardRun {
         if (r.state.ended()) {
@@ -311,12 +311,12 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         return CardRun(r, line.kind, line.text, ahead = r.queueAhead.coerceAtLeast(0), behind = r.queueBehind)
     }
 
-    /** 要紧的在前;同样要紧的,接管队里排在前面的在前,再按开始的先后。 */
+    /** More important first; among equally important ones, the one ahead in the takeover queue comes first, then by start time. */
     private val order = compareBy<Pair<CapsuleRun, Line>>(
         { it.second.kind.ordinal }, { spot(it.first)?.first ?: Int.MAX_VALUE }, { firstSeen[it.first.key] ?: 0L },
     )
 
-    /** 在接管队里前后各有几件:有真实的队列位置用它,没有时按开始等接管的先后;不在等接管为 null。 */
+    /** How many items sit before and after it in the takeover queue: use the real queue position when there is one, otherwise order by when it started waiting for takeover; null when it is not waiting for takeover. */
     private fun spot(r: CapsuleRun): Pair<Int, Int>? {
         if (r.queueAhead >= 0) return r.queueAhead to r.queueBehind
         val queue = takeoverSince.keys.toList()
@@ -324,13 +324,13 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         return if (i < 0) null else i to queue.size - 1 - i
     }
 
-    /** 留在后台运行的那一页:展开成胶囊,说的是它来自的那个对话。 */
+    /** The page left running in the background: expands into a pill naming the conversation it came from. */
     private fun keptView(kept: KeptPage?): CapsuleView.Shown? =
         kept?.let { CapsuleView.Shown(CapsuleKind.KeptPage, KEPT, conversationId = it.conversationId, pill = true) }
 
     /**
-     * 值得提醒的条数:和空闲图标一样只在「一直显示」时有(「有任务时显示」只管任务;那时从主动能力页进提醒列表)。
-     * 只是一颗图标角上的数,不展开、不写字:通知里的字(谁都能发)不上胶囊。
+     * Number of notices worth reminding: like the idle icon, only present with 'always show' ('show during tasks' covers tasks only; the reminder list is then entered from the proactive page).
+     * It is only a number on the icon's corner and expands nothing or shows no text: notification text (which anyone can send) never goes onto the capsule.
      */
     private fun noticeView(inputs: CapsuleInputs): CapsuleView.Shown? =
         if (inputs.mode == CapsuleMode.Always && inputs.notices > 0) CapsuleView.Shown(CapsuleKind.Notice, "", count = inputs.notices) else null
@@ -339,8 +339,8 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         if (mode == CapsuleMode.Always) CapsuleView.Shown(CapsuleKind.Idle, "") else null
 
     /**
-     * 同一件事、同一个状态里换句:离上一句不到 [MIN_SENTENCE_MS] 就先留着上一句,到时候再换成那时最新的。
-     * 展开、缩回也算换了一段,胶囊重新定宽。
+     * Swapping sentences within the same item and state: if less than [MIN_SENTENCE_MS] has passed since the last sentence, keep the previous one for now and swap to the latest one at that point.
+     * Expanding and shrinking back also counts as a new segment, and the capsule calculates its width anew.
      */
     private fun throttle(v: CapsuleView.Shown, now: Long): CapsuleView.Shown {
         val identity = Triple(v.kind, v.runKey, v.pill)
@@ -375,7 +375,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
                 CapsuleKind.NeedTakeover,
                 tr(R.string.capsule_needs_you, reasonLabel(s.reason) ?: oneLine(s.message).ifEmpty { tr(R.string.capsule_handle_it) }),
             )
-            // 已交还、循环还没往下走的那一小段
+            // The short stretch after handing back while the loop has not advanced yet
             Takeover.Stage.None -> Line(CapsuleKind.Running, CONTINUING)
         }
         is TaskState.WaitingConfirmation -> Line(CapsuleKind.NeedConfirm, tr(R.string.capsule_needs_ok, ConfirmationCopy.actionLabel(s.request.action)))
@@ -388,9 +388,9 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
 
     companion object {
         const val MIN_SENTENCE_MS = 1_500L
-        /** 办完后展开成胶囊多久。 */
+        /** How long it expands into a pill after finishing. */
         const val PILL_MS = 4_000L
-        /** 办完后一共停多久(展开的那段加上缩回一颗带角标的那段)。 */
+        /** How long it stays in total after finishing (the expanded stretch plus the stretch as a single icon with a badge). */
         const val LINGER_MS = 10_000L
         val HANDED_OVER: String get() = tr(R.string.capsule_you_handle)
         val THINKING: String get() = tr(R.string.capsule_thinking)
@@ -398,7 +398,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
         val CONTINUING: String get() = tr(R.string.capsule_continuing)
         val KEPT: String get() = tr(R.string.kept_capsule)
 
-        /** 此刻在做什么:正在调 MCP 先说哪个连接器;回放、批量执行写进度;否则先用模型随调用写的话,再用调用里的用意,都没有用固定说法。 */
+        /** What it is doing right now: when calling MCP, name the connector first; replay and batch execution show progress; otherwise prefer the text the model wrote with the call, then the intent of the call, and finally a fixed wording. */
         fun runningText(s: TaskState.Running): String {
             s.mcpConnector?.let { return StatusCopy.callingMcp(it) }
             s.progress?.let { return progressText(it) }
@@ -413,7 +413,7 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
             is RunProgress.WaitingForApp -> tr(R.string.progress_waiting_app, p.app)
         }
 
-        /** 模型写的字压成一行。 */
+        /** Squash text written by the model onto a single line. */
         private fun oneLine(s: String) = s.replace(Regex("\\s+"), " ").trim()
 
         private fun TaskState.ended() = this is TaskState.Succeeded || this is TaskState.Failed || this == TaskState.Cancelled
@@ -421,14 +421,14 @@ class CapsuleModel(private val reasonLabel: (String) -> String? = { null }) {
 }
 
 /**
- * 胶囊的透明度:一颗图标不碰它 [IDLE_MS] 后淡到 [BALL](圈和角标保持实色,由界面管);
- * 碰到或状态变了马上恢复(调用方从那一刻重新计时)。展开成胶囊时、要你处理时、「你来处理」那一条不淡。
+ * Capsule opacity: a single icon that has not been touched for [IDLE_MS] fades to [BALL] (the ring and badge stay solid, managed by the UI);
+ * touching it or a state change restores it immediately (the caller restarts the timer from that moment). It does not fade while expanded into a pill, while something needs you, or for the 'you handle it' bar.
  */
 object CapsuleFade {
     const val IDLE_MS = 3_000L
     const val BALL = 0.4f
 
-    /** [idleFor] 是离上次碰到或状态变了过了多久。 */
+    /** [idleFor] is how long it has been since the last touch or state change. */
     fun alpha(kind: CapsuleKind, needCount: Int, pill: Boolean, idleFor: Long, idleAlpha: Float = BALL): Float = when {
         pill || kind.needsYou || needCount > 0 || kind == CapsuleKind.HandedOver -> 1f
         idleFor < IDLE_MS -> 1f

@@ -3,16 +3,16 @@ package com.wangzan101.mika.capsule
 import com.wangzan101.mika.chat.CurrentChat
 
 /**
- * 点开空闲图标时卡片接着哪个对话(纯逻辑):用户在 App 里所在的那个([current],见 [CurrentChat]);没有记录时接着
- * 调用方读出来的最近那个([recent],进程刚起来、旧版本没有记录时才有);两个都没有就是一张新对话卡片。
+ * Which conversation the card continues from when the idle icon is tapped (pure logic): the one the user is in inside the app ([current], see [CurrentChat]); when that is not
+ * recorded, the most recent one the caller read ([recent], which only exists when the process just started and older versions have no record); with neither, it is a new conversation card.
  *
- * [title] 给出对话 [CurrentChat.Open.id] 的标题(用户起的或第一句话),还没有时返回 null。
+ * [title] returns the title (user-given or the first sentence) of the conversation [CurrentChat.Open.id], or null when there is none yet.
  */
 object CapsuleIdle {
     fun chat(current: CurrentChat?, recent: CardView.Chat?, title: (String) -> String? = { null }): CardView.Chat = when (current) {
         null -> recent ?: CardView.Chat(null)
         CurrentChat.Fresh -> CardView.Chat(null, fresh = true)
-        // 记着它是「用户此刻在的那个」:别的对话里已结束、还挂着的结果不把卡片抢过去(见 [CapsuleCards.of])
+        // Remember that this is the one the user is in right now: results that ended in other conversations and are still lingering must not steal the card (see [CapsuleCards.of])
         is CurrentChat.Open -> CardView.Chat(current.id, title = title(current.id), current = true)
     }
 }

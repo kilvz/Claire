@@ -11,7 +11,7 @@ import com.wangzan101.mika.capsule.CapsuleController.Snapshot
 import com.wangzan101.mika.capsule.CapsuleController.Touch
 import com.wangzan101.mika.capsule.CapsuleController.Companion.TAG
 
-// 胶囊:按状态渲染窗口、显隐同步与复位
+// Capsule: render windows by state, keep visibility in sync, and reset
 internal fun CapsuleController.render(s: Snapshot) {
     last = s
     val service = s.service
@@ -33,13 +33,13 @@ internal fun CapsuleController.render(s: Snapshot) {
         hide()
         return
     }
-    // App 已交到你手上:顶部那一条代替卡片
+    // The app has been handed to you: the bar at the top replaces the card
     if (shown.kind == CapsuleKind.HandedOver) resetCard()
     view = shown
     card = if (expanded) CapsuleCards.of(model.cardRuns(), follow, idle, s.kept) else null
     if (expanded && card == null) resetCard()
     updateThread(card as? CardView.Chat, s.runs)
-    // 换成了没有输入框的内容(例如变成要你同意):输入框收起,焦点还给下面的 App
+    // Switched to content without an input row (e.g. it now needs your approval): collapse the input row and return focus to the app below
     if (inputUi.open && card?.let(CapsuleCards::input) == null) closeInput()
     val detail = card as? CardView.Detail
     val keptCard = card as? CardView.Kept
@@ -54,7 +54,7 @@ internal fun CapsuleController.render(s: Snapshot) {
     }
     applyDrag()
     place()
-    // 换了状态、件数,展开或缩回:马上恢复,重新计时;只换了一句不算(一颗上看不到那句)
+    // State or count changed, expanded or shrunk back: restore immediately and restart the timer; a mere sentence swap does not count (that sentence is not visible on the dot)
     val nowLook = listOf(shown.kind, shown.pill, shown.count, shown.needCount)
     if (nowLook != look) {
         look = nowLook
@@ -64,10 +64,10 @@ internal fun CapsuleController.render(s: Snapshot) {
     _showing.value = true
 }
 
-/** 加上两个窗口(先一颗的,再卡片的,卡片在上面);有一个加不上就都不要,退回通知。 */
+/** Open the two windows (the dot first, then the card, so the card is on top); if either fails, drop both and fall back to notifications. */
 internal fun CapsuleController.openWindows(service: ScreenAccessibility): OverlayWindow? {
     val overlays = service.overlays()
-    // 面板先加,在一颗下面:按着说话时压暗的那层不盖住胶囊
+    // Open the panel first so it sits under the dot: the dimmed layer during hold-to-talk does not cover the capsule
     val panel = overlays.open(OverlayPlacement(Gravity.TOP or Gravity.LEFT), touchable = false) { VoicePanelOverlay() }
     val ball = overlays.open(OverlayPlacement(Gravity.TOP or Gravity.RIGHT)) { CapsuleOverlay() }
     val cardW = ball?.let { overlays.open(OverlayPlacement(Gravity.TOP or Gravity.CENTER_HORIZONTAL), ::outside) { CardOverlay() } }
@@ -83,7 +83,7 @@ internal fun CapsuleController.openWindows(service: ScreenAccessibility): Overla
     panelWindow = panel
     windowOn = service
     syncWindowVisibility()
-    // 新加的面板窗口先藏起来:没在说话时它不该在屏幕上留任何东西
+    // Hide the newly opened panel window first: when not talking it should leave nothing on the screen
     syncPanelWindow()
     for (it in listOf(ball, cardW)) it.onResize(::place)
     ball.onTouch { e ->
@@ -102,10 +102,10 @@ internal fun CapsuleController.refresh() {
 }
 
 /**
- * 对话 [id] 删掉了:它刚结束的任务马上从胶囊和卡片上拿掉,卡片不再接着它(刚在卡片里发了话的;空闲卡片接着的,
- * 展开着时换成开新对话的那张),展开着的卡片按 [CapsuleCards.of] 重挑(什么都没有就收起)。删对话先停掉它的任务、
- * 等它收尾(最多 15 秒)再删记录,所以这时它的任务一般已经结束;等不到收尾的,或者收尾以后、删记录之前又在卡片里接着说的
- * (会在这个对话里开一件新任务),之后存进的那一轮会把对话重新建起来,胶囊照常显示它。
+ * Conversation [id] was deleted: its just-finished tasks are removed from the capsule and card immediately, and the card no longer continues it (if words had just been sent in the card;
+ * if it was the one the idle card continues, it becomes the new-conversation card while expanded), and the expanded card is picked again per [CapsuleCards.of] (collapsing when nothing is left). Deleting a conversation first stops its tasks and
+ * waits for them to wrap up (at most 15 seconds) before deleting the record, so at this point its tasks have usually finished already; for ones that fail to wrap up, or for words sent in the card after
+ * wrapping up but before deleting the record (which starts a new task in this conversation), the turn saved afterwards recreates the conversation and the capsule shows it as usual.
  */
 internal fun CapsuleController.forget(id: String) {
     model.forget(id)
@@ -157,7 +157,7 @@ internal fun CapsuleController.resetCard() {
     updateThread(null, emptyList())
 }
 
-/** 两个窗口交替时显式显隐;空内容只负责排版,不承担把系统窗口旧帧撤下屏幕的职责。 */
+/** Explicitly show or hide when the two windows swap; empty content only handles layout and is not responsible for taking the system window's old frame off the screen. */
 internal fun CapsuleController.syncWindowVisibility() {
     val visible = capsuleWindowVisibility(expanded, cardOut, closing)
     window?.setVisible(visible.capsule)
@@ -165,9 +165,9 @@ internal fun CapsuleController.syncWindowVisibility() {
 }
 
 /**
- * 说话面板窗口:在说时铺满整屏(压暗背后)、才显出来;收起时先显式设为不可见再缩回没有大小。
- * 和一颗、卡片一样,不能拿空内容和零尺寸当作已经不可见:Compose 内容清空后可能不再出新帧,
- * 系统画布上会留着最后一帧「转文字…」,面板看上去就卡在屏幕上了。
+ * The voice panel window: it fills the whole screen (dimming what is behind) and only then becomes visible while talking; when it collapses it is explicitly made invisible first and then shrunk to no size.
+ * Like the dot and the card, empty content and zero size must not be treated as already invisible: Compose may stop producing new frames once the content is cleared,
+ * and the last 'converting…' frame would stay on the system canvas, making the panel look stuck on the screen.
  */
 internal fun CapsuleController.syncPanelWindow() {
     val w = panelWindow ?: return

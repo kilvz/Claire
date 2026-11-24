@@ -56,17 +56,17 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 
 /**
- * 底部输入框:平时是一行提示(浮层不抢键盘),点了打开成能打字的框并弹出输入法;回车或右边的按钮发出。
- * 有 [stop] 时右边一直有黑色的停止键(同对话页输入栏),写了字再多一个发送。
+ * The bottom input row: normally a single hint line (the overlay does not take the keyboard); tapping it opens a box you can type in and raises the IME; Enter or the button on the right sends.
+ * With [stop] there is always a black stop key on the right (same as the conversation screen's input bar); once there is text there is also a send key.
  */
 @Composable
 internal fun InputRow(field: CardInput, ui: CardInputUi, actions: CardActions, stop: (() -> Unit)? = null) {
     ui.screen?.let { ScreenChip(it, actions::dropScreen) }
-    // 选了「排队」时输入框的灰字换成「下一件事」,别还写着补充当前任务
+    // When 'Queue' is selected the placeholder switches to 'Next task' instead of still saying it supplements the current task
     val shown = if (field.kind == CardInputKind.Steer && ui.followUpMode == FollowUpMode.Queue)
         field.copy(hint = tr(R.string.chat_placeholder_queue)) else field
     Column(Modifier.padding(top = 10.dp).fillMaxWidth()) {
-        // 只有「补充/改要求」才需要选交给当前任务还是排下一件;回答、接着说、开始新任务不显示
+        // Only 'supplement / change requirements' needs a choice between steering the current task and queueing the next one; answers, continuations, and new tasks do not show it
         if (field.kind == CardInputKind.Steer) CapsuleFollowUpMode(ui.followUpMode, actions::setFollowUpMode)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CameraKey(actions::captureScreen)
@@ -75,7 +75,7 @@ internal fun InputRow(field: CardInput, ui: CardInputUi, actions: CardActions, s
     }
 }
 
-/** 输入框左边的截屏按钮:圆钮里一块屏。 */
+/** The capture button left of the input row: a piece of screen inside a circular key. */
 @Composable
 private fun CameraKey(onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -89,7 +89,7 @@ private fun CameraKey(onClick: () -> Unit) {
     }
 }
 
-/** 输入框上面那一条:缩略图、「你此刻的屏幕」、App · 时刻,右边 × 不要它;不让截图的页面写「没截到」。 */
+/** The strip above the input row: thumbnail, 'your current screen', app · time, and × on the right to drop it; pages that block capture say 'not captured'. */
 @Composable
 private fun ScreenChip(p: PendingScreen, onRemove: () -> Unit) {
     val c = MikaTheme.colors
@@ -116,7 +116,7 @@ private fun ScreenChip(p: PendingScreen, onRemove: () -> Unit) {
     }
 }
 
-/** 发送键:有东西可发时是蓝底,否则灰的点不了。 */
+/** Send key: blue when there is something to send, otherwise a grey one that cannot be tapped. */
 @Composable
 private fun SendKey(enabled: Boolean, onSend: () -> Unit, start: Dp = 0.dp) {
     val c = MikaTheme.colors
@@ -151,7 +151,7 @@ private fun InputField(field: CardInput, ui: CardInputUi, actions: CardActions, 
                 Text(ui.draft.ifEmpty { field.hint }, style = Body, color = if (ui.draft.isEmpty()) c.ink3 else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             stop?.let { StopKey(it) }
-            // 挂着一屏时不用打开输入框也能直接发
+            // With a screen attached you can send directly without opening the input row
             if (ui.screen != null) SendKey(true, actions::send, start = if (stop != null) 4.dp else 0.dp)
         }
         return
@@ -160,7 +160,7 @@ private fun InputField(field: CardInput, ui: CardInputUi, actions: CardActions, 
         focus.requestFocus()
         keyboard?.show()
     }
-    // 和对话页一样:打开时、外面的字一变(说完接上来),光标放到末尾,接着打都在后面
+    // Same as the conversation screen: on open, and whenever the outside text changes (a reply comes in and continues), the cursor goes to the end so typing continues there
     var fieldValue by remember { mutableStateOf(TextFieldValue(ui.draft, TextRange(ui.draft.length))) }
     val shownValue = if (fieldValue.text == ui.draft) fieldValue else TextFieldValue(ui.draft, TextRange(ui.draft.length))
     Row(
@@ -183,7 +183,7 @@ private fun InputField(field: CardInput, ui: CardInputUi, actions: CardActions, 
     }
 }
 
-/** 胶囊卡片里的紧凑二选一:引导当前任务 / 排队下一件。 */
+/** The compact two-choice control inside the capsule card: steer the current task / queue the next one. */
 @Composable
 private fun CapsuleFollowUpMode(mode: FollowUpMode, onMode: (FollowUpMode) -> Unit) {
     val c = MikaTheme.colors
@@ -208,7 +208,7 @@ private fun CapsuleModePill(value: FollowUpMode, selected: FollowUpMode, onMode:
     }
 }
 
-/** 胶囊卡片底部的一行「排队中 N 件」;点它到对话页管理。 */
+/** A 'N queued' line at the bottom of the capsule card; tapping it opens the conversation screen to manage them. */
 @Composable
 internal fun QueuedLine(count: Int, onClick: (() -> Unit)?) {
     if (count <= 0) return
@@ -228,7 +228,7 @@ internal fun QueuedLine(count: Int, onClick: (() -> Unit)?) {
     }
 }
 
-/** 输入框右边的停止键:黑底圆钮里一个方块,同对话页输入栏。 */
+/** The stop key right of the input row: a square inside a black circular key, same as the conversation screen's input bar. */
 @Composable
 internal fun StopKey(onStop: () -> Unit) {
     val c = MikaTheme.colors

@@ -1,13 +1,13 @@
 package com.wangzan101.mika.capsule
 
 /**
- * 胶囊上的单击和双击(纯逻辑,时钟、落点和输入来源由调用方给):单击展开卡片,双击截取屏幕放进卡片预览。
- * 按下一下([tap])先不算单击:[timeoutMs] 内同一输入来源在 [slopPx] 内再点一下才是双击;
- * 到时还没有第二下([settle])才是单击。落点远、来源不同或时钟倒退都把这一下当作新的第一下。
+ * Single and double taps on the capsule (pure logic; clock, position, and input source come from the caller): a single tap expands the card, a double tap captures the screen into the card preview.
+ * Pressing once ([tap]) is not yet counted as a single tap: a second tap from the same input source within [slopPx] and within [timeoutMs] makes it a double tap;
+ * once the timeout passes without a second tap ([settle]) it is a single tap. A distant position, a different source, or a clock that goes backwards makes this one a new first tap.
  */
 class DoubleTap(val timeoutMs: Long, private val slopPx: Float) {
     enum class Tap {
-        /** 第一下:等 [timeoutMs] 再 [settle]。 */
+        /** The first tap: wait [timeoutMs] and then [settle]. */
         First,
         Double,
     }
@@ -33,7 +33,7 @@ class DoubleTap(val timeoutMs: Long, private val slopPx: Float) {
         }
     }
 
-    /** 第一下之后到时了:还在等第二下就是单击(返回 true,只返回一次);已经成了双击或还没到时返回 false。 */
+    /** The timeout after the first tap has passed: if it is still waiting for a second tap it is a single tap (returns true, only once); false when it already became a double tap or the timeout has not passed. */
     fun settle(now: Long): Boolean {
         val previous = first ?: return false
         if (now - previous.at < timeoutMs) return false
@@ -41,7 +41,7 @@ class DoubleTap(val timeoutMs: Long, private val slopPx: Float) {
         return true
     }
 
-    /** 不再等(清提示、拖动、长按、胶囊收起或换成别的样子)。 */
+    /** Stop waiting (clearing the note, dragging, long press, the capsule collapsing or turning into something else). */
     fun reset() {
         first = null
     }

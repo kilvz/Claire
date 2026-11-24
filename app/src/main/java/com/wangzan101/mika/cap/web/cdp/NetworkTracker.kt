@@ -24,9 +24,9 @@ import kotlinx.serialization.json.put
 import java.util.WeakHashMap
 
 /**
- * 一个标签的网络记录:第一次用到(动作后的自动等待、web_capture)时才打开 Network,
- * 订阅这个标签会话的 `Network.*` 事件喂给 [NetworkLedger]。会话断了或标签关了就停,下次用到时按新会话重建。
- * 只有一个会话的事件进来,所以不必再按标签筛;子会话(sessionId 非空)的请求按会话分开记。
+ * Network record for one tab: Network is only enabled the first time it is used (the automatic wait after an action, web_capture),
+ * subscribing to this tab session's `Network.*` events and feeding them to [NetworkLedger]. It stops when the session drops or the tab closes, and is rebuilt on the new session next time it is used.
+ * Only one session's events come in, so there is no need to filter by tab; requests from child sessions (non-empty sessionId) are recorded per session.
  */
 class NetworkTracker private constructor(
     private val session: CdpSession,
@@ -38,7 +38,7 @@ class NetworkTracker private constructor(
     @Volatile var enabled = false
         private set
 
-    // 先订阅再发 Network.enable:事件流不重放
+    // Subscribe before sending Network.enable: the event stream is not replayed
     private suspend fun start(): Boolean {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             session.events.collect { e ->
@@ -47,8 +47,8 @@ class NetworkTracker private constructor(
         }
         scope.launch { session.closed.first { it }; close() }
         enabled = try {
-            // 渲染进程替 getResponseBody 留的正文也设上限:单个与账本收的上限一致(更大的反正不取);
-            // 总量给账本的两倍,图片脚本等小资源也占这块缓冲,留点余地让接口响应不被挤掉
+            // The body buffer the renderer keeps for getResponseBody is capped too: the per-item cap matches what the ledger accepts (larger ones are not fetched anyway);
+            // the total is twice the ledger's, since images, scripts, and other small resources also use this buffer, leaving some room so interface responses are not squeezed out
             session.send(
                 "Network.enable",
                 buildJsonObject {
@@ -74,10 +74,10 @@ class NetworkTracker private constructor(
 
     fun idle(): Boolean = synchronized(ledger) { ledger.isIdle(clock()) }
 
-    /** 本次动作发出的请求还在途(或刚结束);会话断了当作不忙。 */
+    /** Requests sent by the current action are still in flight (or just finished); a dropped session counts as not busy. */
     fun actionBusy(): Boolean = alive && synchronized(ledger) { ledger.actionBusy(clock()) }
 
-    /** 等到网络空闲(无在途请求且安静 [NetworkLedger.quietMs]),至多 [capMs];到时还不空闲返回 false。 */
+    /** Wait until the network is idle (no requests in flight and quiet for [NetworkLedger.quietMs]), at most [capMs]; returns false if it is still not idle at the deadline. */
     suspend fun awaitIdle(capMs: Long): Boolean {
         val deadline = clock() + capMs
         while (true) {
@@ -91,7 +91,7 @@ class NetworkTracker private constructor(
     fun list(urlContains: String?, method: String?, sinceLastAction: Boolean): List<CapturedResponse> =
         synchronized(ledger) { ledger.list(urlContains, method, sinceLastAction) }
 
-    /** 取一个响应;该有正文还没取时用 `Network.getResponseBody` 取回(取不到就不带正文)。 */
+    /** Fetch one response; when a body should exist but has not been fetched yet, get it with `Network.getResponseBody` (without a body when that fails). */
     suspend fun get(id: String): CapturedResponse? = bodyLock.withLock {
         val fetch = synchronized(ledger) { ledger.bodyToFetch(id) }
         if (fetch != null && alive) {
@@ -108,7 +108,7 @@ class NetworkTracker private constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // 页面已丢掉这个响应(导航后常见)、或调用超时:照常返回,不带正文
+                // The page already dropped this response (common after navigation), or the call timed out: return as usual, without a body
                 Log.i(TAG, "getResponseBody $id failed: ${e.message}")
             }
         }
@@ -135,8 +135,8 @@ class NetworkTracker private constructor(
         private val creating = Mutex()
 
         /**
-         * 这个标签的网络记录,第一次调用时打开 Network。没有 DevTools 会话、或打开失败时为 null(调用方走老路)。
-         * 会话换了(重连)或标签已关时按当前会话重建。
+         * The network record for this tab; Network is enabled on the first call. Null when there is no DevTools session, or when enabling fails (the caller falls back to the old path).
+         * Rebuilt on the current session when the session changed (reconnect) or when the tab was closed.
          */
         suspend fun of(tab: WebTab, clock: () -> Long): NetworkTracker? {
             if (tab.destroyed || tab.crashed) {
@@ -154,7 +154,7 @@ class NetworkTracker private constructor(
             }
         }
 
-        /** 标签关了:停掉它的记录。 */
+        /** Tab closed: stop its record. */
         fun release(tab: WebTab) {
             synchronized(trackers) { trackers.remove(tab) }?.close()
         }

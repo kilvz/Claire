@@ -1,9 +1,9 @@
 package com.wangzan101.mika.cap.web
 
 /**
- * 页面分段交回的 blob 内容(base64)。页面报的长度、每段长度、累计长度都不信:
- * 报的长度超过 [maxBytes] 换算成 base64 的上限(每 3 字节 4 个字,另加填充余量)就在分配之前拒掉;
- * 不按报的长度预先分配;每段至多 [chunk] 个字,累计不超过报的长度。
+ * Blob content (base64) handed back by the page in chunks. Nothing the page reports is trusted: the declared length, the per-chunk length, and the accumulated length.
+ * A declared length beyond the base64 limit for [maxBytes] (4 characters per 3 bytes, plus padding allowance) is rejected before allocating;
+ * nothing is pre-allocated from the declared length; each chunk carries at most [chunk] characters, and the total never exceeds the declared length.
  */
 internal class BlobChunks(private val declared: Int, private val maxBytes: Long, private val chunk: Int = CHUNK) {
     sealed interface Outcome {
@@ -13,7 +13,7 @@ internal class BlobChunks(private val declared: Int, private val maxBytes: Long,
 
     private val sb = StringBuilder()
 
-    /** 报的长度能不能收;不能时给原因。 */
+    /** Whether the declared length can be accepted; when it cannot, why. */
     fun refusal(): String? = when {
         declared < 0 -> UNREADABLE
         declared > maxBase64(maxBytes) -> WebDownloads.TOO_LARGE
@@ -23,7 +23,7 @@ internal class BlobChunks(private val declared: Int, private val maxBytes: Long,
     val received: Int get() = sb.length
     val complete: Boolean get() = sb.length >= declared
 
-    /** 收下一段;超长、超出报的长度时为失败原因。 */
+    /** Accept the next chunk; returns a failure reason when it is too long or exceeds the declared length. */
     fun add(part: String): String? {
         if (part.length > chunk) return UNREADABLE
         if (sb.length.toLong() + part.length > declared) return UNREADABLE
@@ -38,7 +38,7 @@ internal class BlobChunks(private val declared: Int, private val maxBytes: Long,
     }
 
     companion object {
-        /** 与 page.js 的 BLOB_CHUNK 一致。 */
+        /** Matches BLOB_CHUNK in page.js. */
         const val CHUNK = 1 shl 20
         const val UNREADABLE = "unreadable"
 

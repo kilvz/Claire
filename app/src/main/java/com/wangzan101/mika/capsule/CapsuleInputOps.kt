@@ -27,22 +27,22 @@ import com.wangzan101.mika.capsule.CapsuleController.Companion.TAG
 import com.wangzan101.mika.capsule.CapsuleController.Companion.IME_GONE_MS
 import com.wangzan101.mika.capsule.CapsuleController.Companion.IME_POLL_MS
 
-// 胶囊:输入框、发送与截屏附图
-/** 点了输入框:这时才让浮层能接收键盘,输入法对着它弹出。 */
+// Capsule: input row, sending, and screen capture attachments
+/** Input row tapped: only now does the overlay accept the keyboard, and the IME pops up pointing at it. */
 internal fun CapsuleController.openInput() {
     if (inputUi.open) return
     cardWindow?.setFocusable(true)
     inputUi = inputUi.copy(open = true)
 }
 
-/** 收起输入框,立刻把焦点还给下面的 App。 */
+/** Collapse the input row and immediately return focus to the app below. */
 internal fun CapsuleController.closeInput() {
     if (!inputUi.open) return
     inputUi = inputUi.copy(open = false)
     cardWindow?.setFocusable(false)
 }
 
-/** 返回键:先收起输入框,再关放大的画面,最后收起卡片。 */
+/** Back key: collapse the input row first, then dismiss the zoomed image, and finally collapse the card. */
 internal fun CapsuleController.back() {
     when {
         inputUi.open -> closeInput()
@@ -51,15 +51,16 @@ internal fun CapsuleController.back() {
     }
 }
 
-/** 放大或关掉画面;放大时卡片不能拖(没有标题栏)。 */
+/** Zoom in on or dismiss the image; while zoomed the card cannot be dragged (there is no title bar). */
 internal fun CapsuleController.zoom(on: Boolean) {
     zoomed = on
     applyDrag()
 }
 
 /**
- * 发出输入框里的话,和在对话页里发的走同一条路(都记进那个对话):在跑、等条件时插话给它,
- * Claire 问你时作为回答,办完后在同一个对话里接着说,空闲时接着最近的对话或开新对话;后两种之后卡片跟着那个对话的任务看回答。
+ * Send what is in the input row, following the same path as sending from the conversation screen (both are recorded in that conversation):
+ * interject into a task that is running or waiting on a condition, answer when Claire asks you something, and continue in the same conversation once it is done;
+ * when idle, continue the most recent conversation or start a new one; after the latter two, the card follows that conversation's task to show the answer.
  */
 internal fun CapsuleController.send() {
     val app = context.applicationContext as? com.wangzan101.mika.MikaApp
@@ -79,7 +80,7 @@ internal fun CapsuleController.send() {
     refresh()
 }
 
-/** 按输入框此刻交给谁([kind])发出 [text];开始说时进 [conversationId](为 null 时新开一个)。 */
+/** Send [text] to whoever the input row currently addresses ([kind]); the utterance starts in [conversationId] (a new one is created when null). */
 internal fun CapsuleController.submit(c: CardView, kind: CardInputKind, text: String, conversationId: String?, mode: FollowUpMode = FollowUpMode.Steer) {
     val run = when (c) {
         is CardView.Detail -> c.run.run
@@ -101,8 +102,8 @@ internal fun CapsuleController.submit(c: CardView, kind: CardInputKind, text: St
 }
 
 /**
- * 截下的屏幕连同附言 [words] 发出:先存进这句话要去的那个对话(新对话这时就定下编号),
- * 再写成带屏幕的一句话([UserScreenMessage])照常发出;存不下就不发。
+ * Send the captured screen together with the accompanying words [words]: first save it into the conversation this utterance is headed for (a new conversation gets its id here),
+ * then compose it into a message with the screen ([UserScreenMessage]) and send it as usual; if it cannot be saved, do not send.
  */
 internal fun CapsuleController.deliver(c: CardView, kind: CardInputKind, shot: CapturedScreen, words: String, mode: FollowUpMode = FollowUpMode.Steer) {
     val access = (context.applicationContext as MikaApp).appAccess.current()
@@ -127,9 +128,9 @@ internal fun CapsuleController.deliver(c: CardView, kind: CardInputKind, shot: C
 }
 
 /**
- * 双击或读屏的截屏操作:展开单击会打开的那张卡片,把此刻的屏幕挂到现有输入框的预览上。
- * 这里只截屏和填 [PendingScreen],不保存进对话、不提交;用户检查预览后按现有发送键,才由 [send] 调 [deliver]。
- * 那张卡片没有输入框(要你接管、同意)时没有地方预览,就和单击一样只展开。
+ * Double tap or the screen reader's capture action: expand the card that a single tap would open, and attach the current screen to the preview of the existing input row.
+ * Only capture and fill [PendingScreen] here: no saving into the conversation and no submission; after the user checks the preview and presses the existing send key, [send] calls [deliver].
+ * When that card has no input row (it wants you to take over or to approve), there is nowhere to preview, so just expand like a single tap does.
  */
 internal fun CapsuleController.previewScreen() {
     val v = view ?: return
@@ -151,7 +152,7 @@ internal fun CapsuleController.previewScreen() {
     }
 }
 
-/** 卡片里的截屏按钮:截下来挂在输入框上面,补不补一句都行。 */
+/** The capture button inside the card: attach the capture above the input row; adding a line is optional. */
 internal fun CapsuleController.captureForCard() {
     if (capturing) return
     scope.launch {
@@ -162,8 +163,8 @@ internal fun CapsuleController.captureForCard() {
 }
 
 /**
- * 截下用户此刻的屏幕:输入框开着先收起(等输入法下去),浮层藏起来、真的从屏幕上下去了再截,截完马上出来、一颗上闪一下;
- * 再在后台整理屏上的字。前台是 Claire 自己、截不到时为 null。
+ * Capture what the user's screen shows right now: if the input row is open, collapse it first (wait for the IME to go away); hide the overlays, capture only after they are really off the screen, then bring them back immediately and flash the dot;
+ * then tidy up the text on the screen in the background. Returns null when Claire itself is in the foreground and nothing can be captured.
  */
 internal suspend fun CapsuleController.captureScreen(): CapturedScreen? {
     val service = windowOn ?: return null
@@ -175,7 +176,7 @@ internal suspend fun CapsuleController.captureScreen(): CapturedScreen? {
             closeInput()
             withTimeoutOrNull(IME_GONE_MS) { while (imeTop != null) delay(IME_POLL_MS) }
         }
-        // 空着的那个窗口(展开时一颗那个、收起时卡片那个)不画东西,不用等它
+        // The empty window (the dot one while expanded, the card one while collapsed) draws nothing, so there is no need to wait for it
         suspend fun <T> OverlayWindow.hidden(block: suspend () -> T): T = if (height > 0) hiddenWhile(block) else block()
         val store = (context.applicationContext as MikaApp).appAccess
         val sources = MainScreenCapture.sourcePackages(service) ?: return null
@@ -205,8 +206,8 @@ internal suspend fun CapsuleController.captureScreen(): CapturedScreen? {
 }
 
 /**
- * 在对话 [conversationId] 里开始说 [text];别的任务在跑时排上,不丢。卡片接着跟这个对话;
- * 空闲卡片也改成接着这个对话(新开的对话标题就是这句话)。
+ * Start saying [text] in conversation [conversationId]; queue it if another task is running, do not drop it. The card keeps following this conversation;
+ * the idle card also switches to continue this conversation (a newly created conversation's title is this utterance).
  */
 internal fun CapsuleController.startIn(conversationId: String, text: String) {
     TaskService.start(context, text, conversationId)

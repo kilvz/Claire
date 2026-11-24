@@ -16,8 +16,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import com.wangzan101.mika.capsule.CapsuleController.Companion.IME_SHRINK_JUMP_DP
 
-// 胶囊:空闲对话的加载、翻历史与定时淡出
-/** 点开空闲图标:先读用户此刻在哪个对话([loadIdle]),再展开(来回由 [updateThread] 读)。 */
+// Capsule: loading the idle conversation, paging through history, and timed fading
+/** Tap the idle icon: first read which conversation the user is in ([loadIdle]), then expand (the exchange is read by [updateThread]). */
 internal fun CapsuleController.openIdle() {
     scope.launch {
         idle = loadIdle()
@@ -27,23 +27,23 @@ internal fun CapsuleController.openIdle() {
 }
 
 /**
- * 空闲卡片接着的那段对话:用户在 App 里所在的那个,没有记录时接着最近那个(见 [CapsuleIdle]);一个都没有时开新对话。
- * 不按对话文件的时间猜:新开的对话还没有文件,猜到的是上一个。
+ * The conversation the idle card continues: the one the user is in inside the app, or the most recent one when nothing is recorded (see [CapsuleIdle]); when there is none at all, start a new conversation.
+ * It does not guess from conversation file times: a new conversation has no file yet, so the guess would be the previous one.
  */
 internal suspend fun CapsuleController.loadIdle(): CardView.Chat = withContext(Dispatchers.IO) {
     runCatching {
         val store = ConversationStore.shared(context)
         val recent = store.list().firstOrNull()?.let { CardView.Chat(it.id, title = it.title?.let(ScreenCopy::plain)) }
         CapsuleIdle.chat(store.currentChat(), recent) { id ->
-            // 和侧栏一样:用户起的名字或第一句话
+            // Same as the sidebar: the user-given name or the first sentence
             (store.title(id) ?: store.turns(id).firstOrNull()?.userText)?.let(ScreenCopy::plain)
         }
     }.getOrElse { CardView.Chat(null) }
 }
 
 /**
- * 对话卡片要的来回:换了对话从头读(先读最近 [CapsuleThreads.PAGE] 轮);这个对话里的任务出现、结束、拿掉时重读记下的轮次
- * (任务结束后那一轮才记进对话);其余时候只按此刻的任务重排(在回答的字跟着长)。不是对话卡片时清掉。
+ * The exchange the chat card needs: when the conversation changes it is read from the start (the latest [CapsuleThreads.PAGE] turns first); when tasks in this conversation appear, finish, or are removed it re-reads the recorded turns
+ * (a turn is only recorded after its task finishes); otherwise it only re-orders by the current tasks (the streaming answer grows as it is written). Cleared when this is not a chat card.
  */
 internal fun CapsuleController.updateThread(chat: CardView.Chat?, runs: List<CapsuleRun>) {
     val id = chat?.target
@@ -53,7 +53,7 @@ internal fun CapsuleController.updateThread(chat: CardView.Chat?, runs: List<Cap
         past = null
         threadMark = null
         shownTurns = CapsuleThreads.PAGE
-        // 空闲卡片的新对话:来回是空的
+        // A new conversation on the idle card: the exchange is empty
         thread = if (chat != null) ChatThread(emptyList()) else null
         return
     }
@@ -71,7 +71,7 @@ internal fun CapsuleController.updateThread(chat: CardView.Chat?, runs: List<Cap
     rebuildThread()
 }
 
-/** 按记下的轮次和卡片里此刻的任务排出来回;记下的还没读到时先空着。 */
+/** Build the exchange from the recorded turns and the current tasks in the card; while the recorded turns have not been read yet it stays empty. */
 internal fun CapsuleController.rebuildThread() {
     val id = threadOf ?: return
     val p = past ?: return
@@ -80,7 +80,7 @@ internal fun CapsuleController.rebuildThread() {
     thread = pastTitle?.let { built.copy(title = it) } ?: built
 }
 
-/** 后台读对话 [id] 记下的轮次,连同要排出来的那几轮操作过的 App 和网站(从运行记录里读,读过的记着),读到后重排。 */
+/** Read the turns recorded for conversation [id] in the background, along with the apps and sites operated by the turns being laid out (read from the run record, remembered once read), then re-order when they arrive. */
 internal fun CapsuleController.loadPast(id: String) {
     threadJob?.cancel()
     val known = HashMap(placesOf)
@@ -99,12 +99,12 @@ internal fun CapsuleController.loadPast(id: String) {
     }
 }
 
-/** 那次运行操作过的 App 和网站;记录已清掉或读不了时为空(当作纯聊天)。在后台线程调。 */
+/** The apps and sites that run operated; empty when the record has been cleared or cannot be read (treated as pure chat). Call on a background thread. */
 internal fun CapsuleController.placesIn(runId: String): List<String> = runCatching {
     CapsuleThreads.places(runStore.events(runId).filterIsInstance<RunEvent.Activity>()) { ConfirmationNotifier.appLabel(context, it) }
 }.getOrDefault(emptyList())
 
-/** 滚到了顶:往前多排 [CapsuleThreads.PAGE] 轮(先读出它们操作过的 App)。 */
+/** Scrolled to the top: lay out [CapsuleThreads.PAGE] more turns backwards (reading the apps they operated first). */
 internal fun CapsuleController.loadEarlier() {
     val id = threadOf ?: return
     val p = past ?: return
@@ -113,7 +113,7 @@ internal fun CapsuleController.loadEarlier() {
     loadPast(id)
 }
 
-/** 跟着用户屏幕上的输入法:弹出、收起、变高时重新摆。卡片只按这一轮最高的样子摆,打字时不跟着候选行反复变(见 [cardImeTop])。 */
+/** Follow the IME on the user's screen: re-place when it appears, disappears, or grows taller. The card is only placed using the tallest IME of this round, so it does not keep changing with the candidate row while typing (see [cardImeTop]). */
 internal fun CapsuleController.watchIme(service: ScreenAccessibility) {
     imeJob?.cancel()
     imeJob = scope.launch {
@@ -125,7 +125,7 @@ internal fun CapsuleController.watchIme(service: ScreenAccessibility) {
     }
 }
 
-/** 到了模型说的时刻再算一次(换句、办完后缩小、消失)。 */
+/** Recompute once the moment the model named arrives (sentence swap, shrinking after finishing, disappearing). */
 internal fun CapsuleController.schedule(at: Long?) {
     tick?.cancel()
     tick = at?.let { t ->
@@ -136,7 +136,7 @@ internal fun CapsuleController.schedule(at: Long?) {
     }
 }
 
-/** 碰到了:马上恢复,从现在起重新计时。 */
+/** Touched: restore immediately and restart the timer from now. */
 internal fun CapsuleController.wake() {
     lastActive = System.currentTimeMillis()
     fade()
@@ -160,7 +160,7 @@ internal fun CapsuleController.fade() {
     }
 }
 
-/** 只给展开的那件事收画面;换了一件或收起就停。 */
+/** Collect the preview only for the expanded item; it stops when the item changes or the card collapses. */
 internal fun CapsuleController.watchPreview(key: String?) {
     if (key == previewKey) return
     previewKey = key
@@ -177,7 +177,7 @@ internal fun CapsuleController.watchPreview(key: String?) {
     }
 }
 
-/** 留在后台运行的那一页的卡片:收它那块显示的画面(和任务卡片的小画面同一个节流)。 */
+/** The card for the page left running in the background: collect the image of the display it shows (the same throttle as the task card preview). */
 internal fun CapsuleController.watchKept(id: Long) {
     val key = "kept:$id"
     if (key == previewKey) return

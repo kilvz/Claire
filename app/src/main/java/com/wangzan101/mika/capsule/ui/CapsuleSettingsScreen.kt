@@ -35,12 +35,12 @@ import com.wangzan101.mika.ui.theme.MikaIcons
 import com.wangzan101.mika.ui.theme.MikaTheme
 import kotlin.math.roundToInt
 
-/** 设置 › 悬浮胶囊的文字。 */
+/** Text for Settings › Floating capsule. */
 object CapsuleSettingsCopy {
     val TITLE: String get() = tr(R.string.capsule_settings_title)
     val SUBTITLE: String get() = tr(R.string.capsule_settings_sub)
     val FOOTNOTE: String get() = tr(R.string.capsule_settings_foot)
-    /** 系统可能关掉后台的 App,胶囊跟着不见:请用户在系统设置里放行。 */
+    /** The system may kill background apps and the capsule disappears with them: ask the user to allow it in system settings. */
     val BACKGROUND: String get() = tr(R.string.capsule_settings_background)
     val IDLE_OPACITY: String get() = tr(R.string.capsule_idle_opacity)
     val IDLE_OPACITY_DETAIL: String get() = tr(R.string.capsule_idle_opacity_detail)
@@ -67,7 +67,7 @@ object CapsuleSettingsCopy {
     }
 }
 
-/** 设置 › 悬浮胶囊:关闭 / 有任务时显示(默认) / 一直显示,选了当场生效;静置不透明度与展开卡片的大小。 */
+/** Settings › Floating capsule: off / show during tasks (default) / always show, effective immediately when chosen; idle opacity and the expanded card size. */
 @Composable
 fun CapsuleScreen(
     mode: CapsuleMode,

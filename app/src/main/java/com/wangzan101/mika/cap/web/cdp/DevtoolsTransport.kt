@@ -14,8 +14,8 @@ import java.io.InputStream
 import java.io.OutputStream
 
 /**
- * 到本进程 WebView 调试套接字的两种连法。端点就是抽象套接字名。
- * 读写的时限由协议层管(到点关流,阻塞的读写随之返回),这里不设套接字超时。
+ * Two ways to connect to this process's WebView debugging socket. The endpoint is the abstract socket name.
+ * Read and write deadlines are handled by the protocol layer (closing the stream at the deadline makes blocking reads and writes return), so no socket timeout is set here.
  */
 internal class DirectTransport : CdpTransport {
     override fun open(endpoint: String): CdpStream {
@@ -38,7 +38,7 @@ internal class DirectTransport : CdpTransport {
     }
 }
 
-/** 经别人(内置助手,shell 身份)代连:[relay] 连好后把套接字交回来;代连的那一方不在时它抛 IOException。 */
+/** Connecting on someone else's behalf (the built-in helper, under the shell identity): [relay] connects and hands the socket back; it throws IOException when the relaying side is absent. */
 internal class RelayTransport(
     private val relay: (String) -> ParcelFileDescriptor?,
 ) : CdpTransport {
@@ -54,7 +54,7 @@ internal class RelayTransport(
     }
 }
 
-/** 交回来的套接字 fd。关闭时先 shutdown,让阻塞在读上的线程返回。 */
+/** The handed-back socket fd. On close, shut it down first so a thread blocked on read returns. */
 private class FdStream(private val pfd: ParcelFileDescriptor) : CdpStream {
     override val input: InputStream = FileInputStream(pfd.fileDescriptor)
     override val output: OutputStream = FileOutputStream(pfd.fileDescriptor)

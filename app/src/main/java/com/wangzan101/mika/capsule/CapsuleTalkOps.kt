@@ -16,24 +16,24 @@ import com.wangzan101.mika.capsule.CapsuleController.Companion.NOTE_SENT_MS
 import com.wangzan101.mika.capsule.CapsuleController.Companion.NOTE_SHORT_MS
 import com.wangzan101.mika.capsule.CapsuleController.Companion.NOTE_LONG_MS
 
-// 胶囊:按住说话与说话结果、提示条
-/** 此刻能不能在胶囊上说话:有面板窗口、不是「你来处理」那一条、语音输入没设成不用。 */
+// Capsule: hold-to-talk, the speech result, and the note strip
+/** Whether talking on the capsule is possible right now: there is a panel window, it is not the 'you handle it' bar, and voice input is not set to off. */
 internal fun CapsuleController.canTalk(): Boolean = panelWindow != null && !isBar() && !edgeHidden &&
     (context.applicationContext as MikaApp).speech.choice.value != SpeechChoice.Off
 
-/** 读屏的「说话」:没在说就开始(没有手指,只能发出),在说就发出。 */
+/** The screen reader's 'talk': start if not talking (no finger, so it can only send), otherwise send. */
 internal fun CapsuleController.toggleTalk() {
     if (talk.active && !talk.byTouch && !talk.released) talk.finish(CapsuleVoice.Drop.Send)
     else beginTalk(byTouch = false)
 }
 
 /**
- * 开始说:先等着的单击、双击不算了。说给谁按单击会展开的那张卡片(空闲图标上先去读最近那段对话,读到后面板顶上那句跟着换)。
- * 没有录音权限(胶囊弹不了权限框)、语音输入用不了时不录,胶囊上说一句,点一下打开 Claire。
+ * Start talking: a pending single or double tap is dropped. Who it talks to is the card a single tap would expand (on the idle icon the latest conversation is read first, and the line at the top of the panel follows once it arrives).
+ * Without the recording permission (the capsule cannot show the system permission dialog) or when voice input is unavailable, it does not record; it shows a note on the capsule, and a tap opens Claire.
  */
 internal fun CapsuleController.beginTalk(byTouch: Boolean) {
     val v = view ?: return
-    // 松开后还在转时可以重新按:上一段由 talk.begin 丢掉
+    // Pressing again is allowed while the previous segment is still transcribing after release: talk.begin discards the old one
     if (capturing || (talk.active && !talk.released) || !canTalk()) return
     resetTaps()
     wake()
@@ -61,7 +61,7 @@ internal fun CapsuleController.beginTalk(byTouch: Boolean) {
     }
 }
 
-/** 说完了:按松开时的落点发出或打开卡片;没听清、出错时胶囊上说一句(说法和输入栏一样)。 */
+/** Finished talking: send or open the card according to where the finger was released; when nothing was heard or an error occurred, show a note on the capsule (same wording as the input bar). */
 internal fun CapsuleController.spoken(drop: CapsuleVoice.Drop, state: HoldToTalk.State) {
     val idleJob = talkIdle
     talkIdle = null
@@ -75,7 +75,7 @@ internal fun CapsuleController.spoken(drop: CapsuleVoice.Drop, state: HoldToTalk
             when (val why = state.why) {
                 null -> showNote(VoiceCopy.NO_MATCH, CapsuleKind.Failed, opensMika = false, NOTE_SHORT_MS)
                 SpeechFailure.NoPermission -> showNote(tr(R.string.capsule_voice_need_mic), CapsuleKind.Failed, opensMika = true, NOTE_LONG_MS)
-                // 缺权限的是识别服务:胶囊上说不清,带到 Claire 里(在那里按住说话会有说明和去它设置页的按钮)
+                // The missing permission is on the recognition service: that cannot be explained on the capsule, so bring it into Claire (where hold-to-talk explains it and offers a button to its settings page)
                 is SpeechFailure.ServiceNoPermission ->
                     showNote(tr(R.string.capsule_voice_service_need_mic), CapsuleKind.Failed, opensMika = true, NOTE_LONG_MS)
                 is SpeechFailure.Unavailable -> showNote(tr(R.string.capsule_voice_not_ready), CapsuleKind.Failed, opensMika = true, NOTE_LONG_MS)
@@ -87,8 +87,8 @@ internal fun CapsuleController.spoken(drop: CapsuleVoice.Drop, state: HoldToTalk
 }
 
 /**
- * 松开直接发出:发给单击会展开的那张卡片里的对话(和双击发屏幕同一套),胶囊上闪「已插话 / 已回答 / 已发出:…」。
- * 那张卡片没有输入框(要你接管、同意)时不发,展开卡片,字先放进输入框。
+ * Release to send directly: send to the conversation in the card a single tap would expand (the same targeting as double tap to send the screen), and the capsule flashes 'steered / answered / sent: …'.
+ * When that card has no input row (it needs you to take over or to approve), do not send; expand the card and put the text in the input row first.
  */
 internal fun CapsuleController.sendSpoken(text: String) {
     val target = CapsuleCards.of(model.cardRuns(), follow, idle)
@@ -104,7 +104,7 @@ internal fun CapsuleController.sendSpoken(text: String) {
     refresh()
 }
 
-/** 拖到「改一改」松开:展开卡片,字在输入框里、键盘弹出,改完自己发。 */
+/** Release over 'edit': expand the card with the text in the input row and the keyboard up, ready to be sent after editing. */
 internal fun CapsuleController.editSpoken(text: String) {
     open()
     inputUi = inputUi.withSpoken(text)

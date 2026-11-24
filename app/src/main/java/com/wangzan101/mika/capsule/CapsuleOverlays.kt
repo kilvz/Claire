@@ -17,9 +17,9 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.animationsOff
 import kotlinx.coroutines.delay
 
-// 胶囊:卡片、语音面板与胶囊本体的界面
-/** 卡片窗口里:展开时是卡片,收起时窗口先显式隐藏、内容随后清空。标题栏的电源按钮点过时换成退出的确认。
- * 非标准档时整张卡换 [Density.zoomed] 的密度渲染:宽、字、间距等比缩放;高度上限仍按真实屏幕高换算(在 Provider 里 toDp)。 */
+// Capsule: the UI for the card, the voice panel, and the capsule itself
+/** Inside the card window: the card while expanded; while collapsed the window is explicitly hidden first and the content cleared afterwards. When the power button in the title bar has been tapped, it is replaced by the quit confirmation.
+ * At non-standard levels the whole card is rendered with the [Density.zoomed] density: width, text, and spacing scale proportionally; the height cap is still converted from the real screen height (toDp in the Provider). */
 @Composable
 internal fun CapsuleController.CardOverlay() {
     val c = card ?: return
@@ -47,7 +47,7 @@ internal fun CapsuleController.CardOverlay() {
     }
 }
 
-/** 面板窗口里:按着说话时整屏的那一层,贴着一颗此刻的位置;平时什么都没有。 */
+/** Inside the panel window: the full-screen layer shown while holding to talk, anchored to the dot's current position; normally there is nothing. */
 @Composable
 internal fun CapsuleController.VoicePanelOverlay() {
     if (!talk.active) return
@@ -59,7 +59,7 @@ internal fun CapsuleController.VoicePanelOverlay() {
     }
 }
 
-/** 边上那个窗口里:一颗、胶囊或那一条;卡片出来后是空的,卡片往回缩时一颗同时从边上冒出来。胶囊上闪着一句时显示那句。 */
+/** In the side window: the dot, the capsule, or that bar; empty once the card appears, and when the card shrinks back the dot pops out of the edge at the same time. When a note is flashing on the capsule, that note is shown. */
 @Composable
 internal fun CapsuleController.CapsuleOverlay() {
     val shown = view ?: return
@@ -104,7 +104,7 @@ internal fun CapsuleController.CapsuleOverlay() {
     }
 }
 
-/** 用时,每秒更新;不显示用时时为 null。 */
+/** Elapsed time, updated every second while shown; null when no elapsed time is displayed. */
 @Composable
 internal fun CapsuleController.elapsed(startedAt: Long?): String? {
     if (startedAt == null) return null
@@ -124,6 +124,6 @@ internal fun CapsuleController.reasonLabel(reason: String): String? = when (reas
     "login" -> R.string.takeover_reason_login
     "access_blocked" -> R.string.takeover_reason_access_blocked
     "payment" -> R.string.takeover_reason_payment
-    // 「需要你决定」接在「需要你：」后面重复了,用模型写的话
+    // 'Needs your decision' would repeat after 'Needs you: ', so use the text written by the model
     else -> null
 }?.let(context::getString)

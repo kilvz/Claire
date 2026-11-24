@@ -70,21 +70,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * 悬浮胶囊长按说话:松开时手指落在哪([CapsuleVoice.drop])、发出后胶囊上闪的那句([CapsuleVoice.sent]),
- * 一次说话的会话和界面状态([CapsuleTalk],状态机用和输入栏同一个 [HoldToTalk]),
- * 和按住时浮在胶囊旁边的面板([CapsuleVoicePanel]:说给谁、实时的字、波形,「取消」「改一改」两个落点)。
- * 说完交给谁、怎么发由 [CapsuleController] 定(和双击发屏幕同一套找目标)。
+ * Hold-to-talk on the floating capsule: where the finger lands on release ([CapsuleVoice.drop]), the line flashed on the capsule after sending ([CapsuleVoice.sent]),
+ * the session and UI state of one utterance ([CapsuleTalk], whose state machine is the same [HoldToTalk] as the input bar),
+ * and the panel that floats next to the capsule while holding ([CapsuleVoicePanel]: who it is talking to, live text, the waveform, and the two drop targets 'cancel' and 'edit').
+ * Who it is handed to and how it is sent are decided by [CapsuleController] (the same target lookup as double tap to send the screen).
  */
 object CapsuleVoice {
-    /** 松开时:直接发出、打开卡片接着改、丢掉。 */
+    /** On release: send directly, open the card to keep editing, or discard. */
     enum class Drop { Send, Edit, Cancel }
 
-    /** 胶囊上闪的那句里最多带几个字。 */
+    /** Maximum number of characters carried in the line flashed on the capsule. */
     private const val SENT_CHARS = 12
 
     /**
-     * 手指在屏幕上的位置 ([x],[y]) 落在哪:两个圆各自外扩 [slopPx] 算命中,其余是发送。
-     * 圆还没排好版(空的)时不算命中,免得面板刚出来那一下误判。
+     * Where the finger's position on screen ([x],[y]) falls: each of the two circles counts as a hit expanded outward by [slopPx], everything else sends.
+     * While the circles have not been laid out yet (empty), nothing counts as a hit, so the first moment the panel appears is not misjudged.
      */
     fun drop(x: Float, y: Float, cancel: Rect, edit: Rect, slopPx: Int): Drop {
         fun Rect.hit() = !isEmpty && x >= left - slopPx && x <= right + slopPx && y >= top - slopPx && y <= bottom + slopPx
@@ -95,7 +95,7 @@ object CapsuleVoice {
         }
     }
 
-    /** 发出后胶囊上那句:插话、回答还是发出,后面带说的话的前几个字。 */
+    /** The line on the capsule after sending: steered, answered, or sent, followed by the first characters of what was said. */
     fun sent(kind: CardInputKind, text: String): String {
         val head = text.trim().let { if (it.length > SENT_CHARS) it.take(SENT_CHARS) + "…" else it }
         return when (kind) {
@@ -105,7 +105,7 @@ object CapsuleVoice {
         }
     }
 
-    /** 面板顶上那句:说给谁。和卡片输入框交给谁一致;没有输入框(要你接管、同意)或开新对话时是「在听」。 */
+    /** The line at the top of the panel: who it is talking to. Consistent with who the card's input row is addressed to; without an input row (needs takeover, approval) or for a new conversation it is 'listening'. */
     fun title(card: CardView?): String {
         val input = card?.let(CapsuleCards::input)?.kind ?: return tr(R.string.voice_listening)
         val goal = when (card) {
@@ -122,9 +122,9 @@ object CapsuleVoice {
 }
 
 /**
- * 松开后等结果:到 [ms] 还没有人取消就调 [onTimeout]。
- * [arm] 重新计时(上一次作废);会话交出结果、重新按住、面板收起时 [cancel]。
- * 单独拎出来是为了能测:引擎卡住时面板一定要自己收掉。
+ * Waiting for the result after release: if nobody has cancelled by [ms], call [onTimeout].
+ * [arm] restarts the timer (the previous one is voided); [cancel] when the session hands over a result, when holding again, or when the panel collapses.
+ * It is separated out so it can be tested: when the engine is stuck, the panel must always take itself down.
  */
 internal class VoiceWait(private val scope: CoroutineScope, private val onTimeout: () -> Unit) {
     private var job: Job? = null
@@ -144,11 +144,11 @@ internal class VoiceWait(private val scope: CoroutineScope, private val onTimeou
 }
 
 /**
- * 胶囊上一次说话:开会话([begin])、收事件、按着时推计时、手指移动时算落点([move])、松开([finish])。
- * 用手指按着时([byTouch])落点跟着手指;读屏的「说话」没有手指,只会发出。说完([HoldToTalk.State.Done]、
- * [HoldToTalk.State.Problem])交给 [onResult],连同松开时的落点。手还按着时会话先结束了,结果由 [HoldToTalk] 留着,
- * 等手指离开按那时的落点处理(取消就丢掉、改一改打开卡片、其余发出);读屏没有手指,会话一结束就当「发出」。
- * 松开后在转、手指又按下:旧的那段不要了,重新开始听。只在主线程用。
+ * One utterance on the capsule: open a session ([begin]), collect events, tick the timer while holding, compute the drop target as the finger moves ([move]), release ([finish]).
+ * While the user holds with a finger ([byTouch]) the drop target follows the finger; the screen reader's 'talk' has no finger and only sends. When done ([HoldToTalk.State.Done],
+ * [HoldToTalk.State.Problem]) it is handed to [onResult] together with the drop target at release. If the session finishes while the finger is still down, [HoldToTalk] keeps the result
+ * and it is handled with the drop target from when the finger leaves (cancel discards, edit opens the card, everything else sends); the screen reader has no finger, so once the session ends it counts as 'send'.
+ * Releasing while transcribing and pressing again: the old segment is dropped and listening starts over. Used on the main thread only.
  */
 internal class CapsuleTalk(
     private val context: Context,
@@ -156,20 +156,20 @@ internal class CapsuleTalk(
     private val scope: CoroutineScope,
     private val onResult: (CapsuleVoice.Drop, HoldToTalk.State) -> Unit,
 ) {
-    /** [begin] 的结果:开始了,或者为什么没开始。 */
+    /** The result of [begin]: started, or why it did not start. */
     sealed interface Begin {
         data object Started : Begin
         data object NoPermission : Begin
         data class Unavailable(val why: SpeechEngineSpec.Why) : Begin
     }
 
-    // 「太短」从手指按下算:开始听时已经按了 HOLD_MS,状态机只再数剩下的
+    // 'Too short' is measured from the finger going down: HOLD_MS has already elapsed when listening starts, so the state machine only counts the remainder
     val hold = HoldToTalk(clock = SystemClock::elapsedRealtime, maxMs = MAX_MS, minMs = MIN_TOTAL_MS - HOLD_MS)
 
-    /** 面板在显示(按着、或松开后在转)。 */
+    /** The panel is showing (holding, or transcribing after release). */
     var active by mutableStateOf(false)
         private set
-    /** 已松开(或读屏的「发出」),在等字。 */
+    /** Already released (or the screen reader's 'send'), waiting for text. */
     var released by mutableStateOf(false)
         private set
     var byTouch by mutableStateOf(true)
@@ -180,7 +180,7 @@ internal class CapsuleTalk(
     var engine by mutableStateOf("")
         private set
 
-    /** 两个落点在屏幕上的位置,面板排好版后报上来。 */
+    /** The positions of the two drop targets on screen, reported once the panel has been laid out. */
     var cancelAt = Rect.Zero
     var editAt = Rect.Zero
 
@@ -188,7 +188,7 @@ internal class CapsuleTalk(
     private var collector: Job? = null
     private var ticker: Job? = null
     private var watcher: Job? = null
-    /** 松开后等结果的兜底,见 [armWatchdog];[waitMs] 按这次用的引擎定。 */
+    /** Fallback for waiting on the result after release, see [armWatchdog]; [waitMs] is decided by the engine used this time. */
     private val watchdog = VoiceWait(scope) {
         if (!active || !released) return@VoiceWait
         val at = drop ?: aim
@@ -198,14 +198,14 @@ internal class CapsuleTalk(
     private var waitMs = WAIT_PROVIDER_MS
     private var startedAt = 0L
 
-    /** 能不能用、有没有录音权限:都行才开始听。胶囊不是 Activity,弹不了系统的权限框。 */
+    /** Whether it can be used and whether the recording permission is there: listen only when both hold. The capsule is not an Activity, so it cannot show the system permission dialog. */
     fun begin(title: String, byTouch: Boolean): Begin {
         if (active && !released) return Begin.Started
         val source = voice()
         val spec = source.spec()
         if (spec is SpeechEngineSpec.Unavailable) return Begin.Unavailable(spec.why)
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return Begin.NoPermission
-        // 上一段松开后还在转(服务商卡住、或自带识别在收尾):用户重新按,上一段不要了;会话由 press 取消
+        // The previous segment is still transcribing after release (the provider is stuck, or on-device recognition is wrapping up): the user pressed again, so the old one is dropped; the session is cancelled by press
         if (active) stop()
         hold.reset()
         val session = source.start()
@@ -228,7 +228,7 @@ internal class CapsuleTalk(
         collector = scope.launch { session.events.collect { hold.onEvent(it) } }
         watcher = scope.launch {
             hold.state.collect { s ->
-                // 读屏没有手指可等:会话自己结束了就当按了「发出」
+                // The screen reader has no finger to wait for: when the session ends by itself, treat it as pressing 'send'
                 if (s is HoldToTalk.State.Listening && s.ended && !this@CapsuleTalk.byTouch) finish(CapsuleVoice.Drop.Send)
                 if (s is HoldToTalk.State.Done || s is HoldToTalk.State.Problem) {
                     val d = drop ?: aim
@@ -241,7 +241,7 @@ internal class CapsuleTalk(
         ticker = scope.launch {
             while (active && !released) {
                 delay(TICK_MS)
-                // 到点按此刻的落点收尾(状态机到点也会自己松开,但它不知道落点)
+                // Finish at this moment's drop target (the state machine also releases itself on timeout, but it does not know the drop target)
                 val unlimited = (hold.state.value as? HoldToTalk.State.Listening)?.unlimited == true
                 if (!unlimited && SystemClock.elapsedRealtime() - startedAt >= MAX_MS) finish(aim) else hold.tick()
             }
@@ -249,15 +249,15 @@ internal class CapsuleTalk(
         return Begin.Started
     }
 
-    /** 手指移到了屏幕上的 ([x],[y])。 */
+    /** The finger moved to ([x],[y]) on screen. */
     fun move(x: Float, y: Float, slopPx: Int) {
         if (!active || released || !byTouch) return
         aim = CapsuleVoice.drop(x, y, cancelAt, editAt, slopPx)
-        // 状态机也要知道手指在不在取消上:会话在按着时出错,停在取消上就不提示
+        // The state machine also needs to know whether the finger is over cancel: when the session errors while holding, it stays silent while over cancel
         hold.armCancel(aim == CapsuleVoice.Drop.Cancel)
     }
 
-    /** 松开(或读屏的「发出」):取消就丢掉,否则收尾等字。 */
+    /** Release (or the screen reader's 'send'): discard when over cancel, otherwise wrap up and wait for text. */
     fun finish(at: CapsuleVoice.Drop) {
         if (!active || released) return
         if (at == CapsuleVoice.Drop.Cancel) {
@@ -273,15 +273,15 @@ internal class CapsuleTalk(
     }
 
     /**
-     * 松开后的兜底:引擎自己的收尾时限(自带识别 2 秒,流式连接加收尾约 20 秒,整段转写 30 秒)之外再留一点余量,
-     * 到点还没交出结果就收起面板、当没听清。会话卡住时面板不会一直停在「转文字…」留在屏幕上。
+     * Fallback after release: beyond the engine's own wrap-up limit (2 seconds for on-device recognition, about 20 seconds for a streaming connection with wrap-up, 30 seconds for whole-segment transcription) leave a little margin,
+     * and if no result has been handed over by then, collapse the panel and treat it as not heard. When the session is stuck the panel does not stay on screen showing 'converting…' forever.
      */
     private fun armWatchdog() {
         if (!active || !released) return
         watchdog.arm(waitMs)
     }
 
-    /** 这一段不要了(拖到取消、胶囊被拆、触摸被系统收走)。可以重复调。 */
+    /** This segment is no longer wanted (dragged to cancel, the capsule was taken down, the touch was taken away by the system). May be called repeatedly. */
     fun abort() {
         stop()
         hold.dispose()
@@ -301,20 +301,20 @@ internal class CapsuleTalk(
     }
 
     companion object {
-        /** 按住不动这么久才算长按(毫秒)。 */
+        /** How long it must be held without moving to count as a long press (milliseconds). */
         const val HOLD_MS = 400L
-        /** 从手指按下算,不到这么久松开就当没听清。 */
+        /** Measured from the finger going down; releasing before this counts as not heard. */
         const val MIN_TOTAL_MS = 500L
         const val MAX_MS = 60_000L
         private const val TICK_MS = 100L
-        /** 松开后等结果的上限,在引擎自己的收尾时限上各留一点余量(见 [armWatchdog])。 */
+        /** Upper bound for waiting on the result after release, with a little margin on top of each engine's own wrap-up limit (see [armWatchdog]). */
         private const val WAIT_SYSTEM_MS = 8_000L
         private const val WAIT_STREAM_MS = 25_000L
         private const val WAIT_PROVIDER_MS = 35_000L
     }
 }
 
-/** 面板和两个圆离胶囊多远、彼此多远;两个圆多大。 */
+/** How far the panel and the two circles sit from the capsule and from each other; how big the two circles are. */
 private val PanelGap = 16.dp
 private val TargetsGap = 18.dp
 private val TargetSize = 62.dp
@@ -328,13 +328,13 @@ private val TargetText = TextStyle(
     fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium,
     shadow = Shadow(Color.Black.copy(alpha = 0.4f), Offset(0f, 1f), 3f),
 )
-/** 背后的 App 稍微压暗,注意力在面板上。 */
+/** Dim the app behind a little so attention stays on the panel. */
 private const val DIM = 0.28f
 
 /**
- * 按住胶囊说话时整屏的那一层(不接触摸):背后稍微压暗,面板贴着胶囊([anchorTop]..[anchorBottom],屏幕纵坐标)那一边,
- * 放得下就在胶囊上面,否则在下面;两个落点在面板外侧(离胶囊更远),手指拖过去。
- * [insetTop]/[insetBottom] 是状态栏、底部手势条占的高度。两个圆排好版后把屏幕上的位置报给 [talk]。
+ * The full-screen layer while holding the capsule to talk (does not take touches): the background is dimmed a little, and the panel hugs the side of the capsule ([anchorTop]..[anchorBottom], screen y coordinates),
+ * above the capsule when it fits, otherwise below; the two drop targets sit outside the panel (farther from the capsule) and the finger drags onto them.
+ * [insetTop]/[insetBottom] are the heights taken by the status bar and the bottom gesture bar. Once the two circles are laid out, their screen positions are reported to [talk].
  */
 @Composable
 internal fun CapsuleVoicePanel(talk: CapsuleTalk, anchorTop: Int, anchorBottom: Int, insetTop: Int, insetBottom: Int) {
@@ -344,7 +344,7 @@ internal fun CapsuleVoicePanel(talk: CapsuleTalk, anchorTop: Int, anchorBottom: 
     val view = LocalView.current
     val dim by animateFloatAsState(DIM, if (MikaTheme.reduceMotion) snap() else tween(200), label = "voice-dim")
     var below by remember { mutableStateOf(false) }
-    // 圆在屏幕上的位置:窗口内坐标加上窗口在屏幕上的位置
+    // The circles' screen positions: coordinates inside the window plus the window's position on screen
     fun Rect.onScreen(): Rect {
         val at = IntArray(2).also(view::getLocationOnScreen)
         return translate(Offset(at[0].toFloat(), at[1].toFloat()))
@@ -367,7 +367,7 @@ internal fun CapsuleVoicePanel(talk: CapsuleTalk, anchorTop: Int, anchorBottom: 
         val total = targets.height + between + panel.height
         val top = insetTop + gap
         val bottom = cons.maxHeight - insetBottom - gap
-        // 胶囊上面放得下就放上面(两个圆在最上),否则放下面(两个圆在最下)
+        // Place above the capsule if it fits (the two circles at the very top), otherwise below (the two circles at the very bottom)
         val goBelow = anchorTop - gap - total < top
         if (goBelow != below) below = goBelow
         val groupTop = (if (goBelow) anchorBottom + gap else anchorTop - gap - total)
@@ -384,10 +384,10 @@ internal fun CapsuleVoicePanel(talk: CapsuleTalk, anchorTop: Int, anchorBottom: 
     }
 }
 
-/** 「取消」「改一改」两个圆;手指移上去的那个放大、变色。松开后在转时藏起来(位置照样留着,面板不跳)。 */
+/** The 'cancel' and 'edit' circles; the one the finger moves onto grows and changes color. Hidden while transcribing after release (their positions are kept so the panel does not jump). */
 @Composable
 private fun Targets(talk: CapsuleTalk, show: Boolean, onPlaced: (Rect, Rect) -> Unit) {
-    // 两个圆各自排好版的位置(窗口内坐标);两个都有了才报
+    // The laid-out positions of the two circles (window coordinates); report only once both exist
     val at = remember { arrayOf(Rect.Zero, Rect.Zero) }
     Row(
         Modifier.alpha(if (show) 1f else 0f),
@@ -429,7 +429,7 @@ private fun Target(icon: ImageVector, label: String, hot: Boolean, bad: Boolean,
     }
 }
 
-/** 面板:顶上在录的点、说给谁、用的哪个转文字、用时;中间实时的字;波形;底下松开会怎样。 */
+/** The panel: the recording dot, who it is talking to, which transcriber is used, and the elapsed time at the top; the live text in the middle; the waveform; and what releasing will do at the bottom. */
 @Composable
 private fun Panel(talk: CapsuleTalk, state: HoldToTalk.State, below: Boolean) {
     val c = MikaTheme.colors
@@ -480,7 +480,7 @@ private fun Panel(talk: CapsuleTalk, state: HoldToTalk.State, below: Boolean) {
             val style = if (cancel) SaidText.copy(textDecoration = TextDecoration.LineThrough) else SaidText
             val modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 52.dp).alpha(if (cancel) 0.4f else 1f)
             if (heard.isEmpty()) Text(ghost, modifier, style = style, color = c.ink3, maxLines = 5, overflow = TextOverflow.Ellipsis)
-            // 字太多时去掉前面说完的整句,最新的字一直看得见(和输入框同一套)
+            // When there is too much text, drop whole sentences already spoken from the front so the latest text stays visible (same approach as the input bar)
             else com.wangzan101.mika.voice.ui.HeardText(listening?.stable.orEmpty(), listening?.tail.orEmpty(), style, maxLines = 5, modifier)
         }
         if (!converting) {
@@ -488,7 +488,7 @@ private fun Panel(talk: CapsuleTalk, state: HoldToTalk.State, below: Boolean) {
                 VoiceWave(listening?.level ?: 0f, flat = cancel, reduceMotion = MikaTheme.reduceMotion, color = if (cancel || edit) c.ink3 else c.accent)
             }
         }
-        // 在转时中间已经写着「转文字…」,底下不再重复
+        // While transcribing the middle already says 'converting…', so do not repeat it below
         if (converting) return@Column
         val foot = when {
             !talk.byTouch -> stringResource(R.string.capsule_voice_foot_a11y)

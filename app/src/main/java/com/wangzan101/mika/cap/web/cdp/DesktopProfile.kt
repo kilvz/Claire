@@ -6,48 +6,48 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.math.roundToInt
 
-/** 内核自报的一个品牌及版本(UA-CH 的 brands / fullVersionList 各取一种版本)。 */
+/** One brand and version as reported by the engine (one version each taken from UA-CH's brands / fullVersionList). */
 data class Brand(val brand: String, val major: String, val full: String)
 
 /**
- * 桌面版网页的身份:Linux 桌面的 UA 与 UA-CH,内核版本号如实沿用本机 WebView 的,品牌沿用内核自己的(去掉 Android WebView)。
- * 页面能读到的都要和这个身份对得上:UA / UA-CH / navigator.platform 与视口、屏幕、像素比由仿真设([userAgentOverride]、
- * [metricsOverride]、[emulationCalls]);仿真设不了的(触摸能力、指针与悬停的媒体查询、窗口外框、WebView 特有的痕迹)
- * 由文档开始时注入的 [identityScript] 补上。时区不动,沿用本机的;语言默认也沿用本机的,用户在 Claire 里选定了语言时
- * 请求头与 navigator.language(s) 换成那一种(见 [PageLanguage])。
- * 手机版站点一律不改,用本机真实的手机身份。
+ * Identity of a desktop web page: the Linux desktop UA and UA-CH, reusing this device's WebView engine version as-is and the engine's own brands (minus Android WebView).
+ * Everything the page can read must agree with this identity: UA / UA-CH / navigator.platform plus viewport, screen, and pixel ratio are set by emulation ([userAgentOverride],
+ * [metricsOverride], [emulationCalls]); what emulation cannot set (touch capability, pointer and hover media queries, window frame, WebView-specific traces)
+ * is filled in by [identityScript], injected at document start. The time zone is left alone and follows the device; the language defaults to the device too, and when the user has picked a language in Claire
+ * the request headers and navigator.language(s) are switched to that one (see [PageLanguage]).
+ * Mobile sites are never changed and keep the device's real mobile identity.
  */
 object DesktopProfile {
-    /** 桌面版的视口宽度(CSS 像素)。 */
+    /** Desktop viewport width (CSS pixels). */
     const val WIDTH = 1280
     const val FALLBACK_HEIGHT = 800
-    /** 桌面版标签的宿主显示:按 1 CSS 像素对 1 像素画桌面视口。 */
+    /** Host display of the desktop tab: draws the desktop viewport at 1 image pixel per CSS pixel. */
     const val HOST_WIDTH = WIDTH
     const val HOST_HEIGHT = 800
     const val HOST_DPI = 160
     const val NAVIGATOR_PLATFORM = "Linux x86_64"
     const val PLATFORM = "Linux"
-    /** 桌面浏览器窗口里网页之外的部分(标签栏、地址栏)的高度:窗口外框比网页视口高这么多。 */
+    /** Height of the parts outside the page in a desktop browser window (tab strip, address bar): the window frame is this much taller than the page viewport. */
     const val WINDOW_CHROME_PX = 85
     private const val WEBVIEW_BRAND = "Android WebView"
     private val CHROME = Regex("""Chrome/(\d+)((?:\.\d+)*)""")
 
-    /** 从内核默认 UA 里取版本:(主版本, 完整版本)。 */
+    /** Extract the version from the engine's default UA: (major, full). */
     fun version(defaultUa: String): Pair<String, String>? =
         CHROME.find(defaultUa)?.let { m -> m.groupValues[1] to (m.groupValues[1] + m.groupValues[2]) }
 
-    /** UA 里的版本按惯例只写主版本(其余为 0)。 */
+    /** By convention the UA only writes the major version (the rest are zeros). */
     fun userAgent(major: String): String =
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$major.0.0.0 Safari/537.36"
 
-    /** 内核给的品牌去掉 Android WebView;拿不到时用 Chromium 加一个占位品牌。 */
+    /** Drop Android WebView from the brands the engine gives; when unavailable, use Chromium plus one placeholder brand. */
     fun brands(engine: List<Brand>?, major: String, full: String): List<Brand> =
         engine?.filter { it.brand != WEBVIEW_BRAND }?.takeIf { l -> l.any { it.brand == "Chromium" } }
             ?: listOf(Brand("Chromium", major, full), Brand("Not_A Brand", "24", "24.0.0.0"))
 
     /**
-     * `Emulation.setUserAgentOverride` 的参数。这里不带 acceptLanguage:跟随系统时语言保持用户的;
-     * 用户在 Claire 里选定了语言时由 [PageLanguage.withLanguage] 加上。
+     * Parameters for `Emulation.setUserAgentOverride`. It carries no acceptLanguage here: when following the system, the language stays the user's;
+     * when the user has picked a language in Claire it is added by [PageLanguage.withLanguage].
      */
     fun userAgentOverride(major: String, full: String, brands: List<Brand>): JsonObject = buildJsonObject {
         put("userAgent", userAgent(major))
@@ -55,7 +55,7 @@ object DesktopProfile {
         put("userAgentMetadata", metadata(brands, full, PLATFORM, "", "x86", "", mobile = false, bitness = "64", wow64 = false))
     }
 
-    /** CDP 的 `Emulation.UserAgentMetadata`(UA-CH);桌面身份与手机版的默认身份([PageLanguage.mobileOverride])共用。 */
+    /** CDP's `Emulation.UserAgentMetadata` (UA-CH); shared by the desktop identity and the mobile default identity ([PageLanguage.mobileOverride]). */
     fun metadata(
         brands: List<Brand>, fullVersion: String, platform: String, platformVersion: String,
         architecture: String, model: String, mobile: Boolean, bitness: String, wow64: Boolean,
@@ -72,21 +72,21 @@ object DesktopProfile {
         put("wow64", wow64)
     }
 
-    /** 视口高度按宿主的宽高比放大到桌面宽度,整页正好铺满宿主;宿主尺寸未知时用 800。 */
+    /** The viewport height scales the host's aspect ratio up to the desktop width so the whole page exactly fills the host; 800 when the host size is unknown. */
     fun height(viewW: Int, viewH: Int): Int =
         if (viewW > 0 && viewH > 0) (WIDTH.toDouble() * viewH / viewW).roundToInt() else FALLBACK_HEIGHT
 
     /**
-     * 仿真画面的缩放:不缩时 1 CSS 像素占 [density](不加仿真时页面的 devicePixelRatio)个视图像素,
-     * 桌面宽度的页面可能只露出左边一截;缩到整页 [WIDTH] 正好铺满视图宽度,视图像素与 CSS 像素之比就是 viewW / WIDTH
-     * (读屏换算按它)。桌面宿主上视图宽就是 [WIDTH],一比一。
+     * Scale of the emulated image: without scaling, 1 CSS pixel takes [density] view pixels (the page's devicePixelRatio without emulation),
+     * and a desktop-width page may only show its left part; scaling so the whole [WIDTH] page exactly fills the view width makes the view-pixel-to-CSS-pixel ratio viewW / WIDTH
+     * (screen-reader conversion uses it). On a desktop host the view width is [WIDTH], so it is one-to-one.
      */
     fun fitScale(viewW: Int, density: Float): Double? =
         if (viewW > 0 && density > 0f) viewW / (WIDTH * density.toDouble()) else null
 
     /**
-     * `Emulation.setDeviceMetricsOverride` 的参数:桌面宽度、像素比 1、非移动端;[scale] 把整页缩到宿主宽度里显示。
-     * 屏幕按「窗口铺满整个屏幕」算:宽同视口,高是视口加上浏览器窗口的外框([WINDOW_CHROME_PX]),和脚本给的 outerHeight 一致。
+     * Parameters for `Emulation.setDeviceMetricsOverride`: desktop width, pixel ratio 1, not mobile; [scale] shrinks the whole page into the host width.
+     * The screen is computed as 'window filling the whole screen': the width equals the viewport, the height is the viewport plus the browser window frame ([WINDOW_CHROME_PX]), matching the outerHeight the script reports.
      */
     fun metricsOverride(viewW: Int, viewH: Int, scale: Double?): JsonObject = buildJsonObject {
         val h = height(viewW, viewH)
@@ -105,9 +105,9 @@ object DesktopProfile {
     }
 
     /**
-     * 桌面版在 UA 与视口之外还要发的仿真命令(方法, 参数):不开触摸仿真、鼠标不派生触摸事件、
-     * 指针与悬停按鼠标报(内核不认这几项媒体特性时这一条不起作用,由 [identityScript] 兜底)。
-     * 每条单独发,哪条被拒都不影响别的。
+     * Extra emulation commands a desktop page must send beyond UA and viewport (method, params): no touch emulation, mouse does not derive touch events,
+     * pointer and hover are reported as a mouse (when the engine does not honor these media features this entry has no effect and [identityScript] takes over).
+     * Each is sent separately, so one being rejected does not affect the others.
      */
     fun emulationCalls(): List<Pair<String, JsonObject>> = listOf(
         "Emulation.setTouchEmulationEnabled" to buildJsonObject { put("enabled", false) },
@@ -118,33 +118,33 @@ object DesktopProfile {
     )
 
     /**
-     * 桌面版的视口用哪一条:Agent 的标签用仿真把整页 [WIDTH] 缩进视图([metricsOverride],读屏和输入坐标按 [scale] 换算);
-     * 用户亲手看、亲手点的标签([handOperated])不加视口仿真(撤销那一条),交给 WebView 自己的宽视口与总览模式——
-     * 打开时整页缩进屏幕,双指能放大;仿真定死了缩放,放大不了。UA、UA-CH、身份补丁两种标签一样。
+     * Which call the desktop viewport uses: the agent's tab uses emulation to shrink the whole [WIDTH] page into the view ([metricsOverride]; screen-reader and input coordinates convert by [scale]);
+     * a tab the user personally looks at and taps ([handOperated]) gets no viewport emulation (that one is reverted), leaving it to WebView's own wide viewport and overview mode —
+     * the whole page is shrunk onto the screen on open and pinch-zoom works; emulation pins the zoom, so it cannot be zoomed. UA, UA-CH, and the identity patch are the same for both kinds of tab.
      */
     fun viewportCall(handOperated: Boolean, viewW: Int, viewH: Int, scale: Double?): Pair<String, JsonObject> =
         if (handOperated) "Emulation.clearDeviceMetricsOverride" to JsonObject(emptyMap())
         else "Emulation.setDeviceMetricsOverride" to metricsOverride(viewW, viewH, scale)
 
-    /** 手机版换回时撤销 [emulationCalls] 里改过的媒体特性(空列表即撤销)。 */
+    /** Revert the media features changed by [emulationCalls] when switching back to mobile (an empty list reverts them). */
     fun clearMediaCall(): Pair<String, JsonObject> =
         "Emulation.setEmulatedMedia" to buildJsonObject { put("features", JsonArray(emptyList())) }
 
     private val DESKTOP_MEDIA = listOf("pointer" to "fine", "any-pointer" to "fine", "hover" to "hover", "any-hover" to "hover")
 
     /**
-     * 桌面版在每个文档(含框架)开始时注入的补丁,只补仿真设不了的:
-     * - 触摸:navigator.maxTouchPoints 为 0,去掉 ontouch* 处理器属性,`document.createEvent('TouchEvent')` 像桌面一样报不支持;
-     * - 指针与悬停:matchMedia 里的 pointer / any-pointer / hover / any-hover 按鼠标回答(其余照原样交给内核),
-     *   返回对象的 media 仍是页面给的原文(改在原型的 getter 上,对象上不多出自有属性);
-     * - 窗口外框:outerWidth = innerWidth,outerHeight = innerHeight + [WINDOW_CHROME_PX];
-     * - navigator.platform 为 [NAVIGATOR_PLATFORM](没有 DevTools 时也对得上 UA);navigator.webdriver 为假;
-     *   navigator.connection 去掉只有手机才有的 type;没有 window.chrome 时补一个空对象(桌面浏览器上它总在)。
-     * 换过的 getter 先调原来的(接收者不对时照样报 Illegal invocation)再给新值;换过的方法保留原来的 length;
-     * 它们的源码按内置函数的样子显示,别的窗口里的 toString 看也一样(各窗口的补丁源码相同,按源码认)。
-     * 页面脚本新建的同源框架(about:blank、srcdoc)不一定经过文档开始注入:第一次经 contentWindow / contentDocument
-     * 取到时在框架自己的环境里补上同一份(框架禁止 eval 时退回在本环境里补)。已经报 0 个触点的窗口不再补。
-     * 不碰 UA、语言、时区、硬件参数。
+     * The patch injected at the start of every document (including frames) for the desktop version, covering only what emulation cannot set:
+     * - touch: navigator.maxTouchPoints is 0, the ontouch* handler properties are removed, and `document.createEvent('TouchEvent')` reports unsupported like desktop;
+     * - pointer and hover: pointer / any-pointer / hover / any-hover in matchMedia answer as a mouse (everything else is passed to the engine unchanged),
+     *   and the returned object's media is still the page-provided text (changed on the prototype getter so no own properties appear on the object);
+     * - window frame: outerWidth = innerWidth, outerHeight = innerHeight + [WINDOW_CHROME_PX];
+     * - navigator.platform is [NAVIGATOR_PLATFORM] (consistent with the UA even without DevTools); navigator.webdriver is false;
+     *   navigator.connection drops the phone-only type; when window.chrome is absent an empty object is added (it is always there on desktop browsers).
+     * Replaced getters call the original first (still throwing Illegal invocation for a wrong receiver) and then give the new value; replaced methods keep the original length;
+     * their source is shown as a built-in function, and toString from other windows looks the same (the patch source is identical in every window, so it is recognized by source).
+     * Same-origin frames created by page scripts (about:blank, srcdoc) do not necessarily go through document-start injection: the first time they are reached through contentWindow / contentDocument
+     * the same patch is added in the frame's own environment (falling back to patching this environment when the frame forbids eval). Windows that already report 0 touch points are not patched again.
+     * It does not touch UA, language, time zone, or hardware parameters.
      */
     fun identityScript(): String = IDENTITY_SCRIPT
         .replace("__PLATFORM__", NAVIGATOR_PLATFORM)
