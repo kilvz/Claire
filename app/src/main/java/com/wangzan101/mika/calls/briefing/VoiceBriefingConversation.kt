@@ -77,7 +77,7 @@ internal class VoiceBriefingConversation(initialBrief: CallTaskBrief?) {
             "The owner's corrections override what was said before, and any suggestion you make must be stated as a suggestion; never present a guess as fact. " +
             "The owner may speak in several parts, continue after a pause, or revise the briefing; a pause, unrecognized speech, your own understanding of the task or your own summary do not mean the briefing is over. " +
             "Keep listening until the owner explicitly authorizes you; do not say 'briefing complete' or 'it is over', do not urge the owner to finish, and do not decide on the owner's behalf that they have finished. " +
-            "Do not claim you have dialed or completed anything, and do not perform any call control. The owner authorizes you only by saying, on its own, 'I'm done, go ahead and call' (or the Chinese equivalent 我说完了，你去打); " +
+            "Do not claim you have dialed or completed anything, and do not perform any call control. The owner authorizes you only by saying, on its own, 'I'm done, go ahead and call'; " +
             "do not say that line for the owner, and do not accept any other confirmation word in its place. Begin with: Tell me what you need done on this call; I'm listening."
         const val GREETING = "Tell me what you need done on this call; I'm listening."
     }
