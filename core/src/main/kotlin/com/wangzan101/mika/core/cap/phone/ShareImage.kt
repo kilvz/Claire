@@ -17,8 +17,8 @@ import com.wangzan101.mika.core.workspace.SandboxPaths
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 把工作区里的一张图片分享给一个 App(ACTION_SEND + EXTRA_STREAM),在 Claire 的屏上打开它的分享页:
- * 只打开,不发出;收件人和「发送」由模型在那一页上用屏幕工具完成,发送仍走现有的确认关卡。
+ * Shares an image from the workspace to an app (ACTION_SEND + EXTRA_STREAM), opening its share sheet on Claire's screen:
+ * it only opens, it never sends; the model picks the recipient and taps "send" on that page with screen tools, and sending still goes through the existing confirmation gate.
  */
 internal object ShareImage : PhoneTool {
     override val verb = Verb.ShareImage
@@ -46,7 +46,7 @@ internal object ShareImage : PhoneTool {
             throw ArgError("path", "must be a workspace image path under $prefix")
         }
         val text = a.str("text", max = 2000)
-        // 换了 App,之前被拒的付款申报就不是这次的了
+        // The app switched, so a previously refused payment declaration no longer belongs to this run
         ctx.refusedPay = null
         val r = ctx.action(ctx.phone.screen.shareImage(p, path, text))
         if (r.content["ok"] != JsonPrimitive(true)) return r

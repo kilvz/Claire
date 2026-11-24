@@ -21,7 +21,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 不截屏地按文字、资源 ID 或控件类型查询当前无障碍树,结果保留父子线索。 */
+/** Queries the current accessibility tree by text, resource ID or widget type without taking a screenshot; results keep parent/child hints. */
 internal object PhoneQuery : PhoneTool {
     override val verb = Verb.Query
     override val risk = Risk.Read
@@ -42,7 +42,7 @@ internal object PhoneQuery : PhoneTool {
     }
 }
 
-/** 一次采集多屏文字。每次滚动仍通过子动作入口,因此取消、状态记录和动作结果与单步一致。 */
+/** Collects text across multiple screens in one go. Each scroll still goes through the sub-action entry point, so cancellation, state recording and action results match a single step. */
 internal object PhoneCollect : PhoneTool {
     override val verb = Verb.Collect
     override val risk = Risk.Write
@@ -156,7 +156,7 @@ internal object PhoneCollect : PhoneTool {
             val obj = element as? JsonObject ?: return@forEach
             if (obj["secret"] != JsonPrimitive(true)) add((obj["name"] as? JsonPrimitive)?.contentOrNull, boundsFromCenter(obj))
         }
-        // OCR 只包含树里缺失的文字；与树文本按屏幕位置合并，群聊才不会把补出的消息都放到末尾。
+        // OCR only covers text missing from the tree; merge it with the tree text by screen position, so group chats don't end up with all the supplemental messages at the end.
         (content["visibleText"] as? JsonArray)?.forEach { entry ->
             val obj = entry as? JsonObject ?: return@forEach
             add((obj["text"] as? JsonPrimitive)?.contentOrNull, obj["bounds"] as? JsonArray)
@@ -168,7 +168,7 @@ internal object PhoneCollect : PhoneTool {
         }.map(Line::text)
     }
 
-    /** 由元素列表的 center+size 重建 bounds=[l,t,r,b](0–999),供回退路径复用统一的位置归并逻辑。 */
+    /** Rebuilds bounds=[l,t,r,b] (0–999) from an element list's center+size, so the fallback path can reuse the unified position-merging logic. */
     private fun boundsFromCenter(obj: JsonObject): JsonArray? {
         val c = obj["center"] as? JsonObject
         val s = obj["size"] as? JsonArray

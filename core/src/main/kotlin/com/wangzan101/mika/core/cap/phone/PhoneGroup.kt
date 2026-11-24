@@ -4,24 +4,24 @@ import com.wangzan101.mika.core.screen.uistate.ScreenFamily
 import com.wangzan101.mika.core.screen.uistate.tools.ScreenTool
 import com.wangzan101.mika.core.tool.AgentTool
 
-/** 手机能力的 id,也是手机那一套工具名字的前缀。 */
+/** The phone capability's id, and also the prefix of the phone tool set's names. */
 const val PHONE = "phone"
 
-/** 手机读屏的 snapshotId 以它开头(端口的随机编号与稳定编号都是),看编号就知道是手机的。 */
+/** The snapshotId of a phone screen read starts with this (both the port's random IDs and stable IDs), so the ID alone tells you it belongs to the phone. */
 const val PHONE_SNAPSHOT_PREFIX = "p"
 
-/** 手机那一套屏幕工具:经验路线只记手机上的做法。 */
+/** The phone's screen tool set: experience routes only record practices done on the phone. */
 internal val PHONE_FAMILY = ScreenFamily(PHONE, snapshotPrefix = PHONE_SNAPSHOT_PREFIX, routable = true, sandboxCallable = true, ownPrompts = setOf("observe", "back", "scroll", "type_text", "clear_text"))
 
-/** 手机专属的工具。 */
+/** Tools specific to the phone. */
 internal interface PhoneTool : AgentTool {
     override val capability: String get() = PHONE
     override val sandboxCallable: Boolean get() = true
 }
 
 /**
- * 手机一组:那一套屏幕工具(读屏、看图、点、滑、输入、按键、诊断屏幕),再加列出、打开 App 与链接,
- * 标出任务结束时 App 留着还是关掉,经系统标准接口设闹钟、计时器、日程,和转滚轮。按发给模型的顺序。
+ * The phone group: the screen tool set (read the screen, look at images, tap, swipe, type, press keys, diagnose the screen), plus listing and opening apps and links,
+ * marking whether an app stays open or is closed when the task ends, setting alarms, timers and calendar events through the system's standard interfaces, and turning the wheel. In the order sent to the model.
  */
 internal object PhoneGroup {
     val tools: List<AgentTool> = ScreenTool.of(PHONE_FAMILY) + listOf(

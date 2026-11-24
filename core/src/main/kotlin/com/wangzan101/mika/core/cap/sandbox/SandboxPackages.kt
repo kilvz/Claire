@@ -1,10 +1,10 @@
 package com.wangzan101.mika.core.cap.sandbox
 
 /**
- * 运行环境里装的包:Python 与 Node,外加技能脚本清单里 `apk:` 需要的
- * (py3-pypdf:PDF 取字;py3-pillow 现在没有内置技能用到,包本身先留着),以及跟随手机时区所需的 tzdata。
- * 都在 Alpine 3.22 的 main/community 里,构建时装进自带的运行环境
- * (tools/sandbox/build-runtime.py 的 WANT 与此一致,BundledRuntimeTest 核对)。
+ * Packages installed in the runtime: Python and Node, plus what the skill script manifests need from `apk:`
+ * (py3-pypdf: extracting text from PDFs; no bundled skill uses py3-pillow right now, but the package is kept for now), and tzdata, needed to follow the phone's timezone.
+ * All of them are in Alpine 3.22's main/community, and the build installs them into the bundled runtime
+ * (WANT in tools/sandbox/build-runtime.py matches this, verified by BundledRuntimeTest).
  */
 val SANDBOX_PACKAGES: List<String> = listOf(
     "python3", "nodejs", "npm", "py3-pillow", "py3-pypdf", "tzdata",

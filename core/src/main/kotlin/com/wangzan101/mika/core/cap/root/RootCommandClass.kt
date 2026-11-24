@@ -1,14 +1,14 @@
 package com.wangzan101.mika.core.cap.root
 
 /**
- * 一条 root 命令会不会改动东西:只读的直接跑,会改的询问时先问用户。拿不准一律当作会改:
- * 不认识的命令、命令替换、写文件的重定向、here-doc、把字交给另一个 shell 或解释器的,都算会改。
- * 按 sh 的写法切开(引号、转义、; && || | & 换行、括号),每一段单独判,全部只读才算只读。
+ * Whether a root command changes anything: read-only ones run directly, and changing ones ask the user first when asking is required. When in doubt, always treat it as changing:
+ * unknown commands, command substitution, file-writing redirections, here-docs, and anything that hands text to another shell or interpreter all count as changing.
+ * The command is split the way sh parses it (quotes, escapes, ; && || | & newlines, parentheses); each segment is judged on its own, and only if every segment is read-only is the command read-only.
  */
 object RootCommandClass {
     enum class Kind { ReadOnly, Changes }
 
-    /** 免确认命令运行时也用这个 PATH，保证裸命令名不会解析到用户目录。 */
+    /** Confirmation-free commands also use this PATH when run, so bare command names never resolve to a user directory. */
     const val SYSTEM_COMMAND_PATH = "/system/bin"
 
     fun classify(command: String): Kind {
@@ -17,7 +17,7 @@ object RootCommandClass {
         return if (commands.all(::readOnly)) Kind.ReadOnly else Kind.Changes
     }
 
-    /** 只看、不改的命令(参数怎么写都不会写东西的)。 */
+    /** Commands that only read (no matter how the arguments are written, they write nothing). */
     private val READERS = setOf(
         "ls", "cat", "head", "tail", "wc", "stat", "du", "df", "grep", "egrep", "fgrep", "id", "whoami", "uname", "getprop",
         "ps", "pwd", "echo", "printf", "file", "md5sum", "sha1sum", "sha256sum", "sha512sum", "readlink", "realpath",
@@ -26,23 +26,23 @@ object RootCommandClass {
         "sleep", "lsattr", "nl", "column", "comm", "expr", "seq", "rev", "fold", "tac",
     )
 
-    /** dumpsys 里会改状态的子命令(如 `dumpsys battery set`)。 */
+    /** dumpsys subcommands that change state (e.g. `dumpsys battery set`). */
     private val DUMPSYS_WRITES = setOf("set", "reset", "unplug", "force-idle", "unforce", "enable", "disable", "step", "whitelist", "tempwhitelist", "put", "delete", "clear")
 
-    /** `pm`、`cmd package` 里只读的子命令。 */
+    /** Read-only subcommands of `pm` and `cmd package`. */
     private val PM_READ = setOf(
         "list", "path", "dump", "resolve-activity", "query-activities", "query-services", "query-receivers",
         "get-install-location", "get-max-users", "get-max-running-users", "has-feature", "get-app-links", "get-privapp-permissions",
     )
 
-    /** sqlite3 里只读的 PRAGMA(不带 = 的读法)。 */
+    /** Read-only PRAGMAs in sqlite3 (the read form without =). */
     private val PRAGMA_READ = setOf(
         "table_info", "table_xinfo", "table_list", "index_list", "index_info", "index_xinfo", "foreign_key_list", "database_list",
         "user_version", "schema_version", "application_id", "page_count", "page_size", "integrity_check", "quick_check",
         "compile_options", "encoding", "journal_mode", "function_list", "collation_list", "freelist_count",
     )
 
-    /** sqlite3 的点命令里只读的。 */
+    /** Read-only sqlite3 dot commands. */
     private val SQLITE_DOT_READ = setOf(".tables", ".schema", ".indexes", ".indices", ".headers", ".mode", ".dump", ".databases", ".fullschema", ".show", ".width", ".nullvalue", ".separator")
 
     private val SQLITE_FLAGS = setOf(
@@ -53,13 +53,13 @@ object RootCommandClass {
 
     private fun readOnly(words: List<String>): Boolean {
         val assignments = words.takeWhile(ASSIGNMENT::matches)
-        // PATH、LD_PRELOAD 等变量可以改变实际运行的程序。只允许常见的语言设置。
+        // Variables such as PATH and LD_PRELOAD can change which program actually runs. Only common locale settings are allowed.
         if (assignments.any { it.substringBefore('=') !in LOCALE_ASSIGNMENTS }) return false
         val rest = words.drop(assignments.size)
         if (rest.isEmpty()) return true
         var name = rest[0]
         var args = rest.drop(1)
-        // 命令名是变量、带引号拼出来的:看不清
+        // The command name is a variable or assembled with quotes: cannot be determined
         if ('$' in name) return false
         name = name.removePrefix("$SYSTEM_COMMAND_PATH/")
         if ('/' in name) return false
@@ -70,12 +70,12 @@ object RootCommandClass {
         return when (name) {
             in READERS -> true
             "dumpsys" -> args.none { it in DUMPSYS_WRITES }
-            // date -s 改时间;sort -o 写文件;uniq 的第二个文件是输出
+            // date -s changes the time; sort -o writes a file; uniq's second file is the output
             "date" -> args.none { it.startsWith("-s") || it.startsWith("--set") }
             "sort" -> args.none { (it.startsWith("-") && !it.startsWith("--") && 'o' in it) || it.startsWith("--output") }
             "uniq" -> args.count { !it.startsWith("-") } <= 1
             "find" -> args.none { it in FIND_WRITES }
-            // sed 脚本可写文件、执行子命令,-f 还会读另一份脚本;不做不完整的事后猜测,一律走确认
+            // A sed script can write files and execute subcommands, and -f reads another script; no incomplete after-the-fact guessing, so it always goes through confirmation
             "logcat" -> logcatReadOnly(args)
             "dmesg" -> args.none { it in DMESG_WRITES }
             "mount" -> args.isEmpty()
@@ -97,17 +97,17 @@ object RootCommandClass {
     private val LOGCAT_FILTER = Regex("[A-Za-z0-9_.][A-Za-z0-9_.:-]*")
     private val DMESG_WRITES = setOf("-c", "-C", "-n", "--clear", "--console-level", "--read-clear")
 
-    /** 短选项可组合，参数也可紧跟选项。只接受明确列出的只读写法，其他形式走确认。 */
+    /** Short options can be combined, and values can directly follow an option. Only the explicitly listed read-only forms are accepted; anything else goes through confirmation. */
     private fun logcatReadOnly(args: List<String>): Boolean {
         var i = 0
         while (i < args.size) {
             val arg = args[i++]
             when {
-                arg == "--" -> return true // 后面是过滤表达式，getopt 不再解析选项。
+                arg == "--" -> return true // What follows is a filter expression; getopt no longer parses options.
                 arg in LOGCAT_READ_FLAGS || LOGCAT_FILTER.matches(arg) -> Unit
                 arg in LOGCAT_READ_VALUES -> {
                     val value = args.getOrNull(i++) ?: return false
-                    // 参数展开成多个词时，额外的词可能变成新选项。
+                    // When an argument expands into several words, the extra words may become new options.
                     if (value.isEmpty() || value.any { it in "*?[{" }) return false
                 }
                 '=' in arg && arg.substringBefore('=') in LOGCAT_READ_LONG_VALUES -> {
@@ -119,7 +119,7 @@ object RootCommandClass {
         return true
     }
 
-    /** sqlite3 [选项] 库文件 SQL…:SQL 每一句都只读才算。没给 SQL(会从标准输入读)、不认识的选项都算会改。 */
+    /** sqlite3 [options] dbfile SQL...: read-only only if every SQL statement is read-only. Missing SQL (which would be read from stdin) and unknown options count as changing. */
     private fun sqliteReadOnly(args: List<String>): Boolean {
         val sql = mutableListOf<String>()
         var db: String? = null
@@ -152,12 +152,12 @@ object RootCommandClass {
         }
     }
 
-    /** 混在 SELECT 里也算会改的字(子句里藏着的写语句、加载扩展)。 */
+    /** Words that count as changing even when mixed into a SELECT (write statements hidden in a clause, loading extensions). */
     private val WRITE_SQL = listOf("insert", "update", "delete", "replace", "drop", "create", "alter", "attach", "detach", "vacuum", "reindex", "load_extension", "writefile", "edit")
 
     /**
-     * 按 sh 的写法切成一段段简单命令(每段是去掉引号后的词)。遇到看不清的写法返回 null(当作会改):
-     * 命令替换、进程替换、here-doc、读写打开、写到 /dev/null 以外的重定向、没收尾的引号。
+     * Splits the command the way sh parses it into simple commands (each a list of words with quotes removed). Returns null for constructs that cannot be determined (treated as changing):
+     * command substitution, process substitution, here-docs, read-write opens, redirections to anything other than /dev/null, and unterminated quotes.
      */
     private fun split(command: String): List<List<String>>? {
         val commands = mutableListOf<List<String>>()
@@ -184,7 +184,7 @@ object RootCommandClass {
                 single -> if (c == '\'') single = false else word.append(c)
                 c == '\\' && next != null -> { word.append(next); inWord = true; i++ }
                 c == '`' -> return null
-                // 任何未转义且不在单引号里的 $ 都留到 root shell 展开,静态分类看不见展开后的参数
+                // Any unescaped $ outside single quotes is left for the root shell to expand; static classification cannot see the expanded arguments
                 c == '$' -> return null
                 double -> when (c) {
                     '"' -> double = false
@@ -193,11 +193,11 @@ object RootCommandClass {
                 c == '\'' -> { single = true; inWord = true }
                 c == '"' -> { double = true; inWord = true }
                 c == '>' || (c == '&' && next == '>') -> {
-                    // 前面紧挨着的数字是文件描述符(2>…)
+                    // A digit directly before it is a file descriptor (2>...)
                     if (inWord && word.all(Char::isDigit)) { word.clear(); inWord = false } else endWord()
                     i += if (c == '&') 2 else 1
                     if (command.getOrNull(i) == '>' || command.getOrNull(i) == '|') i++
-                    // >&2、>&- 是复制、关闭描述符,不写文件
+                    // >&2 and >&- duplicate or close a descriptor and do not write a file
                     if (command.getOrNull(i) == '&') {
                         i++
                         val fd = command.drop(i).takeWhile { it.isDigit() || it == '-' }
@@ -213,7 +213,7 @@ object RootCommandClass {
                 }
                 c == '<' -> {
                     if (inWord && word.all(Char::isDigit)) { word.clear(); inWord = false } else endWord()
-                    // here-doc、读写打开、进程替换
+                    // here-doc, read-write open, process substitution
                     if (next == '<' || next == '>' || next == '(') return null
                     i++
                     while (command.getOrNull(i)?.isWhitespace() == true) i++
@@ -230,7 +230,7 @@ object RootCommandClass {
         }
         if (single || double) return null
         endCommand()
-        // { 和 } 只是把几条括起来
+        // { and } only group several commands
         return commands.map { w -> w.filter { it != "{" && it != "}" } }.filter { it.isNotEmpty() }
     }
 }

@@ -26,14 +26,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 手机:手机那一套屏幕工具、打开 App 与链接。
- * [pacing] 是在 App 里一步一步操作的节奏(见 [AppPacing]):改动屏幕的动作之前补足停留,限制浏览快慢的 App 屏数有上限;
- * [appTempo] 按包名给出这个 App 的实际节奏([AppTempo]),[appCapped] 说哪些 App 限制浏览快慢(计屏数、受上限);
- * [idle] 给了时新的一屏上的停留里轻轻滚几下(见 [IdleScroll])。
+ * Phone: the phone's set of screen tools, plus opening apps and links.
+ * [pacing] is the pace of operating step by step inside an app (see [AppPacing]): top up the dwell before actions that change the screen, and apps with limited browsing speed have a screen cap;
+ * [appTempo] gives this app's effective pace by package name ([AppTempo]), [appCapped] says which apps limit browsing speed (counting screens, subject to the cap);
+ * when [idle] is provided, gently scroll a few times during the dwell on a new screen (see [IdleScroll]).
  */
 internal class PhoneCapability(
     val screen: ScreenPort,
-    /** 提速开关 deepLinks:提供打开链接的工具。 */
+    /** Speed-up toggle deepLinks: provides the tool for opening links. */
     val deepLinks: Boolean,
     pacing: AppPacing = AppPacing.Off,
     appTempo: (String) -> AppTempo = { AppTempo.NORMAL },
@@ -60,8 +60,8 @@ internal class PhoneCapability(
     }, targetNote = "the exact package name of the app")
 
     /**
-     * 手机一段跟着打开、列出 App 的工具走;手机那一组收着时不给。
-     * 应用访问的规则只在用户禁用了 App(或设置读不出来)时接在后面:名单为空时手机工具不会因它被拒,模型用不着这段。
+     * The phone section goes along with the tools for opening and listing apps; it is not offered when the phone group is collapsed.
+     * The app access rules are appended only when the user has disabled apps (or the settings cannot be read): with an empty list the phone tools are never rejected because of it, so the model does not need this section.
      */
     override fun sections(env: PromptEnv): List<String> {
         if (!env.isOpen(id) || tools.none { it.verb in SECTION_VERBS && it.name in env.offered }) return emptyList()
@@ -77,16 +77,16 @@ internal class PhoneCapability(
         dwell.onIdleScroll = { ctx.sessions[id]?.movedByMika() }
     }
 
-    /** 用户答过话:限制浏览快慢的 App 的屏数重新算(用户答应了接着看)。 */
+    /** The user has answered: the screen count for apps with limited browsing speed is recomputed (the user agreed to keep looking). */
     override fun onUserAnswered(ctx: ToolContext) = dwell.userAnswered()
 
-    /** App 里的对外动作做成之后,这个 App 不再设屏数上限(成批联系、投递做到 App 自己的上限为止)。 */
+    /** Once an outward action inside the app has been done, this app is no longer capped by screen count (bulk contact and delivery run up to the app's own limit). */
     override fun onOutwardEnd(ctx: ToolContext, site: String, done: Boolean) = dwell.outwardEnd(site, done)
 
     /**
-     * 改动屏幕的动作之前按 App 里的节奏停:此刻在哪个 App、这一屏多少字按模型最近读到的那一屏算。
-     * 在 App 里换屏的动作(点、滑、返回、按键、手势)在限制浏览快慢的 App 里到了屏数上限就不做,报 page_limit;打字、清空、滚动、
-     * 拨滚轮、打开别的 App 和对外动作本身不拦。接下来的动作不按屏上的位置做(返回、按键、按方向滚)时,停留里可以轻轻滚几下。
+     * Before an action that changes the screen, pause at the pace inside the app: which app it is right now and how many characters this screen has are taken from the screen the model most recently read.
+     * Actions that switch screens inside an app (tap, swipe, back, key press, gesture) are not performed once the screen cap is reached in an app with limited browsing speed, and report page_limit; typing, clearing, scrolling,
+     * turning the wheel, opening another app and outward actions themselves are not blocked. When the upcoming actions do not work by on-screen position (back, key press, direction-based scroll), a few gentle scrolls may happen during the dwell.
      */
     override suspend fun beforeWrite(ctx: ToolContext, verb: Verb?, outward: Boolean): Paced {
         if (!dwell.paced) return Paced.NONE
@@ -100,7 +100,7 @@ internal class PhoneCapability(
         }
     }
 
-    /** 动作做完:界面大变或换了 App 算换到了新的一屏(往下滚读同一页余下的内容不算进屏数)。 */
+    /** After the action: a major UI change or switching apps counts as moving to a new screen (scrolling down to read the rest of the same page does not count toward the screen count). */
     override fun afterWrite(ctx: ToolContext, verb: Verb?, result: JsonObject) {
         if (!dwell.paced) return
         val effect = result["effect"] as? JsonObject
@@ -110,36 +110,36 @@ internal class PhoneCapability(
         dwell.after(app, newScreen, counts = verb != Verb.Scroll)
     }
 
-    /** 再看一眼:此刻手机上那个 App 的界面状态。 */
+    /** Look again: the UI state of the app currently on the phone. */
     override suspend fun freshLook(ctx: ToolContext, withImage: Boolean): Look? = ctx.sessions[id]?.freshLook(withImage)
 
-    /** 系统命令连着失败了几次;成功一次清零。 */
+    /** How many times system commands have failed in a row; reset to zero by one success. */
     var commandFailures = 0
 
-    /** 本任务已提醒过系统命令换回专门工具:之后再做那几类事的命令不执行。 */
+    /** This task has already been reminded to switch system commands back to the dedicated tools: commands that do those kinds of things afterwards are not executed. */
     var commandSteered = false
 
     companion object {
         val KEY = CapabilityKey<PhoneCapability>(PHONE)
         private val SECTION_VERBS = setOf(Verb.LaunchApp, Verb.ListApps)
 
-        /** 应用访问规则那一段(capabilities/app-access.md)。 */
+        /** The app access rules section (capabilities/app-access.md). */
         private const val APP_ACCESS = "app-access"
 
-        /** 在 App 里换屏的动作:受限制浏览快慢的 App 的屏数上限拦。 */
+        /** Actions that switch screens inside an app: blocked by the screen cap of apps with limited browsing speed. */
         private val BROWSES = setOf(Verb.Tap, Verb.Swipe, Verb.Back, Verb.PressKey, Verb.PhoneGesture)
 
-        /** 不按屏上的位置做的动作:之前的停留里轻轻滚几下不会让它点偏。 */
+        /** Actions that do not work by on-screen position: a few gentle scrolls during the preceding dwell will not make them tap off-target. */
         private val IDLE_BEFORE = setOf(Verb.Back, Verb.PressKey, Verb.Scroll)
 
-        /** 一屏上给人看的字数(输入框里的字、提示语不算)。 */
+        /** Number of characters shown to a person on one screen (text in input fields and hint text do not count). */
         internal fun textChars(s: ScreenSnapshot): Int =
             s.elements.filter { !it.editable && !it.hint }.sumOf { it.name.codePointCount(0, it.name.length) }
 
-        /** 手机一组可能提供的全部工具。 */
+        /** All tools the phone group may offer. */
         fun tools(): List<AgentTool> = PhoneGroup.tools
     }
 }
 
-/** 本任务的手机能力。 */
+/** The phone capability for this task. */
 internal val ToolContext.phone: PhoneCapability get() = this[PhoneCapability.KEY]!!

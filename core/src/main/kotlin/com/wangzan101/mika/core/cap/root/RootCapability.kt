@@ -10,34 +10,34 @@ import com.wangzan101.mika.core.tool.ToolContext
 
 internal const val ROOT = "root"
 
-/** 以 root 跑命令的端口:已 root 的手机上、用户打开了「允许 Claire 执行 root 命令」时由 App 给出,否则不给(工具也就不登记)。 */
+/** The port that runs commands as root: supplied by the app on rooted phones when the user has enabled "Allow Claire to run root commands", and not supplied otherwise (in which case the tool is not registered either). */
 interface RootPort {
-    /** 以 root 跑 [command],最多 [timeoutMs]。会阻塞,实现自己换到 IO 线程。 */
+    /** Runs [command] as root, for at most [timeoutMs]. It blocks, so the implementation switches to an IO thread itself. */
     suspend fun run(command: String, timeoutMs: Long): RootRun
 }
 
-/** 一条 root 命令的结局。 */
+/** The outcome of one root command. */
 sealed interface RootRun {
     /**
-     * 跑了。[stdout]、[stderr] 各最多留 1 MB,多的丢掉并计入 [droppedBytes];[timedOut]:到时限被结束。
+     * It ran. [stdout] and [stderr] each keep at most 1 MB, with the excess dropped and counted in [droppedBytes]; [timedOut]: it was ended when the time limit was reached.
      */
     data class Done(
         val exitCode: Int, val timedOut: Boolean, val stdout: String, val stderr: String, val droppedBytes: Long, val durationMs: Long,
     ) : RootRun
 
-    /** su 拒绝了(用户在 root 管理器里收回了授权)。 */
+    /** su denied it (the user revoked the grant in the root manager). */
     data object Denied : RootRun
 
-    /** su 没回话。 */
+    /** su did not answer. */
     data object NoAnswer : RootRun
 
-    /** 手机上找不到 su 了。 */
+    /** su can no longer be found on the phone. */
     data object Unavailable : RootRun
 }
 
 /**
- * root 命令:一个工具 [RootRunCommand]。只有用户打开了、App 给了端口才装上;不动屏幕,不收起(只有一个工具)。
- * 会改动东西的命令询问时先问用户(工具按参数声明,见 [RootRunCommand.approvalRisk])。
+ * Root commands: a single tool, [RootRunCommand]. It is installed only when the user has enabled it and the app supplies the port; it does not touch the screen and is not collapsed away (there is only one tool).
+ * Commands that change things ask the user first when asking is required (the tool declares this per argument, see [RootRunCommand.approvalRisk]).
  */
 internal class RootCapability(val port: RootPort) : Capability {
     override val id = ROOT

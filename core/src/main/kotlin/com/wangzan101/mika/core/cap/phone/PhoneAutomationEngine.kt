@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 手机界面上的结构化查询和跨屏文本合并。工具和后续本地调用共用这套语义。 */
+/** Structured queries over the phone UI and cross-screen text merging. Tools and subsequent local calls share this same semantics. */
 internal object PhoneAutomationEngine {
     data class Query(val text: String? = null, val resourceId: String? = null, val role: String? = null)
 
@@ -19,12 +19,12 @@ internal object PhoneAutomationEngine {
             val clickRef = if (node.clickable) node.ref ?: clickableParent else clickableParent
             val editRef = if (node.editable) node.ref ?: editableParent else editableParent
             val own = listOfNotNull(node.text.takeUnless { node.secret }, node.description, node.hintText).filter(String::isNotBlank).joinToString(" ")
-            // text 匹配只看节点自身文字(叶子文本节点命中、actionRef 指向可点祖先);resourceId/role 命中容器时才需要后代文字补 name。
+            // Text matching only looks at the node's own text (leaf text nodes match, actionRef points at the clickable ancestor); only when resourceId/role match a container do descendants' text fill in name.
             val hit = (query.text == null || own.contains(query.text, ignoreCase = true)) &&
                 (query.resourceId == null || node.resourceId?.contains(query.resourceId, ignoreCase = true) == true) &&
                 (query.role == null || node.role.contains(query.role, ignoreCase = true))
             if (hit) {
-                // 可访问名:点按的容器(tile/列表项)常把可见文字放在子节点上、自身 text/description/hintText 都空;和元素表一致,从后代取名字。
+                // Accessible name: the container being tapped (tile/list item) often holds the visible text on child nodes with its own text/description/hintText empty; consistent with the element table, take the name from descendants.
                 val name = own.ifBlank { if (node.clickable) descendantLabel(node) else "" }
                 total++
                 if (matches.size < limit) matches += buildJsonObject {
@@ -76,7 +76,7 @@ internal object PhoneAutomationEngine {
         }
     }
 
-    /** 一个节点自身没有可读文字时,用它后代的文字当名字(和元素表给可点容器起名同一规则)。 */
+    /** When a node has no readable text of its own, use its descendants' text as its name (the same rule the element table uses to name clickable containers). */
     private fun descendantLabel(node: UiTreeNode): String {
         val parts = mutableListOf<String>()
         fun collect(n: UiTreeNode) {
@@ -89,7 +89,7 @@ internal object PhoneAutomationEngine {
         return parts.joinToString(" ")
     }
 
-    /** 重叠区域按整段顺序合并,同文的两条独立消息仍可保留。 */
+    /** Overlapping regions are merged in whole-run order, so two independent messages with identical text can still be kept. */
     fun appendPage(accumulated: List<String>, page: List<String>): List<String> {
         if (page.isEmpty()) return accumulated
         val overlap = (minOf(accumulated.size, page.size) downTo 1).firstOrNull { n -> accumulated.takeLast(n) == page.take(n) } ?: 0

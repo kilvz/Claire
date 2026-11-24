@@ -8,20 +8,20 @@ import kotlin.math.roundToLong
 import kotlin.random.Random
 
 /**
- * 往输入框里打字的节奏(纯逻辑,不碰输入框):人打字是一个字一个字出来的,中日韩文字经输入法一个词一个词地上屏,
- * 字与字之间快慢不一,标点、空格之后偶尔停一下。[plan] 把一段字排成一串越来越长的前缀和每一段之前等多久;
- * 最后一段总是全文。
+ * The rhythm of typing into an input field (pure logic, it does not touch the field): a person types one character at a time, CJK text goes on screen word by word through the IME,
+ * the pace varies between characters, and there is an occasional pause after punctuation and spaces. [plan] arranges a stretch of text into a series of ever-longer prefixes plus how long to wait before each step;
+ * the last step is always the full text.
  *
- * - 拉丁字母、数字、标点每个字等 [Limits.latinMs] 里随机取的一段;中日韩文字每个字等 [Limits.cjkMs],
- *   连着的几个([Limits.cjkGroup])一起上屏;
- * - 每一段之后有机会([Limits.pauseChance],标点、空格之后加倍)多停 [Limits.pauseMs];
- * - 字多时几个字并成一段,至多 [Limits.maxSteps] 段;总时长超过 [Limits.maxTotalMs] 时每段按比例缩短,长消息也不会打上几分钟。
- * - 一个字不拆开:代理对、组合附加符号、变体选择符、零宽连接的表情序列都和前面的字算一个。
+ * - Each Latin letter, digit and punctuation mark waits for a random span picked from [Limits.latinMs]; each CJK character waits [Limits.cjkMs],
+ *   with several consecutive ones ([Limits.cjkGroup]) going on screen together;
+ * - After each step there is a chance ([Limits.pauseChance], doubled after punctuation and spaces) to pause for an extra [Limits.pauseMs];
+ * - With a lot of text, several characters merge into one step, up to [Limits.maxSteps] steps; when the total duration exceeds [Limits.maxTotalMs], every step is shortened proportionally, so even long messages don't take minutes to type.
+ * - A character is never split: surrogate pairs, combining marks, variation selectors and zero-width-joiner emoji sequences all count as one with the preceding character.
  *
- * [Instant] 一次写入全文、不等待(「快」、测试、不需要节奏的调用方用它)。
+ * [Instant] writes the full text in one go without waiting (used for "fast", tests, and callers that don't need pacing).
  */
 class TypingPacing(private val random: Random?, val limits: Limits = Limits()) {
-    /** 时长单位毫秒。 */
+    /** Durations are in milliseconds. */
     data class Limits(
         val latinMs: LongRange = 60L..170L,
         val cjkMs: LongRange = 160L..380L,
@@ -32,20 +32,20 @@ class TypingPacing(private val random: Random?, val limits: Limits = Limits()) {
         val maxTotalMs: Long = 6_000L,
     ) {
         companion object {
-            /** 限制浏览快慢的 App(和「像人」时所有 App):打得更慢、停得更多,长消息至多 12 秒。 */
+            /** Apps with limited browsing speed (and, in "human-like" mode, all apps): types slower, pauses more, and long messages take at most 12 seconds. */
             val CAREFUL = Limits(
                 latinMs = 90L..230L, cjkMs = 220L..520L, pauseChance = 0.1, pauseMs = 500L..1_400L, maxSteps = 60, maxTotalMs = 12_000L,
             )
         }
     }
 
-    /** 一段:等 [delayMs] 之后,输入框里是全文的前 [end] 个 UTF-16 单位。 */
+    /** One step: after waiting [delayMs], the input field holds the first [end] UTF-16 units of the full text. */
     data class Step(val end: Int, val delayMs: Long)
 
-    /** 有节奏(不是 [Instant])。 */
+    /** Paced (not [Instant]). */
     val paced: Boolean get() = random != null
 
-    /** 把 [text] 排成一段一段;[Instant]、空串时只有一段(全文、不等)。 */
+    /** Arranges [text] into steps; with [Instant] or an empty string there is only one step (the full text, no wait). */
     fun plan(text: String): List<Step> {
         val r = random ?: return listOf(Step(text.length, 0))
         val units = units(text)
@@ -54,7 +54,7 @@ class TypingPacing(private val random: Random?, val limits: Limits = Limits()) {
         val steps = mutableListOf<Step>()
         var i = 0
         while (i < units.size) {
-            // 中日韩文字按输入法一个词一个词上屏(连着的几个,不跨到别的文字);字多时至少 per 个字一段
+            // CJK text goes on screen word by word through the IME (several consecutive characters, never crossing into another script); with a lot of text, at least per characters per step
             val group = if (isCjk(text, units[i])) {
                 val want = Pace.pick(r, limits.cjkGroup)
                 var k = 1
@@ -78,15 +78,15 @@ class TypingPacing(private val random: Random?, val limits: Limits = Limits()) {
     }
 
     /**
-     * 对这个输入框用的节奏:密码框([secret])不分段(读不回原文,核对不了半截字);要粘贴才收得到输入的网页框([web])
-     * 不分段(写进去的字 App 收不到)。这两种照旧一次写入([Instant]),其余照这个节奏。
+     * The pacing to use for this input field: password fields ([secret]) are not split (the original text cannot be read back, so a partial prefix cannot be verified); web fields that only receive input via paste ([web])
+     * are not split either (the app does not receive the written characters). Those two still write in one go ([Instant]); everything else uses this pacing.
      */
     fun forField(web: Boolean, secret: Boolean): TypingPacing = if (web || secret) Instant else this
 
     /**
-     * 按 [plan] 一段一段把 [text] 的前缀写进 [field],全文那一段留给调用方(照旧整段写入并读回核对),等完最后一段的停顿再返回。
-     * 写第一段后读回核对:框不接受半截字(读回对不上、读不出)或写不进时立刻停下,返回 false,调用方照旧一次写入全文。
-     * 写完了所有前缀返回 true;不分段([Instant]、只有一个字)时什么也不写,返回 false。
+     * Writes the prefixes of [text] into [field] step by step according to [plan], leaving the full-text step to the caller (which still writes it all at once and reads it back to verify), and returns after the last step's pause has elapsed.
+     * After writing the first step it reads back to verify: if the field does not accept partial text (read-back mismatches, or cannot be read) or the write fails, it stops immediately and returns false, and the caller writes the full text in one go as usual.
+     * Returns true after all prefixes have been written; when nothing is split ([Instant], a single character) it writes nothing and returns false.
      */
     suspend fun leadIn(field: TextField, text: String, sleep: suspend (Long) -> Unit = { delay(it) }): Boolean {
         val steps = plan(text)
@@ -105,13 +105,13 @@ class TypingPacing(private val random: Random?, val limits: Limits = Limits()) {
     }
 
     companion object {
-        /** 一次写入全文。 */
+        /** Writes the full text in one go. */
         val Instant = TypingPacing(null)
 
-        /** 像人打字的节奏;[random] 可换成固定种子(测试)。 */
+        /** The human-like typing rhythm; [random] can be replaced with a fixed seed (tests). */
         fun human(random: Random = Random.Default, limits: Limits = Limits()) = TypingPacing(random, limits)
 
-        /** [text] 里每个字的起点(UTF-16 下标):代理对、附加符号、变体选择符、零宽连接的序列和前面的字算一个。 */
+        /** The start index (UTF-16 index) of each character in [text]: surrogate pairs, combining marks, variation selectors and zero-width-joiner sequences count as one with the preceding character. */
         internal fun units(text: String): List<Int> {
             val out = mutableListOf<Int>()
             var i = 0

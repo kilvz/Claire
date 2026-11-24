@@ -14,12 +14,12 @@ import com.wangzan101.mika.core.tool.ToolContext
 import com.wangzan101.mika.core.workspace.SandboxPaths
 
 /**
- * Linux 沙箱:命令、技能脚本、工作区文件。设备支持时提供工具(运行环境没准备好时工具调用会等它);
- * 不是屏幕操作,不过锁屏关卡,也不进屏幕守卫,由 [SandboxGuard] 另管。
+ * The Linux sandbox: commands, skill scripts, workspace files. Tools are provided when the device supports it (a tool call waits for the runtime when it is not ready yet);
+ * this is not screen operation, so it does not go through the lock-screen gate and does not enter the screen guard, being managed separately by [SandboxGuard].
  */
 internal class SandboxCapability(
     private val port: SandboxPort?,
-    /** 本次任务的工作区(对话 ID 或 `p:<projectId>`)。 */
+    /** This task's workspace (a conversation ID, or `p:<projectId>`). */
     private val workspace: () -> String,
     visionEnabled: Boolean,
     onCommand: (String) -> Unit,
@@ -27,7 +27,7 @@ internal class SandboxCapability(
     onPreparing: () -> Unit,
     onScript: ((String) -> Unit)?,
     folderAccess: Boolean = false,
-    /** 这个任务里沙箱命令累计最多跑多久(设置 › 干活时的档位);默认 30 分钟。 */
+    /** How long sandbox commands may accumulate in this task (settings › the working tier); 30 minutes by default. */
     private val budgetMs: Long = SANDBOX_BUDGET_MS,
     folderFileImporter: FolderFileImporter? = null,
     private val folderTools: List<AgentTool> = emptyList(),
@@ -36,7 +36,7 @@ internal class SandboxCapability(
 
     val runner = port?.let { SandboxTools(it, workspace, visionEnabled, onCommand = onCommand, onProgress = onProgress, onPreparing = onPreparing, onScript = onScript, folderAccess = folderAccess, folderFileImporter = folderFileImporter) }
 
-    /** 设备支持沙箱(工具已提供,可能还在准备)。 */
+    /** The device supports the sandbox (tools are already provided, and it may still be preparing). */
     fun available(): Boolean = runner?.available() == true
 
     override val folds = true
@@ -52,10 +52,10 @@ internal class SandboxCapability(
 
     override fun tools(): List<AgentTool> = if (runner?.foldersAvailable == true) SandboxGroup.tools + folderTools else SandboxGroup.tools
 
-    /** 这次的话带着工作区里的文件(附件一行写着 /workspace/ 下的路径):开局就展开沙箱一组。 */
+    /** This message carries files from the workspace (the attachment line gives a path under /workspace/): expand the sandbox group right away. */
     override fun preload(task: String): Boolean = available() && "${SandboxPaths.WORKSPACE}/" in task
 
-    /** 沙箱那一组收着时不给。 */
+    /** Not offered while the sandbox group is collapsed. */
     override fun sections(env: PromptEnv): List<String> {
         if (!env.isOpen(id) || SandboxGroup.tools.none { it.name in env.offered }) return emptyList()
         val p = port?.takeIf { available() }
@@ -91,7 +91,7 @@ internal class SandboxCapability(
     companion object {
         val KEY = CapabilityKey<SandboxCapability>(SANDBOX)
 
-        /** 沙箱一段:写明此刻是否联网([network]:用户的联网设置);项目共享工作区和运行环境还没准备好时分别补一句。 */
+        /** The sandbox section: states whether the network is available right now ([network]: the user's network setting); adds a line each for a project-shared workspace and for a runtime that is not ready yet. */
         fun section(status: SandboxStatus, network: Boolean, sharedWorkspace: Boolean = false): String = buildString {
             append(Prompts.capability(SANDBOX).replace("{{network}}", if (network) NETWORK_ON else NETWORK_OFF))
             if (sharedWorkspace) append("\n- ").append(SHARED_WORKSPACE)
@@ -108,7 +108,7 @@ internal class SandboxCapability(
     }
 }
 
-/** 本任务的沙箱执行;没有沙箱为 null。 */
+/** Sandbox execution for this task; null when there is no sandbox. */
 internal val ToolContext.sandboxRunner: SandboxTools? get() = this[SandboxCapability.KEY]?.runner
 
 internal fun ToolContext.sandboxAvailable(): Boolean = this[SandboxCapability.KEY]?.available() == true

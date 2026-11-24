@@ -23,7 +23,7 @@ import kotlinx.serialization.json.put
 import com.wangzan101.mika.core.screen.uistate.screen
 import com.wangzan101.mika.core.screen.uistate.session
 
-/** 根据每一步读到的当前无障碍树重新定位目标,然后把动作交回统一执行入口。 */
+/** Re-locates the target from the current accessibility tree read at each step, then hands the action back to the unified execution entry point. */
 internal object PhoneRun : PhoneTool {
     override val verb = Verb.PhoneRun
     override val risk = Risk.Write
@@ -123,7 +123,7 @@ internal object PhoneRun : PhoneTool {
                     val present = command.boolean("present") ?: true
                     val timeout = if (op == "assert") 0 else command.integer("timeoutMs") ?: 5_000
                     if (timeout !in 0..10_000) throw ArgError("commands[$index].timeoutMs", "must be 0-10000")
-                    // 等的时候用户插了话:不再等,这一条和后面的都不做,先读那句话
+                    // The user interjected while waiting: stop waiting, skip this command and the following ones, and read that message first
                     val found = awaitText(ctx, text, present, timeout)
                     if (found == null) failCode(SKIPPED_FOR_NEW_MESSAGE)
                     else ToolExecution(buildJsonObject { put("ok", found); if (!found) put("error", "condition_unmet") })
@@ -159,7 +159,7 @@ internal object PhoneRun : PhoneTool {
     private data class Target(val ref: String? = null, val snapshotId: String? = null, val error: String? = null)
 
     private suspend fun select(sub: SubActions, ctx: ToolContext, index: Int, command: JsonObject, editable: Boolean): Target {
-        // 复合工具(do_each 的 @item)直接给 ref + snapshotId:跳过按字重找,原样点。
+        // Composite tools (do_each's @item) pass ref + snapshotId directly: skip the text-based lookup and tap it as-is.
         val directRef = command.string("ref")
         val directSid = command.string("snapshotId")
         if (directRef != null && directSid != null) return Target(ref = directRef, snapshotId = directSid)
@@ -192,7 +192,7 @@ internal object PhoneRun : PhoneTool {
     private suspend fun run(sub: SubActions, ctx: ToolContext, index: Int, name: String, args: JsonObject): ToolExecution =
         sub.run(Part.ToolCall("${ctx.callId}.${index + 1}.$name", name, args.toString()))
 
-    /** 等到文字出现(或消失);用户插话撤掉了这次等待时为 null。 */
+    /** Waits until the text appears (or disappears); null when a user interjection cancelled this wait. */
     private suspend fun awaitText(ctx: ToolContext, text: String, present: Boolean, timeoutMs: Int): Boolean? {
         if (hasText(ctx, text) == present) return true
         if (timeoutMs == 0) return false

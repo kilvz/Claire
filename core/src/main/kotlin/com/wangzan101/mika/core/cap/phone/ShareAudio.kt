@@ -18,8 +18,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 把一个工作区音频分享给一个 App(ACTION_SEND + EXTRA_STREAM),在 Claire 的屏上打开它的分享页:
- * 只打开,不发出;收件人和「发送」由模型在那一页上用屏幕工具完成,发送仍走现有的确认关卡。
+ * Shares a workspace audio file to an app (ACTION_SEND + EXTRA_STREAM), opening its share sheet on Claire's screen:
+ * it only opens, it never sends; the model picks the recipient and taps "send" on that page with screen tools, and sending still goes through the existing confirmation gate.
  */
 internal object ShareAudio : PhoneTool {
     override val verb = Verb.ShareAudio

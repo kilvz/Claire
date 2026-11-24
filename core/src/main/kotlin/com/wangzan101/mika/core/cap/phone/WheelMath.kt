@@ -4,19 +4,19 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * 滚轮选择器(时间、日期、地区这类一格一格转的)的算法,和怎么转无关:认值、算方向和格数、估一格多高。
- * 端口照它在一次工具调用里转到位,不需要模型一格一格看。
+ * The algorithm for wheel pickers (time, date, region and similar one-cell-at-a-time pickers), independent of how they are turned: recognize the value, compute direction and step count, estimate cell height.
+ * The port uses it to turn the wheel into place within a single tool call, so the model need not inspect it cell by cell.
  *
- * 「前进」指滚轮上的值往后走(下面那一项转到中间,数字通常变大);是不是变大由读回来的值校正。
+ * "Forward" means the wheel's value advances (the item below moves to the middle, and numbers usually increase); whether it actually increases is corrected from the values read back.
  */
 object WheelMath {
     private val ONLY_NUMBER = Regex("""^-?\d{1,6}$""")
     private val LEADING_NUMBER = Regex("""^\D{0,3}?(\d{1,6})(?!\d)""")
     private val DIGITS = Regex("""(?<!\d)\d{1,6}(?!\d)""")
-    /** 一项的文字里把值和状态词(「已选中」「selected」……)、单位隔开的标点。 */
+    /** Punctuation that separates the value from status words ("selected", ...) and units within an item's text. */
     private val SEPARATORS = Regex("""[,，、:：;；|/()（）\[\]【】<>《》·•]+""")
 
-    /** 比较文字用:去空白、全角数字换半角、忽略大小写。 */
+    /** For comparing text: strip whitespace, convert full-width digits to half-width, ignore case. */
     fun normalize(s: String): String = buildString {
         for (c in s.trim()) when {
             c.isWhitespace() -> Unit
@@ -26,9 +26,9 @@ object WheelMath {
     }
 
     /**
-     * 显示的文字里的整数:"09" → 9,"9时"/"9 点" → 9,"2026年" → 2026,"第3周" → 3;
-     * 无障碍名字常在值前后带状态词("已选中，21"、"Selected, 21"、"21 (selected)"),整段只有一个数时就是它。
-     * 有几个数时取开头附近的第一个(前面的字超过三个为 null);没有数字为 null。
+     * The integer in displayed text: "09" → 9, "9 h" → 9, "week 3" → 3, "year 2026" → 2026;
+     * accessibility names often carry status words around the value ("Selected, 21", "21 (selected)"), and when the whole string holds only one number, that is it.
+     * With several numbers, take the first one near the start (null when more than three characters precede it); null when there is no number.
      */
     fun number(s: String?): Int? {
         val t = s?.let(::normalize)?.ifEmpty { null } ?: return null
@@ -37,12 +37,12 @@ object WheelMath {
         return LEADING_NUMBER.find(t)?.groupValues?.get(1)?.toIntOrNull()
     }
 
-    /** 按标点切开的几段(已按 [normalize] 处理):"已选中，21" → [已选中, 21]。 */
+    /** The segments split by punctuation (already passed through [normalize]): "Selected, 21" → [selected, 21]. */
     fun segments(s: String): List<String> = normalize(s).split(SEPARATORS).filter { it.isNotEmpty() }
 
     /**
-     * 报给模型的值:名字里带着状态词时只留值那一段("已选中，21" → "21"、"Selected, 21" → "21");
-     * 切不出唯一一段带数字的就原样(文字值不猜哪段是状态词)。
+     * The value reported to the model: when the name carries a status word, keep only the value segment ("Selected, 21" → "21");
+     * if there is not exactly one segment containing a number, return it as-is (for text values we do not guess which segment is the status word).
      */
     fun clean(label: String?): String? {
         val t = label?.trim()?.ifEmpty { null } ?: return null
@@ -51,12 +51,12 @@ object WheelMath {
         return parts.filter { p -> p.any { it.isDigit() || it in '０'..'９' } }.singleOrNull() ?: t
     }
 
-    /** 目标本身就是一个数(「9」「09」「２０２６」),不是带数字的文字。 */
+    /** The target itself is a number ("9", "09", or a full-width "2026"), not text that contains a number. */
     fun numericTarget(target: String): Int? = normalize(target).takeIf(ONLY_NUMBER::matches)?.toIntOrNull()
 
     /**
-     * 滚轮此刻显示的 [shown] 是不是要的 [target]:目标是纯数字时按数比("09" 就是 "9","40分" 就是 "40",
-     * "已选中，21" 就是 "21");否则文字相同,或显示的(或按标点切开的某一段)以目标开头/结尾(「北京市」对「北京」)。
+     * Whether the wheel's currently displayed [shown] is the wanted [target]: when the target is purely numeric, compare as numbers ("09" equals "9", "40 min" equals "40",
+     * "Selected, 21" equals "21"); otherwise the text is identical, or the displayed text (or one of its punctuation-separated segments) starts/ends with the target ("Beijing City" for "Beijing").
      */
     fun matches(shown: String?, target: String): Boolean {
         val s = shown?.let(::normalize)?.ifEmpty { null } ?: return false
@@ -67,8 +67,8 @@ object WheelMath {
     }
 
     /**
-     * 从上到下看得到的几项估出循环的长度:数字里出现一次「往下变小」(…58 59 00 01…),循环长度 = 断点前的最大值 − 断点后的最小值 + 1;
-     * 看不出循环(全是递增、不是数字、太少)为 null。
+     * Estimates the cycle length from the items visible top to bottom: when the numbers decrease exactly once going down (...58 59 00 01...), cycle length = max before the break − min after the break + 1;
+     * null when no cycle is visible (all increasing, not numeric, or too few items).
      */
     fun modulus(visible: List<String>): Int? {
         val n = visible.map { number(it) ?: return null }
@@ -79,7 +79,7 @@ object WheelMath {
         return (n.subList(0, i).max() - n.subList(i, n.size).min() + 1).takeIf { it >= 2 }
     }
 
-    /** 从 [current] 到 [target] 要往数大的那边走几格(负数往小的那边):循环长度 [modulus] 已知时取近的那一边。 */
+    /** How many cells to move from [current] to [target] toward larger numbers (negative goes toward smaller): when the cycle length [modulus] is known, take the nearer direction. */
     fun distance(current: Int, target: Int, modulus: Int?): Int {
         val d = target - current
         if (modulus == null || modulus < 2) return d
@@ -87,14 +87,14 @@ object WheelMath {
         return if (m <= modulus / 2) m else m - modulus
     }
 
-    /** 数从 [before] 变成 [after] 走了几格(循环长度已知时 59→0 是 +1 不是 −59);不是数字为 null。 */
+    /** How many cells the number moved from [before] to [after] (with a known cycle length, 59→0 is +1, not −59); null when not numeric. */
     fun moved(before: String?, after: String?, modulus: Int?): Int? {
         val b = number(before) ?: return null
         val a = number(after) ?: return null
         return distance(b, a, modulus)
     }
 
-    /** 一格多高:相邻几项中心的间距取中位数;不到两项、间距太小为 null。 */
+    /** How tall one cell is: the median of the gaps between adjacent items' centers; null with fewer than two items or when the gaps are too small. */
     fun itemHeight(centers: List<Int>): Int? {
         val sorted = centers.sorted()
         val gaps = (1 until sorted.size).map { sorted[it] - sorted[it - 1] }.filter { it > 2 }
@@ -103,9 +103,9 @@ object WheelMath {
     }
 
     /**
-     * 选中的那一项:只有一项标着选中([Item.selected],无障碍的 isSelected)就是它;各项都带着自己的高度时,
-     * 是自己的上下范围盖住中线 [centerY] 的那一项(都没盖住为 -1:中间那一格没报出来,不拿上下的邻居充数);
-     * 否则按 [selected] 找中线上的。
+     * The selected item: if exactly one item is marked selected ([Item.selected], accessibility's isSelected), it is that one; when every item carries its own height,
+     * it is the item whose vertical extent covers the center line [centerY] (-1 when none covers it: the middle cell was not reported, and the neighbours are not substituted for it);
+     * otherwise find the one on the center line via [selected].
      */
     fun selectedIndex(items: List<Item>, centerY: Int, itemHeight: Int?): Int {
         items.indices.filter { items[it].selected }.singleOrNull()?.let { return it }
@@ -117,17 +117,17 @@ object WheelMath {
     }
 
     /**
-     * 中线上那一格没报出来(有的滚轮只报上下两格)、上下紧挨着的两项都是数时,中间那一格的文字:
-     * 上下差 2 就是夹在中间的数;差得多时只认转过一圈的接口(59 和 1 中间是 0,22 和 0 中间是 23,12 和 2 中间是 1,
-     * 11 和 1 中间是 12,1 和 59 中间是 0)。1–12 的时针在 12 那一格没报出来时上下是 11 和 1,不能按「小的那边减一」推成 0
-     * (0 不在这只滚轮上);倒着排(1 在上、11 在下)也是 12。写法照上面那一项(单位;上下有补零的就补零);推不出为 null。
+     * The text of the middle cell when the cell on the center line was not reported (some wheels only report the two neighbours above and below) and both adjacent items are numbers:
+     * a difference of 2 means the number in between; a bigger difference only counts across a cycle wrap (0 between 59 and 1, 23 between 22 and 0, 1 between 12 and 2,
+     * 12 between 11 and 1, 0 between 1 and 59). With a 1–12 hour hand whose 12 cell is not reported the neighbours are 11 and 1, and it must not be inferred as 0 by "decrement the smaller side"
+     * (0 is not on this wheel); reversed order (1 above, 11 below) is also 12. The spelling follows the upper item (units; if either neighbour is zero-padded, pad as well); null when it cannot be inferred.
      */
     fun between(above: String, below: String): String? {
         val a = number(above) ?: return null
         val b = number(below) ?: return null
         val mid = when {
             abs(b - a) == 2 -> (a + b) / 2
-            // 1–12:11 和 1 中间是 12。要排在「小的那边减一」之前,否则会推成 0
+            // 1–12: between 11 and 1 is 12. This must precede "decrement the smaller side", otherwise it would infer 0
             (a == 11 && b == 1) || (a == 1 && b == 11) -> 12
             b < a && b <= 2 -> if (b >= 1) b - 1 else a + 1
             a < b && a <= 2 -> if (a >= 1) a - 1 else b + 1
@@ -136,14 +136,14 @@ object WheelMath {
         if (mid < 0) return null
         val token = DIGITS.find(above.trim())?.value ?: return null
         val other = DIGITS.find(below.trim())?.value.orEmpty()
-        // 补零的滚轮(上下有一项以 0 开头,如 09、01)照样补零到同样宽
+        // A zero-padded wheel (either neighbour starts with 0, such as 09, 01) is padded to the same width
         val padded = listOf(token, other).any { it.length > 1 && it.startsWith('0') }
         return above.trim().replaceFirst(token, if (padded) mid.toString().padStart(token.length, '0') else mid.toString())
     }
 
     /**
-     * 从上到下的几项里,和第 [anchor] 项连成一列、间距差不多的那一段:同一块里滚轮上下的标题、按钮不算进来。
-     * 一格多高按它和上下相邻项的间距(取小的)算。不到三项、估不出一格多高时原样返回。
+     * Among the items top to bottom, the run that forms one column with the item at [anchor] and has similar spacing: titles and buttons above and below the wheel in the same block are excluded.
+     * Cell height is computed from its spacing to the adjacent items (the smaller one). With fewer than three items, or when cell height cannot be estimated, returns them unchanged.
      */
     fun column(items: List<Item>, anchor: Int): List<Item> {
         if (items.size < 3 || anchor !in items.indices) return items
@@ -160,7 +160,7 @@ object WheelMath {
         return items.subList(lo, hi + 1)
     }
 
-    /** 中线 [centerY] 上的那一项的下标:中心离中线最近的;离得超过大半格(没有正对中线的)为 -1。 */
+    /** Index of the item on the center line [centerY]: the one whose center is closest to the line; -1 when it is more than most of a cell away (nothing is aligned with the center line). */
     fun selected(centers: List<Int>, centerY: Int, itemHeight: Int?): Int {
         val best = centers.indices.minByOrNull { abs(centers[it] - centerY) } ?: return -1
         if (itemHeight != null && abs(centers[best] - centerY) > itemHeight * 0.75) return -1
@@ -168,9 +168,9 @@ object WheelMath {
     }
 
     /**
-     * 要往前转几格才到(负数往后):目标就在看得到的几项里时按位置差算(下面的是前进);目标和选中的都是数字时按数差算
-     * (看得出循环就走近的一边,眼前看不出时用之前看出的 [knownModulus];[increasingForward] 为 false 时前进是变小);
-     * 都不行(文字列表、目标不在眼前)为 null。
+     * How many cells to turn forward to get there (negative goes backward): when the target is among the visible items, compute the position difference (below is forward); when both the target and the selected value are numbers, compute the numeric difference
+     * (with a visible cycle go the nearer side, otherwise use the previously observed [knownModulus]; when [increasingForward] is false, forward means decreasing);
+     * null when neither works (text list, target not in view).
      */
     fun stepsTo(visible: List<String>, selectedIndex: Int, target: String, increasingForward: Boolean = true, knownModulus: Int? = null): Int? {
         if (selectedIndex !in visible.indices) return null
@@ -182,8 +182,8 @@ object WheelMath {
     }
 
     /**
-     * 转过 [steps] 格要拖的距离(像素,正数手指往上拖 = 前进),一格 [itemHeight];一次拖不超过 [maxDrag],超过的分几次。
-     * 返回每一次拖的距离。
+     * The drag distance (pixels; positive means dragging the finger up = forward) needed to turn [steps] cells, one cell being [itemHeight]; a single drag does not exceed [maxDrag], and anything beyond is split into several drags.
+     * Returns the distance of each drag.
      */
     fun drags(steps: Int, itemHeight: Int, maxDrag: Int): List<Int> {
         if (steps == 0 || itemHeight <= 0) return emptyList()
@@ -199,13 +199,13 @@ object WheelMath {
         return out
     }
 
-    /** 滚轮里看得到的一项:文字和中心(像素);[selected] 无障碍标着选中;[height] 它自己有多高(不知道为 0)。 */
+    /** One visible item in the wheel: its text and center (pixels); [selected] is marked selected by accessibility; [height] is its own height (0 when unknown). */
     data class Item(val text: String, val centerX: Int, val centerY: Int, val selected: Boolean = false, val height: Int = 0)
 
     /**
-     * 一个能竖着滚的容器看上去是不是滚轮,宁可漏认不错认:三到九项、每项都是短的值(不超过 [MAX_ITEM_CHARS] 个字)、互不相同,
-     * 都在容器横向的正中(偏离不到宽度的 15%),从上到下等距排着(最大间距不到最小的 1.5 倍)。
-     * 设置页那种靠左排的短标签、聊天列表都不像。
+     * Whether a vertically scrollable container looks like a wheel, preferring to miss one over misidentifying it: three to nine items, each a short value (at most [MAX_ITEM_CHARS] characters) and all distinct,
+     * all centered horizontally in the container (deviating by less than 15% of the width), evenly spaced from top to bottom (the largest gap under 1.5× the smallest).
+     * Left-aligned short labels like those on a settings page, and chat lists, do not look like one.
      */
     fun looksLikeWheel(items: List<Item>, left: Int, right: Int): Boolean {
         if (items.size !in 3..9 || right <= left) return false
@@ -221,31 +221,31 @@ object WheelMath {
 
     private const val MAX_ITEM_CHARS = 8
 
-    /** 拖了 [dragged] 像素实际转过 [moved] 格:一格实际多高;没转为 null。 */
+    /** Dragging [dragged] pixels actually turned [moved] cells: how tall one cell really is; null when nothing turned. */
     fun calibrated(dragged: Int, moved: Int): Int? =
         if (moved == 0) null else abs((dragged.toDouble() / moved).roundToInt()).takeIf { it > 2 }
 }
 
 /**
- * 按无障碍「往前/往后滚」转滚轮时的下一步:每批之后把读回的值交进来,它说再往哪边滚几下,或停。
- * 一下转过的不一定是一格(列表一下滚一页),所以每批之后按读回的值重算:
- * - 目标是数:按数差定方向和下数;第一次读回时看「往前」是变大还是变小;值不动了说明这一边到头、目标不在范围里,停;
- *   来回越过目标好几次(一下不止一格,停不准)也停,交给拖动去校准。
- * - 目标是文字:在眼前就按位置差;不在就一下一下往前扫,到头了反过来扫,两头都到了停。
+ * The next step when turning a wheel via accessibility "scroll forward/backward": after each batch the values read back are fed in, and it says which way to scroll how many times, or to stop.
+ * One action does not necessarily turn one cell (a list scrolls a whole page at a time), so everything is recomputed from the values read back after each batch:
+ * - Numeric target: direction and action count come from the numeric difference; on the first read-back it checks whether "forward" increases or decreases the value; if the value stops changing, this side has hit its end and the target is out of range, so stop;
+ *   if it keeps crossing the target back and forth (one action turns more than one cell, so it cannot stop precisely), it also stops and hands over to dragging for calibration.
+ * - Text target: if in view, use the position difference; otherwise scan forward one action at a time, reverse when hitting the end, and stop once both ends have been reached.
  */
 class WheelSteps(private val target: String, private val cap: Int = 80, private val burst: Int = 5) {
     sealed interface Step {
         data object Done : Step
-        /** 往 [forward] 那边滚 [count] 下。 */
+        /** Scroll [count] times toward the [forward] side. */
         data class Act(val forward: Boolean, val count: Int) : Step
         /**
-         * 停下:[reason] 为 at_end(到头了,目标不在这一边)、not_moving(循环的滚轮滚了不动)、cap(滚了太多下)、
-         * overshoot(停不准)、unknown_value(读不出值)。
+         * Stop: [reason] is at_end (hit the end; the target is not on this side), not_moving (a cycling wheel does not move when scrolled), cap (too many scrolls have been performed),
+         * overshoot (cannot stop precisely), unknown_value (value cannot be read).
          */
         data class Stop(val reason: String) : Step
     }
 
-    /** 到目前为止滚了几下。 */
+    /** How many scroll actions have been performed so far. */
     var actions: Int = 0
         private set
     private val numeric = WheelMath.numericTarget(target)
@@ -258,7 +258,7 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
     private var scanForward = true
     private var scanReversed = false
 
-    /** 刚才那批之后:此刻选中的值 [current] 和看得到的几项 [visible](从上到下)。第一次调时还没滚过。 */
+    /** After the last batch: the currently selected value [current] and the visible items [visible] (top to bottom). On the first call nothing has been scrolled yet. */
     fun next(current: String?, visible: List<String> = emptyList()): Step {
         if (WheelMath.matches(current, target)) return Step.Done
         if (current == null) return Step.Stop("unknown_value")
@@ -268,7 +268,7 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
         if (actions >= cap) return Step.Stop("cap")
         if (numeric != null && WheelMath.number(current) != null) {
             if (prev != null) {
-                // 值不动:看得出循环的滚轮没有头,是这一下没起作用,不是到头了
+                // The value did not move: a wheel with a visible cycle has no end, so this action simply had no effect; it is not the end of the range
                 if (unchanged) return Step.Stop(if (modulus != null) "not_moving" else "at_end")
                 val moved = WheelMath.moved(last, current, modulus)
                 if (!calibrated && moved != null && moved != 0) {
@@ -280,7 +280,7 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
             val forward = d > 0
             val turned = prev != null && forward != prev.forward
             if (turned && ++reversals > 3) return Step.Stop("overshoot")
-            // 刚越过目标往回走:一下一下来
+            // Just overshot the target and are heading back: go one action at a time
             val n = if (turned) 1 else minOf(abs(d), burst)
             return act(forward, n.coerceAtMost(cap - actions), current)
         }
@@ -305,23 +305,23 @@ class WheelSteps(private val target: String, private val cap: Int = 80, private 
 }
 
 /**
- * 拖动转滚轮(App 自己画的、不能无障碍滚的)时的下一步:每次拖完把读回的这一列交进来,它说再拖几格、怎么拖,或停。
- * - 按 [WheelMath.stepsTo] 定格数(数字按数差,看得出循环走近的一边,之前看出过的循环长度记着);第一次转动时看「往上拖」
- *   是变大还是变小,按实际转过的格数校准一格多高。
- * - 拖了值不动不等于到头:只有看不出循环、往要去的那边已经没有项时才算到头(at_end);否则是这一下没起作用,
- *   下次换个快慢(只差一格的还拖远一点),连着 [maxStill] 次不动报 not_moving。
- * - 文字列表、目标不在眼前:一次翻过看得到的几项往一边扫,到头了反过来,两头都到了停。
+ * The next step when turning a wheel by dragging (app-drawn wheels that cannot be scrolled via accessibility): after each drag the column read back is fed in, and it says how many more cells to drag, how to drag, or to stop.
+ * - Step counts come from [WheelMath.stepsTo] (numbers by numeric difference, going the nearer side when a cycle is visible, remembering cycle lengths seen before); on the first turn it checks whether "dragging up"
+ *   increases or decreases the value, and calibrates cell height from the number of cells actually turned.
+ * - A drag during which the value does not move does not mean the end: at_end only counts when no cycle is visible and there are no more items toward the desired side; otherwise the action simply had no effect,
+ *   so the next one changes speed (dragging farther when only one cell short), and [maxStill] consecutive no-move results report not_moving.
+ * - Text lists with the target not in view: it scans one page of visible items at a time toward one side, reverses at the end, and stops once both ends have been reached.
  */
 class WheelDrags(private val target: String, rowHeight: Int, private val maxMoves: Int = 5, private val maxStill: Int = 3) {
     sealed interface Step {
         data object Done : Step
-        /** 拖过 [steps] 格(正数手指往上 = 前进),距离再乘 [boost];[slow] 慢拖不甩,否则快划一下。 */
+        /** Drag over [steps] cells (positive = finger up = forward), with the distance multiplied by [boost]; [slow] drags slowly without a fling, otherwise it is a quick flick. */
         data class Drag(val steps: Int, val boost: Double, val slow: Boolean) : Step
-        /** 停下:[reason] 为 at_end、not_moving、not_reached(转了几轮没到,或按数算到了却没有这个值)、unknown_value。 */
+        /** Stop: [reason] is at_end, not_moving, not_reached (several rounds and still not there, or the numeric math says it arrived but that value does not exist), unknown_value. */
         data class Stop(val reason: String) : Step
     }
 
-    /** 一格多高(像素):先按看得到的几项估,转动后按实际转过的格数校准。 */
+    /** How tall one cell is (pixels): first estimated from the visible items, then calibrated from the number of cells actually turned. */
     var itemHeight: Int = rowHeight.coerceAtLeast(1)
         private set
     private val numeric = WheelMath.numericTarget(target)
@@ -338,8 +338,8 @@ class WheelDrags(private val target: String, rowHeight: Int, private val maxMove
     private var still = 0
 
     /**
-     * 刚才那次拖动之后:这一列从上到下的几项 [items]、各自中心的纵坐标 [centers]、选中项下标 [selected](找不到为 -1),
-     * 和手指实际走过的像素 [dragged](往上为正;第一次调时还没拖过,给 0)。
+     * After the last drag: the column's items top to bottom [items], their centers' y coordinates [centers], the selected index [selected] (-1 when not found),
+     * and the pixels the finger actually travelled [dragged] (positive upward; pass 0 on the first call, before any drag).
      */
     fun next(items: List<String>, selected: Int, centers: List<Int> = emptyList(), dragged: Int = 0): Step {
         val current = items.getOrNull(selected)
@@ -374,17 +374,17 @@ class WheelDrags(private val target: String, rowHeight: Int, private val maxMove
         if (still >= maxStill) return Step.Stop("not_moving")
         if (moves >= maxMoves) return Step.Stop("not_reached")
         val planned = WheelMath.stepsTo(items, selected, target, increasingForward, modulus)
-        // 按数算已经到了却没对上:这个值不在滚轮上(比如 0–59 里找 75)
+        // The numbers say we have arrived but it does not match: this value is not on the wheel (e.g. looking for 75 in 0–59)
         if (planned == 0) return Step.Stop("not_reached")
         lastScanning = planned == null
         val steps = planned ?: ((items.size - 1).coerceAtLeast(1) * if (scanForward) 1 else -1)
         last = current
-        // 上一下没起作用:换个快慢再来;只差一格的拖得短,再拖远一点(拖得多的不加,免得一起作用就转过头、把校准带偏)
+        // The last action had no effect: retry at a different speed; when only one cell short the drag is short, so drag farther (large drags get no boost, lest they overshoot the moment they take effect and skew calibration)
         val boost = if (abs(steps) <= 1) 1.0 + BOOST * still else 1.0
         return Step.Drag(steps, boost, slow = still % 2 == 0).also { lastDrag = it }
     }
 
-    /** 看不出循环,往要去的那边(前进是下面)已经没有项了。 */
+    /** No cycle is visible, and there are no more items toward the desired side (forward is downward). */
     private fun atEnd(items: List<String>, selected: Int, forward: Boolean): Boolean {
         if (modulus != null || items.size < 2 || selected !in items.indices) return false
         return if (forward) selected == items.lastIndex else selected == 0

@@ -36,8 +36,8 @@ internal const val SANDBOX = "sandbox"
 private const val TIMEOUT = "Time limit in seconds, 1-600 (default 60). The command is stopped when it runs out."
 
 /**
- * 沙箱一组:设备支持时提供(运行环境没准备好时工具调用会等它)。路径都是沙箱里的路径;
- * 不是屏幕操作,不过锁屏关卡,也不进屏幕守卫(沙箱守卫另管)。执行在 [com.wangzan101.mika.core.cap.sandbox.SandboxTools] 里。
+ * The sandbox group: provided when the device supports it (a tool call waits for the runtime when it is not ready yet). Paths are all sandbox paths;
+ * this is not screen operation, so it does not go through the lock-screen gate and does not enter the screen guard (the sandbox guard manages it separately). Execution lives in [com.wangzan101.mika.core.cap.sandbox.SandboxTools].
  */
 internal interface SandboxTool : AgentTool {
     override val capability: String get() = SANDBOX
@@ -46,7 +46,7 @@ internal interface SandboxTool : AgentTool {
     override fun offered(ctx: ToolContext) = ctx.sandboxAvailable()
 }
 
-/** 命令与脚本的输出(失败的输出也是事实,照样记)、读到的文件、写入与导出的路径,都是模型可能引用的事实。 */
+/** Command and script output (output on failure is a fact too and is recorded all the same), files read, and paths written and exported are all facts the model may cite. */
 private fun res(r: ToolExecution, k: String) = (r.content[k] as? JsonPrimitive)?.contentOrNull
 private fun ok(r: ToolExecution) = r.content["ok"] == JsonPrimitive(true)
 
@@ -69,7 +69,7 @@ internal object RunCommand : SandboxTool {
     override suspend fun execute(a: Args, ctx: ToolContext) = ctx.sandboxRunner!!.run { ws, _ -> runCommand(a, ws, ctx.callId, ctx.sub, ctx.tools) }
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = o.argStr("command")
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) =
-        // 命令是助手自己写的:放在来处里,不当证据;输出里原样是命令里的字的行(echo 回显)也不算
+        // The command was written by the assistant itself: it goes in the provenance and is not treated as evidence; lines in the output that are verbatim text from the command (echo echoes) do not count either
         listOfNotNull(res(r, "output")?.let { output("退出码 ${res(r, "exitCode")}:\n$it", Place.command("run_command「${o.argStr("command")?.take(200)}」"), o.argStr("command")) })
 }
 
@@ -110,7 +110,7 @@ internal object ReadFile : SandboxTool {
 
     override suspend fun execute(a: Args, ctx: ToolContext) = ctx.sandboxRunner!!.run { ws, _ -> withContext(Dispatchers.IO) { readFile(a, ws) } }
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) =
-        // 读回助手自己用 write_file 写的文件,读到的是它自己写的字,不算证据
+        // Reading back a file the assistant itself wrote with write_file: what is read is its own text, so it is not evidence
         listOfNotNull(if (ok(r) && res(r, "path") !in log.writtenPaths) res(r, "content")?.let { output(it, Place.file("read_file ${res(r, "path")}")) } else null)
 }
 
@@ -182,13 +182,13 @@ internal object ShareFile : SandboxTool {
         listOfNotNull(if (ok(r)) output("share_file 已存到 ${res(r, "savedAs")}") else null)
 }
 
-/** 沙箱给出的一条观察:命令输出、文件内容、写入与导出的路径。[authored] 是助手自己写的命令(输出里的回显不记)。 */
+/** An observation produced by the sandbox: command output, file contents, paths written and exported. [authored] is a command the assistant wrote itself (echoes in the output are not recorded). */
 private fun output(text: String, place: Place? = null, authored: String? = null) =
     Observation(ObsKind.Output, text, source = SANDBOX, place = place, authored = authored)
 
 /**
- * 用看图模型读一张工作区里的图。主模型看不到图、但设置里配了看图模型时,附件里的截图、照片靠它认字、说内容;
- * 主模型自己能看到图时用 read_file 直接把图带回来。没配看图模型不提供。
+ * Uses the vision model to read an image in the workspace. When the main model cannot see images but a vision model is configured in settings, screenshots and photos in attachments rely on it to read text and describe content;
+ * when the main model can see images itself, read_file brings the image back directly. Not offered when no vision model is configured.
  */
 internal object ViewImage : SandboxTool {
     override val verb = Verb.ViewImage

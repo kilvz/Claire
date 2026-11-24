@@ -38,14 +38,14 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 /*
- * 闹钟、计时器、日程:经安卓的标准接口交给手机上的时钟、日历 App,不去一格一格操作它们的界面。
- * 没有 App 接时报 not_supported,模型退回去操作界面。只改手机上的东西、不花钱:风险同打开 App。
+ * Alarms, timers, calendar events: handed to the phone's clock and calendar apps through Android's standard interfaces, rather than operating their UIs step by step.
+ * When no app accepts them it reports not_supported, and the model falls back to operating the UI. Only changes things on the phone and costs no money: same risk as opening an app.
  */
 
-/** 一周七天在参数里的写法 → java.util.Calendar 的星期(周日 = 1)。 */
+/** The seven weekdays' spelling in arguments → java.util.Calendar's day-of-week (Sunday = 1). */
 private val WEEKDAYS = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
 
-/** 结果里写给模型看的本地时间。 */
+/** The local time written into results for the model to read. */
 private val LOCAL_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
 internal object SetAlarm : PhoneTool {
@@ -136,7 +136,7 @@ internal object SetTimer : PhoneTool {
     }
 }
 
-/** 在 Claire 的屏上打开时钟的闹钟列表:核对、删除、改闹钟都在那一页上操作。 */
+/** Opens the clock's alarm list on Claire's screen: checking, deleting and editing alarms all happen on that page. */
 internal object ShowAlarms : PhoneTool {
     override val verb = Verb.ShowAlarms
     override val label = "查看闹钟"
@@ -155,7 +155,7 @@ internal object ShowAlarms : PhoneTool {
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext): String? = (r.content["handledBy"] as? JsonPrimitive)?.contentOrNull
 }
 
-/** 打开日历预填好的新日程页:保存由模型在那一页上点,这里不存任何东西;不要日历权限。 */
+/** Opens the calendar's pre-filled new-event page: saving is tapped by the model on that page, and nothing is stored here; needs no calendar permission. */
 internal object AddCalendarEvent : PhoneTool {
     override val verb = Verb.AddCalendarEvent
     override val label = "添加日程"
@@ -197,8 +197,8 @@ internal object AddCalendarEvent : PhoneTool {
 }
 
 /**
- * 一次经日历提供方写入 1–100 条日程。整批先解析完才碰手机；全天按 UTC 日期边界，
- * 避免本地午夜在批量提供方那里被挪到另一天。这里不弹权限框，也不操作日历界面。
+ * Writes 1–100 calendar events through the calendar provider in one go. The whole batch is parsed before the phone is touched; all-day events use UTC date boundaries,
+ * so a local midnight is not shifted to another day by the bulk provider. No permission dialog is shown here, and the calendar UI is not operated.
  */
 internal object BulkAddCalendarEvents : PhoneTool {
     override val verb = Verb.BulkAddCalendarEvents
@@ -239,7 +239,7 @@ internal object BulkAddCalendarEvents : PhoneTool {
         if (res.result is ActionResult.Ok &&
             (res.eventUris.size != events.size || res.eventUris.any { eventId(it) == null })
         ) {
-            // 提供方已开始写入后才拿到的坏结果不能当成“没写”，也不能自动重试。
+            // A bad result obtained only after the provider has started writing cannot be treated as "nothing written", nor retried automatically.
             res = SystemActionResult(ActionResult.Failed("calendar_write_unconfirmed"))
         }
         return systemResult(ctx, res) {
@@ -267,7 +267,7 @@ internal object BulkAddCalendarEvents : PhoneTool {
             ?.takeIf { it.toLongOrNull()?.let { id -> id > 0 } == true }
 }
 
-/** 单条界面预填和批量直写共用字段校验；批量全天用 UTC，单条界面保持原来的本地日期行为。 */
+/** Field validation shared by single-event UI pre-fill and bulk direct writes; bulk all-day uses UTC while the single-event UI keeps its original local-date behaviour. */
 private fun calendarEvent(a: Args, zone: ZoneId, utcAllDay: Boolean): SystemAction.AddCalendarEvent {
     val title = a.str("title", max = 200)!!
     val allDay = a.bool("allDay", false)
@@ -283,7 +283,7 @@ private fun calendarEvent(a: Args, zone: ZoneId, utcAllDay: Boolean): SystemActi
     )
 }
 
-/** 结果:端口的动作结果照常转(失败按错误码给说明),成功时加上接手的 App 和 [more]。 */
+/** Result: the port's action result is converted as usual (failures get a message by error code), and on success the handling app and [more] are added. */
 private fun systemResult(ctx: ToolContext, res: SystemActionResult, more: JsonObjectBuilder.() -> Unit): ToolExecution {
     val r = ctx.action(res.result)
     if (r.content["ok"] != JsonPrimitive(true)) return r
@@ -292,29 +292,29 @@ private fun systemResult(ctx: ToolContext, res: SystemActionResult, more: JsonOb
         if (res.showing) put("screenOpened", true)
         more()
     }
-    // 端口给的提示(被切走、开到主屏上……)排在前面,这里的说明接在后面
+    // The port's hint (switched away, opened on the main screen, ...) comes first, and this explanation is appended after it
     val hints = listOfNotNull((r.content["hint"] as? JsonPrimitive)?.content, (extra["hint"] as? JsonPrimitive)?.content)
     val merged = r.content + extra + (if (hints.isEmpty()) emptyMap() else mapOf("hint" to JsonPrimitive(hints.joinToString(" "))))
     return ToolExecution(JsonObject(merged), changed = r.changed)
 }
 
-/** 这一类结果的说明:本该悄悄设好的([silent])却开了界面时说这个,否则用 [normal]。 */
+/** The explanation for this kind of result: when something that should have been set silently ([silent]) opened a UI instead, use this; otherwise use [normal]. */
 private fun hint(b: JsonObjectBuilder, normal: String?, res: SystemActionResult, silent: Boolean) {
     (if (silent && res.showing) Feedback["system_action.screen_opened"] else normal)?.let { b.put("hint", it) }
 }
 
 private fun local(ms: Long): String = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).format(LOCAL_TIME)
 
-/** 系统报的下一个闹钟和要设的对不对得上。 */
+/** Whether the next alarm reported by the system matches the one being set. */
 internal object AlarmCheck {
     enum class Status(val wire: String) {
-        /** 系统报的下一个闹钟就是这个时刻。 */
+        /** The next alarm reported by the system is exactly this time. */
         VERIFIED("verified"),
-        /** 下一个是更早的另一个闹钟,这个看不到。 */
+        /** The next one is another, earlier alarm, so this one is not visible. */
         EARLIER_FIRST("earlier_alarm_first"),
-        /** 系统没报出它(没有下一个闹钟,或者下一个比它晚)。 */
+        /** The system does not report it (there is no next alarm, or the next one is later than it). */
         NOT_SEEN("not_seen"),
-        /** 读不到系统的下一个闹钟。 */
+        /** The system's next alarm cannot be read. */
         UNKNOWN("unknown"),
     }
 
@@ -323,7 +323,7 @@ internal object AlarmCheck {
         val next = res.nextAlarmAfter ?: return Status.NOT_SEEN
         val at = Instant.ofEpochMilli(next).atZone(zone)
         if (at.hour == hour && at.minute == minute) return Status.VERIFIED
-        // 这个时刻下一次是什么时候:下一个闹钟比它早,就是被更早的挡住了
+        // When this time next occurs: if the next alarm is earlier than it, it is blocked by an earlier one
         val mine = nextOccurrence(hour, minute, Instant.ofEpochMilli(now).atZone(zone))
         return if (next < mine) Status.EARLIER_FIRST else Status.NOT_SEEN
     }
@@ -335,7 +335,7 @@ internal object AlarmCheck {
     }
 }
 
-/** 日程的时间:本地日期时间(或只有日期的全天),带时区偏移的也认。 */
+/** Event time: a local date-time (or a date-only all-day value); values carrying a timezone offset are accepted too. */
 internal object CalendarTime {
     fun parse(s: String, allDay: Boolean, zone: ZoneId, utcAllDay: Boolean = false): Long? {
         val t = s.trim()

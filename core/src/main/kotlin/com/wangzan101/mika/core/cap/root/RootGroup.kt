@@ -25,18 +25,18 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
-/** root 命令申报的「在哪里」:确认卡片据此显示成 root 命令,而不是某个 App。 */
+/** The "place" that root commands declare: the confirmation card uses it to show a root command rather than some app. */
 const val ROOT_CONFIRM_APP = "root"
 
-/** 命令最长多少字;会改动东西的那几条确认卡片上整条显示。 */
+/** Maximum command length; commands that change things are shown in full on the confirmation card. */
 private const val COMMAND_MAX = 4_000
 private const val DEFAULT_TIMEOUT_SEC = 30
 private const val MAX_TIMEOUT_SEC = 300
 
 /**
- * 以 root 跑一条 Android shell 命令(经 su,uid 0),返回退出码、标准输出与标准错误(长的留头尾)。
- * 只读的命令(见 [RootCommandClass])直接跑;其余按参数声明成要问的一步:询问时先给用户看这条命令,同意了才跑。
- * 不动屏幕,进动作清单。
+ * Runs one Android shell command as root (through su, uid 0) and returns the exit code, stdout and stderr (long output keeps its head and tail).
+ * Read-only commands (see [RootCommandClass]) run directly; the rest declare themselves, per argument, as a step that needs asking: the user is shown the command first, and it runs only after they agree.
+ * It does not touch the screen, and it goes into the action list.
  */
 internal object RootRunCommand : AgentTool {
     override val capability: String get() = ROOT
@@ -56,7 +56,7 @@ internal object RootRunCommand : AgentTool {
 
     override fun available(ctx: ToolContext) = ctx.rootPort != null
 
-    /** 只读命令算只读;会改动的算不可逆(记进审批),但不再逐条问——用户打开「允许 root 命令」本身就是授权。 */
+    /** Read-only commands count as read-only; changing ones count as irreversible (recorded in the approval), but are no longer asked one by one — the user enabling "allow root commands" is itself the authorisation. */
     override fun approvalRisk(args: JsonObject): ApprovalRisk {
         val command = (args["command"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
         return if (command.isNotEmpty() && RootCommandClass.classify(command) == RootCommandClass.Kind.ReadOnly) ApprovalRisk(ActionRisk.Read)
@@ -75,8 +75,8 @@ internal object RootRunCommand : AgentTool {
     }
 
     /**
-     * 跑完的结果。输出(失败的也是事实)可能被回答引用,记成一条观察:命令是助手自己写的,输出里原样的回显不算读到的;
-     * 读的多是别的 App 的数据,只当数据。
+     * The result after running. The output (including on failure, which is still a fact) may be quoted in the answer, so it is recorded as an observation: the command was written by the assistant itself, so verbatim echoes in the output do not count as something it read;
+     * what is read is mostly other apps' data, so it is treated as data only.
      */
     private fun done(r: RootRun.Done, command: String): ToolExecution {
         val (out, outClipped) = OutputClip.clip(r.stdout)

@@ -13,14 +13,14 @@ import com.wangzan101.mika.core.safety.guard.Severity
 import com.wangzan101.mika.core.safety.guard.actionSignature
 import com.wangzan101.mika.core.safety.guard.OffScreenGuard
 
-/** 一个任务里沙箱命令累计最多跑这么久。 */
+/** How long sandbox commands may accumulate within one task. */
 const val SANDBOX_BUDGET_MS = 30 * 60_000L
 private val SANDBOX_COMMANDS = setOf(RunCommand.name, RunBundledScript.name)
 private const val SANDBOX_LOOP_WARN = 3
 private const val SANDBOX_LOOP_STOP = 5
 private const val SANDBOX_LOOP_HINT = "This exact command has failed several times in a row. Do not repeat it unchanged: read the error, then try a different approach."
 
-/** 沙箱命令的守卫(每次任务一份):同一条命令原样重复且失败的次数,和累计运行时长。屏幕守卫不看沙箱工具。 */
+/** The guard for sandbox commands (one per task): how many times the same command has been repeated verbatim and failed, and the accumulated running time. The screen guard does not watch sandbox tools. */
 class SandboxGuard(private val budgetMs: Long = SANDBOX_BUDGET_MS) : OffScreenGuard {
     private var usedMs = 0L
     private var lastSignature: String? = null
@@ -29,7 +29,7 @@ class SandboxGuard(private val budgetMs: Long = SANDBOX_BUDGET_MS) : OffScreenGu
     override var stop: GuardVerdict? = null
         private set
 
-    /** 时长用完时代替执行的结果;没用完为 null。分钟数跟着实际预算走(默认 30,设置里可调档位)。 */
+    /** The result substituted for execution once the time budget is used up; null when it is not. The minute count follows the actual budget (30 by default, adjustable via a settings tier). */
     override fun exhausted(tool: String): JsonObject? {
         if (tool !in SANDBOX_COMMANDS || usedMs < budgetMs) return null
         return buildJsonObject {
@@ -39,7 +39,7 @@ class SandboxGuard(private val budgetMs: Long = SANDBOX_BUDGET_MS) : OffScreenGu
         }
     }
 
-    /** 命令的时限不超过剩下的时长,一条命令不会把累计时长冲过上限。参数不对的原样交给工具层去拒。 */
+    /** A command's time limit does not exceed the remaining time, so a single command cannot push the accumulated time past the cap. Malformed args are passed through as-is for the tool layer to reject. */
     override fun capTimeout(call: Part.ToolCall, args: JsonObject): Part.ToolCall {
         if (call.name !in SANDBOX_COMMANDS || args.isEmpty()) return call
         val leftSec = ((budgetMs - usedMs) / 1000).coerceAtLeast(1)

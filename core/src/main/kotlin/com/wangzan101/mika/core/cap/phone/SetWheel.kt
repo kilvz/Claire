@@ -23,8 +23,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * 把一个滚轮选择器(时间、日期、地区……)转到一个值:一次调用在端口里转到位(能输入就输入,能无障碍滚就滚,
- * 不行就按一格多高拖),不用模型一格一格看。转不到时照实报此刻显示的值。
+ * Turns a wheel picker (time, date, region, ...) to a value: a single call turns it into place in the port (type it in if possible, scroll via accessibility if possible,
+ * otherwise drag by the height of a cell), so the model does not have to inspect it cell by cell. When it cannot be reached, reports the currently displayed value truthfully.
  */
 internal object SetWheel : PhoneTool {
     override val verb = Verb.SetWheel

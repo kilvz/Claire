@@ -23,7 +23,7 @@ data class ExtractReport(
     val dirs: Int,
     val symlinks: Int,
     val hardlinksCopied: Int,
-    /** 最多 [RootfsExtractor.MAX_SKIPPED_NAMES] 个名字;总数看 [skippedTotal]。 */
+    /** At most [RootfsExtractor.MAX_SKIPPED_NAMES] names; see [skippedTotal] for the total. */
     val skipped: List<String>,
     val skippedTotal: Int = skipped.size,
 )
@@ -31,14 +31,14 @@ data class ExtractReport(
 class UnsafeArchiveException(msg: String) : Exception(msg)
 
 /**
- * 把根文件系统 tar.gz 流式解到 dest。
+ * Streams a root filesystem tar.gz into dest.
  *
- * - 符号链接的目标原样保留(哪怕是绝对路径,它在 PRoot 里按根文件系统解释)。
- * - 安卓上 App 不能建硬链接,硬链接改为复制已解出的目标。
- * - 设备文件、FIFO 跳过,记进 skipped。
- * - 任何条目(以及硬链接目标)规范化后不在 dest 里,或要穿过一个已解出的符号链接,抛 UnsafeArchiveException;
- *   已解出的内容由调用方用 [deleteTree] 删除——不能用 File.deleteRecursively,它会跟随(绝对)符号链接删到 dest 外面。
- * - 条目数超过 maxEntries,或普通文件与硬链接副本的总字节数超过 maxBytes,同样抛 UnsafeArchiveException。
+ * - Symlink targets are kept as they are (even absolute paths, which PRoot interprets relative to the root filesystem).
+ * - Apps on Android cannot create hard links, so hard links are copied from the already-extracted target instead.
+ * - Device files and FIFOs are skipped and recorded in skipped.
+ * - Any entry (and any hard-link target) that, once normalized, is not inside dest, or that would traverse an already-extracted symlink, throws UnsafeArchiveException;
+ *   the extracted content must then be deleted by the caller with [deleteTree] — File.deleteRecursively cannot be used, since it follows (absolute) symlinks and deletes outside dest.
+ * - More entries than maxEntries, or more total bytes of regular files and hard-link copies than maxBytes, likewise throws UnsafeArchiveException.
  */
 object RootfsExtractor {
     const val MAX_SKIPPED_NAMES = 1000
@@ -50,7 +50,7 @@ object RootfsExtractor {
         maxEntries: Int = 200_000,
     ): ExtractReport = extractTar(GzipCompressorInputStream(BufferedInputStream(tarGz), true), dest, maxBytes, maxEntries)
 
-    /** 同 [extract],输入是已解压的 tar 流(调用方自己解 xz 等)。 */
+    /** Same as [extract], but the input is an already-decompressed tar stream (the caller handles xz and the like). */
     fun extractTar(
         input: InputStream,
         dest: File,
@@ -81,7 +81,7 @@ object RootfsExtractor {
                 val entry = tar.nextEntry ?: break
                 if (++entries > maxEntries) throw UnsafeArchiveException("archive has more than $maxEntries entries")
                 val rel = relativeName(entry.name)
-                if (rel.isEmpty()) continue // "./" 本身就是 dest
+                if (rel.isEmpty()) continue // "./" is dest itself
                 val target = resolveInside(root, rel, entry.name)
                 when {
                     entry.isDirectory -> {
@@ -107,23 +107,23 @@ object RootfsExtractor {
                         if (attrs.isRegularFile) addBytes(attrs.size(), rel)
                         prepareParent(target)
                         removeIfLinkOrFile(target, dirOk = false)
-                        // NOFOLLOW_LINKS:目标若是符号链接,复制链接本身而不是它指向的东西
+                        // NOFOLLOW_LINKS: if the target is a symlink, copy the link itself rather than what it points to
                         Files.copy(source, target, LinkOption.NOFOLLOW_LINKS, StandardCopyOption.COPY_ATTRIBUTES)
                         hardlinks++
                     }
-                    // 放在 isFile 之前:Commons Compress 对设备条目的 isFile 也可能为真
+                    // Placed before isFile: Commons Compress may also report isFile as true for device entries
                     entry.isCharacterDevice || entry.isBlockDevice || entry.isFIFO -> skip(rel)
                     entry.isFile -> {
-                        // 库只会读出条目声明的字节数,所以按声明大小卡上限就够了
+                        // The library only reads as many bytes as the entry declares, so capping by the declared size is enough
                         addBytes(entry.size, rel)
                         prepareParent(target)
                         removeIfLinkOrFile(target, dirOk = false)
-                        // CREATE_NEW:路径上若冒出符号链接,宁可失败也不跟过去写
+                        // CREATE_NEW: if a symlink appears along the path, fail rather than follow it and write
                         Files.newOutputStream(target, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).use { tar.copyTo(it) }
                         setMode(target, entry.mode, isDir = false)
                         files++
                     }
-                    else -> skip(rel) // 其他不认识的类型
+                    else -> skip(rel) // any other unrecognized type
                 }
             }
         }
@@ -131,13 +131,13 @@ object RootfsExtractor {
     }
 
     /**
-     * 删除整棵树,绝不跟随符号链接(链接本身被删,指向的东西不动);删之前把每个目录改成属主可读写可进入,
-     * 否则只读目录里的东西删不掉。dest 不存在时什么也不做。
+     * Deletes the whole tree, never following symlinks (the link itself is deleted, what it points to is untouched); before deleting, every directory is made owner-readable/writable/traversable,
+     * otherwise the contents of a read-only directory cannot be deleted. Does nothing when dest does not exist.
      */
     fun deleteTree(dest: File) {
         val root = dest.toPath()
         if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) return
-        // 不传 FOLLOW_LINKS:符号链接(包括 root 本身是链接时)按普通文件交给 visitFile
+        // No FOLLOW_LINKS passed: symlinks (including when root itself is a link) are handed to visitFile as ordinary files
         Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
             override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                 val perms = Files.getPosixFilePermissions(dir, LinkOption.NOFOLLOW_LINKS).toMutableSet()
@@ -166,7 +166,7 @@ object RootfsExtractor {
             throw UnsafeArchiveException("invalid symlink target: ${e.message}")
         }
 
-    /** 去掉开头的 "./" 与末尾的 "/";绝对路径直接拒绝。 */
+    /** Strips leading "./" and trailing "/"; absolute paths are rejected outright. */
     private fun relativeName(name: String): String {
         if (name.startsWith("/")) throw UnsafeArchiveException("absolute path in archive: $name")
         var n = name
@@ -182,7 +182,7 @@ object RootfsExtractor {
             throw UnsafeArchiveException("invalid path in archive: ${e.message}")
         }
         if (!p.startsWith(root)) throw UnsafeArchiveException("path escapes destination: $original")
-        // 中间某一级若是已解出的符号链接,写进去就可能落到 dest 外面
+        // If any intermediate component is an already-extracted symlink, writing there could land outside dest
         var cur = root
         for (part in root.relativize(p).toList().dropLast(1)) {
             cur = cur.resolve(part)
@@ -199,13 +199,13 @@ object RootfsExtractor {
         if (Files.isSymbolicLink(target)) {
             Files.delete(target)
         } else if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
-            if (!dirOk) Files.delete(target) // 非空目录会抛 IOException,交给调用方
+            if (!dirOk) Files.delete(target) // a non-empty directory throws IOException, left to the caller
         } else if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             Files.delete(target)
         }
     }
 
-    /** 只取 0777;属主始终可读写,目录始终可进入,否则之后写不进、删不掉。 */
+    /** Only the 0777 bits are taken; the owner can always read and write, and directories are always traversable, otherwise nothing could be written or deleted afterwards. */
     private fun setMode(target: Path, tarMode: Int, isDir: Boolean) {
         var m = (tarMode and 0x1ff) or 0x180
         if (isDir) m = m or 0x40
