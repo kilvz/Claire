@@ -19,7 +19,7 @@ class TriagePlannerTest {
 
     private val send = { pkg: String -> TriagePlan.Send(pkg) }
 
-    // ---- decide:纯函数 ----
+    // ---- decide: a pure function ----
 
     @Test fun lockedNeverSendsNorWaits() {
         val p = mapOf("a" to PendingApp(0, 8))
@@ -43,7 +43,7 @@ class TriagePlannerTest {
         assertEquals("先到点的先发", send("b"), TriagePlanner.decide(true, false, true, old, now))
     }
 
-    // ---- 状态 ----
+    // ---- state ----
 
     @Test fun batchesArePerAppAndAtMostEight() {
         val p = planner()
@@ -65,22 +65,22 @@ class TriagePlannerTest {
         val b = listOf(rec("b1", "com.b", t0))
         p.sync(snap(*(a + b).toTypedArray()), t0)
         val surface = TriageVerdict(TriageDecision.Surface, "r")
-        // 8 条一批,再 3 条一批
+        // a batch of 8, then a batch of 3
         repeat(2) { p.begin("com.a").let { batch -> p.finish(batch.associate { it.record.key to surface }, t0) } }
         val decisions = a.map { (p.mark(it) as TriageMark.Done).verdict }
         assertEquals(10, decisions.count { it.decision == TriageDecision.Surface })
         assertEquals(TriageVerdict(TriageDecision.Ignore, note = TriageNote.SurfaceCapped), decisions.last())
-        // 别的 App 不受影响
+        // other apps are unaffected
         p.begin("com.b").let { batch -> p.finish(batch.associate { it.record.key to surface }, t0) }
         assertEquals(surface, (p.mark(b[0]) as TriageMark.Done).verdict)
-        // 第二天重新算
+        // counted afresh the next day
         val next = rec("a99", "com.a", t0 + day)
         p.sync(snap(*(a + b + next).toTypedArray()), t0 + day)
         p.begin("com.a").let { batch -> p.finish(batch.associate { it.record.key to surface }, t0 + day) }
         assertEquals(surface, (p.mark(next) as TriageMark.Done).verdict)
     }
 
-    // 上限按会话(通知键)算,不按判定的次数:同一个键冷却后又判成值得提醒,不再占一个名额
+    // the cap counts conversations (notification keys), not judgements: when the same key is judged worth surfacing again after its cooldown, it does not take another slot
     @Test fun surfaceCapCountsDistinctKeysNotVerdicts() {
         val p = planner()
         val chat = rec("chat", "com.a", t0)
@@ -90,37 +90,37 @@ class TriagePlannerTest {
             assertEquals("第 ${i + 1} 次", surface, (p.mark(chat.copy(postedAtMs = at)) as TriageMark.Done).verdict)
             at += TriagePlanner.SURFACE_COOLDOWN_MS + 1
         }
-        // 另外 9 个会话还有名额(这个键只占了 1 个),第 10 个没有
+        // the other 9 conversations still have slots (this key took only 1), the 10th does not
         val others = (1..10).map { rec("o$it", "com.a", at + it) }
-        // judge 每次只留这一条在收件箱里:结果当场取
+        // judge leaves only this one record in the inbox each time: the verdict can be read straight away
         val verdicts = others.map { judge(p, it, surface, at); (p.mark(it) as TriageMark.Done).verdict }
         assertEquals(9, verdicts.count { it == surface })
         assertEquals(TriageNote.SurfaceCapped, verdicts.last().note)
-        // 已经算过的键到了上限也照样能提醒
+        // a key that has already been counted can still surface even once the cap is reached
         judge(p, chat.copy(postedAtMs = at + 100), surface, at + 100)
         assertEquals(surface, (p.mark(chat.copy(postedAtMs = at + 100)) as TriageMark.Done).verdict)
     }
 
-    // 从收件箱里没了(用户处理掉、结果被清掉)又出现的同一个键,当天不再占第二个名额;计数熬过结果清理,过了午夜重来
+    // a key that disappears from the inbox (the user dealt with it, the results were cleared) and then reappears does not take a second slot that day; the count survives result clearing and starts over after midnight
     @Test fun aKeyThatComesBackTheSameDayKeepsItsOneSlot() {
         val p = planner()
         val keys = (1..10).map { rec("k$it", "com.a", t0 + it) }
         keys.forEach { judge(p, it, surface, t0) }
         p.sync(snap(), t0 + 1)
         assertTrue(p.marks().isEmpty())
-        // 回来的 k1 还是它那个名额;新的键没有名额了
+        // the returning k1 still has its own slot; a new key finds no slot left
         val back = keys.first().copy(postedAtMs = t0 + 1_000)
         judge(p, back, surface, t0 + 1_000)
         assertEquals(surface, (p.mark(back) as TriageMark.Done).verdict)
         val fresh = rec("new", "com.a", t0 + 2_000)
         judge(p, fresh, surface, t0 + 2_000)
         assertEquals(TriageNote.SurfaceCapped, (p.mark(fresh) as TriageMark.Done).verdict.note)
-        // clear()(关掉判定再打开)也不重置当天的计数
+        // clear() (turning triage off and on again) does not reset that day's count either
         p.clear()
         val fresh2 = rec("new2", "com.a", t0 + 3_000)
         judge(p, fresh2, surface, t0 + 3_000)
         assertEquals(TriageNote.SurfaceCapped, (p.mark(fresh2) as TriageMark.Done).verdict.note)
-        // 本地时间过了午夜:重新算
+        // local time has passed midnight: counted afresh
         val tomorrow = (t0 / day + 1) * day
         val fresh3 = rec("new3", "com.a", tomorrow)
         judge(p, fresh3, surface, tomorrow)
@@ -133,13 +133,13 @@ class TriagePlannerTest {
         p.sync(snap(r), t0)
         p.begin("com.a")
         assertTrue(p.pending().isEmpty())
-        // 请求期间收件箱有变化(锁屏前后照常 sync)
+        // the inbox changes during the request (sync still runs around the lock screen)
         p.sync(snap(r), t0 + 1_000)
         p.abort()
         assertEquals(listOf(r), p.pending())
         assertNull(p.mark(r))
         assertEquals(TriageCounts(pending = 1), p.counts())
-        // 解锁后不用再等:它的计时起点还在
+        // after unlocking there is no need to wait again: its timer start is still there
         assertEquals(TriagePlan.Send("com.a"), p.plan(true, false, true, t0 + TriagePlanner.WINDOW_MS))
     }
 
@@ -167,7 +167,7 @@ class TriagePlannerTest {
         val v1 = rec("k", "com.a", t0)
         p.sync(snap(v1), t0)
         p.begin("com.a")
-        // 请求期间同一条通知更新了:结果记在发出去的那次上,新内容先冷却,不马上再判
+        // the same notification was updated during the request: the verdict is recorded against the post that was sent, and the new content cools down first instead of being judged again straight away
         val v2 = v1.copy(postedAtMs = t0 + 5)
         p.sync(snap(v2), t0 + 5)
         p.finish(mapOf("k" to remember), t0 + 6)
@@ -178,7 +178,7 @@ class TriagePlannerTest {
         assertEquals(listOf(v2), p.cooling())
         assertEquals(TriageCounts(cooling = 1), p.counts())
         assertEquals(TriagePlan.WaitUntil(t0 + 6 + min(2)), p.plan(true, false, true, t0 + 6))
-        // 收件箱里没了:结果和冷却都不留
+        // it is gone from the inbox: neither the verdict nor the cooldown is kept
         p.sync(snap(), t0 + 10)
         assertTrue(p.marks().isEmpty())
         assertEquals(TriageCounts(), p.counts())
@@ -193,10 +193,10 @@ class TriagePlannerTest {
         p.sync(snap(v2), t0 + 5)
         p.finish(mapOf("k" to surface), t0 + 6)
         p.sync(snap(v2), t0 + 6)
-        // 结果记在发出去的那次上,对不上新的发出时间:提醒出不来
+        // the verdict is recorded against the post that was sent and does not match the new post time: no hint comes out
         assertEquals(TriageMark.Done(t0, surface), p.marks()["k"])
         assertEquals(0, NoticeHints().apply { sync(listOf(v2), p.marks(), triageOn = true) }.state.value.unseen)
-        // 所以不按「已经标出来了」冷却 30 分钟,和忽略、记下一样 2 分钟后再判新内容
+        // so it does not cool down for 30 minutes as "already surfaced"; like ignore and remember, the new content is judged again after 2 minutes
         val at = t0 + 6 + min(2)
         assertEquals(TriagePlan.WaitUntil(at), p.plan(true, false, true, t0 + 6))
         assertEquals(TriagePlan.WaitUntil(at + W), p.plan(true, false, true, at))
@@ -207,14 +207,14 @@ class TriagePlannerTest {
         assertEquals(1, NoticeHints().apply { sync(listOf(v2), p.marks(), triageOn = true) }.state.value.unseen)
     }
 
-    // ---- 冷却 ----
+    // ---- cooldown ----
 
     private val remember = TriageVerdict(TriageDecision.Remember, "r")
     private val surface = TriageVerdict(TriageDecision.Surface, "r")
     private fun min(n: Long) = n * 60_000L
     private val W = TriagePlanner.WINDOW_MS
 
-    /** 把 [r] 当一批发出去并判成 [v],判定时间 [at]。 */
+    /** Sends [r] as a batch and judges it as [v], at time [at]. */
     private fun judge(p: TriagePlanner, r: NoticeRecord, v: TriageVerdict, at: Long) {
         p.sync(snap(r), at)
         assertEquals(listOf(TriageItem(r)), p.begin(r.packageName).map { it.copy(history = emptyList()) })
@@ -233,7 +233,7 @@ class TriagePlannerTest {
         assertEquals(TriageCounts(cooling = 1), p.counts())
         assertEquals("只等冷却到点", TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + 20_000))
         assertEquals(TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + min(2) - 1))
-        // 正好到点:待判定,从到点起照常凑批
+        // exactly at the deadline: pending, and batching resumes from the deadline as usual
         assertEquals(TriagePlan.WaitUntil(t0 + min(2) + W), p.plan(true, false, true, t0 + min(2)))
         assertEquals(listOf(v2), p.pending())
         assertEquals(TriageCounts(pending = 1), p.counts())
@@ -270,7 +270,7 @@ class TriagePlannerTest {
         assertEquals(min(30), TriagePlanner.cooldownMs(TriageDecision.Surface, 1))
         assertEquals(min(30), TriagePlanner.cooldownMs(TriageDecision.Surface, 3))
         assertEquals(min(2), TriagePlanner.cooldownMs(TriageDecision.Ignore, 1))
-        // 值得提醒:30 分钟
+        // worth surfacing: 30 minutes
         val q = planner()
         val s1 = rec("s", "com.b", t0)
         judge(q, s1, surface, t0)
@@ -286,10 +286,10 @@ class TriagePlannerTest {
         p.sync(snap(r), t0 + 1)
         assertEquals(TriagePlan.WaitUntil(t0 + min(2) + W), p.plan(true, false, true, t0 + min(2)))
         judge(p, r, remember, t0 + min(2) + W)
-        // 用户点开或划掉了:收件箱里没了
+        // the user opened or swiped it away: it is gone from the inbox
         p.sync(snap(), t0 + min(3))
         assertTrue(p.marks().isEmpty())
-        // 同一个键又来了:是新的一条,照常凑批,之后的冷却又从 2 分钟起
+        // the same key comes in again: it is a new record, batches as usual, and the cooldown after it starts at 2 minutes again
         val again = r.copy(postedAtMs = t0 + min(4))
         p.sync(snap(again), t0 + min(4))
         assertEquals(listOf(again), p.pending())
@@ -298,7 +298,7 @@ class TriagePlannerTest {
         judge(p, again, remember, at)
         p.sync(snap(again.copy(postedAtMs = at + 1)), at + 1)
         assertEquals(TriagePlan.WaitUntil(at + min(2)), p.plan(true, false, true, at + 1))
-        // 清空也一样
+        // clearing behaves the same way
         p.clear()
         p.sync(snap(again.copy(postedAtMs = at + 2)), at + 2)
         assertEquals(TriagePlan.WaitUntil(at + 2 + TriagePlanner.WINDOW_MS), p.plan(true, false, true, at + 2))
@@ -309,11 +309,11 @@ class TriagePlannerTest {
         val k = rec("k", "com.a", t0)
         judge(p, k, remember, t0)
         val k2 = k.copy(postedAtMs = t0 + 1)
-        // 冷却 t0+2min 到点;别的 App 的新通知在冷却快到点时才来,凑批晚于冷却
+        // the cooldown expires at t0+2min; a new notification from another app only arrives shortly before that, so its batch time is later than the cooldown
         val other = rec("o", "com.b", t0 + min(2) - 5_000)
         p.sync(snap(k2, other), t0 + min(2) - 5_000)
         assertEquals(TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + min(2) - 5_000))
-        // 凑批先到
+        // the batch time comes first
         val q = planner()
         judge(q, k, remember, t0)
         val early = rec("o", "com.b", t0 + 1_000)
@@ -329,10 +329,10 @@ class TriagePlannerTest {
         p.sync(snap(k2), t0 + 1)
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Locked), p.plan(false, false, true, t0 + 1))
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Locked), p.plan(false, false, true, t0 + min(60)))
-        // 预算用完、有任务在跑时也不为冷却计时
+        // no cooldown is timed while the budget is used up or a task is running
         assertEquals(TriagePlan.Idle(TriagePlan.Why.BudgetUsedUp), p.plan(true, false, false, t0 + 1))
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Busy), p.plan(true, true, true, t0 + 1))
-        // 解锁时冷却早已到点:马上发
+        // the cooldown expired long ago when unlocking: send immediately
         assertEquals(TriagePlan.Send("com.a"), p.plan(true, false, true, t0 + min(60)))
     }
 
@@ -350,7 +350,7 @@ class TriagePlannerTest {
         p.sync(snap(k2), at)
         assertTrue(p.mark(k2) is TriageMark.Failed)
         assertEquals(TriageCounts(failed = 1), p.counts())
-        // 再试一次不用等冷却;成功后是第二次判定:冷却 5 分钟(失败那次不算)
+        // retrying skips the cooldown; after it succeeds this is the second judgement: a 5-minute cooldown (the failure does not count)
         assertEquals(1, p.retryFailed(at + 10))
         p.sync(snap(k2), at + 10)
         assertEquals(TriagePlan.Send("com.a"), p.plan(true, false, true, at + 10))
@@ -360,7 +360,7 @@ class TriagePlannerTest {
         assertEquals(TriagePlan.WaitUntil(at + 10 + min(5)), p.plan(true, false, true, at + 11))
     }
 
-    /** 把 [r] 当一批发出去,失败在 [at]。 */
+    /** Sends [r] as a batch, failing at [at]. */
     private fun failAt(p: TriagePlanner, r: NoticeRecord, at: Long) {
         p.sync(snap(r), at)
         assertEquals(listOf(r.key), p.begin(r.packageName).map { it.record.key })
@@ -372,7 +372,7 @@ class TriagePlannerTest {
         val p = planner()
         val k = rec("k", "com.a", t0)
         failAt(p, k, t0)
-        // 没有新内容:一直是失败,不自动重试
+        // no new content: it stays failed and is not retried automatically
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Nothing), p.plan(true, false, true, t0 + day / 2))
         val q = planner()
         failAt(q, k, t0)
@@ -403,7 +403,7 @@ class TriagePlannerTest {
             assertEquals(TriagePlan.Send("com.a"), p.plan(true, false, true, at))
         }
         assertEquals(listOf(min(2), min(5), min(15), min(30), min(30)), holds)
-        // 判成功一次:失败次数清零,之后按判定冷却(第一次判定,2 分钟)
+        // one successful judgement: the failure count resets, and judgement cooldowns apply after that (first judgement, 2 minutes)
         judge(p, r, remember, at)
         r = r.copy(postedAtMs = r.postedAtMs + 1)
         p.sync(snap(r), at + 1)
@@ -499,21 +499,21 @@ class TriagePlannerTest {
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Locked), p.plan(false, false, true, t0 + day))
     }
 
-    // 同意跟着总开关走:关掉就清掉(哪怕同时给了要确认的模型);打开时点了同意的记下那一家;打开时没有可确认的不动
+    // consent follows the master switch: turning it off clears the consent (even if a model to confirm was supplied at the same time); when turning it on with a consent, that provider is recorded; when turning it on with nothing to confirm, nothing changes
     @Test fun consentFollowsTheMasterSwitch() {
         val t = TriageTarget("p1", "Provider", "m1")
         val had = TriageConsent("p0", "m0")
         assertEquals(null, TriageConsent.afterSwitch(on = false, confirmed = null, current = had))
         assertEquals(null, TriageConsent.afterSwitch(on = false, confirmed = t, current = had))
         assertEquals(TriageConsent("p1", "m1"), TriageConsent.afterSwitch(on = true, confirmed = t, current = null))
-        // 重新确认换了一家:记新的,不留旧的
+        // confirming again with a different provider: the new one is recorded and the old one is not kept
         assertEquals(TriageConsent("p1", "m1"), TriageConsent.afterSwitch(on = true, confirmed = t, current = had))
-        // 没配模型时打开的:没有同意,闸门停在「等确认」,配好模型也不会自己放行
+        // turned on with no model configured: there is no consent, so the gate stays at "needs consent", and it will not let anything through by itself once a model is configured
         val none = TriageConsent.afterSwitch(on = true, confirmed = null, current = null)
         assertEquals(null, none)
         assertEquals(TriageGate.NoModel, TriageGate.of(true, none, null))
         assertEquals(TriageGate.NeedsConsent, TriageGate.of(true, none, t))
-        // 关掉再打开、这次没点同意:上一次的同意已经清了,不会沿用
+        // turned off and then on again without confirming this time: the earlier consent was already cleared and is not reused
         val reopened = TriageConsent.afterSwitch(on = true, confirmed = null, current = TriageConsent.afterSwitch(false, null, had))
         assertEquals(TriageGate.NeedsConsent, TriageGate.of(true, reopened, t))
     }

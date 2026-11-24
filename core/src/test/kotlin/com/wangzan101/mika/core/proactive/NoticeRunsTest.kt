@@ -30,7 +30,7 @@ class NoticeRunsTest {
         val m = NoticeRuns.summary(before, events, noticeTurnInContext = false)
         assertEquals("完成", m.conclusion)
         assertFalse(everyWord(m).any { it.contains(private) })
-        // 别的照留:目标是用户自己的话,步骤只有工具的名字
+        // everything else is kept as is: the goal is the user's own words, and the steps carry only tool names
         assertEquals(before.goal, m.goal)
         assertEquals(before.steps, m.steps)
         assertEquals(before.id, m.id)
@@ -48,7 +48,7 @@ class NoticeRunsTest {
     }
 
     @Test fun aRunInAReminderConversationCountsAsHavingReadThem() {
-        // 没调读通知的工具,但提醒那一轮(通知原文)就在上文里
+        // it did not call the tool that reads notifications, but the reminder turn (the notification text itself) is in the context
         val events: List<RunEvent> = listOf(
             act(1, "act", "launch_app", target = "com.example.chat"), act(2, "act", "tap", target = "com.example.chat"),
             RunEvent.TaskEnded(500L, "failed", "没找到「$private」那条"),
@@ -58,7 +58,7 @@ class NoticeRunsTest {
     }
 
     @Test fun carryingTheDigestBlockAloneDoesNotCount() {
-        // 开工时带着「来自通知」的那一段归纳、但没读通知原文:照常记。不然非保守档下几乎每个任务的摘要都没了回答
+        // started with the "from notifications" digest section but never read the notification text: recorded as usual. Otherwise, outside the conservative mode almost every task summary would lose its answer
         val events: List<RunEvent> = listOf(
             RunEvent.State(10L, ObservedContext.RUN_STATE, "420"),
             act(1, "act", "launch_app", target = "com.example.shop"), act(2, "act", "tap", target = "com.example.shop"),

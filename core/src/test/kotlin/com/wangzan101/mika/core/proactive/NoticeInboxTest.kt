@@ -47,13 +47,13 @@ class NoticeInboxTest {
         val s = inbox.snapshot()
         assertEquals(1, s.received)
         assertEquals(0, s.kept)
-        assertEquals(1, s.records.size) // 换天只清计数,不清记录
+        assertEquals(1, s.records.size) // a new day only resets the counters, not the records
     }
 
     private fun post(key: String, text: String, at: Long, pkg: String = "p") = NoticeRecord(key, pkg, at, "t", text)
     private fun texts(inbox: NoticeInbox, key: String) = inbox.snapshot().history[key].orEmpty().map { it.text }
 
-    // 同一条通知每来一句就重发一遍、只换正文:先后的话都留着,记录本身是最新的那句
+    // the same notification is reposted with every new line and only the body changes: the successive texts are all kept, while the record itself holds the newest line
     @Test fun repostedTextsAccumulateNewestLast() {
         val inbox = NoticeInbox(clock = { 0 }, zone = { utc })
         inbox.add(post("w", "one", 1)); inbox.add(post("o", "other", 2)); inbox.add(post("w", "two", 3))
@@ -71,7 +71,7 @@ class NoticeInboxTest {
         assertEquals(10, NoticeInbox.HISTORY_LIMIT)
     }
 
-    // 文字没变的更新只更新记录(时间、位置、计数),不多记一段
+    // an update with unchanged text only refreshes the record (time, position, counters) and does not add another segment
     @Test fun equalTextIsNotRecordedTwice() {
         val inbox = NoticeInbox(clock = { 0 }, zone = { utc })
         inbox.add(post("w", "same", 1)); inbox.add(post("o", "x", 2)); inbox.add(post("w", "same", 3))
@@ -80,7 +80,7 @@ class NoticeInboxTest {
         assertEquals(listOf("o", "w"), s.records.map { it.key })
         assertEquals(3L, s.records.last().postedAtMs)
         assertEquals(3, s.kept)
-        // 标题变了也算不同
+        // a changed title also counts as different
         inbox.add(post("w", "same", 4).copy(title = "t2"))
         assertEquals(2, inbox.snapshot().history["w"]!!.size)
     }
@@ -91,18 +91,18 @@ class NoticeInboxTest {
         inbox.remove("a")
         assertFalse("a" in inbox.snapshot().history)
         inbox.add(post("a", "again", 4, "p1"))
-        assertEquals(listOf("again"), texts(inbox, "a")) // 去掉后再来,从头记
-        // 满了被挤掉
+        assertEquals(listOf("again"), texts(inbox, "a")) // coming back after removal records from scratch
+        // full, so the oldest got pushed out
         inbox.add(post("c", "c1", 5, "p2"))
         assertEquals(setOf("a", "c"), inbox.snapshot().history.keys)
-        // 按包名去掉
+        // removal by package name
         inbox.removePackages { it != "p1" }
         assertEquals(setOf("c"), inbox.snapshot().history.keys)
         inbox.clear()
         assertTrue(inbox.snapshot().history.isEmpty())
     }
 
-    // 带消息列表的通知自己带着前面的消息:不另记;以前记的(那时还没有消息列表)也丢掉
+    // a notification carrying a message list already brings its earlier messages along: no extra history; anything recorded before (from when there was no message list) is dropped as well
     @Test fun messagingRecordsKeepNoHistory() {
         val inbox = NoticeInbox(clock = { 0 }, zone = { utc })
         val chat = NoticeRecord("c", "p", 1, "t", "x", messages = listOf(NoticeMessage("a", "hi", 1)), conversation = true)
@@ -111,12 +111,12 @@ class NoticeInboxTest {
         assertEquals(2, inbox.snapshot().records.single().messages.size)
         inbox.add(post("d", "plain", 3)); inbox.add(chat.copy(key = "d", postedAtMs = 4))
         assertFalse("d" in inbox.snapshot().history)
-        // 会话样式但没有消息列表的,照普通通知记
+        // conversation style but without a message list is recorded like an ordinary notification
         inbox.add(post("e", "e1", 5).copy(conversation = true))
         assertEquals(listOf("e1"), texts(inbox, "e"))
     }
 
-    // 和通知栏对一遍:不在通知栏里的记录(和它先后显示过的文字)去掉,还在的不动;都还在时什么都不发生
+    // reconciled against the notification shade: records not in the shade (and the texts they showed over time) are dropped, the ones still there are left alone; when everything is still there nothing happens
     @Test fun retainKeysDropsRecordsNoLongerInTheShade() {
         val inbox = NoticeInbox(clock = { 0L }, zone = { java.time.ZoneOffset.UTC })
         inbox.add(NoticeRecord("a", "com.chat", 1, "t", "one"))
@@ -128,13 +128,13 @@ class NoticeInboxTest {
         assertEquals(2, inbox.retainKeys(setOf("b", "other-apps-notification")))
         assertEquals(listOf("b"), inbox.state.value.records.map { it.key })
         assertTrue(inbox.state.value.history.keys.none { it == "a" || it == "c" })
-        // 通知栏真的空了:全去掉
+        // the notification shade really is empty: drop everything
         assertEquals(1, inbox.retainKeys(emptySet()))
         assertTrue(inbox.state.value.records.isEmpty())
     }
 
-    // 对账去掉的记录,提醒也跟着没了:数字降下来,点开时不会再写一条早就不在通知栏里的提醒。
-    // 这样去掉的不算用户「没看就划掉」(那是用户自己在通知栏里处理时才记的)
+    // hints go away along with records dropped by reconciling: the count comes down, and opening the hints no longer writes one for something long gone from the shade.
+    // records dropped this way do not count as the user "dismissing unseen" (that is only recorded when the user deals with it in the shade)
     @Test fun hintsFollowRecordsDroppedByReconciling() {
         val inbox = NoticeInbox(clock = { 0L }, zone = { java.time.ZoneOffset.UTC })
         val records = listOf(NoticeRecord("a", "com.chat", 1, "t", "one"), NoticeRecord("b", "com.chat", 2, "t", "two"))

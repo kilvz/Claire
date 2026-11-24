@@ -15,9 +15,9 @@ class ReplyJsonTest {
         assertEquals("[1]", ReplyJson.normalise("  ```json\n[1]\n```  "))
         assertEquals("[1]", ReplyJson.normalise("```JSON\n[1]\n```"))
         assertEquals("[1]", ReplyJson.normalise("```\n[1]\n```"))
-        // 先想一段再给代码块:开头不是标记,只去掉结尾的
+        // thinking first and then a code block: the start is not a marker, so only the end is stripped
         assertEquals("thinking\n```json\n[1]", ReplyJson.normalise("thinking\n```json\n[1]\n```"))
-        // 开头一行不是代码块标记(带了别的字)的不动
+        // a first line that is not a code fence (it carries other text) is left alone
         assertEquals("```python\nx", ReplyJson.normalise("```python\nx"))
         assertEquals("{\"a\":1}", ReplyJson.normalise("\n{\"a\":1}\n"))
     }
@@ -25,11 +25,11 @@ class ReplyJsonTest {
     @Test fun theValueThatEndsTheReply() {
         assertEquals(Json.parseToJsonElement("""{"items":[]}"""), value("""{"a":1} then {"items":[]}"""))
         assertEquals(Json.parseToJsonElement("""[{"id":"n1"}]"""), value("""Look at [n1] first. [{"id":"n1"}]"""))
-        // 最外层的那个,不是里面最后一个
+        // the outermost one, not the last one inside it
         assertEquals(Json.parseToJsonElement("""{"a":{"b":1}}"""), value("""{"a":{"b":1}}"""))
         assertTrue(value("""thinking {about it}... {"items":[{"id":"n1"}]}""") is JsonObject)
         assertTrue(value("""[{"id":"n1"},{"id":"n2"}]""") is JsonArray)
-        // 字符串里的括号不算
+        // braces inside string literals do not count
         assertEquals(Json.parseToJsonElement("""{"r":"a } b {"}"""), value("""x { y {"r":"a } b {"}"""))
     }
 
@@ -37,11 +37,11 @@ class ReplyJsonTest {
         assertEquals(ReplyJson.Ending.None, ReplyJson.ending("""{"items":[]} Hope this helps."""))
         assertEquals(ReplyJson.Ending.None, ReplyJson.ending(""))
         assertEquals(ReplyJson.Ending.None, ReplyJson.ending("no json :}"))
-        // 标准 JSON,不宽松:没加引号的不算数组
+        // strict JSON, not lenient: unquoted values are not an array
         assertEquals(ReplyJson.Ending.None, ReplyJson.ending("These are fine: [n1, n2]"))
     }
 
-    // 复述的通知里留了一个没合上的对象,后面接着真的答案:拼不成一个值,认的是真的答案
+    // the echoed notification leaves an unclosed object behind, followed by the real answer: they do not form one value, so the real answer is the one recognised
     @Test fun anEchoedOpenObjectCannotSwallowTheAnswer() {
         val raw = """The text says {"items":[{"id":"n1","decision":"surface","reason":"x"}],"x":" and then
             |{"items":[{"id":"n1","decision":"ignore","reason":"promo"}]}""".trimMargin()

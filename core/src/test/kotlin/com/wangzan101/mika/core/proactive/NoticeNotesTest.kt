@@ -40,7 +40,7 @@ class NoticeNotesTest {
         assertTrue(tools.isEmpty())
         val input = (messages.single().parts.single() as Part.Text).text
         assertTrue(input.startsWith("Language for notes: 简体中文\nApp package: com.chat"))
-        // 几点、群聊还是私聊是我们写的,在不可信那一块外面;说话的人和那句话在里面
+        // the time and whether it is a group or a private chat are written by us, outside the untrusted block; the speaker and the line itself are inside
         assertTrue(input, "[e1] time: 09:00" in input && "[e2] time: 09:01" in input && input.lines().count { it == "chat: group" } == 2)
         assertTrue("王老师: 明天开会 0" in input)
         assertEquals(4, Regex(Regex.escape(Untrusted.OPEN)).findAll(input).count())
@@ -65,11 +65,11 @@ class NoticeNotesTest {
             NoteSignal(listOf(1), "订单 … 已发货,详情 … 或 …"),
             NoteSignal(listOf(1), "到账 3500 元,10 点前回复"),
         ), r.notes)
-        // 引用了不认识的 id 的整句不要(哪怕同时引用了认识的)
+        // a line citing an unknown id is dropped whole (even if it also cites known ones)
         assertEquals(mapOf(NoteDrop.UnknownId to 2, NoteDrop.NoIds to 1, NoteDrop.Sensitive to 2, NoteDrop.Malformed to 1), r.dropped)
     }
 
-    // 给了东西、却没有一条是对象:回复的结构不对,读不出来——不能当成「一句都没写」(那样这一批原文就被标成做过了)
+    // something was given but none of it is an object: the structure of the reply is wrong, so it is unreadable — it must not be treated as "no lines written" (that would mark this batch's source text as done)
     @Test fun anArrayWithNoObjectsIsNotAnEmptyResult() {
         assertNull(NoticeNotes.parse("[1,2,3]", 2))
         assertNull(NoticeNotes.parse("""{"notes":["e1","e2"]}""", 2))
@@ -84,7 +84,7 @@ class NoticeNotesTest {
         assertEquals(12 - LearnTuning.NOTES_MAX, r.dropped[NoteDrop.OverLimit])
         assertEquals(LearnTuning.NOTE_MAX, NoticeNotes.parse("""{"notes":[{"ids":["e1"],"text":"${"长".repeat(500)}"}]}""", 1)!!.notes.single().text.length)
         assertTrue(NoticeNotes.parse("""{"notes":[]}""", 3)!!.notes.isEmpty())
-        // 不是结尾的 JSON、没有 notes、别的东西:读不出来
+        // JSON that is not at the end, a missing notes field, or anything else: unreadable
         assertNull(NoticeNotes.parse("""{"notes":[{"ids":["e1"],"text":"x"}]} Hope this helps.""", 1))
         assertNull(NoticeNotes.parse("""{"signals":[]}""", 1))
         assertNull(NoticeNotes.parse("nothing happened", 1))

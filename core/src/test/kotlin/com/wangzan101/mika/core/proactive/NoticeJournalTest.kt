@@ -13,31 +13,31 @@ class NoticeJournalTest {
     private fun plain(key: String, text: String, at: Long = now, title: String = "T", pkg: String = "com.chat") =
         NoticeRecord(key, pkg, at, title, text)
 
-    // 收件箱里的通知被点开、划掉之后就没了;日志里的还在,而且同一条通知先后的每一段文字都在
+    // once a notification is opened or swiped away it is gone from the inbox; it stays in the journal, along with every successive piece of text that one notification showed
     @Test fun keepsEveryDistinctTextOfANotificationInOrder() {
         val j = journal()
         assertEquals(1, j.add(plain("k", "[1条]A: 在吗", at = now + 1)))
         assertEquals(1, j.add(plain("k", "[2条]A: 明天来吗", at = now + 2)))
-        // 原样重发的不重复记
+        // a verbatim repost is not recorded twice
         assertEquals(0, j.add(plain("k", "[2条]A: 明天来吗", at = now + 3)))
         assertEquals(1, j.add(plain("other", "快递到了", at = now + 4, pkg = "com.mail")))
         assertEquals(listOf("[1条]A: 在吗", "[2条]A: 明天来吗", "快递到了"), j.between(0, Long.MAX_VALUE).map { it.text })
         assertEquals(listOf("com.chat", "com.chat", "com.mail"), j.between(0, Long.MAX_VALUE).map { it.packageName })
-        // 都是空的不记
+        // all blank means nothing is recorded
         assertEquals(0, j.add(plain("e", "", title = "")))
     }
 
-    // 带会话样式的通知每次重发都带着前面的消息:每条消息只记一次,带着是谁说的和它自己的时间
-    // 指纹只有 32 位,不同的两句会撞上:撞上了要比原文,两句都得记下
+    // a conversation-style notification carries its earlier messages on every repost: each message is recorded once, with who said it and its own time
+    // the fingerprint is only 32 bits, so two different lines can collide: on a collision the original text is compared and both lines must be recorded
     @Test fun differentTextsWithTheSameFingerprintAreBothRecorded() {
-        // 「Aa」「BB」的 hashCode 一样,整条的指纹也就一样
+        // "Aa" and "BB" have the same hashCode, so the whole-record fingerprints match too
         assertEquals(listOf("T", null, "Aa").hashCode(), listOf("T", null, "BB").hashCode())
         val j = journal()
         assertEquals(1, j.add(plain("k", "Aa", at = now + 1)))
         assertEquals(1, j.add(plain("k", "BB", at = now + 2)))
         assertEquals(0, j.add(plain("k", "BB", at = now + 3)))
         assertEquals(listOf("Aa", "BB"), j.between(0, Long.MAX_VALUE).map { it.text })
-        // 会话样式的也一样
+        // the same holds for conversation-style records
         val said = now
         assertEquals(listOf("a", "Aa", said).hashCode(), listOf("a", "BB", said).hashCode())
         val styled = journal()
@@ -48,7 +48,7 @@ class NoticeJournalTest {
         assertEquals(0, styled.add(chat(now + 3, "Aa", "BB")))
     }
 
-    // 原样重发的不重复记;但隔了半天以上又发来的同一句(第二天的问候)是新的一次,要记——不然那一天的归纳里没有它
+    // a verbatim repost is not recorded twice; but the same line sent again after more than half a day (the next day's greeting) is a new occurrence and must be recorded — otherwise that day's digest would not contain it
     @Test fun theSameTextIsRecordedAgainAfterALongGap() {
         val j = journal()
         val t0 = now
@@ -67,7 +67,7 @@ class NoticeJournalTest {
         val all = j.between(0, Long.MAX_VALUE)
         assertEquals(listOf("Alice" to "hi", "Bob" to "hello", null to "ok"), all.map { it.sender to it.text })
         assertTrue(all.all { it.title == "Group" })
-        // 消息自己没带时间的,用通知的发出时间
+        // a message with no time of its own uses the notification's post time
         assertEquals(listOf(now + 1, now + 2, now + 9), all.map { it.atMs })
     }
 
@@ -91,7 +91,7 @@ class NoticeJournalTest {
         assertEquals(listOf("fresh"), j.between(0, Long.MAX_VALUE).map { it.text })
     }
 
-    // 取消勾选或禁用的 App:它的记录一并去掉;功能关掉:全清,并记下是从什么时候重新开始的
+    // an app that is deselected or disabled: its records go with it; feature turned off: everything is cleared, and the time it restarted from is recorded
     @Test fun purgeByAppAndClear() {
         val j = journal()
         val started = j.sinceMs
@@ -104,11 +104,11 @@ class NoticeJournalTest {
         j.clear()
         assertEquals(0, j.size)
         assertEquals(now, j.sinceMs)
-        // 清掉之后同样的内容再来,照常记(去重的记录也清了)
+        // the same content coming in after the clear is recorded as usual (the dedup state was cleared too)
         assertEquals(1, j.add(plain("b", "y", pkg = "com.mail")))
     }
 
-    // 存下来再读回(重启):内容、从什么时候开始记都接着上次的
+    // saved and read back (restart): the content and the time recording started carry over from last time
     @Test fun dataRoundTripKeepsEntriesAndSince() {
         val j = journal()
         val since = j.sinceMs
@@ -119,12 +119,12 @@ class NoticeJournalTest {
         assertEquals(since, back.sinceMs)
         assertEquals(j.between(0, Long.MAX_VALUE), back.between(0, Long.MAX_VALUE))
         assertEquals(listOf("one", "hi"), back.between(0, Long.MAX_VALUE).map { it.text })
-        // 键只存了哈希
+        // only a hash of the key is stored
         assertTrue(back.data().entries.none { it.keyId == "a" || it.keyId == "s" })
         assertEquals(NoticeDedup.idOf("a"), back.data().entries.first().keyId)
     }
 
-    // 重启之后同一条通知原样重发、或带着前面几条消息重发:只记新的那一段
+    // after a restart, the same notification reposted verbatim or with its earlier messages: only the new segment is recorded
     @Test fun repostsAfterRestartAreNotRecordedAgain() {
         val j = journal()
         val m1 = NoticeMessage("Alice", "hi", now + 1); val m2 = NoticeMessage("Bob", "hello", now + 2)
@@ -137,7 +137,7 @@ class NoticeJournalTest {
         assertEquals(listOf("hi", "hello", "[2条]A: 明天来吗", "new one"), back.between(0, Long.MAX_VALUE).map { it.text })
     }
 
-    // 到期的要删:没有新通知来也一样,读回来的时候也一样
+    // expired entries must be dropped: even without new notifications arriving, and on read-back too
     @Test fun expiresWithoutNewNotifications() {
         val j = journal(keepMs = 1_000)
         j.add(plain("a", "old", at = now))
@@ -152,7 +152,7 @@ class NoticeJournalTest {
         assertEquals(0, journal(keepMs = 1_000, data = saved).size)
     }
 
-    // 已经归纳完的那一天:整段去掉
+    // a day that has already been digested: the whole span is dropped
     @Test fun removeBeforeDropsADigestedDay() {
         val j = journal()
         j.add(plain("a", "yesterday", at = now + 1))
@@ -162,14 +162,14 @@ class NoticeJournalTest {
         assertFalse(j.removeBefore(now + 50))
     }
 
-    // 分段归纳要用的:哪个 App 到期、它还没归纳过的是哪些;做过的(成没成都算)不再出现,存下来之后也一样
+    // used by the segmented digests: which app is due and which of its entries have not been digested yet; ones already done (whether they succeeded or not) never reappear, and that holds after saving too
     @Test fun pendingDueAndNoted() {
         val j = journal()
         (1..3).forEach { j.add(plain("a$it", "a$it", at = now + it, pkg = "com.a")) }
         j.add(plain("b1", "b1", at = now + 10, pkg = "com.b"))
         assertNull(j.due(now + 20, { true }, dueCount = 5, dueAgeMs = 1_000))
         assertEquals("com.a", j.due(now + 20, { true }, dueCount = 3, dueAgeMs = 1_000))
-        // 到了时间的也算;几个都到期先做最旧的;不归纳的 App 不看
+        // ones past the age threshold count too; when several are due the oldest goes first; apps excluded from digesting are skipped
         assertEquals("com.a", j.due(now + 2_000, { true }, dueCount = 50, dueAgeMs = 1_000))
         assertEquals("com.b", j.due(now + 2_000, { it != "com.a" }, dueCount = 50, dueAgeMs = 1_000))
         val batch = j.pending("com.a", limit = 2)
@@ -180,11 +180,11 @@ class NoticeJournalTest {
         assertEquals(2, j.pendingCount)
         val back = journal(data = j.data())
         assertEquals(listOf("a3"), back.pending("com.a", 10).map { it.text })
-        // 归纳过的还留着(当天要查原文时用)
+        // digested entries are still kept (needed when the original text is looked up that day)
         assertEquals(4, back.size)
     }
 
-    // 消息自己带的时间是发通知的 App 填的:填到将来的按通知的发出时间算(不然过不了期,还会算到将来的某一天)
+    // a message's own time is filled in by the app that posted the notification: a future time is clamped to the post time (otherwise the entry would never expire and would be counted into some future day)
     @Test fun aMessageTimeInTheFutureIsClampedToThePostTime() {
         val j = journal(keepMs = 1_000)
         val future = NoticeMessage("Eve", "from the future", now + 10_000_000)
@@ -196,7 +196,7 @@ class NoticeJournalTest {
         assertEquals(0, j.size)
     }
 
-    // 条数满了挤掉过旧的:「从什么时候起是全的」跟着往后挪(不然通知最多的那天反而被当成全的),存下来、读回来还在;清空后重新算
+    // when the count limit evicts older entries, "since when it has been complete" moves forward with them (otherwise the day with the most notifications would be treated as complete), and it survives save and read-back; it is recomputed after a clear
     @Test fun completeSinceMovesWhenTheCapEvicts() {
         val j = journal(capacity = 3)
         val started = j.sinceMs
@@ -207,7 +207,7 @@ class NoticeJournalTest {
         assertEquals(started, j.sinceMs)
         val back = journal(capacity = 3, data = j.data())
         assertEquals(now + 2, back.completeSinceMs)
-        // 过了保留期被删掉的不算「挤掉」
+        // entries dropped by the retention period do not count as "evicted"
         val k = journal(capacity = 100, keepMs = 1_000)
         k.add(plain("a", "x", at = now))
         now += 5_000
@@ -218,7 +218,7 @@ class NoticeJournalTest {
         assertEquals(now, back.completeSinceMs)
     }
 
-    // 一句分段归纳是照着哪些通知写的:按 App、会话名、起止时间(都含)找;会话名按存句子时同样的办法算(去掉未读条数)
+    // which notifications a segmented-digest line was written from: looked up by app, conversation name and start/end time (all inclusive); the conversation name is computed the same way as when the line was stored (unread counts stripped)
     @Test fun aroundFindsOneChatsEntriesInsideTheWindow() {
         val j = NoticeJournal(clock = { 10_000L })
         fun rec(key: String, pkg: String, at: Long, title: String, text: String) = NoticeRecord(key, pkg, at, title, text)
@@ -228,7 +228,7 @@ class NoticeJournalTest {
         j.add(rec("c", "com.mail", 2_000, "家长群", "别的 App"))
         j.add(rec("a", "com.chat", 9_000, "家长群(4条新消息)", "王老师: 改到后天"))
         assertEquals(listOf("王老师: 明天开会", "李老师: 收到"), j.around("com.chat", "家长群", 1_000, 2_000).map { it.text.substringAfter("]") })
-        // 没记会话名的那种句子(依据的几段不是同一个会话):这个 App 这段时间的都给
+        // a line that recorded no conversation name (its source segments were not all from the same conversation): everything this app has in that window is returned
         assertEquals(3, j.around("com.chat", null, 1_000, 2_500).size)
         assertTrue(j.around("com.chat", "家长群", 3_000, 8_000).isEmpty())
         assertTrue(j.around("com.other", null, 0, 10_000).isEmpty())

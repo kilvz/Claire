@@ -21,7 +21,7 @@ class TopicPoolTest {
 
     @Test fun evidenceIsPerAppAndDayNotPerEvent() {
         val p = TopicPool()
-        // 同一天同一个 App 的十条只算一份
+        // ten notifications from the same app on the same day count as one
         val events = (0 until 10).map { ev(it, at = t0 + it * 60_000L) }
         val r = p.apply("com.shop", events, listOf(new(*(0 until 10).toList().toIntArray())), t0 + day / 2, zone)
         val t = p.all().single()
@@ -30,7 +30,7 @@ class TopicPoolTest {
         assertEquals(1, r.applied)
         assertEquals((0 until 10).toSet(), r.byEvent.keys)
         assertFalse(t.established)
-        // 第二天再来一次:两份证据,已确立
+        // once more the next day: two pieces of evidence, so it is established
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(LearnSignal(listOf(0), topicId = t.id)), t0 + day, zone)
         val t2 = p[t.id]!!
         assertEquals(2, t2.evidenceCount)
@@ -51,14 +51,14 @@ class TopicPoolTest {
         assertFalse(t.established)
     }
 
-    // 证据记到哪个 App 名下只看调用方给的包名:回复里写什么都影响不到(LearnSignal 里根本没有 App 这一项)
+    // which app evidence is attributed to depends only on the package name from the caller: nothing written in the reply can affect it (LearnSignal has no app field at all)
     @Test fun replyCannotAttributeEvidenceToAnotherApp() {
         val p = TopicPool()
         val parsed = NoticeLearn.parse(
             """{"signals":[{"ids":["n1"],"app":"com.bank","package":"com.bank","new":{"kind":"interest","label":"Hiking","app":"com.bank"}}]}""",
             1, emptyList(),
         )!!
-        // 事件上写的包名也不算:只认这批的包名
+        // the package name written on the events does not count either: only the batch's package name is used
         p.apply("com.shop", listOf(ev(0, pkg = "com.bank")), parsed.signals, t0, zone)
         assertEquals(setOf("com.shop"), p.all().single().evidence.keys)
     }
@@ -70,10 +70,10 @@ class TopicPoolTest {
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(new(0, label = "runningshoes")), t0 + day, zone)
         assertEquals(1, p.all().size)
         assertEquals("Running Shoes", p.all().single().label)
-        // 种类不同就是另一个话题
+        // a different kind means a different topic
         p.apply("com.shop", listOf(ev(0)), listOf(new(0, kind = TopicKind.Interest, label = "running shoes")), t0, zone)
         assertEquals(2, p.all().size)
-        // 同一个回复里两条同名的新话题也只起一个
+        // two same-named new topics in one reply create only one
         val q = TopicPool()
         q.apply("com.shop", listOf(ev(0), ev(1)), listOf(new(0, label = "Tea"), new(1, label = "tea")), t0, zone)
         assertEquals(1, q.all().size)
@@ -82,7 +82,7 @@ class TopicPoolTest {
     @Test fun outcomesAreCountedOncePerEventAndTopic() {
         val p = TopicPool()
         val events = listOf(ev(0, outcome = LearnOutcome.Opened), ev(1, outcome = LearnOutcome.Dismissed), ev(2))
-        // 同一个回复里两条都落到同一个话题上:同样的通知不重复算
+        // two entries in the same reply land on the same topic: the same notification is not counted twice
         p.apply("com.shop", events, listOf(new(0, 1, 2), new(0, 1)), t0, zone)
         val id = p.all().single().id
         assertEquals(1, p[id]!!.opened)
@@ -109,9 +109,9 @@ class TopicPoolTest {
         assertEquals(1.0, t.retention(t0), 1e-9)
         val s = LearnTuning.STABILITY_DAYS * (1 + t.strength)
         assertEquals(exp(-10 / s), t.retention(t0 + 10 * day), 1e-9)
-        // 划掉的多也不低于 0
+        // many dismissals still do not take it below 0
         assertEquals(0.0, t.copy(dismissed = 100).strength, 0.0)
-        // 强的忘得慢
+        // strong ones are forgotten more slowly
         val weak = t.copy(evidence = mapOf("p" to listOf(1L)), opened = 0, dismissed = 0)
         assertTrue(weak.retention(t0 + 20 * day) < t.retention(t0 + 20 * day))
     }
@@ -121,7 +121,7 @@ class TopicPoolTest {
         p.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "old")), t0, zone)
         repeat(5) { d -> p.apply("com.shop", listOf(ev(0, at = t0 + d * day)), listOf(new(0, label = "strong")), t0 + d * day, zone) }
         assertEquals(5, p.all().first { it.label == "strong" }.days)
-        // 一份证据:S = 14 天,留存低于 0.1 要 ln(10)×14 ≈ 32 天
+        // one piece of evidence: S = 14 days, and retention below 0.1 needs ln(10)×14 ≈ 32 days
         assertTrue(p.maintain(t0 + 30 * day).isEmpty())
         val dropped = p.maintain(t0 + 33 * day)
         assertEquals(1, dropped.size)
@@ -131,12 +131,12 @@ class TopicPoolTest {
     @Test fun capEvictsLowestScoreFirst() {
         val p = TopicPool()
         repeat(LearnTuning.POOL_CAP) { i -> p.apply("com.shop", listOf(ev(0, at = t0 + i)), listOf(new(0, label = "t$i")), t0 + i, zone) }
-        // 让 t5 变强
+        // make t5 strong
         val strong = p.all().first { it.label == "t5" }.id
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(LearnSignal(listOf(0), topicId = strong)), t0 + day, zone)
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(new(0, label = "newcomer")), t0 + day, zone)
         assertEquals(LearnTuning.POOL_CAP, p.all().size)
-        assertNull(p.all().firstOrNull { it.label == "t0" }) // 最旧、最弱的被挤掉
+        assertNull(p.all().firstOrNull { it.label == "t0" }) // the oldest and weakest is evicted
         assertTrue(p.all().any { it.label == "t5" })
         assertTrue(p.all().any { it.label == "newcomer" })
     }
@@ -147,7 +147,7 @@ class TopicPoolTest {
         assertEquals((20L until 80L).toList(), ev.getValue("p"))
         repeat(LearnTuning.APPS_PER_TOPIC + 3) { ev = TopicPool.addDays(ev, "a$it", listOf(100L + it)) }
         assertEquals(LearnTuning.APPS_PER_TOPIC, ev.size)
-        assertFalse("p" in ev) // 最久没出现的 App 先丢
+        assertFalse("p" in ev) // the app that has not shown up for longest goes first
     }
 
     @Test fun clearAppRemovesItsEvidenceAndOrphans() {
@@ -164,24 +164,24 @@ class TopicPoolTest {
     @Test fun sensitiveTopicsFollowTheSwitch() {
         val p = TopicPool()
         val flagged = LearnSignal(listOf(0), newKind = TopicKind.Interest, newLabel = "diabetes", sensitive = true)
-        // 关着:标了敏感的新话题不收
+        // switch off: a new topic flagged sensitive is not accepted
         assertEquals(1, p.apply("com.health", listOf(ev(0)), listOf(flagged), t0, zone).missing)
         assertTrue(p.all().isEmpty())
-        // 开着:收下并带着标记
+        // switch on: it is accepted and carries the flag
         p.apply("com.health", listOf(ev(0)), listOf(flagged), t0, zone, allowSensitive = true)
         val t = p.all().single()
         assertTrue(t.sensitive)
-        // 关着时引用它、或起同名的新话题,都不加证据
+        // with the switch off, neither referencing it nor creating a same-named new topic adds evidence
         val r = p.apply("com.health", listOf(ev(0, at = t0 + day)),
             listOf(LearnSignal(listOf(0), topicId = t.id), new(0, kind = TopicKind.Interest, label = "Diabetes")), t0 + day, zone)
         assertEquals(2, r.missing)
         assertEquals(1, p[t.id]!!.evidenceCount)
-        // 关着时,后来才到的点开/划掉也不往敏感话题上补
+        // with the switch off, an open/dismiss that arrives later is not credited to a sensitive topic either
         assertFalse(p.addOutcome(setOf(t.id), LearnOutcome.Opened))
         assertEquals(0, p[t.id]!!.opened)
         assertTrue(p.addOutcome(setOf(t.id), LearnOutcome.Opened, allowSensitive = true))
         assertEquals(1, p[t.id]!!.opened)
-        // 关着时也不给模型看
+        // with the switch off it is not shown to the model either
         assertTrue(p.strongest(t0).isEmpty())
         assertEquals(1, p.strongest(t0, includeSensitive = true).size)
         p.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0, zone)
@@ -189,35 +189,35 @@ class TopicPoolTest {
         assertEquals(listOf("running shoes"), p.all().map { it.label })
     }
 
-    // 给模型看的只有 limit 个:这一批的 App 自己印证过的排在前面(哪怕弱),不然它再推同样的东西时模型看不到已有的那个,只能另起一个
+    // only `limit` topics are shown to the model, and the ones this batch's app has corroborated itself come first (even if weak); otherwise, when it suggests the same thing again, the model cannot see the existing topic and can only start a new one
     @Test fun theBatchAppsOwnTopicsAreShownFirst() {
         val p = TopicPool()
-        // 别的 App 的五个话题,各有两天的证据(强)
+        // five topics from other apps, each with two days of evidence (strong)
         for (i in 0 until 5) {
             p.apply("com.news", listOf(ev(0, pkg = "com.news")), listOf(new(0, label = "news $i")), t0, zone)
             p.apply("com.news", listOf(ev(0, at = t0 + day, pkg = "com.news")), listOf(new(0, label = "news $i")), t0 + day, zone)
         }
-        // 这个 App 的两个话题,各只有一天(弱)
+        // this app's two topics, each with only one day (weak)
         p.apply("com.shop", listOf(ev(0), ev(1)), listOf(new(0, label = "running shoes"), new(1, label = "tents")), t0, zone)
         val now = t0 + day
-        // 不说是哪个 App:只按强度,三个位置全是别的 App 的
+        // without naming an app: strength only, so all three slots are other apps' topics
         assertTrue(p.strongest(now, limit = 3).all { it.label.startsWith("news") })
-        // 说了:它自己的两个都在,排在前面;剩下的位置按强度补
+        // when named: both of its own are there, up front, and the remaining slots are filled by strength
         val shown = p.strongest(now, limit = 3, packageName = "com.shop")
         assertEquals(setOf("running shoes", "tents"), shown.take(2).map { it.label }.toSet())
         assertTrue(shown[2].label.startsWith("news"))
-        // 位置够时一个不少
+        // when there are enough slots, nothing is left out
         assertEquals(7, p.strongest(now, packageName = "com.shop").size)
-        // 没推过东西的 App:和不说一样
+        // an app that has never suggested anything: same as naming no app
         assertEquals(p.strongest(now, limit = 3), p.strongest(now, limit = 3, packageName = "com.other"))
-        // 自己的话题比位置还多的 App:只占三分之二(挑它自己最强的),剩下的给其余的里最强的,不把别的 App 的全挤出去
-        // (「tents」再添两天,成了最强的)
+        // an app with more of its own topics than slots: it takes only two thirds (its own strongest ones), the rest go to the strongest of the others, so the other apps are not all pushed out
+        // ("tents" gains two more days and becomes the strongest)
         p.apply("com.shop", listOf(ev(0, at = t0 - day)), listOf(new(0, label = "tents")), now, zone)
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(new(0, label = "tents")), now, zone)
         val news = p.strongest(now, limit = 3, packageName = "com.news")
         assertEquals(listOf(true, true, false), news.map { it.label.startsWith("news") })
         assertEquals("tents", news[2].label)
-        // 六个位置:它自己的占四个,第五个是别人最强的,最后一个按强度轮到它自己剩下的那个
+        // six slots: its own take four, the fifth goes to somebody else's strongest, and the last falls back by strength to the one of its own that is left
         val six = p.strongest(now, limit = 6, packageName = "com.news")
         assertEquals(listOf(true, true, true, true, false, true), six.map { it.label.startsWith("news") })
         assertEquals("tents", six[4].label)
@@ -232,8 +232,8 @@ class TopicPoolTest {
         assertEquals(2, back.all().map { it.id }.toSet().size)
     }
 
-    // 话题 id 不重用:新起了话题却没存上(进程没了、存盘失败),重新读出旧的那份后再起的话题不能拿到同一个 id——
-    // 别处(联系人上连着的话题)可能还记着那个 id,会连到不相干的话题上
+    // topic ids are not reused: if a newly created topic never got saved (the process died, the save failed), a topic created after the old data is read back must not get the same id —
+    // other places (topics linked from contacts) may still remember that id and would end up linked to an unrelated topic
     @Test fun idsAreNotReusedAfterALostSave() {
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "kept")), t0, zone)
@@ -243,13 +243,13 @@ class TopicPoolTest {
         val back = TopicPool(saved)
         back.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "later")), t0, zone)
         assertTrue(lost !in back.all().map { it.id })
-        // 整个池子没了、从空的重来也一样
+        // the same holds when the whole pool is gone and it starts over from empty
         val fresh = TopicPool()
         fresh.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "again")), t0, zone)
         assertTrue(fresh.all().single().id !in p.all().map { it.id })
     }
 
-    // 给的 id 和已有的撞了就再要一个
+    // if the offered id collides with an existing one, another is requested
     @Test fun aCollidingNewIdIsNotUsed() {
         val ids = ArrayDeque(listOf("a", "a", "a", "b"))
         val p = TopicPool(newId = { ids.removeFirst() })
@@ -257,19 +257,19 @@ class TopicPoolTest {
         assertEquals(mapOf("one" to "a", "two" to "b"), p.all().associate { it.label to it.id })
     }
 
-    // 一次回复对一个话题最多记一天:跨了午夜的一批、几条归纳指着同一个话题,都不能凭一次判断就凑出「已确立」
+    // one reply records at most one day per topic: neither a batch crossing midnight nor several entries pointing at the same topic can add up to "established" from a single judgement
     @Test fun oneReplyCountsAsOneDayPerTopic() {
         val events = listOf(ev(0, at = t0), ev(1, at = t0 + day))
         val p = TopicPool()
         p.apply("com.shop", events, listOf(new(0, 1)), t0 + day, zone)
-        // 记在引用的通知里最新那条的日子上
+        // recorded against the day of the newest notification referenced
         assertEquals(mapOf("com.shop" to listOf(20_001L)), p.all().single().evidence)
         assertFalse(p.all().single().established)
-        // 拆成两条同名的新话题、各引用一天的,也一样
+        // the same when it is split into two same-named new topics, each referencing a different day
         val q = TopicPool()
         q.apply("com.shop", events, listOf(new(0), new(1)), t0 + day, zone)
         assertEquals(mapOf("com.shop" to listOf(20_001L)), q.all().single().evidence)
-        // 一条引用已有的、一条新起同名的,也并在一起算
+        // one referencing an existing topic and one starting a same-named new topic are combined too
         val r = TopicPool()
         r.apply("com.shop", listOf(ev(0, at = t0 - 5 * day)), listOf(new(0)), t0 - 5 * day, zone)
         val id = r.all().single().id
@@ -280,7 +280,7 @@ class TopicPoolTest {
         assertEquals(t0 + day, r[id]!!.lastSeenMs)
     }
 
-    // 证据的日子是通知发出的那天,不是判断的那天:同一天的通知分两天判,还是一天
+    // the day of the evidence is the day the notification was posted, not the day it was judged: notifications from one day judged on two separate days still count as one day
     @Test fun judgingOnAnotherDayAddsNoDay() {
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0, at = t0)), listOf(new(0)), t0, zone)
@@ -289,7 +289,7 @@ class TopicPoolTest {
         assertFalse(p.all().single().established)
     }
 
-    // 用户单独删掉的话题不再被学回来:同名的新话题不收,不管归到哪一种、大小写和空白怎么写;别的名字照常收
+    // a topic the user deleted individually is never learned back: a same-named new topic is not accepted, whatever kind it is filed under and however case and whitespace are written; other names are accepted as usual
     @Test fun aDeletedTopicNameIsNotLearnedAgain() {
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0, zone)
@@ -302,37 +302,37 @@ class TopicPoolTest {
         assertEquals(1, r.applied)
         assertEquals(0, r.missing)
         assertEquals(setOf(2), r.byEvent.keys)
-        // 存下来的只有指纹,没有删掉的那个名字;读回来照样拦
+        // only a fingerprint is stored, not the deleted name; it still blocks after read-back
         val data = p.data()
         assertEquals(listOf(TopicPool.fingerprint("running shoes")), data.blocked)
         assertFalse(data.toString().contains("running shoes", ignoreCase = true))
         val back = TopicPool(data)
         back.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0 + 2, zone)
         assertEquals(listOf("trail shoes"), back.all().map { it.label })
-        // 重新允许之后可以再学
+        // after allowing again it can be learned once more
         assertTrue(back.allowAgain())
         assertFalse(back.allowAgain())
         back.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0 + 3, zone)
         assertEquals(listOf("trail shoes", "running shoes"), back.all().map { it.label })
     }
 
-    // 留着的同名话题照常用:先认已有的,要新起时才看是不是删掉过的名字
+    // a kept topic with the same name keeps working as usual: existing topics are matched first, and only when starting a new one is a deleted name checked
     @Test fun aKeptTopicWithABlockedNameKeepsWorking() {
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0), ev(1)), listOf(new(0), new(1, kind = TopicKind.Interest)), t0, zone)
         val (shopping, interest) = p.all()
         assertTrue(p.delete(shopping.id))
-        // 同名、另一种的那个还在:模型再提它(按名字新起)算引用它,照常加证据
+        // the same-named topic of the other kind is still there: when the model mentions it again as a new name it counts as a reference to it, and evidence is added as usual
         val r = p.apply("com.mail", listOf(ev(0, at = t0 + day, pkg = "com.mail")), listOf(new(0, kind = TopicKind.Interest)), t0 + day, zone)
         assertEquals(1, r.applied)
         assertEquals(0, r.blocked)
         assertEquals(setOf("com.shop", "com.mail"), p[interest.id]!!.evidence.keys)
-        // 删掉的那一种不会借此回来
+        // the deleted kind does not come back on the back of it
         assertEquals(1, p.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0 + day, zone).blocked)
         assertEquals(1, p.all().size)
     }
 
-    // 只有单独删才记「不再记录」:清空全部、清掉某个 App 的、删掉敏感的、久了忘掉的、数量满了挤掉的都不记
+    // only an individual delete records "never record again": clearing everything, clearing one app, deleting the sensitive ones, forgetting faded ones and evicting on the cap do not
     @Test fun onlyASingleDeleteBlocksAName() {
         val cleared = TopicPool()
         cleared.apply("com.shop", listOf(ev(0)), listOf(new(0)), t0, zone)
@@ -352,13 +352,13 @@ class TopicPoolTest {
             p.apply("com.shop", listOf(ev(0, at = t0 + 400 * day)), listOf(new(0)), t0 + 400 * day, zone, allowSensitive = true)
             assertEquals(1, p.all().size)
         }
-        // 清空全部是重来,但之前单独删过的名字还记着
+        // clearing everything starts over, but names deleted individually before are still remembered
         val both = TopicPool()
         both.apply("com.shop", listOf(ev(0), ev(1)), listOf(new(0), new(1, label = "tent")), t0, zone)
         both.delete(both.all().first { it.label == "tent" }.id)
         both.clear()
         assertEquals(1, both.blockedCount)
-        // 名单有上限,多了丢最早的
+        // the list is capped, and past the cap the earliest entries are dropped
         val many = TopicPool()
         repeat(LearnTuning.TOPIC_BLOCKED_CAP + 3) { i ->
             many.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "topic $i")), t0, zone)
@@ -369,12 +369,12 @@ class TopicPoolTest {
         assertEquals(1, many.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "topic 5")), t0, zone).blocked)
     }
 
-    // 旧版本存下来的(没有「不再记录」的名单):照样读得出来
-    // ---- 用户把一个话题并进另一个 ----
+    // saved by an older version (no "never record again" list): it still decodes
+    // ---- the user merges one topic into another ----
 
     /**
-     * 两个说法差不多的话题,返回 (a, b) 的 id。a「trail shoes」:com.shop 两天(昨天、今天),点开 1、划掉 1。
-     * b「running shoes」:com.shop 今天、com.mall 明天,点开 1。
+     * Two topics worded almost the same; returns the ids of (a, b). a "trail shoes": com.shop on two days (yesterday, today), opened 1, dismissed 1.
+     * b "running shoes": com.shop today, com.mall tomorrow, opened 1.
      */
     private fun twins(p: TopicPool): Pair<String, String> {
         p.apply("com.shop", listOf(ev(0, at = t0 - day, outcome = LearnOutcome.Opened)), listOf(new(0, label = "trail shoes")), t0 - day, zone)
@@ -392,7 +392,7 @@ class TopicPoolTest {
         assertEquals(b, t.id)
         assertEquals("running shoes", t.label)
         assertEquals(TopicKind.Shopping, t.kind)
-        // 同一个 App 同一天两边都有的只算一份
+        // the same app on the same day counted from both sides counts once
         assertEquals(mapOf("com.shop" to listOf(19_999L, 20_000L), "com.mall" to listOf(20_001L)), t.evidence)
         assertEquals(3, t.days)
         assertTrue(t.established)
@@ -400,16 +400,16 @@ class TopicPoolTest {
         assertEquals(1, t.dismissed)
         assertEquals(t0 - day, t.firstSeenMs)
         assertEquals(t0 + day, t.lastSeenMs)
-        // 已经并掉的、同一个、没有的:什么都不做
+        // one already merged, the same one, or a missing one: nothing happens
         assertFalse(p.merge(a, b))
         assertFalse(p.merge(b, b))
         assertFalse(p.merge(b, "nope"))
         assertEquals(t, p.all().single())
-        // 并掉不是删掉:名字不进「不再记录」
+        // merging is not deleting: the name does not go into "never record again"
         assertEquals(0, p.blockedCount)
     }
 
-    // 并掉的那个名字,模型之后再新起(不管归到哪一种、大小写和空白怎么写):算引用并进去的那个,不另起
+    // a name that was merged away, when the model starts it again later (whatever kind, however case and whitespace are written), counts as a reference to the topic it went into rather than a new topic
     @Test fun aMergedAwayNameIsCountedOnTheTopicItWentInto() {
         val p = TopicPool()
         val (a, b) = twins(p)
@@ -420,12 +420,12 @@ class TopicPoolTest {
         assertEquals(2, r.applied)
         assertEquals(listOf("running shoes", "tents"), p.all().map { it.label })
         assertEquals(20_002L, p[b]!!.evidence.getValue("com.shop").last())
-        // 并的那一刻在途的请求,回复里引用的还是并掉的那个 id:也算到并进去的那个上,不丢
+        // a request that was in flight at the moment of the merge still references the merged-away id in its reply: it is credited to the topic it went into rather than lost
         val late = p.apply("com.mall", listOf(ev(0, at = t0 + 3 * day, pkg = "com.mall")), listOf(LearnSignal(listOf(0), topicId = a)), t0 + 3 * day, zone)
         assertEquals(1, late.applied)
         assertEquals(0, late.missing)
         assertEquals(20_003L, p[b]!!.evidence.getValue("com.mall").last())
-        // 存下来的只有指纹,没有并掉的那个名字;存成文件再读回来照样认
+        // only a fingerprint is stored, not the merged-away name; it is still recognised after a file round trip
         val data = p.data()
         assertEquals(mapOf(TopicPool.fingerprint("trail shoes") to b), data.merged)
         assertFalse(data.toString().contains("trail", ignoreCase = true))
@@ -437,7 +437,7 @@ class TopicPoolTest {
         assertEquals(data.merged, back.data().merged)
     }
 
-    // 并过几回的:名字一路跟到最后并进去的那个;单独删掉并好的那个,并进过它的名字也都不再记
+    // after several merges: a name follows through to the topic it eventually went into; deleting that merged result individually also stops recording every name merged into it
     @Test fun mergedNamesFollowLaterMergesAndAreBlockedWithTheTopic() {
         val p = TopicPool()
         val four = listOf(new(0, label = "a"), new(1, label = "b"), new(2, label = "c"), new(3, label = "d"))
@@ -446,10 +446,10 @@ class TopicPoolTest {
         assertTrue(p.merge(a, b))
         assertTrue(p.merge(b, c))
         assertEquals(mapOf(TopicPool.fingerprint("a") to c, TopicPool.fingerprint("b") to c), p.data().merged)
-        // 在途的请求引用最早并掉的那个:跟到 c
+        // a request in flight references the earliest merged-away topic: it follows through to c
         val late = p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(LearnSignal(listOf(0), topicId = a)), t0 + day, zone)
         assertEquals(setOf(c), late.byEvent.getValue(0))
-        // 删掉 c:a、b、c 三个名字都不再记;d 不受影响
+        // delete c: the three names a, b and c are no longer recorded; d is unaffected
         assertTrue(p.delete(c))
         assertEquals(3, p.blockedCount)
         assertTrue(p.data().merged.isEmpty())
@@ -457,16 +457,16 @@ class TopicPoolTest {
         assertEquals(3, r.blocked)
         assertEquals(1, r.applied)
         assertEquals(listOf(d), p.all().map { it.id })
-        // 重新允许之后可以再学(别名已经没了,是新起的话题)
+        // after allowing again it can be learned once more (the alias is gone, so this is a new topic)
         assertTrue(p.allowAgain())
         p.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "a")), t0 + day, zone)
         assertEquals(listOf("d", "a"), p.all().map { it.label })
     }
 
-    // 「不再记录」和并掉是同一个名字上的两种决定,后做的算数;并进去的话题不是单独删掉而是清掉的,那个名字可以重新学
+    // "never record again" and merged-away are two decisions about the same name, and the later one wins; if the topic merged into was cleared rather than deleted individually, the name can be learned again
     @Test fun aNameIsEitherBlockedOrMergedWhicheverTheUserDidLast() {
         val three = listOf(new(0), new(1, kind = TopicKind.Interest), new(2, label = "tents"))
-        // 同名的两种:删掉一种(名字进了「不再记录」),再把留着的那种并进别的 → 这个名字改成算到那边
+        // two topics with the same name: delete one (the name goes into "never record again"), then merge the kept one into another → this name now counts over there
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0), ev(1), ev(2)), three, t0, zone)
         val (shopping, interest, tents) = p.all().map { it.id }
@@ -477,18 +477,18 @@ class TopicPoolTest {
         assertEquals(0, r.blocked)
         assertEquals(setOf(tents), r.byEvent.getValue(0))
         assertEquals(1, p.all().size)
-        // 反过来:名字并掉之后,同名的另一种被单独删掉 → 这个名字不再记
+        // the other way round: after the name was merged away, the other topic with the same name is deleted individually → the name is no longer recorded
         val q = TopicPool()
         q.apply("com.shop", listOf(ev(0), ev(1), ev(2)), three, t0, zone)
         val (s2, i2, t2) = q.all().map { it.id }
         assertTrue(q.merge(s2, t2))
-        // 留着的同名那一种照常用(先认已有的)
+        // the kept topic with the same name keeps working as usual (existing topics are matched first)
         assertEquals(setOf(i2), q.apply("com.shop", listOf(ev(0)), listOf(new(0, kind = TopicKind.Interest)), t0, zone).byEvent.getValue(0))
         assertTrue(q.delete(i2))
         assertTrue(q.data().merged.isEmpty())
         assertEquals(1, q.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(new(0)), t0 + day, zone).blocked)
         assertEquals(listOf(t2), q.all().map { it.id })
-        // 并进去的话题被清掉了(不是单独删):别名跟着不算数,那个名字照常可以再学,也不进「不再记录」
+        // the topic merged into was cleared (not deleted individually): the alias no longer counts, the name can be learned again as usual, and it does not go into "never record again"
         val c = TopicPool()
         val (a, b) = twins(c)
         c.merge(a, b)
@@ -497,7 +497,7 @@ class TopicPoolTest {
         assertEquals(0, c.blockedCount)
         c.apply("com.shop", listOf(ev(0)), listOf(new(0, label = "trail shoes")), t0, zone)
         assertEquals(listOf("trail shoes"), c.all().map { it.label })
-        // 清空全部也一样
+        // clearing everything behaves the same way
         val e = TopicPool()
         val (x, y) = twins(e)
         e.merge(x, y)
@@ -507,7 +507,7 @@ class TopicPoolTest {
         assertEquals(listOf("trail shoes"), e.all().map { it.label })
     }
 
-    // 有一个是敏感的,并完就是敏感的(只会变严);每个 App 留的天数、一个话题留的 App 数照旧有上限
+    // if either one is sensitive the result is sensitive (it can only become stricter); the per-app day cap and the per-topic app cap still apply
     @Test fun mergingKeepsTheStricterFlagAndTheCaps() {
         val p = TopicPool()
         val diabetes = new(0, kind = TopicKind.Interest, label = "Diabetes")
@@ -516,11 +516,11 @@ class TopicPoolTest {
         val (sensitive, plain) = p.all().map { it.id }
         assertTrue(p.merge(sensitive, plain))
         assertTrue(p[plain]!!.sensitive)
-        // 「敏感类推断」关着时,并掉的那个名字再来也不加证据(并进去的那个是敏感的了)
+        // with "infer sensitive topics" off, the merged-away name coming back adds no evidence (the topic it went into is sensitive now)
         val r = p.apply("com.health", listOf(ev(0, at = t0 + day, pkg = "com.health")), listOf(diabetes), t0 + day, zone)
         assertEquals(1, r.missing)
         assertEquals(2, p[plain]!!.evidenceCount)
-        // 上限:from 有 20 个 App(各一天,越往后越新)和一个共有的 App;into 有 5 个更新的 App 和那个共有的
+        // the cap: `from` has 20 apps (one day each, newer towards the end) plus one shared app; `into` has 5 newer apps plus that shared one
         val cap = LearnTuning.APPS_PER_TOPIC
         val from = ObservedTopic("kx", TopicKind.Shopping, "x", 1, 2,
             (0 until cap - 1).associate { "com.a$it" to listOf(20_000L + it) } + ("com.same" to (0 until 60).map { 20_000L + it }))
@@ -532,22 +532,22 @@ class TopicPoolTest {
         assertEquals(cap, e.size)
         assertEquals((30 until 90).map { 20_000L + it }, e.getValue("com.same"))
         assertTrue((0 until 5).all { "com.b$it" in e })
-        // from 的 19 个里最旧的 5 个让出位置
+        // the 5 oldest of from's 19 make room
         assertTrue((0 until 5).none { "com.a$it" in e })
         assertTrue((5 until cap - 1).all { "com.a$it" in e })
     }
 
-    // 「并入」时列出来的其他话题:名字像的排在前面,其余按强度
+    // the other topics listed when choosing where to merge: similar names come first, the rest by strength
     @Test fun lookAlikeNamesComeFirstWhenPickingWhereToMerge() {
         val p = TopicPool()
         p.apply("com.shop", listOf(ev(0), ev(1), ev(2), ev(3)),
             listOf(new(0, label = "AI 编程工具"), new(1, label = "露营装备"), new(2, label = "ai编程助手"), new(3, label = "编程")), t0, zone)
-        // 「露营装备」多一天证据(最强),名字不像,还是排在像的后面
+        // the "camping gear" topic has one more day of evidence (the strongest), but its name is not similar, so it still comes after the similar ones
         p.apply("com.shop", listOf(ev(0, at = t0 + day)), listOf(new(0, label = "露营装备")), t0 + day, zone)
         val all = p.all()
         val of = all.first { it.label == "AI 编程工具" }
         assertEquals(listOf("ai编程助手", "编程", "露营装备"), TopicPool.mergeCandidates(of, all, t0 + day).map { it.label })
-        // 都不像的:按强度
+        // none of them similar: by strength
         val camping = all.first { it.label == "露营装备" }
         assertEquals(3, TopicPool.mergeCandidates(camping, all, t0 + day).size)
         assertFalse(camping in TopicPool.mergeCandidates(camping, all, t0 + day))
@@ -555,7 +555,7 @@ class TopicPoolTest {
 
     @Test fun olderTopicFilesStillDecode() {
         val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-        // 名单是空的时候不写进文件:这就是旧版本文件的样子
+        // an empty list is not written to the file: this is what an older version's file looks like
         val old = json.encodeToString(TopicPoolData.serializer(), TopicPoolData(topics = listOf(ObservedTopic("k1", TopicKind.Shopping, "running shoes", 1, 2))))
         assertFalse(old, "blocked" in old)
         assertFalse(old, "merged" in old)

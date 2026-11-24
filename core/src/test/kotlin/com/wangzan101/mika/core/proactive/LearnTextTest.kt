@@ -29,7 +29,7 @@ class LearnTextTest {
         listOf(
             "zip code 10001", "Postal code: 100080", "error code 5001", "QR code 1234", "promo code 2024",
             "code review 2026", "barcode 12345678", "decode 12345", "10001 is your zip code",
-            // 只隔着空格的 4 位数多半是年份
+            // a 4-digit number separated only by spaces is usually a year
             "Advent of Code 2026", "Summer of Code 2026", "Code 2026 大会", "the code issue 12345",
         ).forEach { assertFalse(it, auth(it)) }
     }
@@ -39,7 +39,7 @@ class LearnTextTest {
             "取件码 482913", "兑换码 482913", "邀请码 482913", "扫二维码领 5000 积分", "邮编 100080", "页码 1024",
             "到账 3500 元", "订单 2026 年 11 月发货", "错误代码 5001", "电话号码 4829", "登录码已发送,5 分钟内有效",
             "确认码头的 2026 班次", "contraseña nueva enviada", "senha incorreta", "パスワード reset", "密碼已更新",
-            // 密码这个词后面的句子里有个数字,不是密码
+            // the sentence after the password word contains a number, but it is not a password
             "senha alterada em 12 de novembro", "contraseña cambiada el 12 de noviembre", "kata sandi diubah pada 12 November",
         ).forEach { assertFalse(it, auth(it)) }
     }
@@ -52,26 +52,26 @@ class LearnTextTest {
             "10-12 点之间送到", "到账 1 200 元", "2026-11-12 2026-11-15 两天", "2026-1-5 至 2026-1-9",
             "比分 3-2 1-0 2-2 4-1 0-0", "号码 03 12 25 31 33 08 11", "11-12 15:30 到 16:00", "3 号楼 2 单元 1201",
             "第 12 期 2026 年 11 月", "100-200 元,共 3 件", "2026 11 12",
-            // 两段的是范围
+            // two segments mean a range
             "薪资 15000-25000 元", "10000-12000 步", "10000 12000",
-            // 日在前的日期、别的横线
+            // day-first dates, other dash characters
             "12-11-2026 15:30 meeting", "5-1-2026 9:00", "2026–11–12 15:30", "2026‐11‐12 15 点",
         ).forEach {
             assertEquals(it, mask(it))
             assertFalse(it, LearnText.longDigits(LearnText.nfkc(it)))
         }
-        // 六位的一段在句子里留着(名字里本来就不许有六位连着的数字,那是原有的规矩)
+        // a six-digit segment stays in the sentence (names were never allowed to hold six digits in a row; that is the existing rule)
         assertEquals("预算 100000-200000 元", mask("预算 100000-200000 元"))
     }
 
     @Test fun aNumberWrittenInGroupsIsMaskedWhole() {
         assertEquals("回电 …", mask("回电 138 1234 5678"))
         assertEquals("回电 … 找王", mask("回电 138-1234-5678 找王"))
-        assertEquals("座机 …", mask("座机 010-12345678")) // 后一段本来就够长,前面的区号一起遮
+        assertEquals("座机 …", mask("座机 010-12345678")) // the second segment is long enough on its own; the area code in front is masked with it
         assertEquals("卡 … 已扣款", mask("卡 6222 0212 3456 7890 已扣款"))
         assertEquals("客服 …", mask("客服 1-800-123-4567"))
-        assertEquals("回电 …", mask("回电 １３８ １２３４ ５６７８")) // 全角
-        // 日期留着,后面的号码照遮
+        assertEquals("回电 …", mask("回电 １３８ １２３４ ５６７８")) // full-width
+        // the date stays; the number after it is masked as usual
         assertEquals("2026-11-12 回电 …", mask("2026-11-12 回电 138 1234 5678"))
         assertEquals("2026-11-12 …", mask("2026-11-12 138 1234 5678"))
         listOf("138 1234 5678", "王 138-1234-5678", "010-12345678").forEach {

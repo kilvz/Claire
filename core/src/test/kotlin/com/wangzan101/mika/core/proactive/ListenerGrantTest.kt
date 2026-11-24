@@ -36,7 +36,7 @@ class ListenerGrantTest {
             assertFalse("class should reject [$s]", ListenerGrant.validClass(s))
             assertThrows(IllegalArgumentException::class.java) { ListenerGrant.command(pkg, s) }
         }
-        // 包名里不认 $
+        // $ is not accepted in a package name
         assertFalse(ListenerGrant.validPackage("a\$b"))
         assertTrue(ListenerGrant.validClass("a.B\$C_1"))
     }
@@ -93,7 +93,7 @@ class ListenerGrantTest {
         assertTrue(out.length <= ListenerGrant.OUTPUT_LOG_LIMIT + 1)
         assertTrue(out.startsWith("Error: xxx"))
         assertEquals(0, f.rebinds)
-        // 等了约 2 秒(虚拟时间)才放弃
+        // gave up only after about 2 seconds (virtual time)
         assertEquals(ListenerGrant.WAIT_MS, testScheduler.currentTime)
     }
 

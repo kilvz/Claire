@@ -26,7 +26,7 @@ class NoticeFilterTest {
     @Test fun emptyWhitelistDropsEverything() = assertEquals(NoticeDecision.NotWhitelisted, decide(base, emptySet()))
 
     @Test fun whitelistIsCheckedFirst() {
-        // 不在白名单里的,哪怕同时也是空的、常驻的,结论都是「不在白名单」
+        // a record that is not on the whitelist is reported as not whitelisted even when it is also blank and ongoing
         val r = base.copy(packageName = "com.other", ongoing = true, title = "", text = "")
         assertEquals(NoticeDecision.NotWhitelisted, decide(r))
         assertEquals(NoticeDecision.NotWhitelisted, NoticeFilter.decidePackage("com.other", white, setOf("com.other")))
@@ -62,7 +62,7 @@ class NoticeFilterTest {
         assertEquals(NoticeDecision.Blank, decide(base.copy(title = " ", text = "")))
         assertEquals(NoticeDecision.Keep, decide(base.copy(title = "", text = "x")))
         assertEquals(NoticeDecision.Keep, decide(base.copy(title = "x", text = "")))
-        // 只有控制字符的,清洗之后就是空的
+        // one that holds only control characters is blank after cleaning
         assertEquals(NoticeDecision.Blank, decide(NoticeFilter.sanitize(base.copy(title = "\u0000\u0007", text = "\n\t‮"))))
     }
 
@@ -72,8 +72,8 @@ class NoticeFilterTest {
         assertEquals("x y z", r.text)
     }
 
-    // 看不见的格式字符(软连字符、蒙古文元音分隔符、词连接符到不可见运算符)去掉,不变成空格;
-    // 零宽不连字 / 连字(U+200C / U+200D)留着:emoji 和一些文字里要用
+    // invisible format characters (soft hyphen, Mongolian vowel separator, word joiner through invisible operators) are removed rather than turned into spaces;
+    // the zero-width non-joiner / joiner (U+200C / U+200D) stay: emoji and some scripts need them
     @Test fun cleanDropsInvisibleFormatCharacters() {
         assertEquals("untrusted", NoticeFilter.clean("un­tr᠎us⁠t⁡e⁢d⁣⁤", 100))
         assertEquals("a‍b‌c", NoticeFilter.clean("a‍b‌c", 100))
@@ -85,7 +85,7 @@ class NoticeFilterTest {
         assertEquals(200, r.title.length)
         assertEquals(2_000, r.text.length)
         assertEquals(20, r.messages.size)
-        assertEquals(11L, r.messages.first().atMs) // 留下最近的 20 条
+        assertEquals(11L, r.messages.first().atMs) // keeps the 20 most recent
         assertEquals(30L, r.messages.last().atMs)
         assertTrue(r.messages.all { it.text.length == 2_000 && it.sender!!.length == 200 })
     }
@@ -103,7 +103,7 @@ class NoticeFilterTest {
         assertNull(r.messages.single().sender)
     }
 
-    // App 的显示名是那个 App 自己写的,却写在不可信标记外面:收一遍——搭不出标记和我们输入里的格式,也不会很长
+    // the app's display name is written by the app itself, yet it sits outside the untrusted markers: it gets scrubbed — it cannot build the markers or the format of our input, and it stays short
     @Test fun appNamesCannotCarryMarkupOrStructure() {
         assertEquals("微信", NoticeFilter.appName("微信"))
         assertEquals("Shop Plus", NoticeFilter.appName("  Shop\nPlus  "))

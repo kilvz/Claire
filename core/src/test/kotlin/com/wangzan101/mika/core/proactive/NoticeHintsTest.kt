@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NoticeHintsTest {
-    // 认出来是状态显示的通知:提醒拿掉,但不是用户处理掉的,不记「没看就处理了」
+    // a notification recognised as a status display: the hint is withdrawn, but the user did not deal with it, so it is not counted as "dismissed unseen"
     @Test fun aWithdrawnHintIsNotCountedAsDismissedUnseen() {
         val h = NoticeHints()
         val a = rec("a", pkg = "p1")
@@ -27,7 +27,7 @@ class NoticeHintsTest {
         val marks = mapOf(
             "a" to done(1, TriageDecision.Surface, "r-a"),
             "b" to done(1, TriageDecision.Remember),
-            "c" to done(4, TriageDecision.Surface), // 判的是更早那次
+            "c" to done(4, TriageDecision.Surface), // judged on the earlier post
             "d" to TriageMark.Failed(1),
         )
         h.sync(listOf(a, b, c, d), marks, triageOn = true)
@@ -43,7 +43,7 @@ class NoticeHintsTest {
         val rs = (1..5).map { rec("k$it", posted = it.toLong()) }
         h.sync(rs, surface(*rs.toTypedArray()), true)
         assertEquals(listOf("k5", "k4", "k3"), h.state.value.list.map { it.key })
-        // 再同步一次结果不变
+        // syncing again leaves the result unchanged
         h.sync(rs, surface(*rs.toTypedArray()), true)
         assertEquals(listOf("k5", "k4", "k3"), h.state.value.list.map { it.key })
     }
@@ -56,7 +56,7 @@ class NoticeHintsTest {
         h.sync(rs, surface(*rs.toTypedArray()), true)
         assertEquals(listOf("k4", "k3"), h.state.value.list.map { it.key })
         assertEquals(0, h.state.value.unseen)
-        // 挤掉的那条更新了、又判为值得提醒:算新的
+        // the dropped one was updated and judged worth surfacing again: it counts as new
         val k1 = rec("k1", posted = 9)
         val now = rs.drop(1) + k1
         h.sync(now, surface(*now.toTypedArray()), true)
@@ -75,10 +75,10 @@ class NoticeHintsTest {
         assertTrue(s.list.all { it.seen })
         assertEquals(HintFeedback(seen = 2), s.feedback["p1"])
         assertEquals(HintFeedback(seen = 1), s.feedback["p2"])
-        // 再打开一次不重复计
+        // opening it a second time does not count again
         h.markSeen(h.state.value.list)
         assertEquals(3, h.state.value.seenTotal)
-        // 同样的判定再同步也不变回没看过
+        // syncing the same judgement again does not turn it back into unseen
         h.sync(listOf(a, b, c), surface(a, b, c), true)
         assertEquals(0, h.state.value.unseen)
     }
@@ -87,7 +87,7 @@ class NoticeHintsTest {
         val h = NoticeHints()
         val a = rec("a"); val b = rec("b")
         h.sync(listOf(a, b), surface(a, b), true)
-        h.sync(listOf(b), surface(a, b), true) // 不再勾选、被挤掉
+        h.sync(listOf(b), surface(a, b), true) // no longer selected, pushed out
         assertEquals(listOf("b"), h.state.value.list.map { it.key })
         assertEquals(0, h.state.value.dismissedUnseenTotal)
     }
@@ -100,12 +100,12 @@ class NoticeHintsTest {
         h.sync(listOf(b, c), surface(a, b, c), true)
         assertEquals(listOf("b", "c").toSet(), h.state.value.list.map { it.key }.toSet())
         assertEquals(HintFeedback(dismissedUnseen = 1), h.state.value.feedback["p1"])
-        // 看过之后再划掉不算「没看就处理了」
+        // dismissing it after it was seen does not count as "dealt with before being seen"
         h.markSeen(h.state.value.list)
         h.dismissed("b")
         assertEquals(1, h.state.value.dismissedUnseenTotal)
         assertEquals(2, h.state.value.seenTotal)
-        // 不是提醒的键划掉没有影响
+        // dismissing a key that is not a hint has no effect
         h.dismissed("zzz")
         assertEquals(1, h.state.value.dismissedUnseenTotal)
     }
@@ -116,10 +116,10 @@ class NoticeHintsTest {
         h.sync(listOf(a1), surface(a1), true)
         h.markSeen(h.state.value.list)
         assertEquals(0, h.state.value.unseen)
-        // 同一次(发出时间没变)再判一遍也不变回没看过
+        // judging the same post again (post time unchanged) does not turn it back into unseen
         h.sync(listOf(a1), surface(a1), true)
         assertEquals(0, h.state.value.unseen)
-        // 通知更新了、又判为值得提醒:算新的
+        // the notification was updated and judged worth surfacing again: it counts as new
         val a2 = rec("a", posted = 20, text = "two")
         h.sync(listOf(a2), surface(a2), true)
         val s = h.state.value
@@ -132,13 +132,13 @@ class NoticeHintsTest {
         val a1 = rec("a", posted = 10, text = "one")
         h.sync(listOf(a1), surface(a1), true)
         val a2 = rec("a", posted = 20, text = "two")
-        // 新的那次还没判:先留着原来那条
+        // the new post has not been judged yet: keep the original entry for now
         h.sync(listOf(a2), surface(a1), true)
         assertEquals("one", h.state.value.list.single().text)
         h.sync(listOf(a2), surface(a2), true)
         assertEquals("two", h.state.value.list.single().text)
         assertEquals(1, h.state.value.unseen)
-        // 再更新、判成忽略:拿掉
+        // updated again and judged as ignore: removed
         val a3 = rec("a", posted = 30)
         h.sync(listOf(a3), mapOf("a" to done(30, TriageDecision.Ignore)), true)
         assertEquals(0, h.state.value.list.size)
@@ -161,22 +161,22 @@ class NoticeHintsTest {
         h.markSeen(h.state.value.list)
         h.sync(listOf(a, b), surface(a, b), true)
         assertEquals(1, h.state.value.unseen)
-        // 关掉判定:结果还在 marks 里,但列表清空
+        // triage turned off: the results are still in `marks`, but the list is emptied
         h.sync(listOf(a, b), surface(a, b), false)
         assertEquals(0, h.state.value.list.size)
         assertEquals(0, h.state.value.unseen)
-        // 再打开:看过的 a 不回来,没看过的 b 回来
+        // turned back on: the seen `a` does not return, the unseen `b` does
         h.sync(listOf(a, b), surface(a, b), true)
         assertEquals(listOf("b"), h.state.value.list.map { it.key })
     }
 
-    // 点开提醒时只把写进对话的那几条记为看过:写的过程中新来的、同一条又更新了的,还没给用户看过
+    // opening the hints marks only the entries that were written into the conversation as seen: anything new that arrived while writing, and any entry that was updated meanwhile, has not been shown to the user yet
     @Test fun markSeenOnlyCoversWhatWasShown() {
         val h = NoticeHints()
         val a1 = rec("a", posted = 10, text = "one"); val b = rec("b", posted = 11)
         h.sync(listOf(a1, b), surface(a1, b), true)
         val shown = h.state.value.list
-        // 写的过程中:a 更新了并又判为值得提醒,c 新来
+        // while writing: `a` was updated and judged worth surfacing again, `c` is new
         val a2 = rec("a", posted = 20, text = "two"); val c = rec("c", posted = 21)
         h.sync(listOf(a2, b, c), surface(a2, b, c), true)
         h.markSeen(shown)
@@ -184,7 +184,7 @@ class NoticeHintsTest {
         assertEquals(setOf("a", "c"), s.list.filter { !it.seen }.map { it.key }.toSet())
         assertEquals(2, s.unseen)
         assertEquals(1, s.seenTotal)
-        // 已经不在的、空的都没有影响
+        // ones that are gone or empty have no effect
         h.markSeen(listOf(NoticeHint("gone", "p", 1, "", "", "")))
         h.markSeen(emptyList())
         assertEquals(2, h.state.value.unseen)
@@ -198,7 +198,7 @@ class NoticeHintsTest {
         h.sync(emptyList(), emptyMap(), true)
         assertEquals(0, h.state.value.list.size)
         assertEquals(1, h.state.value.seenTotal)
-        // 收件箱清空后同一个键重新进来(重新打开功能)算新的
+        // after the inbox is emptied the same key coming in again (feature turned back on) counts as new
         h.sync(listOf(a), surface(a), true)
         assertEquals(1, h.state.value.unseen)
     }

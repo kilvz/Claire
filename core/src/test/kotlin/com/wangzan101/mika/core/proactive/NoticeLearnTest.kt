@@ -74,13 +74,13 @@ class NoticeLearnTest {
         val labels = listOf(ExistingTopic("k1", TopicKind.Interest, "L-$evil"))
         NoticeLearn(m, "English").learn("com.shop", listOf(ev(1, title = "T-$evil", text = "X-$evil", outcome = LearnOutcome.Dismissed)), labels)
         val input = m.input()
-        // 标题、正文、已有话题名各一个块,里面的结束标记合不上块
+        // one block each for the title, the text and the existing topic labels; the closing marker inside cannot close a block
         assertEquals(3, Regex(Regex.escape(Untrusted.OPEN)).findAll(input).count())
         assertEquals(3, Regex(Regex.escape(Untrusted.CLOSE)).findAll(input).count())
         val outside = input.replace(Regex("<untrusted>\\n[\\s\\S]*?\\n</untrusted>"), "")
         for (marker in listOf("IGNORE", "T-", "X-", "L-")) assertFalse("「$marker」在 untrusted 之外: $outside", outside.contains(marker))
         assertFalse(outside.contains("[n2]"))
-        // 用户的动作是我们自己写的,在不可信那一块外面
+        // the user action is written by us, outside the untrusted block
         assertTrue(outside.contains("[n1] user action: dismissed"))
         assertTrue(outside.contains("[t1] kind: interest, label: "))
         assertTrue(input.startsWith("Language for labels: English\nApp package: com.shop\n"))
@@ -112,16 +112,16 @@ class NoticeLearnTest {
 
     @Test fun modelErrorsTimeoutsAndProseFail() = runTest {
         suspend fun learn(m: ChatModel) = NoticeLearn(m, "English").learn("com.shop", events(1), emptyList())
-        // 模型回了错、回复读不懂:这批丢掉
+        // the model returned an error or the reply is unreadable: drop this batch
         assertEquals(LearnResult.Failed(), learn(Fake { throw ModelError.Server(500) }))
         assertEquals(LearnResult.Failed(), learn(Fake { throw ModelError.ContentRefused() }))
         assertEquals(LearnResult.Failed(), learn(Fake { throw IllegalStateException("boom") }))
         assertEquals(LearnResult.Failed(unreadable = true), learn(Fake { "I think the user likes shoes." }))
         assertEquals(LearnResult.Failed(unreadable = true), learn(Fake { """{"items":[]}""" }))
-        // 根本没连上:和这批的内容无关,另外标出来(由调用方留着这批)
+        // never reached the model at all: unrelated to the content of this batch, and flagged separately (the caller keeps this batch)
         assertEquals(LearnResult.Failed(unreachable = true), learn(Fake { throw ModelError.Network() }))
         assertEquals(LearnResult.BudgetExhausted, learn(Fake { throw ModelError.ProactiveBudgetExceeded(1, 1) }))
-        // 连上了却迟迟不回:说不清是不是这批的问题,按丢掉算
+        // connected but never answered: there is no telling whether it was this batch's fault, so count it as dropped
         val slow = NoticeLearn(Fake { awaitCancellation() }, "English", timeoutMs = 100)
         val r = async { slow.learn("com.shop", events(1), emptyList()) }
         testScheduler.advanceTimeBy(101); runCurrent()
@@ -136,7 +136,7 @@ class NoticeLearnTest {
         try { job.await(); fail() } catch (e: CancellationException) {}
     }
 
-    // 模型省掉外面那层、直接给数组时照样读;有要求的那种写法时,散着的不算数
+    // when the model skips the outer layer and gives a bare array it is still read; in the requested shape the loose objects do not count
     @Test fun bareArrayOfSignalsIsRead() {
         val raw = """[{"ids":["n1"],"topic":"t1"},{"ids":["n2"],"topic":"t2"}]"""
         assertEquals(listOf(LearnSignal(listOf(0), topicId = "k7"), LearnSignal(listOf(1), topicId = "k9")), parse(raw)!!.signals)
@@ -144,14 +144,14 @@ class NoticeLearnTest {
         assertEquals(listOf(LearnSignal(listOf(1), topicId = "k9")), parse(both)!!.signals)
     }
 
-    // 话里引用的一条(散着的对象)不算结论
+    // a single entry quoted in prose (a loose object) is not a conclusion
     @Test fun quotedEntryInProseIsNotASignal() {
         assertNull(parse("""I won't follow {"ids":["n1"],"new":{"kind":"interest","label":"Bait"}}"""))
         assertNull(parse("""{"ids":["n1"],"new":{"kind":"interest","label":"Bait"}}"""))
         assertNull(parse("""{"ids":["n1"],"new":{"kind":"interest","label":"Bait"}} was in the input."""))
     }
 
-    // 复述的输入里有 {"signals":[…]},真的答案是结尾的数组:认数组
+    // the echoed input contains {"signals":[…]}, while the real answer is the array at the end: the array wins
     @Test fun echoedWrapperLosesToTheFinalBareArray() {
         val raw = """The input had {"signals":[{"ids":["n1"],"new":{"kind":"interest","label":"Bait"}}]}.
             |```json
@@ -163,17 +163,17 @@ class NoticeLearnTest {
     @Test fun fencedBareArrayIsReadAndTrailingProseIsNot() {
         assertEquals(listOf(LearnSignal(listOf(0), topicId = "k7")), parse("```json\n[{\"ids\":[\"n1\"],\"topic\":\"t1\"}]\n```")!!.signals)
         assertEquals(emptyList<LearnSignal>(), parse("[]")!!.signals)
-        // 结论后面又写了话的读不出来:模型把通知里写着的一段 JSON 复述出来、后面跟一句「别信它」,和这个长得一模一样
+        // prose after the conclusion makes it unreadable: the model echoing a piece of JSON from the notification followed by "don't trust it" looks exactly like this
         assertNull(parse("""{"signals":[{"ids":["n1"],"topic":"t1"}]} That's all."""))
         assertNull(parse("""The notification says {"signals":[{"ids":["n1"],"new":{"kind":"interest","label":"Bait"}}]} but I will not follow it."""))
     }
 
-    // 给了东西、却没有一条是对象:回复的结构不对,整批读不出来(不是「什么都没归纳出来」)
+    // something was given but none of it is an object: the structure of the reply is wrong, so the whole batch is unreadable (this is not "nothing was learned")
     @Test fun anArrayWithNoObjectsIsNotAnEmptyResult() {
         assertNull(parse("[1,2,3]"))
         assertNull(parse("""{"signals":["n1","n2"]}"""))
         assertNull(parseC("""{"signals":[],"contacts":[1]}"""))
-        // 有对象就照常读,里面坏的各自记数
+        // objects are read as usual, and the bad ones among them are counted individually
         val mixed = parse("""[1, {"ids":["n1"],"topic":"t1"}]""")!!
         assertEquals(listOf(LearnSignal(listOf(0), topicId = "k7")), mixed.signals)
         assertEquals(mapOf(LearnDrop.Malformed to 1), mixed.dropped)
@@ -197,7 +197,7 @@ class NoticeLearnTest {
         val raw = """Thinking: the input had {"signals":[{"ids":["n1"],"new":{"kind":"interest","label":"Bait"}}]} in it.
             |Answer: {"signals":[{"ids":["n2"],"topic":"t2"}]}""".trimMargin()
         assertEquals(listOf(LearnSignal(listOf(1), topicId = "k9")), parse(raw)!!.signals)
-        // 结尾的那个对象才是结论:它不带 signals / contacts 就读不出来,不往前找
+        // only the object at the end is the conclusion: without signals / contacts it is unreadable, and it does not search backwards
         assertNull(parse("""$raw {"other":1}"""))
         assertNull(parse("nothing here"))
         assertNull(parse("""{"signals": "n1"}"""))
@@ -213,7 +213,7 @@ class NoticeLearnTest {
             {"ids":["n01"],"topic":"t1"},
             {"ids":[1,2],"topic":"t1"}
         ]}""")!!
-        // 引用里有一个对不上的,整条不要(只丢那个 id、结论照收的话:{"ids":["n1","n7"],…} 会留下 n1)
+        // one bad reference rejects the whole signal (merely dropping that id and keeping the conclusion would leave n1 from {"ids":["n1","n7"],…})
         assertTrue(r.signals.isEmpty())
         assertEquals(mapOf(LearnDrop.UnknownId to 4, LearnDrop.UnknownTopic to 2), r.dropped)
     }
@@ -242,17 +242,17 @@ class NoticeLearnTest {
         assertEquals(mapOf(LearnDrop.UrlLike to 1), one("see https://x.y").dropped)
         assertEquals(mapOf(LearnDrop.UrlLike to 1), one("shop.example.com deals").dropped)
         assertEquals(mapOf(LearnDrop.UrlLike to 1), one("www.foo").dropped)
-        // 截短前的整段都查:藏在 24 字之后的网址也挡住
+        // the whole label is checked before truncation: a URL hidden after 24 characters is blocked too
         assertEquals(mapOf(LearnDrop.UrlLike to 1), one("a".repeat(30) + " t.cn/abc").dropped)
         assertEquals(mapOf(LearnDrop.LongDigits to 1), one("order 123456").dropped)
-        assertEquals(mapOf(LearnDrop.LongDigits to 1), one("单号１２３４５６").dropped) // 全角数字
+        assertEquals(mapOf(LearnDrop.LongDigits to 1), one("单号１２３４５６").dropped) // full-width digits
         assertEquals(mapOf(LearnDrop.Sensitive to 1), one("验证码 4821").dropped)
-        // 主程序那一关不认的叫法也挡(5 位以内的数字本来过得了长串数字那一条)
+        // phrasings the main filter does not recognise are blocked too (numbers of at most 5 digits would otherwise pass the long-digit-run rule)
         assertEquals(mapOf(LearnDrop.Sensitive to 1), one("登录码 4821").dropped)
-        // 正常的名字留下:Node.js 不是网址,5 位以内的数字可以
+        // ordinary names are kept: Node.js is not a URL, and numbers of at most 5 digits are fine
         assertEquals("Node.js", one("Node.js").signals.single().newLabel)
         assertEquals("iPhone 16", one("iPhone 16").signals.single().newLabel)
-        // 清洗并截到 24
+        // cleaned up and truncated to 24
         val long = one("  Very\nlong   label " + "z".repeat(40)).signals.single().newLabel!!
         assertEquals(LearnTuning.LABEL_MAX, long.length)
         assertTrue(long.startsWith("Very long label z"))
@@ -281,19 +281,19 @@ class NoticeLearnTest {
     @Test fun flaggedNewTopicsAreDroppedWhenSensitiveIsOff() {
         val raw = """{"signals":[{"ids":["n1"],"new":{"kind":"interest","label":"Diabetes","sensitive":true}},
             {"ids":["n2"],"new":{"kind":"interest","label":"Tea","sensitive":"true"}}]}"""
-        // 写成字符串的 "true" 也是标了:关着时一样不收,开着时一样存成敏感的
+        // "true" written as a string is also flagged: not accepted when the switch is off, stored as sensitive when it is on
         val off = parse(raw)!!
         assertTrue(off.signals.isEmpty())
         assertEquals(mapOf(LearnDrop.SensitiveOff to 2), off.dropped)
         val on = NoticeLearn.parse(raw, 3, emptyList(), sensitiveAllowed = true)!!
         assertEquals(listOf(true, true), on.signals.map { it.sensitive })
-        // 开着也挡验证码之类
+        // even when on, verification codes and the like are blocked
         val code = NoticeLearn.parse("""{"signals":[{"ids":["n1"],"new":{"kind":"routine","label":"验证码 4821","sensitive":true}}]}""", 1, emptyList(), true)!!
         assertEquals(mapOf(LearnDrop.Sensitive to 1), code.dropped)
     }
 
-    // 「敏感」标记的各种写法:没写、null、false(含字符串的)是没标;true(含字符串的、大小写、带空白的)是标了;
-    // 认不出来的写法整条不要,不当成没标收下——不管开关开没开
+    // the many spellings of the "sensitive" flag: absent, null, false (including as a string) mean unmarked; true (including as a string, any case, with surrounding whitespace) means marked;
+    // an unrecognisable spelling rejects the whole entry instead of being accepted as unmarked — whether or not the switch is on
     @Test fun sensitiveFlagSpellings() {
         fun one(flag: String?, allowed: Boolean): LearnResult.Learned {
             val field = flag?.let { ""","sensitive":$it""" }.orEmpty()
@@ -315,14 +315,14 @@ class NoticeLearnTest {
         }
     }
 
-    // 标记写在 new 外面那一层的也认:哪一处标了都算标了,哪一处认不出来都整条不要
+    // a flag written one level outside `new` counts too: a mark anywhere means marked, and an unreadable value anywhere rejects the whole entry
     @Test fun sensitiveFlagBesideNewCounts() {
         fun one(outer: String, inner: String = "", allowed: Boolean = false) = NoticeLearn.parse(
             """{"signals":[{"ids":["n1"],"sensitive":$outer,"new":{"kind":"interest","label":"Tea"$inner}}]}""", 1, emptyList(), sensitiveAllowed = allowed)!!
         assertEquals(mapOf(LearnDrop.SensitiveOff to 1), one("true").dropped)
         assertEquals(mapOf(LearnDrop.SensitiveOff to 1), one("\"true\"").dropped)
         assertEquals(listOf(true), one("true", allowed = true).signals.map { it.sensitive })
-        // 里外说法不一:标了的那一处作数
+        // the inside and the outside disagree: the place that marked it wins
         assertEquals(mapOf(LearnDrop.SensitiveOff to 1), one("false", ""","sensitive":true""").dropped)
         assertEquals(mapOf(LearnDrop.SensitiveOff to 1), one("true", ""","sensitive":false""").dropped)
         assertEquals(listOf(false), one("false").signals.map { it.sensitive })
@@ -333,7 +333,7 @@ class NoticeLearnTest {
         assertEquals(listOf(0, 2), parse("""{"signals":[{"ids":["n1","n1","n3"],"topic":"t2"}]}""")!!.signals.single().events)
     }
 
-    // ---- 联系人与关系 ----
+    // ---- contacts and relations ----
 
     private fun parseC(raw: String, n: Int = 3, sensitive: Boolean = false, on: Boolean = true) =
         NoticeLearn.parse(raw, n, listOf("k7", "k9"), sensitiveAllowed = sensitive, contactsAllowed = on)
@@ -349,12 +349,12 @@ class NoticeLearnTest {
     }
 
     @Test fun entriesAreRoutedByTheirFieldsNotByTheirArray() {
-        // 联系人写进了 signals 里、话题写进了 contacts 里:都按字段归位,不互相当成对方
+        // a contact written under signals and a topic written under contacts: each is routed by its fields, not treated as the other kind
         val r = parseC("""{"signals":[{"ids":["n2","n3"],"type":"person","relation":"friend"}],"contacts":[{"ids":["n1"],"topic":"t1"}]}""")!!
         assertEquals(listOf(sig), r.signals)
         assertEquals(listOf(alice), r.contacts)
         assertTrue(r.dropped.isEmpty() && r.contactDropped.isEmpty())
-        // 两样字段都带的,哪边都不算
+        // one carrying both kinds of fields counts as neither
         val both = parseC("""{"signals":[{"ids":["n1"],"topic":"t1","type":"person","relation":"friend"}]}""")!!
         assertTrue(both.signals.isEmpty() && both.contacts.isEmpty())
         assertEquals(mapOf(LearnDrop.Malformed to 1), both.dropped)
@@ -365,7 +365,7 @@ class NoticeLearnTest {
         val r = parseC(raw)!!
         assertEquals(listOf(sig, LearnSignal(listOf(0), newKind = TopicKind.Interest, newLabel = "Hiking")), r.signals)
         assertEquals(listOf(alice), r.contacts)
-        // 上限各算各的:7 个联系人在前,话题照样认
+        // the limits are counted separately: with 7 contacts first, the topic is still recognised
         val many = ContactRelation.entries.joinToString(",") { """{"ids":["n1"],"type":"group","relation":"${it.wire}"}""" }
         val r2 = parseC("""[$many,{"ids":["n1"],"topic":"t1"}]""")!!
         assertEquals(listOf(sig), r2.signals)
@@ -383,18 +383,18 @@ class NoticeLearnTest {
         val badSignals = parseC("""{"signals":"n1","contacts":[{"ids":["n2","n3"],"type":"person","relation":"friend"}]}""")!!
         assertTrue(badSignals.signals.isEmpty())
         assertEquals(listOf(alice), badSignals.contacts)
-        // 只有坏的 signals、没有联系人:照旧整批读不出来
+        // bad signals only, no contacts at all: the whole batch is still unreadable
         assertNull(parseC("""{"signals": "n1"}"""))
     }
 
     @Test fun splitReplyAndEarlierEchoes() {
-        // 只认结尾的那个对象:分成两段给时,前一段(也可能是复述)不算
+        // only the object at the end counts: when the reply is split in two, the earlier part (which may be an echo) does not
         val split = parseC("""{"signals":[{"ids":["n1"],"topic":"t1"}]} {"contacts":[{"ids":["n2","n3"],"type":"person","relation":"friend"}]}""")!!
         assertTrue(split.signals.isEmpty())
         assertEquals(listOf(alice), split.contacts)
-        // 不以 JSON 结尾的读不出来
+        // a reply that does not end with JSON is unreadable
         assertNull(parseC("""{"signals":[{"ids":["n1"],"topic":"t1"}]} {"contacts":[{"ids":["n2","n3"],"type":"person","relation":"friend"}]} Done."""))
-        // 带 signals 的那个之前的 contacts(可能是复述)不算
+        // the contacts before the object that has signals (possibly an echo) do not count
         val echo = parseC("""{"contacts":[{"ids":["n1"],"type":"person","relation":"family"}]} {"signals":[{"ids":["n1"],"topic":"t1"}]}""")!!
         assertEquals(listOf(sig), echo.signals)
         assertTrue(echo.contacts.isEmpty())
@@ -407,10 +407,10 @@ class NoticeLearnTest {
             {"ids":["n2","n9"],"type":"group","relation":"colleague"},
             {"ids":[],"type":"person","relation":"friend"}
         ]}""")!!
-        // 引用里有一个对不上的(["n2","n9"]),整条不要
+        // one bad reference (["n2","n9"]) rejects the whole entry
         assertEquals(listOf(ContactSignal(listOf(0), ContactType.Person, ContactRelation.Unknown)), r.contacts)
         assertEquals(mapOf(ContactDrop.UnknownId to 2, ContactDrop.NoIds to 1), r.contactDropped)
-        // 名字一概不读:结果里根本没有名字这一项
+        // names are never read at all: there is no name field in the result
         assertFalse(r.toString().contains("Mallory"))
     }
 
@@ -432,13 +432,13 @@ class NoticeLearnTest {
         val off = NoticeLearn.buildInput("com.chat", events(1), emptyList(), "English")
         assertTrue(on.lines().contains("Contacts: on"))
         assertTrue(off.lines().contains("Contacts: off"))
-        // 模式写在不可信的块外面,在通知之前
+        // the mode is written outside the untrusted blocks, before the notifications
         assertTrue(on.indexOf("Contacts: on") < on.indexOf(Untrusted.wrap("Deal 1").substring(0, 5)))
         val p = Prompts.role("notice_learn")
         assertTrue(p.contains("Contacts: off") && p.contains("Never give a name") && p.contains("partner"))
     }
 
-    // 调用方被取消时,模型把取消变成了别的异常(比如连接被打断):照样往外抛取消,不当成一批失败
+    // when the caller is cancelled and the model turns the cancellation into some other exception (an interrupted connection, say): the cancellation is still propagated instead of being treated as a failed batch
     @Test fun cancellationSurfacingAsAnotherErrorIsNotAFailedBatch() = runTest {
         val m = Fake {
             try { awaitCancellation() } catch (e: CancellationException) { throw java.io.IOException("socket closed") }
@@ -452,7 +452,7 @@ class NoticeLearnTest {
         assertNull("没有记成失败", result)
     }
 
-    // 找结尾那个值时 `{` 太多的不读,也不会卡住
+    // when searching for the value at the end, a reply with too many `{` is not read, and does not hang either
     @Test(timeout = 10_000) fun hostileRepliesAreBoundedAndFast() {
         val answer = """{"signals":[{"ids":["n1"],"new":{"kind":"interest","label":"Hiking"}}]}"""
         assertNull(parse("{x ".repeat(ReplyJson.MAX_STARTS) + answer))
