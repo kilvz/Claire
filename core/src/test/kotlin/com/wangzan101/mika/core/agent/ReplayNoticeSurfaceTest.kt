@@ -18,8 +18,9 @@ import org.junit.Test
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
 /**
- * 经验回放交还时告诉模型的说明,每种结局一条,经真的 AgentLoop 产生,原样写进金样(prompt-surface/feedback-replay.txt)。
- * 金样是在重构前的代码上生成的:说明改由反馈目录拼出后必须一字不差。
+ * The notice handed back to the model when experience replay returns control, one per outcome, produced by the real
+ * AgentLoop and copied verbatim into the golden file (prompt-surface/feedback-replay.txt).
+ * The golden file was generated from the code before the refactor: once the notices are assembled from the feedback catalog, they must match word for word.
  */
 class ReplayNoticeSurfaceTest {
     private var seq = 0
@@ -30,7 +31,7 @@ class ReplayNoticeSurfaceTest {
         override suspend fun tapRef(ref: String, snapshotId: String): ActionResult = ActionResult.Failed("obscured")
     }
 
-    /** 交还时补进对话的说明(带「按以往」的那段文字)。 */
+    /** The notice appended to the conversation on hand-back (the passage that says "as before" / "the earlier way"). */
     private fun notice(screen: ScreenPort, route: com.wangzan101.mika.core.learn.replay.Route = Notes.route()): String {
         val main = FakeModel(text("写好了"))
         runBlocking {

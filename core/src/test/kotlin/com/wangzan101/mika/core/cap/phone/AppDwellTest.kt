@@ -28,11 +28,11 @@ import org.junit.Test
 import kotlin.random.Random
 
 /**
- * App 里的节奏接在执行入口上:单步和一批里的每一步都在动作之前补足停留,停了多久记成这次调用的等待;
- * 「快」不停;限制浏览快慢的 App 换屏到了上限就不做、报 page_limit,打字照常,用户答话后接着做;停留里轻轻滚过只进运行记录。
+ * App pacing hooks into the execution entry point: both single steps and every step of a batch top up the dwell before the action, and how long it waited is recorded as this call's wait;
+ * "fast" does not wait; for apps that throttle browsing, once screen changes hit the cap nothing is done and page_limit is reported, typing still works, and it carries on after the user answers; a gentle scroll during the dwell only goes into the run record.
  */
 class AppDwellTest {
-    /** 一个 App:每点一下换一整屏(六条不同的内容);记下点、打字、轻轻滚了几下。 */
+    /** One app: every tap swaps a whole screen (six different items); records taps, typing and gentle scrolls. */
     private class Pages(private val pkg: String = "com.slow") : ScreenPort by FakeScreen() {
         var page = 0
         val calls = mutableListOf<String>()
@@ -65,13 +65,13 @@ class AppDwellTest {
         val ex = executor(t)
         val start = currentTime
         repeat(5) { assertEquals(0L, ex.tap(t).waitMs) }
-        // 屏数也不设上限
+        // The number of screens is not capped either
         assertEquals(5, screen.page)
         assertEquals(0L, currentTime - start)
     }
 
     @Test fun perAppFastTempoSkipsDwellEvenWhenOthersWait() = runTest {
-        // 停留引擎开着(别的 App 在等),这个 App 覆盖成「快」:里面不停也不看上限
+        // The dwell engine is on (other apps are waiting) but this app is overridden to "fast": no waiting and no cap inside it
         val screen = Pages("com.quick")
         val t = toolDispatcher(screen, appPacing = { AppPacing.human(Random(3)) }, appTempo = { AppTempo.FAST }, appIdleScroll = { null })
         val ex = executor(t)
@@ -87,10 +87,10 @@ class AppDwellTest {
         assertEquals(0L, ex.tap(t).waitMs)
         val before = currentTime
         val second = ex.tap(t)
-        // 上一下换了一屏:新的一屏的范围(标准)
+        // The previous action changed the screen: the new-screen range (standard)
         assertTrue("${second.waitMs}", second.waitMs in AppPacing.Limits().newScreenMs.first..AppPacing.Limits().maxDwellMs)
         assertTrue(currentTime - before >= second.waitMs)
-        // 一批里的每一步同样经执行入口停
+        // Each step inside a batch also waits through the execution entry point
         val sid = t.execute(Part.ToolCall("o", "phone_observe", "{}")).content["snapshotId"]!!.jsonPrimitive.content
         val typed = ex.run(Part.ToolCall("b1", "phone_type_text", """{"ref":"@e1","snapshotId":"$sid","text":"你好"}"""), Origin.Batch(2)).execution()
         assertTrue("${typed.waitMs}", typed.waitMs > 0)
@@ -101,7 +101,7 @@ class AppDwellTest {
         val t = tools(screen, AppPacing(Random(1), screenCap = 3))
         val ex = executor(t)
         repeat(3) { assertEquals(JsonPrimitive(true), ex.tap(t).content["ok"]) }
-        // 已换了三屏:换屏的动作不做,说明为什么停
+        // Three screens have already been changed: actions that change screens are not done, and the message explains why it stopped
         val stopped = ex.tap(t)
         assertEquals("page_limit", stopped.error())
         assertTrue(stopped.content["message"].toString(), stopped.content["message"].toString().contains("ask_user"))
@@ -112,10 +112,10 @@ class AppDwellTest {
         assertEquals(JsonPrimitive(3), budget["used"])
         assertEquals(JsonPrimitive(3), budget["limit"])
         assertEquals(3, screen.page)
-        // 打字照常
+        // Typing works as usual
         val sid = t.execute(Part.ToolCall("o", "phone_observe", "{}")).content["snapshotId"]!!.jsonPrimitive.content
         assertEquals(JsonPrimitive(true), ex.run(Part.ToolCall("y", "phone_type_text", """{"ref":"@e1","snapshotId":"$sid","text":"a"}"""), Origin.Model(1)).execution().content["ok"])
-        // 用户答过话:接着做
+        // The user has answered: carry on
         t.noteUserAnswer("还要接着看吗?", "继续")
         assertEquals(JsonPrimitive(true), ex.tap(t).content["ok"])
         assertEquals(4, screen.page)
@@ -133,10 +133,10 @@ class AppDwellTest {
         val t = tools(screen, AppPacing.human(Random(5)), IdleScroll(Random(6)))
         val ex = executor(t)
         ex.tap(t)
-        // 点按坐标或编号的动作之前不滚
+        // No idle scroll before actions that tap by coordinate or ref
         ex.tap(t)
         assertTrue(screen.calls.none { it == "idle" })
-        // 返回不按屏上的位置:新的一屏上停得够久,停留里轻轻滚几下,只进运行记录
+        // Back does not aim at a position on screen: it waits long enough on the new screen and scrolls gently a few times during the dwell, which only goes into the run record
         val back = ex.run(Part.ToolCall("k", "phone_back", "{}"), Origin.Model(1)).execution()
         val idled = screen.calls.count { it == "idle" }
         assertTrue("$idled", idled > 0)

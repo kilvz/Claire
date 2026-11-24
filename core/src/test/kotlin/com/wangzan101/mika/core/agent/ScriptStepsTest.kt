@@ -52,7 +52,7 @@ class ScriptStepsTest {
         it.execute(Part.ToolCall("n", "web_navigate", """{"url":"https://shop.example.com/"}"""))
     }
 
-    /** 页面脚本的子步:经执行入口,来源为 Script;守卫结论攒下来供断言。 */
+    /** A page-script sub-step: goes through the execution entry point with origin Script; guard verdicts are collected for assertions. */
     private class Steps(val executor: ActionExecutor, val step: Int) {
         val verdicts = mutableListOf<GuardVerdict>()
         suspend fun run(call: Part.ToolCall) = executor.run(call, Origin.Script(step)).also { o ->
@@ -72,7 +72,7 @@ class ScriptStepsTest {
         val sid = snap["snapshotId"]!!.jsonPrimitive.content
         val tap = s.run(Part.ToolCall("c1.2", "web_tap", """{"ref":"@e1","snapshotId":"$sid"}""")).content
         assertEquals(JsonPrimitive(true), tap["ok"])
-        assertEquals(1, gates) // 只有写操作过锁屏关卡
+        assertEquals(1, gates) // only write actions go through the lock-screen gate
         assertTrue(web.calls.any { it.startsWith("tapRef @e1") })
         val results = events.filterIsInstance<RunEvent.ToolResult>()
         assertEquals(listOf("script", "script"), results.map { it.source })
@@ -89,9 +89,9 @@ class ScriptStepsTest {
         assertEquals("confirmation_required", r["error"]!!.jsonPrimitive.content)
         assertEquals(JsonPrimitive(false), r["executed"])
         assertFalse(web.calls.any { it.startsWith("tapRef") })
-        assertEquals(1, gates) // 先过关卡再按此刻的屏幕判
+        assertEquals(1, gates) // the gate is passed first, then the decision is made on the screen at that moment
         assertEquals("required", events.filterIsInstance<RunEvent.Confirmation>().single().decision)
-        assertEquals(1, events.filterIsInstance<RunEvent.ToolResult>().size) // 没执行的不记成工具结果
+        assertEquals(1, events.filterIsInstance<RunEvent.ToolResult>().size) // actions that did not run are not recorded as tool results
     }
 
     @Test fun startedActionFinishesAndIsRecordedEvenIfCancelled() = runTest {
@@ -107,7 +107,7 @@ class ScriptStepsTest {
         val sid = s.run(Part.ToolCall("c1.1", "web_list_elements", "{}")).content["snapshotId"]!!.jsonPrimitive.content
         val job = launch { s.run(Part.ToolCall("c1.2", "web_tap", """{"ref":"@e1","snapshotId":"$sid"}""")) }
         kotlinx.coroutines.delay(1_000)
-        job.cancel() // 脚本超时、任务取消:动作已经开始
+        job.cancel() // script timed out or the task was cancelled: the action has already begun
         job.join()
         assertTrue(web.calls.any { it.startsWith("tapRef @e1") })
         assertEquals(listOf("c1.1", "c1.2"), events.filterIsInstance<RunEvent.ToolResult>().map { it.callId })
@@ -117,7 +117,7 @@ class ScriptStepsTest {
         val d = onWeb(shop())
         val g = OperationGuards()
         val s = steps(d, g)
-        // 同一个动作反复执行不因签名相同而叫停
+        // Repeating the same action is not stopped just because its signature is identical
         var last: JsonObject? = null
         repeat(14) { last = s.run(Part.ToolCall("c1.$it", "web_tap", """{"x":500,"y":50}""")).content }
         assertTrue(last!!["error"]?.jsonPrimitive?.content != "guard_stopped")
@@ -145,7 +145,7 @@ class ScriptStepsTest {
         val result = model.requests[2].last { it.role == Role.Tool }.parts.filterIsInstance<Part.ToolResult>().single()
         val o = Json.parseToJsonElement(result.content).jsonObject
         assertEquals("confirmation_required", o["error"]!!.jsonPrimitive.content)
-        // 整个脚本调用本身也照常记一条
+        // The whole script call itself is also recorded as usual
         assertTrue(events.filterIsInstance<RunEvent.ToolResult>().any { it.tool == WEB_SCRIPT_TOOL && it.callId == "b" && it.source == "model" })
     }
 }

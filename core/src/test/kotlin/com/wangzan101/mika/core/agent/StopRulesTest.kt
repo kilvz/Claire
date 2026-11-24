@@ -8,8 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 自绘/反自动化界面（微信、GitHub 客户端等）注入无效时的结局文案：要告诉用户「该应用不响应自动化」，
- * 而不是只说「读不到控件」这种症状。
+ * Outcome wording when injection does not work on self-drawn / anti-automation UIs (WeChat, the GitHub client, etc.):
+ * tell the user "the app does not respond to automation" rather than only the symptom "the controls cannot be read".
  */
 class StopRulesTest {
     @Test fun treeBlindNoProgressSaysAppUnresponsive() {

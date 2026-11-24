@@ -18,12 +18,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 剖析工具:用假模型驱动真的 AgentLoop 跑一个典型多步手机任务,逐轮打印发给模型的
- * 输入 token 结构(固定开销 = 系统提示词 + 工具定义;历史 = 消息列表;图片数)。
- * 口径与 ModelCaller 完全一致:overhead = TokenEstimate.of(system) + Σ TokenEstimate.of(name+desc+schema),
- * history = TokenEstimate.of(messages)。
- * 注意:假模型无视觉,history 里没有截图图片;实机每看一次屏还附一张 ~1280px 截图(约 983 token),
- * 报告末尾单独估了这块。跑法:./gradlew :core:test --tests '*TokenProfileTest' --info
+ * Profiling tool: drives the real AgentLoop with a fake model through a typical multi-step phone task and prints, round by
+ * round, the input token structure sent to the model (fixed overhead = system prompt + tool definitions; history = message list; image count).
+ * The accounting matches ModelCaller exactly: overhead = TokenEstimate.of(system) + Σ TokenEstimate.of(name+desc+schema),
+ * history = TokenEstimate.of(messages).
+ * Note: the fake model has no vision, so history holds no screenshot images; on a real device each screen look also attaches a ~1280px screenshot (about 983 tokens),
+ * which is estimated separately at the end of the report. How to run: ./gradlew :core:test --tests '*TokenProfileTest' --info
  */
 class TokenProfileTest {
 
@@ -36,7 +36,7 @@ class TokenProfileTest {
         req.messages.sumOf { m -> m.parts.count { it is Part.Image } }
 
     @Test fun profileTypicalPhoneTask() = runTest {
-        // 一个常见的「查 WLAN 连接状态」任务:看屏 → 点 → 看屏 → 点 → 看屏 → 回答(3 次看屏)。
+        // A common "check the WLAN connection status" task: look at screen → tap → look → tap → look → answer (3 screen looks).
         val screen = ScriptedScreen(listOf(
             Screen(SETTINGS, listOf(label("@e1", "设置", 80), button("@e2", "WLAN", 300), button("@e3", "蓝牙", 400))),
             Screen(SETTINGS, listOf(label("@e1", "WLAN", 80), label("@e2", "已开启", 200), label("@e3", "home-5G", 320), label("@e4", "已连接", 360))),
@@ -79,7 +79,7 @@ class TokenProfileTest {
         sb.append("\n合计输入 token: $totalInput(系统 $totalSystem + 工具 $totalTools + 历史 $totalHistory)\n")
         sb.append("固定开销(每轮都重发的 系统+工具): ${totalSystem + totalTools},占 ${"%.1f".format((totalSystem + totalTools) * 100.0 / totalInput)}%%\n")
 
-        // 实机图片:每次 phone_observe 附一张截图,ModelImage 缩到 1280 边、JPEG 80,约 983 token/张。
+        // Real-device images: every phone_observe attaches a screenshot, scaled by ModelImage to a 1280 edge at JPEG 80, about 983 tokens each.
         val observesReal = main.requests.count { "phone_observe" in it.toolNames }
         val imageEstimate = observesReal * 983
         sb.append("实机看屏 $observesReal 次 ≈ 图片 $imageEstimate token(估,不在上面历史列里)\n")
@@ -89,7 +89,7 @@ class TokenProfileTest {
     }
 
     @Test fun toolCostAudit() {
-        // 纯手机任务(和 simplePhoneTask 同口径)全展开后的工具集 = 第 2 轮起每轮都发给模型的那份。
+        // The fully expanded tool set for a phone-only task (same accounting as simplePhoneTask) = the set sent to the model on every round from round 2 on.
         val dispatcher = toolDispatcher(FakeScreen())
         val specs = dispatcher.offeredNow(all = true)
         data class Row(val name: String, val nameT: Int, val descT: Int, val schemaT: Int, val total: Int)
@@ -111,7 +111,7 @@ class TokenProfileTest {
         sb.append("%-24s %6s %6s %6s %6s\n".format("工具", "名字", "描述", "schema", "合计"))
         rows.take(15).forEach { sb.append("%-24s %6d %6d %6d %6d\n".format(it.name, it.nameT, it.descT, it.schemaT, it.total)) }
 
-        // reason 字段的重复成本:每个非 ownReason 工具都带一段 ~24 token 的说明。
+        // Repeated cost of the reason field: every non-ownReason tool carries a ~24-token note.
         val reasonTokens = TokenEstimate.of(com.wangzan101.mika.core.tool.REASON_NOTE)
         val withReason = specs.count { "\"reason\"" in it.parametersJsonSchema }
         sb.append("\n每个工具都重复的 reason 说明:${reasonTokens} token × $withReason 个工具 ≈ ${reasonTokens * withReason} token/轮\n")

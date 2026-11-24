@@ -29,7 +29,7 @@ class SpeedFlagsTest {
     }
 
     @Test fun retiredKeyIgnored() {
-        // 阶梯式裁剪已转正,存着的旧设置照样读得出其余开关
+        // Tiered pruning is now the default; stored legacy settings still yield the remaining flags
         assertEquals(SpeedFlags(replay = true), SpeedFlags.parse("cacheFriendlyPrune,replay"))
     }
 }

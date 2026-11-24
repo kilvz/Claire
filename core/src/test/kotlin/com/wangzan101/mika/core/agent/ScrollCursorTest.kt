@@ -8,9 +8,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Q2 原型验证：滚动找更多（reveal）时，contentKey 仍稳、到底能停；ordinal 位置依赖、不能当跨屏键。
+ * Q2 prototype validation: when scrolling to reveal more, contentKey stays stable and it stops correctly at the end;
+ * ordinal depends on position and cannot serve as a cross-screen key.
  *
- * 模拟一个可滚动列表：`views` 是滚动过程中逐屏读到的元素（每滚一次，窗口下移、露出新条目）。
+ * Simulates a scrollable list: `views` are the elements read screen by screen while scrolling (each scroll moves the
+ * window down and reveals new items).
  */
 class ScrollCursorTest {
 
@@ -23,7 +25,7 @@ class ScrollCursorTest {
     private fun view(vararg names: String): List<JsonObject> =
         names.mapIndexed { i, n -> el("@e${i + 1}", "ViewGroup", n) }
 
-    /** 驱动一遍：按游标决定做/滚，返回处理顺序、最终 done 集合与最后一步。 */
+    /** Drives one pass: the cursor decides act or scroll; returns the processing order, the final done set and the last step. */
     private fun simulate(views: List<List<JsonObject>>, role: String?, text: String?): Triple<List<String>, Set<String>, ScrollCursor.Step> {
         val cursor = ScrollCursor(role, text)
         val order = mutableListOf<String>()
@@ -45,19 +47,19 @@ class ScrollCursorTest {
         return Triple(order, cursor.done.toSet(), final)
     }
 
-    /** 5 条内容唯一的列表：逐条做一遍、滚到底、准确停。 */
+    /** A list of 5 unique items: each is done once, it scrolls to the end, and stops exactly there. */
     @Test
     fun revealsAndStopsAtEnd() {
         val views = listOf(view("A", "B", "C"), view("B", "C", "D"), view("C", "D", "E"), view("D", "E"))
         val (order, done, final) = simulate(views, "ViewGroup", null)
 
-        // 每条恰好一次，按可见顺序 A→E；滚出屏的 A/B/C 没有重做
+        // Each item exactly once, in visible order A→E; the A/B/C that scrolled off screen are not redone
         assertEquals(listOf("ViewGroup|A", "ViewGroup|B", "ViewGroup|C", "ViewGroup|D", "ViewGroup|E"), order)
         assertEquals(5, done.size)
         assertTrue(final is ScrollCursor.Step.End)
     }
 
-    /** 同名条目（contentKey 相同）会收敛成「做一次」——元素信息不足以跨滚动区分两条同名条目，这是已知边界。 */
+    /** Items with the same name (identical contentKey) collapse to a single action — element information is not enough to tell two same-named items apart across scrolling; this is a known boundary. */
     @Test
     fun identicalContentCollapsesToOnce() {
         val cursor = ScrollCursor("ViewGroup", null)
@@ -67,23 +69,23 @@ class ScrollCursorTest {
         assertTrue(s1 is ScrollCursor.Step.DoNext)
         cursor.finish((s1 as ScrollCursor.Step.DoNext).item)
 
-        // 第二条同名条目 contentKey 已被 done，被当作「做过」跳过；根治靠更细的 item 匹配（让 contentKey 唯一）
+        // The second same-named item has a contentKey already in done, so it is skipped as "already done"; a real fix needs finer item matching (making contentKey unique)
         val s2 = cursor.advance(two, false)
         assertTrue(s2 is ScrollCursor.Step.Scroll)
         assertEquals(setOf("ViewGroup|运营"), cursor.done)
     }
 
-    /** ordinal 是位置依赖的：滚出一条同名条目后，剩下的那条 ordinal 从 1 变 0，所以不能当跨屏键。 */
+    /** ordinal is position-dependent: after one same-named item scrolls out, the remaining one's ordinal goes from 1 to 0, so it cannot be a cross-screen key. */
     @Test
     fun ordinalIsNotStableAcrossScroll() {
         val cursor = EachCursor()
         val first = cursor.match(listOf(el("@e1", "ViewGroup", "运营"), el("@e2", "ViewGroup", "运营"), el("@e3", "ViewGroup", "C")), "ViewGroup", null)
         assertEquals(listOf(0, 1, 0), first.map { it.ordinal })
 
-        // 滚过之后：第一条「运营」滚出屏，剩下的那条「运营」ordinal 变成 0（位置变了，键跟着变）
+        // After scrolling: the first of the two same-named items scrolls off screen, and the remaining one's ordinal becomes 0 (its position changed, so the key changed with it)
         val after = cursor.match(listOf(el("@e9", "ViewGroup", "运营"), el("@e4", "ViewGroup", "C")), "ViewGroup", null)
         assertEquals(listOf(0, 0), after.map { it.ordinal })
-        // 但 contentKey 没变——它才是跨屏身份
+        // But contentKey is unchanged — that is the cross-screen identity
         assertEquals(listOf("ViewGroup|运营", "ViewGroup|C"), after.map { it.contentKey })
     }
 }

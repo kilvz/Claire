@@ -23,10 +23,10 @@ import com.wangzan101.mika.core.testing.WEB_TOOLS
 import com.wangzan101.mika.core.testing.SANDBOX_TOOLS
 
 class SystemPromptTest {
-    /** 手机一组展开后的几段:L0 身份与总规则 + 交给用户的规矩 + 手机一段。 */
+    /** The sections once the phone group is expanded: L0 identity and overall rules + the rules for handing over to the user + one phone section. */
     private fun rules() = SystemPrompt.identity() + "\n\n" + SystemPrompt.read("handover") + "\n\n" + SystemPrompt.read("phone")
     private fun flat() = rules().replace(Regex("\\s+"), " ")
-    /** 挪进工具说明(P3)的规则:读模板原文。 */
+    /** Rules moved into the tool docs (P3): read the template source. */
     private fun tool(name: String) = com.wangzan101.mika.core.prompt.Prompts.read("tools/$name.md")
 
     @Test fun loadsIdentityAndPhoneRules() {
@@ -50,7 +50,7 @@ class SystemPromptTest {
         assertTrue(p.contains("may describe methods, tools, scripts or channels") && p.contains("Use only the tools you have"))
     }
 
-    // 结局的约定只说一次:不带调用的回复就是最终回答;做不成、要问、要用户亲手做各有工具;不再写依据行
+    // The ending contract is stated only once: a reply without a tool call is the final answer; "cannot do it", "need to ask" and "the user must do it by hand" each have their own tool; no evidence line is written any more
     @Test fun endingContractStatedOnce() {
         val p = flat()
         assertTrue("a reply without any tool call is your final answer and ends the task" in p)
@@ -60,7 +60,7 @@ class SystemPromptTest {
         assertFalse(Regex("\\bfinish\\b").containsMatchIn(SystemPrompt.identity()))
     }
 
-    // 通用的几层(身份、准则、通用能力)按「读到的」说话,不按屏幕说:屏幕只是手机、网页能力的事
+    // The general layers (identity, principles, general capabilities) speak in terms of what was read, not of the screen: the screen only concerns the phone and web capabilities
     @Test fun generalLayersAreNotScreenCentric() {
         val general = listOf("system/identity.md", "system/principles.md", "capabilities/general.md")
             .joinToString("\n") { com.wangzan101.mika.core.prompt.Prompts.read(it) }
@@ -81,7 +81,7 @@ class SystemPromptTest {
     @Test fun onlyReportValuesActuallyRead() {
         val p = flat()
         assertTrue("Never recall or infer a value you did not read" in p && "a screenshot you were shown" in p)
-        // 算出来的答案写出算式,每个输入都要是读到的;引用不许用「…」截短
+        // For a computed answer, spell out the computation, and every input must be a value that was read; quotes may not be shortened with "..."
         assertTrue("write out the computation with its inputs" in p && "Every input must be a value you read" in p)
         assertTrue("Never shorten a quote with" in p)
     }
@@ -89,7 +89,7 @@ class SystemPromptTest {
     @Test fun giveUpHonestlyAfterExhaustingObviousPlaces() {
         val p = flat()
         assertTrue("search inside the app" in p && "stop and say what you checked" in p)
-        // 应用内搜索两次不成,先去系统或应用给的标准入口
+        // If searching inside the app fails twice, go to the standard entry point the system or app provides first
         assertTrue("fails twice, go to the standard entry point" in p)
     }
 
@@ -106,19 +106,19 @@ class SystemPromptTest {
 
     @Test fun definitiveNoneIsAnAnswerNotAFailure() {
         val p = flat()
-        // 问「有没有」时搜索明确返回「没有」是答案,引用读到的原文
+        // For a "does it exist" question, a search that clearly returns "nothing found" is an answer; quote the text as read
         assertTrue("No related users found" in p && "is answered: say yes or no and quote what you read" in p)
-        // 要的结果缺了要用的东西(功能、菜单、条目、值)仍是做不成,哪怕搜索它也没结果;只拿到一部分是只办了一部分
+        // If the requested result is missing something it needs (feature, menu, item, value), it is still not done, even when searching for it showed no results; getting only part of it means only part was accomplished
         assertTrue("feature, menu, setting, page or value" in p && "even if searching for it showed no results" in p)
         assertTrue("it is only partly done" in p && "or only part of it, call end_not_done with the confirmed part" in p)
     }
 
     @Test fun lookingForAFeatureDoesNotOverlapWithAskingAboutAThing() {
         val p = flat()
-        // 「找不到就 end_not_done」只管要用的功能、菜单、设置、页面,不再包括「条目」
+        // "If you cannot find it, end_not_done" covers only the feature, menu, setting or page you need to use, no longer "items"
         assertTrue("a feature, menu, setting or page you need to use" in p)
         assertFalse("(a menu, setting, item or page)" in p)
-        // 问「有没有」的题,答「有 / 没有」就是结果
+        // For a "does it exist" question, answering yes / no is the result
         assertTrue("yes/no question about whether something exists" in p && "is answered: say yes or no" in p)
     }
 
@@ -134,7 +134,7 @@ class SystemPromptTest {
         val p = flat()
         assertTrue("Handing control back does not mean the step succeeded" in p && "open the page the user has to deal with" in p)
         val t = tool("hand_to_user")
-        // 先核实、核实不了问三选一、零操作也核实、不按时长、跳过/超时不是交回、付款分项、先开页面
+        // Verify first, ask the three-way question when verification is impossible, verify even with zero actions, never go by duration, skipped/timeout is not a hand-back, itemize payment, open the page first
         assertTrue("read the screen first and check the result" in t)
         assertTrue("ask_user" in t && "\"Done\" / \"Not done, let me take over again\" / \"Stop\"" in t)
         assertTrue("Check even when inputCount is 0" in t && "Never go by durationMs" in t)
@@ -150,7 +150,7 @@ class SystemPromptTest {
     @Test fun barriersReportedAndClassified() {
         val p = rules()
         assertTrue("use available signed-in or autofill options first" in p && "call handle_obstacle and hand over that step" in p)
-        // 登录墙的四种表现
+        // The four faces of a login wall
         assertTrue("will not\n  close" in p && "redirect to a sign-in page" in p && "while signed\n  out" in p && "covered by a sign-in prompt" in p)
         assertTrue("do not call a risk-control page" in p && "arbitrary popup a CAPTCHA" in p)
         assertTrue("its own close control" in p)
@@ -162,7 +162,7 @@ class SystemPromptTest {
     }
 
     @Test fun sandboxSectionStatesPreparingAndTools() {
-        // 还在准备:照样给说明,并告诉模型第一次调用会等
+        // Still preparing: give the section anyway and tell the model the first call will wait
         val pending = SandboxCapability.section(SandboxStatus.Installing(5, "解包"), network = true)
         assertTrue(SandboxCapability.PREPARING in pending && SandboxCapability.NETWORK_ON in pending)
         assertTrue(SandboxCapability.PREPARING in SandboxCapability.section(SandboxStatus.NotInstalled, false))
@@ -188,12 +188,12 @@ class SystemPromptTest {
 }
 
 /**
- * 系统提示词只在 AgentLoop 里拼,各段跟着本任务的工具列表走:有哪组工具才有哪段说明。
- * 每种能力组合存一份完整快照(test/resources/prompts/golden/),提示词有任何改动都会在这里显出来;
- * 有意的改动用 UPDATE_GOLDEN=1 重跑本测试写回快照,再在提交里一起审。
+ * The system prompt is assembled only inside AgentLoop, and each section follows this task's tool list: a section is present only if its tool group is.
+ * One full snapshot per capability combination is stored under test/resources/prompts/golden/, so any change to the prompt shows up here;
+ * for an intended change, rerun this test with UPDATE_GOLDEN=1 to write the snapshots back, then review them together in the commit.
  */
 class SystemPromptAssemblyTest {
-    /** [open] 时上一轮用过手机、网页、沙箱:开局各组都展开(本任务提供了的);否则都收着,只有入口。 */
+    /** When [open], the previous turn used phone, web and sandbox: at the start every group is expanded (those this task provides); otherwise all are collapsed, leaving only the entry point. */
     private fun run(d: ToolDispatcher, flags: SpeedFlags = SpeedFlags.OFF, open: Boolean = true): FakeModel = runBlocking {
         val m = FakeModel(com.wangzan101.mika.core.testing.answerReply("ok"))
         AgentLoop(m, d, SystemPrompt.identity(), flags = flags).run("t", if (open) listOf(Turn("之前", "好", "succeeded", groups = listOf("phone", "web", "sandbox"))) else emptyList())
@@ -239,7 +239,7 @@ class SystemPromptAssemblyTest {
                 val first = SystemPrompt.read(section).lineSequence().first()
                 assertEquals("$name: $section", offered.any { it in tools }, first in m.system!!)
             }
-            // 各组都收着:能力的段落都不给,只有入口那一段
+            // Every group collapsed: no capability sections at all, only the entry-point section
             val (d2, flags2) = make()
             val collapsed = run(d2, flags2, open = false).system!!
             for (section in SECTION_TOOLS.keys + "handover") assertFalse("$name collapsed: $section", SystemPrompt.read(section).lineSequence().first() in collapsed)
@@ -247,7 +247,7 @@ class SystemPromptAssemblyTest {
         }
     }
 
-    /** 应用访问的规则只在用户禁用了 App(或设置读不出来)时才进系统提示词;名单为空时一个字都不多。 */
+    /** The app-access rules enter the system prompt only when the user has disabled an app (or the settings cannot be read); with an empty list not one extra word appears. */
     @Test fun appAccessRuleOnlyWhenAppsAreBlocked() {
         val rule = SystemPrompt.read("app-access")
         assertFalse(promptOf(toolDispatcher(FakeScreen())).contains(rule))
@@ -271,6 +271,6 @@ class SystemPromptAssemblyTest {
     }
 }
 
-/** 每段说明跟着哪组工具走。 */
+/** Which tool group each section follows. */
 private val SECTION_TOOLS: Map<String, Set<String>>
     get() = mapOf("phone" to setOf("phone_launch_app", "phone_list_apps"), "batch" to setOf("do_steps"), "web" to WEB_TOOLS, "sandbox" to SANDBOX_TOOLS)

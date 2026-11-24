@@ -11,7 +11,7 @@ class ReplyLanguageTest {
     private val latin = ReplyLanguage.Family("Latin script")
     private val english = "What Android version is this phone on, and how much storage is used?"
 
-    // 开头一句英文,后面整段漂成中文(读到的中文标签没译)
+    // First sentence in English, then the whole rest drifts into Chinese (the Chinese labels read on screen were not translated)
     private val drifted = """
         Done — I opened Settings and looked at both pages.
 
@@ -32,7 +32,7 @@ class ReplyLanguageTest {
         assertEquals(Mismatch(CHINESE, latin), ReplyLanguage.mismatch(english, answer))
     }
 
-    // 英文正文、标签写成「译文(原文)」
+    // English body text, with labels written as "translation (original)"
     @Test fun englishAnswerWithOriginalLabelsInParenthesesPasses() {
         val answer = """
             **Android version: 14**
@@ -82,11 +82,11 @@ class ReplyLanguageTest {
     @Test fun japaneseIsTellFromChineseByKana() {
         val japanese = "設定を開いて確認しました。アンドロイドのバージョンは14で、ストレージは250ギガバイト使われています。"
         assertEquals(JAPANESE, ReplyLanguage.units(japanese, skipNames = false).keys.single())
-        // 日文问、中文答:不同语族
+        // Asked in Japanese, answered in Chinese: different language families
         assertEquals(Mismatch(CHINESE, JAPANESE), ReplyLanguage.mismatch("アンドロイドのバージョンを教えてください", drifted.substringAfter("\n")))
-        // 日文问、日文答
+        // Asked in Japanese, answered in Japanese
         assertNull(ReplyLanguage.mismatch("アンドロイドのバージョンを教えてください", japanese))
-        // 英文问、日文答
+        // Asked in English, answered in Japanese
         assertEquals(Mismatch(JAPANESE, latin), ReplyLanguage.mismatch(english, japanese))
     }
 
@@ -95,7 +95,7 @@ class ReplyLanguageTest {
         assertEquals(setOf("看", "和", "还有"), stripped.split(Regex("\\s+")).filter(String::isNotBlank).toSet())
     }
 
-    // 汉字按字、拉丁按词;没有小写字母的缩写和单位不算
+    // Han characters count per character, Latin per word; abbreviations and units with no lowercase letters do not count
     @Test fun unitsAreFairAcrossScripts() {
         assertEquals(mapOf(CHINESE to 4), ReplyLanguage.units("打开设置", skipNames = false))
         assertEquals(mapOf(latin to 2), ReplyLanguage.units("Open Settings 512 GB OS", skipNames = false))

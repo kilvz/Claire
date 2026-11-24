@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 折叠摘要的边界:事实去重、进展只留最近几行、结局种类不越上限。 */
+/** Boundaries of the folded summary: facts are deduplicated, progress keeps only the most recent lines, and the number of outcome kinds stays under its cap. */
 class StepSummaryTest {
     private val result = buildJsonObject {
         put("currentApp", "com.tencent.mm")

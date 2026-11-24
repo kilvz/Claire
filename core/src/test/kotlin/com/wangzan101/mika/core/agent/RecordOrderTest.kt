@@ -5,7 +5,7 @@ import com.wangzan101.mika.core.run.record.RunSink
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 运行记录的因果顺序:观察到的内容跟在本次调用的工具结果后面,模型回复与工具结果之间不插别的。 */
+/** Causal order of the run record: observed content follows the tool result of the current call, and nothing is inserted between the model reply and the tool result. */
 class RecordOrderTest {
     private class Sink : RunSink {
         val events = mutableListOf<RunEvent>()

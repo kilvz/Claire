@@ -143,7 +143,7 @@ class McpClientTest {
         )
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         val schema = parameters(tools)
-        // 缺席的 required 补成空的宽松 schema,Args 的 allowed 才会包含它
+        // Missing required properties are filled with an empty, permissive schema so that Args' allowed set includes it
         assertEquals(JsonObject(emptyMap()), schema["properties"]!!.jsonObject["missing"])
         assertEquals(listOf("missing"), schema["required"]!!.jsonArray.map { it.jsonPrimitive.content })
         val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", """{"missing":"x"}"""), ActionPass())
@@ -163,7 +163,7 @@ class McpClientTest {
     }
 
     @Test fun serverCallForwardsOnlyServerArgumentsAndKeepsAnExplicitServerReason() = runBlocking {
-        // reason 是我们给工具统一加的用意说明;服务端自己声明了(属性或 required)才当服务端参数原样转发
+        // reason is the intent note we add to every tool; it is forwarded verbatim as a server argument only when the server itself declares it (as a property or in required)
         val query = Part.ToolCall("c", "mcp_demo__search", """{"q":"lights","reason":"check status"}""")
         for ((schema, expected) in listOf(
             """{"properties":{"q":{}}}""" to """{"q":"lights"}""",
@@ -217,7 +217,7 @@ class McpClientTest {
 
         started.await()
         assertEquals("Team notes", (loop.state.value as TaskState.Running).mcpConnector)
-        // 调用还在进行:这次调用还没记进运行事件
+        // The call is still running: this call has not been recorded in the run events yet
         assertTrue(events.filterIsInstance<RunEvent.Activity>().none { it.label == name })
         release.complete(Unit)
         job.await()
@@ -362,7 +362,7 @@ class McpClientTest {
                 McpAnnotations(openWorldHint = true)))
         }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
-        // 不花钱的对外调用:无人值守也直接做(只记审批),不在判定时就调服务端
+        // An outward call that costs no money: it runs even unattended (only the approval is recorded), and the server is not called while the decision is being made
         val decision = ConfirmDecision(tools, null, provenance = RunProvenance(RunOrigin.Trigger, Attendance.Unattended))
             .judge("mcp_demo__send", buildJsonObject {}, Origin.Model(1))
         assertEquals(Decision.Clear, decision)

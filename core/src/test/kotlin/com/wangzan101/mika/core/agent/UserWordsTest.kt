@@ -7,7 +7,7 @@ import com.wangzan101.mika.core.tool.FakeScreen
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 用户一句话里他自己的话:这次打的字([UserWords.typed])和记忆、技能的引文认的那份([UserWords.said]),按对话页和浏览器页的拼法。 */
+/** The user's own words within a single message: the text typed this time ([UserWords.typed]) and the part that memory and skill quotes count as said ([UserWords.said]), following the chat-page and browser-page composition rules. */
 class UserWordsTest {
     private val tools = toolDispatcher(FakeScreen(), web = FakeWebPort())
     private val mika = QuoteMessage.Quote(QuoteMessage.From.Mika, "你常用的收货地址是幸福路 8 号")
@@ -16,25 +16,25 @@ class UserWordsTest {
 
     private fun words(text: String) = UserWords.typed(text, tools) to UserWords.said(text, tools)
 
-    // 引了 Claire 的回答:引的那段两样都不算;附件行也不算,只带了附件、没打字时都为空
+    // Quoting Claire's reply: the quoted passage counts for neither; attachment lines do not count either, so with only an attachment and no typing both are empty
     @Test fun aQuotedReplyIsNotTheUserWords() {
         assertEquals("照这个改" to "照这个改", words(AttachmentLines.compose(QuoteMessage.compose(mika, "照这个改"), pdf)))
         assertEquals("" to "", words(AttachmentLines.compose(QuoteMessage.compose(mika, ""), pdf)))
     }
 
-    // 引了自己说过的话:打的字只有这次的,记忆的引文连引的那段一起认,放在前面
+    // Quoting something the user said themselves: the typed text is only this time's, while the memory quote also counts the quoted passage, placed in front
     @Test fun anOwnQuoteIsSaidButNotTyped() {
         assertEquals("这个记一下" to "我家猫叫团子\n这个记一下", words(AttachmentLines.compose(QuoteMessage.compose(own, "这个记一下"), pdf)))
         assertEquals("" to "我家猫叫团子", words(AttachmentLines.compose(QuoteMessage.compose(own, ""), pdf)))
     }
 
-    // 浏览器页上问:页面说明照旧去掉
+    // Asking on a browser page: the page description is stripped as before
     @Test fun thePageDescriptionIsNotTheUserWords() {
         val page = AttachedPage.Page("https://shop.example.com/address", "收货地址是幸福路 8 号 - 地址管理")
         assertEquals("这一页的地址对不对" to "这一页的地址对不对", words(AttachedPage.compose(page, "这一页的地址对不对")))
     }
 
-    // 没有引用和附件的话原样;以「>」开头的普通话、引用之后打的以「>」开头的字都不当成引用
+    // Text without quotes and attachments stays as-is; ordinary text that starts with ">" and text starting with ">" typed after a quote are not treated as quotes
     @Test fun plainWordsStayAsTheyAre() {
         assertEquals("查天气" to "查天气", words("查天气"))
         assertEquals("> 这句是我自己写的\n后面" to "> 这句是我自己写的\n后面", words("> 这句是我自己写的\n后面"))
