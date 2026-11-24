@@ -13,10 +13,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机:有能用的另一份用户(分身、工作资料)时,把装在那里的一个 App 开到 Claire 的屏上,最上面的任务属于那份用户,主屏不变。
- * 要测哪一个由参数定:`-Pandroid.testInstrumentationRunnerArguments.copyPackage=<包名>`(可再给 copyUser=<用户编号>);
- * 不给就用列出的第一份。系统先问打开哪一个时,由打开那一步自己点选项、认出要的那份。
- * 没有另一份用户、或那里没有要的 App 时跳过。只打开,不在 App 里做任何操作。
+ * Real device: when another usable user exists (a secondary user / clone, a work profile), open an App installed there on Claire's display; the top task belongs to that user and the main screen is unchanged.
+ * Which one to test is decided by arguments: `-Pandroid.testInstrumentationRunnerArguments.copyPackage=<package name>` (optionally also copyUser=<user id>);
+ * if not given, the first listed one is used. When the system first asks which one to open, the open step itself taps the option and recognizes the copy it wants.
+ * Skipped when there is no other user, or the wanted App is not installed there. It only opens the App and performs no in-App actions.
  */
 @RunWith(AndroidJUnit4::class)
 class AppCopyDeviceTest {
@@ -47,7 +47,7 @@ class AppCopyDeviceTest {
         assertEquals(copy.userId, shell.userOfTask(top))
         assertEquals(copy.userId, agent.screen.target.value?.userId)
         assertEquals("main screen changed", main, DeviceSupport.mainScreenState(shell))
-        // 不在能用之列的用户一律不启动
+        // Users that are not on the allowed list are never started
         assertEquals(ShellService.START_USER_NOT_ALLOWED, shell.startAppInUser(agent.display.displayId, copy.packageName, 99_999, false))
     }
 }

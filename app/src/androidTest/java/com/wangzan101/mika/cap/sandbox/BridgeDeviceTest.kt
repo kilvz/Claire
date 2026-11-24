@@ -24,8 +24,8 @@ import java.util.Collections
 import java.util.UUID
 
 /**
- * 桥的真机用例:沙箱里的 `mika` 命令经抽象套接字回调 Claire。用装好的沙箱(python3 与 mika 客户端都是安装时放的);
- * 没装好就跳过。
+ * Real-device cases for the bridge: the `mika` command inside the sandbox calls back into Claire over an abstract socket. Uses the installed sandbox (both python3 and the mika client are placed at install time);
+ * skipped when it is not installed.
  */
 @RunWith(AndroidJUnit4::class)
 class BridgeDeviceTest {
@@ -36,14 +36,14 @@ class BridgeDeviceTest {
     private fun sh(command: String): CommandResult =
         runBlocking { sb.run("bridge-ws", listOf("/bin/sh", "-lc", command), null, 30_000) { progress += it } }
 
-    // 用装好的沙箱(装的时候装了 python3 和 mika 客户端);没装好就跳过,测试不自己解根文件系统
+    // Use the installed sandbox (python3 and the mika client were installed with it); skip if it is not installed, the test does not unpack a root filesystem itself
     @Before fun needsInstalledSandbox() {
         assumeTrue("sandbox not installed", SandboxState.get(context).status.value is SandboxStatus.Ready)
         assumeTrue("python3 not installed in the rootfs",
             Files.exists(File(SandboxDirs(context).rootfs, "usr/bin/python3").toPath(), LinkOption.NOFOLLOW_LINKS))
     }
 
-    // 导出到「下载/Claire」的测试文件删掉,不留在用户的下载目录里
+    // Delete the test files exported to "Downloads/Claire" so they are not left behind in the user's Downloads directory
     @After fun deleteExported() {
         for (f in shared) runCatching { context.contentResolver.delete(Uri.parse(f.uri), null, null) }
         SandboxDirs(context).workspace(WorkspaceKey.Conversation("bridge-ws")).deleteRecursively()
@@ -56,7 +56,7 @@ class BridgeDeviceTest {
     }
 
     @Test fun shareCallsExporter() {
-        // 名字带随机串,下载目录里不会撞名;工作区外的文件先被路径规则拒掉
+        // The name carries a random string so it cannot collide in the Downloads directory; files outside the workspace are rejected by the path rules first
         val name = "mika-bridge-test-${UUID.randomUUID().toString().take(8)}.txt"
         val r = sh("echo hi > $name; mika share $name; echo rc=$?; mika share /etc/passwd; echo rc=$?")
         assertTrue(r.output, r.output.contains("\"savedAs\":\"Download/Claire/$name\""))

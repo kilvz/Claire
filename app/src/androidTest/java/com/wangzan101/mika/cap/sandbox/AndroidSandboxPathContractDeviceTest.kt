@@ -7,7 +7,7 @@ import com.wangzan101.mika.core.cap.sandbox.SandboxPort
 import org.junit.runner.RunWith
 import java.io.File
 
-/** 路径规则契约在真机的文件系统上跑(符号链接、canonicalFile 的行为以安卓为准)。 */
+/** Runs the path-rule contract on a real device's filesystem (symlinks and canonicalFile behave as Android defines them). */
 @RunWith(AndroidJUnit4::class)
 class AndroidSandboxPathContractDeviceTest : SandboxPathContract() {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext

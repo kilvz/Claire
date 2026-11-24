@@ -15,7 +15,7 @@ class DisplayOrientationWatchDeviceTest {
     @Test fun unavailableTaskListenerFallsBackToPollingAndStopsOnClose() {
         val calls = AtomicInteger()
         val twice = CountDownLatch(2)
-        // 无注册接口的对象模拟系统不提供任务监听;不向真实任务管理器登记。
+        // An object with no registration interface simulates a system that provides no task listener; nothing is registered with the real task manager.
         val watch = DisplayOrientationWatch(Any(), active = { true }) { calls.incrementAndGet(); twice.countDown() }
         try {
             assertTrue("polling fallback did not run", twice.await(4, TimeUnit.SECONDS))
@@ -32,7 +32,7 @@ class DisplayOrientationWatchDeviceTest {
         val watch = DisplayOrientationWatch(Any(), active = { displays.get() }) { calls.incrementAndGet(); first.countDown() }
         try {
             assertTrue("polling fallback did not run", first.await(4, TimeUnit.SECONDS))
-            // 屏都放掉了但还没 close:轮询自己停
+            // All displays are released but close has not been called yet: polling stops by itself
             displays.set(false)
             Thread.sleep(650)
             val stopped = calls.get()

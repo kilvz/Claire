@@ -13,8 +13,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机测试:在 Agent 虚拟屏上打开 [WheelPickerTestActivity],把原版数字滚轮从 0 转到 40,一次调用做完。
- * 「锁住」那个只能走无障碍滚动(一下一格,从 0 往回走 20 格最近);读屏时两个都标成滚轮。
+ * Real-device test: open [WheelPickerTestActivity] on the Agent virtual display and turn the stock numeric wheel from 0 to 40 in one call.
+ * The "locked" one can only be moved via accessibility scrolling (one notch per action; from 0, going back 20 notches is the shortest way); when read by the screen reader both are marked as wheels.
  */
 @RunWith(AndroidJUnit4::class)
 class WheelPickerDeviceTest {
@@ -32,7 +32,7 @@ class WheelPickerDeviceTest {
         return s ?: error("wheel page never showed: ${runBlocking { screen.snapshot() }.elements.map { "${it.role}:${it.name}" }}")
     }
 
-    /** 原版数字滚轮在读屏里不带名字:按位置认,页面上左边是「分」、右边是「锁住」(见 [WheelPickerTestActivity])。 */
+    /** The stock numeric wheel carries no name in the screen-reader tree: identify it by position; on the page the left one is "minutes" and the right one is "locked" (see [WheelPickerTestActivity]). */
     private fun ScreenSnapshot.picker(label: String): UiElement {
         val pickers = elements.filter { it.role == "NumberPicker" }.sortedBy { it.centerX }
         check(pickers.size == 2) { "expected 2 NumberPickers, got ${pickers.map { it.centerX }}" }
@@ -42,7 +42,7 @@ class WheelPickerDeviceTest {
     private fun flatten(n: com.wangzan101.mika.core.screen.uistate.UiTreeNode): List<com.wangzan101.mika.core.screen.uistate.UiTreeNode> =
         listOf(n) + n.children.flatMap(::flatten)
 
-    /** 再让工具调到同一个值一次:滚轮真的已经停在那里,就一下都不用动、起点就是它。 */
+    /** Have the tool set the same value once more: the wheel really is already parked there, so nothing needs to move and the starting point is that value. */
     private suspend fun assertStaysAt(label: String, value: String) {
         val s = screen.snapshot()
         val again = screen.setWheel(s.picker(label).ref, s.snapshotId, value)
@@ -64,7 +64,7 @@ class WheelPickerDeviceTest {
         assertEquals("actions", o.method)
         assertEquals("00", o.from)
         assertTrue("$o", WheelMath.matches(o.value, "40"))
-        // 0 → 40 往回走 20 格最近;每格一下,读回不另算
+        // From 0 to 40, going back 20 notches is the nearest; one notch per action, and reading back is not counted separately
         assertTrue("$o", o.attempts in 20..24)
         assertStaysAt(WheelPickerTestActivity.LOCKED, "40")
     }
@@ -76,7 +76,7 @@ class WheelPickerDeviceTest {
         assertTrue("$o", o.reached)
         assertTrue("$o", o.method in setOf("text", "actions"))
         assertStaysAt(WheelPickerTestActivity.MINUTES, "40")
-        // 另一个滚轮没被动过
+        // The other wheel was not touched
         assertStaysAt(WheelPickerTestActivity.LOCKED, "0")
     }
 

@@ -33,10 +33,10 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
- * 外壳 20 项能力的对照验收(destroy 在 [ShellDestroyParityDeviceTest])。
- * shell 由 [DeviceSupport.shell] 提供,哪个后端在用就测哪个,两个后端跑同一套断言。
- * 断言尽量看外壳以外的证据:DisplayManager、探针页自己报的屏和任务、appops 命令、测试进程直接读剪贴板。
- * 需要外壳已连上;用户的主屏不被打扰(只在 Claire 自己建的屏上开页面)。
+ * Parity acceptance for the shell's 20 capabilities (destroy lives in [ShellDestroyParityDeviceTest]).
+ * The shell is provided by [DeviceSupport.shell]; whichever backend is in use is the one tested, and both backends run the same set of assertions.
+ * Assertions rely as far as possible on evidence from outside the shell: DisplayManager, the display and task reported by the probe page itself, appops commands, and the test process reading the clipboard directly.
+ * Requires the shell to be connected; the user's main screen is left undisturbed (pages are only opened on displays Claire created itself).
  */
 @RunWith(AndroidJUnit4::class)
 class ShellParityDeviceTest {
@@ -50,7 +50,7 @@ class ShellParityDeviceTest {
     @Before
     fun setUp() {
         probe = ShellProbe(context)
-        // 前一个用例若中途失败,外壳里可能还挂着待还原的剪贴板
+        // If the previous case failed midway, a pending clipboard restore may still be hanging in the shell
         shell.restoreClip()
         audioBefore = ParityAudio.mode(SETTINGS)
         clipBefore = ParityClip.text(context)
@@ -69,7 +69,7 @@ class ShellParityDeviceTest {
     private fun newScreen(width: Int = 720, height: Int = 1600, dpi: Int = 320) =
         ParityScreen(shell, width, height, dpi).also { screens += it }
 
-    /** 用 am 把探针页开到指定屏(不经外壳的启动方法),等它报到。 */
+    /** Open the probe page on the given display with am (not through the shell's launch methods) and wait for it to report in. */
     private fun probeOn(displayId: Int): ProbeEvent {
         sh("am start --display $displayId -f 0x18000000 -n ${ShellProbe.COMPONENT}")
         return probe.await { it.kind == ShellProbe.RESUMED && it.display == displayId }
@@ -129,7 +129,7 @@ class ShellParityDeviceTest {
         assertNotNull("display ${s.id} still present", pollUntil(3_000) { true.takeIf { dm.getDisplay(s.id) == null } })
     }
 
-    /** 只释放屏(不经 finishDisplay 挪走留下的)时,屏上的任务随屏关掉;任务结束时的去留见 [AppsAfterTaskDeviceTest]。 */
+    /** When only the display is released (without moving leftover tasks away via finishDisplay), tasks on it are shut down with the display; for what happens to tasks when the task ends see [AppsAfterTaskDeviceTest]. */
     @Test
     fun releaseDisplayDestroysTasksOnIt() {
         val s = newScreen()
@@ -178,7 +178,7 @@ class ShellParityDeviceTest {
         val times = longArrayOf(0, 60, 120, 180)
         val started = System.currentTimeMillis()
         assertTrue(shell.injectStroke(s.id, xs, ys, times))
-        // 注完才返回:至少过了这一笔的时长
+        // It returns only after the injection is done: at least the duration of this stroke has passed
         assertTrue(System.currentTimeMillis() - started >= 170)
         val down = probe.await { it.kind == ShellProbe.TOUCH && it.action == MotionEvent.ACTION_DOWN }
         val release = probe.await { it.kind == ShellProbe.TOUCH && it.action == MotionEvent.ACTION_UP }
@@ -213,7 +213,7 @@ class ShellParityDeviceTest {
     fun injectKeyRefusesKeysOutsideTheAllowlist() {
         val s = newScreen()
         focusedProbeOn(s.id)
-        // 只用打到虚拟屏上也无害的键;电源、音量这类绝不在真机上试
+        // Only use keys that are harmless even when they land on a virtual display; power, volume and the like are never tried on a real device
         assertFalse(shell.injectKey(s.id, KeyEvent.KEYCODE_HOME))
         assertFalse(shell.injectKey(s.id, KeyEvent.KEYCODE_SEARCH))
         Thread.sleep(1_000)
@@ -283,7 +283,7 @@ class ShellParityDeviceTest {
     @Test
     fun restartAppKillsAndRelaunchesOnDisplay() {
         val s = newScreen()
-        // 设置在别处(哪怕后台)有任务时冷启动会降级成普通启动;先清掉,确定走结束进程那条路
+        // Cold start degrades to a normal start when Settings already has a task elsewhere (even in the background); clear that first to be sure the kill-the-process path is taken
         sh("am force-stop $SETTINGS")
         assertEquals(ShellService.START_OK, shell.startApp(s.id, SETTINGS))
         assertNotNull(pollUntil(5_000) { shell.topTaskId(s.id).takeIf { it != -1 } })
@@ -312,7 +312,7 @@ class ShellParityDeviceTest {
     @Test
     fun moveTaskMovesTaskToOtherDisplay() {
         val a = newScreen(720, 1600, 320)
-        // 两块屏尺寸不同,搬过去后探针页一定会重新报到
+        // The two displays differ in size, so the probe page is bound to report in again after being moved over
         val b = newScreen(1080, 1920, 480)
         val task = probeOn(a.id).task
         probe.clear()
@@ -377,7 +377,7 @@ class ShellParityDeviceTest {
 
     // ---- getAudioMode / setAudioMode / setAudioMuted ----
 
-    // 不假设起始模式:新装的包多半是 default,设成与默认相同的 allow 后 appops 也报 default。一律与基线比
+    // Do not assume a starting mode: a freshly installed package is usually default, and after setting allow (identical to the default) appops still reports default. Always compare against the baseline
 
     @Test
     fun getAudioModeMatchesAppOps() {
@@ -449,7 +449,7 @@ class ShellParityDeviceTest {
     fun restoreClipPutsBackUserText() {
         ParityClip.put(context, "parity-user")
         assertEquals(ShellService.CLIP_SET, shell.setClipText("parity-ours"))
-        // 连续放两次,还原的仍是第一次之前用户的
+        // Put text twice in a row; the restore still returns to what the user had before the first one
         assertEquals(ShellService.CLIP_SET, shell.setClipText("parity-ours-2"))
         shell.restoreClip()
         assertEquals("parity-user", ParityClip.text(context))
@@ -522,13 +522,13 @@ class ShellParityDeviceTest {
 
     companion object {
         const val NO_SUCH_APP = "com.wangzan101.no.such.app"
-        // Display.FLAG_TRUSTED 是隐藏常量
+        // Display.FLAG_TRUSTED is a hidden constant
         val DISPLAY_FLAG_TRUSTED: Int =
             runCatching { Display::class.java.getField("FLAG_TRUSTED").getInt(null) }.getOrDefault(1 shl 7)
     }
 }
 
-/** 测试直接经外壳建的屏,画面进本进程的 ImageReader。 */
+/** The test creates the display directly through the shell; frames go into this process's ImageReader. */
 class ParityScreen(private val shell: IMikaShell, width: Int, height: Int, dpi: Int) : AutoCloseable {
     val reader: ImageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
     val id: Int = shell.createDisplay(reader.surface, width, height, dpi)
@@ -552,7 +552,7 @@ class ParityScreen(private val shell: IMikaShell, width: Int, height: Int, dpi: 
     }
 }
 
-/** 不经外壳,直接用 appops 命令读写 PLAY_AUDIO。 */
+/** Reads and writes PLAY_AUDIO directly with the appops command, without going through the shell. */
 object ParityAudio {
     fun mode(pkg: String): String =
         Regex("""PLAY_AUDIO:\s*([a-z_]+)""").find(sh("appops get $pkg PLAY_AUDIO"))?.groupValues?.get(1) ?: "default"
@@ -563,8 +563,8 @@ object ParityAudio {
 }
 
 /**
- * 测试进程直接读写系统剪贴板。后台读剪贴板要 READ_CLIPBOARD_IN_BACKGROUND,临时借 shell 的权限。
- * 只按纯文字保存和还原用户原来的内容。
+ * The test process reads and writes the system clipboard directly. Reading the clipboard in the background requires READ_CLIPBOARD_IN_BACKGROUND, so shell permission is borrowed temporarily.
+ * Only plain text is saved and restored, for the user's original content.
  */
 object ParityClip {
     private const val READ_IN_BACKGROUND = "android.permission.READ_CLIPBOARD_IN_BACKGROUND"
@@ -582,14 +582,14 @@ object ParityClip {
         }
     }
 
-    /** 剪贴板上的文字;空的返回 null。 */
+    /** The text on the clipboard; returns null when empty. */
     fun text(context: Context): String? = asShell {
         manager(context).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
     }
 
     fun description(context: Context): ClipDescription? = asShell { manager(context).primaryClipDescription }
 
-    /** 放一段用户自己的文字;null 表示清空。 */
+    /** Put a piece of the user's own text; null means clear it. */
     fun put(context: Context, text: String?) {
         val cm = manager(context)
         if (text == null) cm.clearPrimaryClip() else cm.setPrimaryClip(ClipData.newPlainText("user", text))

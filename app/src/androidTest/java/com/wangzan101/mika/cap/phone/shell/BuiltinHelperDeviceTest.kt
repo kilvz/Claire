@@ -26,10 +26,10 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
- * 真机测试:内置助手经无线调试起来、交接 Binder、在自己的虚拟屏上注入点击,解绑后助手留着、再绑定直接可用。
- * 前提:安卓 12+,无线调试开着。配对二选一:
- * - 带 `-e pairingCode <6 位码>`(可加 `-e pairingPort <端口>`),此时系统的「使用配对码配对」窗口要开着;
- * - 已经用 Claire 的钥匙配对过:带 `-e assumePaired true`。
+ * Real-device test: the built-in helper comes up via wireless debugging, hands over the Binder, and injects taps on its own virtual display; after unbinding the helper stays around, and the next bind is usable straight away.
+ * Prerequisites: Android 12+, wireless debugging enabled. Pairing, one of two options:
+ * - pass `-e pairingCode <6-digit code>` (optionally add `-e pairingPort <port>`); the system's "Pair using pairing code" window must then be open;
+ * - pairing with Claire's key has already been done: pass `-e assumePaired true`.
  */
 @RunWith(AndroidJUnit4::class)
 class BuiltinHelperDeviceTest {
@@ -75,7 +75,7 @@ class BuiltinHelperDeviceTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(cmd)).use { it.readBytes() }
         }
         try {
-            // executeShellCommand 不经过 sh，不能直接用 ';' 和 '>'；借助 ${IFS} 在 sh -c 单参数里分隔。
+            // executeShellCommand does not go through sh, so ';' and '>' cannot be used directly; use ${IFS} to separate inside the single sh -c argument.
             command("mkdir -p $dir/subdir")
             command("sh -c printf\${IFS}bridge>$dir/sample.txt")
             hintStore.save(com.wangzan101.mika.settings.DeviceDirectory(dir, "Test", "Files", "user"))
@@ -201,14 +201,14 @@ class BuiltinHelperDeviceTest {
             assertNotNull("display $displayId not visible", dm.getDisplay(displayId))
             assertTrue("injectTap", bound.injectTap(displayId, 100, 100))
 
-            // 解绑:屏被撤掉,和服务结束一样;助手进程和它的 Binder 还在
+            // Unbind: the display is torn down, the same as when the service ends; the helper process and its Binder remain
             main.runOnMainSync { conn.unbind() }
             assertNull(conn.shell.value)
             assertTrue("display not released on unbind", poll(5_000) { dm.getDisplay(displayId) == null })
             assertTrue("helper died on unbind", shell.asBinder().pingBinder())
             assertSame(shell, phone.hub.shell.value)
 
-            // 再绑定:直接拿到同一个助手,还能接着用
+            // Bind again: get the same helper directly and keep using it
             main.runOnMainSync { conn.bind() }
             val again = runBlocking { withTimeout(5_000) { conn.shell.filterNotNull().first() } }
             assertSame(shell, again)

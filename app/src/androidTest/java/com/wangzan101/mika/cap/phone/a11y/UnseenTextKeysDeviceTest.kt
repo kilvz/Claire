@@ -68,7 +68,7 @@ class UnseenTextKeysDeviceTest {
         try {
             val rejectingPaste = object : IMikaShell by shell {
                 override fun injectCtrlKey(displayId: Int, keyCode: Int): Int {
-                    // 这个夹具只模拟 V 的结果;A 固定为已投递,避免真实按键的偶发结果改变被测分支。
+                    // This fixture only simulates the result of V; A is always DISPATCHED to keep the occasional result of a real key press from flipping the branch under test.
                     if (keyCode == KeyEvent.KEYCODE_A) return AsciiTextKeys.DISPATCHED
                     if (keyCode != KeyEvent.KEYCODE_V) return shell.injectCtrlKey(displayId, keyCode)
                     if (failPasteAfter != null) {
@@ -89,9 +89,9 @@ class UnseenTextKeysDeviceTest {
 
     private suspend fun AndroidScreen.focusEditor(label: String): UiElement {
         val field = awaitEditor(label)
-        // 预备动作只聚焦、不输入文字;点击偶发丢失时可以安全地重试,正文路径仍只执行一次。
+        // The preparatory step only focuses, it does not type text; if the tap is occasionally dropped it can be retried safely, and the main path still runs only once.
         repeat(3) {
-            // ScreenPort 直接用像素中心;bounds 的 0–999 坐标只有工具入口才转换。
+            // ScreenPort uses the pixel center directly; the 0–999 coordinates of bounds are only converted at the tool entry point.
             tapXY(field.centerX, field.centerY)
             val focused = withTimeoutOrNull(1_500) {
                 var match: UiElement? = null

@@ -39,10 +39,10 @@ import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 真机测试:需要内置助手在运行(已配对、无线调试开着)。 */
+/** Real-device test: requires the built-in helper to be running (paired, wireless debugging enabled). */
 @RunWith(AndroidJUnit4::class)
 class AgentDisplayTest {
-    // 整个测试类共用一条连接,与 App 里长期持有一条连接的用法一致
+    // The whole test class shares a single connection, matching how the App holds one connection for a long time
     companion object {
         private const val SETTINGS = "com.android.settings"
         private const val SHELL_PROCESS = "com.wangzan101.mika:helper"
@@ -109,7 +109,7 @@ class AgentDisplayTest {
             assertEquals("main screen top task changed", mainTop, shell.topTaskId(Display.DEFAULT_DISPLAY))
             assertEquals(-1, shell.topTaskId(d.displayId))
         } finally {
-            // 测试自己在主屏打开的设置:回桌面并结束它,免得收尾动画期间仍算「主屏可见」影响后面的用例
+            // The test itself opened Settings on the main screen: go back to the home screen and stop it, so it does not still count as "visible on the main screen" during the closing animation and affect later cases
             shellCommand("input -d 0 keyevent KEYCODE_HOME")
             shellCommand("am force-stop $SETTINGS")
         }
@@ -121,7 +121,7 @@ class AgentDisplayTest {
         shell.startApp(d.displayId, SETTINGS)
         val png = pollUntil(2_000) { d.latestFramePng() }
         assertNotNull(png)
-        // PNG 文件头
+        // PNG file header
         assertEquals(0x89.toByte(), png!![0])
         assertEquals('P'.code.toByte(), png[1])
     }
@@ -161,7 +161,7 @@ class AgentDisplayTest {
         val d = newDisplay()
         val screen = AndroidScreen(DeviceSupport.service(), shell, DeviceSupport.ready(d))
         val testPackage = InstrumentationRegistry.getInstrumentation().context.packageName
-        // 先留一张带四个明确色块的旧帧,再通过生产入口冷启动另一个 App。
+        // First leave an old frame with four distinct color blocks, then cold-start another App through the production entry point.
         shellCommand("am start -W --display ${d.displayId} -n $testPackage/${RotationTestActivity::class.java.name} --ei orientation ${ActivityInfo.SCREEN_ORIENTATION_PORTRAIT}")
         val previous = pollUntil(5_000) {
             d.latestFramePng()?.takeIf { png ->
@@ -173,7 +173,7 @@ class AgentDisplayTest {
 
         val opened = runBlocking { screen.openApp(SETTINGS, cold = true) }
         assertTrue("openApp: $opened", opened is ActionResult.Ok)
-        // 不等另一帧:生产入口返回后,第一次截图就不能还是启动前的色块页。
+        // No waiting for another frame: once the production entry point returns, the very first screenshot must not still be the pre-launch color-block page.
         val png = runBlocking { screen.screenshotPng() }
         assertNotNull("the newly opened app has no servable frame", png)
         val image = BitmapFactory.decodeByteArray(png, 0, png!!.size)
@@ -253,7 +253,7 @@ class AgentDisplayTest {
 
     private fun normalizedAudioMode(mode: String?): String? = if (mode == "default") "allow" else mode
 
-    // Surface 合成和 GPU 转屏可能把通道的 255 变为 254;容许量化误差,仍严格区分四个象限。
+    // Surface composition and GPU rotation may turn a channel value of 255 into 254; tolerate quantization error while still strictly distinguishing the four quadrants.
     private fun nearColor(actual: Int, expected: Int): Boolean =
         kotlin.math.abs(Color.red(actual) - Color.red(expected)) <= 4 &&
             kotlin.math.abs(Color.green(actual) - Color.green(expected)) <= 4 &&
@@ -264,7 +264,7 @@ class AgentDisplayTest {
         val d = newDisplay()
         shell.startApp(d.displayId, SETTINGS)
         val task = pollUntil(5_000) { shell.topTaskId(d.displayId).takeIf { it != -1 } }!!
-        // 在两块虚拟屏之间挪,不碰用户的主屏
+        // Move between two virtual displays without touching the user's main screen
         val other = AgentDisplay(shell, 720, 1600, 320, InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(android.hardware.display.DisplayManager::class.java))
         try {
             assertTrue(shell.moveTask(task, other.displayId))
@@ -278,14 +278,14 @@ class AgentDisplayTest {
     @Test
     fun coldStartDoesNotKillAppWithTaskOnAnotherScreen() {
         val d = newDisplay()
-        // 用另一块虚拟屏代表「Claire 屏以外的任务」,不碰用户的主屏
+        // Use another virtual display to represent "a task outside the Claire display", without touching the user's main screen
         val other = AgentDisplay(shell, 720, 1600, 320, InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(android.hardware.display.DisplayManager::class.java))
         try {
             assertEquals(ShellService.START_OK, shell.startApp(other.displayId, SETTINGS))
             assertNotNull(pollUntil(5_000) { shell.topTaskId(other.displayId).takeIf { it != -1 } })
             val pid = pollUntil(3_000) { shellCommand("pidof $SETTINGS").trim().takeIf { it.isNotEmpty() } }
             assertNotNull(pid)
-            // 另一块屏也是 Claire 的屏(代表另一个任务):直接拒绝、不强停,返回「被别的任务占用」
+            // The other display is also one of Claire's displays (representing another task): reject outright without force-stopping, returning "in use by another task"
             assertEquals(ShellService.START_IN_USE_BY_OTHER, shell.restartApp(d.displayId, SETTINGS))
             assertEquals("settings process was killed", pid, shellCommand("pidof $SETTINGS").trim())
         } finally {
@@ -332,7 +332,7 @@ class AgentDisplayTest {
         assertNotNull(otherBefore)
         try {
             repeat(2) {
-                // 与真实任务一致:每一轮都有新的 AppMuter、AudioMute 和独立记录,不能跨任务复用内存里的 muted 集。
+                // Consistent with real tasks: each round has a fresh AppMuter, AudioMute and independent record; the in-memory muted set must not be reused across tasks.
                 var values: Map<String, String?>? = null
                 val store = object : MarkerStore {
                     override fun load() = values
@@ -354,7 +354,7 @@ class AgentDisplayTest {
         }
     }
 
-    /** 浮层动作最终经过的真实音频路径：恢复原值，而且本次任务不再自动静音。 */
+    /** The real audio path that the overlay action ultimately goes through: the original value is restored, and this task is no longer muted automatically. */
     @Test
     fun manualUnmuteRestoresRealAudioAndSkipsLaterAutomaticMutes() {
         val prefs = context.getSharedPreferences("manual-unmute-device-test", 0)
@@ -383,7 +383,7 @@ class AgentDisplayTest {
         }
     }
 
-    /** 助手进程被杀后,看门狗重起助手,连接拿到可用的新服务。 */
+    /** After the helper process is killed, the watchdog restarts the helper and the connection obtains a usable new service. */
     @Test
     fun reconnectsAfterShellProcessDies() {
         val before = shell
@@ -408,7 +408,7 @@ class AgentDisplayTest {
         return DeviceSupport.sh(cmd)
     }
 
-    /** 等画面静止(相隔 500ms 的两帧一样),返回该帧。 */
+    /** Wait for the picture to settle (two frames 500ms apart are identical) and return that frame. */
     private fun stableFrame(d: AgentDisplay): ByteArray {
         var last = pollUntil(2_000) { d.latestFramePng() }!!
         repeat(10) {
@@ -420,7 +420,7 @@ class AgentDisplayTest {
         return last
     }
 
-    // Display.FLAG_TRUSTED 是隐藏常量(1 shl 7),反射取不到时用其数值
+    // Display.FLAG_TRUSTED is a hidden constant (1 shl 7); fall back to its numeric value when reflection cannot find it
     private fun displayFlagTrusted(): Int =
         runCatching { Display::class.java.getField("FLAG_TRUSTED").getInt(null) }.getOrDefault(1 shl 7)
 

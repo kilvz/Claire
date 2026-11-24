@@ -16,8 +16,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机测试:系统动作的 intent 在这台手机上有没有 App 接(没有就跳过,不算失败),有的话打开闹钟列表落在 Claire 的屏上、
- * 用户的主屏不动。不设真的闹钟、计时器,不建日程。
+ * Real-device test: whether any App on this phone handles the system-action intents (if not, skip instead of failing); if one does, opening the alarm list lands on Claire's display and
+ * the user's main screen stays untouched. No real alarm, timer or calendar event is created.
  */
 @RunWith(AndroidJUnit4::class)
 class SystemActionDeviceTest {
@@ -37,7 +37,7 @@ class SystemActionDeviceTest {
         val all = listOf(SystemAction.SetAlarm(9, 40), SystemAction.SetTimer(60), SystemAction.ShowAlarms, SystemAction.AddCalendarEvent("t", 0))
         val resolved = all.associateWith { handlers(it) }
         assumeTrue("no app on this phone takes these actions: $resolved", resolved.values.any { it.isNotEmpty() })
-        // 接得住的都能挑出一个直接指定的页面
+        // Every handler that can take it can yield one directly specified page
         for ((a, h) in resolved) if (h.isNotEmpty()) assertTrue("$a", SystemIntents.choose(h, null) in h)
     }
 
