@@ -1,9 +1,9 @@
 package com.wangzan101.mika.core.screen.uistate
 
 /**
- * 把滚轮转到一个值的结果。[reached] 到了;[value] 此刻显示的值(读不出为 null),[from] 开始时显示的;[attempts] 做了几次动作
- * (输入、滚一下、拖一下各算一次);[method] 最后用的做法:text(直接输入)、actions(无障碍滚动)、drag(拖动);
- * [error] 没到时的原因(ref_expired、not_a_wheel、unknown_value、at_end、not_moving、not_reached……),[hint] 端口的补充说明。
+ * The result of turning a wheel to a value. [reached] whether it got there; [value] the value displayed right now (null if unreadable), [from] the one displayed at the start; [attempts] how many actions were performed
+ * (a type-in, a scroll and a drag each count once); [method] the approach used last: text (direct input), actions (accessibility scroll), drag (dragging);
+ * [error] the reason it did not get there (ref_expired, not_a_wheel, unknown_value, at_end, not_moving, not_reached, …), [hint] extra explanation from the port.
  */
 data class WheelOutcome(
     val reached: Boolean,

@@ -14,11 +14,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.roundToInt
 
-/** 两张截图的哈希距离不超过它就算同一画面(控件树与画面同步、@v 编号仍有效)。 */
+/** When the hash distance between two screenshots does not exceed this they count as the same frame (control tree in sync with the frame, @v refs still valid). */
 const val LOCATE_SCREEN_CHANGE = 8
 
 sealed interface LocateResult {
-    /** [x]/[y]/[box] 为 0–999 归一化,与 tap 同一坐标系;[source] 是 "elements" 或 "vision"。 */
+    /** [x]/[y]/[box] are 0–999 normalized, in the same coordinate system as tap; [source] is "elements" or "vision". */
     data class Found(
         val ref: String,
         val snapshotId: String,
@@ -28,17 +28,17 @@ sealed interface LocateResult {
         val seen: String?,
         val source: String,
         val note: String?,
-        /** 只靠看图、没有佐证(这一屏的树不能用,没东西可对照):点完要看效果。 */
+        /** Marked by sight alone with nothing to corroborate it (this screen's tree is unusable, so there is nothing to compare against): check the effect after tapping. */
         val unverified: Boolean = false,
     ) : LocateResult
 
     data class NotFound(val reason: String, val message: String) : LocateResult
 }
 
-/** 画面拿不到或不能给视觉模型看;[reason] 是 protected_content、no_app_open 等。 */
+/** The frame cannot be obtained or must not be shown to the vision model; [reason] is protected_content, no_app_open, etc. */
 class ScreenUnavailable(val reason: String, message: String) : Exception(message)
 
-/** 找不到、看不了时给模型的说明;点名的是这块屏那一套工具。 */
+/** Messages given to the model when something cannot be found or looked at; they name the tools of this screen's own set. */
 private class LocateMessages(f: ScreenFamily) {
     private val describe = f.tool("describe")
     private val dump = f.tool("list_elements")
@@ -65,10 +65,10 @@ private val SEEN = Regex("\"seen\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 private val YES = Regex("^(是|yes(?![A-Za-z0-9_]))", RegexOption.IGNORE_CASE)
 private const val MAX_SEEN = 120
 
-/** 视觉定位一共尝试几次(一次失败再重试一次):模型框选/复看会抖,别把一次抖动判成任务无进展。 */
+/** How many times visual locating is attempted in total (a failure gets one retry): a model's box selection / second look can be flaky, so one flaky result should not be judged as no progress on the task. */
 private const val VISION_ATTEMPTS = 2
 
-/** 视觉定位里值得重试的瞬态失败;环境类失败(防截屏、没开 App、截不到屏)和「找到了但不对/没佐证」(name_mismatch、unverified_grounding)不重试。 */
+/** Transient failures in visual locating that are worth retrying; environment failures (screenshot protection, no app open, no screenshot) and "found but wrong / uncorroborated" (name_mismatch, unverified_grounding) are not retried. */
 private val TRANSIENT_VISION = setOf("not_found", "not_confirmed", "vision_unavailable")
 
 private val PROMPTS: Pair<String, String> by lazy {
@@ -78,9 +78,9 @@ private val PROMPTS: Pair<String, String> by lazy {
 private val DESCRIBE_PROMPT: String get() = Prompts.role("describe")
 
 /**
- * 在屏上找一个元素:有原文且控件树和画面同步时先在控件树里找唯一的精确匹配,
- * 否则让视觉模型框出来,再核对名字、画红框复看确认。找到的点登记进 [registry]。
- * 受保护的页面(系统防截屏)的画面一律不交给视觉模型。
+ * Finds an element on screen: when an exact label is given and the control tree is in sync with the frame, first look for a unique exact match in the control tree;
+ * otherwise have the vision model draw a box, then check the name and confirm it with a second look at a red-framed image. The found point is registered into [registry].
+ * Frames of protected pages (system screenshot protection) are never handed to the vision model.
  */
 class Locator(private val screen: ScreenPort, private val vision: VisionService, private val registry: LocateRegistry, family: ScreenFamily) {
     private val m = LocateMessages(family)
@@ -107,8 +107,8 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     }
 
     /**
-     * 视觉定位(框选 + 复看确认)本身会抖:模型非确定,瞬态失败(框选没给、复看没确认、名字对不上、
-     * 视觉调用失败、佐证没过)重试一次再放弃,不把一次抖动直接判成任务无进展。环境类失败在 [locate] 里已经拦掉,不会走到这。
+     * Visual locating (box selection + confirmation by a second look) is inherently flaky: models are non-deterministic, so transient failures (no box given, second look not confirmed, name mismatch,
+     * vision call failed, corroboration failed) get one retry before giving up, instead of treating one flaky result as no progress on the task. Environment failures are already blocked in [locate] and never reach here.
      */
     private suspend fun locateByVision(target: String, text: String?, elements: List<UiElement>?, synced: Boolean, shot: Shot.Ok): LocateResult {
         val (locatePrompt, confirmPrompt) = PROMPTS
@@ -153,8 +153,8 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
         if (!confirmed) return LocateResult.NotFound("not_confirmed", "Something was marked, but a second look did not confirm it is the described element. ${m.notFoundNext}")
 
         val nameChecked = occupant != null && occupant.name.isNotBlank()
-        // 定位准度没验证过的模型:只靠看图的框要有佐证——框中心的元素就是要找的字(上面已核过名字),或再框一次、复看两次都确认且看到的一致。
-        // 树不能用、或缺了一块而要找的不在树里时,没有东西可对照:照样交出去,标明没佐证,点完由效果说话
+        // For a model whose grounding is not verified, a sight-only box needs corroboration: the element at the box center is the wanted label (the name was already checked above), or a second box plus two confirmations agree and the text seen matches.
+        // When the tree is unusable, or is missing a piece and what is wanted is not in the tree, there is nothing to compare against: hand it out anyway, marked as uncorroborated, and let the effect after tapping speak
         val visionOnly = !located.groundingVerified && !nameChecked && nothingToCheckAgainst(text)
         if (!located.groundingVerified && !nameChecked && !visionOnly) {
             val again = try {
@@ -171,8 +171,8 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     }
 
     /**
-     * 这一屏没有能给看图的框作佐证的东西:树不能用;或缺了一块,而要找的字([text])不在树里(没给字时按不在算)。
-     * 树够用、判不准、读不到屏时都不算:照旧要佐证。
+     * There is nothing on this screen to corroborate a sight-box with: the tree is unusable, or it is missing a piece and the wanted text ([text]) is not in the tree (counted as absent when no text is given).
+     * An adequate tree, an inconclusive verdict, and an unreadable screen do not count: corroboration is still required.
      */
     private suspend fun nothingToCheckAgainst(text: String?): Boolean {
         val s = peekOrNull() ?: return false
@@ -184,7 +184,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     }
 
     /**
-     * 同一张图再框一次:两次的框互相包住对方的中心、看到的字一致(都要有),第二个框画红框复看也确认,才算佐证。
+     * Boxes the same image again: only if each box contains the other's center, the text seen agrees (both must have some), and the second box also passes a red-framed second-look confirmation does it count as corroboration.
      */
     private suspend fun secondLook(target: String, text: String?, first: Box, png: ByteArray, locatePrompt: String, confirmPrompt: String): Boolean {
         val box = parseBox(vision.ask(locatePrompt, if (text != null) "$target (label: \"$text\")" else target, listOf(png))) ?: return false
@@ -198,7 +198,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
 
     private fun contains(b: Box, x: Int, y: Int) = x in b.l..b.r && y in b.t..b.b
 
-    /** 当前截图和「我现在想做的事」交给视觉模型,原样返回描述。画面拿不到抛 [ScreenUnavailable],模型出错抛 ModelError。 */
+    /** Hands the current screenshot and "what I want to do now" to the vision model and returns its description as-is. Throws [ScreenUnavailable] when no frame can be obtained, ModelError when the model fails. */
     suspend fun describe(task: String): String {
         val shot = capture().let { it as? Shot.Ok ?: throw (it as Shot.Missing).let { m -> ScreenUnavailable(m.reason, m.message) } }
         clearForVision()?.let { throw ScreenUnavailable(it.reason, it.message) }
@@ -206,8 +206,8 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     }
 
     /**
-     * 当前画面能不能交给视觉模型:能为 null;不能时是原因
-     * (protected_content、读不到屏时 vision_unavailable)。
+     * Whether the current frame may be given to the vision model: null when it may; otherwise the reason
+     * (protected_content, or vision_unavailable when the screen cannot be read).
      */
     internal suspend fun visionBlocker(): String? = clearForVision()?.reason
 
@@ -219,8 +219,8 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     }
 
     /**
-     * 截一张图。屏上有防截屏窗口时不截(截到的也是黑的,付款页一类不能外传);
-     * 截不到时区分「还没开 App」和一时截不到。
+     * Takes one screenshot. Nothing is captured when a screenshot-protected window is on screen (the capture would be black anyway, and things like payment pages must not leave the device);
+     * when nothing can be captured, it distinguishes "no app open yet" from a temporary failure.
      */
     private suspend fun capture(): Shot {
         if (screen.isProtected()) return Shot.Missing("protected_content", m.protectedScreen)
@@ -233,14 +233,14 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
             val empty = s != null && s.packageName == null && s.elements.isEmpty() && !s.hasWindow
             return if (empty) Shot.Missing("no_app_open", m.noApp) else Shot.Missing("screenshot_unavailable", m.noShot)
         }
-        // 截完再看一次:截图过程中切到了受保护页面
+        // Look again after capturing: a protected page may have come up during the capture
         if (vision.ops.isMostlyBlack(png) && screen.isProtected()) return Shot.Missing("protected_content", m.protectedScreen)
         return Shot.Ok(png, vision.ops.aHash(png))
     }
 
     /**
-     * 交给视觉模型前再读一次屏:受保护页面不传；读不到屏也不传。
-     * 付款页按普通页面处理。可以传时为 null。
+     * Reads the screen once more before handing it to the vision model: protected pages are not sent, nor is an unreadable screen.
+     * Payment pages are handled like ordinary pages. Null when it may be sent.
      */
     private suspend fun clearForVision(): Shot.Missing? {
         val s = peekOrNull() ?: return Shot.Missing("vision_unavailable", m.unchecked)
@@ -256,7 +256,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
     private suspend fun peekOrNull(): ScreenSnapshot? =
         try { screen.peek() } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
 
-    /** 名字或资源 ID(去空白、小写)恰好等于 [text] 的唯一元素;嵌套或同中心的算同一个,多个为 null。 */
+    /** The unique element whose name or resource ID (whitespace removed, lowercased) exactly equals [text]; nested or same-center elements count as one, and multiple distinct matches yield null. */
     private fun exactMatch(elements: List<UiElement>, text: String): UiElement? {
         val want = norm(text)
         val hits = elements.filter { e -> onScreen(e) && (norm(e.name) == want || e.resourceId?.let { norm(it) == want } == true) }
@@ -264,7 +264,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
         return distinct.singleOrNull()
     }
 
-    /** 那一点上面积最小、且不到半屏的元素。 */
+    /** The smallest element covering that point that takes up less than half the screen. */
     private fun elementAt(elements: List<UiElement>, x: Int, y: Int): UiElement? = elements.filter { e ->
         val b = e.bounds
         b.size == 4 && x in b[0]..b[2] && y in b[1]..b[3] && area(e) < 999L * 999 / 2
@@ -277,7 +277,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
         val m = BBOX_2D.find(t) ?: BARE_BOX.find(t) ?: return null
         val (x1, y1, x2, y2) = m.groupValues.drop(1).map { it.toDouble() }
         if (listOf(x1, y1, x2, y2).any { it > 1000 } || x2 <= x1 || y2 <= y1) return null
-        // 0–1 的小数框是另一种坐标约定,换算不可靠
+        // A fractional 0–1 box is a different coordinate convention, so converting it is unreliable
         if (maxOf(x1, y1, x2, y2) <= 1) return null
         fun scale(v: Double) = (v * 999 / 1000).roundToInt()
         val seen = SEEN.find(t)?.groupValues?.get(1)?.let(::unescape)?.trim()?.take(MAX_SEEN)?.ifEmpty { null }
@@ -292,7 +292,7 @@ class Locator(private val screen: ScreenPort, private val vision: VisionService,
         return x.isNotEmpty() && y.isNotEmpty() && y !in x && x !in y
     }
 
-    /** 在屏内且有面积(读屏把屏外的元素压到边上,面积为 0)。 */
+    /** On screen and having area (screen reads pin off-screen elements to the edge, giving them zero area). */
     private fun onScreen(e: UiElement): Boolean {
         val b = e.bounds
         return b.size == 4 && b[0] >= 0 && b[1] >= 0 && b[2] <= 999 && b[3] <= 999 && b[2] > b[0] && b[3] > b[1]

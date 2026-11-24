@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 给模型看的手机窗口层级;节点只留结构与状态位(role/ref/children/交互态),文字、位置、resourceId 都在 elements 里按 ref 对应,省去重复序列化。 */
+/** The phone's window hierarchy as shown to the model; nodes keep only structure and state bits (role/ref/children/interaction state), while text, position and resourceId live in elements keyed by ref, avoiding duplicate serialization. */
 object UiTreeJson {
     fun windows(s: ScreenSnapshot): JsonArray = buildJsonArray {
         for (w in s.windows) add(buildJsonObject {
@@ -39,14 +39,14 @@ object UiTreeJson {
         if (n.wheel) put("wheel", true)
     }
 
-    /** 路径按窗口和子节点序号定位;同一路径的属性变化只发该节点,新增节点发完整子树。 */
+    /** Paths are keyed by window and child index; attribute changes at the same path send only that node, while newly added nodes send the full subtree. */
     fun changes(before: ScreenSnapshot, current: ScreenSnapshot): JsonObject {
         val old = index(before.windows)
         val now = index(current.windows)
         val updated = buildJsonArray {
             for ((path, n) in now) {
                 val previous = old[path]
-                if (previous == null && parent(path) in now && parent(path) !in old) continue // 新父节点已经带上完整子树
+                if (previous == null && parent(path) in now && parent(path) !in old) continue // the new parent already carries the full subtree
                 if (previous == null || shallow(previous) != shallow(n)) add(buildJsonObject {
                     put("path", path)
                     put("node", if (previous == null) node(n) else shallow(n))

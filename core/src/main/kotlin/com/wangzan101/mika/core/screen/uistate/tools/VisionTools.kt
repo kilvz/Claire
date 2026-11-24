@@ -26,11 +26,11 @@ import com.wangzan101.mika.core.screen.uistate.described
 import com.wangzan101.mika.core.screen.uistate.locatedInfo
 import com.wangzan101.mika.core.screen.uistate.locator
 
-/** 看图类工具:要设置里有看图模型(视觉角色)才提供,和主模型能不能看图无关。 */
+/** Vision tools: only offered when a vision model (visual role) is configured in settings, regardless of whether the main model can see images. */
 internal class Describe(f: ScreenFamily) : ScreenTool(f, "describe") {
     override val verb = Verb.Describe
     override val risk = Risk.Read
-    // 只问看图模型、不动界面:用户插话时撤掉,先读那句话
+    // Only asks the vision model and does not touch the UI: cancelled when the user interjects, so that message is read first
     override val yieldsToSteer = true
     override val def by lazy { ToolDef(name,
         describe(),

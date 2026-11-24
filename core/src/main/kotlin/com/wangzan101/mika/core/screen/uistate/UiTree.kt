@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.screen.uistate
 
-/** 一块屏上一个无障碍窗口。根节点读不到时仍保留窗口,让模型知道有遮挡或加载中的界面。 */
+/** One accessibility window on a screen. The window is kept even when its root node cannot be read, so the model knows there is an overlay or a loading UI. */
 data class UiWindowTree(
     val id: Int,
     val type: String,
@@ -12,7 +12,7 @@ data class UiWindowTree(
     val nodes: List<UiTreeNode>,
 )
 
-/** 可见无障碍节点;只有能从这一屏的元素表解析的节点才带 [ref]。 */
+/** A visible accessibility node; only nodes that can be resolved from this screen's element table carry a [ref]. */
 data class UiTreeNode(
     val role: String,
     val bounds: List<Int>,
@@ -30,11 +30,11 @@ data class UiTreeNode(
     val enabled: Boolean = true,
     val focused: Boolean = false,
     val secret: Boolean = false,
-    /** 看上去是滚轮选择器(一格一格转的时间、日期、地区……):用转滚轮的工具一次转到值。 */
+    /** Looks like a wheel picker (time, date, region, … turned notch by notch): use the wheel tool to turn straight to the value. */
     val wheel: Boolean = false,
     val children: List<UiTreeNode> = emptyList(),
 ) {
-    /** 稳定编号只替换模型地址;节点本身与 Android 端的引用表不动。 */
+    /** Stable numbering only replaces the model-facing address; the node itself and the Android-side reference table are left untouched. */
     fun withRefs(refs: Map<String, String>): UiTreeNode = copy(
         ref = ref?.let { refs[it] ?: it },
         children = children.map { it.withRefs(refs) },

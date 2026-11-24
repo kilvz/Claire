@@ -8,11 +8,11 @@ import com.wangzan101.mika.core.model.Part
 import com.wangzan101.mika.core.model.Role
 
 /**
- * 让视觉模型看图回答一个问题。只在设置里有能看图的模型时才建;
- * 调用方负责不把受保护页面、付款页的画面传进来。
+ * Asks a vision model to look at images and answer a question. Only constructed when a model that can see images is configured;
+ * the caller is responsible for never passing in frames of protected pages or payment pages.
  *
- * 现已支持通用多级瀑布流备援 (Waterfall Chain):
- * 主视觉模型遇 429、503、超时或配额耗尽时，自动平滑切换到备援视觉模型，保障任务不中断、不致盲。
+ * Generic multi-level waterfall fallback (Waterfall Chain) is now supported:
+ * when the primary vision model hits 429, 503, a timeout or exhausted quota, it switches smoothly to the fallback vision model, keeping the task from being interrupted or going blind.
  */
 class VisionService(
     private val model: ChatModel,
@@ -20,29 +20,29 @@ class VisionService(
     private val fallbacks: List<ChatModel> = emptyList(),
     private val onModelSwitch: ((from: ChatModel, to: ChatModel, error: ModelError) -> Unit)? = null,
 ) {
-    /** 构造完整视觉瀑布流链表 */
+    /** Builds the complete vision waterfall chain */
     constructor(
         models: List<ChatModel>,
         ops: ImageOps,
         onModelSwitch: ((from: ChatModel, to: ChatModel, error: ModelError) -> Unit)? = null,
     ) : this(models.first(), ops, models.drop(1), onModelSwitch)
 
-    /** 视觉模型链：主模型 + 所有备援模型 */
+    /** Vision model chain: the primary model + all fallback models */
     val chain: List<ChatModel> = listOf(model) + fallbacks
 
-    /** 不区分实际应答模型时,只有整条链均已验证才可承诺定位可信。 */
+    /** Because the actually responding model is not distinguished, grounding can only be promised as verified when the whole chain is verified. */
     val groundingVerified: Boolean get() = chain.all { it.capabilities.groundingVerified }
 
     data class Answer(val text: String, val groundingVerified: Boolean)
 
     /**
-     * 不带工具的一次调用。
-     * 当主视觉模型抛出 [ModelError] 时，若链路上有备援模型，自动切换并继续执行。
+     * A single call without tools.
+     * When the primary vision model throws a [ModelError], if the chain has fallback models it switches automatically and keeps executing.
      */
     suspend fun ask(system: String, text: String, images: List<ByteArray>): String =
         askWithGrounding(system, text, images).text
 
-    /** 可信度随本次回答返回,并发或后续复看不能改变坐标所属模型的属性。 */
+    /** The grounding-verified flag is returned with this answer, so concurrency or later re-checks cannot change the property of the model the coordinates belong to. */
     suspend fun askWithGrounding(system: String, text: String, images: List<ByteArray>): Answer {
         val parts = listOf(Part.Text(text)) + images.map { ModelImage.part(it, ops) }
         val messages = listOf(Message(Role.User, parts, Author.Mika))

@@ -1,16 +1,16 @@
 package com.wangzan101.mika.core.screen.visual
 
-/** 动作前后两帧画面的粗比较用的格子与阈值(判动作效果的旁证)。 */
+/** Grid and thresholds for the coarse comparison of frames before and after an action (corroborating evidence for judging the action's effect). */
 object FrameTuning {
-    /** 画面格子的列数、行数。 */
+    /** Column and row counts of the frame grid. */
     const val GRID_COLS = 24
     const val GRID_ROWS = 48
-    /** 一格亮度差超过这么多算这格变了。 */
+    /** A cell counts as changed when its luma difference exceeds this. */
     const val CELL_DELTA = 16
-    /** 整屏至少这么多格(约 1%)变了才算看得出的变化。 */
+    /** At least this fraction of all cells (about 1%) must change for it to count as a visible change. */
     const val FRAME_VISIBLE = 0.01
-    /** 目标区域里至少这么多格变了才算区域里看得出的变化。 */
+    /** At least this fraction of the target region's cells must change for it to count as a visible change within the region. */
     const val REGION_VISIBLE = 0.15
-    /** 整屏这么多格变了算大面积变化。 */
+    /** This fraction of all cells changing counts as a large-area change. */
     const val FRAME_LARGE = 0.25
 }

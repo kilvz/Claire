@@ -6,19 +6,19 @@ import com.wangzan101.mika.core.run.waitOrSteer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-/** 两次读屏至少隔这么久:界面事件一阵一阵来,不必每条都读一遍。 */
+/** Keep at least this much time between two screen reads: UI events come in bursts, so there is no need to read for every one of them. */
 private const val MIN_GAP_MS = 200L
-/** 端口不报界面事件时,隔这么久重读一次;也是两次看用户有没有插话的最长间隔。 */
+/** When the port reports no UI events, re-read after this interval; it is also the longest interval between two checks for a user interjection. */
 private const val POLL_MS = 500L
-/** 等「界面稳定」时每次交给端口等的上限(端口按自己的安静时长判)。 */
+/** Upper bound for each wait handed to the port when waiting for "UI stable" (the port judges by its own quiet period). */
 private const val STABLE_SLICE_MS = 1_500L
-/** 意外要连着读到几次才算数(页面换页时新旧窗口会短暂同时在)。 */
+/** How many consecutive reads an anomaly needs before it counts (during page transitions the old and new windows briefly coexist). */
 private const val CONFIRM_READS = 2
 
 /**
- * 一批动作里一步做完后的等待:按 [Until] 逐次读屏(不登记编号)做字面比较,手机、网页同一套,只经 [ScreenPort] 与读屏结果。
- * 端口有界面事件时提前醒来([ScreenPort.awaitChange]),否则隔一会儿重读。看出意外(弹框、别的包盖上来、换了 App)、
- * 用户插话、到了时限就不再等,交回去由模型判断。基准是开始等时的那一屏:这一步本身引起的切换由执行入口另外核对。
+ * The wait after one step of a batch finishes: read the screen repeatedly per [Until] (without registering refs) and compare literally, the same for phones and web pages, going only through [ScreenPort] and the screen-read results.
+ * Wake early when the port has UI events ([ScreenPort.awaitChange]), otherwise re-read after a while. On spotting an anomaly (popup, another package covering it, app switch),
+ * a user interjection, or the deadline, it stops waiting and hands back for the model to judge. The baseline is the screen when the wait began: switches caused by this step itself are verified separately by the execution entry point.
  */
 internal class UntilWait(
     private val screen: ScreenPort,
@@ -29,7 +29,7 @@ internal class UntilWait(
     suspend fun run(until: Until): UntilOutcome {
         val start = clock()
         val timeout = until.timeoutMs.coerceIn(0, Until.MAX_MS)
-        // 时钟不走(测试、时钟出错)时也一定结束:每轮至少花 MIN_GAP_MS
+        // Guarantee termination even when the clock does not advance (tests, clock errors): every round costs at least MIN_GAP_MS
         val maxRounds = timeout / MIN_GAP_MS + 2
         var base: ScreenSnapshot? = null
         var stableNow = false
@@ -40,17 +40,17 @@ internal class UntilWait(
             val snap = read()
             if (snap != null) {
                 val first = base ?: snap.also { base = it }
-                // 有意外时这一轮不算成立:弹框后面露出的字不代表能接着做
+                // A round with an anomaly does not count as satisfied: text showing behind a popup does not mean the step can continue
                 val odd = unexpected(first, snap, until)
                 if (odd == null && (!until.stable || stableNow) && holds(until, snap)) return done(true, null)
                 if (odd != null && odd == suspect) seen++ else { suspect = odd; seen = if (odd == null) 0 else 1 }
-                // 页面弹框挂着时页面停着,不必再读一次确认
+                // While a page dialog is up the page is at rest, so no extra read is needed to confirm
                 if (suspect != null && (seen >= CONFIRM_READS || snap.web?.dialog != null)) return done(false, suspect)
             }
             if (interrupted()) return done(false, UntilOutcome.NEW_MESSAGE)
             val left = timeout - (clock() - start)
             if (left <= 0) return done(false, UntilOutcome.TIMEOUT)
-            // 每段等待都在用户插话时立刻结束(见 waitOrSteer),不等到下一轮才看
+            // Every wait segment ends immediately on user interjection (see waitOrSteer), rather than only being checked in the next round
             if (until.stable) {
                 stableNow = waitOrSteer { waitStable(minOf(left, STABLE_SLICE_MS)) } ?: return done(false, UntilOutcome.NEW_MESSAGE)
             } else if (waitOrSteer { awaitChange(minOf(left, POLL_MS)) } ?: return done(false, UntilOutcome.NEW_MESSAGE)) {
@@ -67,11 +67,11 @@ internal class UntilWait(
         try { screen.awaitChange(ms) } catch (e: CancellationException) { throw e } catch (e: Exception) { delay(ms); false }
 
     companion object {
-        /** 条件此刻是否成立(只看给了的几项);和动作结果里 expect 的核对一样按元素名字比,不分大小写。 */
+        /** Whether the condition holds right now (only the items provided are checked); like the expect verification in action results, it compares by element name, case-insensitively. */
         fun holds(until: Until, s: ScreenSnapshot): Boolean {
             val names = s.elements.map { it.name }
             until.appears?.trim()?.let { want -> if (names.none { it.contains(want, ignoreCase = true) }) return false }
-            // 什么都没读到(受保护、读不到)不算「已经没了」
+            // Reading nothing at all (protected, unreadable) does not count as "already gone"
             until.gone?.trim()?.let { gone -> if (names.isEmpty() || names.any { it.contains(gone, ignoreCase = true) }) return false }
             until.place?.trim()?.let { p -> if (!inPlace(s, p)) return false }
             return true
@@ -81,9 +81,9 @@ internal class UntilWait(
             s.packageName?.contains(p, ignoreCase = true) == true || s.web?.url?.contains(p, ignoreCase = true) == true
 
         /**
-         * 和开始等时那一屏 [base] 比,此刻 [now] 有没有明显的意外;没有为 null。
-         * 页面弹框挂着、同一 App 多出一个应用窗口为 [UntilOutcome.POPUP];多出别的包的应用或系统窗口为 [UntilOutcome.SYSTEM_DIALOG];
-         * 前台换成别的 App(且不是 [until] 要等的那个)为 [UntilOutcome.APP_SWITCHED]。网页换站点是正常的跳转,不算换了 App。
+         * Whether [now] shows an obvious anomaly compared with the screen [base] at the start of the wait; null if not.
+         * A page dialog hanging open, or one more application window of the same app, is [UntilOutcome.POPUP]; an extra application or system window of another package is [UntilOutcome.SYSTEM_DIALOG];
+         * the foreground switching to a different app (and not the one [until] waits for) is [UntilOutcome.APP_SWITCHED]. A web page moving to another site is a normal navigation, not an app switch.
          */
         fun unexpected(base: ScreenSnapshot, now: ScreenSnapshot, until: Until): String? {
             if (now.web?.dialog != null && base.web?.dialog == null) return UntilOutcome.POPUP

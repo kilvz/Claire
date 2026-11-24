@@ -19,24 +19,24 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /**
- * 用户屏幕上的字从哪来:先用前台 App 的无障碍树;树不够用(和任务读屏同一套判断,[TreeAdequacy])时再认画面上的字(OCR),
- * 只补树里没有的、去掉认错的行。每行带中心点,看不到图的模型也分得清左边右边(聊天里对方和自己的气泡)。
+ * Where the text on the user's screen comes from: first the foreground app's accessibility tree; when the tree is inadequate (the same judgment as task screen reads, [TreeAdequacy]) the on-frame text is then recognized (OCR),
+ * filling in only what the tree lacks and dropping misread lines. Each line carries its center point, so even a model that cannot see the image can tell left from right (the other party's bubbles vs. your own in a chat).
  */
 object UserScreenText {
-    /** 一屏最多留这么多行、每行这么多字:够看清这一屏,又不把上下文撑大。 */
+    /** At most this many lines per screen, and this many characters per line: enough to make out the screen without inflating the context. */
     const val MAX_LINES = 120
     const val MAX_CHARS = 200
 
-    /** 树不是明显够用:要再认一遍画面上的字。受保护的页面画面是黑的,不认。 */
+    /** The tree is not clearly adequate: the on-frame text must be recognized as well. Protected pages have a black frame, so nothing is recognized there. */
     fun needsOcr(s: ScreenSnapshot): Boolean = TreeAdequacy.ofTree(s).quality.let { it != TreeQuality.Adequate && it != TreeQuality.Protected }
 
     /**
-     * 屏上的字,从上到下、同一行从左到右。树里有名字的元素(密码框不算)和 [ocr] 里树没有的行合在一起;
-     * [top]/[bottom](0–999)以外是状态栏、导航条那几条,那里认出的字(时间、电量)不要。第二个值是有没有用到认出来的字。
+     * The on-screen text, top to bottom and left to right within a row. Named tree elements (password fields excluded) are merged with lines from [ocr] that the tree lacks;
+     * outside [top]/[bottom] (0–999) are the status bar and navigation bar strips, and text recognized there (time, battery) is not wanted. The second value says whether recognized text was used.
      */
     fun lines(s: ScreenSnapshot, ocr: List<VisibleTextLine>?, top: Int = 0, bottom: Int = 999): Pair<List<ScreenLine>, Boolean> {
         val named = s.elements.filter { !it.secret && it.name.isNotBlank() }
-        // 元素的中心是像素,bounds 和认出来的字一样是 0–999:都换成 0–999 再合、再排
+        // Element centers are in pixels while bounds and recognized text are 0–999: convert everything to 0–999 before merging and sorting
         val tree = named.filterNot { joinsChildren(it, named) }
             .map { ScreenLine(clip(it.name), normalize(it.centerX, s.width), normalize(it.centerY, s.height)) }
         val extra = ocr?.let { VisibleText.missing(s, VisibleText.legible(it)) }.orEmpty()
@@ -49,8 +49,8 @@ object UserScreenText {
     }
 
     /**
-     * [e] 只是把框在它里面的那几段字连起来(一行设置项、一条消息的整块):去掉它的名字里这几段后不剩字。
-     * 这时留里面那几段,各有各的位置;名字里有自己的字时照留。
+     * [e] merely concatenates the text segments boxed inside it (a settings row, the whole block of one message): after removing those segments from its name, no characters remain.
+     * In that case the inner segments are kept, each with its own position; when its name has text of its own it is kept as well.
      */
     private fun joinsChildren(e: UiElement, all: List<UiElement>): Boolean {
         val inner = all.filter { it !== e && inside(it.bounds, e.bounds) && area(it.bounds) < area(e.bounds) }
@@ -63,7 +63,7 @@ object UserScreenText {
     private fun inside(a: List<Int>, b: List<Int>) = a.size == 4 && b.size == 4 && a[0] >= b[0] && a[1] >= b[1] && a[2] <= b[2] && a[3] <= b[3]
     private fun area(b: List<Int>) = if (b.size == 4) (b[2] - b[0]).toLong() * (b[3] - b[1]) else 0L
 
-    /** 同一行的容差(0–999):中心高低差不到这么多的算同一行,按左右排。 */
+    /** Same-row tolerance (0–999): centers whose vertical offset is under this count as the same row and are ordered left to right. */
     private const val ROW = 12
 
     private fun clip(t: String): String {
@@ -72,7 +72,7 @@ object UserScreenText {
     }
 }
 
-/** 一屏的说明存成的 JSON(和截图放在一起);读不懂的返回 null。 */
+/** The screen description stored as JSON (kept together with the screenshot); returns null when it cannot be parsed. */
 object UserScreenJson {
     fun encode(s: UserScreen): String = buildJsonObject {
         put("id", s.id); put("takenAt", s.takenAt)

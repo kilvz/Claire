@@ -1,29 +1,29 @@
 package com.wangzan101.mika.core.screen.vision
 
 /**
- * 图像处理接口:输入是编码后的图片字节(截屏 PNG 等),输出同样是编码后的字节。
- * 框坐标 [box] 是 [左, 上, 右, 下],按 0–999 归一化,与读屏元素的 bounds 同一口径。
+ * Image processing interface: the input is encoded image bytes (screenshot PNG etc.) and the output is likewise encoded bytes.
+ * Box coordinates [box] are [left, top, right, bottom], normalized to 0–999, on the same scale as the bounds of screen-read elements.
  */
 interface ImageOps {
     fun size(img: ByteArray): Pair<Int, Int>
 
-    /** 8×8 灰度平均哈希;两帧的 [hamming] 距离越小越像。 */
+    /** 8×8 grayscale average hash; the smaller the [hamming] distance between two frames, the more alike they are. */
     fun aHash(img: ByteArray): Long
 
-    /** 发给模型前压缩:长边不超过 [maxSide]。 */
+    /** Compresses before sending to a model: the long side is capped at [maxSide]. */
     fun toJpeg(img: ByteArray, maxSide: Int = 1280, quality: Int = 80): ByteArray
 
-    /** 在 [box] 外扩 [expandPx] 处画红框。 */
+    /** Draws a red frame [expandPx] outside [box]. */
     fun drawFrame(img: ByteArray, box: IntArray, expandPx: Int = 3, strokePx: Int = 4): ByteArray
 
     fun crop(img: ByteArray, box: IntArray): ByteArray
 
     fun scale(img: ByteArray, factor: Double): ByteArray
 
-    /** 逐像素 ARGB,行优先。 */
+    /** Per-pixel ARGB, row-major. */
     fun pixels(img: ByteArray): IntArray
 
-    /** 几乎全黑:受保护的页面截出来就是这样。 */
+    /** Almost entirely black: this is what a protected page looks like when captured. */
     fun isMostlyBlack(img: ByteArray): Boolean
 }
 
