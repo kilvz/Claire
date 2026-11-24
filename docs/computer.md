@@ -1,75 +1,75 @@
-# 从电脑使用 Mika
+# Use Mika from a computer
 
-简体中文 | [English](computer.en.md)
+AI tools on your computer (or you, in a terminal) can hand a job to Mika on your phone, check progress, answer its follow-up questions and get the result back. The computer says what to get done; Mika on the phone decides how. This page helps you pick an entry point and a connection, then points you to the step-by-step guides.
 
-电脑上的 AI 工具（或者你自己在终端里）可以把一件事交给手机上的 Mika，查进度、回答追问，拿回结果。电脑说「要办成什么」，怎么做由手机上的 Mika 决定。这一页帮你选入口、选连法，然后指向具体的步骤。
+AI agents: go straight to the [agent quick path](agent-quickstart.md).
 
-AI Agent 请直接看 [Agent 快速路径](agent-quickstart.md)。
+On the phone: install the APK ([Releases](https://github.com/wangzan101/Mika/releases/latest)), open Mika once and add a model. If Mika only needs to chat, browse the web and work with files, Android 11 is enough; to let it operate phone apps, also finish the phone-control setup in the [setup guide](setup-guide.md) (Android 12+).
 
-手机端的前提：装好 APK（[Releases](https://github.com/wangzan101/Mika/releases/latest)）、打开过一次 Mika、配好模型。只让 Mika 聊天、上网、处理文件时，安卓 11 就行；要它操作手机 App，还要按[设置指南](setup-guide.md)完成手机操作设置（安卓 12+）。
+## Step 1: pick an entry point (CLI + Skill or MCP)
 
-## 第一步：选入口（CLI + Skill 或 MCP）
+Both entry points reach the same task service on the phone. **Normally one is enough**; you can use both if you need to connect different clients.
 
-两种入口接的是手机上同一份任务服务，**通常选一种就够了**；要同时接入不同的客户端时，也可以并用。
-
-| 你的情况 | 选 | 去看 |
+| Your situation | Pick | Read |
 | --- | --- | --- |
-| 电脑上的 Agent 能执行命令、支持 Skill | **Skill**：自带 CLI 脚本，不用另装 CLI，也不用配 MCP | [安装 Skill](computer-install.md#skill安装) |
-| 想在终端或脚本里派任务 | **CLI**：`mika` 命令 | [安装 CLI](computer-install.md#cli安装)，[连接与任务命令](cli.md) |
-| 用的是支持 MCP 的客户端 | **MCP**：Mika 当 MCP 服务器 | [电脑连接（MCP）](mcp.md) |
+| Your computer agent can run commands and supports Skills | **Skill**: includes its own CLI script, so no separate CLI install and no MCP configuration | [Install the Skill](computer-install.md#skill-install) |
+| You want to submit tasks from a terminal or script | **CLI**: the `mika` command | [Install the CLI](computer-install.md#cli-install), [connection and task commands](cli.md) |
+| You use a client that speaks MCP | **MCP**: Mika acts as an MCP server | [Computer access (MCP)](mcp.md) |
 
-拿不准时：Agent 支持 Skill 就用 Skill，否则用 MCP。
+Not sure? If your agent supports Skills, use the Skill; otherwise use MCP.
 
-## 第二步：选连法（USB 或 Wi-Fi / VPN）
+## Step 2: pick a connection (USB or Wi-Fi / VPN)
 
-两种入口都能用这两种连法。在手机的 设置 › 连接电脑 里，「CLI / Skill」和「MCP」共用同一个连接方式选择。
+Both entry points work over either connection. In Settings › Connect a computer on the phone, "CLI / Skill" and "MCP" share the same connection selector.
 
-| | USB（推荐） | Wi-Fi / 私有 VPN |
+| | USB (recommended) | Wi-Fi / private VPN |
 | --- | --- | --- |
-| 什么时候用 | 手机用数据线连着电脑 | 不想插线，或者人不在手机旁边（远程用） |
-| 怎么打开 | 电脑上一条命令，不用碰手机；CLI 的 `connect` 会替你打开 | 在手机的 设置 › 连接电脑 里打开「网络访问」，默认关着 |
-| 电脑上要有 | adb（Android platform-tools），手机在 `adb devices` 里显示为 `device` | 和手机在同一个 Wi-Fi，或同一个私有 VPN 网络里 |
-| 监听在哪 | 只在手机本机上，Wi-Fi 上连不到 | 只接受局域网、私有 VPN 网络的地址，公网和移动数据不接受 |
+| When | The phone is on a cable to the computer | No cable, or you're away from the phone (remote use) |
+| How to turn it on | One command on the computer, without touching the phone; the CLI's `connect` does it for you | Turn on "network access" in Settings › Connect a computer on the phone; off by default |
+| The computer needs | adb (Android platform-tools), with the phone listed as `device` in `adb devices` | To be on the same Wi-Fi as the phone, or in the same private VPN network |
+| Where it listens | On the phone itself only; not reachable over Wi-Fi | Accepts only LAN and private VPN addresses; public addresses and mobile data are refused |
 
-两种连法各有自己的开关和令牌，可以都开。连接是明文 HTTP，只在自己信任的网络里用；令牌别发给别人。付款、需要你同意的操作只能在手机上处理，电脑交来的任务不会替你点。
+Each connection has its own switch and token, and both can be on at once. The connection is plain HTTP, so use it only on networks you trust, and don't share the token. Payments and anything that needs your consent can only be handled on the phone; tasks from the computer never approve them for you.
 
-## 第三步：照着做
+## Step 3: follow the guide
 
-- **CLI 或 Skill**：先按[安装、升级和卸载](computer-install.md)装好，再看[连接与任务命令](cli.md)。
-- **MCP**：按[电脑连接（MCP）](mcp.md)，USB 和 Wi-Fi / VPN 两种连法都有一步步的说明。
-- **让电脑上的 AI 助手替你装**：手机经 USB 连着电脑时，把[用电脑上的 AI 助手安装](install-with-agent.md)这份说明交给它：它先把 Mika 装到手机上；你也要电脑访问的话，它会按你选的入口接着配好。
+- **CLI or Skill**: install it with [install, update and remove](computer-install.md), then read [connection and task commands](cli.md).
+- **MCP**: follow [Computer access (MCP)](mcp.md), which covers both USB and Wi-Fi / VPN step by step.
+- **Let an AI agent on your computer set it up**: with the phone connected over USB, give it [Install with an AI agent on your computer](install-with-agent.md). It installs Mika on the phone first; if you also want computer access, it then sets up the entry point you chose.
 
-## 电脑任务台（`mika ui`）
+## Task desk (`mika ui`)
 
-也可以通过可选的[飞书连接器](feishu.md)扫码创建或关联机器人，在飞书私聊中派任务和接收结果；电脑仍需保持在线。
+The optional [Feishu connector](feishu.md) can also create/link a bot and exchange tasks and results in private chats; its computer process must stay online.
 
-不想敲命令时，连好手机后运行 `mika ui`，电脑浏览器会打开一个任务台：派任务、看步骤进度、回答追问、追加要求、取消任务，其他入口派的近期任务也会列出来。页面在后台时默认暂停读取，切回来再更新；需要接管的步骤要在手机上处理。界面按浏览器语言显示简体中文或英文。
+If you would rather not type commands, connect the phone and run `mika ui`. Your browser opens a task desk where you can start tasks, follow their steps, answer questions, add instructions and cancel tasks; recent tasks started from other entry points show up too. Reads pause while the tab is hidden by default and resume when you come back; steps that need you still have to be handled on the phone. The desk follows the browser's language: Simplified Chinese or English.
 
-左侧把最近 50 个远程任务按对话归组。中央按轮次显示要求和答复。一轮结束后，在底部继续输入会沿用同一对话。点某一轮的「查看过程」，手机状态和本页观察到的进展会在这一轮的答复上方展开。点「收起过程」即可合上。底部输入框保留当前草稿。需要另起一段时，点「新对话」。
+To get alerts while working in another window, open the phone connection details at the bottom left, turn on **Desktop notifications** and allow notifications in your browser. The desk alerts you when a task needs an answer or a phone takeover, finishes or fails. Click a notification to open the exact turn. Existing states and ordinary progress updates stay quiet.
 
-在手机「设置 → 连接电脑 → 高级设置」打开「允许电脑查看历史记录」后，左侧还会列出手机保存的对话，包括直接在手机上发起的对话。用「加载更多对话」和「加载更早的轮次」继续翻阅。手机发起的任务可在这里查看，在手机上继续或处理追问。此开关默认关闭，授权范围包含所有对话、运行记录和已录制的 Trace 正文，USB 与私有网络连接共用。
+Notifications are off by default. With notifications on, keep at least one desk tab open in the same browser. Background tabs can deliver alerts, and opening extra tabs does not duplicate them. Your computer must allow the browser to show notifications. If the computer sleeps, the browser suspends the page or the phone disconnects, the desk reads the latest state when the connection resumes. Closing all desk tabs or quitting the browser pauses alerts. Reopening the desk starts from the current state.
 
-展开某一轮的「查看过程」，可读手机保存的运行事件及详细 Trace。Trace 按步骤列出模型请求、工具调用、耗时、输入与缓存用量以及首处变化的块；点「查看请求与回复」按页读取已脱敏正文。录制中的内容随当前页面更新，切换轮次保留输入草稿。详细录制需要事先在调试版或性能测试版的开发者选项里开启。未录制、记录被清理或只录到一部分时，页面会说明当前可用情况。
+The sidebar groups the latest 50 remote tasks by conversation. Read each turn in the center and use the composer to continue after a turn ends. Select **View process** to expand the phone’s report and the updates observed in this tab above that turn’s reply. Select **Hide process** to collapse it. The composer keeps your current draft. Select **New chat** to start a separate conversation.
 
-想在别的窗口工作时收到提醒，点左下角的手机连接状态，开启「电脑提醒」，并在浏览器中允许通知。任务台只在发现需要回答、需要手机接管、完成或失败时提醒。点击通知会回到对应对话的那一轮。首次开启时已显示的任务状态和普通步骤更新都保持安静。
+On the phone, open **Settings → Connect a computer → Advanced** and enable **Allow computers to view history** to include saved phone conversations in the sidebar. **Load more conversations** and **Load earlier turns** page through the archive. Tasks started on the phone can be viewed here and continued or answered on the phone. This permission is off by default and covers all conversations, run records and recorded Trace bodies over both USB and private-network connections.
 
-默认关闭提醒。开启后，同一浏览器里只需留一个任务台标签页，切到后台也能收到通知，开多个标签页也只提醒一次。电脑系统需要允许浏览器显示通知。电脑休眠、浏览器挂起页面或手机断线时，要等恢复连接后才能读到最新状态。关闭所有任务台标签页或退出浏览器后，提醒会暂停，重新打开时不会补发关闭期间的通知。
+Each turn’s **View process** can show saved run events and detailed Trace entries, including model attempts, tool calls, timing, input and cached tokens, and the first changed request block. **Read request and reply** loads redacted text one page at a time. Recordings update while the page is visible, and switching the inspected turn keeps the composer’s draft. Detailed recording must have been enabled beforehand in Developer options in a debug or perf build. Missing, rotated and incomplete records are identified in the view.
 
-支持任务恢复的手机会记住每次提交的编号。如果断线时没有收到回执，重新连接后任务台会按编号核对近期任务。原任务没出现在近期列表时，可以点「查找原任务」。找不到时可点「用同一编号重试」。刷新同一标签页后仍可核对，任务台会保留待核对的原始要求，直到找回、重试成功或手动放弃核对。
+On a phone with task recovery, the desk matches a missing submission receipt by ID when the connection returns. Choose **Find task** if the task is outside the recent list. If the phone has no record yet, choose **Retry with the same ID**. The tab keeps the pending request across a reload until you recover it, retry successfully or dismiss it.
 
-- 多台 ADB 设备时，在页面里选一台，或启动时用 `mika ui --device SERIAL` 指定；Wi-Fi / 私有 VPN 连接沿用 `--url` 和 `--token-file`。
-- 只装了 Skill 时用 `python3 <技能目录>/mika/scripts/mika_cli.py ui`（Windows 用 `py -3`）。
-- 浏览器没自动打开时加 `--no-open`，把终端打出的链接复制到本机浏览器。
-- 任务台只监听本机 `127.0.0.1` 的随机端口，每次启动生成新的链接；链接里的密钥就是使用权，不要发给别人。终端按 Ctrl+C 关掉任务台，已经交给手机的任务照常运行。
+- With several ADB devices, choose one in the page or start with `mika ui --device SERIAL`; Wi-Fi / private VPN connections use the usual `--url` and `--token-file`.
+- With only the Skill installed, run `python3 <skills-directory>/mika/scripts/mika_cli.py ui`.
+- Attach files to a new task or a follow-up with **Attach files**, or paste a clipboard image into the composer. Select up to 9 files totalling 200 MiB. You can remove them before sending or send files without a message. The phone imports them into that conversation’s workspace and numbers duplicate names.
+- When a task exports a result file on the phone, its turn shows a download button with the file name and size. Select it to save a copy. A missing or changed result reports an error. Attachments and downloads require a compatible phone and desk.
+- If no browser opens, add `--no-open` and open the printed link in a browser on this computer.
+- The desk listens only on `127.0.0.1` on a random port and prints a new link on every start. The secret in the link is what grants access, so keep it to yourself. Ctrl+C in the terminal closes the desk; tasks already on the phone keep running.
 
-## 导出运行记录
+## Export a run record
 
-任务卡住、结果不对，或要交给电脑上的另一个工具排障时，用同一套连接把手机上这一轮的脱敏记录拉下来。它和手机里「查看过程」是同一份事件，再过一遍脱敏；默认不带截图文件。
+When a task is stuck, the result looks wrong, or another tool on the computer needs to debug it, pull that turn's redacted record over the same connection. It is the same event stream as the phone's process view, redacted again, and it does not include screenshot files.
 
 ```bash
 mika task export TASK_OR_RUN_ID --json
 ```
 
-返回的 JSON 里 `exportFormat` 为 1，并写明 `task_id`、`conversation_id`、run_id（和 `task status` 里的 `conversation` 是同一个对话编号）。`partial` 为 true 表示这一轮还在进行，内容是到目前为止的事件。编号不存在时命令会失败并给出明确错误。只要事件、一行一个：`mika task export ID --events`。
+The JSON has `exportFormat` 1 and states `task_id`, `conversation_id` and run_id (`conversation_id` is the same value as `conversation` on `task status`). `partial: true` means the turn is still in progress and the events are what has been written so far. An unknown id fails with an explicit error. For one event per line: `mika task export ID --events`.
 
-任务台里的「查看过程」仍是本页观察到的进度，不是这份完整事件流。在任务台上下载同一份 JSON、附带 OTLP Trace 或截图，留作后续。
+**View process** on the desk is still the progress observed in that page, not this full event stream. Downloading the same JSON from the desk, or attaching an OTLP Trace or screenshots, is left for later.

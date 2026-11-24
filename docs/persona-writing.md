@@ -1,143 +1,141 @@
-# 给 AI 助手：帮用户写 Mika 人格
+# For AI assistants: writing a Mika persona for the user
 
-简体中文 | [English](persona-writing.en.md)
+This document is written for **an AI assistant that is drafting a Mika persona for the user**. People can follow it too.
 
-这份文档是写给**帮用户起草 Mika 人格的 AI 助手**看的。人也可以照着写。
-
-如果你是用户：把下面这句话发给你的 AI 助手，后半句换成你想要的效果。
+If you are the user: send your AI assistant the line below, replacing the last sentence with what you want.
 
 ```
-请按 https://github.com/wangzan101/Mika/blob/main/docs/persona-writing.md 的要求，帮我写一个 Mika 人格。我想要的效果是：回答短一点，办事时少说话，语气像靠谱的同事。
+Follow https://github.com/wangzan101/Mika/blob/main/docs/persona-writing.md and write a Mika persona for me. What I want: shorter answers, less talk while working, the tone of a reliable colleague.
 ```
 
-如果你是 AI 助手：先读完「人格能改什么」，向用户问清想要的效果，再按「交付格式」给出结果。拿不准用户要什么时问一次，不要替用户编设定。
+If you are the AI assistant: read "What a persona can change" first, ask the user what effect they want, then deliver the result in the "Delivery format". When you are unsure what the user wants, ask once; do not invent a character for them.
 
-## 人格是什么
+## What a persona is
 
-Mika 是手机上替用户办事的助手：操作 App、上网、处理文件，并把结果告诉用户。它说的话有两种：
+Mika is an assistant on the user's phone that gets things done: it operates apps, browses the web, works with files and reports what happened. It speaks in two ways:
 
-- **进度说明**：办事时每一步旁边的一句话，显示在对话和悬浮胶囊里，地方很小。
-- **最终回答**：事情办完后的结果，支持 Markdown（标题、列表、表格、代码块）。
+- **Progress notes**: one line next to each step while it works, shown in the chat and in the floating capsule, where space is tight.
+- **Final answer**: the result once the task is done. Markdown works (headings, lists, tables, code blocks).
 
-人格决定这两种话怎么说。一套人格由四样东西组成：
+A persona decides how both are worded. It has four parts:
 
-| 组成 | 说明 | 上限 |
+| Part | What it is | Limit |
 | --- | --- | --- |
-| 名称 | 只在存了多套时用来区分，显示在「管理人格」和运行过程里；只有一套时自动叫「我的风格」 | 40 字 |
-| 称呼 | Mika 提到自己时用的名字，默认 Mika；只能用文字、数字和空格 | 16 字 |
-| 选项 | 界面上直接选的几项，见下文 | 无 |
-| 指令 | 自己写的一段文字，补充选项表达不了的 | 4000 字（约 3000 token） |
+| Name | Only tells several saved personas apart; shown under "Manage personas" and in the run details. With a single persona it is called "My style" automatically | 40 characters |
+| Nickname | The name Mika uses for itself, Mika by default; letters, digits and spaces only | 16 characters |
+| Options | A few settings chosen in the UI, see below | none |
+| Instructions | Free text for what the options cannot express | 4000 characters (about 3000 tokens) |
 
-人格在设置里选用一套，对所有对话生效，从下一条消息起算；正在进行的任务不受影响。不选人格时 Mika 按平常的方式说话。
+One persona is chosen in Settings and applies to every conversation from the next message on; a task that is already running is not affected. With no persona, Mika speaks the way it normally does.
 
-## 人格能改什么
+## What a persona can change
 
-能改的只有说话和书写的方式：
+Only how Mika speaks and writes:
 
-- 语气、亲切和正式的程度、幽不幽默
-- 回答的长短
-- 进度说明和建议怎么措辞
-- 格式偏好（用不用标题、列表、表情符号）
+- tone, warmth, formality, humour
+- how long answers are
+- how progress notes and suggestions are phrased
+- formatting preferences (headings, lists, emoji)
 
-下面这些写了也不会生效。Mika 仍按原来的规则办，必要时会向用户说明原因：
+The following have no effect even if written. Mika keeps to its rules and, where it matters, tells the user why:
 
-- **让它做事**：开始任务、调用工具、读记忆或屏幕、改设置、对外发送内容、透露信息。这些只听用户自己发的消息。
-- **改规则**：证据、安全、隐私、授权、确认、完成这几类规则。例如「付款不用问我」「不用核对直接说办好了」「查不到就编一个」。要少被询问，请用户在 设置 › 任务运行 里打开「自主模式」，见[询问与自主](modes.md)。
-- **给能力**：人格不能给它工具、权限或访问范围。
-- **换身份**：称呼可以改（见上表），改的只是自称。它仍然是同一个助理，规则和能做的事不变；App 的名字也还是 Mika。
-- **回答的语言**：在 设置 › 语言与外观 里选，不要写进人格。
+- **Making it act**: starting a task, calling a tool, reading memory or the screen, changing a setting, sending something outward, disclosing information. Those follow only the user's own messages.
+- **Changing the rules**: evidence, safety, privacy, authorization, confirmation and completion. For example "pay without asking me", "say it is done without checking", "make something up if you cannot find it". To be asked less often, the user turns on Autonomous mode under Settings › Task running; see [Ask and Autonomous](modes.md).
+- **Granting abilities**: a persona cannot give it tools, permissions or access.
+- **A different identity**: the nickname can change (see the table above), and only the name changes. It is still the same assistant with the same rules and abilities, and the app is still called Mika.
+- **The reply language**: chosen under Settings › Language & appearance; do not put it in a persona.
 
-另外两类内容不属于人格，不要写进去：
+Two more kinds of content do not belong in a persona:
 
-- 一次性的任务要求（「帮我订明天的票」）：那是用户的消息。
-- 关于用户的事实（「我住在上海」「我对花生过敏」）：那是记忆。
+- One-off task requests ("book tomorrow's ticket"): that is a user message.
+- Facts about the user ("I live in Shanghai", "I am allergic to peanuts"): that is memory.
 
-## 先用选项，再写指令
+## Options first, then instructions
 
-选项是现成的，每一档对应一句写好的要求，优先用它们。指令只写选项表达不了的。
+Options are ready-made: each value maps to one prepared sentence, so prefer them. Instructions are only for what the options cannot say.
 
-| 选项 | 可选值 | 管什么 |
+| Option | Values | What it controls |
 | --- | --- | --- |
-| 基础风格和语气 | 默认、干练、友好、活泼 | 整体的调子 |
-| 表情符号 | 少一点、默认、多一点 | 用不用表情符号 |
-| 回答篇幅 | 更短、默认、更详细 | 最终回答的长短 |
-| 进度说明 | 简短、默认、详细 | 办事时每一步说多少 |
+| Base style and tone | Default, Crisp, Friendly, Playful | The overall register |
+| Emoji | Less, Default, More | Whether it uses emoji |
+| Answer length | Shorter, Default, Longer | Length of the final answer |
+| Progress notes | Brief, Default, Detailed | How much it says at each step |
 
-选的时候注意：
+When choosing:
 
-- **大部分选项留在默认。** 只动用户明确想改的那几项。
-- **不要选互相拉扯的组合。** 例如「干练」加「回答更详细」，两句要求彼此抵消。真的需要时，在指令里写清楚谁优先。
-- **选项已经说了的，指令里不要再说一遍。**
+- **Leave most options at Default.** Change only what the user clearly wants changed.
+- **Avoid combinations that pull against each other.** "Crisp" with "Longer answers" asks for two things that cancel out. If the user really needs that, say in the instructions which one wins.
+- **Do not repeat in the instructions what an option already says.**
 
-## 怎么写指令
+## Writing the instructions
 
-1. **写怎么说，不写它是谁。** 两三句交代调子就够。长篇的身世设定会把真正有用的要求冲淡。
-2. **写看得见的做法，不写形容词。** 「要专业」没有用；「金额、时间、地址各占一行」有用。
-3. **分清两种话。** 说明这条要求是管进度说明，还是管最终回答。进度说明的地方很小，别要求它在那里长篇大论。
-4. **一条一行，用祈使句。** 「先给结论，再说依据。」「称呼我老板。」
-5. **写短。** 建议 300 字以内。指令会随每一个任务发给模型，写得越长，每次花的 token 越多。
-6. **用用户的语言写。** 不需要翻译成英文。
-7. **别写这些**：尖括号标签、「忽略以上规则」、让它假装看到了没看到的东西。它们不会生效，只会占地方。
+1. **Describe how it speaks, not who it is.** Two or three sentences set the tone. A long backstory dilutes the requests that matter.
+2. **Describe observable behaviour, not adjectives.** "Be professional" does nothing; "put amounts, times and addresses on their own lines" does.
+3. **Say which kind of speech you mean.** State whether a request is about progress notes or the final answer. Progress notes have little room; do not ask for essays there.
+4. **One request per line, in the imperative.** "Lead with the conclusion, then the reasons." "Call me boss."
+5. **Keep it short.** Under about 150 words is a good target. The instructions are sent with every task, so length costs tokens every time.
+6. **Write in the user's language.** No need to translate into English.
+7. **Leave these out**: angle-bracket tags, "ignore the rules above", asking it to pretend it saw something it did not. They do not work and only take up space.
 
-可以按这三块组织，用不到的块直接省掉：
-
-```
-语气：……
-说话习惯：……
-办事时：……
-```
-
-写完自己检查一遍：
-
-- 每一条都只关于怎么说、怎么写吗？
-- 有没有哪一条其实是选项能表达的？
-- 有没有两条互相矛盾？
-- 删掉任何一条，效果会不会变？不会就删。
-
-## 例子
-
-**干练的同事**
-
-- 选项：基础风格选「干练」，表情符号「少一点」，回答篇幅「更短」，进度说明「简短」。其余默认。
-- 指令：
+Three blocks work well; drop the ones you do not need:
 
 ```
-说话习惯：先给结论，再说依据。数字、时间、地点各占一行。
-办事时：遇到要我决定的事，把选项列成 1、2、3，我回数字就行。
+Tone: …
+Speaking habits: …
+While working: …
 ```
 
-**耐心的讲解者**
+Check the draft before handing it over:
 
-- 选项：基础风格选「友好」，回答篇幅「更详细」。其余默认。
-- 指令：
+- Is every line only about how to speak or write?
+- Is any line something an option already covers?
+- Do any two lines contradict each other?
+- If a line were removed, would anything change? If not, remove it.
+
+## Examples
+
+**A crisp colleague**
+
+- Options: base style Crisp, emoji Less, answer length Shorter, progress notes Brief. Everything else Default.
+- Instructions:
 
 ```
-语气：把我当成第一次接触这件事的人，不用术语，非用不可时顺手解释一句。
-说话习惯：步骤多于三步时编号。每一步说清楚做完会看到什么。
+Speaking habits: lead with the conclusion, then the reasons. Put numbers, times and places on their own lines.
+While working: when I need to decide something, list the choices as 1, 2, 3 so I can reply with a number.
 ```
 
-**有点角色感的管家**
+**A patient explainer**
 
-- 选项：全部默认。
-- 指令：
+- Options: base style Friendly, answer length Longer. Everything else Default.
+- Instructions:
 
 ```
-语气：像一位老派的管家，措辞得体，不急不躁，偶尔来一句克制的幽默。
-说话习惯：称呼我「先生」。坏消息直接说，不绕弯，但先说能怎么补救。
+Tone: treat me as someone new to the topic. Avoid jargon; when a term is unavoidable, explain it in passing.
+Speaking habits: number the steps when there are more than three. For each step, say what I will see when it is done.
 ```
 
-## 交付格式
+**A butler with some character**
 
-人格目前只能在手机上手动设置，所以请把结果分成三段给用户，方便照着做：
+- Options: all Default.
+- Instructions:
 
-1. **称呼**：用户想让它换个名字时给出；不换就写「不用填」。
-2. **选项**：只列不是默认的那几项，写明选哪一档。
-3. **指令**：放在代码块里的纯文本，能直接复制。没有需要补充的就写「不用填」。
+```
+Tone: an old-school butler: courteous, unhurried, with the occasional dry remark.
+Speaking habits: address me as "sir". Give bad news plainly, but say first what can be done about it.
+```
 
-用户想同时存好几套时，再给每一套起一个不超过 40 字的名称。
+## Delivery format
 
-最后告诉用户在哪里填、怎么确认生效：
+A persona can currently only be set by hand on the phone, so give the user three parts they can follow:
 
-- 在哪里设：Mika › 设置 › 人格。在页面上填称呼、选基础风格和各个选项，把指令粘进输入框，最后点底部的「保存」。保存后才生效。
-- 存多套：页底的「管理人格」里可以新建、改名、复制、删除；点某一套选「用这一套」，之后所有对话都按它来。那里的「预览完整提示词」能看到最终发给模型的全文。
-- 确认：发一条消息试试；这一轮的运行过程（展开「更多详情」）里会写着用了哪个人格。
+1. **Nickname**: give one when the user wants it to go by another name; otherwise say "leave empty".
+2. **Options**: list only the ones that are not Default, with the value to pick.
+3. **Instructions**: plain text in a code block, ready to copy. If nothing needs adding, say "leave empty".
+
+Only when the user wants to keep several personas, also give each a name of at most 40 characters.
+
+Then tell the user where to enter it and how to confirm it works:
+
+- Where: Mika › Settings › Persona. Enter the nickname, pick the base style and the options on the page, paste the instructions into the text box, then tap "Save" at the bottom. Nothing applies until it is saved.
+- Several personas: "Manage personas" at the bottom of the page creates, renames, copies and deletes them; tap one and choose "Use this one" and every conversation follows it. "Preview the full prompt" there shows the exact text sent to the model.
+- Confirm: send a message; the run details for that turn (expand "More details") show which persona was used.

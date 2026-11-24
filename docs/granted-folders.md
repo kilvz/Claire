@@ -1,30 +1,30 @@
-# 使用系统授权的手机文件夹
+# Using phone folders granted by the system
 
-在设置的「手机目录」页面选择「选择仅供读取的文件夹」或「选择可读写的文件夹」，再用 Android 系统选择器授权。两种授权都可以让 Mika 在该目录及其子目录中查找文件，把 PDF、图片、表格等普通文件导入当前工作区。比如授权「工作资料」后，可以直接让 Mika 找出其中的报销单。选择读写模式且文档提供方允许写入时，Mika 还可以新建、替换或追加 UTF-8 文本。点击「取消授权」会撤回目录访问权，已导入的工作区副本仍然可用。
+On the "Phone folders" page in Settings, choose "Choose folders for read-only access" or "Choose readable and writable folders", then grant access with the Android system picker. Either kind of grant lets Mika find files in that directory and its subdirectories and import ordinary files such as PDFs, images and spreadsheets into the current workspace. For example, after granting "Work documents" you can ask Mika to find the expense forms in it. In read-write mode, and when the document provider allows writing, Mika can also create, replace or append UTF-8 text. Tapping "Revoke access" withdraws the directory grant; copies already imported into the workspace remain usable.
 
-系统授权文件夹独立于手机助手的实验开关。工具要求设备支持文件与计算环境，并由用户在界面发起有人值守的任务。
+System-granted folders are independent of the phone-control experimental switch. The tools require a device that supports the files and computing environment, and the user must start an attended task from the UI.
 
-## 文件工具
+## File tools
 
-- `list_folder_files` 省略路径时列出系统持久授权的文件夹。系统能确认本机存储位置时，设置页和工具会同时显示该位置。例如，用户说的「内部存储的 Download/Mika」可以和 `displayLocation` 中的 `/storage/emulated/0/Download/Mika` 对上。同一项的 `/folders/…` 标识供后续文件操作使用。仅有显示名时，如有多个可能的目标，应在修改前询问用户。传入目录标识可列出至多 200 个直接子项，并返回可写状态和截断标记。
-- `search_device_files` 在指定目录内按文件名、扩展名或修改时间递归搜索。搜索可以扫描列表预览以外的条目。深度、耗时、条目或匹配数达到限制时，结果中会标明截断原因。
-- `copy_device_file` 将普通文件原样复制到当前工作区的 `/workspace/inbox/`，返回实际文件名和字节数。单文件最多 200 MiB，同名文件另加编号。虚拟文档需要先由其提供方导出为普通文件。
-- `read_file`：接受列表返回的 `/folders/…` 标识，按字节分页读取文本，同时返回整个文件的 SHA-256。
-- `write_file`：可以新建、替换或追加文本。新建不传版本；已有文件必须传上次读取返回的 expectedSha256，版本不一致不写入。
-- `share_file`：将工作区生成的文本文件保存到 folderPath 指定的位置；已有目标同样要求 expectedSha256。不填 folderPath 时保留原有下载目录和文件卡片行为。
+- `list_folder_files` lists the folders the system has persistently granted when the path is omitted. When the system can confirm the on-device storage location, the Settings page and the tool both show it. For example, "Download/Mika in internal storage" as the user says it can be matched with `/storage/emulated/0/Download/Mika` in `displayLocation`. The same entry's `/folders/…` identifier is used by later file operations. When there is only a display name and several possible targets, ask the user before modifying anything. Passing a directory identifier lists up to 200 direct children and returns the writable state and a truncation flag.
+- `search_device_files` recursively searches a given directory by file name, extension or modification time. The search can scan entries beyond the list preview. When the depth, elapsed time, entry count or match count reaches its limit, the result states the reason for truncation.
+- `copy_device_file` copies an ordinary file unchanged into `/workspace/inbox/` in the current workspace and returns the actual file name and byte count. A single file is at most 200 MiB; name collisions get a numbered suffix. Virtual documents must first be exported as ordinary files by their provider.
+- `read_file`: accepts the `/folders/…` identifier returned by the list, reads text in byte-sized pages, and also returns the SHA-256 of the whole file.
+- `write_file`: can create, replace or append text. Creation passes no version; an existing file must be passed the expectedSha256 returned by the previous read, and nothing is written if the version does not match.
+- `share_file`: saves a text file produced in the workspace to the location given by folderPath; an existing target likewise requires expectedSha256. When folderPath is omitted, the original download directory and file-card behaviour are kept.
 
-脚本处理导入后返回的 `/workspace/…` 副本。需要在授权目录中直接读写文本时，给文件工具传列表返回的 `/folders/…` 标识。每份原地读写的文本最多 1 MiB。
+Scripts work on the `/workspace/…` copy returned after import. To read and write text directly in a granted directory, pass the `/folders/…` identifier returned by the list to the file tools. Each text read or written in place is at most 1 MiB.
 
-## 实现与限制
+## Implementation and limits
 
-授权来源是 Android 的持久 URI 权限，逐次验证；界面操作、写入和撤销在同一进程锁下串行执行。撤销会等待已开始的写入结束，之后的操作被拒绝。目录内查找最多检查 2000 项，重复文件名拒绝写入，不通过猜测路径选择目标。
+The grant comes from Android's persistable URI permission and is verified each time; UI operations, writes and revocation run serially under the same process lock. Revocation waits for a write that has already started to finish, and later operations are refused. A directory lookup checks at most 2000 entries, duplicate file names are refused for writing, and targets are never chosen by guessing a path.
 
-更新前检查原文版本，写入后读回验证。Android 文档提供方没有通用的原子替换接口：写入失败会尝试恢复旧内容或删除本次新建的残件；恢复失败会明确报告文件可能已改变，不假报成功。哈希检查可以发现读取后发生的修改，但不能阻止其他应用在最后检查与写入之间同时编辑同一文件。
+The original version is checked before an update and the content is read back and verified after writing. Android document providers have no general atomic-replace interface: if a write fails, Mika tries to restore the old content or delete the leftovers created this time; if the restore fails, it reports explicitly that the file may have changed instead of falsely claiming success. Hash checks can detect a modification made after reading, but they cannot stop another app from editing the same file between the final check and the write.
 
-导入采用流式复制，复用工作区附件的空间检查和失败清理。远程文档提供方的访问耗时取决于其自身响应。
+Import uses a streaming copy and reuses the workspace attachment's space check and failure cleanup. Access to a remote document provider takes as long as that provider's own response.
 
-## 验证
+## Verification
 
-本地覆盖工具路由、中文分页、版本参数、导出分支、路径检查、大小上限，以及远程/无人值守任务不可访问。已有工作区工具、目录授权、资源与提示词检查一并回归。
+Local coverage includes tool routing, Chinese paging, version parameters, the export branch, path checks, size limits, and inaccessibility from remote/unattended tasks. Existing workspace tools, directory grants, resources and prompt checks are regressed together.
 
-`GrantedFolderFilesDeviceTest` 使用真实系统选择器和专用 MikaFolderTest645 文件夹，覆盖授权持久化、只读授权、Markdown 的版本校验与导出、搜索列表预览以外的文件、导入超过 1 MiB 的二进制文件，以及在同一任务内撤销授权。运行前创建空的专用目录，运行中在系统选择器中选择它，结束后清理测试文件。
+`GrantedFolderFilesDeviceTest` uses the real system picker and a dedicated MikaFolderTest645 folder to cover grant persistence, read-only grants, Markdown version checks and export, searching files beyond the list preview, importing a binary file larger than 1 MiB, and revoking a grant within the same task. Before running, create the empty dedicated directory, select it in the system picker during the run, and clean up the test files afterwards.

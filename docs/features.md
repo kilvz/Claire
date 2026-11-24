@@ -1,173 +1,171 @@
-# Mika 能做什么：详细说明
+# What Mika can do, in detail
 
-简体中文 | [English](features.en.md)
+Tell Mika what you want in one sentence, and it gets it done on your phone. This page has the details behind each item under "What it can do" in the [README](../README.md).
 
-你用一句话交代一件事，Mika 在手机上替你办。这里是 [README](readme/README.zh-CN.md) 里「能做什么」每一项的细节。
+## Saved tasks
 
-## 常用任务
+- Long-press one of your text messages and choose “Save as task”, then edit its title and instructions. You can also add, edit, or delete tasks using the star beside the composer or “Saved tasks” in Settings.
+- Choosing a task on a new chat or through the star fills the current composer for editing before sending. Existing text requires confirmation before replacement.
+- While editing, place the cursor where the text should vary and choose “Add a fill-in field”, then name it (for example, “Contact” or “Time range”). Selected text can also be replaced by a field. Choosing this task asks for those values before filling the composer. Repeated names share one value, with up to 12 distinct fields.
+- You can still edit before sending. Cancelling the form or draft replacement leaves the original input untouched. Entered values do not change the saved task and are requested afresh next time.
+- Tasks are stored locally, preserving the previous recommended-task list. Existing tasks remain literal until “Add a fill-in field” is used. Saving, filling and selecting tasks do not call a model or execute a task.
 
-- 长按自己发过的文字消息，选择「存为常用任务」，编辑标题和任务内容后保存；也可以从输入框旁的星标入口或设置中的「常用任务」手动添加、编辑和删除。
-- 在新对话首页或星标入口选择任务，只把内容填入当前输入框，改好后再发送；已有文字草稿时会先询问是否替换。
-- 编辑时，把光标放到每次要变化的位置，点「添加填写项」，输入「联系人」「时间范围」等名称；也可以先选中要替换的文字再添加。调用时先填写这些内容，再填入当前输入框。同名项只填一次，最多 12 个不同项。
-- 填写后仍可修改再发送；取消填写或取消替换草稿，都不会覆盖原输入。具体填写值不写回常用任务，下次使用重新填写。
-- 列表保存在本机，沿用原来的推荐任务数据。旧任务保持原样，使用「添加填写项」后才启用填写功能。保存、填写和调用不请求模型，也不会自动执行任务。
+## Checklist updates and reuse
 
-## 清单更新与结果复用
+- Long-press a text reply from Mika and choose “Save to checklist”. Create a list or select an existing one, review the complete reply, and save it as a new version. Earlier versions remain available. “Saved checklists” is also accessible from the star beside the composer.
+- Choose “Add information” to put the current list and your additions into a draft update request. Send it through the existing chat flow, then long-press the complete updated reply and save it to the original checklist. There is no background overwrite or separate model call.
+- “Changes and history” keeps the latest 10 versions, showing added/rewritten and removed/replaced nonempty text lines plus the saved source reply. These are text differences, not judgments about which business facts are correct. Manual edits also create versions.
+- “Use next” combines your next instruction with the latest checklist in the composer. Existing drafts can be kept or replaced. The latest content can also be copied. Failed writes retain edits, and stale editors cannot overwrite newer versions.
+- Up to 30 lists are stored locally with encryption, independently of conversations; titles allow 100 characters and content allows 12000. Deleting a conversation does not delete its lists. Deleting a checklist removes its history as well.
 
-- 长按 Mika 的文字回复，选择「存为清单」，可以新建清单，也可以选择已有清单，把这份完整回复编辑后存为新版本。原来的版本保留。输入框旁的星标入口中可打开「已存清单」。
-- 在清单里点「补充更新」，填写新信息，会把原清单和更新要求放入当前输入框。发送后由现有聊天流程生成完整更新稿；长按更新后的回复，再选择原清单保存。清单不会在后台自动改写，也不会额外调用一个模型。
-- 「变化与历史」显示最近 10 个版本，可以查看新增或改写、移除或替换的非空文字行，以及保存时的来源回复。它记录文字变化，不推断哪项业务事实正确。手动修改也会保留版本。
-- 「用于下一步」填写接下来要做的事，将最新清单一起放入输入框；有草稿时可以取消或替换。也可以复制最新内容。存储失败会保留编辑，过期编辑不能覆盖较新的版本。
-- 最多保存 30 份清单，每份标题最多 100 字符、内容最多 12000 字符；清单和历史加密保存在本机，独立于对话。删除对话不删除清单；在清单中删除会一并删除其历史。
+## Reusable multi-step tasks
 
-## 可复用的多步骤任务
+- Open the star beside the composer → “Multi-step tasks” to create a task with 2–8 named steps. Edit, reorder, duplicate, or delete templates and supply requirements for each run. A running task uses an immutable template snapshot.
+- Steps use the existing phone task service in sequence, each in its own conversation. Each receives the run requirements and the previous step’s text result, with instructions to inspect the current screen before acting. Previous clicks are never replayed. Results should retain information needed downstream; attachments and workspace files are not automatically passed between steps in this first version.
+- Progress includes each step’s result and conversation, where you can answer questions, take over, or stop. The star remains available during execution. “Pause after this step” finishes the current step before pausing; continuing retains completed work.
+- Only a successful existing outcome judgment advances automatically. Failure, cancellation, an unknown judgment, or process interruption requires review. Inspect the conversation, supply an existing result, or explicitly retry that step. Retries keep prior attempts and use new execution IDs. Potentially completed messages are never automatically resent; model-based judgments cannot guarantee exactly-once actions in external apps.
+- Final text results are saved in run history and can be copied or inserted into the composer, protecting existing drafts. Run again with different requirements. Templates and history are encrypted locally; deleting a template retains its run history.
+- Limits: 30 templates, 50 runs, 10 attempts per step; titles 100 characters, step instructions 2000, run requirements 4000, and results 12000. At capacity, only the oldest completed run is pruned. Oversized results require editing before continuing. One multi-step task runs at a time, using existing queueing, phone permissions, and model settings.
 
-- 输入框旁的星标 →「多步骤任务」，创建包含 2–8 个步骤的任务。每步有名称和要求，可以调整顺序、编辑、复制或删除模板。开始执行时可填写这一次的具体要求；修改模板不影响已经开始的执行。
-- 步骤按顺序交给现有手机任务服务执行，每步使用独立对话。本次要求和上一步的文字结果一起交给下一步，提示模型先检查当前页面；不会重放之前的点击。前一步结果应包含后续所需信息，首版不自动传递附件或工作区文件。
-- 进度页保存每步结果和执行对话，可进入对话回答问题、接管或停止。任务运行时仍可从星标回到进度页。「此步完成后暂停」让当前步骤正常结束，再暂停；继续时保留已完成结果。
-- 只有现有完成判定认为步骤已完成，才自动开始下一步。失败、取消、判定不明或进程中断会停在「待处理」：查看执行对话后，可以填写已经取得的结果继续，也可以明确重试该步。重试使用新的执行编号并保留旧尝试；不会自动重发可能已经发送的消息。完成判定仍依赖模型，不能保证外部 App 的操作绝对只发生一次。
-- 最终文字结果自动保存在执行记录中，可复制或填入当前输入框；已有草稿可以取消或替换。再执行一次可使用新的本次要求。模板与运行记录加密保存在本机，删除模板不删除运行历史。
-- 最多 30 个模板、50 条执行记录；历史满时只淘汰最早的已完成记录。每步最多 10 次尝试，标题最多 100 字符、步骤要求 2000 字符、本次要求 4000 字符、结果 12000 字符。过长结果需要人工整理后继续。同一时间运行一项多步骤任务；各步骤沿用已有排队、手机权限与模型设置。
+## Operates any app without taking over your screen
 
-## 操作任何 App，不占你的屏幕
+Any app installed on your phone works, with no per-app integration: Mika looks at the screen, finds buttons, taps and types like a person would. If it can see it, it can operate it.
 
-手机上装的 App 都能操作，不用事先适配：Mika 像人一样看屏幕、找按钮、点击输入，看得到就能操作。
+- Opens apps on a separate background screen and reads, taps, types and scrolls there while you keep using your phone. A small live view in the chat shows what it is doing; you can close it for the current task, leaving a small button at the bottom right that turns orange when Mika needs you.
+- When several tasks run at once, “Background screens” next to “Running” in the side menu lists which app each task is using and how far it got; open one to watch its live screen, tap to enlarge it and pinch to zoom.
+- When two tasks need the same app, the later one can wait until the other is done with it (up to a few minutes; it shows “Waiting for another task to finish with …”). Two tasks waiting on each other are caught at once instead of hanging.
+- Reads long lists and chat histories screen by screen, e.g. "summarize what my group chat talked about today".
+- Works even with apps whose UI cannot be read directly (custom-drawn UI, unlabeled controls): Mika reads on-screen text with the text recognition bundled in the APK, and with a vision-capable model it can also find buttons and input fields from screenshots.
+- Can share a piece of text straight into an app (to send a message or save a note); Mika still picks the recipient and taps send on that page itself.
+- Recognizes the system asking "open with which app", a dual-installed app asking "which one", and one app opening another (e.g. jumping to a payment page). It carries on when it can, and stops to let you act on screen when you need to choose or handle it yourself.
+- Things only you should do (logging in, verification codes, payment) trigger a notification asking you to take over: the app moves to your main screen, you finish and hand it back, and Mika re-checks before continuing.
+- When a task is done, the apps Mika opened stay in the background on the page where it finished: you find them in recent apps, and the next time Mika opens one it continues from there. They never jump in front of what you are doing. An app that is playing sound or video at that moment is closed; say "keep the music playing" or "close it when you're done" and Mika does that instead.
 
-- 在一块单独的后台屏上打开 App、读界面、点击、输入、滚动，你照常用手机；对话页上的小画面实时显示它在做什么；不想看可以把这个任务的小画面关掉，只留右下角一个小按钮，要你处理时它会变橙色。
-- 几个任务同时在跑时，侧栏「进行中」旁边的「后台屏」页列出每个任务正在用哪个 App、做到哪了，点开能看它的实时画面，再点放大到整屏、双指缩放。
-- 两个任务要用同一个 App 时，后来的那个可以等前一个用完再接着做（最多等几分钟，界面上写「等另一个任务用完某 App」），两个任务互相等的情况会当场认出来，不会一直卡着。
-- 能逐屏读长列表和聊天记录，比如「帮我总结一下某个群今天都聊了些啥」。
-- 界面读不出来的 App（自己画界面、控件没有名字）也能用：Mika 用随 APK 自带的文字识别读屏上的字；配了能看图的模型时，还能看图找按钮和输入框。
-- 能把一段文字直接分享进某个 App（发消息、记笔记），收件人和发送仍由 Mika 在那一页上点。
-- 系统问「用哪个 App 打开」、装了两份的 App 问「打开哪一个」、一个 App 打开另一个 App（比如跳到付款页）时，Mika 认得出来：能处理的接着做，要你选或要你亲手处理的，会停下来请你在屏幕上操作。
-- 需要你亲手处理的事（登录、验证码、付款）会发通知请你接管：App 挪到主屏，你处理完交还，Mika 重新核实再继续。
-- 做完以后，Mika 打开的 App 默认留在后台、停在它做完的那一页：在最近任务里能找到，下次 Mika 再打开它也接着这一页，不会跳到你眼前。做完时正在放声音或视频的 App 会关掉；你说「让音乐接着放」或「做完就关掉」，Mika 照你说的办。
+## Built-in browser
 
-## 内置浏览器
+- Opens any website in the background and operates the page with real clicks and keyboard input. Pages open in desktop mode by default.
+- Reads the page text as well as the data the page itself receives; supports downloads and uploads.
+- Logins persist. You can browse yourself from "Browser" in the side drawer, and sites you log into there are available to Mika too.
+- Paces itself: consecutive page loads on the same site are spaced out, longer on sites that limit browsing speed. It recognizes anti-bot block pages and hands them to you instead of forcing through.
 
-- 任何网站都能打开：在后台打开网页，用真实的点击和键盘输入操作页面，默认按电脑版网页打开。
-- 能读页面正文，也能读页面自己收到的数据；支持下载、上传。
-- 登录过的网站保持登录；侧栏「浏览器」里可以自己浏览，在这里登录的网站 Mika 办事时也能直接用。
-- 翻页有节奏：同一个网站连着换页会停一停，对限制浏览快慢的网站停得更久；认得出风控拦截页，交给你处理而不是硬闯。
+## Mika's own pages
 
-## Mika 自己的页面
+- With Settings › During work › "Let Mika operate its own screens" turned on (off by default), Mika can open its Settings, Browser, Memory, Scheduled tasks and other pages for you. It can also open a report, image or PDF from the workspace in Mika's built-in viewer, post a notification, or put a piece of text on the clipboard.
+- After you approve it, it can also put a link or search results in your visible browser; for a site that needs a sign-in, it can open the "sign in for Mika" page so you can sign in yourself and then carry on.
+- Mika never taps its own UI and cannot change its permissions, model or budget; it only opens the page, and you still do the operating.
 
-- 设置 › 干活时 ›「允许 Mika 操作自己的界面」打开后（默认关），Mika 可以把设置、浏览器、记忆、定时任务等页面打开给你看；也可以把工作区里的报告、图片、PDF 用 App 内查看器打开，发一条通知，或把一段文字放进剪贴板。
-- 它也可以在你点头后，把链接或搜索结果放到你眼前的浏览器里；需要登录的网站，它能先打开「给 Mika 登录」页让你自己登录，再继续办事。
-- Mika 不会点自己的界面，也不会给自己改权限、模型或预算；它只能打开页面，操作仍由你来做。
+## The screen you are looking at
 
-## 此刻的屏幕
+- While you are in another app, a floating Mika capsule at the screen edge shows background task progress, things that need you, and results. Tap it to add a message, answer, approve or stop. If you don't want it, open it and tap "Turn off capsule" at the bottom; you can turn it back on in Settings › Floating capsule.
+- After dragging the capsule to an edge, it fades into a half circle while idle; tap to restore it. Add the Floating capsule tile in Android Quick Settings to switch it on or off. Settings › Floating capsule has optional fullscreen hiding. The expanded chat preview supports pinch resizing and size/reset buttons. See [capsule controls](dev/capsule-controls.md).
+- **Double-tap the capsule** to send the screen you are looking at to Mika, e.g. "how should I reply to this" or "note this down". You can also take a screenshot from the card and add a line before sending.
 
-- 你在别的 App 里时，屏幕边上有一颗 Mika 悬浮胶囊，显示后台任务的进展、要你处理的事和结果，点开可以插话、回答、同意或停止。不想要它时，点开后在最底下点「关闭悬浮胶囊」，之后可在「设置 › 悬浮胶囊」重新打开。
-- 拖动胶囊贴边后，静置会缩成半圆并变淡，点按恢复；可添加安卓快捷设置「悬浮胶囊」磁贴快速开关。在「设置 › 悬浮胶囊」可选全屏时自动隐藏，退出全屏后恢复。展开的对话页小画面支持双指缩放，也有大小和恢复按钮。详见[胶囊控制](dev/capsule-controls.md)。
-- **双击胶囊**，把你正在看的这一屏发给 Mika，比如「这个怎么回」「帮我记下来」；也可以在卡片里截屏、补一句话再发。
+## Scheduled and conditional tasks
 
-## 用 OpenAI Realtime 接打电话
+- "Remind me at 9 tomorrow morning", "check the weather every morning and tell me only if it will rain", "do X every Friday".
+- Conditions can compare with last time: "tell me when it drops by more than 50" compares with the price from the last time the condition started the task; "tell me every time it rains" speaks up on each rainy day; you can also say "at most once a day".
+- Runs at the scheduled time in the original conversation and sends the result back. The scheduled tasks page lets you create, edit, pause, run now or delete, with a preview of the next three occurrences. A daily or weekly plan can use several local times (e.g. `08:00, 12:30, 20:00`) under one identity and pause switch; add, change or remove them with the pickers next to the times, or type them directly. For the first run, pick a date in the calendar and then a time on the wheels. In its original conversation, you can also ask to edit its content, condition, reminder or recurrence.
+- Open a scheduled task's menu and select **Run history** to see the times and statuses of its last 10 recorded runs.
+- Choose **Copy as new plan** from a plan's menu to reuse its content, condition, and recurrence. The copy starts paused by default and sends results to the same conversation.
+- Under **Settings › Notifications**, turn on scheduled task quiet hours and choose start and end times. The window repeats daily in the device's local time and can span midnight. Tasks still run, results go back to the conversation, and scheduled results and reminders appear silently in the notification shade.
 
-在「设置 › AI 接打电话 › 设置 › 实时语音服务」添加配置，选择 OpenAI Realtime，填写有 Realtime 权限的 OpenAI API Key。默认模型是 `gpt-realtime`，音色是 `marin`。保存后点「测试连接」并设为默认，接听和拨打就会使用这套配置。通话音频会发送给 OpenAI，可能产生 API 用量费用。
+## Interrupt or stop anytime
 
-开启自动接听前，先手动接听一通测试电话，确认对方能听到 Mika、Mika 也能听到对方。
+- Keep talking while a task runs to add to or correct your request; Mika reads it before its next step.
+- Every step in the chat can be opened to see exactly what it tapped or typed and how that turned out.
+- “View process” works while the task is still running; new steps keep arriving as it goes.
+- Long-press a message sent during a task to withdraw or edit it before the model picks it up. Editing restores its quote too and is available when the composer has no draft; a message that carries a screen or text selected on a web page cannot be edited.
+- When you press stop, Mika adds a short wrap-up: what it did, what it saw, how many times it sent something, and what is left. Say "continue" next time and it knows where to pick up.
 
-## 电话结束后的跟进
+## Hold to talk
 
-- 在「AI 接打电话 › 设置」开启「生成通话摘要、待办和消息草稿」后，AI 电话结束时会用当前主模型整理已有转写，并在同一次请求里起草一条微信跟进消息。没有转写时不生成；只有寒暄、拒绝联系或没有可跟进内容时可以没有草稿。
-- 打开这通电话的记录，可查看摘要和「微信跟进草稿」，编辑保存后再复制到微信。草稿和通话记录一起加密保存在本机；不会查找联系人、打开微信或自动发送。
-- 生成失败时可以在原通话记录里重试摘要。已有摘要但没有草稿时，可点「写跟进消息」手动补写；无需再次调用模型，也不会批量发送历史转写。草稿需要你核对，特别是日期、价格和双方的承诺。
+- When you are not typing, hold the chat input to speak. When you let go the words land in the input for you to edit; nothing is sent by itself. While a task runs, sending it adds to the task. To send right away, slide up into the "Listening" card; when it turns green and says "Let go to send", let go and the words are sent together with anything already in the input. Slide further up past the card until it says "Let go to cancel" and let go to throw that take away.
+- In other apps, long-press the floating capsule to speak and let go to send it straight to Mika (it adds to a running task, or answers when Mika is asking you). Let go on "Edit" to open the card with the words in its input.
+- By default it uses the phone's built-in speech recognition, which shows words as you speak and costs nothing. If the phone has none, or it is not accurate enough, pick a provider's speech model under Settings › Models › Speech to text; see [models and sign-in](models.md#speech-to-text).
 
-## 定时与条件任务
+## Ask / Autonomous
 
-- 「明早 9 点提醒我」「每天早上看看天气，下雨才告诉我」「每周五做某件事」。
-- 条件可以和上次比：「降价超过 50 块告诉我」比的是上次条件触发任务时的价格；「每次下雨都告诉我」连着几天下雨每天都说；也可以说「一天最多提醒一次」。
-- 到点在原对话里执行，结果送回来；定时任务页可以新建、编辑、暂停、立即执行、删除，保存前预览接下来三次执行时间。每天或每周的同一条计划可以有多个时刻（如 `08:00, 12:30, 20:00`），点时刻旁边的按钮用选择器增删，也可以直接输入；首次执行从日历选日期、再用时间滚轮选时刻。统一暂停与管理。在创建它的对话里也可直接要求修改内容、条件、提醒或重复规则。
-- 点开一条定时任务，选择「执行记录」，可查看最近 10 次的触发时间和状态。
-- 在计划菜单选择「复制为新计划」，可以沿用任务内容、条件和重复规则。副本默认暂停，结果会回到同一个对话。
-- 在「设置 › 通知」可开启定时任务免打扰并设置起止时间。它按设备当地时间每天生效，支持跨午夜。期间计划照常执行，结果回到原对话，结果和定时提醒会静默显示在通知栏。
+- The default is **Ask**: only spending money (placing orders, paying) is confirmed with you first; sending messages, submitting and deleting are done directly. You can switch to **Autonomous**, which does not ask even before paying. See [Ask and Autonomous](modes.md).
 
-## 随时插话、随时停
+## Memory
 
-- 任务进行中可以继续说话，补充或更正要求，Mika 在下一步之前读到。
-- 对话里的每一步都能点开，看这一步具体点了什么、输入了什么、结果怎样。
-- 任务还在跑也能进「运行过程」，每一步按时间往下长。
-- 长按任务中已发送、模型还没处理的消息，可以撤回或取回编辑；编辑会保留原来的引用，输入框已有草稿时不提供编辑；带着屏幕或网页上选中文字的消息不提供编辑。
-- 按停止后，Mika 会补几行交代：做了什么、看到了什么、发出了几次、哪些没做完。下次说「继续」它知道从哪接着做。
+- Remembers facts, preferences and ways of doing things that you state explicitly (ways of doing things need your approval). You can view, edit and delete them. It only learns from what you yourself say, and never stores passwords, verification codes, card numbers and the like. Memory is stored encrypted on the phone.
 
-## 按住说话
+## Faster and steadier on familiar apps and websites
 
-- 对话页输入框没在打字时，按住说话，松开后字填进输入框，改了再发，不会自动发出；任务在跑时发出去就是插话。想说完直接发，按着往上滑进「在听」卡片，变绿写「松开 发送」时松开，字接在输入框已有的字后面一起发出。再往上滑过卡片到「松开 取消」再松开，这段就不要了。
-- 在别的 App 里，长按悬浮胶囊说话，松开直接发给 Mika（任务在跑时是插话，它在问你时是回答）；松在「改一改」上会打开卡片，字放在输入框里给你改。
-- 默认用手机自带的语音识别，边说边出字，不花钱。手机没有、或认不准时，在「设置 › 模型 › 语音转文字」选一个服务商的语音模型，见[模型与登录](models.md#语音转文字)。
+Even without any instructions, Mika can get things done by looking at the screen. For some apps and websites there is extra usage knowledge (where things are, common ways to do things, what to watch out for), which Mika looks up automatically when it needs it, so it takes fewer wrong turns. For example, in a chat app it already knows how to find a contact and scroll through chat history; on a job site it knows how to filter jobs and greet recruiters. There are also general how-to skills for a few kinds of tasks.
 
-## 询问 / 自主
+The apps and websites that already have usage knowledge are listed in the collapsed section under "What it can do" in the [README](../README.md) (anything not listed still works). The knowledge keeps growing and anyone can add to it: it is plain text under [`core/src/main/resources/knowledge/`](../core/src/main/resources/knowledge/) and [`core/src/main/resources/skills/`](../core/src/main/resources/skills/). [Contributions welcome](../.github/CONTRIBUTING.md).
 
-- 默认是**询问**：只有花钱（下单、付款）先问你，发消息、提交、删除这些都直接做完。也可以换成**自主**，连付款也不先问。详见[询问与自主](modes.md)。
+## Batch jobs
 
-## 记忆
+- Batch work (e.g. greeting or applying one by one) starts right away without asking you to confirm the list first. It waits a random interval between items, and stops and tells you when the site itself says you have hit a limit.
 
-- 记住你明确说过的事实、偏好和做事方式（做事方式要你批准），可以查看、修改、删除；只从你自己说的话里记，密码、验证码、卡号这类不记。记忆加密保存在手机上。
+## Everything is traceable
 
-## 熟悉的 App 和网站，做得更快更稳
+- Answers list their sources (pages read, screenshots), and every task has a step-by-step record you can review.
+- Each task ends with a one-line summary: total time, model round trips, tokens used, and time to first feedback. "Token usage" in Settings breaks usage down by day, provider and model.
 
-没有任何说明，Mika 也能看着屏幕把事办成。有些 App 和网站另外写了使用知识（入口在哪、常见做法、要注意什么），Mika 用到时自动查阅，少走弯路。比如进了聊天 App 直接知道怎么找联系人、翻聊天记录；打开招聘网站知道怎么筛岗位、打招呼。另有几类事情的通用做法。
+## Linux sandbox
 
-已经写了使用知识的 App 和网站，清单见 [README](readme/README.zh-CN.md) 里「能做什么」下面的折叠段（没写到的照样能用）。知识持续增加，人人可以补充：它们是放在 [`core/src/main/resources/knowledge/`](../core/src/main/resources/knowledge/) 和 [`core/src/main/resources/skills/`](../core/src/main/resources/skills/) 下的纯文本文件，[欢迎补充](../.github/CONTRIBUTING.zh-CN.md)。
+- Each conversation gets a workspace that can run Python, Node and shell commands, process files you send, and save results to your phone's Download/Mika folder.
+- To share PDFs, documents, audio clips, images or other files, select Mika in the Android share sheet. The files appear in a chat draft where you can add a message before sending. You can share up to 9 files at a time, up to 200 MiB each.
+- Open **Files** in the sidebar to browse attachments and exported files. Combine name, conversation, source, and file type filters. File types are determined by extension and include images, PDFs, audio, video, and other files.
+- Long-press a conversation and choose "Terminal", or open "Files & computing environment" in Settings and tap "Open terminal" on a workspace row, to run commands yourself in that conversation's workspace. It uses the same workspace and network setting as Mika's scripts; Mika cannot see what is in the terminal, and terminal commands do not go into the conversation or run records.
+- Online by default; turn off "Allow scripts to go online" under "Files & computing environment" in Settings if you don't need it. arm64 devices only; on other devices the app installs normally and the sandbox shows "not supported on this device".
+- When it is online these commands also use **Settings › Network proxy** (the same proxy Mika uses for model calls, updates and the in-app browser; see [Models and sign-in](models.md#network-proxy)).
+- The same page shows how much space the sandbox uses and lets you clear a conversation's workspace files; conversations with a running task are skipped.
 
-## 成批的事
+## AI tools on your computer can use it (CLI / MCP)
 
-- 成批做事（比如逐个打招呼、投递）直接开始，不用先跟你确认名单；每两次之间隔开一段随机时间，做到网站自己说「到上限了」就停下告诉你。
+Computer AI tools can use **CLI + Skill or MCP** to hand Mika tasks, check progress and get results. Normally choose one; you don't need both, though you can use both to connect different clients. Both require the phone APK and use the same phone task service. For how to choose and connect, see [Use Mika from a computer](computer.md).
 
-## 过程可查
+- **CLI + Skill** suits computer agents that support Skills and can run commands. The Skill includes its own CLI script, so you do not need a separate global CLI installation or MCP configuration. For terminal or script use alone, install just the CLI. See the [computer CLI / Skill guide](computer-install.md) for installation, updates and removal.
+- **MCP** offers a quick USB connection (ADB forwarding with token authentication) and direct Wi-Fi / private-network access, which must be enabled separately on the phone; see the [computer access guide](mcp.md). Confirmations such as payments still have to be handled on the phone.
 
-- 回答下面列出来源（读过的页面、截图）；每次任务都有可回看的过程记录。
-- 每次任务一行小结：总用时、和模型来回几次、用了多少 Token、多久看到第一次反馈；设置里的「Token 用量」按天、按服务商、按模型统计。
+### Let an AI agent on your computer install Mika
 
-## Linux 沙箱
-
-- 每个对话一个工作区，可以跑 Python、Node 和 shell 命令，处理你发来的文件，把结果存到手机的「下载/Mika」。
-- 在其他 App 里分享单个或多个文件时，选择 Mika 就能把 PDF、文档、音频或图片等附件放进对话草稿。你可以补充说明后发送。一次最多 9 个文件，每个文件最大 200 MiB。
-- 长按对话选「终端」，或在设置 › 文件与计算环境里点工作区那一行的「打开终端」，就能在这个对话的工作区里自己运行命令。它和 Mika 跑脚本用的是同一个工作区、同一套联网设置；Mika 看不到终端里的内容，终端里的命令也不进对话和运行记录。
-- 侧栏「文件」集中查看各会话消息里的附件和导出文件，可按名称、会话、来源和类型筛选，打开、分享或加入会话草稿。类型按文件扩展名分为图片、PDF、音频、视频和其他文件。多选后可以一次把多个文件加入同一个会话的待发栏，也可以一次分享给其他 App。对话页的文件入口默认筛选当前会话。文件库不备份文件，原文件被删除或失去访问权限时会显示不可用。
-- 默认联网，不需要时在设置里的「文件与计算环境」关闭「允许脚本联网」。只支持 arm64 设备；其他设备照常安装，沙箱显示「此设备不支持」。
-- 联网时这些命令也走「设置 › 网络代理」（和 Mika 自己调模型、下更新、内置浏览器用的是同一个，见[模型与登录](models.md#网络代理)）。
-- 同一页能看到沙箱占了多少空间，按对话清理工作区里的文件；有任务在跑的对话不清。
-
-## 电脑上的 AI 工具也能用（CLI / MCP）
-
-电脑上的 AI 工具可以通过 **CLI + Skill 或 MCP** 把任务交给 Mika、查进度并拿回结果，通常选一种即可，无需两套都配置；需要同时接入不同客户端时，也可以并用。手机 APK 是两者的共同前提，两种入口共用手机任务服务。怎么选、怎么连见[从电脑使用 Mika](computer.md)。
-
-- **CLI + Skill**：适合支持 Skill、能执行命令的电脑 Agent。Skill 自带 CLI 脚本，无需另装全局 CLI 或配置 MCP；只在终端或脚本里使用时，单独装 CLI 即可。安装、升级和卸载见[电脑端 CLI / Skill 指南](computer-install.md)。
-- **MCP**：有 USB 快速连接（经 ADB 转发并使用令牌验证），以及需要在手机上另行开启的 Wi-Fi／私有网络连接，见[电脑连接说明](mcp.md)。付款这类确认仍只能在手机上处理。
-
-### 让电脑上的 AI 助手帮你安装
-
-手机用数据线连上电脑，在手机上打开 USB 调试（开发者选项里别的开关不要动，除非 AI 助手请你打开；有的会清除手机数据），然后把下面这句话发给电脑上能执行命令的 AI 助手：
+Connect the phone to your computer with a USB cable, turn on USB debugging on the phone (don't change other switches in Developer options unless the agent asks you to: some can erase the phone), and send this sentence to an AI agent on the computer that can run commands:
 
 ```
-请按 https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.md 的步骤，帮我把 Mika 安装到通过 USB 连着的安卓手机上。
+Follow https://github.com/wangzan101/Mika/blob/main/docs/install-with-agent.md to install Mika on the Android phone connected over USB.
 ```
 
-它会检查手机、下载安装、打开需要的权限，需要你在手机上点的时候会停下来告诉你。API Key 由你自己在 Mika 里填，不经过它。如果你也要求电脑访问，AI 助手会按你选择的接入方式继续配置。步骤见[用电脑上的 AI 助手安装](install-with-agent.md)。
+It checks the phone, downloads and installs Mika, turns on the permissions it needs, and stops to tell you whenever something needs a tap on the phone. You enter your API key in Mika yourself; it never goes through the agent. If you also ask for computer access, the agent configures the access method you choose. The steps are in [Installing Mika with an AI agent](install-with-agent.md).
 
-## 系统要求
+## Requirements
 
-| 项目 | 要求 |
+| Item | Requirement |
 |---|---|
-| 安装、聊天、网页与沙箱任务 | 安卓 11 及以上（沙箱仅支持 arm64） |
-| 操作手机 App | 安卓 12 及以上；安卓 12、13 上后台操作可能影响主屏焦点 |
-| 推荐 | 安卓 14 及以上：后台屏有自己的焦点，不影响你在主屏打字；不同对话的任务同时进行也需要它 |
-| Linux 沙箱 | 仅 arm64 设备；其他设备照常安装，沙箱显示「此设备不支持」 |
-| 模型 | 支持工具调用的模型，可通过服务商 API、本地服务或账号登录配置，见[模型与登录](models.md) |
+| Install, chat, web and sandbox tasks | Android 11 or later (sandbox requires arm64) |
+| Phone app control | Android 12 or later; background work may affect main-screen focus on Android 12–13 |
+| Recommended | Android 14 or later: the background screen has its own focus, so it does not interfere with your typing on the main screen; running tasks from different conversations at the same time also needs it |
+| Linux sandbox | arm64 devices only; on other devices the app installs normally and the sandbox shows "not supported on this device" |
+| Model | A model that supports tool calling, configured through a provider API, a local service or account sign-in; see [Models and sign-in](models.md) |
 
-操作手机 App 要先在「设置手机操作」向导里配对一次无线调试（也可以用电脑经 USB 启动手机助手），每一步见[手机操作设置指南](setup-guide.md)。无障碍不用手动去开：配对成功后 Mika 会自己把它打开；从 GitHub 下载安装的 App，手动打开无障碍时常被系统拦下（提示「受限制的设置」），让 Mika 自己开能省掉这个麻烦。
+Phone app control needs wireless debugging paired once in the "Set up phone control" wizard (or the phone helper started from a computer over USB); every step is in the [phone control setup guide](setup-guide.md). You don't need to turn on accessibility by hand: once pairing succeeds, Mika turns it on by itself. For apps installed from GitHub rather than an app store, Android often blocks turning accessibility on manually ("Restricted setting"), and letting Mika do it avoids that.
 
-## 试一试
+## Try it
 
-空对话里有几条示例，点一下就能改了再发。也可以这样说：
+An empty conversation shows a few examples you can tap, edit and send. Or try something like:
 
-- 「帮我总结一下微信群今天都聊了些啥」
-- 「打开小红书，帮我总结一下某个博主最近发的内容」
-- 「帮我订明天早上 9:40、9:50、10:00 的闹钟」
-- 「每天早上 8 点看看天气，下雨才告诉我」
+- "Summarize what my WeChat group talked about today"
+- "Open Xiaohongshu and summarize what this creator posted recently"
+- "Set alarms for 9:40, 9:50 and 10:00 tomorrow morning"
+- "Check the weather at 8 every morning and tell me only if it will rain"
 
-## 常见问题
+## FAQ
 
-常见问题单独放在了[常见问题](faq.md)里。手机操作方面的问题，见[手机操作设置指南的「遇到问题」](setup-guide.md#遇到问题)。
+The FAQ now has its own page: [FAQ](faq.md). For phone control, see [Troubleshooting](setup-guide.md#troubleshooting) in the setup guide.
+
+## Use OpenAI Realtime for phone calls
+
+In Settings › AI phone calls › Settings › Realtime voice service, add a configuration, select OpenAI Realtime, and enter an OpenAI API key with Realtime access. The default model is `gpt-realtime` and the voice is `marin`. Save the configuration, test the connection, and select **Use as default** for incoming and outgoing calls. Call audio goes to OpenAI and may incur API usage charges.
+
+Before enabling auto-answer, manually answer a test call with Mika and check that both parties can hear each other.
+
+## Follow up after an AI call
+
+Enable call summaries, tasks and message drafts in AI calling settings. After an AI call, the selected main model summarizes the available transcript and drafts a short WeChat follow-up in the same request. Calls without a transcript do not trigger generation; small talk, a refusal to be contacted or no useful follow-up may produce no draft.
+
+Open the call record to review, edit, save and copy the draft. It stays encrypted with the call history. This does not find contacts, open WeChat or send messages. Failed summaries can be retried from the call record; existing summaries without a draft offer “Write follow-up message” to compose one locally, without another model request. Review facts and commitments before using a draft.

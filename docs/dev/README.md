@@ -1,42 +1,35 @@
-# 开发文档
+# Developer docs
 
-简体中文 | [English](README.en.md)
+For people who want to read or change the code, or add knowledge. For building and opening PRs, read the [contributing guide](../../.github/CONTRIBUTING.md) first. User docs are [one level up](../README.md).
 
-写给想读代码、改代码、补知识的人。怎么构建、怎么提 PR，先看[贡献指南](../../.github/CONTRIBUTING.zh-CN.md)。用户文档在[上一级](../README.md)。
+Apart from the knowledge format, the developer docs are in Chinese for now.
 
-## 先读
+## Read first
 
-| 文档 | 讲什么 |
+| Doc | What it covers |
 | --- | --- |
-| [architecture.md](architecture.md) | 按代码现状写的整体结构，带类名和文件路径：主循环、工具、手机操作、浏览器、沙箱、电脑连接、知识与技能 |
-| [roadmap.md](roadmap.md) | 已完成、接下来、已知问题与暂缓 |
+| [architecture.md](architecture.md) | The overall structure as the code stands, with class names and file paths: main loop, tools, phone control, browser, sandbox, computer access, knowledge and skills |
+| [roadmap.md](roadmap.md) | Done, next, known issues and deferred items |
 
-## 写知识和技能
+## Writing knowledge and skills
 
-| 文档 | 讲什么 |
+| Doc | What it covers |
 | --- | --- |
-| [knowledge-format.md](knowledge-format.md)（[English](knowledge-format.en.md)） | 内置 App 知识（`APP.md`）、网站知识（`SITE.md`）和技能（`SKILL.md`）的格式 |
-| [skill-scripts.md](skill-scripts.md) | 知识和技能自带的脚本怎么放、在沙箱里怎么运行 |
+| [knowledge-format.md](knowledge-format.md) ([简体中文](knowledge-format.md)) | Format of built-in app knowledge (`APP.md`), website knowledge (`SITE.md`) and skills (`SKILL.md`) |
+| [skill-scripts.md](skill-scripts.md) | Where scripts that come with knowledge and skills go, and how they run in the sandbox |
 
-## 专题说明与验证记录
+## Topic notes and verification records
 
-| 文档 | 讲什么 |
+| Doc | What it covers |
 | --- | --- |
-| [sms-login.md](sms-login.md) | 用户可控短信验证码登录、权限与隐私边界 |
-| [app-access.md](app-access.md) | 应用访问规则、主动分享授权与标准手机工具的限制边界 |
-| [foldables.md](foldables.md) | 折叠屏布局规则、铰链避让、状态连续性与设备验收 |
-| [persona.md](persona.md) | 人格（可命名的自定义指令）：提示词位置、存储、对话绑定与安全边界 |
-| [account-signin.md](account-signin.md) | 用账号登录模型服务商（不填 Key）的设计，以及明确不做的部分 |
-| [chatgpt-signin-check.md](chatgpt-signin-check.md) | 上手机之前，在电脑上用 App 同一套代码走一遍「用 ChatGPT 登录」 |
-| [remote-device-access-check.md](remote-device-access-check.md) | 远程亮屏与解锁的验证记录 |
-| [personal-agent.md](personal-agent.md) | 长期个人主会话、独立任务委派与结果回流 |
-| [remote-mcp.md](remote-mcp.md) | 自托管远程 CLI / MCP 的部署、手机鉴权和断线语义 |
-| [teach-mika.md](teach-mika.md) | 人工示范怎样收成待确认的知识型技能 |
-| [anywhere.md](anywhere.md) | 只读 Web 控制台的手机端端点：对话与运行状态的契约、安全边界、已知限制与验证 |
+| [account-signin.md](account-signin.md) | Design of signing in to model providers with an account (no key), and what is deliberately left out |
+| [persona.md](persona.md) | Named custom instructions (persona): prompt position, storage, per-chat binding and safety boundaries (Chinese) |
+| [chatgpt-signin-check.md](chatgpt-signin-check.md) | Walking through "Sign in with ChatGPT" on a computer with the app's own code, before trying it on a phone |
+| [remote-device-access-check.md](remote-device-access-check.md) | Verification record for remote wake and unlock |
+| [remote-mcp.md](remote-mcp.md) | Remote CLI / MCP design (Chinese); [English deployment guide](../../companions/relay/README.md) |
+| [teach-mika.md](teach-mika.md) | How a demonstration becomes a skill draft waiting for review (Chinese) |
 
-## 仓库里别处的开发文档
+## Developer docs elsewhere in the repo
 
-- [`eval/README.md`](../../eval/README.md)：真机评测。
-- [`tools/sandbox/README.md`](../../tools/sandbox/README.md)：沙箱原生程序和自带运行环境的重新构建。
-
-开发文档目前除知识格式外只有中文版。
+- [`eval/README.md`](../../eval/README.md): on-device evaluation.
+- [`tools/sandbox/README.md`](../../tools/sandbox/README.md): rebuilding the sandbox's native programs and bundled runtime.
