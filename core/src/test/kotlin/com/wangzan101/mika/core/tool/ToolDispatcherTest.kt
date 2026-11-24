@@ -427,7 +427,7 @@ class ToolDispatcherTest {
         val before = s.snapshots
         val e = d.evidence()
         assertEquals(before + 1, s.snapshots) // One screen was read again right now
-        assertEquals("当前 App:com.x\n搜索", e.freshText)
+        assertEquals("Current app: com.x\n搜索", e.freshText)
         assertEquals(e.read(ObsKind.Read).distinct(), e.read(ObsKind.Read)) // An identical screen read is recorded only once
         assertNull(e.freshImage)
         // Password fields do not record the plain text
@@ -441,7 +441,7 @@ class ToolDispatcherTest {
         }
         val e = toolDispatcher(s).evidence(withImage = true)
         assertNull(e.freshImage)
-        assertEquals("当前 App:com.x\n搜索", e.freshText)
+        assertEquals("Current app: com.x\n搜索", e.freshText)
     }
 
     /** Port with no virtual display yet: a screen read is an empty screen and write operations fail with no_app_open. */
