@@ -254,6 +254,7 @@ private val defaultSystemSession: SttSessionFactory = { context, _, tag, hooks -
         onAnswered = hooks.onAnswered,
         attempts = hooks.attempts ?: SystemSpeech.attempts(
             SystemSpeech.services(context), hooks.rememberedService, hooks.compatibility,
+            hasSystemEntry = capability.defaultService != null || capability.onDevice,
         ),
         compatibility = hooks.compatibility,
         serviceWithoutMic = hooks.serviceWithoutMic,

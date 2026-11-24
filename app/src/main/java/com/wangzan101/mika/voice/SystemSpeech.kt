@@ -25,24 +25,46 @@ object SystemSpeech {
     /** Google's speech app ("Speech Recognition & Synthesis", formerly "Speech Services by Google"); also the Play Store package. */
     const val SPEECH_APP_PACKAGE = "com.google.android.tts"
 
+    /** The Google app, whose recognition service is Google's main network recognizer on most phones. */
+    const val GOOGLE_APP_PACKAGE = "com.google.android.googlequicksearchbox"
+
+    /** Android System Intelligence, which hosts on-device recognition on Android 12 and newer. */
+    const val SYSTEM_INTELLIGENCE_PACKAGE = "com.google.android.as"
+
     /**
-     * Google's speech app when it is installed, null otherwise. Android can still offer no recognition service
-     * when the app is disabled, its recognition component is turned off, or the installed build only carries TTS;
-     * then telling the user to install it again is wrong, and the sheet opens the app's settings instead.
+     * Packages that can carry a Google recognition service. "Speech Recognition & Synthesis" comes first because it is
+     * the smallest, purpose-built install; the Google app and Android System Intelligence also provide one on many phones.
      */
-    fun installedSpeechApp(context: Context): String? = SPEECH_APP_PACKAGE.takeIf {
+    private val SPEECH_APP_PACKAGES = listOf(SPEECH_APP_PACKAGE, GOOGLE_APP_PACKAGE, SYSTEM_INTELLIGENCE_PACKAGE)
+
+    /**
+     * A Google speech package installed on the phone, or null. Android can still offer no recognition service when the app
+     * is disabled, its recognition component is turned off, or the installed build only carries TTS; then telling the
+     * user to install it again is wrong, and the sheet opens the app's settings instead.
+     */
+    fun installedSpeechApp(context: Context): String? = SPEECH_APP_PACKAGES.firstOrNull {
         runCatching { context.packageManager.getPackageInfo(it, 0) }.isSuccess
     }
 
     /**
      * Starting with Android 11, querying RecognitionService must be declared in the manifest, otherwise this is always unavailable.
      * [silent] is the mark that the service was tried before and did not respond (see [SpeechSettings.systemSilent]): the system can only tell whether one exists, whether it answers has to be tried.
+     * A registered service is usable by naming it even when it is not the system default, so it counts as available here;
+     * [SystemCapability.defaultService] records separately whether the system has a default entry (the one a null attempt asks for).
      */
     fun capability(context: Context, silent: Boolean = false): SystemCapability {
         val onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
         val online = runCatching { SpeechRecognizer.isRecognitionAvailable(context) }.getOrDefault(false)
-        return SystemCapability(available = online || onDevice, onDevice = onDevice, responsive = !silent)
+        // Only ask the package manager when the system reports nothing: a registered service that is not the default
+        // is still usable by name, so an installed recognizer keeps built-in recognition available.
+        val installed = (online || onDevice) || services(context).any { it.open }
+        return SystemCapability(
+            available = installed,
+            onDevice = onDevice,
+            responsive = !silent,
+            defaultService = SpeechServiceMic.defaultService(context)?.flattenToShortString(),
+        )
     }
 
     /**
@@ -102,25 +124,80 @@ object SystemSpeech {
     /**
      * Recognition services registered on the phone (components that declare RecognitionService). [RecognizerService.open] is whether it is open to other apps (exported);
      * [RecognizerService.permission] is the permission required to bind it. Used for diagnostics and [attempts].
+     * The query is cached briefly: capability checks happen several times per press, and installing an app in the meantime is rare.
      */
-    fun services(context: Context): List<RecognizerService> = runCatching {
-        context.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0).map { r ->
-            val s = r.serviceInfo
-            RecognizerService(ComponentName(s.packageName, s.name).flattenToShortString(), s.exported, s.permission)
+    fun services(context: Context): List<RecognizerService> {
+        val now = System.currentTimeMillis()
+        servicesCache?.let { (at, list) ->
+            if (now - at in 0..SERVICES_TTL_MS) return list
         }
-    }.getOrDefault(emptyList())
+        val found = runCatching {
+            context.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0).map { r ->
+                val s = r.serviceInfo
+                RecognizerService(ComponentName(s.packageName, s.name).flattenToShortString(), s.exported, s.permission)
+            }
+        }.getOrDefault(emptyList())
+        // Package visibility can hide a service from queryIntentServices on some OEM builds even with the manifest
+        // query declared. Add Google's known components by package when they are installed, enabled and exported;
+        // they are the recognizers this app is meant to use.
+        val known = KNOWN_GOOGLE_SERVICES.mapNotNull { component -> installedService(context, component) }
+        val all = (found + known).distinctBy { ComponentName.unflattenFromString(it.component) ?: it.component }
+        servicesCache = now to all
+        return all
+    }
+
+    @Volatile
+    private var servicesCache: Pair<Long, List<RecognizerService>>? = null
+
+    private const val SERVICES_TTL_MS = 5_000L
+
+    /** Google's recognition components; the app names these directly when the system query comes back empty. */
+    private val KNOWN_GOOGLE_SERVICES = listOf(
+        "$GOOGLE_APP_PACKAGE/com.google.android.voicesearch.serviceapi.GoogleRecognitionService",
+        "$SPEECH_APP_PACKAGE/com.google.android.apps.speech.tts.googletts.service.GoogleTTSRecognitionService",
+        "$SYSTEM_INTELLIGENCE_PACKAGE/com.google.android.apps.miphone.aiai.app.AiAiSpeechRecognitionService",
+    )
+
+    /** A known Google service only when it is present, enabled and exported (otherwise another app cannot bind it). */
+    private fun installedService(context: Context, component: String): RecognizerService? = runCatching {
+        val name = ComponentName.unflattenFromString(component) ?: return null
+        val info = context.packageManager.getServiceInfo(name, 0)
+        if (!info.exported || !info.enabled) return null
+        if (!context.packageManager.getApplicationInfo(name.packageName, 0).enabled) return null
+        RecognizerService(ComponentName(info.packageName, info.name).flattenToShortString(), true, info.permission)
+    }.getOrNull()
 
     /**
      * The recognition services tried in order during one session; null is the system default one (not named explicitly, left to the system to pick).
-     * One previously tried by name that responded ([remembered], still on the phone) comes first; when the default gives no callback at all, the others are then tried by name, those open to other apps first.
-     * In compatibility mode the named candidates are kept even when only one service is registered: a registered service does not mean the system has already picked a default.
-     * Other devices keep the existing candidate rules; at most [MAX_ATTEMPTS] are tried, so the person holding the button does not wait for nothing.
+     * One previously tried by name that responded ([remembered], still on the phone) comes first; then the system entry, then the other registered services, Google's first.
+     * [hasSystemEntry] is false when the phone reports no default service (and no on-device entry): asking for "the default" would only wait for something that is not there,
+     * so the installed services are named directly instead.
+     * With a system entry and a single registered service, only the default is tried (that service is presumably it); in compatibility mode the named candidate is kept anyway.
+     * At most [MAX_ATTEMPTS] are tried, so the person holding the button does not wait for nothing.
      */
-    fun attempts(services: List<RecognizerService>, remembered: String?, compatibility: Boolean = false): List<String?> {
+    fun attempts(
+        services: List<RecognizerService>,
+        remembered: String?,
+        compatibility: Boolean = false,
+        hasSystemEntry: Boolean = true,
+    ): List<String?> {
         val known = remembered?.takeIf { r -> services.any { it.component == r } }
-        val others = if (services.size < 2 && !compatibility) emptyList() else
-            services.filter { it.component != known }.sortedBy { !it.open }.map { it.component }
-        return (listOfNotNull(known) + listOf(null) + others).take(MAX_ATTEMPTS)
+        val named = services
+            .filter { it.component != known }
+            .sortedWith(compareBy({ googleRank(it) }, { !it.open }))
+            .map { it.component }
+        // With a single service and a system entry, that service is the default: try only the default instead of naming it and waiting again for nothing.
+        val others = if (hasSystemEntry && services.size < 2 && !compatibility) emptyList() else named
+        val systemEntry = if (hasSystemEntry) listOf<String?>(null) else emptyList()
+        return (listOfNotNull(known) + systemEntry + others).take(MAX_ATTEMPTS).ifEmpty { listOf(null) }
+    }
+
+    /** Google's recognizers are preferred among named candidates, whichever app currently hosts them. */
+    private fun googleRank(service: RecognizerService): Int = when {
+        service.component.startsWith("$GOOGLE_APP_PACKAGE/") -> 0
+        service.component.startsWith("$SPEECH_APP_PACKAGE/") -> 1
+        service.component.startsWith("$SYSTEM_INTELLIGENCE_PACKAGE/") -> 2
+        else -> 3
     }
 
     /**
@@ -404,7 +481,7 @@ class SystemSpeechSession(
         }
     }
 
-    /** An initialization failure may switch to another entry in compatibility mode; text already heard and wrapping up after release take priority, and recording is never started again. */
+    /** An initialization failure may switch to another recognition service while the finger is down; text already heard and wrapping up after release take priority, and recording is never started again. */
     private fun handleError(error: Int) {
         if (done()) return
         if (usingOnDevice && SystemSpeech.languageMissing(error) && segments.full().isEmpty()) {
@@ -413,7 +490,7 @@ class SystemSpeechSession(
             return
         }
         val outcome = SystemSpeech.afterError(error, holding, heard = segments.full().isNotEmpty(),
-            canTryNext = compatibility && attempt + 1 < attempts.size)
+            canTryNext = attempt + 1 < attempts.size)
         if (outcome == SystemSpeech.Outcome.NextService) {
             attempt++
             open(preferOnDevice = false)

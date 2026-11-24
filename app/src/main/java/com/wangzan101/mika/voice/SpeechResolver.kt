@@ -5,8 +5,15 @@ import com.wangzan101.mika.settings.Provider
 /**
  * Capabilities of the device's built-in recognition: whether the system says it exists ([available]), whether recognition happens on this device (no network),
  * and whether it answers us when tried on this phone ([responsive]; recorded as false when the system says it exists but a request produces no callback at all).
+ * [defaultService] is the system's default recognition component when it can be read; an installed service that is not
+ * the default is still usable by name, which is why [available] also covers registered services.
  */
-data class SystemCapability(val available: Boolean, val onDevice: Boolean, val responsive: Boolean = true) {
+data class SystemCapability(
+    val available: Boolean,
+    val onDevice: Boolean,
+    val responsive: Boolean = true,
+    val defaultService: String? = null,
+) {
     /** Actually usable for dictation: the system has it and it is not recorded as unresponsive. */
     val usable get() = available && responsive
 }

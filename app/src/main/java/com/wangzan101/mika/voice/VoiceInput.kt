@@ -145,10 +145,14 @@ class VoiceInput(
             }
             is SpeechEngineSpec.System -> {
                 val compatibility = SystemSpeech.serviceCompatibility()
+                val capability = systemCapability()
                 SystemSpeechSession(
                     context, spec.onDevice, tag,
                     onNoResponse = settings::noteSystemSilent, onAnswered = settings::noteSystemAnswered,
-                    attempts = SystemSpeech.attempts(SystemSpeech.services(context), settings.systemService, compatibility),
+                    attempts = SystemSpeech.attempts(
+                        SystemSpeech.services(context), settings.systemService, compatibility,
+                        hasSystemEntry = capability.defaultService != null || capability.onDevice,
+                    ),
                     compatibility = compatibility,
                     serviceWithoutMic = { named, onDevice -> SpeechServiceMic.missing(context, named, onDevice) },
                 )

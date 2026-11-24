@@ -139,6 +139,36 @@ class SystemSpeechTest {
             SystemSpeech.attempts(listOf(svc("One"), svc("Two"), svc("Three"), svc("Four")), null, compatibility = true).size)
     }
 
+    /** A service can be installed and open without being the system default: when there is no default entry, name it instead of asking for one that is not there. */
+    @Test fun registeredServicesAreUsedWhenThereIsNoSystemEntry() {
+        assertEquals(listOf("a.b/.One"),
+            SystemSpeech.attempts(listOf(svc("One")), remembered = null, hasSystemEntry = false))
+        assertEquals(listOf<String?>(null),
+            SystemSpeech.attempts(emptyList(), remembered = null, hasSystemEntry = false))
+    }
+
+    /** Google's recognizers are the useful fallbacks on phones without a default, whichever Google app hosts them. */
+    @Test fun googleServicesComeFirstWhenTheSystemHasNoDefault() {
+        val services = listOf(
+            RecognizerService("a.b/.Other", open = true, permission = null),
+            RecognizerService("com.google.android.tts/.Tts", open = true, permission = null),
+            RecognizerService("com.google.android.googlequicksearchbox/.Google", open = true, permission = null),
+        )
+        assertEquals(
+            listOf(
+                "com.google.android.googlequicksearchbox/.Google",
+                "com.google.android.tts/.Tts",
+                "a.b/.Other",
+            ),
+            SystemSpeech.attempts(services, remembered = null, hasSystemEntry = false),
+        )
+        // With a system entry it stays first; Google's services are then the fallback order.
+        assertEquals(
+            listOf(null, "com.google.android.googlequicksearchbox/.Google", "com.google.android.tts/.Tts"),
+            SystemSpeech.attempts(services, remembered = null, hasSystemEntry = true),
+        )
+    }
+
     @Test fun clientFallbackIsBoundedAndNeverReopensAfterReleaseOrLosesText() {
         val client = SpeechRecognizer.ERROR_CLIENT
         assertEquals(SystemSpeech.Outcome.NextService, SystemSpeech.afterError(client, true, false, canTryNext = true))
