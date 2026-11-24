@@ -10,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -174,15 +173,19 @@ class VolcRealtimeAgentToolsTest {
     @Test fun aNoticeEndsSpokenOnlyWhenItsResponseFinishes() = runBlocking {
         fixture {
             val session = connectAgent()
-            val collector = async { session.events.collect {} }
-            // The previous sentence is still playing: its finishing does not count as this report finishing
+            val events = Channel<VolcRealtimeEvent>(16)
+            val collector = async { session.events.collect { events.send(it) } }
+            // The previous sentence is still playing: its finishing does not count as this report finishing.
+            // Wait until the client has processed it, since server frames arrive asynchronously.
             peer().send(audio(VolcRealtimeProtocol.AUDIO_STARTED, "r0"))
+            assertEquals(VolcRealtimeEvent.AssistantAudioStarted, nextEvent(events))
             val ends = Channel<Boolean>(4)
             assertTrue(session.sendNotice("订日料那件,办好了") { ends.trySend(it) })
             assertEquals("speech_text_buffer.commit", nextMessage().type)
             peer().send(audio(VolcRealtimeProtocol.AUDIO_DONE, "r0"))
             peer().send(audio(VolcRealtimeProtocol.AUDIO_STARTED, "r1"))
-            delay(200)
+            assertEquals(VolcRealtimeEvent.AssistantAudioEnded, nextEvent(events))
+            assertEquals(VolcRealtimeEvent.AssistantAudioStarted, nextEvent(events))
             assertTrue("the previous sentence finished and this one just started, so it does not count as finished yet", ends.isEmpty)
             peer().send(audio(VolcRealtimeProtocol.AUDIO_DONE, "r1"))
             assertEquals(true, withTimeout(3_000) { ends.receive() })
