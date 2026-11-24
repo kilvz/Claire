@@ -1,5 +1,5 @@
 #!/bin/sh
-# 参数在 $MIKA_ARGS_FILE 里(JSON)。这里只用 sed 抠字段,不依赖 jq。
+# Args live in $MIKA_ARGS_FILE (JSON). Fields are pulled out with sed only, no jq dependency.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 
@@ -30,7 +30,7 @@ echo "scan: $dir"
 echo "pattern: system prompt / persona / instructions / 你是 / You are"
 echo
 
-# 只看文本类文件,跳过 .git、node_modules 之类的噪音
+# Only look at text-like files; skip noise such as .git, node_modules
 work="$dir/.mika-scan"
 found=0
 list=$(mktemp 2>/dev/null || echo "/tmp/mika-scan.$$")

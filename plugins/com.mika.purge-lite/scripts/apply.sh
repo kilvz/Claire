@@ -1,6 +1,6 @@
 #!/bin/sh
-# 一键应用:检查 persona.conf 能不能用,并当场试跑一次(只看,不改任何文件)。
-# 参数:没有必填项;可选 {"model":"模型名"} 指定按哪个模型试跑。
+# One-shot apply: check whether persona.conf is usable, and do a trial run on the spot (read-only, no files touched).
+# Args: nothing required; optional {"model":"model name"} selects which model to trial-run against.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 

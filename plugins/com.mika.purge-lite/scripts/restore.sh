@@ -1,5 +1,5 @@
 #!/bin/sh
-# 回滚:把这个文件最近一次备份放回去(先备份当前内容,回滚也能再回滚)。
+# Roll back: put this file's most recent backup back (the current content is backed up first, so a rollback can itself be rolled back).
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 
@@ -20,7 +20,7 @@ if [ -z "$latest" ]; then
     exit 3
 fi
 
-# 当前的先留一份,回滚本身也可逆
+# Keep a copy of the current content first; the rollback itself is reversible too
 if [ -f "$path" ]; then
     stamp=$(date +%Y%m%d-%H%M%S)
     cp "$path" "$backupdir/${base}.${stamp}.before-restore.bak"

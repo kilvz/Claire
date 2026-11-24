@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# translate_languages —— 打印「语言怎么选」的说明文档。
+# translate_languages — print the "how to choose a language" documentation.
 set -u
 ARGS="${1:-${MIKA_ARGS_FILE:-}}"
 NAME=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([a-z-]*\)".*/\1/p' "$ARGS" 2>/dev/null | head -n 1)

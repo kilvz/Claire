@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# 编译沙箱的三个原生程序(安卓 arm64),产物放进 app/src/main/jniLibs/arm64-v8a/:
-#   libproot.so         PRoot(GPL-2.0-or-later),静态链接 talloc(LGPL-3.0-or-later)
-#   libproot_loader.so  PRoot 的载入器(静态、-nostdlib)
-#   libmikarun.so       Mika 的启动器(MIT)
+# Compile the sandbox's three native programs (Android arm64); artifacts go into app/src/main/jniLibs/arm64-v8a/:
+#   libproot.so         PRoot (GPL-2.0-or-later), statically linked against talloc (LGPL-3.0-or-later)
+#   libproot_loader.so  PRoot's loader (static, -nostdlib)
+#   libmikarun.so       Mika's launcher (MIT)
 #
-# 用法:tools/sandbox/build-native.sh [--check]
-#   --check  只重编并与仓库里的产物比较 SHA-256,不一致退出 1(不覆盖仓库文件)
+# Usage: tools/sandbox/build-native.sh [--check]
+#   --check  only rebuild and compare SHA-256 against the committed artifacts; exit 1 on mismatch (does not overwrite repo files)
 #
-# 需要 ANDROID_NDK_HOME(或 ANDROID_HOME 下的 ndk/28.2.13676358)、curl、shasum/sha256sum、patch。
+# Requires ANDROID_NDK_HOME (or ndk/28.2.13676358 under ANDROID_HOME), curl, shasum/sha256sum, patch.
 set -euo pipefail
 
 NDK_VERSION=28.2.13676358
@@ -47,7 +47,7 @@ sha256() {
 	else shasum -a 256 "$1" | cut -d' ' -f1; fi
 }
 
-# 路径前缀映射:产物里不留本机路径,保证可重现
+# Path prefix mapping: no local paths left in the artifacts, keeping builds reproducible
 REPRO_FLAGS=(-ffile-prefix-map="$WORK"=. -ffile-prefix-map="$ROOT"=. -Wno-unused-command-line-argument)
 COMMON_CFLAGS=(-O2 -fPIE "${REPRO_FLAGS[@]}")
 EXE_LDFLAGS=(-pie -Wl,-z,max-page-size=16384 -Wl,-z,noexecstack -Wl,--build-id=none)
@@ -55,7 +55,7 @@ EXE_LDFLAGS=(-pie -Wl,-z,max-page-size=16384 -Wl,-z,noexecstack -Wl,--build-id=n
 rm -rf "$WORK/src" "$WORK/obj" "$WORK/out"
 mkdir -p "$WORK/dl" "$WORK/src" "$WORK/obj" "$WORK/out"
 
-# ---- 1. 下载并校验源码 ----
+# ---- 1. Download and verify sources ----
 while read -r name version url sum; do
 	case "$name" in ''|'#'*) continue ;; esac
 	case "$url" in https://*) ;; *) echo "only https:// sources allowed: $name $url" >&2; exit 1 ;; esac
@@ -72,7 +72,7 @@ while read -r name version url sum; do
 	fi
 	mkdir -p "$WORK/src/$name"
 	tar -xzf "$archive" -C "$WORK/src/$name" --strip-components=1
-	# ---- 2. 打补丁(tools/sandbox/patches/<名称>-*.patch,按文件名顺序) ----
+	# ---- 2. Apply patches (tools/sandbox/patches/<name>-*.patch, in filename order) ----
 	for p in "$SANDBOX_DIR/patches/$name"-*.patch; do
 		[ -f "$p" ] || continue
 		patch -d "$WORK/src/$name" -p1 --forward --quiet < "$p"
@@ -82,12 +82,12 @@ done < "$SANDBOX_DIR/sources.lock"
 TALLOC_SRC="$WORK/src/talloc"
 PROOT_SRC="$WORK/src/proot/src"
 
-# ---- 3. talloc:只编 talloc.c,静态库 ----
+# ---- 3. talloc: compile only talloc.c, as a static library ----
 mkdir -p "$WORK/obj/talloc"
 TALLOC_VERSION="$(awk '$1=="talloc"{print $2}' "$SANDBOX_DIR/sources.lock")"
 IFS=. read -r TV_MAJOR TV_MINOR TV_RELEASE <<< "$TALLOC_VERSION"
 cat > "$WORK/obj/talloc/config.h" <<EOF
-/* 手写的最小配置(安卓 bionic, arm64),只覆盖 talloc.c 用到的部分 */
+/* Hand-written minimal config (Android bionic, arm64), covering only what talloc.c uses */
 #define TALLOC_BUILD_VERSION_MAJOR $TV_MAJOR
 #define TALLOC_BUILD_VERSION_MINOR $TV_MINOR
 #define TALLOC_BUILD_VERSION_RELEASE $TV_RELEASE
@@ -143,7 +143,7 @@ EOF
 rm -f "$WORK/obj/talloc/libtalloc.a"
 "$AR" rcsD "$WORK/obj/talloc/libtalloc.a" "$WORK/obj/talloc/talloc.o"
 
-# ---- 4. PRoot 载入器:静态、-nostdlib ----
+# ---- 4. PRoot loader: static, -nostdlib ----
 PO="$WORK/obj/proot"
 mkdir -p "$PO/loader"
 PROOT_VERSION="$(awk '$1=="proot"{print $2}' "$SANDBOX_DIR/sources.lock")"
@@ -165,8 +165,9 @@ LOADER_CFLAGS=(-O2 -fPIC -ffreestanding -Wno-inline-asm "${REPRO_FLAGS[@]}")
 	-o "$PO/loader/loader" "$PO/loader/loader.o" "$PO/loader/assembly.o"
 "$STRIP" -o "$WORK/out/libproot_loader.so" "$PO/loader/loader"
 
-# 上游会把载入器内嵌进 PRoot,PROOT_LOADER 未设置时写到临时目录再执行;安卓不允许执行数据目录里的文件。
-# 这里只嵌一个空占位:PRoot 只能经 PROOT_LOADER 用 nativeLibraryDir 里那份(mikarun 会检查)。
+# Upstream embeds the loader into PRoot and, when PROOT_LOADER is unset, writes it to a temp directory and executes it;
+# Android does not allow executing files from data directories.
+# Only an empty placeholder is embedded here: PRoot must go through PROOT_LOADER and use the copy in nativeLibraryDir (mikarun checks this).
 cat > "$PO/loader/loader-wrapped.S" <<'EOF'
 	.section .rodata
 	.global _binary_loader_elf_start
@@ -176,7 +177,7 @@ _binary_loader_elf_end:
 	.section .note.GNU-stack,"",%progbits
 EOF
 
-# ---- 5. PRoot 本体 ----
+# ---- 5. PRoot itself ----
 PROOT_SOURCES=(
 	cli/cli.c cli/proot.c cli/note.c
 	execve/enter.c execve/exit.c execve/shebang.c execve/elf.c execve/ldso.c execve/auxv.c execve/aoxp.c
@@ -200,13 +201,13 @@ PROOT_OBJECTS+=("$PO/loader/loader-wrapped.o")
 "$CC" "${EXE_LDFLAGS[@]}" -o "$PO/proot" "${PROOT_OBJECTS[@]}" "$WORK/obj/talloc/libtalloc.a"
 "$STRIP" -o "$WORK/out/libproot.so" "$PO/proot"
 
-# ---- 6. 启动器 ----
+# ---- 6. Launcher ----
 mkdir -p "$WORK/obj/mikarun"
 "$CC" "${COMMON_CFLAGS[@]}" -Wall -Wextra -Werror "${EXE_LDFLAGS[@]}" \
 	-o "$WORK/obj/mikarun/mikarun" "$ROOT/app/src/main/cpp/mikarun/mikarun.c"
 "$STRIP" -o "$WORK/out/libmikarun.so" "$WORK/obj/mikarun/mikarun"
 
-# ---- 7. 安装或比较 ----
+# ---- 7. Install or compare ----
 ARTIFACTS=(libproot.so libproot_loader.so libmikarun.so)
 if [ "$CHECK" = 1 ]; then
 	status=0

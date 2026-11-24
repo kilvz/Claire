@@ -1,7 +1,7 @@
 #!/bin/sh
-# 主机侧 pty 验证（Linux，不是安卓）：编译 mikarun 的 host 版本，在 PRoot 里跑一个 shell，
-# 检查 tty、窗口大小（含运行中改大小）、输出转发和 Ctrl+C。只用于开发，不进 APK。
-# 用法（在 Alpine 容器里）：
+# Host-side pty verification (Linux, not Android): compile the host build of mikarun, run a shell inside PRoot,
+# and check the tty, window size (including resizing at runtime), output forwarding and Ctrl+C. Development only, not shipped in the APK.
+# Usage (inside an Alpine container):
 #   docker run --rm --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
 #     -v "$PWD:/src:ro" alpine:3.22 sh /src/tools/sandbox/pty-host-test.sh
 set -eu
@@ -11,7 +11,7 @@ CC="${CC:-gcc}"
 BIN=/tmp/mikarun
 
 apk add --no-cache build-base linux-headers python3 >/dev/null 2>&1
-# proot 不在 3.22 的 main/community 里，用 edge/community 的 5.4.0（和本仓库同一个上游版本）。
+# proot is not in 3.22's main/community, so use 5.4.0 from edge/community (same upstream version as this repo).
 apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community proot >/dev/null 2>&1
 "$CC" -O2 -Wall -Wextra -Werror -DMIKARUN_HOST_API_LEVEL=30 -o "$BIN" "$SRC/app/src/main/cpp/mikarun/mikarun.c"
 echo "COMPILE_OK"

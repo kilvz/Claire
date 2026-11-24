@@ -1,10 +1,11 @@
 #!/bin/sh
-# 做手术:按字面串替换。自动备份、计数校验、原子写入;对不上就不写。
-# 参数在 JSON 文件里($1 或 $MIKA_ARGS_FILE),这里只用 sed 抠字段,不依赖 jq。
+# Doing surgery: literal string replacement. Automatic backup, match-count check, atomic write; nothing is written if counts disagree.
+# Args live in a JSON file ($1 or $MIKA_ARGS_FILE); fields are pulled out with sed only, no jq dependency.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 
-# 取 JSON 字符串字段。不用 sed 的 \| 交替:toybox 的 sed 不支持,真机上会永远取不到值。
+# Extract a JSON string field. Avoid sed's \| alternation: toybox sed does not support it,
+# so on a real device the value would never be found.
 field() {
     raw=$(awk -v key="$1" '
     BEGIN { pat = "\"" key "\"[[:space:]]*:[[:space:]]*\"" }
@@ -31,7 +32,7 @@ path=$(field path)
 find=$(field find)
 repl=$(field replace)
 expect=$(num expect)
-# 没填 expect 就按 1 次算:宁可拒绝,也不要一次替换掉同名的所有片段
+# With no expect given, assume 1 match: better to refuse than to replace every same-named fragment at once
 [ -n "$expect" ] || expect=1
 
 command -v awk >/dev/null 2>&1 || { echo "error: awk is not available on this device, so patch cannot run"; exit 7; }
@@ -54,7 +55,7 @@ tmp="$plugindir/.runtime/patch.$$"
 cnt="$plugindir/.runtime/patch.count.$$"
 trap 'rm -f "$tmp" "$cnt"' EXIT
 
-# 用 ENVIRON 传串,绕开 awk -v 的反斜杠转义;index() 是字面匹配,不是正则
+# Pass strings via ENVIRON to bypass awk -v backslash escaping; index() is a literal match, not a regex
 FIND="$find" REPL="$repl" CNTF="$cnt" awk '
 BEGIN { find = ENVIRON["FIND"]; repl = ENVIRON["REPL"]; n = 0 }
 {
@@ -95,7 +96,7 @@ newsize=$(wc -c < "$path" 2>/dev/null)
 echo "backup: $bak"
 echo "bytes: $size -> $newsize"
 
-# 写回之后立刻读一遍,证明改的就是这里
+# Read the file back right after writing, to prove this is exactly what changed
 echo "--- after ---"
 grep -n -F "$repl" "$path" 2>/dev/null | head -5
 

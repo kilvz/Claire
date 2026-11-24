@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# doc —— 给插件的技能用：把插件目录下的说明文档打印出来（App 里没有 cat 之外的读物，统一走这里）。
-# 本来想用 cat，留着这个占位是为了以后文档变多时能按章节取；现在只支持整篇。
+# doc — used by the plugin's skills: print a doc file from the plugin directory (the App has no reader besides cat, so everything goes through here).
+# Originally this was meant to be cat; the placeholder is kept so that, once there are more docs, they can be fetched by section; for now only whole documents are supported.
 set -u
 ARGS="${1:-${MIKA_ARGS_FILE:-}}"
 NAME=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([a-z_]*\)".*/\1/p' "$ARGS" 2>/dev/null | head -n 1)

@@ -1,10 +1,10 @@
 #!/bin/sh
-# 提示词过一遍:stdin 进原提示词,stdout 出改写后的。
-# 规则在 persona.conf:
-#   prefix=… / suffix=…            整段包在提示词外面
-#   replace=旧=>新                 字面替换,一行一条
-#   [模型名片段]prefix=…           只有发给这个模型时才生效(MIKA_MODEL 里含这个片段)
-# 任何一步出错都原样输出,绝不把任务搞挂。
+# Run the prompt through the rewriter: the original prompt arrives on stdin, the rewritten one leaves on stdout.
+# Rules live in persona.conf:
+#   prefix=… / suffix=…            wrap the whole prompt on the outside
+#   replace=old=>new               literal replacement, one rule per line
+#   [model-name fragment]prefix=…  only takes effect when sending to that model (MIKA_MODEL contains the fragment)
+# If any step fails, output the input unchanged — never break the task.
 set -e
 
 dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,7 +25,7 @@ cp "$in" "$out"
 
 model=$(printf '%s' "${MIKA_MODEL:-}" | tr 'A-Z' 'a-z')
 
-# 这一行对这个模型生效吗:行首 [片段] 存在时,只有模型名含这个片段才算
+# Does this line apply to this model: when a leading [fragment] is present, the model name must contain that fragment
 applies() {
     case "$1" in
         "["*"]"*) ;;
@@ -39,7 +39,7 @@ applies() {
     esac
 }
 
-# 去掉行首的 [片段]
+# Strip the leading [fragment]
 strip_scope() {
     case "$1" in
         "["*"]"*) printf '%s' "${1#*]}" ;;
@@ -47,7 +47,7 @@ strip_scope() {
     esac
 }
 
-# 1) 逐条字面替换
+# 1) literal replacement, rule by rule
 grep -E '^(\[[^]]*\])?replace=' "$cfg" 2>/dev/null | while IFS= read -r line; do
     applies "$line" || continue
     rule=$(strip_scope "$line" | sed 's/^replace=//')
@@ -66,7 +66,7 @@ grep -E '^(\[[^]]*\])?replace=' "$cfg" 2>/dev/null | while IFS= read -r line; do
     }' "$out" > "$tmp" && mv "$tmp" "$out"
 done
 
-# 2) 前缀 / 后缀:每个模型只取一条——带了 [模型] 的优先,否则用通用那条
+# 2) prefix / suffix: take exactly one per model — a [model]-scoped line wins, otherwise the generic one
 pick() {
     kind="$1"
     awk -v kind="$kind" -v model="$model" '

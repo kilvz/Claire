@@ -1,6 +1,6 @@
 #!/bin/sh
-# 一键还原:把 persona.conf 恢复成默认(全是注释,等于不修改提示词)。
-# 原来的内容先备份到 .runtime/backups/,随时能拿回来。
+# One-shot restore: put persona.conf back to the default (all comments, i.e. the prompt is left unmodified).
+# The previous content is backed up to .runtime/backups/ first, so it can be brought back at any time.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 

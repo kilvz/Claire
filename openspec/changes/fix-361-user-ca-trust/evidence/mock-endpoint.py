@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""模拟企业内网自签 HTTPS 的 OpenAI 兼容端点:GET /v1/models 与 POST /v1/chat/completions。"""
+"""Mock an OpenAI-compatible endpoint behind a self-signed HTTPS cert on a corporate intranet: GET /v1/models and POST /v1/chat/completions."""
 import json
 import ssl
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -31,7 +31,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             req = json.loads(self.rfile.read(length) or b"{}") if length else {}
             has_tools = bool(req.get("tools"))
-            # Mika 的「测试并保存」要求模型会调用工具:请求里带 tools 时回一个 tool_call
+            # Mika's "test and save" requires the model to call tools: reply with a tool_call when the request includes tools
             message = (
                 {"role": "assistant", "content": None, "tool_calls": [{
                     "id": "call_1", "type": "function",

@@ -1,10 +1,10 @@
 #!/system/bin/sh
-# translate —— 调用用户自己配的 OpenAI 兼容接口，把文本翻译成目标语言。
+# translate — call the user's own OpenAI-compatible endpoint to translate text into the target language.
 #
-# 跑在 Mika 的 App 进程里（没有 python3），所以只用 POSIX sh + 一个极小的 awk-JSON 解析器。
-# 参数从 $MIKA_ARGS_FILE（JSON）读，脚本本身也接受 $1 当参数文件路径。
-# 凭据走环境变量：MIKA_TRANSLATE_BASE / MIKA_TRANSLATE_KEY / MIKA_TRANSLATE_MODEL
-# （Mika 的插件脚本继承 App 进程环境，所以在系统里配好这三个变量，文本就不会经过对话）。
+# Runs inside Mika's App process (no python3), so it uses only POSIX sh plus a tiny awk JSON parser.
+# Arguments come from $MIKA_ARGS_FILE (JSON); the script also accepts $1 as the argument file path.
+# Credentials come from environment variables: MIKA_TRANSLATE_BASE / MIKA_TRANSLATE_KEY / MIKA_TRANSLATE_MODEL
+# (Mika plugin scripts inherit the App process environment, so once these three are set in the system, the text never passes through the conversation).
 
 set -u
 
@@ -14,8 +14,8 @@ if [ -z "$ARGS" ] || [ ! -f "$ARGS" ]; then
   exit 0
 fi
 
-# ---------- 极简 JSON：取顶层字符串值 ----------
-# json_str <file> <key>：返回已解码的字符串（\\n \\t \\" \\uXXXX 基本覆盖），不存在返回空。
+# ---------- Minimal JSON: get a top-level string value ----------
+# json_str <file> <key>: return the decoded string (\\n \\t \\" \\uXXXX are basically covered), empty when absent.
 json_str() {
   awk -v key="$2" '
     { buf = buf $0 "\n" }
@@ -24,7 +24,7 @@ json_str() {
       if (!match(buf, pat)) exit 0
       i = RSTART + RLENGTH
       n = length(buf)
-      # 跳过空白
+      # skip whitespace
       while (i <= n) { c = substr(buf, i, 1); if (c != " " && c != "\t" && c != "\n" && c != "\r") break; i++ }
       if (substr(buf, i, 1) != "\"") exit 0
       i++
@@ -41,7 +41,7 @@ json_str() {
           else if (d == "/") out = out "/"
           else if (d == "u") {
             hex = substr(buf, i + 2, 4)
-            # 只解 BMP 常用区（中文）；代理对不管，原文里也几乎不会出现
+            # decode only the common BMP range (CJK); surrogate pairs are not handled and hardly ever appear in the source
             code = 0
             for (k = 1; k <= 4; k++) {
               ch = substr(hex, k, 1)
@@ -61,32 +61,32 @@ json_str() {
         out = out c
         i++
       }
-      # 这里解出来的是真正的文本（换行就是换行），不要再转义；转义统一在输出 JSON 的地方做
+      # What is decoded here is real text (a newline is a newline), so do not escape again; escaping is done only where the JSON is output
       printf "%s", out
     }
   ' "$1"
 }
 
 json_num() {
-  # 参数可能是数字也可能是字符串（模型的 JSON 两种都会给）
+  # The value may be a number or a string (model JSON gives both)
   sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([0-9][0-9]*\)".*/\1/p' "$1" | head -n 1 > /tmp/.jn1
   sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$1" | head -n 1 > /tmp/.jn2
   A=$(cat /tmp/.jn1); B=$(cat /tmp/.jn2); rm -f /tmp/.jn1 /tmp/.jn2
   [ -n "$A" ] && printf '%s' "$A" || printf '%s' "$B"
 }
 
-# ---------- 输入 ----------
+# ---------- Input ----------
 TEXT=$(json_str "$ARGS" text)
 TARGET=$(json_str "$ARGS" target)
 SOURCE=$(json_str "$ARGS" source)
 STYLE=$(json_str "$ARGS" style)
 CHUNK=$(json_num "$ARGS" chunk)
-# 目标语言：参数 > 环境变量 MIKA_TRANSLATE_TARGET > 简体中文。
-# 不做白名单——用户说德语、越南语、斯瓦希里语都行，模型自己认。
+# Target language: argument > environment variable MIKA_TRANSLATE_TARGET > Simplified Chinese.
+# No whitelist — German, Vietnamese, Swahili, whatever the user asks for; the model works it out.
 [ -n "$TARGET" ] || TARGET="${MIKA_TRANSLATE_TARGET:-}"
 [ -n "$TARGET" ] || TARGET="简体中文"
 TARGET_NOTE=""
-# 别名匹配时去掉空格和连字符（"Traditional Chinese"、"zh-tw" 都能认），但保留原始值用于透传
+# Strip spaces and hyphens when matching aliases ("Traditional Chinese" and "zh-tw" both work), but keep the original value for pass-through
 NORM=$(printf '%s' "$TARGET" | tr 'A-Z' 'a-z' | tr -d ' _-')
 case "$NORM" in
   zh|zhcn|cn|chinese|中文|简体|简体中文|zhhans)
@@ -102,8 +102,8 @@ case "$NORM" in
   *) TARGET_NOTE="" ;;
 esac
 [ -n "$CHUNK" ] || CHUNK=1800
-# 默认 1800；允许调小到 200，上限 6000（太大的段模型容易漏译）。
-# 小于 200 的不夹到 200，直接回落默认——一段太小只会让切分变碎。
+# Default 1800; may be lowered to 200, upper limit 6000 (chunks that are too large make the model drop parts).
+# Anything below 200 is not clamped to 200 but falls back to the default — too small a chunk only fragments the split.
 if [ "$CHUNK" -lt 200 ] 2>/dev/null || [ "$CHUNK" -gt 6000 ] 2>/dev/null; then
   CHUNK=1800
 fi
@@ -122,9 +122,9 @@ case "$BASE" in
   *) BASE=""; NOTE="未配置 MIKA_TRANSLATE_BASE，用自己的模型在对话里翻译（不调用接口）。" ;;
 esac
 
-# ---------- 切段 ----------
-# 按空行 → 换行 → 句末标点 → 硬切，尽量在自然边界断开，减少上下文丢失。
-# 工作目录解析成绝对路径：相对路径（pt/scripts/../work）在 awk 里写文件会失败——awk 的 > 不做父目录解析。
+# ---------- Chunking ----------
+# Split on blank line -> newline -> sentence-ending punctuation -> hard cut, preferring natural boundaries to minimise lost context.
+# Resolve the work directory to an absolute path: a relative path (pt/scripts/../work) fails when awk writes files — awk's > does not resolve parent directories.
 SELF="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SELF=""
 [ -n "$SELF" ] || SELF="$(dirname "$0")"
 WORK="$SELF/../work"
@@ -133,13 +133,14 @@ WORK="$(cd "$WORK" 2>/dev/null && pwd)" || WORK="/tmp"
 PART="$WORK/rt-$$.txt"
 rm -f "$WORK"/rt-"$$".*.txt 2>/dev/null
 LIST="$WORK/rt-$$.list"
-# awk 的 > 写文件是按行拼的：正文里真正的换行会被当成「新的一行」截断。
-# 所以先编码（换行 → 字面 \n，反斜杠 → \001），awk 只处理单行，落盘后再解码。
+# awk's > assembles the output line by line: a real newline in the body gets treated as "a new line" and truncated.
+# So encode first (newline -> literal \n, backslash -> \001); awk only sees single lines, and decoding happens after writing to disk.
 enc() { printf '%s' "$1" | awk '{ if (NR > 1) printf "%sn", "\\"; printf "%s", $0 }'; }
 printf '%s' "$(enc "$TEXT")" | awk -v max="$CHUNK" -v dir="$WORK" -v pid="$$" -v list="$LIST" '
-  # awk 的 length/substr 在 Android 的 awk 上按字节算，一个汉字 3 字节；
-  # 不按字符切会把半个汉字切成乱码。这里按 UTF-8 前导字节（用字符串比较，避开 ord 的坑）建映射，
-  # 长度、截断、取第 k 个字符一律按字符。不是有效 UTF-8 的行退回按字节。
+  # awk length/substr count bytes on Android, and one CJK character takes 3 bytes;
+  # byte cutting leaves half a character and turns it into garbage. Build a map from UTF-8 lead bytes
+  # (string comparison here, to dodge the ord trap), and do length, truncation and the k-th character
+  # all in characters. Lines that are not valid UTF-8 fall back to bytes.
   function buildmap(s,   i, n, c, o, w) {
     split("", CB); split("", CE)
     o = 0; n = length(s)
@@ -170,20 +171,20 @@ printf '%s' "$(enc "$TEXT")" | awk -v max="$CHUNK" -v dir="$WORK" -v pid="$$" -v
     if (k < 1 || k > CLEN) return ""
     return substr(s, CB[k], CE[k] - CB[k] + 1)
   }
-  # 注意：$(...) 会吃掉末尾换行，所以最后一行不追加 \n
+  # Note: $(...) eats trailing newlines, so do not append \n to the last line
   { lines[NR] = $0 }
   END {
     buf = ""; n = 0; pending_blank = ""
     for (r = 1; r <= NR; r++) {
       line = lines[(r)]
-      # 空行先记着，等下一行真产出块时再补（否则段落在段尾的空行会丢掉）
+      # Remember blank lines and prepend them once the next line really emits a chunk (otherwise a paragraph-final blank line is lost)
       if (line ~ /^[ \t]*$/) { pending_blank = pending_blank "\n"; continue }
-      # 先按句末标点切（中英文都认）；长度一律按字符。
-      # 循环结束时 rest 为空 = 这一行处理完了；在块里另算 eol 标记，
-      # 不另用 cut==0 判行尾（最后一块 cut 也可能 >0，那样就永远不结束）。
+      # Prefer cutting at sentence-ending punctuation (both CJK and Latin); lengths are always counted in characters.
+      # When the loop ends rest is empty = this line is done; the eol flag is computed separately per chunk,
+      # not by testing cut==0 for end of line (the last chunk can have cut > 0 too, and then it would never end).
       rest = line
       while (1) {
-        # 注意：不能写 charlen(rest) + charlen(buf)；buildmap 会改全局 CLEN，先后调用会互相盖掉
+        # Note: never write charlen(rest) + charlen(buf); buildmap mutates the global CLEN, so the two calls overwrite each other
         if (!buildmap(rest)) { LEN_REST = length(rest) } else { LEN_REST = CLEN }
         if (!buildmap(buf)) { LEN_BUF = length(buf) } else { LEN_BUF = CLEN }
         eol = 0
@@ -220,7 +221,7 @@ printf '%s' "$(enc "$TEXT")" | awk -v max="$CHUNK" -v dir="$WORK" -v pid="$$" -v
     if (charlen(buf) > 0) { n++; f = sprintf("%s/rt-%s.%04d.txt", dir, pid, n); printf "%s", buf > f; close(f); printf "%s\n", f >> list }
   }
 '
-# 逐段解码回真文本（字面 \n → 换行，\001 → 反斜杠）
+# Decode every chunk back to real text (literal \n -> newline, \001 -> backslash)
 if [ -s "$LIST" ]; then
   while IFS= read -r f; do
     [ -f "$f" ] || continue
@@ -236,13 +237,13 @@ if [ "$PARTS" -gt 40 ]; then
   exit 0
 fi
 
-# ---------- JSON 转义 ----------
-# JSON 转义：反斜杠 → 引号 → 换行/制表。换行用 awk 转（多条 sed 的 -e 是按顺序作用的，
-# 用 sed 转完再删 \r 会把刚写进去的 \n 又去掉，实测踩过）。
-# 制表符也一并转掉（裸 \t 在 JSON 字符串里同样非法）
+# ---------- JSON escaping ----------
+# JSON escaping: backslash -> quote -> newline/tab. Newlines are escaped with awk (the -e clauses of sed apply in order,
+# so escaping with sed and then removing \r would strip the \n that was just written — hit this in practice).
+# Tabs are escaped too (a raw \t is equally illegal inside a JSON string)
 jesc() { sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'BEGIN{first=1} { if (!first) printf "\\n"; first=0; gsub(/\t/, "\\t"); printf "%s", $0 }' ; }
 
-# ---------- 没有接口：把切好的段交回去，让模型自己翻 ----------
+# ---------- No endpoint: hand the chunks back so the model translates them itself ----------
 if [ -z "$BASE" ]; then
   OUT="$WORK/rt-$$.out.json"
   {
@@ -264,7 +265,7 @@ if [ -z "$BASE" ]; then
   exit 0
 fi
 
-# ---------- 调接口 ----------
+# ---------- Call the endpoint ----------
 STYLE_RULE=""
 case "$STYLE" in
   literal) STYLE_RULE="贴近原文结构，直译为主，术语保持前后一致。" ;;
@@ -303,7 +304,7 @@ while IFS= read -r f; do
       break ;;
   esac
 
-  # choices[0].message.content（字符串）。reasoning_content 有时排在前面，先切到 message 之后更稳。
+  # choices[0].message.content (a string). reasoning_content sometimes comes first, so cutting to after "message" is safer.
   TR=$(awk 'BEGIN { RSTART = 0 }
     {
       buf = buf $0 "\n"
@@ -346,9 +347,9 @@ while IFS= read -r f; do
         out = out c
         i++
       }
-      # 转义：解出来的串里换行是真的换行，这里的 out 只用来拼 JSON 文件（下面再 cat/塞进 JSON）
+      # Escaping: newlines in the decoded string are real newlines, and out here only assembles the JSON file (cat-ed below / placed into JSON)
       gsub(/\r/, "", out)
-      gsub(/\\n/, "\001", out)   # 已经是字面反斜杠+n 的先占位，别被下面再转一次
+      gsub(/\\n/, "\001", out)   # placehold literal backslash+n first, so the next step does not escape it twice
       gsub(/\n/, "\\\\n", out)
       gsub(/\t/, "\\\\t", out)
       gsub(/\001/, "\\\\n", out)
@@ -357,7 +358,7 @@ while IFS= read -r f; do
   ' "$WORK/rt-$$.resp.json")
 
   if [ -z "$(printf '%s' "$TR" | tr -d ' \t\n\r')" ]; then
-    # 有的兼容接口拒绝 system 消息：直接把指令放进 user，再试一次
+    # Some compatible endpoints reject system messages: put the instruction into user and try again
     BODY2="$WORK/rt-$$.req2.json"
     {
       printf '{"model":"%s","temperature":0.2,"messages":[{"role":"user","content":"'
@@ -394,9 +395,9 @@ while IFS= read -r f; do
   fi
 
   [ -n "$TR" ] || { ERR="empty_translation（接口返回里没有 content）"; break; }
-  # 段与段之间只补一个换行；段内换行保持模型给的样子
+  # Add only one newline between chunks; newlines inside a chunk stay exactly as the model returned them
   [ "$AI" -gt 1 ] && printf '\n' >> "$OUT"
-  # 模型有时把换行写成字面的反斜杠+n：拼成大段时统一还原成真换行
+  # The model sometimes writes newlines as a literal backslash+n: normalise them back to real newlines when joining chunks
   printf '%s' "$TR" | tr -d '\r' | sed 's/\\n/\n/g' >> "$OUT"
 done < "$LIST"
 
@@ -415,7 +416,7 @@ cat "$OUT.json"
 rm -f "$WORK"/rt-"$$".*
 
 if [ "$AI" -gt 0 ] && [ "$AI" -gt 3 ]; then
-  # 多段全成功才算完整；一段失败上面就 break 了
+  # Only a run where every chunk succeeded counts as complete; one failed chunk broke out above
   :
 fi
 exit 0

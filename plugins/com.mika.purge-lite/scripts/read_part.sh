@@ -1,5 +1,5 @@
 #!/bin/sh
-# 只看前 N 行,别把整份文件灌进上下文。
+# Look at only the first N lines; don't dump the whole file into context.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 

@@ -1,11 +1,12 @@
 #!/bin/sh
-# 公开信息台账:只做两件事——记一条(必须带来源)、列出来。
-# 参数:{"action":"add","text":"...","source":"https://...","tag":"可选"}
+# Public-info ledger: it does exactly two things — record an entry (source required) and list entries.
+# Args: {"action":"add","text":"...","source":"https://...","tag":"optional"}
 #       {"action":"list","limit":20}
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 
-# 取 JSON 字符串字段。不用 sed 的 \| 交替:toybox 的 sed 不支持,真机上会永远取不到值。
+# Extract a JSON string field. Avoid sed's \| alternation: toybox sed does not support it,
+# so on a real device the value would never be found.
 field() {
     raw=$(awk -v key="$1" '
     BEGIN { pat = "\"" key "\"[[:space:]]*:[[:space:]]*\"" }
@@ -61,7 +62,7 @@ if [ -z "$text" ]; then
     echo "error: text is required"
     exit 3
 fi
-# 没有来源的条目一律不收:这是这套流程唯一不能让步的规矩
+# Entries without a source are always rejected: this is the one rule the whole flow cannot bend on
 case "$source" in
     http://*|https://*) ;;
     *) echo "error: source is required and must be an http(s) URL — 没有来源的线索不收"; exit 4 ;;

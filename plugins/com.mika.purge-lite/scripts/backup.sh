@@ -1,5 +1,5 @@
 #!/bin/sh
-# 备份只落在插件自己的 .runtime/backups 里,不动原文件、不碰别的目录。
+# Backups go only into the plugin's own .runtime/backups; the original file is left alone and no other directory is touched.
 args="$1"
 [ -n "$args" ] || args="$MIKA_ARGS_FILE"
 
