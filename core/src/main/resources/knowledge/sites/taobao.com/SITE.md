@@ -1,27 +1,27 @@
 ---
 name: taobao.com
-display: 淘宝网
-description: 淘宝网页版,提供商品搜索、店铺、详情与购物车
+display: Taobao
+description: Taobao web version, offering product search, shops, details and cart
 domains: ["taobao.com", "s.taobao.com", "item.taobao.com", "world.taobao.com"]
 aliases: ["淘宝", "Taobao", "淘宝网"]
 apps: ["taobao"]
 open: taobao.com
 mode: desktop
 ---
-## 是什么
-淘宝网是阿里巴巴旗下的购物平台,商品来自淘宝及天猫等商家。网页版包含搜索、分类推荐、商品详情、购物车、收藏夹和「我的淘宝」等入口。
+## What it is
+Taobao is a shopping platform under Alibaba, with products from Taobao, Tmall and other merchants. The web version includes entries such as search, category recommendations, product details, cart, favorites and 「我的淘宝」 (My Taobao).
 
-## 页面与网址
-- 首页:`https://www.taobao.com/`。
-- 商品搜索:`https://s.taobao.com/search?q=<URL编码关键词>`。
-- 商品详情:`https://item.taobao.com/item.htm?id=<商品数字id>`。
-- 国际版:`https://world.taobao.com/`,地区、语言及页面内容可能与国内站不同。
+## Pages and URLs
+- Home page: `https://www.taobao.com/`.
+- Product search: `https://s.taobao.com/search?q=<URL编码关键词>`.
+- Product details: `https://item.taobao.com/item.htm?id=<商品数字id>`.
+- International version: `https://world.taobao.com/`; the region, language and page content may differ from the domestic site.
 
-## 功能
-- **搜索与分类**:按关键词查找商品,首页也按品类展示推荐内容。
-- **商品详情**:商品数字 id 标识对应商品,页面可包含规格、价格、销量、评价和店铺信息。
-- **购物车与收藏**:顶部导航提供购物车及收藏夹,收藏内容可分商品与店铺。
-- **我的淘宝**:包含已买到的宝贝、我的足迹等个人内容。
+## Features
+- **Search and categories**: find products by keyword; the home page also shows recommended content by category.
+- **Product details**: the numeric product id identifies the corresponding product, and the page may include specifications, price, sales, reviews and shop information.
+- **Cart and favorites**: the top navigation provides the cart and favorites, and favorites can be split into products and shops.
+- **My Taobao**: contains personal content such as bought items and my footprints.
 
-## 已知现象
-部分搜索、详情和个人页面会要求登录,也可能跳转 App 或显示安全验证。首页推荐、价格和销量会变化;同一商品可能同时存在不同页面或店铺链接。
+## Known issues
+Some search, detail and personal pages require signing in, and may redirect to the app or show a security verification. Home page recommendations, prices and sales change; the same product may have different pages or shop links at the same time.

@@ -1,19 +1,19 @@
-# 发朋友圈
+# Posting to Moments
 
-从底部标签「发现」进入,点「朋友圈」,右上角是「相机」图标。
+Enter from the bottom tab 「发现」 (Discover), tap 「朋友圈」 (Moments); the top right is the 「相机」 (Camera) icon.
 
-| 想发什么 | 操作 |
+| What to post | Operation |
 |---|---|
-| 照片或视频 | 点右上角「相机」,从相册选(最多 9 张),点「完成」 |
-| 只发文字 | 长按右上角「相机」,直接进纯文字编辑页 |
-| 拍一张新的 | 点右上角「相机」,切到「拍摄」拍一张,点「完成」 |
+| Photos or videos | Tap 「相机」 in the top right, choose from the album (up to 9), and tap 「完成」 (Done) |
+| Text only | Long-press 「相机」 in the top right to go straight to the text-only editor |
+| Take a new one | Tap 「相机」 in the top right, switch to 「拍摄」 (Capture) and take one, then tap 「完成」 |
 
-编辑页从上到下:
+The editor page, from top to bottom:
 
-- 顶部输入框:写文字。
-- 「@」:提醒好友,被提醒的人会收到通知。
-- 「所在位置」:给这条加上定位,位置名显示在文字下方。
-- 「谁可以看」:默认所有朋友;可选「部分可见」「不给谁看」或「仅自己」。
-- 「提醒谁看」:选定的人会收到提醒,与「@」分开。
+- Top input box: write the text.
+- 「@」: remind a friend; the person reminded receives a notification.
+- 「所在位置」 (Location): add a location to this post; the place name is shown below the text.
+- 「谁可以看」 (Who can see): all friends by default; you can choose 「部分可见」 (Visible to some), 「不给谁看」 (Hide from) or 「仅自己」 (Only me).
+- 「提醒谁看」 (Notify): the chosen people receive a notification, separate from 「@」.
 
-点右上角「发表」发出;发出后在自己的朋友圈里能看到这一条。照片会传到朋友圈相册,「仅自己」可见的也在里面。
+Tap 「发表」 (Post) in the top right to publish; after publishing you can see the post in your own Moments. Photos are uploaded to the Moments album, and those visible only to yourself are also in it.

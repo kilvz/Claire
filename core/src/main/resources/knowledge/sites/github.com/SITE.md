@@ -1,26 +1,26 @@
 ---
 name: github.com
 display: GitHub
-description: 代码托管与协作网站，可浏览仓库、代码、问题和拉取请求
+description: Code hosting and collaboration site for browsing repositories, code, issues and pull requests
 domains: ["github.com"]
 aliases: ["GitHub", "github"]
 apps: ["github"]
 open: github.com
 mode: desktop
 ---
-## 是什么
-代码托管与协作网站，仓库里有代码、说明文档、问题（Issues）和拉取请求（Pull requests）。
+## What it is
+A code hosting and collaboration site; a repository contains code, documentation, issues and pull requests.
 
-## 页面与网址
-- 仓库：`https://github.com/<所有者>/<仓库名>`。
-- 仓库的问题、拉取请求分别在仓库地址后的 `/issues`、`/pulls`。
-- 搜索：`https://github.com/search?q=<编码词>&type=repositories`；也可搜索代码、问题等类型。
+## Pages and URLs
+- Repository: `https://github.com/<owner>/<repo-name>`.
+- A repository's issues and pull requests are at `/issues` and `/pulls` after the repository address respectively.
+- Search: `https://github.com/search?q=<encoded term>&type=repositories`; you can also search types such as code and issues.
 
-## 功能
-- **仓库**：公开仓库通常无需登录即可看文件、README、提交、分支、问题和拉取请求；私有仓库需要有权限的账号。
-- **Star**：仓库页右上方有 Star 按钮，用于收藏和表示支持，需要登录。当前账号已经加星时按钮显示 Starred；按钮状态可区分是否已加星。
-- **账号**：登录后可见的内容和操作与账号权限有关；界面按钮文字随界面语言变化。
+## Features
+- **Repositories**: public repositories usually require no login to view files, README, commits, branches, issues and pull requests; private repositories need an account with permission.
+- **Star**: the repository page has a Star button in the top right, for bookmarking and showing support; it requires login. When the current account has already starred, the button shows Starred; the button state distinguishes whether it has been starred.
+- **Account**: the content and operations visible after logging in depend on account permissions; the interface button text changes with the interface language.
 
-## 已知现象
-- 仓库不存在、为私有或当前账号无权访问时，页面可能只显示找不到页面。
-- Star 数量可能使用 `1.2k` 这类缩写。
+## Known issues
+- When a repository does not exist, is private, or the current account has no access, the page may only show a page-not-found.
+- The Star count may use abbreviations such as `1.2k`.

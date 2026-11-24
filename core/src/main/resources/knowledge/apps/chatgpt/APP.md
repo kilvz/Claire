@@ -4,30 +4,30 @@ display: ChatGPT
 packages: ["com.openai.chatgpt"]
 aliases: ["ChatGPT", "chatgpt", "OpenAI"]
 open: ChatGPT
-description: OpenAI 官方对话 AI:文本问答、语音对话与多模态识图
+description: OpenAI's official conversational AI, with text Q&A, voice conversation and multimodal image recognition
 ---
-## 是什么
-ChatGPT 是 OpenAI 官方推出的 AI 助手 App,包名 `com.openai.chatgpt`。提供自然语言对话、文本创作、代码解答、图片识别与实时语音交流。
+## What it is
+ChatGPT is the AI assistant app released by OpenAI, package name `com.openai.chatgpt`. It provides natural language conversation, text creation, code answers, image recognition and real-time voice conversation.
 
-## 界面
-主界面极为简洁,主要分为三大区域:
-- **顶部顶栏**:左侧为两条横线汉堡菜单(点击展开侧边历史会话列表与设置),中间是当前模型切换胶囊(如「ChatGPT」或特定模型标识),右侧为右上角的新建对话图标(笔形图标)。
-- **侧边抽屉(Sidebar)**:自左侧滑出,顶部有搜索聊天记录框和「新建聊天 (New Chat)」,中间按时间分组陈列历史会话标题,最底部为个人账号信息与设置齿轮。
-- **对话主窗口**:中间为消息问答流(用户提问气泡靠右,ChatGPT 回复在左侧并带复制、重试、朗读和评价图例)。
-- **底部输入底栏**:包含「+」附加按钮(拍照、相册选图、上传文档或搜索)、耳机图标(进入实时高级语音模式 Advanced Voice Mode)、文字输入框「发消息 (Message)」以及右侧的向上发送箭头按钮。
+## UI
+The main interface is extremely simple and divided into three main areas:
+- **Top bar**: the hamburger menu of two horizontal lines on the left (tap to expand the side list of past conversations and settings), the current model switcher pill in the middle (such as 「ChatGPT」 or a specific model label), and the new-chat icon (a pencil icon) at the top right.
+- **Side drawer**: slides out from the left, with a box for searching chat history and 「新建聊天 (New Chat)」 at the top, past conversation titles grouped by time in the middle, and the personal account information and settings gear at the very bottom.
+- **Main conversation window**: the message Q&A stream in the middle (the user's question bubble on the right, ChatGPT's replies on the left with copy, retry, read-aloud and rating controls).
+- **Bottom input bar**: the 「+」 attach button (camera, pick an image from the album, upload a document or search), the headphone icon (enters real-time Advanced Voice Mode), the text input box 「发消息 (Message)」 and the up-arrow send button on the right.
 
-## 功能
-- **发起新对话与切换历史**:
-  - 点击右上角的笔形图标即可清空当前界面开启全新话题。
-  - 打开左侧抽屉,在历史列表中点击目标标题可回到过去的会话继续追问。
-- **输入并提问**:
-  - 在底部输入框键入问题,点击右侧发送箭头。在生成过程中该按钮变为黑色方块(停止生成图标),点击可中断回答。
-- **多模态图片识别**:
-  - 点击输入框左侧的「+」选择「相机 (Camera)」实时拍照,或选择「相册 (Photos)」选取已保存的屏幕截图,再在输入框附带说明后发送。
-- **高级语音模式 (Voice Mode)**:
-  - 点击耳机图标进入全屏语音动画球模式,在此模式下无需打字直接用麦克风与 AI 实时交谈。点击底部圆圈麦克风可静音,点击右下角「×」退出语音模式回到文字聊天。
+## Features
+- **Starting a new conversation and switching history**:
+  - Tap the pencil icon at the top right to clear the current screen and start a brand-new topic.
+  - Open the left drawer and tap a target title in the history list to return to a past conversation and keep asking.
+- **Typing and asking**:
+  - Type the question into the bottom input box and tap the send arrow on the right. While an answer is being generated the button turns into a black square (the stop-generating icon); tap it to interrupt the answer.
+- **Multimodal image recognition**:
+  - Tap 「+」 to the left of the input box and choose 「相机 (Camera)」 to take a photo on the spot, or choose 「相册 (Photos)」 to pick a saved screenshot, then add a note in the input box and send.
+- **Advanced Voice Mode**:
+  - Tap the headphone icon to enter the full-screen animated voice-ball mode, where you talk to the AI in real time through the microphone without typing. Tap the circle microphone at the bottom to mute, and tap 「×」 at the bottom right to leave voice mode and return to text chat.
 
-## 已知现象
-- **高级语音全屏覆盖**:进入语音模式后文字界面被黑色动画背景遮蔽,必须点击「×」退出后才能恢复文字阅读。
-- **模型额度限制提示**:若频繁使用高级思考模型或未付费账号,界面可能提示「已达到该模型的限制,已为您切换至普通模型」。
-- **登录状态验证**:首次打开或授权过期时弹出「继续使用 Google」「使用 Apple 登录」或输入邮箱,属于常规登录安全验证。
+## Known issues
+- **Advanced voice covers the whole screen**: after entering voice mode the text interface is hidden behind the black animated background, and text is only readable again after tapping 「×」 to exit.
+- **Model quota notices**: if an advanced reasoning model is used frequently or the account is unpaid, the interface may show 「已达到该模型的限制,已为您切换至普通模型」 (the model's limit has been reached, so you have been switched to the standard model).
+- **Sign-in state checks**: on the first launch or when authorization expires, 「继续使用 Google」 (Continue with Google), 「使用 Apple 登录」 (Sign in with Apple) or an email prompt pops up; this is the usual sign-in security check.

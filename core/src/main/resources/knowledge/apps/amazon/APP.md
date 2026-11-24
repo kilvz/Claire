@@ -5,28 +5,28 @@ packages: ["com.amazon.mShop.android.shopping"]
 aliases: ["Amazon", "亚马逊", "amazon"]
 sites: ["amazon.com"]
 open: Amazon
-description: 全球电商购物:商品搜索、比价、购物车与订单跟踪
+description: Global e-commerce shopping, product search, price comparison, cart and order tracking
 ---
-## 是什么
-Amazon 是全球跨境电商购物 App,包名 `com.amazon.mShop.android.shopping`。网站知识见 `amazon.com`。支持在不同国家站点搜索商品、下单结算与追踪物流。
+## What it is
+Amazon is a global cross-border e-commerce shopping app, package name `com.amazon.mShop.android.shopping`. For website knowledge see `amazon.com`. It supports searching products, placing orders and checking out, and tracking shipments on sites in different countries.
 
-## 界面
-底部导航包含四个标签:「首页」「我的账号 (You)」「购物车 (Cart)」「菜单 (三条横线)」。
-- **首页**:顶部为全宽搜索栏,带相机扫描(识别条码或实物)与麦克风图标;搜索栏下方常驻配送地址胶囊「配送至 (Deliver to)...」;主体陈列促销秒杀、基于浏览历史的推荐与分类导购。
-- **搜索结果页**:顶部有筛选(Filters:品牌、Prime 会员专享、价格区间、评分、卖家资质)与排序(Featured, Price low to high, Avg. customer review);商品流中混杂带有「Sponsored (赞助广告)」标记的推广卡片。
-- **商品详情页**:上方为多图轮播,中间为商品全名、星级评价总数、价格与折扣,下方为变体选择区(尺码、颜色、容量)、发货与售卖方(Ships from / Sold by)、黄色「加入购物车 (Add to Cart)」按钮与橙色「立即购买 (Buy Now)」按钮。
-- **我的账号页**:顶部常驻「你的订单 (Your Orders)」「再次购买 (Buy Again)」「你的账户 (Your Account)」「你的心愿单 (Your Lists)」。
+## UI
+The bottom navigation has four tabs: 「首页」 (Home), 「我的账号 (You)」 (Your account), 「购物车 (Cart)」 (Cart) and 「菜单 (三条横线)」 (Menu, three horizontal lines).
+- **Home**: a full-width search bar at the top, with a camera scan (recognizes barcodes or physical items) and a microphone icon; a delivery address pill 「配送至 (Deliver to)...」 sits permanently below the search bar; the body presents promotional flash deals, recommendations based on browsing history and category navigation.
+- **Search results page**: filters at the top (Filters: brand, Prime membership exclusive, price range, rating, seller qualifications) and sorting (Featured, Price low to high, Avg. customer review); the product stream mixes in promotional cards marked 「Sponsored (赞助广告)」 (sponsored ads).
+- **Product detail page**: a multi-image carousel at the top, the full product name, star rating and review count, price and discount in the middle, and below them a variant selection area (size, color, capacity), shipping and seller (Ships from / Sold by), a yellow 「加入购物车 (Add to Cart)」 button and an orange 「立即购买 (Buy Now)」 button.
+- **Your account page**: 「你的订单 (Your Orders)」, 「再次购买 (Buy Again)」, 「你的账户 (Your Account)」 and 「你的心愿单 (Your Lists)」 are permanently at the top.
 
-## 功能
-- **搜索与排除广告干扰**:
-  - 在顶部搜索栏键入商品全称或型号。在结果列表中优先辨识自然排名商品,注意辨别带有小字「Sponsored」的广告位。
-- **加入购物车与安全比价**:
-  - 点击商品后,必须先确认选定正确的颜色或尺码变体,核对库存状态(In Stock / 仅剩 X 件)。
-  - 执行采购比价任务时,优先点击黄色的「加入购物车 (Add to Cart)」;**切勿轻易点击橙色的「立即购买 (Buy Now)」**,后者可能直接触发一键下单并从默认信用卡扣款。
-- **订单追踪**:
-  - 进入底部「我的账号」标签,点击「你的订单 (Your Orders)」即可查看近期订单详情与实时物流派送进度(Track Package)。
+## Features
+- **Searching and filtering out ads**:
+  - Type the full product name or model into the top search bar. In the results list, prefer naturally ranked products and watch out for ad slots carrying the small 「Sponsored」 label.
+- **Adding to the cart and comparing prices safely**:
+  - After tapping a product, you must first confirm that the right color or size variant is selected and check the stock status (In Stock / 仅剩 X 件, only X left).
+  - When doing a procurement price comparison, prefer the yellow 「加入购物车 (Add to Cart)」 button; **never tap the orange 「立即购买 (Buy Now)」 lightly**, because the latter may place a one-click order directly and charge the default credit card.
+- **Order tracking**:
+  - Go to the 「我的账号」 (Your account) tab at the bottom and tap 「你的订单 (Your Orders)」 to see recent order details and live delivery progress (Track Package).
 
-## 已知现象
-- **国家与站点切换影响货架**:Amazon 全球站点独立。若发现货币单位或商品库存异常,需在菜单中检查国家/地区设置(Country & Language),不同国家对应不同收货地址与配送费。
-- **一键购买陷阱**:开启 1-Click 买单后,点击「Buy Now」直接完成付款并生成订单,执行自动化任务时应保持高度谨慎。
-- **会员优惠弹窗**:结账或浏览时经常弹出 Prime 会员包月或免费试用推荐,需点击「不,谢谢 / No, thanks」拒绝。
+## Known issues
+- **Country and site switching affects the shelf**: Amazon sites around the world are independent. If the currency unit or product stock looks wrong, check the country/region setting (Country & Language) in the menu; different countries have different delivery addresses and shipping fees.
+- **One-click purchase trap**: once 1-Click ordering is enabled, tapping 「Buy Now」 completes payment directly and creates an order, so be very careful when running automation tasks.
+- **Membership offer pop-ups**: at checkout or while browsing, a Prime monthly subscription or free trial offer often pops up, and it must be declined by tapping 「不,谢谢 / No, thanks」.

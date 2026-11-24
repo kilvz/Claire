@@ -70,7 +70,7 @@ internal object RunCommand : SandboxTool {
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = o.argStr("command")
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) =
         // The command was written by the assistant itself: it goes in the provenance and is not treated as evidence; lines in the output that are verbatim text from the command (echo echoes) do not count either
-        listOfNotNull(res(r, "output")?.let { output("退出码 ${res(r, "exitCode")}:\n$it", Place.command("run_command「${o.argStr("command")?.take(200)}」"), o.argStr("command")) })
+        listOfNotNull(res(r, "output")?.let { output("Exit code ${res(r, "exitCode")}:\n$it", Place.command("run_command \"${o.argStr("command")?.take(200)}\""), o.argStr("command")) })
 }
 
 internal object RunBundledScript : SandboxTool {
@@ -92,7 +92,7 @@ internal object RunBundledScript : SandboxTool {
     override suspend fun execute(a: Args, ctx: ToolContext) = ctx.sandboxRunner!!.run { ws, ready -> runScript(a, ws, ready.network, ctx.callId, ctx.sub, ctx.tools) }
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = listOfNotNull(o.argStr("source"), o.argStr("script")).joinToString("/")
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) =
-        listOfNotNull(res(r, "output")?.let { output("退出码 ${res(r, "exitCode")}:\n$it", Place.command("run_bundled_script ${o.argStr("source")}/${o.argStr("script")}"), o["args"]?.toString()) })
+        listOfNotNull(res(r, "output")?.let { output("Exit code ${res(r, "exitCode")}:\n$it", Place.command("run_bundled_script ${o.argStr("source")}/${o.argStr("script")}"), o["args"]?.toString()) })
 }
 
 internal object ReadFile : SandboxTool {
@@ -134,7 +134,7 @@ internal object WriteFile : SandboxTool {
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog): List<Observation> {
         if (!ok(r)) return emptyList()
         res(r, "path")?.let { log.writtenPaths += it }
-        return listOf(output("write_file 写入 ${res(r, "path")}(${res(r, "bytesWritten")} 字节,文件现为 ${res(r, "size")} 字节)"))
+        return listOf(output("write_file wrote ${res(r, "path")} (${res(r, "bytesWritten")} bytes; the file is now ${res(r, "size")} bytes)"))
     }
 }
 
@@ -157,7 +157,7 @@ internal object SearchFiles : SandboxTool {
         return listOfNotNull((r.content["matches"] as? JsonArray)?.joinToString("\n") { m ->
             val mo = m as? JsonObject
             "${(mo?.get("file") as? JsonPrimitive)?.contentOrNull}:${(mo?.get("line") as? JsonPrimitive)?.contentOrNull}: ${(mo?.get("text") as? JsonPrimitive)?.contentOrNull}"
-        }?.let { output(it, Place.command("search_files「${o.argStr("pattern")?.take(100)}」")) })
+        }?.let { output(it, Place.command("search_files \"${o.argStr("pattern")?.take(100)}\"")) })
     }
 }
 
@@ -179,7 +179,7 @@ internal object ShareFile : SandboxTool {
     override suspend fun execute(a: Args, ctx: ToolContext) = ctx.sandboxRunner!!.run { ws, _ -> shareFile(a, ws) }
     override fun logTarget(o: JsonObject, r: ToolExecution, ctx: ToolContext) = o.argStr("path")
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog) =
-        listOfNotNull(if (ok(r)) output("share_file 已存到 ${res(r, "savedAs")}") else null)
+        listOfNotNull(if (ok(r)) output("share_file saved to ${res(r, "savedAs")}") else null)
 }
 
 /** An observation produced by the sandbox: command output, file contents, paths written and exported. [authored] is a command the assistant wrote itself (echoes in the output are not recorded). */

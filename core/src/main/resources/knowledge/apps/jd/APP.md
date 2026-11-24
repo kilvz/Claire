@@ -1,25 +1,25 @@
 ---
 name: jd
-display: 京东
+display: JD
 packages: ["com.jingdong.app.mall"]
 aliases: ["京东", "JD", "京东商城"]
 sites: ["jd.com"]
 open: 京东
-description: 商品搜索、自营与第三方店铺、订单和物流的购物 App
+description: Shopping app for product search, first-party and third-party stores, orders and logistics
 ---
-## 是什么
-京东旗下的购物 App,安卓包名 `com.jingdong.app.mall`。商品有京东自营和第三方店铺两种,账号下有购物车、订单、地址、优惠券和 Plus 会员信息。
+## What it is
+The shopping app under JD, Android package name `com.jingdong.app.mall`. Products come in two kinds, JD first-party and third-party stores, and the account holds the cart, orders, addresses, coupons and Plus membership information.
 
-## 界面
-首页顶部是搜索框,下面是频道入口和推荐信息流;底部标签通常有首页、分类、发现、购物车、我的。搜索结果页能按综合、销量、价格排序,也能筛「京东自营」「京东物流」等条件。
+## UI
+The top of the home page is a search box, below it are channel entries and a recommended feed; the bottom tabs are usually Home, Categories, Discover, Cart and Me. The search results page can sort by comprehensive, sales volume and price, and can also filter by conditions such as 「京东自营」 (JD first-party) and 「京东物流」 (JD Logistics).
 
-## 功能
-- **搜索商品**:首页搜索框输入关键词,结果里显示商品图、标题、价格、评价数、店铺名和「自营」标记。
-- **商品详情**:规格选择、价格、评价、店铺入口、「加入购物车」「立即购买」;自营商品会标出发货与售后方。
-- **购物车**:底部「购物车」按店铺和促销分组,可勾选、改数量、看优惠后的合计。
-- **订单**:「我的」里的「我的订单」按状态分组;详情页有订单号、实付款、支付方式、发票信息和物流单号。
-- **物流**:订单详情里的「查看物流」显示配送员、运单号和逐条轨迹。
-- **价保**:部分自营订单在订单详情里能申请价格保护。
+## Features
+- **Searching products**: type keywords into the home page search box; the results show the product image, title, price, review count, store name and the 「自营」 (first-party) badge.
+- **Product details**: specification selection, price, reviews, the store entry, 「加入购物车」 (Add to cart) and 「立即购买」 (Buy now); first-party products mark the shipper and after-sales provider.
+- **Cart**: the 「购物车」 (Cart) tab at the bottom groups items by store and promotion, and you can check items, change quantities and see the total after discounts.
+- **Orders**: 「我的订单」 (My orders) under 「我的」 (Me) is grouped by status; the detail page has the order number, actual payment, payment method, invoice information and tracking number.
+- **Logistics**: 「查看物流」 (View logistics) in the order details shows the courier, the waybill number and the tracking history entry by entry.
+- **Price protection**: for some first-party orders, price protection can be requested in the order details.
 
-## 已知现象
-同一商品常有自营和第三方两套链接,价格和配送时效不同。购物车里的促销活动会让勾选不同商品时合计金额变化。搜索结果里的「京东物流」标记不等于「京东自营」。
+## Known issues
+The same product often has two sets of links, first-party and third-party, with different prices and delivery times. Promotions in the cart make the total change depending on which products are checked. The 「京东物流」 (JD Logistics) badge in search results does not mean 「京东自营」 (JD first-party).

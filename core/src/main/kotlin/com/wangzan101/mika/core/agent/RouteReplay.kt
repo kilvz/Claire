@@ -154,7 +154,7 @@ internal class RouteReplay(
 
     companion object {
         /** The note for this step shown in the UI during replay. */
-        const val REPLAY_NOTE = "按以往的做法操作"
+        const val REPLAY_NOTE = "Replaying the earlier approach"
         /** The route is disabled after this many consecutive misses at the same step. */
         const val ROUTE_MISSES_TO_DISABLE = 2
     }

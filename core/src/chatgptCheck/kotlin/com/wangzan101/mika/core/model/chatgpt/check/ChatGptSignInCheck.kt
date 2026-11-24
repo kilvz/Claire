@@ -328,8 +328,9 @@ private fun explain(e: Throwable): String = when (e) {
     is ModelError.ContextTooLong -> "context_length_exceeded"
     is ModelError.Network -> "网络连接失败:${e.cause?.message.orEmpty()}"
     is ModelError.Server -> "服务端出错(HTTP ${e.status}),稍后再试"
-    is ModelError.BadResponse -> if (e.message.orEmpty().contains("服务端不支持请求里的")) {
-        "unsupported_capability:${e.message?.substringAfter("服务端不支持请求里的 ")?.let { "请求里的 `$it` 这一项不被支持" }}"
+    is ModelError.BadResponse -> if (e.message.orEmpty().contains("The server does not support ")) {
+        val item = e.message.orEmpty().substringAfter("The server does not support ").substringBefore(" in the request")
+        "unsupported_capability:`$item` in the request is not supported"
     } else e.message.orEmpty()
     else -> "${e::class.simpleName}: ${e.message}"
 }

@@ -846,10 +846,10 @@ class AgentLoop(
         /** A normal task has no fixed step cutoff; an explicit step budget is used only for evaluations and subtasks with a specified limit. */
         const val UNLIMITED_STEPS = Int.MAX_VALUE
         /** The description of this step shown in the UI while verification is in progress. */
-        const val VERIFYING_NOTE = "正在核实结果"
+        const val VERIFYING_NOTE = "Verifying the result"
         val APPROVED_STEP_FIRST: String get() = Feedback["approved_step_first"]
         /** The places that still did not match after the answer was sent back once; the outcome description starts this way (the UI marks them individually via [TaskState.Succeeded.unconfirmed]). */
-        const val UNCONFIRMED_NOTE = "未确认:"
+        const val UNCONFIRMED_NOTE = "Unconfirmed: "
         /** The reason when hand_to_user hands payment to the user; payment is irreversible, so the answer must ask for a separate verification. */
         internal const val PAYMENT = "payment"
         /** The source label of the repeated item-by-item work reminder. */
@@ -883,7 +883,7 @@ class AgentLoop(
         is TaskState.Succeeded -> RunEvent.TaskEnded(now(), if (end.doubtful) "unverified" else "succeeded", Redactor.text(end.answer))
         is TaskState.Failed -> RunEvent.TaskEnded(now(), "failed", Redactor.text(end.reason), end.kind.name.lowercase())
         TaskState.Cancelled -> RunEvent.TaskEnded(now(), "cancelled", "已取消")
-        else -> RunEvent.TaskEnded(now(), "error", "任务异常中断")
+        else -> RunEvent.TaskEnded(now(), "error", "The task was interrupted unexpectedly")
     }
 
     internal fun waitingEvent(s: TaskState): RunEvent.State = when (s) {

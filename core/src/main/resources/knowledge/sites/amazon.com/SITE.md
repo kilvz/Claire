@@ -6,26 +6,26 @@ aliases: ["Amazon", "亚马逊"]
 apps: ["amazon"]
 open: amazon.com
 mode: desktop
-description: 跨境电商平台,搜商品,看价格、变体、库存,可加入购物车。
+description: Cross-border e-commerce platform: search products, see prices, variants and stock, and add to cart.
 ---
-## 是什么
+## What it is
 
-全球电商平台。各国家站点(.com、.sg、.co.uk、.de、.co.jp)是各自独立的货架,价格、库存、币种、配送都不同。
+A global e-commerce platform. Each country site (.com, .sg, .co.uk, .de, .co.jp) is an independent storefront, with different prices, stock, currencies and shipping.
 
-## 页面与网址
+## Pages and URLs
 
-- 搜索:在目标国家站点打开 `/s?k=<关键词>`,关键词需 URL 编码。
-- 商品详情:以 ASIN 为准的干净链接。搜索页上的卡片可能被广告改写跳转。
-- 没指定地区时,站点按访问者所在地自然落到某个国家站。
+- Search: open `/s?k=<keyword>` on the target country site; the keyword needs URL encoding.
+- Product details: a clean link keyed by ASIN. Cards on the search page may be rewritten by ads for redirection.
+- When no region is specified, the site naturally lands on some country site based on the visitor's location.
 
-## 功能
+## Features
 
-- **搜索**:公开可看。每个结果有 ASIN、标题、价格与币种、评分与评论数,广告位有标记。
-- **商品详情**:buybox 里是主价格、库存和卖家条件;二手和第三方卖家的报价另列。有变体的商品(颜色、规格等),初始价格只对应默认选中的那一款,选到另一款后价格和库存会变。
-- **加入购物车**:详情页的 Add to Cart 按钮;成功后页面显示 Added to Cart 提示。
+- **Search**: publicly viewable. Each result has an ASIN, title, price and currency, rating and review count, and ad slots are marked.
+- **Product details**: the buybox holds the main price, stock and seller conditions; offers from used and third-party sellers are listed separately. For products with variants (color, size, etc.), the initial price corresponds only to the variant selected by default, and after selecting another variant the price and stock change.
+- **Add to cart**: the Add to Cart button on the detail page; after success the page shows an Added to Cart prompt.
 
-## 已知现象
+## Known issues
 
-- 地区重定向会使页面缺价,或显示 SGD、GBP 等币种。
-- 加购后角标数字和按钮颜色有延迟,未必立即更新。
-- 页面结构改版或弹出人机验证时,商品信息读不出来。
+- Region redirection can make the page lack a price, or show currencies such as SGD and GBP.
+- After adding to cart, the badge number and button color lag and may not update immediately.
+- When the page structure is redesigned or a human verification pops up, product information cannot be read.

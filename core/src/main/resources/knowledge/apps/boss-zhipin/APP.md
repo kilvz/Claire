@@ -1,35 +1,35 @@
 ---
 name: boss-zhipin
-display: BOSS直聘
+display: BOSS Zhipin
 packages: ["com.hpbr.bosszhipin"]
 aliases: ["BOSS直聘", "Boss直聘", "boss直聘", "BOSS", "直聘", "bosszhipin"]
 sites: ["zhipin.com"]
 open: BOSS直聘
 pace: careful
-description: 招聘求职 App：搜职位、看详情、直接与招聘人沟通、发简历
+description: Job hunting app for searching jobs, viewing details, talking to recruiters directly and sending résumés
 ---
-## 是什么
-BOSS直聘是招聘求职 App,包名 `com.hpbr.bosszhipin`。求职者在这上面搜职位、看职位详情,直接与招聘人打招呼、聊天,让招聘人看到自己的在线简历。网页版见 `zhipin.com`。
+## What it is
+BOSS直聘 (BOSS Zhipin) is a job hunting app, package name `com.hpbr.bosszhipin`. Job seekers search jobs and view job details here, greet and chat with recruiters directly, and let recruiters see their online résumé. The web version is at `zhipin.com`.
 
-## 界面
-主要结构通常是「职位」「消息」「我的」等底部标签,具体布局随版本略有不同。
-- 职位页:顶部搜索框,下面是职位卡片列表(一张一个职位:名称、薪资、地点、经验、学历、公司)。可以点筛选,或点职位卡片进详情。
-- 职位详情:职位名、薪资、地点、经验、学历、公司(融资阶段、规模、行业)、招聘人(名字、职务、是否在线)、福利、职位标签、职位描述、公司介绍、工作地址。
-- 消息页:与招聘人的会话列表;「立即沟通」后和某个招聘人的对话在这里。
-- 我的:在线简历、求职期望,以及「谁看过我」「收藏的职位」等。
+## UI
+The main structure usually has bottom tabs such as 「职位」 (Jobs), 「消息」 (Messages) and 「我的」 (Me); the exact layout differs slightly by version.
+- Jobs page: a search box at the top, below it a list of job cards (one card per job: title, salary, location, experience, education, company). You can tap the filters, or tap a job card to open its details.
+- Job details: job title, salary, location, experience, education, company (funding stage, size, industry), recruiter (name, title, whether online), benefits, job tags, job description, company introduction and work address.
+- Messages page: the list of conversations with recruiters; after 「立即沟通」 (Chat now), the conversation with that recruiter is here.
+- Me: online résumé, job expectations, and 「谁看过我」 (Who viewed me), 「收藏的职位」 (Saved jobs) and so on.
 
-## 功能
-- **搜职位/筛选**:关键词 + 城市,再按薪资、工作经验、学历、公司规模、行业等筛选,和网页版同一套条件。
-- **职位详情**:看薪资、要求、公司、招聘人和职位描述。
-- **立即沟通**:向某个职位的招聘人发起打招呼,进入与 TA 的聊天。
-- **聊天**:与招聘人一来一回发文字;招聘人可以看你的在线简历。能否发图片/文件附件随版本。
-- **在线简历**:在「我的」里维护;立即沟通或「感兴趣」后招聘人就能看到这份简历,不用单独传文件。
-- **登录**:手机号+短信验证码、微信,或一键登录。
+## Features
+- **Searching jobs and filtering**: keyword + city, then filter by salary, work experience, education, company size, industry and so on, the same set of conditions as the web version.
+- **Job details**: see the salary, requirements, company, recruiter and job description.
+- **Chat now**: start a greeting to the recruiter of a job and enter the chat with them.
+- **Chat**: send text messages back and forth with the recruiter; the recruiter can see your online résumé. Whether images or file attachments can be sent depends on the version.
+- **Online résumé**: maintained under 「我的」 (Me); after 「立即沟通」 (Chat now) or 「感兴趣」 (Interested) the recruiter can see this résumé without a separate file upload.
+- **Sign-in**: phone number + SMS verification code, WeChat, or one-tap sign-in.
 
-## 已知现象
-- 没登录时打开就是登录页:「微信登录」「一键登录」「其他方式登录」,下面要勾选同意用户协议和隐私政策。登录页左上角返回进的是手机号登录页(手机号、「下一步」、「接收不到短信」,以及微信、QQ 等其他登录方式),再按返回就退出 App。没有不登录浏览的入口。
-- 访问太频繁会被风控:弹出验证码,或提示「访问频繁」「您的环境存在异常」,要等一会儿或换网络再试。
-- 当天能沟通的人数有上限(看到过 150 人),用完后「立即沟通」会弹「您已达到沟通上限」。
+## Known issues
+- When opened while signed out it shows the sign-in page directly: 「微信登录」 (Sign in with WeChat), 「一键登录」 (One-tap sign-in), 「其他方式登录」 (Sign in another way), with a checkbox below for accepting the user agreement and privacy policy. The back arrow at the top left of the sign-in page leads to the phone-number sign-in page (phone number, 「下一步」 (Next), 「接收不到短信」 (Not receiving the SMS), plus other sign-in methods such as WeChat and QQ), and pressing back again exits the app. There is no entry for browsing without signing in.
+- Too-frequent access triggers risk control: a captcha pops up, or a notice says 「访问频繁」 (Too frequent) or 「您的环境存在异常」 (Your environment is abnormal), and you have to wait a while or switch networks and try again.
+- There is a cap on how many people you can talk to in a day (150 has been seen); once it is used up, tapping 「立即沟通」 pops up 「您已达到沟通上限」 (You have reached the chat limit).
 
-## 常用流程
-- **找工作**:搜职位 → 筛选 → 看详情 → 「立即沟通」打招呼 → 聊天、让招聘人看简历。具体步骤见 `references/job-application.md`。
+## Common flows
+- **Finding a job**: search jobs → filter → view details → 「立即沟通」 (Chat now) to greet → chat and let the recruiter see the résumé. See `references/job-application.md` for the exact steps.

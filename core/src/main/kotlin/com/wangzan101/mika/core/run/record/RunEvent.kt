@@ -292,10 +292,10 @@ sealed interface RunEvent {
         /** The place written into run records: an app is its package name, a site is "site domain" (the same form as in past records). */
         fun placeLabel(p: Place?): String? = p?.let { if (it.kind == com.wangzan101.mika.core.screen.observation.PlaceKind.Site) "网站 ${it.name}" else it.name }
 
-        fun clip(s: String): String = if (s.length <= MAX_FIELD) s else s.take(MAX_FIELD) + "…(已截短)"
+        fun clip(s: String): String = if (s.length <= MAX_FIELD) s else s.take(MAX_FIELD) + "…(truncated)"
 
         fun clipResult(s: String): String =
-            if (s.length <= MAX_RESULT) s else s.take(MAX_RESULT) + "…(已截短,原长 ${s.length} 字)"
+            if (s.length <= MAX_RESULT) s else s.take(MAX_RESULT) + "…(truncated, was ${s.length} characters)"
     }
 }
 

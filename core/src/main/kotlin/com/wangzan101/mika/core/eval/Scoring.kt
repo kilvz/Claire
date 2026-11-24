@@ -30,16 +30,16 @@ data class TaskScore(
 )
 
 object Scoring {
-    private val MODEL_ERROR = Regex("API Key|额度|限流|模型")
+    private val MODEL_ERROR = Regex("API Key|额度|限流|模型|Model error")
 
     /** When the evaluation runner itself errors, the failure reason starts with this. */
-    const val HARNESS_PREFIX = "评测器:"
+    const val HARNESS_PREFIX = "Evaluator:"
 
     /** Failures caused by two tasks interfering with each other in parallel evaluation start with this reason prefix. */
-    const val INTERFERENCE_PREFIX = "并行干扰:"
+    const val INTERFERENCE_PREFIX = "Parallel interference:"
 
     /** Failure reason when the Agent itself calls end_not_done; tasks expected to fail accept only this one. */
-    const val GAVE_UP = "Agent 如实报告做不成"
+    const val GAVE_UP = "The Agent honestly reported it could not be done"
 
     /** Start of the failure reason when verification never passes (see AgentLoop). */
     const val VERIFICATION_PREFIX = "核查未通过"
@@ -50,10 +50,10 @@ object Scoring {
      */
     fun failReason(f: TaskState.Failed): String = when (f.kind) {
         FailKind.GaveUp -> GAVE_UP
-        FailKind.Model -> "模型出错:${f.reason}"
+        FailKind.Model -> "Model error: ${f.reason}"
         FailKind.Guard, FailKind.StepLimit, FailKind.TokenLimit, FailKind.TimeLimit -> f.reason
         // A process or service disappearing mid-run is also a matter of the runtime environment, not the Agent's fault
-        FailKind.Environment, FailKind.Interrupted -> "${HARNESS_PREFIX}运行环境:${f.reason}"
+        FailKind.Environment, FailKind.Interrupted -> "${HARNESS_PREFIX}environment: ${f.reason}"
     }
 
     /**
@@ -94,8 +94,8 @@ object Scoring {
         if (reason.startsWith(VERIFICATION_PREFIX)) return FailureClass.verifier_reject
         infraClass(o)?.let { return it }
         return when {
-            "已安全停止" in reason -> FailureClass.guard_stop
-            "步上限" in reason -> FailureClass.step_limit
+            "已安全停止" in reason || "Stopped safely" in reason -> FailureClass.guard_stop
+            "步上限" in reason || "step limit" in reason -> FailureClass.step_limit
             "核查未通过" in reason -> FailureClass.verifier_reject
             o.outcome == "takeover" && t.category != EvalCategory.Barrier -> FailureClass.barrier
             else -> FailureClass.unknown

@@ -1,63 +1,61 @@
 ---
 name: skill-authoring
-display: 写技能
-description: 用户要新建、导入或修改一份技能(做一类事的固定做法)时用:怎么写、怎么查重、怎么存下
+display: Write a skill
+description: Use when the user wants to create, import or change a skill (a fixed way of doing a class of things): how to write it, how to check for duplicates, how to save it
 aliases: ["创建技能", "新建技能", "写个技能", "保存技能", "导入技能", "改技能", "skill"]
 terms: ["技能", "做法", "流程", "步骤", "模板", "以后都这样做", "存成技能", "导入", "改写"]
 ---
-## 什么时候写
+## Entry
 
-- 用户明确要「建一个技能」「把这个做法存下来」「把这段导入成技能」「改一下某个技能」时写。只是聊做法、问能不能做,先回答,不要自己存。
-- 技能写的是一类事以后怎么做,不是一次性的事实或偏好。「我不吃香菜」这类是记忆,不是技能。
-- 能写下技能的只有 `skill_save`。手边没有这个工具时,直接告诉用户这次存不了,不要说已经存好。
+- Write one when the user explicitly asks to "create a skill", "save this way of doing it", "import this as a skill" or "change a skill". If they are only talking about an approach or asking whether something can be done, answer first; do not save anything yourself.
+- A skill records how to do a class of things from now on, not a one-off fact or preference. Something like "I don't eat cilantro" is a memory, not a skill.
+- `skill_save` is the only thing that can write a skill. When this tool is not at hand, tell the user directly that it cannot be saved this time; do not say it has already been saved.
 
-## 先查有没有
+Before writing, check whether one already exists:
 
-1. 用 `skill_search` 按这类事的说法查一次。
-2. 有一份个人技能(personal)就是这类事:用 `skill_read` 读全文,在它的基础上改,存时沿用它的名字、带上读到的 version。不要为同一类事再起一份。
-3. 只有内置技能对得上:内置的改不了。用户要的是不同做法时,另起一个名字写成自己的技能,并告诉用户以后会按哪份来。
+1. Use `skill_search` to search once with the user's wording for this class of things.
+2. If there is already a personal skill for this class of things: read it in full with `skill_read`, change it on that basis, and when saving keep its name and pass the version you read. Do not start another one for the same class of things.
+3. If only a built-in skill matches: built-ins cannot be changed. When the user wants a different approach, start a separate one under a different name as your own skill, and tell the user which one will be followed from now on.
 
-## 先说清再写
+## Steps
 
-用户只给了一句模糊的话(「帮我建个点咖啡的技能」)时,先用 `ask_user` 问清最影响做法的一两点:在哪个 App 或网站、做到哪一步停、有没有固定要求。把要存的要点用几行列给用户确认,再存。用户已经把做法说清楚、或贴来了完整内容,就不用再问。
-
-## 怎么写
-
-整份是一个文档:头部加五个小节,标题照写,全文不超过 4000 字。
+1. When the user gives only one vague sentence ("help me create a skill for ordering coffee"), first use `ask_user` to clarify the one or two points that most affect the approach: which app or site, at which step to stop, and whether there are fixed requirements. List the key points to save in a few lines for the user to confirm, then save. If the user has already spelled out the approach or pasted complete content, there is no need to ask again.
+2. The whole thing is one document: a header plus five sections, with the headings exactly as written, no more than 4000 characters in total.
 
 ```
 ---
 name: order-coffee
-display: 点咖啡
-description: 用户要点一杯咖啡外送或自取时用
-aliases: ["点咖啡", "买杯咖啡"]
+display: Order coffee
+description: Use when the user wants to order a coffee for delivery or pickup
+aliases: ["order coffee", "buy a cup of coffee"]
 ---
-## 入口
-## 步骤
-## 容易出错的地方
-## 怎样算办成
-## 什么时候停下交给用户
+## Entry
+## Steps
+## Common pitfalls
+## How success is verified
+## When to stop and hand off
 ```
 
-- name 用小写英文、数字和连字符,说清是哪类事;display 是简短中文名。
-- description 一句话写「什么时候用」,把用户可能的说法写进 aliases:以后有没有被用上全靠这两处。
-- 入口写从哪儿开始(哪个 App、网站或搜索);步骤写编号的短句,一步一个动作,写按钮、页面的名字,不写坐标。
-- 每次会变的东西(人名、金额、地址、要发的文字)写成 `<参数>` 或「用户指定的联系人」,不写死。
-- 容易出错的地方写会走偏的点和绕过的办法;怎样算办成写办完后在哪儿能看到结果;什么时候停下写需要用户登录、付款、确认或做选择的时刻。
-- 反引号只用来包工具名,App 名、按钮文字不要用反引号。不写密码、验证码、卡号和别人的私人信息。
-- 宁短勿长:模型自己会的不用写,只写这类事特有的做法和坑。
+3. name uses lowercase English letters, digits and hyphens, and makes clear which class of things it is; display is a short name in the user's language.
+4. description writes "when to use" in one sentence, and puts the user's likely wording into aliases: whether it gets used later depends entirely on these two places.
+5. Entry says where to start (which app, site or search); Steps are numbered short sentences, one action per step, naming buttons and pages, not coordinates.
+6. Common pitfalls lists the points where it can go off track and the ways around them; How success is verified says where the result can be seen after finishing; When to stop and hand off lists the moments that need the user to log in, pay, confirm or make a choice.
+7. Prefer short over long: what the model already knows does not need writing; write only the approaches and pitfalls specific to this class of things.
+8. When the user pastes a skill, note or process written elsewhere, rewrite it into the format above: keep the approach itself, remove things irrelevant here (commands for other software, tools that cannot run on a phone, scripts), and fill any sections with missing content with a sentence or two in keeping with the intent. Do not bring accounts, passwords and the like from the original text into it.
+9. Save with `skill_save`: markdown is the whole document, quote copies the user's own words from this task asking you to create or change the skill.
+10. Only an ok result counts as saved. Report back according to the result: what the skill is called, whether it is newly created or an existing one was changed, that it can be seen in "Settings › Memory & skills", and that it will be tried first the next time this class of things comes up.
 
-## 导入用户贴来的内容
+## Common pitfalls
 
-用户贴来一段别处写的技能、笔记或流程时,把它改写成上面的格式:保留做法本身,去掉和这里无关的东西(别的软件的命令、手机上用不了的工具、脚本),内容有缺的小节按原意补一两句。原文里的账号、密码这类东西不要带进来。
+- Things that change each run (names, amounts, addresses, text to send) must be written as `<parameter>` or "the contact the user specifies", never hard-coded.
+- Backticks are only for wrapping tool names; do not use backticks for app names or button text.
+- Never write passwords, verification codes, card numbers or other people's private information, and never carry accounts, passwords and the like over from pasted text.
 
-## 存下和告诉用户
+## How success is verified
 
-1. 用 `skill_save` 存:markdown 是整份文档,quote 抄用户这次要你建或改技能的原话。
-2. 结果 ok 才算存下。照结果告诉用户:技能叫什么、是新建还是改了已有的,在「设置 › 记忆与技能」里能看到,下次遇到这类事会先试用它。
-3. 结果失败时照原因改了再存一次;还是不行就如实说没存上、为什么,不要说已经建好。
-4. 改名、删除这里做不了:请用户在「设置 › 记忆与技能」里删掉旧的;要换名字就按新名字另存一份,再请用户删掉旧的。
+`skill_save` returns ok, and the name in the result is the one being saved; the name and whether it was newly created or changed, as stated in the answer, match the result.
 
-## 怎样算办成
+## When to stop and hand off
 
-`skill_save` 返回 ok,结果里的名字就是要存的那份;回答里说的名字、新建还是修改,和结果一致。
+- If the result is a failure, fix it according to the reason and save once more; if it still fails, truthfully say it was not saved and why; do not say it has been created.
+- Renaming and deleting cannot be done here: ask the user to delete the old one in "Settings › Memory & skills"; to change the name, save a copy under the new name and then ask the user to delete the old one.

@@ -1,31 +1,31 @@
 ---
 name: dedao
-display: 得到
+display: Dedao
 packages: ["com.luojilab.player"]
 aliases: ["得到", "Dedao", "dedao", "得到App"]
 sites: []
 open: 得到
-description: 知识课程、听书、电子书和学习社区
+description: Knowledge courses, audiobooks, e-books and a learning community
 ---
-## 是什么
-得到是知识学习 App,包名 `com.luojilab.player`。有付费课程、听书、电子书、直播和学习社区。
+## What it is
+Dedao is a knowledge learning app, package name `com.luojilab.player`. It has paid courses, audiobooks, e-books, live streams and a learning community.
 
-## 界面
-底部标签:首页、听书看书、知识城邦、学习、最右是个人页(没登录时显示「未登录」)。各标签顶部大多有搜索框,右边有积分、最近学习、消息或设置图标。
-- **首页**:搜索框右边有成长任务/积分换礼、最近学习、消息中心;下面频道:推荐、课程、长谈、AI 学习圈等(有时插着活动频道);推荐页有运营横幅、一排入口(得到榜单、得到课程、听书看书、得到积分、全部分类等)、栏目内容、直播预告。
-- **听书看书**:顶部分我的会员、听书、电子书等;有听书会员开通条、新书上架、名家讲书、镇馆之宝、知识地图、分类入口,下面是每日上新、重磅新书。
-- **知识城邦**:社区动态,分视频、关注、推荐;每条有作者、时间、正文(可「展开」)、转发、评论、点赞、分享。
-- **学习**:自己的学习内容;没登录时只有「登录 / 注册」。
-- **个人页**:头像(点击登录/注册)、学分、今日学习、勋章、证书;「我的账户」(账户余额、卡券、订单、购物车、会员、活动门票、积分);「我的内容」(笔记、最近学习、下载、收藏/清单、订阅通知);邀请好友。右上角齿轮是设置。
+## UI
+Bottom tabs: Home, Listen & Read, Knowledge City, Study, and the profile page at the far right (it shows 「未登录」 (Not signed in) when signed out). Most tabs have a search box at the top, with credits, recent learning, messages or settings icons on the right.
+- **Home**: to the right of the search box are growth tasks / credits-for-gifts, recent learning and the message center; below are channels such as Recommended, Courses, Long talks and the AI learning circle (activity channels are sometimes inserted); the Recommended page has campaign banners, a row of entries (Dedao charts, Dedao courses, Listen & read, Dedao credits, All categories and so on), column content and live stream previews.
+- **Listen & Read**: at the top My membership, Audiobooks, E-books and so on; there is an audiobook membership sign-up bar, new book arrivals, masters explaining books, museum treasures, knowledge maps and category entries, with daily new arrivals and major new books below.
+- **Knowledge City**: community posts, split into Videos, Following and Recommended; each one has the author, time, body text (which can be 「展开」 (expanded)), reposts, comments, likes and shares.
+- **Study**: your own learning content; when signed out it only has 「登录 / 注册」 (Sign in / Sign up).
+- **Profile page**: avatar (tap to sign in/sign up), study credits, today's study, medals, certificates; 「我的账户」 (My account: account balance, cards and coupons, orders, cart, membership, event tickets, credits); 「我的内容」 (My content: notes, recent learning, downloads, favorites/lists, subscription notices); invite friends. The gear at the top right is settings.
 
-## 功能
-- **搜索**:点顶部搜索框进入。有输入框、语音按钮、「取消」;下面是历史搜索(带删除),再是热搜、发现、课程、听书、电子书几个标签的排行。
-- **设置**:帐号/绑定设置、地址管理、安全中心、个人身份认证、隐私设置、后台播放优化、夜间模式、消息通知、一键记笔记、软件升级、添加桌面小组件、版本介绍、清除缓存、关于我们。
+## Features
+- **Search**: tap the search box at the top to enter. There is an input box, a voice button and 「取消」 (Cancel); below are search history (with delete), then rankings under the tabs Hot search, Discover, Courses, Audiobooks and E-books.
+- **Settings**: account/binding settings, address management, security center, personal identity verification, privacy settings, background playback optimization, night mode, message notifications, one-tap note taking, software update, add home screen widget, version notes, clear cache, about us.
 
-## 已知现象
-- 没登录时打开先进手机号登录页(发送验证码、密码登录、微信登录),左上角返回可以跳过,不登录也能浏览。
-- 打开后常弹出整屏活动广告,底下有关闭按钮(资源 ID `close`,没有名字)。
-- 第一次切到某些标签可能出现引导提示(如「最近在学移到这里啦」),挡住点按,先点掉提示再切。
-- 搜索框里的词在轮换,元素名跟着变,按元素点可能报元素已过期,按位置点即可。
-- 顶部右边的图标(积分、最近学习、设置)多数没有名字,只有资源 ID,如设置是 `settingImageView`。
-- 底部标签在元素里看不出哪个被选中,要看画面。
+## Known issues
+- When opened while signed out it first shows the phone-number sign-in page (send verification code, password sign-in, WeChat sign-in); the back arrow at the top left can skip it, and you can browse without signing in.
+- After opening, a full-screen campaign ad often appears, with a close button at the bottom (resource ID `close`, no name).
+- The first time you switch to some tabs a guide tip may appear (such as 「最近在学移到这里啦」, your recent learning moved here), blocking taps; dismiss the tip first, then switch.
+- The words in the search box rotate, and element names change with them, so tapping by element may report that the element has expired; tap by position instead.
+- Most icons on the top right (credits, recent learning, settings) have no name and only a resource ID, such as `settingImageView` for settings.
+- The bottom tabs do not show in the elements which one is selected; look at the screen.

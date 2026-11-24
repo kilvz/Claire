@@ -1,28 +1,28 @@
 ---
 name: 1688.com
 display: 1688
-description: 采购批发平台,提供找货源、找工厂、商品搜索与供应商信息
+description: Procurement and wholesale platform offering supply sourcing, factory finding, product search and supplier information
 domains: ["1688.com", "detail.1688.com", "m.1688.com"]
 aliases: ["1688", "阿里巴巴", "阿里巴巴1688", "阿里1688"]
 apps: ["alibaba-1688"]
 open: 1688.com
 mode: desktop
 ---
-## 是什么
-1688 是面向采购和批发的电商平台,覆盖消费品、工业品等货源。页面既展示商品价格与销量,也展示起订量、供应商、代发和定制等采购信息。
+## What it is
+1688 is an e-commerce platform for procurement and wholesale, covering consumer goods, industrial goods and other supply sources. Pages show product prices and sales as well as procurement information such as minimum order quantity, suppliers, dropshipping and customization.
 
-## 页面与网址
-- 首页:`https://www.1688.com/`,有搜索、以图搜款、精选货源及商品推荐。
-- 商品详情:`https://detail.1688.com/offer/<商品id>.html`。
-- 移动站:`https://m.1688.com/`。
-- 店铺:可使用商家的 `<店铺子域>.1688.com` 地址,与商品详情页是不同页面。
+## Pages and URLs
+- Home page: `https://www.1688.com/`, with search, image search, selected supply sources and product recommendations.
+- Product details: `https://detail.1688.com/offer/<product-id>.html`.
+- Mobile site: `https://m.1688.com/`.
+- Shop: the merchant's `<shop-subdomain>.1688.com` address can be used; it is a different page from the product detail page.
 
-## 功能
-- **搜索**:搜索页可在找货源、找工厂、找供应商、工业品、找服务、找代发等类型间切换。
-- **筛选**:可见综合、销量、价格排序及起订量、地区、经营模式、商家特色等筛选条件;部分搜索支持一件代发、包邮和定制等条件。
-- **以图搜款**:支持上传图片、粘贴图片或图片链接查找相似商品。
-- **商品卡片**:可见标题、价格、销量或成交额、起订量、收藏、供应商名称及找相似入口。
-- **采购服务**:部分商品标有首单优惠、先采后付、退货保障或响应时间等信息。
+## Features
+- **Search**: the search page can switch between types such as supply sourcing, factory finding, supplier finding, industrial goods, service finding and dropshipping finding.
+- **Filtering**: you can see relevance, sales and price sorting and filters such as minimum order quantity, region, business model and merchant features; some searches support conditions such as one-piece dropshipping, free shipping and customization.
+- **Image search**: supports uploading an image, pasting an image or an image link to find similar products.
+- **Product cards**: you can see the title, price, sales or transaction amount, minimum order quantity, favorites, supplier name and a find-similar entry.
+- **Procurement services**: some products are marked with information such as first-order discounts, buy-now-pay-later, return guarantees or response times.
 
-## 已知现象
-同一关键词可以查商品,也可以查工厂或供应商,结果类型不同。商品价格常与规格和采购数量相关;首页推荐及促销信息会变化。
+## Known issues
+The same keyword can search products, factories or suppliers, with different result types. Product prices are often related to specifications and purchase quantity; home page recommendations and promotions change.

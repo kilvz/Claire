@@ -1,19 +1,19 @@
 ---
 name: bilibili
-display: 哔哩哔哩
+display: Bilibili
 packages: ["tv.danmaku.bili"]
 aliases: ["B站", "哔哩哔哩", "bilibili", "b站"]
 sites: ["bilibili.com"]
 open: 哔哩哔哩
-description: 视频社区 App,看视频、评论和实测内容
+description: Video community app for watching videos, comments and hands-on content
 ---
-## 是什么
-哔哩哔哩,包名 `tv.danmaku.bili`。网站是 bilibili.com。
+## What it is
+Bilibili, package name `tv.danmaku.bili`. The website is bilibili.com.
 
-## 界面
-首页有推荐流和搜索框,底部有首页、动态、我的等标签。视频页有播放器、简介和评论区。
+## UI
+The home page has a recommendation feed and a search box, and the bottom has tabs such as Home, Dynamics and Me. A video page has a player, a description and a comment section.
 
-## 功能
-- **搜索视频**:得到视频链接、标题、发布日期。数码类拆机、横评、长期使用的内容较多,白电、家居、母婴相对少。
-- **视频简介**:视频页的正文说明,不含评论区。
-- **评论**:能看到作者、正文、点赞数、楼中楼回复数、日期、是否置顶和评论总数。读到的通常是排在前面的一批,不是全部。
+## Features
+- **Searching videos**: returns video links, titles and publish dates. There is more teardown, comparison and long-term-use content for gadgets, and relatively less for large home appliances, home furnishing and baby products.
+- **Video description**: the body text on the video page, excluding the comment section.
+- **Comments**: shows the author, text, like count, number of nested replies, date, whether pinned and the total comment count. What you read is usually the batch at the top, not all of it.

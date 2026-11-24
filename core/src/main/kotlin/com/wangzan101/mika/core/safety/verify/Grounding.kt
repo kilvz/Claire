@@ -28,7 +28,7 @@ package com.wangzan101.mika.core.safety.verify
  */
 internal object Grounding {
     private val QUOTED = Regex("「([^」]*)」|『([^』]*)』|“([^”]*)”|\"([^\"]*)\"|‘([^’]*)’")
-    private val EVIDENCE = Regex("依据\\**\\s*[:：]")
+    private val EVIDENCE = Regex("(?:依据|Basis|Sources)\\**\\s*[:：]", RegexOption.IGNORE_CASE)
     /**
      * A magnitude word after a number (hundred-million / ten-thousand / thousand) is a magnitude (only whitespace may come
      * between — apps often lay it out as "1561" plus the magnitude word; with punctuation in between it is not one); the
@@ -74,7 +74,7 @@ internal object Grounding {
     )
     private val FOOTNOTE = Regex("\\[\\^?\\d{1,3}]|【\\d{1,3}】")
     private val MAGNITUDE = mapOf("亿" to 8, "万" to 4, "千" to 3)
-    const val APP_HEADER = "当前 App:"
+    const val APP_HEADER = "Current app:"
     /** Text fragments in the basis that are too short would coincidentally match any screen ("on screen", "settings"), so they do not count. */
     private const val MIN_FRAGMENT = 4
     /** For an on-screen line to count as appearing in the basis, the line needs at least this many characters. */

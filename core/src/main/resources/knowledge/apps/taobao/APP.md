@@ -1,25 +1,25 @@
 ---
 name: taobao
-display: 淘宝
+display: Taobao
 packages: ["com.taobao.taobao"]
 aliases: ["淘宝", "Taobao", "手机淘宝"]
 sites: ["taobao.com"]
 open: 淘宝
-description: 商品搜索、店铺、购物车、订单与物流的购物 App
+description: Shopping app for product search, shops, cart, orders and logistics
 ---
-## 是什么
-阿里巴巴旗下的购物 App,安卓包名 `com.taobao.taobao`。商品来自淘宝店铺和天猫店铺,账号下有购物车、收藏、订单、地址和优惠券。
+## What it is
+A shopping app under Alibaba, Android package name `com.taobao.taobao`. Products come from Taobao shops and Tmall shops, and the account has a cart, favorites, orders, addresses and coupons.
 
-## 界面
-首页顶部是搜索框,下面是分类入口、推荐信息流;底部标签通常有首页、逛逛、消息、购物车、我的淘宝。搜索结果页顶部可切换综合、销量、价格等排序,也能按价格区间、发货地等筛选。
+## UI
+At the top of the home page is a search box, below it are category entries and a recommendation feed; the bottom tabs are usually 首页 (Home), 逛逛 (Browse), 消息 (Messages), 购物车 (Cart) and 我的淘宝 (My Taobao). On the search results page you can switch at the top between sorting by 综合 (Relevance), 销量 (Sales) and 价格 (Price), and also filter by price range, shipping location and so on.
 
-## 功能
-- **搜索商品**:首页搜索框输入关键词,结果页显示商品图、标题、价格、销量、店铺名和发货地。
-- **商品详情**:点进商品后有规格选择、价格、评价数、店铺入口、「加入购物车」和「立即购买」。
-- **购物车**:底部「购物车」按店铺分组,可勾选商品、改数量、看合计金额,结算时选地址。
-- **订单**:「我的淘宝」里的「我的订单」按待付款、待发货、待收货、待评价分组;详情页有订单号、金额、物流单号和收货地址。
-- **物流**:订单详情里的「查看物流」显示承运公司、运单号和逐条轨迹。
-- **收藏**:商品和店铺可以分别收藏,在「我的淘宝」里分两个入口。
+## Features
+- **Searching products**: enter keywords in the home page search box; the results page shows product images, titles, prices, sales, shop names and shipping locations.
+- **Product details**: after tapping into a product there are spec selection, price, number of reviews, a shop entry, 「加入购物车」 (Add to cart) and 「立即购买」 (Buy now).
+- **Cart**: the bottom 「购物车」 (Cart) is grouped by shop; you can check products, change quantities, see the total amount, and choose an address at checkout.
+- **Orders**: 「我的订单」 (My orders) in 「我的淘宝」 (My Taobao) is grouped into 待付款 (Pending payment), 待发货 (Pending shipment), 待收货 (Pending receipt) and 待评价 (Pending review); the detail page has the order number, amount, tracking number and shipping address.
+- **Logistics**: 「查看物流」 (View logistics) in the order details shows the carrier, waybill number and each tracking event.
+- **Favorites**: products and shops can be favorited separately, with two entries in 「我的淘宝」.
 
-## 已知现象
-同名商品会有很多不同店铺的链接,价格差别大。首页信息流里的商品卡片和搜索结果卡片样式接近,但点进去的路径不同。购物车里失效的商品会自动归到一组,不参与合计。
+## Known issues
+Products with the same name have links from many different shops, with large price differences. Product cards in the home feed and search result cards look similar, but lead to different paths when tapped. Invalid products in the cart are automatically grouped together and are not included in the total.

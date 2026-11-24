@@ -1,25 +1,25 @@
 ---
 name: meituan-waimai
-display: 美团外卖
+display: Meituan Waimai
 packages: ["com.sankuai.meituan.takeoutnew"]
 aliases: ["美团外卖", "Meituan Waimai", "美团外卖App"]
 sites: ["meituan.com"]
 open: 美团外卖
-description: 外卖搜索、附近商家、优惠、订单与自取服务
+description: Food delivery search, nearby merchants, deals, orders and self-pickup
 ---
-## 是什么
-美团外卖是独立的外卖 App,安卓包名 `com.sankuai.meituan.takeoutnew`,与美团 App 内的外卖频道不同,提供餐饮、商超、药品等配送及自取服务。
+## What it is
+Meituan Waimai is a standalone food delivery app, Android package name `com.sankuai.meituan.takeoutnew`. Unlike the food delivery channel inside the Meituan app, it offers delivery and self-pickup for food, groceries, medicine and more.
 
-## 界面
-首页顶部可切换首页和自取,显示当前位置及搜索框。分类网格包含美食、甜点饮品、超市便利、蔬菜水果、看病买药、晚餐、拼好饭、秒杀、天天津贴和跑腿等。下部有优惠活动、特价外卖和附近商家列表;底部通常是首页、神券、订单、我的。
+## UI
+The top of the home page switches between Home and Self-pickup and shows the current location and a search box. The category grid includes Food, Desserts & drinks, Supermarkets & convenience, Vegetables & fruit, Doctor visits & medicine, Dinner, Pinhaofan, Flash sales, Daily subsidies and Errands. Below are promotional activities, special-price takeout and a list of nearby merchants; the bottom is usually Home, Coupons, Orders and Me.
 
-## 功能
-- **搜索**:按商家、菜品或品类搜索,结果随当前位置变化。
-- **自取**:顶部「自取」切换到自取内容,与首页配送商家列表不同。
-- **附近商家**:商家卡片可显示月售、评分、距离、预计时间、起送价、配送费、配送方式及优惠。
-- **分类服务**:除餐饮外,还可进入超市、蔬果、买药和跑腿等业务。
-- **优惠活动**:神券、拼好饭、秒杀及商家满减等入口分别展示相应活动。
-- **订单**:底部订单入口集中查看外卖订单。
+## Features
+- **Search**: search by merchant, dish or category, and results change with the current location.
+- **Self-pickup**: 「自取」 (Self-pickup) at the top switches to self-pickup content, which differs from the delivery merchant list on the home page.
+- **Nearby merchants**: merchant cards can show monthly sales, rating, distance, estimated time, minimum order price, delivery fee, delivery type and offers.
+- **Category services**: besides food, you can also enter businesses such as supermarkets, fruit and vegetables, medicine and errands.
+- **Promotions**: entries such as coupons, Pinhaofan, flash sales and merchant spend-and-save offers each show the corresponding campaign.
+- **Orders**: the Orders entry at the bottom shows all food delivery orders together.
 
-## 已知现象
-首页默认是配送内容,「自取」在顶部而非底部标签。商家是否营业、配送范围、起送价、配送费、预计时间和优惠均随地址及时段变化;同一商家的月售和评分也可能变化。
+## Known issues
+The home page defaults to delivery content, and 「自取」 (Self-pickup) is at the top rather than in the bottom tabs. Whether a merchant is open, the delivery range, minimum order price, delivery fee, estimated time and offers all change with the address and time of day; the same merchant's monthly sales and rating can change too.

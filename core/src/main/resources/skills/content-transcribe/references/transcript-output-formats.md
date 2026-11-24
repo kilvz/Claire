@@ -1,47 +1,47 @@
-# 几种整理结果的写法
+# How to write the various kinds of results
 
-时间一律写成「分:秒」,超过一小时写「时:分:秒」。估出来的时间前面加「约」。
+Always write times as "minutes:seconds", and as "hours:minutes:seconds" beyond one hour. Put "approx." before estimated times.
 
-## 摘要
+## Summary
 
-五到十句,第三人称、现在时,讲清这期内容的主题、主要论点和结论。不加评价。
+Five to ten sentences, third person, present tense, making clear the topic, main arguments and conclusion of this piece of content. Add no evaluation.
 
-## 章节目录
+## Chapter list
 
-每行一个时间加一个短标题,标题不超过十五个字:
-
-```
-00:00 开场与话题
-03:40 为什么会有这个问题
-09:15 两种做法的对比
-21:30 实际数据
-35:05 听众提问
-```
-
-## 分章节摘要
-
-章节标题后面括号写这一章大约多长,下面两三句写这一章实际讲了什么:
+One time plus a short title per line, with the title no longer than fifteen characters:
 
 ```
-### 03:40 为什么会有这个问题(约 5 分钟)
-主讲人回顾了这个问题的由来,举了两个常见的例子。
-
-### 09:15 两种做法的对比(约 12 分钟)
-比较了做法甲和做法乙的成本和效果,结论是……
+00:00 Opening and topic
+03:40 Why this problem exists
+09:15 Comparison of the two approaches
+21:30 Actual data
+35:05 Listener questions
 ```
 
-## 引文
+## Chapter-by-chapter summary
 
-原话照录,后面写出现的时间;是字幕原文还是翻译,要注明:
+After the chapter title, write in parentheses roughly how long the chapter is, and below it two or three sentences on what the chapter actually covers:
 
 ```
-「先把数据弄干净,比换模型更重要。」—— 12:18
+### 03:40 Why this problem exists (about 5 minutes)
+The speaker reviewed the origin of this problem and gave two common examples.
+
+### 09:15 Comparison of the two approaches (about 12 minutes)
+Compared the cost and effect of approach A and approach B, and the conclusion is...
 ```
 
-## 改写成文章
+## Quotes
 
-- 一个标题
-- 一段开头,说这是根据哪一期内容整理的
-- 每个主要话题一个小标题,下面成段叙述
-- 关键原话用引文格式,带时间
-- 结尾一段:要点或可以照着做的建议
+Record the original words verbatim, followed by the time they appear; note whether it is the subtitle original or a translation:
+
+```
+"Clean the data first; that matters more than changing the model." —— 12:18
+```
+
+## Rewriting into an article
+
+- One title
+- An opening paragraph saying which episode of content this is compiled from
+- A subheading for each main topic, with narrative paragraphs below it
+- Key original words in quote format, with times
+- A closing paragraph: the key points, or advice that can be followed

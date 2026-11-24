@@ -22,8 +22,8 @@ object DecisionPolicy {
 
 /** Fixed messages only: provider replies and transport exceptions can contain request content or keys. */
 sealed class DecisionError(message: String) : Exception(message) {
-    class InvalidRequest : DecisionError("决策请求配置无效")
-    class InvalidResponse : DecisionError("决策模型返回了无效的选择或概率")
-    class Network : DecisionError("决策模型网络连接失败或请求超时")
-    class Http(val status: Int) : DecisionError("决策模型请求失败(HTTP $status)")
+    class InvalidRequest : DecisionError("The decision request is misconfigured")
+    class InvalidResponse : DecisionError("The decision model returned an invalid choice or probability")
+    class Network : DecisionError("The decision model's network connection failed or the request timed out")
+    class Http(val status: Int) : DecisionError("The decision model request failed (HTTP $status)")
 }

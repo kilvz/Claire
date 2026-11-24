@@ -1,31 +1,31 @@
 ---
 name: douyin.com
-display: 抖音
-description: 抖音网页直播间的商品、价格接口与福袋；手机端商城入口
+display: Douyin
+description: Products, price APIs and lucky bags in Douyin web live rooms; mall entry on the mobile app
 domains: ["douyin.com", "jinritemai.com"]
 aliases: ["抖音", "抖音商城", "抖音电商", "douyin", "douyinshop"]
 apps: ["douyin"]
 open: douyin.com
 mode: desktop
 ---
-## 是什么
-短视频平台，同时有商城和直播带货。短视频、商城、直播是三块不同的功能。手机上对应抖音 App，网页直播在 `live.douyin.com`，电商的商品和店铺在 `jinritemai.com`。
+## What it is
+A short video platform that also has a mall and live-stream commerce. Short videos, the mall and live streaming are three different functions. On mobile the counterpart is the Douyin app; web live streams are at `live.douyin.com`, and e-commerce products and shops are at `jinritemai.com`.
 
-## 页面与网址
-网页直播间在 `live.douyin.com` 下。
+## Pages and URLs
+Web live rooms are under `live.douyin.com`.
 
-## 功能
-- **直播间商品**：商品数据通过接口返回，页面上的讲解卡并不一直显示。
-  - 换品时出现 `promotions/pop` 响应；完整商品表在 `promotions/page` 响应里，点直播间页面上的「全部商品」会刷新它。点单个商品卡会离开直播间。
-  - 每件商品有两个 id：`promotion_id` 是这一场里某次上架的编号，`product_id` 是商品本身。同一件商品可能反复上下架。
-  - 价格字段 `min_price` 的单位是分；值为 -1、0 或字段缺失都表示没给价格，不是 0 元。同一商品在 pop 和 page 响应里的价格可能不同。
-  - 商品链接以响应里给出的跳转地址为准。
-- **直播间福袋**：需登录。
-  - 福袋挂件在播放器左上角，只显示倒计时，没有「福袋」字样；倒计时不停重绘，挂件位置会变，需按页面结构定位。
-  - 福袋详情接口只在进入直播间时请求一次，刷新页面不会再发；福袋的出现和开奖是直播间推送的。
-  - 参与条件是否已满足，看响应里用户自己的状态，条件项自带的 `status` 字段不表示完成与否。口令条件的口令在响应里，以原文为准。部分条件要花钻石。
-  - 开奖结果只在开奖那一刻显示在页面上，事后查不到。
+## Features
+- **Live room products**: product data is returned through APIs, and the explanation cards on the page are not always shown.
+  - A `promotions/pop` response appears when the product changes; the complete product table is in the `promotions/page` response, which is refreshed by tapping 「全部商品」 (All products) on the live room page. Tapping a single product card leaves the live room.
+  - Each product has two ids: `promotion_id` is the number of a particular listing in this session, and `product_id` is the product itself. The same product may be listed and delisted repeatedly.
+  - The unit of the price field `min_price` is cents; a value of -1, 0 or a missing field all mean no price was given, not 0 yuan. The price of the same product may differ between the pop and page responses.
+  - The product link is subject to the redirect address given in the response.
+- **Live room lucky bags**: requires login.
+  - The lucky bag widget is in the top left of the player and only shows a countdown, without the word 「福袋」 (Lucky bag); the countdown is constantly repainting, the widget position changes, and it needs to be located by page structure.
+  - The lucky bag detail API is requested only once when entering the live room and is not sent again when the page is refreshed; the appearance and drawing of lucky bags are pushed by the live room.
+  - Whether the participation conditions have been met depends on the user's own state in the response; the `status` field that comes with a condition item does not indicate completion. The password for a password condition is in the response, and the original text prevails. Some conditions cost diamonds.
+  - The draw result is shown on the page only at the moment of the draw and cannot be looked up afterwards.
 
-## 已知现象
-- 接口返回空，可能是风控，也可能是还没抓到，不等于直播间没有商品。
-- 画面上的商品序号不能单独用来认商品；画面模糊或被遮挡时，序号容易对错。
+## Known issues
+- An empty API response may be risk control or may mean it has not been captured yet; it does not mean the live room has no products.
+- The product serial number on the screen cannot be used alone to identify a product; when the screen is blurry or occluded, the serial number is easily mismatched.

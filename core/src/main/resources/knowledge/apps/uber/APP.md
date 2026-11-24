@@ -5,20 +5,20 @@ packages: ["com.ubercab"]
 aliases: ["Uber", "优步", "uber"]
 sites: []
 open: Uber
-description: 车型、价格与行程
+description: Ride types, prices and trips
 ---
-## 是什么
-Uber 是打车 App,包名 `com.ubercab`。
+## What it is
+Uber is a ride-hailing app, package name `com.ubercab`.
 
-## 界面
-底部入口有 Home、Services、Activity、Account。Home 里的「Where to?」填行程;Later 等入口用来预约指定时间的行程。
+## UI
+The bottom entries are Home, Services, Activity and Account. 「Where to?」 on Home fills in the trip; entries such as Later are used to book a trip for a specified time.
 
-## 功能
-- **估价**:填上车点和目的地后得到车型列表,有车型名、原币种的估价、预计到达时间、容量、动态加价。价格通常需要登录才显示。
-- **行程**:Activity 里是历史和当前行程;已叫车的行程能看到司机、车牌和到达时间。
+## Features
+- **Fare estimates**: after filling in the pickup point and destination you get the list of ride types, with ride type name, fare estimate in the local currency, estimated arrival time, capacity and surge pricing. Prices usually require logging in to display.
+- **Trips**: Activity has historical and current trips; for a trip already booked you can see the driver, license plate and arrival time.
 
-## 已知现象
-- 默认上车点是设备 GPS,但可以改成别的城市的地址,界面上有「Search another city」入口。
-- 地址输入框有清除按钮 X;输入后从建议列表里选择匹配项。
-- 机场地址会追问 Which airline 等,有 Skip 可以跳过。
-- 输入框的内容可能在输入过程中变化,输入后需要重新读一遍。
+## Known issues
+- The default pickup point is the device GPS, but it can be changed to an address in another city; the interface has a 「Search another city」 entry.
+- The address input box has a clear button X; after typing, choose the matching item from the suggestion list.
+- For airport addresses it asks follow-up questions such as Which airline, and there is Skip to skip.
+- The content of the input box may change while typing; after typing you need to read it again.

@@ -5,28 +5,28 @@ packages: ["com.google.android.calendar"]
 aliases: ["Google Calendar", "Google 日历", "谷歌日历", "日历"]
 sites: ["calendar.google.com"]
 open: Google Calendar
-description: 日程安排与时间管理:事件创建、多视图切换与提醒
+description: Scheduling and time management with event creation, multi-view switching and reminders
 ---
-## 是什么
-Google Calendar 是谷歌官方日程与时间管理 App,包名 `com.google.android.calendar`。网站知识见 `calendar.google.com`。支持在手机上建立日程事件、待办任务与查看日程安排。
+## What it is
+Google Calendar is Google's official scheduling and time management app, package name `com.google.android.calendar`. For website knowledge see `calendar.google.com`. It supports creating calendar events and to-do tasks on the phone and viewing your schedule.
 
-## 界面
-顶部栏左侧是汉堡侧边栏菜单,中间是当前月份标题(点击展开月历快速跳转日期),右侧包含回到「今天」按钮(带有当日日期的日历图标)、搜索放大镜和账号头像。
-- **侧边抽屉**:可切换主要视图:「日程 (Schedule 连续流)」「日 (Day)」「3天 (3 Days)」「周 (Week)」「月 (Month)」;下方列出各 Google 账号及其名下的子日历(个人事件、工作、任务 Tasks、生日、公共节假日)的多选复选框。
-- **悬浮创建按钮 (+)**:右下角彩色的「+」按钮,点击后弹出「事件 (Event)」「任务 (Task)」选项。
-- **事件详情页**:点击任意日程块滑出全屏页,展示标题、起止时间段、地点、Google Meet 会议链接、参与者列表(含回复状态:已接受/待定/已拒绝)及详细备忘。顶部有铅笔编辑图标和三点删除菜单。
+## UI
+The left of the top bar is the hamburger side menu, the middle is the current month title (tap to expand the month calendar and jump to a date), and the right has a back-to-today button (a calendar icon carrying today's date), a search magnifier and the account avatar.
+- **Side drawer**: switches the main views: 「日程 (Schedule, continuous flow)」, 「日 (Day)」, 「3天 (3 Days)」, 「周 (Week)」, 「月 (Month)」; below it lists each Google account and the sub-calendars under it (personal events, work, Tasks, birthdays, public holidays) with multi-select checkboxes.
+- **Floating create button (+)**: the colored 「+」 button at the bottom right; tapping it pops up the options 「事件 (Event)」 and 「任务 (Task)」.
+- **Event detail page**: tapping any schedule block slides out a full-screen page showing the title, start and end times, location, Google Meet link, attendee list (with response status: accepted/tentative/declined) and detailed notes. The top has a pencil edit icon and a three-dot delete menu.
 
-## 功能
-- **切换视图查看日程**:
-  - 查找某一天的日程安排,建议在侧边栏切至「日」或「日程 (Schedule)」视图,按时间轴纵向滚动阅读事件详情与冲突时段。
-- **创建新事件**:
-  - 点击右下角「+」选「事件」,在顶部输入日程标题。
-  - **时间设定**:默认不是全天事件。若为特定时刻日程,点击开始与结束时间滚轮精确调整;若为全天事务,开启「全天 (All-day)」开关。
-  - **添加地点与通知**:在「添加位置」键入地址,在「添加通知」设定提前 10 分钟或 1 天推送提醒。
-  - 点击右上角「保存 (Save)」完成创建。
-- **删除与修改重复事件**:
-  - 点击事件卡片进入,点右上角三点菜单选「删除」。若为周期性重复日程,系统会弹出确认框:「仅此活动 (This event only)」「此活动及后续所有活动」「所有活动」,需按任务指令准确选定。
+## Features
+- **Switching views to look at the schedule**:
+  - To find the schedule for a particular day, it is recommended to switch the sidebar to the 「日」 (Day) or 「日程 (Schedule)」 view and scroll along the timeline to read event details and conflicting time slots.
+- **Creating a new event**:
+  - Tap 「+」 at the bottom right and choose 「事件」 (Event), then type the event title at the top.
+  - **Setting the time**: the default is not an all-day event. For an event at a specific time, tap the start and end time wheels to adjust them precisely; for an all-day matter, turn on the 「全天 (All-day)」 switch.
+  - **Adding a location and notifications**: type the address under 「添加位置」 (Add location), and set a reminder 10 minutes or 1 day ahead under 「添加通知」 (Add notification).
+  - Tap 「保存 (Save)」 at the top right to finish creating the event.
+- **Deleting and editing repeating events**:
+  - Tap an event card to enter it, then choose 「删除」 (Delete) from the three-dot menu at the top right. For a recurring event, the system pops up a confirmation box: 「仅此活动 (This event only)」, 「此活动及后续所有活动」 (This and all following events) and 「所有活动」 (All events), and you need to pick exactly what the task instruction says.
 
-## 已知现象
-- **多账号与隐藏日历**:若手机登录了多个 Google 账号,事件可能归属于不同的工作或私人日历。若在主视图未看到某个预定日程,先展开侧边抽屉确保目标日历勾选处于激活显示状态。
-- **权限拦截**:首次使用可能申请「日历读取与写入」系统权限。
+## Known issues
+- **Multiple accounts and hidden calendars**: if several Google accounts are signed in on the phone, events may belong to different work or personal calendars. If a scheduled event is not visible in the main view, expand the side drawer first and make sure the target calendar is checked and shown.
+- **Permission prompts**: the first use may request the 「日历读取与写入」 (calendar read and write) system permission.

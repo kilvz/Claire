@@ -95,7 +95,7 @@ class RouteMatcher(
                 onDecision("fallback")
             }
         }
-        val text = list.withIndex().joinToString("\n", "用户原话:$goal\n\n做法模板:\n") { (i, r) -> "${i + 1}. ${r.template}" }
+        val text = list.withIndex().joinToString("\n", "The user said: $goal\n\nApproach templates:\n") { (i, r) -> "${i + 1}. ${r.template}" }
         val reply = try {
             withTimeoutOrNull(TIMEOUT_MS) { model.complete(PROMPT, listOf(Message(Role.User, listOf(Part.Text(text)), Author.Mika)), emptyList()) } ?: return null
         } catch (e: CancellationException) {

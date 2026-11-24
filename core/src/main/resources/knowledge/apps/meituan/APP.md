@@ -1,24 +1,24 @@
 ---
 name: meituan
-display: 美团
+display: Meituan
 packages: ["com.sankuai.meituan"]
 aliases: ["美团", "Meituan"]
 sites: ["meituan.com"]
 open: 美团
-description: 外卖、到店团购、酒店旅行与本地生活服务
+description: Food delivery, in-store group deals, hotels and travel, and other local-life services
 ---
-## 是什么
-美团旗下的本地生活服务 App,安卓包名 `com.sankuai.meituan`。首页按外卖、到店、酒店旅行、电影、买药等业务分频道,账号下有订单、地址、优惠券和会员信息。
+## What it is
+The local-life services app under Meituan, Android package name `com.sankuai.meituan`. The home page splits into channels such as food delivery, in-store, hotels and travel, movies and medicine, and the account holds orders, addresses, coupons and membership information.
 
-## 界面
-首页顶部是城市与搜索框,中间是外卖、美食、酒店、电影等业务入口,下面是推荐信息流;底部标签通常有首页、订单、我的。外卖频道里是商家列表,点进商家后是菜单页和购物车。
+## UI
+The top of the home page is the city and search box, the middle has service entries such as food delivery, food, hotels and movies, and below is a recommended feed; the bottom tabs are usually Home, Orders and Me. The food delivery channel shows a merchant list, and tapping a merchant opens the menu page and the cart.
 
-## 功能
-- **外卖**:外卖频道按距离、评分、销量排商家;商家页有菜单、起送价、配送费、预计送达时间和满减信息。
-- **订单**:底部「订单」里外卖订单和到店团购订单分开列;外卖订单详情有订单号、菜品、实付款、配送地址和骑手信息。
-- **团购与到店**:商家页里的套餐和代金券,购买后生成券码,在「订单」里按待使用、已使用分组。
-- **酒店旅行**:频道里按城市、日期、位置搜酒店,列表显示价格、评分和房型。
-- **搜索**:首页搜索框可搜商家名、菜品名和品类。
+## Features
+- **Food delivery**: the food delivery channel ranks merchants by distance, rating and sales volume; the merchant page has the menu, minimum order price, delivery fee, estimated delivery time and spend-and-save offers.
+- **Orders**: in 「订单」 (Orders) at the bottom, food delivery orders and in-store group deal orders are listed separately; a food delivery order's details have the order number, dishes, actual payment, delivery address and rider information.
+- **Group deals and in-store**: package deals and vouchers on merchant pages generate a voucher code after purchase, grouped into unused and used under 「订单」 (Orders).
+- **Hotels and travel**: the channel searches hotels by city, date and location, and the list shows the price, rating and room types.
+- **Search**: the home page search box can search merchant names, dish names and categories.
 
-## 已知现象
-首页网格里的「外卖」和底部或频道页的「外卖」可能是不同路径。外卖商家页的配送费和预计送达时间会随地址变化。同一商家在团购和外卖里是两套订单,不会出现在同一列表。
+## Known issues
+「外卖」 (food delivery) in the home page grid and 「外卖」 on the bottom or channel page may be different paths. On a food delivery merchant page, the delivery fee and estimated delivery time change with the address. The same merchant has two sets of orders, group deals and food delivery, which never appear in the same list.

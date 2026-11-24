@@ -9,7 +9,7 @@ object ScreenMapRender {
     /** Which screen you are on now; an empty string when it cannot be recognized. */
     fun renderPosition(graph: ScreenGraph, currentId: String?): String {
         val node = currentId?.let { graph.nodes[it] } ?: return ""
-        return "你现在在「${label(node)}」屏"
+        return "You are now on the \"${label(node)}\" screen"
     }
 
     /**
@@ -33,17 +33,17 @@ object ScreenMapRender {
         if (graph.nodes.isEmpty()) return ""
         val lines = mutableListOf<String>()
         val all = graph.nodes.values.sortedBy { label(it) }
-        lines.add("屏（${all.size}）：" + all.take(maxScreens).joinToString(" / ") { label(it) })
+        lines.add("Screens (${all.size}): " + all.take(maxScreens).joinToString(" / ") { label(it) })
         val cur = currentId?.let { graph.nodes[it] }
         if (cur != null) {
-            lines.add("现在在「${label(cur)}」屏")
+            lines.add("Currently on the \"${label(cur)}\" screen")
             val outs = cur.transitions.values.filter { it.to != null && it.to != currentId }
             if (outs.isNotEmpty()) {
-                lines.add("从这屏可走：")
+                lines.add("Reachable from here:")
                 outs.forEach { t ->
                     val toLabel = t.to?.let { graph.nodes[it]?.let(::label) } ?: t.to.orEmpty()
                     val what = t.target ?: t.action
-                    lines.add("  点「$what」→ $toLabel")
+                    lines.add("  Tap \"$what\" → $toLabel")
                 }
             }
         }

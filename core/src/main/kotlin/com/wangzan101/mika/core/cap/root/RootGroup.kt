@@ -90,7 +90,7 @@ internal object RootRunCommand : AgentTool {
             put("stdout", Untrusted.wrap(out)); put("stderr", Untrusted.wrap(err))
             if (r.droppedBytes > 0) put("droppedBytes", r.droppedBytes)
             if (hints.isNotEmpty()) put("hint", hints.joinToString(" "))
-        }, observations = listOf(Observation(ObsKind.Output, "退出码 ${r.exitCode}:\n$out", source = ROOT,
+        }, observations = listOf(Observation(ObsKind.Output, "Exit code ${r.exitCode}:\n$out", source = ROOT,
             place = Place.command("root_run_command「${command.take(200)}」"), trust = Trust.Untrusted, authored = command)))
     }
 

@@ -1,24 +1,24 @@
 ---
 name: alibaba-1688
-display: 阿里巴巴
+display: Alibaba
 packages: ["com.alibaba.wireless"]
 aliases: ["1688", "阿里巴巴", "阿里巴巴1688", "阿里1688"]
 sites: ["1688.com"]
 open: 阿里巴巴
-description: 采购批发、找货源、找工厂、供应商与一件代发
+description: Wholesale procurement, finding product sources, factories, suppliers and one-piece dropshipping
 ---
-## 是什么
-阿里巴巴 App 是 1688 的移动端,安卓包名 `com.alibaba.wireless`,用于采购批发、查找商品货源、工厂及供应商。
+## What it is
+The Alibaba app is the mobile version of 1688, Android package name `com.alibaba.wireless`; it is used for wholesale purchasing, finding product sources, factories and suppliers.
 
-## 界面
-未登录启动时可能直接进入登录页,页面提供淘宝快速登录和服务协议勾选项。首次启动还可能出现系统通知权限弹窗,登录页后方可能仍有其他系统提示。
+## UI
+When launched while signed out it may go straight to the sign-in page, which offers quick sign-in through Taobao and a checkbox for the service agreement. The first launch may also show a system notification permission dialog, and other system prompts may still sit behind the sign-in page.
 
-## 功能
-- **找货源**:按商品关键词浏览采购商品,结果包含价格、销量、起订量及供应商等信息。
-- **找工厂与供应商**:搜索类型可区分商品、工厂及供应商,工厂或商家页面与单个商品详情不同。
-- **筛选**:采购结果可按价格、销量、起订量、地区、经营模式及商家特色等条件筛选。
-- **以图搜款**:通过图片查找相同或相似货源。
-- **代发与定制**:部分商品或供应商支持一件代发、定制及采购服务,具体标识取决于商品。
+## Features
+- **Finding sources**: browse wholesale products by product keyword; results include price, sales volume, minimum order quantity and supplier information.
+- **Finding factories and suppliers**: the search type can distinguish products, factories and suppliers; factory or seller pages differ from a single product's detail page.
+- **Filtering**: procurement results can be filtered by price, sales volume, minimum order quantity, region, business model and seller features.
+- **Image search**: find the same or similar sources through a picture.
+- **Dropshipping and customization**: some products or suppliers support one-piece dropshipping, customization and procurement services; the exact badges depend on the product.
 
-## 已知现象
-设备上的应用名是「阿里巴巴」,1688 是其网站和常见叫法。启动登录页不等于所有公开货源都无法浏览;登录、通知权限和推荐活动可能叠加出现。商品价格常与采购数量及规格相关。
+## Known issues
+The app's name on the device is 「阿里巴巴」 (Alibaba), and 1688 is its website and common name. Landing on the sign-in page does not mean that no public source can be browsed; sign-in, notification permission and promotional activities can appear on top of each other. Product prices are often tied to purchase quantity and specification.

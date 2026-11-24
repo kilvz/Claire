@@ -5,30 +5,30 @@ packages: ["com.zhiliaoapp.musically"]
 aliases: ["TikTok", "tiktok", "抖音海外版"]
 open: TikTok
 pace: careful
-description: 短视频与直播社交:推荐信息流、创作、搜索与私信
+description: Short video and live-streaming social app: recommendation feed, creation, search and private messages
 ---
-## 是什么
-TikTok 是全球流行的短视频与直播社交 App,包名 `com.zhiliaoapp.musically`。为国内抖音的国际化对应应用。具有严格的自动化风控检测,浏览操作需保持适度节奏(`pace: careful`)。
+## What it is
+TikTok is a globally popular short video and live-streaming social app, package name `com.zhiliaoapp.musically`. It is the international counterpart of Douyin in China. It has strict automated risk-control detection, so browsing operations need to keep a moderate pace (`pace: careful`).
 
-## 界面
-底部导航包含五个标签:「首页 (Home)」「朋友 (Friends)」「+ (创作发布)」「收件箱 (Inbox)」「个人资料 (Profile)」。
-- **首页 (Home)**:顶部中间可切换「为你推荐 (For You)」「正在关注 (Following)」「朋友 (Friends)」「直播 (LIVE)」;右上角为搜索放大镜。主体为单列全屏纵向滑动的短视频。
-- **右侧互动工具列**:自上而下排列发布者头像(带关注红圈加号)、心形点赞图标(显示获赞数)、气泡评论图标(显示评论数)、黄色书签收藏图标、分享箭头(转发、发私信、复制链接)以及右下角旋转的音乐原声黑胶唱片。
-- **搜索页**:从首页右上角放大镜进入,支持按「综合 (Top)」「用户 (Users)」「视频 (Videos)」「原声 (Sounds)」「直播 (LIVE)」「话题 (Hashtags)」分类筛选。
-- **收件箱 (Inbox)**:顶部为私信聊天会话入口和在线联系人,下方汇总系统通知、互动消息(点赞、评论、新增关注)。
+## UI
+The bottom navigation contains five tabs: 「首页 (Home)」, 「朋友 (Friends)」, 「+ (创作发布)」 (Create), 「收件箱 (Inbox)」 and 「个人资料 (Profile)」.
+- **首页 (Home)**: at the top center you can switch between 「为你推荐 (For You)」, 「正在关注 (Following)」, 「朋友 (Friends)」 and 「直播 (LIVE)」; in the top right is the search magnifier. The main body is single-column, full-screen, vertically swiped short videos.
+- **Right-side interaction toolbar**: from top to bottom are the creator's avatar (with a follow red-ring plus sign), the heart like icon (showing the number of likes), the bubble comment icon (showing the comment count), the yellow bookmark favorite icon, the share arrow (repost, send a DM, copy link), and in the bottom right a spinning vinyl record of the original sound.
+- **Search page**: enter from the magnifier in the top right of the home page; it supports filtering by 「综合 (Top)」, 「用户 (Users)」, 「视频 (Videos)」, 「原声 (Sounds)」, 「直播 (LIVE)」 and 「话题 (Hashtags)」.
+- **收件箱 (Inbox)**: at the top are the DM conversation entry and online contacts, below is an aggregation of system notifications and interaction messages (likes, comments, new follows).
 
-## 功能
-- **全屏滑动浏览与停留判断**:
-  - 向上轻扫切换下一个推荐视频,向下轻扫回看上一个视频。
-  - 单击屏幕任意位置可暂停/继续播放视频。
-- **互动与评论阅读**:
-  - 双击视频画面或点击右侧心形完成点赞。
-  - 点击气泡图标从底部滑出半屏评论抽屉,支持上下滚动阅读神评、点赞优质评论或在底部「添加评论...」框中撰写回复。向下滑动抽屉或点击左上角「×」收起评论。
-- **关注创作者与音频原声**:
-  - 点击作者头像下方的「+」加号直接关注;或点击作者头像/用户名进入其主页查看个人全部发布作品和置顶作品。
-  - 点击右下角旋转唱片可进入该背景音乐(Sound)聚合页,查看采用同款 BGM 的其他热门视频。
+## Features
+- **Full-screen swipe browsing and deciding to stay**:
+  - Swipe up lightly to switch to the next recommended video, swipe down lightly to go back to the previous one.
+  - Single-tap anywhere on the screen to pause/resume playback.
+- **Interaction and reading comments**:
+  - Double-tap the video picture or tap the heart on the right to like.
+  - Tap the bubble icon to slide out a half-screen comment drawer from the bottom; scroll up and down to read top comments, like good comments, or write a reply in the 「添加评论...」 (Add comment...) box at the bottom. Swipe the drawer down or tap 「×」 in the top left to collapse the comments.
+- **Following creators and original sounds**:
+  - Tap the 「+」 plus sign below the author's avatar to follow directly; or tap the author's avatar/username to enter their profile and see all their published works and pinned works.
+  - Tap the spinning record in the bottom right to enter the aggregation page for that background music (Sound) and see other popular videos using the same BGM.
 
-## 已知现象
-- **风控与滑动过快拦截**:短时间内高频翻页或快速连击会触发滑动卡死或验证码拼图挑战,必须遵循 `pace: careful`。
-- **强制登录/注册拦截弹窗**:在未登录状态下浏览数个视频后,经常弹出不可跳过的「登录 TikTok」全屏页(支持 Google、Facebook 或手机号登录)。
-- **直播间混入信息流**:推荐流中偶现正在直播的房间(画面带有「LIVE」红标且布局异于常规短视频),向上滑动即可快速滑过。
+## Known issues
+- **Risk control and interception of too-fast swiping**: frequent page turning in a short time or rapid repeated taps can trigger a swipe freeze or a CAPTCHA jigsaw challenge, so you must follow `pace: careful`.
+- **Forced login/sign-up interception pop-up**: after browsing several videos without logging in, a non-skippable full-screen 「登录 TikTok」 (Log in to TikTok) page often pops up (supporting Google, Facebook or phone-number login).
+- **Live rooms mixed into the feed**: a room that is live occasionally appears in the recommendation feed (the picture has a red 「LIVE」 mark and the layout differs from regular short videos); swipe up to pass it quickly.

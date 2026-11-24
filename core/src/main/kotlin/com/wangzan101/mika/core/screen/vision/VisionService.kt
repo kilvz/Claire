@@ -53,7 +53,7 @@ class VisionService(
             try {
                 val reply = candidate.complete(system, messages, emptyList())
                 val answer = reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text }
-                if (answer.isBlank()) throw ModelError.BadResponse("视觉模型没有给出回答")
+                if (answer.isBlank()) throw ModelError.BadResponse("the vision model gave no answer")
                 return Answer(answer, candidate.capabilities.groundingVerified)
             } catch (e: ModelError) {
                 lastError = e
@@ -64,6 +64,6 @@ class VisionService(
                 }
             }
         }
-        throw lastError ?: ModelError.BadResponse("视觉模型没有给出回答")
+        throw lastError ?: ModelError.BadResponse("the vision model gave no answer")
     }
 }

@@ -1,39 +1,39 @@
 ---
 name: documents
-display: 处理 PDF 文档
-description: 读 PDF 的文字、按页取、看文档信息,拆分合并后把文件交给用户
+display: Work with PDF documents
+description: Read the text of a PDF, extract it by page, view document information, and hand the split or merged file to the user
 aliases: ["读 PDF", "PDF 转文字", "合并 PDF"]
 terms: ["PDF", "文档", "提取文字", "按页", "合并", "拆分", "扫描件"]
 ---
-## 入口
+## Entry
 
-先看文档在哪:
-- 网上的公开链接:用 `web_navigate` 打开,内置浏览器能直接显示的,读页面就够了。
-- 用户发来的附件:在 `/workspace/inbox/`。
-- 网页上下载的文件:在 `/workspace/downloads/`,可以用 `web_downloads` 查下载记录。
+First see where the document is:
+- A public link on the web: open it with `web_navigate`; if the built-in browser can display it directly, reading the page is enough.
+- An attachment the user sends: in `/workspace/inbox/`.
+- A file downloaded from a web page: in `/workspace/downloads/`, and `web_downloads` can be used to check the download records.
 
-## 步骤
+## Steps
 
-1. 文字型 PDF 用 `run_bundled_script` 跑 `scripts/extract_pdf.py`,`source` 填 `skills/documents`,文件路径相对 `/workspace` 写:
-   - 全文:`args: ["inbox/a.pdf"]`
-   - 指定页(从 1 数,可写 `3`、`1-5`、`1,4,7-9`):`args: ["inbox/a.pdf", "--pages", "1-5"]`
-   - 标题、作者、页数等信息(JSON):`args: ["inbox/a.pdf", "--metadata"]`
-   - 长文档先存成文本:`args: ["inbox/a.pdf", "--out", "a.txt"]`,再用 `read_file` 分段读,或用 `search_files` 找关键词。
-   - 有密码的:加 `--password` 和密码。
-2. 输出里每页以 `--- page N ---` 开头,引用时按它写页码。
-3. 拆分、合并、抽页用 `run_command` 写一小段 Python,调用 pypdf;新文件放在 `/workspace` 下。
-4. 做好的文件用 `share_file` 交给用户。
+1. For a text-based PDF, use `run_bundled_script` to run `scripts/extract_pdf.py`, with `source` set to `skills/documents` and the file path written relative to `/workspace`:
+   - Full text: `args: ["inbox/a.pdf"]`
+   - Specified pages (counted from 1; `3`, `1-5`, `1,4,7-9` may be written): `args: ["inbox/a.pdf", "--pages", "1-5"]`
+   - Information such as title, author and page count (JSON): `args: ["inbox/a.pdf", "--metadata"]`
+   - For a long document, save it as text first: `args: ["inbox/a.pdf", "--out", "a.txt"]`, then read it in sections with `read_file`, or find keywords with `search_files`.
+   - For one with a password: add `--password` and the password.
+2. In the output, each page starts with `--- page N ---`; cite page numbers according to it.
+3. To split, merge or extract pages, use `run_command` to write a short piece of Python calling pypdf; put the new file under `/workspace`.
+4. Hand the finished file to the user with `share_file`.
 
-## 容易出错的地方
+## Common pitfalls
 
-- 脚本退出码为 3、提示没有可取的文字,说明是扫描出来的图片型 PDF;本机没有文字识别,只能看页面图片或告诉用户这一点。部分页没有文字时,脚本会单独报出这些页。
-- 表格、多栏排版取出来的顺序常常是乱的,引用表格里的数字前要对照原页。
-- 页码范围超出文档页数时脚本直接报错,先用 `--metadata` 看页数。
+- If the script exits with code 3 and reports that there is no extractable text, it is a scanned image-based PDF; this machine has no text recognition, so you can only look at the page images or tell the user this. When some pages have no text, the script reports those pages separately.
+- The order extracted from tables and multi-column layouts is often jumbled; check numbers quoted from a table against the original page first.
+- If the page range exceeds the number of pages in the document, the script reports an error directly; use `--metadata` first to check the page count.
 
-## 怎样算办成(核实证据)
+## How success is verified
 
-给出的文字能在脚本输出里对应到原页,并写了页码;交出去的文件 `share_file` 成功,页数和内容与预期一致(可以对新文件再跑一次 `--metadata` 核对页数)。
+The text given can be matched to the original page in the script output, with page numbers written; the file handed over is shared successfully with `share_file`, and its page count and content match expectations (you can run `--metadata` again on the new file to check the page count).
 
-## 什么时候停下交给用户
+## When to stop and hand off
 
-文档有密码而用户没给,或者需要用户决定保留哪些页、按什么顺序合并时,先问用户。
+When the document has a password and the user has not given it, or when the user needs to decide which pages to keep and in what order to merge them, ask the user first.

@@ -5,20 +5,20 @@ packages: ["com.ubercab.eats"]
 aliases: ["Uber Eats", "UberEats", "uber eats", "ubereats"]
 sites: []
 open: Uber Eats
-description: 外卖:餐厅、菜单与订单
+description: Food delivery: restaurants, menus and orders
 ---
-## 是什么
-Uber Eats 是外卖 App,包名 `com.ubercab.eats`。
+## What it is
+Uber Eats is a food delivery app, package name `com.ubercab.eats`.
 
-## 界面
-有 Home/搜索、餐厅菜单、Cart 和 Orders。外卖餐饮和 Grocery、Convenience、Retail 等是分开的频道。
+## UI
+There are Home/search, restaurant menus, Cart and Orders. Food delivery and Grocery, Convenience, Retail etc. are separate channels.
 
-## 功能
-- **餐厅**:按配送地址查看,能看到名称、评分、点评、预计送达时间、配送费、优惠、营业状态和链接,有 Delivery 和 Pickup 两种方式。已打烊的餐厅没有预计送达时间。
-- **菜单**:菜名、分类、原币种价格、选项、是否售罄。通常不登录也能看。
-- **购物车**:显示规格、数量、起送门槛、各项费用、地址与门牌详情和总额。Add 点一次加一份。
-- **订单**:Orders 里有历史订单和当前订单的配送进度。
+## Features
+- **Restaurants**: viewed by delivery address; you can see the name, rating, reviews, estimated delivery time, delivery fee, offers, business status and link, with Delivery and Pickup modes. Restaurants that are closed have no estimated delivery time.
+- **Menu**: dish names, categories, prices in the local currency, options, and whether sold out. Usually viewable without logging in.
+- **Cart**: shows specs, quantity, minimum order threshold, the various fees, address and unit details and the total. Tapping Add once adds one portion.
+- **Orders**: Orders has historical orders and the delivery progress of the current order.
 
-## 已知现象
-- 餐厅和超市零售商品属于不同频道。
-- 界面可能出现登录或验证。
+## Known issues
+- Restaurants and supermarket retail products belong to different channels.
+- The interface may show login or verification.

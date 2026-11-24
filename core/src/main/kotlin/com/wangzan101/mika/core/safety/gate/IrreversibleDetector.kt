@@ -256,7 +256,7 @@ object IrreversibleDetector {
             val own = if (typeAhead && focused.role in SELECTION_ROLES) selection(focused) else elementHit(focused, screen)
             return own ?: declaredHit(combo, screen)
         }
-        if (deleting) return Irreversible(IrrevAction.delete, "${combo.key.key}:焦点不明")
+        if (deleting) return Irreversible(IrrevAction.delete, "${combo.key.key}: no clear focus")
         return declaredHit(combo, screen)
     }
 
@@ -585,7 +585,7 @@ object IrreversibleDetector {
         }
         val fields = s?.elements?.filter { it.editable }.orEmpty()
         if (fields.isNotEmpty() && fields.all { isSearch(it, s) }) return null
-        return Irreversible(IrrevAction.send, "$keyName:焦点不明")
+        return Irreversible(IrrevAction.send, "$keyName: no clear focus")
     }
 
     /**

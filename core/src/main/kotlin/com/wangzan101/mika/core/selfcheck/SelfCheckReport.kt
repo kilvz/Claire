@@ -61,7 +61,7 @@ object SelfCheckReport {
 
     /** The title of the feedback issue: the compatibility tag followed by `Android <version> <model>`; the model is exactly what the system reports (no manufacturer name added). */
     fun issueTitle(f: DeviceFacts?): String =
-        if (f == null) "[兼容性]" else "[兼容性] Android ${f.androidRelease} ${f.model.trim()}".trim()
+        if (f == null) "[Compatibility]" else "[Compatibility] Android ${f.androidRelease} ${f.model.trim()}".trim()
 
     /**
      * URL for creating a new issue: pick the device feedback template and pre-fill only the title. The report is too long to put into the URL (URLs have a length limit), so the user pastes it.

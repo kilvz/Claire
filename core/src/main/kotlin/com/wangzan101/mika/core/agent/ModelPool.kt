@@ -343,11 +343,11 @@ class GroupPool(
     }
 
     private fun unavailableReason(need: ModelNeed): String = when {
-        members.isEmpty() -> "组里没有成员"
-        need.toolCalls && members.none { it.model.capabilities.toolCalls } -> "没有支持工具调用的成员"
-        need.vision && members.none { it.model.capabilities.vision } -> "没有能看图的成员"
-        members.none { health.available(it.key) } -> "成员都在冷却"
-        else -> "成员上下文窗口不够"
+        members.isEmpty() -> "no members in the group"
+        need.toolCalls && members.none { it.model.capabilities.toolCalls } -> "no member supports tool calls"
+        need.vision && members.none { it.model.capabilities.vision } -> "no member can view images"
+        members.none { health.available(it.key) } -> "all members are cooling down"
+        else -> "no member has a large enough context window"
     }
 }
 

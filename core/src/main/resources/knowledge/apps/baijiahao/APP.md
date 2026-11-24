@@ -1,27 +1,27 @@
 ---
 name: baijiahao
-display: 百家号
+display: Baijiahao
 packages: ["com.baidu.baijia"]
 aliases: ["百家号", "Baijiahao", "baijiahao", "百度百家号"]
 sites: []
 open: 百家号
-description: 百度的内容创作者 App,发布图文和视频、管理作品、看数据和收益
+description: Baidu's content creator app for publishing posts and videos, managing works, and checking stats and earnings
 ---
-## 是什么
-百家号是百度的创作者 App,包名 `com.baidu.baijia`。用来发布和管理自己的内容,看阅读、粉丝、收益数据,处理评论和通知。
+## What it is
+Baijiahao is Baidu's creator app, package name `com.baidu.baijia`. It is used to publish and manage your own content, check reads, followers and earnings data, and handle comments and notifications.
 
-## 界面
-底部标签:首页、管理、中间的「+」(发布)、消息、我的。
-- **首页**:标题「百家号」,下面是「热门事件」,可按全网、城市、娱乐、体育等频道切换(右边按钮改频道)。
-- **管理**:上面是数据卡片:累计阅读、本月收益、粉丝总数、消息分析;下面按全部、动态、图文、视频、小视频、直播分标签列出自己的作品,每条有标题、发布时间、状态(如「已发布」)、几个互动数和「…」操作菜单,列表右上有搜索按钮。
-- **消息**:顶部分互动、通知、公告,右上角是消息设置;「互动」里按评论、关注、点赞、收藏、分享分类,下面是消息列表。
-- **我的**:资料卡(粉丝、关注、活力值、信用分),右上角有扫一扫和二维码;「常用功能」:我的权益、我的认证、我的信息、评论管理、素材管理、话题管理、橱窗管理、黑名单管理、我的收藏、主播中心、百+;「更多功能」:发文设置、消息设置、系统设置、帮助反馈。
+## UI
+Bottom tabs: Home, Manage, the middle 「+」 (publish), Messages, Me.
+- **Home**: the title 「百家号」 (Baijiahao), below it 「热门事件」 (Trending events), which can be switched by channel such as all-network, city, entertainment and sports (the button on the right changes the channel).
+- **Manage**: data cards at the top: cumulative reads, earnings this month, total followers, message analytics; below, your works are listed under the tabs All, Posts, Articles, Videos, Short videos and Live, and each one has a title, publish time, status (such as 「已发布」, published), a few interaction counts and a 「…」 action menu; the search button is at the top right of the list.
+- **Messages**: the top splits into Interactions, Notifications and Announcements, with message settings at the top right; 「互动」 (Interactions) is grouped into comments, follows, likes, saves and shares, with the message list below.
+- **Me**: a profile card (followers, following, vitality score, credit score), with scan and QR code at the top right; 「常用功能」 (Common features): My benefits, My verification, My info, Comment management, Material management, Topic management, Showcase management, Blocklist management, My favorites, Host center, Baijia+; 「更多功能」 (More features): Posting settings, Message settings, System settings, Help & feedback.
 
-## 功能
-- **发布**:底部「+」弹出发布面板,显示今天还能发几篇;可选图文、动态、直播、图集、拍视频、上传视频、视频合集、草稿,下面是「推荐活动」;底部有关闭按钮。
-- **系统设置**:清除缓存、关于(版本号)、已收集个人信息清单、第三方信息共享清单、退出登录。
+## Features
+- **Publishing**: the 「+」 at the bottom opens the publish panel, which shows how many posts you can still publish today; it offers Articles, Posts, Live, Photo sets, Shoot video, Upload video, Video collections and Drafts, with 「推荐活动」 (Recommended activities) below; there is a close button at the bottom.
+- **System settings**: Clear cache, About (version number), List of personal information collected, List of third-party information sharing, Log out.
 
-## 已知现象
-- 打开时可能弹出「检测到您尚未打开通知功能……」,按钮是「取消」「去开启」。
-- 不少按钮没有名字,只有资源 ID:返回按钮(`left_button`)、扫一扫(`scan_it`)、二维码(`qr_code`)、作品的操作菜单(`operation_menu_layout`)。
-- 管理页作品下面的几个数字在元素里只有数,没有说明是哪一项,要看画面上的图标。
+## Known issues
+- When opened, it may pop up 「检测到您尚未打开通知功能……」 (notifications are not enabled...), with the buttons 「取消」 (Cancel) and 「去开启」 (Turn on).
+- Quite a few buttons have no name and only a resource ID: the back button (`left_button`), scan (`scan_it`), QR code (`qr_code`) and the work action menu (`operation_menu_layout`).
+- The numbers below a work on the Manage page are only numbers in the elements, with no indication of which metric each one is; look at the icons on screen.

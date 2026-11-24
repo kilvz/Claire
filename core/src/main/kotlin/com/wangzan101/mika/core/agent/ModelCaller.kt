@@ -280,7 +280,7 @@ internal class ModelCaller(
         lastRetryWaitMs = 0
         // A single-member pool ignores the selection criteria: no need to estimate the whole history for it (expensive in long conversations)
         val candidates = if (pool is SingleMemberPool) pool.members else pool.ordered(needOf(history, specs))
-        if (candidates.isEmpty()) throw ModelError.GroupUnavailable(pool.groupName ?: "", "没有可用成员")
+        if (candidates.isEmpty()) throw ModelError.GroupUnavailable(pool.groupName ?: "", "no available members")
         val clock = AttemptClock()
         var last: Throwable? = null
         for ((index, member) in candidates.withIndex()) {

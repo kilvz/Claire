@@ -117,7 +117,7 @@ internal object HttpSupport {
                                 if (cont.isActive) cont.resume(RawResponse(it.code, it.header("retry-after"), it.body?.string().orEmpty()))
                                 return
                             }
-                            val source = it.body?.source() ?: throw ModelError.BadResponse("流式响应没有内容")
+                            val source = it.body?.source() ?: throw ModelError.BadResponse("The streaming response is empty")
                             val data = mutableListOf<String>()
                             var events = 0
                             /** Dispatch one event; returning true means the protocol level has reached its terminal state (e.g. [DONE]), the read loop ends there and no longer waits for the connection to close. */
@@ -140,7 +140,7 @@ internal object HttpSupport {
                             if (cont.isActive) {
                                 dispatch()
                                 val eventStream = it.header("Content-Type")?.contains("event-stream", ignoreCase = true) == true
-                                if (events == 0 && !eventStream) throw ModelError.BadResponse("返回的不是流式内容(Content-Type: ${it.header("Content-Type").orEmpty()})")
+                                if (events == 0 && !eventStream) throw ModelError.BadResponse("The response is not streaming content (Content-Type: ${it.header("Content-Type").orEmpty()})")
                                 cont.resume(RawResponse(it.code, it.header("retry-after"), ""))
                             }
                         } catch (e: Exception) {

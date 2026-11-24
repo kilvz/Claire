@@ -193,7 +193,7 @@ class EvidenceLedger(private val capChars: Int = STORE_CHARS) {
         private fun clip(kind: ObsKind, t: String): String = when (kind) {
             ObsKind.Read, ObsKind.Reply, ObsKind.UserSaid, ObsKind.Attachment -> t.take(READ_CHARS)
             ObsKind.Output, ObsKind.Fact ->
-                if (t.length <= OUTPUT_CHARS) t else t.take(OUTPUT_CHARS * 3 / 4) + "\n…(中间省略)…\n" + t.takeLast(OUTPUT_CHARS / 4)
+                if (t.length <= OUTPUT_CHARS) t else t.take(OUTPUT_CHARS * 3 / 4) + "\n…(middle omitted)…\n" + t.takeLast(OUTPUT_CHARS / 4)
         }
     }
 }

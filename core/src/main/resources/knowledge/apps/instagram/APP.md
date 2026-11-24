@@ -6,35 +6,35 @@ aliases: ["Instagram", "instagram", "IG", "ins", "照片墙"]
 sites: ["instagram.com"]
 open: Instagram
 pace: careful
-description: 图片与 Reels 短视频社交:信息流、快拍、探索与私信
+description: Photo and Reels social app with feed, stories, explore and direct messages
 ---
-## 是什么
-Instagram 是全球图片与短视频社交平台 App,包名 `com.instagram.android`。网站知识见 `instagram.com`。由于平台有严格的反爬机制,浏览需保持适度节奏(`pace: careful`)。
+## What it is
+Instagram is a global photo and short video social platform app, package name `com.instagram.android`. For website knowledge see `instagram.com`. Because the platform has strict anti-scraping mechanisms, browsing needs a moderate pace (`pace: careful`).
 
-## 界面
-底部导航包含五个标签:「首页 (Feed)」「搜索与探索 (Explore)」「+ (创建)」「Reels 短视频」「个人资料 (Profile)」。
-- **首页 (Feed)**:顶部左侧是 Instagram 标头,右侧是通知心形与私信聊天入口(纸飞机/Messenger 图标)。最上方是横向滚动的「快拍 (Stories)」圆形头像栏;主体为单列图文/视频信息流。
-- **帖子卡片**:上方为发布者头像、用户名、位置和三点更多菜单;中间为单图、多图轮播(底部带小圆点指示器)或视频;下方排列心形点赞、气泡评论、纸飞机分享、书签保存,再下方为点赞人数、正文 Caption 和「查看全部 X 条评论」。
-- **探索页**:网格平铺热门图片与短视频,顶部是全局搜索框。
-- **Reels 界面**:全屏沉浸式纵向视频流,右侧竖排点赞、评论、分享、收藏与音频原声入口。
-- **私信 (Direct Messages)**:从首页右上角纸飞机进入,包含最近会话列表、关注者活跃圆圈和搜索框。
+## UI
+The bottom navigation has five tabs: 「首页 (Feed)」, 「搜索与探索 (Explore)」, 「+ (创建)」 (create), 「Reels 短视频」 (Reels short videos) and 「个人资料 (Profile)」.
+- **Home (Feed)**: the Instagram wordmark on the left of the top bar, and on the right the notification heart and the direct message chat entry (paper plane / Messenger icon). At the very top is the horizontally scrolling 「快拍 (Stories)」 row of circular avatars; the body is a single-column image-text/video feed.
+- **Post card**: the poster's avatar, username, location and three-dot more menu at the top; a single image, a multi-image carousel (with a small dot indicator at the bottom) or a video in the middle; below it are the heart like, speech bubble comment, paper plane share and bookmark save actions, and below those the like count, the caption and 「查看全部 X 条评论」 (view all X comments).
+- **Explore page**: a grid of popular images and short videos, with the global search box at the top.
+- **Reels screen**: a full-screen immersive vertical video feed, with vertically stacked like, comment, share, save and original audio entries on the right.
+- **Direct Messages**: entered through the paper plane at the top right of the home page, containing the recent conversation list, the circles of active followers and a search box.
 
-## 功能
-- **防状态残留与层级返回**:
-  - 打开 App 时若停留在全屏 Reels 播放页或深入的私信对话中,底部导航可能隐藏。需点击左上角返回箭头「←」或按系统返回键退出当前模块回到主首页。
-- **浏览快拍 (Stories)**:
-  - 点击头像圆圈进入快拍。快拍每张展示数秒后自动切下一张;点击屏幕右半部分快速跳至下一张,点击左半部分回退上一张;从顶部向下滑动关闭快拍。
-- **多图轮播浏览**:
-  - 遇到带有小圆点指示器的轮播帖子(Carousel),需在图片区域**向左横向滑动**以浏览后续多张图片或附带视频。
-- **互动与评论**:
-  - 双击图片或点击心形图标即可完成点赞;点击气泡图标滑出评论抽屉,在底部输入框撰写回复并点击「发布」。
+## Features
+- **Avoiding leftover state and going back up levels**:
+  - If the app opens on the full-screen Reels playing page or deep in a direct message conversation, the bottom navigation may be hidden. Tap the back arrow 「←」 at the top left or press the system back key to leave the current module and return to the main home page.
+- **Browsing Stories**:
+  - Tap an avatar circle to enter the story. Each story is shown for a few seconds and then switches to the next automatically; tap the right half of the screen to jump quickly to the next one, tap the left half to go back to the previous one, and swipe down from the top to close the story.
+- **Browsing multi-image carousels**:
+  - For a carousel post with a small dot indicator, **swipe horizontally to the left** on the image area to browse the following images or the attached video.
+- **Interacting and commenting**:
+  - Double-tap the image or tap the heart icon to like it; tap the speech bubble icon to slide out the comment drawer, write a reply in the bottom input box and tap 「发布」 (Post).
 
-## 已知现象
-- **截屏策略与全黑防困惑 (FLAG_SECURE)**:
-  - 大部分常规信息流与公开发帖页面在多数机型上可正常读图,可以照常尝试截图与视觉分析。
-  - 但在私信阅后即焚(Vanish Mode)、单次播放媒体(View Once)或部分机型的严格隐私模式下,系统会启用 `FLAG_SECURE` 防截屏保护,导致画面截图呈现全黑。
-  - **若遇到全黑画面切勿困惑,切勿误判为崩溃或卡死**:此时可无缝切换为读取无障碍节点文字(`interfaces`)识别界面元素与文本内容,或直接按返回键退出受保护界面。私信内单次媒体截屏亦可能提醒对方,非必要不触发。
-- **频控与风控 (Pace Careful)**:连续高速点赞、频繁快速滑动或短时间内大批量发私信会触发「请稍后再试」操作受限拦截,操作之间应留有间隔。
-- **私信入口不在底栏**:Instagram 底栏没有独立的私信标签,私信入口固定在首页右上角。若当前不在首页标签,必须先切到底部第一个「首页」标签才能看到私信入口。
-- **保存登录信息与联系人同步弹窗**:登录或更新后经常弹出「是否保存你的登录信息?」「寻找你的 Facebook 好友」全屏提示,需点击「以后再说 / Not Now」跳过。
-- **全屏发帖模式**:点击中间「+」进入全屏相机或图库选择器,需点击左上角「×」取消并退出。
+## Known issues
+- **Screenshot behavior and all-black screens (FLAG_SECURE)**:
+  - Most regular feeds and public post pages can be read normally through screenshots on most devices, so screenshots and visual analysis can be attempted as usual.
+  - However, in direct messages with vanish mode, view-once media, or the strict privacy mode on some devices, the system enables `FLAG_SECURE` screenshot protection, which makes the screenshot all black.
+  - **If you get an all-black screen, don't be confused and don't mistake it for a crash or a freeze**: you can switch seamlessly to reading the accessibility node text (`interfaces`) to identify the interface elements and text content, or just press the back key to leave the protected screen. Taking a screenshot of view-once media in direct messages may also notify the other person, so don't trigger it unless necessary.
+- **Rate limits and risk control (Pace Careful)**: liking at high speed continuously, swiping quickly and frequently or sending many direct messages in a short time triggers a 「请稍后再试」 (please try again later) restricted-operation block, so leave an interval between operations.
+- **The DM entry is not in the bottom bar**: the Instagram bottom bar has no separate DM tab, and the DM entry is fixed at the top right of the home page. If you are not currently on the home tab, you must first switch to the first tab, 「首页」 (Home), to see the DM entry.
+- **Save login info and sync contacts pop-ups**: after signing in or updating, a full-screen prompt 「是否保存你的登录信息?」 (save your login info?) or 「寻找你的 Facebook 好友」 (find your Facebook friends) often pops up; skip it with 「以后再说 / Not Now」.
+- **Full-screen posting mode**: tapping 「+」 in the middle enters the full-screen camera or gallery picker, and you need to tap 「×」 at the top left to cancel and exit.

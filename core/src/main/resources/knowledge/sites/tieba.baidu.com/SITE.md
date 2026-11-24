@@ -1,26 +1,26 @@
 ---
 name: tieba.baidu.com
-display: 百度贴吧
-description: 查老型号和小众话题的使用经验、通病讨论帖
+display: Baidu Tieba
+description: Look up hands-on experience and recurring-issue discussion threads for older models and niche topics
 domains: ["tieba.baidu.com"]
 aliases: ["贴吧", "百度贴吧"]
 apps: []
 open: tieba.baidu.com
 mode: desktop
 ---
-## 是什么
-百度的社区论坛,按「吧」分话题。老型号、长尾话题的长期使用、维修和反复出现的问题讨论多,但老帖不反映当前售价和政策。
+## What it is
+Baidu's community forum, with topics divided into 「吧」 (forums). There is a lot of discussion of long-term use, repairs and recurring problems for older models and long-tail topics, but old posts do not reflect current prices or policies.
 
-## 页面与网址
-- 搜索 `https://tieba.baidu.com/f/search/res?qw=<编码后的关键词>`,可能要登录。
-- 进具体的吧 `https://tieba.baidu.com/f?kw=<编码后的吧名>`,不登录也能看帖子列表。置顶帖常是吧规和定期汇总(装机吧、显卡吧每月一期装机推荐)。
+## Pages and URLs
+- Search `https://tieba.baidu.com/f/search/res?qw=<编码后的关键词>`; signing in may be required.
+- Enter a specific forum at `https://tieba.baidu.com/f?kw=<编码后的吧名>`; the thread list is visible without signing in. Pinned threads are often the forum rules and periodic roundups (the 「装机吧」 (PC-building forum) and 「显卡吧」 (graphics-card forum) each post a monthly build recommendation).
 
-## 功能
-- **搜索**:结果有帖子链接、吧名和日期;没有可用的时间筛选参数。
-- **帖子**:原帖和跟帖里有具体使用经历,包括型号、批次、故障、使用时长、修复过程。
+## Features
+- **Search**: results have thread links, forum names and dates; there is no usable time-filter parameter.
+- **Threads**: the original post and the replies contain concrete usage experience, including model, batch, faults, length of use and repair process.
 
-## 已知现象
-- 不存在的吧也会显示「<名字>吧」的页面,但没有帖子;零帖子就是这个吧不存在。
-- 搜索页显示「木有找到相关内容」后,下面的热门吧、签到、「我常逛的吧」是导航,不是搜索结果。
-- 同一故障出现在多个回复里,可能是转述或同一个案例。
-- 偶尔出现安全验证。
+## Known issues
+- A non-existent forum also shows a 「<名字>吧」 (a "<name>" forum) page, but it has no threads; zero threads means the forum does not exist.
+- After the search page shows 「木有找到相关内容」 (Nothing found), the popular forums, check-in and 「我常逛的吧」 (Forums I visit often) below it are navigation, not search results.
+- The same fault appearing in multiple replies may be a retelling or the same case.
+- A security verification occasionally appears.

@@ -85,10 +85,10 @@ internal object MemorySearch : AgentTool {
         fun lines(list: List<JsonElement>, head: String) =
             list.joinToString("\n", head) { m -> ((m as? JsonObject)?.get("content") as? JsonPrimitive)?.contentOrNull.orEmpty() }
         return listOfNotNull(
-            said.takeIf { it.isNotEmpty() }?.let { Observation(ObsKind.UserSaid, lines(it, "记忆检索「${o.argStr("query")}」:\n"), source = "memory") },
+            said.takeIf { it.isNotEmpty() }?.let { Observation(ObsKind.UserSaid, lines(it, "Memory search \"${o.argStr("query")}\":\n"), source = "memory") },
             // The inferred entries are things a tool found, not facts given by the user: they enter the ledger with their source stated
             own.takeIf { it.isNotEmpty() }?.let {
-                Observation(ObsKind.Fact, lines(it, "记忆检索「${o.argStr("query")}」查到的、Claire 以前自己归纳的(不是用户说的):\n"), source = "memory")
+                Observation(ObsKind.Fact, lines(it, "Found by memory search \"${o.argStr("query")}\"; summarized earlier by Claire itself (not said by the user):\n"), source = "memory")
             },
         )
     }

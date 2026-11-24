@@ -1,26 +1,26 @@
 ---
 name: zhihu.com
-display: 知乎
+display: Zhihu
 domains: ["zhihu.com"]
 aliases: ["知乎", "Zhihu", "zhihu"]
 apps: ["zhihu"]
 open: zhihu.com
 mode: desktop
-description: 中文问答社区,看问题的回答、专栏文章,含专业解释和经验争论
+description: Chinese Q&A community; read answers to questions and column articles, including expert explanations and debates over experience
 ---
-## 是什么
-中文问答与专栏社区,一个问题下有多个回答,回答附作者和赞同数。内容涉及原理解释、使用经历,也有反对意见。
+## What it is
+A Chinese Q&A and column community; a question has multiple answers, and each answer comes with its author and upvote count. The content covers explanations of principles, usage experience, and also dissenting opinions.
 
-## 页面与网址
-- 搜索:`https://www.zhihu.com/search?type=content&q=<编码关键词>`。
+## Pages and URLs
+- Search: `https://www.zhihu.com/search?type=content&q=<编码关键词>`.
 
-## 功能
-- **搜索**:结果含问题、回答、专栏的标题、真实链接和发布日期。搜索词写对象和要点即可,不用加站名。
-- **阅读回答**:正文、作者、赞同数。问题页常先只加载前几个高赞回答,往下滚还会加载,滚动后没有新增就是已到底。
-- **公司讨论**:用公司全称或有辨识度的核心词搜索,取到问题、回答和专栏的链接与片段。
-- **手机 App**:对应说明见 `zhihu`。
+## Features
+- **Search**: the results contain the titles, real links and publish dates of questions, answers and columns. Just write the object and the key points as the search terms; there is no need to add the site name.
+- **Reading answers**: the body text, author and upvote count. A question page often loads only the first few highly upvoted answers at first, and loads more as you scroll down; if nothing new is added after scrolling, you have reached the end.
+- **Company discussion**: search with the company's full name or a distinctive core term to get the links and snippets of questions, answers and columns.
+- **Mobile app**: see `zhihu` for the corresponding documentation.
 
-## 已知现象
-- 未登录时会出现登录弹层,页面只剩导航和页脚,没有正文。
-- 搜索结果里有 AI 生成的回答,只能当找原文的线索。
-- 专栏地址不能说明作者的真实身份。
+## Known issues
+- When not signed in, a sign-in overlay appears, and the page is left with only navigation and footer, with no body text.
+- Search results contain AI-generated answers, which can only serve as clues for finding the original text.
+- A column address cannot establish the author's real identity.

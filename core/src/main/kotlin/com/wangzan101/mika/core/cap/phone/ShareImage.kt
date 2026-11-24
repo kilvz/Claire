@@ -60,7 +60,7 @@ internal object ShareImage : PhoneTool {
     override fun observations(o: kotlinx.serialization.json.JsonObject, r: ToolExecution, log: com.wangzan101.mika.core.tool.EvidenceLog): List<Observation> {
         if (r.content["ok"] != JsonPrimitive(true)) return emptyList()
         return listOfNotNull((o["package"] as? JsonPrimitive)?.content?.let { p ->
-            Observation(ObsKind.Fact, "$name 打开了 $p 的图片分享页(还没发出)", source = PHONE)
+            Observation(ObsKind.Fact, "$name opened the image share page of $p (not sent yet)", source = PHONE)
         })
     }
 }

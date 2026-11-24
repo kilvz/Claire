@@ -1,25 +1,25 @@
 ---
 name: dianping
-display: 大众点评
+display: Dianping
 packages: ["com.dianping.v1"]
 aliases: ["大众点评", "点评", "Dianping"]
 sites: ["dianping.com"]
 open: 大众点评
-description: 查找本地商户、评价、榜单、团购与生活服务内容
+description: Finding local merchants, reviews, rankings, group deals and local-life content
 ---
-## 是什么
-大众点评是本地生活服务 App,安卓包名 `com.dianping.v1`,覆盖餐饮、休闲娱乐、酒店民宿、景点、丽人及电影演出等商户和内容。
+## What it is
+Dianping is a local-life services app, Android package name `com.dianping.v1`, covering merchants and content for dining, leisure and entertainment, hotels and homestays, attractions, beauty salons, movies and shows and more.
 
-## 界面
-首页顶部有关注、附近、热点等频道,城市选择和搜索框支持商户或地点查询,搜索框旁有扫一扫及拍照入口。业务网格包括美食、休闲玩乐、酒店民宿、景点游玩、美团外卖、医疗口腔、特价团、按摩足疗、丽人美发和电影演出等。底部通常是首页、地图、打卡、消息、我的,首页下部是图文或视频信息流。
+## UI
+The top of the home page has channels such as Following, Nearby and Hot spots; the city selector and search box support merchant or place queries, and there are scan and photo entries next to the search box. The business grid includes Food, Leisure & play, Hotels & homestays, Attractions & sightseeing, 美团外卖 (Meituan Waimai), Medical & dental, Special-price group deals, Massage & foot spa, Beauty & hair and Movies & shows. The bottom is usually Home, Map, Check-in, Messages and Me, and the lower part of the home page is an image-text or video feed.
 
-## 功能
-- **搜索与附近**:按关键词或当前城市、附近位置找商户和服务。
-- **分类查找**:从业务网格进入对应品类;「美团外卖」是独立业务入口。
-- **点评榜单**:首页榜单区域可按吃喝玩乐指南查看上榜商户及排名等信息。
-- **地图**:底部地图入口按地理位置浏览周边内容。
-- **打卡与内容**:信息流包含用户发布的商户体验、图片和视频,打卡用于发布内容。
-- **优惠**:免费试、特价团等卡片展示活动或套餐价格。
+## Features
+- **Search and nearby**: find merchants and services by keyword, or by current city and nearby location.
+- **Browsing by category**: enter the matching category from the business grid; 「美团外卖」 (Meituan Waimai) is a separate service entry.
+- **Dianping rankings**: the ranking area on the home page shows listed merchants and information such as their rank under the eat-drink-play guides.
+- **Map**: the Map entry at the bottom browses nearby content by geographic location.
+- **Check-in and content**: the feed includes merchant experiences, photos and videos posted by users, and Check-in is for posting content.
+- **Deals**: cards such as free trials and special-price group deals show the campaign or package price.
 
-## 已知现象
-首页分类网格可横向翻页,首屏不是全部分类。信息流内容、商户距离、价格和榜单会随城市及位置变化;首页的外卖入口与美团外卖 App 不是同一个应用。
+## Known issues
+The home page category grid can be paged horizontally, and the first screen is not all the categories. Feed content, merchant distance, prices and rankings change with city and location; the food delivery entry on the home page and the Meituan Waimai app are not the same app.

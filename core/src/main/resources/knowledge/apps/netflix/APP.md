@@ -4,29 +4,29 @@ display: Netflix
 packages: ["com.netflix.mediaclient"]
 aliases: ["Netflix", "netflix", "网飞", "奈飞"]
 open: Netflix
-description: 影视剧流媒体:影片搜索、剧集选集与我的片单
+description: Film and TV streaming with title search, episode selection and my list
 ---
-## 是什么
-Netflix 是全球影视流媒体播放平台 App,包名 `com.netflix.mediaclient`。提供电影、电视剧、纪录片与动漫在线播放与离线下载。
+## What it is
+Netflix is a global film and TV streaming app, package name `com.netflix.mediaclient`. It offers online playback and offline downloads of movies, TV series, documentaries and anime.
 
-## 界面
-首次打开或切换应用时经常出现「谁在观看? (Who's watching?)」的用户档案选择页。
-- **首页 (Home)**:顶部常驻「剧集」「电影」「分类」胶囊导航,右上角为投屏图标和搜索放大镜。正上方展示当前主推大片海报;主体依次陈列「继续观看 (Continue Watching)」「热门精选」「今日 Top 10 榜单」「我的片单 (My List)」。
-- **底部导航**:包含「首页」「热门与最新 (New & Hot)」「我的 Netflix (包含下载内容与片单)」。
-- **影片详情页**:顶部为预告片或海报图,下方排列影视名称、上映年份、分级标识、季数、清晰度(HD/4K),紧跟黑白两个大按钮:白色的「播放 (Play)」与灰色的「下载 (Download)」。详情页下部有剧集选集(按季选择下拉菜单)、相似作品与演职员信息。
-- **全屏播放器**:轻点屏幕唤出控制栏:中间为暂停/播放、快退 10 秒、快进 10 秒;底部为进度条;下方工具栏提供「锁定」「剧集列表」「音频与字幕 (Audio & Subtitles)」「播放速度 (0.5x 至 1.5x)」「下一集」。
+## UI
+On the first launch or when switching apps, the 「谁在观看? (Who's watching?)」 profile selection page often appears.
+- **Home**: the 「剧集」 (Series), 「电影」 (Films) and 「分类」 (Categories) pills stay at the top, with the cast icon and the search magnifier at the top right. The featured blockbuster poster is shown at the very top; the body lists 「继续观看 (Continue Watching)」, popular picks, the 「今日 Top 10 榜单」 (today's Top 10) and 「我的片单 (My List)」.
+- **Bottom navigation**: contains 「首页」 (Home), 「热门与最新 (New & Hot)」 and 「我的 Netflix」 (My Netflix, including downloads and the list).
+- **Title detail page**: a trailer or poster image at the top, below it the title, release year, rating badge, number of seasons and resolution (HD/4K), immediately followed by two large buttons, the white 「播放 (Play)」 and the grey 「下载 (Download)」. The lower part of the detail page has the episode picker (a dropdown to choose the season), similar titles and cast and crew information.
+- **Full-screen player**: tap the screen lightly to bring up the control bar: pause/play, rewind 10 seconds and forward 10 seconds in the middle; the progress bar at the bottom; the toolbar below offers 「锁定」 (Lock), the episode list, 「音频与字幕 (Audio & Subtitles)」, playback speed (0.5x to 1.5x) and the next episode.
 
-## 功能
-- **档案选择 (Profile) 导航**:
-  - 打开后若停留于档案选择网格,需点击目标用户头像进入该配置的主页。若档案设定了 4 位安全 PIN 码,需在数字键盘输入 PIN 解锁。
-- **搜索影片与类型**:
-  - 点击右上角搜索放大镜,输入影片中文或英文原名、演员或导演名称。搜索结果按海报网格展示。
-- **选集与换季**:
-  - 电视剧播放页向下滚动至「剧集 (Episodes)」区域,点击「第 1 季」下拉菜单切换到目标季度,再点击具体集数行开始播放。
-- **设置音频与字幕**:
-  - 在播放控制栏点击「音频和字幕」滑出选项面板,分别勾选目标原声音轨(如英语 5.1)与目标字幕(如简体中文)。设置后点击右上角应用。
+## Features
+- **Navigating the profile selection**:
+  - If the app opens on the profile grid, tap the target user's avatar to enter that profile's home page. If the profile has a 4-digit PIN set, enter the PIN on the number pad to unlock.
+- **Searching titles and genres**:
+  - Tap the search magnifier at the top right and type the title in Chinese or English, or an actor's or director's name. Results are shown as a poster grid.
+- **Choosing episodes and seasons**:
+  - Scroll down to the 「剧集 (Episodes)」 area on a series page, tap the 「第 1 季」 (season 1) dropdown to switch to the target season, then tap a specific episode row to start playback.
+- **Setting audio and subtitles**:
+  - Tap 「音频和字幕」 (audio and subtitles) in the playback control bar to slide out the options panel, then check the target original audio track (such as English 5.1) and the target subtitles (such as Simplified Chinese). After setting them, tap apply at the top right.
 
-## 已知现象
-- **DRM 画面录屏黑屏 (FLAG_SECURE)**:因受数字版权保护,视频播放区域在无障碍截图中呈现为全黑画面。**这是正常防护现象,切勿误判为加载失败或崩溃**。控制界面依赖控件元素树和屏幕操作完成。
-- **退出播放页**:全屏播放状态下,按系统返回键或点击左上角的向左箭头「←」退出播放器回到影片详情页。
-- **离线下载限制**:部分影片因授权原因没有下载按钮;移动网络下可能提示「仅限 Wi-Fi 下载」,属于系统防护。
+## Known issues
+- **DRM makes the screen capture black (FLAG_SECURE)**: because of digital copyright protection, the video playback area appears completely black in accessibility screenshots. **This is normal protection, not a loading failure or a crash**. Operating the controls has to rely on the view element tree and on-screen actions.
+- **Leaving the playback page**: in full-screen playback, press the system back key or tap the left arrow 「←」 at the top left to leave the player and return to the title detail page.
+- **Offline download limits**: some titles have no download button for licensing reasons; on mobile data a 「仅限 Wi-Fi 下载」 (Wi-Fi downloads only) notice may appear, which is system protection.

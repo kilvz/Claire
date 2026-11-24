@@ -228,65 +228,65 @@ object EvalTasks {
         val errs = mutableListOf<String>()
         // Variants are validated under the original task's id, with errors prefixed by which variant they belong to
         variantsOf(t).forEachIndexed { i, v -> validate(v.copy(id = t.id)).forEach { errs += "${t.id}: variant[${i + 1}]: $it" } }
-        if (!ID.matches(t.id)) errs += "id「${t.id}」须为小写字母数字加连字符"
-        if (t.goal.isBlank()) errs += "${t.id}: goal 为空"
-        t.channel?.let { if (it !in CHANNEL_PREFIX) errs += "${t.id}: channel 只能是 ${CHANNEL_PREFIX.keys.joinToString("/")}" }
-        t.maxSteps?.let { if (it <= 0) errs += "${t.id}: maxSteps 须为正数" }
-        t.split?.let { if (it !in SPLITS) errs += "${t.id}: split 须为 train 或 test" }
-        t.partition?.let { if (it !in PARTITIONS) errs += "${t.id}: partition 须为 tune 或 holdout" }
-        t.session?.let { if (!ID.matches(it)) errs += "${t.id}: session「$it」须为小写字母数字加连字符" }
-        t.timeoutSec?.let { if (it <= 0) errs += "${t.id}: timeoutSec 须为正数" }
+        if (!ID.matches(t.id)) errs += "id \"${t.id}\" must be lowercase letters and digits joined by hyphens"
+        if (t.goal.isBlank()) errs += "${t.id}: goal is empty"
+        t.channel?.let { if (it !in CHANNEL_PREFIX) errs += "${t.id}: channel must be one of ${CHANNEL_PREFIX.keys.joinToString("/")}" }
+        t.maxSteps?.let { if (it <= 0) errs += "${t.id}: maxSteps must be positive" }
+        t.split?.let { if (it !in SPLITS) errs += "${t.id}: split must be train or test" }
+        t.partition?.let { if (it !in PARTITIONS) errs += "${t.id}: partition must be tune or holdout" }
+        t.session?.let { if (!ID.matches(it)) errs += "${t.id}: session \"$it\" must be lowercase letters and digits joined by hyphens" }
+        t.timeoutSec?.let { if (it <= 0) errs += "${t.id}: timeoutSec must be positive" }
         t.requires.forEach { r ->
             val kind = r.substringBefore(':')
-            if (kind !in REQUIREMENT_KINDS || r.substringAfter(':', "").isBlank()) errs += "${t.id}: 不认识的前置条件「$r」"
-            if (kind == "app" && r.substringAfter(':') !in APP_CAPABILITIES) errs += "${t.id}: 前置条件「$r」不是已知的 App 能力"
+            if (kind !in REQUIREMENT_KINDS || r.substringAfter(':', "").isBlank()) errs += "${t.id}: unknown precondition \"$r\""
+            if (kind == "app" && r.substringAfter(':') !in APP_CAPABILITIES) errs += "${t.id}: precondition \"$r\" is not a known app capability"
         }
-        appCapabilities(t).forEach { if (it !in APP_CAPABILITIES) errs += "${t.id}: {app:$it} 不是已知的 App 能力" }
+        appCapabilities(t).forEach { if (it !in APP_CAPABILITIES) errs += "${t.id}: {app:$it} is not a known app capability" }
         t.probesBefore.forEach { (name, probe) ->
-            if (probe !in PROBE_ALLOWLIST) errs += "${t.id}: probesBefore.$name 用了白名单外的探针「$probe」"
+            if (probe !in PROBE_ALLOWLIST) errs += "${t.id}: probesBefore.$name uses a probe outside the allowlist: \"$probe\""
         }
         if (t.checks.isEmpty() && (t.expect == Expect.Succeeded || t.expect == Expect.Confirmation)) {
-            errs += "${t.id}: expect=${t.expect} 至少要有一条核对项"
+            errs += "${t.id}: expect=${t.expect} needs at least one check"
         }
         t.checks.forEachIndexed { i, c ->
             when (c) {
                 is Check.ProbeEquals -> {
-                    if (c.probe !in PROBE_ALLOWLIST) errs += "${t.id}: checks[$i] 用了白名单外的探针「${c.probe}」"
-                    if (c.expected.isBlank()) errs += "${t.id}: checks[$i] expected 为空"
+                    if (c.probe !in PROBE_ALLOWLIST) errs += "${t.id}: checks[$i] uses a probe outside the allowlist: \"${c.probe}\""
+                    if (c.expected.isBlank()) errs += "${t.id}: checks[$i] expected is empty"
                 }
-                is Check.AnswerGrounded -> if (c.minItems < 1) errs += "${t.id}: checks[$i] minItems 须 ≥ 1"
+                is Check.AnswerGrounded -> if (c.minItems < 1) errs += "${t.id}: checks[$i] minItems must be >= 1"
                 is Check.AnswerRegex ->
-                    if (c.pattern.isEmpty()) errs += "${t.id}: checks[$i] pattern 为空"
+                    if (c.pattern.isEmpty()) errs += "${t.id}: checks[$i] pattern is empty"
                     else runCatching { Regex(c.pattern) }
-                        .onFailure { errs += "${t.id}: checks[$i] 正则无效:${it.message}" }
+                        .onFailure { errs += "${t.id}: checks[$i] invalid regex: ${it.message}" }
                         // A regex that can match the empty string holds for any answer
-                        .onSuccess { if (it.containsMatchIn("")) errs += "${t.id}: checks[$i] 正则能匹配空串,核对不了任何东西" }
+                        .onSuccess { if (it.containsMatchIn("")) errs += "${t.id}: checks[$i] regex can match the empty string, so it checks nothing" }
                 is Check.AnswerContains ->
-                    if (c.all.isEmpty() || c.all.any { it.isBlank() }) errs += "${t.id}: checks[$i] all 为空或含空串"
+                    if (c.all.isEmpty() || c.all.any { it.isBlank() }) errs += "${t.id}: checks[$i] all is empty or contains an empty string"
                 is Check.ConfirmationShows -> {
                     val fields = listOf(c.action, c.target, c.content, c.amount)
-                    if (fields.all { it == null }) errs += "${t.id}: checks[$i] 没写任何要核对的字段"
-                    if (fields.any { it != null && it.isBlank() }) errs += "${t.id}: checks[$i] 有字段为空白"
+                    if (fields.all { it == null }) errs += "${t.id}: checks[$i] has no field to check"
+                    if (fields.any { it != null && it.isBlank() }) errs += "${t.id}: checks[$i] has a blank field"
                 }
-                is Check.ScreenHas -> if (c.text.isBlank()) errs += "${t.id}: checks[$i] text 为空"
-                is Check.MemoryUsed -> if (c.min < 1) errs += "${t.id}: checks[$i] min 须 ≥ 1"
+                is Check.ScreenHas -> if (c.text.isBlank()) errs += "${t.id}: checks[$i] text is empty"
+                is Check.MemoryUsed -> if (c.min < 1) errs += "${t.id}: checks[$i] min must be >= 1"
                 is Check.AskedUser -> Unit
                 is Check.WebHas -> {
                     val u = c.url.trim().lowercase()
-                    if (!u.startsWith("https://") && !u.startsWith("http://")) errs += "${t.id}: checks[$i] url 须是 http(s) 网址"
-                    if (c.text.isBlank()) errs += "${t.id}: checks[$i] text 为空"
+                    if (!u.startsWith("https://") && !u.startsWith("http://")) errs += "${t.id}: checks[$i] url must be an http(s) URL"
+                    if (c.text.isBlank()) errs += "${t.id}: checks[$i] text is empty"
                 }
             }
         }
         val referenced = PROBE_REF.findAll(json.encodeToString(EvalTask.serializer(), t)).map { it.groupValues[1] }.toSet()
-        (referenced - t.probesBefore.keys).forEach { errs += "${t.id}: 占位符 {probe:$it} 没在 probesBefore 里声明" }
+        (referenced - t.probesBefore.keys).forEach { errs += "${t.id}: placeholder {probe:$it} is not declared in probesBefore" }
         return errs
     }
 
     /** The whole task set: validate task by task, then check for duplicate ids. */
     fun validateAll(ts: List<EvalTask>): List<String> =
         ts.flatMap { validate(it) } +
-            ts.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.map { "id「$it」重复" }
+            ts.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.map { "duplicate id \"$it\"" }
 
     /** Substitutes `{run}` and `{probe:<name>}`; probes is the result of running probesBefore (placeholder name → output). */
     fun substitute(t: EvalTask, run: String, probes: Map<String, String>): EvalTask {

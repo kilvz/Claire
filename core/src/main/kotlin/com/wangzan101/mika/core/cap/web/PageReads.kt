@@ -72,10 +72,10 @@ internal object ReadPage : WebTool {
         }
         p.netError?.let { return fail("page_not_loaded", Feedback.format("read_url_not_loaded", "url" to url.orEmpty(), "error" to it)) }
         // The links and image descriptions the model sees are quotable facts too, recorded together with the body text
-        val links = p.links.take(50).joinToString("\n") { (t, u) -> "链接「$t」$u" }
-        val images = p.images.take(20).filter { it.first.isNotBlank() }.joinToString("\n") { (alt, u) -> "图片「$alt」$u" }
+        val links = p.links.take(50).joinToString("\n") { (t, u) -> "Link \"$t\" $u" }
+        val images = p.images.take(20).filter { it.first.isNotBlank() }.joinToString("\n") { (alt, u) -> "Image \"$alt\" $u" }
         val read = listOf(p.text.take(max), links, images).filter { it.isNotBlank() }.joinToString("\n")
-        val seen = if (read.isNotBlank()) webRead("网页正文(${p.url},从第 $offset 字起)\n$read", p.url, p.title) else null
+        val seen = if (read.isNotBlank()) webRead("Page text (${p.url}, from character $offset):\n$read", p.url, p.title) else null
         val q = p.quality
         return ok {
             put("url", p.url); put("title", p.title)
@@ -129,7 +129,7 @@ internal object Downloads : WebTool {
     override fun observations(o: JsonObject, r: ToolExecution, log: EvidenceLog): List<Observation> {
         if (r.content["ok"] != JsonPrimitive(true)) return emptyList()
         return listOfNotNull((r.content["downloads"] as? JsonArray)?.let { list ->
-            webRead(list.joinToString("\n", "下载列表(文件名来自网页):\n") { d ->
+            webRead(list.joinToString("\n", "Downloads (file names come from the page):\n") { d ->
                 val dobj = d as? JsonObject
                 listOf("file", "status", "bytes", "error").mapNotNull { k -> (dobj?.get(k) as? JsonPrimitive)?.contentOrNull?.let { "$k=$it" } }.joinToString(" ")
             }, null)
@@ -173,7 +173,7 @@ internal object Capture : WebTool {
                 // Redacted once: the model, the evidence for checks and the run record all get this same copy
                 val red = Redactor.network(url = c.url, body = c.body)
                 val body = red.body
-                val seen = body?.let { webRead("网络响应(${red.url},HTTP ${c.status})\n${it.take(max)}", red.url) }
+                val seen = body?.let { webRead("Network response (${red.url}, HTTP ${c.status}):\n${it.take(max)}", red.url) }
                 return ok {
                     fields(c)
                     if (body != null) {

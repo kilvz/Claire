@@ -1,27 +1,27 @@
 ---
 name: wechat
-display: 微信
+display: WeChat
 packages: ["com.tencent.mm"]
 aliases: ["WeChat", "weixin", "微信", "wechat"]
 sites: []
 open: 微信
 pace: careful
-description: 聊天、公众号与社交
+description: Chat, official accounts and social
 ---
-## 是什么
-微信是聊天与社交 App,包名 `com.tencent.mm`。
+## What it is
+微信 (WeChat) is a chat and social app, package name `com.tencent.mm`.
 
-## 界面
-主要结构通常是聊天列表、通讯录、发现和个人页,具体布局随版本、账号状态和字体设置而不同。顶部搜索会同时返回联系人、群聊、聊天记录、小程序和公众号,结果按分组显示。
+## UI
+The main structure is usually the chat list, contacts, discover and personal pages; the exact layout varies with version, account state and font settings. The top search returns contacts, group chats, chat history, mini programs and official accounts at the same time, with results shown by group.
 
-## 功能
-- **会话**:未读标记、置顶、草稿、服务通知和普通消息都在列表里,容易混淆。联系人显示名、备注名、群名和头像可能相似,进入会话后标题才是实际对象。输入框里有文字只是草稿,发出后会话里才有本人的气泡。群聊中每条消息有发言人。
-- **公众号**:内容与个人会话是分开的。
+## Features
+- **Conversations**: unread markers, pinned chats, drafts, service notifications and ordinary messages are all in the list and easy to confuse. A contact's display name, remark name, group name and avatar may be similar; only the title after entering a conversation is the actual object. Text in the input box is only a draft; only after sending is there a bubble from you in the conversation. In group chats, each message has a speaker.
+- **Official accounts**: content is separate from personal conversations.
 
-## 已知现象
-- 会话列表、聊天页是自绘界面,部分机型上无障碍树可能读不到内容(`treeQuality=unusable`):元素为空,读屏、点按、打字、滚动都不可用,只能退回「截图 + 视觉定位坐标」去点。这与微信默认关闭「无障碍模式」有关。
-- 开启微信「无障碍模式」能显著改善可读性:微信「我 → 设置 → 通用 → 无障碍」里打开无障碍相关选项(不同版本菜单名可能略有差异)。开了之后列表和聊天页的控件基本都能读到。
-- 树空、点按无反应时,先确认窗口/页面选对了、没停在系统弹窗(如部分机型的「选择要使用的应用」分身选择器),而不是反复换坐标重试同一个位置。
+## Known issues
+- The chat list and chat page are custom-drawn interfaces, and on some device models the accessibility tree may not read content (`treeQuality=unusable`): elements are empty, and screen reading, tapping, typing and scrolling are all unavailable, so you can only fall back to "screenshot + visual coordinate location" to tap. This is related to WeChat turning off 「无障碍模式」 (Accessibility mode) by default.
+- Turning on WeChat's 「无障碍模式」 (Accessibility mode) can significantly improve readability: open the accessibility-related options under 「我 → 设置 → 通用 → 无障碍」 (Me → Settings → General → Accessibility) in WeChat (menu names may differ slightly between versions). After turning it on, the controls on the list and chat pages can basically all be read.
+- When the tree is empty and tapping has no response, first confirm that the window/page is the right one and that you are not stuck on a system pop-up (such as the 「选择要使用的应用」 (Choose an app to use) dual-app selector on some models), instead of repeatedly retrying the same position with different coordinates.
 
-## 常用流程
-- **发朋友圈**:从底部「发现」进「朋友圈」,右上角相机选照片,或长按相机只发文字;发出去前每一步的菜单名见 `references/send-moments.md`。
+## Common flows
+- **Posting to Moments**: from the bottom 「发现」 (Discover) enter 「朋友圈」 (Moments), choose photos with the camera in the top right, or long-press the camera to post text only; the menu names at each step before publishing are in `references/send-moments.md`.

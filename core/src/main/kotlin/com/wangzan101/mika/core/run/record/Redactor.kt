@@ -134,7 +134,14 @@ object Redactor {
         val words = CODE_WORD.findAll(t).map { it.range }.toList()
         if (words.isEmpty()) return t
         return CODE_DIGITS.replace(t) { m ->
-            val near = words.any { w -> m.range.first - w.last in 1..CODE_WINDOW + 1 || w.first - m.range.last in 1..CODE_WINDOW + 1 }
+            // "Exit code 0:" on one line followed by a quantity on the next is not a one-time code: a match only counts
+            // when the word and the digits are on the same line (the window is a character distance, not a token one).
+            val near = words.any { w ->
+                val forward = m.range.first - w.last
+                val backward = w.first - m.range.last
+                (forward in 1..CODE_WINDOW + 1 && '\n' !in t.substring(w.last + 1, m.range.first)) ||
+                    (backward in 1..CODE_WINDOW + 1 && '\n' !in t.substring(m.range.last + 1, w.first))
+            }
             if (near) MASK else m.value
         }
     }

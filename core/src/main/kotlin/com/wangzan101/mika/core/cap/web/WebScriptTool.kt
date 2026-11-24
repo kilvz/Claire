@@ -59,7 +59,7 @@ internal object WebScriptTool : WebTool {
         }
         val content = calls.content(run)
         val result = (content["result"] as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
-        val seen = result?.let { webRead("页面脚本的结果(${ctx.lastSnapshot?.web?.url ?: "当前网页"})\n$it", ctx.lastSnapshot?.web?.url) }
+        val seen = result?.let { webRead("Page script result (${ctx.lastSnapshot?.web?.url ?: "current page"}):\n$it", ctx.lastSnapshot?.web?.url) }
         // The script's result comes from a web page: it is wrapped in an untrusted marker when handed to the model
         val shown = if (result == null) content else JsonObject(content +
             ("result" to JsonPrimitive(Untrusted.wrapWithin(result, EVAL_RESULT_MAX_CHARS))) +

@@ -136,7 +136,7 @@ class ResponsesModel(
         put("name", t.name)
         put("description", t.description)
         put("parameters", try { json.parseToJsonElement(t.parametersJsonSchema) } catch (e: Exception) {
-            throw IllegalArgumentException("工具 ${t.name} 的参数 schema 不是合法 JSON", e)
+            throw IllegalArgumentException("The parameter schema for tool ${t.name} is not valid JSON", e)
         })
         put("strict", false)
     }
@@ -204,8 +204,8 @@ class ResponsesModel(
             "subscription_sharing_user_not_eligible" -> ModelError.ChatGptNotEligible(message.take(200))
             // The server is temporarily unavailable: keep the login and try again later
             "subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable" -> ModelError.Server(503)
-            "subscription_sharing_unsupported_capability" -> ModelError.BadResponse("服务端不支持请求里的 ${param ?: "某项内容"}")
-            "subscription_sharing_route_not_supported" -> ModelError.BadResponse("服务端不支持这个接口")
+            "subscription_sharing_unsupported_capability" -> ModelError.BadResponse("The server does not support ${param ?: "an item"} in the request")
+            "subscription_sharing_route_not_supported" -> ModelError.BadResponse("The server does not support this endpoint")
             "subscription_sharing_invalid_user", "chatpass_v2_scope_not_authorized", "chatpass_v2_invalid_authorization_context" ->
                 ModelError.Auth()
             "context_length_exceeded" -> ModelError.ContextTooLong()
@@ -259,7 +259,7 @@ private class ResponsesStream(
     fun accept(data: String): Boolean {
         if (data == "[DONE]") return false
         val root = try { json.parseToJsonElement(data) as? JsonObject } catch (e: Exception) { null }
-            ?: throw ModelError.BadResponse("流式响应不是合法 JSON")
+            ?: throw ModelError.BadResponse("The streaming response is not valid JSON")
         when (root.str("type")) {
             "response.output_text.delta" -> root.str("delta")?.takeIf { it.isNotEmpty() }?.let {
                 visible.append(it)
@@ -286,7 +286,7 @@ private class ResponsesStream(
     /** The server did not reply as a stream and returned the whole response object directly. */
     fun fromBody(text: String): ModelReply {
         val root = try { json.parseToJsonElement(text) as? JsonObject } catch (e: Exception) { null }
-            ?: throw ModelError.BadResponse("返回内容不是合法 JSON")
+            ?: throw ModelError.BadResponse("The response content is not valid JSON")
         (root["error"] as? JsonObject)?.let { throw failure(it) }
         final = root
         incomplete = root.str("status") == "incomplete"
@@ -317,8 +317,8 @@ private class ResponsesStream(
                     }
                 }
                 "function_call" -> {
-                    val id = item.str("call_id") ?: throw ModelError.BadResponse("工具调用缺少编号")
-                    val name = item.str("name") ?: throw ModelError.BadResponse("工具调用缺少名称")
+                    val id = item.str("call_id") ?: throw ModelError.BadResponse("The tool call is missing an ID")
+                    val name = item.str("name") ?: throw ModelError.BadResponse("The tool call is missing a name")
                     calls += Part.ToolCall(id, name, item.str("arguments")?.ifEmpty { null } ?: "{}")
                 }
             }

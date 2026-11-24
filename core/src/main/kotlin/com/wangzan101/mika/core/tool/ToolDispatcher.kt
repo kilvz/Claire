@@ -395,7 +395,7 @@ class ToolDispatcher internal constructor(
     }
 
     fun noteUserAnswer(prompt: String, answer: String) {
-        evidenceLog.observe(Observation(ObsKind.UserSaid, "问用户「${prompt.take(200)}」,用户答:$answer", source = CORE_SOURCE))
+        evidenceLog.observe(Observation(ObsKind.UserSaid, "Asked the user \"${prompt.take(200)}\"; the user answered: $answer", source = CORE_SOURCE))
         capabilities.forEach { it.onUserAnswered(ctx) }
     }
 
@@ -452,17 +452,17 @@ class ToolDispatcher internal constructor(
     /** The takeover's outcome is known only after it is handed back, so the loop adds it to the action log (this is how the verifier knows whether the takeover really happened). */
     fun noteTakeover(reason: String, back: HandBack) {
         val effect = when (back.outcome) {
-            HandBackOutcome.complete -> if (back.userFinished) "用户说已自己办完(未核实)" else "用户已交回(未核实)"
-            HandBackOutcome.skipped -> "接管被跳过"
-            HandBackOutcome.timeout -> "接管超时,无人处理"
-            HandBackOutcome.aborted -> "任务被取消"
+            HandBackOutcome.complete -> if (back.userFinished) "the user said they finished it themselves (unverified)" else "the user took it back (unverified)"
+            HandBackOutcome.skipped -> "takeover skipped"
+            HandBackOutcome.timeout -> "takeover timed out with nobody to handle it"
+            HandBackOutcome.aborted -> "the task was cancelled"
         }
         evidenceLog.noteTakeover("${stepLabel()} ${ctx.tools.nameOf(Verb.HandToUser)}($reason) $effect")
         if (back.outcome == HandBackOutcome.complete) capabilities.forEach { it.onUserAnswered(ctx) }
     }
 
     /** "Step N" in the action log matches the loop's round (several steps in a batch belong to the same round); replay has no rounds. */
-    private fun stepLabel() = if (ctx.currentStep > 0) "第${ctx.currentStep}步" else "回放"
+    private fun stepLabel() = if (ctx.currentStep > 0) "Step ${ctx.currentStep}" else "Replay"
 
     /** An image sent to the main model, encoded uniformly via [ModelImage]; [screenshotId] is the recall id of the screen image. */
     fun modelImage(img: ByteArray, screenshotId: Int?): Part.Image = ModelImage.part(img, imageOps, screenshotId)

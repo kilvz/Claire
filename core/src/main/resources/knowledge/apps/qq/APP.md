@@ -4,20 +4,20 @@ display: QQ
 packages: ["com.tencent.mobileqq"]
 aliases: ["QQ", "手机QQ", "腾讯QQ"]
 open: QQ
-description: 即时消息、群聊、语音视频通话与文件传输
+description: Instant messaging, group chats, voice and video calls, and file transfer
 ---
-## 是什么
-QQ 是腾讯的即时通讯 App,安卓包名 `com.tencent.mobileqq`,提供好友和群聊、语音视频通话、文件及动态等内容。
+## What it is
+QQ is Tencent's instant messaging app, Android package name `com.tencent.mobileqq`, offering friends and group chats, voice and video calls, files, feeds and more.
 
-## 界面
-未登录或登录状态失效时,启动后显示账号密码登录页,可见找回密码、手机号登录、其他登录方式及注册账号。登录失效还可能弹出「身份验证失败,请你重新登录」的安全提醒。
+## UI
+When signed out or when the sign-in has expired, launching shows the account and password sign-in page, with password recovery, phone number sign-in, other sign-in methods and account registration visible. An expired sign-in may also pop up the security reminder 「身份验证失败,请你重新登录」 (identity verification failed, please sign in again).
 
-## 功能
-- **消息**:与好友或群聊成员发送文字、图片等消息。
-- **语音视频**:支持双人及群语音、视频通话。
-- **联系人**:管理好友和群聊,会话与联系人是不同内容。
-- **文件**:支持文件传输,手机可查看电脑文件。
-- **账号**:登录页提供账号密码、手机号及其他登录方式。
+## Features
+- **Messages**: send text, images and other messages to friends or group chat members.
+- **Voice and video**: supports one-to-one and group voice and video calls.
+- **Contacts**: manage friends and group chats; conversations and contacts are different things.
+- **Files**: supports file transfer, and the phone can view the computer's files.
+- **Account**: the sign-in page offers account and password, phone number and other sign-in methods.
 
-## 已知现象
-设备存在多个 QQ 用户或分身时,显式启动也可能先出现系统应用选择框。账号登录失效会阻止进入消息界面;这不是搜索或聊天功能本身的结果。
+## Known issues
+When several QQ users or app clones exist on the device, even an explicit launch may first show the system app chooser. An expired account sign-in blocks access to the message screen; this is not the result of the search or chat feature itself.

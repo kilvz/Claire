@@ -1,29 +1,29 @@
-# 找工作：搜职位 → 打招呼 → 发简历
+# Finding a job: search jobs → greet → send résumé
 
-求职的完整流程，从搜职位一路到让招聘人看到简历。App 和网页版是同一套职位、筛选条件和「立即沟通」。
+The complete job hunting flow, from searching jobs all the way to letting the recruiter see your résumé. The app and the web version share the same jobs, filters and 「立即沟通」 (Chat now).
 
-## 搜职位
+## Searching jobs
 
-1. 打开 BOSS直聘（已登录）。
-2. 职位页顶部搜索框输入关键词；或直接看「推荐」列表（按求职期望推荐）。
-3. 用筛选缩小范围：城市、薪资待遇、工作经验、学历要求、公司规模、行业。这些和网页版同一套条件。
+1. Open BOSS直聘 (BOSS Zhipin) (signed in).
+2. Type keywords into the search box at the top of the Jobs page; or just look at the 「推荐」 (Recommended) list (recommended from your job expectations).
+3. Narrow the list down with filters: city, salary, work experience, education, company size, industry. These are the same conditions as the web version.
 
-## 看职位详情
+## Viewing job details
 
-点某个职位卡片，进详情页。能看到：职位名、薪资、地点、经验、学历、公司（融资阶段、规模、行业）、招聘人（名字、职务、是否在线）、福利、职位标签、职位描述、公司介绍、工作地址。
+Tap a job card to open its detail page. It shows: job title, salary, location, experience, education, company (funding stage, size, industry), recruiter (name, title, whether online), benefits, job tags, job description, company introduction and work address.
 
-## 打招呼（立即沟通）
+## Greeting (Chat now)
 
-详情页上点「立即沟通」，进入和这个招聘人的聊天——这一步算一次沟通，当天沟通人数有上限（用完会弹「您已达到沟通上限」）。
+Tap 「立即沟通」 (Chat now) on the detail page to enter the chat with this recruiter — this counts as one contact, and there is a daily cap on contacts (when it runs out, 「您已达到沟通上限」 (You have reached the chat limit) pops up).
 
-「感兴趣」在「立即沟通」旁边，点它招聘人会收到你的意向和简历，不进入聊天。
+「感兴趣」 (Interested) is next to 「立即沟通」 (Chat now); tapping it sends your interest and résumé to the recruiter without entering the chat.
 
-## 聊天与发简历
+## Chatting and sending the résumé
 
-- 在聊天里发文字，和招聘人一来一回地聊。
-- 你的在线简历（在「我的」里维护）招聘人直接能看，不用单独传文件；能否发图片/文件附件随版本。
+- Send text in the chat and talk back and forth with the recruiter.
+- The recruiter can see your online résumé (maintained under 「我的」 (Me)) directly, with no separate file upload; whether images or file attachments can be sent depends on the version.
 
-## 怎样算办成
+## How you know it worked
 
-- 已经进入和招聘人的聊天、能发消息；或
-- 「感兴趣」已点、招聘人收到了意向。
+- You have entered the chat with the recruiter and can send messages; or
+- 「感兴趣」 has been tapped and the recruiter has received your interest.

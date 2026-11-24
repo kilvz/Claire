@@ -1,23 +1,23 @@
 ---
 name: baidu
-display: 百度
+display: Baidu
 packages: ["com.baidu.searchbox"]
 aliases: ["百度App", "百度搜索", "Baidu"]
 sites: ["baidu.com", "top.baidu.com"]
 open: 百度
-description: 搜索、资讯、热搜、视频与小说等内容服务
+description: Search, news, hot searches, video, novels and other content services
 ---
-## 是什么
-百度 App 提供网页搜索、资讯与视频信息流、热搜榜单、小说和短剧等内容,安卓包名 `com.baidu.searchbox`。
+## What it is
+The Baidu app offers web search, news and video feeds, hot search rankings, novels, short dramas and other content, with Android package name `com.baidu.searchbox`.
 
-## 界面
-首页顶部是搜索框,带语音、拍照搜索和搜索按钮。搜索框下方是横向频道栏,可见关注、热搜、发现、推荐、小说、短剧等频道,频道可以管理和调整。底部通常有百度、视频、消息、我的,中间还有语音入口。
+## UI
+The top of the home page is a search box with voice, photo search and a search button. Below the search box is a horizontal channel bar showing channels such as Following, Hot search, Discover, Recommended, Novels and Short dramas, and the channels can be managed and adjusted. The bottom usually has Baidu, Video, Messages and Me, with a voice entry in the middle.
 
-## 功能
-- **搜索**:首页顶部输入关键词;也可使用语音或拍照搜索。
-- **热搜**:频道栏的「热搜」内有我的热搜、百度热搜及其他分类榜单入口。百度热搜条目显示排名和标题,部分条目标有新、热或直播中状态。
-- **发现与推荐**:以双列卡片展示图文和视频内容,卡片可见标题、来源和阅读量等信息。
-- **视频、消息与个人页**:底部标签分别进入视频内容、消息和个人功能。
+## Features
+- **Search**: type keywords at the top of the home page; voice or photo search can also be used.
+- **Hot searches**: 「热搜」 (Hot search) in the channel bar contains My hot searches, Baidu hot searches and other category ranking entries. Baidu hot search entries show a rank and a title, and some entries are marked as new, hot or live.
+- **Discover and recommended**: image-text and video content is shown as two-column cards, and a card shows information such as the title, source and read count.
+- **Video, messages and profile page**: the bottom tabs lead to video content, messages and personal features respectively.
 
-## 已知现象
-百度热搜页可能先显示部分排名,列表下方有「展开更多」。频道名称、顺序和首页推荐内容会随频道设置、版本与账号状态变化。
+## Known issues
+The Baidu hot search page may show only part of the ranking first, with 「展开更多」 (Show more) below the list. Channel names, order and home page recommended content change with the channel settings, version and account state.

@@ -4,32 +4,32 @@ display: Spotify
 packages: ["com.spotify.music"]
 aliases: ["Spotify", "spotify", "声田"]
 open: Spotify
-description: 音乐与播客流媒体:歌曲播放、歌单、搜索与资料库
+description: Music and podcast streaming: song playback, playlists, search and your library
 ---
-## 是什么
-Spotify 是音乐与播客流媒体 App,包名 `com.spotify.music`。支持全球单曲、专辑、自建与推荐歌单,以及各类播客收听。
+## What it is
+Spotify is a music and podcast streaming app, package name `com.spotify.music`. It supports global singles, albums, self-made and recommended playlists, and listening to all kinds of podcasts.
 
-## 界面
-底部导航通常为三个标签:「首页」「搜索」「你的音乐库」(部分版本为四个,含「创建」)。
-- **首页**:顶部左侧是头像(进入设置与个人资料),中间有「全部」「音乐」「播客」筛选胶囊;主体为最近播放的专辑/歌单网格与个性化推荐流。
-- **搜索页**:顶部为搜索栏「想听什么?」,点击进入输入界面,下方平铺各类浏览分类(流行、播客、排行榜等)。
-- **你的音乐库**:顶部可按「播放列表」「播客」「艺人」「专辑」过滤,展示收藏的歌曲(Liked Songs)、自建歌单和关注的播客。右上角「+」可新建播放列表。
-- **迷你播放栏**:悬浮在底部导航栏上方,显示当前封面、曲名、艺人与播放/暂停按钮。
-- **全屏播放器**:上方为大封面,中间为歌曲与艺人名、加号/心形收藏图标,下方为进度条、随机播放、上一首、播放/暂停、下一首、单曲循环图标。向上滑动展开实时同步歌词。
+## UI
+The bottom navigation is usually three tabs: 「首页」 (Home), 「搜索」 (Search) and 「你的音乐库」 (Your Library) (some versions have four, including 「创建」 (Create)).
+- **首页 (Home)**: top left is the avatar (opens settings and profile), in the middle are the filter pills 「全部」 (All), 「音乐」 (Music) and 「播客」 (Podcasts); the main body is a grid of recently played albums/playlists and a personalized recommendation feed.
+- **Search page**: at the top is the search bar 「想听什么?」 (What do you want to listen to?); tap it to enter the input screen, and below are browsing categories laid out flat (pop, podcasts, charts, etc.).
+- **Your Library**: at the top you can filter by 「播放列表」 (Playlists), 「播客」 (Podcasts), 「艺人」 (Artists) and 「专辑」 (Albums), showing liked songs, user-created playlists and followed podcasts. The 「+」 in the top right creates a new playlist.
+- **Mini player bar**: floats above the bottom navigation bar, showing the current cover, track name, artist and play/pause buttons.
+- **Full-screen player**: above is the large cover, in the middle are the song and artist names and the plus/heart favorite icon, below are the progress bar, shuffle, previous, play/pause, next and repeat-one icons. Swipe up to expand real-time synced lyrics.
 
-## 功能
-- **防全屏遮挡与状态恢复**:
-  - 若上次退出时全屏播放器处于展开状态,重新打开时可能直接停留在大封面全屏播放器,**遮挡底部导航栏**。此时必须先点击左上角的向下折叠箭头「v」或从顶部向下滑动,将播放器收缩为底部迷你栏,才能看到搜索与音乐库入口。
-- **精准搜索与播放**:
-  - 在搜索栏输入歌曲或艺人名。结果页利用顶部胶囊精准切换「单曲」「艺人」「播放列表」「专辑」,避免在综合结果中点错。
-  - 点击艺人进入艺人主页,上方列出「热门单曲(Popular)」榜单。
-- **管理歌单与收藏**:
-  - 点击歌曲右侧三点菜单可「添加到播放列表」「加入已点赞的歌曲」「查看艺人」「查看专辑」。
-  - 在「你的音乐库」中点击「+」输入歌单名称并点击「创建」即可新建歌单。
-- **设备连接**:迷你栏或全屏页上的设备图标(扬声器/显示器图标)可切换音频输出设备(本机、蓝牙耳机、局域网音响)。
+## Features
+- **Avoiding full-screen obstruction and restoring state**:
+  - If the full-screen player was expanded when you last quit, reopening may land directly on the large-cover full-screen player, **blocking the bottom navigation bar**. In this case you must first tap the collapse-down arrow 「v」 in the top left or swipe down from the top to shrink the player into the bottom mini bar before you can see the search and library entrances.
+- **Precise search and playback**:
+  - Type a song or artist name in the search bar. On the results page, use the top pills to switch precisely between 「单曲」 (Songs), 「艺人」 (Artists), 「播放列表」 (Playlists) and 「专辑」 (Albums), to avoid tapping the wrong item in the combined results.
+  - Tap an artist to enter the artist page, where the 「热门单曲(Popular)」 chart is listed at the top.
+- **Managing playlists and favorites**:
+  - Tap the three-dot menu to the right of a song for 「添加到播放列表」 (Add to playlist), 「加入已点赞的歌曲」 (Add to Liked Songs), 「查看艺人」 (View artist) and 「查看专辑」 (View album).
+  - In 「你的音乐库」, tap 「+」, enter the playlist name and tap 「创建」 (Create) to make a new playlist.
+- **Device connection**: the device icon (speaker/monitor icon) on the mini bar or the full-screen page switches the audio output device (this device, Bluetooth headphones, local network speakers).
 
-## 已知现象
-- **免费版限制**:移动端免费账号(Free)点单曲通常进入「随机播放(Shuffle)模式」,无法精确点播非推荐单曲;切歌有每小时次数上限(通常 6 次),用尽后下一首按钮失效置灰。
-- **音频/视频广告**:免费账号在切歌或定时播放期间会插播全屏广告,广告期间不可跳过或拖动进度条。
-- **Premium 促销拦截**:频繁弹出「免费试用 1 个月」或「升级 Premium」全屏弹窗,需点击右上角「×」或底部「不用了/跳过」退出。
-- **离线与下载**:下载歌曲/歌单离线收听属于 Premium 会员功能,免费账号的下载开关置灰或弹出付费提示。
+## Known issues
+- **Free-tier limits**: on mobile, tapping a single track with a free account usually enters 「随机播放(Shuffle)模式」, and non-recommended singles cannot be played on demand; skipping is capped per hour (usually 6 times), and once used up the next button is disabled and grayed out.
+- **Audio/video ads**: free accounts get full-screen ads inserted when skipping or during timed playback, and during the ad you cannot skip or drag the progress bar.
+- **Premium promotion interception**: full-screen pop-ups such as 「免费试用 1 个月」 (1-month free trial) or 「升级 Premium」 (Upgrade to Premium) appear frequently; tap 「×」 in the top right or 「不用了/跳过」 (Not now/Skip) at the bottom to exit.
+- **Offline and downloads**: downloading songs/playlists for offline listening is a Premium feature; for free accounts the download toggle is grayed out or shows a payment prompt.

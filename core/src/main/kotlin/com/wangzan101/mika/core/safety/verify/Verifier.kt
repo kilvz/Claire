@@ -133,7 +133,7 @@ class Verifier(
     suspend fun verify(goal: String, criteria: Criteria, answer: String, evidence: Evidence, earlierGoals: List<String> = emptyList()): Verification {
         val chosen = evidence.ledger.forAnswer(goal, answer)
         val reads = evidence.sources(chosen)
-        if (evidence.protected && reads.isEmpty()) return cannot("结果页受系统防截屏保护,看不到画面,没法核实")
+        if (evidence.protected && reads.isEmpty()) return cannot("The result page is protected against screenshots by the system, so the screen cannot be seen and the result cannot be verified")
         val image = evidence.freshImage?.takeIf { visionModel != null && !evidence.protected }
         val model = if (image != null) visionModel!! else textModel
         val v = when (val first = ask(model, goal, criteria, answer, evidence, chosen, EvidenceLedger.EXCERPT_CHARS, earlierGoals, image)) {
@@ -143,7 +143,7 @@ class Verifier(
             Asked.TimedOut -> when (val second = ask(model, goal, criteria, answer, trimmed(evidence), chosen, TRIM_EXCERPT_CHARS, earlierGoals, image)) {
                 is Asked.Done -> second.v
                 is Asked.Failed -> return cannot(second.reason)
-                Asked.TimedOut -> return cannot("核查超时")
+                Asked.TimedOut -> return cannot("Verification timed out")
             }
         }
         return when (v.verdict) {
@@ -179,11 +179,11 @@ class Verifier(
             withTimeoutOrNull(timeoutMs(body.length, if (image != null) 1 else 0)) {
                 // Replies go through tolerant parsing; when nothing can be read, ask once more for JSON only; only then is it unparseable
                 ModelJson.completeParsed(model, PROMPT, listOf(Message(Role.User, parts, Author.Mika)), ::parse).also { unparsed = it == null }
-            }?.let { Asked.Done(it) } ?: if (unparsed) Asked.Failed("核查器的回复无法解析") else Asked.TimedOut
+            }?.let { Asked.Done(it) } ?: if (unparsed) Asked.Failed("The verifier's reply could not be parsed") else Asked.TimedOut
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Asked.Failed("核查器出错:${e.message ?: e::class.simpleName}")
+            Asked.Failed("Verifier error: ${e.message ?: e::class.simpleName}")
         }
     }
 
@@ -207,10 +207,10 @@ class Verifier(
             put("goal", goal)
             if (earlierGoals.isNotEmpty()) put("earlierGoals", JsonArray(earlierGoals.map(::JsonPrimitive)))
             put("criteria", JsonArray(c.items.map(::JsonPrimitive)))
-            if (c.fallback) put("criteriaNote", "没有另列标准,criteria 只是用户原话本身,请对照用户的目标核对")
+            if (c.fallback) put("criteriaNote", "No separate criteria were listed; criteria is only the user's own words, so check against the user's goal")
             put("kind", c.kind)
             put("answer", answer)
-            put("freshLook", if (e.nothingRead) NOTHING_READ else freshShown(goal, answer, e).ifBlank { if (e.protected) "(页面受防截屏保护,读不到)" else "(没读到文字)" })
+            put("freshLook", if (e.nothingRead) NOTHING_READ else freshShown(goal, answer, e).ifBlank { if (e.protected) "(The page is protected against screenshots and cannot be read)" else "(No text was read)" })
             put("ledger", JsonArray(shown.map { r ->
                 buildJsonObject {
                     if (r.step > 0) put("step", r.step)
@@ -225,7 +225,7 @@ class Verifier(
             if (e.takeovers.isNotEmpty()) put("takeovers", JsonArray(e.takeovers.map(::JsonPrimitive)))
             if (e.userFacts.isNotEmpty()) put("userFacts", JsonArray(e.userFacts.map(::JsonPrimitive)))
         }
-        return "下面是待核对的材料(JSON,字段说明见系统提示):\n$material"
+        return "Below is the material to verify (JSON, field descriptions are in the system prompt):\n$material"
     }
 
     companion object {

@@ -79,7 +79,7 @@ internal object SpawnAgent : AgentTool {
                     }
                     catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
-                        val message = Redactor.text("子任务起不来: ${e.message ?: e::class.simpleName}").take(limit)
+                        val message = Redactor.text("the subtask could not start: ${e.message ?: e::class.simpleName}").take(limit)
                         ToolExecution(buildJsonObject {
                             put("ok", false)
                             put("goal", goal.take(200))

@@ -1,25 +1,25 @@
 ---
 name: weibo.com
-display: 微博
+display: Weibo
 domains: ["weibo.com"]
 aliases: ["微博", "Weibo", "weibo"]
 apps: ["weibo"]
 open: weibo.com
 mode: desktop
-description: 社交媒体,可按关键词和日期搜近期事件、用户发帖及传播数据
+description: Social media; search recent events, user posts and spread data by keyword and date
 ---
-## 是什么
-国内的公开社交媒体,内容是用户发的短帖,带转发、评论、点赞数。可搜近期事件和用户吐槽。
+## What it is
+A public social media platform in China; the content is short posts published by users, with repost, comment and like counts. It can be used to search recent events and user complaints.
 
-## 页面与网址
-- 搜索:`https://s.weibo.com/weibo?q=<编码关键词>&xsort=hot`,`xsort=hot` 按热度排序。
-- 限定日期:加 `timescope=custom:YYYY-MM-DD:YYYY-MM-DD`。
+## Pages and URLs
+- Search: `https://s.weibo.com/weibo?q=<编码关键词>&xsort=hot`, where `xsort=hot` sorts by popularity.
+- Restrict by date: add `timescope=custom:YYYY-MM-DD:YYYY-MM-DD`.
 
-## 功能
-- **搜索**:结果卡片有作者、发布时间、正文、转评赞数。
-- **原帖**:点进可看完整原文、作者和计数。转发帖可追溯到最初的发布者。
-- **手机 App**:打开后进入当前界面,对应的 App 说明见 `weibo`。
+## Features
+- **Search**: result cards have the author, publish time, body text, and repost, comment and like counts.
+- **Original post**: clicking through shows the complete original text, the author and the counts. Reposts can be traced back to the first publisher.
+- **Mobile app**: it opens into the current interface; see `weibo` for the corresponding app documentation.
 
-## 已知现象
-- 热度排序的前排常有营销号和转载。
-- 转发数、点赞数只反映传播,不等于同类遭遇的人数。
+## Known issues
+- The top of popularity-sorted results often contains marketing accounts and reposts.
+- Repost and like counts only reflect spread, and do not equal the number of people who had the same experience.

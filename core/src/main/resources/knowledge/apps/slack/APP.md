@@ -4,29 +4,29 @@ display: Slack
 packages: ["com.Slack"]
 aliases: ["Slack", "slack"]
 open: Slack
-description: 工作区沟通与协作:工作区、频道、私信与线程回复
+description: Workspace communication and collaboration: workspaces, channels, DMs and threaded replies
 ---
-## 是什么
-Slack 是企业与团队工作区沟通协作 App,包名 `com.Slack`。内容按工作区(Workspace)隔离,内部按公共/私密频道、私信(DM)和话题线程(Thread)组织。
+## What it is
+Slack is a workspace communication and collaboration app for enterprises and teams, package name `com.Slack`. Content is isolated by workspace (Workspace), and inside it is organized by public/private channels, direct messages (DM) and threads (Thread).
 
-## 界面
-底部导航通常为四个标签:「主页 (Home)」「私信 (DMs)」「动态/提及 (Activity)」「你 (You)」(部分版本包含 Catch Up 待办)。
-- **主页与频道抽屉**:顶部左侧是当前工作区头像与名称(点击或左滑可唤出工作区切换面板与设置);中间或右侧为搜索栏或放大镜;下方分类陈列:未读消息、话题讨论(Threads)、公共频道(前缀 `#`)、私密频道(前缀小锁 🔒)、外部共享频道与画布(Canvases)。
-- **频道聊天页**:顶部显示频道名称、成员数、搜索与耳机图标(Huddle 随选随聊);中间为消息时间线;底部为消息输入框,支持快捷输入、`@` 成员、表情反应与附加文件「+」。
-- **线程回复页(Thread)**:在频道中点击消息下方的「X 条回复」进入。顶部标有「Thread」及所属频道名,右侧有关注铃铛;底部输入框带有「同时发送到 #频道」复选框。
+## UI
+The bottom navigation is usually four tabs: 「主页」 (Home), 「私信」 (DMs), 「动态/提及」 (Activity) and 「你」 (You) (some versions include a Catch Up to-do).
+- **Home and the channel drawer**: top left is the current workspace avatar and name (tap or swipe left to bring up the workspace switcher and settings); in the middle or on the right is a search bar or magnifier; below are categories: unread messages, threads (Threads), public channels (prefix `#`), private channels (prefix a small lock 🔒), externally shared channels and canvases (Canvases).
+- **Channel chat page**: the top shows the channel name, member count, search and a headphone icon (Huddle, ad-hoc audio chat); the middle is the message timeline; the bottom is the message input box, which supports quick input, `@` members, emoji reactions and attaching files with 「+」.
+- **Thread reply page (Thread)**: enter by tapping 「X 条回复」 (X replies) below a message in a channel. The top is labeled 「Thread」 and the name of the channel it belongs to, on the right is a follow bell; the bottom input box has an 「同时发送到 #频道」 (Also send to #channel) checkbox.
 
-## 功能
-- **确认当前工作区与频道**:
-  - 用户可能同时加入多个企业或社群工作区。打开 App 时务必先核对左上角工作区头像与当前频道标题。若目标频道在另一工作区,点击左上角头像呼出侧边栏切换目标工作区。
-- **线程回复(Thread)**:
-  - 团队沟通强调在话题线程内回复。长按消息或点击消息卡片下方的回复计数进入 Thread。在输入框键入内容并发送;如无必要,**切勿勾选「同时发送到 #频道 (Also send to #channel)」**,避免在公共频道刷屏。
-- **发送消息与富文本**:
-  - 输入框支持粗体、斜体、删除线、代码块及项目列表格式。通过 `@` 提及特定成员或 `@here`/`@channel` 提示全员。
-- **搜索定位历史**:
-  - 点击全局搜索支持利用语法筛选:`in:#频道名` 限制频道、`from:@成员` 指定发言人、`has:link` 查找链接。
+## Features
+- **Confirm the current workspace and channel**:
+  - Users may be in several enterprise or community workspaces at once. When opening the app, always first check the workspace avatar in the top left and the current channel title. If the target channel is in another workspace, tap the top-left avatar to bring up the sidebar and switch to the target workspace.
+- **Thread replies (Thread)**:
+  - Team communication emphasizes replying inside the topic thread. Long-press a message or tap the reply count below the message card to enter the Thread. Type in the input box and send; if unnecessary, **never tick 「同时发送到 #频道」 (Also send to #channel)**, to avoid flooding the public channel.
+- **Sending messages and rich text**:
+  - The input box supports bold, italic, strikethrough, code blocks and bulleted lists. Use `@` to mention specific members or `@here`/`@channel` to notify everyone.
+- **Searching for history**:
+  - The global search supports syntax filters: `in:#channel-name` limits the channel, `from:@member` specifies the speaker, and `has:link` finds links.
 
-## 已知现象
-- **状态残留与深入线程**:退出重开经常直接停留在某个深层 Thread 或私信聊天中,导致看不到主页频道列表。需点击左上角「←」逐步返回上级。
-- **误触随选随聊 (Huddle)**:频道右上角的耳机开关属于即时语音房间,点击会立即启动麦克风并广播进入提示音,切勿随意开启。
-- **权限与归档限制**:被管理员归档(Archived)的频道底部会显示「该频道已被归档,处于只读状态」,无法输入任何新内容。
-- **双重身份验证与 SSO 拦截**:首次使用或令牌过期时可能唤起浏览器或身份验证器进行 SSO 登录认证。
+## Known issues
+- **Leftover state and deep threads**: after quitting and reopening you often land directly in a deep Thread or a DM chat, so the home channel list is not visible. Tap 「←」 in the top left to return step by step to the parent level.
+- **Accidentally starting a Huddle**: the headphone toggle in the top right of a channel is an instant voice room; tapping it immediately turns on the microphone and broadcasts an entry tone, so never turn it on casually.
+- **Permission and archive restrictions**: a channel archived by an admin shows 「This channel has been archived and is read-only」 at the bottom, and no new content can be entered.
+- **Two-factor authentication and SSO interception**: on first use or when the token expires, a browser or authenticator may be brought up for SSO login authentication.

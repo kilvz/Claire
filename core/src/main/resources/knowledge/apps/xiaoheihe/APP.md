@@ -1,40 +1,40 @@
 ---
 name: xiaoheihe
-display: 小黑盒
+display: Heybox
 packages: ["com.max.xiaoheihe"]
 aliases: ["小黑盒", "Heybox", "heybox", "Xiaoheihe", "xiaoheihe", "黑盒"]
 sites: []
 open: 小黑盒
 pace: careful
-description: 游戏社区、游戏库与商城
+description: Gaming community, game library and store
 ---
-## 是什么
-小黑盒是游戏社区与游戏数据 App,包名 `com.max.xiaoheihe`。网站见 `xiaoheihe.cn`,是官网兼 PC/手机客户端下载页。
+## What it is
+Heybox (小黑盒) is a gaming community and game data app, package name `com.max.xiaoheihe`. The website is `xiaoheihe.cn`, which is both the official site and the PC/mobile client download page.
 
-## 界面
-底部导航是 首页｜社区｜＋｜游戏库｜我,中间的 ＋ 是发布入口,不是切换页。
+## UI
+The bottom navigation is 首页｜社区｜＋｜游戏库｜我 (Home | Community | + | Game library | Me); the ＋ in the middle is the posting entry, not a page switch.
 
-首页顶部是 关注／推荐,下面是可横滑的分类条(全部、热榜、PC游戏以及若干具体游戏),分类条右侧还有一个设置图标;信息流是顶部大图轮播加资讯列表,每条给标题、时间·分区和评论数。
+The top of the home page is 关注／推荐 (Following/Recommended), below it is a horizontally scrollable category bar (全部 (All), 热榜 (Hot list), PC游戏 (PC games) and several specific games), and there is also a settings icon on the right of the category bar; the feed is a top large-image carousel plus an information list, each item giving the title, time · section and comment count.
 
-社区是帖子流:卡片上有作者昵称和等级、标题、正文摘要、封面图、分区(如 盒友杂谈、影之刃零),底部一行是收藏数、点赞数和评论数。
+The community is a post feed: cards have the author's nickname and level, title, body summary, cover image and section (such as 盒友杂谈 (Fellow users chat), 影之刃零 (Phantom Blade Zero)), and the bottom row is the number of favorites, likes and comments.
 
-游戏库有 推荐／榜单 两个 tab;顶部一排小程序(黑盒商城、喜加一、赛事中心、黑盒语音),下面是"为你推荐"的双列游戏卡片,卡片上有领券标签、现价、原价、券后价、折扣百分比、"超史低"标记、榜单名次和类型标签。
+The game library has two tabs, 推荐／榜单 (Recommended/Charts); at the top is a row of mini programs (黑盒商城 (Heybox store), 喜加一 (Free game giveaway), 赛事中心 (Esports center), 黑盒语音 (Heybox voice)), below are two-column game cards under "为你推荐" (Recommended for you), with coupon tags, current price, original price, price after coupon, discount percentage, a 「超史低」 (below historical low) mark, chart rank and genre tags.
 
-"我"页上半部是头像、昵称、等级、签名和 关注/粉丝/收藏/历史浏览,下面依次是 数据／动态 两个 tab、我的任务、小程序、黑盒商城(我的订单);再往下是平台页(Steam、Switch、PSN、Xbox、Epic、手游、硬件)的绑定卡片和战绩卡片,然后是 心愿单／我的评分 和游戏列表(价格、评分),可按 全部平台、正在折扣、史低、Steam愿望单 筛选。
+The top half of the 我 (Me) page is the avatar, nickname, level, signature and 关注/粉丝/收藏/历史浏览 (Following/Followers/Favorites/History); below are, in order, the two tabs 数据／动态 (Stats/Posts), 我的任务 (My tasks), 小程序 (Mini programs), 黑盒商城(我的订单) (Heybox store (my orders)); further down are binding cards and stats cards for platform pages (Steam, Switch, PSN, Xbox, Epic, mobile games, hardware), then 心愿单／我的评分 (Wishlist/My ratings) and the game list (price, rating), filterable by 全部平台 (All platforms), 正在折扣 (On discount), 史低 (Historical low) and Steam愿望单 (Steam wishlist).
 
-发布页标题栏右侧显示 30(标题字数上限),正文单独一栏,下面是"添加分区及话题";底部工具条是 相册、视频、游戏库截图、全部模版;右上角才是"发布"。
+The right side of the title bar of the posting page shows 30 (the maximum title length), the body is a separate column, below it is "添加分区及话题" (Add section and topic); the bottom toolbar is 相册 (Album), 视频 (Video), 游戏库截图 (Game library screenshot) and 全部模版 (All templates); the actual "发布" (Publish) is in the top right.
 
-## 功能
-- **首页/社区**:资讯和帖子都按时间、分区组织,卡片上的数字是评论数、点赞数、收藏数,不是浏览量。
-- **搜索**:首页右上角的放大镜进入搜索,旁边的信封是消息。通常需要登录。
-- **游戏库**:卡片上的价格是券后价,同时列出原价和折扣;"更多"进入完整列表,榜单 tab 看排行。
-- **游戏账号管理**:平台页右侧的设置图标进入,可绑定 Switch／Steam／Epic 等,调整战绩卡片大小和平台偏好排序,已绑定的游戏(如明日方舟抽卡)也在这里。
-- **商城与订单**:黑盒商城在游戏库小程序和"我"页都有入口,"我"页那个显示我的订单。
-- **发布**:标题 30 字上限,可选分区和话题,支持相册、视频、游戏库截图和模版。
+## Features
+- **Home/Community**: news and posts are organized by time and section; the numbers on cards are comment count, like count and favorite count, not view count.
+- **Search**: the magnifier in the top right of the home page enters search, and the envelope next to it is messages. Usually requires login.
+- **Game library**: the price on the card is the price after coupon, and the original price and discount are listed as well; "更多" (More) enters the full list, and the 榜单 (Charts) tab shows the rankings.
+- **Game account management**: entered via the settings icon on the right of the platform page; you can bind Switch/Steam/Epic etc., adjust the size of stat cards and the platform preference order, and games already bound (such as Arknights gacha) are also here.
+- **Store and orders**: the Heybox store has entries in the game library mini programs and on the 我 (Me) page; the one on the 我 page shows my orders.
+- **Posting**: 30-character title limit, optional section and topic, supports album, video, game library screenshots and templates.
 
-## 已知现象
-信息流、热度、价格和库存都是动态内容;游戏库的价格是"券后价",会随活动和优惠券变化,不能当固定售价。
+## Known issues
+The feed, popularity, prices and stock are all dynamic content; the price in the game library is the "price after coupon", which changes with events and coupons and cannot be treated as a fixed sale price.
 
-启动时常弹推送精简模式提示和签到弹窗(签到给 H币和经验),这是弹窗,不是障碍。
+At startup it often pops up a push notification lite-mode prompt and a check-in dialog (check-in gives H coins and experience); these are pop-ups, not obstacles.
 
-"我"页和消息需要登录才有内容;没绑定的平台,卡片上显示"绑定我的…"和对应说明。
+The 我 (Me) page and messages have content only after logging in; for unbound platforms, the card shows "绑定我的…" (Bind my...) and the corresponding explanation.

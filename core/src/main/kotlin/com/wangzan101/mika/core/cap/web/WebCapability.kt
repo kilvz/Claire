@@ -97,7 +97,7 @@ internal class WebCapability(
     /** The beginning of the whole-page body text. */
     private suspend fun pageStart(p: WebPort): String? {
         val text = try { p.readPage(EVIDENCE_PAGE_CHARS, 0, scrollLazy = false).text } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
-        return text?.takeIf { it.isNotBlank() }?.let { "网页正文(开头):\n$it" }
+        return text?.takeIf { it.isNotBlank() }?.let { "Page text (beginning):\n$it" }
     }
 
     /** The version the current tab is using right now (mobile / desktop); null when it cannot be read. */

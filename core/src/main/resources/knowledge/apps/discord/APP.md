@@ -4,33 +4,33 @@ display: Discord
 packages: ["com.discord"]
 aliases: ["Discord", "discord", "DC", "开黑"]
 open: Discord
-description: 社群与语音文字聊天:服务器、频道、私信与好友
+description: Community and voice/text chat with servers, channels, DMs and friends
 ---
-## 是什么
-Discord 是社群通讯 App,包名 `com.discord`。内容按服务器(Guild)和频道(Channel)组织,也支持私信(DM)和语音通话。
+## What it is
+Discord is a community communication app, package name `com.discord`. Content is organized by server (Guild) and channel (Channel), and it also supports direct messages (DM) and voice calls.
 
-## 界面
-底部导航通常为四个标签:「服务器」「私信」「通知」「你(个人资料)」(部分版本有独立搜索标签)。
-- **服务器与频道抽屉**:左侧为服务器列表(最上方是私信入口,下方列出已加入的服务器图标,底部为「+」添加与「探索」)。点击服务器后展开其分类与频道列表(#文字频道、🔊语音频道、📢公告、💬论坛)。
-- **聊天界面**:顶部显示当前频道名(`#channel-name`)或私信对象,左侧为返回/抽屉汉堡按钮,右侧为搜索、通知与成员列表。底部为输入区:带附加文件「+」、Nitro礼物、GIF、表情包,以及文字输入框「发消息至 #...」。
-- **私信页**:顶部有搜索与「新私信」按钮,展示好友在线状态与最近私信会话。
+## UI
+The bottom navigation usually has four tabs: 「服务器」 (Servers), 「私信」 (DMs), 「通知」 (Notifications) and 「你(个人资料)」 (You, your profile) (some versions have a separate search tab).
+- **Server and channel drawer**: the server list on the left (the DMs entry at the top, joined server icons below, and 「+」 (Add) and 「探索」 (Explore) at the bottom). Tapping a server expands its categories and channel list (#text channels, 🔊 voice channels, 📢 announcements, 💬 forums).
+- **Chat interface**: the top shows the current channel name (`#channel-name`) or the DM recipient, with the back/drawer hamburger button on the left and search, notifications and the member list on the right. The bottom is the input area: the attach file 「+」, Nitro gift, GIF, stickers, and the text input box 「发消息至 #...」 (Message #...).
+- **DMs page**: search and a 「新私信」 (New DM) button at the top, showing friends' online status and recent DM conversations.
 
-## 功能
-- **判断当前所处位置(防被残留状态误导)**:
-  - 打开 App 时常直接恢复上次退出时的界面(如某个特定服务器的深层频道、帖子或私信)。
-  - **不要在当前停留的频道直接发无关消息或搜无关内容**。发私信先切到底部「私信」标签;去其他服务器先点左上角返回/抽屉按钮回到服务器列表再切目标。
-- **查找与发送频道消息**:
-  - 在服务器频道列表中选定文字频道进入。
-  - 在底部输入框键入文本后点发送。若需回复特定消息,长按该消息选「回复」。
-- **搜索作用域区别**:
-  - 频道顶部搜索栏默认作用域为当前频道(`in:#...`)或当前服务器。
-  - 要全局搜人或搜服务器,使用底部导航的搜索/探索入口。
-- **语音频道**:点击语音频道会弹出预览面板,点「加入语音」才连入;顶部会常驻绿色通话栏,点右上角挂断按钮断开。
+## Features
+- **Telling where you are (don't be misled by leftover state)**:
+  - Opening the app often restores the screen from when you last quit (such as a deep channel, thread or DM on a particular server).
+  - **Don't post unrelated messages or search for unrelated things in the channel you happen to be on**. To send a DM, first switch to the 「私信」 (DMs) tab at the bottom; to go to another server, first tap the back/drawer button at the top left to return to the server list, then switch to the target.
+- **Finding and sending channel messages**:
+  - Pick a text channel in the server's channel list and enter it.
+  - Type the text into the bottom input box and tap send. To reply to a specific message, long-press that message and choose 「回复」 (Reply).
+- **How search scope differs**:
+  - The search bar at the top of a channel defaults to the current channel (`in:#...`) or the current server.
+  - To search people or servers globally, use the search/explore entry in the bottom navigation.
+- **Voice channels**: tapping a voice channel pops up a preview panel, and only tapping 「加入语音」 (Join Voice) connects; a green call bar then stays at the top, and tapping the hang-up button at the top right disconnects.
 
-## 已知现象
-- **状态残留**:退出重新打开会停留上次的频道。若要执行新任务,务必先观察顶部标题和左上角返回按钮,退到顶层再导航。
-- **无发言权限**:在只读频道(如公告、规则),底部输入框变为「你没有在当前频道发送消息的权限」且置灰,切勿在此尝试输入。
-- **慢速模式**:输入框下方显示倒计时条,倒计时归零前无法连续发消息。
-- **新入服守则确认**:刚进新服务器时,底部常弹出「在发言前需要完成几个步骤」,点「完成」勾选同意规则才能解锁打字。
-- **论坛与子区(Threads)**:论坛频道需先点击具体的帖子主题进入,才能在帖子内回复。
-- **全屏图片/文件选择器**:点「+」展开媒体选择器时,按返回键通常先关选择器。
+## Known issues
+- **Leftover state**: quitting and reopening stays on the last channel. To run a new task, always look at the top title and the back button at the top left first, go back to the top level and then navigate.
+- **No permission to speak**: in read-only channels (such as announcements and rules) the bottom input box changes to 「你没有在当前频道发送消息的权限」 (you do not have permission to send messages in the current channel) and is greyed out; never try to type there.
+- **Slow mode**: a countdown bar shows below the input box, and messages cannot be sent continuously until the countdown reaches zero.
+- **New server rules confirmation**: right after joining a new server, a prompt often appears at the bottom saying 「在发言前需要完成几个步骤」 (you need to complete a few steps before speaking); tap 「完成」 (Finish) and accept the rules to unlock typing.
+- **Forums and threads**: a forum channel requires tapping a specific post topic first, and only then can you reply inside the post.
+- **Full-screen image/file picker**: when tapping 「+」 opens the media picker, the back key usually closes the picker first.

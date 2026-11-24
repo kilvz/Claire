@@ -1,30 +1,30 @@
 ---
 name: toutiao
-display: 今日头条
+display: Toutiao
 packages: ["com.ss.android.article.news"]
 aliases: ["今日头条", "头条", "Toutiao", "toutiao"]
 sites: []
 open: 今日头条
-description: 新闻资讯信息流、短视频和商城
+description: News and information feed, short videos and mall
 ---
-## 是什么
-今日头条是新闻资讯 App,包名 `com.ss.android.article.news`。有图文信息流、竖屏视频和商城。
+## What it is
+Toutiao is a news and information app, package name `com.ss.android.article.news`. It has an article and image feed, vertical-screen videos and a mall.
 
-## 界面
-底部标签:首页、视频、中间的「+」(发布)、商城、最右边是个人页(没登录时显示「未登录」)。
-- **首页**:顶部是搜索框(框里轮换显示推荐的热门词)和右边的「豆包 AI」;下面一排频道:关注、推荐、热榜、发现、所在城市、视频等,最右是「听一听开关」。内容是推荐信息流,每条有标题、来源、评论数。
-- **视频**:全屏竖屏视频,上下滑切换;顶部有搜索按钮、频道(关注、精选、推荐、找短剧)、发布、更多面板;右侧是作者头像(加关注)、点赞、评论、收藏、分享。
-- **商城**:顶部频道是直播、商城、国家补贴,下面有商品搜索框、购物车和我的订单、签到、领券、关注店铺、购物消息等入口,再往下是商品流。
-- **个人页**:没登录时点进去是登录页,右上角有「设置」。
+## UI
+Bottom tabs: 首页 (Home), 视频 (Video), the middle 「+」 (publish), 商城 (Mall), and on the far right the personal page (shows 「未登录」 (Not logged in) when not logged in).
+- **Home**: at the top are the search box (the box rotates through recommended hot terms) and 「豆包 AI」 (Doubao AI) on the right; below is a row of channels: 关注 (Following), 推荐 (Recommended), 热榜 (Hot list), 发现 (Discover), the current city, 视频 (Video), etc., and on the far right the 「听一听开关」 (Listen toggle). The content is a recommendation feed, each item with a title, source and comment count.
+- **Video**: full-screen vertical videos, swipe up and down to switch; at the top are a search button, channels (关注, 精选 (Featured), 推荐, 找短剧 (Find short dramas)), publish and a more panel; on the right are the author's avatar (follow), like, comment, favorite and share.
+- **Mall**: the top channels are 直播 (Live), 商城 and 国家补贴 (National subsidy); below are a product search box, cart and my orders, check-in, claim coupons, followed shops, shopping messages and other entries, and further down is the product feed.
+- **Personal page**: when not logged in, tapping it shows the login page, with 「设置」 (Settings) in the top right.
 
-## 功能
-- **搜索**:点首页搜索框进入。顶部有返回、输入框、相机图标、「搜索」按钮;下面是推荐词、搜索历史(带删除)、「猜你想搜」「头条热榜」「影视热搜榜」几组,底部有「AI 搜索」开关、「语音搜索」和「无痕搜索模式」开关。
-- **设置**:扫一扫、隐私设置、深色模式、长辈模式、字体大小、图文详情滑动方式、自动开启阅读模式、清除缓存、音频设置、播放与网络设置、推送通知设置、安全浏览设置。没登录时从登录页右上角进入。
+## Features
+- **Search**: tap the home page search box to enter. At the top are back, the input box, a camera icon and a 「搜索」 (Search) button; below are recommended terms, search history (with delete), and the groups 「猜你想搜」 (You may want to search), 「头条热榜」 (Toutiao hot list) and 「影视热搜榜」 (Film and TV hot search list); at the bottom are an 「AI 搜索」 (AI search) toggle, 「语音搜索」 (Voice search) and a 「无痕搜索模式」 (Incognito search mode) toggle.
+- **Settings**: scan, privacy settings, dark mode, elder mode, font size, article detail swipe mode, auto-enable reading mode, clear cache, audio settings, playback and network settings, push notification settings, safe browsing settings. When not logged in, enter from the top right of the login page.
 
-## 已知现象
-- 没登录时打开会出现登录页(「一键登录」用抖音账号,另有「其他登录方式」),左上角「关闭」可以关掉,不登录也能看首页和视频。
-- 刚打开可能叠着 App 自己的通知询问「是否允许"今日头条"发送通知?」,按钮是「始终允许」「暂不开启」。
-- 搜索框的元素名是当前轮换到的热门词,不是用户输入的内容。搜索页输入框里预先显示的也是推荐词。
-- 首页信息流里标题常被拆成一个字一个元素,整条的标题在外层可点的那个元素名里。
-- 进商城可能弹出领签到现金的大弹窗(「关联抖音并领取」),下方有关闭的「×」;这个弹窗读不到元素。
-- 商城页的元素列表基本只有顶部频道和底部标签,搜索框、入口和商品要看画面。没登录时商品价格显示不全,底部提示「登录查看商品价格」。
+## Known issues
+- When not logged in, opening the app shows the login page (「一键登录」 (One-tap login) uses a Douyin account, and there is also 「其他登录方式」 (Other login methods)); 「关闭」 (Close) in the top left closes it, and you can view the home page and videos without logging in.
+- Right after opening, the app's own notification prompt may be overlaid: 「是否允许"今日头条"发送通知?」 (Allow "Toutiao" to send notifications?), with the buttons 「始终允许」 (Always allow) and 「暂不开启」 (Not now).
+- The element name of the search box is the hot term currently being rotated, not the content the user typed. The search page input box also pre-displays a recommended term.
+- In the home feed, titles are often split into one element per character; the title of the whole item is in the name of the outer clickable element.
+- Entering the mall may pop up a large check-in cash dialog (「关联抖音并领取」 (Link Douyin and claim)), with a close 「×」 below; the elements of this pop-up cannot be read.
+- The element list of the mall page basically only has the top channels and bottom tabs; for the search box, entries and products you have to look at the screen. When not logged in, product prices are not fully shown, and the bottom prompts 「登录查看商品价格」 (Log in to view product prices).

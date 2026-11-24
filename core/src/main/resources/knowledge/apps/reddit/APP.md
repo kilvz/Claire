@@ -4,38 +4,38 @@ display: Reddit
 packages: ["com.reddit.frontpage"]
 aliases: ["Reddit", "reddit", "红迪"]
 open: Reddit
-description: 社区论坛:板块、发帖、投票、评论回复与私信
+description: Community forum: subreddits, posting, voting, comment replies and private messages
 ---
-## 是什么
-Reddit 是全球性社区论坛与内容聚合 App,包名 `com.reddit.frontpage`。内容按板块(Subreddit,前缀 `r/`)组织,用户通过发帖、赞踩投票、评论回复与关注互动积累社区声誉(Karma)。
+## What it is
+Reddit is a global community forum and content aggregation app, package name `com.reddit.frontpage`. Content is organized by subreddit (prefix `r/`), and users build community reputation (Karma) through posting, upvote/downvote voting, comment replies and follow interactions.
 
-## 界面
-底部导航包含五个标签:「首页 (Home)」「社区 (Communities)」「+ (创建发帖)」「聊天 (Chat)」「收件箱 (Inbox)」。
-- **首页**:顶部左侧可切换「Home (自选关注)」「Popular (热门)」「Watch (视频流)」;右侧为搜索放大镜和个人头像。帖子卡片展示板块名(`r/...`)、发帖人、发布时间、标题、正文或图片/视频、赞踩投票按钮(Upvote/Downvote)、评论总数和分享。
-- **社区列表**:可查看「最近访问」「已加入的社区」与「自建收藏夹 (Custom Feeds)」。进入具体板块顶部有板块横幅、简介、成员数和「Join (加入)」按钮。
-- **帖子详情页**:点击卡片进入,上方为完整帖子正文或全宽媒体,下方有排序开关(Best、Top、New、Controversial),下半部为多层级嵌套评论树。每条评论左侧有折叠竖线,下方有赞踩、回复(Reply)与分享。
-- **发帖编辑器**:点击底栏「+」进入。顶部为板块选择器「Select a community」,下方为帖子类型选择栏(文本 Text、图片 Images、视频 Video、链接 Link、投票 Poll),中间为标题与正文框,下方为「Add tags and flair」(标签)以及 NSFW、Spoiler 开关,右上角为「Next / Post」发布按钮。
+## UI
+The bottom navigation contains five tabs: 「Home」, 「Communities」, 「+ (create post)」, 「Chat」 and 「Inbox」.
+- **Home**: at the top left you can switch between 「Home」 (your subscribed communities), 「Popular」 (trending) and 「Watch」 (video feed); on the right are the search magnifier and your personal avatar. A post card shows the subreddit name (`r/...`), poster, posting time, title, body or image/video, upvote/downvote buttons, total comment count and share.
+- **Communities list**: you can view 「Recently Visited」, 「Your Communities」 and 「Custom Feeds」. After entering a specific subreddit, the top has the subreddit banner, description, member count and a 「Join」 button.
+- **Post detail page**: tap a card to enter; above is the full post body or full-width media, below is a sort toggle (Best, Top, New, Controversial), and the lower half is a multi-level nested comment tree. Each comment has a collapse line on its left, and below it are the vote buttons, 「Reply」 and share.
+- **Post editor**: tap 「+」 in the bottom bar to enter. At the top is the subreddit picker 「Select a community」, below it is the post type selection bar (Text, Images, Video, Link, Poll), in the middle are the title and body boxes, below them are 「Add tags and flair」 plus NSFW and Spoiler toggles, and the publish button 「Next / Post」 is in the top right.
 
-## 功能
-- **浏览与赞踩投票 (Upvote/Downvote)**:
-  - 帖子与评论均配有上下箭头:点击向上箭头(Upvote)变橙色表示赞同;点击向下箭头(Downvote)变紫色表示反对;再次点击已点亮的箭头可撤销投票。
-- **发帖全流程 (Create a Post)**:
-  - 点击底栏「+」,在顶部「Select a community」搜索并选定目标板块。
-  - 输入必填的「Title (标题)」;根据所选类型键入正文、添加图片或粘贴外链。
-  - **添加必填 Flair 标签**:许多板块强制要求贴标签,若右上角「Next」或「Post」置灰不可点,需先点击「Add tags and flair」在底部滑出的标签列表中选中一个(如 Discussion、News 等)并点「Apply」应用,按钮才会亮起。
-  - 点击右上角「Post」即可发出。
-- **发表主贴评论与层级回复 (Comment & Reply)**:
-  - **评论帖子**:在帖子详情页底部常驻的「Add a comment」文本框中输入内容,点右侧蓝色纸飞机/箭头发出。
-  - **回复他人评论**:在特定评论卡片下方点击带箭头的「Reply (回复)」按钮,在弹出的回复框中撰写并发送,生成树状嵌套回复。
-  - **折叠评论树**:轻触评论正文或长按可将该条评论及其所有下属子回复折叠为一行,便于快速跳读下一条独立主评论。
-- **积累 Karma (声誉积分) 的途径与操作**:
-  - Reddit 积分分为发帖积分(Post Karma)与评论积分(Comment Karma)。
-  - 新号积累积分首选参与门槛低的大众板块(如 `r/AskReddit`, `r/casualiama`, `r/aww`)。在活跃讨论帖(按 Rising 或 Hot 排序)下方撰写建设性、高共鸣的评论获得 Upvote,或在允许新用户的板块分享优质图文内容。
-- **搜索作用域**:
-  - 首页搜索为全站全局搜索;进入具体板块后,搜索栏前缀显示 `r/板块名`,搜索仅限制在当前社区的历史帖子与评论中。
+## Features
+- **Browsing and voting (Upvote/Downvote)**:
+  - Posts and comments both have up and down arrows: tapping the up arrow (Upvote) turns it orange to agree; tapping the down arrow (Downvote) turns it purple to disagree; tapping a highlighted arrow again undoes the vote.
+- **The full posting flow (Create a Post)**:
+  - Tap 「+」 in the bottom bar, then search in the top 「Select a community」 and choose the target subreddit.
+  - Enter the required 「Title」; depending on the selected type, type the body, add images or paste an external link.
+  - **Add the required flair**: many subreddits require a flair. If 「Next」 or 「Post」 in the top right is grayed out and unclickable, first tap 「Add tags and flair」, select one in the flair list that slides up from the bottom (such as Discussion, News, etc.) and tap 「Apply」; only then does the button light up.
+  - Tap 「Post」 in the top right to publish.
+- **Commenting on the main post and threaded replies (Comment & Reply)**:
+  - **Commenting on a post**: type in the 「Add a comment」 box that is always at the bottom of the post detail page, and tap the blue paper-plane/arrow on the right to send.
+  - **Replying to someone else's comment**: below a specific comment card, tap the 「Reply」 button with an arrow, write in the reply box that pops up and send; this creates a tree-nested reply.
+  - **Collapsing the comment tree**: tap the comment body lightly or long-press to collapse that comment and all its sub-replies into one line, so you can quickly skip to the next independent top-level comment.
+- **Ways to build up Karma (reputation points)**:
+  - Reddit points are divided into post karma and comment karma.
+  - For a new account, the first choice for building points is large general subreddits with a low bar for participation (such as `r/AskReddit`, `r/casualiama`, `r/aww`). Write constructive, resonant comments under active discussion posts (sorted by Rising or Hot) to get Upvotes, or share high-quality image and text content in subreddits that allow new users.
+- **Search scope**:
+  - Search on the home page is global site-wide search; after entering a specific subreddit, the search bar is prefixed with `r/subreddit name` and search is limited to that community's historical posts and comments.
 
-## 已知现象
-- **状态残留**:若上次退出时停留在某个帖子或深层评论区,重新打开会直接回到该贴。需按左上角「←」返回上层板块或首页。
-- **成人与剧透内容遮罩 (NSFW / Spoiler)**:涉及敏感或剧透的内容默认高斯模糊,卡片带有「18+」或「Spoiler」标识,需点击中间「Yes / View」确认方可解除模糊。
-- **新号与 Karma 门槛**:严格板块(如特定交易、提问或技术板块)设有注册天数或最低 Karma 过滤规则。未达标时发帖会被 AutoModerator 机器人自动移除,并在 Inbox 发送私信说明原因。
-- **评分与通知弹窗**:频繁弹出「Rate Reddit」「启用通知」等应用内引导卡片,需点「Not now」「No thanks」关闭。
+## Known issues
+- **Leftover state**: if you quit while on a post or in a deep comment section, reopening goes straight back to that post. Tap 「←」 in the top left to return to the parent subreddit or the home page.
+- **NSFW / Spoiler masking**: content that is sensitive or spoilery is gaussian-blurred by default, the card carries an 「18+」 or 「Spoiler」 mark, and you must tap 「Yes / View」 in the middle to confirm before the blur is removed.
+- **New accounts and Karma thresholds**: strict subreddits (such as certain trading, question or tech subreddits) have filter rules for account age or minimum Karma. If you don't meet them, your post is automatically removed by the AutoModerator bot, which sends a private message in Inbox explaining why.
+- **Rating and notification pop-ups**: in-app prompt cards such as 「Rate Reddit」 and 「Turn on notifications」 pop up frequently; tap 「Not now」 or 「No thanks」 to close them.

@@ -1,24 +1,24 @@
 ---
 name: qqmusic
-display: QQ音乐
+display: QQ Music
 packages: ["com.tencent.qqmusic"]
 aliases: ["QQ音乐", "QQ Music", "qq音乐"]
 sites: ["y.qq.com"]
 open: QQ音乐
-description: 音乐搜索、歌单、排行榜、视频与听歌识曲
+description: Music search, playlists, charts, videos and listen-and-identify
 ---
-## 是什么
-QQ音乐是音乐与音频内容 App,安卓包名 `com.tencent.qqmusic`。未登录时也能浏览部分推荐、歌单和排行榜,播放范围和可听内容受歌曲版权、账号及会员状态影响。
+## What it is
+QQ Music is a music and audio content app, Android package name `com.tencent.qqmusic`. Even when not logged in you can browse some recommendations, playlists and charts; the playback scope and available content depend on song copyright, account and membership status.
 
-## 界面
-首页顶部是搜索框和听歌识曲入口。顶部频道包括推荐、乐馆、儿童、刷歌、AI作歌等;底部通常有首页、视频、刷歌、星光、我的。页面底部还可能出现当前歌曲的迷你播放栏。
+## UI
+At the top of the home page are the search box and the listen-and-identify entry. The top channels include 推荐 (Recommended), 乐馆 (Music Hall), 儿童 (Kids), 刷歌 (Song feed), AI作歌 (AI songwriting), etc.; at the bottom there are usually 首页 (Home), 视频 (Video), 刷歌 (Song feed), 星光 (Starlight) and 我的 (Mine). A mini player bar for the current song may also appear at the bottom of the page.
 
-## 功能
-- **搜索与听歌识曲**:首页顶部分别提供关键词搜索和听歌识曲。
-- **推荐**:首页有猜你喜欢、每日30首、推荐歌曲和歌单,歌曲卡片可见歌名、歌手及收藏等信息。
-- **乐馆**:集中提供歌手、排行、歌单、星光等入口,横向入口区还可能包含专辑等内容。
-- **排行榜**:乐馆的「排行」进入 Charts 页。榜单卡片先展示部分名次,进入榜单后可看到完整歌曲列表、最近更新时间和歌曲数量。
-- **榜单详情**:歌曲行可显示排名、变化幅度、歌名、歌手、专辑、VIP 或其他音质标识;飙升榜可见上升幅度。
+## Features
+- **Search and listen-and-identify**: the top of the home page offers keyword search and listen-and-identify respectively.
+- **Recommendations**: the home page has 猜你喜欢 (Made for you), 每日30首 (30 songs a day), recommended songs and playlists, and song cards show the song name, artist, favorite status and similar information.
+- **乐馆 (Music Hall)**: gathers entrances to artists, charts, playlists, 星光 (Starlight) and more; the horizontal entrance area may also include albums and other content.
+- **Charts**: 「排行」 (Charts) in 乐馆 enters the Charts page. Chart cards first show some rankings; after entering a chart you can see the full song list, the last update time and the number of songs.
+- **Chart details**: song rows can show the rank, the amount of change, song name, artist, album, VIP or other audio-quality badges; the 飙升榜 (Rising chart) shows the rise.
 
-## 已知现象
-冷启动可能出现广告或登录选择页。排行榜首页卡片展示的是摘要,不等于完整榜单;完整列表在对应榜单详情页。推荐内容和榜单会更新。
+## Known issues
+A cold start may show an ad or a login-selection page. The cards on the charts home page are a summary, not the full chart; the full list is on the corresponding chart detail page. Recommended content and charts are updated.
