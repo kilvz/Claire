@@ -345,7 +345,7 @@ class ModelSetupViewModelTest {
         val first = store.connect("Relay", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1", "k", listOf(ListedModel("a")))
         assertTrue(store.use(ModelRole.Main, first.id, "a", ProviderPresets.custom.capabilities))
         listing[deepseekUrl] = deepseek
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         assertEquals(2, store.providers.value.size)
         assertEquals("a", store.configFor(ModelRole.Main)?.model)
@@ -492,7 +492,7 @@ class ModelSetupViewModelTest {
     @Test fun testAndSaveProbesTheRecommendedModelForTheFirstMain() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         runCurrent()
         assertTrue("the form is expanded when there is no provider yet", vm.state.value.showForm)
         assertFalse(vm.state.value.form.canTest)
@@ -522,7 +522,7 @@ class ModelSetupViewModelTest {
     @Test fun failedTestShowsReasonAndSavesNothing() = runTest {
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Auth)
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("bad"); vm.testAndSave(); runCurrent()
         assertEquals(ListState.Failed(ListFailure.Auth.text), vm.state.value.form.test)
         assertTrue(store.providers.value.isEmpty())
@@ -696,7 +696,7 @@ class ModelSetupViewModelTest {
         listing[deepseekUrl] = deepseek
         listing[qwenUrl] = ModelListResult.Ok(listOf(ListedModel("qwen-vl", vision = true), ListedModel("qwen-max")))
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         vm.pick(ModelRole.Main, store.providers.value.single().id, "deepseek-chat"); runCurrent()
         val main = store.roles.value.main
@@ -715,7 +715,7 @@ class ModelSetupViewModelTest {
         listing[deepseekUrl] = deepseek
         listing[qwenUrl] = ModelListResult.Ok(listOf(ListedModel("qwen-max"), ListedModel("qwen-plain", toolCalls = false)))
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         vm.pick(ModelRole.Main, store.providers.value.single().id, "deepseek-chat"); runCurrent()
         vm.openForm(); vm.selectPreset("Qwen"); vm.setApiKey("qk"); vm.testAndSave(); runCurrent()
@@ -746,7 +746,7 @@ class ModelSetupViewModelTest {
     @Test fun pickingMainMarksToolCallsAndSwitchesProvider() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         val p = store.providers.value.single()
         vm.pick(ModelRole.Main, p.id, "deepseek-coder"); runCurrent()
@@ -804,7 +804,7 @@ class ModelSetupViewModelTest {
     @Test fun refreshFailureIsShownAndRemovingProviderDropsItsRoles() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         val p = store.providers.value.single()
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Network)
@@ -895,7 +895,7 @@ class ModelSetupViewModelTest {
     @Test fun typedModelThatIsListedIsNotMarkedTyped() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.setManual(true); vm.setModel("deepseek-reasoner"); vm.testAndSave(); runCurrent()
         assertEquals(listOf("deepseek-reasoner"), built.map { it.first })
         val p = store.providers.value.single()
@@ -930,7 +930,7 @@ class ModelSetupViewModelTest {
     /** Not a single network call: no model listing, no test call, only the address, the key and the fact that it is "not tested". */
     @Test fun saveWithoutTestStoresProviderWithoutListingOrProbe() = runTest {
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk-1"); vm.saveWithoutTest(); runCurrent()
         assertTrue("the model list was never fetched", listCalls.isEmpty())
         assertTrue("no probe call was made", built.isEmpty())
@@ -980,7 +980,7 @@ class ModelSetupViewModelTest {
     @Test fun saveWithoutTestKeepsTheCurrentMainModel() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
         vm.pick(ModelRole.Main, store.providers.value.single().id, "deepseek-chat"); runCurrent()
         val main = store.configFor(ModelRole.Main)
@@ -1014,12 +1014,12 @@ class ModelSetupViewModelTest {
     @Test fun saveWithoutTestKeepsExistingProviderAndItsVerifiedModels() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk-1"); vm.testAndSave(); runCurrent()
         val p = store.providers.value.single()
         store.markVerified(p.id, "deepseek-chat")
         assertFalse(p.savedUntested)
-        vm.openForm(); vm.setApiKey("sk-2"); vm.saveWithoutTest(); runCurrent()
+        vm.openForm(); vm.selectPreset("DeepSeek"); vm.setApiKey("sk-2"); vm.saveWithoutTest(); runCurrent()
         assertEquals("not added twice", 1, store.providers.value.size)
         val after = store.provider(p.id)!!
         assertEquals("sk-2", store.providerKey(p.id))
@@ -1122,7 +1122,7 @@ class ModelSetupViewModelTest {
     @Test fun zeroWidthSpaceIsStrippedAndTreatedAsANormalKey() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk-\u200Babc")
         assertEquals("sk-abc", vm.state.value.form.apiKey)
         assertEquals(ApiKeyText.Notice.InvisibleRemoved, vm.state.value.form.keyNotice)
@@ -1136,7 +1136,7 @@ class ModelSetupViewModelTest {
     @Test fun spaceInsideTheKeyStillHitsTheProvider() = runTest {
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Auth)
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk-1 2")
         assertEquals(ApiKeyText.Notice.None, vm.state.value.form.keyNotice)
         assertTrue(vm.state.value.form.canTest)
@@ -1150,7 +1150,7 @@ class ModelSetupViewModelTest {
     @Test fun changeKeyRefusesNewlinesAndIllegalCharacters() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         val id = store.providers.value.single().id
         val listed = listCalls.size
@@ -1170,7 +1170,7 @@ class ModelSetupViewModelTest {
     @Test fun listingExceptionDoesNotCrashAndHidesTheHeaderValue() = runTest {
         listing[deepseekUrl] = deepseek
         val store = store()
-        val vm = vm(store)
+        val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         val id = store.providers.value.single().id
         listBoom = IllegalArgumentException("Unexpected char 0x0a in Authorization value: Bearer sk-\nabc")
