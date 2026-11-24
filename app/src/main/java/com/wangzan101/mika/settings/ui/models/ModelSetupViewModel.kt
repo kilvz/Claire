@@ -46,7 +46,7 @@ class ModelSetupViewModel(
     /** Account management for the unified voice catalog: deleting a provider also clears the voice models that depend on it; tests and the onboarding flow may omit it. */
     internal val voiceAccounts: com.wangzan101.mika.voice.model.VoiceAccountManager? = null,
 ) {
-    internal val _state = MutableStateFlow(snapshot(ModelSetupUi(AddForm.of(ProviderPresets.all.first()))))
+    internal val _state = MutableStateFlow(snapshot(ModelSetupUi(AddForm.of(ProviderPresets.default))))
     val state: StateFlow<ModelSetupUi> = _state.asStateFlow()
 
     internal val _speechProbe = MutableStateFlow<Map<String, String>>(emptyMap())

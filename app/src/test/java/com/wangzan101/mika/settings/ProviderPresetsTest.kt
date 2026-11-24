@@ -109,6 +109,13 @@ class ProviderPresetsTest {
         assertNotEquals(standard.baseUrl, coding.baseUrl)
     }
 
+    /** The form starts on an English-first international provider, never on a China-only vendor, so the assistant is not biased toward Chinese models. */
+    @Test fun defaultPresetIsInternational() {
+        assertEquals("OpenAI", ProviderPresets.default.label)
+        assertTrue(ProviderPresets.default.baseUrl.startsWith("https://api.openai.com"))
+        assertNotEquals(ProviderPresets.default, ProviderPresets.custom)
+    }
+
     /** The Cloudflare Workers AI preset requires the user to replace {account_id}; the address is editable and the template matches the actual endpoint. */
     @Test fun cloudflarePresetRequiresAccountIdAndHasEditableUrl() {
         val cf = preset("Cloudflare Workers AI")

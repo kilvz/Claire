@@ -112,6 +112,9 @@ object ProviderPresets {
 
     val custom: ProviderPreset get() = all.last()
 
+    /** The preset prefilled when adding a model: an English-first international provider, not a Chinese-specific one. */
+    val default: ProviderPreset get() = all.first { it.label == "OpenAI" }
+
     /** When several presets share a host, pick the closest one by the number of matching path segments; ties at the root address keep the preset order. */
     private fun pathOverlap(presetUrl: String, inputUrl: String): Int {
         val preset = presetUrl.trimEnd('/').toHttpUrlOrNull()?.pathSegments?.filter { it.isNotBlank() } ?: return 0

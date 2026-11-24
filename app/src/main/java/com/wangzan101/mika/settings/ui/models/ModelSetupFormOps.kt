@@ -37,7 +37,7 @@ fun ModelSetupViewModel.openForm() = _state.update { it.copy(formOpen = true) }
 
 fun ModelSetupViewModel.closeForm() {
     testJob?.cancel()
-    _state.update { it.copy(formOpen = false, form = AddForm.of(ProviderPresets.all.first())) }
+    _state.update { it.copy(formOpen = false, form = AddForm.of(ProviderPresets.default)) }
 }
 
 fun ModelSetupViewModel.selectPreset(label: String) {
@@ -149,7 +149,7 @@ fun ModelSetupViewModel.testAndSave() {
         }
         _state.update {
             snapshot(it.copy(
-                form = AddForm.of(ProviderPresets.all.first()), formOpen = false,
+                form = AddForm.of(ProviderPresets.default), formOpen = false,
                 probeNote = note, pickToProbe = saved.id.takeIf { note != null },
             ))
         }
@@ -188,7 +188,7 @@ fun ModelSetupViewModel.saveWithoutTest() {
         }
         _state.update {
             snapshot(it.copy(
-                form = AddForm.of(ProviderPresets.all.first()), formOpen = false,
+                form = AddForm.of(ProviderPresets.default), formOpen = false,
                 probeNote = tr(R.string.model_saved_untested, f.providerName),
             ))
         }
