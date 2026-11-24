@@ -103,7 +103,7 @@ class FileViewerScreenTest {
         val text = "line one\nline two\n"
         show(file("notes.txt", text), "notes.txt")
         compose.onNodeWithContentDescription(context.getString(R.string.viewer_copy)).performClick()
-        // 测试窗口拿到焦点前,系统不让读剪贴板
+        // Until the test window gains focus the system does not let the clipboard be read
         compose.waitUntil(5_000) { compose.activity.hasWindowFocus() }
         compose.runOnIdle {
             val clipboard = context.getSystemService(ClipboardManager::class.java)

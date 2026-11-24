@@ -83,13 +83,13 @@ class UsageScreenTest {
         compose.onNodeWithTag("usage-chart").assertIsDisplayed()
         compose.onNodeWithTag("usage-rank-provider-p1").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("点一家看它的模型").assertExists()
-        // 图例、服务商排行、胶囊各一处
+        // One each in the legend, the provider ranking and the chip
         compose.onAllNodesWithText("旧服务商（已删除）").assertCountEquals(3)
         compose.onNodeWithTag("usage-rank-model-p1-chat-large").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("usage-rank-model-old-legacy").assertExists()
         compose.onNodeWithText("有 2 次调用服务商没报用量，没算进去。").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(UsageCopy.NOTE).performScrollTo().assertIsDisplayed()
-        // 不分用途
+        // Not broken down by purpose
         compose.onAllNodesWithText("主模型").assertCountEquals(0)
     }
 
@@ -131,7 +131,7 @@ class UsageScreenTest {
         compose.onAllNodesWithTag("usage-missing").assertCountEquals(0)
     }
 
-    /** 点排行里的一家选中它(再点取消),模型排行只列这家的;胶囊和排行是同一个选择,总用量不变。 */
+    /** Tapping a provider in the ranking selects it (tapping again deselects it) and the model ranking lists only that provider's models; the chip and the ranking share one selection, and total usage stays the same. */
     @Test
     fun selectingAProviderNarrowsTheModelRanking() {
         var selected by mutableStateOf<String?>(null)

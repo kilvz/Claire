@@ -21,7 +21,7 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 import com.wangzan101.mika.settings.ui.models.edit
 
-/** 在展开的设备上验证真实侧栏入口、页面布局、系统返回和聊天草稿。 */
+/** Verifies the real sidebar destinations, page layout, system back and chat draft on an unfolded device. */
 class SidebarDestinationsDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
@@ -68,19 +68,19 @@ class SidebarDestinationsDeviceTest {
         compose.onNodeWithTag("segment-Skills").assertIsDisplayed().performClick()
         open(R.string.drawer_browser)
         compose.onNodeWithTag("browser-search").assertIsDisplayed()
-        // 旋转到窄窗口后只显示功能页，回到宽窗口时恢复侧栏且仍停留在浏览器。
+        // After rotating to a narrow window only the feature page is shown; returning to a wide window restores the sidebar and still leaves you in the browser.
         compose.runOnUiThread { compose.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("permanent-navigation")).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("browser-search").assertIsDisplayed()
         compose.runOnUiThread { compose.activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("permanent-navigation")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("browser-search").assertIsDisplayed()
-        // 首帧出现不代表新 Activity 已恢复；等系统返回回调恢复后再发送真实返回键。
+        // The first frame appearing does not mean the new Activity has restored; wait for the system back callback to restore before sending the real back key.
         compose.waitUntil(10_000) { compose.activity.lifecycle.currentState == androidx.lifecycle.Lifecycle.State.RESUMED }
         instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.onNodeWithTag("composer-field").assertTextEquals("保留这段折叠屏草稿")
         compose.onNodeWithTag("permanent-navigation").assertIsDisplayed()
-        // 在功能页点新对话也必须回到右侧聊天，而不是只改隐藏的 ViewModel。
+        // Tapping new chat on a feature page must also return to the chat on the right, not just change the hidden ViewModel.
         open(R.string.drawer_plans)
         open(R.string.chat_new)
         compose.onNodeWithTag("composer-field").assertIsDisplayed()

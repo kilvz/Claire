@@ -60,7 +60,7 @@ class WechatSettingsTest {
         assertFalse(store.enabled())
         assertTrue(WechatStore(dir, cipher).unlockAllowed())
 
-        // 重绑并不一定改变连接状态；已打开的页面仍必须观察到授权被清除。
+        // Rebinding does not necessarily change the connection state; an already open page must still observe that the grant was cleared.
         compose.runOnIdle { store.saveAccount(account.copy(token = "new-test-token")) }
         compose.onNodeWithTag("wechat-allow-unlock").assertIsOff()
     }
@@ -81,7 +81,7 @@ class WechatSettingsTest {
     @Test fun failedSaveShowsAnErrorWithoutGrantingUnlock() {
         store.saveAccount(account)
         page()
-        // 模拟授权文件写入失败，核对页面没有显示尚未保存的授权。
+        // Simulate a failure to write the authorization file and check that the page does not show a grant that was never saved.
         assertTrue(File(dir, "unlock.json.tmp").mkdir())
         compose.onNodeWithTag("wechat-allow-unlock").performScrollTo().performClick()
         compose.waitUntil(5_000) {

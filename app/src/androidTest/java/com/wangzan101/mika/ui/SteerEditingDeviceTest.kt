@@ -46,7 +46,7 @@ import com.wangzan101.mika.chat.ui.draft
 import com.wangzan101.mika.settings.ui.models.edit
 import com.wangzan101.mika.settings.ui.models.use
 
-/** 真实对话页与任务服务;脚本模型延迟取消收尾,让消息稳定停在尚未交给模型的阶段。 */
+/** The real conversation screen and task service; the scripted model delays cancellation wrap-up so the message reliably rests at the stage before it is handed to the model. */
 @RunWith(AndroidJUnit4::class)
 class SteerEditingDeviceTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
@@ -163,7 +163,7 @@ class SteerEditingDeviceTest {
         shot("processed-menu")
     }
 
-    // 电脑追加的插话只归当前任务:手机上长按只有复制、引用、选择文字,撤回也被拒,照常交给模型
+    // Steers appended from the desktop belong only to the current task: on the phone a long press offers only copy, quote and select text, withdrawal is refused as well, and they are handed to the model as usual
     @Test fun remoteSteersOfferNoWithdrawOrEdit() {
         val started = app.remoteTasks.start("请核对今天的资料", conversation)
         val task = (started as com.wangzan101.mika.core.remote.StartOutcome.Started).task

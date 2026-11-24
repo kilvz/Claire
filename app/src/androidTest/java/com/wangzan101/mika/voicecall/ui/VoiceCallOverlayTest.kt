@@ -55,8 +55,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 通话页冒烟:假音频 + 假实时会话注入(参照 VoiceHoldTest 的手写 fake 模式),不用真麦克风、真服务。
- * 链:连接 → 听(电波形) → 播音动画 → 打断 → 挂断 → 重试 → 上限;权限拒绝 → 去设置;缺凭据 → 去配置。
+ * Call screen smoke test: fake audio + injected fake realtime session (following the hand-written fake pattern in VoiceHoldTest), no real microphone or real service.
+ * Chain: connect → listen (waveform) → playback animation → barge-in → hang up → retry → time limit; permission denied → go to settings; missing credentials → go to configuration.
  */
 @RunWith(AndroidJUnit4::class)
 class VoiceCallOverlayTest {
@@ -75,7 +75,7 @@ class VoiceCallOverlayTest {
         scope.cancel()
     }
 
-    /** 假音频设备:全绿通道,采集块由测试喂,记下打断/起停次数。 */
+    /** Fake audio device: every channel succeeds, capture chunks are fed by the test, and it records barge-in/start-stop counts. */
     private class FakeAudio : VoiceCallAudio {
         override val micSilenced = MutableStateFlow(false)
         private val capture = Channel<ShortArray>(Channel.UNLIMITED)
@@ -99,7 +99,7 @@ class VoiceCallOverlayTest {
         override fun stopPlayback() {}
     }
 
-    /** 假实时会话:事件由测试喂;记下工具结果。 */
+    /** Fake realtime session: events are fed by the test; tool results are recorded. */
     private class FakeRealtime : CallRealtimeSession {
         private val incoming = Channel<VolcRealtimeEvent>(Channel.UNLIMITED)
         override val events: Flow<VolcRealtimeEvent> = flow { for (event in incoming) emit(event) }
@@ -116,7 +116,7 @@ class VoiceCallOverlayTest {
         override fun close() {}
     }
 
-    /** 一通假通话:真 session 接假设备;[connect] 决定连接成败(可多次,配合重试)。对话流按生产装配同样喂料。 */
+    /** One fake call: a real session wired to the fake device; [connect] decides whether connecting succeeds (it may run multiple times, which pairs with retry). The conversation feed is fed exactly as in the production wiring. */
     private inner class Call(
         val route: VoiceCallRoute,
         connect: suspend (Int) -> CallRealtimeSession,
@@ -187,12 +187,12 @@ class VoiceCallOverlayTest {
         assertTrue(pred())
     }
 
-    /** 等一个文本节点出现(对话流经 route→feed 异步更新,直接断言可能踩空)。 */
+    /** Waits for a text node to appear (the conversation feed is updated asynchronously through route→feed, so asserting directly can miss it). */
     private fun awaitText(text: String, timeoutMs: Long = 5_000) {
         compose.waitUntil(timeoutMs) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
 
-    /** 球的形态从 testTag 读(点阵球不再把英文枚举名读给 TalkBack)。 */
+    /** The ball's shape is read from its testTag (the dot-matrix ball no longer reads the English enum name to TalkBack). */
     private fun ballMode(): String? {
         for (mode in listOf("Web", "Globe", "Wave", "Orbits")) {
             if (compose.onAllNodesWithTag("voicecall-ball-" + mode).fetchSemanticsNodes().isNotEmpty()) return mode
@@ -205,7 +205,7 @@ class VoiceCallOverlayTest {
         assertEquals(mode, ballMode())
     }
 
-    /** 接通:喂一块安静的首块,等到 Active。 */
+    /** Connected: feed one quiet first chunk, then wait for Active. */
     private fun reachActive(call: Call) {
         call.audio.offerChunk(amplitude = 100)
         awaitState(call.session) { it is VoiceCallState.Active }
@@ -220,17 +220,17 @@ class VoiceCallOverlayTest {
         return out
     }
 
-    // ---------- 连接 → 听 → 播音动画 → 打断 → 挂断 → 重试 → 上限 ----------
+    // ---------- connect → listen → playback animation → barge-in → hang up → retry → time limit ----------
 
     @Test fun connectingShowsStatusAndWebBallThenActiveShowsClockAndGlobe() {
         val gate = kotlinx.coroutines.CompletableDeferred<CallRealtimeSession>()
         val call = Call(fakeRoute(), connect = { gate.await() })
         show(call)
-        // 连接中:状态词 + Web 形态球;计时还没开始
+        // Connecting: status word + Web-shaped ball; the timer has not started yet
         compose.onNodeWithText("正在连接…").assertIsDisplayed()
         awaitBall("Web")
 
-        // 服务接上了:检查麦克风 → 接通
+        // Service connected: check the microphone → connected
         gate.complete(call.rt)
         reachActive(call)
         compose.onNodeWithText("在听你说").assertIsDisplayed()
@@ -245,7 +245,7 @@ class VoiceCallOverlayTest {
         show(call)
         reachActive(call)
         awaitBall("Globe")
-        // 用户开口:响亮采集块进来,球换成 Wave
+        // The user speaks: loud capture chunks come in and the ball switches to Wave
         repeat(3) { call.audio.offerChunk(amplitude = 4_000) }
         awaitBall("Wave")
         call.session.end(EndReason.Hangup)
@@ -257,7 +257,7 @@ class VoiceCallOverlayTest {
         show(call)
         reachActive(call)
         awaitBall("Globe")
-        // 助手播音:云端音频进播放队列,电平起来,球换成 Wave
+        // Assistant speaking: cloud audio enters the playback queue, the level rises and the ball switches to Wave
         call.rt.emit(VolcRealtimeEvent.Audio(pcm(4_000, 4_800)))
         awaitBall("Wave")
         call.session.end(EndReason.Hangup)
@@ -270,12 +270,12 @@ class VoiceCallOverlayTest {
         call = Call(route, connect = { call.rt })
         show(call)
         reachActive(call)
-        // 打字办事:先点键盘展开输入行,发出去后路由认领,步骤卡上来
+        // Typing to get things done: tap the keyboard to expand the input row, and after sending, the route claims it and the step card appears
         compose.onNodeWithTag("voicecall-keyboard").performClick()
         compose.onNodeWithTag("voicecall-input").performTextInput("帮我开深色模式")
         compose.onNodeWithTag("voicecall-send").performClick()
         awaitText("正在打开设置")
-        // 办完:卡片收尾标「已完成」
+        // Done: the card wraps up and is marked "Completed"
         flow.value = TaskState.Succeeded("开好了")
         awaitText("已完成")
         compose.onNodeWithTag("voicecall-input").assertTextEquals("")
@@ -294,7 +294,7 @@ class VoiceCallOverlayTest {
         compose.onNodeWithTag("voicecall-input").performTextInput("帮我开深色模式")
         compose.onNodeWithTag("voicecall-send").performClick()
         awaitText("正在打开设置")
-        // 用户开口打断:播放立刻停,已启动未完成的任务取消
+        // The user starts speaking to barge in: playback stops at once and tasks that were started but not finished are cancelled
         call.rt.emit(VolcRealtimeEvent.UserSpeaking)
         awaitValue { cancelled == listOf("conv-1") }
         assertEquals(1, call.audio.interruptCount)
@@ -320,7 +320,7 @@ class VoiceCallOverlayTest {
             if (attempts.incrementAndGet() == 1) throw VolcRealtimeException(VolcRealtimeException.Kind.TIMEOUT) else call.rt
         })
         show(call)
-        // 第一次失败:错误文案(顶栏状态 + 错误卡各一条) + 就地重试
+        // First failure: error copy (one in the top-bar status and one in the error card) + retry in place
         awaitText("连接超时，再试一次")
         compose.onNodeWithTag("voicecall-retry").performClick()
         reachActive(call)
@@ -349,7 +349,7 @@ class VoiceCallOverlayTest {
         call.session.end(EndReason.Hangup)
     }
 
-    // ---------- 权限 / 凭据的门 ----------
+    // ---------- permission / credential gates ----------
 
     @Test fun permissionGateRequestsThenPointsToSettings() {
         val requests = AtomicInteger(0)
@@ -369,7 +369,7 @@ class VoiceCallOverlayTest {
         compose.onNodeWithText("语音通话要用麦克风").assertIsDisplayed()
         compose.onNodeWithText("允许麦克风").performClick()
         assertEquals(1, requests.get())
-        // 用户拒绝过:改指到系统设置
+        // The user denied before: point to system settings instead
         stage = VoiceCallGateStage.PermissionDenied
         compose.onNodeWithText("去设置").performClick()
         assertEquals(1, settings.get())

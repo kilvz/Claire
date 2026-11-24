@@ -168,7 +168,7 @@ private const val GLASS_SHADER = """
         );
         half gray = dot(rgb, half3(0.2126, 0.7152, 0.0722));
         half3 filtered = clamp(mix(half3(gray), rgb, half(filter.x)) * half(filter.y), 0.0, 1.0);
-        // 用对应主题的底色保持可读性，并保留真实聊天纹理和边缘折射。
+        // Tint with the backdrop color of the matching theme to stay readable while keeping the real chat texture and edge refraction.
         return half4(mix(half3(backdropTone.rgb), filtered, half(backdropTone.a)), 1.0);
     }
 """

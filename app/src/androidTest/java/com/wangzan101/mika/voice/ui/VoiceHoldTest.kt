@@ -38,14 +38,14 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.chat.ui.Composer
 import com.wangzan101.mika.chat.ui.ComposerMode
 
-/** 对话输入栏按住说话:长按输入框浮起「在听」卡片,松开后字接在输入框里;上滑取消时什么都不填。用假的语音来源,不用麦克风。 */
+/** Hold-to-talk in the chat composer: long-pressing the input floats up a "Listening" card, and after release the text is appended to the input field; sliding up to cancel fills nothing. Uses a fake voice source, no microphone. */
 @RunWith(AndroidJUnit4::class)
 class VoiceHoldTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    /** 假会话:事件由测试喂;记下松开、取消的次数。 */
+    /** Fake session: events are fed by the test; records the release and cancel counts. */
     private class FakeSession : SpeechSession {
         val out = Channel<SpeechEvent>(Channel.UNLIMITED)
         override val events: Flow<SpeechEvent> = out.receiveAsFlow()
@@ -62,7 +62,7 @@ class VoiceHoldTest {
         override fun start(language: String?): SpeechSession = FakeSession().also { sessions += it }
     }
 
-    /** 引擎不可用的假来源(系统识别没响应);不该有人来起会话。 */
+    /** Fake source for an unavailable engine (system recognition is not responding); nobody should start a session on it. */
     private class UnavailableVoice : VoiceSource {
         override fun spec(): SpeechEngineSpec = SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.SystemNoResponse)
         override fun start(language: String?): SpeechSession = error("不可用的引擎不该起会话")
@@ -75,7 +75,7 @@ class VoiceHoldTest {
         inst.uiAutomation.grantRuntimePermission(inst.targetContext.packageName, Manifest.permission.RECORD_AUDIO)
     }
 
-    /** 「松开 发送」发出的字;[composer] 带上 sendVoice = true 时才有这条路。 */
+    /** Text emitted by "Release to send"; that path only exists when [composer] is given sendVoice = true. */
     private val voiceSent = mutableListOf<String>()
 
     private fun composer(text: String = "", sendVoice: Boolean = false, source: VoiceSource = voice) = compose.setContent {
@@ -95,7 +95,7 @@ class VoiceHoldTest {
     private fun waitTag(tag: String) = compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     private fun waitNoTag(tag: String) = compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
 
-    /** 按在输入框中间的手指要往上移多少,才到「在听」卡片里 y = 卡片上沿 + [intoCard](负数是卡片上沿以上)。 */
+    /** How far a finger pressed in the middle of the input field must move up to reach the "Listening" card at y = card top + [intoCard] (a negative value is above the card's top edge). */
     private fun liftTo(intoCard: Float): Float {
         val card = compose.onNodeWithTag("voice-listen").fetchSemanticsNode().boundsInRoot
         val field = compose.onNodeWithTag("composer-field").fetchSemanticsNode().boundsInRoot
@@ -108,7 +108,7 @@ class VoiceHoldTest {
         waitTag("voice-listen")
         val session = voice.sessions.single()
         session.out.trySend(SpeechEvent.Partial("订明天", "的票"))
-        // 按满半秒以上才不算误触
+        // Only a hold of half a second or more counts as intentional rather than an accidental touch
         Thread.sleep(700)
         compose.onNodeWithTag("composer-field").performTouchInput { up() }
         compose.waitUntil(5_000) { session.released == 1 }
@@ -120,10 +120,10 @@ class VoiceHoldTest {
 
     @Test fun focusedFieldKeepsLongPressForTheSystem() {
         composer("帮我订票")
-        // 点一下:聚焦打字
+        // One tap: focus and type
         compose.onNodeWithTag("composer-field").performClick()
         compose.onNodeWithTag("composer-field").assertIsFocused()
-        // 聚焦后长按是系统的选字、粘贴,不开始听
+        // Once focused, a long press belongs to the system's text selection and paste, so listening does not start
         compose.onNodeWithTag("composer-field").performTouchInput { down(center) }
         Thread.sleep(800)
         compose.waitForIdle()
@@ -151,7 +151,7 @@ class VoiceHoldTest {
         compose.onNodeWithTag("composer-field").assertTextEquals("帮我订明天的票")
     }
 
-    /** 已允许录音,识别服务仍报录音出错:弹说明(麦克风总开关、权限管理);别的麦克风起不来照旧只提示一句。 */
+    /** Recording is allowed but the recognition service still reports an audio error: show the explanation (mic master switch, permission management); when another microphone fails to start, keep the single hint as before. */
     @Test fun audioErrorExplainsWhereToCheckButClientErrorKeepsTheOldHint() {
         composer()
         fun failWith(why: SpeechFailure) {
@@ -175,10 +175,10 @@ class VoiceHoldTest {
         waitTag("voice-listen")
         val session = voice.sessions.single()
         Thread.sleep(700)
-        // 滑过卡片上沿才是取消(滑进卡片里是直接发送)
+        // Only sliding past the card's top edge cancels (sliding into the card sends directly)
         val dy = liftTo(-40f)
         compose.onNodeWithTag("composer-field").performTouchInput { moveBy(androidx.compose.ui.geometry.Offset(0f, dy)) }
-        // 输入栏和上面的小胶囊都写「松开 取消」
+        // Both the input bar and the small capsule above it read "Release to cancel"
         compose.waitUntil(5_000) { compose.onAllNodesWithText("松开 取消", useUnmergedTree = true).fetchSemanticsNodes().size == 2 }
         compose.onNodeWithTag("composer-field").performTouchInput { up() }
         compose.waitUntil(5_000) { session.cancelled == 1 }
@@ -225,31 +225,31 @@ class VoiceHoldTest {
         compose.onNodeWithTag("composer-field").assertTextEquals("订明天的票")
     }
 
-    /** 引擎不可用功能也不消失:按住照常弹「还不能语音输入」说明页(原因 + 去选引擎的路),按住了说明页留着。 */
+    /** The feature does not vanish when the engine is unavailable: holding still pops up the "voice input isn't available yet" explanation page (reason + path to choose an engine), and the page stays while held. */
     @Test fun unavailableEngineHoldShowsTheExplanationSheet() {
         composer(source = UnavailableVoice())
         compose.onNodeWithTag("composer-field").performTouchInput { down(center) }
         waitTag("voice-sheet")
         compose.onNodeWithText("还不能语音输入").assertExists()
-        // 按满半秒以上是故意按住:说明页留着,不收
+        // Holding for half a second or more is deliberate: the explanation page stays and is not dismissed
         Thread.sleep(700)
         compose.onNodeWithTag("composer-field").performTouchInput { up() }
         compose.waitForIdle()
         compose.onNodeWithTag("voice-sheet").assertExists()
     }
 
-    /** 引擎不可用时短按仍是点按:说明页弹过也要收掉、输入框聚焦打字(方案A 对说明页同样成立)。 */
+    /** With an unavailable engine a short press is still a tap: even if the explanation page popped up it must be dismissed and the field focused for typing (option A holds for the explanation page too). */
     @Test fun unavailableEngineShortHoldFallsBackToTap() {
         composer(source = UnavailableVoice())
         compose.onNodeWithTag("composer-field").performTouchInput { down(center) }
-        // 350ms:过了起听的 300ms(说明页已弹)、不足半秒,松手必须回退点按
+        // 350ms: past the 300ms listening threshold (the explanation page has already popped) but under half a second, so releasing must fall back to a tap
         Thread.sleep(350)
         compose.onNodeWithTag("composer-field").performTouchInput { up() }
         waitNoTag("voice-sheet")
         compose.onNodeWithTag("composer-field").assertIsFocused()
     }
 
-    /** 引擎不可用时点话筒:直接弹说明页,不弹「按住说话」那句误导提示。 */
+    /** Tapping the mic with an unavailable engine: opens the explanation page directly instead of showing the misleading "hold to talk" hint. */
     @Test fun unavailableEngineMicTapOpensTheSheet() {
         composer(source = UnavailableVoice())
         waitTag("composer-mic")

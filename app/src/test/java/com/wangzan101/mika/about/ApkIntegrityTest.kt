@@ -28,7 +28,7 @@ class ApkIntegrityTest {
         )) rejects { ApkIntegrity.requireOfficialUrl(url) }
     }
 
-    /** 下载地址只信 GitHub 官方,或「镜像前缀 + 官方地址」这个精确形式;别的主机、路径和参数都不行。 */
+    /** The download address is trusted only if it is the official GitHub one, or exactly the form "mirror prefix + official address"; other hosts, paths and parameters are rejected. */
     @Test fun acceptsOnlyOfficialOrConfiguredMirrorUrls() {
         val official = "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk"
         val mirrors = listOf(UpdateMirror("m", "GhFast", "https://ghfast.top/"))
@@ -51,7 +51,7 @@ class ApkIntegrityTest {
         val file = temp.newFile().apply { writeText("abc") }
         val digest = "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         ApkIntegrity.verify(file, 3, digest)
-        ApkIntegrity.verify(file, null, null) // 兼容没有附件摘要的旧发布元数据。
+        ApkIntegrity.verify(file, null, null) // Compatible with old release metadata that has no asset digest.
         rejects { ApkIntegrity.verify(file, 4, digest) }
         rejects { ApkIntegrity.verify(file, 3, "sha256:bad") }
         rejects { ApkIntegrity.verify(file, 3, "md5:" + "0".repeat(64)) }
@@ -69,7 +69,7 @@ class ApkIntegrityTest {
 
     @Test fun signerMustMatchInstalledOrCarryItInHistory() {
         ApkIntegrity.requireSameSigner(setOf("a"), setOf("a"), setOf("a"))
-        // 新包轮换到新证书,旧证书在签名历史里
+        // The new package rotates to a new certificate, with the old one in the signing history
         ApkIntegrity.requireSameSigner(setOf("a"), setOf("b"), setOf("a", "b"))
         for ((installed, archive, history) in listOf(
             Triple(setOf("a"), setOf("b"), setOf("b")),

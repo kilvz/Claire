@@ -87,7 +87,7 @@ class DiagnosticsTest {
         assertTrue(t.contains("update available: 0.1.8"))
     }
 
-    /** 语音转文字一段:选择、自带识别的情况、手机上登记的识别服务(组件名、开不开放、要的权限);在模型之后。 */
+    /** The speech-to-text section: the choice, the built-in recognition situation and the recognition services registered on the phone (component name, whether exported, required permissions); it comes after models. */
     @Test
     fun speechSectionListsRecognitionServices() {
         val speech = DiagnosticsSnapshot.Speech(
@@ -100,7 +100,7 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("speech to text: auto"))
         assertTrue(t, t.contains("built-in recognition: present, marked no response"))
         assertTrue(t, t.contains("recognition services: 1\n- com.example.voice/.Recognizer (not exported) needs android.permission.BIND_VOICE_INTERACTION"))
-        // 系统设的默认识别服务:没设时照实写(登记了服务不等于设了默认的)
+        // The default recognition service set by the system: when none is set, say so plainly (a registered service does not mean a default is set)
         assertTrue(t, t.contains("default recognition service: not set"))
         val set = Diagnostics.render(snapshot().copy(speech = speech.copy(
             defaultService = "com.example.voice/.Recognizer",
@@ -110,7 +110,7 @@ class DiagnosticsTest {
         assertTrue(set, set.contains("- com.example.voice/.Recognizer, its own mic permission: NOT granted"))
     }
 
-    /** 引导页那几项来自同一个状态机:失败在连接一步,用户确认过无线调试。 */
+    /** Those items on the setup page come from the same state machine: the failure is at the connect step, and the user has confirmed wireless debugging. */
     @Test
     fun phoneControlReadsTheSetupFlow() {
         val t = Diagnostics.render(snapshot())
@@ -142,7 +142,7 @@ class DiagnosticsTest {
         assertTrue(shizukuRestart, shizukuRestart.contains("helper restart: Shizuku"))
     }
 
-    /** 扫过本机、用户填过端口:只写个数和有没有填,不写端口号。 */
+    /** This device has been scanned and the user has filled in a port: write only the counts and whether it was filled in, never the port number. */
     @Test
     fun connectServiceShowsScanAndManualWithoutPortNumbers() {
         val c = ConnectCandidates(0, 0, 0, connected = true, scanned = true, scanOpen = 2, scanAdb = 1, manual = true)
@@ -162,7 +162,7 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("installer: unknown"))
     }
 
-    /** 配对通知频道被关掉:报的是引导页同一份状态,停在配对一步时还写出通知的问题。 */
+    /** The pairing notification channel is turned off: what is reported is the same state as on the setup page, and while stopped at the pairing step it also writes out the notification problem. */
     @Test
     fun pairingChannelOff() {
         val snap = snapshot(shell = BuiltinShellStatus.NotPaired, discovery = PairingDiscovery.Searching, confirmed = emptySet())
@@ -177,7 +177,7 @@ class DiagnosticsTest {
         assertTrue(none, none.contains("pairing channel: Ready (not created)"))
     }
 
-    /** 不带 Key、令牌、邮箱、IP、端口:哪怕它们藏在地址、出错信息里。 */
+    /** No keys, tokens, emails, IPs or ports: even when they hide inside addresses or error messages. */
     @Test
     fun noSecretsAddressesOrPorts() {
         val t = Diagnostics.render(
@@ -207,7 +207,7 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("key=***"))
     }
 
-    /** 最近的运行:相对时间、结局、失败类别、步数、模型;没有目标和回答。 */
+    /** Recent runs: relative time, outcome, failure category, step count, model; no goal and no answer. */
     @Test
     fun recentRuns() {
         val t = Diagnostics.render(snapshot())
@@ -232,7 +232,7 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("last reboot restore: NotRecovered"))
     }
 
-    /** 内置助手拉起 Claire 的记录、启动时无障碍服务的问题:有就写何时、几次,没有写 never / ok。 */
+    /** Records of the built-in helper launching Claire and of accessibility service problems at startup: when present, write when and how many times; otherwise write never / ok. */
     @Test
     fun helperRestoresAndAccessibilityLoss() {
         val base = snapshot()
@@ -247,7 +247,7 @@ class DiagnosticsTest {
         assertTrue(t, t.contains("accessibility on start: removed 2h ago"))
     }
 
-    /** 最近一次 ChatGPT 登录失败:写类别、错误代码和说明;说明里像令牌的串遮住。 */
+    /** The most recent ChatGPT sign-in failure: write the category, error code and description; token-like strings in the description are masked. */
     @Test
     fun chatGptSignInFailureShowsCodeWithoutTokens() {
         val jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEyMzQ1Njc4OTAifQ.c2lnbmF0dXJlLWJ5dGVzLWhlcmUtMTIzNDU2Nzg5MA"
@@ -259,7 +259,7 @@ class DiagnosticsTest {
         assertFalse("没有失败就不写这一行", Diagnostics.render(base).contains("last sign-in failure"))
     }
 
-    /** 脱敏不误伤:时间、版本号、型号里的数字照写。 */
+    /** Sanitizing does not over-reach: the digits in times, version numbers and model names are written as they are. */
     @Test
     fun sanitizeKeepsTimesAndVersions() {
         assertEquals("at 12:30:05 v0.1.7 SDK 34 Pixel 8", Diagnostics.sanitize("at 12:30:05 v0.1.7 SDK 34 Pixel 8"))

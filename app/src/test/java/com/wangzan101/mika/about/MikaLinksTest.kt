@@ -23,12 +23,12 @@ class MikaLinksTest {
         assertTrue(lines.contains("### 遇到了什么问题"))
         assertTrue(lines.contains("### 做了哪几步"))
         assertTrue(lines.contains("### 期望是什么样"))
-        // 诊断信息不自动带上:只提示用户去哪里复制
+        // Diagnostics are not attached automatically: only tell the user where to copy them
         assertTrue(lines.contains("### 诊断信息"))
         assertTrue(lines.contains("（可选）在 Claire「关于 › 反馈问题 › 复制诊断信息」复制后粘贴在这里"))
     }
 
-    /** 型号里已经带厂商名时不重复写。 */
+    /** When the model already carries the manufacturer name, it is not repeated. */
     @Test
     fun modelNotDoubled() {
         val body = MikaLinks.issueBody(device.copy(manufacturer = "samsung", model = "SAMSUNG SM-S9180"))
@@ -42,7 +42,7 @@ class MikaLinksTest {
         val query = url.substringAfter('?')
         assertFalse("no raw spaces or newlines", query.any { it == ' ' || it == '\n' || it == '+' })
         assertFalse("no raw non-ASCII", query.any { it.code > 127 })
-        // 能被当成合法 URI 解析,正文解码回原样
+        // Can be parsed as a valid URI, and the body decodes back unchanged
         URI(url)
         val body = URLDecoder.decode(query.substringAfter("body="), "UTF-8")
         assertEquals(MikaLinks.issueBody(device), body)

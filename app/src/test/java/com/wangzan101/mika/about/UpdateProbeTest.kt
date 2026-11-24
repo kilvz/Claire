@@ -27,8 +27,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * 检查更新的三种来源:GitHub API;镜像把 `/releases/latest` 跳转(302);镜像自己跟到发布页(200)。
- * 发布页兜底时从附件页读 APK 文件名和 sha256。
+ * The three sources for checking updates: the GitHub API; a mirror that redirects `/releases/latest` (302); a mirror that follows through to the release page itself (200).
+ * When falling back to the release page, the APK file name and sha256 are read from the assets page.
  */
 class UpdateProbeTest {
     private val server = MockWebServer()
@@ -105,7 +105,7 @@ class UpdateProbeTest {
         assertNull(UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, emptyList(), "Claire/test"))
     }
 
-    /** 镜像不代理 API(403)时退到发布页:302 的 Location 里取 tag,再从附件页取文件名和摘要。 */
+    /** When the mirror does not proxy the API (403), fall back to the release page: take the tag from the 302 Location, then the file name and digest from the assets page. */
     @Test fun mirrorApi403FallsBackToRedirectingReleasePage() = runTest {
         server.dispatcher = dispatcher { path ->
             when {
@@ -121,7 +121,7 @@ class UpdateProbeTest {
                 else -> MockResponse().setResponseCode(404)
             }
         }
-        // 镜像设置下 API 的 403 只说明它不代理 API,还要继续试发布页。
+        // With mirror settings configured, an API 403 only means it does not proxy the API, so the release page must still be tried.
         val found = UpdateProbe.fetch(UpdateChecker.defaultClient(), mirror, api, releases, listOf("arm64-v8a"), "Claire/test")
         assertNotNull(found)
         assertEquals("0.3.0", found!!.version)
@@ -130,7 +130,7 @@ class UpdateProbeTest {
         assertTrue(found.pageUrl.endsWith("/tag/v0.3.0"))
     }
 
-    /** 有的镜像自己跟到底:`/releases/latest` 直接返回 200 的发布页。 */
+    /** Some mirrors follow through themselves: `/releases/latest` returns a 200 release page directly. */
     @Test fun mirrorServingLatestPageDirectlyIsRead() = runTest {
         server.dispatcher = dispatcher { path ->
             when {
@@ -147,7 +147,7 @@ class UpdateProbeTest {
         assertEquals("sha256:" + "c".repeat(64), found?.apkDigest)
     }
 
-    /** 附件页读不到时按固定命名拼出全架构包地址,至少下载时还能试。 */
+    /** When the assets page cannot be read, assemble the universal APK address from the fixed naming so at least the download can still be attempted. */
     @Test fun missingAssetPageStillProducesTheUniversalApkUrl() = runTest {
         server.dispatcher = dispatcher { path ->
             when {
@@ -180,7 +180,7 @@ class UpdateProbeTest {
         }
     }
 
-    /** 直连 GitHub 时 API 明确回了 HTTP 错误(限流等),就认这一次没查到,不再多打一个网页请求。 */
+    /** When connecting to GitHub directly and the API clearly returns an HTTP error (rate limit etc.), accept that nothing was found this time and do not send one more web page request. */
     @Test fun directGitHubApiFailureDoesNotFetchTheReleasePage() = runTest {
         var requests = 0
         server.dispatcher = dispatcher {
@@ -191,7 +191,7 @@ class UpdateProbeTest {
         assertEquals(1, requests)
     }
 
-    /** 网络错误(不是 HTTP 回应)时直连也退到发布页:GitHub 本身可能只是 API 不通。 */
+    /** On a network error (not an HTTP response) a direct connection also falls back to the release page: with GitHub itself it may just be the API that is unreachable. */
     @Test fun directNetworkFailureFallsBackToReleasePage() = runTest {
         server.dispatcher = dispatcher { path ->
             when {
@@ -220,7 +220,7 @@ class UpdateProbeTest {
             UpdateProbe.fetch(client, "", api, releases, emptyList(), "Claire/test")
         }
         assertTrue(withContext(Dispatchers.IO) { headersReceived.await(2, TimeUnit.SECONDS) })
-        delay(200) // 响应头已到,响应体仍在等待,让读取进入阻塞状态。
+        delay(200) // The response headers have arrived but the body is still pending, which leaves the read blocked.
         withTimeout(1_000) { job.cancelAndJoin() }
         assertTrue(job.isCancelled)
     }

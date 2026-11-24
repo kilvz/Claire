@@ -15,8 +15,8 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * 真机冒烟:走真实 [AndroidSystemTtsEngine] 合成一个完整 WAV。设备没有可用引擎或缺语言数据时,
- * 断言得到的是显式的系统不可用结果(而不是崩溃或换成云端);语言恰好支持时不报错直接通过。
+ * Real-device smoke test: synthesizes a complete WAV through the real [AndroidSystemTtsEngine]. When the device has no usable engine or is missing language data,
+ * the assertion is that an explicit system-unavailable result comes back (rather than a crash or a switch to the cloud); when the language happens to be supported it passes without error.
  */
 @RunWith(AndroidJUnit4::class)
 class SystemTtsDeviceTest {

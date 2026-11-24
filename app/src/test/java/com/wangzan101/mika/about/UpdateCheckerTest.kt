@@ -82,7 +82,7 @@ class UpdateCheckerTest {
         assertEquals("0.1.0", c.state.value.latest?.version)
     }
 
-    /** GitHub 限流(403)就是这次没查到:只问 GitHub 一次,不去别处找。 */
+    /** A GitHub rate limit (403) means nothing was found this time: ask GitHub only once and do not look anywhere else. */
     @Test
     fun gitHubRateLimitIsAFailure() = runTest {
         github = MockResponse().setResponseCode(403).setBody("""{"message":"API rate limit exceeded"}""")
@@ -93,7 +93,7 @@ class UpdateCheckerTest {
         assertNull(c.state.value.update)
     }
 
-    /** 开了镜像后,镜像和官方并行问;官方失败、镜像成功时照样拿到新版本。 */
+    /** With mirrors enabled, the mirror and the official source are asked in parallel; when the official one fails and the mirror succeeds, the new version is obtained all the same. */
     @Test
     fun enabledMirrorIsQueriedInParallelAndCanWin() = runTest {
         val mirror = UpdateMirror("m", "Mirror", server.url("/mirror/").toString())
@@ -124,7 +124,7 @@ class UpdateCheckerTest {
         assertEquals("0.3.0", c.state.value.update?.version)
     }
 
-    /** 同版本先由镜像给出说明、官方后到:以官方的说明为准。 */
+    /** The same version is first described by the mirror and the official source arrives later: the official notes win. */
     @Test
     fun officialNotesReplaceMirrorNotesForSameVersion() = runTest {
         val mirror = UpdateMirror("m", "Mirror", server.url("/mirror/").toString())
@@ -157,7 +157,7 @@ class UpdateCheckerTest {
             withContext(Dispatchers.Default) { withTimeout(3_000) { while (c.state.value.manualRounds == 0) delay(10) } }
             assertEquals(CheckStatus.Done, c.state.value.status)
             assertEquals("0.2.0", c.state.value.update?.version)
-            // 等待首次写盘完成，再用另一个实例验证检查仍在进行时可恢复。
+            // Wait for the first disk write to complete, then use another instance to verify that it is recoverable while the check is still running.
             withContext(Dispatchers.Default) {
                 withTimeout(3_000) { while (!tmp.root.resolve("update.json").exists()) delay(10) }
             }
@@ -546,7 +546,7 @@ class UpdateCheckerTest {
         assertEquals("Claire v0.2.0", c.state.value.latest?.name)
     }
 
-    /** 关掉镜像时一个镜像请求都不发。 */
+    /** With mirrors turned off, not a single mirror request is sent. */
     @Test
     fun disabledMirrorsAreNotContacted() = runTest {
         github = release("v0.2.0")
@@ -565,7 +565,7 @@ class UpdateCheckerTest {
         assertNull(c.state.value.update)
     }
 
-    /** 自动检查失败不改界面上的状态;每次打开都查,只挡住两分钟内连着来的。 */
+    /** A failed automatic check does not change the status shown in the UI; every open triggers a check, with only back-to-back ones within two minutes blocked. */
     @Test
     fun autoCheckIsSilentAndRunsOnEveryOpenButNotInBursts() = runTest {
         val c = checker()
@@ -583,7 +583,7 @@ class UpdateCheckerTest {
         assertEquals(CheckStatus.Idle, c.state.value.status)
     }
 
-    /** 查到的版本存盘:重开 App 不联网也有红点;装上新版后红点消失;上次自动检查的时间也记着。 */
+    /** A found version is persisted: reopening the app with no network still shows the red dot; after installing the new version the dot disappears; the time of the last automatic check is remembered too. */
     @Test
     fun foundUpdateSurvivesRestart() = runTest {
         github = release("v0.2.0")
@@ -601,7 +601,7 @@ class UpdateCheckerTest {
         assertNotNull(upgraded.state.value.latest)
     }
 
-    /** 同时进来的两次自动检查(查还没完)只真的查一次;隔十分钟再打开照样查。 */
+    /** Two automatic checks arriving at the same time (with the check unfinished) only really check once; opening again ten minutes later still checks. */
     @Test
     fun concurrentAutoChecksHitGitHubOnce() = runTest {
         github = release("v0.2.0")

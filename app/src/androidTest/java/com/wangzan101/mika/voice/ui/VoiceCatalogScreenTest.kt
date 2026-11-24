@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 import java.util.UUID
 import com.wangzan101.mika.settings.ui.models.edit
 
-/** 语音模型目录页:系统模型和能力徽章可见,添加/编辑/删除自己的模型可用。 */
+/** Voice model catalog screen: the system model and its capability badges are visible, and adding/editing/deleting your own models works. */
 @RunWith(AndroidJUnit4::class)
 class VoiceCatalogScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

@@ -19,7 +19,7 @@ class AboutCopyTest {
     fun checkRowStates() {
         assertEquals(AboutCopy.CheckValue(null), AboutCopy.checkValue(UpdateState()))
         assertTrue(AboutCopy.checkValue(UpdateState(status = CheckStatus.Checking)).spinner)
-        // 连不上但早先查到过新版:照样提示有新版
+        // Cannot connect, but a newer version was found earlier: still point out that a new version exists
         assertTrue(AboutCopy.checkValue(UpdateState(latest = r020, update = r020, status = CheckStatus.Failed)).dot)
     }
 }

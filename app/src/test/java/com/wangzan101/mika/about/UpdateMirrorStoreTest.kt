@@ -27,7 +27,7 @@ class UpdateMirrorStoreTest {
         assertFalse(store.enabled.value)
         assertTrue(file().isFile)
 
-        // 用户改过之后再次启动,不会被预设覆盖。
+        // After the user has changed things, starting again does not overwrite them with the presets.
         store.delete(store.mirrors.value.first().id)
         val again = loaded(UpdateMirrorStore(file()))
         assertEquals(UpdateMirrors.PRESETS.size - 1, again.mirrors.value.size)

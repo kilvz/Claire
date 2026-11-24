@@ -96,7 +96,7 @@ class TeachScreenTest {
         compose.onNodeWithTag("teach-again").assertHasClickAction()
     }
 
-    /** 没看到操作的总结页:说清是哪一种失败,并留出「再整理一次」和「放弃」两条路。 */
+    /** Summary page for when no actions were observed: spell out which kind of failure this is and leave the two ways out, "summarize again" and "discard". */
     @Test fun failedSummaryExplainsItselfAndOffersRetryAndDiscard() {
         var retried = 0
         var discarded = 0

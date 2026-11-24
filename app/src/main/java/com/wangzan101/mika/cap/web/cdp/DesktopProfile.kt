@@ -227,7 +227,7 @@ object DesktopProfile {
 
   if (!('chrome' in W)) Object.defineProperty(W, 'chrome', { value: {}, writable: true, enumerable: true, configurable: true });
 
-  // 脚本里新建的 about:blank / srcdoc 框架不一定经过文档开始注入:第一次被取到时补上同一份
+  // Frames created by script (about:blank / srcdoc) do not necessarily go through document-start injection: backfill the same payload when one is first retrieved
   var self = desktopIdentity, source = readSource.call(self);
   function adopt(child) {
     try { if (!child || child === W || child.navigator.maxTouchPoints === 0) return; } catch (e) { return; }

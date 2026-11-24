@@ -22,7 +22,7 @@ import java.io.IOException
 import java.nio.file.Files
 import javax.net.SocketFactory
 
-/** 设了网络代理时更新包由 Claire 自己经代理下:请求确实发给代理,下完整才留下文件,出错不留半截。 */
+/** With a network proxy configured the update package is downloaded by Claire itself through the proxy: the request really goes to the proxy, the file is left only once the download is complete, and an error leaves no half-written file. */
 class ProxiedApkDownloadTest {
     private lateinit var proxy: MockWebServer
     private val dir: File = Files.createTempDirectory("apk").toFile()
@@ -119,7 +119,7 @@ class ProxiedApkDownloadTest {
         assertEquals(DownloadPhase.Ready, d.state(target).phase)
     }
 
-    /** 镜像失败就换下一个来源;失败的那个不留半截文件。 */
+    /** If a mirror fails, move on to the next source; the failed one leaves no partial file. */
     @Test fun startFallsBackToTheNextSource() = runTest {
         proxy.enqueue(MockResponse().setResponseCode(404))
         proxy.enqueue(MockResponse().setBody("good"))
@@ -132,7 +132,7 @@ class ProxiedApkDownloadTest {
         assertEquals(2, proxy.requestCount)
     }
 
-    /** 下完了但校验(大小/摘要)不过,也算这个来源失败,继续试下一个。 */
+    /** The download finished but verification (size/digest) does not pass; that also counts as this source failing, so keep trying the next one. */
     @Test fun verificationFailureMovesOnToTheNextSource() = runTest {
         proxy.enqueue(MockResponse().setBody("corrupt"))
         proxy.enqueue(MockResponse().setBody("good"))
@@ -153,7 +153,7 @@ class ProxiedApkDownloadTest {
             val target = File(dir, "identity-$reason.apk")
             val d = ProxiedApkDownload(client(), this)
             d.start(listOf("http://mirror.test/mika.apk", "http://releases.example.test/mika.apk"), target) { file ->
-                // 两个文件大小相同,缺少摘要时大小校验无法识别错误包。
+                // Both files have the same size, so without a digest the size check cannot spot the wrong package.
                 ApkIntegrity.verify(file, size, null)
                 if (file.readText() == "bad!") throw ApkRejected(reason)
             }
@@ -198,7 +198,7 @@ class ProxiedApkDownloadTest {
         assertFalse(target.exists())
     }
 
-    /** 所有来源都失败:状态是 Failed,目标文件和 .part 都不留下。 */
+    /** Every source fails: the state is Failed and neither the target file nor the .part file is left behind. */
     @Test fun allSourcesFailingLeavesNoFile() = runTest {
         proxy.enqueue(MockResponse().setResponseCode(404))
         proxy.enqueue(MockResponse().setResponseCode(404))
