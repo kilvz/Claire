@@ -11,7 +11,7 @@ import com.wangzan101.mika.core.search.WebSearchProvider
 import com.wangzan101.mika.core.search.YouSearch
 import java.util.Base64
 
-/** 一家搜索服务自己的设置:地址(只有要填地址的那几家用)和密钥。 */
+/** Per-provider settings for a search service: the endpoint (only for the few providers that need an address) and the key. */
 data class WebSearchEntry(val endpoint: String = "", val apiKey: String = "")
 
 /** Whether Google Search grounding is available for the current main model. */
@@ -21,8 +21,8 @@ data class GroundingStatus(
 )
 
 /**
- * 网页搜索设置。默认关闭;只有用户明确选好服务商、填好它要的东西并启用后才创建服务。
- * 各家的地址和密钥分开存([entries]),切换服务商不会把一家的密钥发给另一家。
+ * Web search settings. Disabled by default; the service is only created once the user has explicitly picked a provider, filled in what it needs, and enabled it.
+ * Each provider's endpoint and key are stored separately ([entries]), so switching providers never sends one provider's key to another.
  */
 data class WebSearchConfig(
     val enabled: Boolean = false,
@@ -33,8 +33,8 @@ data class WebSearchConfig(
     val current: WebSearchEntry get() = entries[provider] ?: WebSearchEntry()
 
     /**
-     * 选中的那一家此刻的问题;能保存为 null。必须有密钥的那几家没填密钥一律不让保存(开没开都一样);
-     * 地址只在启用时才查。
+     * The problem with the currently selected provider at this moment; null when it can be saved. Providers that require
+     * a key can never be saved without one (whether enabled or not); the endpoint is only checked when enabled.
      */
     val problem: WebSearchProvider.Problem? get() = when {
         provider.keyRequired && current.apiKey.isBlank() -> WebSearchProvider.Problem.Key
@@ -60,9 +60,9 @@ class WebSearchSettings(
         val enabled = prefs.getBoolean(ENABLED, false)
         val saved = WebSearchProvider.of(prefs.getString(PROVIDER, null))
         if (saved != null) return WebSearchConfig(enabled, saved, stored, grounding)
-        // 升级前的设置:那时只有一个「搜索端点网址 + 可选密钥」。网址是 Exa、Jina 的官方接口时归到那一家、密钥跟过去
-        // (原来的请求方式它们不认,这样升级后直接能用)。别的网址没有对应的服务商:归到 You.com 但先关掉、旧密钥不要,
-        // 免得用户不知道就把搜索词改发给另一家、把给别家的密钥发出去。下次保存时写成新的样子,旧的两个键随之删掉。
+        // Legacy settings from before the upgrade: back then there was only one "search endpoint URL + optional key". If the URL is Exa's or Jina's official endpoint it is assigned to that provider and the key follows it
+        // (they do not accept the old request style, so this makes search work right after upgrading). Other URLs have no matching provider: they are mapped to You.com but left disabled and the old key is dropped,
+        // so the user does not unknowingly send their search queries to a different provider and leak a key meant for another one. The next save rewrites everything in the new shape and the two old keys are removed along the way.
         val legacyEndpoint = prefs.getString(LEGACY_ENDPOINT, null).orEmpty()
         val official = legacyOfficial(legacyEndpoint)
         return when {
@@ -95,7 +95,7 @@ class WebSearchSettings(
         check(edit.commit()) { "Cannot save web search settings" }
     }
 
-    /** 每次任务重读设置;关闭、没填好或配置损坏时返回 null,任务只会走浏览器。 */
+    /** Rereads the settings for every task; returns null when disabled, incomplete, or the config is corrupt, in which case the task only uses the browser. */
     fun service(): WebSearch? {
         val config = get()
         if (!config.enabled || config.problem != null) return null
@@ -110,7 +110,7 @@ class WebSearchSettings(
         }
     }
 
-    /** 升级前填的网址是不是 Exa、Jina 的官方接口。 */
+    /** Whether the URL entered before the upgrade is Exa's or Jina's official endpoint. */
     private fun legacyOfficial(endpoint: String): WebSearchProvider? = when (WebSearch.parseEndpoint(endpoint)?.host) {
         "api.exa.ai" -> WebSearchProvider.Exa
         "s.jina.ai" -> WebSearchProvider.Jina
@@ -125,7 +125,7 @@ class WebSearchSettings(
         private const val PREFS = "web_search"
         private const val ENABLED = "enabled"
         private const val PROVIDER = "provider"
-        // 升级前只有一个端点网址和一个密钥;只在迁移时读,保存时删掉
+        // Before the upgrade there was only one endpoint URL and one key; these are read only during migration and removed on save
         private const val LEGACY_ENDPOINT = "endpoint"
         private const val LEGACY_API_KEY = "api_key_encrypted"
 

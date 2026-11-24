@@ -24,7 +24,7 @@ internal class DeviceWorkspaceImports(
     private val imports: DeviceImportStore,
     private val resolveWorkspace: (String) -> WorkspaceKey,
     private val conversationIdFor: (String) -> String,
-    /** 每次导入现取设置里的档位(聊天附件与设备导入共用),改完下一次导入即生效。 */
+    /** Reads the limits from settings on every import (shared by chat attachments and device imports); changes take effect on the next import. */
     private val limits: () -> AttachmentLimits = { AttachmentLimits.DEFAULT },
 ) {
     suspend fun fromFolder(path: String, workspace: String, open: (String) -> InputStream) = locked {

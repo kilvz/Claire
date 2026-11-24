@@ -3,14 +3,14 @@ package com.wangzan101.mika.takeover
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 
-/** 交回那一刻用户在主屏上做过的事:操作次数和停在哪个页面(取不到为 null)。[url] 是网页接管交回时的最终地址,App 接管为 null。 */
+/** What the user did on the main screen at the moment of hand-back: the action count and which page they stopped on (null when unavailable). [url] is the final address when a web takeover is handed back, and null for an app takeover. */
 data class HandoverActivity(val inputCount: Int, val stoppedAt: String?, val url: String? = null)
 
 /**
- * 接管期间数用户在主屏上对 [packageName] 的点击、输入、滚动次数;一次滑动会连着发很多滚动事件,
- * 间隔不到 [MERGE_MS] 的算同一次;同一个输入框连着的文字变化同理。一串连发最长算 [BURST_CAP_MS],
- * 超过的部分另算一次,免得长时间滑动或打字只记 1 次。顺带记下该包最近一次切到的 Activity 简名,取不到页面标题时用。
- * 事件来自无障碍回调所在的协程,读数来自交回的协程,所以加锁。
+ * Counts the user's taps, typing and scrolling on [packageName] on the main screen during takeover; one swipe fires many scroll events in a row,
+ * and those less than [MERGE_MS] apart count as a single one; the same applies to consecutive text changes in the same input field. A burst counts for at most [BURST_CAP_MS],
+ * and anything beyond that counts as another action, so a long scroll or typing session is not recorded as just 1. Also records the simple name of the Activity the package most recently switched to, for use when the page title is unavailable.
+ * Events come from the coroutine running the accessibility callback while reads come from the hand-back coroutine, hence the locking.
  */
 class HandoverActivityCounter(val packageName: String) {
     private var count = 0
@@ -28,7 +28,7 @@ class HandoverActivityCounter(val packageName: String) {
         when (eventType) {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> count++
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> {
-                // 换了输入框就是新的一次
+                // Switching to a different input field starts a new one
                 if (typingSource != source) typingBurst = null
                 typingSource = source
                 typingBurst = advance(typingBurst, timeMs)
@@ -57,8 +57,8 @@ class HandoverActivityCounter(val packageName: String) {
 }
 
 /**
- * 「停在哪」:窗口标题常常只是 App 名,这时用页面(Activity)简名,两样都有且不同才拼在一起;
- * 标题取不到就用页面简名。
+ * "Stopped on": the window title is often just the app name, in which case the simple page (Activity) name is used, and the two are only joined when both exist and differ;
+ * if the title is unavailable, the simple page name is used.
  */
 fun stoppedAt(title: String?, appLabel: String?, activity: String?): String? {
     val t = title?.takeIf { it.isNotBlank() }

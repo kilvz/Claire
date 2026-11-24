@@ -6,40 +6,40 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 任务期间让 Claire 屏上的 App 不出声。PLAY_AUDIO 按「包 + 用户」设([AppAudioKey]),本来那份和另一份(分身、工作资料)分开静。
+ * Keeps the apps on Claire's display silent during a task. PLAY_AUDIO is set per "package + user" ([AppAudioKey]), so the original instance and the other one (clone, work profile) are muted separately.
  *
- * - [beforeOpen]:Claire 要启动某个 App 时,发出启动之前先静上,开头几秒就没声;这一步失败先不报,等它真开出来再试。
- * - [opened]:Claire 屏上冒出一个 App(启动的目标,或从别的 App 里点开、另一份顶上来的):没静过就静,静不了记成「可能出声」。
- * - [notOpened]:启动被拒(没装、用户正用着…),提前静上又没开出来的那个马上还原,不让它在任务期间白白没声。
- * - [release]:用户接管时把这个 App 的声音还回去;之后再 [opened] 又会静上。
- * - [unmute]:用户明确恢复声音;这次任务里之后不再自动静它,即使接管交回也保持有声。
- * - [muteAgain]:用户明确再静上([unmute] 的反向);不走自动静音的判定,静上后回到自动管理。
+ * - [beforeOpen]: when Claire is about to launch an app, mute it before the launch is issued so the first few seconds are silent; if this step fails, don't report it yet and retry once the app actually opens.
+ * - [opened]: an app appears on Claire's display (the launch target, or one opened from another app, or the other instance coming to the front): mute it if not already muted; if it cannot be muted, record it as "may produce sound".
+ * - [notOpened]: the launch was rejected (not installed, the user is using it…): immediately restore the one muted in advance that never opened, so it is not needlessly silent during the task.
+ * - [release]: when the user takes over, give the app's sound back; a later [opened] mutes it again.
+ * - [unmute]: the user explicitly restores sound; it is then never auto-muted again in this task, and stays audible even after a takeover hand-back.
+ * - [muteAgain]: the user explicitly mutes again (the reverse of [unmute]); the auto-mute decision is bypassed, and after muting it returns to automatic management.
  *
- * 不碰的:Claire 自己;没有桌面入口的系统包(系统界面、选择框、权限框这一类,静了会连带系统的声音);
- * 用户此刻在主屏上看得见的(静音按包作用,静了用户手上的也没声)。设置里关掉静音时一个也不静。
- * 收尾时由 [AudioMute.restoreAll] 一起还原,包括任务中途静上的。
+ * Never touched: Claire itself; system packages with no launcher entry (system UI, chooser, permission dialogs and the like, where muting also silences system sounds);
+ * and whatever the user can see on the main screen right now (muting works per package, so muting would silence what is in the user's hands too). When muting is turned off in settings, nothing is muted.
+ * At teardown everything is restored together by [AudioMute.restoreAll], including whatever was muted mid-task.
  */
 class AppMuter(
     private val audio: AudioMute,
-    /** 设置 › 任务运行的「打开的 App 静音」;每次现读,任务中途关掉也算数。 */
+    /** Settings › Task run › "mute opened apps"; read fresh every time, so turning it off mid-task counts too. */
     private val enabled: () -> Boolean,
-    /** 这个包能不能静(见类说明的「不碰的」前两条)。 */
+    /** Whether this package can be muted (see the first two items under "never touched" in the class doc). */
     private val mutable: (packageName: String) -> Boolean,
-    /** 这个包([user] 那份,null 为本来那份)此刻在主屏上看得见。 */
+    /** Whether this package (the [user] instance, or the original when null) is visible on the main screen right now. */
     private val onMainScreen: (packageName: String, user: Int?) -> Boolean,
-    /** 应该静却没静成:任务进度上提示「该 App 可能会出声」。 */
+    /** Should have been muted but wasn't: report "this app may produce sound" in the task progress. */
     private val failed: (packageName: String) -> Unit,
 ) {
-    /** 这次任务里已静上(还没还原)的键。 */
+    /** Keys already muted (not yet restored) in this task. */
     private val muted = HashSet<String>()
 
-    /** 启动前静上、还没见它开出来的键:启动被拒时据此还原。 */
+    /** Keys muted before launch that have not been seen opening yet: used to restore them when the launch is rejected. */
     private val early = HashSet<String>()
 
-    /** 用户明确恢复过声音的键;这次任务里不再自动静它。 */
+    /** Keys whose sound the user explicitly restored; they are no longer auto-muted in this task. */
     private val unmuted = HashSet<String>()
 
-    /** 用户明确恢复过声音、还没再静上的键;小窗的声音按钮据此显示方向,只反映真实音频记录。 */
+    /** Keys whose sound the user explicitly restored and that have not been muted again; the mini-window's sound button uses them to show its direction, reflecting only real audio state. */
     private val _userUnmuted = MutableStateFlow<Set<String>>(emptySet())
     val userUnmuted: StateFlow<Set<String>> = _userUnmuted.asStateFlow()
 
@@ -58,7 +58,7 @@ class AppMuter(
         val key = AppAudioKey.of(packageName, user)
         early -= key
         if (key in muted || key in unmuted || !wanted(packageName)) return
-        // 用户在主屏上正用着它:不静,照实说它可能出声
+        // The user is using it on the main screen right now: don't mute, and report truthfully that it may produce sound
         if (onMainScreen(packageName, user) || !audio.mute(key)) {
             failed(packageName)
             return
@@ -73,7 +73,7 @@ class AppMuter(
         if (audio.restore(key)) muted -= key
     }
 
-    /** 还原一个 App 的声音(用户接管);还原不了返回 false,留在记录里收尾时再试。 */
+    /** Restores one app's sound (user takeover); returns false if it cannot be restored, leaving it in the record to retry at teardown. */
     @Synchronized
     fun release(packageName: String, user: Int?): Boolean {
         val key = AppAudioKey.of(packageName, user)
@@ -84,8 +84,8 @@ class AppMuter(
     }
 
     /**
-     * 用户明确恢复声音。成功后本次任务不再自动静它;失败时保留静音与持久化记录,
-     * 重复点击可以重试,任务收尾的 restoreAll 也仍能恢复。
+     * The user explicitly restores sound. After success it is no longer auto-muted in this task; on failure the mute and the persisted record are kept,
+     * so repeated taps can retry, and restoreAll at task teardown can still restore it.
      */
     @Synchronized
     fun unmute(packageName: String, user: Int?): Boolean {
@@ -99,8 +99,8 @@ class AppMuter(
     }
 
     /**
-     * 用户明确再静上(小窗的反向操作)。不走自动静音的判定:显式意图优先,主屏上看得见的也静。
-     * 成功后回到自动管理,与静音台账一致、收尾照常还原;失败保留恢复状态可重试。
+     * The user explicitly mutes again (the reverse action of the mini-window). The auto-mute decision is bypassed: explicit intent wins, so even apps visible on the main screen are muted.
+     * After success it returns to automatic management, consistent with the mute ledger and restored as usual at teardown; on failure the restored state is kept so it can be retried.
      */
     @Synchronized
     fun muteAgain(packageName: String, user: Int?): Boolean {

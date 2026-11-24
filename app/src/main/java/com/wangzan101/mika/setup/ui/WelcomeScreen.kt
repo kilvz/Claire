@@ -42,7 +42,7 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 import com.wangzan101.mika.ui.theme.MikaRadius
 
-/** 上手第一步:说清 Claire 是什么、能做哪几类事,开始前要做的两件事和大概时间。 */
+/** First onboarding step: explains what Claire is, which categories of things it can do, the two things to do before starting, and the approximate time needed. */
 @Composable
 fun WelcomeScreen(onStart: () -> Unit) {
     val c = MikaTheme.colors
@@ -94,7 +94,7 @@ private fun Feature(icon: ImageVector, title: String, body: String, first: Boole
 
 private val LogoShape = RoundedCornerShape(MikaRadius.Bubble)
 
-/** 欢迎页的文字。 */
+/** Text on the welcome screen. */
 object WelcomeCopy {
     val TITLE: String get() = tr(R.string.welcome_title)
     val LEAD: String get() = tr(R.string.welcome_lead)

@@ -46,9 +46,9 @@ import com.wangzan101.mika.memory.ui.SkillRow
 import com.wangzan101.mika.memory.ui.SkillsUi
 
 /**
- * 技能相关的两块内容。[pending] 为假是「技能」段:已收下的个人技能(开关即启用/停用)和在用的 App 知识;
- * 为真是「待确认」段里的部分:新技能草稿(看全文、改一改再收下、收下、不要)和 App 知识草稿。
- * 个人技能可以分享全文出去,别人分享来的全文从「导入技能」粘进来,先进「待确认」(#165)。
+ * The two skill-related blocks. When [pending] is false this is the "Skills" section: accepted personal skills (the switch enables/disables them) and the app knowledge in use;
+ * when true it is the part inside the "Pending" section: new skill drafts (view the full text, edit then accept, accept, reject) and app knowledge drafts.
+ * Personal skills can be shared as full text, and full text shared by others is pasted in through "Import skill", landing in "Pending" first (#165).
  */
 @Composable
 internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean, onMarket: () -> Unit = {}) {
@@ -172,7 +172,7 @@ internal fun SkillsSection(vm: MemoryViewModel, ui: SkillsUi, pending: Boolean, 
     }
 }
 
-/** 一条 App 知识:点开看全文;草稿可收下试用,没核实的可归档;被试用中的修订暂时顶替的那份只看不动。 */
+/** One piece of app knowledge: tap to see the full text; drafts can be accepted as a trial, unverified ones can be archived; the entry temporarily replaced by a revision under trial is view-only. */
 @Composable
 private fun AppKnowledgeItem(vm: MemoryViewModel, row: AppKnowledgeRow, first: Boolean, expanded: Boolean, onToggle: () -> Unit) {
     val stage = if (row.replaced) tr(R.string.skills_app_replaced) else when (row.stage) {
@@ -194,7 +194,7 @@ private fun AppKnowledgeItem(vm: MemoryViewModel, row: AppKnowledgeRow, first: B
     }
 }
 
-/** 技能行下面:更新草稿改了哪几行,展开时再加全文。 */
+/** Below a skill row: which lines the update draft changed; when expanded, the full text is shown as well. */
 @Composable
 private fun SkillBody(r: SkillRow, expanded: Boolean) = ChangesAndText(r.changedLines, expanded) {
     val body = remember(r.markdown) { skillPreviewBody(r.markdown) }
@@ -207,7 +207,7 @@ internal fun skillPreviewBody(markdown: String): String {
     return if (metadata["name"] is String && body.isNotBlank()) body else markdown
 }
 
-/** 一行下面:这份草稿改了哪几行([changed]),展开时再加全文。 */
+/** Below a row: which lines this draft changed ([changed]); when expanded, the full text is shown as well. */
 @Composable
 private fun ChangesAndText(changed: List<String>, expanded: Boolean, content: @Composable () -> Unit) {
     val c = MikaTheme.colors

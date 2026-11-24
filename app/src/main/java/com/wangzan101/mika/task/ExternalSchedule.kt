@@ -16,13 +16,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * 外部脚本经广播(com.wangzan101.mika.SCHEDULE)建定时任务的入口。
- * 广播是 fire-and-forget,没有返回值:拒绝原因写进 logcat,绝不静默排队。
+ * Entry point for external scripts to create scheduled tasks via broadcast (com.wangzan101.mika.SCHEDULE).
+ * The broadcast is fire-and-forget with no return value: rejection reasons are written to logcat, and nothing is ever queued silently.
  */
 object ExternalSchedule {
     const val ACTION = "com.wangzan101.mika.SCHEDULE"
 
-    /** 每分钟最多接几条;超过直接拒绝,不排队。 */
+    /** How many requests to accept per minute at most; anything beyond that is rejected outright, not queued. */
     private const val LIMIT_PER_MINUTE = 5
     private const val WINDOW_MS = 60_000L
     private const val PREFS = "external_schedule"
@@ -74,7 +74,7 @@ object ExternalSchedule {
         return Outcome.Scheduled
     }
 
-    /** 记下最近一分钟内真正接下的任务;窗口内满 [LIMIT_PER_MINUTE] 条即拒绝。 */
+    /** Records the tasks actually accepted within the last minute; once the window holds [LIMIT_PER_MINUTE] entries, requests are rejected. */
     private fun allowNow(prefs: SharedPreferences): Boolean {
         val now = System.currentTimeMillis()
         val recent = prefs.getString(KEY_RECENT, "").orEmpty()
@@ -86,7 +86,7 @@ object ExternalSchedule {
     }
 }
 
-/** 接外部脚本的广播:prompt 必填,at 可选(ISO 8601 带时区,缺省立即执行)。 */
+/** Receives broadcasts from external scripts: prompt is required, at is optional (ISO 8601 with timezone; missing means run immediately). */
 class ExternalScheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ExternalSchedule.ACTION) return

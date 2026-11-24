@@ -19,8 +19,8 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
- * 个人技能 `skills/personal/<name>/`、待收下草稿 `skills/pending/<id>/`,各含 `SKILL.md` + `meta.json`,明文
- * (沉淀时已去掉个人信息,便于查看与调试)。SKILL.md 读不出或缺失时照样列出,由技能目录报「坏了」,不静默消失。
+ * Personal skills live in `skills/personal/<name>/` and drafts awaiting acceptance in `skills/pending/<id>/`, each holding `SKILL.md` + `meta.json` in plain text
+ * (personal information was already removed when the skill was distilled, which keeps them easy to inspect and debug). A SKILL.md that is unreadable or missing is still listed, and the skills directory reports it as "broken" rather than letting it vanish silently.
  */
 class PersonalSkillFiles(dir: File) : PersonalSkills {
     private val personalDir = File(dir, "skills/personal")
@@ -70,11 +70,11 @@ class PersonalSkillFiles(dir: File) : PersonalSkills {
         if (!ID.matches(id)) return null
         val draftDir = File(pendingDir, id)
         val draft = read(draftDir, null) ?: return null
-        // 更新草稿收下后覆盖它指向的那份已有技能
+        // Accepting an update draft overwrites the existing skill it points at
         val name = draft.replacesDraftOf?.takeIf { PersonalSkills.NAME.matches(it) } ?: draft.name
         if (draft.replacesDraftOf != null && draft.baseHash != null &&
             get(name)?.markdown?.let { PersonalSkills.fingerprint(it) } != draft.baseHash) return null
-        // 头部名字跟存放的名字走:更新草稿、用户改过的全文都可能对不上
+        // The name in the header follows the name it is stored under: update drafts and user-edited full text may both disagree
         val markdown = PersonalSkills.withName(editedMarkdown ?: draft.markdown, name)
         val skill = draft.copy(name = name, markdown = markdown, status = SkillStatus.trial, replacesDraftOf = null, baseHash = null)
         archive(name, "approve")
@@ -95,7 +95,7 @@ class PersonalSkillFiles(dir: File) : PersonalSkills {
         }
     }
 
-    /** 撤销一次删除或覆盖：只接受本地改动日志中的旧版本，不从外部路径读。 */
+    /** Undoes one delete or overwrite: only accepts old versions from the local change journal, never read from external paths. */
     @Synchronized override fun revisions(name: String): List<SkillRevision> {
         if (!PersonalSkills.NAME.matches(name)) return emptyList()
         return journal.takeIf { it.exists() }?.useLines { lines -> lines.mapNotNull { line ->
@@ -141,7 +141,7 @@ class PersonalSkillFiles(dir: File) : PersonalSkills {
     private fun readAll(root: File): List<PersonalSkill> =
         root.listFiles { f -> f.isDirectory }.orEmpty().sortedBy { it.name }.mapNotNull { read(it, null) }
 
-    /** [expectedName] 为 null 时名字取 meta.json(草稿目录名是编号),缺了就用目录名。 */
+    /** When [expectedName] is null the name comes from meta.json (draft directory names are IDs); if it is missing, the directory name is used. */
     private fun read(d: File, expectedName: String?): PersonalSkill? {
         if (!d.isDirectory) return null
         val meta = try {

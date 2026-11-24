@@ -19,7 +19,7 @@ private data class MarketIndex(val version: Int, val skills: List<MarketEntry>)
 /** One public GitHub repository; the catalog cannot supply arbitrary URLs or executable files. */
 internal class SkillMarket(private val http: OkHttpClient = client) {
     companion object {
-        // 官方技能市场仓库还没定;默认留空,用户自己填 owner/repository,不指向任何个人测试仓库。
+        // The official skill-market repository is not decided yet; the default is left empty so users fill in owner/repository themselves, and it does not point at any personal test repository.
         const val DEFAULT_REPO = ""
         private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
             .callTimeout(15, TimeUnit.SECONDS).build()

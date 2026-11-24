@@ -5,35 +5,35 @@ import com.wangzan101.mika.core.safety.gate.ConfirmationRequest
 import com.wangzan101.mika.core.cap.phone.OperatingPace
 
 /**
- * 评测跑器用的钩子。只在测试里设置;产品代码里全是默认值,行为不变。
- * 进程里一份(见 [TaskEnvironment]),同时跑的几个任务共用(自动回答只看提问本身,对哪个任务都一样)。
+ * Hooks for the evaluation runner. Only set in tests; in product code they all hold their defaults and behavior is unchanged.
+ * One instance per process (see [TaskEnvironment]), shared by the tasks running at the same time (the auto-answer only looks at the question itself, so it is the same for any task).
  */
 class EvalHooks {
-    /** 追问(ask_user)的自动回答;返回 null 或空白表示不答,任务一直等到评测超时。 */
+    /** Auto-answer for follow-up questions (ask_user); returning null or blank means no answer, and the task waits until the evaluation times out. */
     @Volatile var autoAnswer: ((prompt: String, options: List<String>?) -> String?)? = null
 
-    /** 遇到接管时评测跑器怎么做:cancel(取消任务,记为 takeover)或 wait(等人处理)。由跑器读取。 */
+    /** What the evaluation runner does on takeover: cancel (cancel the task, recorded as takeover) or wait (wait for the user to handle it). Read by the runner. */
     @Volatile var onTakeover: String = "cancel"
 
-    /** 单题步数上限;null 用 Agent 的默认值。 */
+    /** Step cap per item; null uses the Agent's default. */
     @Volatile var maxSteps: Int? = null
 
     /**
-     * 确认关卡的自动回答;非空时不等用户,直接用它的结果(评测里恒为 false:绝不真的发送、删除、下单)。
-     * 关卡照常记事件,卡片内容留给评测核对。
+     * Auto-answer for the confirmation gate; when non-null the user is not awaited and its result is used directly (always false in evaluations: never really send, delete, or place an order).
+     * The gate still records events as usual, and the card content is left for the evaluation to verify.
      */
     @Volatile var autoDecideConfirmation: ((ConfirmationRequest) -> Boolean)? = null
 
-    /** 起草出的技能草稿直接收下(评测的训练轮)。 */
+    /** Accept drafted skill drafts directly (the training round of evaluations). */
     @Volatile var autoApproveSkillDrafts: Boolean = false
 
-    /** 覆盖「从办成的任务里学技能」开关;null 用设置里的。评测默认关(EvalRunTest 设 false),只有训练轮打开。 */
+    /** Overrides the "learn skills from completed tasks" switch; null uses the one in settings. Off by default in evaluations (EvalRunTest sets false), and only enabled in training rounds. */
     @Volatile var learnSkills: Boolean? = null
 
-    /** 覆盖「自动记住我说过的事」开关;null 用设置里的。评测默认关,只有记忆题集打开。 */
+    /** Overrides the "automatically remember things I said" switch; null uses the one in settings. Off by default in evaluations, and only enabled for memory test sets. */
     @Volatile var rememberMemory: Boolean? = null
 
-    /** 覆盖设置里的操作节奏;null 用设置里的。评测和真机验收默认用「快」,按参数才换成别的。 */
+    /** Overrides the operating pace from settings; null uses the one in settings. Evaluations and real-device acceptance default to "fast", and only switch to another pace when a parameter says so. */
     @Volatile var operatingPace: OperatingPace? = null
 
     fun reset() {

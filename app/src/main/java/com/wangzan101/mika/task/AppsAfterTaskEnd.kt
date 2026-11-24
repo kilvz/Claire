@@ -6,19 +6,19 @@ import com.wangzan101.mika.core.screen.uistate.AfterTaskMarks
 import com.wangzan101.mika.shell.IMikaShell
 
 /**
- * 任务收尾时 Claire 屏上的 App 怎么办:把模型标下的去留交给内置助手([IMikaShell.finishDisplay]),
- * 由它按规则([AppsAfterTask])留下或关掉、再释放虚拟屏。要在还原静音之前调:正在出声的先关掉,留下的不会在还原时突然响。
- * 助手没做成(出错、不认得这块屏)时屏照旧在收尾时释放,上面的 App 随屏关掉。
+ * What happens to the apps on Claire's display when a task wraps up: the keep/close marks left by the model are handed to the built-in helper ([IMikaShell.finishDisplay]),
+ * which keeps or closes them per the rules ([AppsAfterTask]) and then releases the virtual display. Must be called before restoring mutes: whatever is currently making sound is closed first, so kept apps do not suddenly make noise during the restore.
+ * If the helper fails (error, unknown display), the display is still released at teardown and the apps on it close along with the display.
  */
 internal object AppsAfterTaskEnd {
     private const val TAG = "AppsAfterTask"
 
-    /** 这个进程里最近一次任务结束时的结果(给诊断信息的一行,只有个数);还没有过为 null。 */
+    /** The result when a task last ended in this process (the one-line diagnostics, counts only); null when there has not been one yet. */
     @Volatile var lastLine: String? = null
         private set
 
     data class Outcome(val kept: List<String>, val closed: List<String>, val note: String?) {
-        /** 运行记录里的一句:留下、关掉的键和原因。 */
+        /** One line in the run record: the keys kept and closed, plus the reason. */
         val detail: String
             get() = listOfNotNull(
                 "kept ${kept.joinToString(",").ifEmpty { "-" }}",
