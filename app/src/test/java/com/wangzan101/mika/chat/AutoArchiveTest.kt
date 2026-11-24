@@ -22,7 +22,7 @@ class AutoArchiveTest {
     private fun summary(id: String, updatedAt: Long, pinnedAt: Long? = null, archivedAt: Long? = null, restoredAt: Long? = null) =
         ConversationSummary(id, id, updatedAt, pinnedAt = pinnedAt, archivedAt = archivedAt, restoredAt = restoredAt)
 
-    /** 只挑没归档、没置顶、最后改动早于分界线的;在跑的和当前在看的留着。 */
+    /** Picks only chats that are not archived, not pinned, and whose last change predates the cutoff; running ones and the one currently being viewed are kept. */
     @Test fun candidatesOnlyTakeOldUnpinnedChats() {
         val now = 1_000_000_000_000L
         val cutoff = AutoArchive.cutoff(30, now)
@@ -38,7 +38,7 @@ class AutoArchiveTest {
         assertEquals(listOf("old"), AutoArchive.candidates(all, cutoff, setOf("running", "current")))
     }
 
-    /** 手动恢复的对话有 N 天宽限:刚恢复的不收,宽限期过了才可能再收走。 */
+    /** A manually restored conversation gets an N-day grace period: a freshly restored one is not collected, and only once the grace period has passed can it be collected again. */
     @Test fun candidatesGiveRestoredChatsAGracePeriod() {
         val now = 1_000_000_000_000L
         val cutoff = AutoArchive.cutoff(30, now)
@@ -49,7 +49,7 @@ class AutoArchiveTest {
         assertEquals(listOf("restored-long-ago"), AutoArchive.candidates(all, cutoff))
     }
 
-    /** 按设置把老对话真的归档;新对话、置顶的、在跑的和当前在看的都不动。 */
+    /** Actually archives old conversations according to the setting; new ones, pinned ones, running ones and the one currently being viewed are untouched. */
     @Test fun runArchivesOldChatsAndSkipsTheKeptOnes() {
         val dir = tmp.newFolder()
         val store = ConversationStore(dir)
@@ -70,11 +70,11 @@ class AutoArchiveTest {
         assertNull(store.archivedAt("running"))
         assertNull(store.archivedAt("pinned"))
         assertNull(store.archivedAt("current"))
-        // 已经归档的不会重复归档
+        // An already archived chat is not archived again
         assertEquals(0, AutoArchive.run(store, days = 30, running = listOf("running"), currentId = "current", now = now + day))
     }
 
-    /** 从归档里手动恢复的老对话,下次自动归档不会马上又收走。 */
+    /** An old conversation manually restored from the archive is not collected again right away by the next auto-archive run. */
     @Test fun runLeavesAJustRestoredChatAlone() {
         val dir = tmp.newFolder()
         val store = ConversationStore(dir)
@@ -118,7 +118,7 @@ class AutoArchiveTest {
         assertEquals(now, store.archivedAt("old"))
     }
 
-    /** 扫描已读取运行列表后旧对话才开始任务：逐条归档前重查，不能拿旧快照把它收走。 */
+    /** An old conversation starts a task only after the running list has been read and scanned: each entry is re-checked before archiving, so a stale snapshot must not collect it. */
     @Test fun taskStartingAfterRunningSnapshotIsRecheckedBeforeArchiving() {
         val dir = tmp.newFolder()
         val now = System.currentTimeMillis()
@@ -126,7 +126,7 @@ class AutoArchiveTest {
         store.append("old", Turn("旧消息", "好", "succeeded", atMs = now - 40 * day))
         val active = mutableListOf<String>()
         val runningSnapshot = active.toList()
-        active.add("old") // 模拟任务在快照之后开始，并尚未追加结果。
+        active.add("old") // Simulates a task starting after the snapshot, whose result has not been appended yet.
 
         assertEquals(0, AutoArchive.run(
             store, days = 30, running = runningSnapshot, now = now,
@@ -227,7 +227,7 @@ class AutoArchiveTest {
         assertNull(store.archivedAt("fresh"))
     }
 
-    /** 关着(0 天)时一次都不跑。 */
+    /** When off (0 days) it does not run even once. */
     @Test fun runDoesNothingWhenOff() {
         val dir = tmp.newFolder()
         val store = ConversationStore(dir)

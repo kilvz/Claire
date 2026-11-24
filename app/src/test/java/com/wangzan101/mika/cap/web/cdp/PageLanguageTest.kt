@@ -17,11 +17,11 @@ class PageLanguageTest {
 
     @Test fun headerComesFromTheTag() {
         assertEquals("en-US,en", PageLanguage.acceptLanguage("en-Latn-US"))
-        // 文字体系不写
+        // The script subtag is not written
         assertEquals("sr-RS,sr", PageLanguage.acceptLanguage("sr-Latn-RS"))
         assertEquals("pt-BR,pt", PageLanguage.acceptLanguage("pt-BR"))
         assertEquals("id-ID,id", PageLanguage.acceptLanguage("in-ID"))
-        // 没有地区只写语言
+        // Without a region only the language is written
         assertEquals("fr", PageLanguage.acceptLanguage("fr"))
     }
 
@@ -30,7 +30,7 @@ class PageLanguageTest {
         assertSame(o, PageLanguage.withLanguage(o, null))
         val chosen = PageLanguage.withLanguage(o, "en-US,en")
         assertEquals("en-US,en", chosen["acceptLanguage"]!!.jsonPrimitive.content)
-        // 身份其余各项不变
+        // The other identity entries stay unchanged
         assertEquals(o, chosen - "acceptLanguage")
     }
 
@@ -38,7 +38,7 @@ class PageLanguageTest {
         val o = PageLanguage.mobileOverride(mobileUa, mobileMeta, null)
         assertEquals("", o["userAgent"]!!.jsonPrimitive.content)
         assertEquals(setOf("userAgent"), o.keys)
-        // 拿不到默认 UA 时也不去造一个
+        // When the default UA cannot be obtained, no substitute is fabricated either
         assertEquals("", PageLanguage.mobileOverride("", mobileMeta, "en-US,en")["userAgent"]!!.jsonPrimitive.content)
     }
 
@@ -51,9 +51,9 @@ class PageLanguageTest {
         assertTrue(meta["mobile"]!!.jsonPrimitive.boolean)
         assertEquals("Android", meta["platform"]!!.jsonPrimitive.content)
         assertEquals("K", meta["model"]!!.jsonPrimitive.content)
-        // 手机版的品牌照内核给的,Android WebView 留着
+        // The mobile brands are what the engine reports; Android WebView is kept
         assertEquals(listOf("Chromium", "Android WebView"), meta["brands"]!!.jsonArray.map { it.jsonObject["brand"]!!.jsonPrimitive.content })
-        // 取不到默认 UA-CH 时只带 UA 和语言
+        // When the default UA-CH cannot be obtained, only the UA and the language are included
         assertEquals(setOf("userAgent", "acceptLanguage"), PageLanguage.mobileOverride(mobileUa, null, "fr-FR,fr").keys)
     }
 }

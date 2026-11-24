@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
-/** 胶囊卡片的输入框:收起时没发出的字留着,说的话接在后面。 */
+/** The capsule card's input field: text that was not sent when collapsed is kept, and spoken text is appended after it. */
 class CardInputUiTest {
     private val screen = PendingScreen(CapturedScreen(null, UserScreen("", 0L, "com.android.settings", "设置")), null)
 

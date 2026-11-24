@@ -7,7 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 留页的纯逻辑:留下、留新的顶掉旧的、到 2 小时自动关(假时钟)、各种关法的原因、关的时候在来源对话那一轮记一句。 */
+/** The pure logic of kept pages: keeping one, keeping a new one that displaces the old one, auto-closing after 2 hours (fake clock), the reason for each close path, and recording a line in the source conversation's run when closing. */
 class KeptPageSlotTest {
     private var now = 1_000L
     private val released = mutableListOf<String>()
@@ -23,11 +23,11 @@ class KeptPageSlotTest {
         assertEquals(now + 2 * KeptPageSlot.HOUR_MS, p.closesAt)
         assertEquals("tab1", slot.handle())
         assertEquals(2 * KeptPageSlot.HOUR_MS, slot.remainingMs())
-        // 没到点不关
+        // Does not close before the deadline
         now += 2 * KeptPageSlot.HOUR_MS - 1
         assertFalse(slot.expireIfDue())
         assertEquals(1L, slot.remainingMs())
-        // 到点自动关,放掉手里的东西,在来源那一轮记下原因
+        // Auto-closes at the deadline, releases what it holds, and records the reason in the source run
         now += 1
         assertTrue(slot.expireIfDue())
         assertNull(slot.page.value)
@@ -60,7 +60,7 @@ class KeptPageSlotTest {
     @Test fun lateCallbackDoesNotCloseALaterPage() {
         val old = keep("tab1")
         keep("tab2")
-        // 旧那一页崩溃的回调晚到:不关后来留的那一页
+        // The crash callback for the old page arrives late: the page kept afterwards is not closed
         assertFalse(slot.closeIf(old.id, KeptPageClose.Crashed))
         assertEquals("tab2", slot.handle())
     }
@@ -71,7 +71,7 @@ class KeptPageSlotTest {
         assertEquals("course.example.com" to null, slot.recordFor("r1"))
         assertNull(slot.recordFor("r2"))
         assertNull(slot.recordFor(null))
-        // 那一轮还没写进对话页面就崩了:照样记得留过、为什么关
+        // It crashed before that run was written into the conversation page: it still remembers the page was kept and why it was closed
         slot.close(KeptPageClose.Crashed)
         assertEquals("course.example.com" to "crashed", slot.recordFor("r1"))
     }

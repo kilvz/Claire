@@ -24,7 +24,7 @@ class ConversationDeleterTest {
 
     private val active = MutableStateFlow<List<String>>(emptyList())
     private val calls = mutableListOf<String>()
-    /** 定时任务编号 → 绑着的对话。 */
+    /** Scheduled task id → the conversation it is bound to. */
     private val schedules = mutableMapOf("t1" to "a", "t2" to "a", "t3" to "b")
     private val workspaces = mutableSetOf("a", "b")
 
@@ -51,7 +51,7 @@ class ConversationDeleterTest {
         assertEquals(DeleteImpact(runningTask = false, schedules = 0), d.impact("c"))
     }
 
-    /** 没有任务在跑:删它的工作区和记录,保留定时任务;别的对话不动;不去停任务。 */
+    /** No task is running: deletes its workspace and records, keeps the scheduled tasks; other conversations are untouched; no attempt is made to stop tasks. */
     @Test fun deletesRecordsAndWorkspaceButKeepsSchedules() = runTest {
         val store = store()
         store.setPinned("a", true, at = 1L)
@@ -64,7 +64,7 @@ class ConversationDeleterTest {
         assertEquals(null, store.pinnedAt("a"))
     }
 
-    /** 有任务在跑:先停任务并等它收尾(收尾时存进的那一轮也删掉),然后才删文件。 */
+    /** A task is running: stop the task first and wait for it to wind down (the turn stored while winding down is deleted too), and only then delete the files. */
     @Test fun stopsTheRunningTaskAndWaitsForItToEnd() = runTest {
         val store = store()
         active.value = listOf("a", "b")
@@ -72,7 +72,7 @@ class ConversationDeleterTest {
         runCurrent()
         assertEquals(listOf("cancel:a"), calls)
         assertTrue("a" in workspaces)
-        // 任务收尾:存进停止的那一轮,再从进行中拿掉
+        // The task winds down: the cancelled turn is stored, then the task is removed from the running set
         store.append("a", Turn("查天气", "已停止", "cancelled"))
         active.value = listOf("b")
         job.join()
@@ -81,7 +81,7 @@ class ConversationDeleterTest {
         assertFalse("a" in workspaces)
     }
 
-    /** 任务迟迟不收尾:等到上限照样删。 */
+    /** The task takes a long time to wind down: after waiting up to the limit it is deleted anyway. */
     @Test fun givesUpWaitingAfterTheLimit() = runTest {
         val store = store()
         active.value = listOf("a")
@@ -94,7 +94,7 @@ class ConversationDeleterTest {
         assertFalse("a" in workspaces)
     }
 
-    /** 保留下来的计划以后触发时,在原编号下只留下新的结果,不复活已删除的历史。 */
+    /** When a retained schedule fires later, only the new result is left under the original id; the deleted history is not resurrected. */
     @Test fun futureScheduledResultStartsAFreshConversation() = runTest {
         val store = store()
         deleter(store).delete("a")
@@ -103,7 +103,7 @@ class ConversationDeleterTest {
         assertEquals(mapOf("t1" to "a", "t2" to "a", "t3" to "b"), schedules)
     }
 
-    /** 工作区删不掉(设备不支持运行环境等)也照样删记录。 */
+    /** The records are deleted anyway even if the workspace cannot be deleted (for example the device does not support a runtime environment). */
     @Test fun recordsAreDeletedEvenIfTheWorkspaceFails() = runTest {
         val store = store()
         ConversationDeleter(store, active, {}, { emptyList() }, { error("no sandbox") }, io = EmptyCoroutineContext).delete("a")

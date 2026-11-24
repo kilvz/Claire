@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 双击还是单击、截屏预览发进哪个对话、带屏幕的话在列表里怎么称呼。 */
+/** Double tap or single tap, which conversation the screenshot preview is sent into, and how the screen-carrying message is titled in the list. */
 class ScreenSendTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -20,7 +20,7 @@ class ScreenSendTest {
         val t = taps()
         assertEquals(DoubleTap.Tap.First, t.tap(1_000, 100f, 200f, source = 1))
         assertEquals(DoubleTap.Tap.Double, t.tap(1_250, 110f, 210f, source = 1))
-        // 双击之后到时也不再算单击
+        // After a double tap, the timeout no longer counts as a single tap
         assertFalse(t.settle(1_400))
     }
 
@@ -75,11 +75,11 @@ class ScreenSendTest {
         val done = run("b", "c2", TaskState.Succeeded("好"), CapsuleKind.Done)
         assertEquals("c1", CapsuleCards.conversationOf(CapsuleCards.of(listOf(running), null)!!))
         assertEquals("c2", CapsuleCards.conversationOf(CapsuleCards.of(listOf(done), null)!!))
-        // 空闲卡片:接着最近的对话;选了新对话时由调用方新开
+        // Idle card: continues the most recent conversation; when a new conversation is selected the caller starts one
         assertEquals("c9", CapsuleCards.conversationOf(CardView.Chat("c9", title = "t")))
         assertNull(CapsuleCards.conversationOf(CardView.Chat("c9", fresh = true)))
         assertNull(CapsuleCards.conversationOf(CardView.Chat(null)))
-        // 好几件事时卡片只说排在最前的那件,屏幕发给它所在的对话
+        // With several tasks the card only shows the one at the front, and the screen goes to its conversation
         val several = CapsuleCards.of(listOf(running, done))!!
         assertEquals(CardInputKind.Steer, CapsuleCards.input(several)?.kind)
         assertEquals("c1", CapsuleCards.conversationOf(several))

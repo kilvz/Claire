@@ -36,7 +36,7 @@ class WebDownloadsTest {
     private lateinit var ws: File
     private val cookieCalls = mutableListOf<String>()
 
-    /** 测试服务器在本机:只放行它自己,别的地址照真机规则(本机、局域网都不许)。 */
+    /** The test server is on this machine: only it is allowed through, and other addresses follow the real-device rule (neither machine-local nor LAN is allowed). */
     private fun allowServer(url: String): String? =
         if (url.startsWith(server.url("/").toString())) null else DownloadAddressPolicy.refusal(url)
 
@@ -52,8 +52,8 @@ class WebDownloadsTest {
 
     @After
     fun tearDown() {
-        // 有的用例只看登记、不等下载跑完:先等在途下载收尾再关服务器,
-        // 否则下载撞上断开的连接走出错分支(android.util.Log 在 JVM 里会抛),异常漏到同进程后面的测试里。
+        // Some cases only check registration and do not wait for the download to finish: wait for in-flight downloads to settle before shutting the server down,
+        // otherwise a download hits a closed connection and takes the error branch (android.util.Log throws on the JVM), leaking the exception into later tests in the same process.
         runBlocking { withTimeoutOrNull(10_000) { scope.coroutineContext[Job]!!.children.forEach { it.join() } } }
         scope.cancel()
         server.shutdown()
@@ -99,13 +99,13 @@ class WebDownloadsTest {
         assertEquals("report.pdf", WebDownloads.fileName("attachment; filename*=UTF-8''report.pdf; filename=\"old.pdf\"", "https://a/b", null))
         assertEquals("季度报告.pdf", WebDownloads.fileName("attachment; filename*=UTF-8''%E5%AD%A3%E5%BA%A6%E6%8A%A5%E5%91%8A.pdf", "https://a/b", null))
         assertEquals("invoice.pdf", WebDownloads.fileName(null, "https://a.example.com/x/invoice.pdf?token=1", null))
-        // 控制字符、双向控制符(能把 exe 伪装成 pdf)、开头的点、反斜杠路径都去掉
+        // Control characters, bidirectional controls (which can disguise an exe as a pdf), leading dots and backslash paths are all stripped
         assertEquals("evilfdp.exe", WebDownloads.fileName("attachment; filename=\"evil‮fdp.exe\"", "https://a/b", null))
         assertEquals("a b.txt", WebDownloads.fileName("attachment; filename=\"a\u0000\u0007 b.txt\"", "https://a/b", null))
         assertEquals("x.sh", WebDownloads.fileName("attachment; filename=\"..\\\\..\\\\x.sh\"", "https://a/b", null))
         assertEquals("env", WebDownloads.fileName("attachment; filename=\".env\"", "https://a/b", null))
         assertEquals("download", WebDownloads.fileName("attachment; filename=\"..\"", "https://a.example.com/", null))
-        // 名字太长按字节截短,保留扩展名
+        // A name that is too long is truncated by bytes, keeping the extension
         val long = WebDownloads.fileName("attachment; filename=\"${"文".repeat(200)}.pdf\"", "https://a/b", null)
         assertTrue(long, long.endsWith(".pdf") && long.toByteArray().size <= 200)
     }
@@ -157,7 +157,7 @@ class WebDownloadsTest {
         assertFalse(File(ws, "downloads/missing.pdf").exists())
     }
 
-    /** 只有 TLS / 握手一类的错误才改由页面去取,而且换路前地址规则照样过;普通连不上不换。 */
+    /** Only TLS / handshake-type errors switch to fetching via the page, and the address rule still applies before switching routes; an ordinary connection failure does not switch. */
     @Test
     fun pageFallbackOnlyForTlsFailures() {
         val host = "127.0.0.1"
@@ -165,7 +165,7 @@ class WebDownloadsTest {
         val d = WebDownloads(ws, JVM_GATE, SandboxTree(), OkHttpClient(), { null }, scope, addressRefusal = local, dns = Dns.SYSTEM)
         var asked = 0
         val viaPage: suspend (Long) -> Pair<ByteArray, String?>? = { asked++; "%PDF".toByteArray() to "application/pdf" }
-        // 一个只回明文的端口:用 https 连它是握手失败
+        // A port that only answers plaintext: connecting to it with https is a handshake failure
         val plain = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName(host))
         val answering = Thread {
             runCatching { while (true) plain.accept().use { it.getOutputStream().write("HTTP/1.1 400 Bad Request\r\n\r\n".toByteArray()) } }
@@ -173,7 +173,7 @@ class WebDownloadsTest {
         val tls = d.awaitDone(d.start("https://$host:${plain.localPort}/a.pdf", "UA", null, null, null, viaPage = viaPage))
         plain.close(); answering.interrupt()
         assertEquals(tls.error, "done", tls.status); assertEquals(1, asked)
-        // 端口上没人听:普通的网络错误,带上出错类型,不换路
+        // Nobody listens on the port: an ordinary network error, reported with its error type, no route switch
         val closed = MockWebServer().apply { start() }.let { s -> s.url("/b.pdf").toString().also { s.shutdown() } }
         val net = d.awaitDone(d.start(closed, "UA", null, null, null, viaPage = viaPage))
         assertEquals("failed", net.status); assertEquals(1, asked)
@@ -219,11 +219,11 @@ class WebDownloadsTest {
         check("A+%20%FF雪 post", "mixed.bin", byteArrayOf(
             0x41, 0x2B, 0x20, 0xFF.toByte(), 0xE9.toByte(), 0x9B.toByte(), 0xAA.toByte(),
             0x20, 0x70, 0x6F, 0x73, 0x74))
-        // 未转义 Unicode 明确按 UTF-8 写出,不经过 %HH 的字符串解码
+        // Unescaped Unicode is explicitly written out as UTF-8, not decoded through %HH string decoding
         check("雪+😀", "unicode.bin", byteArrayOf(
             0xE9.toByte(), 0x9B.toByte(), 0xAA.toByte(), 0x2B,
             0xF0.toByte(), 0x9F.toByte(), 0x98.toByte(), 0x80.toByte()))
-        // Base64 路径不变,控制用例同时覆盖 NUL、非 UTF-8 与加号字节
+        // The Base64 path is unchanged; the control cases cover NUL, non-UTF-8 and plus bytes at the same time
         check("AP8r", "base64.bin", byteArrayOf(0x00, 0xFF.toByte(), 0x2B), base64 = true)
     }
 
@@ -240,27 +240,27 @@ class WebDownloadsTest {
         assertFalse(File(ws, "downloads/bad.bin").exists())
     }
 
-    /** 页面在链接上给的名字(<a download>)对每种下载都用上,清洗规则照旧;响应头里的名字优先,网址最后。 */
+    /** The name the page gives on the link (<a download>) is used for every download path, with the usual sanitization; a name from the response header takes precedence, and the URL comes last. */
     @Test
     fun pageGivenNamesReachEveryDownloadPath() {
         val d = downloads()
-        // blob: 与 data: 没有响应头,也不拿网址当名字:用页面给的
+        // blob: and data: have no response headers and do not use the URL as a name: the page-given one is used
         assertEquals("/workspace/downloads/report.csv", d.save("blob:https://a.example.com/1", null, "text/csv", "a".toByteArray(), suggested = "report.csv"))
         assertEquals("/workspace/downloads/note.txt", d.dataUrl("data:text/plain;base64,aGVsbG8=", null, suggested = "note.txt"))
-        // 页面给的名字照样清洗:去掉路径
+        // The page-given name is sanitized as usual: the path is stripped
         assertEquals("/workspace/downloads/x.sh", d.save("blob:https://a.example.com/2", null, null, "a".toByteArray(), suggested = "../../x.sh"))
-        // http:页面给的名字排在网址之前、响应头之后
+        // http: the page-given name ranks before the URL and after the response header
         server.enqueue(MockResponse().setBody("1"))
         server.enqueue(MockResponse().setBody("2"))
         assertEquals("/workspace/downloads/月报.pdf", d.start(server.url("/dl?id=1").toString(), "UA", null, "application/pdf", null, suggested = "月报.pdf"))
         assertEquals("/workspace/downloads/from-header.pdf",
             d.start(server.url("/dl?id=2").toString(), "UA", "attachment; filename=\"from-header.pdf\"", null, null, suggested = "page.pdf"))
-        // 先问页面要名字再登记:问的这一会儿 awaitNamed 等着,问完就数得到
+        // The page is asked for a name before registration: awaitNamed waits while that happens, and once it is done the download can be counted
         val before = d.count()
         d.withPageName({ kotlinx.coroutines.delay(100); "later.bin" }) { name -> d.save("blob:https://a.example.com/3", null, null, "b".toByteArray(), name) }
         runBlocking { d.awaitNamed(2_000) }
         assertEquals(listOf("/workspace/downloads/later.bin"), d.since(before).map { it.file })
-        // 页面问不到(出错)也照样下载,用别的名字
+        // Even if the page cannot be asked (it errors), the download still happens under another name
         val before2 = d.count()
         d.withPageName({ error("page gone") }) { name -> d.save("blob:https://a.example.com/4", null, "text/csv", "c".toByteArray(), name) }
         runBlocking { d.awaitNamed(2_000) }
@@ -281,7 +281,7 @@ class WebDownloadsTest {
 
     @Test
     fun everyRedirectHopIsChecked() {
-        // 跳到局域网、本机别的端口:不跟
+        // A redirect to the LAN or to another port on this machine: not followed
         server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", "http://192.168.1.1/router.cfg"))
         server.enqueue(MockResponse().setResponseCode(301).setHeader("Location", "http://127.0.0.1:1/x"))
         val d = downloads()
@@ -290,7 +290,7 @@ class WebDownloadsTest {
         val b = d.awaitDone(d.start(server.url("/b.bin").toString(), "UA", null, null, null))
         assertEquals("blocked_redirect", b.error)
         assertTrue(File(ws, "downloads").list()!!.isEmpty())
-        // 同一服务器上的跳转照常跟,并按跳转后的地址带 Cookie
+        // A redirect on the same server is followed as usual, carrying cookies for the post-redirect address
         server.enqueue(MockResponse().setResponseCode(302).setHeader("Location", "/final/c.txt"))
         server.enqueue(MockResponse().setBody("ok"))
         val c = d.awaitDone(d.start(server.url("/c.txt").toString(), "UA", null, null, null))
@@ -360,7 +360,7 @@ class WebDownloadsTest {
         server.enqueue(MockResponse().setBody("new"))
         val d = downloads()
         val path = d.start(server.url("/a.txt").toString(), "UA", null, null, null)
-        assertEquals("/workspace/downloads/a (2).txt", path) // 已有的名字从不覆盖
+        assertEquals("/workspace/downloads/a (2).txt", path) // an existing name is never overwritten
         d.awaitDone(path)
         assertEquals("keep", private.readText())
     }

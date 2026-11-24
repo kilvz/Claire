@@ -33,7 +33,7 @@ class LoginProbeTest {
     }
 
     @Test fun helpAndLookalikeLinksAreNotLogout() {
-        // 注销账号的说明、帮助页,以及「退出」开头的别的意思
+        // Account-cancellation explanations, help pages, and other meanings that start with "log out"
         assertEquals(LoginState.Unknown, state("账号注销"))
         assertEquals(LoginState.Unknown, state("注销说明"))
         assertEquals(LoginState.Unknown, state("退出全屏"))
@@ -43,16 +43,16 @@ class LoginProbeTest {
 
     @Test fun avatarsAloneNeverDecide() {
         assertEquals(LoginState.Unknown, state(avatars = 3))
-        // 头像只挡住「已退出」
+        // An avatar only blocks "signed out"
         assertEquals(LoginState.Unknown, state("登录", avatars = 1))
     }
 
     @Test fun conflictsAndLoginPagesAreUnknown() {
         assertEquals(LoginState.Unknown, state())
-        // 改密码页:密码框和退出链接都在
+        // Change-password page: both a password field and a logout link are present
         assertEquals(LoginState.Unknown, state("退出登录", pw = true))
         assertEquals(LoginState.Unknown, state("登录", "个人中心"))
-        // 单点登录、通行证跳转途中不下结论,哪怕有密码框
+        // Draws no conclusion mid SSO or passport redirect, even when a password field is present
         assertEquals(LoginState.Unknown, state(pw = true, url = "https://passport.example.com/login?return=/"))
         assertEquals(LoginState.Unknown, state("退出登录", url = "https://example.com/sso/callback"))
     }

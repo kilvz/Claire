@@ -16,8 +16,8 @@ import org.junit.rules.TemporaryFolder
 import java.util.concurrent.TimeUnit
 
 /**
- * 在 node 里给补丁搭一个最小的手机浏览器环境(test resources 里的 identity-harness.js)跑一遍。
- * 机器上没有 node 时跳过。
+ * Builds a minimal mobile browser environment for the patch in node (identity-harness.js in test resources) and runs it once.
+ * Skipped when node is not installed on the machine.
  */
 class IdentityScriptTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -63,10 +63,10 @@ class IdentityScriptTest {
 
     @Test fun patchedFunctionsBehaveLikeBuiltIns() {
         val o = run()
-        // 接收者不对时照样报 Illegal invocation;缺参数时照样报内核的错
+        // A wrong receiver still reports Illegal invocation; missing arguments still report the engine's error
         for (k in listOf("getterIllegal", "outerIllegal", "mediaIllegal", "methodIllegal")) assertEquals(k, "Illegal invocation", o.str(k))
         assertEquals("1 argument required", o.str("methodNoArgs"))
-        // length 与原来的一样
+        // length is the same as before
         assertEquals(listOf(1, 1, 0, 0), o.getValue("lengths").jsonArray.map { it.jsonPrimitive.int })
         assertEquals(
             listOf("function matchMedia() { [native code] }", "function get maxTouchPoints() { [native code] }", "function toString() { [native code] }"),
@@ -80,7 +80,7 @@ class IdentityScriptTest {
         assertEquals(0, o.getValue("childTouch").jsonPrimitive.int)
         assertEquals("function matchMedia() { [native code] }", o.str("crossSource"))
         assertEquals("function get platform() { [native code] }", o.str("crossSourceBack"))
-        // 再跑一遍不会补第二层
+        // Running it again does not patch a second layer
         assertTrue(o.getValue("matchMediaStillOnce").jsonPrimitive.boolean)
     }
 }

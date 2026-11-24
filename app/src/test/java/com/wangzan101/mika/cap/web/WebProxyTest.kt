@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 内置浏览器怎么用网络代理:支持才设、带账号密码的 SOCKS 用不了;只替当前的 HTTP 代理答账号密码。 */
+/** How the built-in browser uses a network proxy: only set when supported; SOCKS with credentials cannot be used; credentials are answered only for the current HTTP proxy. */
 class WebProxyTest {
     private val saved = NetProxy.sharedSource
 
@@ -48,7 +48,7 @@ class WebProxyTest {
         repeat(3) { assertEquals("alice" to "correct", auth.credentialsFor("proxy.example.test")) }
         assertNull(auth.credentialsFor("proxy.example.test"))
 
-        // 即使设置没改,下一页也能在代理会话失效后再次认证。
+        // Even when the setting is unchanged, the next page can authenticate again after the proxy session expires.
         auth.onPageStarted()
         assertEquals("alice" to "correct", auth.credentialsFor("proxy.example.test"))
     }

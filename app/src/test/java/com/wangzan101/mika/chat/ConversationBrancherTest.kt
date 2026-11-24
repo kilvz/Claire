@@ -16,7 +16,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.nio.file.Files
 
-/** 分支工作区只复制 `inbox/` 里的普通文件;符号链接、inbox 外的文件都不进去。纯 JVM,不依赖 Android。 */
+/** A branch workspace copies only regular files inside `inbox/`; symbolic links and files outside inbox never make it in. Pure JVM, no dependency on Android. */
 class ConversationBrancherTest {
     @get:Rule val tmp = TemporaryFolder()
 
@@ -165,10 +165,10 @@ class ConversationBrancherTest {
             if (id == "c1" || id == "c2") sharedKey else WorkspaceKey.Conversation(id)
         }
 
-        // 同项目内分支共享同一目录:不做自拷贝
+        // Branches within the same project share one directory: no self-copy
         assertNull(branchWorkspace.copyInbox("c1", "c2"))
 
-        // 跨工作区分支按各自解析结果复制到独立目录
+        // Branches across workspaces are copied into separate directories, each according to its own resolved result
         assertEquals(BranchCopyResult(copied = 1), branchWorkspace.copyInbox("c1", "c-solo"))
         assertEquals("shared-content", File(dirs.workspace(WorkspaceKey.Conversation("c-solo")), "inbox/doc.txt").readText())
     }
