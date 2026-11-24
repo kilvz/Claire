@@ -62,7 +62,7 @@ class AppKnowledgeWiringTest {
         assertTrue(files.notes().isEmpty())
         files.approve(files.all().single().id)
         assertTrue(files.notes().getValue("xianyu").trial)
-        // 判下来办成、没跑核查:试用转正式
+        // Judged a success with no verification run: the trial becomes official
         learning.learn(aftermath(runEvents(trial = true, steps = 1)))
         assertEquals(AppKnowledgeStage.Verified, files.all().single().stage)
     }
@@ -74,13 +74,13 @@ class AppKnowledgeWiringTest {
         val first = files.all().single()
         assertTrue(first.lesson)
         files.approve(first.id)
-        // 再来一次:对在用的那份起草修订
+        // One more run: draft a revision against the version in use
         val notes = learning(files, TextModel(more)).learn(aftermath(runEvents()))
         assertEquals("Claire 修订了闲鱼的知识，等你确认", notes.skillNotes.single().text)
         val ui = SkillsUi.of(MapSkills(), files).appKnowledge.single { it.stage == AppKnowledgeStage.Draft }
         assertTrue(ui.revision)
         assertEquals(listOf("+ - 「我的」页里的「我发布的」列出自己挂出的商品。"), ui.changedLines)
-        // 已有一份待确认的:不再请模型
+        // A pending draft already exists: the model is not asked again
         val idle = TextModel()
         learning(files, idle).learn(aftermath(runEvents()))
         assertTrue(idle.requests.isEmpty())

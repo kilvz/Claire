@@ -32,7 +32,7 @@ class FileRunStateStoreTest {
             assertEquals("20261107-010203-abc123", reopened.get(RunId("run-1"))?.recordId)
             assertEquals(1, reopened.interruptUnfinished().size)
             assertEquals(RunPhase.Interrupted, FileRunStateStore(file).get(RunId("run-1"))?.phase)
-            // 账本只记阶段与交付:不存发给模型的上下文(图片、原始参数、密钥都不落盘)
+            // The ledger records only phase and delivery: it does not store the context sent to the model (images, raw arguments and keys never hit disk)
             assertFalse(file.readText().contains("\"context\""))
         } finally {
             dir.deleteRecursively()

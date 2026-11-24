@@ -36,7 +36,7 @@ class FollowUpDrainTest {
         registry.onEnded(a)
         val first = registry.takeReady("a").single()
         assertEquals("一", first.text)
-        // 服务马上把第一件登记成新任务:第二件继续排着
+        // The service immediately registers the first item as a new task: the second stays queued
         val next = (registry.tryStart("a", first.text) as StartResult.Started).run
         assertEquals(emptyList<QueuedFollowUp>(), registry.takeReady("a"))
         registry.onEnded(next)
@@ -49,7 +49,7 @@ class FollowUpDrainTest {
         val result = registry.tryStart("a", "下一件", followUp = item)
         assertSame(StartResult.AlreadyRunningInConversation, result)
         assertTrue(registry.followUps.contains("a"))
-        // 这个对话还在跑,取不出来
+        // This conversation is still running, nothing can be taken out
         assertEquals(emptyList<QueuedFollowUp>(), registry.takeReady("a"))
         registry.onEnded(a)
         assertEquals(listOf("id-a"), registry.takeReady("a").map { it.id })
@@ -71,7 +71,7 @@ class FollowUpDrainTest {
         registry.followUps.add(item)
         registry.tryStart("r", "不能重复", followUp = item)
 
-        // 进程在登记后、真正执行前消失：账本和持久队列都还在，恢复只清理排队项，不再次认领。
+        // The process disappears after registration but before actual execution: the ledger and durable queue both survive, and recovery only clears the queued entry instead of claiming it again.
         val recovered = TaskCenter({ limit }, { it.conversationId }, { it.key }, store = registry.store,
             followUps = registry.followUps) { c, g -> Run(c, g) }
         assertEquals(emptyList<QueuedFollowUp>(), recovered.takeReady("r"))
@@ -98,7 +98,7 @@ class FollowUpDrainTest {
         })
         val center = TaskCenter({ limit }, { it.conversationId }, { it.key }, followUps = failing) { c, g -> Run(c, g) }
         center.tryStart("a", "当前")
-        // true 让服务走 persistFollowUp/startFollowUp 的受保护重试,而不是宣称已经排上。
+        // true makes the service take the protected retry path in persistFollowUp/startFollowUp instead of claiming the item is already queued.
         assertTrue(center.deferOrStart("a", "下一件", "id-failed"))
         assertFalse(center.followUps.contains("a"))
         assertEquals(emptyList<QueuedFollowUp>(), center.takeReady("a"))
@@ -110,7 +110,7 @@ class FollowUpDrainTest {
         val b = (registry.tryStart("b", "二") as StartResult.Queued).run
         registry.deferOrStart("b", "下一件", "id-b")
         assertTrue(registry.cancelIfQueued(b))
-        // 容量队列里的任务被取消后,轮到它对话的下一件应该能被取出
+        // After a task in the capacity queue is cancelled, the next item for its conversation should be retrievable
         assertEquals(listOf("id-b"), registry.takeReady("b").map { it.id })
         registry.onEnded(a)
     }

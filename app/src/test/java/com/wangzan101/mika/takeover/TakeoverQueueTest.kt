@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TakeoverQueueTest {
-    // 主屏一次只交一个 App:第二个任务的接管排在第一个后面
+    // Only one App is handed to the main screen at a time: the second task's takeover queues behind the first
     @Test fun secondWaitsForFirst() = runTest {
         val queue = TakeoverQueue()
         val portA = TakeoverControllerTest.FakePort()
@@ -34,7 +34,7 @@ class TakeoverQueueTest {
         assertEquals(listOf("toMain:1", "unmute:a.app"), portB.log)
     }
 
-    // 排在后面的接管不提醒；轮到最前后才开始计算提醒间隔，提醒不会把等待变成超时。
+    // A queued takeover does not remind; the reminder interval only starts once it reaches the front, and reminders never turn the wait into a timeout.
     @Test fun queuedTakeoverStartsRemindersAtTheFront() = runTest {
         val queue = TakeoverQueue()
         val portA = TakeoverControllerTest.FakePort()

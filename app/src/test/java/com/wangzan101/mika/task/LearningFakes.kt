@@ -14,7 +14,7 @@ import com.wangzan101.mika.core.learn.skills.PersonalSkill
 import com.wangzan101.mika.core.learn.skills.PersonalSkills
 import com.wangzan101.mika.core.learn.skills.SkillStatus
 
-/** 按顺序回复固定文字的模型;记下每次请求。 */
+/** Model that replies with fixed text in order; records every request. */
 class TextModel(vararg replies: String) : ChatModel {
     override val capabilities = Capabilities(toolCalls = true, vision = false, contextTokens = 64_000, reasoning = false)
     private val queue = replies.toMutableList()

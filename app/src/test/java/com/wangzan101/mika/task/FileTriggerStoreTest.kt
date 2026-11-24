@@ -125,7 +125,7 @@ class FileTriggerStoreTest {
         assertEquals(10L, restored.lastFiredAtMs)
     }
 
-    // 来源属于扩展状态:存进 sidecar,不写进主文件,旧版严格解码仍能读整份计划。
+    // The source is extended state: it goes into the sidecar rather than the main file, so the old strict decoder can still read the whole plan.
     @Test fun sourceSurvivesStoreReopenWithoutEnteringTheMainFile() {
         val file = Files.createTempDirectory("trigger-source").resolve("triggers.json").toFile()
         val store = FileTriggerStore(file)
@@ -140,7 +140,7 @@ class FileTriggerStoreTest {
         Json.decodeFromString<TriggerSnapshot>(file.readText())
     }
 
-    // 升级前存下的计划文件没有新字段:照常读,按默认值算
+    // Plan files saved before the upgrade lack the new fields: they load as usual and fall back to defaults
     @Test fun planFileFromBeforeConditionStateStillLoads() {
         val file = Files.createTempDirectory("trigger-test").resolve("triggers.json").toFile()
         file.writeText("""{"triggers":[{"id":"old","threadId":"thread","goal":"告诉我","nextAtMs":1000,"conditionGoal":"下雨","lastConditionMet":true}],"windows":[]}""")
@@ -158,7 +158,7 @@ class FileTriggerStoreTest {
         store.upsert(TriggerDefinition("price", "thread", "告诉我", 2_000, conditionGoal = "降价",
             notifyWhen = ConditionNotify.EachTimeMet, cooldownMs = 60_000, baselineValue = "¥700"))
 
-        // 用旧版同样的严格解码读取主文件；扩展字段必须只在 sidecar 中，不能让旧版清空全部计划。
+        // Read the main file with the same strict decoding the old version uses; extended fields must exist only in the sidecar, or the old version would wipe every plan.
         val oldSchema = Json.decodeFromString<TriggerSnapshot>(file.readText())
         assertEquals(setOf("fixed", "price"), oldSchema.triggers.map { it.id }.toSet())
         assertEquals(false, file.readText().contains("baselineValue"))

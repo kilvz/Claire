@@ -90,7 +90,7 @@ class DeviceWorkspaceImportsTest {
         }.exceptionOrNull()
         assertEquals("too_large", (denied as SandboxError).code)
         assertTrue(store.allRecords().isEmpty())
-        // 同一个导入器实例,档位调大后下一次导入就按新值,无需重建
+        // With the same importer instance, the next import uses the new limit once it is raised, no rebuild needed
         maxFileBytes = 1024
         val allowed = imports.fromFolder(path, workspace.wire) { byteArrayOf(1, 2, 3).inputStream() }
         assertEquals("/workspace/inbox/report.pdf", allowed.path)

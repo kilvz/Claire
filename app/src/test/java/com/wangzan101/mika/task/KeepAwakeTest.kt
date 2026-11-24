@@ -43,7 +43,7 @@ class KeepAwakeTest {
         runCurrent()
         assertFalse(lock.held)
 
-        // 用户处理完、任务继续跑:重新常亮
+        // The user is done and the task runs on: the screen is kept awake again
         awake.onState(TaskState.Running(2, ""))
         assertTrue(lock.held)
     }
@@ -63,7 +63,7 @@ class KeepAwakeTest {
         assertFalse(lock.held)
     }
 
-    // 排在别的任务后面等虚拟屏:还在干活,不按等你处理宽限后放开
+    // Queued behind other tasks for the virtual screen: still working, so it is not released after the waiting-for-user grace period
     @Test
     fun queuedForDisplayKeepsHolding() = runTest {
         val lock = FakeLock()
@@ -98,12 +98,12 @@ class KeepAwakeTest {
         awake.onState(TaskState.Running(1, ""))
         awake.close()
         assertFalse(lock.held)
-        // 任务结束后迟到的状态发布不能把锁重新拿回来
+        // A late state publication after the task ended must not take the lock back
         awake.onState(TaskState.Running(2, ""))
         assertFalse(lock.held)
     }
 
-    // 两个任务各持一份:第一个开始时拿锁,最后一个结束时才放
+    // Two tasks each hold one share: the lock is taken when the first starts and released only when the last ends
     @Test
     fun refCountedAcrossRuns() = runTest {
         val lock = FakeLock()
@@ -125,7 +125,7 @@ class KeepAwakeTest {
         assertFalse(lock.held)
     }
 
-    // 排队的任务接班:前一个收尾时先替它拿一份再放开自己的,接班的拿上自己那份后放开,中间屏幕锁不断
+    // A queued task takes over: as the previous one wraps up it first acquires a share for the successor and then releases its own; the successor acquires its own share and then releases the handoff one, so the screen lock is never dropped in between
     @Test
     fun handoffBridgesToQueuedRun() = runTest {
         val lock = FakeLock()
@@ -139,14 +139,14 @@ class KeepAwakeTest {
         b.onState(TaskState.Running(0, ""))
         handoff.release()
         assertTrue(lock.held)
-        // 重复放开(开跑时放过、协程结束时又放一次)不多算
+        // A repeated release (one when the run starts, another when the coroutine ends) is not counted twice
         handoff.release()
         assertTrue(lock.held)
         b.close()
         assertFalse(lock.held)
     }
 
-    /** 屏幕只保持开着,不锁在全亮:用户不操作时由系统照常调暗。 */
+    /** The screen is only kept on, not locked at full brightness: when the user is idle the system dims it as usual. */
     @Suppress("DEPRECATION")
     @Test
     fun screenLockLetsTheSystemDim() {

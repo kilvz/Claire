@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TakeoverControllerTest {
-    /** 虚拟屏是 9 号屏,主屏 0 号。任务 1 是 phone_launch_app 打开的 App,任务 2 是它另开的登录页。 */
+    /** The virtual display is display 9, the main display is 0. Task 1 is the App opened by phone_launch_app, task 2 is the login page it opened separately. */
     internal class FakePort : TakeoverPort {
         val log = mutableListOf<String>()
         val displays = mutableMapOf(1 to AGENT)
@@ -56,7 +56,7 @@ class TakeoverControllerTest {
     private val port = FakePort()
     private lateinit var takeover: Takeover
 
-    /** 每个用例在自己的测试调度器上建接管,计时用虚拟时间。 */
+    /** Each case builds its takeover on its own test scheduler, and timing uses virtual time. */
     private fun test(body: suspend TestScope.() -> Unit) = runTest {
         takeover = Takeover(port, backgroundScope) { testScheduler.currentTime }
         body()
@@ -76,7 +76,7 @@ class TakeoverControllerTest {
 
     @Test
     fun handOverMovesTheTopTaskAndItsPackage() = test {
-        // 登录页由另一个 App 在新任务里打开,盖在上面
+        // The login page was opened by another App in a new task and sits on top
         port.displays[2] = AGENT
         port.packages[2] = "login.app"
         takeover.onState(waiting)
@@ -104,7 +104,7 @@ class TakeoverControllerTest {
         port.packages[2] = "a.app"
         takeover.onState(waiting)
         takeover.handOver()
-        // 用户在主屏把付款页办完,页面自己关掉了:任务 2 不在了
+        // The user finished the payment page on the main screen and the page closed itself: task 2 is gone
         port.displays.remove(2)
         port.log.clear()
         assertTrue(takeover.handBack())
@@ -118,7 +118,7 @@ class TakeoverControllerTest {
         port.packages[2] = "a.app"
         takeover.onState(waiting)
         takeover.handOver()
-        // 页面关掉后,用户在主屏回到了这个 App 的原任务
+        // After the page closed, the user went back to this App's original task on the main screen
         port.displays.remove(2)
         port.displays[1] = 0
         port.log.clear()
@@ -138,7 +138,7 @@ class TakeoverControllerTest {
 
     @Test
     fun finishedMyselfWithoutHandOverResumesWithoutMoving() = test {
-        // 用户可能在别处(另一台设备、电脑)办完了,没点「我来处理」
+        // The user may have finished elsewhere (another device, a computer) without tapping "I'll handle it"
         takeover.onState(waiting)
         assertTrue(takeover.finishedMyself())
         assertEquals(listOf("resume:complete/finished"), port.log)
@@ -236,7 +236,7 @@ class TakeoverControllerTest {
         takeover.onState(TaskState.Running(1, "phone_observe"))
         restorePipSound(takeover) { phoneCalls++ }
         assertEquals(1, phoneCalls)
-        // 接管对象一直存在;即使正在等待用户,普通当前 App 仍走 phone/AppMuter
+        // The takeover target always exists; even while waiting for the user, an ordinary current App still goes through phone/AppMuter
         takeover.onState(waiting)
         restorePipSound(takeover) { phoneCalls++ }
         assertEquals(2, phoneCalls)
@@ -271,7 +271,7 @@ class TakeoverControllerTest {
     fun republishingTheAnsweredTakeoverDoesNotReArm() = test {
         takeover.onState(waiting)
         takeover.handBack()
-        // 循环还没把状态改成 Running 时,同一个等待状态可能被再次发布
+        // Before the loop has changed the state to Running, the same waiting state may be published again
         takeover.onState(waiting)
         assertEquals(Takeover.Stage.None, takeover.stage.value)
         assertFalse(takeover.handBack())
@@ -282,7 +282,7 @@ class TakeoverControllerTest {
         takeover.onState(waiting)
         takeover.handBack()
         takeover.onState(TaskState.Running(5, "phone_observe"))
-        // 与上一次内容相同的新一次接管照常进入等待
+        // A new takeover with the same content as the previous one enters waiting as usual
         takeover.onState(TaskState.WaitingTakeover("captcha", "请拖动滑块"))
         assertEquals(Takeover.Stage.Waiting, takeover.stage.value)
         assertTrue(takeover.handBack())
@@ -306,7 +306,7 @@ class TakeoverControllerTest {
         val second = TaskState.WaitingTakeover("login", "请登录")
         takeover.onState(second)
         assertTrue(takeover.waitKey != first)
-        // 上一次等待遗留的点击:不动作
+        // A click left over from the previous wait: no action
         assertFalse(takeover.handOver(first))
         assertFalse(takeover.skip(first))
         assertEquals(Takeover.Stage.Waiting, takeover.stage.value)
@@ -332,7 +332,7 @@ class TakeoverControllerTest {
         takeover.handOver()
         port.log.clear()
         port.moveBackOk = false
-        // 挪不回:保持原状,用户还在主屏上
+        // Cannot move it back: leave things as they are, the user is still on the main screen
         assertFalse(takeover.skip())
         assertEquals(listOf("back:1"), port.log)
         assertEquals(Takeover.Stage.HandedOver, takeover.stage.value)

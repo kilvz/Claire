@@ -38,7 +38,7 @@ class TakeoverTimeoutTest {
         testScheduler.advanceTimeBy(Takeover.TAKEOVER_WAIT_TIMEOUT_MS / 2)
         t.handOver()
         port.log.clear()
-        // 人在主屏上操作,多久都不把 App 抽走
+        // While the user is operating on the main screen, the App is never pulled away, however long it takes
         testScheduler.advanceTimeBy(Takeover.TAKEOVER_WAIT_TIMEOUT_MS * 4)
         testScheduler.runCurrent()
         assertTrue(port.log.isEmpty())
@@ -53,7 +53,7 @@ class TakeoverTimeoutTest {
         t.onState(waiting)
         testScheduler.advanceTimeBy(Takeover.TAKEOVER_WAIT_TIMEOUT_MS + 1)
         testScheduler.runCurrent()
-        // 提醒不挪动、不改声音，也不结束等待。
+        // Reminders do not move anything, do not change the sound, and do not end the wait.
         assertTrue(port.log.isEmpty())
         assertEquals(TakeoverControllerTest.AGENT, port.displays[1])
         assertEquals(Takeover.Stage.Waiting, t.stage.value)

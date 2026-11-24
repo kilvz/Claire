@@ -47,7 +47,7 @@ class LocalScheduleAdminTest {
     }
 
     @Test fun foreignPlansAreManagedByAnyConversation() {
-        // 计划是设备全局的,别的对话建的计划也能从任意对话管理(#478)
+        // Plans are device-global, so a plan created by another conversation can be managed from any conversation (#478)
         assertTrue(admin.setEnabled("thread-a", second.id, false))
         assertTrue(admin.remove("thread-a", second.id))
         assertEquals(listOf("enabled:plan-b:false", "delete:plan-b"), calls)
@@ -66,7 +66,7 @@ class LocalScheduleAdminTest {
     }
 
     @Test fun editUsesThePlansOwnConversation() {
-        // 编辑别的对话建的计划时,用计划自己所属的对话去匹配,而不是当前对话
+        // When editing a plan created by another conversation, match on the conversation that owns the plan rather than the current one
         assertEquals(null, admin.edit("thread-a", "missing-plan") { it.copy(goal = "changed") })
         assertEquals(true, admin.edit("thread-a", second.id) { it.copy(goal = "changed") }?.scheduled?.onTime)
         assertEquals(listOf("edit:thread-b:plan-b"), calls)

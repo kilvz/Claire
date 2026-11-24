@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 当前界面是网页时,接管把同一个网页标签拿到眼前,不挪 App 任务。 */
+/** When the current surface is a web page, takeover brings the same web tab to the front without moving App tasks. */
 class TakeoverWebTest {
     private class WebFake(val base: TakeoverControllerTest.FakePort = TakeoverControllerTest.FakePort()) : TakeoverPort by base {
         var web: Boolean? = true
@@ -156,7 +156,7 @@ class TakeoverWebTest {
         assertEquals(listOf("showWeb:login:1", "returnWeb:false", "cancel"), port.log)
     }
 
-    /** 并行的两个任务都要接管:同一时间只有排在最前的能把东西拿到主屏,网页的也一样。 */
+    /** Two parallel tasks both need takeover: only the one at the front can bring things to the main screen at a time, and the same holds for the web. */
     @Test
     fun webTakeoverWaitsItsTurnInTheQueue() = runTest {
         val queue = TakeoverQueue()

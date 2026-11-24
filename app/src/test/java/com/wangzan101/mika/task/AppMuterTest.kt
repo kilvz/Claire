@@ -7,9 +7,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 静音规则:启动前静、中途冒出的新 App 静一次、另一份单独静、收尾全还原、没静成照实记下。 */
+/** Muting rules: mute before launch, mute a newly appearing App once mid-task, mute a copy under another user separately, restore everything at the end, and record honestly when muting did not succeed. */
 class AppMuterTest {
-    /** 记下每一次写 PLAY_AUDIO 的假外壳;键是 [AppAudioKey]。 */
+    /** Fake shell that records every PLAY_AUDIO write; keys are [AppAudioKey]. */
     private class FakeAudio : AudioPort {
         val modes = mutableMapOf<String, String>()
         val mutes = mutableListOf<String>()
@@ -44,7 +44,7 @@ class AppMuterTest {
 
     @Test fun mutesBeforeLaunchAndDoesNotMuteAgainOnceOpened() {
         muter.beforeOpen("video.app", null)
-        // 启动还没发出,已经静上了
+        // The launch has not been issued yet, but the mute is already in place
         assertEquals(listOf("video.app"), audio.mutes)
         muter.opened("video.app", null)
         assertEquals(listOf("video.app"), audio.mutes)
@@ -57,7 +57,7 @@ class AppMuterTest {
         muter.notOpened("video.app", null)
         assertEquals("allow", audio.modes["video.app"])
         assertNull(store.saved)
-        // 已经开出来过的,启动被拒不还原(它还在屏上)
+        // For an App that already opened, a refused launch does not restore (it is still on screen)
         muter.beforeOpen("music.app", null)
         muter.opened("music.app", null)
         muter.notOpened("music.app", null)
@@ -75,7 +75,7 @@ class AppMuterTest {
     @Test fun newPackageMidTaskIsMutedOnce() {
         muter.beforeOpen("feed.app", null)
         muter.opened("feed.app", null)
-        // 从目标 App 里点开的另一个 App:第一次看到就静,之后再看到不重复
+        // Another App launched from the target App: mute on first sight, do not mute again afterwards
         muter.opened("player.app", null)
         muter.opened("player.app", null)
         muter.opened("feed.app", null)
@@ -87,7 +87,7 @@ class AppMuterTest {
         muter.opened("chat.app", 10)
         assertEquals(listOf("chat.app@10"), audio.mutes)
         assertFalse("chat.app" in audio.modes)
-        // 本来那份冒出来时另静一次
+        // Mute the original copy separately when it shows up
         muter.opened("chat.app", null)
         assertEquals(listOf("chat.app@10", "chat.app"), audio.mutes)
     }
@@ -112,7 +112,7 @@ class AppMuterTest {
         onMain += "maps.app"
         muter.beforeOpen("maps.app", null)
         assertTrue(audio.mutes.isEmpty())
-        // 用户在主屏上看得见的:不静,照实记下可能出声
+        // Visible to the user on the main screen: do not mute, record honestly that it may make sound
         muter.opened("maps.app", null)
         assertTrue(audio.mutes.isEmpty())
         assertEquals(listOf("maps.app"), failed)
@@ -148,12 +148,12 @@ class AppMuterTest {
         muter.opened("video.app", null)
         assertTrue(muter.unmute("video.app", null))
         assertEquals("allow", audio.modes["video.app"])
-        // 用户明确要有声:再次打开、重新冒出和提前静音都不能改回去
+        // The user explicitly wants sound: reopening, reappearing and early muting must not undo it
         muter.opened("video.app", null)
         muter.beforeOpen("video.app", null)
         assertEquals(listOf("video.app"), audio.mutes)
         assertNull(store.saved)
-        // 已经没有待恢复的静音,任务收尾也不会把用户的选择撤销
+        // No mute is left to restore, so task cleanup does not revoke the user's choice either
         assertTrue(record.restoreAll())
         assertEquals("allow", audio.modes["video.app"])
     }
@@ -164,10 +164,10 @@ class AppMuterTest {
         assertTrue(muter.unmute("video.app", null))
         assertTrue(muter.muteAgain("video.app", null))
         assertEquals("ignore", audio.modes["video.app"])
-        // 回到自动管理:再冒出来不重复静
+        // Back to automatic management: reappearing is not muted again
         muter.opened("video.app", null)
         assertEquals(listOf("video.app", "video.app"), audio.mutes)
-        // 再静上仍走台账,收尾把原模式还回去
+        // Muting again still goes through the ledger, and cleanup restores the original mode
         assertTrue(record.restoreAll())
         assertEquals("allow", audio.modes["video.app"])
         assertNull(store.saved)
@@ -179,7 +179,7 @@ class AppMuterTest {
         muter.opened("maps.app", null)
         assertTrue(failed.isNotEmpty())
         assertTrue(muter.unmute("maps.app", null))
-        // 用户显式再静:不受主屏可见性判定拦,与 unmute 的显式优先对称
+        // The user explicitly mutes again: not blocked by the main-screen visibility check, symmetric with unmute's explicit precedence
         assertTrue(muter.muteAgain("maps.app", null))
         assertEquals("ignore", audio.modes["maps.app"])
     }
@@ -210,7 +210,7 @@ class AppMuterTest {
         audio.modes["video.app"] = "allow"
         muter.opened("video.app", null)
         assertTrue(muter.unmute("video.app", null))
-        // 后续接管交回仍会调用 opened;用户这次任务里的选择继续有效
+        // Later takeover hand-backs still call opened; the user's choice for this task stays in effect
         assertTrue(muter.release("video.app", null))
         muter.opened("video.app", null)
         assertTrue(muter.release("video.app", null))
@@ -234,7 +234,7 @@ class AppMuterTest {
         assertFalse(muter.unmute("video.app", null))
         assertEquals("ignore", audio.modes["video.app"])
         assertEquals(mapOf("video.app" to "allow"), store.saved)
-        // 启动被拒仍可按 early 记录重试;用户再点一次也同样能恢复
+        // A refused launch can still be retried from the early record; tapping again restores it as well
         audio.failing -= "video.app"
         assertTrue(muter.unmute("video.app", null))
         assertEquals("allow", audio.modes["video.app"])

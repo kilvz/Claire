@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExactAlarmGuideTest {
-    // 没有准时闹钟权限时只主动提醒一次;有权限不打扰
+    // Without the exact alarm permission, prompt only once; with the permission, do not disturb
     @Test fun promptsOnceOnlyWhenPermissionMissing() {
         assertTrue(ExactAlarmGuide.shouldPrompt(granted = false, prompted = false))
         assertFalse(ExactAlarmGuide.shouldPrompt(granted = false, prompted = true))

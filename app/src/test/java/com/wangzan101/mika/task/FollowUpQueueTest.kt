@@ -15,9 +15,9 @@ class FollowUpQueueTest {
         q.add(item("a1"))
         q.add(item("a2"))
         q.add(item("b1", "b"))
-        // 每个对话只取最早的一条
+        // Only the earliest item per conversation is claimed
         assertEquals(listOf("a1", "b1"), q.claimNext({ true }).map { it.id })
-        // 取走的第一条还留在 changes 里(claimed),不会再被取;第二条继续排着
+        // The claimed first item stays in changes (claimed) and is never claimed again; the second stays queued
         assertEquals(listOf("a2"), q.claimNext({ true }, "c").map { it.id })
         assertEquals(emptyList<QueuedFollowUp>(), q.claimNext({ true }, "c"))
         assertEquals(listOf("a1", "a2", "b1"), q.changes.value.map { it.id })

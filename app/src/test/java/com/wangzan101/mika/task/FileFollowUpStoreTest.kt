@@ -64,7 +64,7 @@ class FileFollowUpStoreTest {
             queue.add(item("a1", text = "别丢"))
             assertEquals(1, queue.claimNext({ true }).size)
             assertEquals(1, queue.changes.value.count { it.claimed })
-            // 进程在这一刻被杀:重新打开,这一条仍是待处理,不会静默消失
+            // The process is killed at this moment: on reopen this item is still pending and does not silently disappear
             val reopened = FollowUpQueue(FileFollowUpQueueStore(file))
             assertEquals(listOf("a1"), reopened.changes.value.map { it.id })
             assertFalse(reopened.changes.value.single().claimed)
@@ -80,10 +80,10 @@ class FileFollowUpStoreTest {
             file.writeText("not json")
             val queue = FollowUpQueue(FileFollowUpQueueStore(file))
             assertTrue(queue.changes.value.isEmpty())
-            // 原文件挪到 .corrupt-* 留着,不拿空队列覆盖
+            // The original file is moved to .corrupt-* and kept, not overwritten with an empty queue
             assertFalse(file.exists())
             assertTrue(dir.listFiles().orEmpty().any { it.name.startsWith("followups.json.corrupt-") })
-            // 之后照常能写
+            // Afterwards writes still work as usual
             queue.add(item("a1"))
             assertEquals(listOf("a1"), FollowUpQueue(FileFollowUpQueueStore(file)).changes.value.map { it.id })
         } finally {
