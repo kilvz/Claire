@@ -4,9 +4,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 拿几种模拟的滚轮跑 [WheelSteps]:一下一格的数字滚轮(循环、不循环、往前变小)、一下好几格的列表、文字列表。 */
+/** Runs [WheelSteps] against several simulated wheels: a one-step number wheel (wrapping, non-wrapping, decreasing forward), a list that moves several steps per action, and a text list. */
 class WheelStepsTest {
-    /** 模拟一个滚轮:[values] 从上到下,[index] 选中的,一下滚 [perAction] 格,[wrap] 循环。 */
+    /** Simulates a wheel: [values] from top to bottom, [index] selected, [perAction] steps per action, [wrap] wraps around. */
     private class Wheel(val values: List<String>, var index: Int, val wrap: Boolean, val perAction: Int = 1, val forwardIsNext: Boolean = true) {
         fun step(forward: Boolean) {
             val d = (if (forward == forwardIsNext) 1 else -1) * perAction
@@ -19,7 +19,7 @@ class WheelStepsTest {
         }
     }
 
-    /** 跑到停为止,返回最后一步和一共滚了几下。 */
+    /** Runs until it stops and returns the last step and how many scroll actions were performed in total. */
     private fun run(w: Wheel, target: String, cap: Int = 80): Pair<WheelSteps.Step, Int> {
         val s = WheelSteps(target, cap)
         var guard = 0
@@ -62,7 +62,7 @@ class WheelStepsTest {
         assertTrue("$actions", actions <= 15)
     }
 
-    /** 循环的滚轮没有头:滚了值不动是这一下没起作用,报 not_moving(交给拖动),不报到头。 */
+    /** A wrapping wheel has no end: if scrolling leaves the value unchanged that turn had no effect, so report not_moving (leave it to dragging) rather than at_end. */
     @Test fun stuckWrappingWheelIsNotAtItsEnd() {
         val s = WheelSteps("40")
         val visible = listOf("58", "59", "00", "01", "02")
@@ -81,7 +81,7 @@ class WheelStepsTest {
     @Test fun pageSizedStepsThatOvershootStop() {
         val w = Wheel(minutes, 0, wrap = false, perAction = 7)
         val (step, _) = run(w, "40")
-        // 一下七格停不到 40(只能停在 7 的倍数):来回越过几次后停,交给拖动
+        // seven steps at a time cannot land on 40 (only multiples of 7 are reachable): it stops after overshooting back and forth a few times and leaves it to dragging
         assertEquals(WheelSteps.Step.Stop("overshoot"), step)
     }
 

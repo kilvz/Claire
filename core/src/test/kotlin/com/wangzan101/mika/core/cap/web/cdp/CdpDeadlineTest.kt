@@ -12,10 +12,11 @@ import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** 阻塞读写都有上限:对端不回、不读时到点关流,调用方不会一直卡住。 */
+/** Blocking reads and writes are both bounded: when the peer neither replies nor reads, the stream is closed on time and the caller never hangs forever. */
 class CdpDeadlineTest {
     /**
-     * 对端:回完握手(可选)之后什么都不发;[blockWrites] 时握手之后的写一直卡住。读写都只在 close 之后才返回(抛错)。
+     * Peer: sends nothing after the (optional) handshake reply; with [blockWrites] writes after the handshake
+     * block forever. Both reads and writes return (with an error) only after close.
      */
     private class StalledPeer(private val answerHandshake: Boolean, private val blockWrites: Boolean = false) : CdpStream {
         val closed = CountDownLatch(1)

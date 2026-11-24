@@ -6,13 +6,16 @@ import org.junit.Test
 import kotlin.math.roundToInt
 
 /**
- * 拿模拟的、App 自己画的滚轮跑 [WheelDrags]:只能拖,读回的是选中项上下各 [radius] 项,选中项的名字可能带状态词。
- * 重现真机上的时钟:24 小时的时、分滚轮都循环,选中项叫「已选中，21」,上下是 20、22。
+ * Runs [WheelDrags] against a simulated wheel drawn by the app itself: dragging is the only option, and reading
+ * back returns [radius] items above and below the selected one; the selected item's name may carry a state word.
+ * Reproduces the clock on a real device: both the 24-hour and minute wheels wrap, the selected item's label is a
+ * Chinese "selected" prefix plus 21, and its neighbors are 20 and 22.
  */
 class WheelDragsTest {
     /**
-     * [size] 个值(0 起),[value] 选中的;手指往上拖一格 [rowPx] 像素转过一格(数变大,[upIncreases] 为 false 时变小);
-     * 前 [deadDrags] 次拖动没有反应;[label] 是每一项的名字(选中项第二个参数为 true)。
+     * [size] values starting at 0, with [value] selected; dragging one row up by [rowPx] pixels turns one item
+     * (the number grows, or shrinks when [upIncreases] is false); the first [deadDrags] drags have no effect;
+     * [label] is each item's name (the second argument is true for the selected item).
      */
     private class Wheel(
         var value: Int,
@@ -32,7 +35,7 @@ class WheelDragsTest {
         }
         fun items() = visibleValues().map { (v, sel) -> label(v, sel) }
         fun selected() = visibleValues().indexOfFirst { it.second }
-        /** 读回的各项中心:按估的一格 80 像素排(实际一格是 [rowPx]),好测校准。 */
+        /** The centers of the read-back items: laid out assuming 80 pixels per row (the actual row is [rowPx]) to exercise calibration. */
         fun centers() = visibleValues().indices.map { 300 + it * 80 }
         fun drag(upPx: Int) {
             drags++
@@ -42,7 +45,7 @@ class WheelDragsTest {
         }
     }
 
-    /** 跑到停为止,返回最后一步和第一次拖了几格。 */
+    /** Runs until it stops and returns the last step plus how many steps the first drag covered. */
     private fun run(w: Wheel, target: String, rowHeight: Int = 80): Pair<WheelDrags.Step, Int?> {
         val plan = WheelDrags(target, rowHeight)
         var dragged = 0
@@ -83,7 +86,7 @@ class WheelDragsTest {
         assertEquals(7, unit.value)
     }
 
-    /** 看得到 23 → 0 时走近的一边:21 → 7 往前 10 格,不是往回 14 格。 */
+    /** When 23 → 0 is visible it takes the short way round: 21 → 7 goes 10 steps forward, not 14 back. */
     @Test fun wrapSeenTakesTheShortWayRound() {
         val w = Wheel(21, 24, wrap = true, radius = 3)
         val (step, first) = run(w, "7")
@@ -92,14 +95,14 @@ class WheelDragsTest {
         assertEquals(7, w.value)
     }
 
-    /** 第一下拖了没反应(拖得太短、刚好被当成点按):不当作到头,拖远一点再来。 */
+    /** The first drag has no effect (too short, taken as a tap): that is not treated as the end, so it drags farther and retries. */
     @Test fun aDragWithNoEffectIsRetriedNotReportedAsTheEnd() {
         val w = Wheel(21, 24, wrap = true, deadDrags = 1)
         assertEquals(WheelDrags.Step.Done, run(w, "7").first)
         assertEquals(7, w.value)
     }
 
-    /** 怎么拖都不动:报 not_moving(模型自己划),不报 at_end。 */
+    /** The wheel never moves however it is dragged: report not_moving (the model swipes itself), not at_end. */
     @Test fun wheelThatNeverMovesIsNotMovingNotAtEnd() {
         val w = Wheel(21, 24, wrap = true, deadDrags = 100)
         assertEquals(WheelDrags.Step.Stop("not_moving"), run(w, "7").first)
@@ -107,21 +110,21 @@ class WheelDragsTest {
         assertEquals(21, w.value)
     }
 
-    /** 不循环的滚轮拖到了头、往那边已经没有项:才是到头。 */
+    /** Only when a non-wrapping wheel is dragged to its end and no items remain in that direction is it really at the end. */
     @Test fun nonWrappingWheelStopsAtItsEnd() {
         val w = Wheel(8, 11, wrap = false)
         assertEquals(WheelDrags.Step.Stop("at_end"), run(w, "15").first)
         assertEquals(10, w.value)
     }
 
-    /** 往上拖数变小的滚轮:第一次转动后校正方向。 */
+    /** A wheel whose number shrinks when dragged up: the direction is calibrated after the first turn. */
     @Test fun wheelWhoseUpDragDecreasesIsCalibrated() {
         val w = Wheel(21, 60, wrap = true, upIncreases = false)
         assertEquals(WheelDrags.Step.Done, run(w, "25").first)
         assertEquals(25, w.value)
     }
 
-    /** 一格比估的高:按实际转过的格数校准后补拖到位。 */
+    /** A row taller than estimated: after calibrating from the rows actually turned, it drags the rest of the way. */
     @Test fun rowHeightIsCalibrated() {
         val w = Wheel(21, 60, wrap = true, rowPx = 120)
         val (step, _) = run(w, "40", rowHeight = 80)

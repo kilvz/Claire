@@ -8,7 +8,7 @@ import com.wangzan101.mika.core.learn.knowledge.ScriptEntry
 import com.wangzan101.mika.core.workspace.WorkspaceFileGate
 import com.wangzan101.mika.core.workspace.SandboxTree
 
-/** 宿主目录放在临时目录里的沙箱;命令不真跑,按 [next] 回结果并记下收到的参数。 */
+/** A sandbox whose host directory lives in a temp dir; commands do not really run - results come from [next] and the received arguments are recorded. */
 class FakeSandbox(var status: SandboxStatus = SandboxStatus.Ready(network = false)) : SandboxPort {
     class Run(val workspace: String, val argv: List<String>, val cwd: String?, val timeoutMs: Long)
 
@@ -28,7 +28,7 @@ class FakeSandbox(var status: SandboxStatus = SandboxStatus.Ready(network = fals
 
     override fun status() = status
 
-    /** awaitReady 之后的状态(模拟后台准备好了或失败了);null = 不变。 */
+    /** The status after awaitReady (simulates background preparation succeeding or failing); null = unchanged. */
     var afterWait: SandboxStatus? = null
     var waits = 0
 
@@ -82,7 +82,7 @@ class FakeSandbox(var status: SandboxStatus = SandboxStatus.Ready(network = fals
     override fun scriptManifest(skillPath: String): List<ScriptEntry> = manifests[skillPath].orEmpty()
 
     var prepares = 0
-    /** 与打包的那份不一致(且恢复不了)的脚本:"<技能>/<文件>"。 */
+    /** Scripts that differ from the packaged copy (and cannot be restored): "<skill>/<file>". */
     val tampered = mutableSetOf<String>()
     override suspend fun prepare() { prepares++ }
     override suspend fun verifyScript(skillPath: String, file: String) = "$skillPath/$file" !in tampered

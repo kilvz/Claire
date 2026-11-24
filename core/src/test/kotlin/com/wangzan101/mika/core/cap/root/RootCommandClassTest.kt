@@ -68,7 +68,7 @@ class RootCommandClassTest {
         "find /sdcard -name '*.tmp' -delete",
         "find /sdcard -name '*.tmp' -exec rm {} \\;",
         "sed -i 's/a/b/' /data/system/x.xml",
-        // sed 无论表面是否只读都走确认:脚本能写文件或执行子命令,不能靠事后正则猜透
+        // sed always needs confirmation, even when it looks read-only: its scripts can write files or run subcommands, which no after-the-fact regex can fully see through
         "sed -n '1,20p' /data/system/packages.list",
         "sed '1w /data/local/tmp/copied' /data/system/packages.list",
         "sed '1e id' /data/system/packages.list",
@@ -126,7 +126,7 @@ class RootCommandClassTest {
         "logcat -d -- '*:S'",
     )
 
-    /** 拿不准的一律当作会改:命令替换、交给另一个 shell、变量当命令、没收尾的引号、here-doc、不认识的命令。 */
+    /** Anything uncertain is treated as modifying: command substitution, handing off to another shell, a variable used as a command, an unterminated quote, a here-doc, an unknown command. */
     @Test
     fun anythingUnclearNeedsTheUsersOk() = changes(
         "ls $(cat /sdcard/list)",
@@ -152,7 +152,7 @@ class RootCommandClassTest {
         "   ",
     )
 
-    /** 引号里的分号、管道、大于号是字,不是 shell 的写法。 */
+    /** Semicolons, pipes and greater-than signs inside quotes are literal characters, not shell syntax. */
     @Test
     fun quotedOperatorsAreJustText() = readOnly(
         "grep 'a;b|c>d' /data/x",

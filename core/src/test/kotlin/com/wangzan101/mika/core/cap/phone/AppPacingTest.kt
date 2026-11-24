@@ -9,8 +9,10 @@ import org.junit.Test
 import kotlin.random.Random
 
 /**
- * App 里的节奏:同一屏短停、新的一屏长停,限制浏览快慢的 App 按字数加读的时间、停得更久,都有上限;
- * 模型花掉的时间算在内;屏数上限只给限制浏览快慢的 App,用户答话后重来,做成对外动作后不再设;「快」从不等。
+ * Pacing inside apps: a short dwell on the same screen, a long dwell on a new screen; for apps that throttle
+ * browsing, extra reading time per character and a longer dwell, both bounded; time already spent by the model
+ * counts; the screen cap applies only to throttling apps, resets after the user replies, and is lifted once an
+ * outward action has been made; "fast" never waits.
  */
 class AppPacingTest {
     private val std = AppPacing.Limits()
@@ -29,10 +31,10 @@ class AppPacingTest {
             if (same > std.sameScreenMs.last) assertTrue(same <= std.sameScreenMs.last + std.pauseMs.last)
             p.noteAction("com.a", 2_000, newScreen = true)
             val fresh = p.waitBefore(2_000, textChars = 5_000)
-            // 标准的范围不按字数加读的时间
+            // standard ranges add no reading time for character count
             assertTrue("$fresh", fresh in std.newScreenMs.first..std.maxDwellMs)
         }
-        // 平均来说新的一屏停得比同一屏久
+        // on average a new screen dwells longer than the same screen
         fun mean(newScreen: Boolean) = (0 until 200).map { s ->
             AppPacing.human(Random(s)).apply { noteAction("com.a", 0, newScreen) }.waitBefore(0)
         }.average()
@@ -52,10 +54,10 @@ class AppPacingTest {
         p.noteAction("com.slow", 0, newScreen = true, tempo = AppTempo.CAREFUL)
         val empty = p.waitBefore(0, textChars = 0)
         assertTrue("$empty", empty in careful.newScreenMs.first..careful.newScreenMs.last + careful.pauseMs.last)
-        // 每个字加 readMsPerChar,读的时间至多 maxReadMs,整个停留至多 maxDwellMs
+        // each character adds readMsPerChar, reading time is capped at maxReadMs, and the whole dwell at maxDwellMs
         assertEquals(empty + 100 * careful.readMsPerChar, p.waitBefore(0, textChars = 100))
         assertEquals((empty + careful.maxReadMs).coerceAtMost(careful.maxDwellMs), p.waitBefore(0, textChars = 1_000_000))
-        // 同一屏上接着做不加读的时间
+        // continuing on the same screen adds no reading time
         p.noteAction("com.slow", 0, newScreen = false, tempo = AppTempo.CAREFUL)
         val same = p.waitBefore(0, textChars = 1_000)
         assertTrue("$same", same in careful.sameScreenMs.first..careful.sameScreenMs.last + careful.pauseMs.last)
@@ -65,7 +67,7 @@ class AppPacingTest {
         val p = AppPacing.human(Random(4))
         p.noteAction("com.a", 0, newScreen = true, tempo = AppTempo.NORMAL)
         assertTrue(p.waitBefore(0) > 0)
-        // 快的 App 里做完的动作不记停留:再等 0
+        // actions done in a fast app record no dwell: waiting again gives 0
         p.noteAction("com.quick", 0, newScreen = true, tempo = AppTempo.FAST)
         assertEquals(0, p.waitBefore(0, textChars = 1_000))
     }
@@ -92,14 +94,14 @@ class AppPacingTest {
     @Test fun carefulAppsHaveAScreenBudgetThatResetsWhenTheUserAnswers() {
         val p = AppPacing(Random(1), screenCap = 3)
         repeat(3) { p.noteAction("com.slow", 0, newScreen = true, tempo = AppTempo.CAREFUL, capped = true) }
-        // 同一屏上的动作、往下滚读余下的内容不算;节奏慢(careful)但不限屏的 App 也不算
+        // actions on the same screen and scrolling down to read the rest do not count; nor does an app that is slow (careful) but not screen-capped
         p.noteAction("com.slow", 0, newScreen = false, tempo = AppTempo.CAREFUL, capped = true)
         p.noteAction("com.slow", 0, newScreen = true, tempo = AppTempo.CAREFUL, capped = true, counts = false)
         p.noteAction("com.calm", 0, newScreen = true, tempo = AppTempo.CAREFUL, capped = false)
         assertEquals(3, p.screensIn("com.slow"))
         assertEquals(0, p.screensIn("com.calm"))
         assertTrue(p.capReached("com.slow", capped = true))
-        // 普通 App 没有上限
+        // ordinary apps have no cap
         repeat(10) { p.noteAction("com.a", 0, newScreen = true) }
         assertFalse(p.capReached("com.a", capped = true))
         p.userAnswered()
@@ -114,13 +116,13 @@ class AppPacingTest {
         p.outwardDone("com.slow")
         assertFalse(p.capReached("com.slow", capped = true))
         assertTrue(p.capReached("com.other", capped = true))
-        // 用户答话也不恢复
+        // replying does not restore it either
         p.userAnswered()
         repeat(3) { p.noteAction("com.slow", 0, newScreen = true, tempo = AppTempo.CAREFUL, capped = true) }
         assertFalse(p.capReached("com.slow", capped = true))
     }
 
-    /** 默认不限屏数:读、汇总一类的任务和没人在旁边的任务在限制浏览快慢的 App 里也能做完,只是停得更久。 */
+    /** No screen cap by default: reading, summarizing and similar tasks, and tasks with nobody around, can still finish in a browsing-throttled app, only with longer dwells. */
     @Test fun carefulAppsHaveNoScreenBudgetByDefault() {
         val p = AppPacing.human(Random(1))
         assertEquals(null, p.screenCap)
@@ -170,20 +172,20 @@ class AppPacingTest {
         val plan = AppPacePlan(OperatingPace.STANDARD, mapOf("com.xhs" to OperatingPace.HUMAN, "com.bank" to OperatingPace.FAST))
         assertEquals(OperatingPace.HUMAN, plan.of("com.xhs"))
         assertEquals(OperatingPace.FAST, plan.of("com.bank"))
-        // 未覆盖的跟随全局;不知道包名也是全局
+        // apps without an override follow the global setting; an unknown package name also follows it
         assertEquals(OperatingPace.STANDARD, plan.of("com.other"))
         assertEquals(OperatingPace.STANDARD, plan.of(null))
-        // 上限只跟覆盖为「像人」的 App
+        // the cap applies only to apps overridden as "human-like"
         assertTrue(plan.capped("com.xhs"))
         assertFalse(plan.capped("com.bank"))
         assertFalse(plan.capped("com.other"))
         assertFalse(plan.capped(null))
-        // 有更慢的覆盖时不能整个关掉停留
+        // a slower override prevents turning dwell off entirely
         assertFalse(plan.allFast)
         assertTrue(AppPacePlan(OperatingPace.FAST).allFast)
         assertTrue(AppPacePlan(OperatingPace.FAST, mapOf("com.a" to OperatingPace.FAST)).allFast)
         assertFalse(AppPacePlan(OperatingPace.FAST, mapOf("com.a" to OperatingPace.HUMAN)).allFast)
-        // 全局快 + 单个像人:停留引擎仍要转,其余 App 由 tempo=FAST 跳过
+        // global fast + one human-like app: the dwell engine must still run; the other apps are skipped via tempo=FAST
         val pacing = AppPacePlan(OperatingPace.FAST, mapOf("com.xhs" to OperatingPace.HUMAN)).appPacing()
         assertTrue(pacing.paced)
         assertSame(AppPacing.Off, AppPacePlan(OperatingPace.FAST).appPacing())

@@ -27,12 +27,12 @@ class CommandSteerTest {
         assertEquals(CommandSteer.Purpose.Launch, CommandSteer.purpose("am start --display 7 -n com.example/.Main"))
         assertEquals(CommandSteer.Purpose.Launch, CommandSteer.purpose("monkey -p com.example -c android.intent.category.LAUNCHER 1"))
         assertEquals(CommandSteer.Purpose.Launch, CommandSteer.purpose("cmd activity start-activity -n com.example/.Main"))
-        // 分享文字:动作写全或简写都认;分享文件按一般的启动算
+        // text sharing: both the full and the shorthand action are recognized; sharing files counts as a plain launch
         assertEquals(CommandSteer.Purpose.Share, CommandSteer.purpose("am start --display 7 -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'hi' -p com.example.chat"))
         assertEquals(CommandSteer.Purpose.Share, CommandSteer.purpose("am start -a SEND -t text/plain --es android.intent.extra.TEXT hi"))
         assertEquals(CommandSteer.Purpose.Launch, CommandSteer.purpose("am start -a android.intent.action.SENDTO -d smsto:10086"))
         assertEquals(CommandSteer.Purpose.Launch, CommandSteer.purpose("am start -a android.intent.action.SEND -t image/png --eu android.intent.extra.STREAM content://x/1"))
-        // 查询类命令照常
+        // query-style commands work as usual
         assertNull(CommandSteer.purpose("pm list packages"))
         assertNull(CommandSteer.purpose("dumpsys input_method | grep mInputShown"))
         assertNull(CommandSteer.purpose("settings get system screen_off_timeout"))
@@ -68,7 +68,7 @@ class CommandSteerTest {
         val screen = Counting()
         val d = toolDispatcher(screen)
         assertTrue(d.run("input -d 7 tap 500 900").ok())
-        // 提醒过了:换一类模仿的命令(除打字外)也不执行,只说该用哪个工具
+        // already warned: other emulating commands (everything but typing) are not executed either, only the tool to use is named
         for ((command, key) in listOf(
             "input -d 7 keyevent 66" to "system_command.use_key",
             "am start --display 7 -n com.example/.Main" to "system_command.use_launch",
@@ -78,11 +78,11 @@ class CommandSteerTest {
             assertEquals("use_phone_tool", r.error())
             assertEquals(Feedback.format("system_command.refused", "use" to Feedback[key]), r.hint())
         }
-        // 打字例外:提醒过之后仍允许多次(Flutter/WebView 隐藏输入框只有 shell 能写,#371)
+        // typing is the exception: still allowed repeatedly after the warning (only the shell can write to Flutter/WebView hidden inputs, #371)
         val text = d.run("input -d 7 text hi")
         assertTrue(text.ok())
         assertEquals(Feedback["system_command.use_type"], text.hint())
-        // 查状态、读设置的命令照常
+        // commands that check state or read settings work as usual
         assertTrue(d.run("settings get system screen_off_timeout").ok())
         assertTrue(d.run("dumpsys window | grep mCurrentFocus").ok())
         assertEquals(listOf("input -d 7 tap 500 900", "input -d 7 text hi", "settings get system screen_off_timeout", "dumpsys window | grep mCurrentFocus"), screen.ran)
@@ -100,7 +100,7 @@ class CommandSteerTest {
 
     @Test fun refusalStateIsPerRun() = runTest {
         toolDispatcher(Counting()).run("input -d 7 tap 1 1")
-        // 新任务新的计数:第一次照样执行、只提醒
+        // a new task starts a new count: the first one still runs and only gets a hint
         val fresh = toolDispatcher(Counting()).run("input -d 7 tap 1 1")
         assertTrue(fresh.ok())
         assertEquals(Feedback["system_command.use_tap"], fresh.hint())
@@ -110,10 +110,10 @@ class CommandSteerTest {
         val d = toolDispatcher(screen(1, 2, 0, 1))
         assertNull(d.run("pm path x").hint())
         assertEquals(Feedback["system_command.failed_again"], d.run("pm path y").hint())
-        // 成功一次清零
+        // one success resets it
         assertNull(d.run("pm path z").hint())
         assertNull(d.run("pm path w").hint())
-        // 模仿专门工具又失败了:两句都说(第一次就执行;之后的不执行)
+        // emulating a dedicated tool failed again: both hints are given (the first runs; later ones do not)
         val d2 = toolDispatcher(screen(1, 1))
         d2.run("pm path x")
         val both = d2.run("input -d 7 keyevent 66").hint()!!

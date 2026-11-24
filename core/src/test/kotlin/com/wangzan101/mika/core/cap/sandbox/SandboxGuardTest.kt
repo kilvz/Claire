@@ -64,7 +64,7 @@ class SandboxGuardTest {
         val g = SandboxGuard(budgetMs = 5 * 60_000L)
         val inside = call("c1", "command" to JsonPrimitive("make"), "timeoutSec" to JsonPrimitive(120))
         assertEquals(inside, g.capTimeout(inside, Json.parseToJsonElement(inside.argsJson).jsonObject))
-        // 不带 timeoutSec 的按默认 60 秒算,仍在剩余时间内,原样放行
+        // without timeoutSec the default 60 seconds is assumed, which still fits in the remaining budget, so it passes through unchanged
         val noTimeout = call("c2", "command" to JsonPrimitive("ls"))
         assertEquals(noTimeout, g.capTimeout(noTimeout, Json.parseToJsonElement(noTimeout.argsJson).jsonObject))
         val other = Part.ToolCall("c3", "web_read", args("url" to JsonPrimitive("x"), "timeoutSec" to JsonPrimitive(900)).toString())

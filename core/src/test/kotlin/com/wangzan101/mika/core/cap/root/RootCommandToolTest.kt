@@ -32,7 +32,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 记下跑过的命令;每条都成功,输出是命令本身。 */
+/** Records the commands that ran; every one succeeds and its output is the command itself. */
 private class FakeRoot(var answer: RootRun? = null) : RootPort {
     val ran = mutableListOf<String>()
     override suspend fun run(command: String, timeoutMs: Long): RootRun {
@@ -58,8 +58,9 @@ private fun FakeModel.result(i: Int): JsonObject =
 private fun JsonObject.s(k: String) = this[k]!!.jsonPrimitive.content
 
 /**
- * root 命令:只在给了端口时登记;只读的直接跑;会改动东西的询问时先用确认卡片问用户(卡片上就是这条命令),
- * 同意了才跑、不同意不跑;自主模式不问;问不到人的运行里不跑。
+ * root commands: registered only when a port is provided; read-only ones run directly; anything that changes
+ * things first asks the user with a confirmation card (which shows this very command), and runs only if they
+ * agree; autonomous mode does not ask; unattended runs do not run them.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RootCommandToolTest {
@@ -72,11 +73,11 @@ class RootCommandToolTest {
         assertTrue(toolDispatcher(FakeScreen()).offeredNow(all = true).none { it.name == "root_run_command" })
         val with = toolDispatcher(FakeScreen(), root = FakeRoot())
         assertTrue(with.offeredNow().any { it.name == "root_run_command" })
-        // 技能、知识里提到它也认得(名字登记过)
+        // it is recognized when mentioned in skills and knowledge too (the name is registered)
         assertTrue("root_run_command" in knownToolNames())
     }
 
-    /** 只读的直接跑,结果里有退出码和输出;不问用户,也不记成要同意。 */
+    /** Read-only commands run directly and the result carries the exit code and output; the user is not asked and no approval is recorded. */
     @Test
     fun readOnlyCommandsRunWithoutAsking() = runTest {
         val port = FakeRoot(); val sink = Events()
@@ -90,7 +91,7 @@ class RootCommandToolTest {
         assertTrue(sink.all.none { it is RunEvent.Confirmation })
     }
 
-    /** 会改的直接跑:用户打开「允许 root 命令」本身就是授权,不再逐条问。 */
+    /** Changing commands run directly: the user turning on "allow root commands" is itself the authorization, so they are not asked one by one. */
     @Test
     fun changingCommandsRunWithoutAsking() = runTest {
         val port = FakeRoot()
@@ -108,7 +109,7 @@ class RootCommandToolTest {
         assertEquals(listOf("rm /sdcard/x"), port.ran)
     }
 
-    /** 问不到人的运行(定时、无人值守):会改的不跑,只读的照跑。 */
+    /** Runs that cannot reach a user (scheduled, unattended): changing commands do not run, read-only ones still do. */
     @Test
     fun unattendedRunsDoNotChangeAnything() = runTest {
         val port = FakeRoot()
@@ -119,7 +120,7 @@ class RootCommandToolTest {
         assertEquals("approval_unavailable", m.result(1).s("error"))
     }
 
-    /** su 拒绝了:照实告诉模型,不当作命令失败重试。 */
+    /** su was denied: report it as it is and do not retry as if the command had failed. */
     @Test
     fun deniedSuIsReported() = runTest {
         val m = FakeModel(root("ls /data"), FINISH)

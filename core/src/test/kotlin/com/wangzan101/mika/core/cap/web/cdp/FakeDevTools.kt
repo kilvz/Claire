@@ -18,14 +18,15 @@ import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.concurrent.thread
 
-/** 进程内的一对管道:客户端一端是 [CdpStream],服务端一端给假 DevTools 用。 */
+/** A pair of in-process pipes: the client end is the [CdpStream], the server end is used by the fake DevTools. */
 class PipeStream(override val input: InputStream, override val output: OutputStream, private val onClose: () -> Unit) : CdpStream {
     override fun close() = onClose()
 }
 
 /**
- * 假 DevTools:每次 [open] 起一个服务线程。`/json/...` 走 HTTP;其余路径做 WebSocket 升级,
- * 之后每条文本消息交给 [onMessage](默认回 `{"echo": params}`)。服务端独立实现帧编解码,不复用客户端代码。
+ * Fake DevTools: every [open] starts a server thread. `/json/...` goes over HTTP; other paths perform a
+ * WebSocket upgrade, after which each text message is passed to [onMessage] (by default replying
+ * `{"echo": params}`). The server implements frame encoding and decoding itself, not reusing the client code.
  */
 class FakeDevTools(
     private val badAccept: Boolean = false,
@@ -176,7 +177,7 @@ class FakeDevTools(
             out.flush()
         }
 
-        /** 不发关闭帧直接断。 */
+        /** Cuts the connection without sending a close frame. */
         fun drop() = closer()
     }
 }

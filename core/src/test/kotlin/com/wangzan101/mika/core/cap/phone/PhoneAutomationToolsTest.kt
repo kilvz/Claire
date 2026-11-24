@@ -62,8 +62,8 @@ class PhoneAutomationToolsTest {
     }
 
     @Test fun resourceIdMatchResolvesNameFromClickableDescendant() {
-        // do_each 用 resourceId 命中可点容器(tile/列表项),自身无文字、可见文字在子节点上;name 从后代取(和元素表 labelOf 一致),
-        // 供 contentKey 去重;点按另走 ref。标题 + 摘要两个子节点,拼成全名。
+        // do_each matches a clickable container (tile/list item) by resourceId; the container itself has no text and its visible text sits on the child nodes; name is taken from the descendants (consistent with labelOf in the element table),
+        // for contentKey deduplication; tapping goes through ref instead. The title and summary child nodes are joined into the full name.
         val screen = ScreenSnapshot("p1", "com.example.app", emptyList(), 1080, 2400, windows = listOf(
             UiWindowTree(1, "application", 0, null, "com.example.app", true, true, listOf(
                 UiTreeNode("LinearLayout", listOf(0, 100, 999, 200), ref = "@t1", clickable = true, resourceId = "id/tile", children = listOf(
@@ -164,7 +164,7 @@ class PhoneAutomationToolsTest {
     @Test fun collectFallsBackToElementsWhenTreeHasNoText() = runTest {
         val dispatcher = toolDispatcher(FakeScreen())
         dispatcher.ctx.sub = SubActions {
-            // 骨架 tree:只有 role/ref/children,没有 text/bounds(和 UiTreeJson 骨架一致)
+            // skeleton tree: only role/ref/children, no text/bounds (matching the UiTreeJson skeleton)
             val tree = JsonArray(listOf(buildJsonObject {
                 put("id", 1); put("type", "application"); put("layer", 0)
                 put("nodes", JsonArray(listOf(buildJsonObject {
@@ -228,7 +228,7 @@ class PhoneAutomationToolsTest {
         val json = """{"commands":[{"op":"tap","ref":"@e1","snapshotId":"p1"}]}"""
         val result = PhoneRun.execute(Args(PhoneRun.def, Json.parseToJsonElement(json).jsonObject), dispatcher.ctx).content
         assertEquals("true", result["ok"]!!.jsonPrimitive.content)
-        assertEquals(0, calls.count { it == "phone_query" })  // 直接给 ref,不按字重找
+        assertEquals(0, calls.count { it == "phone_query" })  // ref given directly, so no lookup by text
         assertEquals(1, calls.count { it == "phone_tap" })
     }
 
@@ -256,7 +256,7 @@ class PhoneAutomationToolsTest {
         val result = DoEach.execute(Args(DoEach.def, Json.parseToJsonElement(json).jsonObject), dispatcher.ctx).content
         assertEquals("true", result["ok"]!!.jsonPrimitive.content)
         assertEquals(2, result["done"]!!.jsonPrimitive.content.toInt())
-        // @item 换成 ref 直点(带 snapshotId),不靠名字回找
+        // @item is replaced by a direct ref tap (with snapshotId), with no lookup by name
         assertEquals(listOf("@t1", "@t2"), runCalls.map { args ->
             Json.parseToJsonElement(args).jsonObject["commands"]!!.jsonArray[0].jsonObject["ref"]!!.jsonPrimitive.content
         })

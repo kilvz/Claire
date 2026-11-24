@@ -39,7 +39,7 @@ class RootfsExtractorTest {
                     is Dir -> tar.putArchiveEntry(TarArchiveEntry(e.name).apply { mode = e.mode or 0x4000 })
                     is Reg -> {
                         val data = e.body.toByteArray()
-                        // preserveAbsolutePath:否则写入器会悄悄去掉开头的 /
+                        // preserveAbsolutePath: otherwise the writer silently strips the leading /
                         tar.putArchiveEntry(TarArchiveEntry(e.name, true).apply { mode = e.mode or 0x8000; size = data.size.toLong() })
                         tar.write(data)
                     }
@@ -79,7 +79,7 @@ class RootfsExtractorTest {
                 Dir("./bin/"),
                 Reg("./bin/tool", "#!/bin/sh\necho hi\n", mode = 0x1ed /* 0755 */),
                 Dir("./etc/", mode = 0x1c0 /* 0700 */),
-                Reg("./etc/motd", "hello", mode = 0x9a4 /* 04644: setuid 位必须丢掉 */),
+                Reg("./etc/motd", "hello", mode = 0x9a4 /* 04644: the setuid bit must be dropped */),
             ),
             d,
         )
@@ -132,7 +132,7 @@ class RootfsExtractorTest {
         assertFalse(Files.isSymbolicLink(copy.toPath()))
         assertEquals("BB", copy.readText())
         assertTrue(PosixFilePermission.OWNER_EXECUTE in perms(copy))
-        // 是独立副本:改一个不影响另一个
+        // it is an independent copy: changing one leaves the other alone
         copy.writeText("changed")
         assertEquals("BB", File(d, "bin/busybox").readText())
     }
@@ -241,7 +241,7 @@ class RootfsExtractorTest {
 
     @Test fun hardlinkCopiesCountTowardBytes() {
         val d = dest()
-        // 单看条目大小只有 8 字节,但每个硬链接副本都要再占 8 字节
+        // the entry is only 8 bytes on its own, but each hard-link copy takes another 8 bytes
         assertUnsafe(tarGz(Reg("f", "12345678"), Hard("h1", "f"), Hard("h2", "f")), d, maxBytes = 20)
     }
 
@@ -257,7 +257,7 @@ class RootfsExtractorTest {
     }
 
     @Test fun nulInNameRejected() {
-        // 超过 100 字走 pax 头,NUL 能原样带进条目名
+        // names longer than 100 characters use a pax header, so a NUL can be carried verbatim into the entry name
         assertUnsafe(tarGz(Reg("a".repeat(120) + "\u0000b", "x")), dest())
     }
 
@@ -278,7 +278,7 @@ class RootfsExtractorTest {
             ),
             d,
         )
-        // 解包后再把目录改成只读,模拟沙箱里留下的只读目录
+        // after extraction the directory is made read-only, simulating a read-only directory left behind in the sandbox
         Files.setPosixFilePermissions(File(d, "ro").toPath(), setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
         RootfsExtractor.deleteTree(d)
         assertFalse(d.exists())
