@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multilingüe (descargar)</string>
     <string name="voice_catalog_sherpa_download">Descargar (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">Descargando… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">Descomprimiendo el modelo…</string>
     <string name="voice_catalog_sherpa_downloaded">Modelo descargado</string>
     <string name="voice_catalog_sherpa_download_failed">Error al descargar: %1$s</string>
     <string name="voice_catalog_sherpa_retry">Reintentar descarga</string>

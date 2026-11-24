@@ -364,7 +364,6 @@ private fun ModelRow(
 internal fun SherpaDownloadControl(model: VoiceModel) {
     val spec = SherpaOnnxModels.DOWNLOADS[model.id] ?: return
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val states by SherpaModelStore.states.collectAsState()
     val state = states[model.id]
         ?: if (SherpaModelStore.ready(context, model.id)) SherpaModelStore.State.Ready else SherpaModelStore.State.Absent
@@ -380,20 +379,15 @@ internal fun SherpaDownloadControl(model: VoiceModel) {
             PillTone.Warn,
             Modifier.testTag("sherpa-downloading-${model.id}"),
         )
+        SherpaModelStore.State.Unpacking -> StatusPill(
+            stringResource(R.string.voice_catalog_sherpa_unpacking),
+            PillTone.Warn,
+            Modifier.testTag("sherpa-unpacking-${model.id}"),
+        )
         is SherpaModelStore.State.Failed -> Column {
             StatusPill(stringResource(R.string.voice_catalog_sherpa_download_failed, state.message), PillTone.Warn)
             TextButton(
-                onClick = {
-                    scope.launch {
-                        try {
-                            SherpaModelStore.download(context, model.id)
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            // The store already recorded the failure in its state.
-                        }
-                    }
-                },
+                onClick = { SherpaModelStore.start(context, model.id) },
             ) { Text(stringResource(R.string.voice_catalog_sherpa_retry)) }
         }
         SherpaModelStore.State.Absent -> MikaButton(
@@ -401,20 +395,18 @@ internal fun SherpaDownloadControl(model: VoiceModel) {
                 R.string.voice_catalog_sherpa_download,
                 "~${spec.approximateBytes / (1024 * 1024)} MB",
             ),
-            onClick = {
-                scope.launch {
-                    try {
-                        SherpaModelStore.download(context, model.id)
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        // The store already recorded the failure in its state.
-                    }
-                }
-            },
+            onClick = { SherpaModelStore.start(context, model.id) },
             modifier = Modifier.testTag("sherpa-download-${model.id}"),
         )
     }
+}
+
+/** Whether [modelId]'s download or unpacking is still running; testing before it ends would report it as missing. */
+@Composable
+internal fun sherpaPreparing(modelId: String): Boolean {
+    val states by SherpaModelStore.states.collectAsState()
+    return SherpaOnnxModels.DOWNLOADS.containsKey(modelId) &&
+        (states[modelId] is SherpaModelStore.State.Downloading || states[modelId] is SherpaModelStore.State.Unpacking)
 }
 
 @Composable
@@ -430,6 +422,7 @@ private fun CapabilityBadge(
     onTest: () -> Unit,
 ) {
     val c = MikaTheme.colors
+    val preparing = sherpaPreparing(ref.modelId)
     val stopping = stoppable && ui is VoiceProbeUi.Listening
     Column(Modifier.testTag(tag)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -438,7 +431,7 @@ private fun CapabilityBadge(
             if (stopping) {
                 TextButton(onClick = onTest) { Text(stringResource(R.string.chat_stop), style = MikaType.Hint) }
             } else if (ui !is VoiceProbeUi.Running && ui !is VoiceProbeUi.Listening) {
-                TextButton(onClick = onTest) { Text(testLabel, style = MikaType.Hint) }
+                TextButton(onClick = onTest, enabled = !preparing) { Text(testLabel, style = MikaType.Hint) }
             }
         }
         when (ui) {
@@ -449,7 +442,10 @@ private fun CapabilityBadge(
                 style = MikaType.Hint, color = c.ink2,
             )
             is VoiceProbeUi.Failed -> Text(ui.error.detail, style = MikaType.Hint, color = c.bad)
-            VoiceProbeUi.Verified -> StatusPill(stringResource(R.string.voice_catalog_verified), PillTone.Ok)
+            is VoiceProbeUi.Verified -> Column {
+                if (ui.transcript.isNotBlank()) Text(ui.transcript, style = MikaType.Hint, color = c.ink2)
+                StatusPill(stringResource(R.string.voice_catalog_verified), PillTone.Ok)
+            }
         }
         if (ui == VoiceProbeUi.Idle && verified) {
             StatusPill(stringResource(R.string.voice_catalog_verified), PillTone.Ok)

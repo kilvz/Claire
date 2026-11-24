@@ -96,7 +96,7 @@ private fun SpeechFailure.toError(): VoiceModelError = when (this) {
         VoiceErrorCategory.SYSTEM_UNAVAILABLE,
         when (why) {
             SpeechEngineSpec.Why.SherpaModelMissing ->
-                "The on-device model is not downloaded yet. Download it in Settings › Models › Speech models."
+                "The on-device model isn't ready yet. Download it in Settings › Models › Speech models and wait for it to finish."
             SpeechEngineSpec.Why.SherpaFailed ->
                 "The on-device recognition engine could not start."
             SpeechEngineSpec.Why.Off -> "Voice input is turned off."

@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX چندزبانه (دانلود)</string>
     <string name="voice_catalog_sherpa_download">دانلود (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">در حال دانلود… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">در حال باز کردن مدل…</string>
     <string name="voice_catalog_sherpa_downloaded">مدل دانلود شد</string>
     <string name="voice_catalog_sherpa_download_failed">دانلود ناموفق: %1$s</string>
     <string name="voice_catalog_sherpa_retry">دانلود دوباره</string>

@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX multibahasa (unduh)</string>
     <string name="voice_catalog_sherpa_download">Unduh (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">Mengunduh… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">Mengekstrak model…</string>
     <string name="voice_catalog_sherpa_downloaded">Model terunduh</string>
     <string name="voice_catalog_sherpa_download_failed">Unduhan gagal: %1$s</string>
     <string name="voice_catalog_sherpa_retry">Coba unduh lagi</string>

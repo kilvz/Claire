@@ -162,7 +162,7 @@ class VoiceModelProbeTest {
 
         val failed = probe.verifyStt(ref).toList().single() as VoiceProbeState.Failed
 
-        assertTrue(failed.error.detail.contains("not downloaded"))
+        assertTrue(failed.error.detail.contains("isn't ready"))
     }
 
     @Test fun `verifyTts returns the synthesized audio`() = runTest {

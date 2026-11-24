@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX متعدد اللغات (تنزيل)</string>
     <string name="voice_catalog_sherpa_download">تنزيل (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">جارٍ التنزيل… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">جارٍ فك ضغط النموذج…</string>
     <string name="voice_catalog_sherpa_downloaded">تم تنزيل النموذج</string>
     <string name="voice_catalog_sherpa_download_failed">فشل التنزيل: %1$s</string>
     <string name="voice_catalog_sherpa_retry">إعادة التنزيل</string>

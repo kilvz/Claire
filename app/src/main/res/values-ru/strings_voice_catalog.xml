@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX многоязычная (загрузка)</string>
     <string name="voice_catalog_sherpa_download">Загрузить (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">Загрузка… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">Распаковка модели…</string>
     <string name="voice_catalog_sherpa_downloaded">Модель загружена</string>
     <string name="voice_catalog_sherpa_download_failed">Ошибка загрузки: %1$s</string>
     <string name="voice_catalog_sherpa_retry">Повторить загрузку</string>

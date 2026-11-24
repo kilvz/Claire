@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多语言（需下载）</string>
     <string name="voice_catalog_sherpa_download">下载（%1$s）</string>
     <string name="voice_catalog_sherpa_downloading">正在下载… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">正在解压模型…</string>
     <string name="voice_catalog_sherpa_downloaded">模型已下载</string>
     <string name="voice_catalog_sherpa_download_failed">下载失败：%1$s</string>
     <string name="voice_catalog_sherpa_retry">重新下载</string>

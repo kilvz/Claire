@@ -4,9 +4,15 @@ import android.content.Context
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,12 +30,43 @@ object SherpaModelStore {
     sealed interface State {
         data object Absent : State
         data class Downloading(val fraction: Float) : State
+        /** The bytes are in and the archive is being decompressed: on a phone this is the longest silent stretch. */
+        data object Unpacking : State
         data object Ready : State
         data class Failed(val message: String) : State
     }
 
     private val _states = MutableStateFlow<Map<String, State>>(emptyMap())
     val states: StateFlow<Map<String, State>> = _states
+
+    /**
+     * Downloads have their own scope: unpacking a 250 MB archive can take a while, and walking
+     * away from the page must not cancel it halfway through.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val jobs = mutableMapOf<String, Job>()
+
+    /** Starts [modelId] unless it is already downloading or unpacking; the work outlives the screen that asked. */
+    fun start(context: Context, modelId: String) {
+        if (modelId !in SherpaOnnxModels.DOWNLOADS) return
+        val app = context.applicationContext
+        synchronized(jobs) {
+            if (jobs[modelId]?.isActive == true) return
+            val job = scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    download(app, modelId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    // download() already recorded the reason in the state map.
+                } finally {
+                    synchronized(jobs) { jobs.remove(modelId) }
+                }
+            }
+            jobs[modelId] = job
+            job.start()
+        }
+    }
 
     /** Stable names [SherpaOnnx] loads after extraction; a missing one means the archive did not match. */
     private val REQUIRED_FILES = listOf("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt")
@@ -57,6 +94,9 @@ object SherpaModelStore {
         val staging = File(context.filesDir, "sherpa/$modelId.tmp")
         try {
             fetch(spec.url, archive) { fraction -> update(modelId, State.Downloading(fraction)) }
+            // The bytes are all there; what remains is decompressing the archive, which can take
+            // minutes on a phone. Say so instead of leaving a "100%" that looks stuck.
+            update(modelId, State.Unpacking)
             staging.deleteRecursively()
             staging.mkdirs()
             extract(archive, staging, spec)
@@ -68,6 +108,11 @@ object SherpaModelStore {
             if (!staging.renameTo(dest)) throw IOException("Could not move the model into place")
             archive.delete()
             update(modelId, State.Ready)
+        } catch (e: CancellationException) {
+            // Leaving the page no longer cancels the download, so this only happens with the process.
+            runCatching { archive.delete() }
+            runCatching { staging.deleteRecursively() }
+            throw e
         } catch (e: Throwable) {
             update(modelId, State.Failed(e.message ?: "download failed"))
             runCatching { archive.delete() }

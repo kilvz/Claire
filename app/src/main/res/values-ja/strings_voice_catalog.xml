@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX 多言語（ダウンロード）</string>
     <string name="voice_catalog_sherpa_download">ダウンロード（%1$s）</string>
     <string name="voice_catalog_sherpa_downloading">ダウンロード中… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">モデルを展開しています…</string>
     <string name="voice_catalog_sherpa_downloaded">モデルをダウンロードしました</string>
     <string name="voice_catalog_sherpa_download_failed">ダウンロードに失敗しました：%1$s</string>
     <string name="voice_catalog_sherpa_retry">再ダウンロード</string>

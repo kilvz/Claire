@@ -185,7 +185,7 @@ class VoiceCatalogViewModelTest {
         viewModel.verifyStt(ref)
         runCurrent()
         assertEquals(VoiceVerification.Verified, env.catalog.verification(ref))
-        assertEquals(VoiceProbeUi.Verified, viewModel.probeState(ref))
+        assertEquals(VoiceProbeUi.Verified("hello"), viewModel.probeState(ref))
     }
 
     @Test fun `probes flow publishes running and verified probe states`() = runTest {
@@ -202,7 +202,28 @@ class VoiceCatalogViewModelTest {
         viewModel.verifyStt(ref)
         assertEquals(VoiceProbeUi.Running, viewModel.probes.value[fingerprint])
         runCurrent()
-        assertEquals(VoiceProbeUi.Verified, viewModel.probes.value[fingerprint])
+        assertEquals(VoiceProbeUi.Verified("hello"), viewModel.probes.value[fingerprint])
+    }
+
+    @Test fun `microphone level updates keep the transcript already heard`() = runTest {
+        val env = environment()
+        val session = FakeSession(
+            flowOf(
+                SpeechEvent.Level(0.1f),
+                SpeechEvent.Partial(stable = "hel", tail = "lo"),
+                SpeechEvent.Level(0.9f),
+            ),
+        )
+        val probe = VoiceModelProbe(
+            env,
+            startStt = { session },
+            synthesize = { _, _ -> TtsResponse(byteArrayOf(), "audio/wav") },
+            connectRealtime = {},
+        )
+        val viewModel = viewModel(env, backgroundScope, StandardTestDispatcher(testScheduler), probe)
+        viewModel.verifyStt(ref)
+        runCurrent()
+        assertEquals(VoiceProbeUi.Listening("hello"), viewModel.probeState(ref))
     }
 
     @Test fun `a second verifyStt on a live model stops the running capture`() = runTest {
@@ -230,7 +251,7 @@ class VoiceCatalogViewModelTest {
 
         assertTrue(session.released)
         assertFalse(viewModel.canStopStt(liveRef))
-        assertEquals(VoiceProbeUi.Verified, viewModel.probeState(liveRef))
+        assertEquals(VoiceProbeUi.Verified("hello"), viewModel.probeState(liveRef))
     }
 
     @Test fun `saveService and saveUnverified upsert while system entries are protected`() = runTest {

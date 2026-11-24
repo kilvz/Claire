@@ -161,6 +161,8 @@ internal fun VoiceOptionList(
             val probe = if (choice.offer == null) viewModel.probeFingerprint(choice.ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
             else VoiceProbeUi.Idle
             val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(choice.ref)
+            // A model that is still downloading or unpacking cannot record yet; the pill below says why.
+            val preparing = sherpaPreparing(choice.model.id)
             RadioRow(
                 voiceModelDisplayName(choice.model),
                 selected = choice.ref == selected,
@@ -184,7 +186,12 @@ internal fun VoiceOptionList(
                             VoiceProbeUi.Running -> Text(stringResource(R.string.voice_catalog_testing), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink3)
                             is VoiceProbeUi.Listening -> Text(probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink2)
                             is VoiceProbeUi.Failed -> Text(probe.error.detail, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.bad)
-                            VoiceProbeUi.Verified -> Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
+                            is VoiceProbeUi.Verified -> Column {
+                                if (probe.transcript.isNotBlank()) {
+                                    Text(probe.transcript, Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ink2)
+                                }
+                                Text(stringResource(R.string.voice_catalog_verified), Modifier.padding(top = 4.dp), style = MikaType.Hint, color = c.ok)
+                            }
                         }
                         if (choice.model.serviceId == SherpaOnnxModels.SERVICE_ID) SherpaDownloadControl(choice.model)
                     }
@@ -193,7 +200,7 @@ internal fun VoiceOptionList(
                     MikaButton(
                         if (stoppable) stringResource(R.string.chat_stop) else testLabel,
                         onClick = { onTest(choice) }, kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
+                        enabled = !preparing && (stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening)),
                         modifier = Modifier.testTag("voice-try-${choice.ref.serviceId}-${choice.ref.modelId}"),
                     )
                 },

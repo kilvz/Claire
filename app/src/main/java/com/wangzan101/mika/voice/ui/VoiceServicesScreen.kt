@@ -547,6 +547,7 @@ private fun PresetResult(
                 val model = snapshot.modelOf(ref) ?: return@forEachIndexed
                 val probe = viewModel.probeFingerprint(ref)?.let { probes[it] } ?: VoiceProbeUi.Idle
                 val stoppable = probe is VoiceProbeUi.Listening && viewModel.canStopStt(ref)
+                val preparing = sherpaPreparing(ref.modelId)
                 val inUse = when (ref.capability) {
                     VoiceCapability.STT -> snapshot.selections.stt == SttSelection.Model(ref)
                     VoiceCapability.TTS -> snapshot.selections.tts == ref
@@ -570,7 +571,7 @@ private fun PresetResult(
                             }
                         },
                         kind = ButtonKind.Tonal, size = ButtonSize.Small,
-                        enabled = stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening),
+                        enabled = !preparing && (stoppable || (probe !is VoiceProbeUi.Running && probe !is VoiceProbeUi.Listening)),
                     )
                 }
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -579,11 +580,11 @@ private fun PresetResult(
                         VoiceProbeUi.Running -> stringResource(R.string.voice_catalog_testing)
                         is VoiceProbeUi.Listening -> probe.transcript.ifBlank { stringResource(R.string.voice_catalog_listening) }
                         is VoiceProbeUi.Failed -> probe.error.detail
-                        VoiceProbeUi.Verified -> stringResource(R.string.voice_catalog_verified)
+                        is VoiceProbeUi.Verified -> probe.transcript.ifBlank { stringResource(R.string.voice_catalog_verified) }
                     }
                     Text(
                         line.orEmpty(), Modifier.weight(1f).padding(top = 6.dp), style = MikaType.Hint,
-                        color = if (probe is VoiceProbeUi.Failed) c.bad else if (probe == VoiceProbeUi.Verified) c.ok else c.ink3,
+                        color = if (probe is VoiceProbeUi.Failed) c.bad else if (probe is VoiceProbeUi.Verified) c.ok else c.ink3,
                     )
                     MikaButton(
                         stringResource(

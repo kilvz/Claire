@@ -64,6 +64,7 @@
     <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX çok dilli (indir)</string>
     <string name="voice_catalog_sherpa_download">İndir (%1$s)</string>
     <string name="voice_catalog_sherpa_downloading">İndiriliyor… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">Model açılıyor…</string>
     <string name="voice_catalog_sherpa_downloaded">Model indirildi</string>
     <string name="voice_catalog_sherpa_download_failed">İndirme başarısız: %1$s</string>
     <string name="voice_catalog_sherpa_retry">Yeniden indir</string>

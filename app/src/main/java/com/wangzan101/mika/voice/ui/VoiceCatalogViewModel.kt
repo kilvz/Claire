@@ -44,7 +44,8 @@ sealed interface VoiceProbeUi {
     data object Running : VoiceProbeUi
     data class Listening(val transcript: String) : VoiceProbeUi
     data class Failed(val error: VoiceModelError) : VoiceProbeUi
-    data object Verified : VoiceProbeUi
+    /** [transcript] is what the recognizer actually heard, empty for tests that produce no text. */
+    data class Verified(val transcript: String = "") : VoiceProbeUi
 }
 
 /**
@@ -144,7 +145,7 @@ class VoiceCatalogViewModel(
                 is ProbeResult.Success -> {
                     val stillCurrent = runCatching { probe.connection(ref) == fingerprint }.getOrDefault(false)
                     if (stillCurrent) catalog.markVerification(ref, VoiceVerification.Verified)
-                    setProbe(fingerprint, if (stillCurrent) VoiceProbeUi.Verified else VoiceProbeUi.Idle)
+                    setProbe(fingerprint, if (stillCurrent) VoiceProbeUi.Verified() else VoiceProbeUi.Idle)
                 }
                 is ProbeResult.Failed -> setProbe(fingerprint, VoiceProbeUi.Failed(result.error))
             }
@@ -172,9 +173,27 @@ class VoiceCatalogViewModel(
             try {
                 probe.verifyStt(ref, stop).collect { state ->
                     when (state) {
-                        VoiceProbeState.Capturing -> setProbe(fingerprint, VoiceProbeUi.Listening(""))
-                        is VoiceProbeState.Transcribing -> setProbe(fingerprint, VoiceProbeUi.Listening(state.text))
-                        is VoiceProbeState.Verified -> pending.complete(ProbeResult.Success)
+                        // A level event means "still listening", not "nothing heard yet": replacing the
+                        // text here wiped every partial as soon as the next microphone update arrived.
+                        VoiceProbeState.Capturing -> {
+                            if (_probes.value[fingerprint] !is VoiceProbeUi.Listening) {
+                                setProbe(fingerprint, VoiceProbeUi.Listening(""))
+                            }
+                        }
+                        is VoiceProbeState.Transcribing -> {
+                            // Empty updates ("converting", a silent partial) must not erase what was heard.
+                            val heard = state.text.ifBlank {
+                                (_probes.value[fingerprint] as? VoiceProbeUi.Listening)?.transcript.orEmpty()
+                            }
+                            setProbe(fingerprint, VoiceProbeUi.Listening(heard))
+                        }
+                        is VoiceProbeState.Verified -> {
+                            pending.complete(ProbeResult.Success)
+                            // The success path above cannot know the text; keep it so the row shows
+                            // what was actually heard instead of just "Verified".
+                            val stillCurrent = runCatching { probe.connection(ref) == fingerprint }.getOrDefault(false)
+                            if (stillCurrent) setProbe(fingerprint, VoiceProbeUi.Verified(state.transcript))
+                        }
                         is VoiceProbeState.Failed -> pending.complete(ProbeResult.Failed(state.error))
                     }
                 }
