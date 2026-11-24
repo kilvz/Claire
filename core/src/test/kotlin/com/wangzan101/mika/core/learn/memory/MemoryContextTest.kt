@@ -17,7 +17,7 @@ class MemoryContextTest {
         assertTrue(block.usedIds.all { id -> pinned.any { it.id == id } })
     }
 
-    // 交给任务的那段标题说的是「用户告诉你的」:Claire 自己归纳出来的那几条逐条标明不是用户说的
+    // The section header handed to the task says "things the user told you": the entries Claire inferred herself are each marked as not said by the user
     @Test fun inferredMemoriesAreMarkedAsNotTheUsersWords() {
         val said = mem("用户点外卖不要香菜")
         val own = mem("用户常在张江路一带活动").let { it.copy(source = it.source.copy(type = MemoryContext.INFERRED)) }
@@ -68,7 +68,7 @@ class MemoryContextTest {
         val block = MemoryContext.build(distractors(20) + relevant + pinned, goal = "点外卖", lastUserTurn = null)
         val msg = block.message!!
         assertTrue(TokenEstimate.of(msg) <= MemoryContext.MAX_TOKENS)
-        // 置顶的最后去:四条置顶都在,相关的只剩装得下的
+        // Pinned entries go last: all four pinned ones are present, and of the relevant ones only those that fit remain
         assertTrue(pinned.all { it.id in block.usedIds })
         assertTrue(block.usedIds.size in 5..6)
     }
@@ -89,7 +89,7 @@ class MemoryContextTest {
     }
 
     @Test fun belowMinScoreDropped() {
-        // 每条都带同一个检索词:算相关,但这个词毫无区分度,分数低于阈值
+        // Every entry carries the same search term: they count as relevant, but the term has no discriminative power, so the score is below the threshold
         val same = (1..60).map { mem("外卖第${it}单", keywords = listOf("外卖")) }
         assertTrue(MemoryIndex(same).search("外卖", 1).single().second < MemoryContext.MIN_SCORE)
         val block = MemoryContext.build(same, goal = "外卖", lastUserTurn = null)

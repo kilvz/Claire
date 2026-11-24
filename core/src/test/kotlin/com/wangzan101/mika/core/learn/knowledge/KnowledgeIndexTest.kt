@@ -38,7 +38,7 @@ class KnowledgeIndexTest {
         assertError("必须与目录名", appMd("a", listOf("p.a")).let { (p, t) -> p.replace("/a/", "/b/") to t })
         assertError("缺少 packages", appMd("a", emptyList()))
         assertError("不认得的键 assistent", appMd("a", listOf("p.a"), extra = "assistent: 小助手\n"))
-        // 迁移来的元数据键已去掉,写了就报
+        // The metadata keys carried over from the migration were removed; writing one is an error
         listOf("risk: read", "status: draft", "updated: 2026-10-24", "verified_on: x")
             .forEach { assertError("不认得的键 ${it.substringBefore(':')}", appMd("a", listOf("p.a"), extra = "$it\n")) }
         assertError("terms 只有技能能写", appMd("a", listOf("p.a"), extra = "terms: [购物]\n"))
@@ -46,7 +46,7 @@ class KnowledgeIndexTest {
         assertError("description 超过", appMd("a", listOf("p.a")).let { (p, t) -> p to t.replace("description: a 的说明", "description: " + "长".repeat(61)) })
         assertError("超过 2500", appMd("a", listOf("p.a"), body = "字".repeat(2501)))
         assertError("mode 只能是", siteMd("a.com").let { (p, t) -> p to t.replace("mode: desktop\n", "") })
-        // pace:App 和网站能写,只认 careful;技能不能写
+        // pace: apps and sites may set it and only accept careful; skills may not
         assertError("pace 只能是", siteMd("a.com").let { (p, t) -> p to t.replace("mode: desktop\n", "mode: desktop\npace: slow\n") })
         assertError("pace 只能是", appMd("a", listOf("p.a"), extra = "pace: slow\n"))
         assertError("pace 只有 App 和网站能写", skillMd("s", extra = "pace: careful\n"))
@@ -56,7 +56,7 @@ class KnowledgeIndexTest {
         assertError("要在 domains 里", siteMd("a.com", domains = listOf("b.com")))
         assertError("缺少 SKILL.md", "skills/x/notes.md" to "x")
         assertError("links 里的", appMd("a", listOf("p.a"), extra = "links: [\"文件 | file:///sdcard/a\"]\n"))
-        // 技能正文没有上限
+        // Skill bodies have no limit
         assertTrue(errors(skillMd("long", body = "字".repeat(5000))).isEmpty())
     }
 
@@ -74,7 +74,7 @@ class KnowledgeIndexTest {
 
     @Test fun referencedAttachmentsMustExist() {
         assertError("附件 references/x.md 不存在", appMd("a", listOf("p.a"), body = "读 `references/x.md`"))
-        // 点名另一个条目时到那个条目里找
+        // When another entry is named, look for the file inside that entry
         assertTrue(errors(appMd("a", listOf("p.a"), body = "读 `skill:s` 的 `references/x.md`"), skillMd("s"), "skills/s/references/x.md" to "x").isEmpty())
         assertError("提到的 skill:t 不存在", appMd("a", listOf("p.a"), body = "见 skill:t"))
         assertError("可运行的 scripts/run.py 不存在", skillMd("s"), "skills/s/scripts/manifest.json" to """[{"file":"scripts/run.py","runnable":true}]""")

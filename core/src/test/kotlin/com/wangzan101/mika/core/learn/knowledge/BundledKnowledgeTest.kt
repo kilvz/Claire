@@ -14,7 +14,7 @@ import com.wangzan101.mika.core.tool.FakeScreen
 import java.io.File
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
-/** 随 App 打包的知识与技能:构建期校验在测试里再跑一遍,并核对运行时读到的内容。 */
+/** Knowledge and skills bundled with the app: the build-time validation runs again in the tests, and the content read at runtime is checked. */
 class BundledKnowledgeTest {
     private val bundled by lazy { KnowledgeStore.loadBundled() }
     private val catalog by lazy { GuideCatalog.loadBundled() }
@@ -24,7 +24,7 @@ class BundledKnowledgeTest {
         val r = KnowledgeIndex.build(resources)
         assertTrue(r.errors.joinToString("\n"), r.errors.isEmpty())
         assertEquals(mapOf("app" to 49, "site" to 29, "skill" to 6), r.entries.groupingBy { it.kind }.eachCount())
-        // 类路径上的索引就是按当前文件生成的那份
+        // The index on the classpath is the one generated from the current files
         assertEquals(r.entries, catalog.rows)
     }
 
@@ -33,7 +33,7 @@ class BundledKnowledgeTest {
         assertEquals(null, catalog.sitePace("example.com"))
     }
 
-    // App 的 pace 按包名查 App 知识:限制浏览快慢的那几个内置 App 是 careful,别的没有说法
+    // An app's pace is looked up in the app knowledge by package name: the few built-in apps that throttle browsing are careful, the others have no entry
     @Test fun appPaceFollowsTheAppKnowledgeByPackage() {
         val careful = listOf("xiaohongshu", "wechat", "douyin", "kuaishou", "weibo", "boss-zhipin", "xianyu", "xiaoheihe", "instagram", "tiktok")
         val apps = catalog.rows.filter { it.kind == KnowledgeIndex.APP }
@@ -43,7 +43,7 @@ class BundledKnowledgeTest {
         }
         apps.filter { it.name !in careful }.flatMap { it.packages }.forEach { assertEquals(it, null, catalog.appPace(it)) }
         assertEquals(null, catalog.appPace("com.example.unknown"))
-        // carefulApps 给设置里按应用操作节奏列表当初始内容:恰好是这些 App 的全部包名
+        // carefulApps seeds the per-app operation pace list in settings: it is exactly all the packages of these apps
         val carefulPkgs = careful.mapNotNull { n -> apps.singleOrNull { it.name == n } }.flatMap { it.packages }.sorted()
         assertEquals(carefulPkgs, catalog.carefulApps())
     }
@@ -58,7 +58,7 @@ class BundledKnowledgeTest {
         val roots = listOf("knowledge/apps", "knowledge/sites", "skills").map { File(resources, it) }
         val others = roots.flatMap { r -> r.walkTopDown().filter { it.isFile && it.extension !in setOf("md", "json") }.toList() }
         assertTrue(others.toString(), others.all { it.parentFile.name == "scripts" && File(it.parentFile, "manifest.json").isFile })
-        // 英文副本不再随 App 打包
+        // English copies are no longer bundled with the app
         assertTrue(roots.none { r -> r.walkTopDown().any { it.name.endsWith(".en.md") } })
     }
 
@@ -69,7 +69,7 @@ class BundledKnowledgeTest {
     }
 
     @Test fun longBodyTruncatedWithHint() {
-        // 上限按 token:截后连同截断说明不超过上限,且几乎用满
+        // The limit is in tokens: after clipping, including the truncation note, it stays within the limit and nearly fills it
         val clipped = clipKnowledge("字".repeat(KNOWLEDGE_BODY_LIMIT * 2))
         assertTrue(clipped.startsWith("字".repeat(KNOWLEDGE_BODY_LIMIT)))
         assertTrue(clipped.endsWith("\n" + KNOWLEDGE_TRUNCATED_HINT))

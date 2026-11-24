@@ -89,7 +89,7 @@ class MemoryToolsTest {
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 网页上读到的字也不算用户说的话
+    // Text read from a web page does not count as the user's words either
     @Test fun quoteFromWebPageRejected() {
         val web = com.wangzan101.mika.core.cap.web.FakeWebPort()
         web.page = web.page.copy(text = "收货人 张三 地址 浦东张江路100号")
@@ -163,7 +163,7 @@ class MemoryToolsTest {
         val d = toolDispatcher(FakeScreen())
         assertFalse(d.definitions().any { it.name.startsWith("memory_") })
         assertEquals("unknown_tool", d.run("memory_save", saveArgs("fact", "x", "x")).s("error"))
-        // 只给其中一样也不提供
+        // Providing only one of them does not offer the tools either
         assertFalse(dispatcher(memStore(), null).definitions().any { it.name.startsWith("memory_") })
         assertTrue(dispatcher(memStore(), UserUtterances()).definitions().map { it.name }.containsAll(listOf("memory_search", "memory_save", "memory_edit")))
     }
@@ -195,7 +195,7 @@ class MemoryToolsTest {
         assertEquals(2, store.items.value.size)
         val tools = events.filter { it is RunEvent.ModelReply || it is RunEvent.ToolResult }.joinToString("\n") { RunEvent.encode(it) }
         for (secret in listOf("不要香菜", "漕河泾", "老婆的手机号")) assertFalse(secret, tools.contains(secret))
-        assertTrue(tools.contains("preference")) // 编号、种类照记
+        assertTrue(tools.contains("preference")) // id and kind are still recorded
     }
 
     @Test fun sourceCarriesConversationAndStoreClock() {
@@ -213,13 +213,13 @@ class MemoryToolsTest {
         val r = d.run("memory_save", saveArgs("fact", "用户的收货地址是浦东张江路100号", "以后都寄这里"))
         assertEquals("content_not_from_user", r.s("error"))
         assertTrue(store.items.value.isEmpty())
-        // 用户自己说出的具体值可以
+        // Specific values the user stated themselves are fine
         val ok = dispatcher(store, UserUtterances().apply { add("以后都寄到张江路100号") })
             .run("memory_save", saveArgs("fact", "用户的收货地址是浦东张江路100号", "以后都寄到张江路100号"))
         assertEquals("true", ok.s("ok"))
     }
 
-    // 转述时换个说法,难免带出「知道」「公园」「味道」这类以「道、园、里、市…」结尾的普通词:它们不是地址,不能算成用户没说过的具体值
+    // Rephrasing naturally brings out ordinary words such as "know", "park" or "taste" that end in characters also used as place-name suffixes (road, garden, lane, city, …): they are not addresses and must not count as specific values the user never said
     @Test fun ordinaryWordsThatEndLikeAPlaceNameAreNotTakenForDetails() {
         val cases = listOf(
             "记住我周末喜欢逛公园" to "用户周末喜欢去公园散步",
@@ -241,7 +241,7 @@ class MemoryToolsTest {
         assertEquals("true", ok.s("ok"))
     }
 
-    // 真的地址片段照旧要用户说过才行:路名、小区名、行政区、带号的楼
+    // Real address fragments still require the user to have said them: street names, residential compound names, administrative districts, numbered buildings
     @Test fun realAddressFragmentsStillNeedTheUsersWords() {
         val said = "帮我把这个地址记下来,以后都寄这里"
         fun bad(content: String) = UserUtterances().apply { add(said) }.unsupportedMemorySpecifics(content, said)
@@ -251,30 +251,30 @@ class MemoryToolsTest {
         assertEquals(listOf("幸福村"), bad("用户老家在幸福村"))
         assertEquals(listOf("万科小区"), bad("用户住在万科小区"))
         assertTrue(bad("用户住在人民路附近,常去公园").contains("人民路"))
-        // 同时也是普通词的地名后缀、跟在真地名后面的方位说法:照样算
+        // Place-name suffixes that are also ordinary words, and directional wording that follows a real place name, still count
         assertEquals(listOf("安大街"), bad("用户住在长安大街"))
         assertEquals(listOf("福家园"), bad("用户住在幸福家园"))
         assertEquals(listOf("贸大楼"), bad("用户在国贸大楼上班"))
         assertEquals(listOf("福社区"), bad("用户住在幸福社区"))
         assertTrue(bad("用户常去人民路上的店").contains("人民路"))
-        // 行政区划后面直接跟着机构名:拆开看像「市民」「区分」「省事」「村民」,地名照样算
+        // An administrative division directly followed by an institution name splits into things that read like "citizen", "distinguish", "save trouble" or "villager", yet the place name still counts
         assertEquals(listOf("南京市"), bad("用户在南京市民政局工作"))
         assertEquals(listOf("朝阳区"), bad("用户在朝阳区分局上班"))
         assertEquals(listOf("广东省"), bad("用户在广东省事业单位工作"))
         assertEquals(listOf("李家村"), bad("用户在李家村民委员会办过事"))
-        // 以「一路」「马路」「山区」结尾的真地名
+        // Real place names ending in "…1st Road", "road" or "mountain district"
         assertEquals(listOf("技一路"), bad("用户的公司在科技一路"))
         assertEquals(listOf("宝山区"), bad("用户住在宝山区"))
         assertEquals(listOf("大马路"), bad("用户住在大马路"))
         assertTrue(bad("用户家在张江路口").contains("张江路"))
         assertTrue(bad("用户住在李家村里").contains("李家村"))
         assertTrue("3" in bad("用户住在3号楼"))
-        // 用户自己说过的照收
+        // Those the user said themselves are still accepted
         val own = "记住我住在张江路的一品苑"
         assertEquals(emptyList<String>(), UserUtterances().apply { add(own) }.unsupportedMemorySpecifics("用户住在张江路一品苑", own))
     }
 
-    // 按规矩不收的是对这一条的答复,不是操作故障:结果里标明不计入连续失败,仍是不可恢复(同一条别再试)
+    // A rules-based refusal is an answer to this call, not an operation failure: the result says it does not count toward consecutive failures, yet it stays unrecoverable (do not retry the same one)
     @Test fun rulesBasedRefusalsDoNotCountAsOperationFailures() {
         val store = memStore()
         val d = dispatcher(store, UserUtterances().apply { add("帮我把这个地址记下来,以后都寄这里") })
@@ -290,7 +290,7 @@ class MemoryToolsTest {
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 同一条不收的原样再来:第一次是答复,第二次起照常算失败(模型没听「别再试」)
+    // Repeating the same refused call verbatim: the first is an answer, from the second on it counts as a failure as usual (the model ignored "do not retry")
     @Test fun repeatingARefusedSaveCountsAsAFailure() {
         val d = dispatcher(memStore(), UserUtterances().apply { add("帮我把这个地址记下来,以后都寄这里") })
         val args = saveArgs("fact", "用户的收货地址是浦东张江路100号", "以后都寄这里")
@@ -298,11 +298,11 @@ class MemoryToolsTest {
         val again = d.run("memory_save", args)
         assertEquals("content_not_from_user", again.s("error"))
         assertFalse(again.containsKey("counts_as_failure"))
-        // 换一条内容,又是头一回
+        // With different content it is a first time again
         assertEquals("false", d.run("memory_save", saveArgs("fact", "用户的收货地址是浦东张江路200号", "以后都寄这里")).s("counts_as_failure"))
     }
 
-    // 要改、要删的各种平常说法都认(「改得简洁一点」「精简一下」「合并」「去掉」);说了不要的、只是问问的、没提要改的不认
+    // Everyday ways of asking to edit or delete are recognized ("make it more concise", "trim it", "merge", "remove"); requests that say not to, only ask a question, or do not ask for an edit are not recognized
     @Test fun everydayWaysOfAskingToEditAreRecognised() {
         fun attempt(said: String, op: String): JsonObject {
             val store = memStore()
@@ -314,7 +314,7 @@ class MemoryToolsTest {
         for (ask in listOf(
             "把外卖那条记忆的改的简洁一点", "把外卖那条改得短一些", "外卖那条改一下", "外卖那条精简一下", "把外卖这几条合并成一条",
             "整理一下外卖那条记忆", "把外卖那条换成新的说法", "把外卖那条修改一下", "Please shorten the takeaway memory", "Rewrite that memory",
-            // 「能不能改」「要不要改」是在请它改,不是不让改
+            // "Can it be changed" and "should it be changed" are asking for an edit, not forbidding one
             "外卖那条能不能改得简洁一点", "外卖那条可不可以改短",
         )) assertEquals(ask, "true", attempt(ask, "update").s("ok"))
         for (ask in listOf("把外卖那条删了", "外卖那条去掉", "把外卖那条清掉", "外卖那条不用留了,移除吧", "Erase the takeaway memory", "能不能删掉外卖那条")) {
@@ -328,11 +328,11 @@ class MemoryToolsTest {
             "If I asked you to delete that memory, what would you do?")) {
             assertEquals(no, "edit_not_requested", attempt(no, "delete").s("error"))
         }
-        // 条件句本身是要记的内容、没有在问「你会怎么做」:照改
+        // The conditional clause is itself the content to remember, not a question about "what would you do": edit as usual
         assertEquals("true", attempt("把外卖那条改成:如果我说老样子,就是不要香菜", "update").s("ok"))
     }
 
-    // 「把那条改得简洁一点」:条目里本来就有的地址、数字照样带着,不算新补的;另外补进来的还是不收
+    // "Make that entry more concise": the addresses and numbers the entry already had are kept and do not count as newly added; anything else added in is still refused
     @Test fun rewordingAnEntryMayKeepTheDetailsItAlreadyHas() {
         val store = memStore()
         val item = store.add(MemoryKind.fact, "用户常在张江路100号附近点外卖,一周 3 次", listOf("外卖", "Meituan"), MemorySource("manual", atMs = 1)).getOrThrow().item
@@ -341,11 +341,11 @@ class MemoryToolsTest {
         val shorter = d.run("memory_edit", editArgs("update", item.id, "把外卖那条改的简洁一点", "用户常点张江路100号的外卖,每周 3 次"))
         assertEquals("true", shorter.s("ok"))
         assertEquals("用户常点张江路100号的外卖,每周 3 次", store.items.value.single().content)
-        // 原来没有、用户这一轮也没说的:不收,条目不动
+        // Not there before and not said by the user this turn: refused, entry untouched
         val added = d.run("memory_edit", editArgs("update", item.id, "把外卖那条改的简洁一点", "用户常点张江路100号和世纪大道200号的外卖"))
         assertEquals("content_not_from_user", added.s("error"))
         assertEquals("用户常点张江路100号的外卖,每周 3 次", store.items.value.single().content)
-        // 关键词里原来就有的也算
+        // Keywords the entry already had count as well
         val args = buildJsonObject {
             put("op", "update"); put("id", item.id); put("quote", "把外卖那条改的简洁一点"); put("content", "用户常点张江路100号的外卖")
             putJsonArray("keywords") { add(kotlinx.serialization.json.JsonPrimitive("Meituan")) }
@@ -353,7 +353,7 @@ class MemoryToolsTest {
         assertEquals("true", d.run("memory_edit", args).s("ok"))
     }
 
-    // Claire 自己归纳的那条改写之后还是它归纳的;用户这一轮把内容亲口说了的,才改记成用户说的
+    // An entry Claire inferred stays marked as inferred after rewording; only when the user said the content themselves this turn is it recorded as said by the user
     @Test fun rewordingMikasOwnConclusionKeepsItMarkedAsSuch() {
         val store = memStore(inferenceAllowed = { true })
         val item = store.add(MemoryKind.fact, "用户常在张江路100号附近点外卖", listOf("外卖"),
@@ -363,12 +363,12 @@ class MemoryToolsTest {
         assertEquals("true", d.run("memory_edit", editArgs("update", item.id, "把外卖那条改的简洁一点", "用户常点张江路100号的外卖")).s("ok"))
         assertEquals(MemoryContext.INFERRED, store.items.value.single().source.type)
         assertEquals("true", d.search("外卖")["memories"]!!.jsonArray.single().jsonObject.s("inferred"))
-        // 用户亲口说了新的内容:这一条现在是用户说的
+        // The user said the new content themselves: this entry now counts as said by the user
         assertEquals("true", d.run("memory_edit", editArgs("update", item.id, "把外卖那条改成我常点世纪大道200号的外卖", "用户常点世纪大道200号的外卖")).s("ok"))
         assertEquals("user_said", store.items.value.single().source.type)
     }
 
-    // 改记忆也一样:没明确要改、新内容里有用户没说过的具体值,都是对这一条的答复,不计入连续失败
+    // Editing is the same: no explicit request to change, or new content with specific values the user never said, both are answers to this call and do not count toward consecutive failures
     @Test fun refusedEditsDoNotCountAsOperationFailuresEither() {
         val store = memStore()
         val item = store.add(MemoryKind.fact, "用户家住浦东", listOf("地址"), MemorySource("manual", atMs = 1)).getOrThrow().item
@@ -384,13 +384,13 @@ class MemoryToolsTest {
         }
         assertTrue("改的那条说的是「没改」,不是「没存」", "Nothing was changed" in notSaid.s("message"))
         assertEquals("用户家住浦东", store.items.value.single().content)
-        // 真的故障照旧计数:没搜过就改,属于用法不对,模型应当重来
+        // Real failures still count as before: editing without a prior search is a misuse, and the model should retry
         val missing = d.run("memory_edit", editArgs("update", "nope", "把那条地址改成我现在住的地方", "用户家住张江"))
         assertEquals("not_found", missing.s("error"))
         assertFalse(missing.containsKey("counts_as_failure"))
     }
 
-    // ---- 「让 Claire 自己归纳着记」:开着、用户这一轮又亲口让它记时,带着用户没说过的具体值的内容照存,来源标成 Claire 归纳的 ----
+    // ---- "let Claire record its own inferences": with the switch on, when the user again explicitly asked it to remember this turn, content carrying specific values the user never said is still saved and its source is marked as inferred by Claire ----
 
     private val askedToSum = "根据今天的消息看看我是个什么样的人,然后写入一些你觉得合适的东西到记忆里"
 
@@ -403,11 +403,11 @@ class MemoryToolsTest {
         assertTrue(r.s("note").contains("not as something the user said"))
         val item = store.items.value.single()
         assertEquals(MemoryContext.INFERRED, item.source.type)
-        // 引的是用户提要求的那句话
+        // The quote is the sentence in which the user made the request
         assertEquals("写入一些你觉得合适的东西到记忆里", item.source.quote)
     }
 
-    // 关着(默认)时照旧不收:上游原来的规矩不变
+    // Switched off (the default) it is still refused: the upstream rules are unchanged
     @Test fun ownConclusionsAreRefusedByDefault() {
         val store = memStore()
         val r = dispatcher(store, UserUtterances().apply { add(askedToSum) })
@@ -417,7 +417,7 @@ class MemoryToolsTest {
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 开关每次保存时现读:用户在页面上一改就生效
+    // The switch is read fresh on every save: a change on the settings page takes effect immediately
     @Test fun theSwitchIsReadOnEverySave() {
         var on = false
         val store = memStore(inferenceAllowed = { on })
@@ -431,7 +431,7 @@ class MemoryToolsTest {
         assertEquals(1, store.items.value.size)
     }
 
-    // 开着也只是多收「归纳的」:用户亲口说的照旧记成用户说的,不带归纳的标记
+    // Switched on only adds inferred entries: what the user said themselves is still recorded as said by the user, without the inferred mark
     @Test fun whatTheUserSaidStaysUserSaidWithTheSwitchOn() {
         val store = memStore(inferenceAllowed = { true })
         val r = dispatcher(store, UserUtterances().apply { add("记住以后都寄到张江路100号") })
@@ -441,7 +441,7 @@ class MemoryToolsTest {
         assertEquals("user_said", store.items.value.single().source.type)
     }
 
-    // 只有关键词里带着用户没说过的具体值,也算归纳的
+    // Unsupported specific values in the keywords alone also make it inferred
     @Test fun unsupportedKeywordsAloneMakeTheSaveInferred() {
         val store = memStore(inferenceAllowed = { true })
         val args = buildJsonObject {
@@ -453,7 +453,7 @@ class MemoryToolsTest {
         assertEquals(MemoryContext.INFERRED, store.items.value.single().source.type)
     }
 
-    // 开着也不是见什么收什么:引文还得是用户的话,敏感信息还是不收
+    // Being on does not mean accepting anything: the quote must still be the user's words, and sensitive information is still refused
     @Test fun theSwitchDoesNotLoosenQuoteOrSensitiveChecks() {
         val store = memStore(inferenceAllowed = { true })
         val d = dispatcher(store, UserUtterances().apply { add(askedToSum) })
@@ -462,7 +462,7 @@ class MemoryToolsTest {
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 用户这一轮没让它记:随便一句话不能拿来当引文,把屏幕、网页上的字存进来
+    // The user did not ask it to remember this turn: an arbitrary sentence cannot serve as the quote for storing text from the screen or a web page
     @Test fun inferredSavesNeedARequestToRememberInTheQuotedMessage() {
         val store = memStore(inferenceAllowed = { true })
         val d = dispatcher(store, UserUtterances().apply { add("帮我看看这个网页上写了什么") })
@@ -470,14 +470,14 @@ class MemoryToolsTest {
         assertEquals("inference_not_requested", r.s("error"))
         assertEquals("false", r.s("counts_as_failure"))
         assertEquals("false", r.s("recoverable"))
-        // 说了别记的也不收
+        // Saying not to remember is refused too
         val no = dispatcher(store, UserUtterances().apply { add("这些地址不要记到记忆里,帮我核对一下就行") })
             .run("memory_save", saveArgs("fact", "用户的收货地址是浦东张江路100号", "帮我核对一下就行"))
         assertEquals("inference_not_requested", no.s("error"))
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 一轮里说了两句:得引让它记的那一句
+    // Two sentences in one turn: the quote must be the one that asked it to remember
     @Test fun theRequestMustBeInTheMessageThatIsQuoted() {
         val store = memStore(inferenceAllowed = { true })
         val d = dispatcher(store, UserUtterances().apply { add("帮我看看这个网页上写了什么"); add("顺便总结几条写进记忆") })
@@ -485,7 +485,7 @@ class MemoryToolsTest {
         assertEquals("true", d.run("memory_save", saveArgs("fact", "用户关注张江路的房价", "总结几条写进记忆")).s("inferred"))
     }
 
-    // 上一轮的确认可以当用户原话的引文,但不算这一轮让它归纳着记
+    // A confirmation from a previous turn can serve as a quote of the user's words, but does not count as asking it to infer and record this turn
     @Test fun aPreviousConfirmationIsNotARequestToSaveConclusions() {
         val store = memStore(inferenceAllowed = { true })
         val said = UserUtterances().apply {
@@ -497,7 +497,7 @@ class MemoryToolsTest {
         assertTrue(store.items.value.isEmpty())
     }
 
-    // 中文、英文里让它记的说法认得出来(句首大写、弯引号也认);别的话、别的语言一律按没让它记
+    // Requests to remember are recognized in Chinese and English (sentence-initial capitalization and curly quotes too); other phrasings and all other languages are treated as no request
     @Test fun requestsToRememberAreRecognisedInChineseAndEnglishOnly() {
         fun save(said: String, quote: String = said): JsonObject =
             dispatcher(memStore(inferenceAllowed = { true }), UserUtterances().apply { add(said) })
@@ -506,9 +506,9 @@ class MemoryToolsTest {
             "根据今天的消息来觉认为我是个什么样的人,然后写,然后写入一些你觉得合适的东西到记忆里", "你自己总结一下记下来", "幫我歸納幾條存到記憶裡",
             "把你觉得重要的加到记忆里", "别忘了这些", "你能不能帮我记住这些", "Remember whatever you think matters about me", "Save a few notes about my habits",
             "Please add what matters to your memory",
-            // 被拒之后用户顺口回的几种短句
+            // A few short replies the user may add casually right after a refusal
             "那就记吧", "都存吧,没关系", "这几条都记上", "存起来吧",
-            // 让记,只是其中一样不让记:整句引来,让记的那半句算数
+            // It asks to remember but forbids one item: quote the whole sentence and the half that asks counts
             "总结几条写进记忆,别记我的手机号", "Save a summary of my habits, but don't save my phone number",
             "别记错了,把这些记到记忆里", "别忘了把这些记下来",
         )
@@ -516,23 +516,23 @@ class MemoryToolsTest {
         val plain = listOf(
             "帮我看看聊天记录里有什么", "这个地址存在吗,查一下", "我不记得了,你查查看", "What is on this page?",
             "这些不要记到记忆里,帮我核对一下就行", "先别存,我再想想", "别把这些存进去", "不用帮我记",
-            // 光提到「记忆」「memory」这个词不算让它记
+            // Merely mentioning the word "memory" does not count as asking it to remember
             "你记忆功能是怎么工作的?", "This page has a memory error; explain what it means.", "Do you remember what I said yesterday?",
-            // 不让记:直引号、弯引号都认
+            // Asking not to remember: both straight and curly quotes are recognized
             "Don't remember any of this", "Don’t remember any of this", "Please do not save anything from this page",
-            // 别的语言暂不认(改删记忆也只认中英文):让记的、不让记的都按没让它记
+            // Other languages are not recognized yet (memory edits and deletes are Chinese/English only too): both asking to remember and asking not to are treated as no request
             "これまでの内容をまとめて覚えておいて", "この情報を記憶しないでください", "지금까지 내용을 정리해서 기억해 줘", "이 정보는 기억하지 마세요",
             "Recuerda lo que creas importante sobre mí", "No guardes nada de esta página", "Запомни, что считаешь важным обо мне", "Не сохраняй эту информацию",
         )
         for (p in plain) assertTrue("$p -> ${save(p)}", save(p).toString().contains("inference_not_requested"))
-        // 引的是不让记的那半句:后半句的「记住」不能借给它;引让记的那半句才收
+        // The quote is the half that forbids remembering: the "remember" in the other half cannot be borrowed for it; only quoting the half that asks is accepted
         val mixed = "别记我的地址,记住我喜欢喝茶"
         assertEquals("inference_not_requested", save(mixed, "别记我的地址").s("error"))
         assertTrue(save(mixed, "记住我喜欢喝茶").toString().contains("\"inferred\":true"))
         assertEquals("inference_not_requested", save("Don't save my address. Remember that I like tea.", "Don't save my address").s("error"))
     }
 
-    // 查出来的时候标明哪几条是归纳的;给核查的材料里,它们是工具查到的事实,不算用户给的事实
+    // Search results mark which entries are inferred; in the material given to verification they are facts found by a tool, not facts provided by the user
     @Test fun inferredMemoriesAreMarkedInSearchAndKeptOutOfUserFacts() {
         val store = memStore(inferenceAllowed = { true })
         store.add(MemoryKind.preference, "用户点外卖不要香菜", listOf("外卖"), MemorySource("manual", atMs = 1)).getOrThrow()
@@ -581,7 +581,7 @@ class MemoryToolsTest {
     @Test fun placeNamesAndKeywordsChecked() {
         assertEquals("content_not_from_user", saveWith("以后都寄到我家", "用户家在汤臣一品苑", "以后都寄到我家").s("error"))
         assertEquals("content_not_from_user", saveWith("以后都寄到我家", "用户的收货地址在家里", "以后都寄到我家", listOf("张江路100号")).s("error"))
-        // 第三人称转述本身不算从屏幕抄来的
+        // Third-person rephrasing alone does not count as copied from the screen
         assertEquals("true", saveWith("我家里有只猫", "用户家里有猫", "我家里有只猫").s("ok"))
     }
 

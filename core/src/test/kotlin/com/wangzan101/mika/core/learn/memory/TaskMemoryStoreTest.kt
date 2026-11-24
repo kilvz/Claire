@@ -58,9 +58,9 @@ class TaskMemoryStoreTest {
         val s = TaskMemoryStore(p, clock = { now }, ids = { "id${++seq}" })
         assertFalse(s.available)
         assertTrue(s.items.value.isEmpty())
-        assertFalse(s.add(task("new"))) // 前两次读都失败,拒绝写入
+        assertFalse(s.add(task("new"))) // the first two reads both fail, so writes are refused
         assertEquals(0, p.saves)
-        // 第三次读到了:原有的还在,新的加在后面
+        // the third read succeeds: the existing items are kept and the new one is appended
         assertTrue(s.add(task("new")))
         assertTrue(s.available)
         assertEquals(listOf("old", "new"), p.stored.map { it.id })
@@ -72,7 +72,7 @@ class TaskMemoryStoreTest {
             override fun save(items: List<TaskMemory>) = Unit
         }
         val s = TaskMemoryStore(p, clock = { now }, ids = { "id${++seq}" })
-        s.clearAll() // 清除不依赖读到文件
+        s.clearAll() // clearing does not depend on reading the file
         assertTrue(s.available)
         assertTrue(s.items.value.isEmpty())
     }

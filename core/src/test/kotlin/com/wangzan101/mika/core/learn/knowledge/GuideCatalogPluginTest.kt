@@ -74,7 +74,7 @@ class GuideCatalogPluginTest {
 
     @Test fun pluginSkillsBelongToSkillKindsOnly() {
         val c = catalog(feishu)
-        // 内置目录里本来就有飞书相关的 App/站点知识,插件技能不能出现在那一组
+        // The built-in catalog already has Feishu-related app/site knowledge, so a plugin skill must not appear in that group
         assertTrue(c.find("feishu", among = KNOWLEDGE_KINDS).none { it.kind == PLUGIN_KIND })
         assertTrue(c.find("飞书", among = SKILL_KINDS).any { it.name == feishu.name })
     }

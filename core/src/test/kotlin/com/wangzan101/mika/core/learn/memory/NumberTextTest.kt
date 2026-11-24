@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.learn.memory
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 记忆校验与技能脱敏共用的数字归一化:不同语言写出的十进制数字必须落到同一串 ASCII。 */
+/** Number normalization shared by memory validation and skill redaction: decimal numbers written in different scripts must collapse to the same ASCII string. */
 class NumberTextTest {
     @Test fun separatesAndCollapsesAsciiDigits() {
         assertEquals("13800138000", NumberText.collapse("138 0013 8000"))

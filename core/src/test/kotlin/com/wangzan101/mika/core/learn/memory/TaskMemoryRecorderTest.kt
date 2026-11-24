@@ -16,7 +16,7 @@ class TaskMemoryRecorderTest {
         RunEvent.Observed(step * 100L, step, text, kind = ObsKind.Read.wire, place = place)
 
     @Test fun skipsFragmentsThatNeverActed() {
-        // 只读了一屏、没做动作:不记
+        // Only one screen was read and nothing was done: not recorded
         val events: List<RunEvent> = listOf(read(1, "一屏", Place.app("com.x")))
         assertNull(TaskMemoryRecorder.record("看看", events, 0L, "id"))
     }
@@ -68,6 +68,6 @@ class TaskMemoryRecorderTest {
         val longGoal = "字".repeat(500)
         val events: List<RunEvent> = listOf(act(1, "click", "tap", target = "com.x"), RunEvent.OutcomeJudged(1L, "done", "好"))
         val m = TaskMemoryRecorder.record(longGoal, events, 0L, "id")!!
-        assertTrue(m.goal.length <= 121) // 120 + 省略号
+        assertTrue(m.goal.length <= 121) // 120 + ellipsis
     }
 }
