@@ -73,7 +73,7 @@ class LegacyVoiceMigration(
                 models = models.values.toList(),
                 selections = VoiceSelections(
                     stt = legacySpeech.selection.toSttSelection(),
-                    // 全新安装(没有旧朗读选择)默认落在内置系统 TTS;已有的云端选择原样保留。
+                    // A fresh install (no legacy read-aloud choice) defaults to the built-in system TTS; an existing cloud choice is kept as it is.
                     tts = legacyTts.choice?.ref() ?: TtsSelectionController.SYSTEM_TTS_REF,
                     realtime = legacyRealtime.profiles.firstOrNull {
                         it.profile.id == legacyRealtime.activeProfileId

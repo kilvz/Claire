@@ -77,7 +77,7 @@ object VoicePresets {
     fun apply(manager: VoiceAccountManager, catalog: VoiceCatalogStore, plan: VoicePresetPlan): List<VoiceModelRef> {
         manager.saveVoiceAccount(plan.service, plan.credentials)
         val keep = plan.models.map { it.id }.toSet()
-        // 拉取到的、手填的模型不属于预设,换 key 时留着(下一次刷新会按新账号重拉)
+        // Fetched and manually typed models are not part of the preset and are kept when the key changes (the next refresh re-fetches them under the new account)
         catalog.state.value.models.filter {
             it.serviceId == plan.service.id && it.id !in keep && it.origin == VoiceModelOrigin.Builtin
         }.forEach { stale ->
@@ -143,7 +143,7 @@ object VoicePresets {
         val tts = p.ttsModel.trim()
         val realtime = p.realtimeModel.trim()
         if (stt.isEmpty() && tts.isEmpty() && realtime.isEmpty()) throw VoiceModelError.IncompleteConfig("Enter at least one model")
-        // 同名模型合并成一条,多种能力挂在同一个模型上
+        // Models with the same id merge into one entry, with multiple capabilities on the same model
         val byId = linkedMapOf<String, VoiceModel>()
         fun put(modelId: String, change: (VoiceModel) -> VoiceModel) {
             byId[modelId] = change(byId[modelId] ?: VoiceModel(id, modelId, modelId))

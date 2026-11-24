@@ -19,15 +19,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 
 /**
- * 录 16k 单声道 16 位 PCM。start 后每约 [chunkMs] 毫秒更新一次 [level](0..1,按每块 RMS 归一化),
- * 每块读一次 [android.media.AudioRecordingConfiguration.isClientSilenced] 更新 [silenced](系统把麦克风静音置 true,比如别的组件占用时);
- * stop 返回到目前为止的全部 PCM;录满 [maxMs] 自动停止,之后再 stop 仍返回已录的内容。
- * 录音权限由调用方先检查,这里拿不到麦克风就返回 false。stop 会短暂阻塞(等读循环退出),别在主线程调。
+ * Records 16 kHz mono 16-bit PCM. After start it updates [level] about every [chunkMs] milliseconds (0..1, normalized per chunk by RMS),
+ * reads [android.media.AudioRecordingConfiguration.isClientSilenced] once per chunk to update [silenced] (true when the system mutes the microphone, e.g. while another component is using it);
+ * stop returns all PCM captured so far; recording stops automatically once [maxMs] is reached, and a later stop still returns the captured content.
+ * The caller checks the recording permission first; when the microphone cannot be obtained here it returns false. stop blocks briefly (waiting for the read loop to exit), so do not call it on the main thread.
  */
 class PcmRecorder(
     private val maxMs: Int = 60_000,
     private val streaming: Boolean = false,
-    /** 流式时不留整段录音、录多久都行(不预留 [maxMs] 的缓冲,也不到点自停);[stop] 返回空。用于不封顶的会话。 */
+    /** When streaming, keeps no full recording and records for any duration (no [maxMs] buffer is reserved and it does not auto-stop at the limit); [stop] returns empty. Used for sessions without a cap. */
     private val unbounded: Boolean = false,
     internal val inputSource: Int = MediaRecorder.AudioSource.MIC,
     chunkMs: Int = 50,
@@ -48,7 +48,7 @@ class PcmRecorder(
     private var pcm = ShortArray(0)
     private var size = 0
 
-    @SuppressLint("MissingPermission") // 权限由调用方在 start 之前检查
+    @SuppressLint("MissingPermission") // The caller checks the permission before start
     override fun start(): Boolean {
         synchronized(lock) {
             if (record != null) return false
@@ -97,16 +97,16 @@ class PcmRecorder(
                 synchronized(lock) {
                     if (streaming && record === rec) audio.close(IOException("Audio capture failed"))
                 }
-                break // 读失败或已被停掉
+                break // Read failed or recording was already stopped
             }
             var sum = 0.0
             for (i in 0 until n) sum += buf[i].toDouble() * buf[i]
             val lvl = (sqrt(sum / n) / 8000.0).coerceIn(0.0, 1.0).toFloat()
             val full = synchronized(lock) {
-                if (record !== rec) return // 已被 stop/cancel
-                // 在锁里、确认还没被停掉之后才写,免得 cancel 刚归零又被这一块的音量盖回去
+                if (record !== rec) return // Already stopped/cancelled
+                // Write only inside the lock and after confirming it has not been stopped, so a cancel that just reset the level is not overwritten by this chunk's volume
                 _level.value = lvl
-                // API 29 起;配置偶尔取不到时保留上次的值
+                // Since API 29; keep the previous value when the configuration is occasionally unavailable
                 rec.activeRecordingConfiguration?.let { _silenced.value = it.isClientSilenced }
                 val take = if (unbounded && streaming) n else minOf(n, pcm.size - size)
                 if (!(unbounded && streaming)) {
@@ -121,18 +121,18 @@ class PcmRecorder(
             }
             if (full) break
         }
-        // 录满自动停:释放麦克风,已录内容留给之后的 stop 取
+        // Auto-stop when full: release the microphone and leave the captured content for a later stop to take
         synchronized(lock) {
             if (record === rec) {
                 release(rec)
                 record = null
-                _level.value = 0f // 不录了,波形别停在最后一块的音量上
+                _level.value = 0f // No longer recording, so the waveform must not stay at the last chunk's level
             }
         }
         if (streaming) audio.close()
     }
 
-    /** 停止并返回到目前为止录到的全部 PCM;没在录(含已自动停止)也安全。 */
+    /** Stops and returns all PCM recorded so far; safe when not recording (including after it already auto-stopped). */
     override fun stop(): ShortArray {
         val (rec, j) = synchronized(lock) {
             val r = record
@@ -140,7 +140,7 @@ class PcmRecorder(
             if (r != null) release(r)
             r to job.also { job = null }
         }
-        // 等读循环退出,保证之后取到的 PCM 不再变
+        // Wait for the read loop to exit so the PCM taken afterwards no longer changes
         if (rec != null) runBlocking { j?.join() }
         if (streaming) audio.close()
         return synchronized(lock) {
@@ -152,7 +152,7 @@ class PcmRecorder(
         }
     }
 
-    /** 放弃这次录音,丢掉已录内容;可重复调用。 */
+    /** Abandons this recording and drops the captured content; safe to call repeatedly. */
     override fun cancel() {
         synchronized(lock) {
             record?.let { release(it) }

@@ -1,9 +1,9 @@
 package com.wangzan101.mika.voice
 
 /**
- * 按住期间识别服务结束了一段却没听到字(没匹配上、没开口、空结果)时,要不要重开、隔多久。
- * 正常的空段(用户停顿几秒)立刻重开;有的服务刚重开就又回空,连着很快回空就隔一会儿再开,
- * 太多次就不再重开、按已听到的收尾,免得主线程一直在开、错、开里打转。纯逻辑,时间由调用方给。
+ * While holding, decides whether to restart and after how long when the recognition service ends a segment without hearing words (no match, no speech, an empty result).
+ * A normal empty segment (the user pauses for a few seconds) restarts immediately; some services return empty again right after a restart, so when empties keep coming back quickly it waits a while before restarting,
+ * and after too many it stops restarting and finishes with what has been heard, so the main thread does not spin forever in start-error-start. Pure logic; the caller supplies the time.
  */
 class Restarts {
     sealed interface Decision {
@@ -14,7 +14,7 @@ class Restarts {
     private var quick = 0
     private var last = Long.MIN_VALUE
 
-    /** 又一段空的,[now] 是此刻(毫秒,单调时钟)。 */
+    /** Another empty segment; [now] is the current time (milliseconds, monotonic clock). */
     fun onEmpty(now: Long): Decision {
         quick = if (last != Long.MIN_VALUE && now - last <= WINDOW_MS) quick + 1 else 1
         last = now
@@ -25,18 +25,18 @@ class Restarts {
         }
     }
 
-    /** 听到了字:重新计数。 */
+    /** Words were heard: reset the count. */
     fun onSpeech() {
         quick = 0
         last = Long.MIN_VALUE
     }
 
     companion object {
-        /** 和上一次空段隔这么久以内算「很快又回空」。 */
+        /** Within this long after the previous empty segment counts as "empty again too soon". */
         const val WINDOW_MS = 2_000L
-        /** 连着这么多次很快回空之后开始隔一会儿再开。 */
+        /** After this many quick empties in a row, start waiting a while before restarting. */
         const val QUICK = 3
-        /** 连着很快回空超过这么多次就不再重开。 */
+        /** Stop restarting once quick empties in a row exceed this many. */
         const val MAX_QUICK = 8
         const val BACKOFF_MS = 250L
     }

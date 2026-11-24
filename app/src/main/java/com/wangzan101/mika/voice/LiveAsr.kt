@@ -30,49 +30,49 @@ import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
 /**
- * 文字控制帧 + 二进制 PCM 音频的流式识别(自建 Fun-ASR、百炼实时识别)。
- * 各家只在 [LiveAsrProtocol] 里不同:开场发什么、收尾发什么、怎么读服务端的消息;连接、上传、等终结果都在这里。
+ * Streaming recognition over text control frames plus binary PCM audio (self-hosted Fun-ASR, Bailian realtime recognition).
+ * Providers differ only in [LiveAsrProtocol]: what is sent to open, what is sent to close, and how server messages are read; connecting, uploading and waiting for the final result all live here.
  */
 internal interface LiveAsrProtocol {
-    /** 连上后先发的文字消息;发完等 [LiveAsrUpdate.Started] 才开始送音频。 */
+    /** Text messages sent first once connected; audio is only sent after [LiveAsrUpdate.Started] arrives. */
     fun opening(): List<String>
 
-    /** 录音结束、最后一包音频送完后发的文字消息;之后等 [LiveAsrUpdate.Ended]。 */
+    /** Text messages sent after recording ends and the last audio packet goes out; afterwards it waits for [LiveAsrUpdate.Ended]. */
     fun closing(): List<String>
 
-    /** 两包音频之间至少隔多少毫秒;0 表示来多少送多少(连上前攒下的音频尽快追上)。 */
+    /** Minimum milliseconds between two audio packets; 0 means send as fast as it arrives (audio buffered before connecting catches up as quickly as possible). */
     val packetGapMs: Long get() = 0
 
-    /** 读一条服务端消息(二进制消息按 UTF-8 文字读)。服务端报错时抛 [LiveAsrError]。 */
+    /** Reads one server message (binary messages are read as UTF-8 text). Throws [LiveAsrError] when the server reports an error. */
     fun read(message: String): LiveAsrUpdate
 }
 
 internal sealed interface LiveAsrUpdate {
-    /** 服务端准备好收音频了。 */
+    /** The server is ready to receive audio. */
     data object Started : LiveAsrUpdate
 
-    /** 到此刻的全文:[stable] 是已经定下的句子,[tail] 是还在变的那句。每次都是整份替换,不是增量。 */
+    /** The full text so far: [stable] are the finalized sentences, [tail] is the sentence still changing. Each update replaces the whole text; it is not an increment. */
     data class Text(val stable: String, val tail: String) : LiveAsrUpdate
 
-    /** 这次识别结束;[text] 为 null 时用最后一次 [Text] 的全文。 */
+    /** This recognition has ended; when [text] is null, the full text of the last [Text] is used. */
     data class Ended(val text: String? = null) : LiveAsrUpdate
 
-    /** 心跳、确认之类,不改文字。 */
+    /** Heartbeats, acknowledgements and the like; does not change the text. */
     data object None : LiveAsrUpdate
 }
 
-/** 服务端报的错:只带错误码,不带服务端原话(可能回显凭据或说的话)。[auth] 是鉴权、额度一类,界面指去设置。 */
+/** Error reported by the server: carries only the error code, not the server's own wording (which may echo credentials or what was said). [auth] covers authentication, quota and the like; the UI points to settings. */
 internal class LiveAsrError(val code: String, val auth: Boolean = false) : IOException("ASR error $code")
 
 internal interface LiveAsrSocket {
-    /** 服务端的消息;连接断了就关上(异常断开时带着原因)。 */
+    /** Server messages; closed when the connection drops (carrying the reason on abnormal disconnects). */
     val incoming: ReceiveChannel<String>
     fun sendText(text: String)
     fun sendAudio(pcm: ByteArray)
     fun close()
 }
 
-/** 独立的 OkHttp WebSocket:不跟随重定向(凭据只发往填的那个地址),读不设超时(说话时可能很久没有结果)。 */
+/** Standalone OkHttp WebSocket: does not follow redirects (credentials go only to the address that was entered) and reading has no timeout (results can take a long time while speaking). */
 internal class LiveAsrTransport(private val client: OkHttpClient = http) {
     suspend fun connect(url: String, headers: Map<String, String> = emptyMap()): LiveAsrSocket {
         val ready = CompletableDeferred<Unit>()
@@ -123,9 +123,9 @@ internal class LiveAsrTransport(private val client: OkHttpClient = http) {
 }
 
 /**
- * 边说边转时告诉服务说的是哪种语言;[Auto] 不指定,由服务自己判断。存的是 [code](也是百炼 `language_hints` 用的语言代码),
- * 只能往后加。自建 Fun-ASR 服务的提示词按中文语言名写(「语音转写成中文」),所以另有 [funAsrName]。
- * 服务能不能识别某种语言取决于它跑的模型(Fun-ASR-Nano 只有中、英、日,多语种版本更多)。
+ * Tells the service which language is spoken during live transcription; [Auto] specifies nothing and lets the service decide. It stores [code] (also the language code Bailian `language_hints` uses),
+ * which may only be appended to. The self-hosted Fun-ASR service takes its prompt written with the Chinese language name (e.g. "transcribe the speech into Chinese"), hence the separate [funAsrName].
+ * Whether a service can recognize a language depends on the model it runs (Fun-ASR-Nano covers only Chinese, English and Japanese; multilingual versions cover more).
  */
 enum class AsrLanguage(val code: String, val funAsrName: String) {
     Auto("", ""),
@@ -137,17 +137,17 @@ enum class AsrLanguage(val code: String, val funAsrName: String) {
     ;
 
     companion object {
-        /** 读不出来、不认识的一律当 [Auto],不让整条选择失效。 */
+        /** Anything unreadable or unrecognized falls back to [Auto] so the whole selection does not become invalid. */
         fun of(code: String?): AsrLanguage = entries.firstOrNull { it.code == code } ?: Auto
     }
 }
 
-/** 拼文字:前后两段都是拉丁字母或数字时中间补一个空格,中文直接接上。 */
+/** Joins text: a space is inserted when the characters on both sides are Latin letters or digits; Chinese joins directly. */
 internal fun joinAsr(parts: List<String>): String = parts.filter(String::isNotEmpty).fold("") { acc, s ->
     if (acc.isNotEmpty() && acc.last().isLetterOrDigit() && acc.last().code < 128 && s.first().isLetterOrDigit() && s.first().code < 128) "$acc $s" else acc + s
 }
 
-/** 小端 PCM16。 */
+/** Little-endian PCM16. */
 internal fun pcmBytes(pcm: ShortArray, size: Int = pcm.size): ByteArray {
     val data = ByteBuffer.allocate(size * 2).order(ByteOrder.LITTLE_ENDIAN)
     for (i in 0 until size) data.putShort(pcm[i])
@@ -155,9 +155,9 @@ internal fun pcmBytes(pcm: ShortArray, size: Int = pcm.size): ByteArray {
 }
 
 /**
- * 一次按住说话:录音和上传、收结果同时进行;松开后送完剩下的音频和收尾消息,等服务端说结束才给 Final。
- * 断开、超时都算失败,不把没收完的中间结果当最终文字交出去(交出去的字会接着发给模型)。
- * 按住多久都行([unlimited]):只有连接、等开始、等终结果各有时限,整次会话不设上限。
+ * One hold-to-talk session: recording, uploading and receiving results all run at once; after release the remaining audio and the closing messages are sent, and Final is emitted only once the server says it ended.
+ * Disconnects and timeouts count as failures; unfinished intermediate text is never handed out as the final text (handed-out text is sent on to the model).
+ * Holding is unlimited ([unlimited]): only connecting, waiting for the start and waiting for the final result have time limits; the session as a whole has no cap.
  */
 internal class LiveSpeech(
     private val recorder: StreamingRecorder,
@@ -171,7 +171,7 @@ internal class LiveSpeech(
     private val out = SessionEvents()
     override val events: Flow<SpeechEvent> = out.flow
     override val live = true
-    // 边说边传、不攒整段录音:按住多久都行
+    // Upload while speaking and never buffer the whole recording: hold for as long as you like
     override val unlimited = true
     private var work: Job? = null
     private var levels: Job? = null
@@ -194,7 +194,7 @@ internal class LiveSpeech(
                 socket = connection
                 protocol.opening().forEach(connection::sendText)
                 var text = LiveAsrUpdate.Text("", "")
-                // 服务端确认前不送音频;这期间的录音留在录音器的队列里
+                // Send no audio before the server confirms; audio recorded meanwhile stays in the recorder's queue
                 withTimeout(connectTimeoutMs) {
                     while (true) {
                         when (val u = protocol.read(connection.incoming.receive())) {
@@ -286,15 +286,15 @@ internal class LiveSpeech(
     }
 
     companion object {
-        /** 100 ms 一包(16 kHz 单声道)。 */
+        /** One packet per 100 ms (16 kHz mono). */
         const val PACKET_SAMPLES = 1600
     }
 }
 
 /**
- * 不说话只走开场:连得上、服务端回了「开始」(地址、鉴权、模型都认)就算通,随后发收尾消息、断开。
- * 设置页保存前用,不送音频,不产生识别时长;不等服务端对空识别的收尾回应(各家对没有音频的识别怎么收尾不一定)。
- * 失败抛 [LiveAsrError]、[ModelError] 或 IOException。
+ * Opening only, without speaking: it counts as reachable when the connection succeeds and the server replies with "started" (address, authentication and model all accepted); the closing messages are then sent and the socket closed.
+ * Used before saving on the settings page; sends no audio and consumes no recognition time; does not wait for the server's closing reply to an empty recognition (services differ on how they close a recognition with no audio).
+ * Throws [LiveAsrError], [ModelError] or IOException on failure.
  */
 internal suspend fun probeLiveAsr(protocol: LiveAsrProtocol, connect: suspend () -> LiveAsrSocket, timeoutMs: Long = 8_000) {
     withTimeout(timeoutMs) {

@@ -4,39 +4,39 @@ import kotlin.math.abs
 import kotlin.math.floor
 
 /**
- * 一段话说得长、识别服务只解最近一截(解码窗口)时,把一份份中间结果接成到此刻的全文。纯逻辑。
+ * When an utterance runs long and the recognition service only decodes the most recent stretch (the decoding window), stitches the successive intermediate results into the full text so far. Pure logic.
  *
- * [carried] 是已经留住的字,[tail] 是还在变的那截,界面上两截直接相连。窗口往后挪了一份新结果进来时:
- * 1. 先找新结果的开头落在已显示的字里的哪个位置:只比字母和数字(标点、空格、大小写不算),
- *    拿新结果开头 [LOOK] 个字逐个位置对,对上最多的那个位置算数(允许个别字被改写),一样多时取离按时间估的位置最近的;
- *    对上的不到一半、或少于 3 个,当没找到,退回按时间比例估。
- * 2. 重叠的那截里,开头 [HOLD] 个字沿用已显示的:新结果的开头是窗口的最前面,前文被截掉了,最容易解错、解重;
- *    同一截字在上一份里前面还有上文,更可信。往后找到两份连着 [RUN] 个字一样的地方才换成新结果
- *    (两份可以错开 [SLACK] 个字;不在英文单词或数字中间换)。[REACH] 个字之内找不到一样的,就从窗口开头整份换成新结果。
+ * [carried] is the text already kept, [tail] the stretch still changing; the UI shows the two directly joined. When a new result slides the window further along:
+ * 1. First find where the start of the new result falls within the displayed text: compare letters and digits only (punctuation, spaces and case do not count),
+ *    align the first [LOOK] characters of the new result at each position and take the position with the most matches (a few characters may have been rewritten); on a tie, take the one closest to the position estimated from timing;
+ *    fewer than half of them matching, or fewer than 3, counts as not found, and it falls back to the proportional time estimate.
+ * 2. Within the overlapping stretch, the first [HOLD] characters keep the displayed text: the start of the new result is the very front of the window, where the preceding context was cut off, so that part is most prone to mis-decoding and duplication;
+ *    the same stretch in the previous result had context before it and is more trustworthy. Only when the two agree on [RUN] consecutive characters further along is the new result adopted
+ *    (the two may be offset by up to [SLACK] characters; never switching in the middle of an English word or number). If nothing matches within [REACH] characters, the window's start is replaced wholesale by the new result.
  *
- * 只用于按着时的预览;最终文字不经过这里。
+ * Used only for the preview while holding; the final text does not go through here.
  */
 internal class PartialStitch {
-    /** 已经留住的字:平时只往后加;新结果和已显示的对不上、或重叠里找不到一样的地方时,退回到窗口开头为止。 */
+    /** The text already kept: normally only appended to; when the new result does not line up with what is displayed, or no matching place is found in the overlap, it falls back to the window's start. */
     var carried = ""
         private set
 
-    /** 还在变的那截。 */
+    /** The stretch still changing. */
     var tail = ""
         private set
 
-    /** 上一份结果的窗口开头落在 [carried] + [tail] 里的位置。 */
+    /** Where the window start of the previous result falls within [carried] + [tail]. */
     private var anchor = 0
     private var lastStart = 0L
     private var lastDuration = 0L
     private var seen = false
 
-    /** 换了一段话(上一段已经整段定下):从头来,不和上一段对齐。 */
+    /** A different utterance started (the previous one is fully settled): start over without aligning to the previous one. */
     fun reset() {
         carried = ""; tail = ""; anchor = 0; lastStart = 0; lastDuration = 0; seen = false
     }
 
-    /** 一份中间结果 [partial],它的窗口从 [startMs] 到 [durationMs](缺了就沿用上一份的);空的不算。 */
+    /** One intermediate result [partial] whose window runs from [startMs] to [durationMs] (missing values reuse the previous result's); empty ones are ignored. */
     fun feed(partial: String, startMs: Long?, durationMs: Long?) {
         if (partial.isEmpty()) return
         val start = startMs ?: lastStart
@@ -69,7 +69,7 @@ internal class PartialStitch {
             if (at < 0 || score > atScore || (score == atScore && distance < atDistance)) { at = k; atScore = score; atDistance = distance }
         }
         if (at < 0) {
-            // 对不上:按时间比例估窗口开头
+            // No match: estimate the window start from the time proportion
             val k = floor(estimate + 0.5).toInt().coerceIn(from, old.size)
             val cut = if (k < old.size) old[k].index else shown.length
             carried = shown.substring(0, cut); tail = next; anchor = cut
@@ -94,25 +94,25 @@ internal class PartialStitch {
     private fun letters(text: String): List<Letter> =
         text.withIndex().filter { it.value.isLetterOrDigit() }.map { Letter(it.index, it.value.lowercaseChar()) }
 
-    /** [index] 处是不是英文单词或数字的中间(前一个字符也是英文字母或数字)。 */
+    /** Whether [index] is in the middle of an English word or number (the previous character is also a Latin letter or digit). */
     private fun midWord(text: String, index: Int): Boolean = index > 0 && latin(text[index]) && latin(text[index - 1])
 
     private fun latin(c: Char) = c.code < 128 && c.isLetterOrDigit()
 
     companion object {
-        /** 拿新结果开头这么多个字去对位置。 */
+        /** How many characters from the start of the new result are used to locate the position. */
         const val LOOK = 12
 
-        /** 重叠那截开头这么多个字沿用已显示的。 */
+        /** How many characters at the start of the overlapping stretch keep the displayed text. */
         const val HOLD = 8
 
-        /** 之后这么多个字之内找两份一样的地方。 */
+        /** Within this many characters after that, look for a matching passage between the two. */
         const val REACH = 12
 
-        /** 连着这么多个字一样才换。 */
+        /** Switch only after this many consecutive matching characters. */
         const val RUN = 2
 
-        /** 两份最多错开这么多个字。 */
+        /** The two may be offset by at most this many characters. */
         const val SLACK = 2
 
         private val SHIFTS = (-SLACK..SLACK).sortedBy { abs(it) }

@@ -14,7 +14,7 @@ object VoiceVoices {
             "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia",
             "Sadaltager", "Sulafat",
         )
-        // 通义千问 TTS 官方音色表(非实时与实时同一套)
+        // Official Tongyi Qianwen TTS voice list (the same set for non-realtime and realtime)
         TtsProtocol.BailianQwenTts -> listOf(
             "Cherry", "Serena", "Ethan", "Chelsie", "Momo", "Vivian", "Moon", "Maia", "Kai", "Nofish", "Bella", "Jennifer",
             "Ryan", "Katerina", "Aiden", "Eldric", "Mia", "Mochi", "Bellona", "Vincent", "Bunny", "Neil", "Elias", "Arthur",

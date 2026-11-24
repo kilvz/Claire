@@ -105,7 +105,7 @@ object VoiceVendors {
     private fun volcModels(service: String) = listOf(
         stt(service, VoicePresets.VOLC_STT_MODEL, "Doubao Streaming ASR 2.0",
             SttBinding(SttProtocol.DoubaoStreaming, resourceId = DoubaoProtocol.DURATION)),
-        // 音色清单随 app 更新(VolcVoices),不写进存档
+        // The voice list ships with app updates (VolcVoices) and is not written into storage
         tts(service, VOLC_TTS_RESOURCE, "Doubao TTS 2.0",
             TtsBinding(TtsProtocol.VolcSpeech, VOLC_TTS_ENDPOINT, region = VOLC_TTS_RESOURCE, voice = "zh_female_vv_uranus_bigtts")),
         tts(service, "seed-tts-1.0", "Doubao TTS 1.0",
@@ -133,7 +133,7 @@ object VoiceVendors {
             }
             VoicePresetPlan(owned(VoicePresets.VOLC_SERVICE, "Volcano Engine"), credentials, volcModels(VoicePresets.VOLC_SERVICE))
         },
-        // 豆包合成的资源 ID 就是模型 ID,手填的模型要带上它自己的
+        // For Doubao synthesis the resource ID is the model ID, so a manually typed model must carry its own
         retarget = { m -> m.tts?.let { m.copy(tts = it.copy(region = m.id)) } ?: m },
         legacyIds = listOf("stt-doubao"),
         builtins = ::volcModels,
@@ -215,7 +215,7 @@ object VoiceVendors {
             }
     }
 
-    // 系统音色写作「模型:名字」,派生出来的说话模型换成它自己的前缀
+    // The system's voices are written as "model:name", so a derived speak model switches to its own prefix
     private val siliconFlow = keyOnly("siliconflow", "SiliconFlow", VendorModelLists.siliconFlow(SILICONFLOW_BASE), retarget = { m ->
         m.tts?.takeIf { it.voices.all { v -> !v.startsWith("${m.id}:") } }?.let { b ->
             val (voices, names) = VendorModelLists.siliconFlowModelVoices(m.id, emptyList())

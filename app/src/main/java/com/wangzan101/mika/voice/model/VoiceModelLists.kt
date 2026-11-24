@@ -142,7 +142,7 @@ class VoiceModelRefresher(private val catalog: VoiceCatalogStore, private val re
         } catch (e: Exception) {
             return VoiceListRefresh.Failed(VoiceModelError.from(e))
         }
-        // 刷新前的快照可能已过时(期间用户选了别的),以写入时的选择为准
+        // The pre-refresh snapshot may be stale (the user selected something else meanwhile); go by the selection at write time
         val latest = catalog.state.value
         val merged = VoiceModelLists.merge(
             latest.models.filter { it.serviceId == serviceId }, serviceId, listing, selectedIds(latest, serviceId),

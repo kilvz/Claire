@@ -1,30 +1,30 @@
 package com.wangzan101.mika.voice
 
 /**
- * 按住期间识别服务自己结束一段后重开,把各段拼起来。
- * 中日文段之间直接相连,其他文字(英文等)段之间加一个空格。纯逻辑,不碰系统。
+ * While holding, the recognition service may end a segment on its own and restart; this joins the segments together.
+ * Chinese and Japanese segments join directly; segments in other scripts (English etc.) get a space between them. Pure logic, touches no platform APIs.
  */
 class Segments {
     private var done = ""
     private var pending = ""
 
-    /** 当前这一段的中间结果;返回到此刻的全文。 */
+    /** Intermediate result of the current segment; returns the full text so far. */
     fun partial(text: String): String {
         pending = text.trim()
         return full()
     }
 
-    /** 当前这一段识别完了,[text] 是这一段的最终文字。 */
+    /** The current segment finished recognizing; [text] is that segment's final text. */
     fun segmentDone(text: String) {
         done = join(done, text.trim())
         pending = ""
     }
 
-    /** 已完成的各段加上还没完成那段的中间结果;松开后等不到最终结果时就用它。 */
+    /** The completed segments plus the intermediate result of the unfinished one; used when no final result arrives after release. */
     fun full(): String = join(done, pending).trim()
 
     companion object {
-        /** 末尾这么多个字(按码点)还可能被识别服务改掉,界面上画得淡一些。 */
+        /** This many trailing characters (by code point) may still be changed by the recognition service, so the UI draws them dimmer. */
         private const val TAIL = 4
 
         fun split(full: String): SpeechEvent.Partial {
@@ -41,10 +41,10 @@ class Segments {
             else -> "$a $b"
         }
 
-        /** 紧跟前文、前面不加空格的标点。 */
+        /** Punctuation that attaches to the preceding text without a space. */
         private const val ATTACHED = ",.!?;:)"
 
-        /** 本身是空白,或属于不用空格分词的文字(汉字、假名及其全角标点)。 */
+        /** It is whitespace itself, or belongs to scripts that are not segmented by spaces (Han characters, kana and their full-width punctuation). */
         private fun noSpace(cp: Int): Boolean {
             if (Character.isWhitespace(cp)) return true
             when (Character.UnicodeScript.of(cp)) {

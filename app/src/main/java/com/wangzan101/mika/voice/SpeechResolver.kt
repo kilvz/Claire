@@ -3,15 +3,15 @@ package com.wangzan101.mika.voice
 import com.wangzan101.mika.settings.Provider
 
 /**
- * 手机自带识别的能力:系统说有没有([available])、是不是在本机上识别(不联网)、
- * 以及在这台手机上试过时理不理我们([responsive];系统说有、请求发过去却一个回调都不给,就记成 false)。
+ * Capabilities of the device's built-in recognition: whether the system says it exists ([available]), whether recognition happens on this device (no network),
+ * and whether it answers us when tried on this phone ([responsive]; recorded as false when the system says it exists but a request produces no callback at all).
  */
 data class SystemCapability(val available: Boolean, val onDevice: Boolean, val responsive: Boolean = true) {
-    /** 真能拿来听写:系统有、而且没被记成不响应。 */
+    /** Actually usable for dictation: the system has it and it is not recorded as unresponsive. */
     val usable get() = available && responsive
 }
 
-/** 这一次实际要用的识别引擎;选择的东西不在了就给出 [Unavailable] 和原因,由界面提示。 */
+/** The recognition engine actually used this time; when the selected thing is gone, [Unavailable] is returned with the reason for the UI to show. */
 sealed interface SpeechEngineSpec {
     data class System(val onDevice: Boolean) : SpeechEngineSpec
     data class Provider(val provider: com.wangzan101.mika.settings.Provider, val model: String, val method: TranscribeMethod) : SpeechEngineSpec
@@ -24,8 +24,8 @@ sealed interface SpeechEngineSpec {
     data class Sherpa(val model: String) : SpeechEngineSpec
     data class Unavailable(val why: Why) : SpeechEngineSpec
     /**
-     * [SystemNoResponse]:手机自带识别系统说有,但请求发过去一直没有回应(已记下,用户重新选它时清掉)。
-     * [SystemFailed]:手机自带识别未能启动,可以重试;不据此认定服务不存在或麦克风被占用。
+     * [SystemNoResponse]: the system reports the built-in recognition exists, but requests get no response at all (recorded, and cleared when the user selects it again).
+     * [SystemFailed]: the built-in recognition could not start; retrying is safe, and this is not taken to mean the service is missing or the microphone is occupied.
      * [SherpaModelMissing]:on-device model was never downloaded; the catalog page can fetch it.
      * [SherpaFailed]:the on-device engine could not load or run; retrying is safe.
      */
@@ -35,16 +35,16 @@ sealed interface SpeechEngineSpec {
     }
 }
 
-/** 把用户的选择、手机能力和现有服务商对起来,得出这次用哪个引擎。纯函数,不碰系统。 */
+/** Matches the user's choice and the device's capabilities against the available providers to decide which engine is used this time. Pure function, touches no platform APIs. */
 object SpeechResolver {
     fun resolve(choice: SpeechChoice, system: SystemCapability, providers: List<Provider>): SpeechEngineSpec = when (choice) {
         SpeechChoice.Off -> SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.Off)
         is SpeechChoice.Doubao -> if (choice.resourceId in DoubaoProtocol.resources) SpeechEngineSpec.Doubao(choice.resourceId)
             else SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.DoubaoNotConfigured)
         is SpeechChoice.FunAsr -> SpeechEngineSpec.FunAsr(choice.url, choice.language)
-        // 有没有存 Key 由 VoiceInput 开会话时再看(Key 不进选择),这里只按选择给
+        // Whether a key is stored is checked later by VoiceInput when it opens the session (keys are not part of the selection); this only goes by the selection
         is SpeechChoice.Bailian -> SpeechEngineSpec.Bailian(choice.model, choice.region, choice.workspace, choice.language)
-        // 自带识别不响应时照实说、指去设置,不悄悄改用要花钱的服务商模型
+        // When the built-in recognition does not respond, say so plainly and point to settings rather than silently switching to a billable provider model
         SpeechChoice.Auto -> when {
             system.usable -> SpeechEngineSpec.System(system.onDevice)
             system.available -> SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.SystemNoResponse)

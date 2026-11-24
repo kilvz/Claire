@@ -10,15 +10,15 @@ import android.os.IBinder
 import android.speech.RecognitionService
 
 /**
- * 在识别期间保持一份公开的服务连接,让识别服务能够使用调用方的前台能力。
- * 这里只等连接通知,不调用服务的 Binder 协议;识别本身仍交给 SpeechRecognizer。
+ * Keeps a public service connection alive during recognition so the recognition service can use the caller's foreground capabilities.
+ * This only waits for the connection notification and never calls the service's Binder protocol; recognition itself still goes through SpeechRecognizer.
  */
 internal class SpeechServiceLease(
     private val binder: Binder,
     private val onReady: () -> Unit,
     private val onUnavailable: () -> Unit,
 ) : AutoCloseable {
-    /** 平台连接的薄接口;生命周期可以不依赖系统对象测试。 */
+    /** Thin interface over the platform binding; the lifecycle can be tested without depending on system objects. */
     interface Binder {
         fun bind(onConnected: () -> Unit, onUnavailable: () -> Unit): Boolean
         fun unbind()
@@ -35,8 +35,8 @@ internal class SpeechServiceLease(
     private var pendingUnavailable = false
 
     /**
-     * 每份连接只发起一次。false 表示没有绑上,由调用方使用普通识别路径,这里不另发失效通知。
-     * bind 内同步到来的回调等它返回成功后再交给调用方,避免失败的绑定先启动识别。
+     * Each connection is started only once. false means nothing was bound; the caller then uses the ordinary recognition path and no failure notification is sent from here.
+     * Callbacks that arrive synchronously inside bind wait until it returns successfully before being handed to the caller, so a failed binding does not start recognition first.
      */
     fun start(): Boolean {
         synchronized(lock) {
@@ -74,7 +74,7 @@ internal class SpeechServiceLease(
             return@synchronized
         }
         ready = true
-        // 回调和 close 串行;调用方在回调里 close 也可以重入。
+        // Callbacks and close are serialized; the caller may call close from inside a callback, and re-entry is handled.
         try {
             onReady()
         } catch (e: Exception) {
@@ -101,13 +101,13 @@ internal class SpeechServiceLease(
         val cleanup = synchronized(lock) {
             if (closed) return
             closed = true
-            // bind 还没返回时不能提前解绑:它可能尚未登记连接。返回后由 start 补做。
+            // Do not unbind early while bind has not returned yet: the connection may not be registered yet. start does it once bind returns.
             takeUnbind()
         }
         if (cleanup) unbindQuietly()
     }
 
-    /** 只在锁内调用;开始过的绑定即使返回 false 或抛错,也清一次连接登记。 */
+    /** Called only while holding the lock; once a binding has been started, the connection registration is cleared even when it returned false or threw. */
     private fun takeUnbind(): Boolean {
         if (!started || binding || unbound) return false
         unbound = true
@@ -118,12 +118,12 @@ internal class SpeechServiceLease(
         try {
             binder.unbind()
         } catch (_: Exception) {
-            // 没有登记成功、服务已经消失等情形也算收拾完了,不重复解绑。
+            // A registration that never succeeded or a service that already disappeared also counts as cleaned up; no repeated unbind.
         }
     }
 
     companion object {
-        /** 仅给调用方本来就有权绑定的公开服务持有连接;不申请权限,不更改系统配置。 */
+        /** Holds a connection only to a public service the caller already has the right to bind; requests no permission and changes no system configuration. */
         fun forService(
             context: Context,
             service: ComponentName,
@@ -163,7 +163,7 @@ internal class SpeechServiceLease(
         }
 
         override fun unbind() {
-            // 即使系统的解绑抛错,也不让迟到回调再持有会话。
+            // Even if the system's unbind throws, late callbacks must not hold the session any more.
             connected = null
             unavailable = null
             context.unbindService(connection)

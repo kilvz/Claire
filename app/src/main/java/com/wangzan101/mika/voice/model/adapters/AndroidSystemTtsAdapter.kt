@@ -13,7 +13,7 @@ import com.wangzan101.mika.voice.model.VoiceCapability
 import com.wangzan101.mika.voice.model.VoiceModelError
 import java.io.File
 
-/** 内置 Android 系统 TTS:一次合成一个完整 WAV,非流式,能力声明不交给云端或第二套播放路径。 */
+/** Built-in Android system TTS: synthesizes one complete WAV at a time, non-streaming, and its capability declaration is not delegated to the cloud or to a second playback path. */
 class AndroidSystemTtsAdapter(
     private val engineFactory: (Context) -> SystemTtsEngine = { AndroidSystemTtsEngine(it) },
 ) : TtsAdapter {

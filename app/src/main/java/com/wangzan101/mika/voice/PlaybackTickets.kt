@@ -1,22 +1,22 @@
 package com.wangzan101.mika.voice
 
 /**
- * 播放请求的代次令牌:每次新播放请求(begin)使之前所有代次作废,主动停下(invalidate)同理。
- * 旧请求的写文件完成回调和 MediaPlayer 回调(prepared/completion/error/focus)先用 [owns] 比对,
- * 对不上就直接丢弃——跨页面、快速切换时旧请求不会串到新请求上。
- * 只在主线程读写。
+ * Generation tokens for playback requests: every new playback request (begin) invalidates all earlier generations, and so does an explicit stop (invalidate).
+ * The file-writing completion callback and the MediaPlayer callbacks of an old request (prepared/completion/error/focus) are first compared with [owns]
+ * and dropped outright when they do not match — across screens and fast switching, an old request never leaks into a new one.
+ * Read and written on the main thread only.
  */
 internal class PlaybackTickets {
     private var generation = 0L
 
-    /** 新播放请求:作废之前所有代次,返回本次的代次。 */
+    /** New playback request: invalidates all earlier generations and returns this request's generation. */
     fun begin(): Long = ++generation
 
-    /** 主动停下:已经发出、还在路上的回调(如 prepare 完成)一律作废。 */
+    /** Explicit stop: callbacks already issued and still in flight (such as prepare completing) are all invalidated. */
     fun invalidate() {
         generation++
     }
 
-    /** [ticket] 是不是当前代次:是才允许它改播放器状态。 */
+    /** Whether [ticket] is the current generation: only then may it change player state. */
     fun owns(ticket: Long): Boolean = ticket == generation
 }

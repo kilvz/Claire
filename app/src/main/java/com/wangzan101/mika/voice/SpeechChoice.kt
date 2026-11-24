@@ -19,29 +19,29 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** 用户为「语音转文字」做的选择,以及它在设置里的存取。具体用哪个引擎由 [SpeechResolver] 结合手机能力再定。 */
+/** The user's choice for "speech to text" and how it is stored in settings. Which engine is actually used is decided by [SpeechResolver] together with the device's capabilities. */
 sealed interface SpeechChoice {
-    /** 没选过:有手机自带识别就用它。 */
+    /** Never chosen: use the device's built-in recognition when available. */
     data object Auto : SpeechChoice
 
-    /** 明确选了手机自带识别。 */
+    /** The device's built-in recognition was chosen explicitly. */
     data object System : SpeechChoice
 
-    /** 不用语音输入。 */
+    /** Voice input is off. */
     data object Off : SpeechChoice
 
-    /** 用某个服务商的某个模型转写,[method] 决定请求怎么发。 */
+    /** Transcribe with a given provider's given model; [method] decides how the request is made. */
     data class Provider(val providerId: String, val model: String, val method: TranscribeMethod) : SpeechChoice
 
     /** Native streaming ASR, with credentials stored separately from this non-secret selection. */
     data class Doubao(val resourceId: String = "volc.seedasr.sauc.duration") : SpeechChoice
 
-    /** 自建的 Fun-ASR 实时服务;[url] 是规范过的 ws(s) 地址(见 [FunAsrProtocol.normalize]),不含密钥。 */
+    /** Self-hosted Fun-ASR realtime service; [url] is the normalized ws(s) address (see [FunAsrProtocol.normalize]) and holds no secret. */
     data class FunAsr(val url: String, val language: AsrLanguage = AsrLanguage.Auto) : SpeechChoice
 
     /**
-     * 阿里云百炼实时语音识别;API Key 按地域另外加密存,这里只有模型、地域和业务空间 ID([workspace],
-     * 规范过的,见 [BailianProtocol.workspace];空串用通用接入点)。
+     * Alibaba Cloud Bailian realtime speech recognition; the API key is stored encrypted separately per region, so this holds only the model, the region and the business space ID ([workspace],
+     * normalized, see [BailianProtocol.workspace]; an empty string means the general endpoint).
      */
     data class Bailian(
         val model: String = BailianProtocol.DEFAULT_MODEL,
@@ -52,19 +52,19 @@ sealed interface SpeechChoice {
 }
 
 /**
- * 服务商转写音频的接口形态。存的是名字,只能往后加、不能改名或删,旧设置才读得回来。
- * 带 ChatInputAudio 前缀的三种都是对话接口里的 input_audio,只是写法不同,选模型试转时依次都试:
- * [ChatInputAudio] 的 data 放裸 base64 并附一句转写指令;[ChatInputAudioUri] 的 data 换成
- * `data:audio/wav;base64,...` 的 data URI(有的服务只认这种);[ChatInputAudioOnly] 也用 data URI,
- * 但只发音频不带指令(专做转写的模型不收文字块)。
+ * The request shape a provider uses to transcribe audio. The names are persisted, so entries may only be appended, never renamed or removed, otherwise old settings could not be read back.
+ * The three with the ChatInputAudio prefix are all the chat API's input_audio, just written differently, and a trial transcription tries each in turn:
+ * [ChatInputAudio] puts raw base64 in data with a transcription instruction attached; [ChatInputAudioUri] turns data into a
+ * `data:audio/wav;base64,...` data URI (some services accept only that); [ChatInputAudioOnly] also uses a data URI
+ * but sends audio only, without the instruction (transcription-only models do not accept text blocks).
  */
 enum class TranscribeMethod { AudioTranscriptions, ChatInputAudio, GeminiInline, ChatInputAudioUri, ChatInputAudioOnly }
 
 /**
- * 选择存在 [FeatureFlags] 那份设置里,一个键、一段 JSON;读不出来一律当 [SpeechChoice.Auto]。
- * 另记一个「手机自带识别不响应」([systemSilent]):按住说话时服务一直不回话,连着 [SILENT_STRIKES] 次才记上
- * (一次卡住多半是识别服务冷启动慢,不该从此关掉这条路);中间任何一次回了话就重新数。
- * 用户在设置里选「自动」或「手机自带」时记号和次数都清掉,好让换了识别服务、更新过系统的手机能再试。
+ * The choice lives in the [FeatureFlags] settings under a single key as one JSON blob; anything unreadable falls back to [SpeechChoice.Auto].
+ * It also records "device built-in recognition not responding" ([systemSilent]): when the service never answers during hold-to-talk, only [SILENT_STRIKES] such occurrences in a row are recorded
+ * (one hang is usually just a slow cold start of the recognition service, and this path should not be turned off for good because of it); any answer in between resets the count.
+ * When the user picks "Auto" or "device built-in" in settings, both the mark and the count are cleared, so phones whose recognition service changed or whose system was updated can try again.
  */
 class SpeechSettings(private val prefs: SharedPreferences, private val cipher: KeyCipher = KeystoreKeyCipher("mika-speech-keys")) {
     private val _choice = MutableStateFlow(read())
@@ -101,13 +101,13 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         if (_choice.value is SpeechChoice.Doubao) set(SpeechChoice.Off)
     }
 
-    /** 上次用过的自建 Fun-ASR 服务地址,换去别的引擎后再选回来不用重填。 */
+    /** The self-hosted Fun-ASR service address used last time, so switching to another engine and back needs no retyping. */
     val funAsrUrl: String? get() = prefs.getString(FUNASR_URL, null)?.let(FunAsrProtocol::normalize)
 
-    /** 上次给自建服务选的识别语言。 */
+    /** The recognition language chosen last time for the self-hosted service. */
     val funAsrLanguage: AsrLanguage get() = AsrLanguage.of(prefs.getString(FUNASR_LANGUAGE, null))
 
-    /** 选用这个自建 Fun-ASR 服务(地址先经 [FunAsrProtocol.normalize])。 */
+    /** Selects this self-hosted Fun-ASR service (the address goes through [FunAsrProtocol.normalize] first). */
     fun saveFunAsr(url: String, language: AsrLanguage = AsrLanguage.Auto) {
         val choice = SpeechChoice.FunAsr(requireNotNull(FunAsrProtocol.normalize(url)), language)
         prefs.edit().putString(FUNASR_URL, choice.url).putString(FUNASR_LANGUAGE, language.code).putString(KEY, encode(choice).toString())
@@ -115,10 +115,10 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         _choice.value = choice
     }
 
-    /** 这个地域存没存过百炼的 API Key(北京、新加坡的 Key 不通用,各存一份)。 */
+    /** Whether a Bailian API key has been stored for this region (Beijing and Singapore keys are not interchangeable, so each is stored separately). */
     fun hasBailianKey(region: BailianRegion): Boolean = prefs.contains(bailianKeyName(region))
 
-    /** 加密存下这个地域的百炼 API Key 并选用;[apiKey] 为空时沿用这个地域已存的(只换模型)。不联网。 */
+    /** Stores this region's Bailian API key encrypted and selects it; when [apiKey] is empty, the one already stored for this region is kept (only the model changes). No network access. */
     internal fun saveBailian(apiKey: String, choice: SpeechChoice.Bailian) {
         require(BailianProtocol.validModel(choice.model) && BailianProtocol.workspace(choice.workspace) == choice.workspace)
         val edit = prefs.edit()
@@ -133,14 +133,14 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         _choice.value = choice
     }
 
-    /** 这个地域上次用的百炼模型;没有时是默认的。 */
+    /** The Bailian model used last time for this region; the default when there is none. */
     fun bailianModel(region: BailianRegion): String =
         prefs.getString(bailianModelName(region), null)?.takeIf(BailianProtocol::validModel) ?: BailianProtocol.DEFAULT_MODEL
 
-    /** 这个地域上次选的识别语言。 */
+    /** The recognition language chosen last time for this region. */
     fun bailianLanguage(region: BailianRegion): AsrLanguage = AsrLanguage.of(prefs.getString(bailianLanguageName(region), null))
 
-    /** 这个地域上次填的业务空间 ID;没填过是空串。 */
+    /** The business space ID entered last time for this region; an empty string when never entered. */
     fun bailianWorkspace(region: BailianRegion): String =
         prefs.getString(bailianWorkspaceName(region), null)?.let(BailianProtocol::workspace).orEmpty()
 
@@ -149,18 +149,18 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         String(cipher.decrypt(Base64.getDecoder().decode(encrypted)), Charsets.UTF_8).takeIf(String::isNotBlank)
     }.getOrNull()
 
-    /** 删掉这个地域的百炼 Key;正在用这个地域就关掉语音输入。 */
+    /** Deletes this region's Bailian key; if that region is in use, voice input is turned off. */
     fun clearBailian(region: BailianRegion) {
         prefs.edit().remove(bailianKeyName(region)).remove(bailianModelName(region)).remove(bailianWorkspaceName(region)).remove(bailianLanguageName(region)).apply()
         if ((_choice.value as? SpeechChoice.Bailian)?.region == region) set(SpeechChoice.Off)
     }
 
     /**
-     * 「千问实时语音识别」一行上次选用的是哪种(自建或百炼的某个地域),点圆圈时沿用它;
-     * 那种已经用不了(地址读不出、Key 删了)或从没选过时为 null,界面改去设置页。
+     * Which kind the "Qwen realtime speech recognition" row last selected (self-hosted, or Bailian in a given region); tapping the circle reuses it.
+     * Null when that kind is no longer usable (the address cannot be read, the key was deleted) or was never chosen; the UI then sends the user to the settings page instead.
      */
     val lastLive: SpeechChoice? get() = runCatching {
-        // 没记过上次那种时,正在用的就是
+        // When the last-used kind was never recorded, the one in use is it
         val stored = prefs.getString(LIVE_LAST, null)?.let { decode(Json.parseToJsonElement(it).jsonObject) } ?: _choice.value
         when (val c = stored) {
             is SpeechChoice.FunAsr -> c
@@ -169,7 +169,7 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         }
     }.getOrNull()
 
-    /** 这一行算不算设置过:有可以沿用的那种。 */
+    /** Whether this row counts as configured: there is a kind that can be reused. */
     val hasLive: Boolean get() = lastLive != null
 
     /** Reads all still-addressable legacy choices without changing the rollback store. */
@@ -206,7 +206,7 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
     val systemSilent: StateFlow<Boolean> = _systemSilent.asStateFlow()
 
     fun set(choice: SpeechChoice) {
-        // 这两种都会去用手机自带识别:用户主动选了,就再给它机会
+        // Both of these end up using the device's built-in recognition: the user chose it deliberately, so give it another chance
         val retry = choice == SpeechChoice.System || choice == SpeechChoice.Auto
         val edit = prefs.edit().putString(KEY, encode(choice).toString())
         if (retry) edit.remove(SILENT).remove(STRIKES)
@@ -215,13 +215,13 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         if (retry) _systemSilent.value = false
     }
 
-    /** 重试系统识别时只清健康记号;迁移后旧选择仍保持只读。 */
+    /** When retrying system recognition, only the health mark is cleared; the legacy choice stays read-only after migration. */
     fun retrySystem() {
         prefs.edit().remove(SILENT).remove(STRIKES).apply()
         _systemSilent.value = false
     }
 
-    /** 手机自带识别这次一个回调都没给:连着第 [SILENT_STRIKES] 次才记成不响应。 */
+    /** The device's built-in recognition gave no callback at all this time: it is recorded as not responding only at the [SILENT_STRIKES]-th time in a row. */
     fun noteSystemSilent() {
         val strikes = prefs.getInt(STRIKES, 0) + 1
         val edit = prefs.edit().putInt(STRIKES, strikes)
@@ -231,12 +231,12 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
     }
 
     /**
-     * 点名试通过的识别服务(系统默认的不回话、它回了),下次先试它;null 是没有,或者系统默认的就回话。
-     * 见 [SystemSpeech.attempts]。
+     * A named recognition service that worked when tried (the system default did not answer but this one did); it is tried first next time. Null when there is none, or when the system default answers.
+     * See [SystemSpeech.attempts].
      */
     val systemService: String? get() = prefs.getString(SERVICE, null)
 
-    /** 手机自带识别这次回了话([service] 是回话的那个,null 是系统默认的):之前没响应的次数作废,记住回话的服务。 */
+    /** The device's built-in recognition answered this time ([service] is the one that answered, null means the system default): the earlier non-response count is void and the answering service is remembered. */
     fun noteSystemAnswered(service: String? = null) {
         val edit = prefs.edit()
         var changed = false
@@ -283,7 +283,7 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         }
     }
 
-    /** 字段缺了、类型不认识、方法名不存在都返回 null,由调用处退回自动。 */
+    /** Missing fields, unknown types and nonexistent method names all return null, and the caller falls back to auto. */
     private fun decode(obj: JsonObject): SpeechChoice? = when (obj[TYPE]?.jsonPrimitive?.contentOrNull) {
         "auto" -> SpeechChoice.Auto
         "system" -> SpeechChoice.System
@@ -324,7 +324,7 @@ class SpeechSettings(private val prefs: SharedPreferences, private val cipher: K
         private const val STRIKES = "speech_system_silent_strikes"
         private const val SERVICE = "speech_system_service"
 
-        /** 连着这么多次不响应才记下。 */
+        /** Only this many consecutive non-responses are recorded. */
         const val SILENT_STRIKES = 2
 
         fun get(context: Context) = SpeechSettings(
