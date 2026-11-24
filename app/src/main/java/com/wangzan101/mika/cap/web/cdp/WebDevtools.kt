@@ -49,60 +49,60 @@ import java.util.concurrent.ConcurrentHashMap
 import com.wangzan101.mika.cap.web.WebOwner
 
 /**
- * 每个网页标签的 DevTools 会话入口。连不上(系统不支持、被拦、标签已关)时为 null,
- * 调用方退回注入脚本的做法。所有标签默认桌面版,这是新的基线,不依赖会话:没有会话时 WebView 设置里的
- * 桌面 UA、UA-CH(支持时)和宽视口照样生效,只是少了仿真那一层(视口宽度、navigator.platform)。
+ * DevTools session entry point for each web tab. Null when it cannot connect (not supported by the system, blocked, tab already closed),
+ * and the caller falls back to the script-injection approach. All tabs are desktop by default; that is the new baseline and does not depend on the session: without a session, the WebView settings'
+ * desktop UA, UA-CH (when supported) and wide viewport still apply, only the emulation layer is missing (viewport width, navigator.platform).
  *
- * 连法按顺序试、记住结果:直连本进程的 `webview_devtools_remote_<pid>`;被拒就经 [relay] 代连(内置助手,shell 身份;由装配层给);都不行就没有。
- * 进程里通常一份(App 给出,见 [of]);测试可以自己造一份,换会话来源、连法都只影响自己。
- * 每个标签第一次用时写下标记、逐个目标找到它并记住 targetId,之后一直用这一条会话;断了重连一次,再不行这个标签降级(过一阵再试)。
+ * Routes are tried in order and the result remembered: direct to this process's `webview_devtools_remote_<pid>`; if refused, connect through [relay] (the built-in helper, shell identity; supplied by the assembly layer); if neither works, there is none.
+ * Normally one per process (provided by the App, see [of]); tests can build their own, and changing the session source or the route only affects that instance.
+ * When a tab is used for the first time, a marker is written, the tab is found among the targets one by one and its targetId remembered; that single session is used from then on; on disconnect it reconnects once, and if that fails the tab is degraded (retried later).
  *
- * 桌面版网页也在这里:标签一建好就把 WebView 设置换成桌面 UA(连不上 DevTools 时的退路)并在文档开始注入身份补丁,
- * 会话连上后再用仿真把 UA-CH、视口、触摸与指针一并换成桌面(见 [DesktopProfile]);按站点记住的手机版站点都换回默认。
- * 用户在 Claire 里选定了界面语言时,两种版本的网页都按那种语言请求(见 [PageLanguage]);跟随系统时不动。
+ * Desktop web pages are handled here as well: as soon as a tab is created, the WebView settings are switched to a desktop UA (the fallback when DevTools cannot connect) and the identity patch is injected at document start,
+ * then once the session connects, emulation switches UA-CH, viewport, touch and pointer all to desktop (see [DesktopProfile]); sites remembered as mobile switch back to the default.
+ * When the user has chosen the UI language in Claire, pages of both versions are requested in that language (see [PageLanguage]); when following the system, nothing is changed.
  */
 class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     enum class Route { Unknown, Direct, Relay, None }
 
-    /** 测试用:只走直连 / 只走代连 / 当作连不上;null 为自动。改了之后调 [resetRoute]。 */
+    /** For tests: direct only / relay only / treat as unreachable; null means automatic. Call [resetRoute] after changing it. */
     @Volatile var forceRoute: Route? = null
 
     private val _route = MutableStateFlow(Route.Unknown)
-    /** 最近一次检测到的连法;Unknown 是还没测过。 */
+    /** The most recently detected route; Unknown means it has not been probed yet. */
     val route: StateFlow<Route> = _route.asStateFlow()
 
     private val _available = MutableStateFlow(false)
-    /** 现在能用 DevTools(诊断与界面用)。 */
+    /** Whether DevTools is usable right now (for diagnostics and the UI). */
     val available: StateFlow<Boolean> = _available.asStateFlow()
 
     @Volatile var provider: (WebTab) -> CdpSession? = this::cached
 
-    /** 已经连好的会话;还没连就在后台开始连并先返回 null。不阻塞,任意线程可调。 */
+    /** An already connected session; if not connected yet, starts connecting in the background and returns null first. Non-blocking, callable from any thread. */
     fun session(tab: WebTab): CdpSession? =
-        // 换了来源的会话(测试自备的等)也要按这个标签的视口仿真换算 Input 坐标
+        // Sessions from other sources (e.g. test-provided ones) must also convert Input coordinates according to this tab's viewport emulation
         provider(tab)?.also { s -> links[tab]?.let { s.inputScale = it.inputScale } }
 
-    /** 等会话连好(至多 [timeoutMs]);连不上为 null。不要在持有主线程等待的地方调。 */
+    /** Waits for the session to connect (at most [timeoutMs]); null if it cannot connect. Do not call it while holding a main-thread wait. */
     suspend fun awaitSession(tab: WebTab, timeoutMs: Long = ATTACH_TIMEOUT_MS): CdpSession? {
         val link = links[tab] ?: return null
         return bounded(timeoutMs) { attach(link) }
     }
 
-    /** 这个标签现在用的是手机版网页。 */
+    /** This tab currently uses the mobile version of the page. */
     fun isMobile(tab: WebTab): Boolean = links[tab]?.mobile ?: false
 
-    /** 这个标签的 DevTools 目标 id;没连上过为 null。 */
+    /** The DevTools target id of this tab; null if it has never connected. */
     fun targetId(tab: WebTab): String? = links[tab]?.targetId
 
-    // ---------- 标签生命周期(WebTab 调) ----------
+    // ---------- Tab lifecycle (called by WebTab) ----------
 
-    /** 标签刚建好(主线程):打开调试接口,换成桌面版的 WebView 设置,关掉 X-Requested-With 头。 */
+    /** A tab has just been created (main thread): enable the debugging interface, switch to the desktop WebView settings, and turn off the X-Requested-With header. */
     fun prepare(tab: WebTab, context: Context) {
         val st = tab.view.settings
         init(context, st)
         val link = Link(tab)
         links[tab] = link
-        // 视图换了大小(换了宿主显示、进出接管界面):桌面版的视口缩放跟着重算
+        // The view changed size (moved to another host display, entering or leaving the takeover UI): the desktop viewport scale is recomputed
         tab.view.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
             if (r - l != or - ol || b - t != ob - ot) onViewResized(link)
         }
@@ -114,20 +114,20 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         link.acceptLanguage = chosenAcceptLanguage()
     }
 
-    /** 主文档加载前(主线程,可挂起):按目标网站选好手机版或桌面版,并尽量在第一次导航前连好会话、设好仿真。 */
+    /** Before the main document loads (main thread, may suspend): pick mobile or desktop for the target site, and try to connect the session and set up emulation before the first navigation. */
     suspend fun beforeLoad(tab: WebTab, url: String) {
         val link = links[tab] ?: return
         val mobile = wantsMobile(link, url) ?: false
         val changed = link.mobile != mobile
         if (changed) switchMode(link, mobile)
-        // 用户中途换了 Claire 的语言:已开着的标签在下一次主文档加载前换过来(这里重设仿真,这一页就按新的语言请求)
+        // The user changed Claire's language midway: already open tabs switch over before the next main document load (emulation is re-set here, so this page is requested in the new language)
         chosenAcceptLanguage().let { lang ->
             if (lang != link.acceptLanguage) {
                 link.acceptLanguage = lang
                 link.configured = null
             }
         }
-        // 连接与仿真在后台做,这里至多等一小会儿:到点就照常加载(这一页先按 WebView 设置的退路走,连上后再换)
+        // Connecting and emulation happen in the background, and only a short wait is made here: on timeout it loads as usual (this page takes the WebView-settings fallback first and switches once connected)
         bounded(BEFORE_LOAD_WAIT_MS) {
             val s = attach(link)
             if (s != null && link.configured != link.mobile) link.lock.withLock { configure(link, s) }
@@ -135,15 +135,15 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         }
     }
 
-    // 在独立的协程里做,调用方等到上限就走,不会被里面的阻塞读写拖住
+    // Runs in a separate coroutine; the caller leaves once the limit is reached and is not held up by blocking reads inside
     private suspend fun <T> bounded(timeoutMs: Long, block: suspend () -> T?): T? {
         val job = scope.async { block() }
         return withTimeoutOrNull(timeoutMs) { job.await() }
     }
 
     /**
-     * 主文档开始加载(主线程):点链接、跳转到了另一种版本的网站时换过来,并重新加载一次。
-     * 不是网页(about:blank 等)的不动。
+     * The main document started loading (main thread): when a link is clicked onto, or a redirect lands on, a site of the other version, switch over and reload once.
+     * Non-web pages (about:blank and the like) are left alone.
      */
     fun onPageStarted(tab: WebTab, url: String?) {
         val link = links[tab] ?: return
@@ -159,35 +159,35 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     }
 
     /**
-     * 这个标签自己定每个网站用哪一版([policy] 收主机名,返回 true 为手机版),不再看按站点记住的那份(Agent 的);
-     * 设为 null 换回那份。只影响这一个标签,下一次主文档加载时生效(当前页由调用方重新加载)。主线程调用。
+     * This tab decides for itself which version each site uses ([policy] takes a host name and returns true for mobile), instead of the per-site records (the Agent's);
+     * set to null to go back to those. Affects only this tab, and takes effect at the next main document load (the caller reloads the current page). Called on the main thread.
      */
     fun setModePolicy(tab: WebTab, policy: ((String?) -> Boolean)?) {
         links[tab]?.policy = policy
     }
 
     /**
-     * 这个标签由用户亲手看、亲手点(浏览器页里的标签):桌面版也不加视口仿真,页面能双指缩放(见 [DesktopProfile.viewportCall])。
-     * 下一次配置会话时生效。主线程调用。
+     * This tab is viewed and tapped by the user personally (tabs in the browser page): even in desktop mode no viewport emulation is added, so the page supports pinch zoom (see [DesktopProfile.viewportCall]).
+     * Takes effect the next time the session is configured. Called on the main thread.
      */
     fun setHandOperated(tab: WebTab) {
         links[tab]?.handOperated = true
     }
 
-    /** Agent 的标签打开 [host] 时用不用手机版(按站点记住的那份;还没有任何标签建好时按默认的桌面版)。 */
+    /** Whether the Agent's tab should use mobile when opening [host] (per the per-site records; the default desktop when no tab has been created yet). */
     fun agentWantsMobile(host: String?): Boolean = modes?.isMobile(host) ?: false
 
-    // 标签自己的规则优先;没有就看按站点记住的那份,还没读进来为 null
+    // The tab's own rule takes precedence; otherwise the per-site records are used, and null before they have been loaded
     private fun wantsMobile(link: Link, url: String): Boolean? {
         val host = WebUrlPolicy.host(url)
         link.policy?.let { return it(host) }
         return modes?.isMobile(host)
     }
 
-    /** 这个视图该挂在桌面视口大小的宿主显示上(所在标签用桌面版)。不认识的视图为 false。 */
+    /** Whether this view should be hosted on the desktop-viewport-sized host display (the tab owning it uses desktop). False for unknown views. */
     fun wantsDesktopHost(view: WebView): Boolean = links.values.firstOrNull { it.tab.view === view }?.let { !it.mobile } ?: false
 
-    // 主线程:两层设置换过来,挂在宿主上的视图换到对应大小的显示
+    // Main thread: switch both layers of settings over and move a hosted view to the display of the matching size
     private fun switchMode(link: Link, mobile: Boolean) {
         link.mobile = mobile
         applySettings(link.tab.view.settings, mobile)
@@ -196,8 +196,8 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     }
 
     /**
-     * 主线程:桌面版在每个文档(含框架)开始时注入身份补丁([DesktopProfile.identityScript]),手机版撤掉。
-     * 系统不支持文档开始注入时由会话上的 Page.addScriptToEvaluateOnNewDocument 代替(见 [configure])。
+     * Main thread: in desktop mode, inject the identity patch ([DesktopProfile.identityScript]) at the start of every document (frames included); in mobile mode remove it.
+     * When the system does not support document-start injection, Page.addScriptToEvaluateOnNewDocument on the session takes its place (see [configure]).
      */
     private fun applyIdentityScript(link: Link) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
@@ -220,24 +220,24 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         }
     }
 
-    /** 标签关了:断开会话、忘掉它。 */
+    /** The tab was closed: disconnect the session and forget it. */
     fun release(tab: WebTab) {
         val link = links.remove(tab) ?: return
         link.session?.let { s -> scope.launch { s.close() } }
         link.session = null
     }
 
-    /** 记下站点用手机版还是桌面版;当前页要由调用方重新加载(加载前 [beforeLoad] 会换过来)。 */
+    /** Records whether the site uses mobile or desktop; the current page must be reloaded by the caller ([beforeLoad] switches over before loading). */
     fun setSiteMode(host: String, mobile: Boolean) {
         modes?.set(host, mobile)
     }
 
-    /** 测试用:换回真实的会话来源(别的测试换过 [provider] 没换回时)。 */
+    /** For tests: restore the real session source (used when another test replaced [provider] and did not restore it). */
     fun resetProvider() {
         provider = this::cached
     }
 
-    /** 测试用:忘掉检测到的连法,下次重新检测。 */
+    /** For tests: forget the detected route so it is detected again next time. */
     fun resetRoute() {
         path = null
         directFailed = false
@@ -245,39 +245,39 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         _available.value = false
     }
 
-    // ---------- 内部 ----------
+    // ---------- Internals ----------
 
     private class Link(val tab: WebTab) {
         val lock = Mutex()
         @Volatile var session: CdpSession? = null
         @Volatile var targetId: String? = null
         @Volatile var mobile = false
-        /** 这个标签自己的版本规则(见 [setModePolicy]);null 时按站点记住的那份。 */
+        /** This tab's own version rule (see [setModePolicy]); when null, the per-site records are used. */
         @Volatile var policy: ((String?) -> Boolean)? = null
-        /** 用户亲手操作的标签(见 [setHandOperated]):不加视口仿真。 */
+        /** A tab operated by the user personally (see [setHandOperated]): no viewport emulation. */
         @Volatile var handOperated = false
-        /** 网页按哪种语言请求(Accept-Language 的值);null 是跟随系统、不覆盖。建标签和每次主文档加载前按 Claire 的语言取。 */
+        /** The language the page is requested in (the Accept-Language value); null means follow the system, no override. Taken from Claire's language when the tab is created and before every main document load. */
         @Volatile var acceptLanguage: String? = null
-        /** 会话上已设好的版本;null 是还没设。 */
+        /** The version already configured on the session; null means it has not been set yet. */
         @Volatile var configured: Boolean? = null
         @Volatile var degradedAt = 0L
         @Volatile var loadedBeforeAttach = false
         @Volatile var everAttached = false
-        /** 当前仿真下 Input 域坐标与 CSS 像素之比(见 [CdpSession.inputScale])。 */
+        /** Ratio of Input domain coordinates to CSS pixels under the current emulation (see [CdpSession.inputScale]). */
         @Volatile var inputScale = 1.0
-        /** 不加视口仿真时页面的 devicePixelRatio(WebView 每 CSS 像素占几个视图像素),及量它时视图所在的显示。 */
+        /** The page's devicePixelRatio without viewport emulation (how many view pixels the WebView takes per CSS pixel), and the display the view was on when it was measured. */
         @Volatile var baseDpr: Double? = null
         @Volatile var baseDprDisplay = -1
-        /** 这条会话上已经设了视口仿真;设后页面读到的 devicePixelRatio。 */
+        /** Viewport emulation has already been set on this session; the devicePixelRatio the page reports after it is set. */
         @Volatile var metricsSet = false
         @Volatile var emulatedDpr: Double? = null
-        /** 文档开始注入的桌面身份补丁(主线程动);手机版时为 null。 */
+        /** The desktop identity patch injected at document start (touched on the main thread); null in mobile mode. */
         var identityScript: ScriptHandler? = null
-        /** 系统不支持文档开始注入时,在这条会话上登记的同一份补丁的编号。 */
+        /** Identifier of the same patch registered on the session when the system does not support document-start injection. */
         @Volatile var sessionScriptId: String? = null
     }
 
-    /** 一种连法。 */
+    /** One route. */
     private class Path(val route: Route, val transport: CdpTransport)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -291,7 +291,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     @Volatile private var desktopUa: String? = null
     @Volatile private var desktopMetadata: UserAgentMetadata? = null
     @Volatile private var defaultMetadata: UserAgentMetadata? = null
-    /** WebView 的默认手机身份(UA 与 CDP 样子的 UA-CH):手机版选定了语言时照搬它,只换语言。 */
+    /** WebView's default mobile identity (UA plus a CDP-style UA-CH): copied as-is when mobile mode has a chosen language, replacing only the language. */
     @Volatile private var defaultUa: String = ""
     @Volatile private var defaultMetadataJson: JsonObject? = null
     @Volatile private var appContext: Context? = null
@@ -312,7 +312,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         this.defaultUa = defaultUa
         val (major, full) = DesktopProfile.version(defaultUa) ?: ("120" to "120.0.0.0")
         val metadataOk = WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)
-        // 第一次改设置之前取内核自己的 UA-CH,手机版站点换回它
+        // Take the engine's own UA-CH before the first settings change, so mobile sites can switch back to it
         val probe = if (metadataOk) runCatching { WebSettingsCompat.getUserAgentMetadata(st) }.getOrNull() else null
         val engine = probe?.brandVersionList?.map { Brand(it.brand, it.majorVersion, it.fullVersion) }
         val brands = DesktopProfile.brands(engine, major, full)
@@ -335,15 +335,15 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     }
 
     /**
-     * 用户在 Claire 里选定的语言对应的 Accept-Language;跟随系统为 null。标签先按 ICU 的常见写法补全
-     * (en → en-Latn-US)再写成请求头。
+     * The Accept-Language for the language the user has chosen in Claire; null when following the system. The tag is first completed in ICU's common form
+     * (en → en-Latn-US) and then written as a request header.
      */
     private fun chosenAcceptLanguage(): String? {
         val tag = appContext?.let { runCatching { AppLanguage.current(it).tag }.getOrNull() } ?: return null
         return PageLanguage.acceptLanguage(ULocale.addLikelySubtags(ULocale.forLanguageTag(tag)).toLanguageTag())
     }
 
-    // 退路这一层:UA、UA-CH(支持时)、宽视口。仿真连上后以仿真为准(语言只有仿真能设,见 [attach] 里的重新加载)
+    // The fallback layer: UA, UA-CH (when supported), wide viewport. Once emulation is connected it takes precedence (the language can only be set through emulation, see the reload in [attach])
     private fun applySettings(st: WebSettings, mobile: Boolean) {
         st.userAgentString = if (mobile) null else desktopUa
         st.useWideViewPort = !mobile
@@ -379,20 +379,20 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         }
         if (s == null) {
             link.degradedAt = SystemClock.elapsedRealtime()
-            // 代连这条路可能已经断了(助手没了):下次重新检测
+            // The relay route may already be broken (the helper is gone): detect it again next time
             if (p.route == Route.Relay) invalidate(p)
             return null
         }
         link.session = s
         link.degradedAt = 0L
         link.configured = null
-        // 新会话上没有仿真(断开时 WebView 已撤销)
+        // There is no emulation on a new session (WebView has reverted it on disconnect)
         link.metricsSet = false
         link.sessionScriptId = null
         runCatching { configure(link, s) }.onFailure { Log.w(TAG, "emulation on tab ${tab.id}: ${it.message}") }
         if (!link.everAttached && link.loadedBeforeAttach && (!link.mobile || link.acceptLanguage != null)) {
-            // 页面在仿真设好之前就加载了(弹出的标签、第一页没等到会话等):按桌面版或选定的语言重新加载一次。
-            // WebView 设置里没有语言这一项,只有仿真能换请求头,所以手机版选定了语言时也要重载
+            // The page loaded before emulation was set up (a popped-up tab, the first page not waiting for the session, etc.): reload once in desktop mode or with the chosen language.
+            // WebView settings have no language entry, and only emulation can change request headers, so mobile mode with a chosen language must reload too
             withContext(Dispatchers.Main) { if (!tab.destroyed) tab.view.reload() }
         }
         link.everAttached = true
@@ -403,7 +403,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     private suspend fun configure(link: Link, s: CdpSession) {
         val mobile = link.mobile
         if (mobile) {
-            // 跟随系统时空 UA 即撤销覆盖,回到 WebView 设置里的(已换回默认);选定了语言时照搬默认身份、只换语言
+            // When following the system, an empty UA removes the override, returning to the WebView settings (already switched back to the default); with a chosen language, copy the default identity and only replace the language
             s.send("Emulation.setUserAgentOverride", PageLanguage.mobileOverride(defaultUa, defaultMetadataJson, link.acceptLanguage), timeoutMs = CALL_TIMEOUT_MS)
             s.send("Emulation.clearDeviceMetricsOverride", timeoutMs = CALL_TIMEOUT_MS)
             link.metricsSet = false
@@ -415,14 +415,14 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
                 link.sessionScriptId = null
             }
         } else {
-            // 还没排版时按宿主默认的桌面视口尺寸
+            // Before layout has happened, use the host's default desktop viewport size
             val (size, display) = withContext(Dispatchers.Main) {
                 val v = link.tab.view
                 (if (v.width > 0 && v.height > 0) v.width to v.height else DesktopProfile.HOST_WIDTH to DesktopProfile.HOST_HEIGHT) to (v.display?.displayId ?: -1)
             }
             val (w, h) = size
             desktop?.let { s.send("Emulation.setUserAgentOverride", PageLanguage.withLanguage(it, link.acceptLanguage), timeoutMs = CALL_TIMEOUT_MS) }
-            // 触摸、指针与悬停:每条单独发,内核不认的那条不影响别的
+            // Touch, pointer and hover: each is sent separately, so one the engine does not accept does not affect the others
             for ((m, p) in DesktopProfile.emulationCalls()) {
                 runCatching { s.send(m, p, timeoutMs = CALL_TIMEOUT_MS) }.onFailure { Log.i(TAG, "$m not applied on tab ${link.tab.id}: ${it.message}") }
             }
@@ -437,7 +437,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
             DesktopProfile.viewportCall(hand, w, h, fit).let { (m, p) -> s.send(m, p, timeoutMs = CALL_TIMEOUT_MS) }
             link.metricsSet = !hand
             link.emulatedDpr = if (hand) null else readDpr(s)
-            // 缩放后 Input 域的坐标按缩放前的视图(DIP)解释:调用方照旧给 CSS 像素,发送时乘上
+            // After scaling, Input domain coordinates are interpreted in the pre-scale view (DIP): callers still pass CSS pixels, which are multiplied when sending
             s.inputScale = fit ?: 1.0
             link.inputScale = s.inputScale
             Log.i(TAG, if (hand) "tab ${link.tab.id} desktop identity without viewport emulation (hand-operated)" else "tab ${link.tab.id} desktop viewport fitted to ${w}x$h view px (scale $fit)")
@@ -446,8 +446,8 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     }
 
     /**
-     * 不加仿真时 WebView 每 CSS 像素占几个视图像素。它取决于 WebView 认的显示密度,视图换了显示可能就变,
-     * 所以按显示记;要重量时先撤掉仿真,等页面读到的值离开仿真时的值再取。
+     * How many view pixels the WebView takes per CSS pixel without emulation. It depends on the display density the WebView sees and may change when the view moves to another display,
+     * so it is recorded per display; to re-measure, clear the emulation first and wait until the value the page reports moves away from the emulated one.
      */
     private suspend fun baseDpr(link: Link, s: CdpSession, display: Int): Double {
         link.baseDpr?.takeIf { link.baseDprDisplay == display }?.let { return it }
@@ -479,13 +479,13 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
             val tab = link.tab
             if (links[tab] !== link || tab.destroyed || tab.crashed || link.session !== s) return@launch
             link.session = null
-            // 每次断线各重连一次;连不上这个标签降级,过一阵再试
+            // One reconnect per disconnect; if that fails the tab is degraded and retried later
             delay(RECONNECT_BACKOFF_MS)
             if (attach(link) == null) Log.w(TAG, "tab ${tab.id} lost its devtools session and could not reconnect: degraded")
         }
     }
 
-    /** 已知 targetId:直接连回去(标签与目标的对应跨导航不变)。目标没了为 null。 */
+    /** Known targetId: connect straight back (the tab-to-target mapping is unchanged across navigations). Null if the target is gone. */
     private suspend fun reopen(p: Path, targetId: String): CdpSession? {
         val t = CdpDiscovery.list(p.transport, socketName, timeoutMs = DISCOVERY_TIMEOUT_MS).firstOrNull { it.id == targetId } ?: return null
         val ws = t.webSocketDebuggerUrl ?: return null
@@ -515,7 +515,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         return null
     }
 
-    // 握手有上限(到点关流),卡住的握手不会一直占着标签的锁
+    // The handshake has a limit (the stream is closed on timeout), so a stuck handshake does not hold the tab's lock forever
     private suspend fun connect(p: Path, webSocketUrl: String): CdpSession? =
         try {
             CdpSession.connect(p.transport, socketName, CdpDiscovery.webSocketPath(webSocketUrl), handshakeTimeoutMs = CONNECT_TIMEOUT_MS)
@@ -526,7 +526,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
             null
         }
 
-    /** 在标签当前文档里写下标记(主线程执行),等它执行完。 */
+    /** Writes the marker into the tab's current document (executed on the main thread) and waits for it to finish. */
     private suspend fun mark(tab: WebTab, marker: String): Boolean {
         val done = CompletableDeferred<Boolean>()
         withContext(Dispatchers.Main) {
@@ -576,7 +576,7 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
     companion object {
         private const val TAG = "MikaDevtools"
         private const val ATTACH_TIMEOUT_MS = 3_000L
-        /** 第一次导航前等会话的上限:连不上也不能把打开网页拖太久。 */
+        /** Upper bound for waiting for the session before the first navigation: failing to connect must not hold up opening a web page for too long. */
         private const val BEFORE_LOAD_WAIT_MS = 2_500L
         private const val PROBE_TIMEOUT_MS = 2_000L
         private const val DISCOVERY_TIMEOUT_MS = 3_000L
@@ -586,12 +586,12 @@ class WebDevtools(private val relay: ((String) -> ParcelFileDescriptor?)?) {
         private const val RECONNECT_BACKOFF_MS = 500L
         private const val DPR_SETTLE_MS = 500L
         private const val DPR_POLL_MS = 50L
-        /** 降级的标签过这么久再试一次(助手可能重新起来了)。 */
+        /** A degraded tab is retried after this long (the helper may have come back up). */
         private const val DEGRADED_RETRY_MS = 60_000L
-        /** 代连检测失败后过这么久才再测(助手可能还没起来)。 */
+        /** After a relay probe fails, wait this long before probing again (the helper may not be up yet). */
         private const val RELAY_RETRY_MS = 15_000L
 
-        /** 进程里那一份(App 给出)。 */
+        /** The single one in the process (provided by the App). */
         fun of(context: Context): WebDevtools = WebOwner.of(context).webDevtools
     }
 }

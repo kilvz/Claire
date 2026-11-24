@@ -7,14 +7,14 @@ import android.webkit.WebViewDatabase
 import com.wangzan101.mika.core.cap.web.WebUrlPolicy
 
 /**
- * 退出网站:尽力而为。系统接口只能按网址读到 Cookie 的名字,读不到路径、域与 HttpOnly 细节,
- * 所以对这个主机名及各级上级域(到可注册域名为止)读到的每个 Cookie,分别按「只属于主机」和「属于整个域」写一条过期记录,
- * 再清掉这些来源的网页存储。个别网站的登录可能仍在,彻底清除用 [logoutAll]。
- * [cookies]、[storage] 用 mika 网页配置的(见 [WebTab.cookieManager]);主线程调用。
+ * Signing out of a website: best effort. The system APIs can only read Cookie names by URL, not paths, domains or HttpOnly details,
+ * so for every Cookie read for this host name and each parent domain level (down to the registrable domain), write one expiry record for "host only" and one for "whole domain",
+ * then clear the web storage of those origins. On a few sites the login may remain; use [logoutAll] to clear thoroughly.
+ * [cookies] and [storage] come from the mika web profile (see [WebTab.cookieManager]); called on the main thread.
  */
 class WebLogin(private val cookies: CookieManager, private val storage: WebStorage, private val registry: SiteRegistry?) {
 
-    /** 返回过期掉的 Cookie 个数(按名字计)。 */
+    /** Returns the number of expired Cookies (counted by name). */
     fun logout(host: String): Int {
         val h = WebUrlPolicy.host("https://${host.trim()}") ?: return 0
         var expired = 0
@@ -34,8 +34,8 @@ class WebLogin(private val cookies: CookieManager, private val storage: WebStora
     }
 
     /**
-     * 全部退出并清除网页数据:所有 Cookie(含会话 Cookie)、所有网页存储、[views] 的缓存(缓存是整个网页配置共用的,
-     * 给一个视图就清掉全部)、[database] 里记住的 HTTP 认证账号,站点登记表清空。仍是尽力而为。
+     * Sign out everywhere and clear web data: all Cookies (including session Cookies), all web storage, the cache of [views] (the cache is shared by the whole web profile,
+     * so one view clears all of it), the HTTP auth credentials remembered in [database], and the site registry is emptied. Still best effort.
      */
     fun logoutAll(views: List<WebView> = emptyList(), database: WebViewDatabase? = null) {
         cookies.removeSessionCookies(null)
@@ -48,7 +48,7 @@ class WebLogin(private val cookies: CookieManager, private val storage: WebStora
     }
 
     companion object {
-        /** 主机名和它的各级上级域,到可注册域名为止;认不出可注册域名时只有它自己。 */
+        /** The host name and its successive parent domains, down to the registrable domain; if the registrable domain cannot be determined, only the host itself. */
         fun domainsFor(host: String): List<String> {
             val top = WebUrlPolicy.registrable(host) ?: return listOf(host)
             val out = mutableListOf<String>()
@@ -61,11 +61,11 @@ class WebLogin(private val cookies: CookieManager, private val storage: WebStora
             return out
         }
 
-        /** Cookie 头里的名字,去重,保持顺序。 */
+        /** Names in a Cookie header, de-duplicated, order preserved. */
         fun cookieNames(header: String?): List<String> =
             header.orEmpty().split(';').map { it.substringBefore('=').trim() }.filter { it.isNotEmpty() }.distinct()
 
-        /** 让一个 Cookie 过期的两条写法:只属于主机的,和属于整个域的。 */
+        /** The two forms that expire one Cookie: host-only, and whole domain. */
         fun expiryLines(name: String, domain: String) = listOf(
             "$name=; Max-Age=0; Path=/",
             "$name=; Max-Age=0; Path=/; Domain=.$domain",

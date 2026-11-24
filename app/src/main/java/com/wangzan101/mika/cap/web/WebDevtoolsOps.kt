@@ -38,8 +38,8 @@ import com.wangzan101.mika.cap.web.WebScreen.Companion.OFFSCREEN
 import com.wangzan101.mika.cap.web.WebScreen.Companion.DEVTOOLS_REF
 import com.wangzan101.mika.cap.web.WebScreen.Companion.STALE
 
-// 网页屏:调试协议连接、网络静默等待、点击与坐标换算
-/** 网络与等待用的当前标签:崩溃、接管中照读页的规矩抛出;没有标签为 null。 */
+// Web screen: debugging protocol connection, network-quiet waiting, clicking and coordinate conversion
+/** The current tab for network and waiting work: crashes and takeovers in progress throw per the page-reading rules; null when there is no tab. */
 internal fun WebScreen.netTab(): WebTab? {
     crashedTab()?.takeIf { currentTab() == null }?.let { throw WebTabCrashed(it) }
     val tab = currentTab() ?: return null
@@ -60,9 +60,9 @@ internal fun WebScreen.uploadResult(r: ActionResult, handed: Boolean, prepared: 
 }
 
 /**
- * 编号 → 页面里还在的元素。快照里的元素还连在文档上就直接用(页面元素有真实身份,不怕列表复用);
- * 已不在(重新渲染、换了页面)时重读一屏,按 M1 的规则找唯一对应者,找不到为 null(ref_expired)。
- * 两条路都会把元素滚进视口中央。
+ * Ref → the element that is still in the page. If the element from the snapshot is still attached to the document, use it directly (page elements have real identity, so list reuse does not matter);
+ * if it is gone (re-rendered, page changed), read one more screen and find the unique match by the M1 rules, or null (ref_expired) if none is found.
+ * Both paths scroll the element into the center of the viewport.
  */
 internal suspend fun WebScreen.resolve(tab: WebTab, ref: String, snapshotId: String): Target? {
     val snap = synchronized(history) { history.firstOrNull { it.id == snapshotId } } ?: return null
@@ -87,7 +87,7 @@ internal suspend fun WebScreen.resolve(tab: WebTab, ref: String, snapshotId: Str
     return Target(key, freshRef, now, now.name, fresh.scale)
 }
 
-/** 只有无障碍树知道的元素:经 DevTools 滚进视口、重新取框;会话没了、元素已不在时为 null。 */
+/** Elements known only to the accessibility tree: scroll into the viewport and re-take the box through DevTools; null when the session is gone or the element is no longer there. */
 internal suspend fun WebScreen.devtoolsTarget(tab: WebTab, snap: Snap, ref: String, key: String, element: UiElement, relocatedTo: String?): Target? {
     val anchor = snap.anchors[ref] ?: return null
     val session = tab.devtools.session(tab) ?: return null
@@ -100,7 +100,7 @@ internal suspend fun WebScreen.devtoolsTarget(tab: WebTab, snap: Snap, ref: Stri
         cssPoint = placed.x.roundToInt() to placed.y.roundToInt())
 }
 
-// 目标中心点上真是它自己(或它的子孙)才点;被盖住时说出盖住它的是什么
+// Click only when the target point really is it (or one of its descendants); when it is covered, say what covers it
 internal suspend fun WebScreen.reachable(tab: WebTab, t: Target): Reach = if (t.devtools) {
     when {
         t.point == null || t.cssPoint == null -> Reach.Blocked(ActionResult.Failed(OFFSCREEN))
@@ -116,21 +116,21 @@ internal suspend fun WebScreen.reachable(tab: WebTab, t: Target): Reach = if (t.
     HitResult.Gone -> Reach.Blocked(STALE)
 }
 
-// 指纹不算非输入框的焦点:点一下按钮让它获得焦点不是「界面变了」
+// The fingerprint does not count focus on non-input elements: focusing a button by clicking it is not "the UI changed"
 internal suspend fun WebScreen.state(tab: WebTab): PageState {
     val snap = read(tab, null, "w${tab.id}-state").snapshot
     val fingerprint = snap.elements.map { e -> listOf(e.role, e.name, e.bounds, e.editable && e.focused) }.hashCode()
-    // 弹框挂着时页面脚本停着,变动计数读不到
+    // With a dialog up the page script is stalled, so the mutation count cannot be read
     val mutations = if (snap.web?.dialog != null) -1L else script(tab).mutationCount()
     return PageState(snap.web?.url, mutations, fingerprint)
 }
 
-/** 动作开始前调:有 DevTools 时拿到(必要时打开)这个标签的网络记录,并记下「这次动作从这里开始」。 */
+/** Called before an action starts: when DevTools is available, obtains (opening it if needed) this tab's network recording and notes "this action starts here". */
 internal suspend fun WebScreen.network(tab: WebTab): NetworkTracker? = NetworkTracker.of(tab, clock)?.also { it.markAction() }
 
-/** 连续 [quietMs] 没有页面变动、地址不变且主文档不在加载时为安静;到 [capMs] 还不安静就返回 false。 */
+/** Quiet when there has been no page mutation for [quietMs] in a row, the URL is unchanged and the main document is not loading; returns false if it is still not quiet at [capMs]. */
 internal suspend fun WebScreen.awaitQuiet(tab: WebTab, quietMs: Long, capMs: Long): Boolean {
-    // 页面弹框挂着:页面停着,不会再变,也读不动
+    // A page dialog is up: the page is stalled, it will not change again and cannot be read either
     if (tab.dialogs.current != null) return true
     val s = script(tab)
     val deadline = clock() + capMs
@@ -140,7 +140,7 @@ internal suspend fun WebScreen.awaitQuiet(tab: WebTab, quietMs: Long, capMs: Lon
     while (true) {
         delay(POLL_MS)
         if (tab.crashed) return false
-        // 动作弹出了页面弹框:页面停着,不会再变,也读不动
+        // The action raised a page dialog: the page is stalled, it will not change again and cannot be read either
         if (tab.dialogs.current != null) return true
         val m = s.mutationCount()
         val u = url(tab)
@@ -155,15 +155,15 @@ internal suspend fun WebScreen.awaitQuiet(tab: WebTab, quietMs: Long, capMs: Lon
     }
 }
 
-/** 这个标签此刻能用来输入的会话;没有、已断、或 Input 卡住过的为 null。 */
+/** The session usable for input on this tab right now; null if there is none, it has closed, or Input got stuck on it before. */
 internal fun WebScreen.devtools(tab: WebTab): CdpSession? {
     val s = runCatching { tab.devtools.session(tab) }.getOrNull()?.takeIf { !it.closed.value } ?: return null
     return s.takeIf { synchronized(inputStuck) { inputStuck[tab] } !== s }
 }
 
 /**
- * 用 DevTools 做一次输入 [block]:做完为 true;一个事件都没送出去(没有会话、会话已断、第一发就被拒)为 false,
- * 调用方可以改走原生输入;送出过事件后失败(含超时)抛 [InputUncertain],按着的键已抬起。
+ * Performs one input action through DevTools [block]: true when done; false when not a single event was sent (no session, session closed, rejected on the very first send), so the
+ * caller may fall back to native input; failing after events were sent (timeouts included) throws [InputUncertain], and any key being held has been released.
  */
 internal suspend fun WebScreen.cdp(tab: WebTab, what: String, block: suspend InputTrack.() -> Unit): Boolean {
     val s = devtools(tab) ?: return false
@@ -182,7 +182,7 @@ internal suspend fun WebScreen.cdp(tab: WebTab, what: String, block: suspend Inp
     }
 }
 
-/** 滚轮只给桌面版、且正挂在窗口上显示的标签用:后台(没在画)的页面上滚轮会卡住 Input。 */
+/** The scroll wheel is only used on desktop-mode tabs currently attached and shown in a window: on a background (not drawing) page the wheel makes Input hang. */
 internal suspend fun WebScreen.wheelable(tab: WebTab): Boolean = !tab.devtools.isMobile(tab) && withContext(Dispatchers.Main) {
     val v = tab.view
     v.isAttachedToWindow && v.isShown && v.windowVisibility == android.view.View.VISIBLE
@@ -196,7 +196,7 @@ internal suspend fun WebScreen.click(tab: WebTab, p: Reach.Point) {
     if (!cdp(tab, "click") { mouseClick(p.cssX.toDouble(), p.cssY.toDouble()) }) input(tab).tap(p.x, p.y)
 }
 
-/** 落点换成 CSS 像素:编号按点击的规则解析并做遮挡检查;坐标是 view 像素,按此刻的视口宽换算。 */
+/** Converts the target to CSS pixels: a ref is resolved by the click rules with an occlusion check; coordinates are view pixels and are converted with the current viewport width. */
 internal suspend fun WebScreen.cssPoint(tab: WebTab, at: WebPoint): Spot = when (at) {
     is WebPoint.Ref -> {
         val t = resolve(tab, at.ref, at.snapshotId)

@@ -25,22 +25,22 @@ import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.nio.ByteBuffer
 
-/** 网页标签挂在哪里:私有显示上的 Presentation、直接加到该显示的窗口、或不挂窗口(页面可能没完全渲染)。 */
+/** Where a web tab is hosted: a Presentation on the private display, added directly to that display's window, or not attached to a window (the page may not fully render). */
 enum class HostMode { Presentation, WindowManager, Detached }
 
 /**
- * 网页标签的后台宿主:App 自建的私有虚拟显示(不带 PUBLIC 标志,不经 shell 身份的助手),
- * 上面放一个窗口承载当前标签的 WebView。页面因此认为自己可见,定时器、动画帧、懒加载照常运转;
- * 显示的画面进 ImageReader,只给截图和视觉定位用。
+ * Background host for web tabs: an app-created private virtual display (without the PUBLIC flag, not through a shell-identity helper),
+ * with a window on it carrying the current tab's WebView. The page therefore considers itself visible, and timers, animation frames and lazy loading keep running;
+ * the displayed picture goes into an ImageReader, used only for screenshots and visual localization.
  *
- * 两块显示:手机版标签挂在与主屏一样大的那块上;桌面版标签挂在桌面视口大小的那块上。每块都只在有标签要用时才建
- * (桌面版是默认,所以建宿主时先建它;建不起来就用手机那块),不白建、白拆显示;
- * 页面按 1 CSS 像素对 1 像素画,截图清楚、坐标不被压缩。同一时间只挂一个视图,[width]、[height]、截图都按它所在的那块。
+ * Two displays: mobile-mode tabs go on the one the same size as the main screen; desktop-mode tabs go on the one the size of the desktop viewport. Each is created only when a tab needs it
+ * (desktop is the default, so it is created first when building the host; if that fails the phone one is used), so displays are neither created nor torn down for nothing;
+ * pages draw 1 pixel per 1 CSS pixel, so screenshots are sharp and coordinates are not compressed. Only one view is attached at a time, and [width], [height] and screenshots all follow the display it is on.
  *
- * 构造、attach/detach、close 都在主线程调用。
+ * The constructor, attach/detach and close are all called on the main thread.
  */
 class WebHost(private val context: Context, widthPx: Int, heightPx: Int, densityDpi: Int) : Closeable {
-    /** 一块私有显示及其上的窗口、帧。 */
+    /** One private display plus the window and frames on it. */
     private inner class Layer(val width: Int, val height: Int, dpi: Int, name: String) {
         val reader: ImageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 3)
         val virtualDisplay: VirtualDisplay
@@ -49,7 +49,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         var presentation: Presentation? = null
         var windowManager: WindowManager? = null
 
-        // pendingImage/copyScheduled/lastCopyAt/scratch 只在帧线程上动;frame 由 frameLock 保护,截图从任意线程读
+        // pendingImage/copyScheduled/lastCopyAt/scratch are touched only on the frame thread; frame is guarded by frameLock, and screenshots read it from any thread
         val frameLock = Any()
         var frame: Bitmap? = null
         var pendingImage: Image? = null
@@ -63,7 +63,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
             try {
                 reader.setOnImageAvailableListener({ r -> onFrame(r) }, frameHandler)
                 val dm = context.getSystemService(DisplayManager::class.java)
-                // flags=0:私有显示,只有本 App 能往上放内容
+                // flags=0: a private display, where only this app can put content
                 vd = dm.createVirtualDisplay(name, width, height, dpi, reader.surface, 0)
                     ?: error("createVirtualDisplay returned null")
                 val display = vd.display
@@ -80,7 +80,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
                 virtualDisplay = vd
                 container = box
                 mode = chosen
-                // 视图挂在哪个宿主上,从它的父容器就能找回来(换版本时据此换显示)
+                // Which host a view is attached to can be recovered from its parent container (used to switch displays when the mode changes)
                 box.tag = this@WebHost
             } catch (e: Throwable) {
                 reader.setOnImageAvailableListener(null, null)
@@ -112,7 +112,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         }
 
         private fun addWindow(display: Display): FrameLayout? {
-            // createWindowContext 是安卓 11 起才有的;更早的系统退回没有宿主的 WebView(照常渲染、截图)。
+            // createWindowContext exists only from Android 11; older systems fall back to a hostless WebView (rendering and screenshots as usual).
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
             return try {
                 val wctx = context.createDisplayContext(display)
@@ -137,7 +137,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
 
         fun copy(): Bitmap? = synchronized(frameLock) { frame?.let { Bitmap.createBitmap(it, 0, 0, width, height) } }
 
-        /** 帧线程已停之后调。 */
+        /** Called after the frame thread has stopped. */
         fun release() {
             reader.setOnImageAvailableListener(null, null)
             pendingImage?.close()
@@ -153,7 +153,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
             }
         }
 
-        // 每来一帧只留最新一张,至多每 100 毫秒拷一次;静态页面不再出新帧,压着的最后一帧也会被拷下
+        // Keep only the newest frame per arrival and copy at most once every 100 ms; a static page stops producing frames, but the last pending frame is still copied
         private fun onFrame(r: ImageReader) {
             try {
                 val image = r.acquireLatestImage() ?: return
@@ -175,7 +175,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
             pendingImage = null
             try {
                 val plane = image.planes[0]
-                // 行尾可能有对齐填充:位图按行跨度分配一次反复用,截图时再裁到显示宽度
+                // Row ends may carry alignment padding: the bitmap is allocated once at the row stride and reused, then cropped to the display width when taking a screenshot
                 val stridePx = plane.rowStride / plane.pixelStride
                 synchronized(frameLock) {
                     val cur = frame
@@ -185,7 +185,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
                     val needed = target.byteCount
                     if (src.remaining() >= needed) target.copyPixelsFromBuffer(src)
                     else {
-                        // 最后一行可能不带填充,缓冲比整块位图短:先垫进一块等长的缓冲
+                        // The last row may have no padding, making the buffer shorter than the whole bitmap: pad it into an equally long buffer first
                         val s = scratch?.takeIf { it.capacity() == needed } ?: ByteBuffer.allocateDirect(needed).also { scratch = it }
                         s.clear()
                         s.put(src)
@@ -214,14 +214,14 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
     private var desktopFailed = false
     @Volatile private var active: Layer
 
-    /** 当前挂着的那块显示(也就是网页视口)的像素尺寸。 */
+    /** Pixel size of the display currently hosting the view (which is also the web viewport). */
     val width: Int get() = active.width
     val height: Int get() = active.height
-    /** 当前挂着的那块显示的 id 与挂法。 */
+    /** Id and hosting mode of the display currently in use. */
     val displayId: Int get() = active.displayId
     val mode: HostMode get() = active.mode
 
-    /** [close] 之后为 true:不能再往上挂视图。 */
+    /** True after [close]: no more views can be attached. */
     @Volatile var closed: Boolean = false
         private set
 
@@ -229,7 +229,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         checkMain()
         frameThread = HandlerThread("mika-web-frames").apply { start() }
         frameHandler = Handler(frameThread.looper)
-        // 新标签默认桌面版:先建桌面那块;建不起来再建手机那块,两块都不行就抛出(调用方只给手机界面)
+        // New tabs are desktop by default: create the desktop display first; if that fails create the phone one, and if neither works throw (the caller only offers the phone UI)
         active = try {
             desktopLayer() ?: Layer(widthPx, heightPx, densityDpi, PHONE_NAME).also { phone = it }
         } catch (e: Throwable) {
@@ -240,8 +240,8 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
     }
 
     /**
-     * 把标签的视图放进宿主窗口,替换已挂的那个。[desktop] 为 true 时挂到桌面视口那块显示上(建不起来就挂手机那块);
-     * 默认按这个标签现在用的版本。
+     * Puts the tab's view into the host window, replacing the attached one. When [desktop] is true it goes on the desktop-viewport display (if that cannot be created, the phone one);
+     * by default it follows the version this tab currently uses.
      */
     fun attach(tab: WebTab, desktop: Boolean = tab.devtools.wantsDesktopHost(tab.view)) {
         val view = tab.view
@@ -289,12 +289,12 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         }
     }
 
-    /** 显示上的最新一帧(裁到显示宽度的副本),给画中画小窗用;还没有画面时为 null。 */
+    /** The latest frame on the display (a copy cropped to the display width), for the picture-in-picture window; null while there is no picture yet. */
     fun latestFrame(): Bitmap? = active.copy()
 
     /**
-     * 显示上的最新一帧(至多晚约 100 毫秒);还没有画出过任何一帧时为 null。
-     * PNG 编码要几十毫秒,别在主线程调。
+     * The latest frame on the display (up to about 100 ms old); null if no frame has ever been drawn.
+     * PNG encoding takes tens of milliseconds, so do not call it on the main thread.
      */
     fun latestFramePng(): ByteArray? {
         val bmp = active.copy() ?: return null
@@ -309,7 +309,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         checkMain()
         if (closed) return
         closed = true
-        // 先停帧线程,之后才能安全关掉它手里的图和 reader
+        // Stop the frame thread first; only then can the images and reader it holds be closed safely
         phone?.reader?.setOnImageAvailableListener(null, null)
         desktop?.reader?.setOnImageAvailableListener(null, null)
         frameThread.quitSafely()
@@ -318,7 +318,7 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         desktop?.release()
     }
 
-    // 不挂窗口时没人给视图排版,手动按显示尺寸量一次
+    // With no window attached nothing lays the view out, so measure it once manually at the display size
     private fun layoutDetached(l: Layer, view: View) {
         val w = View.MeasureSpec.makeMeasureSpec(l.width, View.MeasureSpec.EXACTLY)
         val h = View.MeasureSpec.makeMeasureSpec(l.height, View.MeasureSpec.EXACTLY)
@@ -335,8 +335,8 @@ class WebHost(private val context: Context, widthPx: Int, heightPx: Int, density
         private const val PHONE_NAME = "mika-web"
 
         /**
-         * 视图所在标签换了手机版/桌面版:它若正挂在某个宿主上,就换到对应大小的那块显示上。不论当初是谁挂上去的。
-         * 不在宿主上(接管中在用户手上、在后台)的不动,下次挂上时按版本挂。主线程调用。
+         * The tab owning the view switched to mobile/desktop mode: if it is currently attached to some host, move it to the display of the matching size. Regardless of who attached it originally.
+         * Views not on a host (in the user's hands during a takeover, or in the background) are left alone and attached by mode the next time. Called on the main thread.
          */
         fun followMode(tab: WebTab) {
             val host = (tab.view.parent as? View)?.tag as? WebHost ?: return

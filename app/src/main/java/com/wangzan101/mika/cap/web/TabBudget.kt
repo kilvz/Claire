@@ -1,15 +1,15 @@
 package com.wangzan101.mika.cap.web
 
 /**
- * 进程里所有任务的网页标签共用的上限(全局至多 [max] 个):每个任务一个标签池,各池作为 [Member] 加入。
- * 「最近用过」用这里的同一个钟,跨任务也比得出谁最久没用。成员的方法都在主线程上调。
+ * Upper limit shared by the web tabs of all tasks in the process (at most [max] in total): each task has one tab pool, and each pool joins as a [Member].
+ * "Recently used" uses the same clock here, so the least recently used tab can be compared across tasks. Member methods are all called on the main thread.
  */
 class TabBudget(val max: Int = DEFAULT_MAX) {
     interface Member {
         fun tabCount(): Int
-        /** 最久没用、可以关掉的标签(编号, 最近用过的时刻);锁住的(接管中)和 [except] 不算。没有为 null。 */
+        /** The least recently used tab that can be closed (id, time last used); locked ones (being taken over) and [except] do not count. Null if there is none. */
         fun oldestSpare(except: String?): Pair<String, Long>?
-        /** 因为全局上限关掉它(发「limit」事件)。 */
+        /** Close it because of the global limit (emits a "limit" event). */
         fun evictForBudget(tabId: String)
     }
 
@@ -30,7 +30,7 @@ class TabBudget(val max: Int = DEFAULT_MAX) {
 
     fun full(): Boolean = total() >= max
 
-    /** 关掉所有任务里最久没用、可以关的那个标签;没有可关的返回 false。 */
+    /** Closes the least recently used closable tab across all tasks; returns false if there is nothing to close. */
     fun evictOldest(except: String?): Boolean {
         val victim = snapshot().mapNotNull { m -> m.oldestSpare(except)?.let { m to it } }.minByOrNull { it.second.second } ?: return false
         victim.first.evictForBudget(victim.second.first)

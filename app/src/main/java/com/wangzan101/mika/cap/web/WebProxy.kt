@@ -12,28 +12,28 @@ import com.wangzan101.mika.core.net.NetProxy
 import com.wangzan101.mika.core.net.ProxyAddress
 
 /**
- * 内置浏览器(本进程所有 WebView)的网络代理,跟设置 › 网络代理 走同一个地址。
- * 安卓的 WebView 只有支持「代理覆盖」(androidx.webkit 的 [ProxyController])时才能单独给 App 设代理;
- * 不支持的、或代理是带账号密码的 SOCKS(浏览器内核不支持 SOCKS 认证)时,浏览器直连,设置页写明。
- * 本机、局域网地址照旧直连;HTTP 代理要账号密码时由 [credentialsFor] 回答(见 `WebTab`)。
+ * Network proxy for the built-in browser (every WebView in this process), following the same address as Settings › Network proxy.
+ * Android's WebView can only set a proxy for the app alone when "proxy override" is supported (androidx.webkit's [ProxyController]);
+ * when it is not supported, or the proxy is a SOCKS proxy with a username and password (the browser engine does not support SOCKS auth), the browser connects directly, and the settings screen says so.
+ * Local and LAN addresses still connect directly; when an HTTP proxy needs credentials, [credentialsFor] answers (see `WebTab`).
  */
 object WebProxy {
-    /** 浏览器这边此刻的情况。 */
+    /** The current situation on the browser side. */
     enum class Mode {
-        /** 没设代理(或代理只给容器用):直连。 */
+        /** No proxy set (or the proxy is for containers only): direct connection. */
         Off,
-        /** 浏览器走代理。 */
+        /** The browser goes through the proxy. */
         Applied,
-        /** 这台手机的 WebView 不支持单独设代理:直连。 */
+        /** This phone's WebView does not support setting a proxy for the app alone: direct connection. */
         Unsupported,
-        /** 带账号密码的 SOCKS 代理浏览器用不了:直连。 */
+        /** A SOCKS proxy with credentials cannot be used by the browser: direct connection. */
         SocksWithCredentials,
     }
 
     private const val TAG = "MikaWebProxy"
     @Volatile private var overridden = false
 
-    /** 按此刻的设置决定浏览器怎么连(纯函数,便于测试)。 */
+    /** Decides how the browser connects under the current settings (a pure function, handy for tests). */
     fun mode(address: ProxyAddress?, supported: Boolean): Mode = when {
         address == null -> Mode.Off
         !supported -> Mode.Unsupported
@@ -41,22 +41,22 @@ object WebProxy {
         else -> Mode.Applied
     }
 
-    /** 浏览器内核认的代理规则写法。SOCKS 有的内核只认 `socks://`,先试 `socks5://`。 */
+    /** Proxy rule syntax accepted by the browser engine. For SOCKS some engines accept only `socks://`, so try `socks5://` first. */
     fun rules(address: ProxyAddress): List<String> {
         val host = if (address.host.contains(':')) "[${address.host}]" else address.host
         return if (address.socks) listOf("socks5://$host:${address.port}", "socks://$host:${address.port}")
         else listOf("http://$host:${address.port}")
     }
 
-    /** WebView 支不支持单独设代理;查询本身会加载 WebView,放在后台线程调。 */
+    /** Whether WebView supports setting a proxy for the app alone; the query itself loads WebView, so call it on a background thread. */
     fun supported(): Boolean = runCatching { WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE) }.getOrDefault(false)
 
-    /** 此刻浏览器这边的情况(会加载 WebView,放在后台线程调)。 */
+    /** The current situation on the browser side (loads WebView, so call it on a background thread). */
     fun mode(): Mode = NetProxy.shared.current().let { mode(it, it != null && supported()) }
 
     /**
-     * 按此刻的设置给本进程的 WebView 设上(或撤掉)代理。没设代理、也没设过时什么都不做(不为此加载 WebView)。
-     * 在主线程上做;可以从任何线程调。
+     * Sets (or removes) the proxy on this process's WebViews according to the current settings. If no proxy is set and none was ever set, does nothing (and does not load WebView for it).
+     * Done on the main thread; may be called from any thread.
      */
     fun apply(context: Context) {
         val address = NetProxy.shared.current()
@@ -86,7 +86,7 @@ object WebProxy {
         }
     }
 
-    /** 浏览器问账号密码时:问的是当前 HTTP 代理才回答,别的主机(网站自己的登录框)不答。 */
+    /** When the browser asks for credentials: answer only if the current HTTP proxy is what is being asked about; for other hosts (a site's own login box) do not answer. */
     fun credentialsFor(host: String?): Pair<String, String>? {
         val p = NetProxy.shared.current() ?: return null
         if (p.socks || !p.hasCredentials || host == null) return null
@@ -95,7 +95,7 @@ object WebProxy {
     }
 }
 
-/** 每个标签的主文档最多替代理答三次;下一次导航重新计数,改对设置后不必关掉标签。只在主线程使用。 */
+/** Each tab's main document gets the proxy answered for it at most three times; the next navigation restarts the count, so fixing the settings does not require closing the tab. Main thread only. */
 internal class WebProxyAuth {
     private var answers = 0
 

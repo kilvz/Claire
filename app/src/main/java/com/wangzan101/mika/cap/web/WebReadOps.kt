@@ -29,10 +29,10 @@ import com.wangzan101.mika.cap.web.WebScreen.Companion.NO_POOL
 import com.wangzan101.mika.cap.web.WebScreen.Companion.NAVIGATE_TIMEOUT_MS
 import com.wangzan101.mika.cap.web.WebScreen.Companion.CLEARTEXT
 
-// 网页屏:按标签页提炼正文与后台读取
+// Web screen: extract body text per tab and read in the background
 /**
- * 读第一段([PageRead.lazy] 且 offset 为 0)前先等正文稳定,滚几屏触发懒加载再等一次,读完滚回原处;
- * 之后的段不等不滚。正文怎么拼、怎么折叠、质量怎么判见 [PageDigest]。
+ * Before reading the first segment ([PageRead.lazy] with offset 0), wait for the body to settle, scroll a few screens to trigger lazy loading and wait once more, then scroll back after reading;
+ * later segments neither wait nor scroll. How the body is assembled, folded and judged for quality is in [PageDigest].
  */
 internal suspend fun WebScreen.digestTab(tab: WebTab, req: PageRead): PageText {
     val s = script(tab)
@@ -64,14 +64,14 @@ internal suspend fun WebScreen.digestTab(tab: WebTab, req: PageRead): PageText {
     }
 }
 
-/** 正文(长度, 摘要)连续几次不变才算稳定,至多 [capMs]。 */
+/** The body (length, digest) counts as stable only after staying unchanged several times in a row, at most [capMs]. */
 internal suspend fun WebScreen.contentStable(tab: WebTab, capMs: Long): Boolean = SettlePolicy.contentStable(
     clock, { if (tab.crashed) null else script(tab).contentSample() }, CONTENT_POLL_MS, CONTENT_STABLE_POLLS, CONTENT_EMPTY_POLLS, capMs,
 )
 
 /**
- * 在临时后台标签里打开 [url] 读一段,读完关掉(出错、取消也关)。同时至多 [BACKGROUND_READS] 个(全进程)。
- * 打不开、变成下载、崩溃都如实放在 [PageText.netError] 里。
+ * Open [url] in a temporary background tab and read one segment, then close it (also on error or cancellation). At most [BACKGROUND_READS] at a time (process-wide).
+ * Failure to open, turning into a download and a crash are all reported as-is in [PageText.netError].
  */
 internal suspend fun WebScreen.readInBackground(req: PageRead, url: String): PageText {
     val pool = pool ?: throw UnsupportedOperationException(NO_POOL)
@@ -90,7 +90,7 @@ internal suspend fun WebScreen.readInBackground(req: PageRead, url: String): Pag
                 tab.mainFrameError != null -> failed(tab.mainFrameError!!)
                 else -> {
                     if (tab.lastLoadFinished) awaitQuiet(tab, QUIET_MS, CAP_MS)
-                    // 和读当前标签同一道关:页面弹着 JS 对话框时不读(页面脚本此时不回话);临时标签马上就关,如实说
+                    // Same gate as reading the current tab: do not read while a JS dialog is open on the page (page scripts do not respond then); the temporary tab is closed right away, so report it truthfully
                     try { dialogGuard(tab); digestTab(tab, req) } catch (e: WebTabCrashed) { failed(BACKGROUND_CRASHED) } catch (e: WebDialogOpen) { failed(BACKGROUND_DIALOG) }
                 }
             }

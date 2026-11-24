@@ -7,8 +7,8 @@ import kotlinx.serialization.json.contentOrNull
 import java.io.File
 
 /**
- * 哪些网站改用手机版网页(默认都是桌面版)。按主机名记,去掉开头的 www.;子域名跟着上级走
- * (记了 example.com,m.example.com 也用手机版)。存在 App 私有目录的一个 JSON 文件里,坏了就从空表开始。
+ * Which sites use the mobile version of the page instead (everything is desktop by default). Recorded by host name with the leading www. stripped; subdomains follow their parent
+ * (recording example.com also makes m.example.com use the mobile version). Stored in a JSON file in the app's private directory; if it is corrupted, start from an empty table.
  */
 class SiteModes(dir: File) {
     private val file = File(dir, FILE)
@@ -35,7 +35,7 @@ class SiteModes(dir: File) {
         }
     }
 
-    /** 记下这个网站用哪一版;改成桌面版时连上级域名的记录一起去掉,否则还会跟着上级走。 */
+    /** Records which version this site uses; when switching to desktop, remove the parent-domain records too, otherwise it would still follow the parent. */
     @Synchronized
     fun set(host: String, mobile: Boolean) {
         val k = key(host) ?: return

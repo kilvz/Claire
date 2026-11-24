@@ -12,21 +12,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 网页接管:把**同一个** WebView 从后台宿主挪到主屏的 [WebTakeoverPage] 里给用户操作,用完放回。
- * 页面状态(表单、滚动、登录流程里的一次性令牌)原样保留。进程里同一时间至多一次接管。
+ * Web takeover: moves **the same** WebView out of the background host into [WebTakeoverPage] on the main screen for the user to operate, and puts it back when done.
+ * Page state (forms, scrolling, one-time tokens in a login flow) is preserved as-is. At most one takeover at a time in the process.
  *
- * 两种用法:
- * - 任务接管([show]):界面上的按钮经 [Session.onAction] 交给任务服务(处理好了 / 我自己做完了 / 取消任务 / 返回键先放着);
- *   交回时由接管状态机调用 [end],拿到接管期间的操作次数与页面标题,视图放回 [Session.home]。
- * - 设置页登录([showLogin]):新开一个看得见的标签,只有「完成」;完成时看一眼页面,没看出仍未登录就把该网站记为已登录。
- * 任务接管交回时要页面上看得出已登录([LoginProbe])才记,看不出不记(用户处理的可能只是验证码)。
+ * Two uses:
+ * - Task takeover ([show]): buttons in the UI are handed via [Session.onAction] to the task service (handled / I finished it myself / cancel the task / leave the back button for now);
+ *   on hand-back the takeover state machine calls [end], gets the number of inputs made during the takeover and the page title, and puts the view back into [Session.home].
+ * - Settings-screen login ([showLogin]): opens a new visible tab with only "Done"; on Done it takes a look at the page and, unless the page still looks signed-out, records the site as signed in.
+ * A task takeover is only recorded when the page visibly shows signed-in at hand-back ([LoginProbe]); if it does not, nothing is recorded (what the user handled may have been just a CAPTCHA).
  */
 object WebHandover {
     enum class Action { HandBack, FinishedMyself, Cancel, PutAside, Done }
 
     /**
-     * 一次接管。[home] 为 null 时没有后台宿主(设置页登录),结束时销毁标签。[reason] 为 null 是设置页登录模式。
-     * [message] 是给用户看的一句说明(含付款信息时一并带上)。
+     * One takeover. When [home] is null there is no background host (settings-screen login) and the tab is destroyed at the end. A null [reason] means settings-login mode.
+     * [message] is a one-line explanation for the user (payment information included when relevant).
      */
     class Session internal constructor(
         val tab: WebTab,
@@ -36,11 +36,11 @@ object WebHandover {
         val waitKey: Int,
         val onAction: (Action) -> Unit,
     ) {
-        /** 用户在接管界面里对页面的触摸与按键次数。 */
+        /** Number of touches and key presses the user made on the page in the takeover UI. */
         @Volatile var inputs: Int = 0
             internal set
 
-        /** 接管界面在主线程上随时记下的页面地址与标题:结束时可能在别的线程上,读不了 WebView。 */
+        /** Page URL and title recorded by the takeover UI on the main thread at any time: at the end it may be on another thread, where WebView cannot be read. */
         @Volatile var url: String? = null
             internal set
         @Volatile var title: String? = null
@@ -49,17 +49,17 @@ object WebHandover {
     }
 
     private val main = Handler(Looper.getMainLooper())
-    /** 设置页登录点「完成」后等页面回话的上限。 */
+    /** Upper bound for waiting for the page to answer after "Done" is tapped on the settings-screen login. */
     private const val CONFIRM_WAIT_MS = 1_500L
 
-    /** 设置页的网站登录正开着:任务的网页接管要等它关掉。 */
+    /** The settings screen's site login is open: a task's web takeover has to wait until it closes. */
     val loginOpen: Boolean get() = _session.value?.loginMode == true
     private val _session = MutableStateFlow<Session?>(null)
     val session: StateFlow<Session?> = _session.asStateFlow()
 
     /**
-     * 任务接管:打开接管界面,标签挪过去。已有一次接管在进行、标签不属于 [taskId] 或已不能用时返回 false。
-     * [currentKey] 给出任务此刻的等待编号:按钮按下时它已经变了(这次等待已过去)就不动作。
+     * Task takeover: open the takeover UI and move the tab over. Returns false when a takeover is already in progress, or the tab does not belong to [taskId], or is no longer usable.
+     * [currentKey] supplies the task's current wait key: if it has already changed by the time the button is pressed (that wait is over), nothing happens.
      */
     fun show(
         context: Context, tab: WebTab, home: WebHost, reason: String, message: String?, waitKey: Int, taskId: String,
@@ -69,7 +69,7 @@ object WebHandover {
         if (_session.value != null || tab.crashed || tab.destroyed || home.closed || tab.ownerTaskId != taskId) return false
         val guarded: (Action) -> Unit = { a ->
             val now = currentKey?.invoke()
-            // 「取消任务」不论哪一次等待都作数
+            // "Cancel task" counts no matter which wait it is
             if (a != Action.Cancel && currentKey != null && now != waitKey) android.util.Log.i("MikaWebHandover", "ignored $a for a past wait ($waitKey, now $now)")
             else onAction(a)
         }
@@ -78,7 +78,7 @@ object WebHandover {
         return true
     }
 
-    /** 设置页「打开登录」:在主屏打开一个看得见的标签,用户自己登录,点「完成」结束。主线程调用。 */
+    /** Settings screen's "open login": open a visible tab on the main screen, let the user log in themselves, and end it when "Done" is tapped. Called on the main thread. */
     fun showLogin(context: Context, host: String, onDone: (String) -> Unit = { WebSites.registry(context).markLoggedIn(it) }): Boolean {
         if (_session.value != null) return false
         val url = "https://${host.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')}/"
@@ -90,7 +90,7 @@ object WebHandover {
                 end()
                 return@Session
             }
-            // 按钮在主线程上按下:用户说完成了,页面上没看出仍未登录就记下;读完再关标签
+            // The button is pressed on the main thread: the user says they are done, so record it unless the page still looks signed-out; close the tab after reading
             val fallback = (tab.view.url ?: _session.value?.url)?.let(WebUrlPolicy::host)
             val decided = java.util.concurrent.atomic.AtomicBoolean(false)
             fun finish(host: String?, state: LoginState) {
@@ -106,12 +106,12 @@ object WebHandover {
     }
 
     /**
-     * 结束这次接管:界面关掉,视图放回后台宿主(设置页登录则销毁标签)。返回接管期间的操作次数和页面标题;
-     * 没有接管在进行时为 null。[loggedIn](用户交回了)时视图放回后看一眼页面,看得出已登录才在 [registry] 里记上。任意线程可调。
+     * Ends this takeover: the UI closes and the view goes back into the background host (for settings-screen login the tab is destroyed). Returns the number of inputs during the takeover and the page title;
+     * null when no takeover is in progress. With [loggedIn] (the user handed back), once the view is back, take a look at the page and record it in [registry] only if it visibly shows signed-in. Callable from any thread.
      */
     fun end(loggedIn: Boolean = false, registry: SiteRegistry? = null, tab: WebTab? = null): HandoverActivity? {
         val s = _session.value ?: return null
-        // [tab] 给了就只结束这个标签的接管(并行时别的任务的不动);同一次只结束一回
+        // If [tab] is given, end only that tab's takeover (with parallel tasks, the others are left alone); each takeover ends only once
         if (tab != null && s.tab !== tab) return null
         if (!_session.compareAndSet(s, null)) return null
         main.post {
@@ -124,7 +124,7 @@ object WebHandover {
         return HandoverActivity(s.inputs, s.title?.takeIf { it.isNotBlank() }, s.url?.takeIf { it.isNotBlank() })
     }
 
-    /** 视图放回后台宿主;没有宿主(设置页登录)就销毁。 */
+    /** Puts the view back into the background host; if there is no host (settings-screen login), destroys it. */
     internal fun restore(s: Session) {
         if (s.tab.destroyed) return
         val home = s.home
@@ -132,7 +132,7 @@ object WebHandover {
             s.tab.destroy()
             return
         }
-        // 标签崩溃了或宿主已关(任务已结束):不往回挂,留给标签池去收拾
+        // The tab crashed or the host is already closed (the task has ended): do not attach it back, leave it for the tab pool to clean up
         if (s.tab.crashed || home.closed) {
             (s.tab.view.parent as? android.view.ViewGroup)?.removeView(s.tab.view)
             return
@@ -140,7 +140,7 @@ object WebHandover {
         home.attach(s.tab)
     }
 
-    /** 任务接管的按钮 → 任务服务的动作,带着这次等待的编号和任务编号(多个任务同时跑时只作用于这一个)。 */
+    /** Task-takeover buttons → task service actions, carrying this wait's key and the task id (with several tasks running at once, only this one is affected). */
     fun taskActions(context: Context, waitKey: Int, runKey: String?): (Action) -> Unit = { action ->
         when (action) {
             Action.HandBack, Action.Done -> TaskService.handBack(context, waitKey, runKey)

@@ -2,9 +2,9 @@ package com.wangzan101.mika.cap.web.cdp
 
 import com.wangzan101.mika.core.cap.web.cdp.CdpTargetInfo
 
-/** 标签与 DevTools 目标的对应:先在标签里写下标记,再逐个候选目标求值找它。 */
+/** Matching a tab to a DevTools target: first write a marker into the tab, then evaluate each candidate target to find it. */
 object TargetMatch {
-    /** 页面里放标记的全局变量名;找到后删掉。 */
+    /** Name of the global variable holding the marker in the page; deleted once found. */
     const val KEY = "__mikaDevtoolsMark"
 
     fun markScript(marker: String): String = "window['$KEY']='$marker';1"
@@ -12,8 +12,8 @@ object TargetMatch {
     const val CLEAR_SCRIPT = "delete window['$KEY'];1"
 
     /**
-     * 要逐个试的目标:只要页面、没被别的客户端连着(有 webSocketDebuggerUrl)、不是别的标签已认领的;
-     * 网址和标签当前网址相同的排前面(多半就是它)。
+     * Targets to try one by one: pages only, not already attached by another client (has a webSocketDebuggerUrl), and not already claimed by another tab;
+     * those whose URL matches the tab's current URL come first (that is most likely the one).
      */
     fun candidates(targets: List<CdpTargetInfo>, claimed: Set<String>, tabUrl: String?): List<CdpTargetInfo> =
         targets.filter { it.type == "page" && it.webSocketDebuggerUrl != null && it.id !in claimed }
