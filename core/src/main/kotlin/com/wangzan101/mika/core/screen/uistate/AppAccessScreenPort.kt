@@ -6,14 +6,18 @@ import com.wangzan101.mika.core.device.access.AppAccessState
 import kotlinx.coroutines.delay
 
 /**
- * 手机端口的应用访问边界:每个 [ScreenPort] 成员都在这里显式写出(不用 `by` 委托),端口以后加的成员不会不经检查就漏过去;
- * 测试里逐个成员核对这一点。
+ * App access boundary for the phone port: every [ScreenPort] member is explicitly written out here (no `by`
+ * delegation), so members added to the port later cannot slip through unchecked; tests verify this member by member.
  *
- * 读屏、动作前后各核对一次前台窗口的归属;按目标打开(App、分享、指定了 App 的链接)只看目标。
- * 窗口探针 [packages] 只读归属,不采集内容,也不为检查创建屏幕。禁用名单为空时什么也不多做。
+ * Screen reads and actions check the foreground window's ownership once before and once after; target-based opens
+ * (apps, shares, links with an explicit app) only look at the target.
+ * The window probe [packages] only reads ownership, does not capture content, and does not create a screen for the
+ * check. When the blocked list is empty it does nothing extra.
  *
- * 少问窗口:[snapshot]、[peek] 直接用读到的这一屏里的窗口归属核对,不另问;给了 [windowToken](窗口一变就变的计数)时,
- * 核对过的结果在窗口没变、名单没变、且不超过 [CHECK_TTL_MS] 时直接沿用(同一次读屏紧接着的截图、预览的一帧帧画面)。
+ * Ask for windows as little as possible: [snapshot] and [peek] check against the window ownership already present in
+ * the screen that was read, without asking again; when [windowToken] (a counter that changes whenever the window
+ * changes) is given, a verified result is reused as long as the window has not changed, the list has not changed, and
+ * no more than [CHECK_TTL_MS] has passed (the screenshot right after the same read, the frame-by-frame previews).
  */
 class AppAccessScreenPort(
     private val inner: ScreenPort,
@@ -24,7 +28,7 @@ class AppAccessScreenPort(
     private val windowToken: (() -> Long)? = null,
     private val clock: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : ScreenPort {
-    /** 上一次核对通过时的窗口计数、名单版本、是否在保护 Claire 自己的界面、时刻。 */
+    /** The window counter, list revision, whether Claire's own UI was being guarded, and the time of the last successful check. */
     private class Verified(val token: Long, val revision: Long, val guarded: Boolean, val at: Long)
 
     @Volatile private var verified: Verified? = null
@@ -45,7 +49,7 @@ class AppAccessScreenPort(
         return v.token == token && v.revision == state.revision && v.guarded == guarded && clock() - v.at <= CHECK_TTL_MS
     }
 
-    /** 核对 [found] 这些窗口归属;有认不出归属的,隔一会儿再问一次窗口。通过了记下,供 [stillVerified] 沿用。 */
+    /** Verifies the ownership of the windows in [found]; if any ownership is unrecognized, asks for the windows again after a short wait. On success it is recorded for [stillVerified] to reuse. */
     private suspend fun verify(state: AppAccessState, found: List<String?>, guarded: Boolean, token: Long?) {
         verified = null
         var s = state
@@ -65,13 +69,13 @@ class AppAccessScreenPort(
         verified = t?.let { Verified(it, s.revision, guarded, clock()) }
     }
 
-    /** 读一屏:读到的就带着窗口归属,读完拿它核对;端口不给窗口时退回问窗口。 */
+    /** Reads one screen: what is read carries its window ownership, which is then used for the check; when the port provides no windows, it falls back to asking for them. */
     private suspend fun observed(read: suspend () -> ScreenSnapshot): ScreenSnapshot {
         val state = appAccess.current()
         if (!state.available) throw AppAccessDenied("app_access_unavailable", null)
         val guarded = protectedUi()
         if (state.blocked.isEmpty() && !guarded) return read()
-        // 计数先取:读的过程中窗口变了,下一次就不沿用
+        // Take the counter first: if the window changes during the read, the next check will not reuse this result
         val token = windowToken?.invoke()
         val snap = read()
         verify(appAccess.current(), snap.accessPackages() ?: packages(), guarded, token)
@@ -89,7 +93,7 @@ class AppAccessScreenPort(
         appAccess.current().denial(packageName)?.let { throw it }
     }
 
-    // ---------- 读屏 ----------
+    // ---------- Screen reads ----------
     override suspend fun snapshot() = observed { inner.snapshot() }
     override suspend fun peek() = observed { inner.peek() }
     override suspend fun screenshotPng() = checked { inner.screenshotPng() }
@@ -98,7 +102,7 @@ class AppAccessScreenPort(
     override suspend fun isProtected() = checked { inner.isProtected() }
     override suspend fun checkScreen() = checked { inner.checkScreen() }
 
-    // ---------- 在当前屏上的动作 ----------
+    // ---------- Actions on the current screen ----------
     override suspend fun tapRef(ref: String, snapshotId: String) = checked { inner.tapRef(ref, snapshotId) }
     override suspend fun tapXY(x: Int, y: Int) = checked { inner.tapXY(x, y) }
     override suspend fun doubleTapRef(ref: String, snapshotId: String) = checked { inner.doubleTapRef(ref, snapshotId) }
@@ -115,7 +119,7 @@ class AppAccessScreenPort(
     override suspend fun pressKey(keyCode: Int) = checked { inner.pressKey(keyCode) }
     override suspend fun setWheel(ref: String, snapshotId: String, value: String) = checked { inner.setWheel(ref, snapshotId, value) }
 
-    // ---------- 等待与事件 ----------
+    // ---------- Waiting and events ----------
     override suspend fun waitStable(timeoutMs: Long) = checked { inner.waitStable(timeoutMs) }
     override suspend fun awaitChange(timeoutMs: Long) = checked { inner.awaitChange(timeoutMs) }
     override suspend fun waitFor(condition: String, value: String?, timeoutMs: Long) = checked { inner.waitFor(condition, value, timeoutMs) }
@@ -123,7 +127,7 @@ class AppAccessScreenPort(
     override suspend fun watchEvents(kind: String, packageName: String?, durationMs: Long, maxEvents: Int) =
         checked { inner.watchEvents(kind, packageName, durationMs, maxEvents) }
 
-    // ---------- 按目标打开:可以离开受限的 App,只看目标 ----------
+    // ---------- Target-based opens: may leave a restricted app, only the target is checked ----------
     override suspend fun openApp(packageName: String, cold: Boolean): ActionResult {
         target(packageName)
         return inner.openApp(packageName, cold)
@@ -139,7 +143,7 @@ class AppAccessScreenPort(
         return inner.shareText(packageName, text)
     }
 
-    /** 能不能分享音频只看里面那个端口有没有实现,不碰界面;真正的分享按目标 App 过名单。 */
+    /** Whether audio can be shared depends only on whether the inner port implements it, without touching the UI; an actual share is checked against the list by target app. */
     override val canShareAudio: Boolean get() = inner.canShareAudio
 
     override suspend fun shareAudio(packageName: String, path: String, text: String?): ActionResult {
@@ -147,7 +151,7 @@ class AppAccessScreenPort(
         return inner.shareAudio(packageName, path, text)
     }
 
-    /** 能不能分享图片只看里面那个端口有没有实现,不碰界面;真正的分享按目标 App 过名单。 */
+    /** Whether images can be shared depends only on whether the inner port implements it, without touching the UI; an actual share is checked against the list by target app. */
     override val canShareImage: Boolean get() = inner.canShareImage
 
     override suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult {
@@ -155,22 +159,22 @@ class AppAccessScreenPort(
         return inner.shareImage(packageName, path, text)
     }
 
-    /** 指定了 App 的在这里看;没指定的由端口按名单挑接手的 App(由谁打开只有端口知道)。 */
+    /** When an app is specified it is checked here; otherwise the port picks the handling app from the list (only the port knows which one opens it). */
     override suspend fun openLink(action: String?, uri: String?, packageName: String?): ActionResult {
         packageName?.let(::target)
         return inner.openLink(action, uri, packageName)
     }
 
-    /** 只等占用登记、不读屏;目标照打开时一样先看,受限的 App 不必等,当场拒。 */
+    /** Only waits for the occupancy registration, without reading the screen; the target is checked first as for an open, so a restricted app is rejected on the spot instead of waiting. */
     override suspend fun awaitAppFree(packageName: String, userId: Int?, timeoutMs: Long): AppWait {
         target(packageName)
         return inner.awaitAppFree(packageName, userId, timeoutMs)
     }
 
-    /** 接手的 App 由端口按名单挑(由谁接只有端口知道);做完后的前台由执行入口照常核对。 */
+    /** The handling app is picked by the port from the list (only the port knows which one handles it); the foreground after it finishes is checked as usual by the execution entry. */
     override suspend fun systemAction(action: SystemAction) = inner.systemAction(action)
 
-    // ---------- 不碰任何 App 界面的:原样转交 ----------
+    // ---------- Touching no app UI at all: passed through unchanged ----------
     override suspend fun systemCommand(command: String) = inner.systemCommand(command)
     override suspend fun bulkCalendarInsert(events: List<SystemAction.AddCalendarEvent>) = inner.bulkCalendarInsert(events)
     override suspend fun listApps() = inner.listApps()
@@ -179,17 +183,19 @@ class AppAccessScreenPort(
     override val afterTask: AfterTaskMarks? get() = inner.afterTask
 
     companion object {
-        /** 有认不出归属的窗口时,隔多久再问一次(刚开的窗口要一会儿才读得到)。 */
+        /** How long to wait before asking for the windows again when some ownership is unrecognized (a freshly opened window takes a moment to become readable). */
         const val RETRY_MS = 100L
 
-        /** 核对结果在窗口没变时最多沿用多久;兜住窗口事件来晚的那一小段。 */
+        /** How long a verified result may be reused while the window has not changed; covers the short window where a window event arrives late. */
         const val CHECK_TTL_MS = 1_000L
     }
 }
 
 /**
- * 这一屏里各 App 窗口的归属,规则同端口的窗口探针:有 App 窗口就是它们的包名(读不到根节点的为 null);
- * 没有 App 窗口时是认得出的前台 App,也没有就是空屏(空列表)。端口没给窗口层级(网页、测试端口)时为 null,由调用方另问。
+ * The ownership of the app windows on this screen, with the same rules as the port's window probe: if there are app
+ * windows it is their package names (null for ones whose root node cannot be read); with no app windows it is the
+ * identifiable foreground app, and with neither the screen is empty (empty list). Null when the port provides no
+ * window hierarchy (web, test ports), and the caller asks separately.
  */
 internal fun ScreenSnapshot.accessPackages(): List<String?>? {
     val apps = windows.filter { it.type == "application" }

@@ -3,24 +3,28 @@ package com.wangzan101.mika.core.screen.uistate
 import kotlin.math.hypot
 
 /**
- * 不给编号、按描述指一个元素:[text] 是它显示的字或无障碍名字(打字时也可以是输入框的提示语),[role] 可选,
- * [field] 为真时只找输入框(打字用)。
+ * Points at an element by description instead of by ref: [text] is the text it displays or its accessibility name
+ * (when typing, it may also be the input field's placeholder), [role] is optional, and when [field] is true only
+ * input fields are searched (used for typing).
  */
 data class ElementQuery(val text: String, val role: String? = null, val field: Boolean = false)
 
 sealed interface DescribedMatch {
-    /** [exact]:名字(或提示语)和描述完全相同;否则是按开头或包含找到的,结果里要说清实际对上的是谁。 */
+    /** [exact]: the name (or placeholder) is exactly the description; otherwise it was found by prefix or containment, and the result must state which element was actually matched. */
     data class Found(val element: UiElement, val exact: Boolean) : DescribedMatch
-    /** 对得上的不止一个;[candidates] 能操作的在前,其余按读屏顺序。 */
+    /** More than one match; [candidates] lists the actionable ones first, the rest in screen-read order. */
     data class Ambiguous(val candidates: List<UiElement>) : DescribedMatch
     data object None : DescribedMatch
 }
 
 /**
- * 在一屏里按描述找唯一的元素。比较前去掉空白、不分大小写。按从严到宽分层找,哪一层先有结果就用哪一层:
- * 名字(或提示语)完全相同 → 名字以描述开头 → 名字包含描述(这一层只认能操作的元素,免得一段正文里碰巧含这几个字)。
- * 同一层里能操作的(打字看能不能输入,其余看能不能点;不可用的不算)优先:恰好一个就是它;
- * 好几个、或一个能操作的都没有却有好几个对上,是 [DescribedMatch.Ambiguous],不猜。[role] 给了时只看这个角色。
+ * Finds the unique element on a screen by description. Whitespace is stripped and case ignored before comparing.
+ * Searches layer by layer from strict to loose, and uses the first layer that yields a result:
+ * name (or placeholder) exactly equal → name starts with the description → name contains the description (this layer
+ * only accepts actionable elements, so a passage of body text that happens to contain those characters is not
+ * picked). Within a layer, actionable ones are preferred (for typing, whether it accepts input; otherwise whether it
+ * is clickable; unavailable ones do not count): exactly one is it; several, or none actionable but several matches,
+ * is [DescribedMatch.Ambiguous], with no guessing. When [role] is given only that role is considered.
  */
 object DescribedTarget {
     fun match(elements: List<UiElement>, q: ElementQuery): DescribedMatch {
@@ -46,16 +50,16 @@ object DescribedTarget {
         return DescribedMatch.None
     }
 
-    /** 能操作:打字看能不能输入,其余看能不能点或输入;页面标了不可用的不算。 */
+    /** Actionable: for typing, whether it accepts input; otherwise whether it is clickable or editable; ones the page marks unavailable do not count. */
     fun usable(e: UiElement, field: Boolean): Boolean =
         UiStates.DISABLED !in e.states && (if (field) e.editable else e.clickable || e.editable)
 
-    /** 离 [e] 最近的另一段有名字的字(和它不同名):候选同名时靠它分辨是哪一个。 */
+    /** The nearest other named piece of text to [e] (with a different name): used to tell same-named candidates apart. */
     fun neighbour(e: UiElement, elements: List<UiElement>): String? = elements
         .filter { it !== e && it.name.isNotBlank() && norm(it.name) != norm(e.name) }
         .minByOrNull { hypot((it.centerX - e.centerX).toDouble(), (it.centerY - e.centerY).toDouble()) }?.name
 
-    /** 元素能被描述的字:名字;输入框还有它自己的提示语。 */
+    /** The text an element can be described by: its name; an input field also has its own placeholder. */
     private fun labels(e: UiElement, field: Boolean): List<String> =
         listOfNotNull(e.name, e.placeholder.takeIf { field || e.editable }).map(::norm).filter { it.isNotEmpty() }
 

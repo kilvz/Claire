@@ -11,15 +11,15 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** 动作对 App 或网页界面状态的实际效果:按动作前后的界面状态(元素表、控件状态、输入焦点、在哪)判出,画面差异只作旁证;[wire] 是结果里 effect.kind 的写法。 */
+/** The actual effect of an action on the app's or web page's UI state: judged from the UI state before and after the action (element table, widget states, input focus, location), with visual differences only as corroboration; [wire] is how effect.kind is written in the result. */
 enum class EffectKind(val wire: String) {
-    /** 界面明显变了,和这个动作对得上。 */
+    /** The screen changed clearly, and the change is consistent with this action. */
     Done("done"),
-    /** 只有小的局部变化(焦点、开关、一两个元素),或可能还在加载:要看一眼结果。 */
+    /** Only small local changes (focus, a switch, one or two elements), or possibly still loading: take a look at the result. */
     SmallChange("small_change"),
-    /** 什么都没变:换个做法,别原样再来。 */
+    /** Nothing changed: try something different, do not repeat it as is. */
     NoEffect("no_effect"),
-    /** 换了地方:手机上前台换成了另一个 App,网页上换了一页(地址或标签变了);新地方见 [NewPlace]。 */
+    /** Went elsewhere: on the phone the foreground switched to another app, on the web a different page was loaded (URL or tab changed); see [NewPlace] for the new place. */
     PlaceChanged("place_changed");
 
     companion object {
@@ -28,10 +28,13 @@ enum class EffectKind(val wire: String) {
 }
 
 /**
- * 动作前后界面状态(元素表)的结构差异。元素按内容对齐(角色 + 名字 + 资源 ID + 是否提示语),不看编号(各次读屏的编号不通用):
- * 同内容同位置同状态算没变,只是控件状态([UiElement.states])变了算 [toggled],同内容换了位置算 [moved](滚动、重排),
- * 同一个输入框里的字变了算 [edited],其余是 [added]/[removed]。[focusMoved]:有输入焦点的元素换了(或焦点出现、消失)。
- * 只看有信息量的元素([UiElement.meaningful])。
+ * The structural difference between the UI states (element tables) before and after an action. Elements are aligned by
+ * content (role + name + resource ID + whether it is a placeholder), not by ref (refs from different reads are not
+ * interchangeable): same content, same position and same state counts as unchanged; only the widget states
+ * ([UiElement.states]) changing counts as [toggled]; same content at a different position counts as [moved]
+ * (scrolling, re-layout); text changed inside the same input field counts as [edited]; the rest are
+ * [added]/[removed]. [focusMoved]: the element holding input focus changed (or focus appeared or disappeared).
+ * Only elements that carry information ([UiElement.meaningful]) are considered.
  */
 data class InterfaceDiff(
     val added: Int,
@@ -45,14 +48,14 @@ data class InterfaceDiff(
     val changes: Int get() = added + removed + moved + edited + toggled
     val none: Boolean get() = changes == 0 && !focusMoved
 
-    /** 变化够多(门槛见 [EffectTuning])。 */
+    /** Enough changes (thresholds in [EffectTuning]). */
     val major: Boolean get() = changes >= max(EffectTuning.MAJOR_MIN, ceil(total * EffectTuning.MAJOR_SHARE).toInt())
 
     companion object {
         fun between(before: ScreenSnapshot, after: ScreenSnapshot): InterfaceDiff {
             val a = before.elements.filter { it.meaningful }
             val b = after.elements.filter { it.meaningful }
-            // 先配全同的,再配只差状态的(拨了开关),再配挪了位置的,再配同一个输入框里换了字的
+            // First pair up fully identical ones, then those differing only in state (a switch was flipped), then moved ones, then ones whose text changed within the same input field
             val leftA = a.toMutableList()
             val leftB = b.toMutableList()
             pairOff(leftA, leftB) { x, y -> key(x) == key(y) && x.bounds == y.bounds && x.states == y.states }
@@ -64,7 +67,7 @@ data class InterfaceDiff(
             return InterfaceDiff(leftB.size, leftA.size, moved, edited, toggled, focusA != focusB, max(a.size, b.size))
         }
 
-        /** 按 [match] 两两配对并从两边移走,返回配上的对数。 */
+        /** Pairs elements up per [match] and removes them from both sides; returns the number of pairs made. */
         private fun pairOff(a: MutableList<UiElement>, b: MutableList<UiElement>, match: (UiElement, UiElement) -> Boolean): Int {
             var n = 0
             val it = a.iterator()
@@ -87,21 +90,25 @@ data class InterfaceDiff(
 }
 
 /**
- * 动作之后到的新地方:[name] 是通用的说法(App 包名、网站主机名,和读界面时的「在哪」一致),
- * [kind] 与 [detail] 是这一种界面自己的细节(手机 "app":{package};网页 "web":{url,title,tabId})。
+ * The new place reached after an action: [name] is the generic designation (app package name, website host name,
+ * consistent with the "where" used when reading the screen), and [kind] and [detail] are the details specific to that
+ * kind of surface (phone "app":{package}; web "web":{url,title,tabId}).
  */
 data class NewPlace(val name: String, val kind: String, val detail: JsonObject)
 
 /**
- * 输入后读回的输入框:[text] 是此刻框里的字(显示提示语时为空串;密码框为 null,不读出),[matches] 是否和要输的一致
- * (比较时去掉空白:有的框会给号码分组加空格)。
+ * The input field as read back after typing: [text] is what is in the field right now (an empty string when a
+ * placeholder is shown; null for password fields, which are not read out), [matches] whether it is consistent with
+ * what was to be typed (whitespace is ignored when comparing: some fields group digits with spaces).
  */
 data class Readback(val text: String?, val secret: Boolean, val matches: Boolean)
 
 /**
- * 判效果用的、来自端口的事实:[changed] 端口在动作里核实的变没变;[switchedTo] 端口看到前台换成的 App;
- * [verified] 输入写完当场读回一致;[loading] 端口说页面还没静下来(网络、导航还在途);
- * [onUserScreen] 动作让这个 App 开到了用户的主屏上、留在那里(用户正用着它),Claire 的屏上看不出变化也不是没点上。
+ * Facts from the port used to judge the effect: [changed] whether the port verified a change during the action;
+ * [switchedTo] the app the port saw the foreground switch to; [verified] the readback right after typing matched;
+ * [loading] the port says the page has not settled yet (network, navigation still in flight); [onUserScreen] the
+ * action brought this app up on the user's own screen and left it there (the user is using it), so no visible change
+ * on Claire's screen does not mean the tap missed.
  */
 data class PortFacts(
     val changed: Boolean? = null,
@@ -112,9 +119,11 @@ data class PortFacts(
 )
 
 /**
- * 一个动作的实际效果:种类、去了哪(换地方时)、界面结构与画面的差异、输入的读回、可能还在加载。
- * [treeBlind]:没看到变化(种类仍是 [EffectKind.NoEffect]),但这一屏的树读不出点的那一处(树不能用,或缺了一块而点不在任何元素上),
- * 只改了焦点、隐藏状态的点看起来也一样,不能说没点上。
+ * The actual effect of one action: the kind, where it went (when it changed place), the UI structure and frame
+ * differences, the input readback, and whether it may still be loading.
+ * [treeBlind]: no change was seen (the kind is still [EffectKind.NoEffect]), but this screen's tree cannot read the
+ * spot that was tapped (the tree is unusable, or a part is missing and the tap was not on any element); taps that only
+ * change focus or visibility look the same, so it cannot be said the tap missed.
  */
 data class ActionEffect(
     val kind: EffectKind,
@@ -149,12 +158,14 @@ data class ActionEffect(
         const val HIDDEN = "(hidden)"
         private const val READBACK_MAX = 200
 
-        /** 看不出变化也不能说没点上的动作:点和手势(只改焦点、隐藏状态时树和画面都可能不动)。 */
+        /** Actions where a lack of visible change must not be called a miss: taps and gestures (when they only change focus or visibility, neither the tree nor the frame may move). */
         private val BLIND_VERBS = setOf(Verb.Tap, Verb.PhoneGesture)
 
         /**
-         * 这一屏的树读不出这个动作作用的那一处:树不能用,或缺了一块而点(画面区域 [region] 的中心)不在任何有信息量的元素上。
-         * 按树里的元素点的([target] 不为 null)只在树不能用时算。[quality] 是这一屏最近一次判的树够不够用,不知道为 null。
+         * This screen's tree cannot read the spot this action acted on: the tree is unusable, or a part is missing and
+         * the tap (the center of the frame region [region]) is not on any informative element. For taps on an element
+         * from the tree ([target] not null) this only counts when the tree is unusable. [quality] is whether this
+         * screen's tree was judged usable at the latest check, null when unknown.
          */
         internal fun treeBlind(verb: Verb, quality: TreeQuality?, before: ScreenSnapshot?, target: UiElement?, region: List<Int>?): Boolean {
             if (verb !in BLIND_VERBS) return false
@@ -171,11 +182,15 @@ data class ActionEffect(
         }
 
         /**
-         * 按动作前后的界面状态判效果。[before]/[after] 读不到时只按端口的事实和画面判;都没有为 null(不报效果)。
-         * [target] 是动作的目标元素(模型读到的那份里的,用来找输入框)。
-         * 输入([Verb.TypeText])带 [typed](要输的字),[pressedEnter] 时不读回(回车之后框可能清空或已换页)。
+         * Judges the effect from the UI state before and after the action. When [before]/[after] cannot be read it
+         * judges only from the port facts and the frame; when neither is available it is null (no effect reported).
+         * [target] is the action's target element (from the copy the model read, used to find the input field).
+         * Typing ([Verb.TypeText]) carries [typed] (the text to type); with [pressedEnter] there is no readback
+         * (after Enter the field may be cleared or the page may have changed).
          *
-         * 拿不准时不说没效果:端口说变了就至少是小变化;界面在动或端口说还在加载时也只算小变化(可能还在加载)。
+         * When unsure, it does not claim there was no effect: if the port says something changed it is at least a
+         * small change; if the screen is moving or the port says it is still loading, it also counts only as a small
+         * change (possibly still loading).
          */
         fun classify(
             verb: Verb,
@@ -188,9 +203,9 @@ data class ActionEffect(
             pressedEnter: Boolean = false,
             secret: Boolean = false,
         ): ActionEffect? {
-            // 端口自己看到前台换了 App:以它为准(两次读可能都在切换之前或之后)
+            // The port itself saw the foreground switch apps: trust it (both reads may fall before or after the switch)
             port.switchedTo?.let { return ActionEffect(EffectKind.PlaceChanged, NewPlace(it, "app", buildJsonObject { put("package", it) }), frame = frame) }
-            // 开到了用户的主屏上:换了地方,只是不在 Claire 的屏上
+            // Brought up on the user's own screen: the place changed, just not on Claire's screen
             port.onUserScreen?.let {
                 return ActionEffect(EffectKind.PlaceChanged, NewPlace(it, "app", buildJsonObject { put("package", it); put("onUserScreen", true) }), frame = frame)
             }
@@ -222,7 +237,7 @@ data class ActionEffect(
             } else null
             val kind = when {
                 readback != null && !readback.secret && readback.matches -> EffectKind.Done
-                // 端口写完当场读回过、一致,而这份界面里找不到那个框(或是密码框):按端口的核对算
+                // The port read back right after writing and it matched, but that field cannot be found in this UI snapshot (or it is a password field): rely on the port's verification
                 port.verified && (readback == null || readback.secret) && !pressedEnter -> EffectKind.Done
                 readback != null && !readback.secret -> if (diff.none && frame?.visible != true) EffectKind.NoEffect else EffectKind.SmallChange
                 diff.major -> EffectKind.Done
@@ -236,10 +251,10 @@ data class ActionEffect(
             return ActionEffect(kind, diff = diff, frame = frame, readback = readback)
         }
 
-        /** 界面上有进度条一类的控件(在加载)。 */
+        /** The UI has a progress-bar-like widget (it is loading). */
         private fun showsProgress(s: ScreenSnapshot) = s.elements.any { it.role.contains("progress", ignoreCase = true) && UiStates.DISABLED !in it.states }
 
-        /** 换了 App 或换了一页:网页看地址(不算 # 之后)和标签,手机看前台包名。都没换为 null。 */
+        /** Switched app or loaded another page: on the web it compares the URL (ignoring anything after #) and the tab, on the phone the foreground package name. Null when nothing switched. */
         private fun moved(before: ScreenSnapshot, after: ScreenSnapshot): NewPlace? {
             val wb = before.web; val wa = after.web
             if (wb != null || wa != null) {
@@ -254,8 +269,10 @@ data class ActionEffect(
         }
 
         /**
-         * 此刻输入框里的字:同一个框(同角色同资源 ID、位置相近)优先,其次有焦点的输入框;找不到为 null(不报读回)。
-         * [want] 是应有的字(清空时为空串);没给为 null 时不读回。
+         * The text in the input field right now: the same field (same role, same resource ID, nearby position) takes
+         * precedence, otherwise the focused input field; null when none is found (no readback reported).
+         * [want] is the text that should be there (an empty string when clearing); when it is null no readback is
+         * done.
          */
         private fun readback(after: ScreenSnapshot, target: UiElement?, want: String?, secret: Boolean): Readback? {
             want ?: return null
@@ -273,7 +290,7 @@ data class ActionEffect(
     }
 }
 
-/** 两个元素中心的距离(0–999 里);缺范围为 0。 */
+/** Distance between two element centers (within 0–999); 0 when a bounds is missing. */
 private fun distance(a: UiElement, b: UiElement): Int {
     if (a.bounds.size != 4 || b.bounds.size != 4) return 0
     val dx = (a.bounds[0] + a.bounds[2]) / 2 - (b.bounds[0] + b.bounds[2]) / 2
@@ -281,9 +298,9 @@ private fun distance(a: UiElement, b: UiElement): Int {
     return kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toInt()
 }
 
-/** 按效果给模型的一句话(prompts/feedback/tools.md 里 effect.*);明显变了不另说。 */
+/** One sentence for the model based on the effect (effect.* in prompts/feedback/tools.md); a clear change needs no note. */
 internal object EffectFeedback {
-    /** [portSwitched]:端口已报过前台被切走(结果里已有那条说明),不再重复。 */
+    /** [portSwitched]: the port already reported that the foreground was switched away (that note is already in the result), so do not repeat it. */
     fun hint(e: ActionEffect, verb: Verb, portSwitched: Boolean): String? {
         val r = e.readback?.takeIf { !it.secret && !it.matches }
         val differs = r?.let { Feedback.format("effect.readback_differs", "readback" to JsonPrimitive(it.text.orEmpty()).toString()) }

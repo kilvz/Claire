@@ -1,8 +1,8 @@
 package com.wangzan101.mika.core.screen.uistate
 
-/** 一个元素自己的上下文,判它做的是什么时只看这些,不看整屏:同一行上的文字(附着的标签、行里的说明)。 */
+/** An element's own context; when judging what it does only these are looked at, not the whole screen: the text on the same row (attached labels, in-row descriptions). */
 object ElementContext {
-    /** 同一行:中心落在元素的上下范围里,或元素的中心落在它的上下范围里。 */
+    /** Same row: its center falls within the element's vertical range, or the element's center falls within its vertical range. */
     fun row(e: UiElement, s: ScreenSnapshot): List<UiElement> {
         if (e.bounds.size != 4) return emptyList()
         val cy = (e.bounds[1] + e.bounds[3]) / 2

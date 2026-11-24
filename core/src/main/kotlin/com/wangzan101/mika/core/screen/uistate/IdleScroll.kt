@@ -4,14 +4,17 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * 停留时顺手的小动作(纯逻辑,不碰页面):人等着翻下一页时,常会把这一页往下滑一点、偶尔又往回拨一点。
- * 一次停留够长([Limits.minWaitMs])才做;做 1–3 下([Limits.count]),每下滚视口高度的一小截([Limits.stepFraction]),
- * 大多往下,偶尔([Limits.upChance])往回拨一点,但往回拨不超过之前往下滚的;几下加起来不超过 [Limits.maxTotal] 个视口,
- * 净移动不超过 [Limits.maxNet] 个视口。时刻落在停留里,前后各留出一段([Limits.leadMs]、[Limits.tailMs])。
- * 只滚页面,不移动指针、不悬停、不点。
+ * Small incidental actions while pausing (pure logic, never touches the page): while waiting to turn to the next page,
+ * people often scroll the current page down a little and occasionally nudge it back up a bit.
+ * Done only when a pause is long enough ([Limits.minWaitMs]); takes 1–3 steps ([Limits.count]), each scrolling a small
+ * fraction of the viewport height ([Limits.stepFraction]), mostly downward, occasionally ([Limits.upChance]) nudging
+ * back up a little, but never back up more than was scrolled down before; the steps together stay within
+ * [Limits.maxTotal] viewports and the net movement within [Limits.maxNet] viewports. The timestamps fall inside the
+ * pause, leaving a margin at both ends ([Limits.leadMs], [Limits.tailMs]).
+ * Only scrolls the page: no pointer movement, no hovering, no tapping.
  */
 class IdleScroll(private val random: Random, val limits: Limits = Limits()) {
-    /** 时长单位毫秒,幅度单位视口高度。 */
+    /** Durations are in milliseconds, amplitudes in viewport heights. */
     data class Limits(
         val minWaitMs: Long = 3_000L,
         val count: IntRange = 1..3,
@@ -21,20 +24,20 @@ class IdleScroll(private val random: Random, val limits: Limits = Limits()) {
         val maxNet: Double = 0.3,
         val leadMs: Long = 800L,
         val tailMs: Long = 1_200L,
-        /** 两下之间至少隔这么久。 */
+        /** At least this long between two steps. */
         val gapMs: Long = 700L,
     )
 
-    /** 一下:停留开始后 [atMs] 时滚 [fraction] 个视口(正为往下)。 */
+    /** One step: at [atMs] after the pause began, scroll [fraction] viewports (positive is downward). */
     data class Step(val atMs: Long, val fraction: Double)
 
-    /** 一次 [waitMs] 的停留里做哪几下;太短为空。 */
+    /** Which steps to take during a pause of [waitMs]; empty when too short. */
     fun plan(waitMs: Long): List<Step> {
         val l = limits
         if (waitMs < l.minWaitMs) return emptyList()
         val room = waitMs - l.leadMs - l.tailMs
         if (room < 0) return emptyList()
-        // 停留里放得下几下(两下之间至少隔 gapMs)
+        // How many steps fit in the pause (at least gapMs between two steps)
         val fits = (room / l.gapMs + 1).toInt()
         val n = random.nextInt(l.count.first, l.count.last + 1).coerceAtMost(fits).coerceAtLeast(1)
         var total = 0.0
@@ -49,14 +52,14 @@ class IdleScroll(private val random: Random, val limits: Limits = Limits()) {
             total += abs(f)
             net += f
         }
-        // 时刻:在可用的那段里均匀撒开,再排好序,两下之间不近于 gapMs
+        // Timestamps: spread uniformly over the usable span, then sorted, with two steps never closer than gapMs
         val times = MutableList(fractions.size) { l.leadMs + random.nextLong(0, room + 1) }.sorted().toMutableList()
         for (i in 1 until times.size) times[i] = maxOf(times[i], times[i - 1] + l.gapMs)
         return fractions.indices.mapNotNull { i -> times[i].takeIf { it <= waitMs - l.tailMs }?.let { Step(it, fractions[i]) } }
     }
 
     private companion object {
-        /** 小于这么点的一下不做(滚了也看不出)。 */
+        /** Steps smaller than this are skipped (scrolling that little is not visible). */
         const val MIN_STEP = 0.02
     }
 }

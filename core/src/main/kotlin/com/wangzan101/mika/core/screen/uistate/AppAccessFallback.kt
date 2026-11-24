@@ -2,12 +2,12 @@ package com.wangzan101.mika.core.screen.uistate
 
 import com.wangzan101.mika.core.device.access.AppAccessDenied
 
-/** 读屏的尽力而为兜底不能把权限拒绝降级成没有内容。 */
+/** Best-effort fallbacks for screen reading must not downgrade a permission denial into having no content. */
 internal fun Exception.rethrowAppAccess() {
     if (this is AppAccessDenied) throw this
 }
 
-/** 普通采集失败可降级;权限拒绝和取消必须回到调用方。 */
+/** An ordinary capture failure may be degraded; a permission denial and cancellation must propagate to the caller. */
 internal suspend inline fun <T> screenAttempt(body: () -> T): T? = try {
     body()
 } catch (e: kotlinx.coroutines.CancellationException) {

@@ -1,10 +1,12 @@
 package com.wangzan101.mika.core.screen.uistate
 
 /**
- * 从一屏的可交互元素里认出「返回」控件,给 back 注入失效时的降级用。
+ * Recognizes a "back" control among a screen's interactive elements, used as a fallback when injecting back fails.
  *
- * 识别顺序(越靠前越可信):名字精确命中返回词 → 名字包含返回词 → 左上角无名字的图标型控件。
- * 认不到就返回 null,让调用方决定要不要硬点——不在这里盲目点。
+ * Recognition order (earlier is more reliable): name exactly matches a back word → name contains a back word →
+ * an unnamed icon-like control in the top-left corner.
+ * Returns null when nothing is recognized, leaving it to the caller to decide whether to tap blindly — no blind taps
+ * here.
  */
 object BackAffordance {
     private val EXACT = setOf(
@@ -12,10 +14,10 @@ object BackAffordance {
         "back", "navigate up", "previous",
         "←", "↩", "‹", "＜",
     )
-    // 不含 "back":它的子串会误伤 feedback/backup/background
+    // "back" is excluded: as a substring it would also hit feedback/backup/background
     private val CONTAINS = listOf("返回", "后退", "回退", "向上导航", "previous", "navigate up")
     private val ICON_ROLES = setOf("ImageButton", "AppCompatImageButton", "ImageView", "Image")
-    // 返回控件的资源 id 末段(去掉包名和 /id/ 前缀)
+    // Trailing segments of back controls' resource IDs (with the package name and /id/ prefix removed)
     private val RESOURCE_SEGMENTS = setOf("back", "navigate_up", "arrow_back", "btn_back", "toolbar_back", "action_bar_up")
 
     fun find(elements: List<UiElement>, screenWidth: Int, screenHeight: Int): UiElement? {

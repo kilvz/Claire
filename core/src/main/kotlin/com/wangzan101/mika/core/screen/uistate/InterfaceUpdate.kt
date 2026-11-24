@@ -7,17 +7,20 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 差异文字超过全量的这个比例就发全量:差异省不了多少,还更难读。 */
+/** When the diff text exceeds this fraction of the full snapshot, send the full one: the diff saves little and is harder to read. */
 private const val MAX_DIFF_RATIO = 0.5
 private const val DEFAULT_MAX_ELEMENTS = 200
 
 /**
- * 两屏之间的差异(按稳定编号对齐),给写操作结果的 `screen` 字段:
- * `{"snapshotId","base","currentApp","full":false,"added":[元素],"removed":[{ref,name,role}],"changed":[元素+"was"],"unchanged":N}`。
- * 没有 base、[baseVisible] 为假(模型已看不到差异要依赖的读屏)、前台 App 变了、或差异文字超过全量的一半时发全量:
- * `{"snapshotId","currentApp","full":true,"elements":[…],"truncated"}`。
- * 差异按两屏的完整元素列表算,输出时 added/changed 合计不超过 [maxElements] 个,超出的标 truncated。
- * 手机快照有窗口树时,全量结果带 tree,差异结果带 treeChanges;调用方给手机传完整元素数。
+ * The difference between two screens (aligned by stable ref), for a write result's `screen` field:
+ * `{"snapshotId","base","currentApp","full":false,"added":[elements],"removed":[{ref,name,role}],"changed":[element+"was"],"unchanged":N}`.
+ * A full snapshot is sent when there is no base, [baseVisible] is false (the model can no longer see the screen the
+ * diff depends on), the foreground app changed, or the diff text exceeds half of the full snapshot:
+ * `{"snapshotId","currentApp","full":true,"elements":[…],"truncated"}`.
+ * The diff is computed from the two screens' complete element lists; the output has at most [maxElements] added and
+ * changed entries combined, with anything beyond that marked truncated.
+ * When a phone snapshot has a window tree, full results carry tree and diff results carry treeChanges; the caller
+ * passes the complete element count for the phone.
  */
 object InterfaceUpdate {
     fun between(base: ModelSnapshot?, current: ModelSnapshot, baseVisible: Boolean, maxElements: Int = DEFAULT_MAX_ELEMENTS): JsonObject {

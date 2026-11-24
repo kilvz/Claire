@@ -8,17 +8,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 这个网站本任务里看的页、这个 App 换的屏到了上限:不再换页、换屏(见 [PageLimitReached])。 */
+/** The pages viewed on this site, or the screens changed in this app, within this task have reached the cap: no more page or screen changes (see [PageLimitReached]). */
 const val PAGE_LIMIT = "page_limit"
 
-/** 换页、换屏之前的停留没让这个动作做:调用方不做它,按 [code] 报(见 [dwellStopped])。网页([com.wangzan101.mika.core.cap.web.PageDwell])和 App 里(手机能力的停留)共用。 */
+/** The pause before a page or screen change kept this action from being done: the caller skips it and reports by [code] (see [dwellStopped]). Shared by the web ([com.wangzan101.mika.core.cap.web.PageDwell]) and apps (the phone capability's pause). */
 internal sealed class DwellStop(message: String) : Exception(message) {
     abstract val code: String
-    /** 附在说明后面的细节;没有为 null。 */
+    /** Details appended after the explanation; null when there are none. */
     open val detail: String? get() = null
 }
 
-/** 本任务里这个网站来的页、限制浏览快慢的这个 App 换的屏到了上限:不再换页、换屏,先回答或问用户。[site] 是网站主机名或 App 包名。 */
+/** The pages from this site, or the screens this app changed, within this task have reached the cap that limits browsing speed: no more page or screen changes; answer or ask the user first. [site] is the site host name or the app package name. */
 internal class PageLimitReached(val site: String, val pages: Int, val cap: Int, val scope: Scope) :
     DwellStop("Claire reached its per-task ${scope.label} budget for $site ($pages/$cap).") {
     enum class Scope(val wireName: String, val label: String) {
@@ -30,12 +30,12 @@ internal class PageLimitReached(val site: String, val pages: Int, val cap: Int, 
     override val detail get() = message
 }
 
-/** 停留中用户插了话:这次不做,先读那句话。 */
+/** The user spoke up during the pause: skip this one and read that message first. */
 internal class DwellInterrupted : DwellStop("The pause before this action was cut short by a new message from the user.") {
     override val code get() = SKIPPED_FOR_NEW_MESSAGE
 }
 
-/** 不做这个动作的工具结果:说明为什么停、接下来怎么办(到上限时附上这个网站、App 看了几页)。 */
+/** The tool result for not doing this action: explains why it stopped and what to do next (at the cap it includes how many pages of this site or app were viewed). */
 internal fun dwellStopped(e: DwellStop): ToolExecution {
     val failure = fail(e.code, listOfNotNull(FAILURE_MESSAGES.getValue(e.code), e.detail).joinToString(" "))
     if (e !is PageLimitReached) return failure
