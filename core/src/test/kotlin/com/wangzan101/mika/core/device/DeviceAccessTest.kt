@@ -97,7 +97,7 @@ class DeviceAccessTest {
         assertEquals("disabled", d.unlock { true }.status)
         assertEquals(0, p.wakes + p.dismisses + p.reveals + p.entries)
         assertNull(s.last)
-        // 拒绝某个来源不会影响已有的定时任务/MCP 调用。
+        // Rejecting one source does not affect existing scheduled jobs or MCP calls.
         s.enabled = true
         assertEquals("unlocked", d.unlock().status)
         assertEquals(1, p.entries)
@@ -165,9 +165,9 @@ class DeviceAccessTest {
         assertTrue(s.last!!.value.all { it == '\u0000' })
     }
 
-    /** 本机开关与远程开关各自独立:local 分流只认 localEnabled,remote 分流只认 enabled。 */
+    /** The local and remote switches are independent: the local path honours only localEnabled, the remote path only enabled. */
     @Test fun localPermissionIsCheckedIndependentlyFromTheRemoteSwitch() = runTest {
-        // 只开本机开关:remote 分流仍拒,local 分流放行
+        // Only the local switch is on: the remote path is still refused, the local path is allowed
         val localOnlyPort = Port()
         val localOnlyStore = Store().apply { enabled = false; localEnabled = true }
         val d = DeviceAccess(localOnlyPort, localOnlyStore)
@@ -177,7 +177,7 @@ class DeviceAccessTest {
         assertEquals(1, localOnlyPort.entries)
         assertFalse(localOnlyStore.attemptBlocked)
         assertFalse(localOnlyStore.localBlocked)
-        // 只开远程开关:local 分流拒绝,一次操作都不做
+        // Only the remote switch is on: the local path refuses and no operation is performed at all
         val remoteOnlyPort = Port()
         val remoteOnlyStore = Store().apply { enabled = true; localEnabled = false }
         assertEquals("disabled", DeviceAccess(remoteOnlyPort, remoteOnlyStore).unlockLocal().status)
@@ -185,7 +185,7 @@ class DeviceAccessTest {
         assertNull(remoteOnlyStore.last)
     }
 
-    /** 唤醒途中用户关掉本机开关:每次操作前重读,流程必须在凭据输入前中止。 */
+    /** The user switches the local switch off mid-wake: it is re-read before every operation, so the flow must abort before entering the credential. */
     @Test fun localSwitchOffDuringWakeStopsBeforeLoadingTheCredential() = runTest {
         val s = Store().apply { enabled = false; localEnabled = true }
         val p = Port().apply { wakeHook = { s.localEnabled = false } }
@@ -196,7 +196,7 @@ class DeviceAccessTest {
         assertFalse(s.localBlocked)
     }
 
-    /** 熄屏但本来没安全锁:本机流程唤醒即带到可用,算这次解的(woke || !wasSecure)。 */
+    /** Screen off but no secure lock configured: the local flow reaches usable state merely by waking, so it counts as this flow's unlock (woke || !wasSecure). */
     @Test fun localWakeOnAnUnsecuredScreenCountsAsOurUnlock() = runTest {
         val p = Port().apply { current = DeviceState(false, true, false, false, true, true) }
         val s = Store().apply { enabled = false; localEnabled = true; kind = null }
@@ -227,31 +227,31 @@ class DeviceAccessTest {
         assertEquals(0, p.entries)
     }
 
-    /** 回锁义务的依据:只有这次流程真的把手机从熄屏/锁屏带到可用,才标记 performedUnlock。 */
+    /** Basis for the re-lock obligation: performedUnlock is set only when this flow actually took the phone from screen-off/locked to usable. */
     @Test fun performedUnlockOnlyWhenThisFlowUnlocked() = runTest {
-        // 本来就可用:不是这次解的
+        // Already usable: not unlocked by this flow
         val already = Port().apply { current = DeviceState(true, false, false, true, true, true) }
         assertFalse(DeviceAccess(already, Store()).unlock().performedUnlock)
         assertEquals(0, already.wakes + already.dismisses + already.entries)
-        // 熄屏唤醒 + 上滑(无安全锁):这次流程带到的
+        // Wake from screen-off + swipe up (no secure lock): brought there by this flow
         val swipe = Port().apply { current = DeviceState(false, true, false, false, true, true) }
         assertTrue(DeviceAccess(swipe, Store().apply { kind = null }).unlock().performedUnlock)
-        // 亮着但锁屏(滑动锁):这次流程上滑解开的
+        // Screen on but locked (swipe lock): unlocked by this flow's swipe
         val dismissed = Port().apply { current = DeviceState(true, true, false, false, true, true) }
         assertTrue(DeviceAccess(dismissed, Store().apply { kind = null }).unlock().performedUnlock)
-        // 输入凭据解开:这次流程解的
+        // Unlocked by entering the credential: unlocked by this flow
         val typed = Port()
         assertTrue(DeviceAccess(typed, Store()).unlock().performedUnlock)
     }
 
     @Test fun manualUnlockDuringOurFlowIsNotOurUnlock() = runTest {
-        // 等凭据页期间用户自己解了:我们没注入,不算这次解的
+        // The user unlocked on their own while we waited for the credential page: we injected nothing, so it does not count as this flow's unlock
         val manual = Port().apply {
             readyTarget = false
             targetHook = { current = current.copy(keyguardShowing = false, deviceLocked = false) }
         }
         assertFalse(DeviceAccess(manual, Store(), 10, 30).unlock().performedUnlock)
-        // enter 报失败但系统已可用(用户同时解的):也不算这次解的
+        // enter reports failure but the system is already usable (the user unlocked simultaneously): also not this flow's unlock
         val raced = object : DeviceAccessPort {
             private var s = DeviceState(true, true, true, true, true, true)
             override suspend fun state() = s
@@ -378,7 +378,7 @@ class DeviceAccessTest {
         assertEquals("unsupported_keyguard", d.unlock().status)
         assertEquals(1, p.reveals)
         assertEquals(0, p.entries)
-        // 下一次明确调用是新的一次解锁流程,可以重新导航;同一次绝不反复滑。
+        // The next explicit call is a new unlock flow and may navigate again; within one flow it never swipes repeatedly.
         assertEquals("unsupported_keyguard", d.unlock().status)
         assertEquals(2, p.reveals)
         assertFalse(s.attemptBlocked)

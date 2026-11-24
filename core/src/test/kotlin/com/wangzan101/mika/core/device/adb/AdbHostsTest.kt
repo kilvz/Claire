@@ -19,7 +19,7 @@ class AdbHostsTest {
         )) {
             assertNotNull(host, AdbHosts.ownAddress(host))
         }
-        // localhost 不查 hosts/DNS,也不接受它的子域;固定成这个已验证的 IPv4 回环。
+        // localhost is not resolved via hosts/DNS and its subdomains are not accepted; it is pinned to this verified IPv4 loopback.
         assertArrayEquals(byteArrayOf(127, 0, 0, 1), AdbHosts.ownAddress("LOCALHOST.")!!.address)
         val target = AdbHosts.ownSocketAddress("[::1]", 5555)
         assertNotNull(target)
@@ -32,7 +32,7 @@ class AdbHostsTest {
             NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().flatMap { it.inetAddresses.toList() }
         }.getOrDefault(emptyList())
         for (address in own) {
-            // hostAddress 可能带 %en0 或 %3;保留 scope,验证后再连接也必须是这份地址。
+            // hostAddress may carry %en0 or %3; the scope is kept, and reconnecting after verification must use this same address.
             assertNotNull(address.hostAddress, AdbHosts.ownAddress(address.hostAddress))
             if (address is Inet4Address) {
                 assertNotNull(address.hostAddress, AdbHosts.ownAddress("::ffff:${address.hostAddress}"))

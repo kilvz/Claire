@@ -6,14 +6,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RootAccessTest {
-    /** 先找 PATH 里的,再找常见的几处;都没有为 null。 */
+    /** Looks in PATH first, then in the usual places; null when none is found. */
     @Test
     fun findsSuOnPathThenInUsualPlaces() {
         assertEquals("/product/bin/su", SuProbe.find("/product/bin:/system/bin") { it == "/product/bin/su" || it == "/system/bin/su" })
         assertEquals("/system/xbin/su", SuProbe.find(null) { it == "/system/xbin/su" })
         assertEquals("/debug_ramdisk/su", SuProbe.find("", setOf("/debug_ramdisk/su")::contains))
         assertNull(SuProbe.find("/system/bin:/vendor/bin") { false })
-        // PATH 里的相对路径、空段不算;结尾的斜杠去掉
+        // Relative entries and empty segments in PATH do not count; a trailing slash is stripped
         assertEquals("/system/bin/su", SuProbe.find("bin::/system/bin/") { it == "bin/su" || it == "/system/bin/su" })
     }
 
@@ -27,7 +27,7 @@ class RootAccessTest {
         assertNull(SuProbe.uid("Permission denied"))
     }
 
-    /** 答复:uid 对就是答应了;uid 不对是切不过去;没读到 uid 时看是不是到了时限。 */
+    /** Answer: a matching uid means granted; a different uid means the switch failed; when no uid was read, check whether the deadline was reached. */
     @Test
     fun answerFromOutputAndTimeout() {
         assertEquals(SuAnswer.Granted, SuProbe.answer("uid=0(root)", timedOut = false, expectUid = 0))
@@ -38,14 +38,14 @@ class RootAccessTest {
         assertEquals(SuAnswer.NoAnswer, SuProbe.answer("", timedOut = true, expectUid = 0))
     }
 
-    /** 以 shell 身份跑时用户参数写在 -c 前面;命令是一个参数,不拆开。 */
+    /** When running as shell, the user argument precedes -c; the command stays one argument and is not split. */
     @Test
     fun suArguments() {
         assertEquals(listOf("/system/bin/su", "-c", "ls -l /data"), SuProbe.rootArgs("/system/bin/su", "ls -l /data"))
         assertEquals(listOf("/sbin/su", "2000", "-c", "id -u; read n"), SuProbe.shellArgs("/sbin/su", "id -u; read n"))
     }
 
-    /** 用户请求、su 在不在、明确授权结果 → 能不能自动用 root 起助手;没有答复时绝不自动执行 su。 */
+    /** User request, whether su exists, explicit grant result → whether the helper may be started automatically with root; without an answer su is never executed automatically. */
     @Test
     fun rootStartGate() {
         assertEquals(RootStart.Off, RootStart.of(enabled = false, suPresent = true, last = SuAnswer.Granted))
@@ -60,7 +60,7 @@ class RootAccessTest {
         assertNull(RootStart.Ready.failure)
         assertEquals(BuiltinShellFailure.RootDenied, RootStart.Denied.failure)
         assertEquals(BuiltinShellFailure.RootUnavailable, RootStart.Gone.failure)
-        // 拒绝、不回话可以重试;su 没了或切不过去要换别的办法
+        // Denial or silence may be retried; a missing su or a failed uid switch needs another approach
         assertEquals(BuiltinShellFix.Retry, BuiltinShellFailure.RootDenied.defaultFix)
         assertEquals(BuiltinShellFix.Retry, BuiltinShellFailure.RootNoAnswer.defaultFix)
         assertEquals(BuiltinShellFix.RePair, BuiltinShellFailure.RootUnavailable.defaultFix)
@@ -76,7 +76,7 @@ class RootAccessTest {
         assertEquals(RootGrant.NoShellUid, RootGrant.of(SuAnswer.WrongUid))
     }
 
-    /** 经 su 起助手的命令:先打 uid,再和经无线调试起的一样(口令不在命令里)。 */
+    /** Command that starts the helper via su: print the uid first, then exactly as starting over wireless debugging (the nonce is not on the command line). */
     @Test
     fun rootCommandPrintsTheUidFirstAndKeepsTheNonceOffTheCommandLine() {
         val c = HelperHandoff.rootCommand("/data/app/x/base.apk", "com.wangzan101.mika", 10123, "ab")

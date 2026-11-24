@@ -44,7 +44,7 @@ class HelperHandoffTest {
         assertEquals(1, written.size)
         val stale = gate.usbNonce()
         assertTrue(written[0].contains(stale))
-        // 解除配对:助手一直不在,也要重写,新脚本里是新口令,旧的不再认
+        // Unpairing: the helper is always absent, yet the script must be rewritten, the new script carries a new nonce and the old one is no longer accepted
         gate.clear()
         assertEquals(2, written.size)
         assertFalse(written[1].contains(stale))
@@ -100,9 +100,9 @@ class HelperHandoffTest {
         val next = g.accept(launch)
         assertNotNull(next)
         assertNotEquals(launch, next)
-        // 用过就不认了
+        // Once used, it is no longer accepted
         assertNull(g.accept(launch))
-        // 换发的口令也只能用一次
+        // The reissued nonce can also be used only once
         val after = g.accept(next)
         assertNotNull(after)
         assertNull(g.accept(next))
@@ -113,7 +113,7 @@ class HelperHandoffTest {
         val g = nonces()
         val resume = g.accept(g.issueLaunch())!!
         val launch = g.issueLaunch()
-        // 旧助手先交接:新起的那个口令作废,它会被拒绝并自己退出
+        // The old helper hands off first: the newly issued nonce becomes void, so the new one is rejected and exits by itself
         assertNotNull(g.accept(resume))
         assertNull(g.accept(launch))
 
@@ -127,7 +127,7 @@ class HelperHandoffTest {
     fun resumeNonceSurvivesProcessRestart() {
         val store = MemStore()
         val resume = nonces(store).accept(nonces(store).issueLaunch())
-        // 新进程:新对象读同一份存储
+        // New process: a new object reads the same store
         assertNotNull(nonces(store).accept(resume))
     }
 
@@ -159,7 +159,7 @@ class HelperHandoffTest {
 
     @Test
     fun launchNonceFromTheFutureIsNotTrusted() {
-        // 记录的签发时间晚于现在(比如重启后时钟从零开始):当作过期
+        // The recorded issue time is later than now (e.g. the clock starts from zero after a reboot): treat it as expired
         val store = MemStore()
         val launch = nonces(store).issueLaunch()
         now -= 1
@@ -202,7 +202,7 @@ class HelperHandoffTest {
         assertNull(HelperHandoff.certPin(null))
     }
 
-    // ---------- 用电脑经 USB 启动 ----------
+    // ---------- Starting from a computer over USB ----------
 
     private val apk = "/data/app/~~x/com.wangzan101.mika-y/base.apk"
     private val scriptPath = "/storage/emulated/0/Android/data/com.wangzan101.mika/files/usb-start.sh"
@@ -210,7 +210,7 @@ class HelperHandoffTest {
     @Test
     fun usbCommandUsesTheShortSdcardPathForTheMainUser() {
         assertEquals("adb shell sh /sdcard/Android/data/com.wangzan101.mika/files/usb-start.sh", HelperHandoff.usbCommand(scriptPath))
-        // 别的用户的存储照实际路径写
+        // For other users the storage path is written exactly as given
         assertEquals(
             "adb shell sh /storage/emulated/10/Android/data/com.wangzan101.mika/files/usb-start.sh",
             HelperHandoff.usbCommand("/storage/emulated/10/Android/data/com.wangzan101.mika/files/usb-start.sh"),
@@ -221,7 +221,7 @@ class HelperHandoffTest {
     fun usbScriptStartsTheSameHelperDetachedWithTheNonceOnStdin() {
         val script = HelperHandoff.usbScript(apk, "com.wangzan101.mika", 10234, "ab'cd", "f00d", scriptPath)
         assertTrue(script.startsWith("#!/system/bin/sh\n"))
-        // 和无线调试同一个入口、同样的参数;指纹里的单引号转义好;忽略挂断信号、另起会话、放到后台、输出丢掉
+        // Same entry point and same arguments as wireless debugging; single quotes in the fingerprint are escaped; hangup is ignored, a new session is started, it is moved to the background and its output is discarded
         assertTrue(
             script,
             script.contains(
@@ -229,13 +229,13 @@ class HelperHandoffTest {
                     "com.wangzan101.mika.shell.HelperMain 'com.wangzan101.mika' 10234 'ab'\\''cd' >/dev/null 2>&1 &)",
             ),
         )
-        // 口令只在变量里,经内建 echo 走管道,不进命令行参数
+        // The nonce lives only in a variable and travels through a pipe via the built-in echo, never as a command-line argument
         assertTrue(script.contains("\nn='f00d'\n"))
         assertEquals(1, script.split("f00d").size - 1)
-        // 只有 shell 身份才起;APK 不在(更新过)就请用户先打开 Claire
+        // It starts only under the shell uid; if the APK is missing (after an update), ask the user to open Claire first
         assertTrue(script.contains("if [ \"\$(id -u)\" != \"2000\" ]; then"))
         assertTrue(script.contains("if [ ! -f '$apk' ]; then"))
-        // 等 setsid 生效再返回,并说清结果和怎么确认
+        // Wait for setsid to take effect before returning, and state the outcome and how to confirm it
         assertTrue(script.contains("\nsleep 2\n"))
         assertTrue(script.contains("if pidof 'com.wangzan101.mika:helper' >/dev/null 2>&1; then"))
         assertTrue(script.contains("Claire helper starting... Open Claire to confirm"))
@@ -249,7 +249,7 @@ class HelperHandoffTest {
         assertTrue(script.contains("On most phones it keeps running after you unplug the cable"))
         assertTrue(script.contains("if phone control stopped after unplugging, plug in and run this command again"))
         assertFalse(script.contains("It keeps running after you unplug the cable."))
-        // 新提示不换启动机制,口令仍只出现一次
+        // The new message does not change the launch mechanism, and the nonce still appears only once
         assertTrue(script.contains("nohup setsid app_process"))
         assertEquals(1, script.split("f00d").size - 1)
     }
@@ -280,12 +280,12 @@ class HelperHandoffTest {
     fun usbNonceIsReusedWhileFreshAndHandsOffOnce() {
         val g = nonces()
         val usb = g.usbNonce()
-        // 重写脚本时还新:沿用,电脑正在跑的那份不作废
+        // Still fresh when the script is rewritten: reuse it so the copy the computer is running stays valid
         wall += HandoffNonces.USB_TTL_MS / 2
         assertEquals(usb, g.usbNonce())
         assertTrue(g.matches(usb))
         assertNotNull(g.accept(usb))
-        // 用过就作废;下一份脚本是新口令
+        // Once used it becomes void; the next script gets a fresh nonce
         assertNull(g.accept(usb))
         assertNotEquals(usb, g.usbNonce())
     }
@@ -317,11 +317,11 @@ class HelperHandoffTest {
     fun usbNonceSurvivesARebootButNotAnotherHandoff() {
         val store = MemStore()
         val usb = nonces(store).usbNonce()
-        // 重启后开机计时归零,墙上时钟照走:脚本照样能用
+        // After a reboot the uptime counter is back to zero while wall-clock time keeps running: the script still works
         now = 0
         val g = nonces(store)
         assertTrue(g.matches(usb))
-        // 无线调试那边起的助手先被收下:脚本里的口令作废
+        // A helper started over wireless debugging is accepted first: the script's nonce becomes void
         assertNotNull(g.accept(g.issueLaunch()))
         assertFalse(g.matches(usb))
         assertNull(store.slots.usb)

@@ -19,7 +19,7 @@ class AccessibilityRepairTest {
     private val on = A11yObservation(enabled = true, connected = true)
     private val off = A11yObservation(enabled = false, connected = false)
 
-    /** 假的环境:[comesBack] 为 true 时,重启后过 [connectAfterMs] 服务连上。 */
+    /** Fake environment: when [comesBack] is true, the service connects [connectAfterMs] after a restart. */
     private inner class Rig(
         initial: A11yObservation = stuck,
         helperStatus: BuiltinShellStatus = BuiltinShellStatus.Running,
@@ -61,13 +61,13 @@ class AccessibilityRepairTest {
 
     @Test
     fun waitsForTheFirstUnlockThenRepairs() = runTest {
-        // 开机后还没解锁过:服务本来就绑不上,不动系统里的无障碍列表
+        // Not unlocked since boot: the service cannot bind anyway, so the system accessibility list is left untouched
         val rig = Rig(unlocked = false).also { it.start(this) }
         advanceTimeBy(AccessibilityRepair.WORST_CASE_MS * 2)
         assertEquals(emptyList<Long>(), rig.restarts)
         assertNull(rig.repair.last.value)
         assertEquals(RepairPhase.Idle, rig.repair.phase.value)
-        // 解锁了还是没连上:照常先等一会儿再修
+        // Unlocked but still not connected: as usual, wait a while and then repair
         val unlockedAt = currentTime
         rig.userUnlocked.value = true
         advanceTimeBy(10_000)
@@ -100,7 +100,7 @@ class AccessibilityRepairTest {
 
     @Test
     fun turnsItBackOnWhenRemovedFromTheSystemList() = runTest {
-        // 强行停止时系统会把 Claire 从无障碍列表里拿掉:一样自动打开
+        // Force-stopping makes the system remove Claire from the accessibility list: turn it back on the same way
         val rig = Rig(initial = off).also { it.start(this) }
         advanceTimeBy(60_000)
         assertEquals(1, rig.restarts.size)
@@ -119,7 +119,7 @@ class AccessibilityRepairTest {
         val rig = Rig(allowed = false).also { it.start(this) }
         advanceTimeBy(60_000)
         assertEquals(emptyList<Long>(), rig.restarts)
-        // 手动打开只改变同一个 active/allowed 状态,不另建一套恢复流程
+        // Manually switching it on only changes the same active/allowed state; no separate recovery flow is created
         rig.allowed = true
         rig.active.value = true
         advanceTimeBy(10_000)
@@ -129,7 +129,7 @@ class AccessibilityRepairTest {
 
     @Test
     fun repairsWithoutHelperWhenAppCanWriteSettingsItself() = runTest {
-        // 无线调试关着、助手不在,但 App 自己有修改系统设置的授权:照样修
+        // Wireless debugging is off and the helper is absent, but the app itself holds the modify-system-settings grant: it still repairs
         val rig = Rig(initial = off, helperStatus = BuiltinShellStatus.NotPaired, direct = true).also { it.start(this) }
         advanceTimeBy(60_000)
         assertEquals(1, rig.restarts.size)
@@ -151,11 +151,11 @@ class AccessibilityRepairTest {
         val rig = Rig(comesBack = false).also { it.start(this) }
         advanceTimeBy(120_000)
         assertEquals(AccessibilityRepair.MAX_ATTEMPTS, rig.restarts.size)
-        // 第二次在第一次等连接超时、再退避之后
+        // The second attempt comes after the first one waited out its connect timeout and then backed off
         val gap = rig.restarts[1] - rig.restarts[0]
         assertTrue("gap $gap", gap >= AccessibilityRepair.CONNECT_TIMEOUT_MS + AccessibilityRepair.BACKOFF_MS)
         assertFalse(rig.repair.last.value!!.restarted)
-        // 用尽之后状态再变(助手掉线又回来)也不再试
+        // Once the attempts are exhausted, later state changes (the helper dropping and coming back) trigger no more tries
         rig.helper.value = BuiltinShellStatus.Connecting
         runCurrent()
         rig.helper.value = BuiltinShellStatus.Running
@@ -168,7 +168,7 @@ class AccessibilityRepairTest {
         val rig = Rig(comesBack = false).also { it.start(this) }
         advanceTimeBy(120_000)
         assertEquals(2, rig.restarts.size)
-        // 用户手动关掉再打开后连上了;之后又卡住:重新计数
+        // After the user turned it off and on manually it connected; then it got stuck again: the count starts over
         rig.service.value = on
         runCurrent()
         rig.comesBack = true
@@ -212,7 +212,7 @@ class AccessibilityRepairTest {
         assertEquals(RepairPhase.Repairing, rig.repair.phase.value)
         advanceTimeBy(10_000)
         assertEquals(RepairPhase.Idle, rig.repair.phase.value)
-        // 被拿掉了也要修;只有在 Claire 里关掉了替我打开才一直是 Idle
+        // Being removed still needs a repair; only switching off "turn on for me" in Claire keeps it Idle
         assertEquals(RepairPhase.Pending, Rig(initial = off).also { it.start(this) }.repair.phase.value)
         val declined = RecoveryConsent(declined = setOf(RecoveryCapability.Accessibility))
         assertEquals(RepairPhase.Idle, Rig(initial = off, consent = declined).also { it.start(this) }.repair.phase.value)
@@ -234,7 +234,7 @@ class AccessibilityRepairTest {
         advanceTimeBy(5_001)
         assertTrue(wait.isCompleted)
         assertNull(wait.await())
-        // 一开始就连着:马上拿到
+        // Connected right from the start: obtained immediately
         assertEquals("svc", AccessibilityRepair.awaitService(MutableStateFlow<String?>("svc"), phase, baseMs = 5_000))
     }
 
@@ -277,7 +277,7 @@ class AccessibilityRepairTest {
     @Test
     fun awaitWithTheRealRepairEndToEnd() = runTest {
         val rig = Rig(connectAfterMs = 3_000).also { it.start(this) }
-        // 服务实例:连上前是 null
+        // Service instance: null until it connects
         val instance = MutableStateFlow<String?>(null)
         backgroundScope.launch { rig.service.collect { instance.value = if (it.connected) "svc" else null } }
         val wait = async { AccessibilityRepair.awaitService(instance, rig.repair.phase, baseMs = 5_000) }

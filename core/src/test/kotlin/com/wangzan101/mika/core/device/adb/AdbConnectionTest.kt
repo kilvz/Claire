@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * 进程内的假 adbd:CNXN → STLS → TLS(要求客户端证书,只认 [authorized] 里的公钥)→ CNXN,
- * 然后提供几个 exec 服务。单线程事件循环,发出的每个 WRTE 都等客户端 OKAY 再发下一个。
+ * In-process fake adbd: CNXN → STLS → TLS (requires a client certificate and trusts only the public keys in [authorized]) → CNXN,
+ * then serves a few exec services. Single-threaded event loop: each WRTE sent waits for the client's OKAY before the next one.
  */
 class FakeAdbd(
     private val authorized: List<AdbIdentity>,
@@ -49,7 +49,7 @@ class FakeAdbd(
             while (!server.isClosed) {
                 val s = server.accept()
                 current = s
-                try { serve(s) } catch (e: IOException) { /* 客户端断开 */ } finally { s.close(); sessionsEnded.put(Unit) }
+                try { serve(s) } catch (e: IOException) { /* client disconnected */ } finally { s.close(); sessionsEnded.put(Unit) }
             }
         } catch (_: IOException) {
         } catch (t: Throwable) {
@@ -123,12 +123,12 @@ class FakeAdbd(
         }
     }
 
-    /** 等这个客户端的会话在设备端处理完;客户端断开后再看 [received] 要先调用,否则最后几条消息可能还没记下。 */
+    /** Waits until this client's session is fully handled on the device side; call it before reading [received] after the client disconnects, otherwise the last few messages may not be recorded yet. */
     fun awaitSessionEnd() {
         check(sessionsEnded.poll(5, TimeUnit.SECONDS) != null) { "fake adbd session did not end" }
     }
 
-    /** 模拟设备那头断开(关掉无线调试、adbd 重启)。 */
+    /** Simulates the device side dropping the connection (wireless debugging turned off, adbd restarted). */
     fun dropClients() {
         current?.close()
     }
@@ -149,7 +149,7 @@ class AdbConnectionTest {
             AdbConnection.open("127.0.0.1", d.port, tls).use { c ->
                 assertTrue(c.banner.startsWith("device::ro.product.name=fake"))
                 assertEquals("hello world\n", c.exec("echo hello world").readText())
-                // 同一连接上可以再开流
+                // Another stream can be opened on the same connection
                 assertEquals("again\n", c.exec("echo again").readText())
             }
             d.awaitSessionEnd()
@@ -237,7 +237,7 @@ class AdbConnectionTest {
 
     @Test
     fun localhostAndMappedLoopbackConnectThroughTheVerifiedAddress() {
-        // 原字符串带空白、方括号或 IPv4-mapped 形式;只有直接使用核对过的 InetAddress 才能连上。
+        // The original string carries whitespace, brackets or an IPv4-mapped form; only connecting directly with the verified InetAddress works.
         for (host in listOf(" localhost. ", " [::ffff:127.0.0.1] ")) {
             FakeAdbd(listOf(TestTls.client)).use { d ->
                 AdbConnection.open(host, d.port, tls).use { c ->

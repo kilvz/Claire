@@ -32,13 +32,13 @@ class AdbIdentitySourceTest {
 
     private val crt = TestTls.client.keyPair.private as RSAPrivateCrtKey
 
-    /** 同一把钥匙,但平台给出的是不带 CRT 参数的 RSA 私钥(编码里公开指数写 0)。 */
+    /** The same key, but the platform hands back an RSA private key without CRT parameters (the public exponent is encoded as 0). */
     private fun nonCrt(key: RSAPrivateCrtKey = crt): RSAPrivateKey =
         KeyFactory.getInstance("RSA").generatePrivate(RSAPrivateKeySpec(key.modulus, key.privateExponent)) as RSAPrivateKey
 
     @Test
     fun generatedKeyRoundTripsToTheIdenticalPublicKey() {
-        // 升级前存下的就是 generate() 出来的私钥编码:读回来要是同一把公钥,已配对的不用重配
+        // What was stored before the upgrade is exactly the private-key encoding produced by generate(): it must read back as the same public key so already-paired devices need no re-pairing
         repeat(3) {
             val id = AdbIdentity.generate("mika@x")
             val back = AdbIdentity.fromPkcs8(id.keyPair.private.encoded, "mika@x")
@@ -61,10 +61,10 @@ class AdbIdentitySourceTest {
     @Test
     fun publicExponentComesFromTheEncodingWhenTheKeyObjectLacksIt() {
         assertEquals(BigInteger.valueOf(65537), Pkcs8Rsa.publicExponent(crt.encoded))
-        // 不带 CRT 的编码里指数是 0:当作不知道
+        // An encoding without CRT has an exponent of 0: treat it as unknown
         assertEquals(BigInteger.ZERO, Pkcs8Rsa.publicExponent(nonCrt().encoded))
         assertNull(Pkcs8Rsa.publicExponent(byteArrayOf(0x30, 0x05, 1)))
-        // 平台给的私钥不带 CRT,编码里却有指数:用编码里的
+        // The platform's private key has no CRT, yet the encoding does carry the exponent: use the encoded one
         assertEquals(BigInteger.valueOf(65537), AdbIdentity.publicExponent(nonCrt(), crt.encoded))
     }
 
@@ -74,7 +74,7 @@ class AdbIdentitySourceTest {
         val odd = g.generateKeyPair().private as RSAPrivateCrtKey
         val stripped = nonCrt(odd)
         assertThrows(AdbKeyUnreadableException::class.java) { AdbIdentity.fromPkcs8(stripped.encoded, "mika@x") }
-        // 编码里带着指数的照常读
+        // An encoding that carries the exponent is read as usual
         assertEquals(BigInteger.valueOf(65539), AdbIdentity.fromPkcs8(odd.encoded, "mika@x").publicKey.publicExponent)
     }
 
@@ -112,7 +112,7 @@ class AdbIdentitySourceTest {
         assertArrayEquals(garbage, store.bytes)
         assertEquals(0, store.writes)
 
-        // 解不开(包装密钥没了)也一样
+        // Same when it cannot be unwrapped (the wrapping key is gone)
         val locked = MemKeyStore(TestTls.client.keyPair.private.encoded).apply { unreadable = true }
         assertThrows(AdbKeyUnreadableException::class.java) { AdbIdentitySource(locked, { "mika@x" }).forConnect() }
         assertEquals(0, locked.writes)
@@ -143,7 +143,7 @@ class AdbIdentitySourceTest {
         val store = MemKeyStore()
         val src = AdbIdentitySource(store, { "mika@x" })
         val forPair = src.forPairing()
-        // 存下的东西之后坏了:这个进程里仍用配对时那一把
+        // The stored data breaks later: this process keeps using the identity from pairing
         store.unreadable = true
         assertSame(forPair, src.forConnect())
         assertSame(forPair, src.forPairing())

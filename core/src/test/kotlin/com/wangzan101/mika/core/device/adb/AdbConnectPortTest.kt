@@ -34,7 +34,7 @@ class AdbConnectPortTest {
 
     @Test
     fun cachedFirstThenPropertyAndMdnsNotAskedWhenItWorks() = runTest {
-        // 缓存的旧端口被拒得很快,接着试属性
+        // The cached stale port is rejected quickly, so the property is tried next
         val cache = Cache(1111)
         assertEquals("conn@4000", chain(4000, 5000, cache).connect(opener(4000)))
         assertEquals(listOf(1111, 4000), attempts)
@@ -57,13 +57,13 @@ class AdbConnectPortTest {
 
     @Test
     fun stalePortsAreSkippedAndDuplicatesTriedOnce() = runTest {
-        // 缓存、属性都是旧端口(都连不上),mDNS 又给了同一个旧端口,最后一个才对
+        // Cache and property are both stale ports (neither connects) and mDNS returns the same stale port again; only the last one is right
         val cache = Cache(4000)
         assertEquals("conn@6000", chain(4000, null, cache, mdnsAll = listOf(4000, 6000)).connect(opener(6000)))
         assertEquals(listOf(4000, 6000), attempts)
     }
 
-    /** 前 [rejectFirst] 次连 [port] 时 TLS 被拒([reason]),之后连得上;别的端口照 [rest]。 */
+    /** The first [rejectFirst] connections to [port] get a TLS rejection ([reason]); afterwards it connects. Other ports go through [rest]. */
     private fun flaky(port: Int, rejectFirst: Int, rest: (String, Int) -> String, reason: Reason = Reason.UNAUTHORIZED): (String, Int) -> String {
         var left = rejectFirst
         return { host, p ->
@@ -78,7 +78,7 @@ class AdbConnectPortTest {
 
     @Test
     fun tlsRejectionOnceIsRetriedOnTheSamePort() = runTest {
-        // 有的系统让另一个服务先接住第一次 TLS 握手、对谁的证书都拒;紧接着再连就落到 adbd
+        // On some systems another service catches the first TLS handshake and rejects any certificate; an immediate retry then lands on adbd
         val cache = Cache()
         assertEquals("conn@4000", chain(4000, 5000, cache).connect(flaky(4000, 1, opener(4000))))
         assertEquals(listOf(4000, 4000), attempts)
@@ -113,7 +113,7 @@ class AdbConnectPortTest {
 
     @Test
     fun rejectedEverywhereIsUnauthorized() = runTest {
-        // 唯一一个回话的端口试两次都拒,其余是旧端口:钥匙确实不被认,要重新配对;不再扫本机端口
+        // The only port that answers rejects both attempts and the rest are stale ports: the key really is not accepted, re-pairing is needed; local ports are no longer scanned
         val scanner = FakeScanner(mapOf("127.0.0.1" to listOf(41000)), setOf(AdbEndpoint("127.0.0.1", 41000)))
         val port = AdbConnectPort(
             { 4000 }, { _, _ -> listOf(5000) }, Cache(3000),
@@ -150,14 +150,14 @@ class AdbConnectPortTest {
 
     @Test
     fun everyMdnsPortIsTriedWhenAStaleRecordComesFirst() = runTest {
-        // 关了又开无线调试:旧端口的记录还在,新的和它一起回来
+        // Turning wireless debugging off and on again: the stale port record is still there and the new port comes back together with it
         val cache = Cache(4000)
         assertEquals("conn@5000", chain(null, null, cache, mdnsAll = listOf(4000, 5000)).connect(opener(5000)))
         assertEquals(listOf(4000, 5000), attempts)
         assertEquals(5000, cache.port)
     }
 
-    /** 每次连接结束都报一次各来源给了几个候选:连上的、全失败的都报。 */
+    /** Every finished connection reports once how many candidates each source provided: both for the connected and the all-failed case. */
     @Test
     fun reportsCandidateCounts() = runTest {
         val seen = mutableListOf<ConnectCandidates>()
@@ -175,7 +175,7 @@ class AdbConnectPortTest {
         assertEquals(ConnectCandidates(0, 0, 0, connected = false), seen.single())
     }
 
-    /** 假扫描:[open] 是各地址上开着的端口,[adb] 里的才回 STLS;记下扫了哪些地址、跳过了哪些端口。 */
+    /** Fake scan: [open] lists the ports open on each address, only those in [adb] answer STLS; records which addresses were swept and which ports were skipped. */
     private class FakeScanner(val open: Map<String, List<Int>>, val adb: Set<AdbEndpoint>) : LocalPortScanner {
         val swept = mutableListOf<String>()
         var skipped: Set<Int> = emptySet()
@@ -202,12 +202,12 @@ class AdbConnectPortTest {
         assertEquals("conn@41235", port.connect(opener(41235)))
         assertEquals(listOf(39000, 41235), attempts)
         assertEquals(41235, cache.port)
-        // 已经试过的缓存端口不再扫;本机地址上找到了,不再扫 Wi-Fi 地址
+        // The already-tried cached port is not scanned again; the local address hit, so the Wi-Fi address is not swept
         assertTrue(39000 in scanner.skipped)
         assertEquals(listOf("127.0.0.1"), scanner.swept)
         assertEquals(listOf(true, false), progress)
         assertEquals(ConnectCandidates(0, 0, 1, connected = true, scanned = true, scanOpen = 2, scanAdb = 1), seen.single())
-        // 下次缓存直接连上,不再扫
+        // Next time the cache connects directly and no scan runs
         attempts.clear()
         assertEquals("conn@41235", port.connect(opener(41235)))
         assertEquals(listOf(41235), attempts)
@@ -239,7 +239,7 @@ class AdbConnectPortTest {
         val port = AdbConnectPort({ null }, { _, _ -> emptyList() }, Cache(), scan = LocalPortScan(scanner, { listOf("127.0.0.1") }))
         assertEquals("conn@41000", port.connect(opener(41000, 42000)))
         assertEquals(listOf(41000), attempts)
-        // 第一个握手失败就试下一个
+        // If the first handshake fails, the next candidate is tried
         attempts.clear()
         assertEquals("conn@42000", port.connect(opener(42000)))
         assertEquals(listOf(41000, 42000), attempts)

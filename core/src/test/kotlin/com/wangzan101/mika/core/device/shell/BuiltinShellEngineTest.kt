@@ -27,7 +27,7 @@ class BuiltinShellEngineTest {
         var wifi = true
         var pairingPort: Int? = 37000
         var pairError: AdbPairingException.Reason? = null
-        /** 每次起助手的结果:null = 成功并交接,其余抛对应异常;用完后一直成功。 */
+        /** Outcome of each helper launch: null = succeeded and handed off, anything else throws that exception; once the queue is empty, launches keep succeeding. */
         val launchResults = ArrayDeque<AdbConnectionException.Reason?>()
         var deliverOnLaunch = true
         var keyUnreadable = false
@@ -37,7 +37,7 @@ class BuiltinShellEngineTest {
         override fun setPaired(paired: Boolean) { pairedFlag = paired; calls += "paired=$paired" }
         override fun wirelessDebugging() = wireless
         override fun wifiConnected() = wifi
-        /** 配对窗口没开([pairingPort] 为 null)时找满时限才说没找到。 */
+        /** When the pairing window is not open ([pairingPort] is null), search for the full timeout before reporting that nothing was found. */
         override suspend fun findPairingPort(timeoutMs: Long) = pairingPort ?: run { delay(timeoutMs); null }
         override fun pair(port: Int, code: String) {
             calls += "pair $port $code"
@@ -55,7 +55,7 @@ class BuiltinShellEngineTest {
         override fun usbStarted() = usb
         override fun setUsbStarted(on: Boolean) { usb = on }
 
-        /** 「用 root 启动」:是否请求过、有没有 su、su 记下的明确答复;[suAnswers] 是每次经 su 起助手时 su 的答复,用完后一直答应。 */
+        /** "Start with root": whether it was requested, whether su exists, and the explicit answer recorded from su; [suAnswers] holds su's answer for each launch through su, and once it runs out su keeps granting. */
         var rootOn = false
         var suPresent = true
         var answered: SuAnswer? = null
@@ -106,13 +106,13 @@ class BuiltinShellEngineTest {
         autoOn: WirelessDebuggingAutoOn? = null,
     ) =
         BuiltinShellEngine(
-            // 不用 backgroundScope:advanceUntilIdle 不等后台任务,看门狗的重试会被跳过
+            // Deliberately not backgroundScope: advanceUntilIdle does not wait for background tasks, so the watchdog's retries would be skipped
             platform, helper, CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)),
             StandardTestDispatcher(testScheduler), backoff,
             graceMs = 3_000, handoffTimeoutMs = 10_000, autoOn = autoOn,
         )
 
-    /** 替用户打开无线调试:写的是假平台的开关;[revert] 为 true 时像不允许的 Wi-Fi 那样,写完马上被系统拨回。 */
+    /** Turns wireless debugging on for the user by writing the fake platform's switch; when [revert] is true the system flips it straight back, as on a Wi-Fi network that is not allowed. */
     private var wants = true
     private var revert = false
     private var switchWrites = 0
@@ -179,7 +179,7 @@ class BuiltinShellEngineTest {
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.PairingWindowClosed), e.status.value)
     }
 
-    /** 诊断信息用的最近一次出错:异常类别、原因和说明;连上后清空。 */
+    /** Most recent error used for diagnostics: exception type, reason and description; cleared once connected. */
     @Test
     fun lastErrorRecordedAndClearedOnSuccess() = runTest {
         val e = engine()
@@ -203,7 +203,7 @@ class BuiltinShellEngineTest {
         runCurrent()
         assertEquals(BuiltinShellStatus.Connecting, e.status.value)
         advanceTimeBy(2_000)
-        // 还活着的助手在宽限期内交接了:不用再经 adbd 起
+        // The helper that is still alive handed off within the grace period: no launch through adbd is needed
         helper.value = "old"
         advanceUntilIdle()
         assertEquals(BuiltinShellStatus.Running, e.status.value)
@@ -237,7 +237,7 @@ class BuiltinShellEngineTest {
         advanceTimeBy(1_001)
         assertEquals(1, launches())
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.ConnectFailed), e.status.value)
-        // 第 1 次失败后等 1 s,第 2 次失败后等 2 s
+        // Wait 1 s after the first failure and 2 s after the second
         advanceTimeBy(1_001)
         assertEquals(2, launches())
         advanceTimeBy(1_000)
@@ -275,7 +275,7 @@ class BuiltinShellEngineTest {
     @Test
     fun notLocalIsNotRetriedAsANetworkFailure() = runTest {
         platform.pairedFlag = true
-        platform.wifi = false // 也不能被二次归成 NoWifi
+        platform.wifi = false // nor may it be reclassified as NoWifi
         platform.launchResults += AdbConnectionException.Reason.NOT_LOCAL
         val e = engine()
         e.retry()
@@ -372,14 +372,14 @@ class BuiltinShellEngineTest {
         assertEquals(1, switchWrites)
         assertEquals(0, launches())
 
-        // 要用助手、开关又变了:不再写(每写一次系统就弹一次框)
+        // The helper is wanted and the switch changed again: write no more (every write pops a system dialog)
         e.need()
         e.wirelessDebuggingChanged()
         advanceUntilIdle()
         assertEquals(1, switchWrites)
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.WifiNotAllowed), e.status.value)
 
-        // 换到了允许过的 Wi-Fi:再写一次,这次开着
+        // Switched to an allowed Wi-Fi network: write once more, and this time it stays on
         revert = false
         e.wifiAvailable()
         advanceUntilIdle()
@@ -395,7 +395,7 @@ class BuiltinShellEngineTest {
         val e = engine(autoOn = autoOn())
         e.retry()
         assertEquals(1, switchWrites)
-        // 用户在系统弹框里允许了、再点重试
+        // The user allowed it in the system dialog and then tapped retry
         revert = false
         e.retry()
         assertEquals(2, switchWrites)
@@ -468,7 +468,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, launches())
     }
 
-    /** 电脑经 USB 起的助手没配对也收下:状态是运行中,并记下「是电脑起的」;手机操作和配对过的一样可用。 */
+    /** A helper started by a computer over USB is accepted even without pairing: the state is running and it is recorded that the computer started it; phone operations work as if it had been paired. */
     @Test
     fun usbStartedHelperRunsWithoutPairing() = runTest {
         val e = engine()
@@ -483,7 +483,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, launches())
     }
 
-    /** 没配对时电脑起的助手停了:不当作从没设置过,说它停了;Claire 自己不去起(起不来)。 */
+    /** When not paired, a computer-started helper that stops: do not treat it as never set up, report that it stopped; Claire does not start it itself (it cannot). */
     @Test
     fun usbHelperStoppingSaysSoAndDoesNotLaunch() = runTest {
         val e = engine()
@@ -498,12 +498,12 @@ class BuiltinShellEngineTest {
         advanceUntilIdle()
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.UsbHelperStopped), e.status.value)
         assertEquals(0, launches())
-        // 再运行一次命令,不是去配对无线调试
+        // Run the command again, rather than going to pair wireless debugging
         assertEquals(BuiltinShellFix.RunUsbCommand, (e.status.value as BuiltinShellStatus.Failed).fix)
         assertEquals(HelperRestart.UsbCommand, e.restart)
     }
 
-    /** 用着用着断了(比如助手正在换一个新的来交接):先显示正在连接,等一会儿还没回来才说停了。 */
+    /** It drops mid-use (e.g. the helper is bringing up a new one to hand off): show connecting first, and only say it stopped after waiting a while. */
     @Test
     fun usbHelperDropMidRunGetsAGraceBeforeStopped() = runTest {
         val e = engine()
@@ -515,7 +515,7 @@ class BuiltinShellEngineTest {
         assertEquals(BuiltinShellStatus.Connecting, e.status.value)
         advanceTimeBy(2_000)
         assertEquals(BuiltinShellStatus.Connecting, e.status.value)
-        // 换手完成:新的助手来交接,一直没有闪成「已停止」
+        // Handoff done: the new helper takes over, so it never flashed to "stopped"
         helper.value = "usb2"
         runCurrent()
         assertEquals(BuiltinShellStatus.Running, e.status.value)
@@ -524,7 +524,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, launches())
     }
 
-    /** 助手停了以后靠什么再起来:没设置、只用 USB 命令起过、配对过无线调试(配对过优先,哪怕上次是用命令起的)。 */
+    /** What brings the helper back after it stops: nothing set up, started only through the USB command, or paired wireless debugging (pairing wins, even if the last start used the command). */
     @Test
     fun restartRouteFollowsHowTheHelperCameUp() = runTest {
         val e = engine()
@@ -538,7 +538,7 @@ class BuiltinShellEngineTest {
         assertEquals(HelperRestart.Wireless, e.restart)
     }
 
-    /** 重启后(新进程)助手没来交接:先等一会儿(还活着的会自己来),等不到才说它停了。 */
+    /** After a restart (a new process) the helper does not hand off: wait a while first (a live one comes by itself) and only say it stopped if nothing arrives. */
     @Test
     fun afterRestartUsbHelperGetsAGraceThenStopped() = runTest {
         platform.usb = true
@@ -563,7 +563,7 @@ class BuiltinShellEngineTest {
         assertEquals(BuiltinShellStatus.Running, e.status.value)
     }
 
-    /** 配对过就照旧由看门狗经无线调试重起,不提示跑命令。 */
+    /** If paired, the watchdog restarts it over wireless debugging as before and does not suggest running the command. */
     @Test
     fun pairedUsbHelperIsRestartedWireless() = runTest {
         platform.usb = true
@@ -575,7 +575,7 @@ class BuiltinShellEngineTest {
         assertEquals(1, launches())
     }
 
-    /** 解除配对把「电脑起过」也忘掉:之后是没设置,不是「停了」。 */
+    /** Unpairing also forgets "started by the computer": afterwards the state is not-set-up, not "stopped". */
     @Test
     fun unpairForgetsUsbStart() = runTest {
         val e = engine()
@@ -599,7 +599,7 @@ class BuiltinShellEngineTest {
         assertEquals(PairingDiscovery.Idle, e.pairingDiscovery.value)
     }
 
-    /** 还在找时再开始一次(用户又回到配对这件事上),找的时限从这时重新算,不按第一次开始的时候收工。 */
+    /** Starting again while still searching (the user has come back to pairing) restarts the search deadline from that moment instead of giving up at the time the first search began. */
     @Test
     fun startingDiscoveryAgainRestartsTheSearchTime() = runTest {
         val e = engine()
@@ -613,7 +613,7 @@ class BuiltinShellEngineTest {
         assertEquals(PairingDiscovery.Idle, e.pairingDiscovery.value)
     }
 
-    /** 打开了「用 root 启动」:没配对也由看门狗经 su 起助手,不碰无线调试;不记成「电脑起的」。 */
+    /** "Start with root" is on: even without pairing the watchdog starts the helper through su, without touching wireless debugging, and it is not recorded as "started by the computer". */
     @Test
     fun rootStartLaunchesWithoutPairing() = runTest {
         platform.enableRoot()
@@ -629,7 +629,7 @@ class BuiltinShellEngineTest {
         assertEquals(false, platform.usb)
     }
 
-    /** 助手死了(或重启后)由看门狗经 su 自己再起,不用配对、不用电脑。 */
+    /** After the helper dies (or after a restart) the watchdog starts it again through su itself, with no pairing and no computer. */
     @Test
     fun rootRestartsTheHelperAfterItDies() = runTest {
         platform.enableRoot()
@@ -644,7 +644,7 @@ class BuiltinShellEngineTest {
         assertEquals(2, suCalls())
     }
 
-    /** 几条路都有时先走 root;root 起不来(这里是交接超时)且配过对,接着走无线调试。 */
+    /** When several routes exist, root goes first; if root cannot get it up (here a handoff timeout) and pairing exists, wireless debugging follows. */
     @Test
     fun rootIsPreferredAndWirelessIsTheFallback() = runTest {
         platform.enableRoot()
@@ -659,12 +659,12 @@ class BuiltinShellEngineTest {
         runCurrent()
         platform.deliverOnLaunch = true
         advanceUntilIdle()
-        // 第二次:su 答应了却没等到交接,换无线调试起来
+        // Second attempt: su granted but no handoff arrived, so switch to starting over wireless debugging
         assertEquals(listOf("su", "su", "launch"), platform.calls)
         assertEquals(BuiltinShellStatus.Running, e.status.value)
     }
 
-    /** su 拒绝了:记下来,报「root 被拒绝」,之后不再自己去问 su(助手需要时也不问),直到用户点重试。 */
+    /** su denied: record it, report "root denied", and afterwards stop asking su on its own (not even when the helper is needed) until the user taps retry. */
     @Test
     fun rootDenialIsRecordedAndNotRetriedUntilTheUserAsks() = runTest {
         platform.enableRoot()
@@ -680,19 +680,19 @@ class BuiltinShellEngineTest {
         advanceUntilIdle()
         assertEquals(1, suCalls())
         assertEquals(BuiltinShellFix.Retry, (e.status.value as BuiltinShellStatus.Failed).fix)
-        // 用户点了重试:平台异步再请求授权,此时尚未直接起助手
+        // The user tapped retry: the platform requests authorization asynchronously, so the helper is not started directly yet
         e.retry()
         assertEquals(BuiltinShellStatus.Connecting, e.status.value)
         assertEquals(1, suCalls())
         assertEquals("ask", platform.calls.last())
-        // 授权完成后平台通知引擎,才按新答复启动
+        // Once authorization completes, the platform notifies the engine and only then is the helper launched per the new answer
         e.rootChanged()
         advanceUntilIdle()
         assertEquals(2, suCalls())
         assertEquals(BuiltinShellStatus.Running, e.status.value)
     }
 
-    /** su 不回话、切不到 shell 身份也一样不反复去问,各自报自己的原因。 */
+    /** su not answering, or failing to switch to the shell uid, likewise stops the repeated asking, each reporting its own reason. */
     @Test
     fun rootNoAnswerAndWrongUidStopAndSaySo() = runTest {
         platform.enableRoot()
@@ -711,7 +711,7 @@ class BuiltinShellEngineTest {
         assertEquals(2, suCalls())
     }
 
-    /** 配过对时 su 拒绝了就走无线调试,状态是运行中(root 的问题在设置里那一项说)。 */
+    /** When paired, an su denial falls back to wireless debugging and the state is running (the root problem is reported in the corresponding settings item). */
     @Test
     fun rootDeniedButPairedRunsOverWireless() = runTest {
         platform.enableRoot()
@@ -724,11 +724,11 @@ class BuiltinShellEngineTest {
         assertEquals(listOf("su", "launch"), platform.calls)
         helper.value = null
         advanceUntilIdle()
-        // 拒绝之后不再问 su
+        // After the denial it no longer asks su
         assertEquals(listOf("su", "launch", "launch"), platform.calls)
     }
 
-    /** 打开了「用 root 启动」,su 却没了:没配对时说 root 用不了了。 */
+    /** "Start with root" is on but su is gone: when not paired, report that root is unavailable. */
     @Test
     fun rootGoneSaysSo() = runTest {
         platform.enableRoot()
@@ -741,7 +741,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, suCalls())
     }
 
-    /** 只记录过用户想用时仍不能自动问 su;必须已有明确的授权答复。 */
+    /** Merely recording that the user wants it is not enough to ask su automatically; an explicit authorization answer must already exist. */
     @Test
     fun rootStartNeverAsksWithoutStoredAuthorization() = runTest {
         platform.rootOn = true
@@ -753,7 +753,7 @@ class BuiltinShellEngineTest {
         assertEquals(0, suCalls())
     }
 
-    /** 用户在设置里授权或停止自动启动:助手不在时按新的情况马上处理。 */
+    /** The user grants in settings or stops auto-start: while the helper is absent, act on the new situation right away. */
     @Test
     fun rootSwitchChangesTakeEffectRightAway() = runTest {
         val e = engine()
@@ -772,7 +772,7 @@ class BuiltinShellEngineTest {
         assertEquals(1, suCalls())
     }
 
-    // ---- Shizuku 通道与切换 ----
+    // ---- Shizuku transport and switching ----
 
     @Test
     fun shellTransportParseDefaultsToAuto() {
@@ -895,14 +895,14 @@ class BuiltinShellEngineTest {
         assertEquals(0, shizukuCalls())
         assertEquals(0, launches())
 
-        // Shizuku 启动后点 retry 直接连上
+        // After Shizuku starts, tapping retry connects directly
         platform.shizuku = ShizukuPlatformState(installed = true, running = true, permissionGranted = true)
         e.retry()
         advanceUntilIdle()
         assertEquals(1, shizukuCalls())
         assertEquals(BuiltinShellStatus.Running, e.status.value)
 
-        // 之后 Shizuku 停了且助手断开:报 ShizukuNotRunning,等 Shizuku 再起来通知引擎后自动连上
+        // Later Shizuku stops and the helper disconnects: report ShizukuNotRunning, then reconnect automatically once Shizuku is up again and notifies the engine
         platform.shizuku = ShizukuPlatformState(installed = true, running = false, permissionGranted = true)
         helper.value = null
         advanceUntilIdle()
@@ -954,7 +954,7 @@ class BuiltinShellEngineTest {
         assertEquals(BuiltinShellStatus.Failed(BuiltinShellFailure.ShizukuBindFailed), bindFailed.status.value)
         assertEquals("shizuku: ShizukuBindFailed", bindFailed.lastError)
 
-        // 调起返回 null 却一直没交接过来时,超时报 ShizukuBindFailed
+        // When the launch returns null and no handoff ever arrives, the timeout reports ShizukuBindFailed
         platform.calls.clear()
         platform.shizukuResults.clear()
         platform.deliverOnShizukuLaunch = false
@@ -1005,26 +1005,26 @@ class BuiltinShellEngineTest {
         assertEquals("shizuku", helper.value)
         assertEquals(1, shizukuCalls())
 
-        // 切到同一通道不重启助手
+        // Switching to the same transport does not restart the helper
         e.selectTransport(ShellTransport.Auto)
         advanceUntilIdle()
         assertEquals(0, platform.calls.count { it == "stop" })
 
-        // 切到仅无线调试:停掉 Shizuku 起的助手,立即经无线调试重起
+        // Switching to wireless-debugging only: stop the Shizuku-started helper and restart it immediately over wireless debugging
         e.selectTransport(ShellTransport.WirelessDebugging)
         runCurrent()
         assertEquals(1, launches())
         assertEquals("binder", helper.value)
         assertEquals(BuiltinShellStatus.Running, e.status.value)
 
-        // 切到仅 Shizuku:停掉无线调试助手,立即经 Shizuku 重起
+        // Switching to Shizuku only: stop the wireless-debugging helper and restart it immediately through Shizuku
         e.selectTransport(ShellTransport.Shizuku)
         runCurrent()
         assertEquals(2, shizukuCalls())
         assertEquals("shizuku", helper.value)
         assertEquals(BuiltinShellStatus.Running, e.status.value)
 
-        // 没配对时切到仅无线调试:停掉助手,回到 NotPaired
+        // Switching to wireless-debugging only when not paired: stop the helper and return to NotPaired
         platform.pairedFlag = false
         e.selectTransport(ShellTransport.WirelessDebugging)
         advanceUntilIdle()

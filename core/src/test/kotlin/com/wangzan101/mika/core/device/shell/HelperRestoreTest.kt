@@ -15,7 +15,7 @@ class HelperRestoreTest {
     fun wishFollowsCapsuleModeTasksAndAccessibility() {
         assertTrue(RestoreWish.of(capsuleAlways = true, taskRunning = false, accessibilityWanted = true, accessibilityOn = false).revive)
         assertTrue(RestoreWish.of(capsuleAlways = false, taskRunning = true, accessibilityWanted = true, accessibilityOn = false).revive)
-        // 无障碍还开着:异常死亡后也要回来并恢复授权,不能只在常驻胶囊或有任务时才修
+        // Accessibility is still on: it must also come back and have its grant restored after an abnormal death; repair must not be limited to permanent capsule mode or to having a task
         val accessibility = RestoreWish.of(capsuleAlways = false, taskRunning = false, accessibilityWanted = true, accessibilityOn = true)
         assertTrue(accessibility.revive)
         assertTrue(accessibility.accessibility)
@@ -34,9 +34,9 @@ class HelperRestoreTest {
     @Test
     fun accessibilityOnlyWhenWantedAndOn() {
         assertTrue(RestoreWish.of(true, false, accessibilityWanted = true, accessibilityOn = true).accessibility)
-        // 用户在 Claire 里关掉了替我打开无障碍
+        // The user switched off "turn on accessibility for me" in Claire
         assertFalse(RestoreWish.of(true, false, accessibilityWanted = false, accessibilityOn = true).accessibility)
-        // 用户趁 Claire 活着在系统设置里关掉了
+        // The user turned it off in system settings while Claire was alive
         assertFalse(RestoreWish.of(true, false, accessibilityWanted = true, accessibilityOn = false).accessibility)
     }
 
@@ -61,11 +61,11 @@ class HelperRestoreTest {
         assertEquals(listOf(a to yes), sent)
         sender.update(a, RestoreWish.NONE)
         assertEquals(a to RestoreWish.NONE, sent.last())
-        // 助手换了一个(新的 Binder):再交一次,哪怕心愿没变
+        // The helper was replaced (a new Binder): hand the wish over again even though it has not changed
         val b = String(charArrayOf('h'))
         sender.update(b, RestoreWish.NONE)
         assertEquals(3, sent.size)
-        // 助手没了又回来:再交
+        // The helper disappears and comes back: hand it over again
         sender.update(null, RestoreWish.NONE)
         sender.update(b, RestoreWish.NONE)
         assertEquals(4, sent.size)
@@ -88,7 +88,7 @@ class HelperRestoreTest {
         val p = HelperRestorePolicy()
         assertEquals(HelperRestorePolicy.Decision.ForceStopped, p.decide(yes, appBack = false, now = 1_000, forceStopped = true))
         assertTrue("强停不消耗异常恢复次数", p.report(1_000).empty)
-        // 手动打开会由系统清掉 stopped 标记;之后再次发生异常死亡,正常恢复仍然可用
+        // Launching it manually makes the system clear the stopped flag; if it dies abnormally again later, normal restore still works
         assertEquals(HelperRestorePolicy.Decision.Restore, p.decide(yes, appBack = false, now = 2_000, forceStopped = false))
     }
 
@@ -106,10 +106,10 @@ class HelperRestoreTest {
     fun policyBacksOffWithinWindowThenAllowsAgain() {
         val p = HelperRestorePolicy(maxAttempts = 3, windowMs = 600_000)
         repeat(3) { assertEquals(HelperRestorePolicy.Decision.Restore, p.decide(yes, false, now = 10_000L + it * 30_000)) }
-        // 拉起来又马上死:窗口内第四次不拉
+        // Raised and immediately died again: the fourth attempt within the window does not raise it
         assertEquals(HelperRestorePolicy.Decision.BackedOff, p.decide(yes, false, now = 100_000))
         assertEquals(HelperRestoreReport(70_000, 3, 100_000), p.report(100_000))
-        // 第一次滑出窗口后又能拉一次
+        // Once the first attempt slides out of the window, another one is allowed
         assertEquals(HelperRestorePolicy.Decision.Restore, p.decide(yes, false, now = 610_000))
         assertEquals(3, p.report(610_000).recent)
         assertEquals(0, p.report(10 * 600_000L).recent)
@@ -132,7 +132,7 @@ class HelperRestoreTest {
             listOf("settings put secure enabled_accessibility_services '$mika'", "settings put secure accessibility_enabled 1"),
             RestoreCommands.accessibility("null", mika),
         )
-        // 已经在列表里(哪种写法都算):不重写列表,只开总开关
+        // Already in the list (either spelling counts): do not rewrite the list, only turn on the master switch
         assertEquals(listOf(RestoreCommands.ENABLE_ACCESSIBILITY), RestoreCommands.accessibility("$mika:$other", mika))
         assertEquals(
             listOf(RestoreCommands.ENABLE_ACCESSIBILITY),
@@ -146,7 +146,7 @@ class HelperRestoreTest {
         val unbound = A11yObservation(enabled = true, connected = false)
         val fine = A11yObservation(enabled = true, connected = true)
         assertEquals(A11yLoss.Removed, A11yStartCheck.loss(removed, connectedSoon = false, expected = true))
-        // 起来时被拿掉,随后修好了:照样记一次被拿掉
+        // Removed at startup and repaired afterwards: a removal is still recorded
         assertEquals(A11yLoss.Removed, A11yStartCheck.loss(removed, connectedSoon = true, expected = true))
         assertEquals(A11yLoss.Unbound, A11yStartCheck.loss(unbound, connectedSoon = false, expected = true))
         assertNull("几秒内系统自己绑上了", A11yStartCheck.loss(unbound, connectedSoon = true, expected = true))
