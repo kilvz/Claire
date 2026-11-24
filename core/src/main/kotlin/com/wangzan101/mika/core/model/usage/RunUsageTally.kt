@@ -9,10 +9,12 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /**
- * 一次运行里经计量的模型调用与实际 HTTP 请求合计。运行把它放进自己的协程上下文,[metered] 套上的模型每次调用结束顺手加一笔,
- * 所以主循环之外的旁路调用(意图判断、核查、看图、压缩……)和失败重试的每一次都算在这次运行名下;
- * 适配器内部的兼容重发增加实际请求数,但不增加逻辑调用数。不在这个上下文里的调用(交出回答后的结局判定、记忆提取)不算,
- * Token 用量页照样都记。只在内存里加,多线程安全。
+ * Totals of metered model calls and actual HTTP requests within one run. The run puts this into its own coroutine context, and
+ * every model wrapped by [metered] adds an entry when a call ends, so bypass calls outside the main loop (intent detection,
+ * verification, image viewing, compaction, …) and every retried attempt count toward this run; a compatibility resend inside the
+ * adapter increases the actual request count but not the logical call count. Calls outside this context (outcome decision after
+ * the answer is handed over, memory extraction) do not count, though the token usage page still records them all. Accumulated in
+ * memory only; safe across threads.
  */
 class RunUsageTally(val tokenBudget: Long? = null, val deepSeekCost: DeepSeekRunCost? = null) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<RunUsageTally>
@@ -27,7 +29,7 @@ class RunUsageTally(val tokenBudget: Long? = null, val deepSeekCost: DeepSeekRun
     private val output = AtomicLong()
     private val cached = AtomicLong()
 
-    /** 记一次逻辑调用及其 [httpAttempts] 次实际请求;只有最终成功回复的 [usage] 可记 token。 */
+    /** Records one logical call and its [httpAttempts] actual requests; only the [usage] of the final successful reply may record tokens. */
     fun add(usage: Usage?, httpAttempts: Int) {
         logicalCalls.incrementAndGet()
         if (usage == null) unreported.incrementAndGet()
@@ -40,17 +42,17 @@ class RunUsageTally(val tokenBudget: Long? = null, val deepSeekCost: DeepSeekRun
         cached.addAndGet(usage.cachedInputTokens.toLong())
     }
 
-    /** 已报告的输入加输出；缓存命中已包含在输入里，不能重复相加。 */
+    /** Reported input plus output; cache hits are already included in input and must not be added again. */
     fun totalTokens(): Long = input.get() + output.get()
 
-    /** 在下一次实际请求前调用；达到预算时不允许收尾、重试或旁路调用继续消耗。 */
+    /** Called before the next actual request; once the budget is reached, no wrapping up, retry or bypass call may keep consuming. */
     fun checkBudget() {
         val limit = tokenBudget ?: return
         val used = totalTokens()
         if (used >= limit) throw ModelError.TaskBudgetExceeded(limit, used)
     }
 
-    /** 此刻的合计,作为运行记录里的一条 [RunEvent.ModelCalls]。 */
+    /** The totals at this moment, as one [RunEvent.ModelCalls] entry in the run record. */
     fun event(atMs: Long, cost: DeepSeekCost? = null) = RunEvent.ModelCalls(
         atMs, logicalCalls.get(), unreported.get(), input.get(), output.get(), cached.get(), calls.get(), httpUnreported.get(), deepSeekCost = cost,
     )

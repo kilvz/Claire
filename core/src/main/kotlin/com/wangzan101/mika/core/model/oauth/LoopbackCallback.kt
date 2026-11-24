@@ -12,24 +12,29 @@ import java.net.SocketTimeoutException
 import java.net.URLDecoder
 
 /**
- * 登录回调用的本机小服务(用 ChatGPT、OpenRouter 登录共用):只绑 127.0.0.1(别的设备连不进来),端口由系统挑一个空闲的。浏览器登录完跳回
- * `http://127.0.0.1:<端口>/auth/callback?…`(或写成 localhost),这里读出参数,把这次登录做完(换令牌、核对)再回一页结果;做的期间浏览器那边
- * 一直等着这个连接。别的路径(如浏览器顺手要的图标)回 404。只收一次回调;用完或放弃都要 [close]。
+ * The small local server used for the sign-in callback (shared by ChatGPT and OpenRouter sign-in): it binds only 127.0.0.1 (no
+ * other device can connect) and the system picks a free port. After signing in, the browser is redirected back to
+ * `http://127.0.0.1:<port>/auth/callback?…` (or written as localhost); the parameters are read here, this sign-in is finished
+ * (token exchange, verification) and then a result page is returned; meanwhile the browser keeps waiting on this connection.
+ * Other paths (such as an icon the browser happens to request) get 404. Only one callback is accepted; it must be [close]d
+ * when finished or abandoned.
  */
 class LoopbackCallback private constructor(private val server: ServerSocket) : Closeable {
     val port: Int get() = server.localPort
 
-    // 找无线调试端口时扫本机,别扫到自己这个监听
+    // When scanning for wireless debugging ports, scan the local machine but not this listening socket
     init { OwnListeningPorts.add(server.localPort) }
     val redirectUri: String get() = redirectUri(HOST)
 
-    /** 回调地址写成 [host](`127.0.0.1` 或 `localhost`,都指本机):有的服务只认其中一种写法。 */
+    /** The callback address is written as [host] (`127.0.0.1` or `localhost`, both meaning this machine): some services accept only one of the two spellings. */
     fun redirectUri(host: String): String = "http://$host:$port$PATH"
 
     /**
-     * 等回调,最多 [timeoutMs];超时为 null。收到回调后先调 [page](可以挂起:在里面把登录做完),
-     * 它给出的网页再回给浏览器,所以网页上能写最终结果。协程取消时立即返回(连接关掉)。
-     * [accept] 不认的回调(如 state 对不上:不是这次登录发起的)回 400、接着等。
+     * Waits for the callback, at most [timeoutMs]; null on timeout. After receiving the callback, [page] is called first (it may
+     * suspend: finish the sign-in inside it) and the page it returns is sent back to the browser, so the page can show the final
+     * result. On coroutine cancellation it returns immediately (the connection is closed).
+     * A callback that [accept] does not recognize (e.g. a state mismatch: not started by this sign-in) gets 400 and waiting
+     * continues.
      */
     suspend fun await(
         timeoutMs: Long,
@@ -45,7 +50,7 @@ class LoopbackCallback private constructor(private val server: ServerSocket) : C
                 s.soTimeout = READ_TIMEOUT_MS
                 val reader = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
                 val requestLine = try { reader.readLine() } catch (e: IOException) { null } ?: return@use
-                // 读掉请求头
+                // Drain the request headers
                 while (true) {
                     val line = try { reader.readLine() } catch (e: IOException) { null }
                     if (line.isNullOrEmpty()) break
@@ -57,7 +62,7 @@ class LoopbackCallback private constructor(private val server: ServerSocket) : C
                     respond(s.getOutputStream(), 404, "Not Found", "text/plain", "Not Found")
                     return@use
                 }
-                // 转义写坏的(如落单的 %)当作不是这次的回调
+                // Treat malformed escaping (e.g. a lone %) as not this sign-in's callback
                 val params = runCatching { parseQuery(target.substringAfter('?', "")) }.getOrNull()
                 if (params == null || !accept(params)) {
                     respond(s.getOutputStream(), 400, "Bad Request", "text/plain", "Bad Request")
@@ -92,7 +97,7 @@ class LoopbackCallback private constructor(private val server: ServerSocket) : C
         private const val POLL_MS = 300
         private const val READ_TIMEOUT_MS = 5_000
 
-        /** 开一个监听;[port] 为 0 时由系统挑。 */
+        /** Opens a listener; [port] 0 lets the system pick one. */
         fun open(port: Int = 0): LoopbackCallback = LoopbackCallback(ServerSocket(port, 4, InetAddress.getByName(HOST)))
 
         fun parseQuery(query: String): Map<String, String> = query.split('&').filter { it.isNotEmpty() }.associate { kv ->

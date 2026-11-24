@@ -14,7 +14,7 @@ import okhttp3.Request
 import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
 
-/** 查询地址固定在官方服务上，配置里的 Base URL 只用于选择服务商。 */
+/** The query address is fixed to the official service; the Base URL in the config is used only to select the provider. */
 enum class AllowanceSource(internal val url: String) {
     DeepSeek("https://api.deepseek.com/user/balance"),
     Kimi("https://api.moonshot.cn/v1/users/me/balance"),
@@ -27,7 +27,7 @@ data class AllowanceMoney(val amount: BigDecimal, val currency: String)
 sealed interface ProviderAllowance {
     data class Balance(val amounts: List<AllowanceMoney>) : ProviderAllowance
 
-    /** remaining 为 null 表示这把 Key 没有配置支出上限。 */
+    /** A null remaining means this key has no configured spending limit. */
     data class KeyLimit(val remaining: AllowanceMoney?, val reset: ResetPeriod? = null) : ProviderAllowance
 }
 

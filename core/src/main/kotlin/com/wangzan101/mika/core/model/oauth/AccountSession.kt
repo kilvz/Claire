@@ -8,12 +8,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * 订阅账号登录没成的原因。界面按它说人话。异常文字里只有类别和错误代码,不放令牌、授权码、设备码。
- * [NoSubscription] 是账号没有这项订阅;[BadIssuer] 是发现到的地址不在允许的主机上,请求不会发出去。
+ * Why a subscription account sign-in failed. The UI turns it into plain language. Exception text carries only the category and
+ * the error code, never tokens, authorization codes or device codes.
+ * [NoSubscription] means the account does not have this subscription; [BadIssuer] means the discovered address is not on an
+ * allowed host, so no request is sent.
  */
 enum class AccountSignInFailure { Denied, Expired, TimedOut, Rejected, NoSubscription, Network, BadIssuer }
 
-/** [code] 是服务端的错误代码(不是机密)。 */
+/** [code] is the server's error code (not a secret). */
 class AccountSignInException(
     val reason: AccountSignInFailure,
     val code: String? = null,
@@ -23,18 +25,18 @@ class AccountSignInException(
     if (!code.isNullOrBlank()) append(": ").append(code)
 }, cause)
 
-/** 换令牌得到的一组令牌。刷新没给的字段保持 null,由调用方沿用旧的。 */
+/** The set of tokens obtained from an exchange. Fields the refresh did not return stay null and the caller keeps the old ones. */
 data class OauthTokens(
     val accessToken: String,
     val refreshToken: String? = null,
     val idToken: String? = null,
     val expiresInSec: Long = 3600,
     val scopes: List<String> = emptyList(),
-    /** 换到的接口根;没给为 null。 */
+    /** The API base obtained from the exchange; null if none was returned. */
     val apiBase: String? = null,
 )
 
-/** 换令牌的结果。被拒时 [terminal] 为真表示这份授权不能再用,该清掉重新登录。 */
+/** Result of a token exchange. When rejected, a true [terminal] means this authorization can no longer be used: it must be cleared and the user must sign in again. */
 sealed interface OauthTokenResult {
     data class Ok(val tokens: OauthTokens) : OauthTokenResult
     data class Rejected(val code: String, val terminal: Boolean) : OauthTokenResult
@@ -42,9 +44,9 @@ sealed interface OauthTokenResult {
 }
 
 /**
- * 一个账号登录(目前是 xAI),整份按 API Key 的方式加密保存。
- * [accessToken] 是调用模型用的访问令牌,[refreshToken] 用来换新的。
- * 退出登录后令牌清空,账号名字留着给人看。
+ * A single account sign-in (currently xAI), stored encrypted as a whole the same way as an API key.
+ * [accessToken] is the access token used to call models, [refreshToken] is used to obtain new ones.
+ * After signing out the tokens are cleared and the account name is kept for display.
  */
 @Serializable
 data class AccountSession(
@@ -58,7 +60,7 @@ data class AccountSession(
     val apiBase: String = "",
     val clientId: String = "",
     val issuer: String = "",
-    /** 登录时从发现文档读到、核对过主机的令牌地址;刷新用它。旧版本存下的没有,刷新时按签发方推。 */
+    /** The token URL read from the discovery document at sign-in with its host verified; used for refresh. Sessions saved by older versions lack it, so refresh derives it from the issuer. */
     val tokenUrl: String = "",
 ) {
     val signedIn: Boolean get() = accessToken.isNotEmpty() || refreshToken.isNotEmpty()
@@ -76,11 +78,15 @@ data class AccountSession(
 }
 
 /**
- * 调用时用的访问令牌。快过期或上一个被拒了就经 [refresh] 换新的,同一时刻只有一个在换。
- * 换到的令牌先 [save] 再拿去用;[save] 同时收到换之前的那份,存储据此判断这期间用户有没有退出或重新登录(那样就不该写回)。授权已不能用就清掉令牌、抛 [ModelError.SignInExpired];网络或服务端一时出错照常抛,令牌留着。
+ * The access token used for calls. When it is about to expire, or the previous one was rejected, a new one is obtained via
+ * [refresh]; only one refresh runs at a time.
+ * New tokens are [save]d before use; [save] also receives the copy from before the refresh, so storage can tell whether the
+ * user signed out or signed in again meanwhile (in which case it must not be written back).
+ * If the authorization is no longer usable the tokens are cleared and [ModelError.SignInExpired] is thrown; transient network
+ * or server errors are thrown as usual and the tokens are kept.
  */
 class AccountTokens(
-    /** 哪一家的登录(界面上的名字),登录失效时说给用户听。 */
+    /** Which provider's sign-in this is (its name in the UI), told to the user when the login expires. */
     private val account: String,
     private val refresh: suspend (AccountSession) -> OauthTokenResult,
     private val load: () -> AccountSession?,

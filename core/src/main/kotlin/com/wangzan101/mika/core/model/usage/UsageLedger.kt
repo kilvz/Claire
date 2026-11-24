@@ -27,10 +27,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
-/** 一格的归属:哪个服务商、哪个模型、哪个用途。 */
+/** Which cell a count belongs to: which provider, which model, which purpose. */
 data class UsageKey(val providerId: String, val model: String, val purpose: UsagePurpose)
 
-/** 一格里累计的数:输入(含缓存命中)、输出、缓存命中的 token,实际 HTTP 请求次数,其中没有对应最终用量的次数。 */
+/** The numbers accumulated in one cell: input (including cache hits), output, cache-hit tokens, actual HTTP request count, and how many of those had no corresponding final usage. */
 data class UsageCounts(
     val input: Long = 0,
     val output: Long = 0,
@@ -56,10 +56,10 @@ data class UsageCounts(
     }
 }
 
-/** [hour] 是 UTC 整点桶:从 1970-01-01T00:00Z 起的第几个小时。 */
+/** [hour] is the UTC hour bucket: the number of hours since 1970-01-01T00:00Z. */
 data class UsageRow(val hour: Long, val key: UsageKey, val counts: UsageCounts)
 
-/** 账本此刻的全部内容;[providerNames] 是每个服务商最近一次记账时的名字(服务商删了也留着)。 */
+/** Everything the ledger holds right now; [providerNames] is each provider's name at its most recent record (kept even after the provider is deleted). */
 data class UsageSnapshot(val rows: List<UsageRow>, val providerNames: Map<String, String>) {
     companion object {
         val EMPTY = UsageSnapshot(emptyList(), emptyMap())
@@ -67,12 +67,16 @@ data class UsageSnapshot(val rows: List<UsageRow>, val providerNames: Map<String
 }
 
 /**
- * 本机的 token 用量账本按 UTC 小时累计。若本地午夜落在小时内，午夜后的用量另存一格供每日预算使用。
- * 本地时区每次用时现取([zone]):进程没退出时手机改了时区,之后的拆格和「今天」就按新时区算。
+ * The on-device token usage ledger, accumulated per UTC hour. If local midnight falls inside an hour, usage after midnight is kept
+ * in a separate cell for the daily budget.
+ * The local time zone is read on each use ([zone]): if the phone's time zone changes while the process is running, later cell
+ * splitting and "today" follow the new zone.
  *
- * 记账([record])只在内存里加一笔,多个线程同时记也安全;改动后等 [flushDelayMs] 由一个后台线程整份写出
- * (先写临时文件再改名,写到一半断电不会坏掉原文件),进程被杀时最多丢掉最后这几秒。
- * 只留最近 [keepDays] 天,更早的在读入和写出时丢掉。文件读不出(损坏)时当作空账本重新开始。
+ * Recording ([record]) only adds to memory and is safe from several threads at once; after a change a background thread writes the
+ * whole ledger out after [flushDelayMs] (temp file first, then rename, so losing power mid-write cannot corrupt the original file);
+ * at most the last few seconds are lost if the process is killed.
+ * Only the most recent [keepDays] days are kept; older ones are dropped on read and on write. If the file cannot be read
+ * (corrupted), it starts over as an empty ledger.
  */
 class UsageLedger(
     private val file: File,
@@ -97,7 +101,7 @@ class UsageLedger(
     }
 
     private val _version = MutableStateFlow(0L)
-    /** 每记一笔加一;界面跟着它重新统计。 */
+    /** Incremented on every record; the UI recomputes on it. */
     val version: StateFlow<Long> = _version.asStateFlow()
 
     init {
@@ -107,7 +111,7 @@ class UsageLedger(
     override fun record(source: UsageSource, usage: Usage?) = record(source, usage, httpAttempts = 1)
 
     override fun record(source: UsageSource, usage: Usage?, httpAttempts: Int) {
-        // 本地组包就失败、从未发请求时,运行记录仍算逻辑调用,但用量账本没有可计的次数或 token。
+        // When local assembly already fails and no request was ever sent, the run record still counts a logical call, but there is no count or token for the usage ledger to record.
         if (httpAttempts <= 0 && usage == null) return
         val at = now()
         val hour = Math.floorDiv(at, HOUR_MS)
@@ -132,20 +136,20 @@ class UsageLedger(
         UsageSnapshot(hours.map { (c, n) -> UsageRow(c.hour, c.key, n) }, HashMap(names))
     }
 
-    /** 这家服务商在当前本地日历日的已报告输入加输出;主动能力的用量有自己的预算,不算在内。 */
+    /** Reported input plus output for this provider on the current local calendar day; proactive usage has its own budget and is not included. */
     fun providerTokensToday(providerId: String): Long =
         tokensToday { it.providerId == providerId && it.purpose != UsagePurpose.Proactive }
 
-    /** 主动能力在当前本地日历日的已报告输入加输出,各服务商合计。 */
+    /** Reported input plus output for proactive capabilities on the current local calendar day, summed across providers. */
     fun proactiveTokensToday(): Long = tokensToday { it.purpose == UsagePurpose.Proactive }
 
-    /** 主动能力在当前本地日历日实际发出的请求数,各服务商合计;服务商不报用量时 Token 数是 0,靠它兜底。 */
+    /** The number of requests proactive capabilities actually sent on the current local calendar day, summed across providers; tokens stay 0 when a provider reports no usage, and this covers that case. */
     fun proactiveCallsToday(): Long = today({ it.purpose == UsagePurpose.Proactive }) { it.calls }
 
-    /** 当前本地日历日里、[key] 选中的格子的输入加输出。 */
+    /** Input plus output of the cells selected by [key] on the current local calendar day. */
     private fun tokensToday(key: (UsageKey) -> Boolean): Long = today(key) { it.input + it.output }
 
-    /** 当前本地日历日里、[key] 选中的格子各取 [amount] 再合计。 */
+    /** Takes [amount] from each cell selected by [key] on the current local calendar day and sums them. */
     private fun today(key: (UsageKey) -> Boolean, amount: (UsageCounts) -> Long): Long {
         val z = zone()
         val today = Instant.ofEpochMilli(now()).atZone(z).toLocalDate()
@@ -158,7 +162,7 @@ class UsageLedger(
         }
     }
 
-    /** 有没写出的改动就当场写出(后台线程定时调;测试和退出前也可直接调)。写失败时留着改动,下次再写。 */
+    /** Writes pending changes out immediately (called periodically by the background thread; tests and shutdown may call it directly). On write failure the changes are kept for the next attempt. */
     fun flush() {
         synchronized(writeLock) {
             val text = synchronized(lock) {

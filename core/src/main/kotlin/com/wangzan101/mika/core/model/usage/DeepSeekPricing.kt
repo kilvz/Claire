@@ -16,7 +16,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
-/** 金额按人民币保留原始精度。没有可估的调用时，金额为空。 */
+/** Amounts keep their original precision in CNY. The amount is null when there is no call that can be estimated. */
 @Serializable
 data class DeepSeekCost(val minCny: String? = null, val maxCny: String? = null, val partial: Boolean = false)
 
@@ -82,7 +82,7 @@ class DeepSeekPriceTable private constructor(private val models: Map<String, Pai
     }
 }
 
-/** 价目表由官网发布。单次读取失败时，短时间内沿用已验证的价目表。 */
+/** The price list is published on the official website. When a fetch fails, the verified price table is reused for a short while. */
 class DeepSeekPriceCache(http: OkHttpClient, private val now: () -> Instant = Instant::now) {
     private val http = http.newBuilder().followRedirects(false).callTimeout(1500, TimeUnit.MILLISECONDS).build()
     private val mutex = Mutex()
@@ -112,7 +112,7 @@ class DeepSeekPriceCache(http: OkHttpClient, private val now: () -> Instant = In
     }
 }
 
-/** 只按模型和时段累计数字，避免为长任务保留逐次调用数据。 */
+/** Accumulates numbers by model and time window only, avoiding per-call data being kept for long tasks. */
 class DeepSeekRunCost {
     private data class Tokens(var hit: Long = 0, var miss: Long = 0, var output: Long = 0)
     private val calls = mutableMapOf<Pair<String, Boolean>, Tokens>()
@@ -167,7 +167,7 @@ class DeepSeekRunCost {
 
         private fun potentiallyPeak(time: Instant): Boolean {
             val local = time.atZone(china)
-            // 工作日名义高峰也可能是法定假日，按两种价分别计算区间。
+            // A nominal weekday peak may also be a statutory holiday, so the range is computed with both prices.
             return local.dayOfWeek.value <= 5 && peakWindows.any { (from, to) -> local.toLocalTime() >= from && local.toLocalTime() < to }
         }
     }

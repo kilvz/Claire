@@ -11,7 +11,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import java.time.Instant
 
-/** 一次调用是为哪个用途发的。存储里记 [key];认不出的 key(以后的版本写的)读成 [Other]。 */
+/** Which purpose a single call was issued for. The [key] is recorded in storage; an unknown key (written by a later version) reads as [Other]. */
 enum class UsagePurpose(val key: String) {
     Main("main"), Vision("vision"), Light("light"), Other("other"), Proactive("proactive");
 
@@ -26,15 +26,17 @@ enum class UsagePurpose(val key: String) {
     }
 }
 
-/** 一个模型是谁的、为哪个用途建的:记用量时原样带上。[providerName] 是建模型时服务商的名字(服务商删了也留着)。 */
+/** Whose model this is and which purpose it was built for: carried as-is when usage is recorded. [providerName] is the provider's name when the model was built (kept even after the provider is deleted). */
 data class UsageSource(
     val providerId: String, val providerName: String, val model: String, val purpose: UsagePurpose,
     val deepSeekDirect: Boolean = false,
 )
 
 /**
- * 一次逻辑调用的结果:[usage] 为 null 表示服务商没报用量(或调用失败),不估 token。
- * [httpAttempts] 是这次调用实际发出的推理请求数;两参数形式保留给不关心请求数的观察者。
+ * The result of one logical call: a null [usage] means the provider did not report usage (or the call failed), so no tokens are
+ * estimated.
+ * [httpAttempts] is the number of inference requests actually sent during this call; the two-argument form is kept for observers
+ * that do not care about request counts.
  */
 fun interface UsageSink {
     fun record(source: UsageSource, usage: Usage?)
@@ -43,16 +45,21 @@ fun interface UsageSink {
 }
 
 /**
- * 给模型套上计量:每次 [ChatModel.complete](及逐段文字的那一路)结束都记一笔,成功且带用量的记 token。
- * 适配器为兼容服务而重发的每个 HTTP 请求都计入次数,最终回复的 token 只记一次;没发请求的本地失败不算 HTTP 请求。
- * 对调用方透明:名字、能力照旧,异常原样抛出,逐段文字照常回调;原模型支持逐段文字,套上的也支持。
- * 记账本身出错不影响调用。
+ * Wraps a model with metering: a record is made at the end of every [ChatModel.complete] (and its incremental-text path), with
+ * tokens recorded on success when usage is present.
+ * Every HTTP request the adapter resends for compatible services counts toward the request count, while the tokens of the final
+ * reply are recorded only once; local failures that sent no request do not count as HTTP requests.
+ * Transparent to the caller: name and capabilities are unchanged, exceptions are thrown as-is, incremental text is passed
+ * through as usual; if the inner model supports incremental text, so does the wrapper.
+ * An error in bookkeeping itself does not affect the call.
  */
 fun ChatModel.metered(
     source: UsageSource, sink: UsageSink,
     /**
-     * 适配器在同一次调用里再发一个请求(兼容重试、刷新令牌后重发)之前调,第二个参数是这次调用已经发出的请求数——
-     * 它们要等这次调用结束才记进账本,按次数设上限的调用方得自己把它们加上。抛出就不再发,这次调用以这个错误结束。
+     * Called by the adapter before it sends another request within the same call (compatible retry, resend after a token
+     * refresh); the second argument is the number of requests already sent for this call — they are only recorded in the ledger
+     * once the call ends, so a caller that enforces a per-count limit must add them itself. Throwing prevents the request, and
+     * this call ends with that error.
      */
     beforeRetry: (UsageSource, Int) -> Unit = { _, _ -> },
     beforeCall: (UsageSource) -> Unit = {},
@@ -74,11 +81,11 @@ private open class MeteredModel(
         counted(system, messages, tools) { inner.complete(system, messages, tools) }
 
     protected suspend fun counted(system: String, messages: List<Message>, tools: List<ToolSpec>, call: suspend () -> ModelReply): ModelReply {
-        // 在一次运行里调用的,也记到这次运行名下(见 RunUsageTally)
+        // Calls made inside a run are also recorded under that run (see RunUsageTally)
         val context = currentCoroutineContext()
         val tally = context[RunUsageTally]
         val conversation = context[ConversationMeter]
-        // 拒绝时不建请求计数、不调用适配器，也不记一笔不存在的逻辑调用。
+        // On rejection no request counter is created, the adapter is not invoked, and no non-existent logical call is recorded.
         tally?.checkBudget()
         beforeCall(source)
         val step = context[ConversationMeter.MainRequest]?.step

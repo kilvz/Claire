@@ -20,8 +20,9 @@ import okhttp3.Response
 import java.io.IOException
 
 /**
- * OpenAI Speech 兼容接口：`POST {base}/audio/speech`，返回二进制音频。
- * 也覆盖火山、硅基流动等按这个形状提供 TTS 的服务；音色和格式由能力表/服务商校验。
+ * OpenAI Speech compatible API: `POST {base}/audio/speech`, returning binary audio.
+ * Also covers services such as Volcano and SiliconFlow that offer TTS in this shape; voices and formats are validated by the
+ * capability table / provider.
  */
 class OpenAiSpeechModel(
     baseUrl: String,
@@ -32,7 +33,7 @@ class OpenAiSpeechModel(
     private val headers: Map<String, String> = emptyMap(),
 ) : StreamingTtsModel {
     override val name: String get() = model
-    /** 地址不合法时为 null:构造不抛,请求时说明原因(见 [endpointOf])。 */
+    /** Null when the address is invalid: construction does not throw and the reason is reported at request time (see [endpointOf]). */
     private val endpoint: HttpUrl? = endpointOf(baseUrl)
     private val json = "application/json".toMediaType()
 
@@ -81,7 +82,7 @@ class OpenAiSpeechModel(
                 throw HttpSupport.networkError(http, req, e)
             }
         }
-        // 阻塞读取不会自行响应协程取消，需要关闭仍在读取的 HTTP 请求。
+        // A blocking read does not respond to coroutine cancellation on its own; the HTTP request that is still reading must be closed.
         try {
             reader.await()
         } finally {
@@ -118,7 +119,7 @@ class OpenAiSpeechModel(
             .build()
     }
 
-    /** 返回 false 时，尚未交付音频，可以用普通合成请求回退。 */
+    /** When it returns false, no audio has been delivered yet, so it can fall back to an ordinary synthesis request. */
     private suspend fun Response.readPlayback(emit: suspend (TtsAudioPart) -> Unit): Boolean {
         if (!isSuccessful) {
             val error = body?.let { peekBody(16 * 1024L).string() }.orEmpty()
@@ -141,7 +142,7 @@ class OpenAiSpeechModel(
         val rateHeader = header("x-audio-sample-rate")
         val channelsHeader = header("x-audio-channels")
         val responseUrl = request.url
-        // OpenAI 官方接口的无头 PCM 固定为 24 kHz 单声道，兼容接口提供自己的格式头。
+        // The OpenAI official API's headerless PCM is always 24 kHz mono; compatible APIs provide their own format headers.
         val useOpenAiDefaults = rateHeader == null && channelsHeader == null &&
             responseUrl.isHttps && responseUrl.host == "api.openai.com" && responseUrl.port == 443
         val sampleRate = if (useOpenAiDefaults) 24_000 else rateHeader?.toIntOrNull()
@@ -171,7 +172,7 @@ class OpenAiSpeechModel(
             total += count
             if (total > MAX_TTS_BYTES) throw TtsError.TooLarge(total)
 
-            // HTTP 数据块可以断在一个 PCM 帧内。把尾部的字节留给下一次读取。
+            // HTTP data chunks can break in the middle of a PCM frame. Leave the trailing bytes for the next read.
             val available = remaining + count
             val aligned = available - available % frameSize
             if (aligned > 0) emit(TtsAudioPart.Pcm(buffer.copyOf(aligned), sampleRate, channels))
@@ -195,7 +196,7 @@ class OpenAiSpeechModel(
     }
 
     companion object {
-        /** `{base}/audio/speech`;地址不合法为 null,调用方据此不建模型。 */
+        /** `{base}/audio/speech`; null when the address is invalid, and the caller then does not create the model. */
         fun endpointOf(baseUrl: String): HttpUrl? = (baseUrl.trim().trimEnd('/') + "/audio/speech").toHttpUrlOrNull()
 
         private val BUFFERED_AUDIO_TYPES = setOf(

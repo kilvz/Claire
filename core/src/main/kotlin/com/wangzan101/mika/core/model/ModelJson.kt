@@ -5,14 +5,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * 读模型按要求交回的 JSON(核查结论、路线匹配、记忆变更……)。不同模型交回的样子不一样:套代码块、前后带几句话、
- * 先想一段再给、一个对象后面又跟一段带花括号的说明、键名大小写或写法不同。这里统一容忍这些;
- * 实在读不出来时再问一次,明确只要 JSON([completeParsed])。
+ * Reads the JSON the model is supposed to return (verification verdicts, route matches, memory changes, …). Models vary:
+ * code fences, surrounding sentences, a preamble, an object followed by a braced explanation, keys spelled differently —
+ * all tolerated here; if it still cannot be read, ask again explicitly for JSON only ([completeParsed]).
  */
 object ModelJson {
     private val lenient = Json { isLenient = true; ignoreUnknownKeys = true }
 
-    /** 回复里第一个能读成 JSON 对象的、括号配平的片段(字符串里的括号不算);没有为 null。 */
+    /** The first brace-balanced fragment in the reply that parses as a JSON object (braces inside strings do not count); null if none. */
     fun firstObject(text: String): JsonObject? {
         var from = text.indexOf('{')
         while (from >= 0) {
@@ -26,7 +26,7 @@ object ModelJson {
         return null
     }
 
-    /** 从 [start] 的 { 起,配平的 } 的位置;配不平为 -1。 */
+    /** Position of the } matching the { at [start]; -1 if the braces do not balance. */
     private fun balancedEnd(s: String, start: Int): Int {
         var depth = 0
         var inString = false
@@ -50,10 +50,10 @@ object ModelJson {
         return -1
     }
 
-    /** 键名比对前去掉大小写、下划线、连字符和空格(verdict、Verdict、final_verdict 里的写法差异)。 */
+    /** Compared after stripping case, underscores, hyphens and spaces (verdict, Verdict and final_verdict count as the same). */
     private fun key(k: String) = k.lowercase().filter { it.isLetterOrDigit() }
 
-    /** 按 [names] 依次找(写法不同也认);都没有为 null。 */
+    /** Looks up each of [names] in order (spelling variants accepted); null if none match. */
     fun JsonObject.field(vararg names: String): JsonElement? {
         for (n in names) {
             this[n]?.let { return it }
@@ -63,12 +63,12 @@ object ModelJson {
         return null
     }
 
-    /** 第一次读不出来时补的一句。 */
+    /** The sentence appended when the first attempt cannot be parsed. */
     const val JSON_ONLY = "上一条回复读不出 JSON。请只输出一个 JSON 对象,不要代码块标记,不要任何其他文字,格式照系统提示。"
 
     /**
-     * 调一次模型并用 [parse] 读回复;读不出来就把那次回复和 [JSON_ONLY] 接在后面再问一次。两次都不行为 null。
-     * 模型出错(异常)照常抛给调用方。
+     * Calls the model once and parses the reply with [parse]; if that fails, appends that reply plus [JSON_ONLY] and asks again.
+     * Null if both attempts fail. Model errors (exceptions) are thrown to the caller as usual.
      */
     suspend fun <T : Any> completeParsed(model: ChatModel, system: String, messages: List<Message>, parse: (String) -> T?): T? {
         val first = model.complete(system, messages, emptyList())

@@ -4,33 +4,33 @@ import kotlinx.coroutines.flow.Flow
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 
-/** 把文字变成声音的模型。和对话模型分开：没有上下文、工具调用和思维链。 */
+/** A model that turns text into speech. Separate from chat models: no context, tool calls or chain of thought. */
 interface TtsModel {
-    /** 模型名，只用于记录。 */
+    /** The model name, used only for records. */
     val name: String
 
     val capabilities: TtsCapabilities
 
-    /** 失败时抛 [ModelError] 或 [TtsError]。 */
+    /** Throws [ModelError] or [TtsError] on failure. */
     suspend fun synthesize(request: TtsRequest): TtsResponse
 }
 
-/** 支持按音频块交付的声音模型。[synthesize] 仍可用于保存完整音频。 */
+/** A speech model that can deliver audio in chunks. [synthesize] can still be used to save complete audio. */
 interface StreamingTtsModel : TtsModel {
-    /** 收集时发起请求。每次合成交付 PCM 分块或一份完整音频，取消收集时释放连接。 */
+    /** The request is issued on collection. Each synthesis delivers PCM chunks or one complete audio file; cancelling collection releases the connection. */
     fun streamAudio(request: TtsRequest): Flow<TtsAudioPart>
 }
 
 sealed interface TtsAudioPart {
-    /** PCM16LE 的完整交错帧。同一次合成的采样率、声道数固定。 */
+    /** A complete interleaved PCM16LE frame. Sample rate and channel count are fixed within one synthesis. */
     data class Pcm(val bytes: ByteArray, val sampleRate: Int, val channels: Int) : TtsAudioPart
 
     data class Complete(val response: TtsResponse) : TtsAudioPart
 }
 
 /**
- * 一次朗读请求。[voice] 为空时用模型/设置里的默认音色；[speed] 为空时用服务商默认；
- * [format] 是希望的输出格式（wav/mp3/opus/aac/flac），服务商不一定都支持。
+ * One read-aloud request. An empty [voice] uses the default voice from the model or settings; an empty [speed] uses the provider
+ * default; [format] is the desired output format (wav/mp3/opus/aac/flac), which providers may not all support.
  */
 data class TtsRequest(
     val text: String,
@@ -39,18 +39,18 @@ data class TtsRequest(
     val format: String = "wav",
 )
 
-/** 合成好的音频。原始 PCM 已由适配器包成 WAV；[sampleRate] 读不出来时为 null。 */
+/** The synthesized audio. Raw PCM has already been wrapped into WAV by the adapter; [sampleRate] is null when it cannot be read. */
 class TtsResponse(val bytes: ByteArray, val mime: String, val sampleRate: Int? = null, val durationMs: Long? = null)
 
-/** 已经写进工作区的一段音频。 */
+/** A piece of audio already written into the workspace. */
 class StoredAudio(val path: String, val bytes: Int, val mime: String, val durationMs: Long? = null)
 
-/** 已经存进音乐库的一段音频。 */
+/** A piece of audio already saved into the music library. */
 class SavedAudio(val savedAs: String, val uri: String, val bytes: Long)
 
 /**
- * 一个声音模型能做什么。[voices] 为 null 表示不限制/未知（音色名由服务商校验）；
- * [maxChars] 是单次文本上限；[formats] 是能输出的容器格式。
+ * What a speech model can do. A null [voices] means unrestricted/unknown (voice names are validated by the provider);
+ * [maxChars] is the per-request text limit; [formats] are the container formats it can output.
  */
 data class TtsCapabilities(
     val voices: Set<String>? = null,
@@ -58,17 +58,17 @@ data class TtsCapabilities(
     val formats: Set<String> = setOf("wav", "mp3"),
 )
 
-/** 声音模型自己的限制：请求不合法、返回的不是音频、音频太大。 */
+/** A speech model's own limits: invalid request, response is not audio, audio too large. */
 sealed class TtsError(message: String) : Exception(message) {
     class Unsupported(message: String) : TtsError(message)
     class BadAudio(message: String) : TtsError(message)
     class TooLarge(val bytes: Long) : TtsError("audio is too large")
 }
 
-/** 生成音频的最大字节数；超过不往播放器/工作区交。 */
+/** Maximum number of bytes of generated audio; anything larger is not handed to the player/workspace. */
 internal const val MAX_TTS_BYTES = 20 * 1024 * 1024
 
-/** 从文件头认音频容器；认不出为 null。只认 TTS 常见的几种。 */
+/** Recognizes the audio container from the file header; null if unrecognized. Only the few containers TTS commonly uses are recognized. */
 internal fun sniffAudioMime(bytes: ByteArray): String? = when {
     bytes.size >= 12 && ascii(bytes, 0, 4) == "RIFF" && ascii(bytes, 8, 4) == "WAVE" -> "audio/wav"
     bytes.size >= 3 && ascii(bytes, 0, 3) == "ID3" -> "audio/mpeg"
@@ -88,7 +88,7 @@ internal fun audioMimeOrBad(bytes: ByteArray, declared: String?): String {
         ?: throw TtsError.BadAudio("response is not a known audio format")
 }
 
-/** 完整收到 RIFF/WAVE 后，将流式响应的未知长度写回，以便 Android 按文件播放。 */
+/** Once RIFF/WAVE has been fully received, write back the unknown length of the streaming response so Android can play it as a file. */
 internal fun finalizeStreamingWavHeader(bytes: ByteArray) {
     if (bytes.size < 12 || ascii(bytes, 0, 4) != "RIFF" || ascii(bytes, 8, 4) != "WAVE") return
     fun sizeAt(offset: Int): Long =
@@ -112,7 +112,7 @@ internal fun finalizeStreamingWavHeader(bytes: ByteArray) {
     }
 }
 
-/** 原始 16 位单声道 PCM 包成 WAV；Gemini TTS 常见这种返回。 */
+/** Wraps raw 16-bit mono PCM into WAV; Gemini TTS commonly returns this. */
 internal fun wrapPcm16Wav(pcm: ByteArray, sampleRate: Int, channels: Int = 1): ByteArray {
     val bits = 16
     val block = channels * bits / 8
@@ -126,7 +126,7 @@ internal fun wrapPcm16Wav(pcm: ByteArray, sampleRate: Int, channels: Int = 1): B
     return out.toByteArray()
 }
 
-/** Gemini inlineData 的 mime 里常带 `rate=24000`；读不出来用 24000。 */
+/** Gemini inlineData mime often carries `rate=24000`; 24000 is used when it cannot be read. */
 internal fun pcmRateOf(mime: String?): Int = mime?.let { Regex("rate=(\\d+)").find(it)?.groupValues?.get(1)?.toIntOrNull() }
     ?.takeIf { it in 8_000..192_000 } ?: 24_000
 

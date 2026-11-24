@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.model.usage
 
-/** 用户可设的 Token 预算范围；null 在设置层表示不限制。 */
+/** The token budget range a user can set; null at the settings layer means unlimited. */
 object TokenBudgetLimits {
     const val MIN = 10_000L
     const val MAX = 100_000_000L

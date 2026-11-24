@@ -21,14 +21,19 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * OpenAI Chat Completions 兼容端点(DeepSeek/Qwen/Kimi/GLM/OpenRouter/本地服务等)。差异只放在 [capabilities]。
+ * An OpenAI Chat Completions compatible endpoint (DeepSeek/Qwen/Kimi/GLM/OpenRouter/local services, etc.). Differences are
+ * expressed only through [capabilities].
  *
- * 思考内容各家放的地方不同:`reasoning_content`、`reasoning`,或者 `content` 是分块数组、思考在 `thinking` 块里。
- * 收到的思考记下从哪个地址、哪个位置来的([ReasoningVia],存在 [Part.Thinking.opaque]),带工具的请求原样放回原处:
- * 有的服务商要求工具调用前后的思考接着回传,不回传就拒绝。只回传从这个地址收到的,别家给的思考不发
- * (不认这个字段的服务商不会收到它)。[reasoningField] 是模型列表里写明的思考字段(`reasoning_content` 或
- * `reasoning`):写明了的,来历不明的思考(旧版本存下的历史)也按它回传。
- * 选了思考强度时另发 `reasoning_effort`;服务商没在列表里写档位的,这里不会收到值。
+ * Providers put thinking content in different places: `reasoning_content`, `reasoning`, or `content` as a chunk array with the
+ * thinking inside `thinking` chunks.
+ * Received thinking records which endpoint and position it came from ([ReasoningVia], stored in [Part.Thinking.opaque]); requests
+ * that carry tools put it back exactly where it was: some providers require the thinking around tool calls to be sent back, and
+ * reject the request otherwise. Only thinking received from this endpoint is replayed; thinking from other providers is not sent
+ * (providers that do not know this field never receive it). [reasoningField] is the thinking field declared in the model list
+ * (`reasoning_content` or `reasoning`): when it is declared, thinking of unknown origin (history saved by older versions) is
+ * replayed using it as well.
+ * When a thinking effort is selected, `reasoning_effort` is sent separately; providers that do not declare levels in the list
+ * never receive a value here.
  */
 class OpenAiCompatModel(
     baseUrl: String,
@@ -37,12 +42,12 @@ class OpenAiCompatModel(
     override val capabilities: Capabilities,
     private val http: OkHttpClient,
     reasoningField: String? = null,
-    /** 每个请求都带的头(客户端标识、服务商要的会话号等,见 [ClientHeaders]);Key 的头由适配器自己加。 */
+    /** Headers sent with every request (client identification, session ids the provider requires, etc., see [ClientHeaders]); the key header is added by the adapter itself. */
     private val headers: Map<String, String> = emptyMap(),
-    /** 用户选的思考强度(`reasoning_effort`);null 不发。 */
+    /** The thinking effort selected by the user (`reasoning_effort`); null means it is not sent. */
     private val reasoningEffort: String? = null,
     private val keySupplier: (() -> String?)? = null,
-    /** 密钥被上游拒绝(429/401/403)时带上 HTTP 状态码回调;接线处按状态决定冷却(429)还是标耗尽(401/403)。 */
+    /** Called back with the HTTP status when the key is rejected upstream (429/401/403); the wiring decides by status whether to cool down (429) or mark it exhausted (401/403). */
     private val onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)? = null,
 ) : StreamingChatModel {
     override val name: String get() = model
@@ -55,7 +60,7 @@ class OpenAiCompatModel(
     private companion object {
         val MARKABLE_ROLES = setOf("system", "user", "tool")
         val EPHEMERAL = buildJsonObject { put("type", "ephemeral") }
-        /** SSE 的最后一件:收到它才算说完。 */
+        /** The last item of an SSE stream: the reply counts as complete only once it arrives. */
         const val STREAM_DONE = "[DONE]"
     }
 
@@ -65,7 +70,9 @@ class OpenAiCompatModel(
         }
         val (status, retryAfter, text) = response
         if (status !in 200..299) throw mapError(status, retryAfter, text)
-        // 有的兼容端点不守 OpenAI 的默认值:没让流式也照样回 SSE(本地、局域网上的自建服务常见)。按流读完再拼,别把 `data:` 当成坏 JSON。
+        // Some compatible endpoints do not honor OpenAI's defaults: they still answer with SSE even when streaming was not
+        // requested (common for self-hosted services on a local network). Read it as a stream and concatenate; do not treat
+        // `data:` as broken JSON.
         if (!looksLikeEvents(text)) return parse(text)
         val stream = OpenAiStream({}, ::parseUsage, ::thinking)
         response.replay(eventsOf(text), stream::accept)
@@ -80,7 +87,7 @@ class OpenAiCompatModel(
             stream = OpenAiStream(onText, ::parseUsage, ::thinking)
             var raw = HttpSupport.stream(http, request(system, messages, tools, stream = true, key = key), stream::accept)
             if (raw.status == 400 && raw.body.contains("stream_options")) {
-                // 一些兼容端点能流式生成，却没有用量选项。
+                // Some compatible endpoints can stream but have no usage option.
                 stream = OpenAiStream(onText, ::parseUsage, ::thinking)
                 raw = HttpSupport.stream(http, request(system, messages, tools, stream = true, includeUsage = false, key = key), stream::accept)
             }
@@ -88,7 +95,7 @@ class OpenAiCompatModel(
         }
         val (status, retryAfter, text) = response
         if (status !in 200..299) {
-            // 不支持流式传输的兼容端点仍可按原接口完成任务。
+            // A compatible endpoint without streaming support can still complete the task through the original endpoint.
             if (status == 400 && text.contains("stream", ignoreCase = true)) return complete(system, messages, tools).also {
                 it.parts.filterIsInstance<Part.Text>().joinToString("") { part -> part.text }.takeIf(String::isNotEmpty)?.let(onText)
             }
@@ -104,7 +111,7 @@ class OpenAiCompatModel(
         val payload = buildJsonObject {
             put("model", model)
             reasoningEffort?.let { put("reasoning_effort", it) }
-            // 思考只在带工具的请求里回传(工具调用一步接一步时要接着想);不带工具的旁路调用不需要
+            // Thinking is replayed only in requests that carry tools (it must follow along step by step across tool calls); side calls without tools do not need it
             val replayReasoning = tools.isNotEmpty()
             val wire = listOf(buildJsonObject { put("role", "system"); put("content", system) }) +
                 messages.flatMap { serialize(it, replayReasoning) }
@@ -114,7 +121,7 @@ class OpenAiCompatModel(
                 put("stream", true)
                 if (includeUsage) putJsonObject("stream_options") { put("include_usage", true) }
             } else {
-                // 写明不要流式:省掉这一项时有的兼容端点默认按 SSE 回
+                // Explicitly say no streaming: without this field some compatible endpoints answer with SSE by default
                 put("stream", false)
             }
         }
@@ -127,9 +134,11 @@ class OpenAiCompatModel(
     }
 
     /**
-     * 显式缓存:标在系统提示词上(每次都一样),再标在最后一条能标的消息上(缓存到这次为止的整段对话,
-     * 下一次请求的开头与它相同时就从缓存取)。服务端从标记往回找相同的开头,所以较早的消息不能被改写。
-     * 内容是字符串的换成一段文字块再标;助手消息(可能只有工具调用)不标。
+     * Explicit caching: marked on the system prompt (identical every time), then on the last message that can be marked (caching
+     * the whole conversation up to this point; the next request whose beginning matches takes it from the cache). The server
+     * searches backwards from the mark for an identical beginning, so earlier messages must not be rewritten.
+     * String content is turned into a single text block before marking; assistant messages (which may hold only tool calls) are
+     * not marked.
      */
     private fun withCacheMarks(wire: List<JsonObject>): List<JsonObject> {
         val last = wire.indexOfLast { (it["role"] as? JsonPrimitive)?.contentOrNull in MARKABLE_ROLES && it["content"] !is JsonNull }
@@ -160,7 +169,7 @@ class OpenAiCompatModel(
         }
     }
 
-    /** 一条内部消息可能展开成多条线上消息(tool 结果各占一条,图片只能放 user 消息)。 */
+    /** One internal message may expand into several wire messages (each tool result gets its own; images can only go in user messages). */
     private fun serialize(m: Message, replayReasoning: Boolean): List<JsonObject> {
         if (m.role == Role.Assistant) return listOf(assistantJson(m, replayReasoning))
         val out = mutableListOf<JsonObject>()
@@ -202,10 +211,10 @@ class OpenAiCompatModel(
         else -> ""
     }
 
-    /** 收到的一段思考:记下这个地址和收到它的位置,回放时认得。 */
+    /** A piece of received thinking: records this endpoint and the position it was received at, so replay recognizes it. */
     private fun thinking(text: String, via: ReasoningVia) = Part.Thinking(text, via.tag(endpoint))
 
-    /** 这条助手消息里能回传给这个地址的思考和放回哪里:从这里收到的按收到的位置;来历不明的按列表写明的字段;都没有为 null。 */
+    /** The thinking of this assistant message that can be replayed to this endpoint, and where to put it: what was received from here goes back to its received position; unknown origin uses the field declared in the list; null if neither. */
     private fun replayable(m: Message): Pair<String, ReasoningVia>? {
         val parts = m.parts.filterIsInstance<Part.Thinking>()
         val own = parts.mapNotNull { p -> ReasoningVia.of(p.opaque, endpoint)?.let { p.text to it } }
@@ -222,7 +231,7 @@ class OpenAiCompatModel(
         return buildJsonObject {
             put("role", "assistant")
             when {
-                // 分块的那家要整条原样放回:思考块在前,文字块在后
+                // The chunk-based provider wants the whole message replayed verbatim: thinking block first, text block after
                 replay?.second == ReasoningVia.ThinkingChunks -> putJsonArray("content") {
                     addJsonObject {
                         put("type", "thinking")
@@ -245,13 +254,13 @@ class OpenAiCompatModel(
         }
     }
 
-    /** 整份回复是 SSE(`data: …` 一件件)还是一份 JSON。 */
+    /** Whether the whole reply is SSE (`data: …` items) or a single JSON document. */
     private fun looksLikeEvents(body: String): Boolean {
         val head = body.trimStart()
         return head.startsWith("data:") || head.startsWith("event:")
     }
 
-    /** 把整份 SSE 回复拆成一件件事件;内容已经收完,缺结束标记时补一个,当作正常说完。 */
+    /** Splits a whole SSE reply into individual events; the content has already been fully received, so a missing end marker is appended and it counts as a normal finish. */
     private fun eventsOf(body: String): List<String> {
         val out = mutableListOf<String>()
         val data = mutableListOf<String>()
@@ -297,7 +306,7 @@ class OpenAiCompatModel(
                 parts += Part.ToolCall(
                     c["id"]!!.jsonPrimitive.content,
                     fn["name"]!!.jsonPrimitive.content,
-                    // 有的适配器对没有参数的工具给空串:当成 `{}`,否则调用方按 JSON 解析会失败
+                    // Some adapters send an empty string for tools without arguments: treat it as `{}`, otherwise the caller's JSON parse fails
                     fn["arguments"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "{}",
                 )
             }
@@ -307,7 +316,8 @@ class OpenAiCompatModel(
                 "length" -> StopReason.MaxTokens
                 else -> if (parts.any { it is Part.ToolCall }) StopReason.ToolUse else StopReason.Other
             }
-            // 有的模型会把工具调用标记直接吐进正文:先还原成调用,还原不了就剥掉,别把乱码交给界面(见 LeakedToolMarkup)
+            // Some models dump tool call markup straight into the text: restore it into calls first, strip it off if that
+            // fails, and do not hand garbage to the UI (see LeakedToolMarkup)
             return LeakedToolMarkup.repair(ModelReply(parts, stop, parseUsage(root["usage"])))
         } catch (e: ModelError) {
             throw e
@@ -319,20 +329,20 @@ class OpenAiCompatModel(
     private fun parseUsage(el: JsonElement?): Usage? {
         val u = el as? JsonObject ?: return null
         fun int(o: JsonObject?, k: String) = (o?.get(k) as? JsonPrimitive)?.intOrNull
-        // 兼容接口有两种命中字段名;按字段是否存在取值
+        // Compatible APIs have two possible cache-hit field names; take whichever is present
         val hit = int(u, "prompt_cache_hit_tokens")
         val miss = int(u, "prompt_cache_miss_tokens")
         val inT = int(u, "prompt_tokens") ?: if (hit != null && miss != null) hit + miss else return null
         val outT = int(u, "completion_tokens") ?: 0
         val detail = int(u["prompt_tokens_details"] as? JsonObject, "cached_tokens")
         val cached = maxOf(detail ?: 0, hit ?: 0).coerceAtMost(inT)
-        // completion_tokens 含思考;有的服务商在 completion_tokens_details.reasoning_tokens 里单独报
+        // completion_tokens includes thinking; some providers report it separately in completion_tokens_details.reasoning_tokens
         val reasoning = (int(u["completion_tokens_details"] as? JsonObject, "reasoning_tokens") ?: 0).coerceIn(0, outT)
         return Usage(inT, outT, cached, reasoning, cacheReported = detail != null || hit != null)
     }
 }
 
-/** Chat Completions 的 delta 可以把同一个工具的名称与参数拆成多帧。 */
+/** A Chat Completions delta can split one tool's name and arguments across several frames. */
 private class OpenAiStream(
     private val onText: (String) -> Unit,
     private val usageOf: (JsonElement?) -> Usage?,
@@ -355,7 +365,7 @@ private class OpenAiStream(
         if (data == "[DONE]") { done = true; return true }
         val root = try { json.parseToJsonElement(data).jsonObject }
         catch (e: Exception) { throw ModelError.BadResponse("流式响应不是合法 JSON", e) }
-        // 有的服务流式请求一开头就出错时回 200,也要按错误类型接入重试与备援
+        // Some services return 200 when a streaming request fails right at the start; route those into retry and fallback by error type as well
         ModelHttp.streamError(root)?.let { throw it }
         chunks++
         usageOf(root["usage"])?.let { usage = it }
@@ -386,7 +396,7 @@ private class OpenAiStream(
         return done
     }
 
-    /** 一次回复里思考只按最先收到的位置记(同一家不会换位置;两个字段都给时只记一份)。 */
+    /** Within one reply, thinking is recorded only at the position it is first received from (a provider does not switch positions; when both fields are present only one copy is kept). */
     private fun appendThinking(t: String, via: ReasoningVia) {
         if (t.isEmpty()) return
         if (thinkingVia == null) thinkingVia = via
@@ -396,12 +406,12 @@ private class OpenAiStream(
     private fun appendVisible(t: String) {
         if (t.isEmpty()) return
         visible.append(t)
-        // 预览也先剥一遍:模型把工具调用标记吐进正文时,别让用户看着乱码流过去
+        // Strip the preview too: when a model dumps tool call markup into the text, do not let the user watch garbage stream past
         onText(LeakedToolMarkup.stripMarkup(visible.toString()))
     }
 
     fun finish(): ModelReply {
-        // 收到 finish_reason 就算回复完整:有的兼容端点不发 [DONE]。两样都没有是连接中途被断开
+        // Receiving finish_reason counts as a complete reply: some compatible endpoints do not send [DONE]. Neither means the connection dropped mid-way
         if (!done && reason == null) throw ModelError.StreamCut()
         if (chunks == 0) throw ModelError.BadResponse("流式响应没有内容")
         val parts = buildList<Part> {
@@ -423,8 +433,9 @@ private class OpenAiStream(
 }
 
 /**
- * 兼容接口把思考放在哪:[field] 是助手消息上的字段名;[ThinkingChunks] 是 `content` 为分块数组、思考在 `thinking` 块里。
- * 记在 [Part.Thinking.opaque] 里的是 `{"endpoint":…,"via":…}`。
+ * Where a compatible API puts thinking: [field] is the field name on the assistant message; [ThinkingChunks] means `content` is
+ * a chunk array with thinking inside `thinking` blocks.
+ * What is stored in [Part.Thinking.opaque] is `{"endpoint":…,"via":…}`.
  */
 internal enum class ReasoningVia(val wire: String, val field: String?) {
     ReasoningContent("reasoning_content", "reasoning_content"),
@@ -434,12 +445,12 @@ internal enum class ReasoningVia(val wire: String, val field: String?) {
     fun tag(endpoint: String): String = buildJsonObject { put("endpoint", endpoint); put("via", wire) }.toString()
 
     companion object {
-        /** 放在消息字段上的几种,按这个次序认(两个都给时取 `reasoning_content`)。 */
+        /** The ones carried on message fields, recognized in this order (`reasoning_content` wins when both are present). */
         val fields = listOf(ReasoningContent, Reasoning)
 
         fun ofField(name: String?): ReasoningVia? = fields.firstOrNull { it.field == name }
 
-        /** [opaque] 是从 [endpoint] 收到的思考时给出它的位置;别处来的、认不出的为 null。 */
+        /** Gives its position when [opaque] is thinking received from [endpoint]; null for thinking from elsewhere or unrecognizable. */
         fun of(opaque: String?, endpoint: String): ReasoningVia? {
             val o = opaque?.let { runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull() } ?: return null
             if ((o["endpoint"] as? JsonPrimitive)?.contentOrNull != endpoint) return null
@@ -449,7 +460,7 @@ internal enum class ReasoningVia(val wire: String, val field: String?) {
     }
 }
 
-/** `content` 是分块数组时:`text` 块拼成回答,`thinking` 块(里面又是 `text` 块)拼成思考。别的块不认。 */
+/** When `content` is a chunk array: `text` blocks form the answer, and `thinking` blocks (which contain `text` blocks) form the thinking. Other blocks are not recognized. */
 private class ContentChunks(val text: String, val thinking: String) {
     companion object {
         fun of(content: JsonArray): ContentChunks {

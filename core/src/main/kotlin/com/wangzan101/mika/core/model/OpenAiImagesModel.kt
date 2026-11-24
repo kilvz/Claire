@@ -24,9 +24,11 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 /**
- * OpenAI Images 兼容接口（`/images/generations` 与 `/images/edits`）。
- * 结果既认 `b64_json` 也认 `url`：有的服务商默认回链接，链接按同一个 [http] 在进程里下载，不交给 WebView/网页。
- * 能力（尺寸、能不能改图、一次几张）由调用方按实测填，不按模型名猜。
+ * OpenAI Images compatible API (`/images/generations` and `/images/edits`).
+ * Results may be `b64_json` or `url`: some providers return links by default, and links are downloaded in-process using the same
+ * [http], never handed to a WebView/web page.
+ * Capabilities (sizes, whether editing works, how many images per request) are filled by the caller from measurements, not
+ * guessed from the model name.
  */
 class OpenAiImagesModel(
     baseUrl: String,
@@ -34,7 +36,7 @@ class OpenAiImagesModel(
     private val model: String,
     override val capabilities: ImageCapabilities,
     private val http: OkHttpClient,
-    /** 每个请求都带的头（客户端标识、服务商会话号等，见 [ClientHeaders]）；Key 的头由这里自己加。 */
+    /** Headers sent with every request (client identification, the provider's session id, etc., see [ClientHeaders]); the key header is added here. */
     private val headers: Map<String, String> = emptyMap(),
 ) : ImageModel {
     override val name: String get() = model
@@ -99,7 +101,7 @@ class OpenAiImagesModel(
             .build()
     }
 
-    /** OpenAI 的尺寸枚举；标准三档。比例不在表里的模型能力里本来就不会有。 */
+    /** OpenAI's size enum; the three standard tiers. An aspect that is not in the model's capabilities never reaches here anyway. */
     private fun openAiSize(aspect: ImageAspect): String? = when (aspect) {
         ImageAspect.Square -> "1024x1024"
         ImageAspect.Portrait -> "1024x1536"
@@ -127,7 +129,7 @@ class OpenAiImagesModel(
         return ImageResponse(images, usageOf(rootJson["usage"] as? JsonObject))
     }
 
-    /** 有的服务商返回链接：按 http(s)、大小、文件头校验后读进内存。 */
+    /** Some providers return links: validate http(s), size and file header, then read them into memory. */
     private suspend fun downloadImage(url: String, revisedPrompt: String?): GeneratedImage {
         val parsed = url.toHttpUrlOrNull() ?: throw ImageError.BadImage("image url is not http(s)")
         if (parsed.scheme != "http" && parsed.scheme != "https") throw ImageError.BadImage("image url is not http(s)")
@@ -160,7 +162,7 @@ class OpenAiImagesModel(
         }
     }
 
-    /** 服务商报的用量口径不完全一样：OpenAI 是 input/output_tokens，兼容服务有时用 prompt/completion_tokens。 */
+    /** Providers do not all report usage the same way: OpenAI uses input/output_tokens, compatible services sometimes use prompt/completion_tokens. */
     private fun usageOf(el: JsonObject?): Usage? {
         val u = el ?: return null
         fun n(vararg keys: String): Int? = keys.firstNotNullOfOrNull { (u[it] as? JsonPrimitive)?.intOrNull }
