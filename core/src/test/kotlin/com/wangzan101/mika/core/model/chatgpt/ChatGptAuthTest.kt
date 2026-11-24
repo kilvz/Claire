@@ -94,7 +94,7 @@ class ChatGptAuthTest {
         assertEquals(a.nonce, q["nonce"])
         assertEquals("S256", q["code_challenge_method"])
         assertEquals(a.challenge, q["code_challenge"])
-        assertNull("第一次注册不带提示", q["id_token_hint"])
+        assertNull("the first registration carries no hint", q["id_token_hint"])
         assertNull(q["login_hint"])
     }
 
@@ -161,13 +161,13 @@ class ChatGptAuthTest {
         assertEquals(SignInFailure.Region, f("unsupported_country"))
         assertEquals(SignInFailure.Blocked, f("http_403", nonJson = true))
         assertEquals(SignInFailure.Blocked, f("http_429", nonJson = true))
-        assertEquals("JSON 的 403 不算防护拦截", SignInFailure.Exchange, f("http_403"))
+        assertEquals("a JSON 403 does not count as bot protection", SignInFailure.Exchange, f("http_403"))
         assertEquals(SignInFailure.Denied, f("access_denied"))
         assertEquals(SignInFailure.Denied, f("consent_required"))
         assertEquals(SignInFailure.NoPlanScope, f("invalid_scope"))
         assertEquals(SignInFailure.NoPlanScope, f("forbidden", "Your plan does not include this"))
         assertEquals(SignInFailure.NoPlanScope, f("subscription_sharing_user_not_eligible"))
-        assertEquals("说明里的词要整词才算", SignInFailure.Exchange, f("server_error", "no explanation"))
+        assertEquals("words in the explanation must match whole", SignInFailure.Exchange, f("server_error", "no explanation"))
         assertEquals(SignInFailure.Exchange, f("invalid_client", "Client authentication failed"))
     }
 
@@ -243,7 +243,7 @@ class ChatGptAuthTest {
         assertEquals("at3", tokens.get(true))
         assertEquals("rt2", stored!!.refreshToken)
         server.takeRequest()
-        assertEquals("用换来的新刷新令牌", "rt2", form(server.takeRequest().body.readUtf8())["refresh_token"])
+        assertEquals("uses the new refresh token obtained in exchange", "rt2", form(server.takeRequest().body.readUtf8())["refresh_token"])
     }
 
     @Test fun deadRefreshTokenSignsOutButTemporaryFailuresKeepIt() = runTest {
@@ -276,7 +276,7 @@ class ChatGptAuthTest {
                 val miss = client.newCall(Request.Builder().url("http://127.0.0.1:${cb.port}/favicon.ico").build()).execute()
                 assertEquals(404, miss.code); miss.close()
                 val stranger = client.newCall(Request.Builder().url("${cb.redirectUri}?code=x&state=other").build()).execute()
-                assertEquals("不是这次登录的回调不收", 400, stranger.code); stranger.close()
+                assertEquals("a callback that is not from this sign-in is not accepted", 400, stranger.code); stranger.close()
                 val hit = client.newCall(Request.Builder().url("${cb.redirectUri}?code=a%20b&state=s").build()).execute()
                 assertEquals(200, hit.code)
                 assertEquals("<p>ok a b</p>", hit.body!!.string())
@@ -292,7 +292,7 @@ class ChatGptAuthTest {
         assertNull(cb.await(400) { "" })
         cb.close()
         val refused = runCatching { Socket("127.0.0.1", port).close() }.isFailure
-        assertTrue("关掉之后端口不再收连接", refused)
+        assertTrue("after closing, the port no longer accepts connections", refused)
     }
 
     // ---------- The whole sign-in ----------
@@ -354,7 +354,7 @@ class ChatGptAuthTest {
             signInWithChatGpt(
                 auth, "urn:uuid:h", clientId = "issued-1", previous = null,
                 openBrowser = browser(seen) { q -> "code=c1&state=${q["state"]}" },
-                onRegistered = { fail("已注册过") }, page = { "done" }, now = { clock },
+                onRegistered = { fail("already registered") }, page = { "done" }, now = { clock },
             )
             fail()
         } catch (e: SignInException) {

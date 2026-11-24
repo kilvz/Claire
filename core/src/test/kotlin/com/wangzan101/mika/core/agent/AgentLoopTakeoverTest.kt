@@ -107,7 +107,7 @@ class AgentLoopTakeoverTest {
         assertEquals("skipped", r.s("outcome")); assertEquals("takeover_skipped", r.s("reason"))
         assertEquals("false", r.s("counts_as_failure")); assertEquals(UserExchange.NO_HANDBACK_NOTE, r.s("note"))
         val verifierPrompt = checker.requests.first().joinToString("\n") { m -> m.parts.filterIsInstance<Part.Text>().joinToString { it.text } }
-        assertTrue(verifierPrompt, "hand_to_user(payment) 接管被跳过" in verifierPrompt)
+        assertTrue(verifierPrompt, "hand_to_user(payment) takeover skipped" in verifierPrompt)
         assertTrue(end.toString(), end is TaskState.Succeeded && !end.verified && end.unconfirmed.isNotEmpty())
     }
 

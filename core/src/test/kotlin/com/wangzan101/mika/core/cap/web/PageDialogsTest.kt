@@ -25,7 +25,7 @@ class PageDialogsTest {
         assertEquals(listOf("accept:-"), r.said)
         assertNull(d.current)
         assertEquals(DialogAnswer.NoDialog, d.answer(true, null))
-        assertEquals("只回一次", 1, r.said.size)
+        assertEquals("answered only once", 1, r.said.size)
     }
 
     @Test fun promptTakesTextOrItsDefault() {

@@ -101,8 +101,8 @@ class MeteredModelTest {
         val m = inner.metered(source, sink)
         assertEquals("plain-model", m.name)
         assertEquals(inner.capabilities, m.capabilities)
-        assertFalse("不支持逐段文字的套上后也不支持", m is StreamingChatModel)
-        assertTrue("没调用就不记", recorded.isEmpty())
+        assertFalse("wrapping a model without text streaming does not make it support it", m is StreamingChatModel)
+        assertTrue("no calls means nothing is recorded", recorded.isEmpty())
     }
 
     @Test fun nonHttpReplyDoesNotInventARequest() = runTest {
@@ -144,18 +144,18 @@ class MeteredModelTest {
         withContext(tally) {
             try {
                 plain.complete("s", user, emptyList())
-                fail("普通调用应在预算检查处停止")
+                fail("a plain call should stop at the budget check")
             } catch (_: ModelError.TaskBudgetExceeded) {}
             try {
                 streaming.completeStreaming("s", user, emptyList()) {}
-                fail("流式调用应在预算检查处停止")
+                fail("a streaming call should stop at the budget check")
             } catch (_: ModelError.TaskBudgetExceeded) {}
         }
         assertEquals(0, plainCalls)
         assertEquals(0, streamingInner.calls)
-        assertTrue("拒绝的调用不写总账", recorded.isEmpty())
-        assertTrue("拒绝的调用不增加实际请求", attempts.isEmpty())
-        assertEquals("拒绝的调用不增加逻辑调用", 1, tally.event(1).calls)
+        assertTrue("a rejected call is not written to the ledger", recorded.isEmpty())
+        assertTrue("a rejected call does not add a real request", attempts.isEmpty())
+        assertEquals("a rejected call does not add a logical call", 1, tally.event(1).calls)
         assertEquals(5L, tally.totalTokens())
     }
 
@@ -166,7 +166,7 @@ class MeteredModelTest {
         }
         try {
             model.complete("s", user, emptyList())
-            fail("每日预算应在请求前拒绝")
+            fail("the daily budget should reject before the request")
         } catch (_: ModelError.DailyBudgetExceeded) {}
         assertEquals(0, calls)
         assertTrue(recorded.isEmpty())

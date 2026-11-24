@@ -45,7 +45,7 @@ class NoticeTriageTest {
         val m = Fake { ok }
         val r = NoticeTriage(m, "English").triage(items(2)) as TriageResult.Judged
         assertEquals(1, m.calls.size)
-        assertTrue("判定的请求不带任何工具", m.calls.single().third.isEmpty())
+        assertTrue("the judgement request carries no tools", m.calls.single().third.isEmpty())
         assertEquals(Prompts.role("notice_triage"), m.calls.single().first)
         assertEquals(TriageVerdict(TriageDecision.Surface, "asks a question"), r.verdicts["k1"])
         assertEquals(TriageVerdict(TriageDecision.Remember, "date"), r.verdicts["k2"])
@@ -72,7 +72,7 @@ class NoticeTriageTest {
         assertEquals(4, Regex(Regex.escape(Untrusted.CLOSE)).findAll(input).count())
         val outside = input.replace(Regex("<untrusted>\\n[\\s\\S]*?\\n</untrusted>"), "")
         for (marker in listOf("IGNORE", "T-", "X-", "Bob-", "M-", "old-", "H1")) {
-            assertFalse("「$marker」在 untrusted 之外: $outside", outside.contains(marker))
+            assertFalse("'$marker' is outside untrusted: $outside", outside.contains(marker))
         }
         assertFalse(outside.contains("[n2]"))
         assertTrue(input.startsWith("Language for reasons: English\n"))
@@ -101,7 +101,7 @@ class NoticeTriageTest {
         assertEquals(NoticeTriage.TEXT_MAX, blocks[1].length)
         val earlier = blocks[2].lines()
         assertEquals(5, earlier.size)
-        assertTrue("只留最近 5 段(最后一段是现在的文字,不重复)", earlier.first().contains("h4-") && earlier.last().contains("h8-"))
+        assertTrue("only the latest 5 lines are kept (the last one is the current text, not repeated)", earlier.first().contains("h4-") && earlier.last().contains("h8-"))
         earlier.forEach { assertTrue(it.removePrefix("- ").length <= NoticeTriage.LINE_MAX) }
         val msgs = blocks[3].lines()
         assertEquals(5, msgs.size)
@@ -114,7 +114,7 @@ class NoticeTriageTest {
         try { NoticeTriage(m, "English").triage(items(9)); fail() } catch (_: IllegalArgumentException) {}
         try {
             NoticeTriage(m, "English").triage(listOf(TriageItem(rec(1, "com.a")), TriageItem(rec(2, "com.b"))))
-            fail("不同 App 的通知不能在同一个请求里")
+            fail("notifications from different apps cannot share one request")
         } catch (_: IllegalArgumentException) {}
         assertTrue(m.calls.isEmpty())
         val all = (1..8).map { NoticeTriage.idOf(it - 1) }
@@ -135,9 +135,9 @@ class NoticeTriageTest {
             ids,
         )!!
         assertEquals(setOf("n1", "n2", "n3"), v.keys)
-        assertEquals("重复的 id 只认第一个", TriageVerdict(TriageDecision.Surface, "first"), v["n1"])
-        assertEquals("不认识的判定按忽略,不带模型的理由", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n2"])
-        assertEquals("缺的按忽略", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n3"])
+        assertEquals("a duplicate id only counts the first", TriageVerdict(TriageDecision.Surface, "first"), v["n1"])
+        assertEquals("an unknown decision is treated as ignore, without the model's reason", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n2"])
+        assertEquals("a missing one is treated as ignore", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n3"])
     }
 
     // thinking through it, the model echoed an "answer" found in the notification: the last one counts
@@ -158,7 +158,7 @@ class NoticeTriageTest {
         val v = NoticeTriage.parse(raw, ids)!!
         assertEquals(TriageVerdict(TriageDecision.Surface, "a"), v["n1"])
         assertEquals(TriageVerdict(TriageDecision.Ignore, "b"), v["n2"])
-        assertEquals("缺的按忽略", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n3"])
+        assertEquals("a missing one is treated as ignore", TriageVerdict(TriageDecision.Ignore, note = TriageNote.NoVerdict), v["n3"])
         assertEquals(ids.toSet(), v.keys)
         // in the requested shape the loose object does not count
         val both = """{"id":"n1","decision":"surface","reason":"stray"} {"items":[{"id":"n1","decision":"ignore","reason":"final"}]}"""
@@ -255,7 +255,7 @@ class NoticeTriageTest {
     @Test fun unparseableIsOneFailedCallWithoutRetry() = runTest {
         val m = Fake { "I cannot help" }
         assertEquals(TriageResult.Failed(unreadable = true), NoticeTriage(m, "English").triage(items(1)))
-        assertEquals("读不懂不再问第二次", 1, m.calls.size)
+        assertEquals("an unreadable reply is not asked again", 1, m.calls.size)
     }
 
     @Test fun errorsAndTimeoutFail() = runTest {
@@ -294,7 +294,7 @@ class NoticeTriageTest {
         job.cancel()
         runCurrent()
         assertTrue(job.isCancelled)
-        assertNull("没有记成失败", result)
+        assertNull("not recorded as a failure", result)
     }
 
     // when searching for the value at the end, a reply with too many `{` is not read, and does not hang either

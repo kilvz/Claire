@@ -55,7 +55,7 @@ class NetProxyTest {
         assertEquals(Proxy.Type.SOCKS, v6.javaProxy().type())
         assertTrue(v6.forApp)
 
-        assertFalse("https 代理只有容器用得上", ProxyAddress.parse("https://proxy.example.com:443")!!.forApp)
+        assertFalse("the https proxy is only useful to the container", ProxyAddress.parse("https://proxy.example.com:443")!!.forApp)
         for (bad in listOf("", "127.0.0.1:7890", "ftp://h:21", "http://host", "http://h:80/path", "http://h :80")) assertNull(bad, ProxyAddress.parse(bad))
     }
 
@@ -137,7 +137,7 @@ class NetProxyTest {
             fail("expected a proxy error")
         } catch (e: ModelError.Proxy) {
             assertEquals(ProxyFailure.AuthFailed, e.failure)
-            assertFalse("账号密码不对不重试", RetryPolicy.transient(e))
+            assertFalse("bad credentials are not retried", RetryPolicy.transient(e))
             assertEquals("proxy_auth", RetryPolicy.label(e))
         }
         // Once credentials have been tried and rejected, it doesn't try again
@@ -178,7 +178,7 @@ class NetProxyTest {
         assertEquals(ProxyFailure.Unreachable, NetProxy.classify(SocketException("Malformed reply from SOCKS server")))
         assertEquals(ProxyFailure.Unreachable, NetProxy.classify(ConnectException("Failed to connect to /127.0.0.1:7890")))
         assertEquals(ProxyFailure.Unreachable, NetProxy.classify(SocketTimeoutException("connect timed out")))
-        assertNull("读回复时超时不是代理的问题", NetProxy.classify(SocketTimeoutException("timeout")))
+        assertNull("a timeout while reading the reply is not a proxy problem", NetProxy.classify(SocketTimeoutException("timeout")))
         assertNull(NetProxy.classify(IOException("unexpected end of stream")))
     }
 
@@ -188,11 +188,11 @@ class NetProxyTest {
         val pa = net.socksCredentials("SOCKS5", "10.0.0.9", 1080)!!
         assertEquals("bob", pa.userName)
         assertEquals("pw", String(pa.password))
-        assertNull("别的主机不答", net.socksCredentials("SOCKS5", "10.0.0.8", 1080))
-        assertNull("别的端口不答", net.socksCredentials("SOCKS5", "10.0.0.9", 1081))
-        assertNull("不是 SOCKS 的询问不答", net.socksCredentials("http", "10.0.0.9", 1080))
+        assertNull("other hosts get no answer", net.socksCredentials("SOCKS5", "10.0.0.8", 1080))
+        assertNull("other ports get no answer", net.socksCredentials("SOCKS5", "10.0.0.9", 1081))
+        assertNull("a non-SOCKS request gets no answer", net.socksCredentials("http", "10.0.0.9", 1080))
         setting = "http://bob:pw@10.0.0.9:1080"
-        assertNull("HTTP 代理不经这里给", net.socksCredentials("SOCKS5", "10.0.0.9", 1080))
+        assertNull("HTTP proxies are not handed out here", net.socksCredentials("SOCKS5", "10.0.0.9", 1080))
     }
 
     @Test fun onlyClientsBuiltHereAreConsideredProxied() {

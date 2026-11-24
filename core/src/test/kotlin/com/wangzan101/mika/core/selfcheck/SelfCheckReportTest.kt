@@ -85,10 +85,10 @@ class SelfCheckReportTest {
 
     @Test
     fun issueLinkPrefillsOnlyTheTitle() {
-        assertEquals("[兼容性] Android 14 Acme Phone 7", SelfCheckReport.issueTitle(facts))
+        assertEquals("[Compatibility] Android 14 Acme Phone 7", SelfCheckReport.issueTitle(facts))
         val url = SelfCheckReport.issueUrl("https://github.com/kilvz/Claire/issues/new", facts)
         assertEquals(
-            "https://github.com/kilvz/Claire/issues/new?template=device-report.yml&title=%5B%E5%85%BC%E5%AE%B9%E6%80%A7%5D%20Android%2014%20Acme%20Phone%207",
+            "https://github.com/kilvz/Claire/issues/new?template=device-report.yml&title=%5BCompatibility%5D%20Android%2014%20Acme%20Phone%207",
             url,
         )
         assertFalse(url.contains("body="))

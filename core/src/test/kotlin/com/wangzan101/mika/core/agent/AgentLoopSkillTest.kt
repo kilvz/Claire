@@ -53,7 +53,7 @@ class AgentLoopSkillTest {
         val r = run("用闲鱼查手机,再发微信给小王,再在知乎搜一下")
         val idx = r.requests.first().index().single()
         // Knowledge and skills each sit under their own heading (the heading says which tool reads the full text)
-        assertTrue(idx.lines().first() == KNOWLEDGE_INDEX_HEADER && idx.lines().any { it.startsWith("- app:xianyu(闲鱼):") })
+        assertTrue(idx.lines().first() == KNOWLEDGE_INDEX_HEADER && idx.lines().any { it.startsWith("- app:xianyu(Xianyu):") })
         assertTrue(SKILL_INDEX_HEADER in idx.lines())
         // The index line comes after the task text
         val texts = r.requests.first().userTexts()

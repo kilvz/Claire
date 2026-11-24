@@ -26,12 +26,12 @@ class ReadmeTranslationsTest {
         val stale = TRANSLATIONS.mapNotNull { name ->
             val marker = MARKER.find(File(root, name).readText())?.groupValues?.get(1)
             when (marker) {
-                null -> "$name 开头缺少 <!-- translated-from: README.md @ $current -->"
+                null -> "$name is missing <!-- translated-from: README.md @ $current --> at the top"
                 current -> null
-                else -> "$name 是从旧版 README.md($marker)翻译的;按 README.md 的改动更新译文,再把开头的 translated-from 改成 $current"
+                else -> "$name was translated from an older README.md ($marker); update the translation for the changes in README.md, then change the translated-from at the top to $current"
             }
         }
-        assertTrue("README 译文过期了(README.md 现在的指纹是 $current):\n" + stale.joinToString("\n"), stale.isEmpty())
+        assertTrue("README translations are stale (README.md now has fingerprint $current):\n" + stale.joinToString("\n"), stale.isEmpty())
     }
 
     @Test fun translationsKeepStructure() {
@@ -40,16 +40,16 @@ class ReadmeTranslationsTest {
         val bad = TRANSLATIONS.flatMap { name ->
             val text = File(root, name).readText()
             listOfNotNull(
-                sections(text).takeIf { it != sections }?.let { "$name 有 $it 个 ## 小节,README.md 有 $sections 个" },
-                localImages(text, name).takeIf { it != images }?.let { "$name 的本地图片和 README.md 不一样:多了 ${it - images},少了 ${images - it}" },
+                sections(text).takeIf { it != sections }?.let { "$name has $it ## sections, README.md has $sections" },
+                localImages(text, name).takeIf { it != images }?.let { "$name has different local images from README.md: extra ${it - images}, missing ${images - it}" },
             )
         }
-        assertTrue("README 译文和 README.md 结构不一致:\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("README translations do not match the structure of README.md:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 
     @Test fun translationsHaveNoGeneratedBlocks() {
         val bad = TRANSLATIONS.filter { "<!-- generated:" in File(root, it).readText() }
-        assertTrue("生成段落只放在 README.md 里,译文里换成指向它的一句话:$bad", bad.isEmpty())
+        assertTrue("generated sections belong only in README.md; replace them in translations with a one-line pointer:$bad", bad.isEmpty())
     }
 
     @Test fun fingerprintIgnoresGeneratedBlocksAndLineEndings() {

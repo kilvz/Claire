@@ -177,7 +177,7 @@ class ToolDispatcherWebTest {
         repeat(5) { t.execute(call("web_observe")) }
         val seen = t.evidence().read(ObsKind.Read, ObsKind.Reply).joinToString("\n")
         assertTrue(seen, seen.contains("第二段正文:车次 G7311"))
-        assertTrue(seen, seen.contains("从第 5000 字起"))
+        assertTrue(seen, seen.contains("from character 5000"))
         assertTrue(seen, seen.contains("G7501"))
     }
 
@@ -470,7 +470,7 @@ class ToolDispatcherWebTest {
         val web = FakeWebPort(); val t = d(web = web); t.webSid()
         t.execute(call("web_tabs", """{"action":"switch","tabId":"t2"}"""))
         t.execute(call("web_tap", """{"x":500,"y":500,"target":"中间"}"""))
-        assertEquals("换了标签后坐标点击先重读一屏", 2, web.reads)
+        assertEquals("after switching tabs a coordinate tap re-reads the screen first", 2, web.reads)
         t.execute(call("web_tabs", """{"action":"close","tabId":"t1"}"""))
         t.execute(call("web_tap", """{"x":500,"y":500,"target":"中间"}"""))
         assertEquals(3, web.reads)
@@ -482,7 +482,7 @@ class ToolDispatcherWebTest {
         t.go()
         val ev = t.evidence()
         assertTrue(ev.freshText, ev.freshText.startsWith("当前网页:https://shop.example.com/cart"))
-        assertTrue(ev.freshText, ev.freshText.endsWith("网页正文(开头):\n正文"))
+        assertTrue(ev.freshText, ev.freshText.endsWith("Page text (beginning):\n正文"))
         assertEquals(listOf("readPage 3000 0 noscroll"), web.calls.filter { it.startsWith("readPage") })
     }
 
@@ -497,8 +497,8 @@ class ToolDispatcherWebTest {
         val label = apps.first().jsonObject.s("label")
         t.execute(call("phone_launch_app", """{"package":"$pkg"}"""))
         val ev = t.evidence()
-        assertTrue(ev.read(ObsKind.Fact).toString(), ev.read(ObsKind.Fact).any { "网页标题「Example Domain」" in it && "https://example.com/" in it })
-        assertTrue(ev.read(ObsKind.Fact).toString(), ev.read(ObsKind.Fact).any { "phone_launch_app 打开了 $pkg" in it && label in it })
+        assertTrue(ev.read(ObsKind.Fact).toString(), ev.read(ObsKind.Fact).any { "page title \"Example Domain\"" in it && "https://example.com/" in it })
+        assertTrue(ev.read(ObsKind.Fact).toString(), ev.read(ObsKind.Fact).any { "phone_launch_app opened $pkg" in it && label in it })
         assertTrue(ev.sources(ev.ledger.all).any { "Example Domain" in it })
     }
 

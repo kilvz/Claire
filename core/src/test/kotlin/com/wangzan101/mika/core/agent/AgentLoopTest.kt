@@ -331,7 +331,7 @@ class AgentLoopTest {
         }).run(RunSpec(RunId("budget"), "t", "test", tokenBudget = 5), RunInbox())
         assertTrue("$end", end is TaskState.Failed && end.kind == FailKind.TokenLimit)
         assertTrue(end is TaskState.Failed && "5" in end.reason)
-        assertEquals("达到预算后不能另发收尾请求", 1, raw.requests.size)
+        assertEquals("no extra closeout request once the budget is reached", 1, raw.requests.size)
         assertEquals(5L, (events.first() as RunEvent.TaskStarted).tokenBudget)
     }
 
@@ -484,8 +484,8 @@ class AgentLoopTest {
 
     @Test fun unexpectedModelExceptionFails() = runTest {
         val l = loop(FakeModel(IllegalStateException("boom")))
-        assertEquals(TaskState.Failed("模型调用异常:boom", FailKind.Model), l.run("t"))
-        assertEquals(TaskState.Failed("模型调用异常:boom", FailKind.Model), l.state.value)
+        assertEquals(TaskState.Failed("Model call failed: boom", FailKind.Model), l.run("t"))
+        assertEquals(TaskState.Failed("Model call failed: boom", FailKind.Model), l.state.value)
     }
 
     @Test fun rateLimitWaitIsCapped() = runTest {
@@ -501,7 +501,7 @@ class AgentLoopTest {
         fun preview() = (l.state.value as? TaskState.Running)?.preview
         val model = object : StreamingChatModel {
             override val capabilities = Capabilities(toolCalls = true, vision = false, contextTokens = 128_000, reasoning = false)
-            override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = error("应走流式")
+            override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = error("should use streaming")
             override suspend fun completeStreaming(
                 system: String, messages: List<Message>, tools: List<ToolSpec>, onText: (String) -> Unit,
             ): ModelReply {
@@ -532,7 +532,7 @@ class AgentLoopTest {
         var calls = 0
         val model = object : StreamingChatModel {
             override val capabilities = Capabilities(toolCalls = true, vision = false, contextTokens = 128_000, reasoning = false)
-            override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = error("应走流式")
+            override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply = error("should use streaming")
             override suspend fun completeStreaming(
                 system: String, messages: List<Message>, tools: List<ToolSpec>, onText: (String) -> Unit,
             ): ModelReply {
@@ -714,7 +714,7 @@ class AgentLoopTest {
             script += tools(call("phone_observe"))
         }
         val r = loop(FakeModel(*script.toTypedArray())).run("t")
-        assertTrue("$r", r is TaskState.Failed && "连续 3 次没有读到新数据" in r.reason)
+        assertTrue("$r", r is TaskState.Failed && "No new data was read 3 times in a row" in r.reason)
     }
 
     @Test fun visibleButUnreadableTreeStopsAfterThreeNoEffectTaps() = runTest {
@@ -726,7 +726,7 @@ class AgentLoopTest {
         val m = FakeModel(*(1..4).map { tools(call("phone_tap", """{"x":500,"y":500}""")) }.toTypedArray())
         val r = AgentLoop(m, toolDispatcher(s), "BASE", retry = FIXED_RETRY).run("t")
         assertTrue("$r", r is TaskState.Failed && r.kind == FailKind.Guard)
-        assertTrue("$r", r is TaskState.Failed && "不响应" in r.reason)
+        assertTrue("$r", r is TaskState.Failed && "may not respond" in r.reason)
         assertEquals(3, m.requests.size)
     }
 

@@ -27,7 +27,7 @@ class RegexPortabilityTest {
                 }.toList()
             }
         }
-        assertTrue("正则里有没转义的花括号,安卓上会编译失败:\n" + offenders.joinToString("\n"), offenders.isEmpty())
+        assertTrue("a regex has an unescaped brace and will fail to compile on Android:\n" + offenders.joinToString("\n"), offenders.isEmpty())
     }
 
     @Test

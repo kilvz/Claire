@@ -382,7 +382,7 @@ class MemoryToolsTest {
             assertEquals("false", r.s("counts_as_failure"))
             assertEquals("false", r.s("recoverable"))
         }
-        assertTrue("改的那条说的是「没改」,不是「没存」", "Nothing was changed" in notSaid.s("message"))
+        assertTrue("The changed entry says 'not changed', not 'not saved'", "Nothing was changed" in notSaid.s("message"))
         assertEquals("用户家住浦东", store.items.value.single().content)
         // Real failures still count as before: editing without a prior search is a misuse, and the model should retry
         val missing = d.run("memory_edit", editArgs("update", "nope", "把那条地址改成我现在住的地方", "用户家住张江"))
@@ -548,7 +548,7 @@ class MemoryToolsTest {
         val said = obs.single { it.kind == com.wangzan101.mika.core.screen.observation.ObsKind.UserSaid }
         val own = obs.single { it.kind == com.wangzan101.mika.core.screen.observation.ObsKind.Fact }
         assertTrue("香菜" in said.text); assertFalse("张江路" in said.text)
-        assertTrue("张江路" in own.text); assertTrue("不是用户说的" in own.text); assertFalse("香菜" in own.text)
+        assertTrue("张江路" in own.text); assertTrue("the user did not say this" in own.text); assertFalse("香菜" in own.text)
     }
 
     @Test fun previousConfirmationDoesNotWeakenCurrentQuoteChecks() {

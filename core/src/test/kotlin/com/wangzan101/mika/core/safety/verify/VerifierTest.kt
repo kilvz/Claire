@@ -100,7 +100,7 @@ class VerifierTest {
         val m = FakeModel()
         val v = Verifier(m, null).verify("查余额", CRITERIA, "余额 10 元\n依据: 「10 元」", evidence(fresh = "", protected = true))
         assertEquals(Verdict.CannotVerify, v.verdict)
-        assertTrue(v.reason, "防截屏" in v.reason)
+        assertTrue(v.reason, "protected against screenshots" in v.reason)
         assertTrue(m.requests.isEmpty()) // Nothing to look at, so the model is not called
         // With text from earlier screens it verifies as usual
         val m2 = FakeModel(text(PASS))
@@ -115,7 +115,7 @@ class VerifierTest {
         assertEquals(Verdict.CannotVerify, badVerdict.verdict)
         val error = Verifier(FakeModel(ModelError.Server(500)), null).verify("查电量", CRITERIA, "电量 86%\n依据: 「86%」", evidence())
         assertEquals(Verdict.CannotVerify, error.verdict)
-        assertTrue(error.reason, "核查" in error.reason)
+        assertTrue(error.reason, "Verifier" in error.reason)
     }
 
     @Test fun usesVisionModelWhenScreenshot() = runTest {
@@ -141,7 +141,7 @@ class VerifierTest {
         val m = FakeModel(text(PASS))
         Verifier(m, null).verify("查电量", Criteria(listOf("查电量"), "read", fallback = true), "电量 86%\n依据: 「86%」", evidence())
         val body = (m.requests.single().single().parts.single() as Part.Text).text
-        assertTrue(body, "用户原话本身" in body)
+        assertTrue(body, "the user's own words" in body)
     }
 
     private fun body(m: FakeModel) = (m.requests.single().single().parts.first() as Part.Text).text
@@ -269,7 +269,7 @@ class VerifierTest {
         }
         val v = Verifier(slow, null).verify("查电量", CRITERIA, "电量 86%\n依据: 「86%」", evidence())
         assertEquals(Verdict.CannotVerify, v.verdict)
-        assertTrue(v.reason, "超时" in v.reason)
+        assertTrue(v.reason, "timed out" in v.reason)
     }
 
     @Test fun definitiveNoneOnScreenPassesGrounding() = runTest {

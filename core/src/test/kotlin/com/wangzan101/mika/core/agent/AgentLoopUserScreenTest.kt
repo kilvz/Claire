@@ -58,7 +58,7 @@ class AgentLoopUserScreenTest {
         assertTrue(body.contains("Screen id: s1"))
         assertTrue(body.contains("(300,200) 周六那个聚会你还去吗"))
         assertTrue(body.contains("<untrusted>"))
-        assertTrue("没有附言时带上按屏幕猜意图的规矩", body.contains("without words"))
+        assertTrue("includes the rule to infer intent from the screen when there are no words", body.contains("without words"))
     }
 
     @Test fun screenWithWordsHasNoExtraRuleAndNoImageWhenMainModelIsBlind() = runBlocking {

@@ -48,6 +48,6 @@ class ReplayerScreenMapTest {
         assertTrue(d.executed) // this step really did run
         assertNotNull(d.screenMap)
         assertTrue(d.screenMap!!.contains("设置"))
-        assertTrue(d.screenMap!!.contains("从这屏可走")) // the hand-back text names which screen it landed on + what is reachable from here
+        assertTrue(d.screenMap!!.contains("Reachable from here")) // the hand-back text names which screen it landed on + what is reachable from here
     }
 }

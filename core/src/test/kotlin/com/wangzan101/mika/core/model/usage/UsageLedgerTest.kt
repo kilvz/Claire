@@ -71,14 +71,14 @@ class UsageLedgerTest {
         l.record(main, Usage(100, 20, cachedInputTokens = 60))
         l.record(light.copy(model = "m2"), Usage(50, 5))
         l.record(other, Usage(999, 999))
-        assertEquals("同一家跨模型、跨用途相加，缓存输入不重复计", 175L, l.providerTokensToday("p1"))
+        assertEquals("same provider across models and purposes adds up, cached input is not double counted", 175L, l.providerTokensToday("p1"))
         assertEquals(1_998L, l.providerTokensToday("p2"))
         assertEquals(0L, l.providerTokensToday("missing"))
 
         clock = Instant.parse("2026-11-09T23:59:59Z").toEpochMilli()
         assertEquals(175L, l.providerTokensToday("p1"))
         clock = Instant.parse("2026-11-10T00:00:00Z").toEpochMilli()
-        assertEquals("本地日期变更后重新计数", 0L, l.providerTokensToday("p1"))
+        assertEquals("recounts after the local date changes", 0L, l.providerTokensToday("p1"))
         l.record(light, Usage(7, 3))
         assertEquals(10L, l.providerTokensToday("p1"))
     }
@@ -91,10 +91,10 @@ class UsageLedgerTest {
         l.record(main, Usage(100, 20))
         l.record(main.copy(purpose = UsagePurpose.Proactive), Usage(40, 2))
         l.record(other.copy(purpose = UsagePurpose.Proactive), Usage(7, 1))
-        assertEquals("主动能力不占服务商的每日预算", 120L, l.providerTokensToday("p1"))
+        assertEquals("proactive work does not use up the provider daily budget", 120L, l.providerTokensToday("p1"))
         assertEquals(0L, l.providerTokensToday("p2"))
-        assertEquals("各服务商合计", 50L, l.proactiveTokensToday())
-        assertEquals("统计里照样算进去", 170L, l.snapshot().rows.sumOf { it.counts.input + it.counts.output })
+        assertEquals("total across providers", 50L, l.proactiveTokensToday())
+        assertEquals("still counted in the totals", 170L, l.snapshot().rows.sumOf { it.counts.input + it.counts.output })
 
         // Counts restart after local midnight
         clock = Instant.parse("2026-11-10T16:00:00Z").toEpochMilli()
@@ -105,7 +105,7 @@ class UsageLedgerTest {
 
         l.flush()
         val reopened = UsageLedger(file, now = { clock }, zone = { zone })
-        assertEquals("用途写进文件、读回来还是主动能力", 10L, reopened.proactiveTokensToday())
+        assertEquals("purpose is written to the file and reads back as proactive work", 10L, reopened.proactiveTokensToday())
         assertEquals(0L, reopened.providerTokensToday("p1"))
     }
 
@@ -148,14 +148,14 @@ class UsageLedgerTest {
             val l = ledger()
             l.record(main, Usage(100, 10))
             clock = Instant.parse("2026-11-10T17:00:00Z").toEpochMilli()
-            assertEquals("上海已过午夜", 0L, l.providerTokensToday("p1"))
+            assertEquals("midnight has passed in Shanghai", 0L, l.providerTokensToday("p1"))
             TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
-            assertEquals("加尔各答还是 11 月 10 日,15:30Z 那笔算今天", 110L, l.providerTokensToday("p1"))
+            assertEquals("still November 10 in Kolkata, the 15:30Z entry counts as today", 110L, l.providerTokensToday("p1"))
             clock = Instant.parse("2026-11-10T18:25:00Z").toEpochMilli()
             l.record(main, Usage(1_000, 0))
             clock = Instant.parse("2026-11-10T18:40:00Z").toEpochMilli()
             l.record(main, Usage(5, 5))
-            assertEquals("这个整点按加尔各答的午夜 18:30Z 拆开", 10L, l.providerTokensToday("p1"))
+            assertEquals("this hour splits at Kolkata midnight, 18:30Z", 10L, l.providerTokensToday("p1"))
         } finally {
             TimeZone.setDefault(before)
         }
@@ -171,7 +171,7 @@ class UsageLedgerTest {
         val back = ledger()
         assertEquals(l.snapshot().rows.toSet(), back.snapshot().rows.toSet())
         assertEquals(l.snapshot().providerNames, back.snapshot().providerNames)
-        assertTrue("临时文件不留下", !File(file.parentFile, file.name + ".tmp").exists())
+        assertTrue("no temp file is left behind", !File(file.parentFile, file.name + ".tmp").exists())
     }
 
     @Test fun flushWritesInBackgroundAfterTheDelay() {
@@ -188,10 +188,10 @@ class UsageLedgerTest {
         clock += 49 * hour
         l.record(main, Usage(2, 2))
         l.flush()
-        assertEquals("写出时丢掉两天以前的", listOf(1049L), l.snapshot().rows.map { it.hour })
+        assertEquals("entries older than two days are dropped on write", listOf(1049L), l.snapshot().rows.map { it.hour })
         clock += 49 * hour
         val back = UsageLedger(file, now = { clock }, keepDays = 2)
-        assertTrue("读入时也丢", back.snapshot().rows.isEmpty())
+        assertTrue("also dropped on read", back.snapshot().rows.isEmpty())
     }
 
     @Test fun corruptFileStartsEmpty() {

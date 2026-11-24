@@ -23,7 +23,7 @@ class VerifierSourcesTest {
     @Test fun commandOutputGroundsTheAnswer() = runTest {
         val m = FakeModel(reply(pass))
         val v = Verifier(m, null).verify("data.csv 有几行", criteria, "共 1287 行\n依据: 「1287 data.csv」",
-            sandboxOnly(listOf("run_command「wc -l data.csv」退出码 0:\n1287 data.csv")))
+            sandboxOnly(listOf("run_command \"wc -l data.csv\" exit code 0:\n1287 data.csv")))
         assertEquals(Verdict.Pass, v.verdict)
         val body = (m.requests.single().single().parts.single() as Part.Text).text
         assertTrue(body, "\"kind\":\"output\"" in body && "run_command(wc -l data.csv)" in body)
@@ -32,7 +32,7 @@ class VerifierSourcesTest {
 
     @Test fun numberMissingFromTheOutputIsNotPass() = runTest {
         val v = Verifier(FakeModel(reply(pass)), null).verify("data.csv 有几行", criteria, "共 1300 行\n依据: 「1300 data.csv」",
-            sandboxOnly(listOf("run_command「wc -l data.csv」退出码 0:\n1287 data.csv")))
+            sandboxOnly(listOf("run_command \"wc -l data.csv\" exit code 0:\n1287 data.csv")))
         assertEquals(Verdict.CannotVerify, v.verdict)
         assertEquals(Verifier.NOT_IN_READS, v.reason)
     }

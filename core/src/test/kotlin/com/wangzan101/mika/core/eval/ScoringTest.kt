@@ -88,7 +88,7 @@ class ScoringTest {
         val guardByModel = Scoring.score(t, obs("failed", failReason = "模型连续返回空回复,已安全停止"))
         assertFalse(guardByModel.passed)
         assertEquals(FailureClass.model_error, guardByModel.failureClass)
-        val harness = Scoring.score(t, obs("failed", failReason = "评测器:探针执行失败"))
+        val harness = Scoring.score(t, obs("failed", failReason = Scoring.HARNESS_PREFIX + "探针执行失败"))
         assertFalse(harness.passed)
         assertEquals(FailureClass.harness, harness.failureClass)
     }
@@ -150,7 +150,7 @@ class ScoringTest {
         assertTrue(s.passed)
         assertEquals(listOf("com.other"), s.leftScope)
         val md = EvalReport.markdown("r", "m", listOf(s to obs("succeeded")), emptyList(), null)
-        assertTrue(md, "- t:com.other" in md)
+        assertTrue(md, "- t: com.other" in md)
     }
 
     // In a parallel eval, a failure caused by two tasks fighting over an app is its own class: neither a harness problem nor the Agent's fault

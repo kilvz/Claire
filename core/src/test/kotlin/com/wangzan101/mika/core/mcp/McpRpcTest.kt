@@ -133,7 +133,7 @@ class McpRpcTest {
         val body = """{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"mika_list_tasks","arguments":{},${modernMeta()}}}"""
         post(body, modernHeaders("tools/call", name = "mika_list_tasks")).let {
             assertEquals(200, it.status)
-            assertFalse("工具调用的结果不可缓存,不带缓存提示", "ttlMs" in it.json()["result"]!!.jsonObject)
+            assertFalse("tool call results are not cacheable and carry no cache hint", "ttlMs" in it.json()["result"]!!.jsonObject)
         }
         val encoded = "=?base64?" + Base64.getEncoder().encodeToString("mika_list_tasks".toByteArray()) + "?="
         assertEquals(200, post(body, modernHeaders("tools/call", name = encoded)).status)

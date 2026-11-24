@@ -21,23 +21,23 @@ class EvalReportMetricsTest {
 
     @Test fun summaryHasARunMetricsSectionWithPerTaskRows() {
         val md = EvalReport.markdown("r1", "m", listOf(pair("t-a", a), pair("t-b", b), pair("t-none", null)), emptyList(), null)
-        assertTrue(md, "## 运行小结" in md)
-        assertTrue(md, "按运行记录算(2 题)" in md)
-        assertTrue(md, "| 用时中位数(秒) | 20 |" in md)
-        assertTrue(md, "| 第一次反馈中位数(秒) | 3 |" in md)
-        assertTrue(md, "| 平均和模型来回 | 6 |" in md)
+        assertTrue(md, "## Run summary" in md)
+        assertTrue(md, "Computed from the run records (2 tasks)" in md)
+        assertTrue(md, "| Median time (s) | 20 |" in md)
+        assertTrue(md, "| Median first feedback (s) | 3 |" in md)
+        assertTrue(md, "| Average model round trips | 6 |" in md)
         // Of the 40 seconds: 20 on the model, 8 reading, 4 acting, the remaining 8
-        assertTrue(md, "| 模型思考占比 | 50.0% |" in md)
-        assertTrue(md, "| 读屏占比 | 20.0% |" in md)
-        assertTrue(md, "| 操作占比 | 10.0% |" in md)
-        assertTrue(md, "| 其他(等待、重试)占比 | 20.0% |" in md)
+        assertTrue(md, "| Model thinking share | 50.0% |" in md)
+        assertTrue(md, "| Screen reading share | 20.0% |" in md)
+        assertTrue(md, "| Action share | 10.0% |" in md)
+        assertTrue(md, "| Other (waiting, retrying) share | 20.0% |" in md)
         assertTrue(md, "| t-a | 10 | 2 | 4 | — | 5 | 2 | 1 | 2 | 3 / 2 | 1000 |" in md)
-        assertFalse(md, "| t-none |" in md.substringAfter("## 运行小结").substringBefore("## 按类计数"))
+        assertFalse(md, "| t-none |" in md.substringAfter("## Run summary").substringBefore("## Count by class"))
     }
 
     @Test fun noRecordsNoSection() {
         val md = EvalReport.markdown("r1", "m", listOf(pair("t", null)), emptyList(), null)
-        assertFalse(md, "## 运行小结" in md)
+        assertFalse(md, "## Run summary" in md)
     }
 
     @Test fun metricsJsonListsEachTaskWithItsMetrics() {

@@ -181,8 +181,8 @@ class ToolDispatcherInteractTest {
         t.interact("""{"action":"key","key":"Escape"}""")
         t.interact("""{"action":"select","ref":"@e2","snapshotId":"$sid","option":"上海"}""")
         val log = t.evidence().actions
-        assertTrue(log.toString(), log.any { "web_interact(key Escape) 生效" in it })
-        assertTrue(log.toString(), log.any { "web_interact(select 「上海」 选择文件) 生效" in it })
+        assertTrue(log.toString(), log.any { "web_interact(key Escape) applied" in it })
+        assertTrue(log.toString(), log.any { "web_interact(select 「上海」 选择文件) applied" in it })
     }
 
     // ---------- irreversible confirmation ----------

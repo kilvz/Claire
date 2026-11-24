@@ -269,7 +269,7 @@ class ContextCompressorTest {
         val c = ContextCompressor(TOOLS).compress(h, contextTokens = 1000)
         assertTrue(c.foldedSteps > 0)
         assertTrue(siteKnowledge in c.messages)
-        assertTrue("所在的往返被折叠了", nav.first() !in c.messages)
+        assertTrue("the enclosing turn was folded", nav.first() !in c.messages)
     }
 
     @Test fun pairingIntactAfterFold() {

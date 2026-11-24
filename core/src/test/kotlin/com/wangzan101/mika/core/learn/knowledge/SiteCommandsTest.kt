@@ -50,15 +50,15 @@ return rows.filter(r => r.title.includes(args.query)).slice(0, args.limit || 20)
 
     @Test fun badHeadersAreRejected() {
         fun errs(text: String, file: String = "scripts/list_items.js") = SiteCommandFile.parse(file, text).errors
-        assertTrue(errs(FIXTURE, "scripts/other.js").any { "必须与文件名" in it })
-        assertTrue(errs(FIXTURE.replace("returns: [{title, url}]\n", "")).any { "缺少 returns" in it })
-        assertTrue(errs(FIXTURE.replace("arg: limit integer", "arg: limit int")).any { "arg 写作" in it })
-        assertTrue(errs(FIXTURE.replace("name: list_items", "name: list_items\ncolor: red")).any { "不认得的键 color" in it })
-        assertTrue(errs(FIXTURE.replace("limit integer", "query integer")).any { "重复" in it })
-        assertTrue(errs("const x = 1;").any { "头部" in it })
-        assertTrue(errs(FIXTURE.substringBefore("*/") + "*/\n").any { "正文为空" in it })
+        assertTrue(errs(FIXTURE, "scripts/other.js").any { "must match the file name" in it })
+        assertTrue(errs(FIXTURE.replace("returns: [{title, url}]\n", "")).any { "missing returns" in it })
+        assertTrue(errs(FIXTURE.replace("arg: limit integer", "arg: limit int")).any { "each arg is written" in it })
+        assertTrue(errs(FIXTURE.replace("name: list_items", "name: list_items\ncolor: red")).any { "unknown header key color" in it })
+        assertTrue(errs(FIXTURE.replace("limit integer", "query integer")).any { "duplicate" in it })
+        assertTrue(errs("const x = 1;").any { "header" in it })
+        assertTrue(errs(FIXTURE.substringBefore("*/") + "*/\n").any { "script body is empty" in it })
         for (bad in listOf("\nawait import('x');", "\nawait import/**/('x');", "\nawait import\n('x');"))
-            assertTrue(bad, errs(FIXTURE + bad).any { "不能用 import" in it })
+            assertTrue(bad, errs(FIXTURE + bad).any { "may not use import" in it })
         assertTrue(errs(FIXTURE + "\n// import('x') 只是注释\nconst s = 'import';").isEmpty())
     }
 
@@ -105,11 +105,11 @@ return rows.filter(r => r.title.includes(args.query)).slice(0, args.limit || 20)
     }
 
     @Test fun scriptsFolderRules() {
-        assertError("没有站点命令头部", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/helper.js" to "module.exports = 1")
-        assertError("既列在", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/list_items.js" to FIXTURE,
+        assertError("has no site command header", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/helper.js" to "module.exports = 1")
+        assertError("is listed in", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/list_items.js" to FIXTURE,
             "knowledge/sites/shop.test/scripts/manifest.json" to """[{"file":"scripts/list_items.js","runnable":true}]""")
-        assertError("只能写在站点知识里", skillMd("buy"), "skills/buy/scripts/list_items.js" to FIXTURE)
-        assertError("scripts/list_items.js: 缺少 description", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/list_items.js" to FIXTURE.replace("description: 列出结果页上的条目\n", ""))
+        assertError("may only be written in site knowledge", skillMd("buy"), "skills/buy/scripts/list_items.js" to FIXTURE)
+        assertError("scripts/list_items.js: missing description", siteMd("shop.test"), "knowledge/sites/shop.test/scripts/list_items.js" to FIXTURE.replace("description: 列出结果页上的条目\n", ""))
         // Sandbox scripts are as before: a .js listed in a manifest is not treated as a site command
         assertEquals(emptyList<String>(), errors(siteMd("shop.test"), "knowledge/sites/shop.test/scripts/tool.js" to "console.log(1)",
             "knowledge/sites/shop.test/scripts/manifest.json" to """[{"file":"scripts/tool.js","runnable":true}]"""))

@@ -111,7 +111,7 @@ class ToolDispatcherVisionTest {
         val d = dispatcher(s)
         val ref = d.locateWlan()
         d.execute(call("phone_list_elements"))
-        assertEquals("读屏不清空", "true", d.tapRef(ref).s("ok"))
+        assertEquals("screen reading is not cleared", "true", d.tapRef(ref).s("ok"))
         val again = d.locateWlan()
         d.execute(call("phone_back"))
         assertEquals("ref_expired", d.tapRef(again).s("error"))

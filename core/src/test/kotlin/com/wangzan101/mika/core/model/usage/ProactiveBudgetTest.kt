@@ -29,7 +29,7 @@ class ProactiveBudgetTest {
         ProactiveBudget.check(19_999, 20_000)
         try {
             ProactiveBudget.check(20_001, 20_000)
-            fail("用到上限应拒绝")
+            fail("reject once the limit is reached")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertEquals(20_000L, e.limit)
             assertEquals(20_001L, e.used)
@@ -43,7 +43,7 @@ class ProactiveBudgetTest {
         ProactiveBudget.check(0, 20_000, callsToday = 199)
         try {
             ProactiveBudget.check(0, 20_000, callsToday = 200)
-            fail("请求次数到上限应拒绝")
+            fail("reject once the request count hits the limit")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertTrue(e.byCalls)
             assertEquals(200L, e.limit)
@@ -52,11 +52,11 @@ class ProactiveBudgetTest {
     }
 
     @Test fun callLimitFollowsTheTokenLimitWithAFloor() {
-        assertEquals("下限", 200L, ProactiveBudget.callLimit(TokenBudgetLimits.MIN))
-        assertEquals("下限", 200L, ProactiveBudget.callLimit(50_000))
+        assertEquals("floor", 200L, ProactiveBudget.callLimit(TokenBudgetLimits.MIN))
+        assertEquals("floor", 200L, ProactiveBudget.callLimit(50_000))
         assertEquals(200L, ProactiveBudget.callLimit(50_249))
-        assertEquals("超过下限后按比例", 201L, ProactiveBudget.callLimit(50_250))
-        assertEquals("默认 20 万", 800L, ProactiveBudget.callLimit(ProactiveBudget.DEFAULT_DAILY_LIMIT))
+        assertEquals("scales proportionally above the floor", 201L, ProactiveBudget.callLimit(50_250))
+        assertEquals("default 200k", 800L, ProactiveBudget.callLimit(ProactiveBudget.DEFAULT_DAILY_LIMIT))
         assertEquals(8_000L, ProactiveBudget.callLimit(2_000_000))
         assertEquals(400_000L, ProactiveBudget.callLimit(TokenBudgetLimits.MAX))
         // At about 500 tokens per call, the token limit is reached first
@@ -67,7 +67,7 @@ class ProactiveBudgetTest {
         ProactiveBudget.check(0, 200_000, callsToday = 799)
         try {
             ProactiveBudget.check(0, 200_000, callsToday = 800)
-            fail("20 万 Token 时请求上限是 800 次")
+            fail("200k tokens means a request limit of 800")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertTrue(e.byCalls)
             assertEquals(800L, e.limit)

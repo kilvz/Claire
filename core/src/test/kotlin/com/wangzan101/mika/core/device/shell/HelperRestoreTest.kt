@@ -55,7 +55,7 @@ class HelperRestoreTest {
         val sender = RestoreWishSender<String> { s, w -> sent += s to w; true }
         val a = "helper-a"
         sender.update(null, yes)
-        assertTrue("没有助手就不交", sent.isEmpty())
+        assertTrue("no helper, nothing to hand over", sent.isEmpty())
         sender.update(a, yes)
         sender.update(a, yes)
         assertEquals(listOf(a to yes), sent)
@@ -80,14 +80,14 @@ class HelperRestoreTest {
         ok = true
         sender.update("h", yes)
         sender.update("h", yes)
-        assertEquals("失败的不算交过,下次再交;交到了就不重复", 2, calls)
+        assertEquals("failures do not count as handed over and are retried next time; a successful handover is not repeated", 2, calls)
     }
 
     @Test
     fun policyDoesNotRestoreForceStopButRecoversAfterManualLaunch() {
         val p = HelperRestorePolicy()
         assertEquals(HelperRestorePolicy.Decision.ForceStopped, p.decide(yes, appBack = false, now = 1_000, forceStopped = true))
-        assertTrue("强停不消耗异常恢复次数", p.report(1_000).empty)
+        assertTrue("a force stop does not consume exception-recovery attempts", p.report(1_000).empty)
         // Launching it manually makes the system clear the stopped flag; if it dies abnormally again later, normal restore still works
         assertEquals(HelperRestorePolicy.Decision.Restore, p.decide(yes, appBack = false, now = 2_000, forceStopped = false))
     }
@@ -97,7 +97,7 @@ class HelperRestoreTest {
         val p = HelperRestorePolicy()
         assertEquals(HelperRestorePolicy.Decision.NotWanted, p.decide(RestoreWish.NONE, appBack = false, now = 1_000))
         assertEquals(HelperRestorePolicy.Decision.AppBack, p.decide(yes, appBack = true, now = 1_000))
-        assertTrue("没拉过", p.report(1_000).empty)
+        assertTrue("never attempted", p.report(1_000).empty)
         assertEquals(HelperRestorePolicy.Decision.Restore, p.decide(yes, appBack = false, now = 2_000))
         assertEquals(HelperRestoreReport(2_000, 1, 0), p.report(2_000))
     }
@@ -149,8 +149,8 @@ class HelperRestoreTest {
         // Removed at startup and repaired afterwards: a removal is still recorded
         assertEquals(A11yLoss.Removed, A11yStartCheck.loss(removed, connectedSoon = true, expected = true))
         assertEquals(A11yLoss.Unbound, A11yStartCheck.loss(unbound, connectedSoon = false, expected = true))
-        assertNull("几秒内系统自己绑上了", A11yStartCheck.loss(unbound, connectedSoon = true, expected = true))
+        assertNull("the system bound it by itself within seconds", A11yStartCheck.loss(unbound, connectedSoon = true, expected = true))
         assertNull(A11yStartCheck.loss(fine, connectedSoon = true, expected = true))
-        assertNull("从没连上过(还没设置)不算", A11yStartCheck.loss(removed, connectedSoon = false, expected = false))
+        assertNull("never connected (not set up yet) does not count", A11yStartCheck.loss(removed, connectedSoon = false, expected = false))
     }
 }

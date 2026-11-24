@@ -37,7 +37,7 @@ class ScriptReadsTest {
         assertTrue("$script", script is ActionOutcome.Ran)
         assertNull(guards.stop)
         val reads = (script as ActionOutcome.Ran).after.filter { it.code == "read_loop" }
-        assertTrue("脚本里的重读要提醒", reads.isNotEmpty())
+        assertTrue("re-reads inside a script should be flagged", reads.isNotEmpty())
         // Repeated reads (read_loop, repeating_action) only warn
         assertTrue(script.verdicts.all { it.severity == com.wangzan101.mika.core.safety.guard.Severity.Warn })
 

@@ -209,7 +209,7 @@ class ChildRunsTest {
             when (spec.goal) {
                 "查甲" -> ChildResult(RunId("child-a"), ChildPhase.Completed, "x".repeat(750))
                 "查乙" -> ChildResult(RunId("child-b"), ChildPhase.Failed, "网页未加载")
-                else -> error("子任务存储不可用")
+                else -> error("child task store unavailable")
             }
         }
         val tools = toolDispatcher(FakeScreen(), runSpec = RunSpec(RunId("parent"), "goal", "thread"), childHost = host)
@@ -224,7 +224,7 @@ class ChildRunsTest {
         assertEquals("true", entries[0]["truncated"].toString())
         assertEquals("750", entries[0]["fullLength"].toString())
         assertEquals("child-b", entries[1].getValue("childRunId").jsonPrimitive.content)
-        assertTrue(entries[2].getValue("error").jsonPrimitive.content.contains("子任务存储不可用"))
+        assertTrue(entries[2].getValue("error").jsonPrimitive.content.contains("child task store unavailable"))
         assertTrue(result.content.getValue("result").jsonPrimitive.content.contains("网页未加载"))
     }
 }

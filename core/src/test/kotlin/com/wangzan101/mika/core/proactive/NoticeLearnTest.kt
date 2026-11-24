@@ -47,7 +47,7 @@ class NoticeLearnTest {
         val m = Fake { """{"signals":[{"ids":["n1","n2"],"topic":"t1"},{"ids":["n3"],"new":{"kind":"interest","label":"Hiking"}}]}""" }
         val r = NoticeLearn(m, "English").learn("com.shop", events(3), existing) as LearnResult.Learned
         assertEquals(1, m.calls.size)
-        assertTrue("归纳的请求不带任何工具", m.calls.single().third.isEmpty())
+        assertTrue("the summarization request carries no tools", m.calls.single().third.isEmpty())
         assertEquals(Prompts.role("notice_learn"), m.calls.single().first)
         assertEquals(
             listOf(LearnSignal(listOf(0, 1), topicId = "k7"), LearnSignal(listOf(2), newKind = TopicKind.Interest, newLabel = "Hiking")),
@@ -78,7 +78,7 @@ class NoticeLearnTest {
         assertEquals(3, Regex(Regex.escape(Untrusted.OPEN)).findAll(input).count())
         assertEquals(3, Regex(Regex.escape(Untrusted.CLOSE)).findAll(input).count())
         val outside = input.replace(Regex("<untrusted>\\n[\\s\\S]*?\\n</untrusted>"), "")
-        for (marker in listOf("IGNORE", "T-", "X-", "L-")) assertFalse("「$marker」在 untrusted 之外: $outside", outside.contains(marker))
+        for (marker in listOf("IGNORE", "T-", "X-", "L-")) assertFalse("\"$marker\" outside untrusted: $outside", outside.contains(marker))
         assertFalse(outside.contains("[n2]"))
         // the user action is written by us, outside the untrusted block
         assertTrue(outside.contains("[n1] user action: dismissed"))
@@ -449,7 +449,7 @@ class NoticeLearnTest {
         job.cancel()
         runCurrent()
         assertTrue(job.isCancelled)
-        assertNull("没有记成失败", result)
+        assertNull("not recorded as a failure", result)
     }
 
     // when searching for the value at the end, a reply with too many `{` is not read, and does not hang either

@@ -106,12 +106,12 @@ class HttpSupportStreamTerminalTest {
             val textSeen = CountDownLatch(1)
             val pending = async(start = CoroutineStart.UNDISPATCHED) { model.completeStreaming("s", user, emptyList()) { textSeen.countDown() } }
             server.awaitRequest()
-            assertTrue("非终态事件没有交付", textSeen.await(3, TimeUnit.SECONDS))
-            assertTrue("非终态事件不能让挂住的连接提前完成", pending.isActive)
+            assertTrue("non-terminal events were not delivered", textSeen.await(3, TimeUnit.SECONDS))
+            assertTrue("non-terminal events must not complete a hanging connection early", pending.isActive)
             server.endResponse()
             try {
                 withTimeout(3_000) { pending.await() }
-                fail("没有终态的 EOF 应报截断")
+                fail("EOF without a terminal event should report truncation")
             } catch (_: ModelError.StreamCut) {
                 // The existing truncation semantics are unchanged
             }
@@ -131,14 +131,14 @@ class HttpSupportStreamTerminalTest {
         val baseUrl = "http://${listener.inetAddress.hostAddress}:${listener.localPort}"
 
         fun awaitRequest() {
-            assertTrue("客户端没有发来请求", requestRead.await(3, TimeUnit.SECONDS))
+            assertTrue("the client sent no request", requestRead.await(3, TimeUnit.SECONDS))
         }
 
         fun awaitClientClosed() {
             try {
                 task.get(3, TimeUnit.SECONDS)
             } catch (e: Exception) {
-                throw AssertionError("客户端没有在协议终态后及时关闭连接", e)
+                throw AssertionError("the client did not close the connection promptly after the protocol terminal state", e)
             }
         }
 
@@ -195,7 +195,7 @@ class HttpSupportStreamTerminalTest {
             val bytes = ByteArrayOutputStream()
             while (true) {
                 val next = input.read()
-                if (next == -1) throw EOFException("请求头不完整")
+                if (next == -1) throw EOFException("incomplete request headers")
                 if (next == '\n'.code) return String(bytes.toByteArray(), Charsets.ISO_8859_1).removeSuffix("\r")
                 bytes.write(next)
             }

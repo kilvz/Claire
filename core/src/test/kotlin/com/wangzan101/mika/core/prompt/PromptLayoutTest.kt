@@ -78,7 +78,7 @@ class PromptLayoutTest {
             "app_knowledge" to "in the language of the \"goal\"",
             "memory_extract" to "in the language the user spoke in",
         ).forEach { (role, phrase) ->
-            assertTrue("$role 没有写明用用户的语言", Prompts.role(role).contains(phrase))
+            assertTrue("$role does not state that the user's language must be used", Prompts.role(role).contains(phrase))
         }
     }
 

@@ -104,7 +104,7 @@ class TeachDraftTest {
         assertNotNull(skill)
         assertTrue(skill!!.skill.markdown.contains("The star is the third icon in the bottom bar"))
         assertFalse(skill.skill.markdown.contains("这份由本机按示范路线整理"))
-        assertTrue("保留的模型稿要标成模型写的", skill.byModel)
+        assertTrue("a kept model draft must be marked as written by the model", skill.byModel)
     }
 
     /** When the model draft is malformed it still falls back to local assembly rather than losing the whole demonstration. */
@@ -112,7 +112,7 @@ class TeachDraftTest {
         val skill = drafted("Just a sentence, no sections at all.")
         assertNotNull(skill)
         assertTrue(skill!!.skill.markdown.contains("This draft was assembled locally from the demonstrated route"))
-        assertFalse("本机整理的稿不能被标成模型写的", skill.byModel)
+        assertFalse("a draft assembled on the device must not be marked as written by the model", skill.byModel)
     }
 
     /** If the model claims a "trial run succeeded", its draft is not accepted: the appended source note cannot whitewash that claim. */    @Test fun modelClaimingATrialRunFallsBackToTheLocalAssembly() = runBlocking {
@@ -138,7 +138,7 @@ class TeachDraftTest {
         """.trimIndent()
         val skill = drafted(reply)
         assertNotNull(skill)
-        assertFalse("声称试跑成功的模型稿不能收", skill!!.skill.markdown.contains("已经试跑成功"))
+        assertFalse("a model draft that claims a successful trial must be rejected", skill!!.skill.markdown.contains("已经试跑成功"))
         assertTrue(skill.skill.markdown.contains("This draft was assembled locally from the demonstrated route"))
     }
 

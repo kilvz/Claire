@@ -127,7 +127,7 @@ class EvalClassesTest {
         // Unknown capabilities and mistyped preconditions fail validation
         assertTrue(EvalTasks.validate(alarmTask.copy(apps = listOf("{app:toaster}"))).any { "toaster" in it })
         assertTrue(EvalTasks.validate(alarmTask.copy(requires = listOf("app:toaster"))).any { "toaster" in it })
-        assertTrue(EvalTasks.validate(alarmTask.copy(requires = listOf("logged:com.x"))).any { "前置条件" in it })
+        assertTrue(EvalTasks.validate(alarmTask.copy(requires = listOf("logged:com.x"))).any { "precondition" in it })
         assertEquals(emptyList<String>(), EvalTasks.validate(alarmTask.copy(requires = listOf("signedIn:zhihu.com", "signedIn:com.x"))))
     }
 

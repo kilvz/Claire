@@ -66,7 +66,7 @@ class ElementFusionTest {
         assertEquals("关闭对话框", close.name)
         assertTrue(close.focused)
         assertEquals("回到 首页", home.name)
-        assertFalse("AX 说禁用", submit.clickable)
+        assertFalse("AX says disabled", submit.clickable)
         // The position still comes from the page script
         assertEquals(p[0].centerX, close.centerX); assertEquals(p[0].bounds, close.bounds)
         assertEquals(Origin.BOTH, r.origins["@e1"])
@@ -74,10 +74,10 @@ class ElementFusionTest {
     }
 
     @Test fun fieldsKeepThePageNameThatCarriesTheValue() {
-        val p = page(el("textbox", "邮箱：a@b.c", 10, 10, e = 1), el("textbox", "已填 6 位", 10, 60, e = 1), el("textbox", "", 10, 110, e = 1))
+        val p = page(el("textbox", "邮箱：a@b.c", 10, 10, e = 1), el("textbox", "filled 6 chars", 10, 60, e = 1), el("textbox", "", 10, 110, e = 1))
         val a = listOf(root(), ax("1", 1, "textbox", "邮箱"), ax("2", 2, "textbox", "密码"), ax("3", 3, "searchbox", "搜索站内"))
         val r = ElementFusion.fuse(input(p, listOf(1, 2, 3), a))
-        assertEquals(listOf("邮箱：a@b.c", "已填 6 位", "搜索站内"), r.elements.map { it.name })
+        assertEquals(listOf("邮箱：a@b.c", "filled 6 chars", "搜索站内"), r.elements.map { it.name })
         assertEquals(listOf("textbox", "textbox", "textbox"), r.elements.map { it.role })
         assertTrue(r.elements.all { it.editable })
     }
@@ -104,7 +104,7 @@ class ElementFusionTest {
             el("button", "设置", 10, 110, c = 1),
             el("text", "第一章", 10, 160),
             el("image", "头像", 10, 210),
-            el("frame", "内嵌页面:x.test", 10, 260),
+            el("frame", "embedded page: x.test", 10, 260),
         )
         val a = listOf(
             root(),
@@ -117,12 +117,12 @@ class ElementFusionTest {
         )
         val r = ElementFusion.fuse(input(p, listOf(1, 2, 3, 4, 5, 6), a))
         assertEquals(listOf("button", "file", "menuitem", "heading", "link", "frame"), r.elements.map { it.role })
-        assertTrue("变成链接就可点", r.elements[4].clickable)
-        assertEquals("内嵌页面:x.test", r.elements[5].name)
+        assertTrue("clickable once turned into a link", r.elements[4].clickable)
+        assertEquals("embedded page: x.test", r.elements[5].name)
     }
 
     @Test fun crossOriginFrameElementsAreAddedAfterThePlaceholder() {
-        val p = page(el("text", "上面", 10, 10), el("frame", "内嵌页面:pay.test", 20, 100, 300, 80), el("text", "下面", 10, 200))
+        val p = page(el("text", "上面", 10, 10), el("frame", "embedded page: pay.test", 20, 100, 300, 80), el("text", "下面", 10, 200))
         val a = listOf(
             root(), ax("t1", 1, "StaticText", "上面"), ax("f", 2, "Iframe"), ax("t2", 3, "StaticText", "下面"),
             root(XF, "xroot"),
@@ -140,21 +140,21 @@ class ElementFusionTest {
         assertEquals(1, c.single().placeholder)
         assertEquals(2, c.single().ownerId)
         val r = ElementFusion.fuse(inp)
-        assertEquals(listOf("上面", "内嵌页面:pay.test", "CrossChild", "下面"), r.elements.map { it.name })
+        assertEquals(listOf("上面", "embedded page: pay.test", "CrossChild", "下面"), r.elements.map { it.name })
         assertEquals((1..4).map { "@e$it" }, r.elements.map { it.ref })
         val b = r.elements[2]
         assertEquals("button", b.role)
         assertTrue(b.clickable)
         near(180, b.centerX); near(260, b.centerY)
         assertEquals(Origin.AX, r.origins["@e3"])
-        assertNull("页面脚本的表里没有它", r.pageRefs["@e3"])
+        assertNull("not in the page script's table", r.pageRefs["@e3"])
         assertEquals("@e3", r.pageRefs["@e4"])
         assertEquals(79, r.backendIds["@e3"])
         assertEquals(mapOf("@e3" to 2), r.frameOwners)
     }
 
     @Test fun crossOriginBoxesAreClippedToThePlaceholder() {
-        val p = page(el("frame", "内嵌页面:x.test", 0, 100, 200, 100))
+        val p = page(el("frame", "embedded page: x.test", 0, 100, 200, 100))
         val a = listOf(
             root(), ax("f", 2, "Iframe"), root(XF, "xr"),
             ax("half", 10, "link", "半截", parent = "xr", frame = XF),
@@ -166,14 +166,14 @@ class ElementFusionTest {
                 boxes = mapOf(10 to Box(150.0, 180.0, 250.0, 220.0), 11 to Box(0.0, 300.0, 50.0, 320.0)),
             ),
         )
-        assertEquals(listOf("内嵌页面:x.test", "半截"), r.elements.map { it.name })
+        assertEquals(listOf("embedded page: x.test", "半截"), r.elements.map { it.name })
         val half = r.elements[1]
         // Visible part in CSS pixels (150..200, 180..200) → viewport (300..400, 360..400)
         near(350, half.centerX); near(380, half.centerY)
     }
 
     @Test fun crossOriginElementCoveredInsideTheFrameIsDropped() {
-        val p = page(el("frame", "内嵌页面:x.test", 0, 100, 200, 100))
+        val p = page(el("frame", "embedded page: x.test", 0, 100, 200, 100))
         val a = listOf(root(), ax("f", 2, "Iframe"), root(XF, "xr"), ax("b", 10, "button", "付款", parent = "xr", frame = XF))
         val r = ElementFusion.fuse(
             input(p, listOf(2), a, owners = mapOf(2 to XF), frames = listOf(Frame(MAIN, null), Frame(XF, MAIN)),
@@ -183,7 +183,7 @@ class ElementFusionTest {
     }
 
     @Test fun framesNestedInsideACrossOriginFrameCount() {
-        val p = page(el("frame", "内嵌页面:x.test", 0, 100, 200, 200))
+        val p = page(el("frame", "embedded page: x.test", 0, 100, 200, 200))
         val a = listOf(root(), ax("f", 2, "Iframe"), root(XF, "xr"), root(XF2, "yr"), ax("b", 20, "checkbox", "同意", parent = "yr", frame = XF2))
         val r = ElementFusion.fuse(
             input(p, listOf(2), a, owners = mapOf(2 to XF), frames = listOf(Frame(MAIN, null), Frame(XF, MAIN), Frame(XF2, XF)),
@@ -223,7 +223,7 @@ class ElementFusionTest {
     }
 
     @Test fun nestedSameNameAxOnlyNodesListedOnce() {
-        val p = page(el("frame", "内嵌页面:x.test", 0, 0, 300, 300))
+        val p = page(el("frame", "embedded page: x.test", 0, 0, 300, 300))
         val a = listOf(
             root(), ax("f", 2, "Iframe"), root(XF, "xr"),
             ax("link", 30, "link", "继续", parent = "xr", frame = XF),
@@ -263,13 +263,13 @@ class ElementFusionTest {
 
     @Test fun budgetKeepsCrossOriginButtonsOverText() {
         val texts = (0 until 5).map { el("text", "文$it", 10, 300 + it * 30) }
-        val p = page(el("frame", "内嵌页面:x.test", 0, 0, 300, 200), *texts.toTypedArray())
+        val p = page(el("frame", "embedded page: x.test", 0, 0, 300, 200), *texts.toTypedArray())
         val a = listOf(root(), ax("f", 2, "Iframe"), root(XF, "xr"), ax("b", 10, "button", "支付", parent = "xr", frame = XF))
         val r = ElementFusion.fuse(
             input(p, listOf(2) + List(5) { null }, a, owners = mapOf(2 to XF), frames = listOf(Frame(MAIN, null), Frame(XF, MAIN)),
                 boxes = mapOf(10 to Box(10.0, 10.0, 60.0, 40.0)), budget = 4),
         )
-        assertEquals(listOf("内嵌页面:x.test", "支付", "文0", "文1"), r.elements.map { it.name })
+        assertEquals(listOf("embedded page: x.test", "支付", "文0", "文1"), r.elements.map { it.name })
         assertEquals(3, r.omitted)
     }
 

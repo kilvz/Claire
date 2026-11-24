@@ -14,7 +14,7 @@ class ScreenMapRenderTest {
     }
 
     @Test fun renderPositionShowsCurrentScreen() {
-        assertEquals("你现在在「主页、设置」屏", ScreenMapRender.renderPosition(graph(), "A"))
+        assertEquals("You are now on the \"主页、设置\" screen", ScreenMapRender.renderPosition(graph(), "A"))
     }
 
     @Test fun renderPositionUnknownIsEmpty() {
@@ -24,11 +24,11 @@ class ScreenMapRenderTest {
 
     @Test fun renderMapListsScreensAndOutgoingEdges() {
         val s = ScreenMapRender.renderMap(graph(), "A")
-        assertTrue(s.contains("屏（2）"))
+        assertTrue(s.contains("Screens (2)"))
         assertTrue(s.contains("主页、设置"))
         assertTrue(s.contains("关于本机"))
-        assertTrue(s.contains("现在在「主页、设置」屏"))
-        assertTrue(s.contains("点「设置」→ 关于本机"))
+        assertTrue(s.contains("Currently on the \"主页、设置\" screen"))
+        assertTrue(s.contains("Tap \"设置\" → 关于本机"))
     }
 
     @Test fun renderMapTruncatesToMaxChars() {
@@ -42,7 +42,7 @@ class ScreenMapRenderTest {
         }
         val g = ScreenGraph("x", nodes)
         val s = ScreenMapRender.renderMap(g, "s1", maxScreens = 12)
-        assertTrue(s.contains("屏（15）")) // The total still reports 15
+        assertTrue(s.contains("Screens (15)")) // The total still reports 15
         assertFalse(s.contains("页15")) // But the list is cut to 12, so the 15th is not there
     }
 
@@ -52,14 +52,14 @@ class ScreenMapRenderTest {
 
     @Test fun renderMapForRecognizesCurrentScreen() {
         val s = ScreenMapRender.renderMapFor(graph(), setOf("主页", "设置"))
-        assertTrue(s!!.contains("现在在「主页、设置」屏"))
-        assertTrue(s.contains("点「设置」→ 关于本机"))
+        assertTrue(s!!.contains("Currently on the \"主页、设置\" screen"))
+        assertTrue(s.contains("Tap \"设置\" → 关于本机"))
     }
 
     @Test fun renderMapForUnrecognizedGivesListOnly() {
         val s = ScreenMapRender.renderMapFor(graph(), setOf("别的字"))
-        assertTrue(s!!.contains("屏（2）"))
-        assertFalse(s.contains("现在在"))
+        assertTrue(s!!.contains("Screens (2)"))
+        assertFalse(s.contains("Currently on"))
     }
 
     @Test fun renderMapForNullGraphIsNull() {

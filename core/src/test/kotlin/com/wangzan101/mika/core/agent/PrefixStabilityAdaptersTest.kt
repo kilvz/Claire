@@ -254,12 +254,12 @@ class PrefixStabilityAdaptersTest {
         val zone0 = bodies.map(api::zone0)
         val msgs = bodies.map(api::messages)
         val opened = (1 until bodies.size).filter { zone0[it] != zone0[it - 1] }
-        assertTrue("$label:区 0 变了 $opened 次", opened.size <= 2)
+        assertTrue("$label: zone 0 changed $opened times", opened.size <= 2)
         for (i in opened) {
             val (a, b) = api.tools(bodies[i - 1]) to api.tools(bodies[i])
             val same = a.zip(b).takeWhile { (x, y) -> x.first == y.first }.size
-            assertTrue("$label 第 ${i + 1} 次请求:展开时改了一组前面的工具 ${a.getOrNull(same)?.second}", same == a.size || a[same].second in entries)
-            assertTrue("$label 第 ${i + 1} 次请求:展开只加不减", b.size > a.size)
+            assertTrue("$label request ${i + 1}: expanding changed a group of earlier tools ${a.getOrNull(same)?.second}", same == a.size || a[same].second in entries)
+            assertTrue("$label request ${i + 1}: expanding only adds, never removes", b.size > a.size)
         }
         val changed = mutableListOf<Int>()
         for (i in 1 until bodies.size) {
@@ -269,12 +269,12 @@ class PrefixStabilityAdaptersTest {
             changed += i
             // The first rewrite is either the pruned entry itself or the summary (when compacting again, the summary is replaced with a new one)
             val (old, new) = firstDiff(a[same], b[same])
-            assertTrue("$label 第 ${i + 1} 次请求第 $same 条改写不是压缩:${new.take(300)}",
+            assertTrue("$label request ${i + 1} item $same rewrite is not a compaction:${new.take(300)}",
                 markers.any { it in new && it !in old } || ContextCompressor.HEADER in new)
         }
-        if (appendOnly) assertEquals("$label:没越过触发点却改写了前缀", emptyList<Int>(), changed)
+        if (appendOnly) assertEquals("$label: prefix was rewritten without passing the trigger point", emptyList<Int>(), changed)
         val rest = bodies.map { b -> JsonObject(b.filterKeys { it !in api.keys }) }.distinct()
-        assertEquals("$label:区 0 和消息以外的字段变了", 1, rest.size)
+        assertEquals("$label: fields other than block 0 and messages changed", 1, rest.size)
         val full = bodies.indices.map { zone0[it] + msgs[it].joinToString("") }
         val pairs = full.zipWithNext().withIndex().filter { (i, _) -> i + 1 !in opened }.map { it.value }
         val share = pairs.sumOf { (a, b) -> a.commonPrefixWith(b).length.toLong() }.toDouble() / pairs.sumOf { (_, b) -> b.length.toLong() }
@@ -286,7 +286,7 @@ class PrefixStabilityAdaptersTest {
         val prefix = api.replay ?: return
         val last = bodies.last().toString()
         val missing = (1..STEPS).filter { "\"$prefix$it\"" !in last }
-        assertEquals("$label:最后一次请求缺了这几步的回放", emptyList<Int>(), missing)
+        assertEquals("$label: the last request is missing replays of these steps", emptyList<Int>(), missing)
     }
 
     // Screen reads, large results (and images): nothing is rewritten across the 30 steps, and zone 0 is expanded only when the phone is first used and when the sandbox is first used
@@ -322,7 +322,7 @@ class PrefixStabilityAdaptersTest {
     // One each for the system prompt, the last tool, and the last user message; an Anthropic request allows at most 4, and more than that causes the whole request to be rejected (400)
     @Test fun anthropicCacheMarksStayWithinLimit() {
         for (body in run(anthropic, contextTokens = 80_000)) {
-            assertEquals("缓存标记个数", 3, CACHE_MARK.findAll(body.toString()).count())
+            assertEquals("number of cache markers", 3, CACHE_MARK.findAll(body.toString()).count())
         }
     }
 

@@ -30,14 +30,14 @@ class TeachSummaryTest {
             newId = { "d1" },
         )
         assertEquals(TeachSummary.Outcome.Abandoned, outcome)
-        assertFalse("丢弃以后不能再写出一份没人认领的草稿", stored)
+        assertFalse("after discarding, no unclaimed draft may be stored", stored)
     }
 
     @Test fun aFailToBuildIsReportedNotThrown() = runBlocking {
         val outcome = TeachSummary.run(
             current = { true },
-            build = { error("模型服务挂了") },
-            store = { _, _ -> error("不该写盘") },
+            build = { error("the model service is down") },
+            store = { _, _ -> error("should not write to disk") },
             newId = { "d1" },
         )
         assertEquals(TeachSummary.Outcome.Failed, outcome)
@@ -47,8 +47,8 @@ class TeachSummaryTest {
         var live = true
         val outcome = TeachSummary.run(
             current = { live },
-            build = { live = false; error("模型服务挂了") },
-            store = { _, _ -> error("不该写盘") },
+            build = { live = false; error("the model service is down") },
+            store = { _, _ -> error("should not write to disk") },
             newId = { "d1" },
         )
         assertEquals(TeachSummary.Outcome.Abandoned, outcome)
@@ -63,7 +63,7 @@ class TeachSummaryTest {
         )
         val drafted = outcome as TeachSummary.Outcome.Drafted
         assertEquals("d1", drafted.draftId)
-        assertFalse("本机整理的稿不能被标成模型写的", drafted.byModel)
+        assertFalse("a draft prepared locally must not be marked as written by the model", drafted.byModel)
     }
 
     @Test fun theStoreSeesTheWholeDraft() = runBlocking {

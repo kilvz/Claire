@@ -65,7 +65,7 @@ class LoopScenarioTest {
     )
 
     private fun snapshot(name: String, end: TaskState, vararg models: Pair<String, FakeChatModel>) {
-        models.forEach { (role, m) -> assertEquals("$role 的剧本没有用完", 0, m.remaining) }
+        models.forEach { (role, m) -> assertEquals("the script for $role was not fully used", 0, m.remaining) }
         LoopSnapshot.check(name, LoopSnapshot.render(end.toString(), models.toList()))
     }
 

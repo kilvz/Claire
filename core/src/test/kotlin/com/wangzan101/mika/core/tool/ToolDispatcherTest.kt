@@ -174,7 +174,7 @@ class ToolDispatcherTest {
         val e = d.evidence()
         assertTrue(e.actions.none { "hand_to_user" in it })
         assertEquals(1, e.takeovers.size)
-        assertTrue(e.takeovers.single(), "hand_to_user(payment) 接管被跳过" in e.takeovers.single())
+        assertTrue(e.takeovers.single(), "hand_to_user(payment) takeover skipped" in e.takeovers.single())
     }
 
     @Test fun argsTrimmed() = runTest {
@@ -332,7 +332,7 @@ class ToolDispatcherTest {
 
     @Test fun listAppsReturnsEachPackageOnceAndOmitsFalseFlags() = runTest {
         val c = toolDispatcher(FakeScreen()).execute(call("phone_list_apps")).content
-        assertNull("包名只在 apps 里出现,不再另带一份完整 packages 数组", c["packages"])
+        assertNull("the package name appears only in apps, with no separate full packages array", c["packages"])
         val app = c["apps"]!!.jsonArray.single().jsonObject
         assertEquals("com.x", app["package"]!!.jsonPrimitive.content)
         assertEquals("X", app["label"]!!.jsonPrimitive.content)
@@ -431,7 +431,7 @@ class ToolDispatcherTest {
         assertEquals(e.read(ObsKind.Read).distinct(), e.read(ObsKind.Read)) // An identical screen read is recorded only once
         assertNull(e.freshImage)
         // Password fields do not record the plain text
-        assertEquals(listOf("第5步 phone_tap(搜索) 生效", "第6步 phone_type_text(「天气」) 生效", "第7步 phone_type_text() 画面没变化", "第8步 phone_back() 画面没变化"), e.actions)
+        assertEquals(listOf("Step 5 phone_tap(搜索) applied", "Step 6 phone_type_text(「天气」) applied", "Step 7 phone_type_text() no visible change", "Step 8 phone_back() no visible change"), e.actions)
         assertNotNull(d.evidence(withImage = true).freshImage)
     }
 

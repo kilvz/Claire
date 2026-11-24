@@ -61,7 +61,7 @@ class ProactiveRetryBudgetTest {
                 assertTrue(e.byCalls)
             }
             assertEquals(1, server.requestCount)
-            assertEquals("发出去的那一个照实记账", cap, run.calls)
+            assertEquals("the one that was sent is accounted for truthfully", cap, run.calls)
             assertEquals(1, run.checks)
             assertEquals(1, run.retryChecks)
         } finally {

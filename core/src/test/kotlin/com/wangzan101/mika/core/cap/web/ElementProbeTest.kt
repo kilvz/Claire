@@ -24,7 +24,7 @@ class ElementProbeTest {
     private val page = PageTree.parse(
         """{"els":[{"r":"button","n":"","x":10,"y":10,"w":100,"h":40,"c":1},
             {"r":"text","n":"展开","x":10,"y":60,"w":100,"h":20},
-            {"r":"frame","n":"内嵌页面:x.test","x":0,"y":100,"w":300,"h":100}],
+            {"r":"frame","n":"embedded page: x.test","x":0,"y":100,"w":300,"h":100}],
             "vw":400,"vh":800,"dpr":2,"trunc":false,"mut":0}""",
         800, 1600, "w1-1", info,
     )
@@ -98,7 +98,7 @@ class ElementProbeTest {
         assertTrue("$out", out is ElementProbe.Outcome.Fused)
         val f = out as ElementProbe.Outcome.Fused
         val r = f.result
-        assertEquals(listOf("关闭", "展开", "内嵌页面:x.test", "CrossChild"), r.elements.map { it.name })
+        assertEquals(listOf("关闭", "展开", "embedded page: x.test", "CrossChild"), r.elements.map { it.name })
         assertEquals(listOf("button", "button", "frame", "button"), r.elements.map { it.role })
         val cross = r.elements[3]
         assertTrue(abs(cross.centerX - 140) <= 2 && abs(cross.centerY - 260) <= 2)
@@ -108,8 +108,8 @@ class ElementProbeTest {
         assertEquals(ElementProbe.Anchor(79, setOf(79, 80), 8), anchor)
         val conn = server.connections.single()
         val methods = conn.received.map { it.getValue("method").jsonPrimitive.content }
-        assertTrue("不取整棵 DOM", "DOM.getDocument" !in methods)
-        assertTrue("释放对象组", "Runtime.releaseObjectGroup" in methods)
+        assertTrue("does not fetch the whole DOM", "DOM.getDocument" !in methods)
+        assertTrue("releases the object group", "Runtime.releaseObjectGroup" in methods)
         // The hit-test point is the center of where the box intersects the visible part of the placeholder
         val hit = conn.received.first { it.getValue("method").jsonPrimitive.content == "DOM.getNodeForLocation" }.getValue("params").jsonObject
         assertEquals(70, hit.getValue("x").jsonPrimitive.int)

@@ -124,7 +124,7 @@ class AgentLoopLightTest {
         val end = loop(main, light).run("t")
         assertTrue("$end", end is TaskState.Failed && end.kind == FailKind.TokenLimit)
         assertEquals(1, light.requests.size)
-        assertEquals("不能用主模型继续消耗同一任务预算", 2, main.requests.size)
+        assertEquals("must not keep using the main model on the same task budget", 2, main.requests.size)
     }
 
     @Test fun otherModelsThinkingAndOpaqueAreNotSentAcross() = runTest {

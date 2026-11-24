@@ -16,14 +16,14 @@ class EvalReportTimingTest {
             pair("c", 10, 300, 100, 5_000, 1_000),
         )
         val md = EvalReport.markdown("r1", "m", scores, emptyList(), null, flags = "inlineScreen,replay")
-        assertTrue(md, "| 模型调用次数中位数 | 6 |" in md)
-        assertTrue(md, "| 模型调用次数 P90 | 10 |" in md)
-        assertTrue(md, "| 缓存命中率(cached/input) | 25.0% |" in md)
+        assertTrue(md, "| Median model calls | 6 |" in md)
+        assertTrue(md, "| Model calls P90 | 10 |" in md)
+        assertTrue(md, "| Cache hit rate (cached/input) | 25.0% |" in md)
         // 30 seconds in total: 15 for the model, 5 for tools
-        assertTrue(md, "| 模型等待占比 | 50.0% |" in md)
-        assertTrue(md, "| 工具执行占比 | 16.7% |" in md)
-        assertTrue(md, "| 回放命中 | 0 |" in md)
-        assertTrue(md, "| 回放交还 | 0 |" in md)
+        assertTrue(md, "| Model wait share | 50.0% |" in md)
+        assertTrue(md, "| Tool execution share | 16.7% |" in md)
+        assertTrue(md, "| Replay hits | 0 |" in md)
+        assertTrue(md, "| Replay hand-backs | 0 |" in md)
         assertTrue(md, "inlineScreen,replay" in md)
     }
 
@@ -31,8 +31,8 @@ class EvalReportTimingTest {
     @Test fun sharesSumToHundredWithOtherRow() {
         val scores = listOf(pair("a", 4, 400, 100, 5_000, 2_000), pair("b", 6, 300, 50, 5_000, 2_000), pair("c", 10, 300, 100, 5_000, 1_000))
         val md = EvalReport.markdown("r1", "m", scores, emptyList(), null)
-        assertTrue(md, "| 其他/等用户占比 | 33.3% |" in md)
-        assertTrue(md, "| 其中等界面占比 | (暂无数据) |" in md)
+        assertTrue(md, "| Other/waiting for the user share | 33.3% |" in md)
+        assertTrue(md, "| Of which waiting for the UI | (no data yet) |" in md)
     }
 
     // Replay eval: variants' replay hits, hand-backs and completions after a hand-back; the original tasks are listed separately and do not enter the metrics
@@ -41,10 +41,10 @@ class EvalReportTimingTest {
             Observed("succeeded", "", emptyList(), null, emptyMap(), emptyMap(), 2, 10_000, 0, 0, 0, null, replayHits = hits, replayHandBacks = backs)
         val scores = listOf(v("a~v1", true, 1, 0), v("a~v2", true, 0, 1), v("b~v1", false, 0, 1), v("b~v2", true, 0, 0))
         val md = EvalReport.markdown("r", "m", scores, emptyList(), null, originals = listOf(pair("a", 4, 1, 0, 1, 1)))
-        assertTrue(md, "| 回放命中率(走完路线的题) | 1/4(25.0%) |" in md)
-        assertTrue(md, "| 回放交还率(中途交还模型的题) | 2/4(50.0%) |" in md)
-        assertTrue(md, "| 交还后办成率 | 1/2(50.0%) |" in md)
-        assertTrue(md, "## 原题(记下路线用,不计入上面的指标)" in md)
-        assertTrue(md, "实跑 4 题" in md)
+        assertTrue(md, "| Replay hit rate (tasks that completed the route) | 1/4(25.0%) |" in md)
+        assertTrue(md, "| Replay hand-back rate (tasks handed back midway) | 2/4(50.0%) |" in md)
+        assertTrue(md, "| Success rate after hand-back | 1/2(50.0%) |" in md)
+        assertTrue(md, "## Original tasks (routes only, not counted in the metrics above)" in md)
+        assertTrue(md, "ran 4 tasks" in md)
     }
 }

@@ -79,13 +79,13 @@ class LoopPoliciesTest {
 
     @Test fun modelFailureReasons() {
         assertTrue("503" in StopRules.modelFailed(ModelError.Server(503)).reason)
-        assertEquals("模型调用异常:boom", StopRules.modelFailed(IllegalStateException("boom")).reason)
+        assertEquals("Model call failed: boom", StopRules.modelFailed(IllegalStateException("boom")).reason)
         val task = StopRules.modelFailed(ModelError.TaskBudgetExceeded(5, 5)) as TaskState.Failed
         assertEquals(FailKind.TokenLimit, task.kind)
         assertTrue(task.reason.contains("5"))
         val daily = StopRules.modelFailed(ModelError.DailyBudgetExceeded("服务商甲", 10_000, 10_000)) as TaskState.Failed
         assertEquals(FailKind.TokenLimit, daily.kind)
-        assertTrue(daily.reason.contains("服务商甲") && daily.reason.contains("本地日期"))
+        assertTrue(daily.reason.contains("服务商甲") && daily.reason.contains("local date"))
     }
 
     // ---- Stuck advice ----
@@ -181,7 +181,7 @@ class LoopPoliciesTest {
         // A task already under aggressive compaction overflows again: if the history has grown and can be shrunk further, send once more
         assertTrue(CompactionPolicy.overflow(s, retried = false) { true }.second)
         // This same overflow has already been retried: do not count it and do not send again
-        assertFalse(CompactionPolicy.overflow(s, retried = true) { error("不该再算") }.second)
+        assertFalse(CompactionPolicy.overflow(s, retried = true) { error("should not recompute") }.second)
     }
 
     // ---- Retries ----

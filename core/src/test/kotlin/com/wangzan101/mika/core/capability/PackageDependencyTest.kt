@@ -35,7 +35,7 @@ class PackageDependencyTest {
     private fun report(bad: List<Use>, root: File) = bad.joinToString("\n") { "${it.file.relativeTo(root)}:${it.line}: ${it.text}" }
 
     @Test fun sourcesAreFound() {
-        assertTrue("找不到源码目录(工作目录应为 core/)", core.isDirectory && File(core, "cap").isDirectory)
+        assertTrue("cannot find the source directory (the working directory should be core/)", core.isDirectory && File(core, "cap").isDirectory)
     }
 
     @Test fun coreDoesNotKnowCapabilities() {
@@ -43,12 +43,12 @@ class PackageDependencyTest {
             val rel = u.file.relativeTo(core).invariantSeparatorsPath
             !rel.startsWith("cap/") && !rel.startsWith("assembly/") && (u.target.startsWith("core.cap.") || u.target == "core.assembly")
         }
-        assertTrue("核心引用了能力或装配层:\n" + report(bad, core), bad.isEmpty())
+        assertTrue("core references the capability or assembly layer:\n" + report(bad, core), bad.isEmpty())
     }
 
     @Test fun toolEngineDoesNotKnowInterfaceState() {
         val bad = uses(core).filter { u -> u.file.relativeTo(core).invariantSeparatorsPath.startsWith("tool/") && u.target == "core.screen.uistate" }
-        assertTrue("工具引擎引用了界面状态:\n" + report(bad, core), bad.isEmpty())
+        assertTrue("the tool engine references UI state:\n" + report(bad, core), bad.isEmpty())
     }
 
     @Test fun capabilitiesDoNotKnowEachOther() {
@@ -56,7 +56,7 @@ class PackageDependencyTest {
             val own = capOf(core, u.file) ?: return@filter false
             u.target == "core.assembly" || (u.target.startsWith("core.cap.") && u.target != "core.cap.$own")
         }
-        assertTrue("能力之间互相引用,或引用了装配层:\n" + report(bad, core), bad.isEmpty())
+        assertTrue("capabilities reference each other, or reference the assembly layer:\n" + report(bad, core), bad.isEmpty())
     }
 
     @Test fun appCapabilitiesDoNotKnowEachOther() {
@@ -66,6 +66,6 @@ class PackageDependencyTest {
             val other = u.target.removePrefix("core.").removePrefix("cap.")
             u.target.contains("cap.") && other != own
         }
-        assertTrue("App 里的能力目录互相引用:\n" + report(bad, app), bad.isEmpty())
+        assertTrue("capability directories in the app reference each other:\n" + report(bad, app), bad.isEmpty())
     }
 }

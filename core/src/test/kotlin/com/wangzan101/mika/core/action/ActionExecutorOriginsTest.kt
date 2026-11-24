@@ -54,7 +54,7 @@ class ActionExecutorOriginsTest(private val label: String, private val action: I
         assertEquals("confirmation_required", out.code)
         assertEquals(action, out.hit?.action)
         assertEquals(label, out.hit?.matched)
-        assertTrue("没有执行", screen.taps.isEmpty())
+        assertTrue("not executed", screen.taps.isEmpty())
         val confirmations = events.filterIsInstance<RunEvent.Confirmation>().map { it.copy(atMs = 0) }
         assertEquals(listOf(RunEvent.Confirmation(0, action.name, label, null, null, "required")), confirmations)
         // An action that was not executed is not recorded as an execution result; for a single model step the refusal explanation is itself the result handed to the model, so one entry is recorded as usual

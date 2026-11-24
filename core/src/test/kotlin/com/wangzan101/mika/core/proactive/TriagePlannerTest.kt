@@ -40,7 +40,7 @@ class TriagePlannerTest {
         val full = young + ("b" to PendingApp(now - 1_000, 8))
         assertEquals(send("b"), TriagePlanner.decide(true, false, true, full, now))
         val old = mapOf("a" to PendingApp(now - 30_000, 1), "b" to PendingApp(now - 40_000, 1))
-        assertEquals("先到点的先发", send("b"), TriagePlanner.decide(true, false, true, old, now))
+        assertEquals("the one that has waited longest goes first", send("b"), TriagePlanner.decide(true, false, true, old, now))
     }
 
     // ---- state ----
@@ -87,7 +87,7 @@ class TriagePlannerTest {
         var at = t0
         repeat(12) { i ->
             judge(p, chat.copy(postedAtMs = at), surface, at)
-            assertEquals("第 ${i + 1} 次", surface, (p.mark(chat.copy(postedAtMs = at)) as TriageMark.Done).verdict)
+            assertEquals("run ${i + 1}", surface, (p.mark(chat.copy(postedAtMs = at)) as TriageMark.Done).verdict)
             at += TriagePlanner.SURFACE_COOLDOWN_MS + 1
         }
         // the other 9 conversations still have slots (this key took only 1), the 10th does not
@@ -155,10 +155,10 @@ class TriagePlannerTest {
         val later = t0 + 3_600_000
         assertEquals(1, p.retryFailed(later))
         p.sync(snap(r), later)
-        assertEquals("再试一次不用再等凑批", TriagePlan.Send("com.a"), p.plan(true, false, true, later))
+        assertEquals("a retry does not wait to batch again", TriagePlan.Send("com.a"), p.plan(true, false, true, later))
         p.begin("com.a")
         p.fail(t0)
-        assertTrue("再失败就又是失败,不会自己再发", p.mark(r) is TriageMark.Failed)
+        assertTrue("a second failure stays failed and is not resent on its own", p.mark(r) is TriageMark.Failed)
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Nothing), p.plan(true, false, true, later + day / 2))
     }
 
@@ -229,9 +229,9 @@ class TriagePlannerTest {
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Nothing), p.plan(true, false, true, t0))
         val v2 = v1.copy(postedAtMs = t0 + 20_000)
         p.sync(snap(v2), t0 + 20_000)
-        assertTrue("更新不马上待判定", p.pending().isEmpty())
+        assertTrue("an update does not become pending right away", p.pending().isEmpty())
         assertEquals(TriageCounts(cooling = 1), p.counts())
-        assertEquals("只等冷却到点", TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + 20_000))
+        assertEquals("only the cooldown has to elapse", TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + 20_000))
         assertEquals(TriagePlan.WaitUntil(t0 + min(2)), p.plan(true, false, true, t0 + min(2) - 1))
         // exactly at the deadline: pending, and batching resumes from the deadline as usual
         assertEquals(TriagePlan.WaitUntil(t0 + min(2) + W), p.plan(true, false, true, t0 + min(2)))
@@ -378,8 +378,8 @@ class TriagePlannerTest {
         failAt(q, k, t0)
         val k2 = k.copy(postedAtMs = t0 + 1)
         q.sync(snap(k2), t0 + 1)
-        assertTrue("停着期间的更新不待判定", q.pending().isEmpty())
-        assertEquals("界面上还是失败", TriageCounts(failed = 1), q.counts())
+        assertTrue("updates while held do not become pending", q.pending().isEmpty())
+        assertEquals("still shown as failed in the UI", TriageCounts(failed = 1), q.counts())
         assertTrue(q.marks()["k"] is TriageMark.Failed)
         assertEquals(TriagePlan.WaitUntil(t0 + min(2)), q.plan(true, false, true, t0 + 1))
         assertEquals(TriagePlan.Idle(TriagePlan.Why.Locked), q.plan(false, false, true, t0 + 1))
@@ -413,7 +413,7 @@ class TriagePlannerTest {
         failAt(p, r, at)
         r = r.copy(postedAtMs = r.postedAtMs + 1)
         p.sync(snap(r), at + 1)
-        assertEquals("又从 2 分钟起", TriagePlan.WaitUntil(at + min(2)), p.plan(true, false, true, at + 1))
+        assertEquals("starts again from 2 minutes", TriagePlan.WaitUntil(at + min(2)), p.plan(true, false, true, at + 1))
     }
 
     @Test fun manualRetryIgnoresTheHoldAndAFailureContinuesTheLadder() {
@@ -424,14 +424,14 @@ class TriagePlannerTest {
         p.sync(snap(k2), t0 + 1)
         assertEquals(1, p.retryFailed(t0 + 2))
         p.sync(snap(k2), t0 + 2)
-        assertEquals("马上发", TriagePlan.Send("com.a"), p.plan(true, false, true, t0 + 2))
+        assertEquals("send right away", TriagePlan.Send("com.a"), p.plan(true, false, true, t0 + 2))
         p.begin("com.a")
         p.fail(t0 + 2)
         p.sync(snap(k2), t0 + 2)
         assertEquals(TriageCounts(failed = 1), p.counts())
         val k3 = k.copy(postedAtMs = t0 + 3)
         p.sync(snap(k3), t0 + 3)
-        assertEquals("第二次失败:停 5 分钟", TriagePlan.WaitUntil(t0 + 2 + min(5)), p.plan(true, false, true, t0 + 3))
+        assertEquals("second failure: hold for 5 minutes", TriagePlan.WaitUntil(t0 + 2 + min(5)), p.plan(true, false, true, t0 + 3))
     }
 
     @Test fun removalForgetsTheFailureHold() {
@@ -445,10 +445,10 @@ class TriagePlannerTest {
         assertTrue(p.marks().isEmpty())
         val again = k.copy(postedAtMs = t0 + min(4))
         p.sync(snap(again), t0 + min(4))
-        assertEquals("新的一条:照常凑批", listOf(again), p.pending())
+        assertEquals("a new record: batches as usual", listOf(again), p.pending())
         failAt(p, again, t0 + min(5))
         p.sync(snap(again.copy(postedAtMs = t0 + min(5) + 1)), t0 + min(5) + 1)
-        assertEquals("失败次数从头算", TriagePlan.WaitUntil(t0 + min(7)), p.plan(true, false, true, t0 + min(5) + 1))
+        assertEquals("the failure count starts over", TriagePlan.WaitUntil(t0 + min(7)), p.plan(true, false, true, t0 + min(5) + 1))
     }
 
     @Test fun newKeyIsJudgedWhileAnotherKeyOfTheAppIsHeld() {
@@ -522,7 +522,7 @@ class TriagePlannerTest {
         val t = TriageTarget("p1", "Provider", "m1")
         val c = TriageConsent.of(t)
         assertTrue(c.covers(t))
-        assertTrue("改名不算换", c.covers(t.copy(providerName = "Renamed")))
+        assertTrue("a rename is not a switch", c.covers(t.copy(providerName = "Renamed")))
         assertFalse(c.covers(t.copy(model = "m2")))
         assertFalse(c.covers(t.copy(providerId = "p2")))
         assertFalse(c.covers(null))

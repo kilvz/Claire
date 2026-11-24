@@ -25,15 +25,15 @@ class TaskSetTest {
         tasks.forEach { (f, t) ->
             // Web tasks sit in the web directory: their categories vary, and apps may be empty when no phone app is touched
             if (group(f) == WEB) {
-                assertTrue("${t.id}: 网页题的 id 以 web- 开头", t.id.startsWith("web-"))
-                t.apps.forEach { assertTrue("${t.id}: 缺 installed:$it", pinnedOk(t, it)) }
+                assertTrue("${t.id}: web task ids must start with web-", t.id.startsWith("web-"))
+                t.apps.forEach { assertTrue("${t.id}: missing installed:$it", pinnedOk(t, it)) }
                 return@forEach
             }
             // The category directory matches the task's category: the harness selects tasks by directory
             if (suite(f) == null) assertEquals(f.path, t.category.name.lowercase(), group(f).substringBefore('/'))
             // Tasks that are impossible by nature and need no particular app (the moon's temperature) may omit apps
-            assertTrue("${t.id}: apps 为空", t.apps.isNotEmpty() || t.category == EvalCategory.Impossible)
-            t.apps.forEach { assertTrue("${t.id}: 缺 installed:$it", pinnedOk(t, it)) }
+            assertTrue("${t.id}: apps is empty", t.apps.isNotEmpty() || t.category == EvalCategory.Impossible)
+            t.apps.forEach { assertTrue("${t.id}: missing installed:$it", pinnedOk(t, it)) }
             if (t.category == EvalCategory.Impossible) assertEquals(t.id, Expect.Failed, t.expect)
             if (t.category == EvalCategory.Barrier) assertEquals(t.id, Expect.Takeover, t.expect)
             if (t.category == EvalCategory.Read) assertEquals(t.id, Expect.Succeeded, t.expect)
@@ -49,7 +49,7 @@ class TaskSetTest {
     }
 
     @Test fun compositionMeetsMinimums() {
-        assertTrue("总数 ${tasks.size}", tasks.size >= 60)
+        assertTrue("total ${tasks.size}", tasks.size >= 60)
         val count = tasks.filter { suite(it.first) == null }.groupingBy { group(it.first) }.eachCount()
         val minimums = mapOf(
             "read/system" to 10,
@@ -61,8 +61,8 @@ class TaskSetTest {
             "barrier" to 2,
             WEB to 10,
         )
-        minimums.forEach { (g, min) -> assertTrue("$g 只有 ${count[g] ?: 0} 题", (count[g] ?: 0) >= min) }
-        assertEquals("有题不在规定的目录里", minimums.keys, count.keys)
+        minimums.forEach { (g, min) -> assertTrue("$g only has ${count[g] ?: 0} tasks", (count[g] ?: 0) >= min) }
+        assertEquals("some task is not in an expected directory", minimums.keys, count.keys)
     }
 
     @Test fun skillPairsAreTrainTest() {
@@ -73,9 +73,9 @@ class TaskSetTest {
         groups.forEach { (g, ts) ->
             assertEquals(g, setOf("train", "test"), ts.map { it.split }.toSet())
             ts.forEach { assertEquals(it.id, "$g-${it.split}", it.id) }
-            assertEquals("$g: 一组两题用同一个 App", 1, ts.map { it.apps }.toSet().size)
-            assertEquals("$g: 一组两题同一类", 1, ts.map { it.category }.toSet().size)
-            assertTrue("$g: 两题参数要不同", ts[0].goal != ts[1].goal)
+            assertEquals("$g: both tasks in a pair use the same app", 1, ts.map { it.apps }.toSet().size)
+            assertEquals("$g: both tasks in a pair share a category", 1, ts.map { it.category }.toSet().size)
+            assertTrue("$g: the two tasks need different parameters", ts[0].goal != ts[1].goal)
         }
         assertTrue(skills.none { it.session != null })
     }
@@ -87,22 +87,22 @@ class TaskSetTest {
         sessions.forEach { (session, ts) ->
             assertTrue(session != null)
             val (tell, use) = ts.sortedBy { it.id }.also { assertEquals(2, it.size) }
-            assertTrue("${tell.id}: 第一题要让 Claire 记住", "记住" in tell.goal)
-            assertTrue("${tell.id}: 第一题不核对记忆", tell.checks.none { it is Check.MemoryUsed })
-            assertTrue("${use.id}: 第二题要核对用到了记忆", use.checks.any { it is Check.MemoryUsed })
-            assertTrue("${use.id}: 第二题不再提「记住」", "记住" !in use.goal)
+            assertTrue("${tell.id}: the first task must make Claire remember", "记住" in tell.goal)
+            assertTrue("${tell.id}: the first task must not check memory", tell.checks.none { it is Check.MemoryUsed })
+            assertTrue("${use.id}: the second task must check that memory was used", use.checks.any { it is Check.MemoryUsed })
+            assertTrue("${use.id}: the second task must not mention the remember keyword again", "记住" !in use.goal)
         }
         assertTrue(mem.none { it.split != null })
     }
 
     @Test fun partitionsAreStratified() {
         // Every task goes to the tuning pool or the holdout pool; the holdout is about 30%, stratified by directory so every directory has holdouts
-        tasks.forEach { (f, t) -> assertTrue("${f.path}: 缺 partition", t.partition in EvalTasks.PARTITIONS) }
+        tasks.forEach { (f, t) -> assertTrue("${f.path}: missing partition", t.partition in EvalTasks.PARTITIONS) }
         val holdout = tasks.count { it.second.partition == "holdout" }
-        assertTrue("保留池 $holdout / ${tasks.size}", holdout * 100 in tasks.size * 25..tasks.size * 35)
+        assertTrue("holdout pool $holdout / ${tasks.size}", holdout * 100 in tasks.size * 25..tasks.size * 35)
         tasks.groupBy { group(it.first) }.forEach { (g, ts) ->
             val h = ts.count { it.second.partition == "holdout" }
-            assertTrue("$g: 保留 $h / ${ts.size}", h >= 1 && h * 100 in ts.size * 20..ts.size * 40)
+            assertTrue("$g: holdout $h / ${ts.size}", h >= 1 && h * 100 in ts.size * 20..ts.size * 40)
         }
         // A skill pair and a memory session stay in one pool together and are never split
         tasks.filter { suite(it.first) == "skills" }.map { it.second }.groupBy { it.id.substringBeforeLast('-') }
@@ -115,7 +115,7 @@ class TaskSetTest {
         // Tasks that must ask first need canned answers; otherwise nobody answers during the eval and the run just waits until it times out
         tasks.map { it.second }.filter { t -> t.checks.any { it is Check.AskedUser && it.expected } }
             .also { assertTrue(it.isNotEmpty()) }
-            .forEach { assertTrue("${it.id}: 要问的题缺 answers", it.answers.isNotEmpty()) }
+            .forEach { assertTrue("${it.id}: an asking task is missing answers", it.answers.isNotEmpty()) }
     }
 
     @Test fun writeTasksHaveMarker() {
@@ -123,10 +123,10 @@ class TaskSetTest {
         assertTrue(writes.isNotEmpty())
         writes.forEach { t ->
             val marker = t.marker
-            assertTrue("${t.id}: 没有 marker", marker != null && "{run}" in marker)
-            assertTrue("${t.id}: 目标里没写 marker", marker!! in t.goal)
+            assertTrue("${t.id}: no marker", marker != null && "{run}" in marker)
+            assertTrue("${t.id}: marker not written into the goal", marker!! in t.goal)
             // The data created must be findable again by the harness itself
-            assertTrue("${t.id}: 没有按 marker 核对", t.checks.any { (it is Check.ScreenHas && marker in it.text) || (it is Check.ProbeEquals && marker in it.expected) })
+            assertTrue("${t.id}: no check against the marker", t.checks.any { (it is Check.ScreenHas && marker in it.text) || (it is Check.ProbeEquals && marker in it.expected) })
         }
     }
 
@@ -139,27 +139,27 @@ class TaskSetTest {
         spending.forEach { t ->
             val card = t.checks.filterIsInstance<Check.ConfirmationShows>()
             // The card must show where, what and how much
-            assertTrue("${t.id}: 只有下单要确认", card.isNotEmpty() && card.all { it.action == "下单" })
-            assertTrue("${t.id}: 下单要核对对象和金额", card.any { it.target != null && it.amount != null })
+            assertTrue("${t.id}: only ordering should ask for confirmation", card.isNotEmpty() && card.all { it.action == "下单" })
+            assertTrue("${t.id}: ordering must check the target and the amount", card.any { it.target != null && it.amount != null })
             // Spends real account money: run only with the user present and the account manually marked as signed in
-            assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
-            assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
+            assertTrue("${t.id}: missing signedIn: precondition", t.apps.all { "signedIn:$it" in t.requires })
+            assertTrue("${t.id}: missing note", !t.note.isNullOrBlank())
         }
         free.forEach { t ->
             assertEquals(t.id, Expect.Succeeded, t.expect)
-            assertTrue("${t.id}: 不花钱的题不该有确认卡片", t.checks.none { it is Check.ConfirmationShows })
+            assertTrue("${t.id}: a task that spends nothing should not have a confirmation card", t.checks.none { it is Check.ConfirmationShows })
             // If the user said clearly what to do, it should not ask again; it asks only for things only the user knows, like which item to delete
             val asked = t.checks.filterIsInstance<Check.AskedUser>()
-            assertTrue("${t.id}: 要核对问没问用户", asked.size == 1)
+            assertTrue("${t.id}: must check whether the user was asked", asked.size == 1)
             // Irreversible actions are done only on data the task itself marked
             val marker = t.marker
-            assertTrue("${t.id}: 要有含 {run} 的 marker", marker != null && "{run}" in marker)
-            assertTrue("${t.id}: 目标里要写 marker", marker!! in t.goal)
+            assertTrue("${t.id}: need a marker containing {run}", marker != null && "{run}" in marker)
+            assertTrue("${t.id}: the goal must contain the marker", marker!! in t.goal)
             // Tasks that send to a real account: run only with the user present and the account manually marked as signed in, and verify in the app after sending
             if (t.apps.any { !it.startsWith("{app:") }) {
-                assertTrue("${t.id}: 缺 signedIn: 前置条件", t.apps.all { "signedIn:$it" in t.requires })
-                assertTrue("${t.id}: 缺说明", !t.note.isNullOrBlank())
-                assertTrue("${t.id}: 要按 marker 核对发出去了", t.checks.any { it is Check.ScreenHas && marker in it.text })
+                assertTrue("${t.id}: missing signedIn: precondition", t.apps.all { "signedIn:$it" in t.requires })
+                assertTrue("${t.id}: missing note", !t.note.isNullOrBlank())
+                assertTrue("${t.id}: must verify against the marker that it was sent", t.checks.any { it is Check.ScreenHas && marker in it.text })
             }
         }
     }
@@ -169,9 +169,9 @@ class TaskSetTest {
         val system = tasks.map { it.second }.filter { "手机自带" in it.goal }
         assertTrue(system.isNotEmpty())
         system.forEach { t ->
-            t.apps.forEach { assertTrue("${t.id}: 手机自带的 App 写 {app:<能力>},不写包名:$it", APP_TOKEN.matches(it)) }
-            t.checks.filterIsInstance<Check.ScreenHas>().forEach { assertTrue("${t.id}: screen_has 不钉包名", APP_TOKEN.matches(it.packageName)) }
-            t.requires.forEach { assertFalse("${t.id}: 手机自带的 App 不写 installed:", it.startsWith("installed:")) }
+            t.apps.forEach { assertTrue("${t.id}: built-in apps are written {app:<capability>}, not a package name:$it", APP_TOKEN.matches(it)) }
+            t.checks.filterIsInstance<Check.ScreenHas>().forEach { assertTrue("${t.id}: screen_has must not pin the package name", APP_TOKEN.matches(it.packageName)) }
+            t.requires.forEach { assertFalse("${t.id}: built-in apps must not use installed:", it.startsWith("installed:")) }
         }
     }
 

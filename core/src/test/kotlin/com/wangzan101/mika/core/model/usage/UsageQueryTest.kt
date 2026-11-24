@@ -48,7 +48,7 @@ class UsageQueryTest {
         assertEquals(11, r.totals.tokens)
         assertEquals(10, r.series.first().tokens)
         assertEquals(1, r.series.last().tokens)
-        assertEquals("最后一根是此刻所在的小时,按本地时间", LocalDateTime.of(2026, 10, 27, 18, 0), r.series.last().start)
+        assertEquals("the last bucket is the hour containing now, in local time", LocalDateTime.of(2026, 10, 27, 18, 0), r.series.last().start)
     }
 
     @Test fun lastDaysCountTodayAndUseLocalDays() {
@@ -62,7 +62,7 @@ class UsageQueryTest {
         assertEquals(LocalDate.of(2026, 10, 27).atStartOfDay(), sh.series.last().start)
         assertEquals(5, sh.series.last().tokens)
         val u = UsageQuery.report(s, UsageRange.LastDays(7), now, utc, emptyMap())
-        assertEquals("同一笔在 UTC 是前一天", 5, u.series[5].tokens)
+        assertEquals("the same entry falls on the previous day in UTC", 5, u.series[5].tokens)
         assertEquals(0, u.series.last().tokens)
     }
 
@@ -96,7 +96,7 @@ class UsageQueryTest {
         assertEquals(25, end - start)
         val rows = (start - 1..end).map { row(it, input = 1) }.toTypedArray()
         val fall = UsageQuery.report(snap(*rows), UsageRange.LastDays(2), fallNow, newYork, emptyMap())
-        assertEquals("11-01 的 25 个小时都算在那天,下一天零点那一小时归下一天", listOf(25L, 1L), fall.series.map { it.tokens })
+        assertEquals("all 25 hours of 11-01 count toward that day, and the midnight hour belongs to the next day", listOf(25L, 1L), fall.series.map { it.tokens })
     }
 
     @Test fun customRangeIsInclusiveAndSwapsReversedEnds() {
@@ -131,7 +131,7 @@ class UsageQueryTest {
         assertEquals(0.3, r.providers[1].share, 1e-9)
 
         val p1 = r.provider("p1")!!
-        assertEquals("现在的名字优先", "甲", p1.name)
+        assertEquals("the current name wins", "甲", p1.name)
         assertFalse(p1.deleted)
         assertEquals(listOf("a", "b"), p1.models.map { it.model })
         assertEquals(500.0 / 600, p1.models[0].share, 1e-9)
@@ -142,7 +142,7 @@ class UsageQueryTest {
 
         val gone = r.provider("gone")!!
         assertTrue(gone.deleted)
-        assertEquals("已删除的用记账时的名字", "旧服务商", gone.name)
+        assertEquals("deleted providers use the name recorded when the usage was logged", "旧服务商", gone.name)
         assertEquals(0.0, gone.share, 0.0)
         assertEquals(2, gone.totals.callsWithoutUsage)
     }
@@ -172,10 +172,10 @@ class UsageQueryTest {
         assertEquals(3L, r.series[0].tokens)
         assertEquals(today.minusDays(83), r.series[0].lastDay)
         assertEquals(4L, r.series[1].tokens)
-        assertEquals("最后一格不满 7 天,截到今天", today, r.series.last().lastDay)
+        assertEquals("the last bucket is short of 7 days and is cut at today", today, r.series.last().lastDay)
         assertEquals(8L, r.series.last().tokens)
         assertEquals(15, r.totals.tokens)
-        assertEquals("45 天还按天", UsageStep.Day, UsageQuery.report(s, UsageRange.Custom(today.minusDays(44), today), now, utc, emptyMap()).step)
+        assertEquals("45 days still uses day steps", UsageStep.Day, UsageQuery.report(s, UsageRange.Custom(today.minusDays(44), today), now, utc, emptyMap()).step)
         assertEquals(UsageStep.Week, UsageQuery.report(s, UsageRange.Custom(today.minusDays(45), today), now, utc, emptyMap()).step)
         assertEquals(UsageStep.Day, UsageQuery.report(s, UsageRange.LastDays(30), now, utc, emptyMap()).step)
     }
@@ -192,7 +192,7 @@ class UsageQueryTest {
         assertEquals(listOf("a", "b", "gone1"), r.providers.map { it.id })
         assertEquals(mapOf("b" to 0, "a" to 1, "gone1" to 2), r.providers.associate { it.id to it.order })
         val wider = UsageQuery.report(s, UsageRange.LastDays(90), now, utc, live)
-        assertEquals("换范围不变色", 2, wider.provider("gone1")!!.order)
+        assertEquals("changing the range does not change colors", 2, wider.provider("gone1")!!.order)
         assertEquals(3, wider.provider("gone2")!!.order)
     }
 

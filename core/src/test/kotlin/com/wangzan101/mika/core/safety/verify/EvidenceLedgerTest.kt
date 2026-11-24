@@ -220,7 +220,7 @@ class EvidenceLedgerTest {
             reply(3, "read_file", """{"path":"out/a.txt"}"""), result(3, "read_file", """{"ok":true,"path":"/workspace/out/a.txt","content":"黄河 5464 公里"}"""),
         )
         val texts = RunFacts.ledger(events, RECORDED_TOOLS).all.joinToString("\n") { it.text }
-        assertFalse(texts, "6300" in texts.replace("退出码 0", "") || "5464" in texts)
+        assertFalse(texts, "6300" in texts.replace("exit code 0", "") || "5464" in texts)
         assertTrue(texts, "/workspace/out/a.txt" in texts)
     }
 

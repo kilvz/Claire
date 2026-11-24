@@ -30,8 +30,8 @@ object LoopSnapshot {
             file.writeText(actual)
             return
         }
-        if (!file.exists()) fail("没有金样 ${file.path};用 ./gradlew :core:test --tests '*LoopScenarioTest' -PupdateSnapshots 生成")
-        assertEquals("快照 $name 变了;确认是有意的改动后用 -PupdateSnapshots 重新生成", file.readText(), actual)
+        if (!file.exists()) fail("missing golden file ${file.path}; generate it with ./gradlew :core:test --tests '*LoopScenarioTest' -PupdateSnapshots")
+        assertEquals("snapshot $name changed; after confirming the change is intended, regenerate with -PupdateSnapshots", file.readText(), actual)
     }
 
     /** Snapshot of one scenario: the outcome, then the requests received by each model (main model, auxiliary roles). */

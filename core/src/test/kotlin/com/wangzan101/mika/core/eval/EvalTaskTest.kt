@@ -96,7 +96,7 @@ class EvalTaskTest {
         }
         assertTrue(EvalTasks.validate(t.copy(id = "ok-1-two")).isEmpty())
         val errs = EvalTasks.validateAll(listOf(t, t.copy(goal = "另一个"), t.copy(id = "other")))
-        assertTrue(errs.any { "重复" in it && t.id in it })
+        assertTrue(errs.any { "duplicate" in it && t.id in it })
         assertTrue(EvalTasks.validateAll(listOf(t, t.copy(id = "other"))).isEmpty())
     }
 

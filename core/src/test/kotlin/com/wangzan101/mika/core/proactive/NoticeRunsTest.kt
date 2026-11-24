@@ -26,9 +26,9 @@ class NoticeRunsTest {
             RunEvent.TaskEnded(500L, "succeeded", "有一条要紧的:$private"),
         )
         val before = recorded(events)
-        assertTrue("没处理之前回答在摘要里", before.conclusion.contains(private))
+        assertTrue("before processing, the answer is in the summary", before.conclusion.contains(private))
         val m = NoticeRuns.summary(before, events, noticeTurnInContext = false)
-        assertEquals("完成", m.conclusion)
+        assertEquals("succeeded", m.conclusion)
         assertFalse(everyWord(m).any { it.contains(private) })
         // everything else is kept as is: the goal is the user's own words, and the steps carry only tool names
         assertEquals(before.goal, m.goal)
@@ -43,7 +43,7 @@ class NoticeRunsTest {
             RunEvent.OutcomeJudged(500L, "done", "回答提到了$private"),
         )
         val m = NoticeRuns.summary(recorded(events), events, noticeTurnInContext = false)
-        assertEquals("办成", m.conclusion)
+        assertEquals("done", m.conclusion)
         assertFalse(everyWord(m).any { it.contains(private) })
     }
 
@@ -54,7 +54,7 @@ class NoticeRunsTest {
             RunEvent.TaskEnded(500L, "failed", "没找到「$private」那条"),
         )
         assertTrue(NoticeRuns.readNotices(events, noticeTurnInContext = true))
-        assertEquals("失败", NoticeRuns.summary(recorded(events), events, noticeTurnInContext = true).conclusion)
+        assertEquals("failed", NoticeRuns.summary(recorded(events), events, noticeTurnInContext = true).conclusion)
     }
 
     @Test fun carryingTheDigestBlockAloneDoesNotCount() {
@@ -66,7 +66,7 @@ class NoticeRunsTest {
         )
         assertFalse(NoticeRuns.readNotices(events, noticeTurnInContext = false))
         val before = recorded(events)
-        assertEquals("完成：已下单一杯美式", before.conclusion)
+        assertEquals("succeeded: 已下单一杯美式", before.conclusion)
         assertEquals(before, NoticeRuns.summary(before, events, noticeTurnInContext = false))
     }
 
@@ -76,15 +76,15 @@ class NoticeRunsTest {
             RunEvent.OutcomeJudged(500L, "partial", "只加了购物车"),
         )
         val before = recorded(events)
-        assertEquals("只办成一部分：只加了购物车", before.conclusion)
+        assertEquals("partially done: 只加了购物车", before.conclusion)
         assertEquals(before, NoticeRuns.summary(before, events, noticeTurnInContext = false))
     }
 
     @Test fun outcomeAloneCoversEveryEndingAndAnEmptyOne() {
         fun ended(outcome: String) = TaskMemoryRecorder.outcome(listOf(RunEvent.TaskEnded(1L, outcome, private)))
-        assertEquals(listOf("完成", "完成(未核实)", "失败", "已取消", "出错", ""),
+        assertEquals(listOf("succeeded", "succeeded (unverified)", "failed", "cancelled", "error", ""),
             listOf("succeeded", "unverified", "failed", "cancelled", "error", "something_else").map(::ended))
         assertEquals("", TaskMemoryRecorder.outcome(emptyList()))
-        assertEquals("没办成", TaskMemoryRecorder.outcome(listOf(RunEvent.OutcomeJudged(1L, "not_possible", private))))
+        assertEquals("not done", TaskMemoryRecorder.outcome(listOf(RunEvent.OutcomeJudged(1L, "not_possible", private))))
     }
 }

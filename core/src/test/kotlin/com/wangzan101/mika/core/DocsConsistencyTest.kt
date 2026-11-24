@@ -92,9 +92,9 @@ class DocsConsistencyTest {
 
     /** What these docs describe are things that only exist while the app runs (directories and files on the device), not in the repo; spell out the reason for each. */
     private val runtimeOnly = mapOf(
-        "eval/logged-in.txt" to "评测的人工登录标记,放在设备上 App 的外部文件目录,不进仓库",
-        "usb-start.sh" to "手机助手启动脚本由 App 写到设备外部文件目录,不进仓库",
-        "connect-computer.sh" to "电脑连接脚本由 App 写到设备外部文件目录,不进仓库",
+        "eval/logged-in.txt" to "manual eval login marker, kept in the app's external files directory on the device, not in the repo",
+        "usb-start.sh" to "the phone assistant start script is written by the app to the device's external files directory, not in the repo",
+        "connect-computer.sh" to "the computer connection script is written by the app to the device's external files directory, not in the repo",
     )
 
     /** Only paths that start with a top-level directory or file that really exists under the repo root, and code-like short file names, point at something in the repo; the rest are runtime artifacts or relative notations. */
@@ -152,10 +152,10 @@ class DocsConsistencyTest {
         return spans(doc.readText()).distinct().mapNotNull { s ->
             if (notIdentifier.containsMatchIn(s)) return@mapNotNull null
             when {
-                isPath(s) -> if (pathExists(s)) null else "$rel: 路径 `$s` 在仓库里找不到"
-                tool.matches(s) -> if (s in remoteApiNames || s in nonToolNames || s in sessionToolNames || s in stringResourceNames || s.substringBefore('_') !in toolPrefixes || s in toolNames) null else "$rel: 工具名 `$s` 不在现有工具里"
+                isPath(s) -> if (pathExists(s)) null else "$rel: path `$s` not found in the repo"
+                tool.matches(s) -> if (s in remoteApiNames || s in nonToolNames || s in sessionToolNames || s in stringResourceNames || s.substringBefore('_') !in toolPrefixes || s in toolNames) null else "$rel: tool name `$s` is not one of the existing tools"
                 classLike.matches(s) && s.count { it.isUpperCase() } >= 2 && s.any { it.isLowerCase() } ->
-                    if (classExists(s) || importedFromOutside(s) || s in displayNames) null else "$rel: 类名 `$s` 在 core/app 的源码里找不到"
+                    if (classExists(s) || importedFromOutside(s) || s in displayNames) null else "$rel: class name `$s` not found in core/app sources"
                 else -> null
             }
         }
@@ -178,7 +178,7 @@ class DocsConsistencyTest {
             doc.readLines().withIndex().filter { (_, line) -> countOk !in line && hardCount.containsMatchIn(line) }
                 .map { (i, line) -> "$rel:${i + 1}: 「${hardCount.find(line)!!.value}」" }
         }
-        assertTrue("文档里写死了会变的个数,改成不带个数的说法(清单用 README 的生成段落):\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("docs hard-code counts that change; use wording without a count (use README's generated sections for lists):\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 
     @Test fun countPatternCatchesTypicalWording() {
@@ -193,8 +193,8 @@ class DocsConsistencyTest {
     }
 
     @Test fun inputsAreFound() {
-        assertTrue("找不到仓库根目录(工作目录应为 core/)", File(root, "settings.gradle.kts").isFile)
-        assertTrue("没找到文档", docs().size >= 5)
+        assertTrue("repo root not found (the working directory should be core/)", File(root, "settings.gradle.kts").isFile)
+        assertTrue("no docs found", docs().size >= 5)
         assertTrue(toolNames.contains("knowledge_read"))
         assertTrue(classExists("ToolDef"))
         assertTrue(spans(docs().joinToString("\n") { it.readText() }).size > 50)
@@ -205,6 +205,6 @@ class DocsConsistencyTest {
         val bad = docs().filterNot {
             it.relativeTo(root).invariantSeparatorsPath.startsWith("docs/design/plans/")
         }.flatMap(::problems)
-        assertTrue("文档里提到了仓库里没有的东西:\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("docs mention things that are not in the repo:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 }

@@ -17,14 +17,14 @@ class KnowledgeStoreTest {
 
     @Test fun byPackageFindsWechat() {
         val e = KnowledgeStore(bundled).byPackage("com.tencent.mm")
-        assertNotNull(e); assertEquals("微信", e!!.display)
-        assertTrue(e.body!!.contains("联系人"))
+        assertNotNull(e); assertEquals("WeChat", e!!.display)
+        assertTrue(e.body!!.contains("contacts"))
     }
 
     @Test fun userNotesAppendedAndLabelled() {
         val store = KnowledgeStore(bundled, mapOf("wechat" to "我的补充", "zhihu.com" to "网页补充"))
         val body = store.byPackage("com.tencent.mm")!!.body!!
-        assertTrue(body.startsWith("## 是什么"))
+        assertTrue(body.startsWith("## What it is"))
         assertTrue(body.endsWith("${KnowledgeStore.NOTES_HEADER}\n我的补充"))
         assertTrue(store.byDomain("www.zhihu.com")!!.body!!.endsWith("网页补充"))
         // An entry without a body can still carry only the user's notes
@@ -80,13 +80,13 @@ class KnowledgeStoreTest {
 
     @Test fun appWithoutHandwrittenProfileUsesSkillBody() {
         val e = KnowledgeStore(bundled).byPackage("com.taobao.idlefish")
-        assertNotNull(e); assertTrue(e!!.body!!.contains("二手"))
+        assertNotNull(e); assertTrue(e!!.body!!.contains("second-hand"))
     }
 
     @Test fun handwrittenProfileBodyComesFirst() {
         val body = KnowledgeStore(bundled).byPackage("com.tencent.mm")!!.body!!
-        assertTrue(body.startsWith("## 是什么"))
-        assertTrue(body.contains("## 界面"))
+        assertTrue(body.startsWith("## What it is"))
+        assertTrue(body.contains("## UI"))
     }
 
     @Test fun appAndSiteAreCrossLinked() {

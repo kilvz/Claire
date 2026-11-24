@@ -173,12 +173,12 @@ class PrefixStabilityTest {
         val reqs = bodies.map(::wire)
         // Zone 0 changes only when a group is expanded, at most twice (phone, sandbox); when it changes, the preceding tools stay byte-for-byte identical and the first changed one is that group's entry tool
         val opened = (1 until reqs.size).filter { reqs[it].zone0 != reqs[it - 1].zone0 }
-        assertTrue("$label:区 0 变了 $opened 次", opened.size <= 2)
+        assertTrue("$label: zone 0 changed $opened times", opened.size <= 2)
         for (i in opened) {
             val (a, b) = reqs[i - 1].tools to reqs[i].tools
             val same = a.zip(b).takeWhile { (x, y) -> x == y }.size
-            assertTrue("$label 第 ${i + 1} 次请求:展开时改了一组前面的工具 ${a.getOrNull(same)?.let(::nameOf)}", same == a.size || nameOf(a[same]) in entries)
-            assertTrue("$label 第 ${i + 1} 次请求:展开只加不减", b.size > a.size)
+            assertTrue("$label request ${i + 1}: expanding changed a group of earlier tools ${a.getOrNull(same)?.let(::nameOf)}", same == a.size || nameOf(a[same]) in entries)
+            assertTrue("$label request ${i + 1}: expansion only adds, never removes", b.size > a.size)
         }
         val changed = mutableListOf<Int>()
         for (i in 1 until reqs.size) {
@@ -188,9 +188,9 @@ class PrefixStabilityTest {
             changed += i
             // The first rewrite is exactly the entry cut by the pruning line (or folded into the summary)
             val first = b.msgs[same]
-            assertTrue("$label 第 ${i + 1} 次请求第 $same 条改写不是压缩:$first", markers.any { it in first && it !in a.msgs[same] } || ContextCompressor.HEADER in first)
+            assertTrue("$label request ${i + 1}, entry $same rewritten without compaction:$first", markers.any { it in first && it !in a.msgs[same] } || ContextCompressor.HEADER in first)
         }
-        if (appendOnly) assertEquals("$label:没越过触发点却改写了前缀", emptyList<Int>(), changed)
+        if (appendOnly) assertEquals("$label: prefix rewritten without crossing the trigger point", emptyList<Int>(), changed)
         return Result(reqs.size - 1, changed, prefixShare(reqs, opened), opened)
     }
 
@@ -228,7 +228,7 @@ class PrefixStabilityTest {
 
     @Test fun lightModelRouting() {
         val (main, light) = run(Setup(light = true))
-        assertTrue("轻量模型应当接过几步", light.isNotEmpty())
+        assertTrue("the light model should take over a few steps", light.isNotEmpty())
         check(main, "main")
         check(light, "light")
     }

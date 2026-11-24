@@ -23,18 +23,18 @@ class EvalReportTest {
         val md = EvalReport.markdown("r1", "deepseek-flash", scores, listOf("e-xhs" to "未安装 com.xingin.xhs"), null)
         assertFalse(secret in md)
         assertFalse("屏幕文字" in md)
-        listOf("r1", "deepseek-flash", "办成率", "2/4", "假成功率", "1/3", "1/4", "未核实成功", "步数", "耗时", "token",
+        listOf("r1", "deepseek-flash", "Success rate", "2/4", "False success rate", "1/3", "1/4", "Unverified successes", "Median steps", "duration", "token",
             "false_success", "a-ok", "b-false", "e-xhs", "未安装 com.xingin.xhs", "Claire评测-r1").forEach {
             assertTrue(it, it in md)
         }
-        assertTrue(md, "| 输入 token | 4000000 |" in md)
+        assertTrue(md, "| Input tokens | 4000000 |" in md)
     }
 
     @Test fun perTaskVerdictShown() {
         val (s, o) = pair("v-ok", "succeeded", true, 4, 10_000)
         val (s2, o2) = pair("v-unv", "unverified", false, 4, 10_000)
         val md = EvalReport.markdown("r1", "m", listOf(s to o.copy(verdict = "pass"), s2 to o2.copy(verdict = "cannot_verify")), emptyList(), null)
-        assertTrue(md, "核查" in md)
+        assertTrue(md, "Verification" in md)
         assertTrue(md, md.lines().any { it.startsWith("| v-ok |") && "pass" in it })
         assertTrue(md, md.lines().any { it.startsWith("| v-unv |") && "cannot_verify" in it })
     }
@@ -46,16 +46,16 @@ class EvalReportTest {
         assertTrue(md, md.lines().any { it.startsWith("| t-a |") && it.endsWith("| 1000000 | 40.0% | 200000 |") })
         assertTrue(md, md.lines().any { it.startsWith("| t-b |") && it.endsWith("| 1000 | 90.0% | 7 |") })
         // Summary: the token-weighted hit rate, plus the median of the per-task hit rates
-        assertTrue(md, "| 缓存命中率(cached/input) | 40.0% |" in md)
-        assertTrue(md, "| 每题缓存命中率中位数 | 65% |" in md)
+        assertTrue(md, "| Cache hit rate (cached/input) | 40.0% |" in md)
+        assertTrue(md, "| Median per-task cache hit rate | 65% |" in md)
     }
 
     @Test fun costOnlyWithPrices() {
         val none = EvalReport.markdown("r1", "m", scores, emptyList(), null)
-        assertFalse("花费" in none)
+        assertFalse("Cost" in none)
         val priced = EvalReport.markdown("r1", "m", scores, emptyList(), Prices(inputPerM = 1.0, outputPerM = 2.0, cachedPerM = 0.5))
         // Per task: uncached input 0.6M×1 + cached 0.4M×0.5 + output 0.2M×2 = 1.2; times four tasks = 4.8
-        assertTrue("花费" in priced)
+        assertTrue("Cost" in priced)
         assertTrue(priced, "4.8" in priced)
     }
 
@@ -66,7 +66,7 @@ class EvalReportTest {
         assertEquals(7.0, EvalReport.p90(listOf(7.0)), 0.0)
         assertEquals(10.0, EvalReport.p90((1..11).map { it.toDouble() }.reversed()), 0.0)
         val md = EvalReport.markdown("r1", "m", scores, emptyList(), null)
-        assertTrue(md, "| 步数中位数 | 7 |" in md && "| 步数 P90 | 10 |" in md && "| 耗时中位数(秒) | 25 |" in md)
+        assertTrue(md, "| Median steps | 7 |" in md && "| Steps P90 | 10 |" in md && "| Median duration (s) | 25 |" in md)
     }
 
     @Test fun totalWallClockShownWhenGiven() {
@@ -75,9 +75,9 @@ class EvalReportTest {
             Observed("succeeded", "", emptyList(), null, emptyMap(), emptyMap(), 1, 60_000, 0, 0, 0, null),
         )
         val o = Observed("succeeded", "", emptyList(), null, emptyMap(), emptyMap(), 1, 60_000, 0, 0, 0, null)
-        assertFalse("总墙钟时间" in EvalReport.markdown("r", "m", listOf(s to o), emptyList(), null))
+        assertFalse("Total wall time" in EvalReport.markdown("r", "m", listOf(s to o), emptyList(), null))
         val md = EvalReport.markdown("r", "m", listOf(s to o), emptyList(), null, totalWallMs = 90_500, parallel = 2)
-        assertTrue(md, "| 总墙钟时间(秒) | 90.5 |" in md)
-        assertTrue(md, "并行 2" in md)
+        assertTrue(md, "| Total wall time (s) | 90.5 |" in md)
+        assertTrue(md, "in parallel" in md)
     }
 }

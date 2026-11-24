@@ -127,7 +127,7 @@ class ResponsesModelTest {
         assertEquals(Triple("call_1", "phone_tap", """{"ref":"a1"}"""), Triple(call.id, call.name, call.argsJson))
         val saved = Json.parseToJsonElement(call.opaque!!).jsonArray.single().jsonObject
         assertEquals("ENC", saved["encrypted_content"]!!.jsonPrimitive.content)
-        assertNull("编号只在服务端有意义,不回放", saved["id"])
+        assertNull("the id only means something server-side and is not replayed", saved["id"])
         assertEquals(StopReason.ToolUse, reply.stopReason)
         assertEquals(Usage(12, 4, 8), reply.usage)
     }

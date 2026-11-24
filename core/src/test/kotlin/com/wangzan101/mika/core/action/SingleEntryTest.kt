@@ -30,20 +30,20 @@ class SingleEntryTest {
         .map { (f, n, line) -> "${f.path}:$n: ${line.trim()}" }
 
     @Test fun sourcesAreFound() {
-        assertTrue("找不到源码目录(工作目录应为 core/)", roots.first().isDirectory)
+        assertTrue("cannot find the source directory (the working directory should be core/)", roots.first().isDirectory)
         assertTrue(codeLines().any { (f, _, line) -> !outsideAction(f) && "ActionPass()" in line })
     }
 
     @Test fun onlyTheExecutorHoldsThePass() {
         val bad = offenders(Regex("""\bActionPass\s*\(""")).filterNot { "class ActionPass" in it }
-        assertTrue("这些地方自己造执行凭证,绕过了执行入口:\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("these places forge their own execution token, bypassing the entry point:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 
     @Test fun onlyTheExecutorDecides() {
         val bad = offenders(Regex(
             """IrreversibleDetector\s*\.\s*(needsCheck|classify|hasLabelAt|unresolved)\b|\.\s*permits\s*\(|\.\s*noteWrite\s*\(|\bIrreversibleDetector\s*[,)]"""
         ))
-        assertTrue("这些地方绕过执行入口直接判定:\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("these places decide directly, bypassing the entry point:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 
     @Test fun actionAndGuardDoNotDependOnTheLoop() {
@@ -52,6 +52,6 @@ class SingleEntryTest {
                 f.readLines().filter { it.startsWith("import com.wangzan101.mika.core.agent.") }.map { "${f.path}: $it" }
             }.toList()
         }
-        assertTrue("执行入口和守卫反过来依赖了主循环:\n" + bad.joinToString("\n"), bad.isEmpty())
+        assertTrue("the entry point and guards depend on the main loop, backwards:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 }

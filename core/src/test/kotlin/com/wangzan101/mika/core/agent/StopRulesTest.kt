@@ -14,11 +14,11 @@ import org.junit.Test
 class StopRulesTest {
     @Test fun treeBlindNoProgressSaysAppUnresponsive() {
         val v = GuardVerdict("no_progress", Severity.Stop, buildJsonObject { put("treeBlind", true) })
-        assertTrue(StopRules.guard(v).reason.contains("不响应"))
+        assertTrue(StopRules.guard(v).reason.contains("may not respond"))
     }
 
     @Test fun plainNoProgressKeepsGenericMessage() {
         val v = GuardVerdict("no_progress", Severity.Stop, buildJsonObject { put("unchanged", 3) })
-        assertTrue(StopRules.guard(v).reason.contains("画面一直没有变化"))
+        assertTrue(StopRules.guard(v).reason.contains("the screen did not change after several actions"))
     }
 }

@@ -153,7 +153,7 @@ class IrreversibleDetectorTest {
     @Test fun activatingKeysAndFocus() {
         val plain = snap(el("@e1", "备注", listOf(0, 0, 999, 100), editable = true, focused = true))
         for (k in listOf("066", "KEYCODE_NUMPAD_ENTER", "23")) assertEquals(k, IrrevAction.send, d.classify("phone_press_key", args("""{"key":"$k"}"""), plain)?.action)
-        assertNull("空格在输入框里只是打字", d.classify("phone_press_key", args("""{"key":"KEYCODE_SPACE"}"""), plain))
+        assertNull("Space in an input field is just typing", d.classify("phone_press_key", args("""{"key":"KEYCODE_SPACE"}"""), plain))
         assertEquals(IrrevAction.send, d.classify("phone_type_text", args("""{"text":"x","pressEnter":true}"""), plain)?.action)
         val button = snap(el("@e1", "发送", listOf(0, 0, 999, 100), focused = true))
         assertEquals(IrrevAction.send, d.classify("phone_press_key", args("""{"key":"KEYCODE_SPACE"}"""), button)?.action)
@@ -219,11 +219,11 @@ class IrreversibleDetectorTest {
         val s = snap(el("@e1", "张三 昨天", listOf(0, 300, 999, 400)), el("@e2", "", listOf(0, 0, 999, 999), clickable = false, scrollable = true))
         assertEquals(Irreversible(IrrevAction.delete, "swipe on 张三 昨天"),
             d.classify("phone_swipe", args("""{"startX":900,"startY":350,"endX":300,"endY":350}"""), null, s))
-        assertNull("太短", d.classify("phone_swipe", args("""{"startX":900,"startY":350,"endX":600,"endY":350}"""), null, s))
-        assertNull("竖滑", d.classify("phone_swipe", args("""{"startX":500,"startY":800,"endX":500,"endY":200}"""), null, s))
-        assertNull("不在行上", d.classify("phone_swipe", args("""{"startX":900,"startY":700,"endX":300,"endY":700}"""), null, s))
+        assertNull("too short", d.classify("phone_swipe", args("""{"startX":900,"startY":350,"endX":600,"endY":350}"""), null, s))
+        assertNull("vertical swipe", d.classify("phone_swipe", args("""{"startX":500,"startY":800,"endX":500,"endY":200}"""), null, s))
+        assertNull("not on a row", d.classify("phone_swipe", args("""{"startX":900,"startY":700,"endX":300,"endY":700}"""), null, s))
         assertEquals(IrrevAction.delete, d.classify("phone_scroll", args("""{"direction":"left","amount":5,"x":500,"y":350}"""), null, s)?.action)
-        assertNull("默认幅度不够长", d.classify("phone_scroll", args("""{"direction":"left","x":500,"y":350}"""), null, s))
+        assertNull("default distance is not long enough", d.classify("phone_scroll", args("""{"direction":"left","x":500,"y":350}"""), null, s))
         assertNull(d.classify("phone_scroll", args("""{"direction":"down","amount":10}"""), null, s))
     }
 
@@ -522,7 +522,7 @@ class IrreversibleDetectorTest {
         }
         // No focused element (the page itself): Delete and Backspace act on the page's selection and are always blocked
         val page = snap(ui("@e1", "卡片", listOf(0, 0, 999, 100)))
-        assertEquals(Irreversible(IrrevAction.delete, "Delete:焦点不明"), hit("Delete", page))
+        assertEquals(Irreversible(IrrevAction.delete, "Delete: no clear focus"), hit("Delete", page))
         assertEquals(IrrevAction.delete, hit("Backspace", page)?.action)
         // Other command keys: allowed unless the page declares them
         for (k in listOf("d", "Control+K", "Alt+s")) assertNull(k, hit(k, page))

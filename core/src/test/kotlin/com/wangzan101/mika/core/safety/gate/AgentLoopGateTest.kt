@@ -150,7 +150,7 @@ class AgentLoopGateTest {
         val s = ChatScreen()
         val m = FakeModel(OBSERVE, tools(call("phone_tap", """{"x":900,"y":950}""")), TYPE, tools(call("phone_tap", """{"x":900,"y":950}""")), failure("没发"))
         loop(m, s).run("t")
-        assertEquals("「+」照常点", 1, s.taps.size)
+        assertEquals("\"+\" is tapped as usual", 1, s.taps.size)
         assertEquals("confirmation_required", m.result(4).s("error"))
         assertEquals(1, s.taps.size)
     }

@@ -139,7 +139,7 @@ class StreamingModelsTest {
     private suspend fun assertCut(model: StreamingChatModel) {
         try {
             model.completeStreaming("s", user, emptyList()) {}
-            throw AssertionError("应拒绝不完整响应")
+            throw AssertionError("should reject an incomplete response")
         } catch (e: ModelError.StreamCut) {
             assertTrue(RetryPolicy.transient(e))
         }
@@ -175,7 +175,7 @@ class StreamingModelsTest {
         server.enqueue(MockResponse().setHeader("Content-Type", "text/html").setBody("<html>hi</html>"))
         try {
             openAi().completeStreaming("s", user, emptyList()) {}
-            throw AssertionError("应拒绝非流式内容")
+            throw AssertionError("should reject non-streaming content")
         } catch (e: ModelError.BadResponse) {
             assertTrue(!RetryPolicy.transient(e))
         }

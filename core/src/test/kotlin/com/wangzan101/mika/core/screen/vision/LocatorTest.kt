@@ -88,7 +88,7 @@ class LocatorTest {
         assertEquals(500 to 130, r.x to r.y)
         assertArrayEquals(intArrayOf(0, 100, 999, 160), r.box)
         assertEquals("@v1", r.ref); assertTrue(r.snapshotId.startsWith("loc_"))
-        assertTrue("没有走视觉", m.requests.isEmpty())
+        assertTrue("did not go through vision", m.requests.isEmpty())
         val (p, hash) = reg.get(r.ref, r.snapshotId)!!
         assertEquals(Point(500, 130), p); assertEquals(JvmTestImageOps.aHash(FRAME_A), hash)
         // Resource IDs are recognized too
@@ -206,7 +206,7 @@ class LocatorTest {
             val m = says()
             val r = notFound(locator(s, m).locate("WLAN", "WLAN"))
             assertEquals("protected_content", r.reason)
-            assertTrue("受保护的画面不交给视觉模型", m.requests.isEmpty())
+            assertTrue("protected screens are not handed to the vision model", m.requests.isEmpty())
             try {
                 locator(s, m).describe("看看")
                 fail("expected protected")

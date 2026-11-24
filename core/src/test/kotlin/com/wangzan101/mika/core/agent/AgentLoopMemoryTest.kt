@@ -92,8 +92,8 @@ class AgentLoopMemoryTest {
             AgentLoop(model, toolDispatcher(FakeScreen(), memory = s, utterances = said), "B", memory = s, intentJudge = judge)
                 .run("你自己总结一下:以后回答简短一点,写进记忆")
         }
-        assertEquals("没有去问意图", 0, judge.requests.size)
-        assertTrue("存下来了", "用户希望回答简短" in s.items.value.map { it.content })
+        assertEquals("did not ask about intent", 0, judge.requests.size)
+        assertTrue("saved", "用户希望回答简短" in s.items.value.map { it.content })
         val result = model.requests[1].last { it.role == Role.Tool }.parts.filterIsInstance<Part.ToolResult>().single().content
         assertTrue(result, "\"ok\":true" in result)
     }
@@ -111,7 +111,7 @@ class AgentLoopMemoryTest {
             AgentLoop(model, toolDispatcher(FakeScreen(), memory = s, utterances = UserUtterances()), "B", memory = s, intentJudge = judge)
                 .run("把外卖那条记忆删掉")
         }
-        assertEquals("没有去问意图", 0, judge.requests.size)
+        assertEquals("did not ask about intent", 0, judge.requests.size)
         val found = model.requests[1].last { it.role == Role.Tool }.parts.filterIsInstance<Part.ToolResult>().single().content
         val result = model.requests[2].last { it.role == Role.Tool }.parts.filterIsInstance<Part.ToolResult>().single().content
         assertTrue("$found -> $result", "\"ok\":true" in result)
@@ -134,9 +134,9 @@ class AgentLoopMemoryTest {
                 .run("如果我说把外卖那条记忆删掉,你会怎样处理?先解释,不要执行。")
         }
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Succeeded)
-        assertEquals("不靠意图判断", 0, judge.requests.size)
+        assertEquals("no intent-based decision", 0, judge.requests.size)
         assertTrue(events.filterIsInstance<RunEvent.ToolResult>().single { it.tool == "memory_edit" }.resultJson.contains("edit_not_requested"))
-        assertTrue("那条还在", s.items.value.any { it.id == target.id && it.status == com.wangzan101.mika.core.learn.memory.MemoryStatus.active })
+        assertTrue("that entry is still there", s.items.value.any { it.id == target.id && it.status == com.wangzan101.mika.core.learn.memory.MemoryStatus.active })
     }
 
     // Several saves at once, some of which the rules refuse: the whole task isn't stopped as "consecutive operation failures". What was stored stays stored, and the model goes on answering truthfully
@@ -158,7 +158,7 @@ class AgentLoopMemoryTest {
                 .run("以后回答简短一点,别的你自己总结几条写进记忆")
         }
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Succeeded)
-        assertEquals("只存上了那一条", before + 1, s.items.value.size)
+        assertEquals("only that one was saved", before + 1, s.items.value.size)
         // The model ran to the end: all five calls happened, then it gave an answer
         assertEquals(6, model.requests.size)
     }
@@ -215,7 +215,7 @@ class AgentLoopMemoryTest {
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Succeeded)
         val seen = events.filterIsInstance<RunEvent.Observed>().single { "张江路" in it.text }
         assertEquals("fact", seen.kind)
-        assertTrue("不是用户说的" in seen.text)
+        assertTrue("the user did not say this" in seen.text)
         // In the tool result the model sees, this entry carries the mark; the block injected at the start is marked too
         assertTrue(events.filterIsInstance<RunEvent.ToolResult>().single { it.tool == "memory_search" }.resultJson.contains("\"inferred\":true"))
         assertTrue(model.requests.first().joinToString("\n") { it.plainText() }.contains("the user did not say this"))
@@ -234,7 +234,7 @@ class AgentLoopMemoryTest {
         }
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Failed)
         assertTrue(end.toString(), "too_many_failures" in end.toString())
-        assertTrue("没有一直转下去:${model.requests.size}", model.requests.size <= 6)
+        assertTrue("did not keep looping:${model.requests.size}", model.requests.size <= 6)
         assertTrue(s.items.value.isEmpty())
     }
 
