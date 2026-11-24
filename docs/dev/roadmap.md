@@ -1,52 +1,52 @@
-# Mika 路线图
+# Mika roadmap
 
-原则:**先把事办好,再求快,再扩能力**。按根因归类修机制,不为单个案例打补丁。现在的结构见 [`architecture.md`](architecture.md)。
+Principle: **get the job done well first, then fast, then expand capabilities**. Fix mechanisms by root cause, not with patches for individual cases. The current structure is in [`architecture.md`](architecture.md).
 
-## 已完成
+## Completed
 
-- **自托管远程 CLI / MCP**:单用户、单设备 HTTPS 网关与手机出站 WSS,一次性配对、手机统一令牌鉴权、透明转发和断线语义;复用现有任务和设备能力。部署见 [remote-mcp.md](remote-mcp.md)。公网证书与具体客户端兼容性仍需实际部署验收。
+- **Self-hosted remote CLI / MCP**: single-user, single-device HTTPS gateway with outbound WSS from the phone; one-time pairing, unified phone token authentication, transparent forwarding and disconnection semantics; reuses the existing tasks and device capabilities. Deployment is in [remote-mcp.md](remote-mcp.md). Public certificates and compatibility with specific clients still need acceptance on an actual deployment.
 
-- **后台虚拟屏办 App 的事**:内置手机助手(经无线调试,配对一次)、虚拟屏、无障碍读屏与操作、文字识别补读、接管、手机复合工具(查询、连续命令、跨屏采集、找、提取、弹窗、等待、事件、手势、系统命令)。
-- **内置浏览器**:私有虚拟显示上的 WebView,经 DevTools 协议真实输入;桌面版身份、标签页池、登录状态与「网站登录」设置、网页接管、下载与上传、只读脚本。
-- **Linux 沙箱**:随 APK 自带的 Alpine 运行环境(arm64)、每对话一个工作区、默认联网、文件进出、知识与技能自带脚本、沙箱里调手机工具。
-- **运行时**:Run 与收件箱(运行中插话)、任务中心(每对话一个 Run、排队、不同对话并行)、送达账本、重启后标记中断并告知、统一的资源协调、按能力装配、子任务(只读调研)。
-- **主循环**:唯一执行入口、工具注册表与按属性办事、观察为中心、不调工具即回答、`end_not_done`、系统生成来源、回答后在后台判定结局、模型临时错误有限重试;工具引擎不直接依赖界面状态(`PackageDependencyTest` 守住)。
-- **上下文**:缓存分区、历史只追加、快满时才一次性压缩、用户原话永不裁剪、压缩后补回。
-- **定时与条件触发**:一次性 / 固定间隔 / 当地时间每天每周、固定提醒、只读条件检查与状态变化去重、条件观测值与比较基准、每次满足都执行、冷却、空闲时再做、精确闹钟能力检测、重启与时区变化后重新布置、结果回原对话、计划页;对话中的计划查询与管理只限本对话。
-- **记忆与学习**:事实、偏好、做法(做法需批准)、用户画像、加密存储;个人技能与 App 知识草稿的起草—收下—试用—核实流程。
-- **知识**:内置 App、网站知识与技能(`core/src/main/resources/` 下,清单见构建生成的索引和 README),统一格式,查找 / 阅读两对工具。
-- **Token 用量**:每次模型调用在源头记账(服务商、模型、用途),本机按小时存 400 天;设置里一个页面看 24 小时 / 7 / 30 / 90 天 / 自定义的总用量、按服务商叠起来的趋势和服务商、模型排行。
-- **远程亮屏与解锁**:电脑连接(MCP)的 `mika_device_state` / `mika_wake_device` / `mika_unlock_device`,默认关、在手机上开启并保存 PIN 或密码;凭据加密存在本机,只定向输入到系统锁屏界面,失败一次即暂停,到手机上重新保存才再试(见 architecture §6)。
-- **评测**:`eval/tasks/` 下的真机评测题,分调优池与保留池;假模型剧本与提示词金样测试。
+- **Doing app things on a background virtual screen**: built-in phone assistant (via wireless debugging, paired once), virtual screen, accessibility screen reading and operation, OCR-assisted reading, takeover, composite phone tools (query, consecutive commands, cross-screen capture, find, extract, popups, wait, events, gestures, system commands).
+- **Built-in browser**: WebView on a private virtual display, with real input via the DevTools protocol; desktop identity, tab pool, login state and a 「网站登录」 (Website login) setting, web takeover, downloads and uploads, read-only scripts.
+- **Linux sandbox**: an Alpine runtime bundled with the APK (arm64), one workspace per conversation, network on by default, files in and out, scripts bundled with knowledge and skills, calling phone tools from the sandbox.
+- **Runtime**: Run and inbox (steering while running), task center (one Run per conversation, queuing, different conversations in parallel), delivery ledger, marking interrupted after restart and telling the user, unified resource coordination, assembly by capability, subtasks (read-only research).
+- **Main loop**: a single execution entry point, tool registry and acting by attributes, observation-centered, answering without calling tools, `end_not_done`, system-generated sources, judging the outcome in the background after answering, limited retries on transient model errors; the tool engine does not directly depend on UI state (`PackageDependencyTest` guards this).
+- **Context**: cache partitions, append-only history, one-time compaction only when nearly full, user's original words never trimmed, restored after compaction.
+- **Scheduled and conditional triggers**: one-off / fixed interval / daily and weekly local time, fixed reminders, read-only condition checks with deduplication of state changes, condition observation values and comparison baselines, running every time the condition is met, cooldown, deferred to idle time, exact alarm capability detection, re-scheduling after reboot and time-zone changes, results back to the original conversation, the plans page; plan queries and management in a conversation are limited to that conversation.
+- **Memory and learning**: facts, preferences, practices (practices need approval), user profile, encrypted storage; the draft → accept → try → verify flow for personal skills and app knowledge drafts.
+- **Knowledge**: built-in app and website knowledge and skills (under `core/src/main/resources/`, see the build-generated index and README for the list), a unified format, and the find / read tool pairs.
+- **Token usage**: every model call is recorded at the source (provider, model, use), stored locally by hour for 400 days; one page in Settings shows total usage for 24 hours / 7 / 30 / 90 days / custom, the trend stacked by provider, and provider and model rankings.
+- **Remote wake and unlock**: `mika_device_state` / `mika_wake_device` / `mika_unlock_device` for computer connection (MCP), off by default, turned on on the phone with a PIN or password saved; credentials are encrypted locally, injected only into the system lock screen, pause after a single failure, and only retried after saving again on the phone (see architecture §6).
+- **Evaluation**: real-device evaluation tasks under `eval/tasks/`, split into a tuning pool and a holdout pool; fake-model scripts and prompt golden tests.
 
-## 接下来
+## Next
 
-1. **真机跑真实任务**:失败按根因归类,在机制层面修,看同类任务一起变好。
-2. **重新打开核查与审批**(见下「已知问题」第 1 条)。
-3. **手机能力 v2**:
-   - 一次多步里能带等待条件(等文字出现、等页面安静后再做下一步),减少模型往返;
-   - 精简观察:读屏结果只发与上一屏的差异、更短的界面描述;
-   - 按需给工具:开局只给一份经过筛选的工具目录,用到时再加载完整定义,工具变多也不撑大固定前缀;
-   - 按同一模型、同一任务测首个反馈时间、模型往返次数、读屏与动作耗时、完成率,以及聊天采集的漏读和重复。
-4. **定时任务的后续阶段**:登录态 App 内的条件监控;多步骤的监控编排;免打扰时段;创建、编辑时预览接下来几次的时间;从用户明确说过的长期意图提出计划建议(用户采用后才生效)。
-5. **更多来源与能力**:渠道(微信等;渠道接口、主人身份、提问编号对应已在 `core/run/` 定义)、MCP 服务端与客户端的传输层和设置入口。
+1. **Run real tasks on real devices**: classify failures by root cause, fix at the mechanism level, and see tasks of the same kind improve together.
+2. **Re-open up verification and approval** (see "Known issues" item 1 below).
+3. **Phone capabilities v2**:
+   - multiple steps in one call can carry wait conditions (wait for text to appear, wait for the page to settle before the next step), reducing model round trips;
+   - leaner observation: screen-reader results send only the diff from the previous screen and shorter UI descriptions;
+   - tools on demand: at the start only a filtered tool catalog is given, full definitions are loaded when needed, so a growing tool count does not bloat the fixed prefix;
+   - measured on the same model and same task: time to first feedback, model round trips, screen-reading and action time, completion rate, plus missed reads and duplicates in chat capture.
+4. **Later stages of scheduled tasks**: condition monitoring inside apps with a login state; multi-step monitoring orchestration; do-not-disturb periods; preview of the next few run times when creating or editing; proposing plans from long-term intentions the user has clearly stated (effective only after the user adopts them).
+5. **More sources and capabilities**: channels (WeChat and others; channel interfaces, owner identity and question-number correspondence are already defined in `core/run/`), and the transport layer and settings entries for MCP servers and clients.
 
-## 已知问题与暂缓
+## Known issues and deferrals
 
-1. **开发阶段关掉了最终核查**(用户决定:开发阶段保持关闭)。`TaskRun` 里 `reviewFinalAnswer = false`:
-   - 回答一律记为「未核实」;学习看的是交出回答后的结局判定(`LearnGate`,见 architecture §3「结果判定」),不再看核查,所以技能草稿、App 知识、经验路线、试用转正式照常发生;核查以后打开了,跑过却没通过的照样挡住;
-   - 风险审批按全局的询问 / 自主(见 architecture §4):询问时只有花钱的一步要同意;开了自主时连付款也不拦,`autonomous` 的提前返回(`ConfirmDecision.judge` 开头)排在「不对 Mika 自己动手」(`ownApp`)检查之前,所以这层保护在自主模式下也不生效(用户决定:暂不改。Agent 操作 Mika 自己的界面也可以是在帮用户办事,以后再定);
-2. **崩溃恢复的保护不全**:中断了的运行的善后(补送结果、告知用户、往对话记一轮「任务中断」)由 `RunRecovery`(`app/task/RunRecovery.kt`)做:进程被杀后用户一打开 App(`MikaApp.onCreate`)就能收到「已中断」,任务服务被销毁而进程还在时(`TaskService.onDestroy`)当场告知;是否告知过看送达账本,每个中断的运行只告知一次。仍然没有「连续异常重启就暂停附属服务」的保护。从中间续跑不做(屏幕状态回不去),只做「中断 → 告知 → 用户重新发起」。
-3. **网页只读脚本的待办**(`core/cap/web/ReadScript.kt`,审查提出,暂不做):
-   - 判断「是不是秘密输入框」只看只读环境建起之后的变化,在那之前就被改成 text 的密码框认不出。考虑和页面脚本共用一份「曾是密码框」的记号。
-   - 「曾经是秘密输入框」只盯主文档的变化,同源 iframe、shadow root 里被改成 text 的密码框认不出;autocomplete 标着银行卡的 `<select>` 读得到选中的值;值超出框的大小时,scrollWidth、scrollHeight 能看出长度或行数。
-   - 秘密 textarea 的字:isEqualNode 能拿它或它的文本节点和页面上已有的节点比是否相同;页面给含秘密 textarea 的 output 赋过 value 以后,defaultValue 里留着赋值前的字;页面把模型拿着的文本节点挪进另一个秘密 textarea(或把 value 属性节点挪到密码框上)、写进秘密再拿掉,模型中间没在新框里读过它时还按原来的框算,读得出。
-4. **触发器的小缺口**:改时区后,按当地时间重复的计划要到下一次认领时才按新时区重算。
-5. **剪贴板**:网页类编辑区靠粘贴输入,安卓 12 起主屏会短暂提示「正在访问剪贴板」;验证码、证件号这类敏感文字粘贴时会在剪贴板里停留约一秒。要彻底避免需要 Mika 自己当输入法提交文字,改动大,暂缓。
-6. **网页任务不进经验回放**:网页的动态内容和登录态差异会让对位频繁失败,先把手机上的回放跑稳。
-7. **需要第三方账号授权的技能脚本**(云文档、地图接口等)暂不做;要做需要一个安全保存服务凭据的入口。
-8. **记忆不做云同步与导出**;以后要做,需要单独设计加密导出。
-9. **真机待验证**:内置助手的各项系统操作、助手被杀或无线调试关闭后的自动恢复、重启后的自动恢复、长时间不用后授权失效的引导、网页渲染进程崩溃、Android 13–15 上精确闹钟授权与撤权、锁屏期间的定时任务,目前主要由单测和设备测试覆盖,还需要在真机上逐项跑过。
-10. **评测的不可逆题**:默认不跑,要跑须传 `-e evalAllowIrreversible true`;每道题用新对话。发送、删除题会真的做完(只碰题目自己带标记的数据、测试账号);询问模式下下单题停在确认卡片上(`EvalHooks` 的自动回答接得上),开发者选项里开了自主时下单也没有这层安全网,会真的下单。
-11. **以后**:连接电脑、任务期间调暗屏幕省电。
-12. **悬浮胶囊分步做**:第一步(浮层宿主、开关、干活中 / 需要你 / 你在处理 / 办完的胶囊、接管交还、和通知的配合)、第二步(点开的卡片:小画面、步骤、停止、接管、同意 / 回答、结果、多件事的列表;拖动贴边、缩成一颗、记住位置)、第三步(卡片里的输入:插话、回答、接着聊、空闲时接着最近的对话或开新对话;输入法弹出时让开)、第四步(多件事:列表按要紧程度排、卡片里切换、接管先后按真实的接管队列、交还后下一件马上成为「需要你」)、第五步(手感:不碰它几秒后淡下去、缩成一颗时状态点保持实色、别的 App 弹出输入法时缩成一颗挪到上面、转屏后按比例摆回)已做;上真机逐项验收后再看全屏播放时要不要自动缩起来、胶囊上的字要不要另加短句。
+1. **Final verification is turned off during development** (user decision: keep it off during development). `reviewFinalAnswer = false` in `TaskRun`:
+   - answers are all recorded as "unverified"; learning looks at the outcome judgment after the answer is handed over (`LearnGate`, see architecture §3 "Outcome judgment") and no longer at verification, so skill drafts, app knowledge, experience routes and trial-to-formal still happen as usual; once verification is turned on later, runs that ran without it and did not pass are still blocked;
+   - risk approval follows the global ask / autonomous setting (see architecture §4): in ask mode only the money-spending step needs consent; with autonomous on, even payment is not blocked, and `autonomous`'s early return (at the start of `ConfirmDecision.judge`) comes before the "don't act on Mika itself" (`ownApp`) check, so this protection does not take effect in autonomous mode either (user decision: not changing it for now. An Agent operating Mika's own UI can also be doing work for the user; decide later);
+2. **Crash recovery protection is incomplete**: cleanup for an interrupted run (re-sending results, telling the user, writing a "task interrupted" turn into the conversation) is done by `RunRecovery` (`app/task/RunRecovery.kt`): after the process is killed, the user gets "interrupted" as soon as they open the app (`MikaApp.onCreate`), and when the task service is destroyed while the process is still alive (`TaskService.onDestroy`) it tells them on the spot; whether it has told them is checked against the delivery ledger, and each interrupted run is reported only once. There is still no protection that "pauses auxiliary services after consecutive abnormal restarts". Resuming from the middle is not done (screen state cannot be restored); only "interrupt → tell → user restarts".
+3. **TODOs for web read-only scripts** (`core/cap/web/ReadScript.kt`, raised in review, not doing for now):
+   - judging "is this a secret input box" only looks at changes after the read-only environment is set up; a password box that was changed to text before that is not recognized. Consider sharing a "was a password box" marker with page scripts.
+   - "used to be a secret input box" only watches changes in the main document; password boxes changed to text in same-origin iframes or shadow roots are not recognized; a `<select>` whose autocomplete marks it as a bank card can have its selected value read; when the value exceeds the box size, scrollWidth and scrollHeight can reveal the length or number of lines.
+   - text in a secret textarea: isEqualNode can compare it or its text node against nodes already on the page to see if they are the same; after the page assigns a value to an output containing a secret textarea, defaultValue retains the text from before the assignment; if the page moves the text node the model holds into another secret textarea (or moves the value attribute node onto a password box), writes it into the secret and then removes it, and the model has not read it in the new box in between, it is still counted under the original box and can be read out.
+4. **A small gap in triggers**: after a time-zone change, plans that repeat by local time only recompute by the new time zone at the next claim.
+5. **Clipboard**: web-style edit areas rely on pasting to input, and since Android 12 the main screen briefly shows 「正在访问剪贴板」 (Accessing clipboard); sensitive text such as verification codes and ID numbers stays in the clipboard for about a second when pasted. Avoiding this entirely would require Mika to submit text by being an input method itself, which is a big change, so it is deferred.
+6. **Web tasks do not go into experience replay**: dynamic page content and login-state differences make alignment fail frequently, so get replay on the phone stable first.
+7. **Skill scripts that need third-party account authorization** (cloud documents, map APIs, etc.) are not done for now; doing it would need a secure entry point for storing service credentials.
+8. **Memory does not do cloud sync or export**; if that is wanted later, encrypted export must be designed separately.
+9. **To be verified on real devices**: the built-in assistant's various system operations, automatic recovery after the assistant is killed or wireless debugging is turned off, automatic recovery after a reboot, guidance when authorization expires after long disuse, web rendering process crashes, exact alarm grant and revoke on Android 13–15, scheduled tasks during lock screen — currently mostly covered by unit tests and device tests, and still need to be run item by item on real devices.
+10. **Irreversible evaluation tasks**: not run by default; to run them you must pass `-e evalAllowIrreversible true`; use a new conversation for each task. Send and delete tasks are really performed (touching only data marked by the task itself and test accounts); in ask mode an ordering task stops at the confirmation card (the automatic answer in `EvalHooks` can pick it up), and with autonomous enabled in developer options there is no such safety net for ordering, and it will really place the order.
+11. **Later**: connect computer, dim the screen during tasks to save power.
+12. **Floating capsule done in steps**: step one (overlay host, switch, capsules for working / needs you / you are handling / done, takeover and hand-back, coordination with notifications), step two (the expanded card: small screen, steps, stop, takeover, agree / answer, results, list of multiple items; drag to snap to the edge, collapse to a bubble, remember position), step three (input in the card: steer, answer, keep chatting, pick up the nearest conversation or start a new one when idle; move aside when the input method pops up), step four (multiple items: list ordered by importance, switching within the card, takeover order following the real takeover queue, the next item immediately becoming "needs you" after hand-back), step five (feel: fade after a few seconds untouched, keep the status dot solid when collapsed to a bubble, collapse and move up when another app shows the input method, restore proportionally after rotation) — done; after item-by-item acceptance on real devices, reconsider whether to auto-collapse during full-screen playback and whether the capsule text needs extra short phrases.

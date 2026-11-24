@@ -1,53 +1,53 @@
 ## ADDED Requirements
 
-### Requirement: 单个上传文件体积上限可由用户设置
+### Requirement: Single uploaded file size limit is user-configurable
 
-用户往沙箱工作区导入单个文件（聊天附件、设备文件导入）的体积上限 SHALL 由用户在设置里从固定档位（200、512、1024、2048 MiB）中选择，默认 200 MiB（与既有行为一致）。档位 SHALL 仅约束聊天附件与设备文件导入（SAF 授权目录、手机助手）两条入口，且每次导入 SHALL 现取当前档位；微信图片与电脑发任务带文件 SHALL 保持固定限额，不受此设置影响。存储里出现档位外的值时 SHALL 按默认 200 MiB 处理。设备剩余空间安全线（500 MiB）SHALL 不受此设置影响、始终生效。
+The size limit for a single file the user imports into the sandbox workspace (chat attachments, device file imports) SHALL be chosen by the user in settings from fixed tiers (200, 512, 1024, 2048 MiB), defaulting to 200 MiB (consistent with existing behavior). The tiers SHALL constrain only the two entry points of chat attachments and device file imports (SAF-granted directories, phone assistant), and each import SHALL read the current tier fresh; WeChat images and files sent with tasks from a computer SHALL keep fixed limits and are unaffected by this setting. When a value outside the tiers appears in storage, it SHALL be treated as the default 200 MiB. The device free-space safety line (500 MiB) SHALL be unaffected by this setting and always in force.
 
-#### Scenario: 默认与现状一致
+#### Scenario: Default matches current behavior
 
-- **WHEN** 用户从未设置过单文件上限，向聊天附加一个 300 MiB 的文件
-- **THEN** 该文件被拒绝导入，失败原因与提示与设置项引入前一致
+- **WHEN** the user has never set a single-file limit and attaches a 300 MiB file to chat
+- **THEN** the file is refused for import, with the same failure reason and message as before the setting was introduced
 
-#### Scenario: 调高档位后放行更大的文件
+#### Scenario: Raising the tier allows larger files
 
-- **WHEN** 用户把单文件上限调到 1024 MiB 档，再向聊天附加同一个 300 MiB 的文件
-- **THEN** 该文件成功导入工作区 inbox/
+- **WHEN** the user raises the single-file limit to the 1024 MiB tier and then attaches the same 300 MiB file to chat
+- **THEN** the file is imported successfully into the workspace inbox/
 
-#### Scenario: 存了非法值回落默认
+#### Scenario: An invalid stored value falls back to the default
 
-- **WHEN** 存储里的单文件上限被写成档位外的值（如 300）
-- **THEN** 读取按 200 MiB 处理，设置页显示默认档位
+- **WHEN** the stored single-file limit is written as a value outside the tiers (e.g. 300)
+- **THEN** it is read as 200 MiB and the settings page shows the default tier
 
-### Requirement: 工作区空间上限可由用户设置
+### Requirement: Workspace space limit is user-configurable
 
-单个工作区（对话沙箱目录）的空间上限 SHALL 由用户在设置里从固定档位（4、8、16、32 GB）中选择，默认 4 GB（与既有行为一致）。聊天附件与设备文件导入的余量检查 SHALL 使用当前档位；微信图片与电脑发任务带文件的余量检查 SHALL 保持固定 4 GB。存储里出现档位外的值时 SHALL 按默认 4 GB 处理。
+The space limit of a single workspace (the conversation sandbox directory) SHALL be chosen by the user in settings from fixed tiers (4, 8, 16, 32 GB), defaulting to 4 GB (consistent with existing behavior). The headroom checks for chat attachments and device file imports SHALL use the current tier; the headroom checks for WeChat images and files sent with tasks from a computer SHALL keep the fixed 4 GB. When a value outside the tiers appears in storage, it SHALL be treated as the default 4 GB.
 
-#### Scenario: 默认与现状一致
+#### Scenario: Default matches current behavior
 
-- **WHEN** 用户从未设置过工作区上限，某工作区已占 4 GB 以上
-- **THEN** 新文件不再导入该工作区，提示工作区已达上限，行为与设置项引入前一致
+- **WHEN** the user has never set a workspace limit and a workspace already occupies more than 4 GB
+- **THEN** new files are no longer imported into that workspace, a message says the workspace has reached its limit, and behavior matches before the setting was introduced
 
-#### Scenario: 调高档位后继续导入
+#### Scenario: Raising the tier allows imports to continue
 
-- **WHEN** 工作区已占 4.2 GB，用户把上限调到 8 GB 档
-- **THEN** 新文件可以继续导入该工作区，直到占用超过 8 GB
+- **WHEN** the workspace occupies 4.2 GB and the user raises the limit to the 8 GB tier
+- **THEN** new files can continue to be imported into that workspace until usage exceeds 8 GB
 
-#### Scenario: 存了非法值回落默认
+#### Scenario: An invalid stored value falls back to the default
 
-- **WHEN** 存储里的工作区上限被写成档位外的值（如 6）
-- **THEN** 读取按 4 GB 处理，设置页显示默认档位
+- **WHEN** the stored workspace limit is written as a value outside the tiers (e.g. 6)
+- **THEN** it is read as 4 GB and the settings page shows the default tier
 
-### Requirement: 失败提示反映实际上限
+### Requirement: Failure messages reflect the actual limit
 
-单文件超限的失败提示 SHALL 写明实际配置的上限值，不得硬编码 200 MiB。
+The failure message for a single file exceeding the limit SHALL state the actually configured limit value and MUST NOT hardcode 200 MiB.
 
-#### Scenario: 范围外入口不受档位影响
+#### Scenario: Out-of-scope entry points are unaffected by tiers
 
-- **WHEN** 单文件上限调到 1024 MiB 档后，用户从电脑发送一个 201 MiB 的任务附件文件
-- **THEN** 电脑传输路径仍按固定 200 MiB 拒绝，微信图片仍按协议层固定 10 MiB 限制，行为与设置项引入前一致
+- **WHEN** after the single-file limit is raised to the 1024 MiB tier, the user sends a 201 MiB task attachment file from a computer
+- **THEN** the computer transfer path still refuses at the fixed 200 MiB, WeChat images still follow the protocol layer's fixed 10 MiB limit, and behavior matches before the setting was introduced
 
-#### Scenario: 512 MiB 档位的提示
+#### Scenario: Message for the 512 MiB tier
 
-- **WHEN** 上限为 512 MiB 档时用户附加一个 600 MiB 的文件
-- **THEN** 聊天里该文件的失败提示写明 512 MiB（或等价的可读容量），而不是 200 MiB
+- **WHEN** the limit is the 512 MiB tier and the user attaches a 600 MiB file
+- **THEN** the failure message in chat for that file states 512 MiB (or an equivalent readable capacity), not 200 MiB

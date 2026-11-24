@@ -1,41 +1,41 @@
-# 产出引用
+# Output references
 
-## 意图
+## Intent
 
-模型在沙箱 `/workspace` 里产出文件（图表、报表、音频、截图等），但现在：
+The model produces files in the sandbox `/workspace` (charts, reports, audio, screenshots, etc.), but right now:
 
-- 聊天里没法直接给用户看/点——只能 `share_file` 拷到「下载/Mika」，用户得去文件夹里找；
-- 后续轮次要再引用它，只能自己记 `/workspace/...` 路径，凭记忆、不稳。
+- there is no way to show or tap them for the user directly in the chat — only `share_file`, which copies them to 「下载/Mika」 (Downloads/Mika), and the user has to go find them in the folder;
+- to reference one again in a later turn, it can only remember the `/workspace/...` path itself, relying on memory and unreliable.
 
-而「用户带的附件」早就有这套待遇（`附件:/workspace/inbox/...` 行 + 聊天页 `AttachmentMessage` 卡片）。缺口是「模型产出」这半没有。
+Yet "user-provided attachments" have long had this treatment (an `附件:/workspace/inbox/...` line + the chat page's `AttachmentMessage` card). The gap is that the "model output" half does not have it.
 
-## 目标
+## Goals
 
-让「模型产出的东西」和「用户带的附件」享有同等的「可引用 + 聊天里可看/可点」待遇。
+Give "things the model produced" the same "referenceable + viewable/tappable in chat" treatment as "user-provided attachments".
 
-## 非目标
+## Non-goals
 
-- 不引入 URL scheme（不搞 `mika://` 之类）。
-- 不做跨会话持久：工作区按对话 ID 隔离、对话结束即清（现状已如此）。
-- 不改沙箱安全边界（路径规范化、链接逃逸拦截照旧）。
+- No URL scheme (no `mika://` or the like).
+- No cross-session persistence: the workspace is isolated by conversation ID and cleared when the conversation ends (this is already the case).
+- Do not change the sandbox security boundary (path normalization and link-escape interception stay as they are).
 
-## 现状（已确认）
+## Current state (confirmed)
 
-- `/workspace` 按「对话 ID」切（`TaskTools` 里 `workspace: () -> String`，注释「本次任务的工作区(对话 ID)」，默认 `"default"`）。
-- 输入附件走 `AttachmentLines`（`附件:/workspace/...` 文本行）+ 聊天页 `AttachmentMessage` 渲染。
-- `share_file` 把文件拷到宿主「下载/Mika」，返回 `savedAs`（一个名字，不是可渲染引用）。
-- 助手回复是 Markdown（`MarkdownText` 渲染），但渲染器不认 `/workspace/...` 的图片/链接。
+- `/workspace` is partitioned by "conversation ID" (`TaskTools` has `workspace: () -> String`, commented "this task's workspace (conversation ID)", defaulting to `"default"`).
+- Input attachments go through `AttachmentLines` (`附件:/workspace/...` text lines) + the chat page's `AttachmentMessage` rendering.
+- `share_file` copies the file to the host's 「下载/Mika」 and returns `savedAs` (a name, not a renderable reference).
+- Assistant replies are Markdown (rendered by `MarkdownText`), but the renderer does not recognize `/workspace/...` images/links.
 
-## 方案
+## Approach
 
-复用 `/workspace` 路径本身作为「产出引用」，不另造格式。三小块：
+Reuse the `/workspace` path itself as the "output reference" rather than inventing another format. Three small pieces:
 
-1. **渲染**：聊天页的 Markdown 渲染把 `/workspace/...` 认出来——图片/音频内联，普通文件画文件卡片（复用 `AttachmentMessage`）。
-2. **提示词**：告诉模型「写到 `/workspace` 的文件，用 Markdown 图片/链接写出来就会在聊天里渲染」，展示时优先用它而不是 `share_file`。
-3. **工具结果**：产出类工具的结果里把 `/workspace/...` 路径写显式（多为现状已有，统一即可）。
+1. **Rendering**: the chat page's Markdown rendering recognizes `/workspace/...` — images/audio inline, ordinary files drawn as file cards (reusing `AttachmentMessage`).
+2. **Prompt**: tell the model "files written to `/workspace` will be rendered in the chat if written as Markdown images/links", and prefer this over `share_file` when showing them.
+3. **Tool results**: make `/workspace/...` paths explicit in the results of output-producing tools (mostly already the case; just unify it).
 
-## 决定的点
+## Decisions
 
-- 引用 = `/workspace/...` 路径本身，不是 URL scheme、不是新的一行文本约定（助手回复本来就是 Markdown）。
-- 会话级：复用现状的「按对话 ID 切」，对话结束即清。
-- 渲染层复用 `AttachmentMessage`，图片/音频内联、普通文件画卡片。
+- A reference = the `/workspace/...` path itself, not a URL scheme and not a new line-of-text convention (assistant replies are Markdown anyway).
+- Session-scoped: reuse the existing "partitioned by conversation ID", cleared when the conversation ends.
+- The rendering layer reuses `AttachmentMessage`: images/audio inline, ordinary files drawn as cards.

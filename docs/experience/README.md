@@ -1,10 +1,10 @@
-# 项目经验
+# Project experience
 
-| 机制 | 适用信号 | 验证范围 |
+| Mechanism | Applicable signal | Verification scope |
 | --- | --- | --- |
-| [任务目标计数与动作记录](patterns/task-goal-progress.md) | 跨应用任务停在 0/N，或整次只有动作没有分数 | 两次运行区分首轮漏建与后续漏报，脚本覆盖补建、计数与收尾 |
-| [回放画面与实际动作关联](patterns/task-playback-frames.md) | 点击后立即返回、同轮多个动作、标记出现在结果图 | 事件与画面关联有单测；原 #348 曾在一台手机上验证 |
-| [Compose 真机测试在输入初始化时失败](patterns/espresso-input-initialization.md) | 用例尚未操作界面，Espresso 就报 `InputManager.getInstance` 不存在 | #644 在一台 SDK 37 手机上复现，升级测试依赖后两条用例通过 |
-| [缓存命中率的分母](patterns/cache-report-coverage.md) | 混用服务商、缓存字段缺失、旧记录只有累计量 | 混合上报已用单测验证，另在一台手机上验证了脚本会话展示 |
-| [实时通知与聊天页任务进度](patterns/promoted-task-notifications.md) | 桌面没有胶囊、一直显示「正在执行」，或任务文字已推进但计数仍为 0 | Android 16 真机验证系统展示；真机见切换 App 后停在「查址」；同名词干扰和 AI 分段停滞经单测复现 |
-| [进度清单被模型当成工具调用](patterns/progress-as-tool-call.md) | 首轮出现 `task_progress · 没成功`，后续手机操作仍在继续 | 真机联测捕获 4 次同名调用，清单成功更新；脚本覆盖无效参数与并行调用 |
+| [Task goal counting and action records](patterns/task-goal-progress.md) | A cross-app task stuck at 0/N, or a whole run with actions but no score | Two runs distinguish a missing initial checklist from later missed reporting; the script covers backfill, counting and wrap-up |
+| [Associating playback frames with actual actions](patterns/task-playback-frames.md) | A click followed immediately by Back, multiple actions in the same round, markers appearing on the result frame | Event-to-frame association has unit tests; the original #348 was verified on one phone |
+| [Compose device tests fail during input initialization](patterns/espresso-input-initialization.md) | Before the test case touches the UI, Espresso reports that `InputManager.getInstance` does not exist | Reproduced #644 on an SDK 37 phone; both test cases pass after upgrading the test dependency |
+| [The denominator of the cache hit rate](patterns/cache-report-coverage.md) | Mixed providers, missing cache fields, old records that only have cumulative totals | Mixed reporting is covered by unit tests; the scripted session display was also verified on one phone |
+| [Live notifications and chat-page task progress](patterns/promoted-task-notifications.md) | No capsule on the home screen, it keeps showing 「正在执行」 (Running), or the task text has advanced while the count is still 0 | System display verified on an Android 16 device; on that device it stayed at 「查址」 (Address lookup) after switching apps; same-name interference and AI segment stalls were reproduced in unit tests |
+| [Progress checklist treated by the model as a tool call](patterns/progress-as-tool-call.md) | `task_progress · 没成功` appears in the first round while subsequent phone operations continue | Device joint testing captured 4 calls with the same name and the checklist updated successfully; the script covers invalid parameters and parallel calls |

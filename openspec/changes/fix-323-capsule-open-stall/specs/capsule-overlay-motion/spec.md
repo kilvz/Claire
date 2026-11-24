@@ -1,27 +1,27 @@
 ## ADDED Requirements
 
-### Requirement: 展开动效在有限时间内到达终态
-悬浮胶囊浮层的展开动效（卡片展开、边窗出现）SHALL 在有限时间内到达终态：动画值到达 1、展开完成回调已调用。帧时钟停摆（等待帧的挂起点不再返回）MUST NOT 使展开状态停留在中间值或使展开完成回调永远不执行。
+### Requirement: The expand animation reaches its terminal state within a finite time
+The expand animation of the floating capsule overlay (card expansion, side-window appearance) SHALL reach its terminal state within a finite time: the animation value reaches 1 and the expand-completion callback has been called. A stalled frame clock (a suspension point waiting for a frame that never returns) MUST NOT leave the expand state at an intermediate value or cause the expand-completion callback to never run.
 
-#### Scenario: 帧停时展开仍落位
-- **WHEN** 浮层展开过程中帧时钟停摆（等待帧的挂起点不再恢复）
-- **THEN** 超过按动画时长与系统动画速度倍率换算的时限后，动画值直接归位到 1，展开完成回调被调用恰好一次
+#### Scenario: expansion still settles when frames stall
+- **WHEN** the frame clock stalls during the overlay expansion (the suspension point waiting for a frame never resumes)
+- **THEN** after a time limit converted from the animation duration and the system animation speed multiplier, the animation value snaps directly to 1 and the expand-completion callback is called exactly once
 
-#### Scenario: 正常展开不受影响
-- **WHEN** 帧时钟正常、系统未减速
-- **THEN** 展开动画按原时长自然播完，动画值到达 1，展开完成回调在动画起步前照常调用，无兜底介入
+#### Scenario: normal expansion is unaffected
+- **WHEN** the frame clock is normal and the system is not slowed down
+- **THEN** the expand animation plays out naturally for its original duration, the animation value reaches 1, the expand-completion callback is called as usual before the animation starts, and no fallback intervenes
 
-#### Scenario: 系统慢动作下有足够时间
-- **WHEN** 系统动画速度倍率大于 1（慢动作）
-- **THEN** 兜底时限按倍率换算（极大倍率最多按 10 倍计），正常慢动作展开不被兜底打断
+#### Scenario: enough time under system slow motion
+- **WHEN** the system animation speed multiplier is greater than 1 (slow motion)
+- **THEN** the fallback time limit is converted by the multiplier (an extreme multiplier is counted at most as 10x), and a normal slow-motion expansion is not interrupted by the fallback
 
-#### Scenario: 关闭动画时直接就位
-- **WHEN** 系统关闭了动画（reduce motion）
-- **THEN** 展开不播动画、直接就位并调用展开完成回调，不走超时路径
+#### Scenario: settle immediately when animations are off
+- **WHEN** the system has animations turned off (reduce motion)
+- **THEN** the expansion plays no animation, settles immediately and calls the expand-completion callback, without taking the timeout path
 
-### Requirement: 展开终态的卡片几何完整
-卡片展开完成后的可见状态 SHALL 与设计几何一致：卡片按缩放档位取完整宽度、水平居中于主屏，无贴边裁切或停留在半开缩放。
+### Requirement: The card geometry is complete in the expanded terminal state
+The visible state after the card finishes expanding SHALL match the design geometry: the card takes its full width for the scale tier, is horizontally centered on the main screen, and has no edge clipping or residual half-open scale.
 
-#### Scenario: 展开后卡片完整居中
-- **WHEN** 主屏竖屏、默认缩放档位下点开悬浮胶囊的卡片并等待展开完成
-- **THEN** 卡片区域整体在屏幕内，左右留边大体对称（居中），可见高度不小于该档位预期高度的下限
+#### Scenario: the card is complete and centered after expansion
+- **WHEN** with the main screen in portrait and the default scale tier, the user taps the floating capsule's card open and waits for the expansion to finish
+- **THEN** the card area lies entirely within the screen, the left/right margins are broadly symmetric (centered), and the visible height is not below the lower bound of the expected height for that tier

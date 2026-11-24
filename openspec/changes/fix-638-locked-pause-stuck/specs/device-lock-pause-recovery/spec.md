@@ -1,36 +1,36 @@
-# device-lock-pause-recovery 能力规格（新增）
+# device-lock-pause-recovery capability spec (added)
 
 ## ADDED Requirements
 
-### Requirement: 锁屏暂停的恢复不依赖广播必达
-任务因熄屏/锁屏暂停在「等你解锁手机」后，恢复判定必须由主动重读系统状态驱动：
-只要有任务在等这份状态，且上一次读到的仍是「锁着」（熄屏或锁屏都算），就按既定轮询周期持续重读；
-广播（SCREEN_ON / USER_PRESENT）只作为立即重读的加速信号，不允许成为恢复的唯一途径。
+### Requirement: Recovery from a lock-screen pause does not depend on broadcast delivery
+After a task pauses at 「等你解锁手机」 (waiting for you to unlock the phone) because of screen-off/lock, the recovery decision MUST be driven by actively re-reading the system state:
+as long as a task is waiting for this state and the last reading is still 「锁着」 (locked — screen off or lock screen both count), keep re-reading at the set polling period;
+broadcasts (SCREEN_ON / USER_PRESENT) serve only as acceleration signals for an immediate re-read and MUST NOT become the only route to recovery.
 
-#### Scenario: 广播全丢仍能自动继续
-- **WHEN** 任务暂停在等解锁，系统此后不投递任何 SCREEN_ON / USER_PRESENT 广播，用户亮屏并解锁手机
-- **THEN** 下一次轮询读到「亮屏且已解锁」时，暂停自动解除、任务继续，无需用户点任何按钮
+#### Scenario: Automatic continuation even when all broadcasts are lost
+- **WHEN** a task is paused waiting for unlock, the system delivers no SCREEN_ON / USER_PRESENT broadcast afterwards, and the user turns the screen on and unlocks the phone
+- **THEN** on the next poll reading 「亮屏且已解锁」 (screen on and unlocked), the pause lifts automatically and the task continues, with no button for the user to tap
 
-#### Scenario: 熄屏期间轮询不停止
-- **WHEN** 上一次读到的是熄屏（interactive=false）
-- **THEN** 轮询仍持续进行（否则亮屏后没有任何事件触发重读）
+#### Scenario: Polling does not stop while the screen is off
+- **WHEN** the last reading was screen-off (interactive=false)
+- **THEN** polling still continues (otherwise nothing would trigger a re-read after the screen is turned on)
 
-#### Scenario: 无人等待时不读系统
-- **WHEN** 没有任何订阅者在等这份锁屏状态
-- **THEN** 不发起周期性系统读取
+#### Scenario: No system reads when nobody is waiting
+- **WHEN** no subscriber is waiting for this lock state
+- **THEN** no periodic system reads are issued
 
-### Requirement: 订阅开始时校准旧状态
-新的订阅者开始等待锁屏状态时，应立即重读一次系统状态，使停更的旧值在等待开始时就得到校准，
-而不是等待第一个轮询周期。
+### Requirement: Calibrate the old state when a subscription starts
+When a new subscriber starts waiting for the lock state, it SHOULD re-read the system state once immediately, so the stale value is calibrated as soon as the wait begins,
+rather than waiting for the first polling period.
 
-#### Scenario: 订阅即自愈
-- **WHEN** 状态里停着过期的「锁着」，此刻系统实际已解锁，且有订阅者开始等待
-- **THEN** 订阅开始后立即重读，状态马上变为「未锁」，等待者立刻放行
+#### Scenario: Self-healing on subscription
+- **WHEN** the state holds a stale 「锁着」 (locked) while the system is actually unlocked, and a subscriber starts waiting
+- **THEN** a re-read happens immediately after the subscription starts, the state becomes 「未锁」 (unlocked) right away, and the waiter is released at once
 
-### Requirement: 恢复判定仍以系统真值为准
-恢复只认重读到的真值（亮屏且设备未锁），不因广播到达、解锁流程自称成功而放行；
-真锁屏期间（如解锁广播早于锁屏界面退下的窗口）不得提前放行。
+### Requirement: The recovery decision still uses the system's true state
+Recovery only accepts the re-read true value (screen on and device unlocked) and does not proceed because a broadcast arrived or the unlock flow claims success;
+during a true lock (e.g. the window where the unlock broadcast arrives before the lock screen dismisses) it MUST NOT proceed early.
 
-#### Scenario: 解锁广播先到、设备仍锁
-- **WHEN** 重读到亮屏但 `isDeviceLocked` 仍为 true
-- **THEN** 保持暂停，直到读到设备真正解锁
+#### Scenario: Unlock broadcast arrives first while the device is still locked
+- **WHEN** the re-read shows the screen on but `isDeviceLocked` is still true
+- **THEN** the pause is kept until the device is read as truly unlocked

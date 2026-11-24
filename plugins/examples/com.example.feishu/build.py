@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""把示例插件打成两个 zip：
+"""Build the example plugin into two zips:
 
-- dist/com.example.feishu-skill-0.1.0.zip：P1a 能直接安装的技能版（manifest.json）
-- dist/com.example.feishu-full-0.2.0.zip：等 P1b 合入后使用的工具版（manifest.full.json 改名成 manifest.json）
+- dist/com.example.feishu-skill-0.1.0.zip: the skill-only version P1a can install directly (manifest.json)
+- dist/com.example.feishu-full-0.2.0.zip: the tools version for after P1b lands (manifest.full.json renamed to manifest.json)
 
-只用标准库；zip 条目统一用 `/`，不打包 README、build.py、manifest.full.json 等非插件内容。
+Standard library only; zip entries always use `/`; non-plugin files such as README, build.py and manifest.full.json are not packed.
 """
 
 import argparse
@@ -22,7 +22,7 @@ def add(zf, source, arcname):
 
 
 def files_under(folder):
-    """插件内容:跳过 __pycache__ 和 .pyc,它们不是安装包的一部分。"""
+    """Plugin contents: skip __pycache__ and .pyc, which are not part of the package."""
     for f in sorted((ROOT / folder).rglob("*")):
         if f.is_file() and "__pycache__" not in f.parts and f.suffix != ".pyc":
             yield f

@@ -1,19 +1,19 @@
-## 1. CLI 报错实现
+## 1. CLI error implementation
 
-- [x] 1.1 `mika_cli.py` 新增 `incompatible(info, capability, remedy)`：从 `info` 取 `server_version`（非空字符串时），构造含能力名 + 版本（已知时）+ 补救的文案，`CliError("incompatible_api", …, capability=…, server_version=…)`
-- [x] 1.2 四处门禁换用该函数：`run_with_files` 显式 `--request-id`（补救=去掉参数照常提交）、`execute` 的 steer 分支、export 分支、`require_files`
-- [x] 1.3 `discover()` 404 / api_version 不符路径保持原样，确认无回归
+- [x] 1.1 `mika_cli.py` gains `incompatible(info, capability, remedy)`: takes `server_version` from `info` (when a non-empty string) and builds copy containing the capability name + version (when known) + remedy, `CliError("incompatible_api", …, capability=…, server_version=…)`
+- [x] 1.2 The four gates switch to this helper: `run_with_files` explicit `--request-id` (remedy = drop the parameter and submit as usual), the steer branch of `execute`, the export branch, and `require_files`
+- [x] 1.3 The `discover()` 404 / api_version mismatch paths stay as-is, confirmed no regression
 
-## 2. 测试
+## 2. Tests
 
-- [x] 2.1 `test_explicit_request_id_never_downgrades_on_an_old_phone` 补断言：文案含 `task_recovery`、`"test"`（DISCOVERY 版本）、`without --request-id`；`error.capability`/`error.server_version` 字段正确
-- [x] 2.2 `test_steer_requires_capability_and_never_falls_back_to_run` 补断言：文案含 `task_steer`，`error.capability` 正确
-- [x] 2.3 新增 export 门禁断言（挂在既有 `test_export_requires_capability_and_unknown_id_is_explicit` 第一段）：文案含 `run_export`
-- [x] 2.4 新增/扩展无 `server_version` 的场景：字段与版本短语不出现、指引仍在
-- [x] 2.5 跑 `companions/mika` 全量 CLI 测试（含既有 `RemoteCliContractTest` 由 cliTest 覆盖）
+- [x] 2.1 `test_explicit_request_id_never_downgrades_on_an_old_phone` gains assertions: the copy contains `task_recovery`, `"test"` (the DISCOVERY version), `without --request-id`; the `error.capability`/`error.server_version` fields are correct
+- [x] 2.2 `test_steer_requires_capability_and_never_falls_back_to_run` gains assertions: the copy contains `task_steer` and `error.capability` is correct
+- [x] 2.3 New export gate assertion (hooked into the first section of the existing `test_export_requires_capability_and_unknown_id_is_explicit`): the copy contains `run_export`
+- [x] 2.4 New/extended scenario without `server_version`: the field and version phrase do not appear, and the guidance is still present
+- [x] 2.5 Run the full CLI test suite for `companions/mika` (including the existing `RemoteCliContractTest`, covered by cliTest)
 
-## 3. 文档与验证
+## 3. Docs and verification
 
-- [x] 3.1 `companions/mika/SKILL.md`：错误表 `incompatible_api` 行改为配对指引；`--request-id` 段补「手机报 incompatible_api 时可去掉该参数照常提交」一句
-- [x] 3.2 本地跑 CI 四组对应项：`python3 -m unittest discover -s companions/mika`、`:core:test`、`:core:cliTest`（cliTest 覆盖真实 CLI×真实服务契约）
-- [ ] 3.3 开分支 `fix/314-cli-version-mismatch-errors`，中文提交，PR 关联 #314，正文附实测错误输出样例
+- [x] 3.1 `companions/mika/SKILL.md`: the `incompatible_api` row of the error table becomes paired guidance; the `--request-id` section gains a sentence "when the phone reports incompatible_api you can drop the parameter and submit as usual"
+- [x] 3.2 Run the CI four-group counterparts locally: `python3 -m unittest discover -s companions/mika`, `:core:test`, `:core:cliTest` (cliTest covers the real CLI × real service contract)
+- [ ] 3.3 Open the branch `fix/314-cli-version-mismatch-errors`, commit in Chinese, PR referencing #314, body with real measured error output samples

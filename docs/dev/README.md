@@ -2,7 +2,7 @@
 
 For people who want to read or change the code, or add knowledge. For building and opening PRs, read the [contributing guide](../../.github/CONTRIBUTING.md) first. User docs are [one level up](../README.md).
 
-Apart from the knowledge format, the developer docs are in Chinese for now.
+The developer docs are in English.
 
 ## Read first
 
@@ -15,7 +15,7 @@ Apart from the knowledge format, the developer docs are in Chinese for now.
 
 | Doc | What it covers |
 | --- | --- |
-| [knowledge-format.md](knowledge-format.md) ([简体中文](knowledge-format.md)) | Format of built-in app knowledge (`APP.md`), website knowledge (`SITE.md`) and skills (`SKILL.md`) |
+| [knowledge-format.md](knowledge-format.md) ([Simplified Chinese](knowledge-format.md)) | Format of built-in app knowledge (`APP.md`), website knowledge (`SITE.md`) and skills (`SKILL.md`) |
 | [skill-scripts.md](skill-scripts.md) | Where scripts that come with knowledge and skills go, and how they run in the sandbox |
 
 ## Topic notes and verification records

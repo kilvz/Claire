@@ -1,26 +1,26 @@
 ## Why
 
-#314：用户把 Mika 装进模拟器、用桥接程序经官方 CLI 遥控时撞上两类版本不匹配，报错都不足以定位：新版 CLI 对无 `task_recovery` 能力的旧 App 只说「Update the phone app to submit a recoverable request」——不指名缺哪个能力、不报手机当前版本（`discover()` 明明已从 `GET /api/v1` 拿到 `server_version`）、更不说「去掉 `--request-id` 即可照常提交」这个立即可用的绕过手段；steer / export / task_files 三处门禁同样只有一句笼统的「update the phone app」。维护者分诊（TRIAGE-2026-11-18 §2.3）已圈定范围：只做这两种不匹配的**明确报错**，不碰模拟器场景本身。
+#314: when a user installed Mika in an emulator and controlled it through a bridge program via the official CLI, they hit two kinds of version mismatch whose errors are insufficient to localize the problem: for an old App lacking the `task_recovery` capability, the new CLI only says "Update the phone app to submit a recoverable request" — it does not name the missing capability, does not report the phone's current version (`discover()` has clearly already got `server_version` from `GET /api/v1`), and does not mention the immediately usable workaround "drop `--request-id` and submit as usual"; the steer / export / task_files gates likewise only have the one vague line "update the phone app". Maintainer triage (TRIAGE-2026-11-18 §2.3) has scoped it: only make these two mismatches produce **clear errors**, without touching the emulator scenario itself.
 
 ## What Changes
 
-- CLI 四处能力门禁（`--request-id`→`task_recovery`、`steer`→`task_steer`、`export`→`run_export`、附件/下载→`task_files`）触发 `incompatible_api` 时，报错文案统一为「手机 Mika 版本（已知时）+ 缺失能力名 + 可执行补救」；`--request-id` 的补救必须写明可去掉该参数照常提交。
-- 错误 JSON（`--json` 输出与退出码 2 的 stderr）新增结构化字段 `capability`、`server_version`（已知时），桥接程序可据此自动降级（#314 报告人正是靠错误码分支绕过的）。
-- `companions/mika/SKILL.md` 错误表中 `incompatible_api` 一行同步为配对指引（能力 → 需更新手机 App / 或去掉参数重试）。
-- 旧 CLI 不认 `--request-id`（argparse 拒绝）方向：已发布的旧 CLI 无法追改，只在 SKILL.md 配对说明中写明，不改代码。
+- When the CLI's four capability gates (`--request-id`→`task_recovery`, `steer`→`task_steer`, `export`→`run_export`, attachments/downloads→`task_files`) trigger `incompatible_api`, the error copy is unified as "phone Mika version (when known) + missing capability name + actionable remedy"; the remedy for `--request-id` must state that the parameter can be dropped and submission proceed as usual.
+- The error JSON (`--json` output and the stderr for exit code 2) gains structured fields `capability` and `server_version` (when known), so bridge programs can auto-downgrade from them (the #314 reporter worked around it precisely by branching on the error code).
+- The `incompatible_api` row of the error table in `companions/mika/SKILL.md` is updated to paired guidance (capability → update the phone App / or drop the parameter and retry).
+- The old-CLI-does-not-recognize-`--request-id` (argparse rejects it) direction: released old CLIs cannot be retrofitted, so it is only documented in the SKILL.md paired guidance, with no code change.
 
 ## Capabilities
 
 ### New Capabilities
-- `cli-capability-errors`: CLI 在手机 App 能力不足时的报错契约——必须可诊断（含手机版本与能力名）、可行动（给出补救），并为机器调用方提供结构化字段。
+- `cli-capability-errors`: the error contract when the phone App lacks capabilities — must be diagnosable (including phone version and capability name), actionable (giving a remedy), and provide structured fields for machine callers.
 
 ### Modified Capabilities
 
-（无——`openspec/specs/` 尚无主规格，本变更首次为该能力立规格。）
+(None — `openspec/specs/` has no main spec yet; this change establishes the spec for this capability for the first time.)
 
 ## Impact
 
-- `companions/mika/scripts/mika_cli.py`：新增 `incompatible(info, capability, remedy)` 辅助函数；替换 4 处门禁的 `CliError` 构造（`run_with_files`、`execute` 的 steer/export 分支、`require_files`）。`discover()` 404 / api_version 不符两条路径保持原文案（此时无 server_version 可报）。
-- `companions/mika/tests/test_mika_cli.py`：既有 3 处 `incompatible_api` 断言补文案与结构化字段检查；新增 export 门禁文案断言。
-- `companions/mika/SKILL.md`：错误表 1 行 + `--request-id` 段落 1 句。
-- 不改 App 侧（Kotlin）：API 已正确广播 capabilities，旧 APK 无法追改；`RemoteCliContractTest` 走的happy path 不受影响。
+- `companions/mika/scripts/mika_cli.py`: new `incompatible(info, capability, remedy)` helper; replaces the `CliError` construction at the 4 gates (`run_with_files`, the steer/export branches of `execute`, `require_files`). The `discover()` 404 / api_version mismatch paths keep their original copy (there is no server_version to report at that point).
+- `companions/mika/tests/test_mika_cli.py`: the 3 existing `incompatible_api` assertions gain copy and structured-field checks; a new export gate copy assertion.
+- `companions/mika/SKILL.md`: 1 row of the error table + 1 sentence in the `--request-id` section.
+- No App-side (Kotlin) changes: the API already broadcasts capabilities correctly and old APKs cannot be retrofitted; the happy path taken by `RemoteCliContractTest` is unaffected.

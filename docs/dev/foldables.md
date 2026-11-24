@@ -1,21 +1,21 @@
-# 折叠屏适配
+# Foldable adaptation
 
-主界面与独立文件查看页按窗口可用空间和 Jetpack WindowManager 报告的分隔折痕布局。窗口未被折痕分隔且使用单栏时，系统栏和键盘仍由原页面处理。
+The main interface and the standalone file viewer lay out according to the window's available space and the separating fold reported by Jetpack WindowManager. When the window is not divided by a fold and a single column is used, the system bars and keyboard are still handled by the original page.
 
-| 窗口 | 布局 |
+| Window | Layout |
 | --- | --- |
-| 可用宽度不足 640dp 或高度不足 480dp | 使用原有的单栏页面和聊天抽屉 |
-| 可用宽度 ≥ 640dp、高度 ≥ 480dp | 左侧为会话列表，右侧为聊天或侧栏选中的定时任务、记忆与技能、浏览器。中线可拖动，左侧至少 280dp，右侧至少 320dp |
-| 一个竖直分隔铰链，左右分别至少 280dp 和 360dp，高度 ≥ 480dp | 以铰链为固定分界，包括零宽折痕 |
-| 横向半折、多铰链或铰链一侧过窄 | 在面积最大的完整区域内布局 |
+| Available width under 640dp or height under 480dp | Use the original single-column page and chat drawer |
+| Available width ≥ 640dp, height ≥ 480dp | Conversation list on the left, chat or the scheduled task, memory and skills, or browser selected in the sidebar on the right. The middle line is draggable, the left side at least 280dp, the right side at least 320dp |
+| One vertical separating hinge, at least 280dp and 360dp on the left and right respectively, height ≥ 480dp | Use the hinge as a fixed divider, including a zero-width fold |
+| Horizontal half-fold, multiple hinges, or one side of the hinge too narrow | Lay out within the largest complete area |
 
-**操作画面。** 双栏聊天把运行中的画面放到左侧。菜单切回会话列表，列表中的「看画面」可恢复预览。手机虚拟屏按预览可用空间调整，在同一个 displayId 上更换尺寸、密度和接收画面的 Surface。长边最多 2048px，预览随应用方向旋转，等比缩放到短边最多 720px。新建的普通后台屏沿用主屏尺寸，预览短边最多 360px。网页沿用浏览器自己的视口策略。
+**Operation screen.** Two-column chat puts the running screen on the left. The menu switches back to the conversation list, and 「看画面」 (View screen) in the list restores the preview. The phone's virtual screen adjusts to the preview's available space, changing size, density and the Surface receiving the picture on the same displayId. The long side is at most 2048px, the preview rotates with the app's orientation and scales proportionally so the short side is at most 720px. A newly created ordinary background screen uses the main screen's size, with the preview's short side at most 360px. Web pages follow the browser's own viewport strategy.
 
-**控制权。** 点顶部状态或首次点自动操作中的画面申请接管。当前动作结束后，画面内的点击、滑动、返回和输入会送往本次运行的目标。再点顶部状态交回，Mika 重新观察后继续。变更尺寸时拒绝旧坐标。切到窄屏后使用悬浮小窗，已接管的任务也可从聊天的「继续」交回。
+**Control.** Tap the top status, or tap the screen during automatic operation for the first time, to request takeover. After the current action finishes, taps, swipes, back and input within the screen are sent to this run's target. Tap the top status again to hand back, and Mika observes again before continuing. Old coordinates are rejected when the size changes. After switching to a narrow screen, the floating small window is used, and a task already taken over can also be handed back from the chat's 「继续」 (Continue).
 
-**回归验证。** JVM 用例覆盖尺寸断点、铰链、坐标转换和控制权互斥。展开真机上的 `SidebarDestinationsDeviceTest` 覆盖侧栏切页和窄宽窗口切换，`InlineScreenControlDeviceTest` 在真实虚拟屏上验证拖动分栏、保持 displayId、点击输入及交回。后一用例需要已连接的手机助手与无障碍服务，输入验证使用测试包自带的原生页面。
+**Regression verification.** JVM cases cover size breakpoints, hinges, coordinate conversion and mutual exclusion of control. `SidebarDestinationsDeviceTest` on an unfolded real device covers sidebar page switching and switching between narrow and wide windows, and `InlineScreenControlDeviceTest` verifies dragging the split, keeping the displayId, tap input and handing back on a real virtual screen. The latter case requires a connected phone assistant and accessibility service, and the input verification uses the native pages bundled with the test package.
 
-**物理姿态验收。** `PhysicalFoldDeviceTest` 默认跳过，只有显式传入 `physicalFold=true` 才执行。适用于 `dumpsys device_state` 将物理姿态命名为 `OPENED`、`CLOSED`、`HALF_OPENED` 的设备。先横屏展开，再按 `adb logcat -s PhysicalFoldCheck` 日志中的提示依次合屏并解锁外屏、保持约 90° 半折、重新横屏展开；每个姿态最多等待三分钟。用例保留一段未发送草稿，检查外屏单栏、半折时标题和输入框不跨铰链、展开后恢复双栏。它读取物理状态并拒绝状态覆盖，不调用模拟折叠命令。截图写入应用外部文件目录的 `fold-verification/`。
+**Physical posture acceptance.** `PhysicalFoldDeviceTest` is skipped by default and runs only when `physicalFold=true` is explicitly passed. It applies to devices whose physical posture `dumpsys device_state` names `OPENED`, `CLOSED`, `HALF_OPENED`. First unfold in landscape, then follow the prompts in the `adb logcat -s PhysicalFoldCheck` log to close the screen and unlock the cover screen, hold a half-fold at about 90°, and unfold again in landscape; wait at most three minutes for each posture. The case keeps an unsent draft, checks the cover screen's single column, that the title and input field do not cross the hinge when half-folded, and that two columns are restored after unfolding. It reads the physical state and rejects state overrides; it does not call simulated fold commands. Screenshots are written to `fold-verification/` in the app's external files directory.
 
 ```sh
 adb shell am instrument -w -r --no-window-animation \

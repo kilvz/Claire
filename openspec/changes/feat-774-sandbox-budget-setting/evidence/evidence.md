@@ -1,27 +1,27 @@
-# 取证时间线（真机：华为 Mate X2，TET-AN50，API 31，2026-11-21）
+# Evidence timeline (real device: Huawei Mate X2, TET-AN50, API 31, 2026-11-21)
 
-| 时刻 | 操作 | 结果 |
+| Time | Action | Result |
 |---|---|---|
-| 17:32 | `./gradlew :app:assembleDebug` 构建含改动的 debug 包 | BUILD SUCCESSFUL |
-| 17:33 | 装包前核查：最近运行记录最新为 2026-11-20（无活跃任务）、截屏确认前台为空聊天首页 | 安全，可操作 |
-| 17:33 | `adb install -r app-debug.apk` | Success；首启弹「语言偏好」引导，点「暂不设置」保持原设置 |
-| 17:34 | 侧栏 › 设置 › 任务运行 | 新行「每个任务的沙箱时间上限」出现在「定时任务最长运行时间」之后，值为默认 **30 分钟**（截图 01） |
-| 17:34 | 点该行 | 弹窗标题 + 说明文案 + 四档单选：30 / 60 / 120 / 240 分钟（截图 02） |
-| 17:35 | 选「240 分钟」 | 行值回写为 **240 分钟**（截图 03）；`run-as … cat shared_prefs/feature_flags.xml` 显示 `sandbox_budget_limit_minutes" value="240"` |
-| 17:36 | 重新选回「30 分钟」 | prefs 回 `value="30"`，设备恢复默认状态，退出设置 |
+| 17:32 | `./gradlew :app:assembleDebug` builds the debug package containing the changes | BUILD SUCCESSFUL |
+| 17:33 | Pre-install check: the latest run record is 2026-11-20 (no active tasks), a screenshot confirms the foreground is the empty chat home screen | Safe, OK to proceed |
+| 17:33 | `adb install -r app-debug.apk` | Success; the first launch shows the 「语言偏好」 (Language preference) guide, tapping 「暂不设置」 (Not now) keeps the existing settings |
+| 17:34 | 侧栏 (sidebar) › 设置 (Settings) › 任务运行 (Task runs) | The new row 「每个任务的沙箱时间上限」 (Per-task sandbox time limit) appears after 「定时任务最长运行时间」 (Max runtime for scheduled tasks), with the default value **30 minutes** (screenshot 01) |
+| 17:34 | Tap that row | Dialog title + description copy + four radio tiers: 30 / 60 / 120 / 240 minutes (screenshot 02) |
+| 17:35 | Select 「240 分钟」 (240 minutes) | The row value is written back as **240 minutes** (screenshot 03); `run-as … cat shared_prefs/feature_flags.xml` shows `sandbox_budget_limit_minutes" value="240"` |
+| 17:36 | Select 「30 分钟」 (30 minutes) back | prefs returns to `value="30"`, the device is restored to its default state, exit settings |
 
-默认行为不变与守卫数学（默认/自定义档的拒绝时机、消息分钟数、capTimeout 夹取）由 `SandboxGuardTest`（core，5 例）与 `FeatureFlagsSandboxBudgetTest`（app，1 例）覆盖；本地全量四组测试见下。
+Default behavior being unchanged and the guard math (rejection timing on the default/custom tiers, minute count in the message, capTimeout clamping) are covered by `SandboxGuardTest` (core, 5 cases) and `FeatureFlagsSandboxBudgetTest` (app, 1 case); the four full local test groups are below.
 
-## 本地测试（2026-11-21）
+## Local tests (2026-11-21)
 
-- `./gradlew :core:test`：全绿（含新增 SandboxGuardTest 5 例）
-- `./gradlew :core:cliTest`：OK
-- `python3 -m unittest discover -s tools/i18n`：12 例 OK；`python3 tools/i18n/translations.py check`：3718 resources / 12 语言通过
-- `python3 -m unittest discover -s tools -p 'test_pull_logs.py'`：OK
-- `./gradlew :app:testDebugUnitTest`：全绿（首轮 TerminalHubTest.deletingProjectClosesSharedProjectTerminal 一次 15s 超时 flake，单独重跑与整组重跑均绿，与本次改动无关——该用例预算 2s→15s 是维护者刚在 3b513b1e 调过的时序敏感项）
-- `./gradlew :app:assembleDebug :app:compileDebugAndroidTestKotlin`（CI app 组构成）：通过
-- `./gradlew :core:relayTest`（Go 组）：BUILD SUCCESSFUL
+- `./gradlew :core:test`: all green (including the 5 new SandboxGuardTest cases)
+- `./gradlew :core:cliTest`: OK
+- `python3 -m unittest discover -s tools/i18n`: 12 cases OK; `python3 tools/i18n/translations.py check`: 3718 resources / 12 languages pass
+- `python3 -m unittest discover -s tools -p 'test_pull_logs.py'`: OK
+- `./gradlew :app:testDebugUnitTest`: all green (in the first round TerminalHubTest.deletingProjectClosesSharedProjectTerminal had a one-off 15s timeout flake; rerunning it alone and rerunning the whole group were both green, unrelated to this change — that case's 2s→15s budget is a timing-sensitive item the maintainer just adjusted in 3b513b1e)
+- `./gradlew :app:assembleDebug :app:compileDebugAndroidTestKotlin` (the composition of the CI app group): passes
+- `./gradlew :core:relayTest` (Go group): BUILD SUCCESSFUL
 
-## 设备用例
+## Device test cases
 
-未跑（本变更不涉设备用例；本机 instrumentation 因无障碍绑定挂起不可用，见 AGENTS.md——连续两轮验证过该 ROM 状态，重启才能清而 PIN 锁 adb 解不开）。
+Not run (this change does not involve device test cases; instrumentation on this machine is unusable because the accessibility binding hangs, see AGENTS.md — this ROM state was verified over two consecutive rounds, it only clears after a reboot and the PIN lock makes adb unable to unlock it).

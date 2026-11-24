@@ -43,12 +43,12 @@ case "$limit" in *[!0-9]*) limit=20 ;; esac
 
 if [ "$action" = "list" ]; then
     if [ ! -f "$ledger" ]; then
-        echo "台账还是空的:$ledger"
+        echo "The ledger is still empty: $ledger"
         exit 0
     fi
     total=$(grep -c '^- ' "$ledger" 2>/dev/null || echo 0)
-    echo "台账:$ledger"
-    echo "条目:$total"
+    echo "Ledger: $ledger"
+    echo "Entries: $total"
     echo "---"
     grep '^- ' "$ledger" 2>/dev/null | tail -n "$limit"
     exit 0
@@ -65,13 +65,13 @@ fi
 # Entries without a source are always rejected: this is the one rule the whole flow cannot bend on
 case "$source" in
     http://*|https://*) ;;
-    *) echo "error: source is required and must be an http(s) URL — 没有来源的线索不收"; exit 4 ;;
+    *) echo "error: source is required and must be an http(s) URL — leads without a source are not accepted"; exit 4 ;;
 esac
 
 stamp=$(date '+%Y-%m-%d %H:%M')
 {
-    printf -- '- %s | %s | 来源: %s' "$stamp" "$text" "$source"
-    [ -n "$tag" ] && printf ' | 标签: %s' "$tag"
+    printf -- '- %s | %s | source: %s' "$stamp" "$text" "$source"
+    [ -n "$tag" ] && printf ' | tag: %s' "$tag"
     printf '\n'
 } >> "$ledger"
 

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mika · Root 设置原型</title>
+<title>Mika · Root settings prototype</title>
 <style>
   * { box-sizing: border-box; }
   :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -50,42 +50,42 @@
 <div class="phone">
   <div class="status"><span>9:41</span><span>● ● ●</span></div>
   <section id="advanced">
-    <div class="nav"><h1>高级与其他</h1></div>
+    <div class="nav"><h1>Advanced & other</h1></div>
     <div class="content">
-      <div class="label">高级能力</div>
+      <div class="label">Advanced capabilities</div>
       <div class="card">
-        <div class="row"><div class="icon">↗</div><div class="copy"><div class="title">网络代理</div><div class="sub">为网络请求设置代理</div></div><span class="chevron">›</span></div>
-        <div class="row"><div class="icon">⌘</div><div class="copy"><div class="title">文件与计算环境</div><div class="sub">沙箱与本地运行环境</div></div><span class="chevron">›</span></div>
-        <button class="row" id="openRoot"><div class="icon">⌾</div><div class="copy"><div class="title">Root</div><div class="sub">助手自动使用 · Root 命令已关闭</div></div><span class="chevron">›</span></button>
+        <div class="row"><div class="icon">↗</div><div class="copy"><div class="title">Network proxy</div><div class="sub">Set a proxy for network requests</div></div><span class="chevron">›</span></div>
+        <div class="row"><div class="icon">⌘</div><div class="copy"><div class="title">Files & compute environment</div><div class="sub">Sandbox and local runtime</div></div><span class="chevron">›</span></div>
+        <button class="row" id="openRoot"><div class="icon">⌾</div><div class="copy"><div class="title">Root</div><div class="sub">Used automatically by the assistant · Root commands are off</div></div><span class="chevron">›</span></button>
       </div>
-      <div class="note">仅在检测到手机已有 Root 能力时显示 Root 入口。</div>
+      <div class="note">The Root entry only appears when the phone is detected to already have Root.</div>
     </div>
   </section>
   <section id="rootPage" class="hidden">
     <div class="nav"><button class="back" id="back">‹</button><h1>Root</h1></div>
     <div class="content">
-      <div class="card root-status"><span class="dot"></span><div class="copy"><div class="title">Root 可用</div><div class="sub">已授权 Mika 使用超级管理员权限</div></div></div>
-      <div class="label">手机操作</div>
+      <div class="card root-status"><span class="dot"></span><div class="copy"><div class="title">Root available</div><div class="sub">Mika has been granted superuser access</div></div></div>
+      <div class="label">Phone control</div>
       <div class="card">
-        <div class="row"><div class="icon">▣</div><div class="copy"><div class="title">自动启动手机助手</div><div class="sub">无需配对或电脑，重启后自动恢复</div></div><span class="badge">自动</span></div>
+        <div class="row"><div class="icon">▣</div><div class="copy"><div class="title">Start the phone assistant automatically</div><div class="sub">No pairing or computer needed; recovers automatically after a reboot</div></div><span class="badge">Automatic</span></div>
       </div>
-      <div class="note">Root 可用时自动优先使用，没有单独开关。授权被撤销或 Root 不可用时，回退到现有启动方式。</div>
-      <div class="label">高级权限</div>
+      <div class="note">When Root is available it is used first automatically, with no separate switch. If authorization is revoked or Root becomes unavailable, it falls back to the existing startup method.</div>
+      <div class="label">Advanced permissions</div>
       <div class="card">
-        <div class="row danger"><div class="icon">›_</div><div class="copy"><div class="title">允许执行 Root 命令</div><div class="sub" id="commandState">已关闭 · Agent 不能执行 Root 命令</div></div><button class="switch" id="commandSwitch" aria-label="允许执行 Root 命令"></button></div>
+        <div class="row danger"><div class="icon">›_</div><div class="copy"><div class="title">Allow Root commands</div><div class="sub" id="commandState">Off · The agent cannot run Root commands</div></div><button class="switch" id="commandSwitch" aria-label="Allow Root commands"></button></div>
       </div>
-      <div class="note">默认关闭。开启后，高权限命令仍按现有确认规则询问用户；错误命令可能损坏应用数据或系统。</div>
+      <div class="note">Off by default. When enabled, privileged commands still ask the user under the existing confirmation rules; a wrong command can damage app data or the system.</div>
     </div>
   </section>
   <div class="scrim hidden" id="warning">
     <div class="dialog">
-      <h2>允许 Mika 执行 Root 命令？</h2>
-      <p>Root 命令可以读取或修改其他应用和系统数据。错误命令可能导致数据丢失、应用异常，甚至系统无法启动。只在你理解风险并信任任务内容时开启。</p>
-      <div class="actions"><button id="cancel">取消</button><button class="allow" id="allow">我理解风险，允许</button></div>
+      <h2>Allow Mika to run Root commands?</h2>
+      <p>Root commands can read or modify other apps' and system data. A wrong command can cause data loss, app failures, or even keep the system from booting. Enable this only if you understand the risk and trust the task.</p>
+      <div class="actions"><button id="cancel">Cancel</button><button class="allow" id="allow">I understand the risk, allow</button></div>
     </div>
   </div>
 </div>
-<div class="hint">点击 Root 进入页面；点击 Root 命令开关查看确认流程</div>
+<div class="hint">Click Root to open the page; click the Root command switch to see the confirmation flow</div>
 <script>
   const advanced = document.getElementById('advanced');
   const rootPage = document.getElementById('rootPage');
@@ -97,14 +97,14 @@
   commandSwitch.onclick = () => {
     if (commandSwitch.classList.contains('on')) {
       commandSwitch.classList.remove('on');
-      commandState.textContent = '已关闭 · Agent 不能执行 Root 命令';
+      commandState.textContent = 'Off · The agent cannot run Root commands';
     } else warning.classList.remove('hidden');
   };
   document.getElementById('cancel').onclick = () => warning.classList.add('hidden');
   document.getElementById('allow').onclick = () => {
     warning.classList.add('hidden');
     commandSwitch.classList.add('on');
-    commandState.textContent = '已开启 · 高权限命令仍会按规则确认';
+    commandState.textContent = 'On · Privileged commands are still confirmed under the rules';
   };
 </script>
 </body>

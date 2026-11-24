@@ -1,83 +1,83 @@
-# 语音模型统一接入设计
+# Unified voice model integration design
 
-日期：2026-11-22  
-状态：已批准（2026-11-22）  
-工作分支：`worktree-voice-model-integration`
+Date: 2026-11-22  
+Status: Approved (2026-11-22)  
+Working branch: `worktree-voice-model-integration`
 
-## 1. 目标与原因
+## 1. Goals and rationale
 
-Mika 的语音输入、回答朗读和实时语音通话，本应只是三种使用方式：
-
-```text
-语音输入 → STT：音频 → 文字
-回答朗读 → TTS：文字 → 音频
-实时通话 → Realtime：音频 ↔ 音频 + 事件
-```
-
-现在的问题不是功能本身复杂，而是三种模型各接各的：
-
-- STT 有聊天服务商模型、独立凭据的流式服务、自建服务和系统识别等不同配置形态；聊天服务商模型还会用一秒静音依次尝试多种协议。
-- TTS 复用聊天服务商，但需要在服务商的模型上写全局「仅朗读」标记，影响聊天、看图、备援和模型组。
-- Realtime 另有独立的配置、凭据、选择和测试状态。
-
-这次只做一件事：**用同一套语音模型目录和适配器机制接入 STT、TTS、Realtime，再让三个功能统一从这里取模型。**
-
-目标是以后接入一个语音模型时，只处理一次：配置服务、声明能力和协议、测试、被功能使用。功能代码不再认识具体服务商，也不再猜协议。
-
-## 2. 范围
-
-### 做
-
-- 建立统一的语音服务、语音模型和模型选择数据结构。
-- 建立 STT、TTS、Realtime 三类适配器注册与创建机制。
-- 迁移现有所有语音模型、协议、凭据引用、选择和测试状态。
-- 提供统一的语音模型管理页；现有语音输入、朗读和实时设置页从同一目录读取。
-- 去掉静音自动猜协议和全局「仅朗读」运行时规则。
-- 把 Android 系统识别和系统 TTS 也注册为内置语音模型；系统 TTS 使用标准 `TextToSpeech` API 补一个非流式适配器。
-- 保留现有协议的实际请求与响应行为，并补配置、迁移、适配器和设置页测试。
-
-### 不做
-
-- 不重写录音、播放器、音频焦点、蓝牙路由或后台服务。
-- 不重做实时通话、运营商通话、任务执行或审批逻辑。
-- 不增加新的云端服务商。
-- 不做本地模型下载、唤醒词或连续对话新功能。
-- 不在这次顺手修普通朗读和实时通话的既有媒体 bug；另开任务处理。
-- 不重构聊天模型主循环，也不把聊天、看图模型并入语音目录。
-
-## 3. 方案选择
-
-### A. 继续扩展现有配置
-
-保留 `SpeechChoice`、`VoiceChoice`、`CallVoiceProfile` 三套写入路径，只在界面上做一个统一入口。
-
-优点：改动少。缺点：底层仍是三套配置和三种规则，新增模型依然要分别处理，全局「仅朗读」耦合也还在。不采用。
-
-### B. 独立语音目录，复用现有账号和协议实现（采用）
-
-新建一个语音目录，统一保存语音服务、模型能力、协议和选择。已有聊天服务商可以作为账号来源被引用；语音自有服务仍由语音目录保存。现有 STT/TTS/Realtime 协议实现逐步挂到统一适配器注册表。
-
-优点：语音真正只有一套模型接入方式，同时不用重写聊天账号体系和已有协议。缺点：需要一次完整的旧配置迁移，并暂时保留迁移兼容代码。
-
-### C. 把语音协议全部塞进聊天 `Provider`
-
-继续扩大聊天服务商的协议类型和模型用途。
-
-优点：表面上少一个存储类。缺点：语音专用协议会反向影响聊天测试、模型组和用途选择，正是当前耦合的来源。不采用。
-
-## 4. 核心模型
-
-### 4.1 服务、模型、选择分开
-
-三个概念不再混在一个 `Choice` 里：
+Mika's voice input, answer read-aloud and realtime voice call should just be three ways of using things:
 
 ```text
-VoiceService：服务是谁，账号和凭据从哪里取
-VoiceModel：这个服务里的哪个模型，能做什么，分别使用什么协议
-VoiceSelection：语音输入、朗读、实时通话当前各选谁，以及音色/语言等使用偏好
+Voice input → STT: audio → text
+Answer read-aloud → TTS: text → audio
+Realtime call → Realtime: audio ↔ audio + events
 ```
 
-建议的数据形态如下，字段名可在实现时按项目风格调整：
+The problem today is not that the features themselves are complex, but that the three kinds of models are each wired up separately:
+
+- STT has different config shapes: chat provider models, streaming services with independent credentials, self-hosted services and system recognition; chat provider models also try multiple protocols in turn using one second of silence.
+- TTS reuses the chat provider, but needs a global "read-aloud only" flag written on the provider's model, which affects chat, image reading, fallback and model groups.
+- Realtime has its own separate config, credentials, selection and test state.
+
+This time we do only one thing: **integrate STT, TTS and Realtime through the same voice model catalog and adapter mechanism, and then let the three features all take models from there.**
+
+The goal is that onboarding a voice model in the future is handled only once: configure the service, declare capabilities and protocols, test, and be used by features. Feature code no longer knows about specific providers, nor guesses protocols.
+
+## 2. Scope
+
+### Do
+
+- Establish unified data structures for voice services, voice models and model selection.
+- Establish the registration and creation mechanism for the three adapter types, STT, TTS and Realtime.
+- Migrate all existing voice models, protocols, credential references, selections and test state.
+- Provide a unified voice model management page; the existing voice input, read-aloud and realtime settings pages read from the same catalog.
+- Remove the silent auto-probing of protocols and the global "read-aloud only" runtime rule.
+- Also register Android system recognition and system TTS as built-in voice models; system TTS uses the standard `TextToSpeech` API with an added non-streaming adapter.
+- Keep the actual request and response behavior of the existing protocols, and add config, migration, adapter and settings-page tests.
+
+### Don't
+
+- Do not rewrite the recorder, the player, audio focus, Bluetooth routing or the background service.
+- Do not redo the realtime call, carrier calls, task execution or approval logic.
+- Do not add new cloud providers.
+- Do not do local model downloads, wake words or continuous-conversation features.
+- Do not fix existing media bugs in ordinary read-aloud and realtime calls as part of this; handle those in a separate task.
+- Do not refactor the chat model main loop, and do not merge chat and image models into the voice catalog.
+
+## 3. Option selection
+
+### A. Keep extending the existing config
+
+Keep the three write paths `SpeechChoice`, `VoiceChoice` and `CallVoiceProfile`, and just add a unified entry on the UI.
+
+Pros: fewer changes. Cons: underneath there are still three sets of config and three sets of rules, a new model still has to be handled separately, and the global "read-aloud only" coupling remains. Not adopted.
+
+### B. A separate voice catalog that reuses the existing account and protocol implementations (adopted)
+
+Create a new voice catalog that uniformly stores voice services, model capabilities, protocols and selections. Existing chat providers can be referenced as account sources; services owned by voice are still stored by the voice catalog. The existing STT/TTS/Realtime protocol implementations are progressively attached to the unified adapter registry.
+
+Pros: voice truly has only one way of integrating models, while the chat account system and the existing protocols do not need rewriting. Cons: it needs one complete migration of old config, and migration compatibility code is kept temporarily.
+
+### C. Cram all voice protocols into the chat `Provider`
+
+Keep expanding the chat provider's protocol types and model purposes.
+
+Pros: on the surface, one fewer storage class. Cons: voice-specific protocols would in turn affect chat testing, model groups and purpose selection, which is exactly where the current coupling comes from. Not adopted.
+
+## 4. Core model
+
+### 4.1 Separate service, model and selection
+
+The three concepts are no longer mixed into a single `Choice`:
+
+```text
+VoiceService: who the service is, and where the account and credentials come from
+VoiceModel: which model in this service, what it can do, and which protocol each capability uses
+VoiceSelection: who voice input, read-aloud and realtime calls currently pick, plus usage preferences such as voice/language
+```
+
+The suggested data shapes are as follows; field names may be adjusted during implementation to match the project style:
 
 ```kotlin
 enum class VoiceCapability { STT, TTS, REALTIME }
@@ -110,17 +110,17 @@ data class VoiceModel(
 )
 ```
 
-能力直接由非空的 binding 得出，不再另存一份可能与协议冲突的布尔值。同一个模型可以同时具有 STT、TTS、Realtime binding；也可以只有其中一个。`VoiceModelRef` 带能力，所以同一个模型用于不同能力时仍有明确配置。
+Capabilities are derived directly from non-null bindings, with no separately stored boolean that could conflict with the protocol. The same model can have STT, TTS and Realtime bindings at the same time, or only one of them. `VoiceModelRef` carries the capability, so the same model still has an explicit config when used for different capabilities.
 
-### 4.2 协议是显式配置
+### 4.2 Protocols are explicit config
 
-每种 binding 都包含明确协议，不再根据模型名或探测结果猜：
+Each binding contains an explicit protocol, no longer guessed from the model name or probe results:
 
 ```text
 SttBinding
 ├── AndroidSystem
 ├── AudioTranscriptions
-├── ChatInputAudio（明确记录 data 写法和是否附转写指令）
+├── ChatInputAudio (explicitly records the data form and whether a transcript instruction is attached)
 ├── GeminiInline
 ├── DoubaoStreaming
 ├── FunAsrStreaming
@@ -136,178 +136,178 @@ RealtimeBinding
 └── OpenAiRealtime
 ```
 
-协议所需的非秘密参数放在对应 binding 中，例如地址、地域、资源 ID、业务空间。密钥只由账号来源提供，不进入 `VoiceModel`。
+Non-secret parameters the protocol needs go into the corresponding binding, such as address, region, resource ID and workspace. Secrets are only supplied by the account source and do not enter `VoiceModel`.
 
-现有五种 `TranscribeMethod` 在迁移时逐一映射为显式配置，不重新探测。自定义聊天音频协议如果存在不同写法，在高级设置里明确选择，不自动轮换。
+The five existing `TranscribeMethod` values are each mapped to explicit config during migration, without re-probing. If a custom chat audio protocol has different forms, choose explicitly in advanced settings; do not rotate automatically.
 
-### 4.3 使用偏好不属于模型定义
+### 4.3 Usage preferences are not part of the model definition
 
-音色、语速、识别语言、自动朗读开关等继续属于使用设置：
+Voice, speaking rate, recognition language, the auto read-aloud toggle and so on remain usage settings:
 
-- `SpeechSettings` 保留系统健康信息和 STT 使用偏好，当前模型改成 `VoiceModelRef` 选择。
-- `VoiceSettings` 保留 `enabled`、`autoRead`、`speakTool`、音色、语速、流式偏好和字数上限，当前模型改成 `VoiceModelRef`。
-- 实时通话保留自己的使用策略和当前 Realtime 选择。
+- `SpeechSettings` keeps the system health information and STT usage preferences, and the current model becomes a `VoiceModelRef` selection.
+- `VoiceSettings` keeps `enabled`, `autoRead`, `speakTool`, voice, speaking rate, streaming preference and the character cap, and the current model becomes a `VoiceModelRef`.
+- Realtime calls keep their own usage policy and current Realtime selection.
 
-这些设置不再保存一份协议副本；协议始终从目录中的模型取得。
+These settings no longer store a copy of the protocol; the protocol always comes from the model in the catalog.
 
-## 5. 统一目录与账号
+## 5. Unified catalog and accounts
 
 ### 5.1 `VoiceCatalogStore`
 
-新增唯一的语音目录，负责：
+Add the single voice catalog, responsible for:
 
-- 服务、模型和账号来源的增删改查。
-- 每个模型的连接测试、能力验证状态。
-- 当前 STT、TTS、Realtime 选择的读取和保存，或向现有使用设置提供统一读写接口。
-- 配置变化后使旧验证状态失效。
-- 非秘密配置原子写入；秘密仍经现有 `KeyCipher` 加密保存。
-- 向设置页和适配器工厂提供同一份状态流，避免不同页面各读一套。
+- CRUD for services, models and account sources.
+- Connection tests and capability verification status for each model.
+- Reading and saving the current STT, TTS and Realtime selections, or providing a unified read/write interface to the existing usage settings.
+- Invalidating old verification status after config changes.
+- Atomic writes of non-secret config; secrets are still stored encrypted through the existing `KeyCipher`.
+- Providing the same state stream to the settings pages and the adapter factory, so different pages do not each read their own copy.
 
-目录损坏时不得清空旧配置或静默回到默认。迁移完成前继续使用旧路径；迁移完成后，损坏应显示「语音配置读取失败」并保留修复入口。
+When the catalog is corrupted, do not clear the old config or silently fall back to defaults. Keep using the old path until migration completes; after migration, corruption should show 「语音配置读取失败」 (Could not read voice config) and keep a repair entry.
 
-### 5.2 复用聊天服务商账号，但不复用聊天用途规则
+### 5.2 Reuse chat provider accounts, but not chat usage rules
 
-`ExistingProvider(providerId)` 表示使用已有聊天服务商的地址、Key、请求头和模型目录：
+`ExistingProvider(providerId)` means using the address, key, request headers and model catalog of an existing chat provider:
 
-- 语音目录不复制这份 Key。
-- 添加语音模型时，可以直接选择已有服务商，再选择 STT/TTS/Realtime 能力和协议。
-- 服务商保存与聊天模型测试分离。只配置语音时，不发送聊天工具调用测试。
-- 聊天服务商被修改后，引用它的语音模型使用新账号信息，验证状态按配置指纹失效。
-- 删除服务商前列出引用它的语音模型；用户确认后一并删除这些语音模型，正在使用的选择回到安全的未配置状态并明确提示。不留无法解释的悬空引用。
+- The voice catalog does not copy this key.
+- When adding a voice model, you can directly select an existing provider, then select the STT/TTS/Realtime capability and protocol.
+- Provider saving is separate from chat model testing. When only voice is configured, no chat tool-call test is sent.
+- After a chat provider is modified, voice models referencing it use the new account information, and verification status is invalidated by config fingerprint.
+- Before deleting a provider, list the voice models that reference it; after the user confirms, delete those voice models too, and the selections in use return to a safe unconfigured state with a clear notice. Do not leave dangling references that cannot be explained.
 
-`VoiceOwned` 用于语音专用账号，例如现有独立流式 ASR 和 Realtime 配置。它仍由语音目录统一管理，不另开一套设置入口。
+`VoiceOwned` is for voice-owned accounts, such as the existing standalone streaming ASR and Realtime configs. They are still managed uniformly by the voice catalog, without opening a separate settings entry.
 
-`None` 用于 Android 系统模型和不需要凭据的自建服务。
+`None` is for Android system models and self-hosted services that need no credentials.
 
-## 6. 统一适配器
+## 6. Unified adapter
 
-### 6.1 一个注册表，三种会话接口
+### 6.1 One registry, three session interfaces
 
-新增 `VoiceAdapterRegistry`，按「能力 + 协议」寻找适配器。使用方只提交模型引用和本次使用参数：
-
-```text
-STT adapter     → 创建现有 SpeechSession
-TTS adapter     → 创建现有 TtsModel / StreamingTtsModel
-Realtime adapter → 创建现有 CallRealtimeSession
-```
-
-三种接口保持不同，不做一个包含所有方法的万能接口。统一的是：配置、注册、创建、测试和错误分类。
-
-现有 `VoiceInput`、`ReadAloud`、Realtime 会话不再按服务商或模型名选择实现，而是：
+Add `VoiceAdapterRegistry`, which finds an adapter by "capability + protocol". Callers submit only the model reference and this use's parameters:
 
 ```text
-当前 VoiceModelRef
-→ VoiceCatalogStore 读模型与账号
-→ VoiceAdapterRegistry 找适配器
-→ 返回原有会话/模型对象
-→ 走现有功能逻辑
+STT adapter     → create the existing SpeechSession
+TTS adapter     → create the existing TtsModel / StreamingTtsModel
+Realtime adapter → create the existing CallRealtimeSession
 ```
 
-系统能力没有 RecognitionService 或 TTS 引擎时，模型仍保留在目录里，但状态为不可用，并提供设置引导；不能静默消失，也不能暗中改用收费模型。
+The three interfaces stay different; do not build one universal interface containing every method. What is unified: config, registration, creation, testing and error classification.
 
-### 6.2 迁移现有实现
-
-- STT：保留 `SystemSpeech`、`ProviderSpeech`、`DoubaoSpeech`、`LiveSpeech` 和现有协议解析。`Transcriber` 的请求构造按显式协议复用，不再调用 `detect`。
-- TTS：保留现有 OpenAI Speech、Gemini TTS 和流式能力。新增系统 TTS 适配器。
-- Realtime：保留现有两种实时协议、事件和会话实现，把连接配置挂到统一适配器工厂。
-
-系统 TTS 第一版使用 `TextToSpeech.synthesizeToFile` + `UtteranceProgressListener` 生成完整 WAV，再交给现有 `VoicePlayer`。这样不引入第二套播放路径，也不改变现有朗读逻辑。初始化、语言数据缺失、引擎缺失、合成失败、取消和 `shutdown` 都在适配器内处理；流式能力声明为 false。
-
-## 7. 统一测试与错误
-
-### 7.1 区分保存、连接测试和能力验证
-
-- **保存**：只做本地校验，可以保存为「未验证」，不强制联网。
-- **连接测试**：只证明地址、鉴权和协议握手可用，界面不能说成「语音已经正常」。
-- **能力验证**：按模型类型做真实验证。
-
-能力验证方式：
-
-- STT：用户按住说一句，展示真实转写。禁止用一秒静音自动判定协议。
-- TTS：合成一句测试文本，并从真实播放路径起播；合成失败和播放失败分别提示。
-- Realtime：连接成功只记连接状态，音频验证继续沿用现有真机验证记录，不能由握手代替。
-
-配置、账号或协议变化后回到未验证。保留现有 Realtime 的音频验证记录，并按新模型引用迁移。
-
-### 7.2 统一错误分类
-
-适配器边界把现有错误映射为语音通用类别：
+The existing `VoiceInput`, `ReadAloud` and Realtime sessions no longer choose an implementation by provider or model name; instead:
 
 ```text
-配置不完整 / 缺凭据 / 鉴权失败 / 模型或能力不支持 /
-网络失败 / 超时 / 限流 / 协议响应错误 /
-系统能力不可用 / 用户取消
+Current VoiceModelRef
+→ VoiceCatalogStore reads the model and account
+→ VoiceAdapterRegistry finds the adapter
+→ returns the original session/model object
+→ runs the existing feature logic
 ```
 
-各协议保留服务端原始错误供诊断，但功能页只处理统一类别。取消不算失败。不得把识别服务无响应、麦克风被占用、鉴权失败都混成「麦克风不可用」。
+When the system has no RecognitionService or TTS engine, the model stays in the catalog but its state is unavailable, with setup guidance; it must not silently disappear, nor secretly switch to a paid model.
 
-## 8. 设置页
+### 6.2 Migrate the existing implementations
 
-新增一个「语音模型」目录页，按服务分组，模型行直接显示 `STT`、`TTS`、`Realtime` 能力。
+- STT: keep `SystemSpeech`, `ProviderSpeech`, `DoubaoSpeech`, `LiveSpeech` and the existing protocol parsing. `Transcriber`'s request construction is reused by explicit protocol and no longer calls `detect`.
+- TTS: keep the existing OpenAI Speech, Gemini TTS and streaming capability. Add the system TTS adapter.
+- Realtime: keep the existing two realtime protocols, events and session implementation, and attach the connection config to the unified adapter factory.
 
-添加或编辑时按能力显示对应字段：
+For the first version, system TTS uses `TextToSpeech.synthesizeToFile` + `UtteranceProgressListener` to generate a complete WAV, then hands it to the existing `VoicePlayer`. This avoids a second playback path and does not change the existing read-aloud logic. Initialization, missing language data, missing engine, synthesis failure, cancellation and `shutdown` are all handled inside the adapter; streaming capability is declared false.
 
-1. 选择已有服务商账号，或新建语音专用服务。
-2. 填模型并声明一种或多种能力。
-3. 为每种能力明确选择协议；预设服务填好默认协议，自定义服务可在高级设置修改。
-4. 保存为未验证，或进行对应测试。
+## 7. Unified testing and errors
 
-语音输入、朗读和实时通话的选择页仍然存在，但只负责「选哪个可用模型 + 使用偏好」，不再各自创建一套服务配置。
+### 7.1 Distinguish saving, connection testing and capability verification
 
-模型列表接口有明确模态信息时可以用于展示；没有时允许手填。不得按模型名决定能力，也不得为了确定能力依次调用多个协议。
+- **Saving**: only local validation; it can be saved as "unverified" and does not force a network call.
+- **Connection test**: only proves the address, auth and protocol handshake work; the UI must not claim "voice is working now".
+- **Capability verification**: do real verification per model type.
 
-## 9. 旧配置迁移
+Capability verification methods:
 
-使用一次性、可重试、原子提交的迁移：
+- STT: the user holds to say one sentence and the real transcript is shown. Do not use one second of silence to determine the protocol automatically.
+- TTS: synthesize one test sentence and play it through the real playback path; synthesis failure and playback failure are reported separately.
+- Realtime: a successful connection only records connection state; audio verification continues to use the existing real-device verification record and cannot be replaced by the handshake.
 
-1. 读取现有 `SpeechChoice`、`VoiceChoice`、`CallVoiceProfile` 及其账号信息。
-2. 创建新服务和模型。共享聊天账号的使用 `ExistingProvider`；语音专用配置使用 `VoiceOwned` 并安全迁移凭据。
-3. 稳定保留原 ID 或生成确定性的迁移 ID，避免重试产生重复服务。
-4. 原 STT 协议逐值映射；TTS 保留协议、音色、语速、流式偏好；Realtime 保留所有配置、当前选择、连接测试和音频验证记录。
-5. 新目录、选择和迁移标记全部写入成功后，运行时才切到新路径。
-6. 任一步失败都继续使用旧路径，下次启动重试；不得出现一半功能走新配置、另一半功能悄悄回默认。
-7. 旧数据在迁移后保留只读回滚副本，不再写入。新版本验证完成后，再在单独清理任务中删除兼容代码和旧数据。
+After config, account or protocol changes, return to unverified. Keep the existing Realtime audio verification records and migrate them under the new model references.
 
-迁移完成后：
+### 7.2 Unified error classification
 
-- `Provider.ttsModels` 只作为读取旧数据的迁移输入，不再参与聊天、看图、备援、模型组或语音运行时判断。
-- 聊天模型是否可用由聊天能力信息和实际聊天测试决定；语音模型是否可用由语音目录声明和验证决定。
-- `Transcriber.detect` 和静音探测路径不再被设置页或运行时调用。
+The adapter boundary maps existing errors into generic voice categories:
 
-## 10. 验收
+```text
+Incomplete config / missing credentials / auth failure / model or capability unsupported /
+network failure / timeout / rate limiting / protocol response error /
+system capability unavailable / user cancelled
+```
 
-### 10.1 目录与迁移
+Each protocol keeps the raw server error for diagnostics, but feature pages only handle the unified categories. Cancellation is not a failure. Recognition service not responding, microphone in use, and auth failure must not all be lumped into 「麦克风不可用」 (Microphone unavailable).
 
-- 同一服务可以注册 STT、TTS、Realtime 三种模型，也可以一个模型声明多种能力。
-- 现有每一种 STT、TTS、Realtime 配置迁移后，协议请求参数和当前选择与迁移前一致。
-- 多个 Realtime 配置、独立凭据、地域配置和音频验证记录均不丢失。
-- 迁移中断可重试，不重复、不丢选择、不泄漏明文密钥。
-- 账号修改、删除、目录损坏和缺失引用都有明确行为。
+## 8. Settings page
 
-### 10.2 接入与使用
+Add a 「语音模型」 (Voice models) catalog page, grouped by service, with each model row showing its `STT`, `TTS` and `Realtime` capabilities.
 
-- 添加一个仅 TTS 的服务，全程不发送聊天测试请求；保存后可用于朗读。
-- 添加 STT 模型时只使用用户明确选择的协议，不发生静音探测或多协议轮换。
-- 三个使用入口均通过同一目录和适配器工厂创建实现，没有按模型名分支。
-- 现有协议的黄金请求/响应测试保持通过。
-- 不支持某项能力时，在选择前阻止或在目录中明确标出，不等到运行时才报含义不明的错误。
+When adding or editing, show the corresponding fields by capability:
 
-### 10.3 系统模型与真机
+1. Select an existing provider account, or create a new voice-owned service.
+2. Fill in the model and declare one or more capabilities.
+3. Explicitly choose a protocol for each capability; preset services come with default protocols filled in, and custom services can change them in advanced settings.
+4. Save as unverified, or run the corresponding test.
 
-- 有可用系统 TTS 时，无需 Key 可以完成朗读；缺引擎、缺语言数据和合成失败均有设置引导。
-- 系统识别和系统 TTS 均按公开能力检测，不做厂商或构建号分支。
-- 在真实 Android 设备的正式性能包上验证：系统 STT、系统 TTS、一个批量 STT、一个流式 STT、一个流式 TTS 和现有 Realtime 的接入与选择迁移。
-- 本次只验证接入和基本功能，不用它替代完整音频路由、打断和长时间通话验收。
+The selection pages for voice input, read-aloud and realtime calls still exist, but are only responsible for "which available model to pick + usage preferences", and no longer each create their own service config.
 
-## 11. 实施拆分建议
+When the model-list API has explicit modality information it may be used for display; when it does not, manual entry is allowed. Do not decide capabilities by model name, and do not call multiple protocols in turn just to determine capabilities.
 
-详细任务计划在设计批准后另写，顺序固定为：
+## 9. Old config migration
 
-1. 语音目录、模型引用、适配器注册表和测试。
-2. 现有 STT/TTS/Realtime 适配器接入，运行时只读新目录。
-3. 原子旧配置迁移和旧路径回退。
-4. 统一设置页与账号保存/测试分离。
-5. 系统 TTS 内置适配器。
-6. 删除静音探测和全局「仅朗读」运行时规则，完成回归后再清理旧路径。
+Use a one-time, retryable, atomically committed migration:
 
-每一步都保持可回退，不把所有改动压成一个不可验证的大提交。实现者可以调整类名和文件位置，但不能改变以下已定方向：统一语音目录、三种适配器、显式协议、复用账号而不复用聊天用途规则、旧配置无损迁移、不重写媒体与实时通话逻辑。
+1. Read the existing `SpeechChoice`, `VoiceChoice`, `CallVoiceProfile` and their account information.
+2. Create new services and models. Shared chat accounts use `ExistingProvider`; voice-owned configs use `VoiceOwned` and have their credentials migrated securely.
+3. Keep the original IDs stably, or generate deterministic migration IDs, so retries do not produce duplicate services.
+4. Map the original STT protocol value by value; TTS keeps the protocol, voice, speaking rate and streaming preference; Realtime keeps all config, the current selection, connection test and audio verification records.
+5. Only after the new catalog, selections and migration marker are all written successfully does the runtime switch to the new path.
+6. If any step fails, keep using the old path and retry on next start; never let half the features use the new config while the other half quietly fall back to defaults.
+7. After migration, keep the old data as a read-only rollback copy and stop writing to it. Once the new version is verified, delete the compatibility code and old data in a separate cleanup task.
+
+After migration completes:
+
+- `Provider.ttsModels` is only a migration input for reading old data and no longer participates in chat, image reading, fallback, model groups or voice runtime decisions.
+- Whether a chat model is usable is decided by chat capability information and the actual chat test; whether a voice model is usable is decided by the voice catalog's declarations and verification.
+- `Transcriber.detect` and the silence-probing path are no longer called by settings pages or the runtime.
+
+## 10. Acceptance
+
+### 10.1 Catalog and migration
+
+- The same service can register STT, TTS and Realtime models, and a single model can declare multiple capabilities.
+- After migrating each existing STT, TTS and Realtime config, the protocol request parameters and the current selection match the pre-migration state.
+- Multiple Realtime configs, independent credentials, region config and audio verification records are all preserved.
+- An interrupted migration can be retried, without duplicates, lost selections or leaked plaintext keys.
+- Account modification, deletion, catalog corruption and missing references all have clear behavior.
+
+### 10.2 Integration and use
+
+- Add a TTS-only service without sending any chat test request during the whole flow; after saving it can be used for read-aloud.
+- When adding an STT model, only the protocol the user explicitly selected is used; no silence probing or multi-protocol rotation happens.
+- All three usage entries create implementations through the same catalog and adapter factory, with no branching by model name.
+- The existing protocols' golden request/response tests keep passing.
+- When a capability is unsupported, block it before selection or mark it clearly in the catalog, instead of waiting until runtime to report an unclear error.
+
+### 10.3 System models and real devices
+
+- When a usable system TTS exists, read-aloud works without a key; missing engine, missing language data and synthesis failure all have setup guidance.
+- System recognition and system TTS are both detected through public capabilities, with no vendor or build-number branching.
+- Verify on a real Android device with the official performance build: the integration and selection migration of system STT, system TTS, one batch STT, one streaming STT, one streaming TTS and the existing Realtime.
+- This time only verify integration and basic functionality; do not use it to replace full acceptance of audio routing, interruption and long calls.
+
+## 11. Suggested implementation split
+
+The detailed task plan is written separately after design approval, in this fixed order:
+
+1. Voice catalog, model references, adapter registry and tests.
+2. Wire in the existing STT/TTS/Realtime adapters; the runtime reads only the new catalog.
+3. Atomic old-config migration and old-path fallback.
+4. Unified settings page and separation of account saving/testing.
+5. Built-in system TTS adapter.
+6. Remove silence probing and the global "read-aloud only" runtime rule, then clean up the old path after the regression passes.
+
+Every step stays revertible; do not squash all changes into one unverifiable giant commit. The implementer may adjust class names and file locations, but must not change the following settled directions: a unified voice catalog, three adapter types, explicit protocols, reusing accounts without reusing chat usage rules, lossless old-config migration, and not rewriting the media and realtime call logic.

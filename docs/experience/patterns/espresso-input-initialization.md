@@ -1,9 +1,9 @@
-# Compose 真机测试在输入初始化时失败
+# Compose device tests fail during input initialization
 
-[个人助手回复复制 #644](https://github.com/wangzan101/Mika/issues/644) 的两条用例第一次运行时，都在 `Espresso.onIdle` 初始化阶段报 `NoSuchMethodException: android.hardware.input.InputManager.getInstance`。还没有点击或长按，不能将这个结果当作复制功能失败。
+Both test cases of [Personal assistant reply copy #644](https://github.com/wangzan101/Mika/issues/644) reported `NoSuchMethodException: android.hardware.input.InputManager.getInstance` during `Espresso.onIdle` initialization on their first run. Nothing has been clicked or long-pressed yet, so this result cannot be treated as a failure of the copy feature.
 
-诊断时检查 **测试 APK** 解析出的 Espresso 版本。本次 Compose 测试间接引入的 3.5.0 在 SDK 37 真机上走了不可用的反射入口；[Espresso 3.7.0 的发布说明](https://developer.android.com/jetpack/androidx/releases/test#espresso-3.7.0)列出了对此的修复。只在 `androidTestImplementation` 指定修复版本，重建、覆盖安装测试 APK，再运行同一条用例；无需调整手机的隐藏 API 策略。
+When diagnosing, check the Espresso version resolved by the **test APK**. The 3.5.0 pulled in indirectly by this Compose test took an unavailable reflection path on an SDK 37 device; the [Espresso 3.7.0 release notes](https://developer.android.com/jetpack/androidx/releases/test#espresso-3.7.0) list the fix for it. Specify the fixed version only in `androidTestImplementation`, rebuild and reinstall the test APK over the existing one, then run the same test case again; there is no need to adjust the phone's hidden API policy.
 
-验证一次：同一台 SDK 37 设备、同一个 Dev 应用，仅覆盖测试包后，`PersonalReplyCopyTest` 从两条初始化失败变为两条通过，包括长按、拖选、全选和全文复制的剪贴板断言。
+Verified once: on the same SDK 37 device with the same Dev app, after reinstalling only the test package, `PersonalReplyCopyTest` went from two initialization failures to two passes, including the clipboard assertions for long-press, drag-select, select-all and full-text copy.
 
-适用边界：上述堆栈出现在用例执行之前。另一种失败发生在刚覆盖安装后的**剪贴板回读**：同一台手机的剪贴板（`ClipboardManager`）允许写入，但因测试窗口尚未取得焦点而拒绝读取，断言得到 null。在 `PersonalReplyCopyTest` 等待 `Activity.hasWindowFocus()` 后，按「覆盖安装 → 立即启动测试」复测通过。这个时序问题与 Espresso 初始化无关；如果已经读到了文字但范围不对，应检查回复组件的选区。
+Applicability boundary: the above stack appears before the test case runs. Another failure happens in **clipboard read-back** right after an over-install: the clipboard (`ClipboardManager`) on the same phone allows writes but refuses reads because the test window has not yet gained focus, so the assertion gets null. After `PersonalReplyCopyTest` waits for `Activity.hasWindowFocus()`, retesting with "over-install → start the test immediately" passes. This timing problem is unrelated to Espresso initialization; if the text has been read but the range is wrong, check the selection of the reply component.

@@ -7,7 +7,7 @@ NAME=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([a-z-]*\)".*/\1/p' "$ARGS" 
 DIR="$(dirname "$0")/../docs"
 FILE="$DIR/$NAME.md"
 if [ ! -f "$FILE" ]; then
-  printf '{"ok":false,"error":"not_found","message":"没有这个文档：%s（可用：translate-languages）"}\n' "$NAME"
+  printf '{"ok":false,"error":"not_found","message":"No such document: %s (available: translate-languages)"}\n' "$NAME"
   exit 0
 fi
 printf '{"ok":true,"name":"%s","text":"' "$NAME"

@@ -1,30 +1,30 @@
-# 微信图片收发
+# Sending and receiving WeChat images
 
-微信本人私聊通道接收文字、图片及同一消息中的多张图片，并可回传任务明确导出的图片。图片仍属于原来的渠道任务，不创建新的运行状态机。
+The WeChat self private chat channel accepts text, images and multiple images within the same message, and can send back images explicitly exported by a task. Images still belong to the original channel task and do not create a new run state machine.
 
-## 接收
+## Receiving
 
-`WechatMessage.userContent()` 合并文字内容，并保留图片列表的原始顺序。只含文字项的消息如果引用了一张图片，会从 `ref_msg.message_item` 取出图片，和本次提问一起导入。消息本身带有附件时只处理本次附件；只有引用编号时，在同一微信绑定和会话最近登记的 512 条来源记录中查找原图。原消息按 `message_id`（缺失时按首个非空的项级 `msg_id`）登记，引用按 `svr_id`（缺失时按被引项的 `msg_id`）匹配。导入时原子保存路径、大小与 SHA-256；重启后核对文件再交给任务。原图缺失或已改变时，请用户重发。`WechatChannel` 先验证当前绑定的本人私聊，并在下载前查消息去重账本；不接收群消息。`WechatApi.downloadImage()` 从微信 CDN 下载、按 iLink 的 AES-128-ECB / PKCS#7 规则解密。
+`WechatMessage.userContent()` merges the text content and preserves the original order of the image list. If a message containing only a text item quotes an image, the image is taken from `ref_msg.message_item` and imported together with the current question. If the message itself carries attachments, only the current attachments are processed; if it only has a quote ID, the original image is looked up among the 512 most recently registered source records for the same WeChat binding and conversation. The original message is registered by `message_id` (or by the first non-empty item-level `msg_id` when that is missing), and the quote is matched by `svr_id` (or by the quoted item's `msg_id` when that is missing). On import, the path, size and SHA-256 are saved atomically; after a restart the file is verified before being handed to the task. If the original image is missing or has changed, ask the user to resend it. `WechatChannel` first validates the currently bound self private chat, and checks the message deduplication ledger before downloading; it does not accept group messages. `WechatApi.downloadImage()` downloads from the WeChat CDN and decrypts according to iLink's AES-128-ECB / PKCS#7 rules.
 
-宿主 `StoredWechatImages` 逐张暂存图片，经 Android 解码边界检查与必要的缩放处理后，调用已有的 `Attachments.withTaskFiles` 导入当前线程工作区。附件仍使用 `AttachmentLines` 格式，因此新任务、追问回答、持久队列及 `read_file` 都复用原有路径。主模型不支持图片时，`read_file` 按已有逻辑明确反馈能力限制。
+The host `StoredWechatImages` stages the images one by one and, after Android decode bounds checks and any necessary scaling, calls the existing `Attachments.withTaskFiles` to import them into the current thread workspace. Attachments still use the `AttachmentLines` format, so new tasks, follow-up answers, the persistent queue and `read_file` all reuse the existing path. When the main model does not support images, `read_file` explicitly reports the capability limit according to the existing logic.
 
-整批图片成功导入后，先原子写入微信 pending 账本，再交给任务，最后推进游标。重放 pending 使用原来的工作区路径，不重复下载；任务持久登记后才确认消息。下载或导入失败会写入独立的失败通知，消息不会退化为缺图的文字任务。暂停、换绑或停止期间的旧导入会回滚本批文件。
+After the whole batch imports successfully, first write atomically to the WeChat pending ledger, then hand it to the task, and finally advance the cursor. Replaying pending items uses the original workspace paths and does not download again; the message is acknowledged only after the task is persistently registered. A download or import failure writes a separate failure notification, and the message does not degrade into a text task missing its images. Old imports during pause, rebinding or stop are rolled back for the files in that batch.
 
-Mika 的本地资源限额：每条消息最多 8 张图片，每张下载图片最多 10 MiB；这是客户端限额，不是微信服务端的限制。入站图片需可由 Android 解码，原始像素最多 64 MiPixels，解码时有界采样；交给任务的图片最多 5 MiB、最长边 4096 像素。普通 PNG/JPEG/WebP 在无需调整时保留原字节；GIF 作为静态图片导入。微信媒体引用和密钥不写入任务提示词，CDN 请求不带 Bot 鉴权。
+Mika's local resource limits: at most 8 images per message and at most 10 MiB per downloaded image; these are client limits, not limits of the WeChat server. Inbound images must be decodable by Android, with at most 64 MiPixels of original pixels and bounded sampling during decode; images handed to the task are at most 5 MiB with a longest edge of 4096 pixels. Plain PNG/JPEG/WebP keeps its original bytes when no adjustment is needed; GIF is imported as a static image. WeChat media references and keys are not written into the task prompt, and CDN requests carry no Bot authentication.
 
-## 回复
+## Replying
 
-用户要求回传的截图可用 `phone_screenshot` / `web_screenshot` 的 `savePath` 保存为工作区内的 PNG，再调用现有 `share_file` 导出。无视觉能力的主模型也可保存截图；截图保护和屏幕访问门禁与原工具一致。
+Screenshots the user asks to be sent back can be saved as PNG files in the workspace using the `savePath` of `phone_screenshot` / `web_screenshot`, and then exported by calling the existing `share_file`. A main model without vision can also save screenshots; screenshot protection and screen access gating are the same as for the original tools.
 
-`TaskService` 从本次运行真实的 `SharedFile` 导出记录中挑选图片，不解析最终回答中的任意文件路径。`ResultDelivery` 先持久化文字和每张图片的独立送达记录，再逐项发送。`WechatChannel` 只读取 MediaStore 导出 URI，核对大小和已有 SHA-256，随后调用 `getuploadurl`、上传加密图片、重新验证绑定状态，并通过 `sendmessage` 发送 `image_item`。
+`TaskService` picks images from the real `SharedFile` export records of this run and does not parse arbitrary file paths out of the final answer. `ResultDelivery` first persists the text and a separate delivery record for each image, then sends them item by item. `WechatChannel` only reads MediaStore export URIs, verifies the size and existing SHA-256, then calls `getuploadurl`, uploads the encrypted images, revalidates the binding state, and sends `image_item` through `sendmessage`.
 
-上传失败记为 Failed；图片消息已经发出但响应不确定时记为 Uncertain。恢复时只发送 Pending 项，不重复发送 Delivered 或 Uncertain 项；任一图片失败或不确定都不会把整批结果记为全部送达。图片本身每张最多 10 MiB；有效图片格式按内容签名检查。
+A failed upload is recorded as Failed; when the image message has already been sent but the response is uncertain, it is recorded as Uncertain. Recovery sends only Pending items and does not resend Delivered or Uncertain items; a failure or uncertainty on any image never marks the whole batch result as fully delivered. Each image itself is at most 10 MiB; valid image formats are checked by content signature.
 
-## 验证入口
+## Verification entry points
 
-- Core：`WechatImagesTest` 验证加密互通、CDN 上传下载、媒体请求构造、鉴权隔离、大小限制及取消；`ScreenshotExportTest` 验证截图保存和保护。
-- App JVM：`WechatImageFilesTest`、`WechatImageChannelTest` 验证真实文件导入、消息重放、失败通知、绑定变化及图片回复；`ResultDeliveryTest`、`FileOutboxStoreTest`、`RunRecoveryTest` 覆盖独立送达和重启恢复。
-- 设备：`WechatImagePreparationTest` 检查 Android 图片解码和采样。没有设备时只编译此测试，不代表实际运行。
-- 微信联调：本人私聊发单图、文字加多图并让 Mika 读取；请求截图并回传；下载中暂停/换绑；测试失败和重启恢复。需要真实绑定和手机，MockWebServer 测试不替代该验收。
+- Core: `WechatImagesTest` verifies encryption interoperability, CDN upload and download, media request construction, authentication isolation, size limits and cancellation; `ScreenshotExportTest` verifies screenshot saving and protection.
+- App JVM: `WechatImageFilesTest` and `WechatImageChannelTest` verify real file import, message replay, failure notifications, binding changes and image replies; `ResultDeliveryTest`, `FileOutboxStoreTest` and `RunRecoveryTest` cover separate delivery and restart recovery.
+- Device: `WechatImagePreparationTest` checks Android image decoding and sampling. Without a device, this test is only compiled, which does not mean it actually ran.
+- WeChat joint debugging: send a single image in the self private chat, send text plus multiple images and have Mika read them; request a screenshot and send it back; pause/rebind during download; test failure and restart recovery. This needs a real binding and a phone; MockWebServer tests do not replace this acceptance.
 
-协议依据是腾讯官方插件 [Tencent/openclaw-weixin](https://github.com/Tencent/openclaw-weixin/tree/0ad1ae91347a938f52f1e4e2abd6dcda51e05f9e) 的 [协议文档](https://github.com/Tencent/openclaw-weixin/blob/0ad1ae91347a938f52f1e4e2abd6dcda51e05f9e/docs/protocol_zh_CN.md)、上传/下载及图片消息构造实现。Mika 使用自身 Kotlin 客户端对接，无新增 OpenClaw 运行时依赖。
+The protocol basis is the Tencent official plugin [Tencent/openclaw-weixin](https://github.com/Tencent/openclaw-weixin/tree/0ad1ae91347a938f52f1e4e2abd6dcda51e05f9e): its [protocol document](https://github.com/Tencent/openclaw-weixin/blob/0ad1ae91347a938f52f1e4e2abd6dcda51e05f9e/docs/protocol_zh_CN.md), upload/download and image message construction implementation. Mika interoperates with its own Kotlin client, with no new OpenClaw runtime dependency.

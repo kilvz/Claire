@@ -1,51 +1,49 @@
-# 页面翻译：接口怎么配
+# Page translation: how to configure the endpoint
 
-插件本身不带任何密钥。翻译走**你自己配的 OpenAI 兼容接口**，三个环境变量：
+The plugin itself carries no key. Translation goes through **an OpenAI-compatible endpoint you configure yourself**, with three environment variables:
 
-| 变量 | 必填 | 说明 | 例子 |
+| Variable | Required | Description | Example |
 |---|---|---|---|
-| `MIKA_TRANSLATE_BASE` | 是 | 完整的 chat/completions 地址 | `https://ark.cn-beijing.volces.com/api/v3/chat/completions` |
-| `MIKA_TRANSLATE_KEY` | 是 | 那个服务的 API Key | `ark-xxxx` |
-| `MIKA_TRANSLATE_MODEL` | 是 | 模型名（要能在上面那个地址调通） | `doubao-seed-2-0-mini-260428` |
+| `MIKA_TRANSLATE_BASE` | yes | Full chat/completions URL | `https://ark.cn-beijing.volces.com/api/v3/chat/completions` |
+| `MIKA_TRANSLATE_KEY` | yes | API Key for that service | `ark-xxxx` |
+| `MIKA_TRANSLATE_MODEL` | yes | Model name (must work when called at the URL above) | `doubao-seed-2-0-mini-260428` |
 
-## 在 Mika 里怎么设
+## How to set it in Mika
 
-1. 打开「设置 → 环境变量」。
-2. 依次新建上面三个变量，值原样填进去。
-3. 新建后**重启一次 Mika**，让 App 进程读到新环境。
-4. 回到浏览器打开一个外文页，跟 Mika 说「翻译这页」，它先调 `translate` 看通道通不通，再干活。
+1. Open 「设置 → 环境变量」 (Settings → Environment variables).
+2. Create the three variables above one by one and fill in the values as they are.
+3. After creating them **restart Mika once** so that the app process reads the new environment.
+4. Go back to the browser, open a foreign-language page, and tell Mika "translate this page"; it first calls `translate` to see whether the channel works, then does the work.
 
-## 没配也能用
+## Usable without configuration
 
-`translate` 发现 `MIKA_TRANSLATE_BASE` 为空时不会报错，而是把正文按自然边界切成编号段落，
-标 `mode: segments` 交回来，由 Mika 用对话里当前的主模型自己翻。区别只有三点：
+When `translate` finds `MIKA_TRANSLATE_BASE` empty it does not report an error; instead it splits the body into numbered paragraphs at natural boundaries, marks them `mode: segments` and hands them back, and Mika translates them itself with the current main model in the conversation. There are only three differences:
 
-- 用你自己在用的模型，**页面正文会经过对话**（就是你平时聊天那个模型服务商）；
-- 长页面会更慢；
-- 质量取决于当前主模型。
+- it uses the model you are already using, and **the page body goes through the conversation** (the model provider you normally chat with);
+- long pages are slower;
+- quality depends on the current main model.
 
-不想让正文离开你选的通道，就把三个变量配好。
+If you do not want the body to leave the channel you chose, configure the three variables.
 
-## 常见服务的写法
+## How to write common services
 
-| 服务 | BASE | MODEL |
+| Service | BASE | MODEL |
 |---|---|---|
-| 火山方舟 Ark | `https://ark.cn-beijing.volces.com/api/v3/chat/completions` | `doubao-seed-2-0-mini-260428` |
+| Volcano Engine Ark | `https://ark.cn-beijing.volces.com/api/v3/chat/completions` | `doubao-seed-2-0-mini-260428` |
 | DeepSeek | `https://api.deepseek.com/chat/completions` | `deepseek-chat` |
-| 通义千问（兼容模式） | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` | `qwen-plus` |
-| 智谱 | `https://open.bigmodel.cn/api/paas/v4/chat/completions` | `glm-4-flash` |
-| 本地 Ollama | `http://127.0.0.1:11434/v1/chat/completions` | `qwen2.5` |
+| Qwen (compatible mode) | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` | `qwen-plus` |
+| Zhipu | `https://open.bigmodel.cn/api/paas/v4/chat/completions` | `glm-4-flash` |
+| Local Ollama | `http://127.0.0.1:11434/v1/chat/completions` | `qwen2.5` |
 
-## 出错了看什么
+## What to look at when it fails
 
-`translate` 的返回里 `error` 字段：
+The `error` field in `translate`'s response:
 
-- `api_failed` + `message` 带 HTTP 状态码和服务端原话——多半是 Key 无效、模型名不对、余额不足；
-- `too_long`——一次超过 40 段，改用 `web_read_page` 的 `offset` 分页读、分两次翻；
-- `empty_text`——正文没传进来；
-- `mode: segments`——见上面「没配也能用」。
+- `api_failed` + `message` carries the HTTP status code and the server's own words — mostly an invalid Key, a wrong model name, or insufficient balance;
+- `too_long` — more than 40 segments in one call; switch to `web_read_page`'s `offset` paging and translate in two passes;
+- `empty_text` — the body was not passed in;
+- `mode: segments` — see "Usable without configuration" above.
 
-## 隐私
+## Privacy
 
-配好变量后，页面上**被翻译的那些字**会发到你指定的那个接口。整页正文不会进 Mika 的对话记录，
-也不会发给 Mika 的主模型。
+Once the variables are configured, **the characters on the page that get translated** are sent to the endpoint you specified. The whole page body does not enter Mika's conversation records, and is not sent to Mika's main model.

@@ -1,17 +1,17 @@
 ## ADDED Requirements
 
-### Requirement: 出站 HTTPS 信任用户安装的 CA
+### Requirement: Outbound HTTPS trusts user-installed CAs
 
-App 的全部出站 HTTPS 连接（模型 API、网页搜索、下载、内置浏览器、MCP 等）除系统证书外，还 MUST 信任用户在系统设置里安装的 CA 证书，让企业内网自签端点（内部 CA 签发的 OpenAI 兼容服务）无需 root 即可直连。明文 http 许可维持现状不变。
+All of the App's outbound HTTPS connections (model APIs, web search, downloads, built-in browser, MCP, etc.) MUST trust, in addition to system certificates, CA certificates the user has installed in system settings, so that self-signed endpoints on a corporate intranet (OpenAI-compatible services issued by an internal CA) can be reached directly without root. The cleartext http permission stays as it is.
 
-#### Scenario: 连接内部 CA 签发的端点
-- **WHEN** 用户在系统设置里装了公司内部 CA，并配置自签 HTTPS 的 OpenAI 兼容端点为服务商
-- **THEN** 模型连接、对话收发正常工作，不出证书校验失败
+#### Scenario: connecting to an endpoint issued by an internal CA
+- **WHEN** the user has installed the corporate internal CA in system settings and configures a self-signed HTTPS OpenAI-compatible endpoint as a provider
+- **THEN** model connections and chat send/receive work normally, with no certificate validation failure
 
-#### Scenario: 未装用户 CA 的设备
-- **WHEN** 设备上没有任何用户安装的 CA
-- **THEN** 全部出站 HTTPS 行为与改动前完全一致（只信系统证书的公共端点照常可连，自签端点照常失败）
+#### Scenario: a device without a user CA installed
+- **WHEN** no user-installed CA exists on the device
+- **THEN** all outbound HTTPS behavior is exactly the same as before the change (public endpoints trusting only system certificates still connect as before, and self-signed endpoints still fail as before)
 
-#### Scenario: 公共端点不受影响
-- **WHEN** 连接 Let's Encrypt 等公共 CA 签发的正常端点
-- **THEN** 证书校验照常通过，无额外提示或降级
+#### Scenario: public endpoints are unaffected
+- **WHEN** connecting to a normal endpoint issued by a public CA such as Let's Encrypt
+- **THEN** certificate validation passes as before, with no extra prompt or downgrade

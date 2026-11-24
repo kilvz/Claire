@@ -1,6 +1,6 @@
 # Contributing
 
-English | [简体中文](CONTRIBUTING.zh-CN.md)
+English | [Simplified Chinese](CONTRIBUTING.zh-CN.md)
 
 Help make Claire better. The easiest way is to add usage knowledge for an app or website, which needs no code; bug reports and code are welcome too.
 

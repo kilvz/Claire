@@ -1,72 +1,72 @@
-# 教 Mika 自动总结 Implementation Plan
+# Teach Mika Auto-Summary Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 示范结束即自动把轨迹整理成技能:桌面/图标/地址栏这类人工机械步骤折叠成 Mika 的直达做法,总结页直接展示成品技能供用户收下。
+**Goal:** When a demonstration ends, automatically turn the trace into a skill: mechanical human steps such as the home screen, icons and the address bar are folded into Mika's direct actions, and the summary page shows the finished skill for the user to accept.
 
-**Architecture:** core 里新增确定性的 `TeachRoute.fold`(只折叠启动器步骤,识别失败 fail-open),提示词与 `TeachDraft` 接收折叠后的路线并指示模型把浏览器/搜索机械动作改写成直达;app 层 `TeachApps` 用系统意图识别桌面与默认浏览器,`TeachRuntime.end()` 自动触发整理,`TeachScreen` 改为无状态页面组(介绍/示范中/整理中/总结/已学会),总结正文复用 `SkillReadingView`。
+**Architecture:** Add a deterministic `TeachRoute.fold` in core (it folds only launcher steps and fails open when detection fails); the prompt and `TeachDraft` receive the folded route and instruct the model to rewrite mechanical browser/search actions into direct actions. In the app layer, `TeachApps` uses system intents to detect the home screen and the default browser, `TeachRuntime.end()` triggers summarizing automatically, and `TeachScreen` becomes a stateless group of pages (intro / demonstrating / summarizing / summary / learned), with the summary body reusing `SkillReadingView`.
 
-**Tech Stack:** Kotlin, Jetpack Compose, JUnit4, Gradle(`:core` 纯 JVM,`:app` unit/androidTest)。
+**Tech Stack:** Kotlin, Jetpack Compose, JUnit4, Gradle(`:core` pure JVM, `:app` unit/androidTest).
 
 **Spec:** `docs/design/specs/2026-11-22-teach-auto-summary-design.md`
 
 ## Global Constraints
 
-- Android 通用:只看系统意图与包名,禁止写死任何启动器/浏览器/App 包名。
-- 不保存示范输入原文;密码字段与敏感命中沿用 `TeachTrace` 现有脱敏,不放开。
-- 所有新增/改动的字符串同步 12 个语言文件(base en、zh、b+zh+Hant、ja、ko、ar、fa、es、pt、ru、in、tr);`StringResourcesTest` 必须绿。
-- 在 worktree 分支开发,不碰 main;非发版不改版本号。
-- 单测用 `./gradlew :app:testDebugUnitTest`(不要裸 `:app:test`,会 OOM);core 用 `./gradlew :core:test`。
-- 不新增截图/录屏;不动机器人执行与「任务后自学」管线。
+- Generic Android: look only at system intents and package names; never hard-code any launcher/browser/app package name.
+- Do not store the raw demonstration input; password fields and sensitive matches keep using the existing redaction in `TeachTrace`, which is not relaxed.
+- Sync every added/changed string across the 12 language files (base en, zh, b+zh+Hant, ja, ko, ar, fa, es, pt, ru, in, tr); `StringResourcesTest` must be green.
+- Develop on a worktree branch, never touch main; do not change the version number outside a release.
+- Use `./gradlew :app:testDebugUnitTest` for unit tests (not bare `:app:test`, which OOMs); use `./gradlew :core:test` for core.
+- Do not add screenshots/screen recordings; do not touch robot execution or the "post-task self-learning" pipeline.
 
 ## Review Focus
 
-1. 第三方启动器(Nova、Lawnchair)或识别不到桌面时:路线必须原样保留,不得误删 App 内步骤。
-2. 示范从 App 内开始(没有桌面步骤)时:不得凭包名合成「启动」步,技能入口仍要能写对 App。
-3. 中途切换 App:每次切换折叠成一条「改用/回到」,不得把桌面点击写进技能,也不得重复堆叠。
-4. 草稿已存但会话未落盘(整理中进程被杀):恢复时按 `learned_from=<traceId>` 复用已有 pending 草稿,不重复生成、不丢轨迹。
-5. 没有模型或整理失败:总结页给结构化本机技能与明确说明 + 重试/重来,绝不退回原始步骤列表。
+1. With a third-party launcher (Nova, Lawnchair), or when the home screen cannot be detected: the route must be kept as-is, and in-app steps must not be dropped by mistake.
+2. When the demonstration starts inside an app (there are no home-screen steps): do not synthesize a "Launch" step from the package name, and the skill entry must still name the right app.
+3. Switching apps mid-demonstration: each switch folds into one "switch to / back to" line, home-screen taps must not be written into the skill, and nothing may stack up repeatedly.
+4. Draft saved but session not persisted (the process is killed while summarizing): on recovery, reuse the existing pending draft by `learned_from=<traceId>`; do not regenerate and do not lose the trace.
+5. No model, or summarizing failed: the summary page gives a structured on-device skill plus a clear explanation + retry/start over, and never falls back to the raw step list.
 
 ---
 
-### Task 1: 交互原型确认(设计闸门,非代码)
+### Task 1: Prototype sign-off (design gate, not code)
 
 **Files:**
-- Create: `/tmp/mika-teach-redesign.html`(本地原型,不入库)
+- Create: `/tmp/mika-teach-redesign.html` (local prototype, not committed)
 
 **Interfaces:**
-- Consumes: 本 spec 的总结页内容与文案。
-- Produces: 用户对原型的口头确认;未确认前不进入 Task 5 的 UI 实现。
+- Consumes: the summary page's content and copy from this spec.
+- Produces: the user's verbal sign-off on the prototype; the Task 5 UI implementation does not start without it.
 
-- [x] **Step 1: 做五态原型**
+- [x] **Step 1: Build the five-state prototype**
 
-单页 HTML,复用现有 Mika 视觉 token(浅色/深色各一版,手机宽度):介绍、示范中、整理中、总结(含折叠提示与五节正文)、已学会。可点击在状态间切换。
+A single-page HTML prototype that reuses the existing Mika visual tokens (one light and one dark version, phone width): intro, demonstrating, summarizing, summary (with the fold note and the five-section body), learned. Clickable to switch between states.
 
-- [x] **Step 2: 给用户看并等确认**
+- [x] **Step 2: Show it to the user and wait for sign-off**
 
-截图 + 本地文件路径发给用户;明确问「总结页的信息层次和操作对不对」。确认后才开始 Task 5;Task 2–4 可并行开工。
+Send the user a screenshot + the local file path; ask explicitly whether the information hierarchy and the actions on the summary page are right. Start Task 5 only after the sign-off; Tasks 2–4 can start in parallel.
 
-- [x] **Step 3: 记录确认**
+- [x] **Step 3: Record the sign-off**
 
-2026-11-22 已确认:介绍/整理中/总结/已学会按原型;示范中保留现有实现(顶部提示 + 现有控制),不重做版式。原型留在 `/tmp/mika-teach-redesign.html`,不入库。
+Confirmed 2026-11-22: intro / summarizing / summary / learned follow the prototype; demonstrating keeps the existing implementation (top hint + existing controls) and the layout is not redone. The prototype stays at `/tmp/mika-teach-redesign.html` and is not committed.
 
 ---
 
-### Task 2: 路线折叠(确定性)
+### Task 2: Route folding (deterministic)
 
 **Files:**
 - Create: `core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/TeachRoute.kt`
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachRouteTest.kt`
 
 **Interfaces:**
-- Consumes: `TeachStep(id, atMs, packageName, window, kind, nodeName, viewId, insufficient, sensitiveOmitted, needsClarification, ...)`、`TeachKind`、现有 `teachLine(step)`。
+- Consumes: `TeachStep(id, atMs, packageName, window, kind, nodeName, viewId, insufficient, sensitiveOmitted, needsClarification, ...)`, `TeachKind`, and the existing `teachLine(step)`.
 - Produces:
-  - `data class RouteStep(val app: String?, val text: String, val kind: TeachKind?)` — `kind == null` 表示合成的启动/切换步;`text` 供提示词与人读。
+  - `data class RouteStep(val app: String?, val text: String, val kind: TeachKind?)` — `kind == null` means a synthesized launch/switch step; `text` is for the prompt and for humans to read.
   - `data class RouteApp(val packageName: String, val label: String, val browser: Boolean)`
   - `data class TeachRoute(val steps: List<RouteStep>, val apps: List<RouteApp>, val folded: List<String>)`
   - `object TeachRoute { fun fold(steps: List<TeachStep>, launcherPackages: Set<String>, browserPackages: Set<String>, label: (String) -> String): TeachRoute }`
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Step 1: Write the failing test**
 
 ```kotlin
 @Test fun foldsLauncherStepsIntoOneDirectLaunch() {
@@ -96,20 +96,20 @@
 @Test fun marksTheDefaultBrowserForThePrompt() { /* 步骤含浏览器包 ⇒ apps 里 browser=true */ }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [ ] **Step 2: Run the test and confirm it fails**
 
 Run: `./gradlew :core:test --tests 'com.wangzan101.mika.core.learn.teach.TeachRouteTest'`
-Expected: FAIL,`TeachRoute` 未定义。
+Expected: FAIL, `TeachRoute` is not defined.
 
-- [ ] **Step 3: 实现 `TeachRoute.fold`**
+- [ ] **Step 3: Implement `TeachRoute.fold`**
 
-规则:遍历步骤;包名在 `launcherPackages` 的直接丢弃并记入 `folded`(用 `teachLine` 的人话,如「桌面点了『小红书』」);当从启动器落到非启动器包、且与上一条保留步骤的包不同时,在保留步骤前插入合成步——首次为「启动 <label>」,切换为「改用 <label>」,回到之前的包为「回到 <label>」;`apps` 按出现顺序去重,`browser` 取 `browserPackages` 命中。`label` 由调用方提供(空标签回退包名)。
+Rule: iterate over the steps; drop any step whose package is in `launcherPackages` and record it in `folded` (using `teachLine`'s human wording, e.g. "tapped 'Xiaohongshu' on the home screen"); when the flow lands from a launcher onto a non-launcher package and that package differs from the previous kept step's package, insert a synthesized step before the kept step — "Launch <label>" the first time, "Switch to <label>" when switching, and "Back to <label>" when returning to a previous package; dedupe `apps` in order of appearance, and set `browser` from a hit in `browserPackages`. `label` is provided by the caller (an empty label falls back to the package name).
 
-- [ ] **Step 4: 跑测试确认通过**
+- [ ] **Step 4: Run the test and confirm it passes**
 
-Run: 同 Step 2。Expected: PASS。
+Run: same as Step 2. Expected: PASS.
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/TeachRoute.kt core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachRouteTest.kt
@@ -118,22 +118,22 @@ git commit -m "feat(teach): fold launcher steps into direct app launches"
 
 ---
 
-### Task 3: 提示词与草稿改用折叠路线
+### Task 3: Point the prompt and the draft at the folded route
 
 **Files:**
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/Teach.kt:312-421`(`TeachDraft`)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/Teach.kt:312-421` (`TeachDraft`)
 - Modify: `core/src/main/resources/prompts/roles/teach_skill.md`
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachDraftTest.kt`
 
 **Interfaces:**
-- Consumes: Task 2 的 `TeachRoute / RouteStep / RouteApp`。
+- Consumes: `TeachRoute / RouteStep / RouteApp` from Task 2.
 - Produces:
   - `TeachDraft.request(session: TeachSession, route: TeachRoute): String`
   - `TeachDraft.assemble(session: TeachSession, route: TeachRoute, name: String): String`
   - `TeachDraft.draft(session: TeachSession, route: TeachRoute, model: ChatModel?, toolNames: Set<String>, scriptTool: String?, runnableScripts: Set<String>, nameTaken: (String) -> Boolean, nowMs: Long): PersonalSkill?`
-  - 新的 `TeachSkill.PREFIX` 用法不变。
+  - The new `TeachSkill.PREFIX` usage is unchanged.
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Step 1: Write the failing test**
 
 ```kotlin
 @Test fun requestTellsTheModelToUseDirectLaunchesAndLinks() {
@@ -161,35 +161,35 @@ git commit -m "feat(teach): fold launcher steps into direct app launches"
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [ ] **Step 2: Run the test and confirm it fails**
 
 Run: `./gradlew :core:test --tests 'com.wangzan101.mika.core.learn.teach.TeachDraftTest'`
-Expected: FAIL(编译错:签名不匹配)。
+Expected: FAIL (compile error: signature mismatch).
 
-- [ ] **Step 3: 改 `request` 与 `assemble`**
+- [ ] **Step 3: Change `request` and `assemble`**
 
-- `request`:输出「目标」「App: <label>(<pkg>)<浏览器? 是>」「已按 Mika 的直达能力省掉:<folded>」和路线步骤(合成步用其 text);删除对原始 launcher 步骤的输出;保留「输入的文字没有保存」。
-- `assemble`:入口小节改为「Mika 直接启动 <首个 app>」;步骤用 `route.steps`;成功判据仍取最后一个保留步骤的包名/窗口;caveats 原样保留;首尾不再出现「桌面/图标」。
-- `draft`:多一个 `route` 参数并传给二者。
+- `request`: output "Goal", "App: <label>(<pkg>)<browser? yes>", "already omitted thanks to Mika's direct actions: <folded>" and the route steps (synthesized steps use their text); remove the output of raw launcher steps; keep "the typed text was not saved".
+- `assemble`: the entry section becomes "Mika launches <first app> directly"; steps use `route.steps`; the success criteria still take the package/window of the last kept step; caveats are kept as-is; the home screen/icons no longer appear at the start or the end.
+- `draft`: takes one more `route` parameter and passes it to both.
 
-- [ ] **Step 4: 重写提示词 `teach_skill.md` 的规则段**
+- [ ] **Step 4: Rewrite the rules section of the `teach_skill.md` prompt**
 
-在现有输出格式与五项要求后追加(替换「不是逐步宏」一条为更具体的):
+Append after the existing output format and the five requirements (replacing the "not a step-by-step macro" item with something more specific):
 
 ```
-示范者的一些动作只是因为人在做,不算知识:
-- 回桌面、找图标、点开 App → 写成「启动/打开 <App>」,不要写桌面和图标。
-- 打开浏览器、点地址栏、输入、点搜索 → 写成「打开 <链接>」或「在 <站点> 搜索」;具体链接/关键词由请求提供,示范里没有保存。
-- 点输入框、输入、提交 → 合成一步「输入 <内容> 并提交」。
-保留真正决定结果的:入口、具体按钮、选项、判据、什么时候停。
-同一屏的等待、重复滚动、无意义返回不写。
+Some of the demonstrator's actions are only there because a human was doing them; they do not count as knowledge:
+- Going back to the home screen, finding an icon, opening an app → write as "Launch/open <App>"; do not write about the home screen and icons.
+- Opening a browser, tapping the address bar, typing, tapping search → write as "Open <link>" or "Search on <site>"; the specific link/keywords come from the request, and the demonstration did not save them.
+- Tapping an input field, typing, submitting → combine into one step, "Enter <content> and submit".
+Keep what really decides the outcome: entries, specific buttons, options, criteria, and when to stop.
+Do not write waiting on the same screen, repeated scrolling, or meaningless back-navigation.
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [ ] **Step 5: Run the test and confirm it passes**
 
-Run: 同 Step 2。Expected: PASS。
+Run: same as Step 2. Expected: PASS.
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/Teach.kt core/src/main/resources/prompts/roles/teach_skill.md core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachDraftTest.kt
@@ -198,25 +198,25 @@ git commit -m "feat(teach): summarize demonstrated routes with direct actions"
 
 ---
 
-### Task 4: 自动整理与收下
+### Task 4: Automatic summarizing and accepting
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/teach/TeachApps.kt`
 - Modify: `app/src/main/java/com/wangzan101/mika/teach/TeachRuntime.kt`
-- Modify: `app/src/main/java/com/wangzan101/mika/teach/ui/TeachScreen.kt`(只改调用点,保证能编译;版式在 Task 5 重做)
+- Modify: `app/src/main/java/com/wangzan101/mika/teach/ui/TeachScreen.kt` (change only the call sites so it compiles; the layout is redone in Task 5)
 - Create: `core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/TeachPending.kt`
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachPendingTest.kt`
 
 **Interfaces:**
-- Consumes: Task 2/3;`PersonalSkills.drafts()[id]`、`approve(id)`、`reject(id)`;`ConfirmationNotifier.appLabel(context, pkg)`。
+- Consumes: Tasks 2/3; `PersonalSkills.drafts()[id]`, `approve(id)`, `reject(id)`; `ConfirmationNotifier.appLabel(context, pkg)`.
 - Produces:
   - `object TeachApps { fun launchers(context: Context): Set<String>; fun defaultBrowsers(context: Context): Set<String>; fun label(context: Context, packageName: String): String }`
-  - `object TeachPending { fun find(drafts: Map<String, PersonalSkill>, traceId: String): Pair<String, PersonalSkill>? }`(匹配 `learned_from == TeachSkill.PREFIX + traceId`)
+  - `object TeachPending { fun find(drafts: Map<String, PersonalSkill>, traceId: String): Pair<String, PersonalSkill>? }` (matches `learned_from == TeachSkill.PREFIX + traceId`)
   - `TeachUi(session, notice, hint, draft: PersonalSkill? = null, folded: List<String> = emptyList(), basic: Boolean = false, acceptedName: String? = null)`
   - `TeachSession(..., acceptedName: String? = null)`
-  - `TeachRuntime.end()` 自动整理;`TeachRuntime.accept()`;删除 `generate()/annotate()/remove()`。
+  - `TeachRuntime.end()` summarizes automatically; `TeachRuntime.accept()`; delete `generate()/annotate()/remove()`.
 
-- [ ] **Step 1: 写 `TeachPending` 失败测试**
+- [ ] **Step 1: Write the failing `TeachPending` test**
 
 ```kotlin
 @Test fun findsTheDraftAlreadyStoredForTheSameTrace() {
@@ -226,30 +226,30 @@ git commit -m "feat(teach): summarize demonstrated routes with direct actions"
 @Test fun ignoresDraftsFromOtherTraces() { assertNull(TeachPending.find(mapOf("d1" to skill(learnedFrom = "teach:t-2")), "t-1")) }
 ```
 
-Run: `./gradlew :core:test --tests '*TeachPendingTest'` → FAIL;实现 → PASS。
+Run: `./gradlew :core:test --tests '*TeachPendingTest'` → FAIL; then implement → PASS.
 
-- [ ] **Step 2: 实现 `TeachApps`**
+- [ ] **Step 2: Implement `TeachApps`**
 
-`launchers`: `ACTION_MAIN + CATEGORY_HOME` 的 `queryIntentActivities(intent, 0)`,异常回退空集。`defaultBrowsers`:`ACTION_VIEW` + `http://` 的 `queryIntentActivities(intent, MATCH_DEFAULT_ONLY)`;空集合法。`label` 直接转 `ConfirmationNotifier.appLabel`。全部 `internal`。
+`launchers`: `queryIntentActivities(intent, 0)` for `ACTION_MAIN + CATEGORY_HOME`; on exception fall back to an empty set. `defaultBrowsers`: `queryIntentActivities(intent, MATCH_DEFAULT_ONLY)` for `ACTION_VIEW` + `http://`; an empty set is legal. `label` delegates straight to `ConfirmationNotifier.appLabel`. Everything is `internal`.
 
-- [ ] **Step 3: 改 `TeachRuntime`**
+- [ ] **Step 3: Change `TeachRuntime`**
 
-- `end()`:把 phase 设成 `Drafting` 后立刻 `scope.launch { summarize(snapshot) }`,不再只停在 Reviewing。
-- `summarize` = 原 `generate()` 的主体:先 `TeachPending.find(skills.drafts(), snapshot.id)` 复用,否则 `build(snapshot)`;`build` 用 `TeachRoute.fold(snapshot.steps, TeachApps.launchers(app), TeachApps.defaultBrowsers(app), { TeachApps.label(app, it) })`;完成后 phase `Reviewing`、`draftId` 落盘、`_ui` 带上 `draft/folded/basic`(basic = 未配置模型)。
-- `accept()`:校验草稿仍在 → `skills.approve(draftId)` → `acceptedName` 写进 session、phase `Saved`、保存并发布;失败给 `TeachNotice.DraftFailed`。
-- `recover()`:`Drafting` 与「`Reviewing` 且无 draftId」重新整理;`Reviewing` 有 draftId 时从 `drafts()` 取回并发布;找不到草稿 → 保持 `Reviewing` + TeachNotice.DraftFailed。
-- 删除 `generate()/annotate()/remove()` 与 `TeachEdit` 的 UI 引用;`discard()` 仍拒绝草稿并删轨迹。
+- `end()`: set the phase to `Drafting` and immediately `scope.launch { summarize(snapshot) }`, instead of only stopping at Reviewing.
+- `summarize` = the body of the old `generate()`: first reuse via `TeachPending.find(skills.drafts(), snapshot.id)`, otherwise `build(snapshot)`; `build` uses `TeachRoute.fold(snapshot.steps, TeachApps.launchers(app), TeachApps.defaultBrowsers(app), { TeachApps.label(app, it) })`; when done, the phase is `Reviewing`, `draftId` is persisted, and `_ui` carries `draft/folded/basic` (basic = no model configured).
+- `accept()`: verify the draft still exists → `skills.approve(draftId)` → write `acceptedName` into the session, phase `Saved`, save and publish; on failure emit `TeachNotice.DraftFailed`.
+- `recover()`: re-summarize for `Drafting` and for "`Reviewing` with no draftId"; when `Reviewing` has a draftId, fetch it back from `drafts()` and publish it; if the draft is not found → stay `Reviewing` + TeachNotice.DraftFailed.
+- Delete `generate()/annotate()/remove()` and the UI references to `TeachEdit`; `discard()` still rejects the draft and deletes the trace.
 
-- [ ] **Step 4: 改 `TeachScreen` 的调用点(临时版)**
+- [ ] **Step 4: Change `TeachScreen`'s call sites (temporary version)**
 
-去掉 `generate()`/`annotate()`/`remove()` 的调用与逐条编辑器;`Drafting` 显示「正在整理」,`Reviewing` 有草稿时先直接显示 `SkillReadingView` 与一个「收下」按钮(最小可用,Task 5 再按原型重排版式与文案)。
+Remove the `generate()`/`annotate()`/`remove()` calls and the per-step editor; `Drafting` shows "Writing this into a skill…", and when `Reviewing` has a draft it first shows `SkillReadingView` directly plus a "Keep this skill" button (minimum viable; Task 5 redoes the layout and copy per the prototype).
 
-- [ ] **Step 5: 编译**
+- [ ] **Step 5: Build**
 
 Run: `./gradlew :app:compileDebugKotlin`
-Expected: BUILD SUCCESSFUL。
+Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/com/wangzan101/mika/teach/TeachApps.kt app/src/main/java/com/wangzan101/mika/teach/TeachRuntime.kt app/src/main/java/com/wangzan101/mika/teach/ui/TeachScreen.kt core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/TeachPending.kt core/src/test/kotlin/com/wangzan101/mika/core/learn/teach/TeachPendingTest.kt
@@ -258,23 +258,23 @@ git commit -m "feat(teach): summarize automatically after demonstration"
 
 ---
 
-### Task 5: 页面改版与文案
+### Task 5: Page redesign and copy
 
 **Files:**
 - Rewrite: `app/src/main/java/com/wangzan101/mika/teach/ui/TeachScreen.kt`
-- Modify: `app/src/main/res/values*/strings_teach.xml`(12 个文件)
-- Test: `app/src/androidTest/java/com/wangzan101/mika/ui/TeachScreenTest.kt`(新建)
+- Modify: `app/src/main/res/values*/strings_teach.xml` (12 files)
+- Test: `app/src/androidTest/java/com/wangzan101/mika/ui/TeachScreenTest.kt` (new)
 
 **Interfaces:**
-- Consumes: Task 4 的 `TeachUi`、`TeachRuntime.accept/discard/resume/end/pause`;`SkillReadingView(markdown)`、`skillPreviewBody(markdown)`、`FrontMatter.parse`。
-- Produces(无状态、可测):
+- Consumes: `TeachUi` from Task 4, `TeachRuntime.accept/discard/resume/end/pause`; `SkillReadingView(markdown)`, `skillPreviewBody(markdown)`, `FrontMatter.parse`.
+- Produces (stateless, testable):
   - `internal data class TeachSummaryView(val display: String, val description: String, val body: String, val folded: List<String>, val basic: Boolean)`
   - `internal fun TeachSummaryPage(view, onAccept, onRedo, onDiscard)`
   - `internal fun TeachIntroPage(goal, hint, notice, onGoal, onStart)`
   - `internal fun TeachDonePage(name, description, onBackToChat, onTeachAgain)`
-  - `TeachScreen` 只做状态分发与 runtime 调用。
+  - `TeachScreen` only dispatches state and calls the runtime.
 
-- [ ] **Step 1: 写 UI 失败测试**
+- [ ] **Step 1: Write the failing UI test**
 
 ```kotlin
 @Test fun summaryShowsTheSkillSectionsAndFoldedNote() {
@@ -292,45 +292,45 @@ git commit -m "feat(teach): summarize automatically after demonstration"
 ```
 
 Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest`
-Expected: FAIL(TeachSummaryPage 未定义)。
+Expected: FAIL (TeachSummaryPage is not defined).
 
-- [ ] **Step 2: 写文案(zh 基准)**
+- [ ] **Step 2: Write the copy (zh as the baseline)**
 
-新增/替换(`strings_teach.xml`):
-- `teach_intro_body`「你先完整做一遍,我在旁边看。做完自动整理成技能,下次直接用。」
-- `teach_disclosure_short`「只看这台手机上的操作;密码、验证码、支付内容不记录。详细说明」
-- `teach_summarizing`「正在整理成技能…」
-- `teach_summary_head`「按 Mika 自己的做法整理,不是把你的操作重放一遍。」
-- `teach_folded_n`「已自动省掉 %1$d 个只用手的步骤」
-- `teach_basic_note`「这次没接模型,按本机规则整理。配好模型后能理解得更细。」
-- `teach_accept`「收下这个技能」
-- `teach_redo`「再示范一次」
-- `teach_retry`「再整理一次」
-- `teach_accepted_title`「学会了」
-- `teach_accepted_body`「『%1$s』已经能用。下次说类似的事,我会先想到它。」
-- `teach_back_chat`「回对话」
-- `teach_teach_again`「再教一件」
-- `teach_no_steps_again`「这次没看到操作,再来一次?」
-- 删除不再使用的 `teach_review`、`teach_generate`、`teach_correct`、`teach_clarify`、`teach_remove`、`teach_insufficient_note`、`teach_draft_ready`、`teach_open_drafts`。
+Add/replace (`strings_teach.xml`):
+- `teach_intro_body` "Do it once in front of me. When you finish, I'll write it into a skill you can use next time."
+- `teach_disclosure_short` "Only what happens on this phone is read; passwords, verification codes and payment details are not recorded. Details"
+- `teach_summarizing` "Writing this into a skill…"
+- `teach_summary_head` "Written the way Mika would do it, not a replay of your taps."
+- `teach_folded_n` "%1$d manual steps folded away automatically"
+- `teach_basic_note` "No model was connected this time, so this was written by local rules. Once a model is configured it can understand things in more detail."
+- `teach_accept` "Keep this skill"
+- `teach_redo` "Demonstrate again"
+- `teach_retry` "Try writing it again"
+- `teach_accepted_title` "Learned"
+- `teach_accepted_body` “%1$s” is ready. Next time you mention something similar, I'll think of it first.
+- `teach_back_chat` "Back to chat"
+- `teach_teach_again` "Teach another"
+- `teach_no_steps_again` "No actions were seen this time. Try again?"
+- Delete the now-unused `teach_review`, `teach_generate`, `teach_correct`, `teach_clarify`, `teach_remove`, `teach_insufficient_note`, `teach_draft_ready`, `teach_open_drafts`.
 
-其余 11 个语言按同样语义翻译;阿拉伯语注意复数形式,所有 `%1$s/%1$d` 占位符保持一致。
+Translate the other 11 languages with the same meaning; watch plural forms in Arabic, and keep every `%1$s/%1$d` placeholder consistent.
 
-- [ ] **Step 3: 重写 `TeachScreen.kt`**
+- [ ] **Step 3: Rewrite `TeachScreen.kt`**
 
-- 介绍:顶部栏 + 小卡说明 + 目标输入(App 现有输入样式)+ `开始示范`;开始后 `moveTaskToBack` 保持现状。
-- 示范中与中断:沿用现有 `Live`/`Interrupted` 版式与按钮(已确认不重做),不显示任何步骤列表。
-- 整理中:说明文字 + 取消,不显示任何步骤列表。
-- 总结:TeachSummaryPage(view, onAccept, onRedo, onDiscard);`display/description` 从 `FrontMatter.parse(draft.markdown)` 取,正文用 `skillPreviewBody`。
-- 已学会:TeachDonePage(name, description, onBackToChat, onTeachAgain);回对话用 `onBack`。
-- 再示范:`runtime.discard()`,再把目标 `prefill` 回介绍。
-- `testTag`:`teach-form/teach-goal/teach-start/teach-summary/teach-folded/teach-accept/teach-redo/teach-discard/teach-done`。
+- Intro: top bar + a small explanatory card + goal input (the app's existing input style) + `开始示范` (Start demonstration); after starting, `moveTaskToBack` stays as it is.
+- Demonstrating and interrupted: keep the existing `Live`/`Interrupted` layout and buttons (already confirmed not to be redone); show no step list.
+- Summarizing: explanatory text + cancel; show no step list.
+- Summary: TeachSummaryPage(view, onAccept, onRedo, onDiscard); `display/description` come from `FrontMatter.parse(draft.markdown)` and the body uses `skillPreviewBody`.
+- Learned: TeachDonePage(name, description, onBackToChat, onTeachAgain); back to chat uses `onBack`.
+- Demonstrate again: `runtime.discard()`, then `prefill` the goal back into the intro.
+- `testTag`: `teach-form/teach-goal/teach-start/teach-summary/teach-folded/teach-accept/teach-redo/teach-discard/teach-done`.
 
-- [ ] **Step 4: 跑测试与 i18n**
+- [ ] **Step 4: Run the tests and i18n**
 
-Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest` → PASS。
-Run: `./gradlew :app:testDebugUnitTest` → PASS(含 `StringResourcesTest`)。
+Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest` → PASS.
+Run: `./gradlew :app:testDebugUnitTest` → PASS (including `StringResourcesTest`).
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/com/wangzan101/mika/teach/ui/TeachScreen.kt app/src/main/res/values*/strings_teach.xml app/src/androidTest/java/com/wangzan101/mika/ui/TeachScreenTest.kt
@@ -339,42 +339,42 @@ git commit -m "feat(teach): show an auto-written skill instead of raw steps"
 
 ---
 
-### Task 6: 真机端到端与回归
+### Task 6: Real-device end-to-end and regression
 
-**Files:** 无代码改动(除非发现 bug)。
+**Files:** no code changes (unless a bug is found).
 
 **Interfaces:**
-- Consumes: 前五任务全部产物。
-- Produces: 设备验证结论;发现的 bug 回到对应任务修。
+- Consumes: every artifact of the first five tasks.
+- Produces: the device verification conclusions; any bug found goes back to the matching task to be fixed.
 
-- [x] **Step 1: 安装并跑真机示范**
+- [x] **Step 1: Install and run a real-device demonstration**
 
-`./gradlew :app:installDebug`;在 A94VUT2C28001694 上从教 Mika 开始,示范「打开小红书 → 搜索装修 → 打开第一条 → 收藏 → 做完了」。截图确认:总结第一步为「启动 小红书」,不含「桌面/图标」;折叠提示数量合理;正文五节齐全。
+`./gradlew :app:installDebug`; on A94VUT2C28001694 start from Teach Mika and demonstrate "open Xiaohongshu → search for renovation → open the first result → favorite → done". Confirm with a screenshot: the first step of the summary is "Launch Xiaohongshu" and contains no "home screen/icons"; the fold note count is reasonable; all five sections of the body are present.
 
-- [x] **Step 2: 收下与可用性**
+- [x] **Step 2: Accepting and usability**
 
-点「收下这个技能」→ 已学会页;进 设置 › 记忆 › 技能,确认它以试用状态存在;回到对话说「用刚才学的技能再搜一次」,确认技能能被检索/读到。
+Tap "Keep this skill" → the learned page; go to Settings › Memory › Skills and confirm it exists in trial state; go back to the chat and say "search once more with the skill you just learned", and confirm the skill can be retrieved/read.
 
-- [ ] **Step 3: 网页示例(本机受限,未能在真机完成)**
+- [ ] **Step 3: Web example (limited on this machine, could not be completed on a real device)**
 
-再示范一次网页操作(默认浏览器搜索),确认总结写成「打开/搜索」,不含地址栏步骤;若模型未改写,记录 prompt 证据并修 Task 3。
+Demonstrate a web action once more (a search in the default browser) and confirm the summary is written as "open/search" with no address-bar steps; if the model did not rewrite it, record the prompt evidence and fix Task 3.
 
-本机实测:Edge/WebView 页面里的点按不产生 TYPE_VIEW_CLICKED,只演示浏览器时采集到的全是 Window 步骤,折叠后没有真实操作、页面报「没有留下步骤」(已加窗口-only 的单测锁住这一行为)。浏览器改写规则目前只由 `TeachDraftTest` 覆盖;等采集层能收到 WebView 事件后再补真机这一条。
+Measured on this machine: taps inside Edge/WebView pages do not produce TYPE_VIEW_CLICKED, so demonstrating with only the browser captures nothing but Window steps; after folding there are no real actions and the page reports "no steps were left" (a window-only unit test was added to lock this behavior). The browser-rewrite rules are currently covered only by `TeachDraftTest`; add this real-device case once the capture layer can receive WebView events.
 
-- [x] **Step 4: 失败与恢复**
+- [x] **Step 4: Failures and recovery**
 
-- 0 步:开始后立刻结束 → 显示「没看到操作」,可重来。
-- 整理中被杀:整理中按返回/强杀 Mika,重进教 Mika → 自动继续整理或显示重试,轨迹不丢。
-- 无模型:临时切到一个未配置模型的资料?若成本高,直接用 Task 3 的本机整理单测 + 代码审阅代替,并在真机只看有模型路径。
+- 0 steps: end immediately after starting → shows "no actions were seen", and you can start over.
+- Killed while summarizing: press back / force-kill Mika during summarizing, then reopen Teach Mika → it resumes summarizing automatically or shows retry, and the trace is not lost.
+- No model: temporarily switch to a profile with no model configured? If that is costly, substitute Task 3's on-device summarization unit test + code review, and only check the with-model path on a real device.
 
-- [x] **Step 5: 回归**
+- [x] **Step 5: Regression**
 
-Run: `./gradlew :core:test :app:testDebugUnitTest` → PASS。
-Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest,com.wangzan101.mika.chat.ui.ChatAttachmentsTest` → PASS。
-Run: `./gradlew :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin` → PASS。
-不做全量 connectedAndroidTest。
+Run: `./gradlew :core:test :app:testDebugUnitTest` → PASS.
+Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest,com.wangzan101.mika.chat.ui.ChatAttachmentsTest` → PASS.
+Run: `./gradlew :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin` → PASS.
+Do not run the full connectedAndroidTest.
 
-- [x] **Step 6: 提交(如有小修)**
+- [x] **Step 6: Commit (if there are small fixes)**
 
 ```bash
 git add -A

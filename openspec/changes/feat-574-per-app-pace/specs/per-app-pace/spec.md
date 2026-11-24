@@ -1,61 +1,61 @@
 ## ADDED Requirements
 
-### Requirement: 按应用覆盖操作节奏
+### Requirement: Per-app operating pace overrides
 
-用户可以在设置里为单个 App 指定操作节奏档位（快 / 标准 / 像人）。任务运行时，每个 App 的生效档位 SHALL 为「该 App 的覆盖值，无覆盖时为全局档位」，并在任务开始时一次性解析（与全局档位「下一个任务起生效」的既有语义一致）。
+Users can specify an operating pace level (快 / 标准 / 像人 — Fast / Standard / Human-like) for an individual app in settings. While a task runs, each app's effective level SHALL be "that app's override value, or the global level when there is no override", resolved once at task start (consistent with the existing semantics of the global level's "takes effect from the next task").
 
-#### Scenario: 覆盖优先于全局
+#### Scenario: Override wins over global
 
-- **WHEN** 全局操作节奏为「标准」，用户把某 App 覆盖为「像人」
-- **THEN** 任务里该 App 按「像人」的停留与打字节奏执行，其他未覆盖 App 仍按「标准」执行
+- **WHEN** the global operating pace is 「标准」 (Standard) and the user overrides an app to 「像人」 (Human-like)
+- **THEN** that app runs in the task with Human-like dwell and typing pace, while other apps without overrides still run as Standard
 
-#### Scenario: 删除覆盖即回到跟随全局
+#### Scenario: Deleting an override returns to following the global
 
-- **WHEN** 用户删除某 App 的覆盖项，全局档位为「快」
-- **THEN** 该 App 在后续任务里按「快」执行，不再有任何单独节奏
+- **WHEN** the user deletes an app's override and the global level is 「快」 (Fast)
+- **THEN** that app runs as Fast in subsequent tasks, with no separate pace any longer
 
-### Requirement: 内置 careful 名单作为列表初始内容
+### Requirement: Built-in careful list as the list's initial content
 
-按应用列表首次初始化时，SHALL 把 App 知识中标记 `pace: careful` 的内置 App 预置为「像人」。初始化之后，手机操作的节奏判定 SHALL 只看按应用列表与全局档位，不再运行时查询 App 知识的 pace；站点（网页）知识的 pace 判定不受影响。
+When the per-app list is first initialized, the built-in apps marked `pace: careful` in app knowledge SHALL be preset to 「像人」 (Human-like). After initialization, pace determination for phone operations SHALL only look at the per-app list and the global level, and no longer query app knowledge's pace at runtime; the pace determination for site (web) knowledge is unaffected.
 
-#### Scenario: 首次使用预置内置名单
+#### Scenario: First use presets the built-in list
 
-- **WHEN** 按应用列表从未初始化过（存储为空）
-- **THEN** 初始化后内置 careful App（微信、小红书、抖音等 8 个）均出现在列表中且档位为「像人」，行为与预置前一致
+- **WHEN** the per-app list has never been initialized (storage is empty)
+- **THEN** after initialization the built-in careful apps (WeChat 微信, Xiaohongshu 小红书, Douyin 抖音 and 8 in total) all appear in the list at the Human-like level, with behavior identical to before the preset
 
-#### Scenario: 删除预置项后不再被知识拉回
+#### Scenario: Deleting a preset item is not pulled back by knowledge
 
-- **WHEN** 用户删除了预置的某个 careful App 的覆盖项，全局为「标准」
-- **THEN** 该 App 按全局「标准」执行，即使 App 知识仍标记它 careful
+- **WHEN** the user deletes the override for one preset careful app and the global setting is 「标准」 (Standard)
+- **THEN** that app runs as the global Standard, even though app knowledge still marks it careful
 
-### Requirement: 快档位的按应用语义
+### Requirement: Per-app semantics of the Fast level
 
-某 App 生效档位为「快」时，该 App SHALL 不做动作间停留、打字一次写入、不设屏数上限；「像人」时 SHALL 按 careful 停留（更久、按字数读、打字更慢）并设屏数上限；「标准」按正常停留。全局「快」不再使覆盖为「像人」的 App 失去放慢。
+When an app's effective level is 「快」 (Fast), that app SHALL not dwell between actions, SHALL type in one shot, and SHALL have no screen-count cap; at Human-like it SHALL use careful dwell (longer, reading by character count, slower typing) and set a screen-count cap; Standard uses normal dwell. The global Fast setting no longer causes apps overridden to Human-like to lose their slowdown.
 
-#### Scenario: 全局快下覆盖像人的 App 仍放慢
+#### Scenario: An app overridden to Human-like still slows down under global Fast
 
-- **WHEN** 全局操作节奏为「快」，某 App 覆盖为「像人」
-- **THEN** 该 App 按 careful 停留与打字节奏执行，其余 App 不停留
+- **WHEN** the global operating pace is 「快」 (Fast) and an app is overridden to 「像人」 (Human-like)
+- **THEN** that app runs with careful dwell and typing pace, while the other apps do not dwell
 
-#### Scenario: 屏数上限只跟覆盖像人走
+#### Scenario: The screen-count cap only follows an override to Human-like
 
-- **WHEN** 全局为「像人」且无任何覆盖
-- **THEN** 所有 App 按 careful 停留与打字，但只有覆盖为「像人」的 App 才计屏数并受上限约束（与现状一致：上限只给限制浏览快慢的 App）
+- **WHEN** the global setting is 「像人」 (Human-like) and there are no overrides
+- **THEN** all apps use careful dwell and typing, but only apps overridden to Human-like count screens and are bound by the cap (consistent with the current state: only apps that limit browsing pace are capped)
 
-### Requirement: 按应用设置界面
+### Requirement: Per-app settings UI
 
-设置 › 干活时 › 操作节奏下 SHALL 提供「按应用设置」入口：列表展示每个已覆盖 App 的当前档位，支持从已安装 App（带搜索）新增、修改档位、删除覆盖；未列入的 App 说明其跟随全局。
+Under 设置 (Settings) › 干活时 (During work) › 操作节奏 (Operating pace), a 「按应用设置」 (Per-app settings) entry SHALL be provided: the list shows each overridden app's current level, and supports adding from installed apps (with search), changing the level, and deleting overrides; apps not in the list are described as following the global setting.
 
-#### Scenario: 修改档位立即写入
+#### Scenario: Changing the level is written immediately
 
-- **WHEN** 用户在按应用列表里把某 App 从「像人」改为「快」并确认
-- **THEN** 列表显示更新为「快」，下一个任务起该 App 按「快」执行
+- **WHEN** the user changes an app from 「像人」 (Human-like) to 「快」 (Fast) in the per-app list and confirms
+- **THEN** the list updates to show Fast, and that app runs as Fast starting from the next task
 
-### Requirement: 评测钩子保持确定性
+### Requirement: Eval hooks remain deterministic
 
-评测/验收钩子设置了操作节奏时，SHALL 忽略按应用覆盖，所有 App 按钩子档位执行。
+When the evaluation/acceptance hook sets an operating pace, per-app overrides SHALL be ignored and all apps SHALL run at the hook's level.
 
-#### Scenario: 评测覆盖按应用列表
+#### Scenario: Evaluation overrides the per-app list
 
-- **WHEN** 评测钩子设定操作节奏为「快」，用户按应用列表里有「像人」覆盖
-- **THEN** 该评测运行里所有 App 按「快」执行
+- **WHEN** the eval hook sets the operating pace to 「快」 (Fast) and the user's per-app list has a Human-like override
+- **THEN** all apps run as Fast in that evaluation run

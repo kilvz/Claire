@@ -1,55 +1,55 @@
-# 远程亮屏与解锁验证
+# Remote wake and unlock verification
 
-日期：2026-10-31。基于 main 提交 `65e82c0d01ac0f016db76cde4c76cb9a3c03183c`（0.1.16）。
+Date: 2026-10-31. Based on main commit `65e82c0d01ac0f016db76cde4c76cb9a3c03183c` (0.1.16).
 
-## 范围与分层
+## Scope and layering
 
-- 手机端默认关闭远程亮屏/解锁，凭据只能在电脑连接设置页本地配置。
-- `core/device/DeviceAccess.kt` 负责串行准备流程和实际状态核验；平台输入、识别由 Android 适配提供。
-- `app/settings/DeviceAccessSettings.kt` 使用独立 Keystore 密钥加密原子存储，保留非秘密状态，不缓存解密后的凭据。
-- `McpDeviceTools` 提供状态、亮屏、解锁接口，拒绝所有参数，沿用原 MCP 认证；不进入模型工具目录或任务历史。
-- `TaskGate` 保持原有逻辑，真实解锁后自动放行。主屏设备管理独立于 Agent 虚拟屏。
-- 设置页使用现有分组、行、按钮与输入组件，中英文资源对应；不恢复或显示旧凭据，编辑时设置禁止截图标志。
+- On the phone side, remote wake/unlock is off by default, and credentials can only be configured locally on the computer connection settings page.
+- `core/device/DeviceAccess.kt` handles the serial preparation flow and actual state verification; platform input and recognition are provided by the Android adapter.
+- `app/settings/DeviceAccessSettings.kt` uses a separate Keystore key with encrypted atomic storage, keeps non-secret state, and does not cache decrypted credentials.
+- `McpDeviceTools` provides status, wake and unlock interfaces, rejects all parameters, and reuses the original MCP authentication; it does not enter the model tool catalog or task history.
+- `TaskGate` keeps its original logic, letting things through automatically after a real unlock. Device management on the main screen is independent of the Agent's virtual screen.
+- The settings page uses the existing grouping, row, button and input components, with Chinese and English resources corresponding; old credentials are not restored or shown, and the no-screenshot flag is set while editing.
 
-## 自动验证
+## Automated verification
 
-构建环境：JDK 17、Android SDK 36、仓库现有 Gradle/AGP/Kotlin 版本。
+Build environment: JDK 17, Android SDK 36, the repository's existing Gradle/AGP/Kotlin versions.
 
 ```sh
 ./gradlew :core:test :app:testDebugUnitTest \
   :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
-最终结果：core 2416 项、app JVM 977 项，无失败、无错误；core 中 2 项原有测试跳过。涵盖依赖方向、文档一致性、中英文资源、原有回归及新增功能测试。
+Final result: 2416 items in core, 977 items in app JVM, no failures, no errors; 2 pre-existing tests in core were skipped. Covers dependency direction, documentation consistency, Chinese and English resources, existing regressions and new feature tests.
 
-新增验证覆盖：默认关闭、无助手、首次解锁边界、幂等亮屏、命令成功但实际未亮屏、无凭据锁屏、PIN/密码流程、输入后擦除、错误凭据后持久暂停、并发调用、取消、等待时手动解锁/撤销许可、加密存储与密钥丢失、凭据更新使旧请求失效、MCP 参数/认证限制、原版锁屏自绘 PIN 控件及 SIM/未知控件排除。
+New verification covers: off by default, no assistant, first-unlock boundary, idempotent wake, command succeeding but the screen not actually turning on, lock screen with no credentials, PIN/password flow, erasing after input, persistent pause after wrong credentials, concurrent calls, cancel, manual unlock/revoking permission while waiting, encrypted storage and key loss, credential update invalidating old requests, MCP parameter/auth restrictions, the stock lock screen's self-drawn PIN control and exclusion of SIM/unknown controls.
 
-## 安卓 16 测试机
+## Android 16 test device
 
-通过独立的 Mika Dev（应用标识 `com.wangzan101.mika.dev`，本地改了应用标识的调试包，不在本次改动内）验证，原发行版及其数据保留。开发版 USB MCP 使用独立端口 18765；没有复制原版模型 Key 或其他私有数据。
+Verified through a separate Mika Dev (application ID `com.wangzan101.mika.dev`, a debug build with the application ID changed locally, not part of this change), with the original release and its data preserved. The development build's USB MCP uses a separate port 18765; the original model key and other private data were not copied.
 
-用户只在手机上配置真实锁屏凭据，测试脚本未读取或输出凭据。记录只包含以下非秘密状态：
+The user configured the real lock-screen credentials only on the phone; the test scripts did not read or output any credentials. The records contain only the following non-secret state:
 
-| 阶段 | interactive | keyguard_showing | device_locked | ready |
+| Phase | interactive | keyguard_showing | device_locked | ready |
 | --- | --- | --- | --- | --- |
-| 开始 | true | false | false | true |
-| 熄屏并锁定 | false | true | true | false |
-| 远程亮屏返回 awake | true | true | true | false |
-| 远程 PIN 解锁返回 unlocked | true | false | false | true |
+| Start | true | false | false | true |
+| Screen off and locked | false | true | true | false |
+| Remote wake returns awake | true | true | true | false |
+| Remote PIN unlock returns unlocked | true | false | false | true |
 
-提交前的持久占位被监测到，成功后占位清除，证明实际走过凭据提交路径，而非只检测到已解锁状态。
+The persistent placeholder was observed before submission and cleared after success, proving the credential submission path was actually exercised rather than only an already-unlocked state being detected.
 
-安卓原版锁屏的 `pinEntry` 是自绘的 `com.android.keyguard.PasswordTextView`，不声明 editable。识别规则按原版的 ID、类名和密码标志放行，其余只认带密码标志、输入类型匹配的编辑框，并有回归测试；未按坐标盲点，也未读取控件文字。
+The stock Android lock screen's `pinEntry` is a self-drawn `com.android.keyguard.PasswordTextView` that does not declare editable. The recognition rule allows it by the stock ID, class name and password flag, and otherwise only accepts edit boxes with the password flag and a matching input type, with regression tests; there was no blind tapping by coordinates and no reading of control text.
 
-`DeviceAccessSectionTest` 在真机通过：二次输入确认、保存条件和保存后不显示输入值。测试仅使用独立缓存中的模拟数据，没有覆盖真实配置。首次测试页未进入前台，终止后从开发版前台重新运行，结果为 OK（1 test）。验证后移除测试包。
+`DeviceAccessSectionTest` passed on a real device: confirming by re-entering, save conditions, and not showing the input value after saving. The test only used simulated data in a separate cache and did not touch the real configuration. The first time, the test page did not come to the foreground; after terminating it, it was rerun from the development build in the foreground, with the result OK (1 test). The test package was removed after verification.
 
-## 明确未验证的部分
+## Explicitly unverified parts
 
-- 真机验证使用用户现有 PIN；没有更改手机的锁屏类型。因此无密码/滑动和密码场景有自动测试覆盖，尚未在该真机上单独切换验证。
-- 密码支持 4–64 位可打印 ASCII 字符，PIN 为 4–16 位数字；不支持图案、SIM PIN 或未知的厂商凭据页。
-- 不支持重启后首次解锁前启动现有 Mika MCP。
-- 上面的真机记录早于「凭据按键只定向投给 SystemUI 窗口」（`ShellService.injectTo`）这一改动；改动后需在真机上重跑 PIN 解锁，并验证锁屏上方有其他窗口时返回 `input_failed` 且不输入。
-- 没有故意向真机提交错误 PIN；失败后停止重试由自动测试核验。
-- 没有变更原有任务付款/确认策略，也没有为验证配置模型或执行对外 App 任务。
+- The real-device verification used the user's existing PIN; the phone's lock-screen type was not changed. So passwordless/swipe and password scenarios are covered by automated tests but have not been separately switched and verified on that device.
+- The password supports 4–64 printable ASCII characters, and the PIN is 4–16 digits; patterns, SIM PINs and unknown vendor credential pages are not supported.
+- Starting the existing Mika MCP before the first unlock after a reboot is not supported.
+- The real-device record above predates the change "credential keystrokes are injected only into the SystemUI window" (`ShellService.injectTo`); after that change, PIN unlock needs to be rerun on a real device, and you need to verify that when other windows sit above the lock screen it returns `input_failed` and does not input.
+- No wrong PIN was deliberately submitted to the real device; stopping retries after failure is checked by automated tests.
+- The original task payment/confirmation policy was not changed, and no model was configured or external app task executed for verification.
 
-手机使用步骤见 [电脑连接说明](../mcp.md)。
+Phone usage steps are in [computer connection documentation](../mcp.md).

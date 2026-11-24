@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>语音模型</title>
+<title>Voice models</title>
 <style>
   :root {
     --bg: #f6f6f4; --panel: #ffffff; --ink: #1a1a1a; --muted: #6f6f6a;
@@ -87,66 +87,66 @@
 <body>
 <div class="shell">
   <header>
-    <h1>语音模型</h1>
-    <button class="btn primary" onclick="openAdd()">＋ 添加模型</button>
+    <h1>Voice models</h1>
+    <button class="btn primary" onclick="openAdd()">＋ Add model</button>
   </header>
-  <div class="sub">统一管理语音转文字、文字转语音和实时通话的模型。能力与协议在此声明；语音输入、朗读和通话设置页只负责选择与使用偏好。</div>
+  <div class="sub">Manage speech-to-text, text-to-speech and realtime call models in one place. Capabilities and protocols are declared here; the voice input, read-aloud and call settings pages only handle selection and usage preferences.</div>
 
   <div id="list"></div>
 
-  <div class="empty" id="empty" style="display:none">还没有语音模型。点击「添加模型」开始。</div>
+  <div class="empty" id="empty" style="display:none">No voice models yet. Click "Add model" to get started.</div>
 </div>
 
 <div class="backdrop" id="sheet">
   <div class="sheet">
-    <h2 id="sheet-title">添加模型</h2>
-    <div class="sub" style="margin-bottom:0">声明能力与协议，保存为「未验证」或立即测试。</div>
+    <h2 id="sheet-title">Add model</h2>
+    <div class="sub" style="margin-bottom:0">Declare capabilities and protocol, then save as "Unverified" or test right away.</div>
 
     <div class="field">
-      <label>账号来源</label>
+      <label>Account source</label>
       <select id="f-account">
-        <option value="existing">已有服务商账号（复用地址与密钥）</option>
-        <option value="owned">新建语音专用账号（加密保存）</option>
-        <option value="none">无凭据（系统 / 自建服务）</option>
+        <option value="existing">Existing provider account (reuse address and key)</option>
+        <option value="owned">New voice-only account (stored encrypted)</option>
+        <option value="none">No credentials (system / self-hosted service)</option>
       </select>
     </div>
 
     <div class="field">
-      <label>模型 ID / 名称</label>
-      <input type="text" id="f-model" placeholder="例如 gpt-4o-transcribe，或自定义标识">
+      <label>Model ID / name</label>
+      <input type="text" id="f-model" placeholder="e.g. gpt-4o-transcribe, or a custom identifier">
     </div>
 
     <div class="field">
-      <label>能力</label>
+      <label>Capabilities</label>
       <div class="caps-row">
-        <label><input type="checkbox" class="cap-toggle" data-cap="stt" onchange="syncProto()"><span>语音转文字</span></label>
-        <label><input type="checkbox" class="cap-toggle" data-cap="tts" onchange="syncProto()"><span>文字转语音</span></label>
-        <label><input type="checkbox" class="cap-toggle" data-cap="rt" onchange="syncProto()"><span>实时通话</span></label>
+        <label><input type="checkbox" class="cap-toggle" data-cap="stt" onchange="syncProto()"><span>Speech to text</span></label>
+        <label><input type="checkbox" class="cap-toggle" data-cap="tts" onchange="syncProto()"><span>Text to speech</span></label>
+        <label><input type="checkbox" class="cap-toggle" data-cap="rt" onchange="syncProto()"><span>Realtime calls</span></label>
       </div>
     </div>
 
     <div id="proto-stt" class="proto-block stt field" style="display:none">
-      <label>语音转文字 · 协议</label>
-      <select><option>系统识别</option><option>音频转写</option><option>聊天音频输入</option><option>Gemini 内联</option><option>豆包流式</option><option>FunASR 流式</option><option>百炼流式</option></select>
-      <div class="hint">聊天音频输入可另设 data 写法与是否附转写指令；流式服务按需填资源 ID / 地域 / 语言。</div>
+      <label>Speech to text · protocol</label>
+      <select><option>System recognition</option><option>Audio transcription</option><option>Chat audio input</option><option>Gemini inline</option><option>Doubao streaming</option><option>FunASR streaming</option><option>Bailian streaming</option></select>
+      <div class="hint">Chat audio input can also set the data format and whether a transcription prompt is attached; streaming services fill in resource ID / region / language as needed.</div>
     </div>
 
     <div id="proto-tts" class="proto-block tts field" style="display:none">
-      <label>文字转语音 · 协议</label>
-      <select><option>系统合成</option><option>OpenAI Speech</option><option>Gemini TTS</option></select>
+      <label>Text to speech · protocol</label>
+      <select><option>System synthesis</option><option>OpenAI Speech</option><option>Gemini TTS</option></select>
     </div>
 
     <div id="proto-rt" class="proto-block rt field" style="display:none">
-      <label>实时通话 · 协议</label>
-      <select><option>火山双工</option><option>OpenAI Realtime</option></select>
-      <div class="field" style="margin-top:8px"><label>接口地址 / 模型 / 音色</label>
-        <input type="text" placeholder="wss://… · 模型名 · 音色编号" style="margin-bottom:6px"></div>
+      <label>Realtime calls · protocol</label>
+      <select><option>Volcano duplex</option><option>OpenAI Realtime</option></select>
+      <div class="field" style="margin-top:8px"><label>Endpoint / model / voice</label>
+        <input type="text" placeholder="wss://… · model name · voice ID" style="margin-bottom:6px"></div>
     </div>
 
     <div class="sheet-actions">
-      <button class="btn ghost" onclick="closeAdd()">取消</button>
-      <button class="btn primary" onclick="saveAsUnverified()">保存为未验证</button>
-      <button class="btn ghost" onclick="saveAndTest()">保存并测试</button>
+      <button class="btn ghost" onclick="closeAdd()">Cancel</button>
+      <button class="btn primary" onclick="saveAsUnverified()">Save as unverified</button>
+      <button class="btn ghost" onclick="saveAndTest()">Save and test</button>
     </div>
   </div>
 </div>
@@ -158,22 +158,22 @@
 
   function seed() {
     return [
-      { svc: '系统', account: '无凭据', items: [
-        { name: '系统识别', id: 'system-stt', caps: [{c:'stt', p:'系统识别', v:'ok'}], edit:false },
-        { name: '系统合成', id: 'system-tts', caps: [{c:'tts', p:'系统合成', v:'ok'}], edit:false },
+      { svc: 'System', account: 'No credentials', items: [
+        { name: 'System recognition', id: 'system-stt', caps: [{c:'stt', p:'System recognition', v:'ok'}], edit:false },
+        { name: 'System synthesis', id: 'system-tts', caps: [{c:'tts', p:'System synthesis', v:'ok'}], edit:false },
       ]},
-      { svc: '火山引擎', account: '已有服务商', items: [
-        { name: '豆包语音', id: 'doubao-asr', caps: [{c:'stt', p:'豆包流式', v:'warn'}] },
-        { name: '豆包朗读', id: 'doubao-tts', caps: [{c:'tts', p:'OpenAI Speech', v:'ok'}] },
-        { name: '豆包实时', id: 'doubao-rt', caps: [{c:'rt', p:'火山双工', v:'warn'}] },
+      { svc: 'Volcano Engine', account: 'Existing provider', items: [
+        { name: 'Doubao voice', id: 'doubao-asr', caps: [{c:'stt', p:'Doubao streaming', v:'warn'}] },
+        { name: 'Doubao read-aloud', id: 'doubao-tts', caps: [{c:'tts', p:'OpenAI Speech', v:'ok'}] },
+        { name: 'Doubao realtime', id: 'doubao-rt', caps: [{c:'rt', p:'Volcano duplex', v:'warn'}] },
       ]},
-      { svc: 'OpenAI', account: '已有服务商', items: [
-        { name: '语音转写', id: 'gpt-4o-transcribe', caps: [{c:'stt', p:'音频转写', v:'ok'}] },
-        { name: '朗读', id: 'tts-1', caps: [{c:'tts', p:'OpenAI Speech', v:'ok'}] },
-        { name: '实时语音', id: 'gpt-4o-realtime', caps: [{c:'rt', p:'OpenAI Realtime', v:'warn'}] },
+      { svc: 'OpenAI', account: 'Existing provider', items: [
+        { name: 'Speech transcription', id: 'gpt-4o-transcribe', caps: [{c:'stt', p:'Audio transcription', v:'ok'}] },
+        { name: 'Read aloud', id: 'tts-1', caps: [{c:'tts', p:'OpenAI Speech', v:'ok'}] },
+        { name: 'Realtime voice', id: 'gpt-4o-realtime', caps: [{c:'rt', p:'OpenAI Realtime', v:'warn'}] },
       ]},
-      { svc: '自建 FunASR', account: '语音专用账号', items: [
-        { name: 'Paraformer', id: 'paraformer-zh', caps: [{c:'stt', p:'FunASR 流式', v:'ok'}] },
+      { svc: 'Self-hosted FunASR', account: 'Voice-only account', items: [
+        { name: 'Paraformer', id: 'paraformer-zh', caps: [{c:'stt', p:'FunASR streaming', v:'ok'}] },
       ]},
     ];
   }
@@ -201,9 +201,9 @@
     top.querySelector('.model-id').textContent = m.id;
     if (m.edit !== false) {
       const act = document.createElement('div'); act.className = 'row-actions';
-      act.innerHTML = `<button class="icon-btn" title="编辑">✎</button><button class="icon-btn" title="删除">🗑</button>`;
+      act.innerHTML = `<button class="icon-btn" title="Edit">✎</button><button class="icon-btn" title="Delete">🗑</button>`;
       act.querySelectorAll('.icon-btn')[0].onclick = () => openEdit(m);
-      act.querySelectorAll('.icon-btn')[1].onclick = () => { if (confirm('删除该模型？')) alert('已删除（原型）'); };
+      act.querySelectorAll('.icon-btn')[1].onclick = () => { if (confirm('Delete this model?')) alert('Deleted (prototype)'); };
       top.appendChild(act);
     }
     row.appendChild(top);
@@ -211,16 +211,16 @@
     const badges = document.createElement('div'); badges.className = 'badges';
     m.caps.forEach(cp => {
       const b = document.createElement('span'); b.className = 'cap ' + cp.c;
-      b.innerHTML = `<span>${cp.c === 'stt' ? '语音转文字' : cp.c === 'tts' ? '文字转语音' : '实时通话'}</span>` +
-        `<span class="proto">${cp.p}</span><button class="test">${cp.c === 'stt' ? '测试' : cp.c === 'tts' ? '试听' : '连接测试'}</button>`;
-      b.querySelector('.test').onclick = () => alert(cp.c === 'rt' ? '仅记录连接成功（原型）' : cp.c === 'stt' ? '请按住说一句以真实验证（原型）' : '合成并从真实播放路径试听（原型）');
+      b.innerHTML = `<span>${cp.c === 'stt' ? 'Speech to text' : cp.c === 'tts' ? 'Text to speech' : 'Realtime calls'}</span>` +
+        `<span class="proto">${cp.p}</span><button class="test">${cp.c === 'stt' ? 'Test' : cp.c === 'tts' ? 'Preview' : 'Connection test'}</button>`;
+      b.querySelector('.test').onclick = () => alert(cp.c === 'rt' ? 'Connection success only recorded (prototype)' : cp.c === 'stt' ? 'Hold to speak a sentence for real verification (prototype)' : 'Synthesize and preview through the real playback path (prototype)');
       badges.appendChild(b);
     });
     row.appendChild(badges);
 
     const status = document.createElement('div'); status.className = 'status';
-    if (m.caps.some(c => c.v === 'warn')) status.innerHTML = '状态：<span class="warn">未验证</span> · 连接/能力验证待完成';
-    else status.innerHTML = '状态：<span class="ok">已验证</span>';
+    if (m.caps.some(c => c.v === 'warn')) status.innerHTML = 'Status: <span class="warn">Unverified</span> · connection/capability verification pending';
+    else status.innerHTML = 'Status: <span class="ok">Verified</span>';
     row.appendChild(status);
     return row;
   }
@@ -230,11 +230,11 @@
       document.getElementById('proto-' + cb.dataset.cap).style.display = cb.checked ? 'block' : 'none';
     });
   }
-  function openAdd() { document.getElementById('sheet-title').textContent = '添加模型'; document.getElementById('sheet').classList.add('open'); }
-  function openEdit(m) { document.getElementById('sheet-title').textContent = '编辑模型 · ' + m.name; document.getElementById('sheet').classList.add('open'); }
+  function openAdd() { document.getElementById('sheet-title').textContent = 'Add model'; document.getElementById('sheet').classList.add('open'); }
+  function openEdit(m) { document.getElementById('sheet-title').textContent = 'Edit model · ' + m.name; document.getElementById('sheet').classList.add('open'); }
   function closeAdd() { document.getElementById('sheet').classList.remove('open'); }
-  function saveAsUnverified() { closeAdd(); alert('已保存为「未验证」（原型）'); }
-  function saveAndTest() { closeAdd(); alert('已保存并开始测试（原型）'); }
+  function saveAsUnverified() { closeAdd(); alert('Saved as "Unverified" (prototype)'); }
+  function saveAndTest() { closeAdd(); alert('Saved and testing started (prototype)'); }
 
   render();
 </script>

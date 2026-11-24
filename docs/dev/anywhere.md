@@ -1,39 +1,39 @@
-# 只读 Web 控制台：手机端只读端点（Mika Anywhere P0）
+# Read-only Web console: phone-side read-only endpoints (Mika Anywhere P0)
 
-这是「Mika Anywhere」的第一阶段。本文只讲**手机端**：给 Web 控制台用的三个只读接口。浏览器页面和网关会话在另一个变更里；设计与分期讨论见上游 issue #372，网关侧见 PR #374（`companions/relay` 的另一个变更）。
+This is the first phase of "Mika Anywhere". This document covers only the **phone side**: the three read-only interfaces used by the Web console. The browser page and the gateway session are in another change; see upstream issue #372 for the design and phasing discussion, and PR #374 for the gateway side (another change in `companions/relay`).
 
-只读——不派工、不回答、不取消，也不碰手机上的任何设置。
+Read-only — no dispatching work, no answering, no cancelling, and no touching any settings on the phone.
 
-## 范围
+## Scope
 
-- **手机新增三个只读端点**：对话列表、一个对话的轮次（分页）、正在运行的任务。
-- **不改执行路径**：不新增工具、不放宽审批、不碰付款与接管；回答、派工、取消仍走现有任务 API。
-- **网关侧**：`/app` 页面、登录会话和 `/web/api` 只读代理由 `companions/relay` 的另一个变更提供；手机只负责下面的端点。
+- **Three new read-only endpoints on the phone**: conversation list, the turns of one conversation (paginated), and running tasks.
+- **No change to the execution path**: no new tools, no loosening of approvals, no touching payments or takeover; answering, dispatching work and cancelling still go through the existing task API.
+- **Gateway side**: the `/app` page, the login session and the `/web/api` read-only proxy are provided by another change in `companions/relay`; the phone is responsible only for the endpoints below.
 
-## 信任边界
+## Trust boundary
 
 ```text
-浏览器 ──HTTPS/Cookie──> relay 网关 ──WSS（已配对设备通道）──> 手机
+browser ──HTTPS/Cookie──> relay gateway ──WSS (paired device channel)──> phone
                                    │
-                          网关内存里保存会话对应的手机令牌
+                          the gateway holds the session's phone token in memory
 ```
 
-- 手机仍然只认 `Authorization: Bearer <手机访问令牌>`，并且**拒绝带 `Origin` 的请求**（防 DNS 重绑定）。网关负责去掉浏览器发来的 `Origin` 和 Cookie，换上网关保存的令牌后转发。
-- 网关因此从「只透明转发」变成「会话期间持有手机令牌」；令牌不落盘，网关重启即失效。网关仍然能看到转发的内容（和现有 CLI / MCP 一样，不是端到端加密），用自己的、可信的网关是前提。
-- 这三个端点不新增信任判断：它们和现有 `/api/v1` 走同一个 `RemoteAccess`，失败冷却、私有地址限制不变。
+- The phone still only accepts `Authorization: Bearer <phone access token>` and **rejects requests carrying an `Origin`** (to prevent DNS rebinding). The gateway is responsible for stripping the `Origin` and Cookie sent by the browser, swapping in the token it holds, and forwarding.
+- The gateway therefore changes from "transparent forwarding only" to "holding the phone token for the duration of the session"; the token is not written to disk and becomes invalid when the gateway restarts. The gateway can still see the forwarded content (as with the existing CLI / MCP, this is not end-to-end encryption), so using your own trusted gateway is a prerequisite.
+- These three endpoints add no new trust decisions: they use the same `RemoteAccess` as the existing `/api/v1`, with the same failure cooldown and private-address restrictions.
 
-## HTTP 契约
+## HTTP contract
 
-认证方式和任务 API 相同（`RemoteAccess`），失败冷却、私有地址限制不变。只读端点挂在 `/api/v1` 下：
+Authentication is the same as the task API (`RemoteAccess`), with the same failure cooldown and private-address restrictions. The read-only endpoints live under `/api/v1`:
 
 ### `GET /api/v1/conversations?limit=20`
 
-`limit` 1–50，默认 20。最近的在前；没有内容的对话不列。
+`limit` 1–50, default 20. Most recent first; conversations with no content are not listed.
 
 ```json
 {
   "conversations": [
-    { "conversation": "8f…", "title": "订一张高铁票", "updated_at_ms": 1762400000000,
+    { "conversation": "8f…", "title": "Book a high-speed train ticket", "updated_at_ms": 1762400000000,
       "pinned_at_ms": 1762400001000, "turn_count": 6 }
   ]
 }
@@ -41,68 +41,68 @@
 
 ### `GET /api/v1/conversations/{id}?from=0&limit=10`
 
-- `limit` 1–10，默认 8；`from` 不传时返回最后一段（打开对话先看到最新的几轮）。
-- 返回的 `from` 是实际起点，`total` 是总轮数；往前翻用 `from = 当前 from − limit`。
-- 字段超长会截断并以 `truncated` 标出：用户原话 2,000 字、回答 4,000 字、备注 500 字、单条插话 500 字，插话最多 10 条。截断按码点，不会切出半个 emoji。
-- 一页最多 10 轮、单轮各项合计约 35 KB（按 CJK 3 字节/字符估算），整页留在 relay 单帧 1 MiB 以内。
+- `limit` 1–10, default 8; when `from` is omitted the last segment is returned (so opening a conversation shows the latest turns first).
+- The returned `from` is the actual starting point and `total` is the total number of turns; to page backwards use `from = current from − limit`.
+- Over-long fields are truncated and marked with `truncated`: user text 2,000 characters, answer 4,000 characters, notes 500 characters, a single interjection 500 characters, and at most 10 interjections. Truncation is by code point and never cuts an emoji in half.
+- At most 10 turns per page, with each turn's fields totaling about 35 KB (estimated at 3 bytes per CJK character), so a whole page stays within the relay's single-frame 1 MiB limit.
 
 ```json
 {
-  "conversation": "8f…", "title": "订一张高铁票", "total": 6, "from": 4,
+  "conversation": "8f…", "title": "Book a high-speed train ticket", "total": 6, "from": 4,
   "turns": [
-    { "index": 4, "user_text": "帮我改签到下午", "outcome": "改好了…", "status": "succeeded",
-      "run_id": "…", "steers": ["顺便选靠窗"], "truncated": false }
+    { "index": 4, "user_text": "Move my booking to the afternoon", "outcome": "Changed…", "status": "succeeded",
+      "run_id": "…", "steers": ["Pick a window seat too"], "truncated": false }
   ]
 }
 ```
 
-`status` 与对话文件里的一致：`succeeded` / `unverified` / `failed` / `cancelled`。
+`status` is the same as in the conversation file: `succeeded` / `unverified` / `failed` / `cancelled`.
 
 ### `GET /api/v1/running`
 
-此刻在跑、排队、等用户的任务，**包括手机上发起的**。`status` 沿用任务 API 的说法（`running`、`queued`、`paused`、`waiting_for_answer`、`waiting_on_phone`）；`needs_you` 表示要用户在场处理（回答、确认、接管）。目标 1,000 字、进度 500 字，超长标 `truncated`；最多 20 条。
+Tasks that are running, queued, or waiting for the user right now, **including those started on the phone**. `status` follows the task API's wording (`running`, `queued`, `paused`, `waiting_for_answer`, `waiting_on_phone`); `needs_you` means the user needs to be present to handle it (answer, confirm, take over). Goal 1,000 characters, progress 500 characters, over-long marked `truncated`; at most 20 entries.
 
 ```json
 {
   "running": [
-    { "conversation": "8f…", "goal": "整理昨天会议的待办", "status": "running", "run_id": "…",
-      "step": 4, "progress": "正在读会议记录", "needs_you": false, "truncated": false }
+    { "conversation": "8f…", "goal": "List the action items from yesterday's meeting", "status": "running", "run_id": "…",
+      "step": 4, "progress": "Reading the meeting notes", "needs_you": false, "truncated": false }
   ]
 }
 ```
 
-`/api/v1` 的 `capabilities` 会多出 `conversations`、`running`。
+`/api/v1`'s `capabilities` will additionally include `conversations` and `running`.
 
-## 网关侧
+## Gateway side
 
-浏览器页面、登录会话和 `/web/api` 只读代理在 `companions/relay` 的另一个变更里（PR #374）。要点：浏览器用同一手机访问令牌登录一次，令牌只存网关内存；只放行这几个只读路径且只允许 GET；手机 `/api/v1` 的 `capabilities` 里出现 `conversations`、`running` 时控制台才启用，否则提示手机端升级。
+The browser page, login session and `/web/api` read-only proxy are in another change in `companions/relay` (PR #374). Key points: the browser logs in once with the same phone access token, and the token is stored only in gateway memory; only these read-only paths are allowed, and only GET; the console is enabled only when `conversations` and `running` appear in the phone's `/api/v1` `capabilities`, otherwise it prompts the user to upgrade the phone side.
 
-## 安全红线（本阶段及以后）
+## Security red lines (this phase and beyond)
 
-- 付款确认、接管仍只能在手机上；远程运行一律按询问开工。
-- 模型 Key、OAuth 令牌、锁屏 PIN、ADB 钥匙永不下发到浏览器。
-- Web 会话不能新开或扩大手机能力（无障碍、无线调试、Root、沙盒联网、应用访问名单）。
-- 控制台只能读，不能经这些端点派工、回答、插话或取消。
+- Payment confirmation and takeover are still phone-only; remote runs always start by asking.
+- Model keys, OAuth tokens, lock-screen PINs and ADB keys are never sent to the browser.
+- A Web session cannot open or expand phone capabilities (accessibility, wireless debugging, Root, sandbox networking, app access list).
+- The console can only read; it cannot dispatch work, answer, interject or cancel through these endpoints.
 
-## 已知限制
+## Known limitations
 
-- 只读：不能发消息、派工、回答、插话、取消，也不能改设置。
-- 没有屏幕画面、文件、文件卡片、运行过程、定时任务、记忆/技能设置。
-- 对话内容按原样读：用户当时发的屏幕标记、附件行等仍在文本里；每轮做了截断（见上面的上限），完整内容仍只在手机上。
-- 没有流式输出；调用方看到的回答只在写入对话后出现。
-- 列表按对话文件的修改时间排序；还没有搜索、置顶优先排序或按任务筛选。
+- Read-only: cannot send messages, dispatch work, answer, interject, cancel, or change settings.
+- No screen image, files, file cards, run progress, scheduled tasks, or memory/skill settings.
+- Conversation content is read as-is: screen markers, attachment lines and the like that the user sent at the time are still in the text; each turn is truncated (see the limits above), and the full content remains only on the phone.
+- No streaming output; the caller sees an answer only after it is written into the conversation.
+- Lists are ordered by the conversation file's modification time; there is no search, pinned-first ordering or task-based filtering yet.
 
-## 验证
+## Verification
 
 ```sh
-# Kotlin 只读 API 与 App 读取
+# Kotlin read-only API and App-side reader
 ./gradlew :core:test --tests "com.wangzan101.mika.core.remote.CompanionApiTest" \
   :app:testDebugUnitTest --tests "com.wangzan101.mika.chat.RemoteConversationReaderTest"
 
-# 编译
+# Compile
 ./gradlew :app:compileDebugKotlin
 ```
 
-## 下一步
+## Next steps
 
-P1 要让浏览器发消息/派工、插话、回答、取消：除了网关的受控 POST 白名单和 CSRF，还要先决定任务 API 怎么操作手机上的普通对话——现有远程入口只认 `mcp-` 前缀的对话，不能直接写进手机上的对话。屏幕预览、文件分块、SSE 再往后。
+P1 needs to let the browser send messages/dispatch work, interject, answer and cancel: besides the gateway's controlled POST allowlist and CSRF, it must first decide how the task API operates ordinary conversations on the phone — the existing remote entry point only recognizes conversations with the `mcp-` prefix and cannot write directly into conversations on the phone. Screen preview, file chunking and SSE come later.

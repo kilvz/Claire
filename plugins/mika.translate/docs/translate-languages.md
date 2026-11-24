@@ -1,39 +1,38 @@
-# 语言怎么选
+# How to choose the language
 
-插件里没有「语言开关」这一层：**翻译成什么语言由你在对话里说**，Mika 把它当参数传给 `translate`。
-所以任何语言都能翻，不限于列表里的这几种。
+The plugin has no "language switch" layer: **the language to translate into is stated by you in the conversation**, and Mika passes it to `translate` as a parameter.
+So any language can be translated, not limited to the ones in the list.
 
-## 怎么说
+## How to say it
 
-| 你想要 | 你就说 | Mika 传的 |
+| What you want | What you say | What Mika passes |
 |---|---|---|
-| 默认中文 | 「翻译这页」 | `target: 简体中文` |
-| 繁体 | 「翻成繁体」/「转成台湾用语」 | `target: 繁體中文（台灣用語）` |
-| 英文 | 「译成英文」 | `target: English` |
-| 日文 | 「翻成日文」 | `target: 日本語` |
-| 韩文 | 「这页翻成韩语」 | `target: 한국어` |
-| 其他任何语言 | 「翻成德语/法语/越南语/阿拉伯语…」 | `target: 德语` 等，用中文说也行，用原文拼写也行 |
+| Chinese by default | "Translate this page" | `target: 简体中文` |
+| Traditional Chinese | "Turn it into Traditional" / "convert to Taiwanese usage" | `target: 繁體中文（台灣用語）` |
+| English | "Translate into English" | `target: English` |
+| Japanese | "Translate into Japanese" | `target: 日本語` |
+| Korean | "Translate this page into Korean" | `target: 한국어` |
+| Any other language | "Translate into German/French/Vietnamese/Arabic…" | `target: 德语` and so on; saying it in Chinese or spelling it in the original script both work |
 
-## 「翻译这页」默认翻成什么
+## What "translate this page" translates into by default
 
-默认 **简体中文**。想改成别的默认，在 [设置 → 环境变量](minis://settings/environments) 里新建：
+The default is **Simplified Chinese**. To change the default, create a new one under [设置 → 环境变量 (Settings → Environment variables)](minis://settings/environments):
 
-| 变量 | 作用 | 例子 |
+| Variable | Effect | Example |
 |---|---|---|
-| `MIKA_TRANSLATE_TARGET` | 默认目标语言 | `繁體中文`、`English`、`日本語` |
+| `MIKA_TRANSLATE_TARGET` | Default target language | `繁體中文`, `English`, `日本語` |
 
-设了以后，说「翻译这页」就按这个语言来；对话里明确说了语言，仍以说的为准。
+Once it is set, "translate this page" follows that language; if a language is explicitly stated in the conversation, that still wins.
 
-## 同一页翻两种语言
+## Translating the same page into two languages
 
-直接说就行：「先翻中文，再给我一份英文」——Mika 会对同一页调两次 `translate`，两次都用同一份正文。
+Just say it: "translate into Chinese first, then give me an English version" — Mika calls `translate` twice on the same page, both times with the same body.
 
-## 原文是什么语言
+## What language the source is
 
-不用管。`translate` 会自己判断；你要是不放心，可以补一句「原文是日文」，Mika 会作为 `source` 传进去，
-术语和专有名词的还原会更准。
+You do not need to care. `translate` judges by itself; if you are unsure, you can add "the source is Japanese", and Mika passes it in as `source`, so terms and proper nouns are restored more accurately.
 
-## 双语对照
+## Bilingual side by side
 
-想要原文和译文并排，说「对照着给我」。Mika 会把每段原文和译文成对列出，而不是只给译文。
-（默认只给译文——用户要的是看懂，不是练习翻译。）
+To get the source and the translation side by side, say "give it to me side by side". Mika lists each source paragraph and its translation in pairs, rather than giving only the translation.
+(By default only the translation is given — what the user wants is to understand, not to practise translation.)

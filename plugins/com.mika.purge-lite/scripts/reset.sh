@@ -17,19 +17,19 @@ if [ -f "$cfg" ]; then
 fi
 
 cat > "$cfg" <<'EOS'
-# 提示词改写配置。改完下一次任务生效。
-# 整段包在提示词外面的：prefix=（放最前）suffix=（放最后）
-# 逐条替换的：replace=旧文字=>新文字（按字面匹配，不是正则）
-# 行首加 [模型名片段] 只对那个模型生效，例如 [claude]prefix=…
+# Prompt-rewrite configuration. Changes take effect on the next task.
+# Wrapped around the whole prompt: prefix= (at the front), suffix= (at the end)
+# One-by-one replacement: replace=old text=>new text (literal match, not a regex)
+# A [model-name fragment] at the start of the line applies only to that model, e.g. [claude]prefix=…
 #
-# 例：先给结论
-# prefix=先给结论，再给理由。不确定的事直接说不确定，不要绕。
+# Example: lead with the conclusion
+# prefix=Give the conclusion first, then the reasoning. If you are not sure, say so plainly; do not hedge.
 #
-# 例：把身份句换成中文（左边是 Mika 原文，右边是想换成的）
-# replace=You are Mika, the user's personal assistant on their phone.=>你是 Mika。
+# Example: replace the identity sentence (left is the original Mika text, right is the replacement)
+# replace=You are Mika, the user's personal assistant on their phone.=>You are Mika.
 #
-# 例：只对某个模型追加要求
-# [gpt]suffix=回答尽量控制在三句话内。
+# Example: add a requirement for one model only
+# [gpt]suffix=Keep answers to three sentences.
 EOS
 echo "restored: $cfg"
 echo "rules now: $(grep -cE '^(\[[^]]*\])?(prefix|suffix|replace)=' "$cfg" 2>/dev/null || echo 0)"

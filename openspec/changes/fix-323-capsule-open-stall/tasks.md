@@ -1,20 +1,20 @@
-## 1. 展开路径守卫
+## 1. Expand-path guard
 
-- [x] 1.1 `CapsuleCardContent.kt`：新增 `runOverlayOpen(reduceMotion, animate)`（`withTimeoutOrNull((CARD_IN_MS * scale) + OPEN_GRACE_MS)`，scale 取 MotionDurationScale、`coerceAtMost(10f)`），`OverlayMotion` 的 open 分支整段（SETTLE 等待、`opened()`、`animateTo`）纳入守卫；超时 `snapTo(1f)` 并补调 `opened()`，`openedCalled` 保证恰好一次；关动画分支行为不变
-- [x] 1.2 确认边窗 `CapsuleOverlay`（恒 `open = true`）经同一 composable 自动受益，无调用点改动
+- [x] 1.1 `CapsuleCardContent.kt`: add `runOverlayOpen(reduceMotion, animate)` (`withTimeoutOrNull((CARD_IN_MS * scale) + OPEN_GRACE_MS)`, with scale taken from MotionDurationScale and `coerceAtMost(10f)`), and bring the whole open branch of `OverlayMotion` (the SETTLE wait, `opened()`, `animateTo`) under the guard; on timeout `snapTo(1f)` and call `opened()` as a make-up, with `openedCalled` guaranteeing exactly one call; the animations-off branch behavior is unchanged
+- [x] 1.2 Confirm that the side window `CapsuleOverlay` (always `open = true`) benefits automatically through the same composable, with no call-site changes
 
-## 2. 单元测试
+## 2. Unit tests
 
-- [x] 2.1 `OverlayMotionTest` 补 `runOverlayOpen` 四场景：正常完成不被兜底、reduceMotion 直接返回、缺帧（`awaitCancellation`）超时落位、慢动作倍率换算（极大倍率截到 10 倍）
+- [x] 2.1 `OverlayMotionTest` adds the four `runOverlayOpen` scenarios: normal completion without the fallback, reduceMotion returning directly, missing frames (`awaitCancellation`) settling on timeout, and slow-motion multiplier conversion (an extreme multiplier is capped at 10x)
 
-## 3. 真机取证（华为 Mate X2 / HarmonyOS 4.2）
+## 3. On-device evidence (Huawei Mate X2 / HarmonyOS 4.2)
 
-- [ ] 3.1 现有 `CapsuleWindowDeviceTest.closedCardLeavesNoPixelsBehind` 在改动后通过（收起残帧回归）——**受阻**：本机无障碍绑定在 instrumentation 强停后卡死（Binding 挂起、不再重试，重启可解但 PIN 锁不可 adb 解），两个设备用例均到不了断言；详见 evidence.md
-- [ ] 3.2 `CapsuleWindowDeviceTest` 新增展开态几何断言：点开卡片后 `capsule-card` 节点 bounds 在屏内、左右留边对称（居中容差）、高度不低于该档位预期下限；真机跑过并留截图——用例已写好并编译通过；本机受阻同上，待无障碍环境正常的设备执行
-- [x] 3.3 证据落 `evidence/`：时间线 + 截图（是否随 PR 发布由用户定）——时间线与单测结果已落，真机截图因用例未能执行而无
-- [x] 3.4 （实施中发现）修复 `DeviceSupport.rebindAccessibility()` 只认完整组件名、与 App 自己写短形式（`PermissionCommands.accessibilityService`）不匹配导致重绑被跳过的测试基建 bug
+- [ ] 3.1 The existing `CapsuleWindowDeviceTest.closedCardLeavesNoPixelsBehind` passes after the change (collapse residual-frame regression) — **blocked**: on this machine the accessibility binding wedges after instrumentation force-stops the app (the binding hangs and no longer retries; a reboot would solve it but the PIN lock cannot be cleared via adb), so both device cases never reach their assertions; see evidence.md
+- [ ] 3.2 `CapsuleWindowDeviceTest` gains expand-state geometry assertions: after tapping the card open, the `capsule-card` node bounds are on-screen with symmetric left/right margins (centering tolerance), and the height is not below the expected lower bound for that tier; run on a real device with a screenshot kept — the case is written and compiles; blocked on this machine as above, awaiting a device with a working accessibility environment
+- [x] 3.3 Evidence goes into `evidence/`: timeline + screenshots (whether they ship with the PR is up to the user) — the timeline and unit test results are in place; on-device screenshots are missing because the case could not be executed
+- [x] 3.4 (Found during implementation) Fix the test-infrastructure bug where `DeviceSupport.rebindAccessibility()` only recognized the full component name and did not match the short form written by the App itself (`PermissionCommands.accessibilityService`), causing rebinds to be skipped
 
-## 4. 构建与收尾
+## 4. Build and wrap-up
 
-- [x] 4.1 `./gradlew :app:testDebugUnitTest`（全量）与 `:app:assembleDebug` 通过
-- [x] 4.2 提交（中文提交信息）、推 fork、建 PR 关联 #323，正文首屏给实测证据；如实写明原始帧停未能复现、守卫由单测与代码路径证明（PR #621）
+- [x] 4.1 `./gradlew :app:testDebugUnitTest` (full suite) and `:app:assembleDebug` pass
+- [x] 4.2 Commit (Chinese commit message), push to the fork, open a PR linked to #323 with the measured evidence on the first screen; state honestly that the original frame stall could not be reproduced and that the guard is proven by unit tests and the code path (PR #621)

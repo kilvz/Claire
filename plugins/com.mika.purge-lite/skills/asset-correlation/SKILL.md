@@ -1,47 +1,47 @@
 ---
 name: asset-correlation
-display: 线索关联台账
-description: 把已经收集到的公开线索整理成关系表：同一个域名/公司/产品/人之间的对应关系、时间线、互相矛盾的记录。不发任何请求，只做整理与判断。
+display: Clue correlation ledger
+description: Turn the public leads already collected into a relation table: the correspondences between the same domain/company/product/person, the timeline, and records that contradict each other. It sends no requests; it only organizes and judges.
 ---
 
-# 线索关联台账
+# Clue correlation ledger
 
-调查到十几条线索之后，真正难的不是继续搜，而是**知道哪条和哪条是同一件事**。
-这套流程只做整理：把台账里的条目连起来，标出证据强度，指出矛盾。
+Once a dozen or more leads have been investigated, the really hard part is not continuing to search but **knowing which lead and which lead are the same thing**.
+This workflow only organizes: it connects the entries in the ledger, marks the strength of the evidence, and points out contradictions.
 
-## 入口
+## Entry
 
-- 台账里已经有十来条以上，用户问「这些是什么关系」「整体看是什么情况」。
-- 同一个主体有多个名字、多个域名、多个产品线，看着像又不是。
-- 两条来源说法冲突，需要判断哪条更可信。
+- The ledger already has a dozen or more entries, and the user asks "what is the relationship between these" or "what is the overall picture".
+- The same subject has several names, several domains and several product lines, and they look like the same thing but are not.
+- Two sources conflict, and you need to judge which is more credible.
 
-## 步骤
+## Steps
 
-1. **先抽实体**：把台账里出现的公司、产品、域名、人、时间点抽出来，各建一行。
-2. **只连有证据的线**：连接的依据必须来自台账里的一条记录（有链接）。凭「名字像」连起来的，标成**推测**，不融进事实。
-3. **标时间线**：同一实体的事件按时间排；时间不明就写「时间不明」，不要排在中间充数。
-4. **标矛盾**：两个来源说的不一样，两条都留着，写清各自来源和差异点，不要替它们和解。
-5. **分级**：`已证实`（两个独立来源）/ `单一来源` / `推测`（有间接证据）/ `存疑`（有反证）。
-6. **收口成表**：实体一行、关系一行，每条关系后面带来源。用 `ledger` 补记新增的结论性条目。
+1. **Extract entities first**: pull out the companies, products, domains, people and points in time that appear in the ledger, and create a row for each.
+2. **Only connect lines that have evidence**: the basis for a connection must come from a record in the ledger (with a link). Connections made because "the names look alike" are marked **speculation** and are not merged into the facts.
+3. **Mark the timeline**: order the events of the same entity by time; when the time is unclear write "time unknown", do not slot it in the middle to fill the gap.
+4. **Mark contradictions**: when two sources say different things, keep both, write down each source and the point of difference, and do not reconcile them on their behalf.
+5. **Grade them**: `Confirmed` (two independent sources) / `Single source` / `Speculation` (indirect evidence) / `Doubtful` (counter-evidence).
+6. **Close it out into a table**: one row per entity, one row per relation, with the source after each relation. Use `ledger` to record the new conclusive entries.
 
-## 容易出错的地方
+## Common pitfalls
 
-- **把共现当因果**：同一个 IP 上挂着两个域名，只能说明「同一台服务器」，不能说明「同一家公司」。
-- **用推测填补空档**：链条中间缺一环就写缺，不要顺手补一个「应该是」。
-- **忽略时间**：同一实体改过名、换过主体，不同时期的记录不能合并成一条。
-- **过度合并**：名字相似就并成一个，会让整张表从根上错。
-- **只留结论不留反证**：反证往往比正证更有信息量。
+- **Treating co-occurrence as causation**: two domains on the same IP only shows "the same server", not "the same company".
+- **Filling gaps with speculation**: if a link is missing in the middle of a chain, say it is missing; do not casually fill in an "it should be".
+- **Ignoring time**: the same entity was renamed or changed owner; records from different periods cannot be merged into one.
+- **Over-merging**: merging everything with a similar name makes the whole table wrong from the root.
+- **Keeping only conclusions and not counter-evidence**: counter-evidence often carries more information than supporting evidence.
 
-## 怎样算办成
+## How success is verified
 
-- 每条关系都能顺着台账回溯到来源。
-- 推测和事实在表里分得开，一眼看得出哪几条还需要补证。
-- 矛盾没有被抹平，而是被写出来。
-- 用户看完能说出「哪几条最值得继续查」。
+- Every relation can be traced back to a source through the ledger.
+- Speculation and fact are distinguishable in the table, and it is obvious at a glance which few still need more evidence.
+- Contradictions are not smoothed over but written out.
+- After reading, the user can say "which few are most worth investigating further".
 
-## 什么时候停下交给用户
+## When to stop and hand off
 
-- 关键节点上只剩推测，继续连就是在编故事。
-- 需要内部资料才能判断（股权、合同、人事）——公开渠道到不了这里。
-- 用户想要的是「怎么利用这个关系」而不是「这个关系是什么」——超出整理的范围，直说。
-- 涉及个人身份信息，只能停在公开职务与公开身份。
+- At key nodes only speculation remains; connecting further would be inventing a story.
+- Judging requires internal material (equity, contracts, personnel) — public channels cannot reach it.
+- What the user wants is "how to use this relationship" rather than "what this relationship is" — that is beyond the scope of organizing; say so directly.
+- When personal identity information is involved, stop at public positions and public identities.

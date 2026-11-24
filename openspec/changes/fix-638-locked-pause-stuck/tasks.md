@@ -1,26 +1,26 @@
-# 任务：LockState 轮询自愈（#638）
+# Tasks: LockState polling self-healing (#638)
 
-## 1. 实现
+## 1. Implementation
 
-- [x] 1.1 `DeviceStateWatcher.kt`：`LockState` 轮询守卫由 `last.interactive && last.locked` 改为 `last.locked`；
-      订阅开始（watched 变 true）时立即 `refresh()` 一次再进入轮询循环
-- [x] 1.2 重写 `LockState` / `Reading` 的注释：删「熄屏时不读，等 SCREEN_ON」旧约定，
-      写明「锁着就重读、广播只当加速信号」，引用 #638（与 #590/#627 注释风格一致）
+- [x] 1.1 `DeviceStateWatcher.kt`: change the `LockState` polling guard from `last.interactive && last.locked` to `last.locked`;
+      when a subscription starts (watched turns true), call `refresh()` once immediately before entering the polling loop
+- [x] 1.2 Rewrite the comments on `LockState` / `Reading`: remove the old 「熄屏时不读，等 SCREEN_ON」 (do not read while the screen is off; wait for SCREEN_ON) convention,
+      state 「锁着就重读、广播只当加速信号」 (re-read while locked; broadcasts only accelerate), and reference #638 (consistent with the comment style of #590/#627)
 
-## 2. 测试
+## 2. Tests
 
-- [x] 2.1 改造 `LockStateTest.unlockSeenWithoutAnotherBroadcast`：熄屏期间也读；
-      断言改为「广播全丢时轮询看到亮屏→解锁两步、gate 放行」
-- [x] 2.2 新增 `LockStateTest.screenOnAndUnlockSeenWithoutAnyBroadcast`：
-      从熄屏锁定出发、一次 refresh() 都不调，两个 tick 内 gate 放行（#638 最小复现）
-- [x] 2.3 新增 `LockStateTest.staleLockedHealsOnSubscribe`：订阅开始即重读，过期「锁着」当场纠正
-- [x] 2.4 复核既有用例不回归：`unlockSeenWhenKeyguardClearsBeforeDevice`、`noReadsWithoutSubscribers`
+- [x] 2.1 Rework `LockStateTest.unlockSeenWithoutAnotherBroadcast`: read while the screen is off too;
+      change the assertion to 「广播全丢时轮询看到亮屏→解锁两步、gate 放行」 (with all broadcasts lost, polling sees the two steps screen-on → unlocked and the gate lets it through)
+- [x] 2.2 Add `LockStateTest.screenOnAndUnlockSeenWithoutAnyBroadcast`:
+      starting from screen-off locked, without calling refresh() even once, the gate lets it through within two ticks (minimal reproduction of #638)
+- [x] 2.3 Add `LockStateTest.staleLockedHealsOnSubscribe`: re-read as soon as the subscription starts, correcting the stale 「锁着」 (locked) on the spot
+- [x] 2.4 Confirm the existing cases do not regress: `unlockSeenWhenKeyguardClearsBeforeDevice`, `noReadsWithoutSubscribers`
 
-## 3. 验证与交付
+## 3. Verification and delivery
 
-- [x] 3.1 本地全量单测：`./gradlew :core:test :core:cliTest :app:testDebugUnitTest` 全绿
-- [x] 3.2 构建 debug 包装真机：回归验证锁屏暂停路径仍正常（任务中熄屏 → 出现「等你解锁手机」横幅），
-      截图取证入 evidence/
-- [x] 3.3 取证落盘 evidence/（时间线 + 截图），说明解锁自动恢复由单测覆盖
-      （本机 PIN 锁 adb 解不开，无法端到端解锁；如实写进 PR）
-- [ ] 3.4 提交、推 fork、建 PR 关联 #638，正文含根因、修法、测试结果与限制说明
+- [x] 3.1 Full local unit test run: `./gradlew :core:test :core:cliTest :app:testDebugUnitTest` all green
+- [x] 3.2 Build the debug package and install it on a real device: regression-check that the lock-screen pause path still works normally (screen off mid-task → the 「等你解锁手机」 (waiting for you to unlock the phone) banner appears),
+      capture screenshots into evidence/
+- [x] 3.3 Persist the evidence into evidence/ (timeline + screenshots), stating that automatic recovery after unlock is covered by unit tests
+      (on this machine adb cannot unlock the PIN lock, so end-to-end unlock is impossible; stated honestly in the PR)
+- [ ] 3.4 Commit, push the fork, open a PR linking #638, with the body containing the root cause, the fix, the test results and the limitations

@@ -1,25 +1,25 @@
 ## Context
 
-`StepRow.shouldHideRawReason`（app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt）是 #765（v0.1.50）引入的纯函数判别：非中文界面 + 用意含汉字 → 隐藏。调用方 `StepRow.text` 与收起态末行摘要都依赖它。已有单测 `StepRowLanguageTest`（app/src/test/.../ui/StepRowLanguageTest.kt）以注入 `isChineseLocale` 参数的方式覆盖了 en 界面隐藏中文、zh 界面不隐藏等场景。
+`StepRow.shouldHideRawReason` (app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt) is a pure-function check introduced by #765 (v0.1.50): non-Chinese UI + reason containing Han characters → hide. Its callers `StepRow.text` and the collapsed-state last-line summary both depend on it. The existing unit test `StepRowLanguageTest` (app/src/test/.../ui/StepRowLanguageTest.kt) injects the `isChineseLocale` parameter to cover scenarios such as hiding Chinese on an en UI and not hiding on a zh UI.
 
 ## Goals / Non-Goals
 
-- Goal：日语界面下按指令写出的日语用意不再被误判为中文而隐藏；非中文界面隐藏中文违约用意的原目的保持不变。
-- Non-Goal：不做"按界面语言逐一白名单"（如 ja 界面放行一切）；不做翻译；不改 `languageDirective` 与提示词侧。
+- Goal: on a Japanese UI, Japanese reasons written as instructed are no longer misjudged as Chinese and hidden; the original purpose of hiding Chinese reasons that break the instruction on non-Chinese UIs stays unchanged.
+- Non-Goal: no "per-UI-language whitelist" (e.g. letting everything through on a ja UI); no translation; do not change `languageDirective` or the prompt side.
 
 ## Decisions
 
-- **判别收紧为「含汉字且不含假名」**（假名即 `\u3040`–`\u30ff` 一个区间，覆盖平假名与片假名两块），而非按界面语言特判：
-  - 假名是日/中唯一可靠的字符级判别信号，语言无关；
-  - 特判 ja 界面放行会连带放行 en 界面下的日语违约用意，规则更绕且仍解决不了"这段文字是什么语言"的本问题。
-- 残余局限（纯汉字无假名的日语串仍被隐藏）接受并在 proposal/spec 里如实记录：无法字符级区分，且回退标题本身已本地化，信息损失有限。
-- 顺带修掉默认参数里的隐式全局依赖吗？**不修**。`isChineseLocale: Boolean = uiLocale().language == "zh"` 依赖 `UiText.source`（单测里已注入桩），保持现状，改动面最小。
+- **Tighten the check to "contains Han characters and no kana"** (kana meaning the single range `\u3040`–`\u30ff`, covering both hiragana and katakana), instead of special-casing by UI language:
+  - kana is the only reliable character-level signal separating Japanese from Chinese, independent of language;
+  - special-casing a ja UI to let things through would also let Japanese reasons that break the instruction through on an en UI, making the rule more convoluted while still not solving the real question of "what language is this text".
+- The residual limitation (a Japanese string with only Han characters and no kana is still hidden) is accepted and recorded faithfully in the proposal/spec: it cannot be distinguished at the character level, and the fallback title is itself localized, so the information loss is limited.
+- Also fix the implicit global dependency in the default parameter? **No.** `isChineseLocale: Boolean = uiLocale().language == "zh"` depends on `UiText.source` (already stubbed in unit tests); keep it as is for the smallest change surface.
 
 ## Risks / Trade-offs
 
-- en 界面下模型违约写日语（原被隐藏，修后显示）：显示外语比丢弃模型解释的信息损失小，且该场景远比 ja 界面主路径罕见。
-- 中文用意里引用单个假名字符（如中文句里夹「ナ」）会被判成日语而显示：自然中文文本不含假名，仅理论上存在。
+- On an en UI the model breaks the instruction and writes Japanese (previously hidden, shown after the fix): showing a foreign language loses less information than dropping the model's explanation, and that scenario is far rarer than the main ja-UI path.
+- A Chinese reason quoting a single kana character (e.g. 「ナ」 inside a Chinese sentence) is judged Japanese and shown: natural Chinese text contains no kana, so this is theoretical only.
 
 ## Migration Plan
 
-无状态迁移；行为随下次发版直接生效。已显示中的历史步骤不受影响（显示是读时计算的）。
+No state migration; the behavior takes effect with the next release. Historical steps already on display are unaffected (display is computed at read time).

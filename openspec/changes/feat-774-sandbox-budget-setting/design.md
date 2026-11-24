@@ -1,32 +1,32 @@
-# 每任务沙箱时间上限做成设置里可调的档位（#774）
+# Make the per-task sandbox time limit an adjustable level in settings (#774)
 
 ## Context
 
-`SandboxGuard`（core/cap/sandbox）从任务开始累计每条沙箱命令的 `durationMs`，超过 `SANDBOX_BUDGET_MS = 30 分钟` 后 `exhausted()` 返回拒绝结果，`capTimeout()` 把单条命令的 `timeoutSec` 压到剩余时间内。构造函数本就有 `budgetMs` 参数（JVM 测试用过小预算），只是 app 侧从未传入，恒为默认。设置里已有三个同类先例：任务步数上限（自定义数字）、定时任务时长（固定档位 15/30/60/120，null=不限制）、token 预算——档位弹窗范式取「定时任务时长」（`TriggerRunLimitDialog`：RadioRow 列档位）。
+`SandboxGuard` (core/cap/sandbox) accumulates the `durationMs` of each sandbox command from the start of a task; once `SANDBOX_BUDGET_MS = 30 minutes` is exceeded, `exhausted()` returns a rejection, and `capTimeout()` compresses a single command's `timeoutSec` to the remaining time. The constructor already has a `budgetMs` parameter (JVM tests have used small budgets), but the app side never passed it, so it is always the default. Settings already has three precedents of the same kind: the task step limit (custom number), the scheduled task duration (fixed levels 15/30/60/120, null = no limit), and the token budget — the level-dialog pattern is taken from "scheduled task duration" (`TriggerRunLimitDialog`: RadioRow lists the levels).
 
 ## Goals / Non-Goals
 
 **Goals:**
-- 用户能把每任务沙箱命令累计时长上限在 30/60/120/240 分钟里选一档，默认 30（与现状一致），下一个任务起生效。
-- 耗尽提示里的分钟数与实际预算一致（不再硬编码 30）。
-- 子任务（ChildAgent）拿与主任务同一档位的预算（各自独立累计，与各自独立步数预算一致）。
+- The user can pick one of 30/60/120/240 minutes as the cap on cumulative sandbox command time per task, defaulting to 30 (consistent with the current state), taking effect from the next task.
+- The minutes in the exhaustion message match the actual budget (no longer hardcoded to 30).
+- Sub-tasks (ChildAgent) get a budget at the same level as the main task (each accumulates independently, consistent with their own independent step budgets).
 
 **Non-Goals:**
-- 不做「不限制」档：时长守卫是耗电/发热的兜底，同命令重复失败另有 `sandbox_loop` 守卫，不靠时间上限兜循环。
-- 不动单条命令 1..600 秒的 `timeoutSec` 校验。
-- 不动「沙箱空间」（物理存储余量 + 500 MB 门槛）与「上传体积」（relay 链路 200 MB）——issue 另两项诉求，另行处理。
-- 不进 SelfConfig（`settings_set`）：定时任务时长等同类限制也没暴露给模型。
+- No "unlimited" level: the duration guard is a backstop against battery drain/heat, repeated failures of the same command are covered by the separate `sandbox_loop` guard, and loops are not handled by the time cap.
+- No changes to the 1..600 second `timeoutSec` validation for a single command.
+- No changes to "sandbox space" (free physical storage + the 500 MB threshold) or "upload size" (200 MB on the relay path) — the issue's other two requests, handled separately.
+- Not exposed in SelfConfig (`settings_set`): similar limits such as scheduled task duration are not exposed to the model either.
 
 ## Decisions
 
-- **档位 30/60/120/240，存分钟数（Int），0=未设置按默认 30。** 与 `TRIGGER_RUN_MINUTES` 同风格：只认档位内的值，存了非法值按未设置算。240 封顶足够覆盖装依赖+编译的长活，又不会把守卫形同虚设。
-- **core 传 `Long` 毫秒，app 侧换算。** `FeatureFlags.sandboxBudgetMinutes(): Int` 给 UI/存储用；`TaskRun` 接线时 `* 60_000L` 传给 `toolDispatcher(sandboxBudgetMs = …)`（新参数，默认 `SANDBOX_BUDGET_MS`，core 单测与其他调用方零改动）。
-- **`SandboxCapability` 加 `budgetMs` 构造参数**，`guard() = SandboxGuard(budgetMs)`；`SANDBOX_BUDGET_MS` 常量保留为默认值与换算基准。
-- **耗尽消息动态化**：`"Sandbox commands in this task have used their ${budgetMs / 60_000} minutes. …"`，英文给模型，与现有文案只差分钟数。
-- **设置入口放「干活时」页**，紧跟「定时任务最长运行时间」之后（同属任务时长类限制），复用 `MikaIcons.Clock`、`RadioRow`、`trPlural`。
+- **Levels 30/60/120/240, stored as minutes (Int), 0 = unset and therefore the default 30.** Same style as `TRIGGER_RUN_MINUTES`: only values within the levels are recognized, and an invalid stored value counts as unset. The 240 cap is enough to cover long jobs that install dependencies + compile, without making the guard a mere formality.
+- **core takes `Long` milliseconds; the app side converts.** `FeatureFlags.sandboxBudgetMinutes(): Int` is used by the UI/storage; when wiring, `TaskRun` passes `* 60_000L` to `toolDispatcher(sandboxBudgetMs = …)` (a new parameter, defaulting to `SANDBOX_BUDGET_MS`, so core unit tests and other callers need zero changes).
+- **`SandboxCapability` gains a `budgetMs` constructor parameter**, with `guard() = SandboxGuard(budgetMs)`; the `SANDBOX_BUDGET_MS` constant remains as the default value and conversion basis.
+- **Dynamically generate the exhaustion message**: `"Sandbox commands in this task have used their ${budgetMs / 60_000} minutes. …"`, in English for the model, differing from the existing copy only in the number of minutes.
+- **The settings entry goes on the 「干活时」 (During work) page**, immediately after 「定时任务最长运行时间」 (Maximum scheduled task run time) (both are task-duration-type limits), reusing `MikaIcons.Clock`, `RadioRow` and `trPlural`.
 
 ## Risks / Trade-offs
 
-- 240 分钟前台任务耗电/发热——用户自选自担，档位不提供「无限」已是最小妥协；默认档位不变，存量用户行为零变化。
-- 子任务各自满额预算理论上可叠加出 240×N 的沙箱时间——子任务由主任务编排且各有步数预算，现状（各自 30 分钟）本就如此，比例不变。
-- 新字符串需 11 个语言目录同步，靠 `tools/i18n` 检查兜底。
+- A 240-minute foreground task drains the battery and produces heat — the user chose it and bears the cost, and not offering "unlimited" is already the minimal compromise; the default level is unchanged, so existing users' behavior does not change at all.
+- Sub-tasks each having a full budget could theoretically add up to 240×N of sandbox time — sub-tasks are orchestrated by the main task and each has its own step budget, and this is already the case today (30 minutes each), so the ratio is unchanged.
+- New strings must be synced across 11 language directories, with the `tools/i18n` check as the backstop.

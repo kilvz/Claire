@@ -1,8 +1,8 @@
-# fix-314 取证
+# fix-314 evidence
 
-## 2026-11-18 端到端实测（模拟旧手机 HTTP 服务）
+## 2026-11-18 end-to-end measurement (simulating an old phone's HTTP service)
 
-模拟 `GET /api/v1` 返回 `server_version=0.1.33`、`capabilities=["tasks","task_steer"]`：
+Simulating `GET /api/v1` returning `server_version=0.1.33`, `capabilities=["tasks","task_steer"]`:
 
 ```
 $ mika … --json task run --goal test --request-id 00000000-0000-4000-8000-000000000001
@@ -14,10 +14,10 @@ $ mika … --json task export t1
 exit=2
 ```
 
-对照旧文案（仅一句）：
-- 旧:`"Update the phone app to submit a recoverable request."`
-- 旧:`"This Mika APK does not support run export."`
+For comparison, the old copy (a single sentence):
+- old: `"Update the phone app to submit a recoverable request."`
+- old: `"This Mika APK does not support run export."`
 
-## 单测
+## Unit tests
 
-`python3 -m unittest discover -s companions/mika/tests`：89 个全过（含新增 2 个用例与 3 处补强断言）。
+`python3 -m unittest discover -s companions/mika/tests`: all 89 pass (including 2 new cases and 3 strengthened assertions).

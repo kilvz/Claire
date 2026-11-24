@@ -1,47 +1,47 @@
 ---
 name: feishu
-display: 飞书消息
-description: 在飞书里读消息、回消息、发到群或个人；也说明电脑端连接器转来的私聊怎么处理
+display: Feishu messages
+description: Read messages, reply to messages and send to groups or individuals in Feishu; also explains how to handle direct messages relayed by the desktop connector
 aliases: ["飞书", "Lark", "lark"]
 apps: ["feishu"]
 sites: ["feishu.cn"]
 terms: ["飞书", "群", "私聊", "艾特", "已读", "云文档", "连接器"]
 ---
 
-## 什么时候用
+## When to use
 
-用户要在飞书（Lark）里读消息、找群、回消息、把一段话发到某个群或个人时用这个技能。用户只说「发消息」但点名了飞书，也用这里；点名别的 App 时用那个 App 的技能。
+Use this skill when the user wants to read messages, find a group, reply to a message, or send a passage to a group or an individual in Feishu (Lark). When the user just says "send a message" but names Feishu, use this one too; when they name another app, use that app's skill.
 
-## 入口
+## Entry
 
-- 手机上的飞书 App 用现有的手机操作工具打开，和操作其他 App 一样。
-- 电脑端飞书连接器转过来的私聊是一条普通任务，按任务正文处理；连接器负责把最终回复发回飞书。
+- The Feishu app on the phone is opened with the existing phone operation tools, the same as operating any other app.
+- A direct message relayed by the desktop Feishu connector is an ordinary task; handle it according to the task body, and the connector is responsible for sending the final reply back to Feishu.
 
-## 步骤
+## Steps
 
-1. **找会话**：按群名、备注名或最近消息找到目标；同名群和个人很多时，打开资料核对头像、成员或邮箱，别点错。
-2. **读**：打开会话读正文，需要时往上翻；留意发件人、时间、是否 @ 了你、有没有附件或云文档链接。未读以列表红点为准。
-3. **拟稿**：按用户的意思写清楚。用户只要稿子就只给稿子；用户说要发，写好就发，不用再问一遍。
-4. **发**：进到正确的会话，输入正文；群聊里需要 @ 人时用飞书的 @ 选择器，不要手打一个看起来像名字的字符串。
-5. **核对**：发出后在会话里找到这条消息的气泡，确认没有红色感叹号或「发送失败」。群消息还要看一眼是不是发到了对的群。
+1. **Find the conversation**: find the target by group name, remark name or recent message; when there are many groups and people with the same name, open the profile to check the avatar, members or email, and do not tap the wrong one.
+2. **Read**: open the conversation and read the body, scrolling up when needed; pay attention to the sender, the time, whether you were @-mentioned, and whether there are attachments or cloud document links. Unread status follows the red dot in the list.
+3. **Draft**: write it clearly according to what the user means. When the user only wants a draft, give only the draft; when the user says to send it, send it once written, without asking again.
+4. **Send**: go into the correct conversation and enter the body; when a person needs to be @-mentioned in a group chat, use Feishu's @ picker, do not type a string that looks like a name by hand.
+5. **Verify**: after sending, find the bubble of this message in the conversation and confirm there is no red exclamation mark or 「发送失败」 (Send failed). For a group message, also check that it went to the right group.
 
-## 飞书特有的地方
+## Feishu-specific points
 
-- 群聊和单聊的输入框行为不同：群聊的 @、话题回复、引用回复都在输入框上方，发之前确认当前是「回复某条」还是「发新消息」。
-- 「已读」只代表对方看过，不代表回复了；不要拿已读状态当办成的证据。
-- 云文档链接打开后是另一套界面，读文档内容时不要把它当成聊天正文。
-- 消息撤回后会留下提示，不能把撤回前的预览当成还在的消息。
+- Group chats and one-to-one chats have different input box behaviour: the group chat's @, thread replies and quote replies are all above the input box; before sending, confirm whether you are currently "replying to a message" or "sending a new message".
+- 「已读」 (Read) only means the other side has seen it, not that they have replied; do not take read status as evidence of success.
+- A cloud document link opens a different interface; when reading document content, do not treat it as the chat body.
+- A recalled message leaves a notice behind; do not treat the preview from before the recall as a message that is still there.
 
-## 电脑端连接器转来的私聊
+## Direct messages relayed by the desktop connector
 
-- 这类任务的正文来自电脑上的飞书连接器。按用户要求处理内容，把最终回复写清楚即可；连接器会负责发回飞书。
-- 没有明确回执时，不要声称「已经发到飞书」；可以说「回复已写好，连接器会发回」。
-- 不要在回复、日志或工具参数里写 webhook、token、App Secret。
+- The body of such a task comes from the Feishu connector on the computer. Handle the content as the user asks and write the final reply clearly; the connector is responsible for sending it back to Feishu.
+- Without an explicit receipt, do not claim "already sent to Feishu"; you can say "the reply is written and the connector will send it back".
+- Do not write webhooks, tokens or App Secrets into replies, logs or tool parameters.
 
-## 怎样算办成（核实证据）
+## How success is verified (checking the evidence)
 
-读：要点和时间都来自打开后的会话正文。发：会话里能看到这条已发出的消息，收件人/群和内容都对。连接器转来的任务：回复内容完整，且没有编造发送结果。
+Reading: the key points and times all come from the conversation body after opening. Sending: this sent message can be seen in the conversation, and the recipient/group and content are correct. Tasks relayed by the connector: the reply content is complete, and no sending result is invented.
 
-## 什么时候停下交给用户
+## When to stop and hand off
 
-需要登录、扫码、输入验证码，或者同名对象/收件人有不止一种可能要用户选的时候，停下交给用户。
+When a login, a QR scan or a verification code is required, or when a same-named object/recipient has more than one possibility and the user has to choose, stop and hand it over to the user.

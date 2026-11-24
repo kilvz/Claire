@@ -1,29 +1,29 @@
-# 操作节奏支持按应用单独设置（#574）
+# Operating pace can be set per app (#574)
 
 ## Why
 
-「操作节奏」只有全局一档（快/标准/像人），而 App 知识里另有一份用户看不见、改不了的 `pace: careful` 名单（8 个内置 App）：风控严的 App 在全局「快」下反而被放快，用户也无法给某个 App 单独放慢或放快。issue #574 要求把这份隐藏判定变成可见、可编辑、可撤销的按应用列表，未列入的 App 跟随全局。
+「操作节奏」 (Operating pace) has only one global level (快/标准/像人 — Fast/Standard/Human-like), while app knowledge holds a separate `pace: careful` list (8 built-in apps) that users can neither see nor change: apps with strict risk controls actually get sped up under the global 「快」 (Fast) setting, and users cannot slow down or speed up a single app on its own. Issue #574 asks to turn this hidden determination into a visible, editable, revocable per-app list, with apps not in the list following the global setting.
 
 ## What Changes
 
-- 新增按应用操作节奏覆盖：每个 App 可单独设「快 / 标准 / 像人」，未覆盖的 App 跟随全局档位；生效档位 = 覆盖值 ?: 全局（任务开始时快照，与现有「下一个任务起生效」一致）。
-- 内置 `pace: careful` 的 8 个 App 在列表首次初始化时预置为「像人」，之后运行时不再查 App 知识的 pace（删掉预置项即回到跟随全局，不再有用户覆盖不了的例外）；站点知识（网页）的 pace 判定不变。
-- 设置 › 干活时 › 操作节奏下新增「按应用设置」入口：列表展示各 App 当前档位，可增（从已安装 App 里选，带搜索）、可改档、可删。
-- core 节奏引擎支持按应用三态：快 = 该 App 不停留、打字一次写入、无屏数上限；标准/像人 = 现有正常/careful 停留与打字。屏数上限（page_limit 闸）只跟「覆盖为像人」走——全局像人不再隐式给所有 App 加上限（保持现状：上限只给限制浏览快慢的 App）。
-- 评测钩子设置了操作节奏时保持确定性：忽略按应用覆盖，全部按钩子档位执行。
+- Add per-app operating pace overrides: each app can be set to 「快 / 标准 / 像人」 (Fast / Standard / Human-like) individually, and apps without an override follow the global level; the effective level = override value ?: global (snapshotted at task start, consistent with the existing "takes effect from the next task").
+- The 8 apps with built-in `pace: careful` are preset to 「像人」 (Human-like) when the list is first initialized, and the app knowledge's pace is no longer queried at runtime afterwards (deleting a preset returns it to following the global setting, so there are no longer exceptions users cannot override); the pace determination for site knowledge (web) is unchanged.
+- Under 设置 (Settings) › 干活时 (During work) › 操作节奏 (Operating pace), add a 「按应用设置」 (Per-app settings) entry: the list shows each app's current level, and items can be added (chosen from installed apps, with search), changed and deleted.
+- The core pace engine supports three per-app states: Fast = the app does not dwell, typing is written in one shot, and there is no screen-count cap; Standard/Human-like = the existing normal/careful dwell and typing. The screen-count cap (the page_limit gate) only follows "overridden to Human-like" — global Human-like no longer implicitly caps every app (keeping the current state: only apps that limit browsing pace are capped).
+- When the eval hook sets an operating pace, determinism is preserved: per-app overrides are ignored and everything runs at the hook's level.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `per-app-pace`: 按应用解析操作节奏——覆盖存储与初始化、生效档位/上限判定、与全局档位及评测钩子的合成规则。
+- `per-app-pace`: resolving the operating pace per app — override storage and initialization, effective-level/cap determination, and the composition rules with the global level and eval hooks.
 
 ### Modified Capabilities
 
-（无现有规格目录，不适用。）
+(No existing spec directories; not applicable.)
 
 ## Impact
 
-- core：`AppPacing`/`AppDwell` 的 pace 入参从 `PlacePace` 换为按应用三态 + 上限判定分离（`PlacePace` 本身不动，网页侧不受影响）；`PhoneCapability`/`TaskTools` 增加对应透传参数；`GuideCatalog` 增加 careful App 清单查询；`OperatingPace` 增加按档位的打字节奏辅助。
-- app：新增覆盖存储（SharedPreferences）、`TaskRun` 三处接线改为按应用解析、设置页新增入口与按应用子页、新字符串 ×11 语言。
-- 行为变化：全局「快」下覆盖为「像人」的 App 会被放慢（正是 issue 要的）；App 知识新增 careful App 不再自动进已有用户的列表（issue 明确接受）。
+- core: the pace input of `AppPacing`/`AppDwell` changes from `PlacePace` to the per-app three-state + separate cap determination (`PlacePace` itself is unchanged, and the web side is unaffected); `PhoneCapability`/`TaskTools` gain the corresponding pass-through parameters; `GuideCatalog` gains a careful-app list query; `OperatingPace` gains a typing-pace helper by level.
+- app: new override storage (SharedPreferences), three wiring points in `TaskRun` changed to per-app resolution, a new entry and per-app sub-page in the settings screen, and new strings ×11 languages.
+- Behavior change: with the global 「快」 (Fast) setting, apps overridden to 「像人」 (Human-like) are slowed down (exactly what the issue asks for); a careful app newly added to app knowledge no longer automatically enters existing users' lists (the issue explicitly accepts this).

@@ -1,33 +1,33 @@
 ## Context
 
-`app/src/main/res/xml/network_security_config.xml` 当前 `base-config`：`cleartextTrafficPermitted="true"`（为局域网 http 模型服务开明文，见注释与 `LocalHosts` 提示），trust-anchors 只声明 `system`。Android 规则：显式声明锚点后用户 CA 一律不信，所以装了公司 CA 也连不上自签端点（#361）。出站 HTTPS 通道众多（模型 API、搜索、下载、浏览器、MCP、OTLP……），OkHttp 客户端在 12 处各自构建（虽有 `NetProxy.shared.client()` 包装点但非人人走它）。
+`app/src/main/res/xml/network_security_config.xml` currently has `base-config`: `cleartextTrafficPermitted="true"` (plaintext opened up for LAN http model services, see the comments and the `LocalHosts` hint), and trust-anchors declares only `system`. Android's rule: once anchors are declared explicitly, user CAs are never trusted, so even with a corporate CA installed the self-signed endpoint cannot be reached (#361). There are many outbound HTTPS channels (model APIs, search, downloads, browser, MCP, OTLP…), and OkHttp clients are built separately in 12 places (there is a `NetProxy.shared.client()` wrapper point, but not everyone goes through it).
 
 ## Goals / Non-Goals
 
 **Goals:**
-- 用户安装的 CA 被全部出站 HTTPS 通道信任，企业内网自签端点免 root 可用。
-- 改动最小（声明式一行 + 注释），不动任何 Kotlin 网络代码。
+- CAs installed by the user are trusted by every outbound HTTPS channel, so self-signed endpoints on a corporate intranet work without root.
+- Minimal change (one declarative line + comments), without touching any Kotlin network code.
 
 **Non-Goals:**
-- 不做设置开关 / 按端点 pinned trust（issue 方案 2/3）：客户端构建分散，运行时热切换范围失控；需要时维护者可在此基础上收紧。
-- 不动明文 http 的现有许可，不碰 core 模块。
+- No settings toggle / per-endpoint pinned trust (issue options 2/3): client construction is scattered, and the scope of a runtime hot-switch would be uncontrollable; maintainers can tighten on top of this when needed.
+- Do not touch the existing cleartext http permission, and do not touch the core module.
 
 ## Decisions
 
-**在 `base-config` 加 `<certificates src="user"/>`，而不是运行时自定义 TrustManager。**
-- 一处声明覆盖所有通道（包括未来新增的客户端），无遗漏面；TrustManager 方案要逐客户端改 12 处，漏一处就是「有的能连有的不能」的疑难杂症。
-- 与现有先例一致：配置已为「用户自建服务」开全局明文 http；信任用户 CA 是同一姿态、更小的放宽（装 CA 需用户在系统设置主动操作确认，明文则零门槛）。
-- debug/release 共用 main 这一份配置，调试探活同样受益。
+**Add `<certificates src="user"/>` to `base-config`, rather than a runtime custom TrustManager.**
+- One declaration covers all channels (including clients added in the future), with no gaps; the TrustManager approach would require changing 12 places client by client, and missing one would create the intractable "some connect, some don't" problem.
+- Consistent with existing precedent: the config already opens global cleartext http for "user-run services"; trusting user CAs is the same stance and a smaller relaxation (installing a CA requires the user to actively confirm in system settings, whereas cleartext has no threshold at all).
+- debug/release share this single config in main, so debugging and liveness checks benefit too.
 
-**守护测试放 `app/src/test`（Robolectric/JUnit 读资源解析 XML），不做行为级真机自动化。**
-- 证书信任行为由系统网络栈解析该 XML 决定，单测里造不出来；真机手测（装 CA → 连自签端点）承担行为验证，测试只防「未来误删这一行」的回退。
+**The guard test goes in `app/src/test` (Robolectric/JUnit reading the resource and parsing the XML), not behavior-level on-device automation.**
+- Certificate trust behavior is determined by the system network stack parsing this XML and cannot be reproduced in a unit test; on-device manual testing (install CA → connect to self-signed endpoint) carries the behavioral verification, and the test only guards against regressions where "this line is accidentally deleted in the future."
 
 ## Risks / Trade-offs
 
-- [设备被装恶意用户 CA 后流量可被解密] → 攻击前提是攻击者已能在受害者设备系统设置里装证书；同一前提下明文许可早已允许无加密直连，攻击面不因此扩大。PR 描述里向维护者写明这一权衡。
-- [维护者可能更想要设置开关（默认关）] → 本变更与其不冲突：开关方案落地时可把锚点改回 system、由开关挂 user；PR 里说明。
-- [Robolectric 解析 resources 是否读到 xml/] → xml/ 资源在单测里可经 `XmlResourceParser` 或直接文件流读取；实现时先验证读取路径，不行就退化为从仓库相对路径读文件断言（仍守护同一事实）。
+- [Traffic can be decrypted after a malicious user CA is installed on the device] → The precondition for the attack is that the attacker can already install a certificate in the victim device's system settings; under the same precondition the cleartext permission already allows unencrypted direct connections, so the attack surface does not expand. Write this trade-off explicitly for maintainers in the PR description.
+- [Maintainers may prefer a settings toggle (default off)] → This change does not conflict with that: when the toggle approach lands, the anchor can be changed back to system and user hung off the toggle; state this in the PR.
+- [Whether Robolectric can read xml/ when parsing resources] → xml/ resources can be read in unit tests through `XmlResourceParser` or a plain file stream; verify the reading path during implementation, and if it does not work, degrade to asserting on a file read via a repo-relative path (still guarding the same fact).
 
 ## Migration Plan
 
-合入即生效，无数据迁移；回滚 = 删掉那一行。
+Takes effect on merge, no data migration; rollback = delete that one line.

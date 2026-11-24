@@ -1,47 +1,47 @@
 ---
 name: passive-recon
-display: 公开信息检索
-description: 只用公开数据源做调查：官方站点、公开公告、证书透明日志、百科、新闻、公开数据库。全程不向目标主机发探测请求，每条线索必须留下可点开的来源链接。
+display: Public information search
+description: Investigate using public data sources only: official sites, public announcements, certificate transparency logs, encyclopedias, news, public databases. Never send a probe request to the target host; every lead must leave a clickable source link.
 ---
 
-# 公开信息检索
+# Public information search
 
-这是一套**只看**的调查流程：不扫描、不爆破、不尝试登录、不构造任何攻击请求。
-它要做的事只有一件——把散落在公开处的信息，变成一份别人能复核的台账。
+This is a **look-only** investigation workflow: no scanning, no brute force, no login attempts, no crafted attack requests.
+It does one thing only — turn information scattered across public places into a ledger that someone else can re-check.
 
-## 入口
+## Entry
 
-- 用户让你查一家公司、一个产品、一个人、一个域名，且信息可能散在多个公开来源里。
-- 用户问「这个说法有没有出处」「帮我核实一下这件事」。
-- 你在一次调查里已经搜了三四轮，开始记不清哪条来自哪里。
+- The user asks you to look into a company, a product, a person or a domain, and the information may be scattered across several public sources.
+- The user asks "is there a source for this claim" or "help me verify this".
+- You have already searched three or four rounds in one investigation and are starting to forget which item came from where.
 
-## 步骤
+## Steps
 
-1. **先定问题**：把「要查清什么」写成三五条可以回答的问题。查不清的当场说，不要边查边改目标。
-2. **只走公开源**，优先级：官方网站与公告 → 政府/监管公开信息 → 证书透明日志（crt.sh）→ 主流新闻 → 百科与公开数据库 → 社区讨论（只作线索，不作结论）。
-3. **每条线索当场入账**：用 `ledger` 记一条，必须有 `source` 链接。没有链接的东西，无论多有道理，都不许写进去。
-4. **交叉验证**：同一条事实至少两个**互不抄自同一篇通稿**的来源；只有一个来源时，标注「单一来源」。
-5. **收口**：把台账按问题分组，写明「已证实 / 单一来源 / 存疑 / 查不到」，查不到的也要写出来。
-6. **交付**：台账路径 + 结论 + 每条结论对应的来源。
+1. **Define the questions first**: write "what needs to be found out" as three to five answerable questions. Say up front what cannot be found out; do not change the goal while investigating.
+2. **Use public sources only**, in priority order: official websites and announcements → government/regulator public information → certificate transparency logs (crt.sh) → mainstream news → encyclopedias and public databases → community discussion (leads only, not conclusions).
+3. **Enter every lead into the ledger on the spot**: record one entry with `ledger`, and it must have a `source` link. Anything without a link, no matter how plausible, must not be written in.
+4. **Cross-validate**: every fact needs at least two sources that **did not copy from the same press release**; when there is only one source, mark it "single source".
+5. **Close it out**: group the ledger by question and write "confirmed / single source / doubtful / cannot be found"; write out the ones that cannot be found too.
+6. **Deliver**: ledger path + conclusions + the source corresponding to each conclusion.
 
-## 容易出错的地方
+## Common pitfalls
 
-- **把搜索摘要当原文**：摘要会漏掉限定词。点进去看原文，再记账。
-- **忘了这是「不发包」**：一旦你开始扫端口、试登录、跑目录字典，就已经越界了。这里不做这些。
-- **来源是转述**：三个网站转载同一篇稿子，仍然是一个来源。
-- **把「没查到」写成「不存在」**：前者是调查结果，后者是结论，两者差很远。
-- **台账写成小作文**：一条一行，事实 + 来源，够了。
+- **Taking a search snippet for the original text**: snippets drop qualifiers. Click through to the original and then record it.
+- **Forgetting that this is "sends no packets"**: as soon as you start scanning ports, trying logins or running directory wordlists, you have already crossed the line. Nothing of that kind here.
+- **The source is a retelling**: three websites reposting the same article are still one source.
+- **Writing "did not find" as "does not exist"**: the former is an investigation result, the latter is a conclusion, and the two are far apart.
+- **Writing the ledger as an essay**: one line per entry, fact + source, that is enough.
 
-## 怎样算办成
+## How success is verified
 
-- 台账里每条都有可点开的来源；`ledger` 不接受没有链接的条目。
-- 结论分成「已证实 / 单一来源 / 存疑 / 查不到」四档，没有把推断混进证实里。
-- 用户能顺着台账自己复核一遍。
-- 全程没有向目标主机发过探测请求。
+- Every entry in the ledger has a clickable source; `ledger` does not accept entries without a link.
+- Conclusions fall into the four grades "confirmed / single source / doubtful / cannot be found", with no inferences mixed into confirmations.
+- The user can re-check everything themselves by following the ledger.
+- No probe request was sent to the target host throughout.
 
-## 什么时候停下交给用户
+## When to stop and hand off
 
-- 查的东西涉及个人隐私（住址、电话、身份证、家庭成员）——只做公开身份与公开职务，停在这里。
-- 用户要的是「能不能进去」「有没有漏洞」——那是第二档的能力，需要书面授权，直接说明做不了。
-- 来源之间互相矛盾且都无法证伪。
-- 需要付费数据库或内部资料才能继续。
+- What is being looked into involves personal privacy (home address, phone number, ID card, family members) — only public identity and public positions, and stop here.
+- What the user wants is "can we get in" or "is there a vulnerability" — that is a second-tier capability requiring written authorization; state directly that you cannot do it.
+- The sources contradict each other and none can be falsified.
+- Continuing requires a paid database or internal material.

@@ -1,126 +1,126 @@
-# 教 Mika:示范结束即自动总结成技能
+# Teaching Mika: auto-summarize into a skill as soon as the demonstration ends
 
-日期:2026-11-22
-状态:待批准
+Date: 2026-11-22
+Status: Pending approval
 
-## 意图与为什么
+## Intent and why
 
-用户教 Mika 一件事,期望的是「我做一遍,它自己学会并把技能总结好」。现在的实际体验是:示范结束 → 页面把录到的原始步骤逐条列出来,每一步配「改成什么」「需要说明」两个输入框 → 用户自己点「生成」→ 再去记忆的草稿箱里找。页面是裸 TextField 加按钮,像个调试工具。
+When a user teaches Mika something, what they expect is: "I do it once, it learns it by itself and summarizes the skill well". The experience today is: the demonstration ends → the page lists the recorded raw steps one by one, each step paired with two input boxes, 「改成什么」 (Change to what) and 「需要说明」 (Needs explanation) → the user taps 「生成」 (Generate) themselves → then goes to find it in the memory drafts box. The page is a bare TextField plus a button, like a debugging tool.
 
-更根本的是总结口径错了。录下来的是「人的做法」:回桌面、找图标点开 App、打开浏览器、点地址栏、输入、点搜索。这些只是人不得不做的机械动作,不是知识;Mika 可以直接启动 App、直接打开链接或搜索结果。真正值得留下的是:从哪个入口进、点哪个按钮、填什么、怎么算办成、什么时候停下来问。现在的模型稿没有被告知这个区别,本机兜底稿更是逐条照抄,于是总结出来还是一份「人的操作录像」。
+More fundamentally, the summarization angle is wrong. What gets recorded is "how a person does it": back to the desktop, find the icon and open the app, open the browser, tap the address bar, type, tap search. These are just mechanical actions a person is forced to perform, not knowledge; Mika can launch the app directly, or open a link or search result directly. What is really worth keeping is: which entry point to go in through, which button to tap, what to fill in, how to tell it got done, and when to stop and ask. The current model draft is not told this distinction, and the on-device fallback draft copies everything verbatim step by step, so the summary is still "a recording of a person's operations".
 
-## 目标
+## Goals
 
-1. 示范结束即自动整理,用户不再点「生成」。
-2. 整理结果直接以成品技能呈现:结构化、可读、可收下;人工机械步骤被省略,写成 Mika 的直达做法。
-3. 教 Mika 的整个流程按产品级重做:介绍、示范中、整理中、总结、已学会。
-4. 没有模型时仍能给出结构化技能(本机整理 + 明确说明),不再退回原始步骤列表。
+1. As soon as the demonstration ends, organize automatically; the user no longer taps 「生成」.
+2. The organized result is presented directly as a finished skill: structured, readable, acceptable; manual mechanical steps are omitted and written as Mika's direct approach.
+3. The whole teach-Mika flow is redone at product quality: intro, during the demonstration, organizing, summary, learned.
+4. Without a model it still produces a structured skill (on-device organizing + a clear explanation), and no longer falls back to the raw step list.
 
-## 非目标
+## Non-goals
 
-- 不保存示范中输入的具体文字(密码、验证码、搜索词都不落盘);技能写成参数化步骤,具体内容由执行时的请求提供。
-- 不做截图/屏幕录制;总结只基于步骤文字、包名、界面名。
-- 不改「从办成的任务里自学」的管线,不改技能执行与采用机制。
-- 不自动收下:总结先给用户看,点了收下才启用。
-- 不改 `TeachPhase` 枚举值名(旧会话兼容),只改语义与界面。
+- Do not save the specific text entered during the demonstration (passwords, verification codes and search terms are all left out of storage); the skill is written as parameterized steps, and the specific content is supplied by the request at execution time.
+- No screenshots/screen recording; the summary is based only on step text, package names and UI names.
+- Do not change the "learn by itself from completed tasks" pipeline, and do not change the skill execution and adoption mechanism.
+- Do not accept automatically: show the summary to the user first, and only enable the skill after they tap accept.
+- Do not change the `TeachPhase` enum value names (old-session compatibility), only the semantics and UI.
 
-## 反目标
+## Anti-goals
 
-- 把人工机械动作写进技能(「回到桌面 → 点图标 → 点地址栏 → 输入 → 点搜索」)。
-- 为「直达」编造示范里没走过的入口、链接或内容。
-- 总结页再出现逐条步骤编辑器或「生成」按钮。
-- 静默失败:没模型、整理失败、0 步、进程被杀,都要说清楚并能重来。
-- 品牌特例:桌面、浏览器都按系统意图识别,不写死包名。
+- Writing manual mechanical actions into the skill ("back to the desktop → tap the icon → tap the address bar → type → tap search").
+- Inventing entry points, links or content that the demonstration never went through, in the name of "direct reach".
+- The summary page ever showing a per-step editor or a 「生成」 button again.
+- Silent failure: no model, summarization failure, 0 steps, process killed — all must be explained clearly and be retryable.
+- Brand special cases: identify both the desktop and the browser by system intent, do not hard-code package names.
 
-## 约束
+## Constraints
 
-- Android 通用:桌面包用 `ACTION_MAIN + CATEGORY_HOME` 查;浏览器用 `ACTION_VIEW` 的默认处理者做提示;识别失败 fail-open(不折叠、不误删)。
-- 现有隐私口径不变:密码字段不记,敏感内容不落盘,输入原文不保存。
-- 12 个语言文件同步新增/删除;`StringResourcesTest` 必须绿。
-- 在 worktree 分支开发,不碰 main;非发版不改版本号。
+- Generic Android: look up the desktop package with `ACTION_MAIN + CATEGORY_HOME`; use the default handler of `ACTION_VIEW` as the browser hint; if identification fails, fail open (no folding, no accidental deletion).
+- The existing privacy stance is unchanged: password fields are not recorded, sensitive content is not written to storage, the original input is not saved.
+- 12 language files updated in sync for additions/removals; `StringResourcesTest` must be green.
+- Develop on a worktree branch, do not touch main; do not change the version number outside a release.
 
-## 方案
+## Approach
 
-### 1. 新流程
+### 1. New flow
 
 ```
-Idle/Ready(介绍) → Recording ⇄ Paused → [结束] → Drafting(自动整理中)
-  → Reviewing(总结好了) → [收下] → Saved(已学会)
-                          ├─ [再示范一次] → 回介绍(带回目标)
-                          └─ [不要]       → 丢弃
+Idle/Ready (intro) → Recording ⇄ Paused → [End] → Drafting (organizing automatically)
+  → Reviewing (summary ready) → [Accept] → Saved (learned)
+                          ├─ [Demonstrate again] → back to intro (brings back the goal)
+                          └─ [Not now]       → discard
 ```
 
-- 结束不再停在「逐条检查」,立即进入整理。
-- 整理完成:草稿存入 pending,总结页直接渲染技能正文。
-- 收下 → 走现有 `PersonalSkills.approve`,成为试用技能;Saved 页明确说「学会了」。
-- 整理失败、0 步、模型不可用:在总结页位置显示原因与「再试一次 / 重来」,不回到原始步骤列表。
-- 进程被杀:恢复时 `Drafting` 重新整理;`Reviewing` 已有草稿则直接显示。若上次已存草稿但会话没来得及落盘,按 `learned_from=<traceId>` 找回已有 pending 草稿,不重复生成。
+- The end no longer stops at a per-step review; it goes straight into organizing.
+- When organizing finishes: the draft is stored in pending, and the summary page renders the skill body directly.
+- Accept → go through the existing `PersonalSkills.approve` to become a trial skill; the Saved page says 「学会了」 (Learned) explicitly.
+- Summarization failure, 0 steps, model unavailable: show the reason and 「再试一次 / 重来」 (Try again / Start over) in the summary page position, and do not return to the raw step list.
+- Process killed: on restore, `Drafting` organizes again; `Reviewing` shows the existing draft directly. If a draft was saved last time but the session did not get to persist it, recover the existing pending draft by `learned_from=<traceId>` and do not regenerate.
 
-### 2. 步骤归一化(两层)
+### 2. Step normalization (two layers)
 
-**a) 机器折叠(确定性,core,可单测)**
+**a) Machine folding (deterministic, core, unit-testable)**
 
-- 启动器包上的步骤(桌面 Window、点图标 Click 等)不进路线。
-- 经由桌面进入/切换 App 的机械段,折叠成一条合成步骤:`启动 <App>` / `改用 <App>` / `回到 <App>`。
-- 折叠掉的原始步骤另存一份人话列表(如「在桌面点了『小红书』」),只用于总结页显示「已省掉 N 个只用手的步骤」,不写进技能。
-- 桌面包集合来自 `PackageManager`;识别不到时 fail-open,整段原样保留,不误删。
-- 浏览器角色(默认 `ACTION_VIEW` 处理者)作为提示传给模型,帮助识别地址栏/搜索流程。
+- Steps on launcher packages (desktop Window, icon Click, etc.) do not enter the route.
+- Mechanical segments that enter or switch apps via the desktop are folded into a single synthesized step: `start <App>` / `switch to <App>` / `return to <App>`.
+- The raw steps that were folded away are kept in a separate plain-language list (e.g. "tapped 小红书 on the desktop"), used only by the summary page to show how many manual steps were folded away, and not written into the skill.
+- The set of desktop packages comes from `PackageManager`; when it cannot be identified, fail open and keep the whole segment as-is, without accidental deletion.
+- The browser role (the default `ACTION_VIEW` handler) is passed to the model as a hint, to help identify address-bar/search flows.
 
-**b) 语义改写(模型)**
+**b) Semantic rewriting (model)**
 
-给模型的输入变成:目标 + App 及角色 + 折叠后的路线 + 被省掉的人工步骤。规则写进 `teach_skill` 提示词:
+The input to the model becomes: goal + app and role + folded route + the manual steps that were folded away. The rules go into the `teach_skill` prompt:
 
-- 打开 App:写「启动/打开 <App>」,不写回桌面、找图标、点击。
-- 网页:写「打开 <链接>」或「在 <站点> 搜索 <关键词>」,不写点地址栏、输入、点搜索;链接/关键词示范里没存,写成由请求提供的内容。
-- 只在 App 内必须点具体控件时才写「点『<控件>』」。
-- 搜索/表单:点输入框 + 输入 + 提交,合成一步「输入 <内容> 并提交」。
-- 保留决策点:入口、具体按钮、选项、判据、停手条件;删掉等待、重复滚动、无意义返回。
-- 沿用:不编造没走到的入口,不声称试跑成功。
+- Opening an app: write "start/open <App>", do not write going back to the desktop, finding the icon or tapping.
+- Web page: write "open <link>" or "search <site> for <keyword>", do not write tapping the address bar, typing or tapping search; if the link/keyword was not stored during the demonstration, write it as content provided by the request.
+- Only write "tap '<control>'" when a specific control really must be tapped inside the app.
+- Search/form: tapping the input box + typing + submitting is merged into one step, "type <content> and submit".
+- Keep decision points: entry point, specific buttons, options, criteria, stop conditions; delete waiting, repeated scrolling and pointless back navigation.
+- Keep the existing rules: do not invent entry points that were not walked, and do not claim a trial run succeeded.
 
-**c) 没有模型**
+**c) No model**
 
-本机整理使用折叠后的路线,按现有五个小节写成平实句子;总结页注明「这次没接模型,按本机规则整理」,不把原始步骤列表丢给用户。
+The on-device organizer uses the folded route and writes plain sentences following the existing five sections; the summary page notes "no model was used this time, organized by on-device rules", and does not dump the raw step list on the user.
 
-### 3. 总结页
+### 3. Summary page
 
-- 顶部:技能名(display)与何时用(description),一行「按 Mika 自己的做法整理,不是把你的操作重放一遍」。
-- 折叠提示卡(仅当折叠发生时):「已省掉 N 个只用手的步骤」,可展开看具体。
-- 正文:复用 `SkillReadingView` 渲染五个小节(入口 / 步骤 / 容易出错的地方 / 怎样算办成 / 什么时候停下交给用户),不显示 frontmatter。
-- 无模型时在正文上方加一行说明。
-- 操作:收下(主)/ 再示范一次 / 不要(次要,需确认)。
-- 收下后 Saved 页:「学会了『<技能名>』」+ 回对话 / 再教一件。
+- Top: skill name (display) and when to use it (description), plus one line: "written the way Mika would do it, not a replay of your taps".
+- Folded hint card (only when folding happened): "N manual steps folded away", expandable to see the details.
+- Body: reuse `SkillReadingView` to render the five sections (entry / steps / common pitfalls / how success is verified / when to stop and hand off to the user), without showing the frontmatter.
+- When there is no model, add an explanatory line above the body.
+- Actions: accept (primary) / demonstrate again / not now (secondary, needs confirmation).
+- After accepting, the Saved page: "learned '<skill name>'" + back to conversation / teach another one.
 
-### 4. 其他页面
+### 4. Other pages
 
-- 介绍页:一句话说明 + 目标输入 + 开始示范;隐私说明收进浅色小卡(可展开),不再是一整段文字。
-- 示范中与中断:**保留现有实现**(屏幕顶部有提示、暂停/结束/放弃),版式与文案不重做。
-- 整理中:进度说明 + 放弃。
-- 中断:说明 + 继续 / 结束 / 放弃,沿用现有语义。
-- 悬浮胶囊与通知:文案改成「做完了点结束,我会自动整理」,行为不变。
+- Intro page: one-sentence explanation + goal input + start demonstration; the privacy note is folded into a light card (expandable), no longer a full paragraph of text.
+- During the demonstration and when interrupted: **keep the existing implementation** (a hint at the top of the screen, pause/end/discard), the layout and copy are not redone.
+- Organizing: progress explanation + discard.
+- Interrupted: explanation + continue / end / discard, reusing the existing semantics.
+- Floating capsule and notification: the copy changes to "tap end when you're done, and I'll organize it automatically", behavior unchanged.
 
-### 5. 数据与兼容
+### 5. Data and compatibility
 
-- `Drafting` = 整理中,`Reviewing` = 总结好了(草稿已有);枚举值不改名。
-- `TeachUi` 增加 `draft: PersonalSkill?`、`folded: List<String>`、`basic: Boolean`、`acceptedName: String?`。
-- `TeachSession` 增加 `acceptedName: String? = null`(旧 JSON 缺省兼容)。
-- 删除逐条编辑/生成相关的 runtime 公开入口(`generate`/`annotate`/`remove`)与对应 UI;数据模型字段保留兼容。
+- `Drafting` = organizing, `Reviewing` = summary ready (the draft already exists); the enum values are not renamed.
+- `TeachUi` gains `draft: PersonalSkill?`, `folded: List<String>`, `basic: Boolean`, `acceptedName: String?`.
+- `TeachSession` gains `acceptedName: String? = null` (defaulted for old-JSON compatibility).
+- Remove the runtime public entry points related to per-step editing/generation (`generate`/`annotate`/`remove`) and the corresponding UI; the data model fields stay for compatibility.
 
-### 6. 验收
+### 6. Acceptance
 
-- 真机示范「打开小红书 → 搜索装修 → 打开第一条 → 收藏」:总结第一步是「启动 小红书」,不含「桌面/图标」;搜索是直达一步;收藏保留;可在技能列表看到并收下。
-- 真机示范一次网页操作(有模型):总结写成「打开/搜索」,不含地址栏步骤。
-- 无模型:仍得到结构化技能,页面有「本机整理」说明。
-- 0 步、整理失败、整理中进程被杀:都有明确状态,可重试/重来。
-- `:app:testDebugUnitTest` 与相关 androidTest 全绿;i18n 全绿。
+- On a real device, demonstrate "open 小红书 → search for renovation → open the first result → save": the summary's first step is "start 小红书", with no "desktop/icon"; the search is a single direct step; saving is kept; it can be seen in the skill list and accepted.
+- On a real device, demonstrate a web operation once (with a model): the summary is written as "open/search", with no address-bar step.
+- No model: still get a structured skill, and the page has an "on-device organizing" note.
+- 0 steps, summarization failure, process killed during organizing: all have a clear state and can be retried/restarted.
+- `:app:testDebugUnitTest` and related androidTest all green; i18n all green.
 
-## 测试
+## Tests
 
-- core 单测:`TeachRouteTest`(桌面折叠、中途切换、识别失败 fail-open、空轨迹、浏览器角色)、`TeachDraftTest`(request 含直达规则与折叠清单、assemble 不含桌面且保留 caveats)。
-- UI 测试:总结页渲染五节与折叠提示、收下/再示范/不要回调、无模型说明、已学会页、介绍页开始回调。
-- 真机 E2E:上述验收;回归 `:app:testDebugUnitTest` + 相关 androidTest;不做全量 connectedAndroidTest。
+- core unit tests: `TeachRouteTest` (desktop folding, switching mid-way, identification failure fail-open, empty trace, browser role), `TeachDraftTest` (the request contains the direct-reach rules and the folded list, assemble excludes the desktop and keeps caveats).
+- UI tests: summary page renders the five sections and the folding hint, accept/demonstrate-again/not-now callbacks, no-model note, learned page, intro page start callback.
+- Real-device E2E: the acceptance above; regression `:app:testDebugUnitTest` + related androidTest; do not run the full connectedAndroidTest.
 
-## 决策(2026-11-22 已确认)
+## Decisions (confirmed 2026-11-22)
 
-1. **输入文字不落盘**:已确认。示范输入的内容通常只是例子,技能按通用路线总结(输入用户要查的内容 / 打开用户给的链接);将来若某一类技能确实要求复现固定内容,再单独讨论。
-2. **收下仍手动**:已确认。总结先给用户看,点「收下这个技能」才启用。
-3. **示范中不改**:已确认(2026-11-22)。现在示范过程中屏幕顶部有提示,这个机制和页面已经够用,保留现状;只重做介绍、整理中、总结、已学会。
+1. **Input text is not stored**: confirmed. What is entered during a demonstration is usually just an example, and the skill is summarized along the generic route (type what the user wants to look up / open the link the user gives); if some class of skill really needs to reproduce fixed content in the future, discuss it separately.
+2. **Accepting is still manual**: confirmed. The summary is shown to the user first, and the skill is only enabled after they tap 「收下这个技能」 (Keep this skill).
+3. **No changes during the demonstration**: confirmed (2026-11-22). There is now a hint at the top of the screen during the demonstration, and this mechanism and page are good enough; keep them as-is and only redo the intro, organizing, summary and learned screens.

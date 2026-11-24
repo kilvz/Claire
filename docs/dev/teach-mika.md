@@ -1,36 +1,36 @@
-# 教 Mika
+# Teaching Mika
 
-人工示范是输入，产物是一份**待确认的知识型技能**：适用场景、入口线索和前置条件、策略、用户说明的原因、成功时能看到什么。不记录坐标宏，也不把一次示范重放成逐步点击。
+A human demonstration is the input, and the product is a **knowledge skill awaiting confirmation**: applicable scenarios, entry clues and preconditions, strategy, the reasons the user explains, and what can be seen on success. No coordinate macros are recorded, and a demonstration is not replayed as step-by-step taps.
 
-和「从办成的任务里学」分开。`RunLearning` / `LearnGate` / 经验路线只消化 Mika 自己做过的运行。示范采集不写入那条路，也不改路线回放。
+Kept separate from "learning from completed tasks". `RunLearning` / `LearnGate` / experience routes only digest runs Mika did itself. Demonstration capture does not write into that path, nor does it change route replay.
 
-## 入口
+## Entry
 
-名称是「教 Mika」。
+The name is 「教 Mika」 (Teach Mika).
 
-- 对话输入栏「＋」打开的面板里。
-- 悬浮胶囊展开后的空闲卡片上。入口收在输入栏上方的箭头里,默认收起;点箭头才出现「教 Mika」,再点收起。学习中的「正在学习」浮层不在这里,暂停和结束也不会被收起。
+- In the panel opened by 「＋」 in the chat input bar.
+- On the idle card after the floating capsule is expanded. The entry is tucked into the arrow above the input bar and collapsed by default; only tapping the arrow makes 「教 Mika」 appear, and tapping again collapses it. The 「正在学习」 (Learning) overlay during learning is not here, and pausing or ending does not collapse it.
 
-任务卡住时的入口这版不做。有任务在跑时不能开始示范；示范进行中（正在采集或暂停）不开始新任务，已排队的下一件留在队列里，不取出来执行。
+The entry for when a task is stuck is not in this version. A demonstration cannot be started while a task is running; while a demonstration is in progress (capturing or paused), no new task is started, and the next queued item stays in the queue and is not taken out to run.
 
-## 采集
+## Capture
 
-开始前先写或确认一句目标。输入框里还没发出的字可以预填，但不能猜一句就自己开始。第一屏说明：步骤只留在本机；生成草稿时，若配置了模型，会把**脱敏摘要**发给当前模型。没有模型时只在本机整理。不要把「存在本机」说成「不会联网」。
+Before starting, write or confirm one sentence of the goal. Text in the input box that has not been sent can be pre-filled, but it cannot guess a sentence and start on its own. The first screen explains: steps stay only on this phone; when generating the draft, if a model is configured, a **desensitized summary** is sent to the current model. Without a model it is only organized locally. Do not say "stays on the phone" as "does not use the network".
 
-用户点「开始示范」之后才采集。采集中 Mika 不操作手机。屏幕上方有一条无障碍浮层，写着「正在学习」或「已暂停」，上面能暂停、继续和结束。它和悬浮胶囊用同一种窗口，不申请通知权限，也不申请「显示在其他应用上层」。通知可以有，但不是唯一出口；没有通知权限也能停。这条浮层加不上就不开始记录。浮层中途消失，或无障碍被关掉，示范改成已停下，不再记录，并说明原因。暂停、尚未开始、应用重启时都不采集。重启后上次若停在采集或暂停，记成已停下，要用户再点继续才采集；继续时同样必须先加上这条浮层。切到别的应用或回到 Mika 时浮层还在，不靠界面停在某一页。
+Capture only after the user taps 「开始示范」 (Start demonstration). During capture Mika does not operate the phone. There is an accessibility overlay at the top of the screen showing 「正在学习」 or 「已暂停」 (Paused), with pause, resume and end on it. It uses the same kind of window as the floating capsule, and does not request notification permission or 「显示在其他应用上层」 (Display over other apps). A notification may exist, but it is not the only way out; without notification permission it can still stop. If this overlay cannot be added, recording does not start. If the overlay disappears midway, or accessibility is turned off, the demonstration becomes stopped, no longer records, and states the reason. Nothing is captured while paused, not yet started, or while the app restarts. After a restart, if it was capturing or paused last time, it is recorded as stopped, and the user must tap resume again before capture happens; resuming likewise requires adding this overlay first. When switching to another app or returning to Mika the overlay is still there; it does not rely on the UI staying on one page.
 
-事件来自无障碍里已有的点击、长按、文字变化、滚动、窗口切换。应用访问里禁用的应用不记。连续滚动、同一输入框的连续文字变化、短时间重复点击合并。不假定一次事件就是一个动作。不保存整屏图、录像或屏幕全文。
+Events come from the clicks, long presses, text changes, scrolls and window switches already available in accessibility. Apps disabled in app access are not recorded. Consecutive scrolls, consecutive text changes in the same input box, and repeated clicks within a short time are merged. It is not assumed that one event is one action. Full-screen images, recordings and full screen text are not saved.
 
-密码、验证码、卡号等不写入步骤、日志或技能；目标或订正里命中敏感过滤的也不落盘。没有可靠节点的步骤标成信息不足，不编坐标。Mika 自己的界面事件丢掉，避免悬浮层污染轨迹。一次没走到的入口不能写成「不存在」。
+Passwords, verification codes, card numbers etc. are not written into steps, logs or skills; goals or corrections that hit the sensitive filter are not written to disk either. Steps without reliable nodes are marked as insufficient information, and coordinates are not invented. Mika's own UI events are dropped to avoid the overlay polluting the trajectory. An entry that was not reached once cannot be written as "does not exist".
 
-## 复盘和草稿
+## Review and draft
 
-结束示范后可以改关键步骤、删掉误触。只有信息不足、说不清点了什么、窗口也认不出时才要求补充一句。来源分成观察到的、用户写明的、模型标明的推测。
+After ending the demonstration you can change key steps and delete accidental touches. Only when the information is insufficient, what was tapped cannot be explained, and the window cannot be recognized either, is one sentence of supplementation required. Sources are divided into observed, stated by the user, and speculation marked by the model.
 
-草稿走现有的五个小节和 `SkillDrafter.validate`，`source: demonstrated`，状态是待确认。不调用 `skill_save`，收下前目录里没有它，模型读不到。收下后仍是试用：正文标明还没有试跑成功；当前界面看不出入口或前置条件时停止套用，退回平常的查看和询问。
+The draft goes through the existing five sections and `SkillDrafter.validate`, with `source: demonstrated`, and its status is awaiting confirmation. `skill_save` is not called, so before accepting there is nothing in the directory and the model cannot read it. After accepting it is still a trial: the body states that it has not yet been trial-run successfully; when the current UI shows no entry or precondition, it stops applying it and falls back to ordinary viewing and asking.
 
-放弃、拒绝草稿、删除技能、收下之后，都删掉本机轨迹。轨迹里只留合并后的步骤，不留原始事件。
+After giving up, rejecting the draft, deleting the skill, or accepting it, the local trajectory is always deleted. Only the merged steps are kept in the trajectory, not the raw events.
 
-## 这版不做
+## Not in this version
 
-不在保存前自动回放，因此也不会为了验证再去付款、发送或下单。不把未验证写成试跑成功。
+It does not automatically replay before saving, so it will not pay, send or place an order again just to verify. It does not write unverified as a successful trial run.

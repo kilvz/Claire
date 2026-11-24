@@ -1,54 +1,54 @@
-# do_each 采用率 Implementation Plan
+# do_each adoption rate Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 模型逐条干活(开详情→动作→返回重复 ≥3 次)时收到机制级的 do_each 建议,并复活 same_state/state_cycle 守卫死代码、给 do_each 说明配真实感示例。
+**Goal:** When the model works item by item (open detail → act → go back, repeated ≥3 times) it gets a mechanism-level do_each suggestion, plus revive the dead same_state/state_cycle guard code and give the do_each description a realistic example.
 
-**Architecture:** 新增纯状态机 `EachLoopDetector`(core/agent)按动词序列形状识别重复,AgentLoop 轮末喂它,命中后以 `ctx.notice` 追加一条提醒并 `track.markRecovery()` 让下一步回主模型;同时在 `OperationGuards.frame()` 里接回 `arrived()`/`cycle()` 两条既有判定(界面状态维度,与形状维度互补)。
+**Architecture:** Add a pure state machine `EachLoopDetector` (core/agent) that recognizes repetition from the shape of the verb sequence; AgentLoop feeds it at the end of each turn, and on a hit it appends a reminder through `ctx.notice` and calls `track.markRecovery()` so the next step returns to the main model. At the same time, wire the two existing `arrived()`/`cycle()` checks back into `OperationGuards.frame()` (the UI-state dimension, complementing the shape dimension).
 
-**Tech Stack:** Kotlin,JUnit4,Gradle(`:core` 纯 JVM 模块)。
+**Tech Stack:** Kotlin, JUnit4, Gradle (`:core` pure JVM module).
 
 **Spec:** `docs/design/specs/2026-11-21-do-each-adoption-design.md`
 
 ## Global Constraints
 
-- 通用 AOSP 行为,只看动词序列形状与界面状态哈希;**禁止任何 App/品牌特例**。
-- 提示词改动只增不改已发消息(前缀缓存);few-shot 增量 <200 token。
-- 反馈键在 `feedback/loop.md` 与 `feedback/tools.md` 间唯一,且每个键必须有代码以 `"<key>"` 字面量引用(`PromptLayoutTest.noOrphanFeedbackKeys` 强制)。
-- 测试名必须与断言语义一致,不留名不副实的测试。
-- 工作分支 `worktree-do-each-adoption`(worktree),不碰 main;不改版本号(非发版)。
-- 全量回归用 `./gradlew :app:testDebugUnitTest`(**不要用裸 `:app:test`,会 OOM**)。
+- Generic AOSP behavior; look only at the shape of the verb sequence and the UI-state hash; **no app/brand special cases**.
+- Prompt changes only add and never modify already-sent messages (prefix cache); the few-shot increment is <200 token.
+- A feedback key is unique between `feedback/loop.md` and `feedback/tools.md`, and every key must be referenced in code as a `"<key>"` literal (enforced by `PromptLayoutTest.noOrphanFeedbackKeys`).
+- Test names must match the semantics of their assertions; leave no test whose name does not reflect what it checks.
+- Work on the `worktree-do-each-adoption` branch (worktree), do not touch main; do not change the version number (not a release).
+- Run full regression with `./gradlew :app:testDebugUnitTest` (**do not use bare `:app:test`, it will OOM**).
 
 ## Review Focus
 
-1. `frame()` 里 `trail` 必须先于 `arrived()` 更新——顺序反了,`arrived()` 内的 cycle 抑制会用旧轨迹(时序 bug,测试只断言最终结论抓不到,需用例覆盖)。
-2. `EachLoopDetector` 在序列恰满 `REPEATS*l` 时就应触发(L=2 时第 6 个动词即触发,不得等到窗口 15 攒满)。
-3. 纯滚动信息流 `[Observe, Scroll]×N` 与双屏对比 `[Tap?, Back]` 之外的 motif 绝不触发(误报防护)。
-4. `cycleLadder` 首级 2→3 后,确认仓库内没有其他代码/测试依赖旧阈值 2(grep `cycleLadder` 全部引用)。
-5. 批(do_steps)与单步交错时 `eachLoop.reset()` 不漏:批前的半截序列不得拼接到批后。
+1. In `frame()`, `trail` must be updated before `arrived()` — with the order reversed, the cycle suppression inside `arrived()` uses the old trail (a timing bug that a test asserting only the final conclusion cannot catch, so it needs dedicated cases).
+2. `EachLoopDetector` must fire as soon as the sequence is exactly `REPEATS*l` long (with L=2 it fires on the 6th verb; it must not wait for the window of 15 to fill).
+3. The pure-scrolling feed `[Observe, Scroll]×N` and the two-screen comparison `[Tap?, Back]` must never fire (false-positive protection).
+4. After the first rung of `cycleLadder` goes 2→3, confirm nothing else in the repo depends on the old threshold of 2 (grep every reference to `cycleLadder`).
+5. When batches (do_steps) and single steps interleave, `eachLoop.reset()` is not missed: a half-formed sequence from before a batch must not be spliced onto what comes after it.
 
 ---
 
-### Task 1: 复活 same_state / state_cycle 守卫
+### Task 1: Revive the same_state / state_cycle guards
 
 **Files:**
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuards.kt`(frame() 169-189 行区域)
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/GuardRules.kt`(cycleLadder 57 行 + 类注释兜圈行)
-- Test: `core/src/test/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuardsTest.kt`(114-183 行的三个测试)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuards.kt` (the frame() 169-189 line region)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/GuardRules.kt` (cycleLadder line 57 + the looping line in the class comment)
+- Test: `core/src/test/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuardsTest.kt` (the three tests at lines 114-183)
 
 **Interfaces:**
-- Consumes: 现有 `OperationGuards.frame(id: String, hash: Long): List<GuardVerdict>`、`GuardRules.cycle(trail: List<Long>): Cycle?`、`GuardVerdict(code, severity, evidence, nudge)`。
-- Produces: `GuardRules.cycleLadder(budget: Int?): List<Int>` 改为 `[3, 4, lateStop(budget, 5, 6)]`(Task 3 不依赖本任务接口,但同一测试文件)。
+- Consumes: the existing `OperationGuards.frame(id: String, hash: Long): List<GuardVerdict>`, `GuardRules.cycle(trail: List<Long>): Cycle?`, `GuardVerdict(code, severity, evidence, nudge)`.
+- Produces: `GuardRules.cycleLadder(budget: Int?): List<Int>` changed to `[3, 4, lateStop(budget, 5, 6)]` (Task 3 does not depend on this task's interface, but uses the same test file).
 
-- [ ] **Step 1: 改写失败测试**
+- [ ] **Step 1: Rewrite the failing tests**
 
-在 `OperationGuardsTest.kt` 中重写三个测试(断言恢复与测试名一致的真实语义;注意 `arrived()` 的 cycle 闸门保持原样——正在兜圈时 same_state 不说,由 state_cycle 单独说,所以第一个测试必须用**不规则**回访序列):
+Rewrite the three tests in `OperationGuardsTest.kt` (assert the real semantics so that assertions match the test names; note that the cycle gate in `arrived()` stays as it is — while looping, same_state stays silent and only state_cycle speaks, so the first test must use an **irregular** revisit sequence):
 
 ```kotlin
 @Test fun returningToTheSameScreenWithoutAnythingNewNudgesAtThree() {
     val g = OperationGuards()
     g.frame("s0", 1L)
-    // 每次经不同的新页面回到同一屏(不规则回访,不构成周期):第二次到 1 不提醒,第三次提醒
+    // each time it returns to the same screen via a different new page (an irregular revisit, not a cycle): the second arrival at 1 does not nudge, the third does
     val out1 = listOf(2L, 3L, 4L, 1L).mapIndexed { i, h -> g.noteAction(); g.frame("a$i", h) }.flatten()
     assertTrue(out1.toString(), out1.none { it.code == "same_state" || it.code == "state_cycle" })
     val out2 = listOf(5L, 6L, 7L).mapIndexed { i, h -> g.noteAction(); g.frame("b$i", h) }.flatten()
@@ -63,7 +63,7 @@
 @Test fun threeStateLoopIsCaught() {
     val g = OperationGuards()
     g.frame("s0", 1L)
-    // 1→2→3 转满三圈(trail 攒到 9)时提醒兜圈;周期循环全程没有 same_state(由 cycle 通道单独说)
+    // when 1→2→3 completes three full rounds (trail has grown to 9) it nudges about looping; a periodic loop produces no same_state at all (that is spoken only by the cycle channel)
     val seq = listOf(2L, 3L, 1L, 2L, 3L, 1L, 2L, 3L)
     val verdicts = seq.mapIndexed { i, h -> g.noteAction(); g.frame("s${i + 1}", h) }
     assertTrue(verdicts.dropLast(1).flatten().none { it.code == "state_cycle" || it.code == "same_state" })
@@ -74,7 +74,7 @@
 @Test fun cycleStopFollowsTheStepBudget() {
     val g = OperationGuards(stepBudget = 30)
     g.frame("s0", 1L)
-    // budget 30 → 梯 [3, 4, max(6, 30/5)=6]:第 5 帧(rounds 3)、第 7 帧(rounds 4)提醒,第 11 帧(rounds 6)叫停
+    // budget 30 → ladder [3, 4, max(6, 30/5)=6]: frames 5 (rounds 3) and 7 (rounds 4) nudge, frame 11 (rounds 6) stops
     var stopAt = 0
     val warnAt = mutableListOf<Int>()
     for (i in 1..11) {
@@ -89,16 +89,16 @@
 }
 ```
 
-并保留 `backAndForthBetweenTwoStatesDoesNotStopProgress` 原样(首级提到 3 后,3 帧 rounds=2 不触发,断言 empty 名副其实)。
+and keep `backAndForthBetweenTwoStatesDoesNotStopProgress` as is (after the first rung is raised to 3, 3 frames with rounds=2 do not trigger, so asserting empty lives up to its name).
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Step 2: Run the tests and confirm they fail**
 
 Run: `./gradlew :core:test --tests '*OperationGuardsTest*' --console=plain -q`
-Expected: FAIL——`returningToTheSameScreen…` 拿不到 same_state(死代码),`threeStateLoopIsCaught` 拿不到 state_cycle,`cycleStop…` 的 stopAt 为 0。
+Expected: FAIL — `returningToTheSameScreen…` does not get same_state (dead code), `threeStateLoopIsCaught` does not get state_cycle, and `cycleStop…` has stopAt of 0.
 
-- [ ] **Step 3: 接线 arrived()/cycle() 进 frame(),改 ladder**
+- [ ] **Step 3: Wire arrived()/cycle() into frame() and change the ladder**
 
-`OperationGuards.frame()` 的 `if (!same)` 块改为(顺序即语义:trail 先更新,再 arrived,再 cycle):
+Change the `if (!same)` block in `OperationGuards.frame()` to (the order is the semantics: update trail first, then arrived, then cycle):
 
 ```kotlin
 if (!same) {
@@ -112,30 +112,30 @@ if (!same) {
 }
 ```
 
-`arrived()` 本体**不动**(cycle 闸门保持:「正在兜圈时由 cycle 说,这里不重复」)。
+The body of `arrived()` stays **untouched** (the cycle gate keeps: "while looping, cycle speaks; do not repeat it here").
 
-`GuardRules.cycleLadder` 改为 `listOf(3, 4, lateStop(budget, 5, 6))`;类注释表格里「在两三个状态之间兜圈(整圈数)| 2、4 |…」一行的提醒列改为「3、4」;「没到过新状态时第 N 次回到同一状态」一行改为「回到同一状态(兜圈时不重复,由兜圈那条说)」。
+Change `GuardRules.cycleLadder` to `listOf(3, 4, lateStop(budget, 5, 6))`; in the class-comment table, change the nudge column of the row "looping among two or three states (full-round count) | 2, 4 |…" to "3, 4"; change the row "the Nth return to the same state without ever reaching a new state" to "returning to the same state (not repeated while looping; the looping row speaks it)".
 
-- [ ] **Step 4: grep 确认没有别处依赖旧首级 2**
+- [ ] **Step 4: grep to confirm nothing else depends on the old first rung of 2**
 
 Run: `grep -rn "cycleLadder" core/src --include="*.kt"`
-Expected: 只有 `GuardRules.kt`(定义)与 `OperationGuards.kt`(调用)两处;无其他阈值假设。
+Expected: only two places, `GuardRules.kt` (definition) and `OperationGuards.kt` (call); no other assumptions about the threshold.
 
-- [ ] **Step 5: 运行测试确认通过**
+- [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `./gradlew :core:test --tests '*OperationGuardsTest*' --console=plain -q`
-Expected: PASS(含保留的 `backAndForth…`、`manyActionsWithoutANewScreen…` 等全部既有测试)。
+Expected: PASS (including every existing test, such as the retained `backAndForth…` and `manyActionsWithoutANewScreen…`).
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuards.kt core/src/main/kotlin/com/wangzan101/mika/core/safety/guard/GuardRules.kt core/src/test/kotlin/com/wangzan101/mika/core/safety/guard/OperationGuardsTest.kt
-git commit -m "fix(guard): 接回 same_state/state_cycle 判定,兜圈提醒首级 2→3"
+git commit -m "fix(guard): restore same_state/state_cycle verdicts, looping nudge first rung 2→3"
 ```
 
 ---
 
-### Task 2: EachLoopDetector 纯状态机
+### Task 2: The EachLoopDetector pure state machine
 
 **Files:**
 - Create: `core/src/main/kotlin/com/wangzan101/mika/core/agent/EachLoopDetector.kt`
@@ -143,11 +143,11 @@ git commit -m "fix(guard): 接回 same_state/state_cycle 判定,兜圈提醒首�
 
 **Interfaces:**
 - Produces:
-  - `internal class EachLoopDetector`,`fun feed(verb: Verb?, ok: Boolean): Boolean`(该提醒返回 true,每任务最多一次),`fun reset()`
-  - 常量 `EachLoopDetector.REPEATS = 3`、`MAX_MOTIF = 5`、`WINDOW = REPEATS * MAX_MOTIF`
-- Consumes: `com.wangzan101.mika.core.tool.Verb`。
+  - `internal class EachLoopDetector`, `fun feed(verb: Verb?, ok: Boolean): Boolean` (returns true when it nudges, at most once per task), `fun reset()`
+  - constants `EachLoopDetector.REPEATS = 3`, `MAX_MOTIF = 5`, `WINDOW = REPEATS * MAX_MOTIF`
+- Consumes: `com.wangzan101.mika.core.tool.Verb`.
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Step 1: Write the failing tests**
 
 ```kotlin
 package com.wangzan101.mika.core.agent
@@ -181,7 +181,7 @@ class EachLoopDetectorTest {
 
     @Test fun twoScreenCompareNeverFires() {
         val d = EachLoopDetector()
-        // motif 里必须恰一个 Back 且至少一个 Tap:[Observe, Back] 不含 Tap,不触发
+        // the motif must contain exactly one Back and at least one Tap: [Observe, Back] contains no Tap, so it does not fire
         assertFalse(d.feedAll(List(4) { listOf(Verb.Observe, Verb.Back) }.flatten()).any { it })
     }
 
@@ -189,7 +189,7 @@ class EachLoopDetectorTest {
         val d = EachLoopDetector()
         assertFalse(d.feedAll(List(2) { listOf(Verb.Tap, Verb.Back) }.flatten()).any { it })
         assertFalse(d.feed(Verb.Tap, false))
-        // 失败后重新攒满 3 次才触发(证明失败前的半截没算进去)
+        // after a failure it must accumulate 3 more to fire (proving the half-formed run before the failure was not counted)
         val fired = d.feedAll(List(3) { listOf(Verb.Tap, Verb.Back) }.flatten())
         assertEquals(listOf(5), fired.indices.filter { fired[it] })
     }
@@ -218,16 +218,16 @@ class EachLoopDetectorTest {
 }
 ```
 
-(`assertEquals` 需要 `org.junit.Assert.assertEquals` import。)
+(`assertEquals` requires the `org.junit.Assert.assertEquals` import.)
 
-- [ ] **Step 2: 运行确认失败**
+- [ ] **Step 2: Run and confirm failure**
 
 Run: `./gradlew :core:test --tests '*EachLoopDetectorTest*' --console=plain -q`
-Expected: FAIL——`EachLoopDetector` 不存在(编译错误)。
+Expected: FAIL — `EachLoopDetector` does not exist (compile error).
 
-- [ ] **Step 3: 实现 `EachLoopDetector`**
+- [ ] **Step 3: Implement `EachLoopDetector`**
 
-语义(唯一合理实现):
+Semantics (the only reasonable implementation):
 
 ```kotlin
 package com.wangzan101.mika.core.agent
@@ -235,8 +235,8 @@ package com.wangzan101.mika.core.agent
 import com.wangzan101.mika.core.tool.Verb
 
 /**
- * 逐条干活的识别:最近动词序列里「开详情→动作→返回」的 motif 完整重复 [REPEATS] 次时提醒一次 do_each。
- * 只看形状不看内容;失败、非屏动词都打断;模型自己用了 do_each 就解除武装。纯状态机,每任务一个实例。
+ * Detecting item-by-item work: when the "open detail → act → go back" motif in the recent verb sequence fully repeats [REPEATS] times, nudge once about do_each.
+ * Only the shape matters, not the content; failures and non-screen verbs all break the run; if the model uses do_each itself, disarm. Pure state machine, one instance per task.
  */
 internal class EachLoopDetector {
     private val seq = ArrayDeque<Verb>()
@@ -245,7 +245,7 @@ internal class EachLoopDetector {
 
     fun reset() = seq.clear()
 
-    /** 喂一轮的动词([ok] 为这轮成功);该提醒返回 true(每任务最多一次)。 */
+    /** Feed one round's verb ([ok] is whether this round succeeded); returns true when it nudges (at most once per task). */
     fun feed(verb: Verb?, ok: Boolean): Boolean {
         if (verb == Verb.DoEach) disarmed = true
         if (verb == null || !ok || verb !in COUNTED) { reset(); return false }
@@ -257,7 +257,7 @@ internal class EachLoopDetector {
         return true
     }
 
-    /** 最近 [REPEATS]×l 个动词呈 l 周期,motif 恰含一个 Back 且至少一个 Tap(开详情→动作→返回的签名)。 */
+    /** The last [REPEATS]×l verbs form a period of l, with the motif containing exactly one Back and at least one Tap (the signature of open detail → act → go back). */
     private fun repeating(): Boolean {
         for (l in 2..MAX_MOTIF) {
             if (seq.size < REPEATS * l) continue
@@ -281,44 +281,44 @@ internal class EachLoopDetector {
 }
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [ ] **Step 4: Run and confirm it passes**
 
 Run: `./gradlew :core:test --tests '*EachLoopDetectorTest*' --console=plain -q`
-Expected: PASS(8 个用例)。
+Expected: PASS (8 cases).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add core/src/main/kotlin/com/wangzan101/mika/core/agent/EachLoopDetector.kt core/src/test/kotlin/com/wangzan101/mika/core/agent/EachLoopDetectorTest.kt
-git commit -m "feat(agent): EachLoopDetector 识别逐条干活的动词形状"
+git commit -m "feat(agent): EachLoopDetector recognizes the verb shape of item-by-item work"
 ```
 
 ---
 
-### Task 3: AgentLoop 接线 + loop.repeating_items 文案
+### Task 3: AgentLoop wiring + loop.repeating_items copy
 
 **Files:**
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/agent/AgentLoop.kt`(`val track = StepTrack()` 附近 ~515 行、单步路径 `track.after(...)` ~779 行、`batch()` 开头 ~955 行)
-- Modify: `core/src/main/resources/prompts/feedback/loop.md`(末尾追加新键)
-- Modify(再生成): `core/src/test/resources/prompt-surface/feedback-loop.txt`
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/agent/AgentLoop.kt` (around line 515 near `val track = StepTrack()`, around line 779 on the single-step path `track.after(...)`, around line 955 at the start of `batch()`)
+- Modify: `core/src/main/resources/prompts/feedback/loop.md` (append the new key at the end)
+- Modify (regenerate): `core/src/test/resources/prompt-surface/feedback-loop.txt`
 
 **Interfaces:**
-- Consumes: Task 2 的 `EachLoopDetector.feed/reset`、`EachLoopDetector.REPEATS`;`ctx.notice(source: String, text: String): Message`(ContextBuilder.kt:160);`Feedback.format(key, vararg vars)`;`track.markRecovery()`(StepTrack)。
-- Produces: feedback 键 `loop.repeating_items`,带占位符 `{{count}}`。
+- Consumes: Task 2's `EachLoopDetector.feed/reset`, `EachLoopDetector.REPEATS`; `ctx.notice(source: String, text: String): Message` (ContextBuilder.kt:160); `Feedback.format(key, vararg vars)`; `track.markRecovery()` (StepTrack).
+- Produces: the feedback key `loop.repeating_items`, with the placeholder `{{count}}`.
 
-- [ ] **Step 1: 加反馈文案**
+- [ ] **Step 1: Add the feedback copy**
 
-`prompts/feedback/loop.md` 末尾追加(自成一体、首尾无空白、英文):
+Append to the end of `prompts/feedback/loop.md` (self-contained, no leading or trailing whitespace, English):
 
 ```
 ## loop.repeating_items
 Your last steps repeat the same cycle — open an item, act on it, go back — {{count}} times in a row. If items remain, finish them in one do_each call instead of one item per turn: item says how to recognize one entry (role/text/resourceId), body is the steps for ONE item with "@item" as targetText, ending with back.
 ```
 
-- [ ] **Step 2: 接线(三处小改)**
+- [ ] **Step 2: Wire it up (three small changes)**
 
-a) `val track = StepTrack()` 之后加:`val eachLoop = EachLoopDetector()`
-b) 单步路径 `track.after(tools.verb(first.name), !isError, ran.verdicts.isNotEmpty() || advice != null, exec.changed, false, exec.place?.name)`(~779 行)之后加:
+a) After `val track = StepTrack()` add: `val eachLoop = EachLoopDetector()`
+b) After the single-step path `track.after(tools.verb(first.name), !isError, ran.verdicts.isNotEmpty() || advice != null, exec.changed, false, exec.place?.name)` (around line 779) add:
 
 ```kotlin
 if (eachLoop.feed(verb, !isError)) {
@@ -327,31 +327,31 @@ if (eachLoop.feed(verb, !isError)) {
 }
 ```
 
-c) `batch()` 函数开头(`val (parsed, problem) = BatchRunner.parse(...)` 之前)加:`eachLoop.reset()`(Review Focus #5)。
+c) At the start of the `batch()` function (before `val (parsed, problem) = BatchRunner.parse(...)`) add: `eachLoop.reset()` (Review Focus #5).
 
-companion object 加:`private const val EACH_LOOP_SOURCE = "each loop"`。`Feedback` 的 import 文件里已有(StuckAdvice 用),`EachLoopDetector` 同包无需 import。
+Add to the companion object: `private const val EACH_LOOP_SOURCE = "each loop"`. The `Feedback` import is already in the file (StuckAdvice uses it), and `EachLoopDetector` is in the same package so it needs no import.
 
-- [ ] **Step 3: 跑 PromptLayoutTest 确认键有引用、无孤儿**
+- [ ] **Step 3: Run PromptLayoutTest to confirm the key is referenced and there are no orphans**
 
 Run: `./gradlew :core:test --tests '*PromptLayoutTest*' --console=plain -q`
-Expected: PASS(`noOrphanFeedbackKeys` 在代码里找到 `"loop.repeating_items"`)。
+Expected: PASS (`noOrphanFeedbackKeys` finds `"loop.repeating_items"` in the code).
 
-- [ ] **Step 4: 重新生成提示词金样并跑全部 prompt 测试**
+- [ ] **Step 4: Regenerate the prompt goldens and run all prompt tests**
 
 Run: `./gradlew :core:test --tests '*PromptSurface*' -PupdateSnapshots --console=plain -q && ./gradlew :core:test --tests '*PromptSurface*' --tests '*PromptLayoutTest*' --console=plain -q`
-Expected: 第一条命令再生成 `feedback-loop.txt`;第二条 PASS。
-随后 `git diff --stat core/src/test/resources/prompt-surface/` 确认只有 `feedback-loop.txt` 变化(若还有别的文件变,停下核对原因)。
+Expected: the first command regenerates `feedback-loop.txt`; the second passes.
+Then run `git diff --stat core/src/test/resources/prompt-surface/` to confirm only `feedback-loop.txt` changed (if any other file changed, stop and verify why).
 
-- [ ] **Step 5: 跑 AgentLoop 相关测试**
+- [ ] **Step 5: Run the AgentLoop-related tests**
 
 Run: `./gradlew :core:test --tests '*AgentLoop*' --tests '*StuckAdvice*' --console=plain -q`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add core/src/main/kotlin/com/wangzan101/mika/core/agent/AgentLoop.kt core/src/main/resources/prompts/feedback/loop.md core/src/test/resources/prompt-surface/feedback-loop.txt
-git commit -m "feat(agent): 逐条干活重复 3 次时提醒改用 do_each,提醒后回主模型"
+git commit -m "feat(agent): nudge towards do_each when item-by-item work repeats 3 times, back to the main model after the nudge"
 ```
 
 ---
@@ -359,54 +359,54 @@ git commit -m "feat(agent): 逐条干活重复 3 次时提醒改用 do_each,提�
 ### Task 4: do_each.md few-shot
 
 **Files:**
-- Modify: `core/src/main/resources/prompts/tools/do_each.md`(末尾示例句)
-- Modify(再生成): `core/src/test/resources/prompt-surface/tools.txt`(及任何渲染 do_each 描述的金样)
+- Modify: `core/src/main/resources/prompts/tools/do_each.md` (the example sentence at the end)
+- Modify (regenerate): `core/src/test/resources/prompt-surface/tools.txt` (and any golden that renders the do_each description)
 
 **Interfaces:**
-- Consumes: 无(纯文案);do_each body 的 op 集合以 `DoEach.kt:50` 的 enum 为准(tap/type/clear/scroll/swipe/key/back/wait/assert/observe,`wait` 的参数是 `whenText`/`timeoutMs`)。
-- Produces: 无接口。
+- Consumes: none (copy only); the op set of a do_each body follows the enum at `DoEach.kt:50` (tap/type/clear/scroll/swipe/key/back/wait/assert/observe; `wait` takes `whenText`/`timeoutMs`).
+- Produces: no interface.
 
-- [ ] **Step 1: 换示例**
+- [ ] **Step 1: Swap the example**
 
-`do_each.md` 里现有的示例句:
+The existing example sentence in `do_each.md`:
 
 `Example — open each item, read its page, go back: do_each(item={"role":"Button"}, body=[{"op":"tap","targetText":"@item"},{"op":"observe"},{"op":"back"}], reveal="scroll").`
 
-替换为(4 步真实 body,含等待):
+Replace it with (a realistic 4-step body that includes a wait):
 
 `Example — open each entry, tap Like on its page, go back: do_each(item={"role":"Button"}, body=[{"op":"tap","targetText":"@item"},{"op":"wait","whenText":"Like","timeoutMs":3000},{"op":"tap","targetText":"Like"},{"op":"back"}]).`
 
-其余文字不动;全段增量 <200 token。
+Leave the rest of the text alone; the increment for the whole section is <200 token.
 
-- [ ] **Step 2: 重新生成金样并跑 prompt 测试**
+- [ ] **Step 2: Regenerate the goldens and run the prompt tests**
 
 Run: `./gradlew :core:test --tests '*PromptSurface*' --tests '*PromptLayoutTest*' -PupdateSnapshots --console=plain -q && ./gradlew :core:test --tests '*PromptSurface*' --console=plain -q`
-注意:`sizes.txt` 金样归 `PromptLayoutTest.layerSizesRendered` 所有,再生成必须带上 `--tests '*PromptLayoutTest*'`,只跑 `*PromptSurface*` 不会更新它。
-Expected: PASS;`git diff --stat core/src/test/resources/prompt-surface/` 只动含 do_each 描述的文件(tools.txt,若 layer 类金样含工具全文也可能有,逐个核对 diff 内容确实只是这句示例)。
+Note: the `sizes.txt` golden belongs to `PromptLayoutTest.layerSizesRendered`, so regeneration must include `--tests '*PromptLayoutTest*'`; running only `*PromptSurface*` will not update it.
+Expected: PASS; `git diff --stat core/src/test/resources/prompt-surface/` only touches files that contain the do_each description (tools.txt, and possibly a layer-class golden if it includes the full tool text; check each diff to confirm the content really is just this example sentence).
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add core/src/main/resources/prompts/tools/do_each.md core/src/test/resources/prompt-surface/
-git commit -m "docs(tools): do_each 示例换成含等待的 4 步真实 body"
+git commit -m "docs(tools): replace the do_each example with a realistic 4-step body that includes a wait"
 ```
 
 ---
 
-### Task 5: 全量回归
+### Task 5: Full regression
 
-**Files:** 无(验证任务)。
+**Files:** none (verification task).
 
-- [ ] **Step 1: core 全量**
+- [ ] **Step 1: core full run**
 
 Run: `./gradlew :core:test --console=plain -q`
-Expected: PASS。
+Expected: PASS.
 
-- [ ] **Step 2: app 全量(注意不是裸 :app:test)**
+- [ ] **Step 2: app full run (note: not bare :app:test)**
 
 Run: `./gradlew :app:testDebugUnitTest --console=plain -q`
-Expected: PASS。
+Expected: PASS.
 
-- [ ] **Step 3: Commit(如有修复)并报告**
+- [ ] **Step 3: Commit (if there were fixes) and report**
 
-无需提交则直接报告:两个测试任务绿、分支 `worktree-do-each-adoption` 的提交清单(`git log --oneline main..HEAD`)。真机 LiveRun 复测(采用率 ≥1/3)不在本计划内,需用户在场另做。
+If no commit is needed, just report: both test tasks are green, and the commit list of the `worktree-do-each-adoption` branch (`git log --oneline main..HEAD`). Re-testing with a LiveRun on a real device (adoption rate ≥1/3) is not part of this plan; it needs the user present and is done separately.

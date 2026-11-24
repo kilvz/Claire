@@ -1,38 +1,38 @@
 ## ADDED Requirements
 
-### Requirement: 每任务沙箱时间上限可由用户设置
+### Requirement: Per-task sandbox time limit is user-configurable
 
-一个任务里沙箱命令的累计运行时长上限 SHALL 由用户在设置里从固定档位（30、60、120、240 分钟）中选择，默认 30 分钟（与既有行为一致）。设置在任务开始时生效，进行中的任务不受改动影响。存储里出现档位外的值时 SHALL 按默认 30 分钟处理。
+The cumulative runtime limit for sandbox commands within a task SHALL be chosen by the user in settings from fixed tiers (30, 60, 120, 240 minutes), defaulting to 30 minutes (consistent with existing behavior). The setting takes effect when a task starts; in-progress tasks are unaffected by changes. When a value outside the tiers appears in storage, it SHALL be treated as the default 30 minutes.
 
-#### Scenario: 默认与现状一致
+#### Scenario: Default matches current behavior
 
-- **WHEN** 用户从未设置过沙箱时间上限
-- **THEN** 任务里沙箱命令累计满 30 分钟后被拒绝继续，行为与设置项引入前一致
+- **WHEN** the user has never set a sandbox time limit
+- **THEN** once sandbox commands in a task accumulate 30 minutes they are refused further use, matching behavior before the setting was introduced
 
-#### Scenario: 调高档位后下一个任务生效
+#### Scenario: Raising the tier takes effect on the next task
 
-- **WHEN** 任务 A 进行中，用户把上限从 30 分钟改为 120 分钟
-- **THEN** 任务 A 仍按 30 分钟拒绝；之后开始的任务 B 按 120 分钟执行
+- **WHEN** task A is in progress and the user changes the limit from 30 minutes to 120 minutes
+- **THEN** task A is still refused at 30 minutes; task B, started afterwards, runs at 120 minutes
 
-#### Scenario: 存了非法值回落默认
+#### Scenario: An invalid stored value falls back to the default
 
-- **WHEN** 存储里的沙箱时间上限被写成档位外的值（如 45 或负数）
-- **THEN** 读取按 30 分钟处理，设置页显示默认档位
+- **WHEN** the stored sandbox time limit is written as a value outside the tiers (e.g. 45 or a negative number)
+- **THEN** it is read as 30 minutes and the settings page shows the default tier
 
-### Requirement: 耗尽提示反映实际上限
+### Requirement: The exhaustion message reflects the actual limit
 
-沙箱时间用尽时返回给模型的提示 SHALL 写明实际配置的分钟数，不得硬编码 30 分钟。
+The message returned to the model when sandbox time is exhausted SHALL state the actually configured minute count and MUST NOT hardcode 30 minutes.
 
-#### Scenario: 120 分钟档位的提示
+#### Scenario: Message for the 120-minute tier
 
-- **WHEN** 上限为 120 分钟的任务沙箱命令累计满 120 分钟
-- **THEN** 工具返回 `sandbox_budget_exhausted`，提示里写 120 minutes
+- **WHEN** sandbox commands in a task with a 120-minute limit accumulate 120 minutes
+- **THEN** the tool returns `sandbox_budget_exhausted` and the message says 120 minutes
 
-### Requirement: 子任务沿用同一档位
+### Requirement: Subtasks use the same tier
 
-子任务（child agent）的沙箱时间上限 SHALL 与发起它的主任务使用同一档位，各自独立累计，互不占用对方的额度。
+A subtask's (child agent's) sandbox time limit SHALL use the same tier as the main task that spawned it, each accumulating independently without consuming the other's allowance.
 
-#### Scenario: 子任务独立累计
+#### Scenario: Subtasks accumulate independently
 
-- **WHEN** 主任务已用 25 分钟沙箱时间，配置为 60 分钟档，随后派出子任务
-- **THEN** 该子任务从 0 累计、满 60 分钟才拒绝；主任务仍按自己的 60 分钟累计继续
+- **WHEN** the main task has used 25 minutes of sandbox time on the 60-minute tier and then spawns a subtask
+- **THEN** that subtask accumulates from 0 and is only refused at 60 minutes; the main task continues accumulating against its own 60 minutes

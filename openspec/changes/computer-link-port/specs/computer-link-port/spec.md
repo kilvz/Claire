@@ -1,23 +1,23 @@
 ## ADDED Requirements
 
-### Requirement: 用户可自定义电脑连接的监听端口
-设置 › 连接电脑 › 高级 SHALL 提供「监听端口」编辑入口，允许把端口改为 1024–65535 之间的整数（默认 8765 可一键恢复）。非法输入 SHALL 在对话框内拦下，不写入存储。
+### Requirement: Users can customize the computer connection's listening port
+设置 (Settings) › 连接电脑 (Connect computer) › 高级 (Advanced) SHALL provide a 「监听端口」 (Listen port) edit entry, allowing the port to be changed to an integer between 1024–65535 (the default 8765 can be restored with one tap). Invalid input SHALL be blocked inside the dialog and not written to storage.
 
-#### Scenario: 修改端口并立即生效
-- **WHEN** 电脑连接（USB 或网络任一）开着，用户把端口从 8765 改为 9123
-- **THEN** 服务在新端口上重新监听；`connect-computer.sh` 重写为转发 9123；USB 连接信息文件 `mcp-usb.json` 重新发布（`port`/`api_url`/`forward` 均为新端口）；前台服务通知显示 9123
+#### Scenario: Change the port and it takes effect immediately
+- **WHEN** the computer connection (USB or network, either one) is on and the user changes the port from 8765 to 9123
+- **THEN** the service listens again on the new port; `connect-computer.sh` is rewritten to forward 9123; the USB connection info file `mcp-usb.json` is republished (`port`/`api_url`/`forward` all carry the new port); the foreground service notification shows 9123
 
-#### Scenario: 没在监听时改端口
-- **WHEN** 电脑连接关着，用户改端口
-- **THEN** 设置保存、脚本按新端口重写；下次打开连接直接用新端口监听
+#### Scenario: Change the port while not listening
+- **WHEN** the computer connection is off and the user changes the port
+- **THEN** the setting is saved and the script is rewritten with the new port; the next time the connection is turned on it listens on the new port directly
 
-#### Scenario: 非法端口被拒
-- **WHEN** 用户在对话框里输入 80 或 70000 或非数字
-- **THEN** 应用按钮不可用并提示范围；设置不落盘
+#### Scenario: Invalid port rejected
+- **WHEN** the user enters 80 or 70000 or a non-numeric value in the dialog
+- **THEN** the apply button is disabled and the range is shown; the setting is not persisted
 
-### Requirement: 端口读取与存量行为兼容
-未自定义时一切 SHALL 保持现状：默认 8765；已写进 `mcp.json` 的合法 `port` 字段（此前只能手工编辑）SHALL 继续按它读取与监听。
+### Requirement: Port reading is compatible with existing behavior
+Without customization everything SHALL stay as it is: default 8765; a valid `port` field already written into `mcp.json` (previously editable only by hand) SHALL continue to be read and listened on.
 
-#### Scenario: 旧设置文件里的自定义端口
-- **WHEN** `mcp.json` 里已手工写过 `"port": 9123`
-- **THEN** 界面显示 9123，监听 9123，与改动前一致
+#### Scenario: Custom port in an old settings file
+- **WHEN** `"port": 9123` has already been written by hand in `mcp.json`
+- **THEN** the UI shows 9123 and the service listens on 9123, the same as before the change

@@ -1,25 +1,25 @@
 ## ADDED Requirements
 
-### Requirement: 小窗声音按钮可双向切换
+### Requirement: The PiP sound button toggles in both directions
 
-小窗展开后的声音按钮 MUST 同时承担「恢复声音」与「再静上」两个方向：目标 App 的声音已被用户恢复过时，按下把它再静上（沿用任务静音台账，收尾照常还原）；否则按下恢复声音（维持现状行为）。按钮的图标与文案 MUST 跟随真实状态：已恢复显示「静音」，未恢复显示「恢复声音」。
+After the PiP window is expanded, the sound button MUST handle both directions — "restore sound" and "mute again": when the target App's sound has already been restored by the user, pressing it mutes the App again (reusing the task mute ledger, with the wrap-up restoring as usual); otherwise pressing it restores the sound (current behavior). The button's icon and label MUST follow the real state: "Mute" when restored, "Restore sound" when not restored.
 
-#### Scenario: 恢复后再按一次能静回去
-- **WHEN** 任务自动静音的目标 App 被用户从小窗恢复了声音，用户再按一次声音按钮
-- **THEN** 该 App 重新被静音，按钮回到「恢复声音」
+#### Scenario: pressing again after restoring mutes it back
+- **WHEN** the user has restored the sound of the target App that the task auto-muted, through the PiP window, and then presses the sound button once more
+- **THEN** that App is muted again and the button returns to "Restore sound"
 
-#### Scenario: 再静后收尾仍还原
-- **WHEN** 用户把恢复过的声音再静上，任务随后正常收尾
-- **THEN** 收尾的统一还原把该 App 的声音恢复为任务开始前的原模式
+#### Scenario: the wrap-up still restores after a re-mute
+- **WHEN** the user mutes again the sound that had been restored, and the task then wraps up normally
+- **THEN** the unified restore at wrap-up puts that App's sound back to the original mode from before the task started
 
-#### Scenario: 再静失败可重试
-- **WHEN** 按下「静音」但静音操作失败（如 shell 暂不可用）
-- **THEN** 按钮保持「静音」状态，再次按下可重试，任务收尾的兜底还原不受影响
+#### Scenario: a failed re-mute can be retried
+- **WHEN** "Mute" is pressed but the mute operation fails (e.g. the shell is temporarily unavailable)
+- **THEN** the button stays in the "Mute" state, pressing again retries, and the wrap-up fallback restore is unaffected
 
-#### Scenario: 接管路径同样可切换
-- **WHEN** 任务处于「已交到用户手上」的接管状态，用户从小窗恢复声音后再按一次
-- **THEN** 被接管的 App 同样被再静上，按钮状态与虚拟屏路径一致
+#### Scenario: the takeover path toggles too
+- **WHEN** the task is in the takeover state ("handed over to the user") and the user restores the sound from the PiP window and then presses once more
+- **THEN** the taken-over App is muted again as well, and the button state matches the virtual-display path
 
-#### Scenario: 状态如实显示
-- **WHEN** 小窗当前目标 App 的声音未被用户恢复过（含从未静过、自动静音中）
-- **THEN** 按钮显示「恢复声音」，与改动前一致；按一下恢复，按钮翻转为「静音」
+#### Scenario: the state is shown truthfully
+- **WHEN** the sound of the PiP window's current target App has not been restored by the user (including never muted and auto-muted)
+- **THEN** the button shows "Restore sound", the same as before the change; pressing once restores and the button flips to "Mute"

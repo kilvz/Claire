@@ -1,59 +1,59 @@
 ## Context
 
-`OverlayMotion`（`CapsuleCardContent.kt:272-314`）是胶囊两个浮层窗口共用的出入场动效：只动 `graphicsLayer` 的缩放/透明度，不改布局、不逐帧改窗口。收起路径经三轮加固：`runOverlayClose` 用 `withTimeoutOrNull((CARD_OUT_MS * scale) + CLOSE_GRACE_MS)` 兜底帧停（MotionDurationScale 最多按 10 倍算），超时后 `snapTo(0f)` + `closed()`；外加看门狗（97053397）与关闭后把浮层根视图显式置不可见（ce037717）。展开路径（`open = true` 分支）没有任何超时：
+`OverlayMotion` (`CapsuleCardContent.kt:272-314`) is the enter/exit animation shared by the capsule's two overlay windows: it only animates the scale/alpha of `graphicsLayer`, changing neither layout nor the window frame by frame. The collapse path has been hardened in three rounds: `runOverlayClose` falls back on frame stalls with `withTimeoutOrNull((CARD_OUT_MS * scale) + CLOSE_GRACE_MS)` (MotionDurationScale counted at up to 10x), and after the timeout does `snapTo(0f)` + `closed()`; plus a watchdog (97053397) and explicitly making the overlay root view invisible after closing (ce037717). The expand path (the `open = true` branch) has no timeout at all:
 
 ```kotlin
-if (shown.value == 0f) repeat(SETTLE_FRAMES) { withFrameNanos { } }   // 帧停 → 永久挂起
-opened()                                                                // cardOut=true、syncWindowVisibility
-shown.animateTo(1f, tween(CARD_IN_MS, easing = MikaMotion.Decelerate)) // 帧停 → 卡在中间值
+if (shown.value == 0f) repeat(SETTLE_FRAMES) { withFrameNanos { } }   // frame stall → suspend forever
+opened()                                                                // cardOut=true, syncWindowVisibility
+shown.animateTo(1f, tween(CARD_IN_MS, easing = MikaMotion.Decelerate)) // frame stall → stuck at an intermediate value
 ```
 
-卡片窗口的 `onOpened` 回调把 `cardOut` 置 true（边窗 `CapsuleOverlay` 据此不再画那颗胶囊）并同步窗口可见性。帧停在 SETTLE 阶段 → `opened()` 不执行 → 边上的胶囊继续画（#323 里「藏在后面的悬浮球」）、窗口状态卡在 opening；帧停在 animateTo 阶段 → 卡片停在 0.6–1.0 之间的缩放、`transformOrigin` 指向停靠边（症状：画面不全、贴右缩小）。边窗自己（`CapsuleOverlay`，恒 `open = true`）的同一处 SETTLE 等待同理，帧停则胶囊永远不出现。
+The card window's `onOpened` callback sets `cardOut` to true (so the side window `CapsuleOverlay` stops drawing that capsule) and syncs window visibility. A frame stall during SETTLE → `opened()` is not executed → the capsule at the side keeps drawing (the "floating ball hidden behind" in #323) and the window state is stuck in opening; a frame stall during animateTo → the card stops at a scale between 0.6 and 1.0, with `transformOrigin` pointing at the docked edge (symptom: incomplete picture, shrunk against the right edge). The side window itself (`CapsuleOverlay`, always `open = true`) has the same SETTLE wait in the same place, so with a frame stall the capsule never appears.
 
-报告机为荣耀 30 Pro+ / HarmonyOS 4.2；本地真机华为 Mate X2 / HarmonyOS 4.2 同 OS 族，可做行为取证（能否复现帧停不强求，状态机层面代码可证）。
+The reporting device is an Honor 30 Pro+ / HarmonyOS 4.2; the local physical device is a Huawei Mate X2 / HarmonyOS 4.2, the same OS family, so behavioral evidence can be gathered (reproducing the frame stall is not required; the state-machine level is provable from code).
 
 ## Goals / Non-Goals
 
 **Goals:**
-- 展开路径与收起路径同级防卡死：无论帧时钟是否停摆，`OverlayMotion` 的 open 分支在有限时间内到达终态（`shown = 1f`、`opened()` 已调用）。
-- 边窗恒开分支同样有守卫。
-- `OverlayMotionTest` 镜像四类场景（正常、关动画、缺帧超时、慢动作倍率）。
-- 真机取证收起残帧回归 + 展开态完整几何（全尺寸、居中、无裁切）。
+- Stall protection on the expand path at the same level as the collapse path: regardless of whether the frame clock stalls, the open branch of `OverlayMotion` reaches its terminal state within a finite time (`shown = 1f`, `opened()` already called).
+- The side window's always-open branch gets the same guard.
+- `OverlayMotionTest` mirrors four scenario classes (normal, animations off, missing-frame timeout, slow-motion multiplier).
+- On-device evidence: collapse residual-frame regression + complete expand-state geometry (full size, centered, no clipping).
 
 **Non-Goals:**
-- 不改停靠/居中几何算法（`CardDocking`、`CapsuleDocking`）。
-- 不改收起路径既有防护，不动窗口管理（`syncWindowVisibility` 的语义）。
-- 不处理「关闭动画期间用户再点胶囊」之类的交互竞态（现状行为保持）。
-- 不给 #323 报告人机型的其它症状（无线调试重连折腾）立案。
+- Do not change the docking/centering geometry algorithms (`CardDocking`, `CapsuleDocking`).
+- Do not change the existing protections on the collapse path, and do not touch window management (the semantics of `syncWindowVisibility`).
+- Do not handle interaction races such as "the user taps the capsule again during the close animation" (current behavior stays).
+- Do not open a case for other symptoms on the #323 reporter's device (wireless-debugging reconnect churn).
 
 ## Decisions
 
-1. **镜像 `runOverlayClose` 做 `runOverlayOpen`，而不是给整个 `LaunchedEffect` 套超时。**
-   收起侧的 `runOverlayClose(reduceMotion, animate)` 已有现成测试模式（`runTest` 直测挂起函数、`awaitCancellation` 模拟帧停），展开侧照抄这个形状：`runOverlayOpen(reduceMotion, animate)` 内部 `withTimeoutOrNull((CARD_IN_MS * scale) + OPEN_GRACE_MS)` 包住「SETTLE 等待 + `opened()` + `animateTo`」整段。超时时返回 false，由调用处 `snapTo(1f)` 兜底并确保 `opened()` 只补调一次。备选（整个 LaunchedEffect 套 withTimeoutOrNull）会把 reduceMotion 分支也卷进去，且超时粒度混在协程管理层，不如纯函数可测。
+1. **Mirror `runOverlayClose` with `runOverlayOpen`, instead of wrapping the whole `LaunchedEffect` in a timeout.**
+   The collapse side's `runOverlayClose(reduceMotion, animate)` already has an established test pattern (`runTest` directly testing the suspend function, `awaitCancellation` simulating a frame stall); the expand side copies that shape: inside `runOverlayOpen(reduceMotion, animate)`, `withTimeoutOrNull((CARD_IN_MS * scale) + OPEN_GRACE_MS)` wraps the whole "SETTLE wait + `opened()` + `animateTo`" sequence. On timeout it returns false, and the call site falls back with `snapTo(1f)` and makes sure `opened()` is called only once as a make-up. The alternative (wrapping the entire LaunchedEffect in withTimeoutOrNull) would also pull in the reduceMotion branch, and the timeout would live at the coroutine-management layer with coarser granularity instead of in a pure function that can be tested.
 
-2. **`opened()` 的调用时机保持「动画起步前」，超时兜底时改为「snap 之后补调」。**
-   正常路径顺序不变（SETTLE → `opened()` → animateTo）：`cardOut` 置位与窗口可见性同步发生在动画起步前，与现状一致。超时路径先 `snapTo(1f)` 再补调 `opened()`：帧停时本来就没有下一帧可画，顺序只影响状态——先把 `shown` 归位，再让状态机落位，恢复供帧后窗口直接是终态。用一个 `var openedCalled` 保证不重复调（`onOpened` 里的 `syncWindowVisibility` 非幂等开销也应只发生一次）。
+2. **`opened()` keeps its "before the animation starts" timing; on the timeout fallback it becomes "called after the snap."**
+   The normal path order is unchanged (SETTLE → `opened()` → animateTo): `cardOut` is set and window visibility synced before the animation starts, as today. The timeout path does `snapTo(1f)` first and then calls `opened()`: with a frame stall there is no next frame to draw anyway, so the order only affects state — put `shown` in its final place first, then let the state machine settle, so the window is already in its terminal state once frames resume. A `var openedCalled` guarantees it is not called twice (the non-idempotent cost of `syncWindowVisibility` inside `onOpened` should also happen only once).
 
-3. **超时时长 `CARD_IN_MS * scale + OPEN_GRACE_MS`，`OPEN_GRACE_MS` 沿用 500ms。**
-   展开动画 240ms，与收起 180ms 同量级；grace 同值，系统慢动作倍率同样 `coerceAtMost(10f)`。两条路径常数各自独立命名，不共用，避免以后单边调整牵连。
+3. **Timeout length `CARD_IN_MS * scale + OPEN_GRACE_MS`, with `OPEN_GRACE_MS` reusing 500ms.**
+   The expand animation is 240ms, the same order as the 180ms collapse; the grace value is the same, and the system slow-motion multiplier is likewise `coerceAtMost(10f)`. The two paths' constants are named independently rather than shared, so that future tuning on one side does not drag in the other.
 
-4. **边窗分支复用同一个 `runOverlayOpen`。**
-   `CapsuleOverlay` 的 `OverlayMotion(open = true, …, onClosed = {})` 与卡片共用 composable，守卫放在 `OverlayMotion` 内部则两处自动同时受益，不需要在调用点分别改。超时兜底对该分支表现为：胶囊直接以全尺寸出现（snap 过的头），可接受——它本来就该一直显示。
+4. **The side-window branch reuses the same `runOverlayOpen`.**
+   `CapsuleOverlay`'s `OverlayMotion(open = true, …, onClosed = {})` shares the composable with the card, so a guard inside `OverlayMotion` automatically benefits both places, with no per-call-site changes. On that branch the timeout fallback shows up as the capsule simply appearing at full size (a snapped head), which is acceptable — it was supposed to be showing all along.
 
-5. **真机取证用现有像素测试 + 新增几何断言，不新增依赖。**
-   `CapsuleWindowDeviceTest` 已有经 Mika 自身无障碍服务找浮层节点、`UiAutomation.takeScreenshot` 比像素的完整模式。展开态几何断言按同一模式：点开卡片后，从无障碍树取 `capsule-card` 节点 bounds，断言（a）节点在屏内、左右留边对称（水平居中，容差按 density 换算）；（b）可见高度达到该缩放档位的预期范围。这条断言防的是 #323 第 1 点一类的「半开/裁切」回归，不依赖复现帧停。
+5. **On-device evidence uses the existing pixel test plus new geometry assertions, with no new dependencies.**
+   `CapsuleWindowDeviceTest` already has a complete pattern for locating overlay nodes through Mika's own accessibility service and comparing pixels with `UiAutomation.takeScreenshot`. The expand-state geometry assertion follows the same pattern: after tapping the card open, read the `capsule-card` node bounds from the accessibility tree and assert (a) the node is on-screen with symmetric left/right margins (horizontally centered, tolerance converted from density); (b) the visible height reaches the expected range for that scale tier. This assertion guards against "half-open/clipped" regressions like point 1 of #323 and does not depend on reproducing the frame stall.
 
 ## Risks / Trade-offs
 
-- [真机上展开动画偶发超过 240ms+500ms（重负载）被误判超时] → 超时兜底只 `snapTo(1f)`，终态与动画自然结束完全一致，用户看到的差别只是动画跳变到全尺寸；状态机落位本就是目的。
-- [`opened()` 在超时路径晚于正常路径调用，边窗多画了一小会儿] → 与现状（永远不落位）相比严格更好；500ms 量级的胶囊多显示无功能影响。
-- [无法在本地复现报告机的帧停] → 守卫的价值由单测的 `awaitCancellation` 场景 + 状态机代码路径证明；真机取证覆盖「修复不破坏正常展开/收起」与「展开终态几何正确」。PR 里如实写明未能复现原始帧停。
-- [几何断言在不同缩放档位/分屏下脆弱] → 断言只取默认档位、竖屏主屏场景，与现有设备测试的环境约定一致（`GestureTapTestActivity` + `CapsuleMode.Always`）。
+- [On a real device the expand animation occasionally exceeds 240ms+500ms (heavy load) and is misjudged as a timeout] → The timeout fallback only does `snapTo(1f)`; the terminal state is exactly the same as the animation finishing naturally, and the only difference the user sees is the animation jumping to full size; settling the state machine is the goal anyway.
+- [`opened()` is called later on the timeout path than on the normal path, so the side window draws for a moment longer] → Strictly better than the status quo (never settling); a capsule showing a bit longer on the order of 500ms has no functional impact.
+- [Cannot reproduce the reporter's frame stall locally] → The guard's value is proven by the unit test's `awaitCancellation` (frame-stall) scenario plus the state-machine code path; on-device evidence covers "the fix does not break normal expand/collapse" and "the expand terminal geometry is correct." The PR states honestly that the original frame stall could not be reproduced.
+- [The geometry assertion is fragile across scale tiers/split screen] → The assertion only covers the default tier and the portrait main-screen scenario, consistent with the environment conventions of the existing device tests (`GestureTapTestActivity` + `CapsuleMode.Always`).
 
 ## Migration Plan
 
-单 PR 合入 main，无数据迁移；回滚 = revert 单提交。
+Merged into main as a single PR, no data migration; rollback = revert the single commit.
 
 ## Open Questions
 
-（无——守卫参数、调用点、测试形状都已对照收起侧确定。）
+(None — the guard parameters, call sites and test shape have all been settled against the collapse side.)

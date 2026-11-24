@@ -1,72 +1,72 @@
-# 微信结果主动推送 + 本机任务解锁 opt-in 设计
+# WeChat proactive result push + local task unlock opt-in design
 
-日期:2026-11-21
-状态:待批准
-调研底稿:会话内调研笔记(两条特性分支精读,含护栏清单与缺陷清单;笔记不入库,结论已全部落入本规格)
+Date: 2026-11-21
+Status: awaiting approval
+Research source: in-session research notes (a close reading of the two feature branches, including the guardrail list and the defect list; the notes are not committed, and every conclusion has landed in this spec)
 
-## 意图与为什么
+## Intent and why
 
-两个小而值的特性,都接在现有底座上:
+Two small, worthwhile features, both hooked onto the existing foundation:
 
-1. **微信结果主动推送**:微信渠道投递层(绑定、Outbox、去重)早已就绪,独缺模型侧的工具入口——用户在任务里明说「做完发我微信」时,模型能把结果主动推到绑定的机主微信。
-2. **本机任务解锁 opt-in**:解锁授权目前只有定时/微信来源的任务能用;本机(界面发起)任务没有授权路径。fork 的同类工作里约 70%(回锁义务、守卫通知、交互计数)我们今天刚以更好的形式合入 main(TaskRelock 带 WAIT_IDLE 宽限),真正要补的只有 ~90 行。
+1. **WeChat proactive result push**: the WeChat channel delivery layer (binding, Outbox, dedupe) has long been ready; the only thing missing is a tool entry point on the model side — when the user says explicitly inside a task "send it to my WeChat when it's done", the model can push the result proactively to the bound owner's WeChat.
+2. **Local task unlock opt-in**: unlock authorization is currently available only to scheduled/WeChat-sourced tasks; local (UI-initiated) tasks have no authorization path. In the fork, about 70% of comparable work (relock obligation, guard notifications, interaction counting) was merged into main today in a better form (TaskRelock with a WAIT_IDLE grace period), so what is really left to add is only ~90 lines.
 
-## 目标
+## Goals
 
-- F1:Ui 来源任务、且开局任务文本带明确「发我微信」意图时,模型可用 `wechat_send_owner(text)` 把文本推给当前绑定的机主私聊;不满足条件时工具根本不出现在供给里。
-- F2:设置里多一个默认关闭的「锁屏时也能跑本机任务」开关,与既有「远程任务解锁」开关互相独立;开了之后 Ui/触发器任务可用本机加密凭据亮屏解锁。
-- 全部新字符串 11 语言;prompt 金样同步再生成。
+- F1: when a task is Ui-sourced and the initial task text carries an explicit "send it to my WeChat" intent, the model can use `wechat_send_owner(text)` to push the text to the currently bound owner's private chat; when the conditions are not met, the tool does not appear in the supply at all.
+- F2: add a default-off "Run tasks while locked" switch in Settings, independent of the existing "remote task unlock" switch; once on, Ui/trigger tasks can use the local encrypted credential to wake the screen and unlock.
+- All new strings in 11 languages; prompt golden samples regenerated in sync.
 
-## 非目标
+## Non-goals
 
-- 不让模型选收件人(投递目标恒为当前绑定的机主私聊)。
-- 不做图片/文件推送(fork 也只有文本)。
-- 不改远程解锁开关的既有语义;两个开关互不影响。
-- 不做解锁失败自动重试(凭据安全:失败即停,转人工)。
+- Not letting the model choose the recipient (the delivery target is always the currently bound owner's private chat).
+- No image/file push (the fork only has text too).
+- Not changing the existing semantics of the remote unlock switch; the two switches do not affect each other.
+- No automatic retry after a failed unlock (credential safety: stop on failure, hand over to a human).
 
-## 反目标
+## Anti-goals
 
-- 凭据任何形式的落盘明文、展示、或失败重试注入。
-- 未经明确意图就出现的推送工具(防模型自作主张外发)。
-- 重复投递(摘要去重;投递结果不确定时绝不自动重发)。
-- 与今天刚合的 TaskRelock/回锁体系重复造轮子——必须复用。
+- Credentials stored in plaintext in any form, displayed, or injected on retry.
+- A push tool that appears without explicit intent (to stop the model from sending things out on its own).
+- Duplicate delivery (summary dedupe; when the delivery result is uncertain, never resend automatically).
+- Reinventing the TaskRelock/relock system just merged today — it must be reused.
 
-## 约束
+## Constraints
 
-- 通用 AOSP;无品牌特例;代码/注释/文档不出现外部项目痕迹。
-- 工具描述走 `core/src/main/resources/prompts/tools/`;金样 `-PupdateSnapshots` 再生成(含 `*PromptLayoutTest*`)。
-- 每个新字符串 11 语言齐全。
+- Generic AOSP; no brand special cases; code/comments/docs carry no trace of external projects.
+- Tool descriptions live in `core/src/main/resources/prompts/tools/`; golden samples are regenerated with `-PupdateSnapshots` (including `*PromptLayoutTest*`).
+- Every new string present in all 11 languages.
 
-## 设计
+## Design
 
-### F1 微信结果主动推送
+### F1 WeChat proactive result push
 
-- **新工具 `wechat_send_owner(text)`**(core 新文件 `WechatOwnerCapability.kt` + `prompts/tools/wechat_send_owner.md`):Risk.Write,工具说明明确「投递成功=微信侧已接收,不代表已读;同一段文本同一次运行不会重复发」。
-- **存在性门控(而非运行时检查)**:仅当 ① 任务来源为 Ui(排除定时/子任务/微信来源)且 ② 开局任务文本通过「明确机主导向发送」闸门时,工具才进入供给。闸门:fork 版只有中文模式(英文任务永远匹配不上,等于对非中文用户是坏的)且长度窗口吞长句——**我们的版本至少中英双语模式,不做长度截断**(我的决定,修 fork 缺陷)。
-- **发送侧**(app 新文件 `WechatOwnerSender.kt`):发送时重新校验绑定(启用 + 账号 + 机主上下文令牌 + 已有私聊线程);运行中途换绑→不可用,如实报。Outbox 摘要去重保证幂等;发送前补 TOCTOU `accepts` 复查(main 上图片路径已有、文本路径没有,顺手补上)。
-- **改动点**:`AgentTool`/`TaskTools` 注册、`WechatStore`(boundOwnerPeer 查询)、`WechatChannel`、`TaskRun`(供给闸门)、`ChatViewModel`(传给任务的事实)、`strings_tools.xml` ×11。
-- 规模:~200 行新代码 + ~160 行测试。
+- **New tool `wechat_send_owner(text)`** (new core file `WechatOwnerCapability.kt` + `prompts/tools/wechat_send_owner.md`): Risk.Write, and the tool description states clearly that "delivered successfully = accepted on the WeChat side, which does not mean read; the same text is not sent twice within one run".
+- **Existence gating (not a runtime check)**: only when ① the task source is Ui (excluding scheduled/subtask/WeChat sources) and ② the initial task text passes the "explicit owner-directed send" gate does the tool enter the supply. The gate: the fork version only has a Chinese mode (English tasks never match, which is as good as broken for non-Chinese users) and its length window swallows long sentences — **our version has at least a bilingual Chinese/English mode and does no length truncation** (my decision, fixing the fork's defect).
+- **Sending side** (new app file `WechatOwnerSender.kt`): re-validate the binding at send time (enabled + account + owner context token + an existing private chat thread); if the binding changes mid-run → unavailable, and report it truthfully. Outbox summary dedupe guarantees idempotency; before sending, add a TOCTOU `accepts` re-check (main already has it on the image path but not on the text path, so it is filled in here as well).
+- **Touch points**: `AgentTool`/`TaskTools` registration, `WechatStore` (boundOwnerPeer query), `WechatChannel`, `TaskRun` (supply gate), `ChatViewModel` (the facts passed to the task), `strings_tools.xml` ×11.
+- Size: ~200 lines of new code + ~160 lines of tests.
 
-### F2 本机任务解锁 opt-in
+### F2 Local task unlock opt-in
 
-- **配置通路**:`DeviceAccessConfig/DeviceAccessStore` 加 `localEnabled`(默认 false),与远程开关各自独立、互不带动;`DeviceAccess.unlockLocal` 走同一加密凭据库(修订号校验、永不展示)。
-- **授权判定**:`taskUnlockAuthorization` 加 Ui 分支——Ui/触发器任务在开关开时获得亮屏解锁授权;触发器任务两个开关任一即可(界面文案必须说清两个开关的关系)。
-- **守卫(全部复用今天合入的体系)**:解锁前必须无障碍在跑且守卫通知可发(回锁义务能立住,否则拒解锁);每步前复查权限,中途撤销在凭据输入前中止;`beginLocalAttempt` 在输入凭据前先落「已阻塞」标记——失败/取消/崩溃后绝不自动重试;只有我方执行的解锁才挂回锁义务(用户本就没锁的立即摘守卫,不报假警——fork 此处有误报缺陷,我们的 `clearUnlockGuardIfSafe` 行为是对的,保持);回锁等全部任务结束、用户动主屏则让位等空闲(fork 是一碰就告警,我们的 WAIT_IDLE 严格更好,保持)。
-- **设置 UI**:独立开关 + 说明文案;失败/被打断的引导字符串(5 键 ×11 语言,回锁类字符串已有)。
-- **行为变化(要在更新说明里讲)**:Ui 任务有了授权路径后,解锁失败从「任务失败」变为「转等用户手动解锁」(走 recoverUnlockFailure)。
-- 规模:~90 行改动 + ~120 行测试。
+- **Configuration path**: `DeviceAccessConfig/DeviceAccessStore` gains `localEnabled` (default false), independent of the remote switch with no cross-effects; `DeviceAccess.unlockLocal` goes through the same encrypted credential store (revision check, never displayed).
+- **Authorization decision**: `taskUnlockAuthorization` gains a Ui branch — Ui/trigger tasks get wake-and-unlock authorization when the switch is on; trigger tasks need only either of the two switches (the UI copy must make the relationship between the two switches clear).
+- **Guards (all reusing the system merged today)**: before unlocking, accessibility must be running and the guard notification must be sendable (otherwise the relock obligation cannot hold, and the unlock is refused); permissions are re-checked before every step, and a mid-run revocation aborts before credential entry; `beginLocalAttempt` writes a "blocked" marker before entering the credential — after a failure/cancellation/crash it never retries automatically; only unlocks performed by us carry the relock obligation (if the user had not locked the phone in the first place, the guard is removed immediately, with no false alarm — the fork has a false-positive defect here, while our `clearUnlockGuardIfSafe` behavior is right, so keep it); relock waits for all tasks to finish, and if the user touches the main screen it yields and waits for idle (the fork alarms on the slightest touch, while our WAIT_IDLE is strictly better, so keep it).
+- **Settings UI**: an independent switch + explanatory copy; guidance strings for failure/interruption (5 keys ×11 languages; the relock strings already exist).
+- **Behavior change (must be explained in the release notes)**: once Ui tasks have an authorization path, an unlock failure changes from "task failed" to "wait for the user to unlock manually" (through recoverUnlockFailure).
+- Size: ~90 lines changed + ~120 lines of tests.
 
-## 验证
+## Verification
 
-- JVM:`:core:test :app:testDebugUnitTest` 全绿(含新测试:闸门中英正反、Ui 门控存在性、去重不重复发、localEnabled 授权矩阵、解锁失败转人工)。
-- 金样:`*PromptSurface*` + `*PromptLayoutTest*` 再生成。
-- 真机(需用户在场):①「把 XX 结果发我微信」端到端;②开关开→本机任务锁屏自动亮屏跑→结束自动回锁;③开关关→本机任务不解锁。真机结果回填本文档。
+- JVM: `:core:test :app:testDebugUnitTest` all green (including the new tests: positive/negative gate cases in Chinese and English, existence gating for Ui, dedupe not resending, the localEnabled authorization matrix, unlock failure handing over to a human).
+- Golden samples: `*PromptSurface*` + `*PromptLayoutTest*` regenerated.
+- Real device (needs the user present): ① "send me the XX result on WeChat" end to end; ② switch on → a local task on the lock screen wakes the screen and runs → relocks automatically when finished; ③ switch off → the local task does not unlock. Real-device results go back into this document.
 
-## 风险与缓解
+## Risks and mitigations
 
-| 风险 | 缓解 |
+| Risk | Mitigation |
 |---|---|
-| 模型滥用推送骚扰机主 | 存在性门控(无明确意图工具不存在)+ 目标固定不可选 + 去重 |
-| 凭据泄露/重试注入 | 输入前落阻塞标记,失败即停;复用既有加密库不新增通路 |
-| 中英之外语言的明确意图漏匹配 | 闸门模式表可扩展;漏匹配=工具不出现(保守方向,不误开) |
-| 两开关语义混淆 | 设置页文案明说关系;触发器任务任一即可 |
+| The model abuses push to bother the owner | Existence gating (no explicit intent, no tool) + a fixed, non-selectable target + dedupe |
+| Credential leak / retry injection | Write the blocked marker before entry, stop on failure; reuse the existing encrypted store, no new path |
+| Explicit intent in languages other than Chinese and English goes unmatched | The gate pattern table is extensible; an unmatched intent means the tool does not appear (the conservative direction, never a false enable) |
+| The two switches are confusing | The settings page copy states the relationship; trigger tasks need only either one |

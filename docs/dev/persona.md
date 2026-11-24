@@ -1,91 +1,91 @@
-# 人格（可命名的自定义指令）
+# Persona (nameable custom instructions)
 
-人格是一层可命名、可复用的自定义提示词：一组界面上选的选项，加一段自己写的指令。在设置里选用一套，对所有对话生效。它只改变 Mika 怎么说话（语气、长度、措辞、格式、进度说明的写法），不改变 Mika 能做什么。记忆回答「知道什么」，人格回答「怎么做事」。
+A persona is a nameable, reusable custom prompt: a set of options chosen in the UI plus a piece of instruction text you write yourself. Choose one in Settings and it applies to all conversations. It only changes how Mika speaks (tone, length, wording, format, how progress notes are written), not what Mika can do. Memory answers "what it knows"; persona answers "how it does things".
 
-> 状态：v1（#292）已合入，发行版默认开启。能力收紧、导入/导出、模型组绑定按后续版本做，见文末。
+> Status: v1 (#292) has been merged and is on by default in releases. Capability narrowing, import/export and model-group binding are planned for later versions; see the end of this document.
 
-## 提示词位置
+## Where the prompt goes
 
-人格拼在身份、准则、通用规则之后，各能力说明之前：
+The persona is assembled after identity, principles and general rules, and before each capability description:
 
 ```
 system/identity.md
 system/principles.md
 capabilities/general.md
-prompts/persona/layer.md（固定头尾 + 用户正文）
-capabilities/groups.md、channels.md、phone.md、web.md、sandbox.md …（按本任务展开的能力）
+prompts/persona/layer.md (fixed header and footer + the user's body)
+capabilities/groups.md, channels.md, phone.md, web.md, sandbox.md, … (the capabilities expanded for this task)
 ```
 
-- `TaskRun` 开局拼一次，任务内不变；主 AgentLoop 和子 AgentLoop 用同一份。
-- 定时任务里的条件检查（`conditionCheck`，要求只输出 JSON 的内部只读检查）不继承人格。
-- 运行记录用 `RunEvent.State("persona", "名字 · vN")` 记这一轮用了谁；`PromptVersion` 自动覆盖提示词变化。
-- 没有人物时 `SystemPrompt.withPersona(base, null) == base`，现有提示词金样逐字节不变。
+- `TaskRun` assembles it once at the start and it does not change within a task; the main AgentLoop and sub-AgentLoops use the same one.
+- Condition checks in scheduled tasks (`conditionCheck`, an internal read-only check required to output only JSON) do not inherit the persona.
+- The run record uses `RunEvent.State("persona", "<name> · vN")` to note who was used this round; `PromptVersion` automatically covers prompt changes.
+- Without a persona, `SystemPrompt.withPersona(base, null) == base`, and the existing prompt goldens are byte-for-byte unchanged.
 
-## 选项
+## Options
 
-`PersonaStyle`（`core/src/main/kotlin/com/wangzan101/mika/core/prompt/PersonaStyle.kt`）是界面上选的那部分：
+`PersonaStyle` (`core/src/main/kotlin/com/wangzan101/mika/core/prompt/PersonaStyle.kt`) is the part chosen in the UI:
 
-- 基础风格和语气：默认 / 干练 / 友好 / 活泼（存盘写 `default`、`crisp`、`warm`、`playful`）。
-- 三个三档选项：表情符号、回答篇幅、进度说明（存盘一律写 `less`、`default`、`more`）。
+- Base style and tone: Default / Crisp / Friendly / Playful (stored as `default`, `crisp`, `warm`, `playful`).
+- Three three-level options: emoji, answer length, progress notes (all stored as `less`, `default`, `more`).
 
-选项有意做得少：一种基础风格定调子，三个选项管最常被要求改的三件事，其余的写进指令。早先试过的「专业」风格和亲切程度、热情程度、标题和列表三个选项已拿掉；文件里若还带着它们，按默认读。
+The options are deliberately few: one base style sets the tone, three options cover the three things most often asked to be changed, and everything else goes into the instructions. The previously tried "Professional" style and the friendliness, enthusiasm, and headings-and-lists options have been removed; if a file still carries them, they are read as default.
 
-每个非默认取值对应 `core/src/main/resources/prompts/persona/style.md` 里的一句固定文字（键是「选项.取值」，格式同 feedback 文件），按固定顺序拼在人格块里、用户写的指令之前，一条一行；中间空一行再接指令。选项全默认时一句不加，只有指令的人格拼出来和加选项之前逐字节一样；选项全默认且指令为空时没有这一层。
+Each non-default value corresponds to one fixed sentence in `core/src/main/resources/prompts/persona/style.md` (the key is "option.value", same format as the feedback files), assembled in fixed order inside the persona block before the user-written instructions, one per line, with a blank line between them and the instructions. When all options are default, nothing is added, and a persona with only instructions comes out byte-for-byte the same as before options existed; when all options are default and the instructions are empty, this layer is absent.
 
-选项只落在固定头允许人格改的范围里。「少问我」「跳过核对」属于授权和证据规则，不做成选项。轻量模型和主模型用同一份系统提示词，选项对两者都生效。
+The options only land within the scope the fixed header allows a persona to change. "Ask me fewer questions" and "skip the verification" belong to authorization and evidence rules and are not made into options. The light model and the main model use the same system prompt, and the options apply to both.
 
-给用户和 AI 助手看的编写要求见 [persona-writing.md](../persona-writing.md)。
+Writing guidance for users and AI assistants is in [persona-writing.md](../persona-writing.md).
 
-## 称呼
+## Name
 
-人格可以带一个称呼（`Persona.nickname`）：助理的自称，默认 Mika。它会进围栏之外的固定文字，所以由 `PersonaPrompt.nickname` 严格清洗：只留各种文字的字母、数字、组合记号、空格、连字符和间隔号，连续空白并成一个，最多 16 个字，清洗后为空就是 Mika。界面上被清洗动过的称呼不让保存（`PersonaPrompt.nicknameAccepted`），不悄悄改。
+A persona can carry a name (`Persona.nickname`): the assistant's self-designation, Mika by default. It goes into fixed text outside the fence, so it is strictly sanitized by `PersonaPrompt.nickname`: only letters of any script, digits, combining marks, spaces, hyphens and middle dots are kept, consecutive whitespace is collapsed into one, at most 16 characters, and if it is empty after sanitizing it becomes Mika. A name that the UI sanitizing has altered cannot be saved (`PersonaPrompt.nicknameAccepted`) — it is not changed silently.
 
-- 称呼是 Mika 时，身份句和人格层和以前逐字节一样。
-- 不是 Mika 时：`system/identity.md` 首句用称呼（文件里是占位符）；后面紧跟 `persona/renamed.md` 一段，说明 Mika 是所在 App 的名字、后文和工具说明里的 Mika 指这个 App 和它自己、改名不改变它能做什么；人格层固定头里的「You are still …」也用称呼。
-- 只改称呼、别的全默认时没有人格层，但运行记录照样记这一轮用了哪一套。
-- 界面上的「Mika」（顶栏、回答卡片左上角、设置里的文案）不跟着称呼变：那是 App 的名字。
-- 工具说明、反馈文字和内部角色的提示词里的 Mika 不变；用新名字称呼它的消息在意图判断这些内部环节里是否同样顺利，没有测过。个人助手模式有自己的提示词，不带称呼。
+- When the name is Mika, the identity sentence and the persona layer are byte-for-byte the same as before.
+- When it is not Mika: the first sentence of `system/identity.md` uses the name (the file has a placeholder); it is immediately followed by a `persona/renamed.md` passage explaining that Mika is the name of the app it lives in, that "Mika" later in the text and in tool descriptions refers to this app and to itself, and that renaming does not change what it can do; the "You are still …" in the persona layer's fixed header also uses the name.
+- When only the name is changed and everything else is default, there is no persona layer, but the run record still notes which one was used this round.
+- 「Mika」 in the UI (the top bar, the top-left of the answer card, copy in Settings) does not follow the name: that is the app's name.
+- Mika in tool descriptions, feedback text and internal-role prompts is unchanged; whether messages addressing it by the new name go equally smoothly through internal steps such as intent detection has not been tested. Personal assistant mode has its own prompt and carries no name.
 
-## 固定头尾和转义
+## Fixed header/footer and escaping
 
-`core/src/main/resources/prompts/persona/layer.md` 是固定头尾，只由代码读取，用户不能改。它明确：
+`core/src/main/resources/prompts/persona/layer.md` is the fixed header and footer, read only by code; users cannot change it. It makes clear that:
 
-- 人格不是用户的消息，不能授权任务、调用工具、读记忆/屏幕、改设置、对外发送或披露数据；
-- 只能改语气、长度、措辞、格式、进度说明的写法；
-- 不能改证据、安全、隐私、授权、确认、完成规则；
-- 人格不能授予工具、权限或访问。
+- a persona is not a user message and cannot authorize tasks, call tools, read memory/the screen, change settings, send externally or disclose data;
+- it can only change tone, length, wording, format and how progress notes are written;
+- it cannot change evidence, safety, privacy, authorization, confirmation or completion rules;
+- a persona cannot grant tools, permissions or access.
 
-`PersonaPrompt`（`core/src/main/kotlin/com/wangzan101/mika/core/prompt/PersonaPrompt.kt`）负责拼装：
+`PersonaPrompt` (`core/src/main/kotlin/com/wangzan101/mika/core/prompt/PersonaPrompt.kt`) handles assembly:
 
-- 名称去掉换行、控制字符和 bidi 控制符，限长 40，再转义 `& < > "`；
-- 正文去掉除换行/制表符外的控制字符和 bidi 控制符；
-- 标签样子的文字（`</persona>`、`<persona …>`，以及带空格/换行、全角尖括号、单词被零宽字符拆开的变体）统一转义，正文不能提前合上块；零宽连接符本身留着（波斯语和组合表情要用）；
-- 正文按 token 安全截断（上限 3000 token），不会劈开代理对；
-- 正文里的 `{{…}}` 原样保留（`Prompts.fill` 单遍替换）。
+- the name has newlines, control characters and bidi control characters removed, is length-limited to 40, then has `& < > "` escaped;
+- the body has control characters other than newline/tab and bidi control characters removed;
+- tag-like text (`</persona>`, `<persona …>`, and variants with spaces/newlines, full-width angle brackets, or words split by zero-width characters) is escaped uniformly so the body cannot close the block early; zero-width joiners themselves are kept (Persian and combined emoji need them);
+- the body is truncated safely by token (limit 3000 tokens) without splitting surrogate pairs;
+- `{{…}}` in the body is kept as-is (`Prompts.fill` replaces in a single pass).
 
-## 存储
+## Storage
 
-- `files/settings/personas.json`：`{ "version": 1, "personas": [...], "active": "<id>" }`。`active` 是设置里选的在用的那一套，和列表同一次写盘；删掉在用的那一套时一并清掉，指向不存在的 id 当没有。带 `version`，原子写（临时文件 + 改名），读不懂时把原文件另存为 `personas.json.bad-<时间>` 并当空列表。不加密，不含密钥。
-- 字段：`id`、`name`、`description`、`prompt`、`style`（选项；旧文件没有时全默认，不认识的取值按默认读）、`nickname`（称呼，空着就是 Mika）、`revision`、`createdAt`、`updatedAt`、`builtin`（v1 不发内置示例，字段预留）。`revision` 在内容真的变了时 +1（点的是已经选着的那一档不写盘、不涨）；只保留最新内容。
-- 对话旁文件 `<conversationId>.persona`（上游 v1 的按对话绑定）不再读写：`ConversationStore` 里的 `persona` / `setPersona` 和分支时的复制还在，但任务不看它，盘上已有的文件留着不动。
+- `files/settings/personas.json`: `{ "version": 1, "personas": [...], "active": "<id>" }`. `active` is the set selected in Settings, written in the same write as the list; deleting the active one clears it too, and an id pointing at a nonexistent one is treated as none. It carries `version`, is written atomically (temp file + rename), and when it cannot be parsed the original file is saved aside as `personas.json.bad-<time>` and it is treated as an empty list. Not encrypted, contains no keys.
+- Fields: `id`, `name`, `description`, `prompt`, `style` (options; all default when missing in an older file, unrecognized values read as default), `nickname` (the name; empty means Mika), `revision`, `createdAt`, `updatedAt`, `builtin` (v1 ships no built-in examples; field reserved). `revision` increments by 1 only when the content actually changes (tapping the tier already selected writes nothing and does not increment); only the latest content is kept.
+- The per-conversation file `<conversationId>.persona` (upstream v1's per-conversation binding) is no longer read or written: `persona` / `setPersona` in `ConversationStore` and the copy on branching remain, but tasks do not look at it, and existing files on disk are left untouched.
 
-## 安全边界
+## Safety boundaries
 
-- 人格不参与工具列表、权限、审批、模型选择的构造。
-- 人格不能授权动作：导入的人格（未来版本）要求调用工具、改设置或对外发送时，模型仍按用户消息和安全规则行事。
-- 未来做能力收紧时，从用户已授权的能力里**减**（拒绝列表），不做并集；通用工具、MCP、插件、记忆、定时、子任务先不碰，等统一权限模型。
-- 「全部清除」目前不删人格；人格页逐个删除。备份集成另行设计。
+- The persona does not take part in constructing the tool list, permissions, approvals or model selection.
+- A persona cannot authorize actions: when an imported persona (a future version) asks to call tools, change settings or send externally, the model still acts according to the user's message and the safety rules.
+- When capability narrowing is done in the future, it will **subtract** from the capabilities the user has already authorized (a deny list), not take a union; general tools, MCP, plugins, memory, scheduled tasks and subtasks are left alone until there is a unified permission model.
+- 「全部清除」 (Clear all) currently does not delete personas; the persona page deletes them one by one. Backup integration will be designed separately.
 
 ## UI
 
-- 入口：设置 › 偏好 › 人格（紧跟「语言与外观」），行尾显示现在在用的：默认 / 存了多套时在用那一套的名称 / 基础风格的叫法 / 已调整。主界面没有人格入口。
-- 人格页（`PersonaScreen`）打开就是在用的那一套。页面上改的是草稿，点底部的「保存」才写下去并回上一页；有没保存的改动就返回或去「管理人格」，先问一句「放弃修改？」。最上面是称呼的输入行；基础风格是四个带说明的单选行；三个三档选项在一张卡片里各占一行，行尾是现在的取值，点开单选对话框；有选项不是默认时卡片末尾多一行「恢复默认选项」（只动选项）；指令是页面上的多行输入框。
-- 还没有在用的时页面显示全默认，第一次保存才建一套（名称「我的风格」）并设为在用（`PersonaStore.editActive`）；保存的内容和原来一样时不写盘、不涨修订号。
-- 页底「管理人格」：存下来的各套，点一行弹操作面板（用这一套、改名、复制一份、删除），在用的带「在用」；「新建人格」建一套全默认的并直接选用；最多 20 套；在用的那一套拼出了提示词时可以展开「预览完整提示词」。删掉在用的那一套就回到默认。
-- 改动从下一个任务起对所有对话生效（含定时、渠道和电脑交来的任务），正在跑的任务不受影响。
-- 功能开关 `FeatureFlags.persona()`：默认开，设置里没有入口；关掉后界面不显示人格入口，任务也不带人格。
+- Entry: Settings › Preferences › Persona (right after 「语言与外观」 (Language and appearance)); the row end shows what is in use now: Default / the name of the active set when several are stored / the base style's label / Adjusted. There is no persona entry on the main screen.
+- The persona page (`PersonaScreen`) opens on the set in use. Edits on the page are a draft; only tapping 「保存」 (Save) at the bottom writes them and returns to the previous page; if there are unsaved changes and you go back or go to 「管理人格」 (Manage personas), it first asks 「放弃修改？」 (Discard changes?). At the top is the name input row; the base style is four radio rows with descriptions; the three three-level options each take one row in a card, with the current value at the row end, and tapping opens a radio dialog; when any option is not default, the card gets an extra row at the end, 「恢复默认选项」 (Restore default options) (which only touches options); the instructions are a multi-line input box on the page.
+- When there is none in use, the page shows all defaults; the first save creates one (named 「我的风格」 (My style)) and sets it active (`PersonaStore.editActive`); when the saved content is the same as before, nothing is written and the revision does not increment.
+- At the bottom of the page, 「管理人格」: the stored sets; tapping a row opens an action sheet (use this one, rename, duplicate, delete), and the active one is marked 「在用」 (In use); 「新建人格」 (New persona) creates an all-default set and selects it directly; at most 20 sets; for the active set, when a prompt has been assembled you can expand 「预览完整提示词」 (Preview full prompt). Deleting the active set returns to default.
+- Changes take effect for all conversations from the next task onward (including scheduled tasks, channels and tasks handed over from the computer); a task already running is unaffected.
+- Feature flag `FeatureFlags.persona()`: on by default, with no entry in Settings; when off, the UI shows no persona entry and tasks carry no persona.
 
-## 测试
+## Tests
 
 ```bash
 ./gradlew :core:test --tests "*PersonaPromptTest*" --tests "*PromptSurfaceTest*"
@@ -93,22 +93,22 @@ capabilities/groups.md、channels.md、phone.md、web.md、sandbox.md …（按�
 ./gradlew :app:compileDebugKotlin
 ```
 
-提示词金样：`core/src/test/resources/prompt-surface/persona/layer.txt`、`layer-options.txt`、`renamed.txt`。有意改固定头尾后用 `-PupdateSnapshots` 重新生成，并在提交里一起审。
+Prompt goldens: `core/src/test/resources/prompt-surface/persona/layer.txt`, `layer-options.txt`, `renamed.txt`. After intentionally changing the fixed header/footer, regenerate with `-PupdateSnapshots` and review them together in the commit.
 
-## 文件
+## Files
 
-- `core/.../core/prompt/PersonaPrompt.kt`、`PersonaStyle.kt`
-- `core/src/main/resources/prompts/persona/layer.md`、`style.md`、`renamed.md`
+- `core/.../core/prompt/PersonaPrompt.kt`, `PersonaStyle.kt`
+- `core/src/main/resources/prompts/persona/layer.md`, `style.md`, `renamed.md`
 - `app/.../settings/PersonaStore.kt`
-- `app/.../chat/ConversationStore.kt`（`persona` / `setPersona`：上游 v1 的对话绑定，已不再使用）
-- `app/.../task/TaskRun.kt`（开局拼装、条件检查排除、子任务共用）
+- `app/.../chat/ConversationStore.kt` (`persona` / `setPersona`: upstream v1's conversation binding, no longer used)
+- `app/.../task/TaskRun.kt` (assembled at start, excluded from condition checks, shared with subtasks)
 - `app/.../ui/PersonaScreen.kt`
-- `app/.../ui/SettingsScreen.kt`、`MainActivity.kt`、`Navigation.kt`
+- `app/.../ui/SettingsScreen.kt`, `MainActivity.kt`, `Navigation.kt`
 - `app/src/main/res/values*/strings_persona.xml`
 
-## 暂不做
+## Not doing yet
 
-- 能力收紧（v2，`RunSpec.disabledCapabilities` 拒绝列表，避免误删 MCP provider）
-- 导入/导出（v2，JSON + 全文预览 + 不自动启用）
-- 模型组绑定、技能置顶（v3）
-- 多人格叠加、人格市场、人格专属记忆
+- Capability narrowing (v2, `RunSpec.disabledCapabilities` deny list, to avoid accidentally deleting MCP providers)
+- Import/export (v2, JSON + full-text preview + no auto-enable)
+- Model group binding, skill pinning (v3)
+- Multiple persona stacking, persona marketplace, persona-specific memory

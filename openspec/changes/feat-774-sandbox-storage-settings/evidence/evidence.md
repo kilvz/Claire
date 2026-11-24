@@ -1,27 +1,27 @@
-# 真机走查取证：沙箱存储档位设置（#774 后续）
+# On-device walkthrough evidence: sandbox storage tier settings (follow-up to #774)
 
-设备：华为 Mate X2（TET-AN50，API 31）；包：app-debug.apk（本分支构建，基于 main 3ad11d66）。
-走查前确认：手机未锁屏、Mika 在主页项目列表、无正在运行的任务（截图 2026-11-22 07:28 留 /tmp 不入库）。
+Device: Huawei Mate X2 (TET-AN50, API 31); package: app-debug.apk (built from this branch, based on main 3ad11d66).
+Pre-walkthrough check: the phone is unlocked, Mika is on the home project list, no tasks are running (screenshot from 2026-11-22 07:28 left in /tmp and not committed).
 
-## 时间线（2026-11-22 07:29–07:32）
+## Timeline (2026-11-22 07:29–07:32)
 
-| 时刻 | 步骤 | 结果 |
+| Time | Step | Result |
 |---|---|---|
-| 07:29 | `adb install -r app-debug.apk` 后进 设置 › 任务运行 | 两行新设置出现：「单个上传文件上限 = 200 MB」「单个工作区上限 = 4 GB」，与默认档一致 → `01-defaults-200mb-4gb.png` |
-| 07:30 | 点「单个上传文件上限」 | 弹窗四档 200/512/1024/2048 MB，副标题写明适用范围与默认值 → `02-attachment-dialog-tiers.png` |
-| 07:30 | 选 1024 MB | 行值回写「1024 MB」→ `03-attachment-1024mb-set.png` |
-| 07:31 | 点「单个工作区上限」 | 弹窗四档 4/8/16/32 GB → `04-workspace-dialog-tiers.png` |
-| 07:31 | 选 16 GB | 行值回写「16 GB」→ `05-workspace-16gb-set.png` |
-| 07:31 | `run-as … cat shared_prefs/feature_flags.xml` | `attachment_file_limit_mb=1024`、`workspace_limit_gb=16` 落盘 |
-| 07:32 | 两行分别恢复 200 MB / 4 GB | 行值与 prefs 均回到默认（`attachment_file_limit_mb=200`、`workspace_limit_gb=4`）→ `06-restored-defaults.png` |
+| 07:29 | `adb install -r app-debug.apk`, then go to 设置 (Settings) › 任务运行 (Task runs) | Two new settings rows appear: 「单个上传文件上限 = 200 MB」 (single upload file limit = 200 MB) and 「单个工作区上限 = 4 GB」 (single workspace limit = 4 GB), matching the default tier → `01-defaults-200mb-4gb.png` |
+| 07:30 | Tap 「单个上传文件上限」 (single upload file limit) | The dialog shows four tiers 200/512/1024/2048 MB, with the subtitle stating the scope and default value → `02-attachment-dialog-tiers.png` |
+| 07:30 | Select 1024 MB | The row value is written back as 「1024 MB」 → `03-attachment-1024mb-set.png` |
+| 07:31 | Tap 「单个工作区上限」 (single workspace limit) | The dialog shows four tiers 4/8/16/32 GB → `04-workspace-dialog-tiers.png` |
+| 07:31 | Select 16 GB | The row value is written back as 「16 GB」 → `05-workspace-16gb-set.png` |
+| 07:31 | `run-as … cat shared_prefs/feature_flags.xml` | `attachment_file_limit_mb=1024` and `workspace_limit_gb=16` are persisted |
+| 07:32 | Restore the two rows to 200 MB / 4 GB respectively | Both row values and prefs return to the defaults (`attachment_file_limit_mb=200`, `workspace_limit_gb=4`) → `06-restored-defaults.png` |
 
-## 结论
+## Conclusion
 
-- 默认行为零变化：不设置时两行显示 200 MB / 4 GB，与既有写死值一致。
-- 档位选择、行值回显、prefs 落盘、恢复默认全链路正常（行值回显即应用读 prefs 的行为证据，未依赖截图读数）。
-- 设备为用户日常机，走查期间无任务运行、未触碰其他 App。
+- Zero change to default behavior: when unset, the two rows show 200 MB / 4 GB, matching the existing hardcoded values.
+- The full chain works: tier selection, row value echo, prefs persistence, and restoring the defaults (the row value echo is itself behavioral evidence that the app reads prefs, not dependent on reading values from screenshots).
+- The device is the user's daily driver; no tasks ran during the walkthrough and no other apps were touched.
 
-本地测试：`:core:test` `:core:cliTest` `:app:testDebugUnitTest` `relayTest`（Go）全绿；
-`python3 -m unittest discover -s tools/i18n`、`translations.py check`（3916 资源 ×12 语言）、
-`test_pull_logs.py`、`:app:assembleDebug`、`:app:compileDebugAndroidTestKotlin` 通过。
-设备用例（connectedDebugAndroidTest）按惯例未跑（本机 ROM 无障碍绑定会挂起，见 AGENTS.md）。
+Local tests: `:core:test` `:core:cliTest` `:app:testDebugUnitTest` `relayTest` (Go) all green;
+`python3 -m unittest discover -s tools/i18n` and `translations.py check` (3916 resources ×12 languages),
+`test_pull_logs.py`, `:app:assembleDebug`, `:app:compileDebugAndroidTestKotlin` pass.
+Device test cases (connectedDebugAndroidTest) were, as usual, not run (the accessibility binding hangs on this machine's ROM, see AGENTS.md).

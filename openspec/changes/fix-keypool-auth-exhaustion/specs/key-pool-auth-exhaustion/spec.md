@@ -1,25 +1,25 @@
 ## ADDED Requirements
 
-### Requirement: 认证失败的密钥永久标记耗尽
+### Requirement: Keys that fail authentication are permanently marked exhausted
 
-HTTP 401/403（密钥无效、被封禁）的池内密钥被标记为耗尽（Exhausted），不再以限流冷却的方式在冷却期满后自动复活、反复参与轮询。
+A pool key that gets HTTP 401/403 (invalid key, banned) is marked as exhausted (Exhausted); it no longer revives automatically after the rate-limit cooldown expires and repeatedly rejoins rotation the way a rate-limited key does.
 
-#### Scenario: 失效 key 不再复活毒化轮询
-- **WHEN** 池内有 keyA（已失效，请求返回 401）与 keyB（有效），任务持续运行超过限流冷却时长（60 秒）
-- **THEN** keyA 首次 401 后即被标记耗尽，其后轮询只选中 keyB；不会再出现"keyA 冷却期满复活 → 选中 → 401 → 再冷却"的循环
+#### Scenario: A dead key no longer revives and poisons rotation
+- **WHEN** the pool holds keyA (dead, requests return 401) and keyB (valid), and the task keeps running longer than the rate-limit cooldown (60 seconds)
+- **THEN** keyA is marked exhausted right after its first 401, and from then on rotation only picks keyB; the "keyA cooldown expires and revives → selected → 401 → cooled down again" loop no longer occurs
 
-#### Scenario: 401 回调带状态码供接线处分流
-- **WHEN** 模型请求返回 401/403/429 中的任一状态
-- **THEN** 模型回调把 HTTP 状态码连同 key 与 Retry-After 一并交给密钥池接线处，由其按状态选择"限流冷却（429）"或"标记耗尽（401/403）"
+#### Scenario: The 401 callback carries the status code so the wiring point can route
+- **WHEN** a model request returns any of 401/403/429
+- **THEN** the model callback hands the HTTP status code, together with the key and Retry-After, to the key-pool wiring point, which picks "rate-limit cooldown (429)" or "mark as exhausted (401/403)" according to the status
 
-### Requirement: 限流冷却行为保持不变
+### Requirement: Rate-limit cooldown behaviour is unchanged
 
-HTTP 429 的密钥仍按 Retry-After（或默认冷却时长）临时避开，冷却期满自动回到轮询。
+A key that gets HTTP 429 is still temporarily avoided according to Retry-After (or the default cooldown), and rejoins rotation automatically when the cooldown expires.
 
-#### Scenario: 429 仍然只是冷却
-- **WHEN** 池内某 key 请求返回 429（带或不带 Retry-After）
-- **THEN** 该 key 被标记限流并带上冷却时长，冷却期满后自动解冻参与轮询；未到期的 key 不被选中
+#### Scenario: 429 still means cooldown only
+- **WHEN** a key in the pool gets 429 (with or without Retry-After)
+- **THEN** that key is marked as rate-limited with a cooldown duration, and after the cooldown expires it is automatically unfrozen and rejoins rotation; a key whose cooldown has not expired is not selected
 
-#### Scenario: 单 key 池遇 401 仍如实失败
-- **WHEN** 池内唯一 key 请求返回 401
-- **THEN** 该 key 被标记耗尽，本次请求按原路径抛出认证错误（不因无 key 可换而吞掉错误或死循环）
+#### Scenario: A single-key pool still fails honestly on 401
+- **WHEN** the only key in the pool gets 401
+- **THEN** that key is marked exhausted, and this request throws the authentication error along the original path (it does not swallow the error or loop forever because there is no key to switch to)

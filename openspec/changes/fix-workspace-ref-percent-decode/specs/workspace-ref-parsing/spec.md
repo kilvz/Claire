@@ -1,44 +1,48 @@
 ## ADDED Requirements
 
-### Requirement: 任务回答渲染产出引用卡片
+### Requirement: Task answers render output reference cards
 
-回答含 `/workspace` 引用的任务最终回答（`Done`）与停止后的交代（`Cancelled` 的 summary）
-SHALL 在回答文字下方渲染引用卡片（照片排格子、文件画卡片），与插话回复
-（`FinishedReply`）同一渲染入口；点开 SHALL 走文件闸门读对话工作区，读不到提示文件不存在。
+The task's final answer (`Done`), when it contains `/workspace` references, and the hand-off after stopping
+(`Cancelled`'s summary) SHALL render reference cards below the answer text (photos laid out in a grid, files
+drawn as cards), through the same rendering entry as interjection replies (`FinishedReply`); opening SHALL go
+through the file gate to read the conversation workspace, and when it cannot be read, show that the file does
+not exist.
 
-#### Scenario: 任务回答带编码引用
-- **WHEN** 任务最终回答含 `![图](/workspace/%E6%8A%A5%E5%91%8A.png)` 与
+#### Scenario: A task answer with encoded references
+- **WHEN** the task's final answer contains `![图](/workspace/%E6%8A%A5%E5%91%8A.png)` and
   `[my report.csv](/workspace/my%20report.csv)`
-- **THEN** 回答下方渲染蓝色图片缩略图与名为 `my report.csv` 的文件卡片；点文件卡经文件
-  闸门打开工作区里的 `my report.csv`
+- **THEN** a blue image thumbnail and a file card named `my report.csv` render below the answer; tapping the
+  file card opens `my report.csv` in the workspace through the file gate
 
-#### Scenario: 停止后的交代带引用
-- **WHEN** 任务被停止后补写的交代（summary）含 `/workspace` Markdown 引用
-- **THEN** 交代下方同样渲染引用卡片
+#### Scenario: The hand-off after stopping carries references
+- **WHEN** the hand-off (summary) written after the task is stopped contains `/workspace` Markdown references
+- **THEN** reference cards render below the hand-off in the same way
 
-### Requirement: 产出引用按百分号转义解码
+### Requirement: Output references are decoded from percent escapes
 
-回答里抽出的 `/workspace` 链接/图片目标，渲染前 SHALL 按 URI 百分号转义宽容解码：合法
-`%HH` 序列按 UTF-8 解出；非法转义序列与字面 `+` SHALL 原样保留；解码后路径仍 SHALL 经
-越界过滤（`..` 或圈出工作区的引用丢弃）。
+Before rendering, the `/workspace` link/image destinations extracted from answers SHALL be leniently decoded
+from URI percent escapes: valid `%HH` sequences are decoded as UTF-8; invalid escape sequences and a literal
+`+` SHALL be kept as-is; after decoding the path SHALL still go through out-of-bounds filtering (references that
+contain `..` or leave the workspace are dropped).
 
-#### Scenario: 空格写成 %20
-- **WHEN** 模型回复含 `[报告](/workspace/my%20report.csv)`
-- **THEN** 引用卡片显示文件名 `my report.csv`，点开经文件闸门读工作区里的
-  `my report.csv`
+#### Scenario: A space written as %20
+- **WHEN** the model reply contains `[报告](/workspace/my%20report.csv)`
+- **THEN** the reference card shows the file name `my report.csv`, and opening reads
+  `my report.csv` in the workspace through the file gate
 
-#### Scenario: 中文文件名被 URL 编码
-- **WHEN** 模型回复含 `![图](/workspace/%E6%8A%A5%E5%91%8A.png)`
-- **THEN** 解析出的引用路径为 `/workspace/报告.png`，按照片渲染缩略图
+#### Scenario: A Chinese file name is URL-encoded
+- **WHEN** the model reply contains `![图](/workspace/%E6%8A%A5%E5%91%8A.png)`
+- **THEN** the parsed reference path is `/workspace/报告.png`, rendered as an image thumbnail
 
-#### Scenario: 字面加号不被当空格
-- **WHEN** 引用目标为 `/workspace/a+b.png`
-- **THEN** 解析出的路径仍为 `/workspace/a+b.png`
+#### Scenario: A literal plus is not treated as a space
+- **WHEN** the reference target is `/workspace/a+b.png`
+- **THEN** the parsed path is still `/workspace/a+b.png`
 
-#### Scenario: 非法百分号序列保留原样
-- **WHEN** 引用目标为 `/workspace/100%.csv`（`%.c` 不是合法转义）
-- **THEN** 解析出的路径仍为 `/workspace/100%.csv`，引用不因解码失败被丢弃
+#### Scenario: An invalid percent sequence is kept as-is
+- **WHEN** the reference target is `/workspace/100%.csv` (`%.c` is not a valid escape)
+- **THEN** the parsed path is still `/workspace/100%.csv`, and the reference is not dropped because decoding
+  failed
 
-#### Scenario: 解码后仍受越界过滤
-- **WHEN** 引用目标解码后含 `..` 或指到工作区外
-- **THEN** 该引用不渲染成卡片
+#### Scenario: Out-of-bounds filtering still applies after decoding
+- **WHEN** the reference target contains `..` after decoding or points outside the workspace
+- **THEN** that reference is not rendered as a card

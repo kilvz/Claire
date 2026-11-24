@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Mika MCP 接入原型</title>
+  <title>Mika MCP integration prototype</title>
   <style>
     /* Layout: Mika settings surfaces, centered app canvas, prototype controls kept outside it. */
     :root {
@@ -262,29 +262,29 @@
   <main class="demo">
     <div class="demo-top">
       <div class="demo-title">
-        <strong>Mika · MCP 接入原型</strong>
-        <span class="demo-note">仅本地演示，所有服务与数据均为虚构</span>
+        <strong>Mika · MCP integration prototype</strong>
+        <span class="demo-note">Local demo only; all services and data are fictional</span>
       </div>
-      <div class="demo-controls" aria-label="原型显示设置">
-        <div class="demo-control" aria-label="外观">
-          <button type="button" data-theme="light" aria-pressed="true">浅色</button>
-          <button type="button" data-theme="dark" aria-pressed="false">深色</button>
+      <div class="demo-controls" aria-label="Prototype display settings">
+        <div class="demo-control" aria-label="Appearance">
+          <button type="button" data-theme="light" aria-pressed="true">Light</button>
+          <button type="button" data-theme="dark" aria-pressed="false">Dark</button>
         </div>
-        <div class="demo-control" aria-label="画布宽度">
-          <button type="button" data-width="phone" aria-pressed="true">手机</button>
-          <button type="button" data-width="wide" aria-pressed="false">宽屏</button>
+        <div class="demo-control" aria-label="Canvas width">
+          <button type="button" data-width="phone" aria-pressed="true">Phone</button>
+          <button type="button" data-width="wide" aria-pressed="false">Wide</button>
         </div>
       </div>
     </div>
     <div class="demo-layout">
-      <nav class="page-nav" id="page-nav" aria-label="原型页面"></nav>
+      <nav class="page-nav" id="page-nav" aria-label="Prototype pages"></nav>
       <div class="canvas">
-        <label class="sr-only" for="page-picker">选择原型页面</label>
+        <label class="sr-only" for="page-picker">Select prototype page</label>
         <select class="page-picker" id="page-picker"></select>
-        <section class="app-frame" id="app-frame" aria-label="Mika 应用界面预览">
+        <section class="app-frame" id="app-frame" aria-label="Mika app screen preview">
           <div id="app"></div>
         </section>
-        <div class="demo-flow" id="demo-flow" aria-label="原型状态快捷入口"></div>
+        <div class="demo-flow" id="demo-flow" aria-label="Prototype state shortcuts"></div>
       </div>
     </div>
   </main>
@@ -299,24 +299,24 @@
       info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg>'
     };
     const pages = [
-      ['catalog', '服务目录'], ['home-empty', '空首页'], ['home', '已添加首页'],
-      ['oauth', 'OAuth 授权'], ['fields', '多字段密钥'], ['open', '免认证连接'],
-      ['package', 'stdio 包确认'], ['connecting', '连接中'], ['success', '连接成功'],
-      ['failure', '可恢复失败'], ['manage', '服务管理'], ['custom', '自定义服务器']
+      ['catalog', 'Service catalog'], ['home-empty', 'Empty home'], ['home', 'Home with services'],
+      ['oauth', 'OAuth authorization'], ['fields', 'Multi-field keys'], ['open', 'No-auth connection'],
+      ['package', 'stdio package confirmation'], ['connecting', 'Connecting'], ['success', 'Connected'],
+      ['failure', 'Recoverable failure'], ['manage', 'Service management'], ['custom', 'Custom server']
     ];
     const services = [
-      { id: 'oauth', name: '云帆文档', mark: '云', category: '效率', auth: '账号授权', summary: '查找文档、读取内容并整理团队资料。', page: 'oauth' },
-      { id: 'fields', name: '北辰数据', mark: '北', category: '数据', auth: 'API Key', summary: '查询数据集、运行分析并获取结构化结果。', page: 'fields' },
-      { id: 'open', name: '星图搜索', mark: '星', category: '搜索', auth: '无需认证', summary: '搜索公开资料并返回带来源的结果。', page: 'open' },
-      { id: 'package', name: '文件管家', mark: '文', category: '本机', auth: '本机环境', summary: '在授权目录中查找、读取和整理文件。', page: 'package' },
-      { id: 'calendar', name: '时刻日历', mark: '时', category: '效率', auth: '账号授权', summary: '查看日程、创建事件并协调参会时间。', page: 'oauth' },
-      { id: 'messages', name: '协作空间', mark: '协', category: '沟通', auth: 'API Key', summary: '查找频道消息、整理讨论并发送更新。', page: 'fields' },
-      { id: 'long', name: '远山知识库', mark: '远', category: '数据', auth: '账号授权', summary: '跨空间检索团队知识，在保留来源的同时汇总较长资料，并帮助定位需要进一步确认的段落。', page: 'oauth' }
+      { id: 'oauth', name: 'Yunfan Docs', mark: 'Y', category: 'Productivity', auth: 'Account authorization', summary: 'Find documents, read content and organize team materials.', page: 'oauth' },
+      { id: 'fields', name: 'Beichen Data', mark: 'B', category: 'Data', auth: 'API Key', summary: 'Query datasets, run analyses and get structured results.', page: 'fields' },
+      { id: 'open', name: 'Xingtu Search', mark: 'X', category: 'Search', auth: 'No authentication', summary: 'Search public information and return results with sources.', page: 'open' },
+      { id: 'package', name: 'File Butler', mark: 'F', category: 'Local', auth: 'Local environment', summary: 'Find, read and organize files in authorized directories.', page: 'package' },
+      { id: 'calendar', name: 'Moment Calendar', mark: 'M', category: 'Productivity', auth: 'Account authorization', summary: 'View schedules, create events and coordinate meeting times.', page: 'oauth' },
+      { id: 'messages', name: 'Team Space', mark: 'T', category: 'Communication', auth: 'API Key', summary: 'Find channel messages, organize discussions and post updates.', page: 'fields' },
+      { id: 'long', name: 'Yuanshan Knowledge Base', mark: 'K', category: 'Data', auth: 'Account authorization', summary: 'Search team knowledge across spaces, summarize longer materials while keeping sources, and help locate passages that need further confirmation.', page: 'oauth' }
     ];
     const state = {
-      page: 'catalog', category: '全部', query: '', theme: 'light', width: 'phone',
+      page: 'catalog', category: 'All', query: '', theme: 'light', width: 'phone',
       origin: 'oauth', enabled: true, deleteConfirm: false, advanced: false,
-      customTransport: 'http', values: { workspace: 'demo-workspace', region: '亚太' }
+      customTransport: 'http', values: { workspace: 'demo-workspace', region: 'Asia Pacific' }
     };
     let connectTimer = null;
 
@@ -325,12 +325,12 @@
     }
     function header(title, back = 'catalog', action = '') {
       return `<header class="app-header">
-        ${back ? `<button class="icon-button" type="button" data-go="${back}" aria-label="返回">${icons.back}</button>` : '<span></span>'}
+        ${back ? `<button class="icon-button" type="button" data-go="${back}" aria-label="Back">${icons.back}</button>` : '<span></span>'}
         <h1>${title}</h1>${action || '<span></span>'}
       </header>`;
     }
     function customFooter() {
-      return `<div class="custom-footer"><button class="text-button" type="button" data-go="custom">没有需要的？自定义 MCP 服务器</button></div>`;
+      return `<div class="custom-footer"><button class="text-button" type="button" data-go="custom">Don't see what you need? Add a custom MCP server</button></div>`;
     }
     function serviceCard(service) {
       return `<button class="service-card" type="button" data-go="${service.page}">
@@ -343,173 +343,173 @@
     }
     function filteredServices() {
       const q = state.query.trim().toLowerCase();
-      return services.filter(s => (state.category === '全部' || s.category === state.category) &&
+      return services.filter(s => (state.category === 'All' || s.category === state.category) &&
         (!q || `${s.name} ${s.summary} ${s.category}`.toLowerCase().includes(q)));
     }
     function catalogResults() {
       const results = filteredServices();
       return results.length ? results.map(serviceCard).join('') :
-        `<div class="card card-pad stack-sm"><strong>没有找到匹配的服务</strong><p class="caption">换个关键词或分类试试，也可以使用自定义接入。</p><button class="button secondary full" type="button" data-go="custom">自定义 MCP 服务器</button></div>`;
+        `<div class="card card-pad stack-sm"><strong>No matching services</strong><p class="caption">Try another keyword or category, or use a custom connection.</p><button class="button secondary full" type="button" data-go="custom">Custom MCP server</button></div>`;
     }
     function catalogPage() {
-      const cats = ['全部', '效率', '数据', '搜索', '沟通', '本机'];
-      return `${header('添加 MCP 服务', 'home')}<div class="app-content stack">
-        <div class="search-wrap">${icons.search}<label class="sr-only" for="catalog-search">搜索服务</label><input class="search" id="catalog-search" type="search" placeholder="搜索服务或能力" value="${esc(state.query)}" autocomplete="off"></div>
-        <div class="chips" aria-label="服务分类">${cats.map(c => `<button class="chip" type="button" data-category="${c}" aria-pressed="${state.category === c}">${c}</button>`).join('')}</div>
-        <div class="row"><p class="caption grow">选择服务后，只需授权或填写必要信息。</p><span class="badge">示例目录</span></div>
+      const cats = ['All', 'Productivity', 'Data', 'Search', 'Communication', 'Local'];
+      return `${header('Add MCP service', 'home')}<div class="app-content stack">
+        <div class="search-wrap">${icons.search}<label class="sr-only" for="catalog-search">Search services</label><input class="search" id="catalog-search" type="search" placeholder="Search services or capabilities" value="${esc(state.query)}" autocomplete="off"></div>
+        <div class="chips" aria-label="Service categories">${cats.map(c => `<button class="chip" type="button" data-category="${c}" aria-pressed="${state.category === c}">${c}</button>`).join('')}</div>
+        <div class="row"><p class="caption grow">After choosing a service, you only authorize or fill in the necessary details.</p><span class="badge">Sample catalog</span></div>
         <div class="service-grid" id="service-results">${catalogResults()}</div>
         ${customFooter()}
       </div>`;
     }
     function emptyHome() {
-      return `${header('MCP 服务', 'catalog')}<div class="app-content stack">
+      return `${header('MCP services', 'catalog')}<div class="app-content stack">
         <div class="card hero-empty">
           <span class="empty-mark">${icons.link}</span>
-          <h2>让 Mika 使用更多工具</h2>
-          <p class="muted">从目录选择服务，授权或填写 Key 即可连接。无需了解地址和连接协议。</p>
+          <h2>Let Mika use more tools</h2>
+          <p class="muted">Choose a service from the catalog, then authorize or enter a key to connect. No need to know addresses or connection protocols.</p>
         </div>
-        <button class="button full" type="button" data-go="catalog">浏览服务目录</button>
-        <button class="button secondary full" type="button" data-go="custom">自定义服务器</button>
-        <p class="caption">已连接的服务会在任务需要时提供工具。每个服务都可以单独停用。</p>
+        <button class="button full" type="button" data-go="catalog">Browse service catalog</button>
+        <button class="button secondary full" type="button" data-go="custom">Custom server</button>
+        <p class="caption">Connected services provide tools when a task needs them. Each service can be disabled on its own.</p>
       </div>`;
     }
     function home() {
-      return `${header('MCP 服务', 'catalog')}<div class="app-content stack">
-        <div class="row"><p class="caption grow">已添加的服务</p><button class="text-button" type="button" data-action="test-all">全部测试</button></div>
+      return `${header('MCP services', 'catalog')}<div class="app-content stack">
+        <div class="row"><p class="caption grow">Added services</p><button class="text-button" type="button" data-action="test-all">Test all</button></div>
         <div class="card">
-          <button class="list-row" type="button" data-go="manage"><span class="service-icon">云</span><span class="grow"><span class="row-title">云帆文档</span><span class="row-subtitle"><span class="badge ok"><span class="dot"></span>已连接 · 12 个工具</span></span></span><span class="chevron">${icons.chevron}</span></button>
-          <div class="list-row"><span class="service-icon">北</span><span class="grow"><span class="row-title">北辰数据</span><span class="row-subtitle">上次验证失败 · 可重新连接</span></span><button class="switch" type="button" role="switch" aria-checked="${state.enabled}" aria-label="启用北辰数据" data-action="toggle"></button></div>
+          <button class="list-row" type="button" data-go="manage"><span class="service-icon">Y</span><span class="grow"><span class="row-title">Yunfan Docs</span><span class="row-subtitle"><span class="badge ok"><span class="dot"></span>Connected · 12 tools</span></span></span><span class="chevron">${icons.chevron}</span></button>
+          <div class="list-row"><span class="service-icon">B</span><span class="grow"><span class="row-title">Beichen Data</span><span class="row-subtitle">Last verification failed · reconnect available</span></span><button class="switch" type="button" role="switch" aria-checked="${state.enabled}" aria-label="Enable Beichen Data" data-action="toggle"></button></div>
         </div>
-        <button class="button full" type="button" data-go="catalog">添加 MCP 服务</button>
-        <p class="caption">服务失败不会影响其他服务或任务。点击服务可查看工具、换 Key 或调整设置。</p>
+        <button class="button full" type="button" data-go="catalog">Add MCP service</button>
+        <p class="caption">A failing service does not affect other services or tasks. Open a service to view its tools, replace its key, or adjust settings.</p>
       </div>`;
     }
     function detailInfo(auth, account) {
       return `<dl class="info-list">
-        <div class="info-item"><dt>认证方式</dt><dd>${auth}</dd></div>
-        <div class="info-item"><dt>账号与费用</dt><dd>${account}</dd></div>
-        <div class="info-item"><dt>数据说明</dt><dd>执行任务时，相关内容会发送给这个服务。Mika 仍会把返回内容视为不可信数据。</dd></div>
+        <div class="info-item"><dt>Authentication</dt><dd>${auth}</dd></div>
+        <div class="info-item"><dt>Account & cost</dt><dd>${account}</dd></div>
+        <div class="info-item"><dt>Data notes</dt><dd>When a task runs, relevant content is sent to this service. Mika still treats returned content as untrusted data.</dd></div>
       </dl>`;
     }
     function oauthPage() {
-      return `${header('云帆文档')}<div class="app-content stack">
-        <div class="detail-head"><span class="service-icon large">云</span><div><h2>云帆文档</h2><p class="muted">文档与团队资料</p></div></div>
-        <p>让 Mika 查找文档、读取内容，并在你确认后创建或更新文档。</p>
-        <div class="card card-pad">${detailInfo('通过云帆账号授权', '需要云帆账号；可使用免费套餐')}</div>
-        <div class="notice">${icons.info}<span>将打开系统浏览器完成授权。回到 Mika 后会自动验证连接并读取工具。</span></div>
-        <button class="button full" type="button" data-connect="oauth">授权登录</button>
+      return `${header('Yunfan Docs')}<div class="app-content stack">
+        <div class="detail-head"><span class="service-icon large">Y</span><div><h2>Yunfan Docs</h2><p class="muted">Docs & team materials</p></div></div>
+        <p>Let Mika find documents, read content, and create or update documents after you confirm.</p>
+        <div class="card card-pad">${detailInfo('Authorize with a Yunfan account', 'Requires a Yunfan account; free plan available')}</div>
+        <div class="notice">${icons.info}<span>The system browser opens to complete authorization. When you return to Mika, the connection is verified and tools are read automatically.</span></div>
+        <button class="button full" type="button" data-connect="oauth">Sign in to authorize</button>
         ${customFooter()}
       </div>`;
     }
     function fieldsPage() {
-      return `${header('北辰数据')}<div class="app-content stack">
-        <div class="detail-head"><span class="service-icon large">北</span><div><h2>北辰数据</h2><p class="muted">多字段认证示例</p></div></div>
-        <p>查询数据集并运行分析。此服务需要两个密钥和工作区信息。</p>
+      return `${header('Beichen Data')}<div class="app-content stack">
+        <div class="detail-head"><span class="service-icon large">B</span><div><h2>Beichen Data</h2><p class="muted">Multi-field authentication example</p></div></div>
+        <p>Query datasets and run analyses. This service needs two keys and workspace details.</p>
         <div class="card card-pad stack">
-          <div class="field"><label for="access-key">访问密钥 <span class="required">必填</span></label><input id="access-key" type="password" autocomplete="off" placeholder="输入访问密钥"><span class="field-help">加密保存在本机，不会写入普通配置。</span></div>
-          <div class="field"><label for="signing-key">签名密钥 <span class="required">必填</span></label><input id="signing-key" type="password" autocomplete="off" placeholder="输入签名密钥"></div>
-          <div class="field"><label for="workspace">工作区 ID <span class="required">必填</span></label><input id="workspace" type="text" value="${esc(state.values.workspace)}" data-value="workspace" autocomplete="off"></div>
-          <div class="field"><label for="region">数据区域</label><select id="region" data-value="region"><option${state.values.region === '亚太' ? ' selected' : ''}>亚太</option><option${state.values.region === '欧洲' ? ' selected' : ''}>欧洲</option><option${state.values.region === '北美' ? ' selected' : ''}>北美</option></select></div>
-          <button class="text-button" type="button" data-action="key-help">在哪里获取密钥？</button>
-          <div class="notice" id="key-help" hidden>${icons.info}<span>在北辰数据的「开发者设置 → 访问凭据」中创建。此处仅为虚构示例。</span></div>
+          <div class="field"><label for="access-key">Access key <span class="required">Required</span></label><input id="access-key" type="password" autocomplete="off" placeholder="Enter access key"><span class="field-help">Encrypted and stored on this device; never written to the regular config.</span></div>
+          <div class="field"><label for="signing-key">Signing key <span class="required">Required</span></label><input id="signing-key" type="password" autocomplete="off" placeholder="Enter signing key"></div>
+          <div class="field"><label for="workspace">Workspace ID <span class="required">Required</span></label><input id="workspace" type="text" value="${esc(state.values.workspace)}" data-value="workspace" autocomplete="off"></div>
+          <div class="field"><label for="region">Data region</label><select id="region" data-value="region"><option${state.values.region === 'Asia Pacific' ? ' selected' : ''}>Asia Pacific</option><option${state.values.region === 'Europe' ? ' selected' : ''}>Europe</option><option${state.values.region === 'North America' ? ' selected' : ''}>North America</option></select></div>
+          <button class="text-button" type="button" data-action="key-help">Where do I get the keys?</button>
+          <div class="notice" id="key-help" hidden>${icons.info}<span>Create them in Beichen Data under "Developer settings → Access credentials". This is a fictional example only.</span></div>
         </div>
-        ${detailInfo('两个加密保存的密钥', '需要开发者账号；按查询量计费')}
-        <button class="button full" type="button" data-connect="fields">连接并保存</button>
+        ${detailInfo('Two encrypted keys', 'Requires a developer account; billed per query')}
+        <button class="button full" type="button" data-connect="fields">Connect and save</button>
         ${customFooter()}
       </div>`;
     }
     function openPage() {
-      return `${header('星图搜索')}<div class="app-content stack">
-        <div class="detail-head"><span class="service-icon large">星</span><div><h2>星图搜索</h2><p class="muted">公开资料搜索</p></div></div>
-        <p>搜索公开资料并返回带来源的结果，无需账号或密钥。</p>
-        <div class="card card-pad">${detailInfo('无需认证', '无需账号；公共服务可能有使用频率限制')}</div>
-        <button class="button full" type="button" data-connect="open">连接</button>
+      return `${header('Xingtu Search')}<div class="app-content stack">
+        <div class="detail-head"><span class="service-icon large">X</span><div><h2>Xingtu Search</h2><p class="muted">Public information search</p></div></div>
+        <p>Search public information and return results with sources; no account or key needed.</p>
+        <div class="card card-pad">${detailInfo('No authentication', 'No account needed; the public service may have rate limits')}</div>
+        <button class="button full" type="button" data-connect="open">Connect</button>
         ${customFooter()}
       </div>`;
     }
     function packagePage() {
-      return `${header('文件管家')}<div class="app-content stack">
-        <div class="detail-head"><span class="service-icon large">文</span><div><h2>文件管家</h2><p class="muted">在本机沙箱中运行</p></div></div>
-        <p>在你授权的目录中查找、读取和整理文件。</p>
-        <div class="notice ok">${icons.check}<span>本机环境已就绪。文件访问范围仍由你单独授权。</span></div>
+      return `${header('File Butler')}<div class="app-content stack">
+        <div class="detail-head"><span class="service-icon large">F</span><div><h2>File Butler</h2><p class="muted">Runs in a local sandbox</p></div></div>
+        <p>Find, read and organize files in directories you authorize.</p>
+        <div class="notice ok">${icons.check}<span>The local environment is ready. File access is still authorized separately by you.</span></div>
         <div class="card card-pad stack-sm">
-          <h3>首次使用需要下载运行包</h3>
+          <h3>The runtime package must be downloaded the first time</h3>
           <dl class="info-list">
-            <div class="info-item"><dt>包名</dt><dd class="package">@example/filepilot-mcp</dd></div>
-            <div class="info-item"><dt>来源</dt><dd>示例官方 npm 发布页</dd></div>
-            <div class="info-item"><dt>版本</dt><dd class="package">1.4.2（精确锁定）</dd></div>
+            <div class="info-item"><dt>Package</dt><dd class="package">@example/filepilot-mcp</dd></div>
+            <div class="info-item"><dt>Source</dt><dd>Example official npm release page</dd></div>
+            <div class="info-item"><dt>Version</dt><dd class="package">1.4.2 (pinned exactly)</dd></div>
           </dl>
-          <p class="caption">确认后才会下载并缓存。以后使用相同版本无需重复下载。</p>
+          <p class="caption">It is downloaded and cached only after you confirm. The same version is not downloaded again later.</p>
         </div>
-        <div class="button-row stack-narrow"><button class="button secondary" type="button" data-go="catalog">取消</button><button class="button" type="button" data-connect="package">确认下载并连接</button></div>
+        <div class="button-row stack-narrow"><button class="button secondary" type="button" data-go="catalog">Cancel</button><button class="button" type="button" data-connect="package">Confirm download and connect</button></div>
         ${customFooter()}
       </div>`;
     }
     function connectingPage() {
-      const packageStep = state.origin === 'package' ? '正在安装已确认的包，然后验证服务…' : state.origin === 'oauth' ? '正在完成授权并验证服务…' : '正在验证连接并读取可用工具…';
-      return `${header('正在连接', null)}<div class="app-content">
-        <div class="state-hero"><span class="spinner" aria-hidden="true"></span><h2>${state.origin === 'package' ? '文件管家' : state.origin === 'fields' ? '北辰数据' : state.origin === 'open' ? '星图搜索' : '云帆文档'}</h2><p class="muted" role="status">${packageStep}</p></div>
-        <div class="stack"><div class="progress" aria-hidden="true"></div><p class="caption">只有连接和工具读取都成功后，服务才会启用。</p><button class="button secondary full" type="button" data-action="cancel-connect">取消</button></div>
+      const packageStep = state.origin === 'package' ? 'Installing the confirmed package, then verifying the service…' : state.origin === 'oauth' ? 'Completing authorization and verifying the service…' : 'Verifying the connection and reading available tools…';
+      return `${header('Connecting', null)}<div class="app-content">
+        <div class="state-hero"><span class="spinner" aria-hidden="true"></span><h2>${state.origin === 'package' ? 'File Butler' : state.origin === 'fields' ? 'Beichen Data' : state.origin === 'open' ? 'Xingtu Search' : 'Yunfan Docs'}</h2><p class="muted" role="status">${packageStep}</p></div>
+        <div class="stack"><div class="progress" aria-hidden="true"></div><p class="caption">The service is enabled only after both the connection and the tool read succeed.</p><button class="button secondary full" type="button" data-action="cancel-connect">Cancel</button></div>
       </div>`;
     }
     function successPage() {
-      return `${header('连接成功', null)}<div class="app-content stack">
-        <div class="state-hero"><span class="state-icon">${icons.check}</span><h2>云帆文档已连接</h2><p class="muted">已读取 <strong>12 个工具</strong>，服务已启用。</p></div>
-        <div class="card card-pad stack-sm"><h3>接下来</h3><p class="caption">Mika 会在适合的任务中使用这些工具。你可以随时停用服务或更换授权。</p></div>
-        <div class="button-row"><button class="button secondary" type="button" data-action="show-tools">查看工具</button><button class="button" type="button" data-go="home">完成</button></div>
-        <div class="tool-list" id="success-tools" hidden><div class="tool"><code>search_documents</code><p class="caption">按关键词查找文档</p></div><div class="tool"><code>read_document</code><p class="caption">读取指定文档内容</p></div><div class="tool"><code>list_spaces</code><p class="caption">列出可访问的空间</p></div></div>
+      return `${header('Connected', null)}<div class="app-content stack">
+        <div class="state-hero"><span class="state-icon">${icons.check}</span><h2>Yunfan Docs is connected</h2><p class="muted">Read <strong>12 tools</strong>; the service is enabled.</p></div>
+        <div class="card card-pad stack-sm"><h3>Next</h3><p class="caption">Mika uses these tools in suitable tasks. You can disable the service or change authorization at any time.</p></div>
+        <div class="button-row"><button class="button secondary" type="button" data-action="show-tools">View tools</button><button class="button" type="button" data-go="home">Done</button></div>
+        <div class="tool-list" id="success-tools" hidden><div class="tool"><code>search_documents</code><p class="caption">Find documents by keyword</p></div><div class="tool"><code>read_document</code><p class="caption">Read the content of a given document</p></div><div class="tool"><code>list_spaces</code><p class="caption">List accessible spaces</p></div></div>
         ${customFooter()}
       </div>`;
     }
     function failurePage() {
-      return `${header('连接未完成', null)}<div class="app-content stack">
-        <div class="state-hero"><span class="state-icon bad">${icons.alert}</span><h2>密钥未通过验证</h2><p class="muted">北辰数据拒绝了访问密钥。请检查密钥是否完整、是否已过期。</p></div>
-        <div class="notice bad">${icons.alert}<span>配置已保存为停用状态，未启用服务。非秘密字段仍保留。</span></div>
-        <div class="button-row"><button class="button secondary" type="button" data-connect="fields">重试</button><button class="button" type="button" data-go="fields">修改密钥</button></div>
-        <details><summary>查看技术详情</summary><div><p class="caption">服务返回认证失败（401）。Mika 没有保存或显示密钥内容。</p><p class="package">MCP_AUTHENTICATION_FAILED</p></div></details>
+      return `${header('Connection not completed', null)}<div class="app-content stack">
+        <div class="state-hero"><span class="state-icon bad">${icons.alert}</span><h2>The key failed verification</h2><p class="muted">Beichen Data rejected the access key. Check that the key is complete and has not expired.</p></div>
+        <div class="notice bad">${icons.alert}<span>The configuration is saved as disabled and the service is not enabled. Non-secret fields are kept.</span></div>
+        <div class="button-row"><button class="button secondary" type="button" data-connect="fields">Retry</button><button class="button" type="button" data-go="fields">Edit keys</button></div>
+        <details><summary>View technical details</summary><div><p class="caption">The service returned an authentication failure (401). Mika did not save or display the key contents.</p><p class="package">MCP_AUTHENTICATION_FAILED</p></div></details>
         ${customFooter()}
       </div>`;
     }
     function managePage() {
-      return `${header('云帆文档', 'home')}<div class="app-content stack">
-        <div class="detail-head"><span class="service-icon large">云</span><div class="grow"><h2>云帆文档</h2><p><span class="badge ok"><span class="dot"></span>已连接</span></p></div><button class="switch" type="button" role="switch" aria-checked="${state.enabled}" aria-label="启用云帆文档" data-action="toggle"></button></div>
-        <p class="caption">最近验证：今天 14:32 · 12 个工具</p>
+      return `${header('Yunfan Docs', 'home')}<div class="app-content stack">
+        <div class="detail-head"><span class="service-icon large">Y</span><div class="grow"><h2>Yunfan Docs</h2><p><span class="badge ok"><span class="dot"></span>Connected</span></p></div><button class="switch" type="button" role="switch" aria-checked="${state.enabled}" aria-label="Enable Yunfan Docs" data-action="toggle"></button></div>
+        <p class="caption">Last verified: today 14:32 · 12 tools</p>
         <div class="card">
-          <button class="list-row" type="button" data-action="retest"><span class="grow row-title">重新测试</span><span class="chevron">${icons.chevron}</span></button>
-          <button class="list-row" type="button" data-go="oauth"><span class="grow row-title">重新授权</span><span class="chevron">${icons.chevron}</span></button>
-          <button class="list-row" type="button" data-go="custom"><span class="grow row-title">高级设置</span><span class="chevron">${icons.chevron}</span></button>
+          <button class="list-row" type="button" data-action="retest"><span class="grow row-title">Test again</span><span class="chevron">${icons.chevron}</span></button>
+          <button class="list-row" type="button" data-go="oauth"><span class="grow row-title">Reauthorize</span><span class="chevron">${icons.chevron}</span></button>
+          <button class="list-row" type="button" data-go="custom"><span class="grow row-title">Advanced settings</span><span class="chevron">${icons.chevron}</span></button>
         </div>
-        <div class="stack-sm"><h3>可用工具</h3><div class="tool"><code>search_documents</code><p class="caption">按关键词查找文档</p></div><div class="tool"><code>read_document</code><p class="caption">读取指定文档内容</p></div><div class="tool"><code>create_document</code><p class="caption">创建新文档；执行前遵循任务确认规则</p></div><button class="text-button" type="button" data-action="show-tools">查看全部 12 个工具</button></div>
-        <div class="notice" id="manage-notice" hidden>${icons.info}<span>演示操作已完成，没有发起真实网络请求。</span></div>
+        <div class="stack-sm"><h3>Available tools</h3><div class="tool"><code>search_documents</code><p class="caption">Find documents by keyword</p></div><div class="tool"><code>read_document</code><p class="caption">Read the content of a given document</p></div><div class="tool"><code>create_document</code><p class="caption">Create a new document; follows task confirmation rules before running</p></div><button class="text-button" type="button" data-action="show-tools">View all 12 tools</button></div>
+        <div class="notice" id="manage-notice" hidden>${icons.info}<span>Demo action completed; no real network request was made.</span></div>
         <div class="divider"></div>
-        <button class="button danger full" type="button" data-action="delete">从 Mika 删除</button>
-        <p class="caption">只会移除 Mika 中的配置，不会撤销云帆账号授权。</p>
-        <div class="card card-pad stack-sm" id="delete-confirm" ${state.deleteConfirm ? '' : 'hidden'}><strong>删除这个服务？</strong><p class="caption">已保存的配置和授权信息会从 Mika 移除。</p><div class="button-row"><button class="button secondary" type="button" data-action="cancel-delete">取消</button><button class="button danger" type="button" data-go="home-empty">确认删除</button></div></div>
+        <button class="button danger full" type="button" data-action="delete">Remove from Mika</button>
+        <p class="caption">Only the configuration in Mika is removed; authorization for your Yunfan account is not revoked.</p>
+        <div class="card card-pad stack-sm" id="delete-confirm" ${state.deleteConfirm ? '' : 'hidden'}><strong>Delete this service?</strong><p class="caption">Saved configuration and authorization info are removed from Mika.</p><div class="button-row"><button class="button secondary" type="button" data-action="cancel-delete">Cancel</button><button class="button danger" type="button" data-go="home-empty">Delete</button></div></div>
       </div>`;
     }
     function customPage() {
       const isStdio = state.customTransport === 'stdio';
-      return `${header('自定义 MCP 服务器', 'catalog')}<div class="app-content stack">
-        <p class="caption">用于目录未收录的服务，或需要自行调整的连接。</p>
+      return `${header('Custom MCP server', 'catalog')}<div class="app-content stack">
+        <p class="caption">For services not in the catalog, or connections you need to tune yourself.</p>
         <div class="card card-pad stack">
-          <div class="field"><label for="custom-name">名称 <span class="required">必填</span></label><input id="custom-name" type="text" placeholder="我的 MCP 服务"></div>
-          <div class="field"><label for="custom-address">${isStdio ? '启动命令' : '服务器地址'} <span class="required">必填</span></label>${isStdio ? '<textarea id="custom-address" placeholder="可执行文件与参数"></textarea><span class="field-help">参数不经 shell 执行。秘密请使用下方环境变量字段。</span>' : '<input id="custom-address" type="url" placeholder="https://example.com/mcp">'}</div>
-          <div class="field"><label for="custom-auth">认证方式</label><select id="custom-auth"><option>Bearer Token</option><option>OAuth 账号授权</option><option>指定秘密请求头</option><option>无需认证</option></select></div>
-          <div class="field"><label for="custom-token">密钥或 Token</label><input id="custom-token" type="password" autocomplete="off" placeholder="加密保存"></div>
+          <div class="field"><label for="custom-name">Name <span class="required">Required</span></label><input id="custom-name" type="text" placeholder="My MCP service"></div>
+          <div class="field"><label for="custom-address">${isStdio ? 'Startup command' : 'Server address'} <span class="required">Required</span></label>${isStdio ? '<textarea id="custom-address" placeholder="Executable and arguments"></textarea><span class="field-help">Arguments are not run through a shell. For secrets, use the environment variable field below.</span>' : '<input id="custom-address" type="url" placeholder="https://example.com/mcp">'}</div>
+          <div class="field"><label for="custom-auth">Authentication</label><select id="custom-auth"><option>Bearer Token</option><option>OAuth account authorization</option><option>Specified secret header</option><option>No authentication</option></select></div>
+          <div class="field"><label for="custom-token">Key or token</label><input id="custom-token" type="password" autocomplete="off" placeholder="Stored encrypted"></div>
         </div>
-        <details ${state.advanced ? 'open' : ''}><summary data-action="advanced">高级设置</summary><div class="stack">
-          <div class="field"><label for="custom-transport">Transport</label><select id="custom-transport" data-action="transport"><option value="http"${!isStdio ? ' selected' : ''}>Streamable HTTP</option><option value="sse">Legacy HTTP + SSE</option><option value="stdio"${isStdio ? ' selected' : ''}>stdio（Linux 沙箱）</option></select></div>
-          <div class="field"><label for="custom-headers">普通请求头</label><textarea id="custom-headers" placeholder="X-Tenant: demo&#10;X-Region: apac"></textarea><span class="field-help">秘密请求头使用独立加密字段，不填写在这里。</span></div>
-          <div class="field"><label for="custom-env">stdio 秘密环境变量</label><textarea id="custom-env" placeholder="SERVICE_API_KEY=••••••"></textarea></div>
-          <div class="field"><label for="custom-allowlist">工具白名单</label><input id="custom-allowlist" type="text" placeholder="留空表示启用全部已发现工具"></div>
-          <div class="row"><span class="grow">允许本地 HTTP</span><button class="switch" type="button" role="switch" aria-checked="false" aria-label="允许本地 HTTP" data-action="toggle"></button></div>
-          <div class="row"><span class="grow">信任服务提供的风险注解</span><button class="switch" type="button" role="switch" aria-checked="false" aria-label="信任风险注解" data-action="toggle"></button></div>
-          <div class="field"><label for="custom-timeout">连接超时（秒）</label><input id="custom-timeout" type="number" value="15" min="1"></div>
-          <div class="field"><label for="custom-preview">结果预览长度</label><input id="custom-preview" type="number" value="4000" min="0"></div>
-          <div class="field"><label for="custom-budget">单次任务成本预算</label><input id="custom-budget" type="text" placeholder="使用任务默认预算"></div>
+        <details ${state.advanced ? 'open' : ''}><summary data-action="advanced">Advanced settings</summary><div class="stack">
+          <div class="field"><label for="custom-transport">Transport</label><select id="custom-transport" data-action="transport"><option value="http"${!isStdio ? ' selected' : ''}>Streamable HTTP</option><option value="sse">Legacy HTTP + SSE</option><option value="stdio"${isStdio ? ' selected' : ''}>stdio (Linux sandbox)</option></select></div>
+          <div class="field"><label for="custom-headers">Regular headers</label><textarea id="custom-headers" placeholder="X-Tenant: demo&#10;X-Region: apac"></textarea><span class="field-help">Secret headers use a separate encrypted field; do not enter them here.</span></div>
+          <div class="field"><label for="custom-env">stdio secret environment variables</label><textarea id="custom-env" placeholder="SERVICE_API_KEY=••••••"></textarea></div>
+          <div class="field"><label for="custom-allowlist">Tool allowlist</label><input id="custom-allowlist" type="text" placeholder="Leave empty to enable all discovered tools"></div>
+          <div class="row"><span class="grow">Allow local HTTP</span><button class="switch" type="button" role="switch" aria-checked="false" aria-label="Allow local HTTP" data-action="toggle"></button></div>
+          <div class="row"><span class="grow">Trust risk annotations provided by the service</span><button class="switch" type="button" role="switch" aria-checked="false" aria-label="Trust risk annotations" data-action="toggle"></button></div>
+          <div class="field"><label for="custom-timeout">Connection timeout (seconds)</label><input id="custom-timeout" type="number" value="15" min="1"></div>
+          <div class="field"><label for="custom-preview">Result preview length</label><input id="custom-preview" type="number" value="4000" min="0"></div>
+          <div class="field"><label for="custom-budget">Per-task cost budget</label><input id="custom-budget" type="text" placeholder="Use the task's default budget"></div>
         </div></details>
-        <div class="notice">${icons.info}<span>自定义服务与目录预设使用相同的安全检查和任务生命周期。</span></div>
-        <div class="button-row"><button class="button secondary" type="button" data-go="catalog">取消</button><button class="button" type="button" data-connect="custom">保存并测试</button></div>
+        <div class="notice">${icons.info}<span>Custom services use the same safety checks and task lifecycle as catalog presets.</span></div>
+        <div class="button-row"><button class="button secondary" type="button" data-go="catalog">Cancel</button><button class="button" type="button" data-connect="custom">Save and test</button></div>
       </div>`;
     }
     function pageHtml() {
@@ -529,9 +529,9 @@
       }
     }
     function flowShortcuts() {
-      if (state.page === 'connecting') return '<span>原型控制：</span><button type="button" data-go="success">演示成功</button><button type="button" data-go="failure">演示失败</button>';
-      if (state.page === 'failure') return '<span>可检查输入保留、重试与技术详情。</span>';
-      return '<span>使用左侧页面清单检查所有状态；点击卡片可继续完整流程。</span>';
+      if (state.page === 'connecting') return '<span>Prototype controls:</span><button type="button" data-go="success">Demo success</button><button type="button" data-go="failure">Demo failure</button>';
+      if (state.page === 'failure') return '<span>Check that inputs are kept, retry, and technical details.</span>';
+      return '<span>Use the page list on the left to check every state; click a card to continue the full flow.</span>';
     }
     function render() {
       clearTimeout(connectTimer);
@@ -540,7 +540,7 @@
       document.querySelectorAll('[data-width]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.width === state.width)));
       document.getElementById('app-frame').classList.toggle('wide', state.width === 'wide');
       document.getElementById('app').innerHTML = pageHtml();
-      document.getElementById('page-nav').innerHTML = '<div class="page-nav-label">原型页面</div>' + pages.map(([id, label]) => `<button type="button" data-go="${id}" ${state.page === id ? 'aria-current="page"' : ''}>${label}</button>`).join('');
+      document.getElementById('page-nav').innerHTML = '<div class="page-nav-label">Prototype pages</div>' + pages.map(([id, label]) => `<button type="button" data-go="${id}" ${state.page === id ? 'aria-current="page"' : ''}>${label}</button>`).join('');
       const picker = document.getElementById('page-picker');
       picker.innerHTML = pages.map(([id, label]) => `<option value="${id}"${state.page === id ? ' selected' : ''}>${label}</option>`).join('');
       document.getElementById('demo-flow').innerHTML = flowShortcuts();

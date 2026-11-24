@@ -1,20 +1,20 @@
-## 1. 静音台账（AppMuter）
+## 1. Mute ledger (AppMuter)
 
-- [x] 1.1 `AppMuter` 增加 `muteAgain(packageName, user): Boolean`（直接 `audio.mute`，键从 `unmuted` 移回 `muted`、清出 `early`；失败留 `unmuted` 可重试），并把 `unmuted` 集合以 `StateFlow<Set<String>>` 暴露（`unmute`/`muteAgain` 时更新）
-- [x] 1.2 `AppMuterTest` 补用例：恢复后再静回到自动管理、再静后 `restoreAll` 台账仍还原、再静失败保留重试、`userUnmuted` 流随操作更新
+- [x] 1.1 `AppMuter` gains `muteAgain(packageName, user): Boolean` (directly `audio.mute`, the key moves from `unmuted` back to `muted` and is cleared out of `early`; on failure it stays in `unmuted` for a retry), and the `unmuted` set is exposed as a `StateFlow<Set<String>>` (updated on `unmute`/`muteAgain`)
+- [x] 1.2 `AppMuterTest` gains cases: re-muting after a restore returns the key to automatic management, the ledger is still restored by `restoreAll` after a re-mute, a failed re-mute keeps the retry, and the `userUnmuted` flow updates with the actions
 
-## 2. 任务与接管路由（TaskRun / Takeover）
+## 2. Task and takeover routing (TaskRun / Takeover)
 
-- [x] 2.1 `TakeoverPort` 增 `muteAgain(packageName)`（TaskRun 匿名实现直接调 `p.audio.muteAgain`），`Takeover` 增对称 `muteBack(): Boolean`
-- [x] 2.2 `TaskRun.unmute()` 改为 `togglePipSound()`：目标键 ∈ `unmuted` → 走「再静上」（接管经 `Takeover.muteBack()`，否则 `p.audio.muteAgain`），否则维持现有恢复路径
-- [x] 2.3 `TaskRun` 暴露 `pipSoundOn: StateFlow<Boolean>`（`combine` 目标 App 流与 `userUnmuted` 流；接管时以被接管包为准），TaskService 按显示中的任务对外提供
+- [x] 2.1 `TakeoverPort` gains `muteAgain(packageName)` (TaskRun's anonymous implementation calls `p.audio.muteAgain` directly), and `Takeover` gains the symmetric `muteBack(): Boolean`
+- [x] 2.2 `TaskRun.unmute()` becomes `togglePipSound()`: if the target key ∈ `unmuted` → take "mute again" (through `Takeover.muteBack()` during takeover, otherwise `p.audio.muteAgain`), otherwise keep the existing restore path
+- [x] 2.3 `TaskRun` exposes `pipSoundOn: StateFlow<Boolean>` (`combine` of the target App flow and the `userUnmuted` flow; during takeover the taken-over package is authoritative), and TaskService provides it outward for the task being displayed
 
-## 3. 小窗 UI 与文案
+## 3. PiP UI and strings
 
-- [x] 3.1 `AgentPip` 声音按钮状态化：`soundOn: Boolean` 参数，已恢复时图标/文案为「静音」（`pip_mute`），点击调 `onToggleSound`；ChatViewModel/ChatScreen/MainActivity 按 `frames`/`pipInput` 同款接线
-- [x] 3.2 新增 `pip_mute` 文案并同步 8 个语言目录（values、zh、b+zh+Hant、ko、fa、in、ar、pt）
+- [x] 3.1 `AgentPip` sound button made stateful: a `soundOn: Boolean` parameter; when already restored the icon/label is "Mute" (`pip_mute`), and tapping calls `onToggleSound`; ChatViewModel/ChatScreen/MainActivity are wired the same way as `frames`/`pipInput`
+- [x] 3.2 Add the `pip_mute` string and sync it to the 8 language directories (values, zh, b+zh+Hant, ko, fa, in, ar, pt)
 
-## 4. 验证
+## 4. Verification
 
-- [x] 4.1 `./gradlew :app:testDebugUnitTest`（AppMuter 新用例与既有全绿）+ `:app:assembleDebug` 构建
-- [x] 4.2 真机验证：任务自动静音 → 小窗恢复声音 → 再按静回去（appops/dumpsys 取证）→ 收尾还原；截图与时间线存 `openspec/changes/fix-589-pip-sound-toggle/evidence/`
+- [x] 4.1 `./gradlew :app:testDebugUnitTest` (the new AppMuter cases plus the existing suite all green) + `:app:assembleDebug` build
+- [x] 4.2 On-device verification: task auto-mutes → PiP restores sound → press again to mute back (appops/dumpsys evidence) → wrap-up restores; screenshots and timeline kept in `openspec/changes/fix-589-pip-sound-toggle/evidence/`

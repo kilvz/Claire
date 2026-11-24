@@ -1,138 +1,138 @@
-# 设计：屏图（screen map）——每个 App 一张可点击的页面结构图，随 APP.md 给模型
+# Design: screen map — one clickable page-structure map per App, given to the model alongside APP.md
 
 ## Context
 
-现状链路（explore 结论）：
+Current pipeline (exploration conclusions):
 
 ```
-任务开始 → RouteMatcher 找路线（模板字面相似 + 一次模型/决策调用选 + 抽槽）
-  └─ Replayer 不调模型逐步回放：每步读屏 → 比「包名 + 前屏锚点(最多3段稳定文字) + 元素选择器唯一命中」
-       → ActionExecutor 执行 → 比「动作后变化 / 后屏锚点」；对不上 Diverged(i) 交还模型
-任务收尾 → RunLearning：起草技能 / 提取记忆 / 起草 App 知识（试用/转正/归档）
-运行记录 → RunEvent.ActionTarget{step, tool, argsJson, target(Selector), before/after(Anchors), effective, ...}
-锚点 → RouteAnchors.texts(snapshot)：包名 + 稳定文字（去数字、去列表内容、去输入框、去用户打的字，取前 3）
-知识 → knowledge/apps/<x>/APP.md（文字说明）+ L2 注入（进入 App 时给模型）
+Task start → RouteMatcher finds a route (template literal similarity + one model/decision call to select + slot extraction)
+  └─ Replayer replays step by step without model calls: each step reads the screen → compares "package name + before-screen anchors (up to 3 stable text segments) + unique element selector match"
+       → ActionExecutor executes → compares "post-action change / after-screen anchors"; on mismatch, Diverged(i) is handed back to the model
+Task wrap-up → RunLearning: draft skills / extract memories / draft App knowledge (trial/promote/archive)
+Run records → RunEvent.ActionTarget{step, tool, argsJson, target(Selector), before/after(Anchors), effective, ...}
+Anchors → RouteAnchors.texts(snapshot): package name + stable text (drop digits, drop list content, drop input fields, drop text the user typed, take the first 3)
+Knowledge → knowledge/apps/<x>/APP.md (explanatory text) + L2 injection (given to the model when entering the App)
 ```
 
-已有一半（回放 + 锚点 + 自学习 + 屏元素模型 + 知识注入）。缺的是**每 App 一张可点击的屏图**：屏实体、跨任务存活、相对导航、身份置信度，以及**把它作为「页面结构」随 APP.md 一起给模型**。
+Half of it already exists (replay + anchors + self-learning + screen element model + knowledge injection). What is missing is **one clickable screen map per App**: screen entities, survival across tasks, relative navigation, identity confidence, and **giving it to the model as "page structure" together with APP.md**.
 
-## 核心认知（决定身份口径与存放）
+## Core insight (determines the identity definition and storage)
 
-1. **页面结构固定，变化的是内容文字**：屏的身份 = 固定骨架（标题栏、标签、按钮、导航），不是内容（列表条目、输入、用户打的字）。图上每个屏是一个**结构页**，内容变了不影响它。
-2. **图是给模型看的**：屏图是 App 的「页面结构」，随 `APP.md` 一起注入；`APP.md` 是文字说明解释（这 App 是什么、坑、技巧），屏图是页面结构（有哪些页、点哪去哪）。一对互补。
-3. **每 App 一张独立的图**，自学习长出来，越用越全。
+1. **The page structure is fixed; what changes is the content text**: a screen's identity = the fixed skeleton (title bar, tabs, buttons, navigation), not the content (list items, inputs, text the user types). Each screen on the map is a **structural page**, unaffected when content changes.
+2. **The map is for the model**: the screen map is the App's "page structure", injected together with `APP.md`; `APP.md` is the explanatory text (what this App is, pitfalls, tricks), while the screen map is the page structure (which pages exist, where clicking leads). The two are complementary.
+3. **One independent map per App**, grown by self-learning, becoming more complete with use.
 
 ## Goals / Non-Goals
 
-**Goals：**
+**Goals:**
 
-- 每 App 一张可点击的屏图：节点 = 结构页（名字 + 锚点 + 层级 + 转移边），边 = 点击导航（在 A 屏点 X → 到 B 屏，记「点哪个元素 + 到哪屏 + 走通过几次」）。
-- 图由运行记录确定性重建；认屏零模型调用；名字/层级由模型标一次缓存；层级按票数。
-- 图随 APP.md 注入模型：认出现在在哪屏后，给「你在哪 + 从这屏出发的路 + 这个 App 的屏清单与怎么走」。
-- 回放接图：已知完整路径零模型调用；每步认屏、落错屏重试一次；对不上交还「落在屏 X + 从这能去哪」。
-- 相对导航：当前屏 → 目标屏在图里找路径、裁公共前缀，没完整走过的目标也能拼段。
-- 误认（错合并 / 错归属）必须为 0。
+- One clickable screen map per App: nodes = structural pages (name + anchors + level + transition edges), edges = click navigation (click X on screen A → go to screen B, recording "which element was clicked + which screen it led to + how many times it succeeded").
+- The map is deterministically rebuilt from run records; identifying a screen costs zero model calls; names/levels are labeled once by the model and cached; levels by vote count.
+- The map is injected into the model alongside APP.md: after identifying which screen it is on, provide "where you are + the paths starting from this screen + this App's screen list and how to get around".
+- Replay connects to the map: a known full path costs zero model calls; each step identifies the screen, retrying once if it lands on the wrong screen; mismatches are handed back as "landed on screen X + where you can go from here".
+- Relative navigation: from the current screen → target screen, find a path in the map and trim the common prefix, so even targets not fully walked before can be assembled from segments.
+- Misidentification (wrong merge / wrong ownership) must be 0.
 
-**Non-Goals：**
+**Non-Goals:**
 
-- 不做离线爬虫预爬 App（不预先点遍 App，边用边长）。
-- 不做设备层 / 主屏图（安卓按包名启动直达，不需要）。
-- 不替代现有 curated 知识（APP.md）和路线系统——屏图是「页面结构」层，与 APP.md（说明）互补，路线继续能用。
+- No offline crawler pre-crawling Apps (no clicking through the whole App in advance; it grows as it is used).
+- No device-level / home-screen map (Android can launch directly by package name, so it is unnecessary).
+- Does not replace the existing curated knowledge (APP.md) or the route system — the screen map is a "page structure" layer complementary to APP.md (explanations), and routes keep working.
 
-**反目标（做了就算失败）：**
+**Anti-goals (doing these counts as failure):**
 
-- 误认屏 / 归错 App：认错比不认更糟——认错把模型指到错地方，不认只是没帮上忙。
-- 身份判定靠模型逐屏标注导致成本失控：认屏零模型调用；名字/层级标一次缓存，不逐屏标。
-- 屏图存用户打的字 / 存内容 / 存坐标当身份：只存固定骨架 + 语义目标。
+- Misidentifying a screen / attributing to the wrong App: a wrong identification is worse than none — it points the model to the wrong place, whereas none merely fails to help.
+- Identity determined by the model labeling every screen, causing runaway cost: screen identification costs zero model calls; names/levels are labeled once and cached, not labeled per screen.
+- The screen map storing text the user typed / content / coordinates as identity: only the fixed skeleton + semantic targets are stored.
 
 ## Decisions
 
-### D1：屏实体与图
+### D1: Screen entities and the map
 
-屏节点（per App，一个结构页）：
+Screen node (per App, one structural page):
 
 ```
 Screen {
-  id           // hash(app + 首次锚点签名)，确定性，可整体重建逐字节相同
-  app          // 包名 slug
-  name         // 语义名（模型标一次缓存；默认可从锚点取一个占位名）
-  anchors      // 稳定骨架文字集合（跨访问合并）+ 每个的落地计数
-  levels       // home/top/inner → 票数（多数决，平票 None）
-  transitions  // (动作, 语义目标, 效果, 到哪屏) → count + off_track
+  id           // hash(app + firstAnchorSignature), deterministic, rebuilt wholesale byte-for-byte identical
+  app          // package name slug
+  name         // semantic name (labeled once by the model and cached; by default a placeholder name can be taken from the anchors)
+  anchors      // stable skeleton text set (merged across visits) + landing count for each
+  levels       // home/top/inner → vote counts (majority decides, ties None)
+  transitions  // (action, semantic target, effect, which screen) → count + off_track
   visits, status // provisional | confirmed
 }
 ```
 
-转移边 effect ∈ { navigated, state_changed, none, left_app, unknown }：动作后有变化但没换屏 = state_changed，换了屏 = navigated，跳去别的 App = left_app。
+Transition edge effect ∈ { navigated, state_changed, none, left_app, unknown }: changed after the action but did not switch screens = state_changed, switched screens = navigated, jumped to another App = left_app.
 
-### D2：认屏（身份）——固定骨架 + 稀有度，零模型调用
+### D2: Screen identification (identity) — fixed skeleton + rarity, zero model calls
 
-对当前 `ScreenSnapshot` 抽**稳定骨架文字集合 S**（复用 `RouteAnchors.texts`：去数字、去列表/可滚动内容、去输入框、去用户打的字，只留标题栏/标签/按钮），与已存屏比对，按 `(重合数, 覆盖率, 稀有度)` 排序取最像的，置信度低于阈值返回 None。
+Extract a **stable skeleton text set S** from the current `ScreenSnapshot` (reusing `RouteAnchors.texts`: drop digits, drop list/scrollable content, drop input fields, drop text the user typed, keeping only title bars/tabs/buttons), compare against stored screens, sort by `(overlap count, coverage, rarity)`, and take the closest; below the confidence threshold, return None.
 
-- 覆盖率 = |S ∩ anchors| / |anchors|；稀有度 = Σ 1 / max(1, 该文字在多少屏出现过)——「确定/返回」哪都有，几乎不是证据。
-- 纯程序、不调模型；低于阈值就是「不知道」，不猜。
-- 骨架口径是 D 的核心：内容会变，骨架不变，所以认屏和建图都只认骨架。
+- Coverage = |S ∩ anchors| / |anchors|; rarity = Σ 1 / max(1, how many screens this text appears on) — 「确定/返回」 (OK/Back) is everywhere and is hardly evidence.
+- Purely programmatic, no model calls; below the threshold means "don't know", no guessing.
+- The skeleton definition is the core of D: content changes, the skeleton does not, so both identification and map building recognize only the skeleton.
 
-### D3：语义名 / 层级——本版不做（已定）
+### D3: Semantic names / levels — not in this version (decided)
 
-屏身份靠骨架锚点**自描述**（「关于本机」这个锚点就是这屏的名字），不需要再让视觉模型给屏标一个语义名。`ScreenNode.name` / `ScreenNode.levels` 字段保留、本版留空，供以后需要时再标。层级（home/top/inner）同理本版不投票。
+Screen identity is **self-describing** through skeleton anchors (the 「关于本机」 (About phone) anchor is this screen's name), so there is no need to have the vision model label a semantic name for each screen. The `ScreenNode.name` / `ScreenNode.levels` fields are kept, left empty in this version, for labeling later if needed. Levels (home/top/inner) likewise are not voted on in this version.
 
-### D4：建图——重放运行记录，确定性，实时只读
+### D4: Building the map — replaying run records, deterministic, read-only in real time
 
-- 收尾时（`RunLearning` 同一后台阶段）重放本次运行的 `RunEvent` 流：`ActionTarget` 的 before/after 各 visit / 建屏、加转移边。实时侧同一份逻辑在内存里跑（不写盘），收尾才落盘——两边结论一致靠「只有一份重放逻辑」。
-- 屏 id 用 `hash(app + 首次锚点签名)`，重放顺序固定 → 整体重建逐字节相同（可验证、可整体 `rebuild` 重来）。
-- 建图原料是 `ActionTarget.before/after` 的骨架锚点；若稀有度需要「每屏完整骨架文字集合」，扩运行记录捕获（与现有记录格式兼容地加字段）。
+- At wrap-up (the same background phase as `RunLearning`), replay this run's `RunEvent` stream: each before/after of an `ActionTarget` visits / creates a screen and adds transition edges. The real-time side runs the same logic in memory (no disk writes) and only persists at wrap-up — both sides agree because "there is only one replay logic".
+- Screen ids use `hash(app + firstAnchorSignature)`; replay order is fixed → a full rebuild is byte-for-byte identical (verifiable, and the whole thing can be redone with `rebuild`).
+- The raw material for building the map is the skeleton anchors of `ActionTarget.before/after`; if rarity needs "the full skeleton text set of each screen", extend run-record capture (adding fields in a way compatible with the existing record format).
 
-### D5：回放接图
+### D5: Replay connecting to the map
 
-- 回放每步：读屏 → `identify(snapshot)` 认当前屏，与路线该步的 `before` 锚点核对（认出的屏 == 预期屏，或锚点仍命中）；执行动作后 `identify` 认落屏，非预期落屏重试一次（仍不对就 Diverged）。
-- 对不上时交还文案升级：从「第 N 步对不上」变成「落在屏 X（或认不出），从这屏出发，图里走过这些路 / 这些目标屏可达」。
+- Each replay step: read the screen → `identify(snapshot)` to identify the current screen, cross-check with the route step's `before` anchors (the identified screen == the expected screen, or the anchors still match); after executing the action, `identify` the landed screen, retrying once if the landed screen is unexpected (still wrong → Diverged).
+- The handback message on mismatch is upgraded: from "step N does not match" to "landed on screen X (or could not identify it); starting from this screen, these paths have been walked / these target screens are reachable".
 
-### D6：相对导航
+### D6: Relative navigation
 
-给定当前屏 `a` 与目标屏 `b`（来自路线目标、或任务指认的目标屏），在图里找 `a→b` 的最短路径：
+Given the current screen `a` and the target screen `b` (from the route target, or a target screen named by the task), find the shortest path `a→b` in the map:
 
-- 两条路线若有公共前缀，裁掉公共部分（从当前屏接上）——换路线不用从头再来。
-- 这是「越来越聪明」的核心：路线是完整路径的一种记法，图才是可拼的中间状态。
+- If two routes share a common prefix, trim the common part (splice in from the current screen) — switching routes does not require starting over.
+- This is the core of "getting smarter": a route is one notation for a complete path, while the map is the assemblable intermediate state.
 
-### D7：merge gate / 置信度
+### D7: merge gate / confidence
 
-两道必须为 0 的关卡（作为 `screen-map` 自检 / 测试，不是运行指标）：
+Two gates that must be 0 (as `screen-map` self-checks / tests, not runtime metrics):
 
-- **wrong-merge**：两个标了不同语义名的屏被认成同一屏。
-- **wrong-owner**：事件归错 App（归 system / unknown 允许，只是不记）。
+- **wrong-merge**: two screens labeled with different semantic names are identified as the same screen.
+- **wrong-owner**: an event is attributed to the wrong App (attributing to system / unknown is allowed, it is just not recorded).
 
-低于置信度的认屏返回 None，也是这道关卡的运行时体现。
+Returning None for an identification below the confidence threshold is the runtime expression of this gate.
 
-### D8：存放与注入——随 APP.md 给模型
+### D8: Storage and injection — given to the model alongside APP.md
 
-- **存放**：每 App 一个结构文件，跟 `APP.md` 放一起（`knowledge/apps/<x>/`）。图是机器长出来的、可写的（与只读的 curated `APP.md` 分开存，见下）。
-- **注入**：模型进入该 App 时（现在注入 `APP.md` 的那一步），**一起注入**：
-  - `APP.md` —— 文字说明解释（是什么、坑、技巧）。
-  - 屏图 —— 页面结构（有哪些页、点哪去哪），渲染成紧凑的「地图」文字段，超长截断（不能挤掉元素列表）。
-- **写入**：原子写 + revision 校验（沿用 `AppKnowledgeFiles` / `FileRouteStore` 先例）；读写失败等于「没有屏图」，任务照旧——所有失败只计数不影响任务。
-- 具体落盘：curated 在 `resources/knowledge/apps/<x>/`（只读），自学习长出的屏图写在可写区 `files/knowledge/apps/<x>/`（与 AppKnowledgeFiles 的 `files/knowledge/app-drafts/` 同级），注入时合并两者。
+- **Storage**: one structure file per App, kept alongside `APP.md` (`knowledge/apps/<x>/`). The map is machine-grown and writable (stored separately from the read-only curated `APP.md`, see below).
+- **Injection**: when the model enters that App (the step that currently injects `APP.md`), **inject together**:
+  - `APP.md` — the explanatory text (what it is, pitfalls, tricks).
+  - the screen map — the page structure (which pages exist, where clicking leads), rendered as a compact "map" text block, truncated when too long (it must not crowd out the element list).
+- **Writing**: atomic writes + revision validation (following the `AppKnowledgeFiles` / `FileRouteStore` precedent); a read/write failure means "no screen map" and the task proceeds as before — all failures are only counted and do not affect the task.
+- Concrete on-disk layout: curated lives in `resources/knowledge/apps/<x>/` (read-only), while self-learning-grown screen maps are written to the writable area `files/knowledge/apps/<x>/` (peer to AppKnowledgeFiles's `files/knowledge/app-drafts/`), and both are merged at injection time.
 
-### D9：页面的更新与「一页多结构」
+### D9: Page updates and "one page, multiple structures"
 
-**页面会变（更新/迭代）——不靠版本号，靠「认不出就安全回退 + 自愈」：**
+**Pages change (updates/iterations) — relying not on version numbers but on "unrecognizable → safe fallback + self-healing":**
 
-- 回放每步认屏 + 元素选择器唯一命中 + 落屏校验：旧路线对上新页面不点错，只「走不通 → 交还模型」；连续 miss 停用路线、LRU 淘汰（现状已有）。
-- 认屏不匹配 → 返回「不知道」，回退正常摸屏；新结构在后来的正常任务里被重新学成新屏（自愈）。
-- 屏身份计票式（锚点落地计数、层级票数）：旧证据被新证据自然顶掉，不设显式「版本/过期」字段。
-- 需要时从「最近 N 次运行」窗口整体重建（确定性），长期没再出现的旧屏自然淘汰。
+- Each replay step identifies the screen + requires a unique element selector match + verifies the landed screen: an old route against a new page does not click wrong, it merely "cannot proceed → handed back to the model"; consecutive misses disable the route and LRU evicts it (already in place).
+- A screen-identification mismatch → return "don't know" and fall back to normal screen exploration; the new structure is re-learned as a new screen during later normal tasks (self-healing).
+- Screen identity is vote-based (anchor occurrence counts, level votes): old evidence is naturally superseded by new evidence, with no explicit "version/expiry" field.
+- When needed, rebuild wholly from the "last N runs" window (deterministic), letting old screens that have not reappeared for a long time drop out naturally.
 
-**一页两种结构——按差异程度三层处理：**
+**One page, two structures — handled in three layers by degree of difference:**
 
-1. 变的是内容（空列表 vs 有内容）：骨架一样，只认骨架，不受影响。
-2. 变的是结构但共享骨架（有/无 banner、登录态、折叠展开、AB 变体）：覆盖阈值 < 1.0 容忍缺一部分；锚点 = 并集 + 计数，稳定部分权重高、偶发部分靠稀有度降权 → 认成同一屏。
-3. 结构真 disjoint（骨架都不同，如登录前/后两套导航）：拆成两屏（宁可分开，不可合错），图上「这一页有 A/B 两种样子」，认到哪种走哪种。
+1. What changed is content (empty list vs with content): the skeleton is the same, only the skeleton is recognized, unaffected.
+2. What changed is structure but the skeleton is shared (banner present/absent, logged-in state, collapsed/expanded, A/B variants): a coverage threshold < 1.0 tolerates a missing part; anchors = union + counts, with stable parts weighted high and occasional parts down-weighted by rarity → identified as the same screen.
+3. Structures are genuinely disjoint (the skeletons all differ, e.g. two navigation sets before/after login): split into two screens (better to split than to merge wrongly); the map says "this page has A/B looks", and whichever is identified is the one used.
 
-**为什么宁可分开不可合错**：拆多了只是冗余节点（无害，后续按锚点计数收敛）；合错了 = 两个不同的页当成一个，导航走错（危险）。merge gate（wrong-merge 必须为 0）只拦「合错」这一向，拆的方向不设门槛。
+**Why better to split than to merge wrongly**: over-splitting only creates redundant nodes (harmless, converging later by anchor counts); merging wrongly = two different pages treated as one and navigation going wrong (dangerous). The merge gate (wrong-merge must be 0) only blocks the "merge wrongly" direction; the split direction has no threshold.
 
-### D10：留给 builder 的决策（可自决，不影响方向）
+### D10: Decisions left to the builder (may be decided independently, does not affect direction)
 
-- 屏图结构文件的具体格式（JSON，注入时序列化成紧凑文字）与文件名。
-- 屏 id 的「锚点签名」取法（前几段拼接哈希 / 完整骨架集合哈希）。
-- 认屏的置信度阈值与「重合 / 覆盖 / 稀有度」权重初值（先给默认，真机调）。
-- 注入时屏图的截断/折叠策略（完整骨架 vs 只给当前可达的几屏）。
+- The concrete format of the screen map structure file (JSON, serialized into compact text at injection) and the file name.
+- How the screen id's "anchor signature" is derived (hash of the first few segments concatenated / hash of the full skeleton set).
+- Initial values for the identification confidence threshold and the "overlap / coverage / rarity" weights (start with defaults, tune on device).
+- The truncation/collapse strategy for the screen map at injection (full skeleton vs only the currently reachable few screens).

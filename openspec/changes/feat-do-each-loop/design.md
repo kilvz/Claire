@@ -1,114 +1,114 @@
-# 设计：跨屏循环原语 `do_each`
+# Design: cross-screen loop primitive `do_each`
 
 ## Context
 
-现状批量能力矩阵（explore 结论）：
+Current batch capability matrix (exploration conclusions):
 
-| 工具 | 屏面 | 形状 | 能循环？ |
+| Tool | Surface | Shape | Can loop? |
 |---|---|---|---|
-| `do_steps` | 单屏 | 线性批（带 expect 条件） | 否（明文 same screen） |
-| `phone_run` | 跨屏 | 线性序列（30 命令，逐条重找目标） | 否 |
-| `web_script` | 网页 | 一整个 JS 程序 | 是（门槛高：写程序） |
-| `phone_wait` / `web_wait_for` | 各屏 | 条件等待 | —（能省轮询，但被冷落） |
+| `do_steps` | Single screen | Linear batch (with expect conditions) | No (explicitly same screen) |
+| `phone_run` | Cross-screen | Linear sequence (30 commands, re-finding the target per command) | No |
+| `web_script` | Web page | A whole JS program | Yes (high bar: writing a program) |
+| `phone_wait` / `web_wait_for` | Any screen | Conditional wait | — (saves polling, but neglected) |
 
-真实记录证据（`20261114-223716-79pbvk`「看广告领福利」）：35 轮 = 3 个广告 ×（等待轮询 ~5 + 关 ×3 + 领 ×1）；工具分布 `wait` 9、`phone_observe` 8、`phone_tap` 12、`phone_wait` 2、`do_steps` 0、`phone_run` 0；输入 token 15K→148K（历史 O(N²)，95% 缓存）。
+Real-record evidence (`20261114-223716-79pbvk` 「看广告领福利」 ("watch ads for rewards")): 35 turns = 3 ads × (waiting/polling ~5 + closing ×3 + claiming ×1); tool distribution `wait` 9, `phone_observe` 8, `phone_tap` 12, `phone_wait` 2, `do_steps` 0, `phone_run` 0; input tokens 15K→148K (history O(N²), 95% cached).
 
-要补的洞：手机侧没有「跨屏循环」这一形状；同时决策层没有任何「重复→批量」的教导，反而被 `effect`/`guard` 反向拉。
+The gap to fill: the phone side has no "cross-screen loop" shape; and the decision layer has no "repetition → batch" teaching at all, instead being pulled the opposite way by `effect`/`guard`.
 
 ## Goals / Non-Goals
 
-**Goals：**
+**Goals:**
 
-- 一个 `do_each` 原语，表面无关，表达「打开→操作→返回 ×N」这类跨屏循环。
-- 声明式、低门槛——和 `do_steps` 一样是步骤数组，不是 JS 程序。
-- 循环体复用 `do_steps` 的步骤语义（expect 条件等待、本地校验、失败即停、受控动作过闸）。
-- 决策层：措辞层面教会「重复→do_each」，先不动运行时。
+- One `do_each` primitive, surface-agnostic, expressing cross-screen loops like "open→act→return ×N".
+- Declarative and low-barrier — a step array like `do_steps`, not a JS program.
+- The loop body reuses `do_steps`'s step semantics (expect conditional waits, local validation, stop on failure, controlled actions going through the gate).
+- Decision layer: teach "repetition → do_each" at the wording level, without touching the runtime yet.
 
-**Non-Goals：**
+**Non-Goals:**
 
-- 不做运行时重复识别 / 计划阶段（后续方向；本设计只留摘要形态，不加识别逻辑）。
-- 不改 `web_script`（保留为 do_each 覆盖不了的任意程序的逃逸口）。
-- 不做并行子代理版「一条一代理」（那是子代理并行的问题，正交）。
+- No runtime repetition detection / planning phase (a future direction; this design only leaves the summary shape, without adding detection logic).
+- `web_script` is unchanged (kept as the escape hatch for arbitrary programs do_each cannot cover).
+- No parallel subagent version of "one agent per item" (that is a subagent-parallelism problem, orthogonal).
 
 ## Decisions
 
-### D1：循环结构表面无关，只有 item 定位与动作执行分派
+### D1: The loop structure is surface-agnostic; only item location and action execution are dispatched
 
-`do_each` 是一个工具（`Verb.DoEach`），同时挂到手机与网页工具组。循环引擎（找下一个 → 跳过已做 → 执行循环体 → 判断终止 → 汇总）完全共享；两处按屏面分派：
+`do_each` is one tool (`Verb.DoEach`), mounted to both the phone and web tool groups. The loop engine (find next → skip done → execute body → decide termination → summarize) is fully shared; two points dispatch by surface:
 
-- **item 定位**：手机在 a11y 树上匹配（role/text/resourceId + 可选容器），网页在 DOM 上匹配（cssSelector/role/text）。
-- **动作执行**：走现有 `ActionExecutor`（`phone_tap`/`web_tap` 已共用执行与录制路径）。
+- **item location**: on phone, match on the a11y tree (role/text/resourceId + optional container); on web, match on the DOM (cssSelector/role/text).
+- **action execution**: goes through the existing `ActionExecutor` (`phone_tap`/`web_tap` already share the execution and recording path).
 
-`mixed_surface` 判定沿用 `do_steps` 的：一次 `do_each` 里的 item 与 body 必须同屏面，混屏直接拒绝。
+The `mixed_surface` decision follows `do_steps`'s: the item and body within one `do_each` must be on the same surface; mixed surfaces are rejected outright.
 
-### D2：循环头 = body 里显式 `@item`，不是隐式「打开」
+### D2: The loop head = an explicit `@item` in the body, not an implicit "open"
 
-循环体是**完整的单条目步骤序列**，其中第一步通常「打开当前条目」，用特殊引用 `@item` 指代本轮定位到的条目；最后一步「返回列表」由模型自己在 body 里写（通常是 `back`）。这样比「引擎隐式打开+隐式返回」更灵活：
+The loop body is a **complete step sequence for a single item**, whose first step usually "opens the current item", using the special reference `@item` to denote the item located this round; the last step "return to the list" is written by the model itself in the body (usually `back`). This is more flexible than "engine implicitly opens + implicitly returns":
 
-- 「点开→打招呼→返回」：`body = [ tap @item, tap "打招呼", back ]`。
-- 「就地循环」（滚动采集、批量已读，不离开列表）：`body` 里不用 `@item`、也不 `back`，同样表达。
+- "Open→greet→return": `body = [ tap @item, tap "打招呼", back ]` — tap the item, tap the 打招呼 (Greet) button, then go back.
+- "In-place loop" (scrolling collection, batch mark-as-read, never leaving the list): the `body` uses neither `@item` nor `back`, and expresses the same thing.
 
-**被否的替代**：引擎隐式 open/return——少了 `@item` 那步的模板，但把「有些循环不打开/不返回」的变体堵死，还要额外一个 `navigate` 字段去开关，反而更啰嗦。
+**Rejected alternative**: engine-implicit open/return — it removes the template for the `@item` step, but closes off the "some loops don't open/don't return" variants, and would need an extra `navigate` field to toggle, ending up more verbose.
 
-### D3：参数形状（草案，原型再收）
+### D3: Parameter shape (draft, to be tightened after the prototype)
 
 ```
 do_each(
-  item: ItemPattern,        // {role?, text?, resourceId?, cssSelector?} 按屏面取字段
-  body: [Step],             // 每条的步骤；可用 @item
-  until?: Until,            // {count: N} | {text: ...} | 默认「无更多条目且 reveal 到底」
-  skip?: Skip,              // {text_matches: ...} 跳过命中的条目
-  reveal?: "scroll"|"none", // 当前屏找不到未做的条目时，滚动找更多（列表任务默认 scroll）
-  max_items?: N,            // 安全上限（缺省取自每调用资源上限）
+  item: ItemPattern,        // {role?, text?, resourceId?, cssSelector?} fields taken per surface
+  body: [Step],             // steps for each item; may use @item
+  until?: Until,            // {count: N} | {text: ...} | default: "no more items and reveal to the end"
+  skip?: Skip,              // {text_matches: ...} skip matched items
+  reveal?: "scroll"|"none", // when no undone item is found on the current screen, scroll to find more (list tasks default to scroll)
+  max_items?: N,            // safety cap (defaults to the per-call resource cap)
 )
 ```
 
-`Step` 复用 `do_steps`/`phone_run` 的步骤形状（tap/type/scroll/swipe/key/back/wait/assert/observe），并带 `expect`/`expect_gone`/`wait_stable` 条件等待——这样「等广告播完出领取按钮」在 body 里是一步条件等待，而不是外部 14 次轮询。
+`Step` reuses the step shape of `do_steps`/`phone_run` (tap/type/scroll/swipe/key/back/wait/assert/observe) and carries `expect`/`expect_gone`/`wait_stable` conditional waits — so "wait for the ad to finish and the claim button to appear" is one conditional wait inside the body instead of 14 polls from outside.
 
-### D4：逐轮 guard 与紧凑摘要
+### D4: Per-round guard and a compact summary
 
-每轮循环体走正常执行与录制路径，沿用 `BatchRunner` 的停止规则：body 步失败、app 切换、需要视觉复核、expect 未满足、until 命中——都停，并记在哪一条哪一步。**关键**：结束后给模型的是一份**紧凑摘要**，不是逐步截图：
+Each loop body goes through the normal execution and recording path, reusing `BatchRunner`'s stop rules: body step failure, app switch, needing visual review, expect unsatisfied, until hit — all stop, recording which item and which step. **Key**: what the model gets at the end is a **compact summary**, not step-by-step screenshots:
 
 ```
 { done: 3, failed: 0, skipped: 0, stopped_at: null,
-  per_item: [ {i:1, ok, note:"已打招呼"}, {i:2, ok, ...}, {i:3, ok} ] }
+  per_item: [ {i:1, ok, note:"greeted"}, {i:2, ok, ...}, {i:3, ok} ] }
 ```
 
-模型一次调用读回 N 条的结局，N 轮压成 1 轮——这正是「思考一次、执行多次」落在 token 上的回报。
+The model reads back the outcomes of N items in a single call, compressing N rounds into 1 — exactly the token payoff of "think once, execute many times".
 
-### D5：与既有工具的边界（教给模型的一句话判据）
+### D5: Boundary with existing tools (one-sentence criterion taught to the model)
 
-| 场景 | 用 |
+| Scenario | Use |
 |---|---|
-| 一屏内确定几步（填一个表单） | `do_steps` |
-| 跨几条屏的固定路线，走一遍 | `phone_run` |
-| **同一动作对多个条目做（打开→操作→返回）** | **`do_each`** |
-| 任意程序 / 数据变换 / 多标签（仅网页） | `web_script`（逃逸口） |
+| A fixed few steps within one screen (fill a form) | `do_steps` |
+| A fixed route across several screens, walked once | `phone_run` |
+| **The same action on multiple items (open→act→return)** | **`do_each`** |
+| Arbitrary program / data transforms / multiple tabs (web only) | `web_script` (escape hatch) |
 
-`do_each` 不取代 `do_steps`/`phone_run`，它们是「线性」；`do_each` 是「循环」。`web_script` 长期保留，但 `do_each` 覆盖其九成的「逐条点」用法后，它退化成很少用的任意程序口。
+`do_each` does not replace `do_steps`/`phone_run`; those are "linear" while `do_each` is "looping". `web_script` stays long-term, but once `do_each` covers ninety percent of its "click each one" uses, it degrades into a rarely used arbitrary-program hatch.
 
-### D6：决策层只落措辞（不动运行时）
+### D6: The decision layer changes wording only (no runtime changes)
 
-1. `capabilities/batch.md` 追加：「同一动作要对多个条目做时（逐个点开→操作→返回，如逐条打招呼、逐条领福利），用 `do_each` 一次做完，别一条一回合。」
-2. `feedback/loop.md` 的 `guard.same_state` 豁免，从「If you are deliberately going through items one by one, carry on.」改为「…going through items one by one, **put the remaining items in one do_each call instead of doing them one at a time**.」
-3. 新增 `tools/do_each.md`，带一个投递类的真实例子（点开→打招呼→返回 ×N）。
-4. 不动运行时：不新增「连续 3 次同动作」检测，不新增计划阶段。
+1. `capabilities/batch.md` gains: "When the same action must be applied to multiple items (open each one → act → return, e.g. greeting one by one, claiming rewards one by one), use `do_each` to finish it in one go instead of one item per turn."
+2. The `guard.same_state` exemption in `feedback/loop.md` changes from "If you are deliberately going through items one by one, carry on." to "…going through items one by one, **put the remaining items in one do_each call instead of doing them one at a time**."
+3. New `tools/do_each.md` with a real outreach-type example (open→greet→return ×N).
+4. No runtime changes: no new "3 consecutive identical actions" detection, no new planning phase.
 
 ## Risks / Trade-offs
 
-- **「找下一个、跳过已做」是引擎最难点**（见 Q1）：ref 每次变，得靠稳定键（text/resourceId/位置）去重，同名条目有歧义。先原型跑通这一点再定稿。
-- **失败语义**：投递里一条打招呼失败，是停还是跳过继续？默认「停并汇报」（安全），`on_error: skip` 作为可选（见 Q4）。
-- **「返回列表」不总是 back**：body 最后一步由模型写，引擎只负责「返回后重新定位 item，定位不到就停」，不替模型猜返回方式。
-- **把「重复」从卡死信号改成批量信号，可能放走真卡死**：guard 的豁免本来就是「逐条过」时才放行，改成「用 do_each」后，若模型误判成循环而实际是绕圈，`do_each` 的 until/max_items 兜底限住次数，不会比现在更坏。
+- **"Find the next one, skip the ones done" is the engine's hardest part** (see Q1): refs change every time, so dedup must rely on stable keys (text/resourceId/position), and identically named items are ambiguous. Get the prototype working on this point before finalizing.
+- **Failure semantics**: in outreach, if one greeting fails, stop or skip and continue? Default is "stop and report" (safe), with `on_error: skip` as an option (see Q4).
+- **"Return to list" is not always back**: the body's last step is written by the model; the engine is only responsible for "re-locate the item after returning, and stop if it cannot be located", never guessing the return method for the model.
+- **Turning "repetition" from a stuck signal into a batch signal may let real stuck states through**: the guard exemption already only applies when "going through items one by one"; after changing it to "use do_each", if the model misjudges a loop where it is actually going in circles, `do_each`'s until/max_items fallback bounds the number of rounds, so it is no worse than today.
 
 ## Migration Plan
 
-纯新增工具 + 两处提示词文字改动，无存量数据迁移。回滚 = 撤销提交；模型没被教之前不会调 `do_each`，行为与今天一致。
+Purely a new tool + two prompt text changes, with no existing data migration. Rollback = revert the commit; before the model is taught, it will not call `do_each`, so behavior matches today.
 
 ## Open Questions
 
-- **Q1 稳定键（已原型验证 ✅）**：item 去重的键是什么？同名条目怎么区分？原型 `core/.../agent/EachCursor.kt`（+ `EachCursorTest`）跑通：**`role|name`，同名冲突退 `role|name#k`（容器内序号）**。关键发现：`resourceId` 在真实 a11y 树里存在但**列表条目同构**——N 条卡片同一 widget 类型、resourceId 一模一样，不能区分第 1 条和第 2 条，故否决「优先 resourceId」。ref 每次快照重排、不能用。唯一名条目的键与位置无关（列表重排也不变）；真同名才靠位置兜底。剩余边界：列表滚动 / 条目被移除时位置键会失效——归入 Q2（reveal）。
-- **Q2 reveal 语义（已原型验证 ✅）**：`ScrollCursor` 跑通——停止条件 = 「刚滚过一次、且这次读屏没出现任何新 contentKey」。contentKey（`role|name`）跨滚动稳定：滚出屏的条目键不变、不重做；`ordinal`（同名序号）位置依赖、滚后失效、不能当跨屏键。边界：同名条目收敛成「做一次」——元素信息不足以跨滚动区分两条同名条目，根治靠更细的 item 匹配让 contentKey 唯一，不是靠键。
-- **Q3 就地循环（已原型验证 ✅）**：不打开条目的循环（滚动采集、批量已读/领取）**不需要新机制**——执行器只关心「这条做没做成」，就地移除时列表上移、但 contentKey 不变，游标照常去重。v1 直接支持，`body` 不用 `@item`/`back` 即可表达（`EachRunnerTest.inPlaceRemovalDedupsWhenItemsShiftUp`）。
-- **Q4 on_error（已原型验证 ✅）**：`stop`（安全默认，失败那条不记 done、留给上层决定重试，后面的不再做）与 `skip`（失败也记 done、继续做后面，投递类「一条失败不挡一屏」）都要 v1 暴露；`EachRunner.OnError` 跑通两者。摘要含 `done/failed/stoppedAt/perItem`。
-- **Q5 与 do_steps 的关系**：是否最终把 do_steps 收敛成 `do_each` 的 `count=1` 特例，还是长期并存？本设计先并存，观察使用后再收敛。
+- **Q1 Stable key (prototype-verified ✅)**: What is the key for item dedup? How are identically named items distinguished? The prototype `core/.../agent/EachCursor.kt` (+ `EachCursorTest`) works: **`role|name`, with same-name conflicts falling back to `role|name#k` (ordinal within the container)**. Key finding: `resourceId` exists in real a11y trees but **list items are isomorphic** — N cards of the same widget type have identical resourceIds, so item 1 and item 2 cannot be distinguished, hence "prefer resourceId" is rejected. refs are reshuffled on every snapshot and are unusable. The key of a uniquely named item is position-independent (unchanged even when the list reorders); only genuine same-name cases fall back to position. Remaining boundary: when the list scrolls / an item is removed, position keys become invalid — folded into Q2 (reveal).
+- **Q2 reveal semantics (prototype-verified ✅)**: `ScrollCursor` works — stop condition = "just scrolled once, and this screen read produced no new contentKey". contentKey (`role|name`) is stable across scrolling: items scrolled off screen keep their keys and are not redone; `ordinal` (same-name ordinal) is position-dependent, becomes invalid after scrolling, and cannot serve as a cross-scroll key. Boundary: identically named items collapse into "do it once" — the element information is insufficient to distinguish two same-name items across scrolls, and the real fix is finer item matching to make contentKey unique, not the key itself.
+- **Q3 In-place loop (prototype-verified ✅)**: Loops that do not open items (scrolling collection, batch mark-as-read/claim) **need no new mechanism** — the executor only cares "did this one succeed", and when items are removed in place the list shifts up but contentKeys stay the same, so the cursor dedups as usual. Supported directly in v1; expressing it only requires the `body` to use neither `@item` nor `back` (`EachRunnerTest.inPlaceRemovalDedupsWhenItemsShiftUp`).
+- **Q4 on_error (prototype-verified ✅)**: Both `stop` (safe default: the failed item is not marked done and is left to the upper layer to decide on retry, and later items are not attempted) and `skip` (failures are also marked done and later items continue, for outreach's "one failure shouldn't block a screen") must be exposed in v1; `EachRunner.OnError` works for both. The summary contains `done/failed/stoppedAt/perItem`.
+- **Q5 Relationship with do_steps**: should do_steps eventually collapse into a `count=1` special case of `do_each`, or coexist long-term? This design keeps them coexisting for now, to converge after observing usage.

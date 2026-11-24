@@ -1,21 +1,21 @@
 ## ADDED Requirements
 
-### Requirement: 非中文界面只隐藏「像中文」的步骤用意
+### Requirement: Non-Chinese UIs hide only step reasons that "look like Chinese"
 
-界面语言非中文时，模型写的步骤用意（reason）只有判定为「像中文」——**含 CJK 汉字（U+4E00–U+9FA5）且不含假名（U+3040–U+30FF）**——才整条隐藏并回退到本地化动作标题；含假名的文本视为日语，照常显示。界面语言为中文（简/繁）时不隐藏任何用意。
+When the UI language is not Chinese, a step reason written by the model is hidden in full and falls back to the localized action title only when it is judged to "look like Chinese" — **containing CJK Han characters (U+4E00–U+9FA5) and no kana (U+3040–U+30FF)**; text containing kana is treated as Japanese and shown as usual. When the UI language is Chinese (Simplified/Traditional), no reason is hidden.
 
-#### Scenario: 日语界面显示日语用意
-- **WHEN** 界面语言为日语，某步的用意是「検索ボタンをタップして連絡先を探す」（含汉字也含假名）
-- **THEN** 该步在步骤行与收起态摘要里显示这句用意，不回退到本地化标题
+#### Scenario: A Japanese UI shows Japanese reasons
+- **WHEN** the UI language is Japanese and a step's reason is 「検索ボタンをタップして連絡先を探す」 (tap the search button to find a contact; containing both Han characters and kana)
+- **THEN** that reason is shown in both the step row and the collapsed-state summary, without falling back to the localized title
 
-#### Scenario: 非中文界面仍隐藏中文用意
-- **WHEN** 界面语言为英语，某步的用意是「点击搜索按钮查找联系人」（含汉字、无假名）
-- **THEN** 该步回退到本地化动作标题（如 Tap · WeChat），不显示原用意
+#### Scenario: A non-Chinese UI still hides Chinese reasons
+- **WHEN** the UI language is English and a step's reason is 「点击搜索按钮查找联系人」 (tap the search button to find a contact; containing Han characters and no kana)
+- **THEN** that step falls back to the localized action title (e.g. Tap · WeChat) and the original reason is not shown
 
-#### Scenario: 中文界面不隐藏任何用意
-- **WHEN** 界面语言为简体或繁体中文，用意为任意语言
-- **THEN** 一律显示原用意（既有行为不变）
+#### Scenario: A Chinese UI hides no reasons
+- **WHEN** the UI language is Simplified or Traditional Chinese and the reason is in any language
+- **THEN** the original reason is always shown (existing behavior unchanged)
 
-#### Scenario: 纯汉字无假名的文本仍按中文处理
-- **WHEN** 界面语言非中文，用意为「設定確認」（有汉字、无假名，无法与中文区分）
-- **THEN** 维持隐藏回退（如实保留的残余局限，此类用意罕见）
+#### Scenario: Text with only Han characters and no kana is still treated as Chinese
+- **WHEN** the UI language is not Chinese and the reason is 「設定確認」 (settings check; Han characters, no kana, indistinguishable from Chinese)
+- **THEN** the hide-and-fall-back behavior is kept (a residual limitation recorded faithfully; such reasons are rare)

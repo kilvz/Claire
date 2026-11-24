@@ -1,24 +1,24 @@
-# 模型组
+# Model groups
 
-模型组是「用途 → 一个或多个具体模型」之上的一层可选配置。一个组里的成员按策略选一个来回答；一次调用失败时，可以换组里的下一个成员继续，不用让整个任务失败。
+A model group is an optional layer on top of "use → one or more concrete models". The members of a group are chosen by policy to answer; when one call fails, the next member in the group can be used instead, without failing the whole task.
 
-单模型配置保持原样。组只用在你想给主模型、看图模型或轻量模型配备用模型的时候。
+Single-model configuration stays as it is. Groups are only used when you want backup models for the main model, the vision model or the light model.
 
-## 配置
+## Configuration
 
-- 设置 › 模型 › 模型组：新建、编辑、删除。
-- 每个组有名称、策略、成员列表；成员可以启停、上下调顺序。
-- 组可以被三个用途中的任意一个选中，和具体模型并列显示在用途选择页。
-- 主模型组要求所有启用成员都支持工具调用；看图组要求至少一个成员能看图。轻量组不强制，不支持工具的成员在需要工具时会跳过。
+- Settings › Models › Model groups: create, edit, delete.
+- Each group has a name, a policy and a member list; members can be enabled/disabled and moved up or down.
+- A group can be selected for any of the three uses, shown alongside concrete models on the use selection page.
+- The main model group requires all enabled members to support tool calling; the vision group requires at least one member that can see images. The light group has no requirement; members that do not support tools are skipped when tools are needed.
 
-存储仍在 `files/settings/providers.json`：
+Storage is still in `files/settings/providers.json`:
 
 ```json
 {
   "groups": [
     {
       "id": "g-...",
-      "name": "主力兜底",
+      "name": "Main fallback",
       "strategy": "failover",
       "sticky": true,
       "members": [
@@ -33,89 +33,89 @@
 }
 ```
 
-组成员引用 `providers` 里的配置 id。配置因此多了一种「被组引用」的生命周期，`ProviderStore.prune` 会把组成员算进「有人用」。
+Group members reference configuration ids in `providers`. A configuration therefore gains a second lifecycle where it is "referenced by a group"; `ProviderStore.prune` counts group members as "in use".
 
-## 策略
+## Policies
 
-- `failover`（默认）：按 `priority` 升序，前一个失败才用下一个。
-- `weighted`：新对话按权重选一个成员，之后粘住；不是按每个请求轮询。
-- `least-latency`：按近期成功率和延迟排序，样本少的成员保留探索。
-- `cost-first`：按成员的费用档位；目前还没有填费用档位的界面，先按优先级。
+- `failover` (default): ascending by `priority`; the next is used only when the previous one fails.
+- `weighted`: a new conversation picks a member by weight and then sticks to it; not round-robin per request.
+- `least-latency`: ordered by recent success rate and latency, keeping exploration for members with few samples.
+- `cost-first`: by the member's cost tier; there is no UI for filling in cost tiers yet, so it falls back to priority.
 
-`sticky` 默认开：同一对话固定在一个成员上，保护前缀缓存。只有失败才会换。
+`sticky` is on by default: the same conversation stays pinned to one member, protecting the prefix cache. Switching only happens on failure.
 
-## 失败转移
+## Failover
 
-| 错误 | 同成员重试 | 换成员 |
+| Error | Retry same member | Switch member |
 | --- | --- | --- |
-| 限流、5xx、网络、流被断、代理连不上 | 组里多个候选时只试 1 次 | 是 |
-| 鉴权、额度、模型不存在/不可用、不支持工具、登录失效 | 否 | 是 |
-| 内容审核拒绝 | 否 | 否（不找更宽松的服务商） |
-| 上下文超长 | 交给压缩流程 | 否 |
-| 请求本身不对、解析失败、取消 | 否 | 否 |
+| Rate limiting, 5xx, network, stream cut off, proxy unreachable | Tried only once when the group has multiple candidates | Yes |
+| Auth, quota, model missing/unavailable, tools unsupported, login expired | No | Yes |
+| Content moderation refusal | No | No (does not look for a more lenient provider) |
+| Context too long | Handed to the compaction flow | No |
+| Bad request itself, parse failure, cancel | No | No |
 
-换成员发生在请求开始前。流式已经吐字后要换人，会先清掉界面上的预览；半截回答不会进历史。已经执行过的工具不会因为换模型重做。
+Switching members happens before a request starts. If the stream has already emitted text and a switch is needed, the preview on screen is cleared first; a half-finished answer does not enter history. Tools that have already run are not redone because the model changed.
 
-## 每成员的上下文与私有数据
+## Per-member context and private data
 
-`ModelCaller` 已经按模型分别保存压缩状态和用量锚点；组只是让它在一次调用里按成员选。选定成员后，压缩窗口、压缩触发点、图片上限都用这个成员自己的能力。主模型组的 `vision` 能力取排在最前的成员：主成员看不了图就不开截图，避免第一张图进入历史后把主成员永久排除；真正带图的请求仍只发给能看图的成员。
+`ModelCaller` already stores compaction state and usage anchors per model; groups just let it pick by member within a single call. Once a member is chosen, the compaction window, compaction trigger point and image limit all use that member's own capabilities. The main model group's `vision` capability comes from the frontmost member: if the main member cannot see images, screenshots are not taken, avoiding a situation where the first image enters history and permanently excludes the main member; requests that actually carry images are still sent only to the members that can see them.
 
-不同服务商的思考内容和工具调用私有字段不能发给别家。`ModelCaller` 记下每条 assistant 消息是谁给的，换成员时去掉别家的 `Part.Thinking` 和 `Part.ToolCall.opaque`。不经过 `ModelCaller` 的一次性调用（起标题、分类、核查、看图）走 `GroupPool.complete`，只在发生转移时统一剥掉这些字段。
+Thinking content and tool-call private fields from different providers must not be sent to another provider. `ModelCaller` records which provider gave each assistant message, and when switching members it strips other providers' `Part.Thinking` and `Part.ToolCall.opaque`. One-off calls that do not go through `ModelCaller` (titling, classification, review, image viewing) go through `GroupPool.complete`, and these fields are stripped uniformly only when a failover happens.
 
-## 健康与冷却
+## Health and cooldown
 
-`ModelHealthRegistry` 按「服务商 + 模型」记连续失败、冷却到什么时候、近期延迟；进程内共享，重启清空。限流按 `Retry-After`（没有则 30 秒），鉴权/额度类冷却 5 分钟，其余连续失败翻倍、最多 10 分钟。冷却结束后先放一个请求进去，成功了就恢复。
+`ModelHealthRegistry` records consecutive failures, cooldown until when, and recent latency per "provider + model"; shared within the process and cleared on restart. Rate limiting follows `Retry-After` (30 seconds if absent), auth/quota cooldowns last 5 minutes, and other consecutive failures double up to 10 minutes. After a cooldown ends, one request is let through first; if it succeeds, the member recovers.
 
-冷却中的成员不参与选择。全部成员都不可用时抛 `ModelError.GroupUnavailable`，任务按模型失败结束并说明原因。
+Members in cooldown do not take part in selection. When no member is available, `ModelError.GroupUnavailable` is thrown, and the task ends as a model failure with the reason stated.
 
-## 观测
+## Observability
 
-- 用量账本不变：每个成员调用各自记在「服务商 × 模型 × 用途」下。
-- 运行记录里 `ModelReply` 增加 `group`；换成员时写一条 `RunEvent.State("model_route", "组 成员A -> 成员B 原因")`。不记录消息内容。
-- 组编辑页显示成员启停和策略；运行详情显示实际回答的模型。
+- The usage ledger is unchanged: each member call is recorded separately under "provider × model × use".
+- In the run record, `ModelReply` gains `group`; on a member switch a `RunEvent.State("model_route", "<group> <member A> -> <member B> <reason>")` is written. Message contents are not recorded.
+- The group edit page shows member enable/disable and policy; the run detail shows which model actually answered.
 
-## 不做
+## Out of scope
 
-- 不做答案合并或投票。
-- 不做跨服务商的工具 schema 转换。
-- 不按请求轮询（会破坏前缀缓存）；加权是按对话分配。
-- 不做并行 racing；留了 `ModelGroup.raceReadOnly` 字段，v3 再实现。
+- No answer merging or voting.
+- No cross-provider tool schema conversion.
+- No per-request round-robin (it would break the prefix cache); weighting is assigned per conversation.
+- No parallel racing; the `ModelGroup.raceReadOnly` field is left in place, to be implemented in v3.
 
-## 测试
+## Tests
 
-- `core`：`ModelGroupTest`、`ModelCallerGroupTest`、`FailoverPolicyTest`、`StripForeignPrivateTest`。
-- `app`：`ProviderStoreGroupTest`（存储往返、prune、退组、服务商删除、逐成员上下文）。
-- 现有 `ModelRouterTest`、`AgentLoopLightTest`、`PrefixStabilityTest` 保持通过；单模型行为不变。
+- `core`: `ModelGroupTest`, `ModelCallerGroupTest`, `FailoverPolicyTest`, `StripForeignPrivateTest`.
+- `app`: `ProviderStoreGroupTest` (storage round trip, prune, leaving a group, provider deletion, per-member context).
+- The existing `ModelRouterTest`, `AgentLoopLightTest` and `PrefixStabilityTest` still pass; single-model behavior is unchanged.
 
-## 相关文件
+## Related files
 
-- `core/src/main/kotlin/com/wangzan101/mika/core/model/ModelGroup.kt`：组、成员、策略、`ModelNeed`、`MemberKey`。
-- `core/src/main/kotlin/com/wangzan101/mika/core/agent/ModelPool.kt`：`ModelPool`、`SingleMemberPool`、`GroupPool`、健康/粘性、`FailoverPolicy`。
-- `core/src/main/kotlin/com/wangzan101/mika/core/agent/ModelCaller.kt`：按成员路由、逐个尝试、换成员时准备历史。
-- `app/src/main/java/com/wangzan101/mika/settings/ProviderStore.kt`：组存储、`RoleChoice.Group`、`modelFor` 建池、prune。
-- `app/src/main/java/com/wangzan101/mika/settings/ui/models/ModelGroupScreen.kt`：组列表和编辑。
+- `core/src/main/kotlin/com/wangzan101/mika/core/model/ModelGroup.kt`: groups, members, policies, `ModelNeed`, `MemberKey`.
+- `core/src/main/kotlin/com/wangzan101/mika/core/agent/ModelPool.kt`: `ModelPool`, `SingleMemberPool`, `GroupPool`, health/stickiness, `FailoverPolicy`.
+- `core/src/main/kotlin/com/wangzan101/mika/core/agent/ModelCaller.kt`: routing by member, trying members one by one, preparing history when switching members.
+- `app/src/main/java/com/wangzan101/mika/settings/ProviderStore.kt`: group storage, `RoleChoice.Group`, `modelFor` building pools, prune.
+- `app/src/main/java/com/wangzan101/mika/settings/ui/models/ModelGroupScreen.kt`: group list and editing.
 
-## 后续（v2/v3）
+## Follow-ups (v2/v3)
 
-本 PR 只做 v1（故障转移、粘性、健康冷却、加权/延迟的运行时基础）。下面这些**没有实现**，按 v2/v3 另开 PR：
+This PR only does v1 (failover, stickiness, health cooldown, runtime foundations for weighted/latency). The following are **not implemented** and will go in separate PRs as v2/v3:
 
 **v2**
 
-- 组编辑页的成员权重输入，让“加权”从现在的按对话轮换变成真正按权重分配。
-- 成员级思考档位/费用档位编辑入口（字段已在，只是没有 UI）。
-- 组级限额执行：`GroupLimits` 的 RPM、并发、每日 token/费用目前只存不执行。
-- 用量账本增加组维度：现在只按「服务商 × 模型 × 用途」记，同一模型在组内外无法区分。
-- 延迟策略细化：首字延迟、近期窗口、探索率可配、半开探测。
-- 可选：健康/冷却状态落盘，重启后仍避开已知坏成员。
+- Member weight input on the group edit page, turning "weighted" from the current per-conversation rotation into a real distribution by weight.
+- Entry points for editing member-level thinking tier / cost tier (the fields exist, there is just no UI).
+- Group-level limit enforcement: `GroupLimits`' RPM, concurrency and daily tokens/cost are currently only stored, not enforced.
+- Group dimension in the usage ledger: currently it only records "provider × model × use", so the same model cannot be distinguished inside and outside a group.
+- Finer latency policies: time to first token, recent window, configurable exploration rate, half-open probing.
+- Optional: persist health/cooldown state so known-bad members are still avoided after a restart.
 
 **v3**
 
-- 用户手填费用档位/单价，露出 cost-first；不抓取服务商价目表。
-- 并行 racing / best-of：只允许无工具、只读请求，每组显式开启，默认关；必须提示同一内容会发给多家。
-- 聚合/投票：涉及工具调用时没有良定义，不建议做；若做只限无工具纯文本且默认关。
-- 组导入/导出/模板：只导组结构和成员名，不含 Key；导入前展示成员和隐私提示。
-- 组级费用预算：依赖费用数据。
+- User-entered cost tiers/unit prices, exposing cost-first; no scraping of provider price lists.
+- Parallel racing / best-of: only tool-free, read-only requests, explicitly enabled per group and off by default; must warn that the same content will be sent to multiple providers.
+- Aggregation/voting: has no well-defined meaning when tool calls are involved, so not recommended; if done, limited to tool-free plain text and off by default.
+- Group import/export/templates: export only group structure and member names, no keys; show members and a privacy notice before importing.
+- Group-level cost budget: depends on cost data.
 
-**明确不做**：流式中途换模型、跨服务商工具 schema 自动转换、把内容审核拒绝当故障转移理由、在模型组 PR 里做对话页模型切换/思考档位/Skill/MCP 挂载（这些见后续 PR1/PR2 设计）。
+**Explicitly not doing**: switching models mid-stream, automatic cross-provider tool schema conversion, treating content moderation refusal as a failover reason, or doing chat-page model switching / thinking tier / Skill / MCP mounting in the model group PR (these are covered by the follow-up PR1/PR2 designs).
 
-恢复时先完成真机验收、上游 review 和 CI；v2 在 #288 合入并稳定后做，v3 另开设计。
+On resuming, finish real-device acceptance, upstream review and CI first; v2 is done after #288 is merged and stable, and v3 gets its own design.

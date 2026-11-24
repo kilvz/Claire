@@ -1,54 +1,54 @@
 ---
 name: purge-method
-display: 提示词审改方法
-description: 改一份别人写的系统提示词/宿主配置前后要走的流程：先审、再备份、只改一处、改完验、留回滚。适用于任何本地提示词文件。
+display: Prompt review and edit method
+description: The process to follow before and after changing a system prompt/host configuration written by someone else: review first, then back up, change only one place, verify after the change, keep a rollback. Works for any local prompt file.
 ---
 
-# 提示词审改方法
+# Prompt review and edit method
 
-改提示词不是写提示词。写的时候只想着效果，改的时候第一件事是**别把还在用的东西弄坏**。
-这套流程来自宿主补丁工具的做法，删掉了攻击部分，只留工程部分。
+Editing a prompt is not writing a prompt. When writing you only think about the effect; when editing, the first thing is **do not break something that is still in use**.
+This workflow comes from a host patching tool's approach, with the attack part removed and only the engineering part kept.
 
-## 入口
+## Entry
 
-- 用户说「看看这个提示词」「帮我改一下它的设定」「为什么它总是这么回」。
-- 用户提到某个目录、某个 `.md`/`.json` 配置、某个 App 的提示词文件。
-- 你自己准备动任何不在插件目录里的文件之前。
+- The user says "look at this prompt", "help me change its settings" or "why does it always reply like this".
+- The user mentions a directory, a `.md`/`.json` configuration or an app's prompt file.
+- Before you yourself are about to touch any file outside the plugin directory.
 
-## 步骤
+## Steps
 
-1. **审**：用 `scan` 扫目录，拿到候选文件与命中数；再用 `read_part` 只读前几十行。
-   先判断这是「系统提示词」「用户数据」还是「程序代码」——三种东西的改法完全不同。
-2. **说清要改什么**：一句话写出「现在是这样 → 改成这样 → 为什么」。
-   改不动的（比如它在 APK 里、在只读分区）当场说，不要硬试。
-3. **备份**：`backup` 先把原文件复制到插件自己的备份目录，记下返回的路径。
-   没有备份就不要进行第 4 步。
-4. **只改一处**：一次只动一个段落，用 `patch` 做**字面**替换（不是正则），并且一定填 `expect`：
-   你预计这里只出现 1 次。`patch` 自己会先备份；匹配数不等于 `expect` 时它一个字都不写，这是故意的。
-5. **验**：说出「怎么判断改对了」。能跑的就跑一遍；不能跑的，至少给出对照：改前读到的、改后读到的。
-6. **留回滚**：把备份路径告诉用户。要退回去就用 `restore`（它会把当前内容也留一份，回滚本身也能撤回）。
+1. **Review**: use `scan` to scan the directory and get the candidate files and hit counts; then use `read_part` to read only the first few dozen lines.
+   First judge whether this is a "system prompt", "user data" or "program code" — the three are edited in completely different ways.
+2. **State clearly what to change**: write in one sentence "it is like this now → change it to this → why".
+   Say on the spot what cannot be changed (for example it is inside an APK or on a read-only partition); do not force it.
+3. **Back up**: use `backup` to copy the original file into the plugin's own backup directory first, and note the returned path.
+   Without a backup, do not proceed to step 4.
+4. **Change only one place**: touch one passage at a time, use `patch` to do a **literal** replacement (not a regex), and always fill in `expect`:
+   you expect this to appear only once here. `patch` backs up by itself first; when the match count is not equal to `expect` it writes nothing, and that is deliberate.
+5. **Verify**: say "how to tell that the change is correct". Run what can be run; for what cannot, at least give the comparison: what was read before the change and what is read after it.
+6. **Keep a rollback**: tell the user the backup path. To go back use `restore` (it also keeps a copy of the current content, so the rollback itself can be undone).
 
-## 容易出错的地方
+## Common pitfalls
 
-- **把「没有找到」当成「不存在」**：扫描有后缀和关键词限制，没扫到只说明没扫到。
-- **一次改太多**：改三处坏掉时，你不知道是哪一处坏的。
-- **没备份就下手**：这是唯一不可逆的错误，其余都能重来。`patch` 会自动备份，但别绕过它手写 sed。
-- **`find` 当成正则写**：`patch` 是字面匹配，写 `.*` 会去找那两个字面字符，不是通配。
-- **`expect` 不填**：一个词在文件里出现 20 次，你只想改 1 处，不填就会全改。
-- **改的是程序代码却当成提示词**：代码里的字符串常常被编译进产物，改了源码不生效。
-- **越权扩大范围**：用户问一个文件，不要去改整个目录。
+- **Taking "not found" to mean "does not exist"**: scanning has suffix and keyword limits, so not finding it only means it was not found.
+- **Changing too much at once**: when three changes break something, you do not know which one broke it.
+- **Acting without a backup**: this is the only irreversible mistake; everything else can be redone. `patch` backs up automatically, but do not bypass it with hand-written sed.
+- **Writing `find` as a regex**: `patch` is a literal match, so `.*` looks for those two literal characters, not a wildcard.
+- **Leaving `expect` empty**: a word appears 20 times in the file and you only want to change 1 place; leave it empty and all of them change.
+- **Treating program code as a prompt**: strings in code are often compiled into the artifact, so editing the source does not take effect.
+- **Overstepping the scope**: the user asked about one file, so do not go and change the whole directory.
 
-## 怎样算办成
+## How success is verified
 
-- 说清了改的是哪个文件、哪一段，改前改后各是什么。
-- 备份路径已经写出来，用户照着能恢复。
-- 改动被验证过：`patch` 打印的 matches 数量符合预期，改完用 `read_part` 读回过。
-- 用户拿到了备份路径，知道 `restore` 怎么用。
-- 没有动用户没让你动的文件。
+- It is clear which file and which passage were changed, and what each looked like before and after.
+- The backup path has been written out, and the user can restore from it.
+- The change has been verified: the number of matches printed by `patch` is as expected, and the file has been read back with `read_part` afterwards.
+- The user has the backup path and knows how to use `restore`.
+- No file the user did not ask you to touch has been touched.
 
-## 什么时候停下交给用户
+## When to stop and hand off
 
-- 文件不在可读范围（APK 内、只读分区、需要 root）。
-- 要改的位置有好几种理解，选错代价大。
-- 用户要的是「让它不被限制」这类效果，而这件事超出改一个文本文件能做到的——直说，别绕。
-- 要动的文件是用户自己的数据（聊天记录、照片、账号），不是配置。
+- The file is outside the readable range (inside an APK, on a read-only partition, needs root).
+- The place to change can be understood in several ways, and choosing wrong is costly.
+- What the user wants is an effect such as "make it not be restricted", and that is beyond what editing one text file can do — say so directly, do not go around it.
+- The file to touch is the user's own data (chat history, photos, accounts), not configuration.

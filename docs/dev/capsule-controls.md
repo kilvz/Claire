@@ -1,22 +1,22 @@
-本次胶囊控制与小画面改动基于用户 fork 的 main（188ffe4），入口沿用「设置 › 悬浮胶囊」。
+This capsule-controls and small-screen change is based on the user's fork of main (188ffe4), with the entry point still at 「设置 › 悬浮胶囊」 (Settings › Floating capsule).
 
-## 使用方法
+## How to use
 
-1. **贴边半圆**：先在胶囊设置打开「贴边自动隐藏」（默认关闭）。普通图标静置 3 秒后缩为贴边半圆，并采用现有闲置透明度（默认 40%）；点按半圆先恢复完整图标，再点可展开卡片。新事项需要用户处理、展开的一行提示、打开的卡片、语音或拖动期间保持完整显示。关闭该设置会立即恢复完整胶囊。
-2. **system-toggle / 快捷设置**：在胶囊设置打开「允许添加到快捷设置」，Android 才会把名为「Mika 胶囊」的磁贴列入控制中心可编辑项；关闭后移除这项注册。用户仍需在 Android 控制中心的「编辑」里自行放入磁贴。点磁贴可关闭或恢复胶囊，恢复之前的「一直显示 / 有任务时显示」模式；长按磁贴直接打开 Mika，而不是系统应用详情页。锁屏时先交给系统解锁。手机操作 / 无障碍未设置好或 Mika 处于完全退出状态时，引导用户打开 Mika，不自动授权或启动任务。
-3. **全屏自动隐藏**：在胶囊设置打开「全屏时隐藏胶囊」，默认关闭。前台主屏应用覆盖屏幕且状态栏不可见时隐藏胶囊；退出全屏恢复。任务和通知继续运行。读取失败、分屏、普通 edge-to-edge 页面仍显示胶囊。退出全屏或关闭该选项可以恢复；快捷设置磁贴也可直接关闭胶囊。全屏自动隐藏优先于半圆显示规则，需要处理事项时仍可通过通知进入 Mika。
-4. **展开小画面缩放**：对话页的小画面展开后支持双指捏合；右下角的「− / + / ↺」也可缩小、放大或恢复默认大小。倍率限制为 65–180%，实际窗口还受可用屏幕范围限制，整张画面按比例显示。收起后仍使用原小画面尺寸，再展开时保留当前倍率。缩放只调整预览窗口，不改变后台屏分辨率，也不向后台应用注入手势。
+1. **Edge-attached semicircle**: first enable 「贴边自动隐藏」 (Auto-hide at edge) in capsule settings (off by default). After the normal icon rests for 3 seconds it shrinks into an edge-attached semicircle, using the existing idle opacity (40% by default); tapping the semicircle first restores the full icon, and tapping again expands the card. While there is a new item needing user handling, an expanded one-line notice, an open card, voice, or dragging, it stays fully visible. Turning the setting off immediately restores the full capsule.
+2. **system-toggle / Quick Settings**: enable 「允许添加到快捷设置」 (Allow adding to Quick Settings) in capsule settings, and only then will Android list the tile named 「Mika 胶囊」 (Mika Capsule) among the editable items in the Control Center; turning it off removes this registration. The user still needs to add the tile themselves via 「编辑」 (Edit) in the Android Control Center. Tapping the tile can turn the capsule off or restore it, restoring the previous 「一直显示 / 有任务时显示」 (Always show / Show when there are tasks) mode; long-pressing the tile opens Mika directly instead of the system app details page. When locked, it first hands over to the system to unlock. When phone control / accessibility is not set up, or Mika is fully exited, it guides the user to open Mika, and does not automatically grant permissions or start tasks.
+3. **Auto-hide in full screen**: enable 「全屏时隐藏胶囊」 (Hide capsule in full screen) in capsule settings, off by default. The capsule is hidden when the foreground main-screen app covers the screen and the status bar is not visible; it is restored when exiting full screen. Tasks and notifications keep running. The capsule is still shown when reading fails, in split screen, and on ordinary edge-to-edge pages. Exiting full screen or turning the option off restores it; the Quick Settings tile can also turn the capsule off directly. Full-screen auto-hide takes precedence over the semicircle display rule, and when something needs handling it can still be reached through the notification.
+4. **Expanded small-screen scaling**: after the small screen on the conversation page is expanded, it supports two-finger pinch; the "− / + / ↺" in the lower right can also shrink, enlarge or restore the default size. The scale is limited to 65–180%, the actual window is also limited by the available screen area, and the whole image is displayed proportionally. After collapsing, the original small-screen size is still used, and the current scale is kept when expanding again. Scaling only adjusts the preview window; it does not change the background screen resolution, nor does it inject gestures into background apps.
 
-## 接线和权限边界
+## Wiring and permission boundaries
 
-- CapsuleTileService 只由 Android Quick Settings 绑定，清单要求 BIND_QUICK_SETTINGS_TILE；普通外部 App 无法通过它开关胶囊。组件在清单中默认禁用，用户设置开关只注册或注销这一个组件；系统按需绑定，停止监听后取消状态订阅，不新增常驻前台服务。
-- 磁贴和设置页共用 FeatureFlags 的胶囊模式。关掉磁贴只改变胶囊显示，不停止任务、不改系统开关。开启需要现有无障碍连接；添加磁贴及解锁由 Android 系统确认。
-- CapsuleEdge 决定是否显示半圆，CapsuleEdgeContent 实际只占半圆宽度，避免透明的另一半挡住下面的应用；点击半圆不会同时触发完整胶囊的点击或截图。
-- 全屏检查仅在用户打开选项且胶囊模式启用时运行，每 500 ms 读主屏应用窗口边界与系统状态栏可见性；不读窗口文字、截图或应用内容。厂商的窗口 Insets 行为可能不同，无法确认时不自动隐藏。
-- 自动隐藏会收起已展开的胶囊卡片、放开输入焦点、取消胶囊录音；未发送文字沿用现有收起逻辑保留。恢复后可再次点开。
-- PipSizing 保持图像比例并限制窗口范围。双指手势开始后，剩余单指不会误变成拖动或「需要你」点击；提供按钮供不便使用双指的用户操作。
+- CapsuleTileService is bound only by Android Quick Settings, and the manifest requires BIND_QUICK_SETTINGS_TILE; an ordinary external app cannot toggle the capsule through it. The component is disabled by default in the manifest, and the user's setting switch only registers or unregisters this one component; the system binds it on demand and cancels the state subscription after listening stops, and no permanent foreground service is added.
+- The tile and the settings page share FeatureFlags' capsule mode. Turning the tile off only changes the capsule display; it does not stop tasks or change the system switch. Enabling it requires an existing accessibility connection; adding the tile and unlocking are confirmed by the Android system.
+- CapsuleEdge decides whether to show the semicircle, and CapsuleEdgeContent actually occupies only the semicircle's width, so the transparent other half does not block the app underneath; tapping the semicircle does not simultaneously trigger the full capsule's tap or screenshot.
+- The full-screen check runs only when the user has turned on the option and capsule mode is enabled, reading the main-screen app window bounds and system status bar visibility every 500 ms; it does not read window text, screenshots or app content. Vendors' window Insets behavior may differ, and it does not auto-hide when it cannot be confirmed.
+- Auto-hide collapses an expanded capsule card, releases input focus, and cancels capsule recording; unsent text is kept using the existing collapse logic. It can be tapped open again after restoring.
+- PipSizing keeps the image ratio and limits the window range. Once a two-finger gesture starts, the remaining single finger does not mistakenly become a drag or a 「需要你」 (Needs you) tap; buttons are provided for users who have trouble using two fingers.
 
-## 本地验证
+## Local verification
 
 ```bash
 ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug
@@ -25,29 +25,29 @@ python3 tools/i18n/translations.py check
 python3 -m unittest discover -s tools/i18n -v
 ```
 
-回归覆盖半圆开关与出现时机、需要用户处理时保持显示、安全边缘位置、全屏/分屏/未知状态、恢复原胶囊模式、设置实时变化、缩放边界和比例、磁贴默认不注册及系统绑定权限。
+Regression coverage includes the semicircle switch and when it appears, staying visible when the user needs to handle something, safe edge positions, full-screen/split-screen/unknown states, restoring the original capsule mode, live settings changes, scaling bounds and ratios, the tile not being registered by default and the system binding permission.
 
-设备 UI 用例为 CapsuleEdgeContentTest 和 AgentPipResizeTest，覆盖半圆点按恢复、缩放按钮、收起后的控制隐藏、捏合不误触接管。编译通过不等于这些用例已在设备上运行。
+The device UI cases are CapsuleEdgeContentTest and AgentPipResizeTest, covering semicircle tap-to-restore, the zoom buttons, hiding controls after collapsing, and a pinch not mistakenly triggering takeover. A successful build does not mean these cases have been run on a device.
 
-## 真机验收清单
+## On-device acceptance checklist
 
-- 开启「允许添加到快捷设置」后，控制中心编辑列表出现「Mika 胶囊」；关闭后从可选列表移除。验证磁贴短按快速开关、长按打开 Mika、锁屏解锁、无障碍断开、完全退出后的引导、显示模式恢复。
-- 打开和关闭「贴边自动隐藏」，验证左右贴边半圆与透明度，第一次点按只恢复，3 秒后再次收起；拖动半圆、转屏和键盘弹出后位置；收到需要处理的新事项时显示完整胶囊。
-- 视频 / 游戏的全屏进入与退出、横竖屏、状态栏临时拉出、分屏、打开与关闭自动隐藏；胶囊隐藏期间任务和通知继续运行。
-- 对话页小画面展开后捏合、连续放大缩小、默认大小恢复；手机长屏与横向网页的两端及底部仍可见；缩放不触发点击接管、关闭或后台屏动作。
+- After enabling 「允许添加到快捷设置」, 「Mika 胶囊」 appears in the Control Center edit list; after turning it off it is removed from the selectable list. Verify the tile's short-press quick toggle, long-press to open Mika, lock-screen unlock, accessibility disconnect, guidance after a full exit, and display mode restoration.
+- Turn 「贴边自动隐藏」 on and off, and verify the left and right edge semicircles and their opacity, that the first tap only restores, and that it collapses again after 3 seconds; the position after dragging the semicircle, rotating the screen and the keyboard popping up; the full capsule is shown when a new item needing handling arrives.
+- Full-screen entry and exit for video / games, landscape and portrait, temporary status bar pull-down, split screen, and turning auto-hide on and off; tasks and notifications keep running while the capsule is hidden.
+- After expanding the small screen on the conversation page, pinch, continuously zoom in and out, and restore the default size; both ends and the bottom of a tall phone screen and a landscape web page remain visible; scaling does not trigger tap takeover, closing or background screen actions.
 
-## 验证记录（2026-11-07）
+## Verification record (2026-11-07)
 
-核心 3,010 项测试（2 项默认跳过）、Android 1,603 项单测均无失败；64 项 CLI Python 测试、1 项跨语言契约测试通过。Debug APK 和 Android 设备测试 APK 构建通过。10 项翻译工具测试及 10 种 UI 语言的 2,016 项资源检查通过。
+Core 3,010 tests (2 skipped by default) and Android 1,603 unit tests all passed; 64 CLI Python tests and 1 cross-language contract test passed. The Debug APK and the Android device test APK built successfully. 10 translation tool tests and 2,016 resource checks across 10 UI languages passed.
 
-使用 JDK 17、Gradle 8.11.1、Android SDK 36。本地命令加 --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process；依赖补齐后可加 --offline 复现。日志、XML 结果和生成的摘要保存在任务 worktree 已忽略的 build 目录。
+Used JDK 17, Gradle 8.11.1, Android SDK 36. Local commands added --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process; once dependencies are complete, --offline can be added to reproduce. Logs, XML results and generated summaries are kept in the task worktree's ignored build directory.
 
-未连接 Android 真机，dp2 也没有可用的 KVM 或 Android 模拟器。设备交互用例仅完成编译，半圆手势、磁贴点按、系统解锁、厂商全屏识别及实际缩放效果仍需按清单验收。
+No Android device was connected, and dp2 has no usable KVM or Android emulator either. Device interaction cases only finished compiling; the semicircle gesture, tile tapping, system unlock, vendor full-screen detection and the actual scaling effect still need acceptance per the checklist.
 
-## 从你的 fork 下载测试 APK
+## Downloading a test APK from your fork
 
-功能分支 feat/capsule-controls 每次推送会触发 Mika Dev APK workflow。先在 fork 的 Actions 页启用工作流；构建成功后，进入该次运行的 Artifacts 区域，下载 Mika-Dev-提交号 的 ZIP，解压后安装 APK。归档还含 SHA256SUMS.txt，保留 14 天。
+Each push to the feature branch feat/capsule-controls triggers the Mika Dev APK workflow. First enable the workflow on the fork's Actions page; after a successful build, go to the Artifacts area of that run and download the ZIP named Mika-Dev-<commit>, unzip it and install the APK. The archive also contains SHA256SUMS.txt and is kept for 14 days.
 
-该 workflow 运行 Android 单测并使用 -PdevInstall 构建 com.wangzan101.mika.dev，应用名为 Mika Dev，可与原 Mika 并行安装。它不继承原应用的模型配置与授权；第一次在 Mika Dev 开启胶囊而手机操作 / 无障碍尚未连接时，会打开 Android 无障碍设置，需由用户明确开启 Mika Dev。测试时若两个胶囊重叠，可先关闭原 Mika 的胶囊。构建失败时另上传测试报告。
+The workflow runs Android unit tests and builds com.wangzan101.mika.dev with -PdevInstall; the app name is Mika Dev, and it can be installed alongside the original Mika. It does not inherit the original app's model configuration and authorizations; the first time the capsule is enabled in Mika Dev while phone control / accessibility is not yet connected, it opens the Android accessibility settings, and the user must explicitly enable Mika Dev. If the two capsules overlap during testing, you can first turn off the original Mika's capsule. If the build fails, a test report is uploaded separately.
 
-workflow_dispatch 可用于手动选择构建分支，但 GitHub 只为默认分支已登记的 workflow 显示手动运行入口；本功能分支首次构建直接由 push 触发，无须为了运行 CI 合入 main。
+workflow_dispatch can be used to manually choose the build branch, but GitHub only shows the manual run entry for a workflow already registered on the default branch; the first build of this feature branch is triggered directly by push, with no need to merge into main just to run CI.

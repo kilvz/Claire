@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 plugins/ 下的每个插件打成可安装的 zip(manifest.json 在 zip 根,skills/scripts/docs 原样带入)。"""
+"""Pack each plugin under plugins/ into an installable zip (manifest.json at the zip root; skills/scripts/docs carried over as they are)."""
 import json
 import os
 import sys

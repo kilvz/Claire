@@ -1,28 +1,31 @@
-## 1. 修复
+## 1. Fix
 
-- [x] 1.1 `MarkdownModel.workspaceRefs`：抽出 Link/Image 目标后按 `ProxyAddress` 先例做
-  宽容百分号解码（`+` 预替换成 `%2B`、`runCatching` 失败保留原串），解码后去重返回
-- [x] 1.2 确认 `WorkspaceRef.outputRefsParsed` 无需改动（normalize 过滤在解码后仍把关
-  `..` 与越界）
+- [x] 1.1 `MarkdownModel.workspaceRefs`: after extracting Link/Image destinations, do lenient percent decoding
+  following the `ProxyAddress` precedent (`+` pre-replaced with `%2B`, `runCatching` keeps the original string
+  on failure), then deduplicate and return
+- [x] 1.2 Confirm `WorkspaceRef.outputRefsParsed` needs no changes (the normalize filter still guards `..` and
+  out-of-bounds paths after decoding)
 
-## 2. 测试
+## 2. Tests
 
-- [x] 2.1 `MarkdownModelTest`：`%20`、中文 `%E6%8A%A5`、字面 `+`、非法 `%` 序列、
-  `<>` 裸形式不受影响、`%2F` 解码后仍被 normalize 圈住
-- [x] 2.2 `WorkspaceRefTest`：编码引用解析出的 `Item.path` 为解码路径、照片分类正确、
-  越界编码引用（如 `%2E%2E`）被丢弃
-- [x] 2.3 跑 `:app:testDebugUnitTest` 相关过滤与 `:core:test` 全量，确认无回归
+- [x] 2.1 `MarkdownModelTest`: `%20`, Chinese `%E6%8A%A5`, literal `+`, invalid `%` sequences, the bare `<>` form
+  unaffected, `%2F` still confined by normalize after decoding
+- [x] 2.2 `WorkspaceRefTest`: the `Item.path` parsed from encoded references is the decoded path, photo
+  classification is correct, out-of-bounds encoded references (such as `%2E%2E`) are dropped
+- [x] 2.3 Run the relevant filters of `:app:testDebugUnitTest` and the full `:core:test`, confirm no regressions
 
-## 3. 主回答接线（真机走查发现：Done/Cancelled 不渲染引用卡片）
+## 3. Wiring the main answer (found in the real-device walkthrough: Done/Cancelled do not render reference cards)
 
-- [x] 3.1 `StatusCard` 加 `conversationId` 参数（`exchange()` 调用处传入），`Done` 的回答
-  与 `Cancelled` 的 summary 在 `MarkdownText` 下、`ReplyActions` 上画 `OutputRefs`，
-  点开照 `FinishedReply` 的 `openSent` + 失败 toast
-- [x] 3.2 重装修复版真机复测：任务回答含 `%20`/`%E6` 引用时卡片出现、名字解码、点开能打开，
-  截图取证
+- [x] 3.1 Add a `conversationId` parameter to `StatusCard` (passed at the `exchange()` call site), draw
+  `OutputRefs` for the `Done` answer and the `Cancelled` summary below `MarkdownText` and above `ReplyActions`,
+  and open following `FinishedReply`'s `openSent` + failure toast
+- [x] 3.2 Retest on a real device with the rewired fixed build: when the task answer contains `%20`/`%E6`
+  references, the cards appear, the names are decoded, and opening works; capture screenshots as evidence
 
-## 4. 交付
+## 4. Delivery
 
-- [ ] 4.1 提交（中文提交信息）、推分支 `fix/workspace-ref-percent-decode`、建 PR 关联
-  产出引用功能背景，正文附单测结果与 commonmark 0.30.1 行为实证说明
-- [ ] 4.2 等 CI 四组（app/core/cli/relay）全绿；真机走查取证存 `evidence/` 并补进 PR
+- [ ] 4.1 Commit (Chinese commit message), push the branch `fix/workspace-ref-percent-decode`, open a PR linking
+  the output-reference feature background, with the unit-test results and the evidence for commonmark 0.30.1
+  behaviour in the body
+- [ ] 4.2 Wait for all four CI groups (app/core/cli/relay) to go green; store the real-device walkthrough
+  evidence in `evidence/` and add it to the PR

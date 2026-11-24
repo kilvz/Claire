@@ -1,40 +1,40 @@
-# 设计：电脑连接端口可自定义（issue #392）
+# Design: customizable computer connection port (issue #392)
 
 ## Context
 
-`McpSettings`（mcp.json）读取时已支持 `port`（1024–65535，默认 8765），但没有写入口；运行时全链路动态：
-- `McpRuntime.startServer` 用 `settings.port` 建 `RemoteHost`（绑定失败抛异常 → `McpServerState.Failed`）
-- `sync()` 在 USB 开着时用实际绑定端口发布 `mcp-usb.json`（`McpUsb.info(port,…)`，`forward` 命令同源）
-- `writeUsbScript()` 用 `settings.port` 生成 `connect-computer.sh`（内容含端口，仅在变化时重写）
-- CLI 每次调用从 `mcp-usb.json` 读端口，无需改动
-- `McpService` 通知文案带端口，`onStartCommand` 每次重建
+`McpSettings` (mcp.json) already supports `port` (1024–65535, default 8765) when reading, but there is no write entry point; at runtime the whole chain is dynamic:
+- `McpRuntime.startServer` creates a `RemoteHost` with `settings.port` (a bind failure throws → `McpServerState.Failed`)
+- `sync()` publishes `mcp-usb.json` with the actual bound port while USB is on (`McpUsb.info(port,…)`; the `forward` command comes from the same source)
+- `writeUsbScript()` generates `connect-computer.sh` with `settings.port` (the content contains the port and is rewritten only when it changes)
+- The CLI reads the port from `mcp-usb.json` on each call, so no change is needed
+- The `McpService` notification text includes the port, and `onStartCommand` rebuilds it every time
 
 ## Goals / Non-Goals
 
-**Goals:** 高级区可改端口，保存即热生效（重绑/重写脚本/重发布/换通知）；存量手工配置完全兼容。
+**Goals:** The port can be changed in the advanced section and takes effect immediately on save (rebind/rewrite the script/republish/update the notification); existing manual configurations remain fully compatible.
 
-**Non-Goals:** CLI/Skill 侧、中继网关（relay）、自动换端口重试（占用时报错并显示即可，与现状一致）。
+**Non-Goals:** The CLI/Skill side, the relay gateway (relay), and automatic retry on another port when the port is taken (just error and display it, the same as now).
 
 ## Decisions
 
-1. **`McpSettings.setPort(port: Int)`，`port` 从 `val` 改为 `@Volatile private var` + getter。**
-   读取校验规则（1024–65535）原样用于 setter：`require` 之外不静默纠正——范围约束在 UI 对话框先拦，存储层兜底。`save()` 本来就写 `port` 字段，无需改格式。
+1. **`McpSettings.setPort(port: Int)`, with `port` changed from `val` to `@Volatile private var` + getter.**
+   The read validation rule (1024–65535) is used as-is for the setter: nothing is silently corrected beyond `require` — the range is stopped first in the UI dialog, with the storage layer as the backstop. `save()` already writes the `port` field, so no format change is needed.
 
-2. **端口变化的重绑放在 `sync()`：`host != null && (hostListen != want || host!!.boundPort != settings.port)` 就 `stopListener()`。**
-   `RemoteHost` 绑定精确端口（占用即抛），`boundPort` 即实际监听端口，可当变化检测依据。不引入额外的 hostPort 字段。
+2. **Rebinding on a port change lives in `sync()`: `host != null && (hostListen != want || host!!.boundPort != settings.port)` triggers `stopListener()`.**
+   `RemoteHost` binds the exact port (throwing if it is taken), and `boundPort` is the actual listening port, which can serve as the basis for change detection. No extra hostPort field is introduced.
 
-3. **入口 `McpRuntime.setPort(port)` = `settings.setPort` + `writeUsbScript()` + `apply()`。**
-   `apply()` 沿用开关的既有路径：有一种开着 → `ensureRunning()` 重起服务 → `onStartCommand` 重建通知 + `sync()`（重绑 + 重新发布 info）；都关着 → 只存设置、重写脚本。`writeUsbScript` 幂等（内容没变不写盘）。
+3. **The entry point `McpRuntime.setPort(port)` = `settings.setPort` + `writeUsbScript()` + `apply()`.**
+   `apply()` follows the switches' existing path: if either one is on → `ensureRunning()` restarts the service → `onStartCommand` rebuilds the notification + `sync()` (rebind + republish info); if both are off → only store the setting and rewrite the script. `writeUsbScript` is idempotent (nothing is written to disk if the content has not changed).
 
-4. **UI 放在「高级」区（现在只有 USB/网络两个开关和端口脚注）。**
-   把端口脚注升级成可点的「监听端口」行 + 对话框：预设「默认 8765」+ 数字输入（5 位以内、只收数字），应用按钮仅在 1024–65535 时可用。`ComputerAccessUi` 增加 `onPortChange: (Int) -> Unit` 传到底层，与其它回调同构。
+4. **The UI goes in the 「高级」 (Advanced) section (which currently has only the two switches, USB/network, and a port footnote).**
+   Upgrade the port footnote into a tappable 「监听端口」 (Listen port) row + dialog: a 「默认 8765」 (Default 8765) preset + a numeric input (up to 5 digits, digits only), with the apply button enabled only for 1024–65535. `ComputerAccessUi` gains `onPortChange: (Int) -> Unit` passed down to the lower layer, isomorphic to the other callbacks.
 
 ## Risks / Trade-offs
 
-- [运行中改端口，已连电脑的会话断] → 这正是改端口的目的（换到可用端口）；`mcp-usb.json` 重新发布 + 脚本提示新 `forward` 命令，电脑侧重连即可；与换令牌的破坏性一致且更小。
-- [热重绑瞬间有短暂不可用] → 开关切换本就经停/起服务，路径相同；绑定失败时 `McpServerState.Failed` 照常显示原因，用户可再换。
-- [范围校验两处（UI + require）] → UI 负责体验、存储层兜底，规则同源常量（1024..65535 已在读取侧）。
+- [Changing the port while running disconnects sessions already connected to the computer] → That is exactly the point of changing the port (moving to an available port); `mcp-usb.json` is republished + the script shows the new `forward` command, so the computer side simply reconnects; the disruption is on par with rotating the token, and smaller.
+- [A brief moment of unavailability during the hot rebind] → Toggling the switches already stops/starts the service through the same path; on a bind failure `McpServerState.Failed` still shows the reason as usual, and the user can change the port again.
+- [Range validation in two places (UI + require)] → The UI handles the experience, the storage layer is the backstop, and the rule comes from the same constant (1024..65535 already on the read side).
 
 ## Migration Plan
 
-纯增量：默认行为不变；手工写过 `port` 的用户照旧。回滚即还原代码，mcp.json 多写的合法 port 字段旧代码也能读。
+Purely additive: default behavior is unchanged; users who have manually written `port` are unaffected. Rolling back just reverts the code, and the old code can also read a valid port field written into mcp.json.

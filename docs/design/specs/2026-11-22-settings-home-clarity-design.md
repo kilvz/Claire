@@ -1,27 +1,27 @@
-# 设置首页信息精简设计
+# Settings home information simplification design
 
-## 目标与原因
+## Goal and rationale
 
-设置首页只承担入口导航和当前状态展示，减少复述标题、罗列详情页内容的常驻副标题，避免文字换行和行高膨胀。用户已在本地 demo 中确认首页方向。
+The settings home is responsible only for entry navigation and showing current status, with fewer permanent subtitles that restate titles or list details-page content, avoiding text wrapping and inflated line heights. The user has already confirmed the home direction in the local demo.
 
-## 范围
+## Scope
 
-- 只修改设置首页的入口，以及「一切就绪」成功状态卡。
-- 移除首页 16 个入口的静态副标题；成功状态卡不再显示「模型已配置 · 手机操作可用」。
-- 保留全部入口、分组、图标、点击回调、开关、状态胶囊、行尾动态值和版本号。
-- 异常状态卡继续显示具体问题、处理说明和修复按钮。
+- Only change the entries on the settings home page, plus the 「一切就绪」 (All ready) success status card.
+- Remove the static subtitles from the 16 entries on the home page; the success status card no longer shows 「模型已配置 · 手机操作可用」 (Model configured · Phone control available).
+- Keep all entries, groups, icons, click callbacks, toggles, status pills, row-end dynamic values and the version number.
+- Error status cards continue to show the specific problem, what to do, and a fix button.
 
-## 非目标
+## Non-goals
 
-- 不修改任务运行、高级及其他二级、三级页面。
-- 不改变列表行、状态卡的共享接口或默认样式。
-- 不删除字符串资源；相同文案仍可能由其他页面使用。
-- 不调整导航结构、字号、间距、颜色或图标。
+- Do not modify task running, advanced, or other second- and third-level pages.
+- Do not change the shared interface or default style of list rows or status cards.
+- Do not delete string resources; the same copy may still be used by other pages.
+- Do not adjust navigation structure, font sizes, spacing, colors or icons.
 
-## 实现方式
+## Implementation
 
-在首页各个列表行调用点省略静态 subtitle，而不是全局隐藏副标题。「一切就绪」状态卡仅在无问题时传入空副标题；有问题时保持现有 StatusCopy.banner 内容。这样把改动限制在首页，不影响其他调用者。
+Omit the static subtitle at each list-row call site on the home page, rather than hiding subtitles globally. The 「一切就绪」 status card passes an empty subtitle only when there are no problems; when there are problems it keeps the existing StatusCopy.banner content. This confines the change to the home page and does not affect other callers.
 
-## 验证
+## Verification
 
-新增 Compose 测试覆盖所有可选首页入口，断言静态副标题消失；现有测试继续验证动态状态、导航、开关和异常修复提示。运行 `SettingsScreenTest` 真机目标测试并检查最终 diff，确认没有二级、三级页面改动。
+Add Compose tests covering all selectable home entries, asserting that the static subtitles are gone; existing tests continue to verify dynamic status, navigation, toggles and error-fix prompts. Run the `SettingsScreenTest` on-device target test and review the final diff to confirm there are no second- or third-level page changes.

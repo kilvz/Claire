@@ -1,36 +1,36 @@
-# 跨屏循环原语 `do_each`：重复任务一次思考、多次执行
+# Cross-screen loop primitive `do_each`: think once, execute many times for repetitive tasks
 
 ## Why
 
-真实运行记录里，「同一动作对多个条目重复做」的任务，agent 是逐条「观察→动手→观察」地做，每轮都重发整段历史 + 一张新截图，成本按 O(N²) 累积。例证：
+In real run records, for tasks that "repeat the same action across multiple items", the agent does them item by item as "observe→act→observe", resending the entire history + a new screenshot every round, with cost accumulating as O(N²). Examples:
 
-- 看广告领福利的真实记录（`20261114-223716-79pbvk`）：35 轮模型调用只做了「看 3 个广告、各领一次」；`wait`+`observe` 轮询 14 次、关广告 `tap` 12 次、`do_steps`/`phone_run` 0 次；输入 token 从 15K 涨到 148K。
-- 投递打招呼类任务「点开→打招呼→返回 ×N」同理：跨屏循环，手机上无工具可表达。
+- The real record for watching ads for rewards (`20261114-223716-79pbvk`): 35 model calls accomplished only "watch 3 ads and claim once each"; `wait`+`observe` polled 14 times, closing ads took 12 `tap`s, with 0 `do_steps`/`phone_run`; input tokens grew from 15K to 148K.
+- Outreach greeting tasks "open→greet→return ×N" are the same: a cross-screen loop with no phone tool to express it.
 
-根因两层（详见 design）：
+The root causes are two layers (see design for details):
 
-1. **能力层**：手机侧没有「循环」原语——`do_steps` 只批单屏线性，`phone_run` 跨屏但线性，只有网页 `web_script` 能循环（但要写整个 JS 程序）。「跨屏循环」这一形状，手机无工具可填。
-2. **决策层**：没有机制让模型「认出重复、commit 一个循环」；`batch.md` 只教填表单，`effect`/`guard` 词汇把「重复」读作「卡死」、把「验证」读作「美德」。
+1. **Capability layer**: the phone side has no "loop" primitive — `do_steps` only batches single-screen linear work, `phone_run` is cross-screen but linear, and only the web `web_script` can loop (but requires writing a whole JS program). There is no phone tool that fills the "cross-screen loop" shape.
+2. **Decision layer**: there is no mechanism that lets the model "recognize repetition and commit to a loop"; `batch.md` only teaches filling forms, and the `effect`/`guard` vocabulary reads "repetition" as "stuck" and "verification" as "virtue".
 
 ## What Changes
 
-- 新增跨屏循环原语 **`do_each`**，一个工具同时服务手机与网页：声明式表达「对若干条目，逐个执行同一段步骤」，一次思考、引擎多次执行。
-- 循环结构（找下一个 / 跳过已做 / 执行循环体 / 终止 / 结果汇总）共用；唯一按屏面分派的是「一条 item 怎么认」（手机 a11y vs 网页 DOM）与动作执行器（已由 ActionExecutor 抽象）。
-- 决策层**先只落措辞、不动运行时**：`batch.md` 增加「重复 → do_each」的教导与真实例子；`guard.same_state` 的豁免从「carry on」升级为「剩下 N 个同类条目，用 do_each 一次做完」；新增 `do_each.md`。
-- 运行时重复识别 / 计划阶段作为后续方向，本设计只在引擎里留汇报形态（紧凑摘要），不实现识别逻辑。
+- New cross-screen loop primitive **`do_each`**, one tool serving both phone and web: declaratively express "for several items, execute the same steps on each", thinking once and letting the engine execute many times.
+- The loop structure (find next / skip done / execute body / terminate / summarize results) is shared; the only surface-dispatched parts are "how one item is recognized" (phone a11y vs web DOM) and the action executor (already abstracted by ActionExecutor).
+- The decision layer **changes wording only, no runtime changes at first**: `batch.md` gains the "repetition → do_each" teaching and a real example; the `guard.same_state` exemption is upgraded from "carry on" to "there are N similar items left, finish them in one go with do_each"; new `do_each.md`.
+- Runtime repetition detection / a planning phase are future directions; this design only leaves the reporting shape (a compact summary) in the engine, without implementing detection logic.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `do-each`: 跨屏循环原语——item 定位（按屏面分派）、循环体步骤（复用 do_steps 步骤语义）、跳过/终止条件、逐轮 guard、紧凑结果摘要。
+- `do-each`: a cross-screen loop primitive — item location (dispatched by surface), loop body steps (reusing do_steps step semantics), skip/termination conditions, per-round guard, compact result summary.
 
 ### Modified Capabilities
 
-- `batch`（`batch.md` 措辞）、`feedback`（`guard.same_state` 措辞）——仅文字。
+- `batch` (`batch.md` wording), `feedback` (`guard.same_state` wording) — text only.
 
 ## Impact
 
-- core：新增循环执行器（与 `BatchRunner` 同族）——item 定位器接口 + 循环控制 + 结果摘要；`Verb.DoEach`、`AgentTool` 注册 `do_each`、`ToolSpec` 生成。
-- 屏面接线：手机 item 定位走 a11y 树（role/text/resourceId），网页走 DOM（cssSelector/role）；动作走现有执行与录制路径（send/post/pay 等受控动作照常过闸）。
-- prompts：新增 `tools/do_each.md`；改 `capabilities/batch.md`、`feedback/loop.md`（`guard.same_state`）。
+- core: new loop executor (same family as `BatchRunner`) — item locator interface + loop control + result summary; `Verb.DoEach`, `AgentTool` registering `do_each`, `ToolSpec` generation.
+- Surface wiring: phone item location goes through the a11y tree (role/text/resourceId), web goes through the DOM (cssSelector/role); actions go through the existing execution and recording path (controlled actions like send/post/pay pass the gate as usual).
+- prompts: new `tools/do_each.md`; changes to `capabilities/batch.md`, `feedback/loop.md` (`guard.same_state`).

@@ -1,20 +1,20 @@
-## 1. 模型回调带上 HTTP 状态
+## 1. Model callbacks carry the HTTP status
 
-- [x] 1.1 `GeminiModel`：`onRateLimit: ((String, Long?) -> Unit)?` 改为 `onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)?`，complete / completeStreaming 两处回调传入实际状态码；换 key 重试逻辑不动。
-- [x] 1.2 `OpenAiCompatModel`：同 1.1（complete / completeStreaming 共两处调用点）。
+- [x] 1.1 `GeminiModel`: change `onRateLimit: ((String, Long?) -> Unit)?` to `onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)?`, and pass the actual status code into both callbacks (complete / completeStreaming); the switch-key retry logic is untouched.
+- [x] 1.2 `OpenAiCompatModel`: same as 1.1 (two call sites in total, complete / completeStreaming).
 
-## 2. 接线处按状态分流
+## 2. Routing by status at the wiring site
 
-- [x] 2.1 `KeyPoolManager.markRejected(providerId, key, status, retryAfterMs)`：429 → `markRateLimited`，401/403 → `markExhausted`；`ProviderStore.buildModel` 两处接线改调它。
-- [x] 2.2 `activeApiKey` 全池耗尽时回落第一个 key 的现状保持（单坏 key 如实报错，测试 `authFailureMarksKeyExhaustedThroughWiredModel` 未改动该路径）。
+- [x] 2.1 `KeyPoolManager.markRejected(providerId, key, status, retryAfterMs)`: 429 → `markRateLimited`, 401/403 → `markExhausted`; both wiring sites in `ProviderStore.buildModel` call it instead.
+- [x] 2.2 Keep the current behavior where `activeApiKey` falls back to the first key when the whole pool is exhausted (a single bad key reports the error honestly; the test `authFailureMarksKeyExhaustedThroughWiredModel` does not change that path).
 
-## 3. 测试
+## 3. Tests
 
-- [x] 3.1 `:core` 模型层：MockWebServer 返回 401/403/429，断言回调收到对应状态码并换 key 重试（OpenAiCompatModelTest +2、GeminiModelTest +1）。
-- [x] 3.2 `:app` 接线层：`ProviderStoreTest.authFailureMarksKeyExhaustedThroughWiredModel`——真 buildModel 走 MockWebServer，401 后池里只剩好 key。
-- [x] 3.3 回归：`./gradlew :core:test :app:testDebugUnitTest :core:cliTest` + `tools/i18n` 12 项 + `translations.py check` 全绿。
+- [x] 3.1 `:core` model layer: MockWebServer returns 401/403/429, assert the callback receives the corresponding status code and switches key to retry (OpenAiCompatModelTest +2, GeminiModelTest +1).
+- [x] 3.2 `:app` wiring layer: `ProviderStoreTest.authFailureMarksKeyExhaustedThroughWiredModel` — the real buildModel goes through MockWebServer, and after a 401 only the good key remains in the pool.
+- [x] 3.3 Regression: `./gradlew :core:test :app:testDebugUnitTest :core:cliTest` + all 12 items of `tools/i18n` + `translations.py check` green.
 
-## 4. 验证与收尾
+## 4. Verification and wrap-up
 
-- [x] 4.1 mock 端点行为证据落在 `evidence/evidence.md`（模型 HTTP 层为纯 JVM 代码，无真机专项）。
-- [ ] 4.2 提交分支、推 fork、开 PR（标题按「现状 → 改动」惯例），等 CI 四组全绿。
+- [x] 4.1 Behavioral evidence for the mock endpoint goes into `evidence/evidence.md` (the model HTTP layer is pure JVM code, so no real-device task applies).
+- [ ] 4.2 Commit the branch, push the fork, open a PR (title following the 「现状 → 改动」 (current state → change) convention), and wait for all four CI groups to go green.

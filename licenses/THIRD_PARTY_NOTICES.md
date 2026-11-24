@@ -1,11 +1,11 @@
 # Third-party notices
 
-## 通话功能（calls/）实现
+## Call feature (calls/) implementation
 
-- Source: https://github.com/DzsGatsby/FlashPhone（Mika 的 Apache-2.0 fork）
+- Source: https://github.com/DzsGatsby/FlashPhone (Mika's Apache-2.0 fork)
 - License: Apache-2.0
-- Usage: 通话功能（拨号、接听、挂断、AI 接听、人工接管、PCM 音频桥、实时语音客户端）按上游
-  Apache-2.0 许可并入,涉及:
+- Usage: The call feature (dialing, answering, hanging up, AI answering, manual takeover, PCM audio bridge, real-time voice client) is incorporated under the upstream
+  Apache-2.0 license, covering:
   - `app/src/main/java/com/wangzan101/mika/calls/`
   - `app/src/main/java/com/wangzan101/mika/cap/phone/shell/ShellCallAudio.kt`
   - `core/src/main/kotlin/com/wangzan101/mika/core/calls/`
@@ -13,7 +13,7 @@
   - `app/src/test/java/com/wangzan101/mika/cap/phone/shell/ShellCallAudioTest.kt`
   - `app/src/test/java/com/wangzan101/mika/ui/CallDeviceReadinessTest.kt`
   - `core/src/test/kotlin/com/wangzan101/mika/core/mcp/McpCallToolsTest.kt`
-- Modifications: 默认问候语等产品文案按 Mika 调整为「Mika AI 电话助手」,相关测试断言随之同步。
+- Modifications: Product copy such as the default greeting was adjusted to "Mika AI call assistant" for Mika, and the related test assertions were updated accordingly.
 - Additional port: FlashPhone v1.1.6–v1.1.12 (through `8bcd8d89a20141f47d4d24c61debc42dabaa2676`):
   foreground voice briefing (`calls/briefing/`, `ui/CallVoiceBriefingHost.kt`), call-bound DTMF
   (`CallDtmfExecutor`, `ui/CallDtmfKeypad.kt`), protocol/ASR fixes and their unit/UI tests.
@@ -22,14 +22,14 @@
 - Follow-up port: FlashPhone v1.1.13 (`554e69207de151329f71821f915cde997f8e69fc`),
   per-carrier-call task binding and compact latest-transcript context; adapted to Mika's
   existing call card and transcript role labels, with ownership/lifetime regressions.
-- Service: 实时语音经火山引擎（Volcengine）的 WebSocket 接口,凭证由用户在通话设置页填写。
+- Service: Real-time voice goes through the Volcengine WebSocket API; credentials are entered by the user on the call settings page.
 
 ## scrcpy
 
 - Project: https://github.com/Genymobile/scrcpy
 - License: Apache-2.0
-- Usage: 以 shell 身份取得系统上下文(ActivityThread / 伪装包名的 Context)的做法仿照 scrcpy。
-  源文件头部保留出处:
+- Usage: The approach of obtaining a system context as the shell user (ActivityThread / a Context with a disguised package name) follows scrcpy.
+  The source file headers retain the attribution:
   - `app/src/main/java/com/wangzan101/mika/shell/ShellContext.kt`
 
 ## Apache Commons Compress
@@ -37,8 +37,8 @@
 - Project: https://commons.apache.org/
 - Artifact: `org.apache.commons:commons-compress:1.28.0`
 - License: Apache-2.0
-- Usage: 以库的形式依赖,用于流式解包沙箱根文件系统的 tar.gz
-  (`core/src/main/kotlin/com/wangzan101/mika/core/cap/sandbox/RootfsExtractor.kt`)。
+- Usage: Used as a library dependency to stream-extract the tar.gz of the sandbox root filesystem
+  (`core/src/main/kotlin/com/wangzan101/mika/core/cap/sandbox/RootfsExtractor.kt`).
 - NOTICE:
 
 ```
@@ -54,7 +54,7 @@ The Apache Software Foundation (https://www.apache.org/).
 - Project: https://commons.apache.org/
 - Artifact: `commons-codec:commons-codec:1.19.0`
 - License: Apache-2.0
-- Usage: Apache Commons Compress 的传递依赖。
+- Usage: Transitive dependency of Apache Commons Compress.
 - NOTICE:
 
 ```
@@ -70,7 +70,7 @@ The Apache Software Foundation (https://www.apache.org/).
 - Project: https://commons.apache.org/
 - Artifact: `commons-io:commons-io:2.20.0`
 - License: Apache-2.0
-- Usage: Apache Commons Compress 的传递依赖。
+- Usage: Transitive dependency of Apache Commons Compress.
 - NOTICE:
 
 ```
@@ -86,7 +86,7 @@ The Apache Software Foundation (https://www.apache.org/).
 - Project: https://commons.apache.org/
 - Artifact: `org.apache.commons:commons-lang3:3.18.0`
 - License: Apache-2.0
-- Usage: Apache Commons Compress 的传递依赖。
+- Usage: Transitive dependency of Apache Commons Compress.
 - NOTICE:
 
 ```
@@ -97,27 +97,27 @@ This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
 ```
 
-## Kotlin 标准库
+## Kotlin standard library
 
 - Project: https://kotlinlang.org/
-- Artifacts: `org.jetbrains.kotlin:kotlin-stdlib:2.1.20`、`kotlin-stdlib-common:2.1.20`、`kotlin-stdlib-jdk7:1.9.10`、
-  `kotlin-stdlib-jdk8:1.9.10`;`org.jetbrains:annotations:23.0.0`
-- License: Apache-2.0(依据各自 POM)
-- Usage: 以库的形式依赖,打进 APK。
+- Artifacts: `org.jetbrains.kotlin:kotlin-stdlib:2.1.20`, `kotlin-stdlib-common:2.1.20`, `kotlin-stdlib-jdk7:1.9.10`,
+  `kotlin-stdlib-jdk8:1.9.10`; `org.jetbrains:annotations:23.0.0`
+- License: Apache-2.0 (per each POM)
+- Usage: Used as a library dependency, packaged into the APK.
 
 ## kotlinx.coroutines
 
 - Project: https://github.com/Kotlin/kotlinx.coroutines
-- Artifacts: `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0`、`kotlinx-coroutines-core-jvm:1.9.0`、`kotlinx-coroutines-android:1.9.0`
-- License: Apache-2.0(依据各自 POM)
-- Usage: 以库的形式依赖,打进 APK。
+- Artifacts: `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0`, `kotlinx-coroutines-core-jvm:1.9.0`, `kotlinx-coroutines-android:1.9.0`
+- License: Apache-2.0 (per each POM)
+- Usage: Used as a library dependency, packaged into the APK.
 
 ## kotlinx.serialization
 
 - Project: https://github.com/Kotlin/kotlinx.serialization
-- Artifacts: `org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3`、`kotlinx-serialization-json:1.7.3`(及其 `-jvm` 变体)
-- License: Apache-2.0(依据各自 POM)
-- Usage: 以库的形式依赖,打进 APK。
+- Artifacts: `org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3`, `kotlinx-serialization-json:1.7.3` (and their `-jvm` variants)
+- License: Apache-2.0 (per each POM)
+- Usage: Used as a library dependency, packaged into the APK.
 
 ## OpenTelemetry
 
@@ -137,111 +137,111 @@ The Apache Software Foundation (https://www.apache.org/).
 
 - Project: https://square.github.io/okhttp/
 - Artifact: `com.squareup.okhttp3:okhttp:4.12.0`
-- License: Apache-2.0(依据 POM)
-- Usage: 以库的形式依赖,用于访问模型接口。
+- License: Apache-2.0 (per the POM)
+- Usage: Used as a library dependency to access model APIs.
 
 ## Okio
 
 - Project: https://github.com/square/okio/
-- Artifacts: `com.squareup.okio:okio:3.6.0`、`okio-jvm:3.6.0`
-- License: Apache-2.0(依据各自 POM)
-- Usage: OkHttp 的依赖。
+- Artifacts: `com.squareup.okio:okio:3.6.0`, `okio-jvm:3.6.0`
+- License: Apache-2.0 (per each POM)
+- Usage: A dependency of OkHttp.
 
-## AndroidX(含 Jetpack Compose)
+## AndroidX (including Jetpack Compose)
 
 - Project: https://developer.android.com/jetpack/androidx
-- License: Apache-2.0(依据各自 POM;`androidx.compose:compose-bom:2024.12.01` 只是版本清单,不含代码)
-- Artifacts(release 运行时类路径里的全部 AndroidX 组件):
-  - Compose 1.7.6:`compose.runtime:runtime`、`runtime-saveable`;`compose.ui:ui`、`ui-geometry`、`ui-graphics`、`ui-text`、
-    `ui-unit`、`ui-util`;`compose.foundation:foundation`、`foundation-layout`;`compose.animation:animation`、`animation-core`;
-    `compose.material:material-icons-core`、`material-ripple`(以上各含 `-android` 变体)
+- License: Apache-2.0 (per each POM; `androidx.compose:compose-bom:2024.12.01` is only a version list and contains no code)
+- Artifacts (all AndroidX components on the release runtime classpath):
+  - Compose 1.7.6: `compose.runtime:runtime`, `runtime-saveable`; `compose.ui:ui`, `ui-geometry`, `ui-graphics`, `ui-text`,
+    `ui-unit`, `ui-util`; `compose.foundation:foundation`, `foundation-layout`; `compose.animation:animation`, `animation-core`;
+    `compose.material:material-icons-core`, `material-ripple` (each of the above also has a `-android` variant)
   - `compose.material3:material3:1.3.1`
-  - `activity:activity`、`activity-ktx`、`activity-compose`:1.9.3
-  - `window:window`、`window-core`:1.3.0(折叠姿态与铰链信息)
-  - `lifecycle:*`(common、common-java8、livedata-core、process、runtime、runtime-compose、runtime-ktx、viewmodel、
-    viewmodel-ktx、viewmodel-savedstate):2.8.3
-  - `core:core`、`core-ktx`:1.13.1;`annotation:annotation`:1.8.1;`annotation-experimental`:1.4.1;
-    `arch.core:core-common`、`core-runtime`:2.2.0;`collection:collection`、`collection-ktx`:1.4.4;
-    `savedstate:savedstate`、`savedstate-ktx`:1.2.1;`emoji2:emoji2`:1.3.0;`profileinstaller`:1.3.1;
-    `startup:startup-runtime`:1.1.1;`concurrent:concurrent-futures`:1.1.0;`autofill`:1.0.0;
-    `customview:customview-poolingcontainer`:1.0.0;`graphics:graphics-path`:1.0.1;`interpolator`:1.0.0;
-    `tracing`:1.0.0;`versionedparcelable`:1.1.1;`webkit:webkit`:1.12.1(内置浏览器)
-- Usage: 界面与系统组件库,打进 APK。
+  - `activity:activity`, `activity-ktx`, `activity-compose`: 1.9.3
+  - `window:window`, `window-core`: 1.3.0 (fold posture and hinge information)
+  - `lifecycle:*` (common, common-java8, livedata-core, process, runtime, runtime-compose, runtime-ktx, viewmodel,
+    viewmodel-ktx, viewmodel-savedstate): 2.8.3
+  - `core:core`, `core-ktx`: 1.13.1; `annotation:annotation`: 1.8.1; `annotation-experimental`: 1.4.1;
+    `arch.core:core-common`, `core-runtime`: 2.2.0; `collection:collection`, `collection-ktx`: 1.4.4;
+    `savedstate:savedstate`, `savedstate-ktx`: 1.2.1; `emoji2:emoji2`: 1.3.0; `profileinstaller`: 1.3.1;
+    `startup:startup-runtime`: 1.1.1; `concurrent:concurrent-futures`: 1.1.0; `autofill`: 1.0.0;
+    `customview:customview-poolingcontainer`: 1.0.0; `graphics:graphics-path`: 1.0.1; `interpolator`: 1.0.0;
+    `tracing`: 1.0.0; `versionedparcelable`: 1.1.1; `webkit:webkit`: 1.12.1 (built-in browser)
+- Usage: UI and system component libraries, packaged into the APK.
 
 ## PRoot
 
 - Project: PRoot
-- Copyright: Copyright (C) 2015 STMicroelectronics(作者名单见源码包内 `AUTHORS`)
-- License: GPL-2.0-or-later,全文见 `licenses/GPL-2.0.txt`
+- Copyright: Copyright (C) 2015 STMicroelectronics (author list in `AUTHORS` inside the source archive)
+- License: GPL-2.0-or-later, full text in `licenses/GPL-2.0.txt`
 - Source: https://github.com/proot-me/proot/archive/refs/tags/v5.4.0.tar.gz
 - Version: 5.4.0
 - SHA-256 (source archive): 29248aac2a7ce10c3bd5ee5602742ec33b2532310ff9cf73b79f3c133e5a5f68
-- Usage: 独立可执行程序。由 `tools/sandbox/build-native.sh` 从上述源码编译为
-  `app/src/main/jniLibs/arm64-v8a/libproot.so` 与其载入器 `libproot_loader.so`,随 APK 发布;
-  Mika 只以子进程方式运行它,不链接它。源码地址、版本与校验值同时记录在 `tools/sandbox/sources.lock`。
-  `libproot.so` 不内嵌载入器(只嵌空占位),运行时经 `PROOT_LOADER` 使用 `libproot_loader.so`。
-- Modifications: 打了四个补丁,同样以 GPL-2.0-or-later 发布:
-  `tools/sandbox/patches/proot-0001-exitkill.patch`(跟踪选项加上 `PTRACE_O_EXITKILL`:PRoot 退出时内核杀掉所有被跟踪的进程);
-  `tools/sandbox/patches/proot-0002-seccomp-trap-enosys.patch`(被 PRoot 之外的 seccomp 过滤器以 SIGSYS 拦下的系统调用改为返回
-  `-ENOSYS` 并取消信号;arm64 上只带 `AT_EACCESS` 标志的 faccessat2 改发成 faccessat);
-  `tools/sandbox/patches/proot-0003-arm64-new-path-syscalls.patch`(arm64 系统调用号表补上 statx 之后新增的带路径调用:
-  faccessat2、fchmodat2 做路径转换,execveat、openat2、io_uring_setup、新挂载接口与 *xattrat/file_*attr 返回 `-ENOSYS`;
-  并修正调用号查表的越界判断);
-  `tools/sandbox/patches/proot-0004-link2symlink-fstat-nonfile.patch`(link2symlink 扩展在 fstat 管道、套接字等非文件描述符时
-  不再读未初始化的 stat 结构、把成功的调用改成失败)。
-- 附带组件 uthash(BSD 许可证,Copyright (c) Troy D. Hanson):PRoot 源码树以子模块形式引用它,
-  只有 `care` 扩展用到;源码归档里该目录为空,Mika 的编译不包含 `care`,因此 `libproot.so` 里没有 uthash 的代码。
+- Usage: A standalone executable. `tools/sandbox/build-native.sh` compiles it from the above sources into
+  `app/src/main/jniLibs/arm64-v8a/libproot.so` and its loader `libproot_loader.so`, shipped with the APK;
+  Mika only runs it as a subprocess and does not link against it. The source address, version and checksum are also recorded in `tools/sandbox/sources.lock`.
+  `libproot.so` does not embed the loader (it only embeds an empty placeholder); at runtime it uses `libproot_loader.so` via `PROOT_LOADER`.
+- Modifications: Four patches were applied, also released under GPL-2.0-or-later:
+  `tools/sandbox/patches/proot-0001-exitkill.patch` (adds `PTRACE_O_EXITKILL` to the tracing options: when PRoot exits, the kernel kills all traced processes);
+  `tools/sandbox/patches/proot-0002-seccomp-trap-enosys.patch` (system calls intercepted with SIGSYS by a seccomp filter outside PRoot are changed to return
+  `-ENOSYS` and the signal is cancelled; on arm64 the faccessat2 call carrying only the `AT_EACCESS` flag is reissued as faccessat);
+  `tools/sandbox/patches/proot-0003-arm64-new-path-syscalls.patch` (adds to the arm64 syscall number table the path-taking calls introduced after statx:
+  faccessat2 and fchmodat2 do path translation, while execveat, openat2, io_uring_setup, the new mount interfaces and *xattrat/file_*attr return `-ENOSYS`;
+  it also fixes the out-of-bounds check in the syscall number lookup table);
+  `tools/sandbox/patches/proot-0004-link2symlink-fstat-nonfile.patch` (the link2symlink extension no longer reads an uninitialized stat struct when fstat targets a pipe, socket or other non-file descriptor,
+  and turns the successful call into a failure).
+- Bundled component uthash (BSD license, Copyright (c) Troy D. Hanson): the PRoot source tree references it as a submodule,
+  and only the `care` extension uses it; that directory is empty in the source archive, and Mika's build does not include `care`, so `libproot.so` contains no uthash code.
 
 ## talloc
 
 - Project: talloc (Samba)
-- Copyright: Copyright (C) Andrew Tridgell 2004;Copyright (C) Stefan Metzmacher 2006
-- License: LGPL-3.0-or-later,全文见 `licenses/LGPL-3.0.txt`;LGPL-3.0 是在 GPL-3.0 之上的附加条款,
-  GPL-3.0 全文见 `licenses/GPL-3.0.txt`
+- Copyright: Copyright (C) Andrew Tridgell 2004; Copyright (C) Stefan Metzmacher 2006
+- License: LGPL-3.0-or-later, full text in `licenses/LGPL-3.0.txt`; LGPL-3.0 adds terms on top of GPL-3.0,
+  whose full text is in `licenses/GPL-3.0.txt`
 - Source: https://www.samba.org/ftp/talloc/talloc-2.4.3.tar.gz
 - Version: 2.4.3
 - SHA-256 (source archive): dc46c40b9f46bb34dd97fe41f548b0e8b247b77a918576733c528e83abd854dd
-- Usage: 只编译 `talloc.c`(未修改),静态链接进独立可执行程序 `libproot.so`;Mika 自身不链接它。
-  重新链接所需的全部源码与编译脚本见 `tools/sandbox/`。
+- Usage: Only `talloc.c` is compiled (unmodified) and statically linked into the standalone executable `libproot.so`; Mika itself does not link against it.
+  All sources and build scripts needed to relink are in `tools/sandbox/`.
 
 ## Alpine Linux
 
 - Project: https://alpinelinux.org/
-- Version: 3.22.7(aarch64 最小根文件系统),外加 Python 3.12、Node 22、Pillow、pypdf 及其依赖
-- License: 各软件包各自的许可证(GPL、LGPL、MIT、BSD、MPL 等);逐个软件包的名称、版本与许可证见
-  `app/src/main/assets/runtime/packages.json`,App 的「开源许可」页也逐个列出
-- Usage: **随 APK 发布**,文件 `app/src/main/assets/runtime/rootfs.tar.xz`,由 `tools/sandbox/build-runtime.py`
-  按 `tools/sandbox/runtime/sources.lock` 从 Alpine 官方源取得并核对签名后生成;Mika 只以子进程方式运行其中的程序,不链接它们。
-  GPL/LGPL/MPL 软件包的对应源码(Alpine 的构建配方与上游源码)随每个版本放进 `mika-<版本>-gpl-sources.tar.gz`,
-  做法见 `tools/sandbox/README.md`。
+- Version: 3.22.7 (aarch64 minimal root filesystem), plus Python 3.12, Node 22, Pillow, pypdf and their dependencies
+- License: Each package's own license (GPL, LGPL, MIT, BSD, MPL, etc.); the name, version and license of each package are in
+  `app/src/main/assets/runtime/packages.json`, and the app's "Open-source licenses" page also lists them one by one
+- Usage: **Shipped with the APK** as `app/src/main/assets/runtime/rootfs.tar.xz`, generated by `tools/sandbox/build-runtime.py`
+  from the official Alpine sources listed in `tools/sandbox/runtime/sources.lock`, after signature verification; Mika only runs the programs inside it as subprocesses and does not link against them.
+  The corresponding source for GPL/LGPL/MPL packages (Alpine build recipes and upstream sources) is placed with each release into `mika-<版本>-gpl-sources.tar.gz`;
+  see `tools/sandbox/README.md` for how this is done.
 
-## Guava ListenableFuture(由 AndroidX 库引入)
+## Guava ListenableFuture (pulled in by AndroidX libraries)
 
 - Project: https://github.com/google/guava
-- Artifact: `com.google.guava:listenablefuture:1.0` — Apache-2.0(依 Maven POM)
-- Usage: 作为库依赖使用,未修改其代码。
+- Artifact: `com.google.guava:listenablefuture:1.0` — Apache-2.0 (per the Maven POM)
+- Usage: Used as a library dependency, with no changes to its code.
 
 ## XZ for Java
 
 - Project: https://tukaani.org/xz/java.html
-- Version: 1.10(org.tukaani:xz)
-- License: 0BSD(BSD Zero Clause License);Copyright (C) The XZ for Java authors and contributors
-- Usage: 首次启动时解压自带的运行环境。
+- Version: 1.10 (org.tukaani:xz)
+- License: 0BSD (BSD Zero Clause License); Copyright (C) The XZ for Java authors and contributors
+- Usage: Extracts the bundled runtime on first launch.
 
 ## ZXing
 
 - Project: https://github.com/zxing/zxing
 - Artifact: `com.google.zxing:core:3.5.3`
-- License: Apache-2.0(依据 Maven POM)
-- Usage: 以库的形式依赖,未修改其代码;只用于在 Android 本机生成微信绑定二维码。
+- License: Apache-2.0 (per the Maven POM)
+- Usage: Used as a library dependency, with no changes to its code; only used to generate the WeChat binding QR code locally on Android.
 
 ## commonmark-java
 
 - Project: https://github.com/commonmark/commonmark-java
-- Artifacts: `org.commonmark:commonmark:0.30.1`、`commonmark-ext-gfm-tables:0.30.1`、`commonmark-ext-gfm-strikethrough:0.30.1`
+- Artifacts: `org.commonmark:commonmark:0.30.1`, `commonmark-ext-gfm-tables:0.30.1`, `commonmark-ext-gfm-strikethrough:0.30.1`
 - License: BSD-2-Clause
-- Usage: 以库的形式依赖,未修改其代码;把对话里回答的 Markdown 解析成语法树,再由 Mika 自己的界面代码显示
-  (`app/src/main/java/com/wangzan101/mika/ui/MarkdownModel.kt`)。
+- Usage: Used as a library dependency, with no changes to its code; it parses the Markdown of answers in the conversation into a syntax tree, which Mika's own UI code then displays
+  (`app/src/main/java/com/wangzan101/mika/ui/MarkdownModel.kt`).
 - License text:
 
 ```
@@ -275,7 +275,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - Project: https://github.com/xtermjs/xterm.js
 - Version: `@xterm/xterm` 5.5.0, `@xterm/addon-fit` 0.10.0
 - License: MIT
-- Usage: 用户终端页面的终端仿真器，随 APK 打包在 `app/src/main/assets/terminal/`。
+- Usage: The terminal emulator for the user terminal page, packaged into the APK at `app/src/main/assets/terminal/`.
 
 ```
 Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
@@ -307,17 +307,17 @@ THE SOFTWARE.
 - Artifacts: `dev.rikka.shizuku:api:13.1.5`, `dev.rikka.shizuku:provider:13.1.5`
 - License: Apache-2.0
 - Usage: Library dependency used to optionally bind a local privileged user service when Shizuku is already installed, running, and authorized by the user.
-## MCP 服务品牌 logo（mcp/mcp-logos.json）
+## MCP service brand logos (mcp/mcp-logos.json)
 
-- Source: https://www.npmjs.com/package/simple-icons（Simple Icons, 钉死版本 16.38.1 + 14.11.0 + 11.15.0）
-- License: CC0 1.0（图标字形本体）;各品牌标志（GitHub、Slack、OpenAI、Google、Notion 等）仍归各自品牌所有,仅在此用于「可连接的服务」标识。
-- Usage: `app/src/main/assets/mcp/mcp-logos.json` 里的品牌轮廓 path 与官方品牌色,由 `tools/mcp/build_logos.py` 生成,供 `McpLogos` 在服务目录/列表/管理页渲染为自着色矢量图标。
+- Source: https://www.npmjs.com/package/simple-icons (Simple Icons, pinned to versions 16.38.1 + 14.11.0 + 11.15.0)
+- License: CC0 1.0 (the icon glyphs themselves); each brand mark (GitHub, Slack, OpenAI, Google, Notion, etc.) remains the property of its brand and is used here only for the "Connectable services" label.
+- Usage: The brand outline paths and official brand colors in `app/src/main/assets/mcp/mcp-logos.json`, generated by `tools/mcp/build_logos.py`, are rendered by `McpLogos` as self-coloring vector icons on the service catalog/list/management pages.
 
-## MCP 服务品牌 logo 补充集（mcp/mcp-logos.json）
+## MCP service brand logo supplement (mcp/mcp-logos.json)
 
-- Source: https://www.npmjs.com/package/@lobehub/icons-static-svg（Lobe Icons, 钉死版本 1.106.0）,只补上一节图标集没有的 AI/搜索服务（Cohere、Groq、xAI、Tencent Cloud 等）
-- License: MIT;各品牌标志仍归各自品牌所有,仅在此用于「可连接的服务」标识。
-- Usage: 同上,由 `tools/mcp/build_logos.py` 取单色 path 写进 `app/src/main/assets/mcp/mcp-logos.json`。
+- Source: https://www.npmjs.com/package/@lobehub/icons-static-svg (Lobe Icons, pinned to version 1.106.0), covering only the AI/search services that the previous icon set lacks (Cohere, Groq, xAI, Tencent Cloud, etc.)
+- License: MIT; each brand mark remains the property of its brand and is used here only for the "Connectable services" label.
+- Usage: Same as above; `tools/mcp/build_logos.py` takes the monochrome path and writes it into `app/src/main/assets/mcp/mcp-logos.json`.
 
 ```text
 MIT License

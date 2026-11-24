@@ -33,5 +33,5 @@ echo "---"
 head -n "$lines" "$path"
 echo "---"
 if [ "$total" -gt "$lines" ] 2>/dev/null; then
-    echo "(还有 $((total - lines)) 行没显示)"
+    echo "($((total - lines)) more lines not shown)"
 fi

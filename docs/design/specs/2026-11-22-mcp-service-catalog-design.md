@@ -1,223 +1,223 @@
-# MCP 服务目录与引导式接入
+# MCP service catalog and guided onboarding
 
-日期:2026-11-22
-状态:已批准(2026-11-22)
+Date: 2026-11-22
+Status: Approved (2026-11-22)
 
-## 意图与为什么
+## Intent and why
 
-Mika 已能作为 MCP 客户端连接第三方服务器,但现在要求用户自己理解并填写名称、URL、传输方式、认证方式、命令和高级参数。目标不是重做 MCP 客户端,而是在现有能力之上提供完整预设目录:用户选择服务后,只授权或填写 API Key,即可连接;没有预设时仍可自定义。
+Mika can already act as an MCP client and connect to third-party servers, but it currently requires users to understand and fill in the name, URL, transport, auth method, command and advanced parameters themselves. The goal is not to redo the MCP client, but to provide a complete preset catalog on top of the existing capabilities: after the user picks a service, they only authorize or enter an API key and can connect; when there is no preset, they can still set up a custom server.
 
-目录不按第一批、第二批限制上线范围。通用接入机制只做一次,服务以批量数据接入,首个版本就尽可能覆盖常见服务,目标规模为 200–300 条可用预设。
+The catalog does not limit its launch scope by first batch or second batch. The generic onboarding mechanism is built once; services are onboarded as bulk data, covering common services as broadly as possible in the first version, with a target scale of 200–300 usable presets.
 
-## 目标
+## Goals
 
-1. 用户选择预设服务后,无需填写 URL、选择 transport 或理解认证协议。
-2. 支持三种用户动作:点击授权、填写 API Key、无认证直接连接。
-3. 连接成功后自动读取真实工具目录并默认启用;失败时给出原因和可执行的下一步。
-4. 自定义 MCP 服务器入口保留完整能力,覆盖目录未收录或需要自行调整的服务。
-5. 预设只是统一配置模板,不为单个服务编写专用连接、工具或提示词逻辑。
-6. 已添加服务可测试、启停、重新授权或换 Key、查看工具、调整和删除。
+1. After the user selects a preset service, they do not need to enter a URL, choose a transport, or understand the auth protocol.
+2. Three user actions are supported: tap to authorize, enter an API key, and connect with no auth.
+3. After a successful connection, the real tool catalog is read automatically and enabled by default; on failure, give the reason and an actionable next step.
+4. The custom MCP server entry keeps full capability, covering services not in the catalog or ones that need to be adjusted.
+5. Presets are only unified configuration templates; no per-service connection, tool or prompt logic is written.
+6. Added services can be tested, started/stopped, re-authorized or re-keyed, have their tools viewed, and be adjusted and deleted.
 
-## 非目标
+## Non-goals
 
-- 不改 Mika 作为 MCP 服务器的「电脑连接」方向。
-- 不重写现有 Streamable HTTP、旧 SSE、stdio、OAuth 和任务工具装配。
-- 不做在线市场、评分、评论、第三方上传或远程目录强制更新。
-- 不保证第三方服务持续在线,不把预设数量当作已验证数量。
-- 不把工具列表或工具参数写死在预设中;工具仍由 MCP 实时发现。
-- 不因服务被内置就信任其 instructions、结果或工具风险注解。
+- Does not change Mika's "computer connection" direction as an MCP server.
+- Does not rewrite the existing Streamable HTTP, legacy SSE, stdio, OAuth and task tool assembly.
+- Does not build an online marketplace, ratings, reviews, third-party uploads, or forced updates from a remote catalog.
+- Does not guarantee that third-party services stay online, and does not treat the number of presets as the number verified.
+- Does not hard-code tool lists or tool parameters into presets; tools are still discovered live by MCP.
+- Does not trust a service's instructions, results or tool risk annotations just because it is built in.
 
-## 反目标
+## Anti-goals
 
-- 每个服务一份 Kotlin 分支、专用认证代码或专用 UI。
-- 把 API Key 拼进 URL、命令、普通配置或日志。
-- 用户填写密钥但未验证成功就显示「已连接」。
-- 首屏平铺 URL、transport、工具白名单、信任注解等高级字段。
-- 目录更新后静默改变已有配置的地址或密钥投递目的地。
-- 因单个预设失效而阻塞目录、其他服务或任务启动。
+- One Kotlin branch, dedicated auth code or dedicated UI per service.
+- Concatenating API keys into URLs, commands, ordinary config or logs.
+- Showing 「已连接」 (Connected) when the user has entered a key but it has not been verified successfully.
+- Flattening advanced fields such as URL, transport, tool allowlist and trust annotations onto the first screen.
+- Silently changing the address or secret delivery destination of existing configs after a catalog update.
+- Blocking the catalog, other services or task startup because one preset is broken.
 
-## 约束
+## Constraints
 
-- 面向通用 Android;stdio 仍只能在 Linux 沙箱中启动,不支持的环境必须显示原因和设置/使用指引。
-- 复用 `McpServerStore`、`McpEndpoint`、`McpConnection` 和现有任务 `ResourceScope` 生命周期。
-- 所有秘密进入加密存储;普通预设和用户配置不得保存秘密。
-- 远程预设只允许服务方官方端点;社区托管代理不作为秘密投递目的地,用户仍可通过自定义路径自行选择。stdio 可收官方或来源可核验、经过审查的包。
-- stdio 包首次需要下载时,先展示包名、来源和版本并由用户明确确认,然后下载和缓存;不静默下载,尽量锁定版本。
-- 目录随 App 发布,离线可浏览;目录数据与说明自行整理,不复制外部项目文字。
-- 所有新增用户可见字符串覆盖项目现有全部 UI 语言;服务专有名称不必翻译,说明文字必须翻译。
-- 新 UI 先提供本地 HTML 原型,经用户确认后再实现到 App。
-- 在 worktree 分支开发,不碰 main;非发版不改版本号。
+- Aimed at generic Android; stdio can still only be launched in the Linux sandbox, and unsupported environments must show the reason plus setup/usage guidance.
+- Reuse `McpServerStore`, `McpEndpoint`, `McpConnection` and the existing task `ResourceScope` lifecycle.
+- All secrets go into encrypted storage; ordinary presets and user config must not store secrets.
+- Remote presets only allow the service provider's official endpoint; community-hosted proxies are not used as secret delivery destinations, though users can still choose them through the custom path. stdio may accept official packages, or packages whose source is verifiable and which have been reviewed.
+- When a stdio package needs to be downloaded for the first time, first show the package name, source and version and require explicit user confirmation, then download and cache it; never download silently, and pin the version where possible.
+- The catalog ships with the app and is browsable offline; catalog data and descriptions are written in-house and do not copy text from external projects.
+- All new user-visible strings cover every UI language the project currently has; service proper names need not be translated, but descriptions must be.
+- New UI first gets a local HTML prototype, which is implemented in the app only after user confirmation.
+- Develop on a worktree branch, do not touch main; do not change the version number outside a release.
 
-## 已考虑的方案
+## Options considered
 
-### 只美化现有配置弹窗
+### Just polish the existing config dialog
 
-改动较小,但用户仍需理解 MCP 地址、传输和认证规则,无法解决主要问题,不采用。
+The change is smaller, but users still need to understand MCP addresses, transports and auth rules, so it does not solve the main problem. Not adopted.
 
-### 内置完整目录 + 引导式认证 + 自定义兜底(选定)
+### Full built-in catalog + guided auth + custom fallback (selected)
 
-一份通用预设格式承载大量服务;预设负责连接参数和认证规则,用户只完成授权或填写密钥。自定义路径保留完整能力。首版目录随 App 发布,不依赖远程服务。
+A single generic preset format carries a large number of services; the preset handles connection parameters and auth rules, and the user only completes authorization or enters a key. The custom path keeps full capability. The first-version catalog ships with the app and does not depend on a remote service.
 
-### 首版直接做在线 MCP 市场
+### Build an online MCP marketplace directly in the first version
 
-可以解决动态更新,但引入审核、缓存、签名、供应链和在线可用性问题,超出当前目标,不采用。
+Would solve dynamic updates, but brings in review, caching, signing, supply chain and online availability problems, which is beyond the current goal. Not adopted.
 
-## 产品设计
+## Product design
 
-### 1. MCP 首页
+### 1. MCP home
 
-- 已添加服务仍显示在首页,包含连接状态、真实工具数量和启停开关。
-- 主操作为「添加 MCP 服务」。
-- 空状态直接提供「浏览服务目录」和「自定义服务器」,不再只显示一张空说明卡。
-- 单个服务失效不影响其他服务;「全部测试」保留。
+- Added services still appear on the home page, including connection status, real tool count and a start/stop toggle.
+- The primary action is 「添加 MCP 服务」 (Add MCP service).
+- The empty state directly offers 「浏览服务目录」 (Browse service catalog) and 「自定义服务器」 (Custom server), instead of showing only an empty explanation card.
+- One service failing does not affect other services; 「全部测试」 (Test all) is kept.
 
-### 2. 服务目录
+### 2. Service catalog
 
-- 首版直接呈现完整目录,支持搜索和少量通用类别筛选;不做排行榜或市场运营位。
-- 每项只显示名称、简要能力说明、类别和认证方式。
-- 不显示 URL、transport、命令或工具 schema。
-- 目录项有统一状态:可用、需要本机环境、暂不可用。不可用项仍可查看原因,不能静默消失。
-- 页面底部持续提供「自定义 MCP 服务器」。
+- The first version presents the full catalog directly, with search and a small number of generic category filters; no leaderboards or marketplace merchandising slots.
+- Each entry shows only the name, a brief capability description, the category and the auth method.
+- No URL, transport, command or tool schema is shown.
+- Catalog entries have a unified state: available, needs local environment, temporarily unavailable. Unavailable entries can still be inspected for the reason and must not silently disappear.
+- The bottom of the page always offers 「自定义 MCP 服务器」 (Custom MCP server).
 
-### 3. 预设详情与连接
+### 3. Preset details and connecting
 
-详情页显示服务能做什么、认证方式、所需第三方账号/费用提示、数据会发送到该服务的说明。
+The details page shows what the service can do, the auth method, any required third-party account/cost notices, and a note that data will be sent to that service.
 
-- OAuth:主按钮为「授权登录」。打开系统浏览器,回到 Mika 后自动验证并读取工具。
-- API Key:只显示该预设声明的密钥和其他必填项、获取帮助和「连接并保存」;支持多个密钥,以及租户、地区、自建地址等普通字段。
-- 无认证:主按钮为「连接」。
-- stdio:不展示命令;只显示所需字段和本机环境状态。需要下载包时先展示包名、来源和版本,用户确认后才安装并继续。
+- OAuth: the primary button is 「授权登录」 (Sign in). Opens the system browser; after returning to Mika it verifies automatically and reads the tools.
+- API key: shows only the keys declared by that preset plus other required items, help on obtaining them, and 「连接并保存」 (Connect and save); supports multiple keys, as well as ordinary fields such as tenant, region and self-hosted address.
+- No auth: the primary button is 「连接」 (Connect).
+- stdio: no command is shown; only the required fields and the local environment status. When a package needs to be downloaded, first show the package name, source and version, and only install and continue after the user confirms.
 
-连接中可取消。只有握手、认证和工具目录读取成功才进入成功页。成功页显示真实工具数量,提供「完成」和「查看工具」。
+Connecting can be cancelled. It only reaches the success page when the handshake, auth and tool catalog read all succeed. The success page shows the real tool count and offers 「完成」 (Done) and 「查看工具」 (View tools).
 
-失败时保留非秘密草稿和已保存配置,明确区分:授权拒绝、密钥无效、网络失败、超时、协议不兼容、OAuth 流程不支持、沙箱环境不可用。提供重试、重新授权、修改密钥或查看技术详情。
+On failure, keep the non-secret draft and the saved config, and clearly distinguish: authorization denied, invalid key, network failure, timeout, protocol incompatible, OAuth flow unsupported, sandbox environment unavailable. Offer retry, re-authorize, edit the key, or view technical details.
 
-### 4. 自定义服务器
+### 4. Custom server
 
-自定义路径保留现有三种 transport 和完整认证能力,但重新分层:
+The custom path keeps the existing three transports and full auth capability, but is re-layered:
 
-- 基本区域:地址或命令、认证信息。
-- 高级区域:transport、工具白名单、本地 HTTP、信任注解、超时、结果预览和成本预算。
-- 自定义服务与预设服务进入同一份 `McpServerStore`,任务侧无来源差异。
+- Basic section: address or command, auth information.
+- Advanced section: transport, tool allowlist, local HTTP, trust annotations, timeout, result preview and cost budget.
+- Custom services and preset services go into the same `McpServerStore`, with no source difference on the task side.
 
-### 5. 已添加服务管理
+### 5. Managing added services
 
-点击服务进入管理页,而不是直接弹出完整技术表单:
+Tapping a service opens the management page, instead of popping up the full technical form directly:
 
-- 状态、最近验证时间、工具列表。
-- 重新测试、重新授权/更换密钥、启停。
-- 高级设置和自定义参数。
-- 删除前说明只会移除 Mika 中的配置,不会撤销第三方账号授权;如支持撤销,提供明确入口但不伪造结果。
+- Status, last verification time, tool list.
+- Re-test, re-authorize/replace the key, start/stop.
+- Advanced settings and custom parameters.
+- Before deleting, explain that it only removes the config in Mika and does not revoke the third-party account authorization; where revocation is supported, provide a clear entry point but do not fake the result.
 
-## 通用技术设计
+## Generic technical design
 
-### 1. 版本化预设目录
+### 1. Versioned preset catalog
 
-目录使用版本化数据文件,不包含秘密。每条预设至少包含:
+The catalog uses a versioned data file and contains no secrets. Each preset contains at least:
 
-- 稳定 `id`、显示名称、说明、类别和本地图标/通用图标。
-- transport,以及 URL 或 stdio 命令模板。
-- 认证类型:none、OAuth、fields。
-- `fields` 为有序动态表单:每项有稳定字段 ID、用户标签、是否秘密、是否必填、校验和帮助;秘密项声明 Bearer、指定请求头或环境变量等投递目标,普通项可声明 URL、header、argv 或环境变量等模板位置。
-- 默认安全策略与是否依赖 stdio 环境;stdio 包需记录来源、包名和尽量固定的版本。
-- 可选的自定义请求头模板和 OAuth 发现配置。
+- A stable `id`, display name, description, category, and local icon/generic icon.
+- transport, plus a URL or stdio command template.
+- Auth type: none, OAuth, fields.
+- `fields` is an ordered dynamic form: each item has a stable field ID, user label, whether it is secret, whether it is required, validation and help; secret items declare a delivery target such as Bearer, a named request header or an environment variable, while ordinary items can declare template positions such as URL, header, argv or environment variable.
+- The default security policy and whether it depends on the stdio environment; stdio packages must record source, package name and a version pinned as tightly as possible.
+- Optional custom request header templates and OAuth discovery config.
 
-工具目录、描述和 input schema 不进入预设,仍来自连接后的实时工具发现。预设文案用自己的话编写。
+Tool catalogs, descriptions and input schemas do not go into presets; they still come from live tool discovery after connecting. Preset copy is written in our own words.
 
-用户配置保存稳定预设 ID 和用户实际覆盖项。后续预设更新默认只影响新添加项;已有项的地址、transport、认证目的地和命令不静默变更。非秘密说明可随版本更新。
+User configs save the stable preset ID and the items the user actually overrides. Subsequent preset updates by default only affect newly added items; the address, transport, auth destination and command of existing items are not silently changed. Non-secret descriptions may update with the version.
 
-### 2. 统一认证与秘密投递
+### 2. Unified auth and secret delivery
 
-在现有 Bearer 与 OAuth 之上补齐通用多字段与秘密目标:
+On top of the existing Bearer and OAuth, fill in generic multi-field and secret targets:
 
-- 一个服务可声明多个秘密字段和多个普通必填字段;UI 只显示该预设实际声明的项。
-- 秘密可投递到 `Authorization: Bearer …`、指定名称的秘密请求头或 stdio 进程环境变量。
-- 普通字段可填入预设声明的 URL、请求头、argv 或环境变量模板;秘密不得进入 URL 或 argv。
+- A service can declare multiple secret fields and multiple ordinary required fields; the UI shows only the items that preset actually declares.
+- Secrets can be delivered to `Authorization: Bearer …`, a named secret request header, or a stdio process environment variable.
+- Ordinary fields can be filled into the URL, request header, argv or environment variable templates declared by the preset; secrets must not enter the URL or argv.
 
-秘密值统一由加密存储按「服务配置 ID + 字段 ID」保存。普通 `headers` 继续只存非秘密值;秘密请求头不得落入该字段。stdio launcher 获得显式、最小化的环境变量集合,不继承 Mika 进程或模型服务商环境。
+Secret values are uniformly stored by encrypted storage under "service config ID + field ID". The ordinary `headers` continue to store only non-secret values; secret request headers must not fall into that field. The stdio launcher gets an explicit, minimized set of environment variables and does not inherit the Mika process or the model provider environment.
 
-OAuth 继续复用现有发现、动态注册、PKCE、回调和刷新。第三方不支持所需流程时,明确报告并提供该预设声明的其他认证方式;不做隐式降级到不安全端点。
+OAuth continues to reuse the existing discovery, dynamic registration, PKCE, callback and refresh. When a third party does not support the required flow, report it clearly and offer the other auth methods declared by that preset; do not implicitly downgrade to an insecure endpoint.
 
-### 3. 配置与连接事务
+### 3. Config and connection transactions
 
-预设选择生成普通 `McpServerConfig`,之后走与自定义一致的验证和连接路径:
+Preset selection generates an ordinary `McpServerConfig`, after which it follows the same validation and connection path as custom servers:
 
 ```text
-未配置 → 待授权/待密钥 → 正在连接 → 已连接并启用
-                              └→ 连接失败(可修改/重试)
+Not configured → awaiting authorization/awaiting key → connecting → connected and enabled
+                                              └→ connection failed (editable/retryable)
 ```
 
-- 保存配置、保存秘密和连接失败不得留下假成功状态。
-- 失败配置默认停用并保留,便于修复;用户可删除。
-- 任务仍只读取已启用且实际可连接的服务;现有 15 秒总连接预算和失败隔离不变。
-- 任务结束、取消和失败仍由现有作用域关闭 HTTP 会话或 stdio 进程。
+- Saving config, saving secrets and connection failure must not leave a false success state.
+- Failed configs are disabled by default and kept so they can be fixed; the user can delete them.
+- Tasks still only read services that are enabled and actually connectable; the existing 15-second total connection budget and failure isolation are unchanged.
+- Task end, cancellation and failure still close HTTP sessions or stdio processes through the existing scope.
 
-### 4. 兼容、备份与更新
+### 4. Compatibility, backup and updates
 
-- 旧 `mcp-servers.json` 无预设字段时按自定义配置读取,原行为不变。
-- 新增字段使用默认值和显式序列化策略;旧版本读取新配置时不得把秘密暴露到普通字段。
-- 现有加密秘密备份扩展到新的秘密类型;恢复后仍需通过真实连接验证,不直接宣称可用。
-- 目录快照带格式版本,损坏或未知条目跳过并记录,不影响其他条目。
+- An old `mcp-servers.json` with no preset fields is read as a custom config, with unchanged behavior.
+- New fields use default values and explicit serialization policy; when an old version reads a new config it must not expose secrets into ordinary fields.
+- The existing encrypted secret backup is extended to the new secret types; after restore it still must pass a real connection verification and must not be declared usable directly.
+- Catalog snapshots carry a format version; corrupted or unknown entries are skipped and logged, without affecting other entries.
 
-### 5. 安全边界
+### 5. Security boundaries
 
-- 预设服务与自定义服务使用相同 URL、重定向、私网 HTTP 和 OAuth 端点检查。
-- 内置不代表可信:默认仍为 `Restricted`,结果和 instructions 仍标为不可信。
-- 高风险服务不因为内置而自动获得付款、确认或其他额外授权。
-- 远程预设只允许官方端点;可核验 stdio 包必须记录来源,社区托管代理不作为预设秘密目的地。
-- 目录不包含自定义可执行安装脚本;stdio 只启动声明的 argv,秘密不进入 argv。
-- stdio 包需要下载时,先由用户确认包名、来源和版本,再经统一包安装/缓存路径执行;不得在每个预设中自带下载命令或静默首次下载。
-- 目录验证或真实服务验收不得使用用户私人账号、密钥或任务内容。
+- Preset services and custom services use the same URL, redirect, private-network HTTP and OAuth endpoint checks.
+- Built-in does not mean trusted: the default is still `Restricted`, and results and instructions are still marked untrusted.
+- High-risk services do not automatically gain payment, confirmation or other extra authorization just because they are built in.
+- Remote presets only allow official endpoints; verifiable stdio packages must record their source, and community-hosted proxies are not used as preset secret destinations.
+- The catalog contains no custom executable install scripts; stdio only launches the declared argv, and secrets do not enter argv.
+- When a stdio package needs to be downloaded, the user first confirms the package name, source and version, then it is executed through the unified package install/cache path; no preset may carry its own download command or download silently on first use.
+- Catalog verification or real-service acceptance must not use the user's personal accounts, keys or task content.
 
-## 实现范围边界
+## Implementation scope boundaries
 
-预计触及:
+Expected to touch:
 
-- App 的预设目录数据、解析与校验。
-- `McpServerStore` / 配置模型的预设关联、通用秘密投递和 OAuth 引导复用。
-- stdio launcher 的显式环境变量传递、沙箱适配,以及经用户确认的统一包安装与缓存路径。
-- MCP 首页、目录、详情/连接、成功和管理页面。
-- 全部现有语言资源、备份和恢复。
-- JVM、UI、目录完整性与真实服务契约测试。
+- The app's preset catalog data, parsing and validation.
+- Preset association, generic secret delivery and OAuth onboarding reuse in `McpServerStore` / the config model.
+- Explicit environment variable passing and sandbox adaptation in the stdio launcher, plus the user-confirmed unified package install and cache path.
+- The MCP home, catalog, details/connect, success and management pages.
+- All existing language resources, backup and restore.
+- JVM, UI, catalog integrity and real-service contract tests.
 
-不修改 inbound `McpRpc`、`McpTaskTools` 或电脑连接权限策略。
+Does not modify inbound `McpRpc`, `McpTaskTools`, or the computer-connection permission policy.
 
-## 验证与验收
+## Verification and acceptance
 
-### 自动化
+### Automated
 
-- 目录格式、ID 唯一、URL/命令模板、认证目标、图标和全部语言完整性。
-- 每种认证目标的秘密存储、请求/环境注入、备份恢复和日志防泄露;多个秘密与普通必填字段的动态表单和模板校验。
-- 旧配置迁移、损坏目录单项隔离、未知版本和预设更新不改变已有秘密目的地。
-- OAuth、API Key、无认证、自定义、连接失败/取消/重试状态机。
-- stdio argv 不经 shell、环境白名单、进程与租约清理;包下载前必须确认,取消不执行,缓存复用与版本提示一致。
-- 目录与自定义服务最终产生相同 `McpConnection`,现有 Agent 工具装配回归不变。
-- `:core:test`、`:app:testDebugUnitTest` 和相关 UI/androidTest;按现有项目约定运行。
+- Catalog format, ID uniqueness, URL/command templates, auth targets, icons and completeness of all languages.
+- Secret storage, request/environment injection, backup restore and log leak prevention for each auth target; dynamic form and template validation for multiple secrets and ordinary required fields.
+- Old config migration, isolation of individual corrupted catalog entries, unknown versions, and preset updates not changing existing secret destinations.
+- OAuth, API key, no auth, custom, connection failure/cancel/retry state machines.
+- stdio argv not going through a shell, environment allowlist, process and lease cleanup; package downloads must be confirmed first, cancellation does not execute, cache reuse is consistent with the version prompt.
+- The catalog and custom services ultimately produce the same `McpConnection`, and the existing agent tool assembly regression is unchanged.
+- `:core:test`, `:app:testDebugUnitTest` and related UI/androidTest; run per existing project conventions.
 
-### 真实服务验收
+### Real-service acceptance
 
-- 对目录做批量、无秘密的端点与协议检查,区分「已验证」与「尚未验证」,不把目录存在当作可连接证明。
-- 使用专用测试账号覆盖 OAuth、API Key、无认证和 stdio 的代表性服务;不写只有某一家能用的逻辑。
-- 覆盖错误密钥、取消授权、令牌刷新、服务离线、工具分页和大结果。
-- 真机验证完整添加流程、任务中真实调用、任务结束清理和全部 UI 语言基本布局。
+- Run bulk, secret-free endpoint and protocol checks against the catalog, distinguishing 「已验证」 (Verified) from 「尚未验证」 (Not yet verified), and do not treat catalog presence as proof of connectability.
+- Use dedicated test accounts to cover representative OAuth, API key, no-auth and stdio services; do not write logic that only works for one vendor.
+- Cover wrong keys, cancelled authorization, token refresh, service offline, tool pagination and large results.
+- On a real device, verify the full add flow, real invocation within a task, cleanup after the task ends, and basic layout in all UI languages.
 
-### 用户验收标准
+### User acceptance criteria
 
-1. 首版可浏览和搜索完整预设目录,不按批次锁定服务。
-2. 预设用户无需填写 URL 或选择 transport。
-3. OAuth 用户主要操作是授权;API Key 用户默认只填 Key。
-4. 成功后展示真实工具数量,失败有明确原因和下一步。
-5. 自定义入口保留完整能力。
-6. 任意单个预设失效不影响其他服务或任务。
-7. 秘密不出现在目录、普通配置、argv、URL 或日志中。
+1. The first version can browse and search the full preset catalog, without locking services by batch.
+2. Preset users do not need to enter a URL or choose a transport.
+3. OAuth users mainly authorize; API key users by default only enter the key.
+4. On success, show the real tool count; on failure, give a clear reason and next step.
+5. The custom entry keeps full capability.
+6. Any single preset failing does not affect other services or tasks.
+7. Secrets do not appear in the catalog, ordinary config, argv, URL or logs.
 
-## 已确认决策
+## Confirmed decisions
 
-1. 采用「完整内置目录 + 自定义接入」,不只做表单美化,也不首版做在线市场。
-2. 首版不以第一批/第二批限制目录规模;通用机制一次实现,服务批量整理和验证。
-3. 用户只需要理解「有预设就授权/填 Key,没有预设就自定义」。
-4. 预设不另造 MCP 实现,最终与自定义服务共用现有连接和任务路径。
-5. App UI 实现前先确认本地 HTML 原型。
-6. 远程预设只收服务方官方端点;stdio 可收官方或来源可核验且经过审查的包;社区托管代理只走用户自定义,不作为预设秘密目的地。
-7. stdio 包需要下载时,展示包名、来源和版本,用户明确确认后统一安装和缓存,不静默下载。
-8. 预设 schema 和动态表单支持多个秘密及租户、地区、自建地址等普通必填字段;用户只看到该服务需要的项。
+1. Adopt "full built-in catalog + custom onboarding", not just form polish, and not an online marketplace in the first version.
+2. The first version does not limit catalog size by first/second batch; the generic mechanism is implemented once, and services are organized and verified in bulk.
+3. Users only need to understand "if there is a preset, authorize/fill in the key; if not, go custom".
+4. Presets do not create another MCP implementation; they ultimately share the existing connection and task paths with custom services.
+5. Confirm the local HTML prototype before implementing the app UI.
+6. Remote presets only accept the service provider's official endpoints; stdio may accept official packages, or packages whose source is verifiable and which have been reviewed; community-hosted proxies only go through user customization and are not used as preset secret destinations.
+7. When a stdio package needs to be downloaded, show the package name, source and version, and install and cache it uniformly after explicit user confirmation, without silent downloads.
+8. The preset schema and dynamic form support multiple secrets and ordinary required fields such as tenant, region and self-hosted address; users only see the items that service needs.

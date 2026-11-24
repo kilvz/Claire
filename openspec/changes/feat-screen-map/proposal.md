@@ -1,41 +1,41 @@
-# 屏图：每个 App 一张可点击的页面结构图，随 APP.md 给模型
+# Screen map: one clickable page-structure map per App, given to the model alongside APP.md
 
 ## Why
 
-Mika 现在能把办成过的做法记成「路线」，并在任务开头不调模型地逐步回放（`core/learn/replay`）。但路线是一条条**平铺的线性路径**：每步的「前后屏锚点」是现算现扔的，没有一个跨任务存活的「屏」概念。后果：
+Mika can now record approaches that worked as "routes" and replay them step by step at the start of a task without calling the model (`core/learn/replay`). But routes are **flat, linear paths** one by one: each step's "before/after screen anchors" are computed and thrown away on the spot, and there is no "screen" concept that survives across tasks. Consequences:
 
-- 换一条没完整走过的路线，即使中间大部分屏都走过，也整条从头再规划。
-- 回放落错屏只报「第 N 步对不上」，说不出「现在落在哪个屏、从这屏还能怎么走」。
-- 屏身份只有一个「包名 + 最多 3 段稳定文字」的粗指纹，没有「这屏到底是不是我以为的那屏」的置信度。
+- Switching to a route not fully walked before, even if most of the screens in the middle have been walked, replans the whole thing from scratch.
+- When replay lands on the wrong screen it only reports "step N does not match", unable to say "which screen we are on now and how we can still move from this screen".
+- Screen identity is only a coarse fingerprint of "package name + at most 3 stable text segments", with no confidence about "is this really the screen I think it is".
 
-更根本地：很多 App **页面结构固定、变化的只是内容文字**。这个固定结构（有哪些页、点哪去哪）是模型每次都要从零摸一遍的东西——它应该被沉淀成一张图，随 `APP.md` 一起给模型。
+More fundamentally: many Apps have a **fixed page structure where only the content text changes**. This fixed structure (which pages exist, where clicking leads) is what the model has to explore from scratch every time — it should be distilled into a map and given to the model alongside `APP.md`.
 
-一句话：**越来越聪明（知道自己在哪、能从此到彼、看得见 App 的结构地图）、干活越来越稳（已知路径不翻车、落错屏能识别并重试）。**
+In one sentence: **getting smarter (knowing where it is, being able to get from here to there, seeing the App's structural map) and working more reliably (known paths do not derail, wrong-screen landings are recognized and retried).**
 
 ## What Changes
 
-- 新增**每 App 一张可点击的屏图**：节点 = 结构页（名字 + 锚点 + 层级 + 转移边），边 = 点击导航（在 A 屏点 X → 到 B 屏）。图由**重放运行记录**自学习长出来，确定性、可整体重建。
-- 认屏（身份）：用「骨架锚点 + 覆盖 + 稀有度」排序取代现在「取前 3 段稳定文字」的粗匹配；低于置信度说「不知道」，不猜。**只认固定骨架，不认内容文字**（内容每次变，骨架不变）。
-- 屏图随 `APP.md` 一起注入模型：`APP.md` 是文字说明解释，屏图是页面结构；模型进 App 拿到「说明 + 地图」，认出现在在哪屏后还能拿到「从这屏出发怎么走」。
-- 回放接图：每步认屏、落错屏重试一次；对不上交还「落在屏 X + 从这屏出发的路」，而不是只说「第 N 步失败」。
-- 相对导航：当前屏 → 目标屏在图里找路径、裁公共前缀，没完整走过的目标也能拼段。
+- New **clickable screen map per App**: nodes = structural pages (name + anchors + level + transition edges), edges = click navigation (click X on screen A → go to screen B). The map grows by self-learning from **replaying run records**; it is deterministic and wholly rebuildable.
+- Screen identification (identity): replace today's coarse matching of "the first 3 stable text segments" with "skeleton anchors + coverage + rarity" ordering; below the confidence threshold say "don't know", no guessing. **Only the fixed skeleton is recognized, not content text** (content changes every time, the skeleton does not).
+- The screen map is injected into the model alongside `APP.md`: `APP.md` is the explanatory text, the screen map is the page structure; entering an App, the model gets "description + map", and after identifying the current screen it also gets "how to get around from this screen".
+- Replay connects to the map: each step identifies the screen, retrying once on a wrong screen; mismatches hand back "landed on screen X + paths starting from this screen" instead of just "step N failed".
+- Relative navigation: from the current screen → target screen, find a path in the map and trim the common prefix, so even targets not fully walked before can be assembled from segments.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `screen-map`：屏图——屏实体存储、从运行记录确定性重建、认屏（骨架锚点 + 稀有度 + 置信度）、转移记账、相对导航、merge gate 自检。
+- `screen-map`: screen map — screen entity storage, deterministic rebuild from run records, screen identification (skeleton anchors + rarity + confidence), transition accounting, relative navigation, merge gate self-check.
 
 ### Modified Capabilities
 
-- `replay`：回放从「沿固定路线」改为「沿图走」——每步认屏、落错屏重试、对不上交还「当前屏 + 可用路径」。
-- 知识注入（进入 App 时注入 `APP.md` 的那一步）：一并注入屏图（页面结构），与 `APP.md`（说明）互补。
-- 运行记录 `RunEvent.ActionTarget` 已有的 before/after 锚点继续作为建图原料（是否扩展捕获更多屏指纹见 design D4）。
+- `replay`: replay changes from "following a fixed route" to "walking the map" — each step identifies the screen, wrong screens are retried, and mismatches hand back "current screen + available paths".
+- Knowledge injection (the step that injects `APP.md` when entering an App): inject the screen map (page structure) as well, complementary to `APP.md` (explanations).
+- The before/after anchors already present in run records' `RunEvent.ActionTarget` continue to serve as raw material for building the map (whether to extend capture with more screen fingerprints, see design D4).
 
 ## Impact
 
-- core：新增 `screenmap` 模块（屏实体、图、认屏、重建、导航）；`Replayer`/`RouteReplay` 接入认屏与落屏校验；`RunLearning` 收尾时重放运行记录长图；`RouteAnchors` 的稳定骨架文字抽取复用于认屏；知识注入路径增加屏图段。
-- app：屏图落盘（可写知识区 `files/knowledge/apps/<x>/`，与 `APP.md` 同级互补），原子写 + revision 校验。
-- 行为变化：任务结束后的后台学习多一步「长图」；进入 App 的上下文多一段「页面结构地图」；回放对不上时的交还文案从「第 N 步失败」变成「落在屏 X，可从这里走」。
+- core: new `screenmap` module (screen entities, map, identification, rebuild, navigation); `Replayer`/`RouteReplay` connect to identification and landed-screen validation; `RunLearning` replays run records to grow the map at wrap-up; `RouteAnchors`'s stable skeleton text extraction is reused for identification; the knowledge injection path gains a screen map block.
+- app: screen map persistence (the writable knowledge area `files/knowledge/apps/<x>/`, peer to and complementary with `APP.md`), atomic write + revision validation.
+- Behavior changes: the background learning after a task ends gains a "grow the map" step; the context on entering an App gains a "page structure map" section; the handback copy on replay mismatch changes from "step N failed" to "landed on screen X, you can go from here".
 
-Non-Goals 与反目标见 design。
+Non-Goals and anti-goals are in design.

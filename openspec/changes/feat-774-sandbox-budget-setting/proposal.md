@@ -1,31 +1,31 @@
-# 每任务沙箱时间上限做成设置里可调的档位（#774）
+# Make the per-task sandbox time limit an adjustable level in settings (#774)
 
 ## Why
 
-issue #774：用户跑耗时沙箱任务（装依赖、编译、数据处理）时，一个任务里沙箱命令累计只有硬编码的 30 分钟（`SandboxGuard.SANDBOX_BUDGET_MS`），到了就拒绝继续，用户没有任何办法放宽。设置里已有同类「用户可调限制」先例（任务步数上限、定时任务时长、token 预算），沙箱时间上限照同一模式开放成档位即可。
+Issue #774: when users run time-consuming sandbox tasks (installing dependencies, compiling, data processing), the cumulative sandbox commands in one task are limited to a hardcoded 30 minutes (`SandboxGuard.SANDBOX_BUDGET_MS`), after which further commands are refused, and users have no way to loosen it. Settings already has precedents for "user-adjustable limits" of the same kind (task step limit, scheduled task duration, token budget), so the sandbox time limit can simply be opened up as a level in the same pattern.
 
-issue 三项诉求里本变更只做「预算时间」一项：**沙箱空间**实际是手机物理存储余量（500 MB 最低剩余门槛），没有软件旋钮可调；**上传体积上限**在电脑连接的 relay/RemoteTaskFiles 链路（200 MB），是另一条链子，不适合混在同一个变更里。
+Of the issue's three requests, this change only does "budget time": **sandbox space** is actually the phone's free physical storage (a 500 MB minimum remaining threshold), with no software knob to adjust; the **upload size limit** lives in the computer connection's relay/RemoteTaskFiles path (200 MB), which is a different chain and does not belong in the same change.
 
 ## What Changes
 
-- 设置 › 干活时新增「每个任务的沙箱时间上限」：档位 30（默认，与现状一致）/ 60 / 120 / 240 分钟，单选弹窗，下一个任务起生效（与步数上限同语义）。
-- `FeatureFlags` 新增存储键与读写（只认档位内的值，存了别的按默认 30 算）。
-- 接线：`TaskRun` 主任务与子任务的 `toolDispatcher` 都传入该值 → `SandboxCapability(budgetMs)` → `SandboxGuard(budgetMs)`（构造参数本就存在，只是从没被外部赋值）。
-- 耗尽提示不再硬编码「30 minutes」，按实际预算动态输出分钟数。
-- 新字符串与全部语言翻译；core/app 单测。
+- 设置 (Settings) › 干活时 (During work) gains 「每个任务的沙箱时间上限」 (Sandbox time limit per task): levels 30 (default, consistent with the current state) / 60 / 120 / 240 minutes, a single-choice dialog, taking effect from the next task (same semantics as the step limit).
+- `FeatureFlags` gains a storage key and read/write (only values within the levels are recognized; anything else counts as the default 30).
+- Wiring: both the main task's and the sub-tasks' `toolDispatcher` in `TaskRun` pass the value → `SandboxCapability(budgetMs)` → `SandboxGuard(budgetMs)` (the constructor parameter already existed, it was just never assigned from outside).
+- The exhaustion message no longer hardcodes "30 minutes"; it outputs the number of minutes dynamically from the actual budget.
+- New strings and translations for all languages; core/app unit tests.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `sandbox-time-budget`: 每任务沙箱命令累计时长的上限——默认值、用户可调档位、生效时机与耗尽行为。
+- `sandbox-time-budget`: the cap on cumulative sandbox command duration per task — default value, user-adjustable levels, when it takes effect, and exhaustion behavior.
 
 ### Modified Capabilities
 
-（无现有规格目录，不适用。）
+(No existing spec directories; not applicable.)
 
 ## Impact
 
-- core：`SandboxGuard`（动态消息）、`SandboxCapability`/`TaskTools.toolDispatcher`（透传参数，默认值不变）。
-- app：`FeatureFlags`（新键）、`TaskRun`（两处接线）、`SettingsScreen`/`SettingsSubPages`（一行设置 + 档位弹窗）、`strings_settings.xml` ×全部语言。
-- 行为不变项：默认仍是 30 分钟；单条命令 10 分钟上限（`timeoutSec` 1..600）不变；同命令重复失败判循环（sandbox_loop）不变；用户自己开的终端不受预算约束。
+- core: `SandboxGuard` (dynamic message), `SandboxCapability`/`TaskTools.toolDispatcher` (pass-through parameters, defaults unchanged).
+- app: `FeatureFlags` (new key), `TaskRun` (two wiring points), `SettingsScreen`/`SettingsSubPages` (one settings row + a level dialog), `strings_settings.xml` × all languages.
+- Unchanged behavior: the default is still 30 minutes; the 10-minute per-command cap (`timeoutSec` 1..600) is unchanged; repeated failures of the same command being judged a loop (sandbox_loop) is unchanged; terminals the user opens themselves are not bound by the budget.

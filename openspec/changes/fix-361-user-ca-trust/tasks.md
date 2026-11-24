@@ -1,15 +1,15 @@
-## 1. 配置与守护测试
+## 1. Config and guard test
 
-- [ ] 1.1 从最新 main 拉分支 `fix/361-user-ca-trust`（用 worktree，不动用户工作区的未提交改动）
-- [ ] 1.2 `network_security_config.xml`：trust-anchors 加 `<certificates src="user"/>`，更新注释说明理由（与明文 http 先例同源）
-- [ ] 1.3 `app/src/test` 加守护测试：解析该 XML，断言 trust-anchors 同时含 `system` 与 `user`、`cleartextTrafficPermitted` 仍为 true
+- [ ] 1.1 Branch `fix/361-user-ca-trust` off the latest main (using a worktree, without touching the user's uncommitted changes in their workspace)
+- [ ] 1.2 `network_security_config.xml`: add `<certificates src="user"/>` to the trust-anchors, and update the comments to explain the reason (same origin as the cleartext http precedent)
+- [ ] 1.3 Add a guard test in `app/src/test`: parse that XML and assert that the trust-anchors contain both `system` and `user`, and that `cleartextTrafficPermitted` is still true
 
-## 2. 验证
+## 2. Verification
 
-- [ ] 2.1 `./gradlew :app:testDebugUnitTest` 全绿
-- [ ] 2.2 真机验证：本机起自签 HTTPS 端点 → 未装 CA 时 App 内连它失败 → 装用户 CA（需解锁手机）后成功；截图/UI dump 取证存 `openspec/changes/fix-361-user-ca-trust/evidence/`
-- [ ] 2.3 公共端点回归：正常服务商连接不受影响（连一次模型或内置浏览器开 https 页）
+- [ ] 2.1 `./gradlew :app:testDebugUnitTest` all green
+- [ ] 2.2 On-device verification: start a self-signed HTTPS endpoint on the local machine → connecting to it from the App fails before the CA is installed → succeeds after installing the user CA (the phone must be unlocked); keep screenshots/UI dumps as evidence in `openspec/changes/fix-361-user-ca-trust/evidence/`
+- [ ] 2.3 Public endpoint regression: connections to normal providers are unaffected (connect to a model once or open an https page in the built-in browser)
 
-## 3. 收尾
+## 3. Wrap-up
 
-- [ ] 3.1 中文提交、写 PR 描述（关联 #361，首屏放实测证据，写明安全权衡与 Non-Goals），等用户确认后推 fork 建 PR
+- [ ] 3.1 Commit in Chinese, write the PR description (linked to #361, with measured evidence on the first screen, stating the security trade-off and Non-Goals), and after user confirmation push to the fork and open the PR

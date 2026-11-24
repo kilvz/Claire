@@ -13,43 +13,43 @@ Three kinds of file, each with one job:
 ## Common requirements
 
 - **Facts only.** Rules such as authorization, confirmation, stop conditions, "don't make things up" or "hand over to the user" belong to the general guidelines and the approval layer, not to knowledge.
-- **Write it in Mika's own words.** Avoid format jargon such as 「本批」 ("this batch"), 「证据」 ("evidence"), 「总则」 ("general rules"), 「通道」 ("channel") and "scope/stops/features".
+- **Write it in Mika's own words.** Avoid format jargon such as "this batch", "evidence", "general rules", "channel" and "scope/stops/features".
 - **Descriptions don't cite skills.** A skill may name an app or website (`app:<id>`, `site:<domain>`); an app or website description never says "follow skill XX".
 - **Describe what happens as what happens.** Write "the 'Delivery' tile in the home grid and the 'Delivery' tab at the bottom are two different entry points; the first opens the delivery channel", not "don't tap the bottom tab".
 - When describing UI, say "screen", "page", "entry point", "button"; don't say "look at the screen".
-- Keep the body under 2500 characters. Put large reference material (station code tables, URL formats, search syntax) in `references/`, and say in the body when to read which attachment.
+- Keep the body under 8000 characters (about 2000 tokens in English). Put large reference material (station code tables, URL formats, search syntax) in `references/`, and say in the body when to read which attachment.
 - Keep facts such as package names, domains, URLs, API endpoints and field names exactly as they are. If you're not sure of a fact, leave it out.
 
-Existing knowledge is written in Chinese; new files can be written in English. The examples below keep the Chinese values from real files.
+Bundled knowledge is written in English. Names that must match what is on screen — `open`, `aliases`, `terms` and quoted UI labels — stay in the language the app or site displays. The examples below are from real files.
 
 ## APP.md
 
 ```markdown
 ---
 name: bilibili                     # directory name: lowercase letters, digits, hyphens
-display: 哔哩哔哩
-description: 视频、直播与动态(at most 60 characters: what this app can do)
+display: Bilibili
+description: Video, live streams and community posts (at most 200 characters: what this app can do)
 packages: ["tv.danmaku.bili", "com.bilibili.app.in"]
-package_aliases: ["国际版 | com.bilibili.app.in"]     # optional: which package a given name refers to
-aliases: ["B站", "哔哩哔哩"]
+package_aliases: ["International | com.bilibili.app.in"]     # optional: which package a given name refers to
+aliases: ["B站", "哔哩哔哩", "bilibili"]
 sites: ["bilibili.com"]            # optional: matching website knowledge
-open: 哔哩哔哩                       # name used to open the app
+open: 哔哩哔哩                       # launcher label, as shown on the phone
 pace: careful                      # optional: this app limits how fast it can be used (acting too fast or viewing too much gets blocked, asks for verification or logs you out)
-links: ["首页 | bilibili://... | tv.danmaku.bili"]       # optional
+links: ["Home | bilibili://... | tv.danmaku.bili"]       # optional
 ---
-## 是什么 (What it is)
+## What it is
 One or two sentences: what service the app provides; if it has several separate packages, what each one is.
 
-## 界面 (UI)
+## UI
 Main pages, bottom tabs, the search entry point, where common features are.
 
-## 功能 (Features)
+## Features
 - **Feature name**: how to get there; whether sign-in is needed; what information it shows (prices, status, fields).
 
-## 常用流程 (Common flows)
+## Common flows
 Optional: something that is asked for often and takes only a few steps (post a Moments, send money, search for a kind of content). If the steps are few, write them in the body; if there are many and they must be matched against specific menu names, put the steps in a `references/` attachment and say in the body when to read which one. Leave this section out if there is nothing to say.
 
-## 已知现象 (Known behavior)
+## Known issues
 Entry points that are easy to confuse, common pop-ups, quirks in loading or refreshing. Leave this section out if there is nothing to say.
 ```
 
@@ -58,28 +58,28 @@ Entry points that are easy to confuse, common pop-ups, quirks in loading or refr
 ```markdown
 ---
 name: bilibili.com                  # main domain
-display: 哔哩哔哩
-description: 视频、搜索与用户主页
+display: Bilibili
+description: Video site: search videos and read user profiles
 domains: ["bilibili.com", "b23.tv"]
-aliases: ["B站", "bilibili"]
+aliases: ["B站", "哔哩哔哩", "bilibili"]
 apps: ["bilibili"]                   # optional: matching app knowledge
 open: bilibili.com                  # URL used to open it
 mode: desktop                      # desktop / mobile: which version of the pages to use
 pace: careful                      # optional: this website limits how fast it can be browsed (viewing too fast or too much gets blocked)
 links: ["..."]                     # optional
 ---
-## 是什么 (What it is)
+## What it is
 
-## 页面与网址 (Pages and URLs)
+## Pages and URLs
 Main pages, how URLs are written (formats with parameters), the search entry point.
 
-## 功能 (Features)
+## Features
 - **Feature name**: on which page; whether sign-in is needed; what information it shows.
 
-## 接口 (APIs)
+## API
 Optional: addresses, parameters and response formats of public APIs.
 
-## 已知现象 (Known behavior)
+## Known issues
 Optional.
 ```
 
@@ -96,17 +96,17 @@ Same format as the personal skills Mika drafts as it learns (see `prompts/roles/
 ```markdown
 ---
 name: pdf-text
-display: 取 PDF 文字
+display: Extract PDF text
 description: one sentence: when to use this skill
-aliases: ["读 PDF", "PDF 转文字"]
+aliases: ["读 PDF", "PDF 转文字", "pdf text"]
 apps: []                           # optional: app knowledge names it uses
 sites: []                          # optional: website knowledge names it uses
 ---
-## 入口 (Entry point)
-## 步骤 (Steps)
-## 容易出错的地方 (Common mistakes)
-## 怎样算办成(核实证据) (What counts as done, and how to check)
-## 什么时候停下交给用户 (When to stop and hand over to the user)
+## Entry
+## Steps
+## Common pitfalls
+## How success is verified
+## When to stop and hand off
 ```
 
 A skill describes how to do "this kind of task", regardless of industry or product category. It can come with `references/` attachments and `scripts/`.

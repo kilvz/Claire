@@ -1,71 +1,71 @@
-# 应用内实时语音通话 · 设计(全量一次做齐)
+# In-app realtime voice call · design (all in one go)
 
-日期:2026-11-22
-状态:待批准
-调研底稿:会话内调研笔记(同源参考实现 PR 全链精读 + 本仓库引擎层比对;笔记不入库,结论已全部落入本规格)
+Date: 2026-11-22
+Status: Pending approval
+Research basis: in-session research notes (a close read of the whole PR chain of a reference implementation from the same source + a comparison with this repository's engine layer; the notes are not checked in, and all conclusions have already been folded into this spec)
 
-## 意图与为什么
+## Intent and why
 
-在 App 内与助手实时语音对话,**并且能语音办事**:全双工、可打断、可免提、前台服务保活;用户说的事经严格安全闸交给既有任务体系执行,进度在通话面板滚动,结果由模型复述;通话文字落回会话。
-引擎层(`VolcRealtimeClient`/`CallPlaybackQueue`/`CallInputPacer`/`PcmRecorder`/`PlaybackTickets`/`CallVoiceProfileStore`)本仓库已有且比参考实现更新——**不移植对方客户端**(那是我们旧引擎的分叉,移植等于降级);增量集中在壳、安全闸、路由与 UI,约 1,600–1,900 行新码 + 600–800 行测试。
-用户已拍板:不分期,一次做齐;worktree 隔离执行。
+Talk to the assistant by realtime voice inside the app, **and get things done by voice**: full duplex, interruptible, hands-free, kept alive by a foreground service; what the user says goes through a strict safety gate into the existing task system, progress scrolls in the call panel, and the model restates the result; the call text is written back into the conversation.
+The engine layer (`VolcRealtimeClient`/`CallPlaybackQueue`/`CallInputPacer`/`PcmRecorder`/`PlaybackTickets`/`CallVoiceProfileStore`) already exists in this repository and is newer than the reference implementation — **do not port the other client** (it is a fork of our old engine, so porting would be a downgrade); the additions are concentrated in the shell, the safety gate, routing and the UI, about 1,600–1,900 new lines of code + 600–800 lines of tests.
+The user has already decided: no phasing, do it all at once; execute in worktree isolation.
 
-## 验收(全部门槛)
+## Acceptance (all are gates)
 
-1. JVM 全绿:安全闸全分支、状态机迁移、协议帧(假服务)、路由决策、转写聚合、回声守卫、背压。
-2. androidTest 冒烟:通话页全链(连接→听→播音→打断→挂断→重试→上限)+ 权限拒绝路径 + 假任务执行路由。
-3. **真机音频矩阵(硬门槛)**:扬声器/听筒/蓝牙耳机 × 打断/回声;VOICE_COMMUNICATION 可用性与 AEC;isSilenced;热插拔;来电中断;焦点被抢;锁屏行为;回声守卫误拦/漏拦实测。
-4. **语音办事全链路真机验证**:说一句话→执行→状态行→复述;防误执行(伪造 function_call、回声冒充指令、跨轮重放)全部不生效。
+1. JVM all green: all safety-gate branches, state machine transitions, protocol frames (fake service), route decisions, transcript aggregation, echo guard, backpressure.
+2. androidTest smoke: full call-page chain (connect→listen→play→interrupt→hang up→retry→limit) + permission-denied path + fake task execution routing.
+3. **Real-device audio matrix (hard gate)**: speaker/earpiece/Bluetooth headset × interruption/echo; VOICE_COMMUNICATION availability and AEC; isSilenced; hot plugging; incoming-call interruption; focus stolen; lock-screen behavior; measured false blocks/misses of the echo guard.
+4. **Full-chain real-device verification of getting things done by voice**: say one sentence→execute→status line→restatement; every anti-mis-execution measure (forged function_call, echo impersonating an instruction, cross-turn replay) does not take effect.
 
-## 功能语义(UX 全链路)
+## Feature semantics (full UX chain)
 
-- **入口**:聊天输入栏听筒按钮(与按住说话共存,进通话模式);悬浮胶囊菜单「语音聊天」显式 intent 直开。前置 = 实时语音凭据已配置(复用 AI 电话配置)+ 麦克风权限。系统数字助手入口与我们 IA 不同,本规格不做。
-- **权限流**:通话面板里用户点按钮才请求 RECORD_AUDIO(不自动弹);拒绝后按钮变「去设置」跳应用详情页,ON_RESUME 重查;凭据缺失时按钮跳实时语音配置页。
-- **接通**:Connecting(可取消)→ 等界面 RESUMED(3 秒未回前台报「请回到前台」)→ 麦克风型前台服务拿租约 → 申请音频焦点 → 开麦校验(首块 3 秒内非空且未被系统静音)→ 扬声器起播 → 本地两音提示音 → 每次会话只播一次问候语 → 「已连接」绿点 + mm:ss 计时 + 红色挂断钮。
-- **对话**:用户说话 → 服务端 VAD 出转写 → 模型被提示词约束:对每段完整话语只调一个 `mika_request` 工具并沉默 → App 侧严格校验后交给既有聊天/工作入口执行 → 进度以短状态行滚动(最多 12 行,不含坐标/日程标题等细节)→ 结果作为 function result 回模型 → 模型只复述结果一次。面板有文字输入框,打字与说话同路。
-- **打断(barge-in)**:用户一开口(服务端 speech_started)→ 播放队列代次作废 + AudioTrack pause/flush/play + 取消尚未完成的本地任务(不声称撤销已生效操作)。
-- **免提**:Android 12+ `setCommunicationDevice`(有线/蓝牙耳机优先于听筒;没有私密听音设备时留扬声器),更老系统用 speakerphone 开关;选中态读系统实际通信设备,热插拔经 AudioDeviceCallback 刷新;挂断恢复原音频模式。
-- **结束**:挂断钮 / 通知栏挂断 / 来电(MODE_IN_CALL/RINGTONE 或电话功能忙 → busy 错误)/ 接通后 10 分钟上限(显示原因,不自动重试)/ 页面 ON_STOP 且不允许后台时收起。通话双方文字在 finally 里 NonCancellable 批量写回发起会话。
-- **错误 UX**:鉴权、连接超时、断连、限流、服务商错误、麦克风无输入、音频焦点失败、播放失败,各占一条独立文案 + 就地重试(attempt++ 重跑整个连接流程)。
+- **Entry**: the earpiece button in the chat input bar (coexists with press-and-hold to talk, enters call mode); the floating capsule menu 「语音聊天」 (Voice chat) opens it directly with an explicit intent. Prerequisite = realtime voice credentials already configured (reusing the AI phone call config) + microphone permission. The system digital assistant entry differs from our IA, so this spec does not cover it.
+- **Permission flow**: in the call panel, RECORD_AUDIO is requested only when the user taps the button (no automatic popup); after denial the button becomes 「去设置」 (Go to settings) and opens the app details page, rechecking on ON_RESUME; when credentials are missing the button jumps to the realtime voice config page.
+- **Connecting**: Connecting (cancellable) → wait for the UI to be RESUMED (if it does not return to the foreground within 3 seconds, report 「请回到前台」 (Please come back to the foreground)) → the microphone-type foreground service gets the lease → request audio focus → mic check (first chunk non-empty within 3 seconds and not silenced by the system) → speaker playback starts → local two-tone prompt → greeting played only once per session → 「已连接」 (Connected) green dot + mm:ss timer + red hang-up button.
+- **Conversation**: the user speaks → server-side VAD produces a transcript → the model is constrained by the prompt: for each complete utterance it calls only one `mika_request` tool and stays silent → after strict validation on the app side it is handed to the existing chat/work entry for execution → progress scrolls as short status lines (at most 12 lines, without details such as coordinates or schedule titles) → the result goes back to the model as a function result → the model restates the result only once. The panel has a text input box, and typing and speaking go the same route.
+- **Interruption (barge-in)**: as soon as the user starts speaking (server speech_started) → the playback queue generation is invalidated + AudioTrack pause/flush/play + cancel local tasks that have not completed (without claiming to undo operations that already took effect).
+- **Hands-free**: Android 12+ `setCommunicationDevice` (wired/Bluetooth headset takes priority over the earpiece; keep the speaker when there is no private listening device), older systems use the speakerphone toggle; the selected state reads the system's actual communication device, hot plugging refreshes via AudioDeviceCallback; hanging up restores the original audio mode.
+- **Ending**: hang-up button / notification shade hang-up / incoming call (MODE_IN_CALL/RINGTONE or phone function busy → busy error) / 10-minute cap after connecting (show the reason, no automatic retry) / collapse when the page is ON_STOP and background is not allowed. Both sides' text is written back to the originating conversation in bulk inside a NonCancellable finally.
+- **Error UX**: auth failure, connection timeout, disconnection, rate limiting, provider error, no microphone input, audio focus failure, playback failure each get their own separate copy + in-place retry (attempt++ reruns the whole connection flow).
 
-## 音频管线与全双工(既定事实,照此实现)
+## Audio pipeline and full duplex (established facts, implement accordingly)
 
-麦克风 AudioRecord(16k mono PCM16,320 采样/20ms 块)→ WebSocket(实时双工服务,STT+LLM+TTS 全在服务端)→ 下行 24k mono PCM16 → 环形播放队列 → AudioTrack(USAGE_VOICE_COMMUNICATION / CONTENT_TYPE_SPEECH,MODE_STREAM,非阻塞写)。VAD 完全在服务端,客户端不做本地 VAD、不做 push-to-talk。上下行独立协程;录音 `Channel<ShortArray>(100)` 背压,连接建立期最多攒 5 秒,溢出即失败绝不静默丢采样;上行 20ms 帧按绝对 deadline pacing;播放队列上限 20 秒(#695 教训),下行单包 ≤1 秒。提示音:本地合成 720/960Hz 正弦各 65ms 淡入淡出包络,直接写播放轨,不计入电平。
+Microphone AudioRecord (16k mono PCM16, 320 samples/20ms chunk) → WebSocket (realtime duplex service, STT+LLM+TTS all server-side) → downlink 24k mono PCM16 → ring playback queue → AudioTrack (USAGE_VOICE_COMMUNICATION / CONTENT_TYPE_SPEECH, MODE_STREAM, non-blocking writes). VAD is entirely server-side; the client does no local VAD and no push-to-talk. Uplink and downlink run in independent coroutines; recording uses a `Channel<ShortArray>(100)` for backpressure, accumulating at most 5 seconds during connection setup, and overflow fails outright rather than silently dropping samples; uplink 20ms frames are paced to absolute deadlines; the playback queue is capped at 20 seconds (#695 lesson), and a single downlink packet is ≤1 second. Prompt tone: locally synthesized 720/960Hz sine, 65ms each with a fade-in/fade-out envelope, written directly to the playback track and not counted in the level meter.
 
-## 组件清单
+## Component list
 
-全部新代码按通用 AOSP 设计:公开 API 能力检测 + 回退链,不为任何机型写特例;代码/注释/文档/提交信息不出现任何外部项目名称。
+All new code follows generic AOSP design: public API capability detection + fallback chain, with no special cases for any device model; code/comments/docs/commit messages do not contain any external project names.
 
-1. **`voice/PcmRecorder`(+~15,改)**:`inputSource`(通话传 VOICE_COMMUNICATION 触发平台 AEC/NS,初始化失败回退 MIC)、`chunkSamples`、`isSilenced` 读数(能力检测,不支持恒 false)。现有语音输入路径行为不变。
-2. **`calls/VolcRealtimeProtocol`(+~80,改)**:`mikaActions` 配置项、`mika_request` 工具注册帧、`functionResult` 帧、`synthesize` 帧(朗读复用)、`response.done` 事件解析。
-3. **`calls/VolcRealtimeClient`(+~60,改)**:`VolcRealtimeConfig.agentTools`、`sendFunctionResult(callId, text)`、`synthesize(text)`、`VolcRealtimeEvent.ResponseDone`。
-4. **`voicecall/VoiceCallSession`(~350,新)**:通话编排,**显式枚举状态机**(Connecting→MicCheck→Active→Ended/Error;禁布尔拼接,`ensureActive()` 区分外部取消):RESUMED 等待、焦点、开麦校验(3s 首块 + isSilenced + VOICE_COMMUNICATION→MIC 回退)、提示音、问候语一次、播放 writer(复用 CallPlaybackQueue)、打断(队列作废+pause/flush/play+通知路由取消任务)、10 分钟上限、8 类错误文案 + 就地重试、回声守卫(播音时与助手已说内容 500 字环形缓冲互为子串的「用户转写」丢弃,阈值可调)。
-5. **`voicecall/VoiceCallRequest`(~120,新)**:执行安全闸——只有「当轮、final 且 complete」的用户转写能喂执行;`utterance` 参数与转写做归一化**单向**包含校验——utterance 必须落在当轮转写里,比转写还长(模型添了用户没说的话)一律拒(不匹配不消费该转写);callId 一次性(含重连重放);助手回声剔除;转写每轮一次性消费。按语义自行重写。
-6. **`voicecall/VoiceCallRoute`(~200,新)**:语音请求→既有聊天/工作任务入口的一次性目的地路由(先到先得);订阅 TaskState 出短状态行;任务需确认/接管时提示「去任务页看」;打断取消已启动未完成任务;结果回 `sendFunctionResult`。
-7. **`voicecall/VoiceCallTranscript`(~50,新)**:事件→Turn(问/答/时间)聚合,结束写回发起会话。
-8. **`voicecall/VoiceCallService`(~130,新)**:麦克风型前台服务 + CATEGORY_CALL ongoing 通知(含挂断动作);`select` 竞速通话协程与通知挂断;Android 14+ mic FGS 只能前台起;锁屏不开通话页。
-9. **`voicecall/VoiceCallAudioRoute`(~120,新)**:免提路由双路径 + 选中态读系统实际设备 + 热插拔刷新 + 挂断恢复;决策抽纯函数供 JVM 测。
-10. **`ui/voicecall/VoiceCallOverlay`(~450,新)**:Compose 全屏 Dialog(`usePlatformDefaultWidth=false`、`decorFitsSystemWindows=false`、点外部不收起),不透明深色;中央呼吸球随双向电平起伏(**自己画**,复用 VoiceWave/Breathing 语言,不引入第三方粒子引擎);状态行滚动区(≤12 行)+ mm:ss + 挂断 + 免提 + 折叠 + 文字输入框。
-11. **入口(各 ~30,改)**:输入栏听筒按钮进通话模式;胶囊菜单「语音聊天」直开。
-12. **提示词约束**:session instructions 让模型对每段完整话语只调一个 `mika_request` 并沉默、只复述结果一次;进 prompts 资源。
-13. **字符串**:约 40 条新 key × 12 个目录(values + 11 locale),问候语本地化,不硬编码。
+1. **`voice/PcmRecorder` (+~15, modified)**: `inputSource` (calls pass VOICE_COMMUNICATION to trigger platform AEC/NS, falling back to MIC if initialization fails), `chunkSamples`, `isSilenced` reading (capability detection, always false when unsupported). The existing voice input path behavior is unchanged.
+2. **`calls/VolcRealtimeProtocol` (+~80, modified)**: `mikaActions` config item, `mika_request` tool registration frame, `functionResult` frame, `synthesize` frame (reused for read-aloud), `response.done` event parsing.
+3. **`calls/VolcRealtimeClient` (+~60, modified)**: `VolcRealtimeConfig.agentTools`, `sendFunctionResult(callId, text)`, `synthesize(text)`, `VolcRealtimeEvent.ResponseDone`.
+4. **`voicecall/VoiceCallSession` (~350, new)**: call orchestration, **explicit enum state machine** (Connecting→MicCheck→Active→Ended/Error; no boolean stitching, `ensureActive()` distinguishes external cancellation): RESUMED wait, focus, mic check (3s first chunk + isSilenced + VOICE_COMMUNICATION→MIC fallback), prompt tone, greeting once, playback writer (reuses CallPlaybackQueue), interruption (queue invalidation + pause/flush/play + notifying the route to cancel the task), 10-minute cap, 8 kinds of error copy + in-place retry, echo guard (during playback, a "user transcript" that is a substring of the 500-character ring buffer of what the assistant has already said is dropped; threshold adjustable).
+5. **`voicecall/VoiceCallRequest` (~120, new)**: execution safety gate — only a "current-turn, final and complete" user transcript can feed execution; the `utterance` parameter and the transcript undergo a normalized **one-way** containment check — the utterance must fall inside the current turn's transcript, and anything longer than the transcript (the model added words the user did not say) is rejected outright (no match means the transcript is not consumed); callId is single-use (including reconnection replay); assistant echo is removed; each turn's transcript is consumed once. Rewrite it yourself by semantics.
+6. **`voicecall/VoiceCallRoute` (~200, new)**: one-shot destination routing from voice requests to the existing chat/work task entry (first come, first served); subscribes to TaskState to emit short status lines; when a task needs confirmation/takeover, prompt 「去任务页看」 (See the task page); interruption cancels started-but-unfinished tasks; the result goes back through `sendFunctionResult`.
+7. **`voicecall/VoiceCallTranscript` (~50, new)**: event→Turn (question/answer/time) aggregation, written back to the originating conversation at the end.
+8. **`voicecall/VoiceCallService` (~130, new)**: microphone-type foreground service + CATEGORY_CALL ongoing notification (with a hang-up action); `select` races the call coroutine against the notification hang-up; Android 14+ mic FGS can only be started from the foreground; do not open the call page on the lock screen.
+9. **`voicecall/VoiceCallAudioRoute` (~120, new)**: hands-free routing with two paths + selected state reading the system's actual device + hot-plug refresh + restore on hang-up; decisions extracted into pure functions for JVM tests.
+10. **`ui/voicecall/VoiceCallOverlay` (~450, new)**: Compose full-screen Dialog (`usePlatformDefaultWidth=false`, `decorFitsSystemWindows=false`, tapping outside does not dismiss), opaque dark; a central breathing sphere rises and falls with the bidirectional level (**drawn in-house**, reusing the VoiceWave/Breathing language, no third-party particle engine); scrolling status-line area (≤12 lines) + mm:ss + hang up + hands-free + collapse + text input box.
+11. **Entry points (~30 each, modified)**: the earpiece button in the input bar enters call mode; the capsule menu 「语音聊天」 opens it directly.
+12. **Prompt constraints**: session instructions make the model call only one `mika_request` per complete utterance and stay silent, and restate the result only once; goes into the prompts resources.
+13. **Strings**: about 40 new keys × 12 directories (values + 11 locales), greeting localized, no hard-coding.
 
-## 执行安全(移植必须守住的核心)
+## Execution safety (the core a port must preserve)
 
-模型可伪造 `function_call`——**只许当轮完整转写触发执行**:final+complete 校验、参数-转写兼容校验(不匹配连转写都不消费)、callId 一次性防重连重放、回声剔除防助手声音冒充指令、转写每轮一次性消费防重复执行。宁可拒执行,不可误执行。
+The model can forge a `function_call` — **only a current-turn complete transcript may trigger execution**: final+complete validation, parameter-transcript compatibility check (on mismatch not even the transcript is consumed), single-use callId to prevent reconnection replay, echo removal to prevent the assistant's voice from impersonating an instruction, single consumption of each turn's transcript to prevent duplicate execution. Better to refuse execution than to execute wrongly.
 
-## 测试策略
+## Test strategy
 
-- JVM:VoiceCallRequest 全部分支(回声/兼容/一次性/跨轮)、状态机全迁移(重试 attempt++、外部取消 vs 内部失败)、协议帧构造与解析(MockWebServer 假实时服务:注册工具/下行音频/function_call/打断)、路由决策纯函数、转写聚合、背压溢出、错误→文案映射。
-- androidTest:通话页冒烟(注入假 runCall 全链)、权限拒绝路径、假任务执行→状态行→function result。
-- 真机矩阵 + 办事全链路:见验收 3、4,逐项记录进 PR 描述。
+- JVM: all VoiceCallRequest branches (echo/compatibility/single-use/cross-turn), all state machine transitions (retry attempt++, external cancellation vs internal failure), protocol frame construction and parsing (MockWebServer fake realtime service: tool registration/downlink audio/function_call/interruption), route decision pure functions, transcript aggregation, backpressure overflow, error→copy mapping.
+- androidTest: call page smoke (injecting a fake runCall full chain), permission-denied path, fake task execution→status line→function result.
+- Real-device matrix + full get-things-done chain: see acceptance 3, 4; record each item in the PR description.
 
-## 风险与对策
+## Risks and mitigations
 
-- **音频路径设备差异(最大)**:AEC 质量、AudioTrack 假死、isSilenced、setCommunicationDevice 兼容性——能力检测 + 回退链,真机矩阵是验收门槛。
-- **回声自激固有残留**:平台 AEC 失效时守卫是概率性的(≥4 字子串启发式,可能误拦用户重复助手的话);保守方向优先(播音时降低执行敏感度),阈值真机调。
-- **权限与政策**:RECORD_AUDIO 运行时权限;后台持续录音必须挂麦克风型 FGS(Android 14+ 只能前台起);退后台 FGS 保活 + 通知挂断。
-- **耗电发热**:持续 16k 采集 + 24k 播放 + 长连;音频线程 `THREAD_PRIORITY_AUDIO`;10 分钟上限兜底。
-- **服务端计费/限流**:按时长计费;错误文案区分「可重试」与「去配置」。
-- **凭据分用途**:通话读默认实时语音档案;试听/朗读书面凭据走错 API 的坑已知晓,按用途分开存取。
-- **多播放源叠音**:进程内互斥 + 代次令牌拦迟到回调(PlaybackTickets 已是正解)。
+- **Audio-path device differences (largest)**: AEC quality, AudioTrack hang, isSilenced, setCommunicationDevice compatibility — capability detection + fallback chain, and the real-device matrix is an acceptance gate.
+- **Inherent residual echo self-excitation**: when platform AEC fails, the guard is probabilistic (≥4-character substring heuristic, may falsely block the user repeating the assistant's words); prefer the conservative direction (lower execution sensitivity during playback), and tune the threshold on real devices.
+- **Permissions and policy**: RECORD_AUDIO runtime permission; continuous background recording must hang off a microphone-type FGS (Android 14+ can only start from the foreground); keep the FGS alive when backgrounded + hang up from the notification.
+- **Power and heat**: continuous 16k capture + 24k playback + long connection; audio threads at `THREAD_PRIORITY_AUDIO`; 10-minute cap as a backstop.
+- **Server-side billing/rate limiting**: billed by duration; error copy distinguishes retryable from go-to-configuration.
+- **Credentials separated by purpose**: calls read the default realtime voice profile; the pitfall of trial-listening/read-aloud text credentials hitting the wrong API is already known, so store and read them separately by purpose.
+- **Multiple playback sources stacking**: in-process mutual exclusion + generation tokens to block late callbacks (PlaybackTickets is already the right answer).

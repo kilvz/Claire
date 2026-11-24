@@ -1,58 +1,58 @@
-# MCP 服务目录与引导式接入 Implementation Plan
+# MCP service catalog and guided setup Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 让用户从完整内置 MCP 目录选择服务后,只授权或填写必要字段即可连接,同时保留完整自定义接入。
+**Goal:** Let users pick a service from the complete built-in MCP catalog and then connect by only authorizing or filling in the necessary fields, while keeping full custom setup.
 
-**Architecture:** 以版本化、无秘密的预设数据描述连接和动态表单;解析、模板解析和校验放在纯 Kotlin core,凭据与连接编排留在 App 的 `McpServerStore`。预设和自定义配置最终共用现有 MCP client、Agent 工具装配与任务资源生命周期;stdio 增加显式环境和经确认的包安装。
+**Architecture:** Describe connections and dynamic forms with versioned, secret-free preset data; parsing, template resolution and validation live in pure Kotlin core, while credentials and connection orchestration stay in the App's `McpServerStore`. Preset and custom configurations ultimately share the existing MCP client, Agent tool assembly and task resource lifecycle; stdio gains an explicit environment and confirmed package installation.
 
-**Tech Stack:** Kotlin、kotlinx.serialization、OkHttp、Compose、现有 Linux 沙箱、JUnit/MockWebServer、本地 HTML 原型。
+**Tech Stack:** Kotlin, kotlinx.serialization, OkHttp, Compose, the existing Linux sandbox, JUnit/MockWebServer, a local HTML prototype.
 
 **Spec:** `docs/design/specs/2026-11-22-mcp-service-catalog-design.md`
 
 ## Global Constraints
 
-- 首版直接提供完整目录,目标 200–300 条可用预设;不按服务批次限制上线,不为单个服务编写专用 Kotlin 分支。
-- 远程预设只使用服务方官方端点;stdio 只收官方或来源可核验且经过审查的包;社区托管代理只走用户自定义。
-- 所有秘密加密保存;秘密不得进入目录、普通配置、URL、argv 或日志。
-- stdio 包下载前展示包名、来源和版本,用户明确确认后统一安装和缓存;不静默下载。
-- 支持多个秘密和多个普通必填字段,UI 只显示当前预设声明的项目。
-- 工具目录和 schema 只从真实 MCP 连接发现,不写入预设。
-- 预设和自定义服务复用现有任务连接预算、失败隔离和 `ResourceScope` 清理。
-- 新 UI 先完成本地 HTML 原型并获得用户确认,再修改 App UI。
-- 所有新增用户可见字符串覆盖项目现有全部 UI 语言;服务专有名称不必翻译。
-- 不修改 inbound `McpRpc`、`McpTaskTools` 或电脑连接权限策略;非发版不改版本号。
+- The first version ships the complete catalog directly, targeting 200–300 usable presets; do not limit the launch by service batches, and do not write dedicated Kotlin branches for a single service.
+- Remote presets use only the service's official endpoint; stdio accepts only official packages, or packages whose source is verifiable and which have been reviewed; community-hosted proxies go only through user customization.
+- All secrets are stored encrypted; secrets must not enter the catalog, ordinary configuration, URLs, argv or logs.
+- Before a stdio package is downloaded, show the package name, source and version, and install and cache it uniformly after the user explicitly confirms; never download silently.
+- Support multiple secrets and multiple ordinary required fields; the UI shows only the items declared by the current preset.
+- The tool catalog and schema are discovered only from a real MCP connection and are not written into presets.
+- Preset and custom services reuse the existing task connection budget, failure isolation and `ResourceScope` cleanup.
+- New UI first completes a local HTML prototype and obtains the user's confirmation before any App UI is modified.
+- All new user-visible strings cover every UI language the project already has; service-proprietary names need not be translated.
+- Do not modify inbound `McpRpc`, `McpTaskTools` or the computer-connection permission policy; do not change the version number (not a release).
 
 ## Review Focus
 
-- 恶意或损坏预设试图把秘密写入 URL/argv、覆盖保留 header 或发往非官方地址:解析和解析器必须拒绝,见 Task 2 的 `rejectsSecretExfiltrationAndUnsupportedTargets`。
-- 多秘密配置在编辑、备份、恢复和删除后不得串号或残留:见 Task 3 的 `fieldSecretsRoundTripMigrateBackupAndDelete`。
-- 用户取消安装、沙箱断网、包版本变化或安装中断时不得执行包:见 Task 6 的 `installRequiresMatchingConsentAndNeverRunsAfterCancellation`。
-- App 升级后的预设不得静默改变已有服务的秘密目的地:见 Task 4 的 `existingPresetConfigKeepsConnectionSnapshotAfterCatalogUpdate`。
-- 单条坏目录、单个服务超时或握手失败不得影响其他条目和任务:见 Task 2、Task 4 与 Task 10 的隔离/回归测试。
+- A malicious or corrupt preset trying to put secrets into the URL/argv, override reserved headers or send to a non-official address: the parser and resolver must reject it, see `rejectsSecretExfiltrationAndUnsupportedTargets` in Task 2.
+- Multi-secret configurations must not cross wires or leave residue after editing, backup, restore and deletion: see `fieldSecretsRoundTripMigrateBackupAndDelete` in Task 3.
+- The package must not be run when the user cancels installation, the sandbox loses its network, the package version changes or the installation is interrupted: see `installRequiresMatchingConsentAndNeverRunsAfterCancellation` in Task 6.
+- Presets after an app upgrade must not silently change where an existing service's secrets go: see `existingPresetConfigKeepsConnectionSnapshotAfterCatalogUpdate` in Task 4.
+- A single bad catalog entry, one service timing out or a failed handshake must not affect other entries or tasks: see the isolation/regression tests in Task 2, Task 4 and Task 10.
 
 ---
 
-### Task 1: 本地 UI 原型与确认门
+### Task 1: Local UI prototype and confirmation gate
 
 **Files:**
 - Create: `docs/design/prototypes/2026-11-22-mcp-service-catalog.html`
 
 **Interfaces:**
-- Produces: 用户确认的 MCP 首页、目录、详情/连接、成功、失败、管理和自定义页面布局;Task 8–9 只实现已确认原型。
+- Produces: the layouts of the MCP home, catalog, detail/connect, success, failure, management and custom pages, confirmed by the user; Tasks 8–9 implement only the confirmed prototype.
 
-- [ ] **Step 1: 制作单文件、可点击的本地 HTML 原型**
+- [ ] **Step 1: Build a single-file, clickable local HTML prototype**
 
-覆盖手机窄屏和桌面宽屏;使用现有 App 的浅色/深色语义,包含:空/非空首页、可搜索和分类的目录、OAuth、多个秘密与普通字段、无认证、连接中/取消、成功工具数、可恢复失败、stdio 包确认、管理和高级自定义。所有数据使用明确的虚构示例,不请求网络。
+Cover narrow phone screens and wide desktop screens; use the existing App's light/dark semantics, and include: empty/non-empty home, a searchable and categorized catalog, OAuth, multiple secrets and ordinary fields, no auth, connecting/cancel, success tool count, recoverable failure, stdio package confirmation, management and advanced customization. All data uses clearly fictional examples and makes no network requests.
 
-- [ ] **Step 2: 本地检查原型**
+- [ ] **Step 2: Check the prototype locally**
 
-Run: 在浏览器打开上述 HTML,逐一点击所有流程并检查窄屏无横向滚动、键盘焦点、深浅色和长文案。
-Expected: 所有状态可达,预设流程不出现 URL/transport,自定义入口始终存在。
+Run: open the above HTML in a browser, click through every flow one by one and check for no horizontal scrolling on narrow screens, keyboard focus, light/dark mode and long copy.
+Expected: every state is reachable, the preset flows never show URL/transport, and the custom entry point is always present.
 
-- [ ] **Step 3: 请用户确认原型**
+- [ ] **Step 3: Ask the user to confirm the prototype**
 
-展示原型并明确等待确认。未获确认前不得执行 Task 8–9 的 App UI 修改;可以先审阅后续纯逻辑代码,但本计划顺序执行时在此停止。
+Show the prototype and explicitly wait for confirmation. Do not carry out the App UI changes of Tasks 8–9 before confirmation; later pure-logic code can be reviewed first, but when this plan is executed in order, stop here.
 
 - [ ] **Step 4: Commit**
 
@@ -61,7 +61,7 @@ git add docs/design/specs/2026-11-22-mcp-service-catalog-design.md docs/design/p
 git commit -m "docs: design and prototype guided MCP service connections"
 ```
 
-### Task 2: 版本化预设模型、目录解析与安全模板解析
+### Task 2: Versioned preset model, catalog parsing and safe template resolution
 
 **Files:**
 - Create: `core/src/main/kotlin/com/wangzan101/mika/core/cap/mcp/McpPreset.kt`
@@ -69,35 +69,35 @@ git commit -m "docs: design and prototype guided MCP service connections"
 
 **Interfaces:**
 - Produces:
-  - `data class McpCatalog(val formatVersion: Int, val presets: List<McpPreset>)`; `McpCatalog.Empty`。
-  - `data class McpPreset(val id: String, val name: String, val summary: McpCopy, val category: String, val transport: String, val auth: String, val endpoint: String, val command: List<String>, val fields: List<McpPresetField>, val packageSpec: McpPackageSpec?, val officialSource: String)`。
-  - `data class McpPresetField(val id: String, val label: McpCopy, val secret: Boolean, val required: Boolean, val help: McpCopy?)`。
-  - `data class McpCopy(val values: Map<String, String>) { fun resolve(languageTag: String): String }`。
-  - `data class McpPackageSpec(val ecosystem: String, val name: String, val version: String, val source: String)`。
-  - `data class ResolvedMcpPreset(val url: String, val argv: List<String>, val headers: Map<String, String>, val environment: Map<String, String>, val auth: String)`。
-  - `object McpCatalogParser { fun parse(text: String): McpCatalog }`。
-  - `class McpPresetResolver { fun resolve(preset: McpPreset, values: Map<String, String>): ResolvedMcpPreset }`。
+  - `data class McpCatalog(val formatVersion: Int, val presets: List<McpPreset>)`; `McpCatalog.Empty`.
+  - `data class McpPreset(val id: String, val name: String, val summary: McpCopy, val category: String, val transport: String, val auth: String, val endpoint: String, val command: List<String>, val fields: List<McpPresetField>, val packageSpec: McpPackageSpec?, val officialSource: String)`.
+  - `data class McpPresetField(val id: String, val label: McpCopy, val secret: Boolean, val required: Boolean, val help: McpCopy?)`.
+  - `data class McpCopy(val values: Map<String, String>) { fun resolve(languageTag: String): String }`.
+  - `data class McpPackageSpec(val ecosystem: String, val name: String, val version: String, val source: String)`.
+  - `data class ResolvedMcpPreset(val url: String, val argv: List<String>, val headers: Map<String, String>, val environment: Map<String, String>, val auth: String)`.
+  - `object McpCatalogParser { fun parse(text: String): McpCatalog }`.
+  - `class McpPresetResolver { fun resolve(preset: McpPreset, values: Map<String, String>): ResolvedMcpPreset }`.
 
 - [ ] **Step 1: Write failing parser/resolver tests**
 
-Test `parsesLocalizedCatalogAndResolvesOnlyDeclaredFields`: 两个预设、多语言文案、多个秘密/普通字段、固定 argv 与模板值得到确定输出。
-Test `rejectsSecretExfiltrationAndUnsupportedTargets`: 重复 ID/字段 ID、秘密进入 URL 或 argv、未知 transport/auth/target、空官方来源、未锁定包版本均失败。
-Test `rejectsMalformedCatalogWithoutPartialSuccess`: 目录级格式错误整体失败;后续资产加载的单条隔离由 Task 7 覆盖。
-Test `copyResolvesExactLanguageThenBaseThenDefault`: 只测语言回退;Task 7 要求正式资产无缺失翻译。
+Test `parsesLocalizedCatalogAndResolvesOnlyDeclaredFields`: two presets, multilingual copy, multiple secret/ordinary fields, and fixed argv with template values all produce deterministic output.
+Test `rejectsSecretExfiltrationAndUnsupportedTargets`: duplicate IDs/field IDs, secrets entering the URL or argv, unknown transport/auth/target, an empty official source and an unpinned package version all fail.
+Test `rejectsMalformedCatalogWithoutPartialSuccess`: a catalog-level format error fails as a whole; per-entry isolation during subsequent asset loading is covered by Task 7.
+Test `copyResolvesExactLanguageThenBaseThenDefault`: tests language fallback only; Task 7 requires the production assets to have no missing translations.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :core:test --tests 'com.wangzan101.mika.core.cap.mcp.McpPresetTest'`
-Expected: FAIL, 类型不存在。
+Expected: FAIL, the type does not exist.
 
 - [ ] **Step 3: Implement the catalog model, parser and resolver**
 
-使用 `kotlinx.serialization`;预设 JSON 只保存声明式模板。Resolver 对普通字段做目标感知校验/编码,对秘密只允许 Bearer、秘密 header 和 env;禁止秘密进入 URL/argv。OAuth 与无认证不得要求秘密字段。
+Use `kotlinx.serialization`; preset JSON stores only declarative templates. The resolver performs target-aware validation/encoding for ordinary fields, and allows secrets only as Bearer, secret headers and env; secrets are forbidden from entering the URL/argv. OAuth and no-auth must not require secret fields.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `./gradlew :core:test --tests 'com.wangzan101.mika.core.cap.mcp.McpPresetTest'`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -106,7 +106,7 @@ git add core/src/main/kotlin/com/wangzan101/mika/core/cap/mcp/McpPreset.kt core/
 git commit -m "feat(mcp): add validated service preset templates"
 ```
 
-### Task 3: 多字段配置、加密秘密与旧配置兼容
+### Task 3: Multi-field configuration, encrypted secrets and old-config compatibility
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/settings/McpFieldSecrets.kt`
@@ -115,31 +115,31 @@ git commit -m "feat(mcp): add validated service preset templates"
 - Modify: `app/src/test/java/com/wangzan101/mika/backup/BackupEngineTest.kt`
 
 **Interfaces:**
-- Consumes: Task 2 的 `McpPreset` / `McpPresetField`。
+- Consumes: Task 2's `McpPreset` / `McpPresetField`.
 - Produces:
-  - `McpServerConfig` 新增 `presetId: String? = null`、`presetSnapshot: McpPreset? = null`、`fieldValues: Map<String, String> = emptyMap()`;快照不含秘密,后者只含非秘密值。
-  - `class McpFieldSecrets { fun get(configId: String, fieldId: String): String?; fun set(configId: String, fieldId: String, value: String?); fun all(configId: String): Map<String, String>; fun clear(configId: String) }`,复用 `mcp-server-secrets.bin`。
-  - Store 保留现有 `token(id)` / `setToken` / OAuth API,并增加 `secret(configId, fieldId)`、`setSecret(...)`、`secrets(configId)`。
+  - `McpServerConfig` gains `presetId: String? = null`, `presetSnapshot: McpPreset? = null` and `fieldValues: Map<String, String> = emptyMap()`; the snapshot contains no secrets, and the latter holds only non-secret values.
+  - `class McpFieldSecrets { fun get(configId: String, fieldId: String): String?; fun set(configId: String, fieldId: String, value: String?); fun all(configId: String): Map<String, String>; fun clear(configId: String) }`, reusing `mcp-server-secrets.bin`.
+  - The Store keeps the existing `token(id)` / `setToken` / OAuth API and adds `secret(configId, fieldId)`, `setSecret(...)` and `secrets(configId)`.
 
 - [ ] **Step 1: Write failing storage and migration tests**
 
-Test `fieldSecretsRoundTripMigrateBackupAndDelete`: 同一服务两个秘密、两个服务互不串号;旧 Bearer 与 OAuth 键可读;删除只清目标服务;备份恢复后秘密可用且普通 JSON 无秘密。
-Test `legacyCustomConfigLoadsWithoutPresetFields`: 旧 JSON 的 transport/token/OAuth/allowlist 行为完全不变。
-Test `presetConfigRejectsSecretInPlainFieldValues`: 预设字段声明为秘密时拒绝写入 `fieldValues`。
+Test `fieldSecretsRoundTripMigrateBackupAndDelete`: two secrets for the same service and two services that never cross wires; legacy Bearer and OAuth keys remain readable; deletion clears only the target service; after a backup and restore the secrets are usable and the ordinary JSON holds no secrets.
+Test `legacyCustomConfigLoadsWithoutPresetFields`: the transport/token/OAuth/allowlist behavior of old JSON is completely unchanged.
+Test `presetConfigRejectsSecretInPlainFieldValues`: writing to `fieldValues` is rejected when a preset field is declared secret.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpServerStoreTest' --tests 'com.wangzan101.mika.backup.BackupEngineTest'`
-Expected: FAIL, 新字段/方法不存在。
+Expected: FAIL, the new fields/methods do not exist.
 
 - [ ] **Step 3: Implement scoped field secrets and compatible config**
 
-在现有加密 JSON 中使用带命名空间的键,不迁移或破坏旧 token/OAuth 键;所有写操作沿用原子替换。预设字段存在性由 catalog 校验,秘密明文只经 `McpFieldSecrets`。
+Use namespaced keys inside the existing encrypted JSON without migrating or breaking the old token/OAuth keys; all writes keep using atomic replacement. The existence of preset fields is validated by the catalog, and secret plaintext goes only through `McpFieldSecrets`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpServerStoreTest' --tests 'com.wangzan101.mika.backup.BackupEngineTest'`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -148,7 +148,7 @@ git add app/src/main/java/com/wangzan101/mika/settings/McpFieldSecrets.kt app/sr
 git commit -m "feat(mcp): store multiple preset credentials securely"
 ```
 
-### Task 4: 预设到 HTTP/OAuth 连接的统一编排
+### Task 4: Unified orchestration from presets to HTTP/OAuth connections
 
 **Files:**
 - Modify: `app/src/main/java/com/wangzan101/mika/settings/McpServerStore.kt`
@@ -156,33 +156,33 @@ git commit -m "feat(mcp): store multiple preset credentials securely"
 - Create: `app/src/test/java/com/wangzan101/mika/settings/McpPresetConnectionTest.kt`
 
 **Interfaces:**
-- Consumes: Task 2 的 catalog/resolver;Task 3 的配置和秘密 API。
+- Consumes: Task 2's catalog/resolver; Task 3's configuration and secret APIs.
 - Produces:
-  - `McpServerStore.catalog: McpCatalog` 构造参数,默认 `McpCatalog.Empty`。
-  - `fun presetConfig(presetId: String, values: Map<String, String>): Result<McpServerConfig>`。
-  - `suspend fun connectPreset(presetId: String, values: Map<String, String>, secrets: Map<String, String>): Result<McpTestResult>`;保存配置/秘密后走现有 `test`,失败保留停用配置。
-  - 现有 `connectionsFor`、`open`、`authorize` 对预设和自定义产出相同 endpoint。
+  - `McpServerStore.catalog: McpCatalog` constructor parameter, defaulting to `McpCatalog.Empty`.
+  - `fun presetConfig(presetId: String, values: Map<String, String>): Result<McpServerConfig>`.
+  - `suspend fun connectPreset(presetId: String, values: Map<String, String>, secrets: Map<String, String>): Result<McpTestResult>`; after saving the configuration/secrets it goes through the existing `test`, and on failure the configuration is kept disabled.
+  - The existing `connectionsFor`, `open` and `authorize` produce the same endpoint for presets and custom configurations.
 
 - [ ] **Step 1: Write failing HTTP/OAuth tests**
 
-Test `presetHttpUsesResolvedUrlHeadersAndBearer`: MockWebServer 验证 URL、多个秘密 header、普通 header 与现有 initialize/tools/list。
-Test `presetOAuthReusesDiscoveryPkceRefreshAndEncryptedStorage`: 使用现有 OAuth 测试替身,不新增服务专用分支。
-Test `failedPresetTestLeavesDisabledEditableConfig`: 连接失败不进入健康成功状态,不产生任务连接。
-Test `existingPresetConfigKeepsConnectionSnapshotAfterCatalogUpdate`: 已保存 URL、auth 目的地和 argv 快照不随目录对象替换;新建配置才使用新模板。
+Test `presetHttpUsesResolvedUrlHeadersAndBearer`: MockWebServer verifies the URL, multiple secret headers and ordinary headers together with the existing initialize/tools/list.
+Test `presetOAuthReusesDiscoveryPkceRefreshAndEncryptedStorage`: uses the existing OAuth test doubles and adds no service-specific branches.
+Test `failedPresetTestLeavesDisabledEditableConfig`: a failed connection does not enter the healthy-success state and produces no task connection.
+Test `existingPresetConfigKeepsConnectionSnapshotAfterCatalogUpdate`: a saved URL, auth destination and argv snapshot do not change when the catalog object is replaced; only newly created configurations use the new template.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpPresetConnectionTest'`
-Expected: FAIL, 预设入口未接线。
+Expected: FAIL, the preset entry point is not wired.
 
 - [ ] **Step 3: Implement preset resolution in the existing store**
 
-`McpServerStore` 接收调用方注入的 catalog;测试直接注入临时目录,App 资产加载在 Task 7 接线。自定义配置继续走原字段;预设配置使用保存的无秘密快照和当前秘密。所有 HTTP 安全校验、禁止重定向、OAuth 端点检查和任务生命周期复用现有实现。
+`McpServerStore` takes a catalog injected by the caller; tests inject a temporary directory directly, and App asset loading is wired in Task 7. Custom configurations keep using the original fields; preset configurations use the saved secret-free snapshot and the current secrets. All HTTP security checks, the ban on redirects, OAuth endpoint checks and the task lifecycle reuse the existing implementation.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpPresetConnectionTest' --tests 'com.wangzan101.mika.settings.McpServerStoreTest'`
-Expected: PASS。
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -191,7 +191,7 @@ git add app/src/main/java/com/wangzan101/mika/settings/McpServerStore.kt app/src
 git commit -m "feat(mcp): connect presets through existing client paths"
 ```
 
-### Task 5: stdio 的显式秘密环境
+### Task 5: The explicit secret environment for stdio
 
 **Files:**
 - Modify: `core/src/main/kotlin/com/wangzan101/mika/core/cap/mcp/StdioMcpClient.kt`
@@ -204,28 +204,28 @@ git commit -m "feat(mcp): connect presets through existing client paths"
 - Modify: `app/src/test/java/com/wangzan101/mika/cap/sandbox/SandboxUsageConcurrencyTest.kt`
 
 **Interfaces:**
-- Produces: `McpStdioLauncher.launch(workspace: String, argv: List<String>, environment: Map<String, String>)`;`SandboxPort.openProcess(..., environment: Map<String, String> = emptyMap())`。旧调用方使用默认空环境。
+- Produces: `McpStdioLauncher.launch(workspace: String, argv: List<String>, environment: Map<String, String>)`; `SandboxPort.openProcess(..., environment: Map<String, String> = emptyMap())`. Old callers use the default empty environment.
 
 - [ ] **Step 1: Write failing environment tests**
 
-Test `stdioPassesOnlyResolvedEnvironment`: 两个秘密和一个普通 env 到达 launcher,argv 不含秘密。
-Test `sandboxProcessEnvironmentUsesExplicitAllowlist`: 只追加解析出的环境,不继承模型服务商、App 或宿主环境;保留 PATH/HOME/TZ 等基础项。
-Test `legacyStdioConfigStillLaunchesWithNoExtraEnvironment`: 旧自定义配置行为不变。
+Test `stdioPassesOnlyResolvedEnvironment`: two secrets and one ordinary env reach the launcher, and argv contains no secrets.
+Test `sandboxProcessEnvironmentUsesExplicitAllowlist`: append only the resolved environment, inherit neither the model provider's, the App's nor the host's environment; keep base entries such as PATH/HOME/TZ.
+Test `legacyStdioConfigStillLaunchesWithNoExtraEnvironment`: old custom configuration behavior is unchanged.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :core:test --tests 'com.wangzan101.mika.core.cap.mcp.StdioMcpClientTest'`
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.cap.sandbox.SandboxUsageConcurrencyTest'`
-Expected: FAIL, 环境参数不存在。
+Expected: FAIL, the environment parameter does not exist.
 
 - [ ] **Step 3: Thread explicit environment through launcher and sandbox**
 
-保持 argv 不经 shell、进程树租约和关闭语义;环境 key 只允许 `[A-Za-z_][A-Za-z0-9_]*`,值不写日志。
+Keep argv from going through a shell, and keep the process-tree lease and shutdown semantics; environment keys may only match `[A-Za-z_][A-Za-z0-9_]*`, and values are never logged.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: 同 Step 2。
-Expected: PASS。
+Run: same as Step 2.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -234,7 +234,7 @@ git add core/src/main/kotlin/com/wangzan101/mika/core/cap/mcp/StdioMcpClient.kt 
 git commit -m "feat(mcp): pass explicit secrets to sandbox stdio"
 ```
 
-### Task 6: 经确认的 stdio 包安装与工作区缓存
+### Task 6: Confirmed stdio package installation and workspace caching
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/mcp/McpPackageManager.kt`
@@ -243,36 +243,36 @@ git commit -m "feat(mcp): pass explicit secrets to sandbox stdio"
 - Modify: `app/src/main/java/com/wangzan101/mika/settings/McpServerStore.kt`
 - Modify: `core/src/main/kotlin/com/wangzan101/mika/core/cap/sandbox/SandboxPackages.kt`
 - Modify: `tools/sandbox/build-runtime.py`
-- Modify: `app/src/main/assets/runtime/rootfs.tar.xz` 与 `app/src/main/assets/runtime/packages.json`(由现有构建脚本生成,不手改二进制)
+- Modify: `app/src/main/assets/runtime/rootfs.tar.xz` and `app/src/main/assets/runtime/packages.json` (generated by the existing build script; do not hand-edit binaries)
 - Create: `app/src/test/java/com/wangzan101/mika/mcp/McpPackageManagerTest.kt`
 
 **Interfaces:**
-- Consumes: `McpPackageSpec`;Task 5 的 stdio 环境。
+- Consumes: `McpPackageSpec`; Task 5's stdio environment.
 - Produces:
-  - `interface McpPackageProvisioner { suspend fun prepare(workspace: String, spec: McpPackageSpec, confirmed: Boolean): List<String> }`,返回安装后 argv 前缀,不执行 MCP 服务本身。
-  - `class McpPackageConsent { fun accepted(spec: McpPackageSpec): Boolean; fun accept(spec: McpPackageSpec); fun clear() }`,同意绑定包名+精确版本+来源。
-  - Store 在预设含包且未缓存时要求明确确认;任务中无新确认不得下载新版本。
+  - `interface McpPackageProvisioner { suspend fun prepare(workspace: String, spec: McpPackageSpec, confirmed: Boolean): List<String> }`, returning the argv prefix after installation, without running the MCP service itself.
+  - `class McpPackageConsent { fun accepted(spec: McpPackageSpec): Boolean; fun accept(spec: McpPackageSpec); fun clear() }`, where consent binds the package name + exact version + source.
+  - The Store requires explicit confirmation when a preset has a package that is not cached; during a task, no new version may be downloaded without a new confirmation.
 
 - [ ] **Step 1: Write failing provisioning tests**
 
-Test `installRequiresMatchingConsentAndNeverRunsAfterCancellation`: 未确认、取消、来源或版本变化均不安装/不启动;确认精确版本后可安装。
-Test `installIsPerWorkspaceCachedAndFailureIsRetryable`: 同一工作区同事务只安装一次;中断不留下成功标记;另一工作区使用已有同意但独立缓存。
-Test `networkOffAndUnsupportedPackageFailWithGuidance`: 不联网或包需要原生构建/安装脚本时返回明确错误,不静默绕过。
-Test `nodeAndPythonPackagesResolvePinnedArgvWithoutSecrets`: 包名@精确版本生成确定 argv,秘密只经 Task 5 环境。
+Test `installRequiresMatchingConsentAndNeverRunsAfterCancellation`: no confirmation, cancellation, or a change of source or version all mean no install/no launch; after confirming the exact version, installation may proceed.
+Test `installIsPerWorkspaceCachedAndFailureIsRetryable`: the same workspace installs only once per transaction; an interruption leaves no success marker; another workspace reuses the existing consent but has its own cache.
+Test `networkOffAndUnsupportedPackageFailWithGuidance`: with no network, or when a package needs a native build/install script, return a clear error and never bypass it silently.
+Test `nodeAndPythonPackagesResolvePinnedArgvWithoutSecrets`: package name@exact version produces a deterministic argv, and secrets go only through the Task 5 environment.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.McpPackageManagerTest'`
-Expected: FAIL, provisioner 不存在。
+Expected: FAIL, the provisioner does not exist.
 
 - [ ] **Step 3: Implement pinned package provisioning**
 
-复用 `SandboxPort.run` 和树锁;Node 使用精确版本、`--ignore-scripts --no-audit --no-fund`,Python 使用精确版本、`--only-binary=:all:`。安装到工作区受控缓存,成功标记原子写入;不支持必须执行安装脚本或原生构建的包。为 Node 包管理器补齐现有 runtime 构建清单并用项目既有流程重建资产,记录验证输出。
+Reuse `SandboxPort.run` and the tree lock; Node uses an exact version with `--ignore-scripts --no-audit --no-fund`, Python uses an exact version with `--only-binary=:all:`. Install into the workspace's controlled cache, with the success marker written atomically; packages that must run an install script or a native build are unsupported. Complete the existing runtime build manifest for the Node package manager, rebuild the assets with the project's existing process, and record the verification output.
 
 - [ ] **Step 4: Run tests and runtime asset checks**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.McpPackageManagerTest' --tests 'com.wangzan101.mika.cap.sandbox.BundledRuntimeTest'`
-Expected: PASS;生成资产的版本和包清单一致。
+Expected: PASS; the generated assets' versions and package manifest are consistent.
 
 - [ ] **Step 5: Commit**
 
@@ -281,7 +281,7 @@ git add app/src/main/java/com/wangzan101/mika/mcp/McpPackageManager.kt app/src/m
 git commit -m "feat(mcp): provision confirmed stdio packages in sandbox"
 ```
 
-### Task 7: 完整内置目录、所有语言与批量核验工具
+### Task 7: The complete built-in catalog, all languages and the bulk verification tool
 
 **Files:**
 - Create: `app/src/main/assets/mcp/catalog.json`
@@ -292,31 +292,31 @@ git commit -m "feat(mcp): provision confirmed stdio packages in sandbox"
 - Create: `tools/mcp/tests/test_check_catalog.py`
 
 **Interfaces:**
-- Consumes: Task 2 的 parser/model;Task 4 的 `McpServerStore.catalog`。
-- Produces: `McpCatalogAssets.load(context: Context): McpCatalog`;单条损坏项记录并跳过,不阻断其他条目。目录核验工具输出结构化 JSON 报告,不写回目录或伪造验证状态。
+- Consumes: Task 2's parser/model; Task 4's `McpServerStore.catalog`.
+- Produces: `McpCatalogAssets.load(context: Context): McpCatalog`; a single corrupt entry is logged and skipped without blocking other entries. The catalog verification tool outputs a structured JSON report and never writes back to the catalog or fabricates verification status.
 
 - [ ] **Step 1: Write failing catalog tests**
 
-Test `bundledCatalogHasAtLeast200UniqueUsablePresets`: 正式资产至少 200 条,不统计损坏项。
-Test `everyPresetHasAllLocaleCopyAndValidOfficialSource`: 所有说明/字段标签覆盖现有 UI 语言;远程条目有官方来源证据;stdio 包有来源和精确版本。
-Test `catalogLoaderSkipsOnlyMalformedEntries`: 坏条目不影响好条目。
-Test `checkerSeparatesVerifiedUnreachableAndUnsupported`: 无秘密 initialize/tools/list 的结果分类真实,网络失败绝不写成已验证。
+Test `bundledCatalogHasAtLeast200UniqueUsablePresets`: the production assets hold at least 200 entries, not counting corrupt ones.
+Test `everyPresetHasAllLocaleCopyAndValidOfficialSource`: every description/field label covers the existing UI languages; remote entries have evidence of an official source; stdio packages have a source and an exact version.
+Test `catalogLoaderSkipsOnlyMalformedEntries`: a bad entry does not affect good entries.
+Test `checkerSeparatesVerifiedUnreachableAndUnsupported`: the results of secret-free initialize/tools/list are classified truthfully, and a network failure is never written up as verified.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpCatalogAssetsTest' && python3 -I -m unittest discover -s tools/mcp/tests -p 'test_check_catalog.py' -v`
-Expected: FAIL, 正式目录和工具不存在。
+Expected: FAIL, the production catalog and the tool do not exist.
 
 - [ ] **Step 3: Populate and validate the complete catalog**
 
-批量整理 200–300 条常见服务;远程端点只收官方,stdio 包核验发布者/来源和精确版本;文案全部自行编写并覆盖所有 UI 语言。使用通用类别和通用图标,不复制外部描述。`McpCatalogAssets` 加载资产,`MikaApp` 将目录注入 `McpServerStore`。核验工具只发无秘密协议请求,结果单独输出报告;未实际核验的条目标为未验证,不谎报。
+Assemble 200–300 common services in bulk; accept only official remote endpoints, and verify the publisher/source and exact version of stdio packages; write all the copy yourself and cover every UI language. Use generic categories and generic icons, and do not copy external descriptions. `McpCatalogAssets` loads the assets, and `MikaApp` injects the catalog into `McpServerStore`. The verification tool sends only secret-free protocol requests and outputs the results in a separate report; entries that were not actually verified are marked unverified, never misreported.
 
 - [ ] **Step 4: Run tests and the offline/online checks**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.settings.McpCatalogAssetsTest' && python3 -I -m unittest discover -s tools/mcp/tests -p 'test_check_catalog.py' -v`
-Expected: PASS。
-Run: `python3 -I tools/mcp/check_catalog.py app/src/main/assets/mcp/catalog.json --output <临时报告路径>`。
-Expected: 报告逐项区分 verified/unreachable/unsupported;失败项有真实原因,不阻塞其他项。
+Expected: PASS.
+Run: `python3 -I tools/mcp/check_catalog.py app/src/main/assets/mcp/catalog.json --output <temporary-report-path>`.
+Expected: the report distinguishes verified/unreachable/unsupported item by item; failed items carry a real reason and do not block other items.
 
 - [ ] **Step 5: Commit**
 
@@ -325,7 +325,7 @@ git add app/src/main/assets/mcp/catalog.json app/src/main/java/com/wangzan101/mi
 git commit -m "feat(mcp): bundle the complete guided service catalog"
 ```
 
-### Task 8: 目录浏览与引导式连接 UI
+### Task 8: Catalog browsing and guided connection UI
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/mcp/ui/McpCatalogScreen.kt`
@@ -333,32 +333,32 @@ git commit -m "feat(mcp): bundle the complete guided service catalog"
 - Create: `app/src/main/java/com/wangzan101/mika/mcp/ui/McpConnectorState.kt`
 - Modify: `app/src/main/java/com/wangzan101/mika/mcp/ui/McpServersScreen.kt`
 - Modify: `app/src/main/java/com/wangzan101/mika/settings/ui/SettingsScreen.kt`
-- Modify: `app/src/main/res/values*/strings_settings.xml` 与必要的 `strings_mcp.xml`
+- Modify: `app/src/main/res/values*/strings_settings.xml` and `strings_mcp.xml` where needed
 - Create: `app/src/test/java/com/wangzan101/mika/mcp/ui/McpConnectorStateTest.kt`
 - Modify: `app/src/androidTest/java/com/wangzan101/mika/settings/ui/SettingsScreenTest.kt`
 
 **Interfaces:**
-- Consumes: Task 1 已确认原型;Task 4/6 的连接与确认 API;Task 7 的目录。
-- Produces: `McpConnectorState` 状态流和动作:`openPreset(id)`、`updateField(id,value)`、`authorize(openBrowser)`、`confirmPackage()`、`connect()`、`cancel()`、`retry()`。UI 不自行拼装 URL/header/argv。
+- Consumes: the prototype confirmed in Task 1; the connection and confirmation APIs from Tasks 4/6; the catalog from Task 7.
+- Produces: the `McpConnectorState` state flow and actions: `openPreset(id)`, `updateField(id,value)`, `authorize(openBrowser)`, `confirmPackage()`, `connect()`, `cancel()`, `retry()`. The UI never assembles URLs/headers/argv itself.
 
 - [ ] **Step 1: Write failing state and UI tests**
 
-State tests 覆盖:选择预设只加载声明字段、多秘密输入、OAuth 回调后自动测试、连接成功才启用、失败保留输入、取消不下载、stdio 包确认版本不匹配需重新确认。
-UI tests 覆盖:空状态进入目录、搜索/分类、预设页无 URL/transport、自定义入口可见、成功工具数、失败重试、返回不丢未提交的非秘密输入。
+State tests cover: selecting a preset loads only declared fields, multiple secret inputs, automatic testing after the OAuth callback, enabling only once the connection succeeds, keeping inputs on failure, no download on cancel, and re-confirmation being required when a stdio package's confirmed version no longer matches.
+UI tests cover: entering the catalog from the empty state, search/category, no URL/transport on preset pages, a visible custom entry point, the success tool count, retry on failure, and going back without losing unsubmitted non-secret input.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.ui.McpConnectorStateTest' :app:compileDebugAndroidTestKotlin`
-Expected: FAIL, 状态机和页面不存在。
+Expected: FAIL, the state machine and the pages do not exist.
 
 - [ ] **Step 3: Implement the approved prototype with existing Compose components**
 
-首页保留已添加列表;目录支持搜索和类别;详情/连接/成功/失败按原型。所有异步动作可取消,秘密不进入 `rememberSaveable`、截图状态或日志;完整新增/替换字符串同步所有语言。
+The home keeps the list of added servers; the catalog supports search and categories; detail/connect/success/failure follow the prototype. Every asynchronous action is cancellable, and secrets never enter `rememberSaveable`, screenshot state or logs; all added/replaced strings are synced across every language.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.ui.McpConnectorStateTest' :app:assembleDebugAndroidTest -PdevInstall`
-Expected: PASS/构建成功;新增字符串完整性测试通过。
+Expected: PASS / build succeeds; the new-string completeness test passes.
 
 - [ ] **Step 5: Commit**
 
@@ -367,7 +367,7 @@ git add app/src/main/java/com/wangzan101/mika/ui app/src/main/java/com/wangzan10
 git commit -m "feat(mcp): add guided service catalog connections"
 ```
 
-### Task 9: 服务管理与完整自定义页面
+### Task 9: Service management and the full custom page
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/mcp/ui/McpServerManageScreen.kt`
@@ -379,25 +379,25 @@ git commit -m "feat(mcp): add guided service catalog connections"
 - Modify: `app/src/androidTest/java/com/wangzan101/mika/settings/ui/SettingsScreenTest.kt`
 
 **Interfaces:**
-- Produces: 管理动作 `test`、`setEnabled`、`reauthorize`、`replaceSecrets`、`delete`;自定义仍产出原 `McpServerConfig`,并支持全部已有高级字段。
+- Produces: the management actions `test`, `setEnabled`, `reauthorize`, `replaceSecrets`, `delete`; customization still produces the original `McpServerConfig` and supports every existing advanced field.
 
 - [ ] **Step 1: Write failing management/custom tests**
 
-覆盖:查看真实工具、启停、重新测试、OAuth 重新授权、只替换选中秘密、删除清理所有秘密;自定义 HTTP/SSE/stdio、Bearer/OAuth、秘密请求头、stdio 秘密环境、多请求头、allowlist、本地 HTTP、信任注解和高级数值均可配置;高级项默认折叠。
+Cover: viewing the real tools, enabling/disabling, re-testing, OAuth re-authorization, replacing only the selected secret, and deletion cleaning up all secrets; custom HTTP/SSE/stdio, Bearer/OAuth, secret request headers, the stdio secret environment, multiple request headers, allowlists, local HTTP, trust annotations and advanced numeric values are all configurable; advanced items are collapsed by default.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.ui.McpConnectorStateTest' :app:compileDebugAndroidTestKotlin`
-Expected: FAIL, 管理/自定义页面未完成。
+Expected: FAIL, the management/custom pages are not finished.
 
 - [ ] **Step 3: Implement management and custom flows**
 
-按已确认原型复用组件;自定义与预设共用 store。删除文案不谎称撤销第三方授权;旧自定义配置可编辑且不失字段。
+Reuse components following the confirmed prototype; customization and presets share the store. The deletion copy does not falsely claim to revoke third-party authorization; old custom configurations remain editable without losing fields.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests 'com.wangzan101.mika.mcp.ui.McpConnectorStateTest' :app:assembleDebugAndroidTest -PdevInstall`
-Expected: PASS/构建成功。
+Expected: PASS / build succeeds.
 
 - [ ] **Step 5: Commit**
 
@@ -406,37 +406,37 @@ git add app/src/main/java/com/wangzan101/mika/ui app/src/main/res app/src/test/j
 git commit -m "feat(mcp): complete service management and custom setup"
 ```
 
-### Task 10: 全链路回归、真实服务与真机验收
+### Task 10: Full-chain regression, real services and on-device acceptance
 
 **Files:**
 - Modify only if a reproduced defect requires it; otherwise no new files.
 
 **Interfaces:**
-- Consumes: 全部前序任务。
-- Produces: 测试证据、真实服务兼容报告和真机验收结果;不把未验证项说成已通过。
+- Consumes: all preceding tasks.
+- Produces: test evidence, a real-service compatibility report and on-device acceptance results; never describe unverified items as passed.
 
 - [ ] **Step 1: Run JVM and catalog regression**
 
 Run: `./gradlew :core:test :app:testDebugUnitTest`
 Run: `python3 -I -m unittest discover -s tools/mcp/tests -v`
-Expected: PASS;若出现既有本地负载敏感 flake,记录原始输出并按项目既有约定判断,不隐瞒。
+Expected: PASS; if a pre-existing, local load-sensitive flake appears, record the raw output and judge it according to the project's existing convention, without concealing it.
 
 - [ ] **Step 2: Run protocol, backup and UI build checks**
 
 Run: `./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -PdevInstall`
-Expected: 构建成功;旧自定义 MCP、备份恢复和 inbound 测试无回归。
+Expected: the build succeeds; old custom MCP, backup/restore and inbound tests show no regression.
 
 - [ ] **Step 3: Verify representative real services without private user data**
 
-用专用测试账号/密钥覆盖 OAuth、单/多秘密、额外普通字段、无认证、Node stdio、Python stdio;覆盖错误密钥、取消授权、刷新、离线、分页和大结果。将真实结果与 Task 7 报告对照,失败只修通用根因,不写服务特例。
+Use dedicated test accounts/keys to cover OAuth, single/multiple secrets, extra ordinary fields, no auth, Node stdio and Python stdio; also cover wrong keys, cancelled authorization, refresh, offline, pagination and large results. Compare the real results against the Task 7 report, and on failure fix only the generic root cause, never writing service special cases.
 
 - [ ] **Step 4: Run phone smoke tests**
 
-在真机验证:目录搜索、OAuth 往返、API Key、多字段、stdio 确认/取消/缓存、任务中真实调用、任务结束进程清理、备份恢复、横竖屏/深浅色、RTL 与至少一种 CJK 语言。使用项目约定的核心冒烟子集,不跑全量约 6 小时套件。
+Verify on a real device: catalog search, the OAuth round trip, API Key, multiple fields, stdio confirmation/cancel/caching, a real invocation during a task, process cleanup after the task ends, backup/restore, landscape/portrait and light/dark, RTL and at least one CJK language. Use the project's agreed core smoke subset and do not run the full roughly 6-hour suite.
 
 - [ ] **Step 5: Final review and commit**
 
-检查 git diff 不含秘密、临时报告或测试账号;确认所有计划项和验收结果如实记录。若有收尾修正,提交:
+Check that the git diff contains no secrets, temporary reports or test accounts; confirm that every plan item and acceptance result is recorded truthfully. If there are cleanup fixes, commit:
 
 ```bash
 git add <verified-changed-files>

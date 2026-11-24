@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""通过飞书自定义机器人 webhook 发一条文本消息。
+"""Send a text message through a Feishu custom-bot webhook.
 
-参数来自 MIKA_PLUGIN_ARGS 指向的 JSON 文件（P1b 的约定）；没有这个环境变量时从 stdin 读。
-最后一行输出 JSON，供 Mika 当工具结果；失败时退出码非零。
+Arguments come from the JSON file MIKA_PLUGIN_ARGS points to (the P1b convention); without that variable they are read from stdin.
+The last line is JSON, which Mika uses as the tool result; on failure the exit code is non-zero.
 """
 
 import base64
@@ -73,7 +73,7 @@ def main():
         if secret:
             body = body.replace(secret, "***")
         fail("HTTP {}: {}".format(e.code, body[:500]), 1)
-    except Exception as e:  # 网络失败按普通错误返回，不重试
+    except Exception as e:  # A network failure is returned as an ordinary error, without retrying
         fail("request failed: {}".format(type(e).__name__), 1)
 
     try:

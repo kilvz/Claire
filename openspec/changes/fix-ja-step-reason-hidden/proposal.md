@@ -1,34 +1,34 @@
 ## Why
 
-v0.1.50 的 #765（f010acab）在同一个提交里加了两件互相抵消的事：
+In v0.1.50, #765 (f010acab) added two mutually canceling things in the same commit:
 
-1. `SystemPrompt.languageDirective("ja")` 指示模型「すべての思考、進捗メモ、ツールの理由…は日本語で」——日语界面下步骤用意（reason）按指令用日语写；
-2. `ChatViewModel.StepRow.shouldHideRawReason`（app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt:142）为了"非中文界面下模型不守指令写中文时别突兀"，对**任何**含 U+4E00–9FA5 汉字的用意整条隐藏、回退到本地化动作标题。
+1. `SystemPrompt.languageDirective("ja")` instructs the model 「すべての思考、進捗メモ、ツールの理由…は日本語で」 (all thinking, progress notes, tool reasons… in Japanese) — so on a Japanese UI the step reason is written in Japanese as instructed;
+2. `ChatViewModel.StepRow.shouldHideRawReason` (app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt:142), meant to avoid awkwardness "when the model breaks the instruction and writes Chinese on a non-Chinese UI", hides the **entire** reason containing any U+4E00–9FA5 Han character and falls back to the localized action title.
 
-判别式只有汉字区间一个信号，而**日语书面语几乎每句都含汉字**（検索、設定、連絡先……只有假名才能区分日/中）。结果：日语界面的用户几乎永远看不到模型的步骤解释——模型越守指令，信息丢得越干净。日语之外的语言不受影响（韩语谚文、西文都不在汉字区间；中文界面恒显示）。
+The check has only the Han range as a single signal, while **almost every sentence of written Japanese contains Han characters** (検索, 設定, 連絡先 … only kana distinguishes Japanese from Chinese). Result: users on a Japanese UI almost never see the model's step explanations — the better the model follows the instruction, the more information is lost. Languages other than Japanese are unaffected (Korean Hangul and Western scripts are outside the Han range; a Chinese UI always shows them).
 
-步骤用意的显示入口有两处都走 `StepRow.text`（ChatViewModel.kt:135）：步骤行本体和收起态的末行摘要（`:254`），隐藏会同时吃掉两处。
+Both display entry points for the step reason go through `StepRow.text` (ChatViewModel.kt:135): the step row itself and the collapsed-state last-line summary (`:254`), so hiding consumes both at once.
 
 ## What Changes
 
-- `shouldHideRawReason` 的"像中文"判别从「含汉字」收紧为「**含汉字且不含假名**」（平假名 U+3040–U+309F、片假名 U+30A0–U+30FF）：日语句子必然混有假名（助词/活用），据此不再误判。
-- 行为矩阵（修后）：
+- The "looks like Chinese" check in `shouldHideRawReason` tightens from "contains Han characters" to "**contains Han characters and no kana**" (hiragana U+3040–U+309F, katakana U+30A0–U+30FF): Japanese sentences necessarily mix in kana (particles/inflection), so they are no longer misjudged.
+- Behavior matrix (after the fix):
 
-| 界面语言 | 用意语言 | 修前 | 修后 |
+| UI language | Reason language | Before | After |
 |---|---|---|---|
-| ja | 日语（守指令） | 隐藏 ✗ | 显示 ✓ |
-| en 等非中文 | 中文（违约） | 隐藏 ✓ | 隐藏 ✓（原目的保留） |
-| en 等非中文 | 日语（违约） | 隐藏 | 显示（罕见角落；显示比丢弃信息损失小） |
-| zh（简/繁） | 任何 | 显示 ✓ | 显示 ✓（不变） |
+| ja | Japanese (following the instruction) | hidden ✗ | shown ✓ |
+| en and other non-Chinese | Chinese (breaking the instruction) | hidden ✓ | hidden ✓ (original purpose kept) |
+| en and other non-Chinese | Japanese (breaking the instruction) | hidden | shown (rare corner; showing loses less than dropping) |
+| zh (Simplified/Traditional) | any | shown ✓ | shown ✓ (unchanged) |
 
-- 残余局限如实记录：纯汉字无假名的日语短串（如「設定確認」）仍无法与中文区分，维持隐藏——此类用意罕见且回退标题本身已本地化。
+- The residual limitation is recorded faithfully: a short Japanese string with only Han characters and no kana (e.g. 「設定確認」 (settings check)) still cannot be distinguished from Chinese and stays hidden — such reasons are rare and the fallback title is itself localized.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `step-reason-language`: 非中文界面下，步骤用意仅在"像中文（含汉字且不含假名）"时才隐藏并回退到本地化标题；含假名的文本（日语）不再被误判为中文。
+- `step-reason-language`: on non-Chinese UIs, a step reason is hidden and falls back to the localized title only when it "looks like Chinese (contains Han characters and no kana)"; text containing kana (Japanese) is no longer misjudged as Chinese.
 
 ### Modified Capabilities
 
-（无——`StepRow` 的隐藏回退是 #765 随 v0.1.50 新引入的行为，无更早的既有规格。）
+(None — `StepRow`'s hide-and-fall-back behavior was newly introduced by #765 with v0.1.50, and there is no earlier existing spec.)

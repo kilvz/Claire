@@ -1,30 +1,30 @@
 ## ADDED Requirements
 
-### Requirement: 能力缺失报错必须可诊断、可行动
-CLI 在手机 Mika App 广播的 capabilities 缺少当前操作所需能力而抛出 `incompatible_api` 时，错误信息 MUST 同时包含：缺失的能力名（`task_recovery` / `task_steer` / `run_export` / `task_files`）、手机已广播的 `server_version`（当且仅当 `GET /api/v1` 已返回该字段）、以及一句可执行的补救（更新手机上的 Mika，或去掉对应参数照常执行）。
+### Requirement: Capability-missing errors must be diagnosable and actionable
+When the CLI throws `incompatible_api` because the capabilities broadcast by the Mika App on the phone lack the capability required by the current operation, the error message MUST include all of: the missing capability name (`task_recovery` / `task_steer` / `run_export` / `task_files`), the `server_version` already broadcast by the phone (if and only if `GET /api/v1` has returned that field), and one actionable remedy (update Mika on the phone, or drop the corresponding parameter and proceed as usual).
 
-#### Scenario: 显式 --request-id 撞上无 task_recovery 的旧 App
-- **WHEN** `mika task run --request-id UUID` 且 `GET /api/v1` 返回的 capabilities 不含 `task_recovery`（含 `server_version`）
-- **THEN** 以 `incompatible_api` 退出（不发起 POST），错误信息包含能力名 `task_recovery`、该 `server_version`，并写明可去掉 `--request-id` 重试以照常提交
+#### Scenario: an explicit --request-id meets an old App without task_recovery
+- **WHEN** `mika task run --request-id UUID` and the capabilities returned by `GET /api/v1` do not include `task_recovery` (while `server_version` is present)
+- **THEN** exit with `incompatible_api` (no POST is issued), and the error message includes the capability name `task_recovery`, that `server_version`, and states that `--request-id` can be dropped and the command retried to submit as usual
 
-#### Scenario: steer 撞上无 task_steer 的旧 App
-- **WHEN** `mika task steer` 且 capabilities 不含 `task_steer`
-- **THEN** `incompatible_api` 错误信息包含能力名 `task_steer` 与补救指引
+#### Scenario: steer meets an old App without task_steer
+- **WHEN** `mika task steer` and the capabilities do not include `task_steer`
+- **THEN** the `incompatible_api` error message includes the capability name `task_steer` and the remedy guidance
 
-#### Scenario: export / 附件下载撞上对应能力缺失
-- **WHEN** `mika task export` 且无 `run_export`，或带附件/`download` 且无 `task_files`
-- **THEN** `incompatible_api` 错误信息分别包含 `run_export` / `task_files` 与补救指引
+#### Scenario: export / attachment download meets the corresponding missing capability
+- **WHEN** `mika task export` and there is no `run_export`, or attachments/`download` are involved and there is no `task_files`
+- **THEN** the `incompatible_api` error messages include `run_export` / `task_files` respectively, along with the remedy guidance
 
-### Requirement: 错误输出携带结构化能力字段
-`incompatible_api` 错误的 JSON 输出（`--json` 的 stdout 与非零退出的 stderr 文档）MUST 附带 `capability` 字段（缺失能力名）；手机已广播版本时 MUST 附带 `server_version` 字段，供桥接程序按字段自动降级。
+### Requirement: Error output carries structured capability fields
+The JSON output of an `incompatible_api` error (the `--json` stdout and the stderr document on non-zero exit) MUST carry a `capability` field (the missing capability name); when the phone has broadcast a version it MUST carry a `server_version` field, so that bridge programs can degrade automatically based on the fields.
 
-#### Scenario: 桥接程序按结构化字段降级
-- **WHEN** 能力缺失触发 `incompatible_api` 且 `--json` 输出
-- **THEN** 输出的 `error` 对象含 `capability`（及可用时的 `server_version`），无需解析自由文本
+#### Scenario: a bridge program degrades based on the structured fields
+- **WHEN** a missing capability triggers `incompatible_api` and the output is `--json`
+- **THEN** the output `error` object contains `capability` (and `server_version` when available), with no need to parse free text
 
-### Requirement: 无版本可报时保持明确指引
-`GET /api/v1` 404（老 APK 无任务 API）或 `api_version` 不符时，错误信息 MUST 保持「装带 CLI 支持的构建」指引，MUST NOT 因缺少 `server_version` 而省略补救或抛未定义错误。
+### Requirement: Keep explicit guidance when no version can be reported
+When `GET /api/v1` returns 404 (an old APK without the task API) or `api_version` does not match, the error message MUST keep the "install a build with CLI support" guidance, and MUST NOT omit the remedy or throw an undefined error just because `server_version` is missing.
 
-#### Scenario: 老 APK 404
-- **WHEN** `GET /api/v1` 返回 404
-- **THEN** 报 `incompatible_api` 并指引安装带 CLI 支持的构建，不出现版本字段也不崩溃
+#### Scenario: old APK 404
+- **WHEN** `GET /api/v1` returns 404
+- **THEN** report `incompatible_api` and guide the user to install a build with CLI support, with no version field and no crash

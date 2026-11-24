@@ -27,7 +27,7 @@ if [ ! -d "$dir" ]; then
 fi
 
 echo "scan: $dir"
-echo "pattern: system prompt / persona / instructions / 你是 / You are"
+echo "pattern: system prompt / persona / instructions / You are"
 echo
 
 # Only look at text-like files; skip noise such as .git, node_modules
@@ -36,7 +36,7 @@ found=0
 list=$(mktemp 2>/dev/null || echo "/tmp/mika-scan.$$")
 find "$dir" -type f \( -name '*.md' -o -name '*.txt' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '*.js' -o -name '*.ts' -o -name '*.py' \) 2>/dev/null | head -2000 > "$list"
 while IFS= read -r f; do
-    hits=$(grep -c -i -E 'system prompt|systemPrompt|persona|instructions|you are an? |你是|提示词' "$f" 2>/dev/null)
+    hits=$(grep -c -i -E 'system prompt|systemPrompt|persona|instructions|you are an? |prompt' "$f" 2>/dev/null)
     [ -n "$hits" ] || hits=0
     [ "$hits" -gt 0 ] || continue
     size=$(wc -l < "$f" 2>/dev/null)

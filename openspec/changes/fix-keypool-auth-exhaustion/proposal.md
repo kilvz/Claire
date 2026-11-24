@@ -1,20 +1,20 @@
 ## Why
 
-#747 给密钥池接上了动态轮询：`GeminiModel` / `OpenAiCompatModel` 在 HTTP 429、401、403 时回调 `onRateLimit`，`ProviderStore` 接线处一律调 `KeyPoolManager.markRateLimited`（60 秒冷却后自动复活）。但 `KeyPoolManager.markExhausted`（401/403 永久失效，#747 提交信息里写明"Automatically mark rate-limited **or exhausted** keys on HTTP 429, 401, 403"）在生产代码里**零调用**——401/403 的坏 key 只会被冷却 60 秒，到期复活，再次被轮询选中，再次 401，永远循环。
+#747 wired dynamic rotation into the key pool: `GeminiModel` / `OpenAiCompatModel` call back `onRateLimit` on HTTP 429, 401 and 403, and the `ProviderStore` wiring site always calls `KeyPoolManager.markRateLimited` (auto-revives after a 60-second cooldown). But `KeyPoolManager.markExhausted` (permanent invalidation on 401/403; #747's commit message says "Automatically mark rate-limited **or exhausted** keys on HTTP 429, 401, 403") has **zero calls** in production code — a bad 401/403 key is only cooled down for 60 seconds, revives when it expires, gets picked by rotation again, gets 401 again, forever.
 
-后果：多 key 池里混进一个失效 key（过期/删号/抄错）时，每次轮到它都白烧一次请求往返；60 秒一轮，永不自愈。回调签名 `(key, retryAfterMs) -> Unit` 不带 HTTP 状态，接线处想区分也区分不了。
+Consequence: when a multi-key pool contains one invalid key (expired/deleted account/mistyped), every turn at that key wastes a request round trip; once per 60 seconds, never self-healing. The callback signature `(key, retryAfterMs) -> Unit` carries no HTTP status, so the wiring site cannot distinguish them even if it wanted to.
 
 ## What Changes
 
-- `GeminiModel` / `OpenAiCompatModel` 的回调带上 HTTP 状态码：`onRateLimit: ((key: String, retryAfterMs: Long?) -> Unit)?` 改为 `onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)?`（#747 未发版，改名无兼容负担；原名对 401/403 本就是误导）。触发集合仍是 429/401/403，模型内换 key 重试逻辑不变。
-- `ProviderStore.buildModel` 接线处按状态分流：429 → `markRateLimited(key, retryAfterMs)`；401/403 → `markExhausted(key)`，把"耗尽"语义真正接上。
+- The callbacks of `GeminiModel` / `OpenAiCompatModel` carry the HTTP status code: `onRateLimit: ((key: String, retryAfterMs: Long?) -> Unit)?` becomes `onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)?` (#747 is unreleased, so the rename has no compatibility burden; the old name was already misleading for 401/403). The trigger set is still 429/401/403, and the in-model switch-key retry logic is unchanged.
+- The `ProviderStore.buildModel` wiring site routes by status: 429 → `markRateLimited(key, retryAfterMs)`; 401/403 → `markExhausted(key)`, actually connecting the "exhausted" semantics.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `key-pool-auth-exhaustion`: 密钥池对 401/403（认证失败/封禁）的 key 永久标记耗尽，不再以 60 秒限流冷却的方式反复复活；429 仍按 Retry-After/默认冷却临时避开。
+- `key-pool-auth-exhaustion`: the key pool permanently marks keys that return 401/403 (authentication failure/ban) as exhausted, instead of repeatedly reviving them through the 60-second rate-limit cooldown; 429 still temporarily avoids a key per Retry-After/default cooldown.
 
 ### Modified Capabilities
 
-（无——#747 尚未发版，`key-pooling` 的对外行为在发版前修正，不构成已发布能力的变更。）
+(None — #747 has not been released, and `key-pooling`'s external behavior is being corrected before release, so this does not constitute a change to a released capability.)

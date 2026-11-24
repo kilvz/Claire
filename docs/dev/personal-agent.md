@@ -1,40 +1,40 @@
-# 个人助手模式（第一版）
+# Personal assistant mode (first version)
 
-固定入口位于侧栏“新对话”上方，打开长期保留的个人主会话。可在设置中开启“启动时打开个人助手”。聊天沿用模型设置中的主模型，执行任务沿用 Mika 的审批、接管、资源排队和运行恢复。主动联系留作后续。
+A fixed entry point sits in the sidebar above “新对话” (New conversation) and opens a long-lived personal main conversation. “启动时打开个人助手” (Open personal assistant on startup) can be enabled in Settings. Chat uses the main model from the model settings, and task execution uses Mika's approvals, takeover, resource queuing and run recovery. Proactive contact is left for later.
 
-## 消息和执行
+## Messages and execution
 
-- `core/personal/PersonalAgent.kt` 是可测试的协调器，使用现有 ChatModel 协议。模型调用来自宿主模型来源，照常记用量。
-- 主聊天使用单独的收件队列，不占用 TaskCenter 执行名额。新文字立即记入主会话，当前回复处理后消费下一批；连续输入不会自动变成后台任务的插话。
-- 模型提供 delegate_task、revise_task、cancel_task、remember、recall_history。明确行动请求才委派；明确补充才修改对应任务；普通讨论保持聊天。
-- 委派前保存任务与独立 conversationId，再调用 TaskService。后台任务可以因资源限制排队，主聊天仍能回复。
-- 修订、停止只接受个人助手登记的 taskId。主聊天不直接拿设备工具。接管、确认、回答通过任务卡打开原有任务页处理。
-- 同轮重复委派去重，启动失败明确显示失败；进程重启不自动重放可能已经执行过的行动。
-- PersonalRuntime 从任务状态与原对话结果回收进度及结果。终态与送达标志同次落盘，重复刷新不重复发结果。延迟生成的停止交代更新同一条消息。
+- `core/personal/PersonalAgent.kt` is a testable coordinator that uses the existing ChatModel protocol. Model calls come from the host model source and record usage as usual.
+- The main chat uses a separate inbox queue and does not take up a TaskCenter execution slot. New text is recorded into the main conversation immediately, and the next batch is consumed once the current reply has been handled; continuous input does not automatically become interruptions of a background task.
+- The model provides delegate_task, revise_task, cancel_task, remember, recall_history. It delegates only for explicit action requests; it revises the corresponding task only for explicit additions; ordinary discussion stays as chat.
+- Before delegating, it saves the task and a separate conversationId, then calls TaskService. Background tasks may queue due to resource limits, while the main chat can still reply.
+- Revision and stop only accept taskIds registered by the personal assistant. The main chat does not directly get device tools. Takeover, confirmation and answers are handled through the task card, which opens the original task page.
+- Repeated delegation in the same turn is deduplicated, and a failed start clearly shows failure; a process restart does not automatically replay actions that may already have run.
+- PersonalRuntime recovers progress and results from task state and the original conversation results. Terminal state and the delivery flag are persisted in the same write, so repeated refreshes do not send results twice. A delayed closing statement updates the same message.
 
-## 连续性与存储
+## Continuity and storage
 
-`files/personal/main-v1.json` 使用 Android AtomicFile 原子写入，保存原始消息、任务对应关系、摘要及覆盖边界。重新打开或重启后仍使用这份主会话，摘要不会删除原文。读入失败时保留原文件备份并显示提示。
+`files/personal/main-v1.json` uses Android AtomicFile for atomic writes, saving the original messages, task correspondences, summaries and coverage boundaries. After reopening or a restart it still uses this main conversation, and summaries do not delete the original text. When reading fails, the original file is kept as a backup and a notice is shown.
 
-较长历史整理成滚动摘要，保留近期区间用于接话，并按模型上下文预算限制历史。recall_history 从完整原文按关键词检索。打开聊天时直接定位到最新消息，按需渲染旧消息。首次读取仍会解析整个本地记录文件。
+Longer history is organized into rolling summaries, keeping a recent range for picking up the conversation, and history is limited by the model's context budget. recall_history searches the full original text by keyword. Opening the chat jumps straight to the latest message and renders older messages on demand. The first read still parses the whole local record file.
 
-长期事实和偏好沿用已有加密记忆存储，尊重总开关。只有用户明确要求记住时才允许写入，附真实原话来源，继续经过敏感信息过滤。模型设置和记忆管理复用已有页面。
+Long-term facts and preferences use the existing encrypted memory store and respect the master switch. Writing is only allowed when the user explicitly asks to remember something, with the real original source attached, and it still goes through sensitive-information filtering. Model settings and memory management reuse the existing pages.
 
-进程被杀后，未完成的主聊天回复下次打开时标为中断，不自动重试带行动的轮次。执行任务沿用既有恢复机制；不承诺常驻在线或从设备操作中途续跑。
+After the process is killed, an unfinished main chat reply is marked as interrupted the next time it is opened, and turns with actions are not automatically retried. Task execution uses the existing recovery mechanism; no promise of always being online or resuming mid-way through device operations.
 
-## 原生界面
+## Native UI
 
-- PersonalAgentScreen 使用悬浮头像与原有聊天输入框，支持按住说话和键盘发送。助手回复沿用 Markdown 渲染，支持表格。
-- 点头像打开任务、记忆和技能弹窗。执行进度集中在头像下方，点进度可打开任务详情。
-- 执行手机任务时，头像右侧显示手机画面。点开可放大，底部进度条默认在最右侧。向左拖可回看，拖回最右或点“回到实时”可继续跟随任务。已结束的任务可从任务详情打开回放。
-- 回放使用低帧率 JPEG 序列，采样间隔至少 500 毫秒。文件保存在应用私有目录，所有回放合计上限为 100 MB。优先清理最旧的非录制中回放。
-- Route.Personal 与固定侧栏入口；原有独立对话保留。
-- 任务详情进入原任务页，查看完整过程、批准或接管；返回个人助手仍是原主会话。
-- 停止定向作用于所选任务，其他执行控制沿用任务页实际支持的状态。
-- 新增界面文案主要为中文；多语言文案和流式展示可后续打磨。
+- PersonalAgentScreen uses the floating avatar and the existing chat input box, supporting push-to-talk and keyboard sending. Assistant replies use the existing Markdown rendering, with table support.
+- Tapping the avatar opens the tasks, memory and skills popover. Execution progress is concentrated below the avatar; tapping the progress opens task details.
+- When executing a phone task, the phone screen is shown to the right of the avatar. Tap to enlarge; the progress bar at the bottom is at the far right by default. Drag left to review, and drag back to the far right or tap “回到实时” (Back to live) to keep following the task. Finished tasks can be opened for playback from task details.
+- Playback uses a low-frame-rate JPEG sequence with a sampling interval of at least 500 milliseconds. Files are stored in the app's private directory, and the total for all playbacks is capped at 100 MB. The oldest non-recording playbacks are cleaned up first.
+- Route.Personal and the fixed sidebar entry; the existing standalone conversation is kept.
+- Task details enter the original task page to view the full process, approve or take over; going back to the personal assistant is still the original main conversation.
+- Stop targets the selected task only; other execution controls follow the states the task page actually supports.
+- The new UI copy is mainly Chinese; multilingual copy and streaming display can be polished later.
 
-## 验证
+## Verification
 
-核心测试覆盖：普通聊天与历史延续、委派后仍可聊天、修订归属、重复委派去重、未知 taskId 拒绝、连续输入、重启不重放、无模型如实报错、停止不误报成功、摘要不删除原文、停止交代不重复送达。
+Core tests cover: ordinary chat and history continuity, still being able to chat after delegation, revision ownership, deduplication of repeated delegation, rejection of unknown taskIds, continuous input, no replay after restart, honest errors with no model, stop not falsely reporting success, summaries not deleting the original text, and the closing statement not being delivered twice.
 
-另有 ChatViewModel、回放存储、预览与拖动时间轴的回归测试。脚本模型测试、模拟器交互和真实模型真机体验分别验收。
+There are also regression tests for ChatViewModel, the playback store, preview and the draggable timeline. Scripted-model tests, emulator interaction and real-model real-device experience are accepted separately.

@@ -1,31 +1,31 @@
-# MCP 服务品牌 logo
+# Brand logos for MCP services
 
-日期：2026-11-22
+Date: 2026-11-22
 
-## 意图
+## Intent
 
-MCP 服务目录 / 列表 / 管理页现在用通用分类图标（10 大类）和统一的 Link 图标，分不出具体是哪个服务。改成每个服务的真实品牌轮廓 + 官方品牌色，一眼认出。
+The MCP service catalog / list / management pages currently use generic category icons (10 major categories) and a uniform Link icon, so you cannot tell which service is which. Change to each service's real brand outline + official brand color, recognizable at a glance.
 
-## 目标 / 非目标
+## Goals / non-goals
 
-- 目标：有品牌的远程服务显示品牌轮廓 + 官方品牌色；无品牌的 stdio 包和自定义服务器沿用现有图标兜底。
-- 非目标：不追官方 press-kit；不在运行时联网拉图；不碰连接逻辑和秘密；不新增用户可见文案（无 12 语言翻译负担）。
+- Goal: branded remote services show the brand outline + official brand color; unbranded stdio packages and custom servers keep using the existing icon fallback.
+- Non-goal: do not chase official press kits; do not fetch images over the network at runtime; do not touch connection logic or secrets; do not add new user-visible copy (no 12-language translation burden).
 
-## 约束
+## Constraints
 
-- CLAUDE.md：品牌标归各自品牌，署名进 `licenses/THIRD_PARTY_NOTICES.md`；图标集来源不写进代码 / 文档 / 提交信息（只进 notices）。
-- 数据在本机：logo 打包进 assets，不在运行时拉取（断网可用、不泄露浏览记录）。
-- 现有 UI 图标槽是 `ImageVector`；项目无图片加载库，不引入。
+- CLAUDE.md: brand marks belong to their respective brands, with attribution in `licenses/THIRD_PARTY_NOTICES.md`; the icon set's source is not written into code / docs / commit messages (only into notices).
+- Data stays local: logos are bundled into assets and not fetched at runtime (works offline, does not leak browsing history).
+- The existing UI icon slot is `ImageVector`; the project has no image loading library, so do not introduce one.
 
-## 方案（已选：A + 官方品牌色）
+## Approach (selected: A + official brand color)
 
-- 来源：CC0 品牌图标集，钉死版本。`tools/mcp/build_logos.py` 一次性抓取，生成 `app/src/main/assets/mcp/mcp-logos.json`（`id → {d, color}`），与 `catalog.json` 分离（目录只管连接，logo 是展示层）。
-- 渲染：`McpLogos` 用 Compose `PathParser` 把 path 转 `ImageVector` 并缓存；列表行的图标槽仍是 `ImageVector`，改动收敛在调用处。
-- 颜色 / 深色模式：官方品牌色原样用。深色品牌（GitHub 黑、Slack 紫、Notion 黑等）在深色模式下会看不见，所以 logo 放在**固定浅色 tile**（两种模式下都浅色）上，品牌色作前景——即各 App「已连接账号」页的通用做法。
-- 兜底规则：自定义服务器（无 `presetId`）→ Link；无品牌的 stdio 包 → 分类图标。
+- Source: a CC0 brand icon set, version pinned. `tools/mcp/build_logos.py` fetches once and generates `app/src/main/assets/mcp/mcp-logos.json` (`id → {d, color}`), separate from `catalog.json` (the catalog only handles connection; logos are a presentation layer).
+- Rendering: `McpLogos` uses Compose `PathParser` to turn the path into an `ImageVector` and caches it; the icon slot in list rows is still `ImageVector`, and the change is confined to the call sites.
+- Color / dark mode: official brand colors are used as-is. Dark brands (GitHub black, Slack purple, Notion black, etc.) would be invisible in dark mode, so the logo sits on a **fixed light tile** (light in both modes) with the brand color as the foreground — the common approach on the "connected accounts" pages of various apps.
+- Fallback rules: custom servers (no `presetId`) → Link; unbranded stdio packages → category icon.
 
-## 留给实现者
+## Left to the implementer
 
-- 212 个 `presetId → 品牌 slug` 的策展映射表（多数直映，少数要手配，约 22 个 stdio 无 slug）。
-- PathParser → ImageVector 的构建细节、缓存、浅色 tile 的 token。
-- 测试：`mcp-logos.json` 解析、slug 覆盖率、fallback 路径。
+- A curated mapping table of 212 `presetId → brand slug` entries (most map directly, a few need manual configuration, about 22 stdio packages have no slug).
+- PathParser → ImageVector build details, caching, and the token for the light tile.
+- Tests: `mcp-logos.json` parsing, slug coverage, fallback paths.

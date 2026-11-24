@@ -1,7 +1,7 @@
-# 任务回放：从点击到返回，中间详情页仍须可见
+# Task playback: from click to back, the intermediate detail page must remain visible
 
-信号：列表上的点击接着是返回，回放却连续显示两次列表；或者点击圈出现在返回后的页面。仅按轮次选择一张图会同时丢失结果画面和标记的来源，批量动作还可能共享轮次。
+Signal: a click on the list is followed by Back, yet playback shows the list twice in a row; or the click circle appears on the page after returning. Choosing a single frame by round alone loses both the result frame and the origin of the marker, and batch actions may share a round.
 
-处理：按实际调用编号关联原图、结果图和错误。两张都有就按顺序展示；标记只属于原图。报告证据通过观测和调用编号定位结果截图。元素中心是位置示意，语义滚动只能表示方向。旧记录只有截图时不推断触点。未采集和引用文件已丢失分别处理。
+Handling: associate the original frame, the result frame and the error by the actual call ID. If both frames exist, show them in order; the marker belongs only to the original frame. Report evidence locates the result screenshot via the observation and the call ID. The element center is only a positional indication, and semantic scrolling can only indicate direction. When an old record has only screenshots, do not infer the touch point. Uncollected cases and lost referenced files are handled separately.
 
-验证范围：原 [PR #348](https://github.com/wangzan101/Mika/pull/348) 在一台手机上复现并验证过详情页、红圈和滑动。拆分后由 `PlaybackTest`、`TaskReportViewModelTest` 和 `TaskPlaybackActionsTest` 检查事件与画面关联；单元测试不能证明某个设备的元素估算位置与真实触点相同。
+Verification scope: the original [PR #348](https://github.com/wangzan101/Mika/pull/348) reproduced and verified the detail page, the red circle and swiping on one phone. After the split, `PlaybackTest`, `TaskReportViewModelTest` and `TaskPlaybackActionsTest` check event-to-frame association; unit tests cannot prove that the estimated element position on a given device matches the real touch point.

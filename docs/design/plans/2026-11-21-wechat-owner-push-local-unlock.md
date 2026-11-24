@@ -1,194 +1,194 @@
-# 微信结果主动推送 + 本机任务解锁 opt-in Implementation Plan
+# Proactive WeChat result push + on-device task unlock opt-in Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 给 Ui 任务加「明确意图时模型可发结果到机主微信」的工具;设置加默认关的「锁屏时运行本机任务」开关,打通 localEnabled 解锁授权链。
+**Goal:** Add a tool to Ui tasks for "when the intent is explicit, the model may send the result to the owner's WeChat"; add a 「锁屏时运行本机任务」 (Run on-device tasks while the screen is locked) switch that defaults to off in Settings, and complete the localEnabled unlock authorization chain.
 
-**Architecture:** F1 走能力插件模式:core 新 WechatOwnerCapability(端口接口+意图闸门+工具定义),app 侧 AndroidWechatOwnerPort 实现(快照/重校验/Outbox 幂等),TaskRun 按来源+意图门控注入。F2 复用今天已合入的 TaskRelock/守卫体系,只补 localEnabled 配置链(DeviceAccess→DeviceAccessSettings→TaskUnlockPolicy→设置 UI)。
+**Architecture:** F1 follows the capability-plugin pattern: a new WechatOwnerCapability in core (port interface + intent gate + tool definition), implemented on the app side by AndroidWechatOwnerPort (snapshot/re-verify/Outbox idempotency), injected by TaskRun gated on source + intent. F2 reuses the TaskRelock/guard system already merged today and only fills in the localEnabled configuration chain (DeviceAccess→DeviceAccessSettings→TaskUnlockPolicy→Settings UI).
 
-**Tech Stack:** Kotlin,coroutines,Jetpack Compose,既有 Outbox/WechatStore/TaskRelock 底座。
+**Tech Stack:** Kotlin, coroutines, Jetpack Compose, the existing Outbox/WechatStore/TaskRelock foundation.
 
 **Spec:** `docs/design/specs/2026-11-21-wechat-owner-push-local-unlock-design.md`
-**调研底稿(接口与护栏细节):** 会话内调研笔记(不入库);所需接口与护栏已全部抄入上方 Spec,以 Spec 为准
+**Research notes (interface and guardrail details):** research notes inside the session (not committed); all required interfaces and guardrails have been copied into the Spec above, which is authoritative
 
 ## Global Constraints
 
-- 通用 AOSP,无品牌特例;代码/注释/文档不出现任何外部项目名称。
-- 每个新用户可见字符串必须 11 语言目录全齐:values、values-zh、values-b+zh+Hant、values-ar/es/fa/in/ja/ko/pt/ru/tr。
-- 工具说明进 `core/src/main/resources/prompts/tools/`;金样再生成命令必须同时含两个过滤:`./gradlew :core:test --tests '*PromptSurface*' --tests '*PromptLayoutTest*' -PupdateSnapshots`(sizes.txt 归 PromptLayoutTest 所有)。
-- 回归命令:`./gradlew :core:test :app:testDebugUnitTest`(禁裸 `:app:test`,OOM)。
-- 复用既有 TaskRelock/守卫/恢复链,不得再搬一套回锁实现。
-- ToolLabels 新 label 必须过 ToolLabelsTest 全覆盖;新 Risk.Write 工具进 ToolRiskTest 白名单。
+- Generic AOSP, no brand special cases; no external project names appear in code/comments/docs.
+- Every new user-visible string must be complete across the 11 language directories: values, values-zh, values-b+zh+Hant, values-ar/es/fa/in/ja/ko/pt/ru/tr.
+- Tool descriptions go into `core/src/main/resources/prompts/tools/`; the golden regeneration command must include both filters: `./gradlew :core:test --tests '*PromptSurface*' --tests '*PromptLayoutTest*' -PupdateSnapshots` (sizes.txt belongs to PromptLayoutTest).
+- Regression command: `./gradlew :core:test :app:testDebugUnitTest` (bare `:app:test` is forbidden, OOM).
+- Reuse the existing TaskRelock/guard/recovery chain; do not bring in another relock implementation.
+- A new ToolLabels label must pass full ToolLabelsTest coverage; new Risk.Write tools go on the ToolRiskTest allowlist.
 
 ## Review Focus
 
-1. 英文明确意图(“send the result to my WeChat”)必须命中闸门、否定句(“不要发我微信”/“don't send to my wechat”)必须不命中——fork 版只有中文模式,本计划修掉(Task 1 测试)。
-2. 同一运行内同一段文本第二次发送不得重复投递,返回旧状态(Task 2 发送器测试)。
-3. 运行中途换绑/停用微信渠道,发送时必须返回 unavailable 且一次都不发(Task 2 发送器测试)。
-4. 唤醒途中用户关掉本机开关,必须在凭据输入前中止(Task 3 DeviceAccess 测试)。
-5. 开本机开关不得带动远程开关,反之亦然(Task 3 设置持久化测试)。
+1. An explicit English intent ("send the result to my WeChat") must hit the gate, and negated sentences ("不要发我微信" (don't send to my WeChat) / "don't send to my wechat") must not — the fork only had the Chinese pattern, and this plan fixes that (Task 1 tests).
+2. Sending the same text a second time within the same run must not deliver it again; the previous status is returned (Task 2 sender tests).
+3. If the WeChat channel is rebound/disabled mid-run, sending must return unavailable and must not send even once (Task 2 sender tests).
+4. If the user turns the on-device switch off during wake-up, the flow must abort before credentials are entered (Task 3 DeviceAccess tests).
+5. Turning the on-device switch on must not drag the remote switch along, and vice versa (Task 3 settings persistence tests).
 
 ---
 
-### Task 1: F1 core——WechatOwnerCapability 与意图闸门
+### Task 1: F1 core — WechatOwnerCapability and the intent gate
 
 **Files:**
 - Create: `core/src/main/kotlin/com/wangzan101/mika/core/cap/wechat/WechatOwnerCapability.kt`
 - Create: `core/src/main/resources/prompts/tools/wechat_send_owner.md`
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/tool/AgentTool.kt`(Verb 枚举)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/tool/AgentTool.kt` (Verb enum)
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/cap/wechat/WechatOwnerRequestTest.kt`
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/cap/wechat/WechatOwnerToolTest.kt`
 
 **Interfaces:**
-- Produces(后续任务依赖,签名钉死):
+- Produces (later tasks depend on these; the signatures are fixed):
   - `interface WechatOwnerPort { suspend fun send(text: String): WechatOwnerResult }`
   - `data class WechatOwnerResult(val status: Status, val message: String? = null) { enum class Status { Delivered, Uncertain, Failed, Unavailable } }`
   - `fun explicitWechatOwnerRequest(goal: String): Boolean`
-  - `class WechatOwnerCapability(private val port: WechatOwnerPort?) : CapabilityProvider`(id 用 `"wechat_owner"`;port 为 null 时不提供工具,sections 也为空)
-  - 工具名 `wechat_send_owner`,参数 `text`(1–4000 字),Risk.Write、offScreen、logged
-  - `Verb.WechatSendOwner`(AgentTool.kt 枚举加一枚,位置按字母邻近放)
+  - `class WechatOwnerCapability(private val port: WechatOwnerPort?) : CapabilityProvider` (the id is `"wechat_owner"`; when port is null no tool is provided and sections are empty too)
+  - tool name `wechat_send_owner`, parameter `text` (1–4000 characters), Risk.Write, offScreen, logged
+  - `Verb.WechatSendOwner` (add one entry to the AgentTool.kt enum, placed next to its alphabetical neighbors)
 
-- [ ] **Step 1: 写失败测试 WechatOwnerRequestTest**
+- [ ] **Step 1: Write the failing WechatOwnerRequestTest**
 
-断言(中英两套模式 + 否定排除 + 长句不截断):
+Assertions (both the Chinese and English patterns + negation exclusion + long sentences not truncated):
 - `explicitWechatOwnerRequest("把今天的新闻摘要发到我的微信")` == true
 - `explicitWechatOwnerRequest("查一下快递进度,结果发我微信")` == true
 - `explicitWechatOwnerRequest("summarize my emails and send the result to my WeChat")` == true
-- `explicitWechatOwnerRequest("把结果发到我的微信,顺便订个闹钟明早八点提醒我带上伞出门")` == true(长句超过 18 字窗口仍命中)
+- `explicitWechatOwnerRequest("把结果发到我的微信,顺便订个闹钟明早八点提醒我带上伞出门")` == true (a long sentence longer than an 18-character window still hits)
 - `explicitWechatOwnerRequest("不要把结果推送到我的微信")` == false
 - `explicitWechatOwnerRequest("don't send anything to my wechat")` == false
-- `explicitWechatOwnerRequest("帮我看看微信里有什么新消息")` == false(读微信 ≠ 发到微信)
+- `explicitWechatOwnerRequest("帮我看看微信里有什么新消息")` == false (reading WeChat ≠ sending to WeChat)
 - `explicitWechatOwnerRequest("今天天气怎么样")` == false
 
-- [ ] **Step 2: 跑 `./gradlew :core:test --tests '*WechatOwnerRequest*' -q` 确认全部编译失败(类不存在)**
+- [ ] **Step 2: Run `./gradlew :core:test --tests '*WechatOwnerRequest*' -q` and confirm everything fails to compile (the class does not exist)**
 
-- [ ] **Step 3: 实现 WechatOwnerCapability.kt**
+- [ ] **Step 3: Implement WechatOwnerCapability.kt**
 
-三部分,全部自写注释措辞:
-1. `WechatOwnerPort` / `WechatOwnerResult`(签名见 Interfaces)。
-2. `explicitWechatOwnerRequest(goal)`:中文模式(发送动词组 ×「我的微信/我微信」)+ 英文模式(send/deliver × my wechat),各自带否定前缀排除(不/别/无需/don't/do not/never);**不做字数距离窗口**(修 fork 漏判长句的缺陷)。实现用两组 Regex,模式表是文件级 private val,方便以后扩语言。
-3. `WechatOwnerCapability`:sections 在 port 非空且工具被供给时给一段自写的行为守则(只在用户明确要求时用一次;只发最终结果与不确定性;接口接受≠已读;失败/不确定如实报告,绝不自动重发;不许拿微信 App 或浏览器当替身)。execute 调 port.send,按 status 映射 ok true/false,message 直传。
+Three parts, with all comment wording of our own:
+1. `WechatOwnerPort` / `WechatOwnerResult` (signatures as in Interfaces).
+2. `explicitWechatOwnerRequest(goal)`: a Chinese pattern (a send-verb group × "my WeChat") + an English pattern (send/deliver × my wechat), each with its own negation-prefix exclusion (`不`/`别`/`无需`/don't/do not/never); **no character-distance window** (fixing the fork's defect of missing long sentences). Use two Regex groups in the implementation, and keep the pattern table as a file-level private val so more languages can be added later.
+3. `WechatOwnerCapability`: when the port is non-null and the tool is supplied, sections give a self-written code of conduct (use it only once when the user explicitly asks; send only the final result and any uncertainty; accepted by the interface ≠ read; report failures/uncertainty truthfully and never resend automatically; never use the WeChat app or a browser as a stand-in). execute calls port.send, maps status to ok true/false, and passes message straight through.
 
-- [ ] **Step 4: 写工具说明 `prompts/tools/wechat_send_owner.md`**
+- [ ] **Step 4: Write the tool description `prompts/tools/wechat_send_owner.md`**
 
-2–3 行英文(与现有工具说明同风格):把最终结果发到机主已绑定的微信私聊;只在用户明确要求时用一次;同文不重复发;delivered 不等于已读,失败如实说。
+2–3 lines of English (in the same style as the existing tool descriptions): send the final result to the owner's bound WeChat private chat; use it only once when the user explicitly asks; do not resend the same text; delivered is not the same as read, and report failures truthfully.
 
-- [ ] **Step 5: AgentTool.kt 的 Verb 加 `WechatSendOwner`;写 WechatOwnerToolTest 并跑绿**
+- [ ] **Step 5: Add `WechatSendOwner` to the Verb in AgentTool.kt; write WechatOwnerToolTest and get it green**
 
-WechatOwnerToolTest:port 为 null 时 tools() 为空;port 给假实现时 tools() 含 wechat_send_owner 且 Risk.Write;text 超 4000 字被拒;port 返回 Unavailable 时结果是 isError 且消息如实。
-跑:`./gradlew :core:test --tests '*WechatOwner*' -q` 全绿。
+WechatOwnerToolTest: with port null, tools() is empty; with a fake port, tools() includes wechat_send_owner with Risk.Write; text over 4000 characters is rejected; when the port returns Unavailable the result is isError and the message is truthful.
+Run: `./gradlew :core:test --tests '*WechatOwner*' -q` all green.
 
 - [ ] **Step 6: Commit**
 
-`feat(wechat): 机主结果推送能力与显式意图闸门(core)`
+`feat(wechat): owner result push capability and explicit intent gate (core)`
 
-### Task 2: F1 app——发送器、绑定查询、TOCTOU 复查、装配
+### Task 2: F1 app — sender, binding lookup, TOCTOU re-check, assembly
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/wechat/WechatOwnerSender.kt`
-- Modify: `app/src/main/java/com/wangzan101/mika/wechat/WechatStore.kt`(尾部加 boundOwnerPeer)
-- Modify: `app/src/main/java/com/wangzan101/mika/wechat/WechatChannel.kt`(文本路径发送前补 accepts 复查)
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/assembly/TaskTools.kt`(toolDispatcher 加 wechatOwner 参数 + provider 登记)
-- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskRun.kt`(工具装配处门控注入)
-- Modify: `app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt`(ToolLabels +1 行)
-- Modify: `app/src/main/res/values*/strings_tools.xml`(11 个目录,各 +1 条)
+- Modify: `app/src/main/java/com/wangzan101/mika/wechat/WechatStore.kt` (add boundOwnerPeer at the end)
+- Modify: `app/src/main/java/com/wangzan101/mika/wechat/WechatChannel.kt` (add an accepts re-check before sending on the text path)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/assembly/TaskTools.kt` (add a wechatOwner parameter to toolDispatcher + register the provider)
+- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskRun.kt` (gated injection at the tool assembly point)
+- Modify: `app/src/main/java/com/wangzan101/mika/chat/ui/ChatViewModel.kt` (ToolLabels +1 line)
+- Modify: `app/src/main/res/values*/strings_tools.xml` (11 directories, +1 entry each)
 - Test: `app/src/test/java/com/wangzan101/mika/wechat/WechatOwnerSenderTest.kt`
-- Modify: `app/src/test/java/com/wangzan101/mika/wechat/WechatStoreTest.kt`(+1)、ToolRiskTest 白名单
+- Modify: `app/src/test/java/com/wangzan101/mika/wechat/WechatStoreTest.kt` (+1), the ToolRiskTest allowlist
 
 **Interfaces:**
-- Consumes: Task 1 的 `WechatOwnerPort`/`WechatOwnerResult`/`explicitWechatOwnerRequest`/`WechatOwnerCapability`。
-- Produces: `fun WechatStore.boundOwnerPeer(): WechatPeer?`(四条件:已启用+有账号+机主 contextToken 非空+已有线程;不满足返回 null)。
+- Consumes: Task 1's `WechatOwnerPort`/`WechatOwnerResult`/`explicitWechatOwnerRequest`/`WechatOwnerCapability`.
+- Produces: `fun WechatStore.boundOwnerPeer(): WechatPeer?` (four conditions: enabled + has an account + the owner's contextToken is non-empty + a thread already exists; otherwise it returns null).
 
-- [ ] **Step 1: 写失败测试 WechatOwnerSenderTest**
+- [ ] **Step 1: Write the failing WechatOwnerSenderTest**
 
-用假 store/假 channel(项目现有测试同款 fake,参考 WechatStoreTest 的写法):
-- 正常路径:快照时机主绑定在,发送时仍在 → status Delivered,Outbox 投递 id 形如 `owner-send:<runKey>:` 前缀。
-- 换绑失效:快照后把绑定账号换掉 → send 返回 Unavailable,channel 一次都没被调(用计数 fake 断言 0 次)。
-- 幂等:同 runKey 同文调两次 send → 第二次返回第一次的状态,channel 只被调 1 次。
-- uncertain 不重发:第一次投递结果 Uncertain,再调同文 → 仍 Uncertain,channel 仍 1 次。
+Use a fake store/fake channel (the same kind of fakes the project's existing tests use; see WechatStoreTest for the style):
+- Normal path: the owner binding exists at snapshot time and still exists at send time → status Delivered, the Outbox delivery id carries a prefix of the form `owner-send:<runKey>:`.
+- Rebinding invalidates: swap the bound account after the snapshot → send returns Unavailable and the channel is never called (assert 0 calls with a counting fake).
+- Idempotency: call send twice with the same runKey and the same text → the second returns the first call's status, and the channel is called only once.
+- uncertain is not resent: the first delivery returns Uncertain, and calling again with the same text → still Uncertain, the channel still called once.
 
-- [ ] **Step 2: 跑 `./gradlew :app:testDebugUnitTest --tests '*WechatOwnerSender*' -q` 确认编译失败**
+- [ ] **Step 2: Run `./gradlew :app:testDebugUnitTest --tests '*WechatOwnerSender*' -q` and confirm it fails to compile**
 
-- [ ] **Step 3: 实现**
+- [ ] **Step 3: Implement**
 
-- `WechatStore.boundOwnerPeer()`(~10 行,语义见 Interfaces)。
-- `WechatOwnerSender.kt`:`class AndroidWechatOwnerPort(app: MikaApp, private val runKey: String) : WechatOwnerPort`——构造时快照 expectedAccount+expectedPeer;send 时重读 store 比对(不符 → Unavailable,不发送);投递 id `owner-send:<runKey>:<sha256(threadId+text).take(16)>`;经 outbox.deliver 幂等;Delivered/Uncertain/Failed 按投递结果映射。
-- `WechatChannel.kt`:文本发送路径在真正调 API 前的 IO 块内补 `if (!store.accepts(peer, account)) return <失败>`(图片路径已有同款,照抄其判定形态;入口 isAlive 检查保留不动)。
+- `WechatStore.boundOwnerPeer()` (~10 lines, semantics as in Interfaces).
+- `WechatOwnerSender.kt`: `class AndroidWechatOwnerPort(app: MikaApp, private val runKey: String) : WechatOwnerPort` — snapshot expectedAccount+expectedPeer at construction; re-read the store and compare at send time (mismatch → Unavailable, send nothing); delivery id `owner-send:<runKey>:<sha256(threadId+text).take(16)>`; idempotent through outbox.deliver; Delivered/Uncertain/Failed mapped from the delivery result.
+- `WechatChannel.kt`: on the text send path, inside the IO block before the API is actually called, add `if (!store.accepts(peer, account)) return <failure>` (the image path already has the same thing; copy its check form; keep the entry isAlive check untouched).
 
-- [ ] **Step 4: 装配与门控**
+- [ ] **Step 4: Assembly and gating**
 
-- `TaskTools.toolDispatcher(...)`:加参数 `wechatOwner: WechatOwnerPort? = null`;providers 列表照现有 object : CapabilityProvider 的挂法加 `WechatOwnerCapability(wechatOwner)`;allTools 追加(参考相邻能力的写法)。
-- `TaskRun.kt` 工具装配处:`wechatOwner = if (provenance.origin == RunOrigin.Ui && !conditionCheck && explicitWechatOwnerRequest(task)) AndroidWechatOwnerPort(app, runKey) else null`(runKey 用该运行已有的唯一键,没有就用 conversationId+开始时刻)。
-- `ChatViewModel.kt` ToolLabels:`"wechat_send_owner" to R.string.tool_wechat_owner`。
-- 11 个 values 目录的 strings_tools.xml 各加 `tool_wechat_owner`(英文默认「发送到我的微信」语义,各语言照现有同文件风格翻译)。
+- `TaskTools.toolDispatcher(...)`: add the parameter `wechatOwner: WechatOwnerPort? = null`; add `WechatOwnerCapability(wechatOwner)` to the providers list the way the existing `object : CapabilityProvider` entries are attached; append to allTools (following the neighboring capabilities).
+- `TaskRun.kt` at the tool assembly point: `wechatOwner = if (provenance.origin == RunOrigin.Ui && !conditionCheck && explicitWechatOwnerRequest(task)) AndroidWechatOwnerPort(app, runKey) else null` (runKey uses the unique key this run already has; if there is none, use conversationId+start time).
+- `ChatViewModel.kt` ToolLabels: `"wechat_send_owner" to R.string.tool_wechat_owner`.
+- Add `tool_wechat_owner` to strings_tools.xml in each of the 11 values directories (the default English meaning is "send to my WeChat"; translate for each language following the style of the existing entries in the same file).
 
-- [ ] **Step 5: 跑测试 + 再生成金样**
+- [ ] **Step 5: Run tests + regenerate goldens**
 
 ```
 ./gradlew :app:testDebugUnitTest --tests '*Wechat*' -q
 ./gradlew :core:test --tests '*PromptSurface*' --tests '*PromptLayoutTest*' -PupdateSnapshots -q
 ./gradlew :core:test -q
 ```
-全绿(ToolRiskTest 若拦新工具,按白名单机制登记)。
+All green (if ToolRiskTest blocks the new tool, register it through the allowlist mechanism).
 
 - [ ] **Step 6: Commit**
 
-`feat(wechat): 机主结果推送发送器与门控装配(app)`
+`feat(wechat): owner result push sender and gated assembly (app)`
 
-### Task 3: F2——localEnabled 解锁授权链与设置开关
+### Task 3: F2 — the localEnabled unlock authorization chain and the settings switch
 
 **Files:**
-- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/device/DeviceAccess.kt`(store 接口加 localEnabled/beginLocalAttempt;unlock 拆 local 分流)
-- Modify: `app/src/main/java/com/wangzan101/mika/settings/DeviceAccessSettings.kt`(config 加字段、setLocalEnabled、beginLocalAttempt、持久化)
-- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskUnlockPolicy.kt`(加 localUnlockEnabled 参数 + Ui 分支)
-- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskRun.kt`(解锁块按来源选 unlockLocal;失败文案三分支)
-- Modify: `app/src/main/java/com/wangzan101/mika/device/ui/DeviceAccessSection.kt`(加 localTasks 变体)
-- Modify: 设置「任务运行」页(`SettingsSubPages.DuringWorkScreen` 与 `SettingsScreen`,挂本机开关)
-- Modify: `app/src/main/res/values*/strings_device_access.xml`(11 目录,各 +5 键:device_local_group/title/sub/foot/unlock_failed)
-- Test: `core/src/test/kotlin/com/wangzan101/mika/core/device/DeviceAccessTest.kt`(+3)
-- Test: `app/src/test/java/com/wangzan101/mika/settings/DeviceAccessSettingsTest.kt`(+1)
-- Test: `app/src/test/java/com/wangzan101/mika/task/TaskUnlockPolicyTest.kt`(+2)
+- Modify: `core/src/main/kotlin/com/wangzan101/mika/core/device/DeviceAccess.kt` (add localEnabled/beginLocalAttempt to the store interface; split unlock into the local branch)
+- Modify: `app/src/main/java/com/wangzan101/mika/settings/DeviceAccessSettings.kt` (add the field to config, setLocalEnabled, beginLocalAttempt, persistence)
+- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskUnlockPolicy.kt` (add the localUnlockEnabled parameter + a Ui branch)
+- Modify: `app/src/main/java/com/wangzan101/mika/task/TaskRun.kt` (the unlock block picks unlockLocal by source; the failure copy has three branches)
+- Modify: `app/src/main/java/com/wangzan101/mika/device/ui/DeviceAccessSection.kt` (add a localTasks variant)
+- Modify: the Settings 「任务运行」 (Task runs) page (`SettingsSubPages.DuringWorkScreen` and `SettingsScreen`; attach the on-device switch)
+- Modify: `app/src/main/res/values*/strings_device_access.xml` (11 directories, +5 keys each: device_local_group/title/sub/foot/unlock_failed)
+- Test: `core/src/test/kotlin/com/wangzan101/mika/core/device/DeviceAccessTest.kt` (+3)
+- Test: `app/src/test/java/com/wangzan101/mika/settings/DeviceAccessSettingsTest.kt` (+1)
+- Test: `app/src/test/java/com/wangzan101/mika/task/TaskUnlockPolicyTest.kt` (+2)
 
 **Interfaces:**
-- Produces: `DeviceAccessStore.localEnabled: Boolean`、`DeviceAccessStore.beginLocalAttempt(): Boolean`(接口默认实现都返回 false);`TaskUnlockPolicy(localUnlockEnabled: () -> Boolean = { false }, …其余不变)`。
+- Produces: `DeviceAccessStore.localEnabled: Boolean`, `DeviceAccessStore.beginLocalAttempt(): Boolean` (the interface default implementations both return false); `TaskUnlockPolicy(localUnlockEnabled: () -> Boolean = { false }, …everything else unchanged)`.
 
-- [ ] **Step 1: 写失败测试(core DeviceAccessTest +3)**
+- [ ] **Step 1: Write the failing tests (core DeviceAccessTest +3)**
 
-- local 独立授权:remote enabled=false、localEnabled=true 时,local 分流 allowed() 为真、remote 分流为假。
-- 唤醒途中撤权:allowed() 每次操作前重读——第一次真、第二次假时,流程在凭据输入前中止(fake 凭据注入计数为 0)。
-- 熄屏未锁也算:屏幕熄但本来没安全锁时,performedUnlock 为真(我方 `woke || !wasSecure` 语义,补用例钉住)。
+- Independent local authorization: with remote enabled=false and localEnabled=true, allowed() on the local branch is true and on the remote branch is false.
+- Revoking authorization mid-wake: allowed() is re-read before every operation — when the first read is true and the second is false, the flow aborts before credentials are entered (the fake credential injection count is 0).
+- Screen off but unlocked counts too: when the screen is off but there was no security lock to begin with, performedUnlock is true (our `woke || !wasSecure` semantics; add a case to pin this down).
 
-- [ ] **Step 2: 写失败测试(app 两处)**
+- [ ] **Step 2: Write the failing tests (two places in app)**
 
-DeviceAccessSettingsTest +1:localEnabled 独立持久化(写 true 不影响 enabled;beginAttempt 与 beginLocalAttempt 的 blocked 占位互不通)。
-TaskUnlockPolicyTest +2:Ui 来源授权随 localUnlockEnabled 实时收放(lambda 每次调用重查);Mcp 来源任何开关组合下都不授权。
+DeviceAccessSettingsTest +1: localEnabled persists independently (writing true does not affect enabled; the blocked slots of beginAttempt and beginLocalAttempt do not leak into each other).
+TaskUnlockPolicyTest +2: authorization for the Ui source is granted and withdrawn in real time with localUnlockEnabled (the lambda is re-checked on every call); the Mcp source is never authorized under any combination of switches.
 
-- [ ] **Step 3: 跑三个测试类确认编译/断言失败**
+- [ ] **Step 3: Run the three test classes and confirm compile/assertion failures**
 
 `./gradlew :core:test --tests '*DeviceAccess*' -q; ./gradlew :app:testDebugUnitTest --tests '*DeviceAccessSettings*' --tests '*TaskUnlockPolicy*' -q`
 
-- [ ] **Step 4: 实现 core + app 授权链**
+- [ ] **Step 4: Implement the core + app authorization chain**
 
-- `DeviceAccess.kt`:store 接口加两个成员(默认 false);`unlock(authorized)`/`unlockLocal(authorized)` 合并为私有 `unlockUsing(local, …)`,`allowed()`/`prepare()` 按 local 分流,输入凭据前走对应 begin*Attempt;不做「local 提前返回」分支(我方 performedUnlock 语义已覆盖)。
-- `DeviceAccessSettings.kt`:config 加 `localEnabled`(默认 false,持久化向后兼容缺省);`setLocalEnabled`(写失败时关回并删文件后抛);`beginLocalAttempt`(独立 blocked 键)。
-- `TaskUnlockPolicy.kt`:加 `localUnlockEnabled: () -> Boolean = { false }`;`origin == Ui && localUnlockEnabled()` → 授权(判定 lambda 每次调用重查,不缓存)。
-- `TaskRun.kt` 解锁块:`origin ∈ {Ui, Trigger} && settings.localEnabled` 走 unlockLocal;失败文案加 `device_local_unlock_failed` 分支(守卫/回锁/恢复逻辑一律不动)。
+- `DeviceAccess.kt`: add two members to the store interface (default false); merge `unlock(authorized)`/`unlockLocal(authorized)` into a private `unlockUsing(local, …)`; `allowed()`/`prepare()` branch by local, and go through the corresponding begin*Attempt before credentials are entered; do not add a "local returns early" branch (our performedUnlock semantics already cover it).
+- `DeviceAccessSettings.kt`: add `localEnabled` to config (default false; persistence is backward compatible with its absence); `setLocalEnabled` (on a write failure, switch it back off, delete the file and then throw); `beginLocalAttempt` (a separate blocked key).
+- `TaskUnlockPolicy.kt`: add `localUnlockEnabled: () -> Boolean = { false }`; `origin == Ui && localUnlockEnabled()` → authorized (the predicate lambda is re-checked on every call and never cached).
+- `TaskRun.kt` unlock block: `origin ∈ {Ui, Trigger} && settings.localEnabled` goes through unlockLocal; add a `device_local_unlock_failed` branch to the failure copy (guard/relock/recovery logic stays untouched in all cases).
 
-- [ ] **Step 5: 设置 UI + 字符串**
+- [ ] **Step 5: Settings UI + strings**
 
-- `DeviceAccessSection.kt`:加 `localTasks: Boolean = false` 参数变体(组名/开关行/脚注换 5 个新键文案,凭据编辑区整段复用)。
-- 「任务运行」页挂本机开关(传 DeviceAccessSettings,脚注说清与「连接电脑」远程开关互不影响)。
-- 11 语言 strings_device_access.xml 各 +5 键。
+- `DeviceAccessSection.kt`: add a `localTasks: Boolean = false` parameter variant (the group name/switch row/footnote use the copy of the 5 new keys; the credential editing area is reused as a whole).
+- Attach the on-device switch to the 「任务运行」 (Task runs) page (pass DeviceAccessSettings; the footnote makes clear that it does not affect the 「连接电脑」 (Connect to computer) remote switch).
+- Add 5 keys to strings_device_access.xml in each of the 11 languages.
 
-- [ ] **Step 6: 跑绿全部相关测试**
+- [ ] **Step 6: Get all related tests green**
 
 `./gradlew :core:test --tests '*DeviceAccess*' -q; ./gradlew :app:testDebugUnitTest --tests '*DeviceAccess*' --tests '*TaskUnlockPolicy*' -q`
 
 - [ ] **Step 7: Commit**
 
-`feat(device): 本机任务亮屏解锁 opt-in 开关与授权链`
+`feat(device): on-device task wake-screen unlock opt-in switch and authorization chain`
 
-### Task 4: 全量回归
+### Task 4: Full regression
 
-- [ ] **Step 1:** `./gradlew :core:test :app:testDebugUnitTest --console=plain -q` 全绿(exit 0)
-- [ ] **Step 2:** 若 TerminalHubTest 15s 超时单独挂且 diff 不碰 app/terminal:按已知环境抖动处理(记忆 terminalhub-test-local-flake),重跑该类确认
+- [ ] **Step 1:** `./gradlew :core:test :app:testDebugUnitTest --console=plain -q` all green (exit 0)
+- [ ] **Step 2:** If TerminalHubTest times out at 15s on its own and the diff does not touch app/terminal: treat it as a known environment flake (the terminalhub-test-local-flake memory) and re-run that class to confirm
