@@ -51,8 +51,8 @@ class PluginSampleTest {
         assertEquals("com.example.feishu/feishu", info.name)
         assertEquals(PLUGIN_KIND, info.kind)
         val body = registry.skillsProvider.read(info, "SKILL.md").orEmpty()
-        assertTrue(body.contains("飞书"))
-        assertTrue(body.contains("连接器"))
+        assertTrue(body.contains("Feishu"))
+        assertTrue(body.contains("connector"))
     }
 
     @Test fun fullManifestRejectedForNonShScriptAndPermissions() {

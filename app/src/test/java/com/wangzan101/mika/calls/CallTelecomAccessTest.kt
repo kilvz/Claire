@@ -65,7 +65,7 @@ class CallTelecomAccessTest {
         ).forEach {
             val result = CallTelecomCommandOutcome.classify(255, it)
             assertEquals(CallTelecomCommandOutcome.FAILED, result)
-            assertEquals("系统未授予管理通话权限", result.appOpsFailureMessage)
+            assertEquals("The system did not grant the call-management permission", result.appOpsFailureMessage)
         }
         assertEquals(CallTelecomCommandOutcome.OK, CallTelecomCommandOutcome.classify(0, ""))
     }
