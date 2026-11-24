@@ -93,7 +93,7 @@ class PluginRegistryTest {
             """{"schema":1,"id":"com.example.tools","name":"T","version":"1.0.0","kind":"capability","tools":[{"name":"send"}]}""",
         )
         assertTrue(registry().plugins.value.isEmpty())
-        assertTrue(dir.isDirectory) // 不删用户的目录,只是不加载
+        assertTrue(dir.isDirectory) // the user's directory is not deleted, just not loaded
     }
 
     @Test fun reinstallingKeepsEnabledState() {

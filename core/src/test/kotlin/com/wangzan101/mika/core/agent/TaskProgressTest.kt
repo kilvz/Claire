@@ -101,7 +101,7 @@ class TaskProgressTest {
         assertFalse(seen("第 1 条"))
         assertFalse(seen("第 1 条"))
         assertEquals(1, tracker.stale)
-        assertFalse(seen("第 1 条", Verb.Tap)) // 非采集调用既不清零也不递增
+        assertFalse(seen("第 1 条", Verb.Tap)) // non-capture calls neither reset nor increment
         assertEquals(1, tracker.stale)
         assertFalse(seen("第 2 条", Verb.Scroll))
         assertEquals(0, tracker.stale)

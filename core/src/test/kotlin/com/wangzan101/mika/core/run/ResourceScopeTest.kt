@@ -25,7 +25,7 @@ class ResourceScopeTest {
         fun release() { released += name }
     }
 
-    /** 建好之后、交回调用方之前任务被取消:换线程的 withContext 交回时抛取消,资源仍归作用域,收尾时放掉。 */
+    /** The task is cancelled after the resource is built but before it is handed back to the caller: the withContext that switches threads throws on hand-back, but the resource still belongs to the scope and is released during cleanup. */
     @Test
     fun cancelledRightAfterCreationStillReleased() = runBlocking {
         val scope = ResourceScope()
@@ -53,7 +53,7 @@ class ResourceScopeTest {
         assertEquals(listOf("c", "b", "a"), released)
     }
 
-    /** 放掉也在登记时给的上下文里做(如只能在主线程关的东西)。 */
+    /** Release also runs in the context given at registration (for things that can only be closed on the main thread, for example). */
     @Test
     fun releaseRunsInAcquireContext() = runBlocking {
         val pool = Executors.newSingleThreadExecutor { Thread(it, "owner-thread") }
@@ -68,7 +68,7 @@ class ResourceScopeTest {
         }
     }
 
-    /** 一个放不掉,其余照放;第一个错误在全部放完后抛出。 */
+    /** If one fails to release, the rest still are; the first error is thrown after everything has been released. */
     @Test
     fun failingReleaseDoesNotSkipOthers() = runBlocking {
         val scope = ResourceScope()
@@ -84,7 +84,7 @@ class ResourceScopeTest {
         assertEquals(listOf("c", "a"), released)
     }
 
-    /** 作用域已关:再建出来的立即放掉,调用方拿到错误而不是一个没人管的资源。 */
+    /** The scope is already closed: anything acquired afterwards is released immediately, so the caller gets an error instead of an orphaned resource. */
     @Test
     fun acquireAfterCloseReleasesImmediately() = runBlocking {
         val scope = ResourceScope()
@@ -98,7 +98,7 @@ class ResourceScopeTest {
         assertEquals(listOf("late"), released)
     }
 
-    /** 多个线程同时登记、同时关:每个恰好放一次。 */
+    /** Several threads acquire and close at the same time: each is released exactly once. */
     @Test
     fun concurrentAcquireAndCloseReleaseEachOnce() = runBlocking {
         repeat(50) { round ->

@@ -101,7 +101,7 @@ class VoiceCallTranscriptTest {
         h.transcript.onUser("带猫去打疫苗")
         h.transcript.onAssistant("好的，记下了")
         h.now = 3_000L
-        h.transcript.onUser("顺便买猫粮") // 通话到这就挂了,这句没等来回答
+        h.transcript.onUser("顺便买猫粮") // the call dropped here; this utterance never got an answer
         h.transcript.close()
         assertEquals(1, h.appended.size)
         val (id, turn) = h.appended[0]
@@ -153,7 +153,7 @@ class VoiceCallTranscriptTest {
             conversationId = { "conv-9" },
             appendTurn = { _, turn ->
                 appended += turn.userText
-                if (appended.size == 1) scope.cancel() // 写到一半整个通话协程域被撤
+                if (appended.size == 1) scope.cancel() // the whole call coroutine scope is cancelled mid-write
                 delay(1)
             },
             nowMillis = { 7L },

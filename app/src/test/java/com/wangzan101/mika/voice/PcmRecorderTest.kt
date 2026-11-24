@@ -10,7 +10,7 @@ class PcmRecorderTest {
     fun defaultsMatchLegacyBehavior() {
         val r = PcmRecorder()
         assertEquals(MediaRecorder.AudioSource.MIC, r.inputSource)
-        assertEquals(800, r.chunkSamples) // 50ms × 16kHz,与旧的 Wav.RATE / 20 一致
+        assertEquals(800, r.chunkSamples) // 50ms × 16kHz, matching the old Wav.RATE / 20
         assertFalse(r.silenced.value)
     }
 

@@ -48,7 +48,7 @@ class PluginSkillsProviderTest {
             "---\nname: feishu\ndisplay: 飞书\ndescription: 发消息\naliases: [fs, lark]\napps: [飞书]\ndomains: [open.feishu.cn]\n---\n正文",
         )
         val info = provider(p).entries().single()
-        assertEquals("飞书通知", info.display) // manifest 的 display 优先
+        assertEquals("飞书通知", info.display) // the manifest's display wins
         assertEquals("发消息", info.description)
         assertEquals(listOf("fs", "lark"), info.aliases)
         assertEquals(listOf("飞书", "open.feishu.cn"), info.terms)

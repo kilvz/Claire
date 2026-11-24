@@ -73,8 +73,8 @@ class TaskReportViewModelTest {
         h.event(RunEvent.TaskEnded(3, "succeeded", "完成")); h.close()
         val r = TaskReportViewModel(store, h.runId).load()!!
         assertEquals(listOf(2, 4), r.frames.map { it.frame.screenshotId })
-        assertEquals(1, r.missingFrames) // null 从未采集，不计入缺失文件
-        assertTrue(r.frames.all { it.mark == null }) // 只剩后帧，不得把点击圈移到后帧
+        assertEquals(1, r.missingFrames) // null means never captured, so it is not counted as a missing file
+        assertTrue(r.frames.all { it.mark == null }) // only the after-frame remains; the tap marker must not be moved onto it
         assertEquals("结束时页面", r.pages.single().title)
     }
 

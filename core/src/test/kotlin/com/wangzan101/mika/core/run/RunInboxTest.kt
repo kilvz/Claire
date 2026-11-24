@@ -37,7 +37,7 @@ class RunInboxTest {
         assertEquals(listOf(RunInbox.UserSteer("b", "留给下一任务")), closed.handoffUnconsumed())
     }
 
-    // 电脑追加的只归当前任务,撤不撤由电脑定:手机这边撤不回,它照样交给模型
+    // entries appended by the computer belong to the current task only, and the computer decides whether to withdraw them: the phone cannot withdraw them, so they are still handed to the model
     @Test fun remoteSteersCannotBeWithdrawn() {
         val inbox = RunInbox()
         inbox.steerCurrent("r", "电脑追加")
