@@ -24,7 +24,7 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6
       - name: Regenerate snapshots
-        run: ./gradlew :core:test --tests '*LoopScenarioTest' --tests '*PromptSurfaceTest' -PupdateSnapshots --stacktrace
+        run: ./gradlew :core:test --tests '*LoopScenarioTest' --tests '*PromptSurfaceTest' --tests '*PromptLayoutTest' -PupdateSnapshots --stacktrace
       - name: Commit updated snapshots
         run: |
           git config user.name "github-actions[bot]"
