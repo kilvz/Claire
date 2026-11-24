@@ -19,7 +19,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
-/** 真日历提供方契约：只清理本次测试唯一标记的事件，不读取或改动其它日程。 */
+/** Contract against the real calendar provider: only clean up the events carrying this test's unique marker; do not read or change any other schedule. */
 @RunWith(AndroidJUnit4::class)
 class CalendarBulkWriterDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()

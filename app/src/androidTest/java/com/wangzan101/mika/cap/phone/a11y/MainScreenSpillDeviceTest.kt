@@ -21,15 +21,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机测试:Claire 屏上的页面经另一个进程里的服务打开另一个 App(和从后台打开一样),系统把它放到主屏;
- * 点的那一下的结果要报 opened、它要被挪回 Claire 的屏,主屏最上面回到原来那个。
- * 打开哪个 App 由仪器参数 spillTarget 指定(默认系统设置);它已经有任务时不跑(挪过来再随屏销毁会丢掉那个任务)。
- * 装了两份的 App 会先问打开哪一个:那个问题不挪、留在主屏,报 picker、onUserScreen,任务等用户选;
- * 仪器参数 pickOption 给了时测试当用户在主屏上选(或 back 关掉),再看选出来的被挪回 Claire 的屏、报开的是哪一份。
+ * Real-device test: a page on Claire's display opens another app through a service in another process (the same as
+ * opening it from the background) and the system puts it on the main screen; the result of that tap must report opened,
+ * it must be moved back to Claire's display, and the top of the main screen must return to what it was.
+ * Which app to open is given by the instrumentation argument spillTarget (system Settings by default); the test does not
+ * run while that app already has a task (moving it over and then destroying it with the display would lose that task).
+ * An app installed twice first asks which copy to open: that question is not moved and stays on the main screen, reporting
+ * picker and onUserScreen, while the task waits for the user to choose; when the instrumentation argument pickOption is
+ * given, the test acts as the user and picks on the main screen (or closes it with back), then checks that the chosen copy
+ * was moved back to Claire's display and which copy was reported as opened.
  */
 @RunWith(AndroidJUnit4::class)
 class MainScreenSpillDeviceTest {
-    // 和任务里一样,屏的尺寸、密度同主屏:挪过来的页面不必因尺寸变了重建(系统的选择框重建时会自己关掉)
+    // As in a task, the display's size and density match the main screen: a page moved over need not be recreated because the size changed (the system's chooser closes itself when it is recreated)
     private val agent = run {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val m = android.util.DisplayMetrics().also {
@@ -46,15 +50,15 @@ class MainScreenSpillDeviceTest {
 
     @After
     fun tearDown() {
-        // 没挪回来时,把留在主屏上的那个挪到 Claire 的屏,随屏一起销毁
+        // When it was not moved back, move the one left on the main screen to Claire's display so it is destroyed with the display
         val main = shell.topTaskId(Display.DEFAULT_DISPLAY)
-        // 中途失败、问题还留在主屏上:按返回关掉它
+        // If it failed midway and the question is still on the main screen: close it with back
         screen.userPick.value?.let { p -> if (main >= 0 && shell.packageOfTask(main) == p.packageName) sh("input keyevent 4") }
         if (main >= 0 && shell.packageOfTask(main) == target) shell.moveTask(main, agent.display.displayId)
         agent.release()
     }
 
-    /** 仪器参数 allowExisting=true 时也跑(那个任务会被挪过来、随屏关掉,和从最近任务里划掉一样)。 */
+    /** Also runs when the instrumentation argument allowExisting=true (that task will be moved over and closed with the display, the same as swiping it away from recents). */
     private fun noTaskYet() {
         if (InstrumentationRegistry.getArguments().getString("allowExisting") == "true") return
         assumeFalse("$target already has a task",
@@ -69,7 +73,7 @@ class MainScreenSpillDeviceTest {
         return s!!
     }
 
-    /** 对照:不经 Claire 的动作、直接往 Claire 的屏上注入一下点按,开出来的落在主屏(这就是要修的现象)。 */
+    /** Control: inject a tap onto Claire's display directly, without going through Claire's actions; what it opens lands on the main screen (this is the behaviour to fix). */
     @Test
     fun withoutTheWatchTheLaunchLandsOnTheMainScreen() = runBlocking<Unit> {
         noTaskYet()
@@ -104,13 +108,13 @@ class MainScreenSpillDeviceTest {
             assertEquals("main screen top did not come back", mainBefore, pollUntil(3_000) { shell.topTaskId(Display.DEFAULT_DISPLAY).takeIf { it == mainBefore } })
             return@runBlocking
         }
-        // 系统在用户屏上问打开哪一个:不挪、不重开,留在主屏等用户选
+        // The system asks on the user's screen which copy to open: it is not moved, not reopened, and stays on the main screen waiting for the user to choose
         assertTrue("question was moved: $opened", !opened.pulledBack && opened.onUserScreen)
         val chooserTask = shell.topTaskId(Display.DEFAULT_DISPLAY)
         assertEquals("question is not on the main screen", opened.packageName, shell.packageOfTask(chooserTask))
         assertNotNull("run is not waiting for the user", screen.userPick.value)
         assertEquals("Claire's screen changed", SpillTestActivity::class.java.name, shell.topActivity(vd))
-        // 仪器参数 pickOption=<第几个,从 0 起> 或 back:这时测试当用户,在主屏上点那个选项(或按返回关掉问题)
+        // Instrumentation argument pickOption=<index, starting from 0> or back: here the test acts as the user, tapping that option on the main screen (or closing the question with back)
         val pick = InstrumentationRegistry.getArguments().getString("pickOption") ?: return@runBlocking
         if (pick == "back") sh("input keyevent 4")
         else {
@@ -124,7 +128,7 @@ class MainScreenSpillDeviceTest {
             sh("input tap ${option!!.centerX} ${option.centerY}")
         }
         val settled = screen.awaitUserPick()
-        // 选出来的要用户亲手处理:这时测试当用户点了继续
+        // What was picked needs the user to handle it by hand: here the test acts as the user and taps continue
         if (settled is AndroidScreen.PickResult.NeedsUser) screen.afterUserStep(settled)
         val after = screen.snapshot()
         val top = shell.topTaskId(vd)
@@ -138,7 +142,7 @@ class MainScreenSpillDeviceTest {
         assertEquals("main screen top did not come back", mainBefore, pollUntil(3_000) { shell.topTaskId(Display.DEFAULT_DISPLAY).takeIf { it == mainBefore } })
     }
 
-    /** 真实任务栈里先回桌面、再打开 App：即使没有语义点击，这条用户导航也不能判成 Agent 外溢。 */
+    /** In a real task stack, going home first and then opening an app: even without a semantic click, this user navigation must not be judged an Agent spill. */
     @Test
     fun returningHomeBeforeOpeningAnAppIsUserNavigation() = runBlocking<Unit> {
         noTaskYet()

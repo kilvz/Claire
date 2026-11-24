@@ -44,7 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import com.wangzan101.mika.voice.ui.nameOf
 
-/** 侧栏的「浏览器」入口;起始页的几段(搜索、常用网站、整理、最近打开),网页的顶栏和工具栏、「更多」面板、「给 Claire 登录」横幅。 */
+/** The drawer's "Browser" entry; the sections of the start page (search, frequently used sites, tidy up, recently opened), the page's top bar and toolbar, the "More" sheet, and the "Sign in for Claire" banner. */
 @RunWith(AndroidJUnit4::class)
 class BrowserScreenTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

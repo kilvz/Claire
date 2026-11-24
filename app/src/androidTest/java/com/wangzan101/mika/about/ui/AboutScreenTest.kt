@@ -87,7 +87,7 @@ class AboutScreenTest {
             scrollTo(t)
             compose.onNodeWithText(t).assertIsDisplayed()
         }
-        // 许可证只在页脚,不再单独一行
+        // The license entry lives only in the footer, no longer on its own row
         compose.onAllNodesWithText("开源许可").assertCountEquals(0)
     }
 
@@ -120,7 +120,7 @@ class AboutScreenTest {
         assertEquals(listOf("issue://prefilled"), calls.urls)
     }
 
-    /** 「复制诊断信息」先打开预览:整段文字看得见,点「复制」才进剪贴板。 */
+    /** "Copy diagnostics" opens a preview first: the whole text is visible, and only tapping "Copy" puts it on the clipboard. */
     @Test
     fun feedbackDiagnosticsPreviewsThenCopies() {
         about()
@@ -140,7 +140,7 @@ class AboutScreenTest {
         assertEquals(sampleDiagnostics, clip)
     }
 
-    /** 联系作者面板:作者微信码、提示和保存按钮都在,点保存走一次回调。 */
+    /** Contact-the-author sheet: the author's WeChat code, the hint and the save button are all there; tapping save fires the callback once. */
     @Test
     fun groupRowOpensGroupSheet() {
         val calls = about()
@@ -259,7 +259,7 @@ class AboutScreenTest {
         assertEquals(listOf(MikaLinks.RELEASES), calls.urls)
     }
 
-    /** 侧栏最底下一行:设置靠左;有新版时右边才出现「更新」带红点(红点在最右边),点它进「关于 Claire」。 */
+    /** Bottom row of the drawer: Settings sits on the left; only when a new version exists does "Update" appear on the right with a red dot (the dot sits at the far right), and tapping it opens "About Claire". */
     @Test
     fun drawerFooterShowsUpdateOnlyWhenAvailable() {
         val calls = mutableListOf<String>()
@@ -277,14 +277,14 @@ class AboutScreenTest {
         compose.onNodeWithText("更新").assertIsDisplayed()
         compose.onNodeWithTag("update-dot", useUnmergedTree = true).assertExists()
         val footer = compose.onNodeWithTag("drawer-footer").getUnclippedBoundsInRoot()
-        // 量文字本身(未合并的树):合并后的可点行节点比文字宽,量它判断不了左右半边
+        // Measure the text itself (unmerged tree): the merged clickable row node is wider than the text, so its bounds cannot tell the left half from the right
         val settings = compose.onNodeWithText("设置", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val update = compose.onNodeWithText("更新", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val dot = compose.onNodeWithTag("update-dot", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val mid = (footer.left + footer.right) / 2
         assertTrue(settings.right < mid)
         assertTrue(update.left > mid)
-        // 更新那一项贴着右边:红点离行的右边只隔两层内边距(行 12dp + 项 12dp)
+        // The update item sits flush right: the red dot is only two paddings away from the row's right edge (12dp row + 12dp item)
         assertTrue(footer.right - dot.right <= 25.dp)
         compose.onNodeWithText("设置").performClick()
         compose.onNodeWithText("更新").performClick()
@@ -306,7 +306,7 @@ class AboutScreenTest {
         compose.onAllNodesWithTag("update-dot", useUnmergedTree = true).assertCountEquals(0)
     }
 
-    /** 设置首页「关于 Claire」一行:有新版写「x 可更新」带红点。 */
+    /** The "About Claire" row on the Settings home screen: with a new version it reads "x available" and carries a red dot. */
     @Test
     fun settingsAboutRowShowsUpdate() {
         compose.setContent {

@@ -16,12 +16,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机测试:后台进程在主屏上打开一个对话框样式的页面(登录验证、账号确认一类要用户在主屏点确认的弹窗)。
- * 这种弹窗要留在主屏给用户;Claire 的屏不该被它盖住,也不该把它挪到后台屏上。
+ * Real-device test: a background process opens a dialog-styled page on the main screen (a popup such as a sign-in
+ * verification or an account confirmation that the user has to confirm on the main screen). Such popups must stay on the
+ * main screen for the user; Claire's display must not be covered by one, nor move one onto a background display.
  */
 @RunWith(AndroidJUnit4::class)
 class DialogSpillDeviceTest {
-    // 和任务里一样,屏的尺寸、密度同主屏:挪过来的页面不必因尺寸变了重建
+    // As in a task, the display's size and density match the main screen: a page moved over need not be recreated because the size changed
     private val agent = run {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val m = android.util.DisplayMetrics().also {
@@ -37,13 +38,13 @@ class DialogSpillDeviceTest {
 
     @After
     fun tearDown() {
-        // 失败时弹窗可能还留在主屏:关掉它
+        // On failure the popup may still be left on the main screen: close it
         val main = shell.topTaskId(Display.DEFAULT_DISPLAY)
         if (main >= 0 && shell.packageOfTask(main) == DeviceSupport.TEST_PACKAGE) DeviceSupport.sh("input keyevent 4")
         agent.release()
     }
 
-    /** 主屏上各窗口的类型、包和范围:对话框样式的窗口明显比整屏小。 */
+    /** Type, package and bounds of each window on the main screen: a dialog-styled window is clearly smaller than the whole screen. */
     private fun dumpMainWindows(label: String) {
         val service = DeviceSupport.service()
         for (w in service.windowsOn(Display.DEFAULT_DISPLAY)) {
@@ -55,7 +56,7 @@ class DialogSpillDeviceTest {
 
     @Test
     fun dialogOnTheMainScreenIsLeftForTheUser() = runBlocking<Unit> {
-        // 先单独看一眼这种对话框在主屏上的窗口(不经过 Claire 的动作)
+        // First look at this kind of dialog's window on the main screen on its own (without going through Claire's actions)
         DeviceSupport.sh("am start -n ${DeviceSupport.TEST_PACKAGE}/${DialogSpillTestActivity::class.java.name}")
         DeviceSupport.pollUntil(5_000) {
             shell.topActivity(Display.DEFAULT_DISPLAY)?.takeIf { it.contains("DialogSpillTestActivity") }
@@ -81,7 +82,7 @@ class DialogSpillDeviceTest {
         val r = screen.tapRef(button.ref, s.snapshotId)
         println("tap result: $r")
 
-        // 从助手的记录里认这次冒到主屏上的弹窗任务(挪走后任务号不变)
+        // Identify this popup task that spilled onto the main screen from the helper's record (a task keeps its id when moved)
         val b = shell.mainArrivals(since)
         val packages = b?.getStringArray(MainScreenWatch.KEY_PACKAGE)
         val tasks = b?.getIntArray(MainScreenWatch.KEY_TASK)
@@ -89,7 +90,7 @@ class DialogSpillDeviceTest {
         assertNotNull("no arrival on the main screen was reported for the popup", dialogTask)
         dumpMainWindows("after action")
 
-        // 让 Claire 有机会处理这次冒到主屏上的任务(动作里没赶上的,读屏时会补)
+        // Give Claire a chance to handle this task that spilled onto the main screen (whatever the action did not catch up with is made up for on the next screen read)
         delay(1_500)
         val now = screen.snapshot()
         delay(500)
@@ -100,9 +101,9 @@ class DialogSpillDeviceTest {
             "after: opened=$opened main top=${shell.topTaskId(Display.DEFAULT_DISPLAY)} " +
                 "dialogTask=$dialogTask stillOnMain=$stillThere vd top=${shell.topTaskId(vd)} (before $vdBefore, main before $mainBefore)",
         )
-        // 弹窗还在主屏,用户能接着点确认
+        // The popup is still on the main screen, so the user can go on and tap confirm
         assertTrue("the dialog was moved off the user's screen", stillThere)
-        // Claire 的屏还是原来那一页
+        // Claire's display still shows the same page as before
         assertEquals("Claire's screen changed", vdBefore, shell.topTaskId(vd))
         assertNotNull("the popup was not reported to the model", opened)
         assertEquals(DeviceSupport.TEST_PACKAGE, opened!!.packageName)

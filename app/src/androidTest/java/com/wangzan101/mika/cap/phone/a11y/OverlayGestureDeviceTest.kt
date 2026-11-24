@@ -29,9 +29,11 @@ import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 分别验证正常与取消的注入不会误点浮层,结束后普通点按恢复。
- * 窗口参数传到输入系统是异步的;外层隔离先等系统稳定,嵌套手势不再改参数,
- * 因而这里验证的是隔离与恢复的状态机,不把固定帧数当成生产代码的同步机制。
+ * Verifies separately that normal and cancelled injection do not hit the overlay by mistake, and that ordinary taps are
+ * restored afterwards. Window parameters reach the input system asynchronously; the outer isolation waits for the system
+ * to settle first, and nested gestures no longer change the parameters, so what is verified here is the state machine of
+ * isolation and restoration, and a fixed number of frames is not treated as the production code's synchronization
+ * mechanism.
  */
 @RunWith(AndroidJUnit4::class)
 class OverlayGestureDeviceTest {

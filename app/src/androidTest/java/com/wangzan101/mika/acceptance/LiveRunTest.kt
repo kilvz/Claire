@@ -62,34 +62,50 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 真机验收:用设置里配好的真实模型跑一个任务,只在显式传参时运行,平时整套测试里会被跳过。
+ * Real-device acceptance: run a task with the real model configured in Settings; it runs only when arguments are passed
+ * explicitly and is skipped in the regular test suite.
  *
- * - 配模型(Key 只经参数传入,写进 App 自己的加密存储,不落别处):
- *   `-e liveKey <key> -e liveBaseUrl <url> -e liveModel <model> [-e liveId <id>]`,运行 [configureProvider]。
- * - 切主模型:`-e liveMain <id>`,同样运行 [configureProvider]。
- * - 跑任务:`-e liveGoal <目标> -e liveRun <记录目录名> [-e liveTimeoutSec 600] [-e liveOnTakeover cancel|handback]
- *   [-e livePace fast|standard|human] [-e liveMoveAwayAtStep N] [-e liveCancelAtStep N]`,运行 [runGoal]。经由真实界面:在输入框里写目标、点发送。
- *   liveCancelAtStep:到第 N 步时像点停止键一样停掉任务,再等停止后的交代记进对话(写进 result.txt 的 summary)。
- *   `-e liveKeepCheckSec N`:任务结束后看有没有留在后台运行的那一页(web_keep_open),有就隔 N 秒读两次页面里的媒体播放进度
- *   (video/audio 的 currentTime,同源的才读得到)和一个只计数的计时器,写进 result.txt 的 kept*(keptPage、keptMediaAdvanced、
- *   keptTimerAdvanced、keptNotification),再存一张它的画面 kept-frame.png;那一页不关,留着给人看。
- *   livePace:在 App 里操作的节奏 fast / standard / human(缺省 fast,跑得快;不改设置里的),比较快慢时传 standard。
- *   liveMoveAwayAtStep:到第 N 步时把虚拟屏上的 App 挪到主屏(模拟用户在主屏打开了同一个 App),
- *   记下暂停状态和通知,几秒后像点通知上的「继续」一样恢复。
+ * - Configure a model (the Key only comes in through the arguments and is written into the app's own encrypted storage,
+ *   nowhere else):
+ *   `-e liveKey <key> -e liveBaseUrl <url> -e liveModel <model> [-e liveId <id>]`, runs [configureProvider].
+ * - Switch the main model: `-e liveMain <id>`, which also runs [configureProvider].
+ * - Run a task: `-e liveGoal <goal> -e liveRun <record dir name> [-e liveTimeoutSec 600] [-e liveOnTakeover cancel|handback]
+ *   [-e livePace fast|standard|human] [-e liveMoveAwayAtStep N] [-e liveCancelAtStep N]`, runs [runGoal]. Through the real
+ *   UI: type the goal into the input box and tap send.
+ *   liveCancelAtStep: at step N stop the task as if tapping the stop key, then wait for the wrap-up after the stop to be
+ *   recorded into the conversation (written to the summary in result.txt).
+ *   `-e liveKeepCheckSec N`: after the task ends, check whether a page was left running in the background (web_keep_open);
+ *   if so, read the page's media playback progress twice, N seconds apart
+ *   (the currentTime of video/audio, readable only for same-origin content) plus a counter-only timer, and write them into
+ *   result.txt's kept* (keptPage, keptMediaAdvanced, keptTimerAdvanced, keptNotification); then save a picture of it as
+ *   kept-frame.png; that page is not closed but kept for a human to look at.
+ *   livePace: the pace of operating inside the app, fast / standard / human (defaults to fast, which runs quickly; it does
+ *   not change the one in Settings); pass standard when comparing speeds.
+ *   liveMoveAwayAtStep: at step N move the app on the virtual display to the main screen (simulating the user opening the
+ *   same app on the main screen), record the paused state and the notification, and a few seconds later resume as if
+ *   tapping "Resume" on the notification.
  *
- * - 在浏览器页上问:`-e liveUrl <网址> -e liveGoal <问题> -e liveRun <记录目录名> [-e liveTimeoutSec 600] [-e liveDesktop true]
- *   [-e liveNew true] [-e liveTouchAtStep N -e liveResumeAfterSec S] [-e liveOnTakeover cancel|handback]`,运行 [runPageAsk]。
- *   经由真实界面:侧栏进浏览器,打开网址(liveDesktop 时换成电脑版),等页面加载完,在网页底下「问问 Claire」里写问题、点发送
- *   (liveNew 时先点「新对话」),这一页借给那个任务。liveTouchAtStep:到第 N 步时经窗口在网页上用手指往上划一下
- *   (和真人一样经 PageFrame,不点到链接),记下有没有暂停、横幅和小卡片出没出来,等 S 秒(缺省 5)后点横幅上的「继续」,记下恢复。
- *   不给 liveTouchAtStep 时,任务里因「你在操作」而暂停算失败(Claire 自己的点按、滚动不该让任务暂停),记录照写。
- *   result.txt 在 runGoal 那些之外还有:borrowed(页面借给了任务)、firstToolCalls、urlsOpened(web_navigate 打开过的网址)、
- *   reopenedSameUrl(又打开了这一页,不该有)、userTabUrlAtEnd、pausedByTouch、resumed、pauses(各种暂停的次数)、userPauses、
- *   conversationId、pageOrigin、listedAsWeb(侧栏里这条对话带「网页」小标签)。每一步、暂停、恢复、结束、侧栏各截一张主屏(step-NN.png 等)。
+ * - Ask on a browser page: `-e liveUrl <url> -e liveGoal <question> -e liveRun <record dir name> [-e liveTimeoutSec 600] [-e liveDesktop true]
+ *   [-e liveNew true] [-e liveTouchAtStep N -e liveResumeAfterSec S] [-e liveOnTakeover cancel|handback]`, runs [runPageAsk].
+ *   Through the real UI: go to the browser from the drawer, open the URL (switching to the desktop version when
+ *   liveDesktop), wait for the page to finish loading, type the question into "Ask Claire" at the bottom of the page and
+ *   tap send (tapping "New conversation" first when liveNew); this page is lent to that task. liveTouchAtStep: at step N,
+ *   swipe up on the web page with a finger through the window (through PageFrame like a real person, without hitting any
+ *   link), record whether it paused and whether the banner and the small card appeared, wait S seconds (5 by default), tap
+ *   "Resume" on the banner and record the resume.
+ *   When liveTouchAtStep is not given, a pause of the task because "you are interacting" counts as a failure (Claire's own
+ *   taps and scrolling must not pause the task), and the record is still written.
+ *   Besides the ones in runGoal, result.txt also has: borrowed (the page was lent to the task), firstToolCalls, urlsOpened
+ *   (URLs opened by web_navigate), reopenedSameUrl (this page was opened again, which should not happen), userTabUrlAtEnd,
+ *   pausedByTouch, resumed, pauses (the count of each kind of pause), userPauses, conversationId, pageOrigin, listedAsWeb
+ *   (this conversation carries the "web page" small tag in the drawer). One main-screen screenshot is taken at every step,
+ *   pause, resume, end and drawer (step-NN.png etc.).
  *
- * 记录写到 App 外部文件目录 acceptance/<liveRun>/:log.txt(每步模型说的话、工具调用与结果摘要)、
- * result.txt(模型、目标、结果、步数、用时、最终回答)、虚拟屏每步画面与主屏截图;
- * 传了 `-e liveSettleSec N` 时等至多 N 秒让结局判定和学习做完,学到的写进 learned.txt。
+ * Records are written to the app's external files directory acceptance/<liveRun>/: log.txt (what the model said at each
+ * step, the tool calls and a summary of their results), result.txt (model, goal, outcome, steps, elapsed time, final
+ * answer), the virtual display's frame at every step and main-screen screenshots;
+ * when `-e liveSettleSec N` is passed, wait up to N seconds for the outcome decision and the learning to finish, and what
+ * was learned is written into learned.txt.
  */
 @RunWith(AndroidJUnit4::class)
 class LiveRunTest {
@@ -115,12 +131,12 @@ class LiveRunTest {
             val model = args.getString("liveModel") ?: error("liveModel missing")
             val id = args.getString("liveId") ?: model
             val baseUrl = args.getString("liveBaseUrl") ?: ProviderPresets.all.first().baseUrl
-            // 能力按地址对得上的模板取(和在设置里选模板一样,含提示词缓存的方式)
+            // Take the capabilities from the preset whose address matches (the same as picking a preset in Settings, including the prompt caching mode)
             val preset = ProviderPresets.forBaseUrl(baseUrl) ?: ProviderPresets.all.first()
             store.save(
                 ProviderConfig(
                     id, ProviderConfig.Kind.OpenAiCompat, baseUrl,
-                    // 看图主模型、看图定位已验证:按参数打开(定位验证只在有实测证据时给)
+                    // Vision main model and vision grounding verified: enabled by argument (grounding verification is only given when there is measured evidence)
                     model, preset.capabilities.copy(vision = args.getString("liveVision") == "true",
                         groundingVerified = args.getString("liveGroundingVerified") == "true"), name = id,
                 ),
@@ -129,9 +145,9 @@ class LiveRunTest {
             check(store.apiKey(id) == key) { "key not stored" }
             saved = id
         }
-        // 配置要有用途在用,否则会被当作没人用清掉:没指定主模型时就用刚存的这条
+        // A configuration must be in use, otherwise it is cleaned up as unused: when no main model is given, use the one just saved
         (main ?: saved)?.let { check(store.choose(ModelRole.Main, RoleChoice.Model(it))) { "cannot assign $it" } }
-        // 看图主模型:看图用主模型
+        // Vision main model: use the main model for vision
         if (args.getString("liveVision") == "true") store.choose(ModelRole.Vision, RoleChoice.SameAsMain)
     }
 
@@ -139,7 +155,7 @@ class LiveRunTest {
     fun runGoal() {
         val goal = args.getString("liveGoal")
         assumeTrue(goal != null)
-        // 测试拉起的进程没套上 App 语言,照正常启动把默认语言换成它:内置浏览器按它向网站要页面语言
+        // The process the test launches does not have the app's language applied, so set the default language to it as a normal launch would: the built-in browser asks sites for the page language based on it
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             val ctx = InstrumentationRegistry.getInstrumentation().targetContext
             ctx.getSystemService(android.app.LocaleManager::class.java).applicationLocales
@@ -164,13 +180,13 @@ class LiveRunTest {
         val recorder = Recorder(::note)
         testTasks.modelFactory = { ctx, s -> TaskEnvironment.defaultModelFactory(ctx, s)?.let { recorder.wrap(it) } }
         note("model=${cfg.model} pace=${pace.name.lowercase()} goal=$goal")
-        // 学习在任务结束后的进程级作用域里跑;开局记下那里已有几件常驻的事,收尾时等它回到这个数
+        // Learning runs in a process-level scope after the task ends; record how many resident jobs are already in there at the start, and wait for it to come back to that number at the end
         val memory = MemoryRuntime.of(context)
         val learningJob = memory.scope.coroutineContext[Job]!!
         val resident = learningJob.children.count { it.isActive }
 
         compose.typeAndSend(goal!!)
-        // 发出去就收起键盘:对话页下面的后台屏小画面才露得出来,和真人发完就收键盘一样
+        // Put the keyboard away as soon as it is sent: only then does the background-display thumbnail under the chat page show, just like a real person who puts the keyboard away after sending
         compose.runOnUiThread {
             val w = compose.activity.window
             compose.activity.currentFocus?.clearFocus()
@@ -178,7 +194,7 @@ class LiveRunTest {
         }
         val chat = (context.applicationContext as MikaApp).chat
         chat.ui.value.blocked?.let { error("blocked by prerequisites: $it") }
-        // 发出去了,对话里就有这一问;没有就立刻报,不白等到超时
+        // Once it goes out, this question is in the conversation; if it is not, fail right away instead of waiting for the timeout
         check(chat.ui.value.exchanges.any { it.goal == goal.trim() }) {
             "send did not go out: composer=${chat.ui.value.composer} exchanges=${chat.ui.value.exchanges.size} task=${DeviceTaskState.state.value}"
         }
@@ -234,7 +250,7 @@ class LiveRunTest {
                 note("chat status at end: ${chat.ui.value.exchanges.lastOrNull()?.status}")
                 break
             }
-            // 界面测试的时钟只在测试推它时才走:等的时候一起往前推,对话页的步骤、计时、小画面才会照常刷新(录演示要用)
+            // The UI test clock only advances when the test pushes it: push it forward while waiting so the chat page's step, timer and thumbnail keep refreshing as usual (needed when recording a demo)
             compose.mainClock.advanceTimeBy(250)
             Thread.sleep(250)
         }
@@ -246,7 +262,7 @@ class LiveRunTest {
         Thread.sleep(1500)
         compose.waitForIdle()
         mainShot(dir, "end-main")
-        // 停止后的交代:等它当作这一轮的回答出现在对话页
+        // The wrap-up after the stop: wait for it to appear on the chat page as this round's answer
         val summary = if (end == TaskState.Cancelled) DeviceSupport.pollUntil(30_000) {
             chat.ui.value.exchanges.lastOrNull()?.status?.let { it as? com.wangzan101.mika.chat.ui.ExchangeStatus.Cancelled }?.summary
         }.also {
@@ -265,7 +281,7 @@ class LiveRunTest {
             is TaskState.Failed -> end.reason
             else -> ""
         }
-        // liveSettleSec:等交出之后的结局判定和学习做完,把学到的写进 learned.txt
+        // liveSettleSec: wait for the outcome decision and the learning after handover to finish, and write what was learned into learned.txt
         val settleMs = (args.getString("liveSettleSec")?.toLong() ?: 0) * 1000
         if (settleMs > 0) {
             val settled = DeviceSupport.pollUntil(settleMs) { true.takeIf { learningJob.children.count { it.isActive } <= resident } } != null
@@ -282,8 +298,9 @@ class LiveRunTest {
     }
 
     /**
-     * 任务结束后留在后台的那一页还在不在跑:隔 [seconds] 秒读两次页面里媒体的播放进度和一个只计数的计时器(只为这次验收放进页面,
-     * 不碰页面自己的东西),存一张它那块显示的画面。返回写进 result.txt 的几行。
+     * Whether the page left in the background after the task ended is still running: read the page's media playback
+     * progress and a counter-only timer twice, [seconds] seconds apart (put into the page only for this acceptance run, so
+     * the page's own things are left alone), and save a picture of what it shows. Returns the lines written into result.txt.
      */
     private fun keptPageCheck(seconds: Long, dir: File, note: (String) -> Unit): String {
         val keeper = (context.applicationContext as MikaApp).pageKeeper
@@ -317,7 +334,7 @@ class LiveRunTest {
             File(dir, "kept-frame.png").outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }
         val notified = mikaNotifications().contains(appString(R.string.kept_notif_title))
-        // WebView 只能在主线程上问
+        // A WebView can only be queried on the main thread
         var keptUrl: String? = null
         InstrumentationRegistry.getInstrumentation().runOnMainSync { keptUrl = if (tab.destroyed) null else tab.view.url }
         return "keptPage=${page.host}\nkeptUrl=$keptUrl\nkeptMedia=${before.size}\nkeptMediaAdvanced=$mediaAdvanced\n" +
@@ -346,7 +363,7 @@ class LiveRunTest {
         testTasks.modelFactory = { ctx, s -> TaskEnvironment.defaultModelFactory(ctx, s)?.let { recorder.wrap(it) } }
         note("model=${cfg.model} url=$url goal=$goal")
 
-        // 侧栏进浏览器,打开网址,等页面加载完
+        // Go to the browser from the drawer, open the URL and wait for the page to finish loading
         compose.onNodeWithContentDescription(appString(R.string.chat_menu)).performClick()
         compose.awaitOne(appString(R.string.drawer_browser)).performClick()
         compose.waitForIdle()
@@ -387,7 +404,7 @@ class LiveRunTest {
         var pausedByTouch = false
         var resumed = false
         var end: TaskState? = null
-        // 暂停按状态流里出现过的每一个算(轮询会漏掉短暂的暂停,也会漏掉触摸后到恢复前测试自己等着的那段)
+        // Count every pause that appeared in the state flow (polling would miss brief pauses, and also the stretch the test itself waits through between a touch and the resume)
         val seen = java.util.Collections.synchronizedList(mutableListOf<TaskState>())
         val watch = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
             var prev: TaskState? = null
@@ -460,8 +477,9 @@ class LiveRunTest {
         val origin = app.conversations.pageOrigin(conversationId)
         val urls = recorder.toolCalls.filter { it.first == "web_navigate" }.mapNotNull { Regex("\"url\"\\s*:\\s*\"([^\"]+)\"").find(it.second)?.groupValues?.get(1) }
         val reopened = urls.any { PageConversations.pageKey(it) == PageConversations.pageKey(url!!) }
-        // 回到对话页、打开侧栏:这条对话带「网页」小标签。先收起通知栏和悬浮通知(盖在上面截不到侧栏);
-        // 界面测试的时钟要推着走,侧栏滑出来的动画才会走完
+        // Go back to the chat page and open the drawer: this conversation carries the "web page" small tag. Collapse the
+        // notification shade and heads-up notifications first (they cover it and the drawer cannot be captured);
+        // the UI test clock has to be pushed along for the drawer's slide-out animation to finish
         fun menuShown() = compose.onAllNodesWithContentDescription(appString(R.string.chat_menu)).fetchSemanticsNodes().isNotEmpty()
         for (i in 0 until 8) {
             if (menuShown()) break
@@ -510,12 +528,12 @@ class LiveRunTest {
                 "conversationId=$conversationId\npageOrigin=${origin?.let { "${it.host} ${it.url} ${it.title}" }}\nlistedAsWeb=$listedAsWeb\n" +
                 "answer=$answer\n",
         )
-        // Claire 自己的点按、滚动不该让任务以为用户在操作
+        // Claire's own taps and scrolling must not make the task think the user is interacting
         if (touchAt <= 0) check(userPauses == 0) { "the run paused as if the user touched the page ($userPauses times) though nobody did" }
         else check(pausedByTouch && resumed) { "touch at step $touchAt: paused=$pausedByTouch resumed=$resumed" }
     }
 
-    /** 在浏览器页的网页上经窗口用手指往上划一小段(网页上半截,面板盖不到;划动不会点到链接);返回划在哪。 */
+    /** Swipes up a short distance with a finger on the web page inside the browser page through the window (the upper half of the page, which the panel does not cover; the swipe does not hit links); returns where it swiped. */
     private fun swipeOnPage(): String {
         val instr = InstrumentationRegistry.getInstrumentation()
         var at: IntArray? = null
@@ -546,7 +564,7 @@ class LiveRunTest {
         return "x=$x y=$y0"
     }
 
-    /** 此刻学到的全部:个人技能(在用与草稿)、App 知识的各份补充、记住的路线条数。 */
+    /** Everything learned so far: personal skills (in use and drafts), each addition to the app knowledge, and the number of remembered routes. */
     private fun learned(memory: MemoryRuntime): String = buildString {
         val skills = memory.skills()
         skills.list().forEach { appendLine("skill ${it.name} status=${it.status} outcomes=${it.outcomes}\n${it.markdown}\n") }
@@ -555,7 +573,7 @@ class LiveRunTest {
         appendLine("routes=${(context.applicationContext as MikaApp).routes.count()}")
     }
 
-    /** Claire 当前通知的标题、正文和按钮(从 dumpsys notification 里摘)。 */
+    /** The titles, texts and buttons of Claire's current notifications (extracted from dumpsys notification). */
     private fun mikaNotifications(): String = sh("dumpsys notification --noredact")
         .split("NotificationRecord(").drop(1).filter { "pkg=com.wangzan101.mika " in it }
         .joinToString(" || ") { rec ->
@@ -575,12 +593,12 @@ class LiveRunTest {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 80, it) }
     }
 
-    /** 只记录,不改动:真实模型的每次回复和上一步的工具结果写进日志。 */
+    /** Records only, changes nothing: every reply of the real model and the previous step's tool results go into the log. */
     private class Recorder(private val note: (String) -> Unit) {
         @Volatile var calls = 0
         @Volatile var inTokens = 0
         @Volatile var outTokens = 0
-        /** 模型调过的工具(名字, 参数),按先后。 */
+        /** Tools the model called (name, arguments), in the order they were called. */
         val toolCalls: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
 
         fun wrap(inner: ChatModel) = object : ChatModel {

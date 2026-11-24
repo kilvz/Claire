@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 import com.wangzan101.mika.ui.awaitOne
 import com.wangzan101.mika.ui.clickInDialog
 
-/** 设置页「网站登录」:列表、单站退出(带「可能仍在」提示)、全部退出要二次确认。 */
+/** The Settings page's "Website logins": the list, signing out of a single site (with a "may still be there" hint), and signing out of everything requires a second confirmation. */
 @RunWith(AndroidJUnit4::class)
 class WebSitesSectionTest {
     @get:Rule(order = Int.MIN_VALUE) val chinese = ChineseUi()

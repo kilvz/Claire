@@ -29,7 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import com.wangzan101.mika.a11y.MikaAccessibilityService
 
-/** 真机测试:需要内置助手在运行(已配对、无线调试开着),且 Claire 无障碍服务已开启。 */
+/** Real-device test: requires the built-in helper to be running (paired, wireless debugging on) and Claire's accessibility service to be enabled. */
 @RunWith(AndroidJUnit4::class)
 class A11yOnDisplayTest {
     companion object {
@@ -53,8 +53,9 @@ class A11yOnDisplayTest {
         }
 
         /**
-         * 启动测试时系统会强停本 App,无障碍服务随之被记为「已崩溃」、不再自动重绑。
-         * 已开启时把它从开启列表里摘下再放回,促使系统重新绑定到当前进程;没开启就不动。
+         * When the test starts, the system force-stops this app, so the accessibility service is recorded as "crashed" and
+         * is no longer rebound automatically. If it is enabled, take it out of the enabled list and put it back so the
+         * system rebinds it to the current process; if it is not enabled, leave it alone.
          */
         private fun rebindAccessibility() {
             if (ScreenAccessibility.instance.value != null) return
@@ -66,13 +67,13 @@ class A11yOnDisplayTest {
                 shellCommand("settings put secure $key ${enabled.filter { it != mika }.joinToString(":").ifEmpty { "\"\"" }}")
                 Thread.sleep(500)
             } finally {
-                // 无论如何恢复原来的完整列表(含其他 App 的服务)
+                // Restore the original full list in any case (including other apps' services)
                 shellCommand("settings put secure $key ${enabled.joinToString(":")}")
             }
         }
 
         private fun shellCommand(cmd: String): String {
-            // 不压制其他无障碍服务,否则 Claire 的服务会在测试期间被暂停
+            // Do not suppress other accessibility services, otherwise Claire's service is paused during the test
             val ua = InstrumentationRegistry.getInstrumentation()
                 .getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             val pfd = ua.executeShellCommand(cmd)
@@ -115,7 +116,7 @@ class A11yOnDisplayTest {
             }
         }
         assertNotNull("no WLAN/设置 node in windows on display ${d.displayId}", found)
-        // 主屏的窗口不会混进虚拟屏的列表
+        // Main-screen windows must not leak into the virtual display's list
         assertTrue(a11y.windowsOn(d.displayId).none { it.displayId != d.displayId })
     }
 
@@ -129,13 +130,13 @@ class A11yOnDisplayTest {
         val a11y = service()
         val mainTop = shell.topTaskId(Display.DEFAULT_DISPLAY)
         val d = settingsOnNewDisplay()
-        // 等页面出现可点击的列表项
+        // Wait for a clickable list item to appear on the page
         val item = pollUntil(5_000) { clickableItem(a11y, d.displayId) }
         assertNotNull("no clickable item on display ${d.displayId}", item)
         val before = stableFrame(d)
 
         val eventDisplays = async(start = CoroutineStart.UNDISPATCHED) {
-            // 收集一段时间内的全部事件,用于检查不会混入主屏事件
+            // Collect all events within a time window, to check that no main-screen events get mixed in
             val got = mutableListOf<AccessibilityEvent>()
             withTimeoutOrNull(3_000) { a11y.eventsFor(d.displayId).collect { got += it } }
             got
@@ -156,7 +157,7 @@ class A11yOnDisplayTest {
         assertEquals("main screen top task changed", mainTop, shell.topTaskId(Display.DEFAULT_DISPLAY))
     }
 
-    /** 第一个可点击的条目在屏上的中心点。 */
+    /** Center point on screen of the first clickable item. */
     private fun clickableItem(a11y: ScreenAccessibility, displayId: Int): Pair<Int, Int>? {
         val rect = android.graphics.Rect()
         for (w in a11y.windowsOn(displayId)) {
@@ -165,7 +166,7 @@ class A11yOnDisplayTest {
             while (queue.isNotEmpty()) {
                 val n = queue.removeFirst()
                 n.getBoundsInScreen(rect)
-                // 跳过顶部标题栏一带,点中间偏下的列表项
+                // Skip the title bar area at the top and tap a list item a little below the middle
                 if (n.isClickable && n.isVisibleToUser && rect.top > 300 && rect.height() in 40..400) {
                     return rect.centerX() to rect.centerY()
                 }

@@ -19,7 +19,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 真机测试:不重要节点能读到、焦点变化算变化、提示语有标记、输入控件被换掉后仍能核实。 */
+/** Real-device test: unimportant nodes are readable, a focus change counts as a change, hint text is marked, and the read-back still verifies after the input control is replaced. */
 @RunWith(AndroidJUnit4::class)
 class ScreenAccuracyTest {
     private val agent = DeviceSupport.newAgent()
@@ -117,11 +117,11 @@ class ScreenAccuracyTest {
             ActionResult.Failed("not_editable", "If this is a visible input box, give its point instead."),
             screen.typeText(s.named("7").ref, s.snapshotId, "咖啡"),
         )
-        // 没有点下去:结果仍是 0
+        // Nothing was tapped: the result is still 0
         assertTrue(screen.snapshot().elements.any { it.name == "0" })
     }
 
-    /** scroll down 要看到更下面的内容:设置首页原来最下面那一项往上挪(或出现了原来没有的项)。 */
+    /** scroll down has to reveal content further down: the item that used to be at the bottom of the Settings home page moves up (or an item that was not there before appears). */
     @Test
     fun scrollDownShowsContentFurtherDown() = runBlocking<Unit> {
         ok(screen.openApp(DeviceSupport.SETTINGS, cold = true))
@@ -137,7 +137,7 @@ class ScreenAccuracyTest {
         assertTrue("content did not move up: new=$newNames", newNames.isNotEmpty() && (wlan == null || wlan.centerY < wlanBefore.centerY))
     }
 
-    /** 系统计算器(按 AOSP 的计算器类别找,没有就跳过):按数字后读得到显示区的值。只在虚拟屏上用。 */
+    /** The system calculator (found by the AOSP calculator category, skipped when absent): after pressing digits, the value in the display area is readable. Only used on the virtual display. */
     @Test
     fun calculatorDisplayIsRead() = runBlocking<Unit> {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
@@ -146,7 +146,7 @@ class ScreenAccuracyTest {
         assumeTrue("no calculator app", pkg != null)
         ok(screen.openApp(pkg!!, cold = true))
         var s = snapUntil(8_000) { snap -> snap.elements.any { it.clickable && it.name == "1" } }
-        // 计算器会保留上次的输入,只要求按完后出现一个以 123 结尾、之前没有的显示值
+        // The calculator keeps the previous input, so it only requires that after the presses a display value ending in 123 appears that was not there before
         val before = s.elements.map { it.name }.toSet()
         for (digit in listOf("1", "2", "3")) {
             val key = s.elements.first { it.clickable && it.name == digit }
@@ -154,7 +154,7 @@ class ScreenAccuracyTest {
             assertEquals("tap $digit", true, r.changed)
             s = screen.snapshot()
         }
-        // 显示区可能带千分位等格式,只比数字
+        // The display area may use thousands separators and other formatting, so compare the digits only
         snapUntil { snap -> snap.elements.any { e -> e.name !in before && e.name.filter(Char::isDigit).endsWith("123") } }
     }
 }
