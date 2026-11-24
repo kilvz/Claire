@@ -6,10 +6,13 @@ import com.wangzan101.mika.core.screen.uistate.ElementLocator
 import com.wangzan101.mika.core.screen.uistate.UiElement
 import java.util.UUID
 
-/** 手机读屏的 snapshotId:手机的前缀加随机串(看编号就知道是手机的,和网页的分得开)。 */
+/**
+ * snapshotId for phone screen reading: the phone prefix plus a random string (the ID alone tells it is the
+ * phone, distinguishable from web pages).
+ */
 internal fun snapshotId(): String = PHONE_SNAPSHOT_PREFIX + UUID.randomUUID()
 
-/** 快照里的一个元素:交给模型的 [element]、认元素用的 [locator]、可直接操作的 [node]。 */
+/** One element in a snapshot: the [element] handed to the model, the [locator] used to identify it, the [node] that can be acted on directly. */
 internal class NodeEntry(val element: UiElement, val locator: ElementLocator, val node: AccessibilityNodeInfo)
 
 internal class NodeSnapshot(val id: String, val entries: List<NodeEntry>) {
@@ -17,8 +20,9 @@ internal class NodeSnapshot(val id: String, val entries: List<NodeEntry>) {
 }
 
 /**
- * 编号登记表:每次快照重新编号(@e1 起),只认最近几次快照的编号。
- * 最新快照的编号可以直接用;更早的快照只拿来按原元素特征重新定位。
+ * Number registry: numbering restarts on every snapshot (from @e1), and only the numbers of the most recent few
+ * snapshots are recognized. Numbers of the latest snapshot can be used directly; older snapshots are only used to
+ * relocate an element by its original features.
  */
 internal class NodeIds(private val keep: Int = 4) {
     sealed interface Lookup {

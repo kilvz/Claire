@@ -25,7 +25,10 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** Claire 的无障碍服务:操作和事件转给当前已连接实例,任务持有旧实例时也能在重连后恢复。 */
+/**
+ * Claire's accessibility service: actions and events are forwarded to the currently connected instance, so a
+ * task holding an old instance can recover after a reconnect.
+ */
 open class ScreenAccessibility : AccessibilityService() {
 
     private class DisplayEvent(val displayId: Int, val event: AccessibilityEvent)
@@ -33,8 +36,9 @@ open class ScreenAccessibility : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // 不少 App 把显示结果的文字控件标成「对无障碍不重要」,不读它们就看不到结果;配置文件里已声明,
-        // 这里再按运行时补一次,防止系统沿用旧的服务配置
+        // Many apps mark the text views that display results as "not important for accessibility"; without reading
+        // them the result cannot be seen. It is already declared in the config file, and is added again at runtime
+        // here so the system cannot keep using an old service config
         serviceInfo?.let { info ->
             if (info.flags and AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS == 0) {
                 info.flags = info.flags or AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -42,7 +46,8 @@ open class ScreenAccessibility : AccessibilityService() {
             }
         }
         _instance.value = this
-        // 配对时读码、引导页打勾都看它;连上和断开各记一句,排查「明明开着却当没开」
+        // Pairing code reading and onboarding check-offs both rely on it; log one line on connect and one on
+        // disconnect, to diagnose "clearly on but treated as off"
         Log.i(TAG, "accessibility service connected")
     }
 
@@ -65,12 +70,16 @@ open class ScreenAccessibility : AccessibilityService() {
 
     private var overlayHost: OverlayHost? = null
 
-    /** 在用户屏幕上画浮层用的宿主(只在主线程用);服务断开时它加的窗口一起拆掉。 */
+    /**
+     * Host used to draw overlays on the user's screen (main thread only); when the service disconnects, the
+     * windows it added are torn down with it.
+     */
     fun overlays(): OverlayHost = overlayHost ?: OverlayHost(this).also { overlayHost = it }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (instance.value !== this) return
-        // 只数主屏上的用户交互,不留文字等内容;回锁义务据此判断用户有没有接着用手机
+        // Count only user interactions on the main screen, keeping no text or other content; the re-lock obligation
+        // uses this to judge whether the user is still using the phone
         if (event.eventType in MAIN_INTERACTIONS && displayOf(event) == Display.DEFAULT_DISPLAY) mainInteractions.incrementAndGet()
         if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) windowChanges.tryEmit(Unit)
         if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED || event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -97,20 +106,20 @@ open class ScreenAccessibility : AccessibilityService() {
             val text = listOfNotNull(title, body).joinToString(" ").ifBlank { event.text.joinToString(" ") }
             notifications.tryEmit(ScreenEvent("notification", event.packageName?.toString(), text.take(2_000)))
         }
-        // 没人订阅就不复制、不查屏号,事件很密
+        // With no subscribers, do not copy and do not look up the display id; events are very frequent
         if (events.subscriptionCount.value == 0) return
         val displayId = displayOf(event)
         if (displayId == Display.INVALID_DISPLAY) return
-        // API 33 以下系统会在回调返回后回收事件对象,订阅方异步读取前先复制一份
+        // Below API 33 the system recycles the event object after the callback returns, so copy it before subscribers read it asynchronously
         events.tryEmit(DisplayEvent(displayId, AccessibilityEvent(event)))
     }
 
     override fun onInterrupt() = Unit
 
-    /** 指定屏上的窗口;该屏没有窗口(或不存在)时为空列表。 */
+    /** Windows on the given display; an empty list when that display has no windows (or does not exist). */
     fun windowsOn(displayId: Int): List<AccessibilityWindowInfo> {
         val service = instance.value ?: return emptyList()
-        // getWindowsOnAllDisplays 是安卓 11 起才有的;更早的系统只有主屏那一份 getWindows。
+        // getWindowsOnAllDisplays exists only from Android 11; older systems only have getWindows for the main display.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return service.windowsOnAllDisplays[displayId].orEmpty()
         if (displayId != Display.DEFAULT_DISPLAY) return emptyList()
         @Suppress("DEPRECATION")
@@ -118,7 +127,10 @@ open class ScreenAccessibility : AccessibilityService() {
         return main.orEmpty()
     }
 
-    /** 在指定屏上沿 [path] 做一次单指手势;完成返回 true,被取消或无法下发返回 false。 */
+    /**
+     * Performs one single-finger gesture along [path] on the given display; returns true when completed, false
+     * when cancelled or when it cannot be dispatched.
+     */
     suspend fun gesture(displayId: Int, path: Path, durationMs: Long): Boolean {
         return gesture(displayId, listOf(path), durationMs)
     }
@@ -126,7 +138,7 @@ open class ScreenAccessibility : AccessibilityService() {
     suspend fun gesture(displayId: Int, paths: List<Path>, durationMs: Long): Boolean =
         dispatch(displayId, paths.map { GestureDescription.StrokeDescription(it, 0, durationMs.coerceAtLeast(1)) })
 
-    /** 在同一点上连点 [count] 下(一次手势里先后几笔):每下按住 [holdMs],两下之间隔 [gapMs]。 */
+    /** Taps [count] times at the same point (several strokes in one gesture): each press lasts [holdMs], with [gapMs] between presses. */
     suspend fun taps(displayId: Int, x: Float, y: Float, count: Int, holdMs: Long, gapMs: Long): Boolean {
         val at = Path().apply { moveTo(x, y) }
         return dispatch(displayId, (0 until count).map { i -> GestureDescription.StrokeDescription(at, i * (holdMs + gapMs), holdMs.coerceAtLeast(1)) })
@@ -150,11 +162,11 @@ open class ScreenAccessibility : AccessibilityService() {
             }
             if (!service.dispatchGesture(gesture, callback, null) && cont.isActive) cont.resume(false)
         }
-        // 注入是在用户屏幕上操作别的 App,不是操作 Claire 自己的浮层;所有单点、双击和拖动统一隔离
+        // Injecting operates other apps on the user's screen, not Claire's own overlays; all taps, double taps and drags are isolated uniformly
         return service.overlayHost?.passInjectedGesturesThrough { send() } ?: send()
     }
 
-    /** 截一张用户屏幕(主屏)的结果:画面,或屏上有防截屏窗口,或截不到(错误码)。 */
+    /** Result of taking one screenshot of the user's screen (the main screen): the picture, or a secure window on screen, or failure (error code). */
     sealed interface MainShot {
         class Ok(val bitmap: Bitmap) : MainShot
         data object Secure : MainShot
@@ -162,8 +174,10 @@ open class ScreenAccessibility : AccessibilityService() {
     }
 
     /**
-     * 截一张主屏(用户看着的那块屏,包括 Claire 自己的浮层:要不要藏起来由调用方定)。系统限制两次截图至少隔一会儿,
-     * 太快时等一秒再截一次。画面是软件位图(可以读像素、编码)。
+     * Takes one screenshot of the main screen (the screen the user is looking at, including Claire's own overlays:
+     * whether to hide them is up to the caller). The system requires a minimum interval between screenshots, so when
+     * taken too fast it waits one second and takes another. The picture is a software bitmap (pixels can be read,
+     * encoded).
      */
     suspend fun takeMainScreenshot(): MainShot {
         val first = screenshotOnce()
@@ -178,7 +192,7 @@ open class ScreenAccessibility : AccessibilityService() {
             cont.resume(MainShot.Failed(ERROR_TAKE_SCREENSHOT_NO_ACCESSIBILITY_ACCESS))
             return@suspendCancellableCoroutine
         }
-        // takeScreenshot 是安卓 11 起才有的;更早的系统当作截不到,不让胶囊的截屏路径崩掉。
+        // takeScreenshot exists only from Android 11; older systems treat it as unattainable, so the capsule's screenshot path does not crash.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             cont.resume(MainShot.Failed(ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR))
             return@suspendCancellableCoroutine
@@ -195,7 +209,8 @@ open class ScreenAccessibility : AccessibilityService() {
             }
 
             override fun onFailure(errorCode: Int) {
-                // 屏上有防截屏窗口:安卓 14 起有专门的错误码;更早的系统截出来是黑的,由调用方看画面判断
+                // A secure window is on screen: from Android 14 there is a dedicated error code; older systems
+                // return a black picture and the caller judges by the image
                 val secure = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && errorCode == ERROR_TAKE_SCREENSHOT_SECURE_WINDOW
                 if (cont.isActive) cont.resume(if (secure) MainShot.Secure else MainShot.Failed(errorCode))
             }
@@ -203,25 +218,27 @@ open class ScreenAccessibility : AccessibilityService() {
     }
 
     /**
-     * 发生在指定屏上的无障碍事件。通道跨实例保留,只有当前连接的服务发布事件。
+     * Accessibility events that happen on the given display. The channel is kept across instances; only the currently
+     * connected service publishes events.
      */
     fun eventsFor(displayId: Int): Flow<AccessibilityEvent> =
         events.filter { it.displayId == displayId }.map { it.event }
 
     fun notificationEvents(): Flow<ScreenEvent> = notifications
 
-    /** 窗口变了的信号(见 [windowChanges]);通道跨服务实例保留。 */
+    /** Signal that windows changed (see [windowChanges]); the channel is kept across service instances. */
     fun windowChanges(): Flow<Unit> = windowChanges
 
     /**
-     * 事件所在的屏。API 33 起事件自带屏号;更早的系统按事件的窗口号去各屏窗口里找,
-     * 找不到(如没有窗口号的通知类事件)就丢弃。
+     * The display the event happened on. From API 33 events carry their display id; older systems look the event's
+     * window id up among the windows of each display, and drop it when not found (e.g. notification-type events with no
+     * window id).
      */
     private fun displayOf(event: AccessibilityEvent): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return event.displayId
         val windowId = event.windowId
         if (windowId == -1) return Display.INVALID_DISPLAY
-        // 安卓 11 起才有「各屏的窗口」;更早的系统只有主屏一份,只在主屏里找。
+        // "Windows on each display" exists only from Android 11; older systems have only the main display's copy, so look only there.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             @Suppress("DEPRECATION")
             val main = windows
@@ -236,23 +253,33 @@ open class ScreenAccessibility : AccessibilityService() {
 
     companion object {
         private const val EVENT_BUFFER = 64
-        /** 两次截图之间系统要求的间隔(安卓原版是一秒)。 */
+        /** Minimum interval the system requires between two screenshots (one second on stock Android). */
         private const val SCREENSHOT_INTERVAL_MS = 1_000L
 
-        // 保持热流:调用方用 UNDISPATCHED 先订阅再操作,不要因服务切换引入异步订阅窗口。
-        // 事件只作观察用,订阅方处理不过来时丢最旧的,不阻塞系统回调
+        // Keep the flow hot: callers subscribe with UNDISPATCHED before acting, so a service switch must not
+        // introduce an asynchronous subscription window.
+        // Events are observation only; when subscribers cannot keep up, drop the oldest and never block the system callback
         private val events = MutableSharedFlow<DisplayEvent>(
             extraBufferCapacity = EVENT_BUFFER,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
-        /** 窗口变了(加上、拿掉、挪动,包括输入法弹出收起):只是个信号,订阅方自己去读窗口。 */
+        /**
+         * Windows changed (added, removed, moved, including the input method appearing and disappearing): just
+         * a signal, subscribers read the windows themselves.
+         */
         private val windowChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         private val windowGeneration = java.util.concurrent.atomic.AtomicLong()
 
-        /** 窗口每加上、拿掉、换页一次就加一(任何屏上的都算);只用来判断「窗口自上次以来变没变」,值本身没有含义。 */
+        /**
+         * Incremented every time a window is added, removed or changes page (on any display); only used to tell
+         * "did windows change since last time", the value itself has no meaning.
+         */
         fun windowGeneration(): Long = windowGeneration.get()
 
-        /** 主屏上用户动过手的次数(点击、长按、滚动、改字、触摸开始);不留事件内容,只数次数。 */
+        /**
+         * How many times the user interacted on the main screen (click, long click, scroll, text change, touch
+         * start); no event content is kept, only the count.
+         */
         private val mainInteractions = java.util.concurrent.atomic.AtomicLong()
         private val MAIN_INTERACTIONS = setOf(
             AccessibilityEvent.TYPE_VIEW_CLICKED, AccessibilityEvent.TYPE_VIEW_LONG_CLICKED,
@@ -260,7 +287,10 @@ open class ScreenAccessibility : AccessibilityService() {
             AccessibilityEvent.TYPE_TOUCH_INTERACTION_START,
         )
 
-        /** 主屏交互的当前计数;只用来判断「自上次以来用户动没动过主屏」,值本身没有含义。 */
+        /**
+         * Current main-screen interaction count; only used to tell "did the user interact with the main screen
+         * since last time", the value itself has no meaning.
+         */
         fun mainInteractionCount(): Long = mainInteractions.get()
         private val notifications = MutableSharedFlow<ScreenEvent>(
             extraBufferCapacity = EVENT_BUFFER,
@@ -269,7 +299,7 @@ open class ScreenAccessibility : AccessibilityService() {
 
         private const val TAG = "MikaA11y"
         private val _instance = MutableStateFlow<ScreenAccessibility?>(null)
-        /** 已连接的服务实例;服务未开启或已断开时为 null。 */
+        /** The connected service instance; null while the service is disabled or has disconnected. */
         val instance: StateFlow<ScreenAccessibility?> = _instance.asStateFlow()
     }
 }

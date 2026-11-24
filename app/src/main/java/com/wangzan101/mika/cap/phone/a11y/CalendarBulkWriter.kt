@@ -12,8 +12,9 @@ import com.wangzan101.mika.core.screen.uistate.SystemActionResult
 import java.util.TimeZone
 
 /**
- * 用安卓公开的 CalendarContract 在 App 进程里写日程。只选系统报告的可见、可写日历，
- * 不读已有日程；不弹权限框，也不使用 shell 或厂商接口。所有操作一次 applyBatch 提交。
+ * Writes calendar events inside the app process using Android's public CalendarContract. Selects only the
+ * visible, writable calendars the system reports; does not read existing events; shows no permission dialog
+ * and uses neither shell nor vendor APIs. All operations are submitted in one applyBatch.
  */
 internal object CalendarBulkWriter {
     fun insert(context: Context, events: List<SystemAction.AddCalendarEvent>): SystemActionResult {
@@ -49,7 +50,8 @@ internal object CalendarBulkWriter {
         val uris = try {
             resolver.applyBatch(CalendarContract.AUTHORITY, ArrayList(operations)).map { it.uri?.toString() }
         } catch (_: Exception) {
-            // 提供方可能已提交前几条；这里既不能报零写入，也不能让上层自动重写整批。
+            // The provider may already have committed the first few rows; we can neither report zero writes
+            // here nor let the caller automatically rewrite the whole batch.
             return failed("calendar_write_unconfirmed")
         }
         if (uris.size != events.size || uris.any { it == null || !validEventUri(it) }) {

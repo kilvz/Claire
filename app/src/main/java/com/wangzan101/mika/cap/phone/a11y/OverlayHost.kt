@@ -50,21 +50,30 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 浮层窗口摆在哪:[gravity] 用 [android.view.Gravity] 的组合,[x]/[y] 是离那条边的像素。
- * 坐标按整块屏幕算(包括状态栏、刘海和底部手势条那几条),要避开哪里由调用方按 [OverlayArea] 定。
+ * Where an overlay window sits: [gravity] is a combination of [android.view.Gravity], [x]/[y] are pixels from that
+ * edge.
+ * Coordinates are relative to the whole screen (including the status bar, notch and bottom gesture bar strips); what
+ * to avoid is decided by the caller via [OverlayArea].
  */
 data class OverlayPlacement(val gravity: Int, val x: Int = 0, val y: Int = 0)
 
-/** 此刻屏幕(按当前方向)的宽高,和四边被状态栏、刘海、导航栏或手势条占掉的像素。 */
+/**
+ * Width and height of the screen right now (in the current orientation), and the pixels taken on each side by
+ * the status bar, notch, navigation bar or gesture bar.
+ */
 data class OverlayArea(
     val width: Int, val height: Int,
     val insetLeft: Int = 0, val insetTop: Int = 0, val insetRight: Int = 0, val insetBottom: Int = 0,
 )
 
 /**
- * 拖动窗口:手指按下后移过系统的触摸阈值才算拖动,这时窗口里正按着的按钮收到取消,不会再当成点按。
- * 可以只让窗口里的一块(把手,见 [OverlayWindow.draggable])能拖,别处的滑动照常交给里面的内容(例如滚动)。
- * [move]/[end] 给的是手指自按下以来在屏幕上移了多少像素(按屏幕坐标算,窗口跟着手指动也不会抖)。
+ * Dragging a window: it only counts as a drag once the finger has moved past the system's touch slop after going
+ * down, at which point the button currently pressed inside the window receives a cancel and is no longer treated as
+ * a tap.
+ * Only one part of the window (the handle, see [OverlayWindow.draggable]) can be made draggable; swipes elsewhere
+ * still go to the content inside (for example scrolling).
+ * [move]/[end] give how many pixels the finger has moved on the screen since going down (in screen coordinates, so
+ * the window does not jitter while following the finger).
  */
 interface OverlayDrag {
     fun start()
@@ -73,20 +82,25 @@ interface OverlayDrag {
 }
 
 /**
- * 长按:手指按下后不动(没移过触摸阈值)满 holdMs 才算长按,先移过阈值就是拖,之后不再算长按(见 [HoldGesture])。
- * 长按开始后窗口不跟着拖,手指在屏幕上的位置(屏幕坐标)交给这里;窗口里正按着的按钮这时收到取消,单击不再成立。
+ * Long press: it only counts once the finger stays still (has not passed the touch slop) for holdMs after going
+ * down; passing the slop first makes it a drag, and it never counts as a long press afterwards (see [HoldGesture]).
+ * Once the long press starts the window does not follow the drag; the finger's position on the screen (screen
+ * coordinates) is handed to this interface; the button currently pressed inside the window then receives a cancel and
+ * a single click no longer holds.
  */
 interface OverlayHold {
     fun start(rawX: Float, rawY: Float)
     fun move(rawX: Float, rawY: Float)
     fun end(rawX: Float, rawY: Float)
-    /** 系统把这串触摸收走了(例如窗口被拆、来电):这次长按不算数。 */
+    /** The system took this touch stream away (e.g. the window was torn down, an incoming call): this long press does not count. */
     fun cancel()
 }
 
 /**
- * 一串触摸算点按、拖动还是长按(纯逻辑,时钟由调用方管):[down] 后先是 [Kind.Tap](还可能是点按);
- * 手指离按下处超过 [slopPx] 就是 [Kind.Drag];还是 Tap 时到点([timeout])就是 [Kind.Hold]。定下拖或长按后不再变,下一次 [down] 重来。
+ * Whether one touch stream is a tap, a drag or a long press (pure logic, the caller manages the clock): after [down]
+ * it starts as [Kind.Tap] (still possibly a tap); once the finger is more than [slopPx] from where it went down it is
+ * [Kind.Drag]; while still Tap, reaching the time limit ([timeout]) makes it [Kind.Hold]. Once a drag or long press is
+ * decided it never changes, and the next [down] starts over.
  */
 class HoldGesture(private val slopPx: Float) {
     enum class Kind { Tap, Drag, Hold }
@@ -99,7 +113,7 @@ class HoldGesture(private val slopPx: Float) {
         return kind
     }
 
-    /** 手指此刻离按下处 [dist] 像素。 */
+    /** How many pixels the finger currently is from where it went down ([dist]). */
     fun move(dist: Float): Kind {
         if (kind == Kind.Tap && dist > slopPx) kind = Kind.Drag
         return kind
@@ -112,10 +126,13 @@ class HoldGesture(private val slopPx: Float) {
 }
 
 /**
- * 借无障碍服务在用户的屏幕(主屏)上画浮层:窗口类型是无障碍浮层,不需要「显示在其他应用上层」权限。
- * 只管机制:加窗口、换位置、拖动、切换能不能接收键盘、拆窗口;画什么由调用方给的 Compose 内容决定。
- * 窗口只有内容那么大,内容以外的地方照常交给下面的 App。
- * 服务断开时由 [ScreenAccessibility] 调 [closeAll],窗口跟着拆掉。只在主线程用。
+ * Draws overlays on the user's screen (the main screen) through the accessibility service: the window type is an
+ * accessibility overlay, so no "display over other apps" permission is needed.
+ * Handles mechanism only: adding windows, moving them, dragging, toggling whether they can receive the keyboard,
+ * tearing them down; what is drawn is up to the Compose content the caller provides.
+ * A window is only as large as its content; places outside the content go to the app underneath as usual.
+ * When the service disconnects, [ScreenAccessibility] calls [closeAll] and the windows are torn down with it. Main
+ * thread only.
  */
 class OverlayHost internal constructor(private val service: ScreenAccessibility) {
     private val windows = mutableListOf<OverlayWindow>()
@@ -124,9 +141,11 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     }
 
     /**
-     * 加一个包住内容大小的浮层窗口。平时不抢焦点、点不到的地方照常交给下面的 App;
-     * [onOutside] 给了时,在窗口外面按下会通知它(收起卡片用)。[touchable] 为 false 时窗口只画、不接触摸(按在上面等于按在下面的 App 上)。
-     * 加不上(服务已断开、系统不让)时返回 null,不抛错。
+     * Adds an overlay window that wraps its content size. Normally it does not take focus, and places it cannot be
+     * tapped go to the app underneath as usual; when [onOutside] is given, a press outside the window notifies it
+     * (used to dismiss a card). With [touchable] false the window only draws and does not receive touches (pressing on
+     * it equals pressing on the app underneath).
+     * Returns null when it cannot be added (the service has disconnected, the system refuses); no exception is thrown.
      */
     fun open(
         placement: OverlayPlacement,
@@ -155,10 +174,13 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
                 (if (secure) WindowManager.LayoutParams.FLAG_SECURE else 0),
             PixelFormat.TRANSLUCENT,
         ).apply {
-            // 按整块屏幕摆,不让系统再把窗口挤进状态栏、导航栏以内:要避开哪里由调用方按 area() 定。
-            // fitInsetsTypes 是安卓 11 起才有的;更早的系统没有这项,窗口本来就按整块屏幕摆。
+            // Position against the whole screen, without letting the system squeeze the window inside the status bar
+            // and navigation bar: what to avoid is decided by the caller via area().
+            // fitInsetsTypes exists only from Android 11; older systems have no such option and lay the window out
+            // against the whole screen anyway.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
-            // 伸进刘海得用 ALWAYS(安卓 11 起);更早的系统用 SHORT_EDGES,竖屏下同样能画到刘海区。
+            // Reaching into the notch requires ALWAYS (from Android 11); older systems use SHORT_EDGES, which in
+            // portrait also draws into the notch area.
             layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -171,14 +193,19 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
             windows += window
             window
         } catch (e: RuntimeException) {
-            // 服务刚断开时窗口令牌已失效,或系统不允许这类窗口:当作没有浮层
+            // The window token is already invalid right after the service disconnected, or the system does not allow
+            // such windows: treat it as no overlay
             Log.w(TAG, "overlay unavailable", e)
             owners.destroy()
             null
         }
     }
 
-    /** 此刻屏幕的大小和四边被系统栏、刘海占掉的部分(转屏后跟着变)。读不到时退回显示尺寸,上下各留一条状态栏常见的高度。 */
+    /**
+     * Size of the screen right now and the parts of its four edges taken by system bars and the notch (they
+     * follow rotation). When unreadable, fall back to the display size, leaving a common status-bar height at
+     * top and bottom.
+     */
     fun area(): OverlayArea = runCatching {
         val m = wm().currentWindowMetrics
         val i = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
@@ -190,8 +217,10 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     }
 
     /**
-     * 用户屏幕上输入法的上边(屏幕坐标);没弹出时为 null。不论输入法是对着哪个 App 弹的(包括 Claire 自己的浮层),
-     * 胶囊和卡片都据此让开。窗口一变就重读,读不到窗口时当作没弹出。
+     * Top edge of the input method on the user's screen (screen coordinates); null when it is not showing. No matter
+     * which app the input method is showing for (including Claire's own overlays), the capsule and cards move out of
+     * its way accordingly. Re-read whenever the windows change; when the window cannot be read, treat it as not
+     * showing.
      */
     fun imeTop(): Flow<Int?> = service.windowChanges().onStart { emit(Unit) }
         .map { readImeTop() }
@@ -222,13 +251,16 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     }.getOrNull()
 
     /**
-     * 自有注入手势执行期间让所有浮层不接触摸,手势落到胶囊或卡片的位置也交给下面的 App。
-     * 结束后恢复每个窗口原本能不能接触摸;原本不接触摸的面板不会被误改成可触摸。嵌套手势只在外层结束时恢复。
-     * 调用方取消协程时也等系统手势收尾再恢复:取消等待并不会撤掉已经注入系统的触摸。
+     * While our own injected gestures run, make every overlay not receive touches, so gestures landing where the
+     * capsule or a card is also go to the app underneath.
+     * Afterwards restore each window's original touchability; panels that were not touchable are not accidentally made
+     * touchable. Nested gestures only restore when the outermost one ends.
+     * When the caller cancels the coroutine, also wait for the system gesture to finish before restoring: cancelling
+     * the wait does not withdraw touches already injected into the system.
      */
     suspend fun <T> passInjectedGesturesThrough(block: suspend () -> T): T = injectedGestures.passThrough(block)
 
-    /** 拆掉全部浮层(服务断开时)。 */
+    /** Tears down all overlays (when the service disconnects). */
     fun closeAll() {
         windows.toList().forEach(OverlayWindow::close)
     }
@@ -245,7 +277,7 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     }
 }
 
-/** [OverlayHost.open] 加上的一个窗口。拆掉之后再调用什么都不做。 */
+/** A window added by [OverlayHost.open]. After it has been torn down, calling anything does nothing. */
 class OverlayWindow internal constructor(
     private val host: OverlayHost,
     private val frame: OverlayFrame,
@@ -256,11 +288,11 @@ class OverlayWindow internal constructor(
     var isOpen = true
         private set
 
-    /** 窗口此刻的宽高(像素);还没排版时为 0。 */
+    /** The window's current width and height (pixels); 0 before it has been laid out. */
     val width: Int get() = frame.width
     val height: Int get() = frame.height
 
-    /** 换位置。 */
+    /** Moves the window. */
     fun place(placement: OverlayPlacement) {
         if (!isOpen || params.gravity == placement.gravity && params.x == placement.x && params.y == placement.y) return
         params.place(placement)
@@ -268,8 +300,9 @@ class OverlayWindow internal constructor(
     }
 
     /**
-     * 能拖动时给 [drag],不能拖给 null。[handle] 是只有按在这块里才拖(窗口内的像素坐标,例如卡片的标题栏),
-     * 为 null 时按在哪都能拖;是空的时哪儿都不能拖。
+     * Give [drag] when it can be dragged, null when it cannot. [handle] means only presses inside that area drag
+     * (pixel coordinates within the window, e.g. a card's title bar); when null, pressing anywhere drags; when empty,
+     * nowhere drags.
      */
     fun draggable(drag: OverlayDrag?, handle: Rect? = null) {
         if (!isOpen) return
@@ -278,8 +311,9 @@ class OverlayWindow internal constructor(
     }
 
     /**
-     * 能长按时给 [hold],不能给 null:按着不动 [holdMs] 毫秒是长按(和 [draggable] 的拖动互斥,先动了就是拖)。
-     * 长按开始时轻震一下,窗口里的按钮收到取消。
+     * Give [hold] when a long press is supported, null when not: pressing without moving for [holdMs] milliseconds is
+     * a long press (mutually exclusive with [draggable]'s drag; moving first makes it a drag).
+     * A light haptic fires when the long press starts, and buttons inside the window receive a cancel.
      */
     fun holdable(hold: OverlayHold?, holdMs: Long = 400) {
         if (!isOpen) return
@@ -287,8 +321,10 @@ class OverlayWindow internal constructor(
     }
 
     /**
-     * 铺满整块屏幕(例如按住说话时压暗背后的那一层),或回到包住内容大小。平时空着的窗口包住内容就没有大小,
-     * 不占一块整屏的画布;要铺满时才铺满(包住内容的窗口系统会先按对话框的宽度量,内容填满也到不了整屏)。
+     * Fill the whole screen (e.g. the layer that dims what is behind while holding to talk), or go back to wrapping the
+     * content size. A normally empty window wrapping its content has no size and does not occupy a full-screen canvas;
+     * fill the screen only when needed (the system first measures a wrapping window at dialog width, so the content
+     * cannot reach the full screen even when it fills that).
      */
     fun setFullScreen(full: Boolean) {
         if (!isOpen) return
@@ -299,17 +335,23 @@ class OverlayWindow internal constructor(
         update()
     }
 
-    /** 能接收键盘时(见 [setFocusable])用户按了返回键;输入法开着时返回键先收起输入法,不到这里。 */
+    /**
+     * The user pressed back while it can receive the keyboard (see [setFocusable]); when the input method is
+     * showing, back dismisses the input method first and never reaches here.
+     */
     fun onBack(onBack: (() -> Unit)?) {
         if (isOpen) frame.onBack = onBack
     }
 
-    /** 按到窗口里面(不论按在哪)时调 [onTouch]:调用方据此恢复透明度,并读取这次真实触摸的落点和来源。 */
+    /**
+     * [onTouch] is called when the window itself is pressed (no matter where): the caller uses it to restore
+     * opacity and to read the position and source of this real touch.
+     */
     fun onTouch(onTouch: ((MotionEvent) -> Unit)?) {
         if (isOpen) frame.onTouch = onTouch
     }
 
-    /** 注入手势期间临时不接触摸;结束时按这个窗口创建时的 [touchable] 恢复。 */
+    /** Temporarily not touchable during injected gestures; restored afterwards per the [touchable] this window was created with. */
     internal fun isolateInjectedGestures(isolate: Boolean) {
         if (!isOpen) return
         val flags = if (touchable && !isolate) params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -319,14 +361,18 @@ class OverlayWindow internal constructor(
         update()
     }
 
-    /** 内容大小变了(胶囊换成卡片、转屏后重排)时调 [onResize],调用方据此重新摆位置。 */
+    /**
+     * [onResize] is called when the content size changes (the capsule turns into a card, a re-layout after
+     * rotation); the caller uses it to reposition.
+     */
     fun onResize(onResize: (() -> Unit)?) {
         if (isOpen) frame.onResize = onResize
     }
 
     /**
-     * 整个窗口显示或隐藏。只把 Compose 内容清空会等下一次排版和换帧,旧帧可能还留在系统的窗口画布上;
-     * 关闭、交替两个窗口时必须显式切换可见性,不能拿空内容当作已经不可见。
+     * Shows or hides the whole window. Merely clearing the Compose content waits for the next layout and frame, and
+     * the old frame may still be on the system's window canvas; when closing or alternating two windows, visibility
+     * must be switched explicitly, and empty content must not be taken as already invisible.
      */
     fun setVisible(visible: Boolean) {
         if (!isOpen) return
@@ -334,7 +380,8 @@ class OverlayWindow internal constructor(
     }
 
     /**
-     * 能不能接收键盘:要在浮层里打字时打开(输入法才会弹出来对着它),收起时立刻关上,把焦点还给下面的 App。
+     * Whether it can receive the keyboard: turn on when typing inside the overlay (only then does the input method pop
+     * up facing it), and turn it off at once when collapsing, giving focus back to the app underneath.
      */
     fun setFocusable(focusable: Boolean) {
         if (!isOpen) return
@@ -349,9 +396,12 @@ class OverlayWindow internal constructor(
     }
 
     /**
-     * 窗口里的东西先藏起来,等它真的从屏幕上下去了再做 [block](例如截用户的屏幕),做完再显示出来。
-     * 「真的下去了」:藏起来的那一帧画好、交给系统(帧提交回调)之后,再等 [GONE_FRAMES] 个刷新,合成器换上了这一帧;
-     * 帧提交回调没来(窗口这时不画)也最多等 [GONE_WAIT_MS]。窗口本身留着(位置、状态都不变),只是这段时间里是透明的。
+     * Hides what is in the window first, runs [block] once it has really left the screen (e.g. taking a screenshot of
+     * the user's screen), then shows it again.
+     * "Really left": after the hidden frame has been drawn and handed to the system (frame commit callback), wait
+     * [GONE_FRAMES] more refreshes for the compositor to pick up that frame; if the frame commit callback never comes
+     * (the window is not drawing then), wait at most [GONE_WAIT_MS]. The window itself stays (position and state
+     * unchanged), it is just transparent during this time.
      */
     suspend fun <T> hiddenWhile(block: suspend () -> T): T {
         val content = frame.getChildAt(0)
@@ -387,16 +437,19 @@ class OverlayWindow internal constructor(
     }
 
     private companion object {
-        /** 藏起来的那一帧交给系统后再等几个刷新:合成器在下一个刷新才换上它。 */
+        /** After the hidden frame is handed to the system, wait a few more refreshes: the compositor only picks it up on the next refresh. */
         const val GONE_FRAMES = 2
         const val GONE_WAIT_MS = 300L
     }
 }
 
 /**
- * 浮层窗口的根,里面是 Compose 内容。收窗口外的按下([onOutside]);能拖动时([drag])手指按在把手([handle],没有时整个窗口)里、
- * 移过触摸阈值就把这串触摸截下来,里面的按钮收到取消。拖动按屏幕坐标算。
- * 能长按时([hold])按下就开始计时,不动满时限就截下这串触摸交给 [hold](点按和拖动都不再成立)。
+ * Root of an overlay window, containing the Compose content. Receives presses outside the window ([onOutside]); when
+ * draggable ([drag]), if the finger goes down inside the handle ([handle], or the whole window when absent) and moves
+ * past the touch slop, this touch stream is intercepted and buttons inside receive a cancel. Dragging is computed in
+ * screen coordinates.
+ * When a long press is supported ([hold]), the timer starts on down and if the finger stays still until the limit,
+ * this touch stream is intercepted and handed to [hold] (neither a tap nor a drag holds any more).
  */
 internal class OverlayFrame(context: Context) : FrameLayout(context) {
     var onOutside: (() -> Unit)? = null
@@ -416,10 +469,13 @@ internal class OverlayFrame(context: Context) : FrameLayout(context) {
     private var tracking = false
     private var dragging = false
     private var holding = false
-    /** 长按开始时自己发给里面内容的那个取消:它经过 [track] 时不当成系统的取消。 */
+    /** The cancel we send to the content inside when a long press starts: when it passes through [track] it is not treated as a system cancel. */
     private var ownCancel = false
     private val holdTimer = Runnable(::holdReached)
-    /** 长按计时走主线程的 Handler,不走 View.postDelayed:后者在窗口还没挂上时要等挂上才跑。 */
+    /**
+     * Long-press timing runs on a main-thread Handler, not View.postDelayed: the latter waits to run until the
+     * window is attached when it is not yet.
+     */
     private val timer = Handler(Looper.getMainLooper())
 
     init {
@@ -429,8 +485,10 @@ internal class OverlayFrame(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * 换长按的接收方([hold] 为 null 是不能长按了)。同一个接收方再装一次(每次重画都会装)什么都不变;
-     * 换了或拿掉时,正在进行的长按先通知旧的那个取消,这串触摸之后的抬起不再交给谁——否则旧的那个永远等不到收尾。
+     * Replaces the long-press receiver ([hold] null means no long press any more). Installing the same receiver again
+     * (which happens on every redraw) changes nothing; when it is replaced or removed, an ongoing long press first
+     * notifies the old one with a cancel, and the subsequent lift of this touch stream is handed to no one — otherwise
+     * the old one would never see its end.
      */
     fun setHold(hold: OverlayHold?, holdMs: Long) {
         this.holdMs = holdMs
@@ -480,11 +538,11 @@ internal class OverlayFrame(context: Context) : FrameLayout(context) {
 
     override fun onInterceptTouchEvent(e: MotionEvent): Boolean = track(e) && (dragging || holding)
 
-    /** 按在内容里没有东西接的地方也能拖。 */
-    @SuppressLint("ClickableViewAccessibility") // 拖动只是挪位置;读屏时用胶囊上的「移到另一边」
+    /** Dragging also works when pressing where nothing in the content handles it. */
+    @SuppressLint("ClickableViewAccessibility") // dragging only moves the window; with a screen reader use "move to the other side" on the capsule
     override fun onTouchEvent(e: MotionEvent): Boolean = track(e)
 
-    /** 跟着这串触摸;返回 true 表示还要接着收(能拖、能长按的时候)。 */
+    /** Follows this touch stream; returning true means it still wants to keep receiving it (when draggable or long-pressable). */
     private fun track(e: MotionEvent): Boolean {
         if (ownCancel) return true
         val d = drag
@@ -541,7 +599,11 @@ internal class OverlayFrame(context: Context) : FrameLayout(context) {
         return tracking
     }
 
-    /** 按着没动到了时限:成了长按。里面正按着的按钮马上收到取消(不等下一个触摸事件),点按、双击都不再成立。 */
+    /**
+     * Pressed without moving until the time limit: it has become a long press. A button currently pressed
+     * inside immediately receives a cancel (without waiting for the next touch event); neither a tap nor a
+     * double tap holds any more.
+     */
     private fun holdReached() {
         val h = hold ?: return
         if (!tracking || dragging || gesture.timeout() != HoldGesture.Kind.Hold) return
@@ -566,7 +628,10 @@ private fun WindowManager.LayoutParams.place(p: OverlayPlacement) {
     y = p.y
 }
 
-/** Compose 在 Activity 之外要自己配上生命周期、状态保存与 ViewModel 的宿主;窗口加上时进入 RESUMED,拆掉时销毁。 */
+/**
+ * Compose outside an Activity must be given its own lifecycle, saved-state and ViewModel host; it enters
+ * RESUMED when the window is added and is destroyed when torn down.
+ */
 internal class OverlayOwners : SavedStateRegistryOwner, ViewModelStoreOwner {
     private val registry = LifecycleRegistry(this)
     private val saved = SavedStateRegistryController.create(this)
@@ -581,7 +646,7 @@ internal class OverlayOwners : SavedStateRegistryOwner, ViewModelStoreOwner {
 
     fun destroy() {
         if (registry.currentState == Lifecycle.State.DESTROYED) return
-        // 从没启动过的(加窗口前就失败)也要先进入 CREATED 才能销毁
+        // Ones that never started (failed before the window was added) must still enter CREATED before being destroyed
         if (registry.currentState == Lifecycle.State.INITIALIZED) registry.currentState = Lifecycle.State.CREATED
         registry.currentState = Lifecycle.State.DESTROYED
         viewModelStore.clear()

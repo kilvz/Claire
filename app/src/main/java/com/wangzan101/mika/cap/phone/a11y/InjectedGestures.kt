@@ -4,7 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-/** 自有注入手势期间隔离浮层触摸;计数和 [isolate] 回调只在主线程使用。 */
+/** Isolates overlay touches while our own injected gestures run; the counter and the [isolate] callback are only used on the main thread. */
 internal class InjectedGestures(private val isolate: (Boolean) -> Unit) {
     private var depth = 0
     val isolated: Boolean get() = depth > 0
@@ -15,7 +15,8 @@ internal class InjectedGestures(private val isolate: (Boolean) -> Unit) {
         try {
             withContext(Dispatchers.Main.immediate) {
                 depth++
-                // 返回调用线程时可能立即因取消抛错;从修改计数起就必须由 finally 成对恢复。
+                // May throw on cancellation right away when returning to the caller thread; from the moment the
+                // counter is modified, undo must happen in a matching finally.
                 entered = true
                 if (depth == 1) isolate(true)
             }
@@ -24,14 +25,15 @@ internal class InjectedGestures(private val isolate: (Boolean) -> Unit) {
             failure = t
             throw t
         } finally {
-            // 排队等主线程时就被取消的没有进入隔离,不能减掉其他手势的计数。
+            // One that was cancelled while still queued for the main thread never entered isolation, so it must
+            // not decrement other gestures' count.
             if (entered) try {
                 withContext(NonCancellable + Dispatchers.Main.immediate) {
                     depth = (depth - 1).coerceAtLeast(0)
                     if (depth == 0) isolate(false)
                 }
             } catch (restoration: Throwable) {
-                // 清理失败不能盖住取消或手势、窗口隔离原本的错误。
+                // A cleanup failure must not mask the cancellation or the gesture/window isolation's original error.
                 val original = failure
                 if (original == null) throw restoration
                 if (original !== restoration) original.addSuppressed(restoration)
@@ -40,7 +42,10 @@ internal class InjectedGestures(private val isolate: (Boolean) -> Unit) {
     }
 }
 
-/** 每个窗口都尝试更新;全部做完再抛首个错误,其余错误附加进去,避免一个坏窗口阻断后续恢复。 */
+/**
+ * Tries to update every window, then throws the first error once all are done, with the rest attached, so one
+ * bad window cannot block the remaining recovery.
+ */
 internal fun <T> forEachGestureWindow(windows: List<T>, update: (T) -> Unit) {
     var failure: Throwable? = null
     for (window in windows) {

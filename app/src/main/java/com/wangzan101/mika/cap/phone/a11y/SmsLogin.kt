@@ -6,8 +6,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 短信登录:在已核验的登录页上填账号、请求/填写验证码、提交并核对结果。
- * 共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
+ * SMS login: on a verified login page, fill in the account, request/enter the verification code, submit and verify
+ * the result.
+ * Fields and methods shared with [AndroidScreen] are accessed through [screen] as a forward reference.
  */
 internal class SmsLogin(private val screen: AndroidScreen) {
 

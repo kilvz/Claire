@@ -22,8 +22,9 @@ import kotlinx.coroutines.withContext
 import kotlin.math.min
 
 /**
- * 打字 / 粘贴 / 清空的整块处理:对着输入框写入、或经剪贴板/输入法降级给自绘编辑器。
- * 共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
+ * The whole handling of typing / pasting / clearing: writing into an input field, or falling back to the clipboard
+ * or the input method for custom-drawn editors.
+ * Fields and methods shared with [AndroidScreen] are accessed through [screen] as a forward reference.
  */
 internal class TextInput(private val screen: AndroidScreen) {
 
@@ -41,7 +42,8 @@ internal class TextInput(private val screen: AndroidScreen) {
                     ActionResult.Failed(f.reason, "The referenced control did not expose an editor or a verified Paste menu.")
                 }
                 f.reason != AndroidScreen.NO_FOCUS -> ActionResult.Failed(f.reason)
-                // 屏上什么都没拿着输入焦点、也没弹输入法:没有框接得住粘贴,不去粘(粘了界面别处一动就会被当成「可能打进去了」)
+                // Nothing on screen holds input focus and no input method is showing: no field can receive a paste, so
+                // do not paste (once pasted, any change elsewhere would be taken as "text may have gone in")
                 !screen.somethingHoldsInputFocus() -> ActionResult.Failed(AndroidScreen.NO_FOCUS)
                 else -> typeUnseen(text)
             }
@@ -56,7 +58,8 @@ internal class TextInput(private val screen: AndroidScreen) {
         if (!field.isFocused) {
             field.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             field.refresh()
-            // ACTION_FOCUS 的返回值和焦点标志都可能不可靠:没确认拿到焦点时,再按普通输入框点一下。
+            // Both ACTION_FOCUS's return value and the focus flag can be unreliable: when focus is not
+            // confirmed, tap it once more like an ordinary input field.
             if (!field.isFocused) {
                 val focusedBefore = screen.focusedEditable()
                 screen.withEventClock { clock ->
@@ -67,8 +70,10 @@ internal class TextInput(private val screen: AndroidScreen) {
                 when {
                     now == null -> Unit
                     screen.sameField(original, now) -> field = now
-                    // 点了以后原框不在了,同一 App 里新冒出一个拿着焦点的框(搜索栏点一下跳到独立搜索页就是这样):
-                    // 和点输入入口一样改写这个新框;原框还在屏上时不换,免得写进别的框
+                    // After the tap the original field is gone and a new field holding focus appeared in the same app
+                    // (this is what happens when tapping a search bar jumps to a separate search page):
+                    // rewrite this new field like an input entry point; do not switch while the original field is still
+                    // on screen, lest the text be written into another field
                     now != focusedBefore && now.packageName == field.packageName &&
                         !(field.refresh() && screen.visibleInputTarget(field)) -> {
                         field = now
@@ -77,11 +82,12 @@ internal class TextInput(private val screen: AndroidScreen) {
                     }
                 }
             }
-            // SET_TEXT 不要求焦点,仍可以尝试;最后以读回核对为准,但把焦点未确认如实带给调用方。
+            // SET_TEXT does not require focus, so it can still be attempted; the read-back check is what counts
+            // in the end, but pass the unconfirmed focus to the caller truthfully.
             focusUncertain = !field.isFocused
         }
         val web = screen.inWebView(field)
-        // 网页编辑区要粘贴才收得到输入;密码框不经剪贴板
+        // A web editor only receives input by pasting; password fields do not go through the clipboard
         var pasteUnavailable = web && field.isPassword
         var inputUncertain = false
         val placeholder = ScreenReader.placeholderOf(field)
@@ -90,7 +96,8 @@ internal class TextInput(private val screen: AndroidScreen) {
             AsciiTextKeys.NOT_SENT -> false
             AsciiTextKeys.DISPATCHED -> true
             else -> {
-                // 动作结果不确定时也可能已经写入:让读回核对停在 UNKNOWN,不能再换一种方式重写。
+                // When the action outcome is uncertain the text may already have been written: keep the
+                // read-back check at UNKNOWN and never rewrite it by another means.
                 inputUncertain = true
                 true
             }
@@ -99,8 +106,9 @@ internal class TextInput(private val screen: AndroidScreen) {
             override fun read(): String? {
                 if (inputUncertain) return null
                 if (field.refresh() && screen.visibleInputTarget(field)) return ScreenReader.fieldText(field, placeholder, text)
-                // 有的 App 内容一变就换掉输入控件:当前拿着输入焦点的那个和原来的类型、资源 ID、位置都对得上才改读它,
-                // 否则算读不回,也不往别的框里写
+                // Some apps replace the input control whenever content changes: only re-read the one currently holding
+                // input focus when its type, resource ID and position all match the original, otherwise treat it as
+                // unreadable and do not write into another field either
                 val now = screen.focusedEditable()?.takeIf { screen.sameField(original, it) } ?: return null
                 field = now
                 return ScreenReader.fieldText(now, placeholder, text)
@@ -111,19 +119,22 @@ internal class TextInput(private val screen: AndroidScreen) {
             }
             override fun retry(text: String): Boolean {
                 if (web || pasteUnavailable) return write(text)
-                // 原生框第一次 SET_TEXT 没落地时,第二次改走选择加粘贴,让编辑器收到真实输入。
+                // When the native field's first SET_TEXT did not take effect, the second attempt switches to
+                // select-and-paste so the editor receives real input.
                 return writeByInput(text)
             }
         }
         val textsBefore = screen.read().texts.toSet()
-        // 像人一样一段一段打出来(见 TypingPacing);密码框、要粘贴才收得到的网页框照旧一次写入。
-        // 写不进、框不接受半截字时停下,下面照旧整段写入并读回核对
+        // Type it out segment by segment like a human (see TypingPacing); password fields and web fields that only
+        // receive input by pasting are still written in one go.
+        // Stop when writing fails or the field does not accept partial text; the whole-string write and read-back below
+        // still run as before
         screen.typing(field.packageName?.toString()).forField(web, field.isPassword).leadIn(io, text)
         var frozen = false
         val verification = typeAndVerify(
             io, text, AndroidScreen.TYPE_ATTEMPTS,
             settle = { screen.withEventClock { clock -> clock.awaitQuiet(AndroidScreen.READBACK_QUIET_MS, AndroidScreen.READBACK_CAP_MS) } },
-            // 读回一直不变时,看界面上有没有冒出含所输文字的新文字(联想词等)
+            // When the read-back never changes, look for new on-screen text containing the typed text (suggestion words etc.)
             reacted = {
                 val typed = text.filterNot { it.isWhitespace() }
                 (screen.read().texts.toSet() - textsBefore).any { typed in it.filterNot { c -> c.isWhitespace() } }.also { frozen = it }
@@ -137,7 +148,7 @@ internal class TextInput(private val screen: AndroidScreen) {
             AndroidScreen.HINT_READBACK_FROZEN.takeIf { frozen },
             AndroidScreen.HINT_PASTE_UNAVAILABLE.takeIf { pasteUnavailable },
         ).joinToString(" ").ifEmpty { null }
-        // 字可能只是显示出来、App 并没收到:不能报「一致」
+        // The text may only be displayed and never received by the app: do not report "matched"
         val reported = if (pasteUnavailable && verification != Verification.MISMATCH) Verification.UNKNOWN else verification
         return screen.ok(verification = reported, hint = hint, secret = field.isPassword, relocatedTo = found.relocatedTo)
     }
@@ -173,12 +184,14 @@ internal class TextInput(private val screen: AndroidScreen) {
         }
     }
 
-    // ---------- 树里看不到的输入框 ----------
+    // ---------- Input fields invisible in the tree ----------
 
     /**
-     * 往这一点上的输入框里打字:先点它,等界面安静;点出了树里看得到、拿着焦点的输入框就照常对着它打,
-     * 否则按 [typeUnseen] 粘贴并核对,粘贴前的屏上文字在点完之后读(点出的光标、键盘不算打进去的字)。
-     * 点了就换到别的 App(点到了链接、按钮)时不打字。
+     * Types into the input field at this point: tap it first and wait for the UI to settle; if that brings up an input
+     * field visible in the tree and holding focus, type into it as usual, otherwise paste and verify per [typeUnseen],
+     * reading the on-screen text before pasting only after the tap (the caret and keyboard it brings up do not count as
+     * typed text).
+     * When the tap switches to another app (a link or a button was hit), do not type.
      */
     internal suspend fun typeAt(x: Int, y: Int, text: String): ActionResult = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext AndroidScreen.NO_APP_OPEN
@@ -191,7 +204,8 @@ internal class TextInput(private val screen: AndroidScreen) {
         } else -1
         val tapped = screen.verified { screen.tapAt(x, y) }
         if (tapped !is ActionResult.Ok) return@withContext tapped
-        // 点了开出了别的 App(开到用户主屏上又挪回来的也是):不打字,照实报这一下点的结果
+        // The tap opened another app (including one opened on the user's main screen and moved back): do not
+        // type; report the result of this tap as it is
         if (tapped.opened != null) return@withContext tapped
         tapped.appSwitched?.takeIf { !tapped.switchedByTarget }?.let { return@withContext UnseenField.tapSwitched(it) }
         when (val focused = screen.focusedField()) {
@@ -208,14 +222,16 @@ internal class TextInput(private val screen: AndroidScreen) {
             }
         }
         val typed = if (target != null && pointEditorFocusMismatch(target)) {
-            // 点击没有让目标拿到焦点,另一个隐藏编辑框还拿着焦点时,按键会写进那个框;这次正文尚未发送。
+            // The tap did not give the target input focus; while another hidden editor still holds focus, key
+            // presses would go into that field; this text has not been sent yet.
             ActionResult.Failed(AndroidScreen.INPUT_NOT_SENT, "The tapped editor did not take input focus; no text was sent.")
         } else {
             typeUnseen(text, atPoint = true)
         }
         if (typed is ActionResult.Failed && anchor != null && original != null && tapped.appSwitched == null) {
-            // 只有粘贴键按下确定没发出,或剪贴板在改动前就被拒绝,才换输入通道。
-            // 「已经发出但没观察到变化」可能已写入,不能再走一条会实际输入的路径。
+            // Only switch input channels when the paste key definitively failed to send, or the clipboard was rejected
+            // before any change.
+            // "Sent but no change observed" may already have been written, so never take another path that actually types.
             if (keyTask >= 0 && (typed.reason == AndroidScreen.INPUT_NOT_SENT || typed.reason == AndroidScreen.PASTE_UNAVAILABLE)) {
                 typeWithKeys(anchor, original, keyTask, text)?.let { return@withContext it }
             }
@@ -231,7 +247,10 @@ internal class TextInput(private val screen: AndroidScreen) {
         typed
     }
 
-    /** 显式点中的自绘编辑器的硬件按键降级:先确认全选已投递,再输入 ASCII,不在粘贴之后重放。 */
+    /**
+     * Hardware-key fallback for an explicitly tapped custom-drawn editor: first confirm the select-all was
+     * delivered, then type ASCII; never replay after a paste.
+     */
     internal suspend fun typeWithKeys(
         anchor: AccessibilityNodeInfo, original: AndroidScreen.FieldShape, taskId: Int, text: String,
     ): ActionResult? {
@@ -257,7 +276,7 @@ internal class TextInput(private val screen: AndroidScreen) {
         }
     }
 
-    /** 焦点明确落在点位之外的节点时为 true;读不到焦点时保留原来的隐藏编辑器输入路径。 */
+    /** True when focus clearly lands on a node other than the tapped point; when focus cannot be read, keep the original hidden-editor input path. */
     internal fun pointEditorFocusMismatch(anchor: AccessibilityNodeInfo): Boolean {
         val window = ScreenReader.contentWindows(screen.windows()).firstOrNull {
             it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused
@@ -279,18 +298,19 @@ internal class TextInput(private val screen: AndroidScreen) {
         return !focus.isPassword && (within(anchor, focus) || within(focus, anchor))
     }
 
-    /** [node] 是不是 [possibleAncestor] 自己或它下面的节点。 */
+    /** Whether [node] is [possibleAncestor] itself or a node below it. */
     internal fun within(node: AccessibilityNodeInfo, possibleAncestor: AccessibilityNodeInfo): Boolean =
         screen.ancestorOrSelf(node) { it == possibleAncestor } != null
 
-    /** 清空这一点上的输入框,做法同 [typeAt]。 */
+    /** Clears the input field at this point, the same way as [typeAt]. */
     internal suspend fun clearAt(x: Int, y: Int): ActionResult = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext AndroidScreen.NO_APP_OPEN
         val hit = pointHit(x, y)
         val target = hit?.node?.takeIf(ScreenReader::canSetText) ?: hit?.contextPasteAnchor()
         val tapped = screen.verified { screen.tapAt(x, y) }
         if (tapped !is ActionResult.Ok) return@withContext tapped
-        // 点了开出了别的 App(开到用户主屏上又挪回来的也是):不清空,照实报这一下点的结果
+        // The tap opened another app (including one opened on the user's main screen and moved back): do not
+        // clear; report the result of this tap as it is
         if (tapped.opened != null) return@withContext tapped
         tapped.appSwitched?.takeIf { !tapped.switchedByTarget }?.let { return@withContext UnseenField.tapSwitched(it) }
         when (val focused = screen.focusedField()) {
@@ -315,10 +335,14 @@ internal class TextInput(private val screen: AndroidScreen) {
     }
 
     /**
-     * 树里没有拿着焦点的输入框:输入框可能在 App 自己画的界面里,树读不到它,焦点在它上面。
-     * 先全选(替换原有的字,和对着节点设字一样),再经剪贴板粘贴,按键只发到 Claire 的屏;之后比打字前后屏上读到的文字
-     * 核对([UnseenField.typed])。不要求弹着输入法:按键发到这块屏拿着焦点的窗口,框不经输入法也收得到;
-     * 没弹输入法而前后一点没变,就请模型先点输入框。弹着输入法时键盘上的字不算屏上的字。
+     * No input field in the tree holds focus: the field may be in UI the app draws itself, which the tree cannot read,
+     * with focus on it.
+     * Select all first (replacing the existing text, the same as setting text on a node), then paste via the
+     * clipboard; key presses are sent only to Claire's screen; afterwards compare the text read on screen before and
+     * after typing ([UnseenField.typed]). The input method need not be showing: key presses go to the focused window on
+     * this screen, and the field receives them without the input method; if it is not showing and nothing changed at
+     * all, ask the model to tap the input field first. While the input method is showing, the text on its keyboard does
+     * not count as on-screen text.
      */
     internal suspend fun typeUnseen(text: String, atPoint: Boolean = false): ActionResult {
         if (screen.blockedFocusedEditor()) return ActionResult.Failed(AndroidScreen.EDITOR_NOT_VISIBLE)
@@ -351,9 +375,12 @@ internal class TextInput(private val screen: AndroidScreen) {
     }
 
     /**
-     * 剪贴板换成 [text]、全选、粘贴,给 App 留出异步读取时间再还原。返回 null:剪贴板不能安全使用(读不到用户原来的内容),
-     * 什么都没动。按键结果沿用 [AsciiTextKeys] 三态;只有正文按下确定没投递才是 NOT_SENT。
-     * 标准粘贴动作存在时只调它一次,返回 false 也按不确定处理,不再补发 Ctrl+V。
+     * Replaces the clipboard with [text], selects all, pastes, gives the app time to read it asynchronously, then
+     * restores it. Returns null when the clipboard cannot be used safely (the user's original content cannot be read):
+     * nothing has been touched. Key-press results keep [AsciiTextKeys]'s three states; NOT_SENT only when the text
+     * key-down definitively was not delivered.
+     * When the standard paste action exists, it is called once only; a false return is also treated as uncertain and
+     * Ctrl+V is not sent on top.
      */
     internal fun pasteUnseen(text: String): Int? =
         screen.withClipboardText(text) {
@@ -370,7 +397,7 @@ internal class TextInput(private val screen: AndroidScreen) {
             } else {
                 ctrlKey(KeyEvent.KEYCODE_V)
             }
-            // 选区或光标可能先重绘,App 随后才异步读取剪贴板。
+            // The selection or caret may redraw first, and the app reads the clipboard asynchronously afterwards.
             Thread.sleep(AndroidScreen.PASTE_WAIT_MS)
             sent
         }
@@ -458,7 +485,7 @@ internal class TextInput(private val screen: AndroidScreen) {
             val before = controls(scoped)
             if (near(startBounds, before).any(::isPaste)) return@withClipboardText AsciiTextKeys.NOT_SENT
             val existing = before.map { it.node }.toSet()
-            // 自绘编辑器的长按阈值可能比系统设置更长。
+            // A custom-drawn editor's long-press threshold may be longer than the system setting.
             val hold = maxOf(AndroidScreen.PASTE_MENU_MIN_HOLD_MS, ViewConfiguration.getLongPressTimeout().toLong() + 2 * AndroidScreen.POLL_MS)
             for (attempt in 0..1) {
                 context.ensureActive()
@@ -486,7 +513,7 @@ internal class TextInput(private val screen: AndroidScreen) {
                             return@withClipboardText AsciiTextKeys.NOT_SENT
                         }
                         context.ensureActive()
-                        // performAction=false 不能证明点击没落到菜单上;按不确定收尾,不补发别的输入。
+                        // performAction=false cannot prove the click did not land on the menu; finish as uncertain and do not send other input.
                         if (!paste.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return@withClipboardText AsciiTextKeys.UNCONFIRMED
                         Thread.sleep(AndroidScreen.PASTE_WAIT_MS)
                         return@withClipboardText AsciiTextKeys.DISPATCHED
@@ -494,7 +521,7 @@ internal class TextInput(private val screen: AndroidScreen) {
                     previous = paste
                     Thread.sleep(AndroidScreen.POLL_MS)
                 } while (SystemClock.uptimeMillis() < deadline)
-                // 编辑器可能忽略第一次长按;只有没冒出菜单控件时才再按一次。
+                // The editor may ignore the first long press; press again only when no menu control has appeared.
                 if (sawNewControl) return@withClipboardText AsciiTextKeys.NOT_SENT
             }
             AsciiTextKeys.NOT_SENT
@@ -515,7 +542,10 @@ internal class TextInput(private val screen: AndroidScreen) {
         }
     }
 
-    /** 和 [typeUnseen] 同样的前提;全选确认投递后才按删除,不确定时停止,不换路径重试。 */
+    /**
+     * Same preconditions as [typeUnseen]; delete only after the select-all delivery is confirmed, stop when
+     * uncertain, and never retry over another path.
+     */
     internal suspend fun clearUnseen(atPoint: Boolean = false): ActionResult {
         if (screen.blockedFocusedEditor()) return ActionResult.Failed(AndroidScreen.EDITOR_NOT_VISIBLE)
         val keyboardUp = imeBox() != null
@@ -539,10 +569,13 @@ internal class TextInput(private val screen: AndroidScreen) {
     internal fun ctrlKey(keyCode: Int): Int =
         runCatching { screen.shell.injectCtrlKey(screen.displayId, keyCode) }.getOrDefault(AsciiTextKeys.UNCONFIRMED)
 
-    /** 这块屏上弹着输入法(这时按返回,安卓先收起输入法)。 */
+    /** The input method is showing on this screen (pressing back then dismisses the input method first on Android). */
     fun keyboardUp(): Boolean = screen.hasDisplay && imeBox() != null
 
-    /** 这块屏上输入法窗口的范围(0–999 的 [l,t,r,b]);没弹输入法为 null。弹着时它上面的字不算屏上的字。 */
+    /**
+     * Bounds of the input method window on this screen ([l,t,r,b] in 0–999); null when the input method is not
+     * showing. While it is showing, text on it does not count as on-screen text.
+     */
     internal fun imeBox(): List<Int>? {
         val r = imeBounds() ?: return null
         return listOf(normalize(r.left, screen.screenWidth), normalize(r.top, screen.screenHeight), normalize(r.right, screen.screenWidth), normalize(r.bottom, screen.screenHeight))

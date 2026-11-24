@@ -5,12 +5,18 @@ import com.wangzan101.mika.core.screen.uistate.Hant
 import kotlin.math.hypot
 
 /**
- * 点击通道兜底的纯逻辑判据:
- * - [mayBeOutward]:按钮文字或资源 ID 像发送、提交、付款、删除、确认等对外或不可逆动作时不补点第二条通道,宁可只试一次;
- * - [pickTarget]:坐标点击无反应时,在包含 (x, y) 的可点目标里挑面积最小且不超过整屏比例上限的一个改走节点点击。
+ * Pure-logic criteria for the click-channel fallback:
+ * - [mayBeOutward]: when the button text or resource ID looks like an outward or irreversible action such as send,
+ *   submit, pay, delete or confirm, do not add a click on the second channel; better to try only once;
+ * - [pickTarget]: when a coordinate tap has no effect, among the clickable targets containing (x, y) pick the
+ *   smallest one whose area is within the share limit of the whole screen and switch to a node click.
  */
 internal object ClickFallback {
-    /** 坐标反查可点节点时,目标面积不超过整屏的这么多,高度不超过屏高的这么多(排除整屏或半屏背景容器)。 */
+    /**
+     * When reverse-looking-up a clickable node from coordinates, the target area must not exceed this share of
+     * the whole screen and its height not this share of the screen height (excludes full-screen or half-screen
+     * background containers).
+     */
     const val MAX_AREA_SHARE = 0.35
     const val MAX_HEIGHT_SHARE = 0.50
     private const val MAX_BUTTON_LABEL_LEN = 24
@@ -25,8 +31,9 @@ internal object ClickFallback {
     )
 
     /**
-     * 开关类按钮:第二条通道再点一次会把刚打开的状态关回去(收藏、关注、点赞、静音),
-     * 或重复发起(接听、拨打)。自绘图标只换颜色时画面差不到 3 格,树也不变,只能靠名字拦。
+     * Toggle-like buttons: a second click on the second channel would turn a just-enabled state back off
+     * (favorite, follow, like, mute), or start it again (answer, dial). When a custom-drawn icon only changes color
+     * the picture differs by fewer than 3 cells and the tree does not change either, so only the name can stop it.
      */
     private val STATEFUL_CJK = setOf("关注", "订阅", "收藏", "点赞", "喜欢", "静音", "接听", "拨打", "挂断")
     private val STATEFUL_EN = setOf(
@@ -35,7 +42,10 @@ internal object ClickFallback {
     )
     private val ID_SPLIT = Regex("(?=[A-Z])|[/_\\-.:]+")
 
-    /** 包含一点的可点候选:[item] 调用方对象,[left]/[top]/[right]/[bottom] 为裁剪到屏幕内的像素边界。 */
+    /**
+     * A clickable candidate containing a point: [item] is the caller's object, [left]/[top]/[right]/[bottom]
+     * are pixel bounds clipped to the screen.
+     */
     data class Candidate<T>(
         val item: T,
         val left: Int,
@@ -56,18 +66,24 @@ internal object ClickFallback {
     }
 
     /**
-     * 名字或资源 ID 像发送、提交、支付、删除、确认按钮,或是开关类按钮时返回 true,
-     * 不自动补点第二条通道:宁可这次点不动,也不能把刚打开的状态点回去或重复发起。
-     * [clickable] 为 true(默认)时,[label] 和点之前的不可逆判定(IrreversibleDetector 的 elementHit)查的是同一类名字:
-     * 点的节点、它的可点祖先、候选,没名字的可点容器是子节点的字连起来的。这时不可逆词和那边一样不看总长:
-     * 英文按钮常带对象(「Send message to …」),容器的名字常带金额(「立即支付 ¥1,299.00 (含运费…)」)。
-     * 传 false 的是点下那片里不可点的正文,只查 [MAX_BUTTON_LABEL_LEN] 字以内的。
+     * Returns true when the name or resource ID looks like a send, submit, pay, delete or confirm button, or a
+     * toggle button; no automatic second-channel click then: better that this tap does nothing than to turn a
+     * just-enabled state back off or repeat the action.
+     * With [clickable] true (the default), [label] is looked up against the same kind of names as the
+     * irreversible check before tapping (IrreversibleDetector's elementHit): the tapped node, its clickable
+     * ancestors, the candidates, and for unnamed clickable containers the joined text of their children. Here, as
+     * there, irreversible words ignore total length: English buttons often carry an object ("Send message to …"),
+     * and container names often carry an amount ("Pay now ¥1,299.00 (incl. shipping…)").
+     * Passing false is for non-clickable body text in the tapped area; only names of at most
+     * [MAX_BUTTON_LABEL_LEN] characters are checked then.
      */
     fun mayBeOutward(label: String?, resourceId: String?, clickable: Boolean = true): Boolean {
         val trimmed = label?.trim().orEmpty()
         val short = trimmed.isNotEmpty() && trimmed.length <= MAX_BUTTON_LABEL_LEN
         if ((short || (clickable && trimmed.isNotEmpty())) && IrreversibleDetector.matchName(trimmed) != null) return true
-        // 确认词、英文开关词整串比,中文开关词按包含比(「点赞(12)」),长段正文里容易出现,都只查短的
+        // Confirm words and English toggle words are compared as the whole string, Chinese toggle words by
+        // containment (a toggle label followed by a count, e.g. "<label>(12)"), which shows up easily inside long body
+        // text; both are only checked when short
         if (short) {
             val norm = Hant.fold(trimmed).filterNot(Char::isWhitespace).lowercase().trimEnd { !it.isLetterOrDigit() }
             if (norm in CONFIRM_WORDS) return true
@@ -82,8 +98,9 @@ internal object ClickFallback {
     }
 
     /**
-     * 从候选里挑出包含 ([x], [y])、非滚动容器、非 WebView、非对外动作且尺寸不过大的最小可点目标;
-     * 面积相同时选中心离 ([x], [y]) 最近的。
+     * Picks from the candidates the smallest clickable target that contains ([x], [y]), is not a scrolling
+     * container, not a WebView, not an outward action and not too large; among equal areas, the one whose center is
+     * closest to ([x], [y]).
      */
     fun <T> pickTarget(
         x: Int,

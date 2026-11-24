@@ -28,53 +28,66 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 「App 被开到用户主屏上」的整块处理:动作前后盯梢主屏冒出来的任务,把开到主屏上的 App 挪回 Claire 的屏,
- * 或等用户在主屏上选完/亲手处理完。共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
+ * The whole handling of "an app got opened on the user's main screen": watch the main screen for tasks appearing
+ * before and after an action, move apps opened on the main screen back to Claire's screen, or wait for the user to
+ * finish choosing or handling it by hand there. Fields and methods shared with [AndroidScreen] are accessed through
+ * [screen] as a forward reference.
  */
 internal class ScreenSpill(private val screen: AndroidScreen) {
 
-    /** 一次动作的盯梢:[since] 开始的时刻,[topBefore] 那时主屏最上面的任务,[agentTopBefore] 那时 Claire 屏上最上面的任务,
-     * [userActiveBefore] 动作开始前用户刚在主屏上动过手。 */
+    /** Watch for one action: [since] the moment it started, [topBefore] the top task on the main screen then,
+     * [agentTopBefore] the top task on Claire's screen then, [userActiveBefore] the user had just operated the main
+     * screen before the action started. */
     internal class Watch(val since: Long, val topBefore: Int, val agentTopBefore: Int, val userActiveBefore: Boolean)
 
-    /** 挪回来的 App 和(系统问打开哪一个时)认出的选项。 */
+    /** The app moved back, and (when the system asks which one to open) the recognized options. */
     internal class Spill(val opened: OpenedElsewhere, val chooser: LaunchChoice?)
 
-    /** 最近一次动作的盯梢;过了 [AndroidScreen.SPILL_WINDOW_MS] 清掉。 */
+    /** Watch for the most recent action; cleared after [AndroidScreen.SPILL_WINDOW_MS]. */
     @Volatile internal var watch: Watch? = null
 
-    /** 已经判过的记录到哪个时刻:同一条不判两次。 */
+    /** Up to which moment records have already been judged: the same one is not judged twice. */
     @Volatile internal var consumed = 0L
 
-    /** 从用户主屏挪回 Claire 屏上的任务,和从它们里面打开的:它们在最上面算目标 App 打开的,不算被切走。 */
+    /**
+     * Tasks moved back from the user's main screen to Claire's screen, and ones opened from them: their being
+     * on top counts as opened by the target app, not as being switched away.
+     */
     internal val adopted: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     internal val _userPick = MutableStateFlow<AndroidScreen.UserPick?>(null)
-    /** 正等着用户在主屏上选;任务据此停住,胶囊上请用户选一下。 */
+    /** Waiting for the user to choose on the main screen; the task pauses on this, and the capsule asks the user to choose. */
     internal val userPick: StateFlow<AndroidScreen.UserPick?> = _userPick.asStateFlow()
 
-    /** 等用户的那些事办完之后要告诉模型的,下一次读屏或动作时报出去。 */
+    /** What must be reported to the model once the things waiting for the user are done; reported at the next screen read or action. */
     @Volatile internal var pendingReport: Spill? = null
 
-    /** 用户在主屏上点东西的时刻和包(只在动作前后那一小段里记)。 */
+    /** Times and packages of the user's taps on the main screen (recorded only during the short stretch around an action). */
     internal val userTaps = java.util.concurrent.ConcurrentLinkedDeque<MainScreenSpill.Tap>()
 
-    /** 上一次动作开始时主屏交互计数;两次动作之间计数变了,说明用户在主屏上动过手(动作前的点按,时间点拿不到)。 */
+    /**
+     * Main-screen interaction count when the previous action started; if the count changed between two actions,
+     * the user operated the main screen (taps before the action whose exact moment is unavailable).
+     */
     @Volatile internal var lastInteractions = -1L
     internal val spillScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile internal var tapWatch: Job? = null
     @Volatile internal var tapWatchUntil = 0L
 
-    /** 用户回主屏桌面的导航证据；桌面 App 按 HOME 解析，不写死。 */
+    /** Navigation evidence that the user returned to the main screen's launcher; launcher apps are resolved via HOME, not hardcoded. */
     internal val homeApps: Set<String> by lazy {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         runCatching { screen.a11y.packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName } }.getOrDefault(emptyList()).toSet()
     }
 
-    /** 不算开到主屏上的:Claire 自己、桌面 App。 */
+    /** Not counted as opened on the main screen: Claire itself, launcher apps. */
     internal val notSpills: Set<String> by lazy { homeApps + screen.a11y.packageName }
 
-    /** 动作之前:请内置助手盯着主屏,记下此刻两块屏最上面的任务;没有屏、接管中或助手不支持时为 null(不盯)。 */
+    /**
+     * Before an action: ask the built-in assistant to watch the main screen and record the top task of both
+     * screens right now; null (do not watch) when there is no screen, a takeover is in progress, or the
+     * assistant does not support it.
+     */
     internal fun armSpillWatch(): Watch? {
         if (!screen.hasDisplay || screen.handedOver()) return null
         val count = ScreenAccessibility.mainInteractionCount()
@@ -87,7 +100,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return Watch(since, top, agentTop, userActiveBefore).also { watch = it }
     }
 
-    /** 盯梢期间记下用户在主屏上的点按(Claire 自己的浮层不算);到期自己停。 */
+    /** Records the user's taps on the main screen while watching (Claire's own overlays excluded); stops itself when the time is up. */
     internal fun watchUserTaps(until: Long) {
         tapWatchUntil = maxOf(tapWatchUntil, until)
         if (tapWatch?.isActive == true) return
@@ -96,10 +109,13 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
                 screen.a11y.eventsFor(Display.DEFAULT_DISPLAY).collect { e ->
                     val systemTouch = e.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START
                     if (MainScreenSpill.isUserTap(e.eventType) &&
-                        // Claire 浮层自己的控件点击不是用户打开了别的 App;系统触摸事件没有这种包名歧义
+                        // A click on Claire's own overlay control is not the user opening another app; system
+                        // touch events carry no such package-name ambiguity
                         (systemTouch || e.packageName?.toString() != screen.a11y.packageName)
                     ) {
-                        // 系统触摸事件带有真实发生时刻;通知栏、桌面等不发控件点击事件的入口也不能漏掉
+                        // System touch events carry the real time it happened; entry points that emit no
+                        // view-click events, such as the notification shade or the launcher, must not be missed
+                        // either
                         val at = if (systemTouch) e.eventTime else SystemClock.uptimeMillis()
                         userTaps.addLast(MainScreenSpill.Tap(at, e.packageName?.toString()))
                         while (userTaps.size > AndroidScreen.MAX_USER_TAPS) userTaps.pollFirst()
@@ -116,8 +132,9 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 动作之后:问内置助手这次动作开始后主屏冒出来的任务,按 [MainScreenSpill] 判;开到主屏上的挪回 Claire 的屏,
-     * 开在用户正用着的 App 里的只报不动。没有为 null。
+     * After an action: ask the built-in assistant for the tasks that came up on the main screen since this action
+     * started and judge them by [MainScreenSpill]; ones opened on the main screen are moved back to Claire's screen,
+     * ones opened inside the app the user is using are only reported, not moved. null if none.
      */
     internal suspend fun takeSpill(w: Watch?): Spill? {
         if (w == null || screen.handedOver()) return null
@@ -128,10 +145,12 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         for (v in MainScreenSpill.decide(arrivals, w.since, AndroidScreen.SPILL_WINDOW_MS, w.topBefore, notSpills, userTaps.toList(), homeApps, w.userActiveBefore)) {
             val a = v.arrival
             val pkg = a.packageName ?: continue
-            // 开到用户主屏上的不在应用访问边界看的那块屏上:被禁用的不挪、不读
+            // Opened on the user's main screen, which is not the screen the app-access boundary watches: do not move or read it when it is denied
             screen.appAccess.current().denial(pkg)?.let { throw it }
             last = when (v) {
-                // 系统问打开哪一个的先按选择框处理;要用户亲手处理的弹窗(登录验证、账号确认一类)留在主屏,不挪到 Claire 的屏上
+                // When the system asks which one to open, handle it as a chooser first; popups that need the
+                // user's own hands (sign-in verification, account confirmation and the like) stay on the main
+                // screen, not moved to Claire's screen
                 is MainScreenSpill.PullBack -> leaveForUser(a, pkg, w) ?: leavePopup(a, pkg) ?: pullBack(a, pkg) ?: last
                 is MainScreenSpill.InUse -> Spill(OpenedElsewhere(pkg, screen.appLabel(pkg), pulledBack = false, inProfile = inProfileOf(pkg, a.userId)), null)
             }
@@ -141,8 +160,9 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 上一次动作的盯梢还没过期时再问一次(那个动作过了一会儿才开出来的);过期了就清掉。
-     * 用户在主屏上选完、处理完之后要说的,先说这个。
+     * Asks again while the watch from the previous action has not expired (that action opened it a while later);
+     * clears it once expired.
+     * Anything to say after the user finished choosing or handling it on the main screen is said first here.
      */
     internal suspend fun lateSpill(): Spill? {
         pendingReport?.let { pendingReport = null; return it }
@@ -153,15 +173,22 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 冒到主屏上的是要用户亲手处理的弹窗(登录验证、账号确认、付款确认一类):不挪,留在用户屏上。
-     * 判据:系统账号登录服务(登记了账号认证器、没有桌面图标的包)的页面,顶层窗口不是整屏(对话框、底部弹层),窗口里有密码框,或页面本身不进最近任务(excludeFromRecents)。
-     * 这类窗口挪到 Claire 的屏上就从用户眼前消失,用户也就没法在主屏上点确认。不是为 null。
-     * noHistory 不算:很多 App 的开屏页带着它,算进来就把普通 App 当成了弹窗。
+     * What came to the main screen is a popup that needs the user's own hands (sign-in verification, account
+     * confirmation, payment confirmation and the like): do not move it, leave it on the user's screen.
+     * Criteria: a page of a system account-login service (a package with registered account authenticators and no
+     * launcher icon), the top window is not full screen (a dialog, a bottom sheet), the window has a password field,
+     * or the page itself is excluded from recents (excludeFromRecents).
+     * Such a window moved to Claire's screen would disappear from in front of the user, and the user could not tap
+     * confirm on the main screen. null if none of these.
+     * noHistory does not count: many apps' splash pages carry it, and counting it would treat ordinary apps as popups.
      */
     internal suspend fun leavePopup(a: MainScreenSpill.Arrival, pkg: String): Spill? =
         if (needsUserWindow(a, pkg)) popup(a, pkg) else null
 
-    /** 主屏上这个任务的顶层窗口是不是一个要用户亲手处理的弹窗(见 [leavePopup])。最多多等两次 [AndroidScreen.POPUP_SETTLE_MS]。 */
+    /**
+     * Whether this task's top window on the main screen is a popup that needs the user's own hands (see
+     * [leavePopup]). Waits at most two extra [AndroidScreen.POPUP_SETTLE_MS].
+     */
     internal suspend fun needsUserWindow(a: MainScreenSpill.Arrival, pkg: String): Boolean {
         if (isAuthenticatorUi(pkg)) return true
         val activity = a.topActivity?.let {
@@ -169,7 +196,8 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         }
         if (activity != null && activity.flags and ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS != 0) return true
         val metrics = screen.a11y.resources.displayMetrics
-        // 刚冒出来的窗口可能还在开场动画里(画得比整屏小),等它停稳再看一次,免得把普通 App 当成弹窗
+        // A window that just appeared may still be in its opening animation (drawn smaller than full screen);
+        // wait for it to settle and look again, so an ordinary app is not taken for a popup
         var window = topWindowOf(pkg)
         if (window == null) {
             delay(AndroidScreen.POPUP_SETTLE_MS)
@@ -188,22 +216,27 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         ScreenReader.contentWindows(screen.a11y.windowsOn(Display.DEFAULT_DISPLAY)).firstOrNull { it.root?.packageName?.toString() == pkg }
 
     /**
-     * 这个包是不是系统的账号登录服务:登记了账号认证器(AccountManager.authenticatorTypes,平台数据),自己又没有桌面图标
-     * (没有 LAUNCHER 入口)。这种包没有自己的首页,冒到主屏上的只会是加账号、登录、验证、验证码一类页面,本身就是用户的事,
-     * 整屏、没有密码框也不能挪到 Claire 的屏上。有桌面图标的认证器包(同步联系人的聊天 App、邮箱 App 等)不算,
-     * 它们的会话、分享、写信页照常挪回。认证器表每次现读:新装的认证器也认得出,这一步只在有页面冒到主屏时才走。
+     * Whether this package is a system account-login service: it has registered account authenticators
+     * (AccountManager.authenticatorTypes, platform data) and no launcher icon of its own (no LAUNCHER entry). Such a
+     * package has no home page of its own; what it brings to the main screen is only add-account, login, verification
+     * and code-entry pages, which are the user's own business, so even a full-screen one without a password field must
+     * not be moved to Claire's screen. Authenticator packages that do have a launcher icon (chat apps that sync
+     * contacts, mail apps, etc.) do not count, and their session, share and compose pages are moved back as usual. The
+     * authenticator table is read fresh every time: newly installed authenticators are recognized too; this step only
+     * runs when a page comes to the main screen.
      */
     internal fun isAuthenticatorUi(pkg: String): Boolean {
         val authenticators = runCatching { AccountManager.get(screen.a11y).authenticatorTypes.mapNotNull { it.packageName }.toSet() }
             .getOrDefault(emptySet())
         if (pkg !in authenticators) return false
-        // 有桌面图标的包对 Claire 一定看得见(清单里查了 LAUNCHER);查不到才算没有
+        // A package with a launcher icon is definitely visible to Claire (LAUNCHER was queried in the
+        // manifest); only when it cannot be found does it count as absent
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg)
         val hasLauncher = runCatching { screen.a11y.packageManager.queryIntentActivities(launcher, 0).isNotEmpty() }.getOrDefault(true)
         return MainScreenSpill.authenticatorUi(pkg, authenticators, hasLauncher)
     }
 
-    /** 窗口没有遮住整块屏:对话框、底部弹层、悬浮窗一类。 */
+    /** The window does not cover the whole screen: dialogs, bottom sheets, floating windows and the like. */
     internal fun isNarrow(window: AccessibilityWindowInfo, metrics: android.util.DisplayMetrics): Boolean {
         val bounds = Rect()
         window.getBoundsInScreen(bounds)
@@ -214,8 +247,10 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         Spill(OpenedElsewhere(pkg, screen.appLabel(pkg), pulledBack = false, inProfile = inProfileOf(pkg, a.userId), needsUser = true), null)
 
     /**
-     * 开到主屏上的是系统问「用哪一个打开」的窗口(系统的选择器,或系统包的窗口里的选项对得上装了两份的 App;
-     * 各系统的选择框不一定是原版那个):不挪,留给用户在自己屏上选,记下来让任务等着。不是为 null。
+     * What was opened on the main screen is the system window asking "open with which one" (the system picker, or a
+     * system package's window whose options match an app installed twice; each system's chooser is not necessarily the
+     * stock one): do not move it, leave it for the user to choose on their own screen, and record it so the task waits.
+     * null if not.
      */
     internal suspend fun leaveForUser(a: MainScreenSpill.Arrival, pkg: String, w: Watch): Spill? {
         val system = screen.isSystemPackage(pkg)
@@ -226,14 +261,17 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return Spill(OpenedElsewhere(pkg, app, pulledBack = false, picker = true), choice)
     }
 
-    /** 把开到主屏上的任务挪到 Claire 的屏(只挪,不替它重新打开),等它到最上面;挪不动为 null。 */
+    /**
+     * Moves the task opened on the main screen to Claire's screen (move only, never reopening it on its
+     * behalf), and waits for it to come to the top; null if it cannot be moved.
+     */
     internal suspend fun pullBack(a: MainScreenSpill.Arrival, pkg: String, byUser: Boolean = false): Spill? {
         if (!runCatching { screen.shell.moveTask(a.taskId, screen.displayId) }.getOrDefault(false)) {
             Log.w(AndroidScreen.TAG, "could not move task ${a.taskId} ($pkg) from the main screen")
             return null
         }
         adopted += a.taskId
-        // 事先不知道会开出哪个 App:挪回来后再占;占不到也不撤回
+        // Which app it will open is unknown in advance: reserve after moving it back; if the reservation fails, do not undo the move
         if (screen.checkOtherTasks) screen.reserve(pkg)
         val deadline = SystemClock.uptimeMillis() + AndroidScreen.LAUNCH_WAIT_MS
         while (runCatching { screen.shell.topTaskId(screen.displayId) }.getOrDefault(-1) != a.taskId && SystemClock.uptimeMillis() < deadline) delay(AndroidScreen.POLL_MS)
@@ -243,8 +281,10 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 主屏上这个系统包的窗口是不是在问打开哪一个:事先不知道是为哪个 App 问的,拿装了两份的 App 的名字去对窗口里的选项
-     * (同一个 App 装了两份正是会这样问的情形);只读这个系统窗口,对不上为 null。
+     * Whether this system package's window on the main screen is asking which one to open: which app it is asking
+     * about is unknown in advance, so the names of apps installed twice are matched against the window's options
+     * (having the same app installed twice is exactly when it asks this way); only this system window is read, null
+     * when nothing matches.
      */
     internal suspend fun mainChooser(pkg: String): LaunchChoice? {
         val w = ScreenReader.contentWindows(screen.a11y.windowsOn(Display.DEFAULT_DISPLAY)).firstOrNull { it.root?.packageName?.toString() == pkg } ?: return null
@@ -257,9 +297,12 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 任务在下一个改动屏幕的动作前调:等用户在主屏上选完(选之前一直盯着主屏)。选完后,开到主屏上的普通页面挪回 Claire 的屏
-     * (只挪,打开它的仍是原来那个 App);要用户亲手处理的(要输密码、窗口读不到,像付款、指纹)留在主屏,返回 [AndroidScreen.PickResult.NeedsUser];
-     * 开在了 Claire 屏上的一并算进来;用户把问题关了就照实说。没在等时为 null。
+     * Called by the task before the next action that changes the screen: waits for the user to finish choosing on the
+     * main screen (watching the main screen until they do). After choosing, ordinary pages opened on the main screen
+     * are moved back to Claire's screen (move only; the app that opened them is still the original one); ones that need
+     * the user's own hands (a password to type, an unreadable window, e.g. payments or fingerprint) stay on the main
+     * screen and [AndroidScreen.PickResult.NeedsUser] is returned; ones opened on Claire's screen also count; if the
+     * user dismissed the question, say so truthfully. null when not waiting.
      */
     suspend fun awaitUserPick(): AndroidScreen.PickResult? = withContext(Dispatchers.IO) {
         val p = _userPick.value ?: return@withContext null
@@ -283,7 +326,7 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
                     pendingReport = pullBack(opened, pkg)
                     return@withContext AndroidScreen.PickResult.Settled
                 }
-                // 选中的 App 开在了 Claire 的屏上(从那边打开的)
+                // The chosen app opened on Claire's screen (it was opened from over there)
                 val top = runCatching { screen.shell.topTaskId(screen.displayId) }.getOrDefault(-1)
                 if (top >= 0 && top != p.agentTop && top !in adopted) {
                     adopted += top
@@ -303,7 +346,10 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         }
     }
 
-    /** 用户处理完([AndroidScreen.PickResult.NeedsUser])点了继续:它还在主屏上就挪回 Claire 的屏接着做,已经关了就照实说。 */
+    /**
+     * The user finished ([AndroidScreen.PickResult.NeedsUser]) and tapped continue: if it is still on the main
+     * screen, move it back to Claire's screen and carry on; if it has closed, say so truthfully.
+     */
     suspend fun afterUserStep(r: AndroidScreen.PickResult.NeedsUser) = withContext(Dispatchers.IO) {
         val still = runCatching { screen.shell.displayOfTask(r.taskId) }.getOrDefault(-1) == Display.DEFAULT_DISPLAY
         val moved = if (still) pullBack(MainScreenSpill.Arrival(r.taskId, r.packageName, r.userId, 0, Display.DEFAULT_DISPLAY, false, true, Display.DEFAULT_DISPLAY), r.packageName, byUser = true) else null
@@ -311,13 +357,16 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 主屏上这个 App 的窗口要用户亲手处理:有密码框,或树里读不出东西而截主屏时系统报防截屏窗口(截到的画面不留,马上丢掉)。
-     * 只看有没有,不读里面写了什么。
+     * This app's window on the main screen needs the user's own hands: it has a password field, or nothing can be read
+     * from the tree and taking a main-screen screenshot makes the system report a secure window (the captured picture
+     * is not kept, it is recycled at once).
+     * Only checks whether such a thing is there, never reads what is written in it.
      */
     internal suspend fun needsUser(pkg: String): Boolean {
-        // 读的是用户主屏上的窗口,应用访问边界看不到:被禁用的不读
+        // Reading a window on the user's main screen, which the app-access boundary cannot see: do not read it when it is denied
         screen.appAccess.current().denial(pkg)?.let { throw it }
-        // 刚上来的窗口要一会儿才读得到:读得到内容(或看到密码框)就下结论,到时限还读不到再看是不是防截屏
+        // A window that just came up takes a while to become readable: conclude once content can be read (or a
+        // password field is seen); if still unreadable at the time limit, check whether it is a secure window
         val deadline = SystemClock.uptimeMillis() + AndroidScreen.PICK_READ_MS
         while (true) {
             val mine = ScreenReader.contentWindows(screen.a11y.windowsOn(Display.DEFAULT_DISPLAY)).filter { it.root?.packageName?.toString() == pkg }
@@ -334,8 +383,9 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
     }
 
     /**
-     * 动作之前 Claire 屏上最上面的是挪回来的任务(或从它里面打开的),动作之后最上面换成了另一个任务:
-     * 这个也是那条路上打开的,一并算进来。装了两份的 App 报开的是哪一份。
+     * If the task on top of Claire's screen before the action was one moved back (or one opened from it), and after
+     * the action the top has changed to another task: that one was opened along the same path too, count it as well.
+     * For an app installed twice, reports which copy was opened.
      */
     internal suspend fun adoptFromAdopted(w: Watch?): String? {
         if (w == null || w.agentTopBefore !in adopted) return null
@@ -346,7 +396,10 @@ internal class ScreenSpill(private val screen: AndroidScreen) {
         return inProfileOf(pkg, runCatching { screen.shell.userOfTask(top) }.getOrDefault(-1))
     }
 
-    /** 装了两份的 App 开的是哪一份:和 Claire 同一个用户的是本来那份;只装了一份或看不出为 null。 */
+    /**
+     * Which copy of an app installed twice was opened: the same user as Claire means the original copy; null
+     * when installed only once or undeterminable.
+     */
     internal suspend fun inProfileOf(pkg: String, userId: Int): String? {
         if (userId < 0 || pkg !in screen.otherProfiles()) return null
         return if (userId == AndroidScreen.myUser) OpenedElsewhere.MAIN_PROFILE else OpenedElsewhere.OTHER_PROFILE

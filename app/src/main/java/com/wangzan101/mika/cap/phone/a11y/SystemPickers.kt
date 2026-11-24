@@ -7,11 +7,12 @@ import android.provider.MediaStore
 import android.provider.Settings
 
 /**
- * 目标 App 调起的系统界面所在的包(权限框、选择器、文件和照片选择器):出现在前台不算被切走。
- * 按标准 Intent 解析得到,不写死包名。
+ * Packages of the system UIs a target app brings up (permission dialogs, choosers, file and photo pickers): their
+ * appearing in the foreground does not count as the app being switched away.
+ * Resolved from standard Intents; package names are not hardcoded.
  */
 internal object SystemPickers {
-    /** 系统自带的选择器(ResolverActivity 等)所在的包。 */
+    /** Package of the system-provided chooser (ResolverActivity and the like). */
     const val SYSTEM_PACKAGE = "android"
     private const val ACTION_REQUEST_PERMISSIONS = "android.content.pm.action.REQUEST_PERMISSIONS"
 

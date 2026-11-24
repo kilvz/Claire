@@ -31,15 +31,18 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 读屏 / 截图 / 界面事件:把 Agent 虚拟屏读成快照与文字,截帧,监视界面事件。
- * 共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
+ * Screen reading / screenshots / UI events: reads the Agent virtual screen into snapshots and text, captures frames,
+ * and watches UI events.
+ * Fields and methods shared with [AndroidScreen] are accessed through [screen] as a forward reference.
  */
 internal class ScreenCapture(private val screen: AndroidScreen) {
 
     internal fun windows() = screen.a11y.windowsOn(screen.displayId)
     /**
-     * 应用访问的窗口探针:屏上各 App 窗口的归属,只读根节点的包名、不读内容。读不到根节点的那一项为 null(归属未知);
-     * 没有 App 窗口时是最上面任务的 App,也没有就是空屏(空列表)。规则和读屏结果里的窗口归属一致。
+     * Window probe for app access: the ownership of each app window on the screen, reading only the root node's
+     * package name and no content. Entries whose root node cannot be read are null (ownership unknown); when there are
+     * no app windows it is the top task's app, and when there is none either it is the empty screen (empty list). Same
+     * rules as the window ownership in screen-read results.
      */
     suspend fun accessPackages(): List<String?> = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext emptyList()
@@ -51,14 +54,14 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
     internal fun read() = ScreenReader.read(windows(), screen.screenWidth, screen.screenHeight)
     internal fun treeHash() = ScreenReader.hash(windows())
 
-    /** 显式使用系统命令或事件工具时按需建屏;普通任务等到第一次打开 App 才建。 */
+    /** Creates the screen on demand when a system command or event tool is used explicitly; ordinary tasks wait until the first app is opened. */
     suspend fun ensureDisplay() { screen.display.get() }
 
-    // ---------- 读屏 ----------
+    // ---------- Screen reading ----------
 
     suspend fun snapshot(): ScreenSnapshot = capture(register = true)
 
-    // 不进编号登记表:模型手里最新的 ref 仍然有效
+    // Not entered into the number registry: the latest ref the model holds still stays valid
     suspend fun peek(): ScreenSnapshot = capture(register = false)
 
     /** Device-local SMS verification needs the exact IDs, including IDs on labelled buttons. */
@@ -67,7 +70,8 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
 
     internal suspend fun capture(register: Boolean, fullResourceIds: Boolean = false): ScreenSnapshot = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext ScreenSnapshot(snapshotId(), null, emptyList(), screen.screenWidth, screen.screenHeight, hasWindow = false)
-        // 上一个动作过了一会儿才开到用户主屏上的:先挪回来再读(只在模型要读的这一屏上做,不在判效果的那一眼里做)
+        // Something a previous action opened on the user's main screen after a while: move it back before
+        // reading (only on the screen the model is about to read, not in the glance that judges the effect)
         val late = if (register) screen.spill.lateSpill() else null
         val r = read()
         val after = treeHash()
@@ -86,17 +90,19 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
             hasWindow = r.anyAppWindow,
             unreadableApp = foreground,
             windows = r.windows,
-            // 还在等用户在主屏上选:照样说一声
+            // Still waiting for the user to choose on the main screen: say so as well
             opened = late?.opened ?: screen.spill._userPick.value?.let { OpenedElsewhere(it.packageName, it.app, pulledBack = false, picker = true) },
-            // 黑帧只说明画面不可用,不能据此声称窗口防截屏;读屏元素仍可作为降级路径。
+            // A black frame only means the picture is unavailable; it cannot prove a window is secure.
+            // Screen-read elements can still serve as a fallback path.
             captureError = if ((r.anyAppWindow || foreground != null) && frameServable() && screen.frameBlack() == true)
                 ScreenDiagnosis.DISPLAY_CAPTURE_UNAVAILABLE else null,
         )
     }
 
     /**
-     * 窗口内容读不到时(安全窗口、启动画面、显示在别处),按 Agent 屏上最上面的任务认前台是哪个 App;
-     * 屏还没建、没有任务或问不到为 null。
+     * When the window content cannot be read (a secure window, a splash screen, shown elsewhere), identify the
+     * foreground app by the top task on the Agent screen; null when the screen is not created yet, there is no task, or
+     * it cannot be asked.
      */
     internal fun foregroundTaskPackage(): String? {
         if (!screen.hasDisplay) return null
@@ -106,8 +112,10 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
     }
 
     /**
-     * Claire 屏上最上面的那个 App(包名、任务、所属用户),每换一个给一次:订阅时先给一次,之后窗口一变(开了新页面、
-     * 从别的 App 里点开了另一个 App、另一份顶上来)就重读。屏还没建、没有任务时不给。在调用方的线程上问内置助手。
+     * The app on top of Claire's screen (package name, task, owning user), re-emitted every time it changes: emitted
+     * once on subscription, then re-read whenever windows change (a new page opened, another app opened from inside
+     * another app, another copy coming on top). Emits nothing while the screen is not created or there is no task. Asks
+     * the built-in assistant on the caller's thread.
      */
     fun foregroundApps(): Flow<AndroidScreen.TargetApp> = flow {
         emit(Unit)
@@ -121,11 +129,15 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
     }.distinctUntilChanged { a, b -> a.packageName == b.packageName && a.userId == b.userId }
 
     suspend fun screenshotPng(): ByteArray? = withContext(Dispatchers.IO) {
-        // 黑图没有可用画面信息,也不能凭它区分安全窗口和合成失败;不要交给模型或 OCR。
+        // A black picture has no usable picture information, and it cannot distinguish a secure window from a
+        // compositing failure; never hand it to the model or OCR.
         if (!frameServable() || screen.frameBlack() == true) return@withContext null
         screen.display.current?.latestFramePng()
     }
-    /** 此刻能不能把 Agent 屏的最新帧交给模型:启动后还没收到新帧时不给,直到新帧到达才解除。 */
+    /**
+     * Whether the latest frame of the Agent screen may be handed to the model right now: not until a new frame
+     * arrives after launch, and the guard lifts only then.
+     */
     internal fun frameServable(): Boolean = when (FrameFreshness.serve({ screen.display.current?.lastFrameAt() }, screen.frameGuardSince)) {
         FrameFreshness.Serve.Guarded -> false
         FrameFreshness.Serve.Fresh -> {
@@ -134,7 +146,7 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
         }
     }
 
-    /** 等这次画面变化之后的首帧;等不到也继续保持保护,不能把旧帧放行。 */
+    /** Waits for the first frame after this picture change; if none arrives, keep the guard on and never let an old frame through. */
     internal suspend fun awaitFrameAfter(startedAt: Long) {
         screen.frameGuardSince = startedAt
         if (FrameFreshness.awaitNewFrame(
@@ -147,8 +159,10 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
     }
 
     /**
-     * 认屏上文字。自绘界面几乎没有无障碍事件,事件安静了画面可能还在过渡:先等画面停稳再认;认的过程中换了整页就按新的一页再认
-     * (规则见 [StillFrameRead])。局部在动(动图头像、光标)不影响字的位置,照用,不再整个丢掉。
+     * Recognizes text on screen. Custom-drawn UIs emit almost no accessibility events, and when the events are quiet
+     * the picture may still be transitioning: wait for the picture to settle before recognizing; if the whole page
+     * changed during recognition, recognize the new page again (rules in [StillFrameRead]). Local motion (animated
+     * avatars, cursor) does not affect text positions, so it is used as is and no longer throws the whole result away.
      */
     suspend fun readVisibleText(): List<VisibleTextLine>? = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay || !frameServable() || screen.frameBlack() == true) return@withContext null
@@ -167,9 +181,10 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
         if (!screen.hasDisplay) return@withContext ScreenDiagnosis.classify(
             ScreenFacts(currentApp = null, hasWindow = false, readableElements = 0, changing = false, blackFrames = emptyList(), texts = emptyList(), passwordField = false),
         )
-        // 先看界面会不会安静下来:一直有变化就是还在加载
+        // First see whether the UI quiets down: constant change means it is still loading
         val quiet = screen.withEventClock { clock -> clock.awaitQuiet(AndroidScreen.QUIET_MS, AndroidScreen.CHECK_CAP_MS) }
-        // 安静时看两次;持续全黑只报画面不可用,不把黑像素当成防截屏的证据
+        // When quiet, look twice; consistently all-black only reports the picture as unavailable, black pixels
+        // are not taken as evidence of a secure window
         val black = mutableListOf<Boolean>()
         screen.frameBlack()?.let(black::add)
         if (quiet) {
@@ -197,7 +212,7 @@ internal class ScreenCapture(private val screen: AndroidScreen) {
         screen.withEventClock { clock -> clock.awaitQuiet(AndroidScreen.QUIET_MS, timeoutMs) }
     }
 
-    /** 这块虚拟屏的下一条界面事件(悬停一类不算);屏还没开时等满时限。 */
+    /** The next UI event on this virtual screen (hover-type ones excluded); waits the full time limit when the screen is not open yet. */
     suspend fun awaitChange(timeoutMs: Long): Boolean = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) { delay(timeoutMs.coerceAtLeast(0)); return@withContext false }
         withTimeoutOrNull(timeoutMs.coerceAtLeast(0)) { screen.a11y.eventsFor(screen.displayId).first { it.eventType and AndroidScreen.IGNORED_EVENTS == 0 } } != null

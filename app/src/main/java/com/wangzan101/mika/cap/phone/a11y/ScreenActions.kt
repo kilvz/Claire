@@ -14,8 +14,9 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
- * 点 / 滑 / 滚 / 返回等动作:下发触摸、点击、滚动、按键,并核对结果。
- * 共享 [AndroidScreen] 的字段与方法经 [screen] 后向引用访问。
+ * Actions such as tap / swipe / scroll / back: dispatch touches, clicks, scrolls and key presses, and verify the
+ * result.
+ * Fields and methods shared with [AndroidScreen] are accessed through [screen] as a forward reference.
  */
 internal class ScreenActions(private val screen: AndroidScreen) {
 
@@ -25,7 +26,7 @@ internal class ScreenActions(private val screen: AndroidScreen) {
         SystemCommandResult(result.getInt("exitCode", -1), result.getString("output").orEmpty())
     }
 
-    // ---------- 动作 ----------
+    // ---------- Actions ----------
 
     suspend fun tapRef(ref: String, snapshotId: String): ActionResult = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext AndroidScreen.NO_APP_OPEN
@@ -63,7 +64,8 @@ internal class ScreenActions(private val screen: AndroidScreen) {
         screen.verified { doubleTapAt(screen.pacing.near(x, y)) }
     }
 
-    // 双击只能是一次手势里的两笔:分两次下发,中间的回调延迟可能超过系统认双击的时限
+    // A double tap must be two strokes within one gesture: dispatched separately, the callback delay in between
+    // may exceed the system's double-tap time limit
     internal suspend fun doubleTapAt(at: Pair<Int, Int>): Boolean {
         delay(screen.pacing.approach())
         return screen.a11y.taps(screen.displayId, at.first.toFloat(), at.second.toFloat(), 2, screen.pacing.doublePress(), screen.pacing.doubleGap())
@@ -78,7 +80,8 @@ internal class ScreenActions(private val screen: AndroidScreen) {
         if (!screen.hasDisplay) return@withContext AndroidScreen.NO_APP_OPEN
         if (paths.isEmpty() || paths.size > 2 || paths.any { it.size < 2 || it.size > 32 }) return@withContext ActionResult.Failed("invalid_gesture")
         screen.verified {
-            // 一根手指照着画好的路径走,按节奏排快慢;几根手指一起动的只让时长浮动一点
+            // One finger follows the prepared path, with pacing shaping the speed; several fingers moving
+            // together only get their duration varied a little
             if (paths.size == 1) return@verified screen.drag(paths.single(), durationMs, bow = false)
             delay(screen.pacing.approach())
             screen.a11y.gesture(screen.displayId, paths.map(screen::pathOf), screen.pacing.duration(durationMs))
@@ -97,7 +100,7 @@ internal class ScreenActions(private val screen: AndroidScreen) {
         }
         val node = start?.let { screen.ancestorOrSelf(it) { n -> n.isScrollable } }
         if (node == null) {
-            // 没有可滚动的控件时用屏幕中部的滑动代替
+            // When there is no scrollable view, fall back to a swipe in the middle of the screen
             val cx = screen.screenWidth / 2
             val (from, to) = if (down) screen.screenHeight * 3 / 4 to screen.screenHeight / 4 else screen.screenHeight / 4 to screen.screenHeight * 3 / 4
             val r = swipe(cx, from, cx, to)
@@ -108,8 +111,11 @@ internal class ScreenActions(private val screen: AndroidScreen) {
     }
 
     /**
-     * 停留时顺手轻轻滚一下:在占了大半屏的那块可滚动内容(信息流、正文)正中慢慢划 [fraction] 个屏高,停稳再抬手、不甩。
-     * 弹着输入法、输入框拿着焦点、上面盖着别的窗口(弹框、浮层)、没有够大的可滚动内容时不滚。
+     * While idling, scroll gently: slowly swipe [fraction] of the screen height down the middle of the scrollable
+     * content that takes up most of the screen (a feed, an article), then settle before lifting the finger, without a
+     * fling.
+     * Does not scroll while the input method is up, an input field has focus, another window covers it (a dialog, an
+     * overlay), or there is no scrollable content large enough.
      */
     suspend fun idleScroll(fraction: Double): Boolean = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay || screen.textInput.imeBox() != null || screen.focusedEditable() != null) return@withContext false
@@ -122,21 +128,27 @@ internal class ScreenActions(private val screen: AndroidScreen) {
         if (dist < AndroidScreen.IDLE_MIN_PX) return@withContext false
         val cx = area.centerX()
         val mid = area.centerY()
-        // 往下看(fraction 为正)手指往上划
+        // Looking further down (positive fraction) means moving the finger up
         val (from, to) = if (fraction > 0) mid + dist / 2 to mid - dist / 2 else mid - dist / 2 to mid + dist / 2
         screen.drag(listOf(cx to from, cx to to), AndroidScreen.IDLE_SCROLL_MS, bow = true)
     }
 
     suspend fun back(): ActionResult = withContext(Dispatchers.IO) {
         if (!screen.hasDisplay) return@withContext AndroidScreen.NO_APP_OPEN
-        // 按键注入 → 点屏上返回控件。逐级降级,不把某个设备上的单点失败当整体不可用。
-        // 不再退回 performGlobalAction(GLOBAL_ACTION_BACK):它作用在服务当前聚焦的屏,焦点在主屏时会把主屏退掉一层(#789)。
+        // Key injection → tap a back control on screen. Degrade step by step, and do not treat a single point
+        // failure on some device as overall unavailability.
+        // No longer fall back to performGlobalAction(GLOBAL_ACTION_BACK): it acts on the display the service
+        // currently focuses, so when the focus is on the main screen it would back the main screen out one
+        // level (#789).
         screen.verified(fallback = { clock -> tapBackControl(clock) }) {
             screen.shell.injectKey(screen.displayId, KeyEvent.KEYCODE_BACK)
         }
     }
 
-    /** back 注入没生效时,点屏上可见的返回控件。认不到返回控件就 false,不硬点。 */
+    /**
+     * When the back injection had no effect, tap the visible back control on screen. Returns false when no back
+     * control is recognized; never taps blindly.
+     */
     internal suspend fun tapBackControl(clock: AndroidScreen.EventClock): Boolean {
         val c = BackAffordance.find(screen.peek().elements, screen.screenWidth, screen.screenHeight) ?: return false
         clock.mark()

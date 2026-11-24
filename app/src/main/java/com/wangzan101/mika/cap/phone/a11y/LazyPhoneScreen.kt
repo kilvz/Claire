@@ -18,14 +18,22 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** 操作手机 App 需要的(内置助手、无障碍)此刻没有;[hint] 是告诉模型和用户怎么弄好的一句话。 */
+/**
+ * What operating phone apps needs (the built-in assistant, accessibility) is not available right now; [hint] is
+ * one sentence telling the model and the user how to fix it.
+ */
 class PhoneUnavailable(val hint: String) : Exception(hint)
 
 /**
- * 用到时才接上的手机端口:第一次 launch_app / open_link,或系统命令、事件工具时才调 [acquire](连内置助手、等无障碍、备好虚拟屏;屏在这些动作用到时才建);
- * 只用网页或沙箱的任务从头到尾不需要内置助手和无障碍。没接上之前读屏是一块空屏、其余动作报 no_app_open,
- * 和接上后还没打开 App 时一样。接不上时这次动作报 phone_unavailable(附怎么弄好),下次再试。
- * 装了哪些 App 只问包管理器([listApps]),不用接上;另一份用户里的 App 没接上时问 [appCopies](内置助手已连着才有,不为它去接)。
+ * A phone port that is only connected when needed: [acquire] is called on the first launch_app / open_link, or for
+ * system commands and event tools (connect the built-in assistant, wait for accessibility, prepare the virtual
+ * screen; the screen is created when these actions need it). Tasks that only use the web or a sandbox need no
+ * built-in assistant and no accessibility from start to finish. Before connecting, reading the screen yields an
+ * empty screen and other actions report no_app_open, just as after connecting but before opening an app. When
+ * connecting fails, this action reports phone_unavailable (with how to fix it) and the next attempt tries again.
+ * Which apps are installed is asked only from the package manager ([listApps]), no connection needed; apps in
+ * another user profile are asked via [appCopies] only once connected (available only when the built-in assistant is
+ * already connected; never connect just for that).
  */
 class LazyPhoneScreen(
     private val width: Int,
@@ -39,10 +47,13 @@ class LazyPhoneScreen(
     private val lock = Mutex()
     @Volatile private var port: ScreenPort? = null
 
-    /** 模型标下的任务结束时各 App 的去留;收尾时由任务交给内置助手执行(没接上过手机就没有可处理的)。 */
+    /**
+     * What happens to each app when the model-marked task ends; at wrap-up the task hands this to the built-in
+     * assistant to execute (nothing to handle if the phone was never connected).
+     */
     override val afterTask = AfterTaskMarks()
 
-    /** 本任务用过手机(已接上)。 */
+    /** This task has used the phone (already connected). */
     val acquired: Boolean get() = port != null
 
     private suspend fun built(): ScreenPort? = lock.withLock {
@@ -66,7 +77,7 @@ class LazyPhoneScreen(
     override suspend fun openApp(packageName: String, cold: Boolean): ActionResult = built()?.openApp(packageName, cold) ?: unavailable()
     override suspend fun openAppCopy(packageName: String, userId: Int, cold: Boolean): ActionResult =
         built()?.openAppCopy(packageName, userId, cold) ?: unavailable()
-    // 被别的任务占着才会等,那时手机早已接上;没接上就没什么可等
+    // Waits only when another task holds it, and by then the phone is long connected; nothing to wait for if not connected
     override suspend fun awaitAppFree(packageName: String, userId: Int?, timeoutMs: Long): AppWait =
         port?.awaitAppFree(packageName, userId, timeoutMs) ?: AppWait.Unsupported
     override suspend fun openLink(action: String?, uri: String?, packageName: String?): ActionResult =
@@ -82,7 +93,7 @@ class LazyPhoneScreen(
     override suspend fun setWheel(ref: String, snapshotId: String, value: String): WheelOutcome =
         port?.setWheel(ref, snapshotId, value) ?: WheelOutcome(false, null, null, 0, "none", error = "no_app_open")
 
-    // ---------- 没接上之前:还没有打开的 App ----------
+    // ---------- Before connecting: no app is open yet ----------
 
     override suspend fun snapshot(): ScreenSnapshot = port?.snapshot() ?: empty()
     override suspend fun peek(): ScreenSnapshot = port?.peek() ?: empty()
@@ -121,7 +132,8 @@ class LazyPhoneScreen(
         return screen.systemCommand(command)
     }
     override suspend fun listApps(): List<Pair<String, String>> = port?.listApps() ?: listApps.invoke()
-    // 要问内置助手:没接上之前不为它去接(接不上会请用户设置),打开过 App 之后才有
+    // Must ask the built-in assistant: never connect just for this before the phone is connected (if it cannot
+    // connect, the user is asked to set it up); available only after an app has been opened
     override suspend fun otherProfiles(): Map<String, List<String>> = port?.otherProfiles() ?: emptyMap()
     override suspend fun appCopies(): List<AppCopy> = port?.appCopies() ?: appCopies.invoke()
     override suspend fun checkScreen(): ScreenCheck? = port?.checkScreen()

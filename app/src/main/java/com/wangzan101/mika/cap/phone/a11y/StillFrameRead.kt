@@ -3,20 +3,29 @@ package com.wangzan101.mika.cap.phone.a11y
 import com.wangzan101.mika.cap.phone.display.FrameMath
 
 /**
- * 认屏上文字(OCR)前后对画面的要求。自绘界面几乎不发无障碍事件,「事件安静」不等于画完:
- * 刚进页面、键盘在升起时认,认到的是过渡帧,或者认完画面已经换了、只好丢掉。
+ * Frame requirements around recognizing text on screen (OCR). Custom-drawn UIs emit almost no accessibility events,
+ * and "events quiet" does not mean the drawing is done: recognizing right after entering a page or while the keyboard
+ * is rising yields a transitional frame, or the picture has already changed by the time recognition finishes and the
+ * result has to be discarded.
  *
- * - 认之前等画面停稳:前后两帧相近([FrameMath.differs] 为假),最多等 [STILL_CAP_MS];一直有局部在动(动图头像、光标)也到时就认。
- * - 认完整页变了([FrameMath.pageChanged]):字的位置已经对不上,按新的一页再认一次,最多 [ATTEMPTS] 次;局部变化不影响字的位置,照用。
+ * - Before recognizing, wait for the picture to settle: two consecutive frames similar ([FrameMath.differs] false),
+ *   waiting at most [STILL_CAP_MS]; if something local is always moving (animated avatars, cursor) recognize anyway
+ *   when the time is up.
+ * - If the whole page changed during recognition ([FrameMath.pageChanged]): the text positions no longer match, so
+ *   recognize the new page again, up to [ATTEMPTS] times; local changes do not affect text positions and are used
+ *   as they are.
  *
- * 时钟、等待、取帧都由调用方注入,便于在 JVM 上测。
+ * Clock, sleeping and frame capture are all injected by the caller so this can be tested on the JVM.
  */
 internal object StillFrameRead {
     const val POLL_MS = 120L
     const val STILL_CAP_MS = 1_200L
     const val ATTEMPTS = 2
 
-    /** [recognize] 认当前一帧;它给 null(没有画面)时直接返回 null。每次都整页变了也返回 null。 */
+    /**
+     * [recognize] recognizes the current frame; when it yields null (no picture), return null right away. Also
+     * returns null if the whole page changed on every attempt.
+     */
     suspend fun <T : Any> read(now: () -> Long, sleep: suspend (Long) -> Unit, frame: () -> IntArray?, recognize: suspend () -> T?): T? {
         repeat(ATTEMPTS) {
             awaitStill(now, sleep, frame)
@@ -27,7 +36,10 @@ internal object StillFrameRead {
         return null
     }
 
-    /** 等到前后两帧相近;到时限还在动返回 false。没有画面时不等。 */
+    /**
+     * Waits until two consecutive frames are similar; returns false if still moving when the time limit is
+     * reached. Does not wait when there is no picture.
+     */
     suspend fun awaitStill(now: () -> Long, sleep: suspend (Long) -> Unit, frame: () -> IntArray?): Boolean {
         val deadline = now() + STILL_CAP_MS
         var prev = frame() ?: return true
