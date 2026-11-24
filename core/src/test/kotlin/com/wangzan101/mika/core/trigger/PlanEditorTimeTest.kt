@@ -80,7 +80,7 @@ class PlanEditorTimeTest {
         assertEquals(newTime.toEpochMilli(), edited.nextAtMs)
     }
 
-    /** 日期/时间选择器读编辑框:当地格式和 ISO 都要认,填错的返回空让用户继续改。 */
+    /** The date/time pickers read the editor fields: both the local format and ISO must be accepted, and invalid input returns null so the user can keep editing. */
     @Test fun pickersReadLocalAndIsoEditorTimes() {
         assertEquals(
             LocalDateTime.of(2026, 11, 13, 9, 30),
@@ -95,7 +95,7 @@ class PlanEditorTimeTest {
         assertNull(parsePlanEditorTime("2026-11-13 09:30", "not/a zone"))
     }
 
-    /** 时刻芯片的解析和写回与保存规则一致:排序、去重、补零;有坏条目就不出芯片。 */
+    /** Parsing and writing back the time chips follows the save rules: sort, dedupe, zero-pad; any bad entry produces no chips at all. */
     @Test fun clockChipsRoundTripTheSameTextTheEditorSaves() {
         assertEquals(
             listOf(LocalTime.of(8, 0), LocalTime.of(12, 30), LocalTime.of(20, 0)),

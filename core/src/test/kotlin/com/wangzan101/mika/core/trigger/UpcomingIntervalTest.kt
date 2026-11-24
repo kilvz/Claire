@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.trigger
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 编辑计划时预览「接下来几次」:恰好落在间隔整倍数上的那次也要算进去。 */
+/** Previewing the "next few runs" while editing a plan: a run falling exactly on a whole multiple of the interval is included too. */
 class UpcomingIntervalTest {
     private fun plan() = TriggerDefinition("p", "t", "goal", 1_000, intervalMs = 1_000)
 

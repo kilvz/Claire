@@ -46,7 +46,7 @@ class ToolDispatcherVisionTest {
         assertEquals("unknown_tool", toolDispatcher(LocScreen()).execute(call("phone_find_visually", """{"target":"x"}""")).content.s("error"))
         val withVision = dispatcher(LocScreen()).definitions().map { it.name }
         assertTrue("phone_find_visually" in withVision); assertTrue("phone_describe" in withVision)
-        // 看图模型和主模型能不能看图是两回事:screenshot 仍只跟着主模型
+        // Whether the vision model and the main model can view images are two separate things: screenshot still follows the main model only
         assertFalse("phone_screenshot" in withVision)
     }
 
@@ -67,14 +67,14 @@ class ToolDispatcherVisionTest {
         val d = dispatcher(s)
         val r = d.tapRef(d.locateWlan())
         assertEquals(r.toString(), "true", r.s("ok"))
-        // 登记的是 0–999 坐标,按屏幕像素点(M1 的坐标点击,带动作后核实)
+        // Refs are registered in 0–999 coordinates and tapped at screen pixels (M1 coordinate tap, with post-action verification)
         assertEquals(listOf("540,312"), s.taps)
         assertEquals("true", r.s("changed"))
         assertEquals("WLAN", r.s("located"))
     }
 
     @Test fun unbackedPointOnAnEmptyTreeIsTappableAndSaysSo() = runTest {
-        // 定位准度没验证过的看图模型,树里什么都没有:点照样能点,结果说明它没佐证、要看效果
+        // A vision model whose locating accuracy is unverified, with nothing in the tree: the tap still works, and the result says it is unbacked and to check the effect
         val model = com.wangzan101.mika.core.agent.FakeModel(
             *listOf("""{"bbox_2d":[0,880,1000,940],"seen":"输入框"}""", "是").map {
                 com.wangzan101.mika.core.model.ModelReply(listOf(Part.Text(it)), com.wangzan101.mika.core.model.StopReason.EndTurn, null)
@@ -100,7 +100,7 @@ class ToolDispatcherVisionTest {
         s.show(FRAME_A)
         assertEquals("ref_expired", d.tapRef(ref.first to "loc_other").s("error"))
         assertTrue(s.taps.isEmpty())
-        // 画面变了的 @v 也不能拿来往那一点上打字
+        // An @v from a changed screen also cannot be used to type at that point
         s.show(FRAME_B)
         assertEquals("ref_expired", d.execute(call("phone_type_text", """{"text":"a","ref":"${ref.first}","snapshotId":"${ref.second}"}""")).content.s("error"))
         assertTrue(s.taps.isEmpty())
@@ -118,7 +118,7 @@ class ToolDispatcherVisionTest {
         assertEquals(listOf("540,312", "phone_back"), s.taps)
     }
 
-    // 复审小项:换算像素按此刻的一屏,不按模型上次读的
+    // Review nit: pixel conversion uses the screen as of now, not the one the model last read
     @Test fun tapVRefUsesFreshScreenSize() = runTest {
         val s = LocScreen(listOf(wlan))
         val d = dispatcher(s)
@@ -136,7 +136,7 @@ class ToolDispatcherVisionTest {
         val r = d.execute(call("phone_tap", """{"x":500,"y":130}""")).content
         assertEquals("invalid_arguments", r.s("error")); assertTrue(r.s("message"), "target" in r.s("message"))
         assertEquals("true", d.execute(call("phone_tap", """{"x":500,"y":130,"target":"WLAN"}""")).content.s("ok"))
-        // 写操作之后恢复普通的坐标点击
+        // After a write operation, plain coordinate taps resume
         assertEquals("true", d.execute(call("phone_tap", """{"x":500,"y":130}""")).content.s("ok"))
         val vs = Json.parseToJsonElement("""{"x":1,"y":1,"target":"x"}""").jsonObject
         assertFalse(d.interfaces.actionTarget(d.declared("phone_tap"), vs).bySight)
@@ -173,7 +173,7 @@ class ToolDispatcherVisionTest {
         val g = d.interfaces.actionTarget(d.declared("phone_tap"), args).args
         assertEquals(listOf("500", "130", "WLAN", "WLAN"), listOf(g.s("x"), g.s("y"), g.s("target"), g.s("text")))
         assertTrue(d.interfaces.actionTarget(d.declared("phone_tap"), args).bySight)
-        // 别的点击、不认识的 @v 原样交回
+        // Other taps and unrecognized @v refs are passed back unchanged
         val e = Json.parseToJsonElement("""{"ref":"@e1","snapshotId":"s"}""").jsonObject
         assertEquals(e, d.interfaces.actionTarget(d.declared("phone_tap"), e).args)
         val gone = Json.parseToJsonElement("""{"ref":"@v9","snapshotId":"loc_x"}""").jsonObject

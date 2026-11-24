@@ -124,7 +124,7 @@ class TriggerEngineTest {
         assertTrue(store.claimDue(1_000).isEmpty())
     }
 
-    // #259:跑过(这里是失败了)的一次性计划,恢复会被拒;就算已经是打开的(旧版本恢复过),也不再排「马上响」的闹钟空转
+    // #259: a one-shot that has run (it failed here) cannot be resumed; even if it is already enabled (an older version resumed it), no "fire immediately" alarm is armed only to spin
     @Test fun oneShotThatAlreadyRanCannotBeResumedAndNeverArmsAnAlarm() {
         val store = MemoryTriggerStore()
         store.upsert(TriggerDefinition("once", "t", "do", 1_000))
@@ -132,7 +132,7 @@ class TriggerEngineTest {
         val armed = mutableListOf<Long?>()
         val sent = mutableListOf<String>()
         val engine = TriggerEngine(store, { armed += it }, idleRetryMs = 500) { t, _ -> sent += t.id }
-        // 还在跑时(窗口进行中)照常隔一会儿重查,等它结束
+        // While it is still running (window in progress), re-check after a while as usual and wait for it to end
         store.upsert(store.get("once")!!.copy(enabled = true))
         engine.rearm(2_000)
         assertEquals(2_500L, armed.single())
@@ -146,7 +146,7 @@ class TriggerEngineTest {
         engine.fire(60_000)
         assertTrue(sent.isEmpty())
         assertEquals(listOf<Long?>(null), armed)
-        // 改了时间就是新的时段,照常排上、到点照常跑
+        // A changed time is a new slot: it is armed as usual and runs when due as usual
         store.upsert(store.get("once")!!.copy(nextAtMs = 120_000))
         engine.rearm(60_000)
         assertEquals(120_000L, armed.last())

@@ -32,11 +32,11 @@ import com.wangzan101.mika.core.model.TtsResponse
 import com.wangzan101.mika.core.testing.SANDBOX_TOOLS
 import com.wangzan101.mika.core.testing.WEB_TOOLS
 
-/** 由工具声明的风险推出的分类,和改成声明之前按名字列的表一样;手机、网页两套屏幕工具各有一份同样的动词。 */
+/** The classification derived from each tool's declared risk matches the name-based table from before the switch; the phone and web screen tool sets each carry the same verbs. */
 class ToolRiskTest {
     private fun both(vararg verbs: String) = verbs.flatMap { listOf("phone_$it", "web_$it") }.toSet()
 
-    /** 原来要过锁屏/暂停关卡的工具表。 */
+    /** The table of tools that used to pass the lock-screen/pause gate. */
     private val oldWriting = both("tap", "scroll", "swipe", "type_text", "clear_text", "back", "press_key", "diagnose") + setOf(
         "phone_launch_app", "phone_share_text", "phone_share_audio", "phone_share_image", "phone_gesture", "phone_sms_login", "hand_to_user",
         "phone_set_alarm", "phone_set_timer", "phone_show_alarms", "phone_add_calendar_event", "phone_set_wheel",
@@ -92,7 +92,7 @@ class ToolRiskTest {
                 "audio_generate", "audio_save", "audio_transcribe", "speak",
                 "image_generate", "image_edit", "image_save", "wechat_send_owner")
         assertEquals(refused, allTools().filter { !it.readOnly }.map { it.name }.toSet())
-        // root 命令、通话工具都只在给了端口时登记:各给一个,所有工具都在
+        // Root command and call tools are registered only when a port is supplied: provide one of each and every tool is present
         val d = toolDispatcher(FakeScreen(), audio = NoAudioPort, audioSaveEnabled = true, audioSpeakTool = true, transcribe = NoTranscribePort,
             image = NoImagePort, imageSaveEnabled = true, root = object : com.wangzan101.mika.core.cap.root.RootPort {
             override suspend fun run(command: String, timeoutMs: Long) = com.wangzan101.mika.core.cap.root.RootRun.Unavailable
@@ -123,8 +123,8 @@ class ToolRiskTest {
     }
 
     /**
-     * 原来 needsCheck / classify 按名字分的几支,现在按声明的目标分;每支的判法没动,
-     * 名字到目标的对应和原来一样,判定结果就一样(具体情形由 IrreversibleDetectorTest 覆盖)。
+     * The branches that needsCheck / classify used to split by name are now split by the declared target; the judgment in each branch is unchanged,
+     * and the name-to-target mapping is the same as before, so the verdicts are the same (specific situations are covered by IrreversibleDetectorTest).
      */
     @Test fun gateTargetsMatchOldNameBranches() {
         val perVerb = mapOf("tap" to GateTarget.Tap, "type_text" to GateTarget.Enter, "press_key" to GateTarget.Key, "swipe" to GateTarget.Swipe, "scroll" to GateTarget.Swipe)

@@ -49,7 +49,7 @@ class ToolDispatcherSandboxTest {
         assertEquals("sandbox_unavailable", unsupported.s("error"))
         assertEquals("false", unsupported.s("recoverable"))
         assertEquals(0, sb.waits)
-        // 还在准备、没开始、失败过:工具照样提供,模型可以先计划
+        // Still preparing, not started yet, or failed before: the tools are offered anyway so the model can plan
         for (s in listOf(SandboxStatus.NotInstalled, SandboxStatus.Installing(40, "解包"), SandboxStatus.Broken("坏了"), SandboxStatus.Ready(false))) {
             sb.status = s
             assertEquals("$s", SANDBOX_NAMES, dispatcher().definitions().map { it.name }.filter { it in SANDBOX_NAMES }.toSet())
@@ -66,7 +66,7 @@ class ToolDispatcherSandboxTest {
         assertEquals(1, sb.waits)
         assertEquals(1, preparing)
         assertEquals(1, sb.runs.size)
-        // 已就绪:不再等
+        // Already ready: no further wait
         d.execute(call("run_command", buildJsonObject { put("command", "ls") }))
         assertEquals(1, sb.waits)
     }
@@ -97,14 +97,14 @@ class ToolDispatcherSandboxTest {
         assertEquals("false", r.s("outputTruncated"))
         assertEquals("off", r.s("network"))
         assertNull(r["fullOutputPath"])
-        // 默认 60 秒,不在工作区下的 cwd 不跑
+        // Defaults to 60 seconds; a cwd outside the workspace is never run
         dispatcher().execute(call("run_command", buildJsonObject { put("command", "true") }))
         assertEquals(60_000L, sb.runs.last().timeoutMs)
         assertNull(sb.runs.last().cwd)
         val out = dispatcher().execute(call("run_command", buildJsonObject { put("command", "ls"); put("cwd", "../..") })).content
         assertEquals("path_outside_workspace", out.s("error"))
         assertEquals(2, sb.runs.size)
-        // 退出码不为 0 或超时:ok=false
+        // Non-zero exit code or timeout: ok=false
         sb.next = { CommandResult(124, true, false, 5000, "", 0, true) }
         val t = dispatcher().execute(call("run_command", buildJsonObject { put("command", "sleep 9") })).content
         assertEquals("false", t.s("ok")); assertEquals("true", t.s("timedOut")); assertEquals("on", t.s("network"))
@@ -144,7 +144,7 @@ class ToolDispatcherSandboxTest {
         assertTrue(d.execute(call("read_file", buildJsonObject { put("path", "nope.txt") })).content.s("networkNote").contains("turned off"))
     }
 
-    // 沙箱就绪时看个人技能:照常返回正文,不列脚本(个人技能不在沙箱的技能目录里)
+    // Reading a personal skill while the sandbox is ready: returns the body as usual and lists no scripts (personal skills are not in the sandbox's skills directory)
     @Test fun personalSkillViewWithSandboxReady() = runTest {
         val catalog = com.wangzan101.mika.core.learn.knowledge.GuideCatalog.withPersonal(
             com.wangzan101.mika.core.learn.knowledge.GuideCatalog.loadBundled(),
@@ -173,7 +173,7 @@ class ToolDispatcherSandboxTest {
         val auth = d.execute(script("scripts/login.py")).content
         assertEquals("script_unavailable", auth.s("error"))
         assertTrue(auth.s("message").contains("需要账号授权"))
-        // 断网时需要联网的脚本不可运行
+        // Without network access, scripts that need the network cannot run
         val net = d.execute(script("scripts/fetch.mjs")).content
         assertEquals("script_unavailable", net.s("error"))
         val escape = d.execute(script("../../../../bin/sh")).content
@@ -220,7 +220,7 @@ class ToolDispatcherSandboxTest {
         assertEquals(long, File(ws, path.removePrefix("/workspace/")).readText())
         assertTrue(r.s("output").contains("10000 characters omitted"))
         assertTrue(r.s("output").length < 16_100)
-        // 1 MB 之外丢掉的也算截断
+        // Bytes dropped beyond the 1 MB cap also count as truncation
         sb.next = { CommandResult(0, false, false, 50, "short", 2048, false) }
         val d = dispatcher().execute(call("run_command", buildJsonObject { put("command", "yes") })).content
         assertEquals("true", d.s("outputTruncated"))
@@ -253,7 +253,7 @@ class ToolDispatcherSandboxTest {
         val bin = read("data.bin").content
         assertEquals("not_text", bin.s("error")); assertEquals("9", bin.s("size")); assertTrue(bin.containsKey("type"))
         assertEquals("not_text", read("latin1.txt").content.s("error"))
-        // 看不了图的模型:图片也只给大小和类型
+        // For a model that cannot view images: an image only reports its size and type
         val img = read("chart.png")
         assertEquals("not_text", img.content.s("error")); assertEquals("image/png", img.content.s("type"))
         assertNull(img.image)
@@ -267,13 +267,13 @@ class ToolDispatcherSandboxTest {
         File(ws, "note.png").writeBytes(byteArrayOf(-119, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0))
         val vision = VisionService(says("图里写着「已订好」"), JvmTestImageOps)
         val d = toolDispatcher(FakeScreen(), false, vision = vision, sandbox = sb, workspace = { "conv1" })
-        // 配了看图模型才提供这个工具
+        // This tool is offered only when a vision model is configured
         assertTrue(d.definitions().any { it.name == "view_image" })
         assertTrue(dispatcher().definitions().none { it.name == "view_image" })
         val r = d.execute(call("view_image", buildJsonObject { put("path", "note.png"); put("question", "写的什么字") })).content
         assertEquals("true", r.s("ok"))
         assertEquals("图里写着「已订好」", r.s("seen"))
-        // 不是图片按 not_text 拒绝
+        // Anything that is not an image is rejected as not_text
         File(ws, "a.txt").writeText("hi")
         val txt = d.execute(call("view_image", buildJsonObject { put("path", "a.txt") })).content
         assertEquals("not_text", txt.s("error"))
@@ -282,7 +282,7 @@ class ToolDispatcherSandboxTest {
     @Test fun readFileUsesByteOffsetAndLimit() = runTest {
         File(ws, "t.txt").writeText("你好世界abc")
         val d = dispatcher()
-        // 第 4 个字节落在「好」中间:跳过残字节,截断处的半个字留给下一次
+        // Byte 4 lands in the middle of the second character (3-byte CJK): the partial byte is skipped and the half character at the cut is left for the next read
         val r = d.execute(call("read_file", buildJsonObject { put("path", "t.txt"); put("offset", 4); put("limit", 7) })).content
         assertEquals("世", r.s("content"))
         assertEquals("false", r.s("eof"))
@@ -310,7 +310,7 @@ class ToolDispatcherSandboxTest {
         File(ws, "dir").mkdirs()
         assertEquals("not_a_file", d.execute(call("read_file", buildJsonObject { put("path", "dir") })).content.s("error"))
         assertEquals("not_a_file", d.execute(call("write_file", buildJsonObject { put("path", "dir"); put("content", "x") })).content.s("error"))
-        // 搜索跳过 FIFO,不会卡住
+        // Search skips FIFOs, so it never blocks
         assertEquals("true", d.execute(call("search_files", buildJsonObject { put("pattern", "x") })).content.s("ok"))
     }
 
@@ -325,7 +325,7 @@ class ToolDispatcherSandboxTest {
     }
 
     @Test fun searchStopsOnSlowRegexAndLimits() = runTest {
-        // 嵌套的懒惰重复:回溯量随长度多项式爆炸(JDK 对 (a+)+ 一类已有优化,用这种)
+        // Nested lazy repetition: backtracking explodes polynomially with length (the JDK already optimizes the (a+)+ family, hence this shape)
         File(ws, "evil.txt").writeText((1..60).joinToString(","))
         val tools = SandboxTools(sb, { "conv1" }, false, SearchLimits(timeMs = 200))
         val def = com.wangzan101.mika.core.cap.sandbox.SearchFiles.def
@@ -370,7 +370,7 @@ class ToolDispatcherSandboxTest {
         assertEquals("abc.d", com.wangzan101.mika.core.cap.sandbox.ShareRules.fitName("abcdefgh.d", maxChars = 5))
     }
 
-    /** 沙箱工具产出的事实(命令输出、读到的文件、写入与导出的路径)进核查证据;命令进动作清单。 */
+    /** Facts produced by sandbox tools (command output, files read, paths written and exported) go into the verification evidence; commands go into the action list. */
     @Test fun sandboxFactsFeedTheVerifierEvidence() = runTest {
         val d = dispatcher()
         sb.next = { CommandResult(0, false, false, 10, "1287 data.csv\n", 0, false) }
@@ -379,23 +379,23 @@ class ToolDispatcherSandboxTest {
         d.execute(call("read_file", buildJsonObject { put("path", "out/r.txt") }))
         d.execute(call("share_file", buildJsonObject { put("path", "out/r.txt") }))
         val e = d.evidence()
-        // 命令是助手写的:记在来处里,不当证据
+        // The command was written by the assistant: it is recorded as provenance, not as evidence
         assertTrue(e.ledger.all.toString(), e.ledger.all.any { it.where.orEmpty().contains("wc -l data.csv") && "1287 data.csv" in it.text && "wc -l" !in it.text })
-        // 写进去又读回来的是助手自己写的字:只记写入的路径,读回的内容不进证据
+        // Text written and then read back is the assistant's own: only the written path is recorded, the read-back content does not become evidence
         assertTrue(e.read(ObsKind.Output).any { "/workspace/out/r.txt" in it })
         assertFalse(e.read(ObsKind.Output).toString(), e.read(ObsKind.Output).any { "报告正文" in it })
         assertTrue(e.read(ObsKind.Output).any { "Download/Claire/r.txt" in it })
         assertTrue(e.actions.toString(), e.actions.any { it.contains("run_command(wc -l data.csv)") })
         assertTrue(e.actions.any { it.contains("share_file(out/r.txt)") })
         assertFalse(e.nothingRead)
-        // 很长的输出按头尾截短
+        // Very long output is shortened from head and tail
         sb.next = { CommandResult(0, false, false, 10, "头" + "x".repeat(20_000) + "尾", 0, false) }
         d.execute(call("run_command", buildJsonObject { put("command", "cat big") }))
         val last = d.evidence().read(ObsKind.Output).last()
         assertTrue(last.length < 4_200 && "尾" in last)
     }
 
-    /** 工具往工作区写(write_file、存完整输出)要拿和沙箱同一把树锁:重置/安装(exclusive)进行中不能交错。 */
+    /** Tools writing to the workspace (write_file, saving full output) must take the same tree lock as the sandbox: they must not interleave with a reset/install (exclusive) in progress. */
     @Test fun workspaceWritesWaitForTheSandboxTreeLock() = kotlinx.coroutines.runBlocking {
         sb.next = { CommandResult(0, false, false, 50, "A".repeat(30_000), 0, false) }
         val calls = listOf(

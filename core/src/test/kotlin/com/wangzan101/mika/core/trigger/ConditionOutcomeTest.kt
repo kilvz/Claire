@@ -25,12 +25,12 @@ class ConditionOutcomeTest {
         assertEquals(ConditionOutcome.VALUE_MAX, long.value!!.length)
     }
 
-    // evidence 是 JSON null 时当作没有,不是字符串 "null"
+    // A JSON null evidence counts as absent, not as the string "null"
     @Test fun nullEvidenceIsAbsent() {
         assertEquals(ConditionOutcome.Checked(true, null), ConditionOutcome.parse("""{"met":true,"evidence":null}"""))
     }
 
-    // 观测值进计划页和下一次的提示:换行、制表合成一个空格,去掉方向控制等格式字符
+    // The observed value goes into the plan page and the next prompt: newlines and tabs collapse into one space, and format characters such as direction controls are stripped
     @Test fun observedValueIsFlattenedAndStripped() {
         assertEquals("最低 ¥620 (含税)", (ConditionOutcome.parse("{\"met\":true,\"value\":\"最低\\n¥620\\t(含税)\"}") as ConditionOutcome.Checked).value)
         assertEquals("620", (ConditionOutcome.parse("{\"met\":true,\"value\":\"\\u202E620\\u200B\"}") as ConditionOutcome.Checked).value)
@@ -39,7 +39,7 @@ class ConditionOutcomeTest {
         assertEquals(null, (ConditionOutcome.parse("""{"met":true,"value":[1]}""") as ConditionOutcome.Checked).value)
     }
 
-    // 按字符截断:emoji 不会被切成半个
+    // Truncation is by character: an emoji is never cut in half
     @Test fun observedValueIsCutByCharactersNotCodeUnits() {
         val v = (ConditionOutcome.parse("{\"met\":true,\"value\":\"${"😀".repeat(100)}\"}") as ConditionOutcome.Checked).value!!
         assertEquals(ConditionOutcome.VALUE_MAX, v.codePointCount(0, v.length))

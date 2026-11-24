@@ -18,7 +18,7 @@ class TriggerToggleTest {
         return TriggerEngine(store, {}, dispatch = { _, _ -> })
     }
 
-    /** 手动运行只记在“现在”这个时段,不会占掉计划自己的下一次时段,所以暂停后还能再打开。 */
+    /** A manual run is recorded only in the "now" slot and does not consume the plan's own next slot, so the plan can still be re-enabled after pausing. */
     @Test fun manualRunDoesNotBlockResumingAOneShot() {
         val plan = plan()
         val manual = window(now)
@@ -27,7 +27,7 @@ class TriggerToggleTest {
         assertTrue(engine(plan, manual).setEnabled(plan.id, true, now))
     }
 
-    /** 一次性计划按计划时间跑过之后不能再开,要再跑得改时间或立即执行;开关和引擎的判断要一致。 */
+    /** A one-shot that has run at its scheduled time cannot be re-enabled; running it again requires changing the time or running it now; the toggle and the engine must agree. */
     @Test fun aOneShotThatUsedItsOwnSlotCannotBeResumed() {
         val plan = plan()
         val used = window(plan.nextAtMs)

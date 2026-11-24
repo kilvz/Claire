@@ -8,14 +8,14 @@ import com.wangzan101.mika.core.trigger.TriggerWindowState.Unknown
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 定时任务连着失败了几次:按这个计划自己的记录往前数,送达过或结果不明就停,跳过的不算。 */
+/** How many times a scheduled task has failed in a row: count backwards through this plan's own records, stop at a delivery or an unclear result, and skipped runs do not count. */
 class FailureStreakTest {
     private fun w(due: Long, state: TriggerWindowState, plan: String = "plan") = TriggerWindow(plan, due, due, state = state)
 
     @Test fun countsFailuresRightBeforeThisOne() {
         val now = w(50, ActionDispatched)
         val windows = listOf(w(10, Delivered), w(20, Failed), w(30, Skipped), w(40, Failed), now)
-        // 40、20 失败,中间 30 是条件没满足跳过,不打断;10 送达过,停
+        // 40 and 20 failed; 30 in between was skipped because the condition was not met, which does not break the streak; 10 was delivered, so stop
         assertEquals(2, failureStreakBefore(windows, now.key))
     }
 

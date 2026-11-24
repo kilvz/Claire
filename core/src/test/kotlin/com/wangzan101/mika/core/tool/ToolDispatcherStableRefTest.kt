@@ -28,7 +28,7 @@ import org.junit.Test
 import com.wangzan101.mika.core.assembly.toolDispatcher
 import com.wangzan101.mika.core.screen.uistate.interfaces
 
-/** 每次读屏换下一份元素清单;端口编号每屏从 @e1 起,snapshotId 是 p1、p2…;同名元素位置不变。 */
+/** Each screen read advances to the next element list; port refs restart at @e1 on every screen, snapshotId is p1, p2, ...; elements of the same name keep their position. */
 private class ScriptedScreen(private vararg val screens: List<String>) : ScreenPort by FakeScreen() {
     val calls = mutableListOf<String>()
     var reads = 0
@@ -64,11 +64,11 @@ class ToolDispatcherStableRefTest {
         val d = toolDispatcher(s, stableRefs = true)
         d.execute(call("phone_observe")); d.execute(call("phone_observe"))
         val r = d.execute(call("phone_tap", """{"ref":"@e2","snapshotId":"p2"}"""))
-        // 模型的 @e2(返回)在端口第二屏是 @e3
+        // The model's @e2 (Back) is @e3 on the port's second screen
         assertEquals(listOf("tapRef @e3 p2"), s.calls)
         assertEquals("true", r.content.s("ok"))
         assertNull(r.content["relocated"])
-        assertNull(r.content["portRef"]) // 端口编号不给模型
+        assertNull(r.content["portRef"]) // Port refs are not given to the model
         assertEquals("@e3", r.record.s("portRef"))
         assertEquals("p2", r.record.s("portSnapshotId"))
         d.execute(call("phone_type_text", """{"ref":"@e1","snapshotId":"p2","text":"x"}"""))
@@ -107,7 +107,7 @@ class ToolDispatcherStableRefTest {
         assertNotNull(snap); assertEquals("p2", snap!!.snapshotId)
         assertEquals("发送", snap.elements.single { it.ref == "@e1" }.name)
         assertNotNull(IrreversibleDetector.classify("phone_tap", args, snap, d.interfaces.peek()))
-        // 旧 snapshotId 但编号仍在最新一屏:按最新一屏判(真正点下去的是最新一屏里的它)
+        // Old snapshotId but the ref is still on the latest screen: judge against the latest screen (what actually gets tapped is that element in the latest screen)
         val old = Json.parseToJsonElement("""{"ref":"@e1","snapshotId":"p1"}""").jsonObject
         assertTrue(d.interfaces.actionTarget(d.declared("phone_tap"), old).aimed!!.elements.any { it.name == "新的" })
         assertNotNull(IrreversibleDetector.classify("phone_tap", old, d.interfaces.actionTarget(d.declared("phone_tap"), old).aimed, d.interfaces.peek()))

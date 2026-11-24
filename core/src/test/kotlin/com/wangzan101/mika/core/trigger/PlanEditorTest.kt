@@ -60,7 +60,7 @@ class PlanEditorTest {
         assertFalse(copy.enabled)
     }
 
-    /** 复制页面的「首次执行」要显示成当地时间,不能把 UTC 的 ISO 字符串塞进 yyyy-MM-dd HH:mm 输入框。 */
+    /** The copy page's "first run" must be shown in local time; a UTC ISO string must not be stuffed into a yyyy-MM-dd HH:mm input field. */
     @Test fun copyingAFutureOncePlanShowsLocalTimeInsteadOfIso() {
         val original = TriggerDefinition("plan", "thread", "goal", now + 600_000)
         val draft = original.toCopyPlanDraft(now)
@@ -71,7 +71,7 @@ class PlanEditorTest {
         assertEquals(original.nextAtMs, copy.nextAtMs)
     }
 
-    /** 带秒的计划向上取整到下一分钟:截掉秒后不能落到当前时刻之前,否则保存会被判成「时间不在将来」。 */
+    /** A plan carrying seconds rounds up to the next minute: after dropping the seconds it must not land before the current instant, or saving would be rejected as "time is not in the future". */
     @Test fun copyingAPlanWithSecondsRoundsUpToAWholeLocalMinute() {
         val original = TriggerDefinition("plan", "thread", "goal", now + 30_000)
         val draft = original.toCopyPlanDraft(now)
@@ -83,7 +83,7 @@ class PlanEditorTest {
         assertFalse(draft.firstAt.contains('T'))
     }
 
-    /** 过期的固定间隔计划从下一次排期开始,同样不能把 ISO 字符串塞进输入框。 */
+    /** An expired fixed-interval plan starts at its next occurrence, and here too an ISO string must not be stuffed into the input field. */
     @Test fun copyingAnExpiredIntervalStartsAtItsNextOccurrenceInLocalTime() {
         val original = TriggerDefinition("plan", "thread", "goal", now - 60_000, intervalMs = 300_000)
         val draft = original.toCopyPlanDraft(now)

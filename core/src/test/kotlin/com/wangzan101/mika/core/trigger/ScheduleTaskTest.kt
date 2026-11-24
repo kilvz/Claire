@@ -153,7 +153,7 @@ class ScheduleTaskTest {
         assertTrue(paused)
     }
 
-    // 计划在、恢复却没改成(跑过的一次性计划):如实说已经跑过,不说找不到
+    // The plan exists but resuming changed nothing (a one-shot that already ran): say honestly that it already ran, not that it was not found
     @Test fun resumingAPlanThatAlreadyRanSaysSoInsteadOfNotFound() = runBlocking {
         val plan = TriggerDefinition("plan-1", "conversation", "查快递", 1000)
         val admin = object : ScheduleAdmin {
@@ -182,7 +182,7 @@ class ScheduleTaskTest {
         assertEquals(86_400_000L, saved?.intervalMs)
     }
 
-    // 没有准时闹钟权限:照样存下,但结果里明说,模型据此告诉用户,不等到点才悄悄失败
+    // Without exact-alarm permission: still saved, but the result says so plainly so the model can tell the user, instead of failing quietly when the time comes
     @Test fun missingExactAlarmPermissionIsReportedAtCreation() = runBlocking {
         var saved: TriggerDefinition? = null
         val tools = toolDispatcher(FakeScreen(), conversationId = "conversation", scheduleTrigger = { saved = it; Scheduled(false, userNotified = true) })
@@ -194,7 +194,7 @@ class ScheduleTaskTest {
         assertTrue(result.content["message"].toString().contains("alarms & reminders"))
         assertTrue(saved != null)
 
-        // 这次没发出提示(提示过了或通知被关):结果照实说
+        // No prompt was shown this time (it was already shown, or notifications are off): the result says so honestly
         val silent = toolDispatcher(FakeScreen(), conversationId = "conversation", scheduleTrigger = { Scheduled(false) })
             .execute(Part.ToolCall("s", "schedule_task", """{"goal":"明天查天气","at":"2026-10-26T09:00:00+08:00"}"""), ActionPass())
         assertEquals(false, silent.content["userNotified"]?.toString()?.toBoolean())
