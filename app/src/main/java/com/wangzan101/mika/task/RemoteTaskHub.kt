@@ -27,7 +27,7 @@ import org.json.JSONArray
 import java.io.IOException
 import java.util.UUID
 
-/** 电脑任务的唯一索引。内部视图可维护全部收件;每个外部请求必须使用 [scope] 后的令牌归属视图。 */
+/** The single index of desktop tasks. The internal view may maintain all receipts; every external request must use the token-owned view returned by [scope]. */
 class RemoteTaskHub(
     private val context: Context,
     private val runs: () -> List<TaskRun> = { (context.applicationContext as com.wangzan101.mika.MikaApp).taskState.runs.value },
@@ -36,7 +36,7 @@ class RemoteTaskHub(
     private val receipts by lazy { RemoteTaskReceipts(context) }
     internal fun migrateUsbOwner(previousOwner: String) = receipts.migrateUsbOwner(previousOwner)
     private val buses = HashMap<RunId, RunEventBus>()
-    /** 同一 request_id 的附件任务必须把查重和单次消费放在同一把稳定锁里;scope() 每次返回新包装,不能拿它当锁。 */
+    /** Attachment tasks with the same request_id must keep duplicate detection and single consumption under the same stable lock; scope() returns a new wrapper each time and cannot be used as the lock. */
     private val fileStartLock = Any()
     private data class PendingEnd(val state: TaskState.Terminal, val steers: List<RemoteSteer>, val runId: String?, val files: List<SharedFile>)
     private val unsaved = mutableMapOf<String, PendingEnd>()

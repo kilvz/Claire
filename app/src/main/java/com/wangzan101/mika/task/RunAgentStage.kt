@@ -41,7 +41,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// 运行装配:Agent 循环与接管
+// Run assembly: the Agent loop and takeover
 internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: RunPhone, taskGate: TaskGate, mem: RunMemory, rec: RunRecord, pr: RunPrompt, web: LazyWebPort?, t: RunTools, priorTurns: List<Turn>): AgentLoop {
     var runStore by a::runStore
     var dispatcher by a::dispatcher
@@ -70,8 +70,8 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
     val runApproval = t.runApproval
     val promptHook = t.promptHook
     val tools = t.tools
-    // 主动能力从通知里攒下、够格带进任务的那一段:只给用户在手机上发起的任务(不给定时、渠道、电脑交来的,也不给条件检查和子任务);
-    // 主动能力没开时不去碰它(连对象都不建)
+    // The segment the proactive capability gathered from notifications and deemed eligible to carry into a task: only for tasks the user started on the phone (not for scheduled, channel or desktop-submitted ones, nor for condition checks and subtasks);
+    // when the proactive capability is off, do not touch it (not even create the object)
     val observed = if (provenance.origin == RunOrigin.Ui && !conditionCheck && FeatureFlags.get(service).proactive()) {
         try {
             (service.application as MikaApp).proactive.observedForTasks()
@@ -83,7 +83,7 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         }
     } else null
 
-    // 主模型备援链(项目 3):评测换掉模型来源时不接设置里的备援,免得测到真服务商
+    // Main-model fallback chain (item 3): when evaluation swaps the model source, do not attach the fallbacks from settings, lest the real providers be tested
     val chainStore = ProviderStore.get(service)
     val (chainModels, fallbackProviderIds) = if (env.modelFactory === TaskEnvironment.defaultModelFactory)
         chainStore.mainFallbackChain(session) else (emptyList<ChatModel>() to emptyList<String?>())
@@ -92,14 +92,14 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         model, tools,
         basePrompt,
         promptTransform = { promptHook.transform(it) },
-        // 助手断开、被挪走只在这一步用的是手机时才查
+        // Helper disconnection or being moved away is only checked when this step uses the phone
         gate = { w ->
             if (phoneScreen.acquired && dispatcher?.surface != WEB) phone?.screen?.let { phoneRuntime.awaitUserPick(it, taskGate, w) }
-            // 等关卡期间发生过锁屏周期:按旧屏幕准备好的动作作废,执行入口换成说明结果喂回模型
+            // A lock-screen cycle happened while waiting at the gate: actions prepared for the old screen are void, and the execution entry is replaced by feeding the outcome back to the model
             if (taskGate.pass({ phoneScreen.acquired && dispatcher?.surface != WEB }, w))
                 throw com.wangzan101.mika.core.safety.gate.ScreenRecoveryRequired()
         }, knowledge = knowledge, screenMaps = memoryRuntime.screenMaps(), sink = sink, trace = trace, installedApps = { apps },
-        // 选渠道用的事实:装了哪些 App、在 Claire 里登录过哪些网站、有没有内置浏览器
+        // Facts used for channel selection: which apps are installed, which sites are logged in inside Claire, and whether a built-in browser exists
         channelFacts = {
             val registry = WebSites.registry(service)
             ChannelFacts(
@@ -112,8 +112,8 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         maxSteps = env.evalHooks.maxSteps ?: runSpec.stepBudget ?: AgentLoop.UNLIMITED_STEPS,
         reviewFinalAnswer = false,
         inputTimeoutMs = TaskService.INPUT_TIMEOUT_MS,
-        // 询问 / 自主:询问时只有花钱的一步先问(有确认关卡和 request_confirmation);自主时连付款也不问。
-        // 开工时询问、中途换成自主的,下一步起不再问;开工时自主的,换成询问留给下一个任务
+        // Ask / autonomous: when asking, only steps that spend money are asked about first (there is a confirmation gate and request_confirmation); when autonomous, not even payments are asked about.
+        // Switching from ask to autonomous mid-run stops asking from the next step; when it started autonomous, switching to ask applies to the next task
         confirmations = runApproval.gate(),
         approvals = runApproval,
         autonomous = runApproval.startedAutonomous,
@@ -121,12 +121,12 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         confirmTimeoutMs = TaskService.CONFIRM_TIMEOUT_MS,
         selfPackage = service.packageName,
         flags = speed,
-        // 只在 lightSteps 打开、轻量模型能调工具且与主模型不是同一份配置时生效
+        // Takes effect only when lightSteps is on, the light model can call tools, and it is not the same configuration as the main model
         modelFallbacks = chainModels, modelChainProviderIds = chainProviderIds,
         router = routedLight?.let { ModelRouter(model, it, fallbacks = lightFallbacks) },
         intentJudge = if (provenance.origin == RunOrigin.Ui) light ?: model else null,
         intentDecision = if (provenance.origin == RunOrigin.Ui) decision else null,
-        // 选路线是辅助判断:用轻量模型,没配用主模型
+        // Route selection is an auxiliary judgement: use the light model, or the main model when none is configured
         routes = if (speed.replay) RouteMatcher(light ?: model, routeStore, knowledge, decision) { detail ->
             sink.event(RunEvent.State(System.currentTimeMillis(), "jev_route", detail))
         } else null,
@@ -137,7 +137,7 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         streamReplies = true,
         stages = chipStages.takeIf { Build.VERSION.SDK_INT >= 36 && provenance.origin == RunOrigin.Ui },
         userScreens = userScreens,
-        // 同一网站、App 里连着联系别人、提交:两次之间隔一段随机的时间
+        // Contacting people or submitting repeatedly within the same site or app: leave a random interval between two consecutive actions
         outwardPacing = OutwardPacing.human(),
         personaLabel = personaLabel,
     )
@@ -154,7 +154,7 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
     val tools = t.tools
     suspend fun <T> io(fallback: T, call: () -> T): T =
         withContext(Dispatchers.IO) { runCatching(call).getOrDefault(fallback) }
-    // 接管期间才订阅主屏的无障碍事件:平时没人订阅,服务不复制事件
+    // Accessibility events on the main screen are subscribed only during takeover: with no subscriber, the service does not copy events
     var counter: HandoverActivityCounter? = null
     var counting: Job? = null
     val handover = Takeover(object : TakeoverPort {
@@ -167,7 +167,7 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
         override suspend fun moveBack(taskId: Int) = moveBackToAgent(taskId)
         override fun setSound(packageName: String, on: Boolean) {
             val p = phone ?: return
-            // 交出去的若是目标 App,按目标所属的那份算;别的按本来那份
+            // If the handed-over app is the target app, use the copy the target belongs to; anything else uses the primary copy
             val user = p.screen.target.value?.takeIf { it.packageName == packageName }?.let { phoneRuntime.copyUser(it.userId) }
             if (on) {
                 if (!p.audio.release(packageName, user)) Log.w(TAG, "could not restore sound of $packageName for takeover")
@@ -188,7 +188,7 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
         override fun watchInput(packageName: String) {
             counting?.cancel()
             val c = HandoverActivityCounter(packageName).also { counter = it }
-            // 立即订阅:接着发生的第一下操作不能漏
+            // Subscribe immediately: the first interaction that follows must not be missed
             val a11y = phone?.a11y ?: return
             counting = side.launch(start = CoroutineStart.UNDISPATCHED) {
                 a11y.eventsFor(Display.DEFAULT_DISPLAY).collect { e ->
@@ -210,9 +210,9 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
         override suspend fun resume(result: HandBack) { inbox.send(RunInput.HandBack(result)) }
         override fun cancel() { inbox.cancel() }
 
-        // 网页界面:把当前标签(同一个页面)拿到主屏的接管界面;手机界面返回 null,走挪任务
+        // Web UI: bring the current tab (the same page) to the takeover UI on the main screen; for the phone UI return null and fall back to moving the task
         override suspend fun showWeb(reason: String, key: Int): Boolean? {
-            // 没打开过网页就不会在网页界面上
+            // If no web page was ever opened, it cannot be on the web UI
             val w = webStack ?: return null
             if (tools.surface != WEB) return null
             val message = takeoverMessage(runState._state.value)
@@ -236,7 +236,7 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
             val previous = runState._state.value as? TaskState.Running
             if (it is TaskState.Running && previous != null && previous.preview != it.preview &&
                 previous.copy(preview = it.preview) == it) {
-                // 文字增量只刷新聊天；通知、接管和设备唤醒不需要每个 token 都重跑。
+                // Text deltas only refresh the chat; notifications, takeover and device wake-up do not need to re-run for every token.
                 synchronized(runState.publishLock) { if (!runState.ended) runState.setState(it) }
                 return@collect
             }
@@ -246,7 +246,7 @@ internal suspend fun TaskRun.assembleTakeover(a: RunAssembly, agent: AgentLoop, 
             env.evalHooks.decisionFor(it)?.let { approved -> agent.answerConfirmation(approved) }
         }
     }
-    // 别的任务的接管进出队时,本任务的接管通知要跟着换(排到最前、或后面多了一个)
+    // When other tasks enter or leave the takeover queue, this task's takeover notification must be updated too (now first in line, or with one more behind it)
     if (parallel) side.launch { service.takeoverQueue.changes.collect { service.refreshNotifications(this@assembleTakeover) } }
     side.launch {
         combine(handover.stage, handover.problem) { stage, _ -> stage }.collect {

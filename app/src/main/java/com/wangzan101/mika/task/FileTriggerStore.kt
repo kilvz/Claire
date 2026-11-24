@@ -19,7 +19,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
-/** 计划扩展状态单独落盘；旧版仍能读主文件，多钟点降级为首个钟点。 */
+/** Extended schedule state is persisted separately; older versions can still read the primary file, and multiple calendar times degrade to the first one. */
 @Serializable
 private data class ConditionPlanState(
     val notifyWhen: ConditionNotify = ConditionNotify.BecomesMet,
@@ -60,7 +60,7 @@ private fun TriggerDefinition.conditionState() = ConditionPlanState(
 private fun TriggerSnapshot.conditionStates(): Map<String, ConditionPlanState> =
     triggers.associate { it.id to it.conditionState() }
 
-/** 主文件保持旧版 schema；新增字段只能进 sidecar。 */
+/** The primary file keeps the legacy schema; new fields may only go into the sidecar. */
 private fun TriggerDefinition.legacy() = copy(
     notifyWhen = ConditionNotify.BecomesMet,
     cooldownMs = null,
@@ -74,7 +74,7 @@ private fun TriggerDefinition.legacy() = copy(
 
 private fun TriggerDefinition.withConditionState(state: ConditionPlanState?): TriggerDefinition {
     if (state == null) return this
-    // 旧版改过首个钟点、或扩展列表损坏时，沿用主文件，不让 sidecar 破坏整份计划。
+    // If an older version changed the first calendar time, or the extended list is corrupted, keep the primary file so the sidecar cannot corrupt the whole plan.
     val times = state.calendarTimes.takeIf { it.firstOrNull() == calendarTime &&
         runCatching { normalizedCalendarTimes(it) == it }.getOrDefault(false) }.orEmpty()
     val plan = copy(source = state.source, calendarTimes = times)
@@ -90,8 +90,8 @@ private fun TriggerDefinition.withConditionState(state: ConditionPlanState?): Tr
 }
 
 /**
- * 触发器和时段账本同文件原子替换；认领时段落盘成功后才返回给派发器。
- * 扩展状态存于 sidecar，按主文件内容选择同一次提交的状态，主文件保持旧版格式。
+ * Triggers and the window ledger are atomically replaced in the same file; a claimed window is only handed to the dispatcher once it has been persisted.
+ * Extended state lives in a sidecar, with the state of the same commit selected by the primary file's contents, while the primary file keeps the legacy format.
  */
 class FileTriggerStore(
     private val file: File,

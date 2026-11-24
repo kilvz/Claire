@@ -18,7 +18,7 @@ import java.io.File
 import java.io.FileOutputStream
 import android.util.Log
 
-/** App 私有目录里的运行账本；每次转阶段后原子替换，异常重启不会把半份 JSON 当成记录。 */
+/** Run ledger in the app's private directory; atomically replaced after every phase transition, so an abnormal restart never mistakes a half-written JSON file for records. */
 class FileRunStateStore(private val file: File) : RunStore {
     private val records = linkedMapOf<RunId, StoredRun>()
 

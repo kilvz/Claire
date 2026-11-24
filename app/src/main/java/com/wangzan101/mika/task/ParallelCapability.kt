@@ -3,12 +3,12 @@ package com.wangzan101.mika.task
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 
-/** 此刻最多能同时跑几个任务;[reason] 说明为什么只能一个(设置页显示),没有限制时为空。 */
+/** How many tasks can run at the same time right now; [reason] explains why only one is possible (shown on the settings page), and is null when nothing is limited. */
 data class ParallelLimit(val max: Int, val reason: String?)
 
 /**
- * 按设备能力决定并行几个任务:每块虚拟屏要有独立焦点(安卓 14+);低内存设备不并行;
- * 第二块屏这次运行里建失败过就不再尝试;其余按用户设定的上限,限定在 1–3。
+ * Decide how many tasks run in parallel from device capability: each virtual display needs independent focus (Android 14+); low-RAM devices do not run in parallel;
+ * once the second display has failed to be created in this run, stop trying; otherwise follow the user-set limit, clamped to 1–3.
  */
 object ParallelCapability {
     const val MIN_SDK = 34

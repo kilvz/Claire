@@ -17,13 +17,13 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 /**
- * 远程收件库里终态和插话去向的存储格式,只在收件这一层用:领域类型([TaskState]、[FailKind])改名、加值不动盘上的字。
- * 读不出来的(格式坏了、更新的版本写的类别)不抛异常,按读不出来的失败返回,电脑照样拿到一个终态。
+ * Storage format for terminal states and steer dispositions in the remote receipt store, used only in this receipt layer: renaming or adding values to the domain types ([TaskState], [FailKind]) never changes the words on disk.
+ * Anything that cannot be read (corrupt format, a kind written by a newer version) does not throw; it is returned as an unreadable failure, so the desktop still gets a terminal state.
  */
 internal object RemoteTaskRecord {
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** 盘上读不懂的终态一律报成这个。 */
+    /** Any terminal state that cannot be understood from disk is reported as this. */
     val UNREADABLE: TaskState.Terminal = TaskState.Failed("The saved result of this task could not be read.", FailKind.Environment)
 
     data class Result(val state: TaskState.Terminal, val runId: String? = null)
@@ -62,7 +62,7 @@ internal object RemoteTaskRecord {
         steers.forEach { s -> addJsonObject { put("messageId", s.messageId); put("state", s.state) } }
     }.toString()
 
-    /** 坏掉的条目跳过,不连累整份结果。 */
+    /** Broken entries are skipped so they do not take down the whole result. */
     fun decodeSteers(text: String): List<RemoteSteer> = runCatching {
         (json.parseToJsonElement(text) as JsonArray).mapNotNull { e ->
             val o = e as? JsonObject ?: return@mapNotNull null
@@ -70,7 +70,7 @@ internal object RemoteTaskRecord {
         }
     }.getOrDefault(emptyList())
 
-    /** 盘上的类别名单独定下,不跟着枚举改名走;新加的类别在这里编译不过,逼着定一个名字。 */
+    /** On-disk kind names are fixed separately and do not follow enum renames; a newly added kind fails to compile here, forcing a name to be chosen. */
     private fun wire(kind: FailKind): String = when (kind) {
         FailKind.GaveUp -> "gave_up"
         FailKind.Model -> "model"
@@ -82,7 +82,7 @@ internal object RemoteTaskRecord {
         FailKind.Interrupted -> "interrupted"
     }
 
-    /** 也认早先直接写枚举名的记录(如 `Interrupted`);认不出的(更新的版本写的)算运行环境出错。 */
+    /** Also accepts older records that wrote the enum name directly (e.g. `Interrupted`); unrecognized ones (written by a newer version) count as an environment error. */
     private fun kind(raw: String?): FailKind = FailKind.entries.firstOrNull { wire(it) == raw }
         ?: FailKind.entries.firstOrNull { it.name == raw } ?: FailKind.Environment
 

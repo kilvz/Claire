@@ -15,7 +15,7 @@ import com.wangzan101.mika.core.remote.RemoteTaskError
 import com.wangzan101.mika.core.remote.RemoteTaskPage
 import kotlinx.serialization.json.Json
 
-/** 唯一一版远程收件迁移:v1 一次升级到同时包含附件、运行编号和令牌归属的 v2。 */
+/** The one and only remote receipt migration: v1 upgrades in a single step to v2, which also carries attachments, run ids and token ownership. */
 internal class RemoteTaskReceipts(
     context: Context, name: String = "remote-tasks.db",
     private val clock: () -> Long = System::currentTimeMillis, private val keep: Int = KEEP,
@@ -29,7 +29,7 @@ internal class RemoteTaskReceipts(
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         require(oldVersion == 1 && newVersion == 2) { "Unknown remote task receipt schema $oldVersion -> $newVersion" }
-        // 这是一次有序迁移。不要在不同功能里各自声明互不兼容的 v2。
+        // This is a single ordered migration. Do not declare mutually incompatible v2 schemas in different features.
         db.execSQL("ALTER TABLE receipts ADD COLUMN file_request TEXT")
         db.execSQL("ALTER TABLE receipts ADD COLUMN files TEXT")
         db.execSQL("ALTER TABLE receipts ADD COLUMN run_id TEXT")
@@ -69,7 +69,7 @@ internal class RemoteTaskReceipts(
             arrayOf<Any>(now - KEEP_MS, keep))
     }
 
-    /** v1 没有令牌概念。首个读取旧任务的已授权电脑认领它;此后换令牌不能读取或导出。 */
+    /** v1 has no notion of tokens. The first authorized desktop that reads a legacy task claims it; after that, another token can neither read nor export it. */
     private fun claimLegacy(owner: String?) {
         if (owner != null) writableDatabase.update("receipts", ContentValues().apply { put("owner", owner) },
             "owner IS NULL", null)
@@ -99,7 +99,7 @@ internal class RemoteTaskReceipts(
         }
     }
 
-    /** 附件任务落库的目标已附加文件路径;重试应按原始目标、会话和附件组成的请求签名核验。 */
+    /** What an attachment task stores is the target with file paths appended; a retry must be verified against the request signature made of the original goal, conversation and attachments. */
     fun findFileRequest(id: String, requestedChat: String?, fileRequest: String, owner: String?): RemoteTask? =
         find(id, goal = null, requestedChat, fileRequest, owner)
 
@@ -111,7 +111,7 @@ internal class RemoteTaskReceipts(
             .use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.entry().task) } }
     }
 
-    /** rowid 游标只向旧记录移动;同时间戳和翻页期间插入的新任务都不会让记录重复或漏掉。 */
+    /** The rowid cursor only moves toward older records; equal timestamps and tasks inserted while paging can neither duplicate nor skip records. */
     fun page(limit: Int, before: String?, owner: String): RemoteTaskPage {
         claimLegacy(owner)
         val cursor = before?.toLongOrNull()?.takeIf { it > 0 }

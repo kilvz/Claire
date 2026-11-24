@@ -22,7 +22,7 @@ class LocalScheduleAdmin internal constructor(
         { thread, id, change -> TriggerRuntime.edit(context, thread, id, change) },
     )
 
-    // 计划按设备全局可见,不按对话过滤:抽屉里手动建的计划各挂在一个新建对话下,按对话过滤会让 AI 在别的对话里 list 不到(#478)
+    // Schedules are visible globally per device and are not filtered by conversation: schedules created manually in the drawer each hang off a newly created conversation, so filtering by conversation would stop the AI from listing them in other conversations (#478)
     override fun list(threadId: String): List<TriggerDefinition> = plans()
 
     private fun owned(threadId: String, id: String): Boolean = list(threadId).any { it.id == id }
@@ -51,7 +51,7 @@ class LocalScheduleAdmin internal constructor(
     }
 
     override fun edit(threadId: String, id: String, change: (TriggerDefinition) -> TriggerDefinition): EditedSchedule? {
-        // 编辑要用计划自己所属的对话(全局后不再拿当前对话的 threadId 去匹配)
+        // Editing must use the conversation the schedule itself belongs to (now that schedules are global, the current conversation's threadId is no longer used to match)
         val own = plans().firstOrNull { it.id == id }?.threadId ?: return null
         return editPlan(own, id, change)
     }

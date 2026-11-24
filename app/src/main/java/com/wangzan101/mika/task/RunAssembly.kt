@@ -35,43 +35,43 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * 一次运行装配过程中各阶段共用、收尾时要放掉的状态。
- * 各阶段([assembleModels]、[assemblePhone]…)把建好的东西记在这里;不经「建完再记到变量」,取消落在中间也不会漏。
+ * State shared by every stage of assembling one run and released during wrap-up.
+ * Each stage ([assembleModels], [assemblePhone], …) records what it built here; without "build it, then assign it to a variable", a cancellation landing in between cannot leak anything.
  */
 internal class RunAssembly(
     val traces: DetailedTraces,
-    // 整个运行共用一份已报告 Token 预算；子任务沿用协程上下文里的这份，不另开额度。
+    // The whole run shares one reported token budget; subtasks inherit the one in the coroutine context and do not open a separate allowance.
     val tokenBudget: Long?,
     showCost: Boolean,
-    // 询问 / 自主:开工时取一份,开发者选项里换开关时跟着变;收尾时交还
+    // Ask / autonomous: taken once when the run starts, and follows the developer-option switch when it is toggled; handed back during wrap-up
     val approvalControl: com.wangzan101.mika.settings.ApprovalControl,
-    // 任务期间的旁路协程(助手连接状态、静音与挪走监视、状态发布),任务结束一并取消
+    // Side coroutines for the duration of the task (helper connection state, muting and moved-away monitoring, state publishing); all cancelled when the task ends
     val side: CoroutineScope,
 ) {
-    // 虚拟屏、网页显示等:建好当场归它,收尾时一起放掉
+    // Virtual display, web display and the like: owned by it the moment they are built, all released together during wrap-up
     val resources = ResourceScope()
     val traceTicket = traces.ticket()
-    // 这次运行里经计量的模型请求(含旁路调用),收尾时记进运行记录
+    // Metered model requests in this run (including side-channel calls), recorded into the run record during wrap-up
     val tally = RunUsageTally(tokenBudget, if (showCost) DeepSeekRunCost() else null)
-    // 手机一侧(内置助手、无障碍、虚拟屏)第一次 launch_app 时才接上:只用网页、沙箱的任务不需要它们
+    // The phone side (built-in helper, accessibility, virtual display) is attached on the first launch_app: tasks that only use web and sandbox do not need them
     var connection: com.wangzan101.mika.cap.phone.shell.ShellBinding? = null
     var smsLogin: com.wangzan101.mika.cap.phone.sms.AndroidSmsLogin? = null
     var watcher: DeviceStateWatcher? = null
     var mute: AudioMute? = null
-    // 模型标下的任务结束时各 App 的去留(在手机端口上);收尾时交给内置助手
+    // What becomes of each app marked by the model when the task ends (on the phone port); handed to the built-in helper during wrap-up
     var afterTask: com.wangzan101.mika.core.screen.uistate.AfterTaskMarks? = null
     var shellDeath: IBinder.DeathRecipient? = null
     var shellBinder: IBinder? = null
     var record: RunHandle? = null
     var runStore: RunStore? = null
-    // 第一次打开网址时才建;没建过就不用关
+    // Created only on the first URL opening; if it was never created, there is nothing to close
     var webStack: WebStack? = null
-    // 当前界面(手机/网页)要看分发器;画中画的画面来源随它切换
+    // The current surface (phone/web) needs the dispatcher; the picture-in-picture frame source switches along with it
     var dispatcher: ToolDispatcher? = null
     var mcpEvents: AutoCloseable? = null
     var liveFeed: AutoCloseable? = null
     var approval: RunApproval? = null
-    // 应用访问边界:工具和预览画面共用一份(接手机端口时建),窗口没变时核对结果直接沿用,预览不必每一帧都问窗口
+    // App access boundary: shared by tools and the preview (built when the phone port is attached); when the window has not changed the check result is reused, so the preview need not query the window every frame
     var accessGuard: com.wangzan101.mika.core.screen.uistate.AppAccessScreenPort? = null
     var smsPrivacy: com.wangzan101.mika.core.cap.phone.sms.SmsPrivateScreen? = null
 
@@ -88,7 +88,7 @@ internal class RunAssembly(
 
 internal class RunModels(
     val model: ChatModel,
-    // 用户在浏览器页上对着一页问的:那一页借给这个任务当当前网页标签
+    // The user asked about a page on the browser page: that page is lent to this task as the current web tab
     val pageLoan: PageLoans.Loan<WebTab>?,
     val light: ChatModel?,
     val decision: DecisionModel?,

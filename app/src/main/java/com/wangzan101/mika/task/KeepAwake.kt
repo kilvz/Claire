@@ -14,14 +14,14 @@ interface WakeLockPort {
 }
 
 /**
- * 任务在跑时屏幕不熄灭:持有屏幕 wake lock,不改任何系统设置、不改亮度。
- * 熄屏后系统会丢弃注入的触摸并随后上锁,所以 Agent 干活期间不能让屏幕自动熄灭;
- * 但用户没在操作时屏幕不必全亮,到了系统的超时照常变暗(见 [ScreenWakeLock])。
+ * Keep the screen on while a task is running: hold a screen wake lock; no system settings are changed and brightness is not touched.
+ * Once the screen goes off the system drops injected touches and then locks, so the screen must not turn off by itself while the Agent is working;
+ * but the screen does not need to stay fully bright while the user is not interacting, and it still dims at the system timeout (see [ScreenWakeLock]).
  *
- * 只在 Running(含等另一个任务用完某个 App)和排在别的任务后面等虚拟屏时持有。等待接管/回答/继续/解锁时屏幕不需要为 Agent 亮着,
- * 再保持 [GRACE_MS](用户多半正要处理,别让屏幕在他眼前熄掉)后释放,任务继续跑时重新持有。
- * 结束、失败、取消立即释放。锁随进程走:Claire 异常退出时系统自动收回,不需要持久化恢复。
- * 用户按电源键照样能熄屏(没带 ACQUIRE_CAUSES_WAKEUP),这时 gate 会让任务等待解锁。
+ * Held only while Running (including waiting for another task to finish with an app) and while queued behind other tasks waiting for a virtual display. The screen need not stay on for the Agent while waiting to take over / answer / continue / unlock,
+ * so it is held for another [GRACE_MS] (the user is most likely about to deal with it, so don't let the screen go dark in front of them) and then released, and re-acquired when the task keeps running.
+ * Finishing, failing and cancelling release it immediately. The lock follows the process: when Claire exits abnormally the system reclaims it, so no persisted recovery is needed.
+ * The user can still turn the screen off with the power button (ACQUIRE_CAUSES_WAKEUP is not set); in that case the gate makes the task wait for unlock.
  */
 class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScope) {
     private var held = false
@@ -33,8 +33,8 @@ class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScop
         if (closed) return
         when (state) {
             is TaskState.Running -> hold()
-            // 排在别的任务后面等虚拟屏:还在干活、不用你处理,照样持有;
-            // 宽限后放开的话,那个任务一结束、放开它那份,屏幕就可能当场熄掉,接着建屏开干时只能等解锁
+            // Queued behind other tasks waiting for a virtual display: still working, nothing for you to handle, so keep holding;
+            // if it were released after the grace period, the moment that task ends and drops its share the screen could go dark right then, and creating a display to start work would have to wait for unlock
             is TaskState.Held -> if (state.reason.queued) hold() else releaseLater()
             TaskState.Idle, is TaskState.Succeeded, is TaskState.Failed, TaskState.Cancelled -> release()
             else -> releaseLater()
@@ -72,7 +72,7 @@ class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScop
         }
     }
 
-    /** 任务结束:释放并忽略之后到达的任何状态(旁路协程里迟到的发布不能重新拿锁)。 */
+    /** Task finished: release and ignore any state that arrives afterwards (a late publish from a side coroutine must not re-acquire the lock). */
     @Synchronized
     fun close() {
         closed = true
@@ -85,8 +85,8 @@ class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScop
 }
 
 /**
- * 几个任务共用一把屏幕锁:每个任务拿一份 [lease],第一份持有时获取、最后一份放开时释放。
- * 每份自己记着拿没拿,重复获取或释放不会多算。
+ * Several tasks share one screen lock: each task takes a [lease]; the lock is acquired while the first lease is held and released when the last is dropped.
+ * Each lease remembers whether it is held, so repeated acquires or releases are not double-counted.
  */
 class SharedWakeLock(private val lock: WakeLockPort) {
     private var count = 0
@@ -113,11 +113,11 @@ class SharedWakeLock(private val lock: WakeLockPort) {
 }
 
 /**
- * 屏幕锁用 SCREEN_DIM_WAKE_LOCK:屏幕保持开着,用户一段时间没碰手机时由系统照常调暗,
- * 用户一碰又回到原来的亮度。不改系统亮度,也不调亮。调暗时屏幕仍是开着、可交互的状态,
- * 注入的触摸照样送达;Agent 操作的是另一块虚拟显示屏,那边的输入也不受主屏明暗影响。
- * 这类锁已标为弃用(推荐窗口的 FLAG_KEEP_SCREEN_ON),但 Claire 在后台跑任务时没有自己的窗口,
- * 而前台服务持有的这类锁仍然有效。
+ * The screen lock uses SCREEN_DIM_WAKE_LOCK: the screen stays on, and when the user has not touched the phone for a while the system dims it as usual,
+ * returning to the previous brightness as soon as the user touches it again. System brightness is neither changed nor increased. While dimmed the screen is still on and interactive,
+ * so injected touches are still delivered; the Agent operates a separate virtual display, whose input is likewise unaffected by the main screen's brightness.
+ * This kind of lock is marked deprecated (a window's FLAG_KEEP_SCREEN_ON is recommended), but Claire has no window of its own while running tasks in the background,
+ * and this kind of lock held by a foreground service still works.
  */
 class ScreenWakeLock(context: Context) : WakeLockPort {
     private val lock = context.getSystemService(PowerManager::class.java)
@@ -128,11 +128,11 @@ class ScreenWakeLock(context: Context) : WakeLockPort {
     override fun release() { if (lock.isHeld) lock.release() }
 
     companion object {
-        /** 保持亮屏但允许系统按超时调暗。 */
+        /** Keep the screen on but let the system dim it on its usual timeout. */
         @Suppress("DEPRECATION")
         const val LEVEL = PowerManager.SCREEN_DIM_WAKE_LOCK
 
-        /** 兜底上限,防止哪条路径漏了释放;正常由任务状态释放。 */
+        /** Fallback upper bound so a missed release on any path cannot hold forever; normally the task state releases it. */
         private const val MAX_HOLD_MS = 6 * 60 * 60 * 1000L
     }
 }

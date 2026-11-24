@@ -7,19 +7,19 @@ import com.wangzan101.mika.core.remote.RunRecordExport
 import com.wangzan101.mika.core.remote.RemoteTask
 import com.wangzan101.mika.record.RunStore
 
-/** 电脑任务编号和它的运行记录怎么对上。只认 [RemoteTaskHub] 里登记过的任务。 */
+/** How a desktop task id corresponds to its run record. Only tasks registered in [RemoteTaskHub] are recognized. */
 interface RemoteRunIndex {
     fun scopeIndex(owner: String): RemoteRunIndex = this
     fun task(id: String): RemoteTask?
-    /** 运行记录编号;还没开记录时为 null。进行中的任务也会从还活着的那次运行上取。 */
+    /** Run record id; null when no record has been started yet. In-progress tasks are also resolved from the run that is still alive. */
     fun rememberedRunId(taskId: String): String?
-    /** 这条运行记录属于哪个电脑任务;收件里没有对应,或对话已删,为 null。 */
+    /** Which desktop task this run record belongs to; null when there is no matching receipt or the conversation has been deleted. */
     fun taskForRun(runId: String): RemoteTask?
 }
 
 /**
- * 给任务 API 的运行记录出口:按任务编号或运行记录编号读 [RunStore] 里已经落盘的 run.json 和 events.jsonl。
- * 手机上发起的运行不导出。不读截图文件。
+ * Run record export for the task API: reads the already persisted run.json and events.jsonl in [RunStore], by task id or run record id.
+ * Runs started on the phone are not exported. Screenshot files are not read.
  */
 class RemoteRunExport(
     private val index: RemoteRunIndex,
@@ -35,7 +35,7 @@ class RemoteRunExport(
         val runs = store()
         val summary = runs.summary(clean) ?: return RunExportLookup.Missing
         val known = index.taskForRun(clean) ?: return RunExportLookup.Missing
-        // origin 只是运行元数据,绝不是所有权索引;索引缺失时一律不可导出。
+        // origin is only run metadata and never an ownership index; whenever the index has no entry, nothing may be exported.
         return RunExportLookup.Found(RunExportRecord(known.id, known.conversation, clean, summary, runs.events(clean)))
     }
 

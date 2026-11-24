@@ -36,15 +36,15 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** 已接上的手机侧:shell、无障碍、虚拟屏、静音。 */
+/** The connected phone side: shell, accessibility, virtual display, muting. */
 internal class PhoneSide(
     val shell: IMikaShell, val a11y: ScreenAccessibility, val screen: AndroidScreen,
     val display: LazyAgentDisplay, val audio: AppMuter,
 )
 
 /**
- * 小窗直接操作的口子:把预览画面上的归一化坐标换算成虚拟屏逻辑坐标,交给内置助手注入。
- * 注入走后台线程:injectStroke 会按笔迹时长逐点 sleep,不能占着界面线程。
+ * Entry point for direct manipulation from the small window: converts normalized coordinates on the preview into virtual-display logical coordinates and hands them to the built-in helper for injection.
+ * Injection runs on a background thread: injectStroke sleeps point by point according to the stroke duration, so it must not occupy the UI thread.
  */
 internal class PipInputImpl(
     private val shell: IMikaShell,
@@ -82,8 +82,8 @@ internal class PipInputImpl(
 }
 
 /**
- * 手机侧运行时:浮层声音、静音规则、目标 App 监视、浏览器页触摸暂停、以及若干手机侧小助手。
- * 原 TaskRun 里的对应函数整体搬到这里;需要读/写的 TaskRun 瞬时字段经 lambda 注入。
+ * Phone-side runtime: overlay sound, muting rules, target app monitoring, pausing on browser page touches, plus several phone-side helpers.
+ * The corresponding functions from the former TaskRun were moved here wholesale; transient TaskRun fields that need reading/writing are injected via lambdas.
  */
 internal class PhoneRuntime(
     private val service: TaskService,
@@ -100,7 +100,7 @@ internal class PhoneRuntime(
     private val setMuteFailedFor: (String?) -> Unit,
     private val workspaceKey: () -> WorkspaceKey = { WorkspaceKey.Conversation(conversationId) },
 ) {
-    /** 浮层上的声音开关:恢复过声音的再按一次静回去,没恢复的按一次恢复(重复点击重试真实动作);没有手机侧或目标 App 时不动。 */
+    /** Sound switch on the overlay: if sound was restored, pressing again mutes it back; if not, pressing restores it (repeated taps retry the real action); does nothing without a phone side or a target app. */
     fun togglePipSound() {
         scope.launch(Dispatchers.IO) {
             val restored = pipSoundRestored()
@@ -123,7 +123,7 @@ internal class PhoneRuntime(
         }
     }
 
-    /** 小窗当前目标的声音是否已被用户恢复过:接管中看交出去的包,否则看虚拟屏目标;键的取法与 unmute/muteAgain 一致。 */
+    /** Whether the sound of the small window's current target has already been restored by the user: during takeover look at the handed-over package, otherwise at the virtual display's target; the key is derived the same way as in unmute/muteAgain. */
     fun pipSoundRestored(): Boolean {
         val p = phone() ?: return false
         val target = p.screen.target.value
@@ -151,8 +151,8 @@ internal class PhoneRuntime(
     }
 
     /**
-     * 这次任务的静音规则(见 [AppMuter]):Claire 自己不静;没有桌面入口的系统包不静(系统界面、选择框一类);
-     * 用户在主屏上看得见的不静;没静成的记下,任务进度上提示可能出声。
+     * Muting rules for this task (see [AppMuter]): Claire itself is never muted; system packages with no launcher entry are not muted (system UI, choosers and the like);
+     * apps the user can see on the main screen are not muted; anything that could not be muted is recorded and flagged in task progress as possibly making sound.
      */
     fun appMuter(shell: IMikaShell, audio: AudioMute): AppMuter {
         val pm = service.packageManager
@@ -172,12 +172,12 @@ internal class PhoneRuntime(
         )
     }
 
-    /** 任务所属的用户 → 静音按哪一份:本来那份(或读不到)为 null,另一份用户里的为那个用户编号。 */
+    /** Task's user -> which copy to mute: null means the primary copy (or it could not be read); a user id means the copy in that other user. */
     fun copyUser(userId: Int): Int? = userId.takeIf { it >= 0 && it != AppCopyReader.myUser }
 
     /**
-     * 系统在用户主屏上问打开哪一个(见 [AndroidScreen.userPick]):停在这里,胶囊上请用户在屏幕上选一下,选好自动接着做;
-     * 选出来的 App 要用户亲手处理的,留在主屏,请用户处理好了点继续。不在等时直接返回。
+     * The system asks on the user's main screen which one to open (see [AndroidScreen.userPick]): hold here and ask the user to pick on screen from the capsule, then continue automatically once picked;
+     * if the picked app needs the user to handle it personally, stay on the main screen and ask the user to press continue when done. Returns immediately when not waiting.
      */
     suspend fun awaitUserPick(screen: AndroidScreen, gate: TaskGate, setWaiting: (TaskState?) -> Unit) {
         val pick = screen.userPick.value ?: return
@@ -188,7 +188,7 @@ internal class PhoneRuntime(
     }
 
     /**
-     * 目标 App 换了就静音(启动前多半已静上,这里补上没静成的),并盯着它有没有被用户挪到主屏。
+     * Mute whenever the target app changes (it is mostly already muted before launch; this covers what was missed), and watch whether it gets moved to the main screen by the user.
      */
     fun watchTarget(p: PhoneSide, states: DeviceStateWatcher) {
         val side = sideScope() ?: return
@@ -221,8 +221,8 @@ internal class PhoneRuntime(
     }
 
     /**
-     * 用户在浏览器页上亲手摸了借给这个任务的页面:正在干活时马上显示暂停,下一个会改动屏幕的工具之前停下,
-     * 用户点「继续」再接着做(见 [TaskGate.onUserOnPage])。等用户回答、接管中等别的状态不动。主线程。
+     * The user personally touched the page lent to this task on the browser page: show paused immediately while working, stop before the next tool that would change the screen,
+     * and resume when the user presses "Continue" (see [TaskGate.onUserOnPage]). Other states such as waiting for an answer or during takeover are left alone. Main thread.
      */
     fun userOnPage() {
         if (state._state.value !is TaskState.Running) return
@@ -231,14 +231,14 @@ internal class PhoneRuntime(
         publish(state._state.value)
     }
 
-    /** 主屏上该包最上面那个窗口的标题;窗口按从上到下排列。 */
+    /** Title of the topmost window of that package on the main screen; windows are ordered from top to bottom. */
     fun mainWindowTitle(a11y: ScreenAccessibility, packageName: String): String? = runCatching {
         a11y.windowsOn(Display.DEFAULT_DISPLAY).firstNotNullOfOrNull { w ->
             w.title?.toString()?.takeIf { it.isNotBlank() && w.root?.packageName?.toString() == packageName }
         }
     }.getOrNull()
 
-    /** 沙箱这一步的说明写到任务卡片上(当前这一步的 note)。 */
+    /** Write the sandbox step's description onto the task card (the current step's note). */
     fun sandboxNote(text: String) {
         val s = state._state.value as? TaskState.Running ?: return
         publish(s.copy(note = text))
@@ -247,8 +247,8 @@ internal class PhoneRuntime(
     fun sandboxOnline() = (sandbox().status() as? SandboxStatus.Ready)?.network == true
 
     /**
-     * 等另一个任务放开 [app] 的这段时间:对外的进展写「等另一个任务用完 [app]」,仍是 Running,不是暂停、也不要你处理;
-     * 等完(放开了、等不到、被停掉)把等之前那一句放回去。等之前不在干活(比如已经停下来要你处理)就不改。
+     * The stretch while waiting for another task to release [app]: report outward progress as "waiting for another task to finish using [app]", still Running, not paused, and nothing for you to handle;
+     * once the wait is over (released, timed out, stopped), restore the line from before the wait. If it was not working before the wait (e.g. already stopped for you to handle), leave it unchanged.
      */
     suspend fun <T> waitingForApp(app: String, wait: suspend () -> T): T {
         val before = state._state.value as? TaskState.Running ?: return wait()
@@ -268,7 +268,7 @@ internal class PhoneRuntime(
 
     private companion object {
         const val TAG = "MikaTask"
-        /** Claire 屏上的前台 App 两次重读之间至少隔这么久。 */
+        /** Minimum gap between two re-reads of the foreground app on the Claire display. */
         const val FOREGROUND_GAP_MS = 300L
     }
 }
