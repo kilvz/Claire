@@ -8,19 +8,24 @@ import kotlinx.serialization.json.JsonObject
 import java.security.MessageDigest
 
 /**
- * 分享出去的一条路线:本地路线原样([route]),外加给人看的名字与说明。
- * 路线格式本身不带个人数据(见 [RouteAnchors]:输入框只存提示语、原话里的可变部分参数化成槽位、
- * 锚点排除数字金额),分享前由界面把整份内容展示给用户确认;导入时先过 [RouteShareLint],
- * 能在导入时就拒绝的(不认识或不可回放的工具、指纹对不上、超限),不等到运行时。
+ * A route being shared out: the local route as it is ([route]), plus a human-readable title and summary.
+ * The route format itself carries no personal data (see [RouteAnchors]: input fields store only the hint text, the
+ * variable parts of the utterance are parameterized into slots, and anchors exclude numbers and amounts); before
+ * sharing, the UI shows the whole content to the user for confirmation; on import it goes through [RouteShareLint]
+ * first, so anything that can be rejected at import time (unknown or non-replayable tools, fingerprint mismatch, over
+ * the limits) is not left until run time.
  */
 @Serializable
 data class RouteShare(
-    /** 共享格式的版本;导入只认自己认识的版本。 */
+    /** The version of the sharing format; import accepts only versions it recognizes. */
     val schema: Int = SCHEMA,
     val route: Route,
     val title: String,
     val summary: String = "",
-    /** [RouteFingerprint] 算出的路径指纹:发布端按它查重(已有人分享过就不必再传),导入端核对内容没有被改过。 */
+    /**
+     * The path fingerprint computed by [RouteFingerprint]: the publishing side deduplicates by it (no need to upload
+     * again if someone has already shared it), and the importing side checks that the content has not been altered.
+     */
     val fingerprint: String,
 ) {
     init {
@@ -41,10 +46,12 @@ data class RouteShare(
 }
 
 /**
- * 路径指纹:[samePath] 语义的哈希化——每步的工具、参数、目标,加上模板、槽位数与涉及的 App。
- * 锚点不进指纹(每次读屏略有出入,不算不同;与 [samePath] 的取舍一致),所以不同设备、不同系统上
- * 录出的同一条路,指纹一致,发布端据此去重。编码逐字段写死,不依赖 data class 的 toString,
- * 保证跨版本稳定。
+ * Path fingerprint: a hash of the [samePath] semantics — each step's tool, arguments and target, plus the template,
+ * the slot count and the apps involved.
+ * Anchors are not part of the fingerprint (each screen read differs slightly and that does not count as a different
+ * path; consistent with the trade-off in [samePath]), so the same route recorded on different devices or systems gets
+ * the same fingerprint, and publishers deduplicate by it. The encoding is hard-coded field by field instead of relying
+ * on the data class's toString, keeping it stable across versions.
  */
 object RouteFingerprint {
     fun of(r: Route): String {
@@ -67,8 +74,9 @@ object RouteFingerprint {
 }
 
 /**
- * 导入校验:结构性硬约束在这里拒绝;软性的(界面改版导致锚点对不上)由运行时的失配回退
- * 与「有人跑通了就更新」的版本演进处理,不在这里拦。返回的问题列表为空表示可收下。
+ * Import validation: structural hard constraints are rejected here; soft ones (anchors no longer matching because the
+ * UI was redesigned) are handled by the mismatch fallback at run time and by version evolution where "whoever gets it
+ * working updates it", and are not blocked here. An empty problem list means the share can be accepted.
  */
 object RouteShareLint {
     fun check(share: RouteShare, tools: ToolIndex): List<String> {
@@ -93,9 +101,11 @@ object RouteShareLint {
     }
 
     /**
-     * 路线实际会碰到的 App(锚点里记下的包名):审核「是否就是这个声明的任务」时,
-     * 声明里写的 App 必须盖住它,步骤走到了声明之外的 App 就该拦下。每步动作前、后两屏的包名都算(和录路线时
-     * [Route.packages] 里取锚点包名的那部分一样):一步点完跳进别的 App 时,那个 App 只出现在这一步的 after 里(最后一步之后没有下一步的 before)。
+     * The apps the route will actually touch (the package names recorded in the anchors): when reviewing "is this
+     * really the declared task", the apps written in the declaration must cover them, and a step that reaches an app
+     * outside the declaration should be blocked. The package names of the screens both before and after each action
+     * count (the same as the anchor package names kept in [Route.packages] when recording a route): when a tap jumps
+     * into another app, that app appears only in that step's after (there is no next step's before after the last step).
      */
     fun touchedPackages(share: RouteShare): Set<String> =
         share.route.steps.flatMap { listOfNotNull(it.before.packageName, it.after.packageName) }.toSet()

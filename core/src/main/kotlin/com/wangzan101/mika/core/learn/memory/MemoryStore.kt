@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** 一次变更;[undoToken] 交给 [MemoryStore.undo] 可恢复到变更之前。 */
+/** A single change; passing [undoToken] to [MemoryStore.undo] restores the state from before the change. */
 sealed interface Change {
     val undoToken: String
 
@@ -13,18 +13,20 @@ sealed interface Change {
     data class Forgot(val before: MemoryItem, override val undoToken: String) : Change
 }
 
-/** 整份读写;加密落盘由 app 层实现。 */
+/** Reads and writes the whole set; encrypted persistence is implemented by the app layer. */
 interface MemoryPersistence {
     fun load(): List<MemoryItem>
     fun save(items: List<MemoryItem>)
 }
 
-/** [code]:`sensitive`|`too_long`|`memory_full`|`not_found`|`duplicate_id`|`unavailable`(记忆文件暂时读不出)。 */
+/** [code]: `sensitive`|`too_long`|`memory_full`|`not_found`|`duplicate_id`|`unavailable` (the memory file cannot be read for the moment). */
 class MemoryRejected(val code: String) : Exception(code)
 
 /**
- * 记忆的唯一写入口。所有写方法共用一把锁:并行任务的写入串行化。
- * 写入前过 [SensitiveFilter];每次变更整份落盘;撤销令牌只在内存里保留最近 [UNDO_KEEP] 个。
+ * The single write entry point for memories. All write methods share one lock, so writes from parallel tasks are
+ * serialized.
+ * Writes go through [SensitiveFilter] first; every change persists the whole set; undo tokens keep only the most
+ * recent [UNDO_KEEP] in memory.
  */
 class MemoryStore(
     private val persistence: MemoryPersistence,
@@ -32,21 +34,23 @@ class MemoryStore(
     private val ids: () -> String,
     val limit: Int = 500,
     /**
-     * 用户让 Claire 记一件事、而内容里有用户自己没说过的具体值时:false(默认)不收;true 照存,来源记成 `inferred`
-     * (见 [MemorySource])。由「记忆与技能」里的开关定,每次保存时现读。
+     * When the user asks Claire to remember something and the content holds specifics the user never said themselves:
+     * false (the default) rejects it; true stores it anyway, with the source recorded as `inferred` (see
+     * [MemorySource]). Set by the switch under "Memory & Skills", read fresh on every save.
      */
     val inferenceAllowed: () -> Boolean = { false },
 ) {
     private val lock = Any()
-    // 读不出(密钥库一时不可用)时先当空的用,但不许写:写了就会用空表盖掉真正的记忆文件
+    // if it cannot be read (the keystore is temporarily unavailable), treat it as empty for now but forbid writes:
+    // a write would overwrite the real memory file with an empty set
     @Volatile private var loaded = false
     private val _items = MutableStateFlow(tryLoad() ?: emptyList())
     val items: StateFlow<List<MemoryItem>> = _items.asStateFlow()
 
-    /** 记忆文件这次读到了没有;false 时写入一律拒绝(`unavailable`),[reloadIfNeeded] 下次再试。 */
+    /** Whether the memory file was read this time; when false every write is rejected (`unavailable`) and [reloadIfNeeded] retries next time. */
     val available: Boolean get() = loaded
 
-    /** 之前没读出来就再读一次(每个任务开始、每次写入前调用);读到返回 true。 */
+    /** Read once more if it was not read before (called at the start of each task and before each write); returns true when loaded. */
     fun reloadIfNeeded(): Boolean = synchronized(lock) {
         if (loaded) return true
         val got = tryLoad() ?: return false
@@ -60,7 +64,7 @@ class MemoryStore(
         null
     }
 
-    // 插入顺序即新旧顺序,超出时丢最旧的
+    // insertion order is the recency order; the oldest is dropped once the cap is exceeded
     private val undos = LinkedHashMap<String, Change>()
 
     fun add(kind: MemoryKind, content: String, keywords: List<String>, source: MemorySource): Result<Change.Added> = synchronized(lock) {
@@ -82,8 +86,9 @@ class MemoryStore(
     }
 
     /**
-     * [keywords]/[source] 为 null 时沿用原值。做法被新的非手写来源(模型提取、memory_save / memory_edit)改动后要重新批准;
-     * 用户在设置里改(manual)或不带来源的改动保持原状态。
+     * When [keywords]/[source] are null the original values are kept. A procedure must be approved again after it is
+     * changed by a new non-manual source (model extraction, memory_save / memory_edit); edits made by the user in
+     * settings (manual) or changes without a source keep the original status.
      */
     fun update(id: String, content: String, keywords: List<String>?, source: MemorySource?): Result<Change.Updated> = synchronized(lock) {
         if (!reloadIfNeeded()) return Result.failure(MemoryRejected("unavailable"))
@@ -114,8 +119,9 @@ class MemoryStore(
     }
 
     /**
-     * 令牌未知、过期或已用过 → false。更新的撤销只在条目仍是这次改后的样子时才做(之后又被改过/忘掉 → false),
-     * 免得把后来的改动一并抹掉。落盘失败时抛出,令牌保留可重试。
+     * Unknown, expired, or already used token → false. Undoing an update is done only when the item still looks the
+     * way it did after that change (changed or forgotten again since → false), so later changes are not wiped along
+     * with it. Throws when persisting fails; the token is kept so it can be retried.
      */
     fun undo(token: String): Boolean = synchronized(lock) {
         val change = undos[token] ?: return false
@@ -123,7 +129,8 @@ class MemoryStore(
         val next = when (change) {
             is Change.Added -> cur.filter { it.id != change.item.id }
             is Change.Updated -> {
-                // 只看这次改动的字段;之后的使用计数、置顶不算「又被改过」,恢复时也保留
+                // look only at the fields this change touched; later use counts and pinning do not count as "changed
+                // again" and are kept on restore
                 val now = cur.find { it.id == change.item.id }
                 if (now == null || now.content != change.item.content || now.keywords != change.item.keywords || now.source != change.item.source) return false
                 val restored = change.before.copy(useCount = now.useCount, lastUsedAt = now.lastUsedAt, pinned = now.pinned)
@@ -158,7 +165,7 @@ class MemoryStore(
         commit(_items.value.map { if (it.id in set) it.copy(useCount = it.useCount + 1, lastUsedAt = now) else it })
     }
 
-    /** 用户要全部清除:读不出的原文件也一并用空表覆盖,这正是用户的意思。 */
+    /** The user wants everything cleared: even an unreadable original file is overwritten with an empty set, which is exactly what the user means. */
     fun clearAll(): Unit = synchronized(lock) {
         undos.clear()
         loaded = true
@@ -172,14 +179,15 @@ class MemoryStore(
         return null
     }
 
-    // 换行、连续空白压成一个空格:记忆块按行编号,内容里不能有换行
+    // newlines and runs of whitespace are collapsed into a single space: the memory block numbers lines, so the
+    // content must not contain newlines
     private fun clean(content: String) = WHITESPACE.replace(content.trim(), " ")
 
     private fun cleanKeywords(keywords: List<String>) =
         keywords.map(::clean).filter { it.isNotEmpty() }.distinct().take(MAX_KEYWORDS)
 
     private fun commit(next: List<MemoryItem>) {
-        // 兜底:任何写入都不能在没读到原文件时发生
+        // safeguard: no write may happen before the original file has been read
         check(loaded) { "memory not loaded" }
         persistence.save(next)
         _items.value = next

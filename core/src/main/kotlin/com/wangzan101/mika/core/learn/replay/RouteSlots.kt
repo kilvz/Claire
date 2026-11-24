@@ -1,8 +1,10 @@
 package com.wangzan101.mika.core.learn.replay
 
 /**
- * 从模板的固定字面片段之间取参数,保留完整原文(包括参数首尾的空白)。只接受唯一的分法。
- * 不做语义改写;复杂/歧义模板交还原模型,且两条路径都经 RouteMatcher.validated 校验。
+ * Takes the parameters from between the template's fixed literal fragments, preserving the exact original text
+ * (including whitespace at either end of a parameter). Only a unique split is accepted.
+ * No semantic rewriting is done; complex or ambiguous templates are left to the original model, and both paths are
+ * validated by RouteMatcher.validated.
  */
 internal object RouteSlots {
     private val SLOT = Regex("\\{(\\d+)\\}")
@@ -14,14 +16,17 @@ internal object RouteSlots {
         if (goal.length > MAX_CHARS || route.template.length > MAX_CHARS || route.slots !in 0..MAX_SLOTS) return null
         val holes = SLOT.findAll(route.template).toList()
         val ids = holes.map { it.groupValues[1].toIntOrNull() ?: return null }
-        // 记录器按操作先后编号,不一定按原话顺序;重复或缺少编号的模板不猜。
+        // the recorder numbers slots in the order of operations, not necessarily in utterance order; templates with
+        // duplicate or missing numbers are not guessed at.
         if (ids.sorted() != (1..route.slots).toList()) return null
         val parts = SLOT.split(route.template)
         if (holes.isEmpty()) return emptyList<String>().takeIf {
             goal.filterNot(Char::isWhitespace) == parts.single().filterNot(Char::isWhitespace)
         }
-        // 参数边界按原始固定文字匹配,不能先删空白再把缩进或结尾换行丢掉。
-        // 固定片段的空白写法不同就交还原模型,不猜哪些空白属于参数。
+        // parameter boundaries are matched against the original literal text; leading whitespace and trailing newlines
+        // must not be dropped by stripping whitespace first.
+        // When a fixed fragment's whitespace is written differently, hand it back to the original model rather than
+        // guessing which whitespace belongs to a parameter.
         if (!goal.startsWith(parts.first())) return null
         if (parts.drop(1).dropLast(1).any(String::isBlank)) return null
         val slots = MutableList(route.slots) { "" }

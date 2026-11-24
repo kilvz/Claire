@@ -5,14 +5,16 @@ import kotlinx.serialization.Serializable
 @Suppress("EnumEntryName")
 enum class MemoryKind { fact, preference, procedure }
 
-/** 只有做法会处于 pending(待用户批准)。 */
+/** Only procedures can be in pending (awaiting user approval). */
 @Suppress("EnumEntryName")
 enum class MemoryStatus { active, pending }
 
 /**
- * [type]:`user_said`(带用户原话 [quote])、`manual`(用户在设置里手写),或 `inferred`——用户让 Claire 记、内容却是 Claire
- * 自己归纳出来的(里面有用户没说过的具体值);这时 [quote] 是用户提出要求的那句话,不是内容的出处。只有用户打开了
- * 「让 Claire 自己归纳着记」才会有这一种(见 [MemoryStore.inferenceAllowed]);交给任务和界面时都标明不是用户说的。
+ * [type]: `user_said` (carries the user's exact words in [quote]), `manual` (typed by the user in settings), or
+ * `inferred` — the user asked Claire to remember it but the content is Claire's own inference (it contains specifics
+ * the user never said); in that case [quote] is the sentence where the user asked for it, not the source of the
+ * content. This kind only exists when the user has turned on the "let Claire record things by inferring them herself"
+ * option (see [MemoryStore.inferenceAllowed]); when handed to tasks and to the UI it is marked as not said by the user.
  */
 @Serializable
 data class MemorySource(
@@ -23,7 +25,7 @@ data class MemorySource(
     val channel: String? = null,
 )
 
-/** [replaces]:被这次更新掉的旧内容,只留一版(界面「原来:…」)。 */
+/** [replaces]: the old content that this update replaced, keeping only one version (the UI shows "originally: …"). */
 @Serializable
 data class MemoryItem(
     val id: String,

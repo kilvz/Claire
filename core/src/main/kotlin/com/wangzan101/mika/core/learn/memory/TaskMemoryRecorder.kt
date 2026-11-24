@@ -6,8 +6,10 @@ import com.wangzan101.mika.core.run.record.RunEvent
 import com.wangzan101.mika.core.tool.PACKAGE_NAME_RE
 
 /**
- * 把一次运行的事件压成跨会话摘要。纯函数、不请模型:[label] 把工具名换成界面的说法,[appLabel] 把包名换成 App 名。
- * 只读几次屏、没做任何动作的碎片任务不记([record] 返回 null)。App 存包名、网站存主机名,是稳定的事实,按它过滤与追溯。
+ * Compresses the events of one run into a cross-session summary. A pure function that does not call a model: [label]
+ * turns tool names into the wording used by the UI, [appLabel] turns package names into app names.
+ * Fragmentary tasks that only read the screen a few times and performed no action are not recorded ([record] returns
+ * null). Apps are stored as package names and websites as hostnames — stable facts to filter and trace by.
  */
 object TaskMemoryRecorder {
 
@@ -20,7 +22,8 @@ object TaskMemoryRecorder {
         appLabel: (String) -> String = { it },
     ): TaskMemory? {
         val acts = events.filterIsInstance<RunEvent.Activity>()
-        // 没做过任何动作(控制类动作已在记录时排除),或只是草草看了一眼:不记
+        // no action was performed (control-type actions are already excluded when recording), or it was just a quick
+        // glance: do not record
         if (acts.none { it.kind != "observe" } && acts.size < 2) return null
 
         val reads = events.filterIsInstance<RunEvent.Observed>().filter { it.kind == ObsKind.Read.wire && it.text.isNotBlank() }
@@ -32,7 +35,7 @@ object TaskMemoryRecorder {
             val what = listOfNotNull(label(a.label), where(a.target, appLabel), a.title?.takeIf(String::isNotBlank)).joinToString(" · ")
             val tags = listOfNotNull("对外发出".takeIf { a.outward && !a.failed }, "没成功".takeIf { a.failed })
             val line = "第 ${a.step} 步 $what" + if (tags.isEmpty()) "" else "(${tags.joinToString("、")})"
-            // 连着读同一处只记一行
+            // consecutive reads of the same place are recorded as a single line
             if (a.kind == "observe" && line == lastObserve) continue
             lastObserve = if (a.kind == "observe") line else null
             steps += TaskMemoryStep(a.atMs, line.clip(LABEL_MAX), readByStep[a.step].orEmpty().clip(DETAIL_MAX))
@@ -51,12 +54,17 @@ object TaskMemoryRecorder {
     }
 
     /**
-     * 只要结局那个词(「办成」「完成」「失败」…),不带回答或理由的文字。回答里多半转述了别人写的东西的任务用它
-     * (读过通知的,见 [com.wangzan101.mika.core.proactive.NoticeRuns]):摘要会被以后的任务搜到,那段字不留。
+     * Only the outcome word ("done", "partially done", "failed", …), without the answer or reason text. Used for tasks
+     * whose answer mostly paraphrases something someone else wrote (those that read notifications, see
+     * [com.wangzan101.mika.core.proactive.NoticeRuns]): the summary will be found by later tasks, so that text is not
+     * kept.
      */
     fun outcome(events: List<RunEvent>): String = conclusion(events, text = false)
 
-    /** 一句话结论:先看交出回答后判的结局,没有再退回任务本身的结局。[text] 为 false 时只留结局那个词。 */
+    /**
+     * The one-sentence conclusion: first look at the outcome judged after the answer was handed over; if there is
+     * none, fall back to the task's own outcome. When [text] is false, only the outcome word is kept.
+     */
     private fun conclusion(events: List<RunEvent>, text: Boolean = true): String {
         events.filterIsInstance<RunEvent.OutcomeJudged>().lastOrNull()?.let { j ->
             val word = when (j.outcome) {
@@ -91,7 +99,10 @@ object TaskMemoryRecorder {
             events.filterIsInstance<RunEvent.Observed>().mapNotNull { it.place?.takeIf { p -> p.kind == PlaceKind.Site }?.name })
             .distinct().take(SITE_MAX)
 
-    /** 活动对象给人看的说法:「网站 域名」只留域名,包名换成 App 名,别的(网址、查询词)原样;空的为 null。 */
+    /**
+     * Human-readable form of an activity target: for "[SITE_PREFIX]<domain>" only the domain is kept, package names
+     * are replaced by app names, anything else (URLs, query terms) stays as is; null when blank.
+     */
     private fun where(target: String?, appLabel: (String) -> String): String? = target?.let {
         when {
             it.isBlank() -> null
@@ -101,7 +112,7 @@ object TaskMemoryRecorder {
         }
     }
 
-    /** 运行记录里网页那一屏的对象写成「网站 <域名>」。 */
+    /** In the run record, the target of a web-page screen is written as [SITE_PREFIX] followed by "<domain>". */
     private const val SITE_PREFIX = "网站 "
 
     private const val GOAL_MAX = 120

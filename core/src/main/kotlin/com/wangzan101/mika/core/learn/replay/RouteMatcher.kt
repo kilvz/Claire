@@ -21,12 +21,14 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 选中的路线和本次原话里的槽值(按 `{1}`、`{2}` 的顺序)。 */
+/** The chosen route and the slot values from the current utterance (in the order of `{1}`, `{2}`). */
 data class RouteChoice(val route: Route, val slots: List<String>)
 
 /**
- * 任务开始时找一条以往成功的路线:先按 App 与字面相似度取候选,再用一次模型调用(没有候选就不调)选定并抽出槽值。
- * 代码再核一遍:槽值个数要对,且每个都是本次原话里逐字出现的一段。[store] 也供循环更新路线计数。
+ * Finds a previously successful route at the start of a task: first take candidates by app and literal similarity,
+ * then use a single model call (skipped when there are no candidates) to pick one and extract the slot values.
+ * Code then verifies once more: the number of slot values must be right, and each of them must be a verbatim segment of
+ * the current utterance. [store] is also used by the loop to update route counters.
  */
 class RouteMatcher(
     private val model: ChatModel,
@@ -51,8 +53,10 @@ class RouteMatcher(
         val list = candidates(goal)
         if (list.isEmpty()) return null
         if (decision != null) {
-            // 只把参数可由原话唯一确定的路线交给决策模型,不用它生成文字。
-            // 歧义模板、无匹配、服务失败或不确定均保留原模型抽取和原来的严格校验。
+            // only routes whose parameters can be uniquely determined from the utterance are handed to the decision
+            // model; it is not used to generate text.
+            // Ambiguous templates, no match, service failure or low confidence all keep the original model extraction
+            // and the original strict validation.
             val choices = list.mapNotNull { route -> RouteSlots.extract(route, goal)?.let { validated(route, it, goal) } }
             if (choices.isNotEmpty()) {
                 val routesById = choices.mapIndexed { i, c -> "route_$i" to c }.toMap()
@@ -132,8 +136,9 @@ class RouteMatcher(
 
         internal fun validated(route: Route, slots: List<String>, goal: String): RouteChoice? {
             if (slots.size != route.slots) return null
-            // 每个槽值在原话里恰好出现一次,且把槽值填回模板要正好得到原话:槽的边界和模板的固定文字对齐
-            // (「张三」不能从「张三丰」里抠出来)
+            // each slot value occurs in the utterance exactly once, and filling the slot values back into the template
+            // must reproduce the utterance exactly: the slot boundaries line up with the template's fixed text
+            // (e.g. "Ann" cannot be carved out of "Anna")
             if (slots.any { it.isBlank() || occurrences(goal, it) != 1 }) return null
             var unknown = false
             val filled = SLOT_N.replace(route.template) { m -> slots.getOrNull(m.groupValues[1].toInt() - 1) ?: run { unknown = true; "" } }
@@ -141,7 +146,7 @@ class RouteMatcher(
             return RouteChoice(route, slots)
         }
 
-        /** 字符二元组;占位符(\u0000)切断前后。 */
+        /** Character bigrams; a placeholder (\u0000) cuts off what precedes and follows it. */
         internal fun bigrams(s: String): Set<String> =
             s.lowercase().filterNot { it.isWhitespace() }.windowed(2).filter { '\u0000' !in it }.toSet()
 

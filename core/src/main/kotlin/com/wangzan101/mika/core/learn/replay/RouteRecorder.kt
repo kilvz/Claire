@@ -11,23 +11,30 @@ import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
 
 /**
- * 把一次办成的运行记成路线。只看 [RunEvent.ActionTarget] 与接管、追问、确认、障碍、结局一类事件;
- * 有任何一项说明这次不该记(要用户出手、付款、密码框、防截屏、用了浏览器工具或沙箱工具),返回 null。
+ * Records a successful run as a route. It only looks at [RunEvent.ActionTarget] and at events such as takeover,
+ * follow-up questions, confirmation, barriers and outcome; any one of them indicating that this run should not be
+ * recorded (needs the user to step in, payment, password field, screenshot protection, used the browser tools or the
+ * sandbox tools) makes it return null.
  */
 object RouteRecorder {
-    /** 用过就说明这次做法离不开用户或别的通道,照着回放不安全。 */
+    /** If one of these was used, the approach depended on the user or on another channel, and replaying it is unsafe. */
     private val NO_ROUTE_VERBS = setOf(Verb.AskUser, Verb.RequestConfirmation, Verb.HandToUser)
     private val WAITING_STATES = setOf("waiting_input", "waiting_takeover", "no_answer")
     private val PROTECTED = Regex("\"protected\"\\s*:\\s*true|\"state\"\\s*:\\s*\"protected\"")
     private val NOT_SECRET = Regex("\"secret\"\\s*:\\s*false")
 
-    /** 槽值至少这么长:太短的字在原话里容易碰巧出现。 */
+    /** Slot values must be at least this long: shorter strings occur by coincidence in the utterance too easily. */
     private const val MIN_SLOT = 2
 
     /**
-     * 输入的字只能是本次原话里恰好出现一次的片段(记成槽);不是的(固定词、追问来的、从别处抄来的)整条不记,
-     * 路线里永远不存用户没在原话里说过的字。目标元素的名字在原话里出现时也必须绑成槽,回放时按新原话认。
-     * 办没办成由调用方按 [com.wangzan101.mika.core.agent.LearnGate] 判过才来记,这里只看路线本身记不记得下。
+     * Typed text may only be a fragment that occurs exactly once in the current utterance (recorded as a slot);
+     * anything else (fixed words, text obtained from a follow-up question, text copied from elsewhere) means the whole
+     * route is not recorded — a route never stores text the user did not say in the utterance. When the name of a
+     * target element appears in the utterance it must also be bound as a slot, so replay identifies it from the new
+     * utterance.
+     * Whether the task succeeded has already been judged by the caller via
+     * [com.wangzan101.mika.core.agent.LearnGate] before recording; here only whether the route itself can be recorded
+     * is checked.
      */
     fun record(goal: String, events: List<RunEvent>, nowMs: Long, tools: ToolIndex): Route? {
         if (events.lastOrNull { it is RunEvent.TaskEnded }?.let { (it as RunEvent.TaskEnded).outcome } != "succeeded") return null
@@ -38,7 +45,7 @@ object RouteRecorder {
         if (acts.isEmpty() || acts.size > MAX_ROUTE_STEPS || acts.any { it.protected }) return null
         val results = events.filterIsInstance<RunEvent.ToolResult>()
 
-        // 槽值按第一次用到的先后编号
+        // slot values are numbered in the order they are first used
         val slots = mutableListOf<String>()
         fun bind(v: String): Boolean {
             if (v in slots) return true
@@ -53,7 +60,7 @@ object RouteRecorder {
             var cleaned = o.filterKeys { it != "ref" && it != "snapshotId" && it != "target" }
             if (tools.verb(a.tool) == Verb.TypeText) {
                 val text = (o["text"] as? JsonPrimitive)?.contentOrNull ?: return null
-                // 端口没明确说不是密码框的输入一律不记
+                // input that the port has not explicitly reported as not being a password field is never recorded
                 if (text == Redactor.MASK) return null
                 val r = a.callId?.let { id -> results.lastOrNull { it.callId == id } } ?: return null
                 if (!NOT_SECRET.containsMatchIn(r.resultJson)) return null
@@ -66,13 +73,13 @@ object RouteRecorder {
                 when {
                     n.isEmpty() -> t
                     n in goal -> if (bind(n)) t.copy(name = "{${slots.indexOf(n) + 1}}") else return null
-                    // 名字里夹着本次的参数(如「发给张三」):不按名字认
+                    // the name contains a parameter from this run (e.g. "send to Ann"): do not identify it by name
                     slots.any { it in n } -> t.copy(name = "", uniqueAtRecord = false)
                     else -> t
                 }
             }
         }
-        // 槽在原话里的位置不能互相重叠(短的被长的吞掉就没法单独换)
+        // the slot positions in the utterance must not overlap (a short one swallowed by a long one could not be substituted on its own)
         val ranges = slots.map { v -> goal.indexOf(v).let { it until it + v.length } }
         if (ranges.indices.any { i -> ranges.indices.any { j -> i < j && ranges[i].first <= ranges[j].last && ranges[j].first <= ranges[i].last } }) return null
         var template = goal
@@ -105,7 +112,7 @@ object RouteRecorder {
         else -> false
     }
 
-    /** 路线只记能回放的那种界面上的做法:用过别的能力(网页、沙箱)的工具,照着回放不完整。 */
+    /** Routes only record on-screen approaches that can be replayed: if tools from other capabilities (web, sandbox) were used, replaying it would be incomplete. */
     private fun barred(tool: String, tools: ToolIndex): Boolean {
         val t = tools[tool] ?: return false
         if (t.verb in NO_ROUTE_VERBS) return true

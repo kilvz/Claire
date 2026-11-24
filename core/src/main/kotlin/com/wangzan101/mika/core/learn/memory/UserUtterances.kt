@@ -3,25 +3,29 @@ package com.wangzan101.mika.core.learn.memory
 import java.text.Normalizer
 
 /**
- * 用户本人在这次任务里说的话:开局、插话和追问的回答里他自己的话(带的屏幕、浏览器页的页面说明、引的 Claire 的回答和附件行不算,
- * 引的他自己说过的话算)、接管交回时的备注。
- * 记忆的 `quote` 必须是其中某句的子串(全半角统一、去首尾空白后比较)——屏幕、网页、工具结果里的字不算。
+ * Things the user himself said during this task: his own words in the opening message, in interjections and in answers
+ * to follow-up questions (attached screen and browser-page descriptions, quoted replies from Claire and attachment lines
+ * do not count; quotes of his own earlier words do count), and remarks typed when taking back control.
+ * A memory's `quote` must be a substring of one of those sentences (compared after unifying full-width/half-width forms
+ * and trimming) — text from screens, web pages or tool results does not count.
  */
 class UserUtterances {
     private val texts = mutableListOf<String>()
-    /** 唯一可跨轮引用的原话:上一轮用户明确确认了再上一轮助手的建议/提问。 */
+    /** The only utterance that may be quoted across turns: the user in the previous turn explicitly confirmed the assistant's proposal/question from the turn before that. */
     private var previousConfirmation: String? = null
 
     @Synchronized fun add(text: String) {
         if (text.isNotBlank()) texts += text
     }
 
-    /** 本轮用户的话;自动提取也只用它,不把上一轮确认当成这轮又说了一遍。 */
+    /** The user's words in this turn; automatic extraction uses only these too, and does not treat the previous turn's confirmation as having been said again this turn. */
     val all: List<String> @Synchronized get() = texts.toList()
 
     /**
-     * 登记仅有的跨轮例外。[confirmation] 是上一轮用户自己的话,[proposal] 是紧挨着它之前那轮助手的回答。
-     * 建议/提问与明确肯定都要由原文看出来;否定、纠错、普通陈述和更早轮次一律不登记。
+     * Registers the only cross-turn exception. [confirmation] is the user's own words in the previous turn, [proposal]
+     * is the assistant's reply in the turn immediately before that.
+     * Both the proposal/question and the explicit affirmation must be visible in the original text; negations,
+     * corrections, plain statements and earlier turns are never registered.
      */
     @Synchronized fun addPreviousConfirmation(confirmation: String, proposal: String, proposalStatus: String) {
         previousConfirmation = null
@@ -32,33 +36,43 @@ class UserUtterances {
         previousConfirmation = text
     }
 
-    /** 每次任务开始清空:上一个任务里说的话不算这次的,跨轮确认也必须按本次上文重新登记。 */
+    /** Cleared at the start of every task: words from the previous task do not count for this one, and a cross-turn confirmation must be registered again against this run's context. */
     @Synchronized fun clear() {
         texts.clear()
         previousConfirmation = null
     }
 
     /**
-     * [content] 里的具体值在 [quote] 和用户本次说的话里都找不到的那些:模型转述时从屏幕上抄来的值。
-     * 具体值 = 引号内的内容、数字(中文数字、分隔开的数字先统一成一串阿拉伯数字)、3 个字母以上的英文/编号、
-     * 地址片段(地名标志字连同前两个字,如「张江路」「一品苑」;只取两个字,模型多补一个区名不至于误拒)。
-     * 标志字里单个字的那些(道、里、园、市、号…)也是很多普通词的结尾或开头:「知道」「公园」「城市」不是地址,
-     * 转述时换个说法带出它们不算补了具体值([ordinaryWord])。
-     * 比较前两边都去掉「用户(的)」「我(的)」,免得第三人称转述本身造成误拒。
+     * The specifics in [content] that are found neither in [quote] nor in what the user said this time: values the
+     * model copied off the screen while paraphrasing.
+     * A specific is: quoted content; a number (Chinese numerals and separated digits are first unified into one run of
+     * Arabic digits); an English word/identifier of 3+ letters; or an address fragment (a place-marker character plus
+     * the two characters before it, e.g. "…Road" or "…Garden"; only two characters are taken, so the model adding a
+     * district name does not cause a false rejection).
+     * The marker characters that are one character long (road, lane, garden, city, number, …) are also the ending or
+     * the beginning of many ordinary words: "know", "park", "city" are not addresses, so bringing them out under a
+     * different wording while paraphrasing does not count as adding a specific ([ordinaryWord]).
+     * Before comparing, "the user('s)" and "I/my" are stripped from both sides, so third-person paraphrasing alone does
+     * not cause a false rejection.
      *
-     * 局限:没加引号的中文人名、无标志字的地名认不出来(「发给王小明」);这类靠提示词和结果卡片上用户过目。
+     * Limitation: Chinese personal names without quotation marks and place names without a marker character cannot be
+     * recognized (e.g. "send it to Wang Xiaoming"); these rely on the prompt and on the user reviewing the result card.
      */
     @Synchronized fun unsupportedSpecifics(content: String, quote: String): List<String> =
         unsupportedSpecifics(content, quote, texts)
 
     /**
-     * 改一条记忆时用:同 [unsupportedSpecifics],另外把 [known](那一条原来的内容和关键词)里有的也算数——
-     * 原样带过来的具体值不是新补的。「把那条改得简洁一点」时用户不会把里面的地址、数字再说一遍。
+     * Used when editing a memory: the same as [unsupportedSpecifics], except that values present in [known] (that
+     * entry's original content and keywords) also count — specifics carried over unchanged are not newly added. When
+     * the user says "make that one more concise", they will not repeat the address or numbers in it.
      */
     @Synchronized fun unsupportedEditSpecifics(content: String, quote: String, known: List<String>): List<String> =
         unsupportedSpecifics(content, quote, texts + known)
 
-    /** memory_save 只有引文本身来自上一轮确认时才让那段话参与具体值核对;普通本轮写入保持原校验。 */
+    /**
+     * For memory_save, that utterance takes part in the specific-value check only when the quote itself comes from the
+     * previous turn's confirmation; ordinary writes in the current turn keep the original validation.
+     */
     @Synchronized fun unsupportedMemorySpecifics(content: String, quote: String): List<String> {
         val sources = if (matches(quote, texts)) texts else texts + listOfNotNull(previousConfirmation)
         return unsupportedSpecifics(content, quote, sources)
@@ -76,9 +90,11 @@ class UserUtterances {
     private fun comparable(s: String) = PERSON.replace(NumberText.collapse(s), "")
 
     /**
-     * [PLACE] 命中的这一段其实是个普通词,不是地址:以单个标志字结尾的常用词(「知道」「公园」「手机号」),
-     * 或者标志字其实是后面那个词的开头(「城市」里的「城」、「里面」里的「里」)。
-     * 名字正好以这些词结尾的地方(「朝阳公园」)因此认不出来;地址里通常还带着路名、门牌号,那些照查。
+     * Whether the [PLACE] match is in fact an ordinary word rather than an address: a common word ending in a single
+     * marker character ("know", "park", "mobile number"), or the marker character is actually the start of the word
+     * that follows (the city marker inside the word for "city", the lane marker inside the word for "inside").
+     * Places whose names happen to end with such words (e.g. "Chaoyang Park") are therefore not recognized; addresses
+     * usually also carry a street name and a house number, and those are still checked.
      */
     private fun ordinaryWord(text: String, m: MatchResult): Boolean {
         val v = m.value
@@ -88,16 +104,18 @@ class UserUtterances {
         return "${v[2]}$next" in ORDINARY_STARTS
     }
 
-    /** 不足 2 个字的引文不算数:一两个字在哪句话里都找得到。普通写入只认本轮。 */
+    /** Quotes shorter than 2 characters do not count: one or two characters can be found in any sentence. Ordinary writes only accept the current turn. */
     @Synchronized fun contains(quote: String): Boolean = matches(quote, texts)
 
-    /** 改删记忆时用完整原话检查引文的上下文，例如引文前的否定。 */
+    /** Used when editing or deleting a memory: checks the quote's context against the full original utterance, for example a negation preceding the quote. */
     @Synchronized internal fun matchingCurrentMessages(quote: String): List<String> =
         matchingMessages(quote, texts).toList()
 
     /**
-     * 引文落在本轮哪句话里、压着其中哪几个分句(按句读切开):每句话一组;本轮没有哪句含着引文时为空。
-     * 「别记我的地址,记住我喜欢喝茶」里引「别记我的地址」只压着前半句——后半句的「记住」不能借给它。
+     * Which sentence of this turn the quote falls in, and which clauses of that sentence it covers (split at clause
+     * punctuation): one group per sentence; empty when no sentence of this turn contains the quote.
+     * In "don't remember my address, remember that I like tea", quoting "don't remember my address" covers only the
+     * first clause — the "remember" in the second half cannot be borrowed for it.
      */
     @Synchronized internal fun quotedClauses(quote: String): List<List<String>> {
         val q = norm(quote)
@@ -120,7 +138,7 @@ class UserUtterances {
         return out
     }
 
-    /** memory_save 另认已登记的上一轮明确确认;助手建议本身永远不是可引用的用户原话。 */
+    /** memory_save additionally accepts a registered explicit confirmation from the previous turn; the assistant's proposal itself is never a quotable user utterance. */
     @Synchronized fun containsMemoryQuote(quote: String): Boolean =
         matches(quote, texts + listOfNotNull(previousConfirmation))
 
@@ -136,7 +154,8 @@ class UserUtterances {
 
     private companion object {
         const val MIN_QUOTE = 2
-        // 句读;英文句号只在后面是空白或结尾时算(3.5、example.com 里的点不算)
+        // clause punctuation; an English period counts only when followed by whitespace or at the end of the text
+        // (the dots in 3.5 or example.com do not count)
         val CLAUSE_END = Regex("[,，。;；!！?？\\n]|\\.(?=\\s|$)")
         val CONFIRMATION = Regex("""^(?:(?:嗯+|恩+|呃|哦|噢|啊)[\s,，。.!！~～]*)?(?:好的?|好呀|好嘞|行|可以|对的?|是的?|没错|同意|就这样|就这么|ok(?:ay)?|yes|yeah|yep|sure|correct|exactly|agreed|sounds\s+good|go\s+ahead)(?=$|[\s,，。.!！:：;；~～])""", RegexOption.IGNORE_CASE)
         val NEGATION = Regex("""不|别|算了|取消|但是|不过|\b(?:no|not|don't|do\s+not|stop|cancel|wrong|but)\b""", RegexOption.IGNORE_CASE)
@@ -146,9 +165,11 @@ class UserUtterances {
         val LATIN = Regex("[A-Za-z][A-Za-z0-9._-]{2,}")
         val PLACE = Regex("\\p{IsHan}{2}(?:小区|大厦|广场|公寓|花园|单元|路|街|巷|弄|镇|村|号|楼|栋|室|区|县|市|省|园|苑|城|道|里|湾)")
         val PERSON = Regex("用户的|用户|我的|我")
-        // 以 [PLACE] 里单个标志字结尾、却不是地名的常用词。只收标志字明显属于这个词本身的:「大街」「家园」「大楼」「社区」
-        // 这类同时也是真地名后缀的(长安大街、幸福家园)不收,宁可偶尔多拒一次。「一路」「马路」「山区」也不收:
-        // 「科技一路」「二马路」「宝山区」都是真地名
+        // Common words that end with one of the single marker characters in [PLACE] but are not place names. Only those
+        // where the marker character clearly belongs to the word itself are included: "avenue", "homeland", "building",
+        // "community"; the kind that is also a real place-name suffix (e.g. Chang'an Avenue, Xingfu Homeland) is
+        // excluded, preferring to reject one too many now and then. "First Road", "road" and "mountain area" are also
+        // excluded: Keji First Road, Second Road and Baoshan District are all real place names
         val ORDINARY_ENDINGS = setOf(
             "知道", "味道", "频道", "渠道", "通道", "地道", "报道", "难道", "道路", "思路", "套路", "出路", "销路",
             "这里", "那里", "哪里", "家里", "心里", "手里", "夜里", "屋里", "城里", "公里",
@@ -157,10 +178,15 @@ class UserUtterances {
             "地区", "市区", "郊区", "上楼", "下楼", "节省", "反省",
             "教室", "卧室", "浴室", "办公室", "会议室", "实验室", "休息室", "上街", "逛街", "乡村", "农村", "城镇", "乡镇",
         )
-        // 标志字打头的常用词:前面两个字加上它被 [PLACE] 当成了地名。「路上」「路口」「街上」「村里」这类跟在真地名后面的
-        // 方位说法不收(「人民路上的店」里的「人民路」是真的)。
-        // 省、市、区、县、镇、村打头的一个也不收:行政区划后面常直接跟着机构名,「南京市民政局」「朝阳区分局」
-        // 「广东省事业单位」「李家村民委员会」拆开看正好是「市民」「区分」「省事」「村民」,真地名会被当成普通词漏掉
+        // Common words that start with a marker character: the two characters before it plus the marker get taken by
+        // [PLACE] as a place name. Directional phrases that follow a real place name — "on the road", "at the
+        // intersection", "on the street", "in the village" — are not included (the "Renmin Road" inside "the shop on
+        // Renmin Road" is genuine).
+        // Nothing starting with a province, city, district, county, town or village character is included either:
+        // administrative divisions are often followed directly by an institution name, and "Nanjing Civil Affairs
+        // Bureau", "Chaoyang District Branch", "Guangdong Provincial Public Institution" and "Lijia Village Committee"
+        // contain, once split up, exactly the ordinary words for "citizen", "distinguish", "save trouble" and
+        // "villager", so genuine place names would be missed as ordinary words
         val ORDINARY_STARTS = setOf(
             "城市", "道理", "道歉", "道具", "道德", "里面", "里边", "里头",
             "号码", "号称", "号召", "楼梯", "室内", "室外", "栋梁",

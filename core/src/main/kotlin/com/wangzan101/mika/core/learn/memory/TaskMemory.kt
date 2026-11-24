@@ -2,7 +2,7 @@ package com.wangzan101.mika.core.learn.memory
 
 import kotlinx.serialization.Serializable
 
-/** 一次任务时间线上的一步:什么时间、做了什么(给人看的一句话)、那一步读到的原文(按需单独取)。 */
+/** One step on a single task's timeline: when it happened, what was done (one human-readable sentence), and the raw text read during that step (fetched separately on demand). */
 @Serializable
 data class TaskMemoryStep(
     val atMs: Long,
@@ -11,9 +11,12 @@ data class TaskMemoryStep(
 )
 
 /**
- * 一次任务的跨会话摘要:目标、一句话结论、动过的 App(包名)与网站(域名)、时间线上的步骤。
- * 任务结束时自动写,加密落盘;检索时分三层给:先索引(goal / conclusion / apps / sites 的紧凑条目),
- * 再时间线(steps 的 label),最后某一步的原文(detail)。App 存包名是为了按 App 稳定过滤与追溯。
+ * A cross-session summary of one task: the goal, a one-sentence conclusion, the apps touched (package names) and
+ * websites (domains), and the steps on the timeline.
+ * Written automatically when the task ends and persisted encrypted; retrieval is served in three layers: first the
+ * index (compact entries of goal / conclusion / apps / sites), then the timeline (the steps' label), and finally the
+ * raw text of a single step (detail). Apps are stored as package names so they can be filtered and traced reliably per
+ * app.
  */
 @Serializable
 data class TaskMemory(

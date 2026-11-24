@@ -4,16 +4,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** 整份读写;加密落盘由 app 层实现。 */
+/** Reads and writes the whole set; encrypted persistence is implemented by the app layer. */
 interface TaskMemoryPersistence {
     fun load(): List<TaskMemory>
     fun save(items: List<TaskMemory>)
 }
 
 /**
- * 跨会话任务摘要的唯一写入口。和 [MemoryStore] 一样:所有写方法共用一把锁,并行任务的写入串行化;
- * 写之前先读盘解密,读不出(密钥库一时不可用)时不写,免得用空表盖掉真正的文件;超出上限丢最旧的。
- * 这类摘要是机器写的经验缓存,没有敏感过滤、待批准和撤销那些记忆才有的东西。
+ * The single write entry point for cross-session task summaries. Same as [MemoryStore]: all write methods share one
+ * lock, so writes from parallel tasks are serialized; the file is read and decrypted before writing, and when it cannot
+ * be read (the keystore is temporarily unavailable) nothing is written, so the real file is not overwritten with an
+ * empty set; the oldest entries are dropped once over the limit.
+ * These summaries are a machine-written cache of experience, without the sensitive filtering, pending approval and undo
+ * that only memories have.
  */
 class TaskMemoryStore(
     private val persistence: TaskMemoryPersistence,
@@ -26,7 +29,7 @@ class TaskMemoryStore(
     private val _items = MutableStateFlow(tryLoad() ?: emptyList())
     val items: StateFlow<List<TaskMemory>> = _items.asStateFlow()
 
-    /** 文件这次读到了没有;false 时写入一律拒绝,下次再试。 */
+    /** Whether the file was read this time; when false every write is rejected and retried next time. */
     val available: Boolean get() = loaded
 
     fun reloadIfNeeded(): Boolean = synchronized(lock) {
@@ -42,7 +45,7 @@ class TaskMemoryStore(
         null
     }
 
-    /** 写进一条摘要;读不出、编号重复、写盘失败都返回 false(调用方不依赖它成功)。 */
+    /** Writes one summary; returns false when the file cannot be read, the ID is duplicated, or persisting fails (the caller does not depend on it succeeding). */
     fun add(task: TaskMemory): Boolean = synchronized(lock) {
         if (!reloadIfNeeded()) return false
         if (_items.value.any { it.id == task.id }) return false
@@ -57,7 +60,7 @@ class TaskMemoryStore(
         true
     }
 
-    /** 用户要全部清除:读不出的原文件也一并用空表覆盖。 */
+    /** The user wants everything cleared: even an unreadable original file is overwritten with an empty set. */
     fun clearAll(): Unit = synchronized(lock) {
         loaded = true
         commit(emptyList())

@@ -1,9 +1,9 @@
 package com.wangzan101.mika.core.learn.memory
 
-/** 跨会话任务摘要的检索:按关键词、App 包名、时间范围筛,给回最相关的几条(最新的在前)。 */
+/** Retrieval over cross-session task summaries: filtered by keyword, app package name and time range, returning the most relevant few (newest first). */
 class TaskMemoryIndex(private val items: List<TaskMemory>) {
 
-    /** 一层索引里的一条:标题、时间、用到的 App/网站、一句话结论和步数,不给步骤原文。 */
+    /** One entry in the lightweight index: title, time, apps/sites used, a one-line conclusion and the step count; the step texts themselves are not included. */
     data class Hit(
         val id: String,
         val goal: String,
@@ -14,7 +14,7 @@ class TaskMemoryIndex(private val items: List<TaskMemory>) {
         val steps: Int,
     )
 
-    /** [query] 在目标、结论、步骤标签里找(空 = 不过滤);[app] 按包名过滤;[since] 只要这之后(含)的。 */
+    /** [query] is looked for in the goal, the conclusion and the step labels (empty = no filtering); [app] filters by package name; [since] keeps only those at or after that time. */
     fun search(query: String, app: String?, since: Long?, limit: Int): List<TaskMemory> {
         val q = query.trim()
         val appKey = app?.trim()?.takeIf { it.isNotEmpty() }
