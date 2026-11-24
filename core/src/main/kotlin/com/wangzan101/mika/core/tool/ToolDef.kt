@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 一个工具发给模型的定义;参数表同时用于生成 schema 和拒绝未知字段。 */
+/** The definition of one tool sent to the model; the parameter table is used both to build the schema and to reject unknown fields. */
 internal class ToolDef(
     val name: String,
     val description: String,
@@ -15,7 +15,7 @@ internal class ToolDef(
     val required: List<String> = emptyList(),
 ) {
     val allowed: Set<String> = props.keys + "reason"
-    /** 参数里的 reason 是工具自己的字段(比如接管的原因),不是附加的用意说明。 */
+    /** The reason in the parameters is the tool's own field (such as the reason for a takeover), not the attached intent note. */
     val ownReason = "reason" in props
 
     fun spec() = ToolSpec(name, description, buildJsonObject {
@@ -52,8 +52,8 @@ internal fun strArray(d: String, max: Int) = buildJsonObject {
 }
 
 /**
- * 每个工具附带的 reason(用意说明)的说法。完整语义(为什么、给用户看、用用户语言)已在 principles 里写一次,
- * 这里只留一个把字段和「这一步的标签」挂上钩的短指针,免得同一段话在几十个工具的 schema 里重复。
+ * The wording for the reason (intent note) attached to every tool. The full semantics (why, shown to the user, in the user's language) are written once in principles,
+ * so only a short pointer linking the field to "the label of this step" is kept here, to avoid repeating the same paragraph in the schemas of dozens of tools.
  */
 internal const val REASON_NOTE = "Short note shown to the user as the step label."
 

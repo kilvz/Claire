@@ -3,8 +3,8 @@ package com.wangzan101.mika.core.tool
 import com.wangzan101.mika.core.model.Part
 
 /**
- * 自己不动界面的工具(页面脚本)里的一个动作交回循环执行:守卫、锁屏关卡、不可逆判定、运行记录都和模型单独调用这个工具时一样。
- * 被拦下没执行时,结果里 error 为 confirmation_required / guard_stopped / target_unresolved,executed 为 false。
+ * An action inside a tool that does not touch the screen itself (a page script) is handed back to the loop for execution: guards, lock-screen gates, irreversible-action checks and run records are the same as when the model calls that tool on its own.
+ * When it is stopped without executing, the result has error set to confirmation_required / guard_stopped / target_unresolved and executed set to false.
  */
 fun interface SubActions {
     suspend fun run(call: Part.ToolCall): ToolExecution

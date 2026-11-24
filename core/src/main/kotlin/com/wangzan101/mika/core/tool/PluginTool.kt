@@ -19,8 +19,8 @@ import kotlinx.serialization.json.contentOrNull
 import java.io.File
 
 /**
- * 一个插件工具的描述:app 侧从 manifest 读出后交给 core。[name] 是拼好的全名(`plugin_<id去点>_<工具名>`)。
- * [scriptDir]/[scriptPath] 是脚本在插件目录里的位置;[inputSchema] 是插件给的工具参数 schema。
+ * Description of one plugin tool: read from the manifest on the app side and handed to core. [name] is the assembled full name (`plugin_<id without dots>_<tool name>`).
+ * [scriptDir]/[scriptPath] is where the script lives in the plugin directory; [inputSchema] is the tool parameter schema supplied by the plugin.
  */
 data class PluginToolSpec(
     val name: String,
@@ -32,21 +32,21 @@ data class PluginToolSpec(
     val risk: Risk,
 )
 
-/** 跑一条插件脚本(在 App 进程内跑 sh)。[env] 是额外要加进进程环境的环境变量。 */
+/** Runs one plugin script (runs sh inside the app process). [env] holds extra environment variables to add to the process environment. */
 interface ScriptRunner {
     suspend fun run(script: File, argsFile: File, env: Map<String, String>, timeoutMs: Long): ScriptResult
 
-    /** 把 [stdin] 写进脚本的 stdin、读 stdout 当结果(提示词钩子用);默认不支持。 */
+    /** Writes [stdin] to the script's stdin and reads stdout as the result (used by prompt hooks); not supported by default. */
     suspend fun runStdin(script: File, stdin: String, env: Map<String, String>, timeoutMs: Long): ScriptResult =
         ScriptResult(1, "", "stdin execution not supported", timedOut = false)
 }
 
-/** 脚本跑完的样子:退出码、输出、有没有超时被掐掉。 */
+/** How a finished script looks: exit code, output, and whether it was cut off by a timeout. */
 data class ScriptResult(val exitCode: Int, val stdout: String, val stderr: String, val timedOut: Boolean)
 
 /**
- * 插件工具:把参数 JSON 写进临时文件,交给 [runner] 跑脚本,再把脚本的 stdout(JSON)当结果。
- * 脚本不退出、输出非 JSON、或返回 `ok:false` 时都变成干净的失败,绝不把任务搞挂。
+ * Plugin tool: writes the argument JSON to a temporary file, hands it to [runner] to run the script, then treats the script's stdout (JSON) as the result.
+ * A script that never exits, prints non-JSON, or returns `ok:false` all become a clean failure; the task is never brought down.
  */
 internal class PluginScriptTool(
     private val spec: PluginToolSpec,
@@ -88,7 +88,7 @@ internal class PluginScriptTool(
     }
 }
 
-/** 插件作为一个能力:无屏、无守卫、无节奏,只把自己的工具放进任务。 */
+/** The plugin as a capability: no screen, no guard, no pacing; it only puts its own tools into the task. */
 internal class PluginCapability(private val tools: List<AgentTool>) : Capability {
     override val id = "plugin"
     override fun status() = CapabilityStatus.Available

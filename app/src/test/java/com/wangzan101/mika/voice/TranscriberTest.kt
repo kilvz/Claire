@@ -25,7 +25,7 @@ class TranscriberTest {
 
     private val wav = Wav.silence(100)
 
-    /** 转写不再按 ttsModels 标记或模型名拒绝:旧标记只作为序列化遗留数据保留,不影响运行时。 */
+    /** Transcription no longer refuses based on the ttsModels mark or the model name: the old mark is kept only as serialized leftover data and does not affect runtime. */
     @Test fun transcriptionHonorsNoTtsMarkingOrNameFilter() = runBlocking {
         val p = provider(ProviderConfig.Kind.OpenAiCompat, "/v1").copy(ttsModels = setOf("custom"))
         server.enqueue(MockResponse().setBody("""{"text":"识别成功"}"""))

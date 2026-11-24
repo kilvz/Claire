@@ -1,10 +1,10 @@
 package com.wangzan101.mika.core.tool
 
-/** 交给模型的命令输出(沙箱、root 命令共用):开头 + 结尾,中间写明省略了多少字。 */
+/** Command output handed to the model (shared by the sandbox and root commands): head + tail, with a note in the middle of how many characters were omitted. */
 object OutputClip {
     fun clip(s: String, head: Int = 4000, tail: Int = 12000): Pair<String, Boolean> {
         if (s.length <= head + tail) return s to false
-        // 不把一个代理对劈成两半
+        // Do not split a surrogate pair in half
         val h = if (head > 0 && s[head - 1].isHighSurrogate()) head - 1 else head
         var start = s.length - tail
         if (start < s.length && s[start].isLowSurrogate()) start++

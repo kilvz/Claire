@@ -9,7 +9,7 @@ import com.wangzan101.mika.voice.model.TtsProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 编辑表单只露出协议和地址;表单之外的协议参数(计费方案、地域、语言、音色)编辑后必须原样留下。 */
+/** The edit form only exposes the protocol and the endpoint; protocol parameters outside the form (billing plan, region, language, voice) must be left exactly as they were after editing. */
 class VoiceCatalogEditBindingTest {
     @Test fun `editing keeps stt parameters the form does not show`() {
         val saved = SttBinding(

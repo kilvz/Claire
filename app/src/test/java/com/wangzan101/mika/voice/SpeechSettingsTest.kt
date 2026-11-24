@@ -35,11 +35,11 @@ class SpeechSettingsTest {
         val prefs = MemoryPrefs()
         val s = SpeechSettings(prefs)
         assertEquals(false, s.systemSilent.value)
-        // 一次卡住(冷启动慢)不算
+        // A single stall (slow cold start) does not count
         s.noteSystemSilent()
         assertEquals(false, s.systemSilent.value)
         assertEquals(false, SpeechSettings(prefs).systemSilent.value)
-        // 次数也记在设置里:重启 App 后再一次不响应就够了
+        // The count is stored in settings too: one more silence after an app restart is enough
         SpeechSettings(prefs).noteSystemSilent()
         assertEquals(true, SpeechSettings(prefs).systemSilent.value)
     }
@@ -63,14 +63,14 @@ class SpeechSettingsTest {
             s.noteSystemSilent()
             assertEquals(true, s.systemSilent.value)
             assertEquals(true, SpeechSettings(prefs).systemSilent.value)
-            // 选别的不清:记号说的是这台手机的识别服务
+            // Picking anything else does not clear it: the mark is about this phone's recognition service
             s.set(SpeechChoice.Off)
             s.set(SpeechChoice.Provider("p", "m", TranscribeMethod.AudioTranscriptions))
             assertEquals(true, SpeechSettings(prefs).systemSilent.value)
             s.set(retry)
             assertEquals(false, s.systemSilent.value)
             assertEquals(false, SpeechSettings(prefs).systemSilent.value)
-            // 次数也清了:再一次不响应不立刻记上
+            // The count is cleared too: one more silence is not marked right away
             s.noteSystemSilent()
             assertEquals(retry.toString(), false, s.systemSilent.value)
         }
@@ -99,7 +99,7 @@ class SpeechSettingsTest {
         }
     }
 
-    /** 点名试通的服务记下来、重开 App 还在;之后系统默认的回了话,就不再记着点名的那个。 */
+    /** The service that answered when tried by name is remembered and survives an app restart; once the system default answers afterwards, the named one is no longer remembered. */
     @Test fun theServiceThatAnsweredIsRemembered() {
         val prefs = MemoryPrefs()
         SpeechSettings(prefs).noteSystemAnswered("a.b/.Two")

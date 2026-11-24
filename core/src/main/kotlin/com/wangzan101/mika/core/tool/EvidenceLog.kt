@@ -10,35 +10,35 @@ import kotlinx.serialization.json.JsonPrimitive
 internal const val RECENT_READS = 3
 internal const val MAX_READ_CHARS = EvidenceLedger.READ_CHARS
 private const val MAX_ACTION_LOG = 30
-/** 用户给的事实:最近几条,每条按头尾截短。 */
+/** Facts the user supplied: the most recent few, each truncated at the head and tail. */
 private const val USER_FACTS = 6
 private const val USER_FACT_CHARS = EvidenceLedger.OUTPUT_CHARS
 
 /**
- * 完成前交给核查器的材料。读到的东西都是观察([Observation]:读到的界面与网页、沙箱输出与读到的文件、
- * 工具结果里的事实),由能力在工具结果里给出,分发器经 [observe] 记进证据账本 [ledger],带上第几步、什么时候;
- * 用户说的([ObsKind.UserSaid]:记忆检索结果、对提问的回答)另记在 [userFacts]。另有动作清单、每次接管的结局。
- * 每个工具自己决定读到了什么([AgentTool.observations])、动作清单写什么([AgentTool.logTarget])。
+ * The material handed to the verifier before completion. Everything read counts as an observation ([Observation]: screens and web pages that were read, sandbox output and files that were read,
+ * facts inside tool results), supplied by a capability in the tool result and recorded by the dispatcher into the evidence ledger [ledger] through [observe], together with the step number and the time;
+ * what the user said ([ObsKind.UserSaid]: memory search results, answers to questions) is recorded separately in [userFacts]. There is also the action log and the outcome of each takeover.
+ * Each tool decides what it has read ([AgentTool.observations]) and what goes into the action log ([AgentTool.logTarget]).
  */
 internal class EvidenceLog(private val clock: () -> Long = System::currentTimeMillis) {
     val ledger = EvidenceLedger()
-    /** 现在是第几步(由调度器在每次执行工具前设好),记进账本的来处。 */
+    /** The current step number (set by the scheduler before each tool execution), recorded into the ledger as its source. */
     var step: Int = 0
-    /** 最近几次读到的界面状态的文字(界面读取去重用)。 */
+    /** Text of the last few screen states that were read (used to deduplicate screen reads). */
     val recentReads = ArrayDeque<String>()
     val actionLog = ArrayDeque<String>()
-    /** 用户给的事实:记忆检索结果、本次任务里对 ask_user 的回答。 */
+    /** Facts the user supplied: memory search results and answers to ask_user within this task. */
     val userFacts = ArrayDeque<String>()
-    /** list_apps 给过的 App 名字,launch_app 的事实里带上。 */
+    /** App names that list_apps has returned; included in launch_app's facts. */
     val appLabels = mutableMapOf<String, String>()
-    /** 每次接管的结局;不限条数,不会像动作清单那样滚出去。 */
+    /** The outcome of each takeover; not capped, so it never rolls off the way the action log does. */
     val takeovers = mutableListOf<String>()
-    /** 助手用 write_file 写过的文件:之后 read_file 读回来的是助手自己写的,不给回答作证。 */
+    /** Files the assistant has written with write_file: anything read back later with read_file was written by the assistant itself and cannot back an answer as evidence. */
     val writtenPaths = mutableSetOf<String>()
 
     /**
-     * 记一条观察:用户说的进 [userFacts](按头尾截短),其余进账本(脱敏、截短、去掉回显,见 [EvidenceLedger.add])。
-     * 返回账本里记下的那一条;没进账本(用户说的、截短后为空的)为 null。
+     * Record one observation: what the user said goes into [userFacts] (truncated at the head and tail), everything else goes into the ledger (redacted, truncated, echoes removed, see [EvidenceLedger.add]).
+     * Returns the entry recorded in the ledger; null when nothing was recorded (what the user said, or empty after truncation).
      */
     fun observe(o: Observation): Observation? {
         if (o.kind == ObsKind.UserSaid) {
@@ -52,7 +52,7 @@ internal class EvidenceLog(private val clock: () -> Long = System::currentTimeMi
         return ledger.add(o, step, clock())
     }
 
-    /** 助手打进输入框(不是密码框)的字:输入框里的回显不能给回答作证。 */
+    /** Text the assistant typed into an input field (not a password field): the echo in the input field cannot back an answer as evidence. */
     fun noteTyped(text: String) = ledger.noteTyped(text)
 
     private fun noteUserFact(text: String) {
@@ -68,8 +68,8 @@ internal class EvidenceLog(private val clock: () -> Long = System::currentTimeMi
     }
 
     /**
-     * 动作清单的一行:[label] 是「第 N 步」,[target] 是动作的对象、[typed] 是输入的字(都由工具给),
-     * [wide] 时对象留长一点(网址、命令、路径)。
+     * One line of the action log: [label] is "step N", [target] is what the action acted on and [typed] is the text that was typed (both supplied by the tool);
+     * with [wide] the target is kept longer (urls, commands, paths).
      */
     fun logAction(label: String, name: String, target: String?, typed: String?, r: ToolExecution, wide: Boolean) {
         val effect = when {

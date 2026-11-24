@@ -3,62 +3,62 @@ package com.wangzan101.mika.core.tool
 import kotlinx.serialization.json.JsonObject
 
 /**
- * 有界面的能力(手机、网页)共用的那一层在每次调用前后做的事:在操作哪块屏、动作前后看一眼报实际效果、附上动作之后的界面、
- * 等界面稳定、此刻的样子。分发器只经这个接口用到它,不认识读屏、元素、编号这些界面状态;具体实现由装配层在开局给。
- * 屏用能力的 id 指。
+ * What the layer shared by screen capabilities (phone, web) does around every call: track which screen is being operated on, take a look before and after an action to report the actual effect, attach the screen as it is after the action,
+ * wait for the screen to settle, and show it as it is now. The dispatcher only reaches it through this interface and knows nothing about screen reads, elements or ids as screen state; the wiring layer supplies the implementation at startup.
+ * A screen is identified by the capability id.
  */
 internal interface SurfaceLayer {
-    /** 此刻在操作的那块屏;没有调用在进行时是最近一次成功操作的那块,任务开始时是第一块。 */
+    /** The screen currently being operated on; when no call is in flight it is the last one operated on successfully, and at task start it is the first one. */
     val current: String
 
-    /** 一次调用开始,作用在 [id] 那块屏上;不是屏或没给时沿用此刻那块。 */
+    /** A call starts, acting on the screen [id]; when it is not a screen or is not given, keep the current one. */
     fun enter(id: String?)
 
-    /** 那次调用结束;[succeeded] 时它那块屏成为最近操作的屏。 */
+    /** That call ends; when [succeeded], its screen becomes the most recently operated screen. */
     fun leave(succeeded: Boolean)
 
-    /** 这个工具作用在哪块屏上;不是屏幕工具为 null。 */
+    /** Which screen this tool acts on; null when it is not a screen tool. */
     fun surfaceOf(tool: AgentTool?): String?
 
-    /** 用另一块屏的编号操作这块屏的工具时给模型的结果(不执行);认不出或没用错为 null。 */
+    /** The result given to the model when a tool for this screen is driven with ids from another screen (not executed); null when it cannot tell or nothing is misaimed. */
     fun misaimed(tool: AgentTool, args: JsonObject, tools: ToolIndex): ToolExecution?
 
-    /** 这次调用不是界面上的(或没走到 [around]):上一次留下的动作目标不留。 */
+    /** This call is not on-screen (or did not go through [around]): the action target left by the previous call is not kept. */
     fun skip()
 
     /**
-     * 包住一次工具执行:之前做界面上的准备,[body] 拿到「这次由界面一侧报实际效果」与否,之后做界面上的收尾
-     * (按 [inlineScreen] 附界面差异、附画面、报效果、清掉看图得来的点)。
+     * Wraps one tool execution: do the on-screen preparation first, [body] receives whether "the screen side reports the actual effect this time", then do the on-screen wrap-up
+     * (attach the screen diff as per [inlineScreen], attach the image, report the effect, clear the points obtained from looking at the image).
      */
     suspend fun around(tool: AgentTool, args: JsonObject, inlineScreen: Boolean, body: suspend (reportsEffect: Boolean) -> ToolExecution): ToolExecution
 
-    /** 开着时写操作执行前取目标元素与锚点(回放开关打开时由循环设置)。 */
+    /** When on, capture the target element and anchor before a write action (set by the loop when the replay switch is on). */
     var captureTargets: Boolean
 
-    /** 运行记录用:模型编号此刻对应的端口编号;没有为空。 */
+    /** For the run record: the port id that the model's id maps to right now; empty when there is none. */
     fun portRecord(tool: AgentTool?, args: JsonObject): JsonObject
 
-    /** 模型此刻还看得到哪些读取(按编号)。 */
+    /** Which reads the model can still see right now (by id). */
     fun setVisible(ids: Set<String>)
 
-    /** 等最近操作的那块屏稳定,最多 [timeoutMs];读不到状态也照常返回。 */
+    /** Wait for the most recently operated screen to settle, at most [timeoutMs]; returns normally even when the state cannot be read. */
     suspend fun settle(timeoutMs: Long)
 
-    /** 最近操作的那块屏此刻看得到的字(每个元素一条,不登记编号);读不到为空。 */
+    /** The text visible right now on the most recently operated screen (one entry per element, ids not registered); empty when it cannot be read. */
     suspend fun visibleText(): List<String>
 
     /**
-     * 在最近操作的那块屏上等到 [until] 成立,或看出意外、到了时限、[interrupted] 为真(用户插了话)就不再等;
-     * 时间按 [clock] 算。读屏不登记编号。
+     * On the most recently operated screen, wait until [until] holds, or stop when something unexpected is seen, the deadline is reached, or [interrupted] is true (the user cut in);
+     * time is taken from [clock]. The screen read does not register ids.
      */
     suspend fun waitUntil(until: Until, clock: () -> Long, interrupted: () -> Boolean): UntilOutcome
 
-    /** 最近操作的那块屏此刻的一帧和它的画面编号;受保护、截不到为 null。 */
+    /** The current frame of the most recently operated screen and its image id; null when it is protected or cannot be captured. */
     suspend fun imageNow(): Pair<ByteArray, Int>?
 
-    /** 此刻的样子(内容和画面同一时刻);什么都没打开时为 null。观察还没记进账本。 */
+    /** How it looks right now (content and image from the same moment); null when nothing is open. The observation has not been recorded into the ledger yet. */
     suspend fun viewNow(): ToolDispatcher.Glance?
 
-    /** 此刻那个地方的版本(网页的手机版、电脑版);没有或读不到为 null。 */
+    /** The version of the current place (the web page's mobile or desktop version); null when there is none or it cannot be read. */
     suspend fun mode(): String?
 }

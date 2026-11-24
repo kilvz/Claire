@@ -3,23 +3,23 @@ package com.wangzan101.mika.core.tool
 import com.wangzan101.mika.core.model.ToolSpec
 
 /**
- * 工具分两层发给模型:一直都在的(核心的通用工具、不收的能力),和按能力分的几组(收着时只有入口工具,用短说明;
- * 第一次用到时展开成整组、换回全文,本任务里一直留着)。只在有屏幕的那几组展开时才提供的通用工具(接管、报障碍、回看画面、一次多步)
- * 算作 [SCREENS] 一组,任何一块屏展开它就展开。
+ * Tools are sent to the model in two layers: the ones always present (the core general tools, unfolded capabilities), and one group per capability (while folded only the entry tool, with a short description;
+ * on first use the whole group is expanded and the full text comes back, and it stays that way for the rest of the task). General tools offered only when one of the screen groups is expanded (takeover, report obstacle, look back at the screen, several steps at once)
+ * count as the [SCREENS] group, and expand whenever any screen expands.
  *
- * 顺序固定:一直都在的 → [SCREENS] → 各能力的组(按登记的顺序)。展开一组只改从它那一组起的部分,
- * 前面的字节不变;请求前缀因展开最多失效一次。
+ * The order is fixed: always-present → [SCREENS] → the capability groups (in registration order). Expanding a group only changes the part from that group on,
+ * the preceding bytes stay the same; the request prefix is invalidated by an expansion at most once.
  */
 internal object ToolGroups {
-    /** 有屏幕的几组共用的那一组。 */
+    /** The group shared by the screen groups. */
     const val SCREENS = "screens"
 
-    /** 冻结下来的一个工具:全文定义、收着时的入口定义(不是入口为 null)、所属的组(一直都在为 null)。 */
+    /** One frozen tool: the full definition, the entry definition used while folded (null when it is not an entry), and the group it belongs to (null for always-present). */
     class Slot(val full: ToolSpec, val entry: ToolSpec?, val group: String?)
 
     /**
-     * 此刻发给模型的工具:[expanded] 是已展开的组(含 [SCREENS]);[extra] 是循环自己另给、属于某一组的定义
-     * (一次多步属于 [SCREENS]),排在那一组的末尾,只在那一组展开时给。
+     * The tools sent to the model right now: [expanded] holds the expanded groups (including [SCREENS]); [extra] holds definitions the loop adds itself for some group
+     * (several steps at once belongs to [SCREENS]), placed at the end of that group and given only when that group is expanded.
      */
     fun layout(slots: List<Slot>, expanded: Set<String>, extra: Map<String, List<ToolSpec>> = emptyMap()): List<ToolSpec> =
         order(slots).flatMap { g ->
@@ -28,6 +28,6 @@ internal object ToolGroups {
             else members.mapNotNull { it.entry }
         }
 
-    /** 各组的先后:一直都在的、[SCREENS]、再按能力第一次出现的顺序。 */
+    /** The order of the groups: always-present, [SCREENS], then capabilities in order of first appearance. */
     fun order(slots: List<Slot>): List<String?> = listOf(null, SCREENS) + slots.mapNotNull { it.group }.filter { it != SCREENS }.distinct()
 }

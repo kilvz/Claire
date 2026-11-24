@@ -2,9 +2,9 @@ package com.wangzan101.mika.core.tool
 
 
 /**
- * open_link 能打开什么。分发器执行前查一次,外壳服务启动前再查一次。
- * 设置页只认安卓原版公开的 `android.settings.*` 动作;链接拒绝文件与脚本类协议,
- * 网页链接必须指定 App(否则会落到浏览器里)。
+ * What open_link may open. Checked once by the dispatcher before execution and again by the shell service before it starts.
+ * Settings pages accept only the stock Android public `android.settings.*` actions; links reject file and script-style schemes,
+ * and web links must name an app (otherwise they land in the browser).
  */
 object LinkPolicy {
     const val APP_DETAILS = "android.settings.APPLICATION_DETAILS_SETTINGS"
@@ -19,11 +19,11 @@ object LinkPolicy {
 
     private val BLOCKED_SCHEMES = setOf("intent", "file", "content", "javascript", "data", "about", "blob")
     private val SCHEME = Regex("^([A-Za-z][A-Za-z0-9+.-]*):")
-    /** 安卓包名的形状;分发器检查 package / app 参数也用它。 */
+    /** The shape of an Android package name; the dispatcher also uses it to check the package / app arguments. */
     val PACKAGE = Regex("^[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)+$")
     private const val MAX_URI = 2000
 
-    /** null = 允许;否则是给模型看的错误说明。 */
+    /** null = allowed; otherwise the error explanation shown to the model. */
     fun check(action: String?, uri: String?, pkg: String?): String? {
         if (action == null && uri == null) return "Give uri, or action for an Android settings page."
         if (pkg != null && !PACKAGE.matches(pkg)) return "package must be an Android package name."

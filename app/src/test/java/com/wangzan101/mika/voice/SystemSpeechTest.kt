@@ -24,7 +24,7 @@ class SystemSpeechTest {
             SystemSpeech.Outcome.Fail(SpeechFailure.Unavailable(SpeechEngineSpec.Why.SystemNoResponse)),
             SystemSpeech.afterSilence(answered = false),
         )
-        // 回过话的服务只是这一段卡住:按已听到的收尾,不记成不响应
+        // A service that has already answered is only stalled for this segment: finish with what was heard, do not record it as no response
         assertEquals(SystemSpeech.Outcome.Finish, SystemSpeech.afterSilence(answered = true))
     }
 
@@ -44,13 +44,13 @@ class SystemSpeechTest {
         assertEquals("en-US", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.English, java.util.Locale.CHINA))
         assertEquals("ar-MA", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Arabic, java.util.Locale.US))
         assertEquals("fr-FR", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.System, java.util.Locale.FRANCE))
-        // 选的语言和系统不同时用这种语言最常见的地区;相同时沿用系统的地区
+        // When the chosen language differs from the system's, use that language's most common region; when they match, keep the system's region
         assertEquals("ja-JP", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Japanese, java.util.Locale.US))
         assertEquals("pt-BR", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Portuguese, java.util.Locale.US))
         assertEquals("pt-PT", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Portuguese, java.util.Locale.forLanguageTag("pt-PT")))
         assertEquals("es-MX", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Spanish, java.util.Locale.forLanguageTag("es-MX")))
         assertEquals("id-ID", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Indonesian, java.util.Locale.forLanguageTag("in-ID")))
-        // 中文按选的简繁定地区,不跟系统
+        // Chinese takes its region from the chosen simplified/traditional script, not from the system
         assertEquals("zh-CN", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.SimplifiedChinese, java.util.Locale.TAIWAN))
         assertEquals("zh", SystemSpeech.isoCode("zh-TW"))
         assertEquals("en", SystemSpeech.isoCode("en-US"))
@@ -58,7 +58,7 @@ class SystemSpeechTest {
 
     @Test
     fun appLanguageWithoutRegionFallsBackToItsUsualRegion() {
-        // 在 App 里选了英语后进程默认语言是不带地区的 en:没有地区可沿用,不能只送 en
+        // After English is chosen in the app the process default locale is "en" with no region: there is no region to follow, so sending only "en" is not enough
         assertEquals("en-US", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.English, java.util.Locale.forLanguageTag("en")))
         assertEquals("ja-JP", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.Japanese, java.util.Locale.forLanguageTag("ja")))
         assertEquals("en-GB", SystemSpeech.speechTag(com.wangzan101.mika.i18n.AppLanguage.English, java.util.Locale.UK))
@@ -66,14 +66,14 @@ class SystemSpeechTest {
 
     @Test
     fun installedTagMatchesTheSameLanguageWrittenDifferently() {
-        // Pixel 10 Pro 的本机识别实际报的:装了台湾中文,但登记的写法带文字子标签
+        // What on-device recognition actually reports on a Pixel 10 Pro: Taiwan Chinese is installed, but it is registered with script subtags
         val pixel = listOf("en-US", "zh-Hant-TW", "cmn-Hant-TW")
         assertEquals("zh-Hant-TW", SystemSpeech.installedTag("zh-TW", pixel))
         assertEquals("en-US", SystemSpeech.installedTag("en-US", pixel))
         assertEquals("en-US", SystemSpeech.installedTag("en", pixel))
         assertEquals("cmn-Hans-CN", SystemSpeech.installedTag("zh-CN", listOf("en-US", "cmn-Hans-CN")))
         assertEquals("id-ID", SystemSpeech.installedTag("in-ID", listOf("id-ID")))
-        // 地区不同、语言不同的不算
+        // A different region or a different language does not count
         assertNull(SystemSpeech.installedTag("zh-CN", pixel))
         assertNull(SystemSpeech.installedTag("en-GB", pixel))
         assertNull(SystemSpeech.installedTag("ja-JP", pixel))
@@ -94,14 +94,14 @@ class SystemSpeechTest {
 
     private fun svc(name: String, open: Boolean = true) = RecognizerService("a.b/.$name", open, null)
 
-    /** 只有一个识别服务时它就是默认的:只试默认的,不点名再试一遍白等。 */
+    /** With a single recognition service, that service is the default: try only the default instead of naming it and waiting again for nothing. */
     @Test
     fun aSingleServiceIsOnlyTriedAsTheDefault() {
         assertEquals(listOf<String?>(null), SystemSpeech.attempts(listOf(svc("One")), remembered = null))
         assertEquals(listOf<String?>(null), SystemSpeech.attempts(emptyList(), remembered = null))
     }
 
-    /** 默认的不回话时,再点名试其余的,对别的 App 开放的在前;总数有上限。 */
+    /** When the default does not answer, try the rest by name, those open to other apps first; the total is capped. */
     @Test
     fun otherServicesFollowTheDefaultOpenOnesFirst() {
         val services = listOf(svc("Closed", open = false), svc("Open"), svc("Third"))
@@ -109,7 +109,7 @@ class SystemSpeechTest {
         assertEquals(SystemSpeech.MAX_ATTEMPTS, SystemSpeech.attempts(services + svc("Fourth"), null).size)
     }
 
-    /** 之前点名试通的排最前、不重复;它已经不在手机上了就不管它。 */
+    /** The one that answered when tried by name before comes first and is not repeated; if it is no longer on the phone, it is ignored. */
     @Test
     fun theServiceThatAnsweredBeforeGoesFirst() {
         val services = listOf(svc("One"), svc("Two"))

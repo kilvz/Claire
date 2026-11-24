@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class VoiceAimTest {
-    // 「在听」卡片在根布局里 y 400..600,输入栏在它下面(手指从 y 680 按下)
+    // The "listening" card sits at y 400..600 in the root layout, with the input bar below it (the finger presses down at y 680)
     private val card = Rect(20f, 400f, 1060f, 600f)
     private val down = 680f
     private fun aim(y: Float, card: Rect = this.card) = voiceAim(Offset(500f, y), card, down - y, cancelLiftPx = 80f, sendLiftPx = 32f)
@@ -24,7 +24,7 @@ class VoiceAimTest {
     @Test fun aboveTheCardCancels() = assertEquals(VoiceAim.Cancel, aim(399f))
 
     @Test fun cardRightAboveTheFingerNeedsALiftBeforeSending() {
-        // 卡片贴着手指:稍微一动不算直接发送
+        // The card sits right at the finger: a slight move does not count as an immediate send
         val close = Rect(20f, 400f, 1060f, 670f)
         assertEquals(VoiceAim.Fill, aim(660f, close))
         assertEquals(VoiceAim.Send, aim(640f, close))

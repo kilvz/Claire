@@ -17,7 +17,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** 机主结果推送发送器:绑定快照比对(TOCTOU)与经 Outbox 的同文幂等。 */
+/** Owner result push sender: binding snapshot comparison (TOCTOU) and same-text idempotency through the Outbox. */
 class WechatOwnerSenderTest {
     @get:Rule val tmp = TemporaryFolder()
     private val cipher = object : KeyCipher {
@@ -25,7 +25,7 @@ class WechatOwnerSenderTest {
         override fun decrypt(data: ByteArray): ByteArray = data
     }
 
-    /** 只数调用次数的假渠道;断言换绑/停用后一次都没被调到。 */
+    /** Fake channel that only counts calls; used to assert it is never called after a rebind/disable. */
     private class CountingChannel(var outcome: SendOutcome = SendOutcome.Delivered) : Channel {
         override val id = WechatChannel.ID
         override val confirms = false
