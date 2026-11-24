@@ -14,7 +14,7 @@ class ModelErrorReasonTest {
         assertEquals(null, StopRules.modelFailed(ModelError.Network()).code)
     }
 
-    /** 找不到模型:知道模型名时说清是哪个、去哪改、模型名大概长什么样;不知道时退回一般的说法。 */
+    /** Model not found: when the model name is known, say which one it is, where to change it, and what the model name roughly looks like; otherwise fall back to the general wording. */
     @Test fun modelNotFoundNamesTheModel() {
         assertEquals(
             "模型「gemini」在这个服务商那里不存在。去设置 › 模型,检查模型名(要填完整的模型 ID,比如 Gemini 的模型名类似 gemini-flash-latest)或改用对应的预设。",
@@ -24,7 +24,7 @@ class ModelErrorReasonTest {
         assertEquals("找不到模型「gemini」", ModelError.ModelNotFound("gemini").message)
     }
 
-    /** 404 也可能是网关、中转服务在说别的:有原话时照原话说、不断定模型不存在,句末的点不重复;没有原话时和上面一样。 */
+    /** A 404 may also be a gateway or relay service saying something else: when the server's own wording is available, quote it and do not assert that the model does not exist, and do not duplicate the trailing period; without it, behave as above. */
     @Test fun modelNotFoundCarriesWhatTheServerSaid() {
         assertEquals(
             "调用模型「group/rpa」时服务端回复：none of group/rpa's models is ready。可能是模型名不对，或者服务那边暂时不可用。" +
@@ -39,7 +39,7 @@ class ModelErrorReasonTest {
         assertFalse(said.contains("不存在"))
     }
 
-    /** 引在句中的服务端原话,三种带原话的失败都只去掉末尾一个句号;截短的省略号不动。 */
+    /** When the server's own wording is quoted mid-sentence, all three failures that carry it drop only one trailing period; an ellipsis from truncation is left alone. */
     @Test fun quotedServerTextDropsOneTrailingPeriod() {
         fun reasons(detail: String) = listOf(
             StopRules.modelFailed(ModelError.ModelNotFound("m", detail)).reason,
@@ -53,7 +53,7 @@ class ModelErrorReasonTest {
         reasons("Wait...").forEach { assertTrue(it, it.contains("Wait...。")) }
     }
 
-    /** 这个账号用不了的模型、不支持工具的模型:说清是哪个、去哪换,或到服务商后台开通。 */
+    /** A model this account cannot use, or one that does not support tools: state which one it is and where to switch, or to enable it in the provider's console. */
     @Test fun modelNotAvailableNamesTheModel() {
         assertEquals(
             "模型「qwen-max」这个账号没开通或没权限用。去设置 › 模型换一个模型，或到服务商后台开通。",
@@ -65,7 +65,7 @@ class ModelErrorReasonTest {
         )
     }
 
-    /** 思考强度被服务端拒绝时保留参数错误并指向档位设置,不再误报 Base URL 或接口类型。 */
+    /** When the server rejects the reasoning effort, keep the parameter error and point to the level setting, and stop falsely blaming the Base URL or API type. */
     @Test fun rejectedReasoningEffortPointsToTheActualSetting() {
         val detail = "Invalid value: 'ultra'. Supported values are: 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', and 'max'."
         val reason = StopRules.modelFailed(ModelError.ReasoningEffortRejected(detail)).reason
@@ -75,7 +75,7 @@ class ModelErrorReasonTest {
         assertFalse(reason.contains("接口类型"))
     }
 
-    /** 整条链失败:主消息是主模型的错误,后面附每个模型的状态码与一行摘要(MK-1 第 2 批)。 */
+    /** The whole chain failed: the primary message is the main model's error, followed by each model's status code and a one-line summary (MK-1 batch 2). */
     @Test fun chainFailedLeadsWithPrimaryAndListsTrail() {
         val primary = ModelError.RateLimited(null)
         val e = ModelError.ChainFailed(primary, listOf("inferx-main" to primary, "gemini-backup" to ModelError.Server(400)))
@@ -85,7 +85,7 @@ class ModelErrorReasonTest {
         assertTrue(reason.contains("「gemini-backup」 HTTP 400"))
     }
 
-    /** 断流有自己的说法、不提 Base URL;真的解析不了(格式对不上)才提示检查 Base URL 和接口类型。 */
+    /** A cut stream has its own wording and does not mention the Base URL; only when parsing really fails (the format does not match) does it suggest checking the Base URL and API type. */
     @Test fun streamCutIsNotBlamedOnConfiguration() {
         val cut = StopRules.modelFailed(ModelError.StreamCut()).reason
         assertTrue(cut.contains("连接就在上游被断开了"))

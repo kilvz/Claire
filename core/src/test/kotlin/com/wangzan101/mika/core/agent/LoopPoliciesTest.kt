@@ -19,11 +19,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 主循环的各条策略:只看传进去的快照,返回决定。 */
+/** The main loop's policies: they only look at the snapshot passed in and return a decision. */
 class LoopPoliciesTest {
     private fun warn(code: String) = GuardVerdict(code, Severity.Warn, JsonObject(emptyMap()))
 
-    // ---- 回合 ----
+    // ---- Turns ----
 
     @Test fun progressChecksAtHalfAndThreeQuarters() {
         val at = (1..21).filter { TurnPolicy.beforeStep(TurnSnapshot(it, 20)) != null }
@@ -63,7 +63,7 @@ class LoopPoliciesTest {
         assertEquals(Feedback["final_turn"], TurnPolicy.finalTurn().text)
     }
 
-    // ---- 停止 ----
+    // ---- Stopping ----
 
     @Test fun giveUpEndsBeforeGuardStop() {
         val stop = GuardVerdict("no_progress", Severity.Stop, JsonObject(emptyMap()))
@@ -88,7 +88,7 @@ class LoopPoliciesTest {
         assertTrue(daily.reason.contains("服务商甲") && daily.reason.contains("本地日期"))
     }
 
-    // ---- 卡住提醒 ----
+    // ---- Stuck advice ----
 
     @Test fun giveUpAdviceFromSecondStuckWarning() {
         val (s1, a1) = StuckAdvice.next(StuckState(), StuckInput(listOf(warn("no_progress")), null, "com.x"))
@@ -96,7 +96,7 @@ class LoopPoliciesTest {
         val (s2, a2) = StuckAdvice.next(s1, StuckInput(listOf(warn("read_loop")), null, "com.x"))
         assertEquals(2, s2.warnings)
         assertEquals(Feedback.format("give_up_advice", "answer_or_failure" to ANSWER_OR_FAILURE), a2)
-        // 不是卡住类的结论不算
+        // Verdicts that are not of the stuck kind do not count
         assertNull(StuckAdvice.next(StuckState(), StuckInput(listOf(warn("too_many_failures")), null, null)).second)
     }
 
@@ -133,7 +133,7 @@ class LoopPoliciesTest {
         assertNull(StuckAdvice.typedText(Verb.TypeText, args, null))
     }
 
-    // ---- 结果之后的说明 ----
+    // ---- Notes after results ----
 
     @Test fun imageNotes() {
         assertEquals(Feedback["recalled_note"], NoticePolicy.imageNote(Verb.ViewPastScreens, false))
@@ -144,12 +144,12 @@ class LoopPoliciesTest {
 
     @Test fun knowledgeLookups() {
         assertEquals(listOf(KnowledgeLookup.App("com.x")), NoticePolicy.knowledgeAfter(Verb.Observe, Place.app("com.x"), true))
-        // 打开一个 App 后也要补它的资料(没在开局 top 3 里的,靠这里补进来)
+        // Opening an app also needs its knowledge filled in (apps missing from the opening top 3 get added here)
         assertEquals(listOf(KnowledgeLookup.App("com.x")), NoticePolicy.knowledgeAfter(Verb.LaunchApp, Place.app("com.x"), true))
         assertEquals(listOf(KnowledgeLookup.Site("example.com")), NoticePolicy.knowledgeAfter(Verb.Observe, Place.site("WWW.Example.com"), true))
         assertEquals(listOf(KnowledgeLookup.Site("shop.example.com")), NoticePolicy.knowledgeAfter(Verb.Navigate, Place.site("shop.example.com"), true))
         assertEquals(emptyList<KnowledgeLookup>(), NoticePolicy.knowledgeAfter(Verb.Navigate, Place.site("shop.example.com"), false))
-        // 动作把任务带到了别处,只有看过那里才找资料;打开网页不算看了 App
+        // The action moved the task elsewhere, so knowledge is looked up only after that place has been seen; opening a web page does not count as seeing an app
         assertEquals(emptyList<KnowledgeLookup>(), NoticePolicy.knowledgeAfter(Verb.Tap, Place.app("com.x"), true))
         assertEquals(emptyList<KnowledgeLookup>(), NoticePolicy.knowledgeAfter(Verb.Navigate, Place.app("com.x"), true))
         assertEquals(emptyList<KnowledgeLookup>(), NoticePolicy.knowledgeAfter(Verb.Observe, null, true))
@@ -161,7 +161,7 @@ class LoopPoliciesTest {
         assertNull(placeAfter(Verb.Tap, nav))
     }
 
-    // ---- 压缩时机 ----
+    // ---- Compaction timing ----
 
     @Test fun compressionReportedOnlyWhenFoldingChanges() {
         var s = CompactionState()
@@ -178,13 +178,13 @@ class LoopPoliciesTest {
         val (s, again) = CompactionPolicy.overflow(CompactionState(), retried = false) { true }
         assertTrue(again && s.aggressive)
         assertFalse(CompactionPolicy.overflow(CompactionState(), retried = false) { false }.second)
-        // 已是狠压缩的任务再次超长:历史长了、压得更小就再重发一次
+        // A task already under aggressive compaction overflows again: if the history has grown and can be shrunk further, send once more
         assertTrue(CompactionPolicy.overflow(s, retried = false) { true }.second)
-        // 同一次超长已经重发过:不再算、不再发
+        // This same overflow has already been retried: do not count it and do not send again
         assertFalse(CompactionPolicy.overflow(s, retried = true) { error("不该再算") }.second)
     }
 
-    // ---- 重试 ----
+    // ---- Retries ----
 
     private val fixed = RetryPolicy(jitter = { 1.0 })
 

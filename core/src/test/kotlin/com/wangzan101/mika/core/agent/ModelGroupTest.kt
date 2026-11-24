@@ -67,7 +67,7 @@ class ModelGroupTest {
             ModelHealthRegistry(), StickyTable(), "g/s",
         )
         assertEquals(listOf("seeing"), pool.ordered(ModelNeed(toolCalls = true, vision = true, estimatedTokens = 50_000)).map { it.model.name })
-        // 上下文不够时放宽窗口限制,交给压缩;工具/看图不够不能放宽
+        // When the context is insufficient, relax the window limit and leave it to compaction; insufficient tool/vision support cannot be relaxed
         assertEquals(setOf("no-tools", "blind", "seeing"), pool.ordered(ModelNeed(estimatedTokens = 50_000)).map { it.model.name }.toSet())
     }
 
@@ -81,7 +81,7 @@ class ModelGroupTest {
             listOf(poolMember("a", a, 0), poolMember("b", b, 1)),
             ModelHealthRegistry(), sticky, "g/s",
         )
-        // 原始估算超过 a 的窗口,但压缩后可能放得下:粘性成员不能被静默换掉
+        // The raw estimate exceeds a's window, but it might fit after compaction: the sticky member must not be silently replaced
         assertEquals("a", pool.ordered(ModelNeed(estimatedTokens = 100_000)).first().model.name)
     }
 
@@ -94,9 +94,9 @@ class ModelGroupTest {
             listOf(poolMember("a", text, 0), poolMember("b", eye, 1)),
             ModelHealthRegistry(), StickyTable(), null,
         )
-        // 主成员看不了图就不开截图,避免第一张图之后永久换到备用成员
+        // If the primary member cannot see images, do not take screenshots, avoiding a permanent switch to a fallback member after the first image
         assertFalse(pool.capabilities.vision)
-        // 真的需要看图时仍然只把图发给能看图的成员
+        // When images are truly needed, images are still sent only to members that can see them
         assertEquals(listOf("eye"), pool.ordered(ModelNeed(vision = true, images = 1)).map { it.model.name })
     }
 
@@ -153,7 +153,7 @@ class ModelGroupTest {
         )
         val first = pool.ordered(ModelNeed()).first()
         pool.noteResult(first, 100, null)
-        // 选完就粘住:后续排序都以它开头
+        // Once chosen it sticks: subsequent orderings start with it
         assertEquals(first.model.name, pool.ordered(ModelNeed()).first().model.name)
     }
 
@@ -202,7 +202,7 @@ class ModelGroupTest {
             g, listOf(poolMember("a", a, weight = 1), poolMember("b", b, weight = 3)),
             ModelHealthRegistry(), StickyTable(), null, weights.forGroup("g"),
         )
-        // 两个任务各建一个池:累计值不能重置,否则每次都先选同一个成员
+        // Two tasks each create a pool: the accumulated counters must not reset, or the same member would always be chosen first
         val first = pool().ordered(ModelNeed()).first().model.name
         val second = pool().ordered(ModelNeed()).first().model.name
         assertTrue(first != second)
@@ -295,7 +295,7 @@ class ModelCallerGroupTest {
         val privatePart = Part.Thinking("private")
         val withPrivate = Message(Role.Assistant, listOf(privatePart, Part.Text("a2")), com.wangzan101.mika.core.model.Author.Mika)
         caller.noteReply(withPrivate, a, null)
-        // a 下一次失败,b 接答:b 收到的历史里不能有 a 的思考内容
+        // a fails next time and b takes over: the history b receives must not contain a's thinking content
         val answer = caller.ask(listOf(firstMessage, withPrivate), emptyList(), 2)
         assertEquals(reply("b1"), answer)
         assertTrue(sent.single().flatMap { it.parts }.none { it is Part.Thinking })
@@ -310,7 +310,7 @@ class FailoverPolicyTest {
             ModelError.StreamCut(), ModelError.Server(503), ModelError.ModelNotFound(), ModelError.ModelNotAvailable(),
             ModelError.ToolsUnsupported(), ModelError.ChatGptLimitReached(), ModelError.ChatGptNotEligible(),
             ModelError.SignInExpired(), ModelError.AccountPlanNotAllowed("xAI"),
-            // 预算按服务商算:同组别家成员还有机会,组内要换
+            // The budget is counted per provider: other members in the same group still have a chance, so fail over within the group
             ModelError.DailyBudgetExceeded("p", 100, 100),
         ).forEach { assertTrue(it::class.simpleName, FailoverPolicy.canFailover(it)) }
     }

@@ -20,7 +20,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 项目 3 的链行为:主模型失败自动换备援、换过去就留在备援、不该换的原样失败。 */
+/** Project 3 chain behavior: switch to a fallback automatically when the main model fails, stay on the fallback once switched, and fail as-is when no switch should happen. */
 class ModelCallerChainTest {
     private class Scripted(override val name: String, var fail: ModelError?) : ChatModel {
         override val capabilities = Capabilities(toolCalls = true, vision = true, contextTokens = 32_000, reasoning = false)
@@ -46,7 +46,7 @@ class ModelCallerChainTest {
         assertSame(backup, caller.lastMainUsed)
         assertEquals(1, main.calls)
         assertEquals(1, backup.calls)
-        // 切过去之后下一步直接问备援,不再先撞一次坏掉的主模型
+        // After switching, the next step asks the fallback directly instead of hitting the broken main model once more
         caller.ask(history, emptyList(), step = 2)
         assertEquals(1, main.calls)
         assertEquals(2, backup.calls)
@@ -94,7 +94,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun chainExhaustionSurfacesPrimaryError() = runTest {
-        // 整条链都失败:主消息是主模型最初的错误,备援的错误进记录(MK-1 第 2 批;第 1 批是直接交出主错误)。
+        // The whole chain fails: the primary message is the main model's original error, and fallback errors go into the trail (MK-1 batch 2; batch 1 delivered the primary error directly).
         val mainErr = ModelError.Server(500)
         val main = Scripted("main", mainErr)
         val backup = Scripted("backup", ModelError.Server(503))
@@ -108,7 +108,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun mixedFailureSurfacesPrimaryWithTrail() = runTest {
-        // 主模型是可切换的错、备援是不可切换的错:照样以主模型的错领头,备援的错进记录(MK-1 第 2 批)。
+        // The main model fails with a switchable error and the fallback with a non-switchable one: the main model's error still leads, and the fallback's error goes into the trail (MK-1 batch 2).
         val mainErr = ModelError.RateLimited(null)
         val main = Scripted("main", mainErr)
         val backup = Scripted("backup", ModelError.BadResponse("HTTP 400 wrapped"))
@@ -122,7 +122,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun laterStepFailureStillSurfacesPrimary() = runTest {
-        // 第一步切到备援并成功,第二步备援自己失败:主模型的错靠任务级记录还在,仍由它领头(MK-1 第 2 批)。
+        // Step 1 switches to the fallback and succeeds; in step 2 the fallback itself fails: the main model's error is still present via the task-level record, so it still leads (MK-1 batch 2).
         val mainErr = ModelError.QuotaExceeded()
         val main = Scripted("main", mainErr)
         val backup = Scripted("backup", null)
@@ -137,7 +137,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun singleModelFailureIsNotWrapped() = runTest {
-        // 没有备援、只试过一个模型:原样交出,不包 ChainFailed。
+        // No fallback and only one model tried: deliver as-is, without wrapping in ChainFailed.
         val err = ModelError.BadResponse("HTTP 400 wrapped")
         val main = Scripted("main", err)
         val caller = caller(main, emptyList())
@@ -168,7 +168,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun fallbackBudgetErrorPropagatesAsItself() = runTest {
-        // 备援报的是任务级预算:说的是整个任务,照它自己交出,不被主模型的错盖掉。
+        // The fallback reports a task-level budget: it concerns the whole task, so it is delivered as-is and is not overridden by the main model's error.
         val budgetErr = ModelError.TaskBudgetExceeded(100, 100)
         val main = Scripted("main", ModelError.QuotaExceeded())
         val backup = Scripted("backup", budgetErr)
@@ -179,7 +179,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun server4xxSwitchesWithoutSameModelRetry() = runTest {
-        // 4xx 是这份请求本身被拒:同一家重试也没用,直接换下一家(MK-1 A-D1 第一点)。
+        // A 4xx means this request itself was rejected: retrying the same provider is useless, so switch to the next provider directly (MK-1 A-D1, point 1).
         val main = Scripted("main", ModelError.Server(400))
         val backup = Scripted("backup", null)
         val caller = ModelCaller(main, toolDispatcher(FakeScreen()), null, SpeedFlags.OFF,
@@ -191,7 +191,7 @@ class ModelCallerChainTest {
     }
 
     @Test fun server5xxRetriesSameModelFirst() = runTest {
-        // 5xx 是一时的故障:先在同一家把重试用完,才换备援。
+        // A 5xx is a transient failure: exhaust retries on the same provider first, then switch to the fallback.
         val main = Scripted("main", ModelError.Server(500))
         val backup = Scripted("backup", null)
         val caller = ModelCaller(main, toolDispatcher(FakeScreen()), null, SpeedFlags.OFF,
@@ -235,7 +235,7 @@ class ModelCallerChainTest {
         assertSame(main, caller.lastMainUsed)
     }
 
-    /** 先给一条带私有字段的回复、之后按 [thenFail] 失败的假模型;顺手记下最后一次收到的历史。 */
+    /** Fake model that first returns a reply carrying private fields and then fails with [thenFail]; it also records the last history it received. */
     private class Recorder(override val name: String, val first: ModelReply?, val thenFail: ModelError?) : ChatModel {
         override val capabilities = Capabilities(toolCalls = true, vision = true, contextTokens = 32_000, reasoning = false)
         var calls = 0
@@ -284,8 +284,8 @@ class ModelCallerChainTest {
     }
 
     @Test fun firstFailoverStripsUnrecordedReplies() = runTest {
-        // 任务第一次调用就 fallover:history 里有一条未记录来源的 assistant 回复(视同主模型给的),
-        // 发给备援时必须剥除私有字段,不能因为 replyOrigin 为空就整份原样直送(审查 T-1112-b649d2 第 3 轮 D1)。
+        // The task fails over on its very first call: history contains an assistant reply with no recorded origin (treated as coming from the main model),
+        // so its private fields must be stripped when sending to the fallback; do not send it through verbatim just because replyOrigin is empty (review T-1112-b649d2 round 3 D1).
         val main = Recorder("main", null, ModelError.QuotaExceeded())
         val backup = Recorder("backup", null, null)
         val caller = caller(main, listOf(backup))
@@ -299,8 +299,8 @@ class ModelCallerChainTest {
     }
 
     @Test fun lightViewStripsUnrecordedReplies() = runTest {
-        // 一条来源未被记录的 assistant 回复(任务刚开始、replyOrigin 还是空的)发给轻量模型时,
-        // 仍须剥除私有字段,不能因为 map 为空就原样直送(审查 T-1112-b649d2 第 2 轮 D1)。
+        // When an assistant reply with no recorded origin (the task just started and replyOrigin is still empty) is sent to the light model,
+        // its private fields must still be stripped; do not send it through verbatim just because the map is empty (review T-1112-b649d2 round 2 D1).
         val main = Recorder("main", null, null)
         val light = Recorder("light", null, null)
         val caller = ModelCaller(main, toolDispatcher(FakeScreen()), ModelRouter(main, light),

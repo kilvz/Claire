@@ -42,7 +42,7 @@ class ModelRouterTest {
             ModelHealthRegistry(), StickyTable(), null,
         )
         val r = ModelRouter(main, pool)
-        // 只要有一个成员支持工具就启用 lightSteps;具体到需要工具的步再按成员过滤
+        // Enable lightSteps as long as at least one member supports tools; for steps that actually need tools, filter by member
         assertTrue(r.active)
         assertSame(pool, r.pick(clean(2)))
         assertTrue(r.isLight(pool))
@@ -53,7 +53,7 @@ class ModelRouterTest {
         val r = ModelRouter(main, light)
         assertSame(light, r.pick(clean(2)))
         assertSame(light, r.pick(clean(3)))
-        // 读屏一类不报画面变化,不算没变
+        // Screen reads and similar do not report screen changes, so they do not count as unchanged
         assertSame(light, r.pick(clean(4).copy(lastChanged = null)))
     }
 
@@ -61,7 +61,7 @@ class ModelRouterTest {
         val r = ModelRouter(main, light)
         assertSame(main, r.pick(clean(5).copy(lastWasRecovery = true)))
         assertSame(main, r.pick(clean(5).copy(sameAppAsLast = false)))
-        // 不看图的轻量模型收不了截图
+        // A light model that cannot see images cannot accept screenshots
         assertSame(main, r.pick(clean(5).copy(hasImages = true)))
         val seeing = NamedModel("seeing", vision = true)
         assertSame(seeing, ModelRouter(main, seeing).pick(clean(5).copy(hasImages = true)))
@@ -109,7 +109,7 @@ class ModelRouterTest {
     }
 }
 
-/** 「在哪」分手机 App 与网站:换到网页、打开网址都算换了地方。 */
+/** "Where" distinguishes phone apps from websites: switching to the web and opening a URL both count as changing place. */
 class PlaceTrackingTest {
     @Test fun placeOfSeparatesAppsAndSites() {
         fun o(s: String) = kotlinx.serialization.json.Json.parseToJsonElement(s) as kotlinx.serialization.json.JsonObject

@@ -25,9 +25,9 @@ import com.wangzan101.mika.core.assembly.toolDispatcher
 import com.wangzan101.mika.core.learn.knowledge.KnowledgeStore
 
 /**
- * 模型能看到的全部提示词表面:每种能力组合的完整系统提示词、每个工具的定义(名字、说明、参数 schema)、
- * 内部角色的提示词。金样在 core/src/test/resources/prompt-surface/;重构前后必须一字不差。
- * 重新生成:./gradlew :core:test --tests '*PromptSurface*' -PupdateSnapshots
+ * Every prompt surface the model can see: the full system prompt for each capability combination, each tool definition (name, description, parameter schema),
+ * and the internal role prompts. The golden files live in core/src/test/resources/prompt-surface/; they must match exactly before and after refactors.
+ * Regenerate: ./gradlew :core:test --tests '*PromptSurface*' -PupdateSnapshots
  */
 class PromptSurfaceTest {
     private class Mem : MemoryPersistence {
@@ -48,7 +48,7 @@ class PromptSurfaceTest {
             toolDispatcher(FakeScreen(), web = FakeWebPort(), sandbox = FakeSandbox(SandboxStatus.Ready(network = true)), workspace = { "w" })
         }),
         "phone-sandbox-preparing" to Combo({ toolDispatcher(FakeScreen(), sandbox = FakeSandbox(SandboxStatus.NotInstalled), workspace = { "w" }) }),
-        // 已 root 的手机上用户打开了 root 命令
+        // The user has enabled root commands on a rooted phone
         "phone-root" to Combo({ toolDispatcher(FakeScreen(), root = object : RootPort {
             override suspend fun run(command: String, timeoutMs: Long): RootRun = RootRun.Unavailable
         }) }),
@@ -59,7 +59,7 @@ class PromptSurfaceTest {
                     web = FakeWebPort(), inlineScreen = true, deepLinks = true,
                     memory = mem, utterances = UserUtterances(), sandbox = FakeSandbox(SandboxStatus.Ready(network = false)), workspace = { "w" },
                     personalSkills = com.wangzan101.mika.core.learn.skills.InMemoryPersonalSkills(),
-                    // 子任务和之前几轮的记录:之前有记过运行的一轮时才有 history_read
+                    // Child tasks and records of previous turns: history_read is present only when a previous turn has a recorded run
                     runSpec = com.wangzan101.mika.core.run.RunSpec(com.wangzan101.mika.core.run.RunId("t"), "t", "thread",
                         priorTurns = listOf(Turn("之前", "好", "succeeded", runId = "r1"))),
                     childHost = com.wangzan101.mika.core.run.ChildRunHost { spec, _ ->
@@ -70,7 +70,7 @@ class PromptSurfaceTest {
         },
     )
 
-    /** [open] 时上一轮用过三组:开局都展开(本任务提供了的);否则都收着,只有入口。 */
+    /** When [open], all three groups were used in the previous turn: expand them all at the start (those this task provides); otherwise keep them all collapsed, with only the entry tools. */
     private fun offered(c: Combo, open: Boolean = true): FakeRequestCapture = runBlocking {
         val m = FakeRequestCapture()
         AgentLoop(m, c.tools(), SystemPrompt.identity(), flags = c.flags, memory = c.memory)
@@ -78,7 +78,7 @@ class PromptSurfaceTest {
         m
     }
 
-    /** 每种组合各组都展开时的系统提示词(收着时的样子见 layeredSurfaces)。 */
+    /** The system prompt for each combination with all groups expanded (for the collapsed form see layeredSurfaces). */
     @Test fun systemPromptPerCombination() {
         for ((name, c) in combos) {
             val m = offered(c)
@@ -87,15 +87,15 @@ class PromptSurfaceTest {
     }
 
     @Test fun toolDefinitions() {
-        // 同名工具按本任务有几块屏可能有几种定义(多一个 surface 参数),入口工具收着时另有短说明:每种都列出
+        // A tool with the same name may have several definitions depending on how many screens this task has (one extra surface parameter), and entry tools have a shorter description when collapsed: list every variant
         val all = combos.values.flatMap { offered(it).tools + offered(it, open = false).tools }
             .distinctBy { it.name + it.description + it.parametersJsonSchema }.sortedBy { it.name }
         PromptSurface.check("tools", PromptSurface.tools(all))
     }
 
     /**
-     * 分层之后各情形下第一次请求的全貌(系统提示词 + 每个工具的定义全文),组合同 everything、按产品路径不给确认工具:
-     * chat 只聊天(都收着)、phone / web 上一轮用过那一组(开局展开)、all 三组都展开。大小另写进 layers/sizes。
+     * The full picture of the first request in each scenario after layering (system prompt + the full definition of every tool), using the same combination as everything but without confirmation tools, as on the product path:
+     * chat only chats (all collapsed), phone / web used that group in the previous turn (expanded at start), all expands all three groups. Sizes are written separately into layers/sizes.
      */
     @Test fun layeredSurfaces() {
         val c = combos.getValue("everything")
@@ -119,19 +119,19 @@ class PromptSurfaceTest {
         PromptSurface.check("roles", PromptSurface.roles())
     }
 
-    /** 人格层:固定头尾和正文的全文,审改动时直接看差在哪。没有人格时其余金样不受影响。 */
+    /** Persona layer: the full text of the fixed header/footer and the body, so changes can be reviewed directly in the diff. Other golden files are unaffected when there is no persona. */
     @Test fun personaLayer() {
         PromptSurface.check("persona/layer", com.wangzan101.mika.core.prompt.PersonaPrompt.layer("测试人格", "先给结论,再展开;少用感叹号。")!!)
     }
 
-    /** 改了称呼之后模型多看到、看到不一样的那几段:身份那一段、「Claire 是 App 的名字」的说明、人格层的固定头。 */
+    /** The segments the model sees that are added or different after renaming: the identity segment, the statement that Claire is the app's name, and the persona layer's fixed header. */
     @Test fun personaRenamed() {
         val identity = SystemPrompt.identity("辉夜").substringBefore("\n\nPrinciples:")
         val layer = com.wangzan101.mika.core.prompt.PersonaPrompt.layer("测试人格", "先给结论。", assistant = "辉夜")!!.substringBefore("\n\nWhat the persona may change")
         PromptSurface.check("persona/renamed", identity + "\n\n---\n\n" + layer)
     }
 
-    /** 带选项的人格层:固定头尾 + 选项的句子 + 用户写的。 */
+    /** A persona layer with options: fixed header/footer + sentences for the options + what the user wrote. */
     @Test fun personaLayerWithOptions() {
         val style = com.wangzan101.mika.core.prompt.PersonaStyle(
             base = com.wangzan101.mika.core.prompt.PersonaStyle.Base.Crisp,
@@ -155,7 +155,7 @@ class PromptSurfaceTest {
         override suspend fun events(runId: String) = emptyList<com.wangzan101.mika.core.run.record.RunEvent>()
     }
 
-    /** 只回一个 finish:记下开工那次请求的系统提示词和工具。 */
+    /** Reply with only a finish: record the system prompt and tools from the request at the start. */
     private class FakeRequestCapture : com.wangzan101.mika.core.model.ChatModel {
         override val capabilities = com.wangzan101.mika.core.model.Capabilities(toolCalls = true, vision = false, contextTokens = 128_000, reasoning = false)
         var system: String? = null

@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 项目 3 的切换决策表:哪种错误换下一个、哪种不换,逐类钉住。 */
+/** Project 3 failover decision table: which errors switch to the next model and which do not, pinned down per category. */
 class FailoverTest {
     private val tags = listOf("OpenRouter", "APInex", "Groq")
 
@@ -36,7 +36,7 @@ class FailoverTest {
     }
 
     @Test fun groupUnavailableSwitchesToNextChainLink() {
-        // 组内已经无人可用/用尽:链上还有健康模型时要能进下一条
+        // No usable member is left in the group / the group is exhausted: must be able to advance to the next link when the chain still has a healthy model
         assertEquals(1, Failover.nextIndex(ModelError.GroupUnavailable("g"), 0, tags, 3))
         assertEquals(1, Failover.nextIndex(ModelError.GroupExhausted("g"), 0, tags, 3))
         assertNull(Failover.nextIndex(ModelError.GroupUnavailable("g"), 1, tags, 2))
@@ -48,11 +48,11 @@ class FailoverTest {
 
     @Test fun dailyBudgetOnlySwitchesAcrossProviders() {
         val blown = ModelError.DailyBudgetExceeded("Gateway", 100, 100, providerId = "primary-id")
-        // 下一个是同一家:不换
+        // The next one is the same provider: do not switch
         assertNull(Failover.nextIndex(blown, 0, listOf("primary-id", "primary-id"), 2))
-        // 同家的跳过,换到不同家
+        // Skip same-provider entries and switch to a different provider
         assertEquals(2, Failover.nextIndex(blown, 0, listOf("primary-id", "primary-id", "backup-id"), 3))
-        // 备援的身份未知时不换。
+        // Do not switch when the fallback's provider identity is unknown.
         assertNull(Failover.nextIndex(blown, 0, listOf("primary-id", null), 2))
     }
 

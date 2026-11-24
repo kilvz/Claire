@@ -17,8 +17,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * [ModelCaller.lastRetryWaitMs] 从第一次真正发出请求起算(失败的请求、退避才算重试等待);
- * 开工到第一次发出之间的准备(压缩、冷却等待)不算。钟每取一次走 10ms,模型调用按 [advanceMs] 走钟。
+ * [ModelCaller.lastRetryWaitMs] is measured from the first request actually sent (only the failed request and the backoff count as retry wait);
+ * preparation between starting work and the first send (compaction, cooldown waits) does not count. The clock advances 10ms per read, and model calls advance it by [advanceMs].
  */
 class ModelCallerRetryWaitTest {
     private class Scripted(
@@ -51,7 +51,7 @@ class ModelCallerRetryWaitTest {
         val caller = caller(model, RetryPolicy(maxRetries = 1, jitter = { 0.0 }))
         caller.ask(history, emptyList(), step = 1)
         assertEquals(2, model.calls)
-        // 两次真正发出之间走过的时间(失败那次的耗时 + 其间的退避);不含第一次发出之前的准备
+        // Time elapsed between the two actual sends (the duration of the failed attempt plus the backoff in between); preparation before the first send is excluded
         assertEquals(model.sentAt[1] - model.sentAt[0], caller.lastRetryWaitMs)
     }
 

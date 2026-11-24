@@ -29,13 +29,13 @@ import com.wangzan101.mika.core.tool.Verb
 import com.wangzan101.mika.core.assembly.toolDispatcher
 
 /**
- * 工具与主循环给模型的反馈文字(提示、错误说明、提醒):按典型情形逐条触发,原样写进金样。
- * 情形按行为描述,不依赖这些字放在哪个文件里。
+ * Feedback text the tools and main loop give the model (hints, error descriptions, reminders): trigger each one with a typical situation and write it verbatim into the golden file.
+ * Situations are described by behavior and do not depend on which file the text lives in.
  */
 internal object PromptSurfaceFeedback {
     private fun call(name: String, args: String = "{}") = Part.ToolCall("c1", name, args)
 
-    /** 各错误码经一次失败的点击转成的说明(端口报什么码,模型就看到对应的说明)。 */
+    /** The description each error code turns into through a failed tap (whatever code the port reports, the model sees the corresponding description). */
     private val FAILURE_CODES = listOf(
         "app_in_use_by_user", "app_in_use_by_other_task", "app_not_found", "no_focus", "not_editable", "no_app_open", "no_history",
         "tab_crashed", "obscured", "offscreen", "key_not_allowed", "no_tab_open", "handed_over", "site_mode_unavailable",
@@ -150,8 +150,8 @@ internal object PromptSurfaceFeedback {
     }
 
     /**
-     * 主循环的提醒、说明、来源标签:经主循环和它的策略里用它们的那些名字取(私有的按名字反射调),
-     * 证明每处用的是对的那条、填法对。带参数的照典型参数调。
+     * The main loop's reminders, notes, and source labels: fetch them under the names the main loop and its policies use for them (private ones are called by name via reflection),
+     * proving that each place uses the right one and fills it in correctly. Parameterized ones are called with typical arguments.
      */
     fun loop(): String {
         fun fileCall(cls: String, name: String, vararg args: Any): String {
@@ -211,7 +211,7 @@ internal object PromptSurfaceFeedback {
         return PromptSurface.entries(items + loopResults())
     }
 
-    /** 主循环自己写的工具结果:一次给了多个调用、申报的 App 不是眼前的、没有确认关卡时申报。 */
+    /** Tool results the main loop writes itself: several calls given at once, a declared app that is not on screen, and a declaration when there is no confirmation gate. */
     private fun loopResults(): List<Pair<String, String>> = runBlocking {
         fun reply(vararg calls: Part.ToolCall) = ModelReply(calls.toList(), StopReason.ToolUse, null)
         val done = com.wangzan101.mika.core.testing.answerReply("ok")
