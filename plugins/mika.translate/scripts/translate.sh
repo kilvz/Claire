@@ -90,13 +90,13 @@ TARGET_NOTE=""
 NORM=$(printf '%s' "$TARGET" | tr 'A-Z' 'a-z' | tr -d ' _-')
 case "$NORM" in
   zh|zhcn|cn|chinese|中文|简体|简体中文|zhhans)
-    TARGET="简体中文"; TARGET_NOTE="用中国大陆的习惯用语与标点。" ;;
+    TARGET="简体中文"; TARGET_NOTE="Use mainland Chinese idiom and punctuation." ;;
   zhtw|zhhk|hk|tw|har|hant|繁体|繁體|繁體中文|繁体中文|traditionalchinese)
-    TARGET="繁體中文"; TARGET_NOTE="用台灣的習慣用語與標點（軟體、網路、影片這類詞按台灣說法）。" ;;
+    TARGET="繁體中文"; TARGET_NOTE="Use Taiwanese idiom and punctuation (words such as software, network and video follow Taiwanese usage)." ;;
   ja|jp|japanese|日语|日文|日本語)
-    TARGET="日本語"; TARGET_NOTE="自然な日本語で。" ;;
+    TARGET="日本語"; TARGET_NOTE="Use natural Japanese." ;;
   ko|kr|korean|韩语|韓語|한국어)
-    TARGET="한국어"; TARGET_NOTE="자연스러운 한국어로。" ;;
+    TARGET="한국어"; TARGET_NOTE="Use natural Korean." ;;
   en|english|英语|英文)
     TARGET="English"; TARGET_NOTE="Natural English." ;;
   *) TARGET_NOTE="" ;;
@@ -119,7 +119,7 @@ MODEL="${MIKA_TRANSLATE_MODEL:-}"
 NOTE=""
 case "$BASE" in
   http://*|https://*) ;;
-  *) BASE=""; NOTE="未配置 MIKA_TRANSLATE_BASE，用自己的模型在对话里翻译（不调用接口）。" ;;
+  *) BASE=""; NOTE="MIKA_TRANSLATE_BASE is not configured; translate with your own model in the conversation (no endpoint call)." ;;
 esac
 
 # ---------- Chunking ----------
@@ -233,7 +233,7 @@ PARTS=$(wc -l < "$LIST" 2>/dev/null | tr -d ' ')
 [ "$PARTS" -gt 0 ] || { printf '{"ok":false,"error":"split_failed","message":"could not split the text"}\n'; exit 0; }
 if [ "$PARTS" -gt 40 ]; then
   rm -f "$WORK"/rt-"$$".*
-  printf '{"ok":false,"error":"too_long","message":"%s 段超过 40 段上限，请分次翻译（改用 web_read_page 的 offset 分页）"}\n' "$PARTS"
+  printf '{"ok":false,"error":"too_long","message":"%s segments exceed the 40-segment limit; translate in several passes (use web_read_page offset paging)"}\n' "$PARTS"
   exit 0
 fi
 
@@ -268,13 +268,13 @@ fi
 # ---------- Call the endpoint ----------
 STYLE_RULE=""
 case "$STYLE" in
-  literal) STYLE_RULE="贴近原文结构，直译为主，术语保持前后一致。" ;;
-  polish) STYLE_RULE="可读性优先，允许调整语序，术语保持前后一致。" ;;
-  *) STYLE_RULE="准确、通顺，术语保持前后一致；保留原文的段落与列表结构。" ;;
+  literal) STYLE_RULE="Stay close to the source structure, translate literally where possible, and keep terminology consistent." ;;
+  polish) STYLE_RULE="Optimise for readability, word order may be adjusted, and keep terminology consistent." ;;
+  *) STYLE_RULE="Accurate and fluent, keep terminology consistent, and preserve the source paragraph and list structure." ;;
 esac
 SRC_RULE=""
-[ -n "$SOURCE" ] && SRC_RULE="源语言是 $SOURCE。"
-SYS="你是专业翻译。把用户给出的文本翻译成${TARGET}。${SRC_RULE}${STYLE_RULE}${TARGET_NOTE}只输出译文，不要解释、不要加引号、不要输出原文。保留原文中的网址、代码、专有名词不译。"
+[ -n "$SOURCE" ] && SRC_RULE="The source language is $SOURCE. "
+SYS="You are a professional translator. Translate the text the user provides into ${TARGET}. ${SRC_RULE}${STYLE_RULE}${TARGET_NOTE} Output only the translation: no explanations, no quotation marks, and do not repeat the source. Leave URLs, code and proper nouns in the original untranslated."
 
 OUT="$WORK/rt-$$.out.json"
 : > "$OUT"
@@ -394,7 +394,7 @@ while IFS= read -r f; do
     }' "$WORK/rt-$$.resp.json")
   fi
 
-  [ -n "$TR" ] || { ERR="empty_translation（接口返回里没有 content）"; break; }
+  [ -n "$TR" ] || { ERR="empty_translation (no content in the endpoint response)"; break; }
   # Add only one newline between chunks; newlines inside a chunk stay exactly as the model returned them
   [ "$AI" -gt 1 ] && printf '\n' >> "$OUT"
   # The model sometimes writes newlines as a literal backslash+n: normalise them back to real newlines when joining chunks
