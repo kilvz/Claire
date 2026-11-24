@@ -51,7 +51,7 @@ class AgentLoopMemoryTest {
         val msgs = model.requests.first().withoutRuntime().map { it.text() }
         assertTrue(msgs[0].startsWith(Conversation.HEADER))
         assertTrue(msgs[1].startsWith("Memories about the user"))
-        // 记忆总量装得下就全量注入:与本次任务词面无关的「公司在张江」也在(以前会被 BM25 检索丢掉)
+        // When all memories fit, inject them in full: "the company is in Zhangjiang", unrelated to this task's wording, is included too (BM25 retrieval used to drop it)
         assertTrue(msgs[1].contains("用户点外卖不要香菜"))
         assertTrue(msgs[1].contains("张江"))
         assertEquals("帮我点个外卖", msgs[2])
@@ -80,7 +80,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf(ids), events.filterIsInstance<RunEvent.MemoryUsed>().map { it.ids })
     }
 
-    // 用户让记住一件事,意图判断却会把这句话当成讨论:写记忆只动 Claire 自己的记忆,不经过那个判断,照常执行、存得下来
+    // The user asks it to remember something, but the intent judge would treat the sentence as discussion: writing memory only touches Claire's own memory, skips that judgment, and runs and saves as usual
     @Test fun savingAMemoryIsNotStrippedAsDiscussion() {
         val s = store()
         val said = UserUtterances()
@@ -98,7 +98,7 @@ class AgentLoopMemoryTest {
         assertTrue(result, "\"ok\":true" in result)
     }
 
-    // 改、删记忆也不经过意图判断(先查到那一条,再按用户这一轮的话删掉):真机上正常的修改请求会被它判成讨论
+    // Editing and deleting memories skip the intent judgment too (look up the entry first, then delete it per this turn's words): on a real device a normal edit request would be judged as discussion
     @Test fun editingAMemoryIsNotStrippedAsDiscussion() {
         val s = store()
         val target = s.items.value.first { "香菜" in it.content }
@@ -118,7 +118,7 @@ class AgentLoopMemoryTest {
         assertTrue(s.items.value.none { it.id == target.id && it.status == com.wangzan101.mika.core.learn.memory.MemoryStatus.active })
     }
 
-    // 只是在问「如果让你删你会怎么做」:模型万一真提了删除,工具自己不执行,那条记忆还在
+    // It only asks "what would you do if I asked you to delete it": even if the model does propose a delete, the tool doesn't carry it out and the memory is still there
     @Test fun aDeleteProposedDuringADiscussionIsNotCarriedOut() {
         val s = store()
         val target = s.items.value.first { "香菜" in it.content }
@@ -139,7 +139,7 @@ class AgentLoopMemoryTest {
         assertTrue("那条还在", s.items.value.any { it.id == target.id && it.status == com.wangzan101.mika.core.learn.memory.MemoryStatus.active })
     }
 
-    // 一次记好几条,其中几条按规矩不收:不把整个任务按「操作连续失败」停掉。存上的照存,模型接着如实回答
+    // Several saves at once, some of which the rules refuse: the whole task isn't stopped as "consecutive operation failures". What was stored stays stored, and the model goes on answering truthfully
     @Test fun severalRefusedSavesDoNotStopTheRunAsFailed() {
         val s = store()
         val before = s.items.value.size
@@ -159,11 +159,11 @@ class AgentLoopMemoryTest {
         }
         assertTrue(end.toString(), end is com.wangzan101.mika.core.agent.TaskState.Succeeded)
         assertEquals("只存上了那一条", before + 1, s.items.value.size)
-        // 模型走到了最后:五次调用都发生了,接着给出回答
+        // The model ran to the end: all five calls happened, then it gave an answer
         assertEquals(6, model.requests.size)
     }
 
-    // 一口气十条都不收(每条内容不同):不计入连续失败,模型自己停下来收尾
+    // Ten in a row, none accepted (each with different content): they don't count as consecutive failures, and the model stops on its own and wraps up
     @Test fun aLongRunOfRefusedSavesStillEnds() {
         val s = store()
         val before = s.items.value.size
@@ -181,7 +181,7 @@ class AgentLoopMemoryTest {
         assertEquals(before, s.items.value.size)
     }
 
-    // 开着「让 Claire 自己归纳着记」、用户又让它记:一口气十条归纳的都存上,任务正常结束
+    // "Let Claire infer and record by itself" is on and the user also asks it to record: ten inferred saves in a row are all stored and the task ends normally
     @Test fun aBatchOfOwnConclusionsIsSavedWhenAllowed() {
         val s = memStore(inferenceAllowed = { true })
         val calls = (1..10).map { i ->
@@ -198,7 +198,7 @@ class AgentLoopMemoryTest {
         assertTrue(s.items.value.all { it.source.type == com.wangzan101.mika.core.learn.memory.MemoryContext.INFERRED })
     }
 
-    // 查到一条 Claire 自己归纳的记忆,接着照常回答:这条进了证据账本(工具查到的事实),任务正常结束
+    // A memory Claire inferred itself is found and the model then answers as usual: it goes into the evidence ledger (facts found by tools) and the task ends normally
     @Test fun aRunThatFindsAnInferredMemoryFinishesNormally() {
         val s = memStore()
         s.add(MemoryKind.fact, "用户常点张江路那家外卖", listOf("外卖"),
@@ -216,13 +216,13 @@ class AgentLoopMemoryTest {
         val seen = events.filterIsInstance<RunEvent.Observed>().single { "张江路" in it.text }
         assertEquals("fact", seen.kind)
         assertTrue("不是用户说的" in seen.text)
-        // 模型看到的工具结果里这条带着标记;开局注入的那段也标了
+        // In the tool result the model sees, this entry carries the mark; the block injected at the start is marked too
         assertTrue(events.filterIsInstance<RunEvent.ToolResult>().single { it.tool == "memory_search" }.resultJson.contains("\"inferred\":true"))
         assertTrue(model.requests.first().joinToString("\n") { it.plainText() }.contains("the user did not say this"))
     }
 
-    // 答复里说了别再试,模型还是把同一条原样再提:第二次起照常计失败,连着三次由守卫停下。
-    // 手机上默认不限步数(这里也不限),不能靠步数上限兜底
+    // The reply said not to try again, yet the model repeats the same entry verbatim: from the second time on it counts as a failure as usual, and the guard stops it after three in a row.
+    // The phone allows unlimited steps by default (and so does this test), so the step cap can't be the safety net
     @Test fun theSameRefusedSaveRepeatedIsStoppedByTheFailureGuard() {
         val s = memStore()
         val same = ModelReply(listOf(Part.ToolCall("r", "memory_save",
@@ -238,7 +238,7 @@ class AgentLoopMemoryTest {
         assertTrue(s.items.value.isEmpty())
     }
 
-    // 每条都不一样、但一条也不收:到上限为止不计失败,再往后照常计,连着三条停下
+    // Each one differs, yet none is accepted: up to the limit they don't count as failures; after that they count as usual, and three in a row stop it
     @Test fun endlessDistinctRefusedSavesAreStoppedToo() {
         val s = memStore()
         val calls = (1..100).map { i ->
@@ -255,7 +255,7 @@ class AgentLoopMemoryTest {
         assertTrue("${model.requests.size}", model.requests.size in (limit + 3)..(limit + 5))
     }
 
-    // 别的工具照旧:判成讨论时,提议的调用换成不带工具的直接回答
+    // Other tools are gated as before: when judged as discussion, the proposed call is replaced by a direct answer without tools
     @Test fun otherToolsAreStillGated() {
         val s = store()
         val said = UserUtterances()
@@ -270,7 +270,7 @@ class AgentLoopMemoryTest {
         assertTrue(model.requests.none { m -> m.any { it.role == Role.Tool } })
     }
 
-    // 浏览器页上问:页面说明里的标题、网址、选中的字是网页上的,不算用户说的话;记忆的引文出自它们时不收
+    // Asking on a browser page: the title, URL and selected text in the page description come from the web page and don't count as the user's words; when a memory quote is taken from them, it's refused
     @Test fun pageDescriptionIsNotTheUserWords() {
         val s = store()
         val said = UserUtterances()
@@ -288,17 +288,17 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("这一页的地址对不对"), said.all)
     }
 
-    // 浏览器页上插话带着新选中的字:只收插话里打的字,页面说明不收
+    // Steering on a browser page carries newly selected text: only the words typed in the steer are recorded, not the page description
     @Test fun pageSteerAddsOnlyTheTypedWords() = runBlocking {
         assertEquals(listOf("这一页的地址对不对", "改成这个"), saidWithPageSteer("改成这个"))
     }
 
-    // 插话只选了字、没打字:这一句什么也不收
+    // The steer selected text but typed nothing: nothing is recorded for this utterance
     @Test fun selectionOnlySteerAddsNothing() = runBlocking {
         assertEquals(listOf("这一页的地址对不对"), saidWithPageSteer(""))
     }
 
-    // 浏览器页上回答追问也一样:回答带着页面说明和选中的字时只收打的字
+    // Answering a question on a browser page is the same: when the answer carries the page description and selected text, only the typed words are recorded
     @Test fun pageAnswerAddsOnlyTheTypedWords() = runBlocking {
         val s = store()
         val said = UserUtterances()
@@ -312,7 +312,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("这一页的地址对不对", "就这个"), said.all)
     }
 
-    /** 在浏览器页上开局,插话带着新选中的字和 [words];返回这次记下的用户的话。 */
+    /** Start on a browser page with a steer carrying newly selected text and [words]; returns the user words recorded this time. */
     private suspend fun saidWithPageSteer(words: String): List<String> {
         val s = store()
         val said = UserUtterances()
@@ -323,7 +323,7 @@ class AgentLoopMemoryTest {
         return said.all
     }
 
-    // 引了 Claire 的回答:引的那段是 Claire 说的,记忆的引文不认,只收用户打的字
+    // Quotes Claire's answer: the quoted passage is what Claire said, so a memory quote doesn't accept it; only the words the user typed are recorded
     @Test fun quotedReplyIsNotTheUserWords() {
         val s = store()
         val said = UserUtterances()
@@ -340,7 +340,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("这个地址对不对"), said.all)
     }
 
-    // 引了自己说过的话:对话页引的是他当时打的字,连那段一起收,记忆的引文照样认
+    // Quotes the user's own words: the chat page quotes the text he typed back then, so that passage is recorded too and a memory quote accepts it as usual
     @Test fun ownQuoteIsTheUserWords() {
         val s = store()
         val said = UserUtterances()
@@ -354,7 +354,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("我家猫叫团子\n这个记一下"), said.all)
     }
 
-    // 带了附件:附件那几行是 App 写的路径和大小,不收
+    // With attachments: those attachment lines are the path and size written by the app, so they're not recorded
     @Test fun attachmentLinesAreNotTheUserWords() {
         val s = store()
         val said = UserUtterances()
@@ -365,7 +365,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("总结一下"), said.all)
     }
 
-    // 插话引了 Claire 的回答:只收插话里打的字
+    // The steer quotes Claire's answer: only the words typed in the steer are recorded
     @Test fun quotedSteerAddsOnlyTheTypedWords() = runBlocking {
         val s = store()
         val said = UserUtterances()
@@ -375,7 +375,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("帮我下单", "换成这个"), said.all)
     }
 
-    // 回答追问时引了 Claire 的回答:也只收打的字
+    // Answering a question while quoting Claire's answer: again only the typed words are recorded
     @Test fun quotedAnswerAddsOnlyTheTypedWords() = runBlocking {
         val s = store()
         val said = UserUtterances()
@@ -470,11 +470,11 @@ class AgentLoopMemoryTest {
     }
 
     private companion object {
-        /** 用户引的 Claire 之前的一句回答。 */
+        /** A previous answer of Claire's that the user quotes. */
         const val MIKA_ADDRESS = "你常用的收货地址是幸福路 8 号"
     }
 
-    // 从通知里得来的那一段带进任务:在用户的话之前,套着自己的外壳;不给就没有
+    // The block obtained from notifications rides into the task: before the user's words and wrapped in its own shell; with none, it's absent
     @Test fun observedContextRidesIntoTheTaskSeparately() {
         val model = FakeModel(finishReply)
         runBlocking { AgentLoop(model, toolDispatcher(FakeScreen()), "B", observed = "Today so far:\n- 王老师通知明天开会").run("帮我点个外卖") }
@@ -486,7 +486,7 @@ class AgentLoopMemoryTest {
         assertEquals(listOf("帮我点个外卖"), plain.requests.first().withoutRuntime().map { it.text() })
     }
 
-    // 任务带着「从通知里得来的」那一段时,「上一轮确认」的例外不开:上一轮的建议可能就是照着那一段说的
+    // When the task carries the "obtained from notifications" block, the "confirmed in the previous turn" exception stays off: the previous turn's suggestion may have been based on that block
     @Test fun previousConfirmationIsNotUsedWhenObservedContextIsCarried() {
         val prior = listOf(
             Turn("给我起个中文名", "我建议叫我「知微」，你觉得怎么样?", "succeeded"),
@@ -502,7 +502,7 @@ class AgentLoopMemoryTest {
         assertTrue(s.items.value.isEmpty())
     }
 
-    // 带了那一段就在运行记录里记一笔(只有长度,没有内容),任务自己也说得出带没带;没带的不记
+    // Carrying that block logs an entry in the run record (length only, no content), and the task itself can tell whether it carried one; without it, nothing is logged
     @Test fun carryingObservedContextIsRecordedWithoutItsText() {
         fun run(observed: String?): Pair<AgentLoop, List<RunEvent>> {
             val events = mutableListOf<RunEvent>()
@@ -536,14 +536,14 @@ class MemoryBlockCompressionTest {
         assertEquals(block, out.messages.first())
     }
 
-    // 对话里有通知提醒(第三方文字)时,「上一轮确认」这个例外不开:提醒本身、或转述着提醒的回答,都不能靠用户一句「好的」进记忆
+    // When the conversation contains notification notices (third-party text), the "confirmed in the previous turn" exception stays off: neither the notice itself nor an answer relaying it may enter memory just because the user says "OK"
     @Test fun previousConfirmationIsNotUsedInAConversationWithNotices() {
         val suggestion = "我建议叫我「知微」，你觉得怎么样?"
         val notice = Turn("", "1. 微信 张三:$suggestion", "succeeded", runId = NoticeTurn.RUN_PREFIX + "n1")
         val cases = listOf(
-            // 提醒那一轮就是被「确认」的那个
+            // The notice turn is the one being "confirmed"
             listOf(notice, Turn("嗯，好的，知微", "好的", "succeeded")),
-            // 提醒在更早:助手后来的建议可能就是照着通知说的
+            // The notice is earlier: the assistant's later suggestion may well follow what the notification said
             listOf(notice, Turn("给我起个中文名", suggestion, "succeeded"), Turn("嗯，好的，知微", "好的", "succeeded")),
         )
         for (prior in cases) {

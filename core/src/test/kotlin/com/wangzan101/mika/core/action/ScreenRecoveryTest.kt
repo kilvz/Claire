@@ -14,7 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 锁屏周期后准备好但还没执行的动作不再执行:模型收到一条说明结果,先重读屏再决定下一步。 */
+/** An action prepared before a lock-screen cycle but not yet executed is no longer executed: the model receives a result explaining that, re-reads the screen, then decides the next step. */
 class ScreenRecoveryTest {
     @Test fun lockedMidRunDoesNotExecutePendingTap() = runTest {
         var taps = 0

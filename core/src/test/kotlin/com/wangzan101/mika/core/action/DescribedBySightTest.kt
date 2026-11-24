@@ -25,11 +25,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 按描述指输入框,而树读不出这一屏:改看图找这个框,之后和传 @vN 一样核对、判不可逆、粘贴核对。 */
+/** Point at an input box by description while the tree can't read this screen: fall back to vision to find the box, then verify, judge irreversibility and verify the paste just as when passing @vN. */
 class DescribedBySightTest {
     private val sink = object : RunSink { override fun event(e: RunEvent) {} }
 
-    /** 一屏(默认树里什么都没有,即树不能用);记下端口收到的打字。 */
+    /** One screen (by default the tree holds nothing, i.e. the tree is unusable); records the typing the port receives. */
     private class Blind(inner: LocScreen = LocScreen()) : ScreenPort by inner {
         val calls = mutableListOf<String>()
         override suspend fun typeText(ref: String?, snapshotId: String?, text: String): ActionResult { calls += "type $ref $text"; return ActionResult.Ok(changed = true) }
@@ -56,12 +56,12 @@ class DescribedBySightTest {
         val vision = model("""{"bbox_2d":[0,880,800,940],"seen":"输入框"}""", "是")
         val c = content(type(executor(screen, vision), """{"element":"底部的消息输入框","text":"明天见"}"""))
         assertEquals(c.toString(), "true", c.s("ok"))
-        // 0–999 的框中心换成像素,点一下再粘贴
+        // Convert the 0–999 box centre to pixels, tap once, then paste
         assertEquals(listOf("typeAt 432,2183 明天见"), screen.calls)
         assertEquals("true", c.s("foundBySight"))
         assertEquals("底部的消息输入框", c.s("resolvedFrom"))
         assertEquals("输入框", c.s("seen"))
-        // 只靠看图、没有佐证:照样标出来
+        // Vision only, no corroboration: still flagged
         assertEquals("true", c.s("unverifiedPoint"))
         assertEquals(2, vision.requests.size)
     }
@@ -75,7 +75,7 @@ class DescribedBySightTest {
     }
 
     @Test fun boxFoundOnASendButtonIsUsedWithoutAsking() = runTest {
-        // 判过不可逆:是发送,不花钱,不先问
+        // Judged irreversible: it's a send, costs no money, so don't ask first
         val screen = Blind()
         val vision = model("""{"bbox_2d":[800,880,999,940],"seen":"发送"}""", "是")
         val o = type(executor(screen, vision), """{"element":"右下角的框","text":"明天见"}""")

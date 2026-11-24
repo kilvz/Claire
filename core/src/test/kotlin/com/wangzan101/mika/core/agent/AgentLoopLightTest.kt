@@ -32,7 +32,7 @@ private fun call(name: String, args: String = "{}") = Part.ToolCall("l${++seq}",
 private fun tools(vararg calls: Part.ToolCall) = ModelReply(calls.toList(), StopReason.ToolUse, null)
 private fun finish() = com.wangzan101.mika.core.testing.answerReply("done")
 
-/** 屏上有一个操作按钮;每次读取另有新序号,路由测试不会被无新数据收尾打断。 */
+/** The screen has one action button; each read gets a new sequence number, so routing tests aren't cut short by an early end on "no new data". */
 private class SendScreen(private val label: String = "发送", private val inner: FakeScreen = FakeScreen()) : com.wangzan101.mika.core.screen.uistate.ScreenPort by inner {
     private var reads = 0
     override suspend fun snapshot() = ScreenSnapshot("s1", "com.x",
@@ -49,13 +49,13 @@ class AgentLoopLightTest {
         AgentLoop(main, toolDispatcher(screen), "BASE", sink = sink, flags = on, router = ModelRouter(main, light))
 
     @Test fun cleanStepsGoToLightAndAreRecorded() = runTest {
-        // 第 1 步主模型;第 2 步前台 App 只见过一次,主模型;第 3 步起两步同 App、无错 → 轻量
+        // Step 1 main model; at step 2 the foreground app has been seen only once, main model; from step 3, two steps on the same app with no error → light
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(tools(call("phone_observe")), finish()))
         val sink = Events()
         val r = loop(main, light, sink).run("t")
         assertTrue(r is TaskState.Succeeded)
-        // 第 4 步轻量模型想交结果,改问主模型
+        // At step 4 the light model wants to hand in the result, so the main model is asked instead
         assertEquals(2, light.requests.size)
         assertEquals(3, main.requests.size)
         val replies = sink.list.filterIsInstance<RunEvent.ModelReply>()
@@ -63,7 +63,7 @@ class AgentLoopLightTest {
         assertEquals(listOf("main", "main", "light", "light", "main"), replies.map { it.model })
     }
 
-    // 不带调用的回复是最终回答,只由主模型给:轻量模型这样回就改问主模型
+    // A reply with no calls is a final answer, given only by the main model: when the light model replies like that, ask the main model instead
     @Test fun lightAnswerIsAskedAgainOfMain() = runTest {
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(com.wangzan101.mika.core.testing.answerReply("LIGHT_ANSWER")))
@@ -74,7 +74,7 @@ class AgentLoopLightTest {
         assertEquals(3, main.requests.size)
         assertTrue(sink.list.any { it is RunEvent.State && it.name == "light_to_main" && it.detail == "no_tool" })
         assertEquals(listOf("main", "main", "light_rejected", "main"), sink.list.filterIsInstance<RunEvent.ModelReply>().map { it.role })
-        // 改派后主模型看到的历史里没有那条没执行的回复
+        // After the re-dispatch the history the main model sees doesn't contain that unexecuted reply
         val asked = main.requests.last()
         assertTrue(asked.flatMap { it.parts }.filterIsInstance<Part.Text>().none { "LIGHT_ANSWER" in it.text })
         assertEquals(asked.size, light.requests.single().size)
@@ -92,7 +92,7 @@ class AgentLoopLightTest {
     }
 
     @Test fun confirmationBlockedStepForcesMain() = runTest {
-        // 第 2 步主模型点「提交订单」被确认关卡拦下:之后两步主模型,第 5 步才轮到轻量模型
+        // At step 2 the main model taps "Submit order" and is stopped by the confirmation gate: the next two steps go to the main model, and only step 5 reaches the light model
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_tap", """{"ref":"@e1","snapshotId":"s1"}""")),
             tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(tools(call("phone_observe")), finish()))
@@ -134,7 +134,7 @@ class AgentLoopLightTest {
             tools(call("phone_observe")), tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(ModelReply(listOf(Part.Thinking("tl"), theirs), StopReason.ToolUse, null), finish()))
         loop(main, light).run("t")
-        // 第 3 步轻量模型;第 4 步它要交结果,改问主模型:轻量模型那条去掉思考和私有数据,主模型自己的原样
+        // Step 3 is the light model; at step 4 it wants to hand in the result, so the main model is asked instead: the light model's entry loses its thinking and private data, the main model's own is kept as it is
         val toMain = main.requests[2].filter { it.role == com.wangzan101.mika.core.model.Role.Assistant }.flatMap { it.parts }
         assertTrue(mine in toMain && Part.Thinking("tm") in toMain)
         assertTrue(theirs.copy(opaque = null) in toMain && Part.Thinking("tl") !in toMain)
@@ -156,7 +156,7 @@ class AgentLoopLightTest {
     @Test fun screenshotsNeverGoToTextOnlyLight() = runTest {
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel())
-        // 主模型看图:observe 附截图,轻量模型不看图就不接
+        // The main model sees images: observe attaches a screenshot, and the light model, which can't see images, won't take over
         val seeing = object : ChatModel by main {
             override val capabilities = main.capabilities.copy(vision = true)
         }
@@ -170,7 +170,7 @@ class AgentLoopLightTest {
         val light = Named("light", FakeModel(com.wangzan101.mika.core.model.ModelError.Network()))
         val r = loop(main, light).run("t")
         assertTrue(r is TaskState.Succeeded)
-        // 轻量模型出错不重试,这一步直接改问主模型
+        // A light-model error isn't retried; this step asks the main model directly
         assertEquals(1, light.requests.size)
         assertEquals(3, main.requests.size)
     }
@@ -180,7 +180,7 @@ class AgentLoopLightTest {
         val light = Named("light", FakeModel(com.wangzan101.mika.core.model.ModelError.Server(503)))
         val r = loop(main, light).run("t")
         assertTrue(r is TaskState.Succeeded)
-        // 503 没有重发给轻量模型,这一步由主模型接
+        // The 503 isn't resent to the light model; the main model takes this step
         assertEquals(1, light.requests.size)
         assertEquals(3, main.requests.size)
     }

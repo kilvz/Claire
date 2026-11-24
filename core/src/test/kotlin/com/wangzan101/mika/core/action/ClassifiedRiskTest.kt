@@ -36,16 +36,16 @@ class ClassifiedRiskTest {
     }
 
     @Test fun onlySpendingMoneyIsPayment() {
-        // 付款、下单就是花钱
+        // Paying and ordering spend money
         assertEquals(Risk(ActionRisk.Irreversible, payment = true), assess("phone_tap", Irreversible(IrrevAction.pay, "付款")))
         assertEquals(Risk(ActionRisk.Irreversible, payment = true), assess("phone_tap", Irreversible(IrrevAction.order, "提交订单")))
-        // 屏上有金额时不可逆的动作(删除)按花钱算;发送、提交放开,不再按花钱
+        // With an amount on screen, irreversible actions (delete) count as spending money; send and submit are let through and no longer count as spending money
         assertEquals(Risk(ActionRisk.External), assess("phone_tap", Irreversible(IrrevAction.submit, "提交"), on = shop))
-        // 账号、密码、安全设置、密码框、看不清的都不是花钱
+        // Account, password, security settings, password fields and anything unreadable are not spending money
         for (tool in listOf("phone_tap", "phone_type_text")) assertEquals(false, assess(tool).payment)
         assertEquals(false, assess("phone_tap", Irreversible(IrrevAction.delete, "注销账号")).payment)
         assertEquals(false, assess("phone_tap", Irreversible(IrrevAction.send, "发送")).payment)
-        // 金额在输入框里(自己打的字)不算;没命中不可逆判定的一般改动不看金额
+        // An amount inside an input field (typed by the user) doesn't count; ordinary changes that don't hit the irreversible check ignore amounts
         val typed = screen.copy(elements = screen.elements + el("@e7", "EditText", "¥25", listOf(0, 600, 999, 700), editable = true))
         assertEquals(false, assess("phone_tap", Irreversible(IrrevAction.submit, "提交"), on = typed).payment)
         assertEquals(Risk(ActionRisk.Change), assess("phone_tap", on = shop))
@@ -56,11 +56,11 @@ class ClassifiedRiskTest {
             el("@e7", "TextView", "150-200元/天", listOf(0, 600, 999, 660)),
             el("@e8", "Button", "提交", listOf(0, 700, 999, 760)),
         ))
-        // 金额只是页面内容,不是这一步要付的钱;区间也不能把提交、联系或删除升级成付款
+        // The amount is just page content, not the money this step would pay; ranges must not upgrade submit, contact or delete into payment either
         assertEquals(Risk(ActionRisk.External), assess("phone_tap", Irreversible(IrrevAction.submit, "提交"), on = salary))
         assertEquals(Risk(ActionRisk.External), assess("phone_tap", Irreversible(IrrevAction.submit, "立即沟通"), on = salary))
         assertEquals(Risk(ActionRisk.Irreversible), assess("phone_tap", Irreversible(IrrevAction.delete, "删除"), on = salary))
-        // 提交放开、不再看金额;合计、付款面板仍把删除升级成付款;明确下单、付款不依赖页面金额
+        // Submit is let through and no longer looks at amounts; totals and payment panels still upgrade delete into payment; explicit ordering and payment don't depend on the page amount
         assertEquals(false, assess("phone_tap", Irreversible(IrrevAction.submit, "提交"), on = shop).payment)
         val unreadableTotal = screen.copy(elements = screen.elements + el("@e9", "TextView", "合计", listOf(0, 600, 999, 660)))
         assertEquals(false, assess("phone_tap", Irreversible(IrrevAction.submit, "提交"), on = unreadableTotal).payment)

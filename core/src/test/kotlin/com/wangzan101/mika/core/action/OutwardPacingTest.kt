@@ -18,7 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** 对外动作之间的间隔:第一次不等、隔够了不等、别的网站各算各的,间隔有上下限且随次数变长;执行入口照它等,等的时间记成等待。 */
+/** Gap between outward actions: the first one doesn't wait, no wait once the gap has passed, each site counts on its own, the gap is bounded and grows with the count; the executor waits accordingly and records the wait as waiting time. */
 class OutwardPacingTest {
     private val limits = OutwardPacing.Limits()
 
@@ -36,7 +36,7 @@ class OutwardPacingTest {
             p.noteDone("example.com", 1_000)
             val gap = p.waitBefore("example.com", 1_000)
             assertTrue("$gap", gap in limits.firstGapMs)
-            // 中间读页面、想下一步花掉的时间算在间隔里
+            // Time spent reading the page and thinking about the next step in between counts toward the gap
             assertEquals(gap - 3_000, p.waitBefore("example.com", 4_000))
             assertEquals(0, p.waitBefore("example.com", 1_000 + gap))
         }
@@ -67,7 +67,7 @@ class OutwardPacingTest {
         assertEquals(null, OutwardPacing.siteOf(null, web = false))
     }
 
-    /** 一屏:一个「立即沟通」、一个普通按钮;记下点了什么。 */
+    /** One screen: a "Contact now" and an ordinary button; records what was tapped. */
     private class GreetPage : ScreenPort by FakeScreen() {
         val taps = mutableListOf<String>()
         private val shown = listOf(
@@ -79,7 +79,7 @@ class OutwardPacingTest {
         override suspend fun tapRef(ref: String, snapshotId: String) = ActionResult.Ok(changed = true).also { taps += ref }
     }
 
-    // 自主执行时也照判定隔开:第二次「立即沟通」前等够间隔,记成这次调用的等待,不算进操作用时;普通点击不等
+    // Autonomous execution is paced the same way: wait out the full gap before the second "Contact now", record it as this call's wait rather than operation time; ordinary taps don't wait
     @Test fun executorWaitsBetweenOutwardTapsAndRecordsTheWait() = runTest {
         val events = mutableListOf<RunEvent>()
         val sink = object : RunSink { override fun event(e: RunEvent) { events += e } }
@@ -100,10 +100,10 @@ class OutwardPacingTest {
         val results = events.filterIsInstance<RunEvent.ToolResult>().associateBy { it.callId }
         assertEquals(0L, results.getValue("c1").waitMs)
         assertEquals(0L, results.getValue("c2").waitMs)
-        // 普通点击花掉的时间算在间隔里,只补不够的部分
+        // Time an ordinary tap takes counts toward the gap, so only the shortfall is filled in
         assertEquals(gap - spent, results.getValue("c3").waitMs)
         assertTrue(results.getValue("c3").durationMs < results.getValue("c3").waitMs)
-        // 活动上标出哪几次是对外动作:停止后交代时按它数发出了几次
+        // Mark on the activity which steps were outward actions: the wrap-up after a stop counts them to report how many were sent
         val outward = events.filterIsInstance<RunEvent.Activity>().associate { it.callId to it.outward }
         assertEquals(mapOf("c1" to true, "c2" to false, "c3" to true), outward)
     }

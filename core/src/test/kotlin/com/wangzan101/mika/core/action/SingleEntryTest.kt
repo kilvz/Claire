@@ -5,15 +5,15 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 执行入口的边界:[com.wangzan101.mika.core.tool.ActionPass] 的构造函数是 internal,App 模块造不出来;
- * core 里由这里守着只有 core.action 造它、只有 core.action 调不可逆判定与同意核对。
- * 包依赖只能单向:core.action 和 core.guard 不依赖调度它们的 core.agent。
+ * Boundary of the execution entry: the constructor of [com.wangzan101.mika.core.tool.ActionPass] is internal, so the App module can't create one;
+ * inside core, this test guards that only core.action creates it and only core.action calls the irreversible check and the consent verification.
+ * Package dependencies may point only one way: core.action and core.guard don't depend on core.agent, which schedules them.
  */
 class SingleEntryTest {
     private val action = File("src/main/kotlin/com/wangzan101/mika/core/action").canonicalPath + File.separator
     private val roots = listOf(File("src/main/kotlin"), File("../app/src/main/java"))
 
-    /** 源码里的代码行(整行注释不算;行内的字符串、网址照常算)。 */
+    /** Code lines in the source (whole-line comments don't count; inline strings and URLs count as usual). */
     private fun codeLines(): List<Triple<File, Int, String>> = roots.filter { it.isDirectory }.flatMap { root ->
         root.walkTopDown().filter { it.isFile && it.extension == "kt" }.flatMap { f ->
             f.readLines().mapIndexedNotNull { i, line ->

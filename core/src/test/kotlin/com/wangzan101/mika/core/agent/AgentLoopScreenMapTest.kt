@@ -18,7 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 带固定元素的一屏,peek 也返回同一屏,认屏认得出。 */
+/** One screen with fixed elements; peek returns the same screen too, so the screen is recognized. */
 private class MapScreen(private val els: List<UiElement>, private val pkg: String = "p.a") : ScreenPort by FakeScreen() {
     var peekCount = 0
     override suspend fun snapshot() = ScreenSnapshot("s", pkg, els, 1080, 2400)
@@ -72,7 +72,7 @@ class AgentLoopScreenMapTest {
         assertTrue(map.contains("我的"))
         assertTrue(map.contains("搜索"))
         assertTrue(map.contains("结果"))
-        assertTrue(map.contains("现在在「")) // 认得出当前屏 → 带位置
+        assertTrue(map.contains("现在在「")) // current screen recognized → location included
     }
 
     @Test fun noScreenMapWhenNoGraph() {
@@ -83,7 +83,7 @@ class AgentLoopScreenMapTest {
     }
 
     @Test fun noScreenMapWhenScreenUnreadable() {
-        // 读不到屏（peek 抛异常 → ScreenSession 兜底为 null），不注入屏图，任务照常
+        // The screen can't be read (peek throws → ScreenSession falls back to null), so no screen map is injected and the task goes on as usual
         val unreadable = object : ScreenPort by FakeScreen() {
             override suspend fun peek(): ScreenSnapshot = throw RuntimeException("unreadable")
         }
@@ -93,7 +93,7 @@ class AgentLoopScreenMapTest {
     }
 
     @Test fun doesNotReReadScreenAfterInjection() {
-        // 注过一次屏图之后,同 App 后续步骤不再读屏读盘(去重在前,别每步都 peek)
+        // Once the screen map has been injected, later steps on the same app no longer read the screen or storage (dedupe comes first, so don't peek on every step)
         val screen = MapScreen(listOf(el("@h", "首页"), el("@m", "我的")))
         val msgs = run(screen, MemMapStore(mapOf("p.a" to graph)),
             reply(call("phone_observe")), reply(call("phone_list_elements")), finish)

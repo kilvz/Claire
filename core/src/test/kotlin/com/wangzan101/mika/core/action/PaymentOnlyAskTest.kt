@@ -35,7 +35,7 @@ import com.wangzan101.mika.core.assembly.toolDispatcher
 private fun el(ref: String, role: String, name: String, b: List<Int>, editable: Boolean = false, secret: Boolean = false) =
     UiElement(ref, role, name, 0, 0, b, null, !editable, editable, false, secret = secret)
 
-/** 和 [title] 的聊天页:标题、输入框、「发送」,另有「卸载」按钮、密码框、一个普通按钮和一行「删除」。 */
+/** Chat page with [title]: title, input box, "Send", plus an "Uninstall" button, a password field, an ordinary button and a "Delete" row. */
 private fun chatPage(title: String = "张三") = listOf(
     el("@e1", "text", title, listOf(0, 0, 999, 80)),
     el("@e2", "edit", "明天见", listOf(0, 900, 790, 999), editable = true),
@@ -46,7 +46,7 @@ private fun chatPage(title: String = "张三") = listOf(
     el("@e7", "button", "删除", listOf(800, 500, 990, 560)),
 )
 
-/** 结算页:店名、合计金额和「提交订单」「立即支付」。 */
+/** Checkout page: shop name, total amount, and "Submit order" / "Pay now". */
 private val checkoutPage = listOf(
     el("@e1", "text", "耳机店", listOf(0, 0, 999, 80)),
     el("@e2", "text", "合计 ¥25", listOf(0, 800, 600, 860)),
@@ -54,14 +54,14 @@ private val checkoutPage = listOf(
     el("@e4", "button", "立即支付", listOf(0, 900, 590, 990)),
 )
 
-/** 普通提交页:待遇是区间金额,不是这次操作要付的钱。 */
+/** Ordinary application page: the compensation is a salary range, not the money this action would pay. */
 private val applicationPage = listOf(
     el("@e1", "text", "示例对象", listOf(0, 0, 999, 80)),
     el("@e2", "text", "150-200元/天", listOf(0, 200, 999, 260)),
     el("@e3", "button", "立即沟通", listOf(600, 900, 990, 990)),
 )
 
-/** 捐赠按钮是明确的金额动作,页面是否有合计都要拦。 */
+/** The donate button is an explicit amount action; block it whether or not the page shows a total. */
 private val donationPage = listOf(
     el("@e1", "text", "公益项目", listOf(0, 0, 999, 80)),
     el("@e2", "text", "150-200元", listOf(0, 200, 999, 260)),
@@ -114,7 +114,7 @@ private class Settable(var auto: Boolean = false) : ApprovalSettings {
     override fun autonomous() = auto
 }
 
-/** 询问时只有花钱的那一步先问用户;别的(发送、删除、卸载、密码框、一般改动)都直接做。 */
+/** When asking, only the step that spends money asks the user first; everything else (send, delete, uninstall, password field, ordinary changes) is simply done. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PaymentOnlyAskTest {
     private fun loop(
@@ -220,7 +220,7 @@ class PaymentOnlyAskTest {
     }
 
     @Test fun confirmationIsOnlyForSpendingMoney() = runTest {
-        // 写不出金额的申请(发消息)不交给用户,直接告诉模型去做
+        // A request that can't state an amount (sending a message) isn't handed to the user; tell the model to just do it
         val s = Chat()
         val send = tools(call("request_confirmation", """{"action":"send","target":"张三","content":"明天见","app":"com.chat"}"""))
         val m = FakeModel(OBSERVE, send, tap("@e3"), FINISH)
@@ -236,7 +236,7 @@ class PaymentOnlyAskTest {
         val s = Chat(page = checkoutPage)
         val approvals = Settable()
         val m = FakeModel(OBSERVE, tap("@e3"), tap("@e3"), FINISH)
-        // 第一次点提交订单时还在询问:被拦下;模型再点之前用户换成了自主
+        // Tapping submit order the first time is still in asking mode: it's blocked; before the model taps again the user switches to autonomous
         val flipping = object : ChatModel by m {
             override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
                 if (m.requests.size == 2) approvals.auto = true
@@ -270,13 +270,13 @@ class PaymentOnlyAskTest {
     }
 
     @Test fun mikaNeverOperatesItself() = runTest {
-        // 屏上是 Claire 自己:不点
+        // The screen is Claire itself: don't tap
         val s = Chat(app = "com.mika")
         val m = FakeModel(OBSERVE, tap("@e6"), GIVE_UP)
         loop(m, s, self = "com.mika").run("t")
         assertTrue(s.taps.isEmpty())
         assertEquals("own_app", m.result(2).s("error"))
-        // 从别的 App 打开 Claire、打开它的应用详情:不做
+        // Opening Claire from another app, or opening its app details: don't do it
         s.app = "com.chat"
         val m2 = FakeModel(OBSERVE, tools(call("phone_launch_app", """{"package":"com.mika"}""")), tools(call("phone_open_link", """{"uri":"package:com.mika"}""")), GIVE_UP)
         loop(m2, s, self = "com.mika").run("t")
