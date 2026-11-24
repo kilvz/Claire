@@ -42,8 +42,8 @@ data class ExportOutcome(
 )
 
 /**
- * P1 的导出执行器:构建文档 → 后端渲染到 cache 暂存 → 复制资产 → 打包 → 写到 SAF。
- * 先写暂存再复制,失败/取消只清暂存,不删目的地。
+ * The P1 export executor: build the document → render it with the backend into staging under cache → copy assets → package → write to SAF.
+ * Staging is written first and then copied, so a failure/cancellation only clears the staging files and never deletes the destination.
  */
 class ExportRuntime(private val context: Context) {
     private val labels = ExportLabelsUi.of(context)

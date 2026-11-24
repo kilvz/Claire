@@ -2,7 +2,7 @@ package com.wangzan101.mika.device
 
 import kotlin.math.abs
 
-/** 没有密码输入节点时,用完整且空间一致的 3×4 数字键盘识别系统 PIN 页。 */
+/** When there is no password input node, identify the system PIN page by a complete and spatially consistent 3×4 numeric keypad. */
 internal object KeyguardPinPad {
     data class Bounds(val left: Int, val top: Int, val right: Int, val bottom: Int)
     data class DigitKey(val digit: Char, val bounds: Bounds)
@@ -21,7 +21,7 @@ internal object KeyguardPinPad {
                 if (!valid(key.bounds) || !inside(key.bounds, window)) return false
                 key.normalized()
             }
-            // 同一个键可能同时暴露可点击父节点和文字子节点;同心节点只算一个键。
+            // The same key may expose both a clickable parent node and a text child node; concentric nodes count as a single key.
             if (validKeys.map { it.x to it.y }.distinct().size != 1) return false
             digits[digit] = validKeys.minBy { it.width + it.height }
         }

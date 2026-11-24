@@ -45,7 +45,7 @@ import com.wangzan101.mika.memory.ui.Row
 
 internal val LibraryTitleStyle = MikaType.LargeTitle.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.4).sp)
 
-/** 文件库顶栏:返回、左对齐大标题、右边「多选」胶囊。 */
+/** File library top bar: back button, left-aligned large title, and a "select" pill on the right. */
 @Composable
 internal fun LibraryTopBar(canSelect: Boolean, working: Boolean, onBack: () -> Unit, onSelect: () -> Unit) {
     val c = MikaTheme.colors
@@ -74,7 +74,7 @@ internal fun LibraryTopBar(canSelect: Boolean, working: Boolean, onBack: () -> U
     }
 }
 
-/** 多选顶栏:左边取消、中间已选数量、右边全选 / 取消全选。 */
+/** Multi-select top bar: cancel on the left, selected count in the middle, select all / deselect all on the right. */
 @Composable
 internal fun LibrarySelectionTopBar(
     count: Int,
@@ -117,7 +117,7 @@ internal fun LibrarySelectionTopBar(
     }
 }
 
-/** 筛选胶囊:描边圆角、内容宽度;展开时浮出一张圆角菜单,选中项用强调色和勾标出。 */
+/** Filter pill: outlined rounded corners at content width; when expanded it floats a rounded menu in which the selected item is marked with the accent color and a check. */
 @Composable
 internal fun LibraryFilterPill(
     label: String,
@@ -161,7 +161,7 @@ internal fun LibraryFilterPill(
     }
 }
 
-/** 筛选菜单里的一行:选中时浅强调底、文字强调色、右端一个勾。 */
+/** A row in the filter menu: when selected it gets a soft accent background, accent text color and a check at the right end. */
 @Composable
 internal fun FilterMenuItem(label: String, selected: Boolean, onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -190,7 +190,7 @@ internal fun LibraryDayHeader(label: String) {
     )
 }
 
-/** 日期分组标题,按系统语言显示月日。 */
+/** Date group header; shows the month and day in the system language. */
 @Composable
 internal fun dayLabel(at: Long?): String {
     if (at == null) return stringResource(R.string.file_library_unknown_time)
@@ -202,8 +202,8 @@ internal fun dayLabel(at: Long?): String {
 }
 
 /**
- * 文件行:左边类型块(多选时换成勾选框),中间名称、类型/大小/来源、会话,
- * 右边「…」更多操作(多选时是「预览」)。长按进入多选。
+ * File row: type tile on the left (replaced by a checkbox in multi-select), name, type/size/source and conversation in the middle,
+ * and a "…" more-actions button on the right (a "Preview" action in multi-select). Long press enters multi-select.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -214,7 +214,7 @@ internal fun LibraryFileRow(
     selecting: Boolean,
     working: Boolean,
     conversationLabel: String,
-    /** 这个文件至少有一个来源对话已经归档:会话名旁边标出来。 */
+    /** At least one source conversation of this file is archived: shown next to the conversation name. */
     fromArchived: Boolean,
     sourceLabel: String,
     divider: Boolean,
@@ -306,7 +306,7 @@ internal fun LibraryFileRow(
     }
 }
 
-/** 文件来自已归档的对话:会话名旁边的小标签,和侧栏里的归档图标一个意思。 */
+/** The file comes from an archived conversation: a small tag next to the conversation name, meaning the same as the archived icon in the sidebar. */
 @Composable
 private fun ArchivedTag() {
     val c = MikaTheme.colors
@@ -321,7 +321,7 @@ private fun ArchivedTag() {
     }
 }
 
-/** 文件类型块:上面一个图形,下面扩展名。 */
+/** File type tile: an icon on top and the extension below. */
 @Composable
 internal fun FileTypeTile(name: String) {
     val c = MikaTheme.colors
@@ -340,7 +340,7 @@ internal fun FileTypeTile(name: String) {
     }
 }
 
-/** 文件块的图形和扩展名;图片、代码、文档各一种图形。 */
+/** Icon and extension for the file tile; images, code and documents each get their own icon. */
 internal fun fileBadge(name: String): Pair<ImageVector, String> {
     val ext = name.substringAfterLast('.', "").uppercase(Locale.ROOT)
     val icon = if (LibraryFileType.of(name) == LibraryFileType.Image) MikaIcons.Photo else when (ext) {
@@ -351,7 +351,7 @@ internal fun fileBadge(name: String): Pair<ImageVector, String> {
     return icon to ext.take(4).ifBlank { "FILE" }
 }
 
-/** 多选底部操作条:次按钮分享,主按钮把所选加入待发栏;进行中显示进度。 */
+/** Multi-select bottom action bar: the secondary button shares, the primary button adds the selection to the pending bar; progress is shown while running. */
 @Composable
 internal fun LibraryBatchBar(
     count: Int,

@@ -3,7 +3,7 @@ package com.wangzan101.mika.export
 import com.wangzan101.mika.core.export.ToolStep
 import com.wangzan101.mika.core.run.record.RunEvent
 
-/** 把运行事件里实际做过的事聚成导出用的工具步骤;最终回答(tool=null)不算一步。 */
+/** Aggregates what actually happened in the run events into tool steps for export; the final answer (tool=null) does not count as a step. */
 object RunEventToolSteps {
     fun of(events: List<RunEvent>): List<ToolStep> {
         val replies = events.filterIsInstance<RunEvent.ModelReply>()

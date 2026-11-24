@@ -78,8 +78,8 @@ private data class ExportRequest(
 )
 
 /**
- * P1 的导出面板:勾消息、选格式和内容选项,然后走 SAF 保存。
- * 导出在界面作用域里跑;离开页面会取消,暂存由 [ExportRuntime] 清理。
+ * The P1 export panel: tick messages, pick the format and content options, then save through SAF.
+ * The export runs in the UI scope; leaving the page cancels it, and staging is cleaned up by [ExportRuntime].
  */
 @Composable
 internal fun ExportConversationDialog(
@@ -156,7 +156,7 @@ internal fun ExportConversationDialog(
                 ) { p -> handler.post { progress = p } }
                 outcome = result
             } catch (e: CancellationException) {
-                // 用户取消;暂存由 runtime 的 finally 清理
+                // Cancelled by the user; staging is cleaned up in the runtime's finally block
             } catch (e: Exception) {
                 failure = e.message ?: e.javaClass.simpleName
             } finally {

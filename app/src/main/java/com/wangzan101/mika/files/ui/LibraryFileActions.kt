@@ -26,7 +26,7 @@ import com.wangzan101.mika.chat.ui.PendingAttachment
 import com.wangzan101.mika.settings.ui.models.use
 import com.wangzan101.mika.voice.ui.nameOf
 
-/** 文件库的来源；工作区路径必须是 /workspace/ 下的路径。 */
+/** A file library source; workspace paths must be paths under /workspace/. */
 sealed interface LibraryFileHandle {
     data class Workspace(val conversationId: String, val path: String) : LibraryFileHandle
     data class Exported(val file: SharedFile) : LibraryFileHandle
@@ -34,21 +34,21 @@ sealed interface LibraryFileHandle {
 
 enum class LibraryAttachmentResult { Added, Full, Unavailable, Failed }
 
-/** 批量加入前的规划；[accepted] 已去掉重复来源并截到目标草稿的剩余槽位。 */
+/** Plan made before a batch add; [accepted] already has duplicate sources removed and is trimmed to the remaining slots of the target draft. */
 data class LibraryAddPlan(
     val accepted: List<LibraryFileHandle>,
     val duplicates: Int,
     val overLimit: Int,
 )
 
-/** 已经复制好、等着合并的一项；[release] 在没被收下时释放副本。 */
+/** An item that has been copied and is waiting to be merged; [release] frees the copy when it is not accepted. */
 data class LibraryStaged(
     val attachment: PendingAttachment,
     val source: LibraryFileHandle,
     val release: () -> Unit,
 )
 
-/** 一批文件合并进草稿的结果；[unavailable] 表示目标草稿整批收不下。 */
+/** Result of merging a batch of files into a draft; [unavailable] means the target draft cannot take the batch at all. */
 data class LibraryMergeResult(
     val added: Int,
     val duplicates: Int,
@@ -56,7 +56,7 @@ data class LibraryMergeResult(
     val unavailable: Boolean = false,
 )
 
-/** 文件库批量加入的最终结果，供界面汇总提示。 */
+/** Final result of a file library batch add, used by the UI to summarize the outcome. */
 data class LibraryBatchOutcome(
     val added: Int,
     val duplicates: Int,
@@ -67,15 +67,15 @@ data class LibraryBatchOutcome(
     val accepted: Int get() = added + duplicates
 }
 
-/** 文件库多选分享的结果；[shared] 是交给系统分享面板的文件数。 */
+/** Result of a file library multi-select share; [shared] is the number of files handed to the system share sheet. */
 data class LibraryShareOutcome(val shared: Int, val failed: List<String>)
 
-/** 文件库操作。工作区文件经闸门复制；导出文件预览和分享使用原 MediaStore URI。 */
+/** File library operations. Workspace files are copied through the gate; exported files are previewed and shared using their original MediaStore URI. */
 object LibraryFileActions {
     private val startupLock = Any()
     private var orphanCleanupDone = false
 
-    /** 普通附件草稿不跨进程恢复；本进程首次创建副本前清理上次进程遗留的副本。 */
+    /** Plain attachment drafts are not restored across processes; before this process creates its first copy, copies left behind by the previous process are cleaned up. */
     private fun cleanupOrphanedDraftCopies(context: Context) = synchronized(startupLock) {
         if (!orphanCleanupDone) {
             File(context.filesDir, "library-attachments").listFiles()?.forEach { it.deleteRecursively() }
@@ -83,7 +83,7 @@ object LibraryFileActions {
         }
     }
 
-    /** 即时检查，只代表检查时可读；后续操作仍会重新打开来源。 */
+    /** An immediate check that only reflects readability at check time; later operations still reopen the source. */
     suspend fun isAvailable(context: Context, source: LibraryFileHandle): Boolean = withContext(Dispatchers.IO) {
         try {
             when (source) {
@@ -112,8 +112,8 @@ object LibraryFileActions {
         show(context, source) { uri, name -> FileViewer.share(context, uri, name) }
 
     /**
-     * 多选分享：工作区文件先复制到缓存并换成 FileProvider URI，导出文件直接用原 URI。
-     * 部分文件准备失败时仍然分享其余文件，失败项交给界面汇总。
+     * Multi-select share: workspace files are first copied into the cache and converted to FileProvider URIs, while exported files use their original URI directly.
+     * When some files fail to prepare, the remaining files are still shared and the failures are left to the UI to summarize.
      */
     suspend fun shareAll(
         context: Context,
@@ -177,7 +177,7 @@ object LibraryFileActions {
                 .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
         }.setType(shareMime(uris.map { runCatching { context.contentResolver.getType(it) }.getOrNull() }))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        // ClipData 让授权覆盖所有 URI；部分接收方也靠它拿文件名和类型。
+        // ClipData makes the grant cover all URIs; some receivers also rely on it to obtain file names and types.
         val clip = runCatching { ClipData.newUri(context.contentResolver, "", uris.first()) }
             .getOrElse { ClipData.newRawUri("", uris.first()) }
         uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
@@ -191,7 +191,7 @@ object LibraryFileActions {
         false
     }
 
-    /** 先复制来源，再在主线程合并目标草稿；复制期间切换会话不会改变目标。 */
+    /** Copy the source first, then merge into the target draft on the main thread; switching conversations during the copy does not change the target. */
     suspend fun addToDraft(context: Context, viewModel: ChatViewModel, targetConversationId: String,
                            source: LibraryFileHandle): LibraryAttachmentResult {
         val caller = currentCoroutineContext()
@@ -212,8 +212,8 @@ object LibraryFileActions {
     }
 
     /**
-     * 批量加入:先按目标草稿规划,再逐个复制,最后一次合并。
-     * 复制期间取消时,当前文件复制完就停,没合并的副本全部释放。
+     * Batch add: plan against the target draft first, then copy one by one, and merge once at the end.
+     * If cancelled during copying, it stops once the current file has finished copying and releases every copy that was not merged.
      */
     suspend fun addAllToDraft(
         context: Context,
@@ -230,7 +230,7 @@ object LibraryFileActions {
             } ?: return@withContext LibraryBatchOutcome(0, 0, 0, emptyList(), unavailable = true)
             val staged = mutableListOf<LibraryStaged>()
             val failed = mutableListOf<String>()
-            // 合并调用一旦返回,副本就归 ChatViewModel 管;取消或异常时只释放还没合并的。
+            // Once the merge call returns, the copies belong to ChatViewModel; only the ones not yet merged are released on cancellation or exception.
             var committed = false
             try {
                 withContext(Dispatchers.Main.immediate) { onProgress(0, plan.accepted.size) }
@@ -303,8 +303,8 @@ object LibraryFileActions {
     }
 
     /**
-     * 副本的文件名:路径分隔符和控制字符换成 `_`,按 UTF-8 字节截短(文件名上限 255 字节,复制时还要接 `.tmp`),
-     * 保留扩展名、不劈开字(放进草稿、预览都按扩展名认类型),和导出、导入附件用的是同一个函数。
+     * File name of the copy: path separators and control characters become `_`, and it is truncated by UTF-8 bytes (the file name limit is 255 bytes, and `.tmp` is appended during the copy),
+     * keeping the extension and never splitting a character (both draft insertion and preview identify the type by extension); this is the same function used for export and imported attachments.
      */
     internal fun copyName(raw: String): String =
         ShareRules.fitName(raw.replace(Regex("[\\\\/\\u0000-\\u001f]"), "_"))
@@ -356,7 +356,7 @@ object LibraryFileActions {
         }
 }
 
-/** 分享时用的 MIME：全是图片用 image/*，同一类型用具体类型，混合或未知用 */*。 */
+/** MIME used when sharing: image/* when all are images, the concrete type when they are all the same, and */* when mixed or unknown. */
 internal fun shareMime(types: List<String?>): String {
     if (types.isEmpty() || types.any { it.isNullOrBlank() }) return "*/*"
     val known = types.filterNotNull()

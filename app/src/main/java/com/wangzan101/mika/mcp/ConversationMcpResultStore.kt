@@ -7,8 +7,8 @@ import com.wangzan101.mika.core.workspace.SandboxPaths
 import java.util.UUID
 
 /**
- * 外部 MCP 工具的长结果写进当前任务工作区,模型可以用 read_file 读。
- * 只写 `mcp-results/`,文件名里的 server/tool 只保留安全字符。
+ * Long results from external MCP tools are written into the current task workspace, where the model can read them with read_file.
+ * Only `mcp-results/` is written, and only safe characters are kept for server/tool in the file name.
  */
 class ConversationMcpResultStore(
     private val dirs: SandboxDirs,

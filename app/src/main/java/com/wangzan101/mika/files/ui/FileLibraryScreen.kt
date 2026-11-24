@@ -54,7 +54,7 @@ internal data class LibraryRow(
     val conversations: List<String>,
     val input: Boolean,
     val handle: LibraryFileHandle,
-    /** 最近一次出现的位置,「在对话中查看」跳到这里。 */
+    /** The most recent occurrence; "open in chat" jumps here. */
     val source: FileSource?,
     val deviceImport: Boolean = false,
 ) {
@@ -64,15 +64,15 @@ internal data class LibraryRow(
 private data class LibraryLoaded(
     val rows: List<LibraryRow>,
     val titles: Map<String, String>,
-    /** 归档了的对话;文件行要标出「来自已归档对话」。 */
+    /** Archived conversations; file rows must mark "from an archived conversation". */
     val archived: Set<String>,
     val partial: Boolean,
     val failed: Boolean = false,
-    /** 对话所属的项目编号,用于把项目名一并标出。 */
+    /** Project ID the conversation belongs to, used to show the project name alongside. */
     val projectIds: Map<String, String> = emptyMap(),
 )
 
-/** 拼接对话显示名:属于项目时带上项目名,没项目时只显示对话标题。 */
+/** Builds the conversation display name: include the project name when the conversation belongs to a project, otherwise show only the conversation title. */
 internal fun libraryConversationDisplay(
     id: String,
     titles: Map<String, String>,
@@ -84,7 +84,7 @@ internal fun libraryConversationDisplay(
     return if (project != null) "$project / $title" else title
 }
 
-/** 「在对话中查看」跳到哪一行:输入文件回到附上它的那条用户消息,产物回到这一轮的文件卡片。 */
+/** Which row "open in chat" jumps to: input files go back to the user message they were attached to, artifacts go to the file card of that turn. */
 internal fun fileLibraryTarget(source: FileSource, input: Boolean): ChatTarget =
     if (input) ChatTarget.Message(source.turnIndex, source.steerIndex) else ChatTarget.Files(source.turnIndex)
 
@@ -98,7 +98,7 @@ internal data class LibraryLoadResult(
     val projectIds: Map<String, String> = emptyMap(),
 )
 
-/** 索引和会话标题分别读取，一边出错不能阻止另一边显示。取消仍交给协程处理。 */
+/** The index and the conversation titles are read separately, so a failure on one side must not prevent the other from being displayed. Cancellation is still handled by the coroutine. */
 internal fun loadLibraryData(
     snapshot: () -> FileLibrarySnapshot,
     summaries: () -> List<ConversationSummary>,
@@ -117,7 +117,7 @@ internal fun loadLibraryData(
     val files = attempt(snapshot)
     val listed = attempt(summaries)
     val names = listed?.associate { it.id to ChatCopy.plainTitle(it.title) }?.toMutableMap() ?: draftTitles.toMutableMap()
-    // 归档状态和标题来自同一次读取,不额外扫一遍对话目录
+    // Archived state and titles come from the same read; the conversation directory is not scanned again
     val archived = listed.orEmpty().filter { it.archivedAt != null }.map { it.id }.toSet()
     val projectIds = listed.orEmpty().mapNotNull { s -> s.projectId?.let { s.id to it } }.toMap()
     draftTitles.forEach { (id, title) -> names.putIfAbsent(id, title) }
@@ -141,7 +141,7 @@ internal fun FileLibraryScreen(
     fromDrawer: Boolean,
     onBack: () -> Unit,
     onAdded: (String) -> Boolean,
-    /** 跳到文件的来源消息;返回会话是否已打开。 */
+    /** Jumps to the file's source message; returns whether the conversation was opened. */
     onOpenSource: (String, ChatTarget) -> Boolean = { _, _ -> false },
     conversationStore: ConversationStore? = null,
     addBatch: suspend (Context, ChatViewModel, String, List<LibraryFileHandle>, (Int, Int) -> Unit) -> LibraryBatchOutcome =
@@ -262,7 +262,7 @@ internal fun FileLibraryScreen(
             if (result == LibraryAttachmentResult.Added) savedElsewhere = !onAdded(id) else error = R.string.file_library_error
         }
     }
-    /** 单行「加入待发栏」:从抽屉进来先选会话,从会话进来直接加回该会话。 */
+    /** Single-row "add to pending bar": when entered from the drawer, pick a conversation first; when entered from a conversation, add it straight back to that conversation. */
     fun addOne(item: LibraryRow) {
         if (working) return
         when {
@@ -280,7 +280,7 @@ internal fun FileLibraryScreen(
             working = false
         }
     }
-    /** 跳到文件最近一次出现的消息:输入文件回到那条用户消息,产物回到这一轮的文件卡片。 */
+    /** Jumps to the message where the file appeared most recently: input files go back to that user message, artifacts go to the file card of that turn. */
     fun openInChat(item: LibraryRow) {
         if (working) return
         val source = item.source ?: return
@@ -533,7 +533,7 @@ internal fun FileLibraryScreen(
         }
     }
     actionsFor?.let { item ->
-        // 来源会话打不开(任务进行中且没开并行、又不是当前会话)时不给这一项
+        // The source conversation cannot be opened (a task is running without parallelism enabled and it is not the current conversation), so do not offer this item
         val canOpenInChat = item.source?.let { it.conversationId == vm.ui.value.conversationId || vm.canSwitch() } == true
         val openInChatAction = SheetAction(
             stringResource(R.string.file_library_open_in_chat), icon = MikaIcons.Message,

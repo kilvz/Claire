@@ -12,13 +12,13 @@ import android.os.LocaleList
 import java.util.Locale
 
 /**
- * App 界面的语言:跟随系统,或者选定下面的一种。资源里英文是默认(`values/`),简体中文在 `values-zh/`、繁体中文在 `values-b+zh+Hant/`,
- * 阿拉伯语在 `values-ar/`,其他语言各在 `values-<语言>/`(印尼语沿用安卓的旧代码 `values-in/`)。安卓按语言和文字体系挑资源,
- * 所以「跟随系统」时系统语言有译文就显示它,没有就显示英文;某种语言缺了哪条,那条也显示英文。
+ * Language of the app UI: follow the system, or pick one of the options below. In resources English is the default (`values/`), Simplified Chinese is in `values-zh/`, Traditional Chinese is in `values-b+zh+Hant/`,
+ * Arabic is in `values-ar/`, and every other language is in `values-<language>/` (Indonesian keeps Android's legacy code `values-in/`). Android selects resources by language and script,
+ * so with "follow system" the system language is shown when it has a translation and English is shown otherwise; if a particular string is missing in a language, that string also falls back to English.
  *
- * 安卓 13 起由系统的「应用语言」管(LocaleManager):系统记住选择、套到整个进程、重建界面,
- * 系统设置里的「应用语言」和这里的开关是同一个值。安卓 11、12 没有这项,由这里记在本地,
- * 经 [wrap] 套到界面的 Context、经 [resources] 套到界面以外取文字的地方,换了之后重建当前界面。
+ * From Android 13 on this is managed by the system "app language" (LocaleManager): the system remembers the choice, applies it to the whole process and recreates the UI,
+ * and the "app language" entry in system settings and the switch here are the same value. Android 11 and 12 have no such feature, so this class stores the choice locally,
+ * applies it to the UI Context through [wrap] and to the places that fetch text outside the UI through [resources], and recreates the current UI after a change.
  */
 enum class AppLanguage(val tag: String?, val speechTag: String?) {
     System(null, null),
@@ -35,7 +35,7 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
     Indonesian("id", "id-ID"),
     Turkish("tr", "tr-TR");
 
-    /** 语言代码(不带文字体系和地区);跟随系统时为 null。 */
+    /** Language code (without script and region); null when following the system. */
     val language: String? get() = tag?.let { Locale.forLanguageTag(it).language.let(::modernCode) }
 
     companion object {
@@ -43,22 +43,22 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
         private const val KEY_TAG = "tag"
         private const val KEY_PROMPTED = "language_prompted"
 
-        /** 是否已经向用户展示过初次/更新语言选择提示。 */
+        /** Whether the first-run/after-update language selection prompt has already been shown to the user. */
         fun hasPrompted(context: Context): Boolean =
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_PROMPTED, false)
 
-        /** 标记已提示或已设置，不再主动弹出询问。 */
+        /** Marks the prompt as shown or the language as set, so it is not offered proactively again. */
         fun markPrompted(context: Context) {
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_PROMPTED, true).apply()
         }
 
-        /** 安卓 12 及以前选定的语言;null 表示跟随系统。进程里读一次,换的时候更新。 */
+        /** Language selected on Android 12 and earlier; null means follow the system. Read once per process and updated when changed. */
         @Volatile
         private var legacyTag: String? = null
         @Volatile
         private var legacyLoaded = false
 
-        /** 安卓 12 及以前按选定语言建出的资源,跟着语言换。 */
+        /** Resources built for the selected language on Android 12 and earlier; they change together with the language. */
         @Volatile
         private var cached: Pair<String, Resources>? = null
 
@@ -73,9 +73,9 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
         )
 
         /**
-         * 实际生效的语言:选定语言直接返回;跟随系统时按系统当前语言映射到支持的某一项
-         * (中文按文字体系分简繁,不支持的落英文)。给界面上写停驻说明、语言指令等要用到
-         * 确定语言标签、又拿不到用户明确选择的地方,避免把「跟随系统」当成中文。
+         * The language actually in effect: an explicit selection is returned as is; when following the system, the system's current language is mapped to one of the supported entries
+         * (Chinese is split into Simplified and Traditional by script, unsupported ones fall back to English). For places that need a definite language tag while the user's explicit choice is unavailable,
+         * such as pinned notes and language instructions written into the UI, this avoids treating "follow system" as Chinese.
          */
         fun resolved(context: Context): AppLanguage {
             val cur = current(context)
@@ -83,12 +83,12 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
             return fromTag(Locale.getDefault().toLanguageTag())
         }
 
-        /** 语言标签对应哪一项:见 [fromTag];标签里没写文字体系时,按 ICU 的常见写法补出来。 */
+        /** Which entry a language tag maps to: see [fromTag]; when the tag does not specify a script, it is filled in with ICU's likely script. */
         fun fromTag(tag: String?): AppLanguage = fromTag(tag) { ULocale.addLikelySubtags(ULocale.forLanguageTag(it)).script }
 
         /**
-         * 中文按文字体系分:写的或 [likelyScript] 补出的是 Hant 就是繁體中文,别的中文是简体中文;
-         * 其他语言按语言代码对上一项(地区不管),对不上的是英文。以前选「中文」存下的 zh-Hans 仍是简体中文。
+         * Chinese is split by script: Hant, whether written explicitly or supplied by [likelyScript], means Traditional Chinese, and any other Chinese is Simplified Chinese;
+         * other languages are matched to one entry by language code (region is ignored), and a language with no match falls back to English. A zh-Hans tag saved by the old "Chinese" option still maps to Simplified Chinese.
          */
         internal fun fromTag(tag: String?, likelyScript: (String) -> String): AppLanguage {
             if (tag.isNullOrEmpty()) return System
@@ -98,7 +98,7 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
             return entries.firstOrNull { it.tag != null && it.language == code } ?: English
         }
 
-        /** 安卓上 java.util.Locale 仍给几种语言用旧代码(印尼语是 in、希伯来语是 iw…),统一成现行代码再比。 */
+        /** On Android, java.util.Locale still returns legacy codes for a few languages (Indonesian is in, Hebrew is iw…); normalize them to the current codes before comparing. */
         internal fun modernCode(language: String): String = when (language) {
             "in" -> "id"
             "iw" -> "he"
@@ -106,7 +106,7 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
             else -> language
         }
 
-        /** 换语言并重建界面。安卓 13 起交给系统(系统自己重建);之前记在本地,重建 [context] 所在的界面。 */
+        /** Changes the language and recreates the UI. From Android 13 on this is handed to the system (which recreates it itself); before that the choice is stored locally and the UI hosting [context] is recreated. */
         fun set(context: Context, language: AppLanguage) {
             markPrompted(context)
             if (systemManaged) {
@@ -123,22 +123,22 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
             // Prompts sent to the model stay English, whatever the UI language is.
         }
 
-        /** App 启动时调:安卓 12 及以前选了语言时,把进程的默认 Locale(日期、数字的格式)也换成它。 */
+        /** Called at app startup: on Android 12 and earlier, when a language has been selected, the process default Locale (formatting of dates and numbers) is switched to it as well. */
         fun applyDefaultLocale(context: Context) {
             if (systemManaged) return
             val locales = legacyLocales(context) ?: Resources.getSystem().configuration.locales
             Locale.setDefault(locales[0])
         }
 
-        /** 套上 App 语言的 Context:在 Activity 的 attachBaseContext 和非 Activity 建界面的地方用。安卓 13 起原样返回。 */
+        /** A Context with the app language applied: used in the Activity's attachBaseContext and wherever non-Activity UI is created. From Android 13 on it returns the base context unchanged. */
         fun wrap(base: Context): Context {
             val locales = legacyLocales(base) ?: return base
             return base.createConfigurationContext(Configuration().apply { setLocales(locales) })
         }
 
         /**
-         * 界面以外取文字用的资源:跟着 App 语言。安卓 13 起也按系统记下的应用语言另建一份,
-         * 不直接用 Application 的资源:进程不是系统按 App 正常拉起时(如测试启动),那份资源还是系统语言。
+         * Resources for fetching text outside the UI: they follow the app language. From Android 13 on a separate copy is still built for the app language recorded by the system
+         * instead of using the Application's resources directly: when the process was not launched normally by the system for the app (e.g. a test launch), those resources are still in the system language.
          */
         fun resources(app: Context): Resources {
             val tag = if (systemManaged) {

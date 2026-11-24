@@ -6,17 +6,17 @@ import com.wangzan101.mika.core.workspace.SandboxError
 import com.wangzan101.mika.core.workspace.SandboxPaths
 
 /**
- * stdio 包的安装与缓存:安装到工作区受控缓存,返回安装后可执行文件所在目录的 argv 前缀,
- * 不执行 MCP 服务本身。调用方把前缀与预设声明的 argv 拼成最终命令。
+ * Installation and caching of stdio packages: installs into the workspace's controlled cache and returns the argv prefix of the directory holding the installed executables,
+ * without running the MCP server itself. The caller combines the prefix with the argv declared by the preset into the final command.
  *
- * 安全:未确认或未缓存时不下载;安装只在 [confirmed] 时进行;成功后原子写入成功标记,中断/失败不留标记、
- * 可重试;秘密只经 Task 5 的环境变量进进程,绝不进入这里生成的 argv。
+ * Safety: nothing is downloaded when unconfirmed or uncached; installation only happens when [confirmed]; on success a success marker is written atomically, while an interruption/failure leaves no marker and
+ * can be retried; secrets enter the process only through Task 5's environment variables and never enter the argv generated here.
  */
 interface McpPackageProvisioner {
     /**
-     * 确保 [spec] 已装进共享包缓存的 [workspace] 视图,返回 argv 前缀(单元素:可执行文件目录,如
-     * `/opt/mika/mcp-cache/npm-<名>-<版本>/node_modules/.bin`)。未缓存且 [confirmed] 为 false 时抛
-     * `mcp_package_consent`;下载/安装失败抛可重试的 `mcp_package_install_failed`。
+     * Ensures [spec] is installed into the [workspace] view of the shared package cache and returns the argv prefix (a single element: the executables directory, e.g.
+     * `/opt/mika/mcp-cache/npm-<name>-<version>/node_modules/.bin`). When it is not cached and [confirmed] is false it throws
+     * `mcp_package_consent`; a download/install failure throws the retryable `mcp_package_install_failed`.
      */
     suspend fun prepare(workspace: String, spec: McpPackageSpec, confirmed: Boolean): List<String>
 }

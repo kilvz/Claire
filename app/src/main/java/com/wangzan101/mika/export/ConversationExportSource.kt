@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 import java.io.FilterInputStream
 import java.io.InputStream
 
-/** 把对话文件、运行记录和工作区资产接给纯 core 的导出构建器。 */
+/** Feeds conversation files, run records and workspace assets into the pure-core export builder. */
 class ConversationExportSource(
     context: Context,
     private val conversationId: String,
@@ -64,7 +64,7 @@ class ConversationExportSource(
         val workspace = dirs.workspace(WorkspaceResolver.resolveFor(app, conversationId))
         when (request) {
             is AssetRequest.Workspace -> {
-                // 只读工作区里的相对路径;gate 会拒绝链接、目录和非普通文件
+                // Only read a relative path inside the workspace; the gate rejects links, directories and non-regular files
                 val rel = request.path.removePrefix("/workspace/")
                 if (!request.path.startsWith("/workspace/") || rel.isEmpty()) return@withContext null
                 val file = runCatching { dirs.gate.openRead(workspace, rel) }.getOrNull() ?: return@withContext null
@@ -91,7 +91,7 @@ class ConversationExportSource(
                         }
                     }
                 }
-                // 打开一次确认还能读;真正的字节在渲染时按需读
+                // Open it once to confirm it is still readable; the actual bytes are read on demand during rendering
                 val readable = runCatching { app.contentResolver.openInputStream(uri)?.use { true } ?: false }.getOrDefault(false)
                 if (!readable) null else asset(request, name, size)
             }

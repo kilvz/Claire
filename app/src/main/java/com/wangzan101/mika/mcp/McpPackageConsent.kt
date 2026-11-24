@@ -8,8 +8,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 /**
- * stdio 包下载确认:同意绑定「包名 + 精确版本 + 来源」(数据类相等,含生态),任何一项变了都要重新确认。
- * 确认是持久的用户决定:传入 [file] 时写盘,重装 App 后仍有效;不传则进程内暂存(测试用)。
+ * Consent for stdio package downloads: an acceptance is bound to "package name + exact version + source" (data class equality, including the ecosystem), so a change to any one of them requires consent again.
+ * The consent is a persistent user decision: when [file] is passed it is written to disk and stays valid after the app is reinstalled; when it is not, it is kept in the process only (for tests).
  */
 class McpPackageConsent(private val file: File? = null) {
     private val accepted = mutableSetOf<McpPackageSpec>()

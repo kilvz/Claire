@@ -1,6 +1,6 @@
 package com.wangzan101.mika.device
 
-/** 生物识别优先的锁屏页(没有密码框、也没有数字键盘)需要一次「用密码解锁」的回退点击。 */
+/** A biometric-first lock screen (with neither a password field nor a numeric keypad) needs one fallback tap on "unlock with password". */
 internal object KeyguardReveal {
     data class Bounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
         val width get() = right - left
@@ -11,10 +11,10 @@ internal object KeyguardReveal {
     data class Candidate(val bounds: Bounds, val clickable: Boolean, val digit: Boolean)
 
     /**
-     * 从 SystemUI 窗口的候选中挑一个最可能是「切换到凭据输入」的大面积点击目标:
-     * 排除数字键和不可点节点,只留覆盖窗口 [minAreaFraction] 以上的大目标,取其中面积最大者。
-     * 「使用密码」这类大按钮能被选中,而「取消」「紧急呼叫」这类小文字链接被排除。
-     * 没有符合条件的目标时返回 null——宁可不动,也不乱点。
+     * Picks from the SystemUI window candidates the large-area click target most likely to "switch to credential input":
+     * digit keys and non-clickable nodes are excluded, only large targets covering at least [minAreaFraction] of the window are kept, and the largest of them is chosen.
+     * Large buttons such as "Use password" get selected, while small text links such as "Cancel" and "Emergency call" are excluded.
+     * Returns null when no target qualifies — better to leave it alone than to tap blindly.
      */
     fun fallbackTarget(candidates: List<Candidate>, window: Bounds, minAreaFraction: Float): Bounds? {
         if (!valid(window)) return null

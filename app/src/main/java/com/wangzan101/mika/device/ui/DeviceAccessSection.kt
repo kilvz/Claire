@@ -39,9 +39,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 电脑连接页中的主屏准备设置;[localTasks] 为 true 时变体为「任务运行」页的本机任务开关:
- * 组名/开关行/脚注换本机任务文案,绑定的是独立的 localEnabled 开关;凭据编辑区两个变体整段共用。
- * 新凭据不进可恢复状态,不显示旧凭据;编辑时禁止截屏。
+ * The home screen preparation settings on the computer connection page; when [localTasks] is true the variant becomes the local task switch of the "task run" page:
+ * the group name/switch row/footnote swap to the local task copy, bound to a separate localEnabled switch; both variants share the whole credential editing area.
+ * New credentials never enter a restorable state and existing credentials are not shown; screenshots are blocked while editing.
  */
 @Composable
 fun DeviceAccessSection(settings: DeviceAccessSettings, localTasks: Boolean = false) {
