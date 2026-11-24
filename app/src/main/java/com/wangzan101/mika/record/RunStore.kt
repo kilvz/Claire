@@ -31,9 +31,9 @@ private const val MAX_WIDTH = 720
 private const val JPEG_QUALITY = 70
 
 /**
- * 运行记录落盘:`files/runs/<yyyyMMdd-HHmmss>-<6位>/` 下 run.json(概要)、events.jsonl(一行一个事件)、
- * screens/NNNN.jpg(读屏画面)。只保留最近 [keep] 次。写盘出错只记日志,不影响任务。
- * 每次运行的小结([RunMetrics])另存在 `files/run-metrics.jsonl`([metrics]),不随记录清理。
+ * Run records on disk: under `files/runs/<yyyyMMdd-HHmmss>-<6 chars>/` there are run.json (summary), events.jsonl (one event per line),
+ * and screens/NNNN.jpg (screen captures). Only the most recent [keep] runs are kept. Write errors are only logged and do not affect the task.
+ * Per-run metrics ([RunMetrics]) are stored separately in `files/run-metrics.jsonl` ([metrics]) and are not removed along with the records.
  */
 class RunStore internal constructor(
     filesDir: File,
@@ -54,7 +54,7 @@ class RunStore internal constructor(
 
     private val root = File(filesDir, "runs")
 
-    /** 每次运行的小结;运行记录关上时由写线程记一份(见 [RunHandle])。 */
+    /** Per-run metrics; recorded by the writer thread when the run record is closed (see [RunHandle]). */
     val metrics = RunMetricsStore(File(filesDir, RunMetricsStore.FILE_NAME))
 
     fun open(goal: String): RunHandle {
@@ -69,17 +69,17 @@ class RunStore internal constructor(
         return handle
     }
 
-    /** 新的在前。 */
+    /** Newest first. */
     fun list(): List<RunSummary> = runDirs().reversed().mapNotNull { d ->
         runCatching { RunEvent.json.decodeFromString(RunSummary.serializer(), File(d, RUN_JSON).readText()) }.getOrNull()
     }
 
-    /** 一次运行的概要;记录已被清掉或读不出为 null。 */
+    /** The summary of one run; null when the record has already been cleaned up or cannot be read. */
     fun summary(runId: String): RunSummary? = dirOf(runId)?.let { d ->
         runCatching { RunEvent.json.decodeFromString(RunSummary.serializer(), File(d, RUN_JSON).readText()) }.getOrNull()
     }
 
-    /** 只读地交给核心(查这个对话之前几轮的记录,见 history_read);在 IO 线程上读。 */
+    /** Hands a read-only view to the core (to look up the records of earlier turns of this conversation, see history_read); reads on the IO thread. */
     fun reader(): RunRecords = object : RunRecords {
         override suspend fun summary(runId: String) = withContext(Dispatchers.IO) { this@RunStore.summary(runId) }
         override suspend fun events(runId: String) = withContext(Dispatchers.IO) { this@RunStore.events(runId) }
@@ -91,7 +91,7 @@ class RunStore internal constructor(
         return f.readLines().filter { it.isNotBlank() }.mapNotNull { runCatching { RunEvent.decode(it) }.getOrNull() }
     }
 
-    /** 从已有 JSONL 按原顺序取用量字段。旧记录的空值、同一步的多次回复和没有步号的压缩事件原样保留。 */
+    /** Extracts the usage fields from the existing JSONL in their original order. Nulls in old records, multiple replies of the same step, and compressed events without a step number are preserved as they are. */
     fun usageLog(runId: String): String {
         val dir = dirOf(runId) ?: throw FileNotFoundException("Run is unavailable")
         return File(dir, EVENTS).useLines { lines ->
@@ -103,7 +103,7 @@ class RunStore internal constructor(
                     } catch (_: SerializationException) { null }
                     val type = event?.get("type") as? JsonPrimitive
                     if (event == null || type == null) {
-                        // 进程中断可能留下一行没写完的记录。标出缺口，保留其余事件。
+                        // A process interruption may leave a partially written line. Mark the gap and keep the remaining events.
                         appendLine("""{"type":"unreadable_event","line":${index + 1}}""")
                         continue
                     }
@@ -118,8 +118,8 @@ class RunStore internal constructor(
     }
 
     /**
-     * 运行记录关上之后补记一个事件(交出回答后判的结局):追加到 events.jsonl,并计入 run.json 的概要。
-     * 记录已被清掉或写盘失败只记日志,不影响任务。
+     * Records one further event after the run record has been closed (the outcome judged after the answer was handed over): appended to events.jsonl and counted into the run.json summary.
+     * If the record has already been cleaned up or the write fails, it is only logged and does not affect the task.
      */
     @Synchronized
     fun append(runId: String, e: RunEvent) {
@@ -137,13 +137,13 @@ class RunStore internal constructor(
 
     fun screen(runId: String, id: Int): File? = dirOf(runId)?.let { File(it, screenPath(id)) }?.takeIf { it.isFile }
 
-    /** 复制到外部文件目录的 runs/ 下,便于拉到开发机(调试版和评测用);那边同样只留最近 [keep] 次。 */
+    /** Copies into runs/ of the external files directory so it can be pulled to a dev machine (used by debug builds and evaluation); only the most recent [keep] runs are kept there as well. */
     fun mirrorToExternal(runId: String) {
         val ext = File(externalDir() ?: return, "runs")
         if (copyTo(runId, File(ext, runId))) runCatching { dirsIn(ext).dropLast(keep).forEach { it.deleteRecursively() } }
     }
 
-    /** 把一次运行的整个目录复制到 [dest](评测把每题的记录放到自己的结果目录下)。 */
+    /** Copies the whole directory of one run to [dest] (evaluation puts each task's records under its own result directory). */
     fun copyTo(runId: String, dest: File): Boolean {
         val src = dirOf(runId) ?: return false
         return runCatching { src.copyRecursively(dest, overwrite = true) }
@@ -151,7 +151,7 @@ class RunStore internal constructor(
             .getOrDefault(false)
     }
 
-    /** 只接受本目录下真实存在的运行,防止拼出别的路径。 */
+    /** Accepts only runs that actually exist under this directory, to prevent other paths from being assembled. */
     private fun dirOf(runId: String): File? =
         File(root, runId).takeIf { ID_RE.matches(runId) && it.isDirectory }
 
@@ -183,10 +183,10 @@ class RunStore internal constructor(
 }
 
 /**
- * 一次运行的记录;任务结束时 [close]。
- * 写盘和压图都在一个专用线程上做,[event]/[screen] 只入队、从不阻塞 Agent 循环;小结([RunMetrics])也在这个线程上边写边算,
- * 写完最后一个事件交给 [finished](跑起来过的运行才有);
- * 画面积压超过 [MAX_PENDING_FRAMES] 张时丢最旧的。[close] 会等队列写完(最多 [CLOSE_WAIT_MS])。
+ * The record of one run; [close] it when the task ends.
+ * Both writing to disk and compressing frames happen on one dedicated thread; [event]/[screen] only enqueue and never block the Agent loop; the metrics ([RunMetrics]) are also written and computed as it goes on this thread,
+ * and once the last event is written they are handed to [finished] (only for runs that actually started);
+ * when more than [MAX_PENDING_FRAMES] frames pile up, the oldest are dropped. [close] waits for the queue to be written out (at most [CLOSE_WAIT_MS]).
  */
 class RunHandle internal constructor(
     val runId: String,
@@ -246,12 +246,12 @@ class RunHandle internal constructor(
                     done = true
                 } else {
                     batch = events.toList().also { events.clear() }
-                    // 事件优先;画面一次一张,中间回来看有没有新事件
+                    // Events take priority; frames go one at a time, checking back in between for new events
                     frame = if (batch.isEmpty()) frames.removeFirstOrNull() else null
                 }
             }
             if (done) {
-                // 小结在锁外写:写的是另一个文件,不挡着别的线程
+                // Metrics are built outside the lock: they go to a different file and do not hold up other threads
                 metrics.build()?.let { m -> safely("metrics") { finished(m) } }
                 return
             }
@@ -261,12 +261,12 @@ class RunHandle internal constructor(
     }
 
     private fun write(e: RunEvent) {
-        // 先计入概要再追加,即使追加失败,结局也会写进 run.json
+        // Fold into the summary before appending, so the outcome reaches run.json even if the append fails
         summary = summary.with(e)
         metrics.add(e)
         safely("event") { File(dir, RunStore.EVENTS).appendText(RunEvent.encode(e) + "\n") }
         sinceSummary += 1
-        // 定期刷新概要:进程被杀时 run.json 里也有大致的步数和用量
+        // Refresh the summary periodically so that run.json holds approximate step counts and usage if the process is killed
         if (e is RunEvent.TaskEnded || sinceSummary >= SUMMARY_EVERY) writeSummary()
     }
 
@@ -302,7 +302,7 @@ class RunHandle internal constructor(
     }
 }
 
-/** 先只读尺寸,按 2 的幂降采样解码,再缩到宽 ≤ 720,JPEG 质量 70。 */
+/** Reads only the dimensions first, decodes with power-of-two downsampling, then scales to width ≤ 720 at JPEG quality 70. */
 private fun toJpeg(png: ByteArray): ByteArray? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(png, 0, png.size, bounds)

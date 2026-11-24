@@ -25,7 +25,7 @@ internal data class AllowanceRoute(
             if (LocalHosts.bypassesProxy(url.host) && (preset?.selfHosted == true || provider.name in selfHostedNames)) {
                 return AllowanceRoute(selfHosted = true)
             }
-            // DeepSeek 同时把不带 /v1 和带 /v1 的地址列为官方接入地址。
+            // DeepSeek lists both the address without /v1 and the one with /v1 as its official endpoint.
             val label = if (url.toString().trimEnd('/') == "https://api.deepseek.com/v1") "DeepSeek" else preset?.label
             return when (label) {
                 "DeepSeek" -> AllowanceRoute(AllowanceSource.DeepSeek, "https://platform.deepseek.com/usage")

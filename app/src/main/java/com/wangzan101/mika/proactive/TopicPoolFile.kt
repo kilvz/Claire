@@ -11,21 +11,21 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
- * 归纳出来的话题池,整份加密成 `proactive/topics.bin`(AES-GCM,正式用 `KeystoreKeyCipher("mika-proactive-topics")`)。
- * 里面只有话题名、种类、计数和时间,没有通知原文。照 [com.wangzan101.mika.memory.EncryptedMemoryFile] 的做法:
- * 写临时文件后原子改名;确实坏了就改名另存,从空开始;这会儿读不了的(密钥库忙、取钥出错)照常抛出,文件不动(哪些算坏见 [StoreCodec])。
- * 另存的旧文件界面上看不到、也读不回来,只是留个底:用户删任何东西时一并删掉([dropBroken]),「清空全部」时整份删([wipe])。
+ * The summarized topic pool, encrypted as a whole into `proactive/topics.bin` (AES-GCM, using `KeystoreKeyCipher("mika-proactive-topics")` in production).
+ * It holds only topic names, kinds, counts and times, never notification text. Following the approach of [com.wangzan101.mika.memory.EncryptedMemoryFile]:
+ * write a temp file and then rename it atomically; if it is genuinely corrupt, rename it aside and start from empty; cases that cannot be read right now (keystore busy, key fetch error) are thrown as usual and the file is left untouched (see [StoreCodec] for what counts as corrupt).
+ * The set-aside old file is not visible in the UI and cannot be read back; it is kept only as a fallback: it is deleted whenever the user deletes anything ([dropBroken]), and deleted in full on "clear all" ([wipe]).
  */
 class TopicPoolFile(dir: File, private val cipher: KeyCipher, private val clock: () -> Long = System::currentTimeMillis) : TopicPoolStore {
     private val poolDir = File(dir, "proactive")
     private val file = File(poolDir, FILE)
     private val tmp = File(poolDir, "$FILE.tmp")
 
-    /** 读出来;没有文件为空池。坏文件另存后也是空池。 */
+    /** Read it back; no file yields an empty pool. A corrupt file also yields an empty pool, after being set aside. */
     @Synchronized
     override fun load(): TopicPoolData {
         if (!file.exists()) return TopicPoolData()
-        val bytes = file.readBytes() // 读不了是 IO 故障,照常抛出
+        val bytes = file.readBytes() // a failure to read is an IO fault; throw as usual
         return StoreCodec.read(bytes, cipher, TopicPoolData.serializer(), VERSION) ?: run {
             moveAside()
             TopicPoolData()
@@ -40,13 +40,13 @@ class TopicPoolFile(dir: File, private val cipher: KeyCipher, private val clock:
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
-    /** 删掉另存的旧文件(`$FILE.broken-…`)。 */
+    /** Deletes the set-aside old files (`$FILE.broken-…`). */
     @Synchronized
     override fun dropBroken() {
         poolDir.listFiles { f -> f.name.startsWith("$FILE.broken-") }.orEmpty().forEach(::delete)
     }
 
-    /** 整份删掉:文件、临时文件、另存的旧文件。 */
+    /** Deletes everything: the file, the temp file and the set-aside old files. */
     @Synchronized
     override fun wipe() {
         delete(file)
@@ -68,13 +68,13 @@ class TopicPoolFile(dir: File, private val cipher: KeyCipher, private val clock:
 
     companion object {
         /**
-         * 这份存盘现在的写法是第几版;读到更新的就不碰(见 [StoreCodec])。改了写法、旧代码读了会出错或丢东西时加一。
-         * 第 2 版:多了并掉的话题名([TopicPoolData.merged])。只认第 1 版的代码读得进来,但下一次存盘就把它丢了,
-         * 并掉的名字又会被另起成一个话题。
+         * Which revision of the format this store currently uses; anything newer is left alone (see [StoreCodec]). Bump it when the format changes in a way that makes old code fail or lose data.
+         * Revision 2: adds merged topic names ([TopicPoolData.merged]). Code that only knows revision 1 can read it, but the next save drops them,
+         * and the merged names get started as separate topics again.
          */
         const val VERSION = 2
 
-        /** 这份内容要按第几版写:没有并掉的名字时和第 1 版写出来的一模一样,就还写 1(换回旧版本照常读得出来)。 */
+        /** Which revision to write this content as: with no merged names it is byte-for-byte what revision 1 writes, so it still writes 1 (an older version reads it back as usual). */
         fun versionOf(data: TopicPoolData): Int = if (data.merged.isEmpty()) 1 else VERSION
         const val FILE = "topics.bin"
         const val KEY_ALIAS = "mika-proactive-topics"

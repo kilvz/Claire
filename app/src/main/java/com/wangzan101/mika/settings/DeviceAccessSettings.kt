@@ -20,7 +20,7 @@ data class DeviceAccessConfig(val enabled: Boolean = false, val localEnabled: Bo
     val kind: CredentialKind? = null, val blocked: Boolean = false, val localBlocked: Boolean = false,
     val revision: String = "")
 
-/** 全部设置加密原子写入。仅保留非秘密状态流,不缓存解密后的凭据。读不出时按关闭处理。 */
+/** All settings are written atomically and encrypted. Only the non-secret state flow is kept; decrypted credentials are never cached. Anything unreadable is treated as off. */
 class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher) : DeviceAccessStore {
     private val file = File(dir, "device-access.bin")
     private val mutable = MutableStateFlow(runCatching { read()?.let(::configOf) }.getOrNull() ?: DeviceAccessConfig())
@@ -33,13 +33,13 @@ class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher)
     @Synchronized fun setEnabled(on: Boolean) {
         try { update(config.value.copy(enabled = on)) }
         catch (e: Exception) {
-            // 撤销许可时即使磁盘/密钥不可用也先在进程内关闭;不让保存错误留下可用的旧许可。
+            // When permission is revoked, turn it off in-process even if the disk or the key is unavailable, so a save error does not leave an old usable permission behind.
             if (!on) { mutable.value = config.value.copy(enabled = false); file.delete() }
             throw e
         }
     }
 
-    /** 本机开关与远程开关互不带动;关闭时的失败处理与 [setEnabled] 同款。 */
+    /** The on-device switch and the remote switch do not drive each other; failure handling on turn-off is the same as in [setEnabled]. */
     @Synchronized fun setLocalEnabled(on: Boolean) {
         try { update(config.value.copy(localEnabled = on)) }
         catch (e: Exception) {
@@ -51,7 +51,7 @@ class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher)
     @Synchronized fun setCredential(kind: CredentialKind, value: String) {
         val chars = value.toCharArray()
         try { require(DeviceCredential.valid(kind, chars)) { "Unsupported credential format" } } finally { chars.fill('\u0000') }
-        // 重新保存凭据同时解除两个占位:新凭据各自允许一次新尝试
+        // Saving the credential again clears both latches at once: a new credential gets one fresh attempt on each path
         save(config.value.copy(kind = kind, blocked = false, localBlocked = false, revision = UUID.randomUUID().toString()), value)
     }
 
@@ -70,7 +70,7 @@ class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher)
         return true
     }
 
-    /** 本机任务的独立占位:与 [beginAttempt] 的占位互不通,同样输入前落、失败即停。 */
+    /** The separate latch for on-device tasks: independent of the latch of [beginAttempt], also set before input and cleared on failure. */
     @Synchronized override fun beginLocalAttempt(): Boolean {
         if (!localEnabled || config.value.localBlocked || config.value.kind == null) return false
         update(config.value.copy(localBlocked = true))
@@ -78,7 +78,7 @@ class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher)
     }
 
     @Synchronized override fun completeAttempt(credential: DeviceCredential) {
-        // 占位为「凭据可能不对」而设;同修订号的核实成功把它证伪,两个占位一起解除
+        // The latch exists because the credential might be wrong; a successful verification with the same revision disproves that, clearing both latches together
         if (config.value.revision == credential.revision) update(config.value.copy(blocked = false, localBlocked = false))
     }
 
@@ -96,7 +96,7 @@ class DeviceAccessSettings(private val dir: File, private val cipher: KeyCipher)
         finally { chars?.fill('\u0000') }
         val revision = (o["revision"] as? JsonPrimitive)?.content.orEmpty()
         check(kind == null || revision.isNotEmpty())
-        // 旧文件没有本机开关字段:按关闭缺省,向后兼容
+        // Old files have no on-device switch field: it defaults to off, for backward compatibility
         return DeviceAccessConfig(enabled = (o["enabled"] as? JsonPrimitive)?.booleanOrNull == true,
             localEnabled = (o["local_enabled"] as? JsonPrimitive)?.booleanOrNull == true, kind = kind,
             blocked = (o["blocked"] as? JsonPrimitive)?.booleanOrNull == true,

@@ -42,10 +42,10 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 自身端口的安卓实现。只给手机上、有用户的 UI 主任务;每个任务一份,只读状态 + 打开展示。
+ * The Android implementation of the self port. Only for main tasks that run on the phone and have a user UI; one per task, read-only status + opening things for display.
  *
- * 前台走进程内 [SelfUi] 请求(界面在导航栈里开);后台只发通知,用户点了才进,
- * 不在后台启动 Activity,也不假装用户已经看见了。
+ * In the foreground it goes through an in-process [SelfUi] request (the screen opens in the navigation stack); in the background it only posts a notification, and the user enters only by tapping it:
+ * it never starts an Activity in the background, nor pretends the user has already seen something.
  */
 class AndroidSelfPort(
     private val app: MikaApp,
@@ -149,7 +149,7 @@ class AndroidSelfPort(
         }.getOrDefault(false)
     }
 
-    // ---- 用户浏览器 ----
+    // ---- User browser ----
 
     override suspend fun browserState(): SelfBrowserState = withContext(Dispatchers.Main) {
         if (!FeatureFlags.get(app).selfOperate()) SelfBrowserState() else browserStateNow()
@@ -257,7 +257,7 @@ class AndroidSelfPort(
         return SelfConsent(prompt, app.getString(R.string.self_consent_allow), app.getString(R.string.self_consent_deny))
     }
 
-    /** 后台通知经内部入口打开对应页面或文件。 */
+    /** Opens the corresponding screen or file from a background notification through the internal entry point. */
     private fun post(
         title: String,
         body: String,

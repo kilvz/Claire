@@ -66,11 +66,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 兼容性自检的安卓实现。手机这几项走任务用的同一套:进程里共用的那条助手连接([PhoneServices.sharedShell])、
- * [AgentDisplay] 建屏、[AndroidScreen] 打开页面、读屏、点按、打字、滚动、返回;网页走内置浏览器的 [WebScreen];
- * 沙箱走 [AndroidSandbox]。只碰 Claire 自己的自检页和系统设置(只打开、不点),不改设置、不联网。
- * 报告里的事实只写状态和数字,不写别的 App 的包名、账号和用户的内容。
- * [status] 是界面那边此刻的系统状态(无障碍、通知、内置助手)。
+ * The Android implementation of the compatibility self-check. On the phone these checks use the same stack the tasks use: the assistant connection shared within the process ([PhoneServices.sharedShell]),
+ * [AgentDisplay] to create the display, [AndroidScreen] to open pages, read the screen, tap, type, scroll and go back; web pages go through the built-in browser's [WebScreen];
+ * the sandbox goes through [AndroidSandbox]. It touches only Claire's own self-check page and the system settings (opening them only, never tapping), changes no settings and uses no network.
+ * The facts in the report contain only statuses and numbers, never other apps' package names, accounts or user content.
+ * [status] is the system status at this moment as the UI sees it (accessibility, notifications, built-in assistant).
  */
 class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus) : SelfCheckPort {
     private val app = context.applicationContext
@@ -82,7 +82,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
     @Volatile private var screen: AndroidScreen? = null
     @Volatile private var web: Web? = null
 
-    /** 开跑时主屏最上面的任务;之后每到一个节点再看一次,变了的节点记下来。 */
+    /** The top task on the main screen when the run starts; it is checked again at every stage, and stages where it changed are recorded. */
     private var mainBefore: Int? = null
     private val mainChanged = mutableListOf<String>()
 
@@ -125,12 +125,12 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         SelfCheck.APP_COPIES -> appCopies()
     }
 
-    // ---------- 熄屏自检(手动诊断) ----------
+    // ---------- screen-off self-check (manual diagnosis) ----------
 
     /**
-     * 手动诊断:主屏熄屏且锁定之后,任务用的那一套(内置助手、虚拟屏、打开系统设置、读树、截图、点按)还能不能工作。
-     * 用真机端口,但持的是 PARTIAL 唤醒锁:不点亮主屏、不走任务解锁。监视挂上之后,主屏亮起、用户回到手机、
-     * 或有任务开跑,这次自检就作废,如实报「被打断」。每段结果经 [report] 交给界面。
+     * Manual diagnosis: whether the stack the tasks use (built-in assistant, virtual display, opening system settings, reading the tree, screenshots, tapping) still works after the main screen is off and locked.
+     * It uses the real-device ports, but holds a PARTIAL wake lock: it does not turn the main screen on and does not use the task unlock path. Once the monitors are armed, if the main screen turns on, the user comes back to the phone,
+     * or a task starts, this self-check is void and honestly reported as "interrupted". Each stage's result is handed to the UI via [report].
      */
     internal suspend fun checkScreenOff(taskBusy: () -> Boolean, report: (Int, CheckOutcome) -> Unit) {
         val displays = app.getSystemService(DisplayManager::class.java)
@@ -174,7 +174,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             displays.registerDisplayListener(listener, Handler(Looper.getMainLooper()))
             registeredListener = true
             lock.acquire(SCREEN_OFF_WAKE_LOCK_MS)
-            // 等用户按电源键熄屏并锁定;期间有任务开跑就不开始
+            // Wait for the user to turn the screen off with the power button and lock the device; if a task starts meanwhile, do not begin
             val ready = withTimeoutOrNull(SCREEN_OFF_READY_MS) {
                 while (!lockedAndOff() && !taskBusy()) delay(POLL_MS)
                 !taskBusy()
@@ -196,7 +196,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         } catch (e: CancellationException) {
             throw e
         } catch (_: ScreenOffInterrupted) {
-            // 主屏状态变了:收尾释放虚拟屏之后统一报「被打断」
+            // The main screen state changed: report "interrupted" once, after cleanup has released the virtual display
         } catch (e: Exception) {
             reportStep(stage, CheckOutcome.fail(e.javaClass.simpleName, Advice.Error))
         } finally {
@@ -223,12 +223,12 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    /** 主屏状态一变就中断在跑的阶段;真正的「被打断」报告在虚拟屏放掉之后才发。 */
+    /** Interrupts the running stage as soon as the main screen state changes; the actual "interrupted" report is sent only after the virtual display is released. */
     private class ScreenOffInterrupted : Exception()
 
     /**
-     * 熄屏自检的几段,顺序和正常自检一致:内置助手 → 虚拟屏 → 打开系统设置 → 读树和截图 → 点按搜索。
-     * 每步前后都核一次主屏状态,变了立即中断;任何一步不过就停。
+     * The stages of the screen-off self-check, in the same order as the normal self-check: built-in assistant → virtual display → open system settings → read tree and screenshot → tap search.
+     * The main screen state is verified before and after every step and the run is interrupted at once if it changes; it stops at the first step that does not pass.
      */
     private suspend fun runScreenOffStages(
         valid: () -> Boolean,
@@ -252,7 +252,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val d = checkNotNull(display)
         val settings = SystemPickers.settingsPackage(app.packageManager)
         var deviceScreen: AndroidScreen? = null
-        // 打开系统设置(只打开、不点):主屏熄着,设置要开在刚建好的虚拟屏上
+        // Open the system settings (open only, no taps): the main screen is off, so Settings must open on the virtual display that was just created
         if (!step(R.string.selfcheck_check_launch) {
             val a11y = ScreenAccessibility.instance.value
             if (a11y == null || settings == null) {
@@ -262,7 +262,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             screen = s
             deviceScreen = s
             verifyLock()
-            // 开在新建好的虚拟屏上;不去 force-stop 系统设置
+            // Open it on the newly created virtual display; do not force-stop Settings
             val opened = s.openApp(settings, cold = false)
             if (opened is ActionResult.Ok && poll(PAGE_WAIT_MS) {
                     verifyLock()
@@ -327,7 +327,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 2 权限 ----------
+    // ---------- 2 permissions ----------
 
     private fun permissions(): CheckOutcome {
         val s = status()
@@ -347,11 +347,11 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 3 内置助手 ----------
+    // ---------- 3 built-in assistant ----------
 
     private suspend fun helper(): CheckOutcome {
         val st = status().builtinShell
-        // 没配过对就不去连(连的时候会提示去设置);配过对的,看门狗可能正在起它,等一会儿
+        // If it was never paired, do not try to connect (connecting would prompt to go to settings); if it was paired, the watchdog may be starting it, so wait a while
         if (st == BuiltinShellStatus.NotPaired && !phone.shellControl.paired) return CheckOutcome.fail("not set up ($st)", Advice.SetUpPhoneControl)
         val conn = connection ?: phone.sharedShell.acquire().also { connection = it }
         val sh = withTimeoutOrNull(HELPER_WAIT_MS) { conn.shell.filterNotNull().first() }
@@ -375,12 +375,12 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 4 虚拟屏 ----------
+    // ---------- 4 virtual display ----------
 
     private suspend fun virtualDisplay(): CheckOutcome {
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
         val m = metrics()
-        // 建屏不中途打断:建好的一定记下,收尾时放掉
+        // Creating the display is not interrupted halfway: one that does get created is always recorded and released during cleanup
         val made = withContext(NonCancellable + Dispatchers.IO) {
             runCatching { AgentDisplay(sh, m.widthPixels, m.heightPixels, m.densityDpi, app.getSystemService(DisplayManager::class.java)) }.onSuccess { display = it }
         }
@@ -395,10 +395,10 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    /** 安卓 14 起显示的「自己的焦点」标志;常量没公开,先按名字取,取不到用原版的值。 */
+    /** The "own focus" flag that displays expose since Android 14; the constant is not public, so read it by name first and fall back to the original value if that fails. */
     private fun ownFocusFlag(): Int = runCatching { Display::class.java.getField("FLAG_OWN_FOCUS").getInt(null) }.getOrDefault(1 shl 11)
 
-    // ---------- 5 打开页面 ----------
+    // ---------- 5 opening pages ----------
 
     private suspend fun appLaunch(): CheckOutcome {
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
@@ -410,7 +410,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             return CheckOutcome.fail("Claire's test page did not open on Claire's display (${reason(own)})", Advice.LaunchFailed)
         }
         sampleMain(sh, "test page")
-        // 先关掉自检页再开系统设置:之后从头开一页,不靠把旧的那一页翻回前面
+        // Close the self-check page before opening the system settings: afterwards a page is opened from scratch rather than by bringing the old one back to the front
         withContext(Dispatchers.Main) { SelfCheckTargetActivity.finishOpen() }
         val settings = SystemPickers.settingsPackage(app.packageManager)
         val settingsNote = if (settings == null) "no system Settings app found" else when (val r = s.openApp(settings, cold = false)) {
@@ -419,7 +419,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
                 val onMika = withContext(Dispatchers.IO) { topPackage(sh, d.displayId) } == settings
                 val onMain = withContext(Dispatchers.IO) { mainTop(sh)?.let { runCatching { sh.packageOfTask(it) }.getOrNull() } } == settings
                 sampleMain(sh, "Settings")
-                // 只看不点:返回一次离开它
+                // Look only, never tap: leave it with a single back press
                 s.back()
                 when {
                     onMain -> SETTINGS_ON_MAIN
@@ -428,7 +428,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
                 }
             }
         }
-        // 后面几项在自检页上做:重新打开一次,从头来
+        // The remaining checks run on the self-check page: open it once more and start from scratch
         val again = s.openOwnPage(SelfCheckTargetActivity.intent(app))
         if (again !is ActionResult.Ok || !poll { withContext(Dispatchers.IO) { isTestPageOnTop(sh, d.displayId) } }) {
             return CheckOutcome.fail("Claire's test page did not reopen after Settings (${reason(again)})", Advice.LaunchFailed)
@@ -441,15 +441,15 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 6 读屏 ----------
+    // ---------- 6 screen reading ----------
 
     private suspend fun screenReading(): CheckOutcome {
         val s = screen ?: return CheckOutcome.fail("no screen", Advice.LaunchFailed)
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
         val d = display ?: return CheckOutcome.fail("no display", Advice.DisplayFailed)
         s.waitStable(SETTLE_MS)
-        // 页面刚开出来时树可能还没齐:只认 Claire 自己窗口里的控件,最多等一会儿。
-        // 系统覆盖窗口不属于新任务;完整系统应用则会成为最上层任务,不能一并容忍。
+        // Right after a page opens, the tree may not be complete yet: only elements in Claire's own window are accepted, and it waits for a while at most.
+        // System overlay windows do not belong to a new task; a full system app, however, becomes the topmost task and cannot be tolerated the same way.
         suspend fun inspect(source: ScreenSnapshot) = readSelfCheckWindow(
             source, app.packageName, withContext(Dispatchers.IO) { topPackage(sh, d.displayId) }, EXPECTED, ::systemPackage,
         ) { key -> find(key) }
@@ -480,7 +480,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         return CheckOutcome.pass("${content.elements.size} Claire-window elements, all expected found; screenshot not blank")
     }
 
-    // ---------- 7 动作 ----------
+    // ---------- 7 actions ----------
 
     private suspend fun actions(): CheckOutcome {
         val s = screen ?: return CheckOutcome.fail("no screen", Advice.LaunchFailed)
@@ -489,10 +489,10 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         val ok = mutableListOf<String>()
         val bad = mutableListOf<String>()
         fun mark(name: String, passed: Boolean) { if (passed) ok += name else bad += name }
-        // 系统覆盖窗口存在时也只对 Claire 的控件做动作;编号仍属于原始快照,可直接交给动作端口。
+        // Even when a system overlay window exists, act only on Claire's own elements; the ids still belong to the original snapshot, so they can be handed straight to the action port.
         fun own(source: ScreenSnapshot) = ownContent(source) ?: source.copy(elements = emptyList(), windows = emptyList())
 
-        // 点按:计数加一
+        // Tap: the counter increments by one
         var snap = own(s.snapshot())
         val before = snap.find(COUNT)?.number()
         val button = snap.find(BUTTON)
@@ -501,13 +501,13 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             mark("tap", poll { own(s.peek()).find(COUNT)?.number() == before + 1 })
         } else mark("tap", false)
 
-        // 打字:英文和中文各打一次,回读输入框
+        // Typing: type once in English and once in Chinese, then read the input field back
         snap = own(s.snapshot())
         mark("type ASCII", snap.find(INPUT)?.let { typed(s, it, snap, ASCII) } == true)
         snap = own(s.snapshot())
         mark("type Chinese", snap.find(INPUT)?.let { typed(s, it, snap, CHINESE) } == true)
 
-        // 滚动:看得见的行换了
+        // Scrolling: the visible rows change
         snap = own(s.snapshot())
         val rowsBefore = snap.rows()
         val list = snap.find(LIST)
@@ -516,7 +516,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
             mark("scroll", poll { own(s.peek()).rows().let { it.isNotEmpty() && it.first() != rowsBefore.first() } })
         } else mark("scroll", false)
 
-        // 返回:自检页离开 Claire 屏的最上面。刚打完字输入法多半还弹着,那几下是收起输入法(安卓本来如此),不算在次数里
+        // Back: the self-check page leaves the top of Claire's display. Right after typing the IME is usually still up, and those presses only hide the IME (that is how Android behaves), so they do not count
         val gone = BackPresses.until(
             tries = BACK_TRIES,
             maxPresses = BACK_MAX_PRESSES,
@@ -543,7 +543,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         return poll { ownContent(s.peek())?.find(INPUT)?.name?.let { SelfCheckText.contains(it, text) } == true }
     }
 
-    // ---------- 8 一直在动 ----------
+    // ---------- 8 stays alive ----------
 
     private suspend fun staysAlive(): CheckOutcome {
         val s = screen ?: return CheckOutcome.fail("no screen", Advice.LaunchFailed)
@@ -577,7 +577,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         return CheckOutcome.pass("frames and tree kept changing for ${ALIVE_MS / 1000} s")
     }
 
-    // ---------- 9 主屏 ----------
+    // ---------- 9 main screen ----------
 
     private suspend fun mainScreen(): CheckOutcome {
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
@@ -588,12 +588,12 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         else CheckOutcome.fail("top task changed during: ${mainChanged.joinToString()}", Advice.MainScreenChanged)
     }
 
-    // ---------- 10 内置浏览器 ----------
+    // ---------- 10 built-in browser ----------
 
     private suspend fun browser(): CheckOutcome {
         if (runCatching { WebViewCompat.getCurrentWebViewPackage(app) == null }.getOrDefault(true)) return CheckOutcome.fail("no WebView on this device", Advice.NoWebView)
         val m = metrics()
-        // 和任务一样在主线程建;建好的一定记下,收尾时关掉。访问不记进网站列表(不给 registry)
+        // Built on the main thread like the tasks do; whatever gets built is always recorded and closed during cleanup. Visits are not added to the site list (no registry is passed)
         val built = withContext(NonCancellable + Dispatchers.Main) {
             runCatching {
                 val host = WebHost(app, m.widthPixels, m.heightPixels, m.densityDpi)
@@ -624,18 +624,18 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         else CheckOutcome.fail("text read; button tap did not change the page", Advice.WebFailed)
     }
 
-    // ---------- 11 沙箱 ----------
+    // ---------- 11 sandbox ----------
 
     private suspend fun sandbox(): CheckOutcome {
         val state = SandboxState.get(app)
         when (val st = state.status.value) {
             is SandboxStatus.Unsupported -> return CheckOutcome.skipped("not supported on ${Build.SUPPORTED_ABIS.firstOrNull() ?: "this device"}", Advice.SandboxUnsupported)
             is SandboxStatus.Ready -> Unit
-            // 不为自检现装运行环境(要好几分钟)
+            // Do not install the runtime environment just for the self-check (it takes several minutes)
             else -> return CheckOutcome.partial("runtime not prepared (${st.javaClass.simpleName})", Advice.SandboxNotPrepared)
         }
         val box = AndroidSandbox(app, state)
-        // 命令出错(比如断网过滤装不上被拒)照实记下;取消照常往外抛
+        // Command errors (for example a rejection because the network filter could not be installed) are recorded as they are; cancellation is propagated as usual
         suspend fun run(argv: List<String>): Result<CommandResult> = try {
             Result.success(box.run(SANDBOX_WORKSPACE, argv, null, COMMAND_MS) {})
         } catch (e: CancellationException) {
@@ -658,7 +658,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 12 另一份 App ----------
+    // ---------- 12 another copy of the app ----------
 
     private suspend fun appCopies(): CheckOutcome {
         val sh = shell ?: return CheckOutcome.fail("no helper", Advice.SetUpPhoneControl)
@@ -667,7 +667,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         return CheckOutcome.pass("${users.size} usable other profile(s)")
     }
 
-    // ---------- 收尾 ----------
+    // ---------- cleanup ----------
 
     override suspend fun release() {
         withContext(NonCancellable) {
@@ -689,14 +689,14 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         }
     }
 
-    // ---------- 小工具 ----------
+    // ---------- helpers ----------
 
     private fun metrics(): DisplayMetrics = DisplayMetrics().also {
         @Suppress("DEPRECATION")
         app.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY).getRealMetrics(it)
     }
 
-    /** 主屏最上面的任务;读不到为 null。 */
+    /** The top task on the main screen; null if it cannot be read. */
     private fun mainTop(sh: IMikaShell): Int? = runCatching { sh.topTaskId(Display.DEFAULT_DISPLAY) }.getOrNull()?.takeIf { it >= 0 }
 
     private suspend fun sampleMain(sh: IMikaShell, stage: String) {
@@ -720,7 +720,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         return null
     }
 
-    /** 实时画面(缩小的那一份)的指纹;还没有画面为 null。 */
+    /** Fingerprint of the live frame (the downscaled one); null when there is no frame yet. */
     private fun frameHash(d: AgentDisplay): Int? {
         val bmp = d.frames.value ?: return null
         return runCatching {
@@ -742,8 +742,8 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
     private fun ownContent(source: ScreenSnapshot): ScreenSnapshot? = selfCheckWindowContent(source, app.packageName)
 
     /**
-     * 自检页上的一个控件:先按资源 id(读屏给的是短名,也认完整写法的结尾),再按页面上的文字(有字的控件读屏时不带资源 id)。
-     * 文字和自检页一样按 App 语言取;比的时候不分大小写、不计较空白(见 [SelfCheckText])。
+     * An element on the self-check page: first by resource id (screen reading supplies the short name, and the tail of the fully-qualified form is accepted too), then by the text on the page (elements that have text carry no resource id when read).
+     * The text is taken in the app language, just like the self-check page; comparisons are case-insensitive and ignore whitespace (see [SelfCheckText]).
      */
     private fun ScreenSnapshot.find(key: String): UiElement? =
         elements.firstOrNull { e -> e.resourceId?.let { it == key || it.endsWith("/$key") } == true }
@@ -759,13 +759,13 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
                 }
             }
 
-    /** 自检页上看得见的行(按从上到下)。 */
+    /** The visible rows on the self-check page (top to bottom). */
     private fun ScreenSnapshot.rows(): List<String> =
         elements.filter { rowText.matches(it.name) }.sortedBy { it.centerY }.map { it.name }
 
     /**
-     * 读屏没找到自检页时写进报告的「看到了什么」:是自检页就写包名和前几个控件;是系统界面只写包名、个数和控件的种类或 id
-     * (系统设置顶上可能有用户的名字,不写文字);别的 App 连包名都不写。
+     * The "what was seen" written into the report when screen reading does not find the self-check page: for the self-check page, the package name and the first few elements; for a system UI, only the package name, the count and the kinds or ids of the elements
+     * (the top of system settings may show the user's name, so no text is written); for other apps not even the package name is written.
      */
     private fun seen(snap: ScreenSnapshot): String {
         val pkg = snap.packageName
@@ -783,7 +783,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         app.packageManager.getApplicationInfo(pkg, 0).flags and ApplicationInfo.FLAG_SYSTEM != 0
     }.getOrDefault(false)
 
-    /** 带一个数字的文字(「点了 %d 次」「计时 %d」「第 %d 行」):按 App 语言取,用来认控件。 */
+    /** Text with a number in it ("tapped %d times", "timer %d", "row %d"): fetched in the app language and used to recognise elements. */
     private fun numbered(res: Int) = SelfCheckText.Numbered(tr(res, SENTINEL), SENTINEL.toString())
 
     private val tapsText by lazy { numbered(R.string.selfcheck_target_taps) }
@@ -809,20 +809,20 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         const val FRAME_TRIES = 20
         const val BLANK_SPREAD = 8
         const val BACK_TRIES = 2
-        /** 连收起输入法在内最多按这么多下。 */
+        /** Maximum number of presses in total, including the ones that hide the IME. */
         const val BACK_MAX_PRESSES = 5
         const val ALIVE_MS = 15_000L
         const val ALIVE_STEP_MS = 500L
-        /** 这么久画面一点没变就算停了(页面上的数字每 250 毫秒跳一次)。 */
+        /** If the frame has not changed at all for this long, it counts as stopped (the number on the page ticks every 250 ms). */
         const val STALL_MS = 3_000L
         const val COMMAND_MS = 8_000L
         const val MAX_CHARS = 4_000
         const val SETTINGS_IN_USE = "Settings is open on the main screen, so it was not opened"
         const val SETTINGS_ON_MAIN = "Settings opened on the main screen"
-        /** 认系统设置的搜索入口:按资源 id 的末段,或按入口名字(中英文)。 */
+        /** Recognising the system settings search entry: by the last segment of the resource id, or by the entry's name (Chinese and English). */
         val SETTINGS_SEARCH_IDS = setOf("search", "search_icon", "search_action_bar_title", "search_button")
         val SETTINGS_SEARCH_LABELS = setOf("Search", "Search settings", "搜索", "搜索设置", "搜尋", "搜尋設定")
-        /** 熄屏自检:唤醒锁上限(不点亮主屏)、等熄屏锁定的超时、各阶段的总预算。 */
+        /** Screen-off self-check: the wake lock limit (the main screen is not turned on), the timeout for waiting until the screen is off and locked, and the total budget for the stages. */
         const val SCREEN_OFF_WAKE_LOCK_MS = 90_000L
         const val SCREEN_OFF_READY_MS = 45_000L
         const val SCREEN_OFF_STAGES_MS = 35_000L
@@ -837,7 +837,7 @@ class AndroidSelfCheck(context: Context, private val status: () -> SystemStatus)
         const val ASCII = "Claire 123"
         const val CHINESE = "你好米卡"
         const val SENTINEL = 987_654_321
-        /** 读屏一项等自检页出现最多这么久。 */
+        /** For the screen-reading check, how long at most to wait for the self-check page to appear. */
         const val PAGE_WAIT_MS = 5_000L
         const val SEEN_ELEMENTS = 5
         const val SEEN_CHARS = 24
@@ -860,8 +860,8 @@ internal data class SelfCheckWindowRead(
 }
 
 /**
- * 把合并读屏结果收窄到 Claire 自己的应用窗口,再检查控件。只有 Claire 仍是最上层任务时,
- * 系统应用的覆盖窗口才不影响自检;完整系统应用有自己的顶层任务,仍算切走。
+ * Narrows the merged screen-reading result down to Claire's own application window, then checks the elements. Only while Claire is still the topmost task
+ * does a system app's overlay window leave the self-check unaffected; a full system app has its own top-level task and still counts as switched away.
  */
 internal fun readSelfCheckWindow(
     screen: ScreenSnapshot,
@@ -878,13 +878,13 @@ internal fun readSelfCheckWindow(
         topTaskPackage != null && topTaskPackage != packageName -> true
         top == null || top == packageName -> false
         !isSystemPackage(top) -> true
-        // 任务归属读不到时不能把系统窗口认定为覆盖层,保持失败。
+        // When the task ownership cannot be read, a system window must not be treated as an overlay; keep it as a failure.
         else -> topTaskPackage != packageName
     }
     return SelfCheckWindowRead(content, missing, wrongApp)
 }
 
-/** 原始快照的编号不变,只把元素和窗口树收窄到指定 App 的应用窗口。 */
+/** The original snapshot's ids stay unchanged; only the elements and the window tree are narrowed to the given app's application windows. */
 internal fun selfCheckWindowContent(screen: ScreenSnapshot, packageName: String): ScreenSnapshot? {
     val ownWindows = screen.windows.filter { it.type == "application" && it.packageName == packageName }
     if (ownWindows.isEmpty()) return null

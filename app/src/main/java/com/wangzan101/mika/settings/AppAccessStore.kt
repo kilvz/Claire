@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 
-/** 应用权限与分类分开保存;没有记录的包名默认允许。 */
+/** App permissions and classifications are stored separately; package names with no record are allowed by default. */
 class AppAccessStore(private val file: File) : AppAccessPolicy {
     private val mutable = MutableStateFlow(load())
     val state = mutable.asStateFlow()

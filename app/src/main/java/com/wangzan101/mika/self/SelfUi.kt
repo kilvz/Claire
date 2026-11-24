@@ -6,10 +6,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicLong
 
-/** 要打开的 Workspace 文件:对话编号 + 沙箱路径。 */
+/** The Workspace file to open: conversation id + sandbox path. */
 data class SelfFileRequest(val conversationId: String, val path: String, val name: String?)
 
-/** 一次自身 UI 请求:打开一页,或打开一个文件。 */
+/** One self UI request: open a screen, or open a file. */
 data class SelfUiRequest(
     val id: Long,
     val screen: SelfScreen? = null,
@@ -23,8 +23,8 @@ data class SelfUiRequest(
 )
 
 /**
- * 进程内的自身 UI 请求。任务在服务里跑,界面在 MainActivity 里;两边同一进程,
- * 用 StateFlow 留一份请求,界面回来时照样能处理。仿 [com.wangzan101.mika.memory.MemoryRuntime.openRequest]。
+ * In-process self UI requests. Tasks run in the service while the UI lives in MainActivity; both are in the same process,
+ * so a request is kept in a StateFlow and can still be handled when the UI comes back. Modelled on [com.wangzan101.mika.memory.MemoryRuntime.openRequest].
  */
 class SelfUi {
     private val _request = MutableStateFlow<SelfUiRequest?>(null)
@@ -45,13 +45,13 @@ class SelfUi {
         return id
     }
 
-    /** 界面处理完了;只清掉同一条,不误删后来的请求。 */
+    /** The UI has handled it; clear only that one, so a later request is not removed by mistake. */
     fun consumed(id: Long) {
         if (_request.value?.id == id) _request.value = null
     }
 }
 
-/** 后台通知点开后带回来的 extra。 */
+/** The extras carried back when a background notification is tapped open. */
 internal object SelfIntents {
     const val EXTRA_SCREEN = "mika_self_screen"
     const val EXTRA_FILE = "mika_self_file"

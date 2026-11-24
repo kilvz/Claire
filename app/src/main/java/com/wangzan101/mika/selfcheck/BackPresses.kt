@@ -1,8 +1,8 @@
 package com.wangzan101.mika.selfcheck
 
 /**
- * 自检里按返回、等页面离开:按之前弹着输入法的那一下,安卓先拿去收起输入法(或先清掉没上屏的字),不算一次;
- * 输入法没弹着时按了 [tries] 下页面还在才算失败。一共最多按 [maxPresses] 下,输入法收不起来也不会一直按下去。
+ * Pressing back and waiting for the page to leave in the self-check: for the press made while the IME was up, Android first uses it to hide the IME (or to clear text that was not committed to the field), so it does not count;
+ * when the IME is not up, a failure is only counted if the page is still there after [tries] presses. At most [maxPresses] presses are made in total, so it will not keep pressing if the IME refuses to hide.
  */
 internal object BackPresses {
     suspend fun until(

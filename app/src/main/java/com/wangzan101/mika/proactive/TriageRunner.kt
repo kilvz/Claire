@@ -27,13 +27,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 判定要用的、App 别处的东西,都由 MikaApp 经 lambda 给:判定关着时一样都不碰(服务商配置、用量账本)。
- * [target] 是现在会用的服务商和模型(不建模型,给界面和门口的检查);[model] 建模型,连同建它用的那个目标
- * (同一次读配置,发请求前对着它查同意);[busy] 是「有任务在跑」。
+ * Everything triage needs from the rest of the app is supplied by MikaApp through lambdas: nothing is touched while triage is off (provider config, usage ledger).
+ * [target] is the provider and model that would be used now (it does not build a model; used by the UI and the gate checks); [model] builds the model along with the target it was built from
+ * (a single config read, which consent is checked against before sending a request); [busy] means "a task is running".
  */
 class TriageHooks(
     val target: () -> TriageTarget?,
-    /** 建模型。参数是这次要发哪一种请求(回复上限跟着它定)。 */
+    /** Builds the model. The argument is which kind of request is being sent this time (the reply limit is chosen from it). */
     val model: (ProactiveCall) -> TargetedModel?,
     val tokensToday: () -> Long,
     val callsToday: () -> Long,
@@ -43,29 +43,29 @@ class TriageHooks(
 
 enum class TriageStatus {
     Off,
-    /** 判定开着,但主动能力没在看守(完全退出期间):什么都不做。 */
+    /** Triage is on, but the proactive feature is not watching (while the app is fully exited): do nothing. */
     Paused,
     NoModel,
     NeedsConsent,
-    /** 「应用访问」设置读不出来:不知道哪些 App 不让碰,停着;待判定的留着。 */
+    /** The "app access" settings cannot be read: it is unknown which apps are off-limits, so it is paused; items pending triage are kept. */
     Suspended,
-    /** 连不上模型(或等到超时也没回应),整个停一阵再试;待判定的留着。 */
+    /** The model cannot be reached (or it never answered before the timeout), so everything pauses for a while and then retries; items pending triage are kept. */
     Unreachable,
     Locked,
-    /** 有任务在跑,等它结束。 */
+    /** A task is running; wait for it to end. */
     Busy,
-    /** 判定那份 Token 今天用完了(或请求时被拒、按 Token 算):明天继续。 */
+    /** Triage's own token allowance is used up for today (or the request was rejected and it counts as tokens): continue tomorrow. */
     TokensUsedUp,
-    /** 判定那份请求次数今天用完了:明天继续。 */
+    /** Triage's own request count is used up for today: continue tomorrow. */
     CallsUsedUp,
-    /** 有待判定的在等这个 App 凑一批,或判过的通知有了新内容、在等冷却到点。 */
+    /** Items pending triage are waiting for this app to fill a batch, or already-triaged notifications have new content and are waiting for the cooldown to elapse. */
     Waiting,
     Sending,
     Idle,
 }
 
 /**
- * 给界面的:现在的状态、各条的结果(按通知键;发出时间对上的是这次的结果,比记录旧的是冷却前那次的结果)、几个数。
+ * For the UI: the current status, each item's result (keyed by notification key; one whose send time matches is the result of this attempt, an older one is the result of the attempt before the cooldown) and a few counts.
  */
 data class TriageState(
     val status: TriageStatus = TriageStatus.Off,
@@ -74,14 +74,14 @@ data class TriageState(
 )
 
 /**
- * 判定的调度:在 [ProactiveRuntime] 那条串行协程上跑,只在看守期间([watch])活着。
+ * Triage scheduling: runs on the single serial coroutine of [ProactiveRuntime] and stays alive only while watching ([watch]).
  *
- * 省电:不轮询。收件箱变了、锁屏状态变了、[TriageHooks.busy] 变了、外部改了开关或预算([poke])时才看一遍([evaluate]);
- * 计时(凑批、判过或判失败的通知冷却到点)只在解锁时才有,一看到锁着就取消,锁着时到点的解锁后再看;锁着时正在发的请求也取消,那一批照旧待判定(不算失败),解锁后再发。
- * 一次只发一批,一批只有一个 App。不自动重试:失败的那批记成失败,按连续失败的次数停一段,停着期间的更新不发,
- * 停完有新内容才再判;没有新内容就等用户点「再试一次」([retryFailed])才再发一次。
- * 预算用完(请求时被拒,或账本那边已到上限)就当天安静停下。
- * 结果只在内存里([TriagePlanner]);日志([log])只记结果类别和条数,不记通知文字和理由。
+ * Power saving: no polling. It takes a look ([evaluate]) only when the inbox changes, the lock state changes, [TriageHooks.busy] changes, or the switch or budget is changed externally ([poke]);
+ * timers (to fill a batch, or for a triaged or failed notification's cooldown to elapse) exist only while unlocked and are cancelled as soon as the device is seen locked; anything that comes due while locked is looked at after unlocking; a request in flight while locked is cancelled as well, and that batch stays pending triage (it does not count as a failure) and is sent after unlocking.
+ * It sends one batch at a time, and a batch covers a single app. No automatic retries: a failed batch is recorded as failed, it pauses for a while according to the number of consecutive failures, and updates during the pause are not sent,
+ * then after the pause it triages again only if there is new content; without new content it waits for the user to tap "try again" ([retryFailed]) before sending once more.
+ * When the budget is used up (the request was rejected, or the ledger has already hit the limit) it quietly stops for the day.
+ * Results live only in memory ([TriagePlanner]); the log ([log]) records only result categories and item counts, never notification text or reasons.
  */
 internal class TriageRunner(
     private val inbox: NoticeInbox,
@@ -93,11 +93,11 @@ internal class TriageRunner(
     private val clock: () -> Long = System::currentTimeMillis,
     private val planner: TriagePlanner = TriagePlanner(),
     private val log: (String) -> Unit = {},
-    /** 每个 App 每天最多提醒几个不同的会话(跟着激进程度变)。 */
+    /** How many different conversations may be surfaced per app per day (varies with the aggressiveness level). */
     private val surfaceCap: () -> Int = { TriagePlanner.SURFACE_CAP_PER_APP },
-    /** 「应用访问」读不出来:停着,不发请求;待判定的照旧留着,读得出来了接着判。 */
+    /** "App access" cannot be read: it stays paused and sends no requests; items pending triage are kept and triaged once it can be read again. */
     private val suspended: () -> Boolean = { false },
-    /** 和归纳共用的请求位(一次只发一个后台请求);不给就是自己一个。 */
+    /** The request slot shared with summarization (only one background request at a time); if not supplied, it gets its own. */
     private val slot: RequestSlot = RequestSlot(),
 ) {
     private val mutable = MutableStateFlow(TriageState())
@@ -109,14 +109,14 @@ internal class TriageRunner(
     private var inFlight: Job? = null
 
     /**
-     * 连不上模型(网络不通、代理不通),或连上了却等到超时也没回应时,整个停一阵,不是只停这一批的那几条通知:这和通知的内容无关,
-     * 只按会话各自冷却的话,每来一个新会话都会再连一次(新会话不在冷却里),来得多的时候就是不停地重连、白耗请求次数。
-     * 连续连不上几次停得越久([TriagePlanner.failureHoldMs])。判成一批、用户点了重试、换了服务商或模型、重新开始看守,都清掉。
-     * 没连上的那一批照旧待判定,不算失败;超时的那一批算失败(可能是这一批本身的问题,不自动重发,用户可以手动再试)。
+     * When the model cannot be reached (no network, proxy not working), or is reached but never answers before the timeout, everything pauses for a while, not merely those few notifications of this batch: this has nothing to do with the notifications' content,
+     * and if only per-conversation cooldowns were used, every new conversation would connect again (new conversations are not in a cooldown), so a burst of them means reconnecting endlessly and wasting request count for nothing.
+     * The more consecutive failures to connect, the longer the pause ([TriagePlanner.failureHoldMs]). It is cleared when a batch is triaged, the user taps retry, the provider or model changes, or watching starts over.
+     * The batch that could not connect stays pending triage and does not count as a failure; the batch that timed out counts as a failure (it may be a problem with that batch itself, so it is not resent automatically and the user can try again manually).
      */
     private var unreachable = 0
     private var unreachableUntilMs = 0L
-    /** 停下时用的是哪一家的哪个模型:换了就不再停。按服务商 id 和模型名认(和同意一样),不看显示名、不比对象。 */
+    /** Which provider's model was in use when the pause started: if that changes, it no longer stays paused. Identified by provider id and model name (as with consent), not by display name and not by object comparison. */
     private var unreachableTarget: TriageConsent? = null
 
     private fun reachableAgain() {
@@ -125,27 +125,27 @@ internal class TriageRunner(
         unreachableTarget = null
     }
 
-    /** 测试看:计时(凑批或冷却到点)在不在。 */
+    /** For tests: whether the timer (for filling a batch or a cooldown elapsing) is active. */
     internal val timerActive: Boolean get() = timer?.isActive == true
     internal val requestActive: Boolean get() = inFlight?.isActive == true
 
     /**
-     * 看守期间一直跑;被取消(锁屏不取消它,关掉功能、完全退出才取消)时计时和请求随之取消,正在发的那批照旧待判定。
-     * [readLocked] 每次从系统读一次锁屏状态(发请求前也读一次,不只看 [locked] 的旧值)。
+     * Runs throughout the watching period; when it is cancelled (locking the device does not cancel it; turning the feature off or fully exiting does), the timer and request are cancelled with it, and the batch being sent stays pending triage.
+     * [readLocked] reads the lock state from the system every time (it is also read once before sending a request, instead of trusting only the stale [locked] value).
      */
     suspend fun watch(locked: StateFlow<Boolean>, readLocked: () -> Boolean) {
         var mine: CoroutineScope? = null
         try {
             coroutineScope {
                 mine = this
-                // 上一次看守留下的(它的收尾可能还没轮到)不算数:那一批照旧待判定
+                // Whatever the previous watching period left behind (its cleanup may not have run yet) does not count: that batch stays pending triage
                 timer?.cancel()
                 timer = null
                 inFlight?.cancel()
                 inFlight = null
                 slot.release(this@TriageRunner)
                 planner.abort()
-                // 重新开始看守(开关关了又开、回到前台):上一次因为连不上而停着的不接着停
+                // Watching starts over (the switch was turned off and back on, the app returned to the foreground): a pause left over from being unreachable does not continue
                 reachableAgain()
                 host = this
                 slot.listen(this@TriageRunner) { evaluate() }
@@ -156,7 +156,7 @@ internal class TriageRunner(
                 awaitCancellation()
             }
         } finally {
-            // 停了又马上重新开始看守时,新的那次可能已经接手:只收拾自己的
+            // When it stops and immediately starts watching again, the new run may already have taken over: clean up only its own state
             if (host === mine) {
                 host = null
                 timer = null
@@ -170,14 +170,14 @@ internal class TriageRunner(
         }
     }
 
-    /** 开关、同意、预算之类变了:重新看一遍。要在串行协程上调。 */
+    /** The switch, consent, budget or similar changed: take another look. Must be called on the serial coroutine. */
     fun poke() {
         if (host != null) evaluate() else publish(if (on()) TriageStatus.Paused else TriageStatus.Off)
     }
 
     /**
-     * 不再收的 App(「应用访问」里禁用了):正在发的是它的那一批就取消(照旧待判定;记录随后从收件箱里去掉,也就不再发),
-     * 再看一遍。要在串行协程上调,在收件箱去掉记录之后。
+     * An app that is no longer collected (disabled in "app access"): if the batch being sent is its own, cancel it (the batch stays pending triage; the records are then removed from the inbox and so will not be sent),
+     * then take another look. Must be called on the serial coroutine, after the records are removed from the inbox.
      */
     fun dropApps(keep: (String) -> Boolean) {
         val pkg = planner.inFlightApp ?: return
@@ -186,21 +186,21 @@ internal class TriageRunner(
         poke()
     }
 
-    /** 「判定失败的再试一次」:点一次只多试一次。要在串行协程上调。 */
+    /** "Try again after a failed triage": each tap grants just one more attempt. Must be called on the serial coroutine. */
     fun retryFailed() {
         planner.retryFailed(clock())
-        // 用户在等结果:连不上而停着的也不再停,马上再试
+        // The user is waiting for a result: a pause caused by being unreachable ends too, and it retries immediately
         reachableAgain()
         poke()
     }
 
-    /** 用户改了预算:不再认今天请求时被拒的那次,按账本重新算。 */
+    /** The user changed the budget: today's rejection at request time is no longer honoured, and it is recomputed from the ledger. */
     fun budgetChanged() {
         planner.clearBudgetLatch()
         poke()
     }
 
-    /** 主动能力关掉时:结果一并清掉(和收件箱同生同灭)。 */
+    /** When the proactive feature is turned off: results are cleared along with it (they live and die together with the inbox). */
     fun clear() {
         stopRequest()
         timer?.cancel()
@@ -210,8 +210,8 @@ internal class TriageRunner(
     }
 
     /**
-     * 看一遍现在该做什么。用到的外部东西(模型配置、用量账本)抛了异常也不能带垮看守(它和锁屏的看守在同一个作业里):
-     * 记下类别,当作这次什么都不做。
+     * Takes a look at what should be done now. Exceptions thrown by the external things it uses (model config, usage ledger) must not take the watcher down (it shares a job with the lock watcher):
+     * the category is logged and this pass is treated as doing nothing.
      */
     private fun evaluate() {
         try {
@@ -220,10 +220,10 @@ internal class TriageRunner(
             throw e
         } catch (e: Exception) {
             log("triage evaluate failed: ${e.javaClass.simpleName}")
-            // 已开了一批、请求却没发出去:算这批失败,免得一直卡在「正在发」
+            // A batch has been opened but the request never went out: count it as a failure for this batch, so it does not stay stuck in "sending"
             if (inFlight == null && planner.inFlightNow) planner.fail(clock())
-            // 已经在发的请求不动:读一下配置出错不说明它该停(停了它已经算过钱,回头还得再发一遍)。只是这一回不发新的。
-            // 但只在确实没锁屏时才留着:锁屏状态读不出来、或锁着,照旧停——锁屏不发是硬规矩
+            // Leave an already-sent request alone: a config read error does not mean it should stop (if stopped, it has already been charged and would have to be sent again). This pass simply sends nothing new.
+            // But keep it only when the device is definitely not locked: if the lock state cannot be read, or the device is locked, stop as usual — never sending while locked is a hard rule
             val unlocked = try { !readLocked() } catch (e: CancellationException) { throw e } catch (e: Exception) { false }
             if (inFlight != null && unlocked) publish(TriageStatus.Sending) else stopAndPublish(TriageStatus.Idle)
         }
@@ -243,7 +243,7 @@ internal class TriageRunner(
             TriageGate.NeedsConsent -> return stopAndPublish(TriageStatus.NeedsConsent)
             else -> {}
         }
-        // 连不上模型、正停着:到点再看(钟被往回拨了、剩下的比最长的一级还长的不算;换了服务商或模型的不再停)
+        // Unreachable and currently pausing: look again when it is due (ignore a clock that was wound back, or a remaining time longer than the longest tier; a changed provider or model no longer pauses)
         if (unreachable > 0 && unreachableTarget?.covers(hooks.target()) != true) reachableAgain()
         val offlineFor = unreachableUntilMs - now
         if (unreachable > 0 && offlineFor > 0 && offlineFor <= TriagePlanner.BACKOFF_MS.last()) {
@@ -255,7 +255,7 @@ internal class TriageRunner(
             return publish(TriageStatus.Unreachable)
         }
         when (val plan = planner.plan(unlocked = true, busy = hooks.busy.value, budgetLeft = budgetLeft(), nowMs = now)) {
-            // 归纳那边正在发:等它发完(它发完会叫这边再看一遍)
+            // Summarization is sending: wait for it to finish (it nudges this side to look again when done)
             is TriagePlan.Send -> if (slot.heldByOther(this)) publish(TriageStatus.Waiting) else send(scope, plan.packageName)
             is TriagePlan.WaitUntil -> {
                 timer = scope.launch {
@@ -278,9 +278,9 @@ internal class TriageRunner(
     private fun send(scope: CoroutineScope, packageName: String) {
         val items = planner.begin(packageName)
         if (items.isEmpty()) return publish(TriageStatus.Idle)
-        // 同意是对着这一家的这个模型给的:对着建模型用的那个目标再对一次,回来时再对一次
+        // Consent was given for this provider's model: check it again against the target the model was built from, and again when the reply comes back
         val consented = consent()
-        // 建模型(要解密 Key)出错算这一批失败,不留着待判定:否则每来一条都再出一次错
+        // An error while building the model (which requires decrypting the key) counts as a failure for this batch and does not stay pending: otherwise every new notification would fail again
         val built = try {
             hooks.model(ProactiveCall.Triage)
         } catch (e: Exception) {
@@ -292,7 +292,7 @@ internal class TriageRunner(
             planner.abort()
             return publish(TriageStatus.NoModel)
         }
-        // 门口查过之后配置可能变了:建模型用的不是同意过的那个,就不发(照旧待判定,等用户重新确认)
+        // The config may have changed after the gate check: if the model was not built from the consented target, do not send (it stays pending triage until the user confirms again)
         if (!consented.covers(built.target)) {
             planner.abort()
             log("triage not sent: target is not the consented one")
@@ -301,9 +301,9 @@ internal class TriageRunner(
         val model = built.model
         val lang = language()
         publish(TriageStatus.Sending)
-        // 先记下作业再开始跑:请求体里要拿它和 inFlight 比
+        // Record the job before starting it: the request body compares it against inFlight
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            // 这里抛出去会带垮整个看守(锁屏、归纳都在里面):读回复时出了意外也只算这批失败
+            // Something thrown here would take the whole watcher down (lock watching and summarization are inside it too): an unexpected error while reading the reply counts only as a failure for this batch
             val result = try {
                 NoticeTriage(model, lang).triage(items)
             } catch (e: CancellationException) {
@@ -312,11 +312,11 @@ internal class TriageRunner(
                 log("triage request failed: ${e.javaClass.simpleName}")
                 TriageResult.Failed()
             }
-            // 已经不是在发的那一个(被取消了,模型却还是回来了;新的一批可能已经在发):什么都不动
+            // No longer the request in flight (it was cancelled but the model still replied; a new batch may already be sending): change nothing
             if (inFlight !== coroutineContext.job) return@launch
             inFlight = null
             slot.release(this@TriageRunner)
-            // 用上结果时也一样:出了意外就当这批失败
+            // The same when applying the result: an unexpected error counts as a failure for this batch
             try {
                 val now = clock()
                 planner.sync(inbox.state.value, now)
@@ -331,9 +331,9 @@ internal class TriageRunner(
                         reachableAgain()
                     }
                     is TriageResult.Failed -> {
-                        // 没连上:和这一批的内容无关,这一批照旧待判定。别的失败记在这一批上
+                        // Could not connect: unrelated to this batch's content, so the batch stays pending triage. Other failures are charged to this batch
                         if (result.unreachable) planner.abort() else planner.fail(now)
-                        // 没连上、或等到超时也没回应:整个停一阵再试(见 unreachable)
+                        // Could not connect, or reached but never answered before the timeout: pause everything for a while and retry (see unreachable)
                         if (result.unreachable || result.unanswered) {
                             unreachable++
                             unreachableUntilMs = now + TriagePlanner.failureHoldMs(unreachable)
@@ -342,7 +342,7 @@ internal class TriageRunner(
                     }
                     TriageResult.BudgetExhausted -> planner.budgetExhausted(now)
                 }
-                // 失败的写明是哪一种(没连上 / 回复读不懂),只有这几个字,没有内容
+                // For failures, note which kind it was (unreachable / unreadable reply); just those words, no content
                 val why = (result as? TriageResult.Failed)
                     ?.let { if (it.unreachable) " unreachable" else if (it.unanswered) " unanswered" else if (it.unreadable) " unreadable" else "" }.orEmpty()
                 log("triage batch: ${result.javaClass.simpleName}$why, ${items.size} items")
@@ -352,7 +352,7 @@ internal class TriageRunner(
                 log("triage apply failed: ${e.javaClass.simpleName}")
                 if (planner.inFlightNow) planner.fail(clock())
             }
-            // 先看自己还有没有要发的(判定先),再叫等着的归纳
+            // First check whether this side still has anything to send (triage goes first), then wake the waiting summarization
             evaluate()
             slot.wakeOthers(this@TriageRunner)
         }
@@ -361,15 +361,15 @@ internal class TriageRunner(
         job.start()
     }
 
-    /** 判定那份([ProactiveBudget.TRIAGE_SHARE_PERCENT]%)还有没有;整份里余下的留给主动能力的其他用途。 */
+    /** Whether triage's own share ([ProactiveBudget.TRIAGE_SHARE_PERCENT]%) is left; the remainder of the whole allowance is reserved for other proactive uses. */
     private fun budgetLeft(): Boolean = triageExhausted() == null
 
     private fun triageExhausted(): ProactiveBudget.Limit? =
         ProactiveBudget.triageExhausted(hooks.tokensToday(), hooks.callsToday(), budgetLimit())
 
     /**
-     * 停下是因为哪一项:先看判定那份;那份还有、却是请求时被拒(当天记着,别的用途把整份用完了)的,看整份里哪项用完;
-     * 都看不出(账本还没跟上)按 Token 算。
+     * Which item caused the stop: triage's own share first; if that share is left but the request was rejected (remembered for the day because another use consumed the whole allowance), see which item of the whole allowance is used up;
+     * if neither can be determined (the ledger has not caught up), assume tokens.
      */
     private fun budgetStatus(): TriageStatus {
         val limit = triageExhausted()
@@ -378,7 +378,7 @@ internal class TriageRunner(
         return if (limit == ProactiveBudget.Limit.Calls) TriageStatus.CallsUsedUp else TriageStatus.TokensUsedUp
     }
 
-    /** 取消正在发的请求(锁屏、关掉、换了服务商):那一批照旧待判定。 */
+    /** Cancels the request in flight (lock, shutdown, provider change): that batch stays pending triage. */
     private fun stopRequest() {
         val job = inFlight ?: return
         inFlight = null

@@ -12,39 +12,39 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 
 /**
- * 这份存盘是更新的版本写的:现在的代码不认得它的写法。读的这一层原样留着它,不读进来、不改、不另存;换回新版本还读得出来。
- * (用户自己要删的照删:「清空全部」之类对读不出来的存盘是整份删,不分是为什么读不出来。)
+ * This store was written by a newer version: the current code does not understand its format. The reading layer keeps it as-is — it is not read in, not modified, and not saved over; switching back to the newer version can still read it.
+ * (Deletions the user asks for still happen: "clear all" and the like delete such unreadable stores in full, without distinguishing why they were unreadable.)
  */
 class NewerStoreVersion(val found: Int, val known: Int) : IOException("store written by a newer version: $found > $known")
 
 /**
- * 主动能力四份加密存盘(话题、联系人、通知原文、各级归纳)共用的读法:分清「文件确实坏了」和「这会儿读不了」。
+ * The shared read path for the four encrypted proactive stores (topics, contacts, notification text, summarization at each level): it tells "the file is genuinely corrupt" apart from "it cannot be read right now".
  *
- * 只有拿得出证据的才算坏:认证没过(密文被改过,或密钥换了、再也解不开)、短得不成一份密文。
- * 别的出错一律算这会儿读不了,照常抛出、文件不动:
- * - 密钥库忙、取钥时 IO 出错、没解锁……这些都不说明密文坏了;
- * - 解开了却读不懂的也不算坏:认证过了,说明这就是 Claire 自己写的那份,读不懂多半是别的版本写的
- *   (新版本加的枚举值、换过的写法),换回能读它的版本还读得出来,删了就没了。
- * 反过来(只认几种异常是「读不了」,其余都当坏文件删掉或另存)的话,一次取钥时的 IO 错就能删掉留两年的月归纳。
+ * Only cases with evidence count as corrupt: failed authentication (the ciphertext was modified, or the key changed and it can never be decrypted again), or too short to be a ciphertext.
+ * Any other error counts as "cannot be read right now": it is thrown as usual and the file is left untouched:
+ * - the keystore being busy, an IO error while fetching the key, the device not being unlocked ... none of these mean the ciphertext is corrupt;
+ * - decrypting fine but failing to parse does not count as corrupt either: authentication passed, so this is the copy Claire itself wrote; failing to parse most likely means it was written by another version
+ *   (enum values a newer version added, a changed format), and switching back to a version that can read it will still read it, whereas deleting it loses it for good.
+ * The other way round (treating only a few exception types as "unreadable" and everything else as a corrupt file to delete or re-save), a single IO error while fetching the key would delete monthly summaries kept for two years.
  *
- * 版本号:每份存盘最外层写着 `version`([write] 总是写,不靠数据类的默认值——默认值序列化时会被省掉)。
- * 读的时候先看它,再往数据类里读:比现在认得的新就抛 [NewerStoreVersion]。不先看的话,新版本的文件多半照样读得进来
- * (不认识的字段被忽略),下一次存盘就按旧写法重写一遍,新版本加的东西就没了。没写版本号的按 1 算。
+ * Version number: every store carries `version` at its outermost level ([write] always writes it and does not rely on the data class's default value — default values are omitted during serialization).
+ * When reading, look at it first, then decode into the data class: if it is newer than what this code knows, throw [NewerStoreVersion]. Without looking first, a file from a newer version would mostly still decode
+ * (unknown fields are ignored), and the next save would rewrite it in the old format, losing whatever the newer version added. A missing version number counts as 1.
  */
 internal object StoreCodec {
     val json = Json { ignoreUnknownKeys = true }
 
     private const val VERSION = "version"
 
-    /** 存盘用的明文:[data] 的内容,最外层带上 [version]。 */
+    /** The plaintext used for storage: the contents of [data] with [version] at the outermost level. */
     fun <T> write(serializer: SerializationStrategy<T>, data: T, version: Int): ByteArray {
         val body = json.encodeToJsonElement(serializer, data) as JsonObject
         return JsonObject(mapOf(VERSION to JsonPrimitive(version)) + (body - VERSION)).toString().toByteArray(Charsets.UTF_8)
     }
 
     /**
-     * 读出来;文件确实坏了为 null(调用方删掉或另存)。这会儿读不了的照常抛出;
-     * 版本比 [known] 新的抛 [NewerStoreVersion]。
+     * Reads it back; null if the file is genuinely corrupt (the caller deletes or re-saves it). Cases that cannot be read right now are thrown as usual;
+     * a version newer than [known] throws [NewerStoreVersion].
      */
     fun <T> read(bytes: ByteArray, cipher: KeyCipher, serializer: DeserializationStrategy<T>, known: Int): T? {
         val plain = try {
@@ -52,10 +52,10 @@ internal object StoreCodec {
         } catch (e: AEADBadTagException) {
             return null
         } catch (e: IllegalArgumentException) {
-            // 短得放不下 IV 和认证标签
+            // too short to hold the IV and the authentication tag
             return null
         }
-        // 读不懂的照常抛出(SerializationException),文件不动
+        // unparseable input is thrown as usual (SerializationException); the file is left untouched
         val root = json.parseToJsonElement(plain.toString(Charsets.UTF_8)) as? JsonObject ?: throw SerializationException("store is not an object")
         val version = when (val v = root[VERSION]) {
             null -> 1

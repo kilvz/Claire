@@ -71,7 +71,7 @@ import kotlinx.coroutines.withContext
 import com.wangzan101.mika.chat.ui.isActive
 import com.wangzan101.mika.ui.openInBrowser
 
-/** 兼容性自检页的文字(纯函数,便于测试):每项的名字、状态、下面那一句大白话。 */
+/** Text of the compatibility self-check page (pure functions, so they are easy to test): each item's name, its status, and the plain-language sentence below it. */
 object SelfCheckCopy {
     fun name(c: SelfCheck): String = tr(
         when (c) {
@@ -101,7 +101,7 @@ object SelfCheckCopy {
         },
     )
 
-    /** 一项下面的那一句:没通过时说原因和下一步,因为前一项没过而跳过时说缺哪一项。 */
+    /** The sentence below an item: when it did not pass, the reason and the next step; when it was skipped because a previous item did not pass, which item is missing. */
     fun line(r: CheckResult): String {
         r.blockedBy?.let { return tr(R.string.selfcheck_line_needs, name(it)) }
         r.advice?.let { return advice(it) }
@@ -149,9 +149,9 @@ object SelfCheckCopy {
 }
 
 /**
- * 设置 › 恢复与修复 › 兼容性自检:接上真实的自检。离开这一页就取消,取消时虚拟屏、自检页、网页标签当场放掉。
- * 有任务在跑时不让开始(两边会抢同一块主屏的注意)。[status] 是此刻的系统状态。
- * 另有一段手动的熄屏自检:主屏熄屏且锁定后验证任务用的那一套还灵不灵;开始之前先在页面上说明步骤。
+ * Settings › Recovery and repair › Compatibility self-check: hooked up to the real self-check. Leaving this page cancels it, and cancelling releases the virtual display, the self-check page and the web tabs on the spot.
+ * It cannot be started while a task is running (the two would compete for attention on the same main screen). [status] is the system status at this moment.
+ * There is also a manual screen-off self-check: after the main screen is off and locked it verifies whether the stack the tasks use still works; the steps are explained on the page before it starts.
  */
 @Composable
 fun SelfCheckScreen(status: SystemStatus, onBack: () -> Unit) {
@@ -174,7 +174,7 @@ fun SelfCheckScreen(status: SystemStatus, onBack: () -> Unit) {
         onStart = {
             val r = SelfCheckRunner(AndroidSelfCheck(context) { current.value })
             runner = r
-            // 读屏、调助手都是阻塞调用:不放在主线程上跑
+            // Reading the screen and calling the assistant are blocking calls: do not run them on the main thread
             job = scope.launch(Dispatchers.Default) { r.run() }
         },
         onCancel = { job?.cancel() },
@@ -236,7 +236,7 @@ private fun copyReport(context: Context, text: String, toast: String) {
     Toast.makeText(context, toast, Toast.LENGTH_LONG).show()
 }
 
-/** 不带状态的自检页,便于测试:顶上一段说明和开始 / 取消,下面每项一行;跑完后给出报告全文和复制、去 GitHub 两个按钮。 */
+/** The self-check page without state, for easier testing: an intro and start / cancel at the top, one row per item below; when finished it gives the full report plus two buttons for copying and for going to GitHub. */
 @Composable
 fun SelfCheckContent(
     state: SelfCheckState,

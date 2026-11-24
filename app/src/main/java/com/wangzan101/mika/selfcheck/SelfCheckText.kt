@@ -3,16 +3,16 @@ package com.wangzan101.mika.selfcheck
 import java.util.Locale
 
 /**
- * 自检认自检页上的文字时用的比法。读屏给的文字不一定和页面上写的一字不差:按钮默认会被系统主题显示成全大写,
- * 读屏读到的就是大写;空白也可能多一个、少一个,或者换成不断行空格。所以先把两边都规整一遍再比:
- * 前后空白去掉、中间的空白并成一个普通空格、大小写不分。
+ * The comparison used when the self-check recognises text on the self-check page. The text screen reading supplies is not necessarily character-for-character what the page shows: by default a button is rendered all in capitals by the system theme,
+ * so screen reading reports it in capitals; whitespace may also be off by one, or replaced with non-breaking spaces. So both sides are normalised before comparing:
+ * leading and trailing whitespace is trimmed, inner whitespace is collapsed into a single ordinary space, and case is ignored.
  */
 internal object SelfCheckText {
     private val SPACES = Regex("[\\s\\p{Z}]+")
 
     /**
-     * 把任意十进制数字变体统一成 ASCII 数字:阿拉伯-印度数字(٠-٩)、扩展阿拉伯-印度数字(۰-۹)、全角数字等。
-     * 读屏给的文字在阿拉伯语等语言里会把数字按本地写法报回来,而页面模板和别处代码按 ASCII 数字算,不统一就认不上。
+     * Normalises any decimal digit variant into ASCII digits: Arabic-Indic digits (٠-٩), extended Arabic-Indic digits (۰-۹), full-width digits and so on.
+     * In languages such as Arabic the text supplied by screen reading reports digits in the local form, while the page templates and other code assume ASCII digits, so without normalising they cannot be recognised.
      */
     fun digitsToAscii(s: String): String = buildString(s.length) {
         for (c in s) {
@@ -28,8 +28,8 @@ internal object SelfCheckText {
     fun contains(text: String, part: String): Boolean = normalize(text).contains(normalize(part))
 
     /**
-     * 带一个数字的文字(「点了 %d 次」「计时 %d」「第 %d 行」)。[template] 是把数字换成 [sentinel] 后的整句;
-     * 认的时候数字前后两段照上面的比法比,中间只能是数字。
+     * Text containing a number ("tapped %d times", "timer %d", "row %d"). [template] is the whole sentence with the number replaced by [sentinel];
+     * when matching, the two segments before and after the number are compared as described above, and only digits may appear in between.
      */
     class Numbered(template: String, sentinel: String) {
         private val parts = normalize(template).split(normalize(sentinel))

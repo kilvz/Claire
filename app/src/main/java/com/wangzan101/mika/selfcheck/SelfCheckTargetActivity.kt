@@ -24,13 +24,13 @@ import com.wangzan101.mika.cap.phone.shell.SystemIntents
 import java.lang.ref.WeakReference
 
 /**
- * 兼容性自检在 Claire 虚拟屏上操作的那一页:一个计数按钮、一个输入框、一列能滚动的行、一行一直在跳的数字和一条来回变色的横条
- * (画面一直在变,好看出虚拟屏会不会过几秒就不动了)。页面上写明这是 Claire 自己的测试页。
+ * The page the compatibility self-check operates on Claire's virtual display: a counter button, a text field, a column of scrollable rows, a line of numbers that keeps ticking, and a bar that alternates colours
+ * (so the frames keep changing, making it visible whether the virtual display freezes after a few seconds). The page states that this is Claire's own test page.
  *
- * 清单里导出,但要求调用方持有 INTERACT_ACROSS_USERS_FULL(shell 和系统有,普通 App 拿不到),没有 intent-filter:
- * 只由内置助手以 shell 身份按组件名打开到 Claire 的屏上(见 [intent])。
- * 万一开到了主屏(屏号是 0),马上关掉,不打扰用户。控件用普通的 View 和资源 id;
- * 文字按 App 语言取([tr]),自检那边按同样的文字认控件(读屏时有字的控件不带资源 id)。
+ * It is exported in the manifest, but callers must hold INTERACT_ACROSS_USERS_FULL (shell and the system have it, ordinary apps cannot), and it has no intent-filter:
+ * it is only opened by the built-in assistant, running as shell, by component name onto Claire's display (see [intent]).
+ * If it ever opens on the main screen (display id 0), it closes itself at once so the user is not disturbed. The elements are plain Views with resource ids;
+ * text is taken in the app language ([tr]), and the self-check recognises elements by that same text (elements with text carry no resource id when read).
  */
 class SelfCheckTargetActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
@@ -63,13 +63,13 @@ class SelfCheckTargetActivity : Activity() {
         setContentView(content())
     }
 
-    // 再打开一次时从头来:计数清零、输入框清空、滚回顶上
+    // When opened again, start from scratch: the counter resets to zero, the text field is cleared, and the list scrolls back to the top
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setContentView(content())
     }
 
-    // 看得见就一直跳(虚拟屏上的页面不一定拿到焦点,不按 onResume 算)
+    // Keep ticking while it is visible (a page on the virtual display does not necessarily get focus, so this is not tied to onResume)
     override fun onStart() {
         super.onStart()
         main.removeCallbacks(ticker)
@@ -109,7 +109,7 @@ class SelfCheckTargetActivity : Activity() {
         column.addView(Button(this).apply {
             id = R.id.selfcheck_button
             text = tr(R.string.selfcheck_target_button)
-            // 按钮默认按主题显示成全大写,读屏读到的也就变了样:照写的样子显示
+            // By default the theme renders the button all in capitals, which also changes what screen reading reports: display it as written
             isAllCaps = false
             setOnClickListener {
                 taps++
@@ -143,12 +143,12 @@ class SelfCheckTargetActivity : Activity() {
 
         @Volatile private var current: WeakReference<SelfCheckTargetActivity>? = null
 
-        /** 打开这一页用的 intent:指明组件,单独一个任务,不进最近任务。 */
+        /** The intent used to open this page: it names the component and runs as a task of its own that does not appear in recents. */
         fun intent(context: Context): Intent = Intent()
             .setClassName(context.packageName, SystemIntents.OWN_PAGE_CLASS)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        /** 自检结束或取消:还开着就关掉。主线程调。 */
+        /** The self-check finished or was cancelled: close it if it is still open. Called on the main thread. */
         fun finishOpen() {
             current?.get()?.finish()
             current = null

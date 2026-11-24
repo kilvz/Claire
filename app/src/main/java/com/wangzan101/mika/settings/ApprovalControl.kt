@@ -4,11 +4,11 @@ import com.wangzan101.mika.core.action.ApprovalSettings
 import com.wangzan101.mika.core.safety.gate.ConfirmationGate
 
 /**
- * 一个任务自己的审批设置:自主与否是开工时取全局的,之后跟着开发者选项里的「自主模式」变([set])。
- * 询问时只有付款先问;自主时连付款也不问。
+ * A task's own approval settings: whether it is autonomous is taken from the global setting when it starts, and afterwards follows the developer options' "autonomous mode" ([set]).
+ * In ask mode only payments are asked about first; in autonomous mode even payments are not asked about.
  */
 class RunApproval(startAutonomous: Boolean) : ApprovalSettings {
-    /** 开工时就是自主:这个任务没有确认关卡,也不给 request_confirmation;中途关掉自主留给下一个任务。 */
+    /** It was autonomous when it started: this task has no confirmation gate and is not offered request_confirmation; turning autonomy off midway is left to the next task. */
     val startedAutonomous: Boolean = startAutonomous
     @Volatile private var auto = startAutonomous
 
@@ -18,21 +18,21 @@ class RunApproval(startAutonomous: Boolean) : ApprovalSettings {
         auto = autonomous
     }
 
-    /** 这个任务(和它的子任务)用的付款确认关卡:开工时是询问才有,每次一份新的。 */
+    /** The payment confirmation gate used by this task (and its subtasks): it exists only if the task was in ask mode when it started, and each is a new instance. */
     fun gate(): ConfirmationGate? = if (startedAutonomous) null else ConfirmationGate()
 }
 
 /**
- * 询问 / 自主是一个全局开关,存在 [ApprovalStore.autonomous],默认询问。每个任务开工时拿一份自己的([start]);
- * 换开关([setAutonomous]):存下来管之后的任务,正在跑的任务也跟着换(从询问换成自主,下一步起付款也不再问)。
+ * Ask / autonomous is a single global switch, stored in [ApprovalStore.autonomous], defaulting to ask. Each task takes its own copy when it starts ([start]);
+ * flipping the switch ([setAutonomous]) stores it for later tasks, and running tasks switch with it (going from ask to autonomous, payments stop being asked about from the next step on).
  */
 class ApprovalControl(private val store: ApprovalStore) {
     private val runs = mutableSetOf<RunApproval>()
 
     /**
-     * [alwaysAsk] 为 true 的任务不管开关,一律按询问开工、也不跟着开关变。两种:
-     * - 电脑经 MCP 交来的任务:付款这一步在这类任务里永远不做(审批判定对非手机发起的一律拒绝),远端没有办法让它放行。
-     * - 对话里有通知提醒的任务(见 [com.wangzan101.mika.core.agent.NoticeTurn]):对话里带着别人写的字,付款照样先问用户。
+     * Tasks with [alwaysAsk] true ignore the switch: they always start in ask mode and do not follow the switch either. There are two kinds:
+     * - Tasks submitted by a computer over MCP: the payment step is never performed in such tasks (the approval decision always rejects anything not initiated on the phone), and the remote side has no way to get it allowed.
+     * - Tasks whose conversation contains notification alerts (see [com.wangzan101.mika.core.agent.NoticeTurn]): the conversation carries text written by someone else, so payments still ask the user first.
      */
     @Synchronized fun start(alwaysAsk: Boolean = false): RunApproval =
         if (alwaysAsk) RunApproval(false) else RunApproval(store.autonomous.value).also { runs += it }

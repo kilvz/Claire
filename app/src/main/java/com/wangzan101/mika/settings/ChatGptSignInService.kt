@@ -22,9 +22,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 用 ChatGPT 登录期间的前台服务:Claire 退到后台、用户在浏览器里登录时撑住进程,系统不冻结它,
- * 本机回调才有人接、换令牌不被耽误。只挂一条安静的通知,上面能「取消」这次登录。
- * 不自己做事:登录跑在 [ChatGptSignIns] 里,这里看着它的 running,登录一结束(成功、失败、取消、超时)就停。
+ * The foreground service used while signing in with ChatGPT: it holds the process up while Claire is in the background and the user signs in in the browser, so the system does not freeze it,
+ * the local callback has someone to receive it, and the token exchange is not delayed. It only posts one quiet notification, which can "cancel" this sign-in.
+ * It does no work itself: the sign-in runs in [ChatGptSignIns], and this service watches its running flag and stops as soon as the sign-in ends (success, failure, cancellation or timeout).
  */
 class ChatGptSignInService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -35,7 +35,7 @@ class ChatGptSignInService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         TaskService.ensureChannels(this)
-        // startForegroundService 之后必须尽快进前台,哪怕马上就要停;进不了前台就此停下,登录照常(只是少了这层保护)
+        // After startForegroundService it must enter the foreground as soon as possible, even if it is about to stop; if it cannot enter the foreground, stop right here: the sign-in goes on as usual (just without this protection)
         val foreground = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -55,7 +55,7 @@ class ChatGptSignInService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
-        // 进程没了登录也就没了,不用重建
+        // If the process is gone, the sign-in is gone too, so there is no need to recreate it
         return START_NOT_STICKY
     }
 
@@ -81,10 +81,10 @@ class ChatGptSignInService : Service() {
     companion object {
         private const val TAG = "MikaChatGpt"
         private const val ACTION_CANCEL = "com.wangzan101.mika.chatgpt.CANCEL_SIGN_IN"
-        /** 和任务、电脑连接的通知错开。 */
+        /** Offset from the notifications used by tasks and by the computer connection. */
         private const val NOTIFICATION_ID = 30_002
 
-        /** 登录开始时调(用户刚点了登录,Claire 在前台,可以开前台服务);开不了抛出,由调用方记下。 */
+        /** Called when a sign-in starts (the user has just tapped sign-in, Claire is in the foreground, so a foreground service may be started); if it cannot start it throws, and the caller records that. */
         fun start(context: Context) {
             if (FeatureFlags.get(context).quitRequested()) return
             context.startForegroundService(Intent(context, ChatGptSignInService::class.java))
