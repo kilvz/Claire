@@ -60,7 +60,7 @@ class RunLearningMemoryTest {
         assertTrue(model.requests.isEmpty())
     }
 
-    // 对话里有通知提醒(别人写的字):用户在这里说的话不自动提取成记忆;任务里明说要记的(memory_save 写下的)照常
+    // The conversation contains notification notices (text written by others): what the user says here is not automatically extracted into memory; things explicitly requested to be remembered in the task (written via memory_save) still are
     @Test fun conversationWithNoticesIsNotMinedForMemory() {
         val store = memoryStore()
         val saved = store.add(MemoryKind.fact, "用户住在张江", emptyList(), MemorySource("user_said", "我住在张江", atMs = 1)).getOrThrow()
@@ -73,7 +73,7 @@ class RunLearningMemoryTest {
         assertEquals(listOf("记住了:用户住在张江"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
     }
 
-    // 这次任务用工具读过通知:和读过网页一样,不自动从用户这次说的话里提取记忆
+    // This run read notifications with a tool: as with reading web pages, memory is not automatically extracted from what the user said this time
     @Test fun aRunThatReadNotificationsIsNotMinedForMemory() {
         val model = TextModel(extractJson)
         val read = com.wangzan101.mika.core.run.record.RunEvent.Activity(0, 1, "observe", com.wangzan101.mika.core.general.NOTICES_READ)
@@ -82,7 +82,7 @@ class RunLearningMemoryTest {
                 .learn(aftermath(listOf("好,就按他说的,以后都不要香菜")).copy(events = { listOf(read) }))
         }
         assertTrue(model.requests.isEmpty())
-        // 别的只读工具不受影响
+        // Other read-only tools are unaffected
         val other = com.wangzan101.mika.core.run.record.RunEvent.Activity(0, 1, "observe", "history_read")
         runBlocking {
             RunLearning(MemorySwitches(), memoryStore(), MapSkills(), catalog, MemoryExtractor(model), null, { "d" })
@@ -91,8 +91,8 @@ class RunLearningMemoryTest {
         assertEquals(1, model.requests.size)
     }
 
-    // 这次任务开工时就带着从通知里得来的那一段:用户这次说的话多半是在回应里面别人写的事,不自动提取记忆。
-    // 从真的跑一遍任务开始:AgentLoop 带着那一段跑完,运行记录里有那一笔,任务结束后的学习据此不提取
+    // This run started out carrying the excerpt derived from notifications: what the user says this time is most likely responding to things others wrote in it, so memory is not automatically extracted.
+    // Start from actually running a task once: AgentLoop runs through with that excerpt, the run record contains that entry, and the post-run learning skips extraction based on it
     @Test fun aRunGivenNotificationContextIsNotMinedForMemory() = runBlocking {
         fun run(observed: String?): Int {
             val store = memoryStore()
@@ -115,7 +115,7 @@ class RunLearningMemoryTest {
             assertTrue(end is TaskState.Succeeded)
             assertEquals(observed != null, agent.carriedObserved)
             val extraction = TextModel(extractJson)
-            // 对话里没有通知提醒(noticeTainted 为假):只靠运行记录里的那一笔
+            // The conversation has no notification notices (noticeTainted is false): only the entry in the run record applies
             val aftermath = RunAftermath("conv", "run", goal, end, utterances.all, emptyList(), emptyList(),
                 dispatcher.definitions().map { it.name }.toSet(), dispatcher.index, events = { events })
             runBlocking { RunLearning(MemorySwitches(), store, MapSkills(), catalog, MemoryExtractor(extraction), null, { "id" }).learn(aftermath) }
@@ -123,7 +123,7 @@ class RunLearningMemoryTest {
         }
         val observed = com.wangzan101.mika.core.proactive.ObservedContext.render(listOf("群里的人点餐时说以后都不要香菜"), emptyList(), emptyList(), emptyList())!!
         assertEquals(0, run(observed))
-        // 没带那一段的同一个任务照常提取
+        // The same task without that excerpt still extracts as usual
         assertEquals(1, run(null))
     }
 }

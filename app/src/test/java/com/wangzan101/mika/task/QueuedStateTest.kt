@@ -17,7 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
-/** 排在开始队列里、还没开始的任务:各处都写排队中,不写已暂停,也不给「继续」(点了也开始不了)。 */
+/** A task queued for start that has not begun yet: every surface says queued, not paused, and offers no "Continue" (tapping it would not start the task either). */
 class QueuedStateTest {
     @get:Rule val texts = ChineseTexts()
 
@@ -37,7 +37,7 @@ class QueuedStateTest {
         assertEquals("排队中" to ChatCopy.Tone.Accent, ChatCopy.subtitle(ex, null))
     }
 
-    // 不能点继续的等待(比如等你在屏幕上选一下)在对话里也不给继续
+    // Waits that cannot be continued (such as waiting for you to pick something on screen) also do not offer Continue in the chat
     @Test fun chatCardOffersContinueOnlyWhenResumable() {
         val ex = Exchange("x", emptyList(), ExchangeStatus.Working, live = true)
         assertEquals(ExchangeStatus.Paused("挪走了", true), ChatViewModel.reduce(ex, TaskState.Held(TaskGate.paused("挪走了"))).status)

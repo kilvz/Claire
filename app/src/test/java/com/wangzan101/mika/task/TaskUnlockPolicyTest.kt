@@ -51,7 +51,7 @@ class TaskUnlockPolicyTest {
         assertTrue(requireNotNull(nextTask).invoke())
     }
 
-    /** Ui 任务跟着本机开关走:判定 lambda 每次调用都重查,不缓存开跑那一刻的值。 */
+    /** Ui tasks follow the local switch: the decision lambda re-checks on every call and does not cache the value from when the run started. */
     @Test fun uiTasksFollowTheLocalUnlockSwitchInRealTime() {
         var on = true
         var checks = 0
@@ -69,7 +69,7 @@ class TaskUnlockPolicyTest {
         assertEquals(4, checks)
     }
 
-    /** Mcp 来源在任何开关组合下都拿不到解锁授权。 */
+    /** Mcp-origin tasks never get unlock authorization under any switch combination. */
     @Test fun mcpTasksStayUnauthorizedWhateverTheLocalSwitchSays() {
         for (on in listOf(false, true)) {
             assertNull(taskUnlockAuthorization(RunOrigin.Mcp, null, localUnlockEnabled = { on }) {

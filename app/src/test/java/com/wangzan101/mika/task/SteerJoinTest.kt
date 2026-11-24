@@ -9,7 +9,7 @@ class SteerJoinTest {
         SteerNote("m2", "顺便看看后天", SteerState.Received),
     )
 
-    // 一批两句插话一起交给模型:打断的那段字只挂在第一句上,第二句没有
+    // A batch of two steers handed to the model together: the interrupted text is attached only to the first one, not to the second
     @Test fun interruptedReplyGoesToTheFirstSteerOfTheBatch() {
         val join = SteerJoin()
         join.interrupted("今天晴")
@@ -18,14 +18,14 @@ class SteerJoinTest {
         assertEquals(listOf("今天晴", null), after.map { it.interrupted })
     }
 
-    // 没有打断什么时只改去向
+    // When nothing was interrupted, only the destination is changed
     @Test fun steerWithoutInterruptionOnlyChangesState() {
         val after = SteerJoin().joined(notes, "m2")
         assertEquals(listOf(SteerState.Received, SteerState.Joined), after.map { it.state })
         assertEquals(listOf(null, null), after.map { it.interrupted })
     }
 
-    // 用过即清:下一批插话不会再挂上上一次的那段字
+    // Cleared once used: the next batch of steers does not carry the previous text again
     @Test fun interruptedReplyIsUsedOnce() {
         val join = SteerJoin()
         join.interrupted("今天晴")
@@ -34,7 +34,7 @@ class SteerJoinTest {
         assertEquals(listOf("今天晴", null, null), second.map { it.interrupted })
     }
 
-    // 插话之前已经说完的回复同样挂到这一批的第一句上,和被打断的分开记
+    // A reply that finished before the steer is likewise attached to the first steer of this batch, recorded separately from the interrupted one
     @Test fun finishedReplyGoesToTheFirstSteerAndIsUsedOnce() {
         val join = SteerJoin()
         join.finished("光合作用是……的过程。")
@@ -57,7 +57,7 @@ class SteerJoinTest {
             remoteSteers(joined, finished = true))
     }
 
-    // 远程插话本来撤不回;万一是撤回状态也只报没用上,不多出一种对外状态;手机上撤回的不报给电脑
+    // Remote steers cannot actually be withdrawn; should one be in the withdrawn state, it is still only reported as not applied, with no extra outward-facing state; withdrawals made on the phone are not reported to the desktop
     @Test fun withdrawnMapsToNotAppliedAndLocalWithdrawalsStayHidden() {
         val remote = SteerNote("remote", "only today", SteerState.Withdrawn, remote = true)
         val local = SteerNote("local", "phone-only text", SteerState.Withdrawn)

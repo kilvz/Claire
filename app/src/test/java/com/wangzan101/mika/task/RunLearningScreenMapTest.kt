@@ -14,7 +14,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 内存里的屏图仓库,可配置 save 抛错。 */
+/** In-memory screen-map store whose save can be configured to throw. */
 private class MemStore(private val graphs: MutableMap<String, ScreenGraph> = mutableMapOf()) : ScreenMapStore {
     var failSave = false
     override fun load(app: String) = graphs[app]
@@ -48,7 +48,7 @@ class RunLearningScreenMapTest {
         learn(store, listOf(tapEvent(listOf("首页"), listOf("设置"))))
         val g = store.load("p.a")!!
         assertEquals(2, g.nodes.size)
-        // 认得出两屏各带骨架锚点
+        // Both screens are recognized, each with its own skeleton anchor
         assertNotNull(g.nodes.values.firstOrNull { it.anchors.containsKey("首页") })
         assertNotNull(g.nodes.values.firstOrNull { it.anchors.containsKey("设置") })
     }
@@ -61,7 +61,7 @@ class RunLearningScreenMapTest {
 
     @Test fun writeFailureDoesNotThrow() {
         val store = MemStore().apply { failSave = true }
-        // 不抛、结局照旧(learn 返回 notes)
+        // Does not throw; the outcome is unchanged (learn returns notes)
         val notes = learn(store, listOf(tapEvent(listOf("首页"), listOf("设置"))))
         assertEquals("run-1", notes.runId)
     }

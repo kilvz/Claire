@@ -32,8 +32,8 @@ class SedimentationWiringTest {
         "## 入口\n用 `phone_launch_app` 打开。\n## 步骤\n1. 点搜索\n## 容易出错的地方\n同名群聊。\n## 怎样算办成(核实证据)\n消息出现在聊天里。\n## 什么时候停下交给用户\n要登录时。"
 
     /**
-     * 一次发微信的运行:在微信([app])里做 6 个动作。动作从时刻 100 起,[extra] 里的事件按自己写的时刻算先后
-     * (技能读在 41 这样的时刻,就是先读了技能再动手)。
+     * A run that sends a WeChat message: performs 6 actions in WeChat ([app]). Actions start at time 100; events in [extra] are ordered by the times they carry
+     * (a skill read at a time like 41 means the skill was read before acting).
      */
     private fun events(verdict: String = "pass", extra: List<RunEvent> = emptyList(), app: String = "com.tencent.mm"): List<RunEvent> {
         var t = 99L
@@ -64,7 +64,7 @@ class SedimentationWiringTest {
         runBlocking { learning(off, learn = false, model = offModel).learn(after(events())) }
         assertTrue(off.drafts.isEmpty() && offModel.requests.isEmpty())
 
-        // 学习看结局不看核查:没跑核查、判下来办成的照样起草;核查跑过却没通过的不起草
+        // Learning looks at the outcome, not the verification: no verification run but judged done still drafts; verification that ran without passing does not draft
         val unreviewed = MapSkills()
         runBlocking { learning(unreviewed, learn = true).learn(after(events(), end = TaskState.Succeeded("ok", verified = false, reviewed = false))) }
         assertEquals(listOf("draft-1"), unreviewed.drafts.keys.toList())
@@ -72,7 +72,7 @@ class SedimentationWiringTest {
         runBlocking { learning(doubtful, learn = true).learn(after(events(), end = TaskState.Succeeded("ok", verified = false, note = "x"))) }
         assertTrue(doubtful.drafts.isEmpty())
 
-        // 回答核实过,但判下来只办了一部分、没办成或没判成:不起草
+        // The answer was verified, but the outcome is partial, not possible, or unknown: no draft
         for (o in listOf(RunOutcome.Partial, RunOutcome.NotPossible, RunOutcome.Unknown)) {
             val notDone = MapSkills()
             val model = TextModel(draftMd)
@@ -80,7 +80,7 @@ class SedimentationWiringTest {
             assertTrue(o.wire, notDone.drafts.isEmpty() && model.requests.isEmpty())
         }
 
-        // 走的是回放路线:不再起草
+        // This took the replay route: no further drafting
         val replayed = MapSkills()
         runBlocking { learning(replayed, learn = true).learn(after(events(extra = listOf(RunEvent.Replay(50, "r", 1, 3, true, ""))))) }
         assertTrue(replayed.drafts.isEmpty())
@@ -92,7 +92,7 @@ class SedimentationWiringTest {
         assertEquals("draft-1", notes.skillNotes.single().draftId)
     }
 
-    // 模型说这次是对一份待确认草稿的更新:写回那份草稿的编号,不另起一份
+    // The model says this run updates an existing pending draft: write back under that draft's id instead of starting a new one
     @Test fun draftUpdatingPendingDraftReplacesIt() {
         val skills = MapSkills()
         skills.putPending("draft-0", PersonalSkill("send-wechat-message", draftMd, SkillStatus.pending, "r0", null, 0, emptyList()))
@@ -129,33 +129,33 @@ class SedimentationWiringTest {
         assertEquals(SkillStatus.suspended, skills.get("wechat-msg")!!.status)
         assertEquals(listOf("verifier_rejected"), skills.get("wechat-msg")!!.outcomes)
         assertEquals("wechat-msg", notes.skillNotes.single().suspended)
-        // 照着个人技能做成的:只记结果,不起草
+        // Done by following a personal skill: record the result only, do not draft
         val ok = MapSkills(skill)
         runBlocking { learning(ok, learn = true).learn(after(events(extra = used))) }
         assertEquals(listOf("verified"), ok.get("wechat-msg")!!.outcomes)
         assertTrue(ok.drafts.isEmpty())
-        // 没跑核查、判下来办成:也算照着做成了
+        // No verification ran but the outcome is done: this also counts as done by following the skill
         val unreviewed = MapSkills(skill)
         runBlocking { learning(unreviewed, learn = true).learn(after(events(extra = used), TaskState.Succeeded("ok", verified = false, reviewed = false))) }
         assertEquals(listOf("verified"), unreviewed.get("wechat-msg")!!.outcomes)
-        // 回答如实说只办了一部分:照着技能做没办成,记 failed
+        // The answer honestly says only part of it was done: following the skill did not succeed, so record failed
         val partial = MapSkills(skill)
         runBlocking { learning(partial, learn = true).learn(after(events(extra = used), outcome = RunOutcome.Partial)) }
         assertEquals(listOf("failed"), partial.get("wechat-msg")!!.outcomes)
-        // 取消的不记
+        // Cancelled runs are not recorded
         val cancelled = MapSkills(skill)
         runBlocking { learning(cancelled, learn = false).learn(after(events(extra = used), TaskState.Cancelled)) }
         assertNull(cancelled.get("wechat-msg")!!.outcomes.firstOrNull())
     }
 
-    // 一次读了两份个人技能、这次没办成:分不清照着哪份做的,两份都不记、都不停用(#569)
+    // Two personal skills were read in one run and the run did not succeed: there is no telling which one was followed, so neither is recorded and neither is suspended (#569)
     @Test fun skillsOnlyBrowsedTogetherAreNotBlamed() {
         val md = draftMd.replace("send-wechat-message", "wechat-msg")
         val keepOn = PersonalSkill("keep-screen-on", md.replace("wechat-msg", "keep-screen-on"), SkillStatus.active, "r0", null, 0, emptyList())
         val drama = PersonalSkill("drama-coins", md.replace("wechat-msg", "drama-coins"), SkillStatus.active, "r0", null, 0, emptyList())
         val browsed = listOf(RunEvent.SkillUsed(41, "keep-screen-on", "viewed"), RunEvent.SkillUsed(42, "drama-coins", "viewed"), RunEvent.SkillUsed(43, "keep-screen-on", "viewed"))
         val rejected = TaskState.Failed("核查未通过:没办成", FailKind.GaveUp)
-        // 连着两次也一样(以前两次没办成就会停用)
+        // The same holds when it happens twice in a row (two failures used to suspend the skill)
         val both = MapSkills(keepOn, drama)
         repeat(2) {
             val notes = runBlocking { learning(both, learn = false).learn(after(events(verdict = "fail", extra = browsed), rejected)) }
@@ -165,7 +165,7 @@ class SedimentationWiringTest {
         assertEquals(emptyList<String>(), both.get("drama-coins")!!.outcomes)
         assertEquals(SkillStatus.active, both.get("keep-screen-on")!!.status)
         assertEquals(SkillStatus.active, both.get("drama-coins")!!.status)
-        // 只读了一份(看了两次也是同一份):照旧记到它头上,提示里写明是哪一份
+        // Only one was read (viewing the same one twice still counts as one): it is recorded against that one as before, and the note states which one it was
         val skills = MapSkills(keepOn, drama)
         val once = listOf(RunEvent.SkillUsed(41, "keep-screen-on", "viewed"), RunEvent.SkillUsed(43, "keep-screen-on", "viewed"))
         val notes = runBlocking { learning(skills, learn = false).learn(after(events(verdict = "fail", extra = once), rejected)) }
@@ -175,7 +175,7 @@ class SedimentationWiringTest {
         assertTrue(notes.skillNotes.single().text.endsWith("keep-screen-on"))
     }
 
-    // 读过、但没照着做:读完之后在别的 App 里动手,或者读完没再动手,结果都不记到它头上(#569)
+    // Read but not followed: acting in another app after reading, or not acting again after reading, so the result is not recorded against it (#569)
     @Test fun skillReadButNotFollowedIsNotBlamed() {
         val skill = PersonalSkill("wechat-msg", draftMd.replace("send-wechat-message", "wechat-msg"), SkillStatus.active, "r0", null, 0, emptyList())
         val rejected = TaskState.Failed("核查未通过:没办成", FailKind.GaveUp)
@@ -184,14 +184,14 @@ class SedimentationWiringTest {
             RunEvent.Observed(50, 1, "只读到微信界面", place = Place.app("com.tencent.mm")))
         runBlocking { learning(elsewhere, learn = false).learn(after(events(verdict = "fail", extra = browsedWechat, app = "com.ss.android.ugc.aweme"), rejected)) }
         assertEquals(emptyList<String>(), elsewhere.get("wechat-msg")!!.outcomes)
-        // 动完手才去读,读完就收尾了
+        // It was read only after the actions were done, and the run wrapped up right after reading
         val late = MapSkills(skill)
         runBlocking { learning(late, learn = false).learn(after(events(verdict = "fail", extra = listOf(RunEvent.SkillUsed(500, "wechat-msg", "viewed"))), rejected)) }
         assertEquals(emptyList<String>(), late.get("wechat-msg")!!.outcomes)
         assertEquals(SkillStatus.active, late.get("wechat-msg")!!.status)
     }
 
-    // 读过一份没照着做、这次自己办成了:不记到它头上,也不挡起草
+    // One skill was read without being followed, and this run succeeded on its own: nothing is recorded against it, and drafting is not blocked
     @Test fun skillReadButNotFollowedStillDrafts() {
         val skill = PersonalSkill("wechat-msg", draftMd.replace("send-wechat-message", "wechat-msg"), SkillStatus.active, "r0", null, 0, emptyList())
         val skills = MapSkills(skill)
@@ -200,7 +200,7 @@ class SedimentationWiringTest {
         assertEquals(listOf("draft-1"), skills.drafts.keys.toList())
     }
 
-    // 读了两份,只进过其中一份写明的 App:照着做的就是那一份,结果记给它
+    // Two skills were read but only one skill's declared app was entered: that is the one followed, so the result is recorded against it
     @Test fun outcomeGoesToTheSkillWhoseAppWasUsed() {
         val md = draftMd.replace("send-wechat-message", "wechat-msg")
         val wechat = PersonalSkill("wechat-msg", md, SkillStatus.active, "r0", null, 0, emptyList())
@@ -212,7 +212,7 @@ class SedimentationWiringTest {
         assertEquals(emptyList<String>(), skills.get("douyin-like")!!.outcomes)
     }
 
-    // 试用中的个人技能:Agent 用 skill_read 读过、这次办成了,转为正式
+    // A personal skill on trial: the agent read it with skill_read and this run succeeded, so it is promoted to active
     @Test fun viewedTrialSkillPromotesOnDoneRun() {
         val skill = PersonalSkill("wechat-msg", draftMd.replace("send-wechat-message", "wechat-msg"), SkillStatus.trial, "r0", null, 0, emptyList())
         val skills = MapSkills(skill)
@@ -222,7 +222,7 @@ class SedimentationWiringTest {
         assertTrue(skills.drafts.isEmpty())
     }
 
-    // 旧运行记录里的 injected(以前开头塞进全文)照样读,和看过一样记结果
+    // injected in old run records (the full text used to be injected at the start) is still read, and the result is recorded as if it had been viewed
     @Test fun oldInjectedRecordCountsAsUse() {
         val skill = PersonalSkill("wechat-msg", draftMd.replace("send-wechat-message", "wechat-msg"), SkillStatus.active, "r0", null, 0, emptyList())
         val skills = MapSkills(skill)

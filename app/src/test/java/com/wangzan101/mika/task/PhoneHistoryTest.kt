@@ -209,7 +209,7 @@ class PhoneHistoryTest {
         assertFalse(record.getValue("trace_available").jsonPrimitive.boolean)
     }
 
-    // 通知提醒那一轮列的是别的 App 的通知:经电脑端读历史时不给出这些字
+    // This notice turn lists notifications from other apps: those words are not exposed when history is read from the desktop side
     @Test fun noticeTurnTextIsNotExported() {
         val store = conversations()
         store.append("talk", Turn("", "1. 微信 张三:明天来吗", "succeeded", runId = "notice:n1"))

@@ -58,14 +58,14 @@ class ResourceSchedulerTest {
         first.join(5_000)
     }
 
-    // ---------- 等别的任务放开 App ----------
+    // ---------- waiting for another task to release an app ----------
 
     private val active: (String) -> Boolean = { true }
 
-    /** 「登记里没人占」就算放开(测试里不看别的屏)。 */
+    /** "Nobody in the registry holds it" counts as released (tests ignore other displays). */
     private fun ResourceScheduler.freeFor(pkg: String, owner: String): suspend () -> Boolean = { appFree(pkg, owner, active, { true }) }
 
-    /** 占着的任务一放开,等着的马上醒来(不用等到下一次轮询)。 */
+    /** As soon as the holding task releases the app, the waiter wakes up immediately (without waiting for the next poll). */
     @Test fun releaseWakesTheWaiter() = runTest {
         val r = ResourceScheduler()
         assertTrue(r.reserveApp("com.chat", "a", active, { true }))
@@ -79,18 +79,18 @@ class ResourceSchedulerTest {
         assertTrue(r.reserveApp("com.chat", "b", active, { true }))
     }
 
-    /** 到时限仍被占着:如实说等不到,也不再算在等。 */
+    /** Still held when the deadline hits: reports honestly that the wait failed, and no longer counts as waiting. */
     @Test fun waitingTimesOut() = runTest {
         val r = ResourceScheduler()
         assertTrue(r.reserveApp("com.chat", "a", active, { true }))
         assertEquals(AppWait.TimedOut, r.awaitApp("com.chat", "b", 3_000, active, r.freeFor("com.chat", "b")))
         assertEquals(3_000L, currentTime)
-        // b 不再登记为在等:a 现在去等 b 手里的 App 不会被当成互相等
+        // b is no longer registered as waiting: a now waiting for the app b holds is not treated as a mutual wait
         assertTrue(r.reserveApp("com.mail", "b", active, { true }))
         assertEquals(AppWait.TimedOut, r.awaitApp("com.mail", "a", 1_000, active, r.freeFor("com.mail", "a")))
     }
 
-    /** a 占着聊天、在等 b 手里的邮件;b 再去等聊天就是互相等:b 当场不等,a 照样等着。 */
+    /** a holds chat and waits for mail held by b; if b then waits for chat that is a mutual wait: b does not wait at all, a keeps waiting. */
     @Test fun mutualWaitIsRefusedAtOnce() = runTest {
         val r = ResourceScheduler()
         assertTrue(r.reserveApp("com.chat", "a", active, { true }))
@@ -99,13 +99,13 @@ class ResourceSchedulerTest {
         runCurrent()
         assertEquals(AppWait.WouldDeadlock, r.awaitApp("com.chat", "b", 60_000, active, r.freeFor("com.chat", "b")))
         assertEquals("没等:时间没走", 0L, currentTime)
-        // b 不等、做完收尾放掉邮件,a 就等到了
+        // b does not wait and releases mail when finishing up, so a gets its turn
         r.releaseOwner("b")
         runCurrent()
         assertEquals(AppWait.Free, a.await())
     }
 
-    /** 三个任务绕成一圈(a 等 b、b 等 c、c 再等 a)同样认得出;不成圈的照常等。 */
+    /** A three-task cycle (a waits for b, b waits for c, c waits for a again) is likewise detected; non-cyclic chains wait as usual. */
     @Test fun longerCyclesAreFoundAndChainsWithoutCycleWait() = runTest {
         val r = ResourceScheduler()
         for ((pkg, owner) in listOf("p.a" to "a", "p.b" to "b", "p.c" to "c")) assertTrue(r.reserveApp(pkg, owner, active, { true }))
@@ -113,14 +113,14 @@ class ResourceSchedulerTest {
         val b = async { r.awaitApp("p.c", "b", 60_000, active, r.freeFor("p.c", "b")) }
         runCurrent()
         assertEquals(AppWait.WouldDeadlock, r.awaitApp("p.a", "c", 60_000, active, r.freeFor("p.a", "c")))
-        // d 不占东西,等 a 手里的不成圈
+        // d holds nothing, so waiting for what a holds does not form a cycle
         val d = async { r.awaitApp("p.a", "d", 2_000, active, r.freeFor("p.a", "d")) }
         advanceTimeBy(2_001)
         assertEquals(AppWait.TimedOut, d.await())
         a.cancel(); b.cancel()
     }
 
-    /** 占着的任务已经不在了(没来得及放开):不算占着,也不算互相等。 */
+    /** The holding task is already gone (it never released the app): it does not count as holding it, nor as a mutual wait. */
     @Test fun goneHolderDoesNotBlockOrDeadlock() = runTest {
         val r = ResourceScheduler()
         assertTrue(r.reserveApp("com.chat", "gone", active, { true }))

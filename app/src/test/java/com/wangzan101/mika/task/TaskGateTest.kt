@@ -43,7 +43,7 @@ class TaskGateTest {
         assertFalse(passed)
         assertEquals(TaskState.Held(TaskGate.LOCKED), reported.last())
 
-        locked.value = LockState.Reading(interactive = true, keyguardLocked = true, deviceLocked = true).locked // 亮屏但还在锁屏界面
+        locked.value = LockState.Reading(interactive = true, keyguardLocked = true, deviceLocked = true).locked // screen on but still on the lock screen
         runCurrent()
         assertFalse(passed)
         locked.value = LockState.Reading(interactive = true, keyguardLocked = false, deviceLocked = false).locked
@@ -57,7 +57,7 @@ class TaskGateTest {
         var systemLocked = true
         var unlocks = 0
         val refreshed = TaskGate(locked, shellUp,
-            refreshLocked = { locked.value = systemLocked }, // 熄屏已发生，广播对应的状态流还没更新
+            refreshLocked = { locked.value = systemLocked }, // the screen already went off, but the state flow for the broadcast has not updated yet
             unattendedUnlock = {
                 unlocks++
                 systemLocked = false
@@ -119,7 +119,7 @@ class TaskGateTest {
         assertEquals(listOf(TaskState.Held(TaskGate.LOCKED)), reported)
     }
 
-    /** 已开始、本地授权的任务解锁失败:不再杀任务、不再重复注入凭据,停在锁屏等用户手动解锁。 */
+    /** A started task with local authorization fails to unlock: the task is no longer killed and credentials are not re-injected; it stays on the lock screen waiting for the user to unlock manually. */
     @Test
     fun midRunFailedUnlockWaitsForManualUnlockWithoutRetryingCredential() = runTest {
         var attempts = 0
@@ -145,7 +145,7 @@ class TaskGateTest {
         assertEquals(1, attempts)
     }
 
-    /** 已开始、本地授权的任务自动解锁成功:关卡告诉调用方锁屏周期发生过,准备好的动作要重读屏再做。 */
+    /** A started task with local authorization unlocks automatically: the gate tells the caller that a lock-screen cycle happened, so prepared actions must re-read the screen before running. */
     @Test
     fun midRunSuccessfulAutoUnlockAlsoRequiresFreshScreen() = runTest {
         val recovering = TaskGate(locked, shellUp,
@@ -157,7 +157,7 @@ class TaskGateTest {
         assertFalse(locked.value)
     }
 
-    /** 解锁助手中途出错:按内部错误处理,转成等待用户解锁,不向外抛错丢进度。 */
+    /** The unlock helper errors midway: treated as an internal error and turned into a wait for the user to unlock, without throwing outward and losing progress. */
     @Test
     fun midRunUnlockExceptionWaitsForUserInsteadOfLosingProgress() = runTest {
         var reportedStatus: String? = null
@@ -176,7 +176,7 @@ class TaskGateTest {
         assertTrue(resumed)
     }
 
-    /** 还没开始过的任务解锁失败照旧失败收尾:没有进度可保。 */
+    /** Unlock failure in a task that never started still ends in failure as before: there is no progress to preserve. */
     @Test
     fun initialFailureStillEndsUnattendedRun() = runTest {
         locked.value = true
@@ -186,7 +186,7 @@ class TaskGateTest {
         assertTrue(outcome.exceptionOrNull() is UnattendedLockException)
     }
 
-    /** 没有解锁授权的任务(用户在场)解锁助手出错:照旧失败收尾,不装作能恢复。 */
+    /** A task without unlock authorization (the user is present) when the unlock helper errors: still ends in failure as before, without pretending it can recover. */
     @Test
     fun unauthorizedRunStillFailsWhenUnlockErrors() = runTest {
         locked.value = true
@@ -197,7 +197,7 @@ class TaskGateTest {
         assertEquals("internal_error", (outcome.exceptionOrNull() as UnattendedLockException).status)
     }
 
-    /** 用户在场的任务中途锁屏、手动解锁回来:关卡同样报锁屏周期,准备好的动作先重读屏。 */
+    /** An attended task that is locked mid-run and comes back via manual unlock: the gate likewise reports a lock-screen cycle, and prepared actions re-read the screen first. */
     @Test
     fun attendedRunResumedFromManualUnlockRequiresFreshScreen() = runTest {
         assertFalse(gate.pass { reported += it })
@@ -217,7 +217,7 @@ class TaskGateTest {
     @Test
     fun unattendedTaskTrustsRefreshedSystemStateOverAttemptOutcome() = runTest {
         locked.value = true
-        // 流程因权限等原因返回时，用户可能刚好已经手动解锁；实际系统状态才是依据。
+        // When the flow returns early for reasons such as permissions, the user may have just unlocked manually; the actual system state is what counts.
         val unattended = TaskGate(locked, shellUp, unattendedUnlock = {
             locked.value = false
             "disabled"
@@ -230,7 +230,7 @@ class TaskGateTest {
 
     @Test
     fun movedAwayPausesUntilUserContinuesThenMovesBack() = runTest {
-        gate.resume() // 暂停之前的「继续」不算数
+        gate.resume() // a "Continue" from before the pause does not count
         gate.onTaskMovedAway()
         var passed = false
         launch { gate.pass { reported += it }; passed = true }
@@ -244,13 +244,13 @@ class TaskGateTest {
         assertTrue(passed)
         assertEquals(1, moveBackCalls)
 
-        // 挪回来之后不再暂停
+        // No longer paused after being moved back
         reported.clear()
         gate.pass { reported += it }
         assertEquals(listOf<TaskState?>(null), reported)
     }
 
-    /** 用户在借出的页面上动手:不论哪种屏都停下,点「继续」当场放行;之前的「继续」不算,也不挪任何东西。 */
+    /** The user touches the page that was handed over: every kind of screen stops, and tapping "Continue" lets it through right away; an earlier "Continue" does not count, and nothing is moved. */
     @Test
     fun userOnPagePausesAnyStepUntilContinue() = runTest {
         gate.onUserOnPage()
@@ -265,7 +265,7 @@ class TaskGateTest {
         assertTrue(passed)
         assertFalse(gate.userOnPagePending)
         assertEquals(0, moveBackCalls)
-        // 还没走到关卡就点了继续:不再停
+        // Continue tapped before the step reached the gate: it does not stop
         gate.onUserOnPage()
         gate.resume()
         reported.clear()
@@ -299,13 +299,13 @@ class TaskGateTest {
         runCurrent()
         assertEquals(TaskState.Held(TaskGate.paused(TaskGate.SHELL_DOWN)), reported.last())
 
-        gate.resume() // 助手还没恢复:继续无效
+        gate.resume() // the helper has not recovered yet: Continue has no effect
         runCurrent()
         assertFalse(passed)
 
         shellUp.value = true
         runCurrent()
-        assertFalse(passed) // 恢复了也要等用户点继续
+        assertFalse(passed) // even after recovery, it waits for the user to tap continue
         gate.resume()
         runCurrent()
         assertTrue(passed)
@@ -315,7 +315,7 @@ class TaskGateTest {
     fun movedAwayMeansOnMainAndNotOnAgentDisplay() {
         assertTrue(DeviceStateWatcher.isMovedAway(agentTop = 5, mainTop = 7, taskId = 7))
         assertFalse(DeviceStateWatcher.isMovedAway(agentTop = 7, mainTop = 3, taskId = 7))
-        // Agent 自己关掉了 App:不在任何屏最上面,不算被拿走
+        // The Agent closed the app itself: it is not on top of any screen, so it does not count as taken away
         assertFalse(DeviceStateWatcher.isMovedAway(agentTop = -1, mainTop = 3, taskId = 7))
         assertFalse(DeviceStateWatcher.isMovedAway(agentTop = -1, mainTop = -1, taskId = -1))
     }
@@ -324,7 +324,7 @@ class TaskGateTest {
     fun continueTappedRightAsPauseIsShownIsNotLost() = runTest {
         gate.onTaskMovedAway()
         var passed = false
-        // 通知一显示「已暂停」用户就点了继续:点击发生在 setWaiting 回调期间
+        // The user tapped continue the moment the notification showed "paused": the tap happened during the setWaiting callback
         launch {
             gate.pass { reported += it; if (it is TaskState.Held && moveBackCalls == 0) gate.resume() }
             passed = true
@@ -343,7 +343,7 @@ class TaskGateTest {
 
     @Test
     fun continueTappedAfterMoveDetectedButBeforeGateCounts() = runTest {
-        // 发现被挪走后通知立即显示暂停;用户在 Agent 走到 gate 之前就点了继续
+        // The notification shows paused as soon as the move-away is detected; the user tapped continue before the Agent reached the gate
         gate.onTaskMovedAway()
         gate.resume()
         gate.pass { reported += it }
@@ -351,7 +351,7 @@ class TaskGateTest {
         assertEquals(null, reported.last())
     }
 
-    /** 网页、沙箱上的步骤不需要内置助手,也不会被挪到主屏:只看锁屏。 */
+    /** Steps on the web and in the sandbox do not need the built-in helper and are never moved to the home screen: only the lock screen is checked. */
     @Test
     fun shellAndMovedAwayOnlyCheckedForPhoneSteps() = runTest {
         shellUp.value = false
@@ -363,7 +363,7 @@ class TaskGateTest {
         runCurrent()
         assertFalse(passed)
         assertEquals(TaskState.Held(TaskGate.paused(TaskGate.SHELL_DOWN)), reported.last())
-        // 锁屏照样挡网页的步骤
+        // The lock screen still blocks web steps
         reported.clear()
         locked.value = true
         var webPassed = false

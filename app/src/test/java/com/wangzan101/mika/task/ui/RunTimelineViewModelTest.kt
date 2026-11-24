@@ -53,7 +53,7 @@ class RunTimelineViewModelTest {
         assertNull(ready(old).header.confirmedIds)
     }
 
-    /** 任务还在跑、还没有结束事件时算「进行中」:页面据此每秒重读,跑完就停。 */
+    /** A task that is still running and has no end event yet counts as "in progress": the page re-reads every second on that basis and stops once the run finishes. */
     @Test fun anUnfinishedRunOfALiveTaskReadsAsRunning() {
         val h = store.open("打开设置")
         store.append(h.runId, RunEvent.ModelReply(clock + 1_000, 1, "", null, null, 500, 10, 0, 900, repliedAtMs = clock + 1_000))
@@ -64,7 +64,7 @@ class RunTimelineViewModelTest {
         assertFalse("结束之后不再重读", done.header.running)
     }
 
-    /** 没有结束记录、任务也已经不在了(进程被杀、记录没写完):算已结束,不一直按秒重读。 */
+    /** No end record and the task is gone as well (process killed, record not fully written): treated as ended, so it does not keep re-reading every second. */
     @Test fun anUnfinishedRunWhoseTaskIsGoneIsNotRunning() {
         val h = store.open("打开设置")
         store.append(h.runId, RunEvent.ModelReply(clock + 1_000, 1, "", null, null, 500, 10, 0, 900, repliedAtMs = clock + 1_000))
@@ -127,7 +127,7 @@ class RunTimelineViewModelTest {
         assertNull(ready(legacy).header.metrics!!.allInputTokens)
     }
 
-    /** 步数用完后的收尾那一轮记作第上限加一步:显示用了几步时不算它,不会出现 4 / 3。 */
+    /** The wrap-up round after the step limit is used up is recorded as limit plus one step: it is not counted when showing how many steps were used, so 4 / 3 never appears. */
     @Test fun stepsUsedNeverExceedsTheLimit() {
         val id = run("查快递") {
             event(RunEvent.TaskStarted(clock, "查快递", "m1", stepLimit = 3))
@@ -194,7 +194,7 @@ class RunTimelineViewModelTest {
         }
         val ui = ready(id)
         assertEquals(2, ui.header.modelCalls)
-        // 改派掉的 observe 不进步骤:这一步显示的是主模型的 tap
+        // The reassigned observe does not become a step: this step shows the main model's tap
         assertEquals(ToolLabels(knownTools()).label("phone_tap"), ui.steps.single().tool)
     }
 
@@ -251,7 +251,7 @@ class RunTimelineViewModelTest {
         assertEquals(listOf("act", "act"), rows.drop(1).map { it.kind })
     }
 
-    /** 外部 MCP 连接器调用的活动单独成行,标的是连接器配置的名字;普通的读照旧合并。 */
+    /** Activities invoked by external MCP connectors get their own row, labeled with the connector's configured name; ordinary reads are still merged. */
     @Test fun mcpCallShowsTheConnectorName() {
         val id = run("查笔记") {
             event(RunEvent.ModelReply(clock, 1, "", "mcp_demo__search", "{}", 10, 1, null))
@@ -266,18 +266,18 @@ class RunTimelineViewModelTest {
     }
 
     @Test fun showsVerifierAndGuardTags() {
-        // 和 AgentLoop 一样用守卫自己的序列化拼结果
+        // Build the result from the guard's own serialization, the same way AgentLoop does
         fun withGuard(vararg v: GuardVerdict) =
             JsonObject(mapOf("ok" to JsonPrimitive(true), "guard" to JsonArray(v.map { it.toJson() }))).toString()
         val warn = withGuard(GuardVerdict("no_progress", Severity.Warn, buildJsonObject { put("same", 3) }))
         val stop = withGuard(GuardVerdict("repeating_action", Severity.Stop, buildJsonObject { put("code", "x"); put("n", 3) }))
-        // 键的顺序换了也认得
+        // Recognized even with a different key order
         val reordered = """{"ok":true,"guard":[{"evidence":{"a":1},"severity":"warn","code":"too_many_failures"},{"severity":"warn","code":"brand_new"}]}"""
         val id = run("发消息") {
             event(RunEvent.ModelReply(clock, 1, "", "phone_scroll", "{}", null, null, null))
             event(RunEvent.ToolResult(clock, 1, "phone_scroll", warn, false, null))
             event(RunEvent.ModelReply(clock, 2, "", "phone_scroll", "{}", null, null, null))
-            // 截短的结果不再是合法 JSON,标签照样认得出
+            // The truncated result is no longer valid JSON, yet the tag is still recognized
             event(RunEvent.ToolResult(clock, 2, "phone_scroll", RunEvent.clip(stop + " ".repeat(RunEvent.MAX_FIELD)), false, null))
             event(RunEvent.ModelReply(clock, 4, "", "phone_tap", "{}", null, null, null))
             event(RunEvent.ToolResult(clock, 4, "phone_tap", reordered, null, null))
@@ -299,11 +299,11 @@ class RunTimelineViewModelTest {
         val four = ui.steps.single { it.step == 4 }
         assertEquals(listOf(Tag("守卫提醒:操作连续失败", TagTone.Warn), Tag("守卫提醒", TagTone.Warn)), four.tags)
         assertEquals("出错了", ui.steps.single { it.step == 5 }.result)
-        // 按规矩没收的不算出错:不带「出错」(界面按这个前缀把一步标成失败),说没收和原因;工具用界面上的名字
+        // Declines by policy do not count as errors: they carry no "error" (the UI marks a step failed based on that prefix) and state what was declined plus the reason; the tool uses its UI name
         val declined = ui.steps.single { it.step == 6 }
         assertEquals("不是你亲口说的,没有写入", declined.result)
         assertEquals("写入记忆", declined.tool)
-        // 同一个错误码,结果里没写不计入失败的(存技能)照旧算出错
+        // Same error code, but a result that does not declare itself as counting toward failure (skill save) still counts as an error
         assertEquals("出错了", ui.steps.single { it.step == 7 }.result)
         assertFalse(ui.toString().contains("brand_new") || ui.toString().contains("some_new_code"))
         assertEquals("核查没通过", ui.header.verdict)
