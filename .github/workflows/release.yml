@@ -73,4 +73,7 @@ jobs:
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
-          generate_release_notes: true
+          # Keep the notes to only what changed: GitHub's generated notes append
+          # contributor handles, PR links, and a Full Changelog URL that expose
+          # the account name, so they are turned off.
+          generate_release_notes: false
