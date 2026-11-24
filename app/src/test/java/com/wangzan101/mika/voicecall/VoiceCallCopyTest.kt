@@ -12,7 +12,7 @@ class VoiceCallCopyTest {
     @get:Rule val texts = ChineseTexts()
 
     @Test
-    fun `每类错误各占一条文案`() {
+    fun `each error kind has its own message`() {
         assertEquals("实时语音凭据没过，去配置里检查", voiceCallErrorText(VoiceCallError.Auth))
         assertEquals("连接超时，再试一次", voiceCallErrorText(VoiceCallError.ConnectTimeout))
         assertEquals("连接断开了", voiceCallErrorText(VoiceCallError.Disconnected))
@@ -26,7 +26,7 @@ class VoiceCallCopyTest {
     }
 
     @Test
-    fun `每种结束原因各占一条文案`() {
+    fun `each end reason has its own message`() {
         assertEquals("通话已结束", voiceCallEndText(EndReason.Hangup))
         assertEquals("已从通知挂断", voiceCallEndText(EndReason.Notification))
         assertEquals("有电话进来，通话结束", voiceCallEndText(EndReason.IncomingCall))
@@ -36,7 +36,7 @@ class VoiceCallCopyTest {
     }
 
     @Test
-    fun `进行中的状态词`() {
+    fun `status words while in progress`() {
         assertEquals("正在连接…", voiceCallStatusText(VoiceCallState.Connecting))
         assertEquals("正在检查麦克风…", voiceCallStatusText(VoiceCallState.MicCheck))
         assertEquals("已连接", voiceCallStatusText(VoiceCallState.Active(1_000L)))
@@ -46,7 +46,7 @@ class VoiceCallCopyTest {
     }
 
     @Test
-    fun `打字请求的结果回到本地——路由的模型指令文案换成本地说法`() {
+    fun `typed request results come back locally: routed model instruction text becomes local wording`() {
         assertEquals("正在处理", typedResultText(VoiceCallRoute.RESULT_BUSY))
         assertEquals("没办成", typedResultText(VoiceCallRoute.RESULT_START_FAILURE))
         assertEquals("需要你在任务页处理，去任务页看看", typedResultText(VoiceCallRoute.RESULT_NEEDS_USER))

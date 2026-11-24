@@ -69,7 +69,7 @@ internal fun SkillReadingView(markdown: String) {
                         Text(title.text, Modifier.semantics { heading() }, style = MikaType.BodyStrong, color = c.ink)
                     }
                     for (block in contents) {
-                        if (block is MdBlock.ListBlock && block.start != null && label.startsWith("步骤")) {
+                        if (block is MdBlock.ListBlock && block.start != null && (label.startsWith("步骤") || label.startsWith("Steps"))) {
                             StepList(block, block.start, body)
                         } else {
                             MarkdownBlocks(listOf(block), body)

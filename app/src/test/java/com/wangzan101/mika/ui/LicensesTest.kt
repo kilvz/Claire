@@ -41,6 +41,6 @@ class LicensesTest {
         val entries = Licenses.runtimePackages(manifest.readText())
         assertTrue(entries.size > 40)
         listOf("busybox", "musl", "python3", "nodejs", "py3-pillow", "py3-pypdf").forEach { n -> assertTrue(n, entries.any { it.name == n }) }
-        entries.forEach { assertTrue(it.name, it.license.isNotBlank() && it.note.startsWith("版本 ")) }
+        entries.forEach { assertTrue(it.name, it.license.isNotBlank() && it.note.startsWith("Version ")) }
     }
 }

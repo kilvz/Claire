@@ -25,7 +25,7 @@ class FeatureFlagsTokenBudgetTest {
         assertEquals(TokenBudgetLimits.MAX, f.taskTokenBudget())
         for (invalid in listOf(-1L, 0L, TokenBudgetLimits.MIN - 1, TokenBudgetLimits.MAX + 1)) {
             f.setTaskTokenBudget(invalid)
-            assertNull("非法值按不限制处理: $invalid", f.taskTokenBudget())
+            assertNull("invalid value treated as unlimited: $invalid", f.taskTokenBudget())
         }
     }
 
@@ -40,7 +40,7 @@ class FeatureFlagsTokenBudgetTest {
         assertEquals(TokenBudgetLimits.MIN, f.proactiveDailyTokenBudget())
         for (invalid in listOf(-1L, 0L, TokenBudgetLimits.MIN - 1, TokenBudgetLimits.MAX + 1)) {
             f.setProactiveDailyTokenBudget(invalid)
-            assertEquals("非法值按默认值处理: $invalid", 200_000L, f.proactiveDailyTokenBudget())
+            assertEquals("invalid value falls back to the default: $invalid", 200_000L, f.proactiveDailyTokenBudget())
         }
     }
 }

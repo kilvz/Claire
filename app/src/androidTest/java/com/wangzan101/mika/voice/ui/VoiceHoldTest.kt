@@ -65,7 +65,7 @@ class VoiceHoldTest {
     /** Fake source for an unavailable engine (system recognition is not responding); nobody should start a session on it. */
     private class UnavailableVoice : VoiceSource {
         override fun spec(): SpeechEngineSpec = SpeechEngineSpec.Unavailable(SpeechEngineSpec.Why.SystemNoResponse)
-        override fun start(language: String?): SpeechSession = error("不可用的引擎不该起会话")
+        override fun start(language: String?): SpeechSession = error("an unavailable engine should not start a session")
     }
 
     private val voice = FakeVoice()

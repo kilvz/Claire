@@ -32,7 +32,7 @@ class VoiceCallFeedTest {
         feed.onAssistant("好的,我看", isFinal = false)
         assertEquals(Triple(Speaker.Mika, "好的,我看", false), feed.said().last())
         feed.onAssistantDraft("明天多云")
-        assertEquals("被打断后的新一段另起一条", 3, feed.items.value.size)
+        assertEquals("a new segment after an interruption starts a new item", 3, feed.items.value.size)
     }
 
     @Test fun `blank text is ignored`() {
@@ -46,11 +46,11 @@ class VoiceCallFeedTest {
         val feed = VoiceCallFeed()
         val old = listOf("上次办完了")
         feed.onTask(busy = false, lines = old)
-        assertTrue("不在办事时不开卡", feed.items.value.isEmpty())
+        assertTrue("no card when not running a task", feed.items.value.isEmpty())
         feed.onTask(busy = true, lines = old)
         var task = feed.items.value.single() as Task
         assertTrue(task.running)
-        assertTrue("上一次留下的行不算这次的步骤", task.steps.isEmpty())
+        assertTrue("lines left over from the previous run do not count as this run's steps", task.steps.isEmpty())
         feed.onTask(busy = true, lines = old + "打开天气")
         feed.onTask(busy = true, lines = old + "打开天气" + "读取预报")
         feed.onTask(busy = false, lines = old + "打开天气" + "读取预报" + "已办完")
@@ -58,7 +58,7 @@ class VoiceCallFeedTest {
         assertEquals(listOf("打开天气", "读取预报", "已办完"), task.steps)
         assertFalse(task.running)
         feed.onTask(busy = true, lines = old + "打开天气" + "读取预报" + "已办完")
-        assertEquals("下一次办事另开一张卡", 2, feed.items.value.filterIsInstance<Task>().size)
+        assertEquals("the next task opens a new card", 2, feed.items.value.filterIsInstance<Task>().size)
     }
 
     @Test fun `the feed keeps only the latest items`() {

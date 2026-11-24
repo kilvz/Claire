@@ -79,7 +79,7 @@ class ModelSetupScreenTest {
     private val form = AddForm.of(ProviderPresets.all.first()).copy(apiKey = "sk")
     private val deepseek = Provider("p1", "DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com",
         listOf(ListedModel("deepseek-chat"), ListedModel("deepseek-coder", toolCalls = false)))
-    private val qwen = Provider("p2", "通义千问", ProviderConfig.Kind.OpenAiCompat, "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    private val qwen = Provider("p2", "Qwen", ProviderConfig.Kind.OpenAiCompat, "https://dashscope.aliyuncs.com/compatible-mode/v1",
         listOf("qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max", "qwen-long").map { ListedModel(it) })
     private val main = ProviderConfig("c1", deepseek.kind, deepseek.baseUrl, "deepseek-chat", caps, deepseek.name, deepseek.id)
     private val vision = ProviderConfig("c2", qwen.kind, qwen.baseUrl, "qwen-vl-max", caps, qwen.name, qwen.id)
@@ -133,7 +133,7 @@ class ModelSetupScreenTest {
         // The form is collapsed, leaving a single entry point
         compose.onNodeWithTag("setup-test").assertDoesNotExist()
         compose.onNodeWithText(ModelsCopy.ADD_PROVIDER).performScrollTo().performClick()
-        compose.onNodeWithTag("provider-通义千问").performScrollTo().performClick()
+        compose.onNodeWithTag("provider-Qwen").performScrollTo().performClick()
         compose.onNodeWithTag("role-vision").performScrollTo().performClick()
         compose.onNodeWithTag("setup-next").assertIsEnabled().performClick()
         assertEquals(listOf("open form", "provider p2", "role Vision", "next"), calls)
@@ -528,7 +528,7 @@ class ModelSetupScreenTest {
                 )
             }
         }
-        compose.onNodeWithText(ModelsCopy.allModelsTitle("通义千问")).assertIsDisplayed()
+        compose.onNodeWithText(ModelsCopy.allModelsTitle("Qwen")).assertIsDisplayed()
         compose.onNodeWithTag("model-qwen-long").assertIsDisplayed()
         compose.onNodeWithTag("all-models-filter").performTextInput("plus")
         compose.onNodeWithTag("model-qwen-plus").assertIsDisplayed()

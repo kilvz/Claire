@@ -64,4 +64,4 @@ fun splitEvidence(answer: String): Pair<String, String?> {
 }
 
 // At a paragraph start or after end-of-sentence punctuation, optionally preceded by markdown prefixes such as **, #, -
-private val EVIDENCE = Regex("""(^|\n|[。.!！?？]\s*)[\s*#>\-]*\**(?:依据|证据|来源)\**\s*[:：]\**""")
+private val EVIDENCE = Regex("""(^|\n|[。.!！?？]\s*)[\s*#>\-]*\**(?:依据|证据|来源|Basis|Evidence|Sources|Source)\**\s*[:：]\**""")

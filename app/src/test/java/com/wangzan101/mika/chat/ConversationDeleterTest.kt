@@ -137,7 +137,7 @@ class ConversationDeleterTest {
 
         assertEquals(listOf("b"), store.list().map { it.id })
         assertNull(store.projectId("a"))
-        assertTrue("项目成员删对话时不能删共享工作区", "a" in workspaces)
+        assertTrue("deleting a conversation must not delete the shared workspace", "a" in workspaces)
         assertFalse(calls.any { it.startsWith("workspace:") })
         assertEquals("a", removedImportFor)
     }

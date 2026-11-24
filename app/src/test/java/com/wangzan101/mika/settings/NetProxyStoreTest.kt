@@ -23,7 +23,7 @@ class NetProxyStoreTest {
         val file = File(dir, "net-proxy.bin")
         assertTrue(file.isFile)
         val raw = String(file.readBytes(), Charsets.ISO_8859_1)
-        assertFalse("文件里不是明文", raw.contains("s3cret") || raw.contains("alice"))
+        assertFalse("not plaintext in the file", raw.contains("s3cret") || raw.contains("alice"))
         // A fresh instance (as after a restart) reads it back the same way
         assertEquals(proxy, NetProxyStore(dir, cipher).get())
     }
@@ -76,7 +76,7 @@ class NetProxyStoreTest {
         assertEquals("socks5://bob:pw@10.0.0.9:1080", store.get())
         assertFalse(old.exists())
         assertTrue(File(dir, "net-proxy.bin").isFile)
-        assertEquals("读的时候不算改了设置", 0, changes)
+        assertEquals("reading does not count as changing settings", 0, changes)
         // After a restart (the old file is gone) it is still this same one
         assertEquals("socks5://bob:pw@10.0.0.9:1080", NetProxyStore(dir, cipher, legacyCipher).get())
         store.set("http://127.0.0.1:7890")

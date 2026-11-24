@@ -23,7 +23,7 @@ class LazyPhoneScreenTest {
 
     private val screen = LazyPhoneScreen(1080, 2400, listApps = { listOf("a.b" to "A") }) {
         attempts++
-        if (!available) throw PhoneUnavailable("手机操作助手没在运行")
+        if (!available) throw PhoneUnavailable("phone assistant is not running")
         real
     }
 
@@ -51,7 +51,7 @@ class LazyPhoneScreenTest {
     }
 
     @Test fun launchingAnAppConnectsOrSaysWhy() = runTest {
-        assertEquals(ActionResult.Failed(LazyPhoneScreen.PHONE_UNAVAILABLE, "手机操作助手没在运行"), screen.openApp("a.b"))
+        assertEquals(ActionResult.Failed(LazyPhoneScreen.PHONE_UNAVAILABLE, "phone assistant is not running"), screen.openApp("a.b"))
         assertFalse(screen.acquired)
         available = true
         assertTrue(screen.openApp("a.b") is ActionResult.Ok)

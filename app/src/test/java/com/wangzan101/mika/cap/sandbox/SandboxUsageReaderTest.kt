@@ -41,7 +41,7 @@ class SandboxUsageReaderTest {
         assertEquals(listOf(1_000L, 300L, 10L), u.workspaces.map { it.bytes })
         assertEquals(listOf("整理表格", "查快递", null), u.workspaces.map { it.title })
         assertEquals(listOf(false, true, false), u.workspaces.map { it.busy })
-        assertNull("对话删掉了的认不出来", u.workspaces.last().conversationId)
+        assertNull("a deleted conversation's workspace is not recognised", u.workspaces.last().conversationId)
         assertEquals(70L, u.runtime)
         assertEquals(70L + 1_310L, u.total)
     }
@@ -50,7 +50,7 @@ class SandboxUsageReaderTest {
         val b = workspace("b", 1_000)
         assertTrue(reader.clear(b.name))
         assertFalse(b.exists())
-        assertTrue("链接指向的文件还在", big.isFile)
+        assertTrue("the file the link points to is still there", big.isFile)
         assertEquals(50_000L, big.length())
     }
 
@@ -60,7 +60,7 @@ class SandboxUsageReaderTest {
         active += "a"
         assertFalse(reader.clear(a.name))
         assertTrue(File(a, "inbox/a.txt").isFile)
-        assertEquals("留下了一个在跑的", 1, reader.clearAll())
+        assertEquals("one running workspace was left behind", 1, reader.clearAll())
         assertTrue(a.exists())
         assertFalse(b.exists())
         assertTrue(big.isFile)

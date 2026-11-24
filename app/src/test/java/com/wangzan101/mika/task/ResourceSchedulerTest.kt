@@ -75,7 +75,7 @@ class ResourceSchedulerTest {
         r.releaseOwner("a")
         runCurrent()
         assertEquals(AppWait.Free, waiter.await())
-        assertTrue("醒来远早于下一次轮询", currentTime < 30_000)
+        assertTrue("wakes up well before the next poll", currentTime < 30_000)
         assertTrue(r.reserveApp("com.chat", "b", active, { true }))
     }
 
@@ -98,7 +98,7 @@ class ResourceSchedulerTest {
         val a = async { r.awaitApp("com.mail", "a", 60_000, active, r.freeFor("com.mail", "a")) }
         runCurrent()
         assertEquals(AppWait.WouldDeadlock, r.awaitApp("com.chat", "b", 60_000, active, r.freeFor("com.chat", "b")))
-        assertEquals("没等:时间没走", 0L, currentTime)
+        assertEquals("did not wait: time did not advance", 0L, currentTime)
         // b does not wait and releases mail when finishing up, so a gets its turn
         r.releaseOwner("b")
         runCurrent()

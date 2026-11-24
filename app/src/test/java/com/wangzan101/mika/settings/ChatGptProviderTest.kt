@@ -103,7 +103,7 @@ class ChatGptProviderTest {
         assertEquals("client-1", store().chatGptRegistration().second)
         assertEquals(p.id, store().configFor(ModelRole.Main)?.providerId)
         assertEquals(ListFailure.Auth, (store().listModels(p) as ModelListResult.Failed).reason)
-        assertTrue("退出后列模型不发请求", listCalls.isEmpty())
+        assertTrue("listing models after sign-out sends no request", listCalls.isEmpty())
     }
 
     @Test fun unconfirmedRevokeStillClearsLocalTokens() = runTest {

@@ -376,7 +376,7 @@ class ChatScreenDeviceTest {
             header.assertIsDisplayed()
             val headerTop = header.fetchSemanticsNode().boundsInWindow.top
             val otherTop = other.fetchSemanticsNode().boundsInWindow.top
-            assertTrue("running entry not under the 进行中 header: $headerTop vs $otherTop", otherTop > headerTop)
+            assertTrue("running entry not under the in-progress header: $headerTop vs $otherTop", otherTop > headerTop)
             other.performClick()
             compose.waitForIdle()
             assertEquals(first, vm.ui.value.conversationId)

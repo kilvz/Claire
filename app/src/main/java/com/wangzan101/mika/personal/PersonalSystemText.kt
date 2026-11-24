@@ -38,8 +38,12 @@ fun personalStopErrorText(context: Context, error: Throwable): String =
         error.message ?: context.getString(R.string.personal_system_stop_failed))
 
 fun PersonalMessage.displayText(context: Context): String = personalSystemText(context, systemType, text)
-fun PersonalTask.displayDetail(context: Context): String =
-    if (detailSystemType == "task_amendment" && detail.startsWith("补充：")) {
-        context.getString(R.string.personal_system_task_amendment, detail.removePrefix("补充："))
-    } else personalSystemText(context, detailSystemType, detail)
+fun PersonalTask.displayDetail(context: Context): String {
+    // New amendments are prefixed in English; records saved earlier use the Chinese prefix.
+    val amendmentPrefix = listOf("Amendment: ", "补充：").firstOrNull(detail::startsWith)
+    if (detailSystemType == "task_amendment" && amendmentPrefix != null) {
+        return context.getString(R.string.personal_system_task_amendment, detail.removePrefix(amendmentPrefix))
+    }
+    return personalSystemText(context, detailSystemType, detail)
+}
 fun PersonalTask.displayResult(context: Context): String? = result?.let { personalSystemText(context, resultSystemType, it) }

@@ -41,6 +41,6 @@ class VoiceBriefingAudioGateTest {
             reason = failure.safeMessage
         }
         assertFalse(submitted)
-        assertEquals("语音交代已停止，未拨号", reason)
+        assertEquals("The voice briefing has stopped; no call was placed", reason)
     }
 }

@@ -121,7 +121,7 @@ class CapsuleCardContentTest {
         compose.runOnIdle { assertEquals(listOf("capture"), calls) }
         val camera = compose.onNodeWithTag("capsule-camera").fetchSemanticsNode().boundsInRoot
         val field = compose.onNodeWithTag("capsule-input").fetchSemanticsNode().boundsInRoot
-        assertTrue("截屏按钮在输入框左边", camera.right <= field.left)
+        assertTrue("the screenshot button is left of the input field", camera.right <= field.left)
     }
 
     @Test fun attachmentChipShowsScreenAndCanBeSentOrRemoved() {
@@ -266,9 +266,9 @@ class CapsuleCardContentTest {
         compose.onNodeWithText("教 Claire").assertDoesNotExist()
         val shelf = compose.onNodeWithTag("capsule-teach-shelf").assertIsDisplayed().fetchSemanticsNode()
         val input = compose.onNodeWithTag("capsule-input").fetchSemanticsNode()
-        assertTrue("箭头在输入栏上方", shelf.boundsInRoot.bottom <= input.boundsInRoot.top)
+        assertTrue("the arrow is above the input bar", shelf.boundsInRoot.bottom <= input.boundsInRoot.top)
         with(compose.density) {
-            assertTrue("收起时只留一条箭头", shelf.boundsInRoot.height <= 32.dp.toPx())
+            assertTrue("when collapsed only the arrow is left", shelf.boundsInRoot.height <= 32.dp.toPx())
         }
         assertEquals("展开教 Claire", shelf.config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription])
         compose.onNodeWithTag("capsule-teach-shelf").performClick()
@@ -277,7 +277,7 @@ class CapsuleCardContentTest {
         val opened = compose.onNodeWithTag("capsule-teach-shelf").fetchSemanticsNode()
         val inputAfter = compose.onNodeWithTag("capsule-input").fetchSemanticsNode()
         assertEquals("收起教 Claire", opened.config[androidx.compose.ui.semantics.SemanticsProperties.StateDescription])
-        assertTrue("展开后箭头仍在输入栏上方", opened.boundsInRoot.bottom <= inputAfter.boundsInRoot.top)
+        assertTrue("after expanding the arrow is still above the input bar", opened.boundsInRoot.bottom <= inputAfter.boundsInRoot.top)
         compose.onNodeWithTag("capsule-teach-shelf").performClick()
         compose.onNodeWithText("教 Claire").assertDoesNotExist()
     }

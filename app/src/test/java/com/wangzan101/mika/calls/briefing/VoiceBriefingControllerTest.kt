@@ -180,7 +180,7 @@ class VoiceBriefingControllerTest {
         assertEquals("我说完了，你去打", controller.state.value.ownerPartial)
         assertEquals("", controller.state.value.ownerTranscript)
         assertEquals(0, dials)
-        assertEquals("这句话未完整识别，未拨号；请重新完整交代", controller.state.value.message)
+        assertEquals("That sentence was not recognized completely; no call was placed. Please give the full briefing again", controller.state.value.message)
         assertTrue(audio.closed)
         assertTrue(connection.closed)
     }
@@ -199,7 +199,7 @@ class VoiceBriefingControllerTest {
         runCurrent()
         assertEquals(0, dials)
         assertEquals(VoiceBriefingActivity.CLOSING, controller.state.value.activity)
-        assertEquals("这句话未完整识别，未拨号；请重新完整交代", controller.state.value.message)
+        assertEquals("That sentence was not recognized completely; no call was placed. Please give the full briefing again", controller.state.value.message)
         assertEquals("问价格", controller.state.value.ownerTranscript)
         assertEquals("预算不能超过一百", controller.state.value.ownerPartial)
         connection.allowClose.complete(Unit)
@@ -247,7 +247,7 @@ class VoiceBriefingControllerTest {
         assertTrue(connection.closed)
         assertEquals(VoiceBriefingActivity.IDLE, controller.state.value.activity)
         assertEquals("问价格，不要预约", controller.state.value.ownerTranscript)
-        assertEquals("本句未能完整识别，未拨号；请重新交代", controller.state.value.message)
+        assertEquals("This sentence could not be recognized completely; no call was placed. Please give the briefing again", controller.state.value.message)
     }
 
     @Test fun `recognition failure is visible while provider is still closing`() = runTest {
@@ -262,7 +262,7 @@ class VoiceBriefingControllerTest {
         assertTrue(connection.closeStarted)
         assertFalse(connection.closed)
         assertEquals(VoiceBriefingActivity.CLOSING, controller.state.value.activity)
-        assertEquals("本句未能完整识别，未拨号；请重新交代", controller.state.value.message)
+        assertEquals("This sentence could not be recognized completely; no call was placed. Please give the briefing again", controller.state.value.message)
         assertEquals("问价格，不要预约", controller.state.value.ownerTranscript)
         connection.allowClose.complete(Unit)
         runCurrent()

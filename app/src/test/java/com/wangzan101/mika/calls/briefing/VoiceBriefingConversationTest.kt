@@ -48,7 +48,7 @@ class VoiceBriefingConversationTest {
             conversation.accept(final("我说完了，你去打").copy(hasUnresolvedPriorTurn = true))
             fail("must not authorize with an unresolved earlier restriction")
         } catch (failure: VoiceBriefingFailure) {
-            assertEquals("之前的交代尚未完整识别，未拨号；请重新完整交代", failure.safeMessage)
+            assertEquals("The earlier briefing was not fully recognized, so no call was placed; please give the full briefing again", failure.safeMessage)
         }
     }
 

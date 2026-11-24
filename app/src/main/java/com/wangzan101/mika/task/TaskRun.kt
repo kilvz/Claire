@@ -612,7 +612,7 @@ class TaskRun(
                     val cost = c.tally.deepSeekCost?.let { usage ->
                         val table = if (usage.hasUsage()) {
                             withTimeoutOrNull(2_000L) { deepSeekPrices.prices() }.also {
-                                if (it == null) Log.d(TAG, "DeepSeek 价目表暂不可用")
+                                if (it == null) Log.d(TAG, "DeepSeek price table is temporarily unavailable")
                             }
                         } else null
                         usage.estimate(table)

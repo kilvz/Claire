@@ -80,20 +80,20 @@ internal class TelecomMuteState(private val dedicatedMuteCallback: Boolean) {
 
 /** An allowlist maps known shell outcomes to fixed diagnostics; no raw shell string leaves here. */
 internal fun shellAudioStopDiagnostic(reason: String?): String? = when (val code = reason?.trim()) {
-    "Handset microphone was unmuted." -> "设备麦克风静音已解除，AI 已交还通话"
-    "Cellular audio mode ended.", "Cellular audio ended." -> "运营商通话音频模式已结束，电话由系统处理"
-    "Downlink consumer stopped draining audio." -> "运营商下行音频传输阻塞，电话由系统处理"
-    "Android silenced the cellular audio capture." -> "安卓停止向 AI 提供通话声音，已交还系统"
-    "Uplink playback stopped accepting audio." -> "运营商上行音频播放无进展，电话由系统处理"
-    "Helper released.", "Call audio owner died." -> "内置助手已释放电话音频，电话由系统处理"
+    "Handset microphone was unmuted." -> "The device microphone was unmuted; the AI handed the call back"
+    "Cellular audio mode ended.", "Cellular audio ended." -> "Carrier call audio mode ended; the system is handling the call"
+    "Downlink consumer stopped draining audio." -> "Carrier downlink audio is blocked; the system is handling the call"
+    "Android silenced the cellular audio capture." -> "Android stopped providing call audio to the AI; control was handed back to the system"
+    "Uplink playback stopped accepting audio." -> "Carrier uplink audio playback made no progress; the system is handling the call"
+    "Helper released.", "Call audio owner died." -> "The built-in helper released the call audio; the system is handling the call"
     else -> when {
         code == null -> null
-        code.startsWith("Downlink read failed (") -> "设备无法读取运营商下行音频，电话由系统处理"
-        code.startsWith("Uplink write failed (") -> "设备无法写入运营商上行音频，电话由系统处理"
-        code.startsWith("Uplink flush failed:") -> "设备无法清空运营商上行音频，电话由系统处理"
+        code.startsWith("Downlink read failed (") -> "The device cannot read carrier downlink audio; the system is handling the call"
+        code.startsWith("Uplink write failed (") -> "The device cannot write carrier uplink audio; the system is handling the call"
+        code.startsWith("Uplink flush failed:") -> "The device cannot flush carrier uplink audio; the system is handling the call"
         code.startsWith("Uplink did not route to the telephony device (") ||
-            code.startsWith("Uplink unexpectedly routed to device type ") -> "设备上行未路由至运营商通话，电话由系统处理"
-        code.startsWith("Downlink unexpectedly routed to device type ") -> "设备下行未路由至运营商通话，电话由系统处理"
+            code.startsWith("Uplink unexpectedly routed to device type ") -> "Device uplink is not routed to the carrier call; the system is handling the call"
+        code.startsWith("Downlink unexpectedly routed to device type ") -> "Device downlink is not routed to the carrier call; the system is handling the call"
         else -> null
     }
 }
@@ -120,12 +120,12 @@ internal suspend fun awaitTelecomMuteBaseline(
     var observedMutedBaseline = false
     return withTimeoutOrNull(1_500L) {
         while (true) {
-            if (!isCurrent()) throw CallMediaFailure("通话身份或音频助手已变化，AI 未接入音频")
+            if (!isCurrent()) throw CallMediaFailure("The call identity or audio helper changed; the AI did not attach to the audio")
             val state = sample()
             // An already-muted handset remains the owner's decision. If it is unmuted
             // while we are still waiting, do not claim the new false baseline and remute it.
             if (observedMutedBaseline && (state.telecomMuted == false || state.hardwareMuted == false)) {
-                throw CallMediaFailure("接管前通话静音已解除，AI 未接入音频")
+                throw CallMediaFailure("The call was unmuted before takeover; the AI did not attach to the audio")
             }
             if (state.telecomMuted == true && state.hardwareMuted == true) observedMutedBaseline = true
             val baseline = TelecomMuteLease.fromBaseline(state.telecomMuted, state.hardwareMuted)
@@ -141,5 +141,5 @@ internal suspend fun awaitTelecomMuteBaseline(
             delay(25L)
         }
         @Suppress("UNREACHABLE_CODE") null
-    } ?: throw CallMediaFailure("Android 通话音频或原有静音状态未稳定，AI 未接入音频")
+    } ?: throw CallMediaFailure("Android call audio or the original mute state was not stable; the AI did not attach to the audio")
 }

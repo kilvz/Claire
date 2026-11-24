@@ -99,7 +99,7 @@ class TaskReportViewModel(private val store: RunStore, val runId: String) {
                 if (index < 0) return@mapNotNull null
                 val frame = frames.lastOrNull { it.stepIndex == index && it.frame.after == true } ?: return@mapNotNull null
                 val title = (listOfNotNull(obs.title) + obs.text.lineSequence().toList()).map(String::trim)
-                    .filter { it.length in 8..90 && '\t' !in it && !it.startsWith("当前 App:") }
+                    .filter { it.length in 8..90 && '\t' !in it && !it.startsWith("Current app:") && !it.startsWith("当前 App:") }
                     .filter { normalize(it).length >= 8 && normalize(it) in normalizedAnswer }
                     .maxByOrNull { normalize(it).length } ?: return@mapNotNull null
                 ReportPage(title, index, frame.frame.screenshotId)

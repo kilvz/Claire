@@ -16,19 +16,19 @@ internal suspend fun <T : Any> awaitCallAudioOpen(
     val startedAt = nowMs()
     while (true) {
         currentCoroutineContext().ensureActive()
-        if (!isCurrent()) throw CallMediaFailure("通话状态或静音已变更，未接入电话音频")
+        if (!isCurrent()) throw CallMediaFailure("The call state or mute changed; phone audio was not connected")
         val beforeAttempt = nowMs() - startedAt
         if (beforeAttempt !in 0L until AUDIO_OPEN_WINDOW_MS) {
-            throw CallMediaFailure("运营商通话音频未能及时就绪，已交还系统")
+            throw CallMediaFailure("The carrier call audio was not ready in time and was handed back to the system")
         }
         // Deliberately do not catch: permission, routing, IPC and allocation faults are not retryable.
         val opened = attempt()
         currentCoroutineContext().ensureActive()
-        if (!isCurrent()) throw CallMediaFailure("通话状态或静音已变更，未接入电话音频")
+        if (!isCurrent()) throw CallMediaFailure("The call state or mute changed; phone audio was not connected")
         if (opened != null) return opened
         val elapsed = nowMs() - startedAt
         if (elapsed !in 0L until AUDIO_OPEN_WINDOW_MS) {
-            throw CallMediaFailure("运营商通话音频未能及时就绪，已交还系统")
+            throw CallMediaFailure("The carrier call audio was not ready in time and was handed back to the system")
         }
         delay(minOf(AUDIO_OPEN_RETRY_MS, AUDIO_OPEN_WINDOW_MS - elapsed))
     }

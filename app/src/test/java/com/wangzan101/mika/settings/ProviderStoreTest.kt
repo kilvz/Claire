@@ -538,7 +538,7 @@ class ProviderStoreTest {
         // The implicit rule "a main model that can see images also serves vision" is gone
         assertNull(s.configFor(ModelRole.Vision))
         val m = s.modelFor(ModelRole.Main)
-        assertEquals("套上计量后能力照旧(临时:每 16 轮折一次)", cfg("a", vision = true).capabilities.copy(compactionEveryRounds = TEMP_COMPACTION_EVERY_ROUNDS), m?.capabilities)
+        assertEquals("capabilities unchanged after adding metering (temp: fold once every 16 rounds)", cfg("a", vision = true).capabilities.copy(compactionEveryRounds = TEMP_COMPACTION_EVERY_ROUNDS), m?.capabilities)
         assertEquals("a" to "sk-a", built.single().first.id to built.single().second)
     }
 
@@ -549,15 +549,15 @@ class ProviderStoreTest {
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.SameAsMain))
         val v = s.configFor(ModelRole.Vision)!!
         assertEquals("a", v.id)
-        assertTrue("用户说主模型能看图,看图这一路照发截图", v.capabilities.vision)
+        assertTrue("user said the main model sees images, so the image path still sends screenshots", v.capabilities.vision)
         s.modelFor(ModelRole.Vision)
         assertTrue(built.last().first.capabilities.vision)
         assertEquals("sk-a", built.last().second)
-        assertTrue("用户说了主模型能看图,主模型自己办事也直接看截图", s.configFor(ModelRole.Main)!!.capabilities.vision)
+        assertTrue("user said the main model sees images, so the main model also looks at screenshots when working itself", s.configFor(ModelRole.Main)!!.capabilities.vision)
         // Still there after reopening
         assertEquals(RoleChoice.SameAsMain, store().roles.value.vision)
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.Off))
-        assertFalse("换走了就回到存着的标记", s.configFor(ModelRole.Main)!!.capabilities.vision)
+        assertFalse("switching away reverts to the stored flag", s.configFor(ModelRole.Main)!!.capabilities.vision)
     }
 
     @Test
@@ -568,10 +568,10 @@ class ProviderStoreTest {
         assertTrue(s.use(ModelRole.Vision, p.id, "m1", none))
         assertTrue(s.configFor(ModelRole.Main)!!.capabilities.vision)
         s.modelFor(ModelRole.Main)
-        assertTrue("建出来的主模型附图", built.last().first.capabilities.vision)
+        assertTrue("the built main model has images", built.last().first.capabilities.vision)
         assertTrue(s.use(ModelRole.Vision, p.id, "m2", none))
-        assertFalse("看图换成别的模型,主模型回到列表和初值说的", s.configFor(ModelRole.Main)!!.capabilities.vision)
-        assertFalse("没改存着的配置", store().list().first { it.model == "m1" }.capabilities.vision)
+        assertFalse("images switched to another model, main model follows the list and initial value", s.configFor(ModelRole.Main)!!.capabilities.vision)
+        assertFalse("stored config untouched", store().list().first { it.model == "m1" }.capabilities.vision)
     }
 
     @Test
@@ -579,12 +579,12 @@ class ProviderStoreTest {
         val s = store()
         val p = connected(s)
         assertTrue(s.use(ModelRole.Main, p.id, "m1", none))
-        assertFalse("列表没写,按初值", s.configFor(ModelRole.Main)!!.capabilities.vision)
+        assertFalse("not in the list, so follow the initial value", s.configFor(ModelRole.Main)!!.capabilities.vision)
         assertTrue(s.setModelVision(p.id, "m1", true))
         assertTrue(s.configFor(ModelRole.Main)!!.capabilities.vision)
         val reopened = store()
         assertEquals(mapOf("m1" to true), reopened.provider(p.id)!!.visionOverrides)
-        assertTrue("重开仍在", reopened.configFor(ModelRole.Main)!!.capabilities.vision)
+        assertTrue("still there after reopening", reopened.configFor(ModelRole.Main)!!.capabilities.vision)
         // The user can turn it off too: when vision uses the main model, the main model stops attaching images as the user said, while the vision path keeps working as before
         assertTrue(s.choose(ModelRole.Vision, RoleChoice.SameAsMain))
         assertTrue(s.setModelVision(p.id, "m1", false))
@@ -622,7 +622,7 @@ class ProviderStoreTest {
         assertFalse(s.choose(ModelRole.Main, RoleChoice.SameAsMain))
         assertFalse(s.choose(ModelRole.Main, RoleChoice.Off))
         assertFalse(s.choose(ModelRole.Light, RoleChoice.Off))
-        assertFalse("不存在的配置", s.choose(ModelRole.Main, RoleChoice.Model("zzz")))
+        assertFalse("config does not exist", s.choose(ModelRole.Main, RoleChoice.Model("zzz")))
         assertEquals(RoleChoices(main = "a"), s.roles.value)
     }
 
@@ -635,8 +635,8 @@ class ProviderStoreTest {
         val main = s.configFor(ModelRole.Main)!!
         val vision = s.configFor(ModelRole.Vision)!!
         assertEquals("m1" to "m2", main.model to vision.model)
-        assertTrue("选作主模型就记工具调用", main.capabilities.toolCalls)
-        assertTrue("选作看图就算能看图", vision.capabilities.vision)
+        assertTrue("choosing it as main model records tool calls", main.capabilities.toolCalls)
+        assertTrue("chosen for images counts as seeing images", vision.capabilities.vision)
         // The light role requires no capabilities at all
         assertTrue(s.use(ModelRole.Light, p.id, "m2", none))
         assertEquals(vision.id, s.configFor(ModelRole.Light)?.id)
@@ -762,7 +762,7 @@ class ProviderStoreTest {
         val s = store()
         val listed = listOf(ListedModel("a", displayName = "A", toolCalls = true, contextTokens = 128_000), ListedModel("b", vision = false))
         val p = s.connect("DeepSeek", ProviderConfig.Kind.OpenAiCompat, "https://api.deepseek.com", "sk-d", listed)
-        assertTrue("连上了还没选模型", s.list().isEmpty())
+        assertTrue("connected but no model chosen yet", s.list().isEmpty())
         assertNull(s.roles.value.main)
         val reopened = store()
         assertEquals(listOf(p), reopened.providers.value)
@@ -787,7 +787,7 @@ class ProviderStoreTest {
         val s = store()
         val p = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", emptyList(), untested = true)
         assertTrue(p.savedUntested)
-        assertTrue("重新读入还在", store().provider(p.id)!!.savedUntested)
+        assertTrue("still there after reloading", store().provider(p.id)!!.savedUntested)
         // Providers that were not saved by skipping the test do not carry this flag
         val other = s.connect("Y", ProviderConfig.Kind.OpenAiCompat, "https://y.test/v1", "k", emptyList())
         assertFalse(other.savedUntested)
@@ -800,12 +800,12 @@ class ProviderStoreTest {
         val s = store()
         val listed = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", emptyList(), untested = true)
         s.rememberModels(listed.id, listOf(ListedModel("m1")))
-        assertFalse("列出来了就算测过", store().provider(listed.id)!!.savedUntested)
+        assertFalse("being listed counts as tested", store().provider(listed.id)!!.savedUntested)
 
         val verified = s.connect("Z", ProviderConfig.Kind.OpenAiCompat, "https://z.test/v1", "k", emptyList(), untested = true)
         assertTrue(s.provider(verified.id)!!.savedUntested)
         s.markVerified(verified.id, "m1")
-        assertFalse("核实过就算测过", s.provider(verified.id)!!.savedUntested)
+        assertFalse("verified counts as tested", s.provider(verified.id)!!.savedUntested)
         assertEquals(setOf("m1"), s.provider(verified.id)!!.verifiedModels)
     }
 
@@ -813,16 +813,16 @@ class ProviderStoreTest {
     @Test
     fun untestedMainProviderFollowsTheMainModel() {
         val s = store()
-        assertNull("没有主模型", s.untestedMainProvider())
+        assertNull("no main model", s.untestedMainProvider())
         val p = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k", emptyList(), untested = true)
         s.markTyped(p.id, "m1")
         s.use(ModelRole.Main, p.id, "m1", none)
         assertEquals(p.id, s.untestedMainProvider()?.id)
         s.markVerified(p.id, "m1")
-        assertNull("试通过了", s.untestedMainProvider())
+        assertNull("test passed", s.untestedMainProvider())
         val listed = s.connect("Y", ProviderConfig.Kind.OpenAiCompat, "https://y.test/v1", "k", listOf(ListedModel("m2")))
         s.use(ModelRole.Main, listed.id, "m2", none)
-        assertNull("从列表里选的不算", s.untestedMainProvider())
+        assertNull("chosen from the list does not count", s.untestedMainProvider())
     }
 
     /** Saving with the test skipped again for a provider whose models were already listed: the existing list is kept, not overwritten by an empty one, and it still counts as "tested". */
@@ -833,7 +833,7 @@ class ProviderStoreTest {
         val again = s.connect("X", ProviderConfig.Kind.OpenAiCompat, "https://x.test/v1", "k2", emptyList(), untested = true)
         assertEquals(p.id, again.id)
         assertEquals(listOf("m1"), again.models!!.map { it.id })
-        assertFalse("已经列过列表的不算没测过", again.savedUntested)
+        assertFalse("already listed, so not untested", again.savedUntested)
         assertEquals("k2", s.providerKey(p.id))
     }
 
@@ -932,7 +932,7 @@ class ProviderStoreTest {
         assertEquals(listOf("DeepSeek", "192.168.1.5"), s.providers.value.map { it.name })
         val ds = s.providers.value[0]
         val local = s.providers.value[1]
-        assertNull("还没列过模型", ds.models)
+        assertNull("models not listed yet", ds.models)
         // Keys move to the providers
         assertEquals("sk-ds", s.providerKey(ds.id))
         assertEquals("sk-local", s.providerKey(local.id))
@@ -1182,7 +1182,7 @@ class ProviderStoreTest {
             assertEquals("Bearer sk", req.getHeader("Authorization"))
             val body = req.body.readUtf8()
             assertTrue(body, body.contains("\"tools\"") && body.contains("get_time"))
-            assertFalse("Chat Completions 不给回复上限", body.contains("max_tokens"))
+            assertFalse("Chat Completions does not send a reply limit", body.contains("max_tokens"))
 
             server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(400).setBody("""{"error":{"type":"MissingSessionID"}}"""))
             val e = s.probe(ProviderConfig.Kind.OpenAiCompat, url, "sk", null, "m", null, none) as ProbeResult.Failed
@@ -1316,14 +1316,14 @@ class ProviderStoreTest {
 
         try {
             s.modelFor(ModelRole.Main)!!.complete("s", emptyList(), emptyList())
-            fail("达到每日预算的服务商应停止下一次请求")
+            fail("a provider that hit its daily budget should stop the next request")
         } catch (e: ModelError.DailyBudgetExceeded) {
             assertEquals("Limited", e.providerName)
             assertEquals(limited.id, e.providerId)
             assertEquals(10_000L, e.limit)
             assertEquals(10_000L, e.used)
         }
-        assertTrue("拒绝时不记一笔不存在的调用", seen.isEmpty())
+        assertTrue("a rejected call is not recorded as a nonexistent usage", seen.isEmpty())
         s.modelFor(ModelRole.Light)!!.complete("s", emptyList(), emptyList())
         assertEquals(listOf(available.id), seen.map { it.providerId })
     }
@@ -1351,14 +1351,14 @@ class ProviderStoreTest {
 
         try {
             s.modelFor(ModelRole.Main)!!.complete("s", emptyList(), emptyList())
-            fail("服务商今天的预算已用完")
+            fail("the provider's budget for today is used up")
         } catch (_: ModelError.DailyBudgetExceeded) {}
         s.proactiveModel()!!.complete("s", emptyList(), emptyList())
 
-        assertEquals("主动能力的用量不动服务商的「今日已用」", 10_000L, b.ledger.providerTokensToday(p.id))
+        assertEquals("proactive usage does not touch the provider's 'used today'", 10_000L, b.ledger.providerTokensToday(p.id))
         assertEquals(5L, b.ledger.proactiveTokensToday())
         val proactive = b.ledger.snapshot().rows.single { it.key.purpose == UsagePurpose.Proactive }
-        assertEquals("轻量用主模型时记在主模型那条配置名下", UsageKey(p.id, "m1", UsagePurpose.Proactive), proactive.key)
+        assertEquals("when the light model uses the main model, usage is recorded under the main model's config", UsageKey(p.id, "m1", UsagePurpose.Proactive), proactive.key)
     }
 
     @Test fun exhaustedProactiveBudgetRefusesOnlyProactiveCalls() = runTest {
@@ -1375,12 +1375,12 @@ class ProviderStoreTest {
 
         try {
             s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-            fail("主动能力今天的预算已用完")
+            fail("proactive budget for today is used up")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertEquals(10_000L, e.limit)
             assertEquals(10_000L, e.used)
         }
-        assertEquals("拒绝时不记一笔不存在的调用", before, b.ledger.snapshot())
+        assertEquals("a rejected call is not recorded as a nonexistent usage", before, b.ledger.snapshot())
 
         s.modelFor(ModelRole.Main)!!.complete("s", emptyList(), emptyList())
         assertEquals(5L, b.ledger.providerTokensToday(p.id))
@@ -1388,7 +1388,7 @@ class ProviderStoreTest {
         // Recovers the next day
         b.clock += 24 * UsageLedger.HOUR_MS
         s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-        assertEquals("轻量模型选了 m2 就用 m2", "m2", b.ledger.snapshot().rows.last { it.key.purpose == UsagePurpose.Proactive && it.key.providerId == p.id }.key.model)
+        assertEquals("light model set to m2 uses m2", "m2", b.ledger.snapshot().rows.last { it.key.purpose == UsagePurpose.Proactive && it.key.providerId == p.id }.key.model)
     }
 
     /** When the provider reports no usage the token count does not grow, so calls stop at the request-count limit (800 calls at the default 200k tokens); main-model calls are unaffected. */
@@ -1407,7 +1407,7 @@ class ProviderStoreTest {
 
         try {
             s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-            fail("主动能力今天的请求次数已到上限")
+            fail("proactive request count for today reached the limit")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertTrue(e.byCalls)
         }
@@ -1438,7 +1438,7 @@ class ProviderStoreTest {
                 .setBody("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"))
             try {
                 s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-                fail("只剩一次额度,重发的那个请求不该发出去")
+                fail("only one quota left, so the resent request should not go out")
             } catch (e: ModelError.ProactiveBudgetExceeded) {
                 assertTrue(e.byCalls)
             }
@@ -1473,7 +1473,7 @@ class ProviderStoreTest {
         repeat(200) { b.ledger.record(UsageSource(p.id, "P", "m1", UsagePurpose.Proactive), null) }
         try {
             s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-            fail("5 万 Token 时请求上限是下限 200 次")
+            fail("at 50k tokens the request cap is the floor of 200")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertTrue(e.byCalls)
             assertEquals(200L, e.limit)
@@ -1484,7 +1484,7 @@ class ProviderStoreTest {
         assertEquals(8_000L, b.ledger.proactiveCallsToday())
         try {
             s.proactiveModel()!!.complete("s", emptyList(), emptyList())
-            fail("200 万 Token 时请求上限是 8000 次")
+            fail("at 2M tokens the request cap is 8000")
         } catch (e: ModelError.ProactiveBudgetExceeded) {
             assertEquals(8_000L, e.limit)
         }
@@ -1515,7 +1515,7 @@ class ProviderStoreTest {
         s.proactiveTargeted(ProactiveCall.Learn)
         assertEquals(ProactiveModelSetup.CAP_THINKING, setups.last().maxOutputTokens)
         s.modelFor(ModelRole.Main)
-        assertEquals("用户任务照用选的档位", "high", setups.last().reasoningEffort)
+        assertEquals("user tasks still use the selected tier", "high", setups.last().reasoningEffort)
         assertNull(setups.last().maxOutputTokens)
         assertEquals(TriageTargetOf(p.id, "P", "m1"), s.proactiveTarget())
 
@@ -1533,7 +1533,7 @@ class ProviderStoreTest {
         assertEquals(null to ProactiveModelSetup.CAP, ProactiveModelSetup.of(ProviderConfig.Kind.Anthropic, null, null, short))
         assertEquals(null to ProactiveModelSetup.CAP_THINKING, ProactiveModelSetup.of(ProviderConfig.Kind.Gemini, null, null, short))
         val guessed = ReasoningOptions(listOf("none", "low"), fromProvider = false)
-        assertEquals("手动档位不猜", "high" to ProactiveModelSetup.CAP_THINKING, ProactiveModelSetup.of(ProviderConfig.Kind.OpenAiResponses, guessed, "high", short))
+        assertEquals("manual tier is not guessed", "high" to ProactiveModelSetup.CAP_THINKING, ProactiveModelSetup.of(ProviderConfig.Kind.OpenAiResponses, guessed, "high", short))
         assertNull(ProactiveModelSetup.lowestDeclared(ReasoningOptions(listOf("ultra"), fromProvider = true)))
         assertEquals(ProactiveModelSetup.CAP, ProactiveModelSetup.of(ProviderConfig.Kind.Anthropic, null, null, ProactiveCall.Learn).second)
     }
@@ -1550,7 +1550,7 @@ class ProviderStoreTest {
         }
         assertFalse(ProactiveCall.Triage.long || ProactiveCall.Learn.long)
         val fullBatch = com.wangzan101.mika.core.proactive.NoticeTriage.MAX_BATCH * (com.wangzan101.mika.core.proactive.NoticeTriage.REASON_MAX + 60)
-        assertTrue("写满的一批判定(按一个字一个半 token 算)也放得下", ProactiveModelSetup.CAP >= fullBatch * 3 / 2)
+        assertTrue("a full batch of judgments fits (at one and a half tokens per character)", ProactiveModelSetup.CAP >= fullBatch * 3 / 2)
     }
 
     @Test fun proactiveTargetIsNullWithoutAnyModel() {

@@ -9,5 +9,5 @@ import kotlinx.coroutines.CancellationException
  */
 internal fun requireVoiceBriefingAudioActive(stopped: Boolean, allowed: () -> Boolean) {
     if (stopped) throw CancellationException("Voice briefing media stopped")
-    if (!allowed()) throw VoiceBriefingFailure("语音交代已停止，未拨号")
+    if (!allowed()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
 }

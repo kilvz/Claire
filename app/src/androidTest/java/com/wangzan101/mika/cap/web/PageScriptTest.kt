@@ -162,7 +162,7 @@ class PageScriptTest {
     fun crossOriginFrameListedAsFrame() = runBlocking<Unit> {
         open("frames.html")
         val frame = pollTree { it.els().firstOrNull { e -> e.str("r") == "frame" } }
-        assertEquals("内嵌页面:fixtures2.androidplatform.net", frame.str("n"))
+        assertEquals("embedded page: fixtures2.androidplatform.net", frame.str("n"))
     }
 
     @Test
@@ -171,7 +171,7 @@ class PageScriptTest {
         val raw = page.tree()
         assertFalse(raw.contains("secret123"))
         assertFalse("role override must not expose the value", raw.contains("hunter22"))
-        assertEquals("密码：已填 9 位", byId("pw")!!.str("n"))
+        assertEquals("密码: filled 9 chars", byId("pw")!!.str("n"))
         assertEquals(FieldValue.Password(9), page.fieldValue(refOf("pw")))
         js("document.getElementById('pw').focus()")
         assertEquals(FieldValue.Password(9), page.fieldValue(null))
@@ -335,11 +335,11 @@ class PageScriptTest {
         val raw = page.tree()
         assertFalse(raw.contains("card-secret-6"))
         assertFalse(raw.contains("otp-secret-4"))
-        assertEquals("已填 13 位", byId("card")!!.str("n"))
-        assertEquals("已填 12 位", byId("otp")!!.str("n"))
+        assertEquals("filled 13 chars", byId("card")!!.str("n"))
+        assertEquals("filled 12 chars", byId("otp")!!.str("n"))
         // The text in a textarea is its value: it is left out of the name, the page read and the digest (the label wrapping it has no other text)
         assertFalse(raw.contains("otp-area-secret-9"))
-        assertEquals("已填 17 位", byId("otparea")!!.str("n"))
+        assertEquals("filled 17 chars", byId("otparea")!!.str("n"))
         val read = page.readPage(12_000, 0, scroll = false)
         assertTrue(read, read.contains("正文一段"))
         assertFalse(read, read.contains("otp-area-secret-9"))

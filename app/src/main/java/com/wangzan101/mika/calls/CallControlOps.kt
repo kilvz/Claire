@@ -12,27 +12,27 @@ suspend fun CallRuntime.dial(number: String, simId: String? = null, task: CallTa
     val taskSnapshot = try {
         task?.validatedSnapshot()
     } catch (e: IllegalArgumentException) {
-        return@onMain report(e.message ?: "本次拨打交代无效")
+        return@onMain report(e.message ?: "These call instructions are invalid")
     }
     prerequisite()?.let { return@onMain report(it) }
-    if (lockedDial != null) return@onMain report("请先取消已安排的锁屏拨出")
-    val normalized = CallPolicy.outgoingNumber(number) ?: return@onMain report("仅支持普通号码，不支持紧急号码、短号或控制代码")
-    if (isEmergency(normalized) != false) return@onMain report("紧急号码或无法确认安全的号码不能拨打")
+    if (lockedDial != null) return@onMain report("Cancel the scheduled locked-screen dial first")
+    val normalized = CallPolicy.outgoingNumber(number) ?: return@onMain report("Only regular numbers are supported; emergency numbers, short codes and control codes are not")
+    if (isEmergency(normalized) != false) return@onMain report("Emergency numbers, or numbers that cannot be confirmed safe, cannot be dialed")
     if (liveCalls().isNotEmpty() || work != null || managedCallPresent() != false) {
-        return@onMain report("已有通话或无法确认空闲，未拨号")
+        return@onMain report("There is already a call, or the line could not be confirmed idle; no call was placed")
     }
     readSims()
     prerequisite()?.let { return@onMain report(it) }
-    if (lockedDial != null) return@onMain report("请先取消已安排的锁屏拨出")
+    if (lockedDial != null) return@onMain report("Cancel the scheduled locked-screen dial first")
     if (liveCalls().isNotEmpty() || work != null || managedCallPresent() != false) {
-        return@onMain report("已有通话或无法确认空闲，未拨号")
+        return@onMain report("There is already a call, or the line could not be confirmed idle; no call was placed")
     }
     val config = settings.state.value
     val picked = CallPolicy.chooseOutgoingSim(sims.map { it.info }, simId, config.defaultOutgoingSimId)
         ?: return@onMain report(when {
-            simId == null && config.defaultOutgoingSimId != null -> "保存的默认拨号 SIM 已不可用，请重新选择"
-            sims.isEmpty() -> "没有可用于运营商通话的 SIM"
-            else -> "请选择一张有效的 SIM，或明确选择系统默认 SIM"
+            simId == null && config.defaultOutgoingSimId != null -> "The saved default dialing SIM is no longer available; select another"
+            sims.isEmpty() -> "No SIM is available for carrier calls"
+            else -> "Select a valid SIM, or explicitly choose the system default SIM"
         })
     val sim = sims.single { it.info.id == picked.id }
     val attempt = Work(CallDirection.OUTGOING, config, requestedNumber = normalized, sim = sim, task = taskSnapshot)
@@ -46,7 +46,7 @@ suspend fun CallRuntime.answer(expectedCallId: String? = null): CallActionResult
     if (expectedCallId != null && call?.id != expectedCallId) return@onMain report(CALL_CHANGED)
     if (call == null || call.direction != CallDirection.INCOMING || call.phase != CallPhase.RINGING ||
         call.suppressed || !carrierCall(call.call)) {
-        return@onMain report("没有可接听的单路运营商来电")
+        return@onMain report("There is no single carrier incoming call to answer")
     }
     work?.let {
         if (it.track === call && it.direction == CallDirection.INCOMING && it.stopReason.value == null) {
@@ -60,7 +60,7 @@ suspend fun CallRuntime.answer(expectedCallId: String? = null): CallActionResult
             }
             return@onMain awaitResult(it)
         }
-        return@onMain report("已有 AI 通话正在进行")
+        return@onMain report("An AI call is already in progress")
     }
     val attempt = Work(CallDirection.INCOMING, settings.state.value, track = call, expectedCallId = expectedCallId)
     startWork(attempt)
@@ -87,7 +87,7 @@ internal suspend fun CallRuntime.sendCallDtmf(target: Tracked, digits: String, o
             stop = { target.call.stopDtmfTone() },
             budget = if (owner != null) target.dtmfBudget else null)
     } catch (cancelled: CancellationException) {
-        recordDtmfStatus(target, owner, "按键发送已停止")
+        recordDtmfStatus(target, owner, "Keypad sending stopped")
         throw cancelled
     }
     recordDtmfStatus(target, owner, dtmfMessage(result))
@@ -105,35 +105,35 @@ internal fun CallRuntime.recordDtmfStatus(target: Tracked, owner: Work?, message
 }
 
 internal fun CallRuntime.dtmfMessage(result: CallDtmfResult): String = when (result.status) {
-    "submitted" -> "已提交 ${result.sentDigits} 个按键，等待对方响应"
-    "partial" -> "已提交 ${result.sentDigits}/${result.requestedDigits} 个按键，发送已中断"
-    "invalid_digits" -> "请输入 1 至 32 个按键，仅限 0–9、*、#"
-    "busy" -> "正在发送按键，请稍后再试"
-    "budget_exceeded" -> "本通 AI 按键次数已达上限，可人工接管后使用键盘"
-    "unavailable" -> "通话或 AI 控制权已变化，已停止发送按键"
-    else -> "未能完成按键发送，请等待对方响应后再操作"
+    "submitted" -> "Sent ${result.sentDigits} keypresses; waiting for the other party to respond"
+    "partial" -> "Sent ${result.sentDigits} of ${result.requestedDigits} keypresses; sending was interrupted"
+    "invalid_digits" -> "Enter 1 to 32 keypresses using only 0–9, * and #"
+    "busy" -> "Keypresses are being sent; try again shortly"
+    "budget_exceeded" -> "This AI call has reached its keypress limit; take over manually to use the keypad"
+    "unavailable" -> "The call or AI control changed; keypress sending stopped"
+    else -> "Keypress sending did not complete; wait for the other party to respond before trying again"
 }
 
 suspend fun CallRuntime.hangup(expectedCallId: String? = null): CallActionResult = onMain {
-    if (!settings.state.value.enabled || !armed) return@onMain report("AI 电话尚未准备好")
+    if (!settings.state.value.enabled || !armed) return@onMain report("AI calling is not ready")
     val call = liveCalls().singleOrNull()
     if (expectedCallId != null && call?.id != expectedCallId) return@onMain report(CALL_CHANGED)
     if (call == null || call.phase == CallPhase.DISCONNECTING || !carrierCall(call.call)) {
-        return@onMain report("没有可挂断的单路运营商通话")
+        return@onMain report("There is no single carrier call to hang up")
     }
     // Shared by local and validated remote hangup; stop keys before waiting for AI cleanup.
     dtmf.cancelPending()
     call.suppressed = true
-    val active = cancelWork("用户挂断")
+    val active = cancelWork("Hang-up by the user")
     val cleaned = awaitCleanup(active)
-    val endedMessage = if (cleaned) "Android 已确认通话结束" else "Android 已确认通话结束；音频恢复尚未确认"
+    val endedMessage = if (cleaned) "Android confirmed the call ended" else "Android confirmed the call ended; audio restoration is not yet confirmed"
     if (confirmedEnded(call)) return@onMain ok(endedMessage)
     if (!isCurrentCall(call, expectedCallId) || call.phase == CallPhase.DISCONNECTING) return@onMain report(CALL_CHANGED)
     if (runCatching {
             if (call.phase == CallPhase.RINGING) call.call.reject(false, null) else call.call.disconnect()
-        }.isFailure) return@onMain report("Android 未能发出挂断请求")
+        }.isFailure) return@onMain report("Android could not send the hang-up request")
     val ended = waitFor(CallPolicy.CONTROL_TIMEOUT_MS) { confirmedEnded(call) } || confirmedEnded(call)
-    if (ended) ok(endedMessage) else report("Android 尚未确认通话结束，请查看系统电话界面")
+    if (ended) ok(endedMessage) else report("Android has not confirmed the call ended; check the system call screen")
 }
 
 suspend fun CallRuntime.cancelAutoAnswer(expectedCallId: String? = null): CallActionResult = onMain {
@@ -141,22 +141,22 @@ suspend fun CallRuntime.cancelAutoAnswer(expectedCallId: String? = null): CallAc
     val target = current?.track
     if (current == null || target == null || !isPendingAutoAnswer(current, target) ||
         !isCurrentCall(target, expectedCallId)) {
-        return@onMain fail("没有可取消的这次自动接听")
+        return@onMain fail("There is no auto-answer to cancel for this call")
     }
-    val active = cancelWork("已取消本次 AI 接听")
-    if (!awaitCleanup(active)) return@onMain fail("已取消 AI 接听，清理尚未确认")
-    if (isCurrentCall(target, expectedCallId) && target.phase == CallPhase.RINGING) ok("已取消 AI 接听，电话继续响铃")
-    else ok("已取消本次 AI 接听")
+    val active = cancelWork("This AI answer was cancelled")
+    if (!awaitCleanup(active)) return@onMain fail("AI answer cancelled; cleanup is not yet confirmed")
+    if (isCurrentCall(target, expectedCallId) && target.phase == CallPhase.RINGING) ok("AI answer cancelled; the call keeps ringing")
+    else ok("This AI answer was cancelled")
 }
 
 suspend fun CallRuntime.takeover(): CallActionResult = takeover(null)
 
 internal suspend fun CallRuntime.takeover(callId: String?): CallActionResult = onMain {
     val current = work
-    if (current == null || (callId != null && callId != current.id)) return@onMain fail("这次 AI 通话已结束")
+    if (current == null || (callId != null && callId != current.id)) return@onMain fail("This AI call has ended")
     dtmf.cancelPending()
     current.track?.suppressed = true
-    val active = cancelWork(if (current.pendingRing) "已取消本次 AI 接听" else "已停止 AI，通话交给系统拨号器")
-    if (awaitCleanup(active)) ok(detail ?: "已停止 AI")
-    else report("AI 已停止，通话音频恢复尚未确认，请查看系统电话界面")
+    val active = cancelWork(if (current.pendingRing) "This AI answer was cancelled" else "AI stopped; the call is handed to the system dialer")
+    if (awaitCleanup(active)) ok(detail ?: "AI stopped")
+    else report("AI stopped; call audio restoration is not yet confirmed, so check the system call screen")
 }

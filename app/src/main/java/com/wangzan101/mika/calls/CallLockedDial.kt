@@ -16,33 +16,33 @@ import com.wangzan101.mika.calls.CallRuntime.Work
 // Call runtime: queue the outgoing dial while the screen is locked
 /** Takes effect only after the owner confirms this specific task while the app is visible. */
 suspend fun CallRuntime.queueLockedDial(number: String, simId: String? = null, task: CallTaskBrief): CallActionResult = onMain {
-    if (!interactiveForeground() || !userUnlocked()) return@onMain fail("请解锁手机并在电话页面确认本次拨号")
-    if (!secureDeviceLock()) return@onMain fail("请先为手机设置 PIN、图案或密码锁")
-    if (lockedDial != null) return@onMain fail("已有一次锁屏拨出，请先取消")
+    if (!interactiveForeground() || !userUnlocked()) return@onMain fail("Unlock the phone and confirm this call on the Phone screen")
+    if (!secureDeviceLock()) return@onMain fail("Set a PIN, pattern or password lock on the phone first")
+    if (lockedDial != null) return@onMain fail("A locked-screen dial is already scheduled; cancel it first")
     val snapshot = try { task.validatedSnapshot() } catch (e: IllegalArgumentException) {
-        return@onMain fail(e.message ?: "本次拨打交代无效")
+        return@onMain fail(e.message ?: "These call instructions are invalid")
     }
     prerequisite()?.let { return@onMain fail(it) }
-    val normalized = CallPolicy.outgoingNumber(number) ?: return@onMain fail("仅支持普通号码，不支持紧急号码、短号或控制代码")
-    if (isEmergency(normalized) != false) return@onMain fail("紧急号码或无法确认安全的号码不能拨打")
-    if (!lockedDialIdle()) return@onMain fail("已有通话或无法确认空闲，未安排拨号")
+    val normalized = CallPolicy.outgoingNumber(number) ?: return@onMain fail("Only regular numbers are supported; emergency numbers, short codes and control codes are not")
+    if (isEmergency(normalized) != false) return@onMain fail("Emergency numbers, or numbers that cannot be confirmed safe, cannot be dialed")
+    if (!lockedDialIdle()) return@onMain fail("There is already a call, or the line could not be confirmed idle; no dial was scheduled")
     readSims()
-    if (!withContext(Dispatchers.IO) { access.ready() }) return@onMain fail("系统通话管理权限不可用")
+    if (!withContext(Dispatchers.IO) { access.ready() }) return@onMain fail("The system call-management permission is unavailable")
     if (!interactiveForeground() || !userUnlocked() || !secureDeviceLock()) {
-        return@onMain fail("请在手机解锁时确认安排锁屏拨出")
+        return@onMain fail("Confirm the locked-screen dial while the phone is unlocked")
     }
     prerequisite()?.let { return@onMain fail(it) }
-    if (lockedDial != null || !lockedDialIdle()) return@onMain fail("已有拨号安排或通话，未安排拨号")
+    if (lockedDial != null || !lockedDialIdle()) return@onMain fail("A dial is already scheduled, or there is a call; no dial was scheduled")
     val config = settings.state.value
     val picked = CallPolicy.chooseOutgoingSim(sims.map { it.info }, simId, config.defaultOutgoingSimId)
-        ?: return@onMain fail(if (simId == null && config.defaultOutgoingSimId != null) "保存的默认拨号 SIM 已不可用，请重新选择"
-            else "请选择一张有效的 SIM，或明确选择可用的系统默认 SIM")
+        ?: return@onMain fail(if (simId == null && config.defaultOutgoingSimId != null) "The saved default dialing SIM is no longer available; select another"
+            else "Select a valid SIM, or explicitly choose an available system default SIM")
     val sim = sims.single { it.info.id == picked.id }
-    if (!CallStandbyService.notificationsAvailable(app, create = true)) return@onMain fail("请允许后台待命通知，以便取消锁屏拨出")
-    val ticket = lockedDialGate.arm(normalized, picked.id, snapshot) ?: return@onMain fail("未能安排本次锁屏拨出")
+    if (!CallStandbyService.notificationsAvailable(app, create = true)) return@onMain fail("Allow background standby notifications so the locked-screen dial can be cancelled")
+    val ticket = lockedDialGate.arm(normalized, picked.id, snapshot) ?: return@onMain fail("Could not schedule this locked-screen dial")
     val pending = PendingLockedDial(ticket, config, sim, settings.credentialsRevision.value)
     lockedDial = pending
-    lockedDialDetail = "已安排锁屏拨出，请在 45 秒内锁屏"
+    lockedDialDetail = "Locked-screen dial scheduled; lock the screen within 45 seconds"
     // A short one-shot lock keeps the confirmation window ticking as the screen turns off.
     // There is no indefinite standby wake lock and no attempt to wake or unlock the display.
     pending.wakeLock = runCatching {
@@ -53,24 +53,24 @@ suspend fun CallRuntime.queueLockedDial(number: String, simId: String? = null, t
         }
     }.getOrNull()
     if (pending.wakeLock == null) {
-        finishLockedDial(pending, "无法保持锁屏拨号确认窗口，未安排拨号")
+        finishLockedDial(pending, "Could not keep the locked-screen dial confirmation window open; no dial was scheduled")
         return@onMain fail(lockedDialDetail.orEmpty())
     }
     if (standbyService == null && !requestCallForegroundService(incoming = false)) {
-        return@onMain fail(lockedDialDetail ?: "后台电话服务未启动")
+        return@onMain fail(lockedDialDetail ?: "The background phone service did not start")
     }
     pending.job = scope.launch(start = CoroutineStart.LAZY) { observeLockedDial(pending) }
     pending.job?.start()
     publish()
-    if (lockedDial === pending) ok("已安排一次锁屏拨出；Android 尚未拨号")
-    else fail(lockedDialDetail ?: "本次锁屏拨出未安排")
+    if (lockedDial === pending) ok("Locked-screen dial scheduled; Android has not placed the call yet")
+    else fail(lockedDialDetail ?: "This locked-screen dial was not scheduled")
 }
 
 suspend fun CallRuntime.cancelLockedDial(requestId: String): CallActionResult = onMain {
     val pending = lockedDial?.takeIf { it.ticket.id == requestId }
-        ?: return@onMain fail("该锁屏拨出已结束或已提交系统")
-    finishLockedDial(pending, "已取消本次锁屏拨出")
-    ok("已取消本次锁屏拨出")
+        ?: return@onMain fail("This locked-screen dial has ended or was submitted to the system")
+    finishLockedDial(pending, "This locked-screen dial was cancelled")
+    ok("This locked-screen dial was cancelled")
 }
 
 internal fun CallRuntime.secureDeviceLock(): Boolean =
@@ -89,26 +89,26 @@ internal suspend fun CallRuntime.observeLockedDial(pending: PendingLockedDial) {
     while (lockedDial === pending) {
         val remaining = pending.ticket.expiresAtMs - SystemClock.elapsedRealtime()
         if (remaining <= 0L) {
-            finishLockedDial(pending, "锁屏拨出安排已过期，未拨号")
+            finishLockedDial(pending, "The locked-screen dial expired; no call was placed")
             return
         }
         val deviceLocked = keyguardLocked()
         val eligible = lockedDialEligible(pending)
         if (pending.claimed) {
             if (!deviceLocked || !eligible || standbyService == null) {
-                finishLockedDial(pending, "手机已解锁或通话条件变化，未执行锁屏拨出")
+                finishLockedDial(pending, "The phone was unlocked or the call conditions changed; the locked-screen dial was not performed")
                 return
             }
         } else when (val decision = lockedDialGate.poll(pending.ticket, deviceLocked && standbyService != null, eligible)) {
             LockedDialGate.Decision.WaitingForLock -> Unit
             is LockedDialGate.Decision.Rejected -> {
-                finishLockedDial(pending, if (decision.reason == LockedDialGate.Rejection.EXPIRED) "锁屏拨出安排已过期，未拨号"
-                    else "电话条件变化，未执行锁屏拨出")
+                finishLockedDial(pending, if (decision.reason == LockedDialGate.Rejection.EXPIRED) "The locked-screen dial expired; no call was placed"
+                    else "The call conditions changed; the locked-screen dial was not performed")
                 return
             }
             is LockedDialGate.Decision.Claimed -> {
                 pending.claimed = true
-                lockedDialDetail = "手机已锁屏，正在准备拨号"
+                lockedDialDetail = "Phone locked; preparing the call"
                 val request = decision.request
                 startWork(Work(CallDirection.OUTGOING, pending.config, requestedNumber = request.number,
                     sim = pending.sim, task = request.task, lockedDialTicket = pending.ticket))
@@ -138,12 +138,12 @@ internal fun CallRuntime.finishLockedDial(pending: PendingLockedDial, reason: St
 internal fun CallRuntime.validateLockedDial(w: Work) {
     val ticket = w.lockedDialTicket ?: return
     val pending = lockedDial?.takeIf { it.ticket === ticket && it.claimed }
-        ?: throw CallProblem("锁屏拨出已取消，未拨号")
+        ?: throw CallProblem("The locked-screen dial was cancelled; no call was placed")
     when (lockedDialGate.submissionRejection(ticket) {
         standbyService != null && lockedDialEligible(pending) && keyguardLocked()
     }) {
-        LockedDialGate.Rejection.EXPIRED -> throw CallProblem("锁屏拨出安排已过期，未拨号")
+        LockedDialGate.Rejection.EXPIRED -> throw CallProblem("The locked-screen dial expired; no call was placed")
         null -> Unit
-        else -> throw CallProblem("手机已解锁或通话条件变化，未执行锁屏拨出")
+        else -> throw CallProblem("The phone was unlocked or the call conditions changed; the locked-screen dial was not performed")
     }
 }

@@ -154,7 +154,7 @@ class ModelSetupViewModelTest {
             runCurrent()
             assertEquals(id, store.configFor(role)?.model)
         }
-        assertEquals("只有主模型试调用", listOf(id), built.map { it.first })
+        assertEquals("only the main model is probed", listOf(id), built.map { it.first })
         assertEquals(setOf(id), store.provider(provider.id)?.verifiedModels)
     }
 
@@ -180,7 +180,7 @@ class ModelSetupViewModelTest {
         assertEquals(listOf("b", "b"), built.map { it.first })
         vm.pick(ModelRole.Light, p.id, "b"); runCurrent()
         assertEquals("b", store.configFor(ModelRole.Light)?.model)
-        assertEquals("轻量不试调用", 2, built.size)
+        assertEquals("the light model is not probed", 2, built.size)
     }
 
     /** A hand-typed light model is probed first: if it fails (not found, no tool call) the previous light model stays and it is not recorded as hand-typed; models picked from the list are not probed. */
@@ -204,7 +204,7 @@ class ModelSetupViewModelTest {
         assertTrue(store.provider(p.id)!!.typedModels.isEmpty())
         vm.pick(ModelRole.Light, p.id, "b"); runCurrent()
         assertEquals("b", store.configFor(ModelRole.Light)?.model)
-        assertEquals("列表里选的轻量不试调用", listOf("typo", "typo2"), built.map { it.first })
+        assertEquals("a light model picked from the list is not probed", listOf("typo", "typo2"), built.map { it.first })
     }
 
     /** A hand-typed vision model that only replies without calling a tool still passes (vision does not rely on tools): it is used and recorded as hand-typed and verified. */
@@ -243,7 +243,7 @@ class ModelSetupViewModelTest {
         assertTrue(store.roles.value.lightFallbacks.isEmpty())
         vm.pickFallback(ModelRole.Light, 0, p.id, "b"); runCurrent()
         assertEquals(1, store.roles.value.lightFallbacks.size)
-        assertEquals("列表里选的备援不试调用", listOf("backup-typed", "nope"), built.map { it.first })
+        assertEquals("a fallback picked from the list is not probed", listOf("backup-typed", "nope"), built.map { it.first })
     }
 
     /** A hand-typed light model inside "use as" is probed first, and on failure the previous light model stays; one from the list is used directly without sending a request. */
@@ -264,7 +264,7 @@ class ModelSetupViewModelTest {
         runCurrent()
         assertEquals(1, done)
         assertEquals("b", store.configFor(ModelRole.Light)?.model)
-        assertEquals("列表里的不试调用", 1, built.size)
+        assertEquals("one from the list is not probed", 1, built.size)
     }
 
     /** For a provider saved by skipping the test, a main-model fallback picked from the list is probed too; on failure that slot stays unchanged. A vision fallback is not probed. */
@@ -277,7 +277,7 @@ class ModelSetupViewModelTest {
         assertTrue(store.provider(untested.id)!!.savedUntested)
         val vm = vm(store)
         vm.pickFallback(ModelRole.Main, 0, listed.id, "b"); runCurrent()
-        assertTrue("列表里、测过的那家不试", built.isEmpty())
+        assertTrue("a listed, already-tested provider is not probed", built.isEmpty())
         vm.clearFallback(ModelRole.Main, 0); runCurrent()
         reply = { throw ModelError.ModelNotFound("local-m") }
         vm.pickFallback(ModelRole.Main, 0, untested.id, "local-m"); runCurrent()
@@ -288,7 +288,7 @@ class ModelSetupViewModelTest {
         vm.pickFallback(ModelRole.Main, 0, untested.id, "local-m"); runCurrent()
         assertEquals(listOf("local-m"), store.list().filter { it.id in store.roles.value.mainFallbacks }.map { it.model })
         vm.pickFallback(ModelRole.Vision, 0, untested.id, "local-m"); runCurrent()
-        assertEquals("看图备援不试", 2, built.size)
+        assertEquals("a vision fallback is not probed", 2, built.size)
     }
 
     /** "Use as → main model" probes first; on failure the previous main model stays, and only a pass switches it. */
@@ -432,7 +432,7 @@ class ModelSetupViewModelTest {
         var done = 0
         vm.useFromProvider(ModelRole.Vision, p.id, "vendor/opaque-image") { done++ }
         runCurrent()
-        assertEquals("没通过不落", 0, done)
+        assertEquals("a failure is not saved", 0, done)
         assertTrue(vm.state.value.manualPick[p.id] is ListState.Failed)
         assertNull(store.configFor(ModelRole.Vision))
         assertEquals(listOf("vendor/opaque-image"), built.map { it.first })
@@ -452,7 +452,7 @@ class ModelSetupViewModelTest {
 
         val p = store.providers.value.single()
         assertEquals(2, p.models?.size)
-        assertEquals("只试一个", 1, built.size)
+        assertEquals("only one is probed", 1, built.size)
         assertNull(store.roles.value.main)
         assertFalse(vm.state.value.canNext)
         assertFalse(vm.state.value.showForm)
@@ -494,7 +494,7 @@ class ModelSetupViewModelTest {
         val store = store()
         val vm = vm(store)
         runCurrent()
-        assertTrue("还没有服务商时表单展开", vm.state.value.showForm)
+        assertTrue("the form is expanded when there is no provider yet", vm.state.value.showForm)
         assertFalse(vm.state.value.form.canTest)
         assertFalse(vm.state.value.canNext)
         vm.setApiKey("sk-1")
@@ -512,7 +512,7 @@ class ModelSetupViewModelTest {
         assertEquals(1, store.list().size)
         val s = vm.state.value
         assertEquals(setOf("deepseek-chat"), s.providers.single().verifiedModels)
-        assertFalse("保存后表单收起", s.showForm)
+        assertFalse("the form collapses after saving", s.showForm)
         assertEquals("", s.form.apiKey)
         assertEquals(ListState.Idle, s.form.test)
         assertNull(s.probeNote)
@@ -558,7 +558,7 @@ class ModelSetupViewModelTest {
         vm.selectPreset(cf.label)
         var form = vm.state.value.form
         assertTrue(form.isCloudflare)
-        assertFalse("Cloudflare 单独展示 Account ID 输入项", form.urlEditable)
+        assertFalse("Cloudflare shows a separate Account ID field", form.urlEditable)
         assertFalse(form.canTest)
         assertEquals(tr(com.wangzan101.mika.R.string.model_url_account_id), form.urlProblem)
 
@@ -585,7 +585,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.form.canTest)
 
         vm.saveWithoutTest(); runCurrent()
-        assertFalse("保存后关闭表单", vm.state.value.showForm)
+        assertFalse("the form closes after saving", vm.state.value.showForm)
         val saved = store.providers.value.single()
         assertEquals("Cloudflare Workers AI (my_a…_123)", saved.name)
         assertEquals(actualUrl, saved.baseUrl)
@@ -623,7 +623,7 @@ class ModelSetupViewModelTest {
         val after = vm.state.value.form
         assertEquals(ProviderConfig.Kind.Anthropic, after.kind)
         assertEquals("gk", after.apiKey)
-        assertNull("选了预设就不再建议", after.suggestedPreset)
+        assertNull("no suggestion once a preset is chosen", after.suggestedPreset)
     }
 
     /** Hand-typed: the main model is probed on this one, and on success it is recorded as hand-typed and verified; fallbacks are not probed. */
@@ -702,11 +702,11 @@ class ModelSetupViewModelTest {
         val main = store.roles.value.main
         vm.openForm()
         assertTrue(vm.state.value.showForm)
-        vm.selectPreset("通义千问")
+        vm.selectPreset("Qwen")
         vm.setApiKey("qk"); vm.testAndSave(); runCurrent()
-        assertEquals(listOf("DeepSeek", "通义千问"), vm.state.value.providers.map { it.name })
+        assertEquals(listOf("DeepSeek", "Qwen"), vm.state.value.providers.map { it.name })
         assertEquals(listOf("sk", "qk"), store.providers.value.map { store.providerKey(it.id) })
-        assertEquals("第二家不改主模型", main, store.roles.value.main)
+        assertEquals("the second provider does not change the main model", main, store.roles.value.main)
         assertEquals(1, store.list().size)
         assertFalse(vm.state.value.showForm)
     }
@@ -718,15 +718,15 @@ class ModelSetupViewModelTest {
         val vm = vm(store)
         vm.setApiKey("sk"); vm.testAndSave(); runCurrent()
         vm.pick(ModelRole.Main, store.providers.value.single().id, "deepseek-chat"); runCurrent()
-        vm.openForm(); vm.selectPreset("通义千问"); vm.setApiKey("qk"); vm.testAndSave(); runCurrent()
-        val qwen = vm.state.value.providers.first { it.name == "通义千问" }
+        vm.openForm(); vm.selectPreset("Qwen"); vm.setApiKey("qk"); vm.testAndSave(); runCurrent()
+        val qwen = vm.state.value.providers.first { it.name == "Qwen" }
         // The selection page lists every model of every provider, without filtering by capability
         assertEquals(listOf(3, 2), vm.state.value.providers.map { vm.state.value.options(it).size })
         vm.pick(ModelRole.Vision, qwen.id, "qwen-plain"); runCurrent()
         val vision = store.configFor(ModelRole.Vision)!!
         assertEquals("qwen-plain", vision.model)
         assertEquals(qwen.id, vision.providerId)
-        assertTrue("选了看图就记看图", vision.capabilities.vision)
+        assertTrue("choosing vision records vision", vision.capabilities.vision)
         assertEquals("qk", store.apiKey(vision.id))
         assertEquals("deepseek-chat", store.configFor(ModelRole.Main)?.model)
         assertTrue(vm.state.value.picked(ModelRole.Vision, qwen.id, "qwen-plain"))
@@ -755,15 +755,15 @@ class ModelSetupViewModelTest {
         assertTrue(main.capabilities.toolCalls)
         vm.pick(ModelRole.Main, p.id, "deepseek-chat"); runCurrent()
         assertEquals("deepseek-chat", store.configFor(ModelRole.Main)?.model)
-        assertEquals("没人用的配置删掉", 1, store.list().size)
+        assertEquals("an unused config is deleted", 1, store.list().size)
     }
 
     @Test fun nextNeedsAMainModel() = runTest {
         val store = store()
         val vm = vm(store)
-        vm.selectPreset("自定义")
+        vm.selectPreset("Custom")
         vm.setBaseUrl("http://192.168.1.5:8000/v1")
-        assertTrue("自定义的 OpenAI 兼容接口可以不填 Key", vm.state.value.form.canTest)
+        assertTrue("a custom OpenAI-compatible endpoint can be saved without a Key", vm.state.value.form.canTest)
         listing["http://192.168.1.5:8000/v1"] = ModelListResult.Failed(ListFailure.NotSupported)
         vm.testAndSave(); runCurrent()
         // The service offers no list: a model name is required first, so nothing was saved
@@ -798,7 +798,7 @@ class ModelSetupViewModelTest {
         assertEquals(1, listCalls.size)
         assertEquals("ak", listCalls.single().third)
         assertEquals(listOf("claude-x", "claude-y"), vm.state.value.options(vm.state.value.providers.single()).map { it.id })
-        assertTrue("已有的配置保留它的能力", vm.state.value.options(vm.state.value.providers.single()).first().capabilities.vision)
+        assertTrue("an existing config keeps its capabilities", vm.state.value.options(vm.state.value.providers.single()).first().capabilities.vision)
     }
 
     @Test fun refreshFailureIsShownAndRemovingProviderDropsItsRoles() = runTest {
@@ -810,7 +810,7 @@ class ModelSetupViewModelTest {
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Network)
         vm.refresh(p.id); runCurrent()
         assertEquals(ListState.Failed(ListFailure.Network.text), vm.state.value.listing[p.id])
-        assertEquals("失败时保留原来的列表", 3, store.providers.value.single().models?.size)
+        assertEquals("the original list is kept on failure", 3, store.providers.value.single().models?.size)
         vm.changeKey(p.id, "sk2"); runCurrent()
         assertEquals("sk2", store.providerKey(p.id))
         vm.removeProvider(p.id); runCurrent()
@@ -881,7 +881,7 @@ class ModelSetupViewModelTest {
             vm.testAndSave(); runCurrent()
             val f = vm.state.value.form
             assertEquals(ListState.Failed(failure.text), f.test)
-            assertTrue("出错后可以手填", f.showModel)
+            assertTrue("manual entry is possible after an error", f.showModel)
             assertTrue(store.providers.value.isEmpty())
             vm.setModel("plan-model"); vm.testAndSave(); runCurrent()
             assertEquals(ListState.Failed(failure.text), vm.state.value.form.test)
@@ -914,7 +914,7 @@ class ModelSetupViewModelTest {
         runCurrent()
         vm.pick(ModelRole.Light, p.id, "deepseek-v9"); runCurrent()
         assertEquals(setOf("deepseek-v9"), store.provider(p.id)?.typedModels)
-        assertEquals("存进文件", setOf("deepseek-v9"), store().provider(p.id)?.typedModels)
+        assertEquals("stored in the file", setOf("deepseek-v9"), store().provider(p.id)?.typedModels)
         store.rememberModels(p.id, deepseek.models)
         vm.pick(ModelRole.Light, p.id, "deepseek-chat"); runCurrent()
         val options = vm.state.value.options(store.provider(p.id)!!)
@@ -932,23 +932,23 @@ class ModelSetupViewModelTest {
         val store = store()
         val vm = vm(store)
         vm.setApiKey("sk-1"); vm.saveWithoutTest(); runCurrent()
-        assertTrue("一次列模型都没调", listCalls.isEmpty())
-        assertTrue("一次试调用都没有", built.isEmpty())
+        assertTrue("the model list was never fetched", listCalls.isEmpty())
+        assertTrue("no probe call was made", built.isEmpty())
         val p = store.providers.value.single()
         assertEquals("DeepSeek", p.name)
         assertEquals("sk-1", store.providerKey(p.id))
         assertEquals(emptyList<ListedModel>(), p.models)
         assertEquals(emptySet<String>(), p.verifiedModels)
-        assertTrue("标成没测过", p.savedUntested)
+        assertTrue("marked as untested", p.savedUntested)
         // It is there in the file too
         assertTrue(store().provider(p.id)!!.savedUntested)
         // Left for the user to choose a main model explicitly.
         assertNull(store.roles.value.main)
         val s = vm.state.value
-        assertFalse("保存后表单收起", s.showForm)
+        assertFalse("the form collapses after saving", s.showForm)
         assertEquals("", s.form.apiKey)
         assertEquals(ListState.Idle, s.form.test)
-        assertTrue("存好后说清它没测过", s.probeNote?.contains(p.name) == true)
+        assertTrue("after saving it says clearly that it was not tested", s.probeNote?.contains(p.name) == true)
     }
 
     /** A hand-typed model saved by skipping the test: after reopening it is picked as the main model, probed once and used only on success (the provider no longer counts as untested either). */
@@ -995,13 +995,13 @@ class ModelSetupViewModelTest {
     @Test fun saveWithoutTestRefusesAnInvalidForm() = runTest {
         val store = store()
         val vm = vm(store)
-        assertFalse("还没填 Key", vm.state.value.form.canSaveUntested)
+        assertFalse("the Key is not filled in yet", vm.state.value.form.canSaveUntested)
         vm.saveWithoutTest(); runCurrent()
         assertTrue(store.providers.value.isEmpty())
         vm.selectPreset(ProviderPresets.custom.label)
         vm.setBaseUrl("api.deepseek.com")
         vm.setApiKey("sk")
-        assertFalse("地址没写协议", vm.state.value.form.canSaveUntested)
+        assertFalse("the URL has no protocol", vm.state.value.form.canSaveUntested)
         vm.saveWithoutTest(); runCurrent()
         assertTrue(store.providers.value.isEmpty())
         // Self-hosted services need no key, so saving is allowed
@@ -1020,12 +1020,12 @@ class ModelSetupViewModelTest {
         store.markVerified(p.id, "deepseek-chat")
         assertFalse(p.savedUntested)
         vm.openForm(); vm.setApiKey("sk-2"); vm.saveWithoutTest(); runCurrent()
-        assertEquals("不重复添加", 1, store.providers.value.size)
+        assertEquals("not added twice", 1, store.providers.value.size)
         val after = store.provider(p.id)!!
         assertEquals("sk-2", store.providerKey(p.id))
-        assertEquals("列过的列表留着", listOf("deepseek-chat", "deepseek-reasoner", "deepseek-coder"), after.models!!.map { it.id })
+        assertEquals("the fetched list is kept", listOf("deepseek-chat", "deepseek-reasoner", "deepseek-coder"), after.models!!.map { it.id })
         assertEquals(setOf("deepseek-chat"), after.verifiedModels)
-        assertFalse("核实过的模型让这家不算没测过", after.savedUntested)
+        assertFalse("a verified model means the provider no longer counts as untested", after.savedUntested)
     }
 
     // ---------- A pasted key containing newlines, zero-width characters or non-ASCII ----------
@@ -1155,11 +1155,11 @@ class ModelSetupViewModelTest {
         val id = store.providers.value.single().id
         val listed = listCalls.size
         vm.changeKey(id, "sk-\n2"); runCurrent()
-        assertEquals("换行的 Key 不存", "sk", store.providerKey(id))
-        assertEquals("换行的 Key 不重新列模型", listed, listCalls.size)
+        assertEquals("a Key with a newline is not saved", "sk", store.providerKey(id))
+        assertEquals("a Key with a newline does not re-list models", listed, listCalls.size)
         vm.changeKey(id, "密钥：sk-3"); runCurrent()
-        assertEquals("没存非法的 Key", "sk", store.providerKey(id))
-        assertEquals("非法的 Key 不重新列模型", listed, listCalls.size)
+        assertEquals("the invalid Key is not saved", "sk", store.providerKey(id))
+        assertEquals("an invalid Key does not re-list models", listed, listCalls.size)
         vm.changeKey(id, "sk-\u200B2"); runCurrent()
         assertEquals("sk-2", store.providerKey(id))
         assertEquals(listed + 1, listCalls.size)
@@ -1204,7 +1204,7 @@ class ModelSetupViewModelTest {
             ),
             usage.toSet(),
         )
-        assertEquals("本地服务商的模型不算进来", emptyList<VoiceModelRef>(), vm.providerVoiceUsage("local"))
+        assertEquals("a local provider's models are not counted", emptyList<VoiceModelRef>(), vm.providerVoiceUsage("local"))
     }
 
     private fun voiceCredentialStore(): VoiceCredentialStore = VoiceCredentialStore(

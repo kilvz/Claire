@@ -394,13 +394,13 @@ class LearnRunnerTest {
         assertTrue(e.runner.requestActive)
         late.complete(Unit)
         runCurrent()
-        assertTrue("新的一批还在发", e.runner.requestActive)
+        assertTrue("the new batch is still being sent", e.runner.requestActive)
         assertEquals(LearnStatus.Sending, e.runner.state.value.status)
         assertEquals(0, e.runner.state.value.pending)
         e.model.gate!!.complete(Unit)
         runCurrent()
         assertEquals(listOf("Hiking"), e.store.data.topics.map { it.label })
-        assertEquals("晚回来的「预算用完」不算数", LearnStatus.Idle, e.runner.state.value.status)
+        assertEquals("a late \"budget exhausted\" does not count", LearnStatus.Idle, e.runner.state.value.status)
     }
 
     @Test fun busyWaits() = runTest {
@@ -461,7 +461,7 @@ class LearnRunnerTest {
         for (hold in listOf(2, 5, 15, 30, 30)) {
             wait(hold * 60_000L - 1)
             e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent()
-            assertEquals("停满 $hold 分钟之前不发", expected, e.model.calls.size)
+            assertEquals("nothing is sent before the full $hold minutes", expected, e.model.calls.size)
             wait(1)
             e.busy.value = true; runCurrent(); e.busy.value = false; runCurrent()
             if (expected < 3) expected++
@@ -609,7 +609,7 @@ class LearnRunnerTest {
         val e = Env(this)
         e.built = target.copy(providerId = "p2")
         e.post(count = LearnTuning.DUE_COUNT)
-        assertTrue("文字没发出去", e.model.calls.isEmpty())
+        assertTrue("nothing was sent", e.model.calls.isEmpty())
         assertFalse(e.runner.requestActive)
         val s = e.runner.state.value
         assertEquals(LearnStatus.NeedsConsent, s.status)
@@ -1287,7 +1287,7 @@ class LearnRunnerTest {
         e.contacts.data = seededContacts()
         fun copies() { e.store.brokenCopies = 1; e.contacts.brokenCopies = 1 }
         fun gone() = e.store.brokenCopies == 0 && e.contacts.brokenCopies == 0
-        copies(); e.runner.open(); assertFalse("只是打开页面不删", gone())
+        copies(); e.runner.open(); assertFalse("merely opening the page does not delete", gone())
         e.runner.deleteTopic("ka"); assertTrue(gone())
         copies(); e.runner.deleteContact("c2"); assertTrue(gone())
         copies(); e.runner.clearApp("com.chat"); assertTrue(gone())
@@ -1396,14 +1396,14 @@ class LearnRunnerTest {
         e.optOut += "com.a"
         e.runner.forgetApps(setOf("com.a"))
         assertEquals(setOf("com.a"), e.purges.journalPurges)
-        assertEquals("读不出来不整份删", 0, e.journal.wipes)
+        assertEquals("an unreadable file is not wiped entirely", 0, e.journal.wipes)
         // Later it becomes readable and the App is allowed again too
         e.journal.failLoad = false
         e.optOut -= "com.a"
         val view = e.runner.notices(e.now() - 10_000, e.now() + 1, LearnLevel.Balanced) { SourceTier.High }!!
         assertEquals(listOf("com.b"), view.entries.map { it.packageName })
         assertEquals(listOf("com.b"), rawApps(e))
-        assertTrue("存上了就不再记着", e.purges.journalPurges.isEmpty())
+        assertTrue("once saved it is no longer recorded", e.purges.journalPurges.isEmpty())
         // After being allowed again, new entries are recorded and kept as usual: a new process will not sweep them away with the earlier pending delete
         e.runner.capture(NoticeRecord("n1", "com.a", e.now(), "新会话", "重新允许之后的"))
         lockAndUnlock(e)
@@ -1422,7 +1422,7 @@ class LearnRunnerTest {
         e.journal.failSave = true
         e.optOut += "com.a"
         e.runner.forgetApps(setOf("com.a"))
-        assertEquals("没存上:文件里还是三条", 3, rawApps(e).size)
+        assertEquals("the save failed: the file still has three entries", 3, rawApps(e).size)
         assertEquals(setOf("com.a"), e.purges.journalPurges)
         e.journal.failSave = false
         e.optOut -= "com.a"
@@ -1522,7 +1522,7 @@ class LearnRunnerTest {
             e.contacts.failSave = true
             e.runner.deleteContact("c1")
             assertEquals(setOf(":contact:c1"), e.purges.contactPurges)
-            assertEquals("没存上,文件里还在", 1, e.contacts.data.contacts.size)
+            assertEquals("the save failed, it is still in the file", 1, e.contacts.data.contacts.size)
             e.contacts.failSave = false
             e.runner.clearAll()
             assertTrue(e.contacts.data.contacts.isEmpty())
@@ -1907,7 +1907,7 @@ class LearnRunnerTest {
         f.model.error = null
         f.model.notesReply = { oneNote }
         f.busy.value = true; runCurrent(); f.busy.value = false; runCurrent()
-        assertEquals("停着的时候不发", 1, notesCalls())
+        assertEquals("nothing is sent while paused", 1, notesCalls())
         wait(LearnTuning.failureHoldMs(1))
         f.busy.value = true; runCurrent(); f.busy.value = false; runCurrent()
         assertEquals(2, notesCalls())
@@ -2012,14 +2012,14 @@ class LearnRunnerTest {
     @Test fun dayDigestIsMadeOnceTheDayIsOver() = runTest {
         val e = withANote()
         nudge(e)
-        assertFalse("当天不自动做", "day" in e.model.kinds)
+        assertFalse("not done automatically on the same day", "day" in e.model.kinds)
         wait(LearnTuning.DAY_MS)
-        assertFalse("没有定时器", "day" in e.model.kinds)
+        assertFalse("no timer", "day" in e.model.kinds)
         nudge(e)
         assertEquals("day", e.model.kinds.last())
         val input = e.model.input(e.model.calls.lastIndex)
         assertTrue(input, "[s1] app: App shop" in input && "买的东西发货了" in input)
-        assertFalse("没有通知原文", "text 1" in input || "title 1" in input)
+        assertFalse("no notification raw text", "text 1" in input || "title 1" in input)
         assertTrue(e.model.tools.last().isEmpty())
         val d = e.digestStore.data.days.single()
         assertEquals(20_000L, d.day)
@@ -2060,7 +2060,7 @@ class LearnRunnerTest {
         e.model.notesReply = { fiveNotes }
         e.model.dayReply = { oneLine }
         e.post(pkg = "com.shop", count = 20)
-        assertEquals("没有人点过,自己做了", "day", e.model.kinds.last())
+        assertEquals("nobody tapped it, it did it by itself", "day", e.model.kinds.last())
         val d = e.digestStore.data.days.single()
         assertTrue(d.partial)
         assertEquals(20_000L, d.day)
@@ -2094,7 +2094,7 @@ class LearnRunnerTest {
         nudge(e)
         val d = e.digestStore.data.days.single()
         assertEquals(20_000L, d.day)
-        assertFalse("完整的那一份照样做了", d.partial)
+        assertFalse("the complete copy is still made", d.partial)
     }
 
     // The user deleted today's: it is not made again automatically (even if new sentences arrive)
@@ -2439,15 +2439,15 @@ class LearnRunnerTest {
         val e = withADay()
         wait(LearnTuning.DAY_MS)
         nudge(e)
-        assertFalse("周日:这一周还没过完", "week" in e.model.kinds)
+        assertFalse("Sunday: the week is not over yet", "week" in e.model.kinds)
         wait(LearnTuning.DAY_MS)
-        assertFalse("没有定时器", "week" in e.model.kinds)
+        assertFalse("no timer", "week" in e.model.kinds)
         nudge(e)
         assertEquals("week", e.model.kinds.last())
         val input = e.model.input(e.model.calls.lastIndex)
         assertTrue(input, "Week: 2024-09-30 (Mon) to 2024-10-06 (Sun)" in input)
         assertTrue(input, "[d1] date: 2024-10-04 (Fri), apps: App shop" in input && "买的东西发货了,今天到" in input)
-        assertFalse("没有通知原文", "text 1" in input || "title 1" in input)
+        assertFalse("no notification raw text", "text 1" in input || "title 1" in input)
         assertTrue(e.model.tools.last().isEmpty())
         val w = e.digestStore.data.weeks.single()
         assertEquals(19_996L, w.start)
@@ -2474,14 +2474,14 @@ class LearnRunnerTest {
         assertEquals("week", e.model.kinds.last())
         wait(20 * LearnTuning.DAY_MS)
         nudge(e)
-        assertFalse("十月还没过完", "month" in e.model.kinds)
+        assertFalse("October is not over yet", "month" in e.model.kinds)
         wait(5 * LearnTuning.DAY_MS)
         nudge(e)
         assertEquals("month", e.model.kinds.last())
         val input = e.model.input(e.model.calls.lastIndex)
         assertTrue(input, "Month: 2024-10" in input)
         assertTrue(input, "[d1] week: 2024-09-30 (Mon) to 2024-10-06 (Sun), apps: App shop" in input && "10 月 4 日买的东西发货了" in input)
-        assertFalse("没有当日归纳的句子", "今天到" in input)
+        assertFalse("no day-digest sentences", "今天到" in input)
         val m = e.digestStore.data.months.single()
         assertEquals("这个月:东西到了", m.brief)
         assertEquals(19_997L, m.start)
@@ -2640,7 +2640,7 @@ class LearnRunnerTest {
             e.runner.deleteSpan(SpanKind.Week, week)
             assertTrue(e.runner.digestWeeks.value.isEmpty())
             assertTrue(e.digestStore.data.weeks.single().let { it.removed && it.lines.isEmpty() })
-            assertTrue("月归纳里依据这一周的句子也去掉", e.digestStore.data.months.single().lines.isEmpty())
+            assertTrue("the month digest's sentences based on this week are removed too", e.digestStore.data.months.single().lines.isEmpty())
             val month = e.digestStore.data.months.single().start
             e.runner.deleteSpan(SpanKind.Month, month)
             assertTrue(e.runner.digestMonths.value.isEmpty())

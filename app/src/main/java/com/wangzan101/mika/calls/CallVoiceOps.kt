@@ -80,9 +80,9 @@ internal fun CallRuntime.realtimeProvider(): CallRealtimeProvider =
     if (realtimeController.migrated) realtimeController.callProvider() else ProfileRealtimeProvider()
 
 suspend fun CallRuntime.selectVoiceProfile(id: String): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
     if (realtimeController.migrated) {
-        val profile = voiceProfiles.get(id) ?: return@onMain fail("实时语音配置不存在")
+        val profile = voiceProfiles.get(id) ?: return@onMain fail("The realtime voice configuration does not exist")
         val ref = RealtimeSelectionController.legacyProfileRef(id, profile.model)
         realtimeController.select(ref)
         val config = settings.state.value
@@ -92,9 +92,9 @@ suspend fun CallRuntime.selectVoiceProfile(id: String): CallActionResult = onMai
             autoAnswer = false,
         ))
         publish()
-        return@onMain ok("已选择${profile.name}，自动接听需要重新开启")
+        return@onMain ok("Selected ${profile.name}; auto-answer must be turned on again")
     }
-    val profile = voiceProfiles.get(id) ?: return@onMain fail("实时语音配置不存在")
+    val profile = voiceProfiles.get(id) ?: return@onMain fail("The realtime voice configuration does not exist")
     settings.save(settings.state.value.copy(
         activeVoiceProfileId = profile.id,
         speaker = profile.speaker,
@@ -103,7 +103,7 @@ suspend fun CallRuntime.selectVoiceProfile(id: String): CallActionResult = onMai
         autoAnswer = false,
     ))
     publish()
-    ok("已选择${profile.name}，自动接听需要重新开启")
+    ok("Selected ${profile.name}; auto-answer must be turned on again")
 }
 
 /**
@@ -111,13 +111,13 @@ suspend fun CallRuntime.selectVoiceProfile(id: String): CallActionResult = onMai
  * Auto-answer is turned off whenever the model actually in use changes, so the user has to confirm again on the new model; credentials and verification mirroring are synced from the catalog.
  */
 suspend fun CallRuntime.selectCallVoice(ref: VoiceModelRef?, speaker: String = ""): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
-    if (!realtimeController.migrated) return@onMain fail("实时语音配置尚未迁移")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
+    if (!realtimeController.migrated) return@onMain fail("The realtime voice configuration has not been migrated yet")
     val before = realtimeController.callCurrent()
     try {
         realtimeController.selectForCalls(ref, speaker)
     } catch (_: VoiceModelError) {
-        return@onMain fail("实时语音模型不存在")
+        return@onMain fail("The realtime voice model does not exist")
     }
     val now = realtimeController.callCurrent()
     val config = settings.state.value
@@ -127,7 +127,7 @@ suspend fun CallRuntime.selectCallVoice(ref: VoiceModelRef?, speaker: String = "
         autoAnswer = config.autoAnswer && now == before,
     ))
     publish()
-    ok(if (now == before) "电话语音已保存" else "电话语音已更换，自动接听需要重新开启")
+    ok(if (now == before) "Call voice saved" else "Call voice changed; auto-answer must be turned on again")
 }
 
 /**
@@ -135,8 +135,8 @@ suspend fun CallRuntime.selectCallVoice(ref: VoiceModelRef?, speaker: String = "
  * a null [engine] with no models makes phone calls follow the voice settings again, realtime choice included.
  */
 suspend fun CallRuntime.selectPhoneVoice(engine: CallEngine?, stt: VoiceModelRef?, tts: VoiceModelRef?, ttsVoice: String = ""): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
-    if (!realtimeController.migrated) return@onMain fail("实时语音配置尚未迁移")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
+    if (!realtimeController.migrated) return@onMain fail("The realtime voice configuration has not been migrated yet")
     val before = standardCalls to callVoiceRef()
     realtimeController.catalog.setPhoneVoice(engine, stt, tts, ttsVoice)
     if (engine == null && stt == null && tts == null) realtimeController.selectForCalls(null)
@@ -144,21 +144,21 @@ suspend fun CallRuntime.selectPhoneVoice(engine: CallEngine?, stt: VoiceModelRef
     val changed = (standardCalls to callVoiceRef()) != before
     if (changed) settings.save(settings.state.value.copy(autoAnswer = false))
     publish()
-    ok(if (changed) "电话语音已更换，自动接听需要重新开启" else "电话语音已保存")
+    ok(if (changed) "Call voice changed; auto-answer must be turned on again" else "Call voice saved")
 }
 
 suspend fun CallRuntime.saveVoiceProfile(profile: CallVoiceProfile, credentials: VolcRealtimeCredentials? = null): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
     if (realtimeController.migrated) {
-        val ref = realtimeController.callCurrent() ?: return@onMain fail("请先选择实时语音模型")
+        val ref = realtimeController.callCurrent() ?: return@onMain fail("Select a realtime voice model first")
         val model = runCatching { realtimeController.model(ref) }.getOrNull()
-            ?: return@onMain fail("实时语音模型不存在")
-        val binding = model.realtime ?: return@onMain fail("实时语音模型不支持通话")
+            ?: return@onMain fail("The realtime voice model does not exist")
+        val binding = model.realtime ?: return@onMain fail("The realtime voice model does not support calls")
         if (binding.speaker != profile.speaker) {
             realtimeController.catalog.upsertModel(model.copy(realtime = binding.copy(speaker = profile.speaker)))
         }
         publish()
-        return@onMain ok("实时语音配置已保存")
+        return@onMain ok("Realtime voice configuration saved")
     }
     val previous = voiceProfiles.get(profile.id)
     val saved = withContext(Dispatchers.IO) { voiceProfiles.save(profile, credentials) }
@@ -173,82 +173,82 @@ suspend fun CallRuntime.saveVoiceProfile(profile: CallVoiceProfile, credentials:
         ))
     }
     publish()
-    ok("实时语音配置已保存")
+    ok("Realtime voice configuration saved")
 }
 
 suspend fun CallRuntime.deleteVoiceProfile(id: String): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
-    if (realtimeController.migrated) return@onMain fail("请在语音模型目录中删除实时模型")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
+    if (realtimeController.migrated) return@onMain fail("Delete the realtime model from the voice model catalog")
     withContext(Dispatchers.IO) { voiceProfiles.delete(id, settings.state.value.activeVoiceProfileId) }
     publish()
-    ok("实时语音配置已删除")
+    ok("Realtime voice configuration deleted")
 }
 
 suspend fun CallRuntime.testVoiceProfile(id: String): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
     if (realtimeController.migrated) {
-        val legacy = voiceProfiles.get(id) ?: return@onMain fail("实时语音配置不存在")
+        val legacy = voiceProfiles.get(id) ?: return@onMain fail("The realtime voice configuration does not exist")
         val ref = RealtimeSelectionController.legacyProfileRef(id, legacy.model)
         val provider = try {
             realtimeController.provider(ref)
         } catch (e: VoiceModelError) {
-            return@onMain fail("实时语音配置不可用，请检查凭据")
+            return@onMain fail("The realtime voice configuration is unavailable; check the credentials")
         }
         realtimeController.markConnectionTested(ref, false)
         publish()
         val result = try {
-            val session = provider.connect(CallVoiceProfile(), VolcRealtimeCredentials(), "连接测试。不要生成语音。")
+            val session = provider.connect(CallVoiceProfile(), VolcRealtimeCredentials(), "Connection test. Do not generate speech.")
             session.close()
             realtimeController.markConnectionTested(ref, true)
             if (realtimeController.callCurrent() == ref) publish()
-            ok("实时语音服务连接成功；手机双向音频仍需通过测试电话验证")
+            ok("Connected to the realtime voice service; two-way phone audio still requires a test call to verify")
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             val reason = when ((error as? VoiceModelError)?.category) {
-                VoiceErrorCategory.AUTH_FAILED -> "凭据或服务权限无效"
-                VoiceErrorCategory.RATE_LIMITED -> "实时语音服务请求过于频繁"
-                VoiceErrorCategory.TIMEOUT -> "实时语音服务连接超时"
-                else -> "无法连接实时语音服务"
+                VoiceErrorCategory.AUTH_FAILED -> "Credentials or service permissions are invalid"
+                VoiceErrorCategory.RATE_LIMITED -> "The realtime voice service is receiving too many requests"
+                VoiceErrorCategory.TIMEOUT -> "The realtime voice service connection timed out"
+                else -> "Could not connect to the realtime voice service"
             }
             fail(reason)
         }
         return@onMain result
     }
-    val profile = voiceProfiles.get(id) ?: return@onMain fail("实时语音配置不存在")
-    val credentials = voiceProfiles.credentials(id) ?: return@onMain fail("请先配置实时语音凭据")
+    val profile = voiceProfiles.get(id) ?: return@onMain fail("The realtime voice configuration does not exist")
+    val credentials = voiceProfiles.credentials(id) ?: return@onMain fail("Configure realtime voice credentials first")
     voiceProfiles.markConnectionTested(id, false)
     publish()
     try {
-        val session = realtimeProvider().connect(profile, credentials, "连接测试。不要生成语音。")
+        val session = realtimeProvider().connect(profile, credentials, "Connection test. Do not generate speech.")
         session.close()
         voiceProfiles.markConnectionTested(id, true)
         if (settings.state.value.activeVoiceProfileId == id) publish()
-        ok("实时语音服务连接成功；手机双向音频仍需通过测试电话验证")
+        ok("Connected to the realtime voice service; two-way phone audio still requires a test call to verify")
     } catch (error: Exception) {
         if (error is CancellationException) throw error
         val reason = when ((error as? VolcRealtimeException)?.kind) {
-            VolcRealtimeException.Kind.AUTH -> "凭据或服务权限无效"
-            VolcRealtimeException.Kind.RATE_LIMITED -> "实时语音服务请求过于频繁"
-            VolcRealtimeException.Kind.TIMEOUT -> "实时语音服务连接超时"
-            else -> "无法连接实时语音服务"
+            VolcRealtimeException.Kind.AUTH -> "Credentials or service permissions are invalid"
+            VolcRealtimeException.Kind.RATE_LIMITED -> "The realtime voice service is receiving too many requests"
+            VolcRealtimeException.Kind.TIMEOUT -> "The realtime voice service connection timed out"
+            else -> "Could not connect to the realtime voice service"
         }
         fail(reason)
     }
 }
 
 suspend fun CallRuntime.setAudioVerified(verified: Boolean): CallActionResult = onMain {
-    if (work != null || lockedDial != null) return@onMain fail("请先结束当前通话或锁屏拨出安排")
+    if (work != null || lockedDial != null) return@onMain fail("End the current call or cancel the locked-screen dial first")
     val config = settings.state.value
     if (realtimeController.migrated) {
-        val ref = callVoiceRef() ?: return@onMain fail(if (standardCalls) "请先选择通话的听写模型" else "请先选择实时语音模型")
+        val ref = callVoiceRef() ?: return@onMain fail(if (standardCalls) "Select a transcription model for calls first" else "Select a realtime voice model first")
         realtimeController.markAudioVerified(ref, config.audioMode, verified)
         settings.save(config.copy(audioVerified = verified, autoAnswer = verified && config.autoAnswer))
         publish()
-        return@onMain ok(if (verified) "已记录本机双向音频验证" else "已取消双向音频验证，自动接听已关闭")
+        return@onMain ok(if (verified) "Two-way audio verified on this device" else "Two-way audio verification cleared; auto-answer is off")
     }
     val id = config.activeVoiceProfileId
     withContext(Dispatchers.IO) { voiceProfiles.markAudioVerified(id, config.audioMode, verified) }
     settings.save(config.copy(audioVerified = verified, autoAnswer = verified && config.autoAnswer))
     publish()
-    ok(if (verified) "已记录本机双向音频验证" else "已取消双向音频验证，自动接听已关闭")
+    ok(if (verified) "Two-way audio verified on this device" else "Two-way audio verification cleared; auto-answer is off")
 }

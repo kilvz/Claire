@@ -78,7 +78,7 @@ class ProactiveLockPolicyTest {
         assertEquals(1_000L, p.lockedAtMs)
         assertEquals(listOf(Action.Rebind), p.unlockedOk(connected = false))
         assertEquals(listOf(Action.CatchUp), p.connectedOk(locked = false, nowMs = 4_000))
-        assertTrue("补收从 N 之前算起", p.lockedAtMs < postedN)
+        assertTrue("catch-up counted from before N", p.lockedAtMs < postedN)
         // Catch-up done: the next lock records a fresh lock time as usual
         assertEquals(listOf(Action.PersistLockedAt(5_000), Action.Unbind), p.locked(5_000, connected = true))
         assertEquals(5_000L, p.lockedAtMs)

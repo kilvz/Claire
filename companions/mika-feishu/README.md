@@ -2,7 +2,7 @@
 
 An optional computer-side connector that receives private messages from a paired Feishu user and submits tasks to Mika on an Android phone. It uses the public `/api/v1` task API and the official Feishu SDK, without modifying Android code or importing the Mika CLI's internals.
 
-See [the English guide](../../docs/feishu.md) or [简体中文指南](../../docs/feishu.md) for QR creation, linking an existing app, manual setup and troubleshooting.
+See [the English guide](../../docs/feishu.md) or [the Chinese guide](../../docs/feishu.md) for QR creation, linking an existing app, manual setup and troubleshooting.
 
 Requires Python 3.10+, a Feishu enterprise custom app, and a Mika phone exposing task API v1 (APK v0.1.23+). Use matching current phone/CLI versions when possible. The computer and phone must be on the same LAN or a trusted private VPN such as Tailscale. The computer must remain online to receive events.
 

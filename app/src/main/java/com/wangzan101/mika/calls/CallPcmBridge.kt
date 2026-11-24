@@ -82,7 +82,7 @@ internal class CallPcmBridge(
         }
         try {
             if (!session.setMuted(false) || (greeting.isNotBlank() && !session.sendGreeting(greeting))) {
-                throw CallMediaFailure("语音服务未接受本次通话的开场白")
+                throw CallMediaFailure("The voice service did not accept the opening line for this call")
             }
             val input = launch(Dispatchers.IO) {
                 val inputPacer = CallInputPacer(session.inputChunkBytes, session.inputSampleRate)
@@ -90,11 +90,11 @@ internal class CallPcmBridge(
                 var position = 0
                 while (true) {
                     val count = callPipeIo { capture.read(frame, position, frame.size - position) }
-                    if (count < 0) throw CallMediaFailure("运营商音频输入已断开")
+                    if (count < 0) throw CallMediaFailure("Carrier audio input was disconnected")
                     if (count == 0) continue
                     position += count
                     if (position == frame.size) {
-                        if (!inputPacer.send { session.sendPcm16(frame) }) throw CallMediaFailure("语音服务音频输入已中断")
+                        if (!inputPacer.send { session.sendPcm16(frame) }) throw CallMediaFailure("Voice service audio input was interrupted")
                         counters?.inputAccepted(frame, System.nanoTime())
                         position = 0
                     }
@@ -110,7 +110,7 @@ internal class CallPcmBridge(
                                 val queuedBytes = playbackQueue.offer(event.pcm)
                                 if (queuedBytes == null) {
                                     counters?.outputRejected()
-                                    throw CallMediaFailure("通话待播音频积压超过安全上限，已交还系统")
+                                    throw CallMediaFailure("The pending call audio backlog exceeded the safety limit; control was handed back to the system")
                                 }
                                 cancelFarewellWaiter()
                                 farewell.audio(event.pcm.size)
@@ -128,10 +128,10 @@ internal class CallPcmBridge(
                                     val cleared = interruptPlayback() && withTimeoutOrNull(750) {
                                         writerLock.withLock { interruptPlayback() }
                                     } == true
-                                    if (!cleared) throw CallMediaFailure("通话音频无法及时停止，已交还系统")
+                                    if (!cleared) throw CallMediaFailure("Call audio could not be stopped in time; control was handed back to the system")
                                     farewell.afterPairedFlush()
                                     if (truncation?.interrupt(heardFrames) == false) {
-                                        throw CallMediaFailure("无法同步已播放的电话音频，已交还系统")
+                                        throw CallMediaFailure("Could not sync the phone audio that was already played; control was handed back to the system")
                                     }
                                 }
                                 // Some providers report a second cancellation after user speech starts.
@@ -176,7 +176,7 @@ internal class CallPcmBridge(
                                         put("requested_digits", result.requestedDigits)
                                         put("remote_confirmed", false)
                                         put("next", "Wait for the next phone prompt; never retry uncertain or partial input automatically.")
-                                    })) throw CallMediaFailure("电话按键结果无法回传，已交还系统")
+                                    })) throw CallMediaFailure("The keypress result could not be returned; control was handed back to the system")
                                 }
                                 if (event.name != "send_dtmf" || digits.isEmpty() || digits.length > 32 ||
                                     digits.any { it !in "0123456789*#" }) {
@@ -195,11 +195,11 @@ internal class CallPcmBridge(
                                 }
                             }
                             is VolcRealtimeEvent.Failed -> throw event.error
-                            VolcRealtimeEvent.Closed -> throw CallMediaFailure("实时语音会话已结束，电话由系统处理")
+                            VolcRealtimeEvent.Closed -> throw CallMediaFailure("The realtime voice session ended; the system is handling the call")
                             else -> Unit
                         }
                     }
-                    throw CallMediaFailure("实时语音连接已断开，电话由系统处理")
+                    throw CallMediaFailure("The realtime voice connection was lost; the system is handling the call")
                 } finally {
                     input.cancel()
                     flushAssistantText()

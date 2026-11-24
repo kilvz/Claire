@@ -673,7 +673,7 @@ class VoiceCallSessionTest {
         assertEquals(listOf("查一下天气" to true), h.userTranscripts)
         h.session.sendUserText("   ")
         h.session.sendUserText("")
-        assertEquals("空白不派发", listOf("typed-1" to "查一下天气"), requests)
+        assertEquals("blank is not dispatched", listOf("typed-1" to "查一下天气"), requests)
         h.session.sendUserText("再定个闹钟")
         assertEquals(listOf("typed-1" to "查一下天气", "typed-2" to "再定个闹钟"), requests)
     }
@@ -704,10 +704,10 @@ class VoiceCallSessionTest {
         assertEquals(VoiceCallTurn.Speaking, h.session.turn.value)
         advanceTimeBy(VoiceCallSession.SPEAKING_IDLE_MS / 2)
         runCurrent()
-        assertEquals("刚播完一小段还算在说", VoiceCallTurn.Speaking, h.session.turn.value)
+        assertEquals("just played a short stretch, still counts as speaking", VoiceCallTurn.Speaking, h.session.turn.value)
         advanceTimeBy(VoiceCallSession.SPEAKING_IDLE_MS + VoiceCallSession.TURN_POLL_MS)
         runCurrent()
-        assertEquals("播放停了一阵就轮回到听", VoiceCallTurn.Listening, h.session.turn.value)
+        assertEquals("playback stopped for a while, so it cycles back to listening", VoiceCallTurn.Listening, h.session.turn.value)
     }
 
     @Test fun `a final user transcript thinks and new speech listens again`() = runTest {
@@ -728,7 +728,7 @@ class VoiceCallSessionTest {
         assertEquals(VoiceCallTurn.Thinking, h.session.turn.value)
         h.rt.emit(VolcRealtimeEvent.UserTranscriptionEmpty)
         runCurrent()
-        assertEquals("没听清就回到听", VoiceCallTurn.Listening, h.session.turn.value)
+        assertEquals("not heard clearly, so it goes back to listening", VoiceCallTurn.Listening, h.session.turn.value)
     }
 
     @Test fun `a reply shown locally ends thinking without waiting for speech`() = runTest {
@@ -739,7 +739,7 @@ class VoiceCallSessionTest {
         h.session.sendUserText("现在几点")
         assertEquals(VoiceCallTurn.Thinking, h.session.turn.value)
         h.session.onLocalReply()
-        assertEquals("打字的结果只在本地显示、不会播出来,显示了就轮回到听", VoiceCallTurn.Listening, h.session.turn.value)
+        assertEquals("typed results only show locally and are not spoken; once shown it cycles back to listening", VoiceCallTurn.Listening, h.session.turn.value)
     }
 
     @Test fun `a local reply does not cut off mika while she is talking`() = runTest {
@@ -765,7 +765,7 @@ class VoiceCallSessionTest {
         h.audio.offerChunk(ShortArray(320) { 5_000 })
         runCurrent()
         assertEquals(1, h.rt.sentPcm.size)
-        assertTrue("静音时上行全零(保持节奏)", h.rt.sentPcm.last().all { it == 0.toByte() })
+        assertTrue("uplink is all zero when muted (keeps the rhythm)", h.rt.sentPcm.last().all { it == 0.toByte() })
         assertEquals(0f, h.session.micLevel.value, 0.001f)
         h.session.setMuted(false)
         h.audio.offerChunk(ShortArray(320) { 5_000 })

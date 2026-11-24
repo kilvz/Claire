@@ -29,10 +29,10 @@ class ModelOptionsTest {
     }
 
     @Test fun userSaidVisionWinsOverListingAndPreset() {
-        assertTrue("没写 + 用户说能看", ModelOptions.seesImages(stored = false, userSaid = true, usedForVision = false))
-        assertTrue("看图也用它", ModelOptions.seesImages(stored = false, userSaid = null, usedForVision = true))
-        assertFalse("用户说不能看", ModelOptions.seesImages(stored = true, userSaid = false, usedForVision = true))
-        assertFalse("列表说不能看,用户没改", ModelOptions.seesImages(stored = false, userSaid = null, usedForVision = false))
+        assertTrue("not written + user says it can see images", ModelOptions.seesImages(stored = false, userSaid = true, usedForVision = false))
+        assertTrue("also used for images", ModelOptions.seesImages(stored = false, userSaid = null, usedForVision = true))
+        assertFalse("user says it cannot see images", ModelOptions.seesImages(stored = true, userSaid = false, usedForVision = true))
+        assertFalse("list says it cannot see images, user did not change it", ModelOptions.seesImages(stored = false, userSaid = null, usedForVision = false))
         val p = Provider("p", "P", ProviderConfig.Kind.OpenAiCompat, "https://relay.test/v1",
             models = listOf(ListedModel("a"), ListedModel("b", vision = false)), visionOverrides = mapOf("a" to true))
         val (a, b) = ModelOptions.ofProvider(p, emptyList())
@@ -66,7 +66,7 @@ class ModelOptionsTest {
             ListedModel("moonshot-v1"),
         )
         val options = ModelOptions.merge(listed, base)
-        val qwen = ProviderPresets.all.single { it.label == "通义千问" }.familyTokens
+        val qwen = ProviderPresets.all.single { it.label == "Qwen" }.familyTokens
         assertEquals(listOf("qwen"), qwen)
         assertEquals(
             listOf("qwen-plus", "qwen-max", "Other/Chat", "antdigital/Ling-3.1-flash", "moonshot-v1"),
@@ -169,7 +169,7 @@ class ModelOptionsTest {
         for (id in listOf("qwen-plus", "deepseek-chat", "gpt-5-mini", "claude-sonnet-4-5", "qwen-vl-max", "step-2-16k")) {
             assertFalse(id, ModelOptions.looksNonChat(opt(id)))
         }
-        assertFalse("接口说是对话模型就照接口", ModelOptions.looksNonChat(opt("my-embed-chat", chat = true)))
+        assertFalse("if the API says it is a chat model, follow the API", ModelOptions.looksNonChat(opt("my-embed-chat", chat = true)))
         assertTrue(ModelOptions.looksNonChat(opt("x", chat = false)))
         // Everything looks like some other purpose: there are no candidates, so the default main model falls back to the first model that can serve as main
         val only = ModelOptions.merge(listOf(ListedModel("text-embedding-v4")), base)
@@ -224,7 +224,7 @@ class ModelOptionsTest {
         )
         val options = ModelOptions.ofProvider(p, configs)
         assertEquals(listOf("a", "b", "typed"), options.map { it.id })
-        assertTrue("已有配置的用配置里的能力", options.first { it.id == "b" }.capabilities.vision)
+        assertTrue("existing config uses the capabilities in the config", options.first { it.id == "b" }.capabilities.vision)
         assertEquals(emptyList<String>(), ModelOptions.ofProvider(p.copy(models = null), emptyList()).map { it.id })
     }
 

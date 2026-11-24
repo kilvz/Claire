@@ -174,7 +174,7 @@ internal fun CallHistorySection(
                         },
                         onDelete = { pendingDelete = record.id },
                         onSaveDraft = onSaveDraft?.let { save -> { text -> save(record.id, text) } },
-                        onRetrySummary = { change("摘要已更新", summaryFailure) { onRetrySummary(record.id) } },
+                        onRetrySummary = { change("Summary updated", summaryFailure) { onRetrySummary(record.id) } },
                         onReuse = if (record.number != null && record.task != null && onReuseTask != null) {
                             { onReuseTask(record.number, record.task) }
                         } else null,
@@ -266,12 +266,12 @@ private fun CallHistoryItem(
                 Text(stringResource(R.string.calls_history_period, start, end),
                     style = MaterialTheme.typography.bodySmall, color = MikaTheme.colors.ink3)
                 record.summary?.let { summary ->
-                    summary.purpose?.let { Text("${stringResource(R.string.calls_summary_purpose)}：$it") }
+                    summary.purpose?.let { Text("${stringResource(R.string.calls_summary_purpose)}: $it") }
                     if (summary.highlights.isNotEmpty()) {
                         Text(stringResource(R.string.calls_summary_highlights), style = MaterialTheme.typography.labelLarge)
                         summary.highlights.forEach { Text("• $it") }
                     }
-                    summary.conclusion?.let { Text("${stringResource(R.string.calls_summary_conclusion)}：$it") }
+                    summary.conclusion?.let { Text("${stringResource(R.string.calls_summary_conclusion)}: $it") }
                     if (summary.uncertainties.isNotEmpty()) {
                         Text(stringResource(R.string.calls_summary_uncertainties), style = MaterialTheme.typography.labelLarge)
                         summary.uncertainties.forEach { Text("• $it") }
@@ -284,7 +284,7 @@ private fun CallHistoryItem(
                                 com.wangzan101.mika.calls.CallFollowUp.Status.DONE -> R.string.calls_summary_done
                                 com.wangzan101.mika.calls.CallFollowUp.Status.UNKNOWN -> R.string.calls_summary_unknown
                             }
-                            Text("${stringResource(state)}：${item.text}")
+                            Text("${stringResource(state)}: ${item.text}")
                         }
                     }
                 }

@@ -11,7 +11,7 @@ class WavTest {
     private fun ascii(b: ByteArray, off: Int) = String(b, off, 4, Charsets.US_ASCII)
 
     @Test
-    fun `一秒 16k 单声道编码出 44 字节头加 32000 字节数据`() {
+    fun `one second of 16k mono encodes a 44-byte header plus 32000 bytes of data`() {
         val wav = Wav.encode(ShortArray(16000))
         assertEquals(44 + 32000, wav.size)
         val buf = ByteBuffer.wrap(wav).order(ByteOrder.LITTLE_ENDIAN)
@@ -31,13 +31,13 @@ class WavTest {
     }
 
     @Test
-    fun `采样按小端写入`() {
+    fun `samples are written little-endian`() {
         val wav = Wav.encode(shortArrayOf(0x0102, -2))
         assertArrayEquals(byteArrayOf(0x02, 0x01, 0xFE.toByte(), 0xFF.toByte()), wav.copyOfRange(44, 48))
     }
 
     @Test
-    fun `静音同长度且数据全零`() {
+    fun `silence has the same length and all-zero data`() {
         val wav = Wav.silence(1000)
         assertEquals(44 + 32000, wav.size)
         assertTrue(wav.drop(44).all { it == 0.toByte() })

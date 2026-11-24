@@ -16,16 +16,16 @@ import com.wangzan101.mika.calls.CallRuntime.Companion.STANDBY_START_MS
 /** Initial authorization comes only from this explicit action in the unlocked phone UI. */
 suspend fun CallRuntime.startBackgroundStandby(): CallActionResult = onMain {
     val config = settings.state.value
-    if (!interactiveForeground() || !userUnlocked()) return@onMain fail("请解锁手机并在电话页面启动后台待命")
-    if (!CallStandbyPolicy.optedIn(config, userUnlocked())) return@onMain fail("请先开启自动接听并完成通话配置")
+    if (!interactiveForeground() || !userUnlocked()) return@onMain fail("Unlock the phone and start background standby on the Phone screen")
+    if (!CallStandbyPolicy.optedIn(config, userUnlocked())) return@onMain fail("Turn on auto-answer and finish the call setup first")
     autoAnswerBlocker(config)?.let { return@onMain fail(it) }
-    if (!CallStandbyService.notificationsAvailable(app, create = true)) return@onMain fail("请允许后台待命通知")
-    if (isIncomingStandbyRunning()) return@onMain ok("后台待命已启动")
-    if (standbyStarting) return@onMain fail("Android 正在启动后台待命")
-    if (!settings.authorizeBackgroundStandby()) return@onMain fail("无法保存后台接听授权，请重试")
-    if (!requestCallForegroundService(incoming = true)) return@onMain fail(standbyStartError ?: "后台待命未启动")
+    if (!CallStandbyService.notificationsAvailable(app, create = true)) return@onMain fail("Allow background standby notifications")
+    if (isIncomingStandbyRunning()) return@onMain ok("Background standby started")
+    if (standbyStarting) return@onMain fail("Android is starting background standby")
+    if (!settings.authorizeBackgroundStandby()) return@onMain fail("Could not save the background answering authorization; try again")
+    if (!requestCallForegroundService(incoming = true)) return@onMain fail(standbyStartError ?: "Background standby did not start")
     state.first { !it.backgroundStandbyStarting }
-    if (isIncomingStandbyRunning()) ok("后台待命已启动") else fail(standbyStartError ?: "后台待命未启动")
+    if (isIncomingStandbyRunning()) ok("Background standby started") else fail(standbyStartError ?: "Background standby did not start")
 }
 
 internal fun CallRuntime.requestCallForegroundService(incoming: Boolean): Boolean {
@@ -40,7 +40,7 @@ internal fun CallRuntime.requestCallForegroundService(incoming: Boolean): Boolea
         val intent = CallStandbyService.startIntent(app, startId)
         if (standbyService != null) app.startService(intent) else app.startForegroundService(intent)
     }.getOrNull() == null) {
-        onStandbyStartFailed("Android 未允许启动后台待命，请在应用中重试")
+        onStandbyStartFailed("Android did not allow background standby to start; try again in the app")
         return false
     }
     // This deadline belongs to the runtime, even if the initiating screen is dismissed.
@@ -48,7 +48,7 @@ internal fun CallRuntime.requestCallForegroundService(incoming: Boolean): Boolea
         delay(STANDBY_START_MS)
         if (standbyStarting) {
             standbyStartTimeout = null
-            onStandbyStartFailed("Android 尚未确认后台待命启动，请重试")
+            onStandbyStartFailed("Android has not confirmed that background standby started; try again")
         }
     }
     return true
@@ -87,7 +87,7 @@ internal fun CallRuntime.onStandbyStartFailed(reason: String) {
     standbyIncomingRequested = false
     standbyStartId = null
     standbyStartError = reason
-    lockedDial?.let { finishLockedDial(it, "后台电话服务未启动，未执行锁屏拨出") }
+    lockedDial?.let { finishLockedDial(it, "The background phone service did not start; the locked-screen dial was not performed") }
     publish()
 }
 
@@ -95,9 +95,9 @@ internal fun CallRuntime.onStandbyStopped(service: CallStandbyService) {
     if (standbyService !== service) return
     standbyService = null
     standbyRunning.value = false
-    lockedDial?.let { finishLockedDial(it, "后台电话服务停止，未执行锁屏拨出") }
+    lockedDial?.let { finishLockedDial(it, "The background phone service stopped; the locked-screen dial was not performed") }
     if (work?.let { (it.direction == CallDirection.OUTGOING) || (it.automatic && it.answerSent && !interactiveForeground()) } == true) {
-        cancelWork("后台电话服务已停止，通话由系统处理")
+        cancelWork("The background phone service stopped; the system is handling the call")
     }
     cancelPendingIfStandbyLost()
     publish()
@@ -127,7 +127,7 @@ internal fun CallRuntime.stopBackgroundStandbyIfUnneeded() {
 
 internal fun CallRuntime.cancelPendingIfStandbyLost() {
     if (!canAutomaticallyAnswerHere() && work?.let { it.automatic && !it.answerSent && it.stopReason.value == null } == true) {
-        cancelWork("后台待命不可用，本次来电由系统电话处理")
+        cancelWork("Background standby is unavailable; the system phone app is handling this incoming call")
     }
 }
 
@@ -152,10 +152,10 @@ internal fun CallRuntime.canAutomaticallyAnswerHere(): Boolean = CallStandbyPoli
 
 suspend fun CallRuntime.pauseAutoAnswer(minutes: Int): CallActionResult = onMain {
     if (minutes !in 1..CallPolicy.MAX_AUTO_ANSWER_PAUSE_MINUTES) {
-        return@onMain fail("暂停时间须在 1 分钟到 24 小时之间")
+        return@onMain fail("The pause must be between 1 minute and 24 hours")
     }
     if (!settings.state.value.enabled || !settings.state.value.autoAnswer) {
-        return@onMain fail("自动接听尚未开启")
+        return@onMain fail("Auto-answer is not on yet")
     }
     saveAutoPause(System.currentTimeMillis() + minutes * 60_000L)
 }
@@ -163,12 +163,12 @@ suspend fun CallRuntime.pauseAutoAnswer(minutes: Int): CallActionResult = onMain
 suspend fun CallRuntime.resumeAutoAnswer(): CallActionResult = onMain { saveAutoPause(null) }
 
 internal suspend fun CallRuntime.saveAutoPause(until: Long?): CallActionResult {
-    if (autoPauseWriting) return fail("自动接听设置正在保存")
+    if (autoPauseWriting) return fail("Auto-answer settings are being saved")
     autoPauseWriting = true
     if (until != null) {
         // Existing calls handled by AI stay connected; a pending auto-answer is left alone.
         if (work?.let { it.automatic && !it.answerSent } == true) {
-            cancelWork("自动接听已暂停，本次来电由系统电话处理")
+            cancelWork("Auto-answer is paused; the system phone app is handling this incoming call")
         }
         liveCalls().filter { it.phase == CallPhase.RINGING }.forEach { it.autoTried = true }
     }
@@ -184,6 +184,6 @@ internal suspend fun CallRuntime.saveAutoPause(until: Long?): CallActionResult {
         autoPauseWriting = false
         publish()
     }
-    return if (!saved) fail("无法保存自动接听暂停设置")
-    else ok(if (until == null) "已恢复自动接听设置" else "已暂停自动接听")
+    return if (!saved) fail("Could not save the auto-answer pause setting")
+    else ok(if (until == null) "Auto-answer settings restored" else "Auto-answer paused")
 }

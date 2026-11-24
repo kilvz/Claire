@@ -44,7 +44,7 @@ class UsageCopyTest {
         assertEquals(100.0 / 201, all.first().share, 1e-9)
         val p1 = UsageCopy.modelRanking(report, "p1")
         assertEquals(listOf("a", "b"), p1.map { it.model.model })
-        assertEquals("占比按这一排算", 100.0 / 110, p1.first().share, 1e-9)
+        assertEquals("the share is computed over this row", 100.0 / 110, p1.first().share, 1e-9)
     }
 
     @Test fun percentLabelsPositiveSharesBelowOnePercentBeforeRounding() {
@@ -86,7 +86,7 @@ class UsageCopyTest {
         assertEquals("123 万", UsageCopy.tokens(1_234_567))
         assertEquals("1235 万", UsageCopy.tokens(12_345_678))
         assertEquals("10 万", UsageCopy.tokens(99_999))
-        assertEquals("进位到一亿时改写成亿", "1 亿", UsageCopy.tokens(99_999_999))
+        assertEquals("rewritten as 亿 when it rounds up to a hundred million", "1 亿", UsageCopy.tokens(99_999_999))
         assertEquals("1.5 亿", UsageCopy.tokens(150_000_000))
         assertEquals("12.3 亿", UsageCopy.tokens(1_234_567_890))
     }

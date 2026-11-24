@@ -23,22 +23,22 @@ class CallSettings(
         val defaults = CallConfig()
         val previous = mutable.value
         require(config.defaultOutgoingSimId == null || CallPolicy.isRememberedSimId(config.defaultOutgoingSimId)) {
-            "保存的拨号 SIM 无效，请重新选择"
+            "The saved dialing SIM is invalid; please choose again"
         }
-        require(config.allowedIncomingNumbers.size <= CallPolicy.MAX_ALLOWED_NUMBERS) { "最多可设置 100 个来电号码" }
+        require(config.allowedIncomingNumbers.size <= CallPolicy.MAX_ALLOWED_NUMBERS) { "You can set at most 100 incoming numbers" }
         val numbers = config.allowedIncomingNumbers.map {
-            requireNotNull(CallPolicy.incomingNumber(it)) { "自动接听名单中包含无效号码" }
+            requireNotNull(CallPolicy.incomingNumber(it)) { "The auto-answer list contains an invalid number" }
         }.distinctBy(CallPolicy::incomingMatchKey).toSet()
-        require(config.bypassIncomingNumbers.size <= CallPolicy.MAX_ALLOWED_NUMBERS) { "最多可设置 100 个本人接听号码" }
+        require(config.bypassIncomingNumbers.size <= CallPolicy.MAX_ALLOWED_NUMBERS) { "You can set at most 100 numbers for you to answer yourself" }
         val bypass = config.bypassIncomingNumbers.map {
-            requireNotNull(CallPolicy.incomingNumber(it)) { "本人接听名单中包含无效号码" }
+            requireNotNull(CallPolicy.incomingNumber(it)) { "The list of numbers you answer yourself contains an invalid number" }
         }.distinctBy(CallPolicy::incomingMatchKey).toSet()
-        require(config.greeting.length <= CallPolicy.MAX_GREETING_CHARS) { "开场白过长" }
-        require(config.systemPrompt.length <= CallPolicy.MAX_PROMPT_CHARS) { "通话说明过长" }
-        require(Regex("[A-Za-z0-9_-]{1,100}").matches(config.activeVoiceProfileId)) { "实时语音配置无效" }
+        require(config.greeting.length <= CallPolicy.MAX_GREETING_CHARS) { "The greeting is too long" }
+        require(config.systemPrompt.length <= CallPolicy.MAX_PROMPT_CHARS) { "The call notes are too long" }
+        require(Regex("[A-Za-z0-9_-]{1,100}").matches(config.activeVoiceProfileId)) { "Invalid realtime voice profile" }
         val speaker = config.speaker.trim().ifBlank { defaults.speaker }
         require(speaker.length <= CallPolicy.MAX_SPEAKER_CHARS && speaker.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "_-" }) {
-            "无效的火山音色编号"
+            "Invalid Volcano voice ID"
         }
         val audioVerified = config.audioVerified && config.audioMode == previous.audioMode
         val next = config.copy(
@@ -80,7 +80,7 @@ class CallSettings(
             .commit()
         // A failed write may not leave auto-answer running with a policy the user tried to change.
         mutable.value = if (committed) next else previous.copy(enabled = next.enabled && previous.enabled, autoAnswer = false, backgroundStandbyAuthorized = false)
-        check(committed) { "无法保存电话设置" }
+        check(committed) { "Unable to save call settings" }
         return next
     }
 
@@ -114,11 +114,11 @@ class CallSettings(
         val modern = apiKey.trim()
         require(listOf(legacyId, legacyKey, modern).all { value ->
             value.length <= 1_024 && value.all { it.code in 33..126 }
-        }) { "火山凭据格式无效" }
+        }) { "Invalid Volcano credentials format" }
         val clear = legacyId.isEmpty() && legacyKey.isEmpty() && modern.isEmpty()
         require(clear || (modern.isNotEmpty() && legacyId.isEmpty() && legacyKey.isEmpty()) ||
             (modern.isEmpty() && legacyId.isNotEmpty() && legacyKey.isNotEmpty())) {
-            "请仅填写 API Key，或同时填写旧版 App ID 和 Access Key"
+            "Enter only an API Key, or fill in both the legacy App ID and Access Key"
         }
         val edit = prefs.edit()
         if (clear) {
@@ -126,7 +126,7 @@ class CallSettings(
         } else {
             val bytes = "${modern}\n${legacyId}\n${legacyKey}".toByteArray()
             try {
-                val encrypted = runCatching { cipher.encrypt(bytes) }.getOrElse { error("无法加密火山凭据") }
+                val encrypted = runCatching { cipher.encrypt(bytes) }.getOrElse { error("Unable to encrypt the Volcano credentials") }
                 edit.putString(CREDENTIALS, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             } finally {
                 bytes.fill(0)
@@ -139,7 +139,7 @@ class CallSettings(
                 backgroundStandbyAuthorized = !clear && mutable.value.backgroundStandbyAuthorized)
             credentialsRevision.value++
         }
-        check(committed) { "无法保存火山凭据" }
+        check(committed) { "Unable to save the Volcano credentials" }
     }
 
     @Synchronized

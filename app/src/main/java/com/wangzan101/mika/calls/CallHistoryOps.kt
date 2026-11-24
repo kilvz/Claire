@@ -7,7 +7,7 @@ import kotlinx.coroutines.CancellationException
 
 // Call runtime: call history and call summaries
 suspend fun CallRuntime.setHistoryHandled(id: String, handled: Boolean): CallActionResult = onMain {
-    historyResult(records.setHandled(id, handled), if (handled) "已标为已处理" else "已标为待处理")
+    historyResult(records.setHandled(id, handled), if (handled) "Marked as handled" else "Marked as open")
 }
 
 suspend fun CallRuntime.saveFollowUpDraft(id: String, text: String): CallActionResult = onMain {
@@ -16,17 +16,17 @@ suspend fun CallRuntime.saveFollowUpDraft(id: String, text: String): CallActionR
 }
 
 suspend fun CallRuntime.deleteHistory(id: String): CallActionResult = onMain {
-    historyResult(records.delete(id), "已删除通话记录")
+    historyResult(records.delete(id), "Call record deleted")
 }
 
 suspend fun CallRuntime.clearHistory(): CallActionResult = onMain {
-    historyResult(records.clear(), "已清空通话记录")
+    historyResult(records.clear(), "Call history cleared")
 }
 
 internal fun CallRuntime.historyResult(result: CallHistory.Result, message: String): CallActionResult = when (result) {
     CallHistory.Result.SAVED -> ok(message)
-    CallHistory.Result.NOT_FOUND -> fail("这条通话记录已不存在")
-    CallHistory.Result.WRITE_FAILED -> fail("无法保存通话记录变更，请重试")
+    CallHistory.Result.NOT_FOUND -> fail("This call record no longer exists")
+    CallHistory.Result.WRITE_FAILED -> fail("Could not save the call record change; try again")
 }
 
 suspend fun CallRuntime.retrySummary(id: String): CallActionResult {
@@ -34,9 +34,9 @@ suspend fun CallRuntime.retrySummary(id: String): CallActionResult {
         return CallActionResult(false, app.getString(R.string.calls_summary_cloud_consent))
     }
     val record = records.state.value.firstOrNull { it.id == id }
-        ?: return CallActionResult(false, "找不到这条通话记录")
-    if (record.transcript.isEmpty()) return CallActionResult(false, "没有可用于总结的转写")
-    return if (records.retryFailedSummary(id) { summarizeCall(id, it.transcript) }) CallActionResult(true, "摘要已更新")
+        ?: return CallActionResult(false, "Could not find this call record")
+    if (record.transcript.isEmpty()) return CallActionResult(false, "There is no transcript to summarize")
+    return if (records.retryFailedSummary(id) { summarizeCall(id, it.transcript) }) CallActionResult(true, "Summary updated")
     else CallActionResult(false, app.getString(R.string.calls_summary_failed))
 }
 

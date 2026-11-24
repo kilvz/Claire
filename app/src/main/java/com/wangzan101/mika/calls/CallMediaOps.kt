@@ -33,8 +33,8 @@ internal suspend fun CallRuntime.probeAudio(): Boolean {
     val ready = probe?.getBoolean("ready") == true
     if (epoch == probeEpoch) {
         audioReady = ready
-        audioDetail = if (ready) "音频路径具备运行条件，仍需双向实机验证"
-            else probe?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() } ?: "内置助手无法检测电话音频"
+        audioDetail = if (ready) "The audio path is ready, but two-way audio still needs on-device verification"
+            else probe?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() } ?: "The built-in helper cannot check call audio"
         publish()
     }
     return ready
@@ -46,18 +46,18 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
         if (greeting.isBlank()) R.string.calls_notification_connected_waiting else R.string.calls_notification_connected,
     )
     if (!notifications.show(w.id, app.getString(R.string.calls_notification_connecting_audio), ringing = false)) {
-        throw CallProblem("电话通知不可用，已交还系统")
+        throw CallProblem("Call notifications are unavailable; control was handed back to the system")
     }
     // Capture is never started while ringing, dialing, held, or in a different call.
-    val target = w.track ?: throw CallProblem("通话已结束")
+    val target = w.track ?: throw CallProblem("The call has ended")
     if (!sameActiveMuteTarget(w, target) || target.suppressed || shell !== helper) {
-        throw CallProblem("通话状态已变更，AI 未接入音频")
+        throw CallProblem("The call state changed; the AI did not attach to the audio")
     }
     w.mediaStage = MediaStage.MUTE_ACQUIRE
     val mute = acquireTelecomMute(w, target, helper)
     if (!sameActiveMuteTarget(w, target) || target.suppressed || shell !== helper ||
         !settings.state.value.enabled || !mute.isConfirmed(target.service.telecomMuted, microphoneMuted())) {
-        throw CallProblem("通话状态或静音已变更，AI 未接入音频")
+        throw CallProblem("The call state or mute changed; the AI did not attach to the audio")
     }
     w.mediaStage = MediaStage.SHELL_OPEN
     w.audioHelper = helper
@@ -78,7 +78,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
             val result = helper.openCallAudio(w.config.audioMode.wire, w.audioOwner)
             if (result?.getBoolean("ready") != true) {
                 if (result?.getString("errorCode") == "cellular_audio_not_ready") return@withContext null
-                throw CallProblem(result?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() } ?: "此设备未建立双向电话音频")
+                throw CallProblem(result?.getString("reason")?.take(160)?.takeIf { it.isNotBlank() } ?: "Two-way call audio was not established on this device")
             }
             val down = result.fd("downlink")
             val up = result.fd("uplink")
@@ -87,7 +87,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
                 result.getInt("playRate") != session.outputSampleRate) {
                 runCatching { down?.close() }
                 runCatching { up?.close() }
-                throw CallProblem("内置助手的电话音频格式不兼容")
+                throw CallProblem("The built-in helper's call audio format is incompatible")
             }
             val capture = ParcelFileDescriptor.AutoCloseInputStream(down)
             val playback = ParcelFileDescriptor.AutoCloseOutputStream(up)
@@ -100,7 +100,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
     }
     if (!sameActiveMuteTarget(w, target) || target.suppressed || shell !== helper ||
         !settings.state.value.enabled || !mute.isConfirmed(target.service.telecomMuted, microphoneMuted())) {
-        throw CallProblem("通话状态或静音已变更，未发送语音")
+        throw CallProblem("The call state or mute changed; no speech was sent")
     }
     // 0 = no time limit: an over-long timeout is passed as "never fires" (the library special-cases waiting on Long.MAX_VALUE and schedules no alarm)
     val remaining = w.config.maxCallSeconds.takeIf { it > 0 }
@@ -130,27 +130,27 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
                     }
                     if (stats?.getBoolean("active") != true) {
                         throw CallMediaFailure(shellAudioStopDiagnostic(stats?.getString("reason"))
-                            ?: "设备已停止双向音频，电话由系统处理")
+                            ?: "The device stopped two-way audio; the system is handling the call")
                     }
                     val bytes = stats.getLong("downBytes")
                     if (!w.aiActive) {
                         if (callAudioHasStarted(greeting, bytes, stats.getLong("upBytes"))) {
                             if (!notifications.show(w.id, notification, ringing = false)) {
-                                throw CallProblem("电话通知不可用，已交还系统")
+                                throw CallProblem("Call notifications are unavailable; control was handed back to the system")
                             }
                             w.aiActive = true
                             detail = notification
                             if (w.direction == CallDirection.INCOMING) {
-                                w.result.complete(ok(if (greeting.isBlank()) "Android 已接听，AI 正在等待对方说话"
-                                    else "Android 已接听，双向音频桥已开始传输"))
+                                w.result.complete(ok(if (greeting.isBlank()) "Android answered; the AI is waiting for the other party to speak"
+                                    else "Android answered; the two-way audio bridge is now streaming"))
                             }
                             publish()
                         } else if (SystemClock.elapsedRealtime() - w.activeElapsed >= 7_000) {
-                            throw CallMediaFailure("双向音频未能及时建立，电话由系统处理")
+                            throw CallMediaFailure("Two-way audio was not established in time; the system is handling the call")
                         }
                     } else {
                         stalled = if (lastBytes == bytes) stalled + 1 else 0
-                        if (stalled >= 2) throw CallMediaFailure("运营商音频输入无进展，电话由系统处理")
+                        if (stalled >= 2) throw CallMediaFailure("Carrier audio input made no progress; the system is handling the call")
                     }
                     lastBytes = bytes
                 }
@@ -205,7 +205,7 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
     if (w.stopReason.value == FAREWELL_ENDING) return
     // No time limit: a normal return from the bridge can only be a natural ending (already handled above); reaching here is the fallback for anything other than an exception, so do not falsely report reaching the time limit
     if (w.config.maxCallSeconds <= 0) return
-    val ending = "已达到 AI 通话时长上限"
+    val ending = "The AI call time limit was reached"
     if (!w.stopReason.record(ending)) return
     w.mediaStage = MediaStage.RELEASE
     w.session?.close()
@@ -220,8 +220,8 @@ internal suspend fun CallRuntime.runAudio(w: Work, helper: IMikaShell, session: 
         ended = runCatching { target.call.disconnect() }.isSuccess &&
             (waitFor(CallPolicy.CONTROL_TIMEOUT_MS) { confirmedEnded(target) } || confirmedEnded(target))
     }
-    w.stopReason.refine(ending, if (ended) "达到时长上限，Android 已挂断"
-        else "达到时长上限，Android 未确认挂断，已交还系统")
+    w.stopReason.refine(ending, if (ended) "The time limit was reached; Android hung up"
+        else "The time limit was reached; Android did not confirm the hang-up, so it was handed back to the system")
 }
 
 internal suspend fun CallRuntime.awaitFarewellPlayback(helper: IMikaShell, w: Work, fence: CallFarewellFence): Boolean {
@@ -272,14 +272,14 @@ internal suspend fun CallRuntime.acquireTelecomMute(w: Work, target: Tracked, he
         // unmute if the acknowledgement times out while this exact call remains active.
         lease.markMuteRequested()
         if (!service.requestMute(target.call, true)) {
-            throw CallProblem("Android 未接受本次通话静音请求")
+            throw CallProblem("Android did not accept the mute request for this call")
         }
     }
     val confirmed = awaitMute {
         sameActiveMuteTarget(w, target) && !target.suppressed &&
             lease.isConfirmed(service.telecomMuted, microphoneMuted())
     }
-    if (!confirmed) throw CallProblem("Android 未确认通话麦克风静音，AI 未接入音频")
+    if (!confirmed) throw CallProblem("Android did not confirm the call microphone is muted; the AI did not attach to the audio")
     return lease
 }
 
@@ -367,17 +367,17 @@ internal fun CallRuntime.debugMediaException(w: Work, error: Throwable) {
 internal fun CallRuntime.validateSessionTarget(w: Work, helper: IMikaShell) {
     prerequisite(ignoreWork = true)?.let { throw CallProblem(it) }
     if (shell !== helper || w.config.audioMode != settings.state.value.audioMode) {
-        throw CallProblem("通话音频设置或内置助手已变化，AI 未接入")
+        throw CallProblem("Call audio settings or the built-in helper changed; the AI did not attach")
     }
     if (w.direction == CallDirection.INCOMING) {
         validateTarget(w)
     } else {
         requireOutgoingForegroundService(w)
-        val target = w.track ?: throw CallProblem("外呼通话已结束，AI 未接入")
+        val target = w.track ?: throw CallProblem("The outgoing call ended; the AI did not attach")
         val account = target.call.details?.accountHandle
         if (!sameActiveMuteTarget(w, target) || target.suppressed || !carrierCall(target.call) ||
             target.direction != CallDirection.OUTGOING || account == null || account != w.sim?.handle) {
-            throw CallProblem("外呼通话已变化，AI 未接入")
+            throw CallProblem("The outgoing call changed; the AI did not attach")
         }
     }
 }
@@ -387,21 +387,21 @@ internal fun CallRuntime.validateTarget(w: Work) {
         val t = w.track
         if (t == null || !isCurrentCall(t, w.expectedCallId) || t.phase != CallPhase.RINGING ||
             t.direction != CallDirection.INCOMING || t.suppressed || !t.service.tracks(t.call) || !carrierCall(t.call)) {
-            throw CallProblem("来电已变化，AI 未接听")
+            throw CallProblem("The incoming call changed; the AI did not answer")
         }
         if (w.automatic) {
-            if (!canAutomaticallyAnswerHere()) throw CallProblem("后台待命不可用，本次来电由系统电话处理")
+            if (!canAutomaticallyAnswerHere()) throw CallProblem("Background standby is unavailable; the system phone app is handling this incoming call")
             val config = settings.state.value
             val initial = t.initialRingPolicy
             if (autoPauseWriting || initial == null ||
                 !CallPolicy.callerAllowed(initial, t.number, t.ringObservedWallMs, t.type, confirmedStranger(t)) ||
                 !CallPolicy.callerAllowed(config, t.number, type = t.type, isStranger = confirmedStranger(t)) || config.audioMode != w.config.audioMode ||
                 SystemClock.elapsedRealtime() - t.ringObservedAt > CallPolicy.AUTO_ANSWER_WINDOW_MS) {
-                throw CallProblem("来电已超时或不再符合自动接听规则")
+                throw CallProblem("The incoming call timed out or no longer matches the auto-answer rules")
             }
         }
     } else {
-        if (liveCalls().isNotEmpty()) throw CallProblem("已有通话，未拨号")
+        if (liveCalls().isNotEmpty()) throw CallProblem("There is already a call; no call was placed")
         validateLockedDial(w)
     }
 }

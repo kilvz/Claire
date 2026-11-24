@@ -59,7 +59,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `任务成功——结果文本回给实时模型`() = runTest {
+    fun `task succeeds — result text goes back to the realtime model`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow(TaskState.Succeeded("明天晴天，最高 25 度"))
         h.route.execute("call-1", "明天天气怎么样")
@@ -69,7 +69,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `任务失败——失败原因回给实时模型`() = runTest {
+    fun `task fails — failure reason goes back to the realtime model`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow(TaskState.Failed("没配模型", FailKind.Environment))
         h.route.execute("call-1", "查一下快递")
@@ -78,7 +78,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `先到先得——两个 callId 竞争只有一个执行`() = runTest {
+    fun `first come first served — two competing callIds, only one runs`() = runTest {
         val h = Harness()
         h.flowReady = false // The task is not registered yet; the first request is waiting for runState to appear
         val first = async { h.route.execute("call-1", "查天气") }
@@ -87,7 +87,7 @@ class VoiceCallRouteTest {
 
         val second = async { h.route.execute("call-2", "定闹钟") }
         runCurrent()
-        assertEquals("后来的请求不重复发起任务", listOf("查天气"), h.launched)
+        assertEquals("a later request does not start the task again", listOf("查天气"), h.launched)
         assertEquals(
             listOf("call-2" to "Another request is still running. Tell the user the previous request is still being handled; they can ask again when it finishes."),
             h.results,
@@ -107,7 +107,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `任务 Held 需要用户——状态行提示去任务页看并交还模型`() = runTest {
+    fun `Held task needs the user — status line points to the task page and hands back to the model`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow<TaskState>(TaskState.Running(1, "正在打开设置"))
         val run = async { h.route.execute("call-1", "帮我开深色模式") }
@@ -129,7 +129,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `任务 WaitingConfirmation——状态行提示去任务页看并交还模型`() = runTest {
+    fun `WaitingConfirmation task — status line points to the task page and hands back to the model`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow<TaskState>(
             TaskState.WaitingConfirmation(ConfirmationRequest(IrrevAction.send, "张三", "晚上一起吃饭吗", null, "com.example")),
@@ -143,7 +143,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `任务排队等待——不算要用户处理,继续等到结果`() = runTest {
+    fun `queued task — does not count as needing the user, keeps waiting for the result`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow<TaskState>(TaskState.Held(GateReason.queued("前面还有 1 个任务")))
         val run = async { h.route.execute("call-1", "查天气") }
@@ -157,7 +157,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `打断——取消已启动未完成的任务`() = runTest {
+    fun `interrupt — cancels a started but unfinished task`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = h.running(1, "正在打开设置")
         val run = async { h.route.execute("call-1", "帮我开深色模式") }
@@ -179,7 +179,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `打断发生在任务登记完成之前——任务一登记就被取消且只取消一次`() = runTest {
+    fun `interrupt before the task is registered — cancelled right after registration and only once`() = runTest {
         val h = Harness()
         h.flowReady = false
         h.flipFlowOnCancel = false // The flow does not exist at registration time, so the cancellation cannot land on it
@@ -194,19 +194,19 @@ class VoiceCallRouteTest {
         h.flows["conv-1"] = MutableStateFlow(TaskState.Cancelled) // The service side has already cancelled it
         advanceUntilIdle()
         assertTrue(run.isCompleted)
-        assertEquals("同一个任务不重复取消", listOf("conv-1"), h.cancelled)
+        assertEquals("the same task is not cancelled twice", listOf("conv-1"), h.cancelled)
         assertEquals(listOf("call-1" to "The task was cancelled because the user interrupted."), h.results)
     }
 
     @Test
-    fun `没有任务在跑时打断——不取消任何东西`() = runTest {
+    fun `interrupt with no task running — cancels nothing`() = runTest {
         val h = Harness()
         h.route.onBargeIn()
         assertTrue(h.cancelled.isEmpty())
     }
 
     @Test
-    fun `状态行缓冲上限 12 行——最旧的滚掉`() = runTest {
+    fun `status line buffer holds at most 12 lines — oldest rolls off`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = h.running(0, "")
         val run = async { h.route.execute("call-1", "干活") }
@@ -227,7 +227,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `状态行剥掉坐标和日程标题等细节`() = runTest {
+    fun `status line strips coordinates and calendar titles`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = h.running(1, "点击 [123,456][789,012] 打开日程「年度体检复查」并提醒")
         val run = async { h.route.execute("call-1", "看看日程") }
@@ -239,7 +239,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `状态行剥掉方头括号包裹的非数字细节`() = runTest {
+    fun `status line strips non-numeric details wrapped in lenticular brackets`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = h.running(1, "点击【通讯录】找到【张三】并呼叫")
         val run = async { h.route.execute("call-1", "打电话") }
@@ -252,7 +252,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `busy 流跟着路由有没有活走`() = runTest {
+    fun `busy flow follows whether the route has work`() = runTest {
         val h = Harness()
         assertFalse(h.route.busy.value)
         h.flowReady = false
@@ -267,7 +267,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `状态行最长 40 字`() = runTest {
+    fun `status line is at most 40 characters`() = runTest {
         val h = Harness()
         val long = "正在处理一件说起来特别特别长的事情".repeat(4) // 60 characters
         h.flows["conv-1"] = h.running(1, long)
@@ -281,7 +281,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `连续重复的状态行不重复进缓冲`() = runTest {
+    fun `consecutive duplicate status lines do not re-enter the buffer`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = h.running(1, "同一句进度")
         val run = async { h.route.execute("call-1", "干活") }
@@ -296,7 +296,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `runState 迟到登记——轮询等到为止`() = runTest {
+    fun `runState registered late — polling waits until it appears`() = runTest {
         val h = Harness()
         h.flowReady = false
         val run = async { h.route.execute("call-1", "查天气") }
@@ -314,7 +314,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `runState 一直不出现——启动失败回给模型`() = runTest {
+    fun `runState never appears — start failure goes back to the model`() = runTest {
         val h = Harness()
         h.flowReady = false
         h.route.execute("call-1", "查天气")
@@ -325,7 +325,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `空答案用兜底文本`() = runTest {
+    fun `empty answer uses fallback text`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow(TaskState.Succeeded(""))
         h.route.execute("call-1", "干活")
@@ -333,7 +333,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `结果文本超长截断`() = runTest {
+    fun `overlong result text is truncated`() = runTest {
         val h = Harness()
         h.flows["conv-1"] = MutableStateFlow(TaskState.Succeeded("长".repeat(3000)))
         h.route.execute("call-1", "干活")
@@ -341,7 +341,7 @@ class VoiceCallRouteTest {
     }
 
     @Test
-    fun `toVoiceLine 逐状态映射`() {
+    fun `toVoiceLine maps each state`() {
         assertNull(TaskState.Idle.toVoiceLine())
         assertEquals("需要你在任务页处理，去任务页看看", TaskState.WaitingTakeover("pay", "请完成支付").toVoiceLine())
         assertEquals("需要你在任务页处理，去任务页看看", TaskState.WaitingInput("选哪个?").toVoiceLine())

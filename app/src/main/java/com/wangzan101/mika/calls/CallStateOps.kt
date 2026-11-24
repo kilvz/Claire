@@ -47,16 +47,16 @@ internal fun CallRuntime.publish() {
     val standbyNotify = enabled && config.autoAnswer && CallStandbyService.notificationsAvailable(app)
     val baseBlocker = if (enabled && config.autoAnswer) autoAnswerBlocker(config, notificationReady) else null
     val standbyBlocked = if (enabled && config.autoAnswer) when {
-        !userUnlocked() -> "手机重启后须先由机主解锁"
-        !standbyNotify -> "请允许后台待命通知"
+        !userUnlocked() -> "After a restart, the phone owner must unlock the phone first"
+        !standbyNotify -> "Allow background standby notifications"
         baseBlocker != null -> baseBlocker
-        pauseSeconds != null -> "自动接听已暂停"
+        pauseSeconds != null -> "Auto-answer is paused"
         standbyStarting && standbyIncomingRequested -> null
-        !isIncomingStandbyRunning() -> standbyStartError ?: "请在电话页面启动后台待命"
+        !isIncomingStandbyRunning() -> standbyStartError ?: "Start background standby on the Phone screen"
         else -> null
     } else null
     val blocker = if (enabled && config.autoAnswer) baseBlocker ?: if (!canAutomaticallyAnswerHere()) {
-        standbyBlocked ?: "后台待命正在启动"
+        standbyBlocked ?: "Background standby is starting"
     } else null else null
     val autoStage = when {
         countdown != null -> CallAutoAnswerStage.COUNTDOWN
@@ -89,7 +89,7 @@ internal fun CallRuntime.publish() {
         number = current?.number ?: active?.requestedNumber,
         aiActive = active?.aiActive == true,
         voiceStage = active?.takeIf { it.aiActive }?.voiceStage,
-        detail = if (enabled && unobservedManagedCall && current == null) "Android 正在通话，但 Claire 尚未收到该通话的回调" else detail,
+        detail = if (enabled && unobservedManagedCall && current == null) "Android is on a call, but Claire has not received the callback for it" else detail,
         pendingAutoAnswer = pending,
         autoAnswerStage = autoStage,
         autoAnswerRemainingSeconds = countdown,
@@ -136,29 +136,29 @@ internal fun CallRuntime.report(message: String): CallActionResult {
 }
 
 internal fun CallRuntime.autoAnswerBlocker(config: CallConfig, notificationReady: Boolean? = null): String? = when {
-    !config.audioVerified -> "请先确认当前模式的双向通话音频"
+    !config.audioVerified -> "Confirm two-way call audio for the current mode first"
     config.incomingScope == IncomingScope.STRANGERS && !hasContactsAccess() -> app.getString(R.string.calls_strangers_note)
     !config.hasIncomingSelection -> if (config.incomingScope == IncomingScope.TYPES)
-        app.getString(R.string.calls_pick_types) else "自动接听名单为空"
+        app.getString(R.string.calls_pick_types) else "The auto-answer list is empty"
     config.incomingScope == IncomingScope.TYPES && ScreenAccessibility.instance.value == null ->
         app.getString(R.string.calls_type_accessibility)
     else -> prerequisite(ignoreWork = true, notificationReady = notificationReady)
-        ?: if (!audioReady) audioDetail ?: "设备通话音频尚未准备好" else null
+        ?: if (!audioReady) audioDetail ?: "Call audio on this device is not ready yet" else null
 }
 
 internal fun CallRuntime.prerequisite(
     ignoreWork: Boolean = false,
     notificationReady: Boolean? = null,
 ): String? = when {
-    !settings.state.value.enabled -> "AI 电话已关闭"
-    configuring -> "AI 电话正在配置"
-    !armed || !access.hasPhonePermissions() -> "请先准备 AI 电话"
-    shell == null -> "Claire 内置助手未连接"
-    standardCalls && cascade.blocker(CallUse.Phone) != null -> "请先在语音设置里选好通话的听写、朗读和思考模型"
-    !activeVoiceProfile().credentialsConfigured -> "请先配置实时语音凭据"
-    !activeVoiceProfile().connectionTested -> "请先测试实时语音连接"
-    !(notificationReady ?: notifications.ready()) -> "请允许 AI 电话通知，以便取消或接管"
-    !ignoreWork && work?.direction == CallDirection.OUTGOING -> "已在处理另一通电话"
+    !settings.state.value.enabled -> "AI calling is off"
+    configuring -> "AI calling is being configured"
+    !armed || !access.hasPhonePermissions() -> "Prepare AI calling first"
+    shell == null -> "Claire's built-in helper is not connected"
+    standardCalls && cascade.blocker(CallUse.Phone) != null -> "Choose the listening, speaking and thinking models for calls in the voice settings first"
+    !activeVoiceProfile().credentialsConfigured -> "Configure realtime voice credentials first"
+    !activeVoiceProfile().connectionTested -> "Test the realtime voice connection first"
+    !(notificationReady ?: notifications.ready()) -> "Allow AI call notifications so you can cancel or take over"
+    !ignoreWork && work?.direction == CallDirection.OUTGOING -> "Another call is already being handled"
     else -> null
 }
 
@@ -243,8 +243,8 @@ internal fun CallRuntime.subscription(handle: PhoneAccountHandle): Int? = runCat
 }.getOrNull()
 
 internal fun CallRuntime.callEndMessage(call: Tracked): String = when (call.call.details?.disconnectCause?.code) {
-    android.telecom.DisconnectCause.BUSY -> "对方占线，通话已结束"
-    android.telecom.DisconnectCause.ERROR, android.telecom.DisconnectCause.RESTRICTED -> "Android 报告通话失败"
-    android.telecom.DisconnectCause.MISSED -> "来电未接"
-    else -> "通话已结束"
+    android.telecom.DisconnectCause.BUSY -> "The other party is busy; the call ended"
+    android.telecom.DisconnectCause.ERROR, android.telecom.DisconnectCause.RESTRICTED -> "Android reported that the call failed"
+    android.telecom.DisconnectCause.MISSED -> "The incoming call was missed"
+    else -> "The call ended"
 }

@@ -106,12 +106,12 @@ class VoiceBriefingController internal constructor(
     ): Boolean {
         if (closed || operation != null) return false
         if (targetKey.isBlank() || !credentials.valid || !safeGate(canContinue)) {
-            mutable.value = VoiceBriefingState(message = "请确认号码、麦克风权限及电话空闲状态后重试")
+            mutable.value = VoiceBriefingState(message = "Check the number, the microphone permission and that the phone is idle, then try again")
             return false
         }
         val conversation = try { VoiceBriefingConversation(initialBrief) }
         catch (_: IllegalArgumentException) {
-            mutable.value = VoiceBriefingState(message = "原有交代无法完整保存，请先修改")
+            mutable.value = VoiceBriefingState(message = "The existing briefing cannot be saved completely; please edit it first")
             return false
         }
         val token = ++generation
@@ -131,17 +131,17 @@ class VoiceBriefingController internal constructor(
                     coroutineScope {
                         val watcher = launch {
                             while (true) {
-                                if (!valid()) throw VoiceBriefingFailure("语音交代已停止，未拨号")
+                                if (!valid()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
                                 delay(50)
                             }
                         }
                         try {
                             val prompt = VoiceBriefingConversation.PROMPT + initialBrief?.let {
-                                "\n以下是主人已经填写的交代，只作本通上下文：\n目标：${it.goal}\n" +
-                                    "必问：${it.questions.joinToString("；")}\n背景：${it.context}\n限制：${it.constraints}"
+                                "\nThe owner has already filled in this briefing; use it only as context for this call:\nGoal: ${it.goal}\n" +
+                                    "Required questions: ${it.questions.joinToString("; ")}\nBackground: ${it.context}\nLimits: ${it.constraints}"
                             }.orEmpty()
                             provider = connect(credentials, config.copy(systemPrompt = prompt, enablePhoneDtmf = false))
-                            if (!valid()) throw VoiceBriefingFailure("语音交代已停止，未拨号")
+                            if (!valid()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
                             localAudio = newAudio().also { audio = it }
                             localAudio!!.start(this, valid,
                                 send = { bytes -> valid() && provider!!.send(bytes) },
@@ -150,15 +150,15 @@ class VoiceBriefingController internal constructor(
                                     this@coroutineScope.cancel(CancellationException("Local briefing audio ended"))
                                 },
                             )
-                            if (!valid() || !provider!!.greet()) throw VoiceBriefingFailure("语音连接已中断，请重试")
+                            if (!valid() || !provider!!.greet()) throw VoiceBriefingFailure("The voice connection was interrupted; please try again")
                             mutable.value = mutable.value.copy(activity = VoiceBriefingActivity.LISTENING)
                             provider!!.events.firstOrNull { event ->
-                                if (!valid()) throw VoiceBriefingFailure("语音交代已停止，未拨号")
+                                if (!valid()) throw VoiceBriefingFailure("The voice briefing has stopped; no call was placed")
                                 when (event) {
                                     VolcRealtimeEvent.UserSpeaking, VolcRealtimeEvent.AssistantInterrupted -> {
                                         val heardFrames = localAudio!!.interrupt()
                                         if (provider!!.playbackTruncation?.interrupt(heardFrames) == false) {
-                                            throw VoiceBriefingFailure("无法同步已播放的语音，未拨号")
+                                            throw VoiceBriefingFailure("Unable to sync the audio already played; no call was placed")
                                         }
                                     }
                                     is VolcRealtimeEvent.Audio -> localAudio!!.enqueue(event.pcm)
@@ -171,26 +171,26 @@ class VoiceBriefingController internal constructor(
                                     }
                                     is VolcRealtimeEvent.AssistantTranscript -> {
                                         val full = mutable.value.assistantTranscript + event.delta
-                                        if (full.length > 16_384) throw VoiceBriefingFailure("对话已达长度限制，请重新开始")
+                                        if (full.length > 16_384) throw VoiceBriefingFailure("The conversation reached its length limit; please start again")
                                         mutable.value = mutable.value.copy(assistantTranscript = full)
                                     }
                                     is VolcRealtimeEvent.Failed, VolcRealtimeEvent.Closed ->
-                                        throw VoiceBriefingFailure("语音连接已结束，未拨号；请重新开始")
+                                        throw VoiceBriefingFailure("The voice connection ended; no call was placed. Please start again")
                                     // Blank recognition without prior text can be ordinary silence.
                                     // An unfinished partial may contain a constraint: never drop it
                                     // and then authorize from a later, unrelated complete final.
                                     VolcRealtimeEvent.UserTranscriptionEmpty -> {
                                         if (mutable.value.ownerPartial.isNotBlank()) {
-                                            throw VoiceBriefingFailure("这句话未完整识别，未拨号；请重新完整交代")
+                                            throw VoiceBriefingFailure("That sentence was not recognized completely; no call was placed. Please give the full briefing again")
                                         }
                                     }
                                     VolcRealtimeEvent.UserTranscriptionFailed ->
-                                        throw VoiceBriefingFailure("本句未能完整识别，未拨号；请重新交代")
+                                        throw VoiceBriefingFailure("This sentence could not be recognized completely; no call was placed. Please give the briefing again")
                                     else -> Unit
                                 }
                                 authorized != null
                             }
-                            if (authorized == null) throw VoiceBriefingFailure("语音连接已结束，未拨号")
+                            if (authorized == null) throw VoiceBriefingFailure("The voice connection ended; no call was placed")
                         } finally {
                             watcher.cancel()
                             localAudio?.stopImmediately()
@@ -200,11 +200,11 @@ class VoiceBriefingController internal constructor(
                     }
                 }
             } catch (error: CancellationException) {
-                failure = if (token == generation) audioFailure.get() ?: "语音交代已到时限或已取消，未拨号" else null
+                failure = if (token == generation) audioFailure.get() ?: "The voice briefing reached its time limit or was canceled; no call was placed" else null
             } catch (error: VoiceBriefingFailure) {
                 failure = error.safeMessage
             } catch (_: Exception) {
-                failure = "语音交代中断，未拨号；请检查权限或连接后重试"
+                failure = "The voice briefing was interrupted; no call was placed. Check permissions or the connection and try again"
             } finally {
                 conversation.cancel()
                 if (token == generation) mutable.value = mutable.value.copy(
@@ -231,7 +231,7 @@ class VoiceBriefingController internal constructor(
                 onAuthorized(brief.validatedSnapshot())
             } else {
                 mutable.value = mutable.value.copy(activity = VoiceBriefingActivity.IDLE,
-                    message = audioFailure.get() ?: failure ?: "语音交代已停止，未拨号")
+                    message = audioFailure.get() ?: failure ?: "The voice briefing has stopped; no call was placed")
             }
         }
         operation = job
@@ -242,7 +242,7 @@ class VoiceBriefingController internal constructor(
                 operation = null
                 if (job.isCancelled) mutable.value = mutable.value.copy(
                     activity = VoiceBriefingActivity.IDLE,
-                    message = mutable.value.message ?: "语音交代已取消，未拨号",
+                    message = mutable.value.message ?: "The voice briefing was canceled; no call was placed",
                 )
             }
         }

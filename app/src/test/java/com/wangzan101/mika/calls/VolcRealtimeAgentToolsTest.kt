@@ -66,8 +66,8 @@ class VolcRealtimeAgentToolsTest {
             // The constraint section: one mika_request per complete utterance, otherwise silent,
             // and the tool result is repeated exactly once.
             assertTrue(instructions.contains("mika_request"))
-            assertTrue(instructions.contains("沉默"))
-            assertTrue(instructions.contains("复述"))
+            assertTrue(instructions.contains("stay silent"))
+            assertTrue(instructions.contains("restate the result"))
             assertFalse(created.containsKey("tools"))
             peer().send("""{"type":"session.created","session":{"id":"local"}}""")
             val update = nextMessage()
@@ -98,7 +98,7 @@ class VolcRealtimeAgentToolsTest {
             assertEquals("session.create", create.type)
             val instructions = create.getValue("session").jsonObject.getValue("instructions").jsonPrimitive.content
             assertTrue(instructions.contains("mika_request"))
-            assertTrue(instructions.contains("沉默"))
+            assertTrue(instructions.contains("stay silent"))
             assertEquals("session.update", nextMessage().type)
             finish(session)
         }

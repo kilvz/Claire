@@ -55,7 +55,7 @@ class KnowPagesTest {
         for (always in listOf(KnowPage.Topics, KnowPage.Contacts, KnowPage.Clear)) assertTrue(data().valid(always))
         assertTrue(d.valid(KnowPage.Day(today - 1)))
         assertFalse(d.valid(KnowPage.Day(today - 2)))
-        assertFalse("今天还没有东西、也做不了", d.valid(KnowPage.Day(today)))
+        assertFalse("nothing yet today, and nothing can be done", d.valid(KnowPage.Day(today)))
         assertTrue(data(canMake = true).valid(KnowPage.Day(today)))
         assertTrue(d.valid(KnowPage.DayLine(today - 1, line)))
         // That line was dropped and replaced by a different one: the original page no longer counts, and it does not fall onto the other line now sitting in that position

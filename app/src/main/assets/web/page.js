@@ -311,10 +311,10 @@
     var label = cut(labelOf(el, role), NAME_CHARS);
     var v = valueOf(el, role);
     if (!v) return label;
-    var shown = v.password != null ? (v.password > 0 ? '已填 ' + v.password + ' 位' : '') : cut(collapse(v.text), NAME_CHARS);
+    var shown = v.password != null ? (v.password > 0 ? 'filled ' + v.password + ' chars' : '') : cut(collapse(v.text), NAME_CHARS);
     if (!shown) return label;
     if (!label || label === shown) return shown;
-    return label + '：' + shown;
+    return label + ': ' + shown;
   }
 
   function hostOf(src) {
@@ -458,7 +458,7 @@
     }
     // Cross-origin frames cannot be read under same-origin rules; just list their presence
     if (rect && !covered(el, ctx, rect)) {
-      push(out, state, el, ctx, rect, 'frame', '内嵌页面:' + hostOf(el.src || el.getAttribute('src') || ''), { c: false, e: false, s: false });
+      push(out, state, el, ctx, rect, 'frame', 'embedded page: ' + hostOf(el.src || el.getAttribute('src') || ''), { c: false, e: false, s: false });
     }
   }
 

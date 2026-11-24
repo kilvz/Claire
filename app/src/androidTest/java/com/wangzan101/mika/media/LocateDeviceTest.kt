@@ -90,7 +90,7 @@ class LocateDeviceTest {
         val r = d.run("phone_find_visually", """{"target":"WLAN","text":"WLAN"}""")
         assertEquals(r.toString(), "true", r.s("found"))
         assertEquals("elements", r.s("source"))
-        assertEquals("控件树命中不问视觉模型", 0, model.asked)
+        assertEquals("a tree hit does not ask the vision model", 0, model.asked)
         tapAndExpectWlanPage(a, d, r)
     }
 

@@ -15,17 +15,17 @@ fun PluginManifest.disclosure(): PluginDisclosure = PluginDisclosure(
 
 /** Default prompt rules for plugins (persona.conf): all comments, i.e. no prompt change; "Restore defaults" writes this back. */
 val DEFAULT_PERSONA_CONF: String = """
-    # 提示词改写配置。改完下一次任务生效。
-    # prefix / suffix:整段包在系统提示词外面(各一行)
-    # replace:一行一条,格式  旧文字=>新文字  (字面匹配,不是正则)
-    # 行首加 [模型名片段] 只对那个模型生效,例如 [claude]prefix=…
+    # Prompt rewrite config. Changes take effect on the next task.
+    # prefix / suffix: the whole block is placed outside the system prompt (one line each)
+    # replace: one per line, format  old text=>new text  (literal match, not a regex)
+    # Put a [model name fragment] at the start of a line to apply it only to that model, e.g. [claude]prefix=…
     #
-    # 例:先给结论
-    # prefix=先给结论,再给理由。不确定的事直接说不确定,不要绕。
+    # Example: conclusion first
+    # prefix=Give the conclusion first, then the reasons. When unsure, say so plainly instead of hedging.
     #
-    # 例:去掉某句固定话术
+    # Example: remove a fixed phrase
     # replace=You are Claire, the user's personal assistant on their phone.=>You are Claire.
     #
-    # 例:追加一条规矩
-    # suffix=回答尽量控制在三句话内,除非用户要细节。
+    # Example: add a rule
+    # suffix=Keep answers to three sentences unless the user wants detail.
 """.trimIndent()

@@ -7,7 +7,7 @@ import org.junit.Test
 class ProviderKeySitesTest {
 
     @Test
-    fun `已知服务商按主机名给出官方 Key 申请页`() {
+    fun `known providers get the official key signup page by host name`() {
         assertEquals("https://platform.deepseek.com/api_keys", ProviderKeySites.forBaseUrl("https://api.deepseek.com"))
         assertEquals("https://platform.openai.com/api-keys", ProviderKeySites.forBaseUrl("https://api.openai.com/v1"))
         assertEquals("https://aistudio.google.com/app/apikey", ProviderKeySites.forBaseUrl("https://generativelanguage.googleapis.com"))
@@ -17,13 +17,13 @@ class ProviderKeySitesTest {
     }
 
     @Test
-    fun `同一主机路径不同也认`() {
+    fun `same host with a different path still matches`() {
         // An official URL typed into the custom form by hand, with a path that differs from the preset, is still recognized by host
         assertEquals("https://platform.deepseek.com/api_keys", ProviderKeySites.forBaseUrl("https://api.deepseek.com/v1"))
     }
 
     @Test
-    fun `认不出的地址不给链接`() {
+    fun `unrecognized addresses get no link`() {
         assertNull(ProviderKeySites.forBaseUrl("https://llm.example.com/v1"))
         assertNull(ProviderKeySites.forBaseUrl("http://127.0.0.1:11434/v1"))
         assertNull(ProviderKeySites.forBaseUrl(""))
@@ -31,7 +31,7 @@ class ProviderKeySitesTest {
     }
 
     @Test
-    fun `每个云服务商预设都能认出申请页`() {
+    fun `every cloud provider preset resolves to a signup page`() {
         // Presets whose official key page is not confirmed yet: exempted explicitly; once confirmed, add the mapping and remove them from here
         val unmapped = setOf("OpenDesign Go", "OpenCode Go")
         // Self-hosted (local address) and custom (empty address) presets are not included; the mapping follows the preset list, so a missing entry fails
@@ -40,6 +40,6 @@ class ProviderKeySitesTest {
             .filter { it.label !in unmapped }
             .filter { ProviderKeySites.forBaseUrl(it.baseUrl) == null }
             .map { it.label }
-        assertEquals("以下预设缺官方 Key 申请页映射: $missing", emptyList<String>(), missing)
+        assertEquals("these presets are missing an official key signup page mapping: $missing", emptyList<String>(), missing)
     }
 }

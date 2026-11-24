@@ -32,7 +32,7 @@ class OverlayMotionTest {
         var returned = false
         runOverlayClose(reduceMotion = false) { awaitCancellation() }
         returned = true
-        assertTrue("动画永远不来下一帧时也要回到调用方收尾", returned)
+        assertTrue("it still returns to the caller to finish when the animation never delivers another frame", returned)
     }
 
     @Test fun systemSlowMotionGetsEnoughTimeToFinish() = runTest {
@@ -70,7 +70,7 @@ class OverlayMotionTest {
         var returned = false
         runOverlayOpen(reduceMotion = false) { awaitCancellation() }
         returned = true
-        assertTrue("浮层拿不到下一帧时也要回到调用方就位", returned)
+        assertTrue("it still returns to the caller to settle when the overlay cannot get another frame", returned)
     }
 
     @Test fun openSystemSlowMotionGetsEnoughTimeToFinish() = runTest {

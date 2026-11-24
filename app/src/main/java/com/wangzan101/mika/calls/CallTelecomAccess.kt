@@ -38,14 +38,14 @@ internal class CallTelecomAccess(private val context: Context) {
         context.checkSelfPermission(Manifest.permission.MANAGE_ONGOING_CALLS) == PackageManager.PERMISSION_GRANTED
 
     fun prepare(shell: IMikaShell): String? {
-        if (!supported) return "电话伴侣模式需要 Android 12 及以上、主用户及运营商通话功能"
-        if (!hasPhonePermissions()) return "请在 Claire 的系统权限中允许电话权限"
-        val original = readOp(shell) ?: return "无法读回电话权限状态"
+        if (!supported) return "Phone companion mode requires Android 12 or later, the primary user, and carrier calling support"
+        if (!hasPhonePermissions()) return "Allow phone permissions in Claire's system permissions"
+        val original = readOp(shell) ?: return "Could not read back the phone permission state"
         val systemDialer = runCatching { telecom?.defaultDialerPackage }.getOrNull()
-            ?: return "无法读回系统默认拨号器"
+            ?: return "Could not read back the system default dialer"
         val restoreOp = journal.getString(PREVIOUS_OP, null)
         if (original != "allow") {
-            if (!journal.edit().putString(PREVIOUS_OP, original).commit()) return "无法保存电话权限还原信息"
+            if (!journal.edit().putString(PREVIOUS_OP, original).commit()) return "Could not save the phone permission restore information"
             val change = command(shell, "cmd appops set --user $user $pkg MANAGE_ONGOING_CALLS allow")
             val readBack = if (change == CallTelecomCommandOutcome.OK) readOp(shell) else null
             val failure = if (original == "default" && readBack == "default") {
@@ -58,27 +58,27 @@ internal class CallTelecomAccess(private val context: Context) {
                 return failure
             }
         } else if (!managePermission()) {
-            return "此系统不允许 Claire 管理运营商通话"
+            return "This system does not allow Claire to manage carrier calls"
         }
         // No public API lists this test override. Reuse external setup when the allow was
         // already granted independently; only remove a registration made by this runtime.
         if (original != "allow" || restoreOp != null || journal.getBoolean(COMPANION, false)) {
             if (!journal.edit().putBoolean(COMPANION, true).commit()) {
                 rollback(shell)
-                return "无法保存电话伴侣还原信息"
+                return "Could not save the phone companion restore information"
             }
             if (command(shell, "cmd telecom add-or-remove-call-companion-app $pkg 1") != CallTelecomCommandOutcome.OK) {
                 rollback(shell)
-                return "此系统未接受电话伴侣注册"
+                return "This system did not accept the phone companion registration"
             }
         }
         if (runCatching { telecom?.defaultDialerPackage }.getOrNull() != systemDialer) {
             rollback(shell)
-            return "系统默认拨号器发生变化，已停止配置"
+            return "The system default dialer changed; setup stopped"
         }
         if (!journal.edit().putString(PREPARED, boot).commit()) {
             rollback(shell)
-            return "无法保存电话伴侣配置"
+            return "Could not save the phone companion configuration"
         }
         currentBootPrepared = true
         return null
@@ -88,10 +88,10 @@ internal class CallTelecomAccess(private val context: Context) {
         // In default mode Android can use the package's grant. Some builds keep the app-op
         // at default after appops set while accepting the grant through Package Manager.
         if (!packageManagePermission()) {
-            if (!journal.edit().putBoolean(OWNS_PACKAGE_PERMISSION, true).commit()) return "无法保存电话权限还原信息"
+            if (!journal.edit().putBoolean(OWNS_PACKAGE_PERMISSION, true).commit()) return "Could not save the phone permission restore information"
             if (command(shell, "pm grant --user $user $pkg ${Manifest.permission.MANAGE_ONGOING_CALLS}") !=
                 CallTelecomCommandOutcome.OK
-            ) return "系统未接受管理通话权限的直接授权"
+            ) return "The system did not accept the direct grant of the call-management permission"
         }
         return CallTelecomCommandOutcome.OK.verificationFailure("default", managePermission())
     }
@@ -155,8 +155,8 @@ internal enum class CallTelecomCommandOutcome {
 
     val appOpsFailureMessage: String
         get() = when (this) {
-            SHELL_APP_OPS_DENIED -> "系统限制 ADB 修改通话管理权限（缺少 MANAGE_APP_OPS_MODES），无法启用电话伴侣"
-            else -> "系统未授予管理通话权限"
+            SHELL_APP_OPS_DENIED -> "The system blocks ADB from changing the call-management permission (MANAGE_APP_OPS_MODES is missing), so phone companion mode cannot be enabled"
+            else -> "The system did not grant the call-management permission"
         }
 
     /** Report the verified post-command state, never raw shell output or a guessed permission. */
@@ -164,9 +164,9 @@ internal enum class CallTelecomCommandOutcome {
         this != OK -> appOpsFailureMessage
         readBack == "default" && telecomGranted -> null
         readBack in setOf("default", "ignore", "deny", "errored", "foreground") ->
-            "已尝试授权，但系统读回的通话管理权限仍为 $readBack，无法启用电话伴侣"
-        readBack != "allow" -> "授权命令已执行，但无法读回通话管理权限状态，请重试"
-        !telecomGranted -> "通话管理权限已读回 allow，但系统通话服务仍未授权，无法启用电话伴侣"
+            "A grant was attempted, but the system still reads back the call-management permission as $readBack, so phone companion mode cannot be enabled"
+        readBack != "allow" -> "The grant command ran, but the call-management permission state could not be read back; try again"
+        !telecomGranted -> "The call-management permission reads back as allow, but the system call service is still not authorized, so phone companion mode cannot be enabled"
         else -> null
     }
 

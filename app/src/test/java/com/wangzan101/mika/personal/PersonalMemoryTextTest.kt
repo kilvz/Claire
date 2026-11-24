@@ -36,7 +36,7 @@ class PersonalMemoryTextTest {
         assertTrue(text.length <= 6500)
         val lines = text.lines()
         assertTrue(lines.all { it == body || it == PERSONAL_INFERRED_MARK + "归".repeat(200) })
-        assertFalse("归纳的那条装不下就整条不带", lines.any { it.startsWith("归") })
+        assertFalse("the inferred entry is left out whole when it does not fit", lines.any { it.startsWith("归") })
         // Widen the limit a little and the whole item is included, with the mark in front
         assertTrue(personalMemoryText(items, max = 7000).lines().any { it == PERSONAL_INFERRED_MARK + "归".repeat(200) })
     }

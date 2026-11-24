@@ -2396,10 +2396,10 @@ class ChatViewModelTest {
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", listOf(remembered)))
         runCurrent()
         val note = vm.ui.value.exchanges.single().memoryNotes.single()
-        assertEquals("记住了:用户点外卖不要香菜", vm.noteText(note))
+        assertEquals("Remembered: 用户点外卖不要香菜", vm.noteText(note))
         // The content is fetched live: once that item is deleted it writes the deleted-memory placeholder
         items.value = items.value.filter { it.id != "a" }
-        assertEquals("记住了:一条已删除的记忆", vm.noteText(note))
+        assertEquals("Remembered: a deleted memory", vm.noteText(note))
         // Reopening the conversation reads it back from the stored turn (only the kind and the id are stored)
         val store = ConversationStore(tmp.newFolder())
         store.append("c2", Turn("点外卖", "ok", "succeeded", runId = "r2", memoryNotes = listOf(remembered), usedMemory = listOf("a")))
@@ -2426,7 +2426,7 @@ class ChatViewModelTest {
         val second = procedure.copy(undoToken = "expired", pendingId = "p2", memoryId = "p2")
         notesFlow.value = mapOf("r1" to com.wangzan101.mika.memory.RunNotes("c1", "r1", listOf(procedure, second)))
         runCurrent()
-        assertEquals("要我以后都这样做吗?点外卖先比价", vm.noteText(procedure))
+        assertEquals("Should I always do it this way from now on? 点外卖先比价", vm.noteText(procedure))
         vm.approveNote("r1", procedure); runCurrent()
         assertEquals(listOf("approve:p1"), learnCalls)
         // On "no" the token has already expired: that procedure is deleted outright
@@ -2542,7 +2542,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("设置版本号", ok))
         live["b"] = "r-b"
         show("a", TaskState.Running(0, "正在准备"))
-        assertNull("这个对话的任务还没分到编号:不拿别的对话的", vm.ui.value.exchanges.last().runId)
+        assertNull("this conversation's task has no id yet: do not take another conversation's", vm.ui.value.exchanges.last().runId)
         live["a"] = "r-a"
         show("a", TaskState.Running(1, "打开设置"))
         assertEquals("r-a", vm.ui.value.exchanges.last().runId)
@@ -3426,14 +3426,14 @@ class ChatViewModelTest {
         val vm = vmWithScreen(open)
         vm.send("打开设置看电量", ok)
         emit(TaskState.Running(0, "正在准备"))
-        assertFalse("还没开屏时不浮出来", vm.ui.value.pip.visible)
+        assertFalse("does not float up before the screen opens", vm.ui.value.pip.visible)
         open.value = true
         runCurrent()
         assertTrue(vm.ui.value.pip.visible)
         assertFalse(vm.ui.value.pip.closed)
 
         vm.closePip()
-        assertTrue("关掉后还有小按钮", vm.ui.value.pip.visible)
+        assertTrue("still a small button after closing", vm.ui.value.pip.visible)
         assertTrue(vm.ui.value.pip.closed)
         assertEquals(ExchangeStatus.Working, vm.ui.value.exchanges.single().status)
         // Later progress does not make it float up again by itself
@@ -3441,7 +3441,7 @@ class ChatViewModelTest {
         assertTrue(vm.ui.value.pip.closed)
 
         vm.reopenPip()
-        assertFalse("点小按钮再打开", vm.ui.value.pip.closed)
+        assertFalse("tapping the small button opens it again", vm.ui.value.pip.closed)
     }
 
     @Test fun pipSoundButtonAlwaysDispatchesRealActionAndDoesNotInventState() = runTest {
@@ -3470,7 +3470,7 @@ class ChatViewModelTest {
         val pip = vm.ui.value.pip
         assertTrue(pip.visible)
         assertTrue(pip.closed)
-        assertFalse("关着时接管也不弹开", pip.expanded)
+        assertFalse("takeover does not expand it while closed", pip.expanded)
         assertEquals(PipMode.NeedsYou, pip.mode)
         assertTrue(vm.ui.value.exchanges.single().status is ExchangeStatus.NeedsTakeover)
     }

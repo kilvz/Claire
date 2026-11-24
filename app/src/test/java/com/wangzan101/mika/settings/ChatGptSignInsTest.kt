@@ -25,7 +25,7 @@ class ChatGptSignInsTest {
         assertTrue(s.start { gate.await() })
         assertEquals(1, kept)
         assertTrue(s.running.value)
-        assertFalse("同一时刻只有一次", s.start { })
+        assertFalse("only one at a time", s.start { })
         assertEquals(1, kept)
         gate.complete(Unit)
         runCurrent()
@@ -36,14 +36,14 @@ class ChatGptSignInsTest {
         val s = signIns()
         s.start { throw IllegalStateException("boom") }
         runCurrent()
-        assertFalse("失败也要结束", s.running.value)
+        assertFalse("failure also ends it", s.running.value)
         s.start { awaitCancellation() }
         runCurrent()
         assertTrue(s.running.value)
         s.cancel()
         runCurrent()
-        assertFalse("取消也要结束", s.running.value)
-        assertTrue("结束后可以再开", s.start { })
+        assertFalse("cancelling also ends it", s.running.value)
+        assertTrue("can start again after it ends", s.start { })
         runCurrent()
         assertFalse(s.running.value)
     }

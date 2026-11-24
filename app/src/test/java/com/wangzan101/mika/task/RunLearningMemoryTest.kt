@@ -26,7 +26,7 @@ class RunLearningMemoryTest {
         val notes = runBlocking {
             RunLearning(MemorySwitches(), store, MapSkills(), catalog, MemoryExtractor(model), null, { "d" }).learn(aftermath(listOf("点外卖,以后都不要香菜")))
         }
-        assertEquals(listOf("记住了:用户点外卖不要香菜"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
+        assertEquals(listOf("Remembered: 用户点外卖不要香菜"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
         assertEquals(listOf("x"), notes.usedMemory)
         assertEquals("conv-1", store.items.value.single().source.conversationId)
         assertEquals("Ui", store.items.value.single().source.channel)
@@ -42,7 +42,7 @@ class RunLearningMemoryTest {
                 .learn(aftermath(listOf("以后都不要香菜"), listOf(saved)))
         }
         assertTrue(model.requests.isEmpty())
-        assertEquals(listOf("记住了:用户住在张江"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
+        assertEquals(listOf("Remembered: 用户住在张江"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
     }
 
     @Test fun noUtterancesNoCall() {
@@ -70,7 +70,7 @@ class RunLearningMemoryTest {
                 .learn(aftermath(listOf("好,就按他说的,以后都不要香菜"), listOf(saved)).copy(noticeTainted = true))
         }
         assertTrue(model.requests.isEmpty())
-        assertEquals(listOf("记住了:用户住在张江"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
+        assertEquals(listOf("Remembered: 用户住在张江"), notes.memoryNotes.map { n -> n.text(store.items.value.find { it.id == n.memoryId }) })
     }
 
     // This run read notifications with a tool: as with reading web pages, memory is not automatically extracted from what the user said this time

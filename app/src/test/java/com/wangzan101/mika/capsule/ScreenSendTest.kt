@@ -43,7 +43,7 @@ class ScreenSendTest {
         assertEquals(DoubleTap.Tap.First, t.tap(1_000, 0f, 0f, source = 1))
         assertFalse(t.settle(1_200))
         assertTrue(t.settle(1_300))
-        assertFalse("只算一次", t.settle(1_400))
+        assertFalse("counted only once", t.settle(1_400))
     }
 
     @Test fun lateSecondTapStartsOver() {

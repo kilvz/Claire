@@ -101,23 +101,22 @@ class CallPolicyTest {
     @Test fun ownerRulesArePassedAsAnExplicitSectionOfTheBoundedCallPrompt() {
         val ownerRules = "仅在来电者说包裹到了时，请对方留下取件地点。"
         val prompt = CallPolicy.prompt("确认对方称呼。", CallDirection.INCOMING, ownerRules)
-        assertTrue(prompt.indexOf("不得索取或透露密码") in 0 until prompt.indexOf(ownerRules))
-        assertTrue(prompt.contains("机主明确保存的通话规则"))
+        assertTrue(prompt.indexOf("Never ask for or reveal passwords") in 0 until prompt.indexOf(ownerRules))
+        assertTrue(prompt.contains("Call rules explicitly saved by the owner"))
         assertTrue(prompt.contains("确认对方称呼。"))
-        assertFalse(CallPolicy.prompt("", CallDirection.INCOMING).contains("机主明确保存的通话规则"))
+        assertFalse(CallPolicy.prompt("", CallDirection.INCOMING).contains("Call rules explicitly saved by the owner"))
     }
 
     @Test fun legacyGreetingMigratesOnlyTheExactOldDefault() {
         val legacyDefault = "您好，我是 Claire 的 AI 电话助手。请问有什么需要我转告？"
         val customWithOldName = "您好，我是 Claire 的 AI 电话助手。请留下可回拨的时间。"
-        val currentDefault = "您好，我是 Claire AI 电话助手。请问有什么需要我转告？"
+        val currentDefault = CallPolicy.DEFAULT_GREETING
         assertEquals(currentDefault, CallConfig().greeting)
         assertEquals(currentDefault, CallPolicy.migrateDefaultGreeting(legacyDefault))
         assertEquals(currentDefault, CallPolicy.spokenGreeting(legacyDefault, hasTask = false))
         assertEquals(customWithOldName, CallPolicy.migrateDefaultGreeting(customWithOldName))
         assertEquals(customWithOldName, CallPolicy.spokenGreeting(customWithOldName, hasTask = false))
-        assertEquals("您好，我是 Claire AI 电话助手。请问现在方便通话吗？",
-            CallPolicy.spokenGreeting(currentDefault, hasTask = true))
+        assertEquals(CallPolicy.TASK_GREETING, CallPolicy.spokenGreeting(currentDefault, hasTask = true))
     }
 
     @Test fun explicitGreetingIsUsedExactlyAndBlankMeansSilence() {
@@ -132,11 +131,11 @@ class CallPolicyTest {
         for (direction in CallDirection.entries) {
             val prompt = CallPolicy.prompt("你好", direction)
             assertTrue(prompt.contains("你好"))
-            assertFalse(prompt.contains("通话开始时明确说明自己是 AI"))
+            assertFalse(prompt.contains("At the start of the call, state clearly that you are an AI"))
             assertFalse(prompt.contains("Flash phone"))
-            assertTrue(prompt.contains("只有对方直接问接话者的身份"))
-            assertTrue(prompt.contains("‘喂，能听到吗’，只答‘能听到，您说’"))
-            assertFalse(prompt.contains("你是 AI 电话助手"))
+            assertTrue(prompt.contains("only when the other party directly asks who is answering"))
+            assertTrue(prompt.contains("if they say 'Hello, can you hear me?', only answer 'I can hear you, go ahead'"))
+            assertFalse(prompt.contains("You are the AI phone assistant"))
         }
     }
 

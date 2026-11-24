@@ -129,7 +129,7 @@ data class DiagnosticsSnapshot(
 
 /** Renders a [DiagnosticsSnapshot] as plain text: fixed section order, English keys, easy to read in WeChat or on GitHub. The whole text is redacted one last time at the end. */
 object Diagnostics {
-    const val HEADER = "Claire 诊断信息 / Claire diagnostics"
+    const val HEADER = "Claire diagnostics"
 
     fun render(s: DiagnosticsSnapshot): String = sanitize(buildString {
         appendLine(HEADER)

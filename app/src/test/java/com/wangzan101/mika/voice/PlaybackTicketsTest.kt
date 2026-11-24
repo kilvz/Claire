@@ -7,7 +7,7 @@ import org.junit.Test
 class PlaybackTicketsTest {
 
     @Test
-    fun `新请求使旧请求失效`() {
+    fun `a new request invalidates the old one`() {
         val tickets = PlaybackTickets()
         val first = tickets.begin()
         assertTrue(tickets.owns(first))
@@ -17,7 +17,7 @@ class PlaybackTicketsTest {
     }
 
     @Test
-    fun `写文件完成时旧请求的回调被丢弃`() {
+    fun `the old request's callback is dropped when the file write completes`() {
         val tickets = PlaybackTickets()
         // The first request starts writing the file (suspended), and the second request comes in right after
         val staleWrite = tickets.begin()
@@ -29,7 +29,7 @@ class PlaybackTicketsTest {
     }
 
     @Test
-    fun `主动停下后旧播放器的回调被丢弃`() {
+    fun `the old player's callback is dropped after stopping on purpose`() {
         val tickets = PlaybackTickets()
         val playing = tickets.begin()
         // The user tapped stop; the MediaPlayer whose prepare is still in flight only calls back onPrepared afterwards
@@ -41,7 +41,7 @@ class PlaybackTicketsTest {
     }
 
     @Test
-    fun `同一代次内多次回调都算数`() {
+    fun `multiple callbacks within the same generation all count`() {
         val tickets = PlaybackTickets()
         val ticket = tickets.begin()
         assertTrue(tickets.owns(ticket))

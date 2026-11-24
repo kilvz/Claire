@@ -79,7 +79,7 @@ class WebProxyTest {
         NetProxy.sharedSource = { "http://alice:pw@proxy.example.test:3128" }
         NetProxy.shared.changed()
         assertEquals("alice" to "pw", WebProxy.credentialsFor("proxy.example.test"))
-        assertNull("网站自己的登录框不答", WebProxy.credentialsFor("site.example.test"))
+        assertNull("does not answer the site's own login form", WebProxy.credentialsFor("site.example.test"))
         NetProxy.sharedSource = { "socks5://alice:pw@proxy.example.test:1080" }
         assertNull(WebProxy.credentialsFor("proxy.example.test"))
         NetProxy.sharedSource = { "" }

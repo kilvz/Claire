@@ -111,7 +111,7 @@ class OpenRouterSignInTest {
         assertEquals("sk-or-v1-SECRET", s.providerKey(p.id))
         assertEquals(listOf(OpenRouterAuth.API_BASE to "sk-or-v1-SECRET"), listCalls)
         assertTrue(ui.openRouterAccount!!.signedIn)
-        assertNotNull("还没有主模型时选一个", ui.roles.main)
+        assertNotNull("pick one when there is no main model yet", ui.roles.main)
         assertEquals(listOf<String?>(null), browser.pages)
         assertTrue(browser.opened.single().startsWith("https://openrouter.ai/auth?"))
         val sent = server.takeRequest().body.readUtf8()
@@ -128,7 +128,7 @@ class OpenRouterSignInTest {
             withTimeout(5_000) { vm.state.first { it.openRouterAccount?.signedIn == false } }
         }
         assertNull(s.providerKey(p.id))
-        assertNotNull("服务商和模型留着", s.provider(p.id)?.models)
+        assertNotNull("provider and model are kept", s.provider(p.id)?.models)
         assertTrue(vm.state.value.signedOut(s.provider(p.id)!!))
     }
 

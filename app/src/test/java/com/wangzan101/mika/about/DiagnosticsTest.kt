@@ -256,7 +256,7 @@ class DiagnosticsTest {
         val t = Diagnostics.render(base.copy(models = base.models.copy(chatGptLastFailure = failure)))
         assertTrue(t, t.contains("ChatGPT last sign-in failure: 5m ago: CodeExpired (code invalid_grant) — CodeExpired: invalid_grant — bad code"))
         assertFalse(t, t.contains("eyJ"))
-        assertFalse("没有失败就不写这一行", Diagnostics.render(base).contains("last sign-in failure"))
+        assertFalse("this line is not written when there is no failure", Diagnostics.render(base).contains("last sign-in failure"))
     }
 
     /** Sanitizing does not over-reach: the digits in times, version numbers and model names are written as they are. */

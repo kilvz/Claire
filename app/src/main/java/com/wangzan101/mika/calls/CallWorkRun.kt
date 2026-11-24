@@ -61,13 +61,13 @@ internal suspend fun CallRuntime.waitAutoAnswerDelay(w: Work) {
 internal suspend fun CallRuntime.ensureOutgoingForegroundService(w: Work) {
     if (standbyService == null) {
         if (!requestCallForegroundService(incoming = false)) {
-            throw CallProblem(standbyStartError ?: "外呼后台电话服务未能启动，未拨号")
+            throw CallProblem(standbyStartError ?: "The outgoing-call background phone service did not start; no call was placed")
         }
         if (!awaitCallForegroundReady(
                 isStarting = { standbyStarting },
                 isReady = { work === w && standbyService?.leaseAvailable == true },
             )) {
-            throw CallProblem(standbyStartError ?: "Android 未确认外呼后台电话服务启动，未拨号")
+            throw CallProblem(standbyStartError ?: "Android did not confirm the outgoing-call background phone service started; no call was placed")
         }
     }
     requireOutgoingForegroundService(w)
@@ -76,63 +76,63 @@ internal suspend fun CallRuntime.ensureOutgoingForegroundService(w: Work) {
 internal fun CallRuntime.requireOutgoingForegroundService(w: Work) {
     val leaseReady = standbyService?.leaseAvailable == true && CallStandbyService.notificationsAvailable(app)
     if (work !== w || !leaseReady || !hasOutgoingForegroundWork()) {
-        throw CallProblem(standbyStartError ?: "外呼后台电话服务不可用，AI 未执行后续操作")
+        throw CallProblem(standbyStartError ?: "The outgoing-call background phone service is unavailable; the AI did not continue")
     }
 }
 
 internal suspend fun CallRuntime.runWork(w: Work) {
     try {
         if (!notifications.show(w.id, detail.orEmpty(), ringing = w.direction == CallDirection.INCOMING)) {
-            throw CallProblem("需要打开 AI 电话通知，才能随时取消或接管")
+            throw CallProblem("AI call notifications must be enabled so you can cancel or take over at any time")
         }
         if (!interactiveForeground()) acquireCallWakeLock(w, 20_000L)
         if (w.direction == CallDirection.OUTGOING) ensureOutgoingForegroundService(w)
         if (w.automatic) waitAutoAnswerDelay(w)
         prerequisite(ignoreWork = true)?.let { throw CallProblem(it) }
         validateTarget(w)
-        val helper = shell ?: throw CallProblem("Claire 内置助手未连接")
+        val helper = shell ?: throw CallProblem("Claire's built-in helper is not connected")
         val migrated = realtimeController.migrated
         val standard = standardCalls
         val provider = if (standard) CascadeCallProvider(cascade, CallUse.Phone) else if (migrated) {
             try {
                 realtimeController.callProvider()
             } catch (e: VoiceModelError) {
-                throw CallProblem("实时语音配置不可用，请检查语音模型")
+                throw CallProblem("The realtime voice configuration is unavailable; check the voice model")
             }
         } else ProfileRealtimeProvider()
         val profile = if (migrated) {
             activeVoiceProfile()
         } else {
             voiceProfiles.get(w.config.activeVoiceProfileId)
-                ?: throw CallProblem("实时语音配置不可用，请重新选择")
+                ?: throw CallProblem("The realtime voice configuration is unavailable; select it again")
         }
         val credentials = if (standard) VolcRealtimeCredentials() else if (migrated) {
             try {
                 realtimeController.credentials()
             } catch (e: VoiceModelError) {
-                throw CallProblem("实时语音凭据不可用，请重新保存")
+                throw CallProblem("Realtime voice credentials are unavailable; save them again")
             }
         } else {
             withContext(Dispatchers.IO) { voiceProfiles.credentials(profile.id) }
-                ?: throw CallProblem("实时语音凭据不可用，请重新保存")
+                ?: throw CallProblem("Realtime voice credentials are unavailable; save them again")
         }
-        if (!probeAudio()) throw CallProblem(audioDetail ?: "此设备的双向通话音频不可用")
+        if (!probeAudio()) throw CallProblem(audioDetail ?: "Two-way call audio is not available on this device")
         if (shell !== helper || w.config.audioMode != settings.state.value.audioMode) {
-            throw CallProblem("通话音频设置已变化，请重试")
+            throw CallProblem("Call audio settings changed; try again")
         }
         validateTarget(w)
         val ownerRules = withContext(Dispatchers.IO) {
             runCatching { instructions.promptSnapshot() }
-                .getOrElse { throw CallProblem("无法读取电话交代，未由 AI 操作电话") }
+                .getOrElse { throw CallProblem("Could not read the call instructions; the AI did not operate the phone") }
         }
         validateTarget(w)
         val systemPrompt = CallPolicy.prompt(w.config.systemPrompt, w.direction, ownerRules, task = w.task) + PHONE_DTMF_PROMPT
         try {
             provider.validate(profile, systemPrompt, enablePhoneDtmf = true)
         } catch (_: IllegalArgumentException) {
-            throw CallProblem("实时语音配置或本次交代无效，未由 AI 操作电话；请检查配置或缩短交代")
+            throw CallProblem("The realtime voice configuration or these call instructions are invalid; the AI did not operate the phone. Check the configuration or shorten the instructions")
         } catch (_: VoiceModelError) {
-            throw CallProblem("实时语音配置不可用，未由 AI 操作电话")
+            throw CallProblem("The realtime voice configuration is unavailable; the AI did not operate the phone")
         }
         val session = startCallSession(
             direction = w.direction,
@@ -142,15 +142,15 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 val connected = withTimeoutOrNull(5_000L) {
                     provider.connect(profile, credentials, systemPrompt, enablePhoneDtmf = true)
                         .also { w.session = it } // Adopt before the timeout/cancellation boundary.
-                } ?: throw CallProblem("实时语音连接超时，未由 AI 接管")
-                if (!connected.setMuted(true)) throw CallProblem("实时语音服务未进入就绪状态")
+                } ?: throw CallProblem("The realtime voice connection timed out; the AI did not take over")
+                if (!connected.setMuted(true)) throw CallProblem("The realtime voice service did not become ready")
                 validateSessionTarget(w, helper)
                 connected
             },
             awaitCarrier = {
                 if (!withContext(Dispatchers.IO) { access.ready() }) {
                     armed = false
-                    throw CallProblem("系统通话管理权限不可用，未由 AI 操作电话")
+                    throw CallProblem("The system call-management permission is unavailable; the AI did not operate the phone")
                 }
                 prerequisite(ignoreWork = true)?.let { throw CallProblem(it) }
                 val ringingCall = w.track
@@ -164,29 +164,29 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 validateTarget(w)
                 w.mediaStage = MediaStage.TELECOM_CONNECT
                 if (w.direction == CallDirection.INCOMING) {
-                    val target = w.track ?: throw CallProblem("来电已结束")
+                    val target = w.track ?: throw CallProblem("The incoming call has ended")
                     w.answerSent = true
                     w.telecomActionIssued = true
-                    detail = "正在等待 Android 确认接听"
+                    detail = "Waiting for Android to confirm the answer"
                     if (runCatching { target.call.answer(VideoProfile.STATE_AUDIO_ONLY) }.isFailure) {
-                        throw CallProblem("Android 未能发出接听请求")
+                        throw CallProblem("Android could not send the answer request")
                     }
                     publish()
                 } else {
-                    if (liveCalls().isNotEmpty() || managedCallPresent() != false) throw CallProblem("已有通话或无法确认空闲，未拨号")
-                    val sim = w.sim ?: throw CallProblem("没有可用的 SIM")
-                    val number = w.requestedNumber ?: throw CallProblem("没有可用的电话号码")
+                    if (liveCalls().isNotEmpty() || managedCallPresent() != false) throw CallProblem("There is already a call, or the line could not be confirmed idle; no call was placed")
+                    val sim = w.sim ?: throw CallProblem("No SIM is available")
+                    val number = w.requestedNumber ?: throw CallProblem("No phone number is available")
                     // Recheck the chosen account before placing the call; Telecom must not fall
                     // back to another SIM if the selection disappeared during preparation.
                     readSims()
                     if (w.lockedDialTicket != null && !withContext(Dispatchers.IO) { access.ready() }) {
                         armed = false
-                        throw CallProblem("系统通话管理权限不可用，未执行锁屏拨出")
+                        throw CallProblem("The system call-management permission is unavailable; the locked-screen dial was not performed")
                     }
-                    if (sims.none { it.handle == sim.handle }) throw CallProblem("选定的拨号 SIM 已不可用，请重新选择")
+                    if (sims.none { it.handle == sim.handle }) throw CallProblem("The selected dialing SIM is no longer available; select another")
                     prerequisite(ignoreWork = true)?.let { throw CallProblem(it) }
-                    if (liveCalls().isNotEmpty() || managedCallPresent() != false) throw CallProblem("已有通话或无法确认空闲，未拨号")
-                    if (isEmergency(number) != false) throw CallProblem("无法确认此号码可安全拨打")
+                    if (liveCalls().isNotEmpty() || managedCallPresent() != false) throw CallProblem("There is already a call, or the line could not be confirmed idle; no call was placed")
+                    if (isEmergency(number) != false) throw CallProblem("Could not confirm that this number is safe to dial")
                     val extras = Bundle().apply {
                         putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, sim.handle)
                         putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, Bundle().apply { putString(TOKEN, w.id) })
@@ -197,28 +197,28 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                     w.telecomActionIssued = true
                     val issued = runCatching { checkNotNull(telecom).placeCall(Uri.fromParts(PhoneAccount.SCHEME_TEL, number, null), extras) }.isSuccess
                     lockedDial?.takeIf { it.ticket === w.lockedDialTicket }?.let {
-                        finishLockedDial(it, if (issued) "正在等待 Android 确认锁屏拨号" else "Android 拒绝锁屏拨号")
+                        finishLockedDial(it, if (issued) "Waiting for Android to confirm the locked-screen dial" else "Android rejected the locked-screen dial")
                     }
                     if (!issued) {
-                        throw CallProblem("Android 拒绝拨号")
+                        throw CallProblem("Android rejected the call")
                     }
                     if (!waitFor(CallPolicy.DIAL_TIMEOUT_MS) { w.track != null }) {
-                        throw CallProblem("未收到该号码的 Android 通话回调，请查看系统拨号器")
+                        throw CallProblem("No Android call callback arrived for this number; check the system dialer")
                     }
                 }
                 val limit = if (w.direction == CallDirection.INCOMING) CallPolicy.CONTROL_TIMEOUT_MS else 55_000L
                 if (!waitFor(limit) { w.track?.phase == CallPhase.ACTIVE }) {
-                    throw CallProblem("Android 未确认通话接通，电话由系统处理")
+                    throw CallProblem("Android did not confirm the call connected; the system is handling the call")
                 }
-                val target = w.track ?: throw CallProblem("通话已结束")
+                val target = w.track ?: throw CallProblem("The call has ended")
                 if (!carrierCall(target.call) || liveCalls().singleOrNull() !== target) {
-                    throw CallProblem("当前通话无法由 AI 安全接管")
+                    throw CallProblem("The AI cannot safely take over the current call")
                 }
                 w.activeAt = System.currentTimeMillis()
                 w.activeElapsed = SystemClock.elapsedRealtime()
                 acquireCallWakeLock(w)
                 w.bridging = true
-                detail = "已接通，正在建立双向音频"
+                detail = "Connected; setting up two-way audio"
                 publish()
             },
         )
@@ -229,32 +229,32 @@ internal suspend fun CallRuntime.runWork(w: Work) {
         throw e
     } catch (e: CallProblem) {
         debugMediaException(w, e)
-        w.stopReason.record(e.message ?: "AI 电话未就绪")
+        w.stopReason.record(e.message ?: "AI calling is not ready")
     } catch (e: CallMediaFailure) {
         debugMediaException(w, e)
         if (w.stopReason.value == null) {
-            w.stopReason.record(shellAudioFailure(w) ?: e.message ?: "通话音频已断开")
+            w.stopReason.record(shellAudioFailure(w) ?: e.message ?: "The call audio disconnected")
         }
     } catch (e: VolcRealtimeException) {
         debugMediaException(w, e)
         w.stopReason.record(when (e.kind) {
-            VolcRealtimeException.Kind.AUTH -> "实时语音服务拒绝认证，请检查电话语音凭据和服务开通状态"
-            VolcRealtimeException.Kind.RATE_LIMITED -> "实时语音达到服务限额，电话由系统处理"
-            VolcRealtimeException.Kind.TIMEOUT, VolcRealtimeException.Kind.NETWORK -> "实时语音连接不可用，电话由系统处理"
-            VolcRealtimeException.Kind.BACKPRESSURE -> "实时音频拥塞，电话由系统处理"
-            else -> "实时语音服务未能继续，请检查通话配置"
+            VolcRealtimeException.Kind.AUTH -> "The realtime voice service rejected authentication; check the call voice credentials and whether the service is activated"
+            VolcRealtimeException.Kind.RATE_LIMITED -> "The realtime voice service reached its quota; the system is handling the call"
+            VolcRealtimeException.Kind.TIMEOUT, VolcRealtimeException.Kind.NETWORK -> "The realtime voice connection is unavailable; the system is handling the call"
+            VolcRealtimeException.Kind.BACKPRESSURE -> "Realtime audio is congested; the system is handling the call"
+            else -> "The realtime voice service could not continue; check the call configuration"
         })
     } catch (e: VoiceModelError) {
         debugMediaException(w, e)
         w.stopReason.record(when (e.category) {
-            VoiceErrorCategory.AUTH_FAILED -> "实时语音服务拒绝认证，请检查电话语音凭据和服务开通状态"
-            VoiceErrorCategory.RATE_LIMITED -> "实时语音达到服务限额，电话由系统处理"
-            VoiceErrorCategory.TIMEOUT, VoiceErrorCategory.NETWORK -> "实时语音连接不可用，电话由系统处理"
-            else -> "实时语音服务未能继续，请检查通话配置"
+            VoiceErrorCategory.AUTH_FAILED -> "The realtime voice service rejected authentication; check the call voice credentials and whether the service is activated"
+            VoiceErrorCategory.RATE_LIMITED -> "The realtime voice service reached its quota; the system is handling the call"
+            VoiceErrorCategory.TIMEOUT, VoiceErrorCategory.NETWORK -> "The realtime voice connection is unavailable; the system is handling the call"
+            else -> "The realtime voice service could not continue; check the call configuration"
         })
     } catch (e: Exception) {
         debugMediaException(w, e)
-        w.stopReason.record("AI 音频连接失败，电话由系统处理")
+        w.stopReason.record("The AI audio connection failed; the system is handling the call")
     } finally {
         withContext(NonCancellable) {
             w.mediaStage = MediaStage.RELEASE
@@ -264,10 +264,10 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                 val target = w.track
                 val ended = target != null && (confirmedEnded(target) ||
                     waitFor(CallPolicy.CONTROL_TIMEOUT_MS) { confirmedEnded(target) } || confirmedEnded(target))
-                w.stopReason.refine(FAREWELL_ENDING, if (ended) "通话已收尾，Android 已挂断"
-                    else "通话已收尾，Android 未确认挂断，已交还系统")
+                w.stopReason.refine(FAREWELL_ENDING, if (ended) "The call was wrapped up; Android hung up"
+                    else "The call was wrapped up; Android did not confirm the hang-up, so it was handed back to the system")
             }
-            val reason = w.stopReason.value ?: "AI 已退出，电话由系统处理"
+            val reason = w.stopReason.value ?: "The AI exited; the system is handling the call"
             if (BuildConfig.DEBUG) w.mediaCounters.playbackDiagnostic()?.let { Log.d("MikaCallMedia", "playback $it") }
             w.track?.let {
                 if (w.telecomActionIssued) {
@@ -290,7 +290,7 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                     finishLockedDial(it, reason, cancelUnplacedWork = false)
                 }
                 work = null
-                detail = if (restored) reason else "$reason；音频恢复尚未确认"
+                detail = if (restored) reason else "$reason; audio restoration is not yet confirmed"
                 if (w.lockedDialTicket != null) lockedDialDetail = detail
                 stopBackgroundStandbyIfUnneeded()
                 if (w.telecomActionIssued && w.track?.phase == CallPhase.ACTIVE) notifications.handoff()
@@ -336,7 +336,7 @@ internal suspend fun CallRuntime.awaitCleanup(w: Work?): Boolean =
 internal suspend fun CallRuntime.awaitResult(w: Work): CallActionResult = try {
     w.result.await()
 } catch (e: CancellationException) {
-    if (!w.telecomActionIssued && !w.automatic && work === w) cancelWork("操作已取消，电话由系统处理")
+    if (!w.telecomActionIssued && !w.automatic && work === w) cancelWork("The action was cancelled; the system is handling the call")
     throw e
 }
 

@@ -58,7 +58,7 @@ internal object VolcRealtimeProtocol {
     const val MAX_UTTERANCE_CHARS = 4_096
 
     /** Session instructions section appended whenever agentTools is on (same placement as CallRuntime.PHONE_DTMF_PROMPT). */
-    const val AGENT_TOOLS_PROMPT = "\n对用户的每段完整话语，只调用一次 mika_request，把这段话语完整原样作为 utterance 传入，其余时间保持沉默，不自行回答。工具结果返回后，只把结果向用户复述一次，不追加发挥，不重复调用。"
+    const val AGENT_TOOLS_PROMPT = "\nFor every complete utterance from the user, call mika_request exactly once, passing that utterance verbatim and in full as utterance; stay silent the rest of the time and do not answer on your own. After a tool result comes back, restate the result to the user once, without adding anything or calling the tool again."
     const val MAX_FUNCTION_CALLS = 128
     const val MAX_FUNCTION_BATCH = 8
     const val MAX_FUNCTION_ARGUMENT_CHARS = 256
@@ -119,7 +119,7 @@ internal object VolcRealtimeProtocol {
     fun phoneTools() = JsonArray(listOf(buildJsonObject {
         put("type", "function")
         put("name", DTMF_FUNCTION)
-        put("description", "在电话语音菜单明确要求按键时，发送真正的电话DTMF按键；说出数字不能代替按键。仅按本次任务和听到的菜单选择，不猜测密码或验证码。等待工具结果，失败时不得声称按键成功。")
+        put("description", "When a phone voice menu explicitly asks you to press a key, send the real phone DTMF keypresses; saying the digits out loud does not replace pressing them. Choose only according to this task and the menu you heard; never guess passwords or verification codes. Wait for the tool result, and never claim a keypress succeeded when it failed.")
         putJsonObject("parameters") {
             put("type", "object")
             putJsonObject("properties") {
@@ -128,7 +128,7 @@ internal object VolcRealtimeProtocol {
                     put("pattern", "^[0-9*#]{1,32}$")
                     put("minLength", 1)
                     put("maxLength", MAX_DTMF_DIGITS)
-                    put("description", "按顺序发送的电话按键，只能含0-9、*、#，最多32个。")
+                    put("description", "Phone keypresses to send in order; only 0-9, * and #, at most 32.")
                 }
             }
             put("required", JsonArray(listOf(JsonPrimitive("digits"))))

@@ -28,7 +28,7 @@ internal fun CallRuntime.onCallChanged(service: MikaInCallService, call: Call) {
     }
     val calls = liveCalls()
     if (calls.isNotEmpty()) lockedDial?.takeUnless { work?.lockedDialTicket === it.ticket && work?.placed == true }
-        ?.let { finishLockedDial(it, "检测到另一通电话，未执行锁屏拨出") }
+        ?.let { finishLockedDial(it, "Another call was detected; the locked-screen dial was not performed") }
     if (calls.size > 1) calls.filter { it.phase == CallPhase.RINGING }.forEach { it.autoTried = true }
     val active = work
     if (active != null) {
@@ -39,22 +39,22 @@ internal fun CallRuntime.onCallChanged(service: MikaInCallService, call: Call) {
         val target = active.track
         if (target === t && active.direction == CallDirection.OUTGOING &&
             call.state in setOf(Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_ACTIVE)) {
-            if (active.lockedDialTicket != null) lockedDialDetail = "Android 已确认锁屏拨出"
-            active.result.complete(ok("Android 已确认拨号；是否接通请查看实时状态"))
+            if (active.lockedDialTicket != null) lockedDialDetail = "Android confirmed the locked-screen dial"
+            active.result.complete(ok("Android confirmed the dial; check the live status to see whether it connects"))
         }
         when {
-            calls.size > 1 -> cancelWork("检测到多路通话，已交还系统拨号器")
+            calls.size > 1 -> cancelWork("Multiple calls were detected; control was handed back to the system dialer")
             target === t && disconnected(call) -> cancelWork(callEndMessage(t))
             target === t && active.direction == CallDirection.INCOMING && !active.answerSent && t.phase != CallPhase.RINGING ->
                 cancelWork(if (t.phase == CallPhase.ACTIVE || t.phase == CallPhase.CONNECTING || t.phase == CallPhase.HOLDING)
-                    "已由系统电话处理，AI 未介入" else "来电不再响铃，AI 未接听")
+                    "The system phone app handled it; the AI did not step in" else "The incoming call stopped ringing; the AI did not answer")
             target === t && active.direction == CallDirection.INCOMING && !active.answerSent &&
                 (t.direction != CallDirection.INCOMING || !carrierCall(t.call)) ->
-                cancelWork("来电已变化，AI 未接听")
+                cancelWork("The incoming call changed; the AI did not answer")
             target === t && active.automatic && !active.answerSent &&
-                !CallPolicy.callerAllowed(settings.state.value, t.number, type = t.type, isStranger = confirmedStranger(t)) -> cancelWork("来电已不符合自动接听规则")
+                !CallPolicy.callerAllowed(settings.state.value, t.number, type = t.type, isStranger = confirmedStranger(t)) -> cancelWork("The incoming call no longer matches the auto-answer rules")
             target === t && t.phase != CallPhase.ACTIVE && active.bridging ->
-                cancelWork("通话已切换，AI 音频已停止")
+                cancelWork("The call switched; AI audio stopped")
         }
     }
     publish()
@@ -130,7 +130,7 @@ internal fun CallRuntime.onCallRemoved(service: MikaInCallService, call: Call) {
     removed.contactLookup?.cancel()
     tracked.remove(call)
     if (work?.track === removed) cancelWork(
-        if (confirmedEnded(removed)) callEndMessage(removed) else "Android 通话状态已断开，电话由系统处理",
+        if (confirmedEnded(removed)) callEndMessage(removed) else "The Android call state was lost; the system is handling the call",
     )
     publish()
 }
@@ -138,6 +138,6 @@ internal fun CallRuntime.onCallRemoved(service: MikaInCallService, call: Call) {
 internal fun CallRuntime.onTelecomMuteChanged(service: MikaInCallService, muted: Boolean) {
     val current = work ?: return
     if (current.track?.service === service && current.muteLease?.observeTelecomMute(muted) == true) {
-        cancelWork("系统通话静音已解除，AI 已交还通话")
+        cancelWork("The system call mute was released; the AI handed the call back")
     }
 }

@@ -95,7 +95,7 @@ class TriageRunnerTest {
                 target = { targetError?.let { throw it }; effective },
                 model = { call ->
                     models++
-                    assertEquals("判定建模型时说的是判定", com.wangzan101.mika.core.proactive.ProactiveCall.Triage, call)
+                    assertEquals("the call is triage, as the model was built for triage", com.wangzan101.mika.core.proactive.ProactiveCall.Triage, call)
                     modelError?.let { throw it }
                     (built ?: effective)?.let { TargetedModel(it, model) }
                 },
@@ -180,7 +180,7 @@ class TriageRunnerTest {
         assertTrue(e.runner.timerActive)
         e.locked.value = true
         runCurrent()
-        assertFalse("一锁屏就取消计时", e.runner.timerActive)
+        assertFalse("locking the screen cancels the timer", e.runner.timerActive)
         wait(TriagePlanner.WINDOW_MS * 10)
         assertTrue(e.model.calls.isEmpty())
     }
@@ -199,7 +199,7 @@ class TriageRunnerTest {
         assertFalse(e.runner.requestActive)
         val s = e.runner.state.value
         assertEquals(TriageStatus.Locked, s.status)
-        assertEquals("照旧待判定,不算失败", 1, s.counts.pending)
+        assertEquals("still pending as before, not counted as failed", 1, s.counts.pending)
         assertEquals(0, s.counts.failed)
         assertNull(s.marks["a"])
         // Send once more after unlocking
@@ -231,13 +231,13 @@ class TriageRunnerTest {
         // The first request only comes back now (reported as "budget exhausted")
         late.complete(Unit)
         runCurrent()
-        assertTrue("新的一批还在发", e.runner.requestActive)
+        assertTrue("a new batch is still in flight", e.runner.requestActive)
         assertEquals(TriageStatus.Sending, e.runner.state.value.status)
         assertEquals(1, e.runner.state.value.counts.sending)
         e.model.gate!!.complete(Unit)
         runCurrent()
         assertEquals(TriageDecision.Remember, (e.runner.state.value.marks.getValue("a") as TriageMark.Done).verdict.decision)
-        assertEquals("晚回来的「预算用完」不算数", TriageStatus.Idle, e.runner.state.value.status)
+        assertEquals("a late \"budget used up\" does not count", TriageStatus.Idle, e.runner.state.value.status)
     }
 
     @Test fun busyWaitsWithoutPollingThenSendsWhenTheTaskEnds() = runTest {
@@ -247,7 +247,7 @@ class TriageRunnerTest {
         wait(TriagePlanner.WINDOW_MS * 5)
         assertTrue(e.model.calls.isEmpty())
         assertEquals(TriageStatus.Busy, e.runner.state.value.status)
-        assertFalse("任务在跑时不计时、不轮询", e.runner.timerActive)
+        assertFalse("no timer or polling while a task is running", e.runner.timerActive)
         e.busy.value = false
         runCurrent()
         assertEquals(1, e.model.calls.size)
@@ -261,10 +261,10 @@ class TriageRunnerTest {
         assertEquals(1, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.failed)
         wait(24 * 3_600_000L)
-        assertEquals("不自动重试", 1, e.model.calls.size)
+        assertEquals("no automatic retry", 1, e.model.calls.size)
         e.runner.retryFailed()
         runCurrent()
-        assertEquals("点一次只多试一次", 2, e.model.calls.size)
+        assertEquals("one tap adds only one retry", 2, e.model.calls.size)
         wait(24 * 3_600_000L)
         assertEquals(2, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.failed)
@@ -277,12 +277,12 @@ class TriageRunnerTest {
         wait(TriagePlanner.WINDOW_MS)
         assertEquals(1, e.model.calls.size)
         val s = e.runner.state.value
-        assertEquals("请求时被拒、账本看不出哪项:按 Token 算", TriageStatus.TokensUsedUp, s.status)
+        assertEquals("rejected on request and the ledger cannot tell which: counts as tokens", TriageStatus.TokensUsedUp, s.status)
         assertEquals(1, s.counts.pending)
         assertEquals(0, s.counts.failed)
         e.post("b", at = 5)
         wait(TriagePlanner.WINDOW_MS * 3)
-        assertEquals("当天不再发", 1, e.model.calls.size)
+        assertEquals("not sent again the same day", 1, e.model.calls.size)
     }
 
     @Test fun ledgerBudgetUsedUpSendsNothing() = runTest {
@@ -316,7 +316,7 @@ class TriageRunnerTest {
         e.post("a")
         wait(TriagePlanner.WINDOW_MS)
         assertEquals(1, e.models)
-        assertTrue("文字没发出去", e.model.calls.isEmpty())
+        assertTrue("the text was never sent", e.model.calls.isEmpty())
         assertFalse(e.runner.requestActive)
         assertEquals(TriageStatus.NeedsConsent, e.runner.state.value.status)
         assertEquals(1, e.runner.state.value.counts.pending)
@@ -339,7 +339,7 @@ class TriageRunnerTest {
         e.effective = target.copy(providerId = "p2")
         e.model.gate!!.complete(Unit)
         runCurrent()
-        assertNull("换了服务商:回来的结果不记", e.runner.state.value.marks["a"])
+        assertNull("provider changed: the returned result is not recorded", e.runner.state.value.marks["a"])
         assertEquals(TriageStatus.NeedsConsent, e.runner.state.value.status)
     }
 
@@ -368,7 +368,7 @@ class TriageRunnerTest {
         e.model.reply = { ok("n1", "n2") }
         e.post("a1", "com.a", 1); e.post("b1", "com.b", 2); e.post("a2", "com.a", 3)
         wait(TriagePlanner.WINDOW_MS)
-        assertEquals("一次只发一批", 1, e.model.calls.size)
+        assertEquals("only one batch per send", 1, e.model.calls.size)
         e.model.gate!!.complete(Unit)
         e.model.gate = null
         runCurrent()
@@ -412,20 +412,20 @@ class TriageRunnerTest {
         runCurrent()
         assertEquals(1, e.runner.state.value.counts.cooling)
         assertEquals(TriageStatus.Waiting, e.runner.state.value.status)
-        assertTrue("冷却到点要靠计时(解锁时)", e.runner.timerActive)
+        assertTrue("cooldown expiry relies on the timer (at unlock)", e.runner.timerActive)
         e.post("a", at = 60)
         wait(60_000)
         e.post("a", at = 70)
         wait(judgedAt + 120_000 - currentTime - 1)
         assertEquals(1, e.model.calls.size)
-        assertNull("正在显示的是旧结果", e.runner.state.value.marks["a"]?.takeIf { it.postedAtMs == 70L })
+        assertNull("the one showing is the old result", e.runner.state.value.marks["a"]?.takeIf { it.postedAtMs == 70L })
         // When it ends, batching resumes as usual and one request carries the accumulated items
         wait(1 + TriagePlanner.WINDOW_MS)
         assertEquals(2, e.model.calls.size)
         assertEquals(0, e.runner.state.value.counts.cooling)
         assertEquals(1, e.runner.state.value.counts.judged)
         wait(3_600_000)
-        assertEquals("没新内容就不再发", 2, e.model.calls.size)
+        assertEquals("no new content, so no more sends", 2, e.model.calls.size)
     }
 
     @Test fun chattyAppCostsAFewRequestsNotOneEveryTwentySeconds() = runTest {
@@ -443,7 +443,7 @@ class TriageRunnerTest {
         e.model.gate!!.complete(Unit)
         e.model.gate = null
         runCurrent()
-        assertEquals("请求期间的更新也进冷却", 1, e.runner.state.value.counts.cooling)
+        assertEquals("updates during the request also enter cooldown", 1, e.runner.state.value.counts.cooling)
         val end = currentTime + 600_000
         while (currentTime < end) {
             e.post("a", at = ++at)
@@ -463,12 +463,12 @@ class TriageRunnerTest {
         assertTrue(e.runner.timerActive)
         e.locked.value = true
         runCurrent()
-        assertFalse("锁着不为冷却计时", e.runner.timerActive)
+        assertFalse("no cooldown timer while locked", e.runner.timerActive)
         wait(3_600_000)
         assertEquals(1, e.model.calls.size)
         e.locked.value = false
         runCurrent()
-        assertEquals("解锁时早已到点:马上发", 2, e.model.calls.size)
+        assertEquals("already past due at unlock: send right away", 2, e.model.calls.size)
     }
 
     @Test fun updateAfterAFailureWaitsForTheHold() = runTest {
@@ -486,7 +486,7 @@ class TriageRunnerTest {
         }
         wait(failedAt + 120_000 - currentTime - 1)
         assertEquals(1, e.model.calls.size)
-        assertEquals("停着的算失败", 1, e.runner.state.value.counts.failed)
+        assertEquals("stopped counts as failed", 1, e.runner.state.value.counts.failed)
         assertEquals(0, e.runner.state.value.counts.pending)
         // After the hold, batch the items and send only once
         wait(1 + TriagePlanner.WINDOW_MS)
@@ -513,7 +513,7 @@ class TriageRunnerTest {
         e.model.reply = { ok("n1") }
         e.locked.value = false
         runCurrent()
-        assertEquals("解锁时早已停完:马上发", 2, e.model.calls.size)
+        assertEquals("already finished stopping at unlock: send right away", 2, e.model.calls.size)
         assertEquals(1, e.runner.state.value.counts.judged)
     }
 
@@ -537,11 +537,11 @@ class TriageRunnerTest {
         e.tokens = ProactiveBudget.triageShare(e.limit) - 1
         e.post("a")
         wait(TriagePlanner.WINDOW_MS)
-        assertEquals("八成之前照常发", 1, e.model.calls.size)
+        assertEquals("still sends normally below 80%", 1, e.model.calls.size)
         e.tokens = ProactiveBudget.triageShare(e.limit)
         e.post("b", at = 5)
         wait(TriagePlanner.WINDOW_MS * 3)
-        assertEquals("到判定那份(整份还剩两成)就停", 1, e.model.calls.size)
+        assertEquals("stops at the judged portion (20% of the whole budget left)", 1, e.model.calls.size)
         assertEquals(TriageStatus.TokensUsedUp, e.runner.state.value.status)
         assertFalse(e.runner.timerActive)
         // The user raises the limit: triage carries on

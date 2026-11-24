@@ -58,10 +58,10 @@ class RunTimelineViewModelTest {
         val h = store.open("打开设置")
         store.append(h.runId, RunEvent.ModelReply(clock + 1_000, 1, "", null, null, 500, 10, 0, 900, repliedAtMs = clock + 1_000))
         val live = RunTimelineViewModel(store, h.runId, alive = { it == h.runId }).load() as TimelineUi.Ready
-        assertTrue("没结束就算在跑", live.header.running)
+        assertTrue("an unfinished run counts as running", live.header.running)
         store.append(h.runId, RunEvent.TaskEnded(clock + 2_000, "succeeded", "好了"))
         val done = RunTimelineViewModel(store, h.runId, alive = { it == h.runId }).load() as TimelineUi.Ready
-        assertFalse("结束之后不再重读", done.header.running)
+        assertFalse("it is not re-read after it ends", done.header.running)
     }
 
     /** No end record and the task is gone as well (process killed, record not fully written): treated as ended, so it does not keep re-reading every second. */
@@ -71,7 +71,7 @@ class RunTimelineViewModelTest {
         val gone = RunTimelineViewModel(store, h.runId, alive = { false }).load() as TimelineUi.Ready
         assertFalse(gone.header.running)
         val other = RunTimelineViewModel(store, h.runId, alive = { it == "another-run" }).load() as TimelineUi.Ready
-        assertFalse("别的任务在跑不算这一次", other.header.running)
+        assertFalse("another task running does not count as this one", other.header.running)
     }
 
     @Test fun usedMemoryAppearsInProcessHeader() {
@@ -116,14 +116,14 @@ class RunTimelineViewModelTest {
         }
         val header = ready(id).header
         assertEquals(500_000L, header.tokenBudget)
-        assertEquals("主循环和旁路调用合计；缓存输入不再加一次", 380L, header.tokensUsed)
+        assertEquals("main loop and side calls together; cached input is not added again", 380L, header.tokensUsed)
 
         val legacy = run("旧记录") {
             event(RunEvent.TaskStarted(clock, "旧记录", "m1", tokenBudget = 100_000))
             event(RunEvent.ModelReply(clock + 1_000, 1, "", null, null, 100, 20, 0, 900, repliedAtMs = clock + 1_000))
             event(RunEvent.TaskEnded(clock + 2_000, "succeeded", "好了"))
         }
-        assertEquals("没有总计事件的旧记录回退主循环 Token", 120L, ready(legacy).header.tokensUsed)
+        assertEquals("an old record without a totals event falls back to the main-loop tokens", 120L, ready(legacy).header.tokensUsed)
         assertNull(ready(legacy).header.metrics!!.allInputTokens)
     }
 

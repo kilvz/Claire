@@ -29,7 +29,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `聚合问、答、时间`() {
+    fun `aggregates questions, answers and timing`() {
         val h = Harness()
         h.transcript.onUser("明天天气怎么样")
         h.now = 2_000L
@@ -42,7 +42,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `新一轮用户话语闭合上一轮`() {
+    fun `a new user utterance closes the previous turn`() {
         val h = Harness()
         h.transcript.onUser("第一句")
         h.transcript.onAssistant("答一")
@@ -59,14 +59,14 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `助手在用户开口前说的话聚成空问轮`() {
+    fun `assistant speech before the user speaks forms an empty question turn`() {
         val h = Harness()
         h.transcript.onAssistant("你好，我在听")
         assertEquals(listOf(VoiceCallTranscript.Turn("", "你好，我在听", 1_000L)), h.transcript.turns())
     }
 
     @Test
-    fun `空白文本不进门`() {
+    fun `blank text is not admitted`() {
         val h = Harness()
         h.transcript.onUser("")
         h.transcript.onAssistant("   ")
@@ -74,7 +74,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `结束写回发起会话——与聊天相同的存储入口`() = runTest {
+    fun `ending writes back to the originating conversation — the same store entry as chat`() = runTest {
         val h = Harness()
         h.transcript.onUser("带猫去打疫苗")
         h.transcript.onAssistant("好的，记下了")
@@ -96,7 +96,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `末轮有问无答不写成空 outcome`() = runTest {
+    fun `last turn with a question but no answer is not written as an empty outcome`() = runTest {
         val h = Harness()
         h.transcript.onUser("带猫去打疫苗")
         h.transcript.onAssistant("好的，记下了")
@@ -111,7 +111,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `全程有问无答一个字也不写`() = runTest {
+    fun `a question with no answer throughout writes nothing at all`() = runTest {
         val h = Harness()
         h.transcript.onUser("喂喂，听得到吗")
         h.transcript.close()
@@ -119,7 +119,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `空问轮不写回`() = runTest {
+    fun `an empty question turn is not written back`() = runTest {
         val h = Harness()
         h.transcript.onAssistant("你好，我在听")
         h.transcript.close()
@@ -127,7 +127,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `重复结束不重复写`() = runTest {
+    fun `repeated ending does not write twice`() = runTest {
         val h = Harness()
         h.transcript.onUser("第一句")
         h.transcript.onAssistant("答")
@@ -137,7 +137,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `没有发起会话时不写`() = runTest {
+    fun `nothing is written when there is no originating conversation`() = runTest {
         val h = Harness(conversationId = null)
         h.transcript.onUser("第一句")
         h.transcript.onAssistant("答")
@@ -146,7 +146,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `调用方协程被取消时仍批量写完`() = runTest {
+    fun `still writes the batch when the caller coroutine is cancelled`() = runTest {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         val appended = mutableListOf<String>()
         val transcript = VoiceCallTranscript(
