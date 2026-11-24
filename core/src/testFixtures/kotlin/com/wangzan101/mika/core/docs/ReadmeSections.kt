@@ -4,16 +4,16 @@ import com.wangzan101.mika.core.learn.knowledge.IndexEntry
 import com.wangzan101.mika.core.learn.knowledge.KnowledgeIndex
 import java.io.File
 
-/** README 里会变的清单(内置知识、服务商预设)从源头生成,夹在 `<!-- generated:<名>:start -->` 和 `<!-- generated:<名>:end -->` 之间。
- * 英文 README.md(仓库首页)用这份源头;`./gradlew updateReadme` 改写它;core 的 `ReadmeSectionsTest` 守着它和生成结果一致。
- * 中文版的生成函数(`knowledge`、`providers`、`sections(english = false)`)是上游留下的机制,Claire 不发中文 README,所以
- * `updateReadme` 只写英文版;以后如果恢复译文,再把 `README_ZH` 加回下面的 main 入口。
- * 知识清单用构建索引的同一个 [KnowledgeIndex.build],顺序就是索引的顺序。服务商预设在 app 的 `ProviderPresets.kt` 里,
- * core 加载不了安卓模块的类,这里按「`ProviderPreset("名字", ProviderConfig.Kind.<类型>, "地址"`」逐条读源码;
- * app 的 `ReadmePresetsTest` 拿真对象 `ProviderPresets.all` 对照,读法跟不上源码时那边失败。
+/** The changeable lists in the README (built-in knowledge, provider presets) are generated from their sources and placed between `<!-- generated:<name>:start -->` and `<!-- generated:<name>:end -->`.
+ * The English README.md (the repository home page) uses this source; `./gradlew updateReadme` rewrites it; core's `ReadmeSectionsTest` guards that it matches the generated result.
+ * The Chinese generators (`knowledge`, `providers`, `sections(english = false)`) are a mechanism left over from upstream; Claire does not ship a Chinese README, so
+ * `updateReadme` writes only the English version; if translations are restored later, add `README_ZH` back to the main entry point below.
+ * The knowledge list uses the same [KnowledgeIndex.build] as the index build, and its order is the index order. Provider presets live in the app's `ProviderPresets.kt`;
+ * core cannot load classes from the Android module, so the source is read entry by entry as `ProviderPreset("label", ProviderConfig.Kind.<kind>, "baseUrl")`;
+ * the app's `ReadmePresetsTest` compares against the real `ProviderPresets.all` object, so that side fails when this reading cannot keep up with the source.
  */
 object ReadmeSections {
-    /** 仓库首页,英文,也是各份译文的原文。 */
+    /** The repository home page, in English; also the source text for every translation. */
     const val README = "README.md"
     const val README_ZH = "docs/readme/README.zh-CN.md"
     const val KNOWLEDGE = "knowledge"
@@ -26,7 +26,7 @@ object ReadmeSections {
     fun start(name: String) = "<!-- generated:$name:start -->"
     fun end(name: String) = "<!-- generated:$name:end -->"
 
-    /** 源码里的一条预设;[kind] 是 `ProviderConfig.Kind` 的枚举名,[baseUrl] 为空的是「自定义」。 */
+    /** One preset from the source; [kind] is the enum name of `ProviderConfig.Kind`, and an empty [baseUrl] means "Custom". */
     data class Preset(val label: String, val kind: String, val baseUrl: String)
 
     private val PRESET = Regex("""ProviderPreset\(\s*"([^"]+)"\s*,\s*ProviderConfig\.Kind\.(\w+)\s*,\s*"([^"]*)"""")
@@ -37,10 +37,10 @@ object ReadmeSections {
     private fun kindName(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI 兼容"; "OpenAiResponses" -> "OpenAI Responses"; else -> kind }
     private fun kindNameEn(kind: String) = when (kind) { "OpenAiCompat" -> "OpenAI-compatible"; "OpenAiResponses" -> "OpenAI Responses"; else -> kind }
 
-    /** 「自定义」能选的接口类型:预设里出现过的;Responses 排最后,和界面上的次序(`ProviderConfig.Kind.withApiKey`)一致。 */
+    /** API kinds the "Custom" option can choose: those that appear among the presets; Responses comes last, matching the order in the UI (`ProviderConfig.Kind.withApiKey`). */
     private fun customKinds(presets: List<Preset>) = presets.map { it.kind }.distinct().sortedBy { it == "OpenAiResponses" }
 
-    /** 「a、b、c」的英文写法:a, b or c。 */
+    /** English form of an "a、b、c" list: a, b or c. */
     private fun orList(items: List<String>) =
         if (items.size <= 1) items.joinToString() else items.dropLast(1).joinToString(", ") + " or " + items.last()
 
@@ -68,14 +68,14 @@ object ReadmeSections {
         ).joinToString("\n")
     }
 
-    /** 一句话:有哪些预设(地址为空的「自定义」不算),自定义能接哪几类接口(见 [customKinds])。 */
+    /** In one sentence: which presets exist (the "Custom" entry, whose address is empty, is excluded), and which API kinds Custom can take (see [customKinds]). */
     fun providers(presets: List<Preset>): String {
         val names = presets.filter { it.baseUrl.isNotEmpty() }.joinToString("、") { it.label }
         val kinds = customKinds(presets).joinToString("、") { kindName(it) }
         return listOf(NOTE, "内置 $names 等服务商预设；其他服务商选「自定义」，$kinds 接口都能接。").joinToString("\n")
     }
 
-    /** [providers] 的英文版;「自定义」那一条的名字照源码写在括号里,对得上中文界面。 */
+    /** English version of [providers]; the name of the "Custom" entry is written in parentheses as in the source, so it matches the Chinese UI. */
     fun providersEn(presets: List<Preset>): String {
         val names = presets.filter { it.baseUrl.isNotEmpty() }.joinToString(", ") { it.label }
         val custom = presets.firstOrNull { it.baseUrl.isEmpty() }?.label
@@ -84,7 +84,7 @@ object ReadmeSections {
         return listOf(NOTE_EN, "Presets for $names and more; for any other provider pick $pick, which takes any $kinds endpoint.").joinToString("\n")
     }
 
-    /** 仓库根目录 [root] 下各段该有的内容;[english] 为真时是 README.md(英文)的版本,否则是 README.zh-CN.md 的。 */
+    /** The content each section should have under the repository root [root]; when [english] is true this is the README.md (English) version, otherwise the README.zh-CN.md one. */
     fun sections(root: File, english: Boolean = true): Map<String, String> {
         val index = KnowledgeIndex.build(File(root, RESOURCES))
         check(index.errors.isEmpty()) { "内置知识校验没通过:\n" + index.errors.joinToString("\n") }
@@ -94,7 +94,7 @@ object ReadmeSections {
         else mapOf(KNOWLEDGE to knowledge(index.entries), PROVIDERS to providers(presets))
     }
 
-    /** 把 [readme] 里每段标记之间换成 [sections] 的内容;标记缺了或顺序不对直接失败。 */
+    /** Replaces the content between each pair of markers in [readme] with the matching content from [sections]; fails outright if a marker is missing or out of order. */
     fun render(readme: String, sections: Map<String, String>): String =
         sections.entries.fold(readme) { text, (name, body) ->
             val s = text.indexOf(start(name))
@@ -103,7 +103,7 @@ object ReadmeSections {
             text.substring(0, s + start(name).length) + "\n" + body + "\n" + text.substring(e)
         }
 
-    /** `updateReadme` 的入口:`<仓库根目录>`。只写英文 README.md;中文 README 不再随 Claire 发行。 */
+    /** Entry point of `updateReadme`: `<repository root>`. Writes only the English README.md; the Chinese README is no longer shipped with Claire. */
     @JvmStatic
     fun main(args: Array<String>) {
         val root = File(args[0])

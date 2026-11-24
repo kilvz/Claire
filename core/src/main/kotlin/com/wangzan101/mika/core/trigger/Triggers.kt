@@ -7,7 +7,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** 计划是谁建的:用户手动、模型(schedule_task)、外部脚本(broadcast);只影响展示,出事能追溯。 */
+/** Who created the plan: the user manually, the model (schedule_task), or an external script (broadcast); affects display only, so incidents can be traced. */
 @Serializable
 enum class TriggerSource { User, Model, External }
 
@@ -17,35 +17,35 @@ data class TriggerDefinition(
     val threadId: String,
     val goal: String,
     val nextAtMs: Long,
-    /** null 是一次性；间隔触发会合并积压的时段，只补跑一次。 */
+    /** null means one-shot; interval triggers merge backlogged slots and catch up only once. */
     val intervalMs: Long? = null,
-    /** 先在沙箱/网页里检查；检查成立才运行 [goal]。 */
+    /** Check in the sandbox/web page first; run [goal] only when the check holds. */
     val conditionGoal: String? = null,
     val enabled: Boolean = true,
-    /** 到点后只在没有前台任务时执行；忙时看门狗稍后重查。 */
+    /** Once due, run only when there is no foreground task; if busy, the watchdog re-checks later. */
     val idleOnly: Boolean = false,
-    /** 上一次有效检查是否满足条件(冷却期内跳过的那次不算);用于只在状态变化时执行动作。 */
+    /** Whether the last valid check met the condition (the one skipped during cooldown does not count); used to act only on state changes. */
     val lastConditionMet: Boolean? = null,
-    /** 固定提醒原文；非空时到点直接送达，不启动模型。 */
+    /** Fixed reminder text; when non-empty it is delivered directly when due, without starting the model. */
     val reminderText: String? = null,
-    /** 按指定时区的当地钟点重复；空表示使用固定毫秒间隔或只运行一次。 */
+    /** Repeat at local clock times in the given time zone; empty means use a fixed millisecond interval or run only once. */
     val calendarTime: String? = null,
     val calendarZone: String? = null,
     val calendarDays: List<Int> = emptyList(),
-    /** 有条件时:只在条件刚满足时执行(默认),或每次检查满足都执行。 */
+    /** With a condition: act only when the condition has just been met (default), or on every check that finds it met. */
     val notifyWhen: ConditionNotify = ConditionNotify.BecomesMet,
-    /** 两次派发动作之间至少隔这么久;冷却期内满足的推迟到冷却结束后再算。 */
+    /** At least this long between two dispatches of the action; a match during the cooldown is deferred until the cooldown ends. */
     val cooldownMs: Long? = null,
-    /** 最近一次有效检查记下的关键值。 */
+    /** Key value recorded by the most recent valid check. */
     val lastValue: String? = null,
-    /** 比较基准:上次派发动作时的值;从没派发过时是第一次检查到的值。 */
+    /** Comparison baseline: the value when the action was last dispatched; when it has never been dispatched, the value from the first check. */
     val baselineValue: String? = null,
     val baselineAtMs: Long? = null,
-    /** 上次因条件满足而派发动作的那次检查的计划时间,冷却从这里算。 */
+    /** The scheduled time of the check that last dispatched the action because the condition was met; the cooldown counts from here. */
     val lastFiredAtMs: Long? = null,
-    /** 多钟点计划；单钟点仍只用 calendarTime，主文件兼容旧版，完整列表由宿主存入扩展状态。 */
+    /** Multi-clock plans; a single clock still uses only calendarTime, the main file stays compatible with older versions, and the full list is stored by the host in the extension state. */
     val calendarTimes: List<String> = emptyList(),
-    /** 计划是谁建的:用户手动 / 模型 / 外部脚本,只影响展示与追溯。 */
+    /** Who created the plan: the user manually / the model / an external script; affects display and traceability only. */
     val source: TriggerSource = TriggerSource.Model,
 ) {
     init {
@@ -76,8 +76,8 @@ data class TriggerWindow(
 }
 
 /**
- * 这个计划在 [currentKey] 这一次之前已经接连失败了几次:从紧挨着的上一次往前数失败的,遇到送达了的或结果不明的就停;
- * 条件没满足而跳过的、还没出结果的不算数,也不打断。认不出 [currentKey] 时为 0。
+ * How many times in a row this plan already failed before the [currentKey] occurrence: count failures backwards from the immediately preceding one, stopping at a delivered or unknown result;
+ * occurrences skipped because the condition was unmet and ones still without a result do not count and do not break the streak. 0 when [currentKey] is not recognized.
  */
 fun failureStreakBefore(windows: List<TriggerWindow>, currentKey: String): Int {
     val current = windows.firstOrNull { it.key == currentKey } ?: return 0
@@ -92,17 +92,17 @@ fun failureStreakBefore(windows: List<TriggerWindow>, currentKey: String): Int {
     return streak
 }
 
-/** claimDue 必须把下次时间与待处理账本一起写入，返回后才可派发。 */
+/** claimDue must write the next time and the pending ledger together; dispatch may start only after it returns. */
 interface TriggerStore {
     fun upsert(trigger: TriggerDefinition)
     fun get(id: String): TriggerDefinition?
     fun all(): List<TriggerDefinition>
     fun windows(): List<TriggerWindow>
     fun claimDue(nowMs: Long, eligible: (TriggerDefinition) -> Boolean = { true }): List<TriggerWindow>
-    /** 手动执行一次，不改变原来的下一次计划时间。 */
+    /** Run once manually, without changing the original next scheduled time. */
     fun claimNow(id: String, nowMs: Long): TriggerWindow?
     fun mark(key: String, state: TriggerWindowState, reason: String? = null): Boolean
-    /** 一次性任务只在结果确定送达后删除。 */
+    /** One-shot tasks are deleted only after delivery is confirmed. */
     fun retireDeliveredOneShots()
     fun remove(id: String)
 }
@@ -116,7 +116,7 @@ data class TriggerSnapshot(val triggers: List<TriggerDefinition>, val windows: L
         .toList()
 }
 
-/** 纯内存实现，文件实现沿用相同的状态转换。 */
+/** Pure in-memory implementation; the file implementation follows the same state transitions. */
 class MemoryTriggerStore(initial: TriggerSnapshot = TriggerSnapshot(emptyList(), emptyList())) : TriggerStore {
     private val triggers = linkedMapOf<String, TriggerDefinition>()
     private val ledger = linkedMapOf<String, TriggerWindow>()
@@ -130,7 +130,7 @@ class MemoryTriggerStore(initial: TriggerSnapshot = TriggerSnapshot(emptyList(),
 
     @Synchronized override fun upsert(trigger: TriggerDefinition) { triggers[trigger.id] = trigger }
 
-    /** 保存编辑并终止旧条件检查的派发资格；已经开始的动作继续收尾。 */
+    /** Save the edit and revoke the old condition check's right to dispatch; actions already started still finish. */
     @Synchronized fun edit(trigger: TriggerDefinition): Boolean {
         val previous = triggers[trigger.id] ?: return false
         if (previous.conditionGoal != null) {
@@ -155,7 +155,7 @@ class MemoryTriggerStore(initial: TriggerSnapshot = TriggerSnapshot(emptyList(),
             it.state == TriggerWindowState.Dispatched || it.state == TriggerWindowState.ActionDispatched }
             .map { it.triggerId }.toSet()
         val due = triggers.values.filter { it.enabled && it.id !in active && it.nextAtMs <= nowMs &&
-            ledger["${it.id}:${it.nextAtMs}"] == null && eligible(it) } // 和 TriggerDefinition.slotTaken 一致
+            ledger["${it.id}:${it.nextAtMs}"] == null && eligible(it) } // consistent with TriggerDefinition.slotTaken
         return due.map { t ->
             val interval = t.intervalMs
             val missed = if (interval == null) 0 else (nowMs - t.nextAtMs) / interval
@@ -204,23 +204,23 @@ class MemoryTriggerStore(initial: TriggerSnapshot = TriggerSnapshot(emptyList(),
 }
 
 /**
- * 这个计划眼下这一次的时段已经记过账(认领过,跑过或正在跑):[TriggerStore.claimDue] 不会再认领它,两边的条件要一致。
- * 一次性计划认领后下次时间不往前走,就是这样;循环的计划认领时就换到下一个时段了。
+ * This plan's current slot is already on the ledger (claimed, ran, or running): [TriggerStore.claimDue] will not claim it again, so both sides must agree.
+ * A one-shot plan's next time does not move after being claimed, which is this case; a recurring plan moves to the next slot when claimed.
  */
 fun TriggerDefinition.slotTaken(windows: List<TriggerWindow>): Boolean =
     windows.any { it.triggerId == id && it.dueAtMs == nextAtMs }
 
 /**
- * 计划页的开关能不能拨:已启用的总能暂停;已停用的看这次时段跑过没有,和 [TriggerEngine.setEnabled] 一致。
- * 一次性计划这次时段跑过就不能再开(要再跑得改时间或立即执行);手动运行只记在别的时段,不算占用。
+ * Whether the plan page's toggle can be flipped: an enabled plan can always be paused; for a disabled one it depends on whether this slot has already run, matching [TriggerEngine.setEnabled].
+ * A one-shot plan cannot be re-enabled once its current slot has run (to run again, change the time or run now); a manual run is recorded in a different slot and does not count as occupying this one.
  */
 fun TriggerDefinition.canToggle(windows: List<TriggerWindow>): Boolean = enabled || !slotTaken(windows)
 
-/** 以当地日历递进，跨夏令时仍保持同一钟点；不存在的钟点使用系统的向前调整规则。 */
+/** Advance along the local calendar, keeping the same clock time across DST; a nonexistent clock time follows the system's forward-adjustment rule. */
 fun nextCalendarAt(time: String, zone: String, days: List<Int>, afterMs: Long): Long =
     nextCalendarAt(listOf(time), zone, days, afterMs)
 
-/** 同一天的多个时刻统一选下一次；夏令时跳时导致两个钟点落在同一瞬间时只派发一次。 */
+/** Several clock times on the same day are unified into the next occurrence; when a DST jump makes two clock times land on the same instant, dispatch only once. */
 fun nextCalendarAt(times: List<String>, zone: String, days: List<Int>, afterMs: Long): Long {
     require(times.isNotEmpty())
     val localTimes = times.map(LocalTime::parse)
@@ -239,7 +239,7 @@ fun nextCalendarAt(times: List<String>, zone: String, days: List<Int>, afterMs: 
 
 private val CALENDAR_CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
 
-/** UI 和模型共用的分钟钟点校验、去重与排序。 */
+/** Minute-level clock validation, de-duplication and sorting shared by the UI and the model. */
 fun normalizedCalendarTimes(times: List<String>): List<String> {
     require(times.isNotEmpty())
     return times.map { raw ->
@@ -249,7 +249,7 @@ fun normalizedCalendarTimes(times: List<String>): List<String> {
     }.distinct().sorted()
 }
 
-/** 修改下次时间时,日历计划也改用新钟点重复;保存与预览必须共用这份转换。 */
+/** When the next time is changed, calendar plans repeat at the new clock time too; save and preview must share this conversion. */
 fun TriggerDefinition.rescheduledTo(nextAtMs: Long): TriggerDefinition {
     val local = calendarZone?.let { zone ->
         CALENDAR_CLOCK.format(Instant.ofEpochMilli(nextAtMs).atZone(ZoneId.of(zone)))
@@ -259,7 +259,7 @@ fun TriggerDefinition.rescheduledTo(nextAtMs: Long): TriggerDefinition {
     return copy(nextAtMs = nextAtMs, enabled = true, calendarTime = times.firstOrNull(), calendarTimes = times)
 }
 
-/** 编辑/创建时预览:首个不早于 [afterMs] 的触发也计入,再按计划自身的时区与重复规则递进。 */
+/** Preview while editing/creating: the first occurrence not earlier than [afterMs] is included, then advance by the plan's own zone and repeat rules. */
 fun upcoming(def: TriggerDefinition, afterMs: Long, count: Int): List<Long> {
     if (count <= 0) return emptyList()
     val out = ArrayList<Long>(count)
@@ -282,7 +282,7 @@ fun upcoming(def: TriggerDefinition, afterMs: Long, count: Int): List<Long> {
     return out
 }
 
-/** 排期由宿主实现；核心负责先记账再派发，异常重启时不会重复执行已认领的时段。 */
+/** Scheduling is implemented by the host; the core records to the ledger first and then dispatches, so a claimed slot is never executed twice after an abnormal restart. */
 class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: (Long?) -> Unit,
     private val isIdle: () -> Boolean = { true }, private val idleRetryMs: Long = 60_000L,
     private val dispatch: (TriggerDefinition, TriggerWindow) -> Unit) {
@@ -294,7 +294,7 @@ class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: 
         val active = windows.filter { it.state == TriggerWindowState.Claimed ||
             it.state == TriggerWindowState.Dispatched || it.state == TriggerWindowState.ActionDispatched }
             .map { it.triggerId }.toSet()
-        // 时段已记过账的计划 claimDue 不会认领,不为它排闹钟:按到期时间排就是「马上响」,响了又认领不了,一直空转
+        // claimDue will not claim plans whose slot is already on the ledger, so no alarm is set for them: scheduling by due time would mean "ring immediately", and ringing again cannot claim them, spinning forever
         scheduleAlarm(store.all().filter { it.enabled && (it.id in active || !it.slotTaken(windows)) }.minOfOrNull {
             if (it.id in active) nowMs + idleRetryMs
             else maxOf(if (it.idleOnly && !idle) nowMs + idleRetryMs else nowMs, it.nextAtMs)
@@ -302,8 +302,8 @@ class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: 
     }
 
     /**
-     * 暂停或恢复 [id];没有这个计划、或要恢复的计划这一次的时段已经记过账([slotTaken],认领过的一次性计划)时不改,返回 false:
-     * 恢复了也不会再跑,要再跑用改时间或立即执行(计划页对这种计划也不给开关)。
+     * Pause or resume [id]; when there is no such plan, or the plan to resume already has its current slot on the ledger ([slotTaken], a claimed one-shot plan), nothing changes and false is returned:
+     * even resumed it would not run again, so running again needs a time change or a run now (the plan page also offers no toggle for such plans).
      */
     fun setEnabled(id: String, enabled: Boolean, nowMs: Long): Boolean {
         val trigger = store.get(id) ?: return false
@@ -313,7 +313,7 @@ class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: 
         return true
     }
 
-    /** 时区变化后,跟随设备旧时区的当地时间计划重算到新时区;显式钉了其他时区的计划不动。 */
+    /** After a time-zone change, local-time plans that followed the device's old zone are recomputed into the new zone; plans explicitly pinned to another zone are left alone. */
     fun rezone(nowMs: Long, fromZone: String, toZone: ZoneId) {
         if (fromZone == toZone.id) return
         store.all().filter { it.enabled && it.calendarTime != null && it.calendarZone == fromZone }

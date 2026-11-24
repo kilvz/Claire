@@ -14,28 +14,28 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /**
- * `files/sandbox/` 这棵树的主人:谁要往树里写,都先在这里拿到许可。进程里一份,由 App 给出,经构造参数交给要写的地方。
+ * Owner of the `files/sandbox/` tree: anyone who wants to write into the tree takes a permit here first. One instance per process, supplied by the App and passed through constructor parameters to the places that write.
  *
- * - [exclusive]:改树的结构、或删整片的(安装/解包/换根文件系统、重置、清空或删掉工作区;App 里经 `SandboxDirs.exclusiveWrite`)。拿到时没有别人在写。
- * - [shared]:往已有的树里添东西的(技能同步、跑命令、网页下载、附件导入)。可以同时有很多个,
- *   但和 [exclusive] 互斥:重置删到一半时,不会有人又在里面建出目录(那样最后的 rmdir 会 ENOTEMPTY)。
+ * - [exclusive]: changes the tree's structure, or deletes large parts of it (install/unpack/swap the root filesystem, reset, wipe or delete a workspace; in the App via `SandboxDirs.exclusiveWrite`). Nobody else is writing while it is held.
+ * - [shared]: adds things to an existing tree (skill sync, running commands, web downloads, attachment import). Many may run at once,
+ *   but they exclude [exclusive]: while a reset is half-way through deleting, nobody can create a directory inside it again (which would make the final rmdir fail with ENOTEMPTY).
  *
- * 有人在等 [exclusive] 时,新来的 [shared] 也排在它后面,重置不会被源源不断的命令饿死。
- * 同一条协程链里已经拿着(任一种)时再拿直接放行,嵌套调用不会自己锁死自己。
+ * While someone is waiting for [exclusive], newly arriving [shared] requests also queue behind it, so a reset cannot be starved by a steady stream of commands.
+ * If the same coroutine chain already holds a permit (of either kind), taking it again is allowed straight away, so nested calls do not deadlock on themselves.
  *
- * - [lease]:长驻进程(沙箱里的 stdio MCP server)用的 shared,活多久拿多久,但可以被收回:
- *   [exclusive] 一拿到入口就收回所有租约(通知持有者停掉进程,许可当场放掉),不会被一个长驻进程挡上几十分钟;
- *   漏关的租约也挡不住重置。换根文件系统、清工作区之后进程本来也跑不下去,停掉比让它在删掉的目录上接着跑干净。
+ * - [lease]: a shared permit for long-lived processes (stdio MCP servers inside the sandbox), held for as long as they live but revocable:
+ *   as soon as [exclusive] acquires the entry it revokes all leases (telling holders to stop their processes and releasing the permit immediately), so a long-lived process cannot block it for tens of minutes;
+ *   a lease that is never closed cannot block a reset either. After the root filesystem is swapped or the workspace wiped, the process could not keep running anyway, and stopping it is cleaner than letting it continue on a deleted directory.
  */
 class SandboxTree {
-    /** 拿到它才能开始:[shared] 只短暂持有,[exclusive] 全程持有,所以写者排队时新读者也等着。 */
+    /** Must be acquired before starting: [shared] holds it only briefly, [exclusive] holds it throughout, so when writers queue up new readers wait too. */
     private val entry = Mutex()
-    /** 有 [shared] 在用时锁着。 */
+    /** Locked while any [shared] is in use. */
     private val noShared = Mutex()
     private val count = Mutex()
     private var holders = 0
 
-    /** 这条协程链此刻拿着哪几棵树的许可。 */
+    /** Which trees' permits this coroutine chain currently holds. */
     private class Held(val trees: Set<SandboxTree>) : AbstractCoroutineContextElement(Key) {
         companion object Key : CoroutineContext.Key<Held>
     }
@@ -51,19 +51,19 @@ class SandboxTree {
         }
     }
 
-    /** 登记着的租约(含还在排队的);[exclusive] 拿着 [entry] 时逐个收回。 */
+    /** Registered leases (including ones still queued); [exclusive] revokes them one by one while holding [entry]. */
     private val leases = LinkedHashSet<Lease>()
 
     /**
-     * 长期持有的 shared 许可,[Lease.close] 时放掉。[exclusive] 要用时先调 [onRevoke](在 IO 线程上,可以阻塞着等进程退出)
-     * 再放掉许可;之后持有者照常 close 不出错。排队期间被收回的,排到那次 [exclusive] 之后重新拿,交回的租约拿到时没被收回过。
-     * 持有者在拿到租约之后启动的东西要自己核一次 [Lease.revoked]:收回可能正好落在拿到和启动之间。
+     * A long-held shared permit, released on [Lease.close]. When [exclusive] needs to run, it first calls [onRevoke] (on the IO thread, where it may block waiting for the process to exit)
+     * and then releases the permit; afterwards the holder may close as usual without error. A lease revoked while queued re-acquires after that [exclusive] finishes, and a lease handed back was never revoked before it was acquired.
+     * Anything the holder starts after acquiring the lease must check [Lease.revoked] itself: a revocation may land exactly between acquisition and start.
      */
     suspend fun lease(onRevoke: () -> Unit): Lease {
         check(this !in heldTrees()) { "lease() must not be called while holding the tree" }
         while (true) {
             val lease = Lease(onRevoke)
-            // 先登记再排队:排在入口上的租约也收得到,不会出现拿到了许可却没登记、挡住重置的空档
+            // Register before queueing: a lease still queued at the entry can also be revoked, so there is no window where the permit is held but unregistered and blocks a reset
             synchronized(leases) { leases += lease }
             val acquired = CompletableDeferred<Boolean>()
             val holder = CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -94,16 +94,16 @@ class SandboxTree {
         withContext(Dispatchers.IO + NonCancellable) { for (l in all) l.revoke() }
     }
 
-    /** 见 [lease]。 */
+    /** See [lease]. */
     class Lease internal constructor(private val onRevoke: () -> Unit) : java.io.Closeable {
         internal val released = CompletableDeferred<Unit>()
         private var held = false
 
-        /** 被 [exclusive] 收回过;收回后许可已经放掉,持有者不该再往树里写。 */
+        /** Has been revoked by [exclusive]; after revocation the permit is already released, and the holder must not write into the tree any more. */
         @Volatile var revoked = false
             private set
 
-        /** 拿到许可时调:这之前已被收回的返回 false。 */
+        /** Called when the permit is acquired: returns false if it was already revoked before that. */
         internal fun markHeld(): Boolean = synchronized(this) { if (revoked) { released.complete(Unit); false } else { held = true; true } }
 
         internal fun revoke() {
@@ -112,7 +112,7 @@ class SandboxTree {
                 revoked = true
                 held
             }
-            // 还在排队的不用停什么:它会排到这次之后重新拿
+            // A lease still queued needs nothing stopped: it will re-acquire after this run
             if (wasHeld) runCatching { onRevoke() }
             released.complete(Unit)
         }

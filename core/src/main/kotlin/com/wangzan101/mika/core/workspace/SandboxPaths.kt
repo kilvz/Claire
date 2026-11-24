@@ -3,23 +3,23 @@ package com.wangzan101.mika.core.workspace
 import java.io.File
 import java.nio.file.Files
 
-/** 模型只看到沙箱里的路径;这里规范化并判断越界。 */
+/** The model only ever sees paths inside the sandbox; normalization and out-of-bounds checks happen here. */
 object SandboxPaths {
     const val WORKSPACE = "/workspace"
     const val SKILLS = "/opt/mika/skills"
-    /** 各工作区共享、沙箱可写的 MCP 包缓存(只经绑定挂载由命令写,不进 normalize/isWritable 的桥分享)。 */
+    /** MCP package cache shared by all workspaces and writable inside the sandbox (written only by commands through a bind mount; not shared through the normalize/isWritable bridge). */
     const val MCP_CACHE = "/opt/mika/mcp-cache"
 
-    /** 单个文件名:不含路径分隔符、控制字符、格式字符(改写方向、零宽等,能让显示的名字和实际的对不上)与行/段分隔符。 */
+    /** A single file name: no path separators, control characters, format characters (bidi overrides, zero width and the like, which can make the displayed name differ from the actual one) or line/paragraph separators. */
     fun plainName(n: String): Boolean =
         n.isNotEmpty() && '/' !in n && '\\' !in n && n != "." && n != ".." &&
             n.codePoints().noneMatch(::hiddenChar)
 
-    /** 控制字符、格式字符(Cf)与 U+2028/U+2029。 */
+    /** Control characters, format characters (Cf) and U+2028/U+2029. */
     fun hiddenChar(cp: Int): Boolean =
         Character.isISOControl(cp) || Character.getType(cp) == Character.FORMAT.toInt() || cp == 0x2028 || cp == 0x2029
 
-    /** 相对路径以 [cwd] 为基;规范化后不在 [WORKSPACE] 或 [SKILLS] 下返回 null。 */
+    /** Relative paths are based on [cwd]; returns null when the normalized path is not under [WORKSPACE] or [SKILLS]. */
     fun normalize(path: String, cwd: String = WORKSPACE): String? {
         if (path.isEmpty() || '\u0000' in path) return null
         val parts = ArrayDeque<String>()
@@ -32,12 +32,12 @@ object SandboxPaths {
         return n.takeIf { under(it, WORKSPACE) || under(it, SKILLS) }
     }
 
-    /** 只有工作区可写;技能目录只读。 */
+    /** Only the workspace is writable; the skills directory is read-only. */
     fun isWritable(normalized: String): Boolean = under(normalized, WORKSPACE)
 
     /**
-     * [root] 下的 [sandboxRel];逐段检查符号链接:指到 [root] 外面的、目标不存在的(写下去会落到哪里看不出来)一律 null,
-     * 最终的 canonicalFile 也必须仍在 [root] 下。
+     * [sandboxRel] under [root]; symbolic links are checked segment by segment: links pointing outside [root] and links whose target does not exist (where writing would land is unknowable) all yield null,
+     * and the final canonicalFile must still be under [root].
      */
     fun resolveHost(root: File, sandboxRel: String): File? {
         val base = root.canonicalFile

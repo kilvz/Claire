@@ -7,29 +7,29 @@ import com.wangzan101.mika.core.safety.gate.IrrevAction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
-/** 终止/中断类工具给 Agent 循环的信号。正常办完不经工具:不带调用的回复就是给用户的回答。 */
+/** Signal that terminate/interrupt-style tools give to the Agent loop. Normal completion does not go through tools: a reply without tool calls is the answer to the user. */
 sealed interface Outcome {
     data class Failure(val message: String, val subtype: String = "interaction_failed", val recoverable: Boolean = false) : Outcome
-    /** 付款时 [item]/[amount]/[address] 在接管卡片上单独列出,卡片就是付款的确认。 */
+    /** On payment, [item]/[amount]/[address] are listed separately on the takeover card, and the card itself is the confirmation of payment. */
     data class Takeover(
         val reason: String, val message: String,
         val item: String? = null, val amount: String? = null, val address: String? = null,
     ) : Outcome
     data class Input(val prompt: String, val options: List<String>? = null) : Outcome
-    /** 模型申报不可逆操作;[foregroundApp] 是申报时读到的前台包名,读不到为 null。 */
+    /** The model declared an irreversible action; [foregroundApp] is the foreground package name read at declaration time, null if unreadable. */
     data class Confirm(val request: ConfirmationRequest, val foregroundApp: String?) : Outcome
 }
 
 /**
- * [changed]:端口核实到的动作前后界面是否变化;没核实时为 null。
- * [frame]:只给运行记录的读屏画面(不发给模型);[image] 不为空时就用它。
- * [images]:随结果发给模型的图(回看历史截图时可有多张);[image] 是其中第一张。
- * [record]:只进运行记录、不发给模型的字段(例如稳定编号对应的端口编号)。
- * [screenElements]:写操作结果带的屏幕(只发了差异)此刻的完整元素列表;防卡住守卫按它比较画面。
- * [imageIds]:与 [images] 一一对应的画面编号(界面画面才有;读到的图片文件为 null,不足的按 null)。
- * [observations]:这次调用读到的东西(能力给出,见 [Observation]);分发器记进证据账本后换成账本里那几条(带编号)。
- * [place]:这次调用之后任务在哪(由能力一侧按结果给出);没说为 null(沿用之前的)。
- * [waitMs]:这次调用里能力为了节奏有意停下的时间(网页一页没看够就换页时补的停留);运行记录把它算作等待。
+ * [changed]: whether the screen changed around the action as verified by the port; null when not verified.
+ * [frame]: screen capture for the run log only (not sent to the model); used when [image] is not empty.
+ * [images]: images sent to the model with the result (may be several when recalling past screenshots); [image] is the first of them.
+ * [record]: fields that only go into the run log and are not sent to the model (e.g. the port id behind a stable id).
+ * [screenElements]: the complete element list of the screen bundled with a write operation's result (only the diff was sent); the anti-stall guard compares screens by it.
+ * [imageIds]: screen ids corresponding one-to-one to [images] (only for UI screens; read image files are null, and missing ones count as null).
+ * [observations]: what was read during this call (supplied by the capability, see [Observation]); the dispatcher records them into the evidence ledger and then substitutes the ledger entries (with ids).
+ * [place]: where the task is after this call (given by the capability side from the result); null if not stated (the previous one carries over).
+ * [waitMs]: time the capability deliberately paused within this call for pacing (the extra dwell added when a page is turned before it has been viewed long enough); the run log counts it as waiting.
  * [followUpTools]: actions made useful by this result; expose their tools for the next model turn.
  */
 class ToolExecution(
@@ -50,7 +50,7 @@ class ToolExecution(
 ) {
     val image: ByteArray? get() = images.firstOrNull()
 
-    /** 换掉其中几样,别的(含读到的观察)照旧。 */
+    /** Replace a few of them; the rest (including observed observations) stay as they are. */
     fun with(
         content: JsonObject = this.content, changed: Boolean? = this.changed, frame: ByteArray? = this.frame, images: List<ByteArray> = this.images,
         record: JsonObject = this.record, screenElements: JsonArray? = this.screenElements, imageIds: List<Int?> = this.imageIds,
@@ -60,41 +60,41 @@ class ToolExecution(
     ) = ToolExecution(content, changed = changed, outcome = outcome, frame = frame, images = images, record = record,
         screenElements = screenElements, imageIds = imageIds, observations = observations, place = place, waitMs = waitMs, followUpTools = followUpTools, playback = playback)
 
-    /** 另读到了 [more]。 */
+    /** Additionally observed [more]. */
     fun observing(vararg more: Observation?): ToolExecution = more.filterNotNull().let { if (it.isEmpty()) this else with(observations = observations + it) }
 }
 
-/** Android 包名:各段以点分隔,首段以字母开头。launch_app、确认申报、跳 App 链接共用。 */
+/** Android package name: segments separated by dots, the first segment starting with a letter. Shared by launch_app, confirmation declarations and app deep links. */
 val PACKAGE_NAME_RE = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
 
-/** 回看保留最近几次读屏;一次最多回看几张。 */
+/** Recall keeps the most recent screen reads; one recall recalls at most this many. */
 internal const val RECALL_KEEP = 20
 internal const val RECALL_MAX_IDS = 5
 
 val FAILURE_SUBTYPES = listOf("blocked", "login_incomplete", "captcha_incomplete", "route_failed", "device_unavailable", "interaction_failed")
-/** request_confirmation 的 target/content 截短到这么长(模型写的,界面要原样显示)。 */
+/** request_confirmation's target/content are truncated to this length (written by the model, the UI must display them verbatim). */
 const val CONFIRM_FIELD_MAX = 200
-/** request_confirmation 接受的动作;付款走 hand_to_user。 */
+/** Actions accepted by request_confirmation; payment goes through hand_to_user. */
 val CONFIRM_ACTIONS = IrrevAction.entries.filter { it != IrrevAction.pay }.map { it.name }
 val BARRIER_KINDS = listOf("popup", "login", "captcha", "access_blocked", "payment")
 val TAKEOVER_REASONS = listOf("captcha", "login", "access_blocked", "payment", "decision", "other")
-/** 技能文档里常见的接管原因说法与改名前的原因,照这里换成上面的原因,导入的文档、存下的技能不用改。 */
+/** Takeover reason wordings commonly seen in skill docs plus the pre-rename reasons; they are mapped here to the reasons above, so imported docs and saved skills need no change. */
 val TAKEOVER_REASON_ALIASES = mapOf("password_required" to "login", "2fa" to "login", "manual_review" to "other", "risk_control" to "access_blocked")
 
-/** 接管的结局。aborted 是用户取消了整个任务。 */
+/** Outcome of a takeover. aborted means the user cancelled the whole task. */
 enum class HandBackOutcome { complete, skipped, timeout, aborted }
 
 /**
- * 接管的结果,作为 hand_to_user 的工具结果交给模型。
- * [userFinished]:用户说已自己办完;[durationMs] 用户手上的时长;[inputCount] 用户在该 App 里的操作次数;
- * [stoppedAt] 交回时该 App 的页面。不知道的为 null。
+ * Result of a takeover, given to the model as the tool result of hand_to_user.
+ * [userFinished]: the user says they have done it themselves; [durationMs] how long the user held it; [inputCount] how many operations the user made in that app;
+ * [stoppedAt] the page of that app at the moment of hand-back. null when unknown.
  */
 data class HandBack(
     val outcome: HandBackOutcome, val userFinished: Boolean = false,
     val durationMs: Long? = null, val inputCount: Int? = null, val stoppedAt: String? = null,
-    /** 网页接管交回时,用户最后停在那里的地址;App 接管为 null。 */
+    /** For a web takeover hand-back, the address where the user last stopped; null for an app takeover. */
     val url: String? = null,
-    /** 用户交回时写的备注(用户原话,可作记忆的出处)。 */
+    /** Note the user wrote when handing back (the user's own words, usable as a source for memory). */
     val note: String? = null,
 )
 

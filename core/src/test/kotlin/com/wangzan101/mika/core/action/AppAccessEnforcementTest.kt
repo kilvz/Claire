@@ -81,7 +81,7 @@ class AppAccessEnforcementTest {
         assertEquals("app_blocked", (outcome as ActionOutcome.Refused).code)
     }
 
-    /** 单步被应用权限挡住时,结果要交给模型继续判断,不能把整次任务当成异常结束。 */
+    /** When a single step is blocked by app permissions, the result must go back to the model for further judgement instead of ending the whole task as an exception. */
     @Test fun blockedToolResultReachesModelInsteadOfFailingTask() = runTest {
         var reads = 0
         val screen = object : ScreenPort by FakeScreen() {

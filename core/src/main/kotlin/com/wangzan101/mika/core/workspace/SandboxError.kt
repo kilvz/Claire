@@ -1,4 +1,4 @@
 package com.wangzan101.mika.core.workspace
 
-/** 沙箱实现报给工具层的已知错误;[code] 原样成为工具结果的 error(如 sandbox_network_isolation_unavailable)。 */
+/** A known error reported by a sandbox implementation to the tool layer; [code] becomes the tool result's error verbatim (e.g. sandbox_network_isolation_unavailable). */
 class SandboxError(val code: String, message: String, val recoverable: Boolean = false) : Exception(message)

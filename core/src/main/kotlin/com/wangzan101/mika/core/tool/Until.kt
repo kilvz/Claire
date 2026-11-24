@@ -1,9 +1,9 @@
 package com.wangzan101.mika.core.tool
 
 /**
- * 一批动作里某一步做完之后,接着做下一步之前要等到的样子;几项都给了要同时成立。代码只做字面比较,不理解意思:
- * [appears] 屏上某个元素的名字含这段字;[gone] 屏上已没有元素含这段字;[place] 前台的 App 包名(手机)或页面地址、站点(网页)含这段字;
- * [stable] 界面停下不再变化。最多等 [timeoutMs]。
+ * How things must look after one step of a batch finishes and before the next step begins; when several are given, all must hold at once. The code only does literal comparisons and understands no meaning:
+ * [appears] some element on screen has a name containing this text; [gone] no element on screen contains this text any more; [place] the foreground app package name (phone) or the page address/site (web) contains this text;
+ * [stable] the screen settles and stops changing. Wait at most [timeoutMs].
  */
 data class Until(
     val appears: String? = null,
@@ -19,9 +19,9 @@ data class Until(
 }
 
 /**
- * 等的结局:[met] 条件成立;没成立时 [stopped] 说明为什么不再等——[TIMEOUT] 到了时限,或提前看出的意外:
- * [POPUP] 同一 App 多了一个窗口(弹框)或页面弹了框,[SYSTEM_DIALOG] 别的包的窗口盖了上来(权限、系统对话框),
- * [APP_SWITCHED] 前台换成了别的 App,[NEW_MESSAGE] 用户插了话。[waitedMs] 是等了多久。
+ * The outcome of the wait: [met] the condition holds; when it does not, [stopped] says why waiting ended — [TIMEOUT] the limit was reached, or an unexpected event spotted early:
+ * [POPUP] the same app gained another window (dialog) or the page opened a popup, [SYSTEM_DIALOG] a window of another package covered ours (permission or system dialog),
+ * [APP_SWITCHED] the foreground switched to another app, [NEW_MESSAGE] the user interjected. [waitedMs] is how long the wait took.
  */
 data class UntilOutcome(val met: Boolean, val stopped: String?, val waitedMs: Long) {
     companion object {

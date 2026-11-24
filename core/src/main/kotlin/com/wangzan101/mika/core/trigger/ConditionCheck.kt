@@ -6,12 +6,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.serialization.Serializable
 
-/** 条件满足时什么时候执行动作。存盘用枚举名,[wire] 是 schedule_task 参数里的写法。 */
+/** When to perform the action once the condition is met. Persisted by enum name; [wire] is the spelling used in the schedule_task arguments. */
 @Serializable
 enum class ConditionNotify(val wire: String) {
-    /** 只在条件从不满足变成满足时执行。 */
+    /** Perform only when the condition changes from unmet to met. */
     BecomesMet("becomes_met"),
-    /** 每次检查满足都执行。 */
+    /** Perform whenever a check finds it met. */
     EachTimeMet("each_time_met");
 
     companion object {
@@ -19,7 +19,7 @@ enum class ConditionNotify(val wire: String) {
     }
 }
 
-/** 一次有效检查之后:要不要执行动作、不执行的原因(时段账本里的机器码)、更新后的计划。 */
+/** After one valid check: whether to perform the action, the reason not to (a machine code in the window ledger), and the updated plan. */
 data class ConditionDecision(val fire: Boolean, val reason: String?, val next: TriggerDefinition)
 
 const val CONDITION_NOT_MET = "condition_not_met"
@@ -27,7 +27,7 @@ const val CONDITION_UNCHANGED = "condition_unchanged"
 const val CONDITION_COOLDOWN = "cooldown"
 const val CONDITION_PLAN_EDITED = "plan_edited"
 
-/** 编辑界面可能打开了很久，保留存储中的最新检查状态，除非用户修改了检查规则。 */
+/** The edit screen may have been open for a long time; keep the latest check state from storage unless the user changed the check rules. */
 internal fun TriggerDefinition.withConditionHistoryFrom(previous: TriggerDefinition): TriggerDefinition {
     val sameCondition = conditionGoal == previous.conditionGoal && notifyWhen == previous.notifyWhen &&
         cooldownMs == previous.cooldownMs && reminderText == previous.reminderText
@@ -41,12 +41,12 @@ internal fun TriggerDefinition.withConditionHistoryFrom(previous: TriggerDefinit
 }
 
 /**
- * 有效检查之后怎么办。想执行:满足,且每次满足都执行或上次不是满足。
- * 冷却从上次执行动作那次检查的计划时间([slotMs])算起,检查跑得快慢不影响;
- * 冷却期内想执行的这次跳过、不补跑:[TriggerDefinition.lastConditionMet] 不动,冷却结束后的检查满足照样执行;
- * 设备的真实时间回调到上次执行之前时算冷却已结束;
- * 计划时间早于上次执行(如「立即执行」之后才认领的晚到时段)仍算冷却期内,执行了也不把上次执行时间往回改。
- * 基准从没有过时记下这次看到的值;执行时换成这次的值(没给值时留着原来的)。基准时间用实际时间 [nowMs]。
+ * What to do after a valid check. It wants to fire when the condition is met and either it fires on every match or the previous check was not met.
+ * The cooldown counts from the scheduled time of the check that last performed the action ([slotMs]), so how fast or slow checks run does not matter;
+ * a fire wanted during cooldown is skipped rather than made up later: [TriggerDefinition.lastConditionMet] stays unchanged, and a check after cooldown ends fires as usual if met;
+ * when the device's real time steps back to before the last fire, the cooldown counts as over;
+ * a scheduled time earlier than the last fire (e.g. a late slot claimed only after "run now") still counts as inside the cooldown, and firing it does not move the last fire time backwards.
+ * When there has never been a baseline, record the value seen now; when firing, replace it with this check's value (keep the old one when no value is given). The baseline time uses the wall-clock time [nowMs].
  */
 fun TriggerDefinition.afterCheck(outcome: ConditionOutcome.Checked, nowMs: Long, slotMs: Long = nowMs): ConditionDecision {
     val want = outcome.met && (notifyWhen == ConditionNotify.EachTimeMet || lastConditionMet != true)
@@ -66,8 +66,8 @@ fun TriggerDefinition.afterCheck(outcome: ConditionOutcome.Checked, nowMs: Long,
 }
 
 /**
- * 动作没能启动:当作这次没有执行,下次满足再试。检查前已有基准时退回它;检查前没有基准时留着这次记下的
- * (仍是「第一次检查到的值」)。这次检查看到的值([TriggerDefinition.lastValue])留着。
+ * The action failed to start: treat it as not fired this time and retry at the next match. When a baseline existed before the check, roll back to it; when there was none, keep the one recorded now
+ * (it is still "the first value observed"). The value seen by this check ([TriggerDefinition.lastValue]) is kept.
  */
 fun TriggerDefinition.revertFire(before: TriggerDefinition): TriggerDefinition =
     copy(lastConditionMet = false, lastFiredAtMs = before.lastFiredAtMs,
@@ -76,7 +76,7 @@ fun TriggerDefinition.revertFire(before: TriggerDefinition): TriggerDefinition =
 
 private val CHECK_TIME: DateTimeFormatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
 
-/** 条件检查运行的目标:条件原文、比较基准、只输出 JSON 的要求。没有条件时为 null。 */
+/** Goal of a condition-check run: the raw condition text, the comparison baseline, and the requirement to output only JSON. null when there is no condition. */
 fun TriggerDefinition.conditionCheckGoal(zone: ZoneId): String? {
     val condition = conditionGoal ?: return null
     val baseline = baselineValue

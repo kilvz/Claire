@@ -10,30 +10,30 @@ import java.nio.channels.Channels
 import java.util.UUID
 
 /**
- * 宿主侧进出沙箱目录(工作区、技能目录、根文件系统)的文件都过这一道。
+ * Every host-side file that enters or leaves a sandbox directory (workspace, skills directory, root filesystem) passes through here.
  *
- * 沙箱里的命令和 Claire 是同一个用户,随时能把文件或目录换成符号链接、硬链接或 FIFO,所以「先按路径检查、再按路径使用」
- * 挡不住。这里每一段都相对上一段已经打开的目录句柄打开、不跟随链接;最后的文件只打开一次,在句柄上核实
- * (实际位置仍在根目录里、是普通文件、只有一个硬链接),之后的读写都在这同一个句柄上。删除也先这样核实。
+ * Commands inside the sandbox run as the same user as Claire and can swap files or directories for symbolic links, hard links or FIFOs at any time, so "check by path, then use by path"
+ * cannot stop them. Here every segment is opened relative to the already-open handle of the previous segment, without following links; the final file is opened only once and verified on the handle
+ * (its real location is still inside the root directory, it is a regular file, and it has only one hard link), and all subsequent reads and writes go through that same handle. Deletion is verified the same way first.
  *
- * [rel] 是根目录下的相对路径(`/` 分隔);`..`、空字节一律算越界。错误都抛 [SandboxError],消息里不带宿主路径。
+ * [rel] is a relative path below the root directory (separated by `/`); `..` and null bytes always count as out of bounds. All errors throw [SandboxError], whose messages never contain host paths.
  */
 class WorkspaceFileGate(private val sys: FdSys) {
 
-    /** 读:普通文件、只有一个硬链接;[under] 给出时文件必须直接在 `<root>/<under>/` 里。 */
+    /** Read: a regular file with exactly one hard link; when [under] is given, the file must sit directly inside `<root>/<under>/`. */
     fun openRead(root: File, rel: String, under: String? = null): GatedFile = open(root, rel, under, OpenHow.READ, createDirs = false)
 
-    /** 新建(已有同名的报 file_exists,从不覆盖);缺的目录逐段建。 */
+    /** Create new (an existing name reports file_exists; never overwrites); missing directories are created segment by segment. */
     fun createNew(root: File, rel: String, under: String? = null): GatedFile = open(root, rel, under, OpenHow.CREATE_NEW, createDirs = true)
 
-    /** 写:没有就建;已有的核实后才截断([append] 时接着写),所以截断不到链进来的别的文件。 */
+    /** Write: create if absent; an existing file is truncated only after verification (appends when [append]), so truncation cannot reach another file that was linked in. */
     fun openWrite(root: File, rel: String, append: Boolean): GatedFile {
         val g = open(root, rel, null, if (append) OpenHow.APPEND else OpenHow.WRITE, createDirs = true)
         if (!append) try { g.truncate() } catch (e: IOException) { g.close(); throw e }
         return g
     }
 
-    /** 在 `<root>/<dir>/` 里新建 [name];重名时依次试「name (2).ext」……,至多 [max] 个。返回实际名字与句柄。 */
+    /** Creates [name] inside `<root>/<dir>/`; on a name clash it tries "name (2).ext" and so on, at most [max] times. Returns the actual name and the handle. */
     fun createNumbered(root: File, dir: String, name: String, max: Int = 999): Pair<String, GatedFile> {
         for (n in 1..max) {
             val candidate = numbered(name, n)
@@ -46,17 +46,17 @@ class WorkspaceFileGate(private val sys: FdSys) {
         throw SandboxError(FILE_EXISTS, "Too many files with this name.", recoverable = true)
     }
 
-    /** 核实是普通文件后才删。 */
+    /** Deletes only after verifying it is a regular file. */
     fun delete(root: File, rel: String, under: String? = null) {
         open(root, rel, under, OpenHow.READ, createDirs = false).use { it.delete() }
     }
 
-    /** 建好目录(逐段,不跟随链接)。 */
+    /** Creates the directory (segment by segment, without following links). */
     fun mkdirs(root: File, rel: String) {
         anchored(root, segments(rel), create = true) { _, _ -> }
     }
 
-    /** 目录里的名字;目录不存在为空。 */
+    /** Names inside the directory; empty when the directory does not exist. */
     fun list(root: File, rel: String): List<String> = try {
         anchored(root, segments(rel), create = false) { _, d -> sys.list(d) }
     } catch (e: SandboxError) {
@@ -64,7 +64,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
     }
 
     /**
-     * 整个换掉 [rel]:在同一目录里写好一份新的再改名盖上。原来那一项是链接、FIFO 或硬链接都只是被换掉,不会写进它指向的东西。
+     * Replaces [rel] entirely: write a fresh copy in the same directory, then rename it over. If the old entry was a link, FIFO or hard link it is merely replaced; nothing is written into what it pointed at.
      */
     fun replace(root: File, rel: String, bytes: ByteArray, mode: Int = 420 /* 0644 */) {
         val segs = segments(rel)
@@ -87,7 +87,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
         }
     }
 
-    /** 让 [rel] 成为指向 [target] 的符号链接(已是就不动);原来那一项整个换掉。 */
+    /** Makes [rel] a symbolic link pointing at [target] (left alone if it already is); any previous entry is replaced entirely. */
     fun symlink(root: File, rel: String, target: String) {
         val segs = segments(rel)
         if (segs.isEmpty()) throw outside()
@@ -100,8 +100,8 @@ class WorkspaceFileGate(private val sys: FdSys) {
     }
 
     /**
-     * 删掉 `<root>/<rel>` 整棵树:每一层都相对上一层的句柄打开、不跟随链接,链接只删链接本身。
-     * 删的过程中被换成链接的目录不会被跟进去。只读目录先改成可写。
+     * Deletes the whole tree at `<root>/<rel>`: each level is opened relative to the previous level's handle without following links, and a link is deleted as the link itself only.
+     * Directories swapped for links during the deletion are not descended into. Read-only directories are made writable first.
      */
     fun deleteTree(root: File, rel: String) {
         val segs = segments(rel)
@@ -117,11 +117,11 @@ class WorkspaceFileGate(private val sys: FdSys) {
         val st = sys.lstat(dir, name) ?: return
         if (st.kind == FdStat.Kind.DIR) {
             if (depth > MAX_DEPTH) throw IOException("directory tree too deep to delete")
-            // 打开前先按名字把目录改成可写(不打开、不跟链接):只读目录也能打开再删,而不是卡在 EACCES(#629)。
+            // Make the directory writable by name before opening it (without opening it or following links): a read-only directory can then still be opened and deleted instead of stalling on EACCES (#629).
             runCatching { sys.chmodAt(dir, name, 448 /* 0700 */) }
             val sub = try { sys.openDir(dir, name, create = false) } catch (e: FdSysException) { null }
             if (sub != null) sub.use {
-                // 删的过程中被挪到根目录外面的,不跟着删
+                // If it was moved outside the root directory during deletion, do not delete it along with the rest
                 if (!inside(it.realPath(), rootReal)) return
                 runCatching { sys.chmod(it, 448 /* 0700 */) }
                 for (child in sys.list(it)) removeEntry(it, child, rootReal, depth + 1)
@@ -144,7 +144,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
             rootFd.close()
             throw e
         }
-        // 之后 dir 归 GatedFile 关;dir 不是根目录本身时根目录句柄这里就关
+        // Afterwards dir is closed by GatedFile; when dir is not the root directory itself, the root handle is closed here
         if (dir !== rootFd) rootFd.close()
         try {
             if (under != null && dir.realPath() != rootReal.trimEnd('/') + "/" + segments(under).joinToString("/")) throw outside()
@@ -161,7 +161,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
         }
     }
 
-    /** 根目录句柄 → 逐段打开到 [segs] 指的目录;中间的句柄用完即关。 */
+    /** Root handle → opened segment by segment down to the directory [segs] points at; intermediate handles are closed as soon as they are done with. */
     private fun walk(rootFd: OpenFd, segs: List<String>, create: Boolean): OpenFd {
         var cur = rootFd
         for (s in segs) {
@@ -196,7 +196,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
     private fun file(dir: OpenFd, name: String, how: OpenHow): OpenFd =
         try { sys.openFile(dir, name, how) } catch (e: FdSysException) { throw map(e, dirStep = false) }
 
-    /** 在句柄上核实:实际位置就是打开它的那个目录里的那个名字、在根目录里;普通文件;只有一个硬链接。 */
+    /** Verify on the handle: the real location is exactly that name in the directory it was opened through, inside the root directory; it is a regular file; it has only one hard link. */
     private fun verify(f: OpenFd, rootReal: String, dir: OpenFd, name: String): FdStat {
         val real = f.realPath()
         if (!inside(real, rootReal) || real != dir.realPath().trimEnd('/') + "/" + name) throw outside()
@@ -227,7 +227,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
         const val OUTSIDE = "path_outside_workspace"
         private const val MAX_DEPTH = 256
 
-        /** 根目录下的各段;`..`、空字节越界。 */
+        /** The segments below the root directory; `..` and null bytes are out of bounds. */
         fun segments(rel: String): List<String> {
             if ('\u0000' in rel) throw SandboxError(OUTSIDE, "The path is not allowed.", recoverable = true)
             return rel.split('/').filter { it.isNotEmpty() && it != "." }.onEach {
@@ -235,7 +235,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
             }
         }
 
-        /** 「a.csv」→「a (2).csv」;没有扩展名的直接加在后面。 */
+        /** "a.csv" → "a (2).csv"; a name without an extension simply gets the counter appended. */
         fun numbered(name: String, n: Int): String {
             if (n <= 1) return name
             val dot = name.lastIndexOf('.')
@@ -246,7 +246,7 @@ class WorkspaceFileGate(private val sys: FdSys) {
     }
 }
 
-/** 过了 [WorkspaceFileGate] 核实的一个文件;读写都在这个句柄上。[stat] 是核实时的。 */
+/** A file verified by [WorkspaceFileGate]; reads and writes all go through this handle. [stat] is the one taken at verification. */
 class GatedFile internal constructor(
     private val sys: FdSys,
     private val dir: OpenFd,
@@ -258,7 +258,7 @@ class GatedFile internal constructor(
 
     fun channel() = fd.channel()
 
-    /** 从头读(或从当前位置);关掉流不关句柄。 */
+    /** Reads from the beginning (or from the current position); closing the stream does not close the handle. */
     fun input(): InputStream = object : java.io.FilterInputStream(Channels.newInputStream(fd.channel())) { override fun close() = Unit }
 
     fun output(): OutputStream = object : java.io.FilterOutputStream(Channels.newOutputStream(fd.channel())) {
@@ -266,7 +266,7 @@ class GatedFile internal constructor(
         override fun close() = flush()
     }
 
-    /** 从 [offset] 起读至多 [len] 字节,读到文件末尾为止。 */
+    /** Reads at most [len] bytes starting at [offset], stopping at the end of the file. */
     fun read(offset: Long, len: Int): ByteArray {
         val buf = ByteBuffer.allocate(len)
         var pos = offset
@@ -287,7 +287,7 @@ class GatedFile internal constructor(
 
     internal fun truncate() = fd.truncate(0)
 
-    /** 删掉这个文件:目录里这个名字仍是同一个文件(设备号+inode)才删,换成了别的就不动。 */
+    /** Deletes this file: only if this name in the directory still refers to the same file (device + inode); if it has been swapped for something else, nothing is done. */
     fun delete() {
         val now = sys.lstat(dir, name) ?: return
         if (now.dev != stat.dev || now.ino != stat.ino || now.kind != FdStat.Kind.FILE) return

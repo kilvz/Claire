@@ -7,9 +7,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
-/** 条件检查的机器结果；无法解析和执行失败都不能当成条件不成立。 */
+/** Machine result of a condition check; neither an unparseable result nor an execution failure may be treated as the condition being unmet. */
 sealed interface ConditionOutcome {
-    /** [value] 是下次拿来比的关键值(如「最低 ¥620」),检查没给时为 null。 */
+    /** [value] is the key value to compare against next time (e.g. "lowest ¥620"); null when the check did not supply one. */
     data class Checked(val met: Boolean, val evidence: String?, val value: String? = null) : ConditionOutcome
     data class Error(val reason: String) : ConditionOutcome
 
@@ -28,14 +28,14 @@ sealed interface ConditionOutcome {
             return Checked(met, evidence, value)
         }
 
-        /** 字符串、数字、布尔照原样取;JSON null、对象、数组当作没有。 */
+        /** Strings, numbers and booleans are taken as they are; JSON null, objects and arrays count as absent. */
         private fun text(e: JsonElement?): String? = (e as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
 
         private val FORMAT = Regex("\\p{Cf}")
-        // 安卓的正则(ICU)不认 (?U) 这类内联标记;用 \p{Z} 收全角空格、不换行空格和行/段分隔符
+        // Android's regex (ICU) does not recognize inline flags such as (?U); use \p{Z} to cover full-width spaces, no-break spaces and line/paragraph separators
         private val BLANK = Regex("[\\s\\p{Cc}\\p{Z}]+")
 
-        /** 观测值会进计划页和下一次的检查指令:去掉格式字符,空白与控制字符合成一个空格,按字符(码点)截到 [VALUE_MAX]。 */
+        /** Observed values enter the plan page and the next check instruction: drop format characters, merge whitespace and control characters into one space, and truncate to [VALUE_MAX] characters (code points). */
         private fun normalize(raw: String): String {
             val flat = raw.replace(FORMAT, "").replace(BLANK, " ").trim()
             if (flat.codePointCount(0, flat.length) <= VALUE_MAX) return flat
