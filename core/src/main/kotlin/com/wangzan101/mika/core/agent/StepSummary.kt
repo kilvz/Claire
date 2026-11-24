@@ -5,23 +5,26 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 折叠掉的步骤的结构化摘要:目标 / 已确认的事实 / 进展 / 下一步。每折一轮就在上一份的基础上更新([next])。
- * 内容全从任务原话、工具结果和模型自己说的话里确定性地取,不另调模型:每次压缩都要重算摘要,
- * 调模型既多一次往返,同样的历史也可能得出不同的摘要,请求前缀就不稳了。
- * 各段都有上限(事实每种 [MAX_FACT_VALUES] 个、进展 [MAX_PROGRESS] 行、更早的结局 [MAX_EARLIER_KINDS] 种,每项截到 [CLIP] 字),
- * 步数再多摘要也不会无限变长。
+ * Structured summary of folded steps: goal / confirmed facts / progress / next step. Each fold updates it on top of the
+ * previous one ([next]).
+ * All content is derived deterministically from the task's original words, tool results, and the model's own words,
+ * without another model call: the summary is recomputed on every compaction, a model call would add a round trip, and
+ * the same history could yield different summaries, making the request prefix unstable.
+ * Every section is capped (facts [MAX_FACT_VALUES] per kind, progress [MAX_PROGRESS] lines, earlier outcomes
+ * [MAX_EARLIER_KINDS] kinds, each item clipped to [CLIP] characters), so the summary never grows without bound no
+ * matter how many steps there are.
  */
 data class StepSummary(
     val goal: String,
-    /** 事实种类 → 值(去重,新的在后)。 */
+    /** Fact kind → values (deduplicated, newest last). */
     val facts: Map<String, List<String>> = emptyMap(),
     val progress: List<String> = emptyList(),
-    /** 并成计数的更早步骤:结局 → 步数。 */
+    /** Earlier steps merged into counts: outcome → step count. */
     val earlier: Map<String, Int> = emptyMap(),
-    /** 模型在折叠段里最后说的打算。 */
+    /** The last stated plan from the model within the folded section. */
     val intent: String? = null,
 ) {
-    /** 折进一轮:[line] 是这一步的进展行(以「→ 结局」结尾),[results] 是这一轮成功的工具结果,[said] 是模型这一轮说的话。 */
+    /** Folds one round in: [line] is this step's progress line (ending in "→ outcome"), [results] are this round's successful tool results, [said] is what the model said in this round. */
     fun next(line: String, results: List<JsonObject>, said: String?): StepSummary {
         val f = facts.toMutableMap()
         for (r in results) for ((key, kind) in FACT_KEYS) {
@@ -32,7 +35,7 @@ data class StepSummary(
         var e = earlier
         while (p.size > MAX_PROGRESS) {
             val kind = p.first().substringAfterLast("→ ").trim()
-            // 超出种类上限的新结局都并进 OTHER,而 OTHER 自己也要占一格:先给它留好位置,不然会多出第 6 种
+            // New outcomes beyond the kind limit are all merged into OTHER, and OTHER itself takes a slot: reserve its place first, or a sixth kind would appear
             val outcome = when {
                 kind in e -> kind
                 e.size + 1 < MAX_EARLIER_KINDS -> kind
@@ -60,7 +63,7 @@ data class StepSummary(
     }
 
     private companion object {
-        /** 结果里能当事实记下的短字段 → 事实种类。 */
+        /** Short fields in results that can be recorded as facts → fact kind. */
         val FACT_KEYS = linkedMapOf("currentApp" to "apps visited", "url" to "pages opened", "path" to "files read or written")
         const val MAX_FACT_VALUES = 4
         const val MAX_PROGRESS = 15

@@ -6,38 +6,40 @@ import com.wangzan101.mika.core.screen.observation.PlaceKind
 import com.wangzan101.mika.core.prompt.Feedback
 import com.wangzan101.mika.core.tool.Verb
 
-/** 一个工具结果之后要按它找的参考资料。 */
+/** The reference material to look up after a tool result. */
 internal sealed interface KnowledgeLookup {
-    /** 前台 App 的资料。 */
+    /** Knowledge about the foreground App. */
     data class App(val pkg: String) : KnowledgeLookup
-    /** 网站的资料;[host] 已小写、去掉 www.,每个站点只在第一次进入时找。 */
+    /** Knowledge about a website; [host] is already lowercased with www. removed, and each site is looked up only on first entry. */
     data class Site(val host: String) : KnowledgeLookup
 }
 
 /**
- * 一个工具结果之后跟什么:附图配哪句说明、到了哪里要找哪份参考资料。纯函数。
+ * What follows a tool result: which note goes with an attached image, and which reference material to look up for
+ * where it landed. Pure functions.
  */
 internal object NoticePolicy {
-    /** 在网页上看界面、读页、打开网页:到了那个站点。 */
+    /** Viewing a UI in a web page, reading a page, opening a web page: arrived at that site. */
     private val SITE_RESULT_VERBS = setOf(Verb.Observe, Verb.ListElements, Verb.Navigate, Verb.ReadPage)
 
-    /** 结果附的图配的说明;[offScreen] 为 true 表示是不动屏幕的工具读到的图片文件,不是屏幕画面。 */
+    /** The note attached to the image on a result; [offScreen] true means an image file read by a tool that does not touch the screen, not a screen frame. */
     fun imageNote(verb: Verb?, offScreen: Boolean): String = when {
-        // 回看补发的图放在这里,对裁剪来说就是新图
+        // Images re-sent when looking back are handled here; for cropping purposes they are new images
         verb == Verb.ViewPastScreens -> Feedback["recalled_note"]
         offScreen -> Feedback["file_image_note"]
         verb in DIAGNOSTIC_VERBS -> Feedback["screenshot_note"]
-        // 动作成功后自动附的画面;只有它是最新的,更早的画面会被换成可回看的占位
+        // The frame automatically attached after a successful action; only it is current, and earlier frames are replaced with a look-back placeholder
         else -> Feedback["action_frame_note"]
     }
 
     /**
-     * 到了 [place] 之后要找的参考资料:看了一个 App 的界面就找这个 App 的;在网页上看界面、读页、打开网页就按域名找这个站点的。
-     * 同一个站点是否已找过由调用方记。[ok] 是这次调用成没成。
+     * The reference material to look up after arriving at [place]: after viewing an App's UI, look up that App's;
+     * when viewing a UI in a web page, reading a page, or opening a web page, look up that site by host.
+     * Whether a site has already been looked up is tracked by the caller. [ok] tells whether this call succeeded.
      */
     fun knowledgeAfter(verb: Verb?, place: Place?, ok: Boolean): List<KnowledgeLookup> = when {
         place == null -> emptyList()
-        // 看界面、列元素、或打开一个 App:到了那个 App 就找它的资料。打开时没在开局 top 3 里的,在这里补进来(同一份不会重复注入)。
+        // Viewing a UI, listing elements, or launching an App: on arriving at that App, look up its knowledge. Apps not in the initial top 3 at launch are added here (the same copy is never injected twice).
         place.kind == PlaceKind.App && (verb == Verb.Observe || verb == Verb.ListElements || verb == Verb.LaunchApp) -> listOf(KnowledgeLookup.App(place.name))
         place.kind == PlaceKind.Site && verb in SITE_RESULT_VERBS && ok -> listOf(KnowledgeLookup.Site(place.name.lowercase().removePrefix("www.")))
         else -> emptyList()

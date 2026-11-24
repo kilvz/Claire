@@ -3,30 +3,37 @@ package com.wangzan101.mika.core.agent
 import com.wangzan101.mika.core.screen.observation.Untrusted
 
 /**
- * Claire 自己写进对话的一轮「通知提醒」(主动能力):用户点开提醒时,Claire 把挑出来的几条通知列成一条消息。
- * 这一轮没有用户的话([Turn.userText] 是空的);[Turn.outcome] 里的标题、正文是别的 App、别人写的,理由是模型看着那些字写的:
- * 都是第三方文字,任何时候都不是用户的话,也不是指令。
+ * A "notice reminder" turn that Claire writes into the conversation itself (a proactive capability): when the user
+ * opens a reminder, Claire lists the selected notifications as one message.
+ * This turn has no user words ([Turn.userText] is empty); the title and body in [Turn.outcome] were written by other
+ * Apps and other people, and the reason was written by the model looking at those words: all of it is third-party
+ * text, never the user's words, and never instructions.
  *
- * 和定时提醒(`reminder:`)、任务中断(`interrupted:`)那几种 App 写的轮次一样,只靠 [Turn.runId] 的前缀认,不另加字段:
- * 对话文件的格式不动,分支、重启之后也都还认得。
+ * Like the App-written turns for scheduled reminders (`reminder:`) and task interruptions (`interrupted:`), it is
+ * recognized solely by the [Turn.runId] prefix, with no extra field: the conversation file format stays unchanged,
+ * and it is still recognized after branching or restarting.
  *
- * 认出来之后各处怎么对待(都在用到的地方写着):交给模型时不说成「用户说」、整段套不可信标记([Conversation.context]、history_read);
- * 有这种轮次的对话([tainted])里,「上一轮确认」不能用来引用别的轮次、任务结束后不自动提取记忆、自主模式下付款也照样先问。
+ * How it is treated once recognized (documented wherever it is used): when handed to the model it is not phrased as
+ * "the user said", and the whole block is wrapped in an untrusted marker ([Conversation.context], history_read);
+ * in a conversation containing such a turn ([tainted]), "confirmation on the previous turn" cannot be used to
+ * reference other turns, memory is not extracted automatically after the task ends, and payments still ask first even
+ * in autonomous mode.
  */
 object NoticeTurn {
-    /** 通知提醒那一轮的 [Turn.runId] 前缀(后面是随机的编号;没有对应的运行记录)。 */
+    /** The [Turn.runId] prefix of a notice-reminder turn (followed by a random ID; there is no matching run record). */
     const val RUN_PREFIX = "notice:"
 
     fun isNotice(t: Turn): Boolean = t.runId?.startsWith(RUN_PREFIX) == true
 
-    /** 这段对话里有没有通知提醒。要拿存着的全部轮次来问,不是喂给模型的最近几轮:提醒那一轮滑出窗口之后,对话照样算。 */
+    /** Whether this conversation contains a notice reminder. Ask with all stored turns, not the last few fed to the model: the conversation still counts after the reminder turn slides out of the window. */
     fun tainted(turns: List<Turn>): Boolean = turns.any(::isNotice)
 
     private val TAG = Regex("<\\s*/?\\s*untrusted", RegexOption.IGNORE_CASE)
 
     /**
-     * 交给模型时套上不可信标记。存的时候是什么样不作数,每次交出去都重新套;文字里自带的标记(开的、合的、中间夹空白的)先弄坏,
-     * 免得提前合上这一层([Untrusted.wrap] 自己只管一字不差的结束标记)。
+     * Wraps it in an untrusted marker when handing it to the model. How it was stored does not matter: it is rewrapped
+     * every time it is handed over. Markers embedded in the text (opening, closing, or with whitespace in between) are
+     * broken first, so this layer cannot be closed early ([Untrusted.wrap] itself only handles the exact closing mark).
      */
     fun untrusted(text: String): String = Untrusted.wrap(text.replace(TAG, "(untrusted"))
 }

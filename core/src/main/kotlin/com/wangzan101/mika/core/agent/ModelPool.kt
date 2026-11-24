@@ -17,11 +17,12 @@ import com.wangzan101.mika.core.net.ProxyFailure
 import kotlinx.coroutines.CancellationException
 import kotlin.random.Random
 
-/** 一次调用的失败该不该换成员、这个成员该冷却多久。 */
+/** Whether a failed call should switch members, and how long that member should cool down. */
 object FailoverPolicy {
     /**
-     * 换成员能不能解决问题。限流、5xx、网络、鉴权、额度、模型不存在/不可用、不支持工具、登录失效都换;
-     * 内容拒绝、上下文超长、请求本身不对、解析失败不换(见 [ModelErrors.transient] 的重试分类)。
+     * Whether switching members can solve it. Rate limiting, 5xx, network, auth, quota, model missing/unavailable,
+     * unsupported tools, and expired sign-in all switch; content refusal, context too long, a malformed request, and
+     * parse failures do not (see the retry classification in [ModelErrors.transient]).
      */
     fun canFailover(e: Throwable): Boolean = when (e) {
         is ModelError.RateLimited, is ModelError.Network, is ModelError.StreamCut -> true
@@ -33,7 +34,7 @@ object FailoverPolicy {
         else -> false
     }
 
-    /** 这个成员出 [e] 后冷却多久。连续失败翻倍;限流按 Retry-After;鉴权/额度类久一点。 */
+    /** How long this member cools down after [e]. Consecutive failures double it; rate limiting follows Retry-After; auth/quota classes get longer. */
     fun cooldownMs(e: Throwable, failures: Int): Long = when (e) {
         is ModelError.RateLimited -> (e.retryAfterMs ?: 30_000L).coerceIn(5_000L, 30 * 60_000L)
         is ModelError.Auth, is ModelError.QuotaExceeded, is ModelError.SignInExpired,
@@ -44,7 +45,7 @@ object FailoverPolicy {
     }
 }
 
-/** 一个成员最近一段时间的健康情况;只在内存里,进程重启清空。 */
+/** A member's health over the recent period; in memory only, cleared on process restart. */
 data class MemberHealth(
     val consecutiveFailures: Int = 0,
     val calls: Long = 0,
@@ -54,22 +55,22 @@ data class MemberHealth(
     val latencySamples: Int = 0,
     val lastError: String? = null,
 ) {
-    /** 越小越优先;没有样本的成员排在后面,由策略的探索概率决定要不要试。 */
+    /** Lower is better; members without samples rank behind, and the strategy's exploration probability decides whether to try them. */
     fun score(): Double {
         if (latencySamples == 0) return Double.MAX_VALUE
-        // 只用连续失败:成功一次就清零,一次早期的失败不会永久拉低分数
+        // Only consecutive failures count: one success resets it, so an early failure cannot permanently drag the score down
         return ewmaLatencyMs * (1 + 2.0 * consecutiveFailures)
     }
 }
 
-/** 每个成员的健康状态,按 [MemberKey] 共享:同一服务商的同一模型不管被几条配置、几个组引用,冷却一次就够。 */
+/** Health state per member, shared by [MemberKey]: the same model from the same provider cools down once no matter how many configs or groups reference it. */
 class ModelHealthRegistry(private val now: () -> Long = System::currentTimeMillis) {
     private val states = HashMap<MemberKey, MemberHealth>()
 
     @Synchronized
     fun snapshot(key: MemberKey): MemberHealth = states[key] ?: MemberHealth()
 
-    /** 冷却结束了(或从没失败过)就可用。冷却结束后先放一个请求进去,成功了自然恢复。 */
+    /** Available once the cooldown has ended (or if it never failed). After a cooldown ends one request is let through; a success restores it naturally. */
     @Synchronized
     fun available(key: MemberKey): Boolean = now() >= (states[key]?.cooldownUntilMs ?: 0)
 
@@ -88,7 +89,7 @@ class ModelHealthRegistry(private val now: () -> Long = System::currentTimeMilli
     fun noteFailure(key: MemberKey, error: Throwable) {
         val old = states[key] ?: MemberHealth()
         val unhealthy = FailoverPolicy.canFailover(error)
-        // 内容拒绝、上下文超长、请求本身不对不代表这个成员坏了:只记次数,不计入连续失败/冷却/延迟评分
+        // Content refusal, context too long, or a malformed request does not mean the member is broken: only the count is recorded, not consecutive failures/cooldown/latency score
         val failures = if (unhealthy) old.consecutiveFailures + 1 else old.consecutiveFailures
         val cooldown = if (unhealthy) now() + FailoverPolicy.cooldownMs(error, failures) else old.cooldownUntilMs
         states[key] = old.copy(
@@ -103,7 +104,7 @@ class ModelHealthRegistry(private val now: () -> Long = System::currentTimeMilli
     }
 }
 
-/** 同一对话固定在一个成员上;LRU 上限 [limit],进程重启清空。 */
+/** Pins the same conversation to one member; LRU capped at [limit], cleared on process restart. */
 class StickyTable(private val limit: Int = 512) {
     private val map = object : LinkedHashMap<String, MemberKey>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MemberKey>): Boolean = size > limit
@@ -123,42 +124,42 @@ class StickyTable(private val limit: Int = 512) {
     }
 }
 
-/** 池里的一个成员:真实模型 + 选择用的元数据。 */
+/** One member in a pool: the real model plus metadata used for selection. */
 data class PoolMember(
     val key: MemberKey,
     val model: ChatModel,
     val priority: Int = 0,
     val weight: Int = 1,
     val costRank: Int? = null,
-    /** 服务商在界面上的名字;只用于运行记录,不参与选择。 */
+    /** The provider's display name; used only in the run log, never for selection. */
     val providerName: String = "",
 ) {
-    /** 运行记录里的称呼:服务商 · 模型。 */
+    /** Label in the run log: provider · model. */
     val label: String get() = if (providerName.isEmpty()) key.model else "$providerName · ${key.model}"
 }
 
 /**
- * 一次调用可以选的一组模型。单模型也包成池(只有一个成员),这样 ModelCaller 只有一条路径;
- * [GroupPool] 是多个成员、带健康和粘性的实现。
+ * A set of models one call can choose from. A single model is also wrapped as a pool (with one member), so
+ * ModelCaller has only one path; [GroupPool] is the implementation with multiple members, health, and stickiness.
  */
 interface ModelPool {
     val members: List<PoolMember>
     val groupName: String?
 
-    /** 池作为整体对调用方承诺的能力;不经过 ModelCaller 的调用方用它。 */
+    /** The capabilities the pool as a whole promises callers; used by callers that do not go through ModelCaller. */
     val capabilities: Capabilities
 
-    /** 按这次请求的要求和策略排出尝试顺序;空列表表示没有可用成员。 */
+    /** Orders the attempt sequence by this request's needs and the strategy; an empty list means no member is available. */
     fun ordered(need: ModelNeed): List<PoolMember>
 
-    /** 一次尝试的结果:成功 [error] 为 null;用来更新健康和粘性。 */
+    /** Result of one attempt: [error] is null on success; used to update health and stickiness. */
     fun noteResult(member: PoolMember, latencyMs: Long?, error: Throwable?)
 
-    /** [model] 是不是这个池里的成员(用来判断「轻量模型给的回复」)。 */
+    /** Whether [model] is a member of this pool (used to tell whether a reply came from the light model). */
     fun owns(model: ChatModel): Boolean
 }
 
-/** 单成员池:行为和加组之前完全一样。 */
+/** Single-member pool: behavior is exactly as it was before groups existed. */
 class SingleMemberPool(override val members: List<PoolMember>) : ModelPool {
     constructor(model: ChatModel) : this(listOf(PoolMember(MemberKey("", model.name), model)))
 
@@ -172,10 +173,10 @@ class SingleMemberPool(override val members: List<PoolMember>) : ModelPool {
     override fun owns(model: ChatModel): Boolean = members.any { it.model === model }
 }
 
-/** 任何 ChatModel 都能当池用;GroupPool 自己就是池。 */
+/** Any ChatModel can be used as a pool; GroupPool is itself a pool. */
 fun ChatModel.asPool(): ModelPool = if (this is ModelPool) this else SingleMemberPool(this)
 
-/** 加权轮询的当前累计值,按组共享:每个任务新建一个池,累计值不能跟着池一起丢。进程重启清空。 */
+/** Current accumulator values for weighted round-robin, shared per group: each task builds a new pool, and the accumulators must not be lost along with it. Cleared on process restart. */
 class GroupWeights {
     private val perGroup = HashMap<String, HashMap<MemberKey, Int>>()
 
@@ -184,10 +185,12 @@ class GroupWeights {
 }
 
 /**
- * 一个模型组建出来的池。除了 [ModelPool],还实现 [ChatModel]/[StreamingChatModel],给不经过 [ModelCaller]
- * 的旁路调用(起标题、分类、核查、看图)用;那条路径自己做一次轻量转移,不参与上下文压缩。
+ * The pool built from a model group. Besides [ModelPool], it also implements [ChatModel]/[StreamingChatModel] for
+ * side calls that bypass [ModelCaller] (title generation, classification, review, image reading); that path does its
+ * own light failover and takes no part in context compaction.
  *
- * [stickyKey] 是「组 + 对话」的键;为 null 时不做粘性(一次性调用)。[weightedWeights] 由 [GroupWeights] 按组给出。
+ * [stickyKey] is the "group + conversation" key; when null there is no stickiness (one-off calls). [weightedWeights]
+ * is supplied per group by [GroupWeights].
  */
 class GroupPool(
     private val group: ModelGroup,
@@ -206,7 +209,7 @@ class GroupPool(
 
     override val capabilities: Capabilities = Capabilities(
         toolCalls = members.isNotEmpty() && members.all { it.model.capabilities.toolCalls },
-        // 提示词的形状由排在最前的成员决定:主成员看不了图就不开截图,避免第一张图之后永久换到备用成员
+        // The prompt shape is decided by the front-most member: if the primary member cannot see images, screenshots stay off, avoiding a permanent switch to a fallback member after the first image
         vision = (members.minByOrNull { it.priority })?.model?.capabilities?.vision == true,
         contextTokens = members.minOfOrNull { it.model.capabilities.contextTokens } ?: 0,
         reasoning = members.any { it.model.capabilities.reasoning },
@@ -220,8 +223,9 @@ class GroupPool(
     private val lock = Any()
 
     override fun ordered(need: ModelNeed): List<PoolMember> = synchronized(lock) {
-        // 窗口不够的成员不直接排除:ModelCaller 会先压缩再发。粘性成员尤其要保留,
-        // 否则长对话会静默从主成员切到一个窗口更大的备用成员。
+        // Members whose window is too small are not excluded outright: ModelCaller compacts before sending. The sticky
+        // member especially must be kept, or a long conversation would silently switch from the primary member to a
+        // fallback with a larger window.
         val relaxed = eligible(need.copy(estimatedTokens = 0))
         if (relaxed.isEmpty()) return emptyList()
         val strict = eligible(need)
@@ -250,14 +254,14 @@ class GroupPool(
             health.available(m.key)
     }
 
-    /** 样本少于 3 的成员保留 10% 探索,其余按近期速度和连续失败排序。 */
+    /** Members with fewer than 3 samples keep a 10% exploration chance; the rest are ranked by recent speed and consecutive failures. */
     private fun leastLatencyFirst(pool: List<PoolMember>): PoolMember {
         val unsampled = pool.filter { health.snapshot(it.key).latencySamples < 3 }
         if (unsampled.isNotEmpty() && random.nextDouble() < 0.1) return unsampled.random(random)
         return pool.minByOrNull { health.snapshot(it.key).score() } ?: pool.first()
     }
 
-    /** 平滑加权轮询:只在「新对话」选一次,选完由粘性固定。累计值按组共享,不同任务同时选也安全。 */
+    /** Smooth weighted round-robin: chosen once for a "new conversation", then pinned by stickiness. Accumulators are shared per group, so concurrent selection by different tasks is safe. */
     private fun weightedFirst(pool: List<PoolMember>): PoolMember = synchronized(weightedWeights) {
         var best: PoolMember? = null
         for (m in pool) {
@@ -291,9 +295,10 @@ class GroupPool(
     ): ModelReply = attempt(system, messages, tools, onText)
 
     /**
-     * 旁路调用的一次转移。这些调用不经过 [ModelCaller],不知道每条消息是谁给的,所以一律去掉别家模型的
-     * 思考内容和工具调用私有字段;一次性调用的消息本来就是新拼的,不会失去有用的上文。
-     * 已经在流式里吐过字就先清空再看下一个。不做同成员重试(那是 [ModelCaller] 的事)。
+     * One failover for a side call. These calls bypass [ModelCaller] and do not know who produced each message, so
+     * thinking content and tool-call private fields from other models are always stripped; one-off calls build fresh
+     * messages anyway, so no useful context is lost. If text was already streamed, it is cleared before trying the
+     * next member. No same-member retries here (that is [ModelCaller]'s job).
      */
     private suspend fun attempt(system: String, messages: List<Message>, tools: List<ToolSpec>, onText: ((String) -> Unit)?): ModelReply {
         val need = needOf(system, messages, tools)
@@ -346,7 +351,7 @@ class GroupPool(
     }
 }
 
-/** 换成员时去掉别的模型给的思考内容和工具调用私有字段;它们只能原样回给产生它的模型。 */
+/** Strips thinking content and tool-call private fields produced by other models when switching members; they may only be returned verbatim to the model that produced them. */
 internal fun stripForeignPrivate(messages: List<Message>): List<Message> = messages.map { m ->
     if (m.role != Role.Assistant || m.parts.none { it is Part.Thinking || (it is Part.ToolCall && it.opaque != null) }) m
     else m.copy(parts = m.parts.mapNotNull { p ->

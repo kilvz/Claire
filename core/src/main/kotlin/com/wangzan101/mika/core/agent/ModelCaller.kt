@@ -29,11 +29,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 一次模型调用:历史只追加,估算越过触发点才压缩一次([ContextCompressor],完整历史不动)、主模型一时的故障按 [retry] 重试、上下文超长时压得更狠再发一次,
- * lightSteps 打开时按 [router] 在大小模型之间分工(轻量模型出错不重试,这一步直接改问主模型)。每个任务开始时 [reset]。
+ * One model call: history is append-only and is compacted once only when the estimate crosses the trigger point
+ * ([ContextCompressor], the full history stays untouched); transient primary-model failures are retried per [retry];
+ * when the context is too long it compacts harder and sends once more; with lightSteps on, work is split between the
+ * large and light models via [router] (the light model's failures are not retried — this step asks the primary model
+ * directly). [reset] at the start of every task.
  *
- * 主模型、轻量模型都可以是模型组([ModelPool]):一次调用按成员能力和策略选一个,失败按 [FailoverPolicy] 换下一个;
- * 每个成员各有一份压缩状态、用量锚点,换成员时用 [viewFor] 去掉别家模型的私有数据。
+ * Both the primary and light models may be model groups ([ModelPool]): a call picks one member by member capability
+ * and policy, and on failure moves to the next per [FailoverPolicy]; each member has its own compaction state and
+ * usage anchor, and on a member switch [viewFor] strips other models' private data.
  */
 internal class ModelCaller(
     private val model: ChatModel,
@@ -45,49 +49,49 @@ internal class ModelCaller(
     private val now: () -> Long,
     private val autonomous: Boolean = false,
     private val trace: RunTrace? = null,
-    /** 主模型的备援(项目 3):主模型这一步失败且 [Failover] 说换,就按序接手;默认没有,行为和原来一样。 */
+    /** Fallbacks for the primary model (item 3): when the primary model fails this step and [Failover] says to switch, they take over in order; none by default, behavior as before. */
     private val fallbacks: List<ChatModel> = emptyList(),
-    /** 与主模型链平行的服务商 ID，用来判断每日预算是否适用于备援。 */
+    /** Provider IDs parallel to the primary model chain, used to judge whether the daily budget applies to a fallback. */
     private val chainProviderIds: List<String?> = emptyList(),
 ) {
-    /** 每个模型一份压缩状态:各自的上下文、各自发出的那份历史,轻量模型那次压缩不连累主模型的请求前缀。 */
+    /** One compaction state per model: its own context and its own sent history, so a light-model compaction does not disturb the primary model's request prefix. */
     private val compressors = java.util.IdentityHashMap<ChatModel, ContextCompressor>()
     private fun compressorFor(m: ChatModel) =
         compressors.getOrPut(m) { ContextCompressor(tools.index, structured = flags.structuredCompaction,
             diffScreens = tools.inlineScreen, triggerOverride = m.capabilities.compactionTriggerTokens,
             foldEvery = m.capabilities.compactionEveryRounds) }
     private val compactions = java.util.IdentityHashMap<ChatModel, CompactionState>()
-    /** 本任务里已为重试等过的时间(对着 [RetryPolicy.taskWaitBudgetMs])。 */
+    /** Time already spent waiting for retries in this task (against [RetryPolicy.taskWaitBudgetMs]). */
     private var taskRetryWaitMs = 0L
 
-    /** 主模型链:[model] 加上备援。切过去之后本任务余下都用它(和轻量模型停用一个道理),[reset] 回到主模型。 */
+    /** Primary model chain: [model] plus fallbacks. Once switched over, the rest of this task uses it (same idea as disabling the light model); [reset] returns to the primary. */
     private val chain: List<ChatModel> = listOf(model) + fallbacks
     private var chainIndex = 0
 
-    /** 本任务里主模型最初的错误、和每个链上模型先犯的错误(整条链失败时的说法用,MK-1 第 2 批);[reset] 清空。 */
+    /** The primary model's original error in this task, and the first error each chain model hit (used for the message when the whole chain fails, MK-1 batch 2); [reset] clears them. */
     private var headError: ModelError? = null
     private val trialLog = ArrayList<Pair<Int, ModelError>>()
 
-    /** 最近一次主模型调用实际用的模型:切到备援后就是备援;[routed] 按它记账。 */
+    /** Model actually used by the most recent primary-model call: the fallback after a switch; [routed] records against it. */
     var lastMainUsed: ChatModel = model
         private set
 
-    /** 本任务的系统提示词:开工时按发给模型的同一份工具列表拼([SystemPrompt.assemble]),任务内不变。 */
+    /** This task's system prompt: assembled at start from the same tool list sent to the model ([SystemPrompt.assemble]), unchanged within the task. */
     var systemPrompt: String = ""
 
-    /** 插件提示词钩子:拼好的系统提示词发模型前过它;为 null 时原样发。 */
+    /** Plugin prompt hook: the assembled system prompt passes through it before being sent to the model; when null it is sent as-is. */
     var promptTransform: (suspend (String) -> String)? = null
 
-    /** 最近一次调用在成功那次请求之前花掉的时间(失败的请求、退避、换成员);从第一次真正发出请求起算。 */
+    /** Time the most recent call spent before its successful request (failed requests, backoff, member switches); measured from the first request actually sent. */
     var lastRetryWaitMs = 0L
         private set
 
-    /** 每条已进历史的回复是哪个模型给的(按消息身份);换模型时按它去掉别家模型的私有数据。没记到的(任务开始前就在历史里的)视同主模型给的。 */
+    /** Which model produced each reply already in history (by message identity); used on model switches to strip other models' private data. Unrecorded replies (those in history before the task started) count as the primary model's. */
     private val producers = java.util.IdentityHashMap<Message, ChatModel>()
 
-    /** 带真实用量的回复(按消息身份)和给出它的模型,是量请求大小的锚点([UsageMeter]);压缩改写前缀后清空。 */
+    /** Replies with real usage (by message identity) and the model that produced them, as anchors for measuring request size ([UsageMeter]); cleared after compaction rewrites the prefix. */
     private val anchors = java.util.IdentityHashMap<Message, Pair<ChatModel, UsageMeter.Anchor>>()
-    /** 每个模型最近一次请求的固定开销估算;回复进历史时和用量一起记进锚点。 */
+    /** Estimated fixed overhead of each model's most recent request; recorded into the anchor together with usage when a reply enters history. */
     private val lastOverhead = java.util.IdentityHashMap<ChatModel, Int>()
 
     fun reset(prompt: String) {
@@ -104,26 +108,26 @@ internal class ModelCaller(
         lastOverhead.clear()
     }
 
-    /** 回复进了历史:记下是哪个模型给的;有真实 usage 的记成上下文大小的锚点。 */
+    /** A reply entered history: record which model produced it; ones with real usage become anchors for context size. */
     fun noteReply(m: Message, used: ChatModel, usage: Usage?) {
         if (m.role == Role.Assistant) producers[m] = used
         val overhead = lastOverhead[used]
         if (usage != null && overhead != null) anchors[m] = used to UsageMeter.Anchor(usage, overhead)
     }
 
-    /** 发给 [using] 的整份请求有多大:最近一条它给的、带真实用量的回复作锚点,没有就全量估算(见 [UsageMeter])。 */
+    /** How large the whole request sent to [using] is: anchor on the latest reply from it carrying real usage, otherwise estimate in full (see [UsageMeter]). */
     private fun requestTokens(messages: List<Message>, using: ChatModel, overhead: Int, scale: Double): Int =
         UsageMeter.of(messages, overhead, scale) { m -> anchors[m]?.takeIf { it.first === using }?.second }
 
-    /** 本任务里分工是否在起作用:开关打开、轻量模型能接手机步、没因不可恢复的错误停用。 */
+    /** Whether routing is in effect in this task: the switch is on, the light model can take phone steps, and it has not been disabled by an unrecoverable error. */
     private val routing: Boolean get() = flags.lightSteps && router?.active == true
 
-    /** 开了分工就在运行记录里记每次调用的模型和角色(停用之后也记,便于对比)。 */
+    /** When routing is on, record the model and role of every call in the run log (still recorded after disabling, for comparison). */
     val recordRoles: Boolean get() = flags.lightSteps && router != null
 
     fun roleOf(m: ChatModel) = if (router?.isLight(m) == true) ROLE_LIGHT else ROLE_MAIN
 
-    /** 这次调用用的成员属于哪个模型组;单模型为 null。子任务没有 router 时回退到主池。 */
+    /** Which model group the member used by this call belongs to; null for a single model. Falls back to the primary pool when a subtask has no router. */
     fun groupOf(m: ChatModel): String? {
         router?.groupOf(m)?.let { return it }
         val mainPool = model.asPool()
@@ -131,9 +135,11 @@ internal class ModelCaller(
     }
 
     /**
-     * 按 [router] 选模型。轻量模型出错、没调工具(不带调用的回复是最终回答,只由主模型给),或要放弃、确认、接管、追问、做不可逆的事,
-     * 它的回复不执行(作为 [ROLE_LIGHT_REJECTED] 记下用量),这一步改问主模型,改问前用 [restarted] 报新的起问时刻。
-     * 返回回复和实际用的模型。
+     * Picks the model per [router]. When the light model errors, makes no tool call (a reply without a call is the
+     * final answer and only comes from the primary model), or wants to give up, confirm, take over, ask back, or do
+     * something irreversible, its reply is not executed (usage is recorded as [ROLE_LIGHT_REJECTED]), this step asks
+     * the primary model instead, and [restarted] reports the new ask time before that.
+     * Returns the reply and the model actually used.
      */
     suspend fun routed(
         history: List<Message>, specs: List<ToolSpec>, track: StepTrack, step: Int, restarted: (Long) -> Unit,
@@ -142,17 +148,18 @@ internal class ModelCaller(
         val r = router?.takeIf { routing } ?: return askRouted(history, specs, step, onText = onText)
         val picked = r.pick(track.context(step, history.any { m -> m.parts.any { it is Part.Image } }))
         if (!r.isLight(picked)) return askRouted(history, specs, step, onText = onText)
-        // 轻量模型的上下文可能更小:它报超长、它那次折叠多少,都不连累主模型(压缩状态按模型分开记)
+        // The light model's context may be smaller: its context-too-long report and how much it folded do not affect
+        // the primary model (compaction state is tracked per model)
         val asked = now()
         val light = try {
             complete(history, specs, picked.asPool(), RetryPolicy.NONE, step, onText)
         } catch (e: CancellationException) {
             throw e
         } catch (e: ModelError.TaskBudgetExceeded) {
-            // 整个运行共用一份预算；轻量失败后不能再改问主模型。
+            // The whole run shares one budget; after a light-model failure it cannot hand off to the primary model again.
             throw e
         } catch (e: Exception) {
-            // Key、额度、模型名、请求本身不对,重试也没用:本任务余下的步都用主模型
+            // Key, quota, model name, or the request itself is wrong: retrying is useless, so the rest of this task's steps use the primary model
             if (e is ModelError.Auth || e is ModelError.IllegalHeader || e is ModelError.QuotaExceeded || e is ModelError.DailyBudgetExceeded || e is ModelError.ModelNotFound ||
                 e is ModelError.ModelNotAvailable || e is ModelError.ToolsUnsupported ||
                 e is ModelError.ChatGptLimitReached || e is ModelError.ChatGptNotEligible || e is ModelError.SignInExpired || e is ModelError.AccountPlanNotAllowed ||
@@ -182,21 +189,26 @@ internal class ModelCaller(
             (!autonomous && ConfirmDecision.mayBeIrreversible(tools, call.name, parseArgs(call.argsJson)))
 
     /**
-     * 问 [using](默认主模型):发出的是给它看的那份历史([viewFor])压缩后的副本。
-     * 问主模型时走主模型链:[complete] 放弃(重试耗尽或不可重试)且 [Failover] 说换,就换链上下一个再问;
-     * 链用完、或 [Failover] 说不换,原样抛出,失败说法和没有备援时一样。问别的模型照旧单发。
+     * Asks [using] (the primary model by default): what is sent is a compacted copy of the history as that model sees
+     * it ([viewFor]).
+     * Asking the primary model goes through the primary chain: when [complete] gives up (retries exhausted or not
+     * retryable) and [Failover] says to switch, the next model on the chain is asked; when the chain is exhausted, or
+     * [Failover] says not to switch, the error is rethrown as-is with the same failure message as without fallbacks.
+     * Asking any other model is still a single send.
      */
     suspend fun ask(history: List<Message>, specs: List<ToolSpec>, step: Int, using: ChatModel = model, onText: ((String) -> Unit)? = null): ModelReply =
         askRouted(history, specs, step, using, onText).first
 
-    /** 同 [ask],返回实际回答的模型(组里可能是任一个成员)。问主模型时同样走主模型链。 */
+    /** Like [ask], but returns the model that actually answered (may be any member of a group). Asking the primary model likewise goes through the primary chain. */
     suspend fun askRouted(
         history: List<Message>, specs: List<ToolSpec>, step: Int, using: ChatModel = model, onText: ((String) -> Unit)? = null,
     ): Pair<ModelReply, ChatModel> {
         if (using !== model) return complete(viewFor(history, using), specs, using.asPool(), retry, step, onText)
-        // 整条链都失败时的说法(MK-1 第 2 批):以主模型最初的错误为主、附每个备援错在哪(见 [terminalError]);
-        // 只试过一个模型就原样交出,和没有备援时一致。每步先把错误记进 [trialLog]:切过去之后,
-        // 后面的步直接由备援起问,主模型的错不在手边,靠这份记录才拼得回整条链的说法。
+        // The message when the whole chain fails (MK-1 batch 2): led by the primary model's original error, with
+        // where each fallback failed attached (see [terminalError]); if only one model was tried it is handed out
+        // as-is, the same as without fallbacks. Each step first records its error into [trialLog]: after a switch,
+        // later steps start from the fallback and the primary model's error is no longer at hand, so only that
+        // record can reconstruct the whole-chain message.
         while (true) {
             val current = chain[chainIndex]
             try {
@@ -214,9 +226,9 @@ internal class ModelCaller(
         }
     }
 
-    /** 链上不再换了,决定交出哪个错误:预算错误原样;只试过一个模型原样;试过整条链包成 [ModelError.ChainFailed]。 */
+    /** No more switching on the chain: decides which error to hand out — budget errors as-is; a single tried model as-is; the whole chain wrapped as [ModelError.ChainFailed]. */
     private fun terminalError(e: ModelError): ModelError {
-        // 当前错误就是预算错误时以它为准;否则链上较早的预算错误优先于包装(审 T-1112-74a8f2 D1):预算错误不包 ChainFailed,原样交出
+        // When the current error is itself a budget error it wins; otherwise an earlier budget error on the chain takes precedence over wrapping (review T-1112-74a8f2 D1): budget errors are not wrapped in ChainFailed, but handed out as-is
         if (e is ModelError.TaskBudgetExceeded || e is ModelError.DailyBudgetExceeded) return e
         trialLog.map { it.second }.firstOrNull {
             it is ModelError.TaskBudgetExceeded || it is ModelError.DailyBudgetExceeded
@@ -226,8 +238,11 @@ internal class ModelCaller(
     }
 
     /**
-     * 发给 [to] 的历史:不是 [to] 给出的回复去掉思考内容和调用上的私有数据(这些只能原样回给产生它的那个模型)。
-     * 没记到来源的回复视同主模型给的:发给主模型(或含主模型的组)时留着,发给轻量模型或备援时都剥。只看字段在不在,不分服务商。
+     * History sent to [to]: replies not produced by [to] lose their thinking content and call-private data (those may
+     * only be returned verbatim to the model that produced them).
+     * Replies with no recorded source count as the primary model's: kept when sending to the primary model (or a group
+     * containing it), stripped when sending to the light model or a fallback. Only field presence matters, regardless
+     * of vendor.
      */
     private fun viewFor(history: List<Message>, to: ChatModel): List<Message> {
         if (producers.isEmpty() && to === model) return history
@@ -245,23 +260,25 @@ internal class ModelCaller(
         }
     }
 
-    /** [from] 是不是 [to] 这个池里的成员;单模型按对象相同。 */
+    /** Whether [from] is a member of the pool [to]; for a single model, object identity. */
     private fun belongsTo(to: ChatModel, from: ChatModel): Boolean =
         (to as? ModelPool)?.owns(from) ?: (to === from)
 
-    /** 一次调用里第一次真正发出请求的时刻;换成员后也保留,等待时长从它起算。 */
+    /** When the first request was actually sent in one call; kept across member switches, and wait time is measured from it. */
     private class AttemptClock { var firstAttemptAt: Long? = null }
 
     /**
-     * 一次调用:按策略排好成员,逐个尝试;成功返回回复和实际用的模型。
-     * 组里有多个候选时,同一成员最多只重试一次,把机会留给下一个;单模型保持原来的重试次数。
+     * One call: orders the members per policy and tries them one by one; on success returns the reply and the model
+     * actually used.
+     * When a group has several candidates, the same member is retried at most once, leaving the chance to the next
+     * one; a single model keeps the original retry count.
      */
     private suspend fun complete(
         history: List<Message>, specs: List<ToolSpec>, pool: ModelPool, policy: RetryPolicy, step: Int,
         onText: ((String) -> Unit)? = null,
     ): Pair<ModelReply, ChatModel> {
         lastRetryWaitMs = 0
-        // 单模型池不看选择条件:不必为它整份估算历史(长对话下这一步很贵)
+        // A single-member pool ignores the selection criteria: no need to estimate the whole history for it (expensive in long conversations)
         val candidates = if (pool is SingleMemberPool) pool.members else pool.ordered(needOf(history, specs))
         if (candidates.isEmpty()) throw ModelError.GroupUnavailable(pool.groupName ?: "", "没有可用成员")
         val clock = AttemptClock()
@@ -298,7 +315,7 @@ internal class ModelCaller(
         throw last ?: ModelError.GroupUnavailable(pool.groupName ?: "")
     }
 
-    /** 对 [using] 的一次完整尝试:压缩、发请求、同成员重试、超长再压。 */
+    /** One full attempt against [using]: compact, send the request, retry on the same member, compact harder when too long. */
     private suspend fun attemptMember(
         history: List<Message>, specs: List<ToolSpec>, using: ChatModel, policy: RetryPolicy, step: Int,
         onText: ((String) -> Unit)?, clock: AttemptClock, maxRetries: Int,
@@ -322,11 +339,11 @@ internal class ModelCaller(
             compaction = next
             compactions[using] = compaction
             try {
-                // 差异的 base 被裁掉或折叠时,下一次写操作要发全量
+                // When the diff base was trimmed or folded, the next write operation must send the full payload
                 if (tools.inlineScreen) tools.setVisibleObservations(visibleReads(sent.messages))
-                // 撞过 429 的话等全局冷却窗口过去再发(不在冷却立即返回,零开销)
+                // If a 429 was hit, wait for the global cooldown window to pass before sending (returns immediately when not cooling down, zero cost)
                 RateLimitGovernor.awaitClear(using.name)
-                // 从第一次发出请求起算:失败的请求、退避和换成员都算重试等待,第一次发出之前的准备不算
+                // Measured from the first request sent: failed requests, backoff, and member switches all count as retry wait; preparation before the first send does not
                 val sentAt = now()
                 lastRetryWaitMs = clock.firstAttemptAt?.let { sentAt - it } ?: 0L
                 if (clock.firstAttemptAt == null) clock.firstAttemptAt = sentAt
@@ -370,7 +387,7 @@ internal class ModelCaller(
             } catch (e: ModelError) {
                 onText?.invoke("")
                 if (e is ModelError.RateLimited) {
-                    // 429：记进全局冷却窗口，别的任务/子代理也一起等；没有重试额度时立刻交给链路切换。
+                    // 429: record into the global cooldown window so other tasks/subagents wait too; with no retry allowance left, hand over to chain switching immediately.
                     val wait = RateLimitGovernor.reportRateLimited(using.name, e.retryAfterMs)
                     val hasFallback = chainIndex + 1 < chain.size && chain[chainIndex] === using
                     val withinRetryLimit = retries < policy.maxRetries &&
@@ -386,13 +403,13 @@ internal class ModelCaller(
                 retries += 1
                 taskRetryWaitMs += wait
                 emit(RunEvent.State(now(), "model_retry", "${roleOf(using)} ${RetryPolicy.label(e)} #$retries ${wait}ms"))
-                // 等待中取消任务就此结束
+                // Cancelling the task during the wait ends it here
                 delay(wait)
             }
         }
     }
 
-    /** 这次请求对成员的要求:要不要工具、有没有图、估算多大。 */
+    /** What this request requires of a member: tools or not, images or not, estimated size. */
     private fun needOf(history: List<Message>, specs: List<ToolSpec>): ModelNeed {
         val images = history.sumOf { m -> m.parts.count { it is Part.Image } }
         val overhead = TokenEstimate.of(systemPrompt) + specs.sumOf { TokenEstimate.of(it.name + it.description + it.parametersJsonSchema) }
@@ -403,19 +420,19 @@ internal class ModelCaller(
     }
 
     companion object {
-        /** [RunEvent.ModelReply.role] 的取值;分工没起作用时为 null。 */
+        /** Values for [RunEvent.ModelReply.role]; null when routing is not in effect. */
         const val ROLE_MAIN = "main"
         const val ROLE_LIGHT = "light"
-        /** 轻量模型的回复没执行,这一步改问了主模型;仍是一次模型调用,用量照记。 */
+        /** The light model's reply was not executed and this step asked the primary model instead; still a model call, and usage is recorded as usual. */
         const val ROLE_LIGHT_REJECTED = "light_rejected"
-        /** 有备援时只给当前主模型一次 429 重试机会，避免在单模型冷却里耗尽任务预算。 */
+        /** With fallbacks available, give the current primary model only one 429 retry, so a single model's cooldown cannot drain the task budget. */
         private const val RATE_LIMIT_FAILOVER_RETRIES = 1
-        /** 有备援时，超过这段 Retry-After 就直接切换备援。 */
+        /** With fallbacks available, switch to a fallback right away when Retry-After exceeds this. */
         private const val RATE_LIMIT_FAILOVER_WAIT_BUDGET_MS = 5_000L
     }
 }
 
-/** 发出的历史里还完整可见的读取(按编号):带元素列表的读取结果与带 screen 对象的动作结果。 */
+/** Reads still fully visible in the sent history (by ID): tool results carrying element lists and action results carrying a screen object. */
 internal fun visibleReads(messages: List<Message>): Set<String> {
     val out = HashSet<String>()
     for (m in messages) for (p in m.parts) {

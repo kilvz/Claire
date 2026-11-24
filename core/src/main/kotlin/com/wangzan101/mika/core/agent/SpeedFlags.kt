@@ -1,6 +1,6 @@
 package com.wangzan101.mika.core.agent
 
-/** 提速开关的显式全关值；App 的首次默认值由 FeatureFlags 决定。 */
+/** The explicit all-off value for the speed flags; the App's initial defaults are decided by FeatureFlags. */
 data class SpeedFlags(
     val inlineScreen: Boolean = false,
     val batchSteps: Boolean = false,
@@ -8,9 +8,9 @@ data class SpeedFlags(
     val deepLinks: Boolean = false,
     val lightSteps: Boolean = false,
     val parallelTasks: Boolean = false,
-    /** 压缩时摘要写成结构化的四段并用真实用量校准估算(会改变模型所见,评测对比后再定)。 */
+    /** During compaction, write the summary as four structured sections and calibrate the estimate with real usage (changes what the model sees; decide after an evaluation comparison). */
     val structuredCompaction: Boolean = false,
-    /** 元素优先,只有读不清或模型主动请求时才给主模型画面。 */
+    /** Elements first; give the primary model screen frames only when reading is unclear or the model explicitly asks. */
     val adaptiveVision: Boolean = false,
     val tablesAtBirth: Boolean = false,
 ) {
@@ -21,17 +21,17 @@ data class SpeedFlags(
         "adaptiveVision" to adaptiveVision, "tablesAtBirth" to tablesAtBirth,
     )
 
-    /** 打开的开关名按字母序用逗号连接;全关为 "none"。[parse] 可读回。 */
+    /** Names of the enabled flags joined by commas in alphabetical order; "none" when all are off. [parse] can read it back. */
     fun describe(): String = on().filterValues { it }.keys.sorted().joinToString(",").ifEmpty { NONE }
 
     companion object {
         private const val NONE = "none"
         val OFF = SpeedFlags()
         private val KEYS = OFF.on().keys
-        /** 已转正或撤掉的开关:存着的设置、评测参数里还可能有,读到就略过。 */
+        /** Flags that were promoted or removed: stored settings and evaluation parameters may still contain them, so they are skipped when read. */
         private val RETIRED = setOf("cacheFriendlyPrune")
 
-        /** "none"(或空)= 全关;否则逗号分隔的 `键=on|off` 或只写键名(= on)。未知键或值抛 [IllegalArgumentException]。 */
+        /** "none" (or empty) = all off; otherwise comma-separated `key=on|off`, or just the key name (= on). An unknown key or value throws [IllegalArgumentException]. */
         fun parse(spec: String): SpeedFlags {
             val s = spec.trim()
             if (s.isEmpty() || s == NONE) return OFF

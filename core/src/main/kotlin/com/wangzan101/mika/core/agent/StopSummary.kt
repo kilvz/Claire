@@ -17,10 +17,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 用户中途停止之后,按这次已经做了的事写几行交代(做了什么、看到了什么、成批的事做了几件、哪些没做完),
- * 当作这一轮的回答给用户看、记进对话(下一句「继续」有上文)。只读这次的运行记录,不再操作任何东西:
- * 请一次模型([writer] 优先,出错换 [fallback]),不给工具;总共最多等 [timeoutMs],没模型、出错、超时就按记录直接拼一段([plain])。
- * 结局照旧是取消,只是多了这段话。
+ * After the user stops midway, writes a few lines of account based on what this run already did (what was done, what
+ * was seen, how many batched items were handled, what was left unfinished), and shows it to the user as this turn's
+ * answer and records it into the conversation (a following "continue" then has context). It only reads this run's
+ * records and operates nothing further: it asks a model once ([writer] first, [fallback] on error), with no tools; the
+ * total wait is at most [timeoutMs], and with no model, an error, or a timeout it assembles a paragraph directly from
+ * the records ([plain]). The outcome is still cancellation; only this text is added.
  */
 class StopSummary(
     private val writer: ChatModel?,
@@ -29,8 +31,10 @@ class StopSummary(
     private val language: String? = null,
 ) {
     /**
-     * [events] 是这次运行记下的事件(没有记录时至少是活动);[draft] 是停下时正在写的那段字(可为空)。
-     * [label] 把工具名换成界面上的说法,[appLabel] 把包名换成 App 名(「网站 域名」只留域名)。
+     * [events] are the events recorded by this run (at least activities when there is no record); [draft] is the text
+     * being written when it stopped (may be empty).
+     * [label] turns a tool name into its UI wording, [appLabel] turns a package name into the App name ("site domain"
+     * keeps only the domain).
      */
     suspend fun summarize(
         goal: String, events: List<RunEvent>, draft: String?,
@@ -68,13 +72,14 @@ class StopSummary(
         private const val NOTE_CHARS = 120
         private const val DRAFT_CHARS = 1200
 
-        /** 有没有可交代的:做过至少一件事、已经确认过进度,或停下时已经写出了字。都没有就只说「已停止」。 */
+        /** Whether there is anything to report: at least one action was taken, progress was confirmed, or text had already been written when it stopped. When none of these, just say "stopped". */
         fun worthSaying(events: List<RunEvent>, draft: String?): Boolean =
             events.any { it is RunEvent.Activity || it is RunEvent.Criteria && (it.criteria.isNotEmpty() || it.progress != null) } || !draft.isNullOrBlank()
 
         /**
-         * 交给模型的材料(有上限,不带画面):用户的要求、做过的事(一件一行,带那一步模型写的用意)、最近读到的内容、
-         * 停下时写了一半的字。都包在标签里;里面的话是材料,不是给写的人的指令。
+         * The material handed to the model (bounded, without images): the user's request, what was done (one action per
+         * line, with the intent the model wrote for that step), recently read content, and the half-written text at the
+         * stop. All wrapped in tags; what is written inside is material, not an instruction to the writer.
          */
         fun facts(
             goal: String, events: List<RunEvent>, draft: String?,
@@ -93,7 +98,7 @@ class StopSummary(
                     "failed".takeIf { a.failed },
                 )
                 val line = "Step ${a.step} $what" + if (tags.isEmpty()) "" else " (${tags.joinToString(", ")})"
-                // 连着读同一处只记一行
+                // Repeated reads of the same place are recorded as one line
                 if (a.kind == "observe" && line == lastObserve) continue
                 lastObserve = if (a.kind == "observe") line else null
                 val note = notes[a.step]?.takeIf { said.add(a.step) }
@@ -118,8 +123,9 @@ class StopSummary(
         }
 
         /**
-         * 不经模型的交代,只按记录拼:去过哪些 App 和网站、各类操作做了几次、对外发出了几次(和是哪些,按那一步的用意)、
-         * 几步没成功、停下时写了一半的字;最后说没做完的部分没有接着做。
+         * An account without a model, assembled from records alone: which Apps and websites were visited, how many
+         * actions of each kind were done, how many things were sent out (and which, by that step's intent), how many
+         * steps failed, and the half-written text at the stop; finally it says the unfinished parts were not continued.
          */
         fun plain(
             goal: String, events: List<RunEvent>, draft: String?,
@@ -188,7 +194,7 @@ class StopSummary(
             }
         }
 
-        /** 活动对象给人看的说法:「网站 域名」只留域名,包名换成 App 名,别的(网址、查询词)原样;空的为 null。 */
+        /** The human-readable form of an activity target: "site domain" keeps only the domain, a package name becomes the App name, anything else (URLs, query terms) stays as-is; null when blank. */
         private fun where(target: String, appLabel: (String) -> String): String? = when {
             target.isBlank() -> null
             target.startsWith(SITE_PREFIX) -> target.removePrefix(SITE_PREFIX).trim()
@@ -196,21 +202,21 @@ class StopSummary(
             else -> target
         }.takeUnless { it.isNullOrBlank() }
 
-        /** 活动对象是 App 或网站时它的名字;别的(网址、查询词、文件)为 null。 */
+        /** The name when the activity target is an App or a website; null for anything else (URLs, query terms, files). */
         private fun placeOf(target: String, appLabel: (String) -> String): String? =
             if (target.startsWith(SITE_PREFIX) || PACKAGE_NAME_RE.matches(target)) where(target, appLabel) else null
 
-        /** 运行记录里网页那一屏的对象写成「网站 <域名>」。 */
+        /** In run records, the object of a web page screen is written as "site <domain>". */
         private const val SITE_PREFIX = "网站 "
 
         private fun list(items: List<String>, max: Int) =
             items.take(max).joinToString("、") + if (items.size > max) " 等 ${items.size} 处" else ""
 
-        /** 非中文里截断后补一个计数,别默默丢掉。 */
+        /** For non-Chinese, append a count after truncation instead of silently dropping items. */
         private fun listOverflow(items: List<String>, max: Int) =
             items.take(max).joinToString(", ") + if (items.size > max) " (+${items.size - max})" else ""
 
-        /** 每一步模型写的话:先用回复里的进度说明,没有用调用参数里的用意(reason)。 */
+        /** What the model wrote for each step: prefer the progress note in the reply, otherwise the intent (reason) in the call arguments. */
         private fun notes(events: List<RunEvent>): Map<Int, String> {
             val out = mutableMapOf<Int, String>()
             for (r in events.filterIsInstance<RunEvent.ModelReply>()) {
@@ -238,7 +244,7 @@ class StopSummary(
 
         private val TAG = Regex("</?\\s*(request|actions|acceptance|progress|last_read|draft)\\s*>", RegexOption.IGNORE_CASE)
 
-        /** 材料里自带的标签去掉,免得它提前收口、把后面的话装成写的人的输入。 */
+        /** Strips tags embedded in the material, so it cannot close early and pass later text off as the writer's input. */
         private fun untag(s: String) = s.replace(TAG, "")
 
         private fun String.clip(max: Int) = if (length <= max) this else take(max) + "…"

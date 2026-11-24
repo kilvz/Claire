@@ -1,14 +1,15 @@
 package com.wangzan101.mika.core.agent
 
 /**
- * 回复正文里漏出来的工具调用:有的推理服务偶尔没把模型的工具调用解析出来,调用原样当文字回来了。
- * 这样的回复不是回答,不能交给用户。
+ * Tool calls leaked into the reply body: some inference services occasionally fail to parse the model's tool calls,
+ * so the call comes back verbatim as text. Such a reply is not an answer and must not be handed to the user.
  *
- * 只认常见的工具调用标记,而且标记后面要出现 Claire 的某个工具名(整词):回答里讲这些格式本身不算。
- * 只判断,不解析也不执行文字里的调用。
+ * Only the common tool-call markers are recognized, and one of Claire's tool names (whole word) must appear after
+ * the marker; merely talking about these formats in an answer does not count.
+ * Detection only: calls in the text are neither parsed nor executed.
  */
 internal object LeakedToolCall {
-    /** 模型写工具调用时常用的标记。 */
+    /** Markers models commonly use when writing tool calls. */
     private val MARKERS = listOf(
         "<tool_call>", "<function=",
         "<|python_tag|>",
@@ -18,8 +19,9 @@ internal object LeakedToolCall {
     )
 
     /**
-     * [text] 里漏出了对 [toolNames] 中某个工具的调用时返回那个工具名;没有为 null。
-     * 只看第一个调用标记之后出现的工具名,取最靠前的那个:标记前面的话里出现 wait、find 这类和工具同名的词不算。
+     * Returns the name of the tool from [toolNames] whose call leaked into [text]; null when there is none.
+     * Only tool names appearing after the first call marker are considered, and the earliest one wins: words such as
+     * wait or find that share a tool's name but appear before the marker do not count.
      */
     fun find(text: String, toolNames: Collection<String>): String? {
         val start = MARKERS.mapNotNull { m -> text.indexOf(m).takeIf { it >= 0 } }.minOrNull() ?: return null

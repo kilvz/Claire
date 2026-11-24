@@ -28,30 +28,33 @@ private val REPLAY_SCREEN_HEADER: String get() = Feedback["replay_screen_header"
 private val REPLAY_NO_SCREEN: String get() = Feedback["replay_no_screen"]
 
 /**
- * 经验回放:第一次模型调用之前,有合适的路线就先照着做,做完或对不上都交还模型;任务结束后按结局更新路线的计数。
- * 路线出了问题(匹配、读写路线)都不影响任务。每个任务开始时 [reset]。
+ * Experience replay: before the first model call, if a suitable route exists, follow it first, and hand back to the
+ * model whether it finishes or diverges; after the task ends, update the route's counts by the outcome.
+ * Problems with the route itself (matching, reading or writing routes) never affect the task. [reset] at the start of
+ * every task.
  */
 internal class RouteReplay(
     private val routes: RouteMatcher,
     private val tools: ToolDispatcher,
     private val gate: suspend () -> Unit,
-    /** 对外显示回放进度(也是关卡等完之后恢复的状态)。 */
+    /** Exposes replay progress to the outside (also the state restored after the gate finishes waiting). */
     private val show: (TaskState.Running) -> Unit,
     private val emit: (RunEvent) -> Unit,
     private val clock: () -> Long,
-    /** 屏图（有则回放时接图核对、交还时给「落在哪屏 + 从这走」）。 */
+    /** Screen maps (when present, the route is checked against them during replay, and hand-back gives "which screen it landed on + go from here"). */
     private val screenMaps: ScreenMapStore? = null,
 ) {
-    /** 本次任务回放过的路线与结果。 */
+    /** The route replayed in this task and its result. */
     private var replayed: Pair<Route, ReplayOutcome>? = null
 
     fun reset() { replayed = null }
 
-    /** 交还时读屏用最近操作的那块屏的读元素工具(回放的路线落在哪块屏就读哪块)。 */
+    /** The element-list tool for the screen most recently operated on, used for the screen read on hand-back (whichever screen the replayed route landed on is the one read). */
     private val dumpTool: String get() = tools.index.nameOf(Verb.ListElements, tools.surface)!!
 
     /**
-     * 找路线并回放;回放过就把经过(做了哪几步、在哪对不上)和一份当前全量读屏交给模型,返回读屏里的前台 App。
+     * Finds a route and replays it; if replay happened, hands the model what happened (which steps ran, where it
+     * diverged) plus a full current screen read, and returns the foreground App from that read.
      */
     suspend fun run(task: String, history: MutableList<Message>, executor: ActionExecutor, ctx: ContextBuilder, track: StepTrack): Place? {
         val choice = try {
@@ -70,7 +73,7 @@ internal class RouteReplay(
             sink = object : RunSink {
                 override fun event(e: RunEvent) {
                     emit(e)
-                    // 一步对上了就显示下一步
+                    // Once a step matches, show the next step
                     if (e is RunEvent.Replay && e.matched && e.step < e.total) {
                         running = running.copy(progress = RunProgress.Replay(e.step + 1, e.total))
                         show(running)
@@ -106,7 +109,7 @@ internal class RouteReplay(
             is ReplayOutcome.StoppedForConfirmation -> Feedback.format("replay.progress", "done" to out.done, "total" to steps.size, "steps" to doneLines.ifEmpty { Feedback["replay.no_steps"] },
                 "next" to Feedback.format("replay.stopped", "step" to (out.done + 1), "action" to Replayer.describe(steps[out.done], choice.slots)))
         }
-        // 当前全量读屏:模型从这里拿编号接着做;读不到就只交说明,任务照常继续
+        // Current full screen read: the model takes IDs from here to continue; if it cannot be read, only the explanation is handed over and the task continues as usual
         val looked = try {
             tools.executeRead(Part.ToolCall("replay_handback", dumpTool, "{}"), 0).takeIf { it.content["ok"] == JsonPrimitive(true) }
         } catch (e: CancellationException) {
@@ -116,21 +119,21 @@ internal class RouteReplay(
         }
         val read = looked?.content
         if (read != null) {
-            // 读屏做成一对工具调用与结果:裁剪和「模型看得到哪几屏」按读屏工具认它,各家接口对调用和结果的配对要求也都满足
+            // The screen read is made a matching tool call and result: trimming and "which screens the model can see" recognize it as the screen-read tool, and every provider's requirement that a call pair with its result is met
             val id = "replay_handback"
             history += Message(Role.Assistant, listOf(Part.Text(Feedback.format("replay.handback", "head" to head, "note" to REPLAY_SCREEN_HEADER)), Part.ToolCall(id, dumpTool, "{}")), Author.Mika)
             history += Message(Role.Tool, listOf(Part.ToolResult(id, read.toString(), isError = false, looked?.observations.orEmpty().map { it.tag })), Author.Mika)
-            // 能看图的主模型:交还时和动作之后一样看到此刻的画面
+            // A primary model that can see images: on hand-back it sees the current frame just as it would after an action
             tools.imageNow()?.let { (png, shotId) -> history += Message(Role.User, listOf(Part.Text(Feedback["action_frame_note"]), tools.modelImage(png, shotId)), Author.Mika) }
         } else {
             history += ctx.notice(REPLAY_SOURCE, Feedback.format("replay.handback", "head" to head, "note" to REPLAY_NO_SCREEN))
         }
-        // 交还之后的一步按恢复步算(大小模型分工时交给主模型)
+        // The step after hand-back counts as a recovery step (with large/light routing it goes to the primary model)
         track.markRecovery()
         return looked?.place
     }
 
-    /** 回放走完且这次运行算办成了([LearnGate],[outcome] 是交出回答后判的结局):成功计数 +1、清掉连续失误。 */
+    /** Replay finished and this run counts as accomplished ([LearnGate]; [outcome] is the outcome judged after the answer was delivered): success count +1, consecutive misses cleared. */
     suspend fun noteResult(end: TaskState, outcome: RunOutcome) {
         val (route, out) = replayed ?: return
         if (out !is ReplayOutcome.Completed || !LearnGate.done(end, outcome)) return
@@ -140,19 +143,19 @@ internal class RouteReplay(
     private suspend fun update(id: String, change: (Route) -> Route) {
         val store = routes.store
         try {
-            // 读改写一次完成:并行的另一个任务同时改这条路线时计数不会丢
+            // Read-modify-write in one step: when another task concurrently changes this route, no counts are lost
             withContext(Dispatchers.IO) { store.update(id, change) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // 路线计数写不进去不影响任务
+            // Failing to write the route count does not affect the task
         }
     }
 
     companion object {
-        /** 回放期间界面上这一步的说明。 */
+        /** The note for this step shown in the UI during replay. */
         const val REPLAY_NOTE = "按以往的做法操作"
-        /** 同一步连续对不上这么多次就停用路线。 */
+        /** The route is disabled after this many consecutive misses at the same step. */
         const val ROUTE_MISSES_TO_DISABLE = 2
     }
 }

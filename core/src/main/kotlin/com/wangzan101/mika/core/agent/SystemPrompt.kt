@@ -6,19 +6,23 @@ import com.wangzan101.mika.core.prompt.PersonaPrompt
 import com.wangzan101.mika.core.prompt.Prompts
 
 /**
- * 系统提示词:P0 身份(prompts/system/identity.md)、P1 通用准则(system/principles.md,不点名工具),
- * 接通用工具的总规则(capabilities/general.md,通用工具一直都在),再接核心自己与各能力给的段落。
- * 段落只在那组工具出现在本任务发给模型的工具列表里时才有:说明和工具出自同一个判断。
- * 任务开始时拼一次,任务内一字不变。
+ * System prompt: P0 identity (prompts/system/identity.md), P1 general principles (system/principles.md, with no tool
+ * names), then the general rules for general tools (capabilities/general.md, general tools are always present), then
+ * the sections provided by the core itself and by each capability.
+ * A section appears only when that group of tools is in the tool list sent to the model for this task: the
+ * instructions and the tools come from the same check.
+ * Assembled once at task start and unchanged by a single character within the task.
  */
 object SystemPrompt {
     /**
-     * [assistant] 是助理的自称(人格里的「称呼」),默认 Claire;进提示词前在这里由 [PersonaPrompt.nickname] 清洗。
-     * 不是 Claire 时身份句用它,并紧跟一段说明:Claire 是所在 App 的名字,后文和工具说明里的 Claire 指这个 App 和它自己。
-     * 是 Claire 时和没有这个参数之前逐字节一样。
+     * [assistant] is the assistant's self-name (the "appellation" in the persona), Claire by default; before entering
+     * the prompt it is sanitized here by [PersonaPrompt.nickname].
+     * When it is not Claire, the identity sentence uses it, immediately followed by an explanation: Claire is the name
+     * of the App it lives in, and Claire in later text and tool descriptions refers to this App and to itself.
+     * When it is Claire, the output is byte-for-byte identical to before this parameter existed.
      */
     fun identity(assistant: String = PersonaPrompt.DEFAULT_NICKNAME): String {
-        // 称呼落在围栏之外,这里自己再清洗一遍,不指望调用方洗过
+        // The name lands outside the fence, so it is sanitized again here rather than trusting the caller to have done it
         val name = PersonaPrompt.nickname(assistant)
         return listOfNotNull(
             Prompts.fill(Prompts.system("identity"), mapOf("assistant" to name)),
@@ -28,13 +32,14 @@ object SystemPrompt {
         ).joinToString("\n\n")
     }
 
-    /** 在身份、准则、通用规则之后接人格层;没有人格时原样返回。 */
+    /** Appends the persona layer after identity, principles, and general rules; returns as-is when there is no persona. */
     fun withPersona(base: String, layer: String?): String = if (layer == null) base else "$base\n\n$layer"
 
     /**
-     * 根据语言偏好生成语言指令段落。
-     * 当选定特定语言时（如 English, 中文），指示模型思考、步骤说明、工具用意及最终回复均使用该语言。
-     * 为空或系统自适应时，指示模型严格跟随用户提示词的语言。
+     * Generates the language-directive section from the language preference.
+     * When a specific language is chosen (such as English or Chinese), instructs the model to think, write step notes,
+     * state tool intents, and give the final reply all in that language.
+     * When empty or system-adaptive, instructs the model to strictly follow the language of the user's prompt.
      */
     fun languageDirective(languageTag: String?): String {
         val tag = languageTag?.trim()?.lowercase()
@@ -68,7 +73,7 @@ object SystemPrompt {
         }
     }
 
-    /** 在 base 提示词后接语言指令层。 */
+    /** Appends the language-directive layer after the base prompt. */
     fun withLanguage(base: String, languageTag: String?): String {
         val directive = languageDirective(languageTag)
         return if (directive.isBlank()) base else "$base\n\n$directive"
@@ -78,14 +83,16 @@ object SystemPrompt {
 
     private const val GENERAL = "general"
 
-    /** 一段能力说明。 */
+    /** One capability section. */
     internal fun read(name: String): String = Prompts.capability(name)
 }
 
 /**
- * 核心自己的段落,排在各能力之前:用到才展开的几组从哪个入口进(groups,只列本任务给了入口的;展开后照旧留着,系统提示词少变);
- * 有两块以上的屏时怎么选、怎么在两块屏之间配合(channels);有屏展开后交给用户、下单发送前的核对(handover);
- * 动作结果自带屏幕时怎么读它(inline-screen);一次多步(batch)。
+ * The core's own sections, placed before the capability sections: which entry point leads into the groups expanded on
+ * demand (groups, listing only the entries offered for this task; once expanded they stay, so the system prompt
+ * changes little); how to choose when there are two or more screens, and how to work across two screens (channels);
+ * handing over to the user after expanding a screen, and checking before placing an order or sending (handover); how to
+ * read an action result that carries its own screen (inline-screen); multiple steps at once (batch).
  */
 internal object CoreSections : PromptSections {
     override fun sections(env: PromptEnv): List<String> = listOfNotNull(

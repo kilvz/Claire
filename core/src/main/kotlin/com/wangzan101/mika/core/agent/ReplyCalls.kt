@@ -13,7 +13,7 @@ private const val PROGRESS_CALL = "task_progress"
 internal fun List<Part>.firstActionCall(): Part.ToolCall? =
     filterIsInstance<Part.ToolCall>().firstOrNull { it.name != PROGRESS_CALL }
 
-/** 保留提供方原有的调用顺序和 ID。误写成调用的进度走文字块的校验，实际动作仍只执行一个。 */
+/** Keeps the provider's original call order and IDs. A progress report mistakenly written as a call goes through the text-block validation, and only one actual action is still executed. */
 internal class ReplyCalls(parts: List<Part>, accept: (CompletionPlanBlock.Extracted) -> Boolean) {
     private val calls = parts.filterIsInstance<Part.ToolCall>()
     val actions = calls.filter { it.name != PROGRESS_CALL }

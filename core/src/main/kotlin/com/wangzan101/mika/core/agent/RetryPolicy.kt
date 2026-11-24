@@ -6,19 +6,23 @@ import com.wangzan101.mika.core.model.ModelErrors
 import kotlin.random.Random
 
 /**
- * 模型调用遇到一时的故障要不要再试、等多久。一时的故障:限流(429)、服务端出错(5xx)、连不上 / 连接被断 / 超时、
- * 流式回复没收尾连接就断了(这时回复还没写进历史、也没执行任何工具,重发是安全的)。
- * 其余错误(Key、额度、模型名、内容被拒、其他 4xx、解析不了)再试也一样,不重试;上下文超长另由压缩处理。
- * 限流带了 Retry-After 就照它等(有上限);其余按指数退避加抖动,每次调用最多重试 [maxRetries] 次。
- * 一个任务里花在等重试上的总时间有上限 [taskWaitBudgetMs](默认 5 分钟,只是安全网):用完之后再出错就直接交出,不再等。
- * 纯函数:抖动由 [jitter] 给(0..1),测试里换成定值。
+ * Whether a model call should be retried after a transient failure, and how long to wait. Transient failures: rate
+ * limiting (429), server errors (5xx), cannot connect / connection dropped / timeout, and a streaming reply whose
+ * connection dropped before it finished (the reply is not yet in history and no tool has run, so resending is safe).
+ * Other errors (key, quota, model name, content refusal, other 4xx, unparseable) would fail the same way on retry and
+ * are not retried; context-too-long is handled separately by compaction.
+ * Rate limiting that carries Retry-After waits as told (with a cap); everything else uses exponential backoff plus
+ * jitter, retrying at most [maxRetries] times per call.
+ * The total time one task spends waiting for retries is capped by [taskWaitBudgetMs] (5 minutes by default, just a
+ * safety net): once it is used up, the next error is handed out immediately without waiting.
+ * Pure functions: jitter comes from [jitter] (0..1) and is replaced with a fixed value in tests.
  */
 class RetryPolicy(
     val maxRetries: Int = 3,
     private val baseMs: Long = 1_000,
     private val maxBackoffMs: Long = 8_000,
     private val retryAfterCapMs: Long = 30_000,
-    /** 一个任务里所有重试等待加起来的上限。 */
+    /** The cap on all retry waits added together within one task. */
     val taskWaitBudgetMs: Long = 5 * 60_000,
     private val jitter: () -> Double = { Random.nextDouble() },
 ) {
@@ -27,15 +31,17 @@ class RetryPolicy(
     }
 
     /**
-     * 这次调用已重试 [retriesSoFar] 次后又遇到 [e],本任务已为重试等了 [waitedInTaskMs]:返回再试前要等的毫秒数;
-     * 不该再试(不是一时的故障、次数到了、等这一次会超出任务的等待上限)为 null。
-     * [maxRetries] 可以在这一次调用里临时压低(组里有下一个成员时,同一成员只试一次)。
+     * After this call has already retried [retriesSoFar] times and hits [e] again, with [waitedInTaskMs] already spent
+     * waiting on retries in this task: returns the milliseconds to wait before retrying, or null when it should not be
+     * retried (not a transient failure, attempts exhausted, or this wait would exceed the task's wait budget).
+     * [maxRetries] may be lowered temporarily for this one call (with another member in the group, the same member is
+     * tried only once).
      */
     fun delayFor(e: Throwable, retriesSoFar: Int, waitedInTaskMs: Long = 0, maxRetries: Int = this.maxRetries): Long? {
         if (retriesSoFar >= maxRetries || !transient(e)) return null
         val wait = (e as? ModelError.RateLimited)?.retryAfterMs?.coerceIn(MIN_RETRY_AFTER_MS, retryAfterCapMs) ?: run {
             val ceiling = minOf(maxBackoffMs, baseMs shl minOf(retriesSoFar, 20))
-            // 一半固定、一半随机:同时出错的几个任务不会在同一刻再撞上去
+            // Half fixed, half random: several tasks failing at once do not hit it again at the same instant
             ceiling / 2 + (ceiling / 2 * jitter().coerceIn(0.0, 1.0)).toLong()
         }
         return wait.takeIf { waitedInTaskMs + it <= taskWaitBudgetMs }
@@ -44,13 +50,13 @@ class RetryPolicy(
     companion object {
         private const val MIN_RETRY_AFTER_MS = 1_000L
 
-        /** 不重试:出错就交出(轻量模型出错时这一步直接改问主模型)。 */
+        /** No retries: hand the error out on failure (when the light model fails, this step asks the primary model directly). */
         val NONE = RetryPolicy(maxRetries = 0)
 
-        /** 一时的故障,过一会儿再发同一个请求可能就好了。 */
+        /** A transient failure: sending the same request again after a while may just work. */
         fun transient(e: Throwable): Boolean = ModelErrors.transient(e)
 
-        /** 运行记录里这次故障的名字。 */
+        /** The name of this failure in the run log. */
         fun label(e: Throwable): String = when (e) {
             is ModelError.RateLimited -> "rate_limited"
             is ModelError.Network -> "network"
