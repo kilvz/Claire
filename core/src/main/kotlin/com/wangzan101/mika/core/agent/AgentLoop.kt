@@ -77,10 +77,10 @@ import kotlinx.serialization.json.put
 import java.time.ZoneId
 import com.wangzan101.mika.core.screen.user.UserScreenSource
 
-/** 批做完后另看的一眼:内容和画面同一时刻。 */
+/** The extra look taken after a batch finishes: the content and the screen at the same moment. */
 internal fun batchViewNote(content: String) = Feedback.format("batch_view_note", "screen" to content)
 
-/** 进度块取出后，其余文字保持一条助手消息；调用及其私有数据原样保留。 */
+/** After the progress block is extracted, the remaining text stays as one assistant message; the calls and their private data are kept as-is. */
 internal fun cleanReplyParts(parts: List<Part>, text: String): List<Part> {
     var textWritten = false
     return parts.mapNotNull { part ->
@@ -92,27 +92,35 @@ internal fun cleanReplyParts(parts: List<Part>, text: String): List<Part> {
 }
 
 /**
- * 写、改 Claire 自己的记忆不先问「是讨论还是要操作」。那个判断管的是要不要去读、去动 App 和网站;这两个工具只动 Claire 自己的记忆,
- * 各有校验(引文必须出自用户这一轮的话,改删还要话里明说了要改、要删,见 MemoryTools),改动在结果卡上可以撤销。
- * 交给它判的话,「总结一下写进记忆」「把那几条改得简洁一点」这样的话在真机上都被判成了讨论:调用被丢掉、改成不带工具重问,
- * 模型只好把调用写成文字,任务以「工具调用没被识别」结束。
- * 「如果我让你把那条删了,你会怎么做」这种只是问问的,由 memory_edit 自己拒(见 MemoryEdit 里的 onlyAsking)。
+ * Writing or changing Claire's own memory does not first ask "is this a discussion or an action". That judgement governs whether to
+ * read or touch apps and websites; these two tools only touch Claire's own memory, and each has its own validation (quotations must
+ * come from the user's words in this turn, and edits/deletions must be explicitly requested in those words, see MemoryTools); changes
+ * can be undone on the result card.
+ * If they were left to that judgement, sentences like "summarize this into memory" or "make those entries more concise" were all judged
+ * as discussion on real devices: the calls were dropped, the model was asked again without tools, and it could only write the calls as
+ * text, ending the task with "tool call not recognised".
+ * Pure questions like "if I asked you to delete that entry, what would you do" are rejected by memory_edit itself (see onlyAsking in MemoryEdit).
  */
 private val MEMORY_WRITE_VERBS = setOf(Verb.MemorySave, Verb.MemoryEdit)
 private val MEMORY_VERBS = setOf(Verb.MemorySearch, Verb.MemorySave, Verb.MemoryEdit)
-/** 讨论历史时仍可查本地记忆与技能资料、之前几轮的记录；这些调用不会打开 App 或网站。 */
+/** Local memory, skill material and earlier turns' records can still be consulted when discussing history; these calls never open an app or a website. */
 private val DISCUSSION_LOOKUP_VERBS = setOf(Verb.MemorySearch, Verb.KnowledgeSearch, Verb.KnowledgeRead, Verb.SkillSearch, Verb.SkillRead, Verb.HistoryRead, Verb.NoticesRead)
 
 /**
- * 驱动“模型 ↔ 工具”的循环,只做调度:问模型([ModelCaller])→ 交执行入口([ActionExecutor])→
- * 按策略([TurnPolicy]、[StopRules]、[StuckAdvice]、[NoticePolicy])决定提醒、建议与结局 → 写进历史。
- * 结局:不带工具调用的回复就是给用户的最终回答(核对见 [AnswerReview],来源由代码从证据账本里找);
- * 随调用写的文字是进度说明([TaskState.Running.narration])。做不成、要问用户、要用户亲手做,各走 end_not_done、
- * ask_user、hand_to_user。只有空回复(或被输出上限截断的回复)会被提醒,而且只提醒一次。
- * 每轮只执行第一个工具调用,写操作前过 [gate](能力的前置条件不满足时挂起,如手机锁屏),守卫结论放进工具结果的 guard 字段。
- * gate 挂起前用 setWaiting 报告原因(能力给的 [TaskState.Held]),放行时传 null;
- * 等待期间对外显示该状态,结束后恢复 Running。
- * 运行过程以 [RunEvent] 交给 [sink](已脱敏、大字段截短),存下的画面经 [RunSink.media] 交出。
+ * Drives the "model ↔ tools" loop and only does scheduling: ask the model ([ModelCaller]) → hand to the execution entry
+ * point ([ActionExecutor]) → decide reminders, advice and the ending by policy ([TurnPolicy], [StopRules], [StuckAdvice],
+ * [NoticePolicy]) → write into the history.
+ * Endings: a reply without tool calls is the final answer to the user (see [AnswerReview] for verification; sources are
+ * found in code from the evidence ledger);
+ * text written alongside calls is progress narration ([TaskState.Running.narration]). Cannot-do, need-to-ask and
+ * user-must-do-it go through end_not_done, ask_user and hand_to_user respectively. Only an empty reply (or one truncated by
+ * the output limit) triggers a reminder, and only once.
+ * Each round executes only the first tool call, and writes pass through [gate] first (suspended when a capability's
+ * precondition is not met, e.g. the phone is locked); guard verdicts go into the guard field of the tool result.
+ * Before gate suspends, setWaiting reports the reason (the capability-provided [TaskState.Held]), and null is passed once
+ * allowed through; the state is shown externally while waiting and Running is restored afterwards.
+ * The run is handed to [sink] as [RunEvent]s (already redacted, large fields clipped), and saved screens are handed over via
+ * [RunSink.media].
  */
 class AgentLoop(
     internal val model: ChatModel,
@@ -121,85 +129,85 @@ class AgentLoop(
     internal val maxSteps: Int = DEFAULT_MAX_STEPS,
     internal val gate: suspend (setWaiting: (TaskState?) -> Unit) -> Unit = {},
     internal val knowledge: KnowledgeStore? = null,
-    /** 各 App 的屏图(页面结构);为 null 时不注入。进入有图的 App 时随 APP.md 一起给。 */
+    /** Each app's screen map (page structure); not injected when null. Given along with APP.md when entering an app that has one. */
     internal val screenMaps: ScreenMapStore? = null,
     sink: RunSink = RunSink.NONE,
-    /** 已安装 App(包名, 显示名),只用于按任务文字挑参考资料;取不到时按空列表处理。 */
+    /** Installed apps (package name, display name), used only to pick reference material by the task text; treated as an empty list when unavailable. */
     internal val installedApps: suspend () -> List<Pair<String, String>> = { emptyList() },
-    /** 最终回答交出前、按风险才请的独立核查(见 [AnswerReview]);为 null 时只做字面核对(产品路径必须给)。 */
+    /** The independent, risk-triggered verification asked for before the final answer is handed over (see [AnswerReview]); when null, only the literal check is done (the product path must provide one). */
     internal val verifier: Verifier? = null,
-    /** 付款的确认关卡；自主执行路径传 null，也不向模型提供 request_confirmation。 */
+    /** The confirmation gate for payments; autonomous paths pass null and do not offer request_confirmation to the model either. */
     internal val confirmations: ConfirmationGate? = ConfirmationGate(),
-    /** 询问 / 自主(中途换成自主时从下一步起照它);默认询问。 */
+    /** Ask / autonomous (when switched to autonomous mid-task, it applies from the next step on); asks by default. */
     internal val approvals: ApprovalSettings = ApprovalSettings.ASK,
-    /** 等用户回答确认的时限,到时按不同意;为 null 时一直等(测试)。 */
+    /** How long to wait for the user to answer a confirmation, treated as not approved on timeout; when null, wait forever (tests). */
     confirmTimeoutMs: Long? = null,
-    /** Claire 自己的包名:作用在它上面的写操作不做。 */
+    /** Claire's own package name: write operations acting on it are not performed. */
     internal val selfPackage: String? = null,
-    /** 追问(ask_user 与开工前的歧义问题)等用户回答的时限;计时走协程调度器的时钟,测试里用虚拟时间。 */
+    /** How long to wait for the user to answer a follow-up question (ask_user and pre-start ambiguity questions); timing uses the coroutine dispatcher's clock, with virtual time in tests. */
     inputTimeoutMs: Long = DEFAULT_INPUT_TIMEOUT_MS,
-    /** 选渠道用的事实;给了就在任务开头注入一行「可用渠道」。 */
+    /** The facts used to choose a channel; when given, an "available channels" line is injected at the start of the task. */
     internal val channelFacts: (suspend () -> ChannelFacts)? = null,
-    /** 提速开关;默认全关。 */
+    /** Speed-up switches; all off by default. */
     val flags: SpeedFlags = SpeedFlags.OFF,
-    /** 事件时间与耗时用的钟;测试里换成假时钟。 */
+    /** The clock used for event times and durations; replaced with a fake clock in tests. */
     internal val clock: () -> Long = System::currentTimeMillis,
-    /** 大小模型分工;只在 flags.lightSteps 打开时用。 */
+    /** Division of labor between the big and small models; used only when flags.lightSteps is on. */
     router: ModelRouter? = null,
-    /** UI 对话第一次要用工具时的独立意图判断；null 保留评测与其他入口的原行为。 */
+    /** An independent intent judgement when the UI conversation is about to use tools for the first time; null keeps the original behavior of evaluations and other entry points. */
     internal val intentJudge: ChatModel? = null,
-    /** 可选的类型化意图判断;不确定或失败时仍问 intentJudge,不替代主模型与执行关卡。 */
+    /** An optional typed intent judgement; when it is unsure or fails, intentJudge is still asked, and it does not replace the main model or the execution gate. */
     intentDecision: com.wangzan101.mika.core.model.decision.DecisionModel? = null,
-    /** 经验回放的路线匹配;只在 flags.replay 打开时用。 */
+    /** Route matching for experience replay; used only when flags.replay is on. */
     routes: RouteMatcher? = null,
-    /** 技能目录(含个人技能);任务开始时列出全部技能,并按目标给几条 App/站点知识的索引。为 null 或 [recommendSkills] 关着时不给索引。 */
+    /** The skill catalog (including personal skills); at task start all skills are listed, plus an index of a few pieces of app/site knowledge chosen for the goal. No index when null or when [recommendSkills] is off. */
     internal val skills: GuideCatalog? = null,
     internal val recommendSkills: Boolean = true,
-    /** 记忆;为 null(或总开关关)时不检索、不注入、不提供 memory_* 工具。 */
+    /** Memory; when null (or the master switch is off), nothing is retrieved, nothing is injected, and no memory_* tool is offered. */
     internal val memory: MemoryStore? = null,
-    /** 运行时状态里的本地时间按这个时区写。 */
+    /** The local time in the runtime state is written in this time zone. */
     internal val zone: ZoneId = ZoneId.systemDefault(),
-    /** 模型调用遇到一时的故障(限流、5xx、网络)时的重试。 */
+    /** Retries when a model call hits a transient failure (rate limiting, 5xx, network). */
     retry: RetryPolicy = RetryPolicy(),
-    /** 不带调用的回复收下当最终回答之前问一次(见 [BeforeAccept]);默认照收。步数用完后的最后一轮不问。 */
+    /** Asked once before a reply without calls is accepted as the final answer (see [BeforeAccept]); accepted as usual by default. Not asked on the last round after the step limit is used up. */
     internal val beforeAccept: suspend (answer: String) -> BeforeAccept = { BeforeAccept.Accept },
     internal val interaction: Interaction = LocalInteraction,
     internal val profileSnapshot: List<ProfileEntry> = emptyList(),
     internal val autonomous: Boolean = false,
-    /** 主动能力从通知里攒下、够格带进这次任务的那一段(见 [com.wangzan101.mika.core.proactive.ObservedContext]);没有为 null。 */
+    /** The block the proactive capability accumulated from notifications that qualifies for carrying into this task (see [com.wangzan101.mika.core.proactive.ObservedContext]); null when there is none. */
     internal val observed: String? = null,
-    /** 交互界面开启可见文字流；评测和后台调用保持原请求格式。 */
+    /** The interactive UI enables a visible text stream; evaluations and background calls keep the original request format. */
     internal val streamReplies: Boolean = false,
-    /** 这个对话里用户发来的屏幕(见 [UserScreenTurns]);没有时带屏幕的那一行原样给模型。 */
+    /** Screens the user sent in this conversation (see [UserScreenTurns]); when absent, the line carrying the screen is given to the model as-is. */
     internal val userScreens: UserScreenSource? = null,
-    /** 评测可保留旧收尾核查；交互产品由执行过程观察结果，收尾只整理来源。 */
+    /** Evaluations may keep the old final verification; for the interactive product the outcome is observed during execution and the finish only assembles sources. */
     internal val reviewFinalAnswer: Boolean = true,
-    /** 同一网站、App 里连着做对外动作(发送、提交)时两次之间的间隔;默认不等。 */
+    /** The interval between two consecutive outward actions (sending, submitting) within the same website or app; no wait by default. */
     internal val outwardPacing: OutwardPacing = OutwardPacing.Off,
-    /** 主模型的备援链；[modelChainProviderIds] 与主模型和备援模型平行。 */
+    /** The fallback chain for the main model; [modelChainProviderIds] is parallel to the main model and the fallback models. */
     internal val modelFallbacks: List<ChatModel> = emptyList(),
     internal val modelChainProviderIds: List<String?> = emptyList(),
     internal val trace: RunTrace? = null,
-    /** 插件提示词钩子:拼好的系统提示词发模型前过它;为 null 时原样发。 */
+    /** Plugin prompt hook: the assembled system prompt passes through it before being sent to the model; sent as-is when null. */
     internal val promptTransform: (suspend (String) -> String)? = null,
-    /** 这一轮用的人格(名字 · 修订号);只写进运行记录,不参与提示词拼装。没有人格为 null。 */
+    /** The persona used in this round (name · revision); written to the run record only, not part of prompt assembly. Null when there is no persona. */
     internal val personaLabel: String? = null,
     internal val stages: TaskStages? = null,
 ) {
     init {
         require(maxSteps > 0) { "maxSteps must be positive" }
-        // 只有开着回放才在写操作前取目标元素与锚点
+        // Targets and anchors are captured before write operations only when replay is on
         tools.captureTargets = flags.replay
         tools.observeMcpCalls(::showMcpCall)
     }
 
-    /** 运行记录:按因果先后写(见 [RecordOrder])。 */
+    /** Run record: written in causal order (see [RecordOrder]). */
     val events = RunEventBus().also { bus ->
         bus.subscribe(sink)
         trace?.let { bus.subscribe(it) }
     }
     internal val sink = RecordOrder(events).also { order ->
-        // 记进证据账本的每条观察原样进运行记录(跟在读到它的那次调用的结果后面)
+        // Every observation recorded in the evidence ledger goes into the run record as-is (right after the result of the call that read it)
         tools.observer = { record { order.observed(RunEvent.Observed.of(it)) } }
     }
 
@@ -210,16 +218,16 @@ class AgentLoop(
         }
     }
     internal val routeMatcher = routes
-    /** 本任务的上下文生成器(外壳、预算、已给过的参考资料)。 */
+    /** This task's context builder (envelope, budget, reference material already given). */
     internal var ctx = ContextBuilder()
-    /** 本任务里用户发来的屏幕(开局时建)。 */
+    /** Screens the user sent within this task (created at the opening). */
     internal var screens: UserScreenTurns? = null
-    /** 这次的原话给模型时的样子(带着屏幕时换成了说明,见 [UserScreenTurns]);还没开始为 null。判结局、提取记忆按它读。 */
+    /** How this task's own words look when given to the model (rewritten into a block when a screen is carried, see [UserScreenTurns]); null before the run starts. Judging the outcome and extracting memory read from it. */
     @Volatile var taskText: String? = null
         internal set
     /**
-     * 用户最近一句话(开局原话或插话)里他这次打的字,见 [ownWords];插话里没打字(只发了屏幕、只选了字)时沿用上一句的。
-     * 语言提示和回答的语言检查按它;记忆、技能的引文收的是 [UserWords.said](还认他引的自己说过的话)。
+     * The characters the user typed in their most recent sentence (the opening words or a steer), see [ownWords]; when a steer typed nothing (only a screen sent, only text selected), the previous sentence's are kept.
+     * Language hints and the answer language check use it; memory and skill quotations collect [UserWords.said] (which also recognises words of the user's own that they quoted).
      */
     internal var latestWords = ""
 
@@ -227,20 +235,20 @@ class AgentLoop(
     val state: StateFlow<TaskState> = _state.asStateFlow()
 
     @Volatile internal var usedMemory: List<String> = emptyList()
-    /** 本次任务记忆块里列出的条目编号;任务结束后读取。 */
+    /** The IDs of the entries listed in this task's memory block; read after the task ends. */
     val usedMemoryIds: List<String> get() = usedMemory
 
-    /** 这次任务开工时带没带「从通知里得来的」那一段;任务结束后读取(带了就不自动提取记忆,不靠读运行记录也知道)。 */
+    /** Whether this task started with the "obtained from notifications" block; read after the task ends (if it did, memory is not extracted automatically — known without reading the run record). */
     val carriedObserved: Boolean get() = observed != null
 
-    /** 本次任务真的用过的能力组(记进这一轮,下一轮开局预先展开);任务结束后读取。 */
+    /** The capability groups actually used in this task (recorded into this turn and pre-expanded at the start of the next turn); read after the task ends. */
     val usedGroups: Set<String> get() = tools.used
 
-    /** 用户本次说的话(memory_save、skill_save 的引文校验用);给了就收集,只在内存里、每个任务开始清空。 */
+    /** What the user said in this task (used for quotation validation by memory_save and skill_save); collected when available, in memory only, cleared at the start of each task. */
     internal val utterances get() = tools.utterances
 
     internal val user = UserExchange(tools, confirmations, confirmTimeoutMs, inputTimeoutMs, { utterances }, { _state.value = it }, ::emit, ::now)
-    /** 自身工具的当次同意:复用等用户回答的那条路,同一次工具调用里等,不分成两步。 */
+    /** Per-call consent for its own tools: reuses the path that waits for the user's answer, waiting inside the same tool call rather than splitting it into two steps. */
     internal val askPort = object : AskPort {
         override suspend fun awaitAnswer(prompt: String, options: List<String>?) = user.awaitAnswer(prompt, options)
     }
@@ -248,27 +256,27 @@ class AgentLoop(
     internal val replay = routes?.let { RouteReplay(it, tools, ::awaitGate, { r -> gateState = r; _state.value = r }, ::emit, clock) }
 
     @Volatile internal var job: Job? = null
-    /** 锁屏/被拿走关卡等完之后恢复的界面状态(当前这一步、批或回放)。 */
+    /** The interface state to restore after waiting out a gate such as the lock screen or being taken away (the current step, batch or replay). */
     @Volatile internal var gateState: TaskState = TaskState.Idle
     @Volatile internal var cancelRequested = false
-    /** 被插话撤掉请求的那一步;之后迟到的流式文字不再显示。 */
+    /** The step whose request was withdrawn because of a steer; streaming text that arrives late afterwards is no longer shown. */
     @Volatile internal var interruptedStep = 0
-    /** 本对话之前几轮用户说的话,只给核查器理解追问;不含干活模型的任何东西。 */
+    /** What the user said in earlier turns of this conversation, given only to the verifier so it understands follow-ups; contains nothing from the working model. */
     internal var earlierGoals: List<String> = emptyList()
-    /** 本次运行的结局;判过结局后路线计数要用([noteOutcome])。 */
+    /** The outcome of this run; route counting needs it after the outcome is judged ([noteOutcome]). */
     @Volatile internal var lastEnd: TaskState? = null
     internal val review = AnswerReview(tools, verifier, ::emit, ::now)
-    /** 本任务每一步存下的画面编号(步 → 编号),回答的来源按它附上画面。 */
+    /** The image IDs saved at each step of this task (step → IDs); the answer's sources attach images according to it. */
     internal val media = mutableMapOf<Int, MutableList<Int>>()
-    /** 本任务的回答已因核对没对上退回过一次;再没对上就标成未确认交出,不再退回。 */
+    /** This task's answer has already been sent back once because the verification did not match; if it still does not match, it is handed over marked as unconfirmed, without sending it back again. */
     internal var gapsNudged = false
     internal var provenance = RunProvenance()
     val activeAsk: Delivery.Ask? get() = user.activeAsk
 
-    /** 新入口:同一对话里的插话和控制经 [inbox] 进入;旧入口继续使用相同的执行路径。 */
+    /** New entry point: steers and control within the same conversation come in through [inbox]; the old entry point keeps using the same execution path. */
     suspend fun run(spec: RunSpec, inbox: RunInbox): TaskState {
         suspend fun start() = runInternal(spec.goal, spec.priorTurns, inbox, spec.provenance, spec.threadId, spec.tokenBudget)
-        // App 在整个运行外层装好共享 tally,子任务也沿用;直接走核心入口时由这里保证 RunSpec 的预算生效。
+        // The app installs a shared tally around the whole run and subtasks reuse it; when going straight through the core entry point, this is what makes RunSpec's budget take effect.
         if (spec.tokenBudget == null || currentCoroutineContext()[RunUsageTally] != null) return start()
         return withContext(RunUsageTally(spec.tokenBudget)) { start() }
     }
@@ -291,13 +299,13 @@ class AgentLoop(
         })
         caller.reset(basePrompt)
         caller.promptTransform = promptTransform
-        // 同意只在一次任务内有效
+        // Consent is only valid within a single task
         confirmations?.reset()
         utterances?.clear()
         emit(RunEvent.TaskStarted(now(), Redactor.text(task), model.name,
             origin = runProvenance.origin.takeIf { it != RunOrigin.Ui }?.name?.lowercase(),
             stepLimit = maxSteps.takeIf { it != Int.MAX_VALUE }, tokenBudget = tokenBudget))
-        // 人格在 TaskStarted 之后记,时间线按「开始时用了谁」读;没有人格不写
+        // The persona is recorded after TaskStarted, so the timeline reads "who was used at the start"; nothing is written when there is no persona
         personaLabel?.let { emit(RunEvent.State(now(), "persona", it)) }
         var end: TaskState? = null
         replay?.reset()
@@ -318,7 +326,7 @@ class AgentLoop(
     internal suspend fun runLoop(task: String, priorTurns: List<Turn>, inbox: RunInbox?): TaskState {
         val end = try {
             coroutineScope {
-                // 插话的信号装在整个运行的上下文里:撤掉也不丢东西的等待据此提前结束(见 waitOrSteer)
+                // The steer signal is installed in the context of the whole run: waits that lose nothing when withdrawn end early because of it (see waitOrSteer)
                 val body = async(inbox?.signal ?: EmptyCoroutineContext) { loop(task, priorTurns, inbox) }
                 job = body
                 if (cancelRequested) body.cancel()
@@ -336,7 +344,7 @@ class AgentLoop(
         return end
     }
 
-    /** 写操作前过 [gate]:挂起期间对外显示等待原因,结束后恢复 [gateState]。 */
+    /** Pass through [gate] before a write operation: the waiting reason is shown externally while suspended, and [gateState] is restored afterwards. */
     internal suspend fun awaitGate() {
         try {
             gate { waiting ->
@@ -349,22 +357,22 @@ class AgentLoop(
     }
 
     /**
-     * 交出的回答判过结局([OutcomeJudge])之后调用:回放走完的路线只在办成([LearnGate])时记一次成功。
-     * 失败、取消的任务不判也不用调用;不调用就不记成功。
+     * Called after the handed-over answer's outcome has been judged ([OutcomeJudge]): a replay route that ran to completion counts one success only when it succeeded ([LearnGate]).
+     * Failed and cancelled tasks are neither judged nor need this call; without the call no success is recorded.
      */
     suspend fun noteOutcome(outcome: RunOutcome) {
         val end = lastEnd ?: return
         replay?.noteResult(end, outcome)
     }
 
-    /** 交回接管的结局;结局作为 hand_to_user 的工具结果交给模型。 */
+    /** The outcome of handing back for takeover; the outcome is given to the model as the tool result of hand_to_user. */
     suspend fun resumeAfterTakeover(result: HandBack) = user.resumeAfterTakeover(result)
 
-    /** 旧的交回方式:一律算 complete;[note] 为 [USER_FINISHED_NOTE] 时表示用户说已自己办完。 */
+    /** The old hand-back form: always counts as complete; when [note] is [USER_FINISHED_NOTE] it means the user said they had already done it themselves. */
     suspend fun resumeAfterTakeover(note: String) =
         resumeAfterTakeover(HandBack(HandBackOutcome.complete, userFinished = note == USER_FINISHED_NOTE))
 
-    /** 回答追问;没有在等的问题(已超时、已答过)时返回 false,由界面告诉用户回答来晚了。 */
+    /** Answer a follow-up question; returns false when no question is waiting (already timed out or already answered), and the UI then tells the user the answer came too late. */
     suspend fun answerInput(text: String): Boolean = user.answerInput(text)
 
     fun cancelInput(askId: String): Boolean = user.cancelInput(askId)
@@ -388,7 +396,7 @@ class AgentLoop(
 
     internal data class LoopHistory(val messages: MutableList<Message>, val labels: Map<String, String>)
 
-    /** 当前给模型的工具单和它的系统提示词:展开新组时一起换,没展开就一字不变。 */
+    /** The tool list currently given to the model and its system prompt: they switch together when a new group is expanded, and stay exactly the same otherwise. */
     internal inner class ToolOffer {
         private var openGroups = tools.expanded
         private val extra = listOfNotNull(BatchRunner.spec(tools.batchable()).takeIf { flags.batchSteps })
@@ -401,13 +409,13 @@ class AgentLoop(
         }
 
         fun recordPromptVersion(): List<String> {
-            // 提示词版本按每组都展开的样子算:同一版提示词不因这次展开了哪几组而不同
+            // The prompt version is computed as if every group were expanded: the same prompt version does not differ by which groups happen to be expanded this time
             val everything = tools.offeredNow(extra, all = true).filter(::keep)
             emit(RunEvent.PromptVersion(now(), PromptVersion.of(SystemPrompt.assemble(basePrompt, tools.promptSections(everything, all = true)), everything)))
             return everything.map { it.name }
         }
 
-        // 每次问模型之前:展开了新的组时,工具和系统提示词跟着换;没展开就一字不变
+        // Before each model call: when new groups were expanded, the tools and system prompt change with them; otherwise nothing changes at all
         fun refresh() {
             val offer = tools.offeredNow(extra).filter(::keep)
             if (offer == current) return
@@ -421,7 +429,7 @@ class AgentLoop(
     internal suspend fun loop(raw: String, rawPrior: List<Turn>, inbox: RunInbox?): TaskState {
         val opening = prepareOpening(raw, rawPrior)
         val task = opening.task
-        // 开局预先展开:上一轮用过的组,和这次的话一定用得上的(见 ToolDispatcher.preload)
+        // Pre-expanded at the opening: the groups used in the previous turn, and those this sentence will certainly need (see ToolDispatcher.preload)
         tools.preload(task, opening.priorTurns.lastOrNull()?.groups.orEmpty()).forEach { emit(RunEvent.State(now(), "tools_preloaded", it)) }
         val offer = ToolOffer()
         val allToolNames = offer.recordPromptVersion()
@@ -434,13 +442,13 @@ class AgentLoop(
         media.clear()
         gapsNudged = false
         interruptedStep = 0
-        // 除用户原话以外的上下文都经它生成:统一外壳、统一预算
+        // All context other than the user's own words is generated through it: one envelope, one budget
         ctx = ContextBuilder(zone = zone)
         val (history, labels) = prepareHistory(opening)
         return LoopSession(opening, offer, allToolNames, guards, recorder, executor, history, labels, inbox).run()
     }
 
-    /** 一轮运行里模型轮次和工具执行共享的状态;每个挂起阶段自管自己的临时量。 */
+    /** State shared by the model turns and tool execution within one run; each suspending phase manages its own temporaries. */
     internal inner class LoopSession(
         private val opening: LoopOpening,
         private val offer: ToolOffer,
@@ -456,21 +464,21 @@ class AgentLoop(
         private var note = ""
         private var emptyNudged = false
         private var progressOnlyTurns = 0
-        // 调过工具才有可核对的材料;交给用户付款和放行过对外动作一样,回答要另请核查
+        // There is material to verify only if tools were called; handing payment to the user is like letting an outward action through, and the answer must ask for a separate verification
         private var acted = false
         private var paymentHandedOver = false
-        // 用户回答了追问、还没做别的事:这时就要交回答,先提醒一次照做(见 [owedFollowUp])
+        // The user answered a follow-up and nothing else has been done yet: now the answer is due, so remind once to do as told (see [owedFollowUp])
         private var answered: String? = null
         private var followUpNudged = false
         private var resultReadNudged = false
         private var languageNudged = false
-        // 工具调用漏成文字的回复刚退回过一次(见 [LeakedToolCall]);正常调了工具就重新算
+        // A reply whose tool call leaked as plain text has just been sent back once (see [LeakedToolCall]); normally calling a tool resets it
         private var leakNudged = false
         private fun facts() = ReviewFacts(acted, paymentHandedOver || recorder.outwardActs > 0, recorder.lastChangeMark?.let { !tools.readSince(it) } == true)
-        // 网页上每个站点只在第一次进入时按域名找一次知识
+        // On the web, knowledge is looked up by domain only on the first visit to each site
         private val visitedSites = mutableSetOf<String>()
 
-        // 任务此刻在哪(App、站点……);由能力一侧按每次调用的结果给出
+        // Where the task is right now (app, site, …); provided by the capability side from each call's result
         private var place: Place? = null
         private var stuck = StuckState()
         private var lastProgressVersion = guards.progressVersion
@@ -488,10 +496,10 @@ class AgentLoop(
         private val newData = NewDataTracker()
         private var intent: IntentGate.Intent? = null
         private var intentAssessed = false
-        // 每次运行只判断一次;判断不出(调用失败、回复不是三个词之一)时为 null,照主模型自己的决定走
+        // Judged only once per run; when it cannot be judged (the call fails, or the reply is not one of the three words) it is null and the main model's own decision stands
         private suspend fun assessIntent(): IntentGate.Intent? {
             intentAssessed = true
-            // 只发来屏幕、没说话:没有话可判,按屏幕猜意图的规矩交给主模型
+            // Only a screen was sent and nothing was said: there are no words to judge, so guessing intent from the screen is left to the main model
             val result = if (opening.screen != null && opening.screen.words.isEmpty()) null else intentGate?.assess(task, opening.priorTurns)
             emit(RunEvent.State(now(), "intent_gate", result?.name ?: "unavailable"))
             return result
@@ -510,8 +518,8 @@ class AgentLoop(
         }
 
         private suspend fun replayOpening() {
-            // 第一次模型调用之前:有合适的路线就先照着做,不调模型;做完或对不上都交还模型
-            // 路线只记、只放手机上的做法:点名用网页的任务不回放
+            // Before the first model call: if a suitable route exists, follow it first without calling the model; whether it finishes or does not match, control returns to the model
+            // Routes only record what is done on the phone: tasks that explicitly call for the web are not replayed
             if (flags.replay && replay != null && !task.trimStart().startsWith(WEB_CHANNEL_PREFIX)) {
                 val reviewRoute = provenance.origin == RunOrigin.Ui && intentGate != null && routeMatcher?.candidates(task)?.isNotEmpty() == true
                 if (reviewRoute) intent = assessIntent()
@@ -552,7 +560,7 @@ class AgentLoop(
                 tools.verb(proposed.name).let { it !in DISCUSSION_LOOKUP_VERBS && it !in MEMORY_WRITE_VERBS }) {
                 if (!intentAssessed) intent = assessIntent()
                 if (intent == IntentGate.Intent.Discuss) {
-                    // 提议的调用尚未写进历史、也没有执行；重问一次，只给直接回答的机会。
+                    // The proposed call has not been written into the history and has not been executed either; ask again, giving only the opportunity for a direct answer.
                     val discussion = history + ctx.notice("conversation_intent",
                         "The user is discussing or reviewing this time. Answer this question directly, without reading or operating apps, websites or other outside content.")
                     val direct = try { caller.askRouted(discussion, emptyList(), step, onText = previewFor(step)) }
@@ -576,11 +584,11 @@ class AgentLoop(
             val retryWaitMs = caller.lastRetryWaitMs
             val repliedAtMs = now()
             val latencyMs = repliedAtMs - asked - retryWaitMs
-            // 随调用写的字是进度说明,界面上的实时那一行先用它
+            // Text written alongside a call is progress narration; the live line in the UI uses it first
             val narration = text.takeIf { !calls.isEmpty && it.isNotEmpty() }
             _state.value = TaskState.Running(step, note, tool, progress = progress.state(step), reason = reason, narration = narration,
                 preview = text.takeIf { streamReplies && calls.isEmpty && it.isNotEmpty() })
-            // 带调用的回复等执行完再记:要看端口是否报告了密码框
+            // A reply carrying calls is recorded after execution: whether the entry point reports a password field needs to be known
             fun recordReply(argsJson: String?) = emit(RunEvent.ModelReply(
                 now(), step, RunEvent.clip(Redactor.text(text)), tool, argsJson,
                 reply.usage?.inputTokens, reply.usage?.outputTokens, reply.usage?.cachedInputTokens, latencyMs,
@@ -597,7 +605,7 @@ class AgentLoop(
             }
         }
 
-        /** 不带调用的回复:进度说明、最终回答,和交出去之前的各道核对。 */
+        /** A reply without calls: progress narration, the final answer, and the checks before it is handed over. */
         private suspend fun handleAnswer(
             step: Int,
             calls: ReplyCalls,
@@ -613,9 +621,9 @@ class AgentLoop(
             }
             track.after(null, ok = false, guard = false, changed = null, recovery = false, app = null)
             recordReply(null)
-            // 模型给出最终回答时,先收下在途的用户插话,再决定是否交出回答。
+            // When the model gives the final answer, take in any in-flight user steer first, then decide whether to hand the answer over.
             if (keepFinished(history, inbox)) return null
-            // 空回复、被输出上限截断的半截话不是回答:提醒一次,再这样就结束
+            // An empty reply, or a half-sentence truncated by the output limit, is not an answer: remind once, and end if it happens again
             if (text.isEmpty() || stopReason == StopReason.MaxTokens) {
                 val n = TurnPolicy.afterEmpty(emptyNudged, truncated = text.isNotEmpty()) ?: return StopRules.noAnswer()
                 emptyNudged = true
@@ -623,8 +631,8 @@ class AgentLoop(
                 return null
             }
             emptyNudged = false
-            // 工具调用原样漏成了文字(服务端没解析成调用):不是回答。退回一次,经工具接口重新调用;
-            // 紧接着又漏就结束,不把原样的标记交给用户
+            // The tool call leaked as plain text verbatim (the server did not parse it as a call): not an answer. Send it back once so it is called again through the tool interface;
+            // if it leaks again right after, end, and do not hand the raw markers to the user
             val leaked = LeakedToolCall.find(text, allToolNames)
             if (leaked != null) {
                 if (leakNudged) return StopRules.toolCallAsText()
@@ -633,7 +641,7 @@ class AgentLoop(
                 TurnPolicy.leakedToolCall(leaked).let { history += ctx.notice(it.source, it.text) }
                 return null
             }
-            // 用户刚同意或回答了什么、之后却什么也没做:先提醒一次照做或说明为什么不做;之后照常核对
+            // The user just approved something or answered something, and then nothing was done: remind once to do it or to explain why not; afterwards verify as usual
             val owed = owedFollowUp(answered).takeIf { !followUpNudged }
             if (owed != null) {
                 followUpNudged = true
@@ -651,7 +659,7 @@ class AgentLoop(
                 history += ctx.notice("operation_result", "The result of the last action has not been read yet. Look at the current screen first to confirm the actual state, then answer; if it cannot be read, say so plainly.")
                 return null
             }
-            // 回答的正文不是用户最近那句的语言:退回一次整段改写;改写后还不对照样交出
+            // The body of the answer is not in the language of the user's latest sentence: send it back once for a full rewrite; if it is still wrong after the rewrite, hand it over anyway
             if (!languageNudged) {
                 val mismatch = ReplyLanguage.mismatch(latestWords, text)
                 if (mismatch != null) {
@@ -660,17 +668,17 @@ class AgentLoop(
                     return null
                 }
             }
-            // 不带调用的回复就是最终回答；产品路径只整理来源。
+            // A reply without calls is the final answer; the product path only assembles sources.
             val result = conclude(task, text, step, currentFacts, history)
             if (result != null) {
-                // 交出之前还有插话(核对、整理来源时到的):不收尾,带着它接着做;没有就关上收件箱,之后的话才是下一件事
+                // Another steer arrived before handover (during verification or source assembly): do not finish, carry on with it; if there is none, close the inbox so that later messages become the next task
                 if (inbox?.closeUnlessSteered() == false) { keepFinished(history, inbox); return null }
                 return result
             }
             return null
         }
 
-        /** 带调用的回复:批量步、确认关卡、单步执行和执行后的收尾判断。 */
+        /** A reply carrying calls: batch steps, confirmation gates, single-step execution and the wrap-up decision after execution. */
         private suspend fun handleTool(
             step: Int,
             calls: ReplyCalls,
@@ -684,7 +692,7 @@ class AgentLoop(
             progressOnlyTurns = 0
             acted = true
             if (firstToolStep == null) firstToolStep = step
-            // 回答之后又做了别的:那个回答算有了下文
+            // Something else was done after the answer: that answer now counts as followed up on
             answered = null
 
             if (stages != null && tools.verb(first.name) !in setOf(Verb.AskUser, Verb.RequestConfirmation, Verb.HandToUser)) {
@@ -693,7 +701,7 @@ class AgentLoop(
             trace?.toolStarted(step, first.name, first.id, now())
             val args = parseArgs(first.argsJson)
 
-            // 用户刚同意的那一步要单独做:批里的步不带同意,混进去会被关卡拦下,同意也可能被别的步用掉或作废
+            // The step the user just approved must be done on its own: steps in a batch carry no consent, so mixing it in would be stopped by the gate, and the consent could also be consumed or invalidated by other steps
             if (((flags.batchSteps && first.name == DO_STEPS_TOOL) || tools.composite(first.name)) && confirmations?.hasGrant == true) {
                 val content = buildJsonObject {
                     put("ok", false); put("error", "approved_step_first"); put("message", APPROVED_STEP_FIRST); put("recoverable", true)
@@ -708,7 +716,7 @@ class AgentLoop(
                 val end = batch(first, calls, history, offer.current, guards, executor, track, eachLoop, step, note, first.name, reason, narration, recordReply = recordReply,
                     app = { place = it }, steerWaiting = { inbox?.hasSteers() == true },
                     noteVerdicts = { s, sub, v ->
-                        // 和单步一样计卡住提醒与同一段字的重复输入
+                        // Counts toward stuck reminders and repeated input of the same text just like a single step
                         val typed = StuckAdvice.typedText(tools.verb(s.tool), parseArgs(s.argsJson), sub?.content)
                         stuckAdvice(v, typed)
                     })
@@ -727,15 +735,15 @@ class AgentLoop(
                 override suspend fun resolve(exec: ToolExecution): ToolExecution? {
                     var e = exec
                     (e.outcome as? Outcome.Confirm)?.let { e = user.confirm(it, step, running) }
-                    // 要等用户的(追问、接管):等之前先记下这次回复,等待中取消任务,运行记录里也留得住
+                    // Waits for the user (follow-up, takeover): record this reply before waiting, so that a task cancelled while waiting still leaves it in the run record
                     waitsForUser = e.outcome is Outcome.Input || e.outcome is Outcome.Takeover
                     if (waitsForUser) recordReply(Redactor.args(tools.verb(first.name), first.argsJson, secretField = true))
-                    // 追问的回答(或超时)就是这次调用的工具结果,调用与结果配对
+                    // The follow-up answer (or its timeout) is this call's tool result, keeping call and result paired
                     (e.outcome as? Outcome.Input)?.let { o ->
                         e = user.input(o, running)
                         if (e.content["ok"] == JsonPrimitive(true)) answered = o.prompt
                     }
-                    // 等到交回,交回的结局就是这次调用的工具结果;取消任务就此结束
+                    // Wait for the hand-back; the hand-back's outcome is this call's tool result, and cancelling the task ends things here
                     (e.outcome as? Outcome.Takeover)?.let { e = user.takeover(it, running) ?: return null }
                     return e
                 }
@@ -750,7 +758,7 @@ class AgentLoop(
                         (advice?.let { mapOf("advice" to JsonPrimitive(it)) } ?: emptyMap()))
                     val isError = (e.content["ok"] as? JsonPrimitive)?.booleanOrNull == false
                     history += calls.results(Part.ToolResult(first.id, ScreenElementTable.text(content, flags.tablesAtBirth && !isError), isError, e.observations.map { it.tag }))
-                    // 只有端口明确说「不是密码框」才记原文
+                    // Record the original text only when the entry point explicitly says "not a password field"
                     val secret = (e.content["secret"] as? JsonPrimitive)?.booleanOrNull != false
                     if (!waitsForUser) recordReply(Redactor.args(tools.verb(first.name), first.argsJson, secret))
                     return Presented(e, content)
@@ -761,7 +769,7 @@ class AgentLoop(
                     recordReply(Redactor.args(tools.verb(first.name), first.argsJson, secretField = true))
                 }
 
-                // 不在屏上、要问的一步(会改动东西的 root 命令):用和付款同一张确认卡片当场问,申报就是这一步本身
+                // A step that is off-screen and needs asking (a root command that changes things): ask on the spot with the same confirmation card as payments, and the declaration is this step itself
                 override suspend fun approve(request: ConfirmationRequest): ToolExecution =
                     user.confirm(Outcome.Confirm(request, request.app), step, running)
             })
@@ -772,14 +780,14 @@ class AgentLoop(
                         recordReply(Redactor.args(tools.verb(first.name), first.argsJson, secretField = true))
                         return StopRules.guard(it)
                     }
-                    // 应用权限拒绝已经由执行入口作为工具结果交给模型:不结束任务,让模型换路线或向用户说明
+                    // App permission denial has already been given to the model as a tool result by the execution entry point: do not end the task, let the model try another route or explain to the user
                     if (AppAccessDenied.isAppAccessCode(action.code) || action.code == com.wangzan101.mika.core.run.ManualControl.CHANGED) {
                         track.after(tools.verb(first.name), ok = false, guard = false, changed = null, recovery = false, app = null)
                         return null
                     }
-                    // 模型单步只会被守卫叫停、被确认关卡拦下或因作用在 Claire 自己身上不做;别的拒绝说明执行入口和这里对不上
+                    // A model's single step can only be stopped by a guard, blocked by the confirmation gate, or not done because it acts on Claire itself; any other refusal means the execution entry point and this code disagree
                     check(action.hit != null || action.code == Refusals.OWN_APP) { "unexpected refusal ${action.code} for ${first.name}" }
-                    // 被确认关卡拦下:不计入失败熔断,交给模型走确认流程
+                    // Blocked by the confirmation gate: not counted toward the failure circuit breaker, handed to the model to go through the confirmation flow
                     track.after(tools.verb(first.name), ok = false, guard = action.before.isNotEmpty(), changed = null, recovery = false, app = null)
                     return null
                 }
@@ -808,7 +816,7 @@ class AgentLoop(
             val stopNow = guards.stop ?: executor.offScreenStop
             val end = StopRules.afterAction(exec.outcome, stopNow)
             if (end != null) {
-                // 模型自己说做不成(end_not_done)时用户刚补了话:不收尾,带着这句话接着做;守卫叫停照样结束
+                // The model itself said it could not do it (end_not_done) and the user has just added something: do not finish, carry on with that message; a guard stop still ends the task
                 if (stopNow == null && exec.outcome is Outcome.Failure && inbox?.closeUnlessSteered() == false) {
                     appendSteers(history, inbox)
                     return null
@@ -817,13 +825,13 @@ class AgentLoop(
             }
 
             if (exec.images.isNotEmpty()) {
-                // 读到的图片文件不是屏幕画面,不带 screenshotId
+                // The image files that were read are not screen images, so no screenshotId is attached
                 history += Message(Role.User, listOf(Part.Text(NoticePolicy.imageNote(verb, offScreen))) +
                     exec.images.mapIndexed { i, img -> tools.modelImage(img, if (offScreen) null else exec.imageIds.getOrNull(i)) }, Author.Mika)
             }
             for (lookup in NoticePolicy.knowledgeAfter(verb, exec.place, !isError)) when (lookup) {
                 is KnowledgeLookup.App -> injectKnowledge(history, knowledge?.byPackage(lookup.pkg), lookup.pkg)
-                // 同一份知识不会重复注入
+                // The same piece of knowledge is never injected twice
                 is KnowledgeLookup.Site -> if (visitedSites.add(lookup.host)) injectKnowledge(history, knowledge?.byDomain(lookup.host), null)
             }
             if (progress.plan.complete) return finalTurn(task, history, offer.current, step + 1, labels, place, recorder, facts(), inbox, progress, Closeout.Completed)
@@ -835,22 +843,22 @@ class AgentLoop(
     companion object {
         const val STEER_MARKER = "<user_interjection>"
         const val DEFAULT_MAX_STEPS = 60
-        /** 正常任务没有固定步数截止；显式步数预算只用于评测和指定上限的子任务。 */
+        /** A normal task has no fixed step cutoff; an explicit step budget is used only for evaluations and subtasks with a specified limit. */
         const val UNLIMITED_STEPS = Int.MAX_VALUE
-        /** 核查期间界面上这一步的说明。 */
+        /** The description of this step shown in the UI while verification is in progress. */
         const val VERIFYING_NOTE = "正在核实结果"
         val APPROVED_STEP_FIRST: String get() = Feedback["approved_step_first"]
-        /** 回答里退回一次后仍没对上的几处,结局说明里这样开头(界面另按 [TaskState.Succeeded.unconfirmed] 逐条标出)。 */
+        /** The places that still did not match after the answer was sent back once; the outcome description starts this way (the UI marks them individually via [TaskState.Succeeded.unconfirmed]). */
         const val UNCONFIRMED_NOTE = "未确认:"
-        /** hand_to_user 交给用户付款时的原因;付款是不可逆的事,回答要另请核查。 */
+        /** The reason when hand_to_user hands payment to the user; payment is irreversible, so the answer must ask for a separate verification. */
         internal const val PAYMENT = "payment"
-        /** 逐条干活重复提醒的来源标签。 */
+        /** The source label of the repeated item-by-item work reminder. */
         internal const val EACH_LOOP_SOURCE = "each loop"
         const val DEFAULT_INPUT_TIMEOUT_MS = 15 * 60_000L
-        /** 交回接管后工具结果里的提醒(界面测试按它认)。 */
+        /** The note in the tool result after handing back for takeover (UI tests recognise it by this). */
         val HANDBACK_NOTE: String get() = UserExchange.HANDBACK_NOTE
 
-        /** 用户点了「我自己做完了」。 */
+        /** The user clicked "I'll do it myself". */
         val USER_FINISHED_NOTE: String get() = Feedback["user_finished_note"]
     }
 
@@ -864,14 +872,14 @@ class AgentLoop(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            // 记录失败不影响任务
+            // A failed record does not affect the task
         }
     }
 
     internal fun emit(e: RunEvent) = record { sink.event(e) }
 
     internal fun ended(end: TaskState?): RunEvent.TaskEnded = when (end) {
-        // 核对过却没能核实(含标成未确认的):记成 unverified,和评测、对话记录同一个说法
+        // Verified but not confirmable (including those marked unconfirmed): recorded as unverified, the same wording as evaluations and the conversation record
         is TaskState.Succeeded -> RunEvent.TaskEnded(now(), if (end.doubtful) "unverified" else "succeeded", Redactor.text(end.answer))
         is TaskState.Failed -> RunEvent.TaskEnded(now(), "failed", Redactor.text(end.reason), end.kind.name.lowercase())
         TaskState.Cancelled -> RunEvent.TaskEnded(now(), "cancelled", "已取消")
@@ -884,5 +892,5 @@ class AgentLoop(
     }
 }
 
-/** 用户点名走网页的说法(评测强制网页渠道时也加在目标前)。 */
+/** How the user says to use the web (also prepended to the goal when an evaluation forces the web channel). */
 private const val WEB_CHANNEL_PREFIX = "用网页"

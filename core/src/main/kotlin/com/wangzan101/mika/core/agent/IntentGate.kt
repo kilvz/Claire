@@ -13,7 +13,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 只在准备调用本轮第一个工具时，独立判断用户是在讨论，还是要读取或操作。 */
+/** Judges independently, only when about to call the first tool of the round, whether the user is discussing or wants to read or act. */
 internal class IntentGate(
     private val judge: ChatModel,
     private val fallback: ChatModel? = null,

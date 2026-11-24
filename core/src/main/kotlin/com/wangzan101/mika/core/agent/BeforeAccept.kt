@@ -1,8 +1,10 @@
 package com.wangzan101.mika.core.agent
 
 /**
- * 一段不带调用的回复被当作最终回答收下之前的那一刻(接缝):外部在这里还能插一句,例如任务进行中用户又发来的话。
- * [Accept] 照常收下(再去核对);[Continue] 不收,把 [note] 作为一条提醒交给模型,任务接着做。
+ * The moment (seam) just before a reply with no tool calls is accepted as the final answer: external code can still
+ * add a note here, for example a message the user sent while the task was in progress.
+ * [Accept] accepts it as usual (and then reviews it); [Continue] does not accept it, hands [note] to the model as a
+ * reminder, and the task carries on.
  */
 sealed interface BeforeAccept {
     data object Accept : BeforeAccept

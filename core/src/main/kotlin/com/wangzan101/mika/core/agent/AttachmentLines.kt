@@ -1,17 +1,21 @@
 package com.wangzan101.mika.core.agent
 
 /**
- * 用户的话里带的附件怎么写:消息末尾每个附件一行「附件:/workspace/inbox/<名字>(<大小>)」,这几行原样存进对话、交给任务。
- * 对话页据此把附件画成照片格子和文件卡片(app 的 AttachmentMessage);语言提示、回答的语言检查和记忆、技能的引文都不算这几行(见 [UserWords])。
- * 旧对话里的消息也是这个写法。
+ * How attachments carried in the user's words are written: one line per attachment at the end of the message
+ * "Attachment: /workspace/inbox/<name> (<size>)". These lines are stored verbatim in the conversation and handed to
+ * the task.
+ * The conversation page uses them to render attachments as photo tiles and file cards (the app's
+ * AttachmentMessage); language hints, the answer language check and memory, and skill quotations do not count these
+ * lines (see [UserWords]).
+ * Messages in old conversations are written the same way.
  */
 object AttachmentLines {
     private const val PREFIX = "附件:"
 
-    /** 名字里可以有括号(「报表 (1).csv」):大小只认最后那对括号里的「数字 + B/KB/MB」;路径在沙箱的 /workspace 下。 */
+    /** Names may contain parentheses ("report (1).csv"): only the last pair of parentheses is taken as the size, and only its "number + B/KB/MB"; the path is under /workspace in the sandbox. */
     private val LINE = Regex("^附件:(/workspace/.+)\\((\\d+(?:\\.\\d+)? (?:B|KB|MB))\\)$")
 
-    /** 拆开的一句话:[files] 是每个附件的路径和写在消息里的大小(「2 KB」),按出现先后;[words] 是附件行以外的话(去掉首尾空白)。 */
+    /** A split message: [files] is the path and the size written in the message ("2 KB") for each attachment, in order of appearance; [words] is the text other than attachment lines (trimmed). */
     data class Parsed(val files: List<Pair<String, String>>, val words: String)
 
     fun sizeLabel(bytes: Long): String = when {
@@ -25,7 +29,7 @@ object AttachmentLines {
 
     fun line(path: String, size: String): String = "$PREFIX$path($size)"
 
-    /** 话在前,每个附件一行在后;话为空时只有附件行。 */
+    /** The words come first, one line per attachment after; when the words are empty only the attachment lines remain. */
     fun compose(text: String, files: List<Pair<String, String>>): String =
         (listOf(text).filter { it.isNotEmpty() } + files.map { (p, s) -> line(p, s) }).joinToString("\n")
 
@@ -40,6 +44,6 @@ object AttachmentLines {
         return Parsed(files, rest.joinToString("\n").trim())
     }
 
-    /** 去掉附件行后的话;没有附件行的原样返回。 */
+    /** The words with attachment lines removed; returned as-is when there are no attachment lines. */
     fun words(text: String): String = parse(text).let { if (it.files.isEmpty()) text else it.words }
 }

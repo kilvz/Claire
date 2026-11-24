@@ -26,9 +26,9 @@ import com.wangzan101.mika.core.agent.AgentLoop.LoopHistory
 import com.wangzan101.mika.core.agent.AgentLoop.LoopOpening
 import com.wangzan101.mika.core.agent.AgentLoop.Companion.STEER_MARKER
 
-// Agent 循环:开场与历史准备、知识注入、运行状态与插话拼接
+// Agent loop: opening and history preparation, knowledge injection, runtime state and steer assembly
 internal suspend fun AgentLoop.prepareOpening(raw: String, rawPrior: List<Turn>): LoopOpening {
-    // 用户发来的屏幕:这一句给全(那句话、截图、详情),之前几轮里的收成一行;下面都用换好的这句
+    // The screen the user sent: given in full for this sentence (the words, screenshots, details), condensed into one line for earlier turns; everything below uses this rewritten sentence
     val shots = UserScreenTurns(userScreens, zone, tools.seesImages, canAskVision = !tools.seesImages && tools.vision != null && tools.definitions().any { it.name == VIEW_USER_SCREEN },
         image = { tools.modelImage(it, null) }, seen = tools::noteUserScreen).also { screens = it }
     user.answerText = shots::asText
@@ -37,24 +37,24 @@ internal suspend fun AgentLoop.prepareOpening(raw: String, rawPrior: List<Turn>)
     taskText = task
     latestWords = ownWords(raw, opening)
     val priorTurns = shots.collapse(rawPrior)
-    // 通知提醒那一轮没有用户的话,不算进「之前几轮用户说的话」
+    // The notification-reminder turn has no user words, so it does not count as "what the user said in earlier turns"
     earlierGoals = priorTurns.filterNot(NoticeTurn::isNotice).map { it.userText }
     val context = Conversation.context(priorTurns)
-    // 仅「上一轮用户明确确认 + 再上一轮助手建议/提问」可供 memory_save 跨轮引用;更早轮次与助手原文不收。
+    // Only "the user's explicit confirmation in the previous turn + the assistant's suggestion/question in the turn before that" may be referenced across turns by memory_save; earlier turns and the assistant's original text are not included.
     val confirmation = rawPrior.lastOrNull()
     val proposal = rawPrior.dropLast(1).lastOrNull()
-    // 对话里有通知提醒(第三方文字)时不开这个例外:提醒那一轮就是以问句收尾的,用户回一句「好的」不能成为引用通知内容的依据。
-    // 看的是存着的全部轮次:提醒隔了几轮之后,助手的回答里照样可能转述着通知。
-    // 这次任务带着「从通知里得来的」那一段时也不开:上一轮的建议可能就是照着那一段说的,用户回一句「好的」
-    // 不能让里面的事变成「用户说的」记忆。用户明说的(本轮原话里有的)照常能记。
+    // Do not open this exception when the conversation contains notification reminders (third-party text): a reminder turn itself ends with a question, and the user replying "ok" cannot be grounds for quoting notification content.
+    // All stored turns are considered: even several turns after a reminder, the assistant's answer may still be relaying the notification.
+    // Nor when this task carries an "obtained from notifications" block: the previous turn's suggestion may have been based on that block, so the user replying "ok"
+    // must not turn what is in it into a memory of "what the user said". What the user states explicitly (present in this turn's own words) can still be remembered.
     if (confirmation != null && proposal != null && !NoticeTurn.tainted(rawPrior) && observed == null) {
         utterances?.addPreviousConfirmation(UserWords.said(confirmation.userText, tools), proposal.outcome, proposal.status)
     }
     utterances?.add(UserWords.said(opening?.words ?: raw, tools))
-    // 记忆块:对话上文之后、任务原文之前;用到的条目由代码记下
+    // Memory block: after the conversation context and before the task text; the entries used are recorded by code
     usedMemory = emptyList()
-    // 上次没读出记忆文件(密钥库一时不可用)就再读一次;还读不出就这次不带记忆
-    // 产品路径用 Auto:记忆总量装得下就全量注入(不漏检索),装不下才退回检索
+    // If the memory file could not be read last time (the keystore was temporarily unavailable), read it again; if it still cannot be read, this run goes without memory
+    // The product path uses Auto: if the total amount of memory fits, inject all of it (so retrieval misses nothing); only fall back to retrieval when it does not fit
     val block = memory?.takeIf { it.reloadIfNeeded() }?.let {
         MemoryContext.build(it.items.value, task, priorTurns.lastOrNull()?.userText, tools.legacy::rewrite,
             mode = MemoryContext.Mode.Auto)
@@ -75,7 +75,7 @@ internal suspend fun AgentLoop.prepareHistory(opening: LoopOpening): LoopHistory
     val index = if (skills != null && recommendSkills) GuideRecommender.index(skills, opening.task) else null
     val start = ctx.start(
         opening.task, priorTurns = opening.context?.let { (it.parts.single() as Part.Text).text }?.let { prior ->
-            // 之前几轮读到的东西查得到时说一句(只在有记过运行的轮次、提供了 history_read 时)
+            // Say a word when what earlier turns read can be looked up (only for turns that have a recorded run, and when history_read is provided)
             if (tools.definitions().any { it.name == HISTORY_READ }) Feedback.format("history_hint", "turns" to prior) else prior
         },
         memory = listOfNotNull(ProfileContext.render(profileSnapshot), opening.memoryMessage).takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
@@ -86,22 +86,22 @@ internal suspend fun AgentLoop.prepareHistory(opening: LoopOpening): LoopHistory
         taskImages = opening.screen?.images.orEmpty(), screens = opening.screen?.details.orEmpty(),
     )
     val history = start.messages.toMutableList()
-    // 带了「从通知里得来的」那一段:记一笔(只记长度)。给了就算,不看最后放没放得下
+    // Carries the "obtained from notifications" block: record it (length only). It counts as given regardless of whether it ended up fitting
     observed?.let { emit(RunEvent.State(now(), ObservedContext.RUN_STATE, it.length.toString())) }
     start.knowledge.filter { it.trial }.forEach { emit(RunEvent.State(now(), "knowledge_trial_used", it.name)) }
-    // 链接只在 open_link 可用时给,且只放行真的给了模型的那几份
+    // Links are given only when open_link is available, and only the ones actually handed to the model are allowed
     if (flags.deepLinks) start.knowledge.forEach { if (it.links.isNotEmpty()) tools.allowLinks(it.links) }
     return LoopHistory(history, labels)
 }
 
-/** 前台 App/站点的参考资料补进历史(确定性,不靠关键词猜);技能开局已全部列出,这里不再补。有屏图的 App 再随 APP.md 接一段页面结构。 */
+/** Add the reference material for the foreground app/site to the history (deterministically, without guessing from keywords); skills are all listed at the opening, so nothing is added here. For apps with screen maps, a section of the page structure is appended along with APP.md. */
 internal suspend fun AgentLoop.injectKnowledge(history: MutableList<Message>, e: KnowledgeEntry?, pkg: String?) {
     ctx.knowledge(e, toolsNote(tools.scriptsOffered()), flags.deepLinks)?.let { m ->
         if (flags.deepLinks && e!!.links.isNotEmpty()) tools.allowLinks(e.links)
         history += m
         if (e?.trial == true) emit(RunEvent.State(now(), "knowledge_trial_used", e.name))
     }
-    // 屏图只试一次:去重在前,没接线、试过或没图都不再读屏读盘
+    // The screen map is attempted only once: deduplication comes first, so if it is not wired up, already tried, or there is no map, neither the screen nor the disk is read again
     if (pkg == null || screenMaps == null || !ctx.firstScreenMapAttempt(pkg)) return
     val graph = screenMaps.load(pkg)
     if (graph == null || graph.nodes.isEmpty()) return
@@ -112,9 +112,11 @@ internal suspend fun AgentLoop.injectKnowledge(history: MutableList<Message>, e:
 }
 
 /**
- * 这一步的运行时状态接在本步最后一条消息的末尾(还没发过的那条),和这一步一起被裁剪、折叠;
- * 发过的消息一概不改,请求前缀逐步只增不变。最后一条是助手消息时(不会发生在正常流程里)单独追加一条。
- * 网页上的版本从浏览器当前标签实际用的版本读。
+ * This step's runtime state is appended to the end of the last message of this step (the one not yet sent), and is
+ * pruned and folded together with this step; messages already sent are never modified, so the request prefix only
+ * grows monotonically. If the last message is an assistant message (which does not happen in the normal flow), a
+ * separate one is appended.
+ * The web version is read from the version actually used by the browser's current tab.
  */
 internal suspend fun AgentLoop.appendRuntimeState(history: MutableList<Message>, place: Place?, labels: Map<String, String>, step: Int, pending: String?) {
     val mode = if (place?.kind == PlaceKind.Site) tools.placeMode() else null
@@ -126,9 +128,12 @@ internal suspend fun AgentLoop.appendRuntimeState(history: MutableList<Message>,
 }
 
 /**
- * 用户这句话里他这次打的字:屏幕的说明、浏览器页的页面说明、引的那一段和附件行先后去掉(见 [UserWords.typed];几样都带着时都去掉),
- * 都没有时是原话;只发了屏幕、只引了一段、只选了字、只带了附件时为空。
- * 给模型的那句带着固定的英文说明、插话标记,后面还可能接着运行时状态,不能拿来判断用户用的语言。
+ * The characters the user typed in this sentence: the screen block, the browser page block, the quoted passage and
+ * the attachment lines are all removed in order (see [UserWords.typed]; when several are present all are removed), and
+ * when none is present it is the original text; it is empty when only a screen, only a quoted passage, only selected
+ * text, or only attachments were sent.
+ * The sentence given to the model carries fixed English blocks and the steer marker, and may be followed by runtime
+ * state, so it cannot be used to judge which language the user is using.
  */
 internal fun AgentLoop.ownWords(raw: String, shown: UserScreenTurns.Rendered?): String = UserWords.typed(shown?.words ?: raw, tools)
 
@@ -139,8 +144,10 @@ internal suspend fun AgentLoop.channelLine(matched: List<KnowledgeEntry>): Strin
 }
 
 /**
- * 插话是独立的真实用户行;只在两步之间追加,绝不改写已经发给模型的消息。
- * 插话带着用户此刻的屏幕时和开局原话一样换好:那句话连同截图,后面跟着屏幕的详情。
+ * A steer is an independent real user line; it is only appended between two steps and never rewrites messages already
+ * sent to the model.
+ * When a steer carries the user's current screen, it is rewritten just like the opening text: the words together with
+ * screenshots, followed by the screen details.
  */
 internal suspend fun AgentLoop.appendSteers(history: MutableList<Message>, inbox: RunInbox?): Boolean =
     appendSteers(history, inbox?.takeSteers().orEmpty())

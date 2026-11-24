@@ -5,35 +5,40 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * Q1+Q2 原型：`do_each` 循环里「定位条目 + 找下一个、跳过已做」的稳定键，与「滚动找更多」。
+ * Q1+Q2 prototype: the stable key for "locate an item + find the next one, skip those already done" in the `do_each`
+ * loop, plus "scroll to find more".
  *
- * 结论（Q1 已验证、Q2 继续）：
- * - `ref` 每次读屏重排，不能跨快照认「同一条」；
- * - `resourceId` 在真实 a11y 树里存在，但列表条目同构（同一 widget 类型、resourceId 一模一样），不能区分第 1 条和第 2 条；
- * - 跨快照、跨滚动稳定的身份是 `contentKey = role|name`（内容）；
- * - 同名条目靠 `ordinal`（本快照里同名出现的序号）在**同一屏内**区分，但 ordinal 是位置依赖的，滚动后失效，不能跨屏用。
+ * Conclusions (Q1 verified, Q2 continued):
+ * - `ref` is reassigned on every screen read, so "the same item" cannot be recognised across snapshots;
+ * - `resourceId` exists in real a11y trees, but list items are isomorphic (same widget type, identical resourceId), so
+ *   it cannot tell item 1 from item 2;
+ * - the identity that is stable across snapshots and scrolls is `contentKey = role|name` (the content);
+ * - items with the same name are distinguished by `ordinal` (the occurrence index of that name within this snapshot)
+ *   within **a single screen**, but ordinal depends on position, becomes invalid after scrolling, and cannot be used
+ *   across screens.
  *
- * 这是未接线的原型，只为验证稳定键与滚动方案；`do_each` 正式实现时再收口。
+ * This is an unwired prototype, only for validating the stable key and the scrolling approach; it will be finalized
+ * when `do_each` is formally implemented.
  */
 internal class EachCursor {
 
-    /** 一条匹配到的条目：模型可见的元素 + 定位信息。 */
+    /** A matched item: the element visible to the model + locating information. */
     data class Item(
-        val contentKey: String, // role|name —— 跨快照、跨滚动稳定的身份
-        val ordinal: Int,       // 本快照里同名条目的序号(0,1,…)，只在本快照内区分同名，不跨屏用
+        val contentKey: String, // role|name -- identity stable across snapshots and scrolls
+        val ordinal: Int,       // index of items with the same name in this snapshot (0,1,…); distinguishes same-name items within this snapshot only, not used across screens
         val role: String,
         val name: String,
-        val ref: String,        // 本轮点按用的 ref(可点祖先的 actionRef,没有才用自身 ref;本次快照内有效)
+        val ref: String,        // ref used for tapping this round (the clickable ancestor's actionRef if present, otherwise its own ref; valid within this snapshot)
     )
 
-    /** 按 pattern（role? / text?）匹配 [elements]，给每条算出 contentKey 与 ordinal。 */
+    /** Match [elements] against the pattern (role? / text?), computing contentKey and ordinal for each. */
     fun match(elements: List<JsonObject>, role: String?, text: String?): List<Item> {
         val count = mutableMapOf<String, Int>()
         val out = mutableListOf<Item>()
         for (e in elements) {
             val r = (e["role"] as? JsonPrimitive)?.contentOrNull ?: ""
             val n = (e["name"] as? JsonPrimitive)?.contentOrNull ?: ""
-            // 点按要落在可点祖先上:find 的结果里 actionRef 是可点祖先、ref 是命中节点自身。
+            // The tap must land on a clickable ancestor: in find results actionRef is the clickable ancestor and ref is the matched node itself.
             val ref = (e["actionRef"] as? JsonPrimitive)?.contentOrNull
                 ?: (e["ref"] as? JsonPrimitive)?.contentOrNull ?: ""
             val roleOk = role == null || r == role
@@ -49,9 +54,10 @@ internal class EachCursor {
 }
 
 /**
- * Q2 原型：滚动游标——跨多次读屏、多次滚动，把每条 contentKey 唯一地做一遍，滚到底就停。
+ * Q2 prototype: a scrolling cursor — across multiple screen reads and multiple scrolls, do each contentKey exactly
+ * once, and stop when the bottom is reached.
  *
- * 用法（调用方驱动滚动，游标只做决定）：
+ * Usage (the caller drives scrolling; the cursor only makes decisions):
  * ```
  * var justScrolled = false
  * while (true) {
@@ -64,17 +70,19 @@ internal class EachCursor {
  * }
  * ```
  *
- * 停止条件：刚滚过一次、且这次读屏没出现任何新 contentKey（到底了）。
- * 已知边界：同名条目（contentKey 相同）会收敛成「做一次」——元素本身信息不足以跨滚动区分两条同名条目，
- * 根治靠更细的 item 匹配（让 contentKey 唯一），不是靠键。
+ * Stop condition: it has just scrolled once, and this screen read produced no new contentKey at all (the bottom is
+ * reached).
+ * Known limitation: items with the same name (identical contentKey) converge to "done once" — the element itself does
+ * not carry enough information to distinguish two same-name items across scrolls; the real fix is finer item matching
+ * (making contentKey unique), not the key.
  */
 internal class ScrollCursor(
     private val role: String?,
     private val text: String?,
 ) {
     private val each = EachCursor()
-    val seen = mutableSetOf<String>()   // 见过的 contentKey（跨滚动）
-    val done = mutableSetOf<String>()   // 已处理的 contentKey
+    val seen = mutableSetOf<String>()   // contentKeys seen (across scrolls)
+    val done = mutableSetOf<String>()   // contentKeys already handled
 
     sealed class Step {
         data class DoNext(val item: EachCursor.Item) : Step()
@@ -82,7 +90,7 @@ internal class ScrollCursor(
         object End : Step()
     }
 
-    /** 给定当前屏读到的 [elements] 与是否刚滚过 [justScrolled]，返回下一步。 */
+    /** Given the [elements] read from the current screen and whether it just scrolled [justScrolled], returns the next step. */
     fun advance(elements: List<JsonObject>, justScrolled: Boolean): Step {
         val items = each.match(elements, role, text)
         val newContent = items.filter { it.contentKey !in seen }.map { it.contentKey }
@@ -92,7 +100,7 @@ internal class ScrollCursor(
         return if (justScrolled && newContent.isEmpty()) Step.End else Step.Scroll
     }
 
-    /** 处理完 [item] 后标记其 contentKey 为已做。 */
+    /** Mark the contentKey of [item] as done after it has been handled. */
     fun finish(item: EachCursor.Item) {
         done += item.contentKey
     }

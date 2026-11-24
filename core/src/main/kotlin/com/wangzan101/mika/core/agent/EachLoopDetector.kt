@@ -3,8 +3,10 @@ package com.wangzan101.mika.core.agent
 import com.wangzan101.mika.core.tool.Verb
 
 /**
- * 逐条干活的识别:最近动词序列里「开详情→动作→返回」的 motif 完整重复 [REPEATS] 次时提醒一次 do_each。
- * 只看形状不看内容;失败、非屏动词都打断;模型自己用了 do_each 就解除武装。纯状态机,每任务一个实例。
+ * Detection of item-by-item work: when the motif "open details → action → back" in the recent verb sequence repeats
+ * completely [REPEATS] times, remind once to use do_each.
+ * Only the shape is looked at, not the content; failures and non-screen verbs break the sequence; once the model
+ * uses do_each itself the detector is disarmed. A pure state machine, one instance per task.
  */
 internal class EachLoopDetector {
     private val seq = ArrayDeque<Verb>()
@@ -13,7 +15,7 @@ internal class EachLoopDetector {
 
     fun reset() = seq.clear()
 
-    /** 喂一轮的动词([ok] 为这轮成功);该提醒返回 true(每任务最多一次)。 */
+    /** Feed the verbs of one round ([ok] is whether that round succeeded); returns true when it should remind (at most once per task). */
     fun feed(verb: Verb?, ok: Boolean): Boolean {
         if (verb == Verb.DoEach) disarmed = true
         if (verb == null || !ok || verb !in COUNTED) { reset(); return false }
@@ -25,7 +27,7 @@ internal class EachLoopDetector {
         return true
     }
 
-    /** 最近 [REPEATS]×l 个动词呈 l 周期,motif 恰含一个 Back 且至少一个 Tap(开详情→动作→返回的签名)。 */
+    /** The most recent [REPEATS]×l verbs have period l, and the motif contains exactly one Back and at least one Tap (the signature of open details → action → back). */
     private fun repeating(): Boolean {
         for (l in 2..MAX_MOTIF) {
             if (seq.size < REPEATS * l) continue

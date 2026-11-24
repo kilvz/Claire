@@ -1,21 +1,27 @@
 package com.wangzan101.mika.core.agent
 
 /**
- * 用户在 Claire 的浏览器里、对着正看的那一页问 Claire 时,这句话怎么写:最前面一段说明是哪一页(固定的英文,模型一看就懂;
- * 对话页、卡片认这一段),空一行后是用户这次说的话(原样)。例如
+ * How the sentence is written when the user asks Claire in Claire's browser about the page they are currently
+ * viewing: first a block explaining which page it is (fixed English, which the model understands at once; the
+ * conversation page and cards recognise this block), then a blank line, then what the user said this time (as-is).
+ * For example
  * ```
  * [Web page I'm viewing in Claire's browser. It is attached to this task as your current web tab.]
- * Title: 降噪耳机 - 搜索结果
- * URL: https://shop.example.com/s?k=降噪耳机
+ * Title: Noise-cancelling headphones - search results
+ * URL: https://shop.example.com/s?k=noise-cancelling+headphones
  * Selected text:
- * | 入耳式降噪耳机 B2 Pro
+ * | In-ear noise-cancelling headphones B2 Pro
  * [End of page]
  *
- * 这页里 700 以内的挑一个
+ * Pick one under 700 from this page
  * ```
- * 这句话原样存进对话、交给任务,模型看到的就是这样;从浏览器页开始的任务带它,插话里带着新选中的字时也带。
- * 语言提示、回答的语言检查和记忆引文只认说明后面用户打的字([words])。
- * 选中的字每行以「| 」开头,和说明的其余几行分得开;页面标题、选中的字都会截短。
+ * This sentence is stored verbatim in the conversation and handed to the task, so this is exactly what the model
+ * sees; a task started from a browser page carries it, and a steer also carries it when it brings newly selected
+ * text.
+ * Language hints, the answer language check and memory quotations only count the characters the user typed after the
+ * block ([words]).
+ * Each line of selected text starts with "| ", which keeps it apart from the other lines of the block; both the page
+ * title and the selected text are truncated.
  */
 object AttachedPage {
     const val HEADER = "[Web page I'm viewing in Claire's browser. It is attached to this task as your current web tab.]"
@@ -25,22 +31,22 @@ object AttachedPage {
     private const val SELECTED = "Selected text:"
     private const val SELECTED_LINE = "| "
 
-    /** 页面标题最多这么多字。 */
+    /** The page title is at most this many characters. */
     const val MAX_TITLE = 200
 
-    /** 选中的字最多交给模型这么多字,多的截掉、末尾加「…」。 */
+    /** The selected text is handed to the model up to this many characters; anything beyond is cut off and "…" is appended. */
     const val MAX_SELECTION = 2000
 
-    /** 网址最多这么长(极长的跟踪参数不全带)。 */
+    /** The URL is at most this long (an extremely long tracking parameter is not carried in full). */
     const val MAX_URL = 1000
 
-    /** 正看的那一页:[selection] 是用户选中的字,没选为 null。 */
+    /** The page being viewed: [selection] is the text the user selected, null when nothing is selected. */
     data class Page(val url: String, val title: String, val selection: String? = null)
 
-    /** 拆开的一句话:[page] 是那一页(没带为 null),[words] 是用户这次说的话(没带时是原话)。 */
+    /** A split sentence: [page] is that page (null when not carried), [words] is what the user said this time (the original text when not carried). */
     data class Parsed(val page: Page?, val words: String)
 
-    /** 说明在前,话在后;话为空时只有说明。 */
+    /** The block comes first and the words after; when the words are empty only the block remains. */
     fun compose(page: Page, words: String): String {
         val lines = mutableListOf(HEADER)
         oneLine(page.title).take(MAX_TITLE).takeIf(String::isNotEmpty)?.let { lines += TITLE + it }
@@ -76,13 +82,13 @@ object AttachedPage {
         return Parsed(Page(url.trim(), title.trim(), selection), lines.drop(end + 1).joinToString("\n").trim())
     }
 
-    /** 去掉页面说明后的话;没带的原样返回。 */
+    /** The words with the page block removed; returned as-is when not carried. */
     fun words(text: String): String = parse(text).words
 
-    /** 这句话带着页面说明。 */
+    /** This sentence carries the page block. */
     fun has(text: String): Boolean = text.lineSequence().firstOrNull()?.trim() == HEADER
 
-    /** 选中的字:去掉首尾空白,每行去掉行尾空白,超过 [MAX_SELECTION] 截断加「…」;空的为 null。说明的结束行不会出现在里面。 */
+    /** The selected text: trimmed at both ends, trailing whitespace removed from each line, truncated with "…" appended if longer than [MAX_SELECTION]; null when empty. The block's end line never appears inside it. */
     fun clip(selection: String?): String? {
         val t = selection?.lines()?.joinToString("\n") { it.trimEnd() }?.trim()?.takeIf(String::isNotEmpty) ?: return null
         val cut = if (t.length <= MAX_SELECTION) t else t.take(MAX_SELECTION).trimEnd() + "…"

@@ -32,12 +32,12 @@ import kotlinx.serialization.json.put
 
 const val DO_STEPS_TOOL = "do_steps"
 private const val MIN_STEPS = 1
-/** 只限制单次调用的资源消耗,不把连续操作的合理长度写成任务规则。 */
+/** Only limits the resource consumption of a single call; it does not turn the reasonable length of consecutive operations into a task rule. */
 private const val MAX_STEPS = 20
 private const val EXPECT_MAX = 200
-/** 第二步起,判定和执行前等界面稳定的上限(与动作自带屏幕相同)。 */
+/** From the second step on, the upper bound for waiting for the interface to settle before judging and executing (same as the screen an action carries). */
 private const val SETTLE_MS = 1500L
-/** 一步的等待条件(都可不给);expect 是旧写法,意思从「做完看一眼」变成「等到出现」。 */
+/** Wait conditions for one step (all optional); expect is the old form, its meaning changed from "take a look when done" to "wait until it appears". */
 private const val EXPECT = "expect"
 private const val EXPECT_GONE = "expect_gone"
 private const val EXPECT_APP = "expect_app"
@@ -45,46 +45,50 @@ private const val WAIT_STABLE = "wait_stable"
 private const val TIMEOUT_S = "timeout_s"
 private val STEP_FIELDS = setOf("tool", "args", EXPECT, EXPECT_GONE, EXPECT_APP, WAIT_STABLE, TIMEOUT_S)
 
-/** 应用访问被挡:批里要停下,并把执行入口的说明原样带给模型。 */
+/** App access is blocked: the batch must stop, and the explanation from the execution entry point is passed to the model as-is. */
 private fun appAccessDenied(code: String) = com.wangzan101.mika.core.device.access.AppAccessDenied.isAppAccessCode(code)
 
-/** 一批里的一步;[until] 是做完之后、接着做之前要等到的样子,没给为 null。 */
+/** One step in a batch; [until] is the state to wait for after it is done and before continuing, null when not given. */
 data class BatchStep(val tool: String, val argsJson: String, val until: Until? = null)
 
 /**
- * 一次执行多个连续动作,逐步核对,出意外就停。每一步(第二步起先等界面稳定)经 [ActionExecutor] 执行,
- * 和单步同一套顺序;批里不使用、也不假设任何同意,不可逆的一步命中就停在它之前,不执行。
- * 核对不通过:工具失败、被切到别的 App、输入回读不一致。一步带了等待条件([Until])时做完先等它成立
- * ([ToolDispatcher.waitUntil]:读屏比字面,不问模型),到时限、看出弹框或换了 App 就停;等了多久写进这一步的结果。
- * 每一步对守卫和运行记录都是一个动作(运行记录里 source = "batch")。
+ * Run several consecutive actions at once, checking each one step by step, and stop on anything unexpected. Each step
+ * (from the second one on, after first waiting for the interface to settle) runs through [ActionExecutor], with the
+ * same sequence as a single step; the batch uses and assumes no consent at all, so an irreversible step stops the batch
+ * before it, without being executed.
+ * A check fails when: the tool fails, focus switched to another app, or the typed input reads back inconsistently. When
+ * a step carries a wait condition ([Until]), after it is done the batch first waits for that to hold
+ * ([ToolDispatcher.waitUntil]: screen reads compared literally, no model asked); it stops when the deadline passes, a
+ * dialog is detected, or the app changed; how long it waited is written into that step's result.
+ * For guards and the run record, each step is one action (source = "batch" in the run record).
  */
 class BatchRunner(
     private val tools: ToolDispatcher,
     private val guards: OperationGuards,
     private val executor: ActionExecutor,
-    /** 每个子步的守卫结论(执行前、执行后各一次)交回循环,计入卡住提醒与重复输入;返回要附给模型的建议。 */
+    /** The guard verdicts for each sub-step (once before and once after execution) are handed back to the loop, counting toward stuck reminders and repeated input; returns the advice to attach for the model. */
     private val noteVerdicts: (step: BatchStep, exec: ToolExecution?, verdicts: List<GuardVerdict>) -> String? = { _, _, _ -> null },
-    /** 用户此刻有没有新插话在等(只看内存里的收件箱);有就在两个子步之间停下,交给循环去送。 */
+    /** Whether a new steer from the user is waiting right now (only looks at the in-memory inbox); if so, stop between two sub-steps and let the loop deliver it. */
     private val steerWaiting: () -> Boolean = { false },
 ) {
     private class Stop(
         val index: Int, val reason: String, val entry: JsonObject, val executed: Boolean, val extra: JsonObject = JsonObject(emptyMap()),
-        /** 停下之后没做的那些子步也各给一条结果(新插话时),子步和结果一一对上。 */
+        /** The sub-steps not done after the stop also get a result each (when a new steer arrives), so sub-steps and results match one-to-one. */
         val rest: List<JsonElement> = emptyList(),
     )
 
-    /** 所有子步里出现过的守卫结论;循环据此判断这一步有没有守卫提醒。 */
+    /** All guard verdicts seen across the sub-steps; the loop uses them to decide whether this step had a guard warning. */
     val verdicts = mutableListOf<GuardVerdict>()
     private var advice: String? = null
 
-    /** 各步按条件等界面花的时间之和;运行记录把它算作等待,不算操作。 */
+    /** The total time the steps spent waiting for the interface per their conditions; the run record counts it as waiting, not as operations. */
     var waitedMs = 0L
         private set
 
     suspend fun run(steps: List<BatchStep>, callId: String, step: Int = 0): ToolExecution {
         val entries = mutableListOf<JsonElement>()
         var last: ToolExecution? = null
-        // 各子步读到的观察(已记进账本);整批的结果带着它们,裁剪时按它们的形态缩短
+        // The observations read by each sub-step (already recorded in the ledger); the batch result carries them so that trimming can shorten by their form
         val seen = mutableListOf<Observation>()
         var stop: Stop? = null
         fun skipFrom(i: Int): Stop {
@@ -96,7 +100,7 @@ class BatchRunner(
                 stop = skipFrom(i)
                 break
             }
-            // 上一步的界面还在变时判定会读到过渡画面,expect 也会误判
+            // When the previous step's interface is still changing, the check reads a transitional frame and expect also misjudges
             if (i > 0) tools.settle(SETTLE_MS)
             val out = executor.run(Part.ToolCall("$callId.${i + 1}", s.tool, s.argsJson), Origin.Batch(step))
             val before = out.before
@@ -110,7 +114,7 @@ class BatchRunner(
                 is ActionOutcome.Ran -> out.exec
                 is ActionOutcome.Refused -> {
                     val hit = out.hit
-                    // 应用权限拒绝:把执行入口给的下一步说明一起交给模型,别让它只看到错误码
+                    // App permission denied: hand the next-step explanation from the execution entry point to the model as well, so it does not only see the error code
                     val message = (out.content["message"] as? JsonPrimitive)?.contentOrNull?.takeIf { appAccessDenied(out.code) }
                     stop = if (hit == null) notRun(out.code, message = message)
                     else notRun(out.code, buildJsonObject { put("action", hit.action.name); put("matched", hit.matched) }, message)
@@ -118,14 +122,14 @@ class BatchRunner(
                 }
                 is ActionOutcome.Cancelled -> { stop = notRun("cancelled"); break }
             }
-            // 这一步之前的停留、间隔或这次等待被用户插话截断:这一步什么也没做,和后面的一起跳过,交给循环去送那句话
+            // The pause, interval or this wait before the step was cut short by a user steer: this step did nothing, so it is skipped along with the rest, and the loop goes to deliver that message
             if (exec.content["error"] == JsonPrimitive(NEW_MESSAGE)) {
                 waitedMs += exec.waitMs
                 stop = skipFrom(i)
                 break
             }
             seen += exec.observations
-            // 子步里为节奏补的停留同样算这一批的等待
+            // Settle pauses added for pacing inside a sub-step also count as waiting for this batch
             waitedMs += exec.waitMs
             val afterVerdicts = out.after
             note(s, exec, afterVerdicts)
@@ -138,16 +142,16 @@ class BatchRunner(
                 failed -> (c["error"] as? JsonPrimitive)?.contentOrNull ?: "failed"
                 c["verification"] == JsonPrimitive("mismatch") -> "action_not_applied"
                 c["app_switched"] != null -> "app_switched"
-                // 开到了用户的主屏上(挪回来了也是换了地方):后面的步骤是按原来那一屏排的
+                // Opened onto the user's home screen (even if moved back, the location changed): the following steps were planned for that other screen
                 c["opened"] != null -> "opened_elsewhere"
-                // 网站、App 说到上限了:后面的步骤不再做
+                // The website or app reports it has reached its limit: do the following steps no more
                 c["limitReached"] != null -> "limit_reached"
                 else -> null
             }
             val review = i < steps.lastIndex && screen != null &&
                 (screen["imageReason"] != null || screen["protected"] == JsonPrimitive(true) ||
                     screen["captureError"] != null || screen["readable"] == JsonPrimitive(false) || screen["note"] != null)
-            // 动作自带的屏幕可能还是加载中的样子:等到要出现的字出现了,就不必再看图
+            // The screen an action carries may still show a loading state: once the text to appear has appeared, there is no need to look at the image
             val until = s.until?.takeIf { hard == null && (!review || it.appears != null) }
             val waited = until?.let { tools.waitUntil(it, executor.recorder::now, steerWaiting) }
             waited?.let { waitedMs += it.waitedMs }
@@ -177,7 +181,7 @@ class BatchRunner(
                 if (all.isNotEmpty()) put("guard", JsonArray(all.map { it.toJson() }))
             }
             if (reason != null) { stop = Stop(i, reason, JsonObject(e + ("executed" to JsonPrimitive(true))), executed = true); break }
-            // 等的时候用户插了话:后面的子步在下一轮开头照常跳过;这已是最后一步时就停在它这里
+            // The user steered while waiting: the following sub-steps are skipped as usual at the start of the next round; if this is already the last step, stop here
             if (waited?.stopped == UntilOutcome.NEW_MESSAGE && i == steps.lastIndex) {
                 stop = Stop(i, NEW_MESSAGE, JsonObject(e + ("executed" to JsonPrimitive(true))), executed = true); break
             }
@@ -223,7 +227,7 @@ class BatchRunner(
                     put("reason", stop.reason)
                     val n = "Step ${stop.index + 1} of ${steps.size}"
                     if (appAccessDenied(stop.reason)) {
-                        // 权限拒绝不是普通的操作失败:不要建议「换个批继续」,把下一步该怎么做说清楚
+                        // A permission denial is not an ordinary operation failure: do not suggest "continue with another batch", but state clearly what to do next
                         val detail = (stop.entry["message"] as? JsonPrimitive)?.contentOrNull
                             ?: "Step ${stop.index + 1} of ${steps.size} was not run (${stop.reason})."
                         put("message", "$detail The remaining steps in this batch were not run.")
@@ -240,8 +244,8 @@ class BatchRunner(
             screen?.let { put("screen", it) }
             if (stop != null) put("recoverable", true)
         }
-        // 子步的画面已经逐个存过
-        // 最后一个子步发给模型的画面(能看图的主模型才有)留给循环,接在整批结果后面
+        // The sub-step screens have already been saved one by one
+        // The screen of the last sub-step to send to the model (only for main models that can see images) is left to the loop, to be appended after the whole batch result
         return ToolExecution(content, changed = last?.changed, frame = if (!executor.recorder.savesScreens) last?.frame ?: last?.image else null,
             screenElements = last?.screenElements, images = last?.images.orEmpty(), imageIds = last?.imageIds.orEmpty(), place = last?.place,
             observations = seen)
@@ -255,13 +259,13 @@ class BatchRunner(
     private fun entry(tool: String, b: JsonObjectBuilder.() -> Unit) = buildJsonObject { put("tool", tool); b() }
 
     companion object {
-        /** 子步因用户新插话没做时的停止原因。 */
+        /** The stop reason when a sub-step was not done because the user sent a new steer. */
         const val NEW_MESSAGE = SKIPPED_FOR_NEW_MESSAGE
 
         /**
-         * 校验 do_steps 的参数;[available] 是此刻提供给模型的工具名,[batchable] 是能放进一批的工具(按工具声明,
-         * 只有屏幕动作和等待;观察、追问、接管、确认都不行)。
-         * 返回步骤,或点名第几步的错误说明。
+         * Validate the arguments of do_steps; [available] is the tool names currently offered to the model, [batchable] the tools that can go into a batch (per the tool declarations,
+         * only screen actions and waiting; observing, asking, taking over and confirming are all excluded).
+         * Returns the steps, or an error description naming which step is at fault.
          */
         fun parse(argsJson: String, available: Set<String>, batchable: List<String>): Pair<List<BatchStep>?, String?> {
             val o = try { Json.parseToJsonElement(argsJson.ifBlank { "{}" }) as? JsonObject } catch (e: SerializationException) { null }
@@ -311,7 +315,7 @@ class BatchRunner(
             return out to null
         }
 
-        /** 等待条件按模型的写法交回(没等到时附在那一步的结果里)。 */
+        /** Wait conditions are handed back in the model's own wording (attached to that step's result when the wait was not met). */
         private fun untilFields(u: Until): JsonObject = buildJsonObject {
             u.appears?.let { put(EXPECT, it) }
             u.gone?.let { put(EXPECT_GONE, it) }
@@ -321,8 +325,8 @@ class BatchRunner(
         }
 
         /**
-         * 一批里的步骤作用在两块以上的屏上时给模型的说明([surfaceOf] 是工具作用的屏,不动屏的等待为 null);
-         * 都在同一块屏上为 null。
+         * The explanation given to the model when the steps in a batch act on more than one screen ([surfaceOf] is the screen a tool acts on, null for waits that do not touch the screen);
+         * null when they are all on the same screen.
          */
         fun mixedSurface(steps: List<BatchStep>, surfaceOf: (String) -> String?): String? {
             val surfaces = steps.mapNotNull { surfaceOf(it.tool) }.distinct()
@@ -330,7 +334,7 @@ class BatchRunner(
             return Feedback.format("batch.mixed_surface", "surfaces" to surfaces.joinToString(", "))
         }
 
-        /** 运行记录用:批里输入的文字一律打码(端口还没说是不是密码框)。 */
+        /** For the run record: text typed inside the batch is always masked (the entry point has not said whether it is a password field). */
         fun redactArgs(argsJson: String): String {
             val o = try { Json.parseToJsonElement(argsJson) as? JsonObject } catch (e: SerializationException) { null } ?: return Redactor.text(argsJson)
             val steps = o["steps"] as? JsonArray ?: return Redactor.text(argsJson)
@@ -342,7 +346,7 @@ class BatchRunner(
             return Redactor.text(JsonObject(o + ("steps" to masked)).toString())
         }
 
-        /** do_steps 的定义;[batchable] 是能放进一批的工具名。 */
+        /** The definition of do_steps; [batchable] is the tool names that can go into a batch. */
         fun spec(batchable: List<String>) = ToolSpec(
             DO_STEPS_TOOL,
             Prompts.tool("do_steps"),
@@ -387,6 +391,6 @@ class BatchRunner(
     }
 }
 
-/** 结果里 effect 的种类;动作没报效果为 null。 */
-/** 动作报回的实际效果的种类(能力写在结果的 effect 里);没报为 null。 */
+/** The kind of the effect in the result; null when the action reported no effect. */
+/** The kind of the actual effect the action reported back (the capability is written in the result's effect); null when not reported. */
 private fun effectKind(c: JsonObject): String? = ((c["effect"] as? JsonObject)?.get("kind") as? JsonPrimitive)?.contentOrNull

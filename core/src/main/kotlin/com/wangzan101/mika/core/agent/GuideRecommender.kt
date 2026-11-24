@@ -17,16 +17,18 @@ internal const val KNOWLEDGE_INDEX_HEADER = "App and website knowledge you can r
 private const val RECOMMEND_COUNT = 3
 
 /**
- * 任务开始时的索引(开局上下文里写一次,中途不改):
- * App/站点知识按任务文字检索,沿用原来的取法(与技能一起取前 3 条,只留知识);
- * 技能不挑,全部列出——内置在前、个人技能在后,各按名字排,每份一行(id、显示名、描述),
- * 用不用、用哪份由模型按描述判断,要用时自己用 skill_read 读全文。
+ * The index at task start (written once into the opening context, not changed mid-task):
+ * app/site knowledge is retrieved by the task text, using the previous approach (take the top 3 together with skills,
+ * then keep only knowledge);
+ * skills are not filtered — all are listed: built-in first, personal skills after, each sorted by name, one line per
+ * entry (id, display name, description). The model decides from the descriptions whether and which to use, and reads
+ * the full text with skill_read when it wants to use one.
  */
 internal object GuideRecommender {
     fun id(info: GuideInfo) = "${info.kind}:${info.name}"
     fun line(info: GuideInfo) = "- ${id(info)}(${info.display}):${info.description}"
 
-    /** 知识与技能各列在自己的标题下;两样都没有为 null。个人技能只有在用和试用的(见 [GuideCatalog.items])。 */
+    /** Knowledge and skills are each listed under their own header; null when there is neither. Personal skills only include those in use and on trial (see [GuideCatalog.items]). */
     fun index(catalog: GuideCatalog, task: String): String? {
         val knowledge = catalog.find(task, limit = RECOMMEND_COUNT, minScore = RECOMMEND_MIN_SCORE).filter { it.kind in KNOWLEDGE_KINDS }
         val skills = catalog.items.filter { it.kind in SKILL_KINDS }.sortedWith(compareBy({ it.kind != KnowledgeIndex.SKILL }, { it.name }))
@@ -35,7 +37,7 @@ internal object GuideRecommender {
             ?.joinToString("\n") { (header, items) -> header + "\n" + items.joinToString("\n", transform = ::line) }
     }
 
-    /** skill_read 成功读了个人技能时给出技能名。 */
+    /** Returns the skill name when skill_read successfully read a personal skill. */
     fun viewedPersonal(verb: Verb?, content: JsonObject): String? {
         if (verb != Verb.SkillRead || content["ok"] != JsonPrimitive(true)) return null
         if ((content["kind"] as? JsonPrimitive)?.contentOrNull != PERSONAL_KIND) return null
