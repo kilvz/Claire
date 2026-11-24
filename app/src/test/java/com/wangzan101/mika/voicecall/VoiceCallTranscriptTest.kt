@@ -189,7 +189,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `each round is written once done, without waiting for hangup; hangup only fills in the last round`() = runTest {
+    fun `each round is written once done, without waiting for hangup, and hangup only fills in the last round`() = runTest {
         val appended = mutableListOf<String>()
         val transcript = VoiceCallTranscript(
             conversationId = { "conv-9" },
@@ -224,7 +224,7 @@ class VoiceCallTranscriptTest {
     }
 
     @Test
-    fun `connecting records an unfinished call; hangup fills in the end, reason, and whether anyone spoke`() = runTest {
+    fun `connecting records an unfinished call, and hangup fills in the end, reason, and whether anyone spoke`() = runTest {
         val recorded = mutableListOf<ConversationCall>()
         var now = 5_000L
         val transcript = VoiceCallTranscript(
