@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 建虚拟屏的标志:有可信屏权限时和原来完全一样;没有时(有的系统里 shell 没有 ADD_TRUSTED_DISPLAY)
- * 只去掉依赖它的那几项,其余照旧。只有 SecurityException 才值得退回。
+ * Flags for creating the virtual display: with the trusted-display permission they are exactly as before; without it (on some systems the shell lacks ADD_TRUSTED_DISPLAY)
+ * only the entries that depend on it are dropped and the rest stay as before. Only SecurityException is worth retrying without trust.
  */
 class DisplayFlagsTest {
     // DisplayManager.VIRTUAL_DISPLAY_FLAG_*
@@ -35,11 +35,11 @@ class DisplayFlagsTest {
     @Test fun untrustedFlagsOnAndroid14DropOnlyTheTrustedOnes() {
         val flags = ShellService.displayFlags(sdk = 34, trusted = false)
         assertEquals(base or touchFeedbackDisabled, flags)
-        // 不能带上的几项
+        // The entries that must not be carried
         for (bit in listOf(trusted, ownDisplayGroup, alwaysUnlocked, ownFocus, stealTopFocusDisabled)) {
             assertEquals("flag $bit must be dropped", 0, flags and bit)
         }
-        // 不依赖可信屏的照旧留下
+        // The ones not depending on the trusted display stay as before
         for (bit in listOf(public, ownContentOnly, supportsTouch, rotatesWithContent, destroyContentOnRemoval, touchFeedbackDisabled)) {
             assertEquals("flag $bit must stay", bit, flags and bit)
         }

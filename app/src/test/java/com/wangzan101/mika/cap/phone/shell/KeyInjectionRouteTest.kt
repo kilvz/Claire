@@ -5,10 +5,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 按键注入的路由：解析到虚拟屏顶部任务的 uid 时走定向注入(直接投给那个窗口，不受全局输入焦点影响，
- * 否则返回键会被投到主屏焦点、虚拟屏上的 App 收不到)；解析不到时退回非定向注入。
+ * Routing of key injection: when the uid of the virtual display's top task resolves, use targeted injection (dispatched straight to that window, unaffected by the global input focus,
+ * otherwise the back key would go to the main display's focus and the app on the virtual display would never receive it); when it does not resolve, fall back to untargeted injection.
  *
- * 修的是「back 在虚拟屏上不生效」：injectKey 之前从不解析目标 uid，一直走非定向注入。
+ * What this fixes is "back does not work on the virtual display": injectKey never resolved a target uid and always used untargeted injection.
  */
 class KeyInjectionRouteTest {
     @Test fun resolvesUidOnAndroid13Plus() {

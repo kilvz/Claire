@@ -11,12 +11,12 @@ class AttachmentsNamingTest {
         assertEquals("etcpasswd", Attachments.safeName("../etc/passwd"))
         assertEquals("ab.txt", Attachments.safeName("a\\b.txt"))
         assertEquals("ab.txt", Attachments.safeName("a\u0000\u0007\nb.txt"))
-        // 改写方向与零宽字符:显示的名字和实际的会对不上
+        // Bidi overrides and zero-width characters: the displayed name would not match the actual one
         assertEquals("invoicefdp.exe", Attachments.safeName("invoice‮fdp.exe"))
         assertEquals("ab", Attachments.safeName("a​ b"))
         assertEquals("attachment", Attachments.safeName("/../\u0001"))
         assertEquals("hidden", Attachments.safeName(".hidden"))
-        // 最多 120 字,且 UTF-8 不超过 240 字节(给系统加序号留余地),扩展名保留
+        // At most 120 characters and no more than 240 UTF-8 bytes (leaving room for the system's numbering), with the extension preserved
         val long = Attachments.safeName("长".repeat(300) + ".txt")
         assertTrue(long.toByteArray().size <= 240)
         assertTrue(long.endsWith(".txt"))
@@ -37,10 +37,10 @@ class AttachmentsNamingTest {
         q.reserve(10); q.reserve(20)
         val third = runCatching { q.reserve(1) }.exceptionOrNull() as com.wangzan101.mika.core.workspace.SandboxError
         assertEquals("share_limit", third.code)
-        // 失败的导出不占额度
+        // A failed export does not consume quota
         q.release(20)
         q.reserve(60)
-        // 按实际复制的字节结算:比预留的少,省下的还能用
+        // Settle against the bytes actually copied: fewer than reserved, so the remainder is still usable
         q.settle(60, 10)
         val bytes = ShareQuota(maxBytes = 100)
         bytes.reserve(90); bytes.settle(90, 50)

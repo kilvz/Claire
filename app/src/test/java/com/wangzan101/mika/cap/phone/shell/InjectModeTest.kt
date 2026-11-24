@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 注入方式:按键等系统定下投给谁,没投出去就报失败(调用方才会退回);触摸照旧不等。
- * 一对按下/抬起:按下没成才退回,按下成了只补抬起。
+ * Injection mode: keys wait for the system to settle who receives them and report failure when they were not dispatched (only then does the caller fall back); touches keep waiting for nothing, as before.
+ * A down/up pair: fall back only when the down was not delivered; when the down succeeded, only the up is retried.
  */
 class InjectModeTest {
     // InputManager.INJECT_INPUT_EVENT_MODE_*

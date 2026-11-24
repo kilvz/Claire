@@ -17,7 +17,7 @@ class ShareIntentTest {
     @Test fun severalShareScreensOnlyLimitThePackage() {
         val args = ShareIntent.amArgs(7, "com.example.chat", text, null)
         assertEquals(listOf("-p", "com.example.chat"), args.takeLast(2))
-        // 文字原样作一个参数,不经 shell 拆开
+        // The text goes through verbatim as a single argument, not split by a shell
         assertEquals(text, args[args.indexOf("android.intent.extra.TEXT") + 1])
     }
 }

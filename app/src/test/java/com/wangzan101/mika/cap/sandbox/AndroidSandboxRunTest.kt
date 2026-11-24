@@ -29,12 +29,12 @@ class AndroidSandboxRunTest {
         }
     }
 
-    /** 技能目录还没同步也先建好再绑:源目录缺了 PRoot 会往命令输出里写警告。 */
+    /** Create the skills directory before binding even when it is not synced yet: with a missing source directory PRoot writes warnings into the command output. */
     @Test fun bindSourcesExistBeforeLaunch() = runBlocking {
         val dirs = SandboxDirs(File(tmp, "s3/files/sandbox"), File(tmp, "s3/cache"), File(tmp, "s3/lib"), JVM_GATE, SandboxTree())
         val sb = AndroidSandbox(dirs, { SandboxStatus.Ready(false) }, { emptyList() })
         assertFalse(dirs.skills.exists())
-        runCatching { sb.run("c1", listOf("true"), null, 1_000) {} } // JVM 上没有启动器,启动本身会失败
+        runCatching { sb.run("c1", listOf("true"), null, 1_000) {} } // no launcher on the JVM, so the launch itself fails
         assertTrue(dirs.skills.isDirectory)
         assertTrue(dirs.workspace(WorkspaceKey.Conversation("c1")).isDirectory)
         assertTrue(dirs.tmp.isDirectory)
@@ -47,12 +47,12 @@ class AndroidSandboxRunTest {
         client.writeText("old bridge")
         val sb = AndroidSandbox(dirs, { SandboxStatus.Ready(false) }, { emptyList() },
             clientScript = { "new bridge".toByteArray() })
-        runCatching { sb.run("c1", listOf("true"), null, 1_000) {} } // JVM 上不启动 PRoot
+        runCatching { sb.run("c1", listOf("true"), null, 1_000) {} } // PRoot is not started on the JVM
         assertEquals("new bridge", client.readText())
         assertTrue(client.canExecute())
     }
 
-    /** 工具调用时运行环境还没好:开始准备并等它;准备完成就就绪,超时返回当时的状态,不支持不等。 */
+    /** The runtime is not ready when a tool call arrives: start preparing and wait for it; it is Ready once preparation finishes, a timeout returns the status at that moment, and states that are not supported do not wait. */
     @Test fun awaitReadyStartsPreparationAndWaits() = runBlocking {
         var status: SandboxStatus = SandboxStatus.NotInstalled
         var starts = 0
@@ -64,7 +64,7 @@ class AndroidSandboxRunTest {
         assertEquals(SandboxStatus.Ready(false), sb.awaitReady(5_000))
         assertEquals(1, starts)
         assertEquals(SandboxStatus.Ready(false), sb.awaitReady(5_000))
-        assertEquals(1, starts) // 已就绪不再准备
+        assertEquals(1, starts) // already ready, so no further preparation
 
         status = SandboxStatus.Installing(10, "解包")
         val slow = AndroidSandbox(dirs, { status }, { emptyList() }, startPreparing = { kotlinx.coroutines.GlobalScope.launch { kotlinx.coroutines.delay(60_000) } })
@@ -78,7 +78,7 @@ class AndroidSandboxRunTest {
 
     @Test fun preparerNeedsWork() {
         assertTrue(RuntimePreparer.needsWork(SandboxStatus.NotInstalled, null, "v2", skipBroken = false))
-        assertTrue(RuntimePreparer.needsWork(SandboxStatus.Ready(false), "v1", "v2", skipBroken = false)) // Claire 升级了
+        assertTrue(RuntimePreparer.needsWork(SandboxStatus.Ready(false), "v1", "v2", skipBroken = false)) // Claire was upgraded
         assertFalse(RuntimePreparer.needsWork(SandboxStatus.Ready(true), "v2", "v2", skipBroken = false))
         assertTrue(RuntimePreparer.needsWork(SandboxStatus.Broken("x"), "v2", "v2", skipBroken = false))
         assertFalse(RuntimePreparer.needsWork(SandboxStatus.Broken("x"), "v2", "v2", skipBroken = true))
@@ -97,13 +97,13 @@ class AndroidSandboxRunTest {
         val calls = mutableListOf<Pair<String, String>>()
         var fail: Exception? = null
         val sb = AndroidSandbox(dirs, { SandboxStatus.Ready(false) }, { emptyList() }, exporter = { g, n ->
-            // 交给导出的是过了关口的句柄:内容从它读
+            // The exporter is handed the handle that passed the gate: content is read from it
             calls += String(g.read(0, 100)) to n; fail?.let { throw it }; com.wangzan101.mika.chat.SharedFile(n, g.size, "Download/Claire/$n", "content://x")
         })
         val f = sb.hostPath("c1", "out/a.txt", forWrite = true)!!.apply { parentFile?.mkdirs(); writeText("a") }
         assertEquals("Download/Claire/a.txt", sb.share(f, "a.txt"))
         assertEquals("a" to "a.txt", calls.single())
-        // 工作区里的硬链接(可能链着 Claire 的私有文件)不导出
+        // Hard links inside the workspace (possibly linked to Claire's private files) are not exported
         val private = File(tmp, "s2/private.db").apply { writeText("secret") }
         val linked = File(f.parentFile, "linked.db")
         Files.createLink(linked.toPath(), private.toPath())
@@ -117,7 +117,7 @@ class AndroidSandboxRunTest {
         assertEquals("share_unavailable", runCatching { none.share(f, "a.txt") }.exceptionOrNull().let { (it as SandboxError).code })
     }
 
-    // 网页上传与沙箱同一套路径规则:只认本对话工作区里的普通文件
+    // Web uploads follow the same path rules as the sandbox: only regular files inside this conversation's workspace are accepted
     @Test fun uploadCheckUsesWorkspaceRules() {
         val ok = sb.hostPath("c1", "in/a.pdf", forWrite = true)!!.apply { parentFile?.mkdirs(); writeText("a") }
         assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.Ok, sb.uploadCheck("c1", "/workspace/in/a.pdf"))
@@ -125,8 +125,8 @@ class AndroidSandboxRunTest {
         assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.NotFound, sb.uploadCheck("c1", "/workspace/in"))
         assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.Outside, sb.uploadCheck("c1", "/opt/mika/skills/skills/x/SKILL.md"))
         assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.Outside, sb.uploadCheck("c1", "/workspace/../etc/passwd"))
-        assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.NotFound, sb.uploadCheck("c2", "/workspace/in/a.pdf")) // 别的对话看不到
-        // 指向工作区外的链接不跟过去
+        assertEquals(com.wangzan101.mika.core.workspace.WorkspacePathCheck.NotFound, sb.uploadCheck("c2", "/workspace/in/a.pdf")) // invisible to other conversations
+        // Links pointing outside the workspace are not followed
         val outside = File(tmp, "secret.txt").apply { writeText("s") }
         Files.createSymbolicLink(File(ok.parentFile, "link.txt").toPath(), outside.toPath())
         assertTrue(sb.uploadCheck("c1", "/workspace/in/link.txt") != com.wangzan101.mika.core.workspace.WorkspacePathCheck.Ok)

@@ -9,7 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-/** 静音记录:解析、恢复规则(没设置过写 allow)、落文件、启动恢复只动记录里的包。 */
+/** Mute ledger: parsing, restore rules (write allow when never set), persistence to a file, and a startup restore that only touches recorded packages. */
 class AudioMuteLedgerTest {
     @get:Rule val tmp = TemporaryFolder()
 
@@ -22,7 +22,7 @@ class AudioMuteLedgerTest {
         assertEquals("ignore", AudioMuteLedger.parseSetMode("PLAY_AUDIO: ignore; time=+2s"))
         assertEquals("deny", AudioMuteLedger.parseSetMode("PLAY_AUDIO: deny"))
         assertEquals("default", AudioMuteLedger.parseSetMode("PLAY_AUDIO: default"))
-        // getAudioMode 对外:没设置过和明确 default 都是 "default"
+        // getAudioMode as seen outside: never set and an explicit default both read as "default"
         assertEquals("default", ShellService.parsePlayAudioMode("No operations."))
         assertEquals("ignore", ShellService.parsePlayAudioMode("PLAY_AUDIO: ignore"))
     }
@@ -48,7 +48,7 @@ class AudioMuteLedgerTest {
         val a = AudioMuteLedger(file())
         a.put("a.app", "default")
         a.put("b.app", "deny")
-        val b = AudioMuteLedger(file()) // 进程被杀后重新启动
+        val b = AudioMuteLedger(file()) // restarted after the process was killed
         assertEquals(listOf("a.app", "b.app"), b.packages())
         assertEquals("deny", b["b.app"])
         b.remove("a.app")
@@ -64,7 +64,7 @@ class AudioMuteLedgerTest {
         val all = ledger.restoreAll { pkg, mode -> written += pkg to mode; pkg != "c.app" }
         assertFalse(all)
         assertEquals(listOf("a.app" to "allow", "b.app" to "deny", "c.app" to "allow"), written)
-        // 失败的留着,下次启动再试;成功的已删
+        // Failures are kept and retried on the next start; successes are already removed
         assertEquals(listOf("c.app"), AudioMuteLedger(file()).packages())
         assertTrue(AudioMuteLedger(file()).restoreAll { _, _ -> true })
         assertFalse(file().exists())

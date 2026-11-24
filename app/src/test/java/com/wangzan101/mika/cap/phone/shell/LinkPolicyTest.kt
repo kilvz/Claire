@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 外壳侧再查一次链接:和 :core 分发器同一组用例,绕过分发器直接调 startView 的也拦得住。 */
+/** The shell side re-checks links: the same set of cases as the :core dispatcher, and it also catches those that bypass the dispatcher and call startView directly. */
 class LinkPolicyTest {
     private val invalid = ShellService.START_INVALID_LINK
 
@@ -47,7 +47,7 @@ class LinkPolicyTest {
         val main = setOf("com.a", "com.b")
         assertEquals(true, ShellLinks.inUse(listOf("com.c", "com.b"), main))
         assertEquals(false, ShellLinks.inUse(listOf("com.c"), main))
-        // 解析不出包名时看不清,按在用处理
+        // Cannot tell when no package name resolves: treat as in use
         assertEquals(true, ShellLinks.inUse(emptyList(), main))
     }
 }

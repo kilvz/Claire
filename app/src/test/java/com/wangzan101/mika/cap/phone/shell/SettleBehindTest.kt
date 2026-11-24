@@ -19,14 +19,14 @@ class SettleBehindTest {
     }
 
     @Test fun visibleDuringTheTransitionWaitsInsteadOfFailing() {
-        // 第一次看到就再排一次
+        // Seen for the first time: reorder once more
         assertEquals(Plan.Wait(setOf(1), emptySet()), SettleBehind.plan(setOf(1, 2), listOf(front(1), behind(2)), 0, null))
-        // 刚排过:只等,不连着排
+        // Just reordered: only wait, do not reorder back to back
         assertEquals(Plan.Wait(emptySet(), emptySet()), SettleBehind.plan(setOf(1, 2), listOf(front(1), behind(2)), 300, 300))
-        // 隔够了再排
+        // Enough time has passed: reorder again
         assertEquals(Plan.Wait(setOf(1), emptySet()),
             SettleBehind.plan(setOf(1), listOf(front(1)), 900, SettleBehind.REORDER_EVERY_MS))
-        // 落定了:留下
+        // Settled: keep it
         assertEquals(Plan.Done(setOf(1, 2), emptySet(), emptySet()),
             SettleBehind.plan(setOf(1, 2), listOf(behind(1), behind(2)), 1_200, 300))
     }
@@ -39,25 +39,25 @@ class SettleBehindTest {
     }
 
     @Test fun closeOutRechecksUnderTheLock() {
-        // 超时还看得见的仍看得见:走退路;另一个留下
+        // The one still visible at the deadline is still visible: take the fallback; the other stays
         assertEquals(Plan.Done(setOf(2), setOf(1), emptySet()),
             SettleBehind.closeOut(setOf(1, 2), setOf(1), listOf(front(1), behind(2))))
-        // 超时那个这会儿落定了:留下
+        // The timed-out one has settled by now: keep it
         assertEquals(Plan.Done(setOf(1, 2), emptySet(), emptySet()),
             SettleBehind.closeOut(setOf(1, 2), setOf(1), listOf(behind(1), behind(2))))
-        // 已落定、此刻又看得见的是用户点开的:照留,不拿走
+        // Settled but visible again means the user opened it: keep it too, do not take it away
         assertEquals(Plan.Done(setOf(2), emptySet(), emptySet()), SettleBehind.closeOut(setOf(2), emptySet(), listOf(front(2))))
-        // 等的时候被别的任务拿到它屏上、或关了:不算留下,也不走退路
+        // Picked up by another task on that display while waiting, or closed: not counted as kept, and no fallback either
         assertEquals(Plan.Done(emptySet(), emptySet(), setOf(1, 2)),
             SettleBehind.closeOut(setOf(1, 2), setOf(1), listOf(Seen(1, onMain = false, visible = true))))
     }
 
     @Test fun tasksNoLongerOnMainAreDroppedNotKept() {
-        // 被别的任务拿到另一块屏上、或已经关了(没列出)
+        // Moved to another display by another task, or already closed (not listed)
         val elsewhere = Seen(3, onMain = false, visible = true)
         assertEquals(Plan.Wait(setOf(1), setOf(3, 4)), SettleBehind.plan(setOf(1, 3, 4), listOf(front(1), elsewhere), 0, null))
         assertEquals(Plan.Done(setOf(1), emptySet(), setOf(3, 4)), SettleBehind.plan(setOf(1, 3, 4), listOf(behind(1), elsewhere), 0, null))
-        // 超时时已不在主屏的不走退路
+        // Those no longer on the main display at the deadline do not take the fallback
         assertEquals(Plan.Done(emptySet(), setOf(1), setOf(3)),
             SettleBehind.plan(setOf(1, 3), listOf(front(1), elsewhere), SettleBehind.TIMEOUT_MS, null))
     }

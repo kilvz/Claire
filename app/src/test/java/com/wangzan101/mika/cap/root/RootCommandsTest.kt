@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RootCommandsTest {
-    /** 任务已经拿到端口后再关掉设置,旧端口也不能再启动 su,更不能把它记成授权被拒绝。 */
+    /** Turning the setting off after a task has already obtained its port must stop the old port from launching su again, and must certainly not record it as a denied authorization. */
     @Test
     fun turningTheSettingOffStopsAnExistingPort() = runBlocking {
         var suCalls = 0

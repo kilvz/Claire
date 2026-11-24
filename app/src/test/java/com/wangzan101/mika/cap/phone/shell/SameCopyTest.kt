@@ -4,30 +4,30 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 主屏占用、Claire 别的屏占用、冷启动看的任务:装了两份的 App 按「包名 + 用户」分开算,只装一份的照旧。 */
+/** Occupancy on the main display, occupancy on Claire's other displays, and the task looked at on cold start: an app installed as two copies is told apart by "package name + user"; a single copy works as before. */
 class SameCopyTest {
     private val chat = "com.example.chat"
 
     @Test fun theUserOnTheMainCopyDoesNotBlockTheCloneAndViceVersa() {
-        // 主屏上是用户 0 的那份
+        // The copy on the main display is user 0's
         assertTrue(ShellService.sameCopy(listOf(chat), 0, chat, 0))
         assertFalse(ShellService.sameCopy(listOf(chat), 0, chat, 128))
-        // 主屏上是分身那份
+        // The copy on the main display is the cloned one
         assertTrue(ShellService.sameCopy(listOf(chat), 128, chat, 128))
         assertFalse(ShellService.sameCopy(listOf(chat), 128, chat, 0))
     }
 
     @Test fun unknownTaskUserCountsAsTheSameCopy() {
-        // 读不到任务属于哪份用户:宁可当成占用
+        // Cannot read which user the task belongs to: treat it as occupying rather than not
         assertTrue(ShellService.sameCopy(listOf(chat), null, chat, 128))
         assertTrue(ShellService.sameCopy(listOf(chat), null, chat, 0))
     }
 
     @Test fun singleCopyAndPackageOnlyChecksAreUnchanged() {
-        // 只装了一份:任务都在用户 0,和原来一样按包名算
+        // Only one copy installed: tasks are all in user 0, so match by package name as before
         assertTrue(ShellService.sameCopy(listOf("x.launcher", chat), 0, chat, 0))
         assertFalse(ShellService.sameCopy(listOf("x.other"), 0, chat, 0))
-        // 不分哪一份(分享):任何一份都算
+        // User not distinguished (sharing): either copy counts
         assertTrue(ShellService.sameCopy(listOf(chat), 128, chat, null))
         assertTrue(ShellService.sameCopy(listOf(chat), 0, chat, null))
     }
