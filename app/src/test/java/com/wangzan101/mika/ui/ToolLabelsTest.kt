@@ -1,9 +1,11 @@
 package com.wangzan101.mika.ui
 
+import com.wangzan101.mika.R
 import com.wangzan101.mika.core.assembly.knownTools
 import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.i18n.ResFileTexts
 import com.wangzan101.mika.i18n.UiText
+import com.wangzan101.mika.i18n.tr
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,5 +40,14 @@ class ToolLabelsTest {
         assertEquals("unknown_tool_name", labels.label("unknown_tool_name"))
         UiText.source = ResFileTexts.english
         assertEquals("Send to my WeChat", labels.label("wechat_send_owner"))
+    }
+
+    /** An MCP tool name embeds a connector digest and is never shown as-is; the row already names the connector. */
+    @Test
+    fun mcpToolNamesFallBackToTheGenericLabel() {
+        val labels = ToolLabels(knownTools())
+        assertEquals(tr(R.string.tool_mcp), labels.label("mcp_github_661dcea9__search_repositories"))
+        UiText.source = ResFileTexts.english
+        assertEquals("MCP tool", labels.label("mcp_team_notes_1a2b3c4d__read"))
     }
 }

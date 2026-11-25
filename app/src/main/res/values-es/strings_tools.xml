@@ -81,4 +81,5 @@
     <string name="tool_mika_confirm_login">Confirmar inicio de sesión</string>
     <string name="tool_mika_favorites">Sitios frecuentes</string>
     <string name="tool_wechat_owner">Enviar a mi WeChat</string>
+    <string name="tool_mcp">Herramienta MCP</string>
 </resources>

@@ -95,25 +95,22 @@ object TaskMemoryRecorder {
             .distinct().take(APP_MAX)
 
     private fun sites(events: List<RunEvent>, acts: List<RunEvent.Activity>): List<String> =
-        (acts.mapNotNull { it.target }.filter { it.startsWith(SITE_PREFIX) }.map { it.removePrefix(SITE_PREFIX).trim() } +
+        (acts.mapNotNull { it.target }.filter { RunEvent.isSitePlace(it) }.map { RunEvent.siteName(it) } +
             events.filterIsInstance<RunEvent.Observed>().mapNotNull { it.place?.takeIf { p -> p.kind == PlaceKind.Site }?.name })
             .distinct().take(SITE_MAX)
 
     /**
-     * Human-readable form of an activity target: for "[SITE_PREFIX]<domain>" only the domain is kept, package names
+     * Human-readable form of an activity target: for a site target only the domain is kept, package names
      * are replaced by app names, anything else (URLs, query terms) stays as is; null when blank.
      */
     private fun where(target: String?, appLabel: (String) -> String): String? = target?.let {
         when {
             it.isBlank() -> null
-            it.startsWith(SITE_PREFIX) -> it.removePrefix(SITE_PREFIX).trim()
+            RunEvent.isSitePlace(it) -> RunEvent.siteName(it).ifEmpty { null }
             PACKAGE_NAME_RE.matches(it) -> appLabel(it)
             else -> it
         }
     }
-
-    /** In the run record, the target of a web-page screen is written as [SITE_PREFIX] followed by "<domain>". */
-    private const val SITE_PREFIX = "网站 "
 
     private const val GOAL_MAX = 120
     private const val CONCLUSION_MAX = 200

@@ -57,7 +57,14 @@ object Conversation {
     const val HEADER = "Earlier turns of this conversation (for reference; what you read this time shows the current state):"
 
     /** The text recorded when the stopped turn has not yet reported anything (or there is nothing to report). */
-    const val CANCELLED_OUTCOME = "已取消"
+    const val CANCELLED_OUTCOME = "Cancelled"
+
+    /** The same marker as written by older versions; still recognised when reading old conversations. */
+    const val LEGACY_CANCELLED_OUTCOME = "已取消"
+
+    /** Whether an outcome is only the cancellation marker rather than a real summary. */
+    fun isCancelledOutcome(text: String): Boolean =
+        text.trim() == CANCELLED_OUTCOME || text.trim() == LEGACY_CANCELLED_OUTCOME
 
     /**
      * Whether this turn delivered a reply normally: a finished task (including finished but unverified), a front-desk reply, and a front-desk report all count; a front desk that produced nothing ([DeskTurn.failure]) does not.
@@ -68,7 +75,7 @@ object Conversation {
 
     /** The explanation added to a stopped turn; null when absent. */
     fun stopSummary(t: Turn): String? =
-        t.outcome.trim().takeIf { t.status == "cancelled" && it.isNotEmpty() && it != CANCELLED_OUTCOME }
+        t.outcome.trim().takeIf { t.status == "cancelled" && it.isNotEmpty() && !isCancelledOutcome(it) }
 
     /**
      * Turn the earlier turns into one reference message with the user role, most recent last; if the whole thing exceeds [maxTokens] (per [TokenEstimate]), drop the earlier turns.

@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">Pengiriman tidak selesai. Tunggu tanggapan.</string>
     <string name="calls_dtmf_invalid">Hanya 0–9, * dan #, maksimal 32 tombol.</string>
     <string name="calls_voice_briefing_start">Jelaskan tugas dengan suara</string>
-    <string name="calls_voice_briefing_note">Gunakan bahasa Mandarin. Untuk mengizinkan panggilan, ucapkan hanya “%1$s” setelah selesai.</string>
+    <string name="calls_voice_briefing_note">Untuk mengizinkan panggilan, ucapkan hanya “%1$s” setelah menjelaskan tugas.</string>
     <string name="calls_voice_briefing_stopped">Penjelasan dihentikan; tidak ada panggilan</string>
     <string name="calls_voice_briefing_authorized">Tugas diizinkan; mengajukan panggilan</string>
     <string name="calls_voice_briefing_permission_granted">Mikrofon diizinkan. Ketuk lagi tombol suara.</string>

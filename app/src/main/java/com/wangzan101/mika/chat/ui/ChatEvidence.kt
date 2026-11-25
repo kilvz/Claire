@@ -30,16 +30,13 @@ fun evidenceSource(events: List<RunEvent>, appLabel: (String) -> String = { it }
     val shots = events.filterIsInstance<RunEvent.Media>()
     val lastStep = shots.maxOfOrNull { it.step } ?: return EvidenceSource(null, emptyList())
     val final = shots.filter { it.step == lastStep }
-    val place = shots.lastOrNull { it.place != null }?.place?.let { if (it.startsWith(SITE_PREFIX)) it.removePrefix(SITE_PREFIX) else appLabel(it) }
+    val place = shots.lastOrNull { it.place != null }?.place?.let { if (RunEvent.isSitePlace(it)) RunEvent.siteName(it) else appLabel(it) }
     return EvidenceSource(place, final.map { it.mediaId }.distinct())
 }
 
-/** In run records the "place" of the web screen is written as "website <domain>". */
-internal const val SITE_PREFIX = "网站 "
-
-/** The place in a source: "website domain" and URLs show their domain, package names become app names, and anything else (commands, files) stays as is. */
+/** The place in a source: site targets show their domain, package names become app names, and anything else (commands, files) stays as is. */
 private fun placeLabel(place: String, appLabel: (String) -> String): String = when {
-    place.startsWith(SITE_PREFIX) -> place.removePrefix(SITE_PREFIX)
+    RunEvent.isSitePlace(place) -> RunEvent.siteName(place)
     place.startsWith("http://") || place.startsWith("https://") -> runCatching { java.net.URI(place).host }.getOrNull() ?: place
     com.wangzan101.mika.core.tool.PACKAGE_NAME_RE.matches(place) -> appLabel(place)
     else -> place

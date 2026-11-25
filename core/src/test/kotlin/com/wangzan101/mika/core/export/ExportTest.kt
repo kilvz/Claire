@@ -150,6 +150,14 @@ class ExportTest {
         assertEquals("", answer.markdown)
     }
 
+    /** Records written before the marker changed still export as a plain cancellation. */
+    @Test fun legacyCancelledMarkerAlsoExportsOnlyTheStatus() {
+        val document = doc(source = Source(status = "cancelled", outcome = Conversation.LEGACY_CANCELLED_OUTCOME))
+        val answer = document.blocks.filterIsInstance<ExportBlock.Answer>().single()
+        assertEquals(AnswerOutcome.Cancelled(null), answer.outcome)
+        assertEquals("", answer.markdown)
+    }
+
     @Test fun namesAreSafeAndUnique() {
         assertEquals("ab.txt", ExportNames.safeFileName("../a\\b.txt"))
         assertEquals("attachment", ExportNames.safeFileName("..."))

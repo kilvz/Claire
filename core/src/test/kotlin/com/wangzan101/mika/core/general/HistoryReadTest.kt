@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.general
 
 import com.wangzan101.mika.core.screen.observation.Untrusted
 import com.wangzan101.mika.core.agent.NoticeTurn
+import com.wangzan101.mika.core.agent.Conversation
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.assembly.toolDispatcher
 import com.wangzan101.mika.core.model.Part
@@ -44,7 +45,7 @@ class HistoryReadTest {
 
     private val turns = listOf(
         Turn("你好", "你好!", "succeeded"),
-        Turn("查三家店的价格", "已取消", "cancelled", runId = "run-a"),
+        Turn("查三家店的价格", Conversation.CANCELLED_OUTCOME, "cancelled", runId = "run-a"),
         Turn("再查一下", "没找到", "failed", runId = "run-gone"),
     )
 

@@ -139,7 +139,7 @@ class ExportDocumentBuilder(
             turn.unconfirmed.map { redact(it, content) },
         )
         "cancelled" -> AnswerOutcome.Cancelled(
-            turn.outcome.takeIf { it.isNotBlank() && it != Conversation.CANCELLED_OUTCOME }?.let { redact(it, content) },
+            turn.outcome.takeIf { it.isNotBlank() && !Conversation.isCancelledOutcome(it) }?.let { redact(it, content) },
         )
         else -> AnswerOutcome.Failed(redact(turn.outcome, content))
     }

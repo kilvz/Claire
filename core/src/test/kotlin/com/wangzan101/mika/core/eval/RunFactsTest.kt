@@ -1,6 +1,7 @@
 package com.wangzan101.mika.core.eval
 
 import com.wangzan101.mika.core.run.record.RunEvent
+import com.wangzan101.mika.core.agent.Conversation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -60,7 +61,7 @@ class RunFactsTest {
         assertEquals(false, RunFacts.stoppedAtGate(listOf(c("declined"), c(null), c("approved"), end)))
         // Declined but the run never ended (timed out and cancelled by the harness) does not count
         assertEquals(false, RunFacts.stoppedAtGate(listOf(c("declined"))))
-        assertEquals(false, RunFacts.stoppedAtGate(listOf(c("declined"), RunEvent.TaskEnded(9, "cancelled", "已取消"))))
+        assertEquals(false, RunFacts.stoppedAtGate(listOf(c("declined"), RunEvent.TaskEnded(9, "cancelled", Conversation.CANCELLED_OUTCOME))))
         assertEquals(false, RunFacts.stoppedAtGate(listOf(c("required"), end)))
     }
 }

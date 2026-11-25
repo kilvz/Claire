@@ -571,7 +571,7 @@ object IrreversibleDetector {
      * Enter-key type cannot be read, so it is not used as evidence.
      */
     private fun enterHit(args: JsonObject, snapshot: ScreenSnapshot?, s: ScreenSnapshot?, key: Int): Irreversible? {
-        val keyName = if (key == KEY_SPACE) "空格" else "回车"
+        val keyName = if (key == KEY_SPACE) "Space" else "Enter"
         val ref = str(args, "ref")
         val field = if (ref == null) null
         else snapshot?.takeIf { it.snapshotId == str(args, "snapshotId") }?.elements?.firstOrNull { it.ref == ref }

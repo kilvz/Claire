@@ -118,7 +118,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
     private val listed = endpoint.tools()
         .filter { connection.allowedTools == null || it.name in connection.allowedTools }
     private val descriptors = listed.distinctBy { it.name }
-    private val toolNames = mcpToolNames(endpoint.serverId, descriptors.map { it.name })
+    private val toolNames = mcpToolNames(endpoint.serverId, descriptors.map { it.name }, connection.displayName)
     private val serverToolNames = descriptors.map { mcpSafe(it.name) }.toSet()
     private val assemblyFailures = mutableListOf<String>()
     private val tools = buildList {
@@ -127,7 +127,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
         }
         descriptors.forEachIndexed { index, descriptor ->
             val name = toolNames[index]
-            val assembled = assembleMcpTool(id, endpoint, descriptor, name) {
+            val assembled = assembleMcpTool(id, endpoint, descriptor, name, connection.displayName) {
                 McpClientTool(id, endpoint, descriptor, name, budget, connection.resultStore, connection.previewChars, connection.trust, connection.displayName)
             }
             add(assembled.tool)
@@ -167,7 +167,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
             capability = id,
             serverId = endpoint.serverId,
             def = ToolDef(
-                name = mcpToolName(endpoint.serverId, "resource_read"),
+                name = mcpToolName(endpoint.serverId, "resource_read", displayName = connection.displayName),
                 description = "Read a resource from the MCP server. Available: $available".take(4000),
                 props = mapOf("uri" to buildJsonObject {
                     put("type", "string")
@@ -193,7 +193,7 @@ internal class McpCapability(connection: McpConnection, override val id: String)
             capability = id,
             serverId = endpoint.serverId,
             def = ToolDef(
-                name = mcpToolName(endpoint.serverId, "prompt_get"),
+                name = mcpToolName(endpoint.serverId, "prompt_get", displayName = connection.displayName),
                 description = "Get a prompt template from the MCP server. Available: $names".take(4000),
                 props = mapOf(
                     "name" to buildJsonObject {
@@ -228,13 +228,14 @@ internal fun assembleMcpTool(
     endpoint: McpEndpoint,
     descriptor: McpToolDescriptor,
     name: String,
+    displayName: String = endpoint.serverId,
     assemble: () -> AgentTool,
 ): McpToolAssembly = try {
     McpToolAssembly(assemble(), null)
 } catch (e: Exception) {
     val reason = mcpAssemblyReason(e)
     McpToolAssembly(
-        McpFailedTool(capability, endpoint.serverId, descriptor, name, reason),
+        McpFailedTool(capability, endpoint.serverId, descriptor, name, displayName, reason),
         "tool '${descriptor.name}': $reason",
     )
 }
@@ -248,17 +249,20 @@ internal fun mcpAssemblyReason(e: Exception): String {
 internal const val MCP_TOOL_NAME_MAX = 64
 private const val MCP_INITIAL_HASH_CHARS = 8
 private const val MCP_MAX_HASH_CHARS = 56
+private const val MCP_LABEL_MAX = 12
 
 /**
- * Generates stable and globally unique tool names. Declarations that stay within the limit and do not collide
- * after sanitizing are kept as-is; the remaining declarations get short names assigned in sorted order of the
- * original tool name, so the order the server returns them in does not affect the result. If a short name
- * collides with an existing name again, the digest length is increased instead of leaving the conflict to be
- * discovered at registration time.
+ * Generates stable and globally unique tool names. The name starts with a readable form of the connector's
+ * display name plus a short digest of its configuration ID, so two connectors with the same label never clash.
+ * Declarations that stay within the limit and do not collide after sanitizing are kept as-is; the remaining
+ * declarations get short names assigned in sorted order of the original tool name, so the order the server
+ * returns them in does not affect the result. If a short name collides with an existing name again, the digest
+ * length is increased instead of leaving the conflict to be discovered at registration time.
  */
-internal fun mcpToolNames(serverId: String, toolNames: List<String>): List<String> {
+internal fun mcpToolNames(serverId: String, toolNames: List<String>, displayName: String = serverId): List<String> {
     require(toolNames.size == toolNames.toSet().size) { "duplicate MCP tool names: $toolNames" }
-    val plain = toolNames.map { mcpPlainToolName(serverId, it) }
+    val prefix = mcpServerPrefix(serverId, displayName)
+    val plain = toolNames.map { mcpPlainToolName(prefix, it) }
     val counts = plain.groupingBy { it }.eachCount()
     val shortened = toolNames.indices.filter { plain[it].length > MCP_TOOL_NAME_MAX || counts.getValue(plain[it]) > 1 }
     val assigned = toolNames.indices.filterNot { it in shortened }.associate { toolNames[it] to plain[it] }.toMutableMap()
@@ -267,7 +271,7 @@ internal fun mcpToolNames(serverId: String, toolNames: List<String>): List<Strin
         var hashChars = MCP_INITIAL_HASH_CHARS
         var round = 0
         while (true) {
-            val candidate = mcpShortToolName(serverId, name, hashChars, round)
+            val candidate = mcpShortToolName(serverId, prefix, name, hashChars, round)
             if (used.add(candidate)) {
                 assigned[name] = candidate
                 break
@@ -278,22 +282,40 @@ internal fun mcpToolNames(serverId: String, toolNames: List<String>): List<Strin
     return toolNames.map { assigned.getValue(it) }
 }
 
-/** The normal form keeps the full server ID and tool name; when too long or colliding after sanitizing, it switches to the digest-suffixed short form. */
-internal fun mcpToolName(serverId: String, toolName: String, short: Boolean = false): String {
-    val plain = mcpPlainToolName(serverId, toolName)
+/** The normal form keeps the readable server label, its digest and the full tool name; when too long or colliding after sanitizing, it switches to the digest-suffixed short form. */
+internal fun mcpToolName(serverId: String, toolName: String, short: Boolean = false, displayName: String = serverId): String {
+    val prefix = mcpServerPrefix(serverId, displayName)
+    val plain = mcpPlainToolName(prefix, toolName)
     return if (!short && plain.length <= MCP_TOOL_NAME_MAX) plain
-        else mcpShortToolName(serverId, toolName, MCP_INITIAL_HASH_CHARS, 0)
+        else mcpShortToolName(serverId, prefix, toolName, MCP_INITIAL_HASH_CHARS, 0)
 }
 
-private fun mcpPlainToolName(serverId: String, toolName: String): String =
-    "mcp_${mcpSafe(serverId)}__${mcpSafe(toolName)}"
+private fun mcpPlainToolName(prefix: String, toolName: String): String = prefix + mcpSafe(toolName)
 
-private fun mcpShortToolName(serverId: String, toolName: String, hashChars: Int, round: Int): String {
+/** "mcp_<label>_<tag>__": a readable label and a short digest of the configuration ID (equal labels stay distinct). */
+private fun mcpServerPrefix(serverId: String, displayName: String): String {
+    val label = mcpSafe(displayName.trim().lowercase())
+        .replace(Regex("_+"), "_")
+        .trim('_')
+        .take(MCP_LABEL_MAX)
+        .ifEmpty { "server" }
+    return "mcp_${label}_${mcpServerTag(serverId)}__"
+}
+
+/** Eight hex characters of SHA-256 over the configuration ID; stable for as long as that ID is. */
+internal fun mcpServerTag(serverId: String): String =
+    MessageDigest.getInstance("SHA-256").digest(serverId.toByteArray(Charsets.UTF_8))
+        .take(MCP_INITIAL_HASH_CHARS / 2).joinToString("") { "%02x".format(it) }
+
+private fun mcpShortToolName(serverId: String, prefix: String, toolName: String, hashChars: Int, round: Int): String {
     val material = if (round == 0) "$serverId\u0000$toolName" else "$round\u0000$serverId\u0000$toolName"
     val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
-    val hash = digest.take(hashChars / 2).joinToString("") { "%02x".format(it) }
-    val head = "mcp_${mcpSafe(serverId).take(8)}__${mcpSafe(toolName)}"
-    return head.take(MCP_TOOL_NAME_MAX - hashChars - 1) + "_" + hash
+    // Leave at least one character of the tool name; rounds distinguish names once the digest cannot grow any more.
+    val usable = (MCP_TOOL_NAME_MAX - prefix.length - 2).coerceAtLeast(2)
+    val hash = digest.take(hashChars.coerceAtMost(usable) / 2).joinToString("") { "%02x".format(it) }
+    val suffix = "_$hash"
+    val room = (MCP_TOOL_NAME_MAX - prefix.length - suffix.length).coerceAtLeast(1)
+    return prefix + mcpSafe(toolName).take(room) + suffix
 }
 
 private val UNSAFE_NAME_CHARS = Regex("[^A-Za-z0-9_]")
@@ -304,6 +326,7 @@ private class McpFailedTool(
     private val serverId: String,
     private val descriptor: McpToolDescriptor,
     name: String,
+    private val displayName: String,
     reason: String,
 ) : AgentTool {
     private val message = "MCP tool '${descriptor.name}' on server '$serverId' could not be assembled: $reason"
@@ -315,6 +338,8 @@ private class McpFailedTool(
     override val risk = Risk.Read
     override val approvalRisk = ApprovalRisk(ActionRisk.Read)
     override val offScreen = true
+    override val listWhenUnknown = true
+    override val connectorName = displayName
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution = ToolExecution(buildJsonObject {
         put("ok", false)
@@ -323,7 +348,7 @@ private class McpFailedTool(
         put("tool", descriptor.name)
         put("message", message)
         put("recoverable", false)
-    })
+    }, record = buildJsonObject { put("mcpConnector", displayName) })
 }
 
 private class McpBudget(private val limit: Long?) {
@@ -373,6 +398,8 @@ private class McpClientTool(
     }
     override val approvalRisk: ApprovalRisk = approval
     override val offScreen = true
+    override val listWhenUnknown = true
+    override val connectorName = displayName
     override val logged = risk != Risk.Read
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution = mcpExecution(
@@ -409,6 +436,8 @@ private class McpSyntheticTool(
     override val risk = Risk.Read
     override val approvalRisk = ApprovalRisk(ActionRisk.Read)
     override val offScreen = true
+    override val listWhenUnknown = true
+    override val connectorName = displayName
     override val logged = false
 
     override suspend fun execute(a: Args, ctx: ToolContext): ToolExecution = mcpExecution(

@@ -151,7 +151,7 @@ internal object ChatReduce {
     /** Human-readable form of an activity target: package names become app names, and "site domain" keeps only the domain. */
     internal fun where(target: String, appLabel: (String) -> String): String? = when {
         target.isBlank() -> null
-        target.startsWith(SITE_PREFIX) -> target.removePrefix(SITE_PREFIX)
+        RunEvent.isSitePlace(target) -> RunEvent.siteName(target).ifEmpty { null }
         com.wangzan101.mika.core.tool.PACKAGE_NAME_RE.matches(target) -> appLabel(target)
         else -> target
     }
@@ -189,7 +189,7 @@ internal object ChatReduce {
             })
     }
 
-    /** One line per attachment at the end of the message: "Attachment: /workspace/inbox/<name> (<size>)"; [files] is (path, bytes) after copying into the workspace. */
+    /** One line per attachment at the end of the message: "Attachment:/workspace/inbox/<name> (<size>)"; [files] is (path, bytes) after copying into the workspace. */
     internal fun withAttachments(text: String, files: List<Pair<String, Long>>): String =
         AttachmentLines.composeBytes(text, files)
 

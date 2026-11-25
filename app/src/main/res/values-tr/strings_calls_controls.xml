@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">Gönderim tamamlanamadı. Tekrar işlem yapmadan önce bir yanıt bekleyin.</string>
     <string name="calls_dtmf_invalid">Yalnızca 0–9, * ve # kullanın, en fazla 32 tuş.</string>
     <string name="calls_voice_briefing_start">Görevi sesle açıklayın</string>
-    <string name="calls_voice_briefing_note">Mandarin konuşun. Aramayı yetkilendirmek için görevi açıkladıktan sonra tek başına \“%1$s\” deyin.</string>
+    <string name="calls_voice_briefing_note">Aramayı yetkilendirmek için görevi açıkladıktan sonra yalnızca “%1$s” deyin.</string>
     <string name="calls_voice_briefing_stopped">Açıklama durdu; arama yapılmadı</string>
     <string name="calls_voice_briefing_authorized">Görev yetkilendirildi; arama gönderiliyor</string>
     <string name="calls_voice_briefing_permission_granted">Mikrofona izin verildi. Başlamak için ses düğmesine tekrar dokunun.</string>

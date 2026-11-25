@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">전송을 완료하지 못했습니다. 상대방의 응답을 기다리세요.</string>
     <string name="calls_dtmf_invalid">0–9, *, #만 최대 32개 입력하세요.</string>
     <string name="calls_voice_briefing_start">음성으로 작업 설명</string>
-    <string name="calls_voice_briefing_note">표준 중국어로 설명하세요. 발신을 승인하려면 마지막에 “%1$s”만 말하세요.</string>
+    <string name="calls_voice_briefing_note">작업을 설명한 뒤 “%1$s”만 말하면 발신이 승인됩니다.</string>
     <string name="calls_voice_briefing_stopped">설명이 중단되었습니다. 전화를 걸지 않았습니다</string>
     <string name="calls_voice_briefing_authorized">작업 승인됨. 발신 요청 중</string>
     <string name="calls_voice_briefing_permission_granted">마이크가 허용되었습니다. 음성 버튼을 다시 누르세요.</string>

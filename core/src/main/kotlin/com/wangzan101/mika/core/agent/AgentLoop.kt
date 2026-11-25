@@ -884,7 +884,7 @@ class AgentLoop(
         // Verified but not confirmable (including those marked unconfirmed): recorded as unverified, the same wording as evaluations and the conversation record
         is TaskState.Succeeded -> RunEvent.TaskEnded(now(), if (end.doubtful) "unverified" else "succeeded", Redactor.text(end.answer))
         is TaskState.Failed -> RunEvent.TaskEnded(now(), "failed", Redactor.text(end.reason), end.kind.name.lowercase())
-        TaskState.Cancelled -> RunEvent.TaskEnded(now(), "cancelled", "已取消")
+        TaskState.Cancelled -> RunEvent.TaskEnded(now(), "cancelled", Conversation.CANCELLED_OUTCOME)
         else -> RunEvent.TaskEnded(now(), "error", "The task was interrupted unexpectedly")
     }
 

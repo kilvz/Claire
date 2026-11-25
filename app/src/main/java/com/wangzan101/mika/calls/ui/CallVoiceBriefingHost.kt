@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -51,6 +52,10 @@ internal fun rememberCallVoiceBriefing(
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         detail = context.getString(if (granted) R.string.calls_voice_briefing_permission_granted else R.string.calls_voice_briefing_permission_denied)
     }
+    // The authorization phrase is recognized in English and Chinese; show the one matching the UI language.
+    val authorizationPhrase =
+        if (LocalConfiguration.current.locales[0].language == "zh") VoiceBriefingAuthorization.PHRASE
+        else VoiceBriefingAuthorization.ENGLISH_PHRASE
     fun cancel() { attempt++; starting = false; controller.cancel() }
     DisposableEffect(lifecycle, controller) {
         val observer = LifecycleEventObserver { _, event ->
@@ -78,7 +83,7 @@ internal fun rememberCallVoiceBriefing(
                         voice.message != null -> R.string.calls_voice_briefing_stopped
                         else -> R.string.calls_voice_briefing_start
                     }))
-                    Text(stringResource(R.string.calls_voice_briefing_note, VoiceBriefingAuthorization.PHRASE))
+                    Text(stringResource(R.string.calls_voice_briefing_note, authorizationPhrase))
                     if (voice.assistantTranscript.isNotBlank()) Text("${profile.name}\n${voice.assistantTranscript}")
                     if (voice.ownerTranscript.isNotBlank() || voice.ownerPartial.isNotBlank())
                         Text("${stringResource(R.string.calls_record_brief)}\n${voice.ownerTranscript}\n${voice.ownerPartial}")

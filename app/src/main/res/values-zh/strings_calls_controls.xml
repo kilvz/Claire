@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">未能完成按键提交，请等待对方响应后再操作。</string>
     <string name="calls_dtmf_invalid">仅支持 0–9、*、#，最多 32 个按键。</string>
     <string name="calls_voice_briefing_start">语音交代任务</string>
-    <string name="calls_voice_briefing_note">请用普通话交代；完成后，单独说“%1$s”才会拨出。</string>
+    <string name="calls_voice_briefing_note">交代任务后，单独说“%1$s”才会拨出。</string>
     <string name="calls_voice_briefing_stopped">语音交代已中断，未拨号</string>
     <string name="calls_voice_briefing_authorized">交代已确认，正在提交拨号</string>
     <string name="calls_voice_briefing_permission_granted">麦克风已允许，请再次点语音交代按钮开始。</string>

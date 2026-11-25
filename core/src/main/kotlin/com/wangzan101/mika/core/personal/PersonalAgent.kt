@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.personal
 
+import com.wangzan101.mika.core.agent.Conversation
 import com.wangzan101.mika.core.agent.TokenEstimate
 import com.wangzan101.mika.core.model.*
 import kotlinx.coroutines.*
@@ -59,7 +60,7 @@ fun decodePersonalState(json: Json, text: String): PersonalState {
         val message = messages.singleOrNull() ?: return@mapIndexedNotNull null
         val rawMessage = rawMessages.getOrNull(message.index) as? JsonObject ?: return@mapIndexedNotNull null
         task.id.takeIf {
-            task.status == "cancelled" && task.delivered && task.result == "已取消" &&
+            task.status == "cancelled" && task.delivered && task.result == Conversation.LEGACY_CANCELLED_OUTCOME &&
                 "resultSystemType" !in raw && "systemType" !in rawMessage && message.value.text == task.result
         }
     }.toSet()

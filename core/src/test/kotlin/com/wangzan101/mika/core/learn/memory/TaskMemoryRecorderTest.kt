@@ -56,12 +56,12 @@ class TaskMemoryRecorderTest {
 
     @Test fun sitesFromSitePrefixedTargetsAndObservedPlace() {
         val events: List<RunEvent> = listOf(
-            act(1, "observe", "browse", target = "网站 example.org"),
+            act(1, "observe", "browse", target = "site example.org"),
             read(1, "页面", Place.site("other.net")),
-            act(2, "submit", "send", target = "网站 example.org"),
+            act(2, "submit", "send", target = "网站 legacy.example.org"),
         )
         val m = TaskMemoryRecorder.record("查网站", events, 0L, "id")!!
-        assertEquals(listOf("example.org", "other.net"), m.sites)
+        assertEquals(listOf("example.org", "legacy.example.org", "other.net"), m.sites)
     }
 
     @Test fun goalAndConclusionAreClipped() {

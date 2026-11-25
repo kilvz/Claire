@@ -29,7 +29,7 @@ class AgentLoopHistoryHintTest {
     }
 
     @Test fun earlierTurnsMentionTheHistoryToolWhenRecordsCanBeRead() {
-        val prior = listOf(Turn("查三家店的价格", "已取消", "cancelled", runId = "run-a"))
+        val prior = listOf(Turn("查三家店的价格", Conversation.CANCELLED_OUTCOME, "cancelled", runId = "run-a"))
         val hint = Feedback.format("history_hint", "turns" to "").trim()
         val text = firstMessage(prior, withRecords = true)
         assertTrue(text.startsWith(Conversation.HEADER))

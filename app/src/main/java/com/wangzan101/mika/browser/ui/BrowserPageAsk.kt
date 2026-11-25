@@ -116,7 +116,6 @@ import com.wangzan101.mika.chat.ui.ChatCopy
 import com.wangzan101.mika.chat.ui.ChatViewModel
 import com.wangzan101.mika.chat.ui.Exchange
 import com.wangzan101.mika.chat.ui.ExchangeStatus
-import com.wangzan101.mika.chat.ui.SITE_PREFIX
 import com.wangzan101.mika.chat.ui.draft
 import com.wangzan101.mika.chat.ui.exchange
 import com.wangzan101.mika.settings.ui.models.Page
@@ -306,7 +305,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
         return ChatViewModel.reduce(before.copy(activities = acts), s, ::appLabel, toolLabels::label).also { exchange = it }
     }
 
-    // Where each step runs: a step whose activity target starts with "website ..." runs on the web page, one that is a package name runs in the app
+    // Where each step runs: a step whose activity target is a site target runs on the web page, one that is a package name runs in the app
     private fun tagsOf(c: CardRun?): List<String?> {
         val ex = c?.run?.exchange ?: return emptyList()
         val content = CapsuleCards.content(c) as? CardContent.Working ?: return emptyList()
@@ -315,7 +314,7 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
             val row = rows.getOrNull(i) ?: return@mapIndexed null
             val target = ex.activities.lastOrNull { it.step == row.step }?.target?.trim().orEmpty()
             when {
-                target.startsWith(SITE_PREFIX) -> PageAskCopy.WEB
+                RunEvent.isSitePlace(target) -> PageAskCopy.WEB
                 PACKAGE_NAME_RE.matches(target) -> PageAskCopy.APP
                 else -> null
             }
@@ -398,8 +397,6 @@ class PageChat(private val context: Context, private val browser: UserBrowser, p
 
     private companion object {
         const val TAG = "MikaPageChat"
-        /** In run records the target of the web-page screen is written as "website <domain>". */
-        const val SITE_PREFIX = "网站 "
     }
 }
 

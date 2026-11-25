@@ -59,6 +59,17 @@ class StopSummaryTest {
         assertTrue(facts, "<progress>\ngoal 2/3\n</progress>" in facts && "0/3" !in facts)
     }
 
+    /** The internal site marker is never shown, whether it was written by the current or an older version. */
+    @Test fun siteTargetsInBothFormatsShowOnlyTheDomain() {
+        val events = listOf(
+            act(1, "web_open", "site example.com"),
+            act(2, "web_open", "网站 legacy.example.org"),
+        )
+        val text = StopSummary.plain("检查网页", events, null, language = "en")
+        assertTrue(text, "- Visited: example.com, legacy.example.org" in text)
+        assertFalse(text, "网站" in text)
+    }
+
     @Test fun plainSummaryCountsBatchActionsAndNamesThem() {
         val text = StopSummary.plain("把推荐里的岗位都打个招呼", greeting, null, ::label, ::app)
         assertEquals(
@@ -150,6 +161,7 @@ class StopSummaryTest {
         assertTrue(text, text.contains("1. The user said: 发消息; the user cancelled this task"))
         assertTrue(text, text.contains("2. The user said: 看四个设置页; the user stopped this task partway; before the stop: 已经停下。看完了网络、蓝牙;显示、声音还没看。"))
         assertEquals(null, Conversation.stopSummary(old))
+        assertEquals(null, Conversation.stopSummary(Turn("发消息", Conversation.LEGACY_CANCELLED_OUTCOME, "cancelled")))
         assertEquals("已经停下。看完了网络、蓝牙;显示、声音还没看。", Conversation.stopSummary(stopped))
     }
 

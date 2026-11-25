@@ -12,8 +12,8 @@ mode: desktop
 Google's web maps, for looking up place information and routes, usually without signing in. The actual URLs are under `google.com/maps`, sharing the google.com domain with Google Flights and others.
 
 ## Pages and URLs
-- Search: `https://www.google.com/maps/search/<编码后的查询>`.
-- Directions: `https://www.google.com/maps/dir/<编码后的起点>/<编码后的终点>`.
+- Search: `https://www.google.com/maps/search/<URL-encoded query>`.
+- Directions: `https://www.google.com/maps/dir/<URL-encoded origin>/<URL-encoded destination>`.
 
 ## Features
 - **Places**: name, address, rating and number of reviews, open status, full opening hours, phone. Opening hours and phone are only visible after expanding the details.

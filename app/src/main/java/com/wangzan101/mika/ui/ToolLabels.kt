@@ -12,6 +12,8 @@ import com.wangzan101.mika.core.tool.ToolIndex
  */
 class ToolLabels(private val tools: ToolIndex, private val legacy: LegacyNames = legacyNames()) {
     fun label(tool: String): String {
+        // Every MCP tool name embeds a connector-specific digest; the user only needs to know a connector was used (the activity row names it), never the internal name.
+        if (tool.startsWith("mcp_")) return tr(R.string.tool_mcp)
         // Tools that declare no label fall back to looking up the table by tool name (still show the tool name if not found); declared ones are looked up by declared text as before.
         val declared = (tools[tool] ?: legacy.resolve(tool)?.let { tools[it] })?.label ?: tool
         return TOOL_LABELS[declared]?.let { tr(it) } ?: declared

@@ -67,8 +67,44 @@ internal class ToolRegistry(
     /** Names of tools that can go into do_steps (including those this task does not offer), in registration order. */
     fun batchable(): List<String> = declared.values.filter { it.batchable }.map { it.name }
 
-    /** Names listed in the "unknown tool" description: the ones available right now (the group that does not touch the screen, which depends on the runtime environment being ready, is not listed). */
+    /** Names listed in the "unknown tool" description: the ones available right now (most off-screen tools are skipped, but MCP tools say [AgentTool.listWhenUnknown]). */
     fun listedNames(): List<String> = all.filter { tool ->
-        !tool.offScreen && if (dynamic(tool)) tool.available(ctx) else tools.containsKey(tool.name)
+        tool.listWhenUnknown && if (dynamic(tool)) tool.available(ctx) else tools.containsKey(tool.name)
     }.map { it.name }
+
+    /**
+     * Which MCP connector an unknown tool name most likely belongs to: only names starting with "mcp_" are
+     * considered, and an exact prefix wins. When the model writes the name slightly wrong (a typo in the digest
+     * is the common case), the closest server segment is chosen.
+     */
+    fun connectorForUnknown(name: String): String? {
+        if (!name.startsWith("mcp_")) return null
+        val connectors = all.mapNotNull { tool ->
+            tool.connectorName?.let { it to tool.name.substringBefore("__") }
+        }.distinctBy { it.second }
+        if (connectors.isEmpty()) return null
+        if (connectors.size == 1) return connectors.first().first
+        val segment = name.substringBefore("__")
+        connectors.firstOrNull { it.second == segment }?.let { return it.first }
+        return connectors.minByOrNull { (_, prefix) -> editDistance(prefix, segment) }?.first
+    }
+
+    private fun editDistance(a: String, b: String): Int {
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+        var previous = IntArray(b.length + 1) { it }
+        for (i in a.indices) {
+            val current = IntArray(b.length + 1)
+            current[0] = i + 1
+            for (j in b.indices) {
+                current[j + 1] = minOf(
+                    current[j] + 1,
+                    previous[j + 1] + 1,
+                    previous[j] + if (a[i] == b[j]) 0 else 1,
+                )
+            }
+            previous = current
+        }
+        return previous[b.length]
+    }
 }

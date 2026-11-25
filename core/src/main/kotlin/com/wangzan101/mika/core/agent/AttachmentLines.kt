@@ -2,18 +2,18 @@ package com.wangzan101.mika.core.agent
 
 /**
  * How attachments carried in the user's words are written: one line per attachment at the end of the message
- * "Attachment: /workspace/inbox/<name> (<size>)". These lines are stored verbatim in the conversation and handed to
+ * "Attachment:/workspace/inbox/<name> (<size>)". These lines are stored verbatim in the conversation and handed to
  * the task.
  * The conversation page uses them to render attachments as photo tiles and file cards (the app's
  * AttachmentMessage); language hints, the answer language check and memory, and skill quotations do not count these
  * lines (see [UserWords]).
- * Messages in old conversations are written the same way.
+ * Messages in old conversations use the prefix "附件:" and are still parsed.
  */
 object AttachmentLines {
-    private const val PREFIX = "附件:"
+    private const val PREFIX = "Attachment:"
 
-    /** Names may contain parentheses ("report (1).csv"): only the last pair of parentheses is taken as the size, and only its "number + B/KB/MB"; the path is under /workspace in the sandbox. */
-    private val LINE = Regex("^附件:(/workspace/.+)\\((\\d+(?:\\.\\d+)? (?:B|KB|MB))\\)$")
+    /** Names may contain parentheses ("report (1).csv"): only the last pair of parentheses is taken as the size, and only its "number + B/KB/MB"; the path is under /workspace in the sandbox. Older versions wrote "附件:" and those lines are still recognised. */
+    private val LINE = Regex("^(?:Attachment:|附件:)(/workspace/.+)\\((\\d+(?:\\.\\d+)? (?:B|KB|MB))\\)$")
 
     /** A split message: [files] is the path and the size written in the message ("2 KB") for each attachment, in order of appearance; [words] is the text other than attachment lines (trimmed). */
     data class Parsed(val files: List<Pair<String, String>>, val words: String)

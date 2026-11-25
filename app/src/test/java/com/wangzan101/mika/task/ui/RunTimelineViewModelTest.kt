@@ -265,6 +265,16 @@ class RunTimelineViewModelTest {
         assertEquals("已调用 Team notes MCP", rows[1].label)
     }
 
+    /** The internal site marker is never shown, and records written before the marker changed still parse. */
+    @Test fun siteTargetsLoseTheInternalMarkerInBothFormats() {
+        val id = run("查网页") {
+            event(RunEvent.Activity(clock, 1, "act", "web_tap", "site example.com", "changed", callId = "a1"))
+            event(RunEvent.Activity(clock, 2, "act", "web_tap", "网站 legacy.example.com", "changed", callId = "a2"))
+        }
+        val rows = ready(id).steps.flatMap { it.activities }
+        assertEquals(listOf("example.com", "legacy.example.com"), rows.map { it.target })
+    }
+
     @Test fun showsVerifierAndGuardTags() {
         // Build the result from the guard's own serialization, the same way AgentLoop does
         fun withGuard(vararg v: GuardVerdict) =

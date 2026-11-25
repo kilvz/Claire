@@ -12,7 +12,7 @@ description: Video platform; search videos and channels and read descriptions, c
 A video platform.
 
 ## Pages and URLs
-- Search: `https://www.youtube.com/results?search_query=<编码词>`.
+- Search: `https://www.youtube.com/results?search_query=<URL-encoded query>`.
 - Video: `/watch?v=<id>`; for a channel, use the channel link.
 
 ## Features

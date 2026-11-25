@@ -68,7 +68,7 @@ internal object SpawnAgent : AgentTool {
         val limit = (a.int("maxResultChars", Int.MIN_VALUE, Int.MAX_VALUE) ?: DEFAULT_RESULT_CHARS).coerceIn(MIN_RESULT_CHARS, MAX_RESULT_CHARS)
         val goals = a.strList("tasks", min = 1, max = MAX_BATCH, itemMax = 4000)
             ?: listOfNotNull(a.str("goal", max = 4000)).takeIf { it.isNotEmpty() }
-            ?: return failure("给一个 goal,或用 tasks 一次派几个")
+            ?: return failure("Provide a goal, or several at once with tasks")
         if (goals.size == 1) return runOne(goals[0], parent, host, format, steps, limit)
         // Several: start them all at once and return once all are done; a failure in any one does not affect the others, and each result is reported separately
         val results = coroutineScope {

@@ -93,6 +93,10 @@ internal interface AgentTool : ToolInfo {
     override val label: String? get() = null
     /** Does not touch the screen (sandbox and the like): skips the lock-screen gate and the screen guard, and images in the result are files rather than screen frames. */
     val offScreen: Boolean get() = false
+    /** Include this tool in the "unknown tool" hint even though it is off-screen (MCP tools are shown to the model but the generic list skips most off-screen tools). */
+    val listWhenUnknown: Boolean get() = !offScreen
+    /** The connector this tool belongs to, when it is an external MCP tool; used to attribute calls that failed before dispatch. */
+    val connectorName: String? get() = null
     val risk: Risk
     /** A read tool may have an optional write mode; that invocation must use the execution entry point. */
     fun readOnly(args: JsonObject): Boolean = readOnly

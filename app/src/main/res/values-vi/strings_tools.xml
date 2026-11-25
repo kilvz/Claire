@@ -81,4 +81,5 @@
     <string name="tool_mika_confirm_login">Xác nhận đăng nhập</string>
     <string name="tool_mika_favorites">Các trang thường dùng</string>
     <string name="tool_wechat_owner">Gửi tới WeChat của tôi</string>
+    <string name="tool_mcp">Công cụ MCP</string>
 </resources>

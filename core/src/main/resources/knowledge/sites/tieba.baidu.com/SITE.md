@@ -12,8 +12,8 @@ mode: desktop
 Baidu's community forum, with topics divided into 「吧」 (forums). There is a lot of discussion of long-term use, repairs and recurring problems for older models and long-tail topics, but old posts do not reflect current prices or policies.
 
 ## Pages and URLs
-- Search `https://tieba.baidu.com/f/search/res?qw=<编码后的关键词>`; signing in may be required.
-- Enter a specific forum at `https://tieba.baidu.com/f?kw=<编码后的吧名>`; the thread list is visible without signing in. Pinned threads are often the forum rules and periodic roundups (the 「装机吧」 (PC-building forum) and 「显卡吧」 (graphics-card forum) each post a monthly build recommendation).
+- Search `https://tieba.baidu.com/f/search/res?qw=<URL-encoded keyword>`; signing in may be required.
+- Enter a specific forum at `https://tieba.baidu.com/f?kw=<URL-encoded forum name>`; the thread list is visible without signing in. Pinned threads are often the forum rules and periodic roundups (the 「装机吧」 (PC-building forum) and 「显卡吧」 (graphics-card forum) each post a monthly build recommendation).
 
 ## Features
 - **Search**: results have thread links, forum names and dates; there is no usable time-filter parameter.

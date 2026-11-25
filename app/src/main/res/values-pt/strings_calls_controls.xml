@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">Não foi possível concluir o envio. Aguarde a resposta.</string>
     <string name="calls_dtmf_invalid">Use apenas 0–9, * e #, até 32 teclas.</string>
     <string name="calls_voice_briefing_start">Descrever tarefa por voz</string>
-    <string name="calls_voice_briefing_note">Fale em mandarim. Para autorizar a chamada, diga apenas “%1$s” ao terminar.</string>
+    <string name="calls_voice_briefing_note">Para autorizar a chamada, diga apenas “%1$s” depois de descrever a tarefa.</string>
     <string name="calls_voice_briefing_stopped">Descrição interrompida; nenhuma chamada feita</string>
     <string name="calls_voice_briefing_authorized">Tarefa autorizada; iniciando chamada</string>
     <string name="calls_voice_briefing_permission_granted">Microfone permitido. Toque novamente no botão de voz.</string>

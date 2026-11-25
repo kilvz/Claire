@@ -12,7 +12,7 @@ mode: desktop
 Google's webmail, which requires signing in to a Google account.
 
 ## Pages and URLs
-Entry `https://mail.google.com/`. Interface: a search box at the top; on the left, Compose plus Inbox, Sent, Drafts, Spam, Trash and custom labels; in the middle, the message list. The interface language follows the account settings, so button names are not necessarily in English. Appending `#search/<编码后的查询>` to the current account's address searches directly, and the account index in the address (such as `u/0`) corresponds to the currently signed-in account. See `references/gmail-search-syntax.md` for the search syntax.
+Entry `https://mail.google.com/`. Interface: a search box at the top; on the left, Compose plus Inbox, Sent, Drafts, Spam, Trash and custom labels; in the middle, the message list. The interface language follows the account settings, so button names are not necessarily in English. Appending `#search/<URL-encoded query>` to the current account's address searches directly, and the account index in the address (such as `u/0`) corresponds to the currently signed-in account. See `references/gmail-search-syntax.md` for the search syntax.
 
 ## Features
 - **List and search**: each row has the sender, subject, date and unread state, but no body. The list is virtualized: as you scroll down, the rows above are removed, and the number of rows scrolled past is not the total number of messages in the mailbox.

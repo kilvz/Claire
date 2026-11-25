@@ -67,7 +67,7 @@ class McpClientTest {
     }
 
     private fun parameters(tools: ToolDispatcher): JsonObject = Json.parseToJsonElement(
-        tools.definitions().single { it.name == "mcp_demo__search" }.parametersJsonSchema,
+        tools.definitions().single { it.name == demo("search") }.parametersJsonSchema,
     ).jsonObject
 
     @Test fun serverInstructionsReachTheModelWithoutGrantingApproval() {
@@ -75,7 +75,7 @@ class McpClientTest {
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         val sections = tools.promptSections(tools.definitions()).joinToString("\n")
         assertTrue(sections, com.wangzan101.mika.core.screen.observation.Untrusted.wrap(endpoint.instructions!!) in sections)
-        assertEquals(ActionRisk.Change, tools.approvalRisk("mcp_demo__search")?.level)
+        assertEquals(ActionRisk.Change, tools.approvalRisk(demo("search"))?.level)
     }
 
     @Test fun blankInstructionsAddNoSectionAndLongInstructionsStayBounded() {
@@ -94,7 +94,7 @@ class McpClientTest {
         val endpoint = endpointWithSchema("""{"type":"object","properties":null}""")
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         assertEquals(setOf("reason"), parameters(tools)["properties"]!!.jsonObject.keys)
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", "{}"), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), "{}"), ActionPass())
         assertEquals(JsonPrimitive(true), result.content["ok"])
         assertEquals(1, endpoint.calls)
     }
@@ -107,7 +107,7 @@ class McpClientTest {
         val properties = parameters(tools)["properties"]!!.jsonObject
         assertEquals(JsonObject(emptyMap()), properties["q"])
         assertEquals(Json.parseToJsonElement("""{"type":"number","minimum":0}"""), properties["n"])
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", """{"q":42}"""), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), """{"q":42}"""), ActionPass())
         assertEquals(JsonPrimitive(true), result.content["ok"])
         assertEquals(1, endpoint.calls)
     }
@@ -146,7 +146,7 @@ class McpClientTest {
         // Missing required properties are filled with an empty, permissive schema so that Args' allowed set includes it
         assertEquals(JsonObject(emptyMap()), schema["properties"]!!.jsonObject["missing"])
         assertEquals(listOf("missing"), schema["required"]!!.jsonArray.map { it.jsonPrimitive.content })
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", """{"missing":"x"}"""), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), """{"missing":"x"}"""), ActionPass())
         assertEquals(JsonPrimitive(true), result.content["ok"])
         assertEquals(1, endpoint.calls)
     }
@@ -157,14 +157,14 @@ class McpClientTest {
         )
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         assertEquals(listOf("q"), parameters(tools)["required"]!!.jsonArray.map { it.jsonPrimitive.content })
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", """{"q":"x"}"""), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), """{"q":"x"}"""), ActionPass())
         assertEquals(JsonPrimitive(true), result.content["ok"])
         assertEquals(1, endpoint.calls)
     }
 
     @Test fun serverCallForwardsOnlyServerArgumentsAndKeepsAnExplicitServerReason() = runBlocking {
         // reason is the intent note we add to every tool; it is forwarded verbatim as a server argument only when the server itself declares it (as a property or in required)
-        val query = Part.ToolCall("c", "mcp_demo__search", """{"q":"lights","reason":"check status"}""")
+        val query = Part.ToolCall("c", demo("search"), """{"q":"lights","reason":"check status"}""")
         for ((schema, expected) in listOf(
             """{"properties":{"q":{}}}""" to """{"q":"lights"}""",
             """{"properties":{"q":{},"reason":{}}}""" to query.argsJson,
@@ -238,14 +238,14 @@ class McpClientTest {
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(broken), McpConnection(healthy)))
         val names = tools.definitions().map { it.name }
         assertTrue("phone_observe" in names)
-        assertTrue("mcp_demo__search" in names)
-        assertFalse(names.any { it.startsWith("mcp_broken__") })
+        assertTrue(demo("search") in names)
+        assertFalse(names.any { it.startsWith("mcp_broken_") })
         val diagnostics = tools.promptSections(tools.definitions()).joinToString("\n")
         assertTrue(diagnostics, "broken" in diagnostics)
         assertTrue(diagnostics, "catalog exploded" in diagnostics)
         assertTrue(diagnostics, "other capabilities remain available" in diagnostics)
 
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", "{}"), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), "{}"), ActionPass())
         assertEquals(JsonPrimitive(true), result.content["ok"])
         assertEquals(1, healthy.calls)
     }
@@ -253,10 +253,10 @@ class McpClientTest {
     @Test fun oneToolAssemblyFailureBecomesDiagnosableToolError() = runBlocking {
         val endpoint = FakeEndpoint()
         val descriptor = endpoint.offered.single()
-        val assembled = assembleMcpTool("mcp:demo", endpoint, descriptor, "mcp_demo__search") {
+        val assembled = assembleMcpTool("mcp:demo", endpoint, descriptor, demo("search")) {
             throw IllegalStateException("schema adapter exploded")
         }
-        assertEquals("mcp_demo__search", assembled.tool.name)
+        assertEquals(demo("search"), assembled.tool.name)
         assertTrue(assembled.failure.orEmpty(), "schema adapter exploded" in assembled.failure.orEmpty())
         val result = assembled.tool.execute(
             Args(assembled.tool.def, buildJsonObject {}),
@@ -272,8 +272,8 @@ class McpClientTest {
         val endpoint = FakeEndpoint().apply { resourcesError = IllegalStateException("resources exploded") }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         val names = tools.definitions().map { it.name }
-        assertTrue("mcp_demo__search" in names)
-        assertFalse("mcp_demo__resource_read" in names)
+        assertTrue(demo("search") in names)
+        assertFalse(demo("resource_read") in names)
         val diagnostics = tools.promptSections(tools.definitions()).joinToString("\n")
         assertTrue(diagnostics, "resources exploded" in diagnostics)
         assertTrue(diagnostics, "resource_read" in diagnostics)
@@ -291,10 +291,10 @@ class McpClientTest {
         val spec = RunSpec(RunId("r"), "task", "thread")
         val tools = toolDispatcher(FakeScreen(), runSpec = spec, mcpServers = listOf(McpConnection(endpoint)))
         val first = tools.definitions().map { it.name }
-        assertTrue("mcp_demo__search" in first)
-        assertEquals(ActionRisk.Change, tools.approvalRisk("mcp_demo__search")?.level)
+        assertTrue(demo("search") in first)
+        assertEquals(ActionRisk.Change, tools.approvalRisk(demo("search"))?.level)
         val trusted = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint, trust = McpTrust.TrustAnnotations)))
-        assertEquals(ActionRisk.Read, trusted.approvalRisk("mcp_demo__search")?.level)
+        assertEquals(ActionRisk.Read, trusted.approvalRisk(demo("search"))?.level)
         endpoint.offered = listOf(McpToolDescriptor("changed", "Changed", buildJsonObject {}))
         assertEquals(first, tools.definitions().map { it.name })
         val subset = toolDispatcher(FakeScreen(), runSpec = spec.copy(capabilities = setOf("phone")), mcpServers = listOf(McpConnection(endpoint)))
@@ -310,8 +310,8 @@ class McpClientTest {
         }
         fun mcpNames(connection: McpConnection) =
             toolDispatcher(FakeScreen(), mcpServers = listOf(connection)).definitions().map { it.name }.filter { it.startsWith("mcp_") }
-        assertEquals(listOf("mcp_demo__search", "mcp_demo__write"), mcpNames(McpConnection(endpoint)))
-        assertEquals(listOf("mcp_demo__write"), mcpNames(McpConnection(endpoint, allowedTools = setOf("write"))))
+        assertEquals(listOf(demo("search"), demo("write")), mcpNames(McpConnection(endpoint)))
+        assertEquals(listOf(demo("write")), mcpNames(McpConnection(endpoint, allowedTools = setOf("write"))))
         assertEquals(emptyList<String>(), mcpNames(McpConnection(endpoint, allowedTools = emptySet())))
     }
 
@@ -324,20 +324,20 @@ class McpClientTest {
         }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         val names = tools.definitions().map { it.name }
-        assertTrue("mcp_demo__resource_read" in names)
-        assertTrue("mcp_demo__prompt_get" in names)
-        assertEquals(ActionRisk.Read, tools.approvalRisk("mcp_demo__resource_read")?.level)
-        assertEquals(ActionRisk.Read, tools.approvalRisk("mcp_demo__prompt_get")?.level)
+        assertTrue(demo("resource_read") in names)
+        assertTrue(demo("prompt_get") in names)
+        assertEquals(ActionRisk.Read, tools.approvalRisk(demo("resource_read"))?.level)
+        assertEquals(ActionRisk.Read, tools.approvalRisk(demo("prompt_get"))?.level)
 
         val resource = tools.execute(
-            Part.ToolCall("c", "mcp_demo__resource_read", """{"uri":"file://a"}"""),
+            Part.ToolCall("c", demo("resource_read"), """{"uri":"file://a"}"""),
             ActionPass(),
         )
         assertEquals("resource:file://a", resource.observations.single().text)
         assertEquals(Trust.Untrusted, resource.observations.single().trust)
 
         val prompt = tools.execute(
-            Part.ToolCall("c", "mcp_demo__prompt_get", """{"name":"summarize","arguments":{"topic":"x"}}"""),
+            Part.ToolCall("c", demo("prompt_get"), """{"name":"summarize","arguments":{"topic":"x"}}"""),
             ActionPass(),
         )
         assertTrue(prompt.observations.single().text.contains("prompt:summarize"))
@@ -348,7 +348,7 @@ class McpClientTest {
         var saved: String? = null
         val store = McpResultStore { _, _, body -> saved = body; "result://one" }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint, store, previewChars = 10)))
-        val result = tools.execute(Part.ToolCall("c", "mcp_demo__search", "{}"), ActionPass())
+        val result = tools.execute(Part.ToolCall("c", demo("search"), "{}"), ActionPass())
         assertEquals("x".repeat(40), saved)
         assertEquals("result://one", result.content["fullResult"]?.toString()?.trim('"'))
         assertTrue(result.content["text"].toString().contains("<untrusted>"))
@@ -364,7 +364,7 @@ class McpClientTest {
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         // An outward call that costs no money: it runs even unattended (only the approval is recorded), and the server is not called while the decision is being made
         val decision = ConfirmDecision(tools, null, provenance = RunProvenance(RunOrigin.Trigger, Attendance.Unattended))
-            .judge("mcp_demo__send", buildJsonObject {}, Origin.Model(1))
+            .judge(demo("send"), buildJsonObject {}, Origin.Model(1))
         assertEquals(Decision.Clear, decision)
         assertEquals(0, endpoint.calls)
     }
@@ -378,6 +378,8 @@ class McpClientTest {
             return McpResult("ok")
         }
     }
+
+    private fun demo(tool: String) = mcpToolName("demo", tool)
 
     private fun namesByOriginal(tools: ToolDispatcher): Map<String, String> =
         tools.definitions().filter { it.name.startsWith("mcp_") }.associate { it.description to it.name }
@@ -401,8 +403,11 @@ class McpClientTest {
         assertEquals(originals.toSet(), names.keys)
         assertEquals(originals.size, names.values.toSet().size)
         assertTrue(names.toString(), names.values.all(validName::matches))
-        assertEquals("mcp_${mcpSafe(uuid)}__search", names["search"])
-        assertEquals("mcp_demo__get_user_186aa1ca", mcpToolName("demo", "get-user", short = true))
+        assertEquals(mcpToolName(uuid, "search"), names["search"])
+        assertTrue(names.getValue("search").startsWith("mcp_"))
+        assertTrue(names.getValue("search").endsWith("__search"))
+        val short = mcpToolName("demo", "get-user", short = true)
+        assertTrue(short, short.startsWith("mcp_demo_") && short.contains("__get_user_"))
         assertEquals(MCP_TOOL_NAME_MAX, mcpToolName(uuid, "a".repeat(100)).length)
         for (original in originals) {
             val result = tools.execute(Part.ToolCall("call-$original", names.getValue(original), "{}"), ActionPass())
@@ -411,8 +416,40 @@ class McpClientTest {
         assertEquals(originals, endpoint.called)
     }
 
+    /** The model sees a readable connector label and a short digest, so two connectors with the same name stay apart. */
+    @Test fun toolNamesCarryTheConnectorLabelAndStayDistinct() {
+        val servers = listOf(
+            McpConnection(NamedEndpoint("id-one", listOf("search")), displayName = "GitHub"),
+            McpConnection(NamedEndpoint("id-two", listOf("search")), displayName = "GitHub"),
+        )
+        val names = toolDispatcher(FakeScreen(), mcpServers = servers).definitions()
+            .map { it.name }.filter { it.startsWith("mcp_") }
+        assertEquals(2, names.toSet().size)
+        for (name in names) {
+            assertTrue(name, name.startsWith("mcp_github_") && name.endsWith("__search"))
+            assertTrue(name, name.length <= MCP_TOOL_NAME_MAX)
+        }
+    }
+
+    /** A model typo in a connector tool name still names the connector, and the hint lists the real MCP tools. */
+    @Test fun unknownMcpToolListsMcpNamesAndIsAttributedToTheConnector() = runBlocking {
+        val endpoint = NamedEndpoint("661dcea9-71dd-4561-9de3-210885130a06", listOf("search_repositories"))
+        val tools = toolDispatcher(
+            FakeScreen(),
+            mcpServers = listOf(McpConnection(endpoint, displayName = "GitHub")),
+        )
+        val valid = mcpToolName(endpoint.serverId, "search_repositories", displayName = "GitHub")
+        val server = valid.substringBefore("__")
+        val corrupt = server.dropLast(1) + (if (server.last() == '0') '1' else '0') + valid.substring(server.length)
+        val result = tools.execute(Part.ToolCall("c", corrupt, "{}"), ActionPass())
+        assertEquals(JsonPrimitive("unknown_tool"), result.content["error"])
+        val message = result.content["message"]!!.jsonPrimitive.content
+        assertTrue(message, valid in message)
+        assertEquals(JsonPrimitive("GitHub"), result.record["mcpConnector"])
+    }
+
     @Test fun aPlainNameOccupyingAGeneratedShortNameDoesNotBreakRegistration() = runBlocking {
-        val occupied = "get_user_186aa1ca"
+        val occupied = mcpToolName("demo", "get-user", short = true).substringAfter("__")
         val originals = listOf("get-user", "get_user", occupied)
         fun create(listed: List<String>) = toolDispatcher(
             FakeScreen(),
@@ -422,7 +459,7 @@ class McpClientTest {
         val names = namesByOriginal(tools)
         assertEquals(3, names.values.toSet().size)
         assertTrue(names.toString(), names.values.all(validName::matches))
-        assertEquals("mcp_demo__$occupied", names[occupied])
+        assertEquals(mcpToolName("demo", occupied), names[occupied])
         assertEquals(names, namesByOriginal(create(originals.reversed())))
         for (original in originals) {
             assertEquals(JsonPrimitive(true), tools.execute(
@@ -433,7 +470,7 @@ class McpClientTest {
 
     @Test fun aPlainNameOccupyingALongToolsShortNameAlsoGetsResolved() {
         val long = "a".repeat(100)
-        val occupied = mcpToolName("demo", long).removePrefix("mcp_demo__")
+        val occupied = mcpToolName("demo", long).substringAfter("__")
         val originals = listOf(long, occupied)
         val names = mcpToolNames("demo", originals)
         assertEquals(2, names.toSet().size)
@@ -457,8 +494,8 @@ class McpClientTest {
             .definitions().filter { it.name.startsWith("mcp_") }
         assertEquals(5, definitions.size)
         assertEquals(5, definitions.map { it.name }.toSet().size)
-        assertTrue("mcp_demo__resource_read" in definitions.map { it.name })
-        assertTrue("mcp_demo__prompt_get" in definitions.map { it.name })
+        assertTrue(mcpToolName("demo", "resource_read") in definitions.map { it.name })
+        assertTrue(mcpToolName("demo", "prompt_get") in definitions.map { it.name })
     }
 
     @Test fun duplicateListingsKeepTheFirstDeclarationAndReportDegradation() {
@@ -474,7 +511,7 @@ class McpClientTest {
         }
         val tools = toolDispatcher(FakeScreen(), mcpServers = listOf(McpConnection(endpoint)))
         val definitions = tools.definitions().filter { it.name.startsWith("mcp_") }
-        assertEquals(listOf("mcp_demo__search", "mcp_demo__write"), definitions.map { it.name })
+        assertEquals(listOf(mcpToolName("demo", "search"), mcpToolName("demo", "write")), definitions.map { it.name })
         assertEquals("first", definitions.first().description)
         val diagnostics = tools.promptSections(tools.definitions()).joinToString("\n")
         assertTrue(diagnostics, "'search': listed 3 times, only the first is used" in diagnostics)

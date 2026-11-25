@@ -145,13 +145,13 @@ class ToolGroupsTest {
         // Groups used in the previous turn
         assertEquals(listOf("phone", "web"), all().preload("再看一下", listOf("web", "phone")))
         // With a workspace file attached (the attachment line contains a path under /workspace/)
-        assertEquals(listOf("sandbox"), all().preload("总结一下\n附件:/workspace/inbox/a.pdf(12 KB)", emptyList()))
+        assertEquals(listOf("sandbox"), all().preload("总结一下\nAttachment:/workspace/inbox/a.pdf(12 KB)", emptyList()))
         // Asked from a browser page about that page: the page is already the current tab
         val page = com.wangzan101.mika.core.agent.AttachedPage.compose(com.wangzan101.mika.core.agent.AttachedPage.Page("https://shop.example.com/", "店"), "挑一个")
         assertEquals(listOf("web"), all().preload(page, emptyList()))
         // The device does not support the sandbox: do not expand
         val none = toolDispatcher(FakeScreen(), sandbox = FakeSandbox(SandboxStatus.Unsupported("x86")), workspace = { "w" })
-        assertEquals(emptyList<String>(), none.preload("附件:/workspace/inbox/a.pdf", listOf("sandbox")))
+        assertEquals(emptyList<String>(), none.preload("Attachment:/workspace/inbox/a.pdf", listOf("sandbox")))
         // Groups this task does not have are not expanded; with nothing at all, everything stays collapsed
         assertEquals(emptyList<String>(), toolDispatcher(FakeScreen()).preload("看看", listOf("web")))
         assertEquals(emptyList<String>(), all().preload("1+1 等于几", emptyList()))

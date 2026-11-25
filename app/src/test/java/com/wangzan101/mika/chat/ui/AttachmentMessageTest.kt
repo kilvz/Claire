@@ -13,7 +13,7 @@ class AttachmentMessageTest {
     @get:Rule val texts = ChineseTexts()
 
     @Test fun photosAndFilesAreSplitOutOfTheWords() {
-        val text = "帮我看看这两张图和合同\n附件:/workspace/inbox/IMG_1.jpg(1.2 MB)\n附件:/workspace/inbox/租房合同（草稿）.pdf(48 KB)\n附件:/workspace/inbox/b.HEIC(900 KB)"
+        val text = "帮我看看这两张图和合同\nAttachment:/workspace/inbox/IMG_1.jpg(1.2 MB)\nAttachment:/workspace/inbox/租房合同（草稿）.pdf(48 KB)\nAttachment:/workspace/inbox/b.HEIC(900 KB)"
         val p = AttachmentMessage.parse(text)
         assertEquals("帮我看看这两张图和合同", p.words)
         assertEquals(listOf("IMG_1.jpg", "b.HEIC"), p.photos.map { it.name })
@@ -32,7 +32,7 @@ class AttachmentMessageTest {
     }
 
     @Test fun linesThatOnlyLookLikeAttachmentsStayInTheWords() {
-        for (t in listOf("附件:/etc/passwd(1 KB)", "附件:/workspace/inbox/a.pdf", "附件:/workspace/inbox/a.pdf(很大)", "看看附件:/workspace/inbox/a.pdf(1 KB)")) {
+        for (t in listOf("附件:/etc/passwd(1 KB)", "Attachment:/workspace/inbox/a.pdf", "Attachment:/workspace/inbox/a.pdf(很大)", "看看Attachment:/workspace/inbox/a.pdf(1 KB)")) {
             val p = AttachmentMessage.parse(t)
             assertFalse(t, p.hasAttachments)
             assertEquals(t, p.words)
@@ -42,23 +42,23 @@ class AttachmentMessageTest {
 
     @Test fun composeWritesWhatParseReads() {
         val text = AttachmentLines.compose("查一下", listOf("/workspace/inbox/a.png" to "3 KB", "/workspace/inbox/b.docx" to "1.0 MB"))
-        assertEquals("查一下\n附件:/workspace/inbox/a.png(3 KB)\n附件:/workspace/inbox/b.docx(1.0 MB)", text)
+        assertEquals("查一下\nAttachment:/workspace/inbox/a.png(3 KB)\nAttachment:/workspace/inbox/b.docx(1.0 MB)", text)
         val p = AttachmentMessage.parse(text)
         assertEquals("查一下", p.words)
         assertEquals(1, p.photos.size)
         assertEquals(1, p.files.size)
-        assertEquals("附件:/workspace/inbox/a.png(3 KB)", AttachmentLines.compose("", listOf("/workspace/inbox/a.png" to "3 KB")))
+        assertEquals("Attachment:/workspace/inbox/a.png(3 KB)", AttachmentLines.compose("", listOf("/workspace/inbox/a.png" to "3 KB")))
         // The text handed to the task is the same as before
         assertEquals(text, ChatViewModel.withAttachments("查一下", listOf("/workspace/inbox/a.png" to 3072L, "/workspace/inbox/b.docx" to 1024L * 1024)))
     }
 
     @Test fun plainDropsThePathLines() {
-        assertEquals("查车次", AttachmentMessage.plain("查车次\n附件:/workspace/inbox/a.pdf(1 KB)"))
-        assertEquals("照片", AttachmentMessage.plain("附件:/workspace/inbox/a.jpg(1 KB)"))
-        assertEquals("2 张照片", AttachmentMessage.plain("附件:/workspace/inbox/a.jpg(1 KB)\n附件:/workspace/inbox/b.png(1 KB)"))
-        assertEquals("a.pdf", AttachmentMessage.plain("附件:/workspace/inbox/a.pdf(1 KB)"))
-        assertEquals("a.pdf 等 2 个文件", AttachmentMessage.plain("附件:/workspace/inbox/a.pdf(1 KB)\n附件:/workspace/inbox/b.zip(1 KB)"))
-        assertEquals("照片和文件", AttachmentMessage.plain("附件:/workspace/inbox/a.jpg(1 KB)\n附件:/workspace/inbox/b.zip(1 KB)"))
+        assertEquals("查车次", AttachmentMessage.plain("查车次\nAttachment:/workspace/inbox/a.pdf(1 KB)"))
+        assertEquals("照片", AttachmentMessage.plain("Attachment:/workspace/inbox/a.jpg(1 KB)"))
+        assertEquals("2 张照片", AttachmentMessage.plain("Attachment:/workspace/inbox/a.jpg(1 KB)\nAttachment:/workspace/inbox/b.png(1 KB)"))
+        assertEquals("a.pdf", AttachmentMessage.plain("Attachment:/workspace/inbox/a.pdf(1 KB)"))
+        assertEquals("a.pdf 等 2 个文件", AttachmentMessage.plain("Attachment:/workspace/inbox/a.pdf(1 KB)\nAttachment:/workspace/inbox/b.zip(1 KB)"))
+        assertEquals("照片和文件", AttachmentMessage.plain("Attachment:/workspace/inbox/a.jpg(1 KB)\nAttachment:/workspace/inbox/b.zip(1 KB)"))
         assertEquals("没有附件\n第二行", AttachmentMessage.plain("没有附件\n第二行"))
     }
 

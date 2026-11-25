@@ -155,7 +155,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
 
     /**
      * Sending with attachments: copy the attachments into the conversation workspace's inbox/ first (the input bar shows they are being added meanwhile),
-     * and once all copies succeed, write each attachment as a line "Attachment: <path> (<size>)" after the words and hand it to the front desk to dispatch as a new task
+     * and once all copies succeed, write each attachment as a line "Attachment:<path> (<size>)" after the words and hand it to the front desk to dispatch as a new task
      * (see [DeskChatOps.sendFiles]); without a front desk, start the task in this conversation as before.
      * If some attachments were not accepted, keep the draft and list the failures so the user can retry or remove them before sending again.
      * If the conversation changes or another task starts during the copy, nothing is sent (the copied files stay in the original conversation's workspace).

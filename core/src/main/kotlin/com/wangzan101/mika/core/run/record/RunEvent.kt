@@ -289,8 +289,27 @@ sealed interface RunEvent {
         /** One record line; events from before the rename (screen_text, screen_saved) are converted to their current shape before reading. */
         fun decode(line: String): RunEvent = json.decodeFromJsonElement(serializer(), LegacyEvents.upgrade(json.parseToJsonElement(line)))
 
-        /** The place written into run records: an app is its package name, a site is "site domain" (the same form as in past records). */
-        fun placeLabel(p: Place?): String? = p?.let { if (it.kind == com.wangzan101.mika.core.screen.observation.PlaceKind.Site) "网站 ${it.name}" else it.name }
+        /** The place written into run records: an app is its package name, a site is "site <domain>" (older records use "网站 <domain>"). */
+        const val SITE_PREFIX = "site "
+        const val LEGACY_SITE_PREFIX = "网站 "
+
+        /** Whether a run-record target was written for a web page rather than an app or a free-form value. */
+        fun isSitePlace(target: String?): Boolean =
+            target != null && (target.startsWith(SITE_PREFIX) || target.startsWith(LEGACY_SITE_PREFIX))
+
+        /** The domain of a site target, without the internal marker (legacy markers included). */
+        fun siteName(target: String): String = when {
+            target.startsWith(SITE_PREFIX) -> target.removePrefix(SITE_PREFIX).trim()
+            target.startsWith(LEGACY_SITE_PREFIX) -> target.removePrefix(LEGACY_SITE_PREFIX).trim()
+            else -> target.trim()
+        }
+
+        /** What the UI shows for a place target: the site marker is internal and never displayed. */
+        fun displayPlace(target: String?): String? = target?.let { if (isSitePlace(it)) siteName(it) else it }
+
+        fun placeLabel(p: Place?): String? = p?.let {
+            if (it.kind == com.wangzan101.mika.core.screen.observation.PlaceKind.Site) "$SITE_PREFIX${it.name}" else it.name
+        }
 
         fun clip(s: String): String = if (s.length <= MAX_FIELD) s else s.take(MAX_FIELD) + "…(truncated)"
 

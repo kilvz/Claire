@@ -1,5 +1,6 @@
 package com.wangzan101.mika.core.run.record
 
+import com.wangzan101.mika.core.agent.Conversation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -94,7 +95,7 @@ class RunMetricsTest {
     }
 
     @Test fun cancelledRunIsNotASuccess() {
-        val m = RunMetrics.of(listOf(started(0), reply(400, 1, "phone_observe"), RunEvent.TaskEnded(900, "cancelled", "已取消")))!!
+        val m = RunMetrics.of(listOf(started(0), reply(400, 1, "phone_observe"), RunEvent.TaskEnded(900, "cancelled", Conversation.CANCELLED_OUTCOME)))!!
         assertEquals("cancelled", m.outcome)
         assertFalse(m.succeeded)
         assertEquals(900L, m.totalMs)

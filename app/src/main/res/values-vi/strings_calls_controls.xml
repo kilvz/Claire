@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">Không thể hoàn tất việc gửi. Hãy chờ phản hồi trước khi thao tác tiếp.</string>
     <string name="calls_dtmf_invalid">Chỉ dùng 0–9, * và #, tối đa 32 phím.</string>
     <string name="calls_voice_briefing_start">Mô tả tác vụ bằng giọng nói</string>
-    <string name="calls_voice_briefing_note">Hãy nói bằng tiếng Quan Thoại. Để cho phép quay số, hãy nói riêng “%1$s” sau khi mô tả tác vụ.</string>
+    <string name="calls_voice_briefing_note">Để cho phép quay số, hãy nói riêng “%1$s” sau khi mô tả tác vụ.</string>
     <string name="calls_voice_briefing_stopped">Đã dừng phần mô tả; chưa thực hiện cuộc gọi nào</string>
     <string name="calls_voice_briefing_authorized">Đã cho phép tác vụ; đang gửi cuộc gọi</string>
     <string name="calls_voice_briefing_permission_granted">Đã cho phép micrô. Nhấn lại nút giọng nói để bắt đầu.</string>

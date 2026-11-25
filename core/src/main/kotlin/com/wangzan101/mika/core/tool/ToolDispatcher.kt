@@ -361,15 +361,18 @@ class ToolDispatcher internal constructor(
     }
 
     /** Unknown tool; when it is a name from before the rename, say what it is called now (without swapping in the new name and executing it for the model). */
-    private fun unknown(name: String, args: JsonObject) = ToolExecution(buildJsonObject {
-        put("ok", false); put("error", "unknown_tool"); put("tool", name)
-        val now = legacy.replacements(name, args).filter { registry[it] != null }
-        val instead = legacy.retiredAs(name)
-        put("message", if (instead != null) Feedback.format("unknown_tool_retired", "name" to name, "instead" to instead)
-            else if (now.isNotEmpty()) Feedback.format("unknown_tool_renamed", "name" to name, "tools" to now.joinToString(" or "))
-            else Feedback.format("unknown_tool", "name" to name, "tools" to (registry.listedNames().joinToString())))
-        put("recoverable", true)
-    })
+    private fun unknown(name: String, args: JsonObject): ToolExecution {
+        val connector = registry.connectorForUnknown(name)
+        return ToolExecution(buildJsonObject {
+            put("ok", false); put("error", "unknown_tool"); put("tool", name)
+            val now = legacy.replacements(name, args).filter { registry[it] != null }
+            val instead = legacy.retiredAs(name)
+            put("message", if (instead != null) Feedback.format("unknown_tool_retired", "name" to name, "instead" to instead)
+                else if (now.isNotEmpty()) Feedback.format("unknown_tool_renamed", "name" to name, "tools" to now.joinToString(" or "))
+                else Feedback.format("unknown_tool", "name" to name, "tools" to (registry.listedNames().joinToString())))
+            put("recoverable", true)
+        }, record = connector?.let { buildJsonObject { put("mcpConnector", it) } } ?: JsonObject(emptyMap()))
+    }
 
     /** The current position of the evidence ledger (see [EvidenceLedger.lastId]); taken before an action, then [readSince] shows whether anything was read again after the action. */
     fun ledgerMark(): Int = evidenceLog.ledger.lastId

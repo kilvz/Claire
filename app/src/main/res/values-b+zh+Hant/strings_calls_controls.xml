@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">無法完成傳送，請先等待對方回應。</string>
     <string name="calls_dtmf_invalid">僅限 0–9、*、#，最多 32 個。</string>
     <string name="calls_voice_briefing_start">語音交代任務</string>
-    <string name="calls_voice_briefing_note">請用普通話交代；完成後，單獨說「%1$s」才會撥出。</string>
+    <string name="calls_voice_briefing_note">交代任務後，單獨說「%1$s」才會撥出。</string>
     <string name="calls_voice_briefing_stopped">語音交代已中斷，未撥號</string>
     <string name="calls_voice_briefing_authorized">交代已確認，正在提交撥號</string>
     <string name="calls_voice_briefing_permission_granted">麥克風已允許，請再次點語音交代按鈕開始。</string>

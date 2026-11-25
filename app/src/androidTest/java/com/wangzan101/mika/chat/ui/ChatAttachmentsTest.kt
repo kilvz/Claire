@@ -301,8 +301,8 @@ class ChatAttachmentsTest {
 
     @Test fun sentMessageShowsPhotosFilesAndWordsButNoPaths() {
         bubble(
-            "帮我看看这些\n附件:/workspace/inbox/a.jpg(1 KB)\n附件:/workspace/inbox/b.jpg(1 KB)\n" +
-                "附件:/workspace/inbox/c.webp(1 KB)\n附件:/workspace/inbox/租房合同 (1).pdf(48 KB)",
+            "帮我看看这些\nAttachment:/workspace/inbox/a.jpg(1 KB)\nAttachment:/workspace/inbox/b.jpg(1 KB)\n" +
+                "Attachment:/workspace/inbox/c.webp(1 KB)\nAttachment:/workspace/inbox/租房合同 (1).pdf(48 KB)",
         )
         compose.onAllNodesWithTag("sent-photo").assertCountEquals(3)
         compose.onAllNodesWithTag("sent-file").assertCountEquals(1)
@@ -310,9 +310,10 @@ class ChatAttachmentsTest {
         compose.onNodeWithText("48 KB").assertIsDisplayed()
         compose.onNodeWithText("帮我看看这些").assertIsDisplayed()
         compose.onAllNodesWithText("/workspace", substring = true).assertCountEquals(0)
-        compose.onAllNodesWithText("附件:", substring = true).assertCountEquals(0)
+        compose.onAllNodesWithText("Attachment:", substring = true).assertCountEquals(0)
     }
 
+    /** A message saved by an older version still shows its photo, without the old prefix or path. */
     @Test fun singlePhotoAloneHasNoWordsBubble() {
         bubble("附件:/workspace/inbox/a.jpg(1 KB)")
         compose.onAllNodesWithTag("sent-photo").assertCountEquals(1)

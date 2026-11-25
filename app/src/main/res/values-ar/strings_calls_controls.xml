@@ -15,7 +15,7 @@
     <string name="calls_dtmf_failed">تعذر إكمال الإرسال. انتظر الرد.</string>
     <string name="calls_dtmf_invalid">استخدم 0–9 و* و# فقط، حتى 32 مفتاحًا.</string>
     <string name="calls_voice_briefing_start">وصف المهمة صوتيًا</string>
-    <string name="calls_voice_briefing_note">تحدث بالصينية المندرينية. للسماح بالاتصال، قل «%1$s» وحدها بعد الانتهاء.</string>
+    <string name="calls_voice_briefing_note">لتفويض الاتصال، قل «%1$s» وحدها بعد وصف المهمة.</string>
     <string name="calls_voice_briefing_stopped">توقف الوصف؛ لم يتم إجراء مكالمة</string>
     <string name="calls_voice_briefing_authorized">تم تأكيد المهمة؛ جارٍ طلب الاتصال</string>
     <string name="calls_voice_briefing_permission_granted">تم السماح بالميكروفون. اضغط زر الصوت مرة أخرى.</string>

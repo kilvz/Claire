@@ -191,7 +191,10 @@ class RunTimelineViewModel(
                     val row = at(e.step)
                     // Calls via MCP form their own kind of row: they name the connector and do not expose the MCP tool name to the user
                     val mcp = e.mcpConnector?.let(StatusCopy::calledMcp)
-                    val next = TimelineActivity(if (mcp != null) "mcp" else e.kind, mcp ?: toolLabel(e.label), e.target, e.effect, obsIds = e.obsIds)
+                    val next = TimelineActivity(
+                        if (mcp != null) "mcp" else e.kind, mcp ?: toolLabel(e.label),
+                        RunEvent.displayPlace(e.target), e.effect, obsIds = e.obsIds,
+                    )
                     val last = row.activities.lastOrNull()
                     val activities = if (next.kind == "observe" && last?.kind == "observe" && last.target == e.target) {
                         row.activities.dropLast(1) + last.copy(count = last.count + 1, obsIds = (last.obsIds + e.obsIds).distinct())

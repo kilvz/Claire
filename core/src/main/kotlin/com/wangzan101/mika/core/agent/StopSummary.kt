@@ -194,20 +194,17 @@ class StopSummary(
             }
         }
 
-        /** The human-readable form of an activity target: "site domain" keeps only the domain, a package name becomes the App name, anything else (URLs, query terms) stays as-is; null when blank. */
+        /** The human-readable form of an activity target: a site target keeps only the domain, a package name becomes the App name, anything else (URLs, query terms) stays as-is; null when blank. */
         private fun where(target: String, appLabel: (String) -> String): String? = when {
             target.isBlank() -> null
-            target.startsWith(SITE_PREFIX) -> target.removePrefix(SITE_PREFIX).trim()
+            RunEvent.isSitePlace(target) -> RunEvent.siteName(target)
             PACKAGE_NAME_RE.matches(target) -> appLabel(target)
             else -> target
         }.takeUnless { it.isNullOrBlank() }
 
         /** The name when the activity target is an App or a website; null for anything else (URLs, query terms, files). */
         private fun placeOf(target: String, appLabel: (String) -> String): String? =
-            if (target.startsWith(SITE_PREFIX) || PACKAGE_NAME_RE.matches(target)) where(target, appLabel) else null
-
-        /** In run records, the object of a web page screen is written as "site <domain>". */
-        private const val SITE_PREFIX = "网站 "
+            if (RunEvent.isSitePlace(target) || PACKAGE_NAME_RE.matches(target)) where(target, appLabel) else null
 
         private fun list(items: List<String>, max: Int) =
             items.take(max).joinToString("、") + if (items.size > max) " 等 ${items.size} 处" else ""

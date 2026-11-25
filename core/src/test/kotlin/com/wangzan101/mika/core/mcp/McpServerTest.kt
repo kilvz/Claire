@@ -6,6 +6,7 @@ import com.wangzan101.mika.core.cap.mcp.McpConnection
 import com.wangzan101.mika.core.cap.mcp.McpEndpoint
 import com.wangzan101.mika.core.cap.mcp.McpResult
 import com.wangzan101.mika.core.cap.mcp.McpToolDescriptor
+import com.wangzan101.mika.core.cap.mcp.mcpToolName
 import com.wangzan101.mika.core.run.record.RunEvent
 import com.wangzan101.mika.core.run.record.RunSink
 import com.wangzan101.mika.core.run.Attendance
@@ -45,12 +46,14 @@ class McpServerTest {
         session.events.subscribe(object : RunSink { override fun event(e: RunEvent) { events += e } })
         assertEquals(RunOrigin.Mcp, session.spec.provenance.origin)
         assertEquals(Attendance.Unattended, session.spec.provenance.attendance)
-        val read = session.call("mcp_fake__read", "{}")
+        val readName = mcpToolName("fake", "read")
+        val sendName = mcpToolName("fake", "send")
+        val read = session.call(readName, "{}")
         assertEquals("true", read["ok"].toString())
-        val send = session.call("mcp_fake__send", "{}")
+        val send = session.call(sendName, "{}")
         assertEquals("true", send["ok"].toString())
         assertEquals(2, endpoint.calls)
-        assertFalse(events.any { it is RunEvent.Approval && it.tool == "mcp_fake__send" })
+        assertFalse(events.any { it is RunEvent.Approval && it.tool == sendName })
         assertTrue(events.any { it is RunEvent.ToolResult })
         session.close()
         assertEquals(RunPhase.Ended, store.get(session.spec.id)?.phase)

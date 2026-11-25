@@ -174,12 +174,9 @@ object CapsuleThreads {
         acts.mapNotNull { a ->
             val t = a.target?.trim().orEmpty()
             when {
-                t.startsWith(SITE_PREFIX) -> t.removePrefix(SITE_PREFIX).trim().ifEmpty { null }
+                RunEvent.isSitePlace(t) -> RunEvent.siteName(t).ifEmpty { null }
                 PACKAGE_NAME_RE.matches(t) -> appLabel(t)
                 else -> null
             }
         }.distinct()
-
-    /** In the run record a web page screen's target is written as SITE_PREFIX followed by the domain. */
-    private const val SITE_PREFIX = "网站 "
 }
