@@ -30,7 +30,7 @@ It works on a hidden background screen, so you can keep using your phone.
 
 - **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI is still available in many languages — switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 2.2.2 is based on upstream Mika 0.1.51 (commit `6d364993f`). See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Its own versioning.** Claire 2.3.0 is based on upstream Mika 0.1.52 (commit `7ff1703f6`). See [VERSION.md](VERSION.md) for how versions are numbered.
 - **Same engine.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, skills and memory — works the same here.
 
 ## Get things done with one sentence

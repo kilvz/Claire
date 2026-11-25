@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.2.2: the documentation now speaks as Claire throughout — the README, feature and setup guides, install-with-an-agent, MCP/CLI pages, FAQ, computer pages and developer docs all use Claire's name, package and releases instead of upstream Mika's. Install steps point at the real `com.kilv.claire` package, `Claire-<version>.apk` and Claire's `v2.2.x` tags, including the accessibility component and external-file paths. The bundled `mika` CLI now defaults to `com.kilv.claire`, so `mika connect` finds Claire without `--package`, and its messages say Claire. No app behaviour changed in this release.
+            New in 2.3.0: sign in with an OpenCode Go account — Claire shows a short code, OpenCode's page confirms it, and each model then uses the protocol and address from OpenCode's own model list. The interface now speaks Vietnamese. The empty chat page has a larger greeting, a swipeable promo card and two rows of example pills that scroll in opposite directions. The composer's send arrow becomes a stop button while a reply or task is running, settings pages keep their scroll position when you go back, and task, voice-call, proactive-listening and sandbox fixes make longer runs steadier.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

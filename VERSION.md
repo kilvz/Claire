@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.2.2 (versionCode 68)
-- **Base version:** upstream Mika 0.1.51 (commit `6d364993f`)
+- **Claire version:** 2.3.0 (versionCode 69)
+- **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -138,6 +138,20 @@ recorded base version.
   file paths; the CLI/Skill docs use Claire's `v2.2.x` tags. The bundled
   `mika` CLI now defaults to the `com.kilv.claire` package, so `mika
   connect` finds Claire without `--package`, and its messages say Claire.
+  Existing English copy, the international default provider, and the
+  Google speech fix are kept.
+- 2.3.0: ported upstream Mika through commit `7ff1703f6` (25 Nov 2026)
+  and added OpenCode Go sign-in. The model screen now offers OpenCode Go
+  in the account sign-in group: Claire shows a short code, OpenCode's page
+  confirms it, and each model then calls the protocol and address named in
+  OpenCode's own model list. The interface speaks Vietnamese, the empty
+  chat page is redesigned around a larger greeting with a swipeable promo
+  card and two rows of example pills, and the composer turns its send
+  arrow into a stop button while a reply or task is running. Settings
+  pages keep their scroll position on back, task pause, voice-call step
+  cards and followed-run controls are steadier, proactive listening
+  re-registers after the system drops it, shared drafts honor their size
+  tiers, and the sandbox source pack includes copyleft pip wheels.
   Existing English copy, the international default provider, and the
   Google speech fix are kept.
 
