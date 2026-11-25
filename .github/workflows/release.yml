@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.3.1: MCP tools now carry readable names that include the connector, so calls to GitHub, filesystem and other servers stay distinct even when two connectors share a label, and a failed tool call is shown under the connector it belongs to instead of its internal name. The MCP catalog's Everything preset starts correctly and every preset description is translated. Run records, cancellation summaries and attachment lines now use English markers (older conversations still open), and the voice-briefing authorization phrase follows the interface language.
+            New in 2.3.2: the shell transport picker's labels are centered and no longer clipped, so Auto, wireless debugging and Shizuku stay readable at any text size or display density. The build is also warning-clean again: deprecated Android calls were replaced with their current equivalents, and the few calls with no replacement are suppressed with the reason documented.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

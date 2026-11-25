@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.3.1 (versionCode 70)
+- **Claire version:** 2.3.2 (versionCode 71)
 - **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -164,6 +164,17 @@ recorded base version.
   attachment lines now use English markers (older conversations still
   open), and the voice-briefing authorization phrase follows the
   interface language.
+
+- 2.3.2: the shell transport picker's labels are centered and no
+  longer clipped, so Auto, wireless debugging and Shizuku stay readable
+  at any text size or display density. The build is warning-clean
+  again: deprecated Android calls were replaced with their current
+  equivalents (parcelable reads, call state, screen-reader checked
+  state, predictive back, display metrics), the test compilations opt
+  in to the coroutine and serialization APIs they use, and the few
+  calls with no replacement are suppressed with the reason documented.
+  The Gradle end-of-life notice is informational and the pinned
+  Gradle/AGP/Kotlin versions still match upstream.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub
