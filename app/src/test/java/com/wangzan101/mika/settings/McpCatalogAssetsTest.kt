@@ -48,15 +48,16 @@ class McpCatalogAssetsTest {
         }
     }
 
-    @Test fun filesystemFamilyStdioPresetsDeclareAServeDirectory() {
-        // server-filesystem / server-everything must be given an "allowed directories" argument at startup, otherwise the process exits immediately.
-        val byId = bundled().presets.associateBy { it.id }
-        for (id in listOf("filesystem", "everything")) {
-            val preset = byId.getValue(id)
-            assertEquals("$id: transport", "stdio", preset.transport)
-            assertTrue("$id must declare a directory argument, got ${preset.command}",
-                preset.command.size >= 2 && preset.command.drop(1).any { it.startsWith("/") })
-        }
+    @Test fun filesystemPresetDeclaresAServeDirectory() {
+        // server-filesystem must be given an "allowed directories" argument at startup, otherwise the process exits immediately.
+        val preset = bundled().presets.single { it.id == "filesystem" }
+        assertEquals("filesystem: transport", "stdio", preset.transport)
+        assertTrue("filesystem must declare a directory argument, got ${preset.command}",
+            preset.command.size >= 2 && preset.command.drop(1).any { it.startsWith("/") })
+        // server-everything takes no arguments; a directory here would be read as an option and the process would not start.
+        val everything = bundled().presets.single { it.id == "everything" }
+        assertEquals("everything: transport", "stdio", everything.transport)
+        assertEquals("everything: command", listOf("mcp-server-everything"), everything.command)
     }
 
     @Test fun catalogLoaderSkipsOnlyMalformedEntries() {

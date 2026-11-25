@@ -1257,7 +1257,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("说明这张图", ok))
         runCurrent()
         assertEquals(listOf(listOf("content://mika.shared/shared.jpg")), imported)
-        assertEquals(listOf("start:说明这张图\n附件:/workspace/inbox/photo.jpg(3 B)"), calls)
+        assertEquals(listOf("start:说明这张图\nAttachment:/workspace/inbox/photo.jpg(3 B)"), calls)
         assertNull(drafts.read())
         assertFalse(drafts.attachmentFile("shared.jpg")!!.exists())
     }
@@ -1296,7 +1296,7 @@ class ChatViewModelTest {
 
         assertTrue(restored.send("", ok))
         runCurrent()
-        assertEquals(listOf("start:附件:/workspace/inbox/周报.pdf(3 B)"), calls)
+        assertEquals(listOf("start:Attachment:/workspace/inbox/周报.pdf(3 B)"), calls)
         assertNull(drafts.read())
         assertFalse(file.exists())
     }
@@ -1586,7 +1586,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("一起看", ok))
         runCurrent()
         assertEquals(listOf(listOf("content://mika.shared/a.jpg", "content://mika.shared/c.png")), imported)
-        assertEquals(listOf("start:一起看\n附件:/workspace/inbox/a.jpg(2 B)\n附件:/workspace/inbox/c.png(1 B)"), calls)
+        assertEquals(listOf("start:一起看\nAttachment:/workspace/inbox/a.jpg(2 B)\nAttachment:/workspace/inbox/c.png(1 B)"), calls)
         assertNull(drafts.read())
         assertFalse(drafts.attachmentFile("a.jpg")!!.exists())
         assertFalse(drafts.attachmentFile("c.png")!!.exists())
@@ -1940,7 +1940,7 @@ class ChatViewModelTest {
         assertTrue(vm.send(vm.ui.value.input, ok))
         runCurrent()
         assertEquals(id to listOf("content://x/1"), imported.last())
-        assertEquals(listOf("start:汇总一下\n附件:/workspace/inbox/报表 (1).csv(2 KB)"), calls)
+        assertEquals(listOf("start:汇总一下\nAttachment:/workspace/inbox/报表 (1).csv(2 KB)"), calls)
         assertTrue(vm.ui.value.attachments.isEmpty())
         assertTrue(vm.ui.value.input.isEmpty())
         // This conversation does not take attachments while it is running its own task (attachments only start with a new task)
@@ -1959,7 +1959,7 @@ class ChatViewModelTest {
         assertTrue(vm.toggleAttachment(PendingAttachment("content://m/1", "a.jpg", 1L)))
         assertTrue(vm.send("", ok))
         runCurrent()
-        assertEquals(listOf("start:附件:/workspace/inbox/a.jpg(3.0 MB)"), calls)
+        assertEquals(listOf("start:Attachment:/workspace/inbox/a.jpg(3.0 MB)"), calls)
     }
 
     @Test fun failedImportWithTextKeepsDraftAndCanBeRetried() = runTest {
@@ -1983,7 +1983,7 @@ class ChatViewModelTest {
         fails = false
         assertTrue(vm.send(vm.ui.value.input, ok))
         runCurrent()
-        assertEquals(listOf("start:分析这个文件\n附件:/workspace/inbox/a.pdf(1 B)"), calls)
+        assertEquals(listOf("start:分析这个文件\nAttachment:/workspace/inbox/a.pdf(1 B)"), calls)
         assertTrue(vm.ui.value.attachments.isEmpty())
     }
 
@@ -3420,7 +3420,7 @@ class ChatViewModelTest {
         assertTrue(vm.send("修改后的问题", ok))
         runCurrent()
         assertEquals(0, imports)
-        assertEquals("start:修改后的问题\n附件:${paths[0]}(2 B)\n附件:${paths[2]}(2 B)", calls.last { it.startsWith("start:") })
+        assertEquals("start:修改后的问题\nAttachment:${paths[0]}(2 B)\nAttachment:${paths[2]}(2 B)", calls.last { it.startsWith("start:") })
         assertFalse(result.needsReattach)
     }
 
