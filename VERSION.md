@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.3.0 (versionCode 69)
+- **Claire version:** 2.3.1 (versionCode 70)
 - **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -154,6 +154,16 @@ recorded base version.
   tiers, and the sandbox source pack includes copyleft pip wheels.
   Existing English copy, the international default provider, and the
   Google speech fix are kept.
+
+- 2.3.1: MCP tools now carry readable names that include the connector,
+  so calls to GitHub, filesystem and other servers stay distinct even
+  when two connectors share a label; a failed tool call is shown under
+  the connector it belongs to instead of its internal name. The MCP
+  catalog's Everything preset starts correctly and every preset
+  description is translated. Run records, cancellation summaries and
+  attachment lines now use English markers (older conversations still
+  open), and the voice-briefing authorization phrase follows the
+  interface language.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

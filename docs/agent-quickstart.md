@@ -12,7 +12,7 @@ curl -s https://api.github.com/repos/kilvz/Claire/releases/latest   # read tag_n
 (Invoke-RestMethod https://api.github.com/repos/kilvz/Claire/releases/latest).tag_name
 ```
 
-Below, `<tag>` is that value (e.g. `v2.3.0`) and `<ver>` is the version without the `v` (e.g. `2.3.0`).
+Below, `<tag>` is that value (e.g. `v2.3.1`) and `<ver>` is the version without the `v` (e.g. `2.3.1`).
 
 ## 2. CLI or Skill
 
