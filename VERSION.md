@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.2.0 (versionCode 66)
-- **Base version:** upstream Mika 0.1.51 (commit `7f7a93155`)
+- **Claire version:** 2.2.1 (versionCode 67)
+- **Base version:** upstream Mika 0.1.51 (commit `6d364993f`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -110,6 +110,24 @@ recorded base version.
   turn, phone calls can ask the owner a question with a reply
   notification, and there is a new file library. Existing English copy,
   the international default provider, and the Google speech fix are
+  kept.
+- 2.2.1: ported upstream Mika through commit `6d364993f` (24 Nov 2026).
+  The chat and settings pages are now a plain, flat style: white chat
+  page with solid bubbles and no translucent layers, a three-block top
+  bar, settings and AI call pages as light-grey groups with bare icons,
+  and one shared borderless input field. The sidebar opens with browser,
+  Teach Claire and AI calls as three cards and a lighter chat list; the
+  plus panel groups camera, album, files and clipboard above Teach
+  Claire, Skills and Saved. Only Claire is visible to the user now: chat,
+  call and phone prompts, tool text and earlier turns never mention a
+  front desk or background task, and the newest result Claire gave is
+  kept in full so follow-ups about it still work. Take over, allow once,
+  continue and stop happen directly on the card in the chat, progress
+  lives in the bar above the message box, and cards appear only when
+  something needs the user. AI call setup is redone automatically after a
+  restart when Android dropped it, and web links from settings, About and
+  answers open in Claire's own browser in a new tab. Existing English
+  copy, the international default provider, and the Google speech fix are
   kept.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
