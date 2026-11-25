@@ -27,7 +27,8 @@ class StringResourcesTest {
         Other("values-ru", Locale.forLanguageTag("ru"), setOf("one", "few", "many", "other")),
         // The Indonesian resource folder keeps Android's legacy language code in
         Other("values-in", Locale.forLanguageTag("id"), setOf("other")),
-        Other("values-tr", Locale.forLanguageTag("tr"), setOf("other")),
+        Other("values-tr", Locale.forLanguageTag("tr"), setOf("one", "other")),
+        Other("values-vi", Locale.forLanguageTag("vi"), setOf("other")),
     )
 
     private val en = ResFileTexts.english
@@ -146,7 +147,8 @@ class StringResourcesTest {
         assertEquals(AppLanguage.Arabic, of("ar"))
         assertEquals(AppLanguage.Arabic, of("ar-MA"))
         assertEquals(AppLanguage.Persian, of("fa-IR"))
-        // Other languages look only at the language code and ignore the region
+        assertEquals(AppLanguage.Vietnamese, of("vi-VN"))
+        // 其他语言只看语言代码,地区不管
         assertEquals(AppLanguage.Japanese, of("ja-JP"))
         assertEquals(AppLanguage.Portuguese, of("pt-PT"))
         assertEquals(AppLanguage.Portuguese, of("pt-BR"))

@@ -22,7 +22,21 @@ It works on a hidden background screen, so you can keep using your phone.
 
 <img src="docs/media/wechat-send-side.gif" alt="From one sentence, Claire opens WeChat on its background screen, finds the contact and sends the message" width="640" />
 
-<sub>"Send a message to File Transfer": Claire's chat on the left, each step on its background screen on the right (4× speed; chat list blurred)</sub>
+<br/>
+
+<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/daily?language=Kotlin" alt="#1 Kotlin Repository of the Day" width="250" height="55" /></a>
+<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/weekly?language=Kotlin" alt="#1 Kotlin Repository of the Week" width="250" height="55" /></a>
+<a href="https://trendshift.io/repositories/326940#achievements"><img src="https://trendshift.io/api/badge/trendshift/repositories/326940/daily" alt="#5 Repository of the Day" width="250" height="55" /></a>
+
+<br/>
+
+English · [简体中文](docs/readme/README.zh-CN.md) · [繁體中文](docs/readme/README.zh-Hant.md) · [日本語](docs/readme/README.ja.md) · [한국어](docs/readme/README.ko.md) · [Español](docs/readme/README.es.md) · [Türkçe](docs/readme/README.tr.md) · [Tiếng Việt](docs/readme/README.vi.md)
+
+<br/>
+
+<img src="docs/media/wechat-send-side.gif" alt="From one sentence, Mika opens WeChat on its background screen, finds the contact and sends the message" width="640" />
+
+<sub>"Send a message to File Transfer": Mika's chat on the left, each step on its background screen on the right (4× speed; chat list blurred)</sub>
 
 </div>
 
@@ -159,7 +173,7 @@ Not sure your phone is up to it? Run Settings › Recovery & repair › **Compat
 
 **Can I use a model running on my own computer?** Yes: pick "Custom" as the provider and enter its address on your local network.
 
-**Is the app in English?** Yes — Claire starts in English and the agent's instructions are written in English. The app UI also comes in Arabic, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian and Indonesian, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Claire in English.
+**Is the app in English?** Yes. The app UI comes in English, Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian, Indonesian and Vietnamese, follows your system language, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Mika in English.
 
 **Where do updates come from?** Only from this repository's [Releases](https://github.com/kilvz/Claire/releases); you can also upgrade in the app from About › Check for updates.
 

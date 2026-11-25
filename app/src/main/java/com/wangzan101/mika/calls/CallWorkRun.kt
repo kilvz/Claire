@@ -203,7 +203,14 @@ internal suspend fun CallRuntime.runWork(w: Work) {
                     requireOutgoingForegroundService(w)
                     w.placed = true
                     w.telecomActionIssued = true
-                    val issued = runCatching { checkNotNull(telecom).placeCall(Uri.fromParts(PhoneAccount.SCHEME_TEL, number, null), extras) }.isSuccess
+                    val issued = try {
+                        checkNotNull(telecom).placeCall(Uri.fromParts(PhoneAccount.SCHEME_TEL, number, null), extras)
+                        true
+                    } catch (_: SecurityException) {
+                        false
+                    } catch (_: RuntimeException) {
+                        false
+                    }
                     lockedDial?.takeIf { it.ticket === w.lockedDialTicket }?.let {
                         finishLockedDial(it, if (issued) "Waiting for Android to confirm the locked-screen dial" else "Android rejected the locked-screen dial")
                     }

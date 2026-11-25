@@ -50,7 +50,9 @@ class VoiceCallFeed(private val maxItems: Int = MAX_ITEMS) {
     private var nextId = 0L
     /** Task ids already finished when the task board was first received (dispatched earlier, so no card); null before it has been received. */
     private var ignored: Set<String>? = null
-    private fun steps(view: DeskTaskView) = (view.recent + listOfNotNull(view.line)).distinct()
+    // recent 只有 3 条,收集方合并丢中间快照时会滚过中间步骤;快照自带的全程 steps 才是完整账目。
+    private fun steps(view: DeskTaskView) =
+        (view.steps.map { it.text } + view.recent + listOfNotNull(view.line)).distinct()
 
     fun onUser(text: String, isFinal: Boolean) = said(VoiceCallFeedItem.Speaker.User, text, partial = !isFinal)
 

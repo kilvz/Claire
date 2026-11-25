@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,10 +63,10 @@ import kotlinx.coroutines.sync.withLock
  * kept in memory only; [LearnRunner] distills topics, contacts and message digests at each level from them, encrypted on this device. Before
  * that confirmation, or when the provider and model actually used differ from the confirmed ones, nothing is sent.
  *
- * Nothing is read while the screen is off or locked: on seeing locked it records the time and asks the system to unbind the listener; after
- * unlocking it asks for a rebind, and on connecting it catches up on what was posted while locked and is still in the shade. The lock state is
- * watched by [ProactiveLockWatch]: broadcasts only mean "look again", the state is read from the system every time; with the screen off it does
- * nothing on a timer, so the phone is not woken for this feature. All work happens on one serial coroutine; system callbacks only hand things over.
+ * 熄屏或锁屏时不读:看到锁着就记下时间并请系统解绑监听;解锁后请系统重绑,连上时把锁屏之后发出、还在通知栏里的补上。
+ * 请了重绑却没连上(系统自己没绑上监听,那个请求对它无效)时,让系统重新登记一次,见 [ListenerReconnect]。
+ * 锁屏状态由 [ProactiveLockWatch] 看:广播只当「该重新看一眼」,状态每次从系统读;熄屏时不定时做任何事,不让手机为这个功能醒。
+ * 所有处理都在一条串行的协程上做,系统回调只是把事情丢过去。
  */
 class ProactiveRuntime(
     context: Context,
@@ -178,6 +179,8 @@ class ProactiveRuntime(
     /** The watch that only exists while running (feature on and not in "fully exited"): lock broadcasts and state collection. */
     private var watching: Job? = null
     private var receiver: BroadcastReceiver? = null
+    /** 请过重绑之后等着看连上没有的那一下(见 [reconnectLater])。 */
+    private var reconnecting: Job? = null
 
     /** The master switch: the entry is on the settings home page, visible and switchable in every build. */
     private fun wanted(): Boolean = flags.proactive()
@@ -508,6 +511,8 @@ class ProactiveRuntime(
     }
 
     private fun end() {
+        reconnecting?.cancel()
+        reconnecting = null
         watching?.cancel()
         watching = null
         lock.stop()
@@ -524,15 +529,37 @@ class ProactiveRuntime(
         for (a in actions) when (a) {
             is ProactiveLockPolicy.Action.PersistLockedAt -> prefs.lastLockedAtMs = a.atMs
             ProactiveLockPolicy.Action.Unbind -> unbind()
-            ProactiveLockPolicy.Action.Rebind -> runCatching { NotificationListenerService.requestRebind(component) }
-                .onFailure { Log.i(TAG, "rebind refused: ${it.javaClass.simpleName}") }
+            ProactiveLockPolicy.Action.Rebind -> {
+                runCatching { NotificationListenerService.requestRebind(component) }
+                    .onFailure { Log.i(TAG, "rebind refused: ${it.javaClass.simpleName}") }
+                reconnectLater()
+            }
             ProactiveLockPolicy.Action.CatchUp -> catchUp()
         }
     }
 
     /**
-     * Once the unbind request goes out the system sends no more callbacks, and the disconnected callback may arrive late: treat it as
-     * disconnected as soon as the request is sent, so that an unlock in the meantime is not taken as "still connected" and left without a rebind.
+     * 请过重绑之后过一会儿再看:还是没连上,多半是系统自己没绑上(见 [ListenerReconnect]),那个请求对它无效,
+     * 换成先按组件名解绑、再重绑。每次请重绑只补这一次;再不行等下一次解锁或打开 Mika。
+     */
+    private fun reconnectLater() {
+        reconnecting?.cancel()
+        reconnecting = scope.launch {
+            delay(ListenerReconnect.WAIT_MS)
+            val step = ListenerReconnect.next(watching != null, readLocked(), connected.value, authorized(), Build.VERSION.SDK_INT)
+            // 第二个条件和 [ListenerReconnect.next] 里的是同一个,这里再写一遍只为让编译期的版本检查看得见
+            if (step != ListenerReconnect.Step.Reregister || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return@launch
+            runCatching {
+                NotificationListenerService.requestUnbind(component)
+                NotificationListenerService.requestRebind(component)
+            }.onSuccess { Log.i(TAG, "listener not bound after rebind, asked the system to register it again") }
+                .onFailure { Log.i(TAG, "re-register refused: ${it.javaClass.simpleName}") }
+        }
+    }
+
+    /**
+     * 解绑请求发出后系统就不再送回调了,断开的回调可能晚到:请求发出去就当已断开,
+     * 免得这段时间里解锁被当成「还连着」而不去重绑。
      */
     private fun unbind() {
         val s = service ?: return

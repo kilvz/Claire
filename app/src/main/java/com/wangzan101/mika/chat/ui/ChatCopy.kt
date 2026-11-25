@@ -4,6 +4,7 @@ import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.core.agent.AttachedPage
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.uiLocale
 import com.wangzan101.mika.i18n.trPlural
 
 /** Texts the conversation page derives from state; it touches no UI and is unit-tested directly. */
@@ -21,18 +22,30 @@ object ChatCopy {
     /** A value statement for the empty conversation: explains what Claire can do. */
     val EMPTY_VALUE get() = tr(R.string.chat_empty_value)
 
-    /** The kind of a built-in example; it only decides the icon and tint of the card on the home screen. */
-    enum class ExampleKind { Web, Follow, GroupChat, Alarm, Schedule }
-    data class Example(val kind: ExampleKind, val title: String, val prompt: String)
+    /** 内置示例的类型,决定卡片上用哪个 App 的图标。 */
+    enum class ExampleKind { Web, Follow, GroupChat, Share, Alarm, Schedule }
+    data class Example(val kind: ExampleKind, val title: String, val prompt: String, val blurb: String? = null)
+
+    /** 界面是不是中文。中文界面的推广卡用国内 App(小红书、微信),其他语言用海外的。 */
+    private fun chineseUi(): Boolean = uiLocale().language == "zh"
 
     /**
-     * The text of the built-in recommended tasks. Used to initialize once only when no recommended task has been saved on this device yet;
-     * both the title and the prompt come from this entry, and after the user edits them in settings they are not added back by a language change or an upgrade.
+     * 空对话顶部的推广卡,写死在这里,每次按当前界面语言取,点了填进去的也是当前语言。
+     * 中文:GitHub star、小红书关注、微信群总结;其他语言:GitHub star、X 关注、把 Mika 分享给朋友。
+     * 用户自己加的任务不在这里,在输入框加号面板里。
+     */
+    val promos get() = listOf(
+        Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star), tr(R.string.chat_example_github_star_blurb)),
+        Example(ExampleKind.Follow, tr(R.string.chat_example_follow_title), tr(R.string.chat_example_follow), tr(R.string.chat_example_follow_blurb)),
+        if (chineseUi()) Example(ExampleKind.GroupChat, tr(R.string.chat_example_group_summary_title), tr(R.string.chat_example_group_summary), tr(R.string.chat_example_group_summary_blurb))
+        else Example(ExampleKind.Share, tr(R.string.chat_example_share_title), tr(R.string.chat_example_share), tr(R.string.chat_example_share_blurb)),
+    )
+
+    /**
+     * 推荐任务(加号面板里那份)第一次初始化用的内容。只在本机还没有保存过时用一次,
+     * 之后就是用户自己的列表,不会因为换语言或升级被加回来。
      */
     val examples get() = listOf(
-        Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star)),
-        Example(ExampleKind.Follow, tr(R.string.chat_example_follow_title), tr(R.string.chat_example_follow)),
-        Example(ExampleKind.GroupChat, tr(R.string.chat_example_group_summary_title), tr(R.string.chat_example_group_summary)),
         Example(ExampleKind.Alarm, tr(R.string.chat_example_alarms_title), tr(R.string.chat_example_alarms)),
         Example(ExampleKind.Schedule, tr(R.string.chat_example_schedule_title), tr(R.string.chat_example_schedule)),
     )
@@ -40,18 +53,24 @@ object ChatCopy {
     fun recommendationSeeds(): List<Pair<String, String>> = examples.map { it.title to it.prompt }
 
     /**
-     * Which kind a recommended task belongs to: when the prompt matches a built-in example exactly it is that built-in one (recognized even if the title was edited);
-     * tasks added by the user have no kind, so null is returned and the UI uses a generic icon.
+     * 曾经放进推荐任务、现在不放了的示例:PDF 总结,还有挪到顶部推广卡写死的那三条。
+     * 升级时把用户没动过的从推荐列表里清掉;改过的留着——那已经是用户自己的任务了。
+     * 当初是按那时的界面语言存的,所以每种语言的原文都比一遍。
      */
-    fun kindOf(prompt: String): ExampleKind? = examples.firstOrNull { it.prompt == prompt }?.kind
-
-    /**
-     * Examples that used to be built in and have since been removed. On upgrade, the entry the user has not touched is cleared from the recommended list;
-     * one whose title or prompt was edited is kept — it is the user's own task by now.
-     */
-    fun retiredRecommendationSeeds(): List<Pair<String, String>> = listOf(
-        tr(R.string.chat_example_pdf_title) to tr(R.string.chat_example_pdf),
-    )
+    fun retiredRecommendationSeeds(context: android.content.Context): List<Pair<String, String>> {
+        val ids = listOf(
+            R.string.chat_example_pdf_title to R.string.chat_example_pdf,
+            R.string.chat_example_github_star_title to R.string.chat_example_github_star,
+            R.string.chat_example_follow_title to R.string.chat_example_follow,
+            R.string.chat_example_group_summary_title to R.string.chat_example_group_summary,
+        )
+        return com.wangzan101.mika.i18n.AppLanguage.entries.mapNotNull { it.tag }.flatMap { tag ->
+            val config = android.content.res.Configuration(context.resources.configuration)
+            config.setLocale(java.util.Locale.forLanguageTag(tag))
+            val res = context.createConfigurationContext(config).resources
+            ids.mapNotNull { (t, p) -> runCatching { res.getString(t) to res.getString(p) }.getOrNull() }
+        }.distinct()
+    }
 
     /** Title of the conversation page's top bar: always the app name; the subtitle says what is happening right now. */
     const val APP_TITLE = "Claire"

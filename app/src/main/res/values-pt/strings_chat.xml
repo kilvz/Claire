@@ -313,7 +313,7 @@
     <string name="chat_example_schedule_title">Defina um lembrete diário</string>
     <string name="chat_example_pdf">Resuma o PDF que eu enviar em um resumo curto.</string>
     <string name="chat_example_schedule">Toda manhã às 8h, lembre-me de ver o tempo.</string>
-    <string name="chat_empty_value">Diga em uma frase, e eu uso seus apps, navego na web e concluo a tarefa.</string>
+    <string name="chat_empty_value">Diga uma vez e eu resolvo no seu celular</string>
     <string name="saved_task_save">Salvar como tarefa</string>
     <string name="task_field_add">Adicionar campo</string>
     <string name="task_field_name">Nome do campo</string>
@@ -342,4 +342,21 @@
     <string name="plus_reuse_hint">Frases · listas · fluxos</string>
     <string name="plus_reuse_phrases">Frases salvas</string>
     <string name="drawer_calls">Chamadas IA</string>
+    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <string name="chat_idea_maps">Me leve à cafeteria mais próxima</string>
+    <string name="chat_idea_camera">Abra a câmera e tire uma foto</string>
+    <string name="chat_idea_sms">Mande para a mãe: cheguei em casa</string>
+    <string name="chat_idea_news">Pesquise as notícias de tecnologia de hoje</string>
+    <string name="chat_idea_dark">Ative o modo escuro</string>
+    <string name="chat_idea_music">Toque uma música relaxante</string>
+    <string name="chat_idea_email">O que dizem meus últimos e-mails?</string>
+    <string name="chat_idea_screenshot">Encontre minha captura de tela mais recente</string>
+    <string name="chat_idea_meeting">Adicione uma reunião amanhã às 15h</string>
+    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
+    <string name="chat_example_github_star_blurb">Apoie o projeto de código aberto Mika</string>
+    <string name="chat_example_follow_blurb">Siga o autor e entre no chat</string>
+    <string name="chat_example_group_summary_blurb">Resuma as mensagens não lidas de hoje</string>
+    <string name="chat_example_share_title">Compartilhe o Mika com um amigo</string>
+    <string name="chat_example_share_blurb">Indique para quem vai usar</string>
+    <string name="chat_example_share">Compartilhe o link do projeto Mika https://github.com/wangzan101/mika com um amigo e diga que ele opera o celular por você.</string>
 </resources>

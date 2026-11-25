@@ -25,6 +25,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ApplicationInfo
 import android.os.Build
+import androidx.annotation.RequiresApi
 
 /**
  * The system context inside the shell process. System services check that "the package name belongs to the caller uid",
@@ -33,6 +34,7 @@ import android.os.Build
 internal class ShellContext private constructor(base: Context) : ContextWrapper(base) {
     override fun getPackageName(): String = SHELL_PACKAGE
     override fun getOpPackageName(): String = SHELL_PACKAGE
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun getAttributionSource(): AttributionSource =
         AttributionSource.Builder(SHELL_UID).setPackageName(SHELL_PACKAGE).build()
     override fun getApplicationContext(): Context = this

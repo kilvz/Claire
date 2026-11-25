@@ -327,7 +327,7 @@
     <string name="chat_example_schedule_title">Установите ежедневное напоминание</string>
     <string name="chat_example_pdf">Суммируй PDF, который я пришлю, в короткую выжимку.</string>
     <string name="chat_example_schedule">Каждое утро в 8 напоминай мне проверить погоду.</string>
-    <string name="chat_empty_value">Скажи одной фразой, и я запущу приложения, выйду в сеть и доведу дело до конца.</string>
+    <string name="chat_empty_value">Скажи одну фразу — я всё сделаю на телефоне</string>
     <string name="saved_task_save">Сохранить как задачу</string>
     <string name="task_field_add">Добавить поле</string>
     <string name="task_field_name">Название поля</string>
@@ -356,4 +356,21 @@
     <string name="plus_reuse_hint">Фразы · списки · сценарии</string>
     <string name="plus_reuse_phrases">Сохранённые фразы</string>
     <string name="drawer_calls">ИИ-звонки</string>
+    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <string name="chat_idea_maps">Проложи маршрут до ближайшей кофейни</string>
+    <string name="chat_idea_camera">Открой камеру и сделай фото</string>
+    <string name="chat_idea_sms">Напиши маме: я дома</string>
+    <string name="chat_idea_news">Найди новости технологий за сегодня</string>
+    <string name="chat_idea_dark">Включи тёмную тему</string>
+    <string name="chat_idea_music">Включи спокойную музыку</string>
+    <string name="chat_idea_email">Что в моих последних письмах?</string>
+    <string name="chat_idea_screenshot">Найди мой последний скриншот</string>
+    <string name="chat_idea_meeting">Добавь встречу завтра в 15:00</string>
+    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
+    <string name="chat_example_github_star_blurb">Поддержи открытый проект Mika</string>
+    <string name="chat_example_follow_blurb">Подпишись на автора и заходи в чат</string>
+    <string name="chat_example_group_summary_blurb">Непрочитанное за сегодня в одной строке</string>
+    <string name="chat_example_share_title">Поделиться Mika с другом</string>
+    <string name="chat_example_share_blurb">Посоветуйте тому, кому пригодится</string>
+    <string name="chat_example_share">Поделись ссылкой на проект Mika https://github.com/wangzan101/mika с другом и расскажи, что он умеет управлять телефоном.</string>
 </resources>

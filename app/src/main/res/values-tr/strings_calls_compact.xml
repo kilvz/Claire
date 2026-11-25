@@ -6,7 +6,7 @@
     <string name="calls_seconds_value">%1$d sn</string>
     <string name="calls_none_added">Yok</string>
     <string name="calls_not_set">Ayarlanmadı</string>
-    <string name="calls_is_set">Ayarlı</string>
+    <string name="calls_is_set">Ayarlandı</string>
     <string name="calls_numbers_count">%1$d numara</string>
     <string name="calls_scope_all_short">Tüm aramalar</string>
     <string name="calls_scope_strangers_short">Bilinmeyen numaralar</string>

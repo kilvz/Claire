@@ -299,7 +299,7 @@
     <string name="chat_example_schedule_title">تنظیم یادآور روزانه</string>
     <string name="chat_example_pdf">PDFای که میفرستم را در یک خلاصه کوتاه جمعبندی کن</string>
     <string name="chat_example_schedule">هر روز صبح ساعت ۸ یادم بینداز هوا را چک کنم</string>
-    <string name="chat_empty_value">یک جمله بگو تا اپ‌هایت را اجرا کنم، وب بگردم و کارت را تمام کنم.</string>
+    <string name="chat_empty_value">یک جمله بگو، بقیه‌اش با من روی گوشی</string>
     <string name="saved_task_save">ذخیره به‌عنوان کار</string>
     <string name="task_field_add">افزودن فیلد</string>
     <string name="task_field_name">نام فیلد</string>
@@ -328,4 +328,21 @@
     <string name="plus_reuse_hint">عبارت · فهرست · روند</string>
     <string name="plus_reuse_phrases">عبارت‌های ذخیره‌شده</string>
     <string name="drawer_calls">تماس هوش مصنوعی</string>
+    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <string name="chat_idea_maps">مسیر نزدیک‌ترین کافه را نشان بده</string>
+    <string name="chat_idea_camera">دوربین را باز کن و عکس بگیر</string>
+    <string name="chat_idea_sms">به مامان پیام بده: رسیدم خانه</string>
+    <string name="chat_idea_news">اخبار فناوری امروز را جست‌وجو کن</string>
+    <string name="chat_idea_dark">حالت تاریک را روشن کن</string>
+    <string name="chat_idea_music">یک موسیقی آرام پخش کن</string>
+    <string name="chat_idea_email">آخرین ایمیل‌هایم چه می‌گویند؟</string>
+    <string name="chat_idea_screenshot">آخرین اسکرین‌شاتم را پیدا کن</string>
+    <string name="chat_idea_meeting">فردا ساعت ۳ بعدازظهر یک جلسه اضافه کن</string>
+    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
+    <string name="chat_example_github_star_blurb">از پروژهٔ متن‌باز Mika حمایت کن</string>
+    <string name="chat_example_follow_blurb">سازنده را دنبال کن و به گفت‌وگو بپیوند</string>
+    <string name="chat_example_group_summary_blurb">خلاصهٔ پیام‌های خوانده‌نشدهٔ امروز در یک خط</string>
+    <string name="chat_example_share_title">Mika را با یک دوست به اشتراک بگذار</string>
+    <string name="chat_example_share_blurb">به کسی که لازمش دارد معرفی کن</string>
+    <string name="chat_example_share">لینک پروژه Mika https://github.com/wangzan101/mika را با یک دوست به اشتراک بگذار و بگو که می‌تواند گوشی را برایش کار کند.</string>
 </resources>

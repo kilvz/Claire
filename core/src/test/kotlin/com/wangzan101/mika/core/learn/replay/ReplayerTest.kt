@@ -5,6 +5,7 @@ import com.wangzan101.mika.core.safety.guard.OperationGuards
 import com.wangzan101.mika.core.action.ActionExecutor
 import com.wangzan101.mika.core.action.ActionRecorder
 import com.wangzan101.mika.core.safety.gate.ConfirmationGate
+import com.wangzan101.mika.core.safety.gate.TargetAppRestoreFailed
 import com.wangzan101.mika.core.learn.knowledge.Link
 import com.wangzan101.mika.core.run.record.RunEvent
 import com.wangzan101.mika.core.run.record.RunSink
@@ -236,7 +237,19 @@ class ReplayerTest {
         assertTrue(s.taps.isEmpty()); assertTrue(s.typed.isEmpty())
     }
 
-    // rejected before execution (another task holds the app): executed is false and the error code goes to the model
+    @Test fun targetRestoreFailureReturnsToModelBeforeAnyStep() = runTest {
+        val s = Notes.screen()
+        val message = "Could not reopen com.notes."
+        val out = replayer(s, gate = { throw TargetAppRestoreFailed("com.notes", message) })
+            .run(RouteChoice(Notes.route(), listOf("x"))) as ReplayOutcome.Diverged
+        assertEquals(0, out.done)
+        assertFalse(out.executed)
+        assertEquals("target_app_restore_failed", out.error)
+        assertEquals(message, out.seen)
+        assertTrue(s.taps.isEmpty())
+    }
+
+    // 执行前就被拒(另一个任务占着 App):executed 为假,错误码交给模型
     @Test fun preExecutionRejectionIsNotExecuted() = runTest {
         val s = LinkScreen(ActionResult.Failed("app_in_use_by_other_task"))
         val d = toolDispatcher(s, deepLinks = true).also { it.captureTargets = true; it.allowLinks(listOf(Link("新建笔记", "notes://new", "com.notes"))) }

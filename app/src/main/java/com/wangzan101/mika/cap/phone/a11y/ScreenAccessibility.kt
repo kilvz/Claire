@@ -110,8 +110,9 @@ open class ScreenAccessibility : AccessibilityService() {
         if (events.subscriptionCount.value == 0) return
         val displayId = displayOf(event)
         if (displayId == Display.INVALID_DISPLAY) return
-        // Below API 33 the system recycles the event object after the callback returns, so copy it before subscribers read it asynchronously
-        events.tryEmit(DisplayEvent(displayId, AccessibilityEvent(event)))
+        // API 33 以下系统会在回调返回后回收事件对象,订阅方异步读取前先复制一份
+        val copy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) AccessibilityEvent(event) else @Suppress("DEPRECATION") AccessibilityEvent.obtain(event)
+        events.tryEmit(DisplayEvent(displayId, copy))
     }
 
     override fun onInterrupt() = Unit
@@ -146,8 +147,11 @@ open class ScreenAccessibility : AccessibilityService() {
 
     private suspend fun dispatch(displayId: Int, strokes: List<GestureDescription.StrokeDescription>): Boolean {
         val service = instance.value ?: return false
-        val gesture = GestureDescription.Builder()
-            .setDisplayId(displayId)
+        // 手势指定屏要 Android 11;更早只能在主屏上做
+        val builder = GestureDescription.Builder()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) builder.setDisplayId(displayId)
+        else if (displayId != Display.DEFAULT_DISPLAY) return false
+        val gesture = builder
             .apply { strokes.forEach(::addStroke) }
             .build()
         suspend fun send(): Boolean = suspendCancellableCoroutine { cont ->

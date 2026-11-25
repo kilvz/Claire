@@ -16,18 +16,19 @@ The full licence texts and copyright notices (`licenses/THIRD_PARTY_NOTICES.md`)
 The runtime (Alpine 3.22 minimal root filesystem + Python, Node and other packages) ships with the APK, at
 `app/src/main/assets/runtime/rootfs.tar.xz`. On the phone's first launch of Mika it is unpacked in the background into `files/sandbox/rootfs`, without network access.
 
-- `runtime/sources.lock`: the address and SHA-256 of the minimal root filesystem, plus each package's repository, version, APKINDEX checksum and `.apk` SHA-256.
-- `runtime/pip-requires.lock`: the wheels to bake into `site-packages` (name, version, file name, download URL, SHA-256). At build time each SHA-256 is verified
-  and then the wheel is unpacked directly, without running pip, so neither offline builds nor rebuilds depend on PyPI; after changing the Python minor version, re-resolve according to the wheel's own tags. Like `sources.lock`,
-  this file is a required build input; without it the build fails.
-- `build-runtime.py`: downloads and verifies according to `sources.lock`, then assembles `rootfs.tar.xz`. It never runs apk at all: it unpacks the packages following apk's layout
-  and writes `/lib/apk/db/installed` from the package-signed metadata, so the database that apk inside the runtime sees is consistent.
-  Every `.apk` must be verified: the SHA-256 in the lock file, its own RSA signature (the public key taken from the pinned minimal root filesystem), the control section checksum matching APKINDEX,
-  and the data section matching the `datahash` in the signed `.PKGINFO`. Install scripts and triggers that would run on the phone must each be listed in `SCRIPTS_NOT_RUN`
-  (pinned by content SHA-256, with a note on why not running them is still correct), otherwise the build fails.
-  It also generates `app/src/main/java/com/wangzan101/mika/cap/sandbox/BundledRuntime.kt` (version, SHA-256, size) and
-  `app/src/main/assets/runtime/packages.json` (all packages, versions, licences; the 「开源许可」 (Open-source licences) page is generated from it).
-- Artifacts are byte-for-byte reproducible:
+- `runtime/sources.lock`:最小根文件系统的地址与 SHA-256,以及每个软件包的仓库、版本、APKINDEX 校验值、`.apk` 的 SHA-256。
+- `runtime/pip-requires.lock`:要烤进 `site-packages` 的 wheel(名称、版本、文件名、下载地址、SHA-256、许可)。构建时逐个核对 SHA-256
+  后直接解开,不运行 pip,所以离线和重编都不依赖 PyPI;换 Python 小版本后按 wheel 自己的 tag 重新求。这个文件和 `sources.lock`
+  一样是构建的必需输入,缺了构建失败。wheel 也是随 APK 发出去的代码,所以 `license` 是构建的必需字段(记的是 wheel 自己的
+  `METADATA` 声明的许可):许可为 GPL/LGPL/MPL 的 wheel,`runtime-sources.py` 会取同一版本的 sdist 放进源码包。
+- `build-runtime.py`:按 `sources.lock` 下载、校验后拼成 `rootfs.tar.xz`。全程不运行 apk:按 apk 的布局解开软件包,
+  并用软件包签过名的元数据写出 `/lib/apk/db/installed`,所以运行环境里的 apk 看到的数据库是一致的。
+  每个 `.apk` 都要核对:锁文件里的 SHA-256、它自己的 RSA 签名(公钥取自钉住的最小根文件系统)、控制段校验值与 APKINDEX 一致、
+  数据段与签过名的 `.PKGINFO` 里的 `datahash` 一致。会在手机上执行的安装脚本与触发器必须逐个列进 `SCRIPTS_NOT_RUN`
+  (按内容的 SHA-256 钉住,并写明为什么不跑也正确),否则构建失败。
+  同时生成 `app/src/main/java/com/wangzan101/mika/cap/sandbox/BundledRuntime.kt`(版本、SHA-256、大小)与
+  `app/src/main/assets/runtime/packages.json`(所有软件包、版本、许可证;「开源许可」页从它生成)。
+- 产物逐字节可重现:
 
 ```bash
 python3 tools/sandbox/build-runtime.py --resolve   # re-resolve dependencies after changing the Alpine minor version or a package, rewriting runtime/sources.lock
@@ -81,12 +82,13 @@ while read -r name version url sum; do
 done < tools/sandbox/sources.lock
 cp -R tools/sandbox/patches tools/sandbox/sources.lock tools/sandbox/build-native.sh tools/sandbox/README.md "$OUT/"
 cp licenses/GPL-2.0.txt licenses/GPL-3.0.txt licenses/LGPL-3.0.txt "$OUT/"
-# every GPL/LGPL/MPL package in the runtime: Alpine's build recipe (pinned to the aports commit in the package record) and the upstream source, each verified by SHA-512
+# 运行环境里每个 GPL/LGPL/MPL 软件包:Alpine 的构建配方(钉在软件包记录的 aports 提交)与上游源码,逐个按 SHA-512 核对;
+# 烤进 site-packages 的 copyleft wheel(许可写在 runtime/pip-requires.lock)取同一版本的 sdist,按 PyPI 的 SHA-256 核对
 python3 tools/sandbox/runtime-sources.py "$OUT/runtime"
 cp tools/sandbox/build-runtime.py tools/sandbox/runtime-sources.py app/src/main/assets/runtime/packages.json "$OUT/runtime/"
 cp -R tools/sandbox/runtime "$OUT/runtime/lock"
 COPYFILE_DISABLE=1 tar -czf "build/gpl-sources/$NAME.tar.gz" -C build/gpl-sources "$NAME"
 ```
 
-After running you get `build/gpl-sources/mika-<version>-gpl-sources.tar.gz`. Before uploading, take a look with `tar -tzf` to confirm that it contains the two source packages, `patches/`,
-and, under `runtime/`, a directory for each GPL/LGPL/MPL package plus `runtime/SOURCES.txt` (sources such as gcc are large; the whole package is a few hundred MB).
+运行后得到 `build/gpl-sources/mika-<版本>-gpl-sources.tar.gz`。上传前用 `tar -tzf` 看一眼,确认里面有两个源码包、`patches/`,
+以及 `runtime/` 下每个 GPL/LGPL/MPL 软件包的目录、每个 copyleft wheel 的目录和 `runtime/SOURCES.txt`(gcc 等源码较大,整包约数百 MB)。
