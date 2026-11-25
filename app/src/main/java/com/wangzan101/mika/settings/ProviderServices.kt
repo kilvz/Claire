@@ -148,6 +148,8 @@ internal fun ProviderStore.resolveGrounding(): GroundingTarget? {
     val providerName = p?.name?.ifBlank { null } ?: ProviderConnection.displayName(cfg)
     val endpoint = listedOf(cfg)?.endpoint
     val (kind, baseUrl) = adapterFor(cfg, endpoint)
+    // Grounding needs a Google Developer API key; OpenCode Go's credential is an account token and its gateway does not offer this
+    if (cfg.kind == ProviderConfig.Kind.OpenCodeGo) return GroundingTarget.Unsupported(providerName)
     return when (kind) {
         ProviderConfig.Kind.Gemini -> {
             val key = apiKey(cfg.id)?.trim().orEmpty()
@@ -196,7 +198,7 @@ fun ProviderStore.ttsModel(choice: VoiceChoice, capabilities: TtsCapabilities): 
     if (p.baseUrl.trim().toHttpUrlOrNull() == null) return null
     val client = modelHttp.newBuilder().readTimeout(120, TimeUnit.SECONDS).build()
     val header = headers(p.sessionHeader, ModelSession.fresh())
-    val key = activeApiKey(p.id) ?: providerKey(p.id)?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() }
+    val key = plainApiKey(p.id)
     return when (choice.protocol) {
         TtsProtocol.OpenAiSpeech -> OpenAiSpeechModel(p.baseUrl, key, model, capabilities, client, header)
         TtsProtocol.GeminiTts -> GeminiTtsModel(p.baseUrl, key.orEmpty(), model, capabilities, client, header)
@@ -213,7 +215,7 @@ fun ProviderStore.imageModel(choice: ImageChoice, capabilities: ImageCapabilitie
     if (choice.model.isBlank()) return null
     val client = modelHttp.newBuilder().readTimeout(180, TimeUnit.SECONDS).build()
     val header = headers(p.sessionHeader, ModelSession.fresh())
-    val key = providerKey(p.id)
+    val key = plainApiKey(p.id)
     return when (choice.protocol) {
         ImageProtocol.OpenAiImages -> OpenAiImagesModel(p.baseUrl, key, choice.model, capabilities, client, header)
         ImageProtocol.GeminiImage -> GeminiImageModel(p.baseUrl, key.orEmpty(), choice.model, capabilities, client, header)
@@ -258,7 +260,7 @@ suspend fun ProviderStore.listModels(kind: ProviderConfig.Kind, baseUrl: String,
 
 /** Re-list the models of a connected provider: uses the stored Key; for subscription sign-in it uses the access token (refreshed first when close to expiry). */
 suspend fun ProviderStore.listModels(p: Provider): ModelListResult {
-    if (p.kind != ProviderConfig.Kind.ChatGpt && p.kind != ProviderConfig.Kind.Xai) {
+    if (p.kind != ProviderConfig.Kind.ChatGpt && p.kind != ProviderConfig.Kind.Xai && p.kind != ProviderConfig.Kind.OpenCodeGo) {
         val key = activeApiKey(p.id) ?: providerKey(p.id)?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() }
         return listModels(p.kind, p.baseUrl, key, p.sessionHeader)
     }

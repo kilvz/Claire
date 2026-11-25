@@ -10,6 +10,7 @@ import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.oauth.AccountSignInException
 import com.wangzan101.mika.core.model.oauth.AccountSignInFailure
 import com.wangzan101.mika.core.model.oauth.DeviceChallenge
+import com.wangzan101.mika.core.model.oauth.OpenCodeAuth
 import com.wangzan101.mika.core.model.oauth.OpenRouterAuth
 import com.wangzan101.mika.core.model.oauth.XaiAuth
 import com.wangzan101.mika.core.model.oauth.signInWithOpenRouter
@@ -26,6 +27,7 @@ import com.wangzan101.mika.settings.connectAccount
 import com.wangzan101.mika.settings.connectChatGpt
 import com.wangzan101.mika.settings.connectOpenRouter
 import com.wangzan101.mika.settings.listModels
+import com.wangzan101.mika.settings.openCodeProvider
 import com.wangzan101.mika.settings.openRouterAccount
 import com.wangzan101.mika.settings.rememberChatGptClient
 import com.wangzan101.mika.settings.signOutAccount
@@ -94,7 +96,7 @@ fun ModelSetupViewModel.cancelChatGptSignIn() {
 fun ModelSetupViewModel.dismissChatGptWelcome() = _state.update { it.copy(chatGptWelcome = false) }
 
 /**
- * Sign in to xAI or OpenRouter with an account: for xAI, a verified page opens in the browser and a short code stays in the UI until the user confirms;
+ * Sign in to xAI, OpenCode Go or OpenRouter with an account: for xAI and OpenCode Go, a verified page opens in the browser and a short code stays in the UI until the user confirms;
  * for OpenRouter, the authorization page opens and, once approved, control returns to the local callback and a Key belonging to the user is obtained.
  * On success it lists the models, saves this provider, picks a main model if there is none yet, then opens its details page ([ModelSetupUi.signedInProvider]).
  * Failures only state the category and error code (and are recorded for diagnostics). Like ChatGPT it runs inside [signIns]: Claire is in the background while the user is in the browser.
@@ -112,6 +114,7 @@ fun ModelSetupViewModel.signInWithAccount(provider: AccountProvider) {
             val (p, failed) = withContext(io) {
                 val (p, listed) = when (provider) {
                     AccountProvider.Xai -> connectXai(browser)
+                    AccountProvider.OpenCodeGo -> connectOpenCodeGo(browser)
                     AccountProvider.OpenRouter -> connectOpenRouter(browser)
                 }
                 if (!store.roles.value.hasMain) {
@@ -145,6 +148,14 @@ internal suspend fun ModelSetupViewModel.connectXai(browser: SignInBrowser): Pai
     return store.connectAccount(session, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty()) to listed
 }
 
+/** OpenCode Go device-code sign-in: lists models and saves (or updates) that provider. The listing is public; calls use the access token. */
+internal suspend fun ModelSetupViewModel.connectOpenCodeGo(browser: SignInBrowser): Pair<Provider, ModelListResult> {
+    val session = store.openCodeAuth.signIn(openBrowser = browser::open, onChallenge = ::publishDevice)
+    val existing = store.openCodeProvider()
+    val listed = store.listModels(ProviderConfig.Kind.OpenCodeGo, session.apiBase.ifBlank { OpenCodeAuth.API_BASE }, session.accessToken)
+    return store.connectAccount(session, (listed as? ModelListResult.Ok)?.models ?: existing?.models.orEmpty()) to listed
+}
+
 /** OpenRouter authorization exchanged for a Key: lists models and saves (or updates) that provider using the OpenRouter preset. */
 internal suspend fun ModelSetupViewModel.connectOpenRouter(browser: SignInBrowser): Pair<Provider, ModelListResult> {
     val key = signInWithOpenRouter(store.openRouterAuth, browser::open, page = { e -> browser.page(e?.let(ModelsCopy::accountFailure)) })
@@ -171,12 +182,13 @@ fun ModelSetupViewModel.dismissAccountFailure() = _state.update { it.copy(accoun
 /** The details page has been opened. */
 fun ModelSetupViewModel.signedInShown() = _state.update { it.copy(signedInProvider = null) }
 
-/** Sign out of the account sign-in: xAI clears the local token and OpenRouter deletes the local Key; the provider and roles are kept so signing in again picks up where it left off. */
+/** Sign out of the account sign-in: xAI and OpenCode Go clear the local token, OpenRouter deletes the local Key; the provider and roles are kept so signing in again picks up where it left off. */
 fun ModelSetupViewModel.signOutAccount(providerId: String) {
     scope.launch {
         withContext(io) {
             val p = store.provider(providerId) ?: return@withContext
-            if (p.kind == ProviderConfig.Kind.Xai) store.signOutAccount(providerId) else store.signOutOpenRouter(providerId)
+            if (p.kind == ProviderConfig.Kind.Xai || p.kind == ProviderConfig.Kind.OpenCodeGo) store.signOutAccount(providerId)
+            else store.signOutOpenRouter(providerId)
         }
         _state.update { snapshot(it.copy(listing = it.listing - providerId)) }
     }

@@ -71,6 +71,7 @@
     <string name="model_example_openai">例: gpt-5-mini</string>
     <string name="model_example_compat">例: deepseek-chat</string>
     <string name="model_example_grok">例: grok-4</string>
+    <string name="model_example_opencode">例: deepseek-v4.1-flash</string>
     <string name="model_probe_not_found">モデル「%1$s」は存在しません。プロバイダーのドキュメントにある完全なモデル ID を入力してください(%2$s)。</string>
     <string name="model_probe_not_found_no_list">モデルを一覧にできず、「%1$s」でのテスト呼び出しでも見つかりませんでした。アドレスかインターフェースの種類が間違っているか、そのモデルが存在しない可能性が高いです(モデル名の例: %2$s)。</string>
     <string name="model_probe_no_tools_pick">%1$s はツールを呼び出しませんでした。Claire がタスクをこなすには、ツールを呼び出せるモデルが必要です。別のメインモデルを選んでください。</string>

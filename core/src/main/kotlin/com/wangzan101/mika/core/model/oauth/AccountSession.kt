@@ -44,7 +44,7 @@ sealed interface OauthTokenResult {
 }
 
 /**
- * A single account sign-in (currently xAI), stored encrypted as a whole the same way as an API key.
+ * A single account sign-in (xAI or OpenCode Go), stored encrypted as a whole the same way as an API key.
  * [accessToken] is the access token used to call models, [refreshToken] is used to obtain new ones.
  * After signing out the tokens are cleared and the account name is kept for display.
  */

@@ -48,6 +48,10 @@ class AnthropicModel(
      * null means the listing does not say (the effort comes from another kind of listing), so it is sent as given.
      */
     private val thinkingTypes: List<String>? = null,
+    /** Supplies the key at request time instead of [apiKey] (subscription sign-in tokens can change between requests). */
+    private val keySupplier: (suspend () -> String?)? = null,
+    /** Called back with the HTTP status when a key is rejected upstream (429/401/403); the wiring decides by status how to react. */
+    private val onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)? = null,
 ) : StreamingChatModel {
     override val name: String get() = model
     private val endpoint = baseUrl.trimEnd('/') + "/v1/messages"
@@ -66,9 +70,13 @@ class AnthropicModel(
      */
     private val staleThinking: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
+    private suspend fun resolveKey(): String = keySupplier?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
+
     override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
         val (status, retryAfter, text) = dropStaleThinking(messages) {
-            HttpSupport.execute(http, request(system, messages, tools, stream = false))
+            requestWithKeyRotation(::resolveKey, onKeyRejected) { key ->
+                HttpSupport.execute(http, request(system, messages, tools, stream = false, key = key.orEmpty()))
+            }
         }
         if (status !in 200..299) throw mapError(status, retryAfter, text)
         return parse(text)
@@ -80,7 +88,9 @@ class AnthropicModel(
         val stream = AnthropicStream(endpoint, onText, ::parseUsage)
         // The rejected attempt produces no events (HttpSupport.stream does not call accept for a non-2xx), so the resend keeps using this stream
         val (status, retryAfter, text) = dropStaleThinking(messages) {
-            HttpSupport.stream(http, request(system, messages, tools, stream = true), stream::accept)
+            requestWithKeyRotation(::resolveKey, onKeyRejected) { key ->
+                HttpSupport.stream(http, request(system, messages, tools, stream = true, key = key.orEmpty()), stream::accept)
+            }
         }
         if (status !in 200..299) throw mapError(status, retryAfter, text)
         if (text.isNotEmpty()) return parse(text).also { reply ->
@@ -108,7 +118,7 @@ class AnthropicModel(
         return thinkingType != "disabled" && opaque !in staleThinking && SignedThinking.block(p, endpoint) != null
     }
 
-    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean): Request {
+    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, key: String): Request {
         val systemText = (listOf(system) + messages.filter { it.role == Role.System }
             .map { m -> m.parts.filterIsInstance<Part.Text>().joinToString("\n") { it.text } })
             .filter { it.isNotEmpty() }.joinToString("\n\n")
@@ -139,7 +149,7 @@ class AnthropicModel(
         }
         return Request.Builder().url(endpoint)
             .withHeaders(headers)
-            .headerOrReject("x-api-key", apiKey)
+            .headerOrReject("x-api-key", key)
             .header("anthropic-version", "2023-06-01")
             .postInference(InferenceProtocol.Anthropic, payload)
             .build()

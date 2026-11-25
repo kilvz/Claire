@@ -50,6 +50,7 @@ At the top of "Add provider" is the group "Sign in with an account · no key nee
 
 - **ChatGPT** (Plus or Pro, uses your plan's usage): tap "Continue with ChatGPT" and sign in in the browser.
 - **xAI / Grok** (SuperGrok or X Premium+ subscription): the browser opens xAI's confirmation page; check that it shows the same short code as your phone, then approve. This sign-in borrows the public sign-in entry of xAI's official command-line tool; xAI did not set it up for Claire and may restrict this use. Some subscription tiers still can't make calls after signing in (403); use an xAI API key in that case.
+- **OpenCode Go** (OpenCode Go subscription): the browser opens OpenCode's confirmation page; check that it shows the same short code as your phone, then approve. This uses OpenCode's public command-line sign-in. Requests go straight to OpenCode's inference gateway, and each model's protocol and address come from its model list.
 - **OpenRouter**: OpenRouter's official authorization for third-party apps. Once you approve, OpenRouter gives Claire a key of your own (named "Claire"), paid from your OpenRouter balance; to stop, delete it on OpenRouter's Keys page.
 
 Signing out only clears the sign-in on this phone.

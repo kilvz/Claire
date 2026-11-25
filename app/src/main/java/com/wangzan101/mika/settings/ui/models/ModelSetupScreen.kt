@@ -202,6 +202,7 @@ fun ModelSetupScreen(
                 LaunchedEffect(p.id) { vm.ensureListed() }
                 val accountKind = when {
                     p.kind == ProviderConfig.Kind.Xai -> SignInKind.Xai
+                    p.kind == ProviderConfig.Kind.OpenCodeGo -> SignInKind.OpenCodeGo
                     p.signIn == ProviderStore.OPENROUTER_SIGN_IN -> SignInKind.OpenRouter
                     else -> null
                 }
@@ -217,12 +218,13 @@ fun ModelSetupScreen(
                     showAll = { allModels = true },
                     retestModel = { model -> vm.retestModel(p.id, model) },
                     voiceUsage = vm::providerVoiceUsage,
-                    // ChatGPT still signs in through the browser directly; xAI and OpenRouter open the explanation panel first
+                    // ChatGPT still signs in through the browser directly; xAI, OpenCode Go and OpenRouter open the explanation panel first
                     signIn = { if (accountKind != null) signInSheet = accountKind else vm.signInWithChatGpt() },
                     signOut = { if (accountKind != null) vm.signOutAccount(p.id) else vm.signOutChatGpt(p.id) },
                     manageUsage = {
                         openInBrowser(context, when (accountKind) {
                             SignInKind.Xai -> ModelsCopy.ACCOUNT_MANAGE_URL
+                            SignInKind.OpenCodeGo -> ModelsCopy.OPENCODE_MANAGE_URL
                             SignInKind.OpenRouter -> OpenRouterAuth.KEYS_PAGE
                             else -> ChatGptAuth.USAGE_URL
                         })
@@ -553,6 +555,7 @@ object ModelSetupCopy {
             ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt -> R.string.model_example_openai
             ProviderConfig.Kind.Xai -> R.string.model_example_grok
             ProviderConfig.Kind.OpenAiCompat -> R.string.model_example_compat
+            ProviderConfig.Kind.OpenCodeGo -> R.string.model_example_opencode
         },
     )
 

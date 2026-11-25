@@ -1,6 +1,6 @@
 # Signing in with an account
 
-At the top of 「添加服务商」 (Add provider) is a 「用账号登录 · 不用填 Key」 (Sign in with an account · no key needed) group: ChatGPT, xAI / Grok, OpenRouter. Tapping one first opens an explanation panel (what will happen, what to watch out for), and sign-in only starts after that; after signing in successfully, that provider's details open: account, status, available models (refreshable), set as main model, sign out (clears this device only).
+At the top of 「添加服务商」 (Add provider) is a 「用账号登录 · 不用填 Key」 (Sign in with an account · no key needed) group: ChatGPT, xAI / Grok, OpenCode Go, OpenRouter. Tapping one first opens an explanation panel (what will happen, what to watch out for), and sign-in only starts after that; after signing in successfully, that provider's details open: account, status, available models (refreshable), set as main model, sign out (clears this device only).
 
 「用 ChatGPT 登录」 (Sign in with ChatGPT) stays as it is (`core/model/chatgpt/`, authorization code + PKCE, local callback). This document covers the other account sign-ins, and the reasons for what is deliberately not done. The local callback (`core/model/oauth/LoopbackCallback.kt`) and PKCE (`core/model/oauth/Pkce.kt`) are shared by ChatGPT and OpenRouter.
 
@@ -15,6 +15,15 @@ Signing in, encrypted storage, refresh and calling each provider's own API are f
 - When the access token is about to expire, the refresh token is used to get a new one, and only one refresh happens at a time. If the refresh is rejected and cannot be used again, the local token is cleared and 「登录已失效」 (Sign-in expired) is reported.
 - Sign-in succeeds but calls return HTTP 403: this means the subscription tier cannot use this API (`ModelError.AccountPlanNotAllowed`), and there is no retry; both the details page and the task outcome suggest switching to an xAI API key.
 - Signing out only clears tokens on this phone. Authorization in the xAI account must be disconnected by the user in xAI's account settings (there is no usable public revocation).
+
+## OpenCode Go (device code)
+
+- Posts to `https://opencode.ai/console/auth/device/code` with the public client `opencode-cli`, `supports_org_scope=true`, and no scope; the response carries the short code and relative verification paths such as `/console/device`. Those paths are resolved against `https://opencode.ai` and checked against the allowlist before the page is opened.
+- Polls `https://opencode.ai/console/auth/device/token` (RFC 8628 device grant) and refreshes at the same endpoint with `grant_type=refresh_token`; a refresh rejected as `invalid_grant` clears the local token and reports that the sign-in expired.
+- The model list is `https://opencode.ai/zen/go/v1/models`. Every model declares its own protocols in the `api` table, with a base URL per protocol: Chat Completions and Responses use `https://opencode.ai/inference/go/openai/v1`, Messages `…/go/anthropic/v1`, and generateContent `…/go/google/v1beta`. Claire picks the model's protocol and address from that list (Chat Completions when none is usable), so OpenCode Go may run on any of the four adapters instead of always using Responses.
+- Calls use `Authorization: Bearer <access token>` in the header the chosen protocol expects (`x-api-key` for Messages, `x-goog-api-key` for generateContent) and also send the conversation session ID in `x-opencode-session`.
+- The account name shown in the details page is read from `https://opencode.ai/console/api/user` for display only; it is never used for authorization.
+- Signing out only clears the token on this phone; the device can also be removed in OpenCode Console (`https://opencode.ai/console`).
 
 ## OpenRouter (official OAuth PKCE)
 

@@ -15,6 +15,7 @@ internal data class AllowanceRoute(
             when (provider.kind) {
                 ProviderConfig.Kind.ChatGpt -> return AllowanceRoute(dashboard = ChatGptAuth.USAGE_URL)
                 ProviderConfig.Kind.Xai -> return AllowanceRoute(dashboard = "https://grok.com/?_s=usage")
+                ProviderConfig.Kind.OpenCodeGo -> return AllowanceRoute(dashboard = "https://opencode.ai/console")
                 else -> Unit
             }
             val url = provider.baseUrl.trim().toHttpUrlOrNull() ?: return AllowanceRoute()

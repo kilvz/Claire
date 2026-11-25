@@ -34,6 +34,8 @@ data class ReasoningOptions(val levels: List<String>, val fromProvider: Boolean)
                         ?.takeIf { it.isNotEmpty() }?.let { ReasoningOptions(it, fromProvider = false) }
                         ?: ReasoningOptions(manualLevels, fromProvider = false)
                 ProviderConfig.Kind.Anthropic, ProviderConfig.Kind.Gemini -> null
+                // adapterFor resolves OpenCode Go to one of the protocols above
+                ProviderConfig.Kind.OpenCodeGo -> null
             }
         }
 

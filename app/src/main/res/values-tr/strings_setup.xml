@@ -71,6 +71,7 @@
     <string name="model_example_openai">örn. gpt-5-mini</string>
     <string name="model_example_compat">örn. deepseek-chat</string>
     <string name="model_example_grok">örn. grok-4</string>
+    <string name="model_example_opencode">örn. deepseek-v4.1-flash</string>
     <string name="model_probe_not_found">\“%1$s\” modeli yok. Sağlayıcının dokümanlarındaki tam model kimliğini girin (%2$s).</string>
     <string name="model_probe_not_found_no_list">Hiçbir model listelenemedi ve \“%1$s\” ile yapılan bir test çağrısı da bulunamadı: adres veya arayüz türü muhtemelen yanlış ya da böyle bir model yok (model adları şuna benzer: %2$s).</string>
     <string name="model_probe_no_tools_pick">%1$s aracı çağırmadı. Claire\'nın işleri halletmek için araç çağırabilen bir modele ihtiyacı var; başka bir ana model seçin.</string>

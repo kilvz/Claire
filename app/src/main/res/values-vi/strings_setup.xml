@@ -71,6 +71,7 @@
     <string name="model_example_openai">vd: gpt-5-mini</string>
     <string name="model_example_compat">vd: deepseek-chat</string>
     <string name="model_example_grok">vd: grok-4</string>
+    <string name="model_example_opencode">vd: deepseek-v4.1-flash</string>
     <string name="model_probe_not_found">Mô hình “%1$s” không tồn tại. Nhập ID mô hình đầy đủ từ tài liệu của nhà cung cấp (%2$s).</string>
     <string name="model_probe_not_found_no_list">Không liệt kê được mô hình nào, và lần gọi kiểm tra với “%1$s” cũng không tìm thấy: có thể địa chỉ hoặc loại giao diện bị sai, hoặc không có mô hình như vậy (tên mô hình có dạng như: %2$s).</string>
     <string name="model_probe_no_tools_pick">%1$s đã không gọi công cụ. Claire cần một mô hình gọi được công cụ để hoàn thành công việc; hãy chọn một mô hình chính khác.</string>

@@ -21,7 +21,7 @@ import com.wangzan101.mika.settings.listModels
 import com.wangzan101.mika.settings.markTyped
 import com.wangzan101.mika.settings.markVerified
 import com.wangzan101.mika.settings.probe
-import com.wangzan101.mika.settings.providerKey
+import com.wangzan101.mika.settings.plainApiKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.update
@@ -286,7 +286,7 @@ internal suspend fun ModelSetupViewModel.probeSaved(p: Provider, model: String):
     val listed = stored.models?.firstOrNull { it.id == model }
     val example = ProviderPresets.forHost(stored.baseUrl)?.kind ?: stored.kind
     return probeModel(
-        stored.kind, stored.baseUrl, store.providerKey(p.id), stored.sessionHeader, model, listed?.endpoint, caps, example,
+        stored.kind, stored.baseUrl, store.plainApiKey(p.id), stored.sessionHeader, model, listed?.endpoint, caps, example,
         providerId = stored.id,
     )
 }

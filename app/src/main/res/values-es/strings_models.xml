@@ -164,10 +164,14 @@
     <string name="account_signed_in_note_xai">Usando tu suscripción de xAI / Grok. El uso se comparte con otros clientes de esta cuenta. Este inicio de sesión reutiliza el cliente de inicio de sesión público de la herramienta de línea de comandos oficial de xAI; consulta el aviso que se muestra antes de continuar.</string>
     <string name="account_signed_out_note">Sesión cerrada en este teléfono. Para revocar también la autorización en xAI, desconéctala en los ajustes de tu cuenta de xAI. Se conservan los modelos que elegiste.</string>
     <string name="account_manage_xai">Abrir la cuenta de xAI</string>
+    <string name="account_signed_in_note_opencode">Usas tu suscripción de OpenCode Go. El uso se comparte con otros clientes de esta cuenta. Los datos de inicio de sesión se guardan cifrados en este teléfono.</string>
+    <string name="account_signed_out_note_opencode">Sesión cerrada en este teléfono. También puedes quitar este dispositivo en OpenCode Console. Tus modelos elegidos se conservan.</string>
+    <string name="account_manage_opencode">Abrir OpenCode Console</string>
     <string name="signin_group">Inicia sesión con una cuenta · sin necesidad de clave</string>
     <string name="signin_key_group">Introducir una clave de API</string>
     <string name="signin_row_chatgpt">Usa tu plan Plus / Pro</string>
     <string name="signin_row_xai">Usa tu suscripción a SuperGrok o X Premium+</string>
+    <string name="signin_row_opencode">Usa tu suscripción de OpenCode Go</string>
     <string name="signin_row_openrouter">Una cuenta para cientos de modelos, pagados con tu propio saldo</string>
     <string name="signin_running">Iniciando sesión…</string>
     <string name="signin_continue">Continuar</string>
@@ -191,6 +195,11 @@
     <string name="signin_openrouter_manage">Abrir la página de claves de OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">El uso sale de tu saldo de OpenRouter. La clave se guarda cifrada en este teléfono; para dejar de usarla, elimina la clave llamada \"Claire\" en la página de claves de OpenRouter.</string>
     <string name="signin_openrouter_signed_out_note">La clave se eliminó de este teléfono. Sigue existiendo en OpenRouter; elimínala en la página de claves. Se conservan los modelos que elegiste.</string>
+    <string name="signin_opencode_title">Iniciar sesión con OpenCode Go</string>
+    <string name="signin_opencode_body">Usa los modelos de OpenCode Go en Claire con tu suscripción de OpenCode Go. El inicio de sesión se hace en la página de OpenCode; las peticiones van directamente a su puerta de inferencia.</string>
+    <string name="signin_opencode_note">Esto usa el inicio de sesión público de la herramienta de línea de comandos de OpenCode. Los datos de inicio de sesión solo se guardan cifrados en este teléfono y nunca se escriben en los registros.</string>
+    <string name="signin_opencode_starting">Abriendo la página de confirmación de OpenCode…</string>
+    <string name="signin_opencode_code_body">La página de confirmación de OpenCode está abierta. Comprueba que el código coincide con el de abajo y confirma.</string>
     <string name="signin_set_main">Establecer como modelo principal</string>
     <string name="signin_set_main_note">Claire lo usa para hacer las cosas</string>
     <string name="signin_sign_out_note">Solo borra el inicio de sesión en este teléfono</string>

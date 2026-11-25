@@ -50,6 +50,7 @@ fun ModelSetupViewModel.ensureListed() {
 internal fun ModelSetupViewModel.listable(p: Provider) = if (p.signIn != null) store.hasKey(p.id) else when (p.kind) {
     ProviderConfig.Kind.ChatGpt -> store.chatGptSession(p.id)?.signedIn == true
     ProviderConfig.Kind.Xai -> store.accountSession(p.id)?.signedIn == true
+    ProviderConfig.Kind.OpenCodeGo -> store.accountSession(p.id)?.signedIn == true
     else -> true
 }
 
@@ -119,7 +120,7 @@ fun ModelSetupViewModel.removeProvider(providerId: String) {
             // For ChatGPT, sign out on the server first, then delete
             when (store.provider(providerId)?.kind) {
                 ProviderConfig.Kind.ChatGpt -> store.signOutChatGpt(providerId)
-                ProviderConfig.Kind.Xai -> store.signOutAccount(providerId)
+                ProviderConfig.Kind.Xai, ProviderConfig.Kind.OpenCodeGo -> store.signOutAccount(providerId)
                 else -> Unit
             }
             // A Key obtained through OpenRouter authorization is deleted along with the provider; the Key on OpenRouter's side must be deleted by the user on the Keys page

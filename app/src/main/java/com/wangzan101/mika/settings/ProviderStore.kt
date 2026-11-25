@@ -17,6 +17,7 @@ import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.model.ToolSpec
 import com.wangzan101.mika.core.net.NetProxy
 import com.wangzan101.mika.core.model.oauth.AccountTokens
+import com.wangzan101.mika.core.model.oauth.OpenCodeAuth
 import com.wangzan101.mika.core.model.oauth.OpenRouterAuth
 import com.wangzan101.mika.core.model.oauth.XaiAuth
 import com.wangzan101.mika.core.model.usage.ProactiveBudget
@@ -65,6 +66,8 @@ class ProviderStore(
     val chatGptAuth: ChatGptAuth = defaultChatGptAuth,
     /** xAI subscription sign-in (device code, refresh). */
     val xaiAuth: XaiAuth = defaultXaiAuth,
+    /** OpenCode Go subscription sign-in (device code, refresh). */
+    val openCodeAuth: OpenCodeAuth = defaultOpenCodeAuth,
     /** OpenRouter account authorization (exchanges for a Key). */
     val openRouterAuth: OpenRouterAuth = defaultOpenRouterAuth,
     /** Proactive tokens reported today (summed over all providers), its daily budget, and the number of requests issued today; read live before each request. */
@@ -199,16 +202,20 @@ class ProviderStore(
         internal val defaultChatGptAuth by lazy { ChatGptAuth(shortHttp) }
         internal val defaultOpenRouterAuth by lazy { OpenRouterAuth(shortHttp) }
         internal val defaultXaiAuth by lazy { XaiAuth(shortHttp) }
+        internal val defaultOpenCodeAuth by lazy { OpenCodeAuth(shortHttp) }
 
         /** The ChatGPT provider's name (a brand name, not translated with the UI language). */
         const val CHATGPT_NAME = "ChatGPT"
         /** The name of the provider signed in with an xAI account (a brand name, not translated with the UI language). It is not the same as the "xAI" preset that takes a Key. */
         const val XAI_NAME = "xAI / Grok"
+        /** The name of the provider signed in with an OpenCode Go account; distinct from the "OpenCode Go" preset that takes a Key. */
+        const val OPENCODE_NAME = "OpenCode Go"
         /** The provider authorized with an OpenRouter account: the name matches the preset, and [Provider.signIn] is set to this value. */
         const val OPENROUTER_NAME = "OpenRouter"
         const val OPENROUTER_SIGN_IN = "openrouter"
         /** How this provider's sign-in is referred to in error messages. */
         internal const val XAI_ACCOUNT = "xAI"
+        internal const val OPENCODE_ACCOUNT = "OpenCode Go"
 
         /**
          * Trial call: the temporary config id, the system prompt, the sentence, the trial tool, and the reply limit.
@@ -221,12 +228,13 @@ class ProviderStore(
         internal const val PROBE_MAX_TOKENS = 1024
 
         /**
-         * The list-models endpoint: OpenAI-compatible, Responses, ChatGPT and xAI all use `GET {base}/models` (Bearer; for subscription sign-in [apiKey] is the access token).
-         * [headers] are sent with every request (see [ClientHeaders]).
+         * The list-models endpoint: OpenAI-compatible, Responses, ChatGPT, xAI and OpenCode Go all use `GET {base}/models`
+         * (Bearer; for subscription sign-in [apiKey] is the access token). [headers] are sent with every request (see [ClientHeaders]).
          */
         suspend fun listAvailable(kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, headers: Map<String, String>): ModelListResult =
             when (kind) {
-                ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt, ProviderConfig.Kind.Xai ->
+                ProviderConfig.Kind.OpenAiCompat, ProviderConfig.Kind.OpenAiResponses, ProviderConfig.Kind.ChatGpt,
+                ProviderConfig.Kind.Xai, ProviderConfig.Kind.OpenCodeGo ->
                     catalog.openAiCompat(baseUrl, apiKey, headers)
                 ProviderConfig.Kind.Anthropic -> catalog.anthropic(baseUrl, apiKey.orEmpty(), headers)
                 ProviderConfig.Kind.Gemini -> catalog.gemini(baseUrl, apiKey.orEmpty(), headers)
@@ -234,11 +242,17 @@ class ProviderStore(
 
         /**
          * Which adapter to use for calling this model and which Base URL to hand it. Both model construction ([buildModel]) and reasoning levels ([ReasoningOptions]) follow it.
-         * Subscription sign-in (xAI) always uses this provider's endpoint and does not follow a different protocol written in the model list, so the subscription is never redirected to another endpoint.
+         * xAI subscription sign-in always uses this provider's endpoint and does not follow a different protocol written in the model list, so the subscription is never redirected to another endpoint.
+         * OpenCode Go is the opposite: its list assigns each model a protocol and base URL, which are followed, falling back to Chat Completions when a model names none.
          */
-        internal fun adapterFor(cfg: ProviderConfig, endpoint: ModelEndpoint?): Pair<ProviderConfig.Kind, String> =
-            if (endpoint == null || cfg.kind == ProviderConfig.Kind.Xai) cfg.kind to cfg.baseUrl
-            else ProviderConfig.Kind.of(endpoint.protocol) to endpoint.adapterBaseUrl
+        internal fun adapterFor(cfg: ProviderConfig, endpoint: ModelEndpoint?): Pair<ProviderConfig.Kind, String> = when {
+            cfg.kind == ProviderConfig.Kind.Xai -> ProviderConfig.Kind.Xai to cfg.baseUrl
+            cfg.kind == ProviderConfig.Kind.OpenCodeGo ->
+                endpoint?.let { ProviderConfig.Kind.of(it.protocol) to it.adapterBaseUrl }
+                    ?: (ProviderConfig.Kind.OpenAiCompat to cfg.baseUrl)
+            endpoint == null -> cfg.kind to cfg.baseUrl
+            else -> ProviderConfig.Kind.of(endpoint.protocol) to endpoint.adapterBaseUrl
+        }
 
         /** The production instance (created by the app): the config lives under files/settings, Keys are encrypted with the Android keystore, and usage is recorded to [usage]. */
         fun create(

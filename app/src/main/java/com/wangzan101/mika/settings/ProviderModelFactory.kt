@@ -20,6 +20,7 @@ import com.wangzan101.mika.core.model.usage.UsagePurpose
 import com.wangzan101.mika.core.model.usage.UsageSource
 import com.wangzan101.mika.core.model.usage.metered
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import com.wangzan101.mika.settings.ProviderStore.Companion.http
 import com.wangzan101.mika.settings.ProviderStore.Companion.XAI_ACCOUNT
 import com.wangzan101.mika.settings.ProviderStore.Companion.adapterFor
@@ -191,10 +192,17 @@ fun ProviderStore.clientHeaders(p: Provider): Map<String, String> = headers(p.se
  */
 internal fun ProviderStore.buildModel(cfg: ProviderConfig, apiKey: String?, endpoint: ModelEndpoint?, setup: ClientSetup): ChatModel {
     val (kind, adapterBase) = adapterFor(cfg, endpoint)
-    // For subscription sign-in use the provider's current address (it may have changed at sign-in); the config stores the one from when it was added
+    // For subscription sign-in use the provider's current address (it may have changed at sign-in); the config stores the one from when it was added.
+    // OpenCode Go is the exception: each listed model names the base URL of its own protocol, which the listing already resolved.
     val baseUrl = if (cfg.kind == ProviderConfig.Kind.Xai) {
         provider(cfg.providerId)?.baseUrl?.takeIf { it.isNotBlank() } ?: adapterBase
     } else adapterBase
+    // OpenCode Go spends an account sign-in: its token goes into whichever header the listed protocol uses, and a 401 asks for a refresh once.
+    val account = if (cfg.kind == ProviderConfig.Kind.OpenCodeGo) accountTokensFor(cfg.providerId) else null
+    val freshOnce = AtomicBoolean(false)
+    val keySupplier: (suspend () -> String?)? = account?.let { tokens -> { tokens.get(freshOnce.getAndSet(false)) } }
+    val onKeyRejected: ((String, Long?, Int) -> Unit)? = account?.let { { _, _, status -> if (status == 401) freshOnce.set(true) } }
+    val requestKey = if (account != null) null else apiKey
     val defaultHttp = http
     val http = setup.readTimeoutSeconds
         ?.takeIf { it in MODEL_READ_TIMEOUT_SECONDS }
@@ -203,29 +211,30 @@ internal fun ProviderStore.buildModel(cfg: ProviderConfig, apiKey: String?, endp
     return when (kind) {
         ProviderConfig.Kind.OpenAiCompat ->
             OpenAiCompatModel(
-                baseUrl, apiKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField, setup.headers,
+                baseUrl, requestKey, cfg.model, cfg.capabilities, http, endpoint?.reasoningField, setup.headers,
                 reasoningEffort = setup.reasoningEffort,
-                keySupplier = { activeApiKey(cfg.providerId) },
-                onKeyRejected = { key, retryMs, status ->
+                keySupplier = keySupplier ?: { activeApiKey(cfg.providerId) },
+                onKeyRejected = onKeyRejected ?: { key, retryMs, status ->
                     KeyPoolManager.shared.markRejected(cfg.providerId, key, status, retryMs)
                 }
             )
         ProviderConfig.Kind.Anthropic -> AnthropicModel(
-            baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http,
+            baseUrl, requestKey.orEmpty(), cfg.model, cfg.capabilities, http,
             maxTokens = setup.maxOutputTokens,
             headers = setup.headers, reasoningEffort = setup.reasoningEffort, thinkingTypes = setup.thinkingTypes,
+            keySupplier = keySupplier, onKeyRejected = onKeyRejected,
         )
         ProviderConfig.Kind.Gemini ->
             GeminiModel(
-                baseUrl, apiKey.orEmpty(), cfg.model, cfg.capabilities, http, setup.headers, setup.maxOutputTokens,
+                baseUrl, requestKey.orEmpty(), cfg.model, cfg.capabilities, http, setup.headers, setup.maxOutputTokens,
                 reasoningEffort = setup.reasoningEffort,
-                keySupplier = { activeApiKey(cfg.providerId) },
-                onKeyRejected = { key, retryMs, status ->
+                keySupplier = keySupplier ?: { activeApiKey(cfg.providerId) },
+                onKeyRejected = onKeyRejected ?: { key, retryMs, status ->
                     KeyPoolManager.shared.markRejected(cfg.providerId, key, status, retryMs)
                 }
             )
         ProviderConfig.Kind.OpenAiResponses ->
-            ResponsesModel(baseUrl, BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http, headers = setup.headers,
+            ResponsesModel(baseUrl, account ?: BearerToken.fixed(apiKey), cfg.model, cfg.capabilities, http, headers = setup.headers,
                 reasoningEffort = setup.reasoningEffort, serviceTier = setup.serviceTier)
         ProviderConfig.Kind.ChatGpt ->
             ResponsesModel(baseUrl, tokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, chatGptPlan = true, headers = setup.headers,
@@ -233,5 +242,7 @@ internal fun ProviderStore.buildModel(cfg: ProviderConfig, apiKey: String?, endp
         ProviderConfig.Kind.Xai ->
             ResponsesModel(baseUrl, accountTokensFor(cfg.providerId), cfg.model, cfg.capabilities, http, headers = setup.headers,
                 reasoningEffort = setup.reasoningEffort, accountLogin = XAI_ACCOUNT)
+        // adapterFor already turned OpenCode Go into one of the four protocols above
+        ProviderConfig.Kind.OpenCodeGo -> throw IllegalStateException("OpenCode Go must resolve to a protocol adapter")
     }
 }

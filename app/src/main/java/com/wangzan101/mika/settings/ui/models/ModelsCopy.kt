@@ -171,7 +171,7 @@ object ModelsCopy {
         SignInFailure.Network -> tr(R.string.chatgpt_fail_network)
     }
 
-    // ---------- Sign in with account (xAI, OpenRouter; ChatGPT is above) ----------
+    // ---------- Sign in with account (xAI, OpenCode Go, OpenRouter; ChatGPT is above) ----------
 
     val SIGN_IN_GROUP: String get() = tr(R.string.signin_group)
     val KEY_GROUP: String get() = tr(R.string.signin_key_group)
@@ -201,25 +201,36 @@ object ModelsCopy {
     val SIGN_OUT_NOTE: String get() = tr(R.string.signin_sign_out_note)
     /** xAI account page. */
     const val ACCOUNT_MANAGE_URL = "https://accounts.x.ai"
+    /** OpenCode Console, where the OpenCode Go subscription and devices are managed. */
+    const val OPENCODE_MANAGE_URL = "https://opencode.ai/console"
 
     fun codeValid(minutes: Int) = tr(R.string.signin_xai_code_valid, minutes)
+
+    /** The line above the short code; the xAI page names xAI, so OpenCode Go has its own. */
+    fun signInCodeBody(kind: SignInKind) = when (kind) {
+        SignInKind.OpenCodeGo -> tr(R.string.signin_opencode_code_body)
+        else -> XAI_CODE_BODY
+    }
 
     /** The small line under each provider in the "Sign in with account" group. */
     fun signInRowLine(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> tr(R.string.signin_row_chatgpt)
         SignInKind.Xai -> tr(R.string.signin_row_xai)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_row_opencode)
         SignInKind.OpenRouter -> tr(R.string.signin_row_openrouter)
     }
 
     fun signInTitle(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_TITLE
         SignInKind.Xai -> tr(R.string.signin_xai_title)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_opencode_title)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_title)
     }
 
     fun signInBody(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_BODY
         SignInKind.Xai -> tr(R.string.signin_xai_body)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_opencode_body)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_body)
     }
 
@@ -230,29 +241,34 @@ object ModelsCopy {
     fun signInInfo(kind: SignInKind): String? = when (kind) {
         SignInKind.ChatGpt -> null
         SignInKind.Xai -> tr(R.string.signin_stored_note)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_opencode_note)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_note)
     }
 
     fun signInStart(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_CONTINUE
         SignInKind.Xai -> tr(R.string.signin_continue)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_continue)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_authorize)
     }
 
     fun signInWaiting(kind: SignInKind) = when (kind) {
         SignInKind.ChatGpt -> CHATGPT_WAITING
         SignInKind.Xai -> tr(R.string.signin_xai_starting)
+        SignInKind.OpenCodeGo -> tr(R.string.signin_opencode_starting)
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_waiting)
     }
 
     fun accountManage(kind: SignInKind) = when (kind) {
         SignInKind.OpenRouter -> tr(R.string.signin_openrouter_manage)
+        SignInKind.OpenCodeGo -> tr(R.string.account_manage_opencode)
         else -> tr(R.string.account_manage_xai)
     }
 
     /** Note below the account sign-in details: what is being used and what happens after signing out. */
     fun accountNote(kind: SignInKind, signedIn: Boolean) = when (kind) {
         SignInKind.OpenRouter -> tr(if (signedIn) R.string.signin_openrouter_signed_in_note else R.string.signin_openrouter_signed_out_note)
+        SignInKind.OpenCodeGo -> tr(if (signedIn) R.string.account_signed_in_note_opencode else R.string.account_signed_out_note_opencode)
         else -> tr(if (signedIn) R.string.account_signed_in_note_xai else R.string.account_signed_out_note)
     }
 
@@ -398,6 +414,7 @@ object ModelsCopy {
         ProviderConfig.Kind.OpenAiResponses -> "OpenAI Responses"
         ProviderConfig.Kind.ChatGpt -> "ChatGPT"
         ProviderConfig.Kind.Xai -> "xAI Responses"
+        ProviderConfig.Kind.OpenCodeGo -> "OpenCode Go"
     }
 
     fun shortUrl(url: String) = url.removePrefix("https://").removePrefix("http://")

@@ -160,10 +160,14 @@
     <string name="account_signed_in_note_xai">Đang dùng gói đăng ký xAI / Grok của bạn. Mức sử dụng được dùng chung với các ứng dụng khách khác trên tài khoản này. Lần đăng nhập này tái sử dụng ứng dụng khách đăng nhập công khai của công cụ dòng lệnh chính thức của xAI; hãy xem thông báo hiển thị trước khi bạn tiếp tục.</string>
     <string name="account_signed_out_note">Đã đăng xuất trên điện thoại này. Để thu hồi quyền cấp trên xAI nữa, hãy ngắt kết nối nó trong cài đặt tài khoản xAI của bạn. Các lựa chọn mô hình được giữ nguyên.</string>
     <string name="account_manage_xai">Mở tài khoản xAI</string>
+    <string name="account_signed_in_note_opencode">Đang dùng gói đăng ký OpenCode Go của bạn. Hạn mức được chia sẻ với các ứng dụng khác trên tài khoản này. Thông tin đăng nhập chỉ được lưu mã hóa trên điện thoại này.</string>
+    <string name="account_signed_out_note_opencode">Đã đăng xuất trên điện thoại này. Bạn cũng có thể xóa thiết bị này trong OpenCode Console. Các mẫu đã chọn vẫn được giữ.</string>
+    <string name="account_manage_opencode">Mở OpenCode Console</string>
     <string name="signin_group">Đăng nhập bằng tài khoản · không cần khóa</string>
     <string name="signin_key_group">Nhập khóa API</string>
     <string name="signin_row_chatgpt">Dùng gói Plus / Pro của bạn</string>
     <string name="signin_row_xai">Dùng gói đăng ký SuperGrok hoặc X Premium+ của bạn</string>
+    <string name="signin_row_opencode">Dùng gói đăng ký OpenCode Go của bạn</string>
     <string name="signin_row_openrouter">Một tài khoản cho hàng trăm mô hình, thanh toán từ số dư của chính bạn</string>
     <string name="signin_running">Đang đăng nhập…</string>
     <string name="signin_continue">Tiếp tục</string>
@@ -187,6 +191,11 @@
     <string name="signin_openrouter_manage">Mở trang Keys của OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">Mức sử dụng được trừ từ số dư OpenRouter của bạn. Khóa được lưu dưới dạng đã mã hóa trên điện thoại này; để ngừng sử dụng, hãy xóa khóa có tên \"Claire\" trên trang Keys của OpenRouter.</string>
     <string name="signin_openrouter_signed_out_note">Khóa đã bị xóa khỏi điện thoại này. Nó vẫn tồn tại trên OpenRouter; hãy xóa nó trên trang Keys. Các lựa chọn mô hình được giữ nguyên.</string>
+    <string name="signin_opencode_title">Đăng nhập bằng OpenCode Go</string>
+    <string name="signin_opencode_body">Dùng các mẫu OpenCode Go trong Claire với gói đăng ký OpenCode Go của bạn. Việc đăng nhập diễn ra trên trang của OpenCode; yêu cầu đi thẳng đến cổng suy luận của OpenCode.</string>
+    <string name="signin_opencode_note">Mục này dùng cách đăng nhập công khai của công cụ dòng lệnh chính thức của OpenCode. Thông tin đăng nhập chỉ được lưu mã hóa trên điện thoại này và không bao giờ được ghi vào nhật ký.</string>
+    <string name="signin_opencode_starting">Đang mở trang xác nhận của OpenCode…</string>
+    <string name="signin_opencode_code_body">Trang xác nhận của OpenCode đã mở. Kiểm tra mã trên trang có khớp với mã bên dưới không, rồi phê duyệt.</string>
     <string name="signin_set_main">Đặt làm mô hình chính</string>
     <string name="signin_set_main_note">Claire dùng nó để hoàn thành công việc</string>
     <string name="signin_sign_out_note">Chỉ xóa đăng nhập trên điện thoại này</string>

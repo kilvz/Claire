@@ -40,7 +40,7 @@ class GeminiModel(
     private val maxOutputTokens: Int? = null,
     /** Reasoning effort selected by the user; null sends nothing, `none` turns thinking off as far as possible, anything else is sent as `thinkingConfig.thinkingLevel`. */
     private val reasoningEffort: String? = null,
-    private val keySupplier: (() -> String?)? = null,
+    private val keySupplier: (suspend () -> String?)? = null,
     /** Called back with the HTTP status code when a key is rejected upstream (429/401/403); the wiring uses the status to decide between cooldown (429) and marking exhausted (401/403). */
     private val onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)? = null,
 ) : StreamingChatModel {
@@ -49,7 +49,7 @@ class GeminiModel(
     private val streamEndpoint = baseUrl.trimEnd('/') + "/v1beta/models/$model:streamGenerateContent?alt=sse"
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun resolveKey(): String = keySupplier?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
+    private suspend fun resolveKey(): String = keySupplier?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
 
     override suspend fun complete(system: String, messages: List<Message>, tools: List<ToolSpec>): ModelReply {
         val (status, retryAfter, text) = requestWithKeyRotation(::resolveKey, onKeyRejected) { key ->
@@ -74,7 +74,7 @@ class GeminiModel(
         return stream.finish()
     }
 
-    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, key: String = resolveKey()): Request {
+    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, key: String): Request {
         val systemText = (listOf(system) + messages.filter { it.role == Role.System }
             .map { m -> m.parts.filterIsInstance<Part.Text>().joinToString("\n") { it.text } })
             .filter { it.isNotBlank() }.joinToString("\n\n")

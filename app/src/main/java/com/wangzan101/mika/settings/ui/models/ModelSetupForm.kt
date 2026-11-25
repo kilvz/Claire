@@ -68,7 +68,7 @@ internal fun AddProviderForm(ui: ModelSetupUi, actions: ModelSetupActions, stand
             style = MikaType.Body, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
         )
     }
-    // Sign-in options (ChatGPT, xAI, OpenRouter)
+    // Sign-in options (ChatGPT, xAI, OpenCode Go, OpenRouter)
     AccountSignInGroup(ui, actions.openSignIn, actions.openProvider)
     // The Key-based group: preset chips
     GroupLabel(ModelsCopy.KEY_GROUP)

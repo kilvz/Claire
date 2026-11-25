@@ -159,10 +159,14 @@
     <string name="account_signed_in_note_xai">در حال استفاده از اشتراک xAI / Grok شما. مصرف با سایر کلاینت‌های این حساب مشترک است. این ورود از کلاینت عمومی ورود ابزار خط فرمان رسمی xAI استفاده می‌کند؛ پیش از ادامه، توضیح مربوط را ببینید.</string>
     <string name="account_signed_out_note">در این گوشی از حساب خارج شدید. برای لغو مجوز در xAI نیز اتصال را در تنظیمات حساب xAI قطع کنید. انتخاب مدل‌ها حفظ می‌شود.</string>
     <string name="account_manage_xai">باز کردن حساب xAI</string>
+    <string name="account_signed_in_note_opencode">از اشتراک OpenCode Go شما استفاده می‌شود. مصرف با سایر کلاینت‌های این حساب مشترک است. اطلاعات ورود فقط به‌صورت رمزنگاری‌شده در این گوشی ذخیره می‌شود.</string>
+    <string name="account_signed_out_note_opencode">از این گوشی خارج شدید. می‌توانید این دستگاه را در OpenCode Console هم حذف کنید. مدل‌های انتخاب‌شده باقی می‌مانند.</string>
+    <string name="account_manage_opencode">باز کردن OpenCode Console</string>
     <string name="signin_group">ورود با حساب · بدون نیاز به کلید</string>
     <string name="signin_key_group">وارد کردن کلید API</string>
     <string name="signin_row_chatgpt">استفاده از اشتراک Plus / Pro شما</string>
     <string name="signin_row_xai">استفاده از اشتراک SuperGrok یا X Premium+ شما</string>
+    <string name="signin_row_opencode">از اشتراک OpenCode Go شما استفاده می‌کند</string>
     <string name="signin_row_openrouter">یک حساب برای صدها مدل، با پرداخت از موجودی شما</string>
     <string name="signin_running">در حال ورود…</string>
     <string name="signin_continue">ادامه</string>
@@ -186,6 +190,11 @@
     <string name="signin_openrouter_manage">باز کردن صفحهٔ Keys در OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">مصرف از موجودی OpenRouter شما کسر می‌شود. کلید در این گوشی رمزگذاری و ذخیره می‌شود؛ برای توقف استفاده، کلید «Claire» را در صفحهٔ Keys ‏OpenRouter حذف کنید.</string>
     <string name="signin_openrouter_signed_out_note">کلید از این گوشی حذف شد، اما همچنان در OpenRouter وجود دارد؛ آن را در صفحهٔ Keys حذف کنید. انتخاب مدل‌ها حفظ می‌شود.</string>
+    <string name="signin_opencode_title">ورود با OpenCode Go</string>
+    <string name="signin_opencode_body">با اشتراک OpenCode Go خود از مدل‌های OpenCode Go در Claire استفاده کنید. ورود در صفحه OpenCode انجام می‌شود؛ درخواست‌ها مستقیم به درگاه استنتاج OpenCode می‌روند.</string>
+    <string name="signin_opencode_note">این ورود از ورود عمومی ابزار خط فرمان OpenCode استفاده می‌کند. اطلاعات ورود فقط به‌صورت رمزنگاری‌شده در این گوشی ذخیره می‌شود و هرگز در گزارش‌ها نوشته نمی‌شود.</string>
+    <string name="signin_opencode_starting">در حال باز کردن صفحه تأیید OpenCode…</string>
+    <string name="signin_opencode_code_body">صفحه تأیید OpenCode باز است. بررسی کنید که کد آن با کد زیر یکی باشد، سپس تأیید کنید.</string>
     <string name="signin_set_main">تنظیم به‌عنوان مدل اصلی</string>
     <string name="signin_set_main_note">میکا از آن برای انجام کارها استفاده می‌کند</string>
     <string name="signin_sign_out_note">فقط اطلاعات ورود را در این گوشی پاک می‌کند</string>

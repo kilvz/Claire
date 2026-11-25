@@ -31,14 +31,16 @@ data class ProviderConfig(
      * API type. [OpenAiResponses] is used when the model list specifies the Responses protocol for a model, by the "OpenAI" preset, and when it is selected while adding a custom provider;
      * [ChatGpt] is the one accessed by signing in with a ChatGPT account and spending plan quota: the credential is the sign-in (see [ChatGptSession]), not an API Key.
      * [Xai] likewise uses account sign-in (device code); the credential is the sign-in rather than an API Key, and it calls xAI's own Responses endpoint.
+     * [OpenCodeGo] also uses account sign-in (device code), but each model in its list names its own protocol and base URL, so calls follow the listing and may use any adapter.
      */
     enum class Kind {
-        OpenAiCompat, Anthropic, Gemini, OpenAiResponses, ChatGpt, Xai;
+        OpenAiCompat, Anthropic, Gemini, OpenAiResponses, ChatGpt, Xai, OpenCodeGo;
 
         /**
          * Which protocol this API type uses for requests. It is used to filter out models that the endpoint explicitly reports as unsupported, see the trial
-         * call in [com.wangzan101.mika.settings.ui.models.ModelSetupViewModel]. The two account sign-in providers (ChatGpt, Xai) both use Responses; they do not go through that form's trial
-         * call (it was verified at sign-in), so this only needs to be correct and does not affect who is filtered out.
+         * call in [com.wangzan101.mika.settings.ui.models.ModelSetupViewModel]. The account sign-in providers (ChatGpt, Xai, OpenCodeGo) do not go through that form's trial
+         * call (it was verified at sign-in), so this only needs to be correct and does not affect who is filtered out. OpenCode Go has no protocol of its own; Chat Completions is
+         * its fallback when a listed model carries no endpoint.
          */
         val protocol: ModelProtocol
             get() = when (this) {
@@ -46,6 +48,7 @@ data class ProviderConfig(
                 Anthropic -> ModelProtocol.Messages
                 Gemini -> ModelProtocol.GenerateContent
                 OpenAiResponses, ChatGpt, Xai -> ModelProtocol.Responses
+                OpenCodeGo -> ModelProtocol.ChatCompletions
             }
 
         companion object {
@@ -118,7 +121,8 @@ data class Provider(
      * [verifiedModels]. The account sign-in providers have fixed model names, so they do not count. The provider page offers "retest" for models in use this way.
      */
     fun untested(model: String): Boolean =
-        kind != ProviderConfig.Kind.ChatGpt && kind != ProviderConfig.Kind.Xai && models?.isEmpty() == true && model !in verifiedModels
+        kind != ProviderConfig.Kind.ChatGpt && kind != ProviderConfig.Kind.Xai && kind != ProviderConfig.Kind.OpenCodeGo &&
+            models?.isEmpty() == true && model !in verifiedModels
 }
 
 /** OkHttp converts timeouts to Int milliseconds, so the value in seconds must still fit after conversion. */

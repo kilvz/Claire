@@ -554,8 +554,9 @@ class ModelSetupScreenTest {
         compose.onNodeWithText(ModelsCopy.KEY_GROUP).performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("signin-chatgpt").performScrollTo().performClick()
         compose.onNodeWithTag("signin-xai").performScrollTo().performClick()
+        compose.onNodeWithTag("signin-opencode").performScrollTo().performClick()
         compose.onNodeWithTag("signin-openrouter").performScrollTo().performClick()
-        assertEquals(listOf("signin ChatGpt", "signin Xai", "signin OpenRouter"), calls)
+        assertEquals(listOf("signin ChatGpt", "signin Xai", "signin OpenCodeGo", "signin OpenRouter"), calls)
     }
 
     @Test fun signedInAccountRowOpensTheProvider() {
@@ -563,6 +564,7 @@ class ModelSetupScreenTest {
         val ui = ModelSetupUi(form, formOpen = true, providers = listOf(grok), xaiAccount = SubscriptionAccount("me@example.com", signedIn = true))
         compose.setContent { MikaTheme { Page(ModelsCopy.ADD_PROVIDER, onBack = {}) { AddProviderForm(ui, actions, standalone = true) } } }
         compose.onNodeWithTag("signin-xai-signed-in", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("signin-opencode-signed-in", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("signin-openrouter-signed-in", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("signin-xai").performScrollTo().performClick()
         assertEquals(listOf("provider p3"), calls)
@@ -583,6 +585,38 @@ class ModelSetupScreenTest {
         compose.onNodeWithText(ModelsCopy.XAI_CODE_COPY_REOPEN).assertIsDisplayed()
         compose.onNodeWithTag("signin-cancel").performClick()
         assertEquals(listOf("start Xai", "key Xai", "cancel Xai"), started)
+    }
+
+    @Test fun openCodeGoSheetShowsItsOwnCodePage() {
+        val started = mutableListOf<String>()
+        val actions = SignInSheetActions(start = { started += "start $it" }, cancel = { started += "cancel $it" }, useApiKey = { started += "key $it" })
+        var ui by mutableStateOf(ModelSetupUi(form))
+        compose.setContent { MikaTheme { SignInSheetBody(ui, SignInKind.OpenCodeGo, actions) } }
+        compose.onNodeWithText(ModelsCopy.signInTitle(SignInKind.OpenCodeGo)).assertIsDisplayed()
+        compose.onNodeWithTag("signin-risk").assertDoesNotExist()
+        compose.onNodeWithTag("signin-start").performClick()
+        ui = ui.copy(accountSignIn = AccountSignInUi(AccountProvider.OpenCodeGo, running = true, userCode = "ABCD-1234", openUrl = "https://opencode.ai/console/device",
+            expiresAtMs = System.currentTimeMillis() + 600_000))
+        compose.onNodeWithTag("signin-code").assertTextContains("ABCD-1234")
+        compose.onNodeWithText(ModelsCopy.signInCodeBody(SignInKind.OpenCodeGo)).assertIsDisplayed()
+        compose.onNodeWithTag("signin-use-key").assertDoesNotExist()
+        compose.onNodeWithTag("signin-cancel").performClick()
+        assertEquals(listOf("start OpenCodeGo", "cancel OpenCodeGo"), started)
+    }
+
+    @Test fun signedInOpenCodeGoDetailShowsAccountAndSignsOut() {
+        val got = mutableListOf<String>()
+        val openCode = Provider("p4", "OpenCode Go", ProviderConfig.Kind.OpenCodeGo, "https://opencode.ai/inference/go/openai/v1", listOf(ListedModel("deepseek-v4.1-flash")))
+        val ui = ModelSetupUi(form, providers = listOf(openCode), openCodeAccount = SubscriptionAccount("me@example.com", signedIn = true))
+        compose.setContent {
+            MikaTheme {
+                ProviderDetailContent(ui, openCode, ProviderDetailActions(signOut = { got += "out" }), onBack = {})
+            }
+        }
+        compose.onNodeWithText("me@example.com").assertIsDisplayed()
+        compose.onNodeWithText(ModelsCopy.accountNote(SignInKind.OpenCodeGo, signedIn = true)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(ModelsCopy.CHATGPT_SIGN_OUT).performScrollTo().performClick()
+        assertEquals(listOf("out"), got)
     }
 
     @Test fun openRouterSheetShowsFailureAndCanRetry() {

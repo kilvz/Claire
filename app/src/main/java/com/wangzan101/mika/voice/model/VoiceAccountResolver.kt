@@ -1,12 +1,10 @@
 package com.wangzan101.mika.voice.model
 
-import com.wangzan101.mika.core.model.KeyPoolManager
 import com.wangzan101.mika.settings.Provider
 import com.wangzan101.mika.settings.ProviderStore
-import com.wangzan101.mika.settings.activeApiKey
+import com.wangzan101.mika.settings.plainApiKey
 import com.wangzan101.mika.settings.clientHeaders
 import com.wangzan101.mika.settings.hasKey
-import com.wangzan101.mika.settings.providerKey
 import java.security.MessageDigest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -22,8 +20,7 @@ interface VoiceProviderAccountSource {
 class ProviderStoreVoiceAccountSource(private val store: ProviderStore) : VoiceProviderAccountSource {
     override fun provider(id: String): Provider? = store.provider(id)
 
-    override fun activeApiKey(id: String): String? =
-        store.activeApiKey(id) ?: store.providerKey(id)?.let { KeyPoolManager.shared.parseKeys(it).firstOrNull() }
+    override fun activeApiKey(id: String): String? = store.plainApiKey(id)
 
     override fun hasKey(id: String): Boolean = store.hasKey(id)
     override fun keyRevision(id: String): Long = store.providerKeyRevisions.value[id] ?: 0L
