@@ -29,7 +29,7 @@ class ChatCopyTest {
         val promos = ChatCopy.promos
         assertEquals(3, promos.size)
         assertEquals(ChatCopy.ExampleKind.Web, promos.first().kind)
-        assertTrue(promos.first().prompt.contains("https://github.com/wangzan101/mika"))
+        assertTrue(promos.first().prompt.contains("https://github.com/kilvz/Claire"))
         promos.forEach { assertTrue(it.title.isNotBlank() && it.prompt.isNotBlank() && !it.blurb.isNullOrBlank()) }
     }
 
