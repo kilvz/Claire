@@ -275,7 +275,7 @@ class SharedDraftStore(private val dir: File) {
     }
 
     companion object {
-        // 新导入按当前档位检查;已保存草稿按支持的最高档位校验,调低设置后也不丢附件。
+        // New imports are checked against the current tier; saved drafts are validated against the highest supported tier so lowering the setting does not lose attachments.
         private val MAX_ATTACHMENT_BYTES = FeatureFlags.ATTACHMENT_FILE_LIMIT_MB.max().toLong() shl 20
         const val MAX_TEXT_CHARS = 100_000
         const val MAX_ATTACHMENTS = 9

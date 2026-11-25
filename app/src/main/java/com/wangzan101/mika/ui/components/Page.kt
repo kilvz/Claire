@@ -30,10 +30,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 子页面的骨架:页面底 + 带返回的顶栏 + 一列可滚动的内容(左右留 [MikaSpace.Page],避开导航栏)。
- * 内容里直接放 [GroupLabel] / [GroupCard] / [FooterNote]。
- * [scrollState] 不给时用本页自己组合里记的,本页一离开组合就丢;在一处切页显示、翻回来要停在原位的页面,
- * 由切页的一方经 [PageScrolls] 给进来。
+ * Subpage skeleton: page background + top bar with back + one scrollable column (with [MikaSpace.Page] on both sides, clear of the navigation bar).
+ * Put [GroupLabel] / [GroupCard] / [FooterNote] directly inside the content.
+ * When [scrollState] is not given, use the one remembered in this page's own composition, which is lost when the page leaves it; for pages shown in a page switcher that must hold their place when returning,
+ * the switcher supplies it via [PageScrolls].
  */
 @Composable
 fun PageScaffold(
@@ -45,9 +45,9 @@ fun PageScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scroll = scrollState ?: rememberScrollState()
-    // 带着位置重新进入组合(切页回来)时,首帧布局里晚一帧才出来的内容(简约列表的卡片脚注,见 rememberCardNote)还没占位,
-    // 可滚动上限偏小,带着的位置会被截短:等上限长回来、这期间没人动过,再放回原来的位置。
-    // 带进来的位置要在组合里读:LaunchedEffect 的协程是派发后才跑的,那时首帧布局可能已经把它截短了
+    // When re-entering composition with a position (returning through the page switcher), content that appears one frame later in the first layout (card footnotes in compact lists, see rememberCardNote) has not taken up space yet,
+    // so the maximum scroll offset is too small and the carried position gets clipped: wait for the offset to grow back, and if nobody moved it in the meantime, restore the original position.
+    // Read the supplied position during composition: a LaunchedEffect coroutine runs only after dispatch, by which time the first layout may already have clipped it
     val wanted = remember(scroll) { scroll.value }
     val placed = remember(scroll) { CompletableDeferred<Unit>() }
     if (scrollState != null) LaunchedEffect(scroll) {
@@ -76,21 +76,21 @@ fun PageScaffold(
     }
 }
 
-/** 带着的位置被首帧截短后,最多等这么久让晚一帧的内容出来;再久就当内容确实变短了。 */
+/** After the carried position is clipped by the first frame, wait at most this long for later content to appear; beyond that, treat the content as genuinely shorter. */
 private const val CLIPPED_RESTORE_MS = 500L
 
 /**
- * 按页记着的滚动位置,给在一处切页显示的 [PageScaffold] 页面用:切到别的页时当前页离开组合,
- * 它自己 [rememberScrollState] 记的位置随之丢掉,切回来就回到顶部。位置放在切页的那一位
- * (翻页期间一直在组合里),各页用 [of] 取自己的交给 [PageScaffold] 的 `scrollState`;
- * 页面重建(换界面语言、进程被回收后恢复)时经 [Saver] 带回来。存下来的位置按枚举名记,一处翻页的页面要在同一个枚举里。
+ * Scroll positions remembered per page, for [PageScaffold] pages shown in a page switcher: switching to another page removes the current page from composition,
+ * losing the position its own [rememberScrollState] remembered, so returning goes back to the top. The positions live with the switcher
+ * (which stays in composition while paging), and each page gets its own via [of] to pass to [PageScaffold]'s `scrollState`;
+ * page recreation (changing UI language, restoring after the process is reclaimed) brings them back through [Saver]. Saved positions are keyed by enum name, so pages in one switcher must share one enum.
  */
 class PageScrolls(saved: Map<String, Any?> = emptyMap()) {
-    /** 重建前各页存下来的位置,那一页第一次被取到时顶上。 */
+    /** Positions saved by each page before recreation, applied when that page is first requested. */
     private val pending = saved.mapValues { (_, position) -> (position as? Number)?.toInt() ?: 0 }.toMutableMap()
     private val states = HashMap<Enum<*>, ScrollState>()
 
-    /** [page] 这一页的滚动状态,第一次取时新建。 */
+    /** The scroll state for [page], created on first request. */
     fun of(page: Enum<*>): ScrollState = states.getOrPut(page) {
         ScrollState(0).also { it.dispatchRawDelta((pending.remove(page.name) ?: 0).toFloat()) }
     }

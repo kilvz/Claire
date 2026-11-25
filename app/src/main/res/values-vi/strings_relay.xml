@@ -19,8 +19,8 @@
     <string name="relay_unpair">Hủy ghép nối cổng</string>
     <string name="relay_unpair_body">Ngắt kết nối điện thoại này khỏi cổng. Cần có kết nối internet. Token truy cập của điện thoại giữ nguyên.</string>
     <string name="relay_failed">Không thể hoàn tất. Kiểm tra địa chỉ cổng, kết nối internet và mã ghép nối. Nếu hủy ghép nối thất bại, quyền truy cập đã tắt; thử lại hoặc thu hồi điện thoại trên cổng.</string>
-    <string name="relay_notif_body">Truy cập từ xa đã bật. Mở Mika để kiểm tra kết nối cổng.</string>
-    <string name="relay_incompatible">Cập nhật Mika và cổng lên phiên bản khớp nhau</string>
+    <string name="relay_notif_body">Truy cập từ xa đã bật. Mở Claire để kiểm tra kết nối cổng.</string>
+    <string name="relay_incompatible">Cập nhật Claire và cổng lên phiên bản khớp nhau</string>
     <string name="relay_copy_gateway">Sao chép địa chỉ cổng</string>
     <string name="relay_cli_help">Lưu token truy cập vào một tệp trên máy tính, rồi chạy lệnh kết nối ở trên.</string>
     <string name="relay_intro">Cổng chuyển tiếp các yêu cầu CLI và MCP thường gửi qua Wi-Fi / LAN tới điện thoại của bạn để truy cập từ xa. Hãy triển khai nó trên máy chủ công cộng của riêng bạn trước khi ghép nối.</string>

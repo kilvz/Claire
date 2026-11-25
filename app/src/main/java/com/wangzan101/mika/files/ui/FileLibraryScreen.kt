@@ -534,7 +534,7 @@ internal fun FileLibraryScreen(
         }
     }
     actionsFor?.let { item ->
-        // 来源会话打不开(任务进行中且没开并行、又不是当前会话)时不给这一项
+        // Do not show this item when the source conversation cannot be opened (a task is running without parallelism and it is not the current conversation)
         val canOpenInChat = item.source?.let { it.conversationId == currentConversation || vm.canSwitch() } == true
         val openInChatAction = SheetAction(
             stringResource(R.string.file_library_open_in_chat), icon = MikaIcons.Message,

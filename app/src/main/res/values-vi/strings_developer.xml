@@ -16,17 +16,17 @@
     <string name="dev_parallel_sub">Tác vụ từ các cuộc trò chuyện khác nhau mỗi tác vụ có một màn hình ảo và chạy cùng lúc</string>
     <string name="dev_compaction">Tóm tắt có cấu trúc cho tác vụ dài</string>
     <string name="dev_compaction_sub">Khi nhiều bước cần nén lại, ghi lại mục tiêu, dữ kiện, tiến độ và bước tiếp theo</string>
-    <string name="dev_group">Cách Mika hoạt động</string>
+    <string name="dev_group">Cách Claire hoạt động</string>
     <string name="dev_autonomy">Chế độ tự chủ</string>
-    <string name="dev_autonomy_sub">Khi bật, Mika không hỏi ngay cả trước khi thanh toán và cứ hoàn thành; khi tắt, chỉ hỏi trước khi thanh toán</string>
-    <string name="dev_note">Các công tắc này ảnh hưởng cách Mika hoạt động và tốc độ của Mika. Thường nên để ở mặc định.</string>
+    <string name="dev_autonomy_sub">Khi bật, Claire không hỏi ngay cả trước khi thanh toán và cứ hoàn thành; khi tắt, chỉ hỏi trước khi thanh toán</string>
+    <string name="dev_note">Các công tắc này ảnh hưởng cách Claire hoạt động và tốc độ của Claire. Thường nên để ở mặc định.</string>
     <string name="dev_grounding">Đã xác minh định vị bằng thị giác</string>
-    <string name="dev_grounding_sub">Bật khi mô hình thị giác %1$s đã được kiểm tra là xác định vị trí chính xác; khi tắt, các vị trí nó đánh dấu cần bằng chứng khác trước khi Mika nhấn vào.</string>
+    <string name="dev_grounding_sub">Bật khi mô hình thị giác %1$s đã được kiểm tra là xác định vị trí chính xác; khi tắt, các vị trí nó đánh dấu cần bằng chứng khác trước khi Claire nhấn vào.</string>
     <string name="dev_speed">Tốc độ</string>
     <string name="dev_experiments">Thử nghiệm</string>
     <string name="dev_run_log">Bản ghi lần chạy</string>
     <string name="dev_screen_tables">Thu gọn phần tử màn hình mới</string>
     <string name="dev_screen_tables_sub">Gửi các trường lặp lại dưới dạng cột bảng trong lần đầu đọc màn hình. Tham chiếu phần tử và cây đầy đủ vẫn được giữ.</string>
     <string name="dev_device_files">Nhập tệp từ thiết bị</string>
-    <string name="dev_device_files_sub">Cho phép Mika sao chép tệp từ bộ nhớ lưu trữ dùng chung của thiết bị vào không gian làm việc. Thay đổi áp dụng cho tác vụ mới.</string>
+    <string name="dev_device_files_sub">Cho phép Claire sao chép tệp từ bộ nhớ lưu trữ dùng chung của thiết bị vào không gian làm việc. Thay đổi áp dụng cho tác vụ mới.</string>
 </resources>

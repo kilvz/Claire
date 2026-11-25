@@ -31,8 +31,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 在一处切页显示的页面从子页回来停在原来的位置:和设置页一个结构,切页的一方持有 [PageScrolls],各页从里面取自己的。
- * 列表页的行都带说明:简约列表里说明收到卡片下面当脚注,晚一帧才出来,页面首帧偏矮,停在底部附近时带着的位置会被截短。
+ * A page shown through a page switcher returns from a subpage to its previous position: the structure matches the settings page,
+ * with the switcher holding [PageScrolls] and each page taking its own from it.
+ * Every row on the list page carries a note: in a compact list the note moves below the card as a footnote and appears one frame late,
+ * so the first frame of the page is shorter and a carried position near the bottom gets clipped.
  */
 @RunWith(AndroidJUnit4::class)
 class PageScrollsDeviceTest {
@@ -68,7 +70,7 @@ class PageScrollsDeviceTest {
         }
     }
 
-    /** 这一行的屏幕纵坐标。滚出屏幕的行被裁剪后坐标是 0,所以先确认它真在屏幕里,免得两边都是 0 空过。 */
+    /** The row's vertical screen coordinate. A row scrolled off screen is clipped to 0, so first confirm it is really on screen, or both sides could be 0 and pass trivially. */
     private fun topOf(row: String): Float =
         compose.awaitOne(row).fetchSemanticsNode().boundsInRoot.top.also { assertTrue("$row 要在屏幕里", it > 0f) }
 
@@ -81,7 +83,7 @@ class PageScrollsDeviceTest {
         assertEquals(before, topOf(row), 1f)
     }
 
-    // 停在最底:返回的首帧卡片脚注还没出来,带着的位置被偏小的上限截短,要等上限长回来再放回去
+    // Parked at the very bottom: on return the card footnote is not there in the first frame, the carried position is clipped by the smaller limit, and it must wait for the limit to grow back before being restored
     @Test fun aPageScrolledToTheBottomComesBackWhereItWas() {
         show { PageScrolls() }
         compose.onNodeWithTag("end").performScrollTo()
@@ -96,7 +98,7 @@ class PageScrollsDeviceTest {
         roundTrip("第 ${ROWS / 2} 行")
     }
 
-    // 换界面语言、进程被回收后页面重建:位置经 PageScrolls.Saver 存下来,重建后接上。停在底部,重建的首帧同样被截短
+    // Page rebuild after changing the UI language or having the process reclaimed: positions are saved through PageScrolls.Saver and restored after the rebuild. Parked at the bottom, the first frame after the rebuild is clipped in the same way
     @Test fun positionsComeBackAfterThePageIsRebuilt() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { Screens(rememberSaveable(saver = PageScrolls.Saver) { PageScrolls() }) }
@@ -112,7 +114,7 @@ class PageScrollsDeviceTest {
     }
 
     private companion object {
-        /** 够长,手机竖屏上要滚好几屏。 */
+        /** Long enough to need several screens of scrolling in phone portrait. */
         const val ROWS = 30
     }
 }

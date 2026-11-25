@@ -8,7 +8,7 @@
     <string name="usage_title">Mức dùng token</string>
     <string name="usage_none">Chưa có</string>
     <string name="usage_empty_title">Không có mức dùng trong giai đoạn này</string>
-    <string name="usage_empty_body">Hãy nhờ Mika làm gì đó và số token đã dùng sẽ được ghi lại ở đây.</string>
+    <string name="usage_empty_body">Hãy nhờ Claire làm gì đó và số token đã dùng sẽ được ghi lại ở đây.</string>
     <string name="usage_note">Số liệu do nhà cung cấp của bạn báo cáo và chỉ lưu trên điện thoại này.</string>
     <string name="usage_total">Tổng</string>
     <string name="usage_trend">Xu hướng</string>

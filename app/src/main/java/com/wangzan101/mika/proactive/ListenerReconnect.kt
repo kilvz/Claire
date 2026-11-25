@@ -1,28 +1,28 @@
 package com.wangzan101.mika.proactive
 
 /**
- * 请系统重绑之后,监听还是没连上时再做什么。纯逻辑,[ProactiveRuntime] 照着做。
+ * What to do after asking the system to rebind when the listener still has not connected. Pure logic, carried out by [ProactiveRuntime].
  *
- * 「请系统重绑」只对系统记着「暂停」的监听有效,也就是 Mika 自己请它解绑过的(锁屏、完全退出)。
- * 系统自己没绑上的,这个请求没有任何效果:有的系统在 App 没在运行、又不允许它自启动时拒绝绑定监听,而且不再重试
- * (开机、进程被强行停止之后都是这样);之后用户打开 Mika,监听已授权、没连着,也不在「暂停」里,怎么请都连不上。
- * 这时先按组件名请系统解绑一次——它就进了「暂停」——再请重绑,系统才会真的去绑;Mika 此刻在运行,绑得上。
+ * "Ask the system to rebind" only works for listeners the system remembers as paused, meaning Claire itself asked to unbind them (screen lock, full exit).
+ * When the system itself failed to bind, this request has no effect: some systems refuse to bind the listener while the app is not running and is not allowed to autostart, and do not retry
+ * (as happens after boot or when the process has been force-stopped); after that the user opens Claire, the listener is authorized, not connected and not "paused", and no request can connect it.
+ * Then first ask the system to unbind by component name—which puts it into "paused"—and then ask to rebind, so the system actually binds it; Claire is running at that point, so it can.
  *
- * 只在这几样都成立时做:在看守、没锁屏(锁着本来就不该连着)、没连上、通知使用权还在;
- * 并且系统有按组件名解绑的接口([SDK_BY_NAME] 起)。更早的系统上没有办法,照旧等系统自己绑。
- * 系统只是绑得慢时多做这一次也无妨:它正在绑的那一次照常完成;已经绑上、只是连上的回调来得晚的,
- * 会多断开再连上一次,补收时重复的由去重挡掉。
+ * Do this only when all of these hold: watching, not locked (it should not be connected while locked), not connected, and notification access is still granted;
+ * and the system has the unbind-by-component API (from [SDK_BY_NAME]). Earlier systems have no way to do it, so keep waiting for the system to bind on its own.
+ * If the system is merely slow, doing this once more does no harm: the bind in progress still completes; for one already bound whose connected callback is just late,
+ * it disconnects and reconnects once more, and duplicates from the catch-up are removed by deduplication.
  */
 object ListenerReconnect {
-    /** 请重绑之后等这么久再看;正常连上用不了一秒。 */
+    /** Wait this long after asking to rebind before checking again; a normal connection takes less than a second. */
     const val WAIT_MS = 3_000L
-    /** 按组件名解绑的接口从这个系统版本开始有。 */
+    /** The unbind-by-component API exists from this system version. */
     const val SDK_BY_NAME = 34
 
     enum class Step {
-        /** 什么都不做。 */
+        /** Do nothing. */
         None,
-        /** 按组件名请系统解绑,再请重绑。 */
+        /** Ask the system to unbind by component name, then ask to rebind. */
         Reregister,
     }
 

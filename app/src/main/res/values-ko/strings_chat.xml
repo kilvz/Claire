@@ -314,7 +314,7 @@
     <string name="plus_reuse_hint">문구 · 목록 · 흐름</string>
     <string name="plus_reuse_phrases">자주 쓰는 문구</string>
     <string name="drawer_calls">AI 전화</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">가장 가까운 카페로 길 안내해 줘</string>
     <string name="chat_idea_camera">카메라 열고 사진 찍어 줘</string>
     <string name="chat_idea_sms">엄마한테 \'집에 도착했어\' 문자 보내 줘</string>
@@ -324,11 +324,11 @@
     <string name="chat_idea_email">최근 메일 내용 알려 줘</string>
     <string name="chat_idea_screenshot">가장 최근 스크린샷 찾아 줘</string>
     <string name="chat_idea_meeting">내일 오후 3시에 회의 일정 추가해 줘</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">오픈 소스 Mika 프로젝트 응원하기</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">오픈 소스 Claire 프로젝트 응원하기</string>
     <string name="chat_example_follow_blurb">개발자를 팔로우하고 대화에 참여하기</string>
     <string name="chat_example_group_summary_blurb">오늘 읽지 않은 메시지를 한 줄로</string>
-    <string name="chat_example_share_title">친구에게 Mika 공유</string>
+    <string name="chat_example_share_title">친구에게 Claire 공유</string>
     <string name="chat_example_share_blurb">필요한 친구에게 추천하기</string>
-    <string name="chat_example_share">Mika 프로젝트 링크 https://github.com/wangzan101/mika를 친구에게 공유하고, 휴대폰을 대신 조작해 준다고 알려 줘</string>
+    <string name="chat_example_share">Claire 프로젝트 링크 https://github.com/kilvz/Claire를 친구에게 공유하고, 휴대폰을 대신 조작해 준다고 알려 줘</string>
 </resources>

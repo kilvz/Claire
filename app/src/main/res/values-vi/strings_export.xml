@@ -27,10 +27,10 @@
     <string name="export_no_messages">Không có gì để xuất</string>
     <string name="export_current_turn">Lượt đang chạy không được bao gồm.</string>
     <string name="export_warnings">%1$d mục không thể đưa vào.</string>
-    <string name="export_filename_fallback">Cuộc trò chuyện Mika</string>
+    <string name="export_filename_fallback">Cuộc trò chuyện Claire</string>
 
     <string name="export_label_user">Người dùng</string>
-    <string name="export_label_mika">Mika</string>
+    <string name="export_label_mika">Claire</string>
     <string name="export_label_steer">Tin nhắn trong lúc tác vụ đang chạy</string>
     <string name="export_label_answer">Câu trả lời</string>
     <string name="export_label_tool_steps">Các bước công cụ</string>

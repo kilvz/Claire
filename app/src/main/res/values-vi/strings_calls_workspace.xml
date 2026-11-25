@@ -12,7 +12,7 @@
     <string name="calls_sim_ask_each_time">Không có SIM ưu tiên</string>
     <string name="calls_task_back_to_edit">Quay lại chỉnh sửa</string>
     <string name="calls_task_confirm_dial">Xác nhận và quay số</string>
-    <string name="calls_task_confirm_note">Mika dùng bản tóm tắt này cho cuộc gọi này. Việc quay số dùng SIM đã chọn và có thể phát sinh cước nhà mạng và phí giọng nói thời gian thực.</string>
+    <string name="calls_task_confirm_note">Claire dùng bản tóm tắt này cho cuộc gọi này. Việc quay số dùng SIM đã chọn và có thể phát sinh cước nhà mạng và phí giọng nói thời gian thực.</string>
     <string name="calls_task_constraints">Những điều không được hứa</string>
     <string name="calls_task_context">Ngữ cảnh bổ sung</string>
     <string name="calls_task_filled">Đã thêm</string>
@@ -36,7 +36,7 @@
     <string name="calls_contacts_tab">Danh bạ</string>
     <string name="calls_manual_tab">Nhập thủ công</string>
     <string name="calls_contacts_search">Tìm kiếm theo tên hoặc số</string>
-    <string name="calls_contacts_permission">Cho phép Mika đọc danh bạ để chọn số của họ. Bạn cũng có thể nhập số thủ công.</string>
+    <string name="calls_contacts_permission">Cho phép Claire đọc danh bạ để chọn số của họ. Bạn cũng có thể nhập số thủ công.</string>
     <string name="calls_contacts_empty">Không có liên hệ nào có số điện thoại dùng được.</string>
     <string name="calls_contacts_failed">Không tải được danh bạ.</string>
 </resources>

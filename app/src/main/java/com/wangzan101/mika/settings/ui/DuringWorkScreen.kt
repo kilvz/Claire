@@ -41,10 +41,10 @@ import com.wangzan101.mika.core.model.usage.TokenBudgetLimits
 import com.wangzan101.mika.device.ui.DeviceAccessSection
 
 /**
- * 设置 › 任务运行:自主模式默认关;屏幕常亮、被操作的 App 静音默认开,可以关;[parallel] 不为空(实验开关打开了)时多一行同时进行的任务数。
- * 下面一组是操作节奏:快 / 标准(默认) / 像人,选了下一个任务起生效。
- * [deviceAccess] 非空时挂「锁屏时运行本机任务」一组:与「连接电脑」的远程开关互不影响,凭据编辑区共用。
- * [scrollState] 由切页的一方给进来,从「操作节奏」回来才停在原来的位置。
+ * Settings › Task running: autonomous mode is off by default; keep screen awake and mute the operated app are on by default and can be turned off; when [parallel] is not null (the experiment switch is on) an extra row sets the number of concurrent tasks.
+ * The group below is operating pace: fast / standard (default) / human-like, taking effect from the next task.
+ * When [deviceAccess] is not null, a "run on-device tasks while locked" group is added: it is independent of the remote "connect to computer" switch and shares the credential editor.
+ * [scrollState] is supplied by the page switcher so returning from "operating pace" stops at the previous position.
  */
 @Composable
 fun DuringWorkScreen(

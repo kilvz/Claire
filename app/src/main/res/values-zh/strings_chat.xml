@@ -314,7 +314,7 @@
     <string name="plus_reuse_hint">说法 · 清单 · 流程</string>
     <string name="plus_reuse_phrases">常用说法</string>
     <string name="drawer_calls">AI 电话</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">导航去最近的咖啡店</string>
     <string name="chat_idea_camera">打开相机拍张照片</string>
     <string name="chat_idea_sms">给妈妈发短信：我到家了</string>
@@ -324,11 +324,11 @@
     <string name="chat_idea_email">看看最新的邮件说了什么</string>
     <string name="chat_idea_screenshot">找出相册里最近的截图</string>
     <string name="chat_idea_meeting">明天下午三点加个会议日程</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">支持一下 Mika 开源项目</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">支持一下 Claire 开源项目</string>
     <string name="chat_example_follow_blurb">去小红书关注，再进群交流</string>
     <string name="chat_example_group_summary_blurb">一句话看完内测群今天聊了啥</string>
-    <string name="chat_example_share_title">把 Mika 分享给朋友</string>
+    <string name="chat_example_share_title">把 Claire 分享给朋友</string>
     <string name="chat_example_share_blurb">推荐给用得上的朋友</string>
-    <string name="chat_example_share">把 Mika 的项目链接 https://github.com/wangzan101/mika 分享给一个朋友，告诉他 Mika 能帮人操作手机</string>
+    <string name="chat_example_share">把 Claire 的项目链接 https://github.com/kilvz/Claire 分享给一个朋友，告诉他 Claire 能帮人操作手机</string>
 </resources>

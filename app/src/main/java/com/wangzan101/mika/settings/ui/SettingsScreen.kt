@@ -146,7 +146,7 @@ fun SettingsScreen(
     // The "vision verified" entry in developer options follows the vision model (when vision uses the main model it is the main model's config)
     val visionConfig = remember(configs, roles) { store.configFor(ModelRole.Vision) }
     var page by rememberSaveable { mutableStateOf(if (openPhoneOps) SettingsPage.PhoneOps else SettingsPage.Home) }
-    // 进子页时当前页离开组合,它自己记的滚动位置随之丢掉;有子页可进的几页在这里记,回来接着刚才的位置
+    // Entering a subpage removes the current page from composition and loses its own remembered scroll position; pages with subpages are remembered here so returning resumes where it was
     val pageScrolls = rememberSaveable(saver = PageScrolls.Saver) { PageScrolls() }
     var explaining by remember { mutableStateOf<Problem?>(null) }
     // "Quit completely" asks first: tasks, the capsule and notifications all stop
@@ -525,7 +525,7 @@ fun SettingsContent(
     /** Auto-archive: how long a conversation without new messages goes before it is archived automatically; 0 means off. */
     autoArchiveDays: Int = 0,
     onOpenAutoArchive: () -> Unit = {},
-    /** 这一页的滚动状态;切页的一方给进来,从子页回来才停得住。 */
+    /** This page's scroll state, supplied by the page switcher so it can hold its place after returning from a subpage. */
     scrollState: ScrollState = rememberScrollState(),
 ) {
     val check = Prerequisites.check(status, hasMainModel = mainModel != null)

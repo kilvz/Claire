@@ -96,7 +96,7 @@ internal class ChatDesk(private val vm: ChatViewModel, private val session: Chat
         vm.scope.launch(vm.io) { deps.desk(id).cancel(taskId) }
     }
 
-    /** 输入框的停止键:停下屏上这条会话里前台还没回完的话,和它派出去、还在跑的每一件。 */
+    /** The composer's stop button: stop the front desk's unfinished replies in the conversation on screen and every piece of work it dispatched that is still running. */
     fun stopAll() {
         val id = _ui.value.conversationId ?: return
         line(id).stopReplies()
@@ -165,13 +165,13 @@ internal class DeskChatOps(
     /** The message the front desk is currently replying to (the part the user said themselves); null when not replying. Cancellation only recognizes it. */
     @Volatile private var current: String? = null
 
-    /** 还没回完的几句(在回的和排在后面的);输入框的停止键一起停掉。 */
+    /** The replies still unfinished (the one being written and the queued ones); the composer's stop button stops them all. */
     private val replies = java.util.concurrent.ConcurrentHashMap.newKeySet<kotlinx.coroutines.Job>()
 
-    /** 停下前台还没回完的话:在回的这句停在已说的地方,排着的不再回。 */
+    /** Stop the front desk's unfinished replies: the current one stops where it has got to and queued ones are no longer answered. */
     fun stopReplies() { replies.toList().forEach { it.cancel() } }
 
-    /** 起标题这件事这条入口做过没有。 */
+    /** Whether title generation has already run through this entry point. */
     @Volatile private var named = false
 
     /** The word check the chat page gives the executor: which of the user's messages the fragment falls in (the current reply first, then newest to oldest), returning that whole message. */
@@ -211,7 +211,7 @@ internal class DeskChatOps(
         replies += job
         job.invokeOnCompletion { cause ->
             replies -= job
-            // 停在排队里、还没开始回的一句:这一轮也收尾,不一直转圈
+            // A queued reply that has not started: close out this round too instead of spinning forever
             if (cause != null) update(runId) { if (it.status == ExchangeStatus.Working) it.copy(status = ExchangeStatus.Done(it.deskReply.orEmpty(), null)) else it }
         }
         return true
@@ -326,10 +326,10 @@ internal class DeskChatOps(
             brain.reply(text, context(runId, reply, tasks, executor(words)))
         } catch (e: CancellationException) {
             current = null
-            // 被停下:已经说出来的留着,这一轮收尾
+            // Stopped: keep what has already been said and close out this round
             val spoken = reply.toString()
             update(runId) { it.copy(deskReply = spoken, status = ExchangeStatus.Done(spoken, null)) }
-            // 派出去的任务得记进这一轮,下次打开会话才接得回来
+            // Dispatched tasks must be recorded in this round so they can be picked up again when the conversation is reopened
             withContext(NonCancellable) { persist(Turn(text, reply.toString(), DeskTurn.STATUS, runId = runId, atMs = startedAt, deskTasks = tasks)) }
             throw e
         } catch (e: Exception) {

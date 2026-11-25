@@ -314,7 +314,7 @@
     <string name="plus_reuse_hint">Frasa · daftar · alur</string>
     <string name="plus_reuse_phrases">Frasa tersimpan</string>
     <string name="drawer_calls">Panggilan AI</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">Arahkan ke kedai kopi terdekat</string>
     <string name="chat_idea_camera">Buka kamera dan ambil foto</string>
     <string name="chat_idea_sms">SMS ke Ibu: aku sudah di rumah</string>
@@ -324,11 +324,11 @@
     <string name="chat_idea_email">Apa isi email terbaru saya?</string>
     <string name="chat_idea_screenshot">Temukan tangkapan layar terbaru saya</string>
     <string name="chat_idea_meeting">Tambahkan rapat besok pukul 15.00</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">Dukung proyek sumber terbuka Mika</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Dukung proyek sumber terbuka Claire</string>
     <string name="chat_example_follow_blurb">Ikuti pembuatnya dan gabung obrolan</string>
     <string name="chat_example_group_summary_blurb">Ringkas pesan belum dibaca hari ini</string>
-    <string name="chat_example_share_title">Bagikan Mika ke teman</string>
+    <string name="chat_example_share_title">Bagikan Claire ke teman</string>
     <string name="chat_example_share_blurb">Rekomendasikan ke yang butuh</string>
-    <string name="chat_example_share">Bagikan tautan proyek Mika https://github.com/wangzan101/mika ke seorang teman, dan bilang Mika bisa mengoperasikan ponsel untuknya.</string>
+    <string name="chat_example_share">Bagikan tautan proyek Claire https://github.com/kilvz/Claire ke seorang teman, dan bilang Claire bisa mengoperasikan ponsel untuknya.</string>
 </resources>

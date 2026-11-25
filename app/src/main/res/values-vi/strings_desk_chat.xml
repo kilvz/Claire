@@ -1,5 +1,5 @@
 <resources>
-    <!-- 聊天页走前台:前台回话的工具小标签、任务卡片、输入栏上方的「在办」 -->
+    <!-- Chat page through the front desk: tool chips for front-desk replies, task cards, and the "in progress" area above the composer -->
     <string name="desk_tool_added">Đã thêm vào “%1$s”</string>
     <string name="desk_tool_answered">Đã trả lời “%1$s”</string>
     <string name="desk_tool_cancelled">Đã hủy “%1$s”</string>

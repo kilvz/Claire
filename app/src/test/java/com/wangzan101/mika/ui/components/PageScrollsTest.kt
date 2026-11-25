@@ -8,7 +8,7 @@ import org.junit.Test
 class PageScrollsTest {
     private enum class Page { Home, Advanced, Sandbox }
 
-    // 首页离开组合去了子页(其间取过子页的状态),回来拿到的还是原来那一份,位置没动
+    // The main page leaves composition for a subpage (whose state was read in the meantime); on return it still gets the same one and the position has not moved
     @Test fun aPageKeepsItsScrollPositionWhileAnotherPageIsShown() {
         val scrolls = PageScrolls()
         val home = scrolls.of(Page.Home)
@@ -21,7 +21,7 @@ class PageScrollsTest {
         assertEquals(150, sandbox.value)
     }
 
-    // 页面重建:存下来的是取过的各页的位置,取回来接上;没存过的页从 0 开始
+    // Page rebuild: the saved values are the positions of pages that were read, restored on return; pages never saved start at 0
     @Test fun savedPositionsComeBackAfterRecreation() {
         val scrolls = PageScrolls()
         scrolls.of(Page.Home).dispatchRawDelta(600f)

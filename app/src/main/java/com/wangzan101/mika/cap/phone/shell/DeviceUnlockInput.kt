@@ -51,7 +51,7 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
         return Rect(0, 0, size.x, size.y)
     }
 
-    /** 安全锁屏仍停在通知/指纹页时做一次通用的上滑。事件定向给 SystemUI,解锁中途完成也不会落进前台 App。 */
+    /** Performs a generic swipe up while a secure lock screen is still on the notification/fingerprint page. Events target SystemUI, so finishing the unlock midway does not leak into the foreground app. */
     fun reveal(): Boolean {
         val target = systemUiUid ?: return false
         if (!power.isInteractive || !keyguard.isKeyguardLocked || !keyguard.isDeviceLocked) return false

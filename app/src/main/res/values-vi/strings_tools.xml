@@ -68,8 +68,8 @@
     <string name="tool_tap">Nhấn</string>
     <string name="tool_type">Nhập văn bản</string>
     <string name="tool_clear">Xóa trường</string>
-    <string name="tool_mika_status">Xem trạng thái của Mika</string>
-    <string name="tool_mika_open_screen">Mở một trang của Mika</string>
+    <string name="tool_mika_status">Xem trạng thái của Claire</string>
+    <string name="tool_mika_open_screen">Mở một trang của Claire</string>
     <string name="tool_mika_open_file">Mở một tệp</string>
     <string name="tool_mika_notify">Gửi thông báo</string>
     <string name="tool_mika_copy">Sao chép văn bản</string>

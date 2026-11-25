@@ -22,17 +22,17 @@ object ChatCopy {
     /** A value statement for the empty conversation: explains what Claire can do. */
     val EMPTY_VALUE get() = tr(R.string.chat_empty_value)
 
-    /** 内置示例的类型,决定卡片上用哪个 App 的图标。 */
+    /** The kind of built-in example, which decides which app icon appears on the card. */
     enum class ExampleKind { Web, Follow, GroupChat, Share, Alarm, Schedule }
     data class Example(val kind: ExampleKind, val title: String, val prompt: String, val blurb: String? = null)
 
-    /** 界面是不是中文。中文界面的推广卡用国内 App(小红书、微信),其他语言用海外的。 */
+    /** Whether the UI is Chinese. Chinese UI promo cards use Chinese apps (Xiaohongshu, WeChat), other languages use international ones. */
     private fun chineseUi(): Boolean = uiLocale().language == "zh"
 
     /**
-     * 空对话顶部的推广卡,写死在这里,每次按当前界面语言取,点了填进去的也是当前语言。
-     * 中文:GitHub star、小红书关注、微信群总结;其他语言:GitHub star、X 关注、把 Mika 分享给朋友。
-     * 用户自己加的任务不在这里,在输入框加号面板里。
+     * Promo cards at the top of the empty chat, hardcoded here, selected by the current UI language each time; tapping one fills in text in that language too.
+     * Chinese: GitHub star, follow on Xiaohongshu, WeChat group summary; other languages: GitHub star, follow on X, share Claire with a friend.
+     * Tasks the user added themselves are not here; they live in the composer's plus panel.
      */
     val promos get() = listOf(
         Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star), tr(R.string.chat_example_github_star_blurb)),
@@ -42,8 +42,8 @@ object ChatCopy {
     )
 
     /**
-     * 推荐任务(加号面板里那份)第一次初始化用的内容。只在本机还没有保存过时用一次,
-     * 之后就是用户自己的列表,不会因为换语言或升级被加回来。
+     * Content used to initialize the suggested tasks (the set in the plus panel) for the first time. It is used once when nothing has been saved locally yet,
+     * after that it is the user's own list and is not added back when changing language or upgrading.
      */
     val examples get() = listOf(
         Example(ExampleKind.Alarm, tr(R.string.chat_example_alarms_title), tr(R.string.chat_example_alarms)),
@@ -53,9 +53,9 @@ object ChatCopy {
     fun recommendationSeeds(): List<Pair<String, String>> = examples.map { it.title to it.prompt }
 
     /**
-     * 曾经放进推荐任务、现在不放了的示例:PDF 总结,还有挪到顶部推广卡写死的那三条。
-     * 升级时把用户没动过的从推荐列表里清掉;改过的留着——那已经是用户自己的任务了。
-     * 当初是按那时的界面语言存的,所以每种语言的原文都比一遍。
+     * Examples that were once suggested tasks but are no longer included: PDF summary, and the three moved into the hardcoded top promo cards.
+     * On upgrade, remove from the suggested list the ones the user never touched; keep edited ones—they are already the user's own tasks.
+     * They were stored in the UI language of the time, so compare the original text for every language.
      */
     fun retiredRecommendationSeeds(context: android.content.Context): List<Pair<String, String>> {
         val ids = listOf(

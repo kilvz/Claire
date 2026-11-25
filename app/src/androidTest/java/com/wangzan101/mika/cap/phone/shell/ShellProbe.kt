@@ -40,7 +40,7 @@ class ShellProbe(private val context: Context) : AutoCloseable {
 
     init {
         val filter = IntentFilter(BROADCAST)
-        // shell 进程发来的广播,要对外可收
+        // The broadcast comes from the shell process, so it must be receivable from outside
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
     }
 

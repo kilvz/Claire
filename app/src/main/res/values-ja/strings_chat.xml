@@ -314,7 +314,7 @@
     <string name="plus_reuse_hint">フレーズ · リスト · フロー</string>
     <string name="plus_reuse_phrases">よく使うフレーズ</string>
     <string name="drawer_calls">AI 電話</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">一番近いカフェまでナビして</string>
     <string name="chat_idea_camera">カメラを開いて写真を撮って</string>
     <string name="chat_idea_sms">母に「家に着いたよ」とSMSして</string>
@@ -324,11 +324,11 @@
     <string name="chat_idea_email">最新のメールの内容を教えて</string>
     <string name="chat_idea_screenshot">最近のスクリーンショットを探して</string>
     <string name="chat_idea_meeting">明日15時に会議の予定を入れて</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">オープンソースの Mika を応援</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">オープンソースの Claire を応援</string>
     <string name="chat_example_follow_blurb">作者をフォローしてチャットに参加</string>
     <string name="chat_example_group_summary_blurb">今日の未読をひとことでまとめる</string>
-    <string name="chat_example_share_title">Mika を友だちにシェア</string>
+    <string name="chat_example_share_title">Claire を友だちにシェア</string>
     <string name="chat_example_share_blurb">役立ちそうな友だちに紹介</string>
-    <string name="chat_example_share">Mika のプロジェクトリンク https://github.com/wangzan101/mika を友だちにシェアして、スマホを代わりに操作してくれると伝えて</string>
+    <string name="chat_example_share">Claire のプロジェクトリンク https://github.com/kilvz/Claire を友だちにシェアして、スマホを代わりに操作してくれると伝えて</string>
 </resources>

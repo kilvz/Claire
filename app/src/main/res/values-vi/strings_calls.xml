@@ -87,7 +87,7 @@
     <string name="calls_outgoing_title">Thực hiện cuộc gọi</string>
     <string name="calls_rules">Quy tắc trả lời</string>
     <string name="calls_setup_credentials">Cấu hình thông tin xác thực giọng nói thời gian thực.</string>
-    <string name="calls_setup_shell">Kết nối trợ lý Mika tích hợp trước.</string>
+    <string name="calls_setup_shell">Kết nối trợ lý Claire tích hợp trước.</string>
     <string name="calls_sim_clear_preferred">Xóa SIM ưu tiên</string>
     <string name="calls_sim_preferred">SIM ưu tiên: %1$s</string>
     <string name="calls_sim_save_preferred">Dùng SIM này theo mặc định</string>
@@ -142,7 +142,7 @@
     <string name="calls_notification_connected">AI đã kết nối. Bạn có thể tiếp quản bất cứ lúc nào.</string>
     <string name="calls_only_types">Chỉ các loại cuộc gọi đã chọn</string>
     <string name="calls_pick_types">Chọn ít nhất một loại cuộc gọi</string>
-    <string name="calls_type_note">Mika dùng Trợ năng để khớp nhãn và số của ứng dụng điện thoại với cuộc gọi đang đổ chuông. Cuộc gọi không nhận diện được sẽ để cho bạn.</string>
+    <string name="calls_type_note">Claire dùng Trợ năng để khớp nhãn và số của ứng dụng điện thoại với cuộc gọi đang đổ chuông. Cuộc gọi không nhận diện được sẽ để cho bạn.</string>
     <string name="calls_type_accessibility">Mở cài đặt Trợ năng</string>
     <string name="calls_type_takeout">Giao đồ ăn</string>
     <string name="calls_type_parcel">Bưu kiện</string>
@@ -156,5 +156,5 @@
     <string name="calls_type_business">Doanh nghiệp và dịch vụ khách hàng</string>
     <string name="calls_type_transport">Taxi và dịch vụ xe</string>
     <string name="calls_only_strangers">Chỉ các số ngoài danh bạ</string>
-    <string name="calls_strangers_note">Cho phép Mika đọc danh bạ. AI chỉ trả lời khi số có thể kiểm tra được và chưa được lưu. Số ẩn và tra cứu thất bại sẽ để cho bạn.</string>
+    <string name="calls_strangers_note">Cho phép Claire đọc danh bạ. AI chỉ trả lời khi số có thể kiểm tra được và chưa được lưu. Số ẩn và tra cứu thất bại sẽ để cho bạn.</string>
 </resources>

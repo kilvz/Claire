@@ -7,7 +7,7 @@ import com.wangzan101.mika.core.screen.uistate.ActionResult
 import com.wangzan101.mika.shell.IMikaShell
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** 返回 false 时任务仍在但挪不动，可以重试；恢复不了时把原因交给 Agent。 */
+/** When this returns false the task still exists but cannot be moved, so it can be retried; when it cannot be restored, hand the reason to the agent. */
 internal suspend fun restoreTargetApp(
     target: MutableStateFlow<TargetApp?>,
     shell: IMikaShell,
@@ -22,7 +22,7 @@ internal suspend fun restoreTargetApp(
         if (display >= 0) {
             if (display == agentDisplay || (fromMainOnly && display != Display.DEFAULT_DISPLAY)) return true
             if (moveBack(app.taskId)) return true
-            // App 可能恰好在查询与挪动之间重启。只在旧任务确实消失时按包名找。
+            // The app may restart between the query and the move. Look up by package name only when the old task has really disappeared.
             val after = shell.displayOfTask(app.taskId)
             if (after >= 0) return after == agentDisplay
         }

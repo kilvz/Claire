@@ -356,7 +356,7 @@
     <string name="plus_reuse_hint">Фразы · списки · сценарии</string>
     <string name="plus_reuse_phrases">Сохранённые фразы</string>
     <string name="drawer_calls">ИИ-звонки</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">Проложи маршрут до ближайшей кофейни</string>
     <string name="chat_idea_camera">Открой камеру и сделай фото</string>
     <string name="chat_idea_sms">Напиши маме: я дома</string>
@@ -366,11 +366,11 @@
     <string name="chat_idea_email">Что в моих последних письмах?</string>
     <string name="chat_idea_screenshot">Найди мой последний скриншот</string>
     <string name="chat_idea_meeting">Добавь встречу завтра в 15:00</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">Поддержи открытый проект Mika</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Поддержи открытый проект Claire</string>
     <string name="chat_example_follow_blurb">Подпишись на автора и заходи в чат</string>
     <string name="chat_example_group_summary_blurb">Непрочитанное за сегодня в одной строке</string>
-    <string name="chat_example_share_title">Поделиться Mika с другом</string>
+    <string name="chat_example_share_title">Поделиться Claire с другом</string>
     <string name="chat_example_share_blurb">Посоветуйте тому, кому пригодится</string>
-    <string name="chat_example_share">Поделись ссылкой на проект Mika https://github.com/wangzan101/mika с другом и расскажи, что он умеет управлять телефоном.</string>
+    <string name="chat_example_share">Поделись ссылкой на проект Claire https://github.com/kilvz/Claire с другом и расскажи, что он умеет управлять телефоном.</string>
 </resources>

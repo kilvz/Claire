@@ -91,7 +91,7 @@ class VoiceCallFeedTest {
     @Test fun `a step that scrolled out of the recent window is still kept from the full history`() {
         val feed = VoiceCallFeed()
         feed.onTasks(listOf(view("t0", DeskTaskPhase.Running, "b", recent = listOf("a", "b"), steps = listOf("a", "b"))))
-        // 收集方合并了两批进展:recent 窗口(3 条)已滚过 c,但快照的全程 steps 还带着
+        // The collector merged two batches of progress: the recent window (3 items) has scrolled past c, but the snapshot's full steps still carry it
         feed.onTasks(
             listOf(
                 view(

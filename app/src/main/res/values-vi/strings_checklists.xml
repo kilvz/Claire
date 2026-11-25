@@ -14,7 +14,7 @@
     <string name="checklist_content">Nội dung</string>
     <string name="checklist_delete_question">Xóa danh sách kiểm tra này và lịch sử của nó?</string>
     <string name="checklist_supplement">Thông tin bổ sung</string>
-    <string name="checklist_next">Mika nên làm gì tiếp theo?</string>
+    <string name="checklist_next">Claire nên làm gì tiếp theo?</string>
     <string name="checklist_fill_input">Điền thông tin</string>
     <string name="checklist_previous_title">Tiêu đề trước: %1$s</string>
     <string name="checklist_added">Đã thêm hoặc viết lại</string>

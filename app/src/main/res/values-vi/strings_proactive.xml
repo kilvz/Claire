@@ -13,12 +13,12 @@
     <string name="proactive_inbox_empty">Chưa có gì</string>
     <string name="proactive_history_more">+%1$d trước đó</string>
     <string name="proactive_apps">Ứng dụng cần đọc (đã chọn %1$d)</string>
-    <string name="proactive_helper_grant">Để trình trợ giúp của Mika cấp quyền</string>
-    <string name="proactive_helper_grant_body">Trình trợ giúp điện thoại của Mika sẽ bật \"Notification access\" cho Mika trong cài đặt hệ thống.\n\nĐây là quyền nhạy cảm: về mặt kỹ thuật nó cho phép đọc mọi thông báo. Mika chỉ đọc các ứng dụng bạn đánh dấu trên trang này. Bạn có thể thu hồi bất cứ lúc nào trong cài đặt hệ thống.</string>
+    <string name="proactive_helper_grant">Để trình trợ giúp của Claire cấp quyền</string>
+    <string name="proactive_helper_grant_body">Trình trợ giúp điện thoại của Claire sẽ bật \"Notification access\" cho Claire trong cài đặt hệ thống.\n\nĐây là quyền nhạy cảm: về mặt kỹ thuật nó cho phép đọc mọi thông báo. Claire chỉ đọc các ứng dụng bạn đánh dấu trên trang này. Bạn có thể thu hồi bất cứ lúc nào trong cài đặt hệ thống.</string>
     <string name="proactive_helper_grant_confirm">Cấp quyền</string>
     <string name="proactive_helper_unavailable">Điều khiển điện thoại chưa được thiết lập. Hãy thiết lập trước, hoặc dùng \"Grant access\" ở trên.</string>
     <string name="proactive_helper_failed">Không cấp quyền được theo cách này. Hãy thử \"Grant access\" ở trên.</string>
-    <string name="proactive_off_note">Tắt công tắc: không đọc hay gửi thêm gì nữa, và các thông báo chưa xử lý cùng văn bản thông báo đã lưu sẽ bị xóa. Các chủ đề, liên hệ và bản tóm tắt đã thu thập vẫn ở lại; xóa chúng trong mục “Những gì Mika đã thu thập”. Quyền truy cập thông báo tự nó vẫn được cấp cho đến khi bạn thu hồi trong cài đặt hệ thống.</string>
+    <string name="proactive_off_note">Tắt công tắc: không đọc hay gửi thêm gì nữa, và các thông báo chưa xử lý cùng văn bản thông báo đã lưu sẽ bị xóa. Các chủ đề, liên hệ và bản tóm tắt đã thu thập vẫn ở lại; xóa chúng trong mục “Những gì Claire đã thu thập”. Quyền truy cập thông báo tự nó vẫn được cấp cho đến khi bạn thu hồi trong cài đặt hệ thống.</string>
     <string name="proactive_triage_no_model">Chưa thiết lập mô hình. Hãy chọn một mô hình trong Cài đặt › Mô hình trước.</string>
     <string name="proactive_triage_consent_title">Gửi thông báo cho một mô hình?</string>
     <string name="proactive_triage_reconfirm">Nhà cung cấp hoặc mô hình đã thay đổi. Đã tạm dừng cho đến khi bạn xác nhận lại.</string>
@@ -41,7 +41,7 @@
     <string name="proactive_triage_no_verdict">chưa có quyết định</string>
     <string name="proactive_triage_capped">ứng dụng này đã đạt giới hạn cảnh báo hôm nay</string>
     <string name="notice_hint_title">Đáng xem</string>
-    <string name="notice_hint_capsule_desc">Mika, %1$d thông báo đáng xem</string>
+    <string name="notice_hint_capsule_desc">Claire, %1$d thông báo đáng xem</string>
     <string name="notice_hint_open">Hiển thị thông báo đáng xem</string>
     <string name="notice_hint_entry">Đáng xem (%1$d)</string>
     <string name="notice_hint_feedback">Đã xem %1$d · đã xử lý trước khi xem %2$d</string>
@@ -60,7 +60,7 @@
     <string name="proactive_known_sub">%1$d chủ đề · %2$d người và nhóm</string>
     <string name="proactive_diag">Chẩn đoán</string>
     <string name="proactive_footer_send">Gửi tới mô hình: tiêu đề, văn bản và tin nhắn gần đây của thông báo từ các ứng dụng bạn chọn, mỗi lần một ứng dụng, tới mô hình bạn đã xác nhận; kèm tên gói của ứng dụng, đó là trò chuyện nhóm hay riêng, bạn đã mở hay bỏ qua mỗi thông báo, và tên của tối đa 30 chủ đề hiện có. Bản tóm tắt hàng ngày, hàng tuần và hàng tháng chỉ được tạo từ các câu đã viết sẵn, không từ văn bản thông báo. Bản hàng ngày còn được cấp tên các cuộc trò chuyện.</string>
-    <string name="proactive_footer_store">Lưu trên điện thoại này, đã mã hóa: các chủ đề ngắn, cùng tên và mối quan hệ phỏng đoán của những người và nhóm bạn trò chuyện. Kết quả sắp xếp chỉ ở trong bộ nhớ. Khi bạn mở một nhắc nhở, các thông báo đó được ghi vào một cuộc trò chuyện và giữ như các cuộc trò chuyện khác của bạn; nếu bạn tiếp tục ở đó, văn bản đó sẽ gửi tới mô hình đang làm việc. Tắt tính năng này, hoặc xóa hay dọn dẹp trong mục “Những gì Mika đã thu thập”, không xóa cuộc trò chuyện đó.</string>
+    <string name="proactive_footer_store">Lưu trên điện thoại này, đã mã hóa: các chủ đề ngắn, cùng tên và mối quan hệ phỏng đoán của những người và nhóm bạn trò chuyện. Kết quả sắp xếp chỉ ở trong bộ nhớ. Khi bạn mở một nhắc nhở, các thông báo đó được ghi vào một cuộc trò chuyện và giữ như các cuộc trò chuyện khác của bạn; nếu bạn tiếp tục ở đó, văn bản đó sẽ gửi tới mô hình đang làm việc. Tắt tính năng này, hoặc xóa hay dọn dẹp trong mục “Những gì Claire đã thu thập”, không xóa cuộc trò chuyện đó.</string>
     <string name="proactive_footer_digest">Bản tóm tắt hàng ngày đang bật, nên những thứ này cũng được lưu: văn bản thông báo (tối đa 2 ngày), ghi chú tạo từ nó (8 ngày), bản tóm tắt mỗi ngày (35 ngày), bản tóm tắt hàng tuần (26 tuần) và bản tóm tắt hàng tháng (2 năm).</string>
     <string name="proactive_footer_no_text">Ngoài các nhắc nhở bạn mở, văn bản thông báo không được lưu: nó chỉ ở trong bộ nhớ cho đến khi đã được xử lý.</string>
     <string name="proactive_app_off">Không đọc</string>

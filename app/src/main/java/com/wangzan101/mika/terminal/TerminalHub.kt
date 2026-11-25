@@ -66,7 +66,7 @@ class TerminalHub internal constructor(
     val sessions: StateFlow<Map<String, TerminalSession>> = _sessions.asStateFlow()
 
     init {
-        // 删除事件不重放:立刻订阅上,刚建好就发生的删除也收得到
+        // Deletion events are not replayed: subscribe immediately so a deletion right after creation is still received
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             conversations.deletions.collect { id -> closeWorkspace(WorkspaceKey.Conversation(id)) }
         }

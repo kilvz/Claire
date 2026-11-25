@@ -201,7 +201,7 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
         }
     }
 
-    /** 此刻屏幕的大小和四边被系统栏、刘海占掉的部分(转屏后跟着变)。读不到时退回显示尺寸,上下各留一条状态栏常见的高度。 */
+    /** The current screen size and the parts of its edges taken by system bars and the cutout (changing after rotation). When it cannot be read, fall back to the display size with a typical status-bar height reserved at the top and bottom. */
     fun area(): OverlayArea = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) fallbackArea() else runCatching {
         val m = wm().currentWindowMetrics
         val i = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
@@ -227,7 +227,7 @@ class OverlayHost internal constructor(private val service: ScreenAccessibility)
     /** Enabled only for the optional fullscreen preference. No screenshots, text or app content. */
     fun fullscreenChanges(): Flow<Boolean> = flow {
         while (currentCoroutineContext().isActive) {
-            // 读窗口尺寸和状态栏可见性要 Android 11;更早的系统不识别全屏
+            // Reading window size and status-bar visibility requires Android 11; earlier versions do not recognize full screen
             emit(if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) false else runCatching {
                 val metrics = wm().currentWindowMetrics
                 val windows = service.windowsOn(Display.DEFAULT_DISPLAY)

@@ -33,7 +33,7 @@
     <string name="workflow_delete_template">Xóa mẫu tác vụ này?</string>
     <string name="workflow_step_number">Bước %1$d</string>
     <string name="workflow_step_name">Tên bước</string>
-    <string name="workflow_instruction">Mika nên làm gì?</string>
+    <string name="workflow_instruction">Claire nên làm gì?</string>
     <string name="workflow_move_up">Di chuyển lên</string>
     <string name="workflow_move_down">Di chuyển xuống</string>
     <string name="workflow_add_step">Thêm bước</string>

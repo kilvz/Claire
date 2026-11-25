@@ -21,7 +21,7 @@
     <string name="backup_replace">Thay thế tất cả</string>
     <string name="backup_imported_title">Đã khôi phục bản sao lưu</string>
     <string name="backup_imported_body">Đã khôi phục %1$d tệp.</string>
-    <string name="backup_after_import_body">Đóng Mika và mở lại để dùng dữ liệu đã khôi phục. Sau đó ghép nối lại gỡ lỗi không dây, bật lại dịch vụ hỗ trợ tiếp cận trong Cài đặt Android, và xóa tệp ZIP sao lưu.</string>
-    <string name="backup_close_app">Đóng Mika</string>
+    <string name="backup_after_import_body">Đóng Claire và mở lại để dùng dữ liệu đã khôi phục. Sau đó ghép nối lại gỡ lỗi không dây, bật lại dịch vụ hỗ trợ tiếp cận trong Cài đặt Android, và xóa tệp ZIP sao lưu.</string>
+    <string name="backup_close_app">Đóng Claire</string>
     <string name="backup_restart_note">Hãy xuất trước, trước khi gỡ cài đặt bất cứ thứ gì: chỉ bản cài này mới giải mã được dữ liệu của bạn.</string>
 </resources>

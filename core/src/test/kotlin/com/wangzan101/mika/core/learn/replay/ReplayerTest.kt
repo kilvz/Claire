@@ -249,7 +249,7 @@ class ReplayerTest {
         assertTrue(s.taps.isEmpty())
     }
 
-    // 执行前就被拒(另一个任务占着 App):executed 为假,错误码交给模型
+    // Rejected before execution (another task is holding the app): executed is false and the error code is handed to the model
     @Test fun preExecutionRejectionIsNotExecuted() = runTest {
         val s = LinkScreen(ActionResult.Failed("app_in_use_by_other_task"))
         val d = toolDispatcher(s, deepLinks = true).also { it.captureTargets = true; it.allowLinks(listOf(Link("新建笔记", "notes://new", "com.notes"))) }

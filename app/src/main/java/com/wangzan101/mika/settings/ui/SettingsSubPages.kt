@@ -85,7 +85,7 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** 设置 › 恢复与修复:手机操作的几个授权开关,下面是兼容性自检的入口;[scrollState] 由切页的一方给进来,从自检回来才停在原来的位置。 */
+/** Settings › Recovery & repair: several permission switches for phone control, followed by the compatibility self-check entry; [scrollState] is supplied by the page switcher so returning from the self-check stops at the previous position. */
 @Composable
 fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}, scrollState: ScrollState = rememberScrollState()) {
     PageScaffold(stringResource(R.string.settings_recovery), onBack, scrollState = scrollState) {

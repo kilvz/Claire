@@ -6,14 +6,14 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * 空对话底部两条滚动条的案例库(`assets/chat/empty_ideas.json`)。按界面语言各一套:
- * 中文界面用国内 App 的那套(简体、繁体两种写法),其他语言用海外 App 的那套,文字是该语言的。
- * 每条绑定具体 App 的包名,手机上装了才显示,图标用那个 App 自己的。
+ * The example library for the two scrolling rows at the bottom of the empty chat (`assets/chat/empty_ideas.json`). One set per UI language:
+ * Chinese UI uses the set of Chinese apps (Simplified and Traditional variants), other languages use the international-app set, with text in that language.
+ * Each entry is bound to a specific app package and only shows when that app is installed, using that app's own icon.
  */
 internal object IdeaLibrary {
     private const val ASSET_PATH = "chat/empty_ideas.json"
 
-    /** 一条案例:场景(吃喝、购物……,只用来把同类错开)、能接它的包名(按先后取第一个装了的)、这条话。 */
+    /** One example: the scene (food, shopping, …, used only to spread similar ones apart), the packages that can handle it (take the first installed one in order), and the text. */
     data class Entry(val scene: String, val packages: List<String>, val text: String)
 
     @Volatile private var cached: JSONObject? = null
@@ -31,7 +31,7 @@ internal object IdeaLibrary {
         }
     }.getOrDefault(emptyList())
 
-    /** 界面语言 → (用哪套, 取哪种文字)。中文看文字体系或地区分简繁;印尼语老写法 in 当 id。 */
+    /** UI language → (which set, which text variant). Chinese is split into Simplified/Traditional by script or region; the old Indonesian code in is treated as id. */
     internal fun setFor(locale: Locale): Pair<String, String> {
         val lang = locale.language.let { if (it == "in") "id" else it }
         if (lang == "zh") {
@@ -42,8 +42,8 @@ internal object IdeaLibrary {
     }
 
     /**
-     * 排成两条:每个场景内部打乱,场景之间轮流取一条(同类不挨着),
-     * 再一条给第一行、一条给第二行。[random] 每次打开对话换一个,顺序常看常新。
+     * Arrange into two rows: shuffle within each scene, then take one from each scene in turn (so similar ones are not adjacent),
+     * then give one to the first row and one to the second. [random] changes each time a conversation opens, so the order stays fresh.
      */
     internal fun <T> arrange(items: List<T>, scene: (T) -> String, random: Random): List<List<T>> {
         val groups = items.groupBy(scene).values.map { it.shuffled(random).toMutableList() }.shuffled(random)

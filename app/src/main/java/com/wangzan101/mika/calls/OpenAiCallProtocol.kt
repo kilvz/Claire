@@ -62,7 +62,7 @@ internal object OpenAiCallProtocol {
         }
     }.toString()
 
-    /** 请模型按现有上下文回一段话(不带 instructions,不是照念)。 */
+    /** Ask the model to reply using the existing context (without instructions, not reading a script aloud). */
     fun respond(noticeId: String? = null) = buildJsonObject {
         put("type", "response.create")
         noticeId?.let { id -> putJsonObject("response") { putJsonObject("metadata") { put("mika_notice_id", id) } } }

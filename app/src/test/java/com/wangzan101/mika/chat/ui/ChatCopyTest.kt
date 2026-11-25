@@ -18,13 +18,13 @@ import com.wangzan101.mika.settings.ui.models.Page
 class ChatCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    /** 推荐任务只用闹钟、日程初始化;推广那几条写死在顶部卡片里,不进推荐任务。 */
+    /** Suggested tasks are initialized with only alarm and calendar; the promo entries are hardcoded in the top cards and do not enter the suggested tasks. */
     @Test fun recommendationSeedsAreAlarmsAndSchedule() {
         assertEquals(listOf(ChatCopy.ExampleKind.Alarm, ChatCopy.ExampleKind.Schedule), ChatCopy.examples.map { it.kind })
         assertEquals(ChatCopy.examples.map { it.title to it.prompt }, ChatCopy.recommendationSeeds())
     }
 
-    /** 顶部推广卡:三张,第一张是 GitHub star,每张都有标题、说明和提示词。 */
+    /** Top promo cards: three of them, the first is GitHub star, and each has a title, description and prompt. */
     @Test fun promosStartWithGithubStar() {
         val promos = ChatCopy.promos
         assertEquals(3, promos.size)

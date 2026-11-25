@@ -248,7 +248,7 @@ internal suspend fun CallRuntime.readSims() {
     }
 }
 
-// 按通话账户取 SIM 的订阅号要 Android 11;更早的系统读不到,当作没有可选的 SIM。
+// Reading a SIM's subscription ID by call account requires Android 11; earlier versions cannot read it, so treat it as having no selectable SIM.
 internal fun CallRuntime.subscription(handle: PhoneAccountHandle): Int? =
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) null else runCatching {
         telephony?.createForPhoneAccountHandle(handle)?.subscriptionId?.takeIf { it >= 0 }

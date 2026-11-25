@@ -199,7 +199,7 @@ fun rememberSkinBackdrop(): SkinBackdrop? {
     return backdrop
 }
 
-// WEBP_LOSSY 从 Android 11 起才有;更早的系统里旧的 WEBP 在质量低于 100 时就是有损压缩
+// WEBP_LOSSY exists from Android 11; on earlier systems the old WEBP format is already lossy below quality 100
 private fun lossyWebp(): Bitmap.CompressFormat =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Bitmap.CompressFormat.WEBP_LOSSY
     else @Suppress("DEPRECATION") Bitmap.CompressFormat.WEBP

@@ -61,9 +61,9 @@ object GroundingCopy {
 }
 
 /**
- * 设置 › 高级与其他 › 开发者选项:速度和实验两组开关;
- * 有看图模型时另有它的「看图定位已验证」([grounding] 为 null 时不显示);最后是「运行统计」的入口([onOpenRunStats] 为 null 时不显示)。
- * [scrollState] 由切页的一方给进来,从「运行统计」「设备目录」回来才停在原来的位置。
+ * Settings › Advanced & other › Developer options: two groups of switches, speed and experiments;
+ * when a vision model exists there is also its "vision grounding verified" ([grounding]; hidden when null); finally the "run statistics" entry ([onOpenRunStats]; hidden when null).
+ * [scrollState] is supplied by the page switcher so returning from "run statistics" or "device catalog" stops at the previous position.
  */
 @Composable
 fun DeveloperOptionsScreen(

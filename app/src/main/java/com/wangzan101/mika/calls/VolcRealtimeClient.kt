@@ -284,7 +284,7 @@ class VolcRealtimeSession internal constructor(
         return send(OpenAiCallProtocol.systemNote(text))
     }
 
-    /** 未确认播完的汇报;只认服务端明确关联的回复,不把下一段音频猜成自己的。 */
+    /** A report not yet confirmed as finished playing; only a reply explicitly linked by the server counts, and the next piece of audio is not assumed to be its own. */
     private class PendingNotice(val id: String, val ended: (Boolean) -> Unit) {
         var responseId: String? = null
         var playing = false
@@ -296,7 +296,7 @@ class VolcRealtimeSession internal constructor(
     private fun trackNotice(id: String, ended: (Boolean) -> Unit) {
         val pending = PendingNotice(id, ended)
         notices.addLast(pending)
-        // 可选关联字段缺失、或关联后一直不开播时,交回上层写回会话,不堵住后续汇报。
+        // When the optional correlation field is missing, or playback never starts after correlation, hand it back to the caller to write into the conversation without blocking later reports.
         pending.timeout = cleanupScope.launch {
             while (true) {
                 delay(noticeMatchTimeoutMs)
@@ -581,7 +581,7 @@ class VolcRealtimeSession internal constructor(
                 } else publish(VolcRealtimeEvent.Audio(pcm))
             }
             VolcRealtimeProtocol.AUDIO_DONE -> if (!isRetiredResponse(responseId)) {
-                // 匿名结束仍按原规则处理播放,但不能证明某条汇报已经播完。
+                // An anonymous end is still handled by the original playback rules, but it cannot prove that a report finished playing.
                 if (!openAi) noticeResponseDone(responseId, completed = true)
                 if (audioActive && (responseId == null || responseId == audioId || audioId == null)) {
                     audioActive = false

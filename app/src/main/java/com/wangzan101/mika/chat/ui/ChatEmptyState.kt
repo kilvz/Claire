@@ -68,8 +68,8 @@ import kotlinx.coroutines.withContext
 import java.time.LocalTime
 
 /**
- * 空对话:问候 + 一句价值主张 + 一张可左右滑的推广示例卡,底部贴着输入框两条慢慢反向滚动的示例。
- * 示例带手机上对应 App 的图标;点一条把完整提示词填进输入框,改好了再发。
+ * Empty chat: a greeting + one value proposition + a swipeable promo example card, with two slowly counter-scrolling example rows above the composer at the bottom.
+ * Examples carry the icon of the matching app on the phone; tapping one fills the full prompt into the composer so it can be edited before sending.
  */
 @Composable
 internal fun EmptyState(
@@ -82,14 +82,14 @@ internal fun EmptyState(
     val c = MikaTheme.colors
     val context = LocalContext.current
     val hour = remember(conversation) { LocalTime.now().hour }
-    // 每次打开一个空对话换一种排法;同一次里两遍加载用同一个,顺序不跳
+    // Each time an empty chat opens, use a different arrangement; both loads in the same visit share one so the order does not jump
     val random = remember(conversation) { kotlin.random.Random(System.nanoTime()) }
     val seed = remember(conversation) { random.nextLong() }
     val ideas by produceState<EmptyIdeas?>(null, seed) {
         value = withContext(Dispatchers.IO) { loadEmptyIdeas(context, kotlin.random.Random(seed)) }
     }
     Column(modifier.fillMaxSize()) {
-        // 问候放在上方约三分之一处,下面紧跟推广卡;剩下的空间留给底部两条滚动示例
+        // Put the greeting about one third from the top, with the promo card right below; leave the rest for the two scrolling example rows at the bottom
         Spacer(Modifier.weight(0.55f))
         Column(Modifier.fillMaxWidth().padding(horizontal = ComposerInset)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -111,7 +111,7 @@ internal fun EmptyState(
     }
 }
 
-/** 推广示例:一次一张,左右滑或每隔几秒自动换下一张,下面几个小圆点。 */
+/** Promo example: one at a time, swipe left/right or auto-advance every few seconds, with small dots below. */
 @Composable
 private fun FeaturedPager(items: List<Idea>, reduceMotion: Boolean, onPick: (RecommendedTask) -> Unit) {
     val c = MikaTheme.colors
@@ -147,7 +147,7 @@ private fun FeaturedPager(items: List<Idea>, reduceMotion: Boolean, onPick: (Rec
 @Composable
 private fun FeaturedCard(idea: Idea, onPick: (RecommendedTask) -> Unit) {
     val c = MikaTheme.colors
-    // 浅灰底、不描边,和底部的示例胶囊同一种材质;副标题是一句说明,点了直接把完整提示词发出去
+    // Light grey fill, no border, same material as the example pills at the bottom; the subtitle is a one-line description, and tapping sends the full prompt directly
     val blurb = idea.blurb ?: idea.task.prompt.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
     Row(
         Modifier.fillMaxWidth().clip(FeaturedShape).background(c.fill)
@@ -163,14 +163,14 @@ private fun FeaturedCard(idea: Idea, onPick: (RecommendedTask) -> Unit) {
                 Text(blurb, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        // 点卡片直接发出去,所以右边是发送的样子(和输入框的发送键同形,小一号),不是「进下一页」的箭头
+        // Tapping the card sends directly, so the right side looks like send (same shape as the composer's send button, one size smaller), not a "go to next page" arrow
         Box(Modifier.padding(start = 8.dp).size(28.dp).clip(CircleShape).background(c.surface), contentAlignment = Alignment.Center) {
             Icon(MikaIcons.Up, null, Modifier.size(15.dp), tint = c.ink)
         }
     }
 }
 
-/** App 图标;手机上没有对应 App 时是浅灰底上的线性图标。 */
+/** App icon; when the app is not on the phone, a line icon on a light grey background. */
 @Composable
 private fun AppMark(idea: Idea, size: androidx.compose.ui.unit.Dp, tile: Color = MikaTheme.colors.fill) {
     val c = MikaTheme.colors
@@ -181,7 +181,7 @@ private fun AppMark(idea: Idea, size: androidx.compose.ui.unit.Dp, tile: Color =
     } else {
         val site = idea.site
         Box(Modifier.size(size).clip(shape).background(tile), contentAlignment = Alignment.Center) {
-            // 网站标志是单色的,跟着字色走,深色模式下自然变白
+            // Website marks are monochrome and follow the text color, turning white automatically in dark mode
             if (site != null) Icon(painterResource(site), null, Modifier.size(size * 0.58f), tint = c.ink)
             else Icon(idea.fallback, null, Modifier.size(size * 0.5f), tint = c.ink2)
         }
@@ -190,7 +190,7 @@ private fun AppMark(idea: Idea, size: androidx.compose.ui.unit.Dp, tile: Color =
 
 private val FeaturedShape = RoundedCornerShape(18.dp)
 
-/** 问候上面那行日期:按界面语言的习惯写,如「11月25日 周二」「Tue, Nov 25」。 */
+/** The date line above the greeting, written in the UI language's convention, e.g. "Tue, Nov 25" or "11月25日 周二". */
 private fun todayLabel(): String {
     val locale = uiLocale()
     val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdEEE")
@@ -200,8 +200,8 @@ private fun todayLabel(): String {
 private const val MARQUEE_DP_PER_SECOND = 22f
 
 /**
- * 一条横着慢慢滚的示例。内容排两遍首尾相接,滚过一遍的宽度就回到开头,看起来没有尽头;
- * 两头淡出。关掉动画时改成可以手动左右滑的一排。
+ * One slowly scrolling example row. The content is laid out twice end to end, and after scrolling one copy's width it returns to the start, so it looks endless;
+ * both ends fade out. With animations off, it becomes a row that can be swiped by hand.
  */
 @Composable
 private fun MarqueeRow(items: List<Idea>, reverse: Boolean, animate: Boolean, onPick: (RecommendedTask) -> Unit, modifier: Modifier = Modifier) {
@@ -236,7 +236,7 @@ private fun MarqueeRow(items: List<Idea>, reverse: Boolean, animate: Boolean, on
     Box(modifier.fillMaxWidth().clipToBounds().then(fade)) {
         Row(
             Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset {
-                // 往左走:0 → -cycle;往右走:-cycle → 0。从右往左排的语言里方向一起镜像
+                // Moving left: 0 → -cycle; moving right: -cycle → 0. In right-to-left languages the direction is mirrored too
                 val x = if (reverse) shift - cycle else -shift
                 IntOffset((if (rtl) -x else x).toInt(), 0)
             },
@@ -251,7 +251,7 @@ private fun MarqueeRow(items: List<Idea>, reverse: Boolean, animate: Boolean, on
     }
 }
 
-/** 滚动条里的一颗:App 图标 + 一句话。 */
+/** One item in the scrolling row: app icon + one line of text. */
 @Composable
 private fun Pill(idea: Idea, onPick: (RecommendedTask) -> Unit) {
     val c = MikaTheme.colors

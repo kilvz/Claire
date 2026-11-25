@@ -178,7 +178,7 @@ class VolcRealtimeAgentToolsTest {
             val session = connectAgent()
             val events = Channel<VolcRealtimeEvent>(32)
             val collector = async { session.events.collect { events.send(it) } }
-            // 上一句还在播:它播完不算这条汇报说完。等客户端认到它开播再交汇报,慢机器上也是这个先后
+            // The previous sentence is still playing: its finishing does not mean this report has finished. Wait until the client sees it start playing before delivering the report; that order holds on slow machines too
             peer().send(audio(VolcRealtimeProtocol.AUDIO_STARTED, "r0"))
             withTimeout(3_000) { while (events.receive() !is VolcRealtimeEvent.AssistantAudioStarted) Unit }
             val ends = Channel<Boolean>(4)
@@ -188,7 +188,7 @@ class VolcRealtimeAgentToolsTest {
             peer().send(audio(VolcRealtimeProtocol.AUDIO_DONE, "r0"))
             peer().send(audio(VolcRealtimeProtocol.AUDIO_STARTED, "r1", notice.getValue("event_id").jsonPrimitive.content))
             delay(200)
-            assertTrue("上一句播完、这条刚开播,还不算说完", ends.isEmpty)
+            assertTrue("the previous line finished and this one just started, so it is not done yet", ends.isEmpty)
             peer().send(audio(VolcRealtimeProtocol.AUDIO_DONE, "r1"))
             assertEquals(true, withTimeout(3_000) { ends.receive() })
             finish(session)

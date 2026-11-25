@@ -244,7 +244,7 @@ fun ChatScreen(
             fillTaskPrompt = task.prompt
         } else fillDraft(task.prompt)
     }
-    // 推广卡点了直接发;输入框里已经有草稿、附件或引用,或者此刻发不出去(还没配好模型、正在学习……)时,退回填进输入框
+    // Tapping a promo card sends directly; when the composer already has a draft, attachment or quote, or sending is not possible right now (model not configured, learning in progress, …), fall back to filling the composer
     val sendTask: (RecommendedTask) -> Unit = { task ->
         val now = vm.ui.value
         val clean = now.input.isEmpty() && now.attachments.isEmpty() && now.quote == null

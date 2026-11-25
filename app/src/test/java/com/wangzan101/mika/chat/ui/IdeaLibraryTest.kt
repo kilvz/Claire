@@ -27,7 +27,7 @@ class IdeaLibraryTest {
         assertEquals(2, rows.size)
         assertEquals(items.toSet(), rows.flatten().toSet())
         assertTrue(rows[0].size - rows[1].size in 0..1)
-        // 交错之前同一场景不挨着:前三条来自三个不同场景
+        // Before interleaving, the same scene must not be adjacent: the first three come from three different scenes
         val woven = rows[0].zip(rows[1]).flatMap { listOf(it.first, it.second) } + rows[0].drop(rows[1].size)
         assertEquals(3, woven.take(3).map { it.take(1) }.toSet().size)
     }

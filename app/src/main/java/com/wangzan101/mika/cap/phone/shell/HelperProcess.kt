@@ -156,7 +156,7 @@ object HelperProcess {
                         putLong(HelperHandoff.KEY_GAVE_UP_AT, r.gaveUpAtMs)
                     }
                 }
-                // 带 AttributionSource 的 provider 调用从 Android 12 起才有;更早的系统交接不了
+                // Provider calls with AttributionSource exist from Android 12; earlier versions cannot hand over
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                     Log.w(TAG, "handoff needs Android 12+")
                     return Outcome.Failed

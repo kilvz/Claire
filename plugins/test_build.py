@@ -1,10 +1,10 @@
-"""plugins/build.py 打出的包要能装进 App。
+"""Packages produced by plugins/build.py must install into the app.
 
-App 的安装器(PluginInstaller.checkName)把含反斜杠或冒号的条目判成不安全路径,整包拒装;
-而 Windows 上 os.path.relpath 返回的正是反斜杠。另外 __pycache__/.pyc 和 Finder 的
-.DS_Store 不是安装包的内容,却会被 os.walk 一起带进去。
+The app's installer (PluginInstaller.checkName) treats entries containing backslashes or colons as unsafe paths and rejects the whole package;
+and on Windows os.path.relpath returns exactly those backslashes. Also, __pycache__/.pyc and Finder's
+.DS_Store are not package content but get picked up by os.walk.
 
-跑法:python3 -m unittest discover -s plugins -v
+Run with: python3 -m unittest discover -s plugins -v
 """
 import os
 import sys
@@ -17,7 +17,7 @@ import build  # noqa: E402
 
 
 def make_plugin(root: str, name: str = "com.probe.demo", version: str = "1.0.0") -> str:
-    """造一个带脚本、字节码缓存和 Finder 记录的最小插件。"""
+    """Build a minimal plugin with a script, a bytecode cache and a Finder record."""
     src = os.path.join(root, name)
     os.makedirs(os.path.join(src, "scripts"))
     os.makedirs(os.path.join(src, "__pycache__"))
@@ -75,8 +75,8 @@ class PackageTest(unittest.TestCase):
         self.assertEqual([], left_overs)
 
     def test_windows_separators_never_reach_the_zip(self):
-        # 安装器拒收含反斜杠的条目,而 Windows 上 os.path.relpath 给的就是反斜杠。
-        # 这里把它打桩成 Windows 的返回值,让真正的打包路径自己走一遍。
+        # The installer rejects entries containing backslashes, and on Windows os.path.relpath returns backslashes.
+        # Stub it here to return Windows-style values so the real packaging path runs end to end.
         real = build.os.path.relpath
 
         def windows_relpath(path, start):
@@ -90,7 +90,7 @@ class PackageTest(unittest.TestCase):
         self.assertIn("scripts/run.sh", names)
 
     def test_every_entry_is_a_relative_slash_path(self):
-        # checkName 拒收绝对路径、反斜杠、冒号和 `..` 段
+        # checkName rejects absolute paths, backslashes, colons and `..` segments
         self.assertEqual(0, build.build())
         for name in self._names():
             self.assertNotIn("\\", name)

@@ -328,7 +328,7 @@
     <string name="plus_reuse_hint">İfadeler · listeler · akışlar</string>
     <string name="plus_reuse_phrases">Kayıtlı ifadeler</string>
     <string name="drawer_calls">AI aramaları</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">En yakın kafeye yol tarifi ver</string>
     <string name="chat_idea_camera">Kamerayı aç ve bir fotoğraf çek</string>
     <string name="chat_idea_sms">Anneme mesaj at: eve vardım</string>
@@ -338,11 +338,11 @@
     <string name="chat_idea_email">Son e-postalarım ne diyor?</string>
     <string name="chat_idea_screenshot">En son ekran görüntümü bul</string>
     <string name="chat_idea_meeting">Yarın saat 15.00\'e bir toplantı ekle</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">Açık kaynak Mika projesini destekle</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Açık kaynak Claire projesini destekle</string>
     <string name="chat_example_follow_blurb">Geliştiriciyi takip et, sohbete katıl</string>
     <string name="chat_example_group_summary_blurb">Bugünün okunmamışlarını tek satırda özetle</string>
-    <string name="chat_example_share_title">Mika\'yı bir arkadaşınla paylaş</string>
+    <string name="chat_example_share_title">Claire\'i bir arkadaşınla paylaş</string>
     <string name="chat_example_share_blurb">İşine yarayacak birine öner</string>
-    <string name="chat_example_share">Mika proje bağlantısını https://github.com/wangzan101/mika bir arkadaşınla paylaş ve telefonu onun yerine kullanabildiğini söyle.</string>
+    <string name="chat_example_share">Claire proje bağlantısını https://github.com/kilvz/Claire bir arkadaşınla paylaş ve telefonu onun yerine kullanabildiğini söyle.</string>
 </resources>

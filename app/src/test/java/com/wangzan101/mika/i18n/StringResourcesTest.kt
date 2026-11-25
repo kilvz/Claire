@@ -148,7 +148,7 @@ class StringResourcesTest {
         assertEquals(AppLanguage.Arabic, of("ar-MA"))
         assertEquals(AppLanguage.Persian, of("fa-IR"))
         assertEquals(AppLanguage.Vietnamese, of("vi-VN"))
-        // 其他语言只看语言代码,地区不管
+        // Other languages only look at the language code and ignore the region
         assertEquals(AppLanguage.Japanese, of("ja-JP"))
         assertEquals(AppLanguage.Portuguese, of("pt-PT"))
         assertEquals(AppLanguage.Portuguese, of("pt-BR"))

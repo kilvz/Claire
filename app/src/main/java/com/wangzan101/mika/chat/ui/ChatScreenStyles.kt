@@ -22,7 +22,7 @@ internal val ComposerInset = 12.dp
 
 internal val FileTileShape = MikaShapes.Tile
 internal val EmptyLead = MikaType.Value
-/** 空对话的问候:比大标题轻一档(中粗),字距略收。 */
+/** The empty-chat greeting: one step lighter than a display title (semi-bold), with slightly tighter letter spacing. */
 internal val EmptyGreeting = MikaType.LargeTitle.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, letterSpacing = (-0.3).sp)
 internal val BubbleText = MikaType.Body.copy(fontSize = 15.sp)
 /** Answer: body text size, justified (Chinese paragraphs get even edges except the last line). */

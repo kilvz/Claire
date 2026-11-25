@@ -342,7 +342,7 @@
     <string name="plus_reuse_hint">Frases · listas · fluxos</string>
     <string name="plus_reuse_phrases">Frases salvas</string>
     <string name="drawer_calls">Chamadas IA</string>
-    <!-- 空对话滚动条里的灵感示例;点了填进输入框 -->
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
     <string name="chat_idea_maps">Me leve à cafeteria mais próxima</string>
     <string name="chat_idea_camera">Abra a câmera e tire uma foto</string>
     <string name="chat_idea_sms">Mande para a mãe: cheguei em casa</string>
@@ -352,11 +352,11 @@
     <string name="chat_idea_email">O que dizem meus últimos e-mails?</string>
     <string name="chat_idea_screenshot">Encontre minha captura de tela mais recente</string>
     <string name="chat_idea_meeting">Adicione uma reunião amanhã às 15h</string>
-    <!-- 空对话推广卡上的一句话说明;完整提示词点了才填进输入框 -->
-    <string name="chat_example_github_star_blurb">Apoie o projeto de código aberto Mika</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Apoie o projeto de código aberto Claire</string>
     <string name="chat_example_follow_blurb">Siga o autor e entre no chat</string>
     <string name="chat_example_group_summary_blurb">Resuma as mensagens não lidas de hoje</string>
-    <string name="chat_example_share_title">Compartilhe o Mika com um amigo</string>
+    <string name="chat_example_share_title">Compartilhe o Claire com um amigo</string>
     <string name="chat_example_share_blurb">Indique para quem vai usar</string>
-    <string name="chat_example_share">Compartilhe o link do projeto Mika https://github.com/wangzan101/mika com um amigo e diga que ele opera o celular por você.</string>
+    <string name="chat_example_share">Compartilhe o link do projeto Claire https://github.com/kilvz/Claire com um amigo e diga que ele opera o celular por você.</string>
 </resources>

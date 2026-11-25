@@ -6,7 +6,7 @@
     <string name="sms_login_limits">Đăng nhập tự động cho ứng dụng gốc đã cấu hình: khớp chính xác chữ ký ứng dụng, người gửi, dịch vụ và tài khoản. Không xác nhận cho từng lần đăng nhập. Thiếu danh tính, quyền hoặc xác minh thành công thì vẫn thực hiện thủ công. Quan sát văn bản gốc tiếp tục sau khi xác minh; hình ảnh vẫn ở cục bộ trong lần chạy này.</string>
     <string name="sms_login_permission">Quyền SMS của Android</string>
     <string name="sms_login_error">Quyền hoặc lưu thất bại. Giữ đăng nhập thủ công; kiểm tra quyền ứng dụng Android.</string>
-    <string name="sms_login_disclosure">Chỉ bật đăng nhập SMS tự động cho tài khoản và ứng dụng đã ký mà bạn cấu hình tại đây. Mika có thể yêu cầu, điền và gửi đăng nhập mà không hỏi lại, rồi xác minh tài khoản cục bộ. Không thanh toán, khôi phục hoặc đăng ký. SMS và mã không bao giờ được lưu hoặc gửi tới mô hình. Tắt hoặc xóa hồ sơ để thu hồi.</string>
+    <string name="sms_login_disclosure">Chỉ bật đăng nhập SMS tự động cho tài khoản và ứng dụng đã ký mà bạn cấu hình tại đây. Claire có thể yêu cầu, điền và gửi đăng nhập mà không hỏi lại, rồi xác minh tài khoản cục bộ. Không thanh toán, khôi phục hoặc đăng ký. SMS và mã không bao giờ được lưu hoặc gửi tới mô hình. Tắt hoặc xóa hồ sơ để thu hồi.</string>
     <string name="sms_login_sender">Người gửi SMS chính xác</string>
     <string name="sms_login_signature">Tên dịch vụ trong dấu ngoặc</string>
     <string name="sms_login_account">Chữ số tài khoản khớp (4–11)</string>

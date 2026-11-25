@@ -26,9 +26,9 @@ interface TakeoverPort {
     suspend fun displayOf(taskId: Int): Int
     suspend fun moveToMain(taskId: Int): Boolean
     suspend fun moveBack(taskId: Int): Boolean
-    /** 挪回目标 App。旧任务已消失时按同一份 App 恢复,恢复不了抛 [TargetAppRestoreFailed]。 */
+    /** Move back to the target app. When the old task has disappeared, restore by the same app and throw [TargetAppRestoreFailed] if that fails. */
     suspend fun restoreTarget(): Boolean
-    /** 开或关该 App 的声音。 */
+    /** Turn this app's sound on or off. */
     fun setSound(packageName: String, on: Boolean)
     /** The user explicitly restores sound; implementations must update this task's auto-mute rules along with it. */
     fun unmute(packageName: String) = setSound(packageName, true)
@@ -290,7 +290,7 @@ class Takeover(
                 val activity = port.handoverActivity()
                 result = result.copy(durationMs = now() - handedAt, inputCount = activity?.inputCount, stoppedAt = activity?.stoppedAt)
             }
-            // 交出去的其他页面可能办完就关掉了;launch_app 的目标即使换了任务编号也要恢复
+            // Other pages handed over may close when done; the launch_app target must be restored even if its task ID changed
             val target = port.targetTask()
             if (handed >= 0 && handed != target && port.displayOf(handed) == MAIN_DISPLAY && !port.moveBack(handed)) {
                 _problem.value = Problem.MoveBackFailed

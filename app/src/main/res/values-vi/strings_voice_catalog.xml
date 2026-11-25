@@ -51,6 +51,7 @@
     <string name="voice_catalog_protocol_stt_doubao_streaming">Doubao streaming</string>
     <string name="voice_catalog_protocol_stt_funasr_streaming">FunASR streaming</string>
     <string name="voice_catalog_protocol_stt_bailian_streaming">Bailian streaming</string>
+    <string name="voice_catalog_protocol_stt_sherpa_streaming">Sherpa-ONNX (trên thiết bị)</string>
     <string name="voice_catalog_protocol_tts_android_system">Hệ thống Android</string>
     <string name="voice_catalog_system_stt_name">Nhận dạng giọng nói hệ thống Android</string>
     <string name="voice_catalog_system_tts_name">Tổng hợp giọng nói hệ thống Android</string>
@@ -59,4 +60,14 @@
     <string name="voice_catalog_protocol_realtime_volc_duplex">Volc duplex</string>
     <string name="voice_catalog_protocol_realtime_openai_realtime">OpenAI Realtime</string>
     <string name="voice_catalog_tts_sample">Xin chào, đây là bản kiểm tra giọng nói.</string>
+
+    <string name="voice_catalog_sherpa_en_name">Sherpa-ONNX tiếng Anh (trên thiết bị)</string>
+    <string name="voice_catalog_sherpa_multi_name">Sherpa-ONNX đa ngôn ngữ (tải xuống)</string>
+    <string name="voice_catalog_sherpa_download">Tải xuống (%1$s)</string>
+    <string name="voice_catalog_sherpa_downloading">Đang tải… %1$d%%</string>
+    <string name="voice_catalog_sherpa_unpacking">Đang giải nén mô hình…</string>
+    <string name="voice_catalog_sherpa_downloaded">Đã tải mô hình</string>
+    <string name="voice_catalog_sherpa_download_failed">Tải xuống thất bại: %1$s</string>
+    <string name="voice_catalog_sherpa_retry">Tải lại</string>
+    <string name="voice_catalog_sherpa_needs_download">Cần tải mô hình xuống trước.</string>
 </resources>

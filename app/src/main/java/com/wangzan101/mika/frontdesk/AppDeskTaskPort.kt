@@ -192,7 +192,7 @@ class AppDeskTaskPort(
         return current().firstOrNull { it.conversationId == taskId && it.key == runKey }
     }
 
-    /** 等任务在服务里登记,然后跟着它的状态走,收尾即停;一直没登记时按子会话记下的结局,没有就记成没开始。 */
+    /** Wait for the task to register with the service, then follow its state and stop when it finishes; if it never registers, use the outcome recorded by the child conversation, or record it as not started. */
     private fun mirror(child: String, entry: Followed, adoptedRun: DeskRun? = null) {
         scope.launch {
             val run = adoptedRun ?: withTimeoutOrNull(startTimeoutMs) {

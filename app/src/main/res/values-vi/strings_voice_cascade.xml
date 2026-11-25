@@ -15,14 +15,14 @@
     <string name="call_mode_speak">Nói</string>
     <string name="call_mode_think_light">Mô hình nhẹ</string>
     <string name="call_mode_think_main">Mô hình chính</string>
-    <string name="call_mode_think_note">Mô hình Mika dùng để trả lời (trò chuyện và cuộc gọi)</string>
+    <string name="call_mode_think_note">Mô hình Claire dùng để trả lời (trò chuyện và cuộc gọi)</string>
     <string name="call_mode_think_light_note">Trả lời nhanh hơn; dùng mô hình chính khi chưa đặt mô hình nhẹ</string>
     <string name="call_mode_listen_device">Nhận dạng trên thiết bị không nghe được âm thanh cuộc gọi. Hãy chọn một mô hình dịch vụ để nghe.</string>
     <string name="call_mode_rhythm">Luân phiên lượt nói</string>
     <string name="call_mode_silence">Khi họ nói xong</string>
     <string name="call_mode_silence_sub">%1$s giây im lặng kết thúc lượt của họ</string>
     <string name="call_mode_barge">Dừng khi họ nói</string>
-    <string name="call_mode_barge_sub">Nếu họ nói trong lúc Mika đang nói, Mika dừng lại và lắng nghe</string>
+    <string name="call_mode_barge_sub">Nếu họ nói trong lúc Claire đang nói, Claire dừng lại và lắng nghe</string>
     <string name="call_mode_realtime_model">Mô hình thời gian thực</string>
     <string name="call_mode_realtime_note">Ở chế độ thời gian thực, mô hình này duy nhất nghe, nghĩ và nói.</string>
     <string name="voice_vendors_lead">Nhập khóa một lần cho mỗi dịch vụ, và mọi mô hình nghe, nói và thời gian thực của nó đều khả dụng.</string>
@@ -54,14 +54,14 @@
     <string name="calls_voice_own_settings_sub">Ví dụ mô hình nhận dạng điện thoại 8 kHz hoặc giọng nói điềm tĩnh hơn</string>
     <string name="calls_voice_device_warn">Nhận dạng trên thiết bị không nghe được phía bên kia cuộc gọi. Hãy chọn mô hình nhận dạng trực tuyến cho cuộc gọi.</string>
     <string name="calls_voice_for_calls">Chỉ dành cho cuộc gọi điện thoại</string>
-    <string name="voicecall_standard_title">Chọn cách Mika nghe và nói</string>
+    <string name="voicecall_standard_title">Chọn cách Claire nghe và nói</string>
     <string name="voicecall_standard_body">Cuộc gọi thoại nghe → nghĩ → nói: mô hình nhận dạng của một dịch vụ nghe bạn, mô hình trò chuyện của bạn trả lời, và mô hình giọng nói đọc câu trả lời thành tiếng.</string>
     <string name="call_mode_idle">Tự động cúp máy</string>
     <string name="call_mode_idle_minutes">%1$d phút</string>
     <string name="call_mode_idle_custom">Tùy chỉnh</string>
     <string name="call_mode_idle_custom_sub">Sau %1$d phút im lặng</string>
     <string name="call_mode_idle_never">Không bao giờ</string>
-    <string name="call_mode_idle_note">Cúp máy khi cuộc gọi không có gì mới trong thời gian này: không ai nói hay nhập chữ và không tác vụ nào tiến triển. Mika hỏi bạn còn đó không trước 30 giây.</string>
+    <string name="call_mode_idle_note">Cúp máy khi cuộc gọi không có gì mới trong thời gian này: không ai nói hay nhập chữ và không tác vụ nào tiến triển. Claire hỏi bạn còn đó không trước 30 giây.</string>
     <string name="call_mode_idle_dialog_title">Cúp máy sau</string>
     <string name="call_mode_idle_dialog_hint">1 đến 120 phút</string>
 </resources>
