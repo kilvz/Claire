@@ -137,8 +137,10 @@ fun PhoneOpsScreen(
                     options.map { it.second },
                     options.indexOfFirst { it.first == status.shellTransport },
                     { onSelectTransport(options[it].first) },
-                    Modifier.padding(12.dp),
+                    // Align with the rows above and the footer below, and let long translations wrap inside the segment.
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                     tags = options.map { "phone-transport-${it.first.name}" },
+                    maxLines = 2,
                 )
             }
             FooterNote(stringResource(R.string.phone_transport_sub))

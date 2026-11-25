@@ -37,10 +37,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -172,7 +174,8 @@ fun MikaButton(
 
 // ---------- Segmented control ----------
 
-/** Segmented control: light filled background, the selected segment is white and raised. [tags] are the test tags for each segment. */
+/** Segmented control: light filled background, the selected segment is white and raised. [tags] are the test tags for each segment.
+ *  [maxLines] is 2 for labels that can be long (locale-dependent), so they wrap instead of being cut off inside the segment. */
 @Composable
 fun SegmentedControl(
     options: List<String>,
@@ -180,13 +183,16 @@ fun SegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     tags: List<String>? = null,
+    maxLines: Int = 1,
 ) {
     val c = MikaTheme.colors
+    // Two-line labels need a taller track that follows the system font scale; single-line controls keep their 32dp height everywhere else.
+    val segmentHeight = if (maxLines > 1) with(LocalDensity.current) { (20 * maxLines).sp.toDp() + 4.dp } else 32.dp
     Row(modifier.fillMaxWidth().background(c.fill, SegmentOuter).padding(2.dp)) {
         options.forEachIndexed { i, label ->
             val on = i == selected
             Box(
-                Modifier.weight(1f).height(32.dp)
+                Modifier.weight(1f).height(segmentHeight)
                     .then(
                         if (on) Modifier.shadow(1.dp, SegmentInner, clip = false, ambientColor = c.cardShadow, spotColor = c.cardShadow)
                             .background(c.surface, SegmentInner)
@@ -197,7 +203,11 @@ fun SegmentedControl(
                     .then(if (tags != null) Modifier.testTag(tags[i]) else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = SegmentText, color = if (on) c.ink else c.ink2, maxLines = 1)
+                Text(
+                    label, Modifier.fillMaxWidth().padding(horizontal = 2.dp), style = SegmentText,
+                    color = if (on) c.ink else c.ink2, textAlign = TextAlign.Center,
+                    maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -205,7 +215,11 @@ fun SegmentedControl(
 
 private val SegmentOuter = MikaShapes.Tile
 private val SegmentInner = MikaShapes.Tile
-private val SegmentText = MikaType.Caption.copy(fontWeight = FontWeight.Medium)
+private val SegmentText = MikaType.Caption.copy(
+    fontWeight = FontWeight.Medium,
+    // Center the glyphs inside the line box as well, so the label sits optically in the middle of the segment.
+    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+)
 
 /** Mirrors horizontal navigation symbols in RTL while leaving non-directional artwork unchanged. */
 @Composable
