@@ -14,7 +14,7 @@
 ## A 回复的样子（`chat/ui`）
 
 1. 前台回话（`DeskReply`）、汇报行、旧式回答（`StatusCard` 的完成态）都用同一个灰块：`colors.answer` + `MikaShapes.AnswerBubble`，正文完整 Markdown；短的贴字宽，长的铺满。
-2. 去掉回答头上的「Mika · 用时 · Token」（`TurnMeta`）和尾部那排按钮（`ReplyActions`）；长按菜单照旧（复制、引用、选择文字、分支）。
+2. 去掉回答头上的「Claire · 用时 · Token」（`TurnMeta`）和尾部那排按钮（`ReplyActions`）；长按菜单照旧（复制、引用、选择文字、分支）。
 3. 同一句话下面的几条回复间距 8；相邻两轮隔了 5 分钟以上时，中间一行时间（今天「14:02」，更早「昨天 21:30」/日期）。
 
 ## B 结果写全、前台少转述

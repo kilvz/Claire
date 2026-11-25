@@ -1,6 +1,6 @@
-# Read-only Web console: phone-side read-only endpoints (Mika Anywhere P0)
+# Read-only Web console: phone-side read-only endpoints (Claire Anywhere P0)
 
-This is the first phase of "Mika Anywhere". This document covers only the **phone side**: the three read-only interfaces used by the Web console. The browser page and the gateway session are in another change; see upstream issue #372 for the design and phasing discussion, and PR #374 for the gateway side (another change in `companions/relay`).
+This is the first phase of "Claire Anywhere". This document covers only the **phone side**: the three read-only interfaces used by the Web console. The browser page and the gateway session are in another change; see upstream issue #372 for the design and phasing discussion, and PR #374 for the gateway side (another change in `companions/relay`).
 
 Read-only — no dispatching work, no answering, no cancelling, and no touching any settings on the phone.
 

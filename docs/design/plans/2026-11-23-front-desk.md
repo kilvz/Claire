@@ -20,7 +20,7 @@
 - 文件按职责拆，不往 `TaskRun.kt`、`ChatViewModel.kt`、`ChatSendOps.kt` 里继续堆新职责；新逻辑放在新文件里。
 - 代码和注释里不留外部产品名。
 - 前台对办事结果的说法只能来自后台的终态；前台不能直接调用会动屏幕、发消息或花钱的工具。
-- 进入 `UserUtterances` 的只能是用户原话，而且要经过代码核对。前台写的东西只能作为「前台补充」，标成 `Trust.Mika`。
+- 进入 `UserUtterances` 的只能是用户原话，而且要经过代码核对。前台写的东西只能作为「前台补充」，标成 `Trust.Claire`。
 - 用户开口只打断前台说话，不取消后台任务。
 - 本地验证用 `./gradlew :core:test` 和 `./gradlew :app:testDebugUnitTest`，不要直接跑 `:app:test`（会内存溢出）。
 
@@ -50,11 +50,11 @@
   - `LlmBrain.SPOKEN_STYLE`、`LlmBrain.toolSpec(tool: JsonObject): ToolSpec`（不变）
 
 - [ ] **Step 1：写失败测试**（假的 `StreamingChatModel` 记录收到的 messages）
-  - `noticeIsAddedAsMikaNoteAndAnswered`：`notice("Task A finished: booked")` 之后，模型收到的最后一条 message 角色是 `Role.User`、作者是 `Author.Mika`，文本以 `[update] ` 开头；ctx 收到模型的回复文字。
+  - `noticeIsAddedAsMikaNoteAndAnswered`：`notice("Task A finished: booked")` 之后，模型收到的最后一条 message 角色是 `Role.User`、作者是 `Author.Claire`，文本以 `[update] ` 开头；ctx 收到模型的回复文字。
   - `seedPutsPriorTurnsBeforeFirstReply`：`seed(listOf(Turn("订日料","好，我让后面去订","desk")))` 之后再 `reply("几点？")`，模型收到的 messages 依次是 用户「订日料」、助手「好，我让后面去订」、用户「几点？」。
   - `seedAfterHistoryIsIgnored`：已经 `reply` 过一轮再 `seed`，history 不变。
 - [ ] **Step 2：** `./gradlew :core:test --tests '*DeskBrainTest*'` → FAIL（类不存在）
-- [ ] **Step 3：** 搬代码，实现 `notice`（给 history 加一条 `Message(Role.User, "[update] $text", Author.Mika)` 后跑 `run(ctx)`）和 `seed`（只在 history 为空时，把每个 Turn 展开成 用户/助手 两条；`status == "desk"` 以外的 Turn 用 `outcome` 当助手文本）。
+- [ ] **Step 3：** 搬代码，实现 `notice`（给 history 加一条 `Message(Role.User, "[update] $text", Author.Claire)` 后跑 `run(ctx)`）和 `seed`（只在 history 为空时，把每个 Turn 展开成 用户/助手 两条；`status == "desk"` 以外的 Turn 用 `outcome` 当助手文本）。
 - [ ] **Step 4：** `./gradlew :core:test --tests '*DeskBrainTest*' && ./gradlew :app:testDebugUnitTest --tests '*Cascade*'` → PASS
 - [ ] **Step 5：** 提交 `refactor(frontdesk): move conversational brain to core, add notice/seed`
 
@@ -146,7 +146,7 @@
 ### Task 5：后台接收「前台补充」，并记录子会话关联
 
 **Files:**
-- Modify: `core/.../agent/ContextBuilder.kt`（加 `ContextKind.DeskNote("desk_note", ContextLayer.Task, Trust.Mika, pinned = true)`，`build(...)` 加参数 `deskNote: String? = null`，放在 Observed 之后）
+- Modify: `core/.../agent/ContextBuilder.kt`（加 `ContextKind.DeskNote("desk_note", ContextLayer.Task, Trust.Claire, pinned = true)`，`build(...)` 加参数 `deskNote: String? = null`，放在 Observed 之后）
 - Modify: `core/.../agent/AgentLoop.kt`（构造参数 `internal val deskNote: String? = null`）、`AgentLoopPrep.kt`（传给 ContextBuilder；deskNote 不进 `utterances`）
 - Modify: `core/.../agent/Conversation.kt`（`Turn` 加 `val deskTasks: List<String> = emptyList()`）
 - Modify: `app/.../task/TaskService.kt`（`start(context, goal, conversationId, messageId, brief: String? = null)`，新增 `EXTRA_BRIEF`，沿 `begin(...)` 传到 `TaskRun`）
@@ -155,7 +155,7 @@
 - Test: `core/src/test/.../agent/ContextBuilderTest.kt`（加用例）、`app/src/test/.../chat/ConversationStoreTest.kt`（加用例）、`app/src/test/.../task/TaskServiceBriefTest.kt`（新）
 
 - [ ] **Step 1：写失败测试**
-  - `deskNoteIsPinnedMikaPieceNotUserWords`：ContextBuilder 输出里有 `desk_note` 段，标签是 `Trust.Mika.label`；压缩后这段还在。
+  - `deskNoteIsPinnedMikaPieceNotUserWords`：ContextBuilder 输出里有 `desk_note` 段，标签是 `Trust.Claire.label`；压缩后这段还在。
   - AgentLoop 层：带 deskNote 跑一轮以后，`utterances` 里只有 goal，没有 deskNote 的文字。
   - `turnTasksRoundTrip`：append 一个带 `deskTasks = listOf("c1","c2")` 的 Turn，重新读回来相等；没有这个字段的旧记录读成空列表。
   - `deskChildrenHiddenFromList`：`setDeskParent("c1","p")` 之后，会话列表不含 c1，`deskParent("c1") == "p"`。
@@ -163,7 +163,7 @@
 - [ ] **Step 2：** `./gradlew :core:test --tests '*ContextBuilderTest*' && ./gradlew :app:testDebugUnitTest --tests '*ConversationStoreTest*' --tests '*TaskServiceBriefTest*'` → FAIL
 - [ ] **Step 3：** 实现上面的改动。
 - [ ] **Step 4：** 再跑 → PASS
-- [ ] **Step 5：** 提交 `feat(task): carry front-desk brief as Mika note and link desk child conversations`
+- [ ] **Step 5：** 提交 `feat(task): carry front-desk brief as Claire note and link desk child conversations`
 
 ---
 
@@ -238,7 +238,7 @@
 - Test: `core/src/test/.../frontdesk/DeskPromptTest.kt`
 
 提示词要写清这些（用自己的话写，P0 身份层不提工具名）：
-- 你是 Mika 的前台，负责和人说话，回话要短、要快。
+- 你是 Claire 的前台，负责和人说话，回话要短、要快。
 - 你只负责交流、不干活：凭上下文（对话记录、相关记忆、任务板）能答的自己答；要查资料、上网、打开 App、操作手机、发消息、改东西、花钱的，一律用派活工具交给后台。问进度就看任务板，不要猜。
 - 派活时 `words` 逐字照抄用户原话，背景和整理写进 `note`；同一件事不要重复派。
 - 用户补充或修改正在办的事时用 `add_to_task`，后台问的问题由用户回答后用 `answer_task` 交回。

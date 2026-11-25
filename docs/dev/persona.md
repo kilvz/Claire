@@ -1,6 +1,6 @@
 # Persona (nameable custom instructions)
 
-A persona is a nameable, reusable custom prompt: a set of options chosen in the UI plus a piece of instruction text you write yourself. Choose one in Settings and it applies to all conversations. It only changes how Mika speaks (tone, length, wording, format, how progress notes are written), not what Mika can do. Memory answers "what it knows"; persona answers "how it does things".
+A persona is a nameable, reusable custom prompt: a set of options chosen in the UI plus a piece of instruction text you write yourself. Choose one in Settings and it applies to all conversations. It only changes how Claire speaks (tone, length, wording, format, how progress notes are written), not what Claire can do. Memory answers "what it knows"; persona answers "how it does things".
 
 > Status: v1 (#292) has been merged and is on by default in releases. Capability narrowing, import/export and model-group binding are planned for later versions; see the end of this document.
 
@@ -38,13 +38,13 @@ Writing guidance for users and AI assistants is in [persona-writing.md](../perso
 
 ## Name
 
-A persona can carry a name (`Persona.nickname`): the assistant's self-designation, Mika by default. It goes into fixed text outside the fence, so it is strictly sanitized by `PersonaPrompt.nickname`: only letters of any script, digits, combining marks, spaces, hyphens and middle dots are kept, consecutive whitespace is collapsed into one, at most 16 characters, and if it is empty after sanitizing it becomes Mika. A name that the UI sanitizing has altered cannot be saved (`PersonaPrompt.nicknameAccepted`) — it is not changed silently.
+A persona can carry a name (`Persona.nickname`): the assistant's self-designation, Claire by default. It goes into fixed text outside the fence, so it is strictly sanitized by `PersonaPrompt.nickname`: only letters of any script, digits, combining marks, spaces, hyphens and middle dots are kept, consecutive whitespace is collapsed into one, at most 16 characters, and if it is empty after sanitizing it becomes Claire. A name that the UI sanitizing has altered cannot be saved (`PersonaPrompt.nicknameAccepted`) — it is not changed silently.
 
-- When the name is Mika, the identity sentence and the persona layer are byte-for-byte the same as before.
-- When it is not Mika: the first sentence of `system/identity.md` uses the name (the file has a placeholder); it is immediately followed by a `persona/renamed.md` passage explaining that Mika is the name of the app it lives in, that "Mika" later in the text and in tool descriptions refers to this app and to itself, and that renaming does not change what it can do; the "You are still …" in the persona layer's fixed header also uses the name.
+- When the name is Claire, the identity sentence and the persona layer are byte-for-byte the same as before.
+- When it is not Claire: the first sentence of `system/identity.md` uses the name (the file has a placeholder); it is immediately followed by a `persona/renamed.md` passage explaining that Claire is the name of the app it lives in, that "Claire" later in the text and in tool descriptions refers to this app and to itself, and that renaming does not change what it can do; the "You are still …" in the persona layer's fixed header also uses the name.
 - When only the name is changed and everything else is default, there is no persona layer, but the run record still notes which one was used this round.
-- 「Mika」 in the UI (the top bar, the top-left of the answer card, copy in Settings) does not follow the name: that is the app's name.
-- Mika in tool descriptions, feedback text and internal-role prompts is unchanged; whether messages addressing it by the new name go equally smoothly through internal steps such as intent detection has not been tested. Personal assistant mode has its own prompt and carries no name.
+- 「Claire」 in the UI (the top bar, the top-left of the answer card, copy in Settings) does not follow the name: that is the app's name.
+- Claire in tool descriptions, feedback text and internal-role prompts is unchanged; whether messages addressing it by the new name go equally smoothly through internal steps such as intent detection has not been tested. Personal assistant mode has its own prompt and carries no name.
 
 ## Fixed header/footer and escaping
 
@@ -66,7 +66,7 @@ A persona can carry a name (`Persona.nickname`): the assistant's self-designatio
 ## Storage
 
 - `files/settings/personas.json`: `{ "version": 1, "personas": [...], "active": "<id>" }`. `active` is the set selected in Settings, written in the same write as the list; deleting the active one clears it too, and an id pointing at a nonexistent one is treated as none. It carries `version`, is written atomically (temp file + rename), and when it cannot be parsed the original file is saved aside as `personas.json.bad-<time>` and it is treated as an empty list. Not encrypted, contains no keys.
-- Fields: `id`, `name`, `description`, `prompt`, `style` (options; all default when missing in an older file, unrecognized values read as default), `nickname` (the name; empty means Mika), `revision`, `createdAt`, `updatedAt`, `builtin` (v1 ships no built-in examples; field reserved). `revision` increments by 1 only when the content actually changes (tapping the tier already selected writes nothing and does not increment); only the latest content is kept.
+- Fields: `id`, `name`, `description`, `prompt`, `style` (options; all default when missing in an older file, unrecognized values read as default), `nickname` (the name; empty means Claire), `revision`, `createdAt`, `updatedAt`, `builtin` (v1 ships no built-in examples; field reserved). `revision` increments by 1 only when the content actually changes (tapping the tier already selected writes nothing and does not increment); only the latest content is kept.
 - The per-conversation file `<conversationId>.persona` (upstream v1's per-conversation binding) is no longer read or written: `persona` / `setPersona` in `ConversationStore` and the copy on branching remain, but tasks do not look at it, and existing files on disk are left untouched.
 
 ## Safety boundaries

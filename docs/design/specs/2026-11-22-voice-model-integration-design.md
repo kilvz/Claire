@@ -6,7 +6,7 @@ Working branch: `worktree-voice-model-integration`
 
 ## 1. Goals and rationale
 
-Mika's voice input, answer read-aloud and realtime voice call should just be three ways of using things:
+Claire's voice input, answer read-aloud and realtime voice call should just be three ways of using things:
 
 ```text
 Voice input → STT: audio → text

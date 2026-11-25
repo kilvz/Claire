@@ -1,6 +1,6 @@
 # Personal assistant mode (first version)
 
-A fixed entry point sits in the sidebar above “新对话” (New conversation) and opens a long-lived personal main conversation. “启动时打开个人助手” (Open personal assistant on startup) can be enabled in Settings. Chat uses the main model from the model settings, and task execution uses Mika's approvals, takeover, resource queuing and run recovery. Proactive contact is left for later.
+A fixed entry point sits in the sidebar above “新对话” (New conversation) and opens a long-lived personal main conversation. “启动时打开个人助手” (Open personal assistant on startup) can be enabled in Settings. Chat uses the main model from the model settings, and task execution uses Claire's approvals, takeover, resource queuing and run recovery. Proactive contact is left for later.
 
 ## Messages and execution
 

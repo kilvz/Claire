@@ -1,13 +1,13 @@
 # Reading full runtime logs on a USB-connected phone
 
 `./gradlew :app:assembleLogs` builds the local inspection package `app-logs.apk`, with the display
-name **Mika Logs** and the package name `com.wangzan101.mika.logs`. It uses the local debug signature,
-installs side by side with the official Mika, and does not overwrite the original app's conversations,
+name **Claire Logs** and the package name `com.kilv.claire.logs`. It uses the local debug signature,
+installs side by side with the official Claire, and does not overwrite the original app's conversations,
 keys and settings.
 
 This build enables Android `debuggable`, so a computer with USB debugging authorization can read this
 app's private directory through `adb run-as`; it does not change other apps' access permissions.
-Detailed traces are on by default and can also be turned off in Mika's settings. After a run ends, the
+Detailed traces are on by default and can also be turned off in Claire's settings. After a run ends, the
 existing debug-build logic also mirrors `run.json`, `events.jsonl` and screenshots into the external
 files directory `runs/`.
 
@@ -15,8 +15,8 @@ After installing and configuring a model and the phone assistant, run one task, 
 
 ```sh
 adb -s SERIAL install -r app/build/outputs/apk/logs/app-logs.apk
-adb -s SERIAL shell run-as com.wangzan101.mika.logs ls files/runs
-python3 tools/pull-logs.py --device SERIAL --output mika-logs.tar
+adb -s SERIAL shell run-as com.kilv.claire.logs ls files/runs
+python3 tools/pull-logs.py --device SERIAL --output claire-logs.tar
 ```
 
 An adb outside PATH can be specified with `--adb /absolute/path/to/adb`.

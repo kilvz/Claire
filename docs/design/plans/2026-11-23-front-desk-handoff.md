@@ -4,7 +4,7 @@
 
 ## 1. 在哪、做到哪了
 
-- **工作目录**：`/Users/bolyn/coding-projects/Mika/.claude/worktrees/front-desk`（git worktree，分支 `front-desk`，从本地 main `2e33e150b` 拉出）。所有活都在这里干。**不要动 main、其他分支和其他 worktree，不要 push、不要 merge**，除非用户亲口要求。
+- **工作目录**：`/Users/bolyn/coding-projects/Claire/.claude/worktrees/front-desk`（git worktree，分支 `front-desk`，从本地 main `2e33e150b` 拉出）。所有活都在这里干。**不要动 main、其他分支和其他 worktree，不要 push、不要 merge**，除非用户亲口要求。
 - **要读的三份文件**（都已提交在这个分支上）：
   - 设计（最高依据）：`docs/design/specs/2026-11-23-front-desk-design.md`
   - 实施计划（11 个任务 + 插入的 3b）：`docs/design/plans/2026-11-23-front-desk.md`
@@ -74,8 +74,8 @@
 
 ## 5. 其他注意
 
-- 主仓库 `/Users/bolyn/coding-projects/Mika` 里还有这三份文档建 worktree 之前留下的未跟踪旧副本（`docs/superpowers/{specs,plans,prototypes}/2026-11-23-front-desk*`）。正式版本在分支上（已随 main 的目录分层移到 `docs/design/`），旧副本等合并时删掉，现在别动。
+- 主仓库 `/Users/bolyn/coding-projects/Claire` 里还有这三份文档建 worktree 之前留下的未跟踪旧副本（`docs/superpowers/{specs,plans,prototypes}/2026-11-23-front-desk*`）。正式版本在分支上（已随 main 的目录分层移到 `docs/design/`），旧副本等合并时删掉，现在别动。
 - main 的 perf 包（0.1.51, versionCode 52, `a85b8a7be`）已装到测试机给用户体验，与本分支无关。
-- 项目规矩见仓库根目录的 `CLAUDE.md` 和用户记忆目录 `/Users/bolyn/.claude/projects/-Users-bolyn-coding-projects-Mika/memory/MEMORY.md`（通用安卓、不加小众服务商、按根因修、新界面先原型等）。
+- 项目规矩见仓库根目录的 `CLAUDE.md` 和用户记忆目录 `/Users/bolyn/.claude/projects/-Users-bolyn-coding-projects-Claire/memory/MEMORY.md`（通用安卓、不加小众服务商、按根因修、新界面先原型等）。
 - 每做完一个任务就往账本追加一行 `Task N: complete (commits a..b, review clean)`，小问题记成 `Task N: minor (deferred): …`。
 - 代码和注释用中文，跟随周围风格；提交信息按任务 brief 给的写。

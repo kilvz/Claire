@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.2.1 (versionCode 67)
+- **Claire version:** 2.2.2 (versionCode 68)
 - **Base version:** upstream Mika 0.1.51 (commit `6d364993f`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -129,6 +129,17 @@ recorded base version.
   answers open in Claire's own browser in a new tab. Existing English
   copy, the international default provider, and the Google speech fix are
   kept.
+- 2.2.2: documentation and computer-tools pass. Every doc now calls the
+  product Claire instead of upstream Mika: the README, feature guide,
+  setup guide, install-with-an-agent guide, MCP and CLI pages, FAQ,
+  computer pages, and the developer docs. Install commands point at
+  `kilvz/Claire` releases and use the real package `com.kilv.claire`,
+  APK name `Claire-<version>.apk`, accessibility component and external
+  file paths; the CLI/Skill docs use Claire's `v2.2.x` tags. The bundled
+  `mika` CLI now defaults to the `com.kilv.claire` package, so `mika
+  connect` finds Claire without `--package`, and its messages say Claire.
+  Existing English copy, the international default provider, and the
+  Google speech fix are kept.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

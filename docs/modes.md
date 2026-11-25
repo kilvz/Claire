@@ -1,6 +1,6 @@
 # Ask and Autonomous
 
-When Mika works for you, the mode decides which steps it checks with you first. There is one global switch: "Developer options" → "Autonomous mode" in Settings. Off means Ask, on means Autonomous.
+When Claire works for you, the mode decides which steps it checks with you first. There is one global switch: "Developer options" → "Autonomous mode" in Settings. Off means Ask, on means Autonomous.
 
 | Mode | Behavior |
 |---|---|
@@ -8,7 +8,7 @@ When Mika works for you, the mode decides which steps it checks with you first. 
 | **Autonomous** | Does not ask even before paying. The spacing between items in batch jobs still applies. |
 
 - The switch applies to all tasks from then on; if a running task switches from Ask to Autonomous, payments are no longer asked about from the next step.
-- In both modes Mika asks you to take over for things only you should do, like logging in, verification codes and payment passwords. It also asks when information is missing or only you can decide (e.g. which of two contacts with the same name).
+- In both modes Claire asks you to take over for things only you should do, like logging in, verification codes and payment passwords. It also asks when information is missing or only you can decide (e.g. which of two contacts with the same name).
 - For tasks that run while you are away, such as scheduled tasks, Ask mode does not wait at a money-spending step: it skips it and tells you plainly which step was not done. Everything else is completed as usual.
 
-You are responsible for actions you approve, and for actions Mika takes on your behalf in Autonomous mode. For anything important, use Ask mode and check the results; see the [disclaimer](disclaimer.md).
+You are responsible for actions you approve, and for actions Claire takes on your behalf in Autonomous mode. For anything important, use Ask mode and check the results; see the [disclaimer](disclaimer.md).

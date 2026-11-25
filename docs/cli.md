@@ -1,12 +1,12 @@
 # Computer CLI and Agent Skill
 
-> Using Mika from a computer? Start with [Use Mika from a computer](computer.md): how to choose between CLI + Skill and MCP, and how to connect.
+> Using Claire from a computer? Start with [Use Claire from a computer](computer.md): how to choose between CLI + Skill and MCP, and how to connect.
 
-CLI and MCP are peer entry points backed by the same remote task service on the phone. The CLI calls an ordinary HTTP task API; it needs no MCP SDK, handshake, tool discovery or MCP client configuration. The Skill tells a computer agent how to delegate, handle questions and report actual results. Mika on Android still plans and executes the task.
+CLI and MCP are peer entry points backed by the same remote task service on the phone. The CLI calls an ordinary HTTP task API; it needs no MCP SDK, handshake, tool discovery or MCP client configuration. The Skill tells a computer agent how to delegate, handle questions and report actual results. Claire on Android still plans and executes the task.
 
 ```mermaid
 flowchart LR
-    Skill["Computer agent + Skill"] --> CLI["Mika CLI"]
+    Skill["Computer agent + Skill"] --> CLI["Claire CLI"]
     Shell["User / shell script"] --> CLI
     Client["MCP client"] --> MCP
     subgraph Phone["Android phone · shared listener and authentication"]
@@ -24,13 +24,13 @@ flowchart LR
 
 ## Installation and maintenance
 
-See the [CLI / Skill installation guide](computer-install.md) for installation, updates, rollback and removal. Normally choose either the CLI or MCP. The phone must support task API v1, first shipped in official APK v0.1.23.
+See the [CLI / Skill installation guide](computer-install.md) for installation, updates, rollback and removal. Normally choose either the CLI or MCP. The phone must support task API v1, first shipped in Claire 2.0.0.
 
 With only the Skill installed, `mika` below means `python3 <skills-directory>/mika/scripts/mika_cli.py` (`py -3` on Windows).
 
 ## Connect
 
-ADB mode requires Android platform-tools and either USB or connected wireless ADB. For wireless ADB, this computer must be paired and connected to the phone, which must appear as `device` in `adb devices`. Pairing Mika's built-in helper on the phone does not pair the computer; both also differ from direct LAN access below.
+ADB mode requires Android platform-tools and either USB or connected wireless ADB. For wireless ADB, this computer must be paired and connected to the phone, which must appear as `device` in `adb devices`. Pairing Claire's built-in helper on the phone does not pair the computer; both also differ from direct LAN access below.
 
 ```bash
 mika devices --json
@@ -38,11 +38,11 @@ mika connect --device SERIAL --json
 mika doctor --device SERIAL --json
 ```
 
-You may omit `--device` when exactly one device is online; the existing ANDROID_SERIAL environment variable is also supported. Multiple devices require a choice, and connection failure never selects a different phone. `connect` runs Mika's official bootstrap script to enable computer access and start the required helper; it does not submit a task. Other commands only read the current connection.
+You may omit `--device` when exactly one device is online; the existing ANDROID_SERIAL environment variable is also supported. Multiple devices require a choice, and connection failure never selects a different phone. `connect` runs Claire's official bootstrap script to enable computer access and start the required helper; it does not submit a task. Other commands only read the current connection.
 
 Each invocation reads the current token, port and boot number, allocates its own temporary `adb forward tcp:0` mapping, then removes only that mapping. Tokens stay in process memory; bootstrap output is captured instead of printed. Exiting the CLI leaves the phone service and ongoing tasks running.
 
-If a debug build is installed alongside Mika, connect with `mika connect --package com.wangzan101.mika.dev`. Use the same package for subsequent `doctor`, `task` and `ui` commands. Omitting `--package` selects `com.wangzan101.mika`. Set different listening ports if both builds have computer access enabled. `--package` selects an ADB target and cannot be used with `--url`.
+If a debug build is installed alongside Claire, connect with `mika connect --package com.kilv.claire.dev`. Use the same package for subsequent `doctor`, `task` and `ui` commands. Omitting `--package` selects `com.kilv.claire`. Set different listening ports if both builds have computer access enabled. `--package` selects an ADB target and cannot be used with `--url`.
 
 The CLI handles forwarding; you do not need the MCP instructions for manually forwarding a fixed port. After reconnecting the cable, make sure the same phone is back in ADB. After a phone reboot or turning off computer access, run `connect` again.
 
@@ -112,7 +112,7 @@ mika ui                      # open the task desk in a local browser
 mika ui --device SERIAL --no-open
 ```
 
-`mika ui` serves a page for this computer only on a random `127.0.0.1` port. It uses the same task commands to start tasks, follow progress, answer questions, add instructions and cancel, and shows Simplified Chinese or English depending on the browser's language. The part of the link after `#` is the session secret for this run; browsers do not send it anywhere. The server also checks Host and Origin and accepts only a fixed set of actions. It is an interactive page for people and does not support `--json`. See [Use Mika from a computer](computer.md#task-desk-mika-ui).
+`mika ui` serves a page for this computer only on a random `127.0.0.1` port. It uses the same task commands to start tasks, follow progress, answer questions, add instructions and cancel, and shows Simplified Chinese or English depending on the browser's language. The part of the link after `#` is the session secret for this run; browsers do not send it anywhere. The server also checks Host and Origin and accepts only a fixed set of actions. It is an interactive page for people and does not support `--json`. See [Use Claire from a computer](computer.md#task-desk-mika-ui).
 
 ## HTTP contract
 

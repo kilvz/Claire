@@ -1,19 +1,19 @@
-# Teaching Mika: auto-summarize into a skill as soon as the demonstration ends
+# Teaching Claire: auto-summarize into a skill as soon as the demonstration ends
 
 Date: 2026-11-22
 Status: Pending approval
 
 ## Intent and why
 
-When a user teaches Mika something, what they expect is: "I do it once, it learns it by itself and summarizes the skill well". The experience today is: the demonstration ends → the page lists the recorded raw steps one by one, each step paired with two input boxes, 「改成什么」 (Change to what) and 「需要说明」 (Needs explanation) → the user taps 「生成」 (Generate) themselves → then goes to find it in the memory drafts box. The page is a bare TextField plus a button, like a debugging tool.
+When a user teaches Claire something, what they expect is: "I do it once, it learns it by itself and summarizes the skill well". The experience today is: the demonstration ends → the page lists the recorded raw steps one by one, each step paired with two input boxes, 「改成什么」 (Change to what) and 「需要说明」 (Needs explanation) → the user taps 「生成」 (Generate) themselves → then goes to find it in the memory drafts box. The page is a bare TextField plus a button, like a debugging tool.
 
-More fundamentally, the summarization angle is wrong. What gets recorded is "how a person does it": back to the desktop, find the icon and open the app, open the browser, tap the address bar, type, tap search. These are just mechanical actions a person is forced to perform, not knowledge; Mika can launch the app directly, or open a link or search result directly. What is really worth keeping is: which entry point to go in through, which button to tap, what to fill in, how to tell it got done, and when to stop and ask. The current model draft is not told this distinction, and the on-device fallback draft copies everything verbatim step by step, so the summary is still "a recording of a person's operations".
+More fundamentally, the summarization angle is wrong. What gets recorded is "how a person does it": back to the desktop, find the icon and open the app, open the browser, tap the address bar, type, tap search. These are just mechanical actions a person is forced to perform, not knowledge; Claire can launch the app directly, or open a link or search result directly. What is really worth keeping is: which entry point to go in through, which button to tap, what to fill in, how to tell it got done, and when to stop and ask. The current model draft is not told this distinction, and the on-device fallback draft copies everything verbatim step by step, so the summary is still "a recording of a person's operations".
 
 ## Goals
 
 1. As soon as the demonstration ends, organize automatically; the user no longer taps 「生成」.
-2. The organized result is presented directly as a finished skill: structured, readable, acceptable; manual mechanical steps are omitted and written as Mika's direct approach.
-3. The whole teach-Mika flow is redone at product quality: intro, during the demonstration, organizing, summary, learned.
+2. The organized result is presented directly as a finished skill: structured, readable, acceptable; manual mechanical steps are omitted and written as Claire's direct approach.
+3. The whole teach-Claire flow is redone at product quality: intro, during the demonstration, organizing, summary, learned.
 4. Without a model it still produces a structured skill (on-device organizing + a clear explanation), and no longer falls back to the raw step list.
 
 ## Non-goals
@@ -83,7 +83,7 @@ The on-device organizer uses the folded route and writes plain sentences followi
 
 ### 3. Summary page
 
-- Top: skill name (display) and when to use it (description), plus one line: "written the way Mika would do it, not a replay of your taps".
+- Top: skill name (display) and when to use it (description), plus one line: "written the way Claire would do it, not a replay of your taps".
 - Folded hint card (only when folding happened): "N manual steps folded away", expandable to see the details.
 - Body: reuse `SkillReadingView` to render the five sections (entry / steps / common pitfalls / how success is verified / when to stop and hand off to the user), without showing the frontmatter.
 - When there is no model, add an explanatory line above the body.

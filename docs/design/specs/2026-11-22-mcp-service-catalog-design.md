@@ -5,7 +5,7 @@ Status: Approved (2026-11-22)
 
 ## Intent and why
 
-Mika can already act as an MCP client and connect to third-party servers, but it currently requires users to understand and fill in the name, URL, transport, auth method, command and advanced parameters themselves. The goal is not to redo the MCP client, but to provide a complete preset catalog on top of the existing capabilities: after the user picks a service, they only authorize or enter an API key and can connect; when there is no preset, they can still set up a custom server.
+Claire can already act as an MCP client and connect to third-party servers, but it currently requires users to understand and fill in the name, URL, transport, auth method, command and advanced parameters themselves. The goal is not to redo the MCP client, but to provide a complete preset catalog on top of the existing capabilities: after the user picks a service, they only authorize or enter an API key and can connect; when there is no preset, they can still set up a custom server.
 
 The catalog does not limit its launch scope by first batch or second batch. The generic onboarding mechanism is built once; services are onboarded as bulk data, covering common services as broadly as possible in the first version, with a target scale of 200–300 usable presets.
 
@@ -20,7 +20,7 @@ The catalog does not limit its launch scope by first batch or second batch. The 
 
 ## Non-goals
 
-- Does not change Mika's "computer connection" direction as an MCP server.
+- Does not change Claire's "computer connection" direction as an MCP server.
 - Does not rewrite the existing Streamable HTTP, legacy SSE, stdio, OAuth and task tool assembly.
 - Does not build an online marketplace, ratings, reviews, third-party uploads, or forced updates from a remote catalog.
 - Does not guarantee that third-party services stay online, and does not treat the number of presets as the number verified.
@@ -83,7 +83,7 @@ Would solve dynamic updates, but brings in review, caching, signing, supply chai
 
 The details page shows what the service can do, the auth method, any required third-party account/cost notices, and a note that data will be sent to that service.
 
-- OAuth: the primary button is 「授权登录」 (Sign in). Opens the system browser; after returning to Mika it verifies automatically and reads the tools.
+- OAuth: the primary button is 「授权登录」 (Sign in). Opens the system browser; after returning to Claire it verifies automatically and reads the tools.
 - API key: shows only the keys declared by that preset plus other required items, help on obtaining them, and 「连接并保存」 (Connect and save); supports multiple keys, as well as ordinary fields such as tenant, region and self-hosted address.
 - No auth: the primary button is 「连接」 (Connect).
 - stdio: no command is shown; only the required fields and the local environment status. When a package needs to be downloaded, first show the package name, source and version, and only install and continue after the user confirms.
@@ -107,7 +107,7 @@ Tapping a service opens the management page, instead of popping up the full tech
 - Status, last verification time, tool list.
 - Re-test, re-authorize/replace the key, start/stop.
 - Advanced settings and custom parameters.
-- Before deleting, explain that it only removes the config in Mika and does not revoke the third-party account authorization; where revocation is supported, provide a clear entry point but do not fake the result.
+- Before deleting, explain that it only removes the config in Claire and does not revoke the third-party account authorization; where revocation is supported, provide a clear entry point but do not fake the result.
 
 ## Generic technical design
 
@@ -134,7 +134,7 @@ On top of the existing Bearer and OAuth, fill in generic multi-field and secret 
 - Secrets can be delivered to `Authorization: Bearer …`, a named secret request header, or a stdio process environment variable.
 - Ordinary fields can be filled into the URL, request header, argv or environment variable templates declared by the preset; secrets must not enter the URL or argv.
 
-Secret values are uniformly stored by encrypted storage under "service config ID + field ID". The ordinary `headers` continue to store only non-secret values; secret request headers must not fall into that field. The stdio launcher gets an explicit, minimized set of environment variables and does not inherit the Mika process or the model provider environment.
+Secret values are uniformly stored by encrypted storage under "service config ID + field ID". The ordinary `headers` continue to store only non-secret values; secret request headers must not fall into that field. The stdio launcher gets an explicit, minimized set of environment variables and does not inherit the Claire process or the model provider environment.
 
 OAuth continues to reuse the existing discovery, dynamic registration, PKCE, callback and refresh. When a third party does not support the required flow, report it clearly and offer the other auth methods declared by that preset; do not implicitly downgrade to an insecure endpoint.
 

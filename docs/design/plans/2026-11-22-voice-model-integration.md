@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work only in `/Users/bolyn/coding-projects/Mika/.claude/worktrees/voice-model-integration` on branch `worktree-voice-model-integration`; never edit `main`, another branch or another worktree. Do not push.
+- Work only in `/Users/bolyn/coding-projects/Claire/.claude/worktrees/voice-model-integration` on branch `worktree-voice-model-integration`; never edit `main`, another branch or another worktree. Do not push.
 - Standard Android APIs are the main path. No manufacturer/model gates, private API reflection or new native dependency.
 - Keep existing media, realtime task execution, approval and audio-route behavior unchanged. Do not fix unrelated playback or call bugs in this branch.
 - No new cloud provider and no new library dependency. Reuse the existing protocol implementations and request semantics.

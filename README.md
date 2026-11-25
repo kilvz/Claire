@@ -30,8 +30,8 @@ It works on a hidden background screen, so you can keep using your phone.
 
 - **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI is still available in many languages — switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 1.2.0 is based on upstream Mika 0.1.50. See [VERSION.md](VERSION.md) for how versions are numbered.
-- **Same engine.** Everything Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, skills and memory — works the same here.
+- **Its own versioning.** Claire 2.2.2 is based on upstream Mika 0.1.51 (commit `6d364993f`). See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Same engine.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, skills and memory — works the same here.
 
 ## Get things done with one sentence
 
@@ -170,7 +170,7 @@ More answers are in the [FAQ](docs/faq.md).
 ## Community & contributing
 
 - **Docs**: all docs and a suggested reading order are in the [docs index](docs/README.md)
-- **Community**: join the [X group chat](https://x.com/i/chat/group_join/g2116926829198246025/48B52j5svL); to reach the original author on WeChat, scan the QR code in the app under About › Contact the author (mention Mika in your request)
+- **Community**: join the [X group chat](https://x.com/i/chat/group_join/g2116926829198246025/48B52j5svL); to reach the original author on WeChat, scan the QR code in the app under About › Contact the author (mention Claire in your request)
 - **Follow the author**: X [@wangzan101](https://x.com/wangzan101)
 - **Report a problem**: [open an issue](https://github.com/kilvz/Claire/issues/new/choose); About › Send feedback in the app can attach diagnostics
 - **Contribute**: add usage knowledge for an app or website (plain text, no code needed), or contribute code; see the [contributing guide](.github/CONTRIBUTING.md)

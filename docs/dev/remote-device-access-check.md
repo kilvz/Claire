@@ -26,7 +26,7 @@ New verification covers: off by default, no assistant, first-unlock boundary, id
 
 ## Android 16 test device
 
-Verified through a separate Mika Dev (application ID `com.wangzan101.mika.dev`, a debug build with the application ID changed locally, not part of this change), with the original release and its data preserved. The development build's USB MCP uses a separate port 18765; the original model key and other private data were not copied.
+Verified through a separate Claire Dev (application ID `com.kilv.claire.dev`, a debug build with the application ID changed locally, not part of this change), with the original release and its data preserved. The development build's USB MCP uses a separate port 18765; the original model key and other private data were not copied.
 
 The user configured the real lock-screen credentials only on the phone; the test scripts did not read or output any credentials. The records contain only the following non-secret state:
 
@@ -47,7 +47,7 @@ The stock Android lock screen's `pinEntry` is a self-drawn `com.android.keyguard
 
 - The real-device verification used the user's existing PIN; the phone's lock-screen type was not changed. So passwordless/swipe and password scenarios are covered by automated tests but have not been separately switched and verified on that device.
 - The password supports 4–64 printable ASCII characters, and the PIN is 4–16 digits; patterns, SIM PINs and unknown vendor credential pages are not supported.
-- Starting the existing Mika MCP before the first unlock after a reboot is not supported.
+- Starting the existing Claire MCP before the first unlock after a reboot is not supported.
 - The real-device record above predates the change "credential keystrokes are injected only into the SystemUI window" (`ShellService.injectTo`); after that change, PIN unlock needs to be rerun on a real device, and you need to verify that when other windows sit above the lock screen it returns `input_failed` and does not input.
 - No wrong PIN was deliberately submitted to the real device; stopping retries after failure is checked by automated tests.
 - The original task payment/confirmation policy was not changed, and no model was configured or external app task executed for verification.

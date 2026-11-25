@@ -1,8 +1,8 @@
-# Teach Mika Auto-Summary Implementation Plan
+# Teach Claire Auto-Summary Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** When a demonstration ends, automatically turn the trace into a skill: mechanical human steps such as the home screen, icons and the address bar are folded into Mika's direct actions, and the summary page shows the finished skill for the user to accept.
+**Goal:** When a demonstration ends, automatically turn the trace into a skill: mechanical human steps such as the home screen, icons and the address bar are folded into Claire's direct actions, and the summary page shows the finished skill for the user to accept.
 
 **Architecture:** Add a deterministic `TeachRoute.fold` in core (it folds only launcher steps and fails open when detection fails); the prompt and `TeachDraft` receive the folded route and instruct the model to rewrite mechanical browser/search actions into direct actions. In the app layer, `TeachApps` uses system intents to detect the home screen and the default browser, `TeachRuntime.end()` triggers summarizing automatically, and `TeachScreen` becomes a stateless group of pages (intro / demonstrating / summarizing / summary / learned), with the summary body reusing `SkillReadingView`.
 
@@ -40,7 +40,7 @@
 
 - [x] **Step 1: Build the five-state prototype**
 
-A single-page HTML prototype that reuses the existing Mika visual tokens (one light and one dark version, phone width): intro, demonstrating, summarizing, summary (with the fold note and the five-section body), learned. Clickable to switch between states.
+A single-page HTML prototype that reuses the existing Claire visual tokens (one light and one dark version, phone width): intro, demonstrating, summarizing, summary (with the fold note and the five-section body), learned. Clickable to switch between states.
 
 - [x] **Step 2: Show it to the user and wait for sign-off**
 
@@ -144,7 +144,7 @@ git commit -m "feat(teach): fold launcher steps into direct app launches"
 }
 
 @Test fun requestCarriesTheFoldedHumanSteps() {
-    assertTrue(TeachDraft.request(session(), route()).contains("已按 Mika 的直达能力省掉"))
+    assertTrue(TeachDraft.request(session(), route()).contains("已按 Claire 的直达能力省掉"))
 }
 
 @Test fun localAssemblyNeverMentionsTheDesktop() {
@@ -168,8 +168,8 @@ Expected: FAIL (compile error: signature mismatch).
 
 - [ ] **Step 3: Change `request` and `assemble`**
 
-- `request`: output "Goal", "App: <label>(<pkg>)<browser? yes>", "already omitted thanks to Mika's direct actions: <folded>" and the route steps (synthesized steps use their text); remove the output of raw launcher steps; keep "the typed text was not saved".
-- `assemble`: the entry section becomes "Mika launches <first app> directly"; steps use `route.steps`; the success criteria still take the package/window of the last kept step; caveats are kept as-is; the home screen/icons no longer appear at the start or the end.
+- `request`: output "Goal", "App: <label>(<pkg>)<browser? yes>", "already omitted thanks to Claire's direct actions: <folded>" and the route steps (synthesized steps use their text); remove the output of raw launcher steps; keep "the typed text was not saved".
+- `assemble`: the entry section becomes "Claire launches <first app> directly"; steps use `route.steps`; the success criteria still take the package/window of the last kept step; caveats are kept as-is; the home screen/icons no longer appear at the start or the end.
 - `draft`: takes one more `route` parameter and passes it to both.
 
 - [ ] **Step 4: Rewrite the rules section of the `teach_skill.md` prompt**
@@ -300,7 +300,7 @@ Add/replace (`strings_teach.xml`):
 - `teach_intro_body` "Do it once in front of me. When you finish, I'll write it into a skill you can use next time."
 - `teach_disclosure_short` "Only what happens on this phone is read; passwords, verification codes and payment details are not recorded. Details"
 - `teach_summarizing` "Writing this into a skill…"
-- `teach_summary_head` "Written the way Mika would do it, not a replay of your taps."
+- `teach_summary_head` "Written the way Claire would do it, not a replay of your taps."
 - `teach_folded_n` "%1$d manual steps folded away automatically"
 - `teach_basic_note` "No model was connected this time, so this was written by local rules. Once a model is configured it can understand things in more detail."
 - `teach_accept` "Keep this skill"
@@ -349,7 +349,7 @@ git commit -m "feat(teach): show an auto-written skill instead of raw steps"
 
 - [x] **Step 1: Install and run a real-device demonstration**
 
-`./gradlew :app:installDebug`; on A94VUT2C28001694 start from Teach Mika and demonstrate "open Xiaohongshu → search for renovation → open the first result → favorite → done". Confirm with a screenshot: the first step of the summary is "Launch Xiaohongshu" and contains no "home screen/icons"; the fold note count is reasonable; all five sections of the body are present.
+`./gradlew :app:installDebug`; on A94VUT2C28001694 start from Teach Claire and demonstrate "open Xiaohongshu → search for renovation → open the first result → favorite → done". Confirm with a screenshot: the first step of the summary is "Launch Xiaohongshu" and contains no "home screen/icons"; the fold note count is reasonable; all five sections of the body are present.
 
 - [x] **Step 2: Accepting and usability**
 
@@ -364,7 +364,7 @@ Measured on this machine: taps inside Edge/WebView pages do not produce TYPE_VIE
 - [x] **Step 4: Failures and recovery**
 
 - 0 steps: end immediately after starting → shows "no actions were seen", and you can start over.
-- Killed while summarizing: press back / force-kill Mika during summarizing, then reopen Teach Mika → it resumes summarizing automatically or shows retry, and the trace is not lost.
+- Killed while summarizing: press back / force-kill Claire during summarizing, then reopen Teach Claire → it resumes summarizing automatically or shows retry, and the trace is not lost.
 - No model: temporarily switch to a profile with no model configured? If that is costly, substitute Task 3's on-device summarization unit test + code review, and only check the with-model path on a real device.
 
 - [x] **Step 5: Regression**

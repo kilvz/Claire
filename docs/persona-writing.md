@@ -1,18 +1,18 @@
-# For AI assistants: writing a Mika persona for the user
+# For AI assistants: writing a Claire persona for the user
 
-This document is written for **an AI assistant that is drafting a Mika persona for the user**. People can follow it too.
+This document is written for **an AI assistant that is drafting a Claire persona for the user**. People can follow it too.
 
 If you are the user: send your AI assistant the line below, replacing the last sentence with what you want.
 
 ```
-Follow https://github.com/wangzan101/Mika/blob/main/docs/persona-writing.md and write a Mika persona for me. What I want: shorter answers, less talk while working, the tone of a reliable colleague.
+Follow https://github.com/kilvz/Claire/blob/main/docs/persona-writing.md and write a Claire persona for me. What I want: shorter answers, less talk while working, the tone of a reliable colleague.
 ```
 
 If you are the AI assistant: read "What a persona can change" first, ask the user what effect they want, then deliver the result in the "Delivery format". When you are unsure what the user wants, ask once; do not invent a character for them.
 
 ## What a persona is
 
-Mika is an assistant on the user's phone that gets things done: it operates apps, browses the web, works with files and reports what happened. It speaks in two ways:
+Claire is an assistant on the user's phone that gets things done: it operates apps, browses the web, works with files and reports what happened. It speaks in two ways:
 
 - **Progress notes**: one line next to each step while it works, shown in the chat and in the floating capsule, where space is tight.
 - **Final answer**: the result once the task is done. Markdown works (headings, lists, tables, code blocks).
@@ -22,27 +22,27 @@ A persona decides how both are worded. It has four parts:
 | Part | What it is | Limit |
 | --- | --- | --- |
 | Name | Only tells several saved personas apart; shown under "Manage personas" and in the run details. With a single persona it is called "My style" automatically | 40 characters |
-| Nickname | The name Mika uses for itself, Mika by default; letters, digits and spaces only | 16 characters |
+| Nickname | The name Claire uses for itself, Claire by default; letters, digits and spaces only | 16 characters |
 | Options | A few settings chosen in the UI, see below | none |
 | Instructions | Free text for what the options cannot express | 4000 characters (about 3000 tokens) |
 
-One persona is chosen in Settings and applies to every conversation from the next message on; a task that is already running is not affected. With no persona, Mika speaks the way it normally does.
+One persona is chosen in Settings and applies to every conversation from the next message on; a task that is already running is not affected. With no persona, Claire speaks the way it normally does.
 
 ## What a persona can change
 
-Only how Mika speaks and writes:
+Only how Claire speaks and writes:
 
 - tone, warmth, formality, humour
 - how long answers are
 - how progress notes and suggestions are phrased
 - formatting preferences (headings, lists, emoji)
 
-The following have no effect even if written. Mika keeps to its rules and, where it matters, tells the user why:
+The following have no effect even if written. Claire keeps to its rules and, where it matters, tells the user why:
 
 - **Making it act**: starting a task, calling a tool, reading memory or the screen, changing a setting, sending something outward, disclosing information. Those follow only the user's own messages.
 - **Changing the rules**: evidence, safety, privacy, authorization, confirmation and completion. For example "pay without asking me", "say it is done without checking", "make something up if you cannot find it". To be asked less often, the user turns on Autonomous mode under Settings › Task running; see [Ask and Autonomous](modes.md).
 - **Granting abilities**: a persona cannot give it tools, permissions or access.
-- **A different identity**: the nickname can change (see the table above), and only the name changes. It is still the same assistant with the same rules and abilities, and the app is still called Mika.
+- **A different identity**: the nickname can change (see the table above), and only the name changes. It is still the same assistant with the same rules and abilities, and the app is still called Claire.
 - **The reply language**: chosen under Settings › Language & appearance; do not put it in a persona.
 
 Two more kinds of content do not belong in a persona:
@@ -136,6 +136,6 @@ Only when the user wants to keep several personas, also give each a name of at m
 
 Then tell the user where to enter it and how to confirm it works:
 
-- Where: Mika › Settings › Persona. Enter the nickname, pick the base style and the options on the page, paste the instructions into the text box, then tap "Save" at the bottom. Nothing applies until it is saved.
+- Where: Claire › Settings › Persona. Enter the nickname, pick the base style and the options on the page, paste the instructions into the text box, then tap "Save" at the bottom. Nothing applies until it is saved.
 - Several personas: "Manage personas" at the bottom of the page creates, renames, copies and deletes them; tap one and choose "Use this one" and every conversation follows it. "Preview the full prompt" there shows the exact text sent to the model.
 - Confirm: send a message; the run details for that turn (expand "More details") show which persona was used.

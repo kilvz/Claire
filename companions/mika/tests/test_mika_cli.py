@@ -410,7 +410,7 @@ else:
             self.assertEqual("phone-a", body["device"])
             self.assertIn(["-s", "phone-a", "forward", "tcp:0", "tcp:8765"], calls())
             self.assertEqual(["-s", "phone-a", "forward", "--remove", "tcp:" + str(server.server_port)], calls()[-1])
-            root = "/sdcard/Android/data/com.wangzan101.mika/files"
+            root = "/sdcard/Android/data/com.kilv.claire/files"
             self.assertIn(["-s", "phone-a", "shell", "sh", root + "/connect-computer.sh"], calls())
             self.assertIn(["-s", "phone-a", "shell", "cat", root + "/mcp-usb.json"], calls())
 
@@ -511,7 +511,7 @@ else:
             adb, env, _, calls = self.fake_adb(server, bootstrap_exit=1)
             result, body = self.invoke("connect", "--adb", str(adb), env=env)
             self.assertEqual("adb", body["error"]["code"])
-            self.assertIn("open Mika once", body["error"]["message"])
+            self.assertIn("open Claire once", body["error"]["message"])
             self.assertFalse(any("forward" in c for c in calls()))
 
     def test_unreadable_connection_info_asks_for_unlock_and_open(self):
@@ -519,7 +519,7 @@ else:
             adb, env, _, calls = self.fake_adb(server, cat_fails=True)
             result, body = self.invoke("doctor", "--adb", str(adb), env=env)
             self.assertEqual("connection_info", body["error"]["code"])
-            self.assertIn("open Mika once", body["error"]["message"])
+            self.assertIn("open Claire once", body["error"]["message"])
             self.assertFalse(any("forward" in c for c in calls()))
 
     def test_unrunnable_adb_is_adb_unavailable(self):
