@@ -156,9 +156,10 @@ fun ChatScreen(
     val workflowRuntime = workflows ?: (LocalContext.current.applicationContext as? MikaApp)?.workflows
     val recommendationStore = recommendations
         ?: (LocalContext.current.applicationContext as? MikaApp)?.recommendedTasks
+    val appContext = LocalContext.current.applicationContext
     val recommendedTasksFlow = remember(recommendationStore) {
         recommendationStore?.also {
-            it.ensureLoaded(seed = { ChatCopy.recommendationSeeds() }, retired = { ChatCopy.retiredRecommendationSeeds() })
+            it.ensureLoaded(seed = { ChatCopy.recommendationSeeds() }, retired = { ChatCopy.retiredRecommendationSeeds(appContext) })
         }?.tasks
             ?: MutableStateFlow<List<RecommendedTask>>(emptyList())
     }
@@ -242,6 +243,12 @@ fun ChatScreen(
             fillTaskTitle = task.title
             fillTaskPrompt = task.prompt
         } else fillDraft(task.prompt)
+    }
+    // Tapping a promo card sends directly; when the composer already has a draft, attachment or quote, or sending is not possible right now (model not configured, learning in progress, …), fall back to filling the composer
+    val sendTask: (RecommendedTask) -> Unit = { task ->
+        val now = vm.ui.value
+        val clean = now.input.isEmpty() && now.attachments.isEmpty() && now.quote == null
+        if (!clean || !vm.send(task.prompt, check)) pickTask(task)
     }
     var retryFailures by remember { mutableStateOf<Pair<String, String>?>(null) }
     var voiceHolding by remember { mutableStateOf(false) }
@@ -431,7 +438,7 @@ fun ChatScreen(
             ) {
                 if (emptyConversation) {
                     item("empty") {
-                        EmptyState(ui.conversationId, recommendedTasks, Modifier.fillParentMaxHeight(), onPick = pickTask)
+                        EmptyState(ui.conversationId, Modifier.fillParentMaxHeight(), reduceMotion = reduceMotion, onPick = pickTask, onSend = sendTask)
                     }
                 }
                 ui.exchanges.forEachIndexed { i, ex ->
@@ -540,7 +547,8 @@ fun ChatScreen(
             mode = ui.composer,
             hasHistory = ui.exchanges.isNotEmpty(),
             onSend = { vm.send(input, check) },
-            onStop = vm::cancel,
+            onStop = vm::stopAll,
+            working = ui.deskTasks.isNotEmpty() || ui.exchanges.any { it.deskReply != null && it.status == ExchangeStatus.Working },
             queued = ui.queued,
             onQueueActions = { queueActions = it },
             onCancelQueued = { id ->

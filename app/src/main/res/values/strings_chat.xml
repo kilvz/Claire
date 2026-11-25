@@ -299,7 +299,7 @@
     <string name="chat_example_schedule_title">Set a daily reminder</string>
     <string name="chat_example_pdf">Summarize the PDF you send into a short digest.</string>
     <string name="chat_example_schedule">Every morning at 8, remind me to check the weather.</string>
-    <string name="chat_empty_value">One sentence, and I\'ll run your apps, browse the web, and get it done.</string>
+    <string name="chat_empty_value">Say it once, and I\'ll handle it on your phone</string>
     <string name="saved_task_save">Save as task</string>
     <string name="task_field_add">Add a fill-in field</string>
     <string name="task_field_name">Field name</string>
@@ -328,4 +328,21 @@
     <string name="plus_reuse_hint">Phrases · lists · flows</string>
     <string name="plus_reuse_phrases">Saved phrases</string>
     <string name="drawer_calls">AI calls</string>
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
+    <string name="chat_idea_maps">Navigate to the nearest coffee shop</string>
+    <string name="chat_idea_camera">Open the camera and take a photo</string>
+    <string name="chat_idea_sms">Text Mom: I\'m home</string>
+    <string name="chat_idea_news">Search today\'s tech news</string>
+    <string name="chat_idea_dark">Turn on dark mode</string>
+    <string name="chat_idea_music">Play some relaxing music</string>
+    <string name="chat_idea_email">What do my latest emails say?</string>
+    <string name="chat_idea_screenshot">Find my most recent screenshot</string>
+    <string name="chat_idea_meeting">Add a meeting tomorrow at 3 pm</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Support the open-source Claire project</string>
+    <string name="chat_example_follow_blurb">Follow the author and join the chat</string>
+    <string name="chat_example_group_summary_blurb">Catch up on today\'s unread in one line</string>
+    <string name="chat_example_share_title">Share Claire with a friend</string>
+    <string name="chat_example_share_blurb">Tell a friend who could use it</string>
+    <string name="chat_example_share">Share the Claire project link https://github.com/kilvz/Claire with a friend, and tell them it can operate the phone for them.</string>
 </resources>

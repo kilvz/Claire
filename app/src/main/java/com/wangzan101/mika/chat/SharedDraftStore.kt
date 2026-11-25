@@ -1,6 +1,6 @@
 package com.wangzan101.mika.chat
 
-import com.wangzan101.mika.cap.sandbox.Attachments
+import com.wangzan101.mika.settings.FeatureFlags
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -270,11 +270,13 @@ class SharedDraftStore(private val dir: File) {
             if (!seen.add(attachment.fileName)) return@all false
             val file = attachmentFile(attachment.fileName)?.takeIf { it.isFile } ?: return@all false
             attachment.name.isNotBlank() && attachment.name.length <= 240 && attachment.size >= 0 &&
-                attachment.size <= Attachments.MAX_BYTES && file.length() == attachment.size
+                attachment.size <= MAX_ATTACHMENT_BYTES && file.length() == attachment.size
         }
     }
 
     companion object {
+        // New imports are checked against the current tier; saved drafts are validated against the highest supported tier so lowering the setting does not lose attachments.
+        private val MAX_ATTACHMENT_BYTES = FeatureFlags.ATTACHMENT_FILE_LIMIT_MB.max().toLong() shl 20
         const val MAX_TEXT_CHARS = 100_000
         const val MAX_ATTACHMENTS = 9
         private const val METADATA = "draft.json"

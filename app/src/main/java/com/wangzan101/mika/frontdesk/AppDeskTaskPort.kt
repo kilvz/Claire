@@ -144,8 +144,9 @@ class AppDeskTaskPort(
         val live = current().firstOrNull { it.conversationId == taskId }
         val initial = live?.state?.value ?: ended(taskId) ?: TaskState.Failed(interrupted(), FailKind.Interrupted)
         val entry = Followed(MutableStateFlow(initial), null, adopted = true)
+        entry.runKey = live?.key
         followed[taskId] = entry
-        if (initial !is TaskState.Terminal) mirror(taskId, entry)
+        if (initial !is TaskState.Terminal) mirror(taskId, entry, live)
         return entry.state.asStateFlow()
     }
 
@@ -183,12 +184,18 @@ class AppDeskTaskPort(
         return true
     }
 
-    private fun live(taskId: String): DeskRun? = current().firstOrNull { it.conversationId == taskId }
+    @Synchronized
+    private fun live(taskId: String): DeskRun? {
+        val entry = followed[taskId] ?: return null
+        if (entry.state.value is TaskState.Terminal) return null
+        val runKey = entry.runKey ?: return null
+        return current().firstOrNull { it.conversationId == taskId && it.key == runKey }
+    }
 
-    /** Wait until the task is registered in the service, then follow its state and stop at the end; when it never registers, use the outcome recorded in the child conversation, or count it as not started if there is none. */
-    private fun mirror(child: String, entry: Followed) {
+    /** Wait for the task to register with the service, then follow its state and stop when it finishes; if it never registers, use the outcome recorded by the child conversation, or record it as not started. */
+    private fun mirror(child: String, entry: Followed, adoptedRun: DeskRun? = null) {
         scope.launch {
-            val run = withTimeoutOrNull(startTimeoutMs) {
+            val run = adoptedRun ?: withTimeoutOrNull(startTimeoutMs) {
                 runs.mapNotNull { list -> list.firstOrNull { it.conversationId == child } }.first()
             }
             if (run == null) {

@@ -87,6 +87,8 @@ internal fun Composer(
     hasHistory: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
+    /** The front desk is replying or work it dispatched is still running: like [ComposerMode.Busy], the right side is Stop when there is no text. */
+    working: Boolean = false,
     /** The next item explicitly queued for this conversation that has not started yet. */
     queued: List<com.wangzan101.mika.task.QueuedFollowUp> = emptyList(),
     onQueueActions: (com.wangzan101.mika.task.QueuedFollowUp) -> Unit = {},
@@ -277,8 +279,8 @@ internal fun Composer(
                                 Icon(MikaIcons.Mic, hint, Modifier.size(MikaSize.Icon), tint = c.ink)
                             }
                         }
-                        // While a task is running, stop is shown when there is no text; once text is written stop yields to send, and what is sent goes to the current task
-                        if (busy && !canSend) {
+                        // While working (a task is running, Claire is replying, or dispatched work is running), show Stop when there is no text; once text is entered, Stop gives way to Send, and the message goes to Claire
+                        if ((busy || working) && !canSend) {
                             Box(
                                 Modifier.size(MikaSize.IconButton).clip(CircleShape)
                                     .clickable(onClickLabel = stringResource(R.string.chat_stop), onClick = onStop),
@@ -287,8 +289,8 @@ internal fun Composer(
                                 Icon(MikaIcons.Stop, stringResource(R.string.chat_stop), Modifier.size(26.dp), tint = c.ink)
                             }
                         }
-                        if (!busy || canSend) {
-                            // When sendable, a white arrow on black (the primary action); with empty input, a grey arrow on grey — sending is the primary action, so the empty state keeps a round background and separates levels from +/mic, while the grey arrow shows it is not available yet. All tokens, so dark theme inverts automatically
+                        if (!(busy || working) || canSend) {
+                            // When sendable, a white arrow on black (primary action); empty input gets a grey arrow on grey—sending is the main action, and the empty state also has a circular base and +/microphone for hierarchy, but the grey arrow shows it is not available yet. All use tokens, so dark theme inverts automatically
                             Box(
                                 Modifier.size(MikaSize.IconButton)
                                     .clip(CircleShape)

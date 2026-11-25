@@ -33,7 +33,8 @@ enum class AppLanguage(val tag: String?, val speechTag: String?) {
     Portuguese("pt", "pt-BR"),
     Russian("ru", "ru-RU"),
     Indonesian("id", "id-ID"),
-    Turkish("tr", "tr-TR");
+    Turkish("tr", "tr-TR"),
+    Vietnamese("vi", "vi-VN");
 
     /** Language code (without script and region); null when following the system. */
     val language: String? get() = tag?.let { Locale.forLanguageTag(it).language.let(::modernCode) }

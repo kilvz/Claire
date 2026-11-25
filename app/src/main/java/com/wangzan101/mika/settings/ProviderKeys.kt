@@ -35,6 +35,15 @@ fun ProviderStore.activeApiKey(providerId: String): String? {
     return KeyPoolManager.shared.getActiveKey(providerId) ?: providerKeys(providerId).firstOrNull()
 }
 
+/**
+ * The provider's key for features that take a plain API key (speech, images, trial calls): null for account sign-ins, whose stored value is a session
+ * (ChatGPT, xAI, OpenCode Go) and must never be sent as an API key.
+ */
+fun ProviderStore.plainApiKey(providerId: String): String? = when (provider(providerId)?.kind) {
+    ProviderConfig.Kind.ChatGpt, ProviderConfig.Kind.Xai, ProviderConfig.Kind.OpenCodeGo -> null
+    else -> activeApiKey(providerId)
+}
+
 /** The key of the provider this model config belongs to. Dynamically prefers returning a healthy active key from the KeyPool. */
 fun ProviderStore.apiKey(configId: String): String? =
     _configs.value.firstOrNull { it.id == configId }?.let { activeApiKey(it.providerId) }

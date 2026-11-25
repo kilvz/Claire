@@ -313,7 +313,7 @@
     <string name="chat_example_schedule_title">Pon un recordatorio diario</string>
     <string name="chat_example_pdf">Resume el PDF que te envío en un resumen corto.</string>
     <string name="chat_example_schedule">Cada mañana a las 8, recuérdame consultar el tiempo.</string>
-    <string name="chat_empty_value">Dilo en una frase y usaré tus apps, navegaré por la web y lo dejaré hecho.</string>
+    <string name="chat_empty_value">Dímelo una vez y lo hago en tu teléfono</string>
     <string name="saved_task_save">Guardar como tarea</string>
     <string name="task_field_add">Añadir campo</string>
     <string name="task_field_name">Nombre del campo</string>
@@ -342,4 +342,21 @@
     <string name="plus_reuse_hint">Frases · listas · flujos</string>
     <string name="plus_reuse_phrases">Frases guardadas</string>
     <string name="drawer_calls">Llamadas IA</string>
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
+    <string name="chat_idea_maps">Llévame a la cafetería más cercana</string>
+    <string name="chat_idea_camera">Abre la cámara y haz una foto</string>
+    <string name="chat_idea_sms">Escribe a mamá: ya estoy en casa</string>
+    <string name="chat_idea_news">Busca las noticias de tecnología de hoy</string>
+    <string name="chat_idea_dark">Activa el modo oscuro</string>
+    <string name="chat_idea_music">Pon música relajante</string>
+    <string name="chat_idea_email">¿Qué dicen mis últimos correos?</string>
+    <string name="chat_idea_screenshot">Busca mi captura de pantalla más reciente</string>
+    <string name="chat_idea_meeting">Añade una reunión mañana a las 3 p. m.</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">Apoya el proyecto de código abierto Claire</string>
+    <string name="chat_example_follow_blurb">Sigue al autor y únete al chat</string>
+    <string name="chat_example_group_summary_blurb">Ponte al día con los mensajes de hoy</string>
+    <string name="chat_example_share_title">Comparte Claire con un amigo</string>
+    <string name="chat_example_share_blurb">Recomiéndalo a quien le sirva</string>
+    <string name="chat_example_share">Comparte el enlace del proyecto Claire https://github.com/kilvz/Claire con un amigo y cuéntale que puede manejar el teléfono por él.</string>
 </resources>

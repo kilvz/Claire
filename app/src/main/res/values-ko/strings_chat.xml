@@ -285,7 +285,7 @@
     <string name="chat_example_schedule_title">매일 알림 설정</string>
     <string name="chat_example_pdf">보내드린 PDF를 짧은 요약으로 정리해 줘</string>
     <string name="chat_example_schedule">매일 아침 8시에 오늘 날씨 확인하라고 알림해 줘</string>
-    <string name="chat_empty_value">한마디만 하면 앱을 조작하고 웹을 탐색해서 일을 끝내드려요.</string>
+    <string name="chat_empty_value">한마디면 휴대폰 조작은 제가 할게요</string>
     <string name="saved_task_save">작업으로 저장</string>
     <string name="task_field_add">입력 항목 추가</string>
     <string name="task_field_name">항목 이름</string>
@@ -314,4 +314,21 @@
     <string name="plus_reuse_hint">문구 · 목록 · 흐름</string>
     <string name="plus_reuse_phrases">자주 쓰는 문구</string>
     <string name="drawer_calls">AI 전화</string>
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
+    <string name="chat_idea_maps">가장 가까운 카페로 길 안내해 줘</string>
+    <string name="chat_idea_camera">카메라 열고 사진 찍어 줘</string>
+    <string name="chat_idea_sms">엄마한테 \'집에 도착했어\' 문자 보내 줘</string>
+    <string name="chat_idea_news">오늘의 IT 뉴스 검색해 줘</string>
+    <string name="chat_idea_dark">다크 모드 켜 줘</string>
+    <string name="chat_idea_music">편안한 음악 틀어 줘</string>
+    <string name="chat_idea_email">최근 메일 내용 알려 줘</string>
+    <string name="chat_idea_screenshot">가장 최근 스크린샷 찾아 줘</string>
+    <string name="chat_idea_meeting">내일 오후 3시에 회의 일정 추가해 줘</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">오픈 소스 Claire 프로젝트 응원하기</string>
+    <string name="chat_example_follow_blurb">개발자를 팔로우하고 대화에 참여하기</string>
+    <string name="chat_example_group_summary_blurb">오늘 읽지 않은 메시지를 한 줄로</string>
+    <string name="chat_example_share_title">친구에게 Claire 공유</string>
+    <string name="chat_example_share_blurb">필요한 친구에게 추천하기</string>
+    <string name="chat_example_share">Claire 프로젝트 링크 https://github.com/kilvz/Claire를 친구에게 공유하고, 휴대폰을 대신 조작해 준다고 알려 줘</string>
 </resources>

@@ -285,7 +285,7 @@
     <string name="chat_example_schedule_title">设置定时提醒</string>
     <string name="chat_example_pdf">把发来的 PDF 整理成一段摘要</string>
     <string name="chat_example_schedule">每天早上 8 点提醒我查今天的天气</string>
-    <string name="chat_empty_value">一句话，让我帮你操作 App、上网、把事办成</string>
+    <string name="chat_empty_value">说一句话，我帮你操作手机</string>
     <string name="saved_task_save">存为常用任务</string>
     <string name="task_field_add">添加填写项</string>
     <string name="task_field_name">填写项名称</string>
@@ -314,4 +314,21 @@
     <string name="plus_reuse_hint">说法 · 清单 · 流程</string>
     <string name="plus_reuse_phrases">常用说法</string>
     <string name="drawer_calls">AI 电话</string>
+    <!-- Inspiration examples in the empty-chat scrolling rows; tapping one fills it into the composer -->
+    <string name="chat_idea_maps">导航去最近的咖啡店</string>
+    <string name="chat_idea_camera">打开相机拍张照片</string>
+    <string name="chat_idea_sms">给妈妈发短信：我到家了</string>
+    <string name="chat_idea_news">搜一下今天的科技新闻</string>
+    <string name="chat_idea_dark">把手机调成深色模式</string>
+    <string name="chat_idea_music">放一首轻松的音乐</string>
+    <string name="chat_idea_email">看看最新的邮件说了什么</string>
+    <string name="chat_idea_screenshot">找出相册里最近的截图</string>
+    <string name="chat_idea_meeting">明天下午三点加个会议日程</string>
+    <!-- One-line description on an empty-chat promo card; the full prompt is filled into the composer only when tapped -->
+    <string name="chat_example_github_star_blurb">支持一下 Claire 开源项目</string>
+    <string name="chat_example_follow_blurb">去小红书关注，再进群交流</string>
+    <string name="chat_example_group_summary_blurb">一句话看完内测群今天聊了啥</string>
+    <string name="chat_example_share_title">把 Claire 分享给朋友</string>
+    <string name="chat_example_share_blurb">推荐给用得上的朋友</string>
+    <string name="chat_example_share">把 Claire 的项目链接 https://github.com/kilvz/Claire 分享给一个朋友，告诉他 Claire 能帮人操作手机</string>
 </resources>

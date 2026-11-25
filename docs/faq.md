@@ -36,7 +36,7 @@ Some screens (e.g. payment or password entry) block screenshots, so Claire canno
 Yes: pick "Custom" as the provider and enter its address on your local network; see [Models and sign-in](models.md#models-on-your-own-computer-or-lan).
 
 **Can I use Claire without an API key?**
-Yes, sign in with a ChatGPT (Plus / Pro), xAI / Grok or OpenRouter account; see [Models and sign-in](models.md#sign-in-with-an-account-no-key-needed).
+Yes, sign in with a ChatGPT (Plus / Pro), xAI / Grok, OpenCode Go or OpenRouter account; see [Models and sign-in](models.md#sign-in-with-an-account-no-key-needed).
 
 ## Using it from a computer
 

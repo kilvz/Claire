@@ -51,14 +51,22 @@ internal fun ChatGptConnection(ui: ModelSetupUi, state: ListState?, actions: Pro
 }
 
 /**
- * Connection that signs in with an xAI or OpenRouter account: account, status, set as main model, open that provider's account page (the Keys page for OpenRouter), and sign out or sign in again.
- * Signing out only clears the sign-in data on this phone (the xAI token, the Key exchanged for OpenRouter); providers, models and roles are kept.
+ * Connection that signs in with an xAI, OpenCode Go or OpenRouter account: account, status, set as main model, open that provider's account page (the Keys page for OpenRouter), and sign out or sign in again.
+ * Signing out only clears the sign-in data on this phone (the xAI or OpenCode Go token, the Key exchanged for OpenRouter); providers, models and roles are kept.
  */
 @Composable
 internal fun AccountConnection(ui: ModelSetupUi, p: Provider, state: ListState?, actions: ProviderDetailActions) {
     val c = MikaTheme.colors
-    val kind = if (p.kind == ProviderConfig.Kind.Xai) SignInKind.Xai else SignInKind.OpenRouter
-    val account = if (kind == SignInKind.Xai) ui.xaiAccount else ui.openRouterAccount
+    val kind = when (p.kind) {
+        ProviderConfig.Kind.Xai -> SignInKind.Xai
+        ProviderConfig.Kind.OpenCodeGo -> SignInKind.OpenCodeGo
+        else -> SignInKind.OpenRouter
+    }
+    val account = when (kind) {
+        SignInKind.Xai -> ui.xaiAccount
+        SignInKind.OpenCodeGo -> ui.openCodeAccount
+        else -> ui.openRouterAccount
+    }
     val signedIn = account?.signedIn == true
     val (_, waiting, failure) = ui.signInState(kind)
     GroupCard {

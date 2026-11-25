@@ -2,6 +2,8 @@ package com.wangzan101.mika.settings.ui
 
 import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.R
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -39,9 +41,10 @@ import com.wangzan101.mika.core.model.usage.TokenBudgetLimits
 import com.wangzan101.mika.device.ui.DeviceAccessSection
 
 /**
- * Settings › Task run: autonomous mode is off by default; keep-screen-on and muting the operated app are on by default and can be turned off; when [parallel] is non-null (the experimental switch is on) an extra row for the number of concurrent tasks appears.
- * The group below is the operating pace: fast / standard (default) / human, taking effect from the next task on.
- * When [deviceAccess] is non-null, a "run local tasks while locked" group is attached: it does not affect the remote switch under "connect to computer", and the credential editor is shared.
+ * Settings › Task running: autonomous mode is off by default; keep screen awake and mute the operated app are on by default and can be turned off; when [parallel] is not null (the experiment switch is on) an extra row sets the number of concurrent tasks.
+ * The group below is operating pace: fast / standard (default) / human-like, taking effect from the next task.
+ * When [deviceAccess] is not null, a "run on-device tasks while locked" group is added: it is independent of the remote "connect to computer" switch and shares the credential editor.
+ * [scrollState] is supplied by the page switcher so returning from "operating pace" stops at the previous position.
  */
 @Composable
 fun DuringWorkScreen(
@@ -65,6 +68,7 @@ fun DuringWorkScreen(
     tokenBudget: Long? = null, onTokenBudget: (Long?) -> Unit = {},
     showTaskCost: Boolean = false, onShowTaskCost: (Boolean) -> Unit = {},
     deviceAccess: DeviceAccessSettings? = null,
+    scrollState: ScrollState = rememberScrollState(),
 ) {
     val context = LocalContext.current
     var editingLimit by remember { mutableStateOf(false) }
@@ -72,7 +76,7 @@ fun DuringWorkScreen(
     var customLimit by remember { mutableStateOf("") }
     var editingTokenBudget by remember { mutableStateOf(false) }
     var customTokenBudget by remember { mutableStateOf("") }
-    PageScaffold(stringResource(R.string.settings_during_work), onBack) {
+    PageScaffold(stringResource(R.string.settings_during_work), onBack, scrollState = scrollState) {
         GroupLabel(AutonomyCopy.GROUP)
         GroupCard {
             ListRow(null, AutonomyCopy.TITLE, note = AutonomyCopy.SUBTITLE, first = true, onClick = { onAutonomous(!autonomous) }) {

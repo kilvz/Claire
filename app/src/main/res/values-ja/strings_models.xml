@@ -154,10 +154,14 @@
     <string name="account_signed_in_note_xai">xAI / Grok のサブスクリプションを使用中です。利用枠は、このアカウントを使う他のクライアントと共有されます。このログインは、xAI 公式のコマンドラインツールの公開ログインクライアントを再利用しています。続ける前に表示される注意事項をご確認ください。</string>
     <string name="account_signed_out_note">このスマホではログアウトしています。xAI 側の許可も取り消すには、xAI のアカウント設定で接続を解除してください。モデルの選択は残ります。</string>
     <string name="account_manage_xai">xAI アカウントを開く</string>
+    <string name="account_signed_in_note_opencode">OpenCode Go のサブスクリプションを使用中です。使用量はこのアカウントの他のクライアントと共有されます。サインイン情報はこの端末にのみ暗号化して保存されます。</string>
+    <string name="account_signed_out_note_opencode">この端末ではサインアウトしました。OpenCode Console でこのデバイスを削除することもできます。選択したモデルは残ります。</string>
+    <string name="account_manage_opencode">OpenCode Console を開く</string>
     <string name="signin_group">アカウントでログイン · キー不要</string>
     <string name="signin_key_group">API キーを入力</string>
     <string name="signin_row_chatgpt">Plus / Pro のプランを使います</string>
     <string name="signin_row_xai">SuperGrok または X Premium+ のサブスクリプションを使います</string>
+    <string name="signin_row_opencode">OpenCode Go のサブスクリプションを使用</string>
     <string name="signin_row_openrouter">1 つのアカウントで数百のモデルを利用でき、ご自身の残高から支払います</string>
     <string name="signin_running">ログイン中…</string>
     <string name="signin_continue">続ける</string>
@@ -181,6 +185,11 @@
     <string name="signin_openrouter_manage">OpenRouter の Keys ページを開く</string>
     <string name="signin_openrouter_signed_in_note">利用料金は OpenRouter の残高から差し引かれます。キーはこのスマホに暗号化して保存されます。使うのをやめるには、OpenRouter の Keys ページで「Claire」という名前のキーを削除してください。</string>
     <string name="signin_openrouter_signed_out_note">このスマホからキーを削除しました。OpenRouter 側にはまだ残っているので、Keys ページで削除してください。モデルの選択は残ります。</string>
+    <string name="signin_opencode_title">OpenCode Go でサインイン</string>
+    <string name="signin_opencode_body">OpenCode Go のサブスクリプションで、Claire から OpenCode Go のモデルを使えます。サインインは OpenCode のページで行い、リクエストは OpenCode の推論ゲートウェイに直接送られます。</string>
+    <string name="signin_opencode_note">OpenCode 公式コマンドラインツールの公開サインインを使用します。サインイン情報はこの端末にのみ暗号化して保存され、ログには書き込まれません。</string>
+    <string name="signin_opencode_starting">OpenCode の確認ページを開いています…</string>
+    <string name="signin_opencode_code_body">OpenCode の確認ページを開きました。ページのコードが下と同じか確認してから承認してください。</string>
     <string name="signin_set_main">メインモデルに設定</string>
     <string name="signin_set_main_note">Claire がタスクをこなすのに使います</string>
     <string name="signin_sign_out_note">このスマホのログイン情報だけを消去します</string>

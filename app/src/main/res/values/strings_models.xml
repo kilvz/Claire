@@ -165,10 +165,14 @@
     <string name="account_signed_in_note_xai">Using your xAI / Grok subscription. Usage is shared with other clients on this account. This sign-in reuses the public sign-in client of xAI\'s official command-line tool; see the notice shown before you continue.</string>
     <string name="account_signed_out_note">Signed out on this phone. To revoke the grant on xAI too, disconnect it in your xAI account settings. Model choices are kept.</string>
     <string name="account_manage_xai">Open xAI account</string>
+    <string name="account_signed_in_note_opencode">Using your OpenCode Go subscription. Usage is shared with other clients on this account. Sign-in details are stored encrypted on this phone.</string>
+    <string name="account_signed_out_note_opencode">Signed out on this phone. You can also remove this device in OpenCode Console. Model choices are kept.</string>
+    <string name="account_manage_opencode">Open OpenCode Console</string>
     <string name="signin_group">Sign in with an account · no key needed</string>
     <string name="signin_key_group">Enter an API key</string>
     <string name="signin_row_chatgpt">Uses your Plus / Pro plan</string>
     <string name="signin_row_xai">Uses your SuperGrok or X Premium+ subscription</string>
+    <string name="signin_row_opencode">Uses your OpenCode Go subscription</string>
     <string name="signin_row_openrouter">One account for hundreds of models, paid from your own balance</string>
     <string name="signin_running">Signing in…</string>
     <string name="signin_continue">Continue</string>
@@ -192,6 +196,11 @@
     <string name="signin_openrouter_manage">Open OpenRouter\'s Keys page</string>
     <string name="signin_openrouter_signed_in_note">Usage comes out of your OpenRouter balance. The key is stored encrypted on this phone; to stop using it, delete the key named \"Claire\" on OpenRouter\'s Keys page.</string>
     <string name="signin_openrouter_signed_out_note">The key was deleted from this phone. It still exists on OpenRouter; delete it on the Keys page. Model choices are kept.</string>
+    <string name="signin_opencode_title">Sign in with OpenCode Go</string>
+    <string name="signin_opencode_body">Use OpenCode Go\'s models in Claire with your OpenCode Go subscription. Sign-in happens on OpenCode\'s page; requests go straight to OpenCode\'s inference gateway.</string>
+    <string name="signin_opencode_note">This uses OpenCode\'s public command-line sign-in. Sign-in details are stored encrypted on this phone only and are never written to logs.</string>
+    <string name="signin_opencode_starting">Opening the OpenCode confirmation page…</string>
+    <string name="signin_opencode_code_body">The OpenCode confirmation page is open. Check that the code there matches the one below, then approve.</string>
     <string name="signin_set_main">Set as main model</string>
     <string name="signin_set_main_note">Claire uses it to get things done</string>
     <string name="signin_sign_out_note">Only clears the sign-in on this phone</string>

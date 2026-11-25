@@ -6,6 +6,7 @@ import com.wangzan101.mika.core.model.chatgpt.ChatGptTokens
 import com.wangzan101.mika.core.model.oauth.AccountSession
 import com.wangzan101.mika.core.model.oauth.AccountTokens
 import com.wangzan101.mika.core.model.oauth.OauthTokenResult
+import com.wangzan101.mika.core.model.oauth.OpenCodeAuth
 import com.wangzan101.mika.core.model.oauth.OpenRouterAuth
 import com.wangzan101.mika.core.model.oauth.XaiAuth
 import com.wangzan101.mika.core.model.ListedModel
@@ -15,12 +16,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import com.wangzan101.mika.settings.ProviderStore.Companion.CHATGPT_NAME
 import com.wangzan101.mika.settings.ProviderStore.Companion.XAI_NAME
+import com.wangzan101.mika.settings.ProviderStore.Companion.OPENCODE_NAME
 import com.wangzan101.mika.settings.ProviderStore.Companion.OPENROUTER_NAME
 import com.wangzan101.mika.settings.ProviderStore.Companion.OPENROUTER_SIGN_IN
 import com.wangzan101.mika.settings.ProviderStore.Companion.XAI_ACCOUNT
+import com.wangzan101.mika.settings.ProviderStore.Companion.OPENCODE_ACCOUNT
 import com.wangzan101.mika.settings.ProviderStore.Companion.get
 
-// Provider storage: ChatGPT, xAI and OpenRouter account sign-in and token refresh
+// Provider storage: ChatGPT, xAI, OpenCode Go and OpenRouter account sign-in and token refresh
 /** ChatGPT provider sign-in (stored in the same place as the API key, encrypted the same way); null when absent or undecryptable. */
 fun ProviderStore.chatGptSession(providerId: String): ChatGptSession? = ChatGptSession.fromJson(providerKey(providerId))
 
@@ -83,18 +86,22 @@ fun ProviderStore.accountSession(providerId: String): AccountSession? = AccountS
 
 fun ProviderStore.xaiProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.Xai }
 
+/** The provider connected by signing in to OpenCode Go; null when there is none. */
+fun ProviderStore.openCodeProvider(): Provider? = _providers.value.firstOrNull { it.kind == ProviderConfig.Kind.OpenCodeGo }
+
 /**
  * Sign-in succeeded: stores the sign-in and the listed models. An account sign-in for one vendor has only one provider, so signing in again updates it.
  */
 fun ProviderStore.connectAccount(session: AccountSession, models: List<ListedModel>): Provider {
     return synchronized(this) {
-        val (name, kind, base) = when (session.provider) {
-            XaiAuth.PROVIDER -> Triple(XAI_NAME, ProviderConfig.Kind.Xai, XaiAuth.API_BASE)
+        val (name, kind, base, sessionHeader) = when (session.provider) {
+            XaiAuth.PROVIDER -> AccountProviderSpec(XAI_NAME, ProviderConfig.Kind.Xai, XaiAuth.API_BASE, null)
+            OpenCodeAuth.PROVIDER -> AccountProviderSpec(OPENCODE_NAME, ProviderConfig.Kind.OpenCodeGo, OpenCodeAuth.API_BASE, OpenCodeAuth.SESSION_HEADER)
             else -> throw IllegalArgumentException("unknown account provider")
         }
         val existing = _providers.value.firstOrNull { it.kind == kind }
-        if (existing == null) return connect(name, kind, base, session.toJson(), models)
-        val p = existing.copy(name = name, baseUrl = base, models = models)
+        if (existing == null) return connect(name, kind, base, session.toJson(), models, sessionHeader = sessionHeader)
+        val p = existing.copy(name = name, baseUrl = base, models = models, sessionHeader = sessionHeader)
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
         _configs.value = _configs.value.map { if (it.providerId == p.id) it.copy(baseUrl = base, name = name) else it }
         setKey(p.id, session.toJson())
@@ -103,7 +110,9 @@ fun ProviderStore.connectAccount(session: AccountSession, models: List<ListedMod
     }
 }
 
-/** Sign out: clears only the token on this phone. Authorization inside the xAI account has to be disconnected by the user in xAI's settings. */
+private data class AccountProviderSpec(val name: String, val kind: ProviderConfig.Kind, val base: String, val sessionHeader: String?)
+
+/** Sign out: clears only the token on this phone. Authorization inside the xAI or OpenCode account has to be disconnected by the user on the provider's page. */
 fun ProviderStore.signOutAccount(providerId: String) {
     synchronized(this) {
         val s = accountSession(providerId) ?: return
@@ -156,10 +165,11 @@ internal fun ProviderStore.saveRefreshed(providerId: String, before: AccountSess
 internal fun ProviderStore.accountTokensFor(providerId: String): AccountTokens = synchronized(accountTokens) {
     accountTokens.getOrPut(providerId) {
         AccountTokens(
-            account = XAI_ACCOUNT,
+            account = if (accountSession(providerId)?.provider == OpenCodeAuth.PROVIDER) OPENCODE_ACCOUNT else XAI_ACCOUNT,
             refresh = { session ->
                 when (session.provider) {
                     XaiAuth.PROVIDER -> xaiAuth.refresh(session)
+                    OpenCodeAuth.PROVIDER -> openCodeAuth.refresh(session)
                     else -> OauthTokenResult.Rejected("unknown", terminal = true)
                 }
             },

@@ -169,10 +169,14 @@
     <string name="account_signed_in_note_xai">Используется ваша подписка xAI / Grok. Расход общий с другими клиентами этого аккаунта. Этот вход использует открытый клиент входа официального инструмента командной строки xAI; прочитайте уведомление, которое показывается перед продолжением.</string>
     <string name="account_signed_out_note">Вы вышли на этом телефоне. Чтобы отозвать доступ и на стороне xAI, отключите его в настройках аккаунта xAI. Выбранные модели сохранятся.</string>
     <string name="account_manage_xai">Открыть аккаунт xAI</string>
+    <string name="account_signed_in_note_opencode">Используется ваша подписка OpenCode Go. Квота делится с другими клиентами этой учетной записи. Данные входа хранятся в зашифрованном виде только на этом телефоне.</string>
+    <string name="account_signed_out_note_opencode">Вы вышли на этом телефоне. Это устройство также можно удалить в OpenCode Console. Выбранные модели сохранятся.</string>
+    <string name="account_manage_opencode">Открыть OpenCode Console</string>
     <string name="signin_group">Вход через аккаунт · ключ не нужен</string>
     <string name="signin_key_group">Ввести ключ API</string>
     <string name="signin_row_chatgpt">Использует ваш тариф Plus / Pro</string>
     <string name="signin_row_xai">Использует вашу подписку SuperGrok или X Premium+</string>
+    <string name="signin_row_opencode">Использует вашу подписку OpenCode Go</string>
     <string name="signin_row_openrouter">Один аккаунт для сотен моделей, оплата с вашего баланса</string>
     <string name="signin_running">Выполняется вход…</string>
     <string name="signin_continue">Продолжить</string>
@@ -196,6 +200,11 @@
     <string name="signin_openrouter_manage">Открыть страницу ключей OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">Расход списывается с вашего баланса OpenRouter. Ключ хранится на этом телефоне в зашифрованном виде; чтобы перестать его использовать, удалите ключ с именем \"Claire\" на странице ключей OpenRouter.</string>
     <string name="signin_openrouter_signed_out_note">Ключ удалён с этого телефона. В OpenRouter он всё ещё существует; удалите его на странице ключей. Выбранные модели сохранятся.</string>
+    <string name="signin_opencode_title">Войти через OpenCode Go</string>
+    <string name="signin_opencode_body">Используйте модели OpenCode Go в Claire с вашей подпиской OpenCode Go. Вход выполняется на странице OpenCode; запросы идут напрямую в шлюз вывода OpenCode.</string>
+    <string name="signin_opencode_note">Здесь используется публичный вход официальной программы командной строки OpenCode. Данные входа хранятся в зашифрованном виде только на этом телефоне и никогда не записываются в журналы.</string>
+    <string name="signin_opencode_starting">Открываем страницу подтверждения OpenCode…</string>
+    <string name="signin_opencode_code_body">Страница подтверждения OpenCode открыта. Убедитесь, что код на ней совпадает с кодом ниже, и подтвердите.</string>
     <string name="signin_set_main">Сделать основной моделью</string>
     <string name="signin_set_main_note">Claire использует её, чтобы выполнять задачи</string>
     <string name="signin_sign_out_note">Выход только на этом телефоне</string>

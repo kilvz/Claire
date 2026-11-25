@@ -71,6 +71,7 @@
     <string name="model_example_openai">مثلاً gpt-5-mini</string>
     <string name="model_example_compat">مثلاً deepseek-chat</string>
     <string name="model_example_grok">مثلاً grok-4</string>
+    <string name="model_example_opencode">مثلاً deepseek-v4.1-flash</string>
     <string name="model_probe_not_found">مدل «%1$s» وجود ندارد. شناسهٔ کامل مدل را از مستندات ارائه‌دهنده وارد کنید (%2$s).</string>
     <string name="model_probe_not_found_no_list">دریافت فهرست مدل‌ها ممکن نشد و درخواست آزمایشی برای «%1$s» نیز پیدا نشد؛ احتمالاً نشانی یا نوع رابط نادرست است یا چنین مدلی وجود ندارد (نمونهٔ نام مدل: %2$s).</string>
     <string name="model_probe_no_tools_pick">%1$s ابزار را فراخوانی نکرد. میکا برای انجام کارها به مدلی نیاز دارد که بتواند ابزارها را فراخوانی کند؛ مدل اصلی دیگری انتخاب کنید.</string>

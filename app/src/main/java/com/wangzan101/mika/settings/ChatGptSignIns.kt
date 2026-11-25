@@ -14,19 +14,19 @@ import kotlinx.coroutines.launch
 data class ChatGptSignInFailureRecord(val atMs: Long, val kind: String, val code: String?, val detail: String)
 
 /** Which provider this sign-in belongs to. The foreground service and a rebuilt UI rely on it, so that another provider's sign-in is not displayed as ChatGPT's. */
-enum class SignInTarget { None, ChatGpt, Xai, OpenRouter }
+enum class SignInTarget { None, ChatGpt, Xai, OpenCodeGo, OpenRouter }
 
 /** For device-code sign-in, the user code shown to the user, the verification page, and when it expires. The device code itself is not here. */
 data class DevicePrompt(val userCode: String, val openUrl: String, val expiresAtMs: Long = 0)
 
 /**
- * The result of one account sign-in (xAI, OpenRouter): on success the stored provider id, on failure the reason shown to the user.
+ * The result of one account sign-in (xAI, OpenCode Go, OpenRouter): on success the stored provider id, on failure the reason shown to the user.
  * It lives in [ChatGptSignIns] rather than in UI state: the UI may be rebuilt during a sign-in, and the result must reach whichever UI is there at that moment.
  */
 data class AccountOutcome(val target: SignInTarget, val providerId: String? = null, val failure: String? = null)
 
 /**
- * The single in-process copy of account sign-ins (ChatGPT, xAI, OpenRouter). A sign-in waits for the user to type the password and pass two-step verification in an external browser, while Claire is in the background:
+ * The single in-process copy of account sign-ins (ChatGPT, xAI, OpenCode Go, OpenRouter). A sign-in waits for the user to type the password and pass two-step verification in an external browser, while Claire is in the background:
  * it runs in the app's scope [scope] (continuing through UI rebuilds and going to the background), and at the start [keepAlive] is called to hold the process up (a foreground service,
  * so the process is not frozen and the local callback has someone to receive it); if that cannot start, a single line is logged and the sign-in proceeds. The foreground service watches [running] and stops itself when it goes back to false,
  * so success, failure, cancellation and timeout all stop it. Only one sign-in exists at a time; [cancel] gives up (the "cancel" on the notification goes through here as well).
@@ -46,7 +46,7 @@ class ChatGptSignIns(
     @Volatile var lastFailure: ChatGptSignInFailureRecord? = null
         private set
 
-    /** The most recent sign-in failure for other accounts (xAI, OpenRouter); the description is likewise already redacted. */
+    /** The most recent sign-in failure for other accounts (xAI, OpenCode Go, OpenRouter); the description is likewise already redacted. */
     @Volatile var lastAccountFailure: ChatGptSignInFailureRecord? = null
         private set
 

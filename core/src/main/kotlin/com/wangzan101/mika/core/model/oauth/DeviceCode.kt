@@ -54,7 +54,7 @@ class DeviceCodeClient(
     private val deviceUrl: String,
     private val tokenUrl: String,
     private val clientId: String,
-    private val scope: String,
+    private val scope: String? = null,
     private val allowedHosts: Set<String>,
     private val extraDeviceForm: Map<String, String> = emptyMap(),
 ) {
@@ -62,7 +62,8 @@ class DeviceCodeClient(
 
     suspend fun start(): DeviceGrant {
         val url = OauthUrls.check(deviceUrl, allowedHosts)
-        val form = FormBody.Builder().add("client_id", clientId).add("scope", scope).apply {
+        val form = FormBody.Builder().add("client_id", clientId).apply {
+            if (scope != null) add("scope", scope)
             extraDeviceForm.forEach { (k, v) -> add(k, v) }
         }.build()
         val raw = postForm(url, form)

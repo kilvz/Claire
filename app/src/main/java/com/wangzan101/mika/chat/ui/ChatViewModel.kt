@@ -442,7 +442,13 @@ class ChatViewModel(
     /** A dispatched task is asking a question and the user tapped [words] on the question card. */
     fun answerDeskTask(taskId: String, words: String) { desking?.answer(taskId, words) }
 
-    /** Stop one dispatched task. */
+    /** The composer's stop button: stop everything running in this conversation—directly run tasks, the front desk's unfinished replies, and every piece of work the front desk dispatched. */
+    fun stopAll() {
+        if (ui.value.composer == ComposerMode.Busy) cancel()
+        desking?.stopAll()
+    }
+
+    /** Stop one piece of work dispatched by the front desk. */
     fun cancelDeskTask(taskId: String) { desking?.cancel(taskId) }
 
     /** When the running task ([taskId] is the conversation it runs in) needs you to act, the button on the question card: it acts only on that task; stopping still goes through Claire. */

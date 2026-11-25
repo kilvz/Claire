@@ -46,7 +46,7 @@ class OpenAiCompatModel(
     private val headers: Map<String, String> = emptyMap(),
     /** The thinking effort selected by the user (`reasoning_effort`); null means it is not sent. */
     private val reasoningEffort: String? = null,
-    private val keySupplier: (() -> String?)? = null,
+    private val keySupplier: (suspend () -> String?)? = null,
     /** Called back with the HTTP status when the key is rejected upstream (429/401/403); the wiring decides by status whether to cool down (429) or mark it exhausted (401/403). */
     private val onKeyRejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)? = null,
 ) : StreamingChatModel {
@@ -55,7 +55,7 @@ class OpenAiCompatModel(
     private val declaredVia = ReasoningVia.ofField(reasoningField)
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun resolveKey(): String? = keySupplier?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
+    private suspend fun resolveKey(): String? = keySupplier?.invoke()?.takeIf { it.isNotBlank() } ?: apiKey
 
     private companion object {
         val MARKABLE_ROLES = setOf("system", "user", "tool")
@@ -107,7 +107,7 @@ class OpenAiCompatModel(
         return stream.finish()
     }
 
-    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, includeUsage: Boolean = true, key: String? = resolveKey()): Request {
+    private suspend fun request(system: String, messages: List<Message>, tools: List<ToolSpec>, stream: Boolean, includeUsage: Boolean = true, key: String?): Request {
         val payload = buildJsonObject {
             put("model", model)
             reasoningEffort?.let { put("reasoning_effort", it) }

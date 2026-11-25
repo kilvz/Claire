@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.semantics
 import com.wangzan101.mika.i18n.tr
 import com.wangzan101.mika.i18n.trPlural
 import com.wangzan101.mika.R
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import com.wangzan101.mika.settings.ThemeAccent
@@ -83,10 +85,10 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** Settings › Recovery & repair: the phone-action permission switches, followed by the entry to the compatibility self-check. */
+/** Settings › Recovery & repair: several permission switches for phone control, followed by the compatibility self-check entry; [scrollState] is supplied by the page switcher so returning from the self-check stops at the previous position. */
 @Composable
-fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}) {
-    PageScaffold(stringResource(R.string.settings_recovery), onBack) {
+fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}, scrollState: ScrollState = rememberScrollState()) {
+    PageScaffold(stringResource(R.string.settings_recovery), onBack, scrollState = scrollState) {
         RecoverySwitches()
         GroupCard {
             ListRow(

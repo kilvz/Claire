@@ -2,6 +2,8 @@ package com.wangzan101.mika.settings.ui
 
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -59,8 +61,9 @@ object GroundingCopy {
 }
 
 /**
- * Settings › Advanced and other › Developer options: the speed and experimental switch groups;
- * when a vision model exists, its "vision grounding verified" toggle as well (hidden when [grounding] is null); finally the "run statistics" entry (hidden when [onOpenRunStats] is null).
+ * Settings › Advanced & other › Developer options: two groups of switches, speed and experiments;
+ * when a vision model exists there is also its "vision grounding verified" ([grounding]; hidden when null); finally the "run statistics" entry ([onOpenRunStats]; hidden when null).
+ * [scrollState] is supplied by the page switcher so returning from "run statistics" or "device catalog" stops at the previous position.
  */
 @Composable
 fun DeveloperOptionsScreen(
@@ -73,8 +76,9 @@ fun DeveloperOptionsScreen(
     deviceFiles: Boolean = false,
     onDeviceFiles: (Boolean) -> Unit = {},
     onDeviceDirectories: (() -> Unit)? = null,
+    scrollState: ScrollState = rememberScrollState(),
 ) {
-    PageScaffold(tr(R.string.settings_developer), onBack) {
+    PageScaffold(tr(R.string.settings_developer), onBack, scrollState = scrollState) {
         GroupLabel(tr(R.string.dev_speed))
         SwitchGroup(DeveloperSwitches.speed(speed), onSpeed)
         GroupLabel(tr(R.string.dev_experiments))

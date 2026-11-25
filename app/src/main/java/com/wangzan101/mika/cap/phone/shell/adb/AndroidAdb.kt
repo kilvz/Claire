@@ -24,8 +24,10 @@ object AndroidAdb {
     private const val WRAP_ALIAS = "mika_adb_key_wrap"
     private const val TAG = "MikaAdbKey"
 
-    // Device-side export is done without a context; under TLS 1.3 an empty context gives the same result as no context (RFC 8446 §7.5)
+    // The device-side export has no context; under TLS 1.3 an empty context and no context produce the same result (RFC 8446 §7.5)
+    // The platform export API requires Android 12; the built-in shell itself is only enabled from 12
     val exporter = KeyingMaterialExporter { socket, label, length ->
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) throw SSLException("keying material export needs Android 12")
         SSLSockets.exportKeyingMaterial(socket, label, ByteArray(0), length) ?: throw SSLException("keying material export failed")
     }
 

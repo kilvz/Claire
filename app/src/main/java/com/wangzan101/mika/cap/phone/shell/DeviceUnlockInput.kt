@@ -2,6 +2,9 @@ package com.wangzan101.mika.cap.phone.shell
 
 import android.app.KeyguardManager
 import android.content.Context
+import android.graphics.Point
+import android.graphics.Rect
+import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import android.view.InputDevice
@@ -40,11 +43,19 @@ internal class DeviceUnlockInput(private val context: Context, private val injec
 
     fun dismiss(): Boolean = command(listOf("wm", "dismiss-keyguard"))
 
-    /** Performs a generic swipe up while a secure keyguard is still on the notification/fingerprint page. The events are directed to SystemUI, so even if the unlock completes mid-way they never land in the foreground app. */
+    private fun screenBounds(): Rect {
+        val wm = context.getSystemService(WindowManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return wm.currentWindowMetrics.bounds
+        val size = Point()
+        @Suppress("DEPRECATION") wm.defaultDisplay.getRealSize(size)
+        return Rect(0, 0, size.x, size.y)
+    }
+
+    /** Performs a generic swipe up while a secure lock screen is still on the notification/fingerprint page. Events target SystemUI, so finishing the unlock midway does not leak into the foreground app. */
     fun reveal(): Boolean {
         val target = systemUiUid ?: return false
         if (!power.isInteractive || !keyguard.isKeyguardLocked || !keyguard.isDeviceLocked) return false
-        val bounds = runCatching { context.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds }.getOrNull() ?: return false
+        val bounds = runCatching { screenBounds() }.getOrNull() ?: return false
         val x = bounds.exactCenterX()
         val startY = bounds.bottom - bounds.height() * 0.15f
         val endY = bounds.top + bounds.height() * 0.45f

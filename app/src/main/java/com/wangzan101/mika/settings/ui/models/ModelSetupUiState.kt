@@ -37,11 +37,11 @@ sealed interface ListState {
 data class ChatGptAccount(val email: String, val signedIn: Boolean)
 
 /**
- * The providers other than ChatGPT that sign in with an account: xAI / Grok uses the device code (confirming a short code in the browser), OpenRouter uses the official PKCE authorization (a local callback exchanges the Key).
+ * The providers other than ChatGPT that sign in with an account: xAI / Grok and OpenCode Go use the device code (confirming a short code in the browser), OpenRouter uses the official PKCE authorization (a local callback exchanges the Key).
  * ChatGPT has its own sign-in flow (see [ModelSetupViewModel.signInWithChatGpt]) and appears side by side with these in the UI.
  */
 enum class AccountProvider(val target: SignInTarget) {
-    Xai(SignInTarget.Xai), OpenRouter(SignInTarget.OpenRouter);
+    Xai(SignInTarget.Xai), OpenCodeGo(SignInTarget.OpenCodeGo), OpenRouter(SignInTarget.OpenRouter);
 
     companion object {
         fun of(target: SignInTarget): AccountProvider? = entries.firstOrNull { it.target == target }
@@ -208,9 +208,11 @@ data class ModelSetupUi(
     val chatGptRevokeUnconfirmed: Boolean = false,
     /** The connected Grok subscription; null when that provider does not exist. */
     val xaiAccount: SubscriptionAccount? = null,
+    /** The provider connected by signing in to OpenCode Go; null when there is none. */
+    val openCodeAccount: SubscriptionAccount? = null,
     /** The provider connected through OpenRouter account authorization; null when there is none. */
     val openRouterAccount: SubscriptionAccount? = null,
-    /** Sign-in progress for xAI and OpenRouter. */
+    /** Sign-in progress for xAI, OpenCode Go and OpenRouter. */
     val accountSignIn: AccountSignInUi = AccountSignInUi(),
     /** Id of the provider that just signed in with an account: the UI opens its details page (see the account and models, set the main model) and clears it once opened. */
     val signedInProvider: String? = null,
@@ -289,6 +291,7 @@ data class ModelSetupUi(
     fun signedOut(p: Provider): Boolean = when {
         p.kind == ProviderConfig.Kind.ChatGpt -> chatGptAccount?.signedIn != true
         p.kind == ProviderConfig.Kind.Xai -> xaiAccount?.signedIn != true
+        p.kind == ProviderConfig.Kind.OpenCodeGo -> openCodeAccount?.signedIn != true
         p.signIn != null -> p.id !in keyed
         else -> false
     }

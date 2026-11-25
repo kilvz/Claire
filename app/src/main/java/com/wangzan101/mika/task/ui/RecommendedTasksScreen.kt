@@ -61,8 +61,9 @@ import com.wangzan101.mika.ui.Route
 /** Frequently used tasks share the home page's local list; the settings entry edits them, the chat entry selects one and fills it into the input box. */
 @Composable
 fun RecommendedTasksScreen(store: RecommendedTaskStore, onBack: () -> Unit, onPick: ((RecommendedTask) -> Unit)? = null, onOpenChecklists: (() -> Unit)? = null, onOpenWorkflows: (() -> Unit)? = null) {
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     remember(store) {
-        store.ensureLoaded(seed = { ChatCopy.recommendationSeeds() }, retired = { ChatCopy.retiredRecommendationSeeds() })
+        store.apply { ensureLoaded(seed = { ChatCopy.recommendationSeeds() }, retired = { ChatCopy.retiredRecommendationSeeds(appContext) }) }
     }
     val tasks by store.tasks.collectAsState()
     val unreadable by store.unreadable.collectAsState()

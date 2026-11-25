@@ -40,11 +40,12 @@ internal object OpenAiCallProtocol {
         put("audio_end_ms", playedMs)
     }.toString()
 
-    fun greeting(text: String) = buildJsonObject {
+    fun greeting(text: String, noticeId: String? = null) = buildJsonObject {
         put("type", "response.create")
         putJsonObject("response") {
             put("instructions", "Speak this greeting verbatim: " + text)
             put("tool_choice", "none")
+            noticeId?.let { putJsonObject("metadata") { put("mika_notice_id", it) } }
         }
     }.toString()
 
@@ -61,8 +62,11 @@ internal object OpenAiCallProtocol {
         }
     }.toString()
 
-    /** Ask the model to reply in the current context (without instructions, not reading a script). */
-    fun respond() = """{"type":"response.create"}"""
+    /** Ask the model to reply using the existing context (without instructions, not reading a script aloud). */
+    fun respond(noticeId: String? = null) = buildJsonObject {
+        put("type", "response.create")
+        noticeId?.let { id -> putJsonObject("response") { putJsonObject("metadata") { put("mika_notice_id", id) } } }
+    }.toString()
 
     fun toolResult(id: String, result: JsonObject) = buildJsonObject {
         put("type", "conversation.item.create")

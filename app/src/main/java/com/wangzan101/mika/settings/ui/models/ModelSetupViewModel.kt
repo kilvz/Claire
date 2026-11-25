@@ -9,6 +9,7 @@ import com.wangzan101.mika.settings.chatGptProvider
 import com.wangzan101.mika.settings.chatGptSession
 import com.wangzan101.mika.settings.hasKey
 import com.wangzan101.mika.settings.openRouterAccount
+import com.wangzan101.mika.settings.openCodeProvider
 import com.wangzan101.mika.settings.providerKeys
 import com.wangzan101.mika.settings.xaiProvider
 import com.wangzan101.mika.voice.SpeechChoice
@@ -124,6 +125,9 @@ class ModelSetupViewModel(
                 store.chatGptSession(p.id).let { ChatGptAccount(it?.email.orEmpty(), it?.signedIn == true) }
             },
             xaiAccount = store.xaiProvider()?.let { p ->
+                store.accountSession(p.id).let { SubscriptionAccount(it?.label.orEmpty(), it?.signedIn == true) }
+            },
+            openCodeAccount = store.openCodeProvider()?.let { p ->
                 store.accountSession(p.id).let { SubscriptionAccount(it?.label.orEmpty(), it?.signedIn == true) }
             },
             openRouterAccount = store.openRouterAccount()?.let { p -> SubscriptionAccount("", store.hasKey(p.id)) },

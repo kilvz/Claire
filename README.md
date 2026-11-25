@@ -71,7 +71,7 @@ It works on a hidden background screen, so you can keep using your phone.
 | 🧩 **Works with any app** | Looks at the screen and finds buttons the way a person does: no app APIs, no per-app integration |
 | 🌐 **Call it from any web page** | In the built-in browser, say what you want on the page you're reading and it works right there; touch the page and it stops |
 | 🧠 **Gets better with use** | Remembers the preferences you tell it, and turns tasks it finishes into skills so next time is faster and steadier |
-| 🔒 **Your data stays on your phone** | There is no Claire server; use your own model API key, or sign in with a ChatGPT, xAI or OpenRouter account |
+| 🔒 **Your data stays on your phone** | There is no Claire server; use your own model API key, or sign in with a ChatGPT, xAI, OpenCode Go or OpenRouter account |
 | 🆓 **Open source and free** | Apache-2.0, all code public |
 
 ## Get started in three steps
@@ -126,7 +126,7 @@ The names are shown as they appear in the knowledge files.
 Presets for DeepSeek, Qwen, Kimi, Zhipu, Zhipu Coding Plan, SiliconFlow, Volcengine Ark, MiniMax, StepFun, Tencent Hunyuan, Baidu Qianfan, OpenRouter, OrcaRouter, OpenDesign Go, OpenCode Go, Anthropic, Gemini, OpenAI, xAI, Mistral, Groq, Cloudflare Workers AI, Ollama, LM Studio and more; for any other provider pick Custom, which takes any OpenAI-compatible, Anthropic, Gemini or OpenAI Responses endpoint.
 <!-- generated:providers:end -->
 
-You can also skip the key and sign in with a ChatGPT (Plus / Pro), xAI / Grok or OpenRouter account. Steps for adding a model, and what to know about each sign-in, are in [models and sign-in](docs/models.md).
+You can also skip the key and sign in with a ChatGPT (Plus / Pro), xAI / Grok, OpenCode Go or OpenRouter account. Steps for adding a model, and what to know about each sign-in, are in [models and sign-in](docs/models.md).
 
 The quickest start is OrcaRouter: one key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token), then pick the free model orcarouter/free, or orcarouter/auto to let it choose the model per prompt.
 
@@ -159,7 +159,7 @@ Not sure your phone is up to it? Run Settings › Recovery & repair › **Compat
 
 **Can I use a model running on my own computer?** Yes: pick "Custom" as the provider and enter its address on your local network.
 
-**Is the app in English?** Yes — Claire starts in English and the agent's instructions are written in English. The app UI also comes in Arabic, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian and Indonesian, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Claire in English.
+**Is the app in English?** Yes. The app UI comes in English, Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian, Indonesian and Vietnamese, follows your system language, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Claire in English.
 
 **Where do updates come from?** Only from this repository's [Releases](https://github.com/kilvz/Claire/releases); you can also upgrade in the app from About › Check for updates.
 

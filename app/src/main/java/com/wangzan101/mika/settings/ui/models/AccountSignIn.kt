@@ -47,16 +47,18 @@ import com.wangzan101.mika.ui.theme.MikaRadius
 import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.openInBrowser
 
-/** The three providers in the "Sign in with account" group of "Add model". ChatGPT has its own sign-in flow; xAI and OpenRouter map to [AccountProvider]. */
+/** The providers in the "Sign in with account" group of "Add model". ChatGPT has its own sign-in flow; xAI, OpenCode Go and OpenRouter map to [AccountProvider]. */
 enum class SignInKind(val account: AccountProvider?, val label: String, val tag: String) {
     ChatGpt(null, "ChatGPT", "chatgpt"),
     Xai(AccountProvider.Xai, "xAI / Grok", "xai"),
+    OpenCodeGo(AccountProvider.OpenCodeGo, "OpenCode Go", "opencode"),
     OpenRouter(AccountProvider.OpenRouter, "OpenRouter", "openrouter");
 
     /** Preset selected for "Use API Key instead"; ChatGPT has no such option. */
     val keyPreset: String? get() = when (this) {
         ChatGpt -> null
         Xai -> "xAI"
+        OpenCodeGo -> "OpenCode Go"
         OpenRouter -> "OpenRouter"
     }
 
@@ -73,10 +75,17 @@ internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean
         (chatGptSignIn as? ListState.Failed)?.message,
     )
     else -> {
-        val signedIn = if (kind == SignInKind.Xai) xaiAccount?.signedIn == true else openRouterAccount?.signedIn == true
+        val signedIn = when (kind) {
+            SignInKind.Xai -> xaiAccount?.signedIn == true
+            SignInKind.OpenCodeGo -> openCodeAccount?.signedIn == true
+            else -> openRouterAccount?.signedIn == true
+        }
         val id = providers.firstOrNull {
-            if (kind == SignInKind.Xai) it.kind == ProviderConfig.Kind.Xai
-            else it.signIn == ProviderStore.OPENROUTER_SIGN_IN
+            when (kind) {
+                SignInKind.Xai -> it.kind == ProviderConfig.Kind.Xai
+                SignInKind.OpenCodeGo -> it.kind == ProviderConfig.Kind.OpenCodeGo
+                else -> it.signIn == ProviderStore.OPENROUTER_SIGN_IN
+            }
         }?.id
         val mine = accountSignIn.provider == kind.account
         Triple(id?.takeIf { signedIn }, mine && accountSignIn.running, accountSignIn.failure?.takeIf { mine })
@@ -84,7 +93,7 @@ internal fun ModelSetupUi.signInState(kind: SignInKind): Triple<String?, Boolean
 }
 
 /**
- * "Sign in with account · no Key required": one row each for ChatGPT, xAI / Grok and OpenRouter. Signed-in ones show "Signed in" and open provider details when tapped;
+ * "Sign in with account · no Key required": one row each for ChatGPT, xAI / Grok, OpenCode Go and OpenRouter. Signed-in ones show "Signed in" and open provider details when tapped;
  * signed-out ones open the explanation panel ([onOpen]) and sign-in only starts from inside it. Rows with sign-in in progress show "Signing in…" and open to show progress.
  */
 @Composable
@@ -139,10 +148,10 @@ internal fun SignInSheet(ui: ModelSetupUi, kind: SignInKind, actions: SignInShee
 @Composable
 internal fun SignInSheetBody(ui: ModelSetupUi, kind: SignInKind, actions: SignInSheetActions) {
     val (_, running, failure) = ui.signInState(kind)
-    val code = ui.accountSignIn.userCode.takeIf { running && kind == SignInKind.Xai && it.isNotBlank() }
+    val code = ui.accountSignIn.userCode.takeIf { running && (kind == SignInKind.Xai || kind == SignInKind.OpenCodeGo) && it.isNotBlank() }
     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 20.dp).testTag("signin-sheet-${kind.tag}")) {
         when {
-            code != null -> DeviceCodeBody(ui.accountSignIn, code) { actions.cancel(kind) }
+            code != null -> DeviceCodeBody(ui.accountSignIn, kind, code) { actions.cancel(kind) }
             // Only one sign-in at a time: this one can't start while another provider is signing in
             else -> IntroBody(kind, running, failure, busy = !running && (ui.chatGptSignIn == ListState.Running || ui.accountSignIn.running), actions)
         }
@@ -182,14 +191,14 @@ private fun IntroBody(kind: SignInKind, running: Boolean, failure: String?, busy
     }
 }
 
-/** xAI device code: the same short code and expiry as on the browser confirmation page; copy it and reopen the confirmation page; can be cancelled while waiting. */
+/** Device code (xAI, OpenCode Go): the same short code and expiry as on the browser confirmation page; copy it and reopen the confirmation page; can be cancelled while waiting. */
 @Composable
-private fun DeviceCodeBody(s: AccountSignInUi, code: String, cancel: () -> Unit) {
+private fun DeviceCodeBody(s: AccountSignInUi, kind: SignInKind, code: String, cancel: () -> Unit) {
     val c = MikaTheme.colors
     val context = LocalContext.current
     Text(ModelsCopy.XAI_CODE_TITLE, Modifier.fillMaxWidth(), style = MikaType.Title, color = c.ink, textAlign = TextAlign.Center)
     Text(
-        ModelsCopy.XAI_CODE_BODY, Modifier.fillMaxWidth().padding(top = 10.dp),
+        ModelsCopy.signInCodeBody(kind), Modifier.fillMaxWidth().padding(top = 10.dp),
         style = MikaType.Caption, color = c.ink2, textAlign = TextAlign.Center,
     )
     Text(

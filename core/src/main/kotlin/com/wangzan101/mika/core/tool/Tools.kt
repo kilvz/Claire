@@ -96,6 +96,8 @@ data class HandBack(
     val url: String? = null,
     /** Note the user wrote when handing back (the user's own words, usable as a source for memory). */
     val note: String? = null,
+    /** The reason given to the model when the user has handed control back and the target app cannot be restored. */
+    val appReturnFailure: String? = null,
 )
 
 

@@ -18,25 +18,19 @@ import com.wangzan101.mika.settings.ui.models.Page
 class ChatCopyTest {
     @get:Rule val texts = ChineseTexts()
 
-    @Test fun fiveDistinctExamplesStartWithGithubStar() {
-        val examples = ChatCopy.examples
-        assertEquals(5, examples.size)
-        assertEquals(5, examples.map { it.title }.filter { it.isNotBlank() }.toSet().size)
-        assertEquals(5, examples.map { it.prompt }.filter { it.isNotBlank() }.toSet().size)
-        assertEquals(examples.size, examples.map { it.kind }.toSet().size)
-        assertEquals(ChatCopy.ExampleKind.Web, examples.first().kind)
-        assertTrue(examples.first().prompt.contains("https://github.com/kilvz/Claire"))
-        // The short title goes on the card and the full prompt goes into the input box: the two are stored separately
-        assertEquals(ChatCopy.examples.map { it.title }, ChatCopy.recommendationSeeds().map { it.first })
-        assertEquals(ChatCopy.examples.map { it.prompt }, ChatCopy.recommendationSeeds().map { it.second })
+    /** Suggested tasks are initialized with only alarm and calendar; the promo entries are hardcoded in the top cards and do not enter the suggested tasks. */
+    @Test fun recommendationSeedsAreAlarmsAndSchedule() {
+        assertEquals(listOf(ChatCopy.ExampleKind.Alarm, ChatCopy.ExampleKind.Schedule), ChatCopy.examples.map { it.kind })
+        assertEquals(ChatCopy.examples.map { it.title to it.prompt }, ChatCopy.recommendationSeeds())
     }
 
-    /** The card icon is picked by kind: a prompt is recognized only when it matches a built-in example exactly; tasks you add yourself show the generic icon. */
-    @Test fun kindsOnlyMatchTheBuiltInExamples() {
-        val examples = ChatCopy.examples
-        examples.forEach { assertEquals(it.kind, ChatCopy.kindOf(it.prompt)) }
-        assertNull(ChatCopy.kindOf("打开设置，把字体调大"))
-        assertNull(ChatCopy.kindOf(examples.first().prompt + "，再顺手点个 watch"))
+    /** Top promo cards: three of them, the first is GitHub star, and each has a title, description and prompt. */
+    @Test fun promosStartWithGithubStar() {
+        val promos = ChatCopy.promos
+        assertEquals(3, promos.size)
+        assertEquals(ChatCopy.ExampleKind.Web, promos.first().kind)
+        assertTrue(promos.first().prompt.contains("https://github.com/kilvz/Claire"))
+        promos.forEach { assertTrue(it.title.isNotBlank() && it.prompt.isNotBlank() && !it.blurb.isNullOrBlank()) }
     }
 
     @Test fun taskCostShowsTwoDecimalPlaces() {

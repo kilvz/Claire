@@ -179,10 +179,14 @@
     <string name="account_signed_in_note_xai">أنت تستخدم اشتراك xAI / Grok. يتشارك هذا الحساب الاستخدام مع العملاء الآخرين. يعيد تسجيل الدخول هذا استخدام عميل تسجيل الدخول العام لأداة سطر الأوامر الرسمية من xAI؛ راجع الإشعار المعروض قبل المتابعة.</string>
     <string name="account_signed_out_note">سُجّل الخروج على هذا الهاتف. لإلغاء الإذن لدى xAI أيضًا، افصلها من إعدادات حساب xAI. ستظل اختيارات النماذج محفوظة.</string>
     <string name="account_manage_xai">فتح حساب xAI</string>
+    <string name="account_signed_in_note_opencode">تستخدم اشتراك OpenCode Go الخاص بك. تُشارَك حصة الاستخدام مع العملاء الآخرين على هذا الحساب. تُخزَّن تفاصيل تسجيل الدخول مشفَّرة على هذا الهاتف.</string>
+    <string name="account_signed_out_note_opencode">تم تسجيل الخروج على هذا الهاتف. يمكنك أيضًا إزالة هذا الجهاز في OpenCode Console. تبقى اختيارات الطرازات محفوظة.</string>
+    <string name="account_manage_opencode">فتح OpenCode Console</string>
     <string name="signin_group">تسجيل الدخول بحساب · لا حاجة إلى مفتاح</string>
     <string name="signin_key_group">إدخال مفتاح API</string>
     <string name="signin_row_chatgpt">يستخدم خطة Plus / Pro الخاصة بك</string>
     <string name="signin_row_xai">يستخدم اشتراك SuperGrok أو X Premium+ الخاص بك</string>
+    <string name="signin_row_opencode">يستخدم اشتراك OpenCode Go الخاص بك</string>
     <string name="signin_row_openrouter">حساب واحد لمئات النماذج، والدفع من رصيدك الخاص</string>
     <string name="signin_running">جارٍ تسجيل الدخول…</string>
     <string name="signin_continue">متابعة</string>
@@ -206,6 +210,11 @@
     <string name="signin_openrouter_manage">فتح صفحة المفاتيح لدى OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">يُخصم الاستخدام من رصيد OpenRouter. يُخزّن المفتاح مشفّرًا على هذا الهاتف؛ لإيقاف استخدامه، احذف المفتاح المسمى "Claire" من صفحة المفاتيح لدى OpenRouter.</string>
     <string name="signin_openrouter_signed_out_note">حُذف المفتاح من هذا الهاتف. لكنه لا يزال موجودًا لدى OpenRouter؛ احذفه من صفحة المفاتيح. ستظل اختيارات النماذج محفوظة.</string>
+    <string name="signin_opencode_title">تسجيل الدخول باستخدام OpenCode Go</string>
+    <string name="signin_opencode_body">استخدم طرازات OpenCode Go في Claire مع اشتراك OpenCode Go الخاص بك. يتم تسجيل الدخول على صفحة OpenCode؛ وتُرسَل الطلبات مباشرة إلى بوابة الاستدلال في OpenCode.</string>
+    <string name="signin_opencode_note">يستخدم هذا تسجيل الدخول العام لأداة سطر أوامر OpenCode. تُخزَّن تفاصيل تسجيل الدخول مشفَّرة على هذا الهاتف فقط ولا تُكتب في السجلات.</string>
+    <string name="signin_opencode_starting">جارٍ فتح صفحة تأكيد OpenCode…</string>
+    <string name="signin_opencode_code_body">صفحة تأكيد OpenCode مفتوحة. تحقق من أن الرمز الموجود هناك يطابق الرمز أدناه، ثم وافق.</string>
     <string name="signin_set_main">تعيينه نموذجًا رئيسيًا</string>
     <string name="signin_set_main_note">يستخدمه Claire لإنجاز المهام</string>
     <string name="signin_sign_out_note">يمحو تسجيل الدخول على هذا الهاتف فقط</string>

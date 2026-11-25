@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- This Compose check cannot see `value = ...` inside a lambda under Kotlin 2 (K2),
+         and every place reported in the project does assign a value; re-enable it once lint is fixed -->
+    <issue id="ProduceStateDoesNotAssignValue" severity="ignore" />
+</lint>

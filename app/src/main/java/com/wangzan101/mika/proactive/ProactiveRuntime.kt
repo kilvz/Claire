@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,10 +63,10 @@ import kotlinx.coroutines.sync.withLock
  * kept in memory only; [LearnRunner] distills topics, contacts and message digests at each level from them, encrypted on this device. Before
  * that confirmation, or when the provider and model actually used differ from the confirmed ones, nothing is sent.
  *
- * Nothing is read while the screen is off or locked: on seeing locked it records the time and asks the system to unbind the listener; after
- * unlocking it asks for a rebind, and on connecting it catches up on what was posted while locked and is still in the shade. The lock state is
- * watched by [ProactiveLockWatch]: broadcasts only mean "look again", the state is read from the system every time; with the screen off it does
- * nothing on a timer, so the phone is not woken for this feature. All work happens on one serial coroutine; system callbacks only hand things over.
+ * Do not read while the screen is off or locked: when locked, record the time and ask the system to unbind the listener; after unlocking, ask the system to rebind, and on connection catch up on what was posted while locked and is still in the notification shade.
+ * When a rebind was requested but the listener did not connect (the system itself failed to bind it, so the request had no effect), make the system register it again, see [ListenerReconnect].
+ * Lock state is watched by [ProactiveLockWatch]: broadcasts only mean "look again", and the state is read from the system each time; nothing is scheduled while the screen is off, so the phone does not wake for this feature.
+ * All handling runs on one serial coroutine; system callbacks only post work to it.
  */
 class ProactiveRuntime(
     context: Context,
@@ -178,6 +179,8 @@ class ProactiveRuntime(
     /** The watch that only exists while running (feature on and not in "fully exited"): lock broadcasts and state collection. */
     private var watching: Job? = null
     private var receiver: BroadcastReceiver? = null
+    /** The check after a rebind request that waits to see whether it connected (see [reconnectLater]). */
+    private var reconnecting: Job? = null
 
     /** The master switch: the entry is on the settings home page, visible and switchable in every build. */
     private fun wanted(): Boolean = flags.proactive()
@@ -508,6 +511,8 @@ class ProactiveRuntime(
     }
 
     private fun end() {
+        reconnecting?.cancel()
+        reconnecting = null
         watching?.cancel()
         watching = null
         lock.stop()
@@ -524,15 +529,37 @@ class ProactiveRuntime(
         for (a in actions) when (a) {
             is ProactiveLockPolicy.Action.PersistLockedAt -> prefs.lastLockedAtMs = a.atMs
             ProactiveLockPolicy.Action.Unbind -> unbind()
-            ProactiveLockPolicy.Action.Rebind -> runCatching { NotificationListenerService.requestRebind(component) }
-                .onFailure { Log.i(TAG, "rebind refused: ${it.javaClass.simpleName}") }
+            ProactiveLockPolicy.Action.Rebind -> {
+                runCatching { NotificationListenerService.requestRebind(component) }
+                    .onFailure { Log.i(TAG, "rebind refused: ${it.javaClass.simpleName}") }
+                reconnectLater()
+            }
             ProactiveLockPolicy.Action.CatchUp -> catchUp()
         }
     }
 
     /**
-     * Once the unbind request goes out the system sends no more callbacks, and the disconnected callback may arrive late: treat it as
-     * disconnected as soon as the request is sent, so that an unlock in the meantime is not taken as "still connected" and left without a rebind.
+     * Look again a moment after a rebind request: if it still has not connected, the system most likely failed to bind it itself (see [ListenerReconnect]), so the request had no effect,
+     * so switch to unbinding by component name and then rebinding. Each rebind request gets this one retry; if it still fails, wait for the next unlock or for Claire to be opened.
+     */
+    private fun reconnectLater() {
+        reconnecting?.cancel()
+        reconnecting = scope.launch {
+            delay(ListenerReconnect.WAIT_MS)
+            val step = ListenerReconnect.next(watching != null, readLocked(), connected.value, authorized(), Build.VERSION.SDK_INT)
+            // The second condition is the same as in [ListenerReconnect.next]; it is repeated here only so the compile-time version check can see it
+            if (step != ListenerReconnect.Step.Reregister || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return@launch
+            runCatching {
+                NotificationListenerService.requestUnbind(component)
+                NotificationListenerService.requestRebind(component)
+            }.onSuccess { Log.i(TAG, "listener not bound after rebind, asked the system to register it again") }
+                .onFailure { Log.i(TAG, "re-register refused: ${it.javaClass.simpleName}") }
+        }
+    }
+
+    /**
+     * After an unbind request the system stops sending callbacks, and the disconnected callback may arrive late: treat the request as already disconnected,
+     * so that an unlock during this window is not treated as "still connected" and skipped for rebinding.
      */
     private fun unbind() {
         val s = service ?: return

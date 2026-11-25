@@ -96,6 +96,13 @@ internal class ChatDesk(private val vm: ChatViewModel, private val session: Chat
         vm.scope.launch(vm.io) { deps.desk(id).cancel(taskId) }
     }
 
+    /** The composer's stop button: stop the front desk's unfinished replies in the conversation on screen and every piece of work it dispatched that is still running. */
+    fun stopAll() {
+        val id = _ui.value.conversationId ?: return
+        line(id).stopReplies()
+        _ui.value.deskTasks.forEach { cancel(it.taskId) }
+    }
+
     fun start() {
         vm.scope.launch {
             combine(_ui.map { it.conversationId }.distinctUntilChanged(), shown) { id, s -> id to s }
@@ -158,7 +165,13 @@ internal class DeskChatOps(
     /** The message the front desk is currently replying to (the part the user said themselves); null when not replying. Cancellation only recognizes it. */
     @Volatile private var current: String? = null
 
-    /** Whether this entry point has already generated a title. */
+    /** The replies still unfinished (the one being written and the queued ones); the composer's stop button stops them all. */
+    private val replies = java.util.concurrent.ConcurrentHashMap.newKeySet<kotlinx.coroutines.Job>()
+
+    /** Stop the front desk's unfinished replies: the current one stops where it has got to and queued ones are no longer answered. */
+    fun stopReplies() { replies.toList().forEach { it.cancel() } }
+
+    /** Whether title generation has already run through this entry point. */
     @Volatile private var named = false
 
     /** The word check the chat page gives the executor: which of the user's messages the fragment falls in (the current reply first, then newest to oldest), returning that whole message. */
@@ -194,7 +207,13 @@ internal class DeskChatOps(
             if (it.conversationId != null && it.conversationId != conversationId) it
             else it.copy(conversationId = conversationId, exchanges = it.exchanges + row, blocked = null)
         }
-        vm.scope.launch { turns.withLock { answer(brain, text, runId, startedAt) } }
+        val job = vm.scope.launch { turns.withLock { answer(brain, text, runId, startedAt) } }
+        replies += job
+        job.invokeOnCompletion { cause ->
+            replies -= job
+            // A queued reply that has not started: close out this round too instead of spinning forever
+            if (cause != null) update(runId) { if (it.status == ExchangeStatus.Working) it.copy(status = ExchangeStatus.Done(it.deskReply.orEmpty(), null)) else it }
+        }
         return true
     }
 
@@ -307,7 +326,10 @@ internal class DeskChatOps(
             brain.reply(text, context(runId, reply, tasks, executor(words)))
         } catch (e: CancellationException) {
             current = null
-            // Dispatched tasks must be recorded in this turn so they reattach when the conversation is opened next time
+            // Stopped: keep what has already been said and close out this round
+            val spoken = reply.toString()
+            update(runId) { it.copy(deskReply = spoken, status = ExchangeStatus.Done(spoken, null)) }
+            // Dispatched tasks must be recorded in this round so they can be picked up again when the conversation is reopened
             withContext(NonCancellable) { persist(Turn(text, reply.toString(), DeskTurn.STATUS, runId = runId, atMs = startedAt, deskTasks = tasks)) }
             throw e
         } catch (e: Exception) {

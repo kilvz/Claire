@@ -4,6 +4,7 @@ import com.wangzan101.mika.core.agent.QuoteMessage
 import com.wangzan101.mika.core.agent.AttachedPage
 import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
+import com.wangzan101.mika.i18n.uiLocale
 import com.wangzan101.mika.i18n.trPlural
 
 /** Texts the conversation page derives from state; it touches no UI and is unit-tested directly. */
@@ -21,18 +22,30 @@ object ChatCopy {
     /** A value statement for the empty conversation: explains what Claire can do. */
     val EMPTY_VALUE get() = tr(R.string.chat_empty_value)
 
-    /** The kind of a built-in example; it only decides the icon and tint of the card on the home screen. */
-    enum class ExampleKind { Web, Follow, GroupChat, Alarm, Schedule }
-    data class Example(val kind: ExampleKind, val title: String, val prompt: String)
+    /** The kind of built-in example, which decides which app icon appears on the card. */
+    enum class ExampleKind { Web, Follow, GroupChat, Share, Alarm, Schedule }
+    data class Example(val kind: ExampleKind, val title: String, val prompt: String, val blurb: String? = null)
+
+    /** Whether the UI is Chinese. Chinese UI promo cards use Chinese apps (Xiaohongshu, WeChat), other languages use international ones. */
+    private fun chineseUi(): Boolean = uiLocale().language == "zh"
 
     /**
-     * The text of the built-in recommended tasks. Used to initialize once only when no recommended task has been saved on this device yet;
-     * both the title and the prompt come from this entry, and after the user edits them in settings they are not added back by a language change or an upgrade.
+     * Promo cards at the top of the empty chat, hardcoded here, selected by the current UI language each time; tapping one fills in text in that language too.
+     * Chinese: GitHub star, follow on Xiaohongshu, WeChat group summary; other languages: GitHub star, follow on X, share Claire with a friend.
+     * Tasks the user added themselves are not here; they live in the composer's plus panel.
+     */
+    val promos get() = listOf(
+        Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star), tr(R.string.chat_example_github_star_blurb)),
+        Example(ExampleKind.Follow, tr(R.string.chat_example_follow_title), tr(R.string.chat_example_follow), tr(R.string.chat_example_follow_blurb)),
+        if (chineseUi()) Example(ExampleKind.GroupChat, tr(R.string.chat_example_group_summary_title), tr(R.string.chat_example_group_summary), tr(R.string.chat_example_group_summary_blurb))
+        else Example(ExampleKind.Share, tr(R.string.chat_example_share_title), tr(R.string.chat_example_share), tr(R.string.chat_example_share_blurb)),
+    )
+
+    /**
+     * Content used to initialize the suggested tasks (the set in the plus panel) for the first time. It is used once when nothing has been saved locally yet,
+     * after that it is the user's own list and is not added back when changing language or upgrading.
      */
     val examples get() = listOf(
-        Example(ExampleKind.Web, tr(R.string.chat_example_github_star_title), tr(R.string.chat_example_github_star)),
-        Example(ExampleKind.Follow, tr(R.string.chat_example_follow_title), tr(R.string.chat_example_follow)),
-        Example(ExampleKind.GroupChat, tr(R.string.chat_example_group_summary_title), tr(R.string.chat_example_group_summary)),
         Example(ExampleKind.Alarm, tr(R.string.chat_example_alarms_title), tr(R.string.chat_example_alarms)),
         Example(ExampleKind.Schedule, tr(R.string.chat_example_schedule_title), tr(R.string.chat_example_schedule)),
     )
@@ -40,18 +53,24 @@ object ChatCopy {
     fun recommendationSeeds(): List<Pair<String, String>> = examples.map { it.title to it.prompt }
 
     /**
-     * Which kind a recommended task belongs to: when the prompt matches a built-in example exactly it is that built-in one (recognized even if the title was edited);
-     * tasks added by the user have no kind, so null is returned and the UI uses a generic icon.
+     * Examples that were once suggested tasks but are no longer included: PDF summary, and the three moved into the hardcoded top promo cards.
+     * On upgrade, remove from the suggested list the ones the user never touched; keep edited ones—they are already the user's own tasks.
+     * They were stored in the UI language of the time, so compare the original text for every language.
      */
-    fun kindOf(prompt: String): ExampleKind? = examples.firstOrNull { it.prompt == prompt }?.kind
-
-    /**
-     * Examples that used to be built in and have since been removed. On upgrade, the entry the user has not touched is cleared from the recommended list;
-     * one whose title or prompt was edited is kept — it is the user's own task by now.
-     */
-    fun retiredRecommendationSeeds(): List<Pair<String, String>> = listOf(
-        tr(R.string.chat_example_pdf_title) to tr(R.string.chat_example_pdf),
-    )
+    fun retiredRecommendationSeeds(context: android.content.Context): List<Pair<String, String>> {
+        val ids = listOf(
+            R.string.chat_example_pdf_title to R.string.chat_example_pdf,
+            R.string.chat_example_github_star_title to R.string.chat_example_github_star,
+            R.string.chat_example_follow_title to R.string.chat_example_follow,
+            R.string.chat_example_group_summary_title to R.string.chat_example_group_summary,
+        )
+        return com.wangzan101.mika.i18n.AppLanguage.entries.mapNotNull { it.tag }.flatMap { tag ->
+            val config = android.content.res.Configuration(context.resources.configuration)
+            config.setLocale(java.util.Locale.forLanguageTag(tag))
+            val res = context.createConfigurationContext(config).resources
+            ids.mapNotNull { (t, p) -> runCatching { res.getString(t) to res.getString(p) }.getOrNull() }
+        }.distinct()
+    }
 
     /** Title of the conversation page's top bar: always the app name; the subtitle says what is happening right now. */
     const val APP_TITLE = "Claire"

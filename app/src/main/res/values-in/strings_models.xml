@@ -153,10 +153,14 @@
     <string name="account_signed_in_note_xai">Memakai langganan xAI / Grok Anda. Penggunaan dibagi dengan klien lain di akun ini. Proses masuk ini memakai ulang klien masuk publik dari alat baris perintah resmi xAI; lihat pemberitahuan yang ditampilkan sebelum Anda melanjutkan.</string>
     <string name="account_signed_out_note">Sudah keluar di ponsel ini. Untuk mencabut izin di xAI juga, putuskan di pengaturan akun xAI Anda. Pilihan model tetap tersimpan.</string>
     <string name="account_manage_xai">Buka akun xAI</string>
+    <string name="account_signed_in_note_opencode">Memakai langganan OpenCode Go Anda. Kuota dipakai bersama dengan klien lain di akun ini. Detail masuk disimpan terenkripsi hanya di ponsel ini.</string>
+    <string name="account_signed_out_note_opencode">Sudah keluar di ponsel ini. Anda juga dapat menghapus perangkat ini di OpenCode Console. Pilihan model tetap tersimpan.</string>
+    <string name="account_manage_opencode">Buka OpenCode Console</string>
     <string name="signin_group">Masuk dengan akun · tanpa kunci</string>
     <string name="signin_key_group">Masukkan kunci API</string>
     <string name="signin_row_chatgpt">Memakai paket Plus / Pro Anda</string>
     <string name="signin_row_xai">Memakai langganan SuperGrok atau X Premium+ Anda</string>
+    <string name="signin_row_opencode">Memakai langganan OpenCode Go Anda</string>
     <string name="signin_row_openrouter">Satu akun untuk ratusan model, dibayar dari saldo Anda sendiri</string>
     <string name="signin_running">Sedang masuk…</string>
     <string name="signin_continue">Lanjutkan</string>
@@ -180,6 +184,11 @@
     <string name="signin_openrouter_manage">Buka halaman Keys OpenRouter</string>
     <string name="signin_openrouter_signed_in_note">Penggunaan diambil dari saldo OpenRouter Anda. Kunci disimpan terenkripsi di ponsel ini; untuk berhenti memakainya, hapus kunci bernama \"Claire\" di halaman Keys OpenRouter.</string>
     <string name="signin_openrouter_signed_out_note">Kunci sudah dihapus dari ponsel ini. Kunci masih ada di OpenRouter; hapus di halaman Keys. Pilihan model tetap tersimpan.</string>
+    <string name="signin_opencode_title">Masuk dengan OpenCode Go</string>
+    <string name="signin_opencode_body">Pakai model OpenCode Go di Claire dengan langganan OpenCode Go Anda. Proses masuk dilakukan di halaman OpenCode; permintaan langsung menuju gateway inferensinya.</string>
+    <string name="signin_opencode_note">Ini memakai proses masuk publik dari alat baris perintah OpenCode. Detail masuk disimpan terenkripsi hanya di ponsel ini dan tidak pernah ditulis ke log.</string>
+    <string name="signin_opencode_starting">Membuka halaman konfirmasi OpenCode…</string>
+    <string name="signin_opencode_code_body">Halaman konfirmasi OpenCode sudah terbuka. Pastikan kode di sana sama dengan kode di bawah, lalu setujui.</string>
     <string name="signin_set_main">Jadikan model utama</string>
     <string name="signin_set_main_note">Claire memakainya untuk menyelesaikan tugas</string>
     <string name="signin_sign_out_note">Hanya menghapus data masuk di ponsel ini</string>

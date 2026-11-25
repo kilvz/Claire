@@ -11,6 +11,7 @@ import com.wangzan101.mika.core.cap.sandbox.SandboxShell
 import com.wangzan101.mika.core.cap.sandbox.SandboxStatus
 import com.wangzan101.mika.core.workspace.SandboxError
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,11 +66,12 @@ class TerminalHub internal constructor(
     val sessions: StateFlow<Map<String, TerminalSession>> = _sessions.asStateFlow()
 
     init {
-        scope.launch {
+        // Deletion events are not replayed: subscribe immediately so a deletion right after creation is still received
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
             conversations.deletions.collect { id -> closeWorkspace(WorkspaceKey.Conversation(id)) }
         }
         projects?.let { store ->
-            scope.launch {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 store.deletions.collect { projectId -> closeWorkspace(WorkspaceKey.Project(projectId)) }
             }
         }

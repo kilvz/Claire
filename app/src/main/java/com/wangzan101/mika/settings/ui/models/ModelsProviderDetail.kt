@@ -80,7 +80,7 @@ class ProviderDetailActions(
     val retestModel: (String) -> Unit = {},
     /** Voice-model capability references under this provider; previews which voice models would be deleted along with it. */
     val voiceUsage: (String) -> List<VoiceModelRef> = { emptyList() },
-    /** Account-signed-in providers (ChatGPT, xAI, OpenRouter): sign in again, sign out, open that provider's usage or account page. */
+    /** Account-signed-in providers (ChatGPT, xAI, OpenCode Go, OpenRouter): sign in again, sign out, open that provider's usage or account page. */
     val signIn: () -> Unit = {},
     val signOut: () -> Unit = {},
     val manageUsage: () -> Unit = {},
@@ -113,7 +113,7 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
         if (p.kind == ProviderConfig.Kind.ChatGpt) {
             GroupLabel(ModelsCopy.CONNECTION)
             ChatGptConnection(ui, state, actions)
-        } else if (p.kind == ProviderConfig.Kind.Xai || p.signIn == ProviderStore.OPENROUTER_SIGN_IN) {
+        } else if (p.kind == ProviderConfig.Kind.Xai || p.kind == ProviderConfig.Kind.OpenCodeGo || p.signIn == ProviderStore.OPENROUTER_SIGN_IN) {
             GroupLabel(ModelsCopy.CONNECTION)
             AccountConnection(ui, p, state, actions)
         } else {

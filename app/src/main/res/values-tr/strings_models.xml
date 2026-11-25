@@ -14,6 +14,7 @@
     <string name="models_roles">Roller</string>
     <string name="models_providers">Sağlayıcılar</string>
     <plurals name="models_providers_count">
+        <item quantity="one">%1$d sağlayıcı</item>
         <item quantity="other">%1$d sağlayıcı</item>
     </plurals>
     <string name="models_add_provider">Sağlayıcı ekle</string>
@@ -90,19 +91,23 @@
     <string name="models_delete_used">%1$s onu kullanıyor; sildikten sonra yeniden seçmeniz gerekecek.</string>
     <string name="models_delete_voice">Ses modelleri %1$s de silinecek.</string>
     <plurals name="models_more">
+        <item quantity="one">%1$d daha, filtrelemek için bir ad yazın</item>
         <item quantity="other">%1$d daha, filtrelemek için bir ad yazın</item>
     </plurals>
     <plurals name="models_view_all">
+        <item quantity="one">%1$d modelin tümünü gör</item>
         <item quantity="other">%1$d modelin tümünü gör</item>
     </plurals>
     <string name="models_all_title">%1$s · Tüm modeller</string>
     <plurals name="models_all_note">
+        <item quantity="one">Toplam %1$d, önce kullanımdaki modeller. Listeyi yeniden almak için sağ üstteki Yenile\'ye dokunun.</item>
         <item quantity="other">Toplam %1$d, önce kullanımdaki modeller. Listeyi yeniden almak için sağ üstteki Yenile\'ye dokunun.</item>
     </plurals>
     <string name="models_use_as">%1$s · Olarak kullan</string>
     <string name="models_openai_compat">OpenAI uyumlu</string>
     <string name="models_no_list">Model listesi yok</string>
     <plurals name="models_count">
+        <item quantity="one">%1$d model</item>
         <item quantity="other">%1$d model</item>
     </plurals>
     <string name="models_used_by">%1$s olarak kullanılıyor</string>
@@ -160,10 +165,14 @@
     <string name="account_signed_in_note_xai">xAI / Grok aboneliğiniz kullanılıyor. Kullanım bu hesaptaki diğer istemcilerle paylaşılır. Bu oturum, xAI\'nın resmi komut satırı aracının genel oturum girişini yeniden kullanır; devam etmeden önce gösterilen bildirime bakın.</string>
     <string name="account_signed_out_note">Bu telefonda oturum kapatıldı. xAI\'daki izni de iptal etmek için xAI hesap ayarlarınızda bağlantısını kesin. Model seçimleri korunur.</string>
     <string name="account_manage_xai">xAI hesabını aç</string>
+    <string name="account_signed_in_note_opencode">OpenCode Go aboneliğiniz kullanılıyor. Kullanım, bu hesaptaki diğer istemcilerle paylaşılır. Oturum bilgileri yalnızca bu telefonda şifreli olarak saklanır.</string>
+    <string name="account_signed_out_note_opencode">Bu telefonda oturum kapatıldı. Bu cihazı OpenCode Console üzerinden de kaldırabilirsiniz. Seçtiğiniz modeller korunur.</string>
+    <string name="account_manage_opencode">OpenCode Console\'u aç</string>
     <string name="signin_group">Bir hesapla oturum aç · anahtar gerekmez</string>
     <string name="signin_key_group">Bir API anahtarı girin</string>
     <string name="signin_row_chatgpt">Plus / Pro planınızı kullanır</string>
     <string name="signin_row_xai">SuperGrok veya X Premium+ aboneliğinizi kullanır</string>
+    <string name="signin_row_opencode">OpenCode Go aboneliğinizi kullanır</string>
     <string name="signin_row_openrouter">Kendi bakiyenizden ödenen, yüzlerce model için tek hesap</string>
     <string name="signin_running">Oturum açılıyor…</string>
     <string name="signin_continue">Devam et</string>
@@ -187,6 +196,11 @@
     <string name="signin_openrouter_manage">OpenRouter\'ın Anahtarlar sayfasını aç</string>
     <string name="signin_openrouter_signed_in_note">Kullanım OpenRouter bakiyenizden düşer. Anahtar bu telefonda şifrelenmiş saklanır; kullanmayı bırakmak için OpenRouter\'ın Anahtarlar sayfasında \“Claire\” adlı anahtarı silin.</string>
     <string name="signin_openrouter_signed_out_note">Anahtar bu telefondan silindi. OpenRouter\'da hâlâ var; Anahtarlar sayfasından silin. Model seçimleri korunur.</string>
+    <string name="signin_opencode_title">OpenCode Go ile oturum aç</string>
+    <string name="signin_opencode_body">OpenCode Go aboneliğinizle Claire\'de OpenCode Go modellerini kullanın. Oturum açma OpenCode sayfasında yapılır; istekler doğrudan OpenCode\'un çıkarım ağ geçidine gider.</string>
+    <string name="signin_opencode_note">Bu, OpenCode\'un resmi komut satırı aracının herkese açık oturum açma yöntemini kullanır. Oturum bilgileri yalnızca bu telefonda şifreli olarak saklanır ve günlüklere asla yazılmaz.</string>
+    <string name="signin_opencode_starting">OpenCode onay sayfası açılıyor…</string>
+    <string name="signin_opencode_code_body">OpenCode onay sayfası açıldı. Sayfadaki kodun aşağıdakiyle aynı olduğunu kontrol edip onaylayın.</string>
     <string name="signin_set_main">Ana model olarak ayarla</string>
     <string name="signin_set_main_note">Claire işleri halletmek için onu kullanır</string>
     <string name="signin_sign_out_note">Yalnızca bu telefondaki oturumu temizler</string>

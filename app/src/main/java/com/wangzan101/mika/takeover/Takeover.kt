@@ -1,6 +1,7 @@
 package com.wangzan101.mika.takeover
 
 import com.wangzan101.mika.core.agent.TaskState
+import com.wangzan101.mika.core.safety.gate.TargetAppRestoreFailed
 import com.wangzan101.mika.core.tool.HandBack
 import com.wangzan101.mika.core.tool.HandBackOutcome
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +26,9 @@ interface TakeoverPort {
     suspend fun displayOf(taskId: Int): Int
     suspend fun moveToMain(taskId: Int): Boolean
     suspend fun moveBack(taskId: Int): Boolean
-    /** Turns the app's sound on or off. */
+    /** Move back to the target app. When the old task has disappeared, restore by the same app and throw [TargetAppRestoreFailed] if that fails. */
+    suspend fun restoreTarget(): Boolean
+    /** Turn this app's sound on or off. */
     fun setSound(packageName: String, on: Boolean)
     /** The user explicitly restores sound; implementations must update this task's auto-mute rules along with it. */
     fun unmute(packageName: String) = setSound(packageName, true)
@@ -287,13 +290,19 @@ class Takeover(
                 val activity = port.handoverActivity()
                 result = result.copy(durationMs = now() - handedAt, inputCount = activity?.inputCount, stoppedAt = activity?.stoppedAt)
             }
-            // The handed-over task may have finished and closed itself (no move needed if it is gone); if the launch_app task is still on the main screen, move it back as well
+            // Other pages handed over may close when done; the launch_app target must be restored even if its task ID changed
             val target = port.targetTask()
-            for (id in listOf(handed, target).filter { it >= 0 }.distinct()) {
-                if (port.displayOf(id) == MAIN_DISPLAY && !port.moveBack(id)) {
+            if (handed >= 0 && handed != target && port.displayOf(handed) == MAIN_DISPLAY && !port.moveBack(handed)) {
+                _problem.value = Problem.MoveBackFailed
+                return false
+            }
+            try {
+                if (target >= 0 && !port.restoreTarget()) {
                     _problem.value = Problem.MoveBackFailed
                     return false
                 }
+            } catch (e: TargetAppRestoreFailed) {
+                result = result.copy(appReturnFailure = e.message)
             }
             port.stopWatching()
             setOfNotNull(handedPackage, port.targetPackage()).forEach { port.setSound(it, false) }

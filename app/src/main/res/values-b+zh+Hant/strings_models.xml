@@ -160,10 +160,14 @@
     <string name="account_signed_in_note_xai">在用你的 xAI / Grok 訂閱。額度和這個帳號的其他客戶端共用。這項登入借用 xAI 官方命令列工具的公開登入入口，風險見登入前的說明。</string>
     <string name="account_signed_out_note">這臺手機上已退出登入。要連 xAI 那邊的授權一起撤掉，到 xAI 帳號設定裡斷開。選好的模型都還在。</string>
     <string name="account_manage_xai">打開 xAI 帳號</string>
+    <string name="account_signed_in_note_opencode">正在使用你的 OpenCode Go 訂閱。額度會與此帳號的其他用戶端共用。登入資訊只加密存在這台手機上。</string>
+    <string name="account_signed_out_note_opencode">這台手機上已登出。你也可以在 OpenCode Console 移除這台裝置。選好的模型都還在。</string>
+    <string name="account_manage_opencode">開啟 OpenCode Console</string>
     <string name="signin_group">用帳號登入 · 不用填 Key</string>
     <string name="signin_key_group">填 API Key</string>
     <string name="signin_row_chatgpt">用 Plus / Pro 方案的額度</string>
     <string name="signin_row_xai">用 SuperGrok 或 X Premium+ 訂閱</string>
+    <string name="signin_row_opencode">使用你的 OpenCode Go 訂閱</string>
     <string name="signin_row_openrouter">一個帳號接幾百個模型，用你自己的餘額</string>
     <string name="signin_running">登入中…</string>
     <string name="signin_continue">繼續登入</string>
@@ -187,6 +191,11 @@
     <string name="signin_openrouter_manage">打開 OpenRouter 的 Keys 頁面</string>
     <string name="signin_openrouter_signed_in_note">用量從你的 OpenRouter 餘額裡扣。Key 加密存在這臺手機上；不想用了，可以在 OpenRouter 的 Keys 頁面刪掉名為「Claire」的那把。</string>
     <string name="signin_openrouter_signed_out_note">這臺手機上的 Key 已刪掉。OpenRouter 那邊的這把 Key 還在，可以在 Keys 頁面刪掉。選好的模型都還在。</string>
+    <string name="signin_opencode_title">用 OpenCode Go 帳號登入</string>
+    <string name="signin_opencode_body">用你的 OpenCode Go 訂閱在 Claire 裡使用 OpenCode Go 的模型。登入會在 OpenCode 的頁面完成；請求直接送到 OpenCode 的推論閘道。</string>
+    <string name="signin_opencode_note">這項登入使用 OpenCode 官方命令列工具的公開登入入口。登入資訊只加密存在這台手機上，不會寫進日誌。</string>
+    <string name="signin_opencode_starting">正在開啟 OpenCode 的確認頁…</string>
+    <string name="signin_opencode_code_body">已開啟 OpenCode 的確認頁。核對頁面上的碼和下面一樣，然後點同意。</string>
     <string name="signin_set_main">設為主模型</string>
     <string name="signin_set_main_note">Claire 辦事時用它</string>
     <string name="signin_sign_out_note">只清這臺手機上的登入資訊</string>
