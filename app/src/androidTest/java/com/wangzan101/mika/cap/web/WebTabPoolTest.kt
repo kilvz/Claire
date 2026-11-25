@@ -229,6 +229,8 @@ class WebTabPoolTest {
         assertTrue(js(current("A")!!, "document.cookie").contains("mika_test=1"))
     }
 
+    // TRIM_MEMORY_RUNNING_LOW is deprecated because newer systems do not send it, but the pool still handles it.
+    @Suppress("DEPRECATION")
     @Test
     fun trimMemoryClosesBackgroundTabsAndReloadsOnSwitch() = runBlocking<Unit> {
         val s = screen("A")
@@ -292,6 +294,8 @@ class WebTabPoolTest {
         assertTrue(runBlocking(Dispatchers.Main) { tab.view.url }!!.endsWith("host.html"))
     }
 
+    // The pool still reacts to the legacy level even though newer systems no longer send it.
+    @Suppress("DEPRECATION")
     @Test
     fun lockedTabIsLeftAloneWhileHandedOver() = runBlocking<Unit> {
         val s = screen("A")

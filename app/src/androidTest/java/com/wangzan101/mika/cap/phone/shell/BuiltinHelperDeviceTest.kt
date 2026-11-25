@@ -94,7 +94,7 @@ class BuiltinHelperDeviceTest {
             assertEquals(2, types[names.indexOf("subdir")])
             val opened = shell.openFile("$dir/sample.txt")
             assertEquals("ok", opened.getString("status"))
-            val fd = opened.getParcelable<android.os.ParcelFileDescriptor>("fd")!!
+            val fd = androidx.core.os.BundleCompat.getParcelable(opened, "fd", android.os.ParcelFileDescriptor::class.java)!!
             android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).use {
                 assertEquals("bridge", it.readBytes().toString(Charsets.UTF_8))
             }
@@ -165,7 +165,7 @@ class BuiltinHelperDeviceTest {
             hintStore.setAuthorization(dir, true, false)
             assertTrue(testHub.syncDeviceFiles())
             assertEquals("denied", shell.openFile("$dir/subdir/Report.PDF").getString("status"))
-            assertEquals("ok", shell.openFile("$dir/sample.txt").also { it.getParcelable<android.os.ParcelFileDescriptor>("fd")?.close() }.getString("status"))
+            assertEquals("ok", shell.openFile("$dir/sample.txt").also { androidx.core.os.BundleCompat.getParcelable(it, "fd", android.os.ParcelFileDescriptor::class.java)?.close() }.getString("status"))
             hintStore.setAuthorization(dir, false, false)
             assertTrue(testHub.syncDeviceFiles())
             assertEquals("denied", shell.openFile("$dir/sample.txt").getString("status"))

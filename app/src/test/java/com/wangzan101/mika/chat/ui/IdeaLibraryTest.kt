@@ -18,7 +18,7 @@ class IdeaLibraryTest {
     @Test fun otherLanguagesUseTheOverseasSetInTheirOwnLanguage() {
         assertEquals("intl" to "en", IdeaLibrary.setFor(Locale.forLanguageTag("en-US")))
         assertEquals("intl" to "ja", IdeaLibrary.setFor(Locale.JAPAN))
-        assertEquals("intl" to "id", IdeaLibrary.setFor(Locale("in", "ID")))
+        assertEquals("intl" to "id", IdeaLibrary.setFor(Locale.forLanguageTag("id-ID")))
     }
 
     @Test fun rowsAlternateScenesAndSplitEvenly() {

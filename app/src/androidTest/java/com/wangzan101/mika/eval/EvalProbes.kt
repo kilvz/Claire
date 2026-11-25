@@ -1,7 +1,6 @@
 package com.wangzan101.mika.eval
 
 import android.hardware.display.DisplayManager
-import android.util.DisplayMetrics
 import android.view.Display
 import androidx.test.platform.app.InstrumentationRegistry
 import com.wangzan101.mika.cap.phone.a11y.AndroidScreen
@@ -85,10 +84,9 @@ class EvalProbes(private val sh: (String) -> String, private val loggedIn: File)
     suspend fun screenHas(pkg: String, text: String, deepLink: String?): Boolean {
         require(PACKAGE.matches(pkg)) { "bad package: $pkg" }
         val shell = DeviceSupport.shell()
-        val metrics = DisplayMetrics().also {
-            InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(DisplayManager::class.java)
-                .getDisplay(Display.DEFAULT_DISPLAY).getRealMetrics(it)
-        }
+        val mainDisplay = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(DisplayManager::class.java)
+            .getDisplay(Display.DEFAULT_DISPLAY)
+        val metrics = DeviceSupport.realMetrics(mainDisplay)
         val display = AgentDisplay(shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(android.hardware.display.DisplayManager::class.java))
         try {
             val screen = AndroidScreen(DeviceSupport.service(), shell, DeviceSupport.ready(display))
@@ -120,9 +118,9 @@ class EvalProbes(private val sh: (String) -> String, private val loggedIn: File)
         require(WebUrlPolicy.checkNavigable(url) == null) { "bad url: $url" }
         val instr = InstrumentationRegistry.getInstrumentation()
         val ctx = instr.targetContext
-        val metrics = DisplayMetrics().also {
-            ctx.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY).getRealMetrics(it)
-        }
+        val metrics = DeviceSupport.realMetrics(
+            ctx.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY),
+        )
         lateinit var host: WebHost
         lateinit var tab: WebTab
         withContext(Dispatchers.Main) {

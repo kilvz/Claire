@@ -12,6 +12,18 @@ kotlin {
     jvmToolchain(17)
 }
 
+// Test code uses the experimental coroutine test scheduler; keep the opt-in out of production sources.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("Test")) {
+        compilerOptions.optIn.set(
+            listOf(
+                "kotlinx.coroutines.ExperimentalCoroutinesApi",
+                "kotlinx.serialization.ExperimentalSerializationApi",
+            ),
+        )
+    }
+}
+
 val traceSchemas by configurations.creating { isTransitive = false }
 val extractTraceSchemas by tasks.registering(Sync::class) {
     from({ zipTree(traceSchemas.singleFile) }) {

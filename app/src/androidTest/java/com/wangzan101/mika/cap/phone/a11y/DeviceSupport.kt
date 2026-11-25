@@ -1,7 +1,10 @@
 package com.wangzan101.mika.cap.phone.a11y
 
 import android.app.UiAutomation
+import android.graphics.Point
 import android.os.ParcelFileDescriptor
+import android.util.DisplayMetrics
+import android.view.Display
 import androidx.test.platform.app.InstrumentationRegistry
 import com.wangzan101.mika.cap.phone.display.AgentDisplay
 import com.wangzan101.mika.cap.phone.display.LazyAgentDisplay
@@ -16,6 +19,13 @@ import com.wangzan101.mika.a11y.MikaAccessibilityService
 
 /** Shared by the real-device tests: the shell connection, the accessibility service and AndroidScreen on the virtual display. Requires the built-in helper to be running (paired, wireless debugging on) and Claire's accessibility service to be enabled. */
 object DeviceSupport {
+    /** Real display metrics, used by probes that create a virtual display at the main screen's size. */
+    @Suppress("DEPRECATION")
+    fun realMetrics(display: Display?): DisplayMetrics = DisplayMetrics().also { display?.getRealMetrics(it) }
+
+    @Suppress("DEPRECATION")
+    fun realSize(display: Display?): Point = Point().also { display?.getRealSize(it) }
+
     const val SETTINGS = "com.android.settings"
     const val TEST_PACKAGE = "com.wangzan101.mika.test"
     private var connection: ShellBinding? = null

@@ -189,6 +189,19 @@ dependencies {
     androidTestImplementation(libs.junit)
 }
 
+// The coroutine test helpers (runTest schedulers, advanceUntilIdle) and a few serialization knobs are still marked
+// experimental; opt in only for the test compilations so production code keeps the stricter check.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("UnitTest") || name.contains("AndroidTest")) {
+        compilerOptions.optIn.set(
+            listOf(
+                "kotlinx.coroutines.ExperimentalCoroutinesApi",
+                "kotlinx.serialization.ExperimentalSerializationApi",
+            ),
+        )
+    }
+}
+
 // LicensesTest reads the repo's licenses/THIRD_PARTY_NOTICES.md: make it part of the test up-to-date check
 tasks.withType<Test>().configureEach {
     inputs.file(rootProject.file("licenses/THIRD_PARTY_NOTICES.md")).withPropertyName("thirdPartyNotices")

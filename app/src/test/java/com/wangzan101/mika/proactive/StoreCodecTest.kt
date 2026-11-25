@@ -36,7 +36,7 @@ class StoreCodecTest {
     )
 
     private fun seed(name: String, text: String = "encrypted bytes that are perfectly fine") =
-        File(dir, name).apply { parentFile.mkdirs(); writeText(text) }
+        File(dir, name).apply { absoluteFile.parentFile?.mkdirs(); writeText(text) }
 
     // Errors from obtaining the key or decrypting — apart from "authentication failed" and "too short to be ciphertext" — do not prove the ciphertext is corrupt: they propagate as usual and the file is left as it was
     @Test fun troubleWhileDecryptingLeavesEveryStoreAlone() {

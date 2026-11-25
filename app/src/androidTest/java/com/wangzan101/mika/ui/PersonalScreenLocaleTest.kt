@@ -43,7 +43,7 @@ class PersonalScreenLocaleTest {
 
     @Test fun profileTabsShowFullLabelsAndRemainSelectableAtLargeFontScale() {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
-        val locale = mutableStateOf(Locale("pt"))
+        val locale = mutableStateOf(Locale.forLanguageTag("pt"))
         val selected = mutableStateOf(PersonalProfileTab.Tasks)
         compose.setContent {
             val configuration = Configuration(base.resources.configuration).apply { setLocale(locale.value) }
@@ -62,8 +62,8 @@ class PersonalScreenLocaleTest {
             }
         }
         for ((language, labels) in listOf(
-            Locale("pt") to listOf("Tarefas", "Memória", "Habilidades"),
-            Locale("es") to listOf("Tareas", "Memoria", "Habilidades"),
+            Locale.forLanguageTag("pt") to listOf("Tarefas", "Memória", "Habilidades"),
+            Locale.forLanguageTag("es") to listOf("Tareas", "Memoria", "Habilidades"),
         )) {
             compose.runOnIdle { locale.value = language }
             labels.forEachIndexed { index, label ->

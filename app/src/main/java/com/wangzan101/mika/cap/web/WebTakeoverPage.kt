@@ -156,7 +156,7 @@ open class WebTakeoverPage : Activity() {
         if (s.loginMode) s.onAction(WebHandover.Action.Cancel) else s.onAction(WebHandover.Action.PutAside)
     }
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onBackPressed() {
         // Only reached before API 33; newer systems route back through the callback registered in onCreate.
         back()

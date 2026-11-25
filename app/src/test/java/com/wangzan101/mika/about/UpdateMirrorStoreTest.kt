@@ -123,7 +123,7 @@ class UpdateMirrorStoreTest {
     }
 
     @Test fun corruptFileIsNotOverwrittenUntilUserResets() {
-        file().parentFile.mkdirs()
+        file().absoluteFile.parentFile?.mkdirs()
         file().writeText("{not json")
         val store = loaded(store())
         assertTrue(store.unreadable.value)

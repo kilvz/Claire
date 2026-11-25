@@ -10,6 +10,7 @@ import org.junit.Test
 
 /** The week (level 3) and month (level 4) digest parts of [DigestPool]: which span is due, the input, recording, deletion propagating upward, and how long each is kept. */
 class DigestSpanTest {
+    private val lenientJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val utc = ZoneOffset.UTC
     private val dayMs = LearnTuning.DAY_MS
     private var n = 0
@@ -296,7 +297,7 @@ class DigestSpanTest {
     // Saved by an older version (no weeks or months, no days/weeks on lines): still decodes
     @Test fun olderFilesStillDecode() {
         val old = """{"version":1,"notes":[],"days":[{"day":$mon,"madeAtMs":5,"lines":[{"text":"旧的一句","notes":["d1"],"apps":["com.chat"]}],"noteCount":1}]}"""
-        val data = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(DigestData.serializer(), old)
+        val data = lenientJson.decodeFromString(DigestData.serializer(), old)
         val p = pool(data)
         assertEquals(DigestLine("旧的一句", listOf("d1"), listOf("com.chat")), p.day(mon)!!.lines.single())
         assertTrue(p.spans(SpanKind.Week).isEmpty())

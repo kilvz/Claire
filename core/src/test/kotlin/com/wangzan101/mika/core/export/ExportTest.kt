@@ -85,7 +85,7 @@ class ExportTest {
     }
 
     @Test fun markdownContainsStructuredContent() = kotlinx.coroutines.runBlocking {
-        val root = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
         try {
             MarkdownExportBackend(labels).render(doc(ExportContent(includeToolSteps = true, includeModel = true)), ExportPresentation(), Reader, DirectoryExportSink(root)) {}
             val text = File(root, "document.md").readText()
@@ -104,7 +104,7 @@ class ExportTest {
     }
 
     @Test fun jsonContainsStableBlockTypes() = kotlinx.coroutines.runBlocking {
-        val root = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
         try {
             JsonExportBackend().render(doc(ExportContent(includeToolSteps = true)), ExportPresentation(), Reader, DirectoryExportSink(root)) {}
             val rootJson = Json.parseToJsonElement(File(root, "document.json").readText()).jsonObject
@@ -175,7 +175,7 @@ class ExportTest {
     }
 
     @Test fun unicodeAssetNamesFitFilesystemLimitsAndKeepTheirExtension() {
-        val root = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
         try {
             val name = ExportNames.safeFileName("界".repeat(120) + ".txt")
             File(root, name).writeText("asset")
@@ -205,8 +205,8 @@ class ExportTest {
     }
 
     @Test fun packageWritesManifestAndZip() {
-        val root = createTempDir()
-        val out = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
+        val out = kotlin.io.path.createTempDirectory().toFile()
         try {
             File(root, "assets").mkdirs()
             File(root, "document.md").writeText("# hi")
@@ -236,8 +236,8 @@ class ExportTest {
     }
 
     @Test fun singleFilePackageCopiesTheOnlyDocument() {
-        val root = createTempDir()
-        val out = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
+        val out = kotlin.io.path.createTempDirectory().toFile()
         try {
             File(root, "document.md").writeText("# hi")
             assertTrue(ExportPackage.copySingle(root, File(out, "x.md")))
@@ -261,7 +261,7 @@ class ExportTest {
     }
 
     @Test fun markdownEscapesUntrustedFields() = kotlinx.coroutines.runBlocking {
-        val root = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
         try {
             val asset = ExportAsset(
                 "a", AssetKind.Image, "x](javascript:alert(1)).jpg", "image/jpeg", 1,
@@ -350,7 +350,7 @@ class ExportTest {
         val document = ExportDocumentBuilder(source, labels, "test", "en") { 1L }.build(
             "c1", "t", ExportSelection("c1"), ExportContent(),
         )
-        val root = createTempDir()
+        val root = kotlin.io.path.createTempDirectory().toFile()
         try {
             MarkdownExportBackend(labels).render(document, ExportPresentation(), Reader, DirectoryExportSink(root)) {}
             val text = File(root, "document.md").readText()

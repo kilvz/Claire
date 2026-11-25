@@ -17,7 +17,7 @@ class PluginSampleTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private val examples: File by lazy {
-        var dir = File(System.getProperty("user.dir")).canonicalFile
+        var dir = File(requireNotNull(System.getProperty("user.dir"))).canonicalFile
         while (dir.parentFile != null && !File(dir, "plugins/examples").isDirectory) dir = dir.parentFile!!
         check(File(dir, "plugins/examples").isDirectory) { "plugins/examples not found from ${System.getProperty("user.dir")}" }
         File(dir, "plugins/examples")

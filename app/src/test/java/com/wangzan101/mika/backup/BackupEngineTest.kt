@@ -36,7 +36,7 @@ class BackupEngineTest {
         BackupEngine(filesDir, prefsDir, { cipher }, appVersionName = "0.1.43", appVersionCode = 48)
 
     private fun File.write(rel: String, bytes: ByteArray): File =
-        File(this, rel).also { it.parentFile.mkdirs(); it.writeBytes(bytes) }
+        File(this, rel).also { it.absoluteFile.parentFile?.mkdirs(); it.writeBytes(bytes) }
 
     private fun File.write(rel: String, text: String): File = write(rel, text.toByteArray(Charsets.UTF_8))
 
@@ -201,7 +201,7 @@ class BackupEngineTest {
         val srcFiles = tmp.newFolder("src-files")
         val srcPrefs = tmp.newFolder("src-prefs")
         buildSource(srcFiles, srcPrefs)
-        val huge = File(srcFiles, "conversations/huge.json").also { it.parentFile.mkdirs() }
+        val huge = File(srcFiles, "conversations/huge.json").also { it.absoluteFile.parentFile?.mkdirs() }
         RandomAccessFile(huge, "rw").use { it.setLength(BackupEngine.MAX_BACKUP_BYTES + 1) }
 
         val out = ByteArrayOutputStream()

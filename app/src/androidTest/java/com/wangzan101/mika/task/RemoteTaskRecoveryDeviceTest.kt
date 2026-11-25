@@ -67,7 +67,7 @@ class RemoteTaskRecoveryDeviceTest {
                 db.execSQL("""CREATE TABLE receipts (id TEXT PRIMARY KEY NOT NULL, conversation TEXT, goal TEXT,
                     started INTEGER NOT NULL, new_chat INTEGER NOT NULL, claimed INTEGER NOT NULL DEFAULT 0, result TEXT, steers TEXT)""")
                 db.execSQL("INSERT INTO receipts(id,conversation,goal,started,new_chat,result) VALUES(?,?,?,?,?,?)",
-                    arrayOf("legacy", "mcp-old", "old goal", now, 1, """{"type":"cancelled"}"""))
+                    arrayOf<Any?>("legacy", "mcp-old", "old goal", now, 1, """{"type":"cancelled"}"""))
                 db.version = 1
             }
             RemoteTaskReceipts(app, name).use { store ->

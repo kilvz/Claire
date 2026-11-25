@@ -26,7 +26,7 @@ class NoticeAllowStoreTest {
     // An unreadable allow-list counts as empty (better to read too little), but it must be able to say "this was unreadable, not that the user selected nothing": nothing else may delete based on it
     @Test fun unreadableFileReadsAsEmptyAndSaysSo() {
         val f = tempFile()
-        f.parentFile.mkdirs()
+        f.absoluteFile.parentFile?.mkdirs()
         assertEquals(true, NoticeAllowStore(f).readable)
         for (bad in listOf("{not json", "", """{"version":2,"allowed":["a"]}""")) {
             f.writeText(bad)

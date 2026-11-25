@@ -30,6 +30,7 @@ object ShellClipboardProbe {
     const val PASSED = "shell-clipboard-passed"
 
     @JvmStatic
+    @Suppress("DEPRECATION") // A standalone app_process has no main looper; this test creates one itself.
     fun main(args: Array<String>) {
         try {
             check(Process.myUid() == ShellContext.SHELL_UID)

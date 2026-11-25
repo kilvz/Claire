@@ -71,7 +71,7 @@ class InlineScreenControlDeviceTest {
         try { compose.waitUntil(15_000) {
             val area = compose.onNodeWithTag("operation-screen-viewport").fetchSemanticsNode().boundsInRoot
             val display = ctx.getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(run.displayId.value)
-            val size = android.graphics.Point().also { display?.getRealSize(it) }
+            val size = DeviceSupport.realSize(display)
             val frame = run.frames.value
             lastState = "viewport=${area.width}x${area.height} display=${size.x}x${size.y} rotation=${display?.rotation} frame=${frame?.width}x${frame?.height} control=${run.manualControl.state.value}"
             frame != null && size.x > 0 && size.y > 0 &&
@@ -123,12 +123,9 @@ class InlineScreenControlDeviceTest {
             }.firstOrNull { it.isVisibleToUser }?.let { node -> Rect().also(node::getBoundsInScreen) }
         }
         assertNotNull("test search field not found on virtual display", search)
-        val size = android.graphics.Point().also {
-            ctx.getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(run.displayId.value).getRealSize(it)
-        }
-        val displayMetrics = android.util.DisplayMetrics().also {
-            ctx.getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(run.displayId.value).getRealMetrics(it)
-        }
+        val display = ctx.getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(run.displayId.value)
+        val size = DeviceSupport.realSize(display)
+        val displayMetrics = DeviceSupport.realMetrics(display)
         assertTrue("phone app must render a compact layout", size.x / displayMetrics.density < 600f)
         val x = search!!.centerX() * frame.width / size.x
         val y = search.centerY() * frame.height / size.y

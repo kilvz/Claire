@@ -26,6 +26,7 @@ import java.io.IOException
 
 class ConversationStoreTest {
     @get:Rule val tmp = TemporaryFolder()
+    private val lenientJson = Json { ignoreUnknownKeys = true }
 
     // Background task ids dispatched by the front desk are stored with that round and read back unchanged; older records without this field read as empty
     @Test fun turnTasksRoundTrip() {
@@ -182,7 +183,7 @@ class ConversationStoreTest {
         val dir = tmp.newFolder("compat")
         ConversationStore(dir).append("c", Turn("问题", "答案", "succeeded", atMs = 123L))
         val raw = java.io.File(dir, "c.json").readText()
-        val old = Json { ignoreUnknownKeys = true }.decodeFromString<List<LegacyTurn>>(raw)
+        val old = lenientJson.decodeFromString<List<LegacyTurn>>(raw)
         assertEquals(listOf(LegacyTurn("问题", "答案", "succeeded")), old)
     }
 
