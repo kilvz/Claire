@@ -44,6 +44,7 @@ object HelperProcess {
     private const val TAG = "MikaHelper"
 
     @JvmStatic
+    @Suppress("DEPRECATION") // A standalone app_process has no main looper; this is the only way to create one.
     fun main(args: Array<String>) {
         if (args.size < 3) {
             Log.e(TAG, "usage: HelperMain <package> <uid> <cert-sha256> (nonce on stdin)")
@@ -59,7 +60,8 @@ object HelperProcess {
             Log.e(TAG, "no nonce on stdin")
             exitProcess(2)
         }
-        // ShellContext needs a main-thread Looper when it builds its own ActivityThread
+        // ShellContext needs a main-thread Looper when it builds its own ActivityThread. This is a standalone
+        // app_process, so the Android environment did not create one; the deprecation only applies to apps.
         Looper.prepareMainLooper()
         val service = ShellService(allowedUid = appUid)
         // Restore sound first for apps that were killed while muted last time and never got restored

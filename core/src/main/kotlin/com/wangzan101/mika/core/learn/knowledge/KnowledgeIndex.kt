@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.learn.knowledge
 
 import com.wangzan101.mika.core.learn.skills.PersonalSkills
 import com.wangzan101.mika.core.tool.LinkPolicy
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -54,6 +55,7 @@ object KnowledgeIndex {
     fun dirOf(kind: String) = when (kind) { APP -> "knowledge/apps"; SITE -> "knowledge/sites"; else -> "skills" }
     fun fileOf(kind: String) = when (kind) { APP -> "APP.md"; SITE -> "SITE.md"; else -> "SKILL.md" }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false; prettyPrint = true; prettyPrintIndent = " " }
     private val DOMAIN = Regex("[a-z0-9]+(?:-[a-z0-9]+)*(?:\\.[a-z0-9]+(?:-[a-z0-9]+)*)+")
     private val REF = Regex("references/[A-Za-z0-9_./-]*[A-Za-z0-9_/-]")

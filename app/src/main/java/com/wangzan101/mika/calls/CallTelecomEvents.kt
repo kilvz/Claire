@@ -18,7 +18,7 @@ internal fun CallRuntime.onCallAdded(service: MikaInCallService, call: Call) {
 
 internal fun CallRuntime.onCallChanged(service: MikaInCallService, call: Call) {
     val t = tracked[call]?.takeIf { it.service === service } ?: return
-    if (call.state == Call.STATE_DISCONNECTED) t.taskBinding.end()
+    if (call.compatState == Call.STATE_DISCONNECTED) t.taskBinding.end()
     if (t.phase == CallPhase.RINGING && t.initialRingPolicy == null) {
         t.initialRingPolicy = settings.state.value
         t.ringObservedAt = SystemClock.elapsedRealtime()
@@ -38,7 +38,7 @@ internal fun CallRuntime.onCallChanged(service: MikaInCallService, call: Call) {
         }
         val target = active.track
         if (target === t && active.direction == CallDirection.OUTGOING &&
-            call.state in setOf(Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_ACTIVE)) {
+            call.compatState in setOf(Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_ACTIVE)) {
             if (active.lockedDialTicket != null) lockedDialDetail = "Android confirmed the locked-screen dial"
             active.result.complete(ok("Android confirmed the dial; check the live status to see whether it connects"))
         }

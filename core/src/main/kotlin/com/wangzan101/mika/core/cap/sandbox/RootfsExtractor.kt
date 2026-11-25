@@ -48,7 +48,7 @@ object RootfsExtractor {
         dest: File,
         maxBytes: Long = 1L shl 30,
         maxEntries: Int = 200_000,
-    ): ExtractReport = extractTar(GzipCompressorInputStream(BufferedInputStream(tarGz), true), dest, maxBytes, maxEntries)
+    ): ExtractReport = extractTar(GzipCompressorInputStream.builder().setInputStream(BufferedInputStream(tarGz)).setDecompressConcatenated(true).get(), dest, maxBytes, maxEntries)
 
     /** Same as [extract], but the input is an already-decompressed tar stream (the caller handles xz and the like). */
     fun extractTar(

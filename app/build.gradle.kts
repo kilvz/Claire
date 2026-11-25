@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.window)
     implementation(libs.androidx.webkit)
     implementation(libs.kotlinx.coroutines.android)

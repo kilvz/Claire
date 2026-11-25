@@ -248,8 +248,8 @@ internal fun Composer(
                         )
                         // The provider is transcribing after release: a spinner inside the field, and the transcribed text is filled in
                         if (converting) VoiceConverting(Modifier.align(Alignment.CenterStart))
-                        if (voiceGesture && vh != null) {
-                            Box(Modifier.matchParentSize().holdToTalk(vh) { field.requestFocus(); keyboard?.show() })
+                        vh?.takeIf { voiceGesture }?.let { hold ->
+                            Box(Modifier.matchParentSize().holdToTalk(hold) { field.requestFocus(); keyboard?.show() })
                         }
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

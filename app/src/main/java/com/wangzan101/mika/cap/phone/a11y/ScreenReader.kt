@@ -1,6 +1,7 @@
 package com.wangzan101.mika.cap.phone.a11y
 
 import android.graphics.Rect
+import android.os.Build
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.wangzan101.mika.core.cap.phone.WheelMath
@@ -127,7 +128,7 @@ internal object ScreenReader {
                 hintText = n.hintText?.toString()?.takeUnless { it.isBlank() },
                 resourceId = n.viewIdResourceName,
                 clickable = n.isClickable, editable = editable, scrollable = n.isScrollable,
-                checkable = n.isCheckable, checked = n.isChecked, selected = n.isSelected,
+                checkable = n.isCheckable, checked = n.isCheckedCompat(), selected = n.isSelected,
                 enabled = n.isEnabled, focused = n.isFocused, secret = n.isPassword,
                 wheel = isWheel(n),
                 children = children,
@@ -237,17 +238,21 @@ internal object ScreenReader {
     }
 
     /** Widget states used to judge the effect of an action (the same set that [hash] looks at). */
-    @Suppress("DEPRECATION")
     private fun uiStates(n: AccessibilityNodeInfo): Set<String> = buildSet {
-        if (n.isChecked) add(UiStates.CHECKED)
+        if (n.isCheckedCompat()) add(UiStates.CHECKED)
         if (n.isSelected) add(UiStates.SELECTED)
         if (!n.isEnabled) add(UiStates.DISABLED)
     }
 
-    // isChecked has been superseded by the tri-state checked since API 36; minSdk 30 still needs it
-    @Suppress("DEPRECATION")
+    /** isChecked is deprecated in API 36 in favour of the tri-state checked; only a fully checked node matches the old boolean. */
+    private fun AccessibilityNodeInfo.isCheckedCompat(): Boolean {
+        if (Build.VERSION.SDK_INT >= 36) return checked == AccessibilityNodeInfo.CHECKED_STATE_TRUE
+        @Suppress("DEPRECATION")
+        return isChecked
+    }
+
     private fun states(n: AccessibilityNodeInfo) =
-        "${n.isChecked}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
+        "${n.isCheckedCompat()}${n.isSelected}${n.isEnabled}${n.isFocused}${n.textSelectionStart}:${n.textSelectionEnd}"
 
     /** The node's own name: its text (hint text counts too; input fields use it to state their purpose), falling back to the content description. */
     fun ownLabel(n: AccessibilityNodeInfo): String? {

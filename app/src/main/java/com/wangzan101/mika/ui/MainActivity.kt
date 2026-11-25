@@ -688,10 +688,10 @@ private fun MikaRoot(
     val sidebarPage = nav.current in setOf(Route.Chat, Route.Personal, Route.Plans, Route.Memory, Route.Browser)
     // When the call page is not on top, an "In call · Back to call" bar at the top; the page underneath starts below it
     val liveCall = voiceCall.liveCall()
-    val callBar = liveCall != null && nav.current != Route.VoiceCall
+    val callBar = liveCall?.takeIf { nav.current != Route.VoiceCall }
     Column(Modifier.fillMaxSize()) {
-    if (callBar && liveCall != null) VoiceCallBar(liveCall) { nav.bringToTop(Route.VoiceCall) }
-    Box(Modifier.weight(1f).fillMaxWidth().then(if (callBar) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
+    callBar?.let { VoiceCallBar(it) { nav.bringToTop(Route.VoiceCall) } }
+    Box(Modifier.weight(1f).fillMaxWidth().then(if (callBar != null) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
     AdaptiveWindow(navigation = sidebarPage) {
         val page: @Composable (() -> Unit) -> Unit = { openDrawer ->
     // Global page switches get the slide-in push transition; inside a page always use route rather than nav.current, because the old page is still rendering during the transition and reading live state would make it change on the spot

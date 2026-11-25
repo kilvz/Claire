@@ -24,6 +24,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -135,6 +136,7 @@ class VoiceCatalogViewModel(
      */
     fun probeAsync(ref: VoiceModelRef): CompletableDeferred<ProbeResult> = startProbe(ref).first
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun startProbe(ref: VoiceModelRef): Pair<CompletableDeferred<ProbeResult>, String> {
         val fingerprint = probe.connection(ref)
         setProbe(fingerprint, VoiceProbeUi.Running)

@@ -17,8 +17,9 @@ class FileProfileBackend(private val file: File, private val cipher: KeyCipher) 
         if (!file.exists()) emptyList() else Json.decodeFromString(codec, cipher.decrypt(file.readBytes()).toString(Charsets.UTF_8))
 
     @Synchronized override fun write(entries: List<ProfileEntry>) {
-        file.parentFile.mkdirs()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
+        val parent = requireNotNull(file.absoluteFile.parentFile) { "Profile file has no parent directory: $file" }
+        parent.mkdirs()
+        val tmp = File(parent, "${file.name}.tmp")
         tmp.writeBytes(cipher.encrypt(Json.encodeToString(codec, entries).toByteArray(Charsets.UTF_8)))
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }

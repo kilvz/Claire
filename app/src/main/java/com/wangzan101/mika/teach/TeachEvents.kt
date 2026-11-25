@@ -1,5 +1,6 @@
 package com.wangzan101.mika.teach
 
+import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import com.wangzan101.mika.core.learn.teach.TeachEventKind
 import com.wangzan101.mika.core.learn.teach.TeachObservation
@@ -36,11 +37,18 @@ object TeachEvents {
                 displayId = displayId,
             )
         } finally {
-            try {
-                source?.recycle()
-            } catch (e: Exception) {
-                // The node has already been recycled
+            // Object pooling was removed in API 33, where recycle() is a no-op; older systems still need it.
+            if (Build.VERSION.SDK_INT < 33) {
+                try {
+                    source?.recycleCompat()
+                } catch (e: Exception) {
+                    // The node has already been recycled
+                }
             }
         }
     }
+
+    /** Object pooling was removed in API 33, but older systems still need explicit recycling. */
+    @Suppress("DEPRECATION")
+    private fun AccessibilityNodeInfo.recycleCompat() = recycle()
 }

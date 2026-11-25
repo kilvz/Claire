@@ -120,7 +120,7 @@ class SystemStatusMonitor(context: Context, private val shell: BuiltinShellContr
     private fun restrictedSettings(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
         val mode = runCatching {
-            app.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(OP_RESTRICTED_SETTINGS, Process.myUid(), app.packageName)
+            app.getSystemService(AppOpsManager::class.java).checkOpNoThrow(OP_RESTRICTED_SETTINGS, Process.myUid(), app.packageName)
         }.getOrNull()
         return mode != AppOpsManager.MODE_ALLOWED
     }

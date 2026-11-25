@@ -99,7 +99,7 @@ class AppKnowledgeFiles(dir: File) : AppKnowledgeDraftStore {
         if (d.exists()) {
             val revision = UUID.randomUUID().toString()
             d.copyRecursively(File(archive, revision), overwrite = true)
-            journal.parentFile.mkdirs()
+            journal.absoluteFile.parentFile?.mkdirs()
             journal.appendText(revision + " " + row.id + " " + row.stage + " " + System.currentTimeMillis() + "\n")
         }
         d.mkdirs()

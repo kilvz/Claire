@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -19,6 +20,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.window.OnBackInvokedDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -76,6 +78,10 @@ open class WebTakeoverPage : Activity() {
         // The takeover ended elsewhere (notification button, timeout, cancel): close this UI; WebHandover puts the view back
         scope.launch {
             WebHandover.session.collect { now -> if (now !== s) leave() }
+        }
+        // Android 13+ delivers back through the predictive-back dispatcher instead of onBackPressed
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { back() }
         }
     }
 
@@ -140,11 +146,20 @@ open class WebTakeoverPage : Activity() {
     }
 
     /** System back key: task takeover = leave it for now; settings-page login = close. */
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        val s = session ?: return super.onBackPressed()
+    private fun back() {
+        val s = session
+        if (s == null) {
+            finish()
+            return
+        }
         record()
         if (s.loginMode) s.onAction(WebHandover.Action.Cancel) else s.onAction(WebHandover.Action.PutAside)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        // Only reached before API 33; newer systems route back through the callback registered in onCreate.
+        back()
     }
 
     private fun record() {

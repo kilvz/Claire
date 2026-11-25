@@ -86,7 +86,9 @@ class WebTabPool(
     private val memory = object : ComponentCallbacks2 {
         override fun onTrimMemory(level: Int) = this@WebTabPool.onTrimMemory(level)
         override fun onConfigurationChanged(newConfig: Configuration) {}
+        // Still delivered on systems before API 34; the constant is deprecated because newer systems never send it.
         @Deprecated("Deprecated in Java")
+        @Suppress("DEPRECATION")
         override fun onLowMemory() = this@WebTabPool.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
     }
 

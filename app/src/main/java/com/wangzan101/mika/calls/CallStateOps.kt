@@ -188,10 +188,18 @@ internal suspend fun CallRuntime.isUnsavedNumber(number: String): Boolean = with
     }
 }
 
-internal fun CallRuntime.liveCalls() = tracked.values.filter { it.call.state != Call.STATE_DISCONNECTED }
+internal fun CallRuntime.liveCalls() = tracked.values.filter { it.call.compatState != Call.STATE_DISCONNECTED }
 
-internal fun CallRuntime.confirmedEnded(t: Tracked): Boolean = t.call.state == Call.STATE_DISCONNECTED ||
+internal fun CallRuntime.confirmedEnded(t: Tracked): Boolean = t.call.compatState == Call.STATE_DISCONNECTED ||
     (t.call !in tracked && managedCallPresent() == false)
+
+/** Call.state is deprecated since Android 12; Details carries the same state from API 31 on. */
+internal val Call.compatState: Int
+    get() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) details?.let { return it.state }
+        @Suppress("DEPRECATION") val legacy = state
+        return legacy
+    }
 
 internal fun CallRuntime.managedCallPresent(): Boolean? = try {
     telecom?.isInManagedCall

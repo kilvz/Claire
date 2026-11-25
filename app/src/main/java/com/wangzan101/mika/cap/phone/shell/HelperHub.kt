@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.phone.shell
 
+import androidx.core.os.BundleCompat
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
@@ -94,7 +95,7 @@ class HelperHub internal constructor(
         val response = block(sh)
         val revision = try { directoryStore.authorizationSnapshot().revision } catch (_: Exception) { null }
         if (shell.value !== sh || revision != snapshot.revision) {
-            response.getParcelable<ParcelFileDescriptor>("fd")?.close()
+            BundleCompat.getParcelable(response, "fd", ParcelFileDescriptor::class.java)?.close()
             directoryStore.clearSync()
             Bundle().apply { putString("status", "policy_changed") }
         } else response

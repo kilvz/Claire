@@ -87,7 +87,7 @@ class RouteMatcher(
                     onDecision("skipped")
                     return null
                 }
-                if (confident && picked != null && picked.choice in routesById &&
+                if (confident && picked.choice in routesById &&
                     picked.applicable?.let { it.isFinite() && it in DecisionPolicy.MIN_APPLICABLE..1.0 } == true) {
                     onDecision("selected")
                     return routesById.getValue(picked.choice)

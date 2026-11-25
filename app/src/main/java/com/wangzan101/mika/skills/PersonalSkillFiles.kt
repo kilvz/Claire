@@ -131,7 +131,7 @@ class PersonalSkillFiles(dir: File) : PersonalSkills {
     }
 
     private fun log(revision: String, operation: String, name: String, existed: Boolean) {
-        journal.parentFile.mkdirs()
+        journal.absoluteFile.parentFile?.mkdirs()
         journal.appendText(buildJsonObject {
             put("revision", revision); put("at", System.currentTimeMillis()); put("operation", operation)
             put("name", name); put("hadPrevious", existed)

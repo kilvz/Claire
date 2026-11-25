@@ -177,6 +177,7 @@ class XaiAuth(
         /** The API base used by subscription sign-in: xAI's own Responses, not converted to another protocol. */
         const val API_BASE = "https://api.x.ai/v1"
         private const val FALLBACK_VERIFY = "https://accounts.x.ai/oauth2/device"
+        private val JSON = Json { ignoreUnknownKeys = true }
 
         /** The claims in the middle segment of the ID token; empty if it cannot be decoded. The signature is not verified: used only to display the email. */
         fun idClaims(idToken: String?): Pair<String, String> {
@@ -185,7 +186,7 @@ class XaiAuth(
                 java.util.Base64.getUrlDecoder().decode(payload.trimEnd('='))
             }.getOrNull() ?: return "" to ""
             val obj = runCatching {
-                Json { ignoreUnknownKeys = true }.parseToJsonElement(String(bytes, Charsets.UTF_8)) as? JsonObject
+                JSON.parseToJsonElement(String(bytes, Charsets.UTF_8)) as? JsonObject
             }.getOrNull() ?: return "" to ""
             val email = obj.str("email") ?: (obj["https://api.x.ai/profile"] as? JsonObject)?.str("email") ?: ""
             return obj.str("sub").orEmpty() to email

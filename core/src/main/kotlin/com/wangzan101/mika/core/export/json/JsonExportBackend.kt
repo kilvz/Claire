@@ -23,6 +23,8 @@ import kotlinx.serialization.json.put
 
 /** Machine-readable export; block types and field names stay stable English and do not change with the UI language. */
 class JsonExportBackend : ExportBackend {
+    private val prettyJson = Json { prettyPrint = true }
+
     override val descriptor = ExportDescriptor(
         id = "core-json",
         formatId = "json",
@@ -76,7 +78,7 @@ class JsonExportBackend : ExportBackend {
                 document.warnings.forEach { w -> add(buildJsonObject { put("code", w.code); put("detail", w.detail) }) }
             })
         }
-        sink.open("document.json").bufferedWriter(Charsets.UTF_8).use { it.write(Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), root)) }
+        sink.open("document.json").bufferedWriter(Charsets.UTF_8).use { it.write(prettyJson.encodeToString(JsonElement.serializer(), root)) }
     }
 
     private fun blockJson(block: ExportBlock): JsonObject = when (block) {

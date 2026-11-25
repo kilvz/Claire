@@ -4,7 +4,7 @@ import com.wangzan101.mika.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import android.view.Display
-import android.util.DisplayMetrics
+import android.view.Surface
 import android.hardware.display.DisplayManager
 import android.content.Context
 import android.graphics.Bitmap
@@ -91,9 +91,16 @@ private val ExpandedWidth = 220.dp
 
 /** Height/width ratio of the main screen in real pixels, including system bars: the virtual screen is created at the main screen's size, and until a frame exists the small window sizes itself by it. */
 private fun mainScreenAspect(context: Context): Float {
-    val m = DisplayMetrics()
-    context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)?.getRealMetrics(m)
-    return if (m.widthPixels > 0 && m.heightPixels > 0) m.heightPixels.toFloat() / m.widthPixels else DEFAULT_ASPECT
+    val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+    val mode = display?.mode
+    if (mode != null && mode.physicalWidth > 0 && mode.physicalHeight > 0) {
+        // The mode is reported in the panel's native orientation; swap it to match the current rotation.
+        val rotated = display.rotation == Surface.ROTATION_90 || display.rotation == Surface.ROTATION_270
+        val width = if (rotated) mode.physicalHeight else mode.physicalWidth
+        val height = if (rotated) mode.physicalWidth else mode.physicalHeight
+        return height.toFloat() / width
+    }
+    return DEFAULT_ASPECT
 }
 
 private const val DEFAULT_ASPECT = 2.2f

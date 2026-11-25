@@ -389,6 +389,8 @@ fun BrowserScreen(
                 properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
             ) {
                 val view = LocalView.current
+                // The compat helper is the API 29-safe way to reach the dialog window's controller.
+                @Suppress("DEPRECATION")
                 val controller = remember(view) { ViewCompat.getWindowInsetsController(view) }
                 DisposableEffect(view) {
                     controller?.hide(WindowInsetsCompat.Type.systemBars())

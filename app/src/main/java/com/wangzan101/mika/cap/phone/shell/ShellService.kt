@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.phone.shell
 
+import androidx.core.os.BundleCompat
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
 import android.app.AppOpsManager
@@ -56,6 +57,8 @@ class ShellService(
 ) : IMikaShell.Stub() {
     internal val context: Context = ShellContext.create()
     internal val displays = HashMap<Int, VirtualDisplay>()
+    /** Density last passed to each virtual display; Display's metrics getters are deprecated, so keep the value for rollback. */
+    internal val displayDpi = HashMap<Int, Int>()
     internal var orientationWatch: DisplayOrientationWatch? = null
     internal val requestedOrientations = ConcurrentHashMap<Int, Int>()
     /** Muted package → the PLAY_AUDIO mode before muting ("default" means it was not set), kept under [stateDir] so the next start resumes restoring after the process is killed. */
@@ -113,16 +116,17 @@ class ShellService(
     override fun resizeDisplay(displayId: Int, surface: Surface, width: Int, height: Int, dpi: Int): Boolean = synchronized(displays) {
         val vd = displays[displayId] ?: return@synchronized false
         if (width !in 1..4096 || height !in 1..4096 || dpi !in 72..1000 || !surface.isValid) return@synchronized false
-        val old = android.util.DisplayMetrics().also { vd.display.getRealMetrics(it) }
         val oldMode = vd.display.mode
+        val oldDpi = displayDpi[displayId] ?: dpi
         val oldSurface = vd.surface
         try {
             vd.resize(width, height, dpi)
             vd.surface = surface
             oldSurface?.release()
+            displayDpi[displayId] = dpi
             true
         } catch (e: Exception) {
-            runCatching { vd.resize(oldMode.physicalWidth, oldMode.physicalHeight, old.densityDpi); vd.surface = oldSurface }
+            runCatching { vd.resize(oldMode.physicalWidth, oldMode.physicalHeight, oldDpi); vd.surface = oldSurface }
             Log.w(TAG, "resizeDisplay failed", e)
             false
         }
@@ -151,6 +155,7 @@ class ShellService(
         awake.stop(displayId)
         // Only remove it under the lock; closing the watcher (binder) and releasing the display happen outside it
         val (vd, watch) = synchronized(displays) {
+            displayDpi.remove(displayId)
             displays.remove(displayId) to (if (displays.isEmpty()) orientationWatch.also { orientationWatch = null } else null)
         }
         watch?.close()
@@ -369,7 +374,14 @@ class ShellService(
         if (asMika == null) return START_ERROR
         // Since Android 14 the sender of a PendingIntent must explicitly allow it to start activities from the background
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            options.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+            // ALLOWED is deprecated on Android 16; ALLOW_ALWAYS keeps the background start permitted there.
+            @Suppress("DEPRECATION")
+            val startMode = if (Build.VERSION.SDK_INT >= 36) {
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+            } else {
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            }
+            options.setPendingIntentBackgroundActivityStartMode(startMode)
         }
         return try {
             asMika.send(context, 0, null, null, null, null, options.toBundle())
@@ -874,8 +886,8 @@ class ShellService(
     override fun openCallAudio(mode: Int, owner: IBinder): Bundle = asCallAudioShell {
         callAudio.open(mode, owner).also { result ->
             if (result.getBoolean("ready")) {
-                val down = result.getParcelable<ParcelFileDescriptor>("downlink")
-                val up = result.getParcelable<ParcelFileDescriptor>("uplink")
+                val down = BundleCompat.getParcelable(result, "downlink", ParcelFileDescriptor::class.java)
+                val up = BundleCompat.getParcelable(result, "uplink", ParcelFileDescriptor::class.java)
                 returnedCallPipes.set(listOfNotNull(down, up))
             }
         }
@@ -944,7 +956,10 @@ class ShellService(
         }
         awake.stopAll()
         val (all, watch) = synchronized(displays) {
-            displays.values.toList().also { displays.clear() } to orientationWatch.also { orientationWatch = null }
+            displays.values.toList().also {
+                displays.clear()
+                displayDpi.clear()
+            } to orientationWatch.also { orientationWatch = null }
         }
         watch?.close()
         all.forEach { it.release() }

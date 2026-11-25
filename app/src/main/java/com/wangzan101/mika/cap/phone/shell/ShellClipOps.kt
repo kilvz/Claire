@@ -1,5 +1,6 @@
 package com.wangzan101.mika.cap.phone.shell
 
+import androidx.core.os.BundleCompat
 import android.app.AppOpsManager
 import android.content.ClipData
 import android.content.pm.PackageManager
@@ -34,7 +35,7 @@ internal fun ShellService.canReadClipboard(): Boolean = runCatching {
     val granted = context.checkPermission(READ_CLIPBOARD_IN_BACKGROUND, Process.myPid(), Process.myUid()) ==
         PackageManager.PERMISSION_GRANTED
     val ops = context.getSystemService(AppOpsManager::class.java)
-    granted && ops.unsafeCheckOpNoThrow(OPSTR_READ_CLIPBOARD, Process.myUid(), ShellContext.SHELL_PACKAGE) ==
+    granted && ops.checkOpNoThrow(OPSTR_READ_CLIPBOARD, Process.myUid(), ShellContext.SHELL_PACKAGE) ==
         AppOpsManager.MODE_ALLOWED
 }.getOrDefault(false)
 
@@ -63,10 +64,10 @@ internal inline fun ShellService.deviceFileCall(block: (DeviceFilePolicy) -> Bun
     val response = block(snapshot.policy)
     synchronized(filePolicyLock) {
         if (filePolicy !== snapshot) {
-            response.getParcelable<ParcelFileDescriptor>("fd")?.close()
+            BundleCompat.getParcelable(response, "fd", ParcelFileDescriptor::class.java)?.close()
             Bundle().apply { putString("status", "policy_changed") }
         } else {
-            response.getParcelable<ParcelFileDescriptor>("fd")?.let { returnedCallPipes.set(listOf(it)) }
+            BundleCompat.getParcelable(response, "fd", ParcelFileDescriptor::class.java)?.let { returnedCallPipes.set(listOf(it)) }
             response
         }
     }
