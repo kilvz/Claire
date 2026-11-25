@@ -103,10 +103,14 @@ internal fun LazyListScope.exchange(
     highlightKey: String? = null,
     /** The two new-run entries after a terminal state: true continues from where the summary broke off, false restarts from the original goal. */
     recover: (Boolean) -> Unit = {},
+    /** A front-desk reply directly below the previous front-desk reply (Claire sending several in a row): smaller top-left corner and closer to the previous one. */
+    joinedAbove: Boolean = false,
+    /** The next front-desk reply directly below this one. */
+    joinedBelow: Boolean = false,
 ) {
     // A front desk turn: the user's words and the front desk's reply; it does not go through the task steps and status cards
     if (ex.deskReply != null) {
-        deskExchange(index, ex, conversationId, reduceMotion, highlightKey)
+        deskExchange(index, ex, conversationId, reduceMotion, highlightKey, joinedAbove, joinedBelow)
         return
     }
     if (ex.goal.isNotEmpty()) item("u$index") {
@@ -202,9 +206,9 @@ internal fun UserBubble(text: String, conversationId: String?, note: String? = n
             }
             if (attached.hasAttachments && attached.words.isNotEmpty()) Spacer(Modifier.size(6.dp))
             if ((!attached.hasAttachments || attached.words.isNotEmpty()) && (paged.page == null || quoted.words.isNotEmpty())) UserMessage(conversationId, attached.words.takeIf { attached.hasAttachments } ?: quoted.words, ChatThumbWidth) { words ->
-                // The user bubble is pale blue with dark text: the selection background is a slightly stronger blue, and the handles stay in the accent color (drawn outside the bubble)
+                // The user bubble is a solid light accent with dark text: the selected background uses a slightly stronger accent, and the handle stays accent-colored (drawn outside the bubble)
                 val colors = MikaTheme.colors
-                val bubble = colors.accent.copy(alpha = 0.14f)
+                val bubble = colors.userBubble
                 CompositionLocalProvider(LocalTextSelectionColors provides TextSelectionColors(colors.accent, colors.accent.copy(alpha = 0.3f))) {
                     MessageArea(
                         key, QuoteMessage.From.You, words, "selectable-user",
@@ -220,7 +224,7 @@ internal fun UserBubble(text: String, conversationId: String?, note: String? = n
 
 @Composable
 private fun UserBubbleText(words: String) {
-    Text(words, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), style = BubbleText, color = MikaTheme.colors.ink)
+    Text(words, Modifier.padding(horizontal = 13.dp, vertical = 9.dp), style = BubbleText, color = MikaTheme.colors.ink)
 }
 
 /** The message lifted by a long-press: [color] background with a shadow; when too long (at most half the screen) only the start is shown and the rest is clipped below. */
@@ -289,10 +293,29 @@ internal fun AnswerArea(key: String, answer: String, modifier: Modifier, content
 /** The spacing between several replies under the same message. */
 internal val ReplyGap = 8.dp
 
-/** The background of a Claire answer: a very faint grey with the bottom-left tail. Short ones hug the text width, long ones fill the width; front desk replies, reports, and legacy answers all use it. */
+/**
+ * Background of Claire's answer: a solid light grey in light mode, one level brighter in dark mode; no transparency or shadow. Bottom-left tail corner.
+ * Short ones hug the text width, long ones fill the width; front-desk replies, reports and old-style answers all use this one.
+ */
 @Composable
-internal fun Modifier.answerSurface(): Modifier =
-    background(MikaTheme.colors.answer, MikaShapes.AnswerBubble).padding(horizontal = 14.dp, vertical = 12.dp)
+internal fun Modifier.answerSurface(joinedAbove: Boolean = false): Modifier =
+    background(MikaTheme.colors.answer, if (joinedAbove) MikaShapes.AnswerBubbleJoined else MikaShapes.AnswerBubble)
+        .padding(horizontal = 13.dp, vertical = 10.dp)
+
+/** Distance between two replies when Claire sends several in a row. */
+internal val JoinedReplyGap = 3.dp
+
+/**
+ * Whether turn [i]'s front-desk reply directly follows the previous turn's front-desk reply: this turn has no user words, the previous reply was drawn,
+ * and no timeline or call line separates them.
+ */
+internal fun replyJoinsAbove(exchanges: List<Exchange>, i: Int, calls: CallMarks): Boolean {
+    if (i <= 0 || i > exchanges.lastIndex) return false
+    val ex = exchanges[i]
+    val prev = exchanges[i - 1]
+    if (ex.deskReply == null || ex.goal.isNotEmpty() || !deskReplyShown(ex) || !deskReplyShown(prev)) return false
+    return calls.before(i).isEmpty() && timeMarkAt(exchanges, i, calls) == null
+}
 
 // ---------- Progress ----------
 

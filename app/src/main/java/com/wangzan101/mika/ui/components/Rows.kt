@@ -115,6 +115,13 @@ enum class TileTone {
 @Composable
 fun IconTile(icon: ImageVector, tone: TileTone = TileTone.Neutral, brandTile: Color? = null) {
     val (bg, fg) = if (brandTile != null) (brandTile to Color.Unspecified) else tone.colors(MikaTheme.colors)
+    // Plain list: draw the icon directly with no backing block; the placeholder width stays the same so dividers and text still line up
+    if (brandTile == null && LocalPlainList.current) {
+        Box(Modifier.size(MikaSize.Tile), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(22.dp), tint = if (tone == TileTone.Neutral || tone == TileTone.Ok) MikaTheme.colors.ink else fg)
+        }
+        return
+    }
     Box(Modifier.size(MikaSize.Tile).background(bg, MikaShapes.Tile), contentAlignment = Alignment.Center) {
         Icon(icon, null, Modifier.size(MikaSize.TileIcon), tint = fg)
     }
@@ -150,9 +157,16 @@ fun ListRow(
     detailColor: Color = Color.Unspecified,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /** Maximum lines for the title, ellipsized beyond that (long titles in lists use 1). */
+    titleMaxLines: Int = Int.MAX_VALUE,
+    /** The note explaining what this row is: in the plain list it moves below the card as a footnote; elsewhere it stays under the title as before. */
+    note: String? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = MikaTheme.colors
+    val noteInCard = rememberCardNote(title, note)
+    val icon = if (brandTile != null) icon else rememberCardIcon(icon)
+    val sub = listOfNotNull(subtitle?.takeIf { it.isNotEmpty() }, note?.takeIf { !noteInCard && it.isNotEmpty() }).joinToString("\n").ifEmpty { null }
     Row(
         modifier.fillMaxWidth()
             .topHairline(first, if (icon != null) TextStartWithIcon else TextStartPlain, c.hair)
@@ -164,8 +178,9 @@ fun ListRow(
     ) {
         if (icon != null) IconTile(icon, tone, brandTile)
         Column(Modifier.weight(1f).padding(vertical = 11.dp)) {
-            Text(title, style = MikaType.Body, color = titleColor.takeOrElse { c.ink })
-            if (!subtitle.isNullOrEmpty()) Text(subtitle, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
+            Text(title, style = MikaType.Body, color = titleColor.takeOrElse { c.ink },
+                maxLines = titleMaxLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            if (!sub.isNullOrEmpty()) Text(sub, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
             if (!detail.isNullOrEmpty()) Text(detail, Modifier.padding(top = 2.dp), style = MikaType.Hint, color = detailColor.takeOrElse { c.ink3 })
         }
         trailing()
@@ -183,7 +198,8 @@ fun RowValue(text: String, tone: ValueTone = ValueTone.Plain) {
         fontWeight = if (tone == ValueTone.Link) FontWeight.Medium else FontWeight.Normal,
         color = when (tone) {
             ValueTone.Plain -> c.ink3
-            ValueTone.Ok -> c.ok
+            // In the plain list, "normal" is not colored; only things that need you get a color
+            ValueTone.Ok -> if (LocalPlainList.current) c.ink3 else c.ok
             ValueTone.Warn -> c.warn
             ValueTone.Bad -> c.bad
             ValueTone.Link -> c.accent
@@ -211,9 +227,13 @@ fun RadioRow(
     /** Extra content under the title (e.g. small capability tags). */
     below: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /** The note for this item: in the plain list it is shown below the card only when selected; elsewhere it is shown under the title. */
+    note: String? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = MikaTheme.colors
+    val noteInCard = rememberCardNote(title, note, selected)
+    val sub = listOfNotNull(subtitle?.takeIf { it.isNotEmpty() }, note?.takeIf { !noteInCard && it.isNotEmpty() }).joinToString("\n").ifEmpty { null }
     Row(
         modifier.fillMaxWidth()
             .topHairline(first, 50.dp, c.hair)
@@ -226,7 +246,7 @@ fun RadioRow(
         RadioMark(selected, enabled)
         Column(Modifier.weight(1f).padding(vertical = 9.dp)) {
             Text(title, style = titleStyle, color = if (enabled) c.ink else c.ink3)
-            if (!subtitle.isNullOrEmpty()) Text(subtitle, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
+            if (!sub.isNullOrEmpty()) Text(sub, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
             if (below != null) Box(Modifier.padding(top = 4.dp)) { below() }
         }
         trailing()
@@ -237,8 +257,10 @@ fun RadioRow(
 private fun RadioMark(selected: Boolean, enabled: Boolean = true) {
     val c = MikaTheme.colors
     if (selected && enabled) {
-        Box(Modifier.size(22.dp).background(c.accent, CircleShape), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(10.dp).background(c.onAccent, CircleShape))
+        // In the plain list, selection uses the body color (matching the black switch); elsewhere it uses the accent color
+        val fill = if (LocalPlainList.current) c.ink else c.accent
+        Box(Modifier.size(22.dp).background(fill, CircleShape), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(10.dp).background(if (LocalPlainList.current) c.surface else c.onAccent, CircleShape))
         }
     } else {
         Box(Modifier.size(22.dp).border(1.6.dp, c.hair, CircleShape))

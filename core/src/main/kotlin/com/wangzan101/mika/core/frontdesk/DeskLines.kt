@@ -6,7 +6,13 @@ const val DESK_LINE_MAX_CHARS = 40
 /** Limit on task result text handed to the front desk: protocol frames cap tool results sent back to the realtime model, leaving room for the outer wrapper. */
 const val DESK_RESULT_MAX_CHARS = 1_800
 
-/** Coordinate forms: the [x,y] and (x,y) common in screen trees and tap positions, plus their full-width variants; bounds are two adjacent pairs, stripped pair by pair. */
+/**
+ * When seeding history, the latest thing Claire said (usually the full result just written into the conversation) carries at most this many characters: the user is looking at the full text and asking "what is item 8"
+ * The replying model must see it too, or it looks like Claire forgot what it just said. Earlier ones are clipped per [DESK_RESULT_MAX_CHARS].
+ */
+const val DESK_SEED_LATEST_MAX_CHARS = 12_000
+
+/** Coordinate shapes: [x,y], (x,y) and their full-width variants common in UI trees and tap positions; bounds are two adjacent pairs, stripped pair by pair. */
 private val COORDINATE_PATTERN = Regex("""[\[\(（【]\s*\d+\s*[,，、]\s*\d+\s*[\]\)）】]""")
 
 /**

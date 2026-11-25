@@ -72,8 +72,11 @@ fun MikaSwitch(
     val c = MikaTheme.colors
     val reduce = MikaTheme.reduceMotion
     val position by animateFloatAsState(if (checked) 1f else 0f, MikaMotion.switch(reduce), label = "switch")
-    val track by animateColorAsState(if (checked) c.accent else c.greySoft, MikaMotion.switch(reduce), label = "switch-track")
-    val thumb = c.thumb
+    // In the plain list, on is black (reversed in dark mode: light background, dark knob), not the accent color
+    val plain = LocalPlainList.current
+    val on = if (plain) c.ink else c.accent
+    val track by animateColorAsState(if (checked) on else c.greySoft, MikaMotion.switch(reduce), label = "switch-track")
+    val thumb = if (plain && c.isDark && checked) c.surface else c.thumb
     val ring = c.floatShadow.copy(alpha = 0.12f)
     Box(
         modifier
@@ -104,6 +107,11 @@ enum class PillTone { Ok, Warn, Neutral, Accent }
 @Composable
 fun StatusPill(text: String, tone: PillTone = PillTone.Neutral, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
+    // Plain list: status is written in grey, and only things that need you use orange
+    if (LocalPlainList.current) {
+        Text(text, modifier, style = MikaType.Value, color = if (tone == PillTone.Warn) c.warn else c.ink3, maxLines = 1)
+        return
+    }
     val (bg, fg) = when (tone) {
         PillTone.Ok -> c.okSoft to c.ok
         PillTone.Warn -> c.warnSoft to c.warn

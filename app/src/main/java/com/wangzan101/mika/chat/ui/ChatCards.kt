@@ -52,6 +52,53 @@ import kotlinx.coroutines.launch
 import com.wangzan101.mika.settings.ui.StatusCopy
 import com.wangzan101.mika.ui.MarkdownText
 
+/**
+ * Which task the buttons on the action cards (takeover, allow once, pause) apply to: a question in the chat page itself uses [of],
+ * while a running task (by its id) is provided by the main chat's question card, and tapping only affects that one.
+ */
+internal class NeedOps(
+    val cancel: () -> Unit, val resume: () -> Unit, val takeOver: () -> Unit, val handBack: () -> Unit,
+    val finishedMyself: () -> Unit, val skip: () -> Unit, val approve: (Int) -> Unit, val decline: (Int) -> Unit,
+) {
+    companion object {
+        fun of(vm: ChatViewModel) = NeedOps(vm::cancel, vm::resume, vm::takeOver, vm::handBack, vm::finishedMyself, vm::skip, vm::approve, vm::decline)
+    }
+}
+
+/** The three cards for takeover, allow once and pause; when [title] is given it overrides the default title (the main chat's question card carries the task's name). Other states do not use this. */
+@Composable
+internal fun NeedStatusCard(status: ExchangeStatus, stage: Takeover.Stage, ops: NeedOps, title: String? = null) {
+    when (status) {
+        is ExchangeStatus.NeedsTakeover -> {
+            val label = takeoverReasonLabel(status.reason)
+            val heading = title ?: if (label != null) stringResource(R.string.takeover_title_reason, stringResource(label)) else stringResource(R.string.takeover_title)
+            val handedOver = stage == Takeover.Stage.HandedOver
+            val text = if (handedOver) stringResource(R.string.takeover_handed_over_hint) else status.message
+            // The item, amount and address being paid for each get their own row: this card is the confirmation before paying
+            val body = listOfNotNull(text, StatusCopy.paymentLines(status.item, status.amount, status.address)).joinToString("\n")
+            NeedCard(heading, body, footer = { TextLink(stringResource(R.string.action_cancel_task), ops.cancel) }) {
+                if (handedOver) {
+                    CardButton(stringResource(R.string.action_finished_myself), onClick = ops.finishedMyself)
+                    CardButton(stringResource(R.string.action_hand_back), primary = true, onClick = ops.handBack)
+                } else {
+                    CardButton(stringResource(R.string.action_skip), onClick = ops.skip)
+                    CardButton(stringResource(R.string.action_take_over), primary = true, onClick = ops.takeOver)
+                }
+            }
+        }
+        // Only actions that spend money need your approval, and each approval covers only this one time
+        is ExchangeStatus.NeedsConfirmation -> NeedCard(status.title, status.body + "\n" + ConfirmationCopy.NOTE) {
+            CardButton(stringResource(R.string.chat_refuse), onClick = { ops.decline(status.key) })
+            CardButton(stringResource(R.string.chat_allow_once), primary = true, onClick = { ops.approve(status.key) })
+        }
+        is ExchangeStatus.Paused -> NeedCard(title ?: stringResource(if (status.resumable) R.string.chat_paused else R.string.chat_waiting_for_you), status.why) {
+            CardButton(stringResource(R.string.action_cancel_task), onClick = ops.cancel)
+            if (status.resumable) CardButton(stringResource(R.string.chat_continue), primary = true, onClick = ops.resume)
+        }
+        else -> Unit
+    }
+}
+
 @StringRes
 fun takeoverReasonLabel(reason: String): Int? = when (reason) {
     "captcha" -> R.string.takeover_reason_captcha
@@ -77,23 +124,7 @@ internal fun StatusCard(
     when (status) {
         ExchangeStatus.Working -> Unit
         ExchangeStatus.WaitingUnlock -> NeedCard(stringResource(R.string.chat_wait_unlock), stringResource(R.string.chat_unlock_body))
-        is ExchangeStatus.NeedsTakeover -> {
-            val label = takeoverReasonLabel(status.reason)
-            val title = if (label != null) stringResource(R.string.takeover_title_reason, stringResource(label)) else stringResource(R.string.takeover_title)
-            val handedOver = stage == Takeover.Stage.HandedOver
-            val text = if (handedOver) stringResource(R.string.takeover_handed_over_hint) else status.message
-            // The payment item, amount and address each go on their own line: this card is the confirmation before payment
-            val body = listOfNotNull(text, StatusCopy.paymentLines(status.item, status.amount, status.address)).joinToString("\n")
-            NeedCard(title, body, footer = { TextLink(stringResource(R.string.action_cancel_task), vm::cancel) }) {
-                if (handedOver) {
-                    CardButton(stringResource(R.string.action_finished_myself), onClick = vm::finishedMyself)
-                    CardButton(stringResource(R.string.action_hand_back), primary = true, onClick = vm::handBack)
-                } else {
-                    CardButton(stringResource(R.string.action_skip), onClick = vm::skip)
-                    CardButton(stringResource(R.string.action_take_over), primary = true, onClick = vm::takeOver)
-                }
-            }
-        }
+        is ExchangeStatus.NeedsTakeover -> NeedStatusCard(status, stage, NeedOps.of(vm))
         is ExchangeStatus.NeedsInput -> {
             val options = status.options.orEmpty()
             val note = stringResource(R.string.no_answer_note, TaskService.INPUT_TIMEOUT_MINUTES)
@@ -106,16 +137,8 @@ internal fun StatusCard(
                 if (options.isEmpty()) CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
             }
         }
-        // Only operations that spend money require your consent, and each approval covers only this one time
-        is ExchangeStatus.NeedsConfirmation -> NeedCard(status.title, status.body + "\n" + ConfirmationCopy.NOTE) {
-            CardButton(stringResource(R.string.chat_refuse), onClick = { vm.decline(status.key) })
-            CardButton(stringResource(R.string.chat_allow_once), primary = true, onClick = { vm.approve(status.key) })
-        }
-        is ExchangeStatus.Paused -> NeedCard(stringResource(if (status.resumable) R.string.chat_paused else R.string.chat_waiting_for_you), status.why) {
-            CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
-            if (status.resumable) CardButton(stringResource(R.string.chat_continue), primary = true, onClick = vm::resume)
-        }
-        // Queued waiting to start: it starts automatically when its turn comes, and tapping continue cannot jump the queue, so only cancel is offered
+        is ExchangeStatus.NeedsConfirmation, is ExchangeStatus.Paused -> NeedStatusCard(status, stage, NeedOps.of(vm))
+        // Queued and waiting to start: it starts automatically when its turn comes, and continue cannot jump the queue, so only cancel is offered
         is ExchangeStatus.Queued -> NeedCard(stringResource(R.string.chat_queued), status.why) {
             CardButton(stringResource(R.string.action_cancel_task), onClick = vm::cancel)
         }

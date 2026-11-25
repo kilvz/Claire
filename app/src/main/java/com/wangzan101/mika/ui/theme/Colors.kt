@@ -3,6 +3,7 @@ package com.wangzan101.mika.ui.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import com.wangzan101.mika.settings.ThemeAccent
 
 /**
@@ -73,6 +74,43 @@ class MikaColors(
         cardShadow = cardShadow, floatShadow = floatShadow, thumb = thumb, series = series, seriesOther = seriesOther,
         grid = grid, isDark = isDark,
     )
+
+    /**
+     * Colors for the chat page: in light mode the page is pure white, Claire's answers are solid light grey bubbles, and user bubbles are a solid light accent;
+     * in dark mode answers are one level brighter than the page. Solid colors avoid stacked transparency that looks grey and dirty.
+     */
+    fun forChat(): MikaColors {
+        val page = if (isDark) bg else surface
+        return MikaColors(
+            bg = page, surface = surface, fill = fill, ink = ink, ink2 = ink2, ink3 = ink3, inkSoft = inkSoft, hair = hair, edge = edge,
+            accent = accent, accentSoft = accentSoft, onAccent = onAccent,
+            ok = ok, okSoft = okSoft, warn = warn, warnSolid = warnSolid, warnSoft = warnSoft, bad = bad, badSoft = badSoft,
+            neutralSoft = neutralSoft, answer = if (isDark) Color(0xFF1C1C1F) else Color(0xFFF4F5F7), greySoft = greySoft,
+            glass = if (isDark) glass else Color(0xF5FFFFFF), glassEdge = glassEdge,
+            cardShadow = cardShadow, floatShadow = floatShadow, thumb = thumb, series = series, seriesOther = seriesOther,
+            grid = grid, isDark = isDark,
+        )
+    }
+
+    /**
+     * Palette for plain-list pages (settings, AI calls): pure white groups on a light grey page, with no outlines or shadows.
+     * In dark mode the page is pure black and groups are dark grey.
+     */
+    fun forPlainList(): MikaColors = MikaColors(
+        bg = if (isDark) Color(0xFF000000) else Color(0xFFF2F2F4),
+        surface = if (isDark) Color(0xFF1C1C1E) else Color(0xFFFFFFFF),
+        fill = fill, ink = ink, ink2 = ink2, ink3 = ink3, inkSoft = inkSoft, hair = hair,
+        edge = Color.Transparent,
+        accent = accent, accentSoft = accentSoft, onAccent = onAccent,
+        ok = ok, okSoft = okSoft, warn = warn, warnSolid = warnSolid, warnSoft = warnSoft, bad = bad, badSoft = badSoft,
+        neutralSoft = neutralSoft, answer = answer, greySoft = greySoft, glass = glass, glassEdge = glassEdge,
+        cardShadow = Color.Transparent, floatShadow = floatShadow, thumb = thumb, series = series, seriesOther = seriesOther,
+        grid = grid, isDark = isDark,
+    )
+
+    /** Background of the user bubble: the light accent pressed into a solid color. */
+    val userBubble: Color
+        get() = accent.copy(alpha = if (isDark) 0.24f else 0.09f).compositeOver(if (isDark) bg else surface)
 }
 
 val LightColors = MikaColors(

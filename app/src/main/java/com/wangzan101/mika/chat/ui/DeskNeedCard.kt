@@ -5,41 +5,64 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import com.wangzan101.mika.R
+import com.wangzan101.mika.core.agent.TaskState
 import com.wangzan101.mika.core.frontdesk.ActionKind
 import com.wangzan101.mika.core.frontdesk.DeskTaskView
+import com.wangzan101.mika.takeover.Takeover
 import com.wangzan101.mika.ui.components.ButtonKind
 import com.wangzan101.mika.ui.components.ButtonSize
 import com.wangzan101.mika.ui.components.MikaButton
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** One question card at the end of the conversation for each task the front desk dispatched that needs you right now ([DeskTaskView.need] not empty); see [needCardKey] for the row key. */
 internal fun LazyListScope.deskNeedRows(
     tasks: List<DeskTaskView>, highlightKey: String?, reduceMotion: Boolean,
-    answer: (taskId: String, words: String) -> Unit, open: (taskId: String) -> Unit, cancel: (taskId: String) -> Unit,
+    answer: (taskId: String, words: String) -> Unit, cancel: (taskId: String) -> Unit, vm: ChatViewModel,
 ) {
     tasks.filter { it.need != null }.forEach { view ->
         val key = needCardKey(view.taskId)
         item(key) {
             JumpHighlight(highlightKey == key, reduceMotion) {
-                DeskNeedCard(view, key, { answer(view.taskId, it) }, { open(view.taskId) }, { cancel(view.taskId) })
+                DeskNeedCard(view, key, { answer(view.taskId, it) }, { cancel(view.taskId) }, vm)
             }
         }
     }
 }
 
 /**
- * A task is waiting on you: with options it says "Choose" (tapping one replies straight to the job, and if none fit you type below); when it only asks without options it says "Reply";
- * when it needs you to take over in the picture it says "Take over", and when it needs your confirmation or a prior action it says "Handle", both offering "Handle it" (enter this job's conversation) and "Stop this job".
+ * A task is waiting for you: with options it is "Needs your choice" (tap one to answer that task directly, or type below if none fit); when it only asks without options it is "Needs your reply".
+ * When it needs you to take over, allow once or do something first, handle it on this card: the same button as on the chat page ([NeedStatusCard]), acting only on that task,
+ * without jumping to another page. When the task's state cannot be read for the moment, only "Stop this task" is offered.
  */
 @Composable
-private fun DeskNeedCard(view: DeskTaskView, key: String, onAnswer: (String) -> Unit, onOpen: () -> Unit, onCancel: () -> Unit) {
+private fun DeskNeedCard(view: DeskTaskView, key: String, onAnswer: (String) -> Unit, onCancel: () -> Unit, vm: ChatViewModel) {
     val need = view.need ?: return
+    if (need.action != null) {
+        val idle = remember { MutableStateFlow<TaskState>(TaskState.Idle) }
+        val none = remember { MutableStateFlow(Takeover.Stage.None) }
+        val state by remember(view.taskId) { vm.runState(view.taskId) ?: idle }.collectAsState()
+        val stage by remember(view.taskId) { vm.runStage(view.taskId) ?: none }.collectAsState()
+        val status = ChatReduce.needStatus(state, vm.appLabel)
+        if (status != null) {
+            val heading = when (status) {
+                is ExchangeStatus.NeedsConfirmation -> null
+                is ExchangeStatus.NeedsTakeover -> stringResource(R.string.desk_need_takeover, view.title)
+                else -> stringResource(R.string.desk_need_handle, view.title)
+            }
+            Box(Modifier.testTag(key)) { NeedStatusCard(status, stage, vm.deskNeedOps(view.taskId), heading) }
+            return
+        }
+    }
     val options = need.options.orEmpty()
     val asking = need.action == null
     val title = when {
@@ -71,7 +94,6 @@ private fun DeskNeedCard(view: DeskTaskView, key: String, onAnswer: (String) -> 
             }) else null,
             buttons = if (asking) null else ({
                 CardButton(stringResource(R.string.desk_need_stop), onClick = onCancel)
-                CardButton(stringResource(R.string.desk_need_go), primary = true, onClick = onOpen)
             }),
         )
     }

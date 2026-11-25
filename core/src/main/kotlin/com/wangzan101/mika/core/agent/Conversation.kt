@@ -98,9 +98,9 @@ object Conversation {
         }
         // A front-desk turn: what the front desk said itself (dispatched tasks run in their own child conversations), not a task outcome; a report turn has no user words
         if (DeskTurn.isDesk(t)) {
-            val said = t.outcome.takeIf { it.isNotBlank() }?.let { "Claire's front desk replied: ${it.clip(clip)}" }
-                ?: "Claire's front desk handed it to a background task"
-            if (t.userText.isBlank()) return "$n. Claire's front desk told the user: ${t.outcome.clip(clip)}"
+            val said = t.outcome.takeIf { it.isNotBlank() }?.let { "Claire replied: ${it.clip(clip)}" }
+                ?: "Claire started working on it"
+            if (t.userText.isBlank()) return "$n. Claire told the user: ${t.outcome.clip(clip)}"
             return "$n. The user said: ${t.userText.clip(clip)}; $said"
         }
         // The answer honestly says it failed or only partly succeeded: describe it by the outcome judged after delivery so the next turn does not treat it as done

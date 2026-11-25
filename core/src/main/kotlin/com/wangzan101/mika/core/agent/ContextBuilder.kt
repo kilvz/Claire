@@ -127,8 +127,8 @@ class ContextBuilder(
         // No clip: this block is already length-limited itself (ObservedContext.MAX_TOKENS), and it consists of pairs of untrusted markers, so truncating in the middle would lose the closing marker.
         // Task-layer items are never dropped, so the whole block goes in; the cost is that when there is a lot of memory and many earlier turns, the app knowledge after it gets at most 600 tokens less allowance
         observed?.let { pieces += Piece(ContextKind.Observed, "notifications", body = it) }
-        // The front-desk note and the task's original words together are what to do this time; the task layer goes in whole, unclipped
-        deskNote?.let { pieces += Piece(ContextKind.DeskNote, "front desk", body = it) }
+        // The front desk's explanation and the task's own words together are this piece of work, passed in whole by the task layer without clipping
+        deskNote?.let { pieces += Piece(ContextKind.DeskNote, "Claire's notes", body = it) }
         channel?.let { pieces += Piece(ContextKind.Channel, "installed apps and websites", body = it) }
         val fresh = knowledge.filter { it.body != null && injected.size < budget.maxKnowledge && injected.add(it.name to it.surface) }
         fresh.forEach { pieces += knowledgePiece(it, knowledgeNote, withLinks) }

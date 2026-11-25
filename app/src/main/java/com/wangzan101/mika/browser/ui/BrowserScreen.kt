@@ -32,7 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import com.wangzan101.mika.ui.components.MikaDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
+import com.wangzan101.mika.ui.components.MikaTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -83,7 +83,12 @@ import com.wangzan101.mika.ui.theme.MikaType
  * browser page elsewhere).
  */
 @Composable
-fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
+fun BrowserScreen(
+    browser: UserBrowser,
+    onBack: () -> Unit,
+    /** True when opened from a link elsewhere: going back past the start closes the tab and returns to the previous page instead of stopping at the browser home page. */
+    returnOnClose: Boolean = false,
+) {
     val context = LocalContext.current
     var filePickerId by rememberSaveable { mutableStateOf<String?>(null) }
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -166,7 +171,11 @@ fun BrowserScreen(browser: UserBrowser, onBack: () -> Unit) {
             browser.closeHost(place, keepPage = activity?.isChangingConfigurations == true)
         }
     }
-    BackHandler(enabled = page != null || tabs.isNotEmpty()) { browser.systemBack() }
+    BackHandler(enabled = page != null || tabs.isNotEmpty()) {
+        val leave = returnOnClose && !browser.canGoBackInTab()
+        browser.systemBack()
+        if (leave) onBack()
+    }
     BackHandler(enabled = find.active) { browser.stopFind() }
     LaunchedEffect(notice) {
         notice?.let {
@@ -471,7 +480,7 @@ private fun PageDialogBox(d: PageDialog, answer: (Boolean, String?) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (d.message.isNotBlank()) Text(d.message)
                 if (leave && d.message.isBlank()) Text(tr(R.string.browser_leave_body))
-                if (d.kind == PageDialog.PROMPT) TextField(input, { input = it }, singleLine = true)
+                if (d.kind == PageDialog.PROMPT) MikaTextField(input, { input = it }, singleLine = true)
             }
         },
         confirmButton = {

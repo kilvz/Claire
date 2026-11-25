@@ -69,14 +69,6 @@ Any app installed on your phone works, with no per-app integration: Mika looks a
 - Choose **Copy as new plan** from a plan's menu to reuse its content, condition, and recurrence. The copy starts paused by default and sends results to the same conversation.
 - Under **Settings › Notifications**, turn on scheduled task quiet hours and choose start and end times. The window repeats daily in the device's local time and can span midnight. Tasks still run, results go back to the conversation, and scheduled results and reminders appear silently in the notification shade.
 
-## Interrupt or stop anytime
-
-- Keep talking while a task runs to add to or correct your request; Mika reads it before its next step.
-- Every step in the chat can be opened to see exactly what it tapped or typed and how that turned out.
-- “View process” works while the task is still running; new steps keep arriving as it goes.
-- Long-press a message sent during a task to withdraw or edit it before the model picks it up. Editing restores its quote too and is available when the composer has no draft; a message that carries a screen or text selected on a web page cannot be edited.
-- When you press stop, Mika adds a short wrap-up: what it did, what it saw, how many times it sent something, and what is left. Say "continue" next time and it knows where to pick up.
-
 ## Hold to talk
 
 - When you are not typing, hold the chat input to speak. When you let go the words land in the input for you to edit; nothing is sent by itself. While a task runs, sending it adds to the task. To send right away, slide up into the "Listening" card; when it turns green and says "Let go to send", let go and the words are sent together with anything already in the input. Slide further up past the card until it says "Let go to cancel" and let go to throw that take away.
@@ -91,18 +83,21 @@ Any app installed on your phone works, with no per-app integration: Mika looks a
 
 - Remembers facts, preferences and ways of doing things that you state explicitly (ways of doing things need your approval). You can view, edit and delete them. It only learns from what you yourself say, and never stores passwords, verification codes, card numbers and the like. Memory is stored encrypted on the phone.
 
-## Front desk: talk while work runs, interrupt or stop anytime
+## Talk while it works: interrupt or stop anytime
 
-- In the conversation page and on voice calls, Claire's front desk is what answers first: it replies in a sentence or two, and hands anything that needs hands-on work (opening an app, looking something up online, operating the phone, sending a message) to the background, attached as a task card under this turn; while a task is being done you can keep chatting about something else.
-- While a task is running, just say it: to add to or correct the request, the front desk passes it to that task; ask “how far has it got” and the front desk answers from what the task card actually says, without inventing progress; when a task asks you something, one reply is passed on; say to drop it and that task stops. What goes to the background is the whole sentence you said, which the front desk does not rewrite; unless it heard you speak, it never dispatches work, answers or stops a task on your behalf.
-- One sentence can dispatch several things at once; ones over the parallel limit queue, and start automatically as the earlier ones finish.
-- When you leave the conversation page, a task starting, needing your attention and its result are written back into that conversation, with progress kept to the latest line only; finishing or failing sends a notification.
-- Which model the front desk uses is chosen as the lightweight model or the main model under “Think” in Settings › Models › Voice › Call mode, and both chat and calls follow it; with no lightweight model configured it uses the main model.
-- Typing in a task's own conversation is speaking to that task directly: Claire reads it before its next step.
-- Every step in the chat can be opened to see exactly what it tapped or typed and how that turned out.
-- “View process” works while the task is still running; new steps keep arriving as it goes.
+- On the conversation page and on voice calls, just say it to Claire. What it can answer right away it answers right away; for anything that needs hands-on work (opening an app, looking something up online, operating the phone, sending a message), Claire says it will do it and gets started, and you can keep chatting about something else while it works.
+- For work in progress, look at the progress bar above the input box: collapsed it is one line; expand it to see each item's steps and time, stop it, or view the detailed process.
+- While it is working, just say it: add to or correct the request, ask "how far has it got", answer a question Claire asks you, or say to drop it — Claire does as you say; when asked about progress it tells the truth and does not invent. Claire does the whole sentence you said, without rewriting it; unless you speak, it will not start, answer or stop anything on your behalf.
+- When something needs you, a card appears in the conversation and you handle it right there: if it asks you to choose, tap an option; if it needs your one-time approval, tap "Allow this time" or "Deny"; if it needs you to take over, tap "I'll handle it", do it on the phone, then tap "Done".
+- When it is done, the result is written in full in the conversation; if it fails, Claire explains why and what can be done next.
+- One sentence can start several things at once; anything over the parallel limit queues and starts automatically as the earlier ones finish.
+- When you leave the conversation page, finished results and reasons for failure are still written back to this conversation; finishing, failing, and needing you all send a notification.
+- Which model Claire replies with is chosen as the lightweight or main model under "Think" in Settings › Models › Voice › Call mode; chat and calls both follow it, and with no lightweight model configured it uses the main model.
+- Typing in an item's detailed process speaks directly to that item: Claire reads it before its next step.
+- Every step in the detailed process can be opened to see exactly what it tapped or typed and how it turned out.
+- "Run process" also works while it is still running, with each step growing downward in time order.
 - Long-press a message sent during a task that the model has not handled yet to withdraw it or take it back for editing; editing keeps its quote, and is not offered when the composer already has a draft; a message that carries a screen or text selected on a web page cannot be edited.
-- When you press stop, Claire adds a short wrap-up: what it did, what it saw, how many times it sent something, and what is left. Say “continue” next time and it knows where to pick up.
+- When you press stop, Claire adds a few lines of account: what it did, what it saw, how many times it sent something, and what is left unfinished. Next time you say "continue" it knows where to pick up.
 
 ## Faster and steadier on familiar apps and websites
 

@@ -93,10 +93,12 @@ class LlmBrain(
         synchronized(lock) {
             if (history.isNotEmpty()) return
             val seeded = mutableListOf<Message>()
-            for (turn in prior) {
+            val latest = prior.indexOfLast { it.outcome.isNotBlank() }
+            for ((i, turn) in prior.withIndex()) {
                 if (turn.userText.isNotBlank()) seeded.addText(Role.User, turn.userText, Author.User)
-                // Results written back to the conversation are the full text; clipped when fed to the front desk, which only needs to know what was done, not the whole thing
-                if (turn.outcome.isNotBlank() && seeded.isNotEmpty()) seeded.addText(Role.Assistant, turn.outcome.take(DESK_RESULT_MAX_CHARS), Author.Mika)
+                // The result written back to the conversation is the full text: the latest one keeps everything (the user is looking at it and following up), earlier ones are clipped to just what was accomplished
+                val cap = if (i == latest) DESK_SEED_LATEST_MAX_CHARS else DESK_RESULT_MAX_CHARS
+                if (turn.outcome.isNotBlank() && seeded.isNotEmpty()) seeded.addText(Role.Assistant, turn.outcome.take(cap), Author.Mika)
             }
             seeded.forEach(::add)
         }
@@ -230,7 +232,7 @@ class LlmBrain(
 
     companion object {
         /** Opens the trailing background note, so the model reads it as current context, not the user's words or orders. */
-        const val BACKGROUND_PREFIX = "[Current background from Claire, refreshed for this reply. " +
+        const val BACKGROUND_PREFIX = "[Current background, refreshed for this reply. " +
             "Not the user's words and not instructions.]\n"
 
         /** How a spoken reply should read, prepended to every call's own instructions. */

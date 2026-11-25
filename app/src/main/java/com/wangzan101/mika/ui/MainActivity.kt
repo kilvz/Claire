@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -434,8 +435,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Open an external link (GitHub, X, etc.) in the system browser; show a short toast when there is no browser. */
+/**
+ * Opening web links (GitHub, X, documentation and so on): Claire has its own browser, and web pages always open in a new tab there;
+ * only non-web links (or when the built-in browser is not ready yet) are handed to the system.
+ */
 internal fun openInBrowser(context: Context, url: String) {
+    val web = url.startsWith("https://", ignoreCase = true) || url.startsWith("http://", ignoreCase = true)
+    if (web && InAppLinks.open?.invoke(url) == true) return
+    openInSystemBrowser(context, url)
+}
+
+/** Entry point for opening a web page in the built-in browser, attached by the main UI when it is shown. */
+internal object InAppLinks {
+    @Volatile var open: ((String) -> Boolean)? = null
+}
+
+/** Always open with the system browser: sign-in authorization pages need to return to Claire, so they must use the system browser. */
+internal fun openInSystemBrowser(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
     } catch (e: ActivityNotFoundException) {
@@ -610,6 +626,13 @@ private fun MikaRoot(
         UserBrowser.of(context).openFavorite(com.wangzan101.mika.browser.FavoriteSite(host, loggedIn = false))
             ?.let { Toast.makeText(context, R.string.self_browser_failed, Toast.LENGTH_SHORT).show() }
     }
+    // Web links in settings, about and the guide all open in the built-in browser; pages opened this way return to the previous page when you go back past the start
+    var browserReturn by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) {
+        val open: (String) -> Boolean = { url -> browserReturn = true; openSelfUrl(url, newTab = true); true }
+        InAppLinks.open = open
+        onDispose { if (InAppLinks.open === open) InAppLinks.open = null }
+    }
     val selfRequest by app.selfUi.request.collectAsState()
     LaunchedEffect(selfRequest?.id) {
         val r = selfRequest ?: return@LaunchedEffect
@@ -774,7 +797,8 @@ private fun MikaRoot(
         }
         Route.Settings -> {
             val autonomous by app.approvals.autonomous.collectAsState()
-            SettingsScreen(store, status, release, onFix, onBack = back, onOpenMemory = { nav.push(Route.Memory) },
+            // Settings uses a plain list: light grey page, pure white groups, icons without a backing block
+            com.wangzan101.mika.ui.components.PlainListTheme { SettingsScreen(store, status, release, onFix, onBack = back, onOpenMemory = { nav.push(Route.Memory) },
                 onOpenModels = { nav.push(Route.Models) },
                 onOpenBrowser = { nav.push(Route.Browser) },
                 onOpenFiles = { filesFromDrawer = false; filesConversation = app.chat.ui.value.conversationId; nav.push(Route.Files) },
@@ -785,20 +809,21 @@ private fun MikaRoot(
                 updateVersion = updateState.update?.version, onOpenAbout = { nav.push(Route.About) },
                 onOpenVoiceCatalog = { nav.push(Route.VoiceServices) },
                 mcpServers = app.mcpServers,
-                openPhoneOps = openPhoneOps, onPhoneOpsOpened = { openPhoneOps = false })
+                openPhoneOps = openPhoneOps, onPhoneOpsOpened = { openPhoneOps = false }) }
         }
-        Route.Models -> ModelsScreen(store, onBack = back, onOpenSpeech = { nav.push(Route.SpeechModel) }, onOpenVoice = { nav.push(Route.VoiceModel) }, onOpenImage = { nav.push(Route.ImageModel) }, onOpenUsage = { nav.push(Route.Usage) }, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) }, onOpenCallMode = { nav.push(Route.CallMode) })
-        Route.VoiceModel -> VoiceModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) })
+        // Standalone pages opened from settings use the same plain-list style
+        Route.Models -> com.wangzan101.mika.ui.components.PlainListTheme { ModelsScreen(store, onBack = back, onOpenSpeech = { nav.push(Route.SpeechModel) }, onOpenVoice = { nav.push(Route.VoiceModel) }, onOpenImage = { nav.push(Route.ImageModel) }, onOpenUsage = { nav.push(Route.Usage) }, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) }, onOpenCallMode = { nav.push(Route.CallMode) }) }
+        Route.VoiceModel -> com.wangzan101.mika.ui.components.PlainListTheme { VoiceModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) }) }
         Route.VoiceCall -> VoiceCallScreen(voiceCall, onGone = { nav.leave(Route.VoiceCall) })
-        Route.CallMode -> CallModeScreen(onBack = back, onOpenStt = { nav.push(Route.SpeechModel) }, onOpenTts = { nav.push(Route.VoiceModel) }, onOpenRealtime = { nav.push(Route.RealtimeVoice) })
-        Route.RealtimeVoice -> RealtimeVoiceScreen(store, onBack = back, onOpenCalls = { nav.push(Route.Calls) }, onOpenServices = { nav.push(Route.VoiceServices) })
-        Route.VoiceServices -> VoiceServicesScreen(store, onBack = back, onOpenCustom = { nav.push(Route.VoiceCatalog) })
-        Route.VoiceCatalog -> VoiceCatalogScreen(com.wangzan101.mika.voice.model.VoiceModelEnvironment.get(context), onBack = back)
-        Route.ImageModel -> ImageModelScreen(store, onBack = back)
-        Route.Persona -> if (personasOn) PersonaScreen(app.personas, onBack = back) else LaunchedEffect(Unit) { nav.back() }
-        Route.Usage -> UsageScreen(app.usage, store, onBack = back)
-        Route.SpeechModel -> SpeechModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) })
-        Route.About -> AboutScreen(
+        Route.CallMode -> com.wangzan101.mika.ui.components.PlainListTheme { CallModeScreen(onBack = back, onOpenStt = { nav.push(Route.SpeechModel) }, onOpenTts = { nav.push(Route.VoiceModel) }, onOpenRealtime = { nav.push(Route.RealtimeVoice) }) }
+        Route.RealtimeVoice -> com.wangzan101.mika.ui.components.PlainListTheme { RealtimeVoiceScreen(store, onBack = back, onOpenCalls = { nav.push(Route.Calls) }, onOpenServices = { nav.push(Route.VoiceServices) }) }
+        Route.VoiceServices -> com.wangzan101.mika.ui.components.PlainListTheme { VoiceServicesScreen(store, onBack = back, onOpenCustom = { nav.push(Route.VoiceCatalog) }) }
+        Route.VoiceCatalog -> com.wangzan101.mika.ui.components.PlainListTheme { VoiceCatalogScreen(com.wangzan101.mika.voice.model.VoiceModelEnvironment.get(context), onBack = back) }
+        Route.ImageModel -> com.wangzan101.mika.ui.components.PlainListTheme { ImageModelScreen(store, onBack = back) }
+        Route.Persona -> com.wangzan101.mika.ui.components.PlainListTheme { if (personasOn) PersonaScreen(app.personas, onBack = back) else LaunchedEffect(Unit) { nav.back() } }
+        Route.Usage -> com.wangzan101.mika.ui.components.PlainListTheme { UsageScreen(app.usage, store, onBack = back) }
+        Route.SpeechModel -> com.wangzan101.mika.ui.components.PlainListTheme { SpeechModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) }) }
+        Route.About -> com.wangzan101.mika.ui.components.PlainListTheme { AboutScreen(
             versionName = BuildConfig.VERSION_NAME, build = BuildConfig.GIT_HASH, beta = BuildConfig.BETA,
             update = updateState,
             issueUrl = remember {
@@ -828,11 +853,11 @@ private fun MikaRoot(
             diagnostics = {
                 Diagnostics.render(DiagnosticsCollector.collect(context, status))
             },
-        )
-        Route.UpdateMirrors -> UpdateMirrorsScreen(app.updateMirrors, onBack = back)
-        Route.License -> LicensesScreen(onBack = back)
-        Route.Browser -> BrowserScreen(remember { UserBrowser.of(context) }, onBack = back)
-        Route.Files -> FileLibraryScreen(app.chat, filesConversation, filesFromDrawer, onBack = back, onAdded = { id ->
+        ) }
+        Route.UpdateMirrors -> com.wangzan101.mika.ui.components.PlainListTheme { UpdateMirrorsScreen(app.updateMirrors, onBack = back) }
+        Route.License -> com.wangzan101.mika.ui.components.PlainListTheme { LicensesScreen(onBack = back) }
+        Route.Browser -> com.wangzan101.mika.ui.components.PlainListTheme { BrowserScreen(remember { UserBrowser.of(context) }, onBack = { browserReturn = false; back() }, returnOnClose = browserReturn) }
+        Route.Files -> com.wangzan101.mika.ui.components.PlainListTheme { FileLibraryScreen(app.chat, filesConversation, filesFromDrawer, onBack = back, onAdded = { id ->
             app.chat.openConversation(id)
             val opened = app.chat.ui.value.conversationId == id
             if (opened) nav.reset()
@@ -842,8 +867,8 @@ private fun MikaRoot(
             val opened = app.chat.ui.value.conversationId == id
             if (opened) nav.reset()
             opened
-        })
-        Route.Memory -> {
+        }) }
+        Route.Memory -> com.wangzan101.mika.ui.components.PlainListTheme {
             val registry = remember { WebSites.registry(context) }
             val sites by registry.entries.collectAsState()
             val webSites = WebSitesState(
@@ -910,10 +935,10 @@ private fun MikaRoot(
             }
             SourceScreen(vm, back)
         }
-        Route.Plans -> PlansScreen(context, onBack = back, onOpenConversation = {
+        Route.Plans -> com.wangzan101.mika.ui.components.PlainListTheme { PlansScreen(context, onBack = back, onOpenConversation = {
             app.chat.openConversation(it)
             nav.reset()
-        })
+        }) }
         Route.Teach -> TeachScreen(
             app.teach,
             onBack = { nav.back() },
@@ -922,7 +947,7 @@ private fun MikaRoot(
             app.chat.openConversation(it)
             nav.reset()
         })
-        Route.Calls -> CallSettingsScreen(app.calls, onBack = back, standalone = true, initialHistoryCallId = focusedCallHistoryId, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) })
+        Route.Calls -> CallSettingsScreen(app.calls, onBack = back, initialHistoryCallId = focusedCallHistoryId, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) })
     }
     }
         }
@@ -952,6 +977,8 @@ private fun MikaRoot(
                 onPlans = { openFromSidebar(Route.Plans) },
                 onMemory = { openFromSidebar(Route.Memory) },
                 onBrowser = { openFromSidebar(Route.Browser) },
+                onTeach = { app.teach.prefill(""); openFromSidebar(Route.Teach) },
+                onCalls = { openFromSidebar(Route.Calls) },
                 frames = if (nav.current == Route.Chat) app.taskState.frames else null,
                 operationRun = app.taskState::run,
                 chatActive = nav.current == Route.Chat || nav.current == Route.Personal,

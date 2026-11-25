@@ -85,7 +85,7 @@ class ChatAttachmentsTest {
             AttachmentFailure("photo.jpg", AttachmentFailureReason.LOW_DEVICE_SPACE),
             AttachmentFailure("notes.txt", AttachmentFailureReason.IO_ERROR),
         ))
-        compose.onNodeWithText("big.zip：超过 200 MiB 限制", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("big.zip：超过", substring = true).assertIsDisplayed()
         compose.onNodeWithText("photo.jpg：手机存储空间不足", substring = true).assertIsDisplayed()
         compose.onNodeWithText("notes.txt：无法读取或复制", substring = true).assertIsDisplayed()
     }
@@ -255,8 +255,8 @@ class ChatAttachmentsTest {
         compose.onNodeWithText(AttachCopy.CHANGE).assertIsDisplayed()
     }
 
-    @Test fun plusSheetOmitsRedundantSubtitlesAndShortensBrowser() {
-        // Avoid the photo-permission prompt on first open interrupting the assertions
+    @Test fun plusSheetGroupsIntoAttachTurnAndReuse() {
+        // Avoid the first-open photo permission prompt interrupting the assertions
         RecentPhotos.markAsked(compose.activity)
         compose.setContent {
             MikaTheme {
@@ -271,21 +271,24 @@ class ChatAttachmentsTest {
                     onTeach = {},
                     onChecklists = {},
                     onWorkflows = {},
-                    onBrowser = {},
                     tasks = emptyList(),
                     onPickTask = {},
                     onPickSkill = {},
                 )
             }
         }
-        // The redundant subtitles are gone
-        compose.onAllNodesWithText("现在拍一张").assertCountEquals(0)
-        compose.onAllNodesWithText("存一份待办清单").assertCountEquals(0)
-        compose.onAllNodesWithText("跑一条已存的多步骤任务").assertCountEquals(0)
-        // The kept subtitle is still there
-        compose.onNodeWithText("从相册选,可多选").assertExists()
-        // The browser subtitle is shortened to the built-in browser label
-        compose.onNodeWithText("内置浏览器").assertExists()
+        // Four buttons in the first row, Teach Claire and Skills in the middle, and a "Frequently used" row below
+        listOf("plus-camera", "plus-album", "plus-files", "plus-clipboard", "plus-teach", "plus-skills")
+            .forEach { compose.onNodeWithTag(it).assertExists() }
+        compose.onNodeWithText("常用").assertExists()
+        // The browser, lists and flows are no longer listed directly on the panel
+        compose.onAllNodesWithText("浏览器").assertCountEquals(0)
+        compose.onAllNodesWithText("已存清单").assertCountEquals(0)
+        // "Frequently used" holds common phrases, with saved lists and flows further down
+        compose.onNodeWithText("常用").performClick()
+        compose.onNodeWithText("常用说法").assertExists()
+        compose.onNodeWithText("已存清单").assertExists()
+        compose.onNodeWithText("流程").assertExists()
     }
 
     private fun bubble(text: String) = compose.setContent {

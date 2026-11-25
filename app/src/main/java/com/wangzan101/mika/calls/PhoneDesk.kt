@@ -171,9 +171,9 @@ class PhoneDesk(
         "The owner can't be reached right now. Don't commit to anything; offer to get back to the caller later.")
 
     companion object {
-        /** Start of a cue: tells the model this is not something the other party said and must not be read out. */
-        const val CUE_MARK = "[A note from Claire, not something the other party said; do not read it out] "
-        const val OWNER_TASK_PREFIX = "Backend task this call belongs to: "
+        /** Start of a cue: tells the model this is not something the other party said and must not be read aloud. */
+        const val CUE_MARK = "[A note from Claire, not something the other party said; do not read it aloud] "
+        const val OWNER_TASK_PREFIX = "The task this call belongs to: "
         const val MAX_QUESTION_CHARS = 300
 
         /** The cue that hands the owner's reply to the model. */

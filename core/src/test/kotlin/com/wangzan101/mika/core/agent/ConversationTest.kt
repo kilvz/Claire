@@ -43,9 +43,9 @@ class ConversationTest {
             Turn("顺便查汇率", "", DeskTurn.STATUS, deskTasks = listOf("c2")),
             Turn("", "订日料:办好了", DeskTurn.REPORT_STATUS, deskTasks = listOf("c1")),
         ))
-        assertTrue(t, "The user said: 帮我订明天的日料; Claire's front desk replied: 好,我让后面去订。" in t)
-        assertTrue(t, "The user said: 顺便查汇率; Claire's front desk handed it to a background task" in t)
-        assertTrue(t, "3. Claire's front desk told the user: 订日料:办好了" in t)
+        assertTrue(t, "The user said: 帮我订明天的日料; Claire replied: 好,我让后面去订。" in t)
+        assertTrue(t, "The user said: 顺便查汇率; Claire started working on it" in t)
+        assertTrue(t, "3. Claire told the user: 订日料:办好了" in t)
         assertFalse(t, "not finished" in t)
     }
 

@@ -22,9 +22,10 @@ internal val ComposerInset = 12.dp
 
 internal val FileTileShape = MikaShapes.Tile
 internal val EmptyLead = MikaType.Value
-internal val BubbleText = MikaType.Body
-/** Answer: body font size, justified (Chinese paragraphs then have even line ends, except for the last line). */
-internal val AnswerText = MikaType.Body.copy(textAlign = TextAlign.Justify)
+internal val BubbleText = MikaType.Body.copy(fontSize = 15.sp)
+/** Answer: body text size, justified (Chinese paragraphs get even edges except the last line). */
+/** Claire's answer body: left-aligned (justifying stretches characters), line height about 1.55× (tight within a paragraph, separated by paragraph spacing), slightly loose letter spacing. */
+internal val AnswerText = MikaType.Body.copy(fontSize = 15.sp, lineHeight = 23.5.sp, letterSpacing = 0.2.sp, textAlign = TextAlign.Start)
 internal val NowText = MikaType.Value
 internal val ClockText = MikaType.Hint.copy(fontFeatureSettings = "tnum")
 internal val StepText = MikaType.Caption
@@ -41,3 +42,20 @@ private val PillText = MikaType.Caption
 private val ChipText = MikaType.Hint.copy(fontWeight = FontWeight.Medium)
 internal val FileName = MikaType.Body.copy(fontWeight = FontWeight.Medium)
 internal val FileMeta = MikaType.Hint
+
+/**
+ * Markdown layout for chat answers: dark grey body, pure black bold, paragraph spacing 14 (about half a line more than the line height), headings not enlarged, muted list bullets,
+ * and quotes and inline code on a light background one step deeper than the answer bubble.
+ */
+internal fun chatMarkdownLook(c: com.wangzan101.mika.ui.theme.MikaColors): com.wangzan101.mika.ui.MarkdownLook {
+    val deeper = if (c.isDark) androidx.compose.ui.graphics.Color(0x14FFFFFF) else androidx.compose.ui.graphics.Color(0xFFE9EBEF)
+    return com.wangzan101.mika.ui.MarkdownLook(
+        gap = 14,
+        flatHeadings = true,
+        bodyInk = if (c.isDark) androidx.compose.ui.graphics.Color(0xFFE2E2E6) else androidx.compose.ui.graphics.Color(0xFF2B2E34),
+        strongInk = c.ink,
+        markerInk = c.ink3,
+        quoteFill = deeper,
+        codeFill = deeper,
+    )
+}

@@ -69,8 +69,8 @@ internal fun DrawerSearchField(query: String, onQueryChange: (String) -> Unit, m
             .height(38.dp)
             .keepsKeyboard()
             .clip(NavShape)
-            .background(c.fill)
-            .then(if (focused) Modifier.border(1.dp, c.accent, NavShape) else Modifier)
+            // Outlined without a fill, to distinguish it from the light grey entry card above
+            .border(1.dp, if (focused) c.accent else c.hair, NavShape)
             .padding(start = 12.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),

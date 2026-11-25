@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -179,11 +178,11 @@ private fun LocalFunAsr(savedUrl: String?, savedLanguage: AsrLanguage, probe: Li
     var language by remember { mutableStateOf(savedLanguage) }
     val url = FunAsrProtocol.normalize(address)
     Text(tr(R.string.speech_funasr_setup_hint), Modifier.padding(top = 4.dp, bottom = 4.dp), style = MikaType.Body, color = c.ink2)
-    // How to deploy each of the two models is documented in the repository; openUri throws when no app can open web pages, in which case nothing is done
-    val uri = LocalUriHandler.current
+    // How each of the two models is deployed is in the repository docs; openUri throws when no app can open a web page, so do nothing then
+    val context = androidx.compose.ui.platform.LocalContext.current
     Text(
         tr(R.string.speech_funasr_deploy_guide),
-        Modifier.clip(MikaShapes.Pill).clickable { runCatching { uri.openUri(FunAsrProtocol.DEPLOY_GUIDE) } }
+        Modifier.clip(MikaShapes.Pill).clickable { runCatching { com.wangzan101.mika.ui.openInBrowser(context, FunAsrProtocol.DEPLOY_GUIDE) } }
             .padding(vertical = 6.dp).testTag("speech-funasr-guide"),
         style = MikaType.Body, color = c.accent,
     )

@@ -112,7 +112,9 @@ class ChatViewModel(
     internal val runGoal: (String) -> String? = { null },
     /** The running task's own state for that conversation (regardless of who the service is showing right now); after switching away it keeps that question-answer's steps updated. */
     internal val runState: (String) -> StateFlow<TaskState>? = { null },
-    /** Memory and skill notes filled in after a task ends, keyed by run id. */
+    /** The takeover progress of the task running in this conversation; used by the main chat's question card when drawing takeover buttons for a running task. */
+    internal val runStage: (String) -> StateFlow<Takeover.Stage>? = { null },
+    /** Memory and skill notes added after a task ends, by run id. */
     internal val runNotes: StateFlow<Map<String, RunNotes>> = MutableStateFlow(emptyMap()),
     internal val learning: LearningActions? = null,
     /** Memory items as of now (read from encrypted storage); the note text and the "used" contents are fetched from here, and the conversation file stores no content. */
@@ -442,6 +444,13 @@ class ChatViewModel(
 
     /** Stop one dispatched task. */
     fun cancelDeskTask(taskId: String) { desking?.cancel(taskId) }
+
+    /** When the running task ([taskId] is the conversation it runs in) needs you to act, the button on the question card: it acts only on that task; stopping still goes through Claire. */
+    internal fun deskNeedOps(taskId: String) = NeedOps(
+        cancel = { cancelDeskTask(taskId) }, resume = { actions.resumeIn(taskId) }, takeOver = { actions.takeOverIn(taskId) },
+        handBack = { actions.handBackIn(taskId) }, finishedMyself = { actions.finishedMyselfIn(taskId) }, skip = { actions.skipIn(taskId) },
+        approve = { actions.approveIn(taskId, it) }, decline = { actions.declineIn(taskId, it) },
+    )
 
     // ChatNoteOps
     fun noteText(note: MemoryNote): String = noting.noteText(note)

@@ -72,7 +72,9 @@ object MikaRadius {
     val Button = 14.dp
     val Card = 16.dp
     val Bubble = 20.dp
-    /** Large cards, dialogs, bottom sheets. */
+    /** Corner radius of user and answer bubbles in chat. */
+    val ChatBubble = 16.dp
+    /** Large cards, dialogs and bottom sheets. */
     val Sheet = 24.dp
 }
 
@@ -84,10 +86,12 @@ object MikaShapes {
     val Sheet = RoundedCornerShape(MikaRadius.Sheet)
     /** Bottom sheet: the top two corners are rounded and the bottom ones are square. */
     val SheetTop = RoundedCornerShape(topStart = MikaRadius.Bubble, topEnd = MikaRadius.Bubble)
-    /** User message bubble: the bottom-right corner is the tail. */
-    val UserBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail, MikaRadius.Bubble)
-    /** Claire's answer: the bottom-left corner is the tail, mirroring the user bubble. */
-    val AnswerBubble = RoundedCornerShape(MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.Bubble, MikaRadius.BubbleTail)
+    /** User message bubble: the tail corner is at the bottom right. */
+    val UserBubble = RoundedCornerShape(MikaRadius.ChatBubble, MikaRadius.ChatBubble, MikaRadius.BubbleTail, MikaRadius.ChatBubble)
+    /** Claire's answer: the tail corner is at the bottom left, symmetric with the user bubble. */
+    val AnswerBubble = RoundedCornerShape(MikaRadius.ChatBubble, MikaRadius.ChatBubble, MikaRadius.ChatBubble, MikaRadius.BubbleTail)
+    /** The later replies when Claire sends several in a row: the top-left corner joining the previous one is also tightened. */
+    val AnswerBubbleJoined = RoundedCornerShape(MikaRadius.BubbleTail, MikaRadius.ChatBubble, MikaRadius.ChatBubble, MikaRadius.BubbleTail)
     val Button = RoundedCornerShape(MikaRadius.Button)
     val Tile = RoundedCornerShape(MikaRadius.Tile)
     /** Composer shell: a fixed radius that doesn't change when the input is multiline (unlike [Pill], which gets rounder with height). */

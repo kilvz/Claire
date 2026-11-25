@@ -308,7 +308,10 @@ class UserBrowser private constructor(private val app: Context) {
         refresh()
     }
 
-    /** System back key: go back in the page when possible; otherwise close the popup if one is open, and otherwise close the current tab. Returns false when no page is open. */
+    /** System back: go back in the web page if it can, otherwise close an open dialog, otherwise close the current tab. Returns false when no web page is open. */
+    /** Whether the current tab can still go back within itself. */
+    fun canGoBackInTab(): Boolean = tab?.view?.canGoBack() == true
+
     fun systemBack(): Boolean {
         val v = tab?.view ?: return false
         if (v.canGoBack()) v.goBack() else if (opener != null) closePopup() else closeActiveTab()

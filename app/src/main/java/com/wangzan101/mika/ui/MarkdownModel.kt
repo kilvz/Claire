@@ -7,6 +7,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
@@ -65,13 +66,18 @@ object MarkdownModel {
     private const val MAX_DEPTH = 12
     private val LINK_SCHEMES = setOf("http", "https", "mailto", "tel")
 
-    /** Styles for inline code and links; the colors follow light/dark mode and are supplied by the display site from the current palette. */
-    class Styles(val code: SpanStyle, val link: TextLinkStyles, val strong: FontWeight = FontWeight.SemiBold) {
+    /** Style for inline code and links; colors follow light and dark, supplied by the display site according to the current palette. */
+    class Styles(
+        val code: SpanStyle, val link: TextLinkStyles, val strong: FontWeight = FontWeight.SemiBold,
+        /** Color of bold text; same as the body when not specified. */
+        val strongColor: Color = Color.Unspecified,
+    ) {
         companion object {
-            fun of(c: MikaColors, strong: FontWeight = FontWeight.SemiBold) = Styles(
-                code = SpanStyle(fontFamily = FontFamily.Monospace, background = c.fill),
+            fun of(c: MikaColors, strong: FontWeight = FontWeight.SemiBold, strongColor: Color = Color.Unspecified, codeFill: Color = c.fill) = Styles(
+                code = SpanStyle(fontFamily = FontFamily.Monospace, background = codeFill),
                 link = TextLinkStyles(SpanStyle(color = c.accent)),
                 strong = strong,
+                strongColor = strongColor,
             )
 
             val Light = of(LightColors)
@@ -191,7 +197,7 @@ object MarkdownModel {
             is SoftLineBreak, is HardLineBreak -> append('\n')
             is Code -> withStyle(s.code) { append(n.literal) }
             is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendInlines(n, s) }
-            is StrongEmphasis -> withStyle(SpanStyle(fontWeight = s.strong)) { appendInlines(n, s) }
+            is StrongEmphasis -> withStyle(SpanStyle(fontWeight = s.strong, color = s.strongColor)) { appendInlines(n, s) }
             is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendInlines(n, s) }
             is Link -> link(n.destination, s) { appendInlines(n, s) }
             // Images are not shown in chat, only their alt text is kept (made into a link when there is an openable address)
