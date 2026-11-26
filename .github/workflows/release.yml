@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.3.3: conversation titles now stay in the language of your first message. An English chat no longer gets a Chinese title, and longer English titles are no longer cut off mid-word; if a model returns a title in another script, the chat shows your first message instead.
+            New in 2.4.0: version bump only; no functional changes from 2.3.3.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

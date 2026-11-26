@@ -25,12 +25,12 @@ android {
         applicationId = "com.kilv.claire"
         minSdk = 29
         targetSdk = 35
-        versionCode = 72
+        versionCode = 73
         // Claire 2.3.0 — base: upstream Mika 0.1.52 (commit 7ff1703f6).
         // Versioning (same scheme as Kai-custom): a.b.c; minor fix bumps c
         // (1.2.1, 1.3.1, 1.3.2), feature / major fix bumps b (1.3.0), rebase onto a new
         // upstream bumps a (2.0.0, b/c reset). versionCode increments each release.
-        versionName = "2.3.3"
+        versionName = "2.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // Beta badge after the version number on the About screen; set to false for a stable release
