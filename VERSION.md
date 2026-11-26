@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.3.2 (versionCode 71)
+- **Claire version:** 2.3.3 (versionCode 72)
 - **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -175,6 +175,13 @@ recorded base version.
   calls with no replacement are suppressed with the reason documented.
   The Gradle end-of-life notice is informational and the pinned
   Gradle/AGP/Kotlin versions still match upstream.
+
+- 2.3.3: conversation titles stay in the language of the first message.
+  An English chat no longer gets a Chinese title: the title prompt now
+  asks for the message's language first, and a title that switches
+  scripts is ignored, with the chat showing the user's first message
+  instead. English titles are no longer cut off mid-word by the old
+  16-character limit.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub
