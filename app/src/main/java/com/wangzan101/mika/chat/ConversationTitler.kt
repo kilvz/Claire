@@ -17,7 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 object ConversationTitler {
     const val TIMEOUT_MS = 8_000L
-    private const val MAX_TITLE = 16
+    private const val MAX_TITLE = 40
     private const val MAX_INPUT = 400
 
     /**
@@ -49,9 +49,25 @@ object ConversationTitler {
             } catch (_: Exception) {
                 null
             }
-            if (title != null) return title
+            if (title != null) {
+                // A model that switches scripts (a Chinese title for an English message) is ignored: the list keeps showing
+                // the first message, which is always in the user's own words.
+                if (scriptsDiffer(words, title)) continue
+                return title
+            }
         }
         return null
+    }
+
+    /** True when one text has CJK characters and the other has none, so a title never changes the message's language. */
+    private fun scriptsDiffer(input: String, title: String): Boolean = hasCjk(title) != hasCjk(input)
+
+    private fun hasCjk(text: String): Boolean = text.codePoints().anyMatch { cp ->
+        when (Character.UnicodeScript.of(cp)) {
+            Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA,
+            Character.UnicodeScript.KATAKANA, Character.UnicodeScript.HANGUL -> true
+            else -> false
+        }
     }
 
     private val TAG = Regex("</?\\s*message\\s*>", RegexOption.IGNORE_CASE)

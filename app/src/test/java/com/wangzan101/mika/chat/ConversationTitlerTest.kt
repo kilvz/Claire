@@ -106,9 +106,21 @@ class ConversationTitlerTest {
         assertEquals("附近的川菜", ConversationTitler.clean("「附近的川菜」"))
         assertEquals("附近的川菜", ConversationTitler.clean("标题：附近的川菜。"))
         assertEquals("Book train", ConversationTitler.clean("\"Book train\"\n多余的解释"))
-        assertEquals(16, ConversationTitler.clean("一".repeat(40))!!.length)
+        assertEquals(40, ConversationTitler.clean("一".repeat(60))!!.length)
+        // English titles are not chopped at the Chinese-length limit
+        assertEquals("Book a taxi to the airport", ConversationTitler.clean("Book a taxi to the airport"))
         assertNull(ConversationTitler.clean("  \n "))
         assertNull(ConversationTitler.clean("「」"))
+    }
+
+    /** A title in another script is discarded rather than shown: the list falls back to the first message instead of a Chinese name for an English chat. */
+    @Test fun titleStaysInTheMessagesScript() = runBlocking {
+        assertNull(ConversationTitler.generate(listOf(Titler("附近的川菜")), "Show me what you can do"))
+        assertEquals(
+            "Capabilities demo",
+            ConversationTitler.generate(listOf(Titler("附近的川菜"), Titler("Capabilities demo")), "Show me what you can do"),
+        )
+        assertEquals("附近的川菜", ConversationTitler.generate(listOf(Titler("附近的川菜")), "带我看看你能做什么"))
     }
 
     @Test fun titleRoundTripsAndShowsInTheList() {

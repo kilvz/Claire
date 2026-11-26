@@ -3,6 +3,7 @@ package com.wangzan101.mika.core.prompt
 import com.wangzan101.mika.core.agent.BatchRunner
 import com.wangzan101.mika.core.testing.PromptSurface
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -71,6 +72,13 @@ class PromptLayoutTest {
     }
 
     /** Things written for the user to read (skills, app knowledge, memories) must follow the user's language: these role prompts have to say so, or the model writes them in English. */
+    /** Conversation titles are written in the message's language: the prompt must not lead with Chinese characters. */
+    @Test fun conversationTitlesFollowTheMessagesLanguage() {
+        val text = Prompts.role("conversation_title")
+        assertTrue("conversation_title does not require the message's language", text.contains("same language as the message"))
+        assertFalse("conversation_title still asks for Chinese characters first", text.contains("Chinese characters"))
+    }
+
     @Test fun learnedTextFollowsTheUsersLanguage() {
         mapOf(
             "skill_draft" to "in the language of the \"goal\"",
