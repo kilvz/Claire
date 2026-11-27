@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.4.0 (versionCode 73)
+- **Claire version:** 2.5.0 (versionCode 74)
 - **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -184,6 +184,11 @@ recorded base version.
   16-character limit.
 
 - 2.4.0: version bump only; no functional changes from 2.3.3.
+
+- 2.5.0: the Telegram settings page shows a QR code for the saved bot
+  once its @username is known (fetched once from Telegram with `getMe`
+  and cached). Scan it with another phone to open the bot in Telegram,
+  then tap Start. The token and chat ID setup is unchanged.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub
