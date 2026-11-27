@@ -10,7 +10,7 @@ data class KeyRejection(val status: Int, val retryAfterMs: Long?)
  * the last result is returned unchanged. Budgets, cancellation and network errors are not handled here.
  */
 suspend fun <T> withKeyRotation(
-    nextKey: () -> String?,
+    nextKey: suspend () -> String?,
     rejected: ((key: String, retryAfterMs: Long?, status: Int) -> Unit)?,
     rejectionOf: (T) -> KeyRejection?,
     send: suspend (String?) -> T,
