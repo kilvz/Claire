@@ -108,7 +108,7 @@ class ConversationTitlerTest {
         assertEquals("附近的川菜", ConversationTitler.clean("「附近的川菜」"))
         assertEquals("附近的川菜", ConversationTitler.clean("标题：附近的川菜。"))
         assertEquals("Book train", ConversationTitler.clean("\"Book train\"\n多余的解释"))
-        assertEquals(40, ConversationTitler.clean("一".repeat(60))!!.length)
+        assertEquals(16, ConversationTitler.clean("一".repeat(60))!!.length)
         // English titles are not chopped at the Chinese-length limit
         assertEquals("Book a taxi to the airport", ConversationTitler.clean("Book a taxi to the airport"))
         assertNull(ConversationTitler.clean("  \n "))
@@ -138,7 +138,7 @@ class ConversationTitlerTest {
     }
 
     @Test fun cjkAndAlphabeticTitlesUseDifferentLimits() = runBlocking {
-        val generatedCjkTitle = ConversationTitler.generate(listOf(Titler("界".repeat(40))), "name this", language = "en")
+        val generatedCjkTitle = ConversationTitler.generate(listOf(Titler("界".repeat(40))), "给这个对话起个名字", language = "zh")
         val generatedAlphabeticTitle = ConversationTitler.generate(listOf(Titler("a".repeat(60))), "name this", language = "en")
         assertEquals(16, generatedCjkTitle!!.length)
         assertEquals(40, generatedAlphabeticTitle!!.length)
@@ -147,7 +147,7 @@ class ConversationTitlerTest {
     @Test fun mixedScriptTitleUsesDeterministicLimit() = runBlocking {
         for (cjk in listOf("界", "豈", "𠀀")) {
             val reply = "a".repeat(20) + cjk + "b".repeat(30)
-            val generatedTitle = ConversationTitler.generate(listOf(Titler(reply)), "name this", language = "en")
+            val generatedTitle = ConversationTitler.generate(listOf(Titler(reply)), "name this $cjk", language = "en")
             assertEquals(cjk, 16, generatedTitle!!.length)
             assertEquals(cjk, "a".repeat(16), generatedTitle)
         }

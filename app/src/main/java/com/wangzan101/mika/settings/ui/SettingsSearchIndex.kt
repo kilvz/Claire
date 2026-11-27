@@ -25,6 +25,7 @@ internal object SettingsSearchIndex {
         SettingsSearchEntry("plans", SettingsDestination.Plans, R.string.drawer_plans, listOf(CAPABILITIES)),
         SettingsSearchEntry("files", SettingsDestination.Files, R.string.file_library_title, listOf(CAPABILITIES)),
         SettingsSearchEntry("wechat", Page(SettingsPage.Wechat), R.string.wechat_title, listOf(CAPABILITIES)),
+        SettingsSearchEntry("telegram", Page(SettingsPage.Telegram), R.string.telegram_title, listOf(CAPABILITIES)),
         SettingsSearchEntry("proactive", Page(SettingsPage.Proactive), R.string.proactive_title, listOf(CAPABILITIES)),
         SettingsSearchEntry("personal", SettingsDestination.Personal, R.string.drawer_personal, listOf(CAPABILITIES), SettingsRequirement.PersonalStart),
 

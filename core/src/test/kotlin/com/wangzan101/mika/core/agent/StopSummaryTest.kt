@@ -40,10 +40,10 @@ class StopSummaryTest {
     @Test fun summariesKeepAcceptanceAndLatestConfirmedProgress() {
         val events = greeting + RunEvent.Criteria(8, listOf("36 条日程都已保存"), emptyList(),
             progress = RunEvent.Progress("已加日程", 12, 36, "第 12 条"))
-        val text = StopSummary.plain("添加整月日程", events, null, ::label, ::app)
+        val text = StopSummary.plain("添加整月日程", events, null, ::label, ::app, language = "zh")
         assertTrue(text, text.contains("- 验收:36 条日程都已保存\n"))
         assertTrue(text, text.contains("- 已确认进度:已加日程 · 12/36 · 第 12 条\n"))
-        val facts = StopSummary.facts("添加整月日程", events, null, ::label, ::app)
+        val facts = StopSummary.facts("添加整月日程", events, null, ::label, ::app, language = "zh")
         assertTrue(facts, facts.contains("<acceptance>\n36 条日程都已保存\n</acceptance>"))
         assertTrue(facts, facts.contains("<progress>\n已加日程 · 12/36 · 第 12 条\n</progress>"))
         assertTrue(StopSummary.worthSaying(events.filterIsInstance<RunEvent.Criteria>(), null))
@@ -53,8 +53,8 @@ class StopSummaryTest {
         val checkpoint = RunEvent.Criteria(1, listOf("地址", "店名", "推荐"), emptyList(),
             progress = RunEvent.Progress("步骤完成", 0, 3), confirmedIds = setOf(1, 2))
         val events = listOf(checkpoint)
-        val summary = StopSummary.plain("找咖啡馆", events, null)
-        val facts = StopSummary.facts("找咖啡馆", events, null)
+        val summary = StopSummary.plain("找咖啡馆", events, null, language = "zh")
+        val facts = StopSummary.facts("找咖啡馆", events, null, language = "zh")
         assertTrue(summary, "已确认进度:目标 2/3" in summary && "0/3" !in summary)
         assertTrue(facts, "<progress>\ngoal 2/3\n</progress>" in facts && "0/3" !in facts)
     }
@@ -71,7 +71,7 @@ class StopSummaryTest {
     }
 
     @Test fun plainSummaryCountsBatchActionsAndNamesThem() {
-        val text = StopSummary.plain("把推荐里的岗位都打个招呼", greeting, null, ::label, ::app)
+        val text = StopSummary.plain("把推荐里的岗位都打个招呼", greeting, null, ::label, ::app, language = "zh")
         assertEquals(
             listOf(
                 "已经停下,停止前做了这些:",
@@ -92,7 +92,7 @@ class StopSummaryTest {
             act(2, "phone_tap", "com.android.settings"), act(3, "phone_tap", "com.android.settings"),
             act(4, "phone_read", "com.android.settings", kind = "observe", title = "网络和互联网"),
         )
-        val text = StopSummary.plain("看看设置里有什么", events, "网络页有 WLAN、热点", ::label, ::app)
+        val text = StopSummary.plain("看看设置里有什么", events, "网络页有 WLAN、热点", ::label, ::app, language = "zh")
         assertTrue(text, text.contains("- 去过:设置\n"))
         assertTrue(text, text.contains("- 看过:设置的网络和互联网\n"))
         assertTrue(text, text.contains("- 做过:打开 App、点击 2 次\n"))

@@ -37,9 +37,11 @@ class TaskChannelsTest {
     @Test fun messagingChannelIdsResolveFromBothRuntimes() {
         val wechat = FakeChannel(WechatChannel.ID)
         val telegram = FakeChannel(TelegramChannel.ID)
-        assertSame(wechat, channelForId(WechatChannel.ID, { wechat }, { telegram }))
-        assertSame(telegram, channelForId(TelegramChannel.ID, { wechat }, { telegram }))
-        assertNull(channelForId("unknown", { wechat }, { telegram }))
+        val wechatFor: (String) -> Channel? = { if (it == wechat.id) wechat else null }
+        val telegramFor: (String) -> Channel? = { if (it == telegram.id) telegram else null }
+        assertSame(wechat, channelForId(WechatChannel.ID, wechatFor, telegramFor))
+        assertSame(telegram, channelForId(TelegramChannel.ID, wechatFor, telegramFor))
+        assertNull(channelForId("unknown", wechatFor, telegramFor))
     }
 
     // The old result channel was created at a lower importance and cannot be raised: switch to a new id, and the old id must be deleted
