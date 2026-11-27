@@ -56,20 +56,19 @@ object ConversationTitler {
         for (m in models.distinct()) {
             val title = try {
                 withTimeoutOrNull(timeoutMs) {
-                    val reply = m.complete(systemPrompt, messages, emptyList())
-                    clean(reply.parts.filterIsInstance<Part.Text>().joinToString("") { it.text })
+                    val raw = m.complete(systemPrompt, messages, emptyList())
+                        .parts.filterIsInstance<Part.Text>().joinToString("") { it.text }
+                    // The script check reads the whole cleaned title; truncating first could drop the only CJK
+                    // character of a mixed-script title and make it look like the model switched languages.
+                    val full = trimReply(raw)
+                    if (full == null || scriptsDiffer(words, full)) null else clean(full)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 null
             }
-            if (title != null) {
-                // A model that switches scripts (a Chinese title for an English message) is ignored: the list keeps showing
-                // the first message, which is always in the user's own words.
-                if (scriptsDiffer(words, title)) continue
-                return title
-            }
+            if (title != null) return title
         }
         return null
     }
@@ -81,11 +80,17 @@ object ConversationTitler {
     private val WRAP = "\"'“”‘’「」『』《》`*#".toSet()
     private val TAIL = "。.!！?？,，;；:：、 ".toSet()
 
-    /** The first non-empty line of the reply becomes the title: removes quotes at both ends, trailing punctuation, and a "Title:" prefix, truncating if too long; null when empty. */
-    fun clean(raw: String): String? {
+    /** The first non-empty line without quotes at both ends, trailing punctuation, or a "Title:" prefix; null when empty. */
+    private fun trimReply(raw: String): String? {
         var t = raw.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return null
         t = t.replace(Regex("^(标题|title)\\s*[:：]\\s*", RegexOption.IGNORE_CASE), "")
         t = t.trim { it in WRAP || it.isWhitespace() }.trimEnd { it in TAIL }.trim { it in WRAP || it.isWhitespace() }
+        return t.takeIf(String::isNotBlank)
+    }
+
+    /** The cleaned reply, truncated to the CJK or alphabetic limit; null when empty. */
+    fun clean(raw: String): String? {
+        val t = trimReply(raw) ?: return null
         val maxTitle = if (hasCjk(t)) MAX_TITLE_CJK else MAX_TITLE_ALPHABETIC
         return t.take(maxTitle).takeIf(String::isNotBlank)
     }

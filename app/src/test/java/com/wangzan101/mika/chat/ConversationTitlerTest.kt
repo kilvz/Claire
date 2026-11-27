@@ -115,6 +115,14 @@ class ConversationTitlerTest {
         assertNull(ConversationTitler.clean("「」"))
     }
 
+    @Test fun titleInTheWrongScriptIsIgnoredAndTheNextModelIsTried() = runBlocking {
+        val chinese = Titler("附近的川菜")
+        val english = Titler("Nearby Sichuan restaurant")
+        assertEquals("Nearby Sichuan restaurant",
+            ConversationTitler.generate(listOf(chinese, english), "find a restaurant nearby"))
+        assertNull(ConversationTitler.generate(listOf(Titler("附近的川菜")), "find a restaurant nearby"))
+    }
+
     @Test fun titleCarriesLanguageDirective() = runBlocking {
         val s = store()
         val id = s.newConversation()
