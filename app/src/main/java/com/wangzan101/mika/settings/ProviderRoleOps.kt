@@ -108,8 +108,9 @@ fun ProviderStore.setFallback(role: ModelRole, slot: Int, configId: String?): Bo
 fun ProviderStore.setMainFallback(slot: Int, configId: String?): Boolean = synchronized(this) { setFallback(ModelRole.Main, slot, configId) }
 
 /**
- * 备援链里第 [from] 位挪到第 [to] 位,其余按原来的先后排;越界为 null,原地不动返回原链。
- * 纯函数,[ProviderStore.moveFallback]、语音备援链(`VoiceFallbacks.moved`)和界面的上移/下移都按它算。
+ * Move position [from] of a fallback chain to position [to], keeping the rest in their original order; out of range is
+ * null, and an unchanged position returns the same chain. Pure function used by [ProviderStore.moveFallback], the voice
+ * fallback chains (`VoiceFallbacks.moved`) and the up/down buttons in the UI.
  */
 internal fun <T> movedFallbacks(chain: List<T>, from: Int, to: Int): List<T>? {
     if (from !in chain.indices || to !in chain.indices) return null
@@ -118,8 +119,9 @@ internal fun <T> movedFallbacks(chain: List<T>, from: Int, to: Int): List<T>? {
 }
 
 /**
- * 在 [role] 的备援链里把第 [from] 位挪到第 [to] 位(上移/下移是相邻两位),只改这一个用途的链。
- * 越界返回 false、什么也不改;和 [setFallback] 一样在锁里改、写同一个配置文件。
+ * Move position [from] to position [to] in the fallback chain for [role] (up/down means adjacent positions), changing only
+ * that one role's chain. Out of range returns false and changes nothing; like [setFallback], it changes the chain under the
+ * lock and writes the same configuration file.
  */
 fun ProviderStore.moveFallback(role: ModelRole, from: Int, to: Int): Boolean {
     return synchronized(this) {
@@ -132,7 +134,7 @@ fun ProviderStore.moveFallback(role: ModelRole, from: Int, to: Int): Boolean {
     }
 }
 
-/** 这个组;不存在为 null。 */
+/** This group; null when it does not exist. */
 fun ProviderStore.group(id: String): ModelGroup? = _groups.value.firstOrNull { it.id == id }
 
 /** The group bound to this role; null when no group is bound or the group no longer exists. */

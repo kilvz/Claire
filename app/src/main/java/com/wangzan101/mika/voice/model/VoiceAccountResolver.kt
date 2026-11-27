@@ -20,9 +20,9 @@ interface VoiceProviderAccountSource {
     fun hasKey(id: String): Boolean
     fun keyRevision(id: String): Long
     fun headers(provider: Provider): Map<String, String>
-    /** 这家密钥池里有几把密钥;只有一把时没得轮换。 */
+    /** How many keys this account's pool has; with only one there is nothing to rotate. */
     fun keyCount(id: String): Int = 1
-    /** 上游拒了 [key]:和对话模型同一处记账(429 冷却,401/403 耗尽),见 [KeyPoolManager.markRejected]。 */
+    /** The upstream rejected [key]: record it in the same place as chat models (429 cooldown, 401/403 exhaustion); see [KeyPoolManager.markRejected]. */
     fun rejectKey(id: String, key: String, status: Int, retryAfterMs: Long?) {}
 }
 
@@ -126,15 +126,16 @@ class VoiceAccountResolver(
         )
     }
 
-    /** [model] 借用的对话服务商密钥池里有不止一把密钥,值得轮换。自带密钥的语音服务只有一把。 */
+    /** The chat provider's key pool borrowed by [model] has more than one key, so rotation is worthwhile. A voice service with its own key has only one. */
     fun pooled(model: ResolvedVoiceModel): Boolean =
         (model.account as? ResolvedAccount.ExistingProvider)?.let { providers.keyCount(it.provider.id) > 1 } == true
 
     /**
-     * 用 [model] 的账号发一次请求。借用对话服务商账号的,走那家的密钥池,和对话模型共用同一份密钥、同一个轮询、
-     * 同一份冷却:每次请求向池里现取一把,被拒(429/401/403,见 [keyRejectionOf])就照对话那边记账,换池里下一把重发,
-     * 每把最多一次([withKeyRotation])。[mayRetry] 为 false 时(比如流式朗读已经交出了声音)不再换密钥重发。
-     * 自带密钥的语音服务原样发一次。
+     * Send one request with [model]'s account. A borrowed chat-provider account goes through that provider's key pool
+     * and shares its keys, rotation and cooldowns with chat models: each request takes a key from the pool, records a
+     * rejection (429/401/403, see [keyRejectionOf]) the same way chat does, and resends with the next key, each key at
+     * most once ([withKeyRotation]). When [mayRetry] is false (for example streaming read-aloud has already produced
+     * audio), do not switch keys and resend. A voice service with its own key sends once unchanged.
      */
     suspend fun <T> withPooledKey(
         model: ResolvedVoiceModel,
@@ -145,7 +146,7 @@ class VoiceAccountResolver(
         val providerId = account.provider.id
         val resolvedKey = account.credentials.apiKey.ifBlank { null }
         val result = withKeyRotation(
-            // 和对话模型的 keySupplier 一样每次请求现取:轮询、跳过冷却中的密钥都在池里做
+            // Like the chat models' keySupplier, take a key per request: rotation and skipping cooled-down keys both happen in the pool
             nextKey = { providers.activeApiKey(providerId) ?: resolvedKey },
             rejected = { key, retryAfterMs, status -> providers.rejectKey(providerId, key, status, retryAfterMs) },
             rejectionOf = { outcome: Result<T> ->

@@ -208,16 +208,16 @@ class VoiceCatalogStoreTest {
 
         assertTrue(store.setFallback(VoiceCapability.STT, 0, b))
         assertTrue(store.setFallback(VoiceCapability.STT, 1, c))
-        assertFalse("链头不能当自己的备援", store.setFallback(VoiceCapability.STT, 2, sttRef))
-        assertFalse("流式识别进不了链", store.setFallback(VoiceCapability.STT, 2, VoiceModelRef("svc", "live", VoiceCapability.STT)))
-        assertFalse("能力不对", store.setFallback(VoiceCapability.STT, 2, ttsRef))
+        assertFalse("The head cannot be its own backup", store.setFallback(VoiceCapability.STT, 2, sttRef))
+        assertFalse("Streaming recognition cannot join a chain", store.setFallback(VoiceCapability.STT, 2, VoiceModelRef("svc", "live", VoiceCapability.STT)))
+        assertFalse("Wrong capability", store.setFallback(VoiceCapability.STT, 2, ttsRef))
         assertTrue(store.moveFallback(VoiceCapability.STT, 1, 0))
         assertFalse(store.moveFallback(VoiceCapability.STT, 1, 2))
         assertTrue(store.setFallback(VoiceCapability.TTS, 0, VoiceModelRef("svc", "b", VoiceCapability.TTS)))
         assertEquals(listOf(c, b), VoiceCatalogStore(backend).state.value.selections.sttFallbacks)
 
         store.setSttSelection(SttSelection.Model(c))
-        assertEquals("新链头从链里拿掉", listOf(b), store.state.value.selections.sttFallbacks)
+        assertEquals("The new head is removed from the chain", listOf(b), store.state.value.selections.sttFallbacks)
 
         store.deleteModel(VoiceModelRef("svc", "b", VoiceCapability.STT))
         val after = VoiceCatalogStore(backend).state.value.selections

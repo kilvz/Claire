@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** 语音等不经 RawResponse 的调用,按抛出的 ModelError 判断「这把密钥被拒」并轮换。 */
+/** Voice and other calls that do not go through RawResponse detect a rejected key from the thrown ModelError and rotate. */
 class KeyRejectionTest {
     @Test fun `rate limit auth and rejecting server statuses are key rejections, through wrappers`() {
         assertEquals(KeyRejection(429, 1500L), keyRejectionOf(ModelError.RateLimited(1500L)))

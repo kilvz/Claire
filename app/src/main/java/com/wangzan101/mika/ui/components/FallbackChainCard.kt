@@ -39,17 +39,18 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 备援链里的一项:[name] 是模型名(等宽显示),[detail] 是它属于哪家/哪个服务;[missing] 为 true 时变淡。 */
+/** One item in a fallback chain: [name] is the model name (shown monospaced), [detail] says which provider/service it belongs to, and a true [missing] renders it faded. */
 data class FallbackChainItem(val name: String, val detail: String = "", val missing: Boolean = false)
 
 /**
- * 「主模型 ➔ 备援 1 ➔ 备援 2 …」这张可折叠的卡片:对话模型的备援链和语音的备援链共用。
- * 点一行换模型,右边上移/下移/移除(点按区 48dp),读屏在行上就有这三个动作;移除先确认。
- * 测试标签是 `[tagPrefix]-<位>`、`-up`、`-down`、`-remove`,末尾的「添加」是 `[tagPrefix]-<链长>`。
+ * The collapsible "Primary ➔ Backup 1 ➔ Backup 2 …" card shared by chat-model and voice fallback chains.
+ * Tap a row to change the model; on the right are up/down/remove (48dp touch targets), and screen readers expose those
+ * three actions on the row itself. Removal asks for confirmation first.
+ * Test tags are `[tagPrefix]-<position>`, `-up`, `-down`, `-remove`; the trailing "Add" is `[tagPrefix]-<chain length>`.
  *
- * @param title 卡片标题(一般是 `model_fallback_chain_title` 套上角色名)。
- * @param removeBody 确认移除的正文,参数是要移除的模型名。
- * @param footer 展开且有备援时卡片下面的说明。
+ * @param title Card title (usually `model_fallback_chain_title` with the role name).
+ * @param removeBody Body of the removal confirmation, parameterized by the model name to remove.
+ * @param footer Explanation below the card when it is expanded and has backups.
  */
 @Composable
 fun FallbackChainCard(
@@ -171,7 +172,7 @@ fun FallbackChainCard(
                         Modifier
                             .fillMaxWidth()
                             .clickable { onPick(slot) }
-                            // 读屏:在这一行上就能上移、下移、移除,不用逐个找右边的小按钮
+                            // Screen readers: up, down and remove are available on this row without hunting for the small buttons on the right
                             .semantics {
                                 customActions = listOfNotNull(
                                     CustomAccessibilityAction(moveUp) { onMove(slot, slot - 1); true }.takeIf { canUp },
@@ -192,7 +193,7 @@ fun FallbackChainCard(
                             Modifier.weight(1f).padding(vertical = 7.dp),
                         )
                         Row {
-                            // 只有一个备援时没有可挪的,不占地方
+                            // With only one backup there is nothing to move, so take no space
                             if (fallbacks.size > 1) {
                                 ChainIconButton(
                                     MikaIcons.Up, stringResource(R.string.model_fallback_move_up_desc, slot + 1), canUp,
@@ -266,7 +267,7 @@ fun FallbackChainCard(
     if (hasAny && expanded) FooterNote(footer)
 }
 
-/** 一行的左半边:序号方块 + 「主模型/备援 #n」+ 模型名 + 来源。 */
+/** Left half of a row: position badge + "Primary/Backup #n" + model name + source. */
 @Composable
 private fun ChainRow(number: Int, badge: String, badgeAccent: Boolean, item: FallbackChainItem, modifier: Modifier) {
     val c = MikaTheme.colors
@@ -308,7 +309,7 @@ private fun ChainRow(number: Int, badge: String, badgeAccent: Boolean, item: Fal
     }
 }
 
-/** 备援一行右边的图标按钮:点按区域 48dp,图标 16dp;不能用时变淡、不可点。 */
+/** Icon buttons on the right of a backup row: 48dp touch target, 16dp icon; faded and disabled when unavailable. */
 @Composable
 private fun ChainIconButton(
     icon: ImageVector,

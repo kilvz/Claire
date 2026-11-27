@@ -22,10 +22,10 @@ class VoiceFallbacksTest {
     @Test fun `set appends, replaces, moves an existing entry and removes`() {
         assertEquals(listOf(a), VoiceFallbacks.set(emptyList(), 0, a))
         assertEquals(listOf(a, b), VoiceFallbacks.set(listOf(a), 1, b))
-        assertEquals("目标位有人就替换", listOf(c, b), VoiceFallbacks.set(listOf(a, b), 0, c))
-        assertEquals("已在链里的移到目标位,不重复", listOf(b, a), VoiceFallbacks.set(listOf(a, b), 0, b))
+        assertEquals("Replace whatever occupies the target slot", listOf(c, b), VoiceFallbacks.set(listOf(a, b), 0, c))
+        assertEquals("An entry already in the chain moves to the target slot without duplicating", listOf(b, a), VoiceFallbacks.set(listOf(a, b), 0, b))
         assertEquals(listOf(b), VoiceFallbacks.set(listOf(a, b), 0, null))
-        assertEquals("撤掉不存在的位不改", listOf(a), VoiceFallbacks.set(listOf(a), 2, null))
+        assertEquals("Removing a missing slot changes nothing", listOf(a), VoiceFallbacks.set(listOf(a), 2, null))
     }
 
     @Test fun `set refuses out of range slots and a full chain`() {
@@ -33,7 +33,7 @@ class VoiceFallbacksTest {
         assertNull(VoiceFallbacks.set(listOf(a), VoiceFallbacks.MAX, b))
         val full = listOf(a, b, c)
         assertEquals(VoiceFallbacks.MAX, full.size)
-        assertEquals("满了还能替换", listOf(a, b, d), VoiceFallbacks.set(full, 2, d))
+        assertEquals("A full chain can still replace", listOf(a, b, d), VoiceFallbacks.set(full, 2, d))
     }
 
     @Test fun `moved swaps neighbours and rejects bad indices`() {
@@ -70,7 +70,7 @@ class VoiceFallbacksTest {
         assertTrue(VoiceFailover.canTryNext(ModelError.Server(500)))
         assertTrue(VoiceFailover.canTryNext(ModelError.Network(SocketTimeoutException())))
         assertTrue(VoiceFailover.canTryNext(ModelError.Auth()))
-        assertTrue("语音层包了一层也认", VoiceFailover.canTryNext(VoiceModelError.from(ModelError.Server(502))))
+        assertTrue("A failure wrapped by the voice layer is still recognized", VoiceFailover.canTryNext(VoiceModelError.from(ModelError.Server(502))))
         assertTrue(VoiceFailover.canTryNext(SocketTimeoutException()))
         assertTrue(VoiceFailover.canTryNext(VoiceModelError.MissingCredentials()))
 

@@ -96,7 +96,7 @@ class CascadeEngine(private val context: Context, private val environment: Voice
         val listen = listenRef(use)!!
         val speakRef = speakRef(use)!!
         val think = thinkModel() ?: throw VoiceModelError.IncompleteConfig("No chat model")
-        // 选的就是朗读/语音输入那一个时带上它的备援链(见 backupsFor),AI 电话自己另选的不带
+        // When the selected model is the one used for read-aloud/voice input, carry its fallback chain (see backupsFor); a model chosen separately for AI calls carries none
         val tts = environment.tts.createSpeaker(context, speakRef, TtsCapabilities())
         val listenBackups = environment.stt.backupsFor(listen)
         val voice = voice(use)

@@ -70,7 +70,7 @@ class ModelRouterTest {
     @Test fun userSteerKeepsThatStepOnMainOnly() {
         val r = ModelRouter(main, light)
         assertSame(main, r.pick(clean(5).copy(userSpoke = true)))
-        // 不算出状况:下一步照常给轻量模型
+        // Not trouble: the next step still goes to the light model as usual
         assertSame(light, r.pick(clean(6)))
     }
 
@@ -110,7 +110,7 @@ class ModelRouterTest {
         assertSame(main, ModelRouter(main, null).pick(clean(2)))
     }
 
-    // root 下跑的命令是模型写的,和 phone_system_command 一样只让主模型给
+    // A command run as root is written by the model: like phone_system_command, only the primary model may provide it
     @Test fun rootCommandIsMainOnly() {
         assertTrue(ModelRouter.mainOnly("root_run_command", com.wangzan101.mika.core.tool.Verb.RootCommand))
         assertTrue(ModelRouter.mainOnly("phone_system_command", com.wangzan101.mika.core.tool.Verb.PhoneCommand))

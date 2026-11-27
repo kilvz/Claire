@@ -20,9 +20,10 @@ import com.wangzan101.mika.voice.model.VoiceFallbacks
 import com.wangzan101.mika.voice.model.VoiceModelRef
 
 /**
- * 语音输入 / 朗读页上的备援链:和对话模型的备援链同一张卡片([FallbackChainCard])。
- * 链头没选、或链头是边说边出字的识别时不显示(那种识别中途换不了模型)。备援只列能进链的模型,不列链头自己;
- * 还没进目录的对话账号自带的语音模型,选上时先写进目录。
+ * Fallback chain on the voice input / read-aloud pages, using the same card as chat-model fallback chains
+ * ([FallbackChainCard]). Hidden when no head is selected or the head is streaming recognition that writes while you speak
+ * (it cannot switch models mid-way). Backups list only eligible models, never the head itself; a voice model bundled with
+ * a chat account that is not in the catalog yet is written into the catalog when selected.
  */
 @Composable
 internal fun VoiceFallbackSection(

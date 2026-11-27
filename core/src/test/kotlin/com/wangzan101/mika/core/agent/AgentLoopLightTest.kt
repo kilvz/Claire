@@ -197,12 +197,12 @@ class AgentLoopLightTest {
         assertEquals(3, main.requests.size)
     }
 
-    // 用户插了话的那一步要重新理解目标:给主模型,不给轻量模型;之后照常分工
+    // A step where the user spoke needs the goal understood again: it goes to the primary model, not the light one; routing then continues as usual
     @Test fun stepAfterUserSteerGoesToMain() = runTest {
         val main = Named("main", FakeModel(tools(call("phone_observe")), tools(call("phone_observe")), tools(call("phone_observe")), finish()))
         val light = Named("light", FakeModel(tools(call("phone_observe")), finish()))
         val inbox = RunInbox()
-        // 第 3 步轻量模型读屏时用户插话:不在模型请求进行中发,不会撤掉请求
+        // The user interjects while the light model reads the screen on step 3: it is not sent during a model request, so the request is not withdrawn
         val screen = object : com.wangzan101.mika.core.screen.uistate.ScreenPort by FakeScreen() {
             private var sent = false
             override suspend fun snapshot(): ScreenSnapshot {
@@ -217,7 +217,7 @@ class AgentLoopLightTest {
         assertEquals(listOf("main", "main", "light", "main", "light_rejected", "main"),
             sink.list.filterIsInstance<RunEvent.ModelReply>().map { it.role })
         fun List<Message>.saidSteer() = flatMap { it.parts }.filterIsInstance<Part.Text>().any { "STEER_WORDS" in it.text }
-        assertTrue("插话之后的那一步问的是主模型", main.requests[3].saidSteer())
+        assertTrue("The step after the interjection asks the primary model", main.requests[3].saidSteer())
         assertTrue(!light.requests[0].saidSteer())
     }
 }

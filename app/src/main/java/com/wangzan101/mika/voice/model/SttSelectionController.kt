@@ -54,9 +54,11 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
     internal fun spec(model: ResolvedVoiceModel): SpeechEngineSpec = environment.registry.stt(model).spec(model)
 
     /**
-     * 开一次识别。[backups] 是这一次的备援链(运行时由调用方传 [backupsFor],试听/测试不传,只试选中的那个)。
-     * 链头是整段上传识别、且有备援或借用的对话账号有多把密钥时,松手后的这段录音按链和密钥池依次转写
-     * ([transcribeChain]);其余照旧交给协议自己的会话。
+     * Open one recognition session. [backups] is this session's fallback chain (the runtime passes [backupsFor];
+     * audition/tests pass none and try only the selected model). When the head transcribes a whole uploaded recording and
+     * there are backups or the borrowed chat account has several keys, the recording made after release is transcribed
+     * through the chain and key pool in order ([transcribeChain]); everything else is handed to the protocol's own
+     * session as before.
      */
     fun start(
         context: Context,
@@ -83,9 +85,10 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
     }
 
     /**
-     * 同一段录音按 [candidates] 依次转写:每个模型走自己账号的密钥池([VoiceAccountResolver.withPooledKey]),
-     * 失败了由 [VoiceFailover] 决定换不换下一个。每个模型最多等 [ProviderSpeech.TRANSCRIBE_TIMEOUT_MS],
-     * 超时当这个模型连不上,换下一个。只收整段上传识别的模型,别的跳过。
+     * Transcribe the same recording through [candidates] in order: each model uses its own account's key pool
+     * ([VoiceAccountResolver.withPooledKey]), and on failure [VoiceFailover] decides whether to try the next one. Each
+     * model waits at most [ProviderSpeech.TRANSCRIBE_TIMEOUT_MS]; a timeout counts as the model being unreachable and
+     * moves on. Only whole-upload transcription models are accepted, others are skipped.
      */
     internal fun transcribeChain(
         context: Context,
@@ -108,27 +111,28 @@ class SttSelectionController(private val environment: VoiceModelEnvironment) {
                 val transcribe = environment.registry.stt(keyed).utterance(context, keyed, spokenLanguage(keyed, language))
                     ?: throw VoiceModelError.Unsupported(VoiceCapability.STT, keyed.model.stt?.protocol?.name)
                 withTimeoutOrNull(attemptTimeoutMs) { transcribe(wav) }
-                    // 和网络超时同一种错误:界面照「连不上」处理,换不换下一个也按网络错误判断
+                    // The same kind of error as a network timeout: the UI treats it as "unreachable", and whether to try the next model follows the network-error rule
                     ?: throw ModelError.Network(SocketTimeoutException("transcription timed out"))
             }
         }
     }
 
-    /** 这次识别交给服务的语言。 */
+    /** The language handed to the service for this recognition. */
     private fun spokenLanguage(model: ResolvedVoiceModel, language: String?): String? {
         val binding = model.model.stt ?: throw VoiceModelError.Unsupported(VoiceCapability.STT)
         return when (binding.protocol) {
-            // 语言是这个服务自己的设置(接入时在表单里选),不跟界面语言走;空 = 自动,往下传空串就是不指定
+            // The language is this service's own setting (chosen in the form when adding it) and does not follow the UI language; empty = auto, passed down as an empty string meaning unspecified
             in SERVICE_LANGUAGE_PROTOCOLS -> binding.language
-            // 还没有选语言的地方:设过的(旧设置迁移来的)用设的,没设的跟调用方给的语言
+            // Where no language is selected yet: use the configured one (including migrated old settings), otherwise follow the caller's language
             in EXPLICIT_ASR_LANGUAGE_PROTOCOLS -> binding.language.ifBlank { null } ?: language
             else -> language
         }
     }
 
     /**
-     * [ref] 的备援链:它是语音输入选中的那个模型时是 [VoiceSelections.sttFallbacks],否则(比如 AI 电话自己选的听写模型)没有。
-     * 链头不是整段上传识别的,也没有。
+     * Fallback chain for [ref]: [VoiceSelections.sttFallbacks] when it is the model selected for voice input, otherwise
+     * none (for example a dictation model chosen separately for AI calls). A head that does not transcribe a whole
+     * uploaded recording also has none.
      */
     fun backupsFor(ref: VoiceModelRef): List<VoiceModelRef> {
         val snapshot = environment.catalog.state.value

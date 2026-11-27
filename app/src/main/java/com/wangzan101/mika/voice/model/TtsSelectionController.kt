@@ -69,15 +69,16 @@ class TtsSelectionController(private val environment: VoiceModelEnvironment) {
         return environment.accountResolver.resolve(service, model)
     }
 
-    /** 只建 [ref] 这一个模型(试听、测试用它:试的是哪个就是哪个,不悄悄换别的)。 */
+    /** Build only [ref] (used by audition and tests: you test exactly what you picked, with no silent switch to another model). */
     fun createTts(context: Context, ref: VoiceModelRef, capabilities: TtsCapabilities): TtsModel {
         val model = requireModel(ref)
         return environment.registry.tts(model).create(context, model, capabilities)
     }
 
     /**
-     * 真正朗读时用:[backups](一般是 [backupsFor])不为空、或借用的对话账号有多把密钥时,包成 [FallbackTtsModel]
-     * 按备援链和密钥池依次试;否则和 [createTts] 一样。链头没配好照常抛。
+     * Used for real read-aloud: when [backups] (usually [backupsFor]) is not empty or the borrowed chat account has more
+     * than one key, wrap it in [FallbackTtsModel] to try the fallback chain and key pool in order; otherwise it behaves
+     * like [createTts]. A misconfigured head still throws as usual.
      */
     fun createSpeaker(
         context: Context,
@@ -92,7 +93,7 @@ class TtsSelectionController(private val environment: VoiceModelEnvironment) {
         return FallbackTtsModel.of(chain, model, ::requireModel, environment.accountResolver, create)
     }
 
-    /** [ref] 的备援链:它是朗读选中的那个模型时是 [VoiceSelections.ttsFallbacks],否则(比如 AI 电话自己选的朗读模型)没有。 */
+    /** The fallback chain for [ref]: [VoiceSelections.ttsFallbacks] when it is the model selected for read-aloud; none otherwise (for example a read-aloud model chosen separately for AI calls). */
     fun backupsFor(ref: VoiceModelRef): List<VoiceModelRef> {
         val selections = environment.catalog.state.value.selections
         return if (selections.tts == ref) selections.ttsFallbacks else emptyList()

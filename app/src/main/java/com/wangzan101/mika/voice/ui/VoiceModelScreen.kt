@@ -231,8 +231,9 @@ private fun MigratedVoiceModelContent(
 
     val previewScope = key(selection) { rememberCoroutineScope() }
 
-    // 音色面板里的试听:和「测试」共用 [player],同一时间只播一条(新的替换旧的);
-    // 面板关掉、换了模型、离开页面都停。合成和播放在 VoicePlayer 里挂起进行,不占主线程。
+    // Audition in the voice panel shares [player] with "Test" and plays only one clip at a time (a new one replaces the
+    // old); it stops when the panel closes, the model changes, or the page is left. Synthesis and playback run
+    // suspended in VoicePlayer without blocking the main thread.
     fun audition(voice: String, locale: Locale? = null) {
         val ref = selection ?: return
         val protocol = selectedModel?.tts?.protocol ?: return
@@ -250,7 +251,7 @@ private fun MigratedVoiceModelContent(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // 失败原因已经在 player.state 里,页面底下的播放状态会显示
+                // The failure reason is already in player.state and shown by the playback status at the bottom of the page
             }
         }
     }

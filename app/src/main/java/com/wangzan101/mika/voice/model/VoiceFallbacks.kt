@@ -6,16 +6,19 @@ import com.wangzan101.mika.settings.movedFallbacks
 import kotlinx.coroutines.CancellationException
 
 /**
- * 语音的备援链([VoiceSelections.sttFallbacks] / [VoiceSelections.ttsFallbacks])怎么改。纯函数,
- * [VoiceCatalogStore] 和界面都按它算;规则和对话模型的备援链([com.wangzan101.mika.settings.setFallback])一样。
+ * How voice fallback chains ([VoiceSelections.sttFallbacks] / [VoiceSelections.ttsFallbacks]) change. Pure functions
+ * used by [VoiceCatalogStore] and the UI, with the same rules as chat-model fallback chains
+ * ([com.wangzan101.mika.settings.setFallback]).
  */
 object VoiceFallbacks {
-    /** 一条链最多几个备援。语音是边说边等的,链太长最坏要等很久。 */
+    /** Maximum backups in one chain. Voice is used while waiting, and a long chain can make the worst case very slow. */
     const val MAX = 3
 
     /**
-     * 只收整段上传识别的模型:松手后把整段录音交出去转写,失败了同一段录音可以交给下一个。
-     * 边说边出字的流式识别(和系统识别)在说话过程中就连着服务,中途换不了,不进链也不当链头。
+     * Only models that transcribe a whole uploaded recording qualify: after release the whole recording is handed over,
+     * and on failure the same recording can go to the next model. Streaming recognition that writes while you speak (and
+     * system recognition) is connected to the service throughout, cannot switch mid-way, and neither joins a chain nor
+     * acts as its head.
      */
     val UTTERANCE_STT_PROTOCOLS: Set<SttProtocol> = setOf(
         SttProtocol.AudioTranscriptions,
@@ -28,7 +31,7 @@ object VoiceFallbacks {
         SttProtocol.XfyunDictation,
     )
 
-    /** [model] 能不能进 [capability] 的备援链(也是这条链能不能挂在它后面)。实时通话没有备援链。 */
+    /** Whether [model] can join a [capability] fallback chain (and whether such a chain can hang off it). Real-time calls have no fallback chain. */
     fun eligible(model: VoiceModel, capability: VoiceCapability): Boolean = when (capability) {
         VoiceCapability.STT -> model.stt?.protocol in UTTERANCE_STT_PROTOCOLS
         VoiceCapability.TTS -> model.tts != null
@@ -36,8 +39,9 @@ object VoiceFallbacks {
     }
 
     /**
-     * 改第 [slot] 位:[ref] 为 null 是撤掉这一位(后面的往前补);已在链里的是移到目标位(不重复占位);
-     * 新的在目标位有人时替换、链没满时接在末尾。越界或链满返回 null。
+     * Change slot [slot]: a null [ref] removes that slot (later entries move up); an entry already in the chain moves to
+     * the target slot without duplicating; a new entry replaces whatever is there, or appends when the chain is not full.
+     * Out of range or a full chain returns null.
      */
     fun set(chain: List<VoiceModelRef>, slot: Int, ref: VoiceModelRef?): List<VoiceModelRef>? {
         if (slot < 0 || slot >= MAX) return null
@@ -53,11 +57,12 @@ object VoiceFallbacks {
         }
     }
 
-    /** 第 [from] 位挪到第 [to] 位;和对话备援链同一个算法。越界为 null。 */
+    /** Move position [from] to position [to], the same algorithm as chat fallback chains. Out of range is null. */
     fun moved(chain: List<VoiceModelRef>, from: Int, to: Int): List<VoiceModelRef>? = movedFallbacks(chain, from, to)
 
     /**
-     * 存之前收拾一遍:去重,去掉链头 [primary] 自己、能力不对的、[usable] 说已经不在目录里或不能进链的,截到 [MAX]。
+     * Clean up before saving: deduplicate, drop the head [primary] itself, wrong-capability entries, and anything [usable]
+     * says is no longer in the catalog or cannot join the chain, then truncate to [MAX].
      */
     fun normalized(
         chain: List<VoiceModelRef>,
@@ -73,10 +78,12 @@ object VoiceFallbacks {
 }
 
 /**
- * 语音这一步失败后要不要换链上的下一个:判断只有这一处。服务商返回的错误([ModelError],可能被语音层包了一层)
- * 交给对话模型链同一个判断 [FailoverPolicy.canFailover](限流、5xx、网络、鉴权、额度、模型不在……换;
- * 内容被拒、请求不对、回复解析不了不换)。语音自己的分类里:超时、网络、限流、鉴权、这个模型没配好
- * (缺凭据、缺地址)、设备上的引擎不在,都是这个模型/账号的事,换;取消、回复解析不了不换。
+ * Whether a failed voice step should try the next entry in the chain: decided only here. Provider errors ([ModelError],
+ * possibly wrapped by the voice layer) go through the same decision as chat-model chains, [FailoverPolicy.canFailover]
+ * (rate limit, 5xx, network, auth, quota, model missing … switch; rejected content, bad request, unparseable reply do
+ * not). In the voice-specific cases, timeouts, network, rate limits, auth, a misconfigured model (missing credentials or
+ * address) and a missing on-device engine are all this model/account's problem, so switch; cancellation and an
+ * unparseable reply do not switch.
  */
 object VoiceFailover {
     fun canTryNext(error: Throwable): Boolean {
@@ -98,9 +105,10 @@ object VoiceFailover {
     }
 
     /**
-     * 按 [candidates] 的顺序试:每个先 [resolve](读账号;没配好的备援直接跳过,链头没配好照常抛),再 [attempt]。
-     * 失败了 [canTryNext] 说换、且 [mayContinue] 还允许(比如流式朗读还没交出声音)才试下一个;
-     * 都不行抛最后一次真正发出去的请求的错误,没发出去过才抛配置错误。
+     * Try [candidates] in order: [resolve] each first (read its account; a misconfigured backup is skipped, while a
+     * misconfigured head still throws), then [attempt]. On failure, try the next only when [canTryNext] says to switch and
+     * [mayContinue] still allows it (for example streaming read-aloud has not produced audio yet). When none work, throw
+     * the error from the last request actually sent; only if nothing was sent, throw the configuration error.
      */
     suspend fun <C, M, T> run(
         candidates: List<C>,

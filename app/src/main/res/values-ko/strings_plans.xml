@@ -42,7 +42,7 @@
     <string name="plans_notify_change">조건이 바뀔 때</string>
     <string name="plans_notify_each">매번</string>
     <string name="plans_cooldown_minutes">실행 사이 최소 간격(분, 선택 사항)</string>
-    <string name="plans_when_idle">Mika가 비어 있을 때만 실행</string>
+    <string name="plans_when_idle">Claire가 비어 있을 때만 실행</string>
     <string name="plans_execution_window">실행 시간대</string>
     <string name="plans_window_anytime">언제든지</string>
     <string name="plans_window_off_peak">비혼잡 시간대</string>
@@ -127,5 +127,5 @@
     <string name="plans_screen_off_unlock">휴대폰 단계 잠금 해제</string>
     <string name="plans_screen_off_fix">해결</string>
     <string name="plans_screen_off_foot">알림, 웹, 샌드박스 단계는 화면이 꺼진 상태에서 잠금 해제 없이 실행됩니다. 패턴 잠금은 자동으로 해제할 수 없습니다.</string>
-    <string name="plans_screen_off_open_failed">설정 화면을 열 수 없습니다. 시스템 설정에서 Mika를 찾아 변경하세요.</string>
+    <string name="plans_screen_off_open_failed">설정 화면을 열 수 없습니다. 시스템 설정에서 Claire를 찾아 변경하세요.</string>
 </resources>

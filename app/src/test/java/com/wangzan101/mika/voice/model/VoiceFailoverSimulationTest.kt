@@ -36,8 +36,9 @@ import java.util.Collections
 import javax.crypto.KeyGenerator
 
 /**
- * 语音备援链和密钥池对着本地假服务真跑一遍:借用对话账号的语音模型和对话模型用同一个 [KeyPoolManager.shared] 池,
- * 429 记冷却换下一把;整个模型过载(5xx)才换链上的下一个模型。
+ * Run voice fallback chains and key pools against a local fake service for real: a voice model borrowing a chat account
+ * shares the same [KeyPoolManager.shared] pool as chat models, a 429 records a cooldown and moves to the next key, and
+ * only whole-model overload (5xx) moves to the next model in the chain.
  */
 class VoiceFailoverSimulationTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -91,9 +92,9 @@ class VoiceFailoverSimulationTest {
 
         assertEquals("hello from backup", text)
         val primaryKeys = trace.filter { it.startsWith("primary:") }.map { it.substringAfter(':') }
-        assertEquals("先 k1 被限流,换 k2;k2 过载不是密钥的事,不再换密钥", listOf("k1", "k2"), primaryKeys.distinct())
+        assertEquals("k1 is rate-limited first, then k2; a k2 overload is not a key problem, so no more key switching", listOf("k1", "k2"), primaryKeys.distinct())
         assertEquals("b1", trace.last().substringAfter(':'))
-        // 对话那边看到的是同一个池:k1 在冷却,只剩 k2 可用
+        // Chat sees the same pool: k1 is cooling down, leaving only k2 usable
         val id = providerId(primary)
         assertEquals(1, KeyPoolManager.shared.activeKeyCount(id))
         assertEquals("k2", store.activeApiKey(id))
@@ -205,7 +206,7 @@ class VoiceFailoverSimulationTest {
         }
         assertSame(cut, thrown)
         assertEquals(1, parts.size)
-        assertEquals("已经开始播了不换模型", listOf("primary:stream:null"), calls)
+        assertEquals("Once playback has started, do not change models", listOf("primary:stream:null"), calls)
     }
 
     @Test fun `try and test paths build only the selected model, the speaker follows the chain`() {
@@ -213,7 +214,7 @@ class VoiceFailoverSimulationTest {
         catalog.setTtsSelection(refs[0])
         catalog.setFallback(VoiceCapability.TTS, 0, refs[1])
         assertEquals(listOf(refs[1]), env.tts.backupsFor(refs[0]))
-        assertEquals("不是朗读选中的模型就没有链", emptyList<VoiceModelRef>(), env.tts.backupsFor(refs[1]))
+        assertEquals("A model not selected for read-aloud has no chain", emptyList<VoiceModelRef>(), env.tts.backupsFor(refs[1]))
         assertFalse(env.tts.createTts(context, refs[0], TtsCapabilities()) is FallbackTtsModel)
     }
 }

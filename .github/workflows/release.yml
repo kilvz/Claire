@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.7.0: the latest upstream features arrive in Claire: pause everything, AI phone calls, video tools, system and on-device voices, a rebuilt schedule editor with screen-off runs, settings search, conversation export, provider nicknames and fallback flow, and Telegram setup by QR code. Telegram tasks no longer crash on their first receipt, and new wireless-debugging pairings show claire@<model> instead of mika@<model> (an existing phone keeps the old entry until it is unpaired and paired again).
+            New in 2.8.0: voice input and read-aloud can use backup models in order, share the chat provider's key pool, rotate keys on rate limits, and fail over when a whole model is overloaded; speech-to-text can follow the same service as Main or Light. The step after you interject goes to the main model, and root commands are only written by the main model.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

@@ -12,7 +12,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 <br/>
 
-<a href="https://github.com/kilvz/Claire/releases/latest"><img src="https://img.shields.io/badge/Download%20APK-Android%2011%2B-2ea043?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a> <a href="https://github.com/kilvz/Claire"><img src="https://img.shields.io/github/stars/kilvz/Claire?style=for-the-badge&logo=github&label=Star&color=FFD700&logoColor=white" alt="Star this repo" /></a>
+<a href="https://github.com/kilvz/Claire/releases/latest"><img src="https://img.shields.io/badge/Download%20APK-Android%2011%2B-2ea043?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
 
 <br/>
 
@@ -30,7 +30,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 - **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI comes in English plus 12 translations and follows your system language; switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 2.7.0 tracks upstream Mika 0.1.52 through commit `1812eabef`. See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Its own versioning.** Claire 2.8.0 tracks upstream Mika 0.1.52 through commit `d0a515665`. See [VERSION.md](VERSION.md) for how versions are numbered.
 - **Same engine, current features.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, schedules, skills and memory — is here, including the latest voice, calling, video and settings work.
 
 ## Get things done with one sentence
@@ -63,17 +63,11 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 <sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Claire isn't tied to them; it works with any app or website on your phone.</sub>
 
-## New in 2.7
+## New in 2.8
 
-- **Pause Claire.** One switch in Settings stops running and queued tasks, skips due plans and turns away new work from chat, computers and message channels. It also parks phone control; the wireless-debugging pairing stays saved for when you resume.
-- **AI phone calls.** Answer or place cellular calls with a realtime voice model, set who may be answered automatically, take over at any time, and get a transcript summary with an optional follow-up message draft.
-- **Video.** Generate short videos with your own video model, look at a video in the workspace frame by frame, save it to the gallery, or share it into another app.
-- **Voices that fit your phone.** Use the system text-to-speech engine or an on-device voice, or a provider's speech service, and pick the voice per language.
-- **Better schedules.** A redesigned plan editor with an AM/PM time picker, timezone search, execution windows, and reliable runs while the screen is off or locked.
-- **Settings search.** Search every settings page and jump straight to the matching row, with the match highlighted.
-- **Telegram setup by QR code.** Scan a code that holds a @BotFather token and the bot is saved without typing the token.
-- **Stability.** Telegram messages no longer crash the app when a task receipt looks up its channel; new wireless-debugging pairings appear as `claire@<model>` instead of `mika@<model>`.
-
+- **Voice fallbacks and key rotation.** Voice input and read-aloud can try backup models in order, share the chat provider's key pool, rotate keys on rate limits, and fail over when a whole model is overloaded. Speech-to-text can follow the same service as Main or Light.
+- **Smarter model routing.** The step after you interject goes to the main model, and root commands are only written by the main model.
+- **Everything from 2.7 stays.** Pause, AI phone calls, video, on-device voices, the rebuilt schedule editor, settings search, Telegram QR setup, and the Telegram and wireless-debugging fixes.
 ## What it can do
 
 | | |
@@ -181,25 +175,6 @@ More answers are in the [FAQ](docs/faq.md).
 - **Follow the original author**: X [@wangzan101](https://x.com/wangzan101)
 - **Report a problem**: [open an issue](https://github.com/kilvz/Claire/issues/new/choose); About › Send feedback in the app can attach diagnostics
 - **Contribute**: add usage knowledge for an app or website (plain text, no code needed), or contribute code; see the [contributing guide](.github/CONTRIBUTING.md)
-
-<p align="center">⭐ If Claire saves you time, give it a star — it helps more people find it.</p>
-
-## Star History
-
-<a href="https://star-history.com/#kilvz/Claire&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date&theme=dark" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date" width="600" />
-  </picture>
-</a>
-
-## Contributors
-
-Thanks to everyone who has helped build Mika, and to everyone who keeps Claire moving:
-
-<a href="https://github.com/wangzan101/Mika/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=wangzan101/Mika&max=100&columns=12" alt="Upstream Mika contributors" />
-</a>
 
 ## License
 

@@ -142,8 +142,9 @@ class VoiceCatalogStore(
     }
 
     /**
-     * 改 [capability](STT / TTS)备援链的第 [slot] 位,规则见 [VoiceFallbacks.set];[ref] 为 null 是撤掉这一位。
-     * 越界、链满、或 [ref] 进不了这条链(能力不对、流式识别、就是链头本身)时不改,返回 false。
+     * Change slot [slot] of the [capability] (STT / TTS) fallback chain; see [VoiceFallbacks.set]. A null [ref] removes
+     * that slot. Returns false without changing anything when the slot is out of range, the chain is full, or [ref]
+     * cannot join this chain (wrong capability, streaming recognition, or the head itself).
      */
     @Synchronized
     fun setFallback(capability: VoiceCapability, slot: Int, ref: VoiceModelRef?): Boolean {
@@ -155,7 +156,7 @@ class VoiceCatalogStore(
         return true
     }
 
-    /** 备援链里第 [from] 位挪到第 [to] 位;越界不改,返回 false。 */
+    /** Move position [from] to position [to] in a fallback chain; out of range changes nothing and returns false. */
     @Synchronized
     fun moveFallback(capability: VoiceCapability, from: Int, to: Int): Boolean {
         val chain = fallbacksOf(mutable.value.selections, capability) ?: return false
@@ -360,7 +361,7 @@ class VoiceCatalogStore(
         ref.capability == capability &&
             models.any { it.sameIdentity(ref.serviceId, ref.modelId) && VoiceFallbacks.eligible(it, capability) }
 
-    /** 备援链去重、去掉链头自己和已删/不能进链的模型。链头换成流式识别时链照存,用不上而已(见 SttSelectionController.backupsFor)。 */
+    /** Deduplicate a fallback chain and drop the head itself plus deleted or ineligible models. When the head becomes streaming recognition the chain is kept but unused (see SttSelectionController.backupsFor). */
     private fun tidyFallbacks(selections: VoiceSelections, models: List<VoiceModel>): VoiceSelections = selections.copy(
         sttFallbacks = VoiceFallbacks.normalized(selections.sttFallbacks, primaryOf(selections, VoiceCapability.STT), VoiceCapability.STT) {
             fallbackUsable(it, VoiceCapability.STT, models)

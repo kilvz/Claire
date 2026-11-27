@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.7.0 (versionCode 77)
-- **Base version:** upstream Mika 0.1.52, merged through commit `1812eabef`
+- **Claire version:** 2.8.0 (versionCode 78)
+- **Base version:** upstream Mika 0.1.52, merged through commit `d0a515665`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -196,6 +196,12 @@ recorded base version.
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
 
+- 2.8.0: merges the latest upstream Mika. Voice input and read-aloud
+  can now use backup models in order, share the chat provider's key pool,
+  rotate keys on 429/401/403, and fail over when a whole model is
+  rate-limited or overloaded; speech-to-text can follow the same service
+  as Main or Light. The step after a user interjection goes to the main
+  model, and root commands are only written by the main model.
 - 2.7.0: merges the latest upstream Mika. New: pause everything from
   Settings; AI phone calls with realtime voice, auto-answer rules,
   summaries and follow-up drafts; video generation and video tools;

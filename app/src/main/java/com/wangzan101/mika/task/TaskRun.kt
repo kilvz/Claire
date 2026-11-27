@@ -239,10 +239,10 @@ class TaskRun(
     internal val env = TaskEnvironment.of(service)
     /** The session ID this conversation is exposed under: every model created for this run (main, lightweight, vision, and side paths such as verification, intent detection and stop summaries) uses it. */
     internal val session = ModelSession.of(conversationId)
-    /** execute 开局构造一次；主/轻量/视觉、备援与失败提示都只读这份。 */
+    /** Built once at the start of execute; the primary/light/vision models, fallbacks and failure hints all read only this snapshot. */
     @Volatile internal var modelSnapshot: TaskModelSnapshot? = null
         private set
-    /** App 给的手机服务(共用的 shell 连接、「去设置」提示)、记忆、经验路线、异常退出后的恢复。 */
+    /** Phone services provided by the App (shared shell connection, "go to Settings" prompts), memory, learned routes, and recovery after an abnormal exit. */
     internal val phoneServices = PhoneServices.of(service)
     internal val memoryRuntime = MemoryRuntime.of(service)
     internal val routeStore = FileRouteStore.shared(service)
@@ -507,8 +507,9 @@ class TaskRun(
     }
 
     /**
-     * 把工作区里的一段视频复制成别的 App 可读的 content URI(分享用),和图片走同一个 [com.wangzan101.mika.media.ShareFileExporter];
-     * 边读边写,不整段读进内存。越界、不是视频、太大时为 null。
+     * Copy a video from the workspace into a content URI other apps can read (for sharing), using the same
+     * [com.wangzan101.mika.media.ShareFileExporter] as images; it streams the copy instead of reading it all into memory.
+     * Null when the range is invalid, the file is not a video, or it is too large.
      */
     internal suspend fun shareWorkspaceVideo(path: String): com.wangzan101.mika.media.ShareableFile? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val trimmed = path.trim()
@@ -528,7 +529,7 @@ class TaskRun(
         }
     }
 
-    /** 本任务的视频端口:手机上开始的任务才给(视频看/存只对用户本机文件有意义)。 */
+    /** This task's video port: only for tasks started on the phone (viewing/saving video only makes sense for the user's own files). */
     internal val videoPort by lazy {
         if (provenance.origin != RunOrigin.Ui) null
         else com.wangzan101.mika.media.AndroidVideoPort(service, conversationId)
@@ -537,8 +538,10 @@ class TaskRun(
     internal val videoSettings by lazy { com.wangzan101.mika.settings.VideoSettings.get(service) }
 
     /**
-     * 本任务的视频生成端口:用户打开了视频生成、选的服务商现在仍能生成视频、且这是手机上开始的任务时才建。
-     * 哪家、什么协议由 [com.wangzan101.mika.settings.videoModel] 按服务商的声明决定;选择对不上时不建,工具也就不出现。
+     * This task's video generation port: built only when the user enabled video generation, the selected provider can
+     * still generate video, and the task started on the phone. [com.wangzan101.mika.settings.videoModel] decides the
+     * provider and protocol from the provider's declaration; when the selection no longer matches, no port is built and
+     * the tools do not appear.
      */
     internal val videoGenerationPort by lazy {
         val state = videoSettings.state.value
@@ -695,7 +698,7 @@ class TaskRun(
     }
 
     suspend fun execute(priorTurns: List<Turn>): TaskState {
-        // 每次启动（UI、定时、渠道都一样）重读所属对话；此后整次运行只用这一份不可变路由。
+        // Every start (UI, schedule or channel alike) re-reads the conversation it belongs to; the whole run then uses only this immutable route.
         val choice = withContext(Dispatchers.IO) {
             runCatching { ConversationStore.shared(service).settings(conversationId).main }.getOrNull()
         }
@@ -787,7 +790,7 @@ class TaskRun(
         com.wangzan101.mika.core.model.VideoJobStage.Running -> R.string.task_video_running
     }
 
-    /** 后台一步的说明写到任务卡片上(当前这一步的 note);不在干活(已暂停/结束)时不动。 */
+    /** Write a background step's explanation to the task card (the current step's note); does nothing when not working (paused/ended). */
     private fun statusNote(text: String) {
         val s = state.value as? TaskState.Running ?: return
         publish(s.copy(note = text))

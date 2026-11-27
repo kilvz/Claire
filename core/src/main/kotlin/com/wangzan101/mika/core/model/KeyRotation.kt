@@ -1,12 +1,13 @@
 package com.wangzan101.mika.core.model
 
-/** 上游拒了这把密钥:HTTP 状态(429 限流;401/403 无效或被封)和它建议的冷却。 */
+/** The upstream rejected this key: the HTTP status (429 rate limit; 401/403 invalid or blocked) and its suggested cooldown. */
 data class KeyRejection(val status: Int, val retryAfterMs: Long?)
 
 /**
- * 一次逻辑请求按密钥池轮换:[send] 的结果经 [rejectionOf] 判为「这把密钥被拒」时,先交 [rejected]
- * (接线处按状态码记 429 冷却或 401/403 耗尽),再向 [nextKey] 要下一把重发;每把密钥最多试一次,
- * 池里没有别的可用密钥就把最后一次的结果原样交回。预算、取消与网络错误不在这里处理。
+ * Rotate through the key pool for one logical request: when [rejectionOf] reports that [send]'s result means "this key
+ * was rejected", pass it to [rejected] first (the wiring records a 429 cooldown or 401/403 exhaustion by status), then
+ * ask [nextKey] for another key and send again. Each key is tried at most once; when the pool has no other usable key,
+ * the last result is returned unchanged. Budgets, cancellation and network errors are not handled here.
  */
 suspend fun <T> withKeyRotation(
     nextKey: () -> String?,
@@ -27,7 +28,7 @@ suspend fun <T> withKeyRotation(
     }
 }
 
-/** 对话适配器那条路:按原始 HTTP 状态判断拒绝。拒绝回调带上状态码,接线处据此区分 429 冷却与 401/403 耗尽。 */
+/** The chat-adapter path: decide rejection from the raw HTTP status. The rejection callback carries the status so the wiring can distinguish 429 cooldown from 401/403 exhaustion. */
 internal suspend fun requestWithKeyRotation(
     nextKey: suspend () -> String?,
     rejected: ((String, Long?, Int) -> Unit)?,
@@ -39,8 +40,9 @@ internal suspend fun requestWithKeyRotation(
 }, send)
 
 /**
- * 已经映射成 [ModelError] 抛出来的失败(语音转写、朗读等不经 [RawResponse] 的调用)里,是不是「这把密钥被拒」。
- * 沿 cause 链找:语音层会把 [ModelError] 包一层再抛。和 [requestWithKeyRotation] 认同样的三种状态。
+ * Checks whether a failure already mapped to [ModelError] and thrown (voice transcription, read-aloud and other calls
+ * that do not go through [RawResponse]) means "this key was rejected". It walks the cause chain because the voice layer
+ * wraps a [ModelError] before throwing. Recognizes the same three statuses as [requestWithKeyRotation].
  */
 fun keyRejectionOf(error: Throwable): KeyRejection? = generateSequence(error) { it.cause }
     .take(MAX_CAUSE_DEPTH)

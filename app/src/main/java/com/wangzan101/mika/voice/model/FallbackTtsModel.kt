@@ -10,9 +10,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 /**
- * 朗读的备援链和密钥池轮换:每次合成先用链头,失败了由 [VoiceFailover] 决定换不换下一个;每个模型都走自己账号的
- * 密钥池([VoiceAccountResolver.withPooledKey])。备援用自己的默认音色(请求里的音色是给链头选的,别家多半不认),
- * 语速照用。流式朗读只在还没交出声音前换,已经开始播了就照常报错,不会一句话换个声音接着念。
+ * Read-aloud fallback chain and key-pool rotation: each synthesis starts with the head, and on failure [VoiceFailover]
+ * decides whether to try the next one; each model uses its own account's key pool
+ * ([VoiceAccountResolver.withPooledKey]). A backup uses its own default voice (the voice in the request was chosen for
+ * the head and other providers usually do not recognize it) but keeps the requested speed. Streaming read-aloud only
+ * switches before any audio has been handed out; once playback has started it fails as usual rather than changing voices
+ * mid-sentence.
  */
 internal class FallbackTtsModel(
     private val chain: List<VoiceModelRef>,
@@ -25,7 +28,7 @@ internal class FallbackTtsModel(
     override val name: String get() = head.name
     override val capabilities: TtsCapabilities get() = head.capabilities
 
-    /** 建好的模型按「第几个 + 哪把密钥」留着:系统引擎、HTTP 客户端不必每句话重建。 */
+    /** Cache built models by "position + key" so the system engine and HTTP clients do not need rebuilding for every sentence. */
     private val built = mutableMapOf<Pair<Int, String>, TtsModel>()
 
     @Synchronized
@@ -44,7 +47,7 @@ internal class FallbackTtsModel(
             accounts.withPooledKey(resolved) { keyed -> modelFor(index, keyed).synthesize(request.forIndex(index)) }
         }
 
-    /** 链头能边合成边播时才是 [StreamingTtsModel];备援不能流式的,整段合成好当一份完整音频交出。 */
+    /** Only a streaming-capable head is a [StreamingTtsModel]; a non-streaming backup synthesizes the whole clip and hands it over as one complete audio file. */
     fun streamAudio(request: TtsRequest): Flow<TtsAudioPart> = flow {
         var started = false
         VoiceFailover.run(chain, ::resolveAt, mayContinue = { !started }) { resolved, index ->
@@ -53,7 +56,7 @@ internal class FallbackTtsModel(
                 val piece = request.forIndex(index)
                 if (model is StreamingTtsModel) {
                     model.streamAudio(piece).collect { part ->
-                        // 先记下再交:下游出的错也算已经开始,不再换模型重来
+                        // Record it before handing it out: downstream errors also count as started, so do not switch models and retry
                         started = true
                         emit(part)
                     }
@@ -67,7 +70,7 @@ internal class FallbackTtsModel(
     }
 
     companion object {
-        /** 链头能流式就给流式的外壳,否则普通的。 */
+        /** Wrap the head as streaming when it can stream, otherwise as the ordinary model. */
         fun of(
             chain: List<VoiceModelRef>,
             first: ResolvedVoiceModel,

@@ -69,7 +69,7 @@ adb shell getprop ro.product.cpu.abi
 
 ## Step 2: Download the latest APK
 
-Ask the GitHub API for the latest release, pick the asset named like `Claire-2.7.0.apk` (the all-architecture build), and download its `browser_download_url`:
+Ask the GitHub API for the latest release, pick the asset named like `Claire-2.8.0.apk` (the all-architecture build), and download its `browser_download_url`:
 
 ```
 URL=$(curl -fsSL https://api.github.com/repos/kilvz/Claire/releases/latest \
@@ -79,7 +79,7 @@ echo "$URL"
 curl -fL -o Claire.apk "$URL"
 ```
 
-Success: `$URL` looks like `https://github.com/kilvz/Claire/releases/download/v2.7.0/Claire-2.7.0.apk`, `curl` reports no error, and `Claire.apk` is in the current folder.
+Success: `$URL` looks like `https://github.com/kilvz/Claire/releases/download/v2.8.0/Claire-2.8.0.apk`, `curl` reports no error, and `Claire.apk` is in the current folder.
 
 If jq is available, parsing the JSON with it is more robust; the idea is the same: take the entry in `assets` whose name matches `Claire-<version>.apk`.
 

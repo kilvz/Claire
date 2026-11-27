@@ -64,13 +64,14 @@ interface SttAdapter {
     fun start(context: Context, model: ResolvedVoiceModel, language: String?, hooks: SttHooks = SttHooks()): SpeechSession
 
     /**
-     * 整段上传识别的协议给出「一段 WAV 进、文字出」的转写(失败抛 [com.wangzan101.mika.core.model.ModelError]);
-     * 备援链和密钥池轮换按它把同一段录音交给下一个模型/下一把密钥。流式和系统识别为 null。
+     * Protocols that transcribe a whole uploaded recording expose "a WAV in, text out" (failure throws
+     * [com.wangzan101.mika.core.model.ModelError]); the fallback chain and key-pool rotation use it to hand the same
+     * recording to the next model/key. Streaming and system recognition return null.
      */
     fun utterance(context: Context, model: ResolvedVoiceModel, language: String?): UtteranceTranscribe? = null
 }
 
-/** 一段 WAV 进、文字出。 */
+/** A WAV in, text out. */
 typealias UtteranceTranscribe = suspend (wav: ByteArray) -> String
 
 private class CategorizedSpeechSession(
@@ -332,7 +333,7 @@ private val defaultSherpaSession: SttSessionFactory = { context, model, _, hooks
 internal fun languageTag(context: Context, language: String?): String =
     language ?: SystemSpeech.speechTag(AppLanguage.current(context))
 
-/** 流式识别要告诉服务的语言;[tag] 为空(这个服务设的是「自动」)时不指定。 */
+/** The language streaming recognition tells the service; when [tag] is empty (the service is set to "auto") none is specified. */
 internal fun asrLanguage(tag: String): AsrLanguage = AsrLanguage.of(SystemSpeech.isoCode(tag))
 
 private fun bailianRegion(binding: SttBinding): BailianRegion =
