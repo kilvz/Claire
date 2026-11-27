@@ -77,14 +77,6 @@ object ConversationTitler {
     /** True when one text has CJK characters and the other has none, so a title never changes the message's language. */
     private fun scriptsDiffer(input: String, title: String): Boolean = hasCjk(title) != hasCjk(input)
 
-    private fun hasCjk(text: String): Boolean = text.codePoints().anyMatch { cp ->
-        when (Character.UnicodeScript.of(cp)) {
-            Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA,
-            Character.UnicodeScript.KATAKANA, Character.UnicodeScript.HANGUL -> true
-            else -> false
-        }
-    }
-
     private val TAG = Regex("</?\\s*message\\s*>", RegexOption.IGNORE_CASE)
     private val WRAP = "\"'“”‘’「」『』《》`*#".toSet()
     private val TAIL = "。.!！?？,，;；:：、 ".toSet()

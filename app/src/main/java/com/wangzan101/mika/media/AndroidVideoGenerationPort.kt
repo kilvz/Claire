@@ -88,8 +88,8 @@ class AndroidVideoGenerationPort(
             }
         }
         return withContext(Dispatchers.IO) {
-            val (w, h) = runCatching { BitmapImageOps.size(bytes) }.getOrElse { throw VideoError.Unsupported("first frame is not an image Mika can read") }
-            if (w <= 0 || h <= 0) throw VideoError.Unsupported("first frame is not an image Mika can read")
+            val (w, h) = runCatching { BitmapImageOps.size(bytes) }.getOrElse { throw VideoError.Unsupported("first frame is not an image Claire can read") }
+            if (w <= 0 || h <= 0) throw VideoError.Unsupported("first frame is not an image Claire can read")
             if (bytes.size <= FIRST_FRAME_RAW_MAX && maxOf(w, h) <= FIRST_FRAME_SIDE) bytes to imageMime(path)
             else BitmapImageOps.toJpeg(bytes, FIRST_FRAME_SIDE, 90) to "image/jpeg"
         }

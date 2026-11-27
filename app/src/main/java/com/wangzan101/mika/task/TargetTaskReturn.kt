@@ -50,6 +50,6 @@ internal suspend fun restoreTargetApp(
     ) return true
     val reason = (result as? ActionResult.Failed)?.reason?.let { " ($it)" }.orEmpty()
     throw TargetAppRestoreFailed(
-        app.packageName, "Couldn't reopen ${app.packageName} on Mika's screen$reason. Open it before continuing or choose another way.",
+        app.packageName, "Couldn't reopen ${app.packageName} on Claire's screen$reason. Open it before continuing or choose another way.",
     )
 }

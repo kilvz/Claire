@@ -26,7 +26,7 @@ import uuid
 
 VERSION = "0.1.0"
 API = "/api/v1"
-DEFAULT_PACKAGE = "com.wangzan101.mika"
+DEFAULT_PACKAGE = "com.kilv.claire"
 # Stable entry point kept in the APK for the CLI; internal classes behind it may move.
 SCREEN_INSPECT = "com.wangzan101.mika.shell.ScreenInspectMain"
 SCREEN_ERRORS = {
