@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.agent
 
 import com.wangzan101.mika.core.run.trace.RunTrace
 import com.wangzan101.mika.core.action.ConfirmDecision
+import com.wangzan101.mika.core.model.Author
 import com.wangzan101.mika.core.model.ChatModel
 import com.wangzan101.mika.core.model.Message
 import com.wangzan101.mika.core.model.ModelError
@@ -146,7 +147,7 @@ internal class ModelCaller(
         onText: ((String) -> Unit)? = null,
     ): Pair<ModelReply, ChatModel> {
         val r = router?.takeIf { routing } ?: return askRouted(history, specs, step, onText = onText)
-        val picked = r.pick(track.context(step, history.any { m -> m.parts.any { it is Part.Image } }))
+        val picked = r.pick(track.context(step, history.any { m -> m.parts.any { it is Part.Image } }).copy(userSpoke = userSpokeSinceReply(history)))
         if (!r.isLight(picked)) return askRouted(history, specs, step, onText = onText)
         // The light model's context may be smaller: its context-too-long report and how much it folded do not affect
         // the primary model (compaction state is tracked per model)
@@ -182,6 +183,12 @@ internal class ModelCaller(
         onText?.invoke("")
         restarted(now())
         return askRouted(history, specs, step, onText = onText)
+    }
+
+    /** 最后一条模型回复之后有用户自己的话(插话,见 [Author.User]);开局那句在第一条回复之前,不算。 */
+    private fun userSpokeSinceReply(history: List<Message>): Boolean {
+        val last = history.indexOfLast { it.role == Role.Assistant }
+        return last >= 0 && (last + 1 until history.size).any { history[it].author == Author.User }
     }
 
     private fun needsMain(call: Part.ToolCall): Boolean =

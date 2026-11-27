@@ -114,7 +114,7 @@ class VoiceInput(
             SttHooks()
         }
         return try {
-            voiceModels.stt.start(context, ref, tag, hooks)
+            voiceModels.stt.start(context, ref, tag, hooks, voiceModels.stt.backupsFor(ref))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

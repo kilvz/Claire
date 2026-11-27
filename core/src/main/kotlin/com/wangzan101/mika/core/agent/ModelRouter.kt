@@ -15,13 +15,14 @@ data class StepContext(
     val sameAppAsLast: Boolean,
     /** The context to be sent contains screenshots; a light model without vision cannot take it. */
     val hasImages: Boolean = false,
+    /** 上一条模型回复之后用户又说了话(插话):要重新理解目标,这一步给主模型。 */
+    val userSpoke: Boolean = false,
 )
 
 /**
- * Division of labor for the experimental switch lightSteps: simple steps go to the light model, the rest to the
- * primary model. When no light model is configured, or it does not support tool calls, the primary model is always
- * used. After a step errors, raises a guard hint, or leaves the screen unchanged, the next [TROUBLE_STEPS] steps are
- * forced to the primary model.
+ * 实验开关 lightSteps 的分工:简单步给轻量模型,其余给主模型。
+ * 轻量模型没配、不支持工具调用时恒用主模型。一步出了错误、守卫提示或画面没变,接下来 [TROUBLE_STEPS] 步强制主模型。
+ * 用户刚插了话的那一步([StepContext.userSpoke])也给主模型。
  *
  * The light side keeps the multi-level Light Waterfall Chain: when the current light model is unavailable, switch to
  * the next one in turn, and only fall back to the primary model when all are exhausted.
@@ -75,7 +76,7 @@ class ModelRouter(
             return main
         }
         val l = currentLight?.takeIf { active } ?: return main
-        val simple = ctx.step > 1 && !ctx.lastWasRecovery && ctx.sameAppAsLast && (!ctx.hasImages || l.capabilities.vision)
+        val simple = ctx.step > 1 && !ctx.lastWasRecovery && !ctx.userSpoke && ctx.sameAppAsLast && (!ctx.hasImages || l.capabilities.vision)
         return if (simple) l else main
     }
 
@@ -97,10 +98,12 @@ class ModelRouter(
 
     companion object {
         const val TROUBLE_STEPS = 2
-        /** These calls (plus do_steps) are not executed when the light model makes them; the step asks the primary model instead: giving up, confirming, hand-over, ask-back, and sandbox commands are all decided by the primary model. */
+        /** 轻量模型给出这些调用(还有 do_steps)时不执行,这一步改问主模型:放弃、确认、接管、追问、沙箱命令、root 命令都由主模型决定。 */
         private val MAIN_ONLY_VERBS = setOf(Verb.EndNotDone, Verb.RequestConfirmation, Verb.HandToUser, Verb.AskUser, Verb.HandleObstacle,
-            Verb.PhoneRun, Verb.Collect, Verb.PhoneFind, Verb.PhoneDialog, Verb.PhoneGesture, Verb.PhoneCommand) +
-            // What runs in the sandbox is a command written by the model: only the primary model may write them
+            Verb.PhoneRun, Verb.Collect, Verb.PhoneFind, Verb.PhoneDialog, Verb.PhoneGesture, Verb.PhoneCommand,
+            // 以 root 身份跑的是模型写的命令,和 phone_system_command 一样只让主模型写
+            Verb.RootCommand) +
+            // 沙箱里跑的是模型写的命令:只让主模型写
             setOf(Verb.RunCommand, Verb.RunBundledScript, Verb.ReadFile, Verb.WriteFile, Verb.SearchFiles, Verb.ShareFile, Verb.ViewImage, Verb.ListFolderFiles)
         /** Calls only the primary model may make ([name] is the tool name, [verb] is the action it performs). */
         fun mainOnly(name: String, verb: Verb?): Boolean = name == DO_STEPS_TOOL || verb in MAIN_ONLY_VERBS
