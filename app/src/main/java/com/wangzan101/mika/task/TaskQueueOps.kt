@@ -95,10 +95,23 @@ internal fun TaskService.startFollowUp(item: QueuedFollowUp) {
     }.onFailure { center.followUps.add(item) }
 }
 
+/**
+ * The built-in messaging channel for [id], looked up in both WeChat and Telegram: checking only one of them made every
+ * task from the other channel fail with "unknown channel" on its first acknowledgement.
+ */
+internal fun channelForId(
+    id: String,
+    wechat: (String) -> Channel?,
+    telegram: (String) -> Channel?,
+): Channel? = wechat(id) ?: telegram(id)
+
 internal fun TaskService.channelFor(peer: ChannelPeer, scheduled: Boolean = false): Channel = when (peer.channelId) {
     LocalChannel.ID -> if (scheduled) scheduledLocalChannel else localChannel
-    else -> checkNotNull((application as com.wangzan101.mika.MikaApp).wechat.channelFor(peer.channelId)) {
-        "unknown channel ${peer.channelId}"
+    else -> {
+        val app = application as MikaApp
+        checkNotNull(channelForId(peer.channelId, app.wechat::channelFor, app.telegram::channelFor)) {
+            "unknown channel ${peer.channelId}"
+        }
     }
 }
 

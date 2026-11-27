@@ -271,7 +271,7 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
         }
         val local = localChannel(scheduled = false)
         val labels = com.wangzan101.mika.ui.ToolLabels(com.wangzan101.mika.core.assembly.knownTools())
-        RunRecovery(runStore, outbox, { id -> if (id == LocalChannel.ID) local else wechat.channelFor(id) ?: telegram.channelFor(id) }, object : TriggerOutcomes {
+        RunRecovery(runStore, outbox, { id -> if (id == LocalChannel.ID) local else com.wangzan101.mika.task.channelForId(id, wechat::channelFor, telegram::channelFor) }, object : TriggerOutcomes {
             override fun interrupted(key: String, reason: String) = TriggerRuntime.interrupted(app, key, reason)
             override fun delivered(key: String) = TriggerRuntime.delivered(app, key)
             override fun actionFailed(key: String, reason: String) = TriggerRuntime.actionFailed(app, key, reason)
