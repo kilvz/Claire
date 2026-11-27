@@ -229,7 +229,7 @@ class StopSummaryTest {
         }
     }
 
-    @Test fun nullBlankAndSystemKeepChineseCompatibilityWithoutInference() = runTest {
+    @Test fun nullBlankAndSystemUseEnglishFactsWithoutInference() = runTest {
         val expectedFacts = StopSummary.facts("open WhatsApp", greeting, null, ::label, ::app, language = null)
         val expectedPlain = StopSummary.plain("open WhatsApp", greeting, null, ::label, ::app, language = null)
         for (language in listOf(null, "", "system")) {
@@ -237,9 +237,9 @@ class StopSummaryTest {
             val plain = StopSummary.plain("open WhatsApp", greeting, null, ::label, ::app, language = language)
             assertEquals(expectedFacts, facts)
             assertEquals(expectedPlain, plain)
-            assertTrue(facts, facts.contains("第 1 步"))
-            assertFalse(facts, facts.contains("Step 1"))
-            assertTrue(plain, plain.startsWith("已经停下,停止前做了这些:"))
+            assertTrue(facts, facts.contains("Step 1"))
+            assertFalse(facts, facts.contains("第 1 步"))
+            assertTrue(plain, plain.startsWith("Stopped. Actions before stop:"))
             val model = FakeModel(answerReply("summary"))
             StopSummary(model, language = language).summarize("open WhatsApp", greeting, null, ::label, ::app)
             assertTrue(model.system!!.contains("Always mirror the language of the user's prompt"))

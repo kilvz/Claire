@@ -3,8 +3,8 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.6.1 (versionCode 76)
-- **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
+- **Claire version:** 2.7.0 (versionCode 77)
+- **Base version:** upstream Mika 0.1.52, merged through commit `1812eabef`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
   to it).
@@ -196,12 +196,18 @@ recorded base version.
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
 
-- 2.6.1: the Telegram bot no longer crashes Claire when a message
-  arrives: the task receipt looks up the Telegram channel as well as
-  WeChat instead of failing with "unknown channel telegram". New
+- 2.7.0: merges the latest upstream Mika. New: pause everything from
+  Settings; AI phone calls with realtime voice, auto-answer rules,
+  summaries and follow-up drafts; video generation and video tools;
+  system, on-device and provider voices with per-language selection; a
+  rebuilt schedule editor with execution windows and reliable runs
+  while the screen is off or locked; live settings search; conversation
+  export; provider nicknames and a visual fallback editor; and Telegram
+  setup by QR code. Fixes: the Telegram bot no longer crashes Claire
+  when a message arrives ("unknown channel telegram"), and new
   wireless-debugging pairings are introduced as `claire@<model>`
-  instead of `mika@<model>`; a device paired before this release keeps
-  the old entry until it is unpaired and paired again.
+  instead of `mika@<model>` (a phone paired earlier keeps the old entry
+  until it is unpaired and paired again).
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

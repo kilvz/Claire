@@ -356,10 +356,10 @@ class ToolDispatcherSandboxTest {
         val d = dispatcher()
         val apk = d.execute(call("share_file", buildJsonObject { put("path", "app.apk") })).content
         assertEquals(apk.toString(), "true", apk.s("ok"))
-        assertEquals("Download/Mika/app.apk", apk.s("savedAs"))
+        assertEquals("Download/Claire/app.apk", apk.s("savedAs"))
         val renamed = d.execute(call("share_file", buildJsonObject { put("path", "notes.txt"); put("name", "x.APKS") })).content
         assertEquals(renamed.toString(), "true", renamed.s("ok"))
-        assertEquals("Download/Mika/x.APKS", renamed.s("savedAs"))
+        assertEquals("Download/Claire/x.APKS", renamed.s("savedAs"))
         assertEquals(
             listOf(File(ws, "app.apk").canonicalFile, File(ws, "notes.txt").canonicalFile),
             sb.shared.map { it.first.canonicalFile },

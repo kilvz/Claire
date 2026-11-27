@@ -105,7 +105,7 @@ class ShareExporterDeviceTest {
         val apkName = "mika-test-$suffix.apk"
         val apkCard = export(apk.name, apkName)
         exported += apkCard.uri
-        assertEquals("Download/Mika/$apkName", apkCard.savedAs)
+        assertEquals("Download/Claire/$apkName", apkCard.savedAs)
         assertEquals(apk.length(), apkCard.size)
         assertEquals("PK", context.contentResolver.openInputStream(android.net.Uri.parse(apkCard.uri))!!.bufferedReader().use { it.readText() })
 
@@ -113,7 +113,7 @@ class ShareExporterDeviceTest {
         val aabName = "mika-test-$suffix.aab"
         val aabCard = export("out.txt", aabName)
         exported += aabCard.uri
-        assertEquals("Download/Mika/$aabName", aabCard.savedAs)
+        assertEquals("Download/Claire/$aabName", aabCard.savedAs)
         assertEquals("a", context.contentResolver.openInputStream(android.net.Uri.parse(aabCard.uri))!!.bufferedReader().use { it.readText() })
     }
 }

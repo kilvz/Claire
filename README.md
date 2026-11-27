@@ -30,7 +30,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 - **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI comes in English plus 12 translations and follows your system language; switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 2.6.1 tracks upstream Mika 0.1.52 through commit `1812eabef`. See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Its own versioning.** Claire 2.7.0 tracks upstream Mika 0.1.52 through commit `1812eabef`. See [VERSION.md](VERSION.md) for how versions are numbered.
 - **Same engine, current features.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, schedules, skills and memory — is here, including the latest voice, calling, video and settings work.
 
 ## Get things done with one sentence
@@ -63,7 +63,7 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 <sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Claire isn't tied to them; it works with any app or website on your phone.</sub>
 
-## New in 2.6
+## New in 2.7
 
 - **Pause Claire.** One switch in Settings stops running and queued tasks, skips due plans and turns away new work from chat, computers and message channels. It also parks phone control; the wireless-debugging pairing stays saved for when you resume.
 - **AI phone calls.** Answer or place cellular calls with a realtime voice model, set who may be answered automatically, take over at any time, and get a transcript summary with an optional follow-up message draft.

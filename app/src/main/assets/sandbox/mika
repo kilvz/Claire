@@ -5,7 +5,7 @@
 #
 # Usage:
 #   mika progress <text>        show a progress line on the task card (at most once per second)
-#   mika share <path> [name]    save a file from /workspace to the phone's Download/Mika
+#   mika share <path> [name]    save a file from /workspace to the phone's Download/Claire
 #   mika info                   Mika version, whether the network is on, the workspace path
 #   mika phone <op> [json]      call a phone tool on this task's virtual screen
 # Prints Mika's JSON reply. Exit code 0 when the reply says ok, 1 otherwise.

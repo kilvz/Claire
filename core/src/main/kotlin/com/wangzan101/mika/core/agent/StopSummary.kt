@@ -302,7 +302,7 @@ internal object StopPhrases {
                 tailIncomplete = { "「$it」還沒做完的部分沒有接著做。" },
                 example = "例:\n已經停下。停止前:\n- 打開了設定，看完了「網路和網際網路」「藍牙」兩頁:網路頁有 WLAN、行動網路、熱點，藍牙頁有配對新設備、已連線的設備。\n- 「顯示」「聲音」兩頁還沒看。",
             )
-            t.startsWith("zh") || t.isEmpty() || t == "system" -> StopPhrase(
+            t.startsWith("zh") -> StopPhrase(
                 isChinese = true,
                 headEmpty = "已经停下,还没开始操作。",
                 headWithActs = "已经停下,停止前做了这些:",
