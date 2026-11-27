@@ -26,10 +26,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.wangzan101.mika.R
 import com.wangzan101.mika.ui.QrCodeImage
 import com.wangzan101.mika.telegram.TelegramConnectionState
 import com.wangzan101.mika.telegram.TelegramRuntime
+import com.wangzan101.mika.telegram.parseTelegramQr
 import com.wangzan101.mika.ui.components.ButtonKind
 import com.wangzan101.mika.ui.components.CapabilityTag
 import com.wangzan101.mika.ui.components.FooterNote
@@ -88,10 +91,14 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
     var confirmRemove by remember { mutableStateOf(false) }
     var botUsername by remember { mutableStateOf(runtime.store.botUsername().takeIf { it.isNotBlank() }) }
     var qrFailed by remember { mutableStateOf(false) }
+    var showScanner by remember { mutableStateOf(false) }
+    var scanError by remember { mutableStateOf<String?>(null) }
     val tokenMissingText = stringResource(R.string.telegram_token_missing)
     val chatIdMissingText = stringResource(R.string.telegram_chat_id_missing)
     val savedText = stringResource(R.string.telegram_saved)
     val saveFailedText = stringResource(R.string.telegram_save_failed)
+    val scanInvalidText = stringResource(R.string.telegram_scan_invalid)
+    val scanTokenOnlyText = stringResource(R.string.telegram_scan_token_only)
     val testSentText = stringResource(R.string.telegram_test_sent)
     val testFailedText = stringResource(R.string.telegram_test_failed)
     val actionFailedText = stringResource(R.string.telegram_action_failed)
@@ -124,27 +131,17 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
         if (configured && botUsername == null) refreshUsername()
     }
 
-    fun saveBot() {
+    fun persistBot(tokenToSave: String, chatIdToSave: String) {
         if (saveBusy) return
-        val tokenToSave = token.trim().ifBlank { runtime.store.token() }
-        if (tokenToSave.isNullOrBlank()) {
-            saveMessage = tokenMissingText
-            saveIsError = true
-            return
-        }
-        if (chatId.trim().isBlank()) {
-            saveMessage = chatIdMissingText
-            saveIsError = true
-            return
-        }
         saveBusy = true
         saveMessage = null
         scope.launch {
             try {
-                withContext(Dispatchers.IO) { runtime.saveBot(tokenToSave, chatId.trim()) }
+                withContext(Dispatchers.IO) { runtime.saveBot(tokenToSave, chatIdToSave) }
                 token = ""
                 showToken = false
                 tokenSaved = true
+                chatId = chatIdToSave
                 saveMessage = savedText
                 saveIsError = false
                 botUsername = null
@@ -159,6 +156,46 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
                 saveBusy = false
             }
         }
+    }
+
+    fun saveBot() {
+        val tokenToSave = token.trim().ifBlank { runtime.store.token() }
+        if (tokenToSave.isNullOrBlank()) {
+            saveMessage = tokenMissingText
+            saveIsError = true
+            return
+        }
+        if (chatId.trim().isBlank()) {
+            saveMessage = chatIdMissingText
+            saveIsError = true
+            return
+        }
+        persistBot(tokenToSave, chatId.trim())
+    }
+
+    // A scanned code fills the bot in without typing the token: with a chat
+    // ID (in the code, in the field, or already saved) the bot is saved at
+    // once; with a token alone, the token is filled in and the chat ID is
+    // still asked for. A code holding no bot token leaves the scanner open
+    // with an error instead of closing it.
+    fun handleScanned(content: String) {
+        val setup = parseTelegramQr(content)
+        if (setup == null) {
+            scanError = scanInvalidText
+            return
+        }
+        val id = setup.chatId ?: chatId.trim().ifBlank { runtime.store.chatId() }
+        if (id.isBlank()) {
+            token = setup.token
+            showScanner = false
+            scanError = null
+            saveMessage = scanTokenOnlyText
+            saveIsError = false
+            return
+        }
+        showScanner = false
+        scanError = null
+        persistBot(setup.token, id)
     }
 
     fun setReceiving(target: Boolean) {
@@ -241,6 +278,16 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
                 MikaButton(
                     stringResource(R.string.telegram_save), ::saveBot, Modifier.fillMaxWidth(),
                     enabled = !saveBusy,
+                )
+                MikaButton(
+                    stringResource(R.string.telegram_scan_qr),
+                    { showScanner = true; scanError = null },
+                    Modifier.fillMaxWidth().testTag("telegram-scan-qr"),
+                    kind = ButtonKind.Secondary, enabled = !saveBusy,
+                )
+                Text(
+                    stringResource(R.string.telegram_scan_qr_caption), style = MikaType.Caption,
+                    color = MikaTheme.colors.ink2,
                 )
                 saveMessage?.let { FooterNote(it, color = if (saveIsError) MikaTheme.colors.bad else MikaTheme.colors.ink2) }
             }
@@ -351,6 +398,20 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
             },
             dismissButton = { TextButton({ confirmRemove = false }) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+
+    if (showScanner) {
+        Dialog(
+            onDismissRequest = { showScanner = false; scanError = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            TelegramQrScanner(
+                onClose = { showScanner = false; scanError = null },
+                errorMessage = scanError,
+                onClearError = { scanError = null },
+                onCode = ::handleScanned,
+            )
+        }
     }
 }
 

@@ -25,12 +25,12 @@ android {
         applicationId = "com.kilv.claire"
         minSdk = 29
         targetSdk = 35
-        versionCode = 74
+        versionCode = 75
         // Claire 2.3.0 — base: upstream Mika 0.1.52 (commit 7ff1703f6).
         // Versioning (same scheme as Kai-custom): a.b.c; minor fix bumps c
         // (1.2.1, 1.3.1, 1.3.2), feature / major fix bumps b (1.3.0), rebase onto a new
         // upstream bumps a (2.0.0, b/c reset). versionCode increments each release.
-        versionName = "2.5.0"
+        versionName = "2.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
         // Beta badge after the version number on the About screen; set to false for a stable release
@@ -162,6 +162,11 @@ dependencies {
     // Both recognition models ship inside the APK; first use does not depend on a Play services download.
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.chinese)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
     // The WeChat binding QR code is encoded on-device only; no online image service is called.
     implementation(libs.zxing.core)
     implementation(libs.shizuku.api)
