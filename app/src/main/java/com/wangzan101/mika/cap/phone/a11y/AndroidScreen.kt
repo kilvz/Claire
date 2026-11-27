@@ -128,7 +128,9 @@ class AndroidScreen(
     internal val shareAudioFile: (suspend (path: String) -> ShareableFile?)? = null,
     /** Turns images in the workspace into a shareable content URI; when null, this screen does not support sharing images. */
     internal val shareImageFile: (suspend (path: String) -> ShareableFile?)? = null,
-    /** For parallel tasks: checks the reservation registry for whether the current task can reserve this package right now (the [user] copy; null means the original). Check only, no reservation. */
+    /** 把工作区里的视频变成可分享的 content URI;为空时这个屏不支持视频分享。 */
+    internal val shareVideoFile: (suspend (path: String) -> ShareableFile?)? = null,
+    /** 并行任务时:按占用登记,本任务此刻能不能占这个包([user] 那份;null 为本来那份)。只查不占。 */
     internal val appFree: (packageName: String, user: Int?) -> Boolean = { _, _ -> true },
     /**
      * For parallel tasks: waits up to that long for another task to release this package; [free] is the complete check (it is not on another screen and nobody holds it in the registry).
@@ -259,8 +261,9 @@ class AndroidScreen(
     override val canShareAudio: Boolean get() = opening.canShareAudio
     override suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult = opening.shareImage(packageName, path, text)
     override val canShareImage: Boolean get() = opening.canShareImage
+    override suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult = opening.shareVideo(packageName, path, text)
+    override val canShareVideo: Boolean get() = opening.canShareVideo
     suspend fun openOwnPage(intent: Intent): ActionResult = opening.openOwnPage(intent)
-
 
     /**
      * Opens a link or a settings page. Like [openApp], the display is created only on first use; if the user is using that app on the main screen, it is not opened.

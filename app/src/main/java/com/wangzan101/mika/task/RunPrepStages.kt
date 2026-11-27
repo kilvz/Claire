@@ -8,8 +8,6 @@ import com.wangzan101.mika.core.agent.SystemPrompt
 import com.wangzan101.mika.core.prompt.PersonaPrompt
 import com.wangzan101.mika.core.run.record.Redactor
 import com.wangzan101.mika.core.learn.memory.UserUtterances
-import com.wangzan101.mika.settings.ProviderStore
-import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.core.agent.Turn
 import com.wangzan101.mika.core.run.RunId
 import com.wangzan101.mika.core.run.RunSpec
@@ -37,21 +35,19 @@ import com.wangzan101.mika.core.cap.web.WEB
 import com.wangzan101.mika.task.TaskRun.Companion.WEB_FRAME_MS
 import com.wangzan101.mika.task.TaskRun.Companion.TAG
 
-// Run assembly: models, run record, memory and knowledge, web, prompt
-internal suspend fun TaskRun.assembleModels(): RunModels? {
-    val model = env.modelFactory(service, session) ?: return null
-    // The user asked about a page on a browser tab: that page is lent to this task as its current web tab (see PageLoans); it can only be borrowed if the page is still open when the run starts
+// 运行装配:模型、运行记录、记忆与知识、网页、提示词
+internal suspend fun TaskRun.assembleModels(snapshot: TaskModelSnapshot): RunModels? {
+    val model = snapshot.main ?: return null
+    // 用户在浏览器页上对着一页问的:那一页借给这个任务当当前网页标签(见 PageLoans);开跑时页面还开着才借得到
     val pageLoan = if (provenance.origin == RunOrigin.Ui) withContext(Dispatchers.Main) { UserBrowser.existing()?.claim(conversationId, key) } else null
-    val light = env.lightModelFactory(service, session)
+    val light = snapshot.light
     val decision = env.decisionModel(service)
-    // Splitting the same model into two instances is neither cheaper nor faster; denying it to batch/finishing tools would only add more reassignments and step-by-step work.
-    // This only skips the step-level split; the light role is still available for auxiliary calls such as intent detection, titles and finishing.
-    val routedLight = light?.takeIf {
-        !ProviderStore.get(service).roles.value.sameModel(ModelRole.Main, ModelRole.Light)
-    }
-    val vision = env.visionModelFactory(service, session)
-    val visionFallbacks = env.visionFallbackFactory(service, session)
-    val lightFallbacks = env.lightFallbackFactory(service, session)
+    // 同一模型分成两个实例并不会更便宜或更快;禁止它给批量/收尾工具反而只会增加改派和逐步操作。
+    // 这只跳过逐步分工,轻量角色仍可用于意图判断、标题和收尾等辅助调用。
+    val routedLight = light?.takeIf { snapshot.routeLightSeparately }
+    val vision = snapshot.vision
+    val visionFallbacks = snapshot.visionFallbacks
+    val lightFallbacks = snapshot.lightFallbacks
 
     val (knowledge, skills) = withContext(Dispatchers.IO) {
         // The user's additions for a particular app/site live under the private directories personal/apps and personal/sites
@@ -60,7 +56,8 @@ internal suspend fun TaskRun.assembleModels(): RunModels? {
         val learnedNotes = legacyNames().let { legacy -> memoryRuntime.appKnowledge().notes().mapValues { it.value.copy(text = legacy.rewrite(it.value.text)) } }
         KnowledgeStore(KnowledgeStore.loadBundled(), userNotes, learnedNotes) to GuideCatalog.loadBundled()
     }
-    return RunModels(model, pageLoan, light, decision, routedLight, vision, visionFallbacks, lightFallbacks, knowledge, skills)
+    return RunModels(model, pageLoan, light, decision, routedLight, vision, visionFallbacks, lightFallbacks,
+        snapshot.mainFallbacks, snapshot.mainProviderIds, knowledge, skills)
 }
 
 internal suspend fun TaskRun.assembleRecord(a: RunAssembly): RunRecord {

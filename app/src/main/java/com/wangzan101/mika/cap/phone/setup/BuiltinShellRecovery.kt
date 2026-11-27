@@ -31,6 +31,7 @@ import com.wangzan101.mika.core.device.shell.RecoveryPolicy
 import com.wangzan101.mika.core.device.shell.RestoreOutcome
 import com.wangzan101.mika.core.device.shell.ShellCommandRunner
 import com.wangzan101.mika.core.device.shell.ShellTransport
+import com.wangzan101.mika.settings.MikaPause
 import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.RecoverySettings
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +43,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -64,8 +64,9 @@ class BuiltinShellRecovery(
     private var started = false
 
     val permissions: RecoveryPermissions by lazy {
-        // While the helper is running (however it was started) or has been paired, commands have a path to go through
-        RecoveryPermissions({ runner.takeIf { control.status.value == BuiltinShellStatus.Running || control.paired } }, settings, app.packageName)
+        // 助手在运行(不论怎么起的)或配对过,命令就有路可走
+        RecoveryPermissions({ runner.takeIf { control.status.value == BuiltinShellStatus.Running || control.paired } }, settings, app.packageName,
+            paused = MikaPause.get(app)::paused)
     }
 
     /**
@@ -77,6 +78,7 @@ class BuiltinShellRecovery(
         consent = { settings.consent.value },
         direct = ::canWriteSecure,
         allowed = { !FeatureFlags.get(app).quitRequested() },
+        paused = MikaPause.get(app)::paused,
     )
 
     private fun canWriteSecure() =
@@ -97,7 +99,9 @@ class BuiltinShellRecovery(
                 write(AccessibilityList.without(current, me))
                 withContext(NonCancellable) {
                     delay(gapMs)
-                    // If adding back fails, write the original list (together with the master switch) back so Claire does not vanish from the list; this attempt is still reported as a failed add-back
+                    // 去掉之后、加回之前用户暂停了 Mika:不加回,暂停本来就要无障碍关着
+                    if (MikaPause.get(app).paused()) return@withContext
+                    // 加回失败时把原来的列表(连同总开关)写回,不让 Mika 从列表里消失;这次仍按加回失败报
                     try {
                         write(AccessibilityList.with(read(), me))
                     } catch (e: Exception) {
@@ -106,9 +110,10 @@ class BuiltinShellRecovery(
                     }
                 }
             } else {
+                if (MikaPause.get(app).paused()) return@withContext PermissionResult.Failed("paused")
                 write(AccessibilityList.with(current, me))
             }
-            PermissionResult.Done
+            if (MikaPause.get(app).paused()) PermissionResult.Failed("paused") else PermissionResult.Done
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -125,7 +130,8 @@ class BuiltinShellRecovery(
     fun start() {
         if (started) return
         started = true
-        val active = FeatureFlags.get(app).quitChanges().map { !it }
+        // 完全退出或暂停了 Mika 期间都不动系统设置;恢复时这两个流会重新判断
+        val active = combine(FeatureFlags.get(app).quitChanges(), MikaPause.get(app).state) { quit, paused -> !quit && !paused }
         scope.launch { permissions.applyWhenRunning(control.status, active) }
         val service = accessibility
         // Look once at startup: after a force-stop the system removes the service from the list, or leaves it listed but never binds it; record that for diagnostics
@@ -191,8 +197,10 @@ class BuiltinShellRecovery(
 
     /** After boot, following the active "restore automatically after reboot", turn wireless debugging back on and restart the helper; returns null when nothing needs doing. */
     suspend fun restoreAfterBoot(): RestoreOutcome? {
-        // Never paired (the helper was started from a computer over USB): Claire cannot start the helper itself, so wireless debugging is left alone;
-        // with root start, Shizuku mode, or Shizuku already ready, wireless debugging is left alone too
+        // 用户暂停了 Mika:开机也不替他打开无线调试、不重起助手
+        if (MikaPause.get(app).paused()) return null
+        // 没配对过(助手是电脑经 USB 起的):Mika 自己起不来助手,不去动无线调试;
+        // 用 root 启动、Shizuku 模式或 Shizuku 已就绪时,也不去动无线调试
         if (!control.paired || control.rootStart || control.shizukuStart || control.transport == ShellTransport.Shizuku) return null
         val holds = app.checkSelfPermission(PermissionCommands.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
         when (BootRestore.gate(Build.VERSION.SDK_INT, settings.consent.value, holds)) {

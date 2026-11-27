@@ -4,6 +4,10 @@ import android.app.ActivityManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -67,6 +71,7 @@ import com.wangzan101.mika.ui.components.PageScrolls
 import com.wangzan101.mika.ui.components.PillTone
 import com.wangzan101.mika.ui.components.RowChevron
 import com.wangzan101.mika.ui.components.RowValue
+import com.wangzan101.mika.ui.components.ValueTone
 import com.wangzan101.mika.ui.components.StateCard
 import com.wangzan101.mika.ui.components.StatusPill
 import com.wangzan101.mika.ui.components.TileTone
@@ -104,8 +109,8 @@ import com.wangzan101.mika.workflow.ui.WorkflowsScreen
 
 private const val SHIZUKU_SETUP_GUIDE_URL = "https://shizuku.rikka.app/guide/setup/"
 
-/** Subpages reachable from settings; [Home] is the settings home page, [Advanced] gathers connection, maintenance and engineering capabilities. */
-private enum class SettingsPage { Home, Advanced, AppAccess, SmsLogin, PhoneOps, Calls, Wechat, Telegram, DuringWork, AppPace, Capsule, Language, Notifications, Recommendations, Checklists, Workflows, Sandbox, Plugins, EnvVars, Recovery, SelfCheck, ComputerAccess, McpServers, Root, Developer, DeviceDirectories, RunStats, Proactive, Backup }
+/** 设置里能进入的子页面;[Home] 是设置首页,[Advanced] 集中放置连接、维护和工程能力。 */
+internal enum class SettingsPage { Home, Advanced, AppAccess, SmsLogin, PhoneOps, Calls, Wechat, DuringWork, AppPace, Capsule, Language, Notifications, Recommendations, Checklists, Workflows, Sandbox, Plugins, EnvVars, Recovery, SelfCheck, ComputerAccess, McpServers, Root, Developer, DeviceDirectories, RunStats, Proactive, Backup, Pause }
 
 /**
  * Settings page: overall status card + everyday / my data / other. Advanced & other adds only one more level, and each subpage returns to the page it came from.
@@ -139,14 +144,23 @@ fun SettingsScreen(
     onOpenPersonas: (() -> Unit)? = null,
     openPhoneOps: Boolean = false,
     onPhoneOpsOpened: () -> Unit = {},
+    /** 别处的「去暂停页」(如助手已暂停的提示)直接打开「暂停 Mika」页。 */
+    openPause: Boolean = false,
+    onPauseOpened: () -> Unit = {},
 ) {
     val configs by store.configs.collectAsState()
     val roles by store.roles.collectAsState()
     val groups by store.groups.collectAsState()
     // The "vision verified" entry in developer options follows the vision model (when vision uses the main model it is the main model's config)
     val visionConfig = remember(configs, roles) { store.configFor(ModelRole.Vision) }
-    var page by rememberSaveable { mutableStateOf(if (openPhoneOps) SettingsPage.PhoneOps else SettingsPage.Home) }
-    // Entering a subpage removes the current page from composition and loses its own remembered scroll position; pages with subpages are remembered here so returning resumes where it was
+    var page by rememberSaveable { mutableStateOf(
+        when {
+            openPhoneOps -> SettingsPage.PhoneOps
+            openPause -> SettingsPage.Pause
+            else -> SettingsPage.Home
+        },
+    ) }
+    // 进子页时当前页离开组合,它自己记的滚动位置随之丢掉;有子页可进的几页在这里记,回来接着刚才的位置
     val pageScrolls = rememberSaveable(saver = PageScrolls.Saver) { PageScrolls() }
     var explaining by remember { mutableStateOf<Problem?>(null) }
     // "Quit completely" asks first: tasks, the capsule and notifications all stop
@@ -158,10 +172,17 @@ fun SettingsScreen(
             onPhoneOpsOpened()
         }
     }
+    LaunchedEffect(openPause) {
+        if (openPause) {
+            page = SettingsPage.Pause
+            onPauseOpened()
+        }
+    }
 
     fun fix(f: Fix) = when (f) {
         Fix.AddModel -> onOpenModels()
         Fix.OpenPhoneOps -> page = SettingsPage.PhoneOps
+        Fix.OpenPause -> page = SettingsPage.Pause
         else -> onFix(f)
     }
     val onProblem: (Problem) -> Unit = { p -> StatusCopy.directFix(p)?.let(::fix) ?: run { explaining = p } }
@@ -177,8 +198,7 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { root.refresh() }
     val wechat = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).wechat }
     val wechatState by wechat.state.collectAsState()
-    val telegram = remember { (context.applicationContext as com.wangzan101.mika.MikaApp).telegram }
-    val telegramState by telegram.state.collectAsState()
+    val mikaPaused by com.wangzan101.mika.settings.MikaPause.get(context).state.collectAsState()
     val flags = remember { FeatureFlags.get(context) }
     var personalStart by remember { mutableStateOf(flags.personalStart()) }
     var parallelMax by remember { mutableIntStateOf(flags.parallelMax()) }
@@ -256,6 +276,32 @@ fun SettingsScreen(
 
     if (page != SettingsPage.Home) BackHandler { back() }
 
+    // 设置搜索:搜索框的字记在这里,从结果点进子页再回来还在;能力条件和下面各入口的显示条件一致
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchAvailable = buildSet {
+        if (status.sdkInt >= Prerequisites.MIN_SDK) add(SettingsRequirement.Recovery)
+        if (sandboxStatus !is SandboxStatus.Unsupported) add(SettingsRequirement.Sandbox)
+        if (mcpServers != null) add(SettingsRequirement.McpServers)
+        if (rootState.suPresent) add(SettingsRequirement.Root)
+        if (showDeveloper) add(SettingsRequirement.Developer)
+        if (personalStart) add(SettingsRequirement.PersonalStart)
+        if (onOpenPersonas != null) add(SettingsRequirement.Personas)
+        if (onOpenMemory != null) add(SettingsRequirement.Memory)
+    }
+    val openSearchResult: (SettingsDestination) -> Unit = { d ->
+        when (d) {
+            is SettingsDestination.Page -> page = d.page
+            SettingsDestination.Models -> onOpenModels()
+            SettingsDestination.Plans -> onOpenPlans()
+            SettingsDestination.Files -> onOpenFiles()
+            SettingsDestination.Personal -> onOpenPersonal()
+            SettingsDestination.Personas -> onOpenPersonas?.invoke()
+            SettingsDestination.Memory -> onOpenMemory?.invoke()
+            SettingsDestination.AutoArchive -> editingAutoArchive = true
+            SettingsDestination.About -> onOpenAbout()
+        }
+    }
+
     val visiblePage = when {
         !showDeveloper && (page == SettingsPage.Developer || page == SettingsPage.DeviceDirectories || page == SettingsPage.RunStats) -> SettingsPage.Home
         page == SettingsPage.Root && !rootState.suPresent -> SettingsPage.Advanced
@@ -286,6 +332,8 @@ fun SettingsScreen(
             onOpenAutoArchive = { editingAutoArchive = true },
             onOpenMemory = onOpenMemory,
             onOpenBackup = { page = SettingsPage.Backup },
+            onOpenPause = { page = SettingsPage.Pause },
+            mikaPaused = mikaPaused,
             onOpenRecommendations = { page = SettingsPage.Recommendations },
             onOpenPersonas = onOpenPersonas,
             onOpenAdvanced = { page = SettingsPage.Advanced },
@@ -294,6 +342,8 @@ fun SettingsScreen(
             onOpenPersonal = onOpenPersonal,
             onOpenPlans = onOpenPlans,
             versionName = BuildConfig.VERSION_NAME, updateVersion = updateVersion, onOpenAbout = onOpenAbout,
+            searchQuery = searchQuery, onSearchQuery = { searchQuery = it },
+            searchAvailable = searchAvailable, onOpenSearchResult = openSearchResult,
             scrollState = pageScrolls.of(SettingsPage.Home),
         )
         SettingsPage.Advanced -> AdvancedSettingsContent(
@@ -396,6 +446,7 @@ fun SettingsScreen(
         SettingsPage.RunStats -> RunStatsScreen(remember { RunStore(context).metrics }, onBack = back)
         SettingsPage.Proactive -> com.wangzan101.mika.proactive.ProactiveScreen(onBack = back)
         SettingsPage.Backup -> BackupScreen(onBack = toHome)
+        SettingsPage.Pause -> PauseScreen(onBack = toHome, onFix = ::fix)
     }
 
     if (editingProxy) NetProxyDialog(
@@ -480,7 +531,7 @@ fun SettingsScreen(
 
 /** Stateless settings home page, easy to test. The home page lists only everyday entries; advanced capabilities are all reached through [onOpenAdvanced]. */
 @Composable
-fun SettingsContent(
+internal fun SettingsContent(
     status: SystemStatus,
     androidRelease: String,
     /** Name of the current main model; empty when there is no usable main model. */
@@ -510,6 +561,9 @@ fun SettingsContent(
     onOpenLanguage: () -> Unit = {},
     onOpenMemory: (() -> Unit)? = null,
     onOpenBackup: (() -> Unit)? = null,
+    /** 「暂停 Mika」页的入口;暂停着时首页这一行写「已暂停」。 */
+    onOpenPause: (() -> Unit)? = null,
+    mikaPaused: Boolean = false,
     onOpenRecommendations: () -> Unit = {},
     onOpenPersonas: (() -> Unit)? = null,
     onOpenAdvanced: () -> Unit = {},
@@ -525,11 +579,25 @@ fun SettingsContent(
     /** Auto-archive: how long a conversation without new messages goes before it is archived automatically; 0 means off. */
     autoArchiveDays: Int = 0,
     onOpenAutoArchive: () -> Unit = {},
-    /** This page's scroll state, supplied by the page switcher so it can hold its place after returning from a subpage. */
+    /** 顶上搜索框里的字;非空时这一页换成搜索结果,返回键先清空它。状态由切页的一方持有,从结果点进子页再回来还在。 */
+    searchQuery: String = "",
+    onSearchQuery: (String) -> Unit = {},
+    /** 此刻具备的能力:要某种能力的入口(见 [SettingsSearchIndex])在设置里不显示时,搜索里也不出现。 */
+    searchAvailable: Set<SettingsRequirement> = emptySet(),
+    onOpenSearchResult: (SettingsDestination) -> Unit = {},
+    /** 这一页的滚动状态;切页的一方给进来,从子页回来才停得住。 */
     scrollState: ScrollState = rememberScrollState(),
 ) {
     val check = Prerequisites.check(status, hasMainModel = mainModel != null)
-    PageScaffold(stringResource(R.string.settings_title), onBack, scrollState = scrollState) {
+    if (searchQuery.isNotEmpty()) BackHandler { onSearchQuery("") }
+    PageScaffold(stringResource(R.string.settings_title), onBack, scrollState = scrollState, viewportModifier = Modifier.imePadding()) {
+        SettingsSearchBar(searchQuery, onSearchQuery)
+        Spacer(Modifier.height(12.dp))
+        if (searchQuery.isNotBlank()) {
+            SettingsSearchResults(searchQuery, remember(searchAvailable) { SettingsSearchIndex.available(searchAvailable) }, onOpenSearchResult)
+            return@PageScaffold
+        }
+
         StatusSummary(check, onProblem)
 
         GroupLabel(stringResource(R.string.settings_model))
@@ -545,6 +613,19 @@ fun SettingsContent(
             ListRow(MikaIcons.Phone, stringResource(R.string.settings_phone_ops), first = true, onClick = onOpenPhoneOps) {
                 PhoneOpsPill(status)
                 RowChevron()
+            }
+            onOpenPause?.let {
+                ListRow(
+                    MikaIcons.Power, stringResource(R.string.pause_title),
+                    stringResource(if (mikaPaused) R.string.pause_row_sub_paused else R.string.pause_row_sub_active),
+                    onClick = it,
+                ) {
+                    RowValue(
+                        stringResource(if (mikaPaused) R.string.pause_helper_paused else R.string.pause_state_active),
+                        if (mikaPaused) ValueTone.Plain else ValueTone.Ok,
+                    )
+                    RowChevron()
+                }
             }
             ListRow(MikaIcons.Clock, stringResource(R.string.drawer_plans), onClick = onOpenPlans) { RowChevron() }
             ListRow(MikaIcons.Paperclip, stringResource(R.string.file_library_title), onClick = onOpenFiles) { RowChevron() }

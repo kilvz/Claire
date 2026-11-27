@@ -34,14 +34,22 @@ object PairingScreen {
      * Whether to pair with the code that was read: there is a code, there is a port (read on screen, or the pairing window has been found), the code has not been tried,
      * and the helper is waiting to pair (not pairing already, not already done). After a wrong code the same code is not retried; it waits for the pairing window to show a new code.
      */
-    fun attempt(reading: PairingScreenReading, portFound: Boolean, status: BuiltinShellStatus, tried: Set<String>): PairingAttempt? {
+    fun attempt(
+        reading: PairingScreenReading,
+        portFound: Boolean,
+        status: BuiltinShellStatus,
+        tried: Set<String>,
+        paused: Boolean = false,
+    ): PairingAttempt? {
+        if (paused) return null
         val code = reading.code ?: return null
         if (code in tried) return null
         if (reading.port == null && !portFound) return null
         val waiting = when (status) {
             BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff -> true
             is BuiltinShellStatus.Failed -> status.reason.duringPairing || status.fix == BuiltinShellFix.RePair
-            BuiltinShellStatus.Connecting, BuiltinShellStatus.Running -> false
+            // 用户暂停了 Mika:不拿屏上读到的码去配对。
+            BuiltinShellStatus.Connecting, BuiltinShellStatus.Running, BuiltinShellStatus.Paused -> false
         }
         return if (waiting) PairingAttempt(code, reading.port) else null
     }

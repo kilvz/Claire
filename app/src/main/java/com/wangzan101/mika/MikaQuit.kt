@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import com.wangzan101.mika.MikaApp
+import com.wangzan101.mika.calls.CallStandbyRecoveryJob
 import com.wangzan101.mika.cap.sandbox.RuntimePreparer
 import com.wangzan101.mika.mcp.McpService
 import com.wangzan101.mika.sandbox.SandboxService
@@ -48,6 +49,8 @@ object MikaQuit {
         // Remove system alarms and in-process long tasks first, then stop the foreground services; when the system
         // re-delivers start requests to the services, they also refuse work according to the quit flag
         runCatching { TriggerRuntime.suspendAlarms(app) }
+        // 来电待命的周期检查一并撤掉;重新打开 Mika 时按原授权再排上
+        CallStandbyRecoveryJob.reconcile(app, authorized = false)
         runCatching { RuntimePreparer.stop(app) }
         runCatching { app.wechat.stop() }
         // When proactive capabilities are on, stop reading notifications: ask the system to unbind the listener,

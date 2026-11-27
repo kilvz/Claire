@@ -253,7 +253,7 @@ class AppAccessScreenPortTest {
         /** The boundary's own members. */
         val OWN = setOf("getAppAccess", "checkAppAccess")
 
-        /** Members that touch no app UI and are passed through unchanged; system actions that pick an app by target are checked against the list by the port itself. Adding one here requires a stated reason. */
-        val PASS_THROUGH = setOf("systemAction", "systemCommand", "bulkCalendarInsert", "listApps", "otherProfiles", "appCopies", "getAfterTask", "getCanShareAudio", "getCanShareImage")
+        /** 不碰任何 App 界面、原样转交的成员;按目标挑 App 的系统动作由端口自己看名单。加进来要说得出为什么。 */
+        val PASS_THROUGH = setOf("systemAction", "systemCommand", "bulkCalendarInsert", "listApps", "otherProfiles", "appCopies", "getAfterTask", "getCanShareAudio", "getCanShareImage", "getCanShareVideo")
     }
 }

@@ -47,6 +47,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         session.refreshParallel()
         if (!session.parallel()) return openConversation(conversationId)
         if (conversationId == _ui.value.conversationId) return
+        if (_ui.value.conversationId == null) vm.clearUnnumberedMainChoice()
         vm.drafting.cancelPendingSharedDraft()
         session.keepDraft()
         lingerJob?.cancel()
@@ -55,6 +56,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         liveIndex = -1
         // A conversation without a task does not carry another task's takeover progress; the input restores only the target conversation's own draft.
         _ui.update { session.restoreDraft(it.rebuildForConversation(conversationId = conversationId, exchanges = past, projectId = session.projectFor(conversationId))) }
+        vm.refreshMainModel()
         session.markCurrent(CurrentChat.Open(conversationId))
         if (conversationId !in activeConversations.value) { vm.live.unpark(conversationId); actions.drainFollowUps(conversationId); return }
         vm.live.follow(conversationId, vm.live.unpark(conversationId))
@@ -63,6 +65,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
     /** Open a conversation owned by the personal assistant or a workflow: switch the display only, do not start another job, and keep the user's draft. */
     fun openWorkflowConversation(conversationId: String) {
         if (conversationId == _ui.value.conversationId) { vm.live.refresh(); return }
+        if (_ui.value.conversationId == null) vm.clearUnnumberedMainChoice()
         session.refreshParallel()
         vm.drafting.cancelPendingSharedDraft()
         session.keepDraft()
@@ -71,6 +74,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         val past = session.saved(conversationId)
         liveIndex = -1
         _ui.update { session.restoreDraft(it.rebuildForConversation(conversationId = conversationId, exchanges = past, projectId = session.projectFor(conversationId))) }
+        vm.refreshMainModel()
         session.markCurrent(CurrentChat.Open(conversationId))
         if (conversationId !in activeConversations.value) { vm.live.unpark(conversationId); return }
         vm.live.follow(conversationId, vm.live.unpark(conversationId))
@@ -139,6 +143,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         // The child conversation Claire uses for a task is not shown to the user (notifications, the small window and old links may point to it): open the chat it belongs to instead
         val id = store.deskParent(requested) ?: requested
         if (_ui.value.conversationId == id) return
+        if (_ui.value.conversationId == null) vm.clearUnnumberedMainChoice()
         session.refreshParallel()
         if (session.parallel()) return switchTo(id)
         if (session.busy()) return
@@ -149,6 +154,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         _ui.update {
             session.restoreDraft(it.rebuildForConversation(conversationId = id, exchanges = past, takeoverStage = it.takeoverStage, projectId = session.projectFor(id)))
         }
+        vm.refreshMainModel()
         session.markCurrent(CurrentChat.Open(id))
         // This conversation's task was started elsewhere (floating pill, scheduled job): attach to it on open
         if (id in activeConversations.value) vm.live.follow(id) else {
@@ -158,6 +164,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
     }
 
     fun newConversation(projectId: String? = null) {
+        if (_ui.value.conversationId == null) vm.clearUnnumberedMainChoice()
         val validProject = projectId?.takeIf { projectStore == null || projectStore.get(it) != null }
         session.refreshParallel()
         if (session.parallel()) {
@@ -170,7 +177,8 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
             val fresh = store.newConversation()
             workspaceResolver?.setDraftProject(fresh, validProject)
             _ui.update { it.rebuildForConversation(conversationId = fresh, projectId = validProject) }
-            // Nothing has been said yet: the pill shows a new-conversation card (the id is assigned once something is said, see begin)
+            vm.refreshMainModel()
+            // 还没说过话:胶囊上是一张新对话卡片(编号等说出来再定,见 begin)
             session.markCurrent(CurrentChat.Fresh)
             return
         }
@@ -179,6 +187,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         session.keepDraft()
         liveIndex = -1
         _ui.update { it.rebuildForConversation(conversationId = null, takeoverStage = it.takeoverStage, projectId = validProject) }
+        vm.refreshMainModel()
         session.markCurrent(CurrentChat.Fresh)
     }
 
@@ -313,7 +322,8 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         pipClosed = false
         val fresh = if (session.parallel()) store.newConversation() else null
         _ui.update { it.rebuildForConversation(conversationId = fresh) }
-        // The screen switched to a new empty conversation: the pill no longer continues the deleted one
+        vm.refreshMainModel()
+        // 屏上换成了一个新的空对话:胶囊不再接着删掉的那个
         session.markCurrent(CurrentChat.Fresh)
     }
 }

@@ -4,11 +4,11 @@
 
 # Claire
 
-**An AI assistant on your phone, in English from the first tap: say what you need, and it works your apps and the web until it's done.**
+**An AI assistant that lives on your phone: say what you need, and it works your apps and the web until it's done.**
 
 Claire is a fork of [Mika](https://github.com/wangzan101/Mika) by [Wang Zan](https://github.com/wangzan101), kept under the same [Apache-2.0](LICENSE) license. It keeps Mika's engine and gives it its own defaults: English first, and OrcaRouter as a built-in model provider.
 
-It works on a hidden background screen, so you can keep using your phone.
+Claire works on a hidden background screen, so you can keep using your phone while it runs.
 
 <br/>
 
@@ -26,12 +26,12 @@ It works on a hidden background screen, so you can keep using your phone.
 
 </div>
 
-## What makes Claire different
+## Why Claire
 
-- **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI is still available in many languages — switch it in Settings › Language.
+- **English by default.** Claire starts in English, and the agent's own instructions are written in English. The app UI comes in English plus 12 translations and follows your system language; switch it in Settings › Language.
 - **OrcaRouter built in.** One API key reaches over 200 models through an OpenAI-compatible endpoint, including a free model (orcarouter/free) and one that picks the model for you (orcarouter/auto). Get a key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token) and add it under Settings › Model.
-- **Its own versioning.** Claire 2.3.0 is based on upstream Mika 0.1.52 (commit `7ff1703f6`). See [VERSION.md](VERSION.md) for how versions are numbered.
-- **Same engine.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, skills and memory — works the same here.
+- **Its own versioning.** Claire 2.6.1 tracks upstream Mika 0.1.52 through commit `1812eabef`. See [VERSION.md](VERSION.md) for how versions are numbered.
+- **Same engine, current features.** Everything upstream Mika does — operating apps on a background screen, browsing the web, the Linux sandbox, schedules, skills and memory — is here, including the latest voice, calling, video and settings work.
 
 ## Get things done with one sentence
 
@@ -63,27 +63,16 @@ It works on a hidden background screen, so you can keep using your phone.
 
 <sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Claire isn't tied to them; it works with any app or website on your phone.</sub>
 
-## Why Claire
+## New in 2.6
 
-| | |
-|---|---|
-| 📱 **Leaves your screen alone** | Opens apps, taps, types and scrolls on a separate background screen while you use your phone as usual; tap the small live view whenever you want to watch |
-| 🧩 **Works with any app** | Looks at the screen and finds buttons the way a person does: no app APIs, no per-app integration |
-| 🌐 **Call it from any web page** | In the built-in browser, say what you want on the page you're reading and it works right there; touch the page and it stops |
-| 🧠 **Gets better with use** | Remembers the preferences you tell it, and turns tasks it finishes into skills so next time is faster and steadier |
-| 🔒 **Your data stays on your phone** | There is no Claire server; use your own model API key, or sign in with a ChatGPT, xAI, OpenCode Go or OpenRouter account |
-| 🆓 **Open source and free** | Apache-2.0, all code public |
-
-## Get started in three steps
-
-1. **Install**: download the APK from [Releases](https://github.com/kilvz/Claire/releases/latest).
-2. **Connect a model**: in Settings › Model, pick OrcaRouter and paste your API key, or pick any other provider, or just sign in with an account ([models and sign-in](docs/models.md)).
-3. **To operate phone apps**: follow the "Set up phone control" wizard in Settings and pair wireless debugging on the phone once ([setup guide](docs/setup-guide.md)). Skip this if you only want chat, web and files.
-
-Then try saying: "Set alarms for 9:40 and 10:00 tomorrow morning" or "Check the weather at 8 every morning and tell me only if it will rain".
-
-> 💡 Have a computer handy? Send this to the AI agent on it and it will set everything up for you:<br/>
-> `Follow https://github.com/kilvz/Claire/blob/main/docs/install-with-agent.md to install Claire on the Android phone connected over USB.`
+- **Pause Claire.** One switch in Settings stops running and queued tasks, skips due plans and turns away new work from chat, computers and message channels. It also parks phone control; the wireless-debugging pairing stays saved for when you resume.
+- **AI phone calls.** Answer or place cellular calls with a realtime voice model, set who may be answered automatically, take over at any time, and get a transcript summary with an optional follow-up message draft.
+- **Video.** Generate short videos with your own video model, look at a video in the workspace frame by frame, save it to the gallery, or share it into another app.
+- **Voices that fit your phone.** Use the system text-to-speech engine or an on-device voice, or a provider's speech service, and pick the voice per language.
+- **Better schedules.** A redesigned plan editor with an AM/PM time picker, timezone search, execution windows, and reliable runs while the screen is off or locked.
+- **Settings search.** Search every settings page and jump straight to the matching row, with the match highlighted.
+- **Telegram setup by QR code.** Scan a code that holds a @BotFather token and the bot is saved without typing the token.
+- **Stability.** Telegram messages no longer crash the app when a task receipt looks up its channel; new wireless-debugging pairings appear as `claire@<model>` instead of `mika@<model>`.
 
 ## What it can do
 
@@ -91,12 +80,17 @@ Then try saying: "Set alarms for 9:40 and 10:00 tomorrow morning" or "Check the 
 |---|---|
 | **Operate apps** | Reads long lists and chat histories, taps and types, shares text into apps; hands logins, verification codes and payments to you |
 | **Browse the web** | A built-in desktop-class browser that keeps you signed in, reads pages, downloads and uploads; paces itself and hands block pages to you |
+| **AI phone calls** | Answers or dials with a realtime voice model, applies your auto-answer rules, lets you speak personally or hang up, and can summarize the call and draft a follow-up |
 | **Your current screen** | Double-tap the floating capsule to send the screen you're looking at: "how should I reply?", "note this down" |
-| **Schedules and conditions** | "Remind me at 9 tomorrow", "do this every Friday"; runs on time in the original conversation |
+| **Schedules and conditions** | "Remind me at 9 tomorrow", "do this every Friday", with execution windows and runs that survive a locked or dark screen |
 | **Jump in or stop anytime** | Keep talking while a task runs to add or correct things (long-press to withdraw or edit one Claire hasn't picked up yet); after a stop it reports where it got to, and "continue" picks up from there |
-| **Hold to talk** | Hold the chat input to speak and edit the words before sending; long-press the floating capsule to speak and release to send. Uses the phone’s built-in speech recognition, or a provider’s speech model if it has none |
-| **Files and computing** | A Linux sandbox per conversation runs Python, Node and shell on the files you send (arm64) |
+| **Hold to talk** | Hold the chat input to speak and edit the words before sending; long-press the floating capsule to speak and release to send |
+| **Voice output** | Read replies aloud with the system engine, an on-device voice, or a provider's speech model, with a voice choice per language |
+| **Images and video** | Generate or edit images, generate short videos, inspect a video in the workspace, save it to the gallery, or share it into another app |
+| **Files and computing** | A Linux sandbox per conversation runs Python, Node and shell on the files you send (arm64); export an installed app's package when you need the APK |
 | **From your computer** | AI tools on your computer can hand Claire tasks through CLI + Skill or MCP ([use Claire from a computer](docs/computer.md)) |
+| **Message channels** | Talk to Claire from Telegram or WeChat, including the Telegram QR setup flow and reliable task receipts |
+| **Pause everything** | Stop all work for a while without uninstalling or unpairing anything, then resume where you left off |
 
 By default Claire runs in **Ask mode**: it checks with you only before spending money (placing orders, paying) and just does everything else. You can switch to **Autonomous mode** instead. See [Ask and Autonomous](docs/modes.md).
 
@@ -128,9 +122,20 @@ Presets for DeepSeek, Qwen, Kimi, Zhipu, Zhipu Coding Plan, SiliconFlow, Volceng
 
 You can also skip the key and sign in with a ChatGPT (Plus / Pro), xAI / Grok, OpenCode Go or OpenRouter account. Steps for adding a model, and what to know about each sign-in, are in [models and sign-in](docs/models.md).
 
-The quickest start is OrcaRouter: one key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token), then pick the free model orcarouter/free, or orcarouter/auto to let it choose the model per prompt.
+The quickest start is OrcaRouter: one key at [orcarouter.ai/console/token](https://www.orcarouter.ai/console/token), then pick the free model orcarouter/free, or orcarouter/auto to let it choose the model per prompt. You can give providers your own nicknames, and build a fallback order with a visual flow editor.
 
 </details>
+
+## Get started in three steps
+
+1. **Install**: download the APK from [Releases](https://github.com/kilvz/Claire/releases/latest).
+2. **Connect a model**: in Settings › Model, pick OrcaRouter and paste your API key, or pick any other provider, or just sign in with an account ([models and sign-in](docs/models.md)).
+3. **To operate phone apps**: follow the "Set up phone control" wizard in Settings and pair wireless debugging on the phone once ([setup guide](docs/setup-guide.md)). Skip this if you only want chat, web and files.
+
+Then try saying: "Set alarms for 9:40 and 10:00 tomorrow morning" or "Check the weather at 8 every morning and tell me only if it will rain".
+
+> 💡 Have a computer handy? Send this to the AI agent on it and it will set everything up for you:<br/>
+> `Follow https://github.com/kilvz/Claire/blob/main/docs/install-with-agent.md to install Claire on the Android phone connected over USB.`
 
 ## Which phones
 
@@ -138,6 +143,7 @@ The quickest start is OrcaRouter: one key at [orcarouter.ai/console/token](https
 |---|---|
 | Chat, web, files | Android 11 or later |
 | Operating phone apps | Android 12 or later; **Android 14+ recommended** (the background screen has its own focus, so it doesn't get in the way of your typing on the main screen) |
+| AI phone calls | Android 11 or later with a SIM and phone permission |
 | Linux sandbox | arm64 devices |
 
 Not sure your phone is up to it? Run Settings › Recovery & repair › **Compatibility self-check**: 12 checks in about a minute, and you can [send us the results](https://github.com/kilvz/Claire/issues/new?template=device-report.yml) in one tap.
@@ -159,7 +165,7 @@ Not sure your phone is up to it? Run Settings › Recovery & repair › **Compat
 
 **Can I use a model running on my own computer?** Yes: pick "Custom" as the provider and enter its address on your local network.
 
-**Is the app in English?** Yes. The app UI comes in English, Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian, Indonesian and Vietnamese, follows your system language, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Claire in English.
+**Is the app in English?** Yes, by default. The UI is translated into Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian, Indonesian, Turkish and Vietnamese, follows your system language, and can be switched in Settings › Language. The built-in app and website knowledge is written in Chinese, but that doesn't limit you: the model reads it fine, and you can talk to Claire in English.
 
 **Where do updates come from?** Only from this repository's [Releases](https://github.com/kilvz/Claire/releases); you can also upgrade in the app from About › Check for updates.
 
@@ -170,10 +176,30 @@ More answers are in the [FAQ](docs/faq.md).
 ## Community & contributing
 
 - **Docs**: all docs and a suggested reading order are in the [docs index](docs/README.md)
+- **Upstream**: Claire follows [Mika](https://github.com/wangzan101/Mika); upstream features are merged regularly and adapted to Claire
 - **Community**: join the [X group chat](https://x.com/i/chat/group_join/g2116926829198246025/48B52j5svL); to reach the original author on WeChat, scan the QR code in the app under About › Contact the author (mention Claire in your request)
-- **Follow the author**: X [@wangzan101](https://x.com/wangzan101)
+- **Follow the original author**: X [@wangzan101](https://x.com/wangzan101)
 - **Report a problem**: [open an issue](https://github.com/kilvz/Claire/issues/new/choose); About › Send feedback in the app can attach diagnostics
 - **Contribute**: add usage knowledge for an app or website (plain text, no code needed), or contribute code; see the [contributing guide](.github/CONTRIBUTING.md)
+
+<p align="center">⭐ If Claire saves you time, give it a star — it helps more people find it.</p>
+
+## Star History
+
+<a href="https://star-history.com/#kilvz/Claire&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date&theme=dark" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kilvz/Claire&type=Date" width="600" />
+  </picture>
+</a>
+
+## Contributors
+
+Thanks to everyone who has helped build Mika, and to everyone who keeps Claire moving:
+
+<a href="https://github.com/wangzan101/Mika/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=wangzan101/Mika&max=100&columns=12" alt="Upstream Mika contributors" />
+</a>
 
 ## License
 

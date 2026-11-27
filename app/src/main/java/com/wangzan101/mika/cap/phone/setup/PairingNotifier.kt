@@ -44,6 +44,8 @@ sealed interface PairingNotice {
             return when (status) {
                 BuiltinShellStatus.Running -> Done
                 BuiltinShellStatus.Connecting -> Working
+                // 用户暂停了 Mika:不弹配对码通知。
+                BuiltinShellStatus.Paused -> null
                 is BuiltinShellStatus.Failed -> when {
                     status.reason.duringPairing -> EnterCode(port, PhoneSetupCopy.notifyRetry(status.reason))
                     status.fix == BuiltinShellFix.RePair && port != null -> EnterCode(port)
@@ -76,8 +78,15 @@ sealed interface PairingNotice {
          * While a code has been submitted but pairing has not started ([submitted]) it is always "pairing", and following does not end at this point either (the same when the helper was already running, since the status still changes once pairing starts);
          * during "pair again" a stale running status does not count as paired ([PhoneSetupFlow.effectiveStatus]), and following ends only when the helper is running and not re-pairing.
          */
-        fun follow(status: BuiltinShellStatus, discovery: PairingDiscovery, repairing: Boolean, submitted: Boolean): Pair<PairingNotice?, Boolean> =
-            if (submitted) Working to false
+        fun follow(
+            status: BuiltinShellStatus,
+            discovery: PairingDiscovery,
+            repairing: Boolean,
+            submitted: Boolean,
+            paused: Boolean = false,
+        ): Pair<PairingNotice?, Boolean> =
+            if (paused) null to true
+            else if (submitted) Working to false
             else of(PhoneSetupFlow.effectiveStatus(status, repairing), discovery) to (status == BuiltinShellStatus.Running && !repairing)
     }
 }

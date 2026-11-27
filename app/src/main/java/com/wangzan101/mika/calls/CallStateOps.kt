@@ -150,15 +150,16 @@ internal fun CallRuntime.prerequisite(
     ignoreWork: Boolean = false,
     notificationReady: Boolean? = null,
 ): String? = when {
-    !settings.state.value.enabled -> "AI calling is off"
-    configuring -> "AI calling is being configured"
-    !armed || !access.hasPhonePermissions() -> "Prepare AI calling first"
-    shell == null -> "Claire's built-in helper is not connected"
-    standardCalls && cascade.blocker(CallUse.Phone) != null -> "Choose the listening, speaking and thinking models for calls in the voice settings first"
-    !activeVoiceProfile().credentialsConfigured -> "Configure realtime voice credentials first"
-    !activeVoiceProfile().connectionTested -> "Test the realtime voice connection first"
+    !settings.state.value.enabled -> "AI calls are off"
+    configuring -> "AI calls are being set up"
+    !armed || !access.hasPhonePermissions() -> "Set up AI calls first"
+    // Also shown on the standby checklist the blocked-standby notification opens (FlashPhone v1.1.15).
+    shell == null -> app.getString(R.string.calls_setup_shell)
+    standardCalls && cascade.blocker(CallUse.Phone) != null -> "Choose the call's listening, speech, and thinking models in Voice settings first"
+    !activeVoiceProfile().credentialsConfigured -> "Configure the real-time voice credentials first"
+    !activeVoiceProfile().connectionTested -> "Test the real-time voice connection first"
     !(notificationReady ?: notifications.ready()) -> "Allow AI call notifications so you can cancel or take over"
-    !ignoreWork && work?.direction == CallDirection.OUTGOING -> "Another call is already being handled"
+    !ignoreWork && work?.direction == CallDirection.OUTGOING -> "Another call is already in progress"
     else -> null
 }
 

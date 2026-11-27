@@ -175,6 +175,8 @@ object HelperHandoff {
         BadNonce,
         /** The process holding the Binder is not the one handing off. */
         BinderElsewhere,
+        /** 用户暂停了 Mika:不收任何助手(包括暂停前起的、晚到的交接),助手被拒后自己退出。 */
+        Paused,
     }
 
     /** Checks that can be done without touching the Binder; returns null when they pass. The nonce is verified separately by [HandoffNonces]. */

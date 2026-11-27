@@ -30,7 +30,9 @@ internal fun CapsuleController.render(s: Snapshot) {
     val shown = model.update(inputs, System.currentTimeMillis()) as? CapsuleView.Shown
     schedule(model.nextChangeAt)
     if (shown == null || service == null) {
-        hide()
+        val suppressed = s.mode == CapsuleMode.Off || service == null || service === failedOn ||
+            s.fullscreen || s.mikaInForeground || s.locked
+        hide(clearLastLook = s.mode == CapsuleMode.Off || !suppressed)
         return
     }
     // The app has been handed to you: the bar at the top replaces the card
@@ -45,22 +47,31 @@ internal fun CapsuleController.render(s: Snapshot) {
     val keptCard = card as? CardView.Kept
     if (keptCard != null) watchKept(keptCard.page.id)
     else watchPreview(detail?.takeIf { CapsuleCards.showsScreen(it.content) }?.run?.run?.key)
+    val nowLook = CapsuleLook.of(shown)
+    val previousLook = look
+    val wakeOnShow = CapsuleEdge.shouldWake(
+        hideAtEdge = s.hideAtEdge,
+        visible = previousLook != null,
+        previous = previousLook ?: lastLook,
+        current = nowLook,
+    )
+    if (nowLook != previousLook) resetTaps()
+    look = nowLook
+    if (wakeOnShow) wake() else fade()
     val w = window ?: openWindows(service)
     if (w == null) {
+        fadeJob?.cancel()
+        look = null
+        lastActive = 0L
+        edgeHidden = false
         view = null
         card = null
         _showing.value = false
         return
     }
+    lastLook = nowLook
     applyDrag()
     place()
-    // State or count changed, expanded or shrunk back: restore immediately and restart the timer; a mere sentence swap does not count (that sentence is not visible on the dot)
-    val nowLook = listOf(shown.kind, shown.pill, shown.count, shown.needCount)
-    if (nowLook != look) {
-        look = nowLook
-        resetTaps()
-        wake()
-    } else fade()
     _showing.value = true
 }
 
@@ -114,11 +125,13 @@ internal fun CapsuleController.forget(id: String) {
     refresh()
 }
 
-internal fun CapsuleController.hide() {
+internal fun CapsuleController.hide(clearLastLook: Boolean = false) {
     resetTaps()
     snap?.cancel()
     fadeJob?.cancel()
     look = null
+    if (clearLastLook) lastLook = null
+    lastActive = 0L
     imeJob?.cancel()
     imeJob = null
     imeTop = null

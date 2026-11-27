@@ -64,6 +64,8 @@ internal fun TaskService.freeSlot(): Int {
 
 /** If this conversation is idle, start right away; if it still has a task, leave it in the persistent queue and hand it out when that task finishes ([onRunEnded]). The check and the queueing happen under the same lock. */
 internal fun TaskService.deferMessage(threadId: String, text: String, messageId: String) {
+    // 暂停时不留给下一件:恢复后不能自己跑起来
+    if (pausedBlocks()) return
     val item = QueuedFollowUp(messageId, threadId, text, System.currentTimeMillis(), QueuedSource.Fallback)
     if (center.deferOrStart(threadId, text, messageId, QueuedSource.Fallback)) startFollowUp(item)
     else keepForeground()
@@ -71,6 +73,12 @@ internal fun TaskService.deferMessage(threadId: String, text: String, messageId:
 
 /** The user explicitly chose "queue": if this conversation still has a task, write it into the persistent queue; if it just became idle, start it right away. */
 internal fun TaskService.queueFollowUp(threadId: String, text: String, messageId: String, source: QueuedSource) {
+    // 暂停时不入队:入了队,恢复后就会自己跑起来。调用方写进去的那一项也拿掉
+    if (pausedBlocks()) {
+        center.followUps.remove(messageId)
+        finishPausedStart(com.wangzan101.mika.core.run.RunProvenance(), null, null, null, null, null, followUp = null)
+        return
+    }
     val item = QueuedFollowUp(messageId, threadId, text, System.currentTimeMillis(), source)
     if (center.deferOrStart(threadId, text, messageId, source)) {
         // This conversation just went idle: skip enqueueing and go straight to startNew; if another task arrives in between, tryStart atomically puts it back into the queue
@@ -82,7 +90,7 @@ internal fun TaskService.queueFollowUp(threadId: String, text: String, messageId
 
 /** Take the next item for this conversation; only one is taken, and startNew either registers it or puts it back. */
 internal fun TaskService.drainReady(conversationId: String?) {
-    if (teachingBlocks()) return
+    if (pausedBlocks() || teachingBlocks()) return
     center.takeReady(conversationId).forEach(::startFollowUp)
 }
 
@@ -183,7 +191,7 @@ internal fun TaskService.cancelQueued(run: TaskRun) {
         TriggerRuntime.actionFailed(this, key, Conversation.CANCELLED_OUTCOME)
     }
     run.end(TaskState.Cancelled)
-    recordTurn(ConversationStore.shared(this), run, TaskState.Cancelled, null, audios = run.audios.value)
+    recordTurn(ConversationStore.shared(this), run, TaskState.Cancelled, null, audios = run.audios.value, videos = run.videos.value)
     run.mcpExternalId = null
     publishRuns()
     center.queued().forEachIndexed { i, q -> q.queue(i + 1) }

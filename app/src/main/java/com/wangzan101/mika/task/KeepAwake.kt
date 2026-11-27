@@ -18,12 +18,20 @@ interface WakeLockPort {
  * Once the screen goes off the system drops injected touches and then locks, so the screen must not turn off by itself while the Agent is working;
  * but the screen does not need to stay fully bright while the user is not interacting, and it still dims at the system timeout (see [ScreenWakeLock]).
  *
- * Held only while Running (including waiting for another task to finish with an app) and while queued behind other tasks waiting for a virtual display. The screen need not stay on for the Agent while waiting to take over / answer / continue / unlock,
- * so it is held for another [GRACE_MS] (the user is most likely about to deal with it, so don't let the screen go dark in front of them) and then released, and re-acquired when the task keeps running.
- * Finishing, failing and cancelling release it immediately. The lock follows the process: when Claire exits abnormally the system reclaims it, so no persisted recovery is needed.
- * The user can still turn the screen off with the power button (ACQUIRE_CAUSES_WAKEUP is not set); in that case the gate makes the task wait for unlock.
+ * 只在 Running(含等另一个任务用完某个 App)和排在别的任务后面等虚拟屏时持有。等待接管/回答/继续/解锁时屏幕不需要为 Agent 亮着,
+ * 再保持 [GRACE_MS](用户多半正要处理,别让屏幕在他眼前熄掉)后释放,任务继续跑时重新持有。
+ * 结束、失败、取消立即释放。锁随进程走:Mika 异常退出时系统自动收回,不需要持久化恢复。
+ * 用户按电源键照样能熄屏(没带 ACQUIRE_CAUSES_WAKEUP),这时 gate 会让任务等待解锁。
+ *
+ * 任务的 CPU 锁([CpuWakeLock])用同一套规则,只是 keepThroughEnd:从开跑一直撑到任务收尾(结果送达、账本记好),
+ * 等你处理时同样过了宽限就放开,不让一个等回答的任务整晚撑着 CPU。
  */
-class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScope) {
+class KeepAwake(
+    private val lock: WakeLockPort,
+    private val scope: CoroutineScope,
+    /** 到了终态(和开跑前的 Idle)也接着持有、直到 [close]:CPU 锁要撑到结果送达、定时账本记好;屏幕锁不用。 */
+    private val keepThroughEnd: Boolean = false,
+) {
     private var held = false
     private var pendingRelease: Job? = null
     private var closed = false
@@ -36,7 +44,7 @@ class KeepAwake(private val lock: WakeLockPort, private val scope: CoroutineScop
             // Queued behind other tasks waiting for a virtual display: still working, nothing for you to handle, so keep holding;
             // if it were released after the grace period, the moment that task ends and drops its share the screen could go dark right then, and creating a display to start work would have to wait for unlock
             is TaskState.Held -> if (state.reason.queued) hold() else releaseLater()
-            TaskState.Idle, is TaskState.Succeeded, is TaskState.Failed, TaskState.Cancelled -> release()
+            TaskState.Idle, is TaskState.Succeeded, is TaskState.Failed, TaskState.Cancelled -> if (keepThroughEnd) hold() else release()
             else -> releaseLater()
         }
     }
@@ -135,4 +143,43 @@ class ScreenWakeLock(context: Context) : WakeLockPort {
         /** Fallback upper bound so a missed release on any path cannot hold forever; normally the task state releases it. */
         private const val MAX_HOLD_MS = 6 * 60 * 60 * 1000L
     }
+}
+
+/**
+ * CPU 唤醒锁(PARTIAL_WAKE_LOCK):熄屏、Doze 里也让任务的网络与推理接着走,不点亮屏幕。
+ * 和屏幕锁一样由 [SharedWakeLock] 分成每个任务各持一份、按任务状态拿放(见 [KeepAwake] 的 keepThroughEnd);
+ * [MAX_HOLD_MS] 只是漏了释放时的兜底。
+ */
+class CpuWakeLock(context: Context, tag: String) : WakeLockPort {
+    private val lock = context.getSystemService(PowerManager::class.java)
+        .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, tag)
+        .apply { setReferenceCounted(false) }
+
+    override fun acquire() = lock.acquire(MAX_HOLD_MS)
+    override fun release() { if (lock.isHeld) lock.release() }
+
+    companion object {
+        private const val MAX_HOLD_MS = 6 * 60 * 60 * 1000L
+    }
+}
+
+/**
+ * 定时派发到任务服务接手之间的 CPU 唤醒。闹钟广播结束后系统就不再替 App 撑着 CPU,
+ * 而前台服务的 onStartCommand、任务拿到自己那份 CPU 锁都在这之后:派发方([TaskService.startTrigger])先拿上,
+ * 服务处理完这次启动(开跑、排队或因暂停/退出不开)就放开;服务没起来时到 [HANDOFF_MS] 自动放开。
+ * 只有这一个派发窗口要撑,所以整个进程一把、不计数:连着来两次就把期限往后推。
+ */
+internal object TriggerHandoffWake {
+    private var lock: PowerManager.WakeLock? = null
+
+    @Synchronized fun hold(context: Context) {
+        val l = lock ?: context.applicationContext.getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Mika:trigger-handoff")
+            .apply { setReferenceCounted(false) }.also { lock = it }
+        l.acquire(HANDOFF_MS)
+    }
+
+    @Synchronized fun release() { lock?.takeIf { it.isHeld }?.release() }
+
+    const val HANDOFF_MS = 60_000L
 }

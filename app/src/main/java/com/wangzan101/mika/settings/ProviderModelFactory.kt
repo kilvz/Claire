@@ -32,21 +32,44 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.get
  * for the vision role it is always true (the user selected it to see images); other roles follow [ModelOptions.seesImages] — what the user said about this model wins,
  * and when nothing was said but vision also uses this config (the same model is selected, or "use the main model"), it likewise counts as able to see, so a screenshot is attached directly instead of making a separate vision call.
  */
-fun ProviderStore.configFor(role: ModelRole): ProviderConfig? {
-    val choices = _roles.value
-    // For a group, the first enabled member is given to the UI as the representative; the real routing goes through the members inside modelFor
-    val id = choices.resolveConfig(role) ?: groupFor(role)?.enabledMembers?.firstOrNull()?.configId ?: return null
+fun ProviderStore.configFor(role: ModelRole): ProviderConfig? = configFor(role, _roles.value)
+
+/** 按一份有效的角色选择解析代表配置；对话覆盖不会写回全局角色。 */
+internal fun ProviderStore.configFor(role: ModelRole, choices: RoleChoices): ProviderConfig? {
+    // 组按「排在最前的启用成员」给界面一个代表;真正的路由在 modelFor 里按成员走
+    val id = choices.resolveConfig(role)
+        ?: choices.resolveGroup(role)?.let(::group)?.enabledMembers?.firstOrNull()?.configId ?: return null
     val cfg = _configs.value.firstOrNull { it.id == id } ?: return null
     val sees = role == ModelRole.Vision || ModelOptions.seesImages(cfg.capabilities.vision,
         provider(cfg.providerId)?.visionOverrides?.get(cfg.model), usedForVision = choices.resolveConfig(ModelRole.Vision) == cfg.id)
     return if (sees == cfg.capabilities.vision) cfg else cfg.copy(capabilities = cfg.capabilities.copy(vision = sees))
 }
 
-/** Returns the provider of the main model when it has not passed its test there yet (see [Provider.untested]); when a task fails because of the model, this is used to suggest "test again". */
-fun ProviderStore.untestedMainProvider(): Provider? {
-    val cfg = configFor(ModelRole.Main) ?: return null
-    val candidates = groupFor(ModelRole.Main)?.enabledMembers?.mapNotNull { m -> _configs.value.firstOrNull { it.id == m.configId } }
-        ?: listOf(cfg)
+/** 一个覆盖此刻是否仍能当主模型；失效覆盖保留在对话旁文件里，仅解析时退回全局。 */
+fun ProviderStore.usableMainChoice(choice: ModelChoice?): ModelChoice? = when (choice) {
+    is ModelChoice.Model -> choice.takeIf { c ->
+        _configs.value.any { it.id == c.configId && it.canUseForChat() && it.capabilities.toolCalls }
+    }
+    is ModelChoice.Group -> choice.takeIf { groupUsable(it.groupId, ModelRole.Main) }
+    null -> null
+}
+
+/** 主模型、SameAsMain、备援和提示元数据共用的唯一覆盖解析入口。 */
+internal fun ProviderStore.effectiveRoles(mainOverride: ModelChoice? = null): RoleChoices {
+    val current = _roles.value
+    return when (val usable = usableMainChoice(mainOverride)) {
+        is ModelChoice.Model -> current.copy(main = usable.configId, mainGroup = null)
+        is ModelChoice.Group -> current.copy(main = null, mainGroup = usable.groupId)
+        null -> current
+    }
+}
+
+/** 主模型在它那家还没测试通过时给出那一家；使用与本次运行相同的覆盖解析。 */
+fun ProviderStore.untestedMainProvider(mainOverride: ModelChoice? = null): Provider? {
+    val choices = effectiveRoles(mainOverride)
+    val cfg = configFor(ModelRole.Main, choices) ?: return null
+    val candidates = choices.resolveGroup(ModelRole.Main)?.let(::group)?.enabledMembers
+        ?.mapNotNull { m -> _configs.value.firstOrNull { it.id == m.configId } } ?: listOf(cfg)
     return candidates.firstNotNullOfOrNull { c -> provider(c.providerId)?.takeIf { it.untested(c.model) } }
 }
 
@@ -56,18 +79,36 @@ fun ProviderStore.untestedMainProvider(): Provider? {
  * When a model group is selected it returns a [GroupPool]: each member meters its own usage, and the group itself only handles selection and transfer.
  * [session] is the conversation this call belongs to (models built within one conversation all get the same one); for providers that declare a session header, every request carries it.
  */
-fun ProviderStore.modelFor(role: ModelRole, session: ModelSession = ModelSession.fresh()): ChatModel? {
-    groupFor(role)?.let { group -> return groupModelFor(role, group, session) }
-    return meteredFor(role, session, UsagePurpose.of(role), ::checkDailyBudget)
+fun ProviderStore.modelFor(
+    role: ModelRole,
+    session: ModelSession = ModelSession.fresh(),
+    mainOverride: ModelChoice? = null,
+): ChatModel? {
+    val choices = effectiveRoles(mainOverride)
+    // 无论组来自对话覆盖还是全局设置，都必须满足这个用途（例如 Vision 至少一个成员能看图）。
+    choices.resolveGroup(role)?.let(::group)?.let { group ->
+        if (!groupUsable(group, role)) return null
+        return groupModelFor(role, group, session, choices)
+    }
+    val cfg = configFor(role, choices) ?: return null
+    val effort = choices.reasoningEffort(role)?.takeIf { ReasoningOptions.of(cfg, listedOf(cfg))?.levels?.contains(it) == true }
+    return meteredWith(cfg, role, session, UsagePurpose.of(role), ::checkDailyBudget,
+        effortOverride = effort, useRoleEffort = false)
 }
 
-/** Builds each member in the group's member order; each member's context settings, reasoning level and request headers follow its own config. */
-internal fun ProviderStore.groupModelFor(role: ModelRole, group: ModelGroup, session: ModelSession): ChatModel? {
+/** 按组的成员顺序建出每个成员;成员的上下文设置、思考档位、请求头都按各自的配置来。 */
+internal fun ProviderStore.groupModelFor(
+    role: ModelRole,
+    group: ModelGroup,
+    session: ModelSession,
+    choices: RoleChoices = _roles.value,
+): ChatModel? {
     val members = group.members.filter { it.enabled }.mapNotNull { m ->
         val cfg = _configs.value.firstOrNull { it.id == m.configId } ?: return@mapNotNull null
         val p = provider(cfg.providerId) ?: return@mapNotNull null
-        val effort = memberReasoningEffort(cfg, p, m.reasoningEffort ?: _roles.value.reasoningEffort(role))
-        val model = meteredWith(cfg, role, session, UsagePurpose.of(role), ::checkDailyBudget, effortOverride = effort)
+        val effort = memberReasoningEffort(cfg, p, m.reasoningEffort ?: choices.reasoningEffort(role))
+        val model = meteredWith(cfg, role, session, UsagePurpose.of(role), ::checkDailyBudget,
+            effortOverride = effort, useRoleEffort = false)
         PoolMember(
             key = MemberKey(p.id, cfg.model), model = model, priority = m.priority,
             weight = m.weight.takeIf { it > 0 } ?: 1, costRank = m.costRank, providerName = p.name,
@@ -139,11 +180,16 @@ fun ProviderStore.modelForConfig(configId: String, session: ModelSession = Model
  * Returns the fallback models and their provider IDs in the given role's fallback order, so failover can determine budget ownership.
  * Slots whose config is gone or that cannot be built are skipped; a shorter chain still works.
  */
-fun ProviderStore.fallbackChain(role: ModelRole, session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> {
+fun ProviderStore.fallbackChain(
+    role: ModelRole,
+    session: ModelSession = ModelSession.fresh(),
+    mainOverride: ModelChoice? = null,
+): Pair<List<ChatModel>, List<String?>> {
     val models = ArrayList<ChatModel>()
     val providerIds = ArrayList<String>()
-    val rolePrimaryId = _roles.value.resolve(role)
-    for (id in _roles.value.fallbacks(role)) {
+    val choices = effectiveRoles(mainOverride)
+    val rolePrimaryId = choices.resolve(role)
+    for (id in choices.fallbacks(role)) {
         if (id == rolePrimaryId) continue
         val cfg = configById(id) ?: continue
         val m = modelForRoleConfig(role, id, session) ?: continue
@@ -156,18 +202,25 @@ fun ProviderStore.fallbackChain(role: ModelRole, session: ModelSession = ModelSe
 /**
  * Returns the fallback models and their provider IDs in the order of [RoleChoices.mainFallbacks], so failover can determine budget ownership.
  */
-fun ProviderStore.mainFallbackChain(session: ModelSession = ModelSession.fresh()): Pair<List<ChatModel>, List<String?>> =
-    fallbackChain(ModelRole.Main, session)
+fun ProviderStore.mainFallbackChain(
+    session: ModelSession = ModelSession.fresh(),
+    mainOverride: ModelChoice? = null,
+): Pair<List<ChatModel>, List<String?>> = fallbackChain(ModelRole.Main, session, mainOverride)
 
-/** Vision model fallback chain */
-fun ProviderStore.visionFallbackChain(session: ModelSession = ModelSession.fresh()): List<ChatModel> =
-    fallbackChain(ModelRole.Vision, session).first
+/** 视觉模型备援链；SameAsMain 按本次有效主模型排除主配置自身。 */
+fun ProviderStore.visionFallbackChain(
+    session: ModelSession = ModelSession.fresh(),
+    mainOverride: ModelChoice? = null,
+): List<ChatModel> = fallbackChain(ModelRole.Vision, session, mainOverride).first
 
-/** Lightweight model fallback chain */
-fun ProviderStore.lightFallbackChain(session: ModelSession = ModelSession.fresh()): List<ChatModel> =
-    fallbackChain(ModelRole.Light, session).first
+/** 轻量模型备援链；SameAsMain 按本次有效主模型排除主配置自身。 */
+fun ProviderStore.lightFallbackChain(
+    session: ModelSession = ModelSession.fresh(),
+    mainOverride: ModelChoice? = null,
+): List<ChatModel> = fallbackChain(ModelRole.Light, session, mainOverride).first
 
-fun ProviderStore.mainProviderId(): String? = configFor(ModelRole.Main)?.providerId
+fun ProviderStore.mainProviderId(mainOverride: ModelChoice? = null): String? =
+    configFor(ModelRole.Main, effectiveRoles(mainOverride))?.providerId
 
 /** Re-checks the config and the ledger before every actual request; when the budget is reached no request is sent and no phantom call is recorded. */
 internal fun ProviderStore.checkDailyBudget(source: UsageSource) {

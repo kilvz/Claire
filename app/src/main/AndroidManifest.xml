@@ -80,6 +80,10 @@
     <!-- list_apps lists launchable apps; resolve the package that hosts the system permission dialog, used to determine "switched away" -->
     <queries>
         <intent><action android:name="android.telecom.InCallService" /></intent>
+        <!-- 列出手机上登记的语音合成引擎,供系统朗读选择引擎(SystemTtsDiscovery) -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -287,6 +291,11 @@
                 android:value="Keeps the user-enabled incoming call assistant available while the screen is locked and carries one user-confirmed outgoing call across screen lock, with a visible ongoing notification and no idle audio capture" />
         </service>
 
+        <service
+            android:name=".calls.CallStandbyRecoveryJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <receiver android:name=".calls.CallNotificationAction" android:exported="false" />
         <!-- Ask the owner from within an AI call: the landing point for replying directly in the notification; not exported (the PendingIntent names this component) -->
         <receiver android:name=".calls.OwnerReplyReceiver" android:exported="false" />
@@ -361,7 +370,18 @@
                 android:resource="@xml/web_files" />
         </provider>
 
-        <!-- Conversation attachments: the camera writes photos into camera/ under the cache, and the copy made when opening an already-sent attachment goes in viewing/; not exported, granted temporarily when used -->
+        <!-- 聊天视频卡片:点开时把工作区视频复制到缓存 videoplay/,只把这份副本临时授权给系统播放器 -->
+        <provider
+            android:name=".media.VideoPlaybackFilesProvider"
+            android:authorities="${applicationId}.videoplay"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/video_playback_files" />
+        </provider>
+
+        <!-- 对话页附件:相机把照片写进缓存里的 camera/,点开已发附件时复制出的一份在 viewing/;不对外导出,用到时临时授权 -->
         <provider
             android:name=".chat.AttachFilesProvider"
             android:authorities="${applicationId}.attachfiles"

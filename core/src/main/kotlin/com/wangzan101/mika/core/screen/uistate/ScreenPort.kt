@@ -287,6 +287,15 @@ interface ScreenPort {
      */
     suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult = ActionResult.Failed("unsupported")
 
+    /** 这个端口能不能分享视频;不能时手机工具不提供 phone_share_video。 */
+    val canShareVideo: Boolean get() = false
+
+    /**
+     * 把工作区里的一段视频分享给 [packageName](ACTION_SEND + EXTRA_STREAM,content URI 允许对方读取),在 Agent 的屏上打开分享页;
+     * 只打开,不发出。这个 App 没有收视频分享的页面时失败 cannot_share;不支持的端口返回 unsupported。
+     */
+    suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult = ActionResult.Failed("unsupported")
+
     /**
      * Perform a system action through standard Android interfaces (see [SystemAction]): first check whether any App accepts it; if none, report not_supported; if one does, hand it over on the Agent's screen
      * (creating the screen on first use, and not opening when the user is using that App on the home screen). Unsupported ports return unsupported.

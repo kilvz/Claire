@@ -10,6 +10,7 @@ import com.wangzan101.mika.cap.phone.a11y.ScreenAccessibility
 import com.wangzan101.mika.cap.phone.PhoneServices
 import com.wangzan101.mika.core.device.shell.BuiltinShellControl
 import com.wangzan101.mika.core.device.shell.PairingCode
+import com.wangzan101.mika.settings.MikaPause
 import com.wangzan101.mika.settings.ui.PhoneSetupCopy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,10 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
     /** Start watching for pairing; if already watching, recount the deadline as [WINDOW_MS] from now rather than starting over (so the notification does not pop up from scratch again). */
     @Synchronized
     fun begin() {
+        if (MikaPause.get(app).paused()) {
+            end()
+            return
+        }
         deadline.extend()
         control.startDiscovery()
         if (watch?.isActive == true) {
@@ -84,7 +89,7 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
                     val d = control.pairingDiscovery.value
                     val pending = submitted
                     val r = _repairing.value
-                    PairingNotice.follow(control.status.value, d, r, pending)
+                    PairingNotice.follow(control.status.value, d, r, pending, paused = MikaPause.get(app).paused())
                 }
                     .distinctUntilChanged()
                     .onEach { (notice, done) -> Log.i(TAG, "notice ${notice?.let { it::class.simpleName } ?: "none"} (discovery ${control.pairingDiscovery.value}, status ${control.status.value})${if (done) "; done" else ""}") }

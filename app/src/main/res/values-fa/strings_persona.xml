@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="persona_title">شخصیت</string>
-    <string name="persona_sub">انتخاب کنید میکا چگونه با شما صحبت کند</string>
+    <string name="persona_sub">انتخاب کنید Claire چگونه با شما صحبت کند</string>
     <string name="persona_default">پیش‌فرض</string>
-    <string name="persona_default_sub">شیوهٔ همیشگی صحبت کردن میکا</string>
+    <string name="persona_default_sub">شیوهٔ همیشگی صحبت کردن Claire</string>
     <string name="persona_empty">هنوز شخصیتی نساخته‌اید</string>
-    <string name="persona_empty_sub">شخصیت فقط شیوهٔ صحبت کردن میکا را تغییر می‌دهد. اختیارات میکا همان می‌ماند.</string>
+    <string name="persona_empty_sub">شخصیت فقط شیوهٔ صحبت کردن Claire را تغییر می‌دهد. اختیارات Claire همان می‌ماند.</string>
     <string name="persona_new">شخصیت جدید</string>
     <string name="persona_name">نام</string>
     <string name="persona_prompt">دستورها</string>
     <string name="persona_prompt_hint">لحن، طول پاسخ، واژه‌گزینی، قالب‌بندی…</string>
     <string name="persona_counter">%1$d نویسه · حدود %2$d توکن</string>
     <string name="persona_preview">پیش‌نمایش متن کامل دستورها</string>
-    <string name="persona_preview_note">قواعدی که به رنگ خاکستری نوشته شده‌اند ثابت‌اند. شخصیت می‌تواند لحن و واژه‌گزینی را تغییر دهد. قواعد ایمنی، مجوزها و آنچه میکا گزارش می‌کند تغییر نمی‌کنند.</string>
+    <string name="persona_preview_note">قواعدی که به رنگ خاکستری نوشته شده‌اند ثابت‌اند. شخصیت می‌تواند لحن و واژه‌گزینی را تغییر دهد. قواعد ایمنی، مجوزها و آنچه Claire گزارش می‌کند تغییر نمی‌کنند.</string>
     <string name="persona_manage">مدیریت شخصیت‌ها</string>
     <string name="persona_delete_title">«%1$s» حذف شود؟</string>
-    <string name="persona_delete_body">این کار برگشت‌پذیر نیست. اگر در حال استفاده باشد، میکا به شیوهٔ معمول صحبت‌کردنش برمی‌گردد.</string>
+    <string name="persona_delete_body">این کار برگشت‌پذیر نیست. اگر در حال استفاده باشد، Claire به شیوهٔ معمول صحبت‌کردنش برمی‌گردد.</string>
     <string name="persona_copy">ایجاد نسخهٔ مشابه</string>
     <string name="persona_name_required">نامی وارد کنید.</string>
     <string name="persona_name_too_long">نام بیش از حد طولانی است.</string>
@@ -55,6 +55,6 @@
     <string name="persona_discard_body">تغییرها هنوز ذخیره نشده‌اند.</string>
     <string name="persona_keep_editing">ادامهٔ ویرایش</string>
     <string name="persona_nickname">لقب</string>
-    <string name="persona_nickname_about">نامی که میکا برای اشاره به خودش به کار می‌برد. اگر خالی بماند همان میکا است. نام برنامه تغییر نمی‌کند.</string>
+    <string name="persona_nickname_about">نامی که Claire برای اشاره به خودش به کار می‌برد. اگر خالی بماند همان Claire است. نام برنامه تغییر نمی‌کند.</string>
     <string name="persona_nickname_invalid">حداکثر %1$d نویسه: فقط حرف، رقم و فاصله.</string>
 </resources>

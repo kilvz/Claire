@@ -1,6 +1,10 @@
 package com.wangzan101.mika.voice.ui
 
 import androidx.compose.foundation.clickable
+import com.wangzan101.mika.ui.components.PickRow
+import com.wangzan101.mika.ui.components.MikaDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -137,9 +141,33 @@ private fun LanguagePicker(selected: AsrLanguage, onSelect: (AsrLanguage) -> Uni
 }
 
 /**
- * The "Qwen live speech recognition" setup page: three tabs side by side at the top — self-hosted, Bailian · Beijing, Bailian · Singapore — each with its own settings.
- * Self-hosted: enter the service address (when only "host:port" is given, it is completed with ws and the default port). Bailian: API Key (one per region, stored ones are not filled back in, leave empty to keep) and model.
- * "Connect and use" connects once and runs through the opening (without sending audio); only if that succeeds is it stored and selected.
+ * 「识别语言」一行:点开单选,和设置里别的「只认几档」的项同一种做法。放在卡片里输入行的下面,
+ * 现在选的值和上面输入框里的字对齐(见 [PickRow])。
+ */
+@Composable
+internal fun AsrLanguageRow(selected: AsrLanguage, onSelect: (AsrLanguage) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    val title = tr(R.string.speech_asr_language)
+    PickRow(title, asrLanguageName(selected), onClick = { picking = true }, modifier = Modifier.testTag("asr-language-row"))
+    if (picking) MikaDialog(
+        onDismissRequest = { picking = false },
+        title = { Text(title) },
+        text = {
+            Column {
+                AsrLanguage.entries.forEachIndexed { i, l ->
+                    RadioRow(asrLanguageName(l), selected = l == selected, onClick = { onSelect(l); picking = false }, first = i == 0)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = { picking = false }) { Text(tr(R.string.cancel)) } },
+    )
+}
+
+/**
+ * 「千问实时语音识别」的设置页:顶上三个分页并排——自建、百炼·北京、百炼·新加坡,各管各的设置。
+ * 自建:填服务地址(只写「主机:端口」时按 ws、默认端口补全)。百炼:API Key(各地域一份,已存的不回填,留空沿用)和模型。
+ * 「连接并使用」先连一次走一遍开场(不送音频),通了才存下并选用。
  */
 @Composable
 fun FunAsrSetupPage(

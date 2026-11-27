@@ -16,6 +16,7 @@ import com.wangzan101.mika.core.tool.Risk
 import com.wangzan101.mika.core.tool.ToolContext
 import com.wangzan101.mika.core.tool.ToolDef
 import com.wangzan101.mika.core.tool.ToolExecution
+import com.wangzan101.mika.core.tool.ToolSchema
 import com.wangzan101.mika.core.tool.Verb
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -371,24 +372,14 @@ private class McpClientTool(
     trust: McpTrust,
     private val displayName: String,
 ) : AgentTool {
-    private val schema = descriptor.inputSchema
     private val approval = mcpApprovalRisk(descriptor.annotations, trust)
-    private val props: Map<String, JsonObject> = (schema["properties"] as? JsonObject).orEmpty()
-        .mapValues { (_, value) -> value as? JsonObject ?: JsonObject(emptyMap()) }
-    private val required: List<String> = (schema["required"] as? JsonArray).orEmpty()
-        .mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString && p.content.isNotBlank() }?.content }
-    // required may point at arguments that properties does not declare (only `$ref` was written, the generator
-    // missed them, etc.): add an empty permissive schema, otherwise Args first rejects passing it under allowed and
-    // then rejects not passing it under required, so the tool cannot be called either way. Names mentioned in
-    // required are added as well: that is the server's own parameter (see ToolDef.ownReason), no longer the
-    // purpose note we attach.
-    private val declaredProps: Map<String, JsonObject> =
-        props + required.filterNot { it in props }.associateWith { JsonObject(emptyMap()) }
+    // MCP tools frequently rely on $defs/$ref, combinators, or omit properties listed in required (incl. ownReason).
+    private val normalized = ToolSchema.normalizeObject(descriptor.inputSchema)
     override val def: ToolDef = ToolDef(
         name,
         descriptor.description,
-        declaredProps,
-        required,
+        normalized.props,
+        normalized.required,
     )
     override val verb = Verb.Interact
     override val risk = when (approval.level) {

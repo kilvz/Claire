@@ -1,5 +1,6 @@
 package com.wangzan101.mika.about.ui
 
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -246,7 +247,7 @@ private fun Hero(versionName: String, build: String, beta: Boolean) {
 
 /** Value at the end of a row: a spinner, a dot plus text, or a plain value. */
 @Composable
-internal fun TrailingValue(v: AboutCopy.CheckValue) {
+internal fun RowScope.TrailingValue(v: AboutCopy.CheckValue) {
     if (v.spinner) {
         CircularProgressIndicator(Modifier.size(16.dp).testTag("update-spinner"), color = MikaTheme.colors.accent, strokeWidth = 2.dp)
         return

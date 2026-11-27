@@ -1,5 +1,7 @@
 package com.wangzan101.mika.settings.ui
 
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.wangzan101.mika.i18n.tr
@@ -8,7 +10,9 @@ import com.wangzan101.mika.R
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.wangzan101.mika.settings.FeatureFlags
 import com.wangzan101.mika.settings.ThemeAccent
 import com.wangzan101.mika.settings.ThemeMode
 import com.wangzan101.mika.ui.components.SegmentedControl
@@ -40,6 +44,7 @@ import kotlin.math.roundToInt
 import com.wangzan101.mika.browser.ui.WebSitesSection
 import com.wangzan101.mika.browser.ui.WebSitesState
 import com.wangzan101.mika.ui.Route
+import com.wangzan101.mika.ui.MainActivity
 
 // ---------- Phone control ----------
 
@@ -88,7 +93,12 @@ fun RoutesScreen(count: Int?, onClear: () -> Unit, onBack: () -> Unit) {
 /** Settings › Recovery & repair: several permission switches for phone control, followed by the compatibility self-check entry; [scrollState] is supplied by the page switcher so returning from the self-check stops at the previous position. */
 @Composable
 fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}, scrollState: ScrollState = rememberScrollState()) {
+    val activity = LocalContext.current.mainActivity()
     PageScaffold(stringResource(R.string.settings_recovery), onBack, scrollState = scrollState) {
+        if (activity != null) {
+            val flags = remember { FeatureFlags.get(activity) }
+            RecentsExclusionSection(flags.excludeFromRecents(), activity.recentsExclusion::set)
+        }
         RecoverySwitches()
         GroupCard {
             ListRow(
@@ -99,7 +109,13 @@ fun RecoveryScreen(onBack: () -> Unit, onOpenSelfCheck: () -> Unit = {}, scrollS
     }
 }
 
-/** Current wording for the appearance (used by the settings page and this row). */
+private tailrec fun Context.mainActivity(): MainActivity? = when (this) {
+    is MainActivity -> this
+    is ContextWrapper -> baseContext.mainActivity()
+    else -> null
+}
+
+/** 外观的当前说法(设置页和这一行都用)。 */
 fun appearanceLabel(mode: ThemeMode): String = tr(
     when (mode) {
         ThemeMode.System -> R.string.appearance_system

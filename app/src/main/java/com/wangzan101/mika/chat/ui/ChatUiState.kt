@@ -129,7 +129,9 @@ data class Exchange(
     val audios: List<com.wangzan101.mika.core.chat.GeneratedAudio> = emptyList(),
     /** Images Claire generated and left in the workspace this turn, shown as photo tiles. */
     val photos: List<com.wangzan101.mika.core.chat.GeneratedPhoto> = emptyList(),
-    /** When following started after this app launch (milliseconds); 0 when unknown. */
+    /** 这一轮 Mika 生成并留在工作区里的视频,显示成视频卡片。 */
+    val videos: List<com.wangzan101.mika.core.chat.GeneratedVideo> = emptyList(),
+    /** 这次打开 App 后开始跟的时刻(毫秒);不知道时为 0。 */
     val startedAt: Long = 0L,
     /** Elapsed time computed at the end; null when not finished or when the start time is unknown. */
     val elapsedMs: Long? = null,
@@ -260,7 +262,9 @@ data class ChatUi(
     val exchanges: List<Exchange> = emptyList(),
     /** Owning project group id; for a new conversation before the first message is sent it lives only in the draft/UI state, and is written to the sidecar file when the first message is sent. */
     val projectId: String? = null,
-    /** Conditions missing when the last send was blocked; empty means it was not blocked. */
+    /** 这个对话下一次任务使用的主模型;未发首句时选择只留在界面进程内。 */
+    val mainModel: MainModelUi = MainModelUi(),
+    /** 上次发送被拦下时缺的条件;为空表示没被拦。 */
     val blocked: List<Problem>? = null,
     val pip: PipUi = PipUi(),
     val composer: ComposerMode = ComposerMode.Idle,

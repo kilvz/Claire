@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -130,17 +132,22 @@ private fun TeachShelf(onTeach: () -> Unit, onVoiceChat: () -> Unit) {
  * The card's bottom line: [primary] ("See process", "Back to Claire"; absent on the idle card when there is no conversation yet) and a gray "Turn off floating capsule".
  * The × in the top right only collapses the card; people who want the capsule to stop appearing turn it off here instead of looking for the setting.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun FooterLinks(actions: CardActions, primary: Pair<String, () -> Unit>?) {
-    Row(
+    FlowRow(
         Modifier.fillMaxWidth().padding(top = 6.dp),
-        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
         primary?.let { (text, onClick) ->
-            TextLink(text, onClick = onClick)
-            Text("·", style = Sub, color = MikaTheme.colors.ink3)
+            Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
+                TextLink(text, onClick = onClick)
+                Text("·", style = Sub, color = MikaTheme.colors.ink3)
+            }
         }
-        TextLink(CardCopy.HIDE_CAPSULE, MikaTheme.colors.ink3, actions::hideCapsule)
+        Box(Modifier.align(Alignment.CenterVertically)) {
+            TextLink(CardCopy.HIDE_CAPSULE, MikaTheme.colors.ink3, actions::hideCapsule)
+        }
     }
 }
 

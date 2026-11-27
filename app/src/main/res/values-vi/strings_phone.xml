@@ -75,7 +75,7 @@
     <string name="fail_revoked">Ghép nối đã hết hạn</string>
     <string name="fail_revoked_body">Hệ thống có thể đã thu hồi sau một thời gian dài không sử dụng, hoặc nó đã bị xóa. Chỉ cần ghép nối lại. Hãy bật “Tắt thời gian chờ ủy quyền adb” trong Tùy chọn nhà phát triển để nó không hết hạn nữa.</string>
     <string name="fail_key_unreadable">Không thể đọc khóa ghép nối</string>
-    <string name="fail_key_unreadable_body">Claire không còn đọc được khóa đã dùng để ghép nối. Hãy ghép nối lại một lần; Claire sẽ tạo khóa mới và mục “mika@…” cũ trong Thiết bị đã ghép nối có thể bị xóa.</string>
+    <string name="fail_key_unreadable_body">Claire không còn đọc được khóa đã dùng để ghép nối. Hãy ghép nối lại một lần; Claire sẽ tạo khóa mới và mục “claire@…” cũ trong Thiết bị đã ghép nối có thể bị xóa.</string>
     <string name="fail_helper">Đã kết nối, nhưng chưa sẵn sàng được</string>
     <string name="fail_helper_body">Thử lại thường sẽ khắc phục được.</string>
     <string name="fail_unknown">Đã xảy ra lỗi</string>

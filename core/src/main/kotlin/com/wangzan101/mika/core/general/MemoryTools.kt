@@ -127,10 +127,10 @@ internal object MemorySave : AgentTool {
         val inferred = (listOf(content) + keywords).any { utterances.unsupportedMemorySpecifics(it, quote).isNotEmpty() }
         if (inferred) {
             if (!store.inferenceAllowed()) return refused(ctx, a, "content_not_from_user", Feedback["memory.content_not_from_user"])
-            // Even when this is on, it does not accept just anything: the quote must fall on the half-sentence the user said in this turn asking for it to be remembered.
-            // Otherwise any phrase like "help me look at this web page" could serve as a quote to store text from the screen or a web page;
-            // and in "don't remember my address, remember I like tea" quoting the first half does not work either — what was asked to be remembered is the second half
-            if (utterances.quotedClauses(quote).none { clauses -> clauses.any(::asksToRemember) }) {
+            // 开着也不是见什么收什么:引文得落在用户这一轮自己说的、让它记的那半句上。
+            // 不然随便一句「帮我看看这个网页」都能被拿来当引文,把屏幕、网页上的字存进来;
+            // 「别记我的地址,记住我喜欢喝茶」里引前半句也不行——让记的是后半句
+            if (utterances.quotedClauses(quote).none { clauses -> clauses.any(MemoryRequests::asksToRemember) }) {
                 return refused(ctx, a, "inference_not_requested", Feedback["memory.inference_not_requested"])
             }
         }
@@ -154,35 +154,6 @@ internal object MemorySave : AgentTool {
                 }
             },
         )
-    }
-
-    /**
-     * This half-sentence asks for it to be remembered: remember, note down, write to memory, store it, save, don't forget, remember, save, add ... to memory. Only Chinese and English verb forms are recognized
-     * ([MemoryEdit] for changing or deleting memory recognizes only these two as well); merely mentioning the word "memory" does not count, and any other language is treated as not asking for it to be remembered —
-     * a wrong match would store something the user did not agree to, so it is better not to match. Used only when accepting "inferred by Claire" entries: the user's own words still need no such wording.
-     */
-    private val SAVE_REQUEST = Regex(
-        "[记記](?:住|下|一下|一[条條]|一[笔筆]|[几幾][条條]|到|[进進]|入|[着著]|好|上|吧|[录錄](?:一下|下|到|[进進]|在))|" +
-            "[写寫][入进進到]|存[入进進到下一上吧]|存起[来來]|保存|儲存|[别別]忘|不要忘|(?:加|添加|放|收)[到进進入]\\S{0,8}?(?:记忆|記憶)|" +
-            "\\b(?:remember|memori[sz]e|save|store|note\\s+(?:that|this|it|down)|keep\\s+in\\s+mind|" +
-            "(?:add|write|put|commit)\\b[^,.;!?\\n]{0,40}?\\b(?:to|in|into)\\s+(?:your\\s+|the\\s+|my\\s+)?memor(?:y|ies))\\b",
-        RegexOption.IGNORE_CASE,
-    )
-    /** Asks whether it still remembers something; not a request for it to remember. */
-    private val RECALL_QUESTION = Regex("\\b(?:do|did)\\s+you\\s+(?:still\\s+|even\\s+)?remember\\b|\\bwhat\\s+(?:do|did|can)\\s+you\\s+remember\\b", RegexOption.IGNORE_CASE)
-    /** This half-sentence says not to remember: "don't remember it", "don't store these", "don't save". "Don't forget to note it down" and "can't recall" are not this. */
-    private val SAVE_NEGATION = Regex(
-        "(?<![能要用可])(?:不|别|別|勿|无需|無需|无须|無須|禁止)\\s*(?:要|用|再|去|必|该|該|应该|應該|许|許|准|可以|能)?\\s*(?:把[^,，。;；!！?？\\n]{0,12}?)?(?:给我|給我|帮我|幫我|替我)?\\s*" +
-            "(?:[记記](?![得忆憶性])|[写寫][入进進到下]|存(?![在款货貨量储儲])|保存|儲存)|" +
-            "\\b(?:do\\s+not|don'?t|never|no\\s+need\\s+to|not\\s+to|shouldn'?t|should\\s+not|mustn'?t|must\\s+not|won'?t|without)\\s+" +
-            "(?:ever\\s+|actually\\s+|please\\s+|you\\s+)?(?:remember|memori[sz]e|sav(?:e|ing)|stor(?:e|ing)|not(?:e|ing)|keep(?:ing)?|add(?:ing)?|writ(?:e|ing)|put(?:ting)?|commit(?:ting)?)\\b",
-        RegexOption.IGNORE_CASE,
-    )
-
-    /** Whether this half-sentence asks for it to be remembered: it contains a remembering verb phrase and is not a prohibition. */
-    private fun asksToRemember(clause: String): Boolean {
-        val c = clause.replace('’', '\'')
-        return SAVE_REQUEST.containsMatchIn(RECALL_QUESTION.replace(c, " ")) && !SAVE_NEGATION.containsMatchIn(c)
     }
 }
 
@@ -217,14 +188,9 @@ internal object MemoryEdit : AgentTool {
         // Judge negation on the full original message containing the quote, so the model cannot simply pick out "delete" from "do not delete".
         val messages = utterances.matchingCurrentMessages(quote)
         if (messages.isEmpty()) return refused(ctx, a, "quote_not_from_user", Feedback["memory.edit_quote_not_from_user"])
-        val (request, negation) = when (op) {
-            "update" -> UPDATE_REQUEST to UPDATE_NEGATION
-            "delete" -> DELETE_REQUEST to DELETE_NEGATION
-            else -> throw ArgError("op", "must be update or delete")
-        }
-        // The message explicitly asks for a change (or deletion), does not say not to, and is not merely a question like "if I said ..., what would you do"
-        val requested = request.containsMatchIn(quote) && messages.none(negation::containsMatchIn) && messages.none(::onlyAsking)
-        if (!requested) return refused(ctx, a, "edit_not_requested", Feedback["memory.edit_not_requested"])
+        if (op != "update" && op != "delete") throw ArgError("op", "must be update or delete")
+        // 话里明说了要改(删),没说不要,也不是「如果我说……你会怎么做」这种只是问问的;各语言的说法在 MemoryRequests
+        if (!MemoryRequests.requested(op, quote, messages)) return refused(ctx, a, "edit_not_requested", Feedback["memory.edit_not_requested"])
         val candidates = ctx.memorySearchCandidates()
         if (candidates == null || id !in candidates) {
             return fail("not_found", Feedback["memory.not_found"], recoverable = true)
@@ -280,27 +246,4 @@ internal object MemoryEdit : AgentTool {
 
     private fun quotesExactId(quote: String, id: String): Boolean =
         Regex("(?<![A-Za-z0-9_-])" + Regex.escape(id) + "(?![A-Za-z0-9_-])").containsMatchIn(quote)
-
-    // Change requested: the various forms of the word "change" (change into, make more concise, change a bit; forms like "another day" or "transform" do not count), plus words that plainly mean change such as simplify, merge, tidy up, replace.
-    // Recognizing only a few fixed phrasings would treat "make those entries a bit more concise" as not requesting a change
-    private const val UPDATE_WORDS = "修改|改(?![天日期变變革善观觀口])|更新|更正|编辑|編輯|精简|精簡|缩短|縮短|简化|簡化|压缩|壓縮|合并|合併|整理|重写|重寫|换成|換成|替换|替換|调整|調整|润色|潤色"
-    private const val UPDATE_WORDS_EN = "update|change|edit|correct|rewrite|reword|rephrase|shorten|simplify|merge|replace|trim|tidy"
-    private const val DELETE_WORDS = "删|刪|忘掉|忘记|忘記|去掉|移除|清掉|清除"
-    private const val DELETE_WORDS_EN = "delete|forget|remove|erase|drop"
-    // "Can it be changed" and "does it need deleting" are questions and requests for it to act, not prohibitions: a negating word immediately preceded by a modal character (can / need / use / may) does not count as negation
-    private const val NOT = "(?<![能要用可])(?:不|别|別|无需|無需|无须|無須|不用|不必|不要|不能|不准|禁止)\\s*(?:要|用|再|去)?\\s*"
-    private const val NOT_EN = "\\b(?:do\\s+not|don't|dont|never|no\\s+need\\s+to)\\s+"
-    private val UPDATE_REQUEST = Regex("$UPDATE_WORDS|\\b(?:$UPDATE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
-    private val DELETE_REQUEST = Regex("$DELETE_WORDS|别记|別記|不要记|不要記|取消记忆|取消記憶|\\b(?:$DELETE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
-    private val UPDATE_NEGATION = Regex("$NOT(?:$UPDATE_WORDS)|$NOT_EN(?:$UPDATE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
-    private val DELETE_NEGATION = Regex("$NOT(?:$DELETE_WORDS)|$NOT_EN(?:$DELETE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
-
-    /**
-     * "If I said to delete that entry, what would you do": this asks how it would handle it, not for it to do it now. Memory edits and deletions do not pass the "discussion or action" gate
-     * (see MEMORY_WRITE_VERBS in AgentLoop), so this kind of phrasing is rejected here. Both must be present: the hypothetical phrasing, plus a question about how it would act —
-     * a hypothetical conditional alone is often exactly the content to be remembered ("if I say the usual place, it means the one downstairs from the office").
-     */
-    private val HYPOTHETICAL = Regex("(?:如果|假如|要是|假设|假設|假使)我(?:说|說|让|讓|叫|要)|\\bif\\s+i\\s+(?:said|asked|told|were\\s+to)\\b", RegexOption.IGNORE_CASE)
-    private val ASKING_HOW = Regex("你会(?:怎么|怎样|如何)|你會(?:怎麼|怎樣|如何)|会(?:发生什么|怎么样)|會(?:發生什麼|怎麼樣)|\\b(?:what|how)\\s+would\\s+you\\b|\\bwhat\\s+would\\s+happen\\b", RegexOption.IGNORE_CASE)
-    private fun onlyAsking(message: String) = HYPOTHETICAL.containsMatchIn(message) && ASKING_HOW.containsMatchIn(message)
 }

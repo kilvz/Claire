@@ -13,6 +13,7 @@ import com.wangzan101.mika.settings.listModels
 import com.wangzan101.mika.settings.rememberModels
 import com.wangzan101.mika.settings.removeProvider
 import com.wangzan101.mika.settings.removeProviderKey
+import com.wangzan101.mika.settings.setProviderNickname
 import com.wangzan101.mika.settings.signOutAccount
 import com.wangzan101.mika.settings.signOutChatGpt
 import com.wangzan101.mika.settings.updateProviderKey
@@ -23,8 +24,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.chat.ui.isActive
 
-// Model setup: refreshing lists, changing Keys and removing providers
-/** Lists this provider's models again and records them; records the reason on failure. */
+// 模型设置:刷新列表、换 Key、改备注与移除服务商
+/** 改这家的备注(见 [com.wangzan101.mika.settings.Provider.nickname]);空的就是去掉。 */
+fun ModelSetupViewModel.renameProvider(providerId: String, nickname: String?) {
+    store.setProviderNickname(providerId, nickname)
+    sync()
+}
+
+/** 重新列一次这个服务商的模型并记下;失败时记下原因。 */
 fun ModelSetupViewModel.refresh(providerId: String) {
     val p = store.provider(providerId) ?: return
     if (refreshJobs[providerId]?.isActive == true) return

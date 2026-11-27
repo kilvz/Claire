@@ -76,8 +76,8 @@ class VoiceInput(
     }
 
     /**
-     * Start a session, called on press (must be on the main thread). [language] is the recognition language (BCP-47); null follows the app UI language.
-     * Without the recording permission or when the engine is unavailable, a session that emits only a single Failed is returned, and the UI handles it the same way.
+     * 开一次会话,按下时调(要在主线程)。[language] 是识别语言(BCP-47);null 跟 App 界面语言(自建流式识别不看它,用服务自己设的语言)。
+     * 没有录音权限、引擎用不了时,给出只发一个 Failed 的会话,界面按同一套处理。
      */
     override fun start(language: String?): SpeechSession =
         if (voiceModels.stt.migrated) startMigrated(language) else startLegacy(language)

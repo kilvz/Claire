@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pause_title">Pausar o Claire</string>
+    <string name="pause_row_sub_active">Pare todo o trabalho do Claire até você retomar</string>
+    <string name="pause_row_sub_paused">Pausado: nenhuma tarefa ou plano é executado</string>
+    <string name="pause_state_active">Ativo</string>
+    <string name="pause_explain">Ao pausar, todas as tarefas em andamento e na fila param, os planos que vencerem são pulados e novas tarefas do chat, de computadores e de canais de mensagens são recusadas até você retomar. O serviço de acessibilidade do Claire e a depuração sem fio também são desativados, e o assistente do celular é parado. Nada é desinstalado ou apagado, e o pareamento da depuração sem fio continua salvo.</string>
+    <string name="pause_paused_title">O Claire está pausado</string>
+    <string name="pause_paused_body">Nenhuma tarefa é executada, os planos são pulados e o assistente do celular fica parado até você retomar.</string>
+    <string name="pause_active_title">O Claire está ativo</string>
+    <string name="pause_active_body">Pause o Claire quando quiser desligá-lo por completo por um tempo.</string>
+    <string name="pause_status_label">O que a pausa desativa</string>
+    <string name="pause_action">Pausar o Claire</string>
+    <string name="pause_action_sub">Parar tarefas, desativar acessibilidade e depuração sem fio, parar o assistente</string>
+    <string name="pause_resume">Retomar o Claire</string>
+    <string name="pause_resume_sub">Reconectar o assistente com o pareamento salvo</string>
+    <string name="pause_resumed">O Claire está ativo de novo.</string>
+    <string name="pause_resume_note">O Claire não conseguiu reativar tudo sozinho. Conclua os passos abaixo.</string>
+    <string name="pause_a11y_restoring">Reativando o serviço de acessibilidade do Claire…</string>
+    <string name="pause_a11y_label">Serviço de acessibilidade</string>
+    <string name="pause_wireless_label">Depuração sem fio</string>
+    <string name="pause_helper_label">Assistente do celular</string>
+    <string name="pause_helper_running">Em execução</string>
+    <string name="pause_helper_paused">Pausado</string>
+    <string name="pause_helper_not_running">Parado</string>
+    <string name="pause_helper_connecting">Conectando…</string>
+    <string name="pause_tasks_stopped">As tarefas em andamento e na fila foram paradas.</string>
+    <string name="pause_done">A acessibilidade e a depuração sem fio estão desativadas e o assistente está parado.</string>
+    <string name="pause_a11y_manual">Não foi possível desativar o serviço de acessibilidade por aqui. Abra as configurações de Acessibilidade e desative o Claire.</string>
+    <string name="pause_wireless_manual">Não foi possível desativar a depuração sem fio por aqui. Abra as Opções do desenvolvedor e desative-a.</string>
+    <string name="pause_save_failed">Não foi possível salvar a alteração, então nada mudou. Tente de novo.</string>
+    <string name="pause_step_a11y">Reative o Claire nas configurações de Acessibilidade</string>
+    <string name="pause_step_wireless">Reative a depuração sem fio nas Opções do desenvolvedor</string>
+    <string name="pause_step_repair">Parear o assistente do celular de novo</string>
+    <string name="pause_reconnect">Reconectar o assistente agora</string>
+    <string name="pause_blocked_task">O Claire está pausado, então esta tarefa não começou. Retome o Claire nas Configurações primeiro.</string>
+    <string name="pause_blocked_plan">O Claire está pausado, então este plano não foi executado.</string>
+    <string name="pause_blocked_workflow">O Claire está pausado, então este fluxo de trabalho não foi executado. Retome o Claire nas Configurações primeiro.</string>
+    <string name="pause_channel_reply">O Claire está pausado no celular, então não começou esta tarefa. Envie de novo depois que o Claire for retomado.</string>
+    <string name="plans_skipped_paused">Pulado enquanto o Claire estava pausado</string>
+    <string name="workflow_stopped_paused">Parado porque o Claire foi pausado</string>
+</resources>

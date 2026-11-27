@@ -25,15 +25,16 @@ data class ConnectCandidates(
 )
 
 /**
- * Finds the connection port for wireless debugging on this device and connects to it. Tried in order, stopping at whichever connects: the port connected last time, the system property (used only when it can be read), every port found via mDNS,
- * a scan of local ports ([scan], only when the earlier ones all failed), and the port the user entered on the onboarding screen ([manual]).
- * mDNS alone is not enough: adbd registers the service only once when wireless debugging is turned on, and that registration is gone after the mDNS daemon restarts; some networks also block multicast;
- * mDNS may also resolve stale ports that are no longer valid, so every port found is tried. A stale cached port is rejected quickly, so it comes first.
- * Once the user has entered a port, no scan is done (the field exists only because scanning had failed), and that port is tried directly.
- * A TLS-level rejection (UNAUTHORIZED, TLS_FAILED) does not necessarily mean the key is wrong: some systems let another service catch the first TLS handshake on the same port,
- * rejecting every certificate, and only an immediate reconnect lands on adbd. So the same port is retried after [tlsRetryDelayMs], and if that still fails the remaining candidates are tried;
- * only when everything fails and some port rejected us this way is UNAUTHORIZED reported (re-pairing required). Once a port has rejected us, local port scanning is skipped:
- * adbd has been found, so a scan would only find it again.
+ * 找本机无线调试的连接端口并连上。按顺序试,哪个连上就停:上次连上的端口、系统属性(读得到才用)、mDNS 查到的每一个、
+ * 扫本机端口([scan],前面都不行时才扫)、用户在引导页填的端口([manual])。
+ * 只靠 mDNS 不行:adbd 只在打开无线调试时登记一次服务,mDNS 守护进程重启后登记就没了,有的网络还拦着组播;
+ * mDNS 也可能同时查到已经失效的旧端口,所以查到几个试几个。缓存的端口失效时被拒得很快,所以排第一。
+ * 用户填了端口就不再扫(之前就是扫不到才让填的),直接试它。
+ * TLS 上被拒(UNAUTHORIZED、TLS_FAILED)不一定是钥匙不对:有的系统让另一个服务先接住同一端口的第一次 TLS 握手,
+ * 对谁的证书都拒,紧接着再连才落到 adbd。所以同一端口隔 [tlsRetryDelayMs] 再试一次,还不行就接着试其余候选;
+ * 只有试遍都连不上、且有端口这样拒了我们,才报 UNAUTHORIZED(要重新配对)。有端口拒了我们也照样扫本机端口(跳过已试过的):
+ * 缓存、属性、mDNS 给的可能是旧端口,上面还有服务回话却不认当前钥匙,而 adbd 已经换到别的端口上了。
+ * 扫描有时间上限,扫不到别的才报 UNAUTHORIZED。
  */
 class AdbConnectPort(
     private val property: () -> Int?,
@@ -64,7 +65,7 @@ class AdbConnectPort(
             { local(property()) },
             { finder.findPorts(AdbServiceTypes.CONNECT, mdnsTimeoutMs).map { AdbEndpoint(localHost, it) } },
             {
-                if (scan == null || manualPort != null || rejected != null) emptyList() else {
+                if (scan == null || manualPort != null) emptyList() else {
                     scanning(true)
                     try {
                         scan.scan(triedPorts).also { scanResult = it }.endpoints

@@ -75,7 +75,7 @@
     <string name="fail_revoked">Eşleştirme süresi doldu</string>
     <string name="fail_revoked_body">Sistem, uzun süre kullanılmadığında eşleştirmeyi iptal etmiş ya da kaldırılmış olabilir. Yeniden eşleştirin. Bir daha süresi dolmasın diye Geliştirici seçenekleri\'nde \“adb yetkilendirme zaman aşımını devre dışı bırak\”ı açın.</string>
     <string name="fail_key_unreadable">Eşleştirme anahtarı okunamıyor</string>
-    <string name="fail_key_unreadable_body">Claire, eşleştirme için kullandığı anahtarı artık okuyamıyor. Bir kez daha eşleştirin; Claire yeni bir anahtar oluşturur ve Eşleştirilmiş cihazlar\'daki eski \“mika@…\” girdisi kaldırılabilir.</string>
+    <string name="fail_key_unreadable_body">Claire, eşleştirme için kullandığı anahtarı artık okuyamıyor. Bir kez daha eşleştirin; Claire yeni bir anahtar oluşturur ve Eşleştirilmiş cihazlar\'daki eski \“claire@…\” girdisi kaldırılabilir.</string>
     <string name="fail_helper">Bağlandı, ancak hazır olamadı</string>
     <string name="fail_helper_body">Yeniden denemek genellikle düzeltir.</string>
     <string name="fail_unknown">Bir şeyler ters gitti</string>

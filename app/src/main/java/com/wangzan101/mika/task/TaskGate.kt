@@ -12,14 +12,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 /**
- * AgentLoop calls [pass] before every tool that changes the screen. The checks, in order:
- * 1. The phone-control helper is unavailable → pause, wait for it to recover and for the user to tap "Continue";
- * 2. The task was moved to the main screen (the user opened this app on the main screen) → pause, and move it back to the virtual display only after the user taps "Continue";
- *    Claire never decides by itself that the user is done, to avoid pulling the app away in front of them;
- * 3. The screen is off or locked → scheduled tasks and separately authorized WeChat tasks try to wake/unlock it, other tasks wait for the unlock; they continue automatically once the screen is on and unlocked.
- * The first two are only checked when this step uses the phone (phone is true): steps on the web or in the sandbox need no helper and can't be moved to the main screen.
- * In addition, when the user personally touches the page lent to the task on the browser page ([onUserOnPage]) → stop first regardless of the surface, and continue once the user taps "Continue".
- * Steps that don't touch the screen (model inference, reading the screen) don't come through here and proceed as usual.
+ * AgentLoop 在每个会改动屏幕的工具之前调用 [pass]。按先后检查:
+ * 1. 手机操作助手不可用 → 暂停,等它恢复且用户点「继续」;
+ * 2. 任务被挪到主屏(用户在主屏打开了这个 App)→ 暂停,用户点「继续」后才把它挪回虚拟屏;
+ *    Mika 不自己判断用户是否用完,避免在用户眼前把 App 抽走;
+ * 3. 屏幕熄灭或锁屏 → 定时任务及另行授权的微信任务尝试唤醒/解锁，其他任务等待解锁；亮屏并解锁后自动继续。
+ * 这三条只在这一步用的是手机(phone 为 true)时才查:网页、沙箱上的步骤不需要助手,不会被挪到主屏,
+ * 也不碰主屏(网页在 App 自己的私有虚拟屏上),熄屏、锁屏时照常开始和继续。
+ * 另外,用户在浏览器页上亲手摸了借给任务的页面([onUserOnPage])→ 不论哪种屏都先停下,用户点「继续」再接着做。
+ * 不碰界面的步骤(模型推理、读屏)不经过这里,照常进行。
  */
 class TaskGate(
     private val locked: StateFlow<Boolean>,
@@ -94,7 +95,7 @@ class TaskGate(
                     }
                     if (shellAvailable.value) movedAway.value = false
                 }
-                locked.value -> {
+                onPhone && locked.value -> {
                     recoveredMidRun = recoveredMidRun || hasPassed
                     setWaiting(TaskState.Held(LOCKED))
                     if (unattendedUnlock == null) {

@@ -105,7 +105,11 @@ internal fun userReason(e: ModelError): String = when (e) {
             "Cannot reach the network proxy, or the proxy did not forward this request; it was still unreachable after retrying. Check that the proxy is on and that the address and port in Settings › Network proxy are correct; clear it when you do not need a proxy."
         ProxyFailure.AuthFailed -> "The network proxy rejected the username or password (HTTP 407). Check the username and password in the proxy address under Settings › Network proxy."
     }
-    is ModelError.Server -> "The model service returned an error (HTTP ${e.status}). Try again later."
+    is ModelError.Server -> {
+        val detail = safeServerDetail(e.detail)
+        if (detail != null) "The model service returned an error (HTTP ${e.status}: $detail). Try again later."
+        else "The model service returned an error (HTTP ${e.status}). Try again later."
+    }
     is ModelError.StreamCut ->
         "The model's reply was cut off upstream before it finished, and it was still cut off after retrying. The usual causes are an unstable network, or an idle timeout that is too short in a relay service or gateway (common when the model thinks for a long time). Try again later."
     is ModelError.BadResponse -> "${e.message}. Check that the Base URL matches the API type."
@@ -137,7 +141,19 @@ private fun chainErrorTag(e: ModelError): String = when (e) {
     else -> " ${RetryPolicy.label(e)}"
 }
 
-/** Server text quoted inside a sentence: drop one trailing period (the original's own), and the sentence quoting it supplies its own "."; ellipses (truncated "…" or "...") are left untouched. */
+private fun safeServerDetail(raw: String?): String? {
+    val trimmed = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (trimmed.startsWith("<!", ignoreCase = true) ||
+        trimmed.startsWith("<html", ignoreCase = true) ||
+        trimmed.startsWith("<head", ignoreCase = true) ||
+        trimmed.startsWith("<body", ignoreCase = true)
+    ) return null
+    val normalized = trimmed.replace(Regex("""\s+"""), " ")
+    val masked = com.wangzan101.mika.core.run.record.Redactor.text(normalized).trim()
+    return masked.takeIf { it.isNotEmpty() }?.let(::quoted)
+}
+
+/** 引在句中的服务端原话:去掉末尾一个句号(原话自带的),由引它的句子补上自己的「。」;省略号(截短的「…」、「...」)不动。 */
 private fun quoted(detail: String): String =
     when {
         detail.endsWith("..") -> detail

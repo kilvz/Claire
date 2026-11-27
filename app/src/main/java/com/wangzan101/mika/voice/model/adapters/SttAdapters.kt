@@ -316,7 +316,8 @@ private val defaultSherpaSession: SttSessionFactory = { context, model, _, hooks
 internal fun languageTag(context: Context, language: String?): String =
     language ?: SystemSpeech.speechTag(AppLanguage.current(context))
 
-private fun asrLanguage(tag: String): AsrLanguage = AsrLanguage.of(SystemSpeech.isoCode(tag))
+/** 流式识别要告诉服务的语言;[tag] 为空(这个服务设的是「自动」)时不指定。 */
+internal fun asrLanguage(tag: String): AsrLanguage = AsrLanguage.of(SystemSpeech.isoCode(tag))
 
 private fun bailianRegion(binding: SttBinding): BailianRegion =
     BailianRegion.entries.firstOrNull { it.name.equals(binding.region, ignoreCase = true) }

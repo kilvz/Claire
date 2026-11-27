@@ -141,7 +141,19 @@ internal fun ImageModelSection(ui: ModelSetupUi, onImage: (() -> Unit)?) {
     }
 }
 
-/** Entry to the unified voice model catalog: capabilities and protocols are declared here; the speech input, read-aloud and call pages only handle selection and usage preferences. */
+/** 视频模型:生成短视频用的模型,和图片一样单独一行。 */
+@Composable
+internal fun VideoModelSection(onVideo: (() -> Unit)?) {
+    if (onVideo == null) return
+    GroupCard {
+        ListRow(ModelsCopy.VIDEO_ICON, stringResource(R.string.role_video), first = true, onClick = onVideo) {
+            RowValue(ModelsCopy.videoLine().title)
+            RowChevron()
+        }
+    }
+}
+
+/** 统一语音模型目录入口:能力与协议在此声明;语音输入、朗读和通话页只负责选择与使用偏好。 */
 @Composable
 internal fun VoiceCatalogSection(onOpenVoiceCatalog: (() -> Unit)?) {
     if (onOpenVoiceCatalog == null) return

@@ -2,6 +2,7 @@ package com.wangzan101.mika.core.agent
 
 import com.wangzan101.mika.core.chat.GeneratedAudio
 import com.wangzan101.mika.core.chat.GeneratedPhoto
+import com.wangzan101.mika.core.chat.GeneratedVideo
 import com.wangzan101.mika.core.model.Author
 import com.wangzan101.mika.core.model.Message
 import com.wangzan101.mika.core.model.Part
@@ -39,7 +40,9 @@ data class Turn(
     val audios: List<GeneratedAudio> = emptyList(),
     /** Images that Claire generated during this turn and left in the workspace; the conversation page draws them as photo tiles below the answer. */
     val photos: List<GeneratedPhoto> = emptyList(),
-    /** The millisecond timestamp at which this turn was stored into the conversation; null for old records, never guessed from file times. */
+    /** 这一轮 Mika 生成并留在工作区里的视频；对话页在回答下面画成视频卡片。 */
+    val videos: List<GeneratedVideo> = emptyList(),
+    /** 这一轮存进对话的毫秒时刻;旧记录没有时为 null,不由文件时间猜测。 */
     val atMs: Long? = null,
     /** The actual verification result. Both unverified turns and old records without this field are null. */
     val verified: Boolean? = null,

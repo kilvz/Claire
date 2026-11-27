@@ -94,6 +94,7 @@ data class AddForm(
     val noList: Boolean = false,
     val name: String = "",
     val manual: Boolean = false,
+    val nickname: String = "",
 ) {
     /** Shows the "model name" field: no models were listed, or the user wants to type it. */
     val showModel: Boolean get() = noList || manual

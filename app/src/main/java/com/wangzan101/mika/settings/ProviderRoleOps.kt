@@ -107,7 +107,32 @@ fun ProviderStore.setFallback(role: ModelRole, slot: Int, configId: String?): Bo
 /** Keeps the legacy method signature fully compatible */
 fun ProviderStore.setMainFallback(slot: Int, configId: String?): Boolean = synchronized(this) { setFallback(ModelRole.Main, slot, configId) }
 
-/** The group with this id; null if it does not exist. */
+/**
+ * 备援链里第 [from] 位挪到第 [to] 位,其余按原来的先后排;越界为 null,原地不动返回原链。
+ * 纯函数,[ProviderStore.moveFallback] 和界面的上移/下移都按它算。
+ */
+internal fun movedFallbacks(chain: List<String>, from: Int, to: Int): List<String>? {
+    if (from !in chain.indices || to !in chain.indices) return null
+    if (from == to) return chain
+    return chain.toMutableList().apply { add(to, removeAt(from)) }
+}
+
+/**
+ * 在 [role] 的备援链里把第 [from] 位挪到第 [to] 位(上移/下移是相邻两位),只改这一个用途的链。
+ * 越界返回 false、什么也不改;和 [setFallback] 一样在锁里改、写同一个配置文件。
+ */
+fun ProviderStore.moveFallback(role: ModelRole, from: Int, to: Int): Boolean {
+    return synchronized(this) {
+        val current = _roles.value.fallbacks(role)
+        val next = movedFallbacks(current, from, to) ?: return false
+        if (next == current) return true
+        _roles.value = _roles.value.withFallbacks(role, next)
+        writeConfig()
+        return true
+    }
+}
+
+/** 这个组;不存在为 null。 */
 fun ProviderStore.group(id: String): ModelGroup? = _groups.value.firstOrNull { it.id == id }
 
 /** The group bound to this role; null when no group is bound or the group no longer exists. */

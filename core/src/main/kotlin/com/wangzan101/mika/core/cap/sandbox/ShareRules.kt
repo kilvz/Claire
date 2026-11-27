@@ -23,9 +23,6 @@ object ShareRules {
         val given = name?.trim() ?: f.name
         if (!plainName(given)) throw SandboxError("invalid_arguments", "name: must be a plain file name without control characters", recoverable = true)
         val saveAs = fitName(given)
-        if (refusedType(saveAs) || refusedType(f.name)) {
-            throw SandboxError("share_refused_type", "App installation packages (.apk, .apks, .xapk, .aab) cannot be shared.", recoverable = false)
-        }
         val hp = f.toPath()
         if (!Files.exists(hp, LinkOption.NOFOLLOW_LINKS)) throw SandboxError("file_not_found", "$p does not exist.", recoverable = true)
         if (!Files.isRegularFile(hp, LinkOption.NOFOLLOW_LINKS)) throw SandboxError("not_a_file", "$p is not a regular file.", recoverable = true)
@@ -36,12 +33,7 @@ object ShareRules {
 
     fun plainName(n: String): Boolean = SandboxPaths.plainName(n)
 
-    /** Never exported: an installation package dropped into "Downloads" could be installed by the user with a single tap, running an App built inside the sandbox. */
-    private val REFUSED_TYPES = setOf("apk", "apks", "xapk", "aab")
-
-    fun refusedType(name: String): Boolean = name.substringAfterLast('.', "").trim().lowercase() in REFUSED_TYPES
-
-    /** File name limit is 255 bytes (UTF-8), leaving room for the system to append a " (n)" sequence number. */
+    /** 文件名上限 255 字节(UTF-8),留出系统加「 (n)」序号的余地。 */
     const val NAME_MAX_BYTES = 240
 
     /** Truncates by UTF-8 bytes (and optionally code point count), keeping the extension (dropped when the extension itself is too long), never splitting a character. */

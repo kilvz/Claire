@@ -74,6 +74,8 @@ class ProviderStore(
     internal val proactiveUsage: () -> Long = { 0L },
     internal val proactiveLimit: () -> Long = { ProactiveBudget.DEFAULT_DAILY_LIMIT },
     internal val proactiveCalls: () -> Long = { 0L },
+    /** 角色和组以外仍拥有配置的外部引用；组合根只提供 id 集，不让设置层依赖聊天或界面。 */
+    internal val externalConfigReferences: () -> Set<String> = { emptySet() },
     /**
      * Builds a callable model: config, Key, the endpoint the provider listing assigns to this model individually (null when absent, in which case the config's API type and address are used), headers, etc.
      * When null, the built-in adapter is used (tests substitute a fake one).
@@ -169,8 +171,8 @@ class ProviderStore(
         val configs = if (existing == null) _configs.value + selected else _configs.value.map {
             if (it.id == existing.id) selected else it
         }
-        // Delete configs used by no role and not in any group (same as [prune])
-        val used = roles.referenced + _groups.value.flatMap { g -> g.members.map { it.configId } }
+        // 没有用途、组或对话引用的配置删掉(和 [prune] 一样)
+        val used = roles.referenced + _groups.value.flatMap { g -> g.members.map { it.configId } } + externalConfigReferences()
         return saveRoleSelection(_providers.value, configs.filter { it.id in used }, roles)
     }
 
@@ -258,11 +260,11 @@ class ProviderStore(
         fun create(
             context: Context, usage: UsageSink, userAgent: String, dailyUsage: (String) -> Long = { 0L },
             proactiveUsage: () -> Long = { 0L }, proactiveLimit: () -> Long = { ProactiveBudget.DEFAULT_DAILY_LIMIT },
-            proactiveCalls: () -> Long = { 0L },
+            proactiveCalls: () -> Long = { 0L }, externalConfigReferences: () -> Set<String> = { emptySet() },
         ): ProviderStore =
             ProviderStore(File(context.applicationContext.filesDir, "settings"), KeystoreKeyCipher(), usage,
                 dailyUsage = dailyUsage, userAgent = userAgent, proactiveUsage = proactiveUsage, proactiveLimit = proactiveLimit,
-                proactiveCalls = proactiveCalls)
+                proactiveCalls = proactiveCalls, externalConfigReferences = externalConfigReferences)
 
         /** The instance shared within the app (provided through [Owner]). */
         fun get(context: Context): ProviderStore = (context.applicationContext as? Owner)?.providers

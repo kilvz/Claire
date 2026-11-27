@@ -172,7 +172,8 @@ class CapsuleController(
     /** The capsule's current opacity (it fades out a few seconds after the last touch); [lastActive] is when it was last touched or its state changed. */
     internal var alpha by mutableStateOf(1f)
     internal var lastActive = 0L
-    internal var look: Any? = null
+    internal var look: CapsuleLook? = null
+    internal var lastLook: CapsuleLook? = null
     internal var fadeJob: Job? = null
 
     /** The card is expanded; [closing] means it is shrinking back toward the capsule (it only really collapses once the animation finishes). */
@@ -287,7 +288,7 @@ class CapsuleController(
     /** The user tapped "quit completely": tear down the overlay right away. The process may be restarted by the accessibility service, in which case the quit flag keeps it from drawing (see [start]). */
     fun stopNow() {
         quitConfirm = false
-        hide()
+        hide(clearLastLook = true)
     }
 
     /** The user opened Claire again: the quit flag has been cleared, so draw again from the current state (used when the process was not killed and comes back to the foreground). */
