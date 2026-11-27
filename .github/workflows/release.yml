@@ -69,7 +69,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.6.0: the Telegram settings page can scan a QR code to set the bot up — point the camera at a code holding the bot token from @BotFather and the bot is saved automatically, no manual token entry.
+            New in 2.6.1: the Telegram bot no longer crashes Claire when a message arrives, and new wireless-debugging pairings are introduced as claire@<model> instead of mika@<model> (a phone paired before this release keeps the old entry until it is unpaired and paired again).
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

@@ -35,7 +35,7 @@ object AndroidAdb {
 
     /** The single identity source for this process: both pairing and connecting take it from here, so they get the same key. */
     fun identities(context: Context): AdbIdentitySource = source ?: synchronized(this) {
-        source ?: AdbIdentitySource(keyStore(context), { "mika@${Build.MODEL}" }) { msg, e -> Log.w(TAG, msg, e) }.also { source = it }
+        source ?: AdbIdentitySource(keyStore(context), { "claire@${Build.MODEL}" }) { msg, e -> Log.w(TAG, msg, e) }.also { source = it }
     }
 
     /** Identity used for connecting; throws [com.wangzan101.mika.core.device.adb.AdbKeyUnreadableException] when the stored key cannot be read. */
