@@ -75,6 +75,13 @@ private data class GetUpdatesResponse(
     val result: List<TelegramUpdate> = emptyList(),
 )
 
+@Serializable
+private data class GetMeResponse(
+    val ok: Boolean = false,
+    val description: String? = null,
+    val result: TelegramUser? = null,
+)
+
 /**
  * Minimal Telegram Bot API client: sendMessage and getUpdates long polling.
  * The bot token travels in the request path, as the Bot API requires; it is
@@ -121,6 +128,17 @@ class TelegramApi(private val http: OkHttpClient, private val baseUrl: String = 
         val response = executeCancellable(request, GetUpdatesResponse.serializer())
         if (!response.ok) throw TelegramApiException(response.description ?: "Telegram getUpdates failed")
         return response.result
+    }
+
+    /**
+     * Returns the bot's @username from getMe, or null when Telegram returns
+     * none. Throws on any failure, including an invalid token (401).
+     */
+    suspend fun getMe(token: String): String? {
+        val request = Request.Builder().url("$baseUrl/bot$token/getMe").get().build()
+        val response = executeCancellable(request, GetMeResponse.serializer())
+        if (!response.ok) throw TelegramApiException(response.description ?: "Telegram getMe failed")
+        return response.result?.username?.takeIf { it.isNotBlank() }
     }
 
     private suspend fun <T> executeCancellable(request: Request, serializer: kotlinx.serialization.KSerializer<T>): T {

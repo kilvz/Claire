@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -15,15 +16,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.wangzan101.mika.R
+import com.wangzan101.mika.ui.QrCodeImage
 import com.wangzan101.mika.telegram.TelegramConnectionState
 import com.wangzan101.mika.telegram.TelegramRuntime
 import com.wangzan101.mika.ui.components.ButtonKind
@@ -82,6 +86,8 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
     var testMessage by remember { mutableStateOf<String?>(null) }
     var testIsError by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
+    var botUsername by remember { mutableStateOf(runtime.store.botUsername().takeIf { it.isNotBlank() }) }
+    var qrFailed by remember { mutableStateOf(false) }
     val tokenMissingText = stringResource(R.string.telegram_token_missing)
     val chatIdMissingText = stringResource(R.string.telegram_chat_id_missing)
     val savedText = stringResource(R.string.telegram_saved)
@@ -92,10 +98,30 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
     val configured = tokenSaved && chatId.isNotBlank()
     val receiving = state !is TelegramConnectionState.Off && state !is TelegramConnectionState.NeedsSetup
 
+    // The bot's @username is fetched from Telegram once, then cached in
+    // the store; a failed fetch shows a note instead of a stale code.
+    fun refreshUsername() {
+        scope.launch {
+            val name = try {
+                runtime.botUsername()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            if (name != null) botUsername = name else qrFailed = true
+        }
+    }
+
     // A removal or a rejected token elsewhere resets the saved values; typing is not disturbed otherwise.
     LaunchedEffect(state) {
         tokenSaved = runtime.store.hasToken()
         if (runtime.store.chatId() != chatId) chatId = runtime.store.chatId()
+    }
+
+    // A fresh setup has no cached username yet; a saved one is shown at once.
+    LaunchedEffect(configured) {
+        if (configured && botUsername == null) refreshUsername()
     }
 
     fun saveBot() {
@@ -121,6 +147,9 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
                 tokenSaved = true
                 saveMessage = savedText
                 saveIsError = false
+                botUsername = null
+                qrFailed = false
+                refreshUsername()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -236,6 +265,33 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
                     RowValue(stringResource(R.string.telegram_owner_private))
                 }
             }
+            val username = botUsername
+            if (username != null) {
+                GroupLabel(stringResource(R.string.telegram_qr_title))
+                GroupCard {
+                    Column(
+                        Modifier.fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        QrCodeImage(
+                            "https://t.me/$username",
+                            stringResource(R.string.telegram_qr_title),
+                            Modifier.padding(vertical = 16.dp).size(240.dp).testTag("telegram-qr"),
+                        )
+                        Text(
+                            "@$username", style = MikaType.BodyStrong,
+                            color = MikaTheme.colors.ink,
+                        )
+                        Text(
+                            stringResource(R.string.telegram_qr_help),
+                            style = MikaType.Caption, color = MikaTheme.colors.ink2,
+                            textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            } else if (qrFailed) {
+                FooterNote(stringResource(R.string.telegram_qr_failed), color = MikaTheme.colors.bad)
+            }
             MikaButton(
                 stringResource(R.string.telegram_test_message_button), ::sendTestMessage, Modifier.fillMaxWidth(),
                 kind = ButtonKind.Secondary, enabled = !testBusy && !actionBusy,
@@ -281,6 +337,8 @@ fun TelegramSettingsScreen(runtime: TelegramRuntime, onBack: () -> Unit) {
                             token = ""
                             chatId = ""
                             tokenSaved = false
+                            botUsername = null
+                            qrFailed = false
                         } catch (e: CancellationException) {
                             throw e
                         } catch (_: Exception) {

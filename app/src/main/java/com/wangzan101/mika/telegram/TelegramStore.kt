@@ -34,6 +34,12 @@ private data class TelegramState(
      * before 1.3.2, so those also ack once more, then never again.
      */
     val firstTaskAckPending: Boolean = true,
+    /**
+     * The bot's @username from getMe, cached so the settings page can show
+     * the bot's link without a network call. Missing in older state.json
+     * files; cleared whenever the setup is reconfigured or removed.
+     */
+    val botUsername: String = "",
 )
 
 /**
@@ -56,6 +62,17 @@ class TelegramStore(
     @Synchronized fun token(): String? = token
 
     @Synchronized fun chatId() = state.chatId
+
+    /** The cached bot @username, or "" when it was never fetched. */
+    @Synchronized fun botUsername() = state.botUsername
+
+    /** Cache the bot @username fetched from getMe. A reconfiguration clears it via [saveBot]. */
+    @Synchronized fun saveBotUsername(value: String) {
+        if (value == state.botUsername) return
+        val next = state.copy(botUsername = value)
+        saveState(next)
+        state = next
+    }
 
     /** A bot is usable once a token and a target chat id are both saved. */
     @Synchronized fun configured() = token != null && state.chatId.isNotBlank()

@@ -160,6 +160,23 @@ class TelegramRuntime(
         }
     }
 
+    /**
+     * The bot's @username, fetched once from Telegram with the saved token
+     * and cached in the store; null when there is no token or Telegram
+     * cannot be reached. The token is never logged.
+     */
+    suspend fun botUsername(): String? = withContext(Dispatchers.IO) {
+        store.botUsername().takeIf { it.isNotBlank() }?.let { return@withContext it }
+        val token = store.token() ?: return@withContext null
+        try {
+            api.getMe(token)?.also { store.saveBotUsername(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     @Synchronized private fun restartMonitor() {
         if (registration == null || !store.enabled()) return
         monitor?.cancel()

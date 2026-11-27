@@ -1,6 +1,7 @@
 package com.wangzan101.mika.telegram
 
 import com.wangzan101.mika.settings.KeyCipher
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -73,5 +74,36 @@ class TelegramStoreTest {
         val reopened = TelegramStore(dir, cipher)
 
         assertFalse(reopened.consumeFirstTaskAck())
+    }
+
+    @Test fun botUsernamePersistsAcrossReopen() {
+        val dir = tmp.newFolder()
+        val first = TelegramStore(dir, cipher)
+        first.saveBot("token", "123")
+        first.saveBotUsername("ClaireAppBot")
+
+        val reopened = TelegramStore(dir, cipher)
+
+        assertEquals("ClaireAppBot", reopened.botUsername())
+    }
+
+    @Test fun reconfiguringWithANewTokenClearsBotUsername() {
+        val store = TelegramStore(tmp.newFolder(), cipher)
+        store.saveBot("token", "123")
+        store.saveBotUsername("ClaireAppBot")
+
+        store.saveBot("new-token", "123")
+
+        assertEquals("", store.botUsername())
+    }
+
+    @Test fun clearingResetsBotUsername() {
+        val store = TelegramStore(tmp.newFolder(), cipher)
+        store.saveBot("token", "123")
+        store.saveBotUsername("ClaireAppBot")
+
+        store.clear()
+
+        assertEquals("", store.botUsername())
     }
 }
