@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.5.0 (versionCode 74)
+- **Claire version:** 2.6.0 (versionCode 75)
 - **Base version:** upstream Mika 0.1.52 (commit `7ff1703f6`)
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -189,6 +189,12 @@ recorded base version.
   once its @username is known (fetched once from Telegram with `getMe`
   and cached). Scan it with another phone to open the bot in Telegram,
   then tap Start. The token and chat ID setup is unchanged.
+
+- 2.6.0: the Telegram settings page can scan a QR code to set the bot
+  up — point the camera at a code holding the bot token from @BotFather
+  (optionally `token|chatId`) and the bot is saved automatically, no
+  manual token entry. A token alone fills the token field; the chat ID
+  is still asked for. CameraX + ML Kit barcode scanning.
 
 A release is cut by pushing a tag `v<version>` (e.g. `v1.1.0`).
 `.github/workflows/release.yml` then builds the release APK on GitHub

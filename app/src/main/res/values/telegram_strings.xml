@@ -52,6 +52,16 @@
     <string name="telegram_qr_title">Open your bot</string>
     <string name="telegram_qr_help">Scan this code with another phone to open the bot in Telegram, then tap Start.</string>
     <string name="telegram_qr_failed">Couldn’t load the bot link. Reopen this page to try again.</string>
+    <string name="telegram_scan_qr">Scan QR code</string>
+    <string name="telegram_scan_qr_caption">Point the camera at a code holding the token from @BotFather — add |chatId to set the chat ID too.</string>
+    <string name="telegram_scan_help">Point the camera at the QR code holding your bot token.</string>
+    <string name="telegram_scan_invalid">That code doesn’t hold a bot token. Try another code.</string>
+    <string name="telegram_scan_try_again">Try again</string>
+    <string name="telegram_scan_close">Close</string>
+    <string name="telegram_scan_allow_camera">Allow camera</string>
+    <string name="telegram_scan_camera_needed">Camera access is needed to scan the code.</string>
+    <string name="telegram_scan_camera_failed">Couldn’t start the camera.</string>
+    <string name="telegram_scan_token_only">Token scanned. Enter your chat ID, then save.</string>
     <string name="telegram_capabilities">First version</string>
     <string name="telegram_capability_text">Private text and real tasks</string>
     <string name="telegram_capability_replies">Claire questions, results &amp; notices</string>
