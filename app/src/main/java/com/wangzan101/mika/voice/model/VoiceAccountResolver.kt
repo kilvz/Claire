@@ -7,6 +7,7 @@ import com.wangzan101.mika.settings.clientHeaders
 import com.wangzan101.mika.settings.hasKey
 import com.wangzan101.mika.settings.providerKey
 import com.wangzan101.mika.settings.providerKeys
+import com.wangzan101.mika.core.model.KeyPoolManager
 import com.wangzan101.mika.core.model.keyRejectionOf
 import com.wangzan101.mika.core.model.withKeyRotation
 import kotlinx.coroutines.CancellationException
