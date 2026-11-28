@@ -82,8 +82,8 @@ internal fun VoiceModel.traits(capability: VoiceCapability): List<VoiceTrait> = 
         SttProtocol.ElevenLabsUpload, SttProtocol.DeepgramUpload, SttProtocol.AzureShortAudio,
         SttProtocol.TencentSentence, SttProtocol.XfyunDictation,
         -> listOf(VoiceTrait.AfterSpeech)
-        // On-device pack: transcribes the whole recording after release at no cost (shown as "On-device · Offline", see [VoiceSource.OnDevice])
-        SttProtocol.OnDevice -> listOf(VoiceTrait.AfterSpeech, VoiceTrait.Free)
+        // On-device pack: live packs write while speaking; whole-clip packs transcribe after release at no cost (shown as "On-device · Offline", see [VoiceSource.OnDevice])
+        SttProtocol.OnDevice -> if (stt?.live == true) listOf(VoiceTrait.Live, VoiceTrait.Free) else listOf(VoiceTrait.AfterSpeech, VoiceTrait.Free)
         null -> emptyList()
     }
     VoiceCapability.TTS -> when (tts?.protocol) {

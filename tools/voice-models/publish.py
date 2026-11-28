@@ -27,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
 PACKS_FILE = HERE / "packs.json"
 CATALOG_FILE = REPO_ROOT / "app" / "src" / "main" / "assets" / "voice-models" / "catalog.json"
+ASSET_DIR = REPO_ROOT / "app" / "src" / "main" / "assets" / "voice-models"
 DEFAULT_CACHE = Path.home() / ".cache" / "claire-voice-models"
 
 SCHEMA = 1
@@ -38,6 +39,8 @@ USER_AGENT = "claire-voice-models-publish"
 CHUNK = 1 << 20
 
 PACK_FIELDS = ["id", "version", "backend", "family", "displayName", "languages", "recommendedFor"]
+# Only present when true; keeps the common catalog entry unchanged.
+PACK_FLAGS = ["streaming", "bundled"]
 
 
 class HashMismatch(Exception):
@@ -54,6 +57,15 @@ class RefuseUpload(Exception):
 
 def asset_name(pack_id, file_name):
     return f"{pack_id}--{file_name}"
+
+
+def is_bundled(pack):
+    """Bundled packs ship inside the APK; their files live under app/src/main/assets, not in the download cache."""
+    return bool(pack.get("bundled"))
+
+
+def pack_dir(pack, cache):
+    return ASSET_DIR / pack["id"] if is_bundled(pack) else Path(cache) / pack["id"]
 
 
 def upstream_of(pack):
@@ -97,8 +109,10 @@ def cached_path(cache, pack, entry):
 
 
 def fetch(packs, cache, opener=default_opener, log=lambda line: None):
-    """Download each pinned file into cache/<packId>/<name>, keeping already verified copies."""
+    """Download each pinned file into cache/<packId>/<name>, keeping already verified copies. Bundled packs need no download."""
     for pack in packs:
+        if is_bundled(pack):
+            continue
         for entry in pack["files"]:
             target = cached_path(cache, pack, entry)
             label = f"{pack['id']}/{entry['name']}"
@@ -131,6 +145,8 @@ def check_upstream(packs, opener=default_opener, log=lambda line: None):
     Files with an explicit url (license texts from the original GitHub repo) are not on HF.
     """
     for pack in packs:
+        if is_bundled(pack):
+            continue
         url = f"https://huggingface.co/api/models/{pack['hfRepo']}/tree/{pack['commit']}"
         with opener(url) as response:
             tree = {item["path"]: item for item in json.loads(response.read()) if item.get("type") == "file"}
@@ -181,6 +197,9 @@ def render_catalog(packs):
         if licenses != [pack["license"]["file"]]:
             raise ValueError(f"{pack['id']}: needs exactly one license file named {pack['license']['file']}")
         item = {field: pack[field] for field in PACK_FIELDS}
+        for flag in PACK_FLAGS:
+            if pack.get(flag):
+                item[flag] = True
         item["files"] = files
         item["license"] = {key: pack["license"][key] for key in ("name", "file", "attribution")}
         item["upstream"] = upstream
@@ -189,11 +208,15 @@ def render_catalog(packs):
 
 
 def verify_cache(packs, cache):
+    """Check every pack's files where they actually live: the cache for downloads, the APK assets for bundled packs."""
     for pack in packs:
+        base = pack_dir(pack, cache)
         for entry in pack["files"]:
-            path = cached_path(cache, pack, entry)
+            path = base / entry["name"]
             label = f"{pack['id']}/{entry['name']}"
             if not path.exists():
+                if is_bundled(pack):
+                    raise FileNotFoundError(f"{label}: not in the APK assets ({base})")
                 raise FileNotFoundError(f"{label}: not in cache {cache}; run fetch first")
             verify_file(path, entry, label)
 
@@ -253,7 +276,7 @@ def asset_upload_args(tag, paths, clobber=False):
 def release_state(tag, run):
     """None if the release does not exist yet, else gh's JSON view of it."""
     view = run(
-        ["gh", "release", "view", tag, "--repo", GITHUB_REPO, "--json", "isPrerelease,tagName"],
+        ["gh", "release", "view", tag, "--repo", GITHUB_REPO, "--json", "isPrerelease,tagName,assets"],
         capture_output=True,
         text=True,
     )
@@ -280,13 +303,24 @@ def upload(packs, cache, tag, run=subprocess.run, clobber=False, log=lambda line
     elif not state.get("isPrerelease"):
         raise RefuseUpload(f"release {tag} exists and is not a pre-release; fix it on GitHub first")
     with tempfile.TemporaryDirectory(prefix="voice-models-") as staging:
+        existing = set() if clobber else {a["name"] for a in (state or {}).get("assets", [])}
         staged = []
+        skipped = 0
         for pack in packs:
+            if is_bundled(pack):
+                continue
             for entry in pack["files"]:
-                link = Path(staging) / asset_name(pack["id"], entry["name"])
+                name = asset_name(pack["id"], entry["name"])
+                if name in existing:
+                    skipped += 1
+                    continue
+                link = Path(staging) / name
                 os.symlink(cached_path(cache, pack, entry).resolve(), link)
                 staged.append(link)
-        log(f"upload  {len(staged)} files to {tag}")
+        if not staged:
+            log(f"nothing to upload ({skipped} assets already on {tag})")
+            return
+        log(f"upload  {len(staged)} files to {tag}" + (f" ({skipped} already there)" if skipped else ""))
         done = run(asset_upload_args(tag, staged, clobber))
         if done.returncode != 0:
             raise RuntimeError("gh release upload failed")

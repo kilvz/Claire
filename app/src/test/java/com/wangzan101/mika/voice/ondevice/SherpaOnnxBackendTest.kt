@@ -17,13 +17,14 @@ class SherpaOnnxBackendTest {
     private fun installed(id: String) = InstalledVoicePack(catalog.entry(id)!!, File("/packs/$id/1"))
 
     @Test
-    fun everyBundledPackIsSupported() {
+    fun everyOfflinePackIsSupported() {
         val backend = SherpaOnnxBackend()
-        catalog.packs.forEach {
+        catalog.packs.filter { !it.streaming }.forEach {
             assertEquals(it.id, SherpaOnnxBackend.ID, it.backend)
             assertTrue(it.id, backend.supports(it.family))
         }
         assertFalse(backend.supports("paraformer"))
+        catalog.packs.filter { it.streaming }.forEach { assertFalse(it.id, backend.supports(it.family)) }
     }
 
     @Test

@@ -63,13 +63,14 @@ Claire works on a hidden background screen, so you can keep using your phone whi
 
 <sub>Several demos use apps popular in China: WeChat is the main messaging app there, and Xiaohongshu (RED) is a lifestyle and social platform. Claire isn't tied to them; it works with any app or website on your phone.</sub>
 
-## New in 2.9
+## New in 2.10
 
+- **Live on-device dictation.** The bundled Zipformer English 20M pack writes words while you speak, with no network, no quota and no length cap; select it under Settings › Models › Voice input. The downloadable Zipformer Multilingual pack does the same for Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese from Settings › Models › Voice input › Offline voice packs. Live packs are always chosen explicitly: "Auto" and fallback chains keep using whole-utterance packs such as Whisper Base, which remains the recommendation for English and Indonesian.
 - **Offline voice packs.** Voice input can run entirely on the phone with a downloaded voice pack: Whisper Base, covering English and Indonesian. Download it in Settings › Models › Voice input › Offline voice packs, import it from a file when the phone is offline, or fetch it through a mirror; every file is checked against its checksum. "Auto" falls back to an installed pack when the system recognizer cannot be used, and the pack stays selected across downloads, updates and restores.
 - **Settings search reaches inside pages.** Searching settings now finds individual rows and switches, then scrolls to the row and highlights it.
 - **Better conversations and models.** Branching a conversation copies its generated images, audio and video; a conversation's own main model now applies to tasks it starts; model groups retry a rate-limited member once before moving on; exports list missing or oversized attachments.
 - **Capsule and phone fixes.** Dragging the capsule out of its edge half-circle follows the finger from the first frame, and the stock PIN field on the lock screen is recognized correctly again.
-- **Everything from 2.8 stays.** Voice fallbacks and key rotation, per-conversation models, pause, AI phone calls, video, the schedule editor, Telegram setup and the earlier reliability fixes.
+- **Everything from 2.9 stays.** Offline voice packs, settings search, conversation branching, per-conversation models, capsule and lock-screen fixes, and the earlier voice, phone-call and reliability features.
 ## What it can do
 
 | | |

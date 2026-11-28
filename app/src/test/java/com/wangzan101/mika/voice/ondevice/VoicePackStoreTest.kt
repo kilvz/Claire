@@ -64,6 +64,20 @@ class VoicePackStoreTest {
     }
 
     @Test
+    fun bundledPackIsInstalledWithoutFilesOnDisk() {
+        val e = entry().copy(bundled = true)
+        val pack = store.installed(e)
+        assertNotNull(pack)
+        assertTrue(pack!!.bundled)
+        assertEquals(VoicePackStatus.Installed, store.status(e))
+        assertNotNull(store.installedAny(e))
+        // cleanup must not resurrect or delete anything for a pack that lives in the APK
+        store.cleanup(VoicePackCatalog("https://example.invalid/", listOf(e)))
+        assertFalse(File(root, e.id).exists())
+        assertNotNull(store.installed(e))
+    }
+
+    @Test
     fun sizeMismatchIsCorrupt() {
         val e = entry()
         fill(versionDir(e), e, short = setOf("model.onnx"))

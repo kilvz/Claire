@@ -134,6 +134,8 @@ class OnDeviceEngines(
     /** The handle given to callers: tracks in-progress recognition and waits for it to finish before closing the native model on release. */
     private inner class Held(val packId: String, val slot: Slot, private val inner: OnDeviceSttEngine) : OnDeviceSttEngine {
         private var inFlight = 0
+        /** Open live streams handed out by [newStream]; they are in use until the session closes them. */
+        private var streams = 0
         /** How many calls the caller gave up on while native decoding is still running. */
         private var abandoned = 0
         private var retired: OnDeviceSttException.Kind? = null
@@ -178,6 +180,50 @@ class OnDeviceEngines(
             var gaveUp = false
         }
 
+        /**
+         * Starts a live stream on this shared model. While it is open the model counts as in use, so release and the idle
+         * timer wait for the session to close it.
+         */
+        override fun newStream(language: String?): OnDeviceSttStream? {
+            val stream = synchronized(this) {
+                retired?.let { throw released(it) }
+                val opened = inner.newStream(language) ?: return null
+                streams++
+                idleJob?.cancel()
+                opened
+            }
+            return TrackedStream(stream)
+        }
+
+        /** A session's stream; closing it is counted like a finished decode. */
+        private inner class TrackedStream(private val stream: OnDeviceSttStream) : OnDeviceSttStream {
+            @Volatile private var closed = false
+
+            override fun accept(pcm: ShortArray) = stream.accept(pcm)
+
+            override fun text() = stream.text()
+
+            override fun isEndpoint() = stream.isEndpoint()
+
+            override fun reset() = stream.reset()
+
+            override fun close() {
+                if (closed) return
+                closed = true
+                val closeNow = synchronized(this@Held) {
+                    streams--
+                    if (retired == null) {
+                        scheduleIdle()
+                        false
+                    } else {
+                        inFlight == 0 && streams == 0
+                    }
+                }
+                runCatching { stream.close() }
+                if (closeNow) runCatching { inner.close() }
+            }
+        }
+
         /** The actual decode; errors go into the result instead of escaping from [scope]. */
         private suspend fun decode(pcm: ShortArray, language: String?): Result<String> = try {
             Result.success(inner.transcribe(pcm, language))
@@ -201,18 +247,18 @@ class OnDeviceEngines(
                     scheduleIdle()
                     false
                 } else {
-                    inFlight == 0
+                    inFlight == 0 && streams == 0
                 }
             }
             if (closeNow) runCatching { inner.close() }
         }
 
-        fun touch() = synchronized(this) { if (retired == null && inFlight == 0) scheduleIdle() }
+        fun touch() = synchronized(this) { if (retired == null && inFlight == 0 && streams == 0) scheduleIdle() }
 
         /** Releases and closes when nothing is recognizing, returning whether it released; check and release are one step, so a just-started recognition cannot race in. */
         fun retireIfIdle(): Boolean {
             synchronized(this) {
-                if (retired != null || inFlight > 0) return false
+                if (retired != null || inFlight > 0 || streams > 0) return false
                 retired = OnDeviceSttException.Kind.OutOfMemory
                 idleJob?.cancel()
             }
@@ -226,7 +272,7 @@ class OnDeviceEngines(
                 if (retired != null) return
                 retired = kind
                 idleJob?.cancel()
-                inFlight == 0
+                inFlight == 0 && streams == 0
             }
             // May be called on the main thread (onTrimMemory); a native close error must not escape
             if (closeNow) runCatching { inner.close() }

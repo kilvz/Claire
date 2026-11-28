@@ -35,7 +35,7 @@ class OnDeviceAutoTest {
     private fun installed(vararg ids: String): (VoicePackEntry) -> Boolean = { it.id in ids }
 
     @Test fun autoUsesRecommendedPack() {
-        // 两个都装了:按识别语言推荐的那个优先,不按清单顺序
+        // Both are installed: the pack recommended for the recognition language wins, not the manifest order
         assertEquals("whisper", OnDeviceAuto.pick("tr-TR", AppLanguage.English, catalog, installed("sense", "whisper"))?.id)
         assertEquals("dolphin", OnDeviceAuto.pick("vi-VN", AppLanguage.English, catalog, installed("sense", "dolphin"))?.id)
     }
@@ -45,8 +45,15 @@ class OnDeviceAutoTest {
     }
 
     @Test fun autoFallsBackToAnyPack() {
-        // 推荐的(sense)没装:用清单里第一个装了的
+        // The recommended pack (sense) is not installed: use the first installed pack in the manifest
         assertEquals("whisper", OnDeviceAuto.pick("zh-CN", AppLanguage.SimplifiedChinese, catalog, installed("dolphin", "whisper"))?.id)
+    }
+
+    @Test fun livePacksAreNeverPickedEvenWhenRecommended() {
+        val withLive = VoicePackCatalog("https://example.invalid/", listOf(entry("live", listOf("en")).copy(streaming = true), entry("whisper", emptyList())))
+        // A live pack produces text only while speaking; "Auto" must keep its whole-utterance behavior
+        assertEquals("whisper", OnDeviceAuto.pick("en-US", AppLanguage.English, withLive, installed("live", "whisper"))?.id)
+        assertNull(OnDeviceAuto.pick("en-US", AppLanguage.English, withLive, installed("live")))
     }
 
     @Test fun nothingInstalledPicksNothing() {

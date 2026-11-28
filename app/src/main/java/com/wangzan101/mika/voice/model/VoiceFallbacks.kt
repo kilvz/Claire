@@ -35,7 +35,8 @@ object VoiceFallbacks {
 
     /** Whether [model] can join a [capability] fallback chain (and whether such a chain can hang off it). Real-time calls have no fallback chain. */
     fun eligible(model: VoiceModel, capability: VoiceCapability): Boolean = when (capability) {
-        VoiceCapability.STT -> model.stt?.protocol in UTTERANCE_STT_PROTOCOLS
+        // Live recognizers produce text while the user speaks and cannot switch mid-way, so they never join a fallback chain
+        VoiceCapability.STT -> model.stt?.let { it.protocol in UTTERANCE_STT_PROTOCOLS && !it.live } == true
         VoiceCapability.TTS -> model.tts != null
         VoiceCapability.REALTIME -> false
     }

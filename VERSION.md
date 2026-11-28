@@ -3,7 +3,7 @@
 Claire follows the same versioning scheme as Kai-custom: `a.b.c` with a
 recorded base version.
 
-- **Claire version:** 2.9.0 (versionCode 79)
+- **Claire version:** 2.10.0 (versionCode 80)
 - **Base version:** upstream Mika, merged through commit `644d3d2f2`
 - **Package:** `com.kilv.claire` since 1.1.0 — installs alongside Mika
   (1.0.0 was still `com.wangzan101.mika` and could not install next
@@ -195,6 +195,18 @@ recorded base version.
   (optionally `token|chatId`) and the bot is saved automatically, no
   manual token entry. A token alone fills the token field; the chat ID
   is still asked for. CameraX + ML Kit barcode scanning.
+
+- 2.10.0: live on-device dictation. Selecting the bundled Zipformer
+  English 20M pack writes words as you speak, with no network, no quota
+  and no length cap; the downloadable Zipformer Multilingual pack does
+  the same for Arabic, English, Indonesian, Japanese, Russian, Thai,
+  Vietnamese and Chinese. Live packs are always chosen explicitly —
+  "Auto" and fallback chains keep using whole-utterance packs such as
+  Whisper Base, which stays the recommendation for English and
+  Indonesian — and calls keep their existing dictation. The streaming
+  engine shares one loaded model across sessions, so starting and
+  stopping dictation does not reload 45 MB each time; loading starts on
+  press and audio queues meanwhile, so the first words are not lost.
 
 - 2.9.0: merges the latest upstream Mika (through `644d3d2f2`) and
   adopts its offline voice-pack system. Voice input can run wholly on the

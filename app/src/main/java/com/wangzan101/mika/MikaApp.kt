@@ -732,7 +732,10 @@ class MikaApp : Application(), WebOwner, SandboxOwner, TaskEnvironment.Owner, Ph
                     val catalog = voice.voicePackCatalog!!()
                     packs.cleanup(catalog)
                     // Killed last time between commit and writing the voice catalog: files are installed but no model is listed, so add it
-                    com.wangzan101.mika.voice.ondevice.VoicePackInstaller.restoreInstalled(catalog, packs, voice.catalog)
+                    com.wangzan101.mika.voice.ondevice.VoicePackInstaller.restoreInstalled(catalog, packs, voice.catalog) { entry ->
+                        voice.voicePackBackends?.find(entry.backend)
+                            ?.let { it.supports(entry.family) && it.abiSupported() } == true
+                    }
                 }
             }.onFailure { Log.w("MikaVoice", "Could not clean voice packs", it) }
         }

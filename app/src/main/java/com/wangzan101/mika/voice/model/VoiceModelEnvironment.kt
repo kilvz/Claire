@@ -157,7 +157,7 @@ class VoiceModelEnvironment(
             val backends = OnDeviceBackends()
             val packCatalog by lazy { VoicePackCatalog.load(context, backends::supports) }
             val packCatalogSource = { packCatalog }
-            val packs = VoicePackStore(File(context.filesDir, VOICE_PACK_DIR))
+            val packs = VoicePackStore(File(context.filesDir, VOICE_PACK_DIR), assets = context.assets)
             return VoiceModelEnvironment(
                 catalog = VoiceCatalogStore(backend, migrated = prefs.getBoolean("migration_complete", false)),
                 accountResolver = VoiceAccountResolver(ProviderStore.get(context), credentials),

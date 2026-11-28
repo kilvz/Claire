@@ -24,8 +24,9 @@ object OnDeviceAuto {
     ): VoicePackEntry? {
         val language = speechTag?.takeIf { it.isNotBlank() }?.let { OnDeviceLanguage.appLanguageFor(Locale.forLanguageTag(it)) } ?: app
         val recommended = OnDeviceLanguage.recommended(catalog, language)
-        if (recommended != null && installed(recommended)) return recommended
-        return catalog.packs.firstOrNull(installed)
+        if (recommended != null && !recommended.streaming && installed(recommended)) return recommended
+        // Streaming packs are opt-in: Auto only picks whole-utterance packs, so it never changes how the voice button behaves
+        return catalog.packs.firstOrNull { !it.streaming && installed(it) }
     }
 
     /**

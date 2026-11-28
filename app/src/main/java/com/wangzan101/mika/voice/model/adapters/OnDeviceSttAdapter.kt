@@ -16,7 +16,9 @@ import com.wangzan101.mika.voice.ondevice.InstalledVoicePack
 import com.wangzan101.mika.voice.ondevice.OnDeviceBackends
 import com.wangzan101.mika.voice.ondevice.OnDeviceEngines
 import com.wangzan101.mika.voice.ondevice.OnDeviceLanguage
+import com.wangzan101.mika.voice.ondevice.OnDeviceSpeechSession
 import com.wangzan101.mika.voice.ondevice.OnDeviceSttException
+import com.wangzan101.mika.voice.ondevice.OnDeviceSttStream
 import com.wangzan101.mika.voice.ondevice.OnDeviceTimeout
 import com.wangzan101.mika.voice.ondevice.VoicePackCatalog
 import com.wangzan101.mika.voice.ondevice.VoicePackEntry
@@ -57,7 +59,24 @@ class OnDeviceSttAdapter(
         spec(model)
         // Call audio arrives from outside; the first version of calls does not use on-device packs (too slow to produce text)
         if (hooks.recorder != null) return FailedSession(SpeechFailure.Unavailable(SpeechEngineSpec.Why.OnDeviceUnsupported))
+        val packId = packId(model)
+        val entry = entry(packId)
+        val pack = installed(entry)
         prewarm(model)
+        if (entry.streaming) {
+            // Live pack: the recorder feeds the transducer while the user speaks; the model may still be loading (the recorder queues audio)
+            val code = OnDeviceLanguage.pick(languageTag(context, language), entry.languages)
+            return categorizedSession {
+                OnDeviceSpeechSession(
+                    recorder = PcmRecorder(streaming = true, unbounded = true, bufferChunks = 1_200),
+                    openStream = { streamingStream(pack, entry, code) },
+                    mapError = { error ->
+                        if (error is OnDeviceSttException) mapped(error, entry)
+                        else VoiceModelError.OnDeviceFailed("Live on-device recognition failed: ${error.message}", error)
+                    },
+                )
+            }
+        }
         val transcribe = utterance(context, model, languageTag(context, language))
         // The transcription limit is computed by utterance from the clip length, not the 30 s used for whole-clip upload (hitting that would look like a connection failure)
         return categorizedSession { ProviderSpeech(PcmRecorder(), transcribe, timeoutMs = Long.MAX_VALUE) }
@@ -99,6 +118,18 @@ class OnDeviceSttAdapter(
             }
         }
     }
+
+    /**
+     * Opens this session's live stream; waits for the shared model to load (the recorder queues audio meanwhile).
+     * A pack whose engine only transcribes whole clips cannot serve a live pack, so it is an on-device failure.
+     */
+    private suspend fun streamingStream(pack: InstalledVoicePack, entry: VoicePackEntry, language: String?): OnDeviceSttStream =
+        try {
+            engines.engine(pack).newStream(language)
+                ?: throw VoiceModelError.OnDeviceFailed("voice pack ${entry.id} has no live stream")
+        } catch (e: OnDeviceSttException) {
+            throw mapped(e, entry)
+        }
 
     /**
      * A missing file ([OnDeviceSttException.Kind.Missing]) means "download required" only when the pack is really not installed at this moment;

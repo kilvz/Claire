@@ -40,7 +40,7 @@ class VoicePackCatalogTest {
     @Test
     fun bundledCatalogIsConsistent() {
         val c = VoicePackCatalog.parse(bundled) { _, _ -> true }
-        assertEquals(1, c.packs.size)
+        assertEquals(3, c.packs.size)
         assertEquals(c.packs.size, c.packs.map { it.id }.toSet().size)
         val sha = Regex("^[0-9a-f]{64}$")
         c.packs.forEach { p ->
@@ -55,6 +55,23 @@ class VoicePackCatalogTest {
         }
         assertEquals(setOf("en", "id"), c.packs.flatMap { it.recommendedFor }.toSet())
         c.packs.forEach { assertTrue(it.languages.containsAll(it.recommendedFor)) }
+        // Live packs are opt-in: Auto and fallback chains only see whole-utterance packs
+        assertEquals(setOf("zipformer-en-20m", "zipformer-multilingual-int8"), c.packs.filter { it.streaming }.map { it.id }.toSet())
+        assertEquals(listOf("zipformer-en-20m"), c.packs.filter { it.bundled }.map { it.id })
+        assertTrue(c.packs.filter { it.streaming }.all { it.recommendedFor.isEmpty() })
+    }
+
+    @Test
+    fun bundledPackFilesMatchTheManifest() {
+        val c = VoicePackCatalog.parse(bundled) { _, _ -> true }
+        c.packs.filter { it.bundled }.forEach { p ->
+            val dir = File("src/main/assets/voice-models/${p.id}")
+            p.files.forEach { f ->
+                val file = File(dir, f.name)
+                assertTrue("${p.id}/${f.name} exists", file.isFile)
+                assertEquals("${p.id}/${f.name} size", f.size, file.length())
+            }
+        }
     }
 
     @Test

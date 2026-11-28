@@ -46,7 +46,7 @@ class OnDeviceRecognitionDeviceTest {
         assumeTrue("needs arm64-v8a", SherpaOnnxBackend().abiSupported())
         val backends = OnDeviceBackends()
         val entry = VoicePackCatalog.load(context, backends::supports).entry(PACK)!!
-        val store = VoicePackStore(File(context.filesDir, "voice-models"))
+        val store = VoicePackStore(File(context.filesDir, "voice-models"), assets = context.assets)
         val pack = store.installed(entry)
         assumeTrue("voice pack ${entry.id} v${entry.version} not installed (${store.status(entry)})", pack != null)
 

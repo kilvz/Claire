@@ -96,7 +96,7 @@ class VoicePacksViewModel(
     private val copy: (String) -> Unit,
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val packs = ops.packs.filter(ops::runnable)
+    private val packs = ops.packs.filter { !it.bundled && ops.runnable(it) }
         .sortedBy { if (it.id == recommended?.id) 0 else 1 }
 
     val visible: Boolean get() = packs.isNotEmpty()

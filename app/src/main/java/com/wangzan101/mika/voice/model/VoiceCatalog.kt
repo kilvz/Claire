@@ -109,6 +109,8 @@ data class SttBinding(
     val includeTranscriptionInstruction: Boolean = true,
     /** Empty means automatic; otherwise this is the explicit legacy ASR language code. */
     val language: String = "",
+    /** The engine emits partial text while the user speaks (live on-device streaming packs); such a model cannot join a fallback chain. */
+    val live: Boolean = false,
 )
 
 @Serializable

@@ -49,6 +49,120 @@
         "attribution": "Whisper by OpenAI, https://github.com/openai/whisper (Copyright (c) 2022 OpenAI); ONNX export by k2-fsa/sherpa-onnx"
       },
       "note": "HF repo has no LICENSE file. Weights are released under MIT with openai/whisper code (the openai/whisper-base HF card says apache-2.0; we follow the original GitHub release, MIT). Not under `upstream`. Whisper language codes are Whisper's own: Hebrew=iw, Javanese=jw."
+    },
+    {
+      "id": "zipformer-en-20m",
+      "version": 1,
+      "backend": "sherpa-onnx-streaming",
+      "family": "zipformer",
+      "displayName": "Zipformer English 20M",
+      "languages": [
+        "en"
+      ],
+      "recommendedFor": [],
+      "bundled": true,
+      "streaming": true,
+      "hfRepo": "csukuangfj/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17",
+      "commit": "d42f2d9f7ca24806fb667456a18a9f1b60f70d16",
+      "files": [
+        {
+          "name": "encoder-epoch-99-avg-1.int8.onnx",
+          "role": "encoder",
+          "size": 42845182,
+          "sha256": "3810755ce7c3ab26b42a8bcf39d191308fa27fb0f53358823ba46141d03b7eb3"
+        },
+        {
+          "name": "decoder-epoch-99-avg-1.onnx",
+          "role": "decoder",
+          "size": 2092272,
+          "sha256": "45a7f940ecfb53d89fa270ad11b88b961e53a317203eb24b1c8e95ed208b0f30"
+        },
+        {
+          "name": "joiner-epoch-99-avg-1.int8.onnx",
+          "role": "joiner",
+          "size": 259572,
+          "sha256": "e085d73b593cf9b0707f370dbd656d58327d3fe36d80d849202ef81df02cb01e"
+        },
+        {
+          "name": "tokens.txt",
+          "role": "tokens",
+          "size": 5048,
+          "sha256": "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"
+        },
+        {
+          "name": "LICENSE",
+          "role": "license",
+          "size": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/4fe6344e038e4ef63c1102d28e6ee9b9c67afcd3/LICENSE"
+        }
+      ],
+      "license": {
+        "name": "Apache-2.0",
+        "file": "LICENSE",
+        "attribution": "Zipformer English 20M by k2-fsa/sherpa-onnx (Apache-2.0); exported from icefall-asr-librispeech-pruned-transducer-stateless7-streaming-small"
+      },
+      "note": "Bundled in the APK for live English dictation. Files are the archive from sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2, checked against the same hashes as the 2.8.0 assets."
+    },
+    {
+      "id": "zipformer-multilingual-int8",
+      "version": 1,
+      "backend": "sherpa-onnx-streaming",
+      "family": "zipformer2",
+      "displayName": "Zipformer Multilingual",
+      "languages": [
+        "ar",
+        "en",
+        "id",
+        "ja",
+        "ru",
+        "th",
+        "vi",
+        "zh"
+      ],
+      "recommendedFor": [],
+      "streaming": true,
+      "hfRepo": "csukuangfj/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10",
+      "commit": "c6726c1147387ad2a11148b33973135d92a55e6c",
+      "files": [
+        {
+          "name": "encoder-epoch-75-avg-11-chunk-16-left-128.int8.onnx",
+          "role": "encoder",
+          "size": 296583597,
+          "sha256": "f9001ed7a9e46d0294438c1a30cd7c72d1cc4bdd4e7880edbcda36f67081e32e"
+        },
+        {
+          "name": "decoder-epoch-75-avg-11-chunk-16-left-128.onnx",
+          "role": "decoder",
+          "size": 33837085,
+          "sha256": "7ebc63f34b21c8efb4a41a5a2eee7fe1448829ce0230ecc5369e67fc14d90d48"
+        },
+        {
+          "name": "joiner-epoch-75-avg-11-chunk-16-left-128.int8.onnx",
+          "role": "joiner",
+          "size": 8257421,
+          "sha256": "db88e3172323551abaa99b91b18fb422a27ea4a834fd0db10389f9478816f917"
+        },
+        {
+          "name": "tokens.txt",
+          "role": "tokens",
+          "size": 195244,
+          "sha256": "784f24950f6bcce1b0021035632dd60fd4617ecd8ca0581ab57d7b39d77ba5ab"
+        },
+        {
+          "name": "LICENSE",
+          "role": "license",
+          "size": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/4fe6344e038e4ef63c1102d28e6ee9b9c67afcd3/LICENSE"
+        }
+      ],
+      "license": {
+        "name": "Apache-2.0",
+        "file": "LICENSE",
+        "attribution": "PengChengStarling by Pengcheng Laboratory, https://huggingface.co/stdo/PengChengStarling (Apache-2.0); ONNX export by k2-fsa/sherpa-onnx"
+      },
+      "note": "Downloadable live pack for multilingual dictation. Selectable on its own; never joins a fallback chain or Auto, because it produces text only while speaking."
     }
   ]
 }

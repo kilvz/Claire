@@ -1,5 +1,6 @@
 package com.wangzan101.mika.voice.ondevice
 
+import android.content.res.AssetManager
 import android.os.StatFs
 import java.io.File
 import java.io.IOException
@@ -39,12 +40,16 @@ enum class VoicePackStatus {
  */
 class VoicePackStore(
     private val root: File,
+    /** APK assets, needed only for [VoicePackEntry.bundled] packs. */
+    private val assets: AssetManager? = null,
     private val freeSpace: (File) -> Long = { StatFs(it.path).availableBytes },
 ) {
     private val staging get() = File(root, STAGING)
 
     /** The current version when it is complete (every file present and matching the manifest size), otherwise null. */
     fun installed(entry: VoicePackEntry): InstalledVoicePack? {
+        // A bundled pack always ships with the APK; nothing is stored under root
+        if (entry.bundled) return InstalledVoicePack(entry, File(root, safeId(entry.id)), assets = assets, bundled = true)
         val dir = versionDir(entry.id, entry.version)
         return if (complete(entry, dir)) InstalledVoicePack(entry, dir) else null
     }

@@ -17,7 +17,7 @@ data class VoicePackFile(
 @Serializable
 data class VoicePackLicense(val name: String, val file: String, val attribution: String)
 
-/** A downloadable offline-recognition voice pack. [backend] + [family] select the engine that loads it. */
+/** An offline-recognition voice pack: downloaded on demand, or bundled in the APK. [backend] + [family] select the engine that loads it. */
 @Serializable
 data class VoicePackEntry(
     val id: String,
@@ -30,6 +30,10 @@ data class VoicePackEntry(
     val files: List<VoicePackFile>,
     val license: VoicePackLicense,
     val upstream: String,
+    /** The engine produces partial text while the user speaks; the pack is selectable on its own but never joins a fallback chain or Auto. */
+    val streaming: Boolean = false,
+    /** The files ship inside the APK under `assets/voice-models/<id>/`; there is nothing to download or delete. */
+    val bundled: Boolean = false,
 ) {
     /** Total bytes across all files (download size and disk usage). */
     val totalBytes: Long get() = files.sumOf { it.size }

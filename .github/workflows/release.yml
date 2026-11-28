@@ -70,7 +70,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.9.0: offline voice packs let voice input run entirely on the phone with a downloaded Whisper Base pack for English and Indonesian, including file import, download mirrors and checksum verification, with Auto falling back to an installed pack when the system recognizer is unusable. Settings search now finds individual rows and scrolls to them. Branching a conversation copies its generated images, audio and video, a conversation's own main model now applies to tasks it starts, model groups retry a rate-limited member once, and the capsule drag and stock lock-screen PIN fixes are included.
+            New in 2.10.0: live on-device dictation. The bundled Zipformer English 20M pack now writes words while you speak — no network, no quota and no length cap — and the downloadable Zipformer Multilingual pack does the same for Arabic, English, Indonesian, Japanese, Russian, Thai, Vietnamese and Chinese. Live packs are always chosen explicitly: Auto and fallback chains keep using whole-utterance packs, and Whisper Base remains the recommendation for English and Indonesian. The streaming model loads on press and is shared between sessions, so dictation starts quickly and does not reload between attempts.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt

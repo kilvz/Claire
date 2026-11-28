@@ -48,7 +48,7 @@ class OnDeviceAcceptanceDeviceTest {
         assumeTrue("no eval audio in $root", File(root, "utt").isDirectory)
         val backends = OnDeviceBackends()
         val catalog = VoicePackCatalog.load(context, backends::supports)
-        val store = VoicePackStore(File(context.filesDir, "voice-models"))
+        val store = VoicePackStore(File(context.filesDir, "voice-models"), assets = context.assets)
         val wanted = args.getString("packs")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }
         val holdMs = args.getString("holdMs")?.toLongOrNull() ?: 0L
         val runs = args.getString("runs")?.toIntOrNull() ?: 3

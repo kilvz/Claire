@@ -123,6 +123,9 @@ class VoiceFallbacksTest {
 
     @Test fun onDeviceIsEligible() {
         val pack = VoiceModel("on-device", "pack", "Pack", stt = SttBinding(SttProtocol.OnDevice, endpoint = "pack"))
-        assertTrue("本机语音包既能当链头也能当备援", VoiceFallbacks.eligible(pack, VoiceCapability.STT))
+        assertTrue("whole-utterance on-device packs can head or join a chain", VoiceFallbacks.eligible(pack, VoiceCapability.STT))
+        // Live packs write while speaking, so they are selectable only on their own
+        val live = VoiceModel("on-device", "live", "Live", stt = SttBinding(SttProtocol.OnDevice, endpoint = "live", live = true))
+        assertFalse(VoiceFallbacks.eligible(live, VoiceCapability.STT))
     }
 }

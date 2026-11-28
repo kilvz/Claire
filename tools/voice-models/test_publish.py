@@ -100,6 +100,14 @@ class FetchTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_fetch_skips_bundled_packs(self):
+        web = good_web()
+        bundle = sample_pack()
+        bundle["bundled"] = True
+        publish.fetch([bundle], self.cache, opener=web)
+        self.assertEqual(web.requested, [])
+        self.assertFalse(self.cache.joinpath("demo-int8").exists())
+
     def test_fetch_downloads_from_upstream_or_file_url(self):
         web = good_web()
         publish.fetch([sample_pack()], self.cache, opener=web)
@@ -181,6 +189,33 @@ class CatalogTest(unittest.TestCase):
         self.assertEqual(model, {"name": "model.onnx", "role": "model", "size": len(MODEL), "sha256": sha(MODEL)})
         self.assertEqual(license_file["url"], "https://raw.githubusercontent.com/someone/demo/abc123/LICENSE")
 
+    def test_catalog_marks_live_and_bundled_packs(self):
+        pack = sample_pack()
+        pack["streaming"] = True
+        pack["bundled"] = True
+        item = publish.render_catalog([pack])["packs"][0]
+        self.assertTrue(item["streaming"])
+        self.assertTrue(item["bundled"])
+
+    def test_build_catalog_checks_bundled_files_in_the_apk_assets(self):
+        pack = sample_pack()
+        pack["bundled"] = True
+        with tempfile.TemporaryDirectory() as tmp:
+            old = publish.ASSET_DIR
+            publish.ASSET_DIR = Path(tmp)
+            try:
+                assets = Path(tmp) / "demo-int8"
+                assets.mkdir()
+                (assets / "model.onnx").write_bytes(MODEL)
+                (assets / "tokens.txt").write_bytes(TOKENS)
+                (assets / "LICENSE").write_bytes(LICENSE)
+                self.assertEqual(publish.build_catalog([pack], Path(tmp) / "cache"), publish.render_catalog([pack]))
+                (assets / "tokens.txt").write_bytes(b"swapped")
+                with self.assertRaises(publish.HashMismatch):
+                    publish.build_catalog([pack], Path(tmp) / "cache")
+            finally:
+                publish.ASSET_DIR = old
+
     def test_catalog_rejects_pack_without_license_file(self):
         pack = sample_pack()
         pack["files"] = pack["files"][:2]
@@ -219,12 +254,22 @@ class CommittedCatalogTest(unittest.TestCase):
         tags = [tag for pack in self.catalog["packs"] for tag in pack["recommendedFor"]]
         self.assertEqual(len(tags), len(set(tags)))
 
-    def test_curated_catalog_has_only_whisper_base(self):
+    def test_curated_catalog_has_whisper_and_live_packs(self):
         ids = [pack["id"] for pack in self.catalog["packs"]]
-        self.assertEqual(ids, ["whisper-base-int8"])
-        pack = self.catalog["packs"][0]
-        self.assertEqual(pack["languages"], ["en", "id"])
-        self.assertEqual(pack["recommendedFor"], ["en", "id"])
+        self.assertEqual(ids, ["whisper-base-int8", "zipformer-en-20m", "zipformer-multilingual-int8"])
+        whisper, bundled, multi = self.catalog["packs"]
+        self.assertEqual(whisper["languages"], ["en", "id"])
+        self.assertEqual(whisper["recommendedFor"], ["en", "id"])
+        self.assertNotIn("streaming", whisper)
+        self.assertTrue(bundled["streaming"])
+        self.assertTrue(bundled["bundled"])
+        self.assertEqual(bundled["languages"], ["en"])
+        # Live packs are opt-in: Auto only considers whole-utterance packs
+        self.assertEqual(bundled["recommendedFor"], [])
+        self.assertTrue(multi["streaming"])
+        self.assertNotIn("bundled", multi)
+        self.assertEqual(multi["recommendedFor"], [])
+        self.assertEqual(multi["languages"], ["ar", "en", "id", "ja", "ru", "th", "vi", "zh"])
 
     def test_asset_names_are_unique(self):
         names = [publish.asset_name(p["id"], f["name"]) for p in self.catalog["packs"] for f in p["files"]]
@@ -285,6 +330,33 @@ class UploadTest(unittest.TestCase):
         self.assertEqual(len(uploads), 1)
         names = sorted(Path(a).name for a in uploads[0] if "--" in Path(a).name and not a.startswith("-"))
         self.assertEqual(names, ["demo-int8--LICENSE", "demo-int8--model.onnx", "demo-int8--tokens.txt"])
+
+    def test_upload_skips_assets_already_on_the_release(self):
+        names = [publish.asset_name("demo-int8", f["name"]) for f in sample_pack()["files"]]
+        gh = FakeGh(view={"isPrerelease": True, "tagName": "voice-models-1", "assets": [{"name": n} for n in names]})
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            publish.fetch([sample_pack()], cache, opener=good_web())
+            publish.upload([sample_pack()], cache, "voice-models-1", run=gh)
+        self.assertFalse(any(call[:3] == ["gh", "release", "upload"] for call in gh.calls))
+
+    def test_upload_skips_bundled_packs(self):
+        pack = sample_pack()
+        pack["bundled"] = True
+        gh = FakeGh(view={"isPrerelease": True, "tagName": "voice-models-1"})
+        with tempfile.TemporaryDirectory() as tmp:
+            old = publish.ASSET_DIR
+            publish.ASSET_DIR = Path(tmp)
+            try:
+                assets = Path(tmp) / "demo-int8"
+                assets.mkdir()
+                (assets / "model.onnx").write_bytes(MODEL)
+                (assets / "tokens.txt").write_bytes(TOKENS)
+                (assets / "LICENSE").write_bytes(LICENSE)
+                publish.upload([pack], Path(tmp) / "cache", "voice-models-1", run=gh)
+            finally:
+                publish.ASSET_DIR = old
+        self.assertFalse(any(call[:3] == ["gh", "release", "upload"] for call in gh.calls))
 
     def test_upload_refuses_tag_that_differs_from_catalog_release(self):
         with self.assertRaises(publish.RefuseUpload):

@@ -22,7 +22,7 @@ object OnDeviceCatalog {
         serviceId = SERVICE_ID,
         id = entry.id,
         displayName = entry.displayName,
-        stt = SttBinding(SttProtocol.OnDevice, endpoint = entry.id),
+        stt = SttBinding(SttProtocol.OnDevice, endpoint = entry.id, live = entry.streaming),
         origin = VoiceModelOrigin.Builtin,
     )
 

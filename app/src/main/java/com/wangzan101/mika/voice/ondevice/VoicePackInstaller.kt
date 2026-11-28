@@ -126,6 +126,8 @@ class VoicePackInstaller(
      * not to a separate coroutine, so a cancelled scope cannot miss them.
      */
     fun download(entry: VoicePackEntry): Boolean {
+        // Bundled packs are already in the APK; there is nothing to download (and they have no release assets to manage)
+        if (entry.bundled) return false
         val lock = lock(entry)
         if (!lock.tryLock()) return false
         var started = false
@@ -199,6 +201,8 @@ class VoicePackInstaller(
      * (if it was selected, voice input returns to "Auto"). If deleting files fails it is still removed from the catalog, and the error is rethrown.
      */
     suspend fun delete(entry: VoicePackEntry) {
+        // Bundled files are part of the APK; deleting them would only hide the model until the next launch restores it
+        if (entry.bundled) return
         download.cancel(key(entry))
         val lock = lock(entry)
         lock.lock()
@@ -343,8 +347,14 @@ class VoicePackInstaller(
          * Called at app start, after [VoicePackStore.cleanup] (on a background thread): registers packs whose files are present (any version) but which have no model in the voice catalog.
          * This happens when the process is killed after a commit renames the new version but before the catalog is written; without this the pack would be installed but unselectable. Registered packs are left alone and nothing is written.
          */
-        fun restoreInstalled(catalog: VoicePackCatalog, store: VoicePackStore, voiceCatalog: VoiceCatalogStore) {
-            voiceCatalog.restoreVoicePacks(catalog.packs.filter { store.installedAny(it) != null })
+        fun restoreInstalled(
+            catalog: VoicePackCatalog,
+            store: VoicePackStore,
+            voiceCatalog: VoiceCatalogStore,
+            runnable: (VoicePackEntry) -> Boolean = { true },
+        ) {
+            // A bundled pack is always "installed", but only add it where this device can actually run it
+            voiceCatalog.restoreVoicePacks(catalog.packs.filter { (!it.bundled || runnable(it)) && store.installedAny(it) != null })
         }
 
         @Volatile
