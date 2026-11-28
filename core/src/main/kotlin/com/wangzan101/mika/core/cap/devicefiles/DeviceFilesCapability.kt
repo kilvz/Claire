@@ -39,7 +39,7 @@ catch (e: IOException) { error("device_file_io", "Could not access or copy the f
 
 private object ListDeviceFiles : DeviceFileTool {
     override val verb = Verb.ListDeviceFiles
-    override val label = "查看设备文件"
+    override val label = "Browse device files"
     override val risk = Risk.Read
     override val def = ToolDef("list_device_files", Prompts.tool("list_device_files"), mapOf(
         "path" to str("Directory identifier from a previous listing; omit to list accessible roots."),

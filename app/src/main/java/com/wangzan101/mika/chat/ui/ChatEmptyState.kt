@@ -190,7 +190,7 @@ private fun AppMark(idea: Idea, size: androidx.compose.ui.unit.Dp, tile: Color =
 
 private val FeaturedShape = RoundedCornerShape(18.dp)
 
-/** The date line above the greeting, written in the UI language's convention, e.g. "Tue, Nov 25" or "11月25日 周二". */
+/** The date line above the greeting, written in the UI language's convention, e.g. "Tue, Nov 25" or "25. Nov., Di". */
 private fun todayLabel(): String {
     val locale = uiLocale()
     val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdEEE")

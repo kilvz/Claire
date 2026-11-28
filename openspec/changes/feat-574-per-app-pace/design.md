@@ -5,7 +5,7 @@
 Current chain (explore conclusion):
 
 ```
-设置 (Settings) › 干活时 (During work) › 操作节奏 (Operating pace) — radio: 快/标准/像人 (Fast/Standard/Human-like) → FeatureFlags.operatingPace() (prefs "operating_pace")
+Settings › During work › Operating pace — radio: Fast/Standard/Human-like → FeatureFlags.operatingPace() (prefs "operating_pace")
   └─ TaskRun.kt:699  pace = evalHooks.operatingPace ?: the settings value
        ├─ pace.appPacing() → an AppPacing instance (FAST→Off; STANDARD→the two normal limit sets; HUMAN→all CAREFUL limits)
        │    └─ PhoneCapability → AppDwell(pacing, pace=lambda)
@@ -14,14 +14,14 @@ Current chain (explore conclusion):
        └─ pace.typing(placePace) → TypingPacing
 ```
 
-Pain points: the careful list (8 built-in apps) is invisible and unchangeable to the user; with the global 「快」 (Fast) setting, `AppPacing.Off` makes the careful determination ineffective as well; a single app cannot be slowed down or sped up independently.
+Pain points: the careful list (8 built-in apps) is invisible and unchangeable to the user; with the global "Fast" setting, `AppPacing.Off` makes the careful determination ineffective as well; a single app cannot be slowed down or sped up independently.
 
 Precedents: `AppAccessStore` (JSON file + StateFlow) is the precedent for per-app settings storage; `AppAccessScreen` is the precedent for a per-app list page (`launchableApps` lists apps + search + ListRow/MikaDialog); `SettingsScreen` routes sub-pages with the `SettingsPage` enum.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Each app can independently be set to 快/标准/像人 (Fast/Standard/Human-like); apps without an override follow the global setting; the built-in careful list becomes the initial content of the list (visible, editable and deletable).
+- Each app can independently be set to Fast/Standard/Human-like; apps without an override follow the global setting; the built-in careful list becomes the initial content of the list (visible, editable and deletable).
 - The phone's dwell, typing and screen-count limit are all resolved from the "effective level"; eval hooks take priority and are deterministic.
 - Changes are concentrated in the core pace engine's inputs and the app's settings/wiring; the web side (sitePace) is untouched.
 
@@ -64,7 +64,7 @@ The default values of the per-app pace parameters of `TaskTools`/`PhoneCapabilit
 
 ### D6: UI — a settings sub-page + an add dialog
 
-`SettingsPage` gains `AppPace`, entered from a new entry under the operating pace group in `DuringWorkScreen`. The sub-page reuses the AppAccessScreen shape: an override ListRow (label + level; tapping it pops up the four choices Fast/Standard/Human-like/Delete), and 「添加」 (Add) opens a MikaDialog (launchableApps + search, excluding already overridden items). New strings are added to all 11 language directories.
+`SettingsPage` gains `AppPace`, entered from a new entry under the operating pace group in `DuringWorkScreen`. The sub-page reuses the AppAccessScreen shape: an override ListRow (label + level; tapping it pops up the four choices Fast/Standard/Human-like/Delete), and "Add" opens a MikaDialog (launchableApps + search, excluding already overridden items). New strings are added to all 11 language directories.
 
 ## Risks / Trade-offs
 

@@ -5,13 +5,13 @@ Status: Pending approval
 
 ## Intent and why
 
-When a user teaches Claire something, what they expect is: "I do it once, it learns it by itself and summarizes the skill well". The experience today is: the demonstration ends → the page lists the recorded raw steps one by one, each step paired with two input boxes, 「改成什么」 (Change to what) and 「需要说明」 (Needs explanation) → the user taps 「生成」 (Generate) themselves → then goes to find it in the memory drafts box. The page is a bare TextField plus a button, like a debugging tool.
+When a user teaches Claire something, what they expect is: "I do it once, it learns it by itself and summarizes the skill well". The experience today is: the demonstration ends → the page lists the recorded raw steps one by one, each step paired with two input boxes, "Change to what" and "Needs explanation" → the user taps "Generate" themselves → then goes to find it in the memory drafts box. The page is a bare TextField plus a button, like a debugging tool.
 
 More fundamentally, the summarization angle is wrong. What gets recorded is "how a person does it": back to the desktop, find the icon and open the app, open the browser, tap the address bar, type, tap search. These are just mechanical actions a person is forced to perform, not knowledge; Claire can launch the app directly, or open a link or search result directly. What is really worth keeping is: which entry point to go in through, which button to tap, what to fill in, how to tell it got done, and when to stop and ask. The current model draft is not told this distinction, and the on-device fallback draft copies everything verbatim step by step, so the summary is still "a recording of a person's operations".
 
 ## Goals
 
-1. As soon as the demonstration ends, organize automatically; the user no longer taps 「生成」.
+1. As soon as the demonstration ends, organize automatically; the user no longer taps "Generate".
 2. The organized result is presented directly as a finished skill: structured, readable, acceptable; manual mechanical steps are omitted and written as Claire's direct approach.
 3. The whole teach-Claire flow is redone at product quality: intro, during the demonstration, organizing, summary, learned.
 4. Without a model it still produces a structured skill (on-device organizing + a clear explanation), and no longer falls back to the raw step list.
@@ -28,7 +28,7 @@ More fundamentally, the summarization angle is wrong. What gets recorded is "how
 
 - Writing manual mechanical actions into the skill ("back to the desktop → tap the icon → tap the address bar → type → tap search").
 - Inventing entry points, links or content that the demonstration never went through, in the name of "direct reach".
-- The summary page ever showing a per-step editor or a 「生成」 button again.
+- The summary page ever showing a per-step editor or a "Generate" button again.
 - Silent failure: no model, summarization failure, 0 steps, process killed — all must be explained clearly and be retryable.
 - Brand special cases: identify both the desktop and the browser by system intent, do not hard-code package names.
 
@@ -52,8 +52,8 @@ Idle/Ready (intro) → Recording ⇄ Paused → [End] → Drafting (organizing a
 
 - The end no longer stops at a per-step review; it goes straight into organizing.
 - When organizing finishes: the draft is stored in pending, and the summary page renders the skill body directly.
-- Accept → go through the existing `PersonalSkills.approve` to become a trial skill; the Saved page says 「学会了」 (Learned) explicitly.
-- Summarization failure, 0 steps, model unavailable: show the reason and 「再试一次 / 重来」 (Try again / Start over) in the summary page position, and do not return to the raw step list.
+- Accept → go through the existing `PersonalSkills.approve` to become a trial skill; the Saved page says "Learned" explicitly.
+- Summarization failure, 0 steps, model unavailable: show the reason and "Try again / Start over" in the summary page position, and do not return to the raw step list.
 - Process killed: on restore, `Drafting` organizes again; `Reviewing` shows the existing draft directly. If a draft was saved last time but the session did not get to persist it, recover the existing pending draft by `learned_from=<traceId>` and do not regenerate.
 
 ### 2. Step normalization (two layers)
@@ -62,7 +62,7 @@ Idle/Ready (intro) → Recording ⇄ Paused → [End] → Drafting (organizing a
 
 - Steps on launcher packages (desktop Window, icon Click, etc.) do not enter the route.
 - Mechanical segments that enter or switch apps via the desktop are folded into a single synthesized step: `start <App>` / `switch to <App>` / `return to <App>`.
-- The raw steps that were folded away are kept in a separate plain-language list (e.g. "tapped 小红书 on the desktop"), used only by the summary page to show how many manual steps were folded away, and not written into the skill.
+- The raw steps that were folded away are kept in a separate plain-language list (e.g. "tapped Xiaohongshu on the desktop"), used only by the summary page to show how many manual steps were folded away, and not written into the skill.
 - The set of desktop packages comes from `PackageManager`; when it cannot be identified, fail open and keep the whole segment as-is, without accidental deletion.
 - The browser role (the default `ACTION_VIEW` handler) is passed to the model as a hint, to help identify address-bar/search flows.
 
@@ -107,7 +107,7 @@ The on-device organizer uses the folded route and writes plain sentences followi
 
 ### 6. Acceptance
 
-- On a real device, demonstrate "open 小红书 → search for renovation → open the first result → save": the summary's first step is "start 小红书", with no "desktop/icon"; the search is a single direct step; saving is kept; it can be seen in the skill list and accepted.
+- On a real device, demonstrate "open Xiaohongshu → search for renovation → open the first result → save": the summary's first step is "start Xiaohongshu", with no "desktop/icon"; the search is a single direct step; saving is kept; it can be seen in the skill list and accepted.
 - On a real device, demonstrate a web operation once (with a model): the summary is written as "open/search", with no address-bar step.
 - No model: still get a structured skill, and the page has an "on-device organizing" note.
 - 0 steps, summarization failure, process killed during organizing: all have a clear state and can be retried/restarted.
@@ -122,5 +122,5 @@ The on-device organizer uses the folded route and writes plain sentences followi
 ## Decisions (confirmed 2026-11-22)
 
 1. **Input text is not stored**: confirmed. What is entered during a demonstration is usually just an example, and the skill is summarized along the generic route (type what the user wants to look up / open the link the user gives); if some class of skill really needs to reproduce fixed content in the future, discuss it separately.
-2. **Accepting is still manual**: confirmed. The summary is shown to the user first, and the skill is only enabled after they tap 「收下这个技能」 (Keep this skill).
+2. **Accepting is still manual**: confirmed. The summary is shown to the user first, and the skill is only enabled after they tap "Keep this skill".
 3. **No changes during the demonstration**: confirmed (2026-11-22). There is now a hint at the top of the screen during the demonstration, and this mechanism and page are good enough; keep them as-is and only redo the intro, organizing, summary and learned screens.

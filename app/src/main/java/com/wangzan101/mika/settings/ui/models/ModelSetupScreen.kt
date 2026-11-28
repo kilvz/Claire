@@ -84,9 +84,9 @@ fun ModelSetupScreen(
     onOpenVoice: (() -> Unit)? = null,
     /** In settings, the "Image model" card opens its settings page; the onboarding flow does not pass it, so the card does not appear. */
     onOpenImage: (() -> Unit)? = null,
-    /** 设置里点「视频模型」卡片去设置页;上手流程不传,卡片就不出现。 */
+    /** In settings, tapping the "Video model" card opens its settings page; the onboarding flow does not pass it, so the card does not appear. */
     onOpenVideo: (() -> Unit)? = null,
-    /** 设置里查看 Token 用量;上手流程不传。 */
+    /** View Token usage in settings; the onboarding flow does not pass it. */
     onOpenUsage: (() -> Unit)? = null,
     /** In settings, open the unified voice model catalog; the onboarding flow does not pass it. */
     onOpenVoiceCatalog: (() -> Unit)? = null,
@@ -190,7 +190,7 @@ fun ModelSetupScreen(
     // The old page still renders during the page-change animation: when a provider was just deleted, the details page can still draw from cached data and then exit
     var heldProviders by remember { mutableStateOf(ui.providers) }
     if (ui.providers.isNotEmpty()) heldProviders = ui.providers
-    // 子页的滚动位置等:返回到上一层时原样恢复,退出的子页丢掉(规则见 PageStates)
+    // Scroll positions and so on for subpages: restored as-is when returning to the parent, and dropped when a subpage exits (rules in PageStates)
     val pageStates = rememberPageStates()
     NavSlide(subPage, depth = { it.depth }, states = pageStates) { page ->
     when (page) {
@@ -388,7 +388,7 @@ class ModelSetupActions(
     /** Turns "enter model name manually" on and off. */
     val setManual: (Boolean) -> Unit = {},
     val setName: (String) -> Unit = {},
-    /** 添加时填的账号备注(见 [com.wangzan101.mika.settings.Provider.nickname])。 */
+    /** Account nickname entered when adding (see [com.wangzan101.mika.settings.Provider.nickname]). */
     val setNickname: (String) -> Unit = {},
     val testAndSave: () -> Unit = {},
     /** Save without testing (see [ModelSetupViewModel.saveWithoutTest]). */
@@ -401,7 +401,7 @@ class ModelSetupActions(
     val pickRoleFallback: (ModelRole, Int) -> Unit = { _, _ -> },
     val clearFallback: (ModelRole, Int) -> Unit = { _, _ -> },
     val moveFallback: (ModelRole, Int, Int) -> Unit = { _, _, _ -> },
-    /** 打开「服务商」页(已连接的服务商 + 添加表单)。 */
+    /** Open the "Providers" page (connected providers + add form). */
     val openProviders: () -> Unit = {},
     /** Open the "Speech to text" picker; when null this card is not shown (onboarding flow). */
     val openSpeech: (() -> Unit)? = null,
@@ -409,9 +409,9 @@ class ModelSetupActions(
     val openVoice: (() -> Unit)? = null,
     /** Open the "Image model" settings page; when null this card is not shown (onboarding flow). */
     val openImage: (() -> Unit)? = null,
-    /** 打开「视频模型」设置页;为 null 时不显示这张卡(上手流程)。 */
+    /** Open the "Video model" settings page; when null this card is not shown (onboarding flow). */
     val openVideo: (() -> Unit)? = null,
-    /** 打开 Token 用量;为 null 时不显示入口(上手流程)。 */
+    /** Open Token usage; when null the entry is not shown (onboarding flow). */
     val openUsage: (() -> Unit)? = null,
     /** Open the unified voice model catalog; when null the entry point is not shown (onboarding flow). */
     val openVoiceCatalog: (() -> Unit)? = null,
@@ -463,7 +463,7 @@ fun ModelSetupContent(
                     RolesSection(ui, onPick, actions.setReasoningEffort)
                     FooterNote(ModelSetupCopy.ONBOARDING_NOTE)
                 } else {
-                    // 服务商入口的副标题:写服务商数,池里有多把 Key 时再带上 Key 数
+                    // Subtitle of the provider entry: state the provider count, plus the Key count when the pool has multiple Keys
                     val providerSubtitle = KeyPoolCopy.providersSubtitle(
                         ui.providers.size,
                         ui.providers.sumOf { p -> ui.providerKeyMap[p.id]?.size ?: 0 },

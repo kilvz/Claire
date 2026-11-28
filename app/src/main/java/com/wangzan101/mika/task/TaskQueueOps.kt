@@ -64,7 +64,7 @@ internal fun TaskService.freeSlot(): Int {
 
 /** If this conversation is idle, start right away; if it still has a task, leave it in the persistent queue and hand it out when that task finishes ([onRunEnded]). The check and the queueing happen under the same lock. */
 internal fun TaskService.deferMessage(threadId: String, text: String, messageId: String) {
-    // 暂停时不留给下一件:恢复后不能自己跑起来
+    // Do not leave it for the next item when paused: it must not start by itself after resume
     if (pausedBlocks()) return
     val item = QueuedFollowUp(messageId, threadId, text, System.currentTimeMillis(), QueuedSource.Fallback)
     if (center.deferOrStart(threadId, text, messageId, QueuedSource.Fallback)) startFollowUp(item)
@@ -73,7 +73,7 @@ internal fun TaskService.deferMessage(threadId: String, text: String, messageId:
 
 /** The user explicitly chose "queue": if this conversation still has a task, write it into the persistent queue; if it just became idle, start it right away. */
 internal fun TaskService.queueFollowUp(threadId: String, text: String, messageId: String, source: QueuedSource) {
-    // 暂停时不入队:入了队,恢复后就会自己跑起来。调用方写进去的那一项也拿掉
+    // Do not queue while paused: once queued it would start by itself after resume. Also remove the item the caller wrote
     if (pausedBlocks()) {
         center.followUps.remove(messageId)
         finishPausedStart(com.wangzan101.mika.core.run.RunProvenance(), null, null, null, null, null, followUp = null)

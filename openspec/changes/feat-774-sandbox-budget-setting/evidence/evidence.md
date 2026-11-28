@@ -4,11 +4,11 @@
 |---|---|---|
 | 17:32 | `./gradlew :app:assembleDebug` builds the debug package containing the changes | BUILD SUCCESSFUL |
 | 17:33 | Pre-install check: the latest run record is 2026-11-20 (no active tasks), a screenshot confirms the foreground is the empty chat home screen | Safe, OK to proceed |
-| 17:33 | `adb install -r app-debug.apk` | Success; the first launch shows the 「语言偏好」 (Language preference) guide, tapping 「暂不设置」 (Not now) keeps the existing settings |
-| 17:34 | 侧栏 (sidebar) › 设置 (Settings) › 任务运行 (Task runs) | The new row 「每个任务的沙箱时间上限」 (Per-task sandbox time limit) appears after 「定时任务最长运行时间」 (Max runtime for scheduled tasks), with the default value **30 minutes** (screenshot 01) |
+| 17:33 | `adb install -r app-debug.apk` | Success; the first launch shows the "Language preference" guide, tapping "Not now" keeps the existing settings |
+| 17:34 | sidebar › Settings › Task runs | The new row "Per-task sandbox time limit" appears after "Max runtime for scheduled tasks", with the default value **30 minutes** (screenshot 01) |
 | 17:34 | Tap that row | Dialog title + description copy + four radio tiers: 30 / 60 / 120 / 240 minutes (screenshot 02) |
-| 17:35 | Select 「240 分钟」 (240 minutes) | The row value is written back as **240 minutes** (screenshot 03); `run-as … cat shared_prefs/feature_flags.xml` shows `sandbox_budget_limit_minutes" value="240"` |
-| 17:36 | Select 「30 分钟」 (30 minutes) back | prefs returns to `value="30"`, the device is restored to its default state, exit settings |
+| 17:35 | Select "240 minutes" | The row value is written back as **240 minutes** (screenshot 03); `run-as … cat shared_prefs/feature_flags.xml` shows `sandbox_budget_limit_minutes" value="240"` |
+| 17:36 | Select "30 minutes" back | prefs returns to `value="30"`, the device is restored to its default state, exit settings |
 
 Default behavior being unchanged and the guard math (rejection timing on the default/custom tiers, minute count in the message, capTimeout clamping) are covered by `SandboxGuardTest` (core, 5 cases) and `FeatureFlagsSandboxBudgetTest` (app, 1 case); the four full local test groups are below.
 

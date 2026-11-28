@@ -163,7 +163,7 @@ Add the single voice catalog, responsible for:
 - Atomic writes of non-secret config; secrets are still stored encrypted through the existing `KeyCipher`.
 - Providing the same state stream to the settings pages and the adapter factory, so different pages do not each read their own copy.
 
-When the catalog is corrupted, do not clear the old config or silently fall back to defaults. Keep using the old path until migration completes; after migration, corruption should show 「语音配置读取失败」 (Could not read voice config) and keep a repair entry.
+When the catalog is corrupted, do not clear the old config or silently fall back to defaults. Keep using the old path until migration completes; after migration, corruption should show "Could not read voice config" and keep a repair entry.
 
 ### 5.2 Reuse chat provider accounts, but not chat usage rules
 
@@ -239,11 +239,11 @@ network failure / timeout / rate limiting / protocol response error /
 system capability unavailable / user cancelled
 ```
 
-Each protocol keeps the raw server error for diagnostics, but feature pages only handle the unified categories. Cancellation is not a failure. Recognition service not responding, microphone in use, and auth failure must not all be lumped into 「麦克风不可用」 (Microphone unavailable).
+Each protocol keeps the raw server error for diagnostics, but feature pages only handle the unified categories. Cancellation is not a failure. Recognition service not responding, microphone in use, and auth failure must not all be lumped into "Microphone unavailable".
 
 ## 8. Settings page
 
-Add a 「语音模型」 (Voice models) catalog page, grouped by service, with each model row showing its `STT`, `TTS` and `Realtime` capabilities.
+Add a "Voice models" catalog page, grouped by service, with each model row showing its `STT`, `TTS` and `Realtime` capabilities.
 
 When adding or editing, show the corresponding fields by capability:
 

@@ -69,13 +69,13 @@ Transition edge effect ∈ { navigated, state_changed, none, left_app, unknown }
 
 Extract a **stable skeleton text set S** from the current `ScreenSnapshot` (reusing `RouteAnchors.texts`: drop digits, drop list/scrollable content, drop input fields, drop text the user typed, keeping only title bars/tabs/buttons), compare against stored screens, sort by `(overlap count, coverage, rarity)`, and take the closest; below the confidence threshold, return None.
 
-- Coverage = |S ∩ anchors| / |anchors|; rarity = Σ 1 / max(1, how many screens this text appears on) — 「确定/返回」 (OK/Back) is everywhere and is hardly evidence.
+- Coverage = |S ∩ anchors| / |anchors|; rarity = Σ 1 / max(1, how many screens this text appears on) — "OK/Back" is everywhere and is hardly evidence.
 - Purely programmatic, no model calls; below the threshold means "don't know", no guessing.
 - The skeleton definition is the core of D: content changes, the skeleton does not, so both identification and map building recognize only the skeleton.
 
 ### D3: Semantic names / levels — not in this version (decided)
 
-Screen identity is **self-describing** through skeleton anchors (the 「关于本机」 (About phone) anchor is this screen's name), so there is no need to have the vision model label a semantic name for each screen. The `ScreenNode.name` / `ScreenNode.levels` fields are kept, left empty in this version, for labeling later if needed. Levels (home/top/inner) likewise are not voted on in this version.
+Screen identity is **self-describing** through skeleton anchors (the "About phone" anchor is this screen's name), so there is no need to have the vision model label a semantic name for each screen. The `ScreenNode.name` / `ScreenNode.levels` fields are kept, left empty in this version, for labeling later if needed. Levels (home/top/inner) likewise are not voted on in this version.
 
 ### D4: Building the map — replaying run records, deterministic, read-only in real time
 

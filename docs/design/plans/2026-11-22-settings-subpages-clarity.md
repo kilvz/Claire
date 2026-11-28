@@ -29,7 +29,7 @@
 - Delete `settings_a11y_sub` (the accessibility service subtitle).
 - Delete `phone_repair_sub` (the repair connection subtitle).
 - The Shizuku diagnostic `phone_shizuku_detail` is shown only when not ready.
-- System version: when normal, the trailing value changes from 「满足」 (Meets requirements) to the version number (`settings_android`) and the subtitle is emptied; the `tooOld`/`focusWarning` branches are untouched.
+- System version: when normal, the trailing value changes from "Meets requirements" to the version number (`settings_android`) and the subtitle is emptied; the `tooOld`/`focusWarning` branches are untouched.
 - **Keep**: the built-in assistant `statusLine` (dynamic diagnostics) and `phone_unpair_sub` (dangerous consequence).
 
 ### Task 2: Task runs (`SettingsSubPages.kt` `DuringWorkScreen`)
@@ -47,7 +47,7 @@
 - **Keep**: the trigger timing of the three channels and the NOTIF_FOOTER system path.
 
 ### Task 5: Recovery and repair (`RecoverySection.kt` `RecoverySection`)
-- Delete `rec_default_on` (「默认打开」 (On by default)); keep `WORKING` (busy feedback).
+- Delete `rec_default_on` ("On by default"); keep `WORKING` (busy feedback).
 
 ### Task 6: Advanced (`SettingsScreen.kt` `AdvancedSettingsContent`)
 - Delete `web_search_row_sub`.
@@ -63,8 +63,8 @@
 
 ## Review Focus
 
-- System version row: when `tooOld` (below Android 12) it still shows 「不支持」 (Not supported); the "not supported" signal must not be lost just because the subtitle was deleted.
+- System version row: when `tooOld` (below Android 12) it still shows "Not supported"; the "not supported" signal must not be lost just because the subtitle was deleted.
 - Shizuku row: the diagnostic must still appear when not ready and is hidden only when ready — it must not be hidden across the board, leaving abnormal states with no hint at all.
-- Recovery page `busy` state: the 「正在…」 (In progress…) feedback while toggling the switch must not disappear along with the deleted 「默认打开」 (On by default).
+- Recovery page `busy` state: the "In progress…" feedback while toggling the switch must not disappear along with the deleted "On by default".
 - The 4 values on task runs: after moving from the subtitle to the right, they must still open a dialog for editing (keep `onClick`).
-- Notification master switch: when `o.appAllowed` is false, the 「去打开」 (Go turn on) link must still be tappable.
+- Notification master switch: when `o.appAllowed` is false, the "Go turn on" link must still be tappable.

@@ -6,9 +6,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * The Android adapter only starts an intent; TaskService owns execution and calls complete.
- * 用户暂停了 Mika([paused]):开始、继续、确认都拒绝([WorkflowProblem.Paused]);
- * 已在进行的流程到了要派下一步时不派:停在「已暂停」(已认领待派的那一步记失败 [PauseFlag.REASON]、停在待确认),
- * 恢复后由用户点继续,不自动接着跑。
+ * The user paused Claire ([paused]): start, continue and confirm are all rejected ([WorkflowProblem.Paused]);
+ * a running workflow that reaches the point of dispatching the next step does not dispatch: it stops as "paused" (the claimed step awaiting dispatch is recorded as failed with [PauseFlag.REASON], parking at awaiting confirmation),
+ * and after resume the user taps continue; it does not resume running automatically.
  */
 class WorkflowRuntime(
     val store: WorkflowStore,
@@ -52,7 +52,7 @@ class WorkflowRuntime(
         try { advance(id) } catch (_: WorkflowException) { _saveError.value = true }
     }
     private fun refuseWhilePaused() { if (paused.paused()) throw WorkflowException(WorkflowProblem.Paused) }
-    /** 用户刚暂停了 Mika:还没派出下一步的流程都停下(见 [advance]);正在跑的那一步随任务被取消而结束。 */
+    /** The user just paused Claire: workflows that have not dispatched their next step all stop (see [advance]); the step currently running ends as its task is cancelled. */
     @Synchronized fun haltForPause() {
         try {
             store.load()
@@ -61,7 +61,7 @@ class WorkflowRuntime(
     }
     private fun advance(id: String) {
         if (paused.paused()) {
-            // 已认领待派的那一步记失败,流程停在待确认;还没到下一步的直接停在「已暂停」。恢复后都由用户点继续
+            // The claimed step awaiting dispatch is recorded as failed and the workflow parks at awaiting confirmation; if it has not reached the next step it stops directly as "paused". After resume the user taps continue
             val pending = store.pendingDispatch(id)
             if (pending != null) store.finish(pending.attemptId, false, "", PauseFlag.REASON) else store.pause(id)
             return

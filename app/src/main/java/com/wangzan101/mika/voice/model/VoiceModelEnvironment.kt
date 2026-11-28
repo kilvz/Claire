@@ -70,7 +70,7 @@ class VoiceModelEnvironment(
             if (existingTts == null) {
                 catalog.upsertModel(TtsSelectionController.SYSTEM_TTS_MODEL)
             } else {
-                // 内置绑定按当前版本重写,只留用户选的引擎
+                // Built-in bindings are rewritten per current version, keeping only the user-selected engine
                 val repaired = TtsSelectionController.SYSTEM_TTS_MODEL.tts!!.copy(engine = existingTts.tts?.engine.orEmpty())
                 if (existingTts.tts != repaired) catalog.upsertModel(existingTts.copy(tts = repaired))
             }

@@ -61,11 +61,11 @@ import kotlinx.coroutines.flow.map
 @Composable
 internal fun ConversationUsageSheet(
     id: String?, onDismiss: () -> Unit,
-    /** 「查看 Token 用量」:跳到设置里的 Token 用量页;不传时这行照常显示,点了只关面板。 */
+    /** "View Token usage": jumps to the Token usage page in settings; when not passed, the row still shows and a tap only closes the panel. */
     onOpenUsage: () -> Unit = {},
-    /** 依赖注入留给设备测试;不传用应用里那份。 */
+    /** Dependency injection kept for device tests; when not passed, use the app's instance. */
     store: ProviderStore? = null,
-    /** 本对话自己存的主模型选择(输入框上方的主模型入口);不传按全局主模型算。 */
+    /** This conversation's own stored main-model choice (the main-model entry above the input field); when not passed, use the global main model. */
     mainOverride: ModelChoice? = null,
 ) {
     val c = MikaTheme.colors
@@ -76,7 +76,7 @@ internal fun ConversationUsageSheet(
     }
 }
 
-/** 面板正文:面板本身只是 ModalBottomSheet 的薄壳,正文单独一层让设备测试不进对话框也能测。 */
+/** Panel body: the panel itself is just a thin shell over ModalBottomSheet; the body is a separate layer so device tests can test it without entering the dialog. */
 @Composable
 internal fun ConversationUsageContent(
     id: String?, onDismiss: () -> Unit, onOpenUsage: () -> Unit, store: ProviderStore?, mainOverride: ModelChoice? = null,
@@ -107,7 +107,7 @@ internal fun ConversationUsageContent(
             result == null -> CircularProgressIndicator(Modifier.padding(top = 12.dp).size(24.dp))
             else -> Text(stringResource(R.string.usage_allowance_unavailable), color = c.ink2)
         }
-        // 明细、历史和各家全量额度都留在「Token 用量」页,面板只给一个就近入口
+        // Details, history and each provider's full allowance stay on the "Token usage" page; the panel only gives a nearby entry
         UsageDetailLink { onDismiss(); onOpenUsage() }
     }
 }
@@ -125,7 +125,7 @@ private fun ConversationTokens(usage: ConversationUsage) {
         UsageCopy.compactTokens(usage.cacheReportedInput)), style = MikaType.Hint, color = c.ink2)
 }
 
-/** 本对话的主模型和它服务商的余额:面板打开时现查,不缓存旧值;没有可用的主模型时整个区不显示。 */
+/** This conversation's main model and its provider's balance: queried live when the panel opens, no stale cache; when there is no usable main model the whole section is hidden. */
 @Composable
 private fun CurrentModelSection(store: ProviderStore, mainOverride: ModelChoice?) {
     val roles by store.roles.collectAsState()
@@ -133,7 +133,7 @@ private fun CurrentModelSection(store: ProviderStore, mainOverride: ModelChoice?
     val groups by store.groups.collectAsState()
     val providers by store.providers.collectAsState()
     val revisions by store.providerKeyRevisions.collectAsState()
-    // 收集这四个流只为在全局选择、配置、组、服务商变化时重算;取值与解析覆盖走 store 同一刻的快照
+    // Collect these four flows only to recompute when the global choice, configs, groups or providers change; values and resolution overrides use the store's snapshot at the same moment
     val current = remember(roles, configs, groups, providers, mainOverride) { currentModelAllowance(store, mainOverride) }
         ?: return
     GroupLabel(stringResource(R.string.chat_current_model), Modifier.padding(top = 12.dp))

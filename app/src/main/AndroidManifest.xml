@@ -80,7 +80,7 @@
     <!-- list_apps lists launchable apps; resolve the package that hosts the system permission dialog, used to determine "switched away" -->
     <queries>
         <intent><action android:name="android.telecom.InCallService" /></intent>
-        <!-- 列出手机上登记的语音合成引擎,供系统朗读选择引擎(SystemTtsDiscovery) -->
+        <!-- List the text-to-speech engines registered on the phone so the system read-aloud picker can choose one (SystemTtsDiscovery) -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
@@ -370,7 +370,7 @@
                 android:resource="@xml/web_files" />
         </provider>
 
-        <!-- 聊天视频卡片:点开时把工作区视频复制到缓存 videoplay/,只把这份副本临时授权给系统播放器 -->
+        <!-- Chat video cards: when opened, copy the workspace video into the videoplay/ cache and grant the system player access only to that copy -->
         <provider
             android:name=".media.VideoPlaybackFilesProvider"
             android:authorities="${applicationId}.videoplay"
@@ -381,7 +381,7 @@
                 android:resource="@xml/video_playback_files" />
         </provider>
 
-        <!-- 对话页附件:相机把照片写进缓存里的 camera/,点开已发附件时复制出的一份在 viewing/;不对外导出,用到时临时授权 -->
+        <!-- Conversation attachments: the camera writes photos to the camera/ cache, and a copy of a sent attachment is made in viewing/ when opened; nothing is exported, and access is granted temporarily when used -->
         <provider
             android:name=".chat.AttachFilesProvider"
             android:authorities="${applicationId}.attachfiles"

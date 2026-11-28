@@ -23,7 +23,7 @@
 - **core takes `Long` milliseconds; the app side converts.** `FeatureFlags.sandboxBudgetMinutes(): Int` is used by the UI/storage; when wiring, `TaskRun` passes `* 60_000L` to `toolDispatcher(sandboxBudgetMs = …)` (a new parameter, defaulting to `SANDBOX_BUDGET_MS`, so core unit tests and other callers need zero changes).
 - **`SandboxCapability` gains a `budgetMs` constructor parameter**, with `guard() = SandboxGuard(budgetMs)`; the `SANDBOX_BUDGET_MS` constant remains as the default value and conversion basis.
 - **Dynamically generate the exhaustion message**: `"Sandbox commands in this task have used their ${budgetMs / 60_000} minutes. …"`, in English for the model, differing from the existing copy only in the number of minutes.
-- **The settings entry goes on the 「干活时」 (During work) page**, immediately after 「定时任务最长运行时间」 (Maximum scheduled task run time) (both are task-duration-type limits), reusing `MikaIcons.Clock`, `RadioRow` and `trPlural`.
+- **The settings entry goes on the "During work" page**, immediately after "Maximum scheduled task run time" (both are task-duration-type limits), reusing `MikaIcons.Clock`, `RadioRow` and `trPlural`.
 
 ## Risks / Trade-offs
 

@@ -81,7 +81,7 @@ class StopSummary(
             RegexOption.MULTILINE,
         )
 
-        /** 把旧记录里的中文停止头部换成 App 语言;已有译文和中文记录原样保留。 */
+        /** Replace the Chinese stop header in old records with the app language; records that already have a translation or are Chinese are kept as-is. */
         fun localizeCancelledHeader(raw: String, language: String?): String {
             val phrase = StopPhrases.forLanguage(language)
             if (phrase.isChinese) return raw
@@ -90,7 +90,7 @@ class StopSummary(
                 .replace(EMPTY_CANCELLED_HEADER, phrase.headEmpty)
         }
 
-        /** 有没有可交代的:做过至少一件事、已经确认过进度,或停下时已经写出了字。都没有就只说「已停止」。 */
+        /** Whether there is anything to report: at least one action was done, progress was confirmed, or some text had been written when it stopped. If none, just say "stopped". */
         fun worthSaying(events: List<RunEvent>, draft: String?): Boolean =
             events.any { it is RunEvent.Activity || it is RunEvent.Criteria && (it.criteria.isNotEmpty() || it.progress != null) } || !draft.isNullOrBlank()
 

@@ -86,13 +86,13 @@ fun ModelSetupViewModel.setName(name: String) = edit {
 
 fun ModelSetupViewModel.setNickname(nickname: String) = edit { it.copy(nickname = nicknameInput(nickname)) }
 
-/** 输入备注时按字符(码点)截到 [Provider.MAX_NICKNAME];首尾空白存的时候才去(见 [Provider.cleanNickname])。 */
+/** When entering a nickname, truncate to [Provider.MAX_NICKNAME] characters (code points); leading/trailing whitespace is stripped only on save (see [Provider.cleanNickname]). */
 internal fun nicknameInput(text: String): String {
     val n = text.codePointCount(0, text.length)
     return if (n <= Provider.MAX_NICKNAME) text else text.substring(0, text.offsetByCodePoints(0, Provider.MAX_NICKNAME))
 }
 
-/** 连接信息变了:进行中的测试和上次的失败原因作废。 */
+/** Connection info changed: an in-progress test and the last failure reason are invalidated. */
 internal fun ModelSetupViewModel.edit(change: (AddForm) -> AddForm) {
     testJob?.cancel()
     _state.update { it.copy(form = change(it.form).copy(test = ListState.Idle)) }

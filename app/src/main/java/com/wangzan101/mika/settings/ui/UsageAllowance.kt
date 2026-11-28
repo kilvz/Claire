@@ -49,8 +49,8 @@ import com.wangzan101.mika.settings.ui.models.refresh
 private val allowanceClient by lazy { ProviderAllowanceClient(ProviderStore.modelHttp) }
 
 /**
- * 一家服务商一次余额查询的状态:从加载中到有值(或查不到为 null)。
- * [updated] 是上次查到的时刻,跨手动刷新保留(刷新中、刷新失败都还显示上一次的时间),换 Key 才清掉。
+ * State of one allowance query for a provider: from loading to a value (or null when it cannot be fetched).
+ * [updated] is the time of the last successful fetch, kept across manual refreshes (still shows the previous time while refreshing or after a failed refresh), and cleared only when the Key changes.
  */
 internal class AllowanceQuery internal constructor(source: AllowanceSource?, lastUpdated: MutableState<Instant?>) {
     var value: ProviderAllowance? by mutableStateOf(null)
@@ -59,9 +59,9 @@ internal class AllowanceQuery internal constructor(source: AllowanceSource?, las
 }
 
 /**
- * 挂在组合上查一遍这家服务商的额度:打开所在界面才跑,Key 版本([revision])或手动 [refresh]
- * 变了作废重来;列表和密钥可能已更新、界面还没来得及重组时,结果经 [ProviderStore.matchesAllowanceConnection]
- * 核对后才落地。没有查询源([source] 为 null)不跑,loading 保持 false。
+ * Query this provider's allowance as part of composition: runs only when the containing screen opens, and starts over when the Key revision ([revision]) or a manual [refresh]
+ * changes; when the list and keys may already be updated but the UI has not recomposed, the result lands only after being checked via [ProviderStore.matchesAllowanceConnection].
+ * With no query source ([source] is null) it does not run and loading stays false.
  */
 @Composable
 internal fun rememberAllowanceQuery(
@@ -76,13 +76,13 @@ internal fun rememberAllowanceQuery(
                     store.allowanceKey(provider, revision)?.takeIf { it.isNotBlank() }?.let { allowanceClient.query(source, it) }
                 }
             } catch (error: ModelError) {
-                Log.w("MikaAllowance", "查询服务商额度失败（${source.name}，${error.javaClass.simpleName}）")
+                Log.w("MikaAllowance", "Provider allowance query failed (${source.name}, ${error.javaClass.simpleName})")
                 null
             } catch (_: IllegalArgumentException) {
-                Log.w("MikaAllowance", "服务商额度请求无效（${source.name}）")
+                Log.w("MikaAllowance", "Provider allowance request was invalid (${source.name})")
                 null
             }
-            // 列表和密钥版本可能已更新，但界面还没来得及重组。
+            // The list and key revision may already be updated, but the UI has not had time to recompose.
             if (store.matchesAllowanceConnection(provider, revision)) {
                 query.value = result
                 if (result != null) query.updated = Instant.now()

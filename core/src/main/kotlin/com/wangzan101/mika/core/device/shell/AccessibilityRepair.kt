@@ -55,7 +55,7 @@ class AccessibilityRepair(
     private val now: () -> Long = System::currentTimeMillis,
     /** False after an explicit exit: nothing is written back for accessibility; when it is turned on manually next time, the active flow of [watch] decides again. */
     private val allowed: () -> Boolean = { true },
-    /** 用户暂停了 Mika 时为 true(读持久化的暂停标记):即使助手状态还没跟上,也不自动打开无障碍。 */
+    /** True when the user paused Claire (reads the persisted pause flag): do not turn accessibility on automatically even if the helper status has not caught up. */
     private val paused: () -> Boolean = { false },
 ) {
     private val _last = MutableStateFlow<RepairOutcome?>(null)
@@ -105,8 +105,8 @@ class AccessibilityRepair(
     }
 
     private fun eligible(s: A11yObservation, h: BuiltinShellStatus, unlocked: Boolean) =
-        // 暂停时绝不自动把无障碍打开:暂停本身就关掉了它,自动修好等于把暂停取消了。
-        // 恢复后照常修;修不成时恢复页再请用户去系统设置里打开。
+        // Never turn accessibility on automatically while paused: pausing turns it off itself, so repairing it automatically would cancel the pause.
+        // After resuming, repair as usual; if repair fails, the recovery page asks the user to turn it on in system settings.
         allowed() && !paused() && s.stuck && unlocked && h != BuiltinShellStatus.Paused &&
             (direct() || h == BuiltinShellStatus.Running) && consent().wants(RecoveryCapability.Accessibility)
 

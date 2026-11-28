@@ -111,8 +111,8 @@ class GeminiModel(
 
     private fun mapError(status: Int, retryAfter: String?, body: String): ModelError = ModelHttp.geminiError(status, retryAfter, body, model)
 
-    // Gemini 不接受 additionalProperties / $schema / $id / allOf 等 OpenAPI 子集之外的键;
-    // title、minLength、maxLength、pattern、default 在它的 Schema 里,原样保留
+    // Gemini does not accept keys outside its OpenAPI subset, such as additionalProperties / $schema / $id / allOf;
+    // title, minLength, maxLength, pattern and default are in its Schema, so they are kept as-is
     private val rejectedKeys = setOf(
         "additionalProperties", "\$schema", "\$id", "\$defs", "definitions", "\$ref",
         "allOf", "not", "const", "examples", "\$comment",
@@ -124,7 +124,7 @@ class GeminiModel(
         "readOnly", "writeOnly", "deprecated",
     )
 
-    // 只在 schema 位置剔除并降级 OpenAPI 子集之外的结构;properties 是 名称->schema 的映射,名称本身不动
+    // Strip and downgrade structures outside the OpenAPI subset only at schema positions; properties is a name -> schema map, and the names themselves are untouched
     private fun sanitize(el: JsonElement, isRoot: Boolean = false): JsonElement = when (el) {
         is JsonObject -> {
             val out = linkedMapOf<String, JsonElement>()
@@ -156,7 +156,7 @@ class GeminiModel(
                         out["items"] = first?.let { sanitize(it, isRoot = false) }
                             ?: buildJsonObject { put("type", "string") }
                     }
-                    // oneOf 在 Gemini 里没有,按 anyOf 发(只是放宽了「恰好一个」)
+                    // Gemini has no oneOf, so send it as anyOf (which only relaxes "exactly one")
                     (k == "anyOf" || k == "oneOf") && v is JsonArray -> {
                         val nonNull = v.filterNot { branch ->
                             val obj = branch as? JsonObject ?: return@filterNot false
@@ -205,8 +205,8 @@ class GeminiModel(
                 out.remove("properties")
                 out.remove("required")
             } else if (!isRoot && effType == "object") {
-                // 没写 properties 的 object 是「任意键值」(内置 do_steps 的 args、read_script 的 args 都是),照原样发;
-                // 降成 string 会让模型传字符串、工具按「必须是对象」拒掉
+                // An object without properties is "arbitrary keys and values" (both built-in do_steps args and read_script args are like this), so send it as-is;
+                // downgrading it to string would make the model pass a string, which the tool rejects as "must be an object"
                 val propsObj = (out["properties"] as? JsonObject)?.takeIf { it.isNotEmpty() }
                 if (propsObj == null) {
                     out.remove("properties")
@@ -219,7 +219,7 @@ class GeminiModel(
                 }
             }
 
-            // 只有原本写了东西、却被剥得一个键不剩的节点(比如只有 $ref)兜底成 string;没写 type 的节点原样发
+            // Only nodes that originally had content but were stripped to zero keys (for example, only $ref) fall back to string; nodes without a type are sent as-is
             if (!isRoot && out.isEmpty() && el.isNotEmpty()) {
                 out["type"] = JsonPrimitive("string")
             }
@@ -235,7 +235,7 @@ class GeminiModel(
         val schema = try { json.parseToJsonElement(t.parametersJsonSchema) } catch (e: Exception) {
             throw IllegalArgumentException("The parameter schema for tool ${t.name} is not valid JSON", e)
         }
-        // 无参数工具:Gemini 拒绝没有 properties 的 object schema,省略 parameters
+        // Tools without parameters: Gemini rejects an object schema without properties, so omit parameters
         val clean = sanitize(schema, isRoot = true)
         val hasProps = (clean as? JsonObject)?.get("properties")?.let { it is JsonObject && it.isNotEmpty() } == true
         if (hasProps) put("parameters", clean)

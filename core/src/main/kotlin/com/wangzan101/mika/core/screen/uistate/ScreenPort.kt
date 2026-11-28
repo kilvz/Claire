@@ -287,12 +287,12 @@ interface ScreenPort {
      */
     suspend fun shareImage(packageName: String, path: String, text: String?): ActionResult = ActionResult.Failed("unsupported")
 
-    /** 这个端口能不能分享视频;不能时手机工具不提供 phone_share_video。 */
+    /** Whether this port can share video; when it cannot, the phone tool does not offer phone_share_video. */
     val canShareVideo: Boolean get() = false
 
     /**
-     * 把工作区里的一段视频分享给 [packageName](ACTION_SEND + EXTRA_STREAM,content URI 允许对方读取),在 Agent 的屏上打开分享页;
-     * 只打开,不发出。这个 App 没有收视频分享的页面时失败 cannot_share;不支持的端口返回 unsupported。
+     * Share a workspace video to [packageName] (ACTION_SEND + EXTRA_STREAM, with a content URI the other side may read), opening its share page on the Agent's screen;
+     * only opens, does not send. Fails with cannot_share when this app has no page for receiving shared videos; unsupported ports return unsupported.
      */
     suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult = ActionResult.Failed("unsupported")
 

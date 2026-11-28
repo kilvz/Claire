@@ -197,7 +197,7 @@ class FollowUpQueue(private val store: FollowUpQueueStore = MemoryFollowUpQueueS
         return publish(current.filterNot { it.id == id })
     }
 
-    /** 用户暂停了 Mika:整个队列清空并落盘,恢复后不会自己跑起来。返回拿掉的项。 */
+    /** The user paused Claire: clears the whole queue and persists it, so nothing starts by itself after resume. Returns the removed items. */
     @Synchronized
     fun clear(): List<QueuedFollowUp> {
         val current = _changes.value

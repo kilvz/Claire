@@ -224,7 +224,7 @@ internal fun TaskService.keepForeground() {
 
 internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
     val service = this
-    // 这个任务自己的那份 CPU 锁:当场拿上(定时派发撑着的那把随后放开),到收尾([run.job] 结束)才放
+    // This task's own CPU lock: take it right away (the one held by scheduled dispatch is released afterwards), and release it only at teardown (when [run.job] ends)
     val cpu = KeepAwake(cpuWake.lease(), scope, keepThroughEnd = true).also { it.onState(run.state.value) }
     val waitingLockWatcher = scope.launch {
         run.state.collectLatest { state ->
@@ -355,6 +355,6 @@ internal fun TaskService.launch(run: TaskRun, store: ConversationStore) {
         }
         onRunEnded(run, store)
     }
-    // 收尾前被取消(服务退出)、放出来还没跑就被停掉时,替它拿着的屏幕锁没交出去也没放开:这里放开
+    // When cancelled before teardown (service exits), or stopped before running after being released, the screen lock held on its behalf was neither handed off nor released: release it here
     run.job?.invokeOnCompletion { waitingLockWatcher.cancel(); cpu.close(); run.wakeHandoff?.release(); run.wakeHandoff = null }
 }

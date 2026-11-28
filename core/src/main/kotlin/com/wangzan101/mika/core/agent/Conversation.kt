@@ -40,9 +40,9 @@ data class Turn(
     val audios: List<GeneratedAudio> = emptyList(),
     /** Images that Claire generated during this turn and left in the workspace; the conversation page draws them as photo tiles below the answer. */
     val photos: List<GeneratedPhoto> = emptyList(),
-    /** 这一轮 Mika 生成并留在工作区里的视频；对话页在回答下面画成视频卡片。 */
+    /** Video that Claire generated during this turn and left in the workspace; the conversation page draws it as a video card below the answer. */
     val videos: List<GeneratedVideo> = emptyList(),
-    /** 这一轮存进对话的毫秒时刻;旧记录没有时为 null,不由文件时间猜测。 */
+    /** Millisecond timestamp when this turn was stored in the conversation; null for old records, never guessed from the file time. */
     val atMs: Long? = null,
     /** The actual verification result. Both unverified turns and old records without this field are null. */
     val verified: Boolean? = null,

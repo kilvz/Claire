@@ -48,7 +48,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Locale
 
-/** 编辑器里正在选哪个钟点。 */
+/** Which clock time is being picked in the editor. */
 internal sealed interface TimeTarget {
     data class FirstRun(val date: LocalDate) : TimeTarget
     data class Clock(val index: Int?) : TimeTarget
@@ -56,7 +56,7 @@ internal sealed interface TimeTarget {
     data object WindowEnd : TimeTarget
 }
 
-/** 一段时长的本地化写法(「15 分钟」「2 hr, 30 min」),交给 ICU 按语言拼。 */
+/** Localized rendering of a duration ("15 minutes", "2 hr, 30 min"), left to ICU to assemble per language. */
 internal fun formatDuration(deltaMs: Long, locale: Locale): String {
     val parts = PlanTimeFormat.durationParts(deltaMs)
     val measures = buildList {
@@ -68,7 +68,7 @@ internal fun formatDuration(deltaMs: Long, locale: Locale): String {
         .formatMeasures(*measures.toTypedArray())
 }
 
-/** 日期、钟点那样的大块点按区:整块可点,至少 48dp 高。 */
+/** Large tap area for a date or clock time: the whole block is tappable and at least 48dp high. */
 @Composable
 internal fun PickerTapTile(
     icon: ImageVector,
@@ -98,7 +98,7 @@ internal fun PickerTapTile(
     }
 }
 
-/** 一排小按钮:按钮本身 32dp 高,外面各留出 48dp 的触控区。 */
+/** A row of small buttons: the buttons themselves are 32dp high, with a 48dp touch area around each. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ChipRow(content: @Composable () -> Unit) {
@@ -116,8 +116,8 @@ internal fun Chip(text: String, selected: Boolean = false, tag: String? = null, 
 }
 
 /**
- * 快捷时间:「15 分钟后」「1 小时后」「今晚 9 点」「明早 9 点」。现在几点在点下去那一刻再取,
- * 不用编辑器打开时的时间(开着编辑器放一会儿再点,也是从点的那一刻往后算)。
+ * Quick times: "in 15 minutes", "in 1 hour", "tonight at 9", "tomorrow morning at 9". The current time is taken at the moment of the tap,
+ * not the time the editor opened (with the editor open for a while, a tap still counts from the moment of the tap).
  */
 @Composable
 internal fun QuickTimeChips(zone: ZoneId, use24Hour: Boolean, locale: Locale, onPick: (LocalDateTime) -> Unit) {
@@ -135,7 +135,7 @@ internal fun QuickTimeChips(zone: ZoneId, use24Hour: Boolean, locale: Locale, on
         if (showTonight) {
             Chip(tr(R.string.plans_quick_tonight, PlanTimeFormat.formatTime(tonight, use24Hour, locale)), tag = "plan-quick-tonight") {
                 val at = now()
-                // 编辑器开着过了 21 点再点:改成明晚,不给出一个已经过去的时间
+                // Tapping after 21:00 with the editor open: switch to tomorrow night, do not offer a time that has already passed
                 val day = if (at.toLocalTime().isBefore(tonight)) at.toLocalDate() else at.toLocalDate().plusDays(1)
                 onPick(day.atTime(tonight))
             }
@@ -146,7 +146,7 @@ internal fun QuickTimeChips(zone: ZoneId, use24Hour: Boolean, locale: Locale, on
     }
 }
 
-/** 每天/每周的钟点:一个钟点一块,点钟点改、点叉删;每个点按区至少 48dp。 */
+/** Clock times for daily/weekly: one tile per time, tap the clock to change and the cross to delete; each tap area is at least 48dp. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ClockChips(

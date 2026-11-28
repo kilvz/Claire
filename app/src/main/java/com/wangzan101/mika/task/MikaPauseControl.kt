@@ -26,24 +26,24 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 「暂停 Mika」:用户亲手让 Mika 整个停下,直到亲手恢复。
+ * "Pause Claire": the user stops all of Claire by hand until they resume it by hand.
  *
- * 暂停做的事只有这些,界面上的说法也只承诺这些:
- * - 写下持久的暂停标记([MikaPause]),之后任务服务、定时、渠道、电脑交来的任务、工作流、自动修复都按它挡住新工作;
- * - 停下在跑和排着的任务,持久排队清空;
- * - 停下内置助手和配对监听,看门狗不再把它起回来;
- * - 关掉 Mika 的无障碍服务和无线调试。
- * 配对钥匙、端口缓存和「已配对」标记一律不动:暂停不是解除配对,[BuiltinShellControl.unpair] 在这里绝不能调。
+ * Pausing does only these things, and the UI wording promises only these:
+ * - Write the persistent pause flag ([MikaPause]); afterwards the task service, scheduling, channels, tasks handed over from the computer, workflows and auto-repair all use it to block new work;
+ * - Stop running and queued tasks and clear the persistent queue;
+ * - Stop the built-in helper and pairing listener so the watchdog no longer starts it again;
+ * - Turn off Claire's accessibility service and wireless debugging.
+ * Pairing key, port cache and the "paired" flag are left untouched: pausing is not unpairing, and [BuiltinShellControl.unpair] must never be called here.
  *
- * 有两件事 App 不一定做得了,恢复时做不成的要列成步骤交给用户:
- * - 无障碍服务:App 有修改系统设置的授权、或助手重连上时,自动修复([com.wangzan101.mika.core.device.shell.AccessibilityRepair])
- *   会把它打开;没有这两条路(或修了没连上)时,安卓只让用户在系统设置里打开。所以恢复后先等修的那一边有个结果
- *   ([awaitAccessibilityRepair]),再决定要不要列这一步;
- * - 无线调试的开关只有拿到修改系统设置的授权时才写得进去,写不进去就得用户去开发者选项里打开。
+ * Two things the app may not be able to do; on resume, whatever cannot be done must be listed as steps for the user:
+ * - Accessibility service: when the app has permission to modify system settings, or when the helper reconnects, auto-repair ([com.wangzan101.mika.core.device.shell.AccessibilityRepair])
+ *   turns it on; without either path (or if repair runs but does not connect), Android only lets the user turn it on in system settings. So after resume, first wait for the repairing side to produce a result
+ *   ([awaitAccessibilityRepair]), then decide whether to list this step;
+ * - The wireless debugging switch can only be written with permission to modify system settings; if it cannot be written, the user must turn it on in developer options.
  *
- * 暂停标记的写盘([MikaPause.set] 同步落盘)放在 IO 线程,不卡主线程;其余步骤在主线程做。
+ * Writing the pause flag to disk ([MikaPause.set] writes synchronously) runs on the IO thread so the main thread is not blocked; the remaining steps run on the main thread.
  *
- * 由 PR #804(Vagif Novruzov)的「Banking mode」改写而来。
+ * Rewritten from "Banking mode" in PR #804 (Vagif Novruzov).
  */
 class MikaPauseControl private constructor(
     private val app: Context,
@@ -53,7 +53,7 @@ class MikaPauseControl private constructor(
 ) {
     companion object {
         private const val HANDOFF_MS = 1_500L
-        /** 助手重连(连接中)加上自动修复最坏的情形,留足余量;过了就照实列出步骤。 */
+        /** Worst case of helper reconnect (connecting) plus auto-repair, with ample margin; past that, list the steps truthfully. */
         private const val REPAIR_WAIT_MS = 60_000L
 
         fun create(context: Context): MikaPauseControl {
@@ -64,7 +64,7 @@ class MikaPauseControl private constructor(
         }
     }
 
-    /** 此刻的真实状态:无障碍、无线调试、助手都直接读系统,不读缓存。 */
+    /** Real state at this moment: accessibility, wireless debugging and helper are all read directly from the system, not from cache. */
     fun snapshot(): PauseState {
         val instanceRunning = ScreenAccessibility.instance.value != null
         val enabled = Settings.Secure.getString(app.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
@@ -85,10 +85,10 @@ class MikaPauseControl private constructor(
     }
 
     /**
-     * 暂停:先把标记写进磁盘(写不进去就什么都不动,返回 null),再停任务、停助手、关无障碍、关无线调试。
-     * 标记先行,所以之后每个异步交接点重新读到的都是「暂停」,中途出错也保持暂停。
-     * 在主线程调用([ScreenAccessibility.disableSelf] 是无障碍服务的方法);写盘那一下切到 IO 线程。
-     * 一旦开始就做完(不随界面离开而取消),不会出现标记写了、后面的步骤没做的半截状态。
+     * Pause: first write the flag to disk (if that fails, do nothing and return null), then stop tasks, stop the helper, turn off accessibility and turn off wireless debugging.
+     * The flag goes first, so every later asynchronous hand-off point re-reads "paused", and a mid-way error still leaves it paused.
+     * Call on the main thread ([ScreenAccessibility.disableSelf] is a method of the accessibility service); the disk write switches to the IO thread.
+     * Once started it runs to completion (not cancelled when the UI leaves), so there is no half-done state where the flag is written but later steps are not.
      */
     suspend fun pause(): PauseResult? = withContext(NonCancellable) { pauseNow() }
 
@@ -98,10 +98,10 @@ class MikaPauseControl private constructor(
         val before = snapshot()
         TaskService.pauseAll(app)
         (app as? MikaApp)?.workflows?.haltForPause()
-        // 停助手和配对监听:看门狗从这一刻起不再重起它;配对钥匙和端口缓存不动。
+        // Stop the helper and pairing listener: from this moment the watchdog no longer restarts it; pairing key and port cache stay untouched.
         shell.pauseChanged()
         runCatching { PhoneServices.of(app).pairing.end() }
-        // 无障碍:服务在跑时能自己关掉自己;在列表里却没在跑时只能由用户去系统设置里关。
+        // Accessibility: a running service can turn itself off; if it is listed but not running, only the user can turn it off in system settings.
         var a11yOff = before.accessibility == AccessibilityState.Off
         var a11yNeedsManual = false
         if (!a11yOff) {
@@ -113,7 +113,7 @@ class MikaPauseControl private constructor(
                 a11yNeedsManual = true
             }
         }
-        // 无线调试:只关开关,不解除配对;写不进去时提示用户去开发者选项里亲手关。
+        // Wireless debugging: only turn off the switch, do not unpair; when it cannot be written, tell the user to turn it off by hand in developer options.
         var wirelessOff = !before.wirelessDebugging
         var wirelessNeedsManual = false
         if (!wirelessOff) {
@@ -133,11 +133,11 @@ class MikaPauseControl private constructor(
     }
 
     /**
-     * 恢复:先清掉标记(写不进去返回 null,保持暂停),已配对时把无线调试打开(写得进去时),再让助手按已配对的连接重连。
-     * 定时重新排一次闹钟(暂停期间到期的窗口照常记跳过、推进到下一次),不补跑。
-     * 暂停期间被跳过的定时、被回绝的消息和任务都不补跑。配对丢了才需要重新配对,平时绝不走那一步。
-     * 返回时无障碍可能还在自动修复中:要等它有结果再列步骤的,接着调 [awaitAccessibilityRepair]。
-     * 在主线程调用;写盘、写开关和排闹钟切到 IO 线程。和 [pause] 一样一旦开始就做完。
+     * Resume: first clear the flag (if that fails, return null and stay paused), turn wireless debugging on when paired (if it can be written), then have the helper reconnect using the paired connection.
+     * Re-arm scheduled alarms once (windows that came due during the pause are still recorded as skipped and advanced to the next one), without catching up.
+     * Schedules skipped during the pause, refused messages and tasks are not caught up. Pairing again is needed only if pairing was lost; normally never take that step.
+     * On return, accessibility may still be auto-repairing: to wait for its result before listing steps, call [awaitAccessibilityRepair] next.
+     * Call on the main thread; disk writes, switch writes and alarm scheduling switch to the IO thread. Like [pause], it runs to completion once started.
      */
     suspend fun resume(): ResumeResult? = withContext(NonCancellable) { resumeNow() }
 
@@ -149,11 +149,11 @@ class MikaPauseControl private constructor(
         }
         shell.pauseChanged()
         withContext(Dispatchers.IO) { runCatching { TriggerRuntime.rearm(app) } }
-        // 再读一次系统:写开关可能被系统在不允许的 Wi-Fi 上撤回,以实测为准。
+        // Read the system again: the switch write may be reverted by the system on disallowed Wi-Fi, so trust the measurement.
         return ResumeResult(planResumeSteps(snapshot()))
     }
 
-    /** 自动修复此刻能不能替用户把无障碍打开:用户没关「替我打开无障碍」,且 App 能直接写系统设置或助手配过对、在跑。 */
+    /** Whether auto-repair can turn on accessibility for the user right now: the user has not turned off "turn on accessibility for me", and the app can write system settings directly or the helper is paired and running. */
     private fun accessibilityRepairPossible(): Boolean {
         val phone = PhoneServices.of(app)
         if (!phone.recoverySettings.consent.value.wants(RecoveryCapability.Accessibility)) return false
@@ -161,8 +161,8 @@ class MikaPauseControl private constructor(
     }
 
     /**
-     * 恢复后等无障碍的自动修复有个结果:服务连上了,或修的那一边停下(放弃、没路可修、助手没连上),最多 [REPAIR_WAIT_MS]。
-     * 没有可修的路时立刻返回。暂停标记刚清时修的那一边要过一会儿才接手,所以先留 [HANDOFF_MS] 给它。
+     * After resume, waits for the accessibility auto-repair to produce a result: the service connected, or the repairing side stopped (gave up, no path to repair, helper not connected), for at most [REPAIR_WAIT_MS].
+     * Returns immediately when there is no path to repair. Right after the pause flag is cleared, the repairing side needs a moment to take over, so first give it [HANDOFF_MS].
      */
     suspend fun awaitAccessibilityRepair() {
         if (ScreenAccessibility.instance.value != null || !accessibilityRepairPossible()) return
@@ -177,7 +177,7 @@ class MikaPauseControl private constructor(
 
 }
 
-/** 暂停相关的真实状态。 */
+/** Real state related to pause. */
 data class PauseState(
     val paused: Boolean,
     val accessibility: AccessibilityState,
@@ -186,7 +186,7 @@ data class PauseState(
     val helperPaired: Boolean,
 )
 
-/** 暂停一次做完之后,哪些关掉了、哪些还要用户亲手做。 */
+/** After one pause completes, what was turned off and what the user still has to do by hand. */
 data class PauseResult(
     val tasksStopped: Boolean,
     val accessibilityOff: Boolean,
@@ -195,24 +195,24 @@ data class PauseResult(
     val wirelessNeedsManual: Boolean,
     val helperPaused: Boolean,
 ) {
-    /** 说好要关的都关掉了。 */
+    /** Everything agreed to be turned off is off. */
     val complete: Boolean get() = accessibilityOff && wirelessOff && helperPaused
 }
 
-/** 恢复一次做完之后,还有哪些步骤要用户亲手做。 */
+/** After one resume completes, which steps the user still has to do by hand. */
 data class ResumeResult(val steps: List<ResumeStep>)
 
-/** 恢复时 App 自己做不成、必须用户亲手做的步骤。 */
+/** Steps the app cannot do itself on resume and the user must do by hand. */
 enum class ResumeStep {
-    /** 去系统设置里打开 Mika 的无障碍服务:自动修复没路可走或修了没连上时才需要。 */
+    /** Open Claire's accessibility service in system settings: needed only when auto-repair has no path or ran without connecting. */
     OpenAccessibilitySettings,
-    /** 去开发者选项里打开无线调试:App 写不进去开关时才需要。 */
+    /** Open wireless debugging in developer options: needed only when the app cannot write the switch. */
     OpenWirelessDebuggingPage,
-    /** 配对已经丢了:重新走一遍配对流程。平时不出现。 */
+    /** Pairing is already lost: run the pairing flow again. Normally does not appear. */
     RePairHelper,
 }
 
-/** 纯函数:按恢复后的真实状态,算出还有哪些步骤要用户亲手做。无线调试只在助手靠它的配对连接时才要求打开;经 Shizuku 或 root 起的助手不提配对。 */
+/** Pure function: from the real state after resume, works out which steps the user still has to do by hand. Wireless debugging is required only when the helper relies on its paired connection; a helper started via Shizuku or root does not mention pairing. */
 fun planResumeSteps(state: PauseState): List<ResumeStep> = buildList {
     if (state.accessibility != AccessibilityState.On) add(ResumeStep.OpenAccessibilitySettings)
     if (state.helperPaired && !state.wirelessDebugging) add(ResumeStep.OpenWirelessDebuggingPage)

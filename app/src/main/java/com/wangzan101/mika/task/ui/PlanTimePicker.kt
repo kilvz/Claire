@@ -58,7 +58,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlanDatePickerDialog(initial: LocalDate, onDismiss: () -> Unit, onPicked: (LocalDate) -> Unit) {
-    // DatePicker 以 UTC 零点表示一天
+    // DatePicker represents a day as UTC midnight
     val state = rememberDatePickerState(
         initialSelectedDateMillis = initial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
     )
@@ -79,8 +79,8 @@ internal fun PlanDatePickerDialog(initial: LocalDate, onDismiss: () -> Unit, onP
 }
 
 /**
- * 钟点选择:滚轮。小时制跟系统设置([use24Hour] 由调用方按 `DateFormat.is24HourFormat` 传入),这里不另给开关;
- * 12 小时制的上午/下午用界面语言的写法,放在小时前还是后也跟语言。数字顺序固定从左到右(钟点在 RTL 语言里也这么写)。
+ * Clock time picker: wheels. The hour cycle follows system settings ([use24Hour] is passed in by the caller from `DateFormat.is24HourFormat`), with no separate switch here;
+ * Under a 12-hour cycle AM/PM uses the UI language's wording, and whether it goes before or after the hour also follows the language. Digit order is fixed left to right (clock time is written this way in RTL languages too).
  */
 @Composable
 internal fun PlanTimePickerDialog(
@@ -149,7 +149,7 @@ private fun Colon() {
     Text(":", style = MikaType.Title, color = MikaTheme.colors.ink3, modifier = Modifier.padding(horizontal = 6.dp))
 }
 
-/** 每格 48dp:既是滚轮的行高,也是点按一格的最小触控尺寸。 */
+/** 48dp per cell: both the wheel row height and the minimum touch size for tapping a cell. */
 private val WheelItem = 48.dp
 
 @Composable
@@ -174,7 +174,7 @@ private fun LabelWheel(
     val selected by remember(labels.size, itemPx) {
         derivedStateOf { (scroll.value.toFloat() / itemPx).roundToInt().coerceIn(0, last) }
     }
-    // 松手后吸附到最近的一格
+    // Snap to the nearest cell after release
     LaunchedEffect(scroll, itemPx, labels.size) {
         snapshotFlow { scroll.isScrollInProgress }.collect { scrolling ->
             if (!scrolling) {

@@ -31,10 +31,10 @@ import com.wangzan101.mika.ui.components.RadioRow
 import com.wangzan101.mika.ui.theme.MikaTheme
 
 /**
- * 设置 › 模型 › 视频模型:选服务商、模型、默认时长/画幅/清晰度、每任务最多几个;打开后才提供 video_generate。
- * 只列能生成视频的服务商([VideoProviders.compatible]);可选的时长、画幅、清晰度来自所填模型的能力。
- * 存着的选择对不上现在的服务商时说明原因,任务里也不会用它。
- * 和语音转写、声音模型一样不在 [com.wangzan101.mika.core.model.ModelRole] 里。
+ * Settings › Models › Video model: choose provider, model, default duration/aspect ratio/resolution, and the maximum per task; video_generate is offered only after it is turned on.
+ * Lists only providers that can generate video ([VideoProviders.compatible]); the available durations, aspect ratios and resolutions come from the capabilities of the entered model.
+ * When the stored choice does not match the current providers, the reason is shown and tasks do not use it either.
+ * Like speech transcription and voice models, it is not in [com.wangzan101.mika.core.model.ModelRole].
  */
 @Composable
 fun VideoModelScreen(store: ProviderStore, onBack: () -> Unit) {
@@ -108,7 +108,7 @@ fun VideoModelScreen(store: ProviderStore, onBack: () -> Unit) {
             }
 
             if (caps != null) {
-                // 存着的偏好这个模型不支持时,显示工具实际会用的那个(和 video_generate 的退回规则一致)
+                // When this model does not support a stored preference, show the one the tool will actually use (consistent with video_generate's fallback rules)
                 val aspect = state.aspect.takeIf { it in caps.aspects } ?: caps.aspects.first()
                 val resolution = state.resolution.takeIf { it in caps.resolutions } ?: caps.resolutions.first()
                 GroupLabel(tr(R.string.video_aspect))

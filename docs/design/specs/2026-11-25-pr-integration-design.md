@@ -1,185 +1,185 @@
-# 19 个开放 PR 的功能域整合设计
+# Functional-area integration design for 19 open PRs
 
-日期：2026-11-25
-基线：`main` / `7ff1703f6`
-集成分支：`integration/pr-batch-2026-11-25`
+Date: 2026-11-25
+Baseline: `main` / `7ff1703f6`
+Integration branch: `integration/pr-batch-2026-11-25`
 
-## 1. 目标与原则
+## 1. Goals and principles
 
-这次工作不是把 19 个 PR 的 diff 依次叠加，而是把它们整理成语义完整、架构统一、可独立审查与回滚的功能提交。最终合入必须同时满足：
+This work is not about stacking the diffs of 19 PRs one after another, but about organizing them into feature commits that are semantically complete, architecturally consistent, and independently reviewable and revertible. The final merge must satisfy all of the following:
 
-- 功能完整：正常路径、失败路径、生命周期、持久化、兼容与恢复形成闭环。
-- 架构清晰：沿用当前 main 的分层与目录，不恢复旧包名、旧入口或已被取代的架构。
-- 可扩展：在两个以上 PR 交汇处建立明确接口与策略，不把某一服务商、系统版本或界面的特殊逻辑扩散为全局假设。
-- 可验证：先写能复现问题的测试，再实现；每组运行相关测试，最终运行完整 CI 与必要的设备验收。
-- 可回滚：按功能域保留独立提交，不把 19 个功能压成一个不可拆分的巨型提交。
-- 通用安卓：标准 API 为主路径，按公开能力检测适配，不引入品牌私有目标实现。
+- Complete functionality: normal paths, failure paths, lifecycle, persistence, compatibility and recovery form a closed loop.
+- Clear architecture: follow the current main layering and directories; do not restore old package names, old entry points or superseded architectures.
+- Extensible: establish explicit interfaces and policies where two or more PRs intersect; do not spread one provider's, system version's or UI's special-case logic into global assumptions.
+- Verifiable: write a test that reproduces the problem first, then implement; run the relevant tests for each group, and finally run the full CI and the necessary device acceptance.
+- Revertible: keep separate commits per functional area; do not squash 19 features into one indivisible giant commit.
+- Generic Android: standard APIs are the main path, adapt through public capability detection, and do not introduce brand-private target implementations.
 
-不在本次范围内：#847、#846、#836、#818、#722、#677、#308、#294、#277；不重构无关模块；不为了“架构优美”另建大型框架。
+Out of scope: #847, #846, #836, #818, #722, #677, #308, #294, #277; do not refactor unrelated modules; do not build a large new framework for the sake of "architectural beauty".
 
-## 2. 整合方式
+## 2. Integration approach
 
-### 已选方式：功能域集成分支
+### Chosen approach: functional-area integration branch
 
-从最新 main 建立隔离 worktree 和集成分支。每个功能域经过“语义设计 → 回归测试 → 完整实现 → 相关测试 → 独立代码审查”后提交到集成分支。全部功能完成后运行完整验证，再以一个保留功能提交的合并节点合入 main。
+Create an isolated worktree and integration branch from the latest main. Each functional area goes through "semantic design → regression tests → full implementation → relevant tests → independent code review" and is then committed to the integration branch. After all features are done, run full verification, then merge into main through a merge node that preserves the feature commits.
 
-不直接修改贡献者 fork，不逐个点击原 PR 的 Merge。原 PR 在整合版本合入前保持原状；合入后逐个注明对应功能提交并关闭为已整合。每个功能提交用 `Co-authored-by` 保留实际被吸收代码的原作者署名。
+Do not modify contributor forks directly, and do not click Merge on each original PR. Original PRs stay as they are until the integrated version is merged; after the merge, annotate each with its corresponding feature commit and close it as integrated. Every feature commit uses `Co-authored-by` to preserve the attribution of the original authors whose code was actually absorbed.
 
-### 未选方式
+### Approaches not chosen
 
-- 逐 PR 修复并合并：同一交汇处反复 rebase，容易把临时妥协带入 main。
-- 全部 squash 为一个提交：审查、归因与回滚边界太差。
-- 先合并再重构：会让中间版本处于已知缺陷状态，违背本次目标。
+- Fix and merge PR by PR: repeated rebases at the same intersection easily carry temporary compromises into main.
+- Squash everything into one commit: the boundaries for review, attribution and rollback are too poor.
+- Merge first, refactor later: this leaves intermediate versions in a known-defective state, contradicting this effort's goal.
 
-## 3. 总体依赖与提交边界
+## 3. Overall dependencies and commit boundaries
 
-顺序如下；无依赖的小组可以并行调查和准备测试，但提交按此顺序进入集成分支：
+The order is as follows; independent groups may investigate and prepare tests in parallel, but commits enter the integration branch in this order:
 
-1. #826：标题与停止摘要语言。
-2. #297：HTML 会话导出。
-3. #306：按对话覆盖主模型/组。
-4. #827、#830、#854：设置与通用按钮/最近任务/搜索，分别保留三个功能提交。
-5. #859：胶囊贴边唤醒。
-6. #829、#849：系统 TTS 引擎与音色，再扩展 OpenAI 兼容语音和自建 ASR。
-7. #856、#852、#853：锁屏凭据、熄屏执行、计划 UI。
-8. #806：Light per-call 工具调用。（#808 已于 2026-11-27 关闭，不做定期压缩与固定输入上限，见 §4.8。）
-9. #804：完整暂停/恢复生命周期。
-10. #803、#811：通话后台待命，再补拨号与历史交互。
-11. #327：飞书多窗口渠道。
-12. #266：ADB 重连与只读读屏，按实际耦合决定是否保留两个提交。
+1. #826: title and stop-summary language.
+2. #297: HTML conversation export.
+3. #306: per-conversation override of the main model/group.
+4. #827, #830, #854: settings and generic buttons / recent tasks / search, kept as three separate feature commits.
+5. #859: capsule edge-docked wake.
+6. #829, #849: system TTS engine and voice, then extend OpenAI-compatible speech and self-hosted ASR.
+7. #856, #852, #853: lock-screen credentials, screen-off execution, plan UI.
+8. #806: Light per-call tool calling. (#808 was closed on 2026-11-27; no periodic compaction or fixed input cap, see §4.8.)
+9. #804: full pause/resume lifecycle.
+10. #803, #811: call background standby, then dial-pad and history interactions.
+11. #327: Feishu multi-window channel.
+12. #266: ADB reconnection and read-only screen reading; decide whether to keep two commits based on actual coupling.
 
-#306 先于 #806，避免模型路由和对话覆盖在旧结构上返工；#856 先于 #852/#853，确保锁屏分类只有一套语义；#829 先于 #849，确保语音配置与音色选择基于同一个目录模型。
+#306 before #806 avoids reworking model routing and conversation overrides on the old structure; #856 before #852/#853 ensures lock-screen classification has only one set of semantics; #829 before #849 ensures voice configuration and voice selection are based on the same catalog model.
 
-## 4. 各功能域设计
+## 4. Functional-area designs
 
-### 4.1 标题与停止摘要（#826）
+### 4.1 Title and stop summary (#826)
 
-- 语言作为显式参数从 App 语言环境传入核心，不以设备默认语言冒充用户语言。
-- `null`/`system` 的兼容路径定义清楚；不能根据一段示例文本构造伪 language tag。
-- 标题长度按文字体系处理，保留现有清理、超时和 fallback。
-- 停止摘要头部本地化集中在一个函数，覆盖全角标点、已有译文和中文不变。
-- 验收：语言指令、fallback、空标题、混合文字、各支持语言测试与 prompt golden。
+- Language is passed into the core as an explicit parameter from the app locale, without passing the device default language off as the user's language.
+- The compatibility path for `null`/`system` is clearly defined; a fake language tag must not be constructed from a sample text.
+- Title length is handled by writing system, keeping the existing cleaning, timeout and fallback.
+- Stop-summary header localization is centralized in one function, covering full-width punctuation, existing translations and Chinese unchanged.
+- Acceptance: language instruction, fallback, empty title, mixed scripts, tests for each supported language and the prompt golden.
 
-### 4.2 HTML 导出（#297）
+### 4.2 HTML export (#297)
 
-- 仅移植真正的 P2 增量，接入当前 Export registry、快照和资产管线。
-- HTML 后端保持默认转义、URL scheme 白名单、严格 CSP；WebView 默认关闭 JS、file/content 访问与 DOM storage。
-- 预览导航、AssetLoader 根目录、取消与销毁清理集中处理，不复制旧 P1。
-- 验收：恶意 Markdown/URL/文件名、附件、取消、销毁、选中快照与当前全语言。
+- Port only the genuine P2 increment and wire it into the current Export registry, snapshot and asset pipeline.
+- The HTML backend keeps default escaping, the URL scheme allowlist and strict CSP; WebView disables JS, file/content access and DOM storage by default.
+- Preview navigation, the AssetLoader root directory, cancellation and destruction cleanup are handled centrally, without copying the old P1.
+- Acceptance: malicious Markdown/URL/file names, attachments, cancellation, destruction, the selected snapshot and all current languages.
 
-### 4.3 对话级模型覆盖（#306）
+### 4.3 Conversation-level model override (#306)
 
-- 对话设置存储是对话覆盖的唯一持久化来源；缺省表示跟随全局。
-- `TaskEnvironment` 在运行开始时生成不可变快照；运行中修改只影响下一次任务。
-- 分支对话在创建时复制来源对话的覆盖快照，之后不随来源对话联动；定时和渠道任务在每次启动时读取其所属对话的当前覆盖。
-- Light/Vision 的 SameAsMain 指向该对话实际生效的主模型，而不是绕过对话覆盖回全局主模型；覆盖被删除或失效时回退全局。
-- 验收：新对话、运行中切换、重开、分支、定时、覆盖删除与模型 chip。
+- The conversation settings store is the only persistence source for conversation overrides; absent means follow the global setting.
+- `TaskEnvironment` generates an immutable snapshot when a run starts; changes during a run affect only the next task.
+- A branched conversation copies the source conversation's override snapshot when created and does not stay linked to the source conversation afterwards; scheduled and channel tasks read the current override of their own conversation at each start.
+- Light/Vision's SameAsMain points to the main model actually in effect for that conversation, rather than bypassing the conversation override and falling back to the global main model; when the override is deleted or invalid, fall back to global.
+- Acceptance: new conversation, switching mid-run, reopening, branching, scheduled, override deletion and the model chip.
 
-### 4.4 设置与按钮（#827、#830、#854）
+### 4.4 Settings and buttons (#827, #830, #854)
 
-- #827 优先用局部布局解决胶囊和卡片按钮问题；确需修改全局按钮组件时，保持原有默认视觉契约，长文本能力通过显式参数启用。
-- #830 用公开 `ActivityManager.AppTask.setExcludeFromRecents`；设置写入、系统调用和 UI 状态必须一致，失败不能静默显示成功。启动与恢复时重新应用。
-- #854 搜索条目是稳定数据模型，匹配、排序、高亮与导航分离；只登记真实可打开的页面，能力不可用时遵循现有可见性。
-- 三个功能保持独立提交，不把搜索、最近任务和胶囊样式混成一个“设置改进”。
-- 验收：越南语及全部语言、长文本、大字体、小屏、深层导航、返回滚动位置、最近任务隐藏/恢复。
+- #827 prefers local layout to solve capsule and card button problems; when the global button component really must change, keep the existing default visual contract and enable long-text capability through an explicit parameter.
+- #830 uses the public `ActivityManager.AppTask.setExcludeFromRecents`; settings writes, system calls and UI state must agree, and failure must not silently show success. Reapply on start and restore.
+- #854 search entries are a stable data model; matching, ordering, highlighting and navigation are separated; register only pages that can really be opened, and follow existing visibility when a capability is unavailable.
+- The three features keep separate commits; do not mix search, recent tasks and capsule styling into one "settings improvement".
+- Acceptance: Vietnamese and all languages, long text, large fonts, small screens, deep navigation, scroll position on back, recent-task hide/restore.
 
-### 4.5 胶囊唤醒（#859）
+### 4.5 Capsule wake (#859)
 
-- 胶囊外观身份包含运行身份，而非只比较 Running/Failed 等视觉字段。
-- 熄屏前后、服务实例替换、任务 A 结束且任务 B 开始时，收起/展开状态由同一状态机决定。
-- 测试清理与偏好恢复互不影响，shell cleanup 失败不能污染后续测试。
-- 验收：同外观不同 run、贴边自动隐藏、唤醒、服务重建和透明度恢复。
+- The capsule's appearance identity includes the run identity, rather than comparing only visual fields such as Running/Failed.
+- Before and after screen-off, when the service instance is replaced, and when task A ends while task B starts, collapsed/expanded state is decided by the same state machine.
+- Test cleanup and preference restoration do not affect each other; a shell cleanup failure must not pollute later tests.
+- Acceptance: same appearance with different runs, auto-hide when docked to the edge, wake, service recreation and opacity restore.
 
-### 4.6 语音引擎、音色与端点（#829、#849）
+### 4.6 Voice engine, voice and endpoints (#829, #849)
 
-- 引擎包名、音色名、识别语言和模型 ID 是不同类型，不用一个全局字符串隐含多种状态。
-- 系统 TTS 引擎选择通过现有 Voice catalog/adapter 注入；引擎枚举与音色查询有超时、释放和默认引擎回退。
-- 音色设置结果必须检查；模型切换与清音色按事务顺序执行：模型切换成功后才能修改对应音色，失败保留旧模型与旧音色。
-- OpenAI 兼容端点支持 http/https、显式 base path 和非默认端口；默认端口在比较与 ID 中规范化。query、fragment、userinfo 一律拒绝，不猜测其语义。已合法保存的配置保持原 ID 和凭据映射；必须修正的非法配置使用显式、可测试的迁移，不把 Key 静默指向另一 endpoint。
-- STT/TTS/Realtime 各自保存模型与音色配置，适配器按能力读取，不把 Realtime 限制扩散到普通 TTS。
-- 新服务商仍执行项目的主流可信审查；本组主要扩展现有协议，不引入三方聚合平台。
-- 验收：引擎失败、音色失败、模型切换写失败、HTTP 局域网、带路径/端口地址、Key 读取、识别语言、资源释放及真机合成。
+- Engine package name, voice name, recognition language and model ID are different types; do not use one global string to imply several states.
+- System TTS engine selection is injected through the existing Voice catalog/adapter; engine enumeration and voice queries have timeouts, release and default-engine fallback.
+- Voice setting results must be checked; model switching and clearing the voice execute in transactional order: the corresponding voice may be changed only after the model switch succeeds, and on failure the old model and old voice are kept.
+- OpenAI-compatible endpoints support http/https, an explicit base path and non-default ports; default ports are normalized in comparisons and IDs. query, fragment and userinfo are always rejected, and their semantics are not guessed. Configs already saved legally keep their original ID and credential mapping; invalid configs that must be corrected use an explicit, testable migration, without silently pointing the key at another endpoint.
+- STT/TTS/Realtime each store their model and voice configuration, and adapters read by capability, without spreading Realtime restrictions to ordinary TTS.
+- New providers still undergo the project's standard trust review; this group mainly extends existing protocols and does not introduce third-party aggregation platforms.
+- Acceptance: engine failure, voice failure, model-switch write failure, HTTP on a LAN, addresses with paths/ports, key reading, recognition language, resource release and on-device synthesis.
 
-### 4.7 锁屏、熄屏执行与计划（#856、#852、#853）
+### 4.7 Lock screen, screen-off execution and plans (#856, #852, #853)
 
-- 凭据识别保持纯函数和保守分类：PIN、密码、SIM PIN、pattern 分开；资源 ID 只是证据之一，不以“旁边有数字键盘”覆盖声明的文字密码类型。
-- `TaskGate` 明确区分 phone 与 web/sandbox 的锁屏策略：web/sandbox 任务可在锁屏/熄屏时启动和继续；phone 任务必须先满足解锁策略，否则等待用户，不在锁屏后盲目操作。
-- 非安全锁屏只在用户已授权无人值守解锁时 wake/dismiss；PIN/密码必须有有效凭据和对应授权，失败有界重试后等待用户；pattern、SIM PIN 和无法分类的凭据界面始终交还给用户，不自动尝试。
-- CPU 唤醒使用有所有权的 lease：任务、后台工作流和 alarm dispatch 分别持有，全部结束后释放；保留网页不能无意延长任务 CPU lease。
-- 无障碍晚绑定、wake/dismiss 重试有统一有界等待，不使用各处临时 delay 堆积。
-- 计划编辑器的草稿是唯一事实来源：隐藏条件不能等于关闭但仍保存；相对时间使用点击时的 now；12/24 小时制、时区和跨年使用同一格式化策略。
-- 凭据 Dialog 自己的 window 必须设置安全标志；开关失败要可见；新计划聊天在尚未物化时仍可打开。
-- 验收：PIN/密码/SIM、锁屏 web/phone、Doze、进程重建、唤醒锁释放、凭据防截屏、隐藏条件、相对时间、跨年时区及真实 instrumentation。
+- Credential recognition stays a pure function with conservative classification: PIN, password, SIM PIN and pattern are separate; the resource ID is only one piece of evidence, and "a numeric keypad is nearby" does not override a declared text password type.
+- `TaskGate` clearly distinguishes the lock-screen policy for phone and web/sandbox: web/sandbox tasks may start and continue while the screen is locked/off; phone tasks must satisfy the unlock policy first, otherwise wait for the user rather than blindly operating after the screen locks.
+- For a non-secure lock screen, wake/dismiss only when the user has authorized unattended unlock; PIN/password require valid credentials and the corresponding authorization, with bounded retries after failure and then waiting for the user; pattern, SIM PIN and unclassifiable credential screens are always handed back to the user, without automatic attempts.
+- CPU wake uses an owned lease: tasks, background workflows and alarm dispatch each hold one, released when all are finished; keeping a web page must not unintentionally extend a task's CPU lease.
+- Accessibility late binding and wake/dismiss retries use a unified bounded wait, instead of piling up ad-hoc delays in each place.
+- The plan editor's draft is the single source of truth: a hidden condition must not equal off but still be saved; relative time uses the now at tap time; 12/24-hour format, time zone and year crossing use the same formatting policy.
+- The credential Dialog's own window must set the secure flag; toggle failures must be visible; a new plan chat can still open before it is materialized.
+- Acceptance: PIN/password/SIM, lock-screen web/phone, Doze, process recreation, wake-lock release, credential screenshot prevention, hidden conditions, relative time, year-crossing time zones and real instrumentation.
 
-### 4.8 Light 工具调用（#806）；不做定期压缩与固定输入上限（#808 已关闭）
+### 4.8 Light tool calling (#806); no periodic compaction or fixed input cap (#808 closed)
 
-- 强制工具调用、输出上限是单次调用选项，不放在整个 Light client 上；纯文本 Light 调用不受影响。
-- Provider 显式声明 forced-tool/max-token 能力及不支持时的降级；400/422 fallback 不吞掉真实错误。
-- 重试合并两次 usage；`task_progress` 伪调用与第一个实际动作分开验证；privileged/最终总结/插话审查路由保持一致。
-- 2026-11-27 决定：不做 #808 的每 15 步定期压缩，也不加统一的 100k 输入上限，#808 已关闭。原因：定期改写历史会改变请求前缀，令 provider 的 prompt cache 失效；Mika 保持请求前缀只追加，只在接近上下文窗口时按大小压缩，这一行为不变。现有按轮数折叠（`compactionEveryRounds`）与大小触发的压缩维持现状。
-- 每次真实请求重新计算需要变化的 prompt transform，overflow retry 与普通 retry 不混用陈旧状态。
-- 验收：所有 provider、不支持 forced tools、纯文本 Light、重试 usage 及与 #306 的组合。
+- Forced tool calling and the output cap are per-call options, not placed on the whole Light client; plain-text Light calls are unaffected.
+- Providers explicitly declare forced-tool/max-token capability and the degradation when unsupported; 400/422 fallback does not swallow real errors.
+- Retries merge the two usages; the `task_progress` fake call and the first real action are verified separately; privileged/final-summary/interjection review routing stays consistent.
+- Decision on 2026-11-27: do not do #808's periodic compaction every 15 steps, and do not add a unified 100k input cap; #808 is closed. Reason: periodically rewriting history changes the request prefix and invalidates the provider's prompt cache; Claire keeps the request prefix append-only and compacts by size only when approaching the context window, and this behavior is unchanged. The existing folding by round count (`compactionEveryRounds`) and size-triggered compaction stay as they are.
+- Recompute the prompt transforms that need to change on every real request; overflow retry and ordinary retry do not share stale state.
+- Acceptance: all providers, unsupported forced tools, plain-text Light, retry usage and combination with #306.
 
-### 4.9 暂停与恢复（#804）
+### 4.9 Pause and resume (#804)
 
-- 持久化 paused 是唯一权威状态，当前引擎状态只是投影；Shizuku、watchdog、repair、pairing 和通知都读取同一策略。
-- 每个异步交接点重新检查 paused，包括已通过启动 guard 但尚未交付 Binder 的连接。
-- 暂停覆盖运行任务、helper、辅助功能、无线调试及自动恢复；恢复保留配对材料，不把暂停变成解绑。
-- 暂停时取消正在执行和已排队的副作用任务；新定时触发记录为因暂停未执行，不在恢复后补跑。渠道新消息返回明确的暂停状态，不形成恢复后自动执行的隐藏队列。恢复只重新开放后续新工作。
-- UI 文案只承诺实际暂停的能力，不把生命周期暂停描述成银行级安全隔离。
-- 验收：连接中暂停、迟到 handoff、传输方式切换、进程重启、辅助功能与无线调试恢复。
-- 电脑侧（CLI / MCP / HTTP）会动手机的请求统一经 `PauseFlag.refuseRemote()` 回 `UNAVAILABLE` 与暂停说明；对话页与悬浮胶囊（含前台模型）在发送处拦下并提示。
-- TODO：桌面配套程序（`companions/`）目前只读（`CompanionApi` 只有 GET），没有要拦的写入口；以后加写入口时必须走 `refuseRemote()`，让桌面端也收到同一句暂停说明，而不是静默失败。
+- Persisted paused is the only authoritative state; the current engine state is only a projection; Shizuku, watchdog, repair, pairing and notifications all read the same policy.
+- Recheck paused at every asynchronous handoff point, including connections that passed the startup guard but have not yet been handed to Binder.
+- Pause covers running tasks, helpers, accessibility, wireless debugging and automatic restore; resume keeps pairing material and does not turn pause into unbinding.
+- While paused, cancel side-effect tasks that are executing and queued; new scheduled triggers are recorded as not executed due to pause and are not caught up after resume. New channel messages return an explicit paused state and do not form a hidden queue that executes automatically after resume. Resume only reopens subsequent new work.
+- UI copy promises only the capabilities actually paused, and does not describe a lifecycle pause as bank-grade security isolation.
+- Acceptance: pausing during connection, late handoff, transport switching, process restart, accessibility and wireless debugging restore.
+- Requests from the computer side (CLI / MCP / HTTP) that would operate the phone uniformly return `UNAVAILABLE` with a pause explanation through `PauseFlag.refuseRemote()`; the conversation page and floating capsule (including the front desk model) block and notify at the send site.
+- TODO: the desktop companion (`companions/`) is currently read-only (`CompanionApi` has GET only), so there is no write entry to block; when a write entry is added later it must go through `refuseRemote()`, so the desktop also receives the same pause explanation instead of failing silently.
 
-### 4.10 通话（#803、#811）
+### 4.10 Calls (#803, #811)
 
-- 后台待命使用公开 JobScheduler/通知/权限机制。用户启用状态在重启和权限暂时丢失后保留，权限恢复时可自动重新武装；显式停止会取消后续自动恢复，直到用户再次启用。完全退出遵循现有退出语义，不暗中复活。
-- 通知路由只展开现有设置页，不建立第二套后台状态机。
-- 拨号盘光标/选区、删除、清空撤销与历史筛选是 UI 状态逻辑，不改变 SIM、外呼复核与锁屏外呼边界。
-- 验收：Doze、重启、权限变化、显式停止、真实拨号、选区退格、清空撤销和筛选重置。
+- Background standby uses public JobScheduler/notification/permission mechanisms. The user's enabled state is kept across restarts and temporary permission loss, and can automatically re-arm when permission returns; an explicit stop cancels subsequent automatic restore until the user enables it again. Full exit follows the existing exit semantics and does not silently come back.
+- Notification routing only expands the existing settings page and does not build a second background state machine.
+- Dial-pad cursor/selection, deletion, clear undo and history filtering are UI state logic and do not change SIM, outbound-call review or the lock-screen outbound-call boundary.
+- Acceptance: Doze, restart, permission changes, explicit stop, real dialing, selection backspace, clear undo and filter reset.
 
-### 4.11 飞书多窗口（#327）
+### 4.11 Feishu multiple windows (#327)
 
-- 复用当前 `Channel`、Outbox、RunInbox、TaskCenter 与持久化去重，不建立第二执行器。
-- 窗口选择只是路由信息；回复、追加、取消同时核对主人、窗口和运行编号，过期 nonce 不作用于新任务。
-- 本地/定时等其他来源只读，只有飞书创建的窗口允许飞书控制；付款与接管仍回手机。
-- 旧绑定迁移保持原渠道所有权：原来由飞书创建的会话迁移为一个飞书所有的默认窗口并保留选择；本地或其他来源会话只读，不因绑定迁移获得飞书控制权。默认窗口被删除后，旧按钮与控制一律拒绝，用户必须显式新建或选择窗口。
-- 旧绑定迁移、卡片明文、私聊限制、结果不明不重发保持明确。
-- 验收：多窗口并行/排队、过期按钮、删除窗口、主人边界、切网、锁屏、重启、真实卡片回调。
+- Reuse the current `Channel`, Outbox, RunInbox, TaskCenter and persisted deduplication; do not build a second executor.
+- Window selection is only routing information; replies, appends and cancels check the owner, window and run number together, and an expired nonce does not act on a new task.
+- Other sources such as local/scheduled are read-only; only windows created by Feishu may be controlled by Feishu; payments and takeover still go back to the phone.
+- Old-binding migration preserves the original channel ownership: conversations originally created by Feishu migrate to a Feishu-owned default window and keep their selection; local or other-source conversations are read-only and do not gain Feishu control because of binding migration. After the default window is deleted, old buttons and controls are all rejected, and the user must explicitly create or select a window.
+- Old-binding migration, card plaintext, private-chat restrictions and not resending when the result is unclear stay explicit.
+- Acceptance: multiple windows in parallel/queued, expired buttons, deleting a window, owner boundary, network switching, lock screen, restart and real card callbacks.
 
-### 4.12 ADB 重连与只读读屏（#266）
+### 4.12 ADB reconnection and read-only screen reading (#266)
 
-- ADB server 端口、stale endpoint 后有界扫描、候选验证沿用当前 `core/src/main/kotlin/com/wangzan101/mika/core/device/adb/`，不恢复旧包。
-- 只读读屏走 shell UID 与 UiAutomation 公开能力，遮蔽密码、限制节点和深度，不压制无障碍服务。
-- 两项能力只有在共享连接生命周期确有必要时保留一个提交，否则分别提交。
-- 验收：非默认 server、拒绝后有界扫描、USB 拔插、虚拟屏 display id、密码不泄露与连续遥测。
+- The ADB server port, bounded scanning after a stale endpoint, and candidate validation follow the current `core/src/main/kotlin/com/wangzan101/mika/core/device/adb/`, without restoring the old package.
+- Read-only screen reading goes through the shell UID and the public capabilities of UiAutomation, masking passwords and limiting nodes and depth, without suppressing the accessibility service.
+- The two capabilities share one commit only when the shared connection lifecycle really requires it; otherwise commit them separately.
+- Acceptance: non-default server, bounded scan after rejection, USB plug/unplug, virtual display ID, no password leakage and continuous telemetry.
 
-## 5. 测试与审查门槛
+## 5. Testing and review gates
 
-每个功能提交前：
+Before each feature commit:
 
-1. 用回归测试复现原 PR 的问题；先确认测试在旧实现上失败。
-2. 跑受影响的 core/app/CLI/relay 测试、资源检查与编译。
-3. 做独立代码审查，检查正确性、架构、项目规则与无关改动；发现的问题修复后复审。
-4. 更新对应架构/用户文档，不保留过期依赖说明。
+1. Reproduce the original PR's problem with a regression test; first confirm the test fails on the old implementation.
+2. Run the affected core/app/CLI/relay tests, resource checks and compilation.
+3. Do an independent code review covering correctness, architecture, project rules and unrelated changes; re-review after fixing the problems found.
+4. Update the corresponding architecture/user docs and do not keep stale dependency notes.
 
-最终合入前：
+Before the final merge:
 
-- 运行与 GitHub CI 等价的完整本地验证。
-- 能自动化的设备测试必须实际执行，而不只编译；无法执行的真实设备/外部服务验收必须明确列为未验证，不能宣称完成。
-- 锁屏、语音、暂停、通话、飞书、ADB 的真实路径没有验收证据时，不直接合入 main。
-- 最终审查完整提交序列和累计 diff，确认没有夹带生成物、密钥、旧目录回退或无关格式化。
+- Run full local verification equivalent to GitHub CI.
+- Device tests that can be automated must actually be executed, not just compiled; real-device/external-service acceptance that cannot be executed must be explicitly listed as unverified and must not be claimed as done.
+- Without acceptance evidence for the real paths of lock screen, voice, pause, calls, Feishu and ADB, do not merge directly into main.
+- In the final review, check the full commit sequence and cumulative diff to confirm no build artifacts, keys, old-directory fallbacks or unrelated formatting were smuggled in.
 
-## 6. 当前验证资源与限制
+## 6. Current verification resources and limitations
 
-- 已检测到一台可连接的安卓设备，可用于测试构建验收；实际安装和会改变系统设置的用例需先说明影响，使用测试数据，不读取或使用真实凭据。
-- 本机当前没有 `go`，relay 构建与测试暂时无法启动；合入前必须补齐该工具并跑通，不记为已通过。
-- 真实模型服务、第三方 TTS、SIM/通话和飞书测试租户的可用凭据尚未确认。可以用本地假服务和 instrumentation 完成的部分先完成；真实外部路径没有证据时明确保留为未验证，不伪造验收结论。
+- One connectable Android device has been detected and can be used for test-build acceptance; cases that actually install or change system settings must first state their impact, use test data, and not read or use real credentials.
+- This machine currently has no `go`, so relay builds and tests cannot start for now; that tool must be installed and passing before the merge, and this is not recorded as passed.
+- Available credentials for real model services, third-party TTS, SIM/calls and the Feishu test tenant are not yet confirmed. Parts that can be completed with local fake services and instrumentation are done first; real external paths without evidence are explicitly left as unverified, and acceptance conclusions are not faked.
 
-## 7. 合并、署名与回滚
+## 7. Merge, attribution and rollback
 
-- 功能提交保持原子性；提交信息说明行为、架构和验证，并附实际贡献者的 `Co-authored-by`。
-- 最终使用保留功能提交的 merge commit，不做全量 squash。
-- 合入后再关闭 19 个原 PR，评论指向对应功能提交；不在整合中途关闭。
-- 任一功能需要回滚时，优先 revert 对应功能提交，避免影响同批其他能力。
-- 若 main 在整合期间前进，定期 rebase 集成分支并重跑受影响测试；不以强行覆盖 main 的方式解决冲突。
+- Feature commits remain atomic; the commit message explains behavior, architecture and verification, and includes the actual contributors' `Co-authored-by`.
+- The final merge uses a merge commit that preserves the feature commits, without a full squash.
+- After merging, close the 19 original PRs with comments pointing to the corresponding feature commits; do not close them midway through integration.
+- When any feature needs rollback, prefer reverting the corresponding feature commit to avoid affecting other capabilities in the same batch.
+- If main moves forward during integration, periodically rebase the integration branch and rerun the affected tests; do not resolve conflicts by force-overwriting main.

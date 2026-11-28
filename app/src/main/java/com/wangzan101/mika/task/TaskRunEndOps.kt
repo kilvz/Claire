@@ -184,7 +184,7 @@ internal fun TaskService.recordTurn(store: ConversationStore, run: TaskRun, end:
         else -> return
     }.copy(runId = runId, remoteTaskId = run.mcpExternalId, steers = steers, groups = groups, interruptedReplies = interrupted, finishedReplies = finished,
         audios = audios, photos = photos, videos = videos)
-        // 这一轮留下了一页:记下站点(已经关了的连同原因),对话页那一轮下面据此显示
+        // This turn left a page: record the site (with the reason for one already closed), so the conversation turn shows it below
         .let { t -> keeper.recordFor(runId)?.let { (host, closed) -> t.copy(keptPage = host, keptPageClosed = closed) } ?: t }
     runCatching { store.append(run.conversationId, turn, files) }.onFailure { Log.w(TAG, "could not save conversation turn", it) }
 }

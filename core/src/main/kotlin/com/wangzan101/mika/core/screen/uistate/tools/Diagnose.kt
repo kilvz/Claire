@@ -21,7 +21,7 @@ import com.wangzan101.mika.core.screen.uistate.session
 /** Diagnose a blank, loading, locked, or protected screen; passes the lock-screen gate (nothing can be diagnosed while locked). */
 internal class Diagnose(f: ScreenFamily) : ScreenTool(f, "diagnose") {
     override val verb = Verb.Diagnose
-    override val label = "检查屏幕"
+    override val label = "Inspect screen"
     override val risk = Risk.Write
     override val def by lazy { ToolDef(name, describe()) }
 

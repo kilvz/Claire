@@ -14,8 +14,8 @@ import com.wangzan101.mika.voice.model.VoiceModelError
 import java.io.File
 
 /**
- * 内置 Android 系统 TTS:一次合成一个完整 WAV,非流式,能力声明不交给云端或第二套播放路径。
- * 用哪个引擎看绑定里的 [com.wangzan101.mika.voice.model.TtsBinding.engine](空 = 手机默认引擎)。
+ * Built-in Android system TTS: synthesises one complete WAV per call, non-streaming, and the capability declaration does not hand off to the cloud or a second playback path.
+ * Which engine is used comes from [com.wangzan101.mika.voice.model.TtsBinding.engine] in the binding (empty = phone default engine).
  */
 class AndroidSystemTtsAdapter(
     private val engineFactory: (context: Context, enginePackage: String?) -> SystemTtsEngine =

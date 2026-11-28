@@ -49,7 +49,7 @@ object MikaQuit {
         // Remove system alarms and in-process long tasks first, then stop the foreground services; when the system
         // re-delivers start requests to the services, they also refuse work according to the quit flag
         runCatching { TriggerRuntime.suspendAlarms(app) }
-        // 来电待命的周期检查一并撤掉;重新打开 Mika 时按原授权再排上
+        // Also cancel the periodic call-standby check; when Claire is reopened it is scheduled again under the existing grant
         CallStandbyRecoveryJob.reconcile(app, authorized = false)
         runCatching { RuntimePreparer.stop(app) }
         runCatching { app.wechat.stop() }

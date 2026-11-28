@@ -85,7 +85,7 @@ fun PlansScreen(context: Context, onBack: () -> Unit, onOpenConversation: (Strin
     val deviceAccess = remember(context) {
         (context.applicationContext as? com.wangzan101.mika.MikaApp)?.deviceAccess?.settings
     }
-    // 从系统设置回来时重读:刚开了权限,提示就该消失
+    // Re-read when returning from system settings: the prompt should disappear as soon as the permission was just granted
     var exact by remember { mutableStateOf(TriggerRuntime.canScheduleExactly(context)) }
     LifecycleResumeEffect(Unit) {
         exact = TriggerRuntime.canScheduleExactly(context)
@@ -137,7 +137,7 @@ fun PlansScreen(context: Context, onBack: () -> Unit, onOpenConversation: (Strin
             }
         }
         FooterNote(tr(R.string.plans_footer))
-        // 精确闹钟没开时顶上已有提示卡,这里只列电池和解锁
+        // When exact alarms are off there is already a prompt card at the top, so only list battery and unlock here
         if (deviceAccess != null) ScreenOffSetupCard(deviceAccess, showAlarm = false)
     }
 
@@ -285,7 +285,7 @@ private fun PlanRow(plan: TriggerDefinition, last: TriggerWindow?, first: Boolea
     ) { MikaSwitch(plan.enabled, onToggle, enabled = canToggle) }
 }
 
-/** 列表里的时间:日期用界面语言的中等格式,钟点跟系统的 12/24 小时制。 */
+/** Time in the list: the date uses the UI language's medium format, and the clock time follows the system 12/24-hour cycle. */
 internal fun formatPlanTime(ms: Long, use24Hour: Boolean): String {
     val zdt = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
     val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(uiLocale()).format(zdt)
@@ -298,7 +298,7 @@ private fun planSourceLabel(source: TriggerSource): String = when (source) {
     TriggerSource.Model -> tr(R.string.plans_source_model)
     TriggerSource.External -> tr(R.string.plans_source_external)
 }
-/** 上次结果:时间、结果;那次检查记下了值时一起显示(检查失败、结果未知的那一次没有值,不拿更早的充数)。 */
+/** Last result: time and result; shown together with the value when that check recorded one (a failed or unknown check has no value, so do not fill in an earlier one). */
 private fun lastResult(plan: TriggerDefinition, w: TriggerWindow, use24Hour: Boolean): String {
     val value = plan.lastValue?.takeIf { w.state in setOf(TriggerWindowState.Skipped, TriggerWindowState.ActionDispatched, TriggerWindowState.Delivered) }
     return if (value != null) tr(R.string.plans_last_value, formatPlanTime(w.dueAtMs, use24Hour), windowLabel(w), value)

@@ -58,10 +58,10 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
     fun clearQuote() = _ui.update { it.copy(quote = null) }
 
     /**
-     * 发送输入框里的话;有引用时引用写在话的前面(见 [QuoteMessage]),发出去后清掉。返回 false 表示没发出去(条件不满足)。
-     * 去向按先后:通话在等主人回话时交给通话;任务在等回答时是回答;带附件时派成前台跟着的一件新任务(不经前台模型);
-     * 其余都交给这条会话的前台(前台在回话时照样能发,不变成「任务在跑」)。正在跟用户学习、或用户暂停了 Mika 时一律不发。
-     * 前台派出的子任务的对话不走前台(见 [ChatDesk.handles]):任务在跑时这句插给它,空着时开新的一件,带附件时随新任务开。
+     * Sends the text in the input field; when there is a quote, the quote goes before the text (see [QuoteMessage]) and is cleared after sending. Returns false when it was not sent (conditions not met).
+     * Destination in order: hand it to the call when a call is waiting for the owner's reply; when a task is waiting for an answer it is the answer; with attachments, dispatch it as a new task the desk follows along (without going through the desk model);
+     * everything else goes to this conversation's desk (the desk can still send while replying, without turning into "task running"). Never send while learning from the user or while the user has paused Claire.
+     * Conversations of subtasks dispatched by the desk do not go through the desk (see [ChatDesk.handles]): while a task is running the message is inserted into it, when idle a new one is started, and with attachments the new task starts with them.
      */
     fun send(text: String, check: Prerequisites.Check): Boolean {
         if (paused()) {
@@ -102,10 +102,10 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
             act({ actions.answer(goal) }) { actions.answerIn(it, goal) }
             return Routed.Sent
         }
-        // 只有「没主模型」可以由本对话的有效选择补足；其余前置条件原样保留。
+        // Only "no main model" can be filled in by this conversation's effective choice; all other preconditions are kept as they are.
         val check = withConversationMainModel(check)
-        // 带附件:先复制进这条会话的工作区,再派成前台跟着的一件新任务(文件随它复制进子会话),有没有任务在跑都一样;
-        // 不走前台时照旧随新任务直接开,任务在跑时不发
+        // With attachments: first copy them into this conversation's workspace, then dispatch a new task the desk follows (files are copied into the sub-conversation with it), whether or not a task is running;
+        // when not going through the desk, start directly with the new task as before, and do not send while a task is running
         if (ui.attachments.isNotEmpty()) {
             if (desk == null && ui.composer != ComposerMode.Idle) return Routed.NotSent
             return if (sendWithAttachments(goal, ui.attachments, check)) Routed.Importing else Routed.NotSent
@@ -248,7 +248,7 @@ internal class ChatSendOps(private val vm: ChatViewModel, private val session: C
             val currentAttachments = now.attachments
             val draftReplaced = sharedDraftSerial != serialBefore
             val keepNewerAttachments = draftReplaced || currentAttachments != submitted.attachments
-            // 交给前台时不看有没有任务在跑;不走前台时照旧:复制期间开始了别的任务就不发了,草稿和附件留着
+            // When handing to the desk, do not check whether a task is running; when not going through the desk, as before: if another task started during copying, do not send, and keep the draft and attachments
             val accepted = desk != null || now.composer == ComposerMode.Idle
             if (accepted && desk != null) {
                 if (!keepNewerAttachments) vm.drafting.discardSharedDraft()

@@ -51,7 +51,7 @@ data class RawNotice(
     )
 
     private companion object {
-        /** NotificationManager.IMPORTANCE_DEFAULT。 */
+        /** NotificationManager.IMPORTANCE_DEFAULT */
         const val IMPORTANCE_DEFAULT = 3
     }
 }

@@ -32,7 +32,7 @@ private const val MUSIC_CONFIRM_APP = "mika:music"
 internal object AudioGenerate : AgentTool {
     override val capability: String get() = AUDIO
     override val verb = Verb.AudioGenerate
-    override val label = "生成语音"
+    override val label = "Generate speech"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -87,7 +87,7 @@ internal object AudioGenerate : AgentTool {
 internal class AudioSave(private val ask: Boolean) : AgentTool {
     override val capability: String get() = AUDIO
     override val verb = Verb.AudioSave
-    override val label = "保存音频"
+    override val label = "Save audio"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -158,7 +158,7 @@ private fun failure(e: Throwable): ToolExecution = when (e) {
 internal object Speak : AgentTool {
     override val capability: String get() = AUDIO
     override val verb = Verb.Speak
-    override val label = "说话"
+    override val label = "Speak"
     override val risk = Risk.Read
     override val offScreen = true
     override val entry = Entry.Opens

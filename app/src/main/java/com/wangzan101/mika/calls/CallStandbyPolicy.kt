@@ -45,7 +45,7 @@ internal object CallStandbyPolicy {
     fun systemAllowsScheduledStart(sdk: Int, backgroundRestricted: Boolean, ignoringBatteryOptimizations: Boolean): Boolean =
         !backgroundRestricted && (sdk < 31 || ignoringBatteryOptimizations)
 
-    /** 不限时长(0)按最大档给预算;锁自然到期后由运行中的看门狗重新拿。 */
+    /** Unlimited duration (0) gets the largest budget; after the lock expires naturally, the running watchdog acquires it again. */
     fun activeWakeBudgetMs(maxCallSeconds: Int): Long =
         (if (maxCallSeconds <= 0) CallPolicy.MAX_SECONDS else maxCallSeconds.coerceIn(15, CallPolicy.MAX_SECONDS)) * 1_000L + 10_000L
 }

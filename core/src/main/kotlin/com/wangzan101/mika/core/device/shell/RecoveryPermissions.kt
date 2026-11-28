@@ -133,7 +133,7 @@ class RecoveryPermissions(
     private val runner: () -> ShellCommandRunner?,
     private val store: RecoveryConsentStore,
     private val packageName: String,
-    /** 用户暂停了 Mika(读持久化的暂停标记):暂停期间不自动打开任何一项,也不把无障碍加回去。 */
+    /** The user paused Claire (reads the persisted pause flag): while paused, do not turn on any item automatically or add accessibility back. */
     private val paused: () -> Boolean = { false },
 ) {
     private val lock = Mutex()
@@ -203,9 +203,9 @@ class RecoveryPermissions(
     }
 
     /**
-     * 让 Mika 的无障碍服务重新运行起来(服务没在运行时用,见 [AccessibilityRepair]),别的服务一个不动:
-     * 列表里没有 Mika 就直接加上;有却没绑定,就先去掉,等 [gapMs] 让系统处理完,再重读列表加回去。
-     * 去掉之后一定会加回去,中途被取消也一样,免得把服务留在关着的状态(只有这期间用户暂停了 Mika 才不加回);加回失败时写回原来的列表,仍报失败。不改 [RecoveryConsent]:这不是打开或收回能力。
+     * Restart Claire's accessibility service (used when the service is not running; see [AccessibilityRepair]) without touching any other service:
+     * If Claire is not in the list, add it directly; if it is present but not bound, remove it first, wait [gapMs] for the system to process, then re-read the list and add it back.
+     * After removal it is always added back, even if cancelled midway, so the service is not left off (only a pause by the user during this window prevents it); if adding back fails, write the original list back and still report failure. Do not change [RecoveryConsent]: this is not turning a capability on or revoking it.
      */
     suspend fun restartAccessibility(gapMs: Long): PermissionResult = lock.withLock {
         if (paused()) return@withLock PermissionResult.Failed(PAUSED)
@@ -219,7 +219,7 @@ class RecoveryPermissions(
             if (removed != PermissionResult.Done) return@withLock removed
             withContext(NonCancellable) {
                 delay(gapMs)
-                // 去掉之后、加回之前用户暂停了 Mika:不加回,暂停本来就要无障碍关着
+                // The user paused Claire after removal and before adding back: do not add back; a pause requires accessibility to stay off
                 if (paused()) return@withContext PermissionResult.Failed(PAUSED)
                 val now = shell.exec(PermissionCommands.READ_ACCESSIBILITY)
                 val back = runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(now, me)))
@@ -240,7 +240,7 @@ class RecoveryPermissions(
         const val PAUSED = "paused"
     }
 
-    /** 每项各自执行,一项失败不挡住后面的;返回第一处失败。 */
+    /** Each item runs separately; one failure does not block the rest. Returns the first failure. */
     private suspend fun run(shell: ShellCommandRunner, capabilities: List<RecoveryCapability>, on: Boolean): PermissionResult {
         var failure: PermissionResult? = null
         for (c in capabilities) {

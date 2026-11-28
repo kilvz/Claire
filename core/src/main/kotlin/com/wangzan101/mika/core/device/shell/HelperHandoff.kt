@@ -175,7 +175,7 @@ object HelperHandoff {
         BadNonce,
         /** The process holding the Binder is not the one handing off. */
         BinderElsewhere,
-        /** 用户暂停了 Mika:不收任何助手(包括暂停前起的、晚到的交接),助手被拒后自己退出。 */
+        /** The user paused Claire: accept no helper (including ones started before the pause or handed in late); a rejected helper exits by itself. */
         Paused,
     }
 

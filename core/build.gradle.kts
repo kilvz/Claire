@@ -73,7 +73,7 @@ sourceSets.main { resources.srcDir(knowledgeIndex) }
 // The parts of the README that change (built-in knowledge, provider presets) are regenerated from the source; see ReadmeSections in testFixtures; ReadmeSectionsTest guards that both sides stay consistent
 val updateReadme by tasks.registering(JavaExec::class) {
     group = "documentation"
-    description = "重新生成 README.md 里 generated 标记之间的段落"
+    description = "Regenerate the sections between the generated markers in README.md"
     classpath = sourceSets["testFixtures"].runtimeClasspath
     mainClass.set("com.wangzan101.mika.core.docs.ReadmeSections")
     args(rootProject.projectDir.absolutePath)
@@ -91,7 +91,7 @@ configurations[chatgptCheck.runtimeOnlyConfigurationName].extendsFrom(configurat
 
 val chatgptSignInCheck by tasks.registering(JavaExec::class) {
     group = "verification"
-    description = "用 App 的登录代码对着 OpenAI 走一遍 ChatGPT 登录;-Ptimeout=<秒> -Pmodel=<slug> -Pkeep"
+    description = "Run the ChatGPT sign-in flow with the app's sign-in code against OpenAI; -Ptimeout=<seconds> -Pmodel=<slug> -Pkeep"
     classpath = chatgptCheck.runtimeClasspath
     mainClass.set("com.wangzan101.mika.core.model.chatgpt.check.ChatGptSignInCheckKt")
     args(listOfNotNull(
@@ -102,8 +102,8 @@ val chatgptSignInCheck by tasks.registering(JavaExec::class) {
     outputs.upToDateWhen { false }
 }
 
-// 读 core 以外仓库文件(文档、README、app 源码与资源、评测任务集)的测试。单独成一个任务,只有它挂这些输入:
-// 只改 app 或文档时 core 的其余测试保持 UP-TO-DATE,不必整套重跑。test 依赖它,./gradlew :core:test 照样全跑。
+// Tests that read repo files outside core (docs, README, app sources and resources, eval task set). They are a separate task with only these inputs:
+// when only app or docs change, the rest of core's tests stay UP-TO-DATE instead of rerunning the whole suite. test depends on this task, so ./gradlew :core:test still runs everything.
 val repoTestClasses = listOf(
     "**/core/DocsConsistencyTest*",
     "**/docs/ReadmeSectionsTest*",
@@ -118,12 +118,12 @@ val repoTestClasses = listOf(
 
 val repoTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "读仓库文档、README、app 源码和评测任务集的一致性测试"
+    description = "Consistency tests over repo docs, README, app sources and the eval task set"
     testClassesDirs = sourceSets.test.get().output.classesDirs
-    // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
+    // testFixtures puts core's jar ahead of the test classpath; keep the directories first so tests that read resources by directory find their files
     classpath = sourceSets.main.get().output + sourceSets.test.get().runtimeClasspath
     include(repoTestClasses)
-    // TaskSetTest 读仓库根目录的评测任务集
+    // TaskSetTest reads the eval task set at the repo root
     inputs.dir(rootProject.file("eval")).withPropertyName("evalTasks")
     // DocsConsistencyTest and ReadmeTranslationsTest read the repository documentation (README.md in the root, and the per-language translations under docs/readme/ which live in docs) and compare it against the app sources; a change to the documentation or app sources requires a rerun
     inputs.files(rootProject.file("README.md"), rootProject.file("tools/sandbox/README.md")).withPropertyName("docsFiles")
@@ -134,18 +134,18 @@ val repoTest by tasks.registering(Test::class) {
 }
 
 tasks.test {
-    // 跨语言 CLI 契约由 cliTest 显式运行;纯 JVM 测试不要求电脑安装 Python。
+    // Cross-language CLI contracts run explicitly through cliTest; pure JVM tests do not require Python on the computer.
     exclude("**/RemoteCliContractTest*")
-    // 真网关跨语言测试显式运行,普通 JVM 测试不要求安装 Go。
+    // The real-gateway cross-language test runs explicitly; ordinary JVM tests do not require Go.
     exclude("**/RelayGatewayIntegrationTest*")
-    // 读仓库文件的测试归 repoTest(见上)
+    // Tests that read repo files live in repoTest (see above)
     exclude(repoTestClasses)
     dependsOn(repoTest)
-    // testFixtures 会把 core 的 jar 放到测试类路径前面;让目录排在前面,按目录读资源的测试才找得到文件
+    // testFixtures puts core's jar ahead of the test classpath; keep the directories first so tests that read resources by directory find their files
     classpath = sourceSets.main.get().output + classpath
-    // updateReadme 先改写 README,同一次构建里测试要读改写后的
+    // updateReadme rewrites README first; tests in the same build must read the rewritten version
     mustRunAfter(updateReadme)
-    // 循环场景的消息序列金样;-PupdateSnapshots 时重新生成(见 LoopSnapshot)
+    // Message-sequence goldens for loop scenarios; regenerate with -PupdateSnapshots (see LoopSnapshot)
     systemProperty("mika.snapshotDir", file("src/test/resources/loop-snapshots").absolutePath)
     // Goldens for the prompt surface (system prompts, tool definitions, feedback text); likewise regenerated with -PupdateSnapshots (see PromptSurface)
     systemProperty("mika.promptSurfaceDir", file("src/test/resources/prompt-surface").absolutePath)
@@ -159,7 +159,7 @@ tasks.test {
 
 val relayGatewayBinary = tasks.register<Exec>("relayGatewayBinary") {
     group = "verification"
-    description = "构建自托管远程 MCP 网关,供跨语言集成测试使用"
+    description = "Build the self-hosted remote MCP gateway for cross-language integration tests"
     val output = layout.buildDirectory.file("relay-check/mika-relay")
     workingDir(rootProject.file("companions/relay"))
     inputs.files(fileTree(rootProject.file("companions/relay")) { include("*.go", "go.mod", "go.sum", "web/**") })
@@ -171,7 +171,7 @@ val relayGatewayBinary = tasks.register<Exec>("relayGatewayBinary") {
 
 tasks.register<Test>("relayTest") {
     group = "verification"
-    description = "真实 Go 网关连接 Kotlin 手机隧道,验证远程 CLI / MCP 全链路"
+    description = "Real Go gateway connects to the Kotlin phone tunnel to verify the full remote CLI / MCP path"
     dependsOn(relayGatewayBinary)
     inputs.file(layout.buildDirectory.file("relay-check/mika-relay")).withPropertyName("relayGatewayBinary")
     testClassesDirs = sourceSets.test.get().output.classesDirs
@@ -182,7 +182,7 @@ tasks.register<Test>("relayTest") {
 
 val cliContractTest by tasks.registering(Test::class) {
     group = "verification"
-    description = "真实 Python CLI 对接 Kotlin 任务 API,核对只走 /api/v1"
+    description = "Real Python CLI against the Kotlin task API, verifying it only uses /api/v1"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.main.get().output + sourceSets.test.get().runtimeClasspath
     include("**/RemoteCliContractTest*")
@@ -193,7 +193,7 @@ val cliContractTest by tasks.registering(Test::class) {
 // Requires Python 3.10+ and is not hooked into check; run ./gradlew :core:cliTest explicitly when needed
 val cliTest by tasks.registering(Exec::class) {
     group = "verification"
-    description = "CLI 进程、假 ADB、独立 Skill 与真实 HTTP 契约测试 (Python 3.10+)"
+    description = "CLI process, fake ADB, standalone Skill and real HTTP contract tests (Python 3.10+)"
     dependsOn(cliContractTest)
     workingDir(rootProject.projectDir)
     commandLine(providers.gradleProperty("mikaPython").getOrElse("python3"), "-m", "unittest", "discover", "-s", "companions/mika/tests", "-v")

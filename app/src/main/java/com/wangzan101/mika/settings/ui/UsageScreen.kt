@@ -578,7 +578,7 @@ private fun TrendChart(report: UsageReport, selected: String?, today: LocalDate)
     Box(Modifier.fillMaxWidth().padding(top = 12.dp).height(132.dp)) {
         Canvas(
             Modifier.fillMaxSize().testTag("usage-chart")
-                .semantics { contentDescription = "${UsageCopy.TREND}，${UsageCopy.stepLabel(report.step)}" }
+                .semantics { contentDescription = "${UsageCopy.TREND}, ${UsageCopy.stepLabel(report.step)}" }
                 .pointerInput(series, rtl) {
                     detectTapGestures { o ->
                         val plot = size.width - gutter.toPx()
@@ -680,7 +680,7 @@ private fun TrendTip(b: UsageBucket, report: UsageReport, index: Int, gutter: Dp
         )
         rows.forEach { (id, v) ->
             val name = report.provider(id)?.let(UsageCopy::providerName) ?: id
-            Text("$name　${UsageCopy.tokens(v)}", style = TipText, color = c.bg, maxLines = 1)
+            Text("$name  ${UsageCopy.tokens(v)}", style = TipText, color = c.bg, maxLines = 1)
         }
     }
 }

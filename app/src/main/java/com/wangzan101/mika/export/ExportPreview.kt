@@ -4,7 +4,7 @@ import com.wangzan101.mika.core.export.ExportWarning
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** 文本预览直接返回内容；HTML 预览把本次暂存目录的所有权交给调用方。 */
+/** Text preview returns content directly; HTML preview hands ownership of this staging directory to the caller. */
 sealed interface ExportPreview {
     val warnings: List<ExportWarning>
 
@@ -22,7 +22,7 @@ sealed interface ExportPreview {
     ) : ExportPreview {
         private val released = AtomicBoolean(false)
 
-        /** 关闭预览或离开面板时调用；重复释放不会误删后续预览的目录。 */
+        /** Called when closing the preview or leaving the panel; repeated release does not wrongly delete a later preview's directory. */
         fun release() {
             if (released.compareAndSet(false, true)) directory.deleteRecursively()
         }

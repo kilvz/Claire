@@ -141,7 +141,7 @@ internal fun ImageModelSection(ui: ModelSetupUi, onImage: (() -> Unit)?) {
     }
 }
 
-/** 视频模型:生成短视频用的模型,和图片一样单独一行。 */
+/** Video model: the model used to generate short videos, on its own row like images. */
 @Composable
 internal fun VideoModelSection(onVideo: (() -> Unit)?) {
     if (onVideo == null) return
@@ -153,7 +153,7 @@ internal fun VideoModelSection(onVideo: (() -> Unit)?) {
     }
 }
 
-/** 统一语音模型目录入口:能力与协议在此声明;语音输入、朗读和通话页只负责选择与使用偏好。 */
+/** Unified voice model catalog entry: capabilities and protocols are declared here; the speech input, read-aloud and call pages only handle selection and usage preferences. */
 @Composable
 internal fun VoiceCatalogSection(onOpenVoiceCatalog: (() -> Unit)?) {
     if (onOpenVoiceCatalog == null) return

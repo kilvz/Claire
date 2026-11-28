@@ -29,8 +29,8 @@ import java.io.File
 import java.io.IOException
 
 /**
- * 视频生成能力的手机实现:调 VideoModel 的异步任务,结果边下载边写进缓存,再经工作区闸门写进 out/video;
- * 用 MediaMetadataRetriever 读尺寸/时长并抽一帧当封面。所有对网络/磁盘的操作都在 IO 线程,取消时停下载并删掉缓存与半截文件。
+ * Phone implementation of the video generation capability: calls VideoModel's async task, writes the result into the cache while downloading, then through the workspace gate into out/video;
+ * uses MediaMetadataRetriever to read size/duration and extract a frame as the cover. All network/disk operations are on IO threads; on cancellation it stops the download and deletes the cache and partial file.
  */
 class AndroidVideoGenerationPort(
     private val context: Context,
@@ -74,8 +74,8 @@ class AndroidVideoGenerationPort(
     }
 
     /**
-     * 首帧图:经闸门读出来。小图原样发;大图(或字节数超过 [FIRST_FRAME_RAW_MAX])缩成长边 [FIRST_FRAME_SIDE] 的 JPEG,
-     * 免得请求体里塞几十 MB 的 base64。
+     * First-frame image: read out through the gate. Small images are sent as is; large ones (or byte size over [FIRST_FRAME_RAW_MAX]) are scaled to [FIRST_FRAME_SIDE] on the long side as JPEG,
+     * to avoid stuffing tens of MB of base64 into the request body.
      */
     private suspend fun firstFrame(path: String): Pair<ByteArray, String> {
         val rel = relative(path) ?: throw VideoError.Unsupported("first frame must be under ${SandboxPaths.WORKSPACE}")
@@ -96,8 +96,8 @@ class AndroidVideoGenerationPort(
     }
 
     /**
-     * 边下边写;超过 [MAX_BYTES] 就停。下载地址是服务商给的临时签名链接:不带服务商的 Key 和请求头,也不写进日志或报错。
-     * 协程一取消就取消这次请求(阻塞中的读随之抛出),不等读完。
+     * Writes while downloading; stops when [MAX_BYTES] is exceeded. The download URL is a temporary signed link from the provider: do not send the provider's key or headers, and do not write it to logs or error messages.
+     * Cancelling the coroutine cancels this request (a blocking read then throws), without waiting for the read to finish.
      */
     private suspend fun download(url: String, target: File) = coroutineScope {
         val call = http.newCall(Request.Builder().url(url).get().build())
@@ -134,7 +134,7 @@ class AndroidVideoGenerationPort(
         }
     }
 
-    /** 写进 out/video;写到一半失败或被取消时删掉这个半截文件。 */
+    /** Writes into out/video; deletes the partial file when writing fails or is cancelled halfway. */
     private suspend fun store(cache: File, name: String): String = dirs.tree.shared {
         withContext(Dispatchers.IO) {
             val (actual, g) = dirs.gate.createNumbered(workspace, "out/video", name)
@@ -193,7 +193,7 @@ class AndroidVideoGenerationPort(
     }
 
     companion object {
-        /** 生成结果的下载缓存目录(在 cacheDir 下);启动时清掉上次进程留下的。 */
+        /** Download cache directory for generation results (under cacheDir); cleared at startup of leftovers from the previous process. */
         const val CACHE_DIR = "video-gen"
         private const val MAX_BYTES = 1024L * 1024 * 1024
         private const val FIRST_FRAME_READ_MAX = 20L * 1024 * 1024

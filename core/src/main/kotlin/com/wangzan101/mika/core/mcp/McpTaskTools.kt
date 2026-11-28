@@ -136,7 +136,7 @@ class McpTaskTools(
                 }
             }
             else -> {
-                // 会动手机的设备与通话工具:暂停时和任务工具同样拒;读状态、挂断、交还听筒照常
+                // Device and call tools that affect the phone: refused while paused just like task tools; reading status, hanging up and returning the receiver work as usual
                 if (name in PAUSE_REFUSED) service.paused.refuseRemote()
                 if (deviceTools?.tools?.any { it.name == name } == true) deviceTools.call(name, args)
                 else if (callTools?.tools?.any { it.name == name } == true) callTools.call(name, args)
@@ -182,7 +182,7 @@ class McpTaskTools(
     }
 
     companion object {
-        /** 暂停时拒绝的设备与通话工具(任务工具的拒绝在 [RemoteTaskService] 与任务入口里)。 */
+        /** Device and call tools refused while paused (task tools are refused in [RemoteTaskService] and the task entry points). */
         private val PAUSE_REFUSED = setOf(McpDeviceTools.WAKE, McpDeviceTools.UNLOCK, McpCallTools.DIAL, McpCallTools.ANSWER)
         const val RUN = "mika_run_task"
         const val STEER = "mika_steer_task"

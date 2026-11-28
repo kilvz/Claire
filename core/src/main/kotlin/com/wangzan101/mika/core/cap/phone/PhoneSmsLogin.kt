@@ -9,7 +9,7 @@ import kotlinx.serialization.json.put
 internal object PhoneSmsLogin : PhoneTool {
     override val verb = Verb.SmsLogin
     override val risk = Risk.Write
-    override val label = "短信验证码登录"
+    override val label = "Sign in with SMS code"
     override val sandboxCallable = false
     override val def = ToolDef("phone_sms_login", Prompts.tool("phone_sms_login"), mapOf(
         "app" to str("Exact Android package of the app the user asked to log into."),

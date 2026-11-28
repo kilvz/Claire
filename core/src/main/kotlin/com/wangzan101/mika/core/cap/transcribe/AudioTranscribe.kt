@@ -25,7 +25,7 @@ import kotlinx.serialization.json.put
 internal object AudioTranscribe : AgentTool {
     override val capability: String get() = TRANSCRIBE
     override val verb = Verb.AudioTranscribe
-    override val label = "转写音频"
+    override val label = "Transcribe audio"
     override val risk = Risk.Read
     override val offScreen = true
     override val concurrency = Concurrency.ParallelSafe

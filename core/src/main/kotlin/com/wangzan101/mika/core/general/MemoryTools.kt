@@ -54,7 +54,7 @@ private fun memoryOn(ctx: ToolContext) = ctx.config.memory != null && ctx.config
 
 internal object MemorySearch : AgentTool {
     override val verb = Verb.MemorySearch
-    override val label = "查找记忆"
+    override val label = "Search memory"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("memory_search",
@@ -97,7 +97,7 @@ internal object MemorySearch : AgentTool {
 /** Changes only Claire's own memory; does not touch the screen or the outside world. */
 internal object MemorySave : AgentTool {
     override val verb = Verb.MemorySave
-    override val label = "写入记忆"
+    override val label = "Save to memory"
     override val risk = Risk.Read
     override val def = ToolDef("memory_save",
         Prompts.tool("memory_save"),
@@ -127,9 +127,9 @@ internal object MemorySave : AgentTool {
         val inferred = (listOf(content) + keywords).any { utterances.unsupportedMemorySpecifics(it, quote).isNotEmpty() }
         if (inferred) {
             if (!store.inferenceAllowed()) return refused(ctx, a, "content_not_from_user", Feedback["memory.content_not_from_user"])
-            // 开着也不是见什么收什么:引文得落在用户这一轮自己说的、让它记的那半句上。
-            // 不然随便一句「帮我看看这个网页」都能被拿来当引文,把屏幕、网页上的字存进来;
-            // 「别记我的地址,记住我喜欢喝茶」里引前半句也不行——让记的是后半句
+            // Even when enabled, it does not accept everything it sees: the quotation must fall in the half-sentence the user said this turn that asks it to remember.
+            // Otherwise any sentence such as "help me look at this web page" could be used as a quotation and store text from the screen or web page;
+            // in "don't remember my address; remember that I like tea", quoting the first half is not allowed either—the second half is what asks it to remember
             if (utterances.quotedClauses(quote).none { clauses -> clauses.any(MemoryRequests::asksToRemember) }) {
                 return refused(ctx, a, "inference_not_requested", Feedback["memory.inference_not_requested"])
             }
@@ -160,7 +160,7 @@ internal object MemorySave : AgentTool {
 /** Changes or deletes one entry by the stable id returned by memory_search, only when the user explicitly asks in this turn; the change goes through the existing result notice and undo mechanism. */
 internal object MemoryEdit : AgentTool {
     override val verb = Verb.MemoryEdit
-    override val label = "修改记忆"
+    override val label = "Edit memory"
     override val risk = Risk.Read
     override val def = ToolDef("memory_edit",
         Prompts.tool("memory_edit"),
@@ -189,7 +189,7 @@ internal object MemoryEdit : AgentTool {
         val messages = utterances.matchingCurrentMessages(quote)
         if (messages.isEmpty()) return refused(ctx, a, "quote_not_from_user", Feedback["memory.edit_quote_not_from_user"])
         if (op != "update" && op != "delete") throw ArgError("op", "must be update or delete")
-        // 话里明说了要改(删),没说不要,也不是「如果我说……你会怎么做」这种只是问问的;各语言的说法在 MemoryRequests
+        // The words explicitly ask to change (delete), do not say not to, and are not a mere question such as "if I said … what would you do"; the phrases for each language are in MemoryRequests
         if (!MemoryRequests.requested(op, quote, messages)) return refused(ctx, a, "edit_not_requested", Feedback["memory.edit_not_requested"])
         val candidates = ctx.memorySearchCandidates()
         if (candidates == null || id !in candidates) {

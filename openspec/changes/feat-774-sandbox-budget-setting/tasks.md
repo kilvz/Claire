@@ -11,7 +11,7 @@
 
 ## 3. app: settings entry point and copy
 
-- [x] 3.1 `SettingsSubPages.DuringWorkScreen` gains parameters, a `ListRow` (showing the current tier's minute count) and a `SandboxBudgetDialog` (RadioRow tiers, no 「不限制」 (Unlimited) option); `SettingsScreen` wires up state and callbacks
+- [x] 3.1 `SettingsSubPages.DuringWorkScreen` gains parameters, a `ListRow` (showing the current tier's minute count) and a `SandboxBudgetDialog` (RadioRow tiers, no "Unlimited" option); `SettingsScreen` wires up state and callbacks
 - [x] 3.2 `strings_settings.xml` (values + all language directories) adds `settings_sandbox_budget`, `settings_sandbox_budget_sub`, the plurals `settings_sandbox_budget_minutes_n`; `python3 tools/i18n/translations.py check` passes
 - [x] 3.3 `./gradlew :app:testDebugUnitTest` all green
 

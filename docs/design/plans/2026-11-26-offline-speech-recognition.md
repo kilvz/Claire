@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Generic Android only: public APIs, no brand-specific paths (CLAUDE.md). Unsupported ABI → source hidden with "此设备不支持离线识别", never a crash.
+- Generic Android only: public APIs, no brand-specific paths (CLAUDE.md). Unsupported ABI → source hidden with "Offline recognition is not supported on this device", never a crash.
 - No model weights in the APK; arm64 APK grows ≤ 20 MB (§7). No downloaded executable code (`.so`, dex) — native libs ship in the APK.
 - A file is loaded only after its size and SHA-256 matched `catalog.json`. The manifest is never fetched from the network.
 - The voice-models Release must never become "latest": pre-release or `make_latest=false` (UpdateChecker reads `/releases/latest`).
@@ -21,7 +21,7 @@
 - Auto uses a pack only when device recognition is not `usable` (anti-goal §2). Auto has no fallback chain.
 - Calls (`CascadeEngine.listenRef`, call STT pickers) never use `OnDevice` models in v1.
 - On-device failures always fail over (`VoiceFailover.canTryNext == true`) and are never `ModelError.Network`.
-- Removing the selected pack from its card sets STT selection to **Auto** (special case vs existing `Off`); restore-without-files keeps the selection and shows "需要下载".
+- Removing the selected pack from its card sets STT selection to **Auto** (special case vs existing `Off`); restore-without-files keeps the selection and shows "Download required".
 - Every new string in default + all 13 locales; `python3 tools/i18n/translations.py check` passes.
 - Third-party: sherpa-onnx and each model listed in `licenses/THIRD_PARTY_NOTICES.md` and the in-app licenses page (`LicensesTest` keeps them in step); each pack installs its own license file.
 - Language codes: manifest `recommendedFor` uses `AppLanguage.tag` values (`zh-Hans`, `zh-Hant`, `id`, …); `languages` uses ISO 639 language parts (`zh`, `en`, `yue`, …).
@@ -45,7 +45,7 @@
 - [ ] **Step 1:** Find the exact Hugging Face repos and pin one commit each for SenseVoice Small int8, Dolphin base CTC int8, Whisper base int8 (sherpa-onnx exports). Record repo, commit, file list, size and the LFS SHA-256 of each needed file.
 - [ ] **Step 2:** Download sherpa-onnx v2.0.3 static-onnxruntime Android AAR; record its SHA-256, the arm64-v8a `.so` total size, and confirm the Kotlin API (`OfflineRecognizer`, `OfflineRecognizerConfig`, `OfflineModelConfig` with `senseVoice`/`whisper`/`dolphin` fields, `createStream`, `acceptWaveform`, `decode`, `getResult`).
 - [ ] **Step 3:** On a mid-range arm64 test phone, run each model (sherpa-onnx demo or a scratch harness, not committed) on 10 everyday commands per §7 for each of the 13 languages; record accuracy, 5 s latency, resident memory; check SenseVoice output for zh-Hant (simplified vs traditional).
-- [ ] **Step 4:** Update the §5.1 recommendation table and §8 with results (move any language that misses to Whisper or mark "效果有限"). Expected: every one of the 13 `AppLanguage` tags is in some pack's `recommendedFor`.
+- [ ] **Step 4:** Update the §5.1 recommendation table and §8 with results (move any language that misses to Whisper or mark "limited effectiveness"). Expected: every one of the 13 `AppLanguage` tags is in some pack's `recommendedFor`.
 - [ ] **Step 5: Commit** `docs(voice): record offline STT verification results`.
 
 ### Task 1: Publish script and bundled manifest
@@ -125,7 +125,7 @@
 
 **Files:**
 - Create: `voice/ondevice/VoicePackStore.kt`
-- Modify: `backup/BackupEngine.kt:103` (`excludedDirs` += `"voice-models"`), backup description string (all locales: "语音包体积大，不备份，恢复后重新下载")
+- Modify: `backup/BackupEngine.kt:103` (`excludedDirs` += `"voice-models"`), backup description string (all locales: "Voice packs are large, so they are not backed up; download them again after restoring")
 - Test: `app/src/test/.../voice/ondevice/VoicePackStoreTest.kt`, existing `BackupEngine` test (add `voiceModelsNotBackedUp`)
 
 **Interfaces:**
@@ -215,7 +215,7 @@
   - `fun progress(entry): StateFlow<DownloadProgress>`; `fun cancel(entry)`.
   - `suspend fun import(entry, inputs: List<ImportInput>): ImportResult` — `data class ImportInput(val name: String, val open: () -> InputStream)`; zip inputs are expanded (entries with or without a `<id>/` prefix); files not in the manifest ignored; `sealed interface ImportResult { data object Installed; data class Missing(val files: List<String>); data class Mismatch(val file: String) }`; same staging/commit path.
   - `fun delete(entry)` — cancel download, `engines.release(id)`, `store.delete(id)`, `voiceCatalog.removeVoicePack(id)`.
-  - `fun downloadUrls(entry): String` — newline-joined official Release URLs (for "复制下载地址").
+  - `fun downloadUrls(entry): String` — newline-joined official Release URLs (for "copy download address").
 
 - [ ] **Step 1: Write failing tests:** `sourcesOrderMirrorsReleaseUpstream`, `preflightNoSpaceBeforeMetered`, `preflightMeteredAsksWithSize`, `downloadCommitsAndRegistersModel`, `killedDuringCommitKeepsOldVersion` (simulate rename failure → old version still `installed`, staging removed, catalog unchanged), `deleteDuringDownloadCancelsAndCleans`, `importZipWithAndWithoutSubdir`, `importReportsMissingAndMismatchByName`, `importIgnoresExtraFiles`.
 - [ ] **Step 2:** Run → FAIL.
@@ -245,14 +245,14 @@
 
 **Files:**
 - Create: `voice/ui/VoicePacksSection.kt`, `voice/ui/VoicePacksViewModel.kt`
-- Modify: `voice/ui/VoiceCatalogScreen.kt` (insert section), STT model picker (`voice/ui/SpeechModelScreen.kt` / `VoiceModelScreen.kt`: packs listed with "本机 · 离线", "需要下载" when missing), call STT pickers (exclude packs), `voice/ui/VoiceHold.kt` (`NoSystemNoModel` / `SystemNoResponse` / `VoicePackMissing` add a "下载离线语音包" action to the voice section), `res/values*/strings_voice*.xml` (13 locales)
+- Modify: `voice/ui/VoiceCatalogScreen.kt` (insert section), STT model picker (`voice/ui/SpeechModelScreen.kt` / `VoiceModelScreen.kt`: packs listed with "On device · Offline", "Download required" when missing), call STT pickers (exclude packs), `voice/ui/VoiceHold.kt` (`NoSystemNoModel` / `SystemNoResponse` / `VoicePackMissing` add a "Download offline voice pack" action to the voice section), `res/values*/strings_voice*.xml` (13 locales)
 - Test: `app/src/test/.../voice/ui/VoicePacksViewModelTest.kt`; `app/src/androidTest/.../voice/VoicePacksScreenTest.kt`
 
 **Interfaces:**
 - Consumes: Task 7 `VoicePackInstaller`, Task 4 `VoicePackStatus`, Task 2 `OnDeviceLanguage.recommended`.
 - Produces: `data class VoicePackCard(val entry: VoicePackEntry, val status: VoicePackStatus, val progress: DownloadProgress?, val recommended: Boolean)`; `VoicePacksViewModel.cards: StateFlow<List<VoicePackCard>>` (recommended first); actions `download`, `confirmMetered`, `cancel`, `delete`, `import(uris)`, `copyUrls`.
 
-- [ ] **Step 1: Write failing tests:** ViewModel `recommendedPackFirst`, `meteredConfirmationFlow`, `noSpaceShowsMessageWithoutStarting`, `unsupportedDeviceHidesSection`; device test: card states NotInstalled → Downloading (progress readable by TalkBack via `contentDescription`/`stateDescription`) → Installed; "需要下载" label in the picker after deleting files behind the store's back.
+- [ ] **Step 1: Write failing tests:** ViewModel `recommendedPackFirst`, `meteredConfirmationFlow`, `noSpaceShowsMessageWithoutStarting`, `unsupportedDeviceHidesSection`; device test: card states NotInstalled → Downloading (progress readable by TalkBack via `contentDescription`/`stateDescription`) → Installed; "Download required" label in the picker after deleting files behind the store's back.
 - [ ] **Step 2:** Run → FAIL.
 - [ ] **Step 3:** Implement with existing `ListRow` / card components; import via `ActivityResultContracts.OpenMultipleDocuments`; copy via `ClipboardManager`. No first-launch prompt.
 - [ ] **Step 4:** Run unit + device tests and `python3 tools/i18n/translations.py check` → PASS.
@@ -261,7 +261,7 @@
 ### Task 10: Docs and acceptance
 
 **Files:**
-- Modify: `docs/dev/architecture.md` §16 (offline source, manifest, download/import, Auto order, extension points), user docs voice page ("离线语音包": where, import, space), spec status → implemented
+- Modify: `docs/dev/architecture.md` §16 (offline source, manifest, download/import, Auto order, extension points), user docs voice page ("Offline voice packs": where, import, space), spec status → implemented
 - Test: device acceptance on the test phone
 
 - [ ] **Step 1:** Install each pack via the UI on the test phone (Release not yet published: point a mirror entry at a local `python3 -m http.server` serving `publish.py fetch` output, or import the zip).

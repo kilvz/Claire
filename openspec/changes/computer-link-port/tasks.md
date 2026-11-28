@@ -2,7 +2,7 @@
 
 - [x] 1.1 `McpSettings`: `port` becomes mutable + `setPort()` (1024–65535 validation, persisted), app unit tests (save/out-of-range/default read, compatibility with old manual values)
 - [x] 1.2 `McpRuntime.setPort()`: write the setting + `writeUsbScript()` + `apply()`; `sync()` rebinds when `boundPort != settings.port`
-- [x] 1.3 The 「监听端口」 (Listen port) row in the `McpScreen` advanced section + dialog (default 8765 shortcut + numeric input validation), wiring `ComputerAccessUi.onPortChange`
+- [x] 1.3 The "Listen port" row in the `McpScreen` advanced section + dialog (default 8765 shortcut + numeric input validation), wiring `ComputerAccessUi.onPortChange`
 
 ## 2. Copy and documentation
 

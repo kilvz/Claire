@@ -3,14 +3,14 @@ package com.wangzan101.mika.core.model
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * 火山方舟 Seedance 视频生成的声明。依据方舟官方文档(2026-11 核对):
- * - 数据面 Base URL 只有 `https://ark.cn-beijing.volces.com/api/v3`(「Base URL 及鉴权」);Coding Plan 用的是另一个地址,不能生成视频。
- * - 各模型的取值(「创建视频生成任务」的 resolution / ratio / duration):
- *   Seedance 2.5:4–30 秒,480p/720p/1080p/4k;Seedance 2.5 flash:4–30 秒,480p/720p;
- *   Seedance 2.0:4–15 秒,480p/720p/1080p/4k;Seedance 2.0 fast / mini:4–15 秒,480p/720p。
- *   宽高比都可选 16:9、4:3、1:1、3:4、9:16、21:9;Seedance 2.5 首帧生视频只支持 adaptive(沿用首帧图的比例)。
- *   generate_audio 2.x 都支持(默认 true)。
- * flash / fast / mini 的完整模型 ID 文档里没给,按名字里的词认;认不出的模型(推理接入点 ep-…、旧版本)按各模型都支持的那部分给。
+ * Declaration of Volcengine Ark Seedance video generation. Based on the official Ark documentation (checked 2026-11):
+ * - The data-plane Base URL is only `https://ark.cn-beijing.volces.com/api/v3` ("Base URL and authentication"); Coding Plan uses a different address and cannot generate videos.
+ * - Values for each model (resolution / ratio / duration from "Create video generation task"):
+ *   Seedance 2.5: 4–30 seconds, 480p/720p/1080p/4k; Seedance 2.5 flash: 4–30 seconds, 480p/720p;
+ *   Seedance 2.0: 4–15 seconds, 480p/720p/1080p/4k; Seedance 2.0 fast / mini: 4–15 seconds, 480p/720p.
+ *   All support the aspect ratios 16:9, 4:3, 1:1, 3:4, 9:16 and 21:9; Seedance 2.5 first-frame video generation supports only adaptive (inherits the first frame's aspect ratio).
+ *   generate_audio is supported by all 2.x models (default true).
+ * The documentation does not give full model IDs for flash / fast / mini, so they are recognized by the words in the name; unrecognized models (inference endpoints ep-…, older versions) get the subset that all models support.
  */
 object ArkSeedance : VideoBackend {
     override val id = "ark-seedance"
@@ -23,7 +23,7 @@ object ArkSeedance : VideoBackend {
     private val BASIC_RESOLUTIONS = setOf("480p", "720p")
     private val ALL_RESOLUTIONS = setOf("480p", "720p", "1080p", "4k")
 
-    /** 认不出的模型:2.0 与 2.5 都接受的取值;带首帧时发 adaptive(两代都接受),不发 generate_audio(用服务商默认)。 */
+    /** Unknown models: values accepted by both 2.0 and 2.5; with a first frame send adaptive (accepted by both generations) and do not send generate_audio (use the provider default). */
     internal val COMMON = VideoCapabilities(
         durations = 4..15, aspects = ASPECTS, resolutions = BASIC_RESOLUTIONS,
         supportsFirstFrame = true, firstFrameKeepsAspect = true, supportsAudio = false,

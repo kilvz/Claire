@@ -18,7 +18,7 @@
 
 ## 4. PR
 
-- [x] 4.1 Push the branch, create the PR (title in the 「现状 → 改动」 (current state → change) form, references #774, first-screen measured evidence, test coverage stated honestly)
+- [x] 4.1 Push the branch, create the PR (title in the "current state → change" form, references #774, first-screen measured evidence, test coverage stated honestly)
 - [x] 4.2 Wait for all four CI groups to go green (app/cli/core/relay groups pass)
 
 ## 5. Rework from PR #797 review (option A: tiers cover only chat attachments and device file imports)
@@ -26,7 +26,7 @@
 - [x] 5.1 Rebase onto the latest main containing #800: resolve the `Attachments`/`AndroidDeviceFiles`/`TaskRun` conflicts per the new structure (importOne's onCopied refactor coexists with limits; device imports are consolidated into `DeviceWorkspaceImports`)
 - [x] 5.2 Revert the out-of-scope wiring: `WechatImageFiles` (room check back to fixed `WORKSPACE_MAX`, dropping the construction-time tier snapshot) and `PhoneTaskFiles` (the up-front sum and room check back to fixed values); both files are zero-diff against main
 - [x] 5.3 Wire the new in-scope entry point: `DeviceWorkspaceImports` gains a `limits: () -> AttachmentLimits` provider, which `copy()` reads fresh each time; the `TaskRun` construction point injects the FeatureFlags tier
-- [x] 5.4 Rewrite both settings subtitle strings ×12 languages to state 「仅聊天附件与设备文件导入；微信/电脑保持固定限额」 (chat attachments and device file imports only; WeChat/computer keep fixed limits)
+- [x] 5.4 Rewrite both settings subtitle strings ×12 languages to state "chat attachments and device file imports only; WeChat/computer keep fixed limits"
 - [x] 5.5 Unit tests: `DeviceWorkspaceImportsTest` gains cases for "tier read fresh each time, small limit rejects/relaxed limit passes"
 - [x] 5.6 Full local run (core/cli/app unit tests + i18n check) + openspec validate — 3300+ app unit tests all green (core/relay are zero-diff against main and were not rerun, CI covers them)
 - [ ] 5.7 Push, update the PR description, reply to review comments, wait for all four CI groups to go green — the first three are done (d920103e pushed, body updated, two comments sent covering the scope decision and the CI note); app/cli/relay are green, and the core red is main's own `DocsConsistencyTest` going red because of the maintainer's 2026-11-22 planning docs (this branch has zero changes to core//docs/, and two main tips fail identically), so once main goes green a rebase and re-push closes the loop

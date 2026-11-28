@@ -256,8 +256,8 @@ internal suspend fun TaskRun.assembleGate(ph: RunPhone): TaskGate {
         refreshLocked = states::refresh,
         unattendedUnlock = unlockAuthorized?.let { authorized ->
             {
-                // 回锁走无障碍的全局动作、守卫走通知;两样都不在就立不住「锁回去」的义务,不去解锁。
-                // 熄屏一夜后无障碍服务可能正断开重连或在自动修复:和接手机时同一个有界等待,等不到照旧不解锁
+                // Relocking uses the accessibility global action and the guard uses a notification; without both the obligation to "lock back" cannot stand, so do not unlock.
+                // After the screen has been off all night the accessibility service may be reconnecting or auto-repairing: the same bounded wait as when picking up the phone, and if it does not arrive, do not unlock as before
                 if (AccessibilityRepair.awaitService(ScreenAccessibility.instance,
                         phoneServices.recovery.accessibilityRepair.phase, A11Y_WAIT_MS) == null) {
                     states.refresh()

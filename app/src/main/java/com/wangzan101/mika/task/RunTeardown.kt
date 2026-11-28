@@ -97,7 +97,7 @@ internal class RunTeardown(
         val recorded = withContext(Dispatchers.IO) { runId?.let { id -> runCatching { k?.runStore?.events(id) }.getOrNull() } }
         val events = recorded?.takeIf { e -> e.any { it is RunEvent.Activity } } ?: synchronized(state.activityLog) { state.activityLog.toList() }
         if (!StopSummary.worthSaying(events, draft)) return null
-        // 还没完成装配就停下的也用开局快照，绝不在收尾时重读已经改变的设置。
+        // Runs that stopped before assembly finished also use the opening snapshot; never re-read changed settings during teardown.
         val (main, light) = if (k != null) k.model to k.light else snapshot()?.let { it.main to it.light } ?: (null to null)
         val lang = com.wangzan101.mika.i18n.AppLanguage.resolved(service).tag
         val labels = ToolLabels(knownTools())

@@ -17,4 +17,4 @@
 ## 4. Verification and wrap-up
 
 - [x] 4.1 Behavioral evidence for the mock endpoint goes into `evidence/evidence.md` (the model HTTP layer is pure JVM code, so no real-device task applies).
-- [ ] 4.2 Commit the branch, push the fork, open a PR (title following the 「现状 → 改动」 (current state → change) convention), and wait for all four CI groups to go green.
+- [ ] 4.2 Commit the branch, push the fork, open a PR (title following the "current state → change" convention), and wait for all four CI groups to go green.

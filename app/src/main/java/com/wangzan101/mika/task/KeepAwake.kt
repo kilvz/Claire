@@ -18,18 +18,18 @@ interface WakeLockPort {
  * Once the screen goes off the system drops injected touches and then locks, so the screen must not turn off by itself while the Agent is working;
  * but the screen does not need to stay fully bright while the user is not interacting, and it still dims at the system timeout (see [ScreenWakeLock]).
  *
- * 只在 Running(含等另一个任务用完某个 App)和排在别的任务后面等虚拟屏时持有。等待接管/回答/继续/解锁时屏幕不需要为 Agent 亮着,
- * 再保持 [GRACE_MS](用户多半正要处理,别让屏幕在他眼前熄掉)后释放,任务继续跑时重新持有。
- * 结束、失败、取消立即释放。锁随进程走:Mika 异常退出时系统自动收回,不需要持久化恢复。
- * 用户按电源键照样能熄屏(没带 ACQUIRE_CAUSES_WAKEUP),这时 gate 会让任务等待解锁。
+ * Held only while Running (including waiting for another task to finish using an app) and while queued behind another task for a virtual screen. While waiting to take over/answer/continue/unlock, the screen does not need to stay on for the Agent,
+ * it is released after holding for [GRACE_MS] longer (the user is probably about to act, so do not let the screen go dark in front of them), and held again when the task continues running.
+ * Released immediately on completion, failure or cancellation. The lock follows the process: if Claire crashes the system reclaims it automatically, so no persisted recovery is needed.
+ * The user can still turn the screen off with the power button (ACQUIRE_CAUSES_WAKEUP is not set); the gate then makes the task wait for unlock.
  *
- * 任务的 CPU 锁([CpuWakeLock])用同一套规则,只是 keepThroughEnd:从开跑一直撑到任务收尾(结果送达、账本记好),
- * 等你处理时同样过了宽限就放开,不让一个等回答的任务整晚撑着 CPU。
+ * The task's CPU lock ([CpuWakeLock]) follows the same rules, except keepThroughEnd: it is held from start through task teardown (result delivered, ledger recorded),
+ * and is also released after the grace period while waiting for you, so a task waiting for an answer does not hold the CPU all night.
  */
 class KeepAwake(
     private val lock: WakeLockPort,
     private val scope: CoroutineScope,
-    /** 到了终态(和开跑前的 Idle)也接着持有、直到 [close]:CPU 锁要撑到结果送达、定时账本记好;屏幕锁不用。 */
+    /** Keep holding in a terminal state (and Idle before start) until [close]: the CPU lock must last until the result is delivered and the scheduled ledger is recorded; the screen lock does not. */
     private val keepThroughEnd: Boolean = false,
 ) {
     private var held = false
@@ -146,9 +146,9 @@ class ScreenWakeLock(context: Context) : WakeLockPort {
 }
 
 /**
- * CPU 唤醒锁(PARTIAL_WAKE_LOCK):熄屏、Doze 里也让任务的网络与推理接着走,不点亮屏幕。
- * 和屏幕锁一样由 [SharedWakeLock] 分成每个任务各持一份、按任务状态拿放(见 [KeepAwake] 的 keepThroughEnd);
- * [MAX_HOLD_MS] 只是漏了释放时的兜底。
+ * CPU wake lock (PARTIAL_WAKE_LOCK): keeps the task's networking and inference running with the screen off and in Doze, without turning the screen on.
+ * Like the screen lock, [SharedWakeLock] gives each task its own share, acquired and released by task state (see keepThroughEnd on [KeepAwake]);
+ * [MAX_HOLD_MS] is only a fallback for a missed release.
  */
 class CpuWakeLock(context: Context, tag: String) : WakeLockPort {
     private val lock = context.getSystemService(PowerManager::class.java)
@@ -164,10 +164,10 @@ class CpuWakeLock(context: Context, tag: String) : WakeLockPort {
 }
 
 /**
- * 定时派发到任务服务接手之间的 CPU 唤醒。闹钟广播结束后系统就不再替 App 撑着 CPU,
- * 而前台服务的 onStartCommand、任务拿到自己那份 CPU 锁都在这之后:派发方([TaskService.startTrigger])先拿上,
- * 服务处理完这次启动(开跑、排队或因暂停/退出不开)就放开;服务没起来时到 [HANDOFF_MS] 自动放开。
- * 只有这一个派发窗口要撑,所以整个进程一把、不计数:连着来两次就把期限往后推。
+ * CPU wake held between scheduled dispatch and the task service taking over. After the alarm broadcast ends the system stops holding the CPU for the app,
+ * and the foreground service's onStartCommand and the task acquiring its own CPU lock both happen after that: the dispatcher ([TaskService.startTrigger]) acquires it first,
+ * and releases it once the service has handled this start (start, queue, or not start due to pause/exit); if the service does not come up it is released automatically after [HANDOFF_MS].
+ * Only this one dispatch window needs holding, so there is a single process-wide lock without counting: two in a row just push the deadline back.
  */
 internal object TriggerHandoffWake {
     private var lock: PowerManager.WakeLock? = null

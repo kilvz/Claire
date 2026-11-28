@@ -212,7 +212,7 @@ object PhoneSetupFlow {
             // Paired and wireless debugging is on but the status has not caught up yet: the implementation connects automatically right away, so show "connecting" first
             BuiltinShellStatus.WirelessDebuggingOff -> working(i)
             BuiltinShellStatus.NotPaired -> guide(SetupStep.PairingCode, i)
-            // 用户暂停了 Mika:不是没配好。停在「连接」这一步:恢复就是在这里重连。
+            // The user paused Claire: this is not a setup failure. Stay on the "connect" step: resuming reconnects here.
             BuiltinShellStatus.Paused -> guide(SetupStep.Connect, i)
             is BuiltinShellStatus.Failed -> {
                 val step = if (status.reason.duringPairing || status.fix == BuiltinShellFix.RePair) SetupStep.PairingCode else SetupStep.Connect

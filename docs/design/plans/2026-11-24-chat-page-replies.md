@@ -1,43 +1,43 @@
-# 聊天页回复改版 实现计划
+# Chat page reply redesign implementation plan
 
-原型：`docs/design/prototypes/2026-11-24-chat-page-hifi.html`（用户 11-24 认可）。
+Prototype: `docs/design/prototypes/2026-11-24-chat-page-hifi.html` (approved by the user on 11-24).
 
-目标：一句话之后的几条回复（前台答应、办完的结果、旧式回答）都画成同一种浅灰块，结果写全；在办的事不再夹卡片进对话，改看输入框上方的进度条；要你处理时对话里一张问题卡；虚拟屏小窗也跟前台派出去的事。
+Goal: Several replies after one sentence (the front desk's acknowledgement, the completed result, and legacy answers) are all drawn as the same light-grey block, with the full result written out; in-progress jobs no longer insert cards into the conversation, and progress is shown in the bar above the input field; when something needs your action there is one question card in the conversation; the virtual-screen mini window also follows the work dispatched by the front desk.
 
-## 用户定下的几条
+## A few decisions from the user
 
-- 小窗挡住问题卡：保持现状（能拖、能关）。
-- 结果下面不留「查看过程」；从右上角 ⋯ →「这个对话里的事」进。
-- 两件事同时有画面：小窗显示最新动的那件；不止一件在办时小窗上写是哪件，只有一件不写。
-- 右上角 ⋯ 里也放「通话设置」（设置里的入口照留）。
+- The mini window covers the question card: keep it as is (draggable, closeable).
+- No "view process" under a result; reach it from ⋯ at the top right → "Jobs in this conversation".
+- Two jobs with screens at the same time: the mini window shows the one that moved most recently; when more than one job is in progress, the window states which one, and when there is only one it does not.
+- "Call settings" also goes in ⋯ at the top right (the entry in Settings stays).
 
-## A 回复的样子（`chat/ui`）
+## A. How replies look (`chat/ui`)
 
-1. 前台回话（`DeskReply`）、汇报行、旧式回答（`StatusCard` 的完成态）都用同一个灰块：`colors.answer` + `MikaShapes.AnswerBubble`，正文完整 Markdown；短的贴字宽，长的铺满。
-2. 去掉回答头上的「Claire · 用时 · Token」（`TurnMeta`）和尾部那排按钮（`ReplyActions`）；长按菜单照旧（复制、引用、选择文字、分支）。
-3. 同一句话下面的几条回复间距 8；相邻两轮隔了 5 分钟以上时，中间一行时间（今天「14:02」，更早「昨天 21:30」/日期）。
+1. Front-desk replies (`DeskReply`), report rows and legacy answers (`StatusCard`'s completed state) all use the same grey block: `colors.answer` + `MikaShapes.AnswerBubble`, with the full body in Markdown; short ones hug the text width and long ones fill the width.
+2. Remove "Claire · time · tokens" (`TurnMeta`) above an answer and the row of buttons at the end (`ReplyActions`); the long-press menu stays as before (copy, quote, select text, branch).
+3. Replies under the same sentence are spaced 8 apart; when two adjacent rounds are more than 5 minutes apart, a time line goes between them (today "14:02", earlier "Yesterday 21:30" / date).
 
-## B 结果写全、前台少转述
+## B. Full results, less paraphrasing by the front desk
 
-1. `DeskEvent.Succeeded.answer` 不再截断；给前台模型看的那份才截（`DESK_RESULT_MAX_CHARS`）。
-2. 聊天页开着时，办好了的结果不经前台模型，原文写成一行汇报（`desk_report`）。没办成仍由前台说（原因 + 下一步）。要你处理不另说一句，对话里出问题卡。
-3. 页面不在时的兜底（`DeskNotifier`）：开始、进度、要你处理都不再往对话里写行；办好了写原文，没办成写一句原因；通知照旧。
-4. `front_desk.md`：打字聊天时不再限死「一两句」——能直接答的问题答完整；语音的简短由 `SPOKEN_STYLE` 管。
+1. `DeskEvent.Succeeded.answer` is no longer truncated; only the copy shown to the front-desk model is truncated (`DESK_RESULT_MAX_CHARS`).
+2. When the chat page is open, a completed result does not go through the front-desk model and is written verbatim as one report line (`desk_report`). A failed job is still spoken by the front desk (reason + next step). Needing your action is not announced in a separate sentence; a question card appears in the conversation.
+3. Fallback when the page is not open (`DeskNotifier`): start, progress and needing-your-action no longer write a line into the conversation; completion writes the original text, and failure writes one sentence with the reason; notifications stay as before.
+4. `front_desk.md`: when chatting by text, no longer limit it to "one or two sentences" — answer questions that can be answered directly in full; brevity for voice is handled by `SPOKEN_STYLE`.
 
-## C 进度条和问题卡
+## C. Progress bar and question cards
 
-1. `DeskTaskView` 加：`goal`（交给后台的原话）、`startedAt`、`steps`（每一步一句 + 时刻，最多 `DESK_STEPS_MAX` 条）、`need`（在问什么、选项、要你做哪类事）、`updatedAt`。时钟由 `FrontDesk` 注入。`recent` 留给通话页。
-2. `DeskTray` 改成原型那样：收起一行（状态点、名字、此刻这一步、用时、`+N`、箭头）；展开每件一段（名字、阶段胶囊、原话、竖线步骤和用时；底部「停止」「查看详细过程 ›」）。
-3. 对话里不再画 `DeskTaskCard`。要你处理的每件在对话末尾一张 `NeedCard`：要你选（问题 + 选项，点了直接回答这件事）或要你接管/确认（「去处理」进这件事的对话，「停止这件事」）。
+1. Add to `DeskTaskView`: `goal` (the original words handed to the background), `startedAt`, `steps` (one sentence per step + time, at most `DESK_STEPS_MAX` entries), `need` (what is being asked, the options, which kind of action is needed), `updatedAt`. The clock is injected by `FrontDesk`. `recent` is left for the call page.
+2. Change `DeskTray` to match the prototype: collapsed, one line (status dot, name, current step, elapsed time, `+N`, arrow); expanded, one section per job (name, phase capsule, original words, vertical-line steps and elapsed time; at the bottom "Stop" and "View detailed process ›").
+3. The conversation no longer draws `DeskTaskCard`. Each job that needs your action gets a `NeedCard` at the end of the conversation: either it asks you to choose (question + options; tapping answers this job directly) or asks you to take over/confirm ("Go handle it" opens this job's conversation, "Stop this job").
 
-## D 小窗跟前台的事
+## D. The mini window follows front-desk jobs
 
-前台接的会话自己没有任务时：在办（在做/要你处理）且有画面的事里取最近动过的那件，让服务显示它（画面跟着换），小窗按它的阶段画绿/橙；不止一件在办时小窗上写事情名字。放大、关掉记在页面里，按事情分开。
+When the conversation the front desk is handling has no task of its own: among jobs that are in progress (running / needing your action) and have a screen, take the one that moved most recently and have the service display it (the screen follows); the mini window draws green/orange according to its phase; when more than one job is in progress, the window shows the job name. Zoom and close state are remembered per page, separately per job.
 
-## E 右上角 ⋯
+## E. ⋯ at the top right
 
-聊天页右上角铅笔换成 ⋯：新对话、通话记录（点一条跳到那一通开头）、这个对话里的事（列出前台派过的每件，点开进它的运行记录，没有就进它的对话）、通话设置。通话页去掉 ⋯（通话记录从聊天页进）。
+Replace the pencil at the top right of the chat page with ⋯: New conversation, Call history (tap one to jump to the start of that call), Jobs in this conversation (list every job the front desk dispatched; tap to open its run record, or its conversation if there is no record), Call settings. Remove ⋯ from the call page (call history is reached from the chat page).
 
-## F 收尾
+## F. Wrap-up
 
-12 种语言的字串；`./gradlew :core:test :app:testDebugUnitTest --continue`、`:app:compileDebugAndroidTestKotlin`；更新 `docs/dev` 里前台、聊天页的说明；真机只派无害的活看一遍；提交到 main，不推。
+Strings for all languages; `./gradlew :core:test :app:testDebugUnitTest --continue`, `:app:compileDebugAndroidTestKotlin`; update the front-desk and chat-page documentation under `docs/dev`; on a device, dispatch only harmless jobs and take a look; commit to main without pushing.

@@ -3,7 +3,7 @@ package com.wangzan101.mika.core.cap.video
 import com.wangzan101.mika.core.model.VideoCapabilities
 import com.wangzan101.mika.core.model.VideoJobStage
 
-/** 一段生成好的视频:工作区路径、尺寸/时长、封面(JPEG,可为空)。 */
+/** A generated video: workspace path, dimensions/duration, and poster (JPEG, may be null). */
 class VideoTake(
     val path: String,
     val durationMs: Long?,
@@ -12,7 +12,7 @@ class VideoTake(
     val poster: ByteArray? = null,
 )
 
-/** 一次生成请求;firstFramePath 是工作区路径,由 App 侧读成字节后交给模型。 */
+/** One generation request; firstFramePath is a workspace path that the app reads into bytes before handing it to the model. */
 class VideoGenerationRequest(
     val prompt: String,
     val durationSec: Int,
@@ -22,16 +22,16 @@ class VideoGenerationRequest(
 )
 
 /**
- * 生成能力的 App 侧实现:调 VideoModel、下载到工作区、抽一帧当封面;进度由端口自己报给任务卡片。
- * 端口不认服务商:哪家、什么协议由 [com.wangzan101.mika.core.model.VideoBackend] 决定。
+ * App-side implementation of the generation capability: calls VideoModel, downloads into the workspace, and extracts one frame as the poster; the port reports progress to the task card itself.
+ * The port does not know about providers: which provider and protocol is decided by [com.wangzan101.mika.core.model.VideoBackend].
  */
 interface VideoGenerationPort {
     val modelName: String
     val capabilities: VideoCapabilities
 
     /**
-     * 提交、等到可下载、存进工作区。失败抛 ModelError/VideoModelError/VideoError。
-     * 任务每进一步也报给 [onStage]:工具据 [VideoJobStage.Submitted] 知道服务商已经收下(开始计费),之后失败不退额度。
+     * Submit, wait until downloadable, and save into the workspace. Failures throw ModelError/VideoModelError/VideoError.
+     * Every step of the task is also reported to [onStage]: the tool uses [VideoJobStage.Submitted] to know the provider accepted it (billing has started), and a later failure does not refund the allowance.
      */
     suspend fun generate(request: VideoGenerationRequest, onStage: suspend (VideoJobStage) -> Unit = {}): VideoTake
 }

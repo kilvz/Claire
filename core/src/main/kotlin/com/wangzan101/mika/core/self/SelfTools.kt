@@ -43,7 +43,7 @@ private fun operate(ctx: ToolContext): SelfPort =
 /** Read-only: self status. */
 internal object MikaStatus : SelfTool {
     override val verb = Verb.SelfStatus
-    override val label = "查看自身状态"
+    override val label = "View status"
     override val risk = Risk.Read
     /** Read-only and does not touch the screen; goes through the read-only call path, not the write entry point. */
     override val offScreen = false
@@ -59,7 +59,7 @@ internal object MikaStatus : SelfTool {
 /** Open one of Claire's own pages; changes only the page in front of the user, no settings. */
 internal object MikaOpenScreen : SelfTool {
     override val verb = Verb.SelfOpenScreen
-    override val label = "打开 Claire 的页面"
+    override val label = "Open Claire's screens"
     override val risk = Risk.Write
     override val def = ToolDef(
         "mika_open_screen",
@@ -84,7 +84,7 @@ internal object MikaOpenScreen : SelfTool {
 /** Open a file in the workspace with the in-app viewer. */
 internal object MikaOpenFile : SelfTool {
     override val verb = Verb.SelfOpenFile
-    override val label = "打开文件"
+    override val label = "Open file"
     override val risk = Risk.Write
     override val def = ToolDef(
         "mika_open_file",
@@ -111,7 +111,7 @@ internal object MikaOpenFile : SelfTool {
 /** Send the user one notification; at most 3 per task. */
 internal object MikaNotify : SelfTool {
     override val verb = Verb.SelfNotify
-    override val label = "发通知"
+    override val label = "Send notification"
     override val risk = Risk.Write
     override val def = ToolDef(
         "mika_notify",
@@ -144,7 +144,7 @@ internal object MikaNotify : SelfTool {
 /** Write the clipboard; never read. */
 internal object MikaCopy : SelfTool {
     override val verb = Verb.SelfCopy
-    override val label = "复制文字"
+    override val label = "Copy text"
     override val risk = Risk.Write
     override val def = ToolDef(
         "mika_copy",
@@ -165,7 +165,7 @@ internal object MikaCopy : SelfTool {
 /** Open a page in the browser the user can see; it opens only when the user agrees at that moment. */
 internal object MikaOpenInBrowser : SelfTool {
     override val verb = Verb.SelfOpenBrowser
-    override val label = "在浏览器里打开"
+    override val label = "Open in browser"
     override val risk = Risk.External
     override val approvalRisk = ApprovalRisk(ActionRisk.External)
     override val logged = true
@@ -205,7 +205,7 @@ internal object MikaOpenInBrowser : SelfTool {
 /** Search with the browser's default search engine and open the results page. */
 internal object MikaSearchInBrowser : SelfTool {
     override val verb = Verb.SelfSearch
-    override val label = "在浏览器里搜索"
+    override val label = "Search in browser"
     override val risk = Risk.External
     override val approvalRisk = ApprovalRisk(ActionRisk.External)
     override val logged = true
@@ -244,7 +244,7 @@ internal object MikaSearchInBrowser : SelfTool {
 /** Site registry: which sites are signed in and which were recently stopped by a captcha/risk control. Read-only. */
 internal object MikaSites : SelfTool {
     override val verb = Verb.SelfSites
-    override val label = "查看网站登录"
+    override val label = "View site sign-ins"
     override val risk = Risk.Read
     /** Goes through the read-only call path and does not touch the screen. */
     override val offScreen = false
@@ -272,7 +272,7 @@ internal object MikaSites : SelfTool {
 /** The page the user's browser is on right now; read-only. */
 internal object MikaUserPage : SelfTool {
     override val verb = Verb.SelfUserPage
-    override val label = "查看正在看的网页"
+    override val label = "View current page"
     override val risk = Risk.Read
     override val offScreen = false
     override val concurrency = Concurrency.ParallelSafe
@@ -296,7 +296,7 @@ internal object MikaUserPage : SelfTool {
 /** Open the "sign in for Claire" page so the user signs in themselves. */
 internal object MikaLoginSite : SelfTool {
     override val verb = Verb.SelfLogin
-    override val label = "请你登录网站"
+    override val label = "Sign in to a site"
     override val risk = Risk.External
     override val approvalRisk = ApprovalRisk(ActionRisk.External)
     override val logged = true
@@ -330,7 +330,7 @@ internal object MikaLoginSite : SelfTool {
 /** The user says the sign-in is done: verify once and record the sign-in state. */
 internal object MikaConfirmLogin : SelfTool {
     override val verb = Verb.SelfConfirmLogin
-    override val label = "核对登录"
+    override val label = "Confirm sign-in"
     override val risk = Risk.Write
     override val logged = true
     override val def = ToolDef("mika_confirm_login", Prompts.tool("mika_confirm_login"))
@@ -344,7 +344,7 @@ internal object MikaConfirmLogin : SelfTool {
 /** Favourite sites: list / add / remove; the change is reversible, no consent for this call. */
 internal object MikaFavorites : SelfTool {
     override val verb = Verb.SelfFavorites
-    override val label = "常用网站"
+    override val label = "Favorite sites"
     override val risk = Risk.Write
     override val logged = true
     override val def = ToolDef(

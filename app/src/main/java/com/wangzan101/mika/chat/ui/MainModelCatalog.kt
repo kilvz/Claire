@@ -8,7 +8,7 @@ import com.wangzan101.mika.settings.usableMainChoice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
-/** 对话页模型面板的一项；[choice] 只允许具体配置或模型组。 */
+/** One item in the conversation page's model panel; [choice] only allows a concrete config or a model group. */
 data class MainModelOption(
     val choice: ModelChoice,
     val title: String,
@@ -17,7 +17,7 @@ data class MainModelOption(
     val memberCount: Int = 0,
 )
 
-/** chip 的显示状态；失效的 [override] 保留用于恢复/审计，[label] 显示实际回退。 */
+/** The chip's display state; an invalid [override] is kept for restore/audit, and [label] shows the actual fallback. */
 data class MainModelUi(
     val available: Boolean = false,
     val override: ModelChoice? = null,
@@ -37,7 +37,7 @@ interface MainModelCatalog {
     fun isGroup(choice: ModelChoice): Boolean
 }
 
-/** 全局 ProviderStore 的只读目录；任何配置、组或角色变化都通知当前对话重算。 */
+/** Read-only catalog of the global ProviderStore; any config, group or role change notifies the current conversation to recompute. */
 class ProviderMainModelCatalog(private val store: ProviderStore) : MainModelCatalog {
     override val changes: Flow<Unit> =
         combine(store.providers, store.configs, store.groups, store.roles) { _, _, _, _ -> }

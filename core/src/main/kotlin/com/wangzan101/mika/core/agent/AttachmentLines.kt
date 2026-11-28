@@ -7,12 +7,12 @@ package com.wangzan101.mika.core.agent
  * The conversation page uses them to render attachments as photo tiles and file cards (the app's
  * AttachmentMessage); language hints, the answer language check and memory, and skill quotations do not count these
  * lines (see [UserWords]).
- * Messages in old conversations use the prefix "附件:" and are still parsed.
+ * Messages in old conversations use the legacy Chinese "attachment" prefix and are still parsed.
  */
 object AttachmentLines {
     private const val PREFIX = "Attachment:"
 
-    /** Names may contain parentheses ("report (1).csv"): only the last pair of parentheses is taken as the size, and only its "number + B/KB/MB"; the path is under /workspace in the sandbox. Older versions wrote "附件:" and those lines are still recognised. */
+    /** Names may contain parentheses ("report (1).csv"): only the last pair of parentheses is taken as the size, and only its "number + B/KB/MB"; the path is under /workspace in the sandbox. Older versions wrote the Chinese attachment prefix and those lines are still recognised. */
     private val LINE = Regex("^(?:Attachment:|附件:)(/workspace/.+)\\((\\d+(?:\\.\\d+)? (?:B|KB|MB))\\)$")
 
     /** A split message: [files] is the path and the size written in the message ("2 KB") for each attachment, in order of appearance; [words] is the text other than attachment lines (trimmed). */

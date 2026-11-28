@@ -98,7 +98,7 @@ internal fun ProviderStore.meteredWith(
         compactionEveryRounds = TEMP_COMPACTION_EVERY_ROUNDS,
     ))
     val roleEffort = if (useRoleEffort) effortOverride ?: _roles.value.reasoningEffort(role) else effortOverride
-    // 主动能力:思考取服务商写明的最低档;回复短的那两种请求另设上限(见 ProactiveModelSetup)
+    // Proactive capability: thinking uses the lowest level the provider states; the two short-reply requests get a separate cap (see ProactiveModelSetup)
     val (effort, cap) = if (purpose == UsagePurpose.Proactive) {
         ProactiveModelSetup.of(adapterFor(cfg, listed?.endpoint).first, ReasoningOptions.of(cfg, listed), roleEffort, call)
     } else roleEffort to null
@@ -222,9 +222,9 @@ fun ProviderStore.imageModel(choice: ImageChoice, capabilities: ImageCapabilitie
 }
 
 /**
- * 视频生成用的模型:只有选择对得上一家能生成视频的服务商([VideoProviders.resolve] 为 Ready)才建;
- * 地址、Key、请求头取这家服务商,协议和模型能力由它的 [com.wangzan101.mika.core.model.VideoBackend] 决定。
- * 不套对话模型的计量。没有 Key 或 Key 含有不能放进请求头的字符时为 null。提交和轮询都是短请求,结果另行下载。
+ * Model for video generation: built only when the choice matches a provider that can generate video ([VideoProviders.resolve] is Ready);
+ * address, Key and request headers come from this provider, and the protocol and model capabilities are determined by its [com.wangzan101.mika.core.model.VideoBackend].
+ * No conversation model metering. Null without a Key or when the Key contains characters that cannot go into a request header. Submission and polling are short requests; results are downloaded separately.
  */
 fun ProviderStore.videoModel(choice: VideoChoice?): VideoModel? {
     val ready = VideoProviders.resolve(choice, providers.value) as? VideoSelection.Ready ?: return null
@@ -237,10 +237,10 @@ fun ProviderStore.videoModel(choice: VideoChoice?): VideoModel? {
 }
 
 /**
- * 用户确认测试指定模型后，按真实任务的适配器和请求头建出 [model]，
- * 带一个无参数的工具([PROBE_TOOL])、请它调用;回复限得很短(协议允许的话,见 [buildModel])。
- * 回了工具调用为 [ProbeResult.ToolCalled],只回了话为 [ProbeResult.NoToolCall],请求失败带着服务端的报错原样返回。
- * 不计量:这几个 token 不属于任何用途。会话号用新的,不属于任何对话。超时由调用方管。
+ * After the user confirms testing the specified model, builds [model] with the real task's adapter and request headers,
+ * gives it a parameterless tool ([PROBE_TOOL]) and asks it to call it; the reply is capped very short (if the protocol allows, see [buildModel]).
+ * Calling the tool returns [ProbeResult.ToolCalled], answering with text only returns [ProbeResult.NoToolCall], and a failed request returns the server's error as-is.
+ * No metering: these few tokens belong to no purpose. The session ID is new and belongs to no conversation. Timeout is up to the caller.
  */
 suspend fun ProviderStore.probe(
     kind: ProviderConfig.Kind, baseUrl: String, apiKey: String?, sessionHeader: String?,

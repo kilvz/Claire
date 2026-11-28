@@ -20,7 +20,7 @@ chmod 600 owner-key
 
 View the owner-key file privately on this machine. It is an admin key, not an MCP token, and is not entered into client configuration. Initialization does not overwrite an old key. Caddy obtains certificates automatically and proxies WebSockets; only Caddy publishes host ports. The domain and ports must be reachable; keep the data and certificate volumes.
 
-Open the gateway's HTTPS address in a browser, enter the admin key, and tap Create pairing code. A pairing code is valid for five minutes and can be used only once. On the phone, 「设置 → 连接电脑 → 远程」 (Settings → Connect computer → Remote), enter the address and pairing code; after pairing you still need to explicitly turn on 「允许远程访问」 (Allow remote access). Before switching phones, the old pairing must be revoked.
+Open the gateway's HTTPS address in a browser, enter the admin key, and tap Create pairing code. A pairing code is valid for five minutes and can be used only once. On the phone, "Settings → Connect computer → Remote", enter the address and pairing code; after pairing you still need to explicitly turn on "Allow remote access". Before switching phones, the old pairing must be revoked.
 
 ### The server already has Nginx
 
@@ -42,8 +42,8 @@ All subsequent Compose commands use the same project name and -f argument. To ro
 
 The phone's existing `McpSettings` access token is used for LAN, remote CLI and MCP alike. The gateway does not generate, validate, digest-store or sync that token; it only forwards `Authorization` transparently, and each request is validated by the phone's `RemoteAccess`. When the LAN switch is off, an explicitly enabled remote connection can still use this token. Temporary USB tokens remain for loopback entries only and cannot be used through remote access.
 
-- MCP: on the phone choose 「MCP → 远程」 (MCP → Remote), and copy the configuration into a client that supports a custom Authorization request header; the address is `https://<your-domain>/mcp`.
-- CLI: on the phone choose 「CLI / Skill → 远程」 (CLI / Skill → Remote), copy the access token into a private file on the computer, and run the connection command shown on the page. The command does not carry the token in plain text.
+- MCP: on the phone choose "MCP → Remote", and copy the configuration into a client that supports a custom Authorization request header; the address is `https://<your-domain>/mcp`.
+- CLI: on the phone choose "CLI / Skill → Remote", copy the access token into a private file on the computer, and run the connection command shown on the page. The command does not carry the token in plain text.
 
 ```sh
 chmod 600 /path/to/token
@@ -56,7 +56,7 @@ Every remote call must pass `--url` and `--token-file`; `mika connect` only veri
 
 ### Wake and unlock through the gateway: off by default
 
-Remote wake and unlock let whoever holds the token enter the lock-screen PIN/password on the phone. On a LAN, only devices on the same network can reach the phone; through the gateway it is the entire internet, and the gateway itself can see the token. So requests coming through the gateway by default **cannot see** screen capabilities (`mika_device_state`, `mika_wake_device`, `mika_unlock_device` and `/api/v1/device`; `/api/v1`'s capabilities do not list `device_state` either) — the tools and endpoints simply do not appear rather than appearing and then being refused. To wake and unlock through the gateway, three things must all be turned on on the phone: 「允许远程访问」, the remote page's 「允许经网关唤醒和解锁」 (Allow waking and unlocking through the gateway) (off by default, stored in the encrypted gateway configuration, resetting to off on pairing or re-pairing), and the existing 「允许远程亮屏与解锁」 (Allow remote wake and unlock). LAN and USB behavior are unchanged.
+Remote wake and unlock let whoever holds the token enter the lock-screen PIN/password on the phone. On a LAN, only devices on the same network can reach the phone; through the gateway it is the entire internet, and the gateway itself can see the token. So requests coming through the gateway by default **cannot see** screen capabilities (`mika_device_state`, `mika_wake_device`, `mika_unlock_device` and `/api/v1/device`; `/api/v1`'s capabilities do not list `device_state` either) — the tools and endpoints simply do not appear rather than appearing and then being refused. To wake and unlock through the gateway, three things must all be turned on on the phone: "Allow remote access", the remote page's "Allow waking and unlocking through the gateway" (off by default, stored in the encrypted gateway configuration, resetting to off on pairing or re-pairing), and the existing "Allow remote wake and unlock". LAN and USB behavior are unchanged.
 
 After the phone changes its access token, old tokens for LAN and remote stop working immediately, with no gateway sync needed; clients must update their configuration. Unpairing only revokes the device channel and does not change the access token; after re-pairing, clients holding that token can still access. To invalidate those clients, change the token on the phone.
 
@@ -80,7 +80,7 @@ The gateway Web UI uses Go templates and embedded local CSS/JS, with no framewor
 
 ## Disconnection and revocation
 
-Turning off remote immediately closes the channel and keeps the pairing; unpairing closes first, then asks the gateway to delete the device identity, and when the network is down it keeps the closed state so it can be retried. The Web UI's 「解除手机配对」 (Unpair phone) must be confirmed before it runs.
+Turning off remote immediately closes the channel and keeps the pairing; unpairing closes first, then asks the gateway to delete the device identity, and when the network is down it keeps the closed state so it can be retried. The Web UI's "Unpair phone" must be confirmed before it runs.
 
 Connections are re-established with backoff, and operations are not replayed; each request has its own number, and a repeated number on the same connection is not executed. At most eight requests at a time, a 1 MiB body limit, 8 KiB each for query and headers, a 65-second timeout, covering the phone's state waits of up to 50 seconds. When a phone result is too large an error is returned, and the channel is not revoked because of it.
 

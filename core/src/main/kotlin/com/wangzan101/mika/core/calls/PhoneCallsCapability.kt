@@ -34,7 +34,7 @@ private class CallAgentTool(private val action: String, override val verb: Verb)
     override val offScreen = true
     override val risk = if (action == "state") Risk.Read else Risk.Write
     override val logged = action != "state"
-    override val label = when (action) { "state" -> "通话状态"; "dial" -> "拨打电话"; "answer" -> "AI 接听"; "hangup" -> "挂断电话"; else -> "人工接管" }
+    override val label = when (action) { "state" -> "Call status"; "dial" -> "Make a call"; "answer" -> "AI answer"; "hangup" -> "Hang up"; else -> "Take over" }
     override val def = ToolDef("phone_call_$action", Prompts.tool("phone_call_$action"),
         when (action) {
             "dial" -> mapOf("number" to str("Explicitly requested telephone number. No emergency, USSD or MMI codes."),

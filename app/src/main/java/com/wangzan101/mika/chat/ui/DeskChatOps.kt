@@ -58,7 +58,7 @@ class DeskChatDeps(
      * A new one is built for every turn (reply, report), so a model changed in settings takes effect on the next message.
      */
     val brain: (conversationId: String, mainOverride: ModelChoice?) -> DeskBrain?,
-    /** 给还没有标题、也还没存过一轮的会话按第一句话起标题(见 [com.wangzan101.mika.chat.ConversationTitler.ensure])。 */
+    /** Gives a conversation that has no title yet and has not stored a turn a title from its first sentence (see [com.wangzan101.mika.chat.ConversationTitler.ensure]). */
     val title: suspend (conversationId: String, first: String) -> Unit = { _, _ -> },
 )
 
@@ -174,12 +174,12 @@ internal class DeskChatOps(
     /** The message the front desk is currently replying to (the part the user said themselves); null when not replying. Cancellation only recognizes it. */
     @Volatile private var current: String? = null
 
-    /** 还没回完的话(含汇报、排队回复)和附件派发;输入框的停止键一起停掉。 */
+    /** Replies not yet finished (including reports and queued replies) and attachment dispatch; the input field's stop key stops them all. */
     private val replies = java.util.concurrent.ConcurrentHashMap.newKeySet<Job>()
 
     private class Stopped : CancellationException("Chat stopped")
 
-    /** 停下这条会话的前台工作,不取消常驻前台的汇报投递循环。 */
+    /** Stops this conversation's desk work, without cancelling the resident desk report-delivery loop. */
     fun stopReplies() { replies.toList().forEach { it.cancel(Stopped()) } }
 
     private fun <T : Job> tracked(job: T): T = job.also {
@@ -187,7 +187,7 @@ internal class DeskChatOps(
         job.invokeOnCompletion { replies -= job }
     }
 
-    /** 附件还在导入当前会话、尚未派给子任务时也属于这次发送。 */
+    /** Attachments still importing into the current conversation, not yet dispatched to a subtask, also belong to this send. */
     fun trackAttachmentImport(job: Job) { tracked(job) }
 
     /** Whether title generation has already run through this entry point. */
@@ -229,12 +229,12 @@ internal class DeskChatOps(
         }
         val job = vm.scope.launch(start = CoroutineStart.UNDISPATCHED) {
             val replyContext = currentCoroutineContext()
-            // 先按发送顺序排上队;停止只取消回话,不取消等待落库的位置。
+            // Queue in send order first; stop only cancels the reply, not the slot waiting to be persisted.
             withContext(NonCancellable) {
                 turns.withLock {
                     var answering = false
                     try {
-                        // 模型仍在原来的可取消上下文里运行。
+                        // The model still runs in the original cancellable context.
                         withContext(replyContext) {
                             answering = true
                             answer(brain, text, runId, startedAt)
@@ -273,7 +273,7 @@ internal class DeskChatOps(
             if (it.conversationId != null && it.conversationId != conversationId) it
             else it.copy(conversationId = conversationId, exchanges = it.exchanges + row, blocked = null)
         }
-        // 发送返回前就进入 finally 的保护范围,紧接着点停止也会保存用户这一句。
+        // Enters the finally protection before send returns, so tapping stop right after still saves this user message.
         tracked(vm.scope.launch(start = CoroutineStart.UNDISPATCHED) {
             var tasks = emptyList<String>()
             var failure: String? = null
@@ -293,7 +293,7 @@ internal class DeskChatOps(
             } finally {
                 withContext(NonCancellable) {
                     update(runId) { it.copy(deskTasks = tasks, status = failure?.let(ExchangeStatus::Failed) ?: ExchangeStatus.Done("", null)) }
-                    // 停止附件准备也要收尾;已经派出的任务编号不能因等待回话锁而丢掉。
+                    // Stopping attachment preparation must also finish up; a dispatched task id must not be lost while waiting for the reply lock.
                     turns.withLock { persist(Turn(goal, "", DeskTurn.STATUS, note = failure, runId = runId, atMs = startedAt, deskTasks = tasks)) }
                 }
             }
@@ -313,23 +313,23 @@ internal class DeskChatOps(
     }
 
     /**
-     * 页面开着这条会话时说一句汇报。开始、排队、进度在进度条里实时看得到,要你处理在对话里有问题卡,都不另说一句;
-     * 办好了把后台的完整结果原文写成一行汇报,不经前台模型转述;没办成由前台说(原因和下一步),写成一行汇报。
-     * 页面不在、没配模型、前台什么也没说时返回 false(交给兜底);前台说失败时去掉这一行、抛出,也交给兜底。
-     * 停止键只停前台说的那一句:说出一部分的写下,一个字没说的交给兜底;办好了的结果原文不经模型,不随停止取消。
+     * Says one report while the page is showing this conversation. Started, queued and progress are visible live in the progress bar, and needs-your-attention appears as a question card in the conversation, so no extra sentence for those;
+     * on success, write the background's full result verbatim as a one-line report, without the desk model restating it; on failure the desk says it (reason and next step), written as a one-line report.
+     * Returns false when the page is not open, no model is configured, or the desk said nothing (hand over to the fallback); when the desk says failure, drop this line, throw, and also hand over to the fallback.
+     * The stop key only stops the sentence the desk says: a partly spoken one is written down, one with nothing said goes to the fallback; a successful result is verbatim and does not go through the model, so it is not cancelled by stop.
      */
     override suspend fun deliver(report: DeskReport): Boolean {
         if (!page.showing(conversationId)) return false
         when (val event = report.event) {
             is DeskEvent.Started, is DeskEvent.Queued, is DeskEvent.Progress,
             is DeskEvent.NeedsAnswer, is DeskEvent.NeedsAction -> return true
-            // 等回话锁时被停掉会让结果既不进对话也不交兜底,所以不进 [replies]
+            // Being stopped while waiting for the reply lock would leave the result neither in the conversation nor in the fallback, so it does not go into [replies]
             is DeskEvent.Succeeded -> return turns.withLock { result(event.taskId, DeskNotifier.rowText(report).orEmpty()) }
             else -> Unit
         }
         return supervisorScope {
             var kept = false
-            // 单条汇报独立取消,不能把 FrontDesk 常驻的投递协程也停掉。
+            // A single report is cancelled independently and must not stop FrontDesk's resident delivery coroutine.
             val reply = tracked(async(start = CoroutineStart.LAZY) { notice(report) { kept = true } })
             try {
                 reply.await()
@@ -340,7 +340,7 @@ internal class DeskChatOps(
         }
     }
 
-    /** 没办成、取消了由前台说一句;停止时说出一部分就写下并调 [kept]。 */
+    /** On failure or cancellation the desk says one sentence; when stopped, a partly spoken one is written down and [kept] is called. */
     private suspend fun notice(report: DeskReport, kept: () -> Unit): Boolean {
         val brain = deps.brain(conversationId, vm.effectiveMainModelChoice(conversationId)) ?: return false
         return turns.withLock {

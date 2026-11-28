@@ -7,8 +7,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /**
- * 允许模型任务执行的当地时间段，分钟从 0 到 1440；[endMinute] 小于 [startMinute] 时跨过午夜。
- * [days] 是窗口开始日，1 到 7 对应周一到周日，空表示每天。00:00–24:00 可表示全天。
+ * Local time window in which model tasks may run, with minutes from 0 to 1440; when [endMinute] is less than [startMinute], it crosses midnight.
+ * [days] are the window's start days, 1 to 7 for Monday to Sunday, and empty means every day. 00:00–24:00 can represent all day.
  */
 @Serializable
 data class ExecutionWindow(
@@ -26,8 +26,8 @@ private val WEEKDAYS = (1..5).toList()
 private val WEEKEND = listOf(6, 7)
 
 /**
- * DeepSeek 公布的工作日峰段为 01:00–04:00、06:00–10:00 UTC，其余时间与周末半价。
- * 法定节假日也全天半价，但不内置会更新的节假日表；这里保守地仍按普通工作日避开峰段。
+ * DeepSeek publishes weekday peak periods of 01:00–04:00 and 06:00–10:00 UTC; other times and weekends are half price.
+ * Public holidays are also half price all day, but no holiday table that gets updated is built in; conservatively, this still avoids peak periods as on ordinary weekdays.
  */
 val DEEPSEEK_OFF_PEAK_WINDOWS = listOf(
     ExecutionWindow(0, 60, WEEKDAYS),
@@ -43,7 +43,7 @@ private fun localMinuteAt(date: LocalDate, minute: Int, zone: ZoneId): Long = wh
     else -> date.atTime(LocalTime.of(minute / 60, minute % 60)).atZone(zone).toInstant().toEpochMilli()
 }
 
-/** [atMs] 已在窗口内就原样返回，否则返回下一次开窗；开始日属于前一天时也计入跨午夜窗口。 */
+/** Returns [atMs] as-is when it is already inside a window, otherwise returns the next opening; windows whose start day is the previous day are also counted as crossing midnight. */
 fun nextExecutionWindowAt(windows: List<ExecutionWindow>, zone: String, atMs: Long): Long {
     require(windows.isNotEmpty() && windows.all(::isValidExecutionWindow))
     val zoneId = ZoneId.of(zone)
@@ -71,7 +71,7 @@ fun nextExecutionWindowAt(windows: List<ExecutionWindow>, zone: String, atMs: Lo
 fun isWithinExecutionWindow(windows: List<ExecutionWindow>, zone: String, atMs: Long): Boolean =
     windows.isNotEmpty() && nextExecutionWindowAt(windows, zone, atMs) == atMs
 
-/** UI 与 schedule_task 共用的自定义 HH:mm 窗口；结束可写 24:00，起止相同会被拒绝。 */
+/** Custom HH:mm window shared by the UI and schedule_task; the end may be 24:00, and identical start and end are rejected. */
 fun customExecutionWindow(start: String, end: String): ExecutionWindow {
     fun minute(raw: String, allowEndOfDay: Boolean): Int {
         val text = raw.trim()

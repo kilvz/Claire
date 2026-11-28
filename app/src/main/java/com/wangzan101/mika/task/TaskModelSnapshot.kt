@@ -15,7 +15,7 @@ import com.wangzan101.mika.settings.untestedMainProvider
 import com.wangzan101.mika.settings.usableMainChoice
 import com.wangzan101.mika.settings.visionFallbackChain
 
-/** 一次任务不可变的模型路由；任务开始后设置或对话覆盖再变也不会改这份实例。 */
+/** Immutable model routing for one task; changes to settings or conversation overrides after the task starts do not change this instance. */
 data class TaskModelSnapshot(
     val main: ChatModel?,
     val light: ChatModel?,
@@ -29,7 +29,7 @@ data class TaskModelSnapshot(
     val conversationChoice: ModelChoice? = null,
 ) {
     companion object {
-        /** 在同一个 ProviderStore 锁内解析一次完整路由，避免设置写入拼出半新半旧的快照。 */
+        /** Resolve the full routing once under the same ProviderStore lock, so a settings write cannot produce a snapshot that is half new and half old. */
         fun capture(store: ProviderStore, session: ModelSession, mainOverride: ModelChoice? = null): TaskModelSnapshot =
             synchronized(store) {
                 val choices = store.effectiveRoles(mainOverride)

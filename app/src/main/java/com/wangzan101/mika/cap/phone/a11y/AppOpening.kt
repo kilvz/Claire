@@ -168,7 +168,7 @@ internal class AppOpening(private val screen: AndroidScreen) {
         awaitOpened(packageName, before, hint = null, sharing = true, launchedAt = startedAt)
     }
 
-    /** 和 [shareAudio] 相同,只是把视频交给目标 App。 */
+    /** Same as [shareAudio], but hands a video to the target app. */
     suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult = withContext(Dispatchers.IO) {
         val share = screen.shareVideoFile?.invoke(path) ?: return@withContext ActionResult.Failed("unsupported")
         if (screen.checkOtherTasks) {

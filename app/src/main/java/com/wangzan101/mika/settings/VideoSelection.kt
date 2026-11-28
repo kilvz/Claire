@@ -4,18 +4,18 @@ import com.wangzan101.mika.core.model.VideoBackend
 import com.wangzan101.mika.core.model.VideoBackends
 import com.wangzan101.mika.core.model.VideoCapabilities
 
-/** 一家能生成视频的服务商,和它说的视频协议。 */
+/** A provider that can generate video, and the video protocol it declares. */
 data class VideoProvider(val provider: Provider, val backend: VideoBackend)
 
 /**
- * 存着的视频选择和现在的服务商对不对得上。
- * 对不上([Stale])时不清掉选择(用户把地址改回来就能接着用),但任务里不建生成端口、设置页说明原因,绝不把请求发给不说这种协议的地址。
+ * Whether the stored video choice matches the current providers.
+ * When it does not match ([Stale]) the choice is not cleared (the user can keep using it after changing the address back), but no generation port is built for tasks, the settings page explains why, and a request is never sent to an address that does not declare this protocol.
  */
 sealed interface VideoSelection {
-    /** 还没选服务商。 */
+    /** No provider selected yet. */
     data object None : VideoSelection
 
-    /** 选了能用的服务商,但还没填模型。 */
+    /** A usable provider is selected, but no model has been entered yet. */
     data class NoModel(val target: VideoProvider) : VideoSelection
 
     data class Ready(val target: VideoProvider, val model: String, val capabilities: VideoCapabilities) : VideoSelection
@@ -23,20 +23,20 @@ sealed interface VideoSelection {
     data class Stale(val reason: Reason) : VideoSelection
 
     enum class Reason {
-        /** 选的服务商删掉了。 */
+        /** The selected provider was deleted. */
         ProviderRemoved,
 
-        /** 服务商还在,但地址改了,已经不说当初选的那种视频协议(或这个版本不认那种协议)。 */
+        /** The provider still exists, but its address changed and it no longer declares the video protocol chosen originally (or this version does not recognize that protocol). */
         NoLongerCompatible,
     }
 }
 
-/** 按 [VideoBackends] 的声明筛服务商、核对存着的选择;纯函数,不碰存储。 */
+/** Filter providers by [VideoBackends] declarations and verify the stored choice; a pure function that does not touch storage. */
 object VideoProviders {
     fun compatible(providers: List<Provider>): List<VideoProvider> =
         providers.mapNotNull { p -> VideoBackends.forBaseUrl(p.baseUrl)?.let { VideoProvider(p, it) } }
 
-    /** 能生成视频的服务商模板的名字(添加服务商时选它们):设置页在一家都没有时提示用户。 */
+    /** Names of the provider templates that can generate video (chosen when adding a provider): the settings page prompts the user when there are none. */
     fun presetLabels(): List<String> =
         ProviderPresets.all.filter { VideoBackends.forBaseUrl(it.baseUrl) != null }.map { it.label }.distinct()
 

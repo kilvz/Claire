@@ -159,7 +159,7 @@ class AppAccessScreenPort(
         return inner.shareImage(packageName, path, text)
     }
 
-    /** 视频分享和图片一样:只看实现,不碰界面。 */
+    /** Video sharing works like images: just look at the implementation, do not touch the UI. */
     override val canShareVideo: Boolean get() = inner.canShareVideo
 
     override suspend fun shareVideo(packageName: String, path: String, text: String?): ActionResult {
@@ -167,7 +167,7 @@ class AppAccessScreenPort(
         return inner.shareVideo(packageName, path, text)
     }
 
-    /** 指定了 App 的在这里看;没指定的由端口按名单挑接手的 App(由谁打开只有端口知道)。 */
+    /** Requests that specify an app are checked here; when none is specified, the port picks the app that takes over from its list (only the port knows which app opens it). */
     override suspend fun openLink(action: String?, uri: String?, packageName: String?): ActionResult {
         packageName?.let(::target)
         return inner.openLink(action, uri, packageName)

@@ -7,19 +7,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 「暂停 Mika」的持久标记,整个进程一份。这是唯一的真相来源:任务服务、定时、渠道、电脑交来的任务、工作流、
- * 内置助手的看门狗与交接、自动修复和配对通知都只读它([paused]),不各自另存;内置助手的 Paused 状态只是它的投影。
- * 改它只经 [set]:先同步写盘,写成了才更新内存里的值,所以进程随时被杀,重启后读到的都是最后一次写成的。
- * [set] 会等磁盘,别在主线程上调(暂停页经 [com.wangzan101.mika.task.MikaPauseControl] 切到 IO 线程)。
+ * The persistent flag for "Pause Claire", one per process. This is the single source of truth: the task service, scheduling, channels, tasks handed over from the computer, workflows,
+ * the built-in helper's watchdog and hand-off, auto-repair and pairing notifications all read only it ([paused]) and do not store their own copies; the built-in helper's Paused state is only a projection of it.
+ * Change it only through [set]: write to disk synchronously first, and only update the in-memory value after the write succeeds, so no matter when the process is killed, a restart reads the last successful write.
+ * [set] waits for disk, so do not call it on the main thread (the pause page switches to the IO thread via [com.wangzan101.mika.task.MikaPauseControl]).
  */
 class MikaPause internal constructor(initial: Boolean, private val persist: (Boolean) -> Boolean) : PauseFlag {
     private val _state = MutableStateFlow(initial)
-    /** 给要跟着变的地方(界面、自动修复的「此刻能不能动」)用。 */
+    /** For places that need to follow it (UI, auto-repair's "can it act right now"). */
     val state: StateFlow<Boolean> = _state.asStateFlow()
 
     override fun paused(): Boolean = _state.value
 
-    /** 写盘失败返回 false,内存里的值不变。 */
+    /** Returns false when the disk write fails; the in-memory value stays unchanged. */
     @Synchronized
     fun set(paused: Boolean): Boolean {
         if (_state.value == paused) return true

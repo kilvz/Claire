@@ -32,7 +32,7 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 输入框上方的主模型入口；有任务在跑时明确说明改动从下一件开始。 */
+/** The main-model entry above the input field; while a task is running, states clearly that changes start from the next one. */
 @Composable
 fun MainModelChip(ui: MainModelUi, busy: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     if (!ui.available) return
@@ -67,7 +67,7 @@ fun MainModelChip(ui: MainModelUi, busy: Boolean, onClick: () -> Unit, modifier:
     }
 }
 
-/** 本对话的主模型选择；失效选择留在对话文件里，但这里只列当前能解析的项。 */
+/** This conversation's main-model choice; invalid choices stay in the conversation file, but only currently resolvable items are listed here. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainModelSheet(

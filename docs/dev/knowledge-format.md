@@ -31,9 +31,9 @@ display: Bilibili
 description: Video, live streams and community posts (at most 200 characters: what this app can do)
 packages: ["tv.danmaku.bili", "com.bilibili.app.in"]
 package_aliases: ["International | com.bilibili.app.in"]     # optional: which package a given name refers to
-aliases: ["B站", "哔哩哔哩", "bilibili"]
+aliases: ["B site", "bilibili"]
 sites: ["bilibili.com"]            # optional: matching website knowledge
-open: 哔哩哔哩                       # launcher label, as shown on the phone
+open: Bilibili                    # launcher label, as shown on the phone
 pace: careful                      # optional: this app limits how fast it can be used (acting too fast or viewing too much gets blocked, asks for verification or logs you out)
 links: ["Home | bilibili://... | tv.danmaku.bili"]       # optional
 ---
@@ -61,7 +61,7 @@ name: bilibili.com                  # main domain
 display: Bilibili
 description: Video site: search videos and read user profiles
 domains: ["bilibili.com", "b23.tv"]
-aliases: ["B站", "哔哩哔哩", "bilibili"]
+aliases: ["B site", "bilibili"]
 apps: ["bilibili"]                   # optional: matching app knowledge
 open: bilibili.com                  # URL used to open it
 mode: desktop                      # desktop / mobile: which version of the pages to use
@@ -98,7 +98,7 @@ Same format as the personal skills Claire drafts as it learns (see `prompts/role
 name: pdf-text
 display: Extract PDF text
 description: one sentence: when to use this skill
-aliases: ["读 PDF", "PDF 转文字", "pdf text"]
+aliases: ["read PDF", "PDF to text", "pdf text"]
 apps: []                           # optional: app knowledge names it uses
 sites: []                          # optional: website knowledge names it uses
 ---

@@ -11,7 +11,7 @@ Current batch capability matrix (exploration conclusions):
 | `web_script` | Web page | A whole JS program | Yes (high bar: writing a program) |
 | `phone_wait` / `web_wait_for` | Any screen | Conditional wait | — (saves polling, but neglected) |
 
-Real-record evidence (`20261114-223716-79pbvk` 「看广告领福利」 ("watch ads for rewards")): 35 turns = 3 ads × (waiting/polling ~5 + closing ×3 + claiming ×1); tool distribution `wait` 9, `phone_observe` 8, `phone_tap` 12, `phone_wait` 2, `do_steps` 0, `phone_run` 0; input tokens 15K→148K (history O(N²), 95% cached).
+Real-record evidence (`20261114-223716-79pbvk` "watch ads for rewards"): 35 turns = 3 ads × (waiting/polling ~5 + closing ×3 + claiming ×1); tool distribution `wait` 9, `phone_observe` 8, `phone_tap` 12, `phone_wait` 2, `do_steps` 0, `phone_run` 0; input tokens 15K→148K (history O(N²), 95% cached).
 
 The gap to fill: the phone side has no "cross-screen loop" shape; and the decision layer has no "repetition → batch" teaching at all, instead being pulled the opposite way by `effect`/`guard`.
 
@@ -45,7 +45,7 @@ The `mixed_surface` decision follows `do_steps`'s: the item and body within one 
 
 The loop body is a **complete step sequence for a single item**, whose first step usually "opens the current item", using the special reference `@item` to denote the item located this round; the last step "return to the list" is written by the model itself in the body (usually `back`). This is more flexible than "engine implicitly opens + implicitly returns":
 
-- "Open→greet→return": `body = [ tap @item, tap "打招呼", back ]` — tap the item, tap the 打招呼 (Greet) button, then go back.
+- "Open→greet→return": `body = [ tap @item, tap "Greet", back ]` — tap the item, tap the Greet button, then go back.
 - "In-place loop" (scrolling collection, batch mark-as-read, never leaving the list): the `body` uses neither `@item` nor `back`, and expresses the same thing.
 
 **Rejected alternative**: engine-implicit open/return — it removes the template for the `@item` step, but closes off the "some loops don't open/don't return" variants, and would need an extra `navigate` field to toggle, ending up more verbose.

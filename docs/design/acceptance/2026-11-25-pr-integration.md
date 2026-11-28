@@ -1,54 +1,54 @@
-# 五个 PR 范围整合验收记录
+# Acceptance record for the five-PR scope integration
 
-日期：2026-11-25
-范围：`integration/pr-batch-2026-11-25`，设计见 `docs/design/specs/2026-11-25-pr-integration-design.md`。
-结论：限定范围内验收通过。
+Date: 2026-11-25
+Scope: `integration/pr-batch-2026-11-25`, design in `docs/design/specs/2026-11-25-pr-integration-design.md`.
+Conclusion: acceptance passed within the limited scope.
 
-## 范围与提交
+## Scope and commits
 
-本次只整合 #826、#297、#306、#827 和 #830。用户已停止其余 14 个 PR，这些 PR 未实现，不在本次验收范围内。
+This integration covers only #826, #297, #306, #827 and #830. The user has stopped the remaining 14 PRs; those PRs were not implemented and are outside this acceptance scope.
 
-设计提交为 `dc8319c62` 和 `2af96c9f4`。变基后的功能提交如下：
+The design commits are `dc8319c62` and `2af96c9f4`. The rebased feature commits are as follows:
 
-| PR | 功能提交 | 验收范围 |
+| PR | Feature commit | Acceptance scope |
 |---|---|---|
-| #826 | `195f956fe` | 标题与停止摘要语言 |
-| #297 | `ba97697ec` | 安全 HTML 会话导出与预览 |
-| #306 | `71841c351` | 按对话保存主模型覆盖与不可变运行快照 |
-| #827 | `7ecb80646` | 卡片操作多行显示 |
-| #830 | `9b5c17022` | 最近任务排除同步 |
+| #826 | `195f956fe` | Title and stop-summary language |
+| #297 | `ba97697ec` | Safe HTML conversation export and preview |
+| #306 | `71841c351` | Per-conversation main-model override and immutable run snapshot |
+| #827 | `7ecb80646` | Multi-line display for card actions |
+| #830 | `9b5c17022` | Recent-task exclusion sync |
 
-每个功能均保留为一个原子提交及所需的贡献者署名；#297 保留两位贡献者署名。
+Each feature is kept as one atomic commit plus the required contributor attribution; #297 keeps two contributor attributions.
 
-## 完整 CI
+## Full CI
 
-以下检查均已在最终折叠提交序列上实际执行并通过：
+The following checks were actually run on the final squashed commit series and passed:
 
-- core：4414 项测试，0 失败、0 错误，5 项跳过。
-- app：3824 项测试，0 失败、0 错误、0 跳过。
-- debug APK 构建及 androidTest 编译通过。
-- CLI：90 项 Python 测试，以及 contract/integration 检查通过。
-- relay：Go 与 Kotlin 集成测试通过。
-- 翻译工具：12 项测试通过。
-- 资源检查：13 种界面语言共 4396 项资源通过。
-- 日志工具：7 项测试通过。
+- core: 4414 tests, 0 failures, 0 errors, 5 skipped.
+- app: 3824 tests, 0 failures, 0 errors, 0 skipped.
+- Debug APK build and androidTest compilation passed.
+- CLI: 90 Python tests, plus contract/integration checks passed.
+- relay: Go and Kotlin integration tests passed.
+- translation tool: 12 tests passed.
+- resource check: 13 UI languages, 4396 resources in total, passed.
+- logging tool: 7 tests passed.
 
-## 真机验收
+## Device acceptance
 
-在一台选定的安卓 14 测试机上实际执行全部 63 项定向功能测试，结果为 63 项通过、0 失败、0 跳过，覆盖：
+All 63 targeted functional tests were actually run on one selected Android 14 test phone: 63 passed, 0 failed, 0 skipped, covering:
 
-- HTML 导出预览。
-- 模型选择标签。
-- 真实 TaskRun 执行。
-- 多行操作、卡片与胶囊界面。
-- 最近任务排除。
+- HTML export preview.
+- Model-selection labels.
+- Real TaskRun execution.
+- Multi-line actions, card and capsule UI.
+- Recent-task exclusion.
 
-## 审查结论
+## Review conclusion
 
-各任务独立审查均通过；#306 和 #830 的修复轮次均通过限定范围复审。最终全分支审查首先发现的设计文档行尾空格已移除并通过差异空白检查。随后更正审查补充的四项 #306 Important 问题——对话覆盖的 NoModel 判定、共享草稿的待保存选择绑定、首次 Desk 发送拒绝后的重试身份，以及对话引用配置的 Provider 所有权——均已实现 fail-first 回归并修复，定点复审确认四项全部解决且无新增 Critical/Important 回归。上述生产修复已折回 #306 的单一原子提交，最终完整代码树与清洁复审时的代码树一致。
+Each task passed independent review; the fix rounds for #306 and #830 passed limited-scope re-review. The final whole-branch review first found trailing whitespace in a design document, which was removed and passed the diff whitespace check. It then corrected four #306 Important issues raised by the review — the NoModel decision for conversation overrides, binding of a shared draft's pending-save selection, retry identity after the first Desk send is rejected, and Provider ownership of the conversation-reference configuration — all implemented with fail-first regressions and fixed; targeted re-review confirmed all four were resolved with no new Critical/Important regressions. These production fixes were squashed back into #306's single atomic commit, and the final full code tree matches the code tree at the clean review.
 
-共享胶囊 TextLink 居中影响范围略大于页脚，该项为已接受的 MINOR 结论，本轮不修改。
+The shared capsule TextLink centring has a slightly larger impact range than the footer; this item is an accepted MINOR conclusion and is not changed this round.
 
-## 验证边界
+## Verification boundaries
 
-本记录不声称已完成真实模型服务商验收，也不声称已运行全 App 的完整设备 instrumentation 测试套件。现有 AGP/compileSdk 与 Kotlin 警告仍属非阻塞、既有问题。
+This record does not claim that acceptance with real model providers is complete, nor that the full device instrumentation suite for the whole app has been run. The existing AGP/compileSdk and Kotlin warnings remain non-blocking, pre-existing issues.

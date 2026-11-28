@@ -7,152 +7,152 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.view.Surface;
 
-// 运行在 shell 身份(uid 2000)进程里的常驻服务:经无线调试拉起的内置助手。
+// A resident service running in a process with the shell identity (uid 2000): the built-in helper started through wireless debugging.
 interface IMikaShell {
     int createDisplay(in Surface surface, int width, int height, int dpi) = 1;
     void releaseDisplay(int displayId) = 2;
-    // 0=已启动 1=用户正在主屏使用该 App(不启动,不打扰主屏) 2=没有可启动的入口 3=出错
+    // 0=started 1=the user is using the app on the main screen (do not start, do not disturb the main screen) 2=no entry point to start 3=error
     int startApp(int displayId, String packageName) = 3;
     int topTaskId(int displayId) = 4;
     boolean moveTask(int taskId, int displayId) = 5;
     boolean injectKey(int displayId, int keyCode) = 6;
     boolean injectTap(int displayId, int x, int y) = 7;
     boolean setAudioMuted(String packageName, boolean muted) = 8;
-    // 冷启动:先结束该 App 的进程再启动;返回值同 startApp,用户正在主屏使用时不结束、返回 1;
-    // App 在 Mika 的屏以外还有任务时不结束,改为普通启动并返回 4
+    // Cold start: end the app's process first, then start it; return value same as startApp, and when the user is using it on the main screen it is not ended and 1 is returned;
+    // when the app has tasks outside Claire's screens it is not ended; a normal start is done instead and 4 is returned
     int restartApp(int displayId, String packageName) = 9;
-    // 该包当前的 PLAY_AUDIO 模式(allow/ignore/default…);读不到返回 null
+    // The package's current PLAY_AUDIO mode (allow/ignore/default…); null when it cannot be read
     String getAudioMode(String packageName) = 10;
-    // 把 PLAY_AUDIO 设回指定模式;用于 Mika 异常退出后按持久化记录恢复
+    // Set PLAY_AUDIO back to the given mode; used to restore from the persisted record after Claire exits abnormally
     boolean setAudioMode(String packageName, String mode) = 11;
-    // 任务所在的屏;任务已不存在返回 -1
+    // The screen the task is on; -1 when the task no longer exists
     int displayOfTask(int taskId) = 12;
-    // 任务最上面页面所属的包;任务不存在返回 null
+    // The package that owns the task's top page; null when the task does not exist
     String packageOfTask(int taskId) = 13;
-    // 以 shell 身份把剪贴板设成这段纯文字(不弹系统的「已复制」浮层),供粘贴到只认真实输入的编辑区。
-    // 内容标为敏感(API 33+)。第一次设置前记下原剪贴板;读不到原剪贴板时不动它。返回 0=已设置 1=读不到原剪贴板(未改动) 2=出错
+    // With the shell identity, set the clipboard to this plain text (without showing the system "copied" overlay), for pasting into an editor that only accepts real input.
+    // The content is marked sensitive (API 33+). The original clipboard is recorded before the first set; when the original clipboard cannot be read it is left alone. Returns 0=set 1=cannot read the original clipboard (unchanged) 2=error
     int setClipText(String text) = 14;
-    // 还原 setClipText 之前的剪贴板(原先为空则清空);已被用户换掉时不动并视为完成,此刻读不到则保留记录、返回 false 待下次再还原
+    // Restore the clipboard from before setClipText (empty it if it was empty); when the user already replaced it, leave it alone and treat it as done, and when it cannot be read right now keep the record and return false to restore next time
     boolean restoreClip() = 15;
-    // 打开链接或安卓设置页(action 为空时按 VIEW 打开 uri;packageName 限定由哪个 App 打开)。
-    // 返回值同 startApp,另有 5=没有 App 能打开 6=链接不允许;解析出的 App 在主屏有任务时不启动、返回 1
+    // Open a link or an Android settings page (when action is empty, open uri with VIEW; packageName restricts which app opens it).
+    // Return value same as startApp, plus 5=no app can open it 6=link not allowed; when the resolved app has a task on the main screen it is not started and 1 is returned
     int startView(int displayId, String action, String uri, String packageName) = 17;
-    // 该包的任务所在的 Mika 虚拟屏(并行任务查冲突用);不在 Mika 的任何一块屏上返回 -1
+    // The Claire virtual screen the package's task is on (used to check conflicts between parallel tasks); -1 when it is not on any of Claire's screens
     int displayOfPackage(String packageName) = 18;
-    // setClipText 之前用户剪贴板的文字(原先为空或不是文字时为空串);没有待还原的返回 null。供 Mika 加密留底,进程被杀后还原
+    // The user's clipboard text before setClipText (an empty string when it was empty or not text); null when there is nothing to restore. Used by Claire to keep an encrypted copy and restore it after the process is killed
     String savedClipText() = 19;
-    // 剪贴板仍是 Mika 放进去的 ours 时,换回用户原来的文字 original(空串则清空);已被用户换掉时不动
-    // 已还原、用户已换掉或已不需要还原返回 true;此刻读不到或写入失败返回 false,调用方保留加密留底
+    // While the clipboard still holds ours — the text Claire put there — swap back the user's original text original (empty it if the string is empty); when the user already replaced it, leave it alone
+    // Returns true when it is restored, the user already replaced it or no restore is needed; returns false when it cannot be read right now or the write fails, and the caller keeps the encrypted copy
     boolean restoreClipText(String original, String ours) = 20;
-    // 服务所在进程的 [uid, pid];Mika 收下内置助手的 Binder 前据此确认它就在来交接的那个进程里
+    // The [uid, pid] of the process the service runs in; before Claire accepts the built-in helper's Binder it uses this to confirm the helper is in the process that came to hand off
     int[] identity() = 21;
-    // 撤掉 Mika 这次绑定留下的改动(还原剪贴板、解除静音、释放所有虚拟屏),进程不退出;内置助手解绑时用
+    // Undo the changes Claire's binding left behind (restore the clipboard, unmute, release all virtual screens) without exiting the process; used when the built-in helper unbinds
     void releaseAll() = 22;
-    // 以 shell 身份连 Mika 自己 WebView 的调试套接字(抽象名 webview_devtools_remote_<pid>,pid 须是 Mika 的进程),
-    // 把连好的套接字交回;名字不合规矩或连不上返回 null。Mika 自己直连被系统拦下时用
+    // With the shell identity, connect to Claire's own WebView debugging socket (abstract name webview_devtools_remote_<pid>, pid must be Claire's process),
+    // and hand the connected socket back; null when the name does not follow the rule or the connection fails. Used when Claire's own direct connection is blocked by the system
     ParcelFileDescriptor openDevtoolsSocket(String name) = 23;
-    // 在本任务已建好的虚拟屏上下文中，以 shell 身份执行命令；返回 exitCode 和 output。
+    // Run a command with the shell identity in the context of the virtual screen already created for this task; returns exitCode and output.
     Bundle runSystemCommand(int displayId, String command) = 24;
-    // 当前虚拟屏最上面 Activity 的完整类名；没有任务时返回 null。
+    // The fully qualified class name of the top Activity on the current virtual screen; null when there is no task.
     String topActivity(int displayId) = 25;
-    // 往这块屏发 Ctrl+键(只放行 A 全选、V 粘贴):0=按下未投递 1=完整按键已投递 2=可能只投递了一部分
+    // Send Ctrl+key to this screen (only A select-all and V paste are allowed): 0=press not delivered 1=full key delivered 2=possibly only part delivered
     int injectCtrlKey(int displayId, int keyCode) = 26;
-    // `pm list users` 的原样输出;出错为 null
+    // The raw output of `pm list users`; null on error
     String listUsers() = 27;
-    // `pm list packages --user <userId>` 的原样输出;出错为 null
+    // The raw output of `pm list packages --user <userId>`; null on error
     String listPackages(int userId) = 28;
-    // 该包是系统自带的(含更新过的系统 App);查不到返回 false
+    // Whether the package is a system package (including updated system apps); false when it cannot be found
     boolean isSystemPackage(String packageName) = 29;
-    // 把一段文字分享给该包(ACTION_SEND text/plain,EXTRA_TEXT),启动到这块屏;返回值同 startApp,另有 5=该包没有收文字分享的页面;
-    // 该包在主屏有任务时不启动、返回 1
+    // Share a piece of text with the package (ACTION_SEND text/plain, EXTRA_TEXT), starting it on this screen; return value same as startApp, plus 5=the package has no page that accepts text shares;
+    // when the package has a task on the main screen it is not started and 1 is returned
     int startShare(int displayId, String packageName, String text) = 30;
-    // 从现在起盯着主屏 windowMs:这段时间里主屏最上面换了的任务都记下(见 mainArrivals);返回此刻主屏最上面的任务,没有为 -1。
-    // Agent 每个动作之前调:App 不从自己在 Mika 屏上的页面、而是从后台打开另一个 App 时,系统把它放到主屏,Mika 据此认出、挪回来
+    // From now on watch the main screen for windowMs: during this time record every task that changes at the top of the main screen (see mainArrivals); return the task at the top of the main screen right now, -1 if none.
+    // Called by the Agent before every action: when an app opens another app from the background instead of from its own page on Claire's screen, the system puts it on the main screen, and Claire recognizes it from this and moves it back
     int watchMainScreen(int windowMs) = 31;
-    // sinceUptimeMs(SystemClock.uptimeMillis)之后主屏冒到最上面的任务,先后排;字段见 MainScreenWatch.toBundle。出错为 null
+    // Tasks that came to the top of the main screen after sinceUptimeMs (SystemClock.uptimeMillis), in order; fields see MainScreenWatch.toBundle. null on error
     Bundle mainArrivals(long sinceUptimeMs) = 32;
-    // 任务所属的用户(分身、工作资料是别的用户);任务不存在返回 -1
+    // The user the task belongs to (clones and work profiles are other users); -1 when the task does not exist
     int userOfTask(int taskId) = 33;
-    // 在 Mika 自己的屏上按一根手指的一笔触摸:times[i] 毫秒(相对按下)时手指在 (xs[i], ys[i]);第一个点按下,最后一个点抬起。
-    // 按时间逐个注入,注完才返回(至多约 10 秒);不是 Mika 的屏、参数不对或按下没注入成功返回 false
+    // One-finger stroke on one of Claire's own screens: at times[i] milliseconds (relative to the press) the finger is at (xs[i], ys[i]); the first point presses, the last point lifts.
+    // Injected one by one in time order, returning only after all are injected (at most about 10 seconds); returns false when it is not Claire's screen, the arguments are wrong or the press was not injected successfully
     boolean injectStroke(int displayId, in int[] xs, in int[] ys, in long[] times) = 34;
-    // 系统动作(设闹钟、计时器、打开闹钟列表、打开预填的新日程,见 SystemIntents;别的 intent 一律不启动),启动到这块屏。
-    // 先以 shell 身份启动;接手的页面要求 Mika 有的权限(如设闹钟)而 shell 没有时,改为发出 Mika 做好的 asMika(以 Mika 的身份启动、
-    // 屏仍是这块)。返回值同 startView:5=没有页面接,6=不在放行之列;接手的 App 在主屏有任务时不启动、返回 1
+    // System actions (set alarm, timer, open the alarm list, open a prefilled new calendar event, see SystemIntents; no other intent is ever started), starting on this screen.
+    // Start with the shell identity first; when the receiving page requires a permission Claire has (such as setting an alarm) and the shell does not, send the asMika Claire prepared instead (start with Claire's identity,
+    // the screen is still this one). Return value same as startView: 5=no page accepts it, 6=not on the allowlist; when the receiving app has a task on the main screen it is not started and 1 is returned
     int startSystemAction(int displayId, in Intent intent, in PendingIntent asMika) = 35;
-    // 以 shell 身份跑一条设置用的命令(授权、无障碍列表等;和经已配对的无线调试跑一样),不限于某块屏;返回 exitCode 和 output。
-    // 助手是电脑经 USB 起的、没配对过无线调试时,Mika 的这类命令只能经这里
+    // Run a setup command with the shell identity (authorization, accessibility list, etc.; the same as running through paired wireless debugging), not limited to one screen; returns exitCode and output.
+    // When the helper was started by a computer over USB and wireless debugging was never paired, Claire can only run this kind of command through here
     Bundle runCommand(String command) = 36;
-    // Mika 的进程被杀后助手要不要把它拉起来(RestoreWish.flags:1=拉起来 2=拉起来前写回无障碍服务)。
-    // 助手读不到 Mika 的设置,只记最后交来的这一份;Mika 每次交接后和心愿变了时都交一次
+    // Whether the helper should bring Claire back after Claire's process is killed (RestoreWish.flags: 1=bring it back 2=write back the accessibility service before bringing it back).
+    // The helper cannot read Claire's settings, only remembers the last copy handed over; Claire hands over one after every handoff and whenever the wish changes
     void setRestoreWish(int flags) = 37;
-    // 能打开里面 App 的那几份别的用户(分身、工作资料一类;规则见 AppCopies):users=int[] 编号,summary=给诊断信息的一行
-    // (编号、标记、类型、资料组,不含名字和装了什么);读不到用户为 null
+    // The other users that can open the apps inside (clones, work profiles and the like; rules see AppCopies): users=int[] numbers, summary=one line for diagnostics
+    // (number, flags, type, profile group, without names or what is installed); null when users cannot be read
     Bundle appCopyUsers() = 38;
-    // 在另一份用户 userId 里打开该包,启动到这块屏;只认 appCopyUsers 列出的那几份,别的返回 8。返回值同 startApp / restartApp。
-    // 主屏、Mika 另一块屏上的占用只看这一份(包名 + 用户):用户在主屏用着本来那份时不挡这一份,反过来也一样。
-    // cold 时只结束这份用户里的进程,另一份不动;userId 是 Mika 自己的用户时等同 startApp / restartApp
+    // Open the package in another user userId, starting it on this screen; only those listed by appCopyUsers are accepted, others return 8. Return value same as startApp / restartApp.
+    // Occupancy on the main screen and another Claire screen only considers this copy (package name + user): when the user is using the original copy on the main screen it does not block this copy, and the reverse also holds.
+    // With cold only the processes in this user are ended and the other copy is left alone; when userId is Claire's own user it is the same as startApp / restartApp
     int startAppInUser(int displayId, String packageName, int userId, boolean cold) = 39;
-    // 该包在 userId 那份用户里的任务所在的 Mika 虚拟屏;不在 Mika 的任何一块屏上返回 -1
+    // The Claire virtual screen the package's task in user userId is on; -1 when it is not on any of Claire's screens
     int displayOfPackageInUser(String packageName, int userId) = 40;
 
-    // 主屏设备准备,与虚拟屏按键白名单分开;凭据只经 Binder 传入,不经 shell 命令行。
+    // Main-screen device setup, separate from the virtual-screen key allowlist; credentials are only passed in through Binder, never through the shell command line.
     boolean wakeDevice() = 41;
     boolean dismissDeviceKeyguard() = 42;
-    // clear=输入前要回删的已有字符数(空框为 0,避免在部分系统上空框 DEL 关掉密码页)
+    // clear=number of existing characters to delete before typing (0 for an empty field, so an empty field is not closed by DEL on some systems)
     boolean enterDeviceCredential(int kind, in byte[] credential, int clear) = 43;
 
-    // 同 getAudioMode / setAudioMuted / setAudioMode,作用在 userId 那份用户里的那份(分身、工作资料);
-    // userId 是 Mika 自己的用户时等同原来的几个。PLAY_AUDIO 按包 + 用户分开设,两份互不影响
+    // Same as getAudioMode / setAudioMuted / setAudioMode, acting on the copy in user userId (clones, work profiles);
+    // when userId is Claire's own user it is the same as the originals. PLAY_AUDIO is set per package + user, and the two copies do not affect each other
     String getAudioModeInUser(String packageName, int userId) = 44;
     boolean setAudioMutedInUser(String packageName, int userId, boolean muted) = 45;
     boolean setAudioModeInUser(String packageName, int userId, String mode) = 46;
-    // 该包(userId 那份)在主屏上有看得见的任务,即用户正在主屏用它;看不清主屏时返回 true
+    // The package (the userId copy) has a visible task on the main screen, i.e. the user is using it on the main screen right now; returns true when the main screen cannot be seen clearly
     boolean visibleOnMainScreen(String packageName, int userId) = 47;
 
-    // 任务结束:按规则处理这块屏上的 App(见 AppsAfterTask),再释放这块屏。留下的挪到主屏、排在最后面(不到用户眼前),
-    // 正在出声的和 close 里的随屏关掉。keep / close 是模型标过的键(包名,另一份为 包名@用户)。
-    // 返回 AppsAfterTask.KEY_* :kept=留下的键,closed=关掉的「键:原因」,note=挪不了时的一句原因(可为空)。不是 Mika 的屏为 null
+    // Task finished: handle the apps on this screen by the rules (see AppsAfterTask), then release this screen. Those kept are moved to the main screen, at the very end (out of the user's sight);
+    // the ones playing audio and those in close are closed along with the screen. keep / close are keys the model marked (package name, or package name@user for another copy).
+    // Returns AppsAfterTask.KEY_*: kept=keys kept, closed=closed "key: reason", note=one reason sentence when it cannot be moved (may be empty). null when it is not Claire's screen
     Bundle finishDisplay(int displayId, in String[] keep, in String[] close) = 48;
-    // 安全锁屏还停在通知/指纹页时,做一次定向给 SystemUI 的通用上滑;不含凭据。
+    // When the secure lock screen is still on the notification/fingerprint page, do one generic upward swipe directed at SystemUI; contains no credentials.
     boolean revealDeviceCredential() = 49;
 
-    // 只在 Mika 的虚拟屏、指定的最前面任务里,把可打印 ASCII 作为键盘事件输入;不发送控制字符
-    // 0=未发送 1=全部事件已投递 2=投递不确定(可能只输入了前缀)
+    // Only on Claire's virtual screens, in the given top task, type printable ASCII as keyboard events; control characters are not sent
+    // 0=not sent 1=all events delivered 2=delivery uncertain (possibly only the prefix was typed)
     int injectAsciiText(int displayId, int taskId, String packageName, String text) = 50;
 
-    // 对 SystemUI 做一次定向点击,用于生物识别优先锁屏页上「用密码解锁」这类回退按钮;不含凭据。
+    // Do one directed tap on SystemUI, for fallback buttons such as "unlock with password" on the biometric-first lock screen page; contains no credentials.
     boolean revealDeviceCredentialTap(int x, int y) = 51;
 
-    // 通话音频独立于通话控制。0=自动,1=直连运营商音频,2=Android PSTN 重定向。
+    // Call audio is independent of call control. 0=auto, 1=direct carrier audio, 2=Android PSTN redirect.
     Bundle probeCallAudio(int mode) = 52;
-    // 仅 ACTIVE 运营商通话；owner 每通独立，死亡时停止。下行可读/上行可写的匿名管道均为单声道 PCM16LE。
+    // Only for ACTIVE carrier calls; the owner is separate per call and it stops on death. The downstream-readable and upstream-writable anonymous pipes are both mono PCM16LE.
     Bundle openCallAudio(int mode, IBinder owner) = 53;
     void stopCallAudio(IBinder owner) = 54;
     boolean flushCallAudio(IBinder owner) = 55;
     Bundle callAudioStats(IBinder owner) = 56;
 
-    // 当前用户的 /sdcard 或 /storage/emulated/<user> 绝对路径,按名称排序;首次 afterName=null,limit 为 1..128。
-    // status=ok/not_found/denied/not_directory/invalid/io_error;成功时 names、types
-    // (0=其他或链接 1=普通文件 2=目录)等长,next 非空时传给下一页;目录变化时不保证快照。
+    // The absolute path of the current user's /sdcard or /storage/emulated/<user>, sorted by name; the first time afterName=null, limit is 1..128.
+    // status=ok/not_found/denied/not_directory/invalid/io_error; on success names, types
+    // (0=other or symlink 1=regular file 2=directory) have equal length, and a non-empty next is passed to the next page; the snapshot is not guaranteed while the directory changes.
     Bundle listFiles(String path, String afterName, int limit) = 57;
-    // 只读打开普通文件;结果 status=ok/not_found/denied/not_file/invalid/io_error,
-    // 成功时 fd 为 ParcelFileDescriptor,调用方负责关闭。路径按 shell 的权限访问。
+    // Open a regular file read-only; the result status=ok/not_found/denied/not_file/invalid/io_error,
+    // on success fd is a ParcelFileDescriptor, and the caller is responsible for closing it. The path is accessed with the shell's permissions.
     Bundle openFile(String path) = 58;
-    // 只读、有界搜索；返回 status、paths、visited、truncated 和可选 reason。
+    // Read-only, bounded search; returns status, paths, visited, truncated and an optional reason.
     Bundle searchFiles(String path, String name, String extension, long modifiedAfter, long modifiedBefore, int maxDepth, int maxEntries, int timeoutMs) = 59;
     // Replace the device-file bridge policy. Empty roots deny all access; protocol and revision are separate.
     Bundle setDeviceFilePolicy(int protocol, String session, long revision, in String[] roots, in boolean[] recursive) = 60;
 
-    // 把工作区里的一个文件分享给一个包:ACTION_SEND + EXTRA_STREAM,content URI 已授权可读;只打开分享页,不发出。
+    // Share a file from the workspace with a package: ACTION_SEND + EXTRA_STREAM, the content URI is granted readable; only opens the share page, does not send.
     int startShareFile(int displayId, String packageName, String uri, String mime, String text) = 61;
 
-    // 原地改变 Mika 虚拟屏尺寸并替换接收画面的 Surface，保留屏上的任务。
+    // Change the size of a Claire virtual screen in place and replace the Surface that receives the picture, keeping the tasks on the screen.
     boolean resizeDisplay(int displayId, in Surface surface, int width, int height, int dpi) = 62;
 
     // Find the task for the same app, preferring the specified display, then the main display, then others. Returns [taskId, displayId]; empty when there is no task and null when reading fails.
     @nullable int[] findTaskForPackage(String packageName, int userId, int displayId) = 63;
 
-    // 沿用早先定下的销毁事务号;AIDL 要求要么全部方法编号要么都不编号
+    // Reuse the destroy transaction number fixed earlier; AIDL requires either all methods to be numbered or none of them to be
     void destroy() = 16777114;
 }

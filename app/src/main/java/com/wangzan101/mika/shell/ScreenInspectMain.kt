@@ -4,7 +4,7 @@ import androidx.annotation.Keep
 import com.wangzan101.mika.cap.phone.shell.ScreenInspect
 
 /**
- * 只读读屏的入口:电脑端 CLI(`mika screen`)的命令里写的是这个全名,不随内部重构改名;实现在手机能力里。
+ * Read-only screen inspection entry point: the desktop CLI (`mika screen`) writes this full name in its command and it does not change with internal refactors; the implementation lives in the phone capability.
  * `CLASSPATH=<base.apk> app_process /system/bin com.wangzan101.mika.shell.ScreenInspectMain`
  */
 @Keep

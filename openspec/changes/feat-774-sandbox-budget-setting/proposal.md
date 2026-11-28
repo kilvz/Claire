@@ -8,7 +8,7 @@ Of the issue's three requests, this change only does "budget time": **sandbox sp
 
 ## What Changes
 
-- 设置 (Settings) › 干活时 (During work) gains 「每个任务的沙箱时间上限」 (Sandbox time limit per task): levels 30 (default, consistent with the current state) / 60 / 120 / 240 minutes, a single-choice dialog, taking effect from the next task (same semantics as the step limit).
+- Settings › During work gains "Sandbox time limit per task": levels 30 (default, consistent with the current state) / 60 / 120 / 240 minutes, a single-choice dialog, taking effect from the next task (same semantics as the step limit).
 - `FeatureFlags` gains a storage key and read/write (only values within the levels are recognized; anything else counts as the default 30).
 - Wiring: both the main task's and the sub-tasks' `toolDispatcher` in `TaskRun` pass the value → `SandboxCapability(budgetMs)` → `SandboxGuard(budgetMs)` (the constructor parameter already existed, it was just never assigned from outside).
 - The exhaustion message no longer hardcodes "30 minutes"; it outputs the number of minutes dynamically from the actual budget.

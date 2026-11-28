@@ -237,7 +237,7 @@ internal fun GeneratedAudioCards(audios: List<com.wangzan101.mika.core.chat.Gene
     }
 }
 
-/** 这一轮生成的视频:首帧封面、时长、点开用系统播放器。 */
+/** The video generated in this turn: first-frame cover, duration, opens in the system player. */
 @Composable
 internal fun GeneratedVideoCards(videos: List<com.wangzan101.mika.core.chat.GeneratedVideo>, vm: ChatViewModel) {
     val c = MikaTheme.colors

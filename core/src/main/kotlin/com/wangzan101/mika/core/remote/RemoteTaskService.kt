@@ -17,8 +17,8 @@ sealed class RemoteTaskError(val code: Code, message: String) : Exception(messag
 }
 
 /**
- * 电脑来的请求(MCP 与 CLI 接口共用)在用户暂停了 Mika 时的唯一拒法:UNAVAILABLE 加 [PauseFlag.REMOTE_MESSAGE]。
- * 不记回执、不排队;恢复后电脑要重新发。
+ * The only way to reject a request from a computer (shared by the MCP and CLI APIs) when the user paused Claire: UNAVAILABLE plus [PauseFlag.REMOTE_MESSAGE].
+ * No receipt is recorded and nothing is queued; the computer must resend after resuming.
  */
 fun PauseFlag.refuseRemote() {
     if (paused()) throw RemoteTaskError.General(RemoteTaskError.Code.UNAVAILABLE, PauseFlag.REMOTE_MESSAGE)
@@ -33,7 +33,7 @@ class RemoteTaskService(
     private val tasks: RemoteTasks,
     private val pollMs: Long = 250,
     private val records: RunExportSource? = null,
-    /** 用户暂停了 Mika:回答和插话直接拒([refuseRemote]);开始新任务由 [tasks] 在查过重发之后拒,同一请求的重发照样拿到原来的任务。 */
+    /** The user paused Claire: answering and steering are rejected directly ([refuseRemote]); starting a new task is rejected by [tasks] after checking for a resend, and a resend of the same request still gets the original task. */
     val paused: PauseFlag = PauseFlag.Never,
 ) {
     init { require(pollMs > 0) }

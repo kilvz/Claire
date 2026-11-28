@@ -49,25 +49,25 @@ object SystemPrompt {
             tag.startsWith("en") ->
                 "## Communication & Reasoning Language\nYou must think, formulate all progress notes, tool call reasons, and final replies in English."
             tag.startsWith("zh") ->
-                "## 语言设定\n所有思考过程、动作用意、执行进度与最终回复均使用中文。"
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Chinese."
             tag.startsWith("ja") ->
-                "## 言語設定\nすべての思考、進捗メモ、ツールの理由、および回答は日本語で行ってください。"
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Japanese."
             tag.startsWith("es") ->
-                "## Directiva de idioma\nDebes pensar, formular todas las notas de progreso, motivos de llamadas a herramientas y respuestas finales en español."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Spanish."
             tag.startsWith("ko") ->
-                "## 언어 설정\n모든 생각, 진행 상황 메모, 도구 호출 이유 및 최종 답변은 한국어로 작성해야 합니다."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Korean."
             tag.startsWith("ar") ->
-                "## توجيه اللغة\nيجب عليك التفكير وكتابة جميع ملاحظات التقدم وأسباب استخدام الأدوات والردود النهائية باللغة العربية."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Arabic."
             tag.startsWith("fa") ->
-                "## راهنمای زبان\nباید تمام افکار، یادداشت‌های پیشرفت، دلایل فراخوانی ابزارها و پاسخ‌های نهایی را به فارسی بنویسید."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Persian."
             tag.startsWith("pt") ->
-                "## Diretriz de idioma\nVocê deve pensar, formular todas as notas de progresso, motivos de chamada de ferramentas e respostas finais em português."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Portuguese."
             tag.startsWith("id") || tag.startsWith("in") ->
-                "## Arahan Bahasa\nAnda harus berpikir, menulis semua catatan kemajuan, alasan pemanggilan alat, dan balasan akhir dalam bahasa Indonesia."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Indonesian."
             tag.startsWith("ru") ->
-                "## Языковая директива\nВы должны думать, формулировать все заметки о ходе выполнения, причины вызова инструментов и окончательные ответы на русском языке."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Russian."
             tag.startsWith("tr") ->
-                "## Dil Yönergesi\nTüm düşünceleri, ilerleme notlarını, araç çağrı nedenlerini ve nihai yanıtları Türkçe olarak oluşturmalısınız."
+                "## Communication & Reasoning Language\nYou must think, write all progress notes, tool call reasons, and final replies in Turkish."
             else ->
                 "## Communication & Reasoning Language\nAlways mirror the language of the user's prompt for all internal thinking, progress notes, tool call reasons, and final replies."
         }

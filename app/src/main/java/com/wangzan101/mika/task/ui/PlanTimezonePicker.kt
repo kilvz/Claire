@@ -40,8 +40,8 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /**
- * 时区选择:按界面语言显示城市和时区名,可按城市、编号、时区名或「+8」「GMT+8」这样的偏移搜。
- * 几百个时区的本地化名字在后台线程建一次索引,输入时只在索引里筛,不再逐个查名字。
+ * Time zone picker: shows cities and time zone names in the UI language, searchable by city, ID, time zone name or an offset such as "+8" or "GMT+8".
+ * Localized names for hundreds of time zones are indexed once on a background thread; input only filters the index instead of looking up each name.
  */
 @Composable
 internal fun PlanTimezonePickerDialog(
@@ -51,7 +51,7 @@ internal fun PlanTimezonePickerDialog(
 ) {
     val locale = uiLocale()
     var query by remember { mutableStateOf("") }
-    // 编辑器打开时已在后台预热,通常这里直接拿到现成索引;还没建好就后台建完再显示。
+    // Already warmed up in the background when the editor opened, so usually the index is ready here; if not, build it in the background and then show it.
     val index by produceState(PlanZoneIndex.cached(locale), locale) {
         if (value == null) value = withContext(Dispatchers.Default) { PlanZoneIndex.get(locale) }
     }
@@ -104,7 +104,7 @@ internal fun PlanTimezonePickerDialog(
     )
 }
 
-/** 选中时区在编辑器里的说法:本地化城市名 + 偏移。 */
+/** How the selected time zone is described in the editor: localized city name + offset. */
 internal fun zoneSummary(zoneId: String, locale: Locale): String {
     val city = runCatching { TimeZoneNames.getInstance(locale).getExemplarLocationName(zoneId) }.getOrNull()
     val offset = runCatching { PlanTimeFormat.zoneOffsetLabel(java.time.ZoneId.of(zoneId)) }.getOrNull()
@@ -112,9 +112,9 @@ internal fun zoneSummary(zoneId: String, locale: Locale): String {
 }
 
 /**
- * 按界面语言建好的时区索引,进程内复用。几百个时区逐个查本地化城市名和时区名,真机上第一次要几百毫秒到几秒,
- * 不放在每次打开选择器时现查。偏移随夏令时会变,索引存一小时后重建。同一语言同时只建一份,别的调用方等它建完。
- * [get] 会阻塞,只在后台线程(或测试线程)调用。
+ * Time zone index built per UI language and reused within the process. Looking up localized city and time zone names for hundreds of zones one by one takes hundreds of milliseconds to seconds on a device the first time,
+ * so it is not looked up fresh each time the picker opens. Offsets change with daylight saving time, so the index is rebuilt after an hour. Only one is built at a time per language, and other callers wait for it.
+ * [get] blocks, so call it only on a background thread (or a test thread).
  */
 internal object PlanZoneIndex {
     private const val MAX_AGE_MS = 3_600_000L
@@ -122,7 +122,7 @@ internal object PlanZoneIndex {
     private val built = java.util.concurrent.ConcurrentHashMap<Locale, Built>()
     private val building = Any()
 
-    /** 主线程可调:只读现成的,不等正在建的那份。 */
+    /** Callable from the main thread: reads only a ready index and does not wait for one being built. */
     fun cached(locale: Locale, nowMs: Long = System.currentTimeMillis()): List<ZoneEntry>? =
         built[locale]?.takeIf { nowMs - it.atMs < MAX_AGE_MS }?.zones
 

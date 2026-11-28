@@ -28,16 +28,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
 
 /**
- * 只读读屏的 shell 入口:电脑经已授权的 ADB 运行
+ * Read-only screen inspection shell entry point: a computer runs it over authorized ADB
  * `CLASSPATH=<Mika base.apk> app_process /system/bin com.wangzan101.mika.shell.ScreenInspectMain`
- * (稳定入口,只转到这里;CLI 只认那个全名),
- * 标准输出打一行 JSON(各显示屏的窗口和控件树,每个窗口带 `display_id`)。
+ * (stable entry point, only forwards here; the CLI only recognises that full name),
+ * standard output prints one line of JSON (windows and control trees of every display, each window with `display_id`).
  *
- * 只在 shell 身份(uid 2000)下运行。`UiAutomation` 一律用 [UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES] 连接:
- * 默认的连接(flags = 0,也就是系统自带的 `uiautomator dump`)会把 Mika 等其他无障碍服务断开。
- * 拿不到带 flags 的连接方式时报 `unsupported`,绝不退回默认连接。不点击、不输入、不改设置;
- * 密码框不输出文字和描述,控件数和深度有上限(见 [ScreenInspectTree])。整个过程不超过 [WATCHDOG_MS]。
- * 不写日志:屏幕内容只出现在这一行输出里。
+ * Runs only under shell identity (uid 2000). `UiAutomation` always connects with [UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES]:
+ * the default connection (flags = 0, i.e. the system's built-in `uiautomator dump`) disconnects other accessibility services such as Claire's.
+ * When a connection method with flags is unavailable it reports `unsupported` and never falls back to the default connection. No taps, no input, no settings changes;
+ * password fields output no text or description, and control count and depth are capped (see [ScreenInspectTree]). The whole process takes no longer than [WATCHDOG_MS].
+ * Writes no logs: screen content appears only in this single line of output.
  */
 @Keep
 object ScreenInspect {
@@ -51,7 +51,7 @@ object ScreenInspect {
             finish(failure("shell_required"), 2)
         }
         val done = AtomicBoolean(false)
-        // binder 调用卡住(系统忙、应用不回话)时也按时退出,不留进程
+        // Exits on time even when a binder call hangs (system busy, app not responding), leaving no process behind
         Thread {
             try {
                 Thread.sleep(WATCHDOG_MS)
@@ -64,14 +64,14 @@ object ScreenInspect {
         val result = try {
             inspect(thread.looper)
         } catch (e: Throwable) {
-            // 异常文字可能带着屏幕内容,只报类别;个别系统缺方法时是 LinkageError,也算读不了
+            // Exception text may carry screen content, so report only the class; when a method is missing on some systems it is a LinkageError, which also counts as unreadable
             failure("screen_unavailable")
         } finally {
             thread.quitSafely()
         }
         val ok = (result["status"] as? JsonPrimitive)?.content == "ok"
         if (done.compareAndSet(false, true)) finish(result, if (ok) 0 else 1)
-        // 看门狗已经抢先输出,正在退出
+        // The watchdog has already printed first and we are exiting
         Thread.sleep(Long.MAX_VALUE)
     }
 
@@ -86,7 +86,7 @@ object ScreenInspect {
             try {
                 access.connect(automation)
             } catch (e: Exception) {
-                // 另一个 UiAutomation 正连着,或系统拒绝;不换成会压制无障碍服务的默认连接重试
+                // Another UiAutomation is connected, or the system refused; do not retry with the default connection that would suppress accessibility services
                 return failure("connect_failed")
             }
             automation.serviceInfo = automation.serviceInfo.apply {
@@ -97,12 +97,12 @@ object ScreenInspect {
             try {
                 automation.waitForIdle(IDLE_MS, IDLE_TIMEOUT_MS)
             } catch (e: TimeoutException) {
-                // 一直在动的界面也照读当前的样子
+                // Even a constantly changing UI is read as it currently looks
             }
             val budget = InspectBudget()
             val displays = windowsByDisplay(automation)
             val windows = buildJsonArray {
-                // 获得焦点的、活动的窗口先读,总预算不够时截掉的是其余窗口
+                // Focused and active windows are read first; when the total budget is not enough, the remaining windows are what gets cut
                 val all = displays.flatMap { (displayId, list) -> list.map { displayId to it } }
                 for ((displayId, window) in ScreenInspectTree.windowOrder(all, { it.second.isFocused }, { it.second.isActive })) {
                     add(window(displayId, window, budget))
@@ -123,7 +123,7 @@ object ScreenInspect {
         }
     }
 
-    /** 安卓 11(API 30)起有公开的 getWindowsOnAllDisplays,能读到 Mika 的虚拟屏;更早只有默认屏。 */
+    /** Android 11 (API 30) and later have public getWindowsOnAllDisplays, which can read Claire's virtual display; earlier versions only have the default display. */
     private fun windowsByDisplay(automation: UiAutomation): List<Pair<Int, List<AccessibilityWindowInfo>>> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val all = automation.windowsOnAllDisplays
@@ -143,7 +143,7 @@ object ScreenInspect {
             put("bounds", ScreenInspectTree.bounds(intArrayOf(rect.left, rect.top, rect.right, rect.bottom)))
             put("active", window.isActive)
             put("focused", window.isFocused)
-            // 窗口本身也算进总输出;超了就只留窗口信息,不读控件树
+            // The window itself also counts toward the total output; when exceeded, keep only window info and do not read the control tree
             val room = budget.charge(ScreenInspectTree.NODE_OVERHEAD + ((title as? JsonPrimitive)?.contentOrNull?.length ?: 0))
             val tree = if (room) window.root?.let { ScreenInspectTree.node(A11yInspectNode(it), budget) } else null
             put("root", tree ?: JsonNull)
@@ -158,20 +158,20 @@ object ScreenInspect {
     private fun finish(result: JsonObject, code: Int): Nothing {
         println(result.toString())
         System.out.flush()
-        // app_process 的 binder 线程和 HandlerThread 不会自己结束
+        // app_process binder threads and the HandlerThread do not end by themselves
         exitProcess(code)
     }
 }
 
 /**
- * 在 shell 进程里建一个 [UiAutomation] 并带 flags 连上。系统没有给 shell 进程的公开构造方法,
- * 这几处都是隐藏 API,逐个按能力探测,缺了就整个不可用(由调用方报 `unsupported`),不改走别的连接方式:
- * - `android.app.UiAutomationConnection` 无参构造、`android.app.IUiAutomationConnection`:安卓 4.3(API 18)起;
- * - `UiAutomation(Looper, IUiAutomationConnection)`:API 18 起,AOSP 里 `uiautomator` 的 shell 包装就这样建(安卓 10–15 的源码里都在,
- *   各版本真机仍需验收);找不到时试安卓 14(API 34)加的 `UiAutomation(Context, IUiAutomationConnection)`,
- *   Context 的主线程换成我们的 [Looper](连接回调排在这条线程上,不能用没在转的主线程);
- * - `connect(int flags)`:安卓 7.0(API 24)起;Mika 最低 API 29,正常都有;没有时绝不调无参的 `connect()`(会压制无障碍服务);
- * - `disconnect()`:API 18 起。
+ * Creates a [UiAutomation] in the shell process and connects it with flags. The system provides no public constructor for the shell process,
+ * so these are all hidden APIs, probed one by one by capability; if any is missing the whole thing is unavailable (the caller reports `unsupported`) and it does not switch to another connection method:
+ * - `android.app.UiAutomationConnection` no-arg constructor, `android.app.IUiAutomationConnection`: Android 4.3 (API 18) and later;
+ * - `UiAutomation(Looper, IUiAutomationConnection)`: API 18 and later; in AOSP the shell wrapper of `uiautomator` is built this way (present in Android 10–15 sources,
+ *   still needs acceptance on real devices of each version); when not found, try `UiAutomation(Context, IUiAutomationConnection)` added in Android 14 (API 34),
+ *   with the Context's main thread replaced by our [Looper] (connection callbacks are posted to this thread; a main thread that is not running cannot be used);
+ * - `connect(int flags)`: Android 7.0 (API 24) and later; Claire's minimum is API 29, so it is normally present; when absent, never call the no-arg `connect()` (it would suppress accessibility services);
+ * - `disconnect()`: API 18 and later.
  */
 @SuppressLint("PrivateApi", "DiscouragedPrivateApi", "BlockedPrivateApi")
 private class UiAutomationAccess(
@@ -185,7 +185,7 @@ private class UiAutomationAccess(
         runCatching { UiAutomation::class.java.getConstructor(Looper::class.java, connectionInterface) }.getOrNull()
             ?.let { return it.newInstance(looper, instance) as UiAutomation }
         val byContext = UiAutomation::class.java.getConstructor(Context::class.java, connectionInterface)
-        // ShellContext 自建 ActivityThread 时要有主线程 Looper;这里在 main 线程上
+        // ShellContext needs a main-thread Looper when it creates its own ActivityThread; here we are on the main thread
         @Suppress("DEPRECATION")
         if (Looper.getMainLooper() == null) Looper.prepareMainLooper()
         val context = object : ContextWrapper(ShellContext.create()) {
@@ -217,7 +217,7 @@ private class UiAutomationAccess(
     }
 }
 
-/** 把 [AccessibilityNodeInfo] 交给 [ScreenInspectTree]。 */
+/** Hands [AccessibilityNodeInfo] to [ScreenInspectTree]. */
 internal class A11yInspectNode(private val info: AccessibilityNodeInfo) : InspectNode {
     override val packageName: CharSequence? get() = info.packageName
     override val className: CharSequence? get() = info.className
@@ -233,6 +233,6 @@ internal class A11yInspectNode(private val info: AccessibilityNodeInfo) : Inspec
     override val childCount: Int get() = info.childCount
     override fun child(index: Int): InspectNode? = info.getChild(index)?.let(::A11yInspectNode)
 
-    @Suppress("DEPRECATION") // API 33 起回收是空操作;更早的系统要回收
+    @Suppress("DEPRECATION") // Since API 33 recycling is a no-op; older systems must recycle
     override fun release() = info.recycle()
 }

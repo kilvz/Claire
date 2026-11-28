@@ -89,13 +89,13 @@ class ProviderDetailActions(
     val setDailyBudget: (Long?) -> Boolean = { false },
     /** Set this provider's default model as the main model (the row in account sign-in details). */
     val useAsMain: () -> Unit = {},
-    /** 改这家的备注;null 是去掉备注。 */
+    /** Change this provider's nickname; null removes the nickname. */
     val rename: (String?) -> Unit = {},
 )
 
 /**
- * 服务商详情里的密钥区:标题按池里 Key 的数量说话,每把 Key 一行(多把时可单独移除),末尾常驻「添加」。
- * [keys] 是这家服务商池里的 Key 原文,[showKeys] 为真时才明文显示。
+ * The key section in provider details: the title speaks to the number of Keys in the pool, one row per Key (each removable when there are several), with a permanent "Add" at the end.
+ * [keys] are the raw Keys in this provider's pool, shown in plain text only when [showKeys] is true.
  */
 @Composable
 internal fun KeyPoolSection(
@@ -159,8 +159,8 @@ internal fun KeyPoolSection(
 }
 
 /**
- * 一个服务商:连接(状态、接口、地址、Key 可更换)、几个模型(在用的在前,最多 [MODEL_PREVIEW] 个,其余点「查看全部」)、删除。
- * 点一个模型从底部弹出「用作」。页面长度基本固定,模型再多也不会把删除挤到很远。
+ * One provider: connection (status, interface, address, replaceable Key), a few models (in-use ones first, at most [MODEL_PREVIEW], the rest via "View all"), and delete.
+ * Tapping a model pops up "Use as" from the bottom. Page length is basically fixed, so no matter how many models there are, delete is not pushed far away.
  */
 @Composable
 fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetailActions, onBack: () -> Unit) {
@@ -482,7 +482,7 @@ fun ProviderDetailContent(ui: ModelSetupUi, p: Provider, actions: ProviderDetail
     }
 }
 
-/** 改账号备注:空着保存就是去掉备注。字数在输入时按 [Provider.MAX_NICKNAME] 截。 */
+/** Change the account nickname: saving empty removes the nickname. The length is truncated to [Provider.MAX_NICKNAME] while typing. */
 @Composable
 internal fun ProviderRenameDialog(current: String?, onDismiss: () -> Unit, onConfirm: (String?) -> Unit) {
     var text by remember { mutableStateOf(current.orEmpty()) }

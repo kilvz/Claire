@@ -188,7 +188,7 @@ fun ListRow(
             if (!sub.isNullOrEmpty()) Text(sub, Modifier.padding(top = 2.dp), style = MikaType.Caption, color = c.ink3)
             if (!detail.isNullOrEmpty()) Text(detail, Modifier.padding(top = 2.dp), style = MikaType.Hint, color = detailColor.takeOrElse { c.ink3 })
         }
-        // 行尾最多占标题旁可用宽度的一半出头:值再长也只省略值,标题不被挤没
+        // At most a bit more than half the width available next to the title: when the value is longer only the value is ellipsized, and the title is not squeezed away
         Row(
             Modifier.trailingSlot(TrailingMaxFraction, RowGap),
             verticalAlignment = Alignment.CenterVertically,
@@ -198,15 +198,15 @@ fun ListRow(
     }
 }
 
-/** 行里图标块、标题、行尾之间的间距。 */
+/** Spacing between the icon block, title and row end within a row. */
 private val RowGap = 14.dp
 
-/** 行尾([ListRow] 的 trailing)最多占图标块以外宽度的比例。 */
+/** The maximum fraction of the width beyond the icon block that the row end (trailing of [ListRow]) may take. */
 private const val TrailingMaxFraction = 0.52f
 
 /**
- * 行尾的位置:宽度不超过父布局给的最大宽度的 [fraction](宽度不受限时不管),有内容时前面空出 [gap],
- * 没内容时整块不占地方(和以前一样,标题一直排到行尾)。一次测量,不用子组合。
+ * Position of the row end: width no more than [fraction] of the max width the parent gives (ignored when width is unbounded), with [gap] left before it when there is content,
+ * and taking no space at all when empty (as before, the title runs all the way to the row end). Single measure, no subcomposition.
  */
 private fun Modifier.trailingSlot(fraction: Float, gap: Dp) = layout { measurable, constraints ->
     val gapPx = gap.roundToPx()
@@ -221,7 +221,7 @@ private fun Modifier.trailingSlot(fraction: Float, gap: Dp) = layout { measurabl
 
 enum class ValueTone { Plain, Ok, Warn, Bad, Link }
 
-/** 行尾的值。放不下时省略,把位置先让给同一行尾的开关、箭头。 */
+/** The row-end value. Ellipsized when it does not fit, yielding first to the switch and arrow at the same row end. */
 @Composable
 fun RowScope.RowValue(text: String, tone: ValueTone = ValueTone.Plain, modifier: Modifier = Modifier) {
     val c = MikaTheme.colors
@@ -346,8 +346,8 @@ fun InputRow(
 }
 
 /**
- * 卡片里和 [InputRow] 排成一列的选择行:左边同样宽的标题,现在选的值从输入框里文字的位置起排,行尾一个小箭头;
- * 点了由调用方弹出选择。同一张卡片里既有输入行又有选择行时用它,两种行的内容上下对齐。
+ * A choice row in a card laid out in a column with [InputRow]: a title of the same width on the left, the currently selected value starting from where text in the input field starts, and a small arrow at the row end;
+ * tapping opens a picker provided by the caller. Use it in a card that has both input rows and choice rows, so the contents of both line up vertically.
  */
 @Composable
 fun PickRow(
@@ -374,7 +374,7 @@ fun PickRow(
     }
 }
 
-/** 输入框末尾的叉:点一下清空。和搜索框的清空按钮同一套大小和颜色,只在有内容时由调用方放出来。 */
+/** The X at the end of the input field: tap to clear. Same size and colour as the search field's clear button; the caller only shows it when there is content. */
 @Composable
 fun FieldClearButton(description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(

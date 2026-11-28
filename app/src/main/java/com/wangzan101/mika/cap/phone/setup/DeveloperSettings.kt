@@ -53,9 +53,9 @@ object DeveloperSettings {
         runCatching { Settings.Global.putInt(cr, ADB_WIFI_ENABLED, 1) }.getOrDefault(false)
 
     /**
-     * 把无线调试开关写成关闭(要有修改系统设置的授权,和打开同一条路)。
-     * 只关开关,不解除配对:配对钥匙、端口缓存和系统里的授权记录都留着,
-     * 再打开时直接用已配对的连接重连,不用重新配对。写入被拒返回 false。
+     * Writes the wireless debugging switch to off (requires the grant to modify system settings, the same path as turning it on).
+     * Only turns the switch off, does not unpair: the pairing key, port cache and system authorization records all remain,
+     * so turning it on again reconnects directly with the paired connection, without pairing again. Returns false when the write is rejected.
      */
     fun turnOffWirelessDebugging(cr: ContentResolver): Boolean =
         runCatching { Settings.Global.putInt(cr, ADB_WIFI_ENABLED, 0) }.getOrDefault(false)

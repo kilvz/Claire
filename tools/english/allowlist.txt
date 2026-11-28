@@ -1,0 +1,82 @@
+# Files where Chinese is functional data, not text to translate.
+#
+# The English-only check still enforces English comments in these files; only
+# Chinese inside code (string literals, regular expressions) is allowed.
+#
+# Keep this list narrow. Add a file only when its Chinese is:
+#   * a matching table for Chinese screens, speech or messages (for example
+#     recognizing a "send" button or a Chinese "remember this" request), or
+#   * a legacy/vendor value that must stay byte-identical (old greetings,
+#     vendor voice names, old run-record markers), or
+#   * localized output generated for Chinese users at runtime.
+#
+# Anything else must be translated.
+#
+app/src/main/java/com/wangzan101/mika/voice/LiveAsr.kt
+app/src/main/java/com/wangzan101/mika/voice/model/VolcVoices.kt
+app/src/main/java/com/wangzan101/mika/chat/ConversationTitler.kt
+app/src/main/java/com/wangzan101/mika/chat/ui/ChatEvidence.kt
+app/src/main/java/com/wangzan101/mika/cap/web/LoginProbe.kt
+app/src/main/java/com/wangzan101/mika/cap/phone/a11y/AndroidScreen.kt
+app/src/main/java/com/wangzan101/mika/cap/phone/a11y/ClickFallback.kt
+app/src/main/java/com/wangzan101/mika/cap/phone/a11y/SmsLogin.kt
+app/src/main/java/com/wangzan101/mika/task/ui/TaskReportExport.kt
+app/src/main/java/com/wangzan101/mika/task/ui/TaskReportViewModel.kt
+app/src/main/java/com/wangzan101/mika/personal/PersonalRuntime.kt
+app/src/main/java/com/wangzan101/mika/personal/PersonalSystemText.kt
+app/src/main/java/com/wangzan101/mika/settings/ui/LanguagePromptDialog.kt
+app/src/main/java/com/wangzan101/mika/settings/ui/UsageScreen.kt
+app/src/main/java/com/wangzan101/mika/calls/CallFarewellPolicy.kt
+app/src/main/java/com/wangzan101/mika/calls/CallPolicy.kt
+app/src/main/java/com/wangzan101/mika/calls/CallVoiceProfiles.kt
+app/src/main/java/com/wangzan101/mika/calls/IncomingCallLabels.kt
+app/src/main/java/com/wangzan101/mika/calls/IncomingCallType.kt
+app/src/main/java/com/wangzan101/mika/calls/briefing/VoiceBriefingConversation.kt
+app/src/main/java/com/wangzan101/mika/selfcheck/AndroidSelfCheck.kt
+app/src/main/java/com/wangzan101/mika/skills/ui/SkillReadingView.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/memory/MemoryExtractor.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/memory/MemoryIndex.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/memory/NumberText.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/memory/SensitiveFilter.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/memory/UserUtterances.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/knowledge/KnowledgeStore.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/teach/Teach.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillDrafter.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillOutcomes.kt
+core/src/main/kotlin/com/wangzan101/mika/core/learn/skills/SkillRedactor.kt
+core/src/main/kotlin/com/wangzan101/mika/core/run/record/Redactor.kt
+core/src/main/kotlin/com/wangzan101/mika/core/run/record/RunEvent.kt
+core/src/main/kotlin/com/wangzan101/mika/core/run/trace/TracePayload.kt
+core/src/main/kotlin/com/wangzan101/mika/core/agent/AgentLoop.kt
+core/src/main/kotlin/com/wangzan101/mika/core/agent/AttachmentLines.kt
+core/src/main/kotlin/com/wangzan101/mika/core/agent/Conversation.kt
+core/src/main/kotlin/com/wangzan101/mika/core/agent/StopSummary.kt
+core/src/main/kotlin/com/wangzan101/mika/core/agent/TaskStages.kt
+core/src/main/kotlin/com/wangzan101/mika/core/frontdesk/DeskPromise.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/audio/AudioTools.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/wechat/WechatOwnerCapability.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/web/PageDigest.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/web/WebBarrier.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/image/ImageTools.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/phone/sms/SmsLogin.kt
+core/src/main/kotlin/com/wangzan101/mika/core/cap/phone/sms/SmsLoginAutomation.kt
+core/src/main/kotlin/com/wangzan101/mika/core/general/MemoryRequests.kt
+core/src/main/kotlin/com/wangzan101/mika/core/proactive/ContactIdentity.kt
+core/src/main/kotlin/com/wangzan101/mika/core/proactive/LearnText.kt
+core/src/main/kotlin/com/wangzan101/mika/core/proactive/NoticeShapes.kt
+core/src/main/kotlin/com/wangzan101/mika/core/safety/verify/Grounding.kt
+core/src/main/kotlin/com/wangzan101/mika/core/safety/gate/ConfirmationGate.kt
+core/src/main/kotlin/com/wangzan101/mika/core/safety/gate/IrreversibleDetector.kt
+core/src/main/kotlin/com/wangzan101/mika/core/safety/gate/NumericKeypadEditing.kt
+core/src/main/kotlin/com/wangzan101/mika/core/eval/BarrierSignals.kt
+core/src/main/kotlin/com/wangzan101/mika/core/eval/EvalTask.kt
+core/src/main/kotlin/com/wangzan101/mika/core/eval/Scoring.kt
+core/src/main/kotlin/com/wangzan101/mika/core/model/ModelAccessErrors.kt
+core/src/main/kotlin/com/wangzan101/mika/core/model/usage/DeepSeekPricing.kt
+core/src/main/kotlin/com/wangzan101/mika/core/tool/LegacyNames.kt
+core/src/main/kotlin/com/wangzan101/mika/core/personal/PersonalAgent.kt
+core/src/main/kotlin/com/wangzan101/mika/core/screen/vision/Locator.kt
+core/src/main/kotlin/com/wangzan101/mika/core/screen/uistate/BackAffordance.kt
+core/src/main/kotlin/com/wangzan101/mika/core/screen/uistate/Hant.kt
+core/src/main/kotlin/com/wangzan101/mika/core/screen/uistate/LimitNotice.kt
+core/src/main/kotlin/com/wangzan101/mika/core/screen/uistate/ScreenDiagnosis.kt

@@ -28,7 +28,7 @@ private const val FILE_ROLE = "file"
 /** Hand files from the workspace to a file control on the page; the file control has to be clicked, so it is judged irreversible like a click. */
 internal object Upload : WebTool {
     override val verb = Verb.Upload
-    override val label = "上传文件"
+    override val label = "Upload file"
     override val risk = Risk.External
     override val gateTarget = GateTarget.FileControl
     override val logged = true

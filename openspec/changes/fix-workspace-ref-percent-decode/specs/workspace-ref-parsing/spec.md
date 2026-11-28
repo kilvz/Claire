@@ -9,7 +9,7 @@ through the file gate to read the conversation workspace, and when it cannot be 
 not exist.
 
 #### Scenario: A task answer with encoded references
-- **WHEN** the task's final answer contains `![图](/workspace/%E6%8A%A5%E5%91%8A.png)` and
+- **WHEN** the task's final answer contains `![photo](/workspace/%E6%8A%A5%E5%91%8A.png)` and
   `[my report.csv](/workspace/my%20report.csv)`
 - **THEN** a blue image thumbnail and a file card named `my report.csv` render below the answer; tapping the
   file card opens `my report.csv` in the workspace through the file gate
@@ -26,13 +26,13 @@ from URI percent escapes: valid `%HH` sequences are decoded as UTF-8; invalid es
 contain `..` or leave the workspace are dropped).
 
 #### Scenario: A space written as %20
-- **WHEN** the model reply contains `[报告](/workspace/my%20report.csv)`
+- **WHEN** the model reply contains `[report](/workspace/my%20report.csv)`
 - **THEN** the reference card shows the file name `my report.csv`, and opening reads
   `my report.csv` in the workspace through the file gate
 
 #### Scenario: A Chinese file name is URL-encoded
-- **WHEN** the model reply contains `![图](/workspace/%E6%8A%A5%E5%91%8A.png)`
-- **THEN** the parsed reference path is `/workspace/报告.png`, rendered as an image thumbnail
+- **WHEN** the model reply contains `![photo](/workspace/%E6%8A%A5%E5%91%8A.png)`
+- **THEN** the parsed reference path is `/workspace/report.png` (original was Chinese), rendered as an image thumbnail
 
 #### Scenario: A literal plus is not treated as a space
 - **WHEN** the reference target is `/workspace/a+b.png`

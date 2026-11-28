@@ -26,7 +26,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** 自包含 HTML：内联样式、严格 CSP、无脚本，资产只使用包内相对地址。 */
+/** Self-contained HTML: inline styles, strict CSP, no scripts, assets only use relative addresses within the bundle. */
 class HtmlExportBackend(private val labels: ExportLabels = ExportLabels.English) : ExportBackend {
     override val descriptor = ExportDescriptor(
         id = "app-html",

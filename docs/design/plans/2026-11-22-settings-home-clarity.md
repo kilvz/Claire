@@ -39,7 +39,7 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Add `homeOmitsStaticEntrySubtitles`, rendering the home page with all optional callbacks, `onPersonalStart` and `autoArchiveDays = 7`. Assert that none of the following text exists: success status details, model catalog, call method, WeChat description, proactive-capability description, task runs catalog, capsule description, persona description, notification description, personal-assistant recap, memory catalog, backup description, archive description, common tasks description, app access description, SMS default status, advanced catalog. Also assert that `DeepSeek`, `可用` (Available), `正常` (Normal), `7 天` (7 days) and the version value still exist.
+Add `homeOmitsStaticEntrySubtitles`, rendering the home page with all optional callbacks, `onPersonalStart` and `autoArchiveDays = 7`. Assert that none of the following text exists: success status details, model catalog, call method, WeChat description, proactive-capability description, task runs catalog, capsule description, persona description, notification description, personal-assistant recap, memory catalog, backup description, archive description, common tasks description, app access description, SMS default status, advanced catalog. Also assert that `DeepSeek`, `Available`, `Normal`, `7 days` and the version value still exist.
 
 - [ ] **Step 2: Run the test and confirm it fails**
 

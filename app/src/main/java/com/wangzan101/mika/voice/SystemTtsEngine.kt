@@ -6,7 +6,7 @@ import android.speech.tts.UtteranceProgressListener
 import java.io.File
 import java.util.Locale
 
-/** 按名字设音色的结果:用上了、这个引擎没有这个音色(或音色数据没装)、引擎出错。 */
+/** Result of setting a voice by name: applied, this engine does not have this voice (or the voice data is not installed), engine error. */
 enum class SystemVoiceResult { Applied, NotOffered, Failed }
 
 /**
@@ -23,10 +23,10 @@ interface SystemTtsEngine {
 
     fun setSpeechRate(rate: Float): Int
 
-    /** 按 [android.speech.tts.Voice.getName] 设音色。 */
+    /** Sets the voice by [android.speech.tts.Voice.getName]. */
     fun setVoice(voiceName: String): SystemVoiceResult
 
-    /** 注册合成进度回调;[onError] 只带 utteranceId,错误码由真实引擎自行归一。 */
+    /** Registers the synthesis progress callback; [onError] only carries the utteranceId, and the real engine normalises error codes itself. */
     fun setOnUtteranceProgressListener(onDone: (utteranceId: String) -> Unit, onError: (utteranceId: String) -> Unit)
 
     /** Synthesize into [file]; returns TextToSpeech.SUCCESS or TextToSpeech.ERROR. */
@@ -38,9 +38,9 @@ interface SystemTtsEngine {
 }
 
 /**
- * 真实实现:每个实例持有自己的 [TextToSpeech],调用方保证一次合成用完即关。
- * [enginePackage] 为空用手机的默认引擎;指定的引擎没装时 [TextToSpeech] 自己会连默认引擎,
- * 连上了却初始化失败时这里再退回默认引擎试一次。
+ * Real implementation: each instance holds its own [TextToSpeech], and the caller guarantees it is shut down right after one synthesis.
+ * An empty [enginePackage] uses the phone's default engine; when the specified engine is not installed, [TextToSpeech] itself connects to the default engine,
+ * and when it connects but initialisation fails, this falls back to the default engine and tries once more.
  */
 class AndroidSystemTtsEngine(
     context: Context,
@@ -74,7 +74,7 @@ class AndroidSystemTtsEngine(
                 ?: return SystemVoiceResult.NotOffered
             if (t.setVoice(voice) == TextToSpeech.SUCCESS) SystemVoiceResult.Applied else SystemVoiceResult.Failed
         } catch (e: RuntimeException) {
-            // 引擎进程死掉时 getVoices/setVoice 可能直接抛
+            // When the engine process dies, getVoices/setVoice may throw directly
             SystemVoiceResult.Failed
         }
     }
@@ -103,6 +103,6 @@ class AndroidSystemTtsEngine(
     }
 }
 
-/** 引擎说这个音色的数据还没下载到手机上。 */
+/** The engine says this voice's data has not been downloaded to the phone yet. */
 internal fun android.speech.tts.Voice.notInstalled(): Boolean =
     features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) == true

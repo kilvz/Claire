@@ -41,7 +41,7 @@ class HelperHub internal constructor(
     initialShell: IMikaShell? = null,
 ) {
     private val app = context.applicationContext
-    /** 用户暂停了 Mika:交接一律拒绝,见 [offer]、[attachShizuku]。读持久化的暂停标记,每次交接时现读。 */
+    /** The user paused Claire: all hand-offs are rejected, see [offer], [attachShizuku]. Reads the persisted pause flag, freshly on every hand-off. */
     private val pause = com.wangzan101.mika.settings.MikaPause.get(app)
 
     private val _shell = MutableStateFlow<IMikaShell?>(initialShell)
@@ -155,7 +155,7 @@ class HelperHub internal constructor(
             appApk = app.applicationInfo.sourceDir,
             hasBinder = binder != null,
         )?.let { return reject(callingUid, it) }
-        // 暂停时不碰口令也不碰 Binder:助手被拒后自己退出,恢复后由看门狗按已配对的连接重起
+        // While paused, touch neither the token nor Binder: the rejected helper exits by itself, and after resume the watchdog restarts it over the paired connection
         if (pause.paused()) return reject(callingUid, HelperHandoff.Reject.Paused)
         val gate = nonces
         val nonce = extras?.getString(HelperHandoff.KEY_NONCE)
@@ -197,7 +197,7 @@ class HelperHub internal constructor(
      */
     @Synchronized
     fun attachShizuku(binder: IBinder): IMikaShell? {
-        // 启动前查过暂停、Binder 却在暂停之后才到:不收,调用方见 null 会解绑
+        // Pause was checked before start but Binder arrived after the pause: do not accept it; the caller sees null and unbinds
         if (pause.paused()) {
             Log.w(TAG, "shizuku helper refused: Mika is paused")
             return null

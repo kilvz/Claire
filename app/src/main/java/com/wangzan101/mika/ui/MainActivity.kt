@@ -311,7 +311,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // The user previously tapped "quit completely": opening Claire brings it back, and the capsule plus the startup work skipped on quit are made up for here
         com.wangzan101.mika.MikaQuit.resume(this)
-        // 主人亲手打开 Mika:清掉「系统里被主动停止」的记录,按已有授权重新排上来电待命的周期检查
+        // The owner opened Claire by hand: clear the "actively stopped in the system" record and re-schedule the periodic call-standby check under the existing grant
         CallStandbyRecoveryJob.onOwnerOpenedApp(application as MikaApp)
         monitor.start()
         // Silently check for a new version on every launch (only once if opened repeatedly within two minutes), and stay quiet on failure
@@ -330,7 +330,7 @@ class MainActivity : ComponentActivity() {
         foreground = true
         monitor.refresh()
         recentsExclusion.reapply()
-        // 回到前台时按最新设置查一次自动归档(启动时也查过,这里照顾长期不退出的进程)
+        // On returning to the foreground, check auto-archive once under the latest settings (also checked at startup; this covers a process that stays up for a long time)
         (application as MikaApp).autoArchiveNow()
     }
 
@@ -375,8 +375,8 @@ class MainActivity : ComponentActivity() {
                 }
             } else openNotificationSettings()
             Fix.OpenPairingChannel -> openChannelSettings(PairingNotifier.ensureChannel(this).id)
-            Fix.AddModel -> Unit // 设置页自己处理
-            // 换页由 MikaRoot 处理
+            Fix.AddModel -> Unit // the settings page handles it itself
+            // Page changes are handled by MikaRoot
             Fix.OpenPhoneSetup, Fix.OpenPhoneOps, Fix.RepairPhoneHelper, Fix.OpenPause -> Unit
             Fix.RetryPhoneHelper -> phone.pairing.scope.launch {
                 phone.sharedShell.reconnect()
@@ -434,7 +434,7 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(EXTRA_OPEN_VOICE_CALL)
     }
 
-    /** 待命通知「去处理」直开电话页的待命检查:一次性请求,电话页打开检查页后清掉;读一次就摘掉,旋转不重复触发。 */
+    /** Standby notification "handle it" opens the phone page's standby check directly: a one-shot request, cleared after the phone page opens the check page; read once and removed, so rotation does not trigger it again. */
     private fun takeCallStandby(intent: Intent) {
         if (!intent.getBooleanExtra(EXTRA_OPEN_CALL_STANDBY, false)) return
         requestedCallStandby = true
@@ -539,7 +539,7 @@ private fun MikaRoot(
                 openPhoneOps = true
                 nav.push(Route.Settings)
             }
-            // 「暂停 Mika」是设置里的一页:直接打开它。
+            // "Pause Claire" is a page in settings: open it directly.
             Fix.OpenPause -> {
                 openPause = true
                 nav.push(Route.Settings)
@@ -629,7 +629,7 @@ private fun MikaRoot(
             onCallsOpened()
         }
     }
-    // 只负责把电话页摆到最上面;请求留到电话页真的打开检查页时才清(onCallStandbyOpened)
+    // Only brings the phone page to the top; the request is cleared only when the phone page actually opens the check page (onCallStandbyOpened)
     LaunchedEffect(requestedCallStandby) {
         if (requestedCallStandby) {
             focusedCallHistoryId = null
@@ -723,8 +723,8 @@ private fun MikaRoot(
     // When a page has its own back handling (sub-pages inside settings, the drawer), it gets the event first; here we only go back one page
     BackHandler(enabled = nav.canGoBack) { nav.back() }
     val back: () -> Unit = { nav.back() }
-    // 各页离开组合树时保留列表位置和输入内容:还在返回栈里的页按返回原样恢复,出栈的页丢掉、下次进来从头开始;
-    // 对话页和个人助理是来回切的根页面,一直留着
+    // Pages keep their list position and input content when leaving the composition tree: pages still in the back stack restore as they were, popped pages discard it and start over next time;
+    // the conversation page and the personal assistant are root pages switched back and forth, and are always kept
     val screenStates = rememberPageStates(keep = { it == Route.Chat.name || it == Route.Personal.name })
     val sidebarPage = nav.current in setOf(Route.Chat, Route.Personal, Route.Plans, Route.Memory, Route.Browser)
     // When the call page is not on top, an "In call · Back to call" bar at the top; the page underneath starts below it
@@ -735,7 +735,7 @@ private fun MikaRoot(
     Box(Modifier.weight(1f).fillMaxWidth().then(if (callBar != null) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
     AdaptiveWindow(navigation = sidebarPage) {
         val page: @Composable (() -> Unit) -> Unit = { openDrawer ->
-    // 全局换页套滑动推入过渡;页内一律用 route 不用 nav.current:过渡动画期间旧页还在渲染,读实时状态会瞬间变脸
+    // Global page switches use a slide push transition; inside pages always use route, not nav.current: during the transition the old page is still rendering, and reading live state would change its appearance instantly
     NavSlide(nav.stack, depth = { it.size }, states = screenStates, pageKey = { it.last().name }) { stack ->
     val route = stack.last()
     when (route) {
@@ -758,7 +758,7 @@ private fun MikaRoot(
             )
         }
         Route.Chat, Route.Personal -> {
-            // 对话页重新看得见(回到前台、从别的页面回来):补上别处存进来的轮次,接上别处开始的任务
+            // The conversation page is visible again (returned to foreground, came back from another page): add turns stored elsewhere and attach tasks started elsewhere
             LifecycleStartEffect(Unit) {
                 app.chat.refresh()
                 onStopOrDispose {}
@@ -867,7 +867,7 @@ private fun MikaRoot(
                     })
                 }) }
         }
-        // 设置里点进去的独立页面同样用简约列表样式
+        // Standalone pages entered from settings also use the simple list style
         Route.Models -> com.wangzan101.mika.ui.components.PlainListTheme { ModelsScreen(store, onBack = back, onOpenSpeech = { nav.push(Route.SpeechModel) }, onOpenVoice = { nav.push(Route.VoiceModel) }, onOpenImage = { nav.push(Route.ImageModel) }, onOpenVideo = { nav.push(Route.VideoModel) }, onOpenUsage = { nav.push(Route.Usage) }, onOpenVoiceCatalog = { nav.push(Route.VoiceServices) }, onOpenCallMode = { nav.push(Route.CallMode) }) }
         Route.VoiceModel -> com.wangzan101.mika.ui.components.PlainListTheme { VoiceModelScreen(store, onBack = back, onOpenServices = { nav.push(Route.VoiceServices) }) }
         Route.VoiceCall -> VoiceCallScreen(voiceCall, onGone = { nav.leave(Route.VoiceCall) })

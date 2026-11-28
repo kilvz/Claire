@@ -31,7 +31,7 @@ The catalog does not limit its launch scope by first batch or second batch. The 
 
 - One Kotlin branch, dedicated auth code or dedicated UI per service.
 - Concatenating API keys into URLs, commands, ordinary config or logs.
-- Showing 「已连接」 (Connected) when the user has entered a key but it has not been verified successfully.
+- Showing "Connected" when the user has entered a key but it has not been verified successfully.
 - Flattening advanced fields such as URL, transport, tool allowlist and trust annotations onto the first screen.
 - Silently changing the address or secret delivery destination of existing configs after a catalog update.
 - Blocking the catalog, other services or task startup because one preset is broken.
@@ -67,9 +67,9 @@ Would solve dynamic updates, but brings in review, caching, signing, supply chai
 ### 1. MCP home
 
 - Added services still appear on the home page, including connection status, real tool count and a start/stop toggle.
-- The primary action is 「添加 MCP 服务」 (Add MCP service).
-- The empty state directly offers 「浏览服务目录」 (Browse service catalog) and 「自定义服务器」 (Custom server), instead of showing only an empty explanation card.
-- One service failing does not affect other services; 「全部测试」 (Test all) is kept.
+- The primary action is "Add MCP service".
+- The empty state directly offers "Browse service catalog" and "Custom server", instead of showing only an empty explanation card.
+- One service failing does not affect other services; "Test all" is kept.
 
 ### 2. Service catalog
 
@@ -77,18 +77,18 @@ Would solve dynamic updates, but brings in review, caching, signing, supply chai
 - Each entry shows only the name, a brief capability description, the category and the auth method.
 - No URL, transport, command or tool schema is shown.
 - Catalog entries have a unified state: available, needs local environment, temporarily unavailable. Unavailable entries can still be inspected for the reason and must not silently disappear.
-- The bottom of the page always offers 「自定义 MCP 服务器」 (Custom MCP server).
+- The bottom of the page always offers "Custom MCP server".
 
 ### 3. Preset details and connecting
 
 The details page shows what the service can do, the auth method, any required third-party account/cost notices, and a note that data will be sent to that service.
 
-- OAuth: the primary button is 「授权登录」 (Sign in). Opens the system browser; after returning to Claire it verifies automatically and reads the tools.
-- API key: shows only the keys declared by that preset plus other required items, help on obtaining them, and 「连接并保存」 (Connect and save); supports multiple keys, as well as ordinary fields such as tenant, region and self-hosted address.
-- No auth: the primary button is 「连接」 (Connect).
+- OAuth: the primary button is "Sign in". Opens the system browser; after returning to Claire it verifies automatically and reads the tools.
+- API key: shows only the keys declared by that preset plus other required items, help on obtaining them, and "Connect and save"; supports multiple keys, as well as ordinary fields such as tenant, region and self-hosted address.
+- No auth: the primary button is "Connect".
 - stdio: no command is shown; only the required fields and the local environment status. When a package needs to be downloaded, first show the package name, source and version, and only install and continue after the user confirms.
 
-Connecting can be cancelled. It only reaches the success page when the handshake, auth and tool catalog read all succeed. The success page shows the real tool count and offers 「完成」 (Done) and 「查看工具」 (View tools).
+Connecting can be cancelled. It only reaches the success page when the handshake, auth and tool catalog read all succeed. The success page shows the real tool count and offers "Done" and "View tools".
 
 On failure, keep the non-secret draft and the saved config, and clearly distinguish: authorization denied, invalid key, network failure, timeout, protocol incompatible, OAuth flow unsupported, sandbox environment unavailable. Offer retry, re-authorize, edit the key, or view technical details.
 
@@ -196,7 +196,7 @@ Does not modify inbound `McpRpc`, `McpTaskTools`, or the computer-connection per
 
 ### Real-service acceptance
 
-- Run bulk, secret-free endpoint and protocol checks against the catalog, distinguishing 「已验证」 (Verified) from 「尚未验证」 (Not yet verified), and do not treat catalog presence as proof of connectability.
+- Run bulk, secret-free endpoint and protocol checks against the catalog, distinguishing "Verified" from "Not yet verified", and do not treat catalog presence as proof of connectability.
 - Use dedicated test accounts to cover representative OAuth, API key, no-auth and stdio services; do not write logic that only works for one vendor.
 - Cover wrong keys, cancelled authorization, token refresh, service offline, tool pagination and large results.
 - On a real device, verify the full add flow, real invocation within a task, cleanup after the task ends, and basic layout in all UI languages.

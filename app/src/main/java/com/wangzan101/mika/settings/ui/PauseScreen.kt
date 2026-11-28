@@ -39,11 +39,11 @@ import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
 /**
- * 「暂停 Mika」页:一键停下 Mika 的全部工作,再一键恢复。
+ * "Pause Claire" page: stop all of Claire's work with one tap, and resume with one tap.
  *
- * 暂停停下任务、挡住新任务和定时、关掉 Mika 的无障碍服务和无线调试、停下内置助手;无线调试的配对留着,
- * 恢复时直接重连,不用新的配对码。无障碍服务能自动修复时先等它修完;修不成才把它列成一步交给用户。
- * 每当暂停标记、助手状态或无障碍实例变了都重读系统,界面永远是实测,不是上次记的。
+ * Pausing stops tasks, blocks new tasks and scheduling, turns off Claire's accessibility service and wireless debugging, and stops the built-in helper; the wireless debugging pairing is kept,
+ * so resume reconnects directly without a new pairing code. When the accessibility service can be auto-repaired, wait for that to finish first; only when it fails is it listed as a step for the user.
+ * Whenever the pause flag, helper status or accessibility instance changes, the system is re-read, so the UI is always measured, not what was recorded last time.
  */
 @Composable
 fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
@@ -55,7 +55,7 @@ fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
     val a11yInstance by ScreenAccessibility.instance.collectAsState()
     var state by remember { mutableStateOf(control.snapshot()) }
     var notice by remember { mutableStateOf<String?>(null) }
-    // 点了恢复、无障碍还在等自动修复的结果:这期间不把「去系统设置打开」列成一步
+    // Resume was tapped and accessibility is still waiting for the auto-repair result: do not list "open in system settings" as a step during this time
     var a11yRestoring by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -74,7 +74,7 @@ fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
     }
     val wirelessText = stringResource(if (state.wirelessDebugging) R.string.state_on else R.string.state_off)
     val (a11yText, a11yTone) = StatusCopy.accessibilityValue(state.accessibility)
-    // 没暂停时,按真实状态算出恢复后还剩哪些步骤要用户亲手做。
+    // When not paused, work out from the real state which steps still need the user by hand after resume.
     val resumeSteps = if (state.paused) emptyList() else planResumeSteps(state).let { steps ->
         if (a11yRestoring) steps - ResumeStep.OpenAccessibilitySettings else steps
     }
@@ -166,7 +166,7 @@ fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
             )
         }
 
-        // 恢复后还剩的、App 自己做不成的步骤:每一步都是一个直达系统设置的按钮。
+        // Steps remaining after resume that the app cannot do itself: each one is a button straight to system settings.
         if (!state.paused && resumeSteps.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Text(
@@ -192,7 +192,7 @@ fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
             }
         }
 
-        // 助手已配对、却还没连上(例如刚恢复、正在等 Wi-Fi):手动再连一次。
+        // The helper is paired but not connected yet (for example just resumed, waiting for Wi-Fi): connect once more manually.
         if (!state.paused && state.helperPaired &&
             state.helper != BuiltinShellStatus.Running && state.helper != BuiltinShellStatus.Connecting
         ) {
@@ -212,7 +212,7 @@ fun PauseScreen(onBack: () -> Unit, onFix: (Fix) -> Unit) {
     }
 }
 
-/** 暂停做完后的一句交代:停了任务就先说;没关掉的逐项说要用户去哪里关。 */
+/** A closing note after pausing: speak first if tasks were stopped; for anything not turned off, say per item where the user must go to turn it off. */
 private fun pauseNotice(context: Context, result: PauseResult): String = buildList {
     if (result.tasksStopped) add(context.getString(R.string.pause_tasks_stopped))
     if (result.complete) add(context.getString(R.string.pause_done))

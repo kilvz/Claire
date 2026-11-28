@@ -15,7 +15,7 @@ The developer docs are in English.
 
 | Doc | What it covers |
 | --- | --- |
-| [knowledge-format.md](knowledge-format.md) ([Simplified Chinese](knowledge-format.md)) | Format of built-in app knowledge (`APP.md`), website knowledge (`SITE.md`) and skills (`SKILL.md`) |
+| [knowledge-format.md](knowledge-format.md) | Format of built-in app knowledge (`APP.md`), website knowledge (`SITE.md`) and skills (`SKILL.md`) |
 | [skill-scripts.md](skill-scripts.md) | Where scripts that come with knowledge and skills go, and how they run in the sandbox |
 
 ## Topic notes and verification records
@@ -23,11 +23,11 @@ The developer docs are in English.
 | Doc | What it covers |
 | --- | --- |
 | [account-signin.md](account-signin.md) | Design of signing in to model providers with an account (no key), and what is deliberately left out |
-| [persona.md](persona.md) | Named custom instructions (persona): prompt position, storage, per-chat binding and safety boundaries (Chinese) |
+| [persona.md](persona.md) | Named custom instructions (persona): prompt position, storage, per-chat binding and safety boundaries |
 | [chatgpt-signin-check.md](chatgpt-signin-check.md) | Walking through "Sign in with ChatGPT" on a computer with the app's own code, before trying it on a phone |
 | [remote-device-access-check.md](remote-device-access-check.md) | Verification record for remote wake and unlock |
-| [remote-mcp.md](remote-mcp.md) | Remote CLI / MCP design (Chinese); [English deployment guide](../../companions/relay/README.md) |
-| [teach-mika.md](teach-mika.md) | How a demonstration becomes a skill draft waiting for review (Chinese) |
+| [remote-mcp.md](remote-mcp.md) | Remote CLI / MCP design; [English deployment guide](../../companions/relay/README.md) |
+| [teach-mika.md](teach-mika.md) | How a demonstration becomes a skill draft waiting for review |
 
 ## Developer docs elsewhere in the repo
 

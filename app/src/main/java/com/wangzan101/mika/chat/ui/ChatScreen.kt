@@ -127,9 +127,9 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit,
     /** The "go to settings" in the blocked hint. */
     openSettings: () -> Unit,
-    /** 用量面板里的「查看 Token 用量」:跳到设置里的 Token 用量页。 */
+    /** "View Token usage" in the usage panel: jumps to the Token usage page in settings. */
     openUsage: () -> Unit = {},
-    /** 「＋」面板里的「浏览器」:打开内置浏览器。 */
+    /** "Browser" in the "+" panel: opens the built-in browser. */
     onOpenBrowser: () -> Unit = {},
     openRun: (String) -> Unit = {},
     /** A task needs the phone but phone operation is not ready: put a "go to settings" row under that question-answer (attached at the end when it cannot be matched to a specific turn). */
@@ -678,7 +678,7 @@ fun ChatScreen(
             )
         }
 
-        // 面板里的「当前模型」跟着本对话在主模型入口里存的选择走,和这个对话下一次任务用的一致
+        // The "Current model" in the panel follows the choice stored in the main-model entry for this conversation, and matches the model this conversation's next task uses
         if (showUsage) ConversationUsageSheet(ui.conversationId, onDismiss = { showUsage = false }, onOpenUsage = openUsage,
             mainOverride = ui.mainModel.override)
     if (showRecords) {

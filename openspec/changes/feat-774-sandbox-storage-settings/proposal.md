@@ -3,7 +3,7 @@
 issue #774 reported three hardcoded sandbox limits: budget time (PR #780 already made it an adjustable tier), workspace space (4 GB),
 single uploaded file size (200 MiB). The latter two are still hardcoded in `Attachments` constants: chat attachments / WeChat images /
 files sent with tasks from a computer all hit the 200 MiB single-file and 4 GB workspace limits, with no way for users to relax them, leaving them to stare at
-「上传失败：超过 200 MiB」 (Upload failed: over 200 MiB). Following the same pattern as the already-merged sandbox duration tiers, these two storage limits are also opened up as
+"Upload failed: over 200 MiB". Following the same pattern as the already-merged sandbox duration tiers, these two storage limits are also opened up as
 tier radio options in settings.
 
 ## What Changes
@@ -15,8 +15,8 @@ tier radio options in settings.
   device file imports (#800's `DeviceWorkspaceImports`, both the SAF-granted directories and the phone assistant), reading the tier fresh on each import;
   computer transfer (`RemoteTaskFiles`/`PhoneTaskFiles`) and the WeChat protocol layer (`WechatImages` 10 MiB) are out of scope and
   keep fixed limits (the scope decision made explicit in PR #797 review).
-- The 「任务运行」 (Task runs) settings page gains two tier radio rows (following the SandboxBudgetDialog pattern): single-file limit and workspace limit.
-- The failure copy in chat for 「超过 200 MiB 限制」 (over the 200 MiB limit) changes to carry the actual limit value (`chat_attach_too_large` gains a placeholder, with
+- The "Task runs" settings page gains two tier radio rows (following the SandboxBudgetDialog pattern): single-file limit and workspace limit.
+- The failure copy in chat for "over the 200 MiB limit" changes to carry the actual limit value (`chat_attach_too_large` gains a placeholder, with
   all translations kept in sync).
 - The device free-space floor `MIN_FREE` (500 MiB) is a device safety line and is not opened up.
 

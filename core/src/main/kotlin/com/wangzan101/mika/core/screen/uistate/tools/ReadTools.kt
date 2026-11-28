@@ -28,7 +28,7 @@ import com.wangzan101.mika.core.screen.uistate.session
 /** Read this screen: the element table (observe also adds a screenshot depending on configuration), or a standalone screenshot. */
 internal class Observe(f: ScreenFamily) : ScreenTool(f, "observe") {
     override val verb = Verb.Observe
-    override val label = "看屏幕"
+    override val label = "View screen"
     override val risk = Risk.Read
     override val def by lazy { ToolDef(name, describe()) }
 
@@ -40,7 +40,7 @@ internal class Observe(f: ScreenFamily) : ScreenTool(f, "observe") {
 
 internal class ListElements(f: ScreenFamily) : ScreenTool(f, "list_elements") {
     override val verb = Verb.ListElements
-    override val label = "读取界面元素"
+    override val label = "Read UI elements"
     override val risk = Risk.Read
     override val def by lazy { ToolDef(name, describe()) }
 
@@ -50,7 +50,7 @@ internal class ListElements(f: ScreenFamily) : ScreenTool(f, "list_elements") {
 /** Seeing models receive the image; any task with a workspace can save it for delivery to the user. */
 internal class Screenshot(f: ScreenFamily) : ScreenTool(f, "screenshot") {
     override val verb = Verb.Screenshot
-    override val label = "截图"
+    override val label = "Screenshot"
     override val risk = Risk.Read
     override val def by lazy { ToolDef(name, describe(), mapOf(
         "savePath" to str("Optional new PNG path under /workspace. Save the screenshot there, then use share_file to give it to the user."))) }

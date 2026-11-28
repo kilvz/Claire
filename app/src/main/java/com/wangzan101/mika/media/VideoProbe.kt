@@ -9,13 +9,13 @@ import java.nio.ByteBuffer
 import kotlin.math.max
 
 /**
- * 用 MediaMetadataRetriever 读视频的元数据和帧。数据直接从工作区闸门核实过的句柄按需读([GatedSource]),
- * 不先把整段视频复制到缓存,也不读进内存;调用方在闸门的 shared 区里用完再关句柄。
+ * Reads video metadata and frames with MediaMetadataRetriever. Data is read on demand directly from the handle verified by the workspace gate ([GatedSource]),
+ * without first copying the whole video to the cache or reading it into memory; the caller uses it inside the gate's shared section and then closes the handle.
  */
 internal object VideoProbe {
     class Meta(val durationMs: Long?, val width: Int, val height: Int, val hasAudio: Boolean)
 
-    /** 在 [g] 上开一个 retriever,用完释放;解不开时抛出 retriever 的异常。 */
+    /** Opens a retriever on [g] and releases it when done; when it cannot be opened, throws the retriever's exception. */
     fun <T> open(g: GatedFile, block: (MediaMetadataRetriever) -> T): T {
         val retriever = MediaMetadataRetriever()
         try {
@@ -26,7 +26,7 @@ internal object VideoProbe {
         }
     }
 
-    /** 时长、显示方向上的宽高(已按旋转角交换)、有没有音轨。 */
+    /** Duration, width/height in display orientation (already swapped by rotation), and whether there is an audio track. */
     fun meta(r: MediaMetadataRetriever): Meta {
         val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
         val width = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
@@ -37,13 +37,13 @@ internal object VideoProbe {
         return Meta(duration, w, h, hasAudio)
     }
 
-    /** [atMs] 附近的关键帧,长边缩到 [maxSide] 以内的 JPEG;取不到为 null。 */
+    /** Key frame near [atMs], JPEG with long side scaled within [maxSide]; null when unavailable. */
     fun frameJpeg(r: MediaMetadataRetriever, atMs: Long, maxSide: Int): ByteArray? {
         val bitmap = r.getFrameAtTime(atMs.coerceAtLeast(0) * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
         return try { jpeg(bitmap, maxSide) } finally { bitmap.recycle() }
     }
 
-    /** [atMs] 附近的关键帧,长边缩到 [maxSide] 以内;取不到为 null。调用方负责 recycle。 */
+    /** Key frame near [atMs], long side scaled within [maxSide]; null when unavailable. The caller is responsible for recycle. */
     fun frameBitmap(r: MediaMetadataRetriever, atMs: Long, maxSide: Int): Bitmap? {
         val bitmap = r.getFrameAtTime(atMs.coerceAtLeast(0) * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
         val scaled = scaled(bitmap, maxSide)
@@ -51,7 +51,7 @@ internal object VideoProbe {
         return scaled
     }
 
-    /** 在 0..[durationMs] 上均匀取 [count] 个时间点;一帧时取中间。 */
+    /** Takes [count] evenly spaced points over 0..[durationMs]; for one frame, takes the middle. */
     fun sampleTimes(durationMs: Long, count: Int): List<Long> =
         if (count <= 1) listOf(durationMs.coerceAtLeast(0) / 2)
         else List(count) { i -> durationMs.coerceAtLeast(0) * i / (count - 1) }
@@ -75,7 +75,7 @@ internal object VideoProbe {
         return Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * f).toInt()), max(1, (bitmap.height * f).toInt()), true)
     }
 
-    /** 按位置从闸门句柄读;关掉 retriever 不关句柄(句柄由调用方的 use 关)。 */
+    /** Reads from the gate handle at a position; closing the retriever does not close the handle (the caller's use closes it). */
     private class GatedSource(private val g: GatedFile) : MediaDataSource() {
         override fun getSize(): Long = g.size
 

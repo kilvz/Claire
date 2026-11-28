@@ -32,7 +32,7 @@ import com.wangzan101.mika.ui.theme.MikaSize
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 设置首页顶上的搜索框。 */
+/** The search box at the top of the settings home. */
 @Composable
 internal fun SettingsSearchBar(query: String, onQuery: (String) -> Unit) {
     SearchField(
@@ -43,8 +43,8 @@ internal fun SettingsSearchBar(query: String, onQuery: (String) -> Unit) {
 }
 
 /**
- * 搜索结果:[available] 是此刻设置里看得到的条目,按当前界面语言取字后匹配 [query]。
- * 每行写标题和它在哪(组 › 上级页),命中的字高亮;点一行交给 [onOpen]。
+ * Search results: [available] are the entries visible in settings right now, matched against [query] after resolving text in the current UI language.
+ * Each row shows the title and where it is (group › parent page), with matched characters highlighted; tapping a row goes to [onOpen].
  */
 @Composable
 internal fun SettingsSearchResults(
@@ -88,7 +88,7 @@ private fun SettingsSearchResultRow(hit: SettingsSearchHit, accent: Color, onCli
     }
 }
 
-/** 把 [ranges] 这几段标成强调色加粗。 */
+/** Style the [ranges] segments in the accent color and bold. */
 internal fun highlighted(text: String, ranges: List<IntRange>, color: Color): AnnotatedString = buildAnnotatedString {
     append(text)
     val style = SpanStyle(color = color, fontWeight = FontWeight.SemiBold)

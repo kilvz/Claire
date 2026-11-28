@@ -35,7 +35,7 @@ class RemoteTaskHub(
     private val context: Context,
     private val runs: () -> List<TaskRun> = { (context.applicationContext as com.wangzan101.mika.MikaApp).taskState.runs.value },
     private val clock: () -> Long = System::currentTimeMillis,
-    /** 用户暂停了 Mika:查过重发之后、记回执之前拒([refuseRemote])。 */
+    /** The user paused Claire: refuse after the resend check and before recording the receipt ([refuseRemote]). */
     private val pause: PauseFlag = MikaPause.get(context),
 ) : McpTaskHost, RemoteTasks, RemoteRunIndex {
     private val receipts by lazy { RemoteTaskReceipts(context) }
@@ -79,7 +79,7 @@ class RemoteTaskHub(
 
     private fun startOwned(owner: String?, goal: String, conversation: String?, requestId: String?, attachments: List<String>): StartOutcome = try {
         val id = requestId ?: UUID.randomUUID().toString()
-        // 带附件的要先用掉上传的文件:暂停时在这之前就拒,文件留着,恢复后同一请求还能再发
+        // Tasks with attachments must consume the uploaded files first: refuse before that when paused so the files stay and the same request can be resent after resume
         if (attachments.isNotEmpty()) refuseWhilePaused()
         val task = if (attachments.isEmpty()) launch(owner, id, goal, conversation, Attendance.Reachable)
             else startWithFiles(owner, id, goal, conversation, attachments)
@@ -123,7 +123,7 @@ class RemoteTaskHub(
         return task
     }
 
-    /** 用户在手机上暂停了 Mika:不记回执、不排队,明确拒绝;恢复后要电脑重新发。 */
+    /** The user paused Claire on the phone: record no receipt, do not queue, refuse explicitly; the computer must resend after resume. */
     private fun refuseWhilePaused() = pause.refuseRemote()
 
     fun claimStart(id: String): Boolean = try {

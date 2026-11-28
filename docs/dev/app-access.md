@@ -6,7 +6,7 @@ After an app is disabled, the standard phone tools refuse to read and operate it
 
 When the app access page is open, it only reads the local app list and does not send the content to the model. When "Refresh app list" is tapped and there are still unclassified apps, it first confirms that app names and package names will be sent to the configured AI model for risk classification; the content inside apps is not sent. Recommended disabling lists only financial apps that are still allowed, which can be disabled one by one or all at once; apps already disabled no longer appear.
 
-Page copy follows the interface language. Category names are provided by the UI and core stores no Chinese; classification reasons are written in the interface language, old reasons stay as they are after a language change and are updated the next time classification runs. Categories changed manually are not overwritten by AI; the UI displays them as 「用户选择」/「Set by you」.
+Page copy follows the interface language. Category names are provided by the UI and core stores no Chinese; classification reasons are written in the interface language, old reasons stay as they are after a language change and are updated the next time classification runs. Categories changed manually are not overwritten by AI; the UI displays them as "Set by you".
 
 When the user actively shares the screen of a disabled app, they can choose:
 

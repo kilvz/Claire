@@ -128,9 +128,9 @@ class AndroidScreen(
     internal val shareAudioFile: (suspend (path: String) -> ShareableFile?)? = null,
     /** Turns images in the workspace into a shareable content URI; when null, this screen does not support sharing images. */
     internal val shareImageFile: (suspend (path: String) -> ShareableFile?)? = null,
-    /** 把工作区里的视频变成可分享的 content URI;为空时这个屏不支持视频分享。 */
+    /** Turns a video in the workspace into a shareable content URI; when null, this screen does not support video sharing. */
     internal val shareVideoFile: (suspend (path: String) -> ShareableFile?)? = null,
-    /** 并行任务时:按占用登记,本任务此刻能不能占这个包([user] 那份;null 为本来那份)。只查不占。 */
+    /** During parallel tasks: looks up the occupancy registry to see whether this task can occupy this package right now (the [user] entry; null for the base entry). Check only, does not occupy. */
     internal val appFree: (packageName: String, user: Int?) -> Boolean = { _, _ -> true },
     /**
      * For parallel tasks: waits up to that long for another task to release this package; [free] is the complete check (it is not on another screen and nobody holds it in the registry).

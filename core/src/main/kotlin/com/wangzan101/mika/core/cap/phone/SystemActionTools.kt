@@ -50,7 +50,7 @@ private val LOCAL_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM
 
 internal object SetAlarm : PhoneTool {
     override val verb = Verb.SetAlarm
-    override val label = "设闹钟"
+    override val label = "Set alarm"
     override val risk = Risk.Write
     override val entry = Entry.Alone
     override val logged = true
@@ -106,7 +106,7 @@ internal object SetAlarm : PhoneTool {
 
 internal object SetTimer : PhoneTool {
     override val verb = Verb.SetTimer
-    override val label = "设计时器"
+    override val label = "Set timer"
     override val risk = Risk.Write
     override val entry = Entry.Alone
     override val logged = true
@@ -139,7 +139,7 @@ internal object SetTimer : PhoneTool {
 /** Opens the clock's alarm list on Claire's screen: checking, deleting and editing alarms all happen on that page. */
 internal object ShowAlarms : PhoneTool {
     override val verb = Verb.ShowAlarms
-    override val label = "查看闹钟"
+    override val label = "View alarms"
     override val risk = Risk.Write
     override val showsScreenAfter = true
     override val logged = true
@@ -158,7 +158,7 @@ internal object ShowAlarms : PhoneTool {
 /** Opens the calendar's pre-filled new-event page: saving is tapped by the model on that page, and nothing is stored here; needs no calendar permission. */
 internal object AddCalendarEvent : PhoneTool {
     override val verb = Verb.AddCalendarEvent
-    override val label = "添加日程"
+    override val label = "Add calendar event"
     override val risk = Risk.Write
     override val entry = Entry.Opens
     override val showsScreenAfter = true
@@ -202,7 +202,7 @@ internal object AddCalendarEvent : PhoneTool {
  */
 internal object BulkAddCalendarEvents : PhoneTool {
     override val verb = Verb.BulkAddCalendarEvents
-    override val label = "批量添加日程"
+    override val label = "Add calendar events in bulk"
     override val risk = Risk.Write
     override val entry = Entry.Alone
     override val offScreen = true

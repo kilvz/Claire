@@ -104,18 +104,18 @@ data class Provider(
     /** Model names the user marked as TTS, independent of chat roles and the provider's model listing. */
     val ttsModels: Set<String> = emptySet(),
     /**
-     * 用户给这个账号起的备注(如「工作」「个人」),只用来显示,界面上写成「名字(备注)」(见 ModelsCopy.providerName)。
-     * 不进 [key]、不进 id,也不参与找同一家服务商:改备注不会新建服务商,也碰不到 Key。没起为 null;存之前经 [cleanNickname]。
+     * The nickname the user gives this account (such as "Work" or "Personal"), used only for display, shown as "name (nickname)" in the UI (see ModelsCopy.providerName).
+     * It does not go into [key] or the id, and does not participate in finding the same provider: changing the nickname neither creates a provider nor touches the Key. Null when unset; goes through [cleanNickname] before storage.
      */
     val nickname: String? = null,
 ) {
     val key: String get() = ProviderConnection.keyOf(kind, baseUrl, name)
 
     companion object {
-        /** 备注最多几个字(按码点算)。 */
+        /** Maximum nickname length in characters (counted by code point). */
         const val MAX_NICKNAME = 32
 
-        /** 备注统一这样整理:去掉控制字符和首尾空白,截到 [MAX_NICKNAME] 个字;空的算没起(null)。 */
+        /** Normalizes a nickname like this: strip control characters and leading/trailing whitespace, truncate to [MAX_NICKNAME] characters; empty counts as unset (null). */
         fun cleanNickname(raw: String?): String? {
             val text = raw?.filterNot { it.isISOControl() }?.trim()?.ifEmpty { null } ?: return null
             val n = text.codePointCount(0, text.length)
@@ -164,13 +164,13 @@ data class ModelContextSettings(val windowTokens: Int? = null, val triggerTokens
         (readTimeoutSeconds == null || readTimeoutSeconds in MODEL_READ_TIMEOUT_SECONDS)
 }
 
-/** 对话里对主模型的覆盖：一个具体模型或一个模型组；null 表示跟随全局。 */
+/** Override of the main model within a conversation: a specific model or a model group; null means follow global. */
 sealed interface ModelChoice {
     data class Model(val configId: String) : ModelChoice
     data class Group(val groupId: String) : ModelChoice
 }
 
-/** 一个用途选了什么:一个具体模型、一个模型组、用主模型,或不用(只有看图可以不用)。 */
+/** What a purpose selected: a specific model, a model group, use the main model, or none (only image viewing can use none). */
 sealed interface RoleChoice {
     /** Use the model config [configId]. */
     data class Model(val configId: String) : RoleChoice

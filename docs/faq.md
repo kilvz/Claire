@@ -46,7 +46,7 @@ Yes. AI tools on your computer can use either CLI + Skill or MCP; normally you p
 ## Language
 
 **Is the app in English?**
-Yes. The app UI comes in 11 languages: English, Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian and Indonesian. It follows your system language (English when your system language isn't one of them), and can be switched in Settings › Language & appearance › Language. The built-in app and website knowledge is in English, and you can talk to Claire in your own language.
+Yes. The app UI comes in 13 languages: English, Arabic, Persian, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, Portuguese, Russian, Indonesian, Turkish and Vietnamese. It follows your system language (English when your system language isn't one of them), and can be switched in Settings › Language & appearance › Language. The built-in app and website knowledge is in English, and you can talk to Claire in your own language.
 
 ## Privacy
 

@@ -153,7 +153,7 @@ private fun safeServerDetail(raw: String?): String? {
     return masked.takeIf { it.isNotEmpty() }?.let(::quoted)
 }
 
-/** 引在句中的服务端原话:去掉末尾一个句号(原话自带的),由引它的句子补上自己的「。」;省略号(截短的「…」、「...」)不动。 */
+/** A server quote embedded in a sentence: drop one trailing period (the quote's own), and the sentence quoting it supplies its own period; ellipses (truncated "…" or "...") are left alone. */
 private fun quoted(detail: String): String =
     when {
         detail.endsWith("..") -> detail

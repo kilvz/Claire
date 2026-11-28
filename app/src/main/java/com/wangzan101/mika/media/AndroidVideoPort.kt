@@ -21,8 +21,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * 视频能力的手机实现:读工作区视频的元数据/抽帧用 MediaMetadataRetriever([VideoProbe]),存影片库走 [VideoExporter]。
- * 为了避免「检查完再按路径用」被沙箱里换掉,解码直接读工作区闸门核实过的那个句柄;不复制到缓存,也不整段读进内存。
+ * Phone implementation of the video capability: reads workspace video metadata/extracts frames with MediaMetadataRetriever ([VideoProbe]), and saves to the movie library via [VideoExporter].
+ * To avoid the path being swapped inside the sandbox between the check and the use, decoding reads directly from the handle verified by the workspace gate; it is not copied to the cache or read entirely into memory.
  */
 class AndroidVideoPort(
     private val context: Context,
@@ -47,7 +47,7 @@ class AndroidVideoPort(
         }
     }
 
-    /** 聊天卡片的封面:开头附近一帧,长边 [maxSide] 以内;读不出来为 null。 */
+    /** Cover for chat cards: a frame near the start, long side within [maxSide]; null when unreadable. */
     suspend fun poster(path: String, maxSide: Int): Bitmap? =
         runCatching { probe(path) { _, r -> VideoProbe.frameBitmap(r, 0, maxSide) } }
             .getOrElse { if (it is CancellationException) throw it else null }
@@ -65,7 +65,7 @@ class AndroidVideoPort(
         }
     }
 
-    /** 经工作区闸门打开 [path],在同一个句柄上解码。 */
+    /** Opens [path] through the workspace gate and decodes on the same handle. */
     private suspend fun <T> probe(path: String, block: (GatedFile, MediaMetadataRetriever) -> T): T {
         val rel = relative(path) ?: throw VideoError.Unsupported("the path must be under ${SandboxPaths.WORKSPACE}")
         return dirs.tree.shared {
@@ -104,9 +104,9 @@ class AndroidVideoPort(
     }
 
     companion object {
-        /** 存、分享一段工作区视频的上限。 */
+        /** Upper limit for saving and sharing one workspace video. */
         const val MAX_BYTES = 1024L * 1024 * 1024
-        /** 给模型看的帧长边。 */
+        /** Long side of frames shown to the model. */
         private const val FRAME_SIDE = 1280
     }
 }

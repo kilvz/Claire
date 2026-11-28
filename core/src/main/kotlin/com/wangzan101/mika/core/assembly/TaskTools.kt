@@ -145,17 +145,17 @@ fun toolDispatcher(
     audioAskBeforeSave: Boolean = true,
     /** Whether the user allows the model to speak proactively; off by default. */
     audioSpeakTool: Boolean = false,
-    /** 视频看/存;为空时不装视频能力。 */
+    /** Video viewing/saving; when null, the video capability is not installed. */
     video: com.wangzan101.mika.core.cap.video.VideoPort? = null,
-    /** 视频生成;为空时不提供 video_generate。 */
+    /** Video generation; when null, video_generate is not provided. */
     videoGeneration: com.wangzan101.mika.core.cap.video.VideoGenerationPort? = null,
-    /** 每任务最多生成几个视频。 */
+    /** Maximum number of videos generated per task. */
     videoMaxPerTask: Int = 1,
-    /** 视频生成没指定时的默认时长/画幅/清晰度(来自用户设置)。 */
+    /** Default duration/aspect/resolution when video generation does not specify them (from the user's settings). */
     videoDurationSec: Int = 5,
     videoAspect: String = "16:9",
     videoResolution: String = "720p",
-    /** 固定音频转写端口;为空且未给 [transcribeProvider] 时不装转写能力。 */
+    /** Fixed audio transcription port; when null and [transcribeProvider] is not given, the transcription capability is not installed. */
     transcribe: com.wangzan101.mika.core.cap.transcribe.TranscribePort? = null,
     /** Resolves the transcription port dynamically according to the current STT selection; both listing and execution re-check it without rebuilding other task state. */
     transcribeProvider: (() -> com.wangzan101.mika.core.cap.transcribe.TranscribePort?)? = null,

@@ -26,7 +26,7 @@ import kotlinx.serialization.json.put
 /** Queries the web directly through the search endpoint configured by the user; on failure it plainly tells the model to fall back to the browser rather than silently switching services. */
 internal object WebSearchTool : AgentTool {
     override val verb = Verb.WebSearch
-    override val label = "搜索网页"
+    override val label = "Search the web"
     override val risk = Risk.Read
     override val offScreen = true
     override val concurrency = Concurrency.ParallelSafe

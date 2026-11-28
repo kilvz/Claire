@@ -103,11 +103,11 @@ fun PlanEditorDialog(
     onSave: (TriggerDefinition) -> Unit,
     initialDraft: PlanDraft? = null,
     deviceAccess: DeviceAccessSettings? = null,
-    /** 小时制跟系统设置,编辑器里不另给开关;测试可固定成某一种。 */
+    /** Hour cycle follows system settings; the editor offers no separate switch; tests can pin one. */
     use24Hour: Boolean = systemUses24Hour(),
 ) {
     val locale = uiLocale()
-    // 时区选择器要用的本地化索引建起来较慢,编辑器一打开就在后台预热,点开选择器时直接有列表。
+    // Building the localized index for the time zone picker is slow, so warm it up in the background as soon as the editor opens, and the list is ready when the picker opens.
     LaunchedEffect(locale) { withContext(Dispatchers.Default) { PlanZoneIndex.get(locale) } }
 
     val newId = remember(original?.id) { original?.id ?: UUID.randomUUID().toString() }
@@ -390,7 +390,7 @@ fun PlanEditorDialog(
                                         }
                                     }
                                     ChipRow {
-                                        // 「工作日」「周末」按周一至周五、周六周日算(ISO 星期,与存储一致)
+                                        // "Workdays" and "Weekends" mean Monday to Friday and Saturday to Sunday (ISO weekdays, consistent with storage)
                                         listOf(
                                             R.string.plans_every_day to setOf(1, 2, 3, 4, 5, 6, 7),
                                             R.string.plans_weekdays_workdays to setOf(1, 2, 3, 4, 5),
@@ -629,7 +629,7 @@ fun PlanEditorDialog(
     }
 }
 
-/** 系统设置里的 12/24 小时制。 */
+/** The 12/24-hour setting from system settings. */
 @Composable
 internal fun systemUses24Hour(): Boolean {
     val context = LocalContext.current

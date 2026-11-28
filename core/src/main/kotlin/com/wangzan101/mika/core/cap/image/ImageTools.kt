@@ -36,7 +36,7 @@ private const val GALLERY_CONFIRM_APP = "mika:gallery"
 internal object ImageGenerate : AgentTool {
     override val capability: String get() = IMAGE
     override val verb = Verb.ImageGenerate
-    override val label = "生成图片"
+    override val label = "Generate image"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -97,7 +97,7 @@ internal object ImageGenerate : AgentTool {
 internal object ImageEdit : AgentTool {
     override val capability: String get() = IMAGE
     override val verb = Verb.ImageEdit
-    override val label = "修改图片"
+    override val label = "Edit image"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -167,7 +167,7 @@ internal object ImageEdit : AgentTool {
 internal class ImageSave(private val ask: Boolean) : AgentTool {
     override val capability: String get() = IMAGE
     override val verb = Verb.ImageSave
-    override val label = "保存图片"
+    override val label = "Save image"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true

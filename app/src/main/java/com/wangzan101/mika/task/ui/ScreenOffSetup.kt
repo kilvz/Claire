@@ -42,15 +42,15 @@ import com.wangzan101.mika.ui.components.ValueTone
 import com.wangzan101.mika.ui.theme.MikaIcons
 
 /**
- * 「熄屏时运行」:列出计划熄屏、锁屏时按时跑要的三项(精确闹钟、电池策略、锁屏解锁),哪项没好点哪项去处理。
- * 只读状态、跳到系统标准设置页;解锁凭据在带 FLAG_SECURE 的对话框里用 [DeviceAccessSection] 设,和任务运行页同一套。
- * [showAlarm] 为 false 时不列精确闹钟(计划页顶上已有那张提示卡)。
+ * "Run with the screen off": lists the three things a plan needs to run on time with the screen off and locked (exact alarms, battery policy, lock screen unlock); tap whichever is not ready to deal with it.
+ * Reads state only and jumps to standard system settings pages; unlock credentials are set with [DeviceAccessSection] in a FLAG_SECURE dialog, the same setup as the task run page.
+ * When [showAlarm] is false, exact alarms are not listed (the plans page already has that prompt card at the top).
  */
 @Composable
 internal fun ScreenOffSetupCard(settings: DeviceAccessSettings, showAlarm: Boolean = true) {
     val context = LocalContext.current
     val config by settings.config.collectAsState()
-    // 从系统设置回来时重读:刚改的权限、电池策略、锁屏方式要立刻反映出来
+    // Re-read when returning from system settings: permissions, battery policy and lock screen method just changed must be reflected immediately
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
         resumes++
@@ -81,7 +81,7 @@ internal fun ScreenOffSetupCard(settings: DeviceAccessSettings, showAlarm: Boole
         ListRow(
             MikaIcons.Leaf, tr(R.string.plans_screen_off_battery), first = !showAlarm,
             subtitle = if (readiness.battery == PlanBatteryPolicy.Restricted) tr(R.string.plans_screen_off_battery_restricted_sub) else null,
-            // 受限要在应用详情的电池页里改;其余去系统标准的「电池优化」列表
+            // Restricted must be changed on the app details battery page; the rest go to the standard system "battery optimization" list
             onClick = {
                 if (readiness.battery == PlanBatteryPolicy.Restricted) open(appDetails)
                 else open(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), appDetails)
@@ -121,8 +121,8 @@ internal fun ScreenOffSetupCard(settings: DeviceAccessSettings, showAlarm: Boole
 }
 
 /**
- * 解锁设置对话框。对话框是独立窗口,活动窗口上的 FLAG_SECURE 管不到它:这里自己开 [SecureFlagPolicy.SecureOn],
- * 输入凭据时不进截图、录屏和最近任务缩略图。开关和凭据的保存失败由 [DeviceAccessSection] 自己显示。
+ * Unlock settings dialog. The dialog is a separate window, so FLAG_SECURE on the activity window does not cover it: it turns on [SecureFlagPolicy.SecureOn] itself,
+ * so credentials are not captured in screenshots, screen recording or recent task thumbnails while being entered. Failures saving the switch and credentials are shown by [DeviceAccessSection] itself.
  */
 @Composable
 private fun ScreenOffUnlockDialog(settings: DeviceAccessSettings, onDismiss: () -> Unit) {
@@ -152,21 +152,21 @@ private fun readSystem(context: Context): SystemState {
             else -> PlanBatteryPolicy.Managed
         }
     }.getOrDefault(PlanBatteryPolicy.Unknown)
-    // 读不到就当设了锁屏密码:宁可多提示一句去存凭据,也不误报「已就绪」
+    // If it cannot be read, assume a lock screen password is set: better to prompt once more to store credentials than to falsely report "ready"
     val secure = runCatching { context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure }.getOrNull() ?: true
     return SystemState(TriggerRuntime.canScheduleExactly(context), battery, secure)
 }
 
-/** 依次尝试系统标准设置页,打开一个就停;都打不开返回 false。 */
+/** Try the standard system settings pages in order and stop at the first that opens; return false if none open. */
 private fun openFirst(context: Context, vararg intents: Intent): Boolean {
     for (intent in intents) {
         try {
             context.startActivity(intent)
             return true
         } catch (_: ActivityNotFoundException) {
-            // 这个机型没有这一页,试下一页
+            // This device model does not have this page, try the next one
         } catch (_: SecurityException) {
-            // 个别系统不让第三方打开这一页,试下一页
+            // Some systems do not let third parties open this page, try the next one
         }
     }
     return false

@@ -30,7 +30,7 @@ import com.wangzan101.mika.core.screen.uistate.session
  */
 internal object RequestConfirmation : SurfaceAware {
     override val verb = Verb.RequestConfirmation
-    override val label = "请你同意"
+    override val label = "Ask for approval"
     override val risk = Risk.Read
     override val def = ToolDef("request_confirmation",
         Prompts.tool("request_confirmation"),

@@ -46,16 +46,16 @@ If a debug build is installed alongside Claire, connect with `mika connect --pac
 
 The CLI handles forwarding; you do not need the MCP instructions for manually forwarding a fixed port. After reconnecting the cable, make sure the same phone is back in ADB. After a phone reboot or turning off computer access, run `connect` again.
 
-电脑上另有程序占着默认的 ADB 服务器端口(通常是 5037)、和米卡用的 ADB 冲突时,可以给米卡单独指定一个服务器端口:
+If another program on the computer occupies the default ADB server port (usually 5037) and conflicts with the ADB used by Claire, you can specify a separate server port for Claire:
 
 ```bash
 mika --adb-server-port 5038 devices --json
 mika --adb-server-port 5038 connect --device SERIAL --json
 ```
 
-之后的 `doctor`、`task`、`ui`、`notification-doctor` 都带上同一个选项。这是电脑上 ADB 服务器的端口,与手机上 Mika 的监听端口无关,也不能与 `--url` 同用。不指定时沿用 adb 自己的选择(包括 `ANDROID_ADB_SERVER_PORT` 环境变量)。换了服务器端口后,无线 ADB 设备要在这个服务器上重新 `adb -P 5038 connect`。有的手机拔插 USB 时会重启 `adbd`,由 USB 启动的手机助手会随之退出;在 Mika 里完成无线调试配对后,手机端会自己重新拉起助手。
+Subsequent `doctor`, `task`, `ui` and `notification-doctor` commands must carry the same option. This is the port of the ADB server on the computer; it has nothing to do with Claire's listening port on the phone, and cannot be used together with `--url`. When not specified, adb's own choice is used (including the `ANDROID_ADB_SERVER_PORT` environment variable). After changing the server port, wireless ADB devices must reconnect on this server with `adb -P 5038 connect`. Some phones restart `adbd` when the USB cable is plugged or unplugged, and the phone helper started over USB exits with it; after completing wireless debugging pairing in Claire, the phone side restarts the helper itself.
 
-也可以使用手机设置里显式开启的局域网/私有网络连接:
+Alternatively, use a LAN/private-network connection explicitly enabled in the phone's settings:
 
 ```bash
 mika --url http://PHONE:8765 --token-file /path/to/private-token-file doctor --json
@@ -63,19 +63,19 @@ mika --url http://PHONE:8765 --token-file /path/to/private-token-file doctor --j
 
 The private token file contains only the access token. Use the server origin or `/api/v1` URL, not `/mcp`; URL credentials are rejected. The CLI refuses redirects and ignores ambient HTTP proxies. The server retains its private-network restrictions. Plain LAN HTTP does not encrypt traffic; ADB or a trusted private network can be used.
 
-## 经 ADB 只读读屏
+## Read-only screen reading over ADB
 
 ```bash
 mika screen --device SERIAL --json
-# 并排安装的调试版
+# Debug build installed side by side
 mika screen --device SERIAL --package com.wangzan101.mika.dev --json
 ```
 
-`screen` 经已授权的 ADB 以 shell 身份运行 Mika APK 里的读屏入口,读出各显示屏(包括 Mika 的虚拟屏)上可访问的窗口和控件树,每个窗口带 `display_id`。它用安卓公开的 `UiAutomation` 能力连接,并带 `FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES`,读屏期间 Mika 的无障碍服务照常运行;系统自带的 `adb shell uiautomator dump` 用的是会压制其他无障碍服务的连接,会让 Mika 暂时断开,所以不要用它代替。系统给不出这种连接时直接报错,不退回会压制的方式。
+`screen` runs the screen-reading entry point in the Claire APK as the shell user over authorized ADB, reading the accessible windows and control trees on each display (including Claire's virtual display); each window carries a `display_id`. It connects using Android's public `UiAutomation` capability with `FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES`, so Claire's accessibility service keeps running while reading the screen; the system's built-in `adb shell uiautomator dump` uses a connection that suppresses other accessibility services and would temporarily disconnect Claire, so do not use it as a substitute. When the system cannot provide such a connection it reports an error directly, without falling back to a suppressing method.
 
-只读:不点击、不输入、不改设置,也不需要手机上的任务服务。密码框(及其子控件)不输出文字和描述,只标 `password: true`;单次最多 2500 个控件、60 层,每段文字最多 1000 个字符,整次输出约 100 万个字符;获得焦点的、活动的窗口先读。超出时 `truncated` 为真,`truncated_by` 写明是哪一项(`nodes`、`depth`、`text`、`output`),用结果前先看 `node_count` 和 `truncated`。另一个界面自动化会话正占用时返回 `screen_unavailable`(`reason` 为 `connect_failed`),手机上 15 秒内读不完返回 `timeout`。需要包含此入口的 Mika 版本;旧版本返回 `reason` `outdated_app` 并提示更新,ADB 出错为 `adb_failed`,输出不是读屏结果为 `unreadable`,都不会把手机上的原始输出当结果。只用局域网连接(`--url`)时没有这个命令。
+Read-only: no taps, no input, no settings changes, and no task service needed on the phone. Password fields (and their child controls) output no text or description, only `password: true`; a single read covers at most 2500 controls and 60 levels, each text at most 1000 characters, and the whole output is about 1 million characters; focused and active windows are read first. When exceeded, `truncated` is true and `truncated_by` names which limit (`nodes`, `depth`, `text`, `output`); check `node_count` and `truncated` before using the result. When another UI automation session is occupying it, returns `screen_unavailable` (`reason` is `connect_failed`); when the phone cannot finish reading within 15 seconds, returns `timeout`. Requires a Claire version that includes this entry point; older versions return `reason` `outdated_app` and prompt for an update, ADB errors are `adb_failed`, and output that is not screen-reading output is `unreadable`; none of these treat raw phone output as a result. This command is not available with a LAN-only connection (`--url`).
 
-## 任务命令
+## Task commands
 
 ```bash
 mika --device SERIAL task run --goal-file task.txt --json

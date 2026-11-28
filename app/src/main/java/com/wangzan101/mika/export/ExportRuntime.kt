@@ -48,7 +48,7 @@ data class ExportOutcome(
     val bytes: Long,
 )
 
-/** Android 适配层：预览和导出都显式接收对话框已经选定的同一个来源快照。 */
+/** Android adapter layer: both preview and export explicitly receive the same source snapshot already chosen by the dialog. */
 class ExportRuntime(private val context: Context) {
     private val processor = ExportProcessor(
         labels = ExportLabelsUi.of(context),
@@ -117,8 +117,8 @@ class ExportRuntime(private val context: Context) {
 }
 
 /**
- * 与 Android 无关的导出处理器，便于用同一份真实代码验证快照、资产和取消语义。
- * 暂存成功后，HTML 预览目录只归返回的 [ExportPreview.Html] 所有。
+ * An export processor independent of Android, so the same real code can verify snapshots, assets and cancellation semantics.
+ * After staging succeeds, the HTML preview directory is owned only by the returned [ExportPreview.Html].
  */
 internal class ExportProcessor(
     private val labels: com.wangzan101.mika.core.export.ExportLabels,
@@ -193,7 +193,7 @@ internal class ExportProcessor(
             handedOff = true
             return result
         } finally {
-            // withContext 在取消边界丢弃返回值时也必须清掉尚未交付的 HTML 目录。
+            // Even when withContext discards the return value at a cancellation boundary, an HTML directory not yet handed off must still be cleaned up.
             if (!handedOff) staging.deleteRecursively()
         }
     }

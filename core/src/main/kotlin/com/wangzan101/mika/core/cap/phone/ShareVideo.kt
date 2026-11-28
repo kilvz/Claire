@@ -17,10 +17,10 @@ import com.wangzan101.mika.core.workspace.SandboxPaths
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** 把工作区视频分享给一个 App:ACTION_SEND + EXTRA_STREAM,只打开分享页,不发出。 */
+/** Share a workspace video to an app: ACTION_SEND + EXTRA_STREAM; only opens the share page, does not send. */
 internal object ShareVideo : PhoneTool {
     override val verb = Verb.ShareVideo
-    override val label = "分享视频到 App"
+    override val label = "Share video to app"
     override val risk = Risk.Write
     override val showsScreenAfter = true
     override val logged = true

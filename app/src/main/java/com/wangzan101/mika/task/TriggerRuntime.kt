@@ -123,7 +123,7 @@ object TriggerRuntime {
         engine(context, store).rearm(System.currentTimeMillis())
     }
 
-    /** 暂停期间到了任务服务门口的时段(派发后、开跑前用户暂停了):记成「因暂停跳过」,恢复后不补跑。 */
+    /** A window that came due at the task service door during a pause (the user paused after dispatch and before start): recorded as "skipped due to pause" and not caught up after resume. */
     @Synchronized fun skippedPaused(context: Context, key: String) {
         val store = store(context)
         if (store.windows().none { it.key == key }) return
@@ -158,7 +158,7 @@ object TriggerRuntime {
             return
         }
         outcome as ConditionOutcome.Checked
-        // 检查办完时用户已暂停:不执行动作,也不记这次检查的结论(恢复后的下一次检查照常比较)
+        // The user paused after the check completed: do not execute the action and do not record this check's conclusion (the next check after resume still compares as usual)
         if (MikaPause.get(context).paused()) {
             store.mark(window.key, TriggerWindowState.Skipped, PauseFlag.REASON)
             return
@@ -342,7 +342,7 @@ object ExactAlarmGuide {
     fun shouldPrompt(granted: Boolean, prompted: Boolean): Boolean = !granted && !prompted
 }
 
-/** 闹钟广播的 goAsync 期间系统替 App 撑着 CPU;派发到任务服务那一段由 [TriggerHandoffWake] 接着撑。 */
+/** The system holds the CPU for the app during the alarm broadcast's goAsync; the dispatch to the task service is held by [TriggerHandoffWake] instead. */
 class TriggerAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != "com.wangzan101.mika.task.TRIGGER_ALARM") return

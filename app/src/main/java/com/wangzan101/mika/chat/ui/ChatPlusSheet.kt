@@ -278,8 +278,8 @@ private fun SheetLink(text: String, onClick: () -> Unit) {
 }
 
 /**
- * 第一张卡片里的最近照片:最新的四张缩略图,末尾一块「更多」进「最近的照片」页。
- * 点一下选上或取消,长按看大图(选中状态不变);[onPreview] 为空时用 App 自带的查看页。
+ * The recent photos in the first card: the latest four thumbnails, with a "More" tile at the end that opens the "Recent photos" page.
+ * Tap to select or deselect, long press for the full image (selection state unchanged); when [onPreview] is null, use the app's own viewer.
  */
 @Composable
 internal fun PlusRecentRow(
@@ -304,7 +304,7 @@ internal fun PlusRecentRow(
     }
 }
 
-/** 最近照片末尾的「更多」:和缩略图一样大的灰砖,图标加一行字。字放不下时省略,不折行。 */
+/** The "More" tile at the end of recent photos: a grey tile the same size as a thumbnail, an icon plus one line of text. Text that does not fit is ellipsized, not wrapped. */
 @Composable
 private fun RowScope.MorePhotosTile(onClick: () -> Unit) {
     val c = MikaTheme.colors
@@ -313,7 +313,7 @@ private fun RowScope.MorePhotosTile(onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick).testTag("plus-more-photos"),
         contentAlignment = Alignment.Center,
     ) {
-        // 图标带权重但不撑满:Column 先量文字,格子矮时缩的是图标,字不被裁
+        // The icon has weight but does not fill: Column measures text first, so when the cell is short the icon shrinks and the text is not clipped
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Icon(MikaIcons.Photos, null, Modifier.weight(1f, fill = false).size(22.dp), tint = c.ink2)
             Text(
@@ -324,7 +324,7 @@ private fun RowScope.MorePhotosTile(onClick: () -> Unit) {
     }
 }
 
-/** 相册的二级页:四列最近的照片(点一下选上,右上角是序号;再点取消;长按看大图,选中状态不变)。[onGrant] 是没给照片权限时。 */
+/** The album's second-level page: four columns of recent photos (tap to select, index in the top-right corner; tap again to deselect; long press for the full image, selection state unchanged). [onGrant] is for when photo permission is not granted. */
 @Composable
 internal fun PlusPhotosPage(
     access: PhotoAccess,

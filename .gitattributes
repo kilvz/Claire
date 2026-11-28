@@ -1,6 +1,6 @@
 app/src/main/assets/sandbox/mika text eol=lf
 
-# 文本文件统一 LF:金样、提示词、README 都按字节比较,换行不能随平台变。
-# text=auto 不碰二进制文件;gradlew.bat 保持 CRLF(Windows 批处理对纯 LF 兼容性不稳)。
+# Text files use LF: goldens, prompts and the README are compared byte for byte, so line endings must not vary by platform.
+# text=auto leaves binaries alone; gradlew.bat stays CRLF (Windows batch files are unreliable with plain LF).
 * text=auto eol=lf
 *.bat text eol=crlf

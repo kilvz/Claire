@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 聊天视频卡片点开时复制出来的那一份;只把这份交给系统播放器,工作区本身不开放 -->
+<!-- The copy made when a chat video card is opened; only this copy is handed to the system player, and the workspace itself is never exposed -->
 <paths>
     <cache-path name="videoplay" path="videoplay/" />
 </paths>

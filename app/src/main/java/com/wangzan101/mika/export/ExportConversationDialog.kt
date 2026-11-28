@@ -120,7 +120,7 @@ private data class ExportRequest(
     val bundle: Boolean,
 )
 
-/** 导出与预览都消费这里创建的不可变来源快照；离开页面会取消任务并释放预览暂存。 */
+/** Export and preview both consume the immutable source snapshot created here; leaving the page cancels the task and releases the preview staging. */
 @Composable
 internal fun ExportConversationDialog(
     conversationId: String,
@@ -218,7 +218,7 @@ internal fun ExportConversationDialog(
                 ) { p -> handler.post { progress = p } }
                 outcome = result
             } catch (e: CancellationException) {
-                // 用户取消；runtime 只清理这次暂存。
+                // User cancelled; runtime only cleans up this staging.
             } catch (e: Exception) {
                 failure = e.message ?: e.javaClass.simpleName
             } finally {
@@ -247,7 +247,7 @@ internal fun ExportConversationDialog(
                     formatId = request.format,
                 ) { p -> handler.post { progress = p } }
             } catch (e: CancellationException) {
-                // 取消或离开面板时，runtime 清理尚未交付的暂存目录。
+                // When cancelled or leaving the panel, runtime cleans up staging directories not yet handed off.
             } catch (e: Exception) {
                 failure = e.message ?: e.javaClass.simpleName
             } finally {
@@ -537,7 +537,7 @@ internal fun ExportConversationDialog(
     DisposableEffect(previewResult) {
         val current = previewResult
         onDispose {
-            // 必须释放 effect 创建时的值；重组后的新预览不能替旧值清理。
+            // Must release the value captured when the effect was created; a new preview after recomposition must not clean up the old value on its behalf.
             (current as? ExportPreview.Html)?.release()
         }
     }

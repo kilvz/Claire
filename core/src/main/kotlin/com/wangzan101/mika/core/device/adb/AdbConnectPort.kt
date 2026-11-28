@@ -25,16 +25,16 @@ data class ConnectCandidates(
 )
 
 /**
- * 找本机无线调试的连接端口并连上。按顺序试,哪个连上就停:上次连上的端口、系统属性(读得到才用)、mDNS 查到的每一个、
- * 扫本机端口([scan],前面都不行时才扫)、用户在引导页填的端口([manual])。
- * 只靠 mDNS 不行:adbd 只在打开无线调试时登记一次服务,mDNS 守护进程重启后登记就没了,有的网络还拦着组播;
- * mDNS 也可能同时查到已经失效的旧端口,所以查到几个试几个。缓存的端口失效时被拒得很快,所以排第一。
- * 用户填了端口就不再扫(之前就是扫不到才让填的),直接试它。
- * TLS 上被拒(UNAUTHORIZED、TLS_FAILED)不一定是钥匙不对:有的系统让另一个服务先接住同一端口的第一次 TLS 握手,
- * 对谁的证书都拒,紧接着再连才落到 adbd。所以同一端口隔 [tlsRetryDelayMs] 再试一次,还不行就接着试其余候选;
- * 只有试遍都连不上、且有端口这样拒了我们,才报 UNAUTHORIZED(要重新配对)。有端口拒了我们也照样扫本机端口(跳过已试过的):
- * 缓存、属性、mDNS 给的可能是旧端口,上面还有服务回话却不认当前钥匙,而 adbd 已经换到别的端口上了。
- * 扫描有时间上限,扫不到别的才报 UNAUTHORIZED。
+ * Find and connect to the local wireless debugging port. Tries in order and stops at the first that connects: the port used last time, a system property (only if readable), every port found by mDNS,
+ * a local port scan ([scan], only when the earlier sources fail), and the port the user entered on the setup page ([manual]).
+ * mDNS alone is not enough: adbd registers the service only once when wireless debugging is turned on, the registration is lost when the mDNS daemon restarts, and some networks block multicast;
+ * mDNS may also find stale ports at the same time, so every port it finds is tried. A stale cached port is rejected quickly, so it is tried first.
+ * When the user entered a port, do not scan (the field exists precisely because scanning failed before); try that port directly.
+ * A rejection over TLS (UNAUTHORIZED, TLS_FAILED) does not necessarily mean the key is wrong: some systems let another service accept the first TLS handshake on the same port
+ * and reject every certificate; an immediate reconnect then reaches adbd. So retry the same port once after [tlsRetryDelayMs], and if that fails continue with the other candidates;
+ * report UNAUTHORIZED (re-pairing required) only when every candidate failed and at least one port rejected us this way. Even if a port rejected us, still scan local ports (skipping those already tried):
+ * the cache, the property and mDNS may point to a stale port where some service still answers but does not accept the current key, while adbd has moved to another port.
+ * The scan has a time limit; report UNAUTHORIZED only when nothing else is found.
  */
 class AdbConnectPort(
     private val property: () -> Int?,

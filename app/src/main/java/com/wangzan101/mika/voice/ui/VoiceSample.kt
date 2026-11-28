@@ -7,15 +7,15 @@ import com.wangzan101.mika.i18n.AppLanguage
 import com.wangzan101.mika.i18n.tr
 import java.util.Locale
 
-/** 界面有这种语言的翻译:试听句子能用音色自己的语言说。 */
+/** The UI has a translation for this language: the audition sentence can be spoken in the voice's own language. */
 internal fun hasUiTranslation(locale: Locale): Boolean {
     val code = AppLanguage.modernCode(locale.language)
     return code.isNotEmpty() && AppLanguage.entries.any { it.language == code }
 }
 
 /**
- * 试听/测试用的一句话,来自字符串资源 voice_try_sample。音色带语言、且界面有这种语言的翻译时用那种语言,
- * 否则(没给语言、界面没有这种语言)用当前界面语言,不为任何语言在代码里写死句子。
+ * A sentence for audition/testing, from the string resource voice_try_sample. When the voice has a language and the UI has a translation for it, use that language,
+ * otherwise (no language given, or the UI has no such translation) use the current UI language; never hard-code a sentence for any language in code.
  */
 internal fun voiceSample(context: Context, voiceLocale: Locale? = null): String {
     val locale = voiceLocale?.takeIf(::hasUiTranslation) ?: return tr(R.string.voice_try_sample)

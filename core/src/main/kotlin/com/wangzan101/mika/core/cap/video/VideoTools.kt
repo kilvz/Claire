@@ -34,7 +34,7 @@ private const val MOVIES_CONFIRM_APP = "mika:movies"
 internal object VideoFrames : AgentTool {
     override val capability: String get() = VIDEO
     override val verb = Verb.VideoFrames
-    override val label = "看视频"
+    override val label = "View video"
     override val risk = Risk.Read
     override val offScreen = true
     override val concurrency = Concurrency.ParallelSafe
@@ -78,7 +78,7 @@ internal object VideoFrames : AgentTool {
 internal object VideoInfoTool : AgentTool {
     override val capability: String get() = VIDEO
     override val verb = Verb.VideoInfo
-    override val label = "查看视频信息"
+    override val label = "View video info"
     override val risk = Risk.Read
     override val offScreen = true
     override val concurrency = Concurrency.ParallelSafe
@@ -111,7 +111,7 @@ internal object VideoInfoTool : AgentTool {
 internal class VideoSave(private val ask: Boolean) : AgentTool {
     override val capability: String get() = VIDEO
     override val verb = Verb.VideoSave
-    override val label = "保存视频"
+    override val label = "Save video"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -175,11 +175,11 @@ private fun failure(e: Throwable): ToolExecution = when (e) {
     else -> fail("video_failed", e.message?.take(300) ?: "Video operation failed.")
 }
 
-/** 生成一段视频;默认不提供,用户配置并打开视频模型后才给。 */
+/** Generate a video; not provided by default, only after the user configures and enables a video model. */
 internal object VideoGenerate : AgentTool {
     override val capability: String get() = VIDEO
     override val verb = Verb.VideoGenerate
-    override val label = "生成视频"
+    override val label = "Generate video"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true
@@ -203,7 +203,7 @@ internal object VideoGenerate : AgentTool {
         val port = cap.generation ?: return fail("video_unavailable", "Video generation is not configured.")
         val prompt = a.str("prompt", max = 4000)!!.trim()
         val caps = port.capabilities
-        // 没指定时用设置里的默认值;设置里的值这个模型不支持时退回它支持的,免得每次都因为默认值报错
+        // Use the defaults from settings when not specified; if this model does not support a configured value, fall back to one it supports, so the default does not cause an error every time
         val duration = a.int("durationSec", 1, 60) ?: cap.defaultDuration.coerceIn(caps.durations.first, caps.durations.last)
         val aspect = a.str("aspect") ?: cap.defaultAspect.takeIf { it in caps.aspects } ?: caps.aspects.first()
         val resolution = a.str("resolution") ?: cap.defaultResolution.takeIf { it in caps.resolutions } ?: caps.resolutions.first()
@@ -214,8 +214,8 @@ internal object VideoGenerate : AgentTool {
             return fail("task_video_limit_reached", "This task already used its video allowance (${cap.used()}/${cap.maxPerTask}).")
         }
         val first = a.str("first_frame_path", max = 500)?.let { workspacePath(it) }
-        // 额度只在确定没花钱时退:服务商还没收下任务,或明确报告任务失败(没有产出)。
-        // 收下之后的超时、断网、下载失败,以及提交后不知道建没建成的,都不退,免得模型重试又建一个付费任务。
+        // Refund the allowance only when it is certain that no money was spent: the provider had not accepted the task, or explicitly reported failure (no output).
+        // Timeouts, network loss and download failures after acceptance, and submissions whose outcome is unknown, are not refunded, so a model retry does not create another paid task.
         var submitted = false
         val generated = try {
             port.generate(VideoGenerationRequest(prompt, duration, aspect, resolution, first)) { stage ->

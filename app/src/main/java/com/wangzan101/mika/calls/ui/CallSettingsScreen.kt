@@ -68,14 +68,14 @@ fun CallSettingsScreen(runtime: CallRuntime, onInstructions: (() -> Unit)? = nul
             handledFocusRequest = focusRequest
         }
     }
-    // 待命通知「去处理」:先回到工作台,由工作台打开已有的待命检查页
+    // Standby notification "handle it": first go back to the desk, which then opens the existing standby check page
     LaunchedEffect(openStandbyChecklist) {
         if (openStandbyChecklist) {
             instructionsOpen = false
             voiceProfilesOpen = false
         }
     }
-    // 这里的子页都不是导航路由,系统返回键要先关子页,不能直接退出整个电话页
+    // The sub-pages here are not navigation routes; the system back key must close the sub-page first and cannot exit the whole phone page directly
     BackHandler(enabled = voiceProfilesOpen || instructionsOpen) {
         voiceProfilesOpen = false
         instructionsOpen = false
@@ -147,9 +147,9 @@ private fun CallSettingsWorkspace(
             handledFocusRequest = focusRequest
         }
     }
-    // 待命受阻的通知只展开已有的待命检查页(原因与去设置都在那里);通话或锁屏拨号进行中不打断
-    // 待命受阻的通知只展开已有的待命检查页(原因与去设置都在那里);通话或锁屏拨号进行中不打断。
-    // 一次性请求:处理完就清,之后再进电话页不会重开。
+    // The standby-blocked notification only expands the existing standby check page (reason and go-to-settings are both there); do not interrupt an ongoing call or lock-screen dialing
+    // The standby-blocked notification only expands the existing standby check page (reason and go-to-settings are both there); do not interrupt an ongoing call or lock-screen dialing.
+    // One-shot request: cleared once handled, so re-entering the phone page does not reopen it.
     LaunchedEffect(openStandbyChecklist) {
         if (!openStandbyChecklist) return@LaunchedEffect
         if (idle && pendingLockedDial == null) {

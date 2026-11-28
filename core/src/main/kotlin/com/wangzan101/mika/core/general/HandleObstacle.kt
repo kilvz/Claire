@@ -17,7 +17,7 @@ import kotlinx.serialization.json.put
 /** State what is blocking the current app or web page, and get the next step for how to handle it. */
 internal object HandleObstacle : SurfaceAware {
     override val verb = Verb.HandleObstacle
-    override val label = "遇到障碍"
+    override val label = "Hit a roadblock"
     override val risk = Risk.Read
     override val withScreens = true
     override val def = ToolDef("handle_obstacle",

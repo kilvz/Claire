@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a tool to Ui tasks for "when the intent is explicit, the model may send the result to the owner's WeChat"; add a 「锁屏时运行本机任务」 (Run on-device tasks while the screen is locked) switch that defaults to off in Settings, and complete the localEnabled unlock authorization chain.
+**Goal:** Add a tool to Ui tasks for "when the intent is explicit, the model may send the result to the owner's WeChat"; add a "Run on-device tasks while the screen is locked" switch that defaults to off in Settings, and complete the localEnabled unlock authorization chain.
 
 **Architecture:** F1 follows the capability-plugin pattern: a new WechatOwnerCapability in core (port interface + intent gate + tool definition), implemented on the app side by AndroidWechatOwnerPort (snapshot/re-verify/Outbox idempotency), injected by TaskRun gated on source + intent. F2 reuses the TaskRelock/guard system already merged today and only fills in the localEnabled configuration chain (DeviceAccess→DeviceAccessSettings→TaskUnlockPolicy→Settings UI).
 
@@ -22,7 +22,7 @@
 
 ## Review Focus
 
-1. An explicit English intent ("send the result to my WeChat") must hit the gate, and negated sentences ("不要发我微信" (don't send to my WeChat) / "don't send to my wechat") must not — the fork only had the Chinese pattern, and this plan fixes that (Task 1 tests).
+1. An explicit English intent ("send the result to my WeChat") must hit the gate, and negated sentences ("don't send to my WeChat" / "don't send to my wechat") must not — the fork only had the Chinese pattern, and this plan fixes that (Task 1 tests).
 2. Sending the same text a second time within the same run must not deliver it again; the previous status is returned (Task 2 sender tests).
 3. If the WeChat channel is rebound/disabled mid-run, sending must return unavailable and must not send even once (Task 2 sender tests).
 4. If the user turns the on-device switch off during wake-up, the flow must abort before credentials are entered (Task 3 DeviceAccess tests).
@@ -51,14 +51,14 @@
 - [ ] **Step 1: Write the failing WechatOwnerRequestTest**
 
 Assertions (both the Chinese and English patterns + negation exclusion + long sentences not truncated):
-- `explicitWechatOwnerRequest("把今天的新闻摘要发到我的微信")` == true
-- `explicitWechatOwnerRequest("查一下快递进度,结果发我微信")` == true
+- `explicitWechatOwnerRequest("send today's news summary to my WeChat")` == true
+- `explicitWechatOwnerRequest("check the delivery progress and send the result to my WeChat")` == true
 - `explicitWechatOwnerRequest("summarize my emails and send the result to my WeChat")` == true
-- `explicitWechatOwnerRequest("把结果发到我的微信,顺便订个闹钟明早八点提醒我带上伞出门")` == true (a long sentence longer than an 18-character window still hits)
-- `explicitWechatOwnerRequest("不要把结果推送到我的微信")` == false
+- `explicitWechatOwnerRequest("send the result to my WeChat and also set an alarm for eight tomorrow morning to remind me to take an umbrella")` == true (a long sentence longer than an 18-character window still hits)
+- `explicitWechatOwnerRequest("do not push the result to my WeChat")` == false
 - `explicitWechatOwnerRequest("don't send anything to my wechat")` == false
-- `explicitWechatOwnerRequest("帮我看看微信里有什么新消息")` == false (reading WeChat ≠ sending to WeChat)
-- `explicitWechatOwnerRequest("今天天气怎么样")` == false
+- `explicitWechatOwnerRequest("check what new messages I have in WeChat")` == false (reading WeChat ≠ sending to WeChat)
+- `explicitWechatOwnerRequest("what is the weather like today")` == false
 
 - [ ] **Step 2: Run `./gradlew :core:test --tests '*WechatOwnerRequest*' -q` and confirm everything fails to compile (the class does not exist)**
 
@@ -66,7 +66,7 @@ Assertions (both the Chinese and English patterns + negation exclusion + long se
 
 Three parts, with all comment wording of our own:
 1. `WechatOwnerPort` / `WechatOwnerResult` (signatures as in Interfaces).
-2. `explicitWechatOwnerRequest(goal)`: a Chinese pattern (a send-verb group × "my WeChat") + an English pattern (send/deliver × my wechat), each with its own negation-prefix exclusion (`不`/`别`/`无需`/don't/do not/never); **no character-distance window** (fixing the fork's defect of missing long sentences). Use two Regex groups in the implementation, and keep the pattern table as a file-level private val so more languages can be added later.
+2. `explicitWechatOwnerRequest(goal)`: a Chinese pattern (a send-verb group × "my WeChat") + an English pattern (send/deliver × my wechat), each with its own negation-prefix exclusion (the Chinese negations plus don't/do not/never); **no character-distance window** (fixing the fork's defect of missing long sentences). Use two Regex groups in the implementation, and keep the pattern table as a file-level private val so more languages can be added later.
 3. `WechatOwnerCapability`: when the port is non-null and the tool is supplied, sections give a self-written code of conduct (use it only once when the user explicitly asks; send only the final result and any uncertainty; accepted by the interface ≠ read; report failures/uncertainty truthfully and never resend automatically; never use the WeChat app or a browser as a stand-in). execute calls port.send, maps status to ok true/false, and passes message straight through.
 
 - [ ] **Step 4: Write the tool description `prompts/tools/wechat_send_owner.md`**
@@ -143,7 +143,7 @@ All green (if ToolRiskTest blocks the new tool, register it through the allowlis
 - Modify: `app/src/main/java/com/wangzan101/mika/task/TaskUnlockPolicy.kt` (add the localUnlockEnabled parameter + a Ui branch)
 - Modify: `app/src/main/java/com/wangzan101/mika/task/TaskRun.kt` (the unlock block picks unlockLocal by source; the failure copy has three branches)
 - Modify: `app/src/main/java/com/wangzan101/mika/device/ui/DeviceAccessSection.kt` (add a localTasks variant)
-- Modify: the Settings 「任务运行」 (Task runs) page (`SettingsSubPages.DuringWorkScreen` and `SettingsScreen`; attach the on-device switch)
+- Modify: the Settings "Task runs" page (`SettingsSubPages.DuringWorkScreen` and `SettingsScreen`; attach the on-device switch)
 - Modify: `app/src/main/res/values*/strings_device_access.xml` (11 directories, +5 keys each: device_local_group/title/sub/foot/unlock_failed)
 - Test: `core/src/test/kotlin/com/wangzan101/mika/core/device/DeviceAccessTest.kt` (+3)
 - Test: `app/src/test/java/com/wangzan101/mika/settings/DeviceAccessSettingsTest.kt` (+1)
@@ -177,7 +177,7 @@ TaskUnlockPolicyTest +2: authorization for the Ui source is granted and withdraw
 - [ ] **Step 5: Settings UI + strings**
 
 - `DeviceAccessSection.kt`: add a `localTasks: Boolean = false` parameter variant (the group name/switch row/footnote use the copy of the 5 new keys; the credential editing area is reused as a whole).
-- Attach the on-device switch to the 「任务运行」 (Task runs) page (pass DeviceAccessSettings; the footnote makes clear that it does not affect the 「连接电脑」 (Connect to computer) remote switch).
+- Attach the on-device switch to the "Task runs" page (pass DeviceAccessSettings; the footnote makes clear that it does not affect the "Connect to computer" remote switch).
 - Add 5 keys to strings_device_access.xml in each of the 11 languages.
 
 - [ ] **Step 6: Get all related tests green**

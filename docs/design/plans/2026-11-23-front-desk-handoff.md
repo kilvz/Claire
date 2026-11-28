@@ -1,81 +1,81 @@
-# 前台层实施：交接说明（2026-11-23，第二次交接）
+# Front desk implementation: handoff notes (2026-11-23, second handoff)
 
-给接手的 agent。按这份说明可以接着做，不需要回看之前的对话。上一版交接（Task 3 半途）已被执行完，本版是当前状态。
+For the agent taking over. You can continue from these notes without rereading earlier conversations. The previous handoff (Task 3 halfway) has been completed, and this version is the current state.
 
-## 1. 在哪、做到哪了
+## 1. Where and how far
 
-- **工作目录**：`/Users/bolyn/coding-projects/Claire/.claude/worktrees/front-desk`（git worktree，分支 `front-desk`，从本地 main `2e33e150b` 拉出）。所有活都在这里干。**不要动 main、其他分支和其他 worktree，不要 push、不要 merge**，除非用户亲口要求。
-- **要读的三份文件**（都已提交在这个分支上）：
-  - 设计（最高依据）：`docs/design/specs/2026-11-23-front-desk-design.md`
-  - 实施计划（11 个任务 + 插入的 3b）：`docs/design/plans/2026-11-23-front-desk.md`
-  - 聊天页原型（用户已认可 v2 + 输入框上方在办条变体）：`docs/design/prototypes/2026-11-23-front-desk-chat.html`
-- **进度账本**（最重要，git 忽略、只在磁盘上）：`.superpowers/sdd/2026-11-23-front-desk/progress.md`。里面有预检表、所有裁定（Ruling A–K）、每个任务的提交区间和延后的小问题。**以账本 + `git log` 为准**，不要凭印象重做已完成的任务。
-- **当前状态**（写这份时，HEAD = `c4ac312e2`）：
+- **Working directory**: `/Users/bolyn/coding-projects/Claire/.claude/worktrees/front-desk` (git worktree, branch `front-desk`, branched from local main `2e33e150b`). All work happens here. **Do not touch main, other branches or other worktrees; do not push or merge** unless the user asks in person.
+- **Three files to read** (all committed on this branch):
+  - Design (highest authority): `docs/design/specs/2026-11-23-front-desk-design.md`
+  - Implementation plan (11 tasks + inserted 3b): `docs/design/plans/2026-11-23-front-desk.md`
+  - Chat-page prototype (user has approved v2 + the in-progress bar variant above the input field): `docs/design/prototypes/2026-11-23-front-desk-chat.html`
+- **Progress ledger** (most important; git-ignored, only on disk): `.superpowers/sdd/2026-11-23-front-desk/progress.md`. It contains the pre-flight table, all rulings (Ruling A–K), the commit range of each task and deferred minor issues. **Trust the ledger + `git log`**; do not redo completed tasks from memory.
+- **Current state** (HEAD = `c4ac312e2` when this was written):
 
-| 任务 | 状态 | 提交 |
+| Task | Status | Commits |
 |---|---|---|
-| 1 对话脑子搬进 core | ✅ 完成，审查通过 | `4e44b27cf` |
-| 2 任务事件归类 + 汇报规则 | ✅ 完成，审查通过 | `6fcb6813b` |
-| 3 调度工具 + 执行器 | ✅ 完成，审查通过 | `ea95da0ef` |
-| 3b 前台只说话+派活（用户改定，去掉查询工具） | ✅ 完成，审查通过 | `455cb0c19`…`677a7ae66` |
-| 4 按会话常驻 FrontDesk | ✅ 完成，审查通过 | `3db7ef9ff` |
-| 5 后台接收前台补充 | ✅ 完成，审查通过 | `1727a6f81` |
-| 6 接线 app 层（1 轮修复后通过） | ✅ 完成，审查通过 | `cef4d456f`…`37fb910c3` |
-| 7 前台提示词 + 模型选择 | ✅ 完成，审查通过 | `c4ac312e2` |
-| 8 语音通话接前台 | ⏸ **实现者已派出，被叫停时还没动工作区** | 起点 `c4ac312e2` |
-| 9 聊天页走前台（原型门已开） | 未开始 | — |
-| 10 AI 电话里的前台 | 未开始 | — |
-| 11 全量回归 + 真机验证 | 未开始 | — |
+| 1 Move the conversational brain into core | ✅ Done, review passed | `4e44b27cf` |
+| 2 Task-event classification + report policy | ✅ Done, review passed | `6fcb6813b` |
+| 3 Dispatch tools + executor | ✅ Done, review passed | `ea95da0ef` |
+| 3b Front desk only talks and dispatches (user change, lookup tools removed) | ✅ Done, review passed | `455cb0c19`…`677a7ae66` |
+| 4 Per-conversation resident FrontDesk | ✅ Done, review passed | `3db7ef9ff` |
+| 5 Background receives front-desk notes | ✅ Done, review passed | `1727a6f81` |
+| 6: App-layer wiring (passed after 1 fix round) | ✅ Done, review passed | `cef4d456f`…`37fb910c3` |
+| 7 Front-desk prompts + model choice | ✅ Done, review passed | `c4ac312e2` |
+| 8 Voice call connected to the front desk | ⏸ **The implementer was dispatched but had not touched the working tree when stopped** | Start point `c4ac312e2` |
+| 9 Chat page goes through the front desk (prototype gate open) | Not started | — |
+| 10 The front desk in AI phone calls | Not started | — |
+| 11 Full regression + device verification | Not started | — |
 
-**Task 8 的摊子**：实现者（opus）被派出后不久用户叫停，控制器已直接终止它。**终止时它还在读代码阶段，工作区干净、没有任何半成品**（已验证）。**接手第一件事：重新派一个 Task 8 实现者**（opus，BASE = 当时的 HEAD），按第 2 节的提示词写法，带上第 3 节的裁定（Ruling B/F/G/H/I 必带）。Task 8 的 brief 已生成好：`.superpowers/sdd/2026-11-23-front-desk/task-8-brief.md`，报告写到同目录 `task-8-report.md`。
+**Task 8 leftovers**: shortly after the implementer (opus) was dispatched the user called a stop, and the controller terminated it directly. **When terminated it was still reading code; the working tree was clean with no work in progress** (verified). **First thing on taking over: dispatch a new Task 8 implementer** (opus, BASE = HEAD at the time), following the prompt style in section 2 and carrying the rulings in section 3 (Ruling B/F/G/H/I are mandatory). Task 8's brief is already generated: `.superpowers/sdd/2026-11-23-front-desk/task-8-brief.md`; the report goes to `task-8-report.md` in the same directory.
 
-## 2. 执行方式（用户选的：subagent-driven）
+## 2. Execution approach (user's choice: subagent-driven)
 
-用 superpowers 的 `subagent-driven-development` 技能。每个任务：派一个实现子代理 → 派一个审查子代理 → 有 Critical/Important 就回给原实现者修 → 通过后记账本 → 下一个。不在任务之间停下来问用户。
+Use the superpowers `subagent-driven-development` skill. For each task: dispatch an implementation subagent → dispatch a review subagent → send any Critical/Important findings back to the original implementer to fix → after it passes, update the ledger → next. Do not stop between tasks to ask the user.
 
-**脚本**（技能目录 `/Users/bolyn/.claude/plugins/cache/superpowers-dev/superpowers/7.0.2/skills/subagent-driven-development/scripts/`，在 worktree 根目录下跑）：
-- 生成任务说明：`bash <dir>/task-brief $PWD/docs/design/plans/2026-11-23-front-desk.md N` → 写出 `task-N-brief.md`（**8/9/10/11 的 brief 已经生成好**，直接在 `.superpowers/sdd/2026-11-23-front-desk/` 里）
-- 生成审查包：`bash <dir>/review-package $PWD/docs/design/plans/2026-11-23-front-desk.md <BASE> HEAD`。BASE 是派实现者之前记下的 HEAD，**不要用 HEAD~1**
+**Scripts** (skill directory `/Users/bolyn/.claude/plugins/cache/superpowers-dev/superpowers/7.0.2/skills/subagent-driven-development/scripts/`, run from the worktree root):
+- Generate the task brief: `bash <dir>/task-brief $PWD/docs/design/plans/2026-11-23-front-desk.md N` → writes `task-N-brief.md` (**briefs for 8/9/10/11 are already generated**, directly in `.superpowers/sdd/2026-11-23-front-desk/`)
+- Generate the review package: `bash <dir>/review-package $PWD/docs/design/plans/2026-11-23-front-desk.md <BASE> HEAD`. BASE is the HEAD recorded before dispatching the implementer; **do not use HEAD~1**
 
-**已经准备好的公共文件**（在 `.superpowers/sdd/2026-11-23-front-desk/`，派活时让子代理读，提示词就能写得很短）：
-- `implementer-rules.md`：实现者守则 + 本项目规则（只在本 worktree 干活、本地化 12 份、测试命令等）
-- `reviewer-rules.md`：审查方法和输出格式
-- `global-constraints.md`：计划里的全局约束
+**Shared files already prepared** (in `.superpowers/sdd/2026-11-23-front-desk/`; have the subagent read them when dispatching so the prompt can be very short):
+- `implementer-rules.md`: implementer rules + project rules (work only in this worktree, localize every language copy, test commands, etc.)
+- `reviewer-rules.md`: review method and output format
+- `global-constraints.md`: the global constraints from the plan
 
-**模型**：一律用 **`opus`**（Ruling D：`sonnet` 别名在这个账号上 404）。
+**Model**: always use **`opus`** (Ruling D: the `sonnet` alias returns 404 on this account).
 
-**验证**：纯 core 的任务跑 `./gradlew :core:test`；碰 app 的任务（8/9/10/11 全部）跑 `./gradlew :app:testDebugUnitTest` 全量（约 20 分钟）。**不要跑裸 `:app:test`**（会 OOM）。已知本地负载抖动可忽略：`TerminalHubTest` 15s 超时、`McpServerStoreTest.cancelDuringConnectClosesWhatConnected`（diff 不碰对应区域时）。
+**Verification**: pure core tasks run `./gradlew :core:test`; tasks touching app (8/9/10/11 all) run the full `./gradlew :app:testDebugUnitTest` (about 20 minutes). **Do not run bare `:app:test`** (OOM). Known local load flakiness can be ignored: `TerminalHubTest` 15s timeout, `McpServerStoreTest.cancelDuringConnectClosesWhatConnected` (when the diff does not touch the corresponding area).
 
-## 3. 已定的裁定（派后面的任务时要带上）
+## 3. Settled rulings (carry them when dispatching later tasks)
 
-账本里有原文，这里列后面任务会用的：
-- **Ruling A**：`DeskBrain.seed(prior)` 只在历史为空时生效，每个 Turn 展开成 用户(userText 非空) + 助手(outcome 非空)，不看 status。
-- **Ruling B**：清洗函数在 core `DeskLines.stripDetails`；`VoiceCallRoute` 调它，Task 8 删 `VoiceCallRoute` 时确认没有别的调用方被晾着。结果上限常量 `DESK_RESULT_MAX_CHARS = 1_800`。
-- **Ruling C**：原型已认可（v2 + 输入框上方在办条变体，11-23 18:03），**Task 9 的门已开**，直接按原型做。
-- **Ruling E**：只改 core 的任务不跑 app 全量。
-- **Ruling F**（Task 3 实际接口）：`DeskLedger.add(entry: DeskTaskEntry)`；`DeskToolExecutor` 构造带 `conversationId: String` + `onDispatched: (DeskTaskEntry) -> Unit = {}`；`DISPATCH_DEDUPE_MS = 30_000L`；工具结果形态固定（`started{task_id}` / `queued{task_id, position}` / `failed{reason}` / `ok` / `not_accepted` / `rejected{reason}` / `unknown_task` / `already_dispatched{task_id}` / `unavailable` / `unsupported`）。
-- **Ruling G**：`FrontDesk.track(taskId, title)` 不写账本（执行器写）；app 接线 `onDispatched = { desk.track(it.taskId, it.title) }`。
-- **Ruling H**：interrupted 报告去下一个挂着的 surface，否则立刻进 sink（写进会话，不重念）——`FrontDesk.deliver` 已是这个行为，bridge 的 `deliver` 返回 false 就会触发。
-- **Ruling I（用户 11-23 改定）**：前台只说话+派活。User 工具 = dispatch/add/answer/cancel；Phone 工具 = 只有 ask_owner；查询工具（check_tasks/web_search/recall_memory）已删除，任务板+记忆由代码经 DeskBackground 放进上下文。**任何任务都不得把查询工具接回来。**
-- **Ruling J**：背景块是临时尾随消息（system 保持字节稳定吃缓存）；记忆每句用户话查一次；任务板带进行中/待答任务最近 ≤3 行进展。
-- **Ruling K**：model 适配器有 opt-in 的不缓存消息标记，移动缓存点放在不缓存块之前；默认请求保持字节不变。
-- **Task 6 的 Ruling**：desk 的 steer 走本地 `run.steer`，不是计划原文的 `steerRemote`（那是 MCP 专用）。
-- 派每个任务前看一眼真实代码签名，别照抄计划原文。
-- 派发顺序：**`8 → 10 → 9 → 11 → 全分支终审`**。
+The ledger has the original text; here are the ones later tasks will use:
+- **Ruling A**: `DeskBrain.seed(prior)` only takes effect when history is empty; each Turn expands to user (userText non-empty) + assistant (outcome non-empty), regardless of status.
+- **Ruling B**: the cleaning function is in core `DeskLines.stripDetails`; `VoiceCallRoute` calls it, and when Task 8 deletes `VoiceCallRoute`, confirm no other caller is left stranded. The result limit constant is `DESK_RESULT_MAX_CHARS = 1_800`.
+- **Ruling C**: the prototype is approved (v2 + the in-progress bar variant above the input field, 11-23 18:03), **Task 9's gate is open**; follow the prototype directly.
+- **Ruling E**: tasks that only change core do not run the full app suite.
+- **Ruling F** (actual Task 3 interfaces): `DeskLedger.add(entry: DeskTaskEntry)`; the `DeskToolExecutor` constructor takes `conversationId: String` + `onDispatched: (DeskTaskEntry) -> Unit = {}`; `DISPATCH_DEDUPE_MS = 30_000L`; tool result shapes are fixed (`started{task_id}` / `queued{task_id, position}` / `failed{reason}` / `ok` / `not_accepted` / `rejected{reason}` / `unknown_task` / `already_dispatched{task_id}` / `unavailable` / `unsupported`).
+- **Ruling G**: `FrontDesk.track(taskId, title)` does not write the ledger (the executor writes it); app wiring uses `onDispatched = { desk.track(it.taskId, it.title) }`.
+- **Ruling H**: an interrupted report goes to the next attached surface, otherwise straight to the sink (write to the conversation, do not read it out again) — `FrontDesk.deliver` already behaves this way; the bridge's `deliver` returning false triggers it.
+- **Ruling I (user change, 11-23)**: the front desk only talks and dispatches. User tools = dispatch/add/answer/cancel; Phone tools = only ask_owner; lookup tools (check_tasks/web_search/recall_memory) have been deleted, and the task board + memory are put into the context by code through DeskBackground. **No task may bring the lookup tools back.**
+- **Ruling J**: the background block is a temporary trailing message (system stays byte-stable to hit the cache); memory is looked up once per user sentence; the task board carries recent ≤3 lines of progress for in-progress / awaiting-answer tasks.
+- **Ruling K**: the model adapter has an opt-in no-cache message marker; move the cache point before the no-cache block; default requests stay byte-identical.
+- **Task 6 ruling**: desk steer goes through local `run.steer`, not the plan's `steerRemote` (that is MCP-only).
+- Check the real code signatures before dispatching each task; do not copy the plan text verbatim.
+- Dispatch order: **`8 → 10 → 9 → 11 → whole-branch final review`**.
 
-## 4. 剩下的任务要点
+## 4. Key points for the remaining tasks
 
-- **Task 8（语音通话接前台）**：删 `VoiceCallRoute`/`VoiceCallTaskLauncher` 及其测试；新建 `VoiceDeskBridge`；`CallRealtimeSession.sendNotice`；级联 + 实时（Volc）两套；`onBargeIn` 不再取消任务；对话流任务卡改由 `desk.active` 驱动。账本里两条 deferred 要在本任务顺手验证：desk_report 行渲染、sink 通知靠 `ReportPolicy` 节流（不要在 bridge 里造第二个节流）。
-- **Task 9（聊天页走前台）**：按原型做，门已开（Ruling C）。
-- **Task 10（AI 电话前台）**：`PhoneDesk` 只有 `ask_owner`；主人回复走通知 `RemoteInput`（minSdk 29 满足 API 24+）；`OwnerReplyReceiver` 在 Manifest 注册、不导出。
-- **Task 11（真机）**：打 perf 包（`./gradlew :app:assemblePerf`，正式版就是这个变体、debug 签名）、装测试机（安装要在手机上点一下，**用户在手机旁才能做**）、`adb shell cmd package compile -f -m speed com.wangzan101.mika` 强制 AOT（注意：`cmd compile` 在这台机上不存在，要用 `cmd package compile`）。测试机是 HONOR ANP-AN00（A94VUT2C28001694，Android 14）。用 `LiveRunTest` 自己跑场景。用户不在就把能自动跑的跑完，真机项写进验收文档标「待真机」。
-- **全分支终审**：所有任务完成后按技能的 `references/final-review.md` 做，用最强模型。账本里所有 `minor (deferred)` 交给终审分拣。
-- 做完以后用 `superpowers:finishing-a-development-branch` 问用户怎么合，**不要自己合到 main**。
+- **Task 8 (voice call connects to the front desk)**: delete `VoiceCallRoute`/`VoiceCallTaskLauncher` and their tests; create `VoiceDeskBridge`; `CallRealtimeSession.sendNotice`; both cascade + real-time (Volc); `onBargeIn` no longer cancels tasks; conversation-flow task cards are driven by `desk.active`. Two deferred items in the ledger should be verified along the way in this task: desk_report row rendering, and the sink notification throttled by `ReportPolicy` (do not create a second throttle in the bridge).
+- **Task 9 (chat page goes through the front desk)**: follow the prototype; the gate is open (Ruling C).
+- **Task 10 (AI phone front desk)**: `PhoneDesk` has only `ask_owner`; the owner's reply goes through the notification `RemoteInput` (minSdk 29 satisfies API 24+); `OwnerReplyReceiver` is registered in the Manifest and not exported.
+- **Task 11 (device)**: build the perf package (`./gradlew :app:assemblePerf`; the release build is this variant, signed with debug), install on the test phone (installing requires one tap on the phone, **possible only with the user next to the phone**), force AOT with `adb shell cmd package compile -f -m speed com.wangzan101.mika` (note: `cmd compile` does not exist on this phone; use `cmd package compile`). The test phone is a HONOR ANP-AN00 (A94VUT2C28001694, Android 14). Run scenarios yourself with `LiveRunTest`. If the user is not around, finish everything that can run automatically and mark the device items in the acceptance document as "awaiting device".
+- **Whole-branch final review**: after all tasks are done, follow the skill's `references/final-review.md` and use the strongest model. All `minor (deferred)` items in the ledger go to the final review for triage.
+- When done, use `superpowers:finishing-a-development-branch` to ask the user how to merge; **do not merge into main yourself**.
 
-## 5. 其他注意
+## 5. Other notes
 
-- 主仓库 `/Users/bolyn/coding-projects/Claire` 里还有这三份文档建 worktree 之前留下的未跟踪旧副本（`docs/superpowers/{specs,plans,prototypes}/2026-11-23-front-desk*`）。正式版本在分支上（已随 main 的目录分层移到 `docs/design/`），旧副本等合并时删掉，现在别动。
-- main 的 perf 包（0.1.51, versionCode 52, `a85b8a7be`）已装到测试机给用户体验，与本分支无关。
-- 项目规矩见仓库根目录的 `CLAUDE.md` 和用户记忆目录 `/Users/bolyn/.claude/projects/-Users-bolyn-coding-projects-Claire/memory/MEMORY.md`（通用安卓、不加小众服务商、按根因修、新界面先原型等）。
-- 每做完一个任务就往账本追加一行 `Task N: complete (commits a..b, review clean)`，小问题记成 `Task N: minor (deferred): …`。
-- 代码和注释用中文，跟随周围风格；提交信息按任务 brief 给的写。
+- The main repository `/Users/bolyn/coding-projects/Claire` still has untracked old copies of these three documents from before the worktree was created (`docs/superpowers/{specs,plans,prototypes}/2026-11-23-front-desk*`). The official versions are on the branch (moved to `docs/design/` along with main's directory layering); delete the old copies at merge time and leave them alone for now.
+- main's perf package (0.1.51, versionCode 52, `a85b8a7be`) is already installed on the test phone for the user to try and is unrelated to this branch.
+- Project rules are in `CLAUDE.md` at the repository root and the user memory directory `/Users/bolyn/.claude/projects/-Users-bolyn-coding-projects-Claire/memory/MEMORY.md` (generic Android, do not add niche providers, fix by root cause, prototype new UI first, etc.).
+- After finishing each task, append a line to the ledger: `Task N: complete (commits a..b, review clean)`; record minor issues as `Task N: minor (deferred): …`.
+- Use Chinese for code and comments, following the surrounding style; write commit messages as given in the task brief.

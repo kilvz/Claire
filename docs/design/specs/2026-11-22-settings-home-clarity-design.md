@@ -6,8 +6,8 @@ The settings home is responsible only for entry navigation and showing current s
 
 ## Scope
 
-- Only change the entries on the settings home page, plus the 「一切就绪」 (All ready) success status card.
-- Remove the static subtitles from the 16 entries on the home page; the success status card no longer shows 「模型已配置 · 手机操作可用」 (Model configured · Phone control available).
+- Only change the entries on the settings home page, plus the "All ready" success status card.
+- Remove the static subtitles from the 16 entries on the home page; the success status card no longer shows "Model configured · Phone control available".
 - Keep all entries, groups, icons, click callbacks, toggles, status pills, row-end dynamic values and the version number.
 - Error status cards continue to show the specific problem, what to do, and a fix button.
 
@@ -20,7 +20,7 @@ The settings home is responsible only for entry navigation and showing current s
 
 ## Implementation
 
-Omit the static subtitle at each list-row call site on the home page, rather than hiding subtitles globally. The 「一切就绪」 status card passes an empty subtitle only when there are no problems; when there are problems it keeps the existing StatusCopy.banner content. This confines the change to the home page and does not affect other callers.
+Omit the static subtitle at each list-row call site on the home page, rather than hiding subtitles globally. The "All ready" status card passes an empty subtitle only when there are no problems; when there are problems it keeps the existing StatusCopy.banner content. This confines the change to the home page and does not affect other callers.
 
 ## Verification
 

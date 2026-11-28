@@ -21,8 +21,8 @@ Goal: run `CapsuleWindowDeviceTest` (collapse residual-frame regression + the ne
      `com.wangzan101.mika/.a11y.MikaAccessibilityService`, later changed to the full form
      `com.wangzan101.mika/com.wangzan101.mika.a11y.MikaAccessibilityService` (DeviceSupport matches the full form as a string);
    - detach → force-stop → reattach; a full off/on cycle; cycles with longer intervals (5s/15s);
-   - going through the system Settings UI (screenshots + visual-model navigation): Accessibility (无障碍) → Downloaded services (已下载的服务) → Mika (status 「服务已停止」 (Service stopped)) →
-     the 「使用 Mika」 (Use Mika) switch → the system confirmation dialog 「是否允许 Mika 使用无障碍服务？」 (Allow Mika to use accessibility services?) → Allow.
+   - going through the system Settings UI (screenshots + visual-model navigation): Accessibility → Downloaded services → Claire (status "Service stopped") →
+     the "Use Claire" switch → the system confirmation dialog "Allow Claire to use accessibility services?" → Allow.
 3. The system state stayed at `Bound services:{} / Binding services:{com.wangzan101.mika/...MikaAccessibilityService}`, with
    `Crashed services:{}` empty; the App process was alive (`dumpsys activity services` shows no ServiceRecord for that service,
    i.e. the binding never reached the application side), and logcat showed no sign of retries.

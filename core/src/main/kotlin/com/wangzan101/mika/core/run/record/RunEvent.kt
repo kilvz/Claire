@@ -289,7 +289,7 @@ sealed interface RunEvent {
         /** One record line; events from before the rename (screen_text, screen_saved) are converted to their current shape before reading. */
         fun decode(line: String): RunEvent = json.decodeFromJsonElement(serializer(), LegacyEvents.upgrade(json.parseToJsonElement(line)))
 
-        /** The place written into run records: an app is its package name, a site is "site <domain>" (older records use "网站 <domain>"). */
+        /** The place written into run records: an app is its package name, a site is "site <domain>" (older records use the Chinese word for site followed by <domain>). */
         const val SITE_PREFIX = "site "
         const val LEGACY_SITE_PREFIX = "网站 "
 

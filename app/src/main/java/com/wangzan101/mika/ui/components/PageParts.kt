@@ -74,8 +74,8 @@ fun RowActions(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 /**
- * 搜索框:浅填充底、圆角 14、高 40,左边放大镜。给了 [onSubmit] 时键盘上是「前往」,按下交给它。
- * 给了 [onClear] 时,有字就在右边放一个清除按钮([clearTag] 是它的测试标签)。
+ * Search field: light fill background, 14 corner radius, 40 high, magnifier on the left. When [onSubmit] is given the keyboard shows "Go", and pressing it hands over.
+ * When [onClear] is given, a clear button appears on the right whenever there is text ([clearTag] is its test tag).
  */
 @Composable
 fun SearchField(

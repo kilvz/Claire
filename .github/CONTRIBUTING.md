@@ -1,22 +1,22 @@
 # Contributing
 
-English | [Simplified Chinese](CONTRIBUTING.zh-CN.md)
-
 Help make Claire better. The easiest way is to add usage knowledge for an app or website, which needs no code; bug reports and code are welcome too.
 
 ## Add app / website knowledge (no code needed)
 
-The easiest contribution: write an `APP.md` for an app or a `SITE.md` for a website, or improve an existing one. They are plain-text Markdown files with a header, under [`core/src/main/resources/knowledge/`](../core/src/main/resources/knowledge/); general how-to skills for a few kinds of tasks live under [`core/src/main/resources/skills/`](../core/src/main/resources/skills/). See [`docs/dev/knowledge-format.md`](../docs/dev/knowledge-format.md) for the format. Existing knowledge is in Chinese, but new files can be written in English.
+The easiest contribution: write an `APP.md` for an app or a `SITE.md` for a website, or improve an existing one. They are plain-text Markdown files with a header, under [`core/src/main/resources/knowledge/`](../core/src/main/resources/knowledge/); general how-to skills for a few kinds of tasks live under [`core/src/main/resources/skills/`](../core/src/main/resources/skills/). See [`docs/dev/knowledge-format.md`](../docs/dev/knowledge-format.md) for the format. Write the body in English; names that must match what is on screen (`open`, `aliases`, `terms` and quoted UI labels) stay in the language the app or site displays, which is often Chinese.
 
 Claire can get things done just by looking at the screen; for apps and websites with usage knowledge (where things are, common ways to do things, what to watch out for), it looks the knowledge up when needed and takes fewer wrong turns. The current list is in the collapsed section under "What it can do" in the [README](../README.md).
 
 ## Reporting issues
 
-When opening an issue, please include your **phone model, Android version and Claire version** ("About Claire" (关于 Claire) in Settings), what you did, what you expected and what actually happened. Screenshots from "View steps" (查看过程) help a lot (hide anything private first). In the app, About › Send feedback can copy diagnostics for you to paste into the issue; results from Settings › Recovery & repair › Compatibility self-check can be filed as a [device report](https://github.com/kilvz/Claire/issues/new?template=device-report.yml).
+When opening an issue, please include your **phone model, Android version and Claire version** ("About Claire" in Settings), what you did, what you expected and what actually happened. Screenshots from "View steps" help a lot (hide anything private first). In the app, About › Send feedback can copy diagnostics for you to paste into the issue; results from Settings › Recovery & repair › Compatibility self-check can be filed as a [device report](https://github.com/kilvz/Claire/issues/new?template=device-report.yml).
 
 ## Contributing code
 
-PRs welcome. Start with [`docs/dev/architecture.md`](../docs/dev/architecture.md) (written against the current code, with class names and file paths) and [`docs/dev/roadmap.md`](../docs/dev/roadmap.md) (done, next, known issues). Please include unit tests with your changes. The developer docs are in Chinese for now.
+PRs welcome. Start with [`docs/dev/architecture.md`](../docs/dev/architecture.md) (written against the current code, with class names and file paths) and [`docs/dev/roadmap.md`](../docs/dev/roadmap.md) (done, next, known issues). Please include unit tests with your changes.
+
+The source is English-only: prompts, UI text, code comments, documentation and release notes are written in English, and translations live in `app/src/main/res/values-*`. Run `python3 tools/english/check.py` before pushing; see [`tools/english/README.md`](../tools/english/README.md) for the rule and the few places where Chinese is data (localization, legacy values, matching tables).
 
 When you open a PR, keep **"Allow edits by maintainers"** checked (on by default for PRs from a personal fork). If a PR is close but needs a few fixes (an edge case, a missing translation, a rebase onto the latest `main`), a maintainer can add commits on top of yours on your PR branch and merge it, instead of you having to iterate on every change. Your commits stay as they are (no force-push), and the merge keeps you as the author. If edits are not allowed, a maintainer has to open a separate PR to make the fixes; you'll still be credited with `Co-authored-by`, but your original PR will be closed in favour of the new one. The `PR policy` check fails while the option is off.
 
@@ -30,6 +30,7 @@ Requires JDK 17 and the Android SDK (`sdk.dir` in `local.properties`, or the `AN
 ./gradlew :core:test :core:cliTest :app:testDebugUnitTest   # unit tests
 python3 -m unittest discover -s tools/i18n -v              # translation tool tests (no JDK/Android SDK)
 python3 tools/i18n/translations.py check                  # lightweight translation resource checks
+python3 tools/english/check.py                            # English-only checks (prompts, docs, comments)
 python3 -m unittest discover -s tools -p 'test_pull_logs.py' -v   # log export tool tests (adb is mocked; no phone needed)
 python3 -m unittest discover -s tools/voice-models -v      # voice pack tool tests
 ./gradlew updateReadme                        # regenerate the built-in knowledge and provider lists in the READMEs
@@ -39,9 +40,9 @@ The debug build is not precompiled and its UI is several times slower; use the p
 
 - The repository has two modules: `:core` is pure Kotlin and holds the main loop, tools, prompts and knowledge, and can be run on a computer with unit tests and a fake model; `:app` is the Android host.
 - README sections between the `generated` markers are produced by `./gradlew updateReadme`; don't edit them by hand. Unit tests check that they are up to date.
-- The README comes in several languages. The English `README.md` at the repository root is the original; the translations are in `docs/readme/`. `README.zh-CN.md` (Simplified Chinese) has the same generated sections as `README.md`; in `README.zh-Hant.md`, `README.ja.md`, `README.ko.md` and `README.es.md` the generated sections are replaced by one sentence pointing to the English or Simplified Chinese README. `README.md` at the root only points to `README.md`, kept so old links still work. Each translation starts with `<!-- translated-from: README.md @ <fingerprint> -->`, where the fingerprint is the first 12 hex digits of the SHA-256 of the root README.md with the generated sections removed. After you change README.md, `ReadmeTranslationsTest` lists the stale translations and prints the new fingerprint: update the translations to match, then replace the fingerprint at the top. Translations must also keep the same number of `## ` sections and the same local images as README.md. Native speakers are welcome to improve a translation with a PR.
+- The README is English only. `README.md` at the repository root is the original; `README.en.md` only points to it, kept so old links still work. `./gradlew updateReadme` regenerates the generated sections; translations were removed when Claire rewrote the README (see `ReadmeTranslationsTest` if you want to add them back).
 - The sandbox's native binaries and bundled runtime are checked into the repository; to rebuild them see [`tools/sandbox/README.md`](../tools/sandbox/README.md).
-- For translation key checks and a multi-language reference CSV without a JDK or Android SDK, see [`tools/i18n/README.md`](../tools/i18n/README.md). These lightweight checks cover all 11 current UI languages, including Arabic and Persian, but do not replace the JVM `StringResourcesTest` checks for exact placeholders, CLDR plural rules and language registration.
+- For translation key checks and a multi-language reference CSV without a JDK or Android SDK, see [`tools/i18n/README.md`](../tools/i18n/README.md). These lightweight checks cover all 13 current UI languages, including Arabic and Persian, but do not replace the JVM `StringResourcesTest` checks for exact placeholders, CLDR plural rules and language registration.
 - For on-device evaluation see [`eval/README.md`](../eval/README.md).
 
 ### CI
@@ -49,7 +50,7 @@ The debug build is not precompiled and its UI is several times slower; use the p
 Pull requests and pushes to `main` run on GitHub Actions ([`ci.yml`](workflows/ci.yml)); no secrets are required:
 
 - `core (JVM)`: `./gradlew :core:test`
-- `cli (Python)`: `./gradlew :core:cliTest`, plus `tools/i18n` unit tests, translation resource checks and unit tests for the log export tool `tools/pull-logs.py` and the voice pack tools in `tools/voice-models` (Python 3.10+; CI uses 3.12)
+- `cli (Python)`: `./gradlew :core:cliTest`, plus `tools/i18n` unit tests, translation resource checks, the English-only check (`tools/english/check.py`) and unit tests for the log export tool `tools/pull-logs.py` and the voice pack tools in `tools/voice-models` (Python 3.10+; CI uses 3.12)
 - `app (Android)`: `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:compileDebugAndroidTestKotlin` (device tests are compiled, not run)
 - `relay (Go)`: `go test ./...` in `companions/relay`, then `./gradlew :core:relayTest`
 - `maintainer edits allowed` ([`pr-maintainer-edits.yml`](workflows/pr-maintainer-edits.yml)): PRs from a fork fail until "Allow edits by maintainers" is checked; ticking it doesn't start a new run, so push a commit or ask a maintainer to re-run it. Organization-owned forks, where GitHub doesn't offer the option, only get a warning.

@@ -1,22 +1,22 @@
 /*
- * mikarun — Mika 沙箱启动器。
+ * mikarun — Claire sandbox launcher.
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) 2026 Mika authors
  *
- * 用法:
- *   libmikarun.so [--timeout <秒,1-3600>] [--net on|off] [--nice <0-19,默认10>]
- *                 [--max-procs <默认256>] [--max-file-mb <默认2048>]
- *                 [--pty [--pty-cols <1-1000,默认80>] [--pty-rows <1-1000,默认24>]
- *                  [--pty-size <文件>]] -- <程序> [参数…]
- *   libmikarun.so --self-test    输出 "mikarun ok"、"seccomp ok" / "seccomp unavailable: <原因>"、
- *                                "pty ok" / "pty unavailable: <原因>",退出 0
+ * Usage:
+ *   libmikarun.so [--timeout <seconds,1-3600>] [--net on|off] [--nice <0-19,default 10>]
+ *                 [--max-procs <default 256>] [--max-file-mb <default 2048>]
+ *                 [--pty [--pty-cols <1-1000,default 80>] [--pty-rows <1-1000,default 24>]
+ *                  [--pty-size <file>]] -- <program> [args…]
+ *   libmikarun.so --self-test    prints "mikarun ok", "seccomp ok" / "seccomp unavailable: <reason>",
+ *                                "pty ok" / "pty unavailable: <reason>", then exits 0
  *
- * 不给 --net 时按 off 处理(断网是默认值)。不给 --timeout 时不限时。
- * --pty 把命令接到一块伪终端上(控制终端),用于用户自己开的终端;不给时仍是普通管道。
- * --pty-size 指向一个普通文件,内容是 "列 行";运行中每 200ms 读一次,变了就用 TIOCSWINSZ
- * 改窗口大小(内核会给前台进程组发 SIGWINCH)。
- * 退出码:命令自身的退出码;超时 124;命令被信号 N 杀死 128+N;
- *         启动器自身出错 125,原因写在标准错误最后一行,以 "mikarun:" 开头。
+ * Without --net it is treated as off (no network is the default). Without --timeout there is no time limit.
+ * --pty connects the command to a pseudo-terminal (controlling terminal), for terminals the user opens; without it, a plain pipe is still used.
+ * --pty-size points to a regular file whose content is "cols rows"; while running it is read every 200ms, and when it changes TIOCSWINSZ
+ * resizes the window (the kernel sends SIGWINCH to the foreground process group).
+ * Exit code: the command's own exit code; 124 on timeout; 128+N when the command is killed by signal N;
+ *         125 when the launcher itself fails, with the reason on the last line of stderr, prefixed with "mikarun:".
  */
 
 #ifndef _GNU_SOURCE
@@ -57,32 +57,32 @@
 #define EXIT_TIMEOUT 124
 #define EXIT_LAUNCHER_ERROR 125
 
-/* aarch64 的系统调用号(过滤器只认这一种架构) */
+/* aarch64 system call numbers (the filter only recognizes this architecture) */
 #define NR_IOCTL_AARCH64 29
 #define NR_SOCKET_AARCH64 198
 #define NR_IO_URING_SETUP_AARCH64 425
 #define NR_PIDFD_SEND_SIGNAL_AARCH64 424
 #define NR_PIDFD_OPEN_AARCH64 434
 #define NR_CLOSE_RANGE_AARCH64 436
-#define BINDER_WRITE_READ_CMD 0xc0306201u /* _IOWR('b', 1, struct binder_write_read),64 位 */
+#define BINDER_WRITE_READ_CMD 0xc0306201u /* _IOWR('b', 1, struct binder_write_read), 64-bit */
 
-#define GRACE_MS 2000          /* SIGTERM 之后等多久再 SIGKILL */
+#define GRACE_MS 2000          /* how long to wait after SIGTERM before SIGKILL */
 #define POLL_MS 50
-#define KILL_ROUNDS_MAX 200    /* SIGKILL 循环的上限(约 10 秒),防止异常情况下永远不退出 */
+#define KILL_ROUNDS_MAX 200    /* upper bound of the SIGKILL loop (about 10 seconds), so it never hangs in abnormal cases */
 #define SCAN_MAX 32768
 
 struct options {
 	int self_test;
-	long timeout_sec;  /* 0 = 不限时 */
+	long timeout_sec;  /* 0 = no time limit */
 	int net_off;
 	long nice;
 	long max_procs;
 	long max_file_mb;
-	int pty;           /* 1 = 给命令一块伪终端 */
-	long pty_cols;     /* 1-1000,默认 80 */
-	long pty_rows;     /* 1-1000,默认 24 */
-	const char *pty_size_path; /* --pty-size:每 200ms 读一次 "列 行",变了就改窗口大小 */
-	char **command; /* 以 NULL 结尾,指向 argv 内部 */
+	int pty;           /* 1 = give the command a pseudo-terminal */
+	long pty_cols;     /* 1-1000, default 80 */
+	long pty_rows;     /* 1-1000, default 24 */
+	const char *pty_size_path; /* --pty-size: read "cols rows" every 200ms, change the window size when it changes */
+	char **command; /* NULL-terminated, points inside argv */
 };
 
 static int fail(const char *what, const char *detail)
@@ -111,7 +111,7 @@ static int parse_long(const char *name, const char *text, long min, long max, lo
 	return 0;
 }
 
-/* 返回 0 成功;非 0 时已写好错误信息。 */
+/* Returns 0 on success; on non-zero the error message has already been written. */
 static int parse_options(int argc, char **argv, struct options *opts)
 {
 	int i = 1;
@@ -182,7 +182,7 @@ static int parse_options(int argc, char **argv, struct options *opts)
 		}
 		if (strncmp(arg, "--", 2) == 0)
 			return fail("unknown option", arg), -1;
-		break; /* 第一个非选项参数即命令 */
+		break; /* the first non-option argument is the command */
 	}
 
 	if (opts->self_test)
@@ -193,13 +193,13 @@ static int parse_options(int argc, char **argv, struct options *opts)
 	return 0;
 }
 
-/* ---------- 断网:seccomp 过滤器 ---------- */
+/* ---------- network isolation: seccomp filter ---------- */
 
 /*
- * 白名单:socket() 只放行 AF_UNIX(桥要用)与 AF_NETLINK(查本机网卡、路由等,不出本机),其余地址族 → EACCES;
- * io_uring_setup → ENOSYS(它能绕开 socket 过滤);binder 的 BINDER_WRITE_READ ioctl → EACCES
- * (经系统服务也能把数据带出去,PRoot 里本来也不绑 binder 设备,这里再拦一道);其余放行。
- * 非 aarch64 的系统调用(32 位兼容层)一律杀进程,防止换个调用号绕过。过滤器随 fork/exec 继承、不能撤销。
+ * Allowlist: socket() only allows AF_UNIX (the bridge needs it) and AF_NETLINK (querying local interfaces, routes, etc., which stays on the machine); other address families → EACCES;
+ * io_uring_setup → ENOSYS (it can bypass the socket filter); binder's BINDER_WRITE_READ ioctl → EACCES
+ * (data can also be carried out through system services, and PRoot does not bind the binder device anyway, so this is one more layer); everything else is allowed.
+ * Non-aarch64 system calls (32-bit compatibility layer) always kill the process, so another call number cannot be used to bypass it. The filter is inherited across fork/exec and cannot be removed.
  */
 static int install_net_filter(char *reason, size_t reason_len)
 {
@@ -213,7 +213,7 @@ static int install_net_filter(char *reason, size_t reason_len)
 		/* 6 */ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR_SOCKET_AARCH64, 2, 0),          /* → 9 */
 		/* 7 */ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR_IOCTL_AARCH64, 6, 0),           /* → 14 */
 		/* 8 */ BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-		/* 小端:参数的低 32 位在前;socket 的 domain、ioctl 的 cmd 都是 32 位,内核只看低 32 位 */
+		/* little-endian: the low 32 bits of an argument come first; socket's domain and ioctl's cmd are 32-bit, and the kernel only looks at the low 32 bits */
 		/* 9 */ BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])),
 		/* 10 */ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_UNIX, 2, 0),                  /* → 13 */
 		/* 11 */ BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_NETLINK, 1, 0),               /* → 13 */
@@ -240,7 +240,7 @@ static int install_net_filter(char *reason, size_t reason_len)
 	return 0;
 }
 
-/* 在子进程里装过滤器并实测:AF_INET 被拒、AF_UNIX 可用。返回 0 可用,否则 reason 写原因。 */
+/* Install the filter in a child process and test it for real: AF_INET is denied, AF_UNIX works. Returns 0 when usable, otherwise reason holds the reason. */
 static int probe_net_filter(char *reason, size_t reason_len)
 {
 	int fds[2];
@@ -316,24 +316,24 @@ static int self_test(void)
 	return 0;
 }
 
-/* ---------- /proc 扫描 ---------- */
+/* ---------- /proc scanning ---------- */
 
 /*
- * 安卓给 App 装的 seccomp 策略对它不认识的系统调用发 SIGSYS(直接杀进程),而不是返回 ENOSYS。
- * pidfd_open/pidfd_send_signal 从 API 31、close_range 从 API 34 起才在策略里,更早的系统上不能试。
+ * The seccomp policy Android installs for an app sends SIGSYS (killing the process) for system calls it does not know, instead of returning ENOSYS.
+ * pidfd_open/pidfd_send_signal are only in the policy from API 31, close_range from API 34, so they must not be tried on earlier systems.
  */
 static int api_level(void)
 {
 #ifdef __ANDROID__
 	return android_get_device_api_level();
 #elif defined(MIKARUN_HOST_API_LEVEL)
-	return MIKARUN_HOST_API_LEVEL; /* 只用于在普通 Linux 上测退路 */
+	return MIKARUN_HOST_API_LEVEL; /* only used to test the fallback on ordinary Linux */
 #else
 	return 10000;
 #endif
 }
 
-/* 读 /proc/<pid>/stat 里的父进程号与线程数。返回 0 成功。 */
+/* Read the parent process number and thread count from /proc/<pid>/stat. Returns 0 on success. */
 static int read_stat(int proc_fd, const char *pid_name, pid_t *ppid, long *threads)
 {
 	char path[64], buf[1024];
@@ -352,10 +352,10 @@ static int read_stat(int proc_fd, const char *pid_name, pid_t *ppid, long *threa
 	if (n <= 0)
 		return -1;
 	buf[n] = '\0';
-	p = strrchr(buf, ')'); /* 进程名里可能有空格和括号,从最后一个 ')' 往后读 */
+	p = strrchr(buf, ')'); /* the process name may contain spaces and parentheses, so read from the last ')' onward */
 	if (p == NULL)
 		return -1;
-	/* 字段 3 state、4 ppid,……,20 num_threads */
+	/* fields 3 state, 4 ppid, ..., 20 num_threads */
 	if (sscanf(p + 2, "%c %d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %ld",
 		   &state, &pp, &nt) != 3)
 		return -1;
@@ -374,7 +374,7 @@ static int is_pid_name(const char *s)
 	return 1;
 }
 
-/* 本身份(uid)当前的任务数(线程也算,RLIMIT_NPROC 按任务计数)。 */
+/* Current number of tasks for this identity (uid); threads count too, since RLIMIT_NPROC counts tasks. */
 static long count_user_tasks(void)
 {
 	DIR *dir = opendir("/proc");
@@ -404,9 +404,9 @@ static pid_t scan_pid[SCAN_MAX];
 static pid_t scan_ppid[SCAN_MAX];
 static unsigned char scan_mark[SCAN_MAX];
 static int scan_count;
-static int pidfd_usable = -1; /* -1 未知,0 不可用,1 可用 */
+static int pidfd_usable = -1; /* -1 unknown, 0 unavailable, 1 usable */
 
-/* 再读一次 /proc/<pid>/stat:父进程仍是本进程,或是本轮扫描认定的后代。 */
+/* Read /proc/<pid>/stat again: the parent is still this process, or a descendant recognized by this scan round. */
 static int still_descendant(pid_t pid)
 {
 	char name[32];
@@ -426,10 +426,10 @@ static int still_descendant(pid_t pid)
 }
 
 /*
- * 扫描与发信号之间,进程号可能已被回收并复用给同一身份(Mika 自己)的别的进程。
- * 有 pidfd 时:先 pidfd_open 钉住进程身份,再确认它仍是后代,然后经 pidfd 发信号——不会误杀。
- * 没有 pidfd 时只能在 kill 前再确认一次(窗口很小);kill_tree 另外先 SIGSTOP 整棵树再重扫,
- * 停住的进程不会再回收子进程,重扫后的进程号就稳定了。
+ * Between the scan and sending a signal, the process number may already have been reaped and reused for another process of the same identity (Claire itself).
+ * With pidfd: first pin the process identity with pidfd_open, then confirm it is still a descendant, then send the signal through the pidfd — no wrong kill.
+ * Without pidfd the only option is to confirm once more before kill (a very small window); kill_tree also SIGSTOPs the whole tree first and rescans,
+ * and a stopped process does not reap children, so the process numbers from the rescan stay stable.
  */
 static void send_to_descendant(pid_t pid, int sig)
 {
@@ -445,15 +445,15 @@ static void send_to_descendant(pid_t pid, int sig)
 		}
 		if (errno == ESRCH)
 			return;
-		pidfd_usable = 0; /* 内核太旧(ENOSYS)等:改走下面的退路 */
+		pidfd_usable = 0; /* kernel too old (ENOSYS) etc.: use the fallback below */
 	}
 	if (still_descendant(pid))
 		kill(pid, sig);
 }
 
 /*
- * 找出父进程链最终指向本进程的所有进程(本进程是子进程收割者,脱离父进程的后代也会挂回来),
- * sig 非 0 时给它们发信号。返回找到的个数(含尚未被回收的僵尸);扫描表装满时多算一个,当作「还有」。
+ * Find all processes whose parent chain eventually points to this process (this process is the child subreaper, so descendants that left their parent hang back here too);
+ * when sig is non-zero, send them that signal. Returns the number found (including zombies not yet reaped); when the scan table is full one extra is counted, treated as "there are more".
  */
 static int signal_descendants(int sig)
 {
@@ -463,7 +463,7 @@ static int signal_descendants(int sig)
 	int n = 0, found = 0, full, changed, i;
 
 	if (dir == NULL)
-		return 1; /* 看不到就当还有,让调用方继续等 */
+		return 1; /* if it cannot be seen, assume there are more and let the caller keep waiting */
 	while ((e = readdir(dir)) != NULL && n < SCAN_MAX) {
 		pid_t ppid;
 		long threads;
@@ -477,7 +477,7 @@ static int signal_descendants(int sig)
 		scan_mark[n] = ppid == self;
 		n++;
 	}
-	full = e != NULL; /* 还没读完就满了 */
+	full = e != NULL; /* full before the read finished */
 	closedir(dir);
 
 	do {
@@ -507,9 +507,9 @@ static int signal_descendants(int sig)
 	return found + full;
 }
 
-/* ---------- 运行与清场 ---------- */
+/* ---------- running and cleanup ---------- */
 
-/* 回收所有已结束的直接子进程(包括挂回来的孤儿);主子进程的状态记下来。 */
+/* Reap every finished direct child (including orphans that hung back); the main child's status is recorded. */
 static void reap(pid_t child, int *status, int *have_status)
 {
 	pid_t p;
@@ -530,7 +530,7 @@ static void sleep_ms(long ms)
 		;
 }
 
-/* 先给进程组和所有后代发 SIGTERM,等 GRACE_MS;还在的后代 SIGKILL,循环到一个不剩。 */
+/* First send SIGTERM to the process group and all descendants and wait GRACE_MS; SIGKILL the descendants still there, looping until none remain. */
 static void kill_tree(pid_t child, int *status, int *have_status)
 {
 	long waited;
@@ -539,7 +539,7 @@ static void kill_tree(pid_t child, int *status, int *have_status)
 	reap(child, status, have_status);
 	if (signal_descendants(0) == 0)
 		return;
-	kill(-getpid(), SIGTERM); /* 本进程也在组里;SIGTERM 已被屏蔽,不影响自己 */
+	kill(-getpid(), SIGTERM); /* this process is in the group too; SIGTERM is already blocked, so it does not affect us */
 	signal_descendants(SIGTERM);
 	for (waited = 0; waited < GRACE_MS; waited += POLL_MS) {
 		sleep_ms(POLL_MS);
@@ -549,7 +549,7 @@ static void kill_tree(pid_t child, int *status, int *have_status)
 	}
 	for (round = 0; round < KILL_ROUNDS_MAX; round++) {
 		if (!pidfd_usable)
-			signal_descendants(SIGSTOP); /* 先冻住整棵树,下面重扫得到的进程号不会再变 */
+			signal_descendants(SIGSTOP); /* freeze the whole tree first, so the process numbers from the rescan below no longer change */
 		if (signal_descendants(SIGKILL) == 0)
 			return;
 		sleep_ms(POLL_MS);
@@ -566,9 +566,9 @@ static long now_ms(void)
 }
 
 /*
- * PRoot 在 PROOT_LOADER 未设置时会把内嵌的载入器写进临时目录再执行(安卓禁止执行数据目录里的文件),
- * 所以启动 libproot.so 前要求 PROOT_LOADER 指向与启动器同目录(nativeLibraryDir)里的文件。
- * 返回 0 通过;非 0 时已写好错误信息。
+ * When PROOT_LOADER is not set, PRoot writes the embedded loader into a temporary directory and executes it (Android forbids executing files in the data directory),
+ * so before starting libproot.so, PROOT_LOADER must point to a file in the same directory as the launcher (nativeLibraryDir).
+ * Returns 0 when it passes; on non-zero the error message has already been written.
  */
 static int check_proot_loader(const char *program)
 {
@@ -585,7 +585,7 @@ static int check_proot_loader(const char *program)
 	if (n < 0)
 		return fail("cannot read /proc/self/exe", strerror(errno));
 	self[n] = '\0';
-	/* bionic 的 dirname 返回共用的缓冲区,先拷出一份 */
+	/* bionic's dirname returns a shared buffer, so copy it out first */
 	snprintf(self_dir, sizeof(self_dir), "%s", dirname(self));
 	snprintf(path, sizeof(path), "%s", loader);
 	if (strcmp(basename(path), "libproot_loader.so") != 0)
@@ -595,7 +595,7 @@ static int check_proot_loader(const char *program)
 	return 0;
 }
 
-/* 文件大小与进程数上限;软硬限一起设,且不超过原有硬限。 */
+/* File size and process count limits; set the soft and hard limits together, and never above the existing hard limit. */
 static int set_limit(int resource, rlim_t value, const char *name)
 {
 	struct rlimit rl;
@@ -611,7 +611,7 @@ static int set_limit(int resource, rlim_t value, const char *name)
 	return 0;
 }
 
-/* oom_score_adj 只能调高(普通身份);写不进去就算了。 */
+/* oom_score_adj can only be raised (ordinary identity); if it cannot be written, so be it. */
 static void set_oom_score_adj(const char *value)
 {
 	int fd = open("/proc/self/oom_score_adj", O_WRONLY | O_CLOEXEC);
@@ -622,7 +622,7 @@ static void set_oom_score_adj(const char *value)
 	}
 }
 
-/* 关掉 0/1/2 以外继承来的描述符,命令拿不到 Mika 的任何文件或套接字。 */
+/* Close inherited descriptors other than 0/1/2, so the command cannot get any of Claire's files or sockets. */
 static void close_inherited_fds(void)
 {
 	DIR *dir;
@@ -644,9 +644,9 @@ static void close_inherited_fds(void)
 	closedir(dir);
 }
 
-/* ---------- 伪终端 ---------- */
+/* ---------- pseudo-terminal ---------- */
 
-/* 写满 [len] 字节;被信号打断就接着写。返回 0 成功。 */
+/* Write all [len] bytes; keep writing if interrupted by a signal. Returns 0 on success. */
 static int write_all(int fd, const char *buf, size_t len)
 {
 	while (len > 0) {
@@ -663,7 +663,7 @@ static int write_all(int fd, const char *buf, size_t len)
 	return 0;
 }
 
-/* 建一对 pty;[cols]/[rows] 已限定在 1-1000。失败时 reason 写原因。 */
+/* Create a pty pair; [cols]/[rows] are already clamped to 1-1000. On failure reason holds the reason. */
 static int open_pty(int *master, int *slave, long cols, long rows, char *reason, size_t reason_len)
 {
 	struct winsize ws;
@@ -729,8 +729,8 @@ static int pty_self_test(char *reason, size_t reason_len)
 }
 
 /*
- * 读 --pty-size 文件("列 行");变了就 ioctl(TIOCSWINSZ),内核会给前台进程组发 SIGWINCH。
- * 文件不存在、内容不完整或数值越界时什么也不做,下一轮再试。
+ * Read the --pty-size file ("cols rows"); when it changes, ioctl(TIOCSWINSZ), and the kernel sends SIGWINCH to the foreground process group.
+ * When the file does not exist, the content is incomplete or a value is out of range, do nothing and try again next round.
  */
 static void apply_pty_size(int master, const char *path, long *cols, long *rows)
 {
@@ -764,8 +764,8 @@ static void apply_pty_size(int master, const char *path, long *cols, long *rows)
 }
 
 /*
- * pty 模式下的等待循环:把 stdin 转给 master、把 master 的输出转给 stdout,同时照看子进程和信号。
- * 子进程退出、超时或被 SIGTERM 打断后,再把从端里剩下的字读完(最多 200 毫秒),不丢最后一行。
+ * Wait loop in pty mode: forward stdin to the master and the master's output to stdout, while watching the child and signals.
+ * After the child exits, on timeout or when interrupted by SIGTERM, drain the remaining bytes from the slave (at most 200 milliseconds) so the last line is not lost.
  */
 static void relay_pty(int master, pid_t child, const struct options *opts,
 	int *status, int *have_status, int *timed_out, int *terminated, sigset_t *wait_set)
@@ -827,7 +827,7 @@ static void relay_pty(int master, pid_t child, const struct options *opts,
 						if (write_all(STDOUT_FILENO, buf, (size_t)n) != 0)
 							master_open = 0;
 					} else if (n == 0 || (errno != EINTR && errno != EAGAIN)) {
-						master_open = 0; /* EIO:子进程关掉了从端 */
+						master_open = 0; /* EIO: the child closed the slave */
 					}
 				} else {
 					n = read(STDIN_FILENO, buf, sizeof(buf));
@@ -836,14 +836,14 @@ static void relay_pty(int master, pid_t child, const struct options *opts,
 							stdin_open = 0;
 					} else if (n == 0 || (errno != EINTR && errno != EAGAIN)) {
 						stdin_open = 0;
-						/* stdin 关了:给 shell 一个 EOF,让它自己退出;从端还开着就还能收输出 */
+						/* stdin closed: give the shell an EOF so it exits by itself; if the slave is still open, output can still be received */
 						if (master_open && write_all(master, "\004", 1) != 0)
 							master_open = 0;
 					}
 				}
 			}
 		}
-		/* 不阻塞地看一眼有没有要处理的信号;SIGCHLD 下一轮 reap */
+		/* Non-blocking peek for a signal to handle; SIGCHLD is reaped next round */
 		sig = sigtimedwait(wait_set, NULL, &zero);
 		if (sig == SIGTERM || sig == SIGINT || sig == SIGHUP) {
 			*terminated = sig;
@@ -868,19 +868,19 @@ static void relay_pty(int master, pid_t child, const struct options *opts,
 	}
 }
 
-/* 自成会话、收割者、父死信号、优先级、OOM 分数、资源上限、断网。返回 0 成功。 */
+/* Own session, subreaper, parent-death signal, priority, OOM score, resource limits, network isolation. Returns 0 on success. */
 static int prepare(const struct options *opts)
 {
 	pid_t parent = getppid();
 	char reason[160];
 	long used;
 
-	/* 父进程在读到 PPID 之前就没了:已被过继给 init,父死信号再也不会来 */
+	/* The parent was gone before PPID was read: already adopted by init, so the parent-death signal will never come */
 	if (parent == 1)
 		return fail("parent exited", NULL);
 	if (prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0) != 0)
 		return fail("PR_SET_PDEATHSIG", strerror(errno));
-	if (getppid() != parent) /* 设置之前父进程就已经没了 */
+	if (getppid() != parent) /* the parent was already gone before it was set */
 		return fail("parent exited", NULL);
 	if (setsid() < 0 && getsid(0) != getpid())
 		return fail("setsid", strerror(errno));
@@ -888,8 +888,8 @@ static int prepare(const struct options *opts)
 		return fail("PR_SET_CHILD_SUBREAPER", strerror(errno));
 
 	/*
-	 * 优先级与 OOM 分数只是保护 Mika 自身,做不到不拦命令。启动器自己 900、命令 1000(子进程里再调):
-	 * 内存不够时先杀命令,启动器活着才能清场。
+	 * Priority and OOM score only protect Claire itself; they cannot stop the command from being killed. The launcher is 900, the command 1000 (adjusted again in the child):
+	 * when memory runs short the command is killed first, and the launcher must stay alive to clean up.
 	 */
 	setpriority(PRIO_PROCESS, 0, (int)opts->nice);
 	set_oom_score_adj("900");
@@ -897,8 +897,8 @@ static int prepare(const struct options *opts)
 	if (set_limit(RLIMIT_FSIZE, (rlim_t)opts->max_file_mb << 20, "RLIMIT_FSIZE") != 0)
 		return -1;
 	/*
-	 * RLIMIT_NPROC 由内核按身份(uid)整体计数:Mika 的线程、同时在跑的其它沙箱命令都占同一个额度,
-	 * 所以上限 = 设置时本身份已有的任务数 + max-procs,而不是单给这条命令 max-procs 个。
+	 * RLIMIT_NPROC is counted by the kernel per identity (uid) as a whole: Claire's threads and other sandbox commands running at the same time all draw on the same quota,
+	 * so the limit = tasks this identity already had when set + max-procs, not max-procs for this command alone.
 	 */
 	used = count_user_tasks();
 	if (used < 0)
@@ -922,7 +922,7 @@ static int run(const struct options *opts)
 
 	if (check_proot_loader(opts->command[0]) != 0)
 		return EXIT_LAUNCHER_ERROR;
-	/* 先屏蔽要等的信号,再做别的,避免信号在 sigtimedwait 之前到来而丢失 */
+	/* Block the signals to wait for first, then do the rest, so a signal cannot arrive and get lost before sigtimedwait */
 	sigemptyset(&wait_set);
 	sigaddset(&wait_set, SIGCHLD);
 	sigaddset(&wait_set, SIGTERM);
@@ -946,16 +946,16 @@ static int run(const struct options *opts)
 	if (child == 0) {
 		sigprocmask(SIG_SETMASK, &orig_set, NULL);
 		/*
-		 * 启动器被直接 SIGKILL 时没机会清场:PRoot 靠 PDEATHSIG 跟着死,PRoot 打了补丁带
-		 * PTRACE_O_EXITKILL,它一死所有被跟踪的进程都被内核杀掉。Mika 整个进程被系统杀掉时,
-		 * 安卓按 App 的 cgroup 把同一 cgroup 里的进程(包括这里所有沙箱进程)一起杀掉,这是最后一道。
+		 * When the launcher is SIGKILLed directly it has no chance to clean up: PRoot dies along via PDEATHSIG, and PRoot is patched with
+		 * PTRACE_O_EXITKILL, so once it dies all traced processes are killed by the kernel. When Claire's whole process is killed by the system,
+		 * Android kills the processes in the same cgroup together per the app's cgroup (including all sandbox processes here); this is the last line of defense.
 		 */
 		prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
 		set_oom_score_adj("1000");
 		if (opts->pty) {
 			/*
-			 * 父进程在 prepare() 里已经 setsid();子进程另建一个会话,才能把从端设成控制终端。
-			 * 从端在 fork 前就打开了,这里不再经过文件系统。
+			 * The parent already called setsid() in prepare(); the child creates another session so the slave can be made the controlling terminal.
+			 * The slave was opened before fork, so this does not go through the filesystem again.
 			 */
 			if (setsid() < 0 && getsid(0) != getpid()) {
 				fprintf(stderr, "mikarun: pty: setsid: %s\n", strerror(errno));
@@ -1008,11 +1008,11 @@ static int run(const struct options *opts)
 				terminated = sig;
 				break;
 			}
-			/* SIGCHLD、超时(EAGAIN)、EINTR:回到循环开头重新检查 */
+			/* SIGCHLD, timeout (EAGAIN), EINTR: go back to the top of the loop and check again */
 		}
 	}
 
-	/* 命令正常结束时也清一遍:留在后台的进程不能活过这条命令 */
+	/* Clean up on normal command exit too: processes left in the background must not outlive this command */
 	kill_tree(child, &status, &have_status);
 	if (timed_out)
 		return EXIT_TIMEOUT;

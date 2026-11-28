@@ -31,7 +31,7 @@ import com.wangzan101.mika.ui.theme.MikaShapes
 import com.wangzan101.mika.ui.theme.MikaTheme
 import com.wangzan101.mika.ui.theme.MikaType
 
-/** 操作面板里一行行尾的小按钮(例如试听):点它只做这件事,不选这一行、不关面板。[description] 给读屏念。 */
+/** The small button at the end of a row in the action sheet (e.g. audition): tapping it only does that, without selecting the row or closing the sheet. [description] is read by screen readers. */
 class SheetTrailing(
     val icon: ImageVector,
     val description: String,
@@ -39,8 +39,8 @@ class SheetTrailing(
 )
 
 /**
- * 操作面板里的一项;[icon] 放在文字左边;[destructive] 为真时文字用出错红。
- * [searchable] 为假的项(「手动输入」「默认」这类)搜索时也一直留着。
+ * One item in the action sheet; [icon] goes to the left of the text; when [destructive] is true the text uses the error red.
+ * Items with [searchable] false (such as "Manual input", "Default") stay visible during search too.
  */
 class SheetAction(
     val label: String,
@@ -51,10 +51,10 @@ class SheetAction(
     val onClick: () -> Unit,
 )
 
-/** 项数到这么多时(且调用方给了 searchHint)顶上出搜索框。 */
+/** When there are this many items (and the caller provided searchHint) a search field appears at the top. */
 const val SHEET_SEARCH_MIN = 12
 
-/** 按 [query] 留下文字里含它的项(不分大小写);不参与搜索的项一直留着。 */
+/** Keeps items whose text contains [query] (case-insensitive); items not participating in search always stay. */
 internal fun filterSheetActions(actions: List<SheetAction>, query: String): List<SheetAction> {
     val q = query.trim()
     if (q.isEmpty()) return actions
@@ -62,9 +62,9 @@ internal fun filterSheetActions(actions: List<SheetAction>, query: String): List
 }
 
 /**
- * 点一行后从底部升起的操作面板:顶上一行说明是在对什么操作,下面每项一行。
- * 点任何一项都会先执行它、再关掉面板。项多到一屏放不下时(例如引擎的几百个音色)列表在面板里上下滑,标题不动。
- * 给了 [searchHint] 且项数不少于 [SHEET_SEARCH_MIN] 时,标题下多一个搜索框按文字筛选。
+ * An action sheet that rises from the bottom after tapping a row: a top line explains what is being acted on, and each item is one row below.
+ * Tapping any item executes it first, then closes the sheet. When there are too many items for one screen (e.g. an engine's hundreds of voices) the list scrolls inside the sheet and the title stays put.
+ * When [searchHint] is given and there are at least [SHEET_SEARCH_MIN] items, an extra search field under the title filters by text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +106,7 @@ fun ActionSheet(title: String?, actions: List<SheetAction>, searchHint: String? 
                         onClick = { a.onClick(); onDismiss() },
                     ) {
                         a.trailing?.let { t ->
-                            // IconButton 自带 48dp 触摸区;图标本身不分左右,RTL 下随行一起镜像到左边
+                            // IconButton has its own 48dp touch area; the icon itself has no left or right, and under RTL it mirrors to the left along with the row
                             IconButton(onClick = t.onClick) {
                                 Icon(t.icon, t.description, Modifier.size(20.dp), tint = c.accent)
                             }

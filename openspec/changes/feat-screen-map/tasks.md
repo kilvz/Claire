@@ -15,7 +15,7 @@
 
 ## Review Focus (inputs the spec does not cover but that bite the hardest; each is pinned by a test in the owning task)
 
-1. **Screen misidentification**: when two screens share generic text like 「确定/返回/设置」 (OK/Back/Settings), that must never be used to judge them as the same screen — rarity must down-weight it (task 2 test).
+1. **Screen misidentification**: when two screens share generic text like "OK/Back/Settings", that must never be used to judge them as the same screen — rarity must down-weight it (task 2 test).
 2. **No guessing below the threshold**: when a screen has only vague anchors, or the screen is not in the map, `identify` must return None rather than force-matching the nearest screen (task 2 test).
 3. **One page, two structures**: when a banner/empty state is missing the skeleton still matches (coverage threshold < 1.0); when the skeletons are genuinely disjoint, split into two screens instead of merging wrongly (tasks 2, 3 tests).
 4. **An old route after a page update**: replay lands on the wrong screen, retries once, still wrong → Diverged, and never keeps clicking (task 7 test).
@@ -41,7 +41,7 @@
 - [ ] **1.2 Run the test to confirm it fails** (the class does not exist). Run: `./gradlew :core:test --tests "*ScreenNodeTest"`, expecting FAIL.
 - [ ] **1.3 Implement `ScreenNode.kt`**: the types from the table above + `@Serializable` annotations; `ScreenId.of` uses the first 16 hex chars of `sha256(app + "\u0000" + signature)`, and `key()` is computed inside `Transition`.
 - [ ] **1.4 Run the test to confirm it passes**.
-- [ ] **1.5 Commit**: `feat(screenmap): 屏实体与确定性屏 id`
+- [ ] **1.5 Commit**: `feat(screenmap): screen entities and deterministic screen ids`
 
 ---
 
@@ -61,12 +61,12 @@
 
 - [ ] **2.1 Write the failing test**: `ScreenRecognizerTest` covers —
   - multiple anchors on the same screen hit → identified correctly; one anchor missing (coverage still sufficient) → still identified correctly (the "missing banner" of one page with two structures);
-  - generic text (「确定」 (OK), 「返回」 (Back)) appearing on multiple screens → down-weighted by rarity, and not used to judge the two screens as one (Review Focus #1);
+  - generic text ("OK", "Back") appearing on multiple screens → down-weighted by rarity, and not used to judge the two screens as one (Review Focus #1);
   - only vague anchors / the screen is not in the map → return null (Review Focus #2).
 - [ ] **2.2 Run the test to confirm it fails**.
 - [ ] **2.3 Implement `identify`**: first filter out the skeleton text set by the `RouteAnchors.texts` definition, then compute the overlap/coverage/rarity ordering; return null below `confidenceMin`.
 - [ ] **2.4 Run the test to confirm it passes**.
-- [ ] **2.5 Commit**: `feat(screenmap): 认屏（骨架锚点+覆盖+稀有度+置信度）`
+- [ ] **2.5 Commit**: `feat(screenmap): screen recognition (skeleton anchors + coverage + rarity + confidence)`
 
 ---
 
@@ -88,7 +88,7 @@
 - [ ] **3.2 Run the test to confirm it fails**.
 - [ ] **3.3 Implement `apply`**: visit before/after in event order (`ScreenId.of(app, firstSkeletonAnchorSignature)` creates the screen; the signature = the stable skeleton texts sorted and joined); on matched, status provisional→confirmed, anchors count +1, levels voted; transition edges are deduplicated and counted by key.
 - [ ] **3.4 Run the test to confirm it passes**.
-- [ ] **3.5 Commit**: `feat(screenmap): 从运行记录确定性重建屏图`
+- [ ] **3.5 Commit**: `feat(screenmap): deterministic screen map rebuild from run records`
 
 ---
 
@@ -108,7 +108,7 @@
 - [ ] **4.2 Run the test to confirm it fails**.
 - [ ] **4.3 Implement**.
 - [ ] **4.4 Run the test to confirm it passes**.
-- [ ] **4.5 Commit**: `feat(screenmap): 图上相对导航与公共前缀`
+- [ ] **4.5 Commit**: `feat(screenmap): relative navigation and common prefix on the map`
 
 ---
 
@@ -128,7 +128,7 @@
 - [ ] **5.2 Run the test to confirm it fails**.
 - [ ] **5.3 Implement**.
 - [ ] **5.4 Run the test to confirm it passes**.
-- [ ] **5.5 Commit**: `feat(screenmap): 屏图渲染成给模型的紧凑地图`
+- [ ] **5.5 Commit**: `feat(screenmap): render the screen map as a compact map for the model`
 
 ---
 
@@ -149,7 +149,7 @@
 - [ ] **6.2 Run the test to confirm it fails**.
 - [ ] **6.3 Implement the interface and persistence**.
 - [ ] **6.4 Run the test to confirm it passes**.
-- [ ] **6.5 Commit**: `feat(screenmap): 屏图落盘（原子写+revision）`
+- [ ] **6.5 Commit**: `feat(screenmap): persist the screen map (atomic write + revision)`
 
 ---
 
@@ -168,7 +168,7 @@
 - [ ] **7.2 Run the test to confirm it fails**.
 - [ ] **7.3 Implement**: wire `identify` into the before/after check of each step in `Replayer.run`; add the wrong-screen retry; splice `renderMap` into the Diverged branch of `RouteReplay.run`.
 - [ ] **7.4 Run the test to confirm it passes** (and run the full `:core:test` to confirm the existing replay tests are not broken).
-- [ ] **7.5 Commit**: `feat(screenmap): 回放接图（认屏+落错重试+交还地图）`
+- [ ] **7.5 Commit**: `feat(screenmap): replay connects to the map (screen recognition + wrong-landing retry + hand back the map)`
 
 ---
 
@@ -187,7 +187,7 @@
 - [ ] **8.2 Run the test to confirm it fails**.
 - [ ] **8.3 Implement**: chain `renderMap` after the existing `injectKnowledge` path (the `APP.md` injection point); carry `renderPosition` in `runtimeState`.
 - [ ] **8.4 Run the test to confirm it passes**.
-- [ ] **8.5 Commit**: `feat(screenmap): 进入 App 时随 APP.md 注入页面结构`
+- [ ] **8.5 Commit**: `feat(screenmap): inject page structure with APP.md when entering the App`
 
 ---
 
@@ -206,7 +206,7 @@
 - [ ] **9.2 Run the test to confirm it fails**.
 - [ ] **9.3 Implement**: call `ScreenMapBuilder.apply` + `ScreenMapStore.save` in `RunLearning.learn` (or the wrap-up background coroutine), wrapped in `guarded`.
 - [ ] **9.4 Run the test to confirm it passes**.
-- [ ] **9.5 Commit**: `feat(screenmap): 任务收尾重放运行记录长图`
+- [ ] **9.5 Commit**: `feat(screenmap): replay run records at task teardown to grow the map`
 
 ---
 
@@ -226,7 +226,7 @@
 - [ ] **10.2 Run the test to confirm it fails**.
 - [ ] **10.3 Implement**.
 - [ ] **10.4 Run the test to confirm it passes**.
-- [ ] **10.5 Commit**: `feat(screenmap): merge gate 自检`
+- [ ] **10.5 Commit**: `feat(screenmap): merge gate self-check`
 
 ---
 

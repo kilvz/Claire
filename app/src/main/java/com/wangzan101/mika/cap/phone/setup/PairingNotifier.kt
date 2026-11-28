@@ -44,7 +44,7 @@ sealed interface PairingNotice {
             return when (status) {
                 BuiltinShellStatus.Running -> Done
                 BuiltinShellStatus.Connecting -> Working
-                // 用户暂停了 Mika:不弹配对码通知。
+                // The user paused Claire: do not show the pairing-code notification.
                 BuiltinShellStatus.Paused -> null
                 is BuiltinShellStatus.Failed -> when {
                     status.reason.duringPairing -> EnterCode(port, PhoneSetupCopy.notifyRetry(status.reason))

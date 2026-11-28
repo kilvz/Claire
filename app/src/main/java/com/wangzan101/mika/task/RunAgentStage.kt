@@ -79,7 +79,7 @@ internal suspend fun TaskRun.assembleAgent(a: RunAssembly, m: RunModels, ph: Run
         }
     } else null
 
-    // 主模型及备援服务商都来自开局那一份快照；运行中改设置只影响下一次任务。
+    // The main model and fallback providers both come from the snapshot taken at start; changing settings while running only affects the next task.
     val chainModels = m.mainFallbacks
     val chainProviderIds = m.mainProviderIds
     val agent = AgentLoop(

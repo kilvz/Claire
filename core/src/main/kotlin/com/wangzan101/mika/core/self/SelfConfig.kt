@@ -45,7 +45,7 @@ private fun port(ctx: ToolContext): SelfConfig =
 /** List the settings Claire can change itself: keys, human-readable names, current values, selectable values. Read-only. */
 internal object SettingsList : AgentTool {
     override val verb = Verb.SettingsList
-    override val label = "查看设置"
+    override val label = "View settings"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
 
@@ -68,7 +68,7 @@ internal object SettingsList : AgentTool {
 /** Change one of Claire's own settings; both the key and the value must come from [SettingsList]. */
 internal object SettingsSet : AgentTool {
     override val verb = Verb.SettingsSet
-    override val label = "改设置"
+    override val label = "Change settings"
     override val risk = Risk.Write
     /** Does not touch the screen: it changes Claire's own settings, unrelated to the current task's screen. */
     override val offScreen = true

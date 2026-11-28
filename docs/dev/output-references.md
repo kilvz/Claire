@@ -4,10 +4,10 @@
 
 The model produces files in the sandbox `/workspace` (charts, reports, audio, screenshots, etc.), but right now:
 
-- there is no way to show or tap them for the user directly in the chat — only `share_file`, which copies them to 「下载/Claire」 (Downloads/Claire), and the user has to go find them in the folder;
+- there is no way to show or tap them for the user directly in the chat — only `share_file`, which copies them to "Downloads/Claire", and the user has to go find them in the folder;
 - to reference one again in a later turn, it can only remember the `/workspace/...` path itself, relying on memory and unreliable.
 
-Yet "user-provided attachments" have long had this treatment (an `附件:/workspace/inbox/...` line + the chat page's `AttachmentMessage` card). The gap is that the "model output" half does not have it.
+Yet "user-provided attachments" have long had this treatment (an `Attachment:/workspace/inbox/...` line + the chat page's `AttachmentMessage` card). The gap is that the "model output" half does not have it.
 
 ## Goals
 
@@ -22,8 +22,8 @@ Give "things the model produced" the same "referenceable + viewable/tappable in 
 ## Current state (confirmed)
 
 - `/workspace` is partitioned by "conversation ID" (`TaskTools` has `workspace: () -> String`, commented "this task's workspace (conversation ID)", defaulting to `"default"`).
-- Input attachments go through `AttachmentLines` (`附件:/workspace/...` text lines) + the chat page's `AttachmentMessage` rendering.
-- `share_file` copies the file to the host's 「下载/Claire」 and returns `savedAs` (a name, not a renderable reference).
+- Input attachments go through `AttachmentLines` (`Attachment:/workspace/...` text lines) + the chat page's `AttachmentMessage` rendering.
+- `share_file` copies the file to the host's "Downloads/Claire" and returns `savedAs` (a name, not a renderable reference).
 - Assistant replies are Markdown (rendered by `MarkdownText`), but the renderer does not recognize `/workspace/...` images/links.
 
 ## Approach

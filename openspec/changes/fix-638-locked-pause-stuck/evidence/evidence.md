@@ -1,41 +1,41 @@
-# #638 锁屏暂停卡死——验证取证
+# #638 lock-screen pause stuck — verification evidence
 
-## 单元测试（修复证明）
+## Unit tests (proof of the fix)
 
-`./gradlew :core:test :core:cliTest :app:testDebugUnitTest` 全绿（2026-11-16）。
-`LockStateTest` 5 用例全过，其中：
+`./gradlew :core:test :core:cliTest :app:testDebugUnitTest` all green (2026-11-16).
+`LockStateTest` all 5 cases pass, including:
 
-- `screenOnAndUnlockSeenWithoutAnyBroadcast`（新增，#638 最小复现）：熄屏锁定出发，
-  SCREEN_ON / USER_PRESENT 一条不来，熄屏期间轮询照读（`reads > dark`），
-  系统状态变亮屏+解锁后两个 tick 内 gate 放行。旧代码在该用例第一步就失败
-  （熄屏快照 interactive=false 挡住轮询，reads 不增长）。
-- `staleLockedHealsOnSubscribe`（新增）：订阅开始立即重读，漏掉的解锁不用等第一个 500ms。
-- `unlockSeenWithoutAnotherBroadcast`（改造）：去掉「熄屏时不读」断言，USER_PRESENT 先到
-  但设备仍锁时继续轮询，直到 deviceLocked=false 才放行。
-- `unlockSeenWhenKeyguardClearsBeforeDevice`、`noReadsWithoutSubscribers`（既有，不回归）。
+- `screenOnAndUnlockSeenWithoutAnyBroadcast` (new, minimal reproduction of #638): starting from screen-off locked,
+  not a single SCREEN_ON / USER_PRESENT arrives, polling still reads while the screen is off (`reads > dark`),
+  and after the system state changes to screen-on + unlocked, the gate lets it through within two ticks. Old code failed at the first step of this case
+  (the screen-off snapshot has interactive=false, which blocked polling, so reads did not grow).
+- `staleLockedHealsOnSubscribe` (new): re-read immediately when the subscription starts, and a missed unlock does not wait for the first 500ms.
+- `unlockSeenWithoutAnotherBroadcast` (reworked): removed the "do not read while the screen is off" assertion; when USER_PRESENT arrives first
+  but the device is still locked, polling continues until deviceLocked=false and only then lets it through.
+- `unlockSeenWhenKeyguardClearsBeforeDevice`, `noReadsWithoutSubscribers` (existing, no regression).
 
-## 真机回归（无回归证明）
+## Device regression (proof of no regression)
 
-华为 Mate X2（TET-AN50，HarmonyOS 4.2 / API 31），本分支 debug 包，真实模型 glm-5.3-flash，
-任务经「电脑连接」API 注入（run 20261116-090428-bdn5xo）：
+Huawei Mate X2 (TET-AN50, HarmonyOS 4.2 / API 31), this branch's debug package, real model glm-5.3-flash,
+task injected through the "computer connection" API (run 20261116-090428-bdn5xo):
 
-1. 任务创建时手机熄屏（电源键熄屏，未到 PIN 锁定延迟）→ 约 10 秒后任务 API 状态 `paused`
-   ——熄屏按「锁着」暂停的路径正常（`!interactive` 判定，改动未触碰）。
-2. 电源键亮屏 → 任务 API 状态回到 `running`，无任何人工干预；
-   `dumpsys window` 焦点窗口为 `com.android.settings.HWSettings`——任务恢复后确实继续操作手机
-   （events.jsonl 前几步为打开设置）。**熄屏暂停 → 亮屏自动继续，链路完整。**
-3. 之后任务在「回到桌面」步骤上反复尝试（导航栏查找失败、shell 命令被拒），属模型能力问题，
-   与本改动无关，验证目的已达后取消（`run-090428-events.jsonl` 全程留档）。
+1. The phone screen was off when the task was created (power-button screen-off, before the PIN lock delay) → about 10 seconds later the task API state was `paused`
+   — the screen-off pause path via "locked" works normally (`!interactive` decision, untouched by this change).
+2. Power-button screen-on → the task API state returned to `running`, with no manual intervention;
+   the `dumpsys window` focus window was `com.android.settings.HWSettings` — after resuming, the task really kept operating the phone
+   (the first few steps of events.jsonl were opening settings). **Screen-off pause → screen-on auto-continue, the chain is complete.**
+3. After that the task repeatedly retried the "return to home" step (navigation bar lookup failed, shell command rejected), which is a model capability issue,
+   unrelated to this change; it was cancelled after the verification goal was reached (`run-090428-events.jsonl` keeps the full record).
 
-限制：本机带 PIN 锁且 adb 解不开，「锁屏→输 PIN 解锁→自动继续」的端到端链路无法在本机完成
-（本 ROM 短暂熄屏未触发 PIN 键锁，上面实测的是熄屏/亮屏变体）；该场景由
-`screenOnAndUnlockSeenWithoutAnyBroadcast` 用虚拟时钟确定性覆盖（广播全丢也恢复）。
+Limitations: this machine has a PIN lock that adb cannot clear, so the end-to-end chain "lock screen → enter PIN to unlock → auto-continue" cannot be completed on this machine
+(this ROM's brief screen-off did not trigger the PIN lock; what was measured above is the screen-off/screen-on variant); that scenario is deterministically covered by
+`screenOnAndUnlockSeenWithoutAnyBroadcast` with a virtual clock (it recovers even when all broadcasts are lost).
 
-截图 `01-task-running-after-resume.png`：恢复运行中的聊天界面（状态判读以 API/事件流为准）。
+Screenshot `01-task-running-after-resume.png`: the chat UI while running after resume (judge status by the API/event stream).
 
-## 过程记录
+## Process notes
 
-- 验证中发现并顺带修复了本机测试环境的坑：给 App 换 providers.json 做实验时，应用会在运行中
-  重写 provider-keys.json 并丢弃不在当前配置里的服务商密钥——**换 providers 必须连同
-  provider-keys.json 一起备份/恢复**，否则真实模型通道报「API Key 无效」。
-  （该坑与本 PR 无关，已记入本地 AGENTS.md 流程。）
+- During verification we found and incidentally fixed a pitfall in this machine's test environment: when experimenting by swapping the App's providers.json, the app rewrites
+  provider-keys.json while running and discards provider keys that are not in the current config — **swapping providers must back up/restore
+  provider-keys.json together**, otherwise the real model channel reports "API Key invalid".
+  (This pitfall is unrelated to this PR, and has been recorded in the local AGENTS.md process.)

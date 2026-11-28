@@ -1,14 +1,14 @@
 package com.wangzan101.mika.core.general
 
 /**
- * 一种语言里让记、让改删的几组说法。[prepare] 先把要判的话归一(转小写之类),再逐个匹配。
- * 判断的规矩和中英文一样:让记看分句,先抹掉「问它记不记得」的部分,分句里出现不让记的说法就不算;
- * 让改 / 删看引文,不让改删、只是问问看引文所在的整句(模型可能把前面的「别」漏在引文外)。
+ * The sets of phrases in one language for asking to remember or to change/delete. [prepare] first normalizes the text to judge (lowercasing and so on), then matches each phrase.
+ * The rules match those for Chinese and English: remembering looks at the clause, first stripping out the part that asks whether it remembers; if a clause contains a phrase that says not to remember, it does not count;
+ * changing/deleting looks at the quotation, and whether not to change/delete or merely asking is judged from the whole sentence containing the quotation (the model may leave a preceding "don't" outside the quotation).
  */
 private class Phrases(
-    /** 这一块管的界面语言(语言代码,同 values-<语言>,印尼语写 id)。 */
+    /** The UI language this block covers (language code, as in values-<language>; Indonesian is id). */
     val languages: List<String>,
-    /** 否定词和英文同形(西语、葡语的 no):它的否定不拿来否决中英文的请求。 */
+    /** The negation word is the same as in English (no in Spanish and Portuguese): its negation is not used to override Chinese or English requests. */
     val negationLooksEnglish: Boolean = false,
     val prepare: (String) -> String = { it },
     val save: Regex,
@@ -21,7 +21,7 @@ private class Phrases(
     val hypothetical: Regex,
     val askingHow: Regex,
 ) {
-    /** 这半句里没有本语言让记的说法时为 null;有时为让没让它记。 */
+    /** Null when this clause contains no phrase in this language asking to remember; otherwise whether it asked to remember. */
     fun asksToRemember(clause: String): Boolean? {
         val c = prepare(clause)
         if (!save.containsMatchIn(recallQuestion.replace(c, " "))) return null
@@ -30,7 +30,7 @@ private class Phrases(
     fun negatesRemember(clause: String): Boolean = saveNegation.containsMatchIn(prepare(clause))
     fun requests(op: String, quote: String): Boolean = request(op).containsMatchIn(prepare(quote))
     fun negates(op: String, message: String): Boolean = negation(op).containsMatchIn(prepare(message))
-    /** 「如果我说…」和「你会怎么做」两样都有,只是在问它会怎么做。 */
+    /** Both "if I said …" and "what would you do" are present: it is only asking what it would do. */
     fun onlyAsking(message: String): Boolean {
         val m = prepare(message)
         return hypothetical.containsMatchIn(m) && askingHow.containsMatchIn(m)
@@ -40,15 +40,15 @@ private class Phrases(
 }
 
 /**
- * 「让它记」「让它改 / 删」在各语言里的说法,给 [MemorySave]、[MemoryEdit] 判「用户这一轮明确要求了没有」。
- * 一种语言一块([Phrases]),只收没歧义的动词说法;中英文那一块的正则原来就在 [MemoryTools] 里,原样搬来。
- * 新加一种语言就是再加一块,不放心哪块整块删掉即可——删掉只是那种语言又回到「不认」,别的不受影响。
+ * The phrases for "ask it to remember" and "ask it to change/delete" in each language, used by [MemorySave] and [MemoryEdit] to decide whether "the user explicitly requested it this turn".
+ * One block per language ([Phrases]), accepting only unambiguous verb phrases; the Chinese and English block's regexes used to live in [MemoryTools] and were moved here as-is.
+ * Adding a language means adding a block; any block can be deleted wholesale if unsure—deleting it only makes that language unrecognized again, with no effect on the others.
  */
 internal object MemoryRequests {
     /**
-     * 这半句让它记:记住、记下、写入记忆、存起来、保存、别忘了、remember、save、add … to memory。只认动词的明确说法
-     * (改删记忆的 [MemoryEdit] 也一样),光提到「记忆」「memory」这个词不算——认错了就是把用户没同意的东西存进去,宁可不认。
-     * 只在收「Mika 自己归纳的」时用:用户原话照旧不需要这些字眼。这里只是中英文的说法,其余语言各有自己的一块(见下)。
+     * This clause asks it to remember: remember, note down, write to memory, store, save, don't forget, remember, save, add … to memory. Only explicit verb phrases count
+     * (same for [MemoryEdit] when changing/deleting memories); merely mentioning the word "memory" does not count—a false positive stores something the user did not agree to, so it is better not to recognize it.
+     * Only used when accepting "Claire's own inferences": the user's own words still need no such wording. This covers only Chinese and English; other languages each have their own block (see below).
      */
     private val SAVE_REQUEST = Regex(
         "[记記](?:住|下|一下|一[条條]|一[笔筆]|[几幾][条條]|到|[进進]|入|[着著]|好|上|吧|[录錄](?:一下|下|到|[进進]|在))|" +
@@ -57,9 +57,9 @@ internal object MemoryRequests {
             "(?:add|write|put|commit)\\b[^,.;!?\\n]{0,40}?\\b(?:to|in|into)\\s+(?:your\\s+|the\\s+|my\\s+)?memor(?:y|ies))\\b",
         RegexOption.IGNORE_CASE,
     )
-    /** 问它还记不记得,不是让它记。 */
+    /** Asks whether it still remembers, not asks it to remember. */
     private val RECALL_QUESTION = Regex("\\b(?:do|did)\\s+you\\s+(?:still\\s+|even\\s+)?remember\\b|\\bwhat\\s+(?:do|did|can)\\s+you\\s+remember\\b", RegexOption.IGNORE_CASE)
-    /** 这半句是不让记:「别记」「不要把这些存进去」「don't save」。「别忘了记下来」「不记得」不是。 */
+    /** This clause says not to remember: "don't remember", "don't store these", "don't save". "Don't forget to note it down" and "don't remember" do not count. */
     private val SAVE_NEGATION = Regex(
         "(?<![能要用可])(?:不|别|別|勿|无需|無需|无须|無須|禁止)\\s*(?:要|用|再|去|必|该|該|应该|應該|许|許|准|可以|能)?\\s*(?:把[^,，。;；!！?？\\n]{0,12}?)?(?:给我|給我|帮我|幫我|替我)?\\s*" +
             "(?:[记記](?![得忆憶性])|[写寫][入进進到下]|存(?![在款货貨量储儲])|保存|儲存)|" +
@@ -67,13 +67,13 @@ internal object MemoryRequests {
             "(?:ever\\s+|actually\\s+|please\\s+|you\\s+)?(?:remember|memori[sz]e|sav(?:e|ing)|stor(?:e|ing)|not(?:e|ing)|keep(?:ing)?|add(?:ing)?|writ(?:e|ing)|put(?:ting)?|commit(?:ting)?)\\b",
         RegexOption.IGNORE_CASE,
     )
-    // 要改:「改」字的各种说法(改成、改得简洁一点、改一下;「改天」「改变」这类不算),和精简、合并、整理、换成这些说的就是改的词。
-    // 只认这几个固定说法的话,「把那几条改得简洁一点」会被当成没说要改
+    // Changing: the various phrases with the character for change (change to, make it more concise, change it; "another day" and "change" in the sense of transformation do not count), plus shorten, merge, tidy and replace, which all mean change.
+    // If only these fixed phrases were recognized, "make those entries more concise" would be treated as not asking to change.
     private const val UPDATE_WORDS = "修改|改(?![天日期变變革善观觀口])|更新|更正|编辑|編輯|精简|精簡|缩短|縮短|简化|簡化|压缩|壓縮|合并|合併|整理|重写|重寫|换成|換成|替换|替換|调整|調整|润色|潤色"
     private const val UPDATE_WORDS_EN = "update|change|edit|correct|rewrite|reword|rephrase|shorten|simplify|merge|replace|trim|tidy"
     private const val DELETE_WORDS = "删|刪|忘掉|忘记|忘記|去掉|移除|清掉|清除"
     private const val DELETE_WORDS_EN = "delete|forget|remove|erase|drop"
-    // 「能不能改」「要不要删」是在问、在请它做,不是不让:前面紧挨着同一个字的「不」不算否定
+    // "Can you change it" and "should it be deleted" are questions and requests for it to act, not prohibitions: a "not" directly before the same character does not count as negation.
     private const val NOT = "(?<![能要用可])(?:不|别|別|无需|無需|无须|無須|不用|不必|不要|不能|不准|禁止)\\s*(?:要|用|再|去)?\\s*"
     private const val NOT_EN = "\\b(?:do\\s+not|don't|dont|never|no\\s+need\\s+to)\\s+"
     private val UPDATE_REQUEST = Regex("$UPDATE_WORDS|\\b(?:$UPDATE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
@@ -82,9 +82,9 @@ internal object MemoryRequests {
     private val DELETE_NEGATION = Regex("$NOT(?:$DELETE_WORDS)|$NOT_EN(?:$DELETE_WORDS_EN)\\b", RegexOption.IGNORE_CASE)
 
     /**
-     * 「如果我说把那条删掉,你会怎么处理」:在问它会怎么做,不是让它现在做。改删记忆不过「讨论还是操作」那一关
-     * (见 AgentLoop 的 MEMORY_WRITE_VERBS),这种问法在这里拒。两样都有才算:假设的说法,加上问它会怎么做——
-     * 只有假设的条件句常常就是要记的内容(「如果我说老地方,就是公司楼下那家」)。
+     * "If I said to delete that entry, what would you do": it is asking what it would do, not asking it to do it now. Changing/deleting memories does not pass the "discussion versus action" gate
+     * (see MEMORY_WRITE_VERBS in AgentLoop); this kind of question is rejected here. Both must be present: a hypothetical, plus a question about what it would do—
+     * a conditional with only the hypothetical is often exactly the content to remember ("if I say the usual place, it means the restaurant downstairs from the office").
      */
     private val HYPOTHETICAL = Regex("(?:如果|假如|要是|假设|假設|假使)我(?:说|說|让|讓|叫|要)|\\bif\\s+i\\s+(?:said|asked|told|were\\s+to)\\b", RegexOption.IGNORE_CASE)
     private val ASKING_HOW = Regex("你会(?:怎么|怎样|如何)|你會(?:怎麼|怎樣|如何)|会(?:发生什么|怎么样)|會(?:發生什麼|怎麼樣)|\\b(?:what|how)\\s+would\\s+you\\b|\\bwhat\\s+would\\s+happen\\b", RegexOption.IGNORE_CASE)
@@ -103,7 +103,7 @@ internal object MemoryRequests {
         askingHow = ASKING_HOW,
     )
 
-    // 日本語:覚えておいて、覚えといて、覚えて、記憶して、保存して、忘れないで。「覚えてる?」「覚えてない」是问它记不记得、说自己不记得
+    // Japanese: remember (oboete oite), keep it in mind (oboete ite), remember (oboete), memorize (kioku shite), save (hozon shite), do not forget. "Do you remember?" and "I don't remember" ask whether it remembers or say the speaker does not remember
     private val ja = Phrases(
         languages = listOf("ja"),
         save = Regex(
@@ -144,7 +144,7 @@ internal object MemoryRequests {
                 "何(?:を)?(?:しますか|をする|するんですか|するつもり|する予定)|(?:どういう|どんな)(?:風|ふう)に(?:する|します|対応|反応|答え|考え)",
         ),
     )
-    // 한국어:기억해 줘、기억해 두세요、기억해、저장해 줘、잊지 마세요。「기억나?」「기억해요?」是在问它记不记得
+    // Korean: 기억해 줘, 기억해 두세요, 기억해, 저장해 줘, 잊지 마세요. "기억나?" and "기억해요?" ask whether it remembers
     private val ko = Phrases(
         languages = listOf("ko"),
         save = Regex(
@@ -184,7 +184,7 @@ internal object MemoryRequests {
                 "어떻게\\s*되|어떻게\\s*돼|어떻게\\s*될까|무엇이\\s*(?:일어나|벌어지|발생|생기)|뭐가\\s*(?:일어나|벌어지|발생|생기)",
         ),
     )
-    // Русский:запомни、сохрани、не забудь、возьми на заметку。「ты помнишь?」「вы помните?」是问它记不记得
+    // Russian: запомни, сохрани, не забудь, возьми на заметку. "ты помнишь?" and "вы помните?" ask whether it remembers
     private val ru = Phrases(
         languages = listOf("ru"),
         prepare = { it.lowercase() },
@@ -225,7 +225,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // Español:recuerda、acuérdate、guarda、apunta、no olvides。「¿te acuerdas?」「¿recuerdas?」是问它记不记得
+    // Spanish: recuerda, acuérdate, guarda, apunta, no olvides. "¿te acuerdas?" and "¿recuerdas?" ask whether it remembers
     private val es = Phrases(
         languages = listOf("es"),
         negationLooksEnglish = true,
@@ -270,7 +270,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // Português:lembra、lembre-se、guarda、salva、anota、não esqueça。「você lembra?」「lembra disso?」是问它记不记得
+    // Portuguese: lembra, lembre-se, guarda, salva, anota, não esqueça. "você lembra?" and "lembra disso?" ask whether it remembers
     private val pt = Phrases(
         languages = listOf("pt"),
         negationLooksEnglish = true,
@@ -311,7 +311,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // Türkçe:hatırla、aklında tut、hafızana al、not al、kaydet、unutma。「hatırlıyor musun?」「hatırladın mı?」是问它记不记得
+    // Turkish: hatırla, aklında tut, hafızana al, not al, kaydet, unutma. "hatırlıyor musun?" and "hatırladın mı?" ask whether it remembers
     private val tr = Phrases(
         languages = listOf("tr"),
         prepare = { it.lowercase().replace("\u0307", "") },
@@ -362,7 +362,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // العربية:احفظ、تذكّر、احتفظ بهذا、خزّن、سجّل、لا تنسَ。「هل تتذكر؟」是问它记不记得。一般不标元音,同形词多(تذكرة 票、تذكير 提醒),逐个排掉
+    // Arabic: احفظ, تذكّر, احتفظ بهذا, خزّن, سجّل, لا تنسَ. "هل تتذكر؟" asks whether it remembers. Usually unvocalized, with many homographs (تذكرة ticket, تذكير reminder), each filtered out individually
     private val ar = Phrases(
         languages = listOf("ar"),
         prepare = { AR_DIACRITICS.replace(it, "") },
@@ -404,7 +404,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // فارسی:به خاطر بسپار、یادت باشه、یادت نره、فراموش نکن、ذخیره کن、یادداشت کن。「یادته؟」「به یاد داری؟」是问它记不记得
+    // Persian: به خاطر بسپار, یادت باشه, یادت نره, فراموش نکن, ذخیره کن, یادداشت کن. "یادته؟" and "به یاد داری؟" ask whether it remembers
     private val fa = Phrases(
         languages = listOf("fa"),
         prepare = { it.replace('\u200C', ' ') },
@@ -447,7 +447,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // Tiếng Việt:hãy nhớ、nhớ giúp、ghi nhớ、lưu lại、đừng quên。「còn nhớ không?」「bạn có nhớ…?」是问它记不记得。必须带声调符号才认(去掉后 nhớ/nhờ/nhỏ 同形)
+    // Vietnamese: hãy nhớ, nhớ giúp, ghi nhớ, lưu lại, đừng quên. "còn nhớ không?" and "bạn có nhớ…?" ask whether it remembers. Only recognized with tone marks (without them nhớ/nhờ/nhỏ are homographs)
     private val vi = Phrases(
         languages = listOf("vi"),
         prepare = { it.lowercase() },
@@ -484,7 +484,7 @@ internal object MemoryRequests {
         ),
     )
 
-    // Bahasa Indonesia:ingat、catat、simpan、hafalkan、jangan lupa。「kamu ingat nggak?」「masih ingat?」是问它记不记得
+    // Indonesian: ingat, catat, simpan, hafalkan, jangan lupa. "kamu ingat nggak?" and "masih ingat?" ask whether it remembers
     private val id = Phrases(
         languages = listOf("id"),
         prepare = { it.lowercase() },
@@ -525,16 +525,16 @@ internal object MemoryRequests {
         ),
     )
 
-    /** 中英文以外的各块。新加一种语言:上面写一块,加进这里,再在 MemoryRequestsTest 里给它一组句子。 */
+    /** Blocks for languages other than Chinese and English. To add a language: write a block above, add it here, then give it a set of sentences in MemoryRequestsTest. */
     private val others = listOf(ja, ko, ru, es, pt, tr, ar, fa, vi, id)
 
-    /** 认得哪几种界面语言;MemoryRequestsTest 拿它对照 app 的 values-<语言> 目录,两边不能脱节。 */
+    /** Which UI languages are recognized; MemoryRequestsTest compares this against the app's values-<language> directories, and the two must not drift apart. */
     internal val languages: List<String> get() = (listOf(zhEn) + others).flatMap { it.languages }
 
     /**
-     * 这半句话让它记了没有。中英文有说法时按原来的规矩定,只是别的语言里否定词不与中英文撞形的(「保存しないで」「jangan save」)
-     * 说不让记也算不让;没有中英文说法时,其余语言任一种有说法就算,但任一种的不让记出现在这半句里就不算——
-     * 西语、葡语共用 guarda、elimina 这些动词,否定词却不同。
+     * Whether this clause asked it to remember. Chinese and English decide by the original rules, except that in other languages a negation word that does not collide with Chinese or English ("don't save" in Japanese, "jangan save")
+     * also counts as not asking to remember; when there is no Chinese or English phrase, any other language's phrase counts, but if any language's negation appears in this clause it does not—
+     * Spanish and Portuguese share verbs such as guarda and elimina, but their negation words differ.
      */
     fun asksToRemember(clause: String): Boolean {
         val c = clause.replace('’', '\'')
@@ -542,7 +542,7 @@ internal object MemoryRequests {
         return others.any { it.asksToRemember(c) == true } && others.none { it.negatesRemember(c) }
     }
 
-    /** 本轮原话是否明确要求这次改或删。[quote] 是引文,[messages] 是含着它的整句;规矩同 [asksToRemember]。 */
+    /** Whether the original words this turn explicitly asked for this change or deletion. [quote] is the quotation and [messages] are the whole sentences containing it; the rules match [asksToRemember]. */
     fun requested(op: String, quote: String, messages: List<String>): Boolean {
         if (zhEn.requests(op, quote)) {
             if (messages.any { zhEn.negates(op, it) || zhEn.onlyAsking(it) }) return false
@@ -562,18 +562,18 @@ private const val W0 = "(?<!\\p{L})"
 
 private const val W1 = "(?!\\p{L})"
 
-/** 名词后面直接接这些,是在问界面、方法或词义(「編集画面はどこ」「削除って何」),不是让它改删。 */
+/** Nouns directly followed by these are asking about a UI, method or word meaning ("where is the edit screen", "what does delete mean"), not asking it to change or delete. */
 private const val JA_NOT_REQUEST = "(?!画面|方法|やり方|仕方|手順|ボタン|アイコン|メニュー|履歴|場所|機能|ページ|項目|一覧|は|が|って|とは|という)"
 
-/** 「そのままにしておいて」「残して」:不让改、不让删的通用说法。 */
+/** "Leave it as it is" and "keep it": general phrases for not changing and not deleting. */
 private const val JA_KEEP =
     "そのまま(?:にし|にして|にしてお|で(?:お|い|結構|大丈夫|いい)|保持|残し|に|で)|いじら(?:ないで|ず|ない)|触ら(?:ないで|ず|ない)|" +
         "残し(?:てお|ておい|てく|てくだ|て|といて)|置い(?:てお|てく|てくだ|ておい|て|といて)|忘れない|忘れずに"
 
-/** 「기억해 줘」「기억해 주세요」「기억해 둬」是让它记;「기억해야 해」「기억해 봐」「기억해요?」不算。 */
+/** "기억해 줘", "기억해 주세요" and "기억해 둬" ask it to remember; "기억해야 해", "기억해 봐" and "기억해요?" do not count. */
 private fun koRequest(stem: String) = "${stem}해(?!\\s*(?:야|봐|보|요))"
 
-/** 名词后面直接接这些,是在问界面、位置或词义(「수정 화면은 어디」「삭제는 뭐야」),不是让它改删。 */
+/** Nouns directly followed by these are asking about a UI, location or word meaning ("where is the edit screen", "what is delete"), not asking it to change or delete. */
 private const val KO_NOT_REQUEST =
     "(?!\\s*(?:화면|방법|버튼|아이콘|메뉴|기록|목록|기능|페이지|설정)|은|는|이|가|이라|란|이란|라는|이라는|이라고|하고|해서|하면|하니|하냐)"
 
@@ -603,31 +603,31 @@ private const val RU_UPDATE_NEGATION_WORDS =
 
 private const val RU_DELETE_NEGATION_WORDS = "удал|сотр|стир|убер|убир|забудь|забыва|забыт|очист|вычеркн|выброс|выкин|трогай"
 
-/** 「не」和动词之间常夹着宾语(「не надо ничего удалять」);只放行这几个代词,别的词(「не знаю, удали…」)不算否定。 */
+/** "не" often has an object between it and the verb ("не надо ничего удалять"); only these pronouns are allowed through, and other words ("не знаю, удали…") do not count as negation. */
 private const val RU_GAP = "(?:(?:этот|эту|этого|этой|ту|то|тот|того|его|е[её]|их|ничего|вообще)\\s*){0,3}"
 
 private const val RU_KEEP =
     "оставь(?:те)?\\s+(?:как\\s+есть|так|это|вс[её]|его|е[её]|их|на\\s+месте|в\\s+покое|в\\s+стороне|нетронутым|нетронутой)|" +
         "пусть\\s+(?:оста[её]тся|стоит|останется|будет|остаётся)|не\\s+трогай|не\\s+трогайте|не\\s+трогать|не\\s+прикасайся|не\\s+прикосайся"
 
-/** 不让改 / 不让删:「не меняй」「не надо удалять」;「оставь как есть」「не трогай」两种都不让。 */
+/** Not changing / not deleting: "не меняй", "не надо удалять"; "оставь как есть" and "не трогай" forbid both. */
 private fun ruNegated(verbs: String) =
     "${W0}не\\s+(?:надо|нужно|стоит|обязательно|требуется|пока)?\\s*" + RU_GAP + "(?:$verbs)|" +
         "${W0}не\\s+(?:хочу|желаю|намерен|собираюсь),?\\s*(?:чтобы\\s+(?:ты|вы)\\s+\\p{L}*?)?\\s*" + RU_GAP + "(?:$verbs)|" +
         "(?:$verbs)\\p{L}*\\s+не\\s+(?:надо|нужно|стоит|обязательно)|можно\\s+не\\s+(?:$verbs)"
 
 /**
- * 「no / não」和动词之间常夹着宾语、quero、que 之类的词(「no quiero que lo guardes」「não quero que você anote」);
- * 只放行这几个,别的词(「no sé, apunta…」「não sei, anota…」)不算否定。西语、葡语共用动词多、否定词只差一个字母,两块用同一份。
+ * "no / não" often has an object, quero, que and similar words between it and the verb ("no quiero que lo guardes", "não quero que você anote");
+ * only these are allowed through, and other words ("no sé, apunta…", "não sei, anota…") do not count as negation. Spanish and Portuguese share many verbs and their negation words differ by one letter, so both blocks use the same one.
  */
 private const val ES_GAP =
     "(?:(?:quiero|queres|quero|precisa|preciso|necesito|necesario|hace|falta|vayas|favor|você|voce|usted|senhor|senhora|isso|isto|esto|este|esta|esse|essa|ese|esa|eso|" +
     "aquele|aquela|aquell|meu|minha|nada|todo|tudo|tus|teus|tuas|los|las|les|lhe|que|por|como|assim|asi|de|em|en|mi|mis|lo|la|le|me|te|nos|se|tu|es|é|va|vá|a|e)\\s*){0,6}"
 
-/** 动词后面直接黏着的宾语代词(guárdalo、cámbiamelo);用在要求词尾完整的那些动词上,免得 guarded、editor 这类英文词被当成西语。 */
+/** Object pronouns attached directly after the verb (guárdalo, cámbiamelo); used for verbs that require a complete ending, so English words such as guarded and editor are not taken as Spanish. */
 private const val ES_CL = "(?:me|te|se|nos|os|l[oa]s?|les?){0,2}"
 
-/** 葡语动词后用连字符接的宾语代词(guarda-o、tire-me)。 */
+/** Object pronouns attached after Portuguese verbs with a hyphen (guarda-o, tire-me). */
 private const val PT_CL = "(?:-(?:o|a|os|as|lo|la|los|las|me|te|se|nos|lhe|lhes))?"
 
 private const val ES_UPDATE_WORDS = "actualiz|cambi|modifi|corri|correcci|edit|reescrib|reformul|acort|simplif|fusion|combin|reemplaz|sustitu|ajust|rectifiqu|rectific|toqu|tires"
@@ -639,7 +639,7 @@ private const val ES_KEEP =
 
 private fun esNegated(verbs: String) = "${W0}(?:no|n[aã]o)\\s+" + ES_GAP + "(?:$verbs)|${W0}sin\\s+(?:\\p{L}+\\s+){0,2}(?:$verbs)|" + ES_KEEP
 
-/** 不让改删的词。 */
+/** Words for not changing/deleting. */
 private const val PT_UPDATE_WORDS = "mud|alter|modif|atualiz|corr|edit|reescrev|reformul|encurt|simplif|fund|junt|combin|substitu|troc|toc"
 
 private const val PT_DELETE_WORDS = "apag|delet|elimin|esque|remov|tir|exclu|descart|limp|borr|toc"
@@ -649,36 +649,36 @@ private const val PT_KEEP =
 
 private fun ptNegated(verbs: String) = "${W0}(?:no|n[aã]o)\\s+" + ES_GAP + "(?:$verbs)|${W0}sem\\s+(?:\\p{L}+\\s+){0,2}(?:$verbs)|" + PT_KEEP
 
-/** 「olduğu gibi bırak」「aynen kalsın」:不让改、不让删的通用说法。 */
+/** "olduğu gibi bırak" and "aynen kalsın": general phrases for not changing and not deleting. */
 private const val TR_KEEP =
     "(?:oldu[ğg]u\\s*gibi|oldu[ğg]u\\s*haliyle|aynen|ayn[ıi]\\s*(?:şekilde|haliyle)|[öo]yle|b[öo]yle)\\s*(?:b[ıi]rak|kals[ıi]n|dursun|kal|dur)|" +
         "dokunma|el\\s*atma|el\\s*s[uü]rme|de[ğg]i[şs]mesin|de[ğg]i[şs]memeli"
 
-/** 阿拉伯文一般不标元音:发音符号和tatweel 先去掉再比。 */
+/** Arabic is usually unvocalized: diacritics and tatweel are removed before comparison. */
 private val AR_DIACRITICS = Regex("[\\u064B-\\u0652\\u0670\\u0640\\u0653-\\u0655]")
 
-/** 词的起点。紧贴在前面的 و、ف 是连词(「وتذكر」= 并记住),不算前一个词的一部分。 */
+/** Word start. The و and ف directly before it are conjunctions ("وتذكر" = and remember), not part of the previous word. */
 private const val AR_W0 = "(?<![\\p{L}&&[^وف]])"
 
-/** 「اتركه كما هو」(原样留着)、「لا تلمس」(别碰):不让改、不让删的通用说法。 */
+/** "اتركه كما هو" (leave it as it is) and "لا تلمس" (don't touch): general phrases for not changing and not deleting. */
 private const val AR_KEEP =
     "اترك(?:ه|ها|هم|هن|كم)?${W1}|احتفظ\\s+ب|(?:زي|كما|مثل)\\s+ما\\s+هو${W1}|على\\s+ما\\s+هو|لا\\s+تلمس"
 
-/** «همونجوری بذار»(原样放着)、「دست نزن」(别碰):不让改、不让删的通用说法。 */
+/** "همونجوری بذار" (leave it as it is) and "دست نزن" (don't touch): general phrases for not changing and not deleting. */
 private const val FA_KEEP =
     "نگهش\\s*دار|همونجوری\\s*(?:بذار|بمونه|نگهش\\s*دار)|همینجوری\\s*(?:بذار|بمونه)|همون\\s*طوری\\s*(?:بذار|بمونه)|همین\\s*طوری\\s*(?:بذار|بمونه)|" +
         "دست\\s*(?:رو\\s*)?نزن|دستت\\s*(?:رو\\s*)?نزن|بذار\\s*(?:همونجوری|همینجوری|همون\\s*طوری)\\s*(?:بمونه|بذار)"
 
-/** 「giữ nguyên」(保持原样)、「đừng động vào」(别动):不让改、不让删的通用说法。 */
+/** "giữ nguyên" (keep as is) and "đừng động vào" (don't touch): general phrases for not changing and not deleting. */
 private const val VI_KEEP =
     "giữ\\s+(?:lại|nguyên|đi|nó|cho)|cứ\\s+để\\s+nguyên|để\\s+nguyên|đừng\\s+(?:động|đụng)\\s+vào|đừng\\s+làm\\s+gì|cứ\\s+giữ|vẫn\\s+giữ"
 
 /** "tidak" and its colloquial spellings match only at the word start. enggak, ngga, ngak and kagak were previously recognized by the endings gak and ga, so they are listed individually. */
 private const val ID_NOT = "${W0}(?:tidak|enggak|engga|engak|enga|nggak|ngga|ngak|nga|kagak|kaga|gak|ga)"
 
-/** 「jangan」和动词之间只放行这几个宾语;「jangan lupa」(别忘了)里的 lupa 不在其中,是让它记。 */
+/** Only these objects are allowed between "jangan" and the verb; lupa in "jangan lupa" (don't forget) is not among them, so it means asking it to remember. */
 private const val ID_GAP = "(?:(?:ini|itu|semua|semuanya|dia|mereka|nya|hal|yang|saja|aja|dulu)\\s+){0,3}"
 
-/** 「biarkan saja」(就这样吧)、「pertahankan」(保留):不让改、不让删的通用说法。 */
+/** "biarkan saja" (leave it be) and "pertahankan" (keep): general phrases for not changing and not deleting. */
 private const val ID_KEEP =
     "biarkan\\s+saja|biar\\s+saja|tetap\\s+(?:disimpan|ada|seperti|sama|begitu|dipertahankan)|simpan\\s+saja|pertahankan|${W0}jangan\\s+di-?apa-?apa-?kan|${W0}jangan\\s+di-?ubah"

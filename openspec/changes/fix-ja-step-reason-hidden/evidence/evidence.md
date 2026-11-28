@@ -1,43 +1,43 @@
-# fix-ja-step-reason-hidden 取证
+# fix-ja-step-reason-hidden evidence
 
-日期：2026-11-21 · 分支：`fix/ja-step-reason-hidden`（基于 main 7101e997，v0.1.50）
+Date: 2026-11-21 · Branch: `fix/ja-step-reason-hidden` (based on main 7101e997, v0.1.50)
 
-## 缺陷定位（读码 + 字符区间事实）
+## Locating the defect (code reading + character-range facts)
 
-- 引入提交：f010acab（#765，v0.1.50 发布）。
-- `ChatViewModel.kt` 原 `shouldHideRawReason`：非中文界面下 `reason.any { it in '\u4e00'..'\u9fa5' }` 即隐藏。
-- `languageDirective("ja")`（同提交引入）要求模型用日语写全部用意；日语书面语必混汉字（検索/設定/連絡先…，均落在 U+4E00–9FA5），假名（U+3040–30FF）是唯一可靠的日/中字符级判别信号。
-- 结论：日语界面下模型按指令写的用意几乎恒被隐藏，`StepRow.text`（步骤行与收起态摘要两处入口）退化为本地化标题。
+- Introducing commit: f010acab (#765, released in v0.1.50).
+- `ChatViewModel.kt`'s original `shouldHideRawReason`: on a non-Chinese UI, `reason.any { it in '\u4e00'..'\u9fa5' }` hides it.
+- `languageDirective("ja")` (introduced in the same commit) requires the model to write every reason in Japanese; written Japanese necessarily mixes in kanji (e.g. search/settings/contacts …, all within U+4E00–9FA5), and kana (U+3040–30FF) is the only reliable character-level signal for telling Japanese from Chinese.
+- Conclusion: on a Japanese UI the reasons the model writes as instructed are almost always hidden, and `StepRow.text` (both entry points: the step row and the collapsed-state summary) degrades to the localized title.
 
-## 行为矩阵（修前 → 修后）
+## Behavior matrix (before fix → after fix)
 
-| 界面 | 用意 | 修前 | 修后 |
+| UI | Reason | Before | After |
 |---|---|---|---|
-| ja | 日语（漢字+仮名） | 隐藏 | 显示 |
-| en 等非中文 | 中文 | 隐藏 | 隐藏（不变） |
-| en 等非中文 | 日语 | 隐藏 | 显示（罕见违约场景，显示信息损失更小） |
-| zh 简/繁 | 任意 | 显示 | 显示（不变） |
-| 非中文 | 纯汉字无假名（設定確認） | 隐藏 | 隐藏（无法与中文区分，如实保留） |
+| ja | Japanese (kanji + kana) | hidden | shown |
+| en and other non-Chinese | Chinese | hidden | hidden (unchanged) |
+| en and other non-Chinese | Japanese | hidden | shown (rare instruction-breaking case; showing loses less information) |
+| zh Simplified/Traditional | any | shown | shown (unchanged) |
+| non-Chinese | Han only, no kana (settings check) | hidden | hidden (cannot be distinguished from Chinese, kept faithfully) |
 
-## 测试验证
+## Test verification
 
-新增/修改：`app/src/test/java/com/wangzan101/mika/ui/StepRowLanguageTest.kt`
-- `testShouldKeepJapaneseReasonInNonChineseLocale`：非中文界面「検索ボタンをタップして連絡先を探す」「「微信」アプリを開く」不隐藏；中文界面日语照常显示。
-- `testShouldHideKanjiOnlyReasonInNonChineseLocale`：「設定確認」仍隐藏（残余局限）。
-- `testStepRowTextShowsJapaneseReasonUnderJapaneseUi`：ui_locale=ja 时 `StepRow.text` 直接返回日语用意（端到端断言）。
+Added/modified: `app/src/test/java/com/wangzan101/mika/ui/StepRowLanguageTest.kt`
+- `testShouldKeepJapaneseReasonInNonChineseLocale`: on a non-Chinese UI, "tap the search button to find a contact" and "open the WeChat app" (original was Japanese) are not hidden; on a Chinese UI, Japanese is shown as usual.
+- `testShouldHideKanjiOnlyReasonInNonChineseLocale`: "settings check" (original was Japanese) is still hidden (residual limitation).
+- `testStepRowTextShowsJapaneseReasonUnderJapaneseUi`: with ui_locale=ja, `StepRow.text` returns the Japanese reason directly (end-to-end assertion).
 
-**反事实验证**（防空转测试）：把判别式临时翻回旧版 `reason.any { it in '\u4e00'..'\u9fa5' }` 后，
-`StepRowLanguageTest > testShouldKeepJapaneseReasonInNonChineseLocale FAILED`、
-`StepRowLanguageTest > testStepRowTextShowsJapaneseReasonUnderJapaneseUi FAILED`（BUILD FAILED in 8s）；
-恢复修复版后同类全绿（BUILD SUCCESSFUL in 6s）。临时改动用字符串精确替换进/退，未用 git checkout，事后 `git diff` 复核仅剩正式改动（4 行实现 + 34 行测试）。
+**Counterfactual verification** (guard against a no-op test): after temporarily reverting the predicate to the old version `reason.any { it in '\u4e00'..'\u9fa5' }`,
+`StepRowLanguageTest > testShouldKeepJapaneseReasonInNonChineseLocale FAILED`,
+`StepRowLanguageTest > testStepRowTextShowsJapaneseReasonUnderJapaneseUi FAILED` (BUILD FAILED in 8s);
+after restoring the fixed version the same tests were all green (BUILD SUCCESSFUL in 6s). The temporary change was applied and reverted by exact string replacement, without git checkout; a later `git diff` review showed only the real change remained (4 lines of implementation + 34 lines of tests).
 
-## 全量本地测试
+## Full local test run
 
-- `./gradlew :core:test :core:cliTest :app:testDebugUnitTest` → BUILD SUCCESSFUL（5m；cli 89 tests OK）
+- `./gradlew :core:test :core:cliTest :app:testDebugUnitTest` → BUILD SUCCESSFUL (5m; cli 89 tests OK)
 - `python3 -m unittest discover -s tools/i18n` → 12 tests OK
 - `python3 tools/i18n/translations.py check` → 3699 resources across 12 UI languages passed
-- relayTest（Go）未本地跑：改动只涉及 app 侧显示判别，不触 core/relay 代码，随 CI 复核。
+- relayTest (Go) was not run locally: the change only touches the app-side display predicate, not core/relay code, so CI covers it.
 
-## 未做部分（如实）
+## Not done (stated faithfully)
 
-- 未做真机走查：需日语界面 + 真实模型按日语输出用意的端到端任务，成本高且依赖模型行为；判别逻辑已由注入 ui_locale 桩的单测（含反事实）覆盖。
+- No device walkthrough: it would need a Japanese UI plus a real model writing reasons in Japanese for an end-to-end task, which is costly and depends on model behavior; the predicate logic is already covered by unit tests with an injected ui_locale stub (including the counterfactual).

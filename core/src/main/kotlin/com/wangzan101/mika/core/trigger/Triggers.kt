@@ -48,7 +48,7 @@ data class TriggerDefinition(
     val calendarTimes: List<String> = emptyList(),
     /** Who created the plan: the user manually / the model / an external script; affects display and traceability only. */
     val source: TriggerSource = TriggerSource.Model,
-    /** 模型任务允许执行的当地窗口；空表示随时执行。固定提醒和手动立即执行不受此限制。 */
+    /** Local windows in which model tasks may run; empty means run at any time. Fixed reminders and manual immediate runs are not subject to this. */
     val executionWindowZone: String? = null,
     val executionWindows: List<ExecutionWindow> = emptyList(),
 ) {
@@ -66,7 +66,7 @@ data class TriggerDefinition(
 
     fun calendarClocks(): List<String> = calendarTimes.ifEmpty { listOfNotNull(calendarTime) }
 
-    /** 到点后的实际可执行时间；提醒不消耗模型，不被低价窗口推迟。 */
+    /** The actual executable time after the scheduled time; reminders do not use the model and are not delayed by cheaper windows. */
     fun executionAtOrAfter(atMs: Long): Long =
         if (executionWindows.isEmpty() || reminderText != null) atMs
         else nextExecutionWindowAt(executionWindows, executionWindowZone!!, atMs)
@@ -307,7 +307,7 @@ fun upcoming(def: TriggerDefinition, afterMs: Long, count: Int): List<Long> {
 /** Scheduling is implemented by the host; the core records to the ledger first and then dispatches, so a claimed slot is never executed twice after an abnormal restart. */
 class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: (Long?) -> Unit,
     private val isIdle: () -> Boolean = { true }, private val idleRetryMs: Long = 60_000L,
-    /** 用户暂停了 Mika:到点的时段照样认领、记成「因暂停跳过」,不派发;恢复后不补跑。 */
+    /** The user paused Claire: due windows are still claimed and marked "skipped because paused", but not dispatched; they are not backfilled after resuming. */
     private val paused: PauseFlag = PauseFlag.Never,
     private val dispatch: (TriggerDefinition, TriggerWindow) -> Unit) {
     fun rearm(nowMs: Long) {
@@ -340,7 +340,7 @@ class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: 
         return true
     }
 
-    /** 时区变化后,跟随设备旧时区的当地时间与自定义窗口重算到新时区;显式钉了其他时区(如 UTC 价格窗口)的不动。 */
+    /** After a time-zone change, local calendar times and custom windows that followed the device's old zone are recomputed in the new zone; anything explicitly pinned to another zone (such as the UTC price window) is left alone. */
     fun rezone(nowMs: Long, fromZone: String, toZone: ZoneId) {
         if (fromZone == toZone.id) return
         store.all().filter { (it.enabled && it.calendarTime != null && it.calendarZone == fromZone) ||
@@ -362,7 +362,7 @@ class TriggerEngine(private val store: TriggerStore, private val scheduleAlarm: 
 
     fun fire(nowMs: Long) {
         if (paused.paused()) {
-            // 暂停时不等空闲:等着的时段若留到恢复以后,就成了恢复时自动补跑的暗队列
+            // Do not wait for idle while paused: a waiting window left until after resume would become a hidden queue that runs automatically on resume
             store.claimDue(nowMs) { it.executionAtOrAfter(nowMs) == nowMs }
                 .forEach { store.mark(it.key, TriggerWindowState.Skipped, PauseFlag.REASON) }
             rearm(nowMs)

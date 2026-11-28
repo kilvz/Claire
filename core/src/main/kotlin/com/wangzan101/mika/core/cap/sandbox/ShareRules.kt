@@ -33,7 +33,7 @@ object ShareRules {
 
     fun plainName(n: String): Boolean = SandboxPaths.plainName(n)
 
-    /** 文件名上限 255 字节(UTF-8),留出系统加「 (n)」序号的余地。 */
+    /** File names are capped at 255 bytes (UTF-8), leaving room for the system's " (n)" suffix. */
     const val NAME_MAX_BYTES = 240
 
     /** Truncates by UTF-8 bytes (and optionally code point count), keeping the extension (dropped when the extension itself is too long), never splitting a character. */

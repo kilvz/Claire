@@ -149,17 +149,17 @@ internal object SettingsSearchIndex {
         SettingsSearchEntry("about", SettingsDestination.About, R.string.settings_about),
     )
 
-    /** 设置里有、但不进搜索的子页,和不登记的原因。 */
+    /** Subpages that exist in settings but are excluded from search, and why they are not indexed. */
     val unindexedPages: Map<SettingsPage, String> = mapOf(
         SettingsPage.Home to "The settings home itself; the search box is on this page",
         SettingsPage.Calls to "The settings home no longer has this row; call settings are under Real-time voice, so search does not add a dead-end shortcut",
     )
 
-    /** 在 [have] 这些能力下设置里看得到的条目。 */
+    /** Entries visible in settings under the [have] capabilities. */
     fun available(have: Set<SettingsRequirement>): List<SettingsSearchEntry> =
         entries.filter { e -> e.requires.let { it == null || it in have } }
 
-    /** 按当前界面语言取字([text] 由字符串资源编号取字)。 */
+    /** Get text in the current UI language ([text] resolves text from a string resource ID). */
     fun resolve(entries: List<SettingsSearchEntry>, text: (Int) -> String): List<SettingsSearchItem> =
         entries.map { e ->
             SettingsSearchItem(e, text(e.title), e.path.joinToString(PATH_SEPARATOR) { text(it) }, e.aliases.map(text))

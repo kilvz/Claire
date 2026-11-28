@@ -140,10 +140,10 @@
 
 **Files:**
 - Create: `app/src/main/java/com/wangzan101/mika/voicecall/ui/VoiceCallOverlay.kt`
-- Modify: `app/src/main/java/com/wangzan101/mika/chat/ui/ChatScreen.kt`(输入栏听筒按钮)
-- Modify: `app/src/main/java/com/wangzan101/mika/capsule/CapsuleController.kt` + `CapsuleCardContent.kt`(菜单「语音聊天」)
-- Modify: `app/src/main/java/com/wangzan101/mika/ui/MainActivity.kt`(EXTRA_OPEN_VOICE_CALL 直开)
-- Create: `app/src/main/res/values*/strings_voicecall.xml`(×12 目录)
+- Modify: `app/src/main/java/com/wangzan101/mika/chat/ui/ChatScreen.kt` (input field earpiece button)
+- Modify: `app/src/main/java/com/wangzan101/mika/capsule/CapsuleController.kt` + `CapsuleCardContent.kt` (menu "Voice chat")
+- Modify: `app/src/main/java/com/wangzan101/mika/ui/MainActivity.kt` (EXTRA_OPEN_VOICE_CALL opens it directly)
+- Create: `app/src/main/res/values*/strings_voicecall.xml` (all language directories)
 - Test: `app/src/androidTest/java/com/wangzan101/mika/voicecall/ui/VoiceCallPageTest.kt`
 
 **Interfaces:**

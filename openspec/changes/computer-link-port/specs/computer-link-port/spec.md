@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Users can customize the computer connection's listening port
-设置 (Settings) › 连接电脑 (Connect computer) › 高级 (Advanced) SHALL provide a 「监听端口」 (Listen port) edit entry, allowing the port to be changed to an integer between 1024–65535 (the default 8765 can be restored with one tap). Invalid input SHALL be blocked inside the dialog and not written to storage.
+Settings › Connect computer › Advanced SHALL provide a "Listen port" edit entry, allowing the port to be changed to an integer between 1024–65535 (the default 8765 can be restored with one tap). Invalid input SHALL be blocked inside the dialog and not written to storage.
 
 #### Scenario: Change the port and it takes effect immediately
 - **WHEN** the computer connection (USB or network, either one) is on and the user changes the port from 8765 to 9123

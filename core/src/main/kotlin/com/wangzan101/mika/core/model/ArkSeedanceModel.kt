@@ -25,16 +25,16 @@ import java.net.UnknownHostException
 import java.util.Base64
 
 /**
- * 火山方舟 Seedance 适配器(接口见方舟文档「创建 / 查询 / 取消或删除视频生成任务」):
- * POST `/contents/generations/tasks` 提交(参数放在 body 里,强校验);GET `.../tasks/{id}` 轮询,
- * 状态 queued / running / succeeded / failed / cancelled / expired;成功后 `content.video_url` 是 24 小时内有效的下载地址,交给调用方立即下载。
+ * Volcengine Ark Seedance adapter (API per the Ark documentation "Create / query / cancel or delete video generation tasks"):
+ * POST `/contents/generations/tasks` submits (parameters in the body, strictly validated); GET `.../tasks/{id}` polls,
+ * statuses queued / running / succeeded / failed / cancelled / expired; on success `content.video_url` is a download URL valid for 24 hours, handed to the caller for immediate download.
  *
- * 计费安全:
- * - 提交不自动重发(关掉 OkHttp 的连接失败重试);请求发出后连接断了抛 [VideoModelError.Unconfirmed],不让上层当作没提交。
- * - 请求里带 `execution_expires_after`(文档允许的最小值 1 小时):本地放弃了的任务,排队太久会被服务商自己终止,不会隔几天才跑。
- * - 轮询有总时限 [timeoutMs];偶发的网络 / 5xx / 限流容忍 [MAX_POLL_ERRORS] 次,不因一次抖动丢下已在计费的任务。
- * - 提交之后因取消、超时或出错不再等时,尽力发一次 DELETE:文档写明只有 queued 的任务能取消(不再计费),
- *   running 的取消不了、服务商那边会跑完;终态任务的 DELETE 只删记录。DELETE 失败不影响原来的结果。
+ * Billing safety:
+ * - Submission is not retried automatically (OkHttp connection-failure retries are off); if the connection drops after the request is sent, throw [VideoModelError.Unconfirmed] so the caller does not treat it as not submitted.
+ * - The request carries `execution_expires_after` (the documentation's minimum, 1 hour): a task abandoned locally is terminated by the provider if it queues too long, rather than running days later.
+ * - Polling has an overall limit [timeoutMs]; occasional network / 5xx / rate-limit errors are tolerated [MAX_POLL_ERRORS] times, so one blip does not abandon a task that is already being billed.
+ * - When waiting stops after submission due to cancellation, timeout or error, make a best-effort DELETE: the documentation states that only queued tasks can be cancelled (and stop being billed),
+ *   running tasks cannot be cancelled and will finish on the provider side; DELETE on a terminal task only deletes the record. A failed DELETE does not affect the original result.
  */
 class ArkSeedanceModel(
     baseUrl: String,
@@ -51,7 +51,7 @@ class ArkSeedanceModel(
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonType = "application/json".toMediaType()
 
-    /** 提交用的客户端:连接失败不由 OkHttp 悄悄重发,免得一次生成建出两个付费任务。 */
+    /** Client used for submission: OkHttp does not silently retry connection failures, so one generation does not create two paid tasks. */
     private val submitHttp = http.newBuilder().retryOnConnectionFailure(false).build()
 
     override suspend fun generate(request: VideoRequest, onProgress: suspend (VideoJobStage) -> Unit): VideoOutput {
@@ -77,7 +77,7 @@ class ArkSeedanceModel(
         )
     }
 
-    /** 按文档的 body 形状建提交请求;单测直接核对它。 */
+    /** Build the submission request with the body shape from the documentation; unit tests check it directly. */
     internal fun submitBody(request: VideoRequest): JsonObject = buildJsonObject {
         put("model", model)
         putJsonArray("content") {
@@ -109,7 +109,7 @@ class ArkSeedanceModel(
         val submitted = try {
             HttpSupport.execute(submitHttp, req)
         } catch (e: ModelError.Network) {
-            // 连不上(域名、拒绝连接、没有路由)说明请求没发出去;别的断开(超时、读到一半)不知道服务商建没建任务
+            // Being unable to connect (DNS failure, connection refused, no route) means the request was not sent; other disconnects (timeout, read halfway) leave it unknown whether the provider created a task
             if (e.cause.isNotSent()) throw e
             throw VideoModelError.Unconfirmed(e)
         }
@@ -157,7 +157,7 @@ class ArkSeedanceModel(
         }
     }
 
-    /** 尽力取消:不等太久、不被取消打断、失败也不抛。 */
+    /** Best-effort cancellation: does not wait long, is not interrupted by cancellation, and does not throw on failure. */
     private suspend fun abandon(jobId: String) {
         withContext(NonCancellable) {
             withTimeoutOrNull(CANCEL_TIMEOUT_MS) { runCatching { HttpSupport.execute(http, task(jobId).delete().build()) } }
@@ -196,10 +196,10 @@ class ArkSeedanceModel(
         private const val MAX_POLL_ERRORS = 5
         private const val ADAPTIVE = "adaptive"
 
-        /** `execution_expires_after` 的取值范围是 [3600, 259200] 秒(默认 48 小时);取最小值。 */
+        /** `execution_expires_after` ranges from [3600, 259200] seconds (default 48 hours); use the minimum. */
         internal const val EXPIRES_AFTER_SEC = 3_600
 
-        /** 方舟任务状态 → 进度;终态和不认识的状态为 null。 */
+        /** Ark task status → progress; null for terminal and unknown statuses. */
         internal fun stageOf(status: String): VideoJobStage? = when (status) {
             "queued" -> VideoJobStage.Queued
             "running" -> VideoJobStage.Running
@@ -209,7 +209,7 @@ class ArkSeedanceModel(
         private fun Throwable?.isNotSent(): Boolean =
             this is UnknownHostException || this is ConnectException || this is NoRouteToHostException
 
-        /** 服务商已给出终态:任务不会再跑,不用取消。 */
+        /** The provider has reached a terminal state: the task will not run again, so there is no need to cancel. */
         private fun Exception.isTerminal(): Boolean = this is VideoModelError.Failed || this is VideoModelError.Timeout
 
         private fun ModelError.isTransient(): Boolean =

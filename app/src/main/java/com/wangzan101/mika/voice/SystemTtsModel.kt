@@ -15,10 +15,10 @@ import java.io.File
 import java.util.Locale
 
 /**
- * 用系统 [TextToSpeech] 合成完整 WAV 的非流式声音模型。每次合成新建一个引擎、初始化后合成到临时文件、
- * 等 [SystemTtsEngine.setOnUtteranceProgressListener] 的完成回调再读出字节,完成、出错或取消都一定 stop/shutdown。
- * 交回 [TtsResponse] 后由现有 [VoicePlayer] 播放,不另开播放路径或后台服务。初始化和合成各有上限,
- * 引擎不响应或中途死掉时按超时失败。用哪个引擎由 [engineFactory] 决定(适配器按目录里的 [com.wangzan101.mika.voice.model.TtsBinding.engine] 建)。
+ * A non-streaming voice model that synthesises a complete WAV with the system [TextToSpeech]. Each synthesis creates a new engine, initialises it, synthesises to a temp file,
+ * waits for the completion callback of [SystemTtsEngine.setOnUtteranceProgressListener] and then reads the bytes; on completion, error or cancellation it always stops/shuts down.
+ * The [TtsResponse] is handed back and played by the existing [VoicePlayer], without another playback path or background service. Initialisation and synthesis each have a timeout,
+ * and fail by timeout when the engine does not respond or dies midway. Which engine to use is decided by [engineFactory] (the adapter builds it from [com.wangzan101.mika.voice.model.TtsBinding.engine] in the catalog).
  */
 class SystemTtsModel(
     private val context: Context,
@@ -37,7 +37,7 @@ class SystemTtsModel(
         return try {
             val ready = CompletableDeferred<Int>()
             engine.init { ready.complete(it) }
-            // 引擎没响应(进程起不来、被杀)时不一直等
+            // When the engine does not respond (process cannot start, killed), do not wait forever
             val status = withTimeoutOrNull(initTimeoutMs) { ready.await() }
                 ?: throw VoiceModelError.Protocol(
                     VoiceErrorCategory.TIMEOUT, "System text-to-speech engine did not respond",
@@ -48,8 +48,8 @@ class SystemTtsModel(
                 )
             }
 
-            // 用户选的音色自带语言,用上了就不再按界面语言挑;这个引擎没有它(换过引擎、旧设置留下的别家音色名、
-            // 音色数据被删)时按界面语言用引擎默认的音色
+            // The user-selected voice carries its own language, so once applied it is no longer chosen by UI language; when this engine does not have it (engine changed, a voice name from another vendor left by old settings,
+            // voice data deleted), use the engine's default voice for the UI language
             val voiceName = request.voice?.trim().orEmpty()
             val voiceApplied = voiceName.isNotEmpty() && when (engine.setVoice(voiceName)) {
                 SystemVoiceResult.Applied -> true
@@ -93,7 +93,7 @@ class SystemTtsModel(
                         VoiceErrorCategory.SYSTEM_UNAVAILABLE, "System text-to-speech synthesis failed",
                     )
                 }
-                // 合成中途引擎死掉时进度回调不会再来
+                // When the engine dies midway through synthesis, the progress callback will not come again
                 withTimeoutOrNull(synthesisTimeoutMs) { complete.await() }
                     ?: throw VoiceModelError.Protocol(
                         VoiceErrorCategory.TIMEOUT, "System text-to-speech engine stopped responding",

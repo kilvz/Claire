@@ -105,10 +105,10 @@ internal fun Composer(
     overLimit: Int = 0,
     onRemove: (String) -> Unit = {},
     onDismissRejected: () -> Unit = {},
-    /** 输入框上方的本对话主模型入口。 */
+    /** This conversation's main-model entry above the input field. */
     mainModel: MainModelUi = MainModelUi(),
     onMainModel: () -> Unit = {},
-    /** 要随下一句话发出去的引用;有时输入框上方一张小条,× 去掉。 */
+    /** A quote to send along with the next message; when present, a small bar above the input field, × removes it. */
     quote: QuoteMessage.Quote? = null,
     onRemoveQuote: () -> Unit = {},
     editRequest: Int = 0,

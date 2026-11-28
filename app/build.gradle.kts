@@ -38,13 +38,13 @@ android {
         buildConfigField("boolean", "ADB_LOGS", "false")
     }
 
-    // 沙箱程序只有 arm64 版本(jniLibs/arm64-v8a);APK 不限 ABI,别的设备照常安装、显示「此设备不支持沙箱」。
-    // 沙箱程序要从 nativeLibraryDir 直接执行,安装时必须解到磁盘
+    // The sandbox binaries only ship for arm64 (jniLibs/arm64-v8a); the APK stays ABI-agnostic so other devices install normally and show "This device does not support the sandbox".
+    // Sandbox binaries execute directly from nativeLibraryDir, so they must be extracted to disk on install
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // 离线识别(sherpa-onnx AAR)只用 arm64-v8a;AAR 里另外几种架构的库不打进 APK,别的设备显示「此设备不支持离线识别」。
-            // 按文件名前缀排除(以后版本多出的 sherpa/onnxruntime 库也排除);不整目录排除,ML Kit 等别的库这些架构照常带
+            // Offline recognition (the sherpa-onnx AAR) only uses arm64-v8a; the other architectures in the AAR are left out of the APK, and other devices show "This device does not support offline recognition".
+            // Exclude by file-name prefix (sherpa/onnxruntime libraries added in later versions are excluded too); do not exclude whole directories, so other libraries such as ML Kit keep those architectures
             excludes += listOf("armeabi-v7a", "x86", "x86_64").flatMap { abi -> listOf("lib/$abi/libsherpa-onnx*.so", "lib/$abi/libonnxruntime*.so") }
         }
     }
@@ -178,7 +178,7 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
-    // 离线语音识别:sherpa-onnx 2.0.3(静态链接 onnxruntime),不在 Maven 上,放在 app/libs,校验值见 app/libs/README.md
+    // Offline speech recognition: sherpa-onnx 2.0.3 (statically linked onnxruntime), not on Maven, kept in app/libs; see app/libs/README.md for checksums
     implementation(files("libs/sherpa-onnx-2.0.3-static.aar"))
 
     testImplementation(libs.junit)
@@ -199,12 +199,12 @@ dependencies {
     androidTestImplementation(libs.junit)
 }
 
-// JVM 单测只在 debug 上跑:release/perf/logs 的代码与 debug 相同,各编一遍、跑一遍只是重复(裸 :app:test 还会因此内存不够)
+// JVM unit tests only run on debug: release/perf/logs share debug's code, so building and running each is repetition (and a bare :app:test runs out of memory)
 androidComponents {
     beforeVariants { variant -> if (variant.buildType != "debug") variant.enableUnitTest = false }
 }
 
-// LicensesTest 读仓库的 licenses/THIRD_PARTY_NOTICES.md:让它参与测试的增量判断
+// LicensesTest reads licenses/THIRD_PARTY_NOTICES.md from the repo: make it part of the test's up-to-date check
 tasks.withType<Test>().configureEach {
     inputs.file(rootProject.file("licenses/THIRD_PARTY_NOTICES.md")).withPropertyName("thirdPartyNotices")
 }

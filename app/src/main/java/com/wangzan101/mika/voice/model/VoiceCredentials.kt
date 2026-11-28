@@ -121,7 +121,7 @@ class VoiceCredentialStore(
             )
         }
 
-        /** 凭据编号只收字母、数字和 `._:-`,最长 160 个字符。 */
+        /** Credential ids accept only letters, digits and `._:-`, at most 160 characters. */
         internal fun validSecretId(secretId: String): Boolean = SECRET_ID.matches(secretId)
         private fun key(secretId: String) = "voice_owned_$secretId"
     }

@@ -134,14 +134,14 @@ object MikaIcons {
         "M6 4.5 h12 a2.5 2.5 0 0 1 2.5 2.5 v10 a2.5 2.5 0 0 1 -2.5 2.5 h-12 a2.5 2.5 0 0 1 -2.5 -2.5 v-10 a2.5 2.5 0 0 1 2.5 -2.5 z",
         "M7.4 10 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0", "M20.5 16 l-5 -5 l-8 8.5",
     )
-    /** 一叠照片:后面露出第二张的一角(还有更多照片)。 */
+    /** A stack of photos: the corner of a second one peeking behind (there are more photos). */
     val Photos = stroke(
         "photos",
         "M8.5 4.5 h8 a2.5 2.5 0 0 1 2.5 2.5 v8.5",
         "M7 7.5 h7.5 a2.5 2.5 0 0 1 2.5 2.5 v7 a2.5 2.5 0 0 1 -2.5 2.5 h-7.5 a2.5 2.5 0 0 1 -2.5 -2.5 v-7 a2.5 2.5 0 0 1 2.5 -2.5 z",
         "M6.8 16.3 l2.4 -2.4 l1.8 1.8 l2.2 -2.2 l1.9 1.9",
     )
-    /** 截屏:一块屏,上面一条,中间一个圆(截下此刻的屏幕)。 */
+    /** Screenshot: a screen with a bar at the top and a circle in the middle (captures the screen at this moment). */
     val Camera = stroke(
         "camera",
         "M6 4 h12 a3 3 0 0 1 3 3 v10 a3 3 0 0 1 -3 3 h-12 a3 3 0 0 1 -3 -3 v-10 a3 3 0 0 1 3 -3 z",

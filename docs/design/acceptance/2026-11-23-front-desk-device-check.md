@@ -1,114 +1,114 @@
-# 前台(聊天 / 语音通话 / AI 电话)· 真机验收记录
+# Front desk (chat / voice call / AI phone) · device acceptance record
 
-日期:2026-11-23
-范围:`front-desk` 分支(设计见 `docs/design/specs/2026-11-23-front-desk-design.md`,计划见 `docs/design/plans/2026-11-23-front-desk.md` Task 11)。
-用法:能自动跑的由 `LiveRunTest#runDesk` 在真机上跑,结果打 `[x]`;要人开口、要真实来电的标「待真机」,写清步骤留给主人。**任一项不通过都算这一版不达验收。**
+Date: 2026-11-23
+Scope: the `front-desk` branch (design in `docs/design/specs/2026-11-23-front-desk-design.md`, plan in `docs/design/plans/2026-11-23-front-desk.md` Task 11).
+How to use: what can run automatically is run on a device by `LiveRunTest#runDesk` and the result is ticked `[x]`; items that require a person to speak or a real incoming call are marked "awaiting device", with the steps written down for the owner. **Any single failure means this version does not pass acceptance.**
 
-测试环境:安卓 14 测试机;装的是 perf 包(和发布版一样不可调试、预先编译:`./gradlew :app:assemblePerf` → `adb install -r` → `adb shell cmd package compile -f -m speed com.wangzan101.mika`)。前台和后台任务用的是手机上已配好的主模型(轻模型设成「跟主模型」);任务并行开关关着,所以并行上限为 1。
+Test environment: an Android 14 test phone; the perf package is installed (like the release build, non-debuggable and precompiled: `./gradlew :app:assemblePerf` → `adb install -r` → `adb shell cmd package compile -f -m speed com.wangzan101.mika`). Foreground and background tasks use the main model already configured on the phone (the light model is set to "same as main model"); the task parallel switch is off, so the parallel limit is 1.
 
-安全约束:真机上只派无害、可撤销的活(开设置页、查天气、打开计算器看一眼);不发消息、不打给真人、不付钱、不删东西、不改账号和系统设置。
+Safety constraint: on the device only dispatch harmless, reversible work (open a settings page, check the weather, open the calculator and take a look); do not send messages, call real people, pay money, delete anything, or change the account and system settings.
 
-## 怎么跑
+## How to run
 
 ```bash
-# 装测试包(不要用 connectedAndroidTest:它会卸载 App、清掉主人的数据)
+# Install the test package (do not use connectedAndroidTest: it uninstalls the app and wipes the owner's data)
 ./gradlew :app:assembleDebugAndroidTest
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 
-# 一个场景:deskScript 的各步用 || 隔开
-#   say:<话>        在聊天页打字发出,等前台这一轮回完
+# One scenario: separate the deskScript steps with ||
+#   say:<text>        type and send on the chat page, wait for the front desk to finish this round
 #   wait:running|queued|needsyou|idle|tasks=N|report
-#   home            退到桌面(之后的汇报应走兜底:写回会话 + 通知)
-#   sleep:<秒> / notifications
+#   home            go to the home screen (later reports should take the fallback: write back to the conversation + notification)
+#   sleep:<seconds> / notifications
 adb shell am instrument -w -r -e class com.wangzan101.mika.acceptance.LiveRunTest#runDesk \
   -e deskRun desk-chat -e deskWaitSec 240 [-e deskParallelMax 1] \
   -e deskScript "'say:...||wait:running||...'" \
   com.wangzan101.mika.test/androidx.test.runner.AndroidJUnitRunner
-# 结果:App 外部文件目录 acceptance/<deskRun>/ 下的 result.txt、log.txt、每步截图 step-NN.png
+# Results: result.txt, log.txt and per-step screenshots step-NN.png under acceptance/<deskRun>/ in the app's external files directory
 ```
 
-`result.txt` 里每一轮记 `firstWordMs`(发出到第一个字)、`firstTaskMs`(发出到派出第一件)、回话、派了哪些、工具小标签;`saved*` 是这条会话存下的轮次(兜底写回的汇报是 `desk_report`)。
+`result.txt` records `firstWordMs` (from sending to the first word), `firstTaskMs` (from sending to dispatching the first job), the reply, what was dispatched, and tool chips for each round; `saved*` are the rounds stored for this conversation (a fallback write-back report is `desk_report`).
 
-## 一、聊天页
+## 1. Chat page
 
-- [x] 派一件开 App 的活(「打开系统设置,告诉我设置首页前 2 个菜单项叫什么」):前台回话、挂出任务卡,卡片「在办」
-  - 开口时间:派单的轮次 2.4–3.4 s(这一项那次 2.5 s;修复前一次 4.3 s),设计目标是文字 1–2 秒内开口(目标值,不是硬门槛),**派单的轮次超了**:前台模型先发派单工具调用、拿到结果后再出字,这一来回在当前主模型上约 1.6–2.5 s。只回话不派单的轮次 1.2–2.1 s,在目标内。
-  - 结论:**通过(已接受)**。派单轮开口超出目标,按目标值而非门槛接受,见「发现的问题」4。
-- [x] 任务在跑时问要联网的问题(「顺便帮我查一下今天北京的天气怎么样」):前台派出去,说「排上队/正在查」,第二张卡「排队中 · 第 1 个」
-- [x] 问「那件办到哪了」:前台照任务板回答(在读取中 / 天气排第 1 位),**没有调用任何工具**
-- [x] 说「改成 3 个」:前台把话补给在跑的那件,回话上方小标签「已加到「查看设置首页前两项」」;任务最后按 3 项回报
-  - 注:小标签的字是「已加到「<任务标题>」」,计划里写的是「已加入」,意思一致。
-- [x] 同时派两件(并行上限 1,`deskParallelMax=1`):第二件显示「排队中 · 第 1 个」,前台说「排在第一顺位等着」;第一件办完后第二件自动开始,两件都办成
-- [x] 后台要回答(「帮我打开一个手机自带的小工具 App 看一眼,具体打开哪个,开始做之后先问我」):卡片变「要你处理」,前台在聊天里问「你想打开哪一个?」;回「计算器」后前台转给任务(小标签「已回复「…」」),任务接着把计算器打开并回报
-- [x] 页面不在(退到桌面)时任务办完:汇报写回会话(存成 `desk_report` 一行)并发通知(Ruling H)
-- [x] 页面不在时每件任务办完**只有一条通知**(前台那条),排队的那件开始时**不发通知**(「开始做了」只写回会话),通知正文是纯文字、不带 `**` 之类的记号(见「发现的问题」2、3;按运行判断后复测 desk-notify3)
-- [x] 页面不在时后台停下来问用户(同上「后台要回答」那句,发出后退到桌面):通知栏里只有任务自己那条「需要你回答」(带回复框和「计算器」「时钟」两个选项按钮),前台的问话只写回会话(`desk_report` 一行「在问你:…」),**没有第二条通知**(见「发现的问题」6,复测 desk-ask-away)
-- [x] 修复后复测:刚派出、任务服务还没接手的那一刻,卡片不再先闪「排队中」,前台也不再说「还在排队」(见「发现的问题」1)
+- [x] Dispatch a job that opens an app ("open system settings and tell me the names of the first 2 menu items on the settings home page"): the front desk replies, posts a task card, and the card says "in progress"
+  - Time to first word: 2.4–3.4 s for dispatch rounds (2.5 s that time for this item; 4.3 s in one run before the fix); the design goal is to start speaking within 1–2 seconds for text (a target, not a hard threshold), and **the dispatch round exceeds it**: the front-desk model first sends the dispatch tool call and only produces text after getting the result; this round trip takes about 1.6–2.5 s on the current main model. Rounds that only reply without dispatching take 1.2–2.1 s, within the target.
+  - Conclusion: **pass (accepted)**. The dispatch round's time to first word exceeds the target; accepted against the target value rather than a threshold, see "Problems found" 4.
+- [x] While a task is running, ask a question that needs the internet ("also check today's weather in Beijing for me"): the front desk dispatches it, says "queued / checking", and the second card says "queued · #1"
+- [x] Ask "how is that job going": the front desk answers from the task board (reading / weather queued at #1), **without calling any tool**
+- [x] Say "change it to 3": the front desk adds it to the running job, and a small chip above the reply says "added to 'check the first two items on the settings home page'"; the task finally reports 3 items
+  - Note: the chip text is "added to '<task title>'", while the plan says "added"; the meaning is the same.
+- [x] Dispatch two jobs at once (parallel limit 1, `deskParallelMax=1`): the second shows "queued · #1" and the front desk says "waiting in first place"; when the first finishes the second starts automatically, and both succeed
+- [x] The background needs an answer ("open one of the phone's built-in utility apps and take a look; which one to open, ask me first after starting"): the card changes to "needs you", and the front desk asks in the chat "which one do you want to open?"; after replying "calculator" the front desk relays it to the task (chip "replied '…'"), and the task opens the calculator and reports back
+- [x] The task finishes while the page is not open (gone to the home screen): the report is written back to the conversation (stored as one `desk_report` line) and a notification is sent (Ruling H)
+- [x] While the page is not open, **only one notification** per finished task (the front desk's); the queued job **sends no notification** when it starts ("started" is only written back to the conversation); the notification body is plain text without markers such as `**` (see "Problems found" 2 and 3; retested desk-notify3 after judging by run)
+- [x] While the page is not open, the background stops to ask the user (same sentence as "the background needs an answer" above, then go to the home screen): the notification shade has only the task's own "needs your answer" (with a reply box and two option buttons "calculator" and "clock"); the front desk's question is only written back to the conversation (one `desk_report` line "asking you: …"), **with no second notification** (see "Problems found" 6, retested desk-ask-away)
+- [x] Retest after the fix: at the moment a job has just been dispatched and the task service has not taken over yet, the card no longer flashes "queued", and the front desk no longer says "still queued" (see "Problems found" 1)
 
-## 二、语音通话 · 标准模式(听→想→说)
+## 2. Voice call · standard mode (listen → think → speak)
 
-**待真机(需要主人在场开口)。** 真机上没法替主人说话;下面的链路已由单测覆盖(`VoiceDeskBridgeTest`:派单立刻返回、两件同时跑、后台要回答时在通话里问并转达、终态只说一次、挂断后交给兜底;`CascadeVoiceSessionTest`、`VoiceCallSessionTest`:插话只打断播放;界面由 `VoiceCallPageTest` 12/12 在真机上验过)。
+**Awaiting device (requires the owner to be present and speak).** On a device nobody can speak for the owner; the chain below is covered by unit tests (`VoiceDeskBridgeTest`: dispatch returns immediately, two jobs run at once, asks in the call when the background needs an answer and relays it, the terminal state is said only once, after hang-up it goes to the fallback; `CascadeVoiceSessionTest`, `VoiceCallSessionTest`: barge-in only interrupts playback; the UI was verified 12/12 on a device by `VoiceCallPageTest`).
 
-步骤:
-1. 先在「设置 › 模型 › 语音 › 通话方式」里选「标准」(听、想、说各用选好的模型),再从聊天页输入栏旁的听筒按钮进通话页,等「已连接」。
-2. 说「打开设置看看安卓版本号」。
-   - [ ] 前台 2–3 秒内开口,说已经派出去;通话页出现任务卡。
-3. 任务在跑时接着说「今天北京天气怎么样」。
-   - [ ] 前台照常回话(派出第二件或说在查),不卡住、不等第一件。
-4. 前台说话时直接插话「等一下」。
-   - [ ] 前台立刻停播;两件任务都**没有被取消**(卡片仍在办)。
-5. 等任务办完。
-   - [ ] 结果在通话里**只说一次**。
-6. 再派一件(如「打开计算器看一眼」),说完立刻挂断。
-   - [ ] 挂断后任务继续;办完后结果写回发起通话的那个会话(`desk_report` 一行),并收到通知。
+Steps:
+1. First choose "Standard" in "Settings › Model › Voice › Call method" (listen, think and speak each use the selected models), then enter the call page from the earpiece button next to the chat-page input field and wait for "Connected".
+2. Say "open settings and check the Android version number".
+   - [ ] The front desk starts speaking within 2–3 seconds and says it has dispatched the job; a task card appears on the call page.
+3. While the task is running, continue "how is the weather in Beijing today".
+   - [ ] The front desk replies as usual (dispatches a second job or says it is checking), without getting stuck or waiting for the first job.
+4. While the front desk is speaking, barge in with "wait a moment".
+   - [ ] The front desk stops playback immediately; both tasks are **not cancelled** (the cards are still in progress).
+5. Wait for the tasks to finish.
+   - [ ] The result is **said only once** in the call.
+6. Dispatch another job (e.g. "open the calculator and take a look"), and hang up immediately after saying it.
+   - [ ] After hanging up the task continues; when it finishes the result is written back to the conversation that started the call (one `desk_report` line) and a notification is received.
 
-## 三、语音通话 · 实时模式(有实时配置时)
+## 3. Voice call · real-time mode (when real-time configuration exists)
 
-**待真机(需要主人在场开口;手机上要先配好实时语音)。** 步骤与第二节完全相同,只是第 1 步在「设置 › 模型 › 语音 › 通话方式」里改选「实时（高级）」。另看一条(Ruling P):实时协议没有提示输入时靠模型再次调用工具取回结果——
-- [ ] 后台要回答时,模型在通话里问出来;主人回答后,任务能及时接着做(记下从回答到任务继续的大致秒数)。
-- 通过:第二节 2–6 步的每一项在实时模式下都成立,并且上面这一条里模型问出了问题、主人回答后任务接着做了(秒数照实记)。
+**Awaiting device (requires the owner to be present and speak; real-time voice must be configured on the phone first).** The steps are exactly the same as section 2, except that step 1 changes the selection in "Settings › Model › Voice › Call method" to "Real-time (advanced)". Also check one item (Ruling P): when the real-time protocol has no prompt input, it relies on the model calling the tool again to fetch the result —
+- [ ] When the background needs an answer, the model asks it in the call; after the owner answers, the task can continue promptly (note the approximate number of seconds from the answer to the task continuing).
+- Pass: every item in steps 2–6 of section 2 holds in real-time mode, and in the item above the model asked the question and the task continued after the owner answered (record the seconds as they are).
 
-## 四、AI 电话
+## 4. AI phone
 
-**待真机(需要主人在场;不拨真实号码)。** 自动验收不拨打也不接听任何真实电话。链路由单测覆盖:`PhoneDeskTest`(只开 ask_owner、请示立刻返回、主人回复以提示转给模型而不是逐字念、通话结束撤销请示、没有提示输入时等下一次请示取回)与 `OwnerQuestionsTest`(请示落进主人的会话、通知回复框的回复记进会话、只有通知时也能答)。
+**Awaiting device (requires the owner to be present; do not dial real numbers).** Automatic acceptance neither dials nor answers any real call. The chain is covered by unit tests: `PhoneDeskTest` (only enables ask_owner, its request returns immediately, the owner's reply is passed to the model as a prompt instead of being read out verbatim, a pending request is withdrawn when the call ends, and when there is no prompt input it waits for the next request to fetch the result) and `OwnerQuestionsTest` (the request lands in the owner's conversation, a reply in the notification reply box is recorded in the conversation, and it can be answered even with only the notification).
 
-步骤(需要一部主人自己的第二台手机或可信的熟人配合,当作「对方」):
-1. 用 AI 电话打给自己的第二台手机(或让它打进来),接通后由「对方」问一个只能主人拿主意的问题,例如「明天下午三点方便吗?」。
-   - [ ] 主人手机上收到一条带回复框的通知,问题原文在里面;对应会话里也有这条请示。
-2. 在通知的回复框里回「方便」。
-   - [ ] 通话里 Claire 用自己的话转告对方(不是逐字念),对方听得到。
-3. 在会话里再回一次。
-   - [ ] 已经答过的请示不再被重复转告。
-4. 让「对方」再问一个只能主人拿主意的问题(例如「那后天呢?」),主人这次先不回,直接挂断。
-   - [ ] 第二条请示的通知照常弹出(第一条已答的不再留在通知栏)。
-   - [ ] 挂断后这条没答的请示被撤销:它的通知消失,会话里多一行「通话已结束,这个问题已撤回,不用再回了。」;之后再在会话里回复,不会转进任何通话。
+Steps (requires the owner's own second phone or a trusted acquaintance to play the "other party"):
+1. Use AI phone to call your own second phone (or have it call in); after connecting, the "other party" asks a question that only the owner can decide, e.g. "are you free at 3 p.m. tomorrow?".
+   - [ ] The owner's phone receives a notification with a reply box, with the original question inside; the request is also in the corresponding conversation.
+2. Reply "yes" in the notification's reply box.
+   - [ ] In the call, Claire relays it to the other party in her own words (not verbatim), and the other party can hear it.
+3. Reply once more in the conversation.
+   - [ ] A request that has already been answered is not relayed again.
+4. Have the "other party" ask another question that only the owner can decide (e.g. "what about the day after tomorrow?"), and this time the owner does not reply and hangs up directly.
+   - [ ] The notification for the second request pops up as usual (the answered first one is no longer in the notification shade).
+   - [ ] After hanging up, this unanswered request is withdrawn: its notification disappears, and the conversation gains a line "The call has ended; this question has been withdrawn, no need to reply again."; replying later in the conversation is not relayed into any call.
 
-## 五、冒烟子集
+## 5. Smoke subset
 
-计划里说「按 release-smoke-test 的约定」,仓库里找不到这个名字的约定;按现有冒烟题集 `eval-smoke`(`EvalRunTest -e evalSet eval-smoke`)跑:
+The plan says "per the release-smoke-test convention", but no convention with that name can be found in the repository; run the existing smoke set `eval-smoke` (`EvalRunTest -e evalSet eval-smoke`):
 
-- [x] 2/2 办成(`smoke-settings-version`、`smoke-impossible-menu` 都按预期收尾),没有新的失败;假成功 0。
+- [x] 2/2 succeeded (`smoke-settings-version` and `smoke-impossible-menu` both wrapped up as expected), with no new failures; false successes 0.
 
-## 发现的问题
+## Problems found
 
-1. **(已修)刚派出的任务先显示「排队中」,前台跟着说「还在排队」。** 任务服务接手前状态是 `Idle`,任务板把 `Idle` 一律记成排队;派单结果其实是「已开始」。卡片会闪一下「排队中」,前台看任务板回话时也说「任务还在排队」。修法:`FrontDesk` 更新任务板时,`Idle` 而且端口说它不在开始队列里(`queuePosition == null`)的,记成在做;真排队的(端口给了位置)照旧。单测 `FrontDeskTest.startingTaskIsNotShownAsQueued` / `idleTaskWithAQueuePositionIsQueued`。
-2. **(已修)页面不在时同一件任务办完收到两条通知,排队的那件开始时也发一条「开始做了」。** 前台是它正跟着的那次运行的唯一声音:
-   - 只有一个前台此刻正跟着**这次运行**、会把结局说出来时,任务才不发自己的「任务完成」。判断在 `DeskRegistry.reportsEnding`:端口按运行编号认它跟的那次运行(`followedTaskOf`),再看还在的前台里有没有跟着这件(`FrontDesk.tracks`);用户自己取消的前台不说(`ReportPolicy.saysEnding`),任务照发。任务服务经 `MikaApp.deskReportsEnding` 这个谓词问,任务包不引用前台包。
-   - 其余情况任务照旧自己发:子会话里收尾后直接打字开的另一件、进程没了以后补送的结果(`restored`)、前台会话已删、不是前台派的任务。
-   - 第一版按子会话上的 `deskParent` 标记判断,会把上面几种也压成零条通知;评审指出后改成按运行判断。
-   - 兜底路径里开始、排队、进度只写回会话,不发通知;判断只在 `ReportPolicy.notifies`。
-   - 复测(desk-notify2,修复第一版后;desk-notify3,按运行判断后;两件、上限 1、第二件排队时退到桌面):通知栏只有两条,每件一条;第二件开始的「开始做了」只出现在会话里。
-3. **(已修)兜底通知里带 Markdown 记号。** 通知正文改用应用里现成的 `MarkdownModel.toPlainText` 去掉记号;写回会话的那一行保留原文,聊天页照常渲染。复测通知正文为「…显示的数字是 405。」。
-4. **(已知差距,已接受)派单那一轮开口偏慢。** 派单的轮次 2.4–3.4 s,目标 1–2 s;见第一节。设计里是目标值不是硬门槛,该项记为通过(已接受)。
-5. **(与本分支无关)`ChatAttachmentsTest.rejectedAttachmentsShowTheirIndividualReasons` 在 main 上本来就失败。** #797 把附件上限文案从「200 MiB」改成按档位显示「200 MB」,测试还在断言「MiB」。聊天包设备测试 65/66 的那一个就是它。
-6. **(已修)页面不在时后台要用户回答、确认、接管,会收到两条通知。** 任务自己发一条带回复框或确认、接管按钮的「需要你处理」,前台兜底又发一条「在问你…」。改成保留任务那条(确认、接管的安全流程和按钮都在那条上),前台的问话只写回会话。前置条件不满足时任务不另发提醒,仍由前台发这一条。判断在 `ReportPolicy.notifies`。复测 desk-ask-away:只有任务那条「需要你回答」。
+1. **(Fixed) A freshly dispatched task first shows "queued", and the front desk says "still queued".** Before the task service takes over, the state is `Idle`, and the task board treats `Idle` as queued; the dispatch result is actually "started". The card flashes "queued" and the front desk also says "the task is still queued" when answering from the task board. Fix: when `FrontDesk` updates the task board, a task that is `Idle` and whose port says it is not in the start queue (`queuePosition == null`) is recorded as in progress; genuinely queued ones (the port gave a position) stay as before. Unit tests `FrontDeskTest.startingTaskIsNotShownAsQueued` / `idleTaskWithAQueuePositionIsQueued`.
+2. **(Fixed) While the page is not open, the same finished task received two notifications, and the queued job also sent a "started" notification when it began.** The front desk is the only voice of the run it is following at the moment:
+   - A task sends its own "task complete" only when exactly one front desk is currently following **this run** and will say the outcome. The decision is in `DeskRegistry.reportsEnding`: the port identifies the run it follows by run ID (`followedTaskOf`), then checks whether any of the remaining front desks follows this task (`FrontDesk.tracks`); a front desk the user cancelled themselves does not speak (`ReportPolicy.saysEnding`), and the task still sends. The task service asks through the predicate `MikaApp.deskReportsEnding`; the task package does not reference the front-desk package.
+   - Otherwise the task sends its own as before: another job started by typing directly after wrap-up in a child conversation, a result delivered after the process was gone (`restored`), a deleted front-desk conversation, or a task not dispatched by the front desk.
+   - The first version judged by the `deskParent` marker on the child conversation, which also flattened the cases above to zero notifications; after review pointed this out, it was changed to judge by run.
+   - In the fallback path, start, queue and progress are only written back to the conversation and send no notification; the decision is only in `ReportPolicy.notifies`.
+   - Retests (desk-notify2, after the first version of the fix; desk-notify3, after judging by run; two jobs, limit 1, second queued, go to the home screen): the notification shade has only two, one per job; the second job's "started" appears only in the conversation.
+3. **(Fixed) Fallback notifications contained Markdown markers.** The notification body now uses the app's existing `MarkdownModel.toPlainText` to strip markers; the line written back to the conversation keeps the original text, and the chat page renders it as usual. Retest notification body: "…the number shown is 405.".
+4. **(Known gap, accepted) The dispatch round's time to first word is slow.** Dispatch rounds take 2.4–3.4 s against a target of 1–2 s; see section 1. The design treats it as a target, not a hard threshold, and the item is recorded as passing (accepted).
+5. **(Unrelated to this branch) `ChatAttachmentsTest.rejectedAttachmentsShowTheirIndividualReasons` already fails on main.** #797 changed the attachment limit text from "200 MiB" to a tier-based "200 MB", and the test still asserts "MiB". It is the one failure in the chat package's 65/66 device tests.
+6. **(Fixed) While the page is not open, when the background needs the user to answer, confirm or take over, two notifications were received.** The task sends its own "needs your action" with a reply box or confirm/takeover buttons, and the front-desk fallback sent another "asking you…". Changed to keep the task's notification (the confirmation and takeover safety flow and buttons are on it) and only write the front desk's question back to the conversation. When preconditions are not met the task sends no extra reminder, and the front desk still sends this one. The decision is in `ReportPolicy.notifies`. Retest desk-ask-away: only the task's "needs your answer".
 
-## 记录
+## Record
 
-| 项 | 机型 | 安卓版本 | 结果 | 备注 |
+| Item | Model | Android version | Result | Notes |
 |---|---|---|---|---|
-| 聊天页 10 项 | 安卓 14 测试机 | 14 | 通过 | 派单轮开口 2.4–3.4 s(目标 1–2 s,已接受),只回话轮 1.2–2.1 s |
-| 冒烟子集 | 安卓 14 测试机 | 14 | 通过 | eval-smoke 2/2 |
-| 语音通话 · 标准 | | | 待真机 | 需主人开口 |
-| 语音通话 · 实时 | | | 待真机 | 需主人开口和实时配置 |
-| AI 电话 | | | 待真机 | 需主人在场,不拨真实号码 |
+| Chat page, 10 items | Android 14 test phone | 14 | Pass | Dispatch round time to first word 2.4–3.4 s (target 1–2 s, accepted); reply-only rounds 1.2–2.1 s |
+| Smoke subset | Android 14 test phone | 14 | Pass | eval-smoke 2/2 |
+| Voice call · standard | | | Awaiting device | Requires the owner to speak |
+| Voice call · real-time | | | Awaiting device | Requires the owner to speak and real-time configuration |
+| AI phone | | | Awaiting device | Requires the owner present; no real numbers dialed |

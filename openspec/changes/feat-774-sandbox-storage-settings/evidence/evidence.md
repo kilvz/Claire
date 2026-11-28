@@ -7,11 +7,11 @@ Pre-walkthrough check: the phone is unlocked, Mika is on the home project list, 
 
 | Time | Step | Result |
 |---|---|---|
-| 07:29 | `adb install -r app-debug.apk`, then go to 设置 (Settings) › 任务运行 (Task runs) | Two new settings rows appear: 「单个上传文件上限 = 200 MB」 (single upload file limit = 200 MB) and 「单个工作区上限 = 4 GB」 (single workspace limit = 4 GB), matching the default tier → `01-defaults-200mb-4gb.png` |
-| 07:30 | Tap 「单个上传文件上限」 (single upload file limit) | The dialog shows four tiers 200/512/1024/2048 MB, with the subtitle stating the scope and default value → `02-attachment-dialog-tiers.png` |
-| 07:30 | Select 1024 MB | The row value is written back as 「1024 MB」 → `03-attachment-1024mb-set.png` |
-| 07:31 | Tap 「单个工作区上限」 (single workspace limit) | The dialog shows four tiers 4/8/16/32 GB → `04-workspace-dialog-tiers.png` |
-| 07:31 | Select 16 GB | The row value is written back as 「16 GB」 → `05-workspace-16gb-set.png` |
+| 07:29 | `adb install -r app-debug.apk`, then go to Settings › Task runs | Two new settings rows appear: "single upload file limit = 200 MB" and "single workspace limit = 4 GB", matching the default tier → `01-defaults-200mb-4gb.png` |
+| 07:30 | Tap "single upload file limit" | The dialog shows four tiers 200/512/1024/2048 MB, with the subtitle stating the scope and default value → `02-attachment-dialog-tiers.png` |
+| 07:30 | Select 1024 MB | The row value is written back as "1024 MB" → `03-attachment-1024mb-set.png` |
+| 07:31 | Tap "single workspace limit" | The dialog shows four tiers 4/8/16/32 GB → `04-workspace-dialog-tiers.png` |
+| 07:31 | Select 16 GB | The row value is written back as "16 GB" → `05-workspace-16gb-set.png` |
 | 07:31 | `run-as … cat shared_prefs/feature_flags.xml` | `attachment_file_limit_mb=1024` and `workspace_limit_gb=16` are persisted |
 | 07:32 | Restore the two rows to 200 MB / 4 GB respectively | Both row values and prefs return to the defaults (`attachment_file_limit_mb=200`, `workspace_limit_gb=4`) → `06-restored-defaults.png` |
 

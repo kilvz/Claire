@@ -29,30 +29,30 @@ import com.wangzan101.mika.voice.model.VoiceModelEnvironment
 import java.util.Locale
 
 /**
- * 换系统朗读用的引擎:先把引擎写进目录,写成了才把音色清回默认(音色名只在一个引擎里有效);
- * 写失败时引擎和音色都保持原样。重选当前引擎不动音色。
+ * Changing the engine used for system read-aloud: first write the engine into the catalog, and only after it succeeds clear the voice back to default (a voice name is only valid within one engine);
+ * when the write fails, engine and voice both stay as they were. Re-selecting the current engine does not touch the voice.
  */
 internal fun chooseSystemTtsEngine(tts: TtsSelectionController, settings: VoiceSettings, engine: String): Boolean {
     val changed = try {
         tts.setSystemEngine(engine)
     } catch (e: Exception) {
-        // 目录读不出、写不进(VoiceCatalogStore.commit 的检查)或系统朗读没登记:什么都不改
+        // Catalog unreadable, unwritable (the check in VoiceCatalogStore.commit) or system read-aloud not registered: change nothing
         return false
     }
     if (changed) settings.setVoice("")
     return changed
 }
 
-/** 引擎面板里每项的文字:同名的引擎后面带上包名,分得清是哪个。 */
+/** Text for each item in the engine sheet: engines with the same name get the package name appended so it is clear which one it is. */
 internal fun engineLabels(engines: List<SystemTtsEngineInfo>): Map<String, String> {
     val duplicated = engines.groupBy { it.label }.filterValues { it.size > 1 }.keys
     return engines.associate { it.packageName to if (it.label in duplicated) "${it.label} (${it.packageName})" else it.label }
 }
 
 /**
- * 内置系统朗读的「引擎」「音色」两行。引擎列手机上登记的语音合成引擎,音色列所选引擎已装好的音色,
- * 都在后台查,查不到时只给「默认」。行和面板只认公开接口给的名字,不对任何厂商的引擎特殊处理。
- * 给了 [onAudition] 时音色面板每项带试听按钮;播放归调用方,面板关掉时调 [onVoicesClosed] 让它停下。
+ * The "Engine" and "Voice" rows of built-in system read-aloud. The engine column lists speech synthesis engines registered on the phone, the voice column lists voices installed for the selected engine,
+ * both queried in the background, showing only "Default" when not found. Rows and sheets only recognise names from public APIs and do not special-case any vendor's engine.
+ * When [onAudition] is given, each voice item in the sheet has an audition button; playback belongs to the caller, and when the sheet closes [onVoicesClosed] is called to stop it.
  */
 @Composable
 internal fun SystemTtsRows(

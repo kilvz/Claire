@@ -3,9 +3,9 @@ package com.wangzan101.mika.core.run
 import com.wangzan101.mika.core.action.ConfirmChoice
 
 /**
- * 渠道入站在这里验主人、问题编号与确认权限；普通新消息始终新开任务。
- * 用户暂停了 Mika([paused])时新消息不开任务、也不留着等恢复:先确认收到,再尽力回一句「已暂停」([Route.paused]);
- * 回复发不出去也不影响确认,渠道不会把这条重交、恢复后也不会自动跑起来;要办的事恢复后重新发。
+ * Channel inbound requests verify the owner, question ID and confirmation permission here; ordinary new messages always start a new task.
+ * When the user paused Claire ([paused]), a new message does not start a task and is not held for resume: acknowledge receipt first, then make a best effort to reply "paused" ([Route.paused]);
+ * Even if the reply cannot be sent, the acknowledgement stands, the channel will not redeliver this message, and it will not start automatically after resuming; resend the request after resuming.
  */
 class ChannelGateway(
     private val owners: OwnerIdentity,
@@ -15,7 +15,7 @@ class ChannelGateway(
 ) {
     interface Route {
         suspend fun newTask(peer: ChannelPeer, messageId: String, text: String)
-        /** 暂停期间收到的新消息(已确认收到):尽力告诉对方 Mika 已暂停、这条没有开始办。发不出去就算了,不重试。 */
+        /** A new message received while paused (already acknowledged): make a best effort to tell the other side that Claire is paused and this message was not started. If it cannot be sent, let it go without retrying. */
         suspend fun paused(peer: ChannelPeer, messageId: String)
         suspend fun answer(threadId: String, askId: String, text: String): Boolean
         suspend fun confirm(threadId: String, askId: String, choice: ConfirmChoice): Boolean

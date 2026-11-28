@@ -40,12 +40,12 @@ interface LocalPortScanner {
 data class ScanResult(val endpoints: List<AdbEndpoint>, val open: Int, val adb: Int)
 
 /**
- * 找连接端口的最后一招:前面几个来源都没给出能连上的端口时,扫本机自己的地址。
- * 无线调试的 adbd 监听一个系统随手分配的端口,落在临时端口范围里([range],读不到就用 [FALLBACK_RANGE])。
- * 按 [hosts] 的顺序一个地址一个地址扫(先 127.0.0.1,再本机 Wi-Fi 地址;adbd 可能只绑其中一个),
- * 每个开着的端口发 CNXN 看回不回 STLS;一个地址上有像 adbd 的就不再扫下一个。只扫本机,不碰别的设备。
- * 每次扫 [PORT_BATCH_SIZE] 个端口、扫完这一段就核对其中开着的;核对出像 adbd 的就停,不再扫后面的段,否则再扫下一段。
- * 扫描和核对合计不超过 [budgetMs]。
+ * The last resort for finding the connection port: when the earlier sources produced no connectable port, scan the machine's own addresses.
+ * Wireless debugging's adbd listens on a port the system assigns at random, within the ephemeral port range ([range], or [FALLBACK_RANGE] when unreadable).
+ * Scans one address at a time in [hosts] order (127.0.0.1 first, then the machine's Wi-Fi address; adbd may bind only one of them),
+ * sends CNXN to every open port to see whether it replies STLS; once an address has something that looks like adbd, the next address is not scanned. Only this machine is scanned, never other devices.
+ * Each pass scans [PORT_BATCH_SIZE] ports and immediately checks the open ones in that batch; if something looks like adbd, stop and do not scan later batches, otherwise scan the next batch.
+ * Scanning and checking together take no longer than [budgetMs].
  */
 class LocalPortScan(
     private val scanner: LocalPortScanner,
@@ -64,7 +64,7 @@ class LocalPortScan(
         val found = ArrayList<AdbEndpoint>()
         var open = 0
         hosts@ for (host in hosts().distinct()) {
-            // 分段扫、每段扫完马上核对:整段一口气扫完再核对,扫得慢时预算全花在扫描上,早就开着的 adbd 来不及核对
+            // Scan in batches and check each batch immediately: scanning the whole range before checking spends the budget on scanning when it is slow, leaving no time to check an adbd that has been open all along
             var first = ports.first
             while (first <= ports.last) {
                 val left = deadline - now()
@@ -76,7 +76,7 @@ class LocalPortScan(
                     if (now() >= deadline) break@hosts
                     if (scanner.speaksAdbTls(host, port, probeTimeoutMs)) found += AdbEndpoint(host, port)
                 }
-                // 这一段里核对出 adbd 就不再扫后面的段,也不再扫下一个地址
+                // Once adbd is found in this batch, do not scan later batches or the next address
                 if (found.isNotEmpty()) break@hosts
                 if (last == ports.last) break
                 first = last + 1
@@ -86,10 +86,10 @@ class LocalPortScan(
     }
 
     companion object {
-        /** 一段扫多少个端口再核对。 */
+        /** How many ports to scan per batch before checking. */
         const val PORT_BATCH_SIZE = 1_024
 
-        /** 读不到系统的临时端口范围时扫这一段(覆盖各版本常见的设置)。 */
+        /** Batch scanned when the system's ephemeral port range cannot be read (covers the settings common across versions). */
         val FALLBACK_RANGE = 30_000..65_535
 
         /**

@@ -32,7 +32,7 @@ Each directory with scripts has a `scripts/manifest.json`, an array with one ent
 - `runnable`: whether it can run in the sandbox. A script with `false` only serves to say what is missing, and `run_bundled_script` refuses it.
 - `reason`: optional, the reason given when `runnable` is `false`.
 - `needs`: dependency list. `apk:<package>` means this Alpine package is required (must be in `SANDBOX_PACKAGES`); `net` means network access is required.
-- `network`: whether network access is needed. When it is `true` and 「允许脚本联网」 (Allow scripts to use the network) under Settings → Advanced is off (off by default), `run_bundled_script` refuses to run and prompts you to turn it on.
+- `network`: whether network access is needed. When it is `true` and "Allow scripts to use the network" under Settings → Advanced is off (off by default), `run_bundled_script` refuses to run and prompts you to turn it on.
 
 Parsing and the "can it run right now" judgment are in `core/.../knowledge/ScriptManifest.kt`; whether the manifest, the scripts mentioned in the docs and the script files all line up is checked by `BundledScriptsManifestTest`.
 

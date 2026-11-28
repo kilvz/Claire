@@ -1,6 +1,6 @@
 # Personal assistant mode (first version)
 
-A fixed entry point sits in the sidebar above “新对话” (New conversation) and opens a long-lived personal main conversation. “启动时打开个人助手” (Open personal assistant on startup) can be enabled in Settings. Chat uses the main model from the model settings, and task execution uses Claire's approvals, takeover, resource queuing and run recovery. Proactive contact is left for later.
+A fixed entry point sits in the sidebar above "New conversation" and opens a long-lived personal main conversation. "Open personal assistant on startup" can be enabled in Settings. Chat uses the main model from the model settings, and task execution uses Claire's approvals, takeover, resource queuing and run recovery. Proactive contact is left for later.
 
 ## Messages and execution
 
@@ -26,7 +26,7 @@ After the process is killed, an unfinished main chat reply is marked as interrup
 
 - PersonalAgentScreen uses the floating avatar and the existing chat input box, supporting push-to-talk and keyboard sending. Assistant replies use the existing Markdown rendering, with table support.
 - Tapping the avatar opens the tasks, memory and skills popover. Execution progress is concentrated below the avatar; tapping the progress opens task details.
-- When executing a phone task, the phone screen is shown to the right of the avatar. Tap to enlarge; the progress bar at the bottom is at the far right by default. Drag left to review, and drag back to the far right or tap “回到实时” (Back to live) to keep following the task. Finished tasks can be opened for playback from task details.
+- When executing a phone task, the phone screen is shown to the right of the avatar. Tap to enlarge; the progress bar at the bottom is at the far right by default. Drag left to review, and drag back to the far right or tap "Back to live" to keep following the task. Finished tasks can be opened for playback from task details.
 - Playback uses a low-frame-rate JPEG sequence with a sampling interval of at least 500 milliseconds. Files are stored in the app's private directory, and the total for all playbacks is capped at 100 MB. The oldest non-recording playbacks are cleaned up first.
 - Route.Personal and the fixed sidebar entry; the existing standalone conversation is kept.
 - Task details enter the original task page to view the full process, approve or take over; going back to the personal assistant is still the original main conversation.

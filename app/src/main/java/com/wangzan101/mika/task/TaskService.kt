@@ -103,7 +103,7 @@ class TaskService : Service() {
     internal fun rememberRecord(run: TaskRun, recordId: String) = center.markRecord(run, recordId)
     /** The screen-on wake lock shared by several tasks. */
     internal val wakeLock by lazy { SharedWakeLock(ScreenWakeLock(this)) }
-    /** 几个任务(和派发中的工作流步骤)共用的 CPU 锁:熄屏、Doze 里也接着跑;各持一份,见 [KeepAwake]。 */
+    /** CPU lock shared by several tasks (and workflow steps being dispatched): keeps running with the screen off and in Doze; each holds its own share, see [KeepAwake]. */
     internal val cpuWake by lazy { SharedWakeLock(CpuWakeLock(this, "Mika:run")) }
 
     internal fun reservePackage(pkg: String, runKey: String, stillUsed: () -> Boolean) = center.reserve(pkg, runKey, stillUsed)
@@ -185,7 +185,7 @@ class TaskService : Service() {
                 if (thread != null && text.isNotBlank()) queueFollowUp(thread, text, id, source)
             }
             ACTION_DRAIN_FOLLOWUPS -> drainReady(intent.getStringExtra(EXTRA_CONVERSATION))
-            // 开跑的任务当场拿上自己那份 CPU 锁([launch]);排队、因暂停不开的也到此为止:派发时撑着的那把都可以放开
+            // A starting task immediately takes its own CPU lock ([launch]); queued tasks and those not starting due to pause stop here too: the one held during dispatch can be released
             ACTION_START_TRIGGER -> try {
                 begin(intent.getStringExtra(EXTRA_GOAL).orEmpty(), intent.getStringExtra(EXTRA_CONVERSATION),
                     provenance = RunProvenance(RunOrigin.Trigger, Attendance.Unattended),
@@ -197,7 +197,7 @@ class TaskService : Service() {
             ACTION_START_WORKFLOW -> {
                 workflowStarts.incrementAndGet()
                 keepForeground()
-                // 认领步骤到交给任务之间熄屏也不睡过去;步骤开跑后由任务自己那份接着撑
+                // Do not sleep with the screen off between claiming a step and handing it to the task; once the step starts, the task's own lock keeps holding
                 val cpu = cpuWake.lease().also { it.acquire() }
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     val workflows = (application as com.wangzan101.mika.MikaApp).workflows
@@ -508,7 +508,7 @@ class TaskService : Service() {
             checkGoal: String? = null, condition: String? = null) {
             if (FeatureFlags.get(context).quitRequested()) return
             val checking = checkGoal != null
-            // 闹钟广播一结束系统就不再撑 CPU:撑到服务处理完这次启动(见 [TriggerHandoffWake])
+            // Once the alarm broadcast ends the system no longer holds the CPU: hold it until the service finishes handling this start (see [TriggerHandoffWake])
             TriggerHandoffWake.hold(context)
             try {
                 context.startForegroundService(Intent(context, TaskService::class.java).setAction(ACTION_START_TRIGGER)
@@ -546,8 +546,8 @@ class TaskService : Service() {
         }
 
         /**
-         * 用户刚暂停了 Mika(标记已经写好):持久排队清空;服务里还有任务(在跑或排着)就让它全部停下。
-         * 之后服务门口的 [pausedBlocks] 挡住一切新开始。
+         * The user just paused Claire (the flag is already written): clear the persistent queue; if the service still has tasks (running or queued), stop them all.
+         * Afterwards [pausedBlocks] at the service door blocks every new start.
          */
         fun pauseAll(context: Context) {
             val app = context.applicationContext as? com.wangzan101.mika.MikaApp ?: return
@@ -556,7 +556,7 @@ class TaskService : Service() {
             runCatching { context.startService(Intent(context, TaskService::class.java).setAction(ACTION_PAUSE_ALL)) }
         }
 
-        /** [runKey] 见 [send];应用内的按钮带着屏上那个对话的任务编号,不会落到别的任务上。 */
+        /** [runKey] see [send]; in-app buttons carry the task ID of the conversation on screen so they cannot land on another task. */
         fun cancel(context: Context, runKey: String? = null) = send(context, ACTION_CANCEL, runKey = runKey)
 
         /** The user tapped "Continue": the app that was moved away is moved back to Claire's screen. */

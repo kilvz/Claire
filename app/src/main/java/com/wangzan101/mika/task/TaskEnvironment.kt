@@ -50,8 +50,8 @@ class TaskEnvironment {
         else decisionModelFactory(context)
 
     /**
-     * 任务开始唯一的模型快照。默认来源按对话覆盖解析；替换主模型的测试/评测完全不触真实 ProviderStore，
-     * 只使用显式注入的其余工厂，避免默认工厂偷偷回调设置里的服务商。
+     * The single model snapshot at task start. The default source resolves conversation overrides; tests/evals that replace the main model never touch the real ProviderStore,
+     * using only the other explicitly injected factories, so the default factory cannot secretly call back into the providers in settings.
      */
     fun modelSnapshot(context: Context, session: ModelSession, mainOverride: ModelChoice? = null): TaskModelSnapshot {
         if (modelFactory !== defaultModelFactory) {
@@ -74,7 +74,7 @@ class TaskEnvironment {
         )
     }
 
-    /** 评测跑器用的钩子;产品里全是默认值。 */
+    /** Hooks for the eval runner; in the product they are all defaults. */
     val evalHooks = EvalHooks()
 
     /** An Application that provides the process-wide instance. */

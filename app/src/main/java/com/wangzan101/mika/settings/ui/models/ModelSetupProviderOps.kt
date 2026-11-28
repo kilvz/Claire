@@ -24,14 +24,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.wangzan101.mika.chat.ui.isActive
 
-// 模型设置:刷新列表、换 Key、改备注与移除服务商
-/** 改这家的备注(见 [com.wangzan101.mika.settings.Provider.nickname]);空的就是去掉。 */
+// Model settings: refresh the list, change the Key, edit the nickname and remove a provider
+/** Change this provider's nickname (see [com.wangzan101.mika.settings.Provider.nickname]); empty means remove it. */
 fun ModelSetupViewModel.renameProvider(providerId: String, nickname: String?) {
     store.setProviderNickname(providerId, nickname)
     sync()
 }
 
-/** 重新列一次这个服务商的模型并记下;失败时记下原因。 */
+/** List this provider's models again and record them; on failure record the reason. */
 fun ModelSetupViewModel.refresh(providerId: String) {
     val p = store.provider(providerId) ?: return
     if (refreshJobs[providerId]?.isActive == true) return

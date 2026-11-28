@@ -1,26 +1,26 @@
 ## ADDED Requirements
 
-### Requirement: 办事步骤卡不丢中间状态行
+### Requirement: The work step card does not lose intermediate status lines
 
-语音通话页的办事步骤卡（`VoiceCallFeed`）MUST 把任务快照（`DeskTaskView`）里**每一次新
-出现的**状态行都排进对应卡片：单次快照携带多行新状态时这些行 MUST 全部成为步骤（顺序
-保留）；快照的 recent 滚动窗口滚出的行 MUST 从快照自带的全程 `steps` 历史补齐——即无论
-收集方合并丢了多少次中间快照，卡上步骤 MUST 与前台账本一致。快照没有带来新行时 MUST NOT
-产生新步骤；任务首次上卡时携带的已有进展 MUST 直接成为卡上步骤。
+The work step card (`VoiceCallFeed`) on the voice call page MUST put **every newly
+appearing** status line in the task snapshot (`DeskTaskView`) into the matching card: when a single snapshot carries multiple new status lines, all of them MUST become steps (order
+preserved); lines that scroll out of the snapshot's recent rolling window MUST be backfilled from the snapshot's own full-run `steps` history — that is, no matter
+how many intermediate snapshots the collector merges and drops, the card steps MUST match the front desk ledger. When a snapshot brings no new lines it MUST NOT
+produce new steps; existing progress carried when a task first appears on a card MUST directly become card steps.
 
-#### Scenario: 收集方合并丢中间快照、窗口滚出中间步骤
-- **WHEN** 任务连续产出多条进展，两次 `desk.active` 收集之间超过 recent 窗口容量（3 条），
-  中间步骤已滚出 recent 窗口
-- **THEN** 下一次收集到的快照凭全程 `steps` 把滚出窗口的步骤全部补进卡，不丢任何一步
+#### Scenario: The collector merges and drops intermediate snapshots, and the window scrolls out intermediate steps
+- **WHEN** the task produces several progress lines in a row, more than the recent window capacity (3) between two `desk.active` collections,
+  so the intermediate steps have already scrolled out of the recent window
+- **THEN** the next collected snapshot backfills all the scrolled-out steps into the card from the full-run `steps`, losing no step
 
-#### Scenario: 任务首次上卡时已带进展
-- **WHEN** 通话开始时任务已在做（快照的全程 `steps` 已有多步），该任务第一次上卡
-- **THEN** 卡以快照全程步骤开卡，而不是只有最近几行
+#### Scenario: A task already has progress when it first appears on a card
+- **WHEN** the task is already running when the call starts (the snapshot's full-run `steps` already has several steps), and the task first appears on a card
+- **THEN** the card opens with the snapshot's full-run steps, not just the most recent few lines
 
-#### Scenario: 单次快照多行新状态
-- **WHEN** 一次快照的 `recent`/`line` 携带多行新状态（StateFlow 合并后的快照）
-- **THEN** 这些行全部成为步骤，顺序保留
+#### Scenario: A single snapshot with multiple new status lines
+- **WHEN** one snapshot's `recent`/`line` carries multiple new status lines (a snapshot after StateFlow merging)
+- **THEN** all these lines become steps, preserving order
 
-#### Scenario: 无新行的快照不产生步骤
-- **WHEN** 一次快照携带的状态行与卡上已有步骤相比没有新行（重复通知）
-- **THEN** 步骤卡内容不变
+#### Scenario: A snapshot with no new lines produces no steps
+- **WHEN** the status lines a snapshot carries have no new lines compared with the steps already on the card (a duplicate notification)
+- **THEN** the step card content is unchanged

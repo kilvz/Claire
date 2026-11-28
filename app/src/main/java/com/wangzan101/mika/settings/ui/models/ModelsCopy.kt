@@ -204,9 +204,9 @@ object ModelsCopy {
     val SIGN_IN_BUSY: String get() = tr(R.string.signin_busy)
 
     /**
-     * 界面上服务商的名字,各处都用这一个:授权来的 OpenRouter 加一句来历,和用户自己填 Key 的那一家分得开;
-     * 起了备注(见 [Provider.nickname])写成「名字(备注)」;没起备注的 Cloudflare 用账号编号的头尾区分。
-     * 括号怎么写由各语言的 provider_name_with_note 决定。
+     * The provider name in the UI, used everywhere: authorized OpenRouter gets a note about its origin, distinguishing it from the one the user entered a Key for;
+     * a nickname (see [Provider.nickname]) is written as "name (nickname)"; Cloudflare without a nickname is distinguished by the start and end of the account ID.
+     * How the parentheses are written is decided per language by provider_name_with_note.
      */
     fun providerName(p: Provider): String {
         val base = if (p.signIn == ProviderStore.OPENROUTER_SIGN_IN) tr(R.string.signin_openrouter_name, p.name) else p.name
@@ -383,7 +383,7 @@ object ModelsCopy {
 
     fun imageLine(ui: ModelSetupUi): RoleLine = RoleLine(tr(R.string.role_image), tr(R.string.role_image_what), unset = true)
 
-    /** 「视频模型」:生成短视频,同样不在 [ModelRole] 里。 */
+    /** "Video model": generates short videos and, likewise, is not in [ModelRole]. */
     val VIDEO_ICON: ImageVector get() = MikaIcons.Camera
 
     fun videoLine(): RoleLine = RoleLine(tr(R.string.role_video), tr(R.string.role_video_what), unset = true)

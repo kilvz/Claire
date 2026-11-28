@@ -14,14 +14,14 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 /**
- * 分享前把工作区里的一个文件(图片、视频)复制到「下载/Mika/share」:MediaStore 的 content URI 可以被对方 App 读取,
- * 不需要 FileProvider,也不需要存储权限。复制出来的是独立的一份,任务结束、工作区被清理后对方仍能读。
+ * Before sharing, copies a file (image, video) from the workspace to "Downloads/Claire/share": the MediaStore content URI can be read by the receiving app,
+ * with no FileProvider and no storage permission needed. The copy is independent, so the other side can still read it after the task ends and the workspace is cleaned up.
  */
 class ShareFileExporter(private val context: Context) {
     suspend fun save(bytes: ByteArray, mime: String, name: String): ShareableFile =
         ByteArrayInputStream(bytes).use { save(it, mime, name) }
 
-    /** 边读边写,不把整个文件读进内存(视频可以有几百 MB);协程取消时删掉写了一半的副本。 */
+    /** Reads and writes as it goes, without loading the whole file into memory (videos can be hundreds of MB); deletes the half-written copy when the coroutine is cancelled. */
     suspend fun save(input: InputStream, mime: String, name: String): ShareableFile = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val display = if (name.substringAfterLast('.', "").isEmpty()) "$name.${extensionOf(mime)}" else name
@@ -73,7 +73,7 @@ class ShareFileExporter(private val context: Context) {
     }
 }
 
-/** 没有扩展名的分享文件按 MIME 补一个;认不出的图片按 png、视频按 mp4。 */
+/** Adds an extension to a shared file that has none, based on MIME; unknown images become png, videos mp4. */
 internal fun shareExtension(mime: String): String {
     val type = mime.substringBefore('/').lowercase()
     return when (mime.substringAfter('/', "").lowercase()) {

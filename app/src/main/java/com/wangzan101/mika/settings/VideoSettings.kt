@@ -16,16 +16,16 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /**
- * 用户选的视频服务商、模型和协议;Key 仍由 [ProviderStore] 按服务商保存。
- * [backendId] 是 [com.wangzan101.mika.core.model.VideoBackend.id]:服务商地址后来改了、不再说这种协议时,
- * [VideoProviders.resolve] 认出来,不把请求发错地方。
+ * The video provider, model and protocol the user chose; the Key is still stored per provider by [ProviderStore].
+ * [backendId] is [com.wangzan101.mika.core.model.VideoBackend.id]: when the provider address later changes and no longer declares this protocol,
+ * [VideoProviders.resolve] notices and does not send requests to the wrong place.
  */
 data class VideoChoice(val providerId: String, val model: String, val backendId: String)
 
 /**
- * 视频生成设置。默认关;打开并选了能生成视频的服务商和模型后才提供 video_generate。
- * [maxPerTask] 是每任务最多生成几个(默认 1),防止模型循环烧钱。
- * 时长、宽高比、清晰度是用户偏好;模型不支持时由工具退回模型支持的值(能力见 [VideoProviders.resolve])。
+ * Video generation settings. Off by default; video_generate is offered only after it is on and a provider and model that can generate video are selected.
+ * [maxPerTask] is the maximum generated per task (default 1), preventing the model from burning money in a loop.
+ * Duration, aspect ratio and resolution are user preferences; when the model does not support them, the tool falls back to values the model supports (capabilities in [VideoProviders.resolve]).
  */
 data class VideoSettingsState(
     val enabled: Boolean = false,
@@ -80,7 +80,7 @@ class VideoSettings(private val prefs: SharedPreferences) {
         fun bool(key: String, fallback: Boolean) = (obj[key] as? JsonPrimitive)?.booleanOrNull ?: fallback
         val providerId = (obj["providerId"] as? JsonPrimitive)?.contentOrNull
         val model = (obj["model"] as? JsonPrimitive)?.contentOrNull
-        // 认不认得这种协议、服务商还对不对得上,交给 [VideoProviders.resolve];这里原样读回来
+        // Whether the protocol is recognized and the provider still matches is up to [VideoProviders.resolve]; read it back as-is here
         val backendId = (obj["protocol"] as? JsonPrimitive)?.contentOrNull
         val choice = if (providerId.isNullOrBlank() || backendId.isNullOrBlank()) null
         else VideoChoice(providerId, model.orEmpty(), backendId)

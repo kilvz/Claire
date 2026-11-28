@@ -192,7 +192,7 @@ internal fun CallTaskScreen(
         }
     }
 
-    // 三个可选项收在一行里;填过的草稿(例如从记录里复用)直接展开
+    // The three options fit on one line; a filled draft (for example reused from a record) expands directly
     val anyExtra = draft.questions.isNotBlank() || draft.context.isNotBlank() || draft.constraints.isNotBlank()
     var extrasOpen by rememberSaveable { mutableStateOf(false) }
     val showExtras = extrasOpen || anyExtra

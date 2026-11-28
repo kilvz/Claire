@@ -10,7 +10,7 @@ import com.wangzan101.mika.settings.RoleChoices
 import com.wangzan101.mika.settings.effectiveRoles
 
 /**
- * 用量面板「当前模型」区要显示的内容:主模型的显示名,和它相关的服务商(余额按服务商查)。
+ * What the usage panel's "Current model" section shows: the main model's display name and its associated providers (allowance is queried per provider).
  */
 data class CurrentModelAllowance(
     val modelLabel: String,
@@ -18,10 +18,10 @@ data class CurrentModelAllowance(
 )
 
 /**
- * 主模型是具体模型时显示它的模型标识（和设置里模型行的口径一致，见 [com.wangzan101.mika.settings.ui.models.ModelsCopy.modelLine]；
- * `ProviderConfig.name` 在 `use()` 建的配置里就是服务商名，不能当模型名用），余额只查它服务商一家;
- * 是模型组时显示组名,余额按启用成员的服务商去重显示。没选主模型、引用的配置或服务商
- * 已不在(删了 Key、prune 了配置)时返回 null,面板不显示这个区。
+ * When the main model is a concrete model, show its model id (consistent with the model row in settings, see [com.wangzan101.mika.settings.ui.models.ModelsCopy.modelLine];
+ * in configs created by `use()`, `ProviderConfig.name` is the provider name and cannot be used as the model name), and query the allowance only for that one provider;
+ * when it is a model group, show the group name, and show allowances deduplicated by the providers of enabled members. When no main model is selected, or the referenced config or provider
+ * no longer exists (key deleted, config pruned), return null and the panel does not show this section.
  */
 fun currentModelAllowance(
     roles: RoleChoices, configs: List<ProviderConfig>, groups: List<ModelGroup>, providers: List<Provider>,
@@ -43,9 +43,9 @@ fun currentModelAllowance(
 }
 
 /**
- * 本对话此刻的主模型:[mainOverride] 是对话自己存的选择(输入框上方的主模型入口),跟任务启动时
- * 走同一个解析入口(`ProviderStore.effectiveRoles`)——面板显示的模型必须和这个对话下一次任务
- * 真正用的一致;选择已失效(配置被删、组不可用)时由它退回全局主模型。
+ * This conversation's current main model: [mainOverride] is the conversation's own stored choice (the main-model entry above the input field), resolved through
+ * the same entry point as task start (`ProviderStore.effectiveRoles`) — the model shown in the panel must match the one this conversation's next task
+ * actually uses; when the choice is invalid (config deleted, group unavailable) it falls back to the global main model.
  */
 fun currentModelAllowance(store: ProviderStore, mainOverride: ModelChoice? = null): CurrentModelAllowance? =
     currentModelAllowance(store.effectiveRoles(mainOverride), store.configs.value, store.groups.value, store.providers.value)

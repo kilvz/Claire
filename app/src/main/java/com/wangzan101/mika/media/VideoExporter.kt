@@ -13,7 +13,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 
-/** 把一段视频存到手机的「影片/Mika」(MediaStore.Video,不需要存储权限)。 */
+/** Saves a video to the phone's "Movies/Claire" (MediaStore.Video, no storage permission needed). */
 class VideoExporter(private val context: Context) {
     suspend fun save(input: InputStream, mime: String, name: String): SavedVideo = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
@@ -47,7 +47,7 @@ class VideoExporter(private val context: Context) {
         SavedVideo("$DIRECTORY/$actual", uri.toString(), size)
     }
 
-    /** 删掉上次进程留下的、没写完的影片库条目;启动时调用。 */
+    /** Deletes unfinished movie-library entries left by the previous process; called at startup. */
     fun cleanPending() {
         val resolver = context.contentResolver
         val args = Bundle().apply {

@@ -28,7 +28,7 @@ The runtime (Alpine 3.22 minimal root filesystem + Python, Node and other packag
   and the data section matching the `datahash` in the signed `.PKGINFO`. Install scripts and triggers that would run on the phone must each be listed in `SCRIPTS_NOT_RUN`
   (pinned by content SHA-256, with a note on why not running them is still correct), otherwise the build fails.
   It also generates `app/src/main/java/com/wangzan101/mika/cap/sandbox/BundledRuntime.kt` (version, SHA-256, size) and
-  `app/src/main/assets/runtime/packages.json` (all packages, versions, licences; the 「开源许可」 (Open-source licences) page is generated from it).
+  `app/src/main/assets/runtime/packages.json` (all packages, versions, licences; the "Open-source licences" page is generated from it).
 - Artifacts are byte-for-byte reproducible:
 
 ```bash

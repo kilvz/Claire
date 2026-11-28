@@ -14,12 +14,12 @@ import java.util.Locale
 
 data class Time12Hour(val hour12: Int, val minute: Int, val isPm: Boolean)
 
-/** 距离下一次还有多久,拆成天、小时、分钟(分钟向上取整;满一天后不再写分钟),由界面按语言拼成文字。 */
+/** How long until the next one, split into days, hours and minutes (minutes rounded up; minutes are omitted once a full day is reached), assembled into text by the UI per language. */
 data class DurationParts(val days: Long, val hours: Long, val minutes: Long)
 
 /**
- * 时区选择器里的一项。[city] 是本地化的代表城市(取不到时用编号里的地名),[displayName] 是本地化的时区名,
- * [offsetLabel] 按建索引那一刻算(夏令时期间就是夏令时的偏移)。
+ * One entry in the time zone picker. [city] is the localized representative city (falls back to the place name in the ID when unavailable), [displayName] is the localized time zone name,
+ * [offsetLabel] is calculated at the moment the index is built (during daylight saving time it is the DST offset).
  */
 data class ZoneEntry(
     val id: String,
@@ -34,8 +34,8 @@ data class ZoneEntry(
 }
 
 /**
- * 计划编辑器与计划页共用的时间显示。只管显示,存储格式不变(钟点仍是 `HH:mm`)。
- * 12/24 小时制由调用方按系统设置传入;钟点格式取界面语言的短时间格式再换成要的小时制,上午/下午放哪边跟语言走。
+ * Time display shared by the plan editor and the plans page. Display only; the storage format is unchanged (clock time is still `HH:mm`).
+ * The 12/24-hour cycle is passed in by the caller from system settings; the clock pattern is the UI language's short time pattern converted to the requested hour cycle, and where AM/PM goes follows the language.
  */
 internal object PlanTimeFormat {
     fun to12Hour(time: LocalTime): Time12Hour {
@@ -49,7 +49,7 @@ internal object PlanTimeFormat {
         return LocalTime.of(hour12 % 12 + if (isPm) 12 else 0, minute)
     }
 
-    /** [locale] 的钟点格式,换成 [use24Hour] 要的小时制;引号里的字面文字(如加拿大法语的 'h')原样保留。 */
+    /** Clock pattern for [locale], converted to the hour cycle required by [use24Hour]; quoted literal text (such as 'h' in Canadian French) is kept as-is. */
     fun timePattern(locale: Locale, use24Hour: Boolean): String {
         val base = DateTimeFormatterBuilder.getLocalizedDateTimePattern(null, FormatStyle.SHORT, IsoChronology.INSTANCE, locale)
         val hasDayPeriod = unquoted(base).any { it in DAY_PERIOD }
@@ -95,14 +95,14 @@ internal object PlanTimeFormat {
     fun formatTime(time: LocalTime, use24Hour: Boolean, locale: Locale): String =
         DateTimeFormatter.ofPattern(timePattern(locale, use24Hour), locale).format(time)
 
-    /** 12 小时制下,这种语言把上午/下午写在小时前面(选择器据此排滚轮)。 */
+    /** Under a 12-hour cycle, whether this language writes AM/PM before the hour (the picker orders its wheel accordingly). */
     fun dayPeriodFirst(locale: Locale): Boolean {
         val p = unquoted(timePattern(locale, use24Hour = false))
         val a = p.indexOf('a')
         return a >= 0 && a < p.indexOf('h')
     }
 
-    /** 本地化的「上午」「下午」,下标 0 是上午。 */
+    /** Localized "AM" and "PM"; index 0 is AM. */
     fun amPm(locale: Locale): List<String> = DateFormatSymbols.getInstance(locale).amPmStrings.toList()
 
     fun formatFriendlyDate(date: LocalDate, today: LocalDate, todayLabel: String, tomorrowLabel: String, locale: Locale): String =
@@ -125,8 +125,8 @@ internal object PlanTimeFormat {
     }
 
     /**
-     * 选择器里可选的时区:地理区域下的 IANA 编号和 UTC,不列 Etc/、SystemV/、US/ 这类别名;按此刻偏移、再按城市排。
-     * 城市名由 [cityName] 给(安卓上用 ICU 的本地化城市名);整份在后台线程建一次,搜索只在这份里筛。
+     * Time zones selectable in the picker: IANA IDs under geographic regions plus UTC, excluding aliases such as Etc/, SystemV/ and US/; sorted by current offset, then by city.
+     * City names come from [cityName] (localized ICU city names on Android); the whole index is built once on a background thread, and search only filters within it.
      */
     fun zoneIndex(
         locale: Locale,
@@ -149,8 +149,8 @@ internal object PlanTimeFormat {
         .toList()
 
     /**
-     * 按编号、城市、时区名筛;输入的是偏移(「+8」「GMT+8」「UTC+5:30」「+08:00」)时按偏移精确筛,
-     * 「+1」不会把 +10、+11 也带出来。当前选中的排第一。
+     * Filters by ID, city and time zone name; when the input is an offset ("+8", "GMT+8", "UTC+5:30", "+08:00") it filters by exact offset,
+     * so "+1" does not also bring up +10 and +11. The currently selected one comes first.
      */
     fun searchZones(index: List<ZoneEntry>, query: String, preferredZoneId: String): List<ZoneEntry> {
         val q = query.trim().lowercase(Locale.ROOT)
@@ -170,12 +170,12 @@ internal object PlanTimeFormat {
         "Africa/", "America/", "Antarctica/", "Arctic/", "Asia/", "Atlantic/", "Australia/", "Europe/", "Indian/", "Pacific/",
     )
 
-    /** 中日韩的 12 小时制把上午/下午写在前面(「上午9:05」)。只在这种语言默认 24 小时制、要补上午/下午时用。 */
+    /** CJK 12-hour formats write AM/PM before the hour ("AM 9:05"). Only used when this language defaults to a 24-hour cycle and AM/PM must be added. */
     private fun dayPeriodLeads(locale: Locale) = locale.language in setOf("zh", "ja", "ko")
 
     private val OFFSET_QUERY = Regex("""^(?:gmt|utc)?\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$""")
 
-    /** 「+8」「gmt-5」「utc+5:30」「+0545」→ 偏移秒数;不像偏移的返回 null。 */
+    /** "+8", "gmt-5", "utc+5:30", "+0545" -> offset in seconds; returns null when it does not look like an offset. */
     internal fun parseOffsetQuery(query: String): Int? {
         val m = OFFSET_QUERY.matchEntire(query.trim().lowercase(Locale.ROOT)) ?: return null
         val hours = m.groupValues[2].toInt()

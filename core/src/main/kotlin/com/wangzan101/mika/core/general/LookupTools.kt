@@ -30,7 +30,7 @@ import kotlinx.serialization.json.put
 /** Looks up app and website knowledge; reads the catalog only, and is offered only when a catalog exists. */
 internal object KnowledgeSearch : AgentTool {
     override val verb = Verb.KnowledgeSearch
-    override val label = "查找 App/网站知识"
+    override val label = "Find app/site knowledge"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     private val KINDS = KnowledgeIndex.KINDS.filter { it in KNOWLEDGE_KINDS }
@@ -54,7 +54,7 @@ internal object KnowledgeSearch : AgentTool {
 /** Looks up skills (built-in skills and the personal skills the user is using); reads the catalog only, and is offered only when a catalog exists. */
 internal object SkillSearch : AgentTool {
     override val verb = Verb.SkillSearch
-    override val label = "查找技能"
+    override val label = "Find skill"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("skill_search", Prompts.tool("skill_search"), mapOf("query" to query("Words for the kind of task, 1-200 characters.")), listOf("query"))
@@ -68,7 +68,7 @@ internal object SkillSearch : AgentTool {
 /** Reads the body or attachments of app or website knowledge. */
 internal object KnowledgeRead : AgentTool {
     override val verb = Verb.KnowledgeRead
-    override val label = "查看 App/网站知识"
+    override val label = "View app/site knowledge"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("knowledge_read",
@@ -86,7 +86,7 @@ internal object KnowledgeRead : AgentTool {
 /** Reads the body or attachments of a skill, including the user's personal skills. */
 internal object SkillRead : AgentTool {
     override val verb = Verb.SkillRead
-    override val label = "查看技能"
+    override val label = "View skill"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("skill_read",

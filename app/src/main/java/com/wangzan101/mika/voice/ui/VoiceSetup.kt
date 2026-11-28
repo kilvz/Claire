@@ -102,15 +102,15 @@ internal fun rememberVoiceCatalogViewModel(voiceModels: VoiceModelEnvironment): 
 }
 
 /**
- * 换一个朗读模型。音色跟着回到新模型自己的默认:上一个模型的音色名对新模型多半不存在,带过去只会合成失败。
- * 电话里选朗读模型也是这样(见 [com.wangzan101.mika.voice.model.VoiceCatalogStore.setPhoneVoice] 的调用处)。
- * 先写模型、写成了才清音色(和换系统朗读引擎的 [chooseSystemTtsEngine] 同一个顺序)。
- * 重选当前这个模型不动音色。旧设置还没迁进目录时(迁移没成功)也不动:那时朗读用的还是旧选择里记的音色,
- * 这里的选择对它不起作用。
+ * Switch to another read-aloud model. The voice returns to the new model's own default: the previous model's voice name most likely does not exist for the new model, and carrying it over would only make synthesis fail.
+ * Choosing a read-aloud model during a call works the same way (see the call site of [com.wangzan101.mika.voice.model.VoiceCatalogStore.setPhoneVoice]).
+ * Write the model first, and only after it succeeds clear the voice (the same order as [chooseSystemTtsEngine] when changing the system read-aloud engine).
+ * Re-selecting the current model does not touch the voice. When old settings have not been migrated into the catalog yet (migration did not succeed) it is not touched either: read-aloud still uses the voice recorded in the old choice,
+ * and the choice here has no effect on it.
  */
 internal fun selectReadAloud(voiceModels: VoiceModelEnvironment, settings: VoiceSettings, ref: VoiceModelRef) {
     val switching = voiceModels.tts.migrated && voiceModels.tts.current() != ref
-    // 先换模型,写成了才清音色:目录写失败(抛出)时模型和音色都保持原样
+    // Switch the model first, and only after it succeeds clear the voice: when the catalog write fails (throws), model and voice both stay as they were
     voiceModels.tts.select(ref)
     if (switching) settings.setVoice("")
 }
@@ -251,7 +251,7 @@ internal fun VoicePickerSheet(
             }
         } +
         SheetAction(stringResource(R.string.voice_enter_voice_id), MikaIcons.Edit, searchable = false) { typing = true }
-    // 选「手动输入」时面板会顺手关掉,这里拦下,让输入框接着出来
+    // When "Manual input" is chosen the sheet closes by itself; intercept it here so the input field can come up next
     ActionSheet(stringResource(R.string.voice_voice), actions, searchHint = stringResource(R.string.search)) { if (!typing) onDismiss() }
 }
 

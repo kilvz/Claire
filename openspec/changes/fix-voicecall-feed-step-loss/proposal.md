@@ -1,32 +1,32 @@
 ## Why
 
-通话页办事步骤卡会丢步骤。上游 8bd0d661 改版的 `VoiceCallFeed.onTask(busy, lines)` 每次回调
-只把 `lines` 的**最后一条**加进卡里，而生产方经 StateFlow 投递，收集方跟不上时会合并丢中间值，
-两次回调之间积累的多行新状态只剩最后一行能上卡（本变更首轮已按「基线差分」修复）。
+The work step card on the call page can lose steps. The upstream 8bd0d661 revamp's `VoiceCallFeed.onTask(busy, lines)` added only the
+**last line** of `lines` to the card on each callback, while the producer delivers through a StateFlow and the collector merges and drops intermediate values when it cannot keep up,
+so of the multiple new status lines accumulated between two callbacks only the last line reached the card (this change's first round fixed it with a "baseline diff").
 
-2026-11-24 上游 bbf2872d/17a30645/19c8ff89 把这一块整体重构：`VoiceCallFeed` 改为
-`onTasks(views: List<DeskTaskView>)`，卡片步骤取 `(view.recent + view.line).distinct()` 后与
-卡内已有步骤去重合并。重构后**单次快照多行新状态已能全部上卡**，但留下残余缺口：
-`recent` 是仅 3 条（`DESK_RECENT_LINES`）的滚动窗口，若两次 `desk.active` 收集之间任务产出
-超过 3 条不同进展行，滚出窗口的中间步骤仍会丢；而每个 `DeskTaskView` 快照自带的**全程
-`steps` 历史**（最多 `DESK_STEPS_MAX`=60 步，`FrontDesk.updateView` 逐条累积）反而没有被
-`VoiceCallFeed` 使用。
+On 2026-11-24 upstream (bbf2872d/17a30645/19c8ff89) refactored this area as a whole: `VoiceCallFeed` changed to
+`onTasks(views: List<DeskTaskView>)`, and the card steps take `(view.recent + view.line).distinct()` and then merge them with
+the steps already on the card, deduplicated. After the refactor **a single snapshot with multiple new status lines can all reach the card**, but a residual gap remains:
+`recent` is a rolling window of only 3 entries (`DESK_RECENT_LINES`), so if the task produces
+more than 3 distinct progress lines between two `desk.active` collections, the intermediate steps that scroll out of the window are still lost; while each `DeskTaskView` snapshot's own **full-run
+`steps` history** (at most `DESK_STEPS_MAX`=60 steps, accumulated item by item by `FrontDesk.updateView`) is instead not
+used by `VoiceCallFeed`.
 
 ## What Changes
 
-`VoiceCallFeed` 的卡片步骤来源从「`recent + line`（≤4 行窗口）」改为「快照全程 `steps` 的文本
-+ `recent + line` 兜底」：任一快照自带的完整历史让卡上步骤对收集方合并免疫——无论中间丢了几
-次快照，下一次收到的快照仍带着全程。配套把旧 API 的单测移植到 `onTasks` 新 API，新增覆盖：
-窗口滚出中间步骤仍从全程历史补齐、任务首次上卡时携带已有进展、重复快照不产生步骤。
+`VoiceCallFeed`'s card step source changes from "`recent + line` (a ≤4-line window)" to "the snapshot's full-run `steps` text
++ `recent + line` fallback": the complete history carried by any snapshot makes the card steps immune to collector merging — no matter how many intermediate
+snapshots are dropped, the next snapshot received still carries the full run. Paired with this, the old API's unit tests are ported to the new `onTasks` API, adding coverage for:
+intermediate steps scrolled out of the window are still backfilled from the full history, a task first appearing on a card carries its existing progress, and repeated snapshots produce no steps.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `voicecall-task-steps`: 语音通话页办事步骤卡的状态行收集契约——快照里每一次新出现的
-  状态行都必须成为步骤（单次快照多行全收、recent 窗口滚出的行从全程 steps 补齐、无新行
-  不产生步骤）。
+- `voicecall-task-steps`: the status-line collection contract for the work step card on the voice call page — every newly appearing
+  status line in a snapshot must become a step (all lines in a single snapshot are collected, lines scrolled out of the recent window are backfilled from the full-run steps, and no new lines
+  produce no steps).
 
 ### Modified Capabilities
 
-（无——`openspec/specs/` 目前没有 voicecall 相关规格，本修复按新能力立契约。）
+(None — `openspec/specs/` currently has no voicecall spec; this fix establishes a contract as a new capability.)

@@ -111,8 +111,8 @@ class BuiltinShellEngine(
     private val pairingPortTimeoutMs: Long = 5_000,
     private val autoOn: WirelessDebuggingAutoOn? = null,
     /**
-     * 用户是否暂停了 Mika:读持久化的暂停标记,这是唯一的真相来源,引擎不另存一份。
-     * 每个异步交接点(起助手前后、看门狗重试、交接进来的 Binder)都重新读一次。
+     * Whether the user paused Claire: reads the persisted pause flag, which is the only source of truth; the engine keeps no copy.
+     * It is re-read at every asynchronous hand-off (before and after starting the helper, watchdog retries, Binders handed in).
      */
     private val pausedFlag: () -> Boolean = { false },
 ) : BuiltinShellControl {
@@ -126,9 +126,9 @@ class BuiltinShellEngine(
         private set
 
     private val launchLock = Mutex()
-    /** 正在起助手的那次(持着 [launchLock]);暂停时取消。 */
+    /** The launch currently starting the helper (while holding [launchLock]); cancelled on pause. */
     @Volatile private var launchJob: Job? = null
-    /** 这次起助手替用户打开过无线调试;只在持着 [launchLock] 时读写。 */
+    /** This launch turned wireless debugging on for the user; read and written only while holding [launchLock]. */
     private var turnedOnThisLaunch = false
     private var failures = 0
     private var retryJob: Job? = null
@@ -139,10 +139,10 @@ class BuiltinShellEngine(
     override val paused: Boolean get() = pausedFlag()
 
     /**
-     * 暂停标记变了,按它重新投影状态。
-     * 暂停:取消排着的重试与配对发现,停掉正在跑的助手,看门狗不再把它起回来;
-     * 不调用 [BuiltinShellPlatform.forget]——配对钥匙、端口缓存和「已配对」标记都留着。
-     * 恢复:按已有配对重新连接(助手还在手里就直接算运行);没有配对过、也起不来时回到没设置的样子,由界面引导配对。
+     * The pause flag changed; re-project the status from it.
+     * Pause: cancel queued retries and pairing discovery, stop the running helper, and stop the watchdog from starting it again;
+     * do not call [BuiltinShellPlatform.forget]—the pairing key, port cache and "paired" flag all stay.
+     * Resume: reconnect through the existing pairing (if the helper is still in hand, count it as running); if it was never paired and cannot start, return to the unconfigured state and let the UI guide pairing.
      */
     override fun pauseChanged() {
         if (pausedFlag()) {
@@ -153,7 +153,7 @@ class BuiltinShellEngine(
                 discoveryJob?.cancel()
                 discoveryJob = null
             }
-            // 正在起的那次也取消:它可能正等着无线调试打开或交接,收尾时自己把替用户打开的无线调试关回去
+            // Also cancel the launch in progress: it may be waiting for wireless debugging to turn on or for a hand-off, and its teardown turns off the wireless debugging it turned on for the user
             launchJob?.cancel()
             _discovery.value = PairingDiscovery.Idle
             runCatching { platform.stopHelper() }
@@ -237,7 +237,7 @@ class BuiltinShellEngine(
         var first = true
         scope.launch {
             helper.collect { h ->
-                // 暂停着:助手断开是用户要的,不重起;若有晚交接进来的助手也立即停掉。
+                // Paused: the helper disconnecting is what the user wanted, so do not restart it; if a helper is handed in late, stop it immediately too.
                 if (pausedFlag()) {
                     if (h != null) runCatching { platform.stopHelper() }
                     _status.value = BuiltinShellStatus.Paused
@@ -345,7 +345,7 @@ class BuiltinShellEngine(
      */
     fun wirelessDebuggingChanged() {
         if (pausedFlag()) return
-        // 经 su 或纯 Shizuku 起助手不看无线调试
+        // Starting the helper through su or pure Shizuku does not depend on wireless debugging
         if (helper.value != null || !platform.paired() || rootStart || platform.transport() == ShellTransport.Shizuku) return
         if (autoOn?.writing == true) return
         if (platform.wirelessDebugging() == false) {
@@ -383,7 +383,7 @@ class BuiltinShellEngine(
         when (val g = auto.gate(platform.wifiConnected())) {
             AutoOnGate.Act -> {
                 _status.value = BuiltinShellStatus.Connecting
-                // 写之前就记下:等系统处理的那几秒里被暂停取消,收尾也要关回去
+                // Record it before writing: if this is cancelled by a pause during the few seconds the system takes, teardown must still turn it back off
                 turnedOnThisLaunch = true
                 if (withContext(io) { auto.turnOn() }) return true
             }
@@ -415,13 +415,13 @@ class BuiltinShellEngine(
     }
 
     /**
-     * 起一次助手。整段持着 [launchLock];正在起的这次记在 [launchJob],用户暂停时 [pauseChanged] 取消它。
-     * 每一步连接(Shizuku、root、已配对的连接)之前都重读暂停标记;这次为了连接替用户打开过无线调试、
-     * 却因暂停没连成时,收尾把无线调试关回去(暂停本来就要它关着)。
+     * Start the helper once. Holds [launchLock] throughout; the launch in progress is recorded in [launchJob], and [pauseChanged] cancels it when the user pauses.
+     * Re-read the pause flag before each connection step (Shizuku, root, the paired connection); if this run turned wireless debugging on for the user to connect
+     * but did not connect because of a pause, teardown turns wireless debugging back off (a pause requires it off anyway).
      */
     private suspend fun launchOnce(): Unit = launchLock.withLock {
         turnedOnThisLaunch = false
-        // 在自己的子协程里起:暂停只取消这一次,不连带取消调用方
+        // Start in its own child coroutine: a pause cancels only this launch, not the caller
         coroutineScope {
             val job = launch {
                 try {
@@ -438,7 +438,7 @@ class BuiltinShellEngine(
         }
     }
 
-    /** 暂停了就停在 Paused 返回 true;起到一半的助手一并停掉。 */
+    /** If paused, stop at Paused and return true; also stop a helper that was half-started. */
     private fun stoppedByPause(): Boolean {
         if (!pausedFlag()) return false
         if (helper.value != null) runCatching { platform.stopHelper() }
@@ -510,7 +510,7 @@ class BuiltinShellEngine(
         }
         if (stoppedByPause()) return
         if (platform.wirelessDebugging() == false && !turnOnWirelessDebugging()) return
-        // 打开无线调试要等系统处理几秒:这期间用户暂停了就不再连
+        // Turning wireless debugging on takes a few seconds for the system to process: if the user pauses meanwhile, do not connect
         if (stoppedByPause()) return
         _status.value = BuiltinShellStatus.Connecting
         val failure = attempt()

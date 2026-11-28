@@ -17,18 +17,18 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
-// 任务服务:用户暂停了 Mika 时挡住新任务、停下手上的任务
+// Task service: block new tasks and stop the current ones when the user paused Claire
 
 /**
- * 用户暂停了 Mika([MikaPause]):不开始任何新任务,也不从排队里取。
- * 各入口在发请求前已经查过一次;这里是服务门口的第二道,挡住查过之后、到服务之前用户才暂停的那些。
+ * The user paused Claire ([MikaPause]): start no new task and take nothing from the queue.
+ * Each entry point already checked once before sending the request; this is the second gate at the service door, blocking those where the user paused after the check and before the service.
  */
 internal fun TaskService.pausedBlocks(): Boolean = MikaPause.get(this).paused()
 
 /**
- * 暂停时被挡在门口的开始请求:把它的来源一一了结,不留到恢复后自动跑。
- * 定时的这一次记成「因暂停跳过」;电脑交来的报失败;工作流这一步记失败(停在待确认,恢复后由用户决定);
- * 排队项从持久队列里拿掉;渠道消息先确认收到,再尽力回一句「已暂停」;界面上发起的提示一声。
+ * A start request blocked at the door during a pause: settle its source one by one, and do not leave it to start by itself after resume.
+ * This scheduled run is recorded as "skipped due to pause"; a task handed over by the computer is reported as failed; a workflow step is recorded as failed (left pending confirmation, for the user to decide after resume);
+ * a queued item is removed from the persistent queue; a channel message is acknowledged first, then a best-effort "paused" reply is sent; a UI-initiated one gets a toast.
  */
 internal fun TaskService.finishPausedStart(
     provenance: RunProvenance,
@@ -58,7 +58,7 @@ internal fun TaskService.finishPausedStart(
     if (provenance.origin == RunOrigin.Ui && followUp == null) {
         Toast.makeText(this, tr(R.string.pause_blocked_task), Toast.LENGTH_LONG).show()
     }
-    // 前台启动的约定要兑现;没有任务在前台时马上撤下,不让「准备中」通知闪一下又消失
+    // Honour the foreground start contract; withdraw immediately when no task is in the foreground, so the "preparing" notification does not flash and disappear
     if (foreground != null || taskState._busy.value) keepForeground()
     else {
         startInForeground(null, preparingNotification())
@@ -67,8 +67,8 @@ internal fun TaskService.finishPausedStart(
 }
 
 /**
- * 用户刚暂停:停下所有在跑和排着的任务,持久排队里的下一件也一并拿掉(不留暗队列,恢复后不会自己跑起来)。
- * 排着的直接记为已取消;在跑的走正常取消,收尾时各自了结定时、电脑、工作流和渠道。
+ * The user just paused: stop all running and queued tasks, and also remove the next item in the persistent queue (leave no hidden queue that starts by itself after resume).
+ * Queued ones are recorded as cancelled directly; running ones go through normal cancellation, and at teardown each settles scheduling, computer, workflow and channel.
  */
 internal fun TaskService.stopForPause() {
     center.followUps.clear()
@@ -78,8 +78,8 @@ internal fun TaskService.stopForPause() {
 }
 
 /**
- * 暂停期间渠道来的新消息(调用方已确认收到):尽力回一句「Mika 已暂停,这条没有开始办」。经可靠送达账本发,
- * 同一条消息只回一次;发不出去就算了,不让它挡住确认、也不让渠道重交。
+ * New channel messages during a pause (the caller has acknowledged receipt): make a best-effort reply "Claire is paused, this one was not started". Sent through the reliable delivery ledger,
+ * replying only once per message; if it cannot be sent, so be it: do not let it block acknowledgment or make the channel redeliver.
  */
 internal suspend fun replyPaused(outbox: Outbox, channel: Channel, peer: ChannelPeer, messageId: String) {
     try {

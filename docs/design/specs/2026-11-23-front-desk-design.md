@@ -1,167 +1,167 @@
-# 前台层（Front Desk）设计
+# Front Desk layer design
 
-日期：2026-11-23 · 状态：已确定方向，待用户审阅全文
+Date: 2026-11-23 · Status: Direction settled; full text awaiting user review
 
-## 1. 为什么要做
+## 1. Why
 
-现在 Claire 收到一句话，就把它整个交给后台任务循环（`AgentLoop` / `TaskRun`），一直跑到出结果才交付。只是对话的话够用，但下面三处已经不够了：
+Today, when Claire receives a sentence, it hands the whole thing to the background task loop (`AgentLoop` / `TaskRun`) and only delivers when a result comes out. That is enough for plain conversation, but three places are no longer sufficient:
 
-- **应用内语音通话回话慢，办事时还聊不了。** 语音模型调 `mika_request` 之后，VoiceCallRoute.execute（已删） 会一直挂到任务进入终态；同一时间只受理一个请求；用户一开口就取消任务（`onBargeIn → cancelTask`）；任务需要人回答时只说一句「去任务页看」。标准模式（听→想→说）的「想」用的是主模型或轻量模型，而且整句合成完才开始播，延迟一段叠一段。
-- **打字聊天时，用户只能盯着任务进度。** 每条消息直接进任务循环，中间没有一层先接住用户、再去派活。插话还是排队，要用户手动切（`FollowUpMode`）。
-- **AI 接打电话时，通话里的模型叫不动后台。** 它只有拨号键工具，任务信息只读，电话里没法回头查东西，用户也没法中途给它递话。
+- **In-app voice calls reply slowly, and you cannot chat while something is being done.** After the voice model calls `mika_request`, VoiceCallRoute.execute (deleted) stays blocked until the task reaches a terminal state; only one request is accepted at a time; the task is cancelled as soon as the user starts speaking (`onBargeIn → cancelTask`); and when a task needs a human answer it only says "Check the task page". In standard mode (listen → think → speak), the "think" step uses the main model or the light model, and playback starts only after the whole sentence is synthesized, stacking one delay on another.
+- **While typing in chat, the user can only watch task progress.** Every message goes straight into the task loop, with no layer in between that first receives the user and then dispatches work. Interjections still queue and require a manual switch (`FollowUpMode`).
+- **During AI phone calls, the model in the call cannot reach the background.** It has only the dial-pad tools, task information is read-only, it cannot look anything up during the call, and the user cannot pass it a message midway.
 
-用户想要的样子：有一个常驻、反应快的「前台」，专门负责和人说话；它把活派给后台去做，偶尔报一下进度。
+What the user wants: a resident, fast-reacting "front desk" dedicated to talking with the person; it dispatches work to the background and occasionally reports progress.
 
-## 2. 定位（用户已定）
+## 2. Positioning (settled by the user)
 
-- **前台是 Claire 统一的入口。** 聊天、应用内语音通话、AI 电话都先由前台接话。三处是同一个前台，只是面对的人和说话方式不同。
-- **前台只负责和人交流，不干活（用户 11-23 改定）。** 它做的是闲聊、出主意、回应、转述进度。它要知道的东西（这条会话的记录、相关记忆、各任务的当前状态）由代码每轮放进上下文，前台不自己去查。凡是需要调用工具的事，包括联网搜索、读网页、查资料，以及动手机（开 App、点屏幕、发消息、改东西、花钱），一律派给后台。前台手里只有「和用户交流、和后台交接」的工具：派活、补充、转达回答、取消，电话里再加请示用户。
-- **搭法选 A：** 独立的前台层，后台沿用现有任务体系。没选「让 AgentLoop 兼任前台」，因为它太重，回话快不起来；也没选「前台当常驻主任务、后台当子代理」，因为主任务会占着任务生命周期和虚拟屏，跟「随时在线」冲突。
+- **The front desk is Claire's unified entry point.** Chat, in-app voice calls and AI phone calls all have the front desk answer first. The three are the same front desk, only facing different people and speaking in different ways.
+- **The front desk only communicates with the person and does no work (changed by the user on 11-23).** It does small talk, offers ideas, responds and relays progress. What it needs to know (this conversation's record, relevant memories, each task's current state) is put into context by code every turn; the front desk does not look it up itself. Anything that needs a tool — including web search, reading web pages, looking things up, and operating the phone (opening apps, tapping the screen, sending messages, changing things, spending money) — is dispatched to the background. The front desk holds only the tools for "talking with the user and handing off to the background": dispatch work, supplement, relay answers, cancel, plus asking the user during calls.
+- **Structure A is chosen:** an independent front desk layer, with the background continuing to use the existing task system. It did not choose "let AgentLoop double as the front desk" because that is too heavy to reply quickly, and did not choose "the front desk as a resident main task and the background as subagents" because the main task would hold the task lifecycle and the virtual screen, conflicting with "always online".
 
-## 3. 目标 / 非目标 / 反目标
+## 3. Goals / non-goals / anti-goals
 
-**目标**
-1. 用户每说一句，前台很快就给出第一反应（文字流式开始输出，语音开始播放）。目标是文字 1–2 秒内、语音 2–3 秒内开口（目标值，不是硬性门槛）。
-2. 后台在跑的时候，用户可以继续跟前台聊、再派新活、补充或改需求，也可以取消。说话本身不再取消任务。
-3. 一个会话里可以同时挂多件后台任务，受现有并行上限约束（`ParallelCapability`）。超出上限就排队，由前台告诉用户排在第几个。
-4. 后台的关键节点由前台挑着讲：开始办了、卡住了、需要你回答或确认、办完了。其余细节留在任务卡里。
-5. 后台需要人回答时（`WaitingInput`），由前台在对话里问用户，再把答案递回去。确认和接管（`WaitingConfirmation` / `WaitingTakeover`）仍走现有卡片和安全闸；前台只负责提醒、指路，不代替用户同意。
-6. 聊天、语音通话、电话三处共用这一个前台实现，各自只写一层适配。
+**Goals**
+1. Every time the user says something, the front desk gives a first reaction quickly (text starts streaming, speech starts playing). The target is to start speaking within 1–2 seconds for text and 2–3 seconds for speech (targets, not hard gates).
+2. While the background is running, the user can keep chatting with the front desk, dispatch new work, supplement or change requirements, and cancel. Speaking itself no longer cancels tasks.
+3. One conversation can hold several background tasks at once, subject to the existing parallelism limit (`ParallelCapability`). Beyond the limit they queue, and the front desk tells the user their position.
+4. The front desk selectively reports the background's key moments: work started, stuck, needs your answer or confirmation, finished. All other details stay in the task card.
+5. When the background needs a human answer (`WaitingInput`), the front desk asks the user in the conversation and passes the answer back. Confirmation and takeover (`WaitingConfirmation` / `WaitingTakeover`) still go through the existing cards and safety gate; the front desk only reminds and points the way, and does not consent on the user's behalf.
+6. Chat, voice calls and phone calls share this one front desk implementation, each adding only an adapter layer.
 
-**非目标（本次不做）**
-- 主动任务、定时触发、微信渠道、远程 MCP 入口（`startTrigger` / `startChannel` / `startMcp`）。它们暂时照旧直接进后台，以后再决定要不要过前台。
-- 后台任务循环本身的改造。只在需要的地方加事件出口和接口，不改它的决策逻辑。
-- 安全策略的重新设计。确认闸、风险分级沿用现有的。
+**Non-goals (not in this round)**
+- Proactive tasks, scheduled triggers, the WeChat channel and the remote MCP entry (`startTrigger` / `startChannel` / `startMcp`). For now they still go straight to the background; whether they should pass through the front desk is decided later.
+- Reworking the background task loop itself. Only add event outlets and interfaces where needed, without changing its decision logic.
+- Redesigning the safety policy. The confirmation gate and risk grading stay as they are.
 
-**反目标（技术上能跑，但做成这样就算失败）**
-- 前台变慢：带了太多工具或上下文，回一句话要五六秒。
-- 前台话痨：每一步进度都播报，打断用户，或者把坐标、界面细节念出来。
-- 前台装作办完了：后台还没有终态，前台就说「已经发了 / 订好了」。前台对办事结果的说法只能来自后台的终态。
-- 前台绕过后台动手：前台能直接调动屏幕、发消息、花钱的工具。
-- 搞成三套：聊天、语音、电话各写一份「派活—等待—汇报」逻辑。
+**Anti-goals (technically runnable, but doing it this way counts as failure)**
+- The front desk slows down: too many tools or too much context, so one reply takes five or six seconds.
+- The front desk chatters: announces every step of progress, interrupts the user, or reads out coordinates and UI details.
+- The front desk pretends work is done: the background has no terminal state yet and the front desk says "already sent / already booked". What the front desk says about results may come only from the background's terminal state.
+- The front desk acts around the background: the front desk gets tools that directly drive the screen, send messages or spend money.
+- Three implementations: chat, voice and phone each write their own "dispatch — wait — report" logic.
 
-## 4. 结构
+## 4. Structure
 
 ```
- 用户 / 对方
-    │  文字或语音
+ User / other party
+    │  text or speech
  ┌──▼───────────────────────────┐
- │ 入口适配层（Surface）          │  聊天页 · 语音通话（标准/实时）· AI 电话
+ │ Entry adapter (Surface)      │  Chat page · Voice call (standard/realtime) · AI phone call
  └──┬───────────────────────────┘
-    │  用户的话 ↓   前台要说的话 ↑
+    │  user's words ↓   front desk's words ↑
  ┌──▼───────────────────────────┐
- │ 前台 FrontDesk（core）         │  一个轻量对话循环
- │  - 会话记录（就是这条会话）     │
- │  - 上下文：记忆、任务状态（代码放）│
- │  - 调度工具：派活/查进度/补充/  │
- │    取消/转达回答               │
- │  - 汇报策略：哪些后台事件要说   │
+ │ Front Desk (core)            │  a lightweight conversation loop
+ │  - conversation record       │
+ │  - context: memory, task state (from code) │
+ │  - dispatch tools: dispatch/progress/ │
+ │    supplement/cancel/relay answer    │
+ │  - reporting policy: which events to say │
  └──┬──────────────▲────────────┘
-    │ 派活/补充/取消 │ 后台事件（开始/卡住/要回答/终态）
+    │ dispatch/supplement/cancel │ background events (started/stuck/needs answer/terminal)
  ┌──▼──────────────┴────────────┐
- │ 后台：现有 TaskService/TaskRun │  每个派出的活是一个任务
+ │ Background: TaskService/TaskRun │  each dispatched job is a task
  └──────────────────────────────┘
 ```
 
-### 4.1 前台循环
+### 4.1 Front desk loop
 
-- 放在 core 里，是一个新的轻量循环，不复用 `AgentLoop`。底层零件直接复用：调模型（`ModelCaller`）、失败切换（`Failover`）、上下文压缩、语言判断（`ReplyLanguage`），以及提示词分层。
-- 输入有两种：用户的一句话，或者一条后台事件。两种都会触发前台的一轮回复；后台事件可以判定成「不说」。
-- 每轮最多调几次工具（有上限，类似 `LlmBrain.maxToolRounds`）。工具调用不阻塞后台：派活工具派完就立刻返回，不等任务结束。
-- **生命周期（用户已定）**：前台跟着会话走，不跟着某一次通话走。它常驻在应用层，每条会话一个前台。在通话里，前台能看到这条会话之前的聊天记录（压缩后）。挂断后，派出去的活继续跑；之后的「要你回答」和最终结果，由前台写回这条会话，并发通知。聊天页用的也是这个前台。
-- 用户在前台回话途中又开口时，前台的这一轮作废（语音还要停播），但已经派出去的后台任务不受影响。
+- It lives in core as a new lightweight loop and does not reuse `AgentLoop`. Lower-level parts are reused directly: model calls (`ModelCaller`), failover (`Failover`), context compaction, language determination (`ReplyLanguage`), and prompt layering.
+- There are two kinds of input: one sentence from the user, or one background event. Both trigger a round of front desk replies; a background event can be judged as "say nothing".
+- Each round calls tools at most a few times (there is a limit, similar to `LlmBrain.maxToolRounds`). Tool calls do not block the background: the dispatch tool returns immediately after dispatching and does not wait for the task to finish.
+- **Lifecycle (settled by the user)**: the front desk follows the conversation, not any single call. It is resident at the app layer, one front desk per conversation. During a call, the front desk can see this conversation's earlier chat history (compacted). After hanging up, dispatched work keeps running; later "needs your answer" events and final results are written back to this conversation by the front desk, with a notification. The chat page uses this same front desk.
+- When the user speaks again while the front desk is replying, that round is voided (speech also stops playing), but background tasks already dispatched are unaffected.
 
-### 4.2 前台的工具
+### 4.2 Front desk tools
 
-**没有查询类工具（用户 11-23 改定）**：前台不带联网搜索、查记忆、查进度这类工具。
-- 任务状态：每轮由代码把这条会话里各任务的当前状态（编号、标题、在办/排队第几/要你处理/已结束、一句话进展）放进前台的上下文，前台看着说。
-- 记忆：每次用户说话，由代码按这句话检索相关记忆，放进上下文（标成背景资料，不是指令）。
-- 要查资料、上网的，派给后台。
+**No query tools (changed by the user on 11-23)**: the front desk carries no tools for web search, memory lookup or progress lookup.
+- Task state: every round, code puts the current state of each task in this conversation (number, title, in progress / queue position / needs your attention / finished, one-line progress) into the front desk's context, and the front desk talks from that.
+- Memory: every time the user speaks, code retrieves relevant memories for that sentence and puts them into context (marked as background material, not instructions).
+- Anything that needs research or the internet is dispatched to the background.
 
-**调度工具**只剩和用户、和后台交接用的：
+**Dispatch tools** are only the ones for handing off with the user and the background:
 
-| 工具 | 做什么 | 落到现有机制 |
+| Tool | What it does | Maps to existing mechanism |
 |---|---|---|
-| 派活 | 写一段完整的任务目标交给后台，立即返回任务编号 | `TaskService.start(...)`，同 VoiceCallTaskLauncher（已删） |
-| 补充指令 | 把用户新说的话递给某个在办任务 | `SteerCoordinator.steer` |
-| 取消 | 取消某个任务 | `TaskService.cancel(runKey)` |
-| 转达回答 | 把用户对后台提问的回答交回去 | 现有 `WaitingInput` 回答入口 |
+| Dispatch work | Write a complete task goal and hand it to the background, returning the task number immediately | `TaskService.start(...)`, same as VoiceCallTaskLauncher (deleted) |
+| Supplement instruction | Pass what the user just said to a task in progress | `SteerCoordinator.steer` |
+| Cancel | Cancel a task | `TaskService.cancel(runKey)` |
+| Relay answer | Pass the user's answer to a background question back | existing `WaitingInput` answer entry |
 
-派活时目标要写完整（把前台对话里的上下文带上），因为后台任务看不到前台的对话。
+When dispatching, the goal must be written completely (including the context from the front desk conversation), because the background task cannot see the front desk conversation.
 
-**谁算目标的作者（我的决定）**：后台把任务目标当成用户原话（`UserUtterances`），记忆的引用核对、`skill_save` 都靠它；语音的安全闸③也要求请求必须是用户当轮转写的子串。所以派活工具要分两个字段：
-- `用户原话`：用户说过的原句，可以是多句，由代码从前台会话里按编号取，不让模型改写。只有这一段进 `UserUtterances`，也只有它要过闸③。
-- `前台补充`：前台写的背景和整理，进任务上下文时明确标成「前台的说明，不是用户原话」。
+**Who counts as the author of the goal (my decision)**: the background treats the task goal as the user's own words (`UserUtterances`); memory citation checking and `skill_save` both rely on it; safety gate ③ for voice also requires the request to be a substring of the user's current-turn transcript. So the dispatch tool separates two fields:
+- `user's own words`: the exact sentences the user said, possibly several, taken by code from the front desk conversation by number, not rewritten by the model. Only this segment goes into `UserUtterances`, and only it must pass gate ③.
+- `front desk supplement`: background and organization written by the front desk, clearly marked as "the front desk's explanation, not the user's own words" when it enters the task context.
 
-转达 `WaitingInput` 的回答也按这个规矩：交回去的必须是用户的原话。这样现有的信任边界一点不松。需要改 `TaskService.start` 和任务装配的接口。
+Relaying a `WaitingInput` answer follows the same rule: what is handed back must be the user's own words. This keeps the existing trust boundary fully tight. It requires changing `TaskService.start` and the task assembly interface.
 
-### 4.3 后台事件 → 前台
+### 4.3 Background events → front desk
 
-- 前台按任务编号订阅各任务自己的 `TaskState`，跟原来的 VoiceCallRoute（已删）一样，绝不订全局状态流。
-- 状态变化先在代码里归成几类事件：**开始了、阶段进展（节流）、卡住要你处理、要你回答、成功、失败、取消**，再交给前台。
-- **汇报策略是代码规则，不交给模型临场决定。** 开始、要回答、要处理、终态这几类必报；阶段进展默认不报，只在用户问起或长时间没消息时报。前台模型负责把要报的事说成人话。
-- 进度文字沿用 `stripVoiceLineDetails` 这一类清洗：去掉坐标，引号里的细节不上嘴。
+- The front desk subscribes to each task's own `TaskState` by task number, like the former VoiceCallRoute (deleted), and never subscribes to the global state stream.
+- State changes are first grouped by code into several event kinds: **started, stage progress (throttled), stuck and needs your attention, needs your answer, success, failure, cancelled**, then handed to the front desk.
+- **The reporting policy is a code rule and is not left to the model to decide on the fly.** Started, needs answer, needs attention and terminal events must be reported; stage progress is not reported by default, only when the user asks or after a long silence. The front desk model is responsible for turning what must be reported into plain language.
+- Progress text goes through the same class of cleaning as `stripVoiceLineDetails`: remove coordinates, and do not read out details inside quotes.
 
-### 4.4 一个会话挂多个任务
+### 4.4 One conversation with multiple tasks
 
-- 现在 `TaskCenter.byConversation` 默认一个会话对应一个任务。前台派出的每件活，都要能和前台所在的会话区分开，又能挂回这个会话。**做法留给实现**：可以每件活各开一个子会话，挂到前台会话上（原来的 VoiceCallRoute 就是新建会话），也可以扩展 TaskCenter 允许一个会话多个任务。不管哪种，聊天页都要能把各任务的卡片挂回前台会话。
-- 并行上限沿用 `ParallelCapability`，超出排队，排队信息让前台说出来。
+- Today `TaskCenter.byConversation` maps one conversation to one task by default. Every job the front desk dispatches must be distinguishable from the conversation the front desk is in, yet attach back to that conversation. **The approach is left to implementation**: each job can open its own child conversation attached to the front desk conversation (the former VoiceCallRoute created a new conversation), or TaskCenter can be extended to allow multiple tasks per conversation. Either way, the chat page must be able to attach each task's card back to the front desk conversation.
+- The parallelism limit follows `ParallelCapability`; beyond it, tasks queue, and the queue information is spoken by the front desk.
 
-### 4.5 入口适配
+### 4.5 Entry adapters
 
-- **聊天页**：会话里的气泡变成前台的话，后台任务以任务卡的形式穿插在对话里，点开就是现有的任务详情和进度。手动切「插话 / 排队」的开关去掉，改由前台判断。**界面要先出本地 HTML 原型，用户确认后才实现。**
-- **应用内语音通话**：标准模式里的 `LlmBrain` 换成前台；原 VoiceCallRoute 的阻塞式派活拆掉，换成前台的调度工具。**实时模式（第三方实时语音模型，用户已定）**：由实时模型自己当前台，负责说话和判断。core 前台的调度工具都开给它（派活、补充、取消、转达）；任务进展用系统消息推给它，相关记忆在开场时放进它的提示词；原来的 `mika_request` 和「保持沉默、只转发原话」的提示词（`AGENT_TOOLS_PROMPT`）换成前台角色的提示词。事件归类和汇报策略还是 core 里同一份代码，后台事件按各协议的能力，以工具结果或系统消息的形式推回实时模型。实时模式的验收清单和标准模式完全一样。用户开口只打断前台说话，不取消任务。
-- **通话里的确认和接管（我的决定）**：本次不在通话页加确认卡。前台说「这一步要你在手机上点一下」，用户切到任务卡去处理，通话由现有前台服务（`VoiceCallService`）在后台保持。验收时要确认切出去后音频和通话不掉；通话页内嵌确认卡放到以后，到时候先出原型。
-- **AI 电话**：面对的是第三方，规矩见 5.1。
+- **Chat page**: bubbles in the conversation become the front desk's words, and background tasks are interspersed in the conversation as task cards; tapping one opens the existing task details and progress. The manual "interject / queue" switch is removed and the front desk decides instead. **The UI must first produce a local HTML prototype, and is implemented only after the user confirms.**
+- **In-app voice calls**: in standard mode, `LlmBrain` is replaced by the front desk; the former VoiceCallRoute's blocking dispatch is dismantled and replaced by the front desk's dispatch tools. **Realtime mode (third-party realtime voice model, settled by the user)**: the realtime model itself acts as the front desk, handling speaking and decisions. All of the core front desk's dispatch tools are exposed to it (dispatch, supplement, cancel, relay); task progress is pushed to it as system messages, and relevant memories are placed in its prompt at the opening; the former `mika_request` and the "stay silent, only forward the user's own words" prompt (`AGENT_TOOLS_PROMPT`) are replaced by the front desk role prompt. Event grouping and the reporting policy remain the same code in core, and background events are pushed back to the realtime model as tool results or system messages according to each protocol's capabilities. The acceptance checklist for realtime mode is exactly the same as for standard mode. The user speaking only interrupts the front desk's speech and does not cancel tasks.
+- **Confirmation and takeover during a call (my decision)**: this round does not add a confirmation card to the call page. The front desk says "this step needs you to tap on the phone"; the user switches to the task card to handle it, and the call is kept alive in the background by the existing foreground service (`VoiceCallService`). Acceptance must confirm that audio and the call survive switching away; an embedded confirmation card in the call page is left for later, with a prototype first.
+- **AI phone calls**: these face a third party; the rules are in 5.1.
 
-### 4.6 模型与速度
+### 4.6 Model and speed
 
-- 前台默认用轻量模型（`ModelRole.Light`），没配就退回主模型。用户可以在设置里换（我的决定）。
-- 语音这条路：回复流式生成，按句切分后立即逐句合成、逐句播放（已有 `SentenceSplitter`）；能流式合成的服务商就走流式。合成慢的问题按服务商的能力检测走对应实现，检测不到就退回整句合成。
+- The front desk uses the light model by default (`ModelRole.Light`), falling back to the main model when none is configured. The user can change it in settings (my decision).
+- On the voice path: replies are generated as a stream, split into sentences, and each sentence is synthesized and played immediately (`SentenceSplitter` already exists); providers that support streaming synthesis use streaming. Slow synthesis is handled by the provider's capability detection with the corresponding implementation, and falls back to whole-sentence synthesis when it cannot be detected.
 
-### 4.7 提示词
+### 4.7 Prompts
 
-- 按现有分层加一层前台角色（`prompts/roles/` 下新增）。内容：Claire 的身份；前台的职责边界（只交流、不干活：凭上下文能答的自己答，要调工具的一律派出去，不替后台说结果）；派活时怎么写完整目标；怎么挑重点讲进度。语音场景再叠加 `SPOKEN_STYLE`。
-- 前台判断「自己答还是派出去」之后，后台任务的 `IntentGate` 就重复了。本次保留不动，等前台稳定后再评估要不要关掉。
+- Add a front desk role layer following the existing layering (new under `prompts/roles/`). Content: Claire's identity; the front desk's responsibility boundary (only communicate, do no work: answer from context what it can, dispatch anything needing tools, and do not state results on the background's behalf); how to write a complete goal when dispatching; how to pick out the important points when reporting progress. In voice scenarios, layer `SPOKEN_STYLE` on top.
+- Once the front desk decides "answer myself or dispatch", the background task's `IntentGate` becomes redundant. This round leaves it unchanged and evaluates whether to turn it off once the front desk is stable.
 
-## 5. 范围（用户已定：不分期，一次做完）
+## 5. Scope (settled by the user: no phasing, done in one go)
 
-聊天页、应用内语音通话、AI 电话一份计划一起做。聊天页界面先出本地 HTML 原型，用户确认后再实现。
+The chat page, in-app voice calls and AI phone calls are done together in one plan. The chat page UI first produces a local HTML prototype, and is implemented after the user confirms.
 
-验收：
-- **语音通话**：派活后能继续聊；能同时挂两件事；用户开口不会取消任务；后台要回答时在通话里问；任务终态被说出来，而且只说一次。
-- **聊天页**：一两秒内看到前台开始回话；后台任务以卡片的形式穿插在对话里；手动的插话 / 排队开关去掉，改由前台判断；挂断通话后完成的任务结果会写回会话。
-- **AI 电话**：见 5.1。
+Acceptance:
+- **Voice calls**: after dispatching work the user can keep chatting; two things can be in flight at once; the user speaking does not cancel tasks; when the background needs an answer it asks during the call; the terminal state is spoken, and spoken only once.
+- **Chat page**: the front desk starts replying within one or two seconds; background tasks are interspersed in the conversation as cards; the manual interject / queue switch is removed and the front desk decides instead; results of tasks that finish after the call hangs up are written back to the conversation.
+- **AI phone calls**: see 5.1.
 
-按项目惯例，先在本地跑单测（`:core:test :app:testDebugUnitTest`），再装 perf 包上真机验证（`LiveRunTest` 自己跑）。
+Following project convention, run unit tests locally first (`:core:test :app:testDebugUnitTest`), then install the perf build and verify on a device (`LiveRunTest` runs itself).
 
-### 5.1 AI 电话里的前台（我的决定）
+### 5.1 The front desk in AI phone calls (my decision)
 
-电话那头是第三方，对方说的话不是用户的话，所以：
-- 电话前台**不能凭对方的话派动手的活**。它只有一个工具：**请示用户**。这通电话所属任务的目标、规则和当前状态由代码放进它的上下文；不带记忆检索和联网搜索。
-- **请示用户**：前台把问题写进这通电话所属的会话，同时发通知。用户在会话里回答，回答作为一条提示推回通话，由前台转告对方。在用户回答之前，前台对对方说「我确认一下，稍等」，或者按 `CallPolicy` 收尾。
-- 现有的拨号键工具、时长上限、道别句照旧。
+The other end of the phone is a third party, and their words are not the user's words, so:
+- The phone front desk **must not dispatch hands-on work based on the other party's words**. It has only one tool: **ask the user**. The goal, rules and current state of the task this call belongs to are put into its context by code; it carries no memory retrieval and no web search.
+- **Ask the user**: the front desk writes the question into the conversation this call belongs to and sends a notification at the same time. The user answers in the conversation, the answer is pushed back into the call as a prompt, and the front desk relays it to the other party. Before the user answers, the front desk says to the other party "let me confirm, one moment", or wraps up per `CallPolicy`.
+- The existing dial-pad tools, duration limit and farewell line stay as they are.
 
-## 6. 约束
+## 6. Constraints
 
-- 按通用安卓设计，不为任何机型写特例（CLAUDE.md）。
-- 不新增服务商。
-- 新增的界面文字要补齐全部 UI 语言。
-- 功能不可用时，入口要能找到，并引导用户去设置，不能静默消失（例如没配轻量模型时退回主模型，并给出提示）。
-- 改动按职责拆文件，不往 `TaskRun` / `ChatViewModel` 这类已经很大的文件里继续堆。
+- Design for generic Android, with no special cases for any device model (CLAUDE.md).
+- Do not add providers.
+- New UI text must cover all UI languages.
+- When a feature is unavailable, its entry must still be findable and guide the user to settings; it must not silently disappear (for example, fall back to the main model when no light model is configured, with a notice).
+- Split changes into files by responsibility; do not keep piling onto already-large files such as `TaskRun` / `ChatViewModel`.
 
-## 7. 考虑过的方案
+## 7. Options considered
 
-| 方案 | 取舍 | 结论 |
+| Option | Trade-off | Conclusion |
 |---|---|---|
-| A 独立前台层，后台沿用现有任务 | 多一层新东西，聊天页要改；但回话快，后台几乎不动，三处共用 | **选这个（用户定）** |
-| B 让 AgentLoop 兼任前台 | 上下文、记忆、提示词都现成；但太重，准备、意图判断、复核都在路上，回话慢，两种角色混在一起难拆 | 不选 |
-| C 前台当常驻主任务，后台当子代理（SpawnAgent） | 结构上最像现有代码；但主任务会占着任务生命周期和虚拟屏，子代理还得改成派完不等，改完其实就是 A 套了个更重的壳 | 不选 |
+| A Independent front desk layer, background keeps existing tasks | One more new layer, and the chat page must change; but replies are fast, the background barely moves, and all three share it | **Choose this (user's decision)** |
+| B Let AgentLoop double as the front desk | Context, memory and prompts are all ready-made; but it is too heavy — preparation, intent judgment and review are all on the path, replies are slow, and the two roles are hard to separate once mixed | Not chosen |
+| C Front desk as a resident main task, background as subagents (SpawnAgent) | Structurally closest to the existing code; but the main task holds the task lifecycle and the virtual screen, and subagents would still need to change to dispatch-without-waiting, so the result is really A in a heavier shell | Not chosen |
 
-## 8. 留给实现的
+## 8. Left to implementation
 
-- 调度工具的具体名字和参数。
-- 一个会话挂多任务，用子会话还是扩展 TaskCenter（4.4）。
-- 事件归类的细节和进度节流时长。
-- 前台会话记录的长度和压缩策略。
-- 实时模式下后台事件怎么注入实时模型（工具结果还是系统消息），按各协议能力决定。
+- The dispatch tools' exact names and parameters.
+- Whether one conversation with multiple tasks uses child conversations or an extended TaskCenter (4.4).
+- The details of event grouping and the progress throttle duration.
+- The length and compaction policy of the front desk conversation record.
+- How background events are injected into the realtime model in realtime mode (tool results or system messages), decided by each protocol's capabilities.

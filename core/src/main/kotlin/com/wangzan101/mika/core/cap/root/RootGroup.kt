@@ -41,7 +41,7 @@ private const val MAX_TIMEOUT_SEC = 300
 internal object RootRunCommand : AgentTool {
     override val capability: String get() = ROOT
     override val verb = Verb.RootCommand
-    override val label = "root 命令"
+    override val label = "Root command"
     override val risk = Risk.Write
     override val offScreen = true
     override val logged = true

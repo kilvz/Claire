@@ -209,8 +209,8 @@ internal fun rememberAttachLaunchers(
 }
 
 /**
- * 最近的一张照片:方块缩略图;选中时蓝框、淡蓝罩、右上角蓝底序号,没选时右上角一个空心圈。
- * 点一下交给 [onClick](选上或取消);给了 [onPreview] 时长按看大图,选中状态不变。
+ * The most recent photo: a square thumbnail; when selected a blue border, light-blue veil and a blue badge with the index in the top-right corner, otherwise a hollow circle in the top-right corner.
+ * A tap passes it to [onClick] (select or deselect); when [onPreview] is given, a long press shows the full image and the selection state does not change.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -242,7 +242,7 @@ internal fun RecentCell(photo: PendingAttachment, order: Int?, onClick: () -> Un
     }
 }
 
-/** 预览一张还没发出的照片:在 App 的查看页看大图;读不到时提示一声。 */
+/** Previews a photo not yet sent: shows the full image in the app's viewer; says so when it cannot be read. */
 @Composable
 internal fun rememberPhotoPreview(): (PendingAttachment) -> Unit {
     val context = LocalContext.current
@@ -258,7 +258,7 @@ internal fun rememberPhotoPreview(): (PendingAttachment) -> Unit {
     }
 }
 
-// ---------- 待发 ----------
+// ---------- Pending send ----------
 
 /** A row of pending attachments above the input box: photos are square thumbnails, files are small cards (type, name, size); tap to preview or open, tap × in the top-right corner to remove. */
 @Composable

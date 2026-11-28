@@ -17,15 +17,15 @@ class SystemPromptLanguageTest {
     @Test
     fun testLanguageDirectiveChinese() {
         val directive = SystemPrompt.languageDirective("zh-CN")
-        assertTrue(directive.contains("语言设定"))
-        assertTrue(directive.contains("所有思考过程、动作用意、执行进度与最终回复均使用中文"))
+        assertTrue(directive.contains("Communication & Reasoning Language"))
+        assertTrue(directive.contains("final replies in Chinese"))
     }
 
     @Test
     fun testLanguageDirectiveJapanese() {
         val directive = SystemPrompt.languageDirective("ja")
-        assertTrue(directive.contains("言語設定"))
-        assertTrue(directive.contains("日本語"))
+        assertTrue(directive.contains("Communication & Reasoning Language"))
+        assertTrue(directive.contains("final replies in Japanese"))
     }
 
     @Test
@@ -42,17 +42,17 @@ class SystemPromptLanguageTest {
     fun allLocalesUseTheirDirectiveAndUnsupportedOnesMirrorThePrompt() {
         val expected = mapOf(
             "en" to "final replies in English",
-            "zh-Hans" to "所有思考过程",
-            "zh-Hant" to "所有思考过程",
-            "ja" to "日本語",
-            "ko" to "한국어",
-            "es" to "español",
-            "pt" to "português",
-            "ru" to "русском",
-            "ar" to "العربية",
-            "fa" to "فارسی",
-            "id" to "bahasa Indonesia",
-            "tr" to "Türkçe",
+            "zh-Hans" to "final replies in Chinese",
+            "zh-Hant" to "final replies in Chinese",
+            "ja" to "final replies in Japanese",
+            "ko" to "final replies in Korean",
+            "es" to "final replies in Spanish",
+            "pt" to "final replies in Portuguese",
+            "ru" to "final replies in Russian",
+            "ar" to "final replies in Arabic",
+            "fa" to "final replies in Persian",
+            "id" to "final replies in Indonesian",
+            "tr" to "final replies in Turkish",
         )
         for ((tag, text) in expected) assertTrue(tag, SystemPrompt.languageDirective(tag).contains(text))
         for (tag in listOf("vi", "und", "not-a-language")) {

@@ -74,7 +74,7 @@ class ProviderStore(
     internal val proactiveUsage: () -> Long = { 0L },
     internal val proactiveLimit: () -> Long = { ProactiveBudget.DEFAULT_DAILY_LIMIT },
     internal val proactiveCalls: () -> Long = { 0L },
-    /** 角色和组以外仍拥有配置的外部引用；组合根只提供 id 集，不让设置层依赖聊天或界面。 */
+    /** External references that still own configs outside roles and groups; the composition root provides only a set of ids, so the settings layer does not depend on chat or UI. */
     internal val externalConfigReferences: () -> Set<String> = { emptySet() },
     /**
      * Builds a callable model: config, Key, the endpoint the provider listing assigns to this model individually (null when absent, in which case the config's API type and address are used), headers, etc.
@@ -171,7 +171,7 @@ class ProviderStore(
         val configs = if (existing == null) _configs.value + selected else _configs.value.map {
             if (it.id == existing.id) selected else it
         }
-        // 没有用途、组或对话引用的配置删掉(和 [prune] 一样)
+        // Delete configs with no role, group or conversation reference (same as [prune])
         val used = roles.referenced + _groups.value.flatMap { g -> g.members.map { it.configId } } + externalConfigReferences()
         return saveRoleSelection(_providers.value, configs.filter { it.id in used }, roles)
     }

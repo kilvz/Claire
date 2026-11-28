@@ -48,7 +48,7 @@ object PairingScreen {
         val waiting = when (status) {
             BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff -> true
             is BuiltinShellStatus.Failed -> status.reason.duringPairing || status.fix == BuiltinShellFix.RePair
-            // 用户暂停了 Mika:不拿屏上读到的码去配对。
+            // The user paused Claire: do not pair with the code read from the screen.
             BuiltinShellStatus.Connecting, BuiltinShellStatus.Running, BuiltinShellStatus.Paused -> false
         }
         return if (waiting) PairingAttempt(code, reading.port) else null

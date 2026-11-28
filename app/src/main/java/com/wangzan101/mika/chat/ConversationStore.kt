@@ -544,8 +544,8 @@ class ConversationStore(
     }
 
     /**
-     * 未物化对话的主模型选择；进程内保存，null 键表示尚未编号的新对话。
-     * 与旁文件同属这个进程级存储，界面重建不会丢掉，也不会把 ViewModel 生命周期带进模型设置。
+     * Main-model choice of a conversation not yet materialised; kept in-process, a null key means a new conversation without an id yet.
+     * Part of the same process-level storage as the sidecar files; UI recreation does not lose it, and it does not drag the ViewModel lifecycle into model settings.
      */
     private val pendingMainChoices = mutableMapOf<String?, ModelChoice?>()
 
@@ -567,7 +567,7 @@ class ConversationStore(
         pendingMainChoices[to] = choice
     }
 
-    /** 全局角色、备援或组成员变动时，对话直接引用的模型配置仍属于有效所有权。 */
+    /** When the global role, fallback or group members change, model configs referenced directly by a conversation still count as valid ownership. */
     @Synchronized
     internal fun referencedModelConfigIds(): Set<String> {
         val saved = dir.listFiles { f -> f.isFile && f.name.endsWith(SETTINGS_SUFFIX) }.orEmpty().mapNotNull { f ->
@@ -589,7 +589,7 @@ class ConversationStore(
         return if (hasPendingMainChoice(parent)) pendingMainChoice(parent) else settings(parent).main
     }
 
-    /** 这个对话自己的运行设置；没有旁文件或读不懂时全部跟随全局。 */
+    /** This conversation's own run settings; when there is no sidecar file or it cannot be read, everything follows the global settings. */
     @Synchronized
     fun settings(conversationId: String): ConversationSettings = runCatching {
         val f = settingsFile(conversationId).takeIf { it.isFile } ?: return@runCatching ConversationSettings()
@@ -606,8 +606,8 @@ class ConversationStore(
     }.getOrDefault(ConversationSettings())
 
     /**
-     * 改这个对话下一次任务的运行设置；默认设置删掉旁文件，不留下空文件。
-     * 非默认设置先写临时文件再原子替换，失败时保留此前完整的选择。
+     * Changes this conversation's run settings for the next task; default settings delete the sidecar file, leaving no empty file.
+     * Non-default settings write a temp file first and then replace it atomically; on failure the previous complete choice is kept.
      */
     @Synchronized
     fun setSettings(conversationId: String, settings: ConversationSettings): Boolean {
@@ -640,10 +640,10 @@ class ConversationStore(
     }
 
     /**
-     * 把 [sourceId] 的轮次复制成新对话 [targetId],复制到 [throughTurn](0 起,含在内)为止。
-     * 源不存在、源文件损坏、[throughTurn] 越界、目标已有对话文件时返回 false,什么都不写。
-     * [title] 非空白时写成新对话标题;[origin] 非空时写 `<targetId>.branch`。
-     * 标题、网页来源、分支来源都是旁文件,写不进去不影响对话本身已复制好。
+     * Copies the turns of [sourceId] into a new conversation [targetId], up to and including [throughTurn] (0-based).
+     * Returns false and writes nothing when the source does not exist, the source file is corrupt, [throughTurn] is out of range, or the target already has a conversation file.
+     * When [title] is non-blank it becomes the new conversation title; when [origin] is non-empty it writes `<targetId>.branch`.
+     * Title, web origin and branch origin are all sidecar files; failing to write them does not affect the conversation itself having been copied.
      */
     @Synchronized
     fun branch(
@@ -682,7 +682,7 @@ class ConversationStore(
         // The persona and project membership follow the conversation; the switch history is not copied and the new conversation starts from the current one
         persona(sourceId)?.let { setPersona(targetId, it.personaId) }
         projectId(sourceId)?.let { setProject(targetId, it) }
-        // 分支只复制创建时的选择；之后源对话和分支各自独立修改。
+        // The branch only copies the choice at creation time; afterwards the source conversation and the branch each change independently.
         settings(sourceId).main?.let { setSettings(targetId, ConversationSettings(it)) }
         origin?.let { writeBranchOrigin(targetId, it) }
         return true
@@ -974,7 +974,7 @@ class ConversationStore(
 
         /** How many persona switch records are kept at most. */
         private const val MAX_PERSONA_HISTORY = 50
-        /** 对话自己的运行设置；不是一轮对话，不进入列表、归档或导出。 */
+        /** The conversation's own run settings; it is not a turn, so it does not enter the list, archive or export. */
         private const val SETTINGS_SUFFIX = ".settings.json"
     }
 

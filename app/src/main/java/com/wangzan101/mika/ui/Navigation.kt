@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import com.wangzan101.mika.ui.theme.MikaTheme
 
-/** App 里的页面。对话是根页面,其余都从它(或从设置)进去,返回时回到进来的那一页。 */
+/** Pages in the app. The conversation is the root page; all others are entered from it (or from settings) and return to the page they came from. */
 enum class Route { Chat, Personal, Settings, Memory, Plans, Browser, Files, Run, Source, PhoneSetup, Models, Usage, SpeechModel, VoiceModel, ImageModel, Welcome, ModelSetup, About, License, UpdateMirrors, Screens, Teach, Calls, Report, Playback, Persona, VoiceCatalog, RealtimeVoice, VoiceServices, CallMode, VoiceCall, VideoModel, VoicePacks }
 
 /**
@@ -131,11 +131,11 @@ private object NavAnim {
 }
 
 /**
- * 换页时各页的界面状态(滚动位置、输入框、展开的子页……)。规则跟返回栈一致:
- * 页面还压在栈里(比当前页浅)时留着,按返回回去原样恢复;退出栈(返回到更浅的页、同层换成别的页)就丢掉,
- * 下次从入口重新进来是新的一页。[keep] 为真的页面一直留着(对话页、个人助理这类根页面来回切)。
+ * UI state of each page across page switches (scroll position, input field, expanded sub-pages…). The rules follow the back stack:
+ * a page still on the stack (shallower than the current page) is kept and restored as it was when going back; once it leaves the stack (going back to a shallower page, or replacing it with another page at the same level) it is dropped,
+ * and entering again from the entry point next time is a new page. Pages with [keep] true are always kept (root pages such as the conversation page and the personal assistant, switched back and forth).
  *
- * 由调用方 remember 在换页动效外面:页面框架(侧栏常驻/抽屉)换形态时 [NavSlide] 会重新组合,状态不能跟着丢。
+ * The caller remembers it outside the page-switch animation: when the page framework (persistent sidebar/drawer) changes shape, [NavSlide] recomposes and the state must not be lost with it.
  */
 @Stable
 class PageStates internal constructor(
@@ -143,7 +143,7 @@ class PageStates internal constructor(
     private val depths: HashMap<String, Int>,
     private val keep: (String) -> Boolean,
 ) {
-    /** 进入 [key] 这一页(层级 [depth]):同层及更深的其他页已出栈,扔掉它们存着的状态。 */
+    /** Enters page [key] (level [depth]): other pages at the same level and deeper have left the stack, so discard their stored state. */
     internal fun enter(key: String, depth: Int) {
         for (gone in stalePages(depths, key, depth, keep)) {
             depths -= gone
@@ -153,7 +153,7 @@ class PageStates internal constructor(
     }
 
     internal companion object {
-        /** 进入 [key]/[depth] 时该丢掉的页面:层级不比它浅、不是它自己、也不是常驻页。 */
+        /** Pages that should be discarded when entering [key]/[depth]: level not shallower than it, not itself, and not a kept page. */
         fun stalePages(known: Map<String, Int>, key: String, depth: Int, keep: (String) -> Boolean): List<String> =
             known.filter { (k, d) -> k != key && d >= depth && !keep(k) }.keys.toList()
 
@@ -172,12 +172,12 @@ fun rememberPageStates(keep: (String) -> Boolean = { false }): PageStates {
 }
 
 /**
- * 页面切换的滑动推入过渡:[depth] 变深时新页从右滑入、旧页小幅左移(视差),变浅时反向。
- * 同级替换按推入处理;系统关了动画([MikaTheme.reduceMotion])时直接替换。
- * 内容里要用 [targetState] 的值(动画期间旧页还在),别读导航的实时状态。
+ * Slide push transition for page switches: when [depth] increases the new page slides in from the right and the old page shifts slightly left (parallax), and the reverse when it decreases.
+ * Same-level replacement is treated as a push; when system animations are off ([MikaTheme.reduceMotion]) it replaces directly.
+ * Content must use the [targetState] value (the old page is still there during the animation); do not read the navigation's live state.
  *
- * 给了 [states] 时每页的界面状态按 [pageKey] 存进去(规则见 [PageStates]),[pageKey] 相同视为同一页:
- * 只是页面数据变了不重演换页动效,也不会两份同名页同时在组合树里。
+ * When [states] is given, each page's UI state is stored under [pageKey] (rules in [PageStates]); the same [pageKey] is treated as the same page:
+ * a mere page data change does not replay the page-switch animation, and two pages with the same [pageKey] are never in the composition tree at once.
  */
 @Composable
 fun <T> NavSlide(

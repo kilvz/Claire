@@ -485,7 +485,7 @@ private fun VendorForm(vendor: VoiceVendor, onBack: () -> Unit, onSave: (VoicePr
                 } catch (e: VoiceModelError) {
                     error = e.detail
                 } catch (e: Exception) {
-                    // 存储那一层的检查不过(凭据、目录写不进去之类)抛的不是 VoiceModelError:一样写在页上,不让它冒出去
+                    // Checks in the storage layer fail (credentials, catalog unwritable, etc.) and throw something other than VoiceModelError: show it on the page the same way, do not let it escape
                     error = VoiceModelError.from(e).detail
                 }
             },
@@ -532,7 +532,7 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
                     InputRow(stringResource(R.string.voice_field_api_key), apiKey, { apiKey = it }, "sk-…", secret = true)
                     InputRow(stringResource(R.string.voice_field_name), name, { name = it }, optional)
                 }
-                // 识别、朗读、实时语音各一组,各放各的配置;哪一组的模型留空,那一项就不接
+                // One group each for recognition, read-aloud and real-time speech, each with its own config; when a group's model is left empty, that item is not connected
                 val modelLabel = stringResource(R.string.voice_model_id)
                 val voiceLabel = stringResource(R.string.voice_voice)
                 GroupLabel(stringResource(R.string.voice_cap_stt))
@@ -554,7 +554,7 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
             PresetKind.SelfHosted -> {
                 GroupCard {
                     InputRow(stringResource(R.string.voice_field_url), url, { url = it }, "192.168.1.5:10095", first = true, keyboard = KeyboardType.Uri)
-                    // 识别语言:默认「自动」,不指定、由服务自己判断;服务能认哪些语言看它跑的模型
+                    // Recognition language: "Auto" by default, unspecified and decided by the service itself; which languages the service can recognise depends on the model it runs
                     AsrLanguageRow(AsrLanguage.of(language), { language = it.code })
                 }
             }
@@ -572,7 +572,7 @@ private fun PresetForm(kind: PresetKind, onBack: () -> Unit, onSave: (VoicePrese
                 } catch (e: VoiceModelError) {
                     error = e.detail
                 } catch (e: Exception) {
-                    // 存储那一层的检查不过(凭据、目录写不进去之类)抛的不是 VoiceModelError:一样写在页上,不让它冒出去
+                    // Checks in the storage layer fail (credentials, catalog unwritable, etc.) and throw something other than VoiceModelError: show it on the page the same way, do not let it escape
                     error = VoiceModelError.from(e).detail
                 }
             },

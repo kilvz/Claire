@@ -52,7 +52,7 @@ private fun ok(r: ToolExecution) = r.content["ok"] == JsonPrimitive(true)
 
 internal object RunCommand : SandboxTool {
     override val verb = Verb.RunCommand
-    override val label = "处理文件"
+    override val label = "Process files"
     override val risk = Risk.Write
     override val entry = Entry.Opens
     override val composite = true
@@ -75,7 +75,7 @@ internal object RunCommand : SandboxTool {
 
 internal object RunBundledScript : SandboxTool {
     override val verb = Verb.RunBundledScript
-    override val label = "运行自带脚本"
+    override val label = "Run bundled script"
     override val risk = Risk.Write
     override val composite = true
     override val logged = true
@@ -97,7 +97,7 @@ internal object RunBundledScript : SandboxTool {
 
 internal object ReadFile : SandboxTool {
     override val verb = Verb.ReadFile
-    override val label = "读文件"
+    override val label = "Read file"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("read_file",
@@ -116,7 +116,7 @@ internal object ReadFile : SandboxTool {
 
 internal object WriteFile : SandboxTool {
     override val verb = Verb.WriteFile
-    override val label = "写文件"
+    override val label = "Write file"
     override val risk = Risk.Write
     override val logged = true
     override val wideTarget = true
@@ -140,7 +140,7 @@ internal object WriteFile : SandboxTool {
 
 internal object SearchFiles : SandboxTool {
     override val verb = Verb.SearchFiles
-    override val label = "搜索文件"
+    override val label = "Search files"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("search_files",
@@ -163,7 +163,7 @@ internal object SearchFiles : SandboxTool {
 
 internal object ShareFile : SandboxTool {
     override val verb = Verb.ShareFile
-    override val label = "导出文件"
+    override val label = "Export file"
     override val risk = Risk.Write
     override val logged = true
     override val wideTarget = true
@@ -192,7 +192,7 @@ private fun output(text: String, place: Place? = null, authored: String? = null)
  */
 internal object ViewImage : SandboxTool {
     override val verb = Verb.ViewImage
-    override val label = "看图"
+    override val label = "View image"
     override val risk = Risk.Read
     override val concurrency = Concurrency.ParallelSafe
     override val def = ToolDef("view_image",
@@ -225,7 +225,7 @@ internal object ViewImage : SandboxTool {
 
 internal object ListFolderFiles : SandboxTool {
     override val verb = Verb.ListFolderFiles
-    override val label = "查看授权文件夹"
+    override val label = "Browse allowed folders"
     override val risk = Risk.Read
     override val entry = Entry.Opens
     override val def = ToolDef("list_folder_files", Prompts.tool("list_folder_files"), mapOf(

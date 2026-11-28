@@ -218,7 +218,7 @@ internal object ScheduleTask : AgentTool {
 
     private fun invalidWindow(): Nothing = throw PlanValidationException(PlanValidation.InvalidExecutionWindow)
 
-    /** 省略时编辑保留原窗口；自定义时间、时区与手动编辑器共用解析规则。 */
+    /** When omitted, editing keeps the original window; custom time, time zone and the manual editor share the same parsing rules. */
     private fun executionSpec(a: Args, original: TriggerDefinition? = null): ExecutionSpec {
         val previous = original?.toPlanDraft()
         val raw = a.str("executionWindow")
@@ -256,7 +256,7 @@ internal object ScheduleTask : AgentTool {
         PlanExecutionWindow.Custom -> "custom"
     }
 
-    /** 缺省字段保留；清空钟点/间隔、条件、提醒和冷却有显式的空值语义。验证与页面共用。 */
+    /** Missing fields are kept; clearing the clock time/interval, condition, reminder and cooldown has explicit null semantics. Validation is shared with the page. */
     private fun editedPlan(a: Args, original: TriggerDefinition): TriggerDefinition {
         val goal = a.str("goal", max = 4000) ?: original.goal
         val reminder = a.str("reminder", min = 0, max = 2000)?.trim()?.ifEmpty { null }

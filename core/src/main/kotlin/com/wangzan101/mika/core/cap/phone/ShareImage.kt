@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 internal object ShareImage : PhoneTool {
     override val verb = Verb.ShareImage
-    override val label = "分享图片到 App"
+    override val label = "Share image to app"
     override val risk = Risk.Write
     override val showsScreenAfter = true
     override val logged = true

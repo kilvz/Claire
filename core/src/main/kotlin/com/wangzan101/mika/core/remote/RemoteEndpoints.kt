@@ -20,7 +20,7 @@ class RemoteEndpoints(
     private val records: RunExportSource? = null,
     private val calls: com.wangzan101.mika.core.calls.PhoneCallPort? = null,
     private val companion: RemoteCompanion? = null,
-    /** 用户暂停了 Mika:MCP 与 CLI 接口共用这一个标记([refuseRemote])。 */
+    /** The user paused Claire: the MCP and CLI APIs share this one flag ([refuseRemote]). */
     private val paused: com.wangzan101.mika.core.run.PauseFlag = com.wangzan101.mika.core.run.PauseFlag.Never,
 ) {
     private val companionApi = companion?.let(::CompanionApi)

@@ -145,7 +145,7 @@ fun SettingsScreen(
     onOpenPersonas: (() -> Unit)? = null,
     openPhoneOps: Boolean = false,
     onPhoneOpsOpened: () -> Unit = {},
-    /** 别处的「去暂停页」(如助手已暂停的提示)直接打开「暂停 Mika」页。 */
+    /** The "go to pause page" from elsewhere (such as a helper-paused prompt) opens the "Pause Claire" page directly. */
     openPause: Boolean = false,
     onPauseOpened: () -> Unit = {},
     /** Subpages under Models (usage, voice input, read-aloud, call mode, voice services, image/video models), opened by the Activity router. */
@@ -163,7 +163,7 @@ fun SettingsScreen(
             else -> SettingsPage.Home
         },
     ) }
-    // 进子页时当前页离开组合,它自己记的滚动位置随之丢掉;有子页可进的几页在这里记,回来接着刚才的位置
+    // Entering a subpage removes the current page from composition and loses its own recorded scroll position; the pages that have subpages record it here and resume where they left off
     val pageScrolls = rememberSaveable(saver = PageScrolls.Saver) { PageScrolls() }
     val focusHost = remember { FocusTargetHost() }
     var explaining by remember { mutableStateOf<Problem?>(null) }
@@ -274,7 +274,7 @@ fun SettingsScreen(
 
     if (page != SettingsPage.Home) BackHandler { back() }
 
-    // 设置搜索:搜索框的字记在这里,从结果点进子页再回来还在;能力条件和下面各入口的显示条件一致
+    // Settings search: the search box text is recorded here, so it survives going into a subpage from a result and coming back; capability conditions match the display conditions of the entries below
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchAvailable = buildSet {
         if (status.sdkInt >= Prerequisites.MIN_SDK) add(SettingsRequirement.Recovery)
@@ -577,7 +577,7 @@ internal fun SettingsContent(
     onOpenLanguage: () -> Unit = {},
     onOpenMemory: (() -> Unit)? = null,
     onOpenBackup: (() -> Unit)? = null,
-    /** 「暂停 Mika」页的入口;暂停着时首页这一行写「已暂停」。 */
+    /** Entry to the "Pause Claire" page; the home row says "Paused" while paused. */
     onOpenPause: (() -> Unit)? = null,
     mikaPaused: Boolean = false,
     onOpenRecommendations: () -> Unit = {},
@@ -595,13 +595,13 @@ internal fun SettingsContent(
     /** Auto-archive: how long a conversation without new messages goes before it is archived automatically; 0 means off. */
     autoArchiveDays: Int = 0,
     onOpenAutoArchive: () -> Unit = {},
-    /** 顶上搜索框里的字;非空时这一页换成搜索结果,返回键先清空它。状态由切页的一方持有,从结果点进子页再回来还在。 */
+    /** Text in the search box at the top; when non-empty this page switches to search results, and back first clears it. State is held by the page switcher, so it survives going into a subpage from a result and coming back. */
     searchQuery: String = "",
     onSearchQuery: (String) -> Unit = {},
-    /** 此刻具备的能力:要某种能力的入口(见 [SettingsSearchIndex])在设置里不显示时,搜索里也不出现。 */
+    /** Capabilities available right now: when an entry requiring a capability (see [SettingsSearchIndex]) is not shown in settings, it does not appear in search either. */
     searchAvailable: Set<SettingsRequirement> = emptySet(),
     onOpenSearchResult: (SettingsDestination) -> Unit = {},
-    /** 这一页的滚动状态;切页的一方给进来,从子页回来才停得住。 */
+    /** Scroll state of this page; provided by the page switcher so it can stop where it was after returning from a subpage. */
     scrollState: ScrollState = rememberScrollState(),
 ) {
     val check = Prerequisites.check(status, hasMainModel = mainModel != null)

@@ -45,7 +45,7 @@ object DeskPromise {
             """\b(biar|biarlah)\s+(saya|aku)\b""",
             RegexOption.IGNORE_CASE,
         ),
-        // Chinese: "我来/让我/我会/我这就/我马上 … + action", simplified and traditional; the action can follow a short object ("我来把设置改一下").
+        // Chinese: patterns meaning "I'll / let me / I will / I'm about to … + action", simplified and traditional; the action can follow a short object (for example, "I'll change the settings").
         Regex(
             """(我来|我來|让我|讓我|我会|我會|我这就|我這就|我马上|我馬上|正在|马上|馬上)[^。！？!?\n]{0,12}(检查|檢查|查看|设置|設定|调整|調整|处理|處理|修好|修改|关掉|關掉|关闭|關閉|打开|打開|试试|試試|看一下|改)""",
         ),

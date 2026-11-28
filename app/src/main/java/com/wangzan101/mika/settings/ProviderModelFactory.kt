@@ -34,9 +34,9 @@ import com.wangzan101.mika.settings.ProviderStore.Companion.get
  */
 fun ProviderStore.configFor(role: ModelRole): ProviderConfig? = configFor(role, _roles.value)
 
-/** 按一份有效的角色选择解析代表配置；对话覆盖不会写回全局角色。 */
+/** Resolve the representative config from an effective role choice; conversation overrides are not written back to global roles. */
 internal fun ProviderStore.configFor(role: ModelRole, choices: RoleChoices): ProviderConfig? {
-    // 组按「排在最前的启用成员」给界面一个代表;真正的路由在 modelFor 里按成员走
+    // Groups give the UI a representative as the "first enabled member"; real routing goes per member in modelFor
     val id = choices.resolveConfig(role)
         ?: choices.resolveGroup(role)?.let(::group)?.enabledMembers?.firstOrNull()?.configId ?: return null
     val cfg = _configs.value.firstOrNull { it.id == id } ?: return null
@@ -45,7 +45,7 @@ internal fun ProviderStore.configFor(role: ModelRole, choices: RoleChoices): Pro
     return if (sees == cfg.capabilities.vision) cfg else cfg.copy(capabilities = cfg.capabilities.copy(vision = sees))
 }
 
-/** 一个覆盖此刻是否仍能当主模型；失效覆盖保留在对话旁文件里，仅解析时退回全局。 */
+/** Whether an override can still serve as the main model right now; an invalid override stays in the conversation-side file and only falls back to global during resolution. */
 fun ProviderStore.usableMainChoice(choice: ModelChoice?): ModelChoice? = when (choice) {
     is ModelChoice.Model -> choice.takeIf { c ->
         _configs.value.any { it.id == c.configId && it.canUseForChat() && it.capabilities.toolCalls }
@@ -54,7 +54,7 @@ fun ProviderStore.usableMainChoice(choice: ModelChoice?): ModelChoice? = when (c
     null -> null
 }
 
-/** 主模型、SameAsMain、备援和提示元数据共用的唯一覆盖解析入口。 */
+/** The single override resolution entry point shared by the main model, SameAsMain, fallbacks and prompt metadata. */
 internal fun ProviderStore.effectiveRoles(mainOverride: ModelChoice? = null): RoleChoices {
     val current = _roles.value
     return when (val usable = usableMainChoice(mainOverride)) {
@@ -64,7 +64,7 @@ internal fun ProviderStore.effectiveRoles(mainOverride: ModelChoice? = null): Ro
     }
 }
 
-/** 主模型在它那家还没测试通过时给出那一家；使用与本次运行相同的覆盖解析。 */
+/** Returns the provider of the main model when that provider has not passed testing yet; uses the same override resolution as this run. */
 fun ProviderStore.untestedMainProvider(mainOverride: ModelChoice? = null): Provider? {
     val choices = effectiveRoles(mainOverride)
     val cfg = configFor(ModelRole.Main, choices) ?: return null
@@ -85,7 +85,7 @@ fun ProviderStore.modelFor(
     mainOverride: ModelChoice? = null,
 ): ChatModel? {
     val choices = effectiveRoles(mainOverride)
-    // 无论组来自对话覆盖还是全局设置，都必须满足这个用途（例如 Vision 至少一个成员能看图）。
+    // Whether the group comes from a conversation override or global settings, it must satisfy this purpose (for example Vision needs at least one member that can see images).
     choices.resolveGroup(role)?.let(::group)?.let { group ->
         if (!groupUsable(group, role)) return null
         return groupModelFor(role, group, session, choices)
@@ -96,7 +96,7 @@ fun ProviderStore.modelFor(
         effortOverride = effort, useRoleEffort = false)
 }
 
-/** 按组的成员顺序建出每个成员;成员的上下文设置、思考档位、请求头都按各自的配置来。 */
+/** Build each member in the group's member order; each member's context settings, thinking level and request headers come from its own config. */
 internal fun ProviderStore.groupModelFor(
     role: ModelRole,
     group: ModelGroup,
@@ -205,13 +205,13 @@ fun ProviderStore.mainFallbackChain(
     mainOverride: ModelChoice? = null,
 ): Pair<List<ChatModel>, List<String?>> = fallbackChain(ModelRole.Main, session, mainOverride)
 
-/** 视觉模型备援链；SameAsMain 按本次有效主模型排除主配置自身。 */
+/** Vision model fallback chain; SameAsMain excludes the main config itself based on this run's effective main model. */
 fun ProviderStore.visionFallbackChain(
     session: ModelSession = ModelSession.fresh(),
     mainOverride: ModelChoice? = null,
 ): List<ChatModel> = fallbackChain(ModelRole.Vision, session, mainOverride).first
 
-/** 轻量模型备援链；SameAsMain 按本次有效主模型排除主配置自身。 */
+/** Light model fallback chain; SameAsMain excludes the main config itself based on this run's effective main model. */
 fun ProviderStore.lightFallbackChain(
     session: ModelSession = ModelSession.fresh(),
     mainOverride: ModelChoice? = null,

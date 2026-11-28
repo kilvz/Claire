@@ -28,7 +28,7 @@ enum class Fix {
     // Built-in helper
     OpenPhoneSetup, RepairPhoneHelper, RetryPhoneHelper, UnpairPhoneHelper, OpenPhoneOps,
     OpenAboutPhone, OpenDeveloperOptions, OpenUsbDebugging, OpenWirelessDebugging, OpenWifi,
-    /** 打开设置页(「暂停 Mika」在设置首页就有入口):Mika 暂停着时横幅点的就是它。 */
+    /** Open the settings page ("Pause Claire" has an entry on the settings home): this is what the banner taps when Claire is paused. */
     OpenPause,
 }
 
@@ -90,7 +90,7 @@ object StatusCopy {
         Problem.NoModel -> Fix.AddModel
         // The onboarding page explains every step, so no explanation is popped up again
         is Problem.PhoneHelper -> when {
-            // Mika 暂停着:这不是故障,是用户亲手要的,去能恢复的那页。
+            // Claire is paused: not a failure, the user asked for it, so go to the page where it can be resumed.
             p.status == BuiltinShellStatus.Paused -> Fix.OpenPause
             PhoneSetupCopy.canReconnect(p.status) -> Fix.RetryPhoneHelper
             (p.status as? BuiltinShellStatus.Failed)?.reason == BuiltinShellFailure.ShizukuNotInstalled ||
@@ -174,7 +174,7 @@ object StatusCopy {
                     tr(R.string.banner_failed), PhoneSetupCopy.failure(st.reason).title,
                     if (PhoneSetupCopy.canReconnect(st)) PhoneSetupCopy.RECONNECT else tr(R.string.fix_it),
                 )
-            // Mika 暂停着:标题说在暂停,下面一句说停了什么。
+            // Claire is paused: the title says it is paused and the line below says what was stopped.
             BuiltinShellStatus.Paused -> BannerCopy(
                 tr(R.string.pause_paused_title),
                 tr(R.string.pause_paused_body),

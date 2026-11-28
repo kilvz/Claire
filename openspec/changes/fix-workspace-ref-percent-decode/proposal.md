@@ -18,7 +18,7 @@ real-device walkthrough (PR #748):
    CommonMark rules it must write `%20` (a bare space is invalid inside a `[](...)` destination), and when it
    references a Chinese file name following URL habits it often writes the `%E6%8A%A5` form — even if such
    references render, they are cards whose names carry the encoded string, and opening goes through the file
-   gate, which cannot find the file by the literal path, so 「文件不存在」 (File not found) always pops up; image
+   gate, which cannot find the file by the literal path, so "File not found" always pops up; image
    thumbnails are empty placeholders. Fix it before the release.
 
 ## What Changes

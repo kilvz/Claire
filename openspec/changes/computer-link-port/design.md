@@ -26,8 +26,8 @@
 3. **The entry point `McpRuntime.setPort(port)` = `settings.setPort` + `writeUsbScript()` + `apply()`.**
    `apply()` follows the switches' existing path: if either one is on → `ensureRunning()` restarts the service → `onStartCommand` rebuilds the notification + `sync()` (rebind + republish info); if both are off → only store the setting and rewrite the script. `writeUsbScript` is idempotent (nothing is written to disk if the content has not changed).
 
-4. **The UI goes in the 「高级」 (Advanced) section (which currently has only the two switches, USB/network, and a port footnote).**
-   Upgrade the port footnote into a tappable 「监听端口」 (Listen port) row + dialog: a 「默认 8765」 (Default 8765) preset + a numeric input (up to 5 digits, digits only), with the apply button enabled only for 1024–65535. `ComputerAccessUi` gains `onPortChange: (Int) -> Unit` passed down to the lower layer, isomorphic to the other callbacks.
+4. **The UI goes in the "Advanced" section (which currently has only the two switches, USB/network, and a port footnote).**
+   Upgrade the port footnote into a tappable "Listen port" row + dialog: a "Default 8765" preset + a numeric input (up to 5 digits, digits only), with the apply button enabled only for 1024–65535. `ComputerAccessUi` gains `onPortChange: (Int) -> Unit` passed down to the lower layer, isomorphic to the other callbacks.
 
 ## Risks / Trade-offs
 

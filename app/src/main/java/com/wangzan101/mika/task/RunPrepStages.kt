@@ -35,15 +35,15 @@ import com.wangzan101.mika.core.cap.web.WEB
 import com.wangzan101.mika.task.TaskRun.Companion.WEB_FRAME_MS
 import com.wangzan101.mika.task.TaskRun.Companion.TAG
 
-// 运行装配:模型、运行记录、记忆与知识、网页、提示词
+// Run assembly: model, run record, memory and knowledge, web, prompt
 internal suspend fun TaskRun.assembleModels(snapshot: TaskModelSnapshot): RunModels? {
     val model = snapshot.main ?: return null
-    // 用户在浏览器页上对着一页问的:那一页借给这个任务当当前网页标签(见 PageLoans);开跑时页面还开着才借得到
+    // Asked by the user on a page in the browser: that page is lent to this task as the current web tab (see PageLoans); it can only be lent if the page is still open at start
     val pageLoan = if (provenance.origin == RunOrigin.Ui) withContext(Dispatchers.Main) { UserBrowser.existing()?.claim(conversationId, key) } else null
     val light = snapshot.light
     val decision = env.decisionModel(service)
-    // 同一模型分成两个实例并不会更便宜或更快;禁止它给批量/收尾工具反而只会增加改派和逐步操作。
-    // 这只跳过逐步分工,轻量角色仍可用于意图判断、标题和收尾等辅助调用。
+    // Splitting the same model into two instances is neither cheaper nor faster; forbidding it for batch/teardown tools only adds reassignment and step-by-step operations.
+    // This only skips the step-by-step split; light roles are still usable for auxiliary calls such as intent classification, titles and teardown.
     val routedLight = light?.takeIf { snapshot.routeLightSeparately }
     val vision = snapshot.vision
     val visionFallbacks = snapshot.visionFallbacks

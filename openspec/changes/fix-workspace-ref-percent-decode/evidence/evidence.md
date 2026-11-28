@@ -12,7 +12,7 @@ decode either, it does not match the real file name.
 ### B. Real-device walkthrough (found defect 1)
 
 Installed main (c4ef434c + decode fix) → connect-computer submitted the task "generate /workspace/my report.csv
-(with a space) and /workspace/报告.png (Chinese name), deliver the reply as Markdown references, percent-encode
+(with a space) and /workspace/report.png (a Chinese name), deliver the reply as Markdown references, percent-encode
 the link targets per URL rules" → the task completed, and the answer contained
 `![…](/workspace/%E6%8A%A5%E5%91%8A.png)` and `[my report.csv](/workspace/my%20report.csv)`.
 

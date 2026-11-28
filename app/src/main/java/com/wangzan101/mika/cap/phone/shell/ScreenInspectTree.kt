@@ -8,7 +8,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** 只读读屏时看到的一个控件;真机上包着 AccessibilityNodeInfo,测试里换成假的。 */
+/** One control seen during read-only screen inspection; on a device it wraps AccessibilityNodeInfo, in tests it is replaced with a fake. */
 internal interface InspectNode {
     val packageName: CharSequence?
     val className: CharSequence?
@@ -16,7 +16,7 @@ internal interface InspectNode {
     val text: CharSequence?
     val description: CharSequence?
     val isPassword: Boolean
-    /** left, top, right, bottom(屏幕坐标)。 */
+    /** left, top, right, bottom (screen coordinates). */
     val bounds: IntArray
     val isClickable: Boolean
     val isEditable: Boolean
@@ -24,13 +24,13 @@ internal interface InspectNode {
     val isVisible: Boolean
     val childCount: Int
     fun child(index: Int): InspectNode?
-    /** 用完交还(旧系统上要回收节点)。 */
+    /** Hand back when done (old systems must recycle the node). */
     fun release()
 }
 
 /**
- * 一次读屏的上限:控件总数、树的深度、每段文字的长度,以及整次输出的大致字符数([maxOutput],
- * 每个控件按 [ScreenInspectTree.NODE_OVERHEAD] 个字符的字段开销加上各段文字算)。超出哪一项就记进 [truncatedBy]。
+ * Limits for one screen inspection: total controls, tree depth, length of each text segment, and the approximate character count of the whole output ([maxOutput],
+ * each control counted as [ScreenInspectTree.NODE_OVERHEAD] characters of field overhead plus its text segments). Whichever limit is exceeded is recorded in [truncatedBy].
  */
 internal class InspectBudget(
     val maxNodes: Int = ScreenInspectTree.MAX_NODES,
@@ -39,15 +39,15 @@ internal class InspectBudget(
     val maxOutput: Long = ScreenInspectTree.MAX_OUTPUT,
 ) {
     var nodes = 0
-    /** 已经写出的大致字符数。 */
+    /** Approximate number of characters already written. */
     var output = 0L
-    /** 因为哪几项上限截断了:`nodes`、`depth`、`text`、`output`(按先后)。 */
+    /** Which limits truncated the output: `nodes`, `depth`, `text`, `output` (in that order). */
     val truncatedBy = LinkedHashSet<String>()
     val truncated: Boolean get() = truncatedBy.isNotEmpty()
 
     fun cut(reason: String) { truncatedBy += reason }
 
-    /** 再写 [chars] 个字符还在总上限内就记上并返回真;否则记下截断。 */
+    /** Records it and returns true when [chars] more characters still fit within the total limit; otherwise records the truncation. */
     fun charge(chars: Long): Boolean {
         if (output + chars > maxOutput) {
             cut(ScreenInspectTree.CUT_OUTPUT)
@@ -59,23 +59,23 @@ internal class InspectBudget(
 }
 
 /**
- * 把控件树写成 JSON。密码框(以及它下面的所有子控件)不写文字和描述,只标 `password: true`;
- * 超出 [InspectBudget] 的部分不读(连子节点都不去取),只记下截断的原因。
+ * Writes the control tree as JSON. Password fields (and all their descendants) write no text or description, only `password: true`;
+ * parts beyond [InspectBudget] are not read (not even child nodes are fetched), only the reason for truncation is recorded.
  */
 internal object ScreenInspectTree {
     const val MAX_NODES = 2_500
     const val MAX_DEPTH = 60
     const val MAX_TEXT = 1_000
-    /** 整次输出的字符上限;CLI 最多收 4 MiB,按 UTF-8 每字符最多 3 字节留出余量。 */
+    /** Character limit for the whole output; the CLI accepts at most 4 MiB, leaving headroom at up to 3 bytes per character in UTF-8. */
     const val MAX_OUTPUT = 1_000_000L
-    /** 一个控件除文字外的字段(键名、布尔、坐标、括号)大约占的字符数。 */
+    /** Approximate number of characters a control's non-text fields (key names, booleans, coordinates, brackets) take. */
     const val NODE_OVERHEAD = 220L
     const val CUT_NODES = "nodes"
     const val CUT_DEPTH = "depth"
     const val CUT_TEXT = "text"
     const val CUT_OUTPUT = "output"
 
-    /** [node] 由这里交还;超出总数、深度或输出上限时返回 null。 */
+    /** [node] is handed back here; returns null when the total count, depth or output limit is exceeded. */
     fun node(node: InspectNode, budget: InspectBudget, depth: Int = 0, inSecret: Boolean = false): JsonObject? {
         try {
             if (budget.nodes >= budget.maxNodes) { budget.cut(CUT_NODES); return null }
@@ -121,12 +121,12 @@ internal object ScreenInspectTree {
         val s = value.toString()
         if (s.length <= budget.maxText) return JsonPrimitive(s)
         budget.cut(CUT_TEXT)
-        // 不把一个字符的代理对切成两半
+        // Do not split a character's surrogate pair in half
         val end = if (s[budget.maxText - 1].isHighSurrogate()) budget.maxText - 1 else budget.maxText
         return JsonPrimitive(s.substring(0, end))
     }
 
-    /** 窗口的读取顺序:获得焦点的在前,其次是活动的,其余按显示屏、系统给的顺序;预算先给前面的。 */
+    /** Window read order: focused first, then active, the rest by display and in the order the system gives; the budget goes to the earlier ones first. */
     fun <W> windowOrder(windows: List<W>, focused: (W) -> Boolean, active: (W) -> Boolean): List<W> =
         windows.withIndex().sortedWith(
             compareBy<IndexedValue<W>>({ if (focused(it.value)) 0 else 1 }, { if (active(it.value)) 0 else 1 }, { it.index }),

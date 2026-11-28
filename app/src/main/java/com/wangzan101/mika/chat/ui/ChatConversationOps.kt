@@ -178,7 +178,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
             workspaceResolver?.setDraftProject(fresh, validProject)
             _ui.update { it.rebuildForConversation(conversationId = fresh, projectId = validProject) }
             vm.refreshMainModel()
-            // 还没说过话:胶囊上是一张新对话卡片(编号等说出来再定,见 begin)
+            // Nothing said yet: the capsule shows a new-conversation card (the id is decided once something is said, see begin)
             session.markCurrent(CurrentChat.Fresh)
             return
         }
@@ -323,7 +323,7 @@ internal class ChatConversationOps(private val vm: ChatViewModel, private val se
         val fresh = if (session.parallel()) store.newConversation() else null
         _ui.update { it.rebuildForConversation(conversationId = fresh) }
         vm.refreshMainModel()
-        // 屏上换成了一个新的空对话:胶囊不再接着删掉的那个
+        // The screen switched to a new empty conversation: the capsule no longer follows the deleted one
         session.markCurrent(CurrentChat.Fresh)
     }
 }

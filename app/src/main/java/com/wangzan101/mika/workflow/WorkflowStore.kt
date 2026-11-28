@@ -32,7 +32,7 @@ import java.util.UUID
 @Serializable data class WorkflowData(val templates: List<WorkflowTemplate> = emptyList(), val runs: List<WorkflowRun> = emptyList())
 enum class WorkflowProblem {
     Invalid, Full, Changed, Busy, Read, Write, ResultTooLong,
-    /** 用户暂停了 Mika:不开始、不继续,恢复后再操作。 */
+    /** The user paused Claire: do not start or continue; act again after resume. */
     Paused,
 }
 class WorkflowException(val problem: WorkflowProblem) : Exception(problem.name)

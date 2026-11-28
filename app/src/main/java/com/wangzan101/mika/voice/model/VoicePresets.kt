@@ -146,16 +146,16 @@ object VoicePresets {
 
     private fun openAiCompatible(p: VoicePreset.OpenAiCompatible): VoicePresetPlan {
         val base = p.baseUrl.trim().trimEnd('/')
-        // 自己在本机、局域网跑的服务多半只有 http,和添加聊天服务商时一样收下;Key 照旧必填、照旧加密保存
+        // Services run locally or on the LAN are usually http only; accept it like when adding a chat provider; the Key is still required and still stored encrypted
         val uri = runCatching { URI(base) }.getOrNull()
             ?.takeIf { it.scheme?.lowercase() in HTTP_SCHEMES && !it.host.isNullOrBlank() }
             ?: throw VoiceModelError.IncompleteConfig("Address must start with http:// or https://")
-        // query、fragment、账号密码不知道服务想拿它们做什么,不猜,一律不收
+        // It is unknown what the service would do with query, fragment or username/password, so do not guess and always reject them
         if (uri.rawQuery != null || uri.rawFragment != null || uri.rawUserInfo != null) {
             throw VoiceModelError.IncompleteConfig("Address must not contain a query, fragment or user info")
         }
         val key = p.apiKey.trim().ifEmpty { throw VoiceModelError.IncompleteConfig("Enter the API key") }
-        // 同一台机器上不同端口是不同的服务(各存各的,后存的不顶掉先存的);没写端口、或写的就是默认端口的,编号和以前一样
+        // Different ports on the same machine are different services (each stored separately, a later save does not replace an earlier one); without a port, or with the default port, the id is the same as before
         val defaultPort = if (uri.scheme.equals("https", ignoreCase = true)) 443 else 80
         val host = uri.host + if (uri.port >= 0 && uri.port != defaultPort) ":${uri.port}" else ""
         val id = "compat:$host${uri.path.orEmpty().trimEnd('/')}"
@@ -181,9 +181,9 @@ object VoicePresets {
     }
 
     /**
-     * 存这个服务的 Key 用的编号。凭据编号只收字母、数字和 `._:-`,而带路径的地址(…/v1)做成的服务编号里有 `/`:
-     * 能直接用的照旧(以前存下的 Key 还找得到);不能的把别的字符换成 `_`、截短,再接一段服务编号的摘要,
-     * 两个地址不会换出同一个编号。
+     * The id used to store this service's Key. Credential ids accept only letters, digits and `._:-`, while a service id made from an address with a path (…/v1) contains `/`:
+     * those that can be used directly stay as they are (previously stored Keys are still found); for the rest, other characters are replaced with `_`, truncated, and a digest of the service id appended,
+     * so two addresses never map to the same id.
      */
     internal fun secretId(serviceId: String): String {
         val plain = "preset:$serviceId"

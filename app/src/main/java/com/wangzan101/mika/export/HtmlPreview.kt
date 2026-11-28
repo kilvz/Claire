@@ -19,7 +19,7 @@ import java.io.File
 
 internal const val HTML_PREVIEW_ORIGIN = "https://appassets.androidplatform.net"
 
-/** 一次 HTML 预览的 WebView 与暂存目录由同一个会话持有，释放顺序固定且可重复调用。 */
+/** The WebView and staging directory of one HTML preview are held by the same session; release order is fixed and repeatable. */
 internal class HtmlPreviewSession(context: Context, val preview: ExportPreview.Html) {
     private val loader = htmlPreviewAssetLoader(context, preview.directory)
 
@@ -71,7 +71,7 @@ internal class HtmlPreviewSession(context: Context, val preview: ExportPreview.H
     }
 }
 
-/** 用真实 destroy 生命周期记录释放状态，避免旧 WebView 在重组后继续存活。 */
+/** Records release state with the real destroy lifecycle, so an old WebView does not stay alive after recomposition. */
 internal class HtmlPreviewWebView(context: Context) : WebView(context) {
     @Volatile
     var isDestroyed: Boolean = false
@@ -84,7 +84,7 @@ internal class HtmlPreviewWebView(context: Context) : WebView(context) {
     }
 }
 
-/** 只暴露这次暂存根目录内的普通文件；规范化路径和链接目标都不能越界。 */
+/** Only exposes regular files inside this staging root; neither normalized paths nor link targets may escape it. */
 internal fun htmlPreviewAssetLoader(context: Context, directory: File): WebViewAssetLoader {
     val root = directory.canonicalFile
     val rootPath = root.toPath()

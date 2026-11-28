@@ -8,7 +8,7 @@ import com.wangzan101.mika.core.prompt.Prompts
 import com.wangzan101.mika.core.tool.AgentTool
 import com.wangzan101.mika.core.tool.ToolContext
 
-/** 视频能力:看视频(元数据 + 抽帧)、把视频存进影片库。没有端口时不装。 */
+/** Video capability: view videos (metadata + frame extraction) and save videos to the movie library. Not installed when there is no port. */
 const val VIDEO = "video"
 
 internal class VideoCapability(

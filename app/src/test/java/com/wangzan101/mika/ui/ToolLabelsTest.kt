@@ -7,6 +7,7 @@ import com.wangzan101.mika.i18n.ResFileTexts
 import com.wangzan101.mika.i18n.UiText
 import com.wangzan101.mika.i18n.tr
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -14,18 +15,21 @@ import org.junit.Test
 class ToolLabelsTest {
     @get:Rule val texts = ChineseTexts()
 
-    /** Every tool that declares a label has UI text, and the Chinese matches the declaration word for word; English has a separate set. */
+    /** Every tool that declares a label has UI text, and the English UI text has no Chinese left in it. */
     @Test
     fun everyDeclaredLabelIsLocalized() {
         val tools = knownTools()
         val labels = ToolLabels(tools)
         val declared = tools.names.mapNotNull { n -> tools[n]?.label?.let { n to it } }
         assertTrue(declared.size > 40)
+        for ((name, label) in declared) assertTrue("$name: $label", label in ToolLabels.TOOL_LABELS)
+        UiText.source = ResFileTexts.english
         for ((name, label) in declared) {
             assertTrue("$name: $label", label in ToolLabels.TOOL_LABELS)
-            assertEquals(name, label, labels.label(name))
+            val shown = labels.label(name)
+            assertTrue("$name: $shown", shown.isNotBlank())
+            assertFalse("$name: $shown", shown.any { it in '\u3400'..'\u9fff' })
         }
-        UiText.source = ResFileTexts.english
         assertEquals("Tap", labels.label("tap"))
         assertEquals("Open web page", labels.label("browser_navigate"))
         assertEquals("Browse device files", labels.label("list_device_files"))

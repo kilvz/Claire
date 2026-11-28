@@ -2,7 +2,7 @@
 
 ## Context
 
-PR #780 already turned the cumulative sandbox command runtime into a tier radio option on the 「任务运行」 (Task runs) page, in this pattern:
+PR #780 already turned the cumulative sandbox command runtime into a tier radio option on the "Task runs" page, in this pattern:
 a new FeatureFlags key (only values within the tiers are accepted, values outside fall back to the default) → call sites read flags and pass through →
 a tier dialog on the settings page (`SandboxBudgetDialog` pattern) → new strings ×12 languages.
 This change applies the same restructuring to the two remaining hardcoded limits from #774:
@@ -49,10 +49,10 @@ All three import paths converge on `Attachments.importInto` / `Attachments.withT
    prefs store the MB value (`attachment_max_mb`) and the GB value (`workspace_max_gb`),
    read as `takeIf { it in tiers } ?: default` — the same defense as `sandboxBudgetMinutes`.
 
-3. **The settings entry point goes on the 「任务运行」 (Task runs) page (DuringWorkScreen), right next to the sandbox duration tier.**
-   From the #774 user's perspective this is one 「沙箱限额」 (Sandbox limits) group of three (time/space/single file); duration already lives on
+3. **The settings entry point goes on the "Task runs" page (DuringWorkScreen), right next to the sandbox duration tier.**
+   From the #774 user's perspective this is one "Sandbox limits" group of three (time/space/single file); duration already lives on
    DuringWorkScreen, and moving it would split them up. The UI copies `SandboxBudgetDialog` (radio tiers,
-   no 「不限制」 (Unlimited)). The displayed value reuses the capacity formatting already in `SandboxCopy.size`.
+   no "Unlimited"). The displayed value reuses the capacity formatting already in `SandboxCopy.size`.
 
 4. **Over-limit copy: `chat_attach_too_large` gains `%2$s` (the actual tier value), and the render point formats
    the current tier.** The render point (ChatScreen's AttachmentFailureReason.TOO_LARGE
@@ -73,7 +73,7 @@ All three import paths converge on `Attachments.importInto` / `Attachments.withT
   unaffected by the tier, and keeps providing the fallback.
 - [Adding a placeholder to `chat_attach_too_large` misses a language] → the `tools/i18n` parity
   check turns red and CI blocks it.
-- [The scope is misunderstood as applying to all entry points] → the settings subtitle states 「仅聊天附件与设备文件导入；微信/电脑保持固定限额」 (chat attachments and device file imports only; WeChat/computer keep fixed limits);
+- [The scope is misunderstood as applying to all entry points] → the settings subtitle states "chat attachments and device file imports only; WeChat/computer keep fixed limits";
   `DeviceWorkspaceImportsTest` asserts the provider is read fresh each time (changing tiers on the same instance takes effect immediately, preventing a regression to a construction-time snapshot).
 
 ## Migration Plan

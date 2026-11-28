@@ -45,7 +45,7 @@ object ConversationTitler {
         timeoutMs: Long = TIMEOUT_MS,
         language: String? = null,
     ): String? {
-        // 网页说明不算第一句话;只带着选中的字、没写话时按选中的字起
+        // A web-page description does not count as the first sentence; with only selected text and no typed words, title from the selected text
         val page = AttachedPage.parse(first)
         val said = page.words.ifBlank { page.page?.selection.orEmpty() }
         val words = UserScreenMessage.parse(said).words.take(MAX_INPUT)
@@ -95,7 +95,7 @@ object ConversationTitler {
         return t.take(maxTitle).takeIf(String::isNotBlank)
     }
 
-    /** 按码点识别文字体系,包含兼容汉字和基本多文种平面以外的汉字。 */
+    /** Identifies scripts by code point, including compatibility Han characters and Han characters outside the BMP. */
     private fun hasCjk(text: String): Boolean {
         var index = 0
         while (index < text.length) {

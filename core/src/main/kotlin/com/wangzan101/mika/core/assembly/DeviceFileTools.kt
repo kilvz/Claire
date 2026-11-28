@@ -19,7 +19,7 @@ private fun unavailable(source: String): Nothing =
 private class CopyDeviceFile(override val capability: String) : DeviceFileTool {
     override fun available(ctx: ToolContext) = super.available(ctx) || ctx.sandboxRunner?.folderImportAvailable == true
     override val verb = Verb.CopyDeviceFile
-    override val label = "复制设备文件"
+    override val label = "Copy device file"
     override val risk = Risk.Write
     override val logged = true
     override val wideTarget = true
@@ -44,7 +44,7 @@ private class CopyDeviceFile(override val capability: String) : DeviceFileTool {
 private class SearchDeviceFiles(override val capability: String) : DeviceFileTool {
     override fun available(ctx: ToolContext) = super.available(ctx) || ctx.sandboxRunner?.foldersAvailable == true
     override val verb = Verb.SearchDeviceFiles
-    override val label = "搜索设备文件"
+    override val label = "Search device files"
     override val risk = Risk.Read
     override val def = ToolDef("search_device_files", Prompts.tool("search_device_files"), mapOf(
         "path" to str("Directory to search."), "name" to str("Case-insensitive filename substring."),

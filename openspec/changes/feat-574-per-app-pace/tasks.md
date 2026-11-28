@@ -17,8 +17,8 @@
 
 ## 3. UI: settings entry and per-app sub-page
 
-- [x] 3.1 `SettingsPage` gains the `AppPace` route; `DuringWorkScreen` gains a 「按应用设置」 (Per-app settings) entry row under the operating pace group
-- [x] 3.2 `AppPaceScreen`: an override list (label + level), a four-choice dialog (快/标准/像人/删除 — Fast/Standard/Human-like/Delete), and an add dialog (launchableApps + search, excluding already overridden items)
+- [x] 3.1 `SettingsPage` gains the `AppPace` route; `DuringWorkScreen` gains a "Per-app settings" entry row under the operating pace group
+- [x] 3.2 `AppPaceScreen`: an override list (label + level), a four-choice dialog (Fast/Standard/Human-like/Delete), and an add dialog (launchableApps + search, excluding already overridden items)
 - [x] 3.3 Add the new strings to values and all 11 language directories
 
 ## 4. Verification and wrap-up

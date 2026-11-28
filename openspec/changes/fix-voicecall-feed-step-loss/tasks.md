@@ -1,24 +1,24 @@
-## 1. 修复 VoiceCallFeed 的步骤来源（首轮：基线差分；2026-11-24 上游重构后：改用全程 steps）
+## 1. Fix VoiceCallFeed's step source (first round: baseline diff; after the 2026-11-24 upstream refactor: use full-run steps)
 
-- [x] 1.1 （首轮，随 db9877ff 提交）`VoiceCallFeed.onTask` 改为「最长重合后缀差分」补齐
-  所有新行——上游 2026-11-24 重构（onTasks/DeskTaskView 模型）后该 API 已不存在。
-- [x] 1.2 （移植）`VoiceCallFeed.steps(view)` 改为
-  `(view.steps.map { it.text } + view.recent + listOfNotNull(view.line)).distinct()`，
-  卡片步骤以快照全程历史为准，对收集方合并免疫；`withTask` 去重合并与 `ignored`
-  基线语义不动；删除旧模型的 `newSince` 差分辅助。
-- [x] 1.3 更新 `VoiceCallFeed` 相关文档注释与实现一致。
+- [x] 1.1 (First round, committed with db9877ff) `VoiceCallFeed.onTask` changed to "longest common suffix diff" to backfill
+  all new lines — the API no longer exists after the 2026-11-24 upstream refactor (onTasks/DeskTaskView model).
+- [x] 1.2 (Port) `VoiceCallFeed.steps(view)` changed to
+  `(view.steps.map { it.text } + view.recent + listOfNotNull(view.line)).distinct()`,
+  so card steps follow the snapshot's full-run history and are immune to collector merging; `withTask`'s dedup-merge and the `ignored`
+  baseline semantics are unchanged; the old model's `newSince` diff helper is removed.
+- [x] 1.3 Update `VoiceCallFeed`'s documentation comments to match the implementation.
 
-## 2. 单元测试（VoiceCallFeedTest，随上游重构迁移到 onTasks API）
+## 2. Unit tests (VoiceCallFeedTest, migrated to the onTasks API with the upstream refactor)
 
-- [x] 2.1 两次收集之间产出超过 recent 窗口（3 条）的进展：滚出窗口的中间步骤仍从
-  快照全程 steps 补齐（修复前丢失）。
-- [x] 2.2 任务首次上卡时快照已带进展：卡直接以全程 steps 开卡（修复前只有 recent+line）。
-- [x] 2.3 回归：重复快照不产生步骤；单次快照多行全收、终态行也进卡（上游既有用例
-  继续通过）。
+- [x] 2.1 Progress produced between two collections exceeds the recent window (3): intermediate steps scrolled out of the window are still
+  backfilled from the snapshot's full-run steps (lost before the fix).
+- [x] 2.2 When a task first appears on a card the snapshot already carries progress: the card opens directly with the full-run steps (before the fix only recent+line).
+- [x] 2.3 Regression: repeated snapshots produce no steps; all lines in a single snapshot are collected and the final-state line also goes onto the card (the upstream
+  existing cases continue to pass).
 
-## 3. 验证
+## 3. Verification
 
-- [x] 3.1 （首轮）`./gradlew :app:testDebugUnitTest --tests '*VoiceCallFeedTest*'` 全绿。
-- [x] 3.2 （首轮）本地全量 `:core:test :core:cliTest :app:testDebugUnitTest` 通过。
-- [x] 3.3 （移植轮）rebase 到最新 main 后重跑上述测试；rebase 事件与结果追加
-  `evidence/evidence.md`。
+- [x] 3.1 (First round) `./gradlew :app:testDebugUnitTest --tests '*VoiceCallFeedTest*'` all green.
+- [x] 3.2 (First round) Local full run `:core:test :core:cliTest :app:testDebugUnitTest` passes.
+- [x] 3.3 (Port round) Rebase onto the latest main and rerun the above tests; the rebase events and results are appended to
+  `evidence/evidence.md`.

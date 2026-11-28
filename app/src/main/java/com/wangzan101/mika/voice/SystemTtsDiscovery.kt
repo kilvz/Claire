@@ -12,14 +12,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 
-/** 手机上登记的一个语音合成引擎。 */
+/** A speech synthesis engine registered on the phone. */
 data class SystemTtsEngineInfo(
     val packageName: String,
     val label: String,
     val isDefault: Boolean = false,
 )
 
-/** 引擎提供的一个音色;[name] 是 [android.speech.tts.Voice.getName],存进设置的就是它。 */
+/** A voice provided by an engine; [name] is [android.speech.tts.Voice.getName], and that is what is stored in settings. */
 data class SystemTtsVoiceInfo(
     val name: String,
     val locale: Locale? = null,
@@ -27,14 +27,14 @@ data class SystemTtsVoiceInfo(
 )
 
 /**
- * 列出手机上的语音合成引擎和某个引擎的音色,只用公开接口:引擎按 [TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE]
- * 查服务(清单的 `<queries>` 里登记了这个 action),音色用 [TextToSpeech.getVoices]。不认任何具体厂商的包名。
+ * Lists speech synthesis engines on the phone and the voices of one engine, using only public APIs: engines are queried by [TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE]
+ * (the action is declared in the manifest's `<queries>`), voices use [TextToSpeech.getVoices]. No specific vendor package name is recognised.
  */
 object SystemTtsDiscovery {
-    /** 等引擎初始化的上限;冷启动的引擎要先拉起进程。 */
+    /** Upper bound for waiting for engine initialisation; a cold engine has to bring its process up first. */
     const val VOICES_TIMEOUT_MS = 5_000L
 
-    /** 已装的引擎,默认引擎在前,其余按名字排。查不到时为空。 */
+    /** Installed engines, default engine first, the rest sorted by name. Empty when none found. */
     suspend fun engines(context: Context): List<SystemTtsEngineInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val intent = Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE)
@@ -65,8 +65,8 @@ object SystemTtsDiscovery {
         engines.sortedWith(compareByDescending<SystemTtsEngineInfo> { it.isDefault }.thenBy { it.label.lowercase() })
 
     /**
-     * [enginePackage] 的音色(空 = 默认引擎);只列已经装好数据的,和 [preferred] 同语言的在前。
-     * 引擎没装、初始化失败或超时都返回空表,查完一定 shutdown。
+     * Voices of [enginePackage] (empty = default engine); only lists those with data installed, with those in the same language as [preferred] first.
+     * Returns an empty list when the engine is not installed, initialisation fails or times out; always shuts down after querying.
      */
     suspend fun voices(context: Context, enginePackage: String, preferred: Locale?): List<SystemTtsVoiceInfo> =
         withContext(Dispatchers.Main) {

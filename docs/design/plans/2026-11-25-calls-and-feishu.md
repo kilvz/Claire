@@ -47,7 +47,7 @@
 - [ ] **Step 3: Implement Job/service/manifest boundaries.** Use bounded async `onStartJob`/`jobFinished`, `setPersisted(true)`, `exported=false` and `BIND_JOB_SERVICE`; quit cancels recovery and null-Intent/stale Job recheck all gates. Only user reopen clears quit through existing `MikaQuit.resume` before reconciliation.
 - [ ] **Step 4: Write failing notification-route tests then implement.** Assert one-time checklist opening, no rotation repeat, active call/locked dial precedence and back-stack preservation. Use a unique request code/action and consume/remove the extra in both `onCreate` and `onNewIntent`; do not add a second standby UI state machine.
 - [ ] **Step 5: Verify and review.** Run recovery/policy/settings/manifest unit tests and targeted notification instrumentation. Device acceptance covers reboot/Doze, permission and battery changes, explicit stop, task-manager stop, complete quit/reopen and null-Intent; no old number may auto-dial.
-- [ ] **Step 6: Commit.** Run `git add app && git commit -m 'feat(calls): recover authorized incoming standby' -m 'Co-authored-by: 大作手Gatsby <duskhdmi@gmail.com>'`.
+- [ ] **Step 6: Commit.** Run `git add app && git commit -m 'feat(calls): recover authorized incoming standby' -m 'Co-authored-by: DzsGatsby <duskhdmi@gmail.com>'`.
 
 ### Task 2: #811 dial editing, clear undo and history filters
 
@@ -65,7 +65,7 @@
 - [ ] **Step 3: Write failing clear/review/history tests.** Assert clear invalidates old review, undo requires fresh review, new input invalidates undo, rotation/process restoration cannot revive undo, SIM/history remain unchanged, clear-search preserves status filter and reset restores all records with `cleared==0`.
 - [ ] **Step 4: Implement draft/history interactions.** Keep undo snapshot only in `remember`, restore only while current draft is empty, and close stale review on clear. Clear search resets query/showAll/expanded but not filter; zero-result reset additionally selects ALL without deleting data. Add keypad and all localized resources.
 - [ ] **Step 5: Verify and review.** Run number/resource unit tests, translation checks and targeted Compose instrumentation for selection, emoji, clear/undo/review, rotation and history. Real dial acceptance rechecks number/SIM/locked confirmation.
-- [ ] **Step 6: Commit.** Run `git add app && git commit -m 'feat(calls): complete dial editing and history reset' -m 'Co-authored-by: 大作手Gatsby <duskhdmi@gmail.com>'`.
+- [ ] **Step 6: Commit.** Run `git add app && git commit -m 'feat(calls): complete dial editing and history reset' -m 'Co-authored-by: DzsGatsby <duskhdmi@gmail.com>'`.
 
 ### Task 3: #327 Feishu windows on current run architecture
 

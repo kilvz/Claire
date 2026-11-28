@@ -54,7 +54,7 @@ fun ProviderStore.connect(
             verifiedModels = found.verifiedModels + verified, typedModels = found.typedModels + typed,
             // "Untested" only when this run did not test, the provider has no verified models and no list was ever listed; every other case counts as tested
             savedUntested = untested && verified.isEmpty() && found.verifiedModels.isEmpty() && listed.isEmpty(),
-            // 这次没填备注就留着原来的;备注不参与找同一家(见 [Provider.nickname])
+            // Keep the old nickname when none is entered this time; the nickname does not participate in finding the same provider (see [Provider.nickname])
             nickname = Provider.cleanNickname(nickname) ?: found.nickname,
         )
         _providers.value = _providers.value.map { if (it.id == p.id) p else it }
@@ -65,7 +65,7 @@ fun ProviderStore.connect(
     }
 }
 
-/** 改这家的备注(见 [Provider.nickname]);空的就是去掉备注。和其它改动一样在锁里改、写同一个配置文件。 */
+/** Change this provider's nickname (see [Provider.nickname]); empty means remove it. Like other changes it is made under the lock and writes the same config file. */
 fun ProviderStore.setProviderNickname(providerId: String, nickname: String?) {
     synchronized(this) {
         val p = provider(providerId) ?: return
@@ -78,7 +78,7 @@ fun ProviderStore.setProviderNickname(providerId: String, nickname: String?) {
     }
 }
 
-/** 记下服务商最近一次列出的模型。列出来了,就说明「没测过」不再成立(跳过测试存下的那家在这里清掉标记)。 */
+/** Record the models this provider last listed. Once listed, "untested" no longer holds (this clears the flag on a provider saved by skipping the test). */
 fun ProviderStore.rememberModels(providerId: String, models: List<ListedModel>) {
     synchronized(this) {
         if (provider(providerId) == null) return

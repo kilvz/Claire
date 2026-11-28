@@ -71,29 +71,29 @@ Confirmed 2026-11-22: intro / summarizing / summary / learned follow the prototy
 ```kotlin
 @Test fun foldsLauncherStepsIntoOneDirectLaunch() {
     val steps = listOf(
-        step(0, "com.android.launcher3", TeachKind.Window, title = "桌面"),
-        step(1, "com.android.launcher3", TeachKind.Click, node = "小红书"),
-        step(2, "com.xingin.xhs", TeachKind.Window, title = "首页"),
-        step(3, "com.xingin.xhs", TeachKind.Click, node = "搜索"),
+        step(0, "com.android.launcher3", TeachKind.Window, title = "Home screen"),
+        step(1, "com.android.launcher3", TeachKind.Click, node = "Xiaohongshu"),
+        step(2, "com.xingin.xhs", TeachKind.Window, title = "Home"),
+        step(3, "com.xingin.xhs", TeachKind.Click, node = "Search"),
     )
     val route = TeachRoute.fold(steps, setOf("com.android.launcher3"), emptySet()) { it }
     assertEquals(2, route.steps.size)
-    assertTrue(route.steps[0].text.startsWith("启动"))
-    assertTrue(route.steps[1].text.contains("点了「搜索」"))
+    assertTrue(route.steps[0].text.startsWith("Launch"))
+    assertTrue(route.steps[1].text.contains("tapped 'Search'"))
     assertEquals(2, route.folded.size)
-    assertTrue(route.folded.any { it.contains("小红书") })
+    assertTrue(route.folded.any { it.contains("Xiaohongshu") })
     assertEquals(listOf("com.xingin.xhs"), route.apps.map { it.packageName })
 }
 
-@Test fun appSwitchMidDemoBecomesOneSwitchStep() { /* A → launcher → B ⇒ "改用 B"; 连续桌面步骤只折叠一次 */ }
+@Test fun appSwitchMidDemoBecomesOneSwitchStep() { /* A → launcher → B ⇒ "Switch to B"; consecutive home-screen steps fold only once */ }
 
 @Test fun unknownLauncherLeavesEveryStepUntouched() {
-    // launcherPackages 为空:保留步骤数与 text 行一一对应,folded 为空
+    // launcherPackages is empty: the step count maps one-to-one to text lines, folded is empty
 }
 
-@Test fun demoStartedInsideAnAppDoesNotInventALaunchStep() { /* 首步即在 App 内 ⇒ 不合成启动步 */ }
+@Test fun demoStartedInsideAnAppDoesNotInventALaunchStep() { /* the first step is already inside an app ⇒ no launch step is synthesized */ }
 
-@Test fun marksTheDefaultBrowserForThePrompt() { /* 步骤含浏览器包 ⇒ apps 里 browser=true */ }
+@Test fun marksTheDefaultBrowserForThePrompt() { /* steps contain a browser package ⇒ browser=true in apps */ }
 ```
 
 - [ ] **Step 2: Run the test and confirm it fails**
@@ -138,19 +138,19 @@ git commit -m "feat(teach): fold launcher steps into direct app launches"
 ```kotlin
 @Test fun requestTellsTheModelToUseDirectLaunchesAndLinks() {
     val req = TeachDraft.request(session(), route())
-    assertTrue(req.contains("启动 com.xingin.xhs"))
-    assertTrue(req.contains("直接打开"))
-    assertTrue(req.contains("不要写") && req.contains("桌面"))
+    assertTrue(req.contains("Launch com.xingin.xhs"))
+    assertTrue(req.contains("open directly"))
+    assertTrue(req.contains("do not write") && req.contains("home screen"))
 }
 
 @Test fun requestCarriesTheFoldedHumanSteps() {
-    assertTrue(TeachDraft.request(session(), route()).contains("已按 Claire 的直达能力省掉"))
+    assertTrue(TeachDraft.request(session(), route()).contains("omitted thanks to Claire's direct actions"))
 }
 
 @Test fun localAssemblyNeverMentionsTheDesktop() {
     val md = TeachDraft.assemble(session(), route(), "xhs-search")
-    assertFalse(md.contains("桌面"))
-    assertTrue(md.contains("启动 com.xingin.xhs"))
+    assertFalse(md.contains("home screen"))
+    assertTrue(md.contains("Launch com.xingin.xhs"))
 }
 
 @Test fun localAssemblyKeepsTheEvidenceCaveats() {
@@ -279,16 +279,16 @@ git commit -m "feat(teach): summarize automatically after demonstration"
 ```kotlin
 @Test fun summaryShowsTheSkillSectionsAndFoldedNote() {
     compose.setContent { MikaTheme { TeachSummaryPage(fixture(), {}, {}, {}) } }
-    compose.onNodeWithText("入口").assertIsDisplayed()
-    compose.onNodeWithText("怎样算办成").assertIsDisplayed()
-    compose.onNodeWithText("已自动省掉 2 个只用手的步骤").assertIsDisplayed()
+    compose.onNodeWithText("Entry").assertIsDisplayed()
+    compose.onNodeWithText("What counts as done").assertIsDisplayed()
+    compose.onNodeWithText("2 manual steps folded away automatically").assertIsDisplayed()
     compose.onNodeWithTag("teach-accept").assertHasClickAction()
 }
-@Test fun summaryWithoutFoldedStepsHidesTheNote() { /* folded = emptyList ⇒ 节点不存在 */ }
-@Test fun summaryWithoutModelExplainsTheLocalSummary() { /* basic = true ⇒ 本机整理说明出现 */ }
-@Test fun acceptButtonCallsBack() { /* 点 teach-accept ⇒ 回调 1 次 */ }
-@Test fun introStartCallsBack() { /* 点 teach-start ⇒ 回调 */ }
-@Test fun donePageOffersChatAndTeachAgain() { /* 两个按钮都显示 */ }
+@Test fun summaryWithoutFoldedStepsHidesTheNote() { /* folded = emptyList ⇒ the node does not exist */ }
+@Test fun summaryWithoutModelExplainsTheLocalSummary() { /* basic = true ⇒ the on-device summary note appears */ }
+@Test fun acceptButtonCallsBack() { /* tap teach-accept ⇒ the callback runs once */ }
+@Test fun introStartCallsBack() { /* tap teach-start ⇒ callback */ }
+@Test fun donePageOffersChatAndTeachAgain() { /* both buttons are shown */ }
 ```
 
 Run: `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wangzan101.mika.ui.TeachScreenTest`
@@ -317,7 +317,7 @@ Translate the other 11 languages with the same meaning; watch plural forms in Ar
 
 - [ ] **Step 3: Rewrite `TeachScreen.kt`**
 
-- Intro: top bar + a small explanatory card + goal input (the app's existing input style) + `开始示范` (Start demonstration); after starting, `moveTaskToBack` stays as it is.
+- Intro: top bar + a small explanatory card + goal input (the app's existing input style) + "Start demonstration"; after starting, `moveTaskToBack` stays as it is.
 - Demonstrating and interrupted: keep the existing `Live`/`Interrupted` layout and buttons (already confirmed not to be redone); show no step list.
 - Summarizing: explanatory text + cancel; show no step list.
 - Summary: TeachSummaryPage(view, onAccept, onRedo, onDiscard); `display/description` come from `FrontMatter.parse(draft.markdown)` and the body uses `skillPreviewBody`.

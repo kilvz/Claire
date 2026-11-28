@@ -394,8 +394,8 @@ internal object ToolSchema {
                     continue
                 }
             }
-            // 到下一个 % 为止整段按 UTF-8 写入:逐字符编码会把代理对拆坏。
-            // write(ByteArray, Int, Int) 而不是 writeBytes:后者到 API 33 才有,minSdk 29 上会 NoSuchMethodError
+            // Write the whole run up to the next % as UTF-8: encoding character by character would split surrogate pairs.
+            // Use write(ByteArray, Int, Int) instead of writeBytes: the latter only exists from API 33, so it would throw NoSuchMethodError on minSdk 29
             val end = segment.indexOf('%', i + 1).let { if (it < 0) segment.length else it }
             val chunk = segment.substring(i, end).toByteArray(Charsets.UTF_8)
             bytes.write(chunk, 0, chunk.size)

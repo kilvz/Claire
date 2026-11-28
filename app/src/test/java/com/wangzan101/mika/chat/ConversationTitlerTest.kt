@@ -141,7 +141,7 @@ class ConversationTitlerTest {
             val capturedSystemPrompt = m.system!!
             assertTrue(capturedSystemPrompt.contains("Always mirror the language of the user's prompt"))
             assertFalse(capturedSystemPrompt.contains("final replies in English."))
-            assertFalse(capturedSystemPrompt.contains("## 语言设定"))
+            assertFalse(capturedSystemPrompt.contains("final replies in Chinese"))
         }
     }
 

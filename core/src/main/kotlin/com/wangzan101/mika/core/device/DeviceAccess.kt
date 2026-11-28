@@ -105,7 +105,7 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
         }
         if (!allowed()) return@withLock result("disabled", now)
         val wasSecure = now.secure
-        // 这次流程刚把屏幕唤醒时锁屏可能还没准备好接受 dismiss:在同一个有界等待([waitMs])里重试,每次前复核授权
+        // When this flow has just woken the screen, the lock screen may not be ready to accept dismiss yet: retry within the same bounded wait ([waitMs]), re-checking permission before each attempt
         if (!retrying(enabled = woke, ::allowed) { port.dismiss() }) {
             return@withLock result(if (allowed()) "dismiss_failed" else "disabled", read())
         }
@@ -188,7 +188,7 @@ class DeviceAccess(private val port: DeviceAccessPort, private val store: Device
         while (s != null && !done(s) && waited < waitMs) { delay(pollMs); waited += pollMs; s = read() }
         return s
     }
-    /** [action] 成功就返回 true;[enabled] 时失败了隔 [pollMs] 再试,总共不超过 [waitMs],[allowed] 一收回就停。 */
+    /** Returns true when [action] succeeds; when [enabled], retries after [pollMs] on failure for at most [waitMs] in total, and stops as soon as [allowed] is withdrawn. */
     private suspend fun retrying(enabled: Boolean, allowed: () -> Boolean, action: suspend () -> Boolean): Boolean {
         var waited = 0L
         while (true) {

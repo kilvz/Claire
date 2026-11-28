@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 internal object ShareAudio : PhoneTool {
     override val verb = Verb.ShareAudio
-    override val label = "分享音频到 App"
+    override val label = "Share audio to app"
     override val risk = Risk.Write
     override val showsScreenAfter = true
     override val logged = true

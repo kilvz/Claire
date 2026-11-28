@@ -115,7 +115,7 @@ private tailrec fun Context.mainActivity(): MainActivity? = when (this) {
     else -> null
 }
 
-/** 外观的当前说法(设置页和这一行都用)。 */
+/** What the appearance is currently called (used by the settings page and this row). */
 fun appearanceLabel(mode: ThemeMode): String = tr(
     when (mode) {
         ThemeMode.System -> R.string.appearance_system

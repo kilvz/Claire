@@ -1,11 +1,11 @@
 # app/libs
 
-不在 Maven 上、随仓库固定版本发布的库。换版本时同时更新这里的校验值和 `licenses/THIRD_PARTY_NOTICES.md`。
+Libraries that are not on Maven and ship at a pinned version in the repository. When changing the version, update both the checksum here and `licenses/THIRD_PARTY_NOTICES.md`.
 
-| 文件 | 来源 | SHA-256 | 大小 |
+| File | Source | SHA-256 | Size |
 |---|---|---|---|
-| `sherpa-onnx-2.0.3-static.aar` | https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.3/sherpa-onnx-static-link-onnxruntime-2.0.3.aar(原文件名 `sherpa-onnx-static-link-onnxruntime-2.0.3.aar`,未修改) | `7744a3a8f08f017d59c2d8ed8d9b700345561f5abe9f4e06dc6eaef3a0b977b4` | 39,999,115 B |
+| `sherpa-onnx-2.0.3-static.aar` | https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.3/sherpa-onnx-static-link-onnxruntime-2.0.3.aar (original file name `sherpa-onnx-static-link-onnxruntime-2.0.3.aar`, unmodified) | `7744a3a8f08f017d59c2d8ed8d9b700345561f5abe9f4e06dc6eaef3a0b977b4` | 39,999,115 B |
 
-sherpa-onnx AAR 里带四种架构的原生库,`app/build.gradle.kts` 的 `packaging.jniLibs.excludes` 只留 `arm64-v8a`。
+The sherpa-onnx AAR bundles native libraries for four architectures; `packaging.jniLibs.excludes` in `app/build.gradle.kts` keeps only `arm64-v8a`.
 
-核对:`shasum -a 256 app/libs/sherpa-onnx-2.0.3-static.aar`
+Verify with: `shasum -a 256 app/libs/sherpa-onnx-2.0.3-static.aar`

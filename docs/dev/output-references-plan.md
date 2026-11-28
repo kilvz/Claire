@@ -25,7 +25,7 @@
 | Bare mention of `/workspace/c` in the body (not a Markdown image/link) | Not treated as a reference |
 | Path contains `..`, or `hostPath` returns null (out of bounds/escape/does not exist) | That reference is not rendered, no crash |
 | File is .csv/.pdf/.py or other non-media | Draw a file card (not a photo grid); tapping previews it |
-| File no longer exists (after the session is cleared) | The card shows 「已失效」 (Expired) or is simply not rendered, no crash |
+| File no longer exists (after the session is cleared) | The card shows "Expired" or is simply not rendered, no crash |
 
 ---
 
@@ -44,11 +44,11 @@
 @Test fun workspaceRefsExtractsImageAndLink() {
     assertEquals(
         listOf("/workspace/a.png", "/workspace/b.csv"),
-        MarkdownModel.workspaceRefs("看图 ![图](/workspace/a.png) 和 [报告](/workspace/b.csv)"),
+        MarkdownModel.workspaceRefs("see the image ![image](/workspace/a.png) and [report](/workspace/b.csv)"),
     )
 }
 @Test fun workspaceRefsIgnoresBareTextAndHttp() {
-    assertEquals(emptyList<String>(), MarkdownModel.workspaceRefs("文件在 /workspace/c 里，外链 https://x.com/a.png"))
+    assertEquals(emptyList<String>(), MarkdownModel.workspaceRefs("the file is in /workspace/c, external link https://x.com/a.png"))
 }
 @Test fun workspaceRefsDeduplicates() {
     assertEquals(listOf("/workspace/a.png"), MarkdownModel.workspaceRefs("![x](/workspace/a.png) ![y](/workspace/a.png)"))
