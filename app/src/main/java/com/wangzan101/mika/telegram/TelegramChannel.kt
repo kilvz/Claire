@@ -20,10 +20,11 @@ class TelegramChannel(
     private val api: TelegramApi,
     private val activeAsk: (String) -> Delivery.Ask? = { null },
     private val log: (String) -> Unit = { Log.i(TAG, it) },
+    private val imageReader: TelegramImageReader? = null,
 ) : Channel {
     override val id = ID
     override val confirms = false
-    override val supportsImages = false
+    override val supportsImages get() = imageReader != null
     @Volatile private var sink: ChannelInputSink? = null
     private val pollLock = Mutex()
 
@@ -73,8 +74,8 @@ class TelegramChannel(
 
     override suspend fun send(peer: ChannelPeer, delivery: Delivery): SendOutcome {
         if (peer.channelId != id || !isAlive(peer)) return SendOutcome.Failed
-        if (delivery is Delivery.Image) return SendOutcome.Failed
         val token = store.token() ?: return SendOutcome.Failed
+        if (delivery is Delivery.Image) return sendImage(token, peer, delivery)
         val text = when (delivery) {
             is Delivery.Ask -> delivery.text
             is Delivery.Result -> delivery.text
@@ -93,6 +94,49 @@ class TelegramChannel(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: TelegramApiException) {
+                SendOutcome.Failed
+            } catch (_: IOException) {
+                SendOutcome.Uncertain
+            }
+            log("${delivery::class.simpleName} send $outcome in ${(System.nanoTime() - started) / 1_000_000} ms")
+            outcome
+        }
+    }
+
+    /**
+     * Uploads an exported image. The bytes are read before the request, so an
+     * unreadable export is a definite failure; a network failure after the
+     * request started is uncertain and is never re-sent automatically.
+     * Telegram may reject a photo on its own limits (HTTP 400); the original
+     * bytes then go as a document so the user still receives the picture.
+     */
+    private suspend fun sendImage(token: String, peer: ChannelPeer, delivery: Delivery.Image): SendOutcome {
+        val reader = imageReader ?: return SendOutcome.Failed
+        return withContext(Dispatchers.IO) {
+            val started = System.nanoTime()
+            val bytes = try {
+                reader.read(delivery)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                log("Image export read failed for ${delivery.name}")
+                return@withContext SendOutcome.Failed
+            }
+            val outcome = try {
+                // A pause or reconfiguration after the read must not upload the old image.
+                if (!store.accepts(peer)) return@withContext SendOutcome.Failed
+                try {
+                    api.sendPhoto(token, peer.peerId, delivery.name, bytes)
+                } catch (e: TelegramApiException) {
+                    if (e.httpCode != 400) throw e
+                    if (!store.accepts(peer)) return@withContext SendOutcome.Failed
+                    api.sendDocument(token, peer.peerId, delivery.name, bytes)
+                }
+                SendOutcome.Delivered
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: TelegramApiException) {
+                log("Image send rejected: ${e.httpCode} ${e.message}")
                 SendOutcome.Failed
             } catch (_: IOException) {
                 SendOutcome.Uncertain

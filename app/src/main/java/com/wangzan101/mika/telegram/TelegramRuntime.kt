@@ -76,7 +76,8 @@ class TelegramRuntime(
         }, com.wangzan101.mika.settings.MikaPause.get(context))
 
     val channel = TelegramChannel(store, api,
-        activeAsk = { threadId -> app.taskState.run(threadId)?.activeAsk })
+        activeAsk = { threadId -> app.taskState.run(threadId)?.activeAsk },
+        imageReader = TelegramImageFiles(context))
 
     private var registration: AutoCloseable? = null
     private var monitor: Job? = null

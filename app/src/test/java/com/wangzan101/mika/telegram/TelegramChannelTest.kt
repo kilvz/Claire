@@ -1,6 +1,8 @@
 package com.wangzan101.mika.telegram
 
 import com.wangzan101.mika.core.run.ChannelPeer
+import com.wangzan101.mika.core.run.Delivery
+import com.wangzan101.mika.core.run.SendOutcome
 import com.wangzan101.mika.core.cap.wechat.WechatAccount
 import com.wangzan101.mika.core.cap.wechat.WechatApi
 import com.wangzan101.mika.settings.KeyCipher
@@ -17,6 +19,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.IOException
 import java.net.InetAddress
 
 class TelegramChannelTest {
@@ -135,6 +138,77 @@ class TelegramChannelTest {
             channel.typing(peer)
 
             assertEquals(0, server.requestCount)
+        }
+    }
+
+    @Test fun imageUploadsAsAPhotoForTheOwnerPeer() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+            val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 1, 2, 3)
+            val channel = TelegramChannel(store, api(server), log = {}, imageReader = { bytes })
+            val peer = store.peer("123")
+            server.enqueue(response("""{"ok":true,"result":{"message_id":9}}"""))
+
+            val outcome = channel.send(peer, Delivery.Image(
+                "result:1:image:0", peer.threadId, "content://media/external/images/media/42",
+                "selfie.jpg", bytes.size.toLong()))
+
+            assertEquals(SendOutcome.Delivered, outcome)
+            assertEquals(1, server.requestCount)
+            val request = server.takeRequest()
+            assertEquals("/bottest-token/sendPhoto", request.path)
+            val body = request.body.readUtf8()
+            assertTrue(body.contains("name=\"chat_id\""))
+            assertTrue(body.contains("123"))
+            assertTrue(body.contains("filename=\"selfie.jpg\""))
+        }
+    }
+
+    @Test fun imageFallsBackToADocumentWhenTelegramRejectsThePhoto() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+            val channel = TelegramChannel(store, api(server), log = {}, imageReader = { byteArrayOf(1, 2, 3) })
+            val peer = store.peer("123")
+            server.enqueue(response("""{"ok":false,"description":"PHOTO_INVALID_DIMENSIONS"}""").setResponseCode(400))
+            server.enqueue(response("""{"ok":true,"result":{"message_id":10}}"""))
+
+            val outcome = channel.send(peer, Delivery.Image(
+                "result:1:image:0", peer.threadId, "content://media/external/images/media/42",
+                "selfie.jpg", 3))
+
+            assertEquals(SendOutcome.Delivered, outcome)
+            assertEquals(2, server.requestCount)
+            assertEquals("/bottest-token/sendPhoto", server.takeRequest().path)
+            assertEquals("/bottest-token/sendDocument", server.takeRequest().path)
+        }
+    }
+
+    @Test fun imageThatCannotBeReadFailsWithoutUploading() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+            val channel = TelegramChannel(store, api(server), log = {},
+                imageReader = { throw IOException("export is gone") })
+            val peer = store.peer("123")
+
+            val outcome = channel.send(peer, Delivery.Image(
+                "result:1:image:0", peer.threadId, "content://media/external/images/media/42",
+                "selfie.jpg", 3))
+
+            assertEquals(SendOutcome.Failed, outcome)
+            assertEquals(0, server.requestCount)
+        }
+    }
+
+    @Test fun imagesAreOnlySupportedWithAReader() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            val store = configuredStore(tmp.newFolder())
+
+            assertTrue(TelegramChannel(store, api(server), log = {}, imageReader = { byteArrayOf(1) }).supportsImages)
+            assertFalse(TelegramChannel(store, api(server), log = {}).supportsImages)
         }
     }
 

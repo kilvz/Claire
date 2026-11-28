@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -83,9 +84,10 @@ private data class GetMeResponse(
 )
 
 /**
- * Minimal Telegram Bot API client: sendMessage and getUpdates long polling.
- * The bot token travels in the request path, as the Bot API requires; it is
- * never logged and never written to any file. Only outcomes are logged.
+ * Minimal Telegram Bot API client: sendMessage, photo/document uploads and
+ * getUpdates long polling. The bot token travels in the request path, as the
+ * Bot API requires; it is never logged and never written to any file. Only
+ * outcomes are logged.
  */
 class TelegramApi(private val http: OkHttpClient, private val baseUrl: String = BASE_URL) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
@@ -99,6 +101,33 @@ class TelegramApi(private val http: OkHttpClient, private val baseUrl: String = 
         val response = executeCancellable(request, SendMessageResponse.serializer())
         if (!response.ok || response.result == null) {
             throw TelegramApiException(response.description ?: "Telegram sendMessage failed")
+        }
+        return response.result.messageId
+    }
+
+    /**
+     * Uploads [bytes] as a photo. Telegram applies its own photo limits and
+     * answers HTTP 400 when they are exceeded; the caller then falls back to
+     * [sendDocument] so the file still arrives unchanged.
+     */
+    suspend fun sendPhoto(token: String, chatId: String, fileName: String, bytes: ByteArray): Long =
+        sendUpload(token, chatId, "sendPhoto", "photo", fileName, bytes)
+
+    /** Uploads [bytes] as a file, keeping the original bytes and name. */
+    suspend fun sendDocument(token: String, chatId: String, fileName: String, bytes: ByteArray): Long =
+        sendUpload(token, chatId, "sendDocument", "document", fileName, bytes)
+
+    private suspend fun sendUpload(
+        token: String, chatId: String, method: String, field: String, fileName: String, bytes: ByteArray,
+    ): Long {
+        val payload = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("chat_id", chatId)
+            .addFormDataPart(field, fileName, bytes.toRequestBody(mediaTypeOf(fileName)))
+            .build()
+        val request = Request.Builder().url("$baseUrl/bot$token/$method").post(payload).build()
+        val response = executeCancellable(request, SendMessageResponse.serializer())
+        if (!response.ok || response.result == null) {
+            throw TelegramApiException(response.description ?: "Telegram $method failed")
         }
         return response.result.messageId
     }
@@ -140,6 +169,14 @@ class TelegramApi(private val http: OkHttpClient, private val baseUrl: String = 
         if (!response.ok) throw TelegramApiException(response.description ?: "Telegram getMe failed")
         return response.result?.username?.takeIf { it.isNotBlank() }
     }
+
+    private fun mediaTypeOf(fileName: String) = when (fileName.substringAfterLast('.', "").lowercase()) {
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "jpg", "jpeg" -> "image/jpeg"
+        else -> "application/octet-stream"
+    }.toMediaType()
 
     private suspend fun <T> executeCancellable(request: Request, serializer: kotlinx.serialization.KSerializer<T>): T {
         val call = http.newCall(request)

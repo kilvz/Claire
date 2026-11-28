@@ -75,6 +75,55 @@ class TelegramApiTest {
         }
     }
 
+    @Test fun sendPhotoUploadsTheFileToTheBotPath() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            server.enqueue(response("""{"ok":true,"result":{"message_id":9}}"""))
+            val bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 1, 2, 3)
+
+            assertEquals(9, api(server).sendPhoto("test-token", "8756247324", "selfie.jpg", bytes))
+
+            val request = server.takeRequest()
+            assertEquals("/bottest-token/sendPhoto", request.path)
+            assertEquals("POST", request.method)
+            val body = request.body.readUtf8()
+            assertTrue(body.contains("name=\"chat_id\""))
+            assertTrue(body.contains("8756247324"))
+            assertTrue(body.contains("filename=\"selfie.jpg\""))
+            assertTrue(body.contains("Content-Type: image/jpeg"))
+        }
+    }
+
+    @Test fun sendDocumentKeepsTheOriginalFileName() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            server.enqueue(response("""{"ok":true,"result":{"message_id":10}}"""))
+            val bytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3)
+
+            assertEquals(10, api(server).sendDocument("test-token", "8756247324", "scan.png", bytes))
+
+            val request = server.takeRequest()
+            assertEquals("/bottest-token/sendDocument", request.path)
+            val body = request.body.readUtf8()
+            assertTrue(body.contains("filename=\"scan.png\""))
+            assertTrue(body.contains("Content-Type: image/png"))
+        }
+    }
+
+    @Test fun sendPhotoSurfacesATelegramRejection() = runTest {
+        MockWebServer().use { server ->
+            server.start(InetAddress.getByName("127.0.0.1"), 0)
+            server.enqueue(response("""{"ok":false,"description":"PHOTO_INVALID_DIMENSIONS"}""").setResponseCode(400))
+
+            try {
+                api(server).sendPhoto("test-token", "8756247324", "selfie.jpg", byteArrayOf(1, 2, 3))
+                fail("expected TelegramApiException")
+            } catch (e: TelegramApiException) {
+                assertEquals(400, e.httpCode)
+            }
+        }
+    }
+
     @Test fun getMeReturnsTheBotUsername() = runTest {
         MockWebServer().use { server ->
             server.start(InetAddress.getByName("127.0.0.1"), 0)
