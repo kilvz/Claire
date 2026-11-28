@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">Perintah</string>
     <string name="timeline_expired">Catatan ini sudah kedaluwarsa</string>
     <string name="tag_approved">Anda menyetujui</string>
     <string name="tag_declined">Anda menolak</string>

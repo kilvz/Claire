@@ -185,6 +185,35 @@ class RunTimelineViewModelTest {
         assertEquals("没有核查", h.verdict)
     }
 
+    @Test fun expandedStepsKeepTheWholeCommandAndItsOutput() {
+        val command = "settings get global device_name"
+        val id = run("查设备名") {
+            event(RunEvent.ModelReply(clock, 1, "", "root_run_command",
+                """{"command":"$command","timeoutSec":30}""", 10, 1, null))
+            event(RunEvent.ToolResult(clock, 1, "root_run_command",
+                """{"ok":true,"exitCode":0,"stdout":"<untrusted>\nPixel 9\n</untrusted>","stderr":""}""", true, null))
+            event(RunEvent.TaskEnded(clock + 1_000, "succeeded", "Pixel 9"))
+        }
+        val step = ready(id).steps.single()
+        assertEquals(command, step.command)
+        assertEquals("Pixel 9", step.output)
+        // The full argument is kept, so the expanded title can show all of it
+        assertEquals(command, step.detail)
+    }
+
+    @Test fun enormousCommandOutputIsCappedButStderrIsStillIncluded() {
+        val stdout = "x".repeat(RunTimelineViewModel.OUTPUT_MAX + 100)
+        val id = run("跑命令") {
+            event(RunEvent.ToolResult(clock, 1, "root_run_command",
+                """{"ok":false,"exitCode":1,"stdout":"$stdout","stderr":"<untrusted>\nno such file\n</untrusted>"}""", false, null))
+            event(RunEvent.TaskEnded(clock + 1_000, "failed", "没成"))
+        }
+        val output = ready(id).steps.single().output!!
+        assertTrue("the display cap is respected: ${output.length}", output.length <= RunTimelineViewModel.OUTPUT_MAX + 2)
+        assertTrue("the cut is marked", output.endsWith("…"))
+        assertTrue("stderr is kept even when stdout is huge", output.startsWith("no such file"))
+    }
+
     @Test fun rejectedLightReplyCountsAsCallButNotStep() {
         val id = run("看电量") {
             event(RunEvent.ModelReply(clock, 1, "", "phone_observe", "{}", 10, 1, null, model = "light", role = "light_rejected"))

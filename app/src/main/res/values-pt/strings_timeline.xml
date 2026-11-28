@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">Comando</string>
     <string name="timeline_expired">Este registro expirou</string>
     <string name="tag_approved">Você aprovou</string>
     <string name="tag_declined">Você recusou</string>

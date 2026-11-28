@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">Lệnh</string>
     <string name="timeline_expired">Bản ghi này đã hết hạn</string>
     <string name="tag_approved">Bạn đã phê duyệt</string>
     <string name="tag_declined">Bạn đã từ chối</string>

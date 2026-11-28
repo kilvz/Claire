@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">دستور</string>
     <string name="timeline_expired">این سابقه منقضی شده است</string>
     <string name="tag_approved">شما تأیید کردید</string>
     <string name="tag_declined">شما رد کردید</string>

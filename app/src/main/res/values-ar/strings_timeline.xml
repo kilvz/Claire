@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">الأمر</string>
     <string name="timeline_expired">انتهت صلاحية هذا السجل</string>
     <string name="tag_approved">وافقتَ</string>
     <string name="tag_declined">رفضتَ</string>

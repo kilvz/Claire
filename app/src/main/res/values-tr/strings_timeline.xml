@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">Komut</string>
     <string name="timeline_expired">Bu kaydın süresi doldu</string>
     <string name="tag_approved">Onayladınız</string>
     <string name="tag_declined">Reddettiniz</string>

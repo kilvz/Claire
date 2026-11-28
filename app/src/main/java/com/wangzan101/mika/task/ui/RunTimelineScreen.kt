@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -272,7 +274,8 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
     var open by rememberSaveable(s.step) { mutableStateOf(false) }
     val shot = s.screenshotId
     val failed = s.result?.startsWith(stringResource(R.string.result_error_prefix)) == true
-    val hasMore = s.said.isNotEmpty() || s.activities.isNotEmpty() || s.tags.isNotEmpty() || shot != null
+    val hasMore = s.said.isNotEmpty() || s.activities.isNotEmpty() || s.tags.isNotEmpty() || shot != null ||
+        s.command != null || s.output != null
     // A step via MCP: the title gives the connector name and does not expose the raw MCP tool name
     val mcpLabels = s.activities.filter { it.kind == "mcp" }.map { it.label }.distinct()
     val title = if (mcpLabels.isNotEmpty()) mcpLabels.joinToString(" · ")
@@ -288,7 +291,10 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
                 Text(stringResource(R.string.step_number, s.step), style = MikaType.Label, color = c.ink3)
                 Text(
                     title, Modifier.weight(1f).padding(start = 8.dp),
-                    style = MikaType.Body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MikaType.Body, color = c.ink,
+                    // Collapsed, the row stays one line; expanded, the full title is shown instead of staying clipped
+                    maxLines = if (open) Int.MAX_VALUE else 1,
+                    overflow = if (open) TextOverflow.Visible else TextOverflow.Ellipsis,
                 )
                 s.result?.let { result ->
                     val (bg, fg) = when {
@@ -305,6 +311,8 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
             }
             Text(RunTimelineViewModel.timingLabel(s.timing), Modifier.padding(top = 2.dp), style = MikaType.Hint, color = c.ink3)
             if (open && hasMore) {
+                s.command?.let { TextBlock(stringResource(R.string.timeline_command), it) }
+                s.output?.let { TextBlock(stringResource(R.string.usage_output), it) }
                 if (s.said.isNotEmpty()) {
                     MarkdownText(s.said, MikaType.Caption.copy(color = c.ink2), Modifier.padding(top = 9.dp))
                 }
@@ -324,6 +332,19 @@ private fun TimelineRow(s: TimelineStep, first: Boolean, last: Boolean, vm: RunT
                 if (shot != null) Shot(vm, shot, s.step)
             }
         }
+    }
+}
+
+@Composable
+private fun TextBlock(label: String, text: String) {
+    val c = MikaTheme.colors
+    Text(label, Modifier.padding(top = 10.dp), style = MikaType.Label, color = c.ink3)
+    SelectionContainer {
+        Text(
+            text,
+            Modifier.padding(top = 3.dp).fillMaxWidth().background(c.fill, MikaShapes.Chip).padding(horizontal = 10.dp, vertical = 8.dp),
+            style = MikaType.Hint.copy(fontFamily = FontFamily.Monospace), color = c.ink2,
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">コマンド</string>
     <string name="timeline_expired">この記録は期限切れです</string>
     <string name="tag_approved">許可しました</string>
     <string name="tag_declined">拒否しました</string>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">指令</string>
     <string name="timeline_expired">這次的記錄已過期</string>
     <string name="tag_approved">你同意了</string>
     <string name="tag_declined">你沒同意</string>

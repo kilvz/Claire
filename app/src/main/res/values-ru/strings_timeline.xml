@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">Команда</string>
     <string name="timeline_expired">Срок хранения этой записи истёк</string>
     <string name="tag_approved">Вы одобрили</string>
     <string name="tag_declined">Вы отклонили</string>

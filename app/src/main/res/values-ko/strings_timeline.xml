@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="timeline_command">명령</string>
     <string name="timeline_expired">이 기록은 만료됐어요</string>
     <string name="tag_approved">승인함</string>
     <string name="tag_declined">거절함</string>

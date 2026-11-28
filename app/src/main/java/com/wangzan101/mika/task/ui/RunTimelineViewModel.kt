@@ -43,7 +43,7 @@ data class StepTiming(
 }
 
 /**
- * One row of the timeline. [said] is what the model said in this step (clipped to 80 characters), [tool] is the tool's Chinese label,
+ * One row of the timeline. [said] is what the model said in this step, [tool] is the tool's localized label,
  * [detail] is the single argument that best identifies the object (already redacted in the record and shown as is), and [screenshotId] is the picture saved for this step.
  */
 data class TimelineStep(
@@ -56,6 +56,10 @@ data class TimelineStep(
     val screenshotId: Int?,
     val activities: List<TimelineActivity> = emptyList(),
     val timing: StepTiming = StepTiming(),
+    /** The full command this step ran, when its arguments contain one (root and system commands); the title only has the same argument mixed in with the tool name. */
+    val command: String? = null,
+    /** The command's stdout/stderr (or the tool's plain output), with the untrusted markers removed; null when the result has no such text. */
+    val output: String? = null,
 )
 
 data class TimelineHeader(
@@ -150,7 +154,8 @@ class RunTimelineViewModel(
     fun usageLog(): String = store.usageLog(runId)
 
     companion object {
-        const val SAID_MAX = 80
+        /** How much command output a row keeps for display; native results can be 100k characters, far more than a phone screen can render at once. */
+        const val OUTPUT_MAX = 20_000
 
         /** Groups by step number; events without a step number (verification, confirmation, takeover, barrier) hang on the most recent step before them. */
         internal fun steps(events: List<RunEvent>, toolLabel: (String) -> String = { it }): List<TimelineStep> {
@@ -174,6 +179,7 @@ class RunTimelineViewModel(
                             said = said,
                             tool = e.tool?.let(toolLabel) ?: row.tool,
                             detail = e.argsJson?.let(::detailOf) ?: row.detail,
+                            command = e.argsJson?.let(::commandOf) ?: row.command,
                         )
                     }
                 }
@@ -184,6 +190,7 @@ class RunTimelineViewModel(
                         result = resultLabel(e.resultJson, e.changed),
                         tags = row.tags + guardTags(e.resultJson),
                         screenshotId = row.screenshotId ?: e.screenshotId,
+                        output = e.resultJson.let(::outputOf) ?: row.output,
                     )
                 }
                 is RunEvent.Media -> at(e.step).let { rows[e.step] = it.copy(screenshotId = it.screenshotId ?: e.mediaId) }
@@ -241,14 +248,39 @@ class RunTimelineViewModel(
             else -> duration(ms)
         }
 
-        private fun clipSaid(s: String) = if (s.length <= SAID_MAX) s else s.take(SAID_MAX) + "…"
-
-        private val DETAIL_KEYS = listOf("text", "package", "query", "key", "direction", "ref", "answer", "reason")
+        private val DETAIL_KEYS = listOf("command", "text", "package", "query", "key", "direction", "ref", "answer", "reason")
 
         private fun detailOf(argsJson: String): String? {
             val o = parse(argsJson) ?: return null
-            return DETAIL_KEYS.firstNotNullOfOrNull { k -> (o[k] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } }?.let(::clipSaid)
+            // Kept whole: the collapsed row clips it with maxLines, and expanding shows the complete title
+            return DETAIL_KEYS.firstNotNullOfOrNull { k -> (o[k] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } }
         }
+
+        /** The complete command from the model's arguments, never clipped: the timeline shows it in full when the step is expanded. */
+        private fun commandOf(argsJson: String): String? {
+            val o = parse(argsJson) ?: return null
+            return COMMAND_KEYS.firstNotNullOfOrNull { k -> (o[k] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } }
+        }
+
+        private val COMMAND_KEYS = listOf("command")
+
+        /**
+         * The command's output: root and system commands return `stdout`/`stderr` (wrapped as untrusted data), other shell-like tools use `output`.
+         * Only plain text fields are taken, so other tools' JSON (element lists, media metadata) is not dumped into the timeline.
+         */
+        internal fun outputOf(resultJson: String): String? {
+            val o = parse(resultJson) ?: return null
+            fun field(key: String) = (o[key] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+            // stderr first: when a command fails, the reason matters more than a long stdout and must not be cut off
+            val parts = listOfNotNull(field("stderr"), field("stdout"), field("output")).distinct()
+            if (parts.isEmpty()) return null
+            val text = parts.joinToString("\n\n") { plain(it) }
+            return if (text.length <= OUTPUT_MAX) text else text.take(OUTPUT_MAX) + "\n…"
+        }
+
+        /** Removes the untrusted-data markers the record wraps around command output. */
+        private fun plain(text: String): String =
+            text.removePrefix("<untrusted>").removeSuffix("</untrusted>").trim()
 
         // The result may be truncated into invalid JSON: ok / error are found only in their top-level key form (quotes inside element text are escaped and do not falsely match)
         private val NOT_OK = Regex(""""ok"\s*:\s*false""")
