@@ -70,7 +70,7 @@ jobs:
           # Update the "New in ..." line below for every release; never
           # re-add the intro / install / OrcaRouter boilerplate.
           body: |
-            New in 2.10.1: pictures now arrive in Telegram. When a task exports an image — a photo taken with the camera, a screenshot, or a generated picture — the chat receives it as a photo instead of it staying only in Download/Claire. Photos that Telegram rejects on its own size or dimension limits arrive as a file with the original bytes, and an upload that cannot be confirmed is reported instead of being silently re-sent.
+            New in 2.10.2: Claire starts the work she says she is starting. A reply that promises to change a setting, look something up or operate the phone now begins that task in the same turn; if a promise still goes out with nothing behind it, Claire gets one more chance to start the work, so "on it" is backed by a running task instead of leaving you waiting.
           files: |
             dist/Claire-*.apk
             dist/SHA256SUMS.txt
