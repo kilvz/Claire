@@ -1,6 +1,7 @@
 package com.wangzan101.mika.settings.ui.models
 
 import com.wangzan101.mika.core.model.ListFailure
+import com.wangzan101.mika.core.model.ModelListResult
 import com.wangzan101.mika.core.model.ModelRole
 import com.wangzan101.mika.i18n.ChineseTexts
 import com.wangzan101.mika.settings.AesGcmKeyCipher
