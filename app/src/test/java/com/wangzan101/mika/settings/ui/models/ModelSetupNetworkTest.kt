@@ -172,7 +172,7 @@ class ModelSetupNetworkTest {
         server.enqueue(MockResponse().setResponseCode(401).setBody("""{"error":{"message":"invalid api key"}}"""))
         val (store, vm) = setUp()
         vm.testAndWait()
-        assertEquals(ListState.Failed(ListFailure.Auth.text), vm.state.value.form.test)
+        assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Auth))), vm.state.value.form.test)
         assertFalse(vm.state.value.form.noList)
         assertTrue(store.providers.value.isEmpty())
         assertEquals(listOf("/models"), List(server.requestCount) { server.takeRequest().path })

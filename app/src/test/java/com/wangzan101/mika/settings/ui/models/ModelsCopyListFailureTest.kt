@@ -7,6 +7,8 @@ import com.wangzan101.mika.i18n.ResFileTexts
 import com.wangzan101.mika.i18n.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.util.Locale
@@ -47,14 +49,16 @@ class ModelsCopyListFailureTest {
         assertEquals("Too many requests, try again later", ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.RateLimited, "")))
     }
 
-    /** 新增的 7 条在简体中文里和 core 自带的文字逐字一致(标点也算),中文界面看不出这次改动。 */
-    @Test fun chineseKeepsTheCoreWording() {
+    /** The Chinese UI uses the localized Chinese resources rather than the English core text. */
+    @Test fun chineseUsesLocalizedWording() {
         withTexts(ResFileTexts.chinese) {
-            for (reason in listOf(ListFailure.Auth, ListFailure.Quota, ListFailure.RateLimited, ListFailure.Network,
-                ListFailure.NotSupported, ListFailure.Server, ListFailure.BadResponse)) {
-                assertEquals(reason.name, reason.text, ModelsCopy.listFailure(ModelListResult.Failed(reason)))
+            for (reason in ListFailure.entries) {
+                val text = ModelsCopy.listFailure(ModelListResult.Failed(reason))
+                assertTrue(reason.name, cjk.containsMatchIn(text))
+                assertNotEquals(reason.name, reason.text, text)
             }
-            assertEquals(ListFailure.Quota.text + "(402)", ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Quota, "402")))
+            val quota = ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Quota, "402"))
+            assertTrue(quota, quota.endsWith("(402)"))
         }
     }
 

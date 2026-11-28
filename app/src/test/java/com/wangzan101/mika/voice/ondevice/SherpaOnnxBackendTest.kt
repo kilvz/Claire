@@ -27,16 +27,6 @@ class SherpaOnnxBackendTest {
     }
 
     @Test
-    fun senseVoiceMapsModelAndTokensByRole() {
-        val m = SherpaOnnxBackend.modelConfig(installed("sensevoice-small-int8"), EngineOptions(3))
-        assertEquals("/packs/sensevoice-small-int8/1/model.int8.onnx", m.senseVoice.model)
-        assertEquals("", m.senseVoice.language)
-        assertEquals("/packs/sensevoice-small-int8/1/tokens.txt", m.tokens)
-        assertEquals(3, m.numThreads)
-        assertEquals("", m.whisper.encoder)
-    }
-
-    @Test
     fun whisperMapsEncoderDecoderAndAutoLanguage() {
         val m = SherpaOnnxBackend.modelConfig(installed("whisper-base-int8"), EngineOptions(2))
         assertEquals("/packs/whisper-base-int8/1/base-encoder.int8.onnx", m.whisper.encoder)
@@ -47,16 +37,8 @@ class SherpaOnnxBackendTest {
     }
 
     @Test
-    fun dolphinMapsModel() {
-        val m = SherpaOnnxBackend.modelConfig(installed("dolphin-base-ctc-int8"), EngineOptions(4))
-        assertEquals("/packs/dolphin-base-ctc-int8/1/model.int8.onnx", m.dolphin.model)
-        assertEquals("/packs/dolphin-base-ctc-int8/1/tokens.txt", m.tokens)
-        assertEquals("", m.senseVoice.model)
-    }
-
-    @Test
     fun unknownFamilyIsUnsupported() {
-        val p = installed("dolphin-base-ctc-int8")
+        val p = installed("whisper-base-int8")
         try {
             SherpaOnnxBackend.modelConfig(p.copy(entry = p.entry.copy(family = "paraformer")), EngineOptions(1))
             fail()

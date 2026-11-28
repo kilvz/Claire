@@ -8,12 +8,12 @@ import java.io.File
 
 class DownloadUrlsTest {
     private val mirrors = listOf(UpdateMirror("m", "GhFast", "https://ghfast.top/"))
-    private val release = "https://github.com/wangzan101/Mika/releases/download/voice-models-v1/sensevoice-small-int8--tokens.txt"
+    private val release = "https://github.com/kilvz/Claire/releases/download/voice-models-1/sensevoice-small-int8--tokens.txt"
     private val upstream = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt"
 
     /** 和更新原来的规则一模一样:官方附件,或「镜像前缀 + 官方地址」,都得是 .apk。 */
     @Test fun apkRulesUnchanged() {
-        val official = "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk"
+        val official = "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk"
         DownloadUrls.requireTrusted(official, official, mirrors, ".apk")
         DownloadUrls.requireTrusted("https://ghfast.top/$official", official, mirrors, ".apk")
         DownloadUrls.requireTrusted(official.replace(".apk", ".APK"), official.replace(".apk", ".APK"), mirrors, ".apk")
@@ -23,17 +23,17 @@ class DownloadUrlsTest {
             "https://evil.test/$official" to mirrors,
             "https://ghfast.top/$official?x=1" to mirrors,
             "https://user:pass@ghfast.top/$official" to mirrors,
-            "https://ghfast.top/https://github.com/wangzan101/Mika/releases/download/v0.2.0/other.apk" to mirrors,
-            "https://ghfast.top/https://github.com/wangzan101/Mika/releases/tag/v0.2.0" to mirrors,
+            "https://ghfast.top/https://github.com/kilvz/Claire/releases/download/v0.2.0/other.apk" to mirrors,
+            "https://ghfast.top/https://github.com/kilvz/Claire/releases/tag/v0.2.0" to mirrors,
         )) rejects { DownloadUrls.requireTrusted(url, official, allowed, ".apk") }
         for (url in listOf(
-            "http://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com.evil.test/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com/other/Mika/releases/download/v0.2.0/Mika.apk",
+            "http://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com.evil.test/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com/other/Claire/releases/download/v0.2.0/Claire.apk",
             "https://github.com/wangzan101/Mika/releases/download/%2e%2e/%2E%2e/%2e%2e/%2e%2e/other/x.apk",
-            "https://github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.zip",
-            "https://user:pass@github.com/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
-            "https://github.com:8443/wangzan101/Mika/releases/download/v0.2.0/Mika.apk",
+            "https://github.com/kilvz/Claire/releases/download/v0.2.0/Claire.zip",
+            "https://user:pass@github.com/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
+            "https://github.com:8443/kilvz/Claire/releases/download/v0.2.0/Claire.apk",
             // 语音包的上游主机不能拿来当更新包的官方地址。
             "https://huggingface.co/x/y/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/Mika.apk",
         )) rejects { DownloadUrls.requireTrusted(url, url, mirrors, ".apk") }
@@ -62,12 +62,12 @@ class DownloadUrlsTest {
             "https://evil.test/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt",
             "http://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt",
             "https://user@huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt",
-            "https://user:pass@github.com/wangzan101/Mika/releases/download/voice-models-v1/x",
+            "https://user:pass@github.com/kilvz/Claire/releases/download/voice-models-1/x",
             "https://huggingface.co:8443/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt",
             "https://huggingface.co.evil.test/csukuangfj/sherpa-onnx-whisper-base/resolve/bb53ee204431c90d314c1cc08d28d23e5b7927cc/base-tokens.txt",
             // 上游只认固定提交,不认会变的分支。
             "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/main/base-tokens.txt",
-            "https://github.com/other/Mika/releases/download/voice-models-v1/x",
+            "https://github.com/other/Claire/releases/download/voice-models-1/x",
             "https://raw.githubusercontent.com/openai/whisper/main/LICENSE",
         )) rejects { DownloadUrls.requireTrusted(url, url, mirrors, null) }
         for ((url, official, allowed) in listOf(

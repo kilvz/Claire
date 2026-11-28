@@ -106,7 +106,7 @@ class VoicePackInstallerTest {
         upstream = "https://huggingface.co/o/r/resolve/$commitA/",
     )
 
-    private val release = "https://github.com/wangzan101/Mika/releases/download/voice-models-v1/"
+    private val release = "https://github.com/kilvz/Claire/releases/download/voice-models-1/"
     private fun catalog(e: VoicePackEntry = entry()) = VoicePackCatalog(release, listOf(e))
 
     private fun data(f: VoicePackFile) = when (f.name) {
@@ -118,7 +118,7 @@ class VoicePackInstallerTest {
     /** 每个文件的 Release 地址都回正确内容。 */
     private fun serveRelease(e: VoicePackEntry = entry()) {
         e.files.forEach { f ->
-            val path = "github.com/wangzan101/Mika/releases/download/voice-models-v1/${e.id}--${f.name}"
+            val path = "github.com/kilvz/Claire/releases/download/voice-models-1/${e.id}--${f.name}"
             routes[path] = { MockResponse().setBody(okio.Buffer().write(data(f))) }
         }
     }
@@ -266,7 +266,7 @@ class VoicePackInstallerTest {
     @Test fun releaseFailureFallsBackToUpstream() = runTest {
         val e = entry()
         serveRelease(e)
-        routes.remove("github.com/wangzan101/Mika/releases/download/voice-models-v1/pk--model.onnx")
+        routes.remove("github.com/kilvz/Claire/releases/download/voice-models-1/pk--model.onnx")
         routes["huggingface.co/o/r/resolve/$commitA/model.onnx"] = { MockResponse().setBody(okio.Buffer().write(modelData)) }
         val i = installer(this)
         i.download(e)
@@ -332,7 +332,7 @@ class VoicePackInstallerTest {
 
     private fun serveSlowModel(e: VoicePackEntry) {
         serveRelease(e)
-        routes["github.com/wangzan101/Mika/releases/download/voice-models-v1/pk--model.onnx"] = {
+        routes["github.com/kilvz/Claire/releases/download/voice-models-1/pk--model.onnx"] = {
             MockResponse().setBody(okio.Buffer().write(modelData)).throttleBody(1, 1, TimeUnit.SECONDS)
         }
     }
@@ -587,7 +587,7 @@ class VoicePackInstallerTest {
         val e = entry(2)
         serveRelease(e)
         val stagingRoot = File(root, ".staging")
-        val last = "github.com/wangzan101/Mika/releases/download/voice-models-v1/pk--LICENSE"
+        val last = "github.com/kilvz/Claire/releases/download/voice-models-1/pk--LICENSE"
         // 最后一个文件开始下时把 .staging 设成只读:文件照样写进 staging 自己的目录,但 staging 改名不出去
         routes[last] = {
             stagingRoot.setWritable(false)

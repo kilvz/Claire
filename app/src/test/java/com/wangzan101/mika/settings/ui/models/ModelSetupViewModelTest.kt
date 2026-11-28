@@ -365,7 +365,7 @@ class ModelSetupViewModelTest {
             vm.testAndSave()
             runCurrent()
 
-            assertEquals(ListState.Failed(failure.text), vm.state.value.form.test)
+            assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(failure))), vm.state.value.form.test)
             assertTrue(store.providers.value.isEmpty())
             assertTrue(built.isEmpty())
         }
@@ -524,7 +524,7 @@ class ModelSetupViewModelTest {
         val store = store()
         val vm = vm(store).also { it.selectPreset("DeepSeek") }
         vm.setApiKey("bad"); vm.testAndSave(); runCurrent()
-        assertEquals(ListState.Failed(ListFailure.Auth.text), vm.state.value.form.test)
+        assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Auth))), vm.state.value.form.test)
         assertTrue(store.providers.value.isEmpty())
         assertTrue(store.list().isEmpty())
         assertFalse(vm.state.value.canNext)
@@ -809,7 +809,7 @@ class ModelSetupViewModelTest {
         val p = store.providers.value.single()
         listing[deepseekUrl] = ModelListResult.Failed(ListFailure.Network)
         vm.refresh(p.id); runCurrent()
-        assertEquals(ListState.Failed(ListFailure.Network.text), vm.state.value.listing[p.id])
+        assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Network))), vm.state.value.listing[p.id])
         assertEquals("the original list is kept on failure", 3, store.providers.value.single().models?.size)
         vm.changeKey(p.id, "sk2"); runCurrent()
         assertEquals("sk2", store.providerKey(p.id))
@@ -880,11 +880,11 @@ class ModelSetupViewModelTest {
             vm.selectPreset(ProviderPresets.custom.label); vm.setBaseUrl(url); vm.setApiKey("k")
             vm.testAndSave(); runCurrent()
             val f = vm.state.value.form
-            assertEquals(ListState.Failed(failure.text), f.test)
+            assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(failure))), f.test)
             assertTrue("manual entry is possible after an error", f.showModel)
             assertTrue(store.providers.value.isEmpty())
             vm.setModel("plan-model"); vm.testAndSave(); runCurrent()
-            assertEquals(ListState.Failed(failure.text), vm.state.value.form.test)
+            assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(failure))), vm.state.value.form.test)
             assertTrue(store.providers.value.isEmpty())
             assertTrue(built.isEmpty())
             vm.closeForm()
@@ -1142,7 +1142,7 @@ class ModelSetupViewModelTest {
         assertTrue(vm.state.value.form.canTest)
         vm.testAndSave(); runCurrent()
         assertEquals("sk-1 2", listCalls.single().third)
-        assertEquals(ListState.Failed(ListFailure.Auth.text), vm.state.value.form.test)
+        assertEquals(ListState.Failed(ModelsCopy.listFailure(ModelListResult.Failed(ListFailure.Auth))), vm.state.value.form.test)
         assertTrue(store.providers.value.isEmpty())
     }
 
